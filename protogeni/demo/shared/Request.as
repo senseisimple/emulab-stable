@@ -14,6 +14,8 @@
 
 package
 {
+  import flash.events.ErrorEvent;
+
   public class Request
   {
     public function Request(newServer : String) : void
@@ -64,7 +66,7 @@ package
       return null;
     }
 
-    public function fail() : Request
+    public function fail(event : ErrorEvent) : Request
     {
       return null;
     }

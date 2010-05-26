@@ -1939,7 +1939,9 @@ sub print_named_link_ptop
     my $proto_count = scalar(@_);
 
     my $source_full = "$source:$source/$source_if";
-    my $dest_full = "$dest:$dest_if";
+    # Not sure about (null) stuff ... 
+    my $dest_full = "$dest:" .
+	(($dest_if eq "(null)") ? "$dest_if" : "$dest/$dest_if");
     if ($source =~ /cisco/ && $dest =~ /cisco/)
     {
 	$source_full = $source;

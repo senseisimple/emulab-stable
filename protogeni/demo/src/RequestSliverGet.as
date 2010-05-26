@@ -14,15 +14,17 @@
 
 package
 {
+  import flash.events.ErrorEvent;
+
   public class RequestSliverGet extends Request
   {
     public function RequestSliverGet(newCm : ComponentManager,
-									 newSliceUrn : String,
+                                                                         newSliceUrn : String,
                                              newNext : Request) : void
     {
       super(newCm.getName());
       cm = newCm;
-	  sliceUrn = newSliceUrn;
+          sliceUrn = newSliceUrn;
       next = newNext;
     }
 
@@ -33,15 +35,15 @@ package
 
     override public function start(credential : Credential) : Operation
     {
-	  opName = "Getting sliver";
-	  op.reset(Geni.getSliver);
-	  op.addField("slice_urn", sliceUrn);
-	  op.addField("credentials", new Array(credential.slice));
-	  op.setExactUrl(cm.getUrl());
-	  return op;
+          opName = "Getting sliver";
+          op.reset(Geni.getSliver);
+          op.addField("slice_urn", sliceUrn);
+          op.addField("credentials", new Array(credential.slice));
+          op.setExactUrl(cm.getUrl());
+          return op;
     }
 
-        override public function fail() : Request
+        override public function fail(event : ErrorEvent) : Request
         {
            return next;
         }
@@ -52,11 +54,11 @@ package
       var result : Request = next;
       if (code == 0)
       {
-		// Sliver exists
+                // Sliver exists
         cm.setSliver(String(response.value));
-	    var cred:XML = new XML(response.value);
-	    cm.setSliverUrn(cred.credential.target_urn);
-		result = new RequestSliverResolve(cm, sliceUrn, null);
+            var cred:XML = new XML(response.value);
+            cm.setSliverUrn(cred.credential.target_urn);
+                result = new RequestSliverResolve(cm, sliceUrn, null);
       }
       else
       {
@@ -66,7 +68,7 @@ package
     }
 
     private var cm : ComponentManager;
-	private var sliceUrn : String;
+        private var sliceUrn : String;
     private var next : Request;
   }
 }

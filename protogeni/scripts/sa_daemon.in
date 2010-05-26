@@ -101,12 +101,32 @@ Genixmlrpc->SetTimeout(10);
 $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+sa";
 
+if (CheckDaemonRunning("sa_daemon")) {
+    fatal("Not starting another sa daemon!");
+}
 # Go to ground.
 if (! $debug) {
     if (TBBackGround($LOGFILE)) {
 	exit(0);
     }
 }
+if (MarkDaemonRunning("sa_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
+    ReOpenLog($LOGFILE);
+    $EUID = $SAVEEUID;
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
 GeniUtil::FlipToGeniUser();
 
 #
@@ -366,16 +386,6 @@ sub RenewSlices()
     }
 }
 
-#
-# Setup a signal handler for newsyslog.
-#
-sub handler()
-{
-    ReOpenLog($LOGFILE);
-}
-$SIG{HUP} = \&handler
-    if (!$debug);
-
 while (1) {
     next
 	if (NoLogins());
@@ -406,6 +416,7 @@ sub fatal($)
 	     $msg,
 	     $TBOPS);
 
+    MarkDaemonStopped("sa_daemon");
     die("*** $0:\n".
 	"    $msg\n");
 }

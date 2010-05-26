@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -64,7 +64,6 @@ my $NODEDEAD_EID= NODEDEAD_EID;
 
 sub fatal($);
 sub notify($);
-sub daemonize();
 sub freefromreloading($);
 		      
 my $os_load	= "$TB/bin/os_load -s";
@@ -112,10 +111,31 @@ if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
 
+#
+# Only one please.
+#
+if (CheckDaemonRunning("reload_daemon")) {
+    fatal("Not starting another reload daemon!");
+}
+
 # Go to ground.
 if (! $debug) {
-    daemonize();
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
 }
+if (MarkDaemonRunning("reload_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    ReOpenLog($logfile);
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
 
 print "Reload Daemon starting... pid $$, at ".`date`;
 
@@ -556,6 +576,7 @@ sub fatal($)
     local($msg) = $_[0];
 
     SENDMAIL($TBOPS, "Reload Daemon Died", $msg, $TBOPS);
+    MarkDaemonStopped("reload_daemon");
     die($msg);
 }
 
@@ -565,32 +586,4 @@ sub notify($)
 
     print "$mesg\n";
     SENDMAIL($TBOPS, "Reload Daemon Message", $mesg, $TBOPS);
-}
-
-#
-# Become a daemon.
-# 
-sub daemonize()
-{
-    my $mypid = fork();
-    if ($mypid) {
-	exit(0);
-    }
-
-    #
-    # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller will continue to wait
-    # even though the parent has exited. 
-    #
-    open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
-
-    #
-    # Open the batch log and start writing to it. 
-    #
-    open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
-    open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
-
-    TBdbfork();
-    return 0;
 }

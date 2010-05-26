@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #/usr/testbed/bin/tevc -e tbres/pelab-generated now elabc-elab-1 modify dest=10.0.0.2 delay=$1
 #/usr/testbed/bin/tevc -e tbres/pelab-generated now elabc-elab-2 modify dest=10.0.0.1 delay=$1
 #/usr/testbed/bin/tevc -e tbres/pelab-generated now elabc-elab-1 modify dest=10.0.0.2 bandwidth=$2

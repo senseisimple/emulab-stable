@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Database Constants
@@ -589,6 +589,22 @@ function TBGetVersionInfo(&$major, &$minor, &$build)
 	$minor = "Y";
     }
     return 1;
+}
+
+#
+# Get the commit hash.
+#
+function TBGetCommitHash()
+{
+    $query_result = 
+	DBQueryFatal("select value from version_info ".
+		     "where name='commithash'");
+
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	return $row[0];
+    }
+    return null;
 }
 
 #

@@ -1,0 +1,47 @@
+#
+# This is the first install update script.
+#
+# Note that all actions *MUST* be idempotent; if this script is run
+# again, it should always do the right thing, not break if something
+# was already done. See boss-install for lots of example of how to use
+# libinstall to help with this.
+#
+use strict;
+use libinstall;
+
+my $TESTBED_STARTUP = "/usr/local/etc/rc.d/3.testbed.sh";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "startupfile", "Updating testbed startup file", sub {
+	    DoneIfIdentical("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    main::MarkForReboot($version);
+	    DiffFiles("$TOP_OBJDIR/rc.d/3.testbed.sh", $TESTBED_STARTUP);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+	#
+	# The structure of /usr/testbed/expinfo has changed. 
+	#
+	Phase "expinfo", "Updating testbed expinfo directory", sub {
+	    PhaseSkip("Already updated")
+		if (-d "$TBROOT/expinfo/emulab-ops");
+
+	    ExecQuietFatal("$TBROOT/sbin/fixexpinfo");
+	};
+    }
+    
+    return 0;
+}
+1;

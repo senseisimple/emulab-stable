@@ -1092,6 +1092,8 @@ sub external_resource_index($) {
     return __reservation($_[0], 'external_resource_index'); }
 sub external_resource_id($) {
     return __reservation($_[0], 'external_resource_id'); }
+sub inner_elab_role($) {
+    return __reservation($_[0], 'inner_elab_role'); }
 
 #
 # Lookup a specific attribute in the node_attributes table, 
@@ -1226,6 +1228,9 @@ sub control_iface($;$) {
 }
 sub rebootable($;$) {
     return NodeTypeInfo($_[0])->rebootable($_[1]);
+}
+sub bios_waittime($;$) {
+    return NodeTypeInfo($_[0])->bios_waittime($_[1]);
 }
 
 #
@@ -2457,6 +2462,25 @@ sub GetOsids($) {
     return ($self->{"DBROW"}{"def_boot_osid"},
 	    $self->{"DBROW"}{"temp_boot_osid"},
 	    $self->{"DBROW"}{"next_boot_osid"});
+}
+
+sub ClearOsids($) {
+    my $self = shift;
+
+    my $node_id = $self->node_id();
+    
+    DBQueryWarn("update nodes set ".
+		"  def_boot_osid=NULL,".
+		"  next_boot_osid=NULL,".
+		"  temp_boot_osid=NULL ".
+		"where node_id='$node_id'")
+	or return -1;
+
+    $self->{"DBROW"}{"def_boot_osid"}  = undef;
+    $self->{"DBROW"}{"temp_boot_osid"} = undef;
+    $self->{"DBROW"}{"next_boot_osid"} = undef;
+    
+    return 0;
 }
 
 #

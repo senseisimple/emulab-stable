@@ -1,0 +1,83 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Data::Dumper;
+
+#
+# Update DB.
+#
+sub usage()
+{
+    print STDERR "Usage: testbed-version\n";
+    exit(-1);
+}
+my $optlist   = "v";
+my $verbose   = 0;
+
+#
+# Configure variables
+#
+my $TB	         = "@prefix@";
+my $TBOPS        = "@TBOPSEMAIL@";
+my $DBNAME       = "@TBDBNAME@";
+
+# Protos
+sub Fatal($);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Do not modify the include path if it was specified when invoked.
+# This allows update to run from the build tree.
+#
+BEGIN
+{
+    eval "require emdbi";
+    if ($@) {
+	unshift(@INC, "@prefix@/lib");
+    }
+}
+use emdb;
+use libtestbed;
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+
+my $query_result =
+    DBQueryFatal("select * from version_info order by name");
+
+while (my ($name, $value) = $query_result->fetchrow_array()) {
+    printf("%-20s %s\n", $name . ":" , $value);
+}
+
+exit(0);
+
+sub Fatal($)
+{
+    my ($msg) = @_;
+
+    Restart();
+    die("*** $0:\n".
+	"    $msg\n");
+}

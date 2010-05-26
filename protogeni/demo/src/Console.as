@@ -60,6 +60,7 @@ package
                                              arena.embedButton,
                                              arena.rspecButton,
                                              arena.fullScreenButton,
+                                             arena.discoverButton,
                                              clip.backButton,
                                              clip.copyButton),
                                    new Array(clickConsole,
@@ -70,6 +71,7 @@ package
                                              clickEmbed,
                                              clickRspec,
                                              clickFullScreen,
+                                             clickDiscover,
                                              clickBack,
                                              clickCopy));
 
@@ -87,7 +89,7 @@ package
     {
       pushRequest(new RequestListComponents(managers));
       forEachComponent(discoverComponents);
-	}
+        }
 
     public function getConsole() : TextField
     {
@@ -253,6 +255,12 @@ package
       }
     }
 
+    function clickDiscover(event : MouseEvent) : void
+    {
+      pushRequest(new RequestResourceDiscovery(managers.getCurrentManager(),
+                                               null));
+    }
+
     function clickBack(event : MouseEvent) : void
     {
       clip.visible = false;
@@ -330,14 +338,14 @@ package
       arena.deleteButton.gotoAndStop(newState);
       arena.embedButton.gotoAndStop(newState);
     }
-	
-	function failure(event : ErrorEvent, fault : MethodFault) : void
+
+        function failure(event : ErrorEvent, fault : MethodFault) : void
     {
-	   clip.text.appendText(Util.getFailure(queue.front().getOpName(),
+           clip.text.appendText(Util.getFailure(queue.front().getOpName(),
                                            queue.front().getUrl(),
                                            event, fault));
       clip.text.scrollV = clip.text.maxScrollV;
-      var next : Request = queue.front().fail();
+      var next : Request = queue.front().fail(event);
       queue.front().cleanup();
       queue.pop();
       if (next != null)
@@ -360,7 +368,7 @@ package
         {
           queue.push(next);
         }
-		queue.front().cleanup();
+                queue.front().cleanup();
         queue.pop();
         start();
       }

@@ -38,7 +38,7 @@ if ($UID != 0) {
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $BOSSNODE = "@BOSSNODE@";
-my $batchlog = "$TB/log/poollog";
+my $logfile  = "$TB/log/poollog";
 my $SWAPEXP  = "$TB/bin/swapexp";
 
 # Testbed Support library
@@ -62,6 +62,7 @@ my $EVhandle;
 # Prototypes.
 sub SetupEventHandler();
 sub fatal($);
+sub cleanup();
 sub notify($);
 		      
 #
@@ -93,12 +94,28 @@ if (defined($options{"n"})) {
     $impotent = $options{"n"};
 }
 
+if (!$impotent && CheckDaemonRunning("pool_daemon")) {
+    fatal("Not starting another pool daemon!");
+}
 # Go to ground.
 if (! ($debug || $impotent)) {
-    if (TBBackGround($batchlog)) {
+    if (TBBackGround($logfile)) {
 	exit(0);
     }
 }
+if (!$impotent && MarkDaemonRunning("pool_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    ReOpenLog($logfile);
+}
+$SIG{HUP} = \&handler
+    if (!($debug || $impotent));
+
 print "Pool Daemon starting... pid $$, at ".`date`;
 
 #
@@ -124,6 +141,8 @@ if ($experiment->state() eq EXPTSTATE_NEW()) {
     $experiment->SetState(EXPTSTATE_SWAPPED());
 }
 if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
+    print STDERR "Pool Daemon exiting since the experiment is swapped\n";
+    cleanup();
     exit(0);
 }
 
@@ -141,6 +160,7 @@ if (!defined($elabman)) {
 my $image = Image->Lookup(TBOPSPID(), "FEDORA8-OVZ-STD");
 if (!defined($image)) {
     print STDERR "Pool Daemon exiting since there is suitable image\n";
+    cleanup();
     exit(0);
 }
 
@@ -377,6 +397,7 @@ sub fatal($)
     my ($msg) = @_;
 
     SENDMAIL($TBOPS, "Pool Daemon Died", $msg, $TBOPS);
+    cleanup();
     die($msg);
 }
 
@@ -386,4 +407,10 @@ sub notify($)
 
     print "$msg\n";
     SENDMAIL($TBOPS, "Pool Daemon Message", $msg, $TBOPS);
+}
+
+sub cleanup()
+{
+    MarkDaemonStopped("pool_daemon")
+	if (!$impotent);
 }

@@ -14,6 +14,9 @@
 
 package
 {
+  import flash.events.ErrorEvent;
+  import flash.events.SecurityErrorEvent;
+
   public class RequestResourceDiscovery extends Request
   {
     public function RequestResourceDiscovery(newCm : ComponentManager,
@@ -44,11 +47,16 @@ package
       return op;
     }
 
-        override public function fail() : Request
-        {
-        	cm.resourceFailure();
-        	return next;
-        }
+    override public function fail(event : ErrorEvent) : Request
+    {
+      var state = ComponentManager.IO_FAILURE;
+      if (event is SecurityErrorEvent)
+      {
+        state = ComponentManager.SECURITY_FAILURE;
+      }
+      cm.resourceFailure(state);
+      return next;
+    }
 
     override public function complete(code : Number, response : Object,
                                       credential : Credential) : Request
@@ -60,7 +68,7 @@ package
       }
       else
       {
-        cm.resourceFailure();
+        cm.resourceFailure(ComponentManager.INTERNAL_FAILURE);
       }
       return result;
     }

@@ -132,13 +132,16 @@ if( $? == -1 ) {
 	die( "refusing to overwrite $originalfile" );
     rename( "$TB/etc/emulab.pem", "$originalfile" ) or
 	die( "could not rename root certificate" );
+
+    my $serial = TBGetUniqueIndex( "user_sslcerts" );
     # Save the new certificate to a temporary file: OpenSSL will reuse the
     # plain text from the old certificate instead of the current version,
     # so we regenerate the whole thing once we've finished to avoid
     # horrible confusion.
     system( "$OPENSSL x509 -days 2000 -text -extfile $extfile " .
-	    "-signkey $TB/etc/emulab.key < $originalfile " .
-	    "> $TB/etc/emulab.tmp" );
+	    "-set_serial $serial -signkey $TB/etc/emulab.key " .
+	    "< $originalfile > $TB/etc/emulab.tmp" );
+
     # For some reason, OpenSSL can return non-zero even when the certificate
     # generation succeeded.  Check the output file instead.
     if( !( -s "$TB/etc/emulab.tmp" ) ) {
@@ -245,8 +248,7 @@ if (! -e "$TB/www/protogeni") {
 $crosstext = <<'CROSSEND';
 <?xml version="1.0"?>
 <cross-domain-policy>
-    <allow-access-from domain="boss.emulab.net" />
-    <allow-access-from domain="users.emulab.net" />
+    <allow-access-from domain="*.emulab.net" />
     <allow-access-from domain="*.protogeni.net" />
 </cross-domain-policy>
 CROSSEND

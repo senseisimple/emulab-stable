@@ -142,12 +142,10 @@ my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
 my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
-my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
 my $MV         = "/bin/mv";
-my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
 my $QUOTAON    = "/usr/sbin/quotaon";
 
@@ -175,11 +173,8 @@ my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
 #
 my $LIST_DIR      = "/etc/mail/lists";
 my $TIPLOG_DIR    = "/var/log/tiplogs";
-my $PORTSDIR      = "/usr/ports";
 my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $SRCDIR        = '@srcdir@';
-my $RCDIR         = "/usr/local/etc/rc.d";
-my $VARRUN        = "/var/run";
 
 #
 # And some lists that we use

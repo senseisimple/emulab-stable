@@ -271,7 +271,7 @@ sub GetAdvertisement($$)
     my ($available, $pc) = @_;
     my $xml = undef;
 
-    my $invocation = "$PTOPGEN -x -g 0.1 -r -p GeniSlices";
+    my $invocation = "$PTOPGEN -x -g 0.2 -r -p GeniSlices";
     $invocation .= " -a" unless $available;
     if (defined($pc)) {
 	$invocation .= " -1 $pc";
@@ -1003,7 +1003,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my @interfaces = GeniXML::FindNodes("n:linkendpoints | ".
 					    "n:interface_ref",
 					    $linkref)->get_nodelist();
-	my %managers   = undef;
+	my %managers   = ();
 	my $ifacenum   = 1;
 	my $trivial_ok = 0;
 

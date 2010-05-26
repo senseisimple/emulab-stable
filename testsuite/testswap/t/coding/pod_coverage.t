@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 use Test::More;
 eval "use Test::Pod::Coverage 1.00";
 if ( $@ ) {

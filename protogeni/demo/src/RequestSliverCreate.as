@@ -14,6 +14,8 @@
 
 package
 {
+  import flash.events.ErrorEvent;
+
   class RequestSliverCreate extends Request
   {
     public function RequestSliverCreate(newManager : ComponentManager,
@@ -129,7 +131,7 @@ package
       return result;
     }
 
-    override public function fail() : Request
+    override public function fail(event : ErrorEvent) : Request
     {
       var result : Request = releaseTicket();
       nodes.revertState(manager);

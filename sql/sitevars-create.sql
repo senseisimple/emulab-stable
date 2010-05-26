@@ -93,6 +93,9 @@ INSERT INTO sitevariables VALUES ('general/default_latitude','40.768652','','The
 INSERT INTO sitevariables VALUES ('general/default_longitude','-111.84581','','The default longitude of your site',0);
 INSERT INTO sitevariables VALUES ('oml/default_osid',NULL,'','Default OSID to use for OML server',1);
 INSERT INTO sitevariables VALUES ('oml/default_server_startcmd',NULL,'','Default command line to use to start OML server',1);
+INSERT INTO sitevariables VALUES ('images/create/maxwait',NULL,'72','Max time (minutes) to allow for saving an image',0);
+INSERT INTO sitevariables VALUES ('images/create/idlewait',NULL,'8','Max time (minutes) to allow between periods of progress (image file getting larger) when saving an image (should be <= maxwait)',0);
+INSERT INTO sitevariables VALUES ('images/create/maxsize',NULL,'6','Max size (GB) of a created image',0);
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

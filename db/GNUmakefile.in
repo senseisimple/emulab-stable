@@ -11,6 +11,8 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
+SUBBOSS_BIN_SCRIPTS	= subboss_dhcpd_makeconf
+
 BIN_SCRIPTS	= nalloc nfree nodeip readycount subboss_dhcpd_makeconf
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
@@ -50,6 +52,8 @@ TARGETS = emdb.pm emutil.pm emdbi.pm
 SETUID_SBIN_SCRIPTS =
 endif
 
+$(SUBBOSS_BIN_SCRIPTS):
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
@@ -63,6 +67,8 @@ install: boss-install
 else
 install: clrhouse-install
 endif
+
+subboss-install: $(addprefix $(INSTALL_BINDIR)/, $(SUBBOSS_BIN_SCRIPTS))
 
 boss-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
