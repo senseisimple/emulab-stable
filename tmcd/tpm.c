@@ -221,6 +221,14 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 		error("NULL nonce to %s\n", __FUNCTION__);
 		return 0;
 	}
+	if (!pcrs) {
+		error("NULL pcrs to %s\n", __FUNCTION__);
+		return 0;
+	}
+	if (!idkey) {
+		error("NULL idkey to %s\n", __FUNCTION__);
+		return 0;
+	}
 
 	pcrmlen = ntohs(pcomp[PCOMP_PCRMASK_LEN]);
 	pcrlen = ntohl(pcomp[PCOMP_PCRBLOB_LEN]);
@@ -254,7 +262,8 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	}
 
 	/* Make sure that the PCRs are what we expect them to be.  Dig up
-	 * required PCRs */
+	 * required PCRs.  This assumes our pcrs argument contains the required
+	 * PCR values in ascending order. */
 	for (i = 0, c = 0; i < PCOMP_PCRMASK_BITS; i++) {
 		if (pcrm & (1 << i)) {
 			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c],

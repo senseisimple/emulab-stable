@@ -683,6 +683,14 @@ tmcd_quote_verifysig(void *final, void *sig, size_t siglen, void *pubkey)
 		error("NULL pubkey to %s\n", __FUNCTION__);
 		return 0;
 	}
+	if (!final) {
+		error("NULL final to %s\n", __FUNCTION__);
+		return 0;
+	}
+	if (!sig) {
+		error("NULL sig to %s\n", __FUNCTION__);
+		return 0;
+	}
 
 	/* Cannot fail */
 	tpm_extract_key((char *)pubkey, &k);
