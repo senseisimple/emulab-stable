@@ -12,6 +12,7 @@
 #endif /* STANDALONE */
 
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include <strings.h>
 #include <string.h>
@@ -194,7 +195,7 @@ tmcd_tpm_generate_nonce(unsigned char *nonce)
  *
  * Returns 1 if the quote is valid, 0 otherwise.
  */
-int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
+int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, unsigned char *pcomp,
     ssize_t pcomplen, TPM_NONCE nonce, unsigned short wantpcrs,
     TPM_PCR *pcrs, unsigned char *idkey)
 {
@@ -230,8 +231,8 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 		return 0;
 	}
 
-	pcrmlen = ntohs(pcomp[PCOMP_PCRMASK_LEN]);
-	pcrlen = ntohl(pcomp[PCOMP_PCRBLOB_LEN]);
+	pcrmlen = ntohs(*((unsigned short *)&pcomp[PCOMP_PCRMASK_LEN]));
+	pcrlen = ntohl(*((uint32_t *)&pcomp[PCOMP_PCRBLOB_LEN]));
 	/* Some sanity - 28 bytes is the smallest quote size possible on our
 	 * TPMs.
 	 * XXX: We do not deal with variable length pcr masks yet (it is
@@ -239,11 +240,11 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	i = pcrmlen + pcrlen + sizeof(short) + sizeof(uint32_t);
 	if (pcrmlen != 2 || i != pcomplen || pcomplen < 28) {
 		error("Corrupt quote blob; unexpected quote size\n");
-		error("pcr mask len: %d, pcomplen: %d, calculated len: %d\n",
-		    pcrmlen, pcomplen, i);
+		error("pcr mask len: %d, pcomplen: %d, pcrlen: %d,"
+		    " calculated len: %d\n", pcrmlen, pcomplen, pcrlen, i);
 		return 0;
 	}
-	pcrm = pcomp[PCOMP_PCRMASK];
+	pcrm = *((unsigned short *)&pcomp[PCOMP_PCRMASK]);
 	for (i = 0; i < PCOMP_PCRMASK_BITS; i++)
 		if (pcrm & (1 << i))
 			pcrtot++;
@@ -281,7 +282,7 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, char *pcomp,
 	sp.fixed[4] = 'Q'; sp.fixed[5] = 'U';
 	sp.fixed[6] = 'O'; sp.fixed[7] = 'T';
 
-	if (tmcd_quote_hash(&pcomp, pcomplen, &sp.comphash)) {
+	if (tmcd_quote_hash(pcomp, pcomplen, &sp.comphash)) {
 		error("Error hashing pcr composite\n");
 		return 0;
 	}
