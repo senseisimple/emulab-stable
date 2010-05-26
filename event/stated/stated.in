@@ -857,6 +857,7 @@ sub stateTransition($$) {
 			 "$node entered state $mode/$newstate from " .
                          "$mode/$oldstate",
 			 "Stated Daemon <".$TBOPS.">");
+		next;
             };
 	    /^RELOADOLDMFS$/ && do {
 		my $frisbee_osid = TBNodeDiskloadOSID($node);
