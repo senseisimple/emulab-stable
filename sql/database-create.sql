@@ -3295,6 +3295,23 @@ CREATE TABLE `table_regex` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `template_stamps`
+--
+
+CREATE TABLE `template_stamps` (
+  `guid` varchar(16) NOT NULL default '',
+  `vers` smallint(5) unsigned NOT NULL default '0',
+  `id` smallint(5) unsigned NOT NULL auto_increment,
+  `instance` int(10) unsigned default NULL,
+  `stamp_type` varchar(32) NOT NULL default '',
+  `modifier` varchar(32) default NULL,
+  `stamp` int(10) unsigned default NULL,
+  `aux_type` varchar(32) default NULL,
+  `aux_data` float default '0',
+  PRIMARY KEY  (`guid`,`vers`,`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `testbed_stats`
 --
 
