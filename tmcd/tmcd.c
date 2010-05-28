@@ -4490,7 +4490,7 @@ COMMAND_PROTOTYPE(dosecurestate)
          */
 	res = mydb_query("select q.pcr,q.value from nodes as n "
 			"left join tpm_quote_values as q "
-                        "on n.op_mode = q.op_mode "
+                        "on (n.op_mode = q.op_mode or q.op_mode='*') "
 			"where n.node_id='%s' and q.state ='%s' "
                         "order by q.pcr",
 			2, reqp->nodeid,newstate);
@@ -4679,7 +4679,7 @@ COMMAND_PROTOTYPE(doquoteprep)
          */
 	res = mydb_query("select q.pcr from nodes as n "
 			"left join tpm_quote_values as q "
-                        "on n.op_mode = q.op_mode "
+                        "on (n.op_mode = q.op_mode or q.op_mode='*') "
 			"where n.node_id='%s' and q.state ='%s' "
                         "order by q.pcr",
 			1, reqp->nodeid,newstate);
