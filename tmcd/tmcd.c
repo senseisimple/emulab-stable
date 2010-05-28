@@ -4793,7 +4793,8 @@ COMMAND_PROTOTYPE(doquoteprep)
 /*
  * Get the decryption key for the image a node is suposed to be loading
  */
-COMMAND_PROTOTYPE(doimagekey) {
+COMMAND_PROTOTYPE(doimagekey)
+{
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf;
 	char		*bufe = &buf[MYBUFSIZE];
@@ -4813,7 +4814,7 @@ COMMAND_PROTOTYPE(doimagekey) {
          * probably not a good idea, but the right way to get it isn't clear
          */
         res = mydb_query("select op_mode, eventstate from nodes where "
-                "node_id='%s'",1,reqp->nodeid);
+                "node_id='%s'",2,reqp->nodeid);
 
 	if (!res) {
 		error("IMAGEKEY: %s: DB Error getting event state\n",
@@ -4848,7 +4849,7 @@ COMMAND_PROTOTYPE(doimagekey) {
         /*
          * Grab and return the key itself
          */
-	res = mydb_query("select decryption_key from current_reloads as r "
+	res = mydb_query("select r.decryption_key from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
 			 "where node_id='%s' order by r.idx",
 			 1, reqp->nodeid);
@@ -4883,6 +4884,8 @@ COMMAND_PROTOTYPE(doimagekey) {
             bufp += OUTPUT(bufp, bufe - bufp, "%s",row[0]);
         }
 	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+	client_writeback(sock, buf, strlen(buf), tcp);
+
         mysql_free_result(res);
         return 0;
 }
