@@ -108,6 +108,9 @@ if (@ARGV) {
 if (defined($options{"d"})) {
     $debug++;
 }
+if (defined($options{"f"})) {
+    $force = 1;
+}
 if (defined($options{"a"})) {
     $all = 1;
 }

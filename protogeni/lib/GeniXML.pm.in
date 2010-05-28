@@ -204,6 +204,12 @@ sub GetVirtualId($)
 	GetText("nickname", $node);
 }
 
+sub GetSliverId($)
+{
+    my ($node) = @_;
+    return GetText("sliver_urn", $node);
+}
+
 sub GetManagerId($)
 {
     my ($node) = @_;
