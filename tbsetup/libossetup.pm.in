@@ -681,7 +681,7 @@ sub WaitForNodes($@)
     #
     my $waittime  = 0;
     my $minutes   = 0;
-    my $canceled  = 0;
+    my $canceled  = $self->canceled();
 
     #
     # Wait for the nodes to finish booting, as recorded in database
@@ -1215,7 +1215,7 @@ sub AddNode($$)
     # custom guest OSs, which are loaded on the client side with
     # a sorta standard frisbee approach. We reach into the libosload
     # library to set up the necessary state, but otherwise the node
-    # is rebooted normally.
+    # is rebooted normally (or starts when its physical node starts).
     #
     if ($node->_setupoperation() eq $libossetup::RELOAD) {
 	my $image = $node->_loadimage();
@@ -1467,7 +1467,9 @@ sub WaitDone($@)
 
 #####################################################################
 #
-# Local virtual nodes. 
+# Local virtual nodes.
+#
+# Use libossetup_virtnode class above.
 #
 package libossetup_pcvm;
 use base qw(libossetup_virtnode);
@@ -1568,7 +1570,8 @@ sub AddNode($$)
 # Protogeni are special.
 #
 # The problem with the current approach, is that this can happen in
-# parallel with all of os_setup; there are no dependencies. 
+# parallel with all of os_setup; there are no dependencies. Maybe we
+# need pre/post hooks of some kind?
 #
 sub LightUpNodes($@)
 {
@@ -1586,6 +1589,23 @@ sub LightUpNodes($@)
     }
     TBDebugTimeStamp("Geni slivers have been started.");
     return 0;
+}
+
+#
+# Look for unusual errors when waiting for virt nodes.
+#
+sub WaitForNode($$)
+{
+    my ($self, $node) = @_;
+    my $parent = $self->parent();
+
+    #
+    # No need to wait for protogeni nodes after cancel.
+    #
+    if ($parent->canceled()) {
+	$node->_maxwait(0);
+    }
+    return $self->SUPER::WaitForNode($node);
 }
 
 #
