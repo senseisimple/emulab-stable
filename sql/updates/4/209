@@ -1,0 +1,27 @@
+#
+# Add missing table.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("template_stamps")) {
+	DBQueryFatal("CREATE TABLE `template_stamps` ( ".
+		     " `guid` varchar(16) NOT NULL default '', ".
+		     " `vers` smallint(5) unsigned NOT NULL default '0', ".
+		     " `id` smallint(5) unsigned NOT NULL auto_increment, ".
+		     " `instance` int(10) unsigned default NULL, ".
+		     " `stamp_type` varchar(32) NOT NULL default '', ".
+		     " `modifier` varchar(32) default NULL, ".
+		     " `stamp` int(10) unsigned default NULL, ".
+		     " `aux_type` varchar(32) default NULL, ".
+		     " `aux_data` float default '0', ".
+		     " PRIMARY KEY  (`guid`,`vers`,`id`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    return 0;
+}
+1;
