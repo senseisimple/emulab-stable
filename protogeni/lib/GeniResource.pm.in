@@ -26,6 +26,7 @@ use GeniAuthority;
 use GeniComponent;
 use GeniUser;
 use GeniHRN;
+use GeniXML;
 use emutil qw(TBGetUniqueIndex);
 use User;
 use Project;
@@ -218,6 +219,7 @@ sub manager_version($)  { return $_[0]->{'manager_version'}; }
 sub last_rpc_error($)   { return $_[0]->{'last_rpc_error'}; }
 sub last_rpc_output($)  { return $_[0]->{'last_rpc_output'}; }
 sub last_rpc_value($)   { return $_[0]->{'last_rpc_value'}; }
+sub manifest_string($)  { return $_[0]->{'MANIFESTSTR'}; }
 
 #
 # Delete a resource record from the DB.
@@ -378,11 +380,11 @@ sub Manifest($)
 	return undef;
     }
     my ($manifest_string) = $query_result->fetchrow_array();
-    my $manifest = XMLin($manifest_string, KeyAttr => [],
-			 ForceArray => ["node", "link", "interface",
-					"interface_ref", "linkendpoints",
-					"component_manager"]);
-
+    my $manifest = GeniXML::Parse($manifest_string);
+    if (!defined($manifest)) {
+	print STDERR "Could not getmanifest for $self\n";
+	return undef;
+    }
     $self->{'MANIFEST'}    = $manifest;
     $self->{'MANIFESTSTR'} = $manifest_string;
     return $manifest;
@@ -397,14 +399,7 @@ sub UpdateManifest($$)
 	return -1;
     }
     my $manifest_idx = $self->manifest_idx();
-
-    my $manifest_string =
-	eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
-    if ($@) {
-	print STDERR "UpdateManifest: XMLout error: $@\n";
-	print STDERR Dumper($manifest);
-	return -1;
-    }
+    my $manifest_string = GeniXML::Serialize($manifest);
 
     my $query_result =
 	DBQueryWarn("update geni_manifests set ".
@@ -462,12 +457,80 @@ sub ManagerVersion($)
 }
 
 #
+# Convert an rspec structure (as from libvtop) into proper format.
+# This is horrible.
+#
+sub ConvertRspec($)
+{
+    my ($rspec) = @_;
+
+    my $template =
+	"<rspec xmlns=\"http://protogeni.net/resources/rspec/0.2\" ".
+	"       type=\"request\" generated_by=\"libvtop\">".
+	"</rspec>";
+
+    my $new = GeniXML::Parse($template);
+    if (!defined($new)) {
+	print STDERR "ConvertRspec: Could not create new document\n";
+	return undef;
+    }
+    # ???
+    my $root = $new;
+
+    foreach my $ref (@{ $rspec->{'node'} }) {
+	my $node = GeniXML::AddElement("node", $root);
+	
+	foreach my $key ('virtual_id', 'component_urn', 'exclusive',
+			 'virtualization_type', 'virtualization_subtype',
+			 'startup_command', 'tarfiles') {
+	    GeniXML::SetText($key, $node, $ref->{$key})
+		if (exists($ref->{$key}));
+	}
+	foreach my $ifaceref (@{ $ref->{'interface'} }) {
+	    my $iface = GeniXML::AddElement("interface", $node);
+	    foreach my $key ('virtual_id', 'component_id') {
+		GeniXML::SetText($key, $iface, $ifaceref->{$key})
+		    if (exists($ifaceref->{$key}));
+	    }
+	}
+    }
+    if (exists($rspec->{'link'})) {
+	foreach my $linkref (@{ $rspec->{'link'} }) {
+	    my $link = GeniXML::AddElement("link", $root);
+	    foreach my $key ('virtual_id', 'link_type',
+			     'virtualization_type') {
+		GeniXML::SetText($key, $link, $linkref->{$key})
+		    if (exists($linkref->{$key}));
+	    }
+	    # These are special; see libvtop.
+	    foreach my $key ('bandwidth', 'latency', 'packet_loss') {
+		if (exists($linkref->{$key})) {
+		    my ($val) = @{ $linkref->{$key} };
+
+		    GeniXML::SetText($key, $link, $val);
+		}
+	    }
+	    foreach my $ifaceref (@{ $linkref->{'interface_ref'} }) {
+		my $iface = GeniXML::AddElement("interface_ref", $link);
+		
+		foreach my $key ('virtual_node_id', 'virtual_interface_id',
+				 'tunnel_ip') {
+		    GeniXML::SetText($key, $iface, $ifaceref->{$key})
+			if (exists($ifaceref->{$key}));
+		}
+	    }
+	}
+    }
+    return $new;
+}
+
+#
 # Add Resources. We get an rspec to replace the current rspec.
 # Ask for a ticket, and then redeem it.
 #
 sub GetTicket($$$$)
 {
-    my ($self, $user, $rspec, $impotent) = @_;
+    my ($self, $user, $rspec_string, $impotent) = @_;
     my $ticket;
     my $response;
 
@@ -482,15 +545,6 @@ sub GetTicket($$$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
-
-    my $rspec_string = eval { XMLout($rspec, "NoAttr" => 1) };
-    if ($@) {
-	print STDERR "GetTicket: XMLout error: $@\n";
-	print STDERR Dumper($rspec);
-	return -1;
-    }
-
-    $rspec_string =~ s/opt\>/rspec\>/g;
 
     #
     # Load the SA cert to act as caller context.
