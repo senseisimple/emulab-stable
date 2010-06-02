@@ -678,6 +678,7 @@ tmcd_quote_verifysig(void *final, void *sig, size_t siglen, void *pubkey)
 {
 	struct keydata k;
 	RSA *rsa;
+	int ret;
 
 	if (!pubkey) {
 		error("NULL pubkey to %s\n", __FUNCTION__);
@@ -700,7 +701,10 @@ tmcd_quote_verifysig(void *final, void *sig, size_t siglen, void *pubkey)
 		return 0;
 	}
 
-	return RSA_verify(NID_sha1, final, 20, sig, siglen, rsa);
+	ret = RSA_verify(NID_sha1, final, 20, sig, siglen, rsa);
+	RSA_free(rsa);
+
+	return ret;
 }
 
 static RSA *
