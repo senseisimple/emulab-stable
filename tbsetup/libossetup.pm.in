@@ -24,6 +24,7 @@ use libtestbed;
 use libreboot;
 use libosload;
 use Node;
+use NodeType;
 use libtblog;
 use English;
 use Data::Dumper;
@@ -781,9 +782,16 @@ sub NewType($$)
 
     #
     # These special cases will eventually be encoded in the DB.
+    # Note that type might be a class, and so Lookup() returns nothing.
     #
-    $type = "protogeni"
-	if ($type eq "pcfedphys" || $type eq "pcfed");
+    my $typeinfo = NodeType->Lookup($type);
+
+    if ($type eq "pcfedphys" || $type eq "pcfed") {
+	$type = "protogeni";
+    }
+    elsif (defined($typeinfo) && $typeinfo->issubnode()) {
+	$type = "subnode";
+    }
 
     my $packname = "libossetup_${type}";
     my $newtype  = eval { $packname->New($self); };
@@ -812,8 +820,12 @@ sub TypeLookup($$)
     #
     # These special cases will eventually be encoded in the DB.
     #
-    $type = "protogeni"
-	if ($type eq "pcfedphys" || $type eq "pcfed");
+    if ($type eq "pcfedphys" || $type eq "pcfed") {
+	$type = "protogeni";
+    }
+    elsif ($node->issubnode()) {
+	$type = "subnode";
+    }
 
     return $self->{'TYPECACHE'}->{$type}
         if (exists($self->{'TYPECACHE'}->{$type}));
@@ -1516,6 +1528,36 @@ use Node;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
+
+#
+# A constructor for an object to handle all nodes of this type.
+#
+sub New($$) {
+    my ($class, $parent) = @_;
+
+    my $self = $class->SUPER::New("subnode", $parent);
+    bless($self, $class);
+    return $self;
+}
+
+sub AddNode($$)
+{
+    my ($self, $node) = @_;
+
+    print "Will skip subnode $node ISUP wait.\n";
+
+    return $self->SUPER::AddNode($node);
+}
+
+#
+# We do not currently do anything with subnodes; no waiting for ISUP. 
+#
+sub Volunteers($)
+{
+    my ($self) = @_;
+
+    return ();
+}
 
 #####################################################################
 #

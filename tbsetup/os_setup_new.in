@@ -486,6 +486,11 @@ foreach (keys(%{ $MyStruct->failedlist() })) {
 foreach (keys(%{ $MyStruct->nodelist() })) {
     my $node   = $MyStruct->node($_);
     my $osinfo = $node->_bootosinfo();
+
+    # Was not setup to do anything, so ignore.
+    next
+	if (!defined($osinfo));
+    
     my $osid   = $osinfo->osid();
     my $type   = $node->type();
     $total{$osid}{any_type}++;
