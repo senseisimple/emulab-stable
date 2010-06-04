@@ -55,7 +55,7 @@ sub DoUpdate($$$)
     # Unrelated bug fix.
     DBQueryFatal("REPLACE INTO table_regex VALUES ".
 	 " ('virt_nodes','ips','text','regex', ".
-	 "  '^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*\$',".
+	 "  '^(\\\\d{1,2}:\\\\d{1,3}\\\\.\\\\d{1,3}\\\\.\\\\d{1,3}\\\\.\\\\d{1,3} {0,1})*\$',".
 	 "  0,2048,NULL)");
     
     return 0;
