@@ -3829,6 +3829,8 @@ CREATE TABLE `virt_lans` (
   `trace_db` tinyint(1) NOT NULL default '0',
   `fixed_iface` varchar(128) default '',
   `layer` tinyint(4) NOT NULL default '2',
+  `implemented_by_path` tinytext,
+  `implemented_by_link` tinytext,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),
@@ -3930,6 +3932,25 @@ CREATE TABLE `virt_parameters` (
   `description` text,
   PRIMARY KEY  (`exptidx`,`name`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_paths`
+--
+
+DROP TABLE IF EXISTS `virt_paths`;
+CREATE TABLE `virt_paths` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `pathname` varchar(32) NOT NULL default '',
+  `segmentname` varchar(32) NOT NULL default '',
+  `segmentindex` tinyint(4) unsigned NOT NULL default '0',
+  `layer` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`pathname`,`segmentname`),
+  UNIQUE KEY `segidx` (`exptidx`,`pathname`,`segmentindex`),
+  KEY `pid` (`pid`,`eid`,`pathname`),
+  KEY `pideid` (`pid`,`eid`,`pathname`,`segmentname`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

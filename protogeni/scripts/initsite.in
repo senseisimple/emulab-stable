@@ -77,6 +77,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libtestbed;
 use libdb qw(TBSetSiteVar TBOPSPID DBQueryFatal);
+use emutil qw(TBGetUniqueIndex);
 use User;
 use Project;
 use Experiment;

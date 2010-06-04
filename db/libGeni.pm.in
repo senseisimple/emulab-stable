@@ -802,6 +802,10 @@ sub StartSlivers($$$$)
 	}
 	$count++;
     }
+    # Everything failed, stop now. 
+    return -1
+	if (!@tmp);
+    
     MapNodes($experiment, $verbose);
     
     return WaitForSlivers($experiment, $user, $verbose, @tmp);

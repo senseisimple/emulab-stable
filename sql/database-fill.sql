@@ -691,7 +691,7 @@ REPLACE INTO table_regex VALUES ('virt_node_desires','desire','text','regex','^[
 REPLACE INTO table_regex VALUES ('virt_node_desires','weight','int','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','eid','text','redirect','experiments:eid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','ips','text','regex','^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','ips','text','regex','^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*$',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','cmd_line','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','rpms','text','regex','^([-\\w\\.\\/\\+:~]+;{0,1})*$',0,4096,NULL);
@@ -969,6 +969,14 @@ REPLACE INTO table_regex VALUES ('experiment_template_searches','name','text','r
 REPLACE INTO table_regex VALUES ('user_pubkeys','verify','text','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('user_pubkeys','user','text','redirect','users:uid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('user_pubkeys','keyfile','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
+
+REPLACE INTO table_regex VALUES ('virt_paths','pathname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_paths','segmentname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_paths','segmentindex','int','redirect','default:tinyuint',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_paths','layer','int','redirect','default:tinyint',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_path','text','redirect','virt_paths:pathname',1,128,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_link','text','redirect','default:tinytext',0,0,NULL);
 
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','role','text','regex','^(boss|router|ops|fs|node)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','attrkey','text','regex','^[-\\w\\.]+$',1,32,NULL);

@@ -47,6 +47,8 @@ Simulator instproc init {args} {
     array set lanlink_list {}
     $self instvar subnets;		# Indexed by IP subnet
     array set subnets {}
+    $self instvar path_list;		# Indexed by path id
+    array set path_list {}
 
     # link_map is indexed by <node1>:<node2> and contains the
     # id of the lanlink connecting them.  In the case of
@@ -271,6 +273,21 @@ Simulator instproc make-lan {nodelist bw delay args} {
     return $curlan
 }
 
+# make-path <linklist>
+Simulator instproc make-path {linklist args} {
+    var_import ::GLOBALS::last_class
+    $self instvar id_counter
+    $self instvar path_list
+
+    set curpath tbpath-path[incr id_counter]
+    
+    Path $curpath $self $linklist
+    set path_list($curpath) {}
+    set last_class $curpath
+    
+    return $curpath
+}
+
 Simulator instproc make-cloud {nodelist bw delay args} {
     $self instvar event_list
     $self instvar event_count
@@ -349,6 +366,7 @@ Simulator instproc event-group {{list {}}} {
 # method casues the 'ran' variable to be set to 1.
 Simulator instproc run {} {
     $self instvar lanlink_list
+    $self instvar path_list
     $self instvar node_list
     $self instvar event_list
     $self instvar prog_list
@@ -579,6 +597,9 @@ Simulator instproc run {} {
     }
     foreach tg [array names topography_list] {
 	$tg updatedb "sql"
+    }
+    foreach path [array names path_list] {
+	$path updatedb "sql"
     }
 
     set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "encap_style" "allowfixnode"]
@@ -952,6 +973,12 @@ Simulator instproc rename_topography {old new} {
     $self instvar topography_list
     unset topography_list($old)
     set topography_list($new) {}
+}
+
+Simulator instproc rename_path {old new} {
+    $self instvar path_list
+    unset path_list($old)
+    set path_list($new) {}
 }
 
 # find_link <node1> <node2>
