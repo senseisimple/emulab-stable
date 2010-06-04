@@ -145,10 +145,8 @@ tmcd_server_sslinit(void)
 	/*
 	 * Make it so the client must provide authentication.
 	 */
-	/*SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER |
-			   SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);*/
-	/* Disable required client auth for our experiment... */
-	SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, 0);
+	SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER |
+			   SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
 
 	/*
 	 * No session caching! Useless and eats up memory.
