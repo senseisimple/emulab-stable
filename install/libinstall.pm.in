@@ -10,17 +10,20 @@
 #
 use POSIX qw(strftime);
 use Exporter;
-use vars qw(@EXPORT $TOP_OBJDIR
+use vars qw(@EXPORT $TOP_OBJDIR $TOP_SRCDIR
 	    $TBROOT $LOGDIR $MAINSITE $PGENISUPPORT $GMAKE $PKG_INFO
-	    $PORTSDIR $VARRUN $RCDIR);
+	    $PORTSDIR $VARRUN $RCDIR $MYSQL $DBNAME
+	    $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION);
 
-@EXPORT = qw($TOP_OBJDIR
+@EXPORT = qw($TOP_OBJDIR $TOP_SRCDIR
 	     $TBROOT $LOGDIR $MAINSITE $PGENISUPPORT $GMAKE $PKG_INFO
-	     $PORTSDIR $VARRUN $RCDIR);
+	     $PORTSDIR $VARRUN $RCDIR $MYSQL $DBNAME
+	     $SQL_UPDATE_MAJOR_REVISION $INSTALL_UPDATE_MAJOR_REVISION);
 
 # Configure variables
 
 $TBROOT        = "@prefix@";
+$TOP_SRCDIR    = "@top_srcdir@";
 $LOGDIR        = "$TBROOT/log";
 $MAINSITE      = @TBMAINSITE@;
 $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
@@ -30,6 +33,14 @@ $PORTSDIR      = "/usr/ports";
 $VARRUN        = "/var/run";
 $RCDIR         = "/usr/local/etc/rc.d";
 
+$DBNAME        = "@TBDBNAME@";
+$MYSQL         = "/usr/local/bin/mysql";
+
+# Change these if the major numbers in sql/updates or install/updates
+# are changed.
+$SQL_UPDATE_MAJOR_REVISION	= 4;
+$INSTALL_UPDATE_MAJOR_REVISION	= 5;
+
 #
 # Make sure that output gets printed right away
 #
@@ -38,7 +49,7 @@ $| = 1;
 #
 # Magic string that shows up in files already edited 
 #
-my $MAGIC_TESTBED_VERSION = "5.0";
+my $MAGIC_TESTBED_VERSION = $INSTALL_UPDATE_MAJOR_REVISION + ".0";
 my $MAGIC_TESTBED_START   = "Added by Emulab - Version: ";
 my $MAGIC_TESTBED_END     = "End of Emulab added section";
 
