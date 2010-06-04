@@ -830,7 +830,11 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/checkuplog             640  9     1000 *     Z ".
 		"/var/run/checkup_daemon.pid",
 	    "$LOGDIR/poollog                640  9     1000 *     Z ".
-		"/var/run/pool_daemon.pid");
+		"/var/run/pool_daemon.pid",
+	    "$LOGDIR/expire_daemon.log      640  9     1000 *     Z ".
+		"/var/run/expire_daemon.pid",
+	    "$LOGDIR/sa_daemon.log          640  9     1000 *     Z ".
+		"/var/run/sa_daemon.pid");
     };
 };
 
