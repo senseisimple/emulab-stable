@@ -72,6 +72,7 @@ my $debug	      = 0;
      "elabinelab_attributes"	=> [ "role", "attrkey", "ordering" ],
      "virt_tiptunnels"		=> [ "host", "vnode" ],
      "virt_parameters"          => [ "name", "value" ],
+     "virt_paths"		=> [ "pathname", "segmentname"],
 );
 
 # 
@@ -1180,6 +1181,11 @@ use vars qw(@ISA);
 use VirtExperiment;
 
 package VirtExperiment::VirtTableRow::elabinelab_attributes;
+use vars qw(@ISA);
+@ISA = "VirtExperiment::VirtTableRow";
+use VirtExperiment;
+
+package VirtExperiment::VirtTableRow::virt_paths;
 use vars qw(@ISA);
 @ISA = "VirtExperiment::VirtTableRow";
 use VirtExperiment;

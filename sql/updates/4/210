@@ -1,0 +1,63 @@
+#
+# Add virt_paths
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("virt_paths")) {
+	DBQueryFatal("CREATE TABLE `virt_paths` ( ".
+	     " `pid` varchar(12) NOT NULL default '', ".
+	     " `eid` varchar(32) NOT NULL default '', ".
+	     " `exptidx` int(11) NOT NULL default '0', ".
+	     " `pathname` varchar(32) NOT NULL default '', ".
+	     " `segmentname` varchar(32) NOT NULL default '', ".
+	     " `segmentindex` tinyint(4) unsigned NOT NULL default '0', ".
+	     " `layer` tinyint(4) NOT NULL default '0', ".
+	     " PRIMARY KEY  (`exptidx`,`pathname`,`segmentname`), ".
+	     " UNIQUE KEY `segidx` (`exptidx`,`pathname`,`segmentindex`), ".
+	     " KEY `pid` (`pid`,`eid`,`pathname`), ".
+             " KEY `pideid` (`pid`,`eid`,`pathname`,`segmentname`) ".
+	     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_paths', 'pathname', 'text', 'redirect', ".
+		 "  'virt_nodes:vname', 0,0,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_paths', 'segmentname', 'text', 'redirect', ".
+		 "  'virt_nodes:vname', 0,0,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_paths', 'segmentindex', 'int', 'redirect', ".
+		 "  'default:tinyuint', 0,0,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_paths', 'layer', 'int', 'redirect', ".
+		 "  'default:tinyint', 0,0,NULL)");
+ 
+    if (!DBSlotExists("virt_lans", "implemented_by_path")) {
+        DBQueryFatal("ALTER TABLE virt_lans ADD ".
+		     " `implemented_by_path` tinytext");
+    }
+    if (!DBSlotExists("virt_lans", "implemented_by_link")) {
+        DBQueryFatal("ALTER TABLE virt_lans ADD ".
+		     " `implemented_by_link` tinytext");
+    }
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_lans', 'implemented_by_path', 'text', 'redirect', ".
+		 "  'virt_paths:pathname', 1,128,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_lans', 'implemented_by_link', 'text', 'redirect', ".
+		 "  'default:tinytext', 0,0,NULL)");
+
+    # Unrelated bug fix.
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+	 " ('virt_nodes','ips','text','regex', ".
+	 "  '^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*$',".
+	 "  0,2048,NULL");
+    
+    return 0;
+}
+1;
