@@ -807,7 +807,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/stated.log             640  9     1000 *     Z ".
 	        "/var/run/stated.pid 31",
 	    "$LOGDIR/checknodes.log         640  14    300  *     Z ".
-	        "/var/run/checknodes.pid",
+	        "/var/run/checknodes_daemon.pid",
 	    "$LOGDIR/osselect.log           640  9     300  *     Z",
 	    "$LOGDIR/power.log              640  7     300  *     Z",
 	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
@@ -824,7 +824,13 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/plablinkdata.log       640  7     1000 *     Z",
 	    "$LOGDIR/xmlrpcbag.log          640  7     300  *     Z",
 	    "$LOGDIR/sshxmlrpc.log          640  7     300  *     Z",
-	    "$LOGDIR/sslxmlrpc.log          640  7     300  *     Z");
+	    "$LOGDIR/sslxmlrpc.log          640  7     300  *     Z",
+	    "$LOGDIR/reloadlog              640  9     1000 *     Z ".
+		"/var/run/reload_daemon.pid",
+	    "$LOGDIR/checkuplog             640  9     1000 *     Z ".
+		"/var/run/checkup_daemon.pid",
+	    "$LOGDIR/poollog                640  9     1000 *     Z ".
+		"/var/run/pool_daemon.pid");
     };
 };
 
