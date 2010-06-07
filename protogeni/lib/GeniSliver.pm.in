@@ -671,8 +671,7 @@ sub Create($$$$$$)
 	$sliver_uuid = $vnode->uuid();
 	$resource_id = $vnode->node_id();
 	$hostname = GeniUtil::FindHostname($vnode->node_id());
-	$sshdport = $vnode->sshdport()
-	    if (!defined($vnode->jailip()));
+	$sshdport = $vnode->sshdport();
     }
     else {
 	$hrn = "${PGENIDOMAIN}." . $node->node_id();
