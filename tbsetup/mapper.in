@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -284,6 +284,8 @@ sub AssignLoop()
 
     TBDebugTimeStamp("mapper loop started");
     while (1) {
+	my $gotlock = 0;
+	
 	chat("Assign run $currentrun\n");
 
 	my $prefix = ($debug || $regression ? "$pid-$eid" : "$pid-$eid-$$");
@@ -298,12 +300,39 @@ sub AssignLoop()
 	}
 
 	#
+	# Serialize with the pool daemon if using shared nodes.
+	# XXX When using shared nodes, only one can proceed at a
+	# time through assignment. This is okay for now since few
+	# experiments are using shared nodes. Eventually needs to be
+	# a barrier. 
+	#
+	if ((!($impotent || $regression)) && $vtop->sharednodecount()) {
+	    while (1) {
+		my $lock_result =
+		    DBQueryWarn("select get_lock('pool_daemon', 10)");
+		fatal("DB Error tring to get pool_daemon lock")
+		    if (!defined($lock_result));
+
+		($gotlock) = $lock_result->fetchrow_array();
+		last
+		    if ($gotlock);
+		
+		chat("Waiting for pool daemon lock ...\n");
+	    }
+	}
+
+	#
 	# RunAssign returns  0 if successful.
 	#           returns -1 if failure, but assign says to stop trying.
 	#           returns  1 if failure, but assign says to try again.
 	#           returns  2 if we made some forward progress.
 	#
 	my $retval = RunAssign($precheck, $prefix);
+
+	if ($gotlock) {
+	    DBQueryWarn("select release_lock('pool_daemon')")
+		or fatal("Could not release the pool lock");
+	}
 
 	# Success!
 	last
