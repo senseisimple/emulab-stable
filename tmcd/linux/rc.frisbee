@@ -393,12 +393,35 @@ fi
 # which disk is which.
 $BINDIR/get_edd_map > $BOOTDIR/edd_map 2>/dev/null
 
+
 FRISBEE_OPTS="-S $BOSSIP"
 
 if [ -e $BOOTDIR/myip ]; then
 	FRISBEE_OPTS="$FRISBEE_OPTS -i `cat $BOOTDIR/myip`"
 fi
 IMAGEUNZIP_OPTS="-o -O -W 32"
+
+RESIDMEM=32
+RESIDMEM=`expr \( $RESIDMEM + 2 \) \* 1024`
+FREEMEM=`free | sed -n 's/^-\/+ buffers.* \([0-9]*\)$/\1/p'`
+if [ -z "$FREEMEM" ]; then
+	# BusyBox's 'free' command has slightly different output
+	FREEMEM=`free | sed -n 's/^  *Mem: *[0-9]* *[0-9]* *\([0-9]*\) *.*$/\1/p'`
+fi
+if [ $FREEMEM -gt $RESIDMEM ]; then
+	BUFFERMEM=`expr $FREEMEM - $RESIDMEM`
+	DATASEGSIZE=`ulimit -d`
+	if ! [ $DATASEGSIZE = unlimited ] &&
+	     [ $BUFFERMEM -gt $DATASEGSIZE ]; then
+		BUFFERMEM=$DATASEGSIZE
+		echo "WARNING: kernel limits buffering to $BUFFERMEM KB"
+	else
+		BUFFERMEM=`expr $BUFFERMEM / 1024`
+	fi
+
+	FRISBEE_OPTS="$FRISBEE_OPTS -M $BUFFERMEM"
+fi
+
 
 # Wipe the MBR and partition boot blocks on all disks if reloading
 case $STATUS in

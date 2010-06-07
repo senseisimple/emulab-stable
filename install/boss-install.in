@@ -21,8 +21,6 @@
 #
 my $PREFIX     = '@prefix@';
 my $SRCDIR     = '@srcdir@';
-my $TOP_SRCDIR = '@top_srcdir@';
-my $DBNAME     = "@TBDBNAME@";
 my $ERRORLOG_DBNAME = "@TBERRORLOGDBNAME@";
 my $ELABINELAB = @ELABINELAB@;
 my $WINSUPPORT = @WINSUPPORT@;
@@ -79,7 +77,6 @@ my $MOUNT      = "/sbin/mount";
 my $SUDO       = "/usr/local/bin/sudo";
 my $SUIDPERL   = "/usr/bin/suidperl";
 
-my $MYSQL      = "/usr/local/bin/mysql";
 my $MYSQLADMIN = "/usr/local/bin/mysqladmin";
 my $MYSQLSHOW  = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
@@ -807,7 +804,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/stated.log             640  9     1000 *     Z ".
 	        "/var/run/stated.pid 31",
 	    "$LOGDIR/checknodes.log         640  14    300  *     Z ".
-	        "/var/run/checknodes.pid",
+	        "/var/run/checknodes_daemon.pid",
 	    "$LOGDIR/osselect.log           640  9     300  *     Z",
 	    "$LOGDIR/power.log              640  7     300  *     Z",
 	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
@@ -824,7 +821,17 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/plablinkdata.log       640  7     1000 *     Z",
 	    "$LOGDIR/xmlrpcbag.log          640  7     300  *     Z",
 	    "$LOGDIR/sshxmlrpc.log          640  7     300  *     Z",
-	    "$LOGDIR/sslxmlrpc.log          640  7     300  *     Z");
+	    "$LOGDIR/sslxmlrpc.log          640  7     300  *     Z",
+	    "$LOGDIR/reloadlog              640  9     1000 *     Z ".
+		"/var/run/reload_daemon.pid",
+	    "$LOGDIR/checkuplog             640  9     1000 *     Z ".
+		"/var/run/checkup_daemon.pid",
+	    "$LOGDIR/poollog                640  9     1000 *     Z ".
+		"/var/run/pool_daemon.pid",
+	    "$LOGDIR/expire_daemon.log      640  9     1000 *     Z ".
+		"/var/run/expire_daemon.pid",
+	    "$LOGDIR/sa_daemon.log          640  9     1000 *     Z ".
+		"/var/run/sa_daemon.pid");
     };
 };
 
@@ -935,6 +942,46 @@ Phase "database", "Setting up database", sub {
 	    ExecQuietFatal("cp $TOP_SRCDIR/sql/database-create-old-errorlog.sql $TOP_SRCDIR/sql/database-create-errorlog.sql")
 	}
 	ExecQuietFatal("$MYSQL $ERRORLOG_DBNAME < $TOP_SRCDIR/sql/database-create-errorlog.sql");
+    };
+    Phase "version_info", "Initializing version_info table", sub {
+	my $SQLUPDATES =
+	    "$TOP_SRCDIR/sql/updates/$SQL_UPDATE_MAJOR_REVISION";
+	my $INUPDATES  =
+	    "$TOP_SRCDIR/install/updates/$INSTALL_UPDATE_MAJOR_REVISION";
+	
+	my ($exitval, @results) =
+	    ExecQuiet("echo 'select * from version_info' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar(@results)) {
+	    PhaseSkip("Already done");
+	}
+	($exitval, @results) =
+	    ExecQuiet("cd $SQLUPDATES ; ls | sort -n -r | head -1");
+	if ($exitval) {
+	    PhaseFail("Error getting sql update list");
+	}
+	my $sqlfile = $results[0];
+	chomp($sqlfile);
+
+	($exitval, @results) =
+	    ExecQuiet("cd $INUPDATES ; ls | sort -n -r | head -1");
+	if ($exitval) {
+	    PhaseFail("Error getting install update list");
+	}
+	my $updatefile = $results[0];
+	chomp($updatefile);
+
+	my $sqlval = $SQL_UPDATE_MAJOR_REVISION . "." . $sqlfile;
+	my $upval  = $INSTALL_UPDATE_MAJOR_REVISION . "." . $updatefile;
+
+	ExecQuietFatal("echo 'insert into version_info set ".
+		       "  name=\"dbrev\", value=\"$sqlval\"' ".
+		       "| $MYSQL -s $DBNAME");
+	ExecQuietFatal("echo 'insert into version_info set ".
+		       "  name=\"install\", value=\"$upval\"' ".
+		       "| $MYSQL -s $DBNAME");
     };
 };
 

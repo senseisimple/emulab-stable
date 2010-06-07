@@ -62,10 +62,15 @@ if (!$query_result) {
 #
 my $hash = `cd $SRCDIR; tools/git/current_branch_head`;
 if ($?) {
-    die("*** $0:\n".
-	"    Unable to get commit hash for source tree\n");
+    print STDERR
+	"*** $0:\n".
+	"    Unable to get commit hash for source tree\n";
+
+    $hash = "";
 }
-chomp($hash);
+else {
+    chomp($hash);
+}
 $hash = $dbh->quote($hash);
 
 $query_result =

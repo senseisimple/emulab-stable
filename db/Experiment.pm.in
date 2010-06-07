@@ -99,6 +99,7 @@ my $EXPT_RESOURCESHOSED = 0;
 		   "virt_simnode_attributes",
 		   "virt_user_environment",
 		   "virt_parameters",
+		   "virt_paths",
 		   # vis_nodes is locked during update in prerender, so we
 		   # will get a consistent dataset when we backup.
 		   "vis_nodes",

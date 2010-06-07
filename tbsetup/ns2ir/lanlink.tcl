@@ -214,8 +214,9 @@ LanLink instproc init {s nodes bw d type} {
     # XXX Allow user to set the accesspoint.
     $self set accesspoint {}
 
-    # Optional layer
+    # Optional layer and implemented-by relationship
     $self set layer {}
+    $self set implemented_by {}
 
     # A simulated lanlink unless we find otherwise
     $self set simulated 1
@@ -322,6 +323,37 @@ Link instproc trace {{ttype "header"} {texpr ""}} {
     
     $toqueue trace $ttype $texpr
     $fromqueue trace $ttype $texpr
+}
+
+#
+# A link can be implemented in terms of a path or
+# a link at a lower level of the stack.
+#
+Link instproc implemented_by {impl} {
+    $self instvar implemented_by
+    $self instvar layer
+    
+    if {[$impl info class] == "Path"} {
+	set implemented_by $impl
+    } elseif {[$impl info class] == "Link"} {
+	if {$layer == {}} {
+	    perror "\[$self implemented_by] no layer set!"
+	    return
+	}
+	set impl_layer [$impl set layer]
+	if {$impl_layer == {}} {
+	    perror "\[$self implemented_by] no layer set in $impl!"
+	    return
+	}
+	if {$impl_layer >= $layer} {
+	    perror "\[$self implemented_by] $impl is not at a lower layer!"
+	    return
+	}
+	set implemented_by $impl
+    } else {
+        perror "\[$self implemented_by] must be a link or a path!"
+        return
+    }
 }
 
 Lan instproc trace_snaplen {len} {
@@ -720,6 +752,7 @@ Link instproc updatedb {DB} {
     $self instvar mustdelay
     $self instvar fixed_iface
     $self instvar layer
+    $self instvar implemented_by
 
     $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
 
@@ -810,6 +843,13 @@ Link instproc updatedb {DB} {
 	if { $layer != {} } {
 	    lappend fields "layer"
 	}
+	if { $implemented_by != {} } {
+	    if {[$implemented_by info class] == "Path"} {
+		lappend fields "implemented_by_path"
+	    } else {
+		lappend fields "implemented_by_link"
+	    }
+	}
 
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $backfill($nodeport) $rbackfill($nodeport)  $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
 
@@ -838,6 +878,9 @@ Link instproc updatedb {DB} {
 	# Set the layer
 	if { $layer != {} } {
 	    lappend values $layer
+	}
+	if { $implemented_by != {} } {
+	    lappend values $implemented_by
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values
