@@ -218,7 +218,6 @@ my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
 my $WWWDIR          = "/usr/local/www/data";
 
 # For installing mysqld
-my $MYSQL           = "/usr/local/bin/mysql";
 my $MYSQLADMIN      = "/usr/local/bin/mysqladmin";
 my $MYSQLSHOW       = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP       = "/usr/local/bin/mysqldump";
@@ -233,7 +232,6 @@ my $LIST_DIR      = "/etc/mail/lists";
 my $TIPLOG_DIR    = "/var/log/tiplogs";
 my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $SRCDIR        = '@srcdir@';
-my $TOP_SRCDIR    = "@top_srcdir@";
 
 #
 # And some lists that we use

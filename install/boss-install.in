@@ -21,8 +21,6 @@
 #
 my $PREFIX     = '@prefix@';
 my $SRCDIR     = '@srcdir@';
-my $TOP_SRCDIR = '@top_srcdir@';
-my $DBNAME     = "@TBDBNAME@";
 my $ERRORLOG_DBNAME = "@TBERRORLOGDBNAME@";
 my $ELABINELAB = @ELABINELAB@;
 my $WINSUPPORT = @WINSUPPORT@;
@@ -79,7 +77,6 @@ my $MOUNT      = "/sbin/mount";
 my $SUDO       = "/usr/local/bin/sudo";
 my $SUIDPERL   = "/usr/bin/suidperl";
 
-my $MYSQL      = "/usr/local/bin/mysql";
 my $MYSQLADMIN = "/usr/local/bin/mysqladmin";
 my $MYSQLSHOW  = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
@@ -945,6 +942,46 @@ Phase "database", "Setting up database", sub {
 	    ExecQuietFatal("cp $TOP_SRCDIR/sql/database-create-old-errorlog.sql $TOP_SRCDIR/sql/database-create-errorlog.sql")
 	}
 	ExecQuietFatal("$MYSQL $ERRORLOG_DBNAME < $TOP_SRCDIR/sql/database-create-errorlog.sql");
+    };
+    Phase "version_info", "Initializing version_info table", sub {
+	my $SQLUPDATES =
+	    "$TOP_SRCDIR/sql/updates/$SQL_UPDATE_MAJOR_REVISION";
+	my $INUPDATES  =
+	    "$TOP_SRCDIR/install/updates/$INSTALL_UPDATE_MAJOR_REVISION";
+	
+	my ($exitval, @results) =
+	    ExecQuiet("echo 'select * from version_info' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar(@results)) {
+	    PhaseSkip("Already done");
+	}
+	($exitval, @results) =
+	    ExecQuiet("cd $SQLUPDATES ; ls | sort -n -r | head -1");
+	if ($exitval) {
+	    PhaseFail("Error getting sql update list");
+	}
+	my $sqlfile = $results[0];
+	chomp($sqlfile);
+
+	($exitval, @results) =
+	    ExecQuiet("cd $INUPDATES ; ls | sort -n -r | head -1");
+	if ($exitval) {
+	    PhaseFail("Error getting install update list");
+	}
+	my $updatefile = $results[0];
+	chomp($updatefile);
+
+	my $sqlval = $SQL_UPDATE_MAJOR_REVISION . "." . $sqlfile;
+	my $upval  = $INSTALL_UPDATE_MAJOR_REVISION . "." . $updatefile;
+
+	ExecQuietFatal("echo 'insert into version_info set ".
+		       "  name=\"dbrev\", value=\"$sqlval\"' ".
+		       "| $MYSQL -s $DBNAME");
+	ExecQuietFatal("echo 'insert into version_info set ".
+		       "  name=\"install\", value=\"$upval\"' ".
+		       "| $MYSQL -s $DBNAME");
     };
 };
 

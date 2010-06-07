@@ -1191,13 +1191,14 @@ if ($widearea && ! defined($component_name)) {
 if ($genimode ne $NO_GENI) {
     foreach $key (keys %interfaceroles) {
 	if (is_public_interface($key)) {
-	    $key =~ /^([^:]+):([^:]+)$/;
-	    my $node = $1;
-	    my $iface = $2;
-	    if (defined($nodes{$node})) {
-		print_simple_link($node, $iface,
-				  $fake_inet_switch, $fake_inet_iface,
-				  100000, 0, 0, @inet_protos);
+	    if ($key =~ /^([^:]+):([^:]+)$/) {
+		my $node = $1;
+		my $iface = $2;
+		if (defined($nodes{$node})) {
+		    print_simple_link($node, $iface,
+				      $fake_inet_switch, $fake_inet_iface,
+				      100000, 0, 0, @inet_protos);
+		}
 	    }
 	}
     }
