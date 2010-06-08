@@ -3881,7 +3881,8 @@ sub AllocNodes($)
 	my $vpnodename = $self->solution_v2v()->{$vnodename};
 	my $vpnode     = $self->pnodes()->{$vpnodename};
 	
-	if ($vpnode->isjailed() || $vpnode->isremotenode()) {
+	if ($vpnode->isjailed() ||
+	    $vpnode->isremotenode() || $vpnode->_onsharednode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
 	    my $sshdport  = nextipportnum($pnode);
