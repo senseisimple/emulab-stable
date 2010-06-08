@@ -481,6 +481,7 @@ sub ConvertRspec($)
 	my $node = GeniXML::AddElement("node", $root);
 	
 	foreach my $key ('virtual_id', 'component_urn', 'exclusive',
+			 'component_manager_urn', 'component_manager_uuid',
 			 'virtualization_type', 'virtualization_subtype',
 			 'startup_command', 'tarfiles') {
 	    GeniXML::SetText($key, $node, $ref->{$key})
