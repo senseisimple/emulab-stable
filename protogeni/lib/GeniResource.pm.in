@@ -520,6 +520,14 @@ sub ConvertRspec($)
 			if (exists($ifaceref->{$key}));
 		}
 	    }
+	    foreach my $cmref (@{ $linkref->{'component_manager'} }) {
+		my $cm = GeniXML::AddElement("component_manager", $link);
+		
+		foreach my $key ('id') {
+		    GeniXML::SetText($key, $cm, $cmref->{$key})
+			if (exists($cmref->{$key}));
+		}
+	    }
 	}
     }
     return $new;
