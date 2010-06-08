@@ -186,8 +186,8 @@
 				var nodeName : QName = new QName(Rspec.namespace(), "location");
 				var temps:XMLList = p.elements(nodeName);
 				var temp:XML = temps[0];
-				var lat:Number = 39.017625;
-				var lng:Number = 125.763899;
+				var lat:Number = -72.134678;
+				var lng:Number = 170.332031;
 				if(temps.length() > 0)
 				{
 					if(Number(temp.@latitude) != 0 && Number(temp.@longitude) != 0)
