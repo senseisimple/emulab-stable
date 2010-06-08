@@ -1346,7 +1346,7 @@ sub Volunteers($)
 		    # Something went wrong with the physnode reboot, so the
 		    # virtnodes are DOA.
 		    #
-		    $node->_setupstatus($libossetup::SETUP_OKAY);
+		    $node->_setupstatus($libossetup::SETUP_FAILED);
 		    $typehandler->WaitDone($node);
 		    next;
 		}
