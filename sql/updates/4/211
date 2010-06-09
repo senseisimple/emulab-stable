@@ -15,5 +15,12 @@ sub DoUpdate($$$)
         DBQueryFatal("ALTER TABLE virt_lans ADD ".
 		     " `ofcontroller` tinytext");
     }
+    DBQueryFatal("REPLACE INTO table_regex VALUES" .
+                 " ('virt_lans', 'ofenabled', 'int', 'redirect', ".
+                 "  'default:boolean', 0,0,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES" .
+                 " ('virt_lans', 'ofcontroller', 'int', 'redirect', ".
+                 "  'default:tinytext', 0,0,NULL)");
 }
 1;
