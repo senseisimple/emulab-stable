@@ -463,11 +463,23 @@ sub ManagerVersion($)
 sub ConvertRspec($)
 {
     my ($rspec) = @_;
+    my $template;
 
-    my $template =
-	"<rspec xmlns=\"http://protogeni.net/resources/rspec/0.2\" ".
-	"       type=\"request\" generated_by=\"libvtop\">".
-	"</rspec>";
+    if (1) {
+	$template =
+	    "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.2\" ".
+	    "       type=\"request\" generated_by=\"libvtop\">".
+	    "</rspec>";
+    }
+    else {
+	$template =
+	    "<rspec xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ".
+	    "       xsi:schemaLocation=".
+	    "\"http://www.protogeni.net/resources/rspec/0.2 ".
+	    "  http://www.protogeni.net/resources/rspec/0.2/request.xsd\" ".
+	    "       type=\"request\" generated_by=\"libvtop\"> ".
+	    "</rspec>";
+    }
 
     my $new = GeniXML::Parse($template);
     if (!defined($new)) {
@@ -1114,55 +1126,6 @@ sub Clear($$)
 	}
     }
 
-    if (defined($sliver_credential)) {
-	my $method_name = "DeleteSlice";
-	my $method_args = undef;
-
-	if ($manager_version == 1.0) {
-	    $method_args->{'credential'} = $slice_credential->asString();
-	}
-	elsif ($manager_version == 2.0) {
-	    $method_args->{'credentials'} = [$slice_credential->asString()];
-	    $method_args->{'slice_urn'}   = $slice->urn();
-	}
-	else {
-	    print STDERR
-		"GeniResource::Clear Unknown version at $authority\n";
-	    return -1;
-	}
-	print STDERR "Deleting sliver on $authority\n";
-	$response =
-	    Genixmlrpc::CallMethod($authority->url(), $usercontext,
-				   $method_name, $method_args);
-	if (!defined($response)) {
-	    $self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
-	    print STDERR "*** Internal error deleting sliver for $self\n";
-	    return -1;
-	}
-	$self->{'last_rpc_error'} = $response->code();
-	$self->{'last_rpc_output'} = $response->output();
-	$self->{'last_rpc_value'}  = $response->value();
-	if ($response->code() != GENIRESPONSE_SUCCESS &&
-	    $response->code() != GENIRESPONSE_SEARCHFAILED) {
-	    print STDERR "Could not delete sliver for $self. Error: ";
-	    print STDERR "  " . $response->output() . "\n";
-	    return -1;
-	}
-	$sliver_credential->Delete();
-	$self->Update({"credential_idx" => 0});
-
-	#
-	# Delete this now; no point in waiting for the CM to tell us.
-	#
-	# Needs to move elsewhere I think.
-	#
-	my $clientsliver =
-	    GeniRegistry::ClientSliver->LookupByAuthority($slice,
-							  $manager_urn);
-	$clientsliver->Delete()
-	    if (defined($clientsliver));
-    }
-
     if (defined($newticket)) {
 	my $method_name = "ReleaseTicket";
 	my $method_args = { "ticket" => $newticket->asString() };
@@ -1203,6 +1166,54 @@ sub Clear($$)
     if (defined($oldticket)) {
 	$oldticket->Delete(TICKET_DELETED);
 	$self->Update({"ticket_idx" => 0});
+    }
+
+    my $method_name = "DeleteSlice";
+    my $method_args = undef;
+
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $slice_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR "GeniResource::Clear Unknown version at $authority\n";
+	return -1;
+    }
+    print STDERR "Deleting sliver on $authority\n";
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR "*** Internal error deleting sliver for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS &&
+	$response->code() != GENIRESPONSE_SEARCHFAILED) {
+	print STDERR "Could not delete sliver for $self. Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    #
+    # Delete this now; no point in waiting for the CM to tell us.
+    #
+    # Needs to move elsewhere I think.
+    #
+    my $clientsliver =
+	GeniRegistry::ClientSliver->LookupByAuthority($slice,
+						      $manager_urn);
+    $clientsliver->Delete()
+	if (defined($clientsliver));
+    
+    if (defined($sliver_credential)) {
+	$sliver_credential->Delete();
+	$self->Update({"credential_idx" => 0});
     }
 
     #
