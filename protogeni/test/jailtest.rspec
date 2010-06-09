@@ -1,13 +1,13 @@
 <rspec xmlns="http://protogeni.net/resources/rspec/0.1">
  <node virtual_id="geni1" 
        colocate="geni1"
-       exclusive=0
+       exclusive="0"
        virtualization_type="emulab-vnode"
        virtualization_subtype="emulab-openvz">
  </node>
  <node virtual_id="geni2"
        colocate="geni1" 
-       exclusive=0
+       exclusive="0"
        virtualization_type="emulab-vnode"
        virtualization_subtype="emulab-openvz"> 
  </node>
