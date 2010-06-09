@@ -37,7 +37,6 @@ my $impotent = 0;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
