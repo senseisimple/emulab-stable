@@ -1137,10 +1137,9 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	    TBGetVersionInfo($major, $minor, $build);
 	
 	    $versioninfo = "Vers: $major.$minor Build: $build";
-
-	    $hash = TBGetCommitHash();
-	    if ($hash) {
-		$commithash = "$hash";
+	    $commithash  = TBGetCommitHash();
+	    if (!$commithash) {
+		$commithash = "";
 	    }
 	}
 	echo "<div id='versioninfo'>$versioninfo";

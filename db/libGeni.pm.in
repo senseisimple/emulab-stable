@@ -781,12 +781,14 @@ sub StartSlivers($$$$)
     my $errors = 0;
     my $count  = 0;
     my @tmp    = ();
+    my @failed = ();
     foreach my $result (@results) {
 	my $resource = $resources[$count];
 	
 	if ($result != 0) {
 	    print STDERR "*** Error starting slivers for $resource\n";
 	    $errors++;
+	    push(@failed, $resource);
 	}
 	else {
 	    #
@@ -801,6 +803,36 @@ sub StartSlivers($$$$)
 	    push(@tmp, $resource);
 	}
 	$count++;
+    }
+    #
+    # Set the nodes to TBFAILED to avoid waiting in os_setup.
+    #
+    if (@failed) {
+	foreach my $resource (@failed) {
+	    my $manager_urn = $resource->manager_urn();
+	    my $ticketstr   = $resource->Ticket();
+	    my $ticket      = GeniXML::Parse($ticketstr);
+	    return -1
+		if (!defined($ticket));
+
+	    foreach my $ref (GeniXML::FindNodes("n:node",
+						$ticket)->get_nodelist()) {
+		my $vname            = GeniXML::GetVirtualId($ref);
+		my $this_manager_urn = GeniXML::GetManagerId($ref);
+
+		next
+		    if (!defined($this_manager_urn) ||
+			$manager_urn ne $this_manager_urn);
+		
+		my $node = $experiment->VnameToNode($vname);
+		next
+		    if (!defined($node));
+
+		if ($node->eventstate() ne TBDB_NODESTATE_TBFAILED()) {
+		    $node->SetEventState(TBDB_NODESTATE_TBFAILED());
+		}
+	    }
+	}
     }
     # Everything failed, stop now. 
     return -1
@@ -878,7 +910,9 @@ sub WaitForSlivers($$$@)
     my $coderef = sub {
 	my ($resource) = @_;
 	my $ref;
-	my $notready = 0;
+	my $failed   = 0;
+	my $ready    = 0;
+	my $count    = 0;
 
 	print STDERR "Getting ($$) sliver status for $resource\n";
 
@@ -919,19 +953,28 @@ sub WaitForSlivers($$$@)
 	    }
 	    # State was changed in a another process.
 	    $node->Refresh();
-
+	    
+	    $count++;
 	    if ($status eq "ready") {
 		# print statement would be repeated.
+		# Normal node waiting at this point, for ISUP to arrive.
+		$ready++;
 	    }
 	    elsif ($status eq "failed") {
 		# print statement would be repeated.
-	    }
-	    else {
-		$notready++;
+		# We want to do something here, to avoid waiting
+		# for something that failed, but might not report in any
+		# status. os_setup might wait a really long time for the
+		# timeout, and that is silly.
+		#
+		if ($node->eventstate() ne TBDB_NODESTATE_TBFAILED()) {
+		    $node->SetEventState(TBDB_NODESTATE_TBFAILED());
+		}
+		$failed++;
 	    }
 	}
-	# Tell the parent to stop if ready or all failed.
-	if ($ref->{'status'} eq "ready" || $notready == 0) {
+	# Tell the parent to stop if all nodes are ready.
+	if ($ref->{'status'} eq "ready" || ($failed + $ready) == $count) {
 	    return 0;
 	}
 	# Tell the parent not ready.
@@ -977,10 +1020,10 @@ sub WaitForSlivers($$$@)
 	    if (@resources);
     }
     #
-    # If we get here, mark any nodes left over or failed, with TBFAILED.
+    # If we get here, mark nodes in failed resources, with TBFAILED.
     # This will stop the waiting up in os_setup.
     #
-    foreach my $resource (@resources, @failed) {	
+    foreach my $resource (@failed) {	
 	my $manifest = $resource->Manifest();
 	next
 	    if (!defined($manifest));

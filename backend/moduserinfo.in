@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -409,6 +409,11 @@ sub CheckPassword($$$$$)
     my ($prefix, $uid, $password, $name, $email) = @_;
     my $checkpass_args = escapeshellarg($password)
 	. " " . $uid . " " . escapeshellarg($name . ":" . $email);
+
+    # Make taint check happy.
+    if ($checkpass_args =~ /^(.*)$/) {
+	$checkpass_args = $1;
+    }
     my $pwokay = `$checkpass $checkpass_args`;
     if ($?) {
 	chomp($pwokay);

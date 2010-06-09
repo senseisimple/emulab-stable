@@ -442,17 +442,17 @@ void print_help() {
       << endl;
   cout << "  -u           - Print a summary of the solution." << endl;
   cout << "  -c <float>   - Use the 'connected' pnode finding algorithm ";
-	cout <<                   "<float>*100%" << endl;
-	cout << "                 of the time." << endl;
+  cout <<                   "<float>*100%" << endl;
+  cout << "                 of the time." << endl;
   cout << "  -n           - Don't anneal - just do the prechecks." << endl;
 
   cout << "  -x <file>    - Specify a text ptop file" << endl;
   cout << "  -y <file>    - Specify a text top file" << endl;
 #ifdef WITH_XML
   cout << "  -W <file>    - Specify the output rspec file" << endl;
-	cout << "  -f <T>[/<T>] - Specify the ptop/vtop file formats " << endl;
-	cout << "                 T should be one of (text|xml|rspec-<rspec ver. number>)" << endl;;
-	cout << "                 Specifying only one T is equivalent to -f T/T"<<endl;
+  cout << "  -f <T>[/<T>] - Specify the ptop/vtop file formats " << endl;
+  cout << "                 T should be one of (text|xml|rspec)" << endl;
+  cout << "                 Specifying only one T is equivalent to -f T/T"<<endl;
 #endif
   cout << "  -F          - Apply additional checking to fixed nodes" << endl;
   cout << "  -D          - Dump configuration options" << endl;
@@ -946,6 +946,14 @@ int main(int argc,char **argv) {
     break;
 
 #ifdef WITH_XML
+
+    case 'W':
+    if (strcmp(optarg, "") == 0) {
+      print_help();
+    }
+    vtopOutputFilename = optarg;
+    break;
+
 	case 'f':
 		if (strcmp(optarg, "") == 0) {
 			print_help();
@@ -1253,4 +1261,3 @@ int main(int argc,char **argv) {
       exit(EXIT_SUCCESS);
   }
 }
-
