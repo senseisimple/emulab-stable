@@ -17,10 +17,11 @@ sub DoUpdate($$$)
     }
     DBQueryFatal("REPLACE INTO table_regex VALUES" .
                  " ('virt_lans', 'ofenabled', 'int', 'redirect', ".
-                 "  'default:boolean', 0,0,NULL)");
+                 "  'default:boolean', 0,0,NULL);");
 
     DBQueryFatal("REPLACE INTO table_regex VALUES" .
-                 " ('virt_lans', 'ofcontroller', 'int', 'redirect', ".
-                 "  'default:tinytext', 0,0,NULL)");
+                 " ('virt_lans', 'ofcontroller', 'text', 'redirect', ".
+                 "  'default:tinytext', 0,0,NULL);");
+    return 0;
 }
 1;
