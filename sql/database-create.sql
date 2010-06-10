@@ -3831,6 +3831,8 @@ CREATE TABLE `virt_lans` (
   `layer` tinyint(4) NOT NULL default '2',
   `implemented_by_path` tinytext,
   `implemented_by_link` tinytext,
+  `ofenabled` tinyint(1) default '0',
+  `ofcontroller` tinytext,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),
