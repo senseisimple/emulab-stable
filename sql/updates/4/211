@@ -1,0 +1,26 @@
+#
+# Add virt_paths
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+
+    if (!DBSlotExists("virt_lans", "ofenabled")) {
+        DBQueryFatal("ALTER TABLE virt_lans ADD ".
+		     " `ofenabled` tinyint(1) default '0'");
+    }
+    if (!DBSlotExists("virt_lans", "ofcontroller")) {
+        DBQueryFatal("ALTER TABLE virt_lans ADD ".
+		     " `ofcontroller` tinytext");
+    }
+    DBQueryFatal("REPLACE INTO table_regex VALUES" .
+                 " ('virt_lans', 'ofenabled', 'int', 'redirect', ".
+                 "  'default:boolean', 0,0,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES" .
+                 " ('virt_lans', 'ofcontroller', 'int', 'redirect', ".
+                 "  'default:tinytext', 0,0,NULL)");
+}
+1;

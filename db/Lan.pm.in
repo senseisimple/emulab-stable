@@ -49,6 +49,93 @@ my %LanTables = ("lans"           => ["lanid"],
 		 "ifaces"         => ["lanid", "ifaceid"]);
 
 #
+# Initialize Openflow attributes in lan_attributes table.
+#
+sub InitOpenflowAttributes($$$)
+{
+    my ($exptidx, $vname, $lanid) = @_;
+
+    my $ofenabled = 0;
+    my $ofcontroller = "";
+    my $safe_val;
+    
+    # Add openflow arrtibutes:
+    my $query_result =
+	DBQueryWarn("select ofenabled, ofcontroller from virt_lans ".
+		    "where exptidx='$exptidx' and vname='$vname'");
+    return 0
+	if (!$query_result);	
+    ($ofenabled, $ofcontroller) = $query_result->fetchrow_array()
+	if ($query_result->numrows);  
+	
+    #
+    # Firstly check if the attribuets are there, if no values, 
+    # insert them. This is because the vlan may be created
+    # by Lookup many times. The values can be overwritten by
+    # the later creation.
+    #
+    # Process 'ofenabled':
+    $query_result =
+	DBQueryWarn("select attrvalue from lan_attributes ".
+		    "where lanid='$lanid' and attrkey='ofenabled'");
+    return 0
+	if (!$query_result);
+    if (!$query_result->numrows)
+    {
+	$safe_val = DBQuoteSpecial($ofenabled);
+	$query_result =
+	    DBQueryWarn("replace into lan_attributes set ".
+			"  lanid='$lanid', ".
+			"  attrkey='ofenabled', ".
+			"  attrvalue=$safe_val, ".
+			"  attrtype='integer'");
+	return 0
+	    if (!defined($query_result));	  
+    }
+    
+    # Process 'ofcontroller':
+    $query_result =
+	DBQueryWarn("select attrvalue from lan_attributes ".
+		    "where lanid='$lanid' and attrkey='ofcontroller'");
+    return 0
+	if (!$query_result);
+    if (!$query_result->numrows)
+    {
+	$safe_val = DBQuoteSpecial($ofcontroller);
+	$query_result =
+	    DBQueryWarn("replace into lan_attributes set ".
+			"  lanid='$lanid', ".
+			"  attrkey='ofcontroller', ".
+			"  attrvalue=$safe_val, ".
+			"  attrtype='string'");
+	return 0
+	    if (!defined($query_result));	  
+    }
+
+    # Process 'oflistener':
+    $query_result =
+	DBQueryWarn("select attrvalue from lan_attributes ".
+		    "where lanid='$lanid' and attrkey='oflistener'");
+    return 0
+	if (!$query_result);
+    if (!$query_result->numrows)
+    {
+	$safe_val = DBQuoteSpecial("");
+	$query_result =
+	    DBQueryWarn("replace into lan_attributes set ".
+			"  lanid='$lanid', ".
+			"  attrkey='oflistener', ".
+			"  attrvalue=$safe_val, ".
+			"  attrtype='string'");
+	return 0
+	    if (!defined($query_result));	  
+    }
+    
+    return 1;
+}
+
+
+#
 # Lookup and create a class instance to return.
 #
 sub Lookup($$;$$)
@@ -106,6 +193,9 @@ sub Lookup($$;$$)
     $self->{'LAN'}   = $query_result->fetchrow_hashref();
     $self->{"ATTRS"} = {};
     $self->{"EXPT"}  = $experiment;
+
+    return undef
+    	if (!Lan->InitOpenflowAttributes($self->{'LAN'}->{'exptidx'}, $self->{'LAN'}->{'vname'}, $lanid));
 
     #
     # Grab the attributes for this lan now.
@@ -188,7 +278,7 @@ sub Create($$$;$$$)
     # Need the newly minted ID
     my $lanid = $query_result->insertid();
     my $lan   = Lan->Lookup($lanid);
-
+    	
     print "Created lan: $lan\n"
 	if ($debug && $lan);
     return $lan;
