@@ -1566,15 +1566,20 @@ sub Volunteers($)
 package libossetup_protogeni;
 use base qw(libossetup_handler);
 
+my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
+
 use libdb;
 use libtestbed;
 use libossetup;
 use libtblog;
-use libGeni;
 use Node;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
+
+if ($PGENISUPPORT) {
+    require libGeni;
+}
 
 sub New($$) {
     my ($class, $parent) = @_;
