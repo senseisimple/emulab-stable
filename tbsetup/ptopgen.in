@@ -1655,7 +1655,11 @@ sub print_switch
 	push @$interfaces, "(null)";
     }
     # XXX
-    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, $interfaces,
+    my $types = ["switch:1"];
+    if ($name ne "procurve1") {
+	push(@$types, "*lan:*");
+    }
+    print_node($name, $types, [], [], $uuid, $interfaces,
         $country, $latitude, $longitude, undef);
 }
 
