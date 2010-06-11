@@ -385,7 +385,7 @@ sub GetTickets($$$$)
     };
     print STDERR "Getting all tickets in parallel ...\n";
     
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR "*** GetTickets: Internal error getting tickets\n";
 	#
 	# Need to be careful here; some of the tickets might have been
@@ -779,7 +779,7 @@ sub StartSlivers($$$$)
     };
     print STDERR "Starting all slivers in parallel ...\n";
 
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR "*** StartSlivers: Internal error starting slivers.\n";
 	return -1;
     }
@@ -1095,7 +1095,7 @@ sub DeleteAllSlivers($$)
     };
     print STDERR "Deleting all slivers in parallel ...\n";
 
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR
 	    "*** DeleteAllSlivers: Internal error deleting slivers.\n";
 	#
