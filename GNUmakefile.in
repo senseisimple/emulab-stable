@@ -30,7 +30,7 @@ include Makeconf
 # Then things that depend on stuff we just did:
 #
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
-SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
+SUBDIRS = lib apache db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
 		tools/svn wiki bugdb collab protogeni node_usage install
@@ -41,7 +41,7 @@ else
 SUBDIRS = db tbsetup account protogeni
 endif
 
-all:		all-subdirs 
+all:		all-subdirs just-builddirs 
 
 #
 # We used to statically link our event agents.  We no longer do this, but
@@ -175,6 +175,10 @@ ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 	-chmod 775 $(INSTALL_TOPDIR)/images
 	-ln -s /usr/testbed/bin/nse $(INSTALL_TOPDIR)/bin
 endif
+
+just-builddirs:
+	@$(MAKE) -C rc.d all
+	@$(MAKE) -C apache all
 
 tipserv-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
@@ -424,6 +428,11 @@ elabinelab:
 	-mkdir -p $(INSTALL_TOPDIR)/src
 	rm -f $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
 	tar czf $(INSTALL_TOPDIR)/src/emulab-src.tar.gz -C $(SRCDIR) --exclude=.git .
+
+elabinelab-git:
+	-mkdir -p $(INSTALL_TOPDIR)/src
+	rm -f $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
+	git archive --prefix=testbed/ | gzip -c > $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
