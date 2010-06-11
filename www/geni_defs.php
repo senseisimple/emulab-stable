@@ -174,6 +174,23 @@ class GeniSlice
 	}
 	return null;
     }
+    #
+    # The urn is stored in the certificate.
+    #
+    function urn() {
+	$slice_uuid = $this->uuid();
+	
+	$query_result =
+	    DBQueryFatal("select urn from geni_certificates ".
+			 "where uuid='$slice_uuid'",
+			 $this->dblink);
+
+	if ($query_result && mysql_num_rows($query_result)) {
+	    $row = mysql_fetch_row($query_result);
+	    return $row[0];
+	}
+	return null;
+    }
 }
 
 class GeniUser

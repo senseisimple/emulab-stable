@@ -139,7 +139,7 @@ sub Resolve($)
     
     if ($type eq "node") {
 	my $node  = $object;
-	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id());
+	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id(), "0.1");
 	if (! defined($rspec)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Error getting advertisement");
