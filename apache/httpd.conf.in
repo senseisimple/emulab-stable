@@ -1337,6 +1337,7 @@ SSLCARevocationFile @prefix@/etc/genicrl.bundle
 # supplying a verifiable certificate. 
 #
 SSLVerifyClient optional
+SSLVerifyDepth  10
 
 # Reject the unencrypted certs that all users get. 
 <Location />
@@ -1351,7 +1352,6 @@ ScriptAlias /protogeni/xmlrpc/ses @prefix@/protogeni/xmlrpc/protogeni-ses.pl
 	SSLRequireSSL
 	Order deny,allow
 	allow from all
-	SSLVerifyDepth  5
 </Directory>
 <Directory "@prefix@/protogeni/">
 	SSLRequireSSL
@@ -1361,7 +1361,6 @@ ScriptAlias /protogeni/xmlrpc/ses @prefix@/protogeni/xmlrpc/protogeni-ses.pl
 	Options +ExecCGI +FollowSymLinks
 	SetHandler cgi-script
 	SetEnv USER "nobody"
-	SSLVerifyDepth  5
 </Directory>
 </IfDefine>
 </VirtualHost>                                  
