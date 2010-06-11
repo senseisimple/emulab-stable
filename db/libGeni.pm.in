@@ -452,7 +452,7 @@ sub RedeemTickets($$$)
     };
     print STDERR "Redeeming all tickets in parallel ...\n";
 
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 300}, \@results, $coderef, @resources)) {
 	print STDERR "*** RedeemTickets: Internal error getting tickets\n";
 	#
 	# Need to be careful here; some of the tickets might have been
@@ -515,20 +515,25 @@ sub MapNodes($$)
 
 	print STDERR "$manifest_string\n"
 	    if ($verbose);
-	
+
 	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $manifest)->get_nodelist()) {
-	    my $sliver_urn = GeniXML::GetSliverId($ref);
+	    my $sliver_urn = GeniXML::GetText("sliver_urn", $ref);
 	    my $vname      = GeniXML::GetVirtualId($ref);
 	    my $sshdport   = GeniXML::GetText("sshdport", $ref);
+	    my $manager_urn= GeniXML::GetText("component_manager_urn", $ref);
 
 	    #
 	    # The manifest can include nodes from other CMs. There will not
 	    # be a sliver urn in that case.
 	    #
-	    my $component_manager_urn = GeniXML::GetManagerId($ref);
 	    next
-		if (!defined($sliver_urn) && !defined($component_manager_urn));
+		if (!defined($sliver_urn));
+
+	    # Hmm, still need to check this. 
+	    next
+		if (!defined($manager_urn) ||
+		    $manager_urn ne $resource->manager_urn());
 	    
 	    my $node = $experiment->VnameToNode($vname);
 	    if (!defined($node)) {

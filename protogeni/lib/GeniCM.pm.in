@@ -158,7 +158,7 @@ sub Resolve($)
 					undef, "Nothing here by that name");
 	}
 
-	my $rspec = GetAdvertisement(0, $node->node_id());
+	my $rspec = GetAdvertisement(0, $node->node_id(), "0.1");
 	if (! defined($rspec)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not start avail");
@@ -248,7 +248,7 @@ sub DiscoverResourcesAux($$$)
     #
     # Acquire the advertisement from ptopgen and compress it if requested.
     #
-    my $xml = GetAdvertisement($available, undef);
+    my $xml = GetAdvertisement($available, undef, "0.2");
     if (! defined($xml)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
@@ -266,12 +266,12 @@ sub DiscoverResourcesAux($$$)
 #
 # Use ptopgen in xml mode to spit back an xml file. 
 #
-sub GetAdvertisement($$)
+sub GetAdvertisement($$$)
 {
-    my ($available, $pc) = @_;
+    my ($available, $pc, $version) = @_;
     my $xml = undef;
 
-    my $invocation = "$PTOPGEN -x -g 0.2 -r -p GeniSlices";
+    my $invocation = "$PTOPGEN -x -g $version -r -p GeniSlices";
     $invocation .= " -a" unless $available;
     if (defined($pc)) {
 	$invocation .= " -1 $pc";
