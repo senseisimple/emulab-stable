@@ -3844,6 +3844,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		mbrvers[51];
 	char            *loadpart, *OS, *prepare;
 	int		disknum, nrows, zfill;
+	int             frisbee_pid;
 
 	/*
 	 * Get the address the node should contact to load its image
@@ -3865,10 +3866,12 @@ COMMAND_PROTOTYPE(doloadinfo)
 		return 1;
 	}
 
+
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
 		mysql_free_result(res);
 		return 0;
 	}
+
 
 	if (nrows > 1 && vers <= 29) {
 
@@ -3911,6 +3914,40 @@ COMMAND_PROTOTYPE(doloadinfo)
 		OS = row[2];
 		prepare = row[8];
 
+		res2 = mydb_query("select load_address,frisbee_pid from subboss_images as i "
+				 "left join subbosses as s on s.subboss_id = i.subboss_id "
+				 "where s.node_id = '%s' and s.service = 'frisbee' and "
+				 "i.imageid = '%s' and i.load_address != '' and "
+				 "i.sync != 1", 2, reqp->nodeid, row[7]);
+
+		if (!res2) {
+			error("doloadinfo: %s: DB Error getting subboss info!\n",
+			       reqp->nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
+
+		frisbee_pid = 0;
+		address[0] = '\0';
+
+		if (mysql_num_rows(res2)) {
+			row2 = mysql_fetch_row(res2);
+
+			if (row2[0] && row2[0][0])
+				strcpy(address, row2[0]);
+
+			if (row2[1] && row2[1][0])
+				frisbee_pid = atoi(row2[1]);
+		} else {
+			if (row[0] && row[0][0])
+				strcpy(address, row[0]);
+
+			if (row[3] && row[3][0])
+				frisbee_pid = atoi(row[3]);
+		}
+
+		mysql_free_result(res2);
+
 		/*
 		 * Remote nodes get a URL for the address.
 		 */
@@ -3930,19 +3967,18 @@ COMMAND_PROTOTYPE(doloadinfo)
 			/*
 			 * Simple text string.
 			 */
-			if (! row[0] || !row[0][0]) {
+			if (!address[0]) {
 				mysql_free_result(res);
 				return 0;
 			}
-			strcpy(address, row[0]);
 
 			/*
 			 * Sanity check
 			 */
-			if (!row[3] || !row[3][0]) {
+			if (!frisbee_pid) {
 				error("doloadinfo: %s: "
 				      "No pid associated with address %s\n",
-				      reqp->nodeid, row[0]);
+				      reqp->nodeid, address);
 				mysql_free_result(res);
 				return 1;
 			}
