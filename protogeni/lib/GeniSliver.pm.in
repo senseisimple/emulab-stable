@@ -652,8 +652,9 @@ sub Create($$$$$$)
 	return undef;
     }
     my $hrn;
-    my $sshdport;
+    my $sshdport = 22;
     my $hostname;
+    my $phostname;
     my $resource_id;
     my $sliver_uuid;
 
@@ -671,14 +672,14 @@ sub Create($$$$$$)
 	$sliver_uuid = $vnode->uuid();
 	$resource_id = $vnode->node_id();
 	$hostname = GeniUtil::FindHostname($vnode->node_id());
-	$sshdport = $vnode->sshdport()
-	    if (!defined($vnode->jailip()));
+	$phostname = GeniUtil::FindHostname($vnode->phys_nodeid());
+	$sshdport = $vnode->sshdport();
     }
     else {
 	$hrn = "${PGENIDOMAIN}." . $node->node_id();
 	$sliver_uuid = $node->uuid();
 	$resource_id = $node->node_id();
-	$hostname = GeniUtil::FindHostname($node->node_id());
+	$phostname = $hostname = GeniUtil::FindHostname($node->node_id());
     }
 
     #
@@ -687,6 +688,13 @@ sub Create($$$$$$)
     GeniXML::SetText("sliver_uuid", $rspec, $sliver_uuid);
     GeniXML::SetText("hostname", $rspec, $hostname);
     GeniXML::SetText("sshdport", $rspec, $sshdport) if (defined($sshdport));
+
+    # This is a version 2.0 thing.
+    my $services = GeniXML::AddElement("services", $rspec);
+    my $login = GeniXML::AddElement("login", $services);
+    GeniXML::SetText("authentication", $login, "ssh-keys");
+    GeniXML::SetText("hostname", $login, $phostname);
+    GeniXML::SetText("port", $login, $sshdport);
 
     return GeniSliver->Create($slice, $user, $sliver_uuid, $resource_uuid,
 			      "Node", $resource_id, $hrn, $nickname, $rspec);

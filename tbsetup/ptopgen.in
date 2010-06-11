@@ -407,13 +407,17 @@ if (defined($pid)) {
 # 1) To avoid an explosion in the number of features for nodes
 # 2) To avoid information leaks, allowing projects to see each other's images
 # 
-my $osidquery = "select distinct o.osid, oi.type, o.osname, o.pid, o.OS, o.version, o.description from os_info as o " .
+my $osidquery = "select distinct o.osid, oi.type, o.osname, o.pid, o.OS, o.version, o.description,o.protogeni_export from os_info as o " .
 	"left join osidtoimageid as oi on o.osid = oi.osid " .
 	"left join images as i on oi.imageid = i.imageid ".
 	"where i.global = 1";
 if ($pid) {
     $osidquery .= " or i.pid='$pid'";
 }
+
+my $defaultosidquery = 'select distinct o.osid, t.type, o.osname, o.pid, o.OS, o.version, o.description, o.protogeni_export '.
+    'from os_info as o left join node_type_attributes as t '.
+    'on (o.osid=t.attrvalue) where t.attrkey="default_osid"';
 
 #
 # For subOS support (i.e., vnode OSes running atop vhost OSes), we have to
@@ -434,41 +438,55 @@ if ($pid) {
 }
 $subosidquery .= ")";
 
-my %node_type_osids;
-my %osid_node_types;
-my %osid_subosids;
-my %osid_name;
-my %osid_pid;
-my %osid_os;
-my %osid_version;
-my %osid_description;
-my %node_countries;
-my %node_latitudes;
-my %node_longitudes;
+our %node_type_osids;
+our %osid_node_types;
+our %osid_subosids;
+our %osid_name;
+our %osid_pid;
+our %osid_os;
+our %osid_version;
+our %osid_description;
+our %node_countries;
+our %node_latitudes;
+our %node_longitudes;
+
 $result = DBQueryFatal($osidquery);
-while (my ($osid,$type,$osname,$ospid,$osos,
-	   $osversion,$osdescription) = $result->fetchrow()) {
-    if ($typemap{$type}) {
-	push(@{ $typemap{$type}->{'OSLIST'} }, $osid);
-	$osid_name{$osid} = $osname;
-	$osid_pid{$osid} = $ospid;
-	$osid_os{$osid} = $osos;
-	$osid_version{$osid} = $osversion;
-	$osid_description{$osid} = $osdescription;
-    }
-    if ($node_type_osids{$type}) {
-	push @{$node_type_osids{$type}}, $osid;
-    } else {
-	$node_type_osids{$type} = [$osid];
-    }
-    #
-    # We have to maintain a data structure telling us which types an OSID could
-    # be on for use below with generic OSIDs
-    #
-    if ($osid_node_types{$osid}) {
-	push @{$osid_node_types{$osid}}, $type;
-    } else {
-	$osid_node_types{$osid} = [$type];
+processOs($result);
+
+$result = DBQueryFatal($defaultosidquery);
+processOs($result);
+
+sub processOs
+{
+    my $result = shift(@_);
+    while (my ($osid,$type,$osname,$ospid,$osos,
+	       $osversion,$osdescription,$geni) = $result->fetchrow()) {
+	if ($typemap{$type}) {
+	    my $default = $typemap{$type}->{'OSID'};
+	    if ($geni eq 1 ||
+		(defined($default) && $default eq $osid)) {
+		push(@{ $typemap{$type}->{'OSLIST'} }, $osid);
+		$osid_name{$osid} = $osname;
+		$osid_pid{$osid} = $ospid;
+		$osid_os{$osid} = $osos;
+		$osid_version{$osid} = $osversion;
+		$osid_description{$osid} = $osdescription;
+	    }
+	}
+	if ($node_type_osids{$type}) {
+	    push @{$node_type_osids{$type}}, $osid;
+	} else {
+	    $node_type_osids{$type} = [$osid];
+	}
+	#
+	# We have to maintain a data structure telling us which types an OSID could
+	# be on for use below with generic OSIDs
+	#
+	if ($osid_node_types{$osid}) {
+	    push @{$osid_node_types{$osid}}, $type;
+	} else {
+	    $osid_node_types{$osid} = [$type];
+	}
     }
 }
 #
@@ -1173,13 +1191,14 @@ if ($widearea && ! defined($component_name)) {
 if ($genimode ne $NO_GENI) {
     foreach $key (keys %interfaceroles) {
 	if (is_public_interface($key)) {
-	    $key =~ /^([^:]+):([^:]+)$/;
-	    my $node = $1;
-	    my $iface = $2;
-	    if (defined($nodes{$node})) {
-		print_simple_link($node, $iface,
-				  $fake_inet_switch, $fake_inet_iface,
-				  100000, 0, 0, @inet_protos);
+	    if ($key =~ /^([^:]+):([^:]+)$/) {
+		my $node = $1;
+		my $iface = $2;
+		if (defined($nodes{$node})) {
+		    print_simple_link($node, $iface,
+				      $fake_inet_switch, $fake_inet_iface,
+				      100000, 0, 0, @inet_protos);
+		}
 	    }
 	}
     }
@@ -1636,7 +1655,11 @@ sub print_switch
 	push @$interfaces, "(null)";
     }
     # XXX
-    print_node($name, ["switch:1", "*lan:*"], [], [], $uuid, $interfaces,
+    my $types = ["switch:1"];
+    if ($name ne "procurve1") {
+	push(@$types, "*lan:*");
+    }
+    print_node($name, $types, [], [], $uuid, $interfaces,
         $country, $latitude, $longitude, undef);
 }
 

@@ -199,6 +199,7 @@ if (!defined($experiment)) {
 }
 my $special = ($pid eq "testbed" || $pid eq "tbres" ||
 	       $pid eq "emulab-ops" || $pid eq "utahstud");
+my $newsetup = ($pid eq "testbed" || $pid eq "geni");
 
 #
 # Print starting message.
@@ -1285,8 +1286,10 @@ sub doSwapin($) {
     #
     print "Resetting OS and rebooting.\n";
     TBDebugTimeStamp("launching os_setup");
-    if (!($os_setup_pid = fork())) { 
-	exec("os_setup $pid $eid") or return 1;
+    if (!($os_setup_pid = fork())) {
+	my $oscmd = ($newsetup ? "os_setup_new" : "os_setup");
+	
+	exec("$oscmd $pid $eid") or return 1;
     } elsif ($os_setup_pid == -1) {
 	tberror "Fork failed.";
 	return 1;

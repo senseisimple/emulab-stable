@@ -1263,13 +1263,12 @@ sub GenVirtNodes($)
 		$self->{'RSPEC'} = {
 		    'generated_by' => 'libvtop',
 		    'type'  => 'request',
-		    'xmlns' => 'http://www.protogeni.net/resources/rspec/0.1',
+		    'xmlns' => 'http://www.protogeni.net/resources/rspec/0.2',
 		    'node'  => [] };
 	    }
 	    push(@{ $self->rspec()->{'node'} }, $ref);
 	    next;
 	}
-
 	my $subnodestr = "";
 	if ($vnode->_issubnode()) {
 	    my $parent  = $vnode->_parent();
@@ -3310,7 +3309,7 @@ sub ReadRspecSolution($$)
     $self->printdb("Nodes:\n");
 
     foreach my $ref (@{ $self->rspec()->{'node'} }) {
-	my $node_urn = $ref->{'component_urn'};
+	my $node_urn = $ref->{'component_urn'} || $ref->{'component_uuid'};
 	my $virtual  = $ref->{'virtual_id'};
 
 	# Skip LAN/Fake nodes.
@@ -3769,7 +3768,7 @@ sub AllocNodes($)
     if (defined($self->rspec()) && !$self->impotent()) {
 	$self->printdb("Requesting geni tickets ...\n");
 	
-	if (libGeni::GetTickets($self->experiment(), $self->impotent(),
+	if (libGeni::GetTickets($self->experiment(), $self->verbose(),
 				$self->user(), $self->rspec())) {
 	    tberror("Could not allocate Geni Tickets\n");
 	    return -1;
@@ -3882,7 +3881,8 @@ sub AllocNodes($)
 	my $vpnodename = $self->solution_v2v()->{$vnodename};
 	my $vpnode     = $self->pnodes()->{$vpnodename};
 	
-	if ($vpnode->isjailed() || $vpnode->isremotenode()) {
+	if ($vpnode->isjailed() ||
+	    $vpnode->isremotenode() || $vpnode->_onsharednode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
 	    my $sshdport  = nextipportnum($pnode);

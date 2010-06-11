@@ -52,13 +52,13 @@ TARGETS = emdb.pm emutil.pm emdbi.pm
 SETUID_SBIN_SCRIPTS =
 endif
 
-$(SUBBOSS_BIN_SCRIPTS):
-
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
 all:	$(TARGETS)
+
+$(SUBBOSS_BIN_SCRIPTS):
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

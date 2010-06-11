@@ -29,7 +29,7 @@ sub usage()
     exit(-1);
 }
 my $optlist  = "id";
-my $debug    = 0;
+my $debug    = 1;
 my $impotent = 0;
 
 #
@@ -37,7 +37,6 @@ my $impotent = 0;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -261,7 +260,7 @@ foreach my $node (@nodelist) {
     # dynamic in how the modules are loaded/defined, perhaps specified on
     # a per-type basis in the DB.
     #
-    my $object = $MyStruct->TypeCache($node);
+    my $object = $MyStruct->TypeLookup($node);
     if (!defined($object)) {
 	$object = $MyStruct->NewType($type);
 	if (!defined($object)) {
@@ -309,8 +308,12 @@ while (1) {
     # Go through and ask each one for volunteers. 
     #
     foreach my $object (@{ $objects }) {
+	print "Asking $object for volunteers\n"
+	    if ($debug);
 	my @list = $object->Volunteers();
-	last
+	print "$object returns volunteers: @list\n"
+	    if ($debug && @list);
+	next
 	    if (! @list);
 	@nodes = (@nodes, @list);
 	push(@volunteers, [$object, \@list]);
@@ -368,6 +371,7 @@ while (1) {
     }
 
     # And wait. 
+    print STDERR "Waiting for nodes ...\n";
     $MyStruct->WaitForNodes(@nodes);
 
     #
@@ -481,6 +485,11 @@ foreach (keys(%{ $MyStruct->failedlist() })) {
 foreach (keys(%{ $MyStruct->nodelist() })) {
     my $node   = $MyStruct->node($_);
     my $osinfo = $node->_bootosinfo();
+
+    # Was not setup to do anything, so ignore.
+    next
+	if (!defined($osinfo));
+    
     my $osid   = $osinfo->osid();
     my $type   = $node->type();
     $total{$osid}{any_type}++;

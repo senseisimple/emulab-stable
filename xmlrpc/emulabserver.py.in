@@ -4552,13 +4552,29 @@ class elabinelab:
         if not xmlfilename:
             return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
 
-        argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+        #
+        # Create a temporary file for the output.
+        #
+        (outfp, outfilename) = writensfile("");
+        if not outfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
 
-        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxyv2 " + argstr)
+        argstr  = "-o " + outfilename + " ";
+        argstr += "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+
+        (exitval,output) = runcommand(TBDIR + "/sbin/snmpit.proxyv2 " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+
+        #
+        # Results are in the outfile.
+        #
+        stuff = ""
+        for l in outfp:
+            stuff += l
+            pass
         
-        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, stuff, output=output)
     
     #
     # Fire up a frisbeed for an image,

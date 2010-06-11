@@ -64,12 +64,18 @@ $| = 1;
 BEGIN
 {
     if (-e "../Makeconf") {
+	my $srcdir = "@top_srcdir@";
 	my $objdir = `/bin/pwd`;
 	chomp($objdir);
 	# Prior to first install or running from object dir.
 	unshift(@INC, "$objdir/../db");
-	unshift(@INC, "$objdir/@top_srcdir@/install");
-	unshift(@INC, "$objdir/@top_srcdir@/tbsetup");
+	if ($srcdir =~ /^\//) {
+	    unshift(@INC, "$srcdir/install");
+	    unshift(@INC, "$srcdir/tbsetup");
+	} else {
+	    unshift(@INC, "$objdir/$srcdir/install");
+	    unshift(@INC, "$objdir/$srcdir/tbsetup");
+	}
 	unshift(@INC, "$objdir/../tbsetup");
     }
 }
@@ -117,10 +123,17 @@ if (! (-e "../db/dbupdate" && -e "./update-install")) {
 my $objdir = `/bin/pwd`;
 chomp($objdir);
 
+my $abssrcdir;
+if ($SRCDIR =~ /^\//) {
+    $abssrcdir = "$SRCDIR";
+} else {
+    $abssrcdir = "$objdir/$SRCDIR";
+}
+
 my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
 	       "-I${objdir}/../db", 
-	       "-I${objdir}/${SRCDIR}/tbsetup",
-	       "-I${objdir}/${SRCDIR}/install",
+	       "-I${abssrcdir}/tbsetup",
+	       "-I${abssrcdir}/install",
 	       # To catch a few extra things that do not normally change.
 	       "-I@prefix@/lib"
 	       );
@@ -167,6 +180,8 @@ if ($verify) {
     print "    this is resolved. Typically, you can resolve this by:\n\n";
     print "        boss> cd /your/object/dir\n";
     print "        boss> gmake update-testbed\n\n";
+    print "    More information is available at:\n";
+    print "       https://users.emulab.net/trac/emulab/wiki/install/update-testbed-v2\n\n";
     exit($exitval);
 }
 

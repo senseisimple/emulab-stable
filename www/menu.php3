@@ -1137,10 +1137,9 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	    TBGetVersionInfo($major, $minor, $build);
 	
 	    $versioninfo = "Vers: $major.$minor Build: $build";
-
-	    $hash = TBGetCommitHash();
-	    if ($hash) {
-		$commithash = "$hash";
+	    $commithash  = TBGetCommitHash();
+	    if (!$commithash) {
+		$commithash = "";
 	    }
 	}
 	echo "<div id='versioninfo'>$versioninfo";
@@ -1212,7 +1211,7 @@ function PAGEFOOTER($view = NULL) {
                 </ul>
                 <!-- begin copyright -->
                 <span class='copyright'>
-                <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
+                <a href=$TBDOCBASE/copyright.php>
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </span>\n";
     }
