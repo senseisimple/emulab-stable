@@ -452,7 +452,7 @@ sub RedeemTickets($$$)
     };
     print STDERR "Redeeming all tickets in parallel ...\n";
 
-    if (ParRun({'maxwaittime' => 300}, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR "*** RedeemTickets: Internal error getting tickets\n";
 	#
 	# Need to be careful here; some of the tickets might have been
@@ -710,6 +710,9 @@ sub MapNodes($$)
 		}
 	    }
 	}
+	print STDERR Dumper($manifest)
+	    if ($verbose);
+	
 	# The manifest was changed above.
 	if ($resource->UpdateManifest($manifest)) {
 	    print STDERR "Could not store manifest for $resource\n";
