@@ -395,7 +395,7 @@ sub RestartSubbossDhcp($$)
 {
         my ($subboss, $restart) = @_;
 
-        my $cmd = "ssh $subboss @prefix@/bin/subboss_dhcpd_makeconf";
+        my $cmd = "ssh $subboss @prefix@/sbin/subboss_dhcpd_makeconf";
 
         $cmd .= " -r" if ($restart);
 
