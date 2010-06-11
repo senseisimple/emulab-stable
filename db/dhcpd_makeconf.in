@@ -57,6 +57,9 @@ my %singlectlnet    = ();
 my $template        = $DHCPD_TEMPLATE;
 my $outfile	    = "/tmp/dhcpd_makeconf.$$";
 my $OUT		    = *STDOUT;
+my %subboss_dhcp_servers;
+
+sub RestartSubbossDhcp($$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -175,6 +178,7 @@ while (my %row = $query_result->fetchhash()) {
 	    $tftp_subbosses{$node_id} = $row{"IP"};
     } elsif ($row{"service"} eq 'dhcp') {
 	    $dhcp_subbosses{$node_id} = $row{"IP"};
+	    $subboss_dhcp_servers{$row{"subboss_id"}} = 1;
     } elsif ($row{"service"} eq 'bootinfo') {
 	    $bootinfo_subbosses{$node_id} = $row{"IP"};
     }
@@ -365,6 +369,11 @@ if ($install) {
 	    fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
 	}
     }
+
+    for my $subboss (keys %subboss_dhcp_servers) {
+        RestartSubbossDhcp($subboss, $restart);
+    }
+
     TBScriptUnlock();
 }
 exit(0);
@@ -380,5 +389,19 @@ sub fatal {
 
     die("*** $0:\n".
 	"    $msg\n");
+}
+
+sub RestartSubbossDhcp($$)
+{
+        my ($subboss, $restart) = @_;
+
+        my $cmd = "ssh $subboss @prefix@/sbin/subboss_dhcpd_makeconf";
+
+        $cmd .= " -r" if ($restart);
+
+        print "Restarting dhcpd on subboss $subboss\n";
+        if (system($cmd)) {
+	    print STDERR "Failed to restart dhcpd on $subboss\n";
+	}
 }
 
