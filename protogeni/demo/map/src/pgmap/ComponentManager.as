@@ -33,10 +33,13 @@
 		[Bindable]
 		public var Hrn : String = "";
 		
+		public var Urn : String = "";
+		
 		[Bindable]
 		public var Show : Boolean = false;
 		
-		public var Message : String = "";
+		public var errorMessage : String = "";
+		public var errorDescription : String = "";
 		
 		public var Nodes:PhysicalNodeGroupCollection = new PhysicalNodeGroupCollection();
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();
@@ -60,6 +63,11 @@
 				return Url;
 		}
 		
+		public function VisitUrl():String
+		{
+			return Url.substr(0, Url.length-3);
+		}
+		
 		private static var NODE_PARSE : int = 0;
 	    private static var LINK_PARSE : int = 1;
 	    private static var DONE : int = 2;
@@ -77,6 +85,11 @@
 	    private var linkDictionary:Dictionary;
 	    public var Rspec:XML = null;
 	    
+	    public function mightNeedSecurityException():Boolean
+	    {
+	    	return errorMessage.search("#2048") > -1;
+	    }
+	    
 	    public function clear():void
 	    {
 	    	Nodes = new PhysicalNodeGroupCollection();
@@ -84,7 +97,8 @@
 			AllNodes = new ArrayCollection();
 			Rspec = null;
 			Status = ComponentManager.UNKOWN;
-			Message = "";
+			errorMessage = "";
+			errorDescription = "";
 	    }
 	    
 	    public function processRspec(afterCompletion : Function):void {
