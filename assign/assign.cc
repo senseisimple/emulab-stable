@@ -187,9 +187,10 @@ void read_physical_topology(char *filename) {
   
 #ifdef WITH_XML
   if (ptop_xml_input) {
-		cout << "Physical Graph: " << parse_ptop_xml(PG,SG,filename) << endl;
-  } else if (ptop_rspec_input) {
-	  cout << "Physical Graph: " << parse_ptop_rspec (PG, SG, filename) << endl;
+	cout << "Physical Graph: " << parse_ptop_xml(PG,SG,filename) << endl;
+  } 
+  else if (ptop_rspec_input) {
+	cout << "Physical Graph: " << parse_advertisement(PG, SG, filename) << endl;
 	}
 	else {
       cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
@@ -310,7 +311,7 @@ void read_virtual_topology(char *filename) {
 	cout << "Virtual Graph: " << parse_vtop_xml(VG,filename) << endl;
   }
   else if (vtop_rspec_input){
-  	  cout << "Virtual Graph: " << parse_vtop_rspec (VG, filename) << endl ;
+  	  cout << "Virtual Graph: " << parse_request (VG, filename) << endl;
   }
   else {
       cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;

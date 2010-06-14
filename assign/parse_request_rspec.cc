@@ -66,35 +66,20 @@ static rspec_parser* rspecParser;
  * These are not meant to be used outside of this file,so they are only
  * declared in here
  */
-bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg, 
+static bool populate_nodes(DOMElement *root, tb_vgraph &vg, 
 		                  	map< pair<string, string>,
 		                      	 pair<string, string> >* fixed_interfaces);
-bool populate_links_rspec(DOMElement *root, tb_vgraph &vg, 
+static bool populate_links(DOMElement *root, tb_vgraph &vg, 
 							map< pair<string, string>, 
 								 pair<string, string> >* fixed_interfaces);
 							   					
-bool populate_vclasses_rspec (DOMElement *root, tb_vgraph &vg);
-
+DOMElement* appendChildTagWithData (DOMElement* parent, 
+									const char* tag_name, 
+									const char* child_value);
 string generate_virtualNodeId (string virtual_id);
 string generate_virtualIfaceId(string node_name, int interface_number);
 
-DOMElement* appendChildTagWithData (DOMElement* parent, 
-									const char*tag_name, 
-									const char* child_value);
-
-string numToString (int num);
-string numToString (double num);
-float stringToNum (string str);
-
-int getRspecVersion (DOMElement* root);
-
-bool hasComponentSpec (DOMElement* element);
-
-void populate_policies(DOMElement *root);
-
-int parse_fds_xml (const DOMElement* tag, node_fd_set *fd_set);
-
-int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
+int parse_request(tb_vgraph &vg, char *filename) {
     /* 
      * Fire up the XML domParser
      */
@@ -109,6 +94,7 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
     domParser->setDoNamespaces(true);
     domParser->setDoSchema(true);
     domParser->setValidationSchemaFullChecking(true);
+	//domParser->setExternalSchemaLocation("http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd");
         
     /*
      * Just use a custom error handler - must admin it's not clear to me why
@@ -146,7 +132,7 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
 		{
 			cerr << "Error: RSpec type must be \"request\"" << endl;
 			exit (EXIT_FATAL);
-		}
+		} 
         
         // NOTE: Not sure about datetimes. They are strings for now
         XStr generated (request_root->getAttribute(XStr("generated").x()));
@@ -154,9 +140,7 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
 		
 		// Initialize the rspec parser with the correct object depending
 		// on the version of the rspec.
-		
-		// getRspecVerson converts the v0.1 to v1.
-		int rspecVersion = getRspecVersion(request_root);
+		int rspecVersion = rspec_parser_helper::getRspecVersion(request_root);
 		switch (rspecVersion)
 		{
 			case 1:
@@ -179,7 +163,7 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
         * structures
         */
         XMLDEBUG("starting node population" << endl);
-        if (!populate_nodes_rspec(request_root,vg, &fixed_interfaces)) {
+        if (!populate_nodes(request_root,vg, &fixed_interfaces)) {
 			cerr << "Error reading nodes from virtual topology " 
 				 << filename << endl;
 			exit(EXIT_FATAL);
@@ -187,7 +171,7 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
         XMLDEBUG("finishing node population" << endl);
         
         XMLDEBUG("starting link population" << endl);
-        if (!populate_links_rspec(request_root,vg, &fixed_interfaces)) {
+        if (!populate_links(request_root,vg, &fixed_interfaces)) {
 			cerr << "Error reading links from virtual topology " 
 				 << filename << endl;
 			exit(EXIT_FATAL);
@@ -208,7 +192,9 @@ int parse_vtop_rspec(tb_vgraph &vg, char *filename) {
     return 0;
 }
 
-bool populate_node(DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pair<string,string> >* fixed_interfaces) 
+bool populate_node(DOMElement* elt, 
+					tb_vgraph &vg, map< pair<string,string>, 
+					pair<string,string> >* fixed_interfaces) 
 {	
 	bool hasVirtualId;
 	string virtualId = rspecParser->readVirtualId(elt, hasVirtualId);
@@ -247,7 +233,7 @@ bool populate_node(DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pai
 				<< " were not unique."	<< endl;
 		return false;
 	}
-	fixed_interfaces->insert(fixedIfacesOnNode.begin(), fixedIfacesOnNode.end());
+	fixed_interfaces->insert(fixedIfacesOnNode.begin(),fixedIfacesOnNode.end());
 	
 	/* Deal with the location tag */
 	cerr << "WARNING: Country information will be ignored" << endl;
@@ -259,6 +245,7 @@ bool populate_node(DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pai
 
 	int typeCount;
 	vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
+	cerr << " Here " << endl;
 	bool no_type = (typeCount == 0);
 	if (typeCount > 1) {
 		cerr << "ERROR: Too many node types (" << typeCount << ") on " 
@@ -272,6 +259,8 @@ bool populate_node(DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pai
 		
 	bool isUnlimited = (typeSlots == 1000);
 		
+	cerr << "Done parsing node types " << endl;
+	
 	/*
 	 * Make a tb_ptype structure for this guy - or just add this node to
 	 * it if it already exists
@@ -351,6 +340,8 @@ bool populate_node(DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pai
 	virtual_nodes.push_back(vv);
 	put(vvertex_pmap,vv,v);
 		
+	// If a component manager has been specified, then the node must be 
+	// managed by that CM. We implement this as a desire.
 	if (hasCMId) 
 	{
 		tb_node_featuredesire node_fd (
@@ -367,7 +358,7 @@ bool populate_node(DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pai
 /*
  * Pull nodes from the document, and populate assign's own data structures
  */
-bool populate_nodes_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
+bool populate_nodes(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
 	bool is_ok = true;
     /*
      * Get a list of all nodes in this document
@@ -499,11 +490,11 @@ bool populate_link (DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pa
 								XStr(interface.virtualNodeId 
 										+ string(":") + str_lan_id).x());
 			appendChildTagWithData(link, "bandwidth",
-										numToString(bandwidth).c_str());
+								rspecParser->numToString(bandwidth).c_str());
 			appendChildTagWithData(link, "latency",
-								   		numToString(latency).c_str());
+								rspecParser->numToString(latency).c_str());
 			appendChildTagWithData(link, "packet_loss",
-										numToString(packetLoss).c_str());
+								rspecParser->numToString(packetLoss).c_str());
 				
 			DOMElement* src_interface_ref 
 							= doc->createElement(XStr("interface_ref").x());
@@ -667,7 +658,7 @@ bool populate_link (DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pa
 /*
  * Pull the links from the ptop file, and populate assign's own data sturctures
  */
-bool populate_links_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
+bool populate_links(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
     
     bool is_ok = true;
     
@@ -687,6 +678,16 @@ bool populate_links_rspec(DOMElement *root, tb_vgraph &vg, map< pair<string, str
     return is_ok;
 }
 
+DOMElement* appendChildTagWithData (DOMElement* parent, 
+									const char* tag_name, 
+									const char* child_value)
+{
+	DOMElement* child = doc->createElement(XStr(tag_name).x());
+	child->appendChild(doc->createTextNode(XStr(child_value).x()));
+	parent->appendChild(child);
+	return child;
+}
+
 string generate_virtualNodeId (string virtual_id) 
 {
 	std:ostringstream oss;
@@ -697,54 +698,11 @@ string generate_virtualNodeId (string virtual_id)
 	return oss.str();
 }
 
-DOMElement* appendChildTagWithData (DOMElement* parent, const char*tag_name, const char* child_value)
-{
-	DOMElement* child = doc->createElement(XStr(tag_name).x());
-	child->appendChild(doc->createTextNode(XStr(child_value).x()));
-	parent->appendChild(child);
-	return child;
-}
-
 string generate_virtualIfaceId (string lan_name, int interface_number)
 {
 	std:ostringstream oss;
 	oss << lan_name << ":" << interface_number;
 	return oss.str();
-}
-
-string numToString(int num)
-{
-	std::ostringstream oss;
-	oss << num;
-	return oss.str();
-}
-
-string numToString(double num)
-{
-	std::ostringstream oss;
-	oss << num;
-	return oss.str();
-}
-
-float stringToNum (string s)
-{
-	float num;
-	std::istringstream iss(s);
-	iss >> num;
-	return num;
-}
-
-int getRspecVersion (DOMElement* root)
-{
-	string schemaLocAttr =
-		string (XStr(root->getAttribute(XStr("xsi:schemaLocation").x())).c());
-	string schemaLocation = schemaLocAttr.substr(0,schemaLocAttr.find(' '));
-	float tmpRspecVersion 
-			=  stringToNum(schemaLocation.substr(schemaLocation.rfind('/')+1));
-	int rspecVersion = (int)tmpRspecVersion;
-	if (tmpRspecVersion < 1)
-		rspecVersion = 1;
-	return rspecVersion;
 }
 
 #endif

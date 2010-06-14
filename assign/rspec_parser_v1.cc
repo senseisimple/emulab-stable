@@ -179,13 +179,4 @@ map< pair<string, string>, pair<string, string> >
 	return fixedInterfaces;
 }
 
-void rspec_parser_v1 :: dummyFun ()
-{
-	set< pair<string, string> >::iterator it;
-	cerr << "Ifaces seen" << endl;
-	for (it = (this->ifacesSeen).begin(); it != (this->ifacesSeen).end(); it++)
-		cerr << "(" << it->first << "," << it->second << ")" << endl;
-	cerr << endl;
-}
-
 #endif

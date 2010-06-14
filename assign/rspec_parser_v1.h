@@ -47,9 +47,6 @@ class rspec_parser_v1 : public rspec_parser
 		std::vector<struct link_interface> readLinkInterface
 									(const xercesc::DOMElement* link, int& ifaceCount);
 		struct link_interface getIface (const xercesc::DOMElement*);
-
-		void dummyFun ();
-		
 };
 
 #endif

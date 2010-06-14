@@ -18,6 +18,19 @@
 #include "xstr.h"
 #include <xercesc/dom/DOM.hpp>
 
+using namespace rspec_emulab_extension;
+
+rspec_parser :: rspec_parser (int type)
+{
+	this->emulabExtensions = new emulab_extensions_parser(type);
+	this->rspecType = type; 
+}
+
+rspec_parser :: ~rspec_parser ()
+{
+	free(this->emulabExtensions);
+}
+
 struct link_interface rspec_parser :: getIface (const DOMElement* tag)
 {
 	bool exists;
@@ -99,7 +112,7 @@ vector<struct node_type> rspec_parser::readNodeTypes (const DOMElement* node,
 		if (slot == "unlimited")
 			typeSlots = unlimitedSlots;
 		else 
-			typeSlots = atoi(slot.c_str());
+			typeSlots = (int)stringToNum(slot);
 			
 		bool isStatic = tag->hasAttribute(XStr("static").x());
 		struct node_type type = {typeName, typeSlots, isStatic};
@@ -250,10 +263,6 @@ vector<struct link_type> rspec_parser::readLinkTypes (const DOMElement* link,
 	}
 	typeCount = linkTypes->getLength();
 	return types;
-}
-
-void rspec_parser :: dummyFun ()
-{
 }
 
 string rspec_parser :: readSubnodeOf (const DOMElement* tag, bool& isSubnode)

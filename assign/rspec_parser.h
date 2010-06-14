@@ -75,7 +75,7 @@ class rspec_parser : public rspec_parser_helper
 // 		std::string readChild (const xercesc::DOMElement*, const char*, bool&);
 	protected:
 		// Extensions parser object
-		emulab_extensions_parser* emulabExtensions;
+		rspec_emulab_extension::emulab_extensions_parser* emulabExtensions;
 		
 		int rspecType; 
 		std::set< std::pair<std::string, std::string> >ifacesSeen;
@@ -83,13 +83,8 @@ class rspec_parser : public rspec_parser_helper
 		
 	public:
 		// Constructors and destructors
-		rspec_parser(int type) { 
-			this->emulabExtensions = new emulab_extensions_parser(type);
-			this->rspecType = type; 
-		}
-		~rspec_parser() {
-			free (this->emulabExtensions);
-		}
+		rspec_parser(int type);
+		~rspec_parser();
 		
 		// Common functions
 		virtual std::string readPhysicalId (const xercesc::DOMElement*, bool&);
@@ -135,9 +130,8 @@ class rspec_parser : public rspec_parser_helper
 		// Ideally, this ought to be done automatically,
 		// but there doesn't seem to be a clean way of making it happen.
 		virtual std::map< std::pair<std::string, std::string>, 
-										  std::pair<std::string, std::string> >
+						  std::pair<std::string, std::string> >
 					readInterfacesOnNode (const xercesc::DOMElement*, bool&);
-		virtual void dummyFun();
 };
 
 

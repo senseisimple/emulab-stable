@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+
 const XMLCh* getChildValue(const DOMElement *tag, const char *name) {
     DOMNodeList *list = tag->getElementsByTagName(XStr(name).x());
     if (list->getLength() != 1) {

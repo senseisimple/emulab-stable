@@ -15,7 +15,9 @@ static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.7 2009-10-21 
 #include "parse_advertisement_rspec.h"
 #include "xmlhelpers.h"
 #include "parse_error_handler.h"
+#include "rspec_parser_helper.h"
 #include "rspec_parser_v1.h"
+#include "rspec_parser_v2.h"
 
 #include <fstream>
 #include <map>
@@ -54,7 +56,8 @@ extern name_vclass_map vclass_map;
 
 // This is a hash map of the entire physical topology 
 // because it takes far too long for it to search the XML DOM tree.
-map<string, DOMElement*>* advertisement_elements = new map<string, DOMElement*>();
+map<string, DOMElement*>* advertisement_elements 
+										= new map<string, DOMElement*>();
 DOMElement* advt_root = NULL;
 
 /*
@@ -70,16 +73,12 @@ static rspec_parser* rspecParser;
  * These are not meant to be used outside of this file, so they are only
  * declared in here
  */
-bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+static bool populate_nodes(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			  set<string> &unavailable);
-bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+static bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			  set<string> &unavailable);
 
-void populate_policies(DOMElement *root);
-
-int parse_fds_xml (const DOMElement* tag, node_fd_set *fd_set);
-
-int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
+int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     /* 
      * Fire up the XML parser
      */
@@ -94,16 +93,7 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     domParser->setDoNamespaces(true);
     domParser->setDoSchema(true);
     domParser->setValidationSchemaFullChecking(true);
-    
-		//TODO: Determine version number here
-		rspecParser = new rspec_parser_v1(RSPEC_TYPE_ADVT);
-		
-    /*
-     * Must validate against the ptop schema
-     */
-/*		domParser -> setExternalSchemaLocation
-			("http://www.protogeni.net/resources/rspec/0.1 " SCHEMA_LOCATION);*/
-    
+	    
     /*
      * Just use a custom error handler - must admin it's not clear to me why
      * we are supposed to use a SAX error handler for this, but this is what
@@ -131,17 +121,33 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
         * Get the root of the document - we're going to be using the same root
         * for all subsequent calls
         */
-        DOMDocument *doc = domParser->getDocument();
+        DOMDocument* doc = domParser->getDocument();
         advt_root = doc->getDocumentElement();
         set<string> unavailable; // this should really be an unordered_set,
 	    // but that's not very portable yet
 
+		int rspecVersion = rspec_parser_helper::getRspecVersion(advt_root);
+		switch (rspecVersion)
+		{
+			case 1:
+				rspecParser = new rspec_parser_v1(RSPEC_TYPE_ADVT);
+				break;
+			case 2:
+				rspecParser = new rspec_parser_v2(RSPEC_TYPE_ADVT);
+				break;
+			default:
+				cerr << "ERROR: Unsupported rspec ver. " << rspecVersion
+						<< " ... Aborting " << endl;
+				exit(EXIT_FATAL);
+		}
+		XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
+		
         bool is_physical;
         XStr type (advt_root->getAttribute(XStr("type").x()));
         if (strcmp(type.c(), "advertisement") == 0)
         	is_physical = true;
-				else if (strcmp(type.c(), "request") == 0)
-					is_physical = false;
+		else if (strcmp(type.c(), "request") == 0)
+			is_physical = false;
         
         // XXX: Not sure about datetimes, so they are strings for now
         XStr generated (advt_root->getAttribute(XStr("generated").x()));
@@ -152,24 +158,19 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
         * structures
         */
         XMLDEBUG("starting node population" << endl);
-        if (!populate_nodes_rspec(advt_root,pg,sg,unavailable)) {
+        if (!populate_nodes(advt_root,pg,sg,unavailable)) {
         	cerr << "Error reading nodes from physical topology "
 							 << filename << endl;
         	exit(EXIT_FATAL);
         }
         XMLDEBUG("finishing node population" << endl);
-//         cerr << "Dummy fun: ";
-// 				rspecParser->dummyFun();
-				XMLDEBUG("starting link population" << endl);
-        if (!populate_links_rspec(advt_root,pg,sg,unavailable)) {
+		XMLDEBUG("starting link population" << endl);
+        if (!populate_links(advt_root,pg,sg,unavailable)) {
         	cerr << "Error reading links from physical topology "
 							 << filename << endl;
         	exit(EXIT_FATAL);
         }
         XMLDEBUG("finishing link population" << endl);
-        
-        // TODO: We need to do something about these policies
-		//populate_policies(root);
         
         cerr << "RSpec parsing finished" << endl; 
     }
@@ -178,14 +179,14 @@ int parse_ptop_rspec(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     * All done, clean up memory
     */
 //     XMLPlatformUtils::Terminate();
-		free(rspecParser);
+	free(rspecParser);
     return 0;
 }
 
 /*
  * Pull nodes from the document, and populate assign's own data structures
  */
-bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+bool populate_nodes(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			  set<string> &unavailable) {
 	bool is_ok = true;
 	pair<map<string, DOMElement*>::iterator, bool> insert_ret;
@@ -381,7 +382,7 @@ bool populate_nodes_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 /*
  * Pull the links from the ptop file, and populate assign's own data sturctures
  */
-bool populate_links_rspec(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
+bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			  set<string> &unavailable) {
     
     bool is_ok = true;

@@ -18,19 +18,32 @@
 class rspec_parser_v2 : public rspec_parser
 {
 	private:
-		std::set<std::string> nodesSeen;
-	
-	// Reads the interfaces on a link		
-		std::vector< struct link_interface >
-			readLinkInterface (const xercesc::DOMElement*, int&);
-	
-		struct link_characteristics readLinkCharacteristics 
-									(const xercesc::DOMElement*, 
-									  int&,
-									  int defaultBandwidth = -1, 
-									  int unlimitedBandwidth = -1);
+			
+	protected:
+		std::map<std::string, std::string> ifacesSeen;
+		struct link_interface getIface (const xercesc::DOMElement*);
+		
 	public:
 		rspec_parser_v2 (int type) : rspec_parser (type) { ; }
+		// Reads the interfaces on a link		
+		std::vector< struct link_interface >
+				readLinkInterface (const xercesc::DOMElement*, int&);
+	
+		struct link_characteristics readLinkCharacteristics 
+										(const xercesc::DOMElement*, 
+				 							int&,
+	 										int defaultBandwidth = -1, 
+  											int unlimitedBandwidth = -1);
+		
+		std::vector<struct node_type> readNodeTypes
+										(const xercesc::DOMElement*,
+				 							int& typeCount,
+											int unlimitedSlots);
+		
+		map< pair<string, string>, pair<string, string> >
+				readInterfacesOnNode (const DOMElement* node, 
+										bool& allUnique);
+
 };
 
 
