@@ -266,9 +266,16 @@ sub LoadFromString($$)
 	print STDERR "Could not create tempfile for cert string\n";
 	return undef;
     }
-    print $tempfile "-----BEGIN CERTIFICATE-----\n";
-    print $tempfile $string;
-    print $tempfile "-----END CERTIFICATE-----\n";
+
+    # The certificate might already have the header and footer
+    # so only add them if needed.
+    if ($string =~ /^-----BEGIN CERTIFICATE-----/) {
+        print $tempfile $string;
+    } else {
+        print $tempfile "-----BEGIN CERTIFICATE-----\n";
+        print $tempfile $string;
+        print $tempfile "-----END CERTIFICATE-----\n";
+    }
 
     my $certificate = GeniCertificate->LoadFromFile($filename);
     unlink($filename);
@@ -325,7 +332,7 @@ sub LoadFromFile($$)
 	} elsif( $line =~ /^\s+Authority Information Access:\s*$/ ) {
 	    $accessinfo = 1;
 	} elsif( $altname ) {
-	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturi = $1
+	    m'^\s*URI:(urn:publicid:[-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturi = $1
 		foreach split( /, /, $line );
 	    $altname = 0;
 	} elsif( $accessinfo ) {
