@@ -306,7 +306,7 @@ sub AssignLoop()
 	# experiments are using shared nodes. Eventually needs to be
 	# a barrier. 
 	#
-	if ((!($impotent || $regression)) && $vtop->sharednodecount()) {
+	if (0 && (!($impotent || $regression)) && $vtop->sharednodecount()) {
 	    while (1) {
 		my $lock_result =
 		    DBQueryWarn("select get_lock('pool_daemon', 10)");

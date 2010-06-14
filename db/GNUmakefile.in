@@ -11,9 +11,9 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SUBBOSS_BIN_SCRIPTS	= subboss_dhcpd_makeconf
+SUBBOSS_SBIN_SCRIPTS	= subboss_dhcpd_makeconf
 
-BIN_SCRIPTS	= nalloc nfree nodeip readycount subboss_dhcpd_makeconf
+BIN_SCRIPTS	= nalloc nfree nodeip readycount
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
@@ -58,7 +58,7 @@ endif
 # 
 all:	$(TARGETS)
 
-$(SUBBOSS_BIN_SCRIPTS):
+$(SUBBOSS_SBIN_SCRIPTS):
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -68,7 +68,9 @@ else
 install: clrhouse-install
 endif
 
-subboss-install: $(addprefix $(INSTALL_BINDIR)/, $(SUBBOSS_BIN_SCRIPTS))
+subboss-install: $(addprefix $(INSTALL_SBINDIR)/, $(SUBBOSS_SBIN_SCRIPTS))
+	ln -sf $(INSTALL_SBINDIR)/subboss_dhcpd_makeconf \
+		$(CLIENT_BINDIR)/subboss_dhcpd_makeconf
 
 boss-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
@@ -78,7 +80,7 @@ boss-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
         $(addprefix $(INSTALL_DIR)/opsdir/lib/, $(USERLIBS))
 
 post-install: 
-	chown root $(INSTALL_BINDIR)/subboss_dhcpd_makeconf
+	chown root $(INSTALL_SBINDIR)/subboss_dhcpd_makeconf
 	chown root $(INSTALL_SBINDIR)/genelists
 	chmod u+s $(INSTALL_SBINDIR)/genelists
 	chown root $(INSTALL_SBINDIR)/dhcpd_makeconf

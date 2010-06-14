@@ -7922,7 +7922,7 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 			 "left join interfaces as i on n.node_id = i.node_id "
 			 "left join reserved as r on n.node_id = r.node_id "
 			 "where s.subboss_id = '%s' and "
-	                 "s.service='dhcp' and i.role='ctrl'", 11,
+	                 "s.service='dhcp' and i.role='ctrl' order by n.priority", 11,
 			 reqp->nodeid);
 
 	if (!res) {
