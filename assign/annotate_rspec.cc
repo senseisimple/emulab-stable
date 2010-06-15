@@ -145,9 +145,9 @@ void annotate_rspec::annotate_element (const char* v_name, list<const char*>* li
 	{
 	    static int gave_apology;
 
-	    if( !gave_apology ) {
+	    if( !links->empty() && !gave_apology ) {
 		gave_apology = 1;
-		cout << "Warning: unable to locate interfaces on "
+		cerr << "Warning: unable to locate interfaces on "
 		    "switch/switch links; omitting those\n";
 	    }
 	}

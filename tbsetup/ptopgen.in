@@ -1670,9 +1670,11 @@ sub print_switch
     {
 	push @$interfaces, "(null)";
     }
-    # XXX
+    # XXX - local hack for Utah - don't allow our 'hub' switch to be host for
+    # LAN nodes, which encourages the placement of all LAN members on the same
+    # switch
     my $types = ["switch:1"];
-    if ($name ne "procurve1") {
+    if (defined($MAINSITE) && $MAINSITE && $name ne "procurve1") {
 	push(@$types, "*lan:*");
     }
     print_node($name, $types, [], [], $uuid, $interfaces,
