@@ -236,6 +236,7 @@ endif
 	@$(MAKE) -C db subboss-install
 	@$(MAKE) -C tmcd subboss-install
 	@$(MAKE) -C rc.d subboss-install
+	@$(MAKE) -C dhcpd subboss-install
 	# Hack: this should probably be done by a subboss-install
 	# script, but there isn't a huge need for that yet
 	@rm -f $(INSTALL_RCDIR)/isc-dhcpd
