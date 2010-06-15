@@ -846,14 +846,30 @@ foreach $node (keys(%nodes)) {
 	if ($typemap{$realtype}->{'ISVIRT'} && $count > 0) {
 	    next
 		if (! $virtstuff);
-		
+
+	    #
+	    # If the node is shared, must subtract the current global count
+	    # from the max first, to see if there is any room left.
+	    #
+	    if ($sharing_mode{$node} && exists($globalcounts{$node})) {
+		$count -= $globalcounts{$node};
+	    }
 	    if (defined($mfactor) && $mfactor <= $count) {
-		$auxinfo = "$auxtype:$mfactor";
+		$count = $mfactor;
 	    }
-	    else {
-		$auxinfo = "$auxtype:$count";
-	    }
+	    $auxinfo = "$auxtype:$count";
 	    $needvirtgoo = 1;
+
+	    #
+	    # Add in machine specific auxtypes that use the same count.
+	    #
+	    push(@types, "${type}-vm:$count");
+
+	    # And a legacy type.
+	    my $legacy_type = $type;
+	    if (($legacy_type =~ s/pc/pcvm/)) {
+		push(@types, "${legacy_type}:$count");
+	    }
 	}
 	push(@types, $auxinfo);
     }
