@@ -1,4 +1,9 @@
 package Tools;
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 use SemiModern::Perl;
 use Log::Log4perl qw(get_logger :levels);
 use POSIX qw(setsid);

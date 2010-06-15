@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1126,8 +1126,10 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	echo "<span class='timestamp'>$now</span>\n";
 	echo "</div>";
     
-	if ($login_user || VIEWSET($view, 'hide_versioninfo'))
+	if ($login_user || VIEWSET($view, 'hide_versioninfo')) {
 	    $versioninfo = "";
+	    $commithash  = "";
+	}
 	else {
 	    $major = "";
 	    $minor = "";
@@ -1135,8 +1137,17 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	    TBGetVersionInfo($major, $minor, $build);
 	
 	    $versioninfo = "Vers: $major.$minor Build: $build";
+	    $commithash  = TBGetCommitHash();
+	    if (!$commithash) {
+		$commithash = "";
+	    }
 	}
-	echo "<div id='versioninfo'>$versioninfo</div>";
+	echo "<div id='versioninfo'>$versioninfo";
+	if ($commithash != "") {
+	    echo "<br>";
+	    echo substr($commithash, 0, 24);
+	}
+	echo "</div>";
 	if ($notice) {
 	    echo "<span class='headernotice'>$notice</span>";
 	}
@@ -1148,6 +1159,9 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	echo "$title</h2>";
         # Close off 'contentheader' (rightcontentheader);
 	echo "</div>\n";
+	if ($commithash != "") {
+	    echo "<!-- This site is running commit $commithash -->\n";
+	}
 	if ($login_user) {
         # And start the contentbody.
 	    echo "<div id='fullcontentbody'>";
@@ -1197,7 +1211,7 @@ function PAGEFOOTER($view = NULL) {
                 </ul>
                 <!-- begin copyright -->
                 <span class='copyright'>
-                <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
+                <a href=$TBDOCBASE/copyright.php>
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </span>\n";
     }

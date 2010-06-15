@@ -62,6 +62,13 @@ if ($EXPOSETEMPLATES) {
 #
 # For the Sajax Interface
 #
+$USER_VIS_URL = "http://$USERNODE/exp-vis/$pid/$eid/";
+$HAVE_USER_VIS = 0;
+$whocares = null;
+if ($EXP_VIS && CHECKURL($USER_VIS_URL, $whocares)) {
+  $HAVE_USER_VIS = 1;
+}
+
 function FreeNodeHtml()
 {
     global $this_user, $experiment;
@@ -87,6 +94,7 @@ function ModifyAnno($newtext)
 function Show($which, $arg1, $arg2)
 {
     global $experiment, $instance, $uid, $TBSUEXEC_PATH, $TBADMINGROUP;
+    global $USER_VIS_URL;
     $pid  = $experiment->pid();
     $eid  = $experiment->eid();
     $html = "";
@@ -226,6 +234,11 @@ function Show($which, $arg1, $arg2)
 	$html .= "<button name=savens type=button value=1";
 	$html .= " onclick=\"SaveNS();\">";
 	$html .= "Save</button>\n";
+    }
+    elseif ($which == "uservis") {
+	ob_start();
+	$html .= "<iframe src=\"$USER_VIS_URL\" width=\"100%\" height=600 id=\"vis-iframe\"></iframe>";
+	ob_end_clean();
     }
     return $html;
 }
@@ -692,6 +705,12 @@ if ($instance) {
               <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	          "id=\"li_anno\" onclick=\"Show('anno');\">".
                   "Annotation</a></li>\n";
+}
+if ($HAVE_USER_VIS) {
+    echo "<li>
+              <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+	          "id=\"li_uservis\" onclick=\"Show('uservis');\">".
+                  "User Visualization</a></li>\n";
 }
 echo "</ul>\n";
 echo "</div>\n";

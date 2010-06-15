@@ -1,0 +1,84 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libptop;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT @EXPORT_OK);
+
+@ISA = "Exporter";
+@EXPORT = qw( );
+
+sub Create($)
+{
+    my ($class) = @_;
+    my $self = {};
+
+    $self->{'NODES'} = {};
+    $self->{'LINKS'} = {};
+
+    bless($self, $class);
+
+    return $self;
+}
+
+# Accessors
+sub nodes($) { return $_[0]->{'NODES'}; }
+sub links($) { return $_[0]->{'LINKS'}; }
+
+# Add new nodes and links
+sub CreateNode($$)
+{
+    my ($self, $name) = @_;
+    my $node = libptop::pnode->Create($name);
+    $self->nodes()->{$name} = $node;
+    return $node;
+}
+
+###############################################################################
+# Physical Nodes. These contain the all of the per-node state used to
+# generate ptop or xml files.
+
+package libptop::pnode;
+
+sub Create($$)
+{
+    my ($class, $name) = @_;
+
+    my $self = {};
+
+    $self->{'NAME'} = $name;
+    $self->{'SUBNODE_OF'} = undef;
+    $self->{'IS_REMOTE'} = undef;
+
+    bless($self, $class);
+    return $self;
+}
+
+# Accessors
+sub name($)       { return $_[0]->{'NAME'}; }
+sub subnode_of($) { return $_[0]->{'SUBNODE_OF'}; }
+sub is_subnode($) { return defined($_[0]->subnode_of()); }
+sub is_remote($)  { return $_[0]->{'IS_REMOTE'}; }
+
+sub SetSubnode($$$)
+{
+    my ($self, $phys_name, $is_subnode) = @_;
+    if ($is_subnode) {
+	$self->{'SUBNODE_OF'} = $phys_name;
+    } else {
+	$self->{'SUBNODE_OF'} = undef;
+    }
+}
+
+sub SetRemote($$)
+{
+    my ($self, $isremote) = @_;
+    $self->{'IS_REMOTE'} = $isremote;
+}
+
+1;

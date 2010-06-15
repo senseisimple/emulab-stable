@@ -364,6 +364,7 @@ namespace eval GLOBALS {
 source ${GLOBALS::libdir}/nsobject.tcl
 source ${GLOBALS::libdir}/sim.tcl
 source ${GLOBALS::libdir}/lanlink.tcl
+source ${GLOBALS::libdir}/path.tcl
 source ${GLOBALS::libdir}/node.tcl
 source ${GLOBALS::libdir}/null.tcl
 source ${GLOBALS::libdir}/traffic.tcl

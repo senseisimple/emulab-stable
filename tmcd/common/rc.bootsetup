@@ -35,12 +35,12 @@ if ($EUID != 0) {
 
 #
 # Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
+# library and initialize itself.
+#
 use libsetup;
 use libtmcc;
 use librc;
-use libtestbed;
+use libtestbed ('TB_EVENTSERVER', 'TB_BOSSNODE');
 
 # Script specific goo.
 my $RCDIR	= "$BINDIR/rc";

@@ -25,7 +25,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  spewconlog opsdb_control newnode suchown archive_list \
                   wanodecheckin wanodecreate spewimage \
                   anonsendmail epmodeset fixexpinfo node_traffic \
-		  dumpdescriptor
+		  dumpdescriptor subboss_tftpboot_sync
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
                   webwanodecheckin webspewimage
@@ -49,6 +49,8 @@ SETUID_LIBX_SCRIPTS  = xlogin
 all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(CTRLSBIN_SCRIPTS) \
 	$(SUBDIRS) firstuser setbuildinfo
 
+subboss: daemon_wrapper
+
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
@@ -67,6 +69,8 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	@echo "Don't forget to do a post-install as root"
 
 boss-install: install
+
+subboss-install: $(INSTALL_SBINDIR)/daemon_wrapper
 
 post-install: 
 	chown root $(INSTALL_SBINDIR)/grabwebcams

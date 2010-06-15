@@ -15,3 +15,6 @@ NodeContents &=
 
 LinkContents &=
   attribute sliver_id { text }
+
+InterfaceContents &=
+  attribute mac_address { text } ?

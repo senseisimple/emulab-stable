@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# GENIPUBLIC-COPYRIGHT
+# EMULAB-COPYRIGHT
 # Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
@@ -82,16 +82,10 @@ my $NODEILL_PID = NODEILL_PID();
 my $NODEILL_EID = NODEILL_EID();
 
 #
-# Check for existing pidfile and running daemon. Mostly cause
-# of devel tree versions.
+# Only one please.
 #
-if (-e $PIDFILE) {
-    my $opid = `cat $PIDFILE`;
-    chomp($opid);
-    if (kill(0, $opid)) {
-	fatal("Lockfile $PIDFILE exists, and process $opid is running");
-    }
-    unlink($PIDFILE);
+if (CheckDaemonRunning("checknodes_daemon")) {
+    fatal("Not starting another checknodes daemon!");
 }
 
 #
@@ -140,10 +134,8 @@ if (! $debug) {
 	exit(0);
     }
 }
-# This acts as a lockfile to prevent a devel version from running at
-# the same time as the real version or another devel version.
-if (system("echo '$PID' > $PIDFILE")) {
-    fatal("Could not create $PIDFILE!");
+if (MarkDaemonRunning("checknodes_daemon")) {
+    fatal("Could not mark daemon as running!");
 }
 print "Check Nodes Daemon starting ... pid $$, at ".`date`;
 
@@ -169,9 +161,15 @@ while (1) {
     my @informtbopsfatal = ();
     my @informtbopswarn  = ();
     my @tmp = ();
+    my $disabled;
 
     print "Running at ".
 	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
+
+    if (! TBGetSiteVar("web/nologins", \$disabled) || $disabled) {
+	print "  Skipping this loop cause of nologins\n";
+	goto loop;
+    }
 
     #
     # Look for nodes in a wierd state. Lets test them.
@@ -183,6 +181,7 @@ while (1) {
 	    "left join node_types as t on t.type=n.type ".
 	    "where (n.eventstate!='". TBDB_NODESTATE_ISUP ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_PXEWAIT ."' and ".
+	    "       n.eventstate!='". TBDB_NODESTATE_PXELIMBO ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_ALWAYSUP ."' and ".
 	    "       n.eventstate!='". TBDB_NODESTATE_POWEROFF ."') and ".
             "       r.pid is null and n.role='testnode' and ".
@@ -337,6 +336,7 @@ while (1) {
   loop:
     sleep(($debug ? 10 : 60));
 }
+MarkDaemonStopped("checknodes_daemon");
 exit(0);
 
 sub NodeIsDead($)
@@ -372,6 +372,8 @@ sub fatal($)
 	     "Check Nodes Daemon died",
 	     $msg,
 	     $TBOPS);
+
+    MarkDaemonStopped("checknodes_daemon");
 
     die("*** $0:\n".
 	"    $msg\n");

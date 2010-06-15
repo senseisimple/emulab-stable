@@ -42,7 +42,6 @@ my $CVSSUPPORT  = @CVSSUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
-my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
 my $LIBDIR      = "$PREFIX/lib";
 my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
@@ -75,6 +74,8 @@ my $TBADMINGID  = 101;
 my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
 # XXX temporary until fix dependencies in emulab-ops package
 my $PYM2_PKG	  = "py25-m2crypto-0.19.1";
+# XXX temporary until someone extracts their head from the dark regions
+my $EASYINSTALL	  = "/usr/local/bin/easy_install";
 
 #
 # Allow this to work if the library is left in the source directory
@@ -183,13 +184,11 @@ my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
 my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
-my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $PKG_DEL    = "/usr/sbin/pkg_delete";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
 my $MV         = "/bin/mv";
-my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
 my $MOUNT      = "/sbin/mount";
 my $TAR	       = "/usr/bin/tar";
@@ -221,7 +220,6 @@ my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
 my $WWWDIR          = "/usr/local/www/data";
 
 # For installing mysqld
-my $MYSQL           = "/usr/local/bin/mysql";
 my $MYSQLADMIN      = "/usr/local/bin/mysqladmin";
 my $MYSQLSHOW       = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP       = "/usr/local/bin/mysqldump";
@@ -234,12 +232,8 @@ my $MYSQL_LOGDIR    = "$LOGDIR/mysql";
 #
 my $LIST_DIR      = "/etc/mail/lists";
 my $TIPLOG_DIR    = "/var/log/tiplogs";
-my $PORTSDIR      = "/usr/ports";
 my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $SRCDIR        = '@srcdir@';
-my $TOP_SRCDIR    = "@top_srcdir@";
-my $RCDIR         = "/usr/local/etc/rc.d";
-my $VARRUN        = "/var/run";
 
 #
 # And some lists that we use
@@ -552,6 +546,44 @@ Phase "portfixup", "Fixing up packages", sub {
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
+    if ($FBSD_MAJOR > 6) {
+	#
+	# What a crock!  First, that the FreeBSD ports system
+	# defaults to installing the zipped .egg files that have
+	# to be unzipped per-user before use.  Second, that it
+	# offers no easy way at package creation to override this.
+	# Third, that there is no easy way that I could find in
+	# the python eggs system to set a global cache directory
+	# into which to unpack all eggs; you have to set
+	# PYTHON_EGG_CACHE in the environment of every script.
+	# Fourth, that the per-user default value might be in an
+	# unwritable location.
+	#
+	# So, I am reduced to manually unpacking all .egg files
+	# into the corresponding .egg directories after the
+	# install!  Since this would totally screw any attempt
+	# to update those packages, I just do it to the one
+	# package that I know will fail otherwise.
+	#
+	Phase "m2crypto-egg", "Unpacking python m2crypto .egg", sub {
+	    my $pydir = "/usr/local/lib/python2.5/site-packages";
+	    my $egg = `ls -d $pydir/M2Crypto-0.19.1-py2.5-*.egg 2>/dev/null`;
+	    chomp($egg);
+	    if (! -x $EASYINSTALL) {
+		PhaseSkip("python easy_install missing");
+	    }
+	    if ($egg eq "") {
+		PhaseSkip("py25-m2crypto egg not found");
+	    }
+	    if (-d "$egg") {
+		PhaseSkip("py25-m2crypto egg already unpacked");
+	    }
+	    ExecQuietFatal("mv $egg /var/tmp/");
+	    $egg =~ s/$pydir//;
+	    ExecQuietFatal("$EASYINSTALL -Z /var/tmp$egg");
+	    ExecQuietFatal("mv /var/tmp$egg $pydir/$egg.bak");
+	};
+    }
 };
 
 Phase "patches", "Applying patches", sub {
@@ -595,7 +627,8 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
 		      (($ISFS && $WINSUPPORT) ? qq|smbd_enable="YES"| : ()),
 		      qq|apache_enable="YES"|,
 		      qq|syslogd_flags=""|,
-		      ($CVSSUPPORT ? qq|cvsd_enable="YES"| : ()));
+		      ($CVSSUPPORT ? qq|cvsd_enable="YES"| : ()),
+		      qq|pubsubd_flags="-T 10"|);
 };
 
 Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
@@ -763,13 +796,16 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
     Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
 	DoneIfEdited($FSTAB);
-	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,nodev,nosuid\t0\t0",
-		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,nodev,nosuid\t0\t0");
+	my $nfsopt = "nosuid";
+	$nfsopt .= ",nodev"
+	    if ($FBSD_MAJOR < 7);
+	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,$nfsopt\t0\t0");
 	if ($SCRATCHDIR) {
 	    push(@lines,
-		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,nodev,nosuid\t0\t0");
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,$nfsopt\t0\t0");
 	}
 
 	AppendToFileFatal($FSTAB, @lines);
@@ -837,16 +873,16 @@ Phase "syslog", "Setting up syslog", sub {
 	    # Find the cron line, after which we place our auth.info line
 	    #
 	    if ($line =~ /^cron/) {
-		print SC "# " . MAGIC_TESTBED_START . "\n";
+		print SC "# " . MAGIC_TESTBED_START() . "\n";
 		print SC "auth.info\t\t\t\t\t/var/log/logins\n";
-		print SC "# " . MAGIC_TESTBED_END . "\n";
+		print SC "# " . MAGIC_TESTBED_END() . "\n";
 	    }
 	}
 
 	#
 	# Put a few more lines at the end
 	#
-	print SC "# " . MAGIC_TESTBED_START . "\n";
+	print SC "# " . MAGIC_TESTBED_START() . "\n";
 	print SC "!capture\n";
 	print SC "*.*\t\t\t\t\t\t/var/log/tiplogs/capture.log\n";
 	print SC "!mountd\n";
@@ -855,7 +891,7 @@ Phase "syslog", "Setting up syslog", sub {
 	print SC "*.*\t\t\t\t\t\t${LOGDIR}/pubsubd.log\n";
 	print SC "!elvin_gateway\n";
 	print SC "*.*\t\t\t\t\t\t${LOGDIR}/elvin_gateway.log\n";
-	print SC "# " . MAGIC_TESTBED_END . "\n";
+	print SC "# " . MAGIC_TESTBED_END() . "\n";
 	close SC;
     };
 

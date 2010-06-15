@@ -80,7 +80,7 @@ proc tb-elab-in-elab {onoff} {}
 proc tb-elab-in-elab-topology {topo} {}
 proc tb-set-inner-elab-eid {eid} {}
 proc tb-set-elabinelab-cvstag {cvstag} {}
-proc tb-elabinelab-singlenet {} {}
+proc tb-elabinelab-singlenet {{onoff 1}} {}
 proc tb-set-elabinelab-attribute {key val {order 0}} {}
 proc tb-unset-elabinelab-attribute {key} {}
 proc tb-set-elabinelab-role-attribute {role key val {order 0}} {}
@@ -261,6 +261,9 @@ Simulator instproc make-cloud {nodes bw delay args} {
     return [$self make-lan $nodes $bw $delay]
 }
 
+Simulator instproc make-path {linklist} {
+}
+
 Node instproc program-agent {args} {
 }
 
@@ -287,6 +290,9 @@ LanNode instproc trace {args} {
 }
 
 LanNode instproc trace_endnode {args} {
+}
+
+LanNode instproc implemented_by {args} {
 }
 
 LanNode instproc unknown {m args} {

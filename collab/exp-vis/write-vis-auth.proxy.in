@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+set -e 
+
+if [ "$USER" != "root" ]; then
+  echo "Must be root." 1>&2
+  exit 1
+fi
+
+TEMPFILE=`mktemp /var/run/exp-vis.XXXXXX`
+cat > $TEMPFILE
+mv $TEMPFILE /var/run/exp-vis.auth
+

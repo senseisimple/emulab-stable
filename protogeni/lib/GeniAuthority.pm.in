@@ -26,6 +26,8 @@ use emutil qw(TBGetUniqueIndex);
 use English;
 use overload ('""' => 'Stringify');
 use XML::Simple;
+use Date::Parse;
+use Data::Dumper;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -181,6 +183,22 @@ sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
 #
+# Expired?
+#
+sub IsExpired($)
+{
+    my ($self)  = @_;
+    my $expires = $self->expires();
+
+    return 1
+	if (!defined($expires) || $expires eq "");
+    
+    my $when = strptime($expires);
+
+    return ($when < time());
+}
+
+#
 # Delete from the DB.
 #
 sub Delete($)
@@ -205,36 +223,39 @@ sub Delete($)
 }
 
 #
-# Check to see if there is an existing authority with the same prefix.
+# Check to see if there is an existing authority with the same urn.
 #
-sub CheckExisting($$$$)
+sub CheckExisting($$)
 {
-    my ($class, $type, $uuid, $hrn) = @_;
+    my ($class, $certificate) = @_;
+    my $urn = $certificate->urn();
 
-    my ($prefix) = ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/);
-    $type = lc($type);
+    my (undef, undef, $type) = GeniHRN::Parse($urn);
+    return -1
+	if (!defined($type));
+    my $safe_urn = DBQuoteSpecial($urn);
 
     my $query_result =
-	DBQueryWarn("select uuid,type from geni_authorities ".
-		    "where uuid_prefix='$prefix'");
+	DBQueryWarn("select urn,type from geni_authorities ".
+		    "where urn=$safe_urn");
 
     return -1
 	if (!$query_result);
     return 0
 	if (!$query_result->numrows);
 
-    while (my ($DBuuid,$DBtype) = $query_result->fetchrow_array()) {
+    while (my ($DBurn,$DBtype) = $query_result->fetchrow_array()) {
 	# Look for an exact match, which means its just a replacement.
 	next
-	    if ($uuid eq $DBuuid && $type eq $DBtype);
+	    if ($urn eq $DBurn && $type eq $DBtype);
 
-	# Same uuid, different type.
+	# Same urn, different type.
 	return 1
-	    if ($uuid eq $DBuuid && $type ne $DBtype);
+	    if ($urn eq $DBurn && $type ne $DBtype);
 
-	# Different uuid, same type.
+	# Different urn, same type.
 	return 1
-	    if ($uuid ne $DBuuid && $type eq $DBtype);
+	    if ($urn ne $DBurn && $type eq $DBtype);
     }
     return 0;
 }
@@ -307,61 +328,30 @@ sub Version($)
 	print STDERR "  " . $response->output() . "\n";
 	return undef;
     }
-    $self->{'version'} = $response->value();
-    return $response->value();
-}
-
-#
-# Does the uuid prefix match.
-#
-sub PrefixMatch($$)
-{
-    my ($self, $uuid) = @_;
-
-    return 0
-	if (!ref($self));
-
-    my $uuid_prefix = $self->uuid_prefix();
-
-    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
-	return 1
-	    if ("$uuid_prefix" eq "$1");
-    }
-    return 0;
-}
-
-#
-# Find an authority by looking for the prefix. This will eventually go
-# away when we fully switch to URNs
-#
-# Note tha only SAs are looked up this way.
-#
-sub LookupByPrefix($$)
-{
-    my ($class, $uuid) = @_;
-    my $prefix;
-    
-    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
-	$prefix = $1;
-    }
-    elsif ($uuid =~ /^(\w+)$/) {
-	$prefix = $1;
+    if (ref($response->value())) {
+	$self->{'version'} = $response->value()->{'api'};
     }
     else {
-	print STDERR "Could no parse uuid for prefix\n";
-	return undef;
+	$self->{'version'} = $response->value();
     }
-    
-    my $query_result =
-	DBQueryWarn("select uuid from geni_authorities ".
-		    "where uuid_prefix='$prefix' and type='sa'");
+    return $self->{'version'};
+}
 
-    return undef
-	if (! $query_result || !$query_result->numrows);
+#
+# Check that the authority is the issuer of the given certificate.
+# This check is not quite complete yet.
+#
+sub CheckValidIssuer($$)
+{
+    my ($self, $certificate) = @_;
 
-    ($uuid) = $query_result->fetchrow_array();
+    my ($hisauthority, undef, undef) = GeniHRN::Parse($self->urn());
+    my ($herauthority, undef, undef) = GeniHRN::Parse($certificate->urn());
+    return 0
+	if (! (defined($hisauthority) && defined($herauthority) &&
+	       $hisauthority eq $herauthority));
 
-    return GeniAuthority->Lookup($uuid);
+    return 1;
 }
 
 #
@@ -391,6 +381,40 @@ sub ListAll($$)
     }
     @$pref = @result;
     return 0;
+}
+
+#
+# Find an authority by looking for the prefix. This will eventually go
+# away when we fully switch to URNs
+#
+# Note tha only SAs are looked up this way.
+#
+sub LookupByPrefix($$)
+{
+    my ($class, $uuid) = @_;
+    my $prefix;
+    
+    if ($uuid =~ /^\w+\-\w+\-\w+\-\w+\-(\w+)$/) {
+	$prefix = $1;
+    }
+    elsif ($uuid =~ /^(\w+)$/) {
+	$prefix = $1;
+    }
+    else {
+	print STDERR "Could not parse uuid for prefix\n";
+	return undef;
+    }
+    
+    my $query_result =
+	DBQueryWarn("select uuid from geni_authorities ".
+		    "where uuid_prefix='$prefix' and type='sa'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    ($uuid) = $query_result->fetchrow_array();
+
+    return GeniAuthority->Lookup($uuid);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

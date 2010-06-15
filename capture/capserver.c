@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -10,6 +10,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <paths.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -19,6 +20,7 @@
 #include <errno.h>
 #include <mysql/mysql.h>
 #include <sys/time.h>
+#include <signal.h>
 #include <grp.h>
 #include "capdecls.h"
 #include "config.h"
@@ -29,6 +31,9 @@
 static int	debug = 0;
 static int	portnum = SERVERPORT;
 static gid_t	admingid;
+char		*Pidname;
+void		sigterm(int);
+void		cleanup(void);
 
 char *usagestr = 
  "usage: capserver [-d] [-p #]\n"
@@ -53,6 +58,8 @@ main(int argc, char **argv)
 	struct sockaddr_in	name;
 	struct timeval		timeout;
 	struct group		*group;
+	struct sigaction	sa;
+	sigset_t		actionsigmask;
 
 	while ((ch = getopt(argc, argv, "dp:")) != -1)
 		switch(ch) {
@@ -83,6 +90,15 @@ main(int argc, char **argv)
 		syslog(LOG_ERR, "Could not connect to DB!");
 		exit(1);
 	}
+
+	sigemptyset(&actionsigmask);
+	sigaddset(&actionsigmask, SIGINT);
+	sigaddset(&actionsigmask, SIGTERM);
+	memset(&sa, 0, sizeof sa);
+	sa.sa_handler = sigterm;
+	sa.sa_mask = actionsigmask;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
 
 	/*
 	 * Grab the GID for the default group.
@@ -128,6 +144,19 @@ main(int argc, char **argv)
 		exit(1);
 	}
 	syslog(LOG_NOTICE, "listening on TCP port %d", ntohs(name.sin_port));
+
+	if (!getuid()) {
+		FILE	*fp;
+		char    mybuf[BUFSIZ];
+	    
+		sprintf(mybuf, "%s/capserver.pid", _PATH_VARRUN);
+		fp = fopen(mybuf, "w");
+		if (fp != NULL) {
+			fprintf(fp, "%d\n", getpid());
+			(void) fclose(fp);
+			Pidname = strdup(mybuf);
+		}
+	}
 
 	while (1) {
 		struct sockaddr_in client;
@@ -295,6 +324,22 @@ main(int argc, char **argv)
 	}
 	close(tcpsock);
 	syslog(LOG_NOTICE, "daemon terminating");
+	cleanup();
 	exit(0);
 }
 
+void
+sigterm(int sig)
+{
+	cleanup();
+	exit(0);
+}
+
+void
+cleanup(void)
+{
+	syslog(LOG_NOTICE, "daemon exiting by signal");
+
+	if (Pidname)
+	    (void) unlink(Pidname);
+}

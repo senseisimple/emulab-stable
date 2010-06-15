@@ -41,7 +41,7 @@ CREATE TABLE `geni_authorities` (
   `url` tinytext,
   `urn` tinytext,
   PRIMARY KEY  (`uuid`),
-  UNIQUE KEY `hrn` (`hrn`)
+  UNIQUE KEY `urn` (`urn`(256))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `geni_slices`;
@@ -55,6 +55,7 @@ CREATE TABLE `geni_slices` (
   `shutdown` datetime default NULL,
   `locked` datetime default NULL,
   `creator_uuid` varchar(40) NOT NULL default '',
+  `creator_urn` tinytext,
   `name` tinytext,
   `sa_uuid` varchar(40) NOT NULL default '',
   `needsfirewall` tinyint(1) NOT NULL default '0',

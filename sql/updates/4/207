@@ -1,0 +1,22 @@
+use strict;
+use libdb;
+
+#
+# Minor changes to virt_node_desires table.
+#
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("alter table virt_node_desires change desire ".
+		 " `desire` varchar(64) NOT NULL default ''");
+
+    DBQueryFatal("update table_regex set min=1,max=64 ".
+		 "where table_name='virt_node_desires' and ".
+		 "      column_name='desire'");
+
+    return 0;
+}
+1;
+
+

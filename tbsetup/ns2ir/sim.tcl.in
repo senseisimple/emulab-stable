@@ -47,6 +47,8 @@ Simulator instproc init {args} {
     array set lanlink_list {}
     $self instvar subnets;		# Indexed by IP subnet
     array set subnets {}
+    $self instvar path_list;		# Indexed by path id
+    array set path_list {}
 
     # link_map is indexed by <node1>:<node2> and contains the
     # id of the lanlink connecting them.  In the case of
@@ -271,6 +273,21 @@ Simulator instproc make-lan {nodelist bw delay args} {
     return $curlan
 }
 
+# make-path <linklist>
+Simulator instproc make-path {linklist args} {
+    var_import ::GLOBALS::last_class
+    $self instvar id_counter
+    $self instvar path_list
+
+    set curpath tbpath-path[incr id_counter]
+    
+    Path $curpath $self $linklist
+    set path_list($curpath) {}
+    set last_class $curpath
+    
+    return $curpath
+}
+
 Simulator instproc make-cloud {nodelist bw delay args} {
     $self instvar event_list
     $self instvar event_count
@@ -349,6 +366,7 @@ Simulator instproc event-group {{list {}}} {
 # method casues the 'ran' variable to be set to 1.
 Simulator instproc run {} {
     $self instvar lanlink_list
+    $self instvar path_list
     $self instvar node_list
     $self instvar event_list
     $self instvar prog_list
@@ -391,6 +409,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::delay_capacity
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::TBCOMPAT::triggertypes
     var_import ::GLOBALS::modelnet_cores
     var_import ::GLOBALS::modelnet_edges
     var_import ::GLOBALS::elab_in_elab
@@ -579,6 +598,9 @@ Simulator instproc run {} {
     foreach tg [array names topography_list] {
 	$tg updatedb "sql"
     }
+    foreach path [array names path_list] {
+	$path updatedb "sql"
+    }
 
     set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "encap_style" "allowfixnode"]
     set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $vlink_encapsulate $fix_current_resources]
@@ -673,11 +695,18 @@ Simulator instproc run {} {
     }
 
     foreach event $event_list {
-	set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ]
-	set values [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6]]
-	if {[llength $event] > 7} {
+	if {[string equal [lindex $event 0] "swapout"]} {
+               set event [lreplace $event 0 0 0]
+	       set triggertype "SWAPOUT"
+	} else {
+	       set triggertype "TIMER"
+	}
+	set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "triggertype" ]
+	set values [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] $triggertypes($triggertype)]
+	if {[llength $event] > 8} {
+
 	    lappend fields "parent"
-	    lappend values [lindex $event 7]
+	    lappend values [lindex $event 8]
 	}
 	$self spitxml_data "eventlist" $fields $values
     }
@@ -741,6 +770,7 @@ Simulator instproc attach-agent {node agent} {
 Simulator instproc agentinit {agent} {
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::TBCOMPAT::triggertypes
 
     if {[$agent info class Application/Traffic/CBR]} {
 	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "parent" ] [list "0" [$agent get_node] $agent $objtypes(TRAFGEN) $eventtypes(MODIFY) [$agent get_params] "" "__ns_sequence"]
@@ -799,12 +829,18 @@ Simulator instproc at {time eventstring} {
 	return
     }
 
-    set ptime [::GLOBALS::reltime-to-secs $time]
-    if {$ptime == -1} {
-	perror "Invalid time spec: $time"
-	return
+    if {[string equal $time "swapout"]} {
+# "swapout" will be preserved as the time until we're at a point
+# where we can shunt it into a code path where it changes the
+# trigger type.
+    } else {
+       set ptime [::GLOBALS::reltime-to-secs $time]
+       if {$ptime == -1} {
+               perror "Invalid time spec: $time"
+               return
+       }
+       set time $ptime
     }
-    set time $ptime
 
     $self instvar event_list
     $self instvar event_count
@@ -937,6 +973,12 @@ Simulator instproc rename_topography {old new} {
     $self instvar topography_list
     unset topography_list($old)
     set topography_list($new) {}
+}
+
+Simulator instproc rename_path {old new} {
+    $self instvar path_list
+    unset path_list($old)
+    set path_list($new) {}
 }
 
 # find_link <node1> <node2>

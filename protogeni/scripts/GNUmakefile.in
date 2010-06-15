@@ -17,8 +17,8 @@ PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  gencrlbundle shutdownslice remauthority listusage \
 		  update reregister cleanupticket listhistory \
 		  register_sliver sa_daemon genadmincredential \
-      genclrcredentials \
-		  register_sliver sa_daemon advt-merge.py
+		  genclrcredentials genallow_extcred advt-merge 
+
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 

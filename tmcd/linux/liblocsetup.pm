@@ -22,6 +22,7 @@ use Exporter;
 	 os_groupdel os_getnfsmounts os_islocaldir
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
 	 os_get_disks os_get_disk_size os_get_partition_info os_nfsmount
+	 os_gendhcpdconf os_get_ctrlnet_ip
        );
 
 sub VERSION()	{ return 1.0; }
@@ -57,7 +58,7 @@ sub INXENVM()   { return libsetup::INXENVM(); }
 
 #
 # Various programs and things specific to Linux and that we want to export.
-# 
+#
 $CP		= "/bin/cp";
 $DF		= "/bin/df";
 $EGREP		= "/bin/egrep -q";
@@ -117,13 +118,13 @@ my $debug = 0;
 
 #
 # OS dependent part of cleanup node state.
-# 
+#
 sub os_account_cleanup()
 {
     #
     # Don't just splat the master passwd/group files into place from $ETCDIR.
     # Instead, grab the current Emulab uids/gids, grab the current group/passwd
-    # files and their shadow counterparts, remove any emulab u/gids from the 
+    # files and their shadow counterparts, remove any emulab u/gids from the
     # loaded instance of the current files, then push any new/changed uid/gids
     # into the master files in $ETCDIR.  Also, we remove accounts from the
     # master files if they no longer appear in the current files.  Finally, we
@@ -132,15 +133,10 @@ sub os_account_cleanup()
     my %PDB;
     my %GDB;
 
-    my $pretval = dbmopen(%PDB, $PASSDB, undef);
-    my $gretval = dbmopen(%GDB, $GROUPDB, undef);
-
-    if ($pretval) {
+    dbmopen(%PDB, $PASSDB, 0660) or
 	die "Cannot open $PASSDB: $!";
-    }
-    elsif ($gretval) {
+    dbmopen(%GDB, $GROUPDB, 0660) or
 	die "Cannot open $GROUPDB: $!";
-    }
 
     if ($debug) {
 	use Data::Dumper;
@@ -257,22 +253,22 @@ sub os_account_cleanup()
 
 	foreach my $ent (keys(%{$lineHash{$real}})) {
 	    # skip root and toor!
-	    next 
+	    next
 		if ($ent eq 'root' || $ent eq 'toor');
 
 	    # push new entities into master
 	    if (!defined($lineHash{$master}->{$ent})) {
 		# append new "line"
 		$lineHash{$master}->{$ent} = scalar(@{$lineList{$master}});
-		$lineList{$master}->[$lineHash{$master}->{$ent}] = 
+		$lineList{$master}->[$lineHash{$master}->{$ent}] =
 		    $lineList{$real}->[$lineHash{$real}->{$ent}];
 		print "DEBUG: adding $ent to $master\n"
 		    if ($debug);
 	    }
 	    # or replace modified entities
-	    elsif ($lineList{$real}->[$lineHash{$real}->{$ent}] 
+	    elsif ($lineList{$real}->[$lineHash{$real}->{$ent}]
 		   ne $lineList{$master}->[$lineHash{$master}->{$ent}]) {
-		$lineList{$master}->[$lineHash{$master}->{$ent}] = 
+		$lineList{$master}->[$lineHash{$master}->{$ent}] =
 		    $lineList{$real}->[$lineHash{$real}->{$ent}];
 		print "DEBUG: updating $ent in $master\n"
 		    if ($debug);
@@ -293,7 +289,7 @@ sub os_account_cleanup()
 	}
     }
 
-    # now write the masters to .new files so we can diff, do the diff for 
+    # now write the masters to .new files so we can diff, do the diff for
     # files that are world-readable, then mv into place over the masters.
     my %modes = ( "$ETCDIR/passwd" => 0644,"$ETCDIR/group" => 0644,
 		  "$ETCDIR/shadow" => 0600,"$ETCDIR/gshadow" => 0600 );
@@ -365,7 +361,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 
     #
     # Special handling for new style interfaces (which have settings).
-    # This should all move into per-type modules at some point. 
+    # This should all move into per-type modules at some point.
     #
     if ($iface_type eq "ath" && defined($settings)) {
 
@@ -395,7 +391,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
               last SWITCH1;
           };
         }
-	 
+
 	#
 	# At the moment, we expect just the various flavors of 80211, and
 	# we treat them all the same, configuring with iwconfig and iwpriv.
@@ -434,7 +430,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	else {
 	    $iwcmd .= " txpower auto";
 	}
-	# Allow this too. 
+	# Allow this too.
 	if (exists($settings->{"sens"})) {
 	    $iwcmd .= " sens " . $settings->{"sens"};
 	}
@@ -455,13 +451,13 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	# The reason to assume adhoc is because we need accesspoint set to
 	# know how to configure the device for ap/sta modes, and setting a
 	# device to monitor mode by default sucks.
-	# 
+	#
 	# This needs to be last for some reason.
 	#
 	if (exists($settings->{'accesspoint'})) {
 	    my $accesspoint = $settings->{"accesspoint"};
 	    my $accesspointwdots;
-	    
+
 	    # Allow either dotted or undotted notation!
 	    if ($accesspoint =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
 		$accesspointwdots = "$1:$2:$3:$4:$5:$6";
@@ -476,7 +472,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 		     "provided for $iface!\n");
 		return undef;
 	    }
-	    
+
 	    if (libsetup::findiface($accesspoint) eq $iface) {
 		$wlccmd .= " wlanmode ap";
 		$iwcmd .= " mode Master";
@@ -495,13 +491,13 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 		$wlccmd .= " wlanmode monitor";
 		$iwcmd .= " mode Monitor";
 	    }
-	    elsif ($settings->{'mode'} =~ /ap/i 
-		   || $settings->{'mode'} =~ /access[\s\-]*point/i 
+	    elsif ($settings->{'mode'} =~ /ap/i
+		   || $settings->{'mode'} =~ /access[\s\-]*point/i
 		   || $settings->{'mode'} =~ /master/i) {
 		$wlccmd .= " wlanmode ap";
 		$iwcmd .= " mode Master";
 	    }
-	    elsif ($settings->{'mode'} =~ /sta/i 
+	    elsif ($settings->{'mode'} =~ /sta/i
 		   || $settings->{'mode'} =~ /managed/i) {
 		$wlccmd .= " wlanmode sta";
 		$iwcmd .= " mode Managed ap any";
@@ -531,7 +527,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
     #
     if ($iface_type eq "flex900" && defined($settings)) {
 
-        my $tuncmd = 
+        my $tuncmd =
             "/bin/env PYTHONPATH=/usr/local/lib/python2.4/site-packages ".
             "$BINDIR/tunnel.py";
 
@@ -543,7 +539,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 
         my $mac = $settings->{"mac"};
 
-        if (!exists($settings->{"protocol"}) || 
+        if (!exists($settings->{"protocol"}) ||
             $settings->{"protocol"} ne "flex900") {
             warn("*** WARNING: Unknown gnuradio protocol specified!\n");
             return undef;
@@ -583,7 +579,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 
     #
     # Only do this stuff if we have a physical interface, otherwise it doesn't
-    # mean anything.  We need this for virtnodes whose networks must be 
+    # mean anything.  We need this for virtnodes whose networks must be
     # config'd from inside the container, vm, whatever.
     #
     if ($iface_type ne 'veth') {
@@ -642,7 +638,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	}
 	if (defined($ethtool)) {
 	    # this seems to work for returning an error on eepro100
-	    $uplines = 
+	    $uplines =
 		"if $ethtool $iface >/dev/null 2>&1; then\n    " .
 		"  $ethtool -s $iface autoneg off speed $speed duplex $duplex\n    " .
 		"  sleep 2 # needed due to likely bug in e100 driver on pc850s\n".
@@ -661,7 +657,7 @@ sub os_ifconfig_line($$$$$$$$;$$$)
 	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
 	$downlines = "$IFCONFIGBIN $iface down";
     }
-    
+
     return ($uplines, $downlines);
 }
 
@@ -722,7 +718,7 @@ sub os_ifconfig_veth($$$$$;$$$$%)
 		$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
 		$downlines = "$IFCONFIGBIN $iface down";
 	    }
-	    
+
 	    return ($uplines, $downlines);
 	}
 
@@ -788,7 +784,7 @@ sub os_ifconfig_veth($$$$$;$$$$%)
     #   vconfig set_name_type VLAN_PLUS_VID_NO_PAD (once only)
     #
     #	ifconfig eth0 up (should be done before we are ever called)
-    #	vconfig add eth0 601 
+    #	vconfig add eth0 601
     #   ifconfig vlan601 inet ...
     #
     #   ifconfig vlan601 down
@@ -862,13 +858,13 @@ sub os_viface_name($)
 sub os_etchosts_line($$$)
 {
     my ($name, $ip, $aliases) = @_;
-    
+
     return sprintf("%s\t%s %s", $ip, $name, $aliases);
 }
 
 #
 # Add a new group
-# 
+#
 sub os_groupadd($$)
 {
     my($group, $gid) = @_;
@@ -878,7 +874,7 @@ sub os_groupadd($$)
 
 #
 # Delete an old group
-# 
+#
 sub os_groupdel($)
 {
     my($group) = @_;
@@ -888,7 +884,7 @@ sub os_groupdel($)
 
 #
 # Remove a user account.
-# 
+#
 sub os_userdel($)
 {
     my($login) = @_;
@@ -898,7 +894,7 @@ sub os_userdel($)
 
 #
 # Modify user group membership.
-# 
+#
 sub os_usermod($$$$$$)
 {
     my($login, $gid, $glist, $pswd, $root, $shell) = @_;
@@ -917,7 +913,7 @@ sub os_usermod($$$$$$)
 
 #
 # Modify user password.
-# 
+#
 sub os_modpasswd($$)
 {
     my($login, $pswd) = @_;
@@ -936,7 +932,7 @@ sub os_modpasswd($$)
 
 #
 # Add a user.
-# 
+#
 sub os_useradd($$$$$$$$$)
 {
     my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root, $shell) = @_;
@@ -1024,13 +1020,22 @@ sub os_mkdir($$)
 }
 
 #
-# OS Dependent configuration. 
-# 
+# OS Dependent configuration.
+#
 sub os_setup()
 {
     return 0;
 }
-    
+
+#
+# Generate ISC dhcpd config file for subbosses
+#
+sub os_gendhcpdconf()
+{
+	return gendhcpdconf("/etc/dhcpd.conf",
+		"/etc/dhcpd.conf.subboss.template");
+}
+
 #
 # OS dependent, routing-related commands
 #
@@ -1140,7 +1145,7 @@ sub MapShell($)
 sub os_islocaldir($)
 {
     my ($dir) = @_;
-    my $rv = 0; 
+    my $rv = 0;
 
     my @dfoutput = `$DF -l $dir 2>/dev/null`;
     if (grep(!/^filesystem/i, @dfoutput) > 0) {
@@ -1155,7 +1160,7 @@ sub os_getnfsmounts($)
     my %mounted = ();
 
     #
-    # Grab the output of the mount command and parse. 
+    # Grab the output of the mount command and parse.
     #
     if (! open(MOUNT, "/bin/mount|")) {
 	print "os_getnfsmounts: Cannot run mount command\n";
@@ -1222,10 +1227,10 @@ sub os_fwrouteconfig_line($$$)
 sub getCurrentIwconfig($;$);
 
 #
-# Returns a list of commands needed to change the current device state to 
+# Returns a list of commands needed to change the current device state to
 # something matching the given configuration options.
 #
-sub os_ifdynconfig_cmds($$$$$) 
+sub os_ifdynconfig_cmds($$$$$)
 {
     my ($ret_aref,$iface,$action,$optref,$ifcfg) = @_;
     my %opts = %$optref;
@@ -1262,7 +1267,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	}
 
 	# handle the up/down case right away.
-	if (($action eq 'up' || $action eq 'down') 
+	if (($action eq 'up' || $action eq 'down')
 	    && scalar(keys(%opts)) == 0) {
 	    push @cmds,"$IFCONFIGBIN $ath $action";
 	    @$ret_aref = @cmds;
@@ -1271,7 +1276,7 @@ sub os_ifdynconfig_cmds($$$$$)
 
 	# first grab as much current state as we can, so we don't destroy
 	# previous state if we have to destroy the VAP (i.e., athX) interface
-	# 
+	#
 	# NOTE that we don't bother grabbing current ifconfig state --
 	# we assume that the current state is just what Emulab configured!
 	my $iwc_ref = getCurrentIwconfig($ath);
@@ -1295,7 +1300,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	    $opts{'accesspoint'} = $opts{'ap'};
 	    delete $opts{'ap'};
 	}
-	# we want this to be determined by the keyword 'freq' to iwconfig, 
+	# we want this to be determined by the keyword 'freq' to iwconfig,
 	# not channel
 	if (exists($opts{'channel'}) && !exists($opts{'freq'})) {
 	    $opts{'freq'} = $opts{'channel'};
@@ -1343,7 +1348,7 @@ sub os_ifdynconfig_cmds($$$$$)
 		   || $niwc{'mode'} =~ /master/i) {
 		$niwc{'mode'} = "Master";
 	    }
-	    elsif ($niwc{'mode'} =~ /sta/i 
+	    elsif ($niwc{'mode'} =~ /sta/i
 		   || $niwc{'mode'} =~ /managed/i) {
 		$niwc{'mode'} = 'Managed';
 	    }
@@ -1365,7 +1370,7 @@ sub os_ifdynconfig_cmds($$$$$)
 		$niwc{'protocol'} = '80211g';
 	    }
 	    else {
-		print STDERR "ERROR: invalid protocol '" . $niwc{'protocol'} . 
+		print STDERR "ERROR: invalid protocol '" . $niwc{'protocol'} .
 		    "'\n";
 		return 11;
 	    }
@@ -1373,7 +1378,7 @@ sub os_ifdynconfig_cmds($$$$$)
 
 	# to be backwards compat:
 	# If the user sets a mode, we will put the device in that mode.
-	# If the user does not set a mode, but does set an accesspoint, 
+	# If the user does not set a mode, but does set an accesspoint,
 	#   we force the mode to either Managed or Master.
 	# If the user sets neither a mode nor accesspoint, but we are told to
 	#   "remember" the current state, we use that mode and ap.
@@ -1384,9 +1389,9 @@ sub os_ifdynconfig_cmds($$$$$)
 		my $tap = $niwc{'accesspoint'};
 		$tap =~ s/://g;
 		$tap = lc($tap);
-		
+
 		my $tmac = lc($emifc{'MAC'});
-		
+
 		if ($tap eq $tmac) {
 		    # we are going to be the accesspoint; switch our mode to
 		    # master
@@ -1404,9 +1409,9 @@ sub os_ifdynconfig_cmds($$$$$)
 	    my $tap = $niwc{'accesspoint'};
 	    $tap =~ s/://g;
 	    $tap = lc($tap);
-	    
+
 	    my $tmac = lc($emifc{'MAC'});
-	    
+
 	    if ($tap eq $tmac) {
 		# we are going to be the accesspoint; switch our mode to
 		# master
@@ -1420,7 +1425,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	elsif ($remember) {
 	    # swipe first the old emulab config state, then the current
 	    # iwconfig state:
-	    
+
 	    # actually, this was already done above.
 	}
 
@@ -1441,7 +1446,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	if (exists($niwc{'mode'}) && $niwc{'mode'} ne $iwc{'mode'}) {
 	    $mode_ch = 1;
 	}
-	
+
 	if (exists($niwc{'mode'})) {
 	    $iwc_mode = $niwc{'mode'};
 	    if ($niwc{'mode'} eq 'Ad-Hoc') {
@@ -1462,7 +1467,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	    if ($niwc{'protocol'} ne $iwc{'protocol'}) {
 		$proto_ch = 1;
 	    }
-	    
+
 	    if ($niwc{'protocol'} eq '80211a') {
 		$iwp_mode = 1;
 	    }
@@ -1474,7 +1479,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	    }
 	}
 
-	# for atheros cards, if we have to change the mode, we have to 
+	# for atheros cards, if we have to change the mode, we have to
 	# first tear down the VAP and rerun wlanconfig, then reconstruct
 	# and reconfig the VAP.
 	if ($mode_ch == 1) {
@@ -1489,7 +1494,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	    print STDERR "IWPRIV: proto=".$niwc{'protocol'}." ($iwp_mode)\n";
 	}
 	if ($reset_wlan) {
-	    print STDERR "IFCONFIG: iface=$ath; ip=" . $emifc{'IPADDR'} . 
+	    print STDERR "IFCONFIG: iface=$ath; ip=" . $emifc{'IPADDR'} .
 		"; netmask=" . $emifc{'IPMASK'} . "\n";
 	}
 
@@ -1518,7 +1523,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	}
 	if (defined($iwc_mode) && $iwc_mode ne '') {
 	    $iwcstr .= " mode $iwc_mode";
-	    
+
 	    if ($iwc_mode eq 'Managed') {
 		if (exists($niwc{'ap'})) {
 		    if (!($niwc{'ap'} =~ /:/)) {
@@ -1554,15 +1559,15 @@ sub os_ifdynconfig_cmds($$$$$)
 	    push @cmds,"$IFCONFIGBIN $ath down";
 	    push @cmds,"$IFCONFIGBIN $wifi down";
 	    push @cmds,"$WLANCONFIG $ath destroy";
-	    
+
 	    if ($reset_kmod) {
 		## also "reset" the kernel modules:
 		push @cmds,"$RMMOD ath_pci ath_rate_sample ath_hal";
 		push @cmds,"$RMMOD wlan_scan_ap wlan_scan_sta wlan";
 		push @cmds,"$MODPROBE ath_pci autocreate=none";
 	    }
-	    
-	    push @cmds,"$WLANCONFIG $ath create wlandev $wifi " . 
+
+	    push @cmds,"$WLANCONFIG $ath create wlandev $wifi " .
 		"wlanmode $wlc_mode";
 	}
 	if (($proto_ch || $mode_ch || $reset_wlan) && defined($iwp_mode)) {
@@ -1570,18 +1575,18 @@ sub os_ifdynconfig_cmds($$$$$)
 	}
 	push @cmds,"$IWCONFIG $ath $iwcstr";
 	if ($reset_wlan) {
-	    push @cmds,"$IFCONFIGBIN $ath inet " . $emifc{'IPADDR'} . 
+	    push @cmds,"$IFCONFIGBIN $ath inet " . $emifc{'IPADDR'} .
 		" netmask " . $emifc{'IPMASK'} . " up";
 	    # also make sure routing is up for this interface
 	    push @cmds,"/var/emulab/boot/rc.route " . $emifc{'IPADDR'} . " up";
 	}
 
 	# We don't do this right now because when we have to reset
-	# wlan state to force a new mode, we panic the kernel if we 
+	# wlan state to force a new mode, we panic the kernel if we
 	# do a wlanconfig without first destroying any monitor mode VAPs.
 	# What's more, I haven't found a way to see which VAP is attached to
 	# which real atheros device.
-	
+
 	#if ($do_mon_vdev) {
 	#    $athmon = "ath" . ($iface_num + 10);
 	#    push @cmds,"$WLANCONFIG $athmon create wlandev $wifi wlanmode monitor";
@@ -1604,7 +1609,7 @@ sub os_ifdynconfig_cmds($$$$$)
 
 	if (!exists($opts{'protocol'})
 	    || $opts{'protocol'} ne 'flex900') {
-	    warn("*** WARNING: Unknown gnuradio protocol specified, " . 
+	    warn("*** WARNING: Unknown gnuradio protocol specified, " .
 		 "assuming flex900!\n");
         }
 
@@ -1643,7 +1648,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	# find out if we have to kill the current tunnel process...
 	my $tpid;
 	if (!open(PSP, "ps axwww 2>&1 |")) {
-	    print STDERR "ERROR: open: $!"; 
+	    print STDERR "ERROR: open: $!";
 	    return 19;
 	}
 	while (my $psl = <PSP>) {
@@ -1662,7 +1667,7 @@ sub os_ifdynconfig_cmds($$$$$)
 	    push @cmds,"/sbin/modprobe tun";
 	}
 
-	my $tuncmd = 
+	my $tuncmd =
 	    "/bin/env PYTHONPATH=/usr/local/lib/python2.4/site-packages " .
 	    "$BINDIR/tunnel.py -f $freq -r $rate";
 	if (defined($carrierthresh)) {
@@ -1684,9 +1689,9 @@ sub os_ifdynconfig_cmds($$$$$)
 	# also make sure routing is up for this interface
 	push @cmds,"/var/emulab/boot/rc.route " . $emifc{'IPADDR'} . " up";
     }
-    
+
     @$ret_aref = @cmds;
-    
+
     return 0;
 }
 
@@ -1707,7 +1712,7 @@ my %def_iwconfig_regex = ( 'protocol' => '.+(802.*11[abg]{1}).*',
 			 );
 
 #
-# Grab current iwconfig data for a specific interface, based on the 
+# Grab current iwconfig data for a specific interface, based on the
 # specified regexps (which default to def_iwconfig_regex if unspecified).
 # Postprocess the property values so that they can be stuck back into iwconfig.
 #
@@ -1743,16 +1748,16 @@ sub getCurrentIwconfig($;$) {
                 if ($line =~ /$regexp/) {
                     $r{$iwprop} = $1;
                 }
-            }    
+            }
         }
     }
-     
+
     # postprocessing.
     # We change the values back to valid args to the iwconfig command
     if (defined($r{'protocol'})) {
         $r{'protocol'} =~ s/\.//g;
     }
-     
+
     if (defined($r{'rate'})) {
         if ($r{'rate'} =~ /^(\d+) Mb\/s/) {
             $r{'rate'} = "${1}M";
@@ -1778,7 +1783,7 @@ sub getCurrentIwconfig($;$) {
     foreach my $rk (keys(%r)) {
 	print STDERR "gci $rk=".$r{$rk}."\n";
     }
-     
+
     return \%r;
 }
 
@@ -1790,7 +1795,7 @@ sub os_config_gre($$$$$$$)
 
     if (GENVNODE() && GENVNODETYPE() eq "openvz") {
 	$dev = "gre$unit";
-	
+
 	if (system("$IFCONFIGBIN $dev $inetip netmask $mask up")) {
 	    warn("Could not start tunnel $dev!\n");
 	    return -1;
@@ -1814,6 +1819,39 @@ sub os_get_disks
 	@blockdevs = map { s#/sys/block/##; $_ } glob('/sys/block/*');
 
 	return @blockdevs;
+}
+
+sub os_get_ctrlnet_ip
+{
+	my $iface;
+	my $address;
+
+	if (!open CONTROLIF, "$BOOTDIR/controlif") {
+		return undef;
+	}
+
+	$iface = <CONTROLIF>;
+	chomp $iface;
+
+	$iface =~ /(.*)/;
+	$iface = $1;
+
+	close CONTROLIF;
+
+	if (!open IFCFG, "$IFCONFIGBIN $iface|") {
+		return undef;
+	}
+
+	while (<IFCFG>) {
+		if (/inet addr: ([0-9.]*) /) {
+			$address = $1;
+			last;
+		}
+	}
+
+	close IFCFG;
+
+	return $address;
 }
 
 sub os_get_disk_size($)

@@ -1,19 +1,37 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
+
+#
+# NB: Any changes to this document should be reflected in the Wiki page:
+# http://users.emulab.net/trac/emulab/wiki/EventAPI
+#
+
+The Emulab event system API:
 
 * event_register: Register with the testbed event system
 
       #include <event.h>
 
       event_handle_t event_register(char *name, int threaded);
+      event_handle_t event_register_withkeyfile(char *name, int threaded, char *keyfile);
+      event_handle_t event_register_withkeydata(char *name, int threaded, unsigned char *keydata, int len);
+      event_handle_t event_register_withkeyfile_withretry(char *name, int threaded, char *keyfile, int retrycount);
+      event_handle_t event_register_withkeydata_withretry(char *name, int threaded, unsigned char *keydata, int len, int retrycount);
 
-  Register with the testbed event system.  NAME specifies the name of
-  the event server.  Returns a pointer to a handle that may be passed
-  to other event system routines if the operation is successful, NULL
-  otherwise.
+  Register with the testbed event system with an optional HMAC key.
+
+  In all forms, NAME specifies the name of the event server and THREADED is
+  an indication as to whether the calling application is multi-threaded.
+  Returns a pointer to a handle that may be passed to other event system
+  routines if the operation is successful, NULL otherwise.
+
+  The syntax of the NAME parameter is inherited from elvin, and is a subset
+  of their URI syntax.  It is of the form elvin://<server>:<port> where
+  <server> is the IP or DNS name of the server, and PORT is the TCP port
+  number to use.
 
   The THREADED parameter should be set to 1 if the registering
   client is multi-threaded. If THREADED is 1, the event
@@ -24,16 +42,16 @@
   event loop, and the client must call event_main after connecting in
   order to receive notifications.
 
-  Elvin note: NAME is a URL of the form "elvin:/[protocol
-  stack]/[endpoint]", where a protocol stack names a transport
-  module, a security module, and a marshaling module as a comma
-  separated list (e.g., "http,none,xml"), and the endpoint format
-  is dependent on the transport module used.  If no protocol
-  stack is given, the default stack (tcp, none, xdr) is used.  For the
-  testbed's purposes, "elvin://HOSTNAME" should suffice.  If NAME
-  is NULL, then Elvin's server discovery protocol will be used to find
-  the Elvin server.
+  In the _withretry forms, RETRYCOUNT is the number of attempt to try
+  making a connection to the server before failing.  Retries happen
+  at a transport-specific interval, in the case of pubsub (the current
+  and only supported transport) it is 5 seconds.
 
+  In the _withkey* forms, the given KEYDATA and LEN or the contents of
+  KEYFILE are used as a key for the keyed-hash MAC computation to
+  authenticate all events sent or received via the returned handle.
+  The HMAC is a SHA1 hash computed using the OpenSSL HMAC_* routines.
+  Event HMACs appear as opaque attributes in events.
 
 * event_unregister: Unregister with the testbed event system
 
@@ -52,8 +70,21 @@
       int event_main(event_handle_t handle);
 
   Enter the main loop of the event system, waiting to receive event
-  notifications. Returns non-zero if the operation is successful, 0
-  otherwise.
+  notifications. Remains in the main loop until an error occurs or
+  event_stop_main is called. Returns non-zero if the operation is
+  successful, 0 otherwise.  Should only be called by single-threaded
+  programs.
+
+
+* event_stop_main: Force event_main to return
+
+      #include <event.h>
+
+      event_stop_main(event_handle_t handle)
+
+  Can be called from an event handler or signal handler to force the
+  main loop to return, either to check for a completion condition or
+  to handle other, non event related processing.
 
 
 * event_notify: Send an event notification
@@ -67,6 +98,8 @@
   allocated by event_notification_alloc, and may optionally
   have attributes added to it by event_notification_put_*.
   Returns non-zero if the operation is successful, 0 otherwise.
+  If HANDLE has an associated hash key, an HMAC is computed and
+  added as an attribute before sending.
 
   Note that NOTIFICATION is not deallocated by event_notify.  The
   caller is responsible for deallocating the notification when it
@@ -81,15 +114,23 @@
                          event_notification_t notification,
                          struct timeval *time);
 
-  Schedule the event notification NOTIFICATION to be sent at time
-  TIME. NOTIFICATION is allocated by event_notification_alloc,
+  Send the indicated notification as a "scheduled" event.
+  NOTIFICATION is allocated by event_notification_alloc,
   and may optionally have attributes added to it by
   event_notification_put_*. Returns non-zero if the operation
   is successful, 0 otherwise.
 
   This function essentially operates as a deferred event_notify.
-  event_notify sends notifications immediately,
-  whereas event_schedule sends notifications at some later time.
+  event_notify sends notifications immediately to recipients,
+  whereas event_schedule causes notifications to be sent at
+  some later time.
+
+  IMPORTANT NOTE: scheduled events are NOT held in the calling process
+  for later delivery. Instead, event_schedule adds a SCHEDULER=1 attribute
+  to the notification along with attributes for the delivery time, and
+  then uses event_notify to immediately send the event. There must be
+  an event agent subscribed to SCHEDULER events that implements the
+  queuing and later sending of the unadorned notification.
 
   Note that NOTIFICATION is not deallocated by event_schedule.
   The caller is responsible for deallocating the notification
@@ -101,14 +142,17 @@
       #include <event.h>
 
       event_notification_t event_notification_alloc(event_handle_t handle,
-                                                    char *host,
-                                                    event_type_t type);
+						    address_tuple_t tuple);
 
-  Allocate an event notification.  The HOST parameter specifies
-  the hostname of the node that should receive the notification,
-  or EVENT_HOST_ANY if the notification should go to all hosts.
-  The TYPE parameter specifies the event type. Returns
-  a pointer to an event notification structure if the operation
+  Allocate an event notification destined for a particular target.
+  The TUPLE parameter describes the target of the notification.
+  It contains a set of strings for a standard set of Emulab attributes
+  including the Emulab site and host, the project and experiment names,
+  the target object type and name, and the event type, group and timeline. 
+  All are optional and will be given default "any" values if not specified
+  by the caller.
+
+  Returns a pointer to an event notification structure if the operation
   is successful, 0 otherwise.
 
 
@@ -121,6 +165,17 @@
 
   Free the event notification NOTIFICATION. Returns non-zero if the
   operation is successful, 0 otherwise.
+
+
+* event_notification_clone: create a (deep) copy of a notification
+
+      event_notification_t
+      event_notification_clone(event_handle_t handle,
+			       event_notification_t notification);
+
+  Create an exact copy of NOTIFICATION.
+  Returns a pointer to an event notification structure if the operation
+  is successful, 0 otherwise.
 
 
 * event_notification_get_*: Get an attribute from an event notification
@@ -149,6 +204,12 @@
                                         char *name,
                                         char *buffer,
                                         int length);
+      int event_notification_get_opaque_length(event_handle_t handle,
+					     event_notification_t notification,
+					     char *name)
+      int event_notification_get_string_length(event_handle_t handle,
+					     event_notification_t notification,
+					     char *name)
 
   Get the attribute with name NAME from the event notification
   NOTIFICATION.
@@ -159,6 +220,49 @@
 
   For _opaque and _string: Writes LENGTH bytes into *BUFFER and
   returns non-zero if the named attribute is found, 0 otherwise.
+
+  The _length functions return the length of the named attribute,
+  and can be used to size buffers for subsequent get_* calls.
+
+
+* event_notification_get_<tuple-arg>: extract notification tuple info
+
+      int event_notification_get_site(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+      int event_notification_get_host(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+      int event_notification_get_expt(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+      int event_notification_get_objtype(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+      int event_notification_get_objname(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+      int event_notification_get_eventtype(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+      int event_notification_get_group(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+      int event_notification_get_timeline(event_handle_t handle,
+				      event_notification_t notification,
+				      void *buffer,
+				      int length);
+
+  Convenience functions for extracting subscription attributes from a
+  notification.  Wrappers for event_notification_get_string using the
+  specific NAME value.
 
 
 * event_notification_put_*: Add an attribute to an event notification
@@ -188,13 +292,12 @@
 
   Add an attribute with name NAME to the event notification
   NOTIFICATION. For _double, _int32, _int64, and _string: The value
-  is specified in VALUE. For _opaque: The value is specified
-  in the buffer BUFFER which has length LENGTH. Returns non-zero if
-  the operation is successful, 0 otherwise.
+  is specified in VALUE (strings are null-terminated). For _opaque:
+  The value is specified in the buffer BUFFER which has length LENGTH.
+  Returns non-zero if the operation is successful, 0 otherwise.
 
 
-* event_notification_attr_remove: Remove an attribute from an event
-  notification
+* event_notification_remove: Remove an attribute from an event notification
 
       #include <event.h>
 
@@ -213,25 +316,38 @@
 
       event_subscription_t event_subscribe(event_handle_t handle,
                                            event_notify_callback_t callback,
-                                           event_type_t type,
+                                           address_tuple_t tuple,
                                            void *data);
 
-  Subscribe to events of type TYPE.  Event notifications that match
-  TYPE will be passed to the callback function CALLBACK; DATA is
-  an arbitrary pointer that will be passed to the callback function.
-  Callback functions are of the form
+  Subscribe to events matching the information in TUPLE, arranging for
+  CALLBACK to be called with DATA as an argument when an event occurs.
+  Returns a pointer to an event subscription structure if the operation
+  is successful, 0 otherwise.
+
+  The information in TUPLE is used to create a pubsub boolean expression
+  that is a conjunction of all the tuple elements. DATA is an arbitrary
+  pointer that will be passed to the callback function. CALLBACK functions
+  are of the form:
 
       void callback(event_handle_t handle,
                     event_notification_t notification,
-                    char *host,
-                    event_type_t type,
                     void *data);
 
   where HANDLE is the handle to the event server, NOTIFICATION is the
-  event notification, HOST and TYPE are the respective attributes of
-  the event notification, and DATA is the arbitrary pointer passed to
-  event_subscribe.  Returns a pointer to an event
-  subscription structure if the operation is successful, 0 otherwise.
+  event notification, and DATA is the arbitrary pointer passed to
+  event_subscribe. The various event_notification_get_* functions can
+  be applied to the notification to extract information.
+
+
+* event_unsubscribe: Clear a subscription for an event
+
+      #include <event.h>
+
+      int event_unsubscribe(event_handle_t handle, event_subscription_t es);
+
+  Unregister an interest in the specified subscription.  ES is a subscription
+  object returned from a previous event_subscribe call.
+
 
 * event_poll: Poll for new events
 
@@ -242,6 +358,7 @@
   Polls for new events. Calls callbacks for all pending events. Does
   not block - simply processes events that are currently queued.
 
+
 * event_poll_blocking: Poll for new events
 
       #include <event.h>
@@ -249,10 +366,10 @@
       int event_poll_blocking(event_handle_t handle, unsigned int timeout);
 
   Same as event_poll, but blocks waiting for an event. Times out
-  after the given amount of time (which is in millseconds), or doesn't time
+  after the given amount of time (which is in milliseconds), or doesn't time
   out if 0 is given.
 
   IMPORTANT: elvin uses timeouts internally. So, this function does
   NOT guarantee that when it returns, either an event has been
-  recieved or your timeout has passed. This should not be much of
+  received or your timeout has passed. This should not be much of
   a problem, but you have been warned!

@@ -14,15 +14,15 @@ package libsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( libsetup_init libsetup_setvnodeid libsetup_settimeout cleanup_node 
+    qw ( libsetup_init libsetup_setvnodeid libsetup_settimeout cleanup_node
 	 getifconfig getrouterconfig gettrafgenconfig gettunnelconfig
-	 check_nickname	bootsetup startcmdstatus whatsmynickname 
+	 check_nickname	bootsetup startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
-	 jailsetup dojailconfig findiface libsetup_getvnodeid 
+	 jailsetup dojailconfig findiface libsetup_getvnodeid
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
 	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
-         getlinkdelayconfig getloadinfo getbootwhat
+         getlinkdelayconfig getloadinfo getbootwhat gendhcpdconf
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -31,13 +31,13 @@ use Exporter;
 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
 	 ISFW FAKEJAILED LINUXJAILED GENVNODE GENVNODETYPE GENVNODEHOST
-	 SHAREDHOST
+	 SHAREDHOST SUBBOSS
 
 	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC TMCCBIN
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP TMLTPMAP
-	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
-	 TMCREATOR TMSWAPPER TMFWCONFIG TMGENVNODECONFIG 
+	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY
+	 TMCREATOR TMSWAPPER TMFWCONFIG TMGENVNODECONFIG
 	 INXENVM
        );
 
@@ -46,6 +46,7 @@ use English;
 
 # The tmcc library.
 use libtmcc;
+use librc;
 
 #
 # This is the VERSION. We send it through to tmcd so it knows what version
@@ -88,8 +89,8 @@ sub libsetup_getvnodeid()
 }
 
 #
-# True if running inside a jail. Set just below. 
-# 
+# True if running inside a jail. Set just below.
+#
 my $injail;
 
 #
@@ -105,7 +106,7 @@ my $ingenvnode;
 
 #
 # True if running as a fake jail (no jail, just processes).
-# 
+#
 my $nojail;
 
 #
@@ -176,7 +177,7 @@ BEGIN
 	else {
 	    die("Bad data in urn: $urn");
 	}
-	
+
 	# The cache needs to go in a difference location.
 	libtmcc::configtmcc("cachedir", $SHADOWDIR);
 	libtmcc::configtmcc("server", $server);
@@ -223,7 +224,7 @@ BEGIN
     }
 
     $role = "";
-    # Get our role. 
+    # Get our role.
     if (-e "$BOOTDIR/role") {
 	open(VN, "$BOOTDIR/role");
 	$role = <VN>;
@@ -233,7 +234,7 @@ BEGIN
 }
 
 #
-# This "local" library provides the OS dependent part. 
+# This "local" library provides the OS dependent part.
 #
 use liblocsetup;
 
@@ -253,14 +254,14 @@ sub TMLTPMAP()		{ "$BOOTDIR/ltpmap";}
 
 #
 # This path is valid only *outside* the jail when its setup.
-# 
+#
 sub JAILDIR()		{ "$VARDIR/jails/$vnodeid"; }
 
 #
 # This path is valid only *outside* the vm.  Sucks, but this is the best we
 # can do.  Probably the only way to make this vm-specific if necessary is to
 # have them create their dir and symlink.
-# 
+#
 sub GENVNODEDIR()	{ "$VARDIR/vms/$vnodeid"; }
 
 #
@@ -280,11 +281,11 @@ sub GENVNODETYPE() {
 # Also valid outside the jail, this is where we put local project storage.
 #
 sub LOCALROOTFS() {
-    return "/users/local" 
+    return "/users/local"
 	if (REMOTE());
-    return "$VARDIR/jails/local" 
+    return "$VARDIR/jails/local"
 	if (JAILED());
-    return "$VARDIR/vms/local" 
+    return "$VARDIR/vms/local"
 	if (GENVNODE());
 }
 
@@ -292,7 +293,7 @@ sub LOCALROOTFS() {
 # Okay, here is the path mess. There are three environments.
 # 1. A local node where everything goes in one place ($VARDIR/boot).
 # 2. A virtual node inside a jail or a Plab vserver ($VARDIR/boot).
-# 3. A virtual (or sub) node, from the outside. 
+# 3. A virtual (or sub) node, from the outside.
 #
 # As for #3, whether setting up a old-style (fake) virtual node or a new style
 # jailed node, the code that sets it up needs a different per-vnode path.
@@ -302,7 +303,7 @@ sub CONFDIR() {
 	if ($shadow);
     return $BOOTDIR
 	if ($injail || $inplab || $ingenvnode);
-    return GENVNODEDIR() 
+    return GENVNODEDIR()
 	if ($vnodeid && GENVNODETYPE());
     return JAILDIR()
 	if ($vnodeid);
@@ -314,16 +315,16 @@ sub LOGDIR() {
 	if ($shadow);
     return $LOGDIR
 	if ($injail || $inplab || $ingenvnode);
-    return GENVNODEDIR() 
+    return GENVNODEDIR()
 	if ($vnodeid && GENVNODETYPE());
-    return JAILDIR() 
+    return JAILDIR()
 	if ($vnodeid);
     return $LOGDIR;
 }
 
 #
 # The rest of these depend on the environment running in (inside/outside jail).
-# 
+#
 sub TMNICKNAME()	{ CONFDIR() . "/nickname";}
 sub TMJAILNAME()	{ CONFDIR() . "/jailname";}
 sub TMFAKEJAILNAME()	{ CONFDIR() . "/fakejail";}
@@ -433,6 +434,11 @@ sub ISFW()	{ if (-e TMFWCONFIG()) { return 1; } else { return 0; } }
 sub SIMHOST()   { if ($role eq "simhost") { return 1; } else { return 0; } }
 sub SIMTRAFGEN(){ if (-e ISSIMTRAFGENPATH())  { return 1; } else { return 0; } }
 
+#
+# Are we a subboss?
+#
+sub SUBBOSS()   { if ($role eq "subboss") { return 1; } else { return 0; } }
+
 # A jail host?
 sub JAILHOST()     { return (($role eq "virthost" ||
 			      $role eq "sharedhost") ? 1 : 0); }
@@ -460,14 +466,14 @@ sub INXENVM()	{ return ($ingenvnode && GENVNODETYPE() eq "xen"); }
 #
 sub cleanup_node ($) {
     my ($scrub) = @_;
-    
+
     print STDOUT "Cleaning node; removing configuration files\n";
     unlink TMUSESFS, TMROLE, ISSIMTRAFGENPATH, ISDELAYNODEPATH;
 
     #
     # If scrubbing, also remove the password/group files and DBs so
     # that we revert to base set.
-    # 
+    #
     if ($scrub) {
 	unlink TMNICKNAME;
     }
@@ -491,7 +497,7 @@ sub check_status ()
     # This is possible if the boss node does not now about us yet.
     # We want to appear free. Specifically, it could happen on the
     # MFS when trying to bring in brand new nodes. tmcd will not know
-    # anything about us, and return no info. 
+    # anything about us, and return no info.
     #
     return 0
 	if (! @tmccresults);
@@ -502,7 +508,7 @@ sub check_status ()
 	unlink TMNICKNAME;
 	return 0;
     }
-    
+
     if ($status =~ /ALLOCATED=([-\@\w]*)\/([-\@\w]*) NICKNAME=([-\@\w]*)/) {
 	$pid   = $1;
 	$eid   = $2;
@@ -512,7 +518,7 @@ sub check_status ()
 	warn "*** WARNING: Error getting reservation status\n";
 	return -1;
     }
-    
+
     #
     # Stick our nickname in a file in case someone wants it.
     # Do not overwrite; we want to save the original info until later.
@@ -521,14 +527,14 @@ sub check_status ()
     if (! -e TMNICKNAME()) {
 	system("echo '$vname.$eid.$pid' > " . TMNICKNAME());
     }
-    
+
     return ($pid, $eid, $vname);
 }
 
 #
 # Check cached nickname. Its okay if we have been deallocated and the info
 # is stale. The node will notice that later.
-# 
+#
 sub check_nickname()
 {
     if (-e TMNICKNAME) {
@@ -557,7 +563,7 @@ sub initsfs()
     # Default to no SFS unless we can determine we have it running.
     unlink TMUSESFS()
 	if (-e TMUSESFS());
-    
+
     # Do I have a host key?
     if (! -e "/etc/sfs/sfs_host_key") {
 	return;
@@ -593,8 +599,8 @@ sub initsfs()
 }
 
 #
-# Get the role of the node and stash it for future libsetup load. 
-# 
+# Get the role of the node and stash it for future libsetup load.
+#
 sub dorole()
 {
     my @tmccresults;
@@ -605,7 +611,7 @@ sub dorole()
     }
     return 0
 	if (! @tmccresults);
-    
+
     #
     # There should be just one string. Ignore anything else.
     #
@@ -626,7 +632,7 @@ sub dorole()
 
 #
 # Get the nodeid
-# 
+#
 sub donodeid()
 {
     my $nodeid;
@@ -638,7 +644,7 @@ sub donodeid()
     }
     return 0
 	if (! @tmccresults);
-    
+
     #
     # There should be just one string. Ignore anything else.
     #
@@ -649,7 +655,7 @@ sub donodeid()
 	warn "*** WARNING: Bad nodeid line: $tmccresults[0]";
 	return -1;
     }
-    
+
     system("echo '$nodeid' > ". TMNODEID);
     if ($?) {
 	warn "*** WARNING: Could not write nodeid to " . TMNODEID() . "\n";
@@ -661,7 +667,7 @@ sub donodeid()
 # Parse the router config and return a hash. This leaves the ugly pattern
 # matching stuff here, but lets the caller do whatever with it (as is the
 # case for the IXP configuration stuff). This is inconsistent with many
-# other config scripts, but at some point that will change. 
+# other config scripts, but at some point that will change.
 #
 sub getifconfig($;$)
 {
@@ -680,7 +686,7 @@ sub getifconfig($;$)
 	@$rptr = ();
 	return -1;
     }
-    
+
     my $ethpat  = q(INTERFACE IFACETYPE=(\w*) INET=([0-9.]*) MASK=([0-9.]*) );
     $ethpat    .= q(MAC=(\w*) SPEED=(\w*) DUPLEX=(\w*) );
     $ethpat    .= q(IFACE=(\w*) RTABID=(\d*) LAN=([-\w\(\)]*));
@@ -699,9 +705,9 @@ sub getifconfig($;$)
 	    my $mac     = $1;
 	    my $capkey  = $2;
 	    my $capval  = $3;
-	    
+
 	    #
-	    # Stash the setting into the setting list, but must find the 
+	    # Stash the setting into the setting list, but must find the
 	    #
 	    if (!exists($ifacehash{$mac})) {
 		warn("*** WARNING: ".
@@ -715,7 +721,7 @@ sub getifconfig($;$)
 	    my $inet     = $2;
 	    my $mask     = $3;
 	    my $mac      = $4;
-	    my $speed    = $5; 
+	    my $speed    = $5;
 	    my $duplex   = $6;
 	    my $iface    = $7;
 	    my $rtabid   = $8;
@@ -823,7 +829,7 @@ sub getifconfig($;$)
 	    warn "*** WARNING: Bad ifconfig line: $str\n";
 	}
     }
-  
+
     @$rptr = @ifacelist;
     return 0;
 }
@@ -848,7 +854,7 @@ sub getlinkdelayconfig($;$)
 	@$rptr = ();
 	return -1;
     }
-    
+
     my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
     $pat .= q(LINKNAME=([-\d\w]+) VNODE=([-\d\w]+) );
     $pat .= q(INET=([0-9.]*) MASK=([0-9.]*) );
@@ -898,7 +904,7 @@ sub getlinkdelayconfig($;$)
 	    warn "*** WARNING: Bad linkdelay line: $str\n";
 	}
     }
-  
+
     @$rptr = @ldlist;
     return 0;
 }
@@ -939,7 +945,7 @@ sub gettopomap($)
 	chomp($_);
 	my @values = split(",", $_);
 	my $rowref = {};
-    
+
 	for (my $i = 0; $i < scalar(@slots); $i++) {
 	    $rowref->{$slots[$i]} = (defined($values[$i]) ? $values[$i] : undef);
 	}
@@ -978,7 +984,7 @@ sub genhostsfile($@)
     if ($hostname =~ /[^.]+\.(.+)/) {
 	$localaliases .= " localhost.$1";
     }
-    
+
     #
     # First, write a localhost line into the hosts file - we have to know the
     # domain to use here
@@ -998,9 +1004,9 @@ sub genhostsfile($@)
 	    my $name    = $1;
 	    my $ip      = $2;
 	    my $aliases = $3;
-	    
+
 	    my $hostline = os_etchosts_line($name, $ip, $aliases);
-	    
+
 	    print HOSTS "$hostline\n";
 	}
 	else {
@@ -1018,6 +1024,143 @@ sub genhostsfile($@)
 }
 
 #
+# Generate ISC dhcpd configuration file
+#
+sub gendhcpdconf($$)
+{
+	my ($outfile, $template) = @_;
+	my $tmpfile =  "/tmp/gendhcpdconf.$$";
+	my @tmccresults;
+	my @nodes;
+        # don't cache this stuff, can't get stale dhcpd info!
+        my %opthash = ( 'nocache' => 1 );
+
+	return 0 if (!SUBBOSS());
+
+	if (tmcc(TMCCCMD_DHCPDCONF, undef, \@tmccresults, %opthash) == 0
+		&& scalar(@tmccresults)) {
+	#} else {
+	#	fatal("No dhcpd configuration data returned by tmcd\n");
+	}
+
+	for (@tmccresults) {
+		my $node = {};
+		for my $pair (split /\s+/, $_) {
+			$pair =~ /([^=]+)=(.*)/;
+			$$node{$1} = $2;
+		}
+
+		push @nodes, $node;
+	}
+
+	if (!open(OF, ">$tmpfile")) {
+		warn("Could not open $tmpfile\n");
+		return 1;
+	}
+
+	if (!open(IF,"<$template")) {
+	   warn("Unable to open $template for reading");
+	   return 1;
+	}
+	while (<IF>) {
+		if (/^(\s*)\%\%nodes/) {
+			my $spaces = $1;
+
+			for my $row (@nodes) {
+			    my $ip  = $$row{"IP"};
+			    my $mac = $$row{"MAC"};
+			    my $node_id;
+			    my $next_server = $$row{"TFTP"};
+			    my $bootinfo_server = $$row{"BOOTINFO"};
+			    my $hostname = $$row{"HOSTNAME"};
+			    my $filename = $$row{"FILENAME"};
+			    my $singlenet = $$row{"SINGLENET"};
+			    my $inner_elab_boot = $$row{"INNER_ELAB_BOOT"};
+			    my $plab_boot = $$row{"PLAB_BOOT"};
+			    my $booting;
+			    my $dns;
+
+			    if (defined $hostname) {
+			    	$hostname =
+				    "${spaces}\toption host-name \"$hostname\";\n";
+			    }
+
+    			    if (defined $filename) {
+				$filename =~ s/^"(.*)"$/$1/;
+				$filename =
+				    "${spaces}\tfilename \"$filename\";\n";
+			    }
+
+
+			    if (defined $next_server) {
+				$next_server = "${spaces}\tnext-server " .
+					$next_server . ";\n";
+			    }
+
+			    if (defined $bootinfo_server) {
+				$bootinfo_server = "${spaces}\toption " .
+				"PXE.emulab-bootinfo " . $bootinfo_server . ";\n";
+			    }
+
+			    if ($inner_elab_boot) {
+				if ($singlenet) {
+					$booting  = "${spaces}\tignore booting;\n";
+				} else {
+					$dns = "${spaces}\toption ".
+					    "domain-name-servers 1.1.1.1;\n";
+				}
+			    }
+
+			    #
+			    # Handle alternate boot program filename if it exists.
+			    # Use mutable nodes.pxe_boot_path if it is defined.
+			    # Otherwise use the node_types.pxe_boot_path if it is
+			    # defined.  Otherwise don't set anything (use the global
+			    # default).
+			    #
+			    if (defined $filename) {
+			        # make sure it is pretty constrained
+			        if ($filename =~ /^\/tftpboot\// && $fn !~ /\.\./) {
+			            $filename = "${spaces}\tfilename \"$filename\";\n";
+			        }
+			}
+
+			# Need to make MAC look right..
+			$mac =~ s/(..)\B/$1:/g;
+
+			print OF "${spaces}host $ip {\n";
+			print OF $filename if $filename;
+			print OF $next_server if $next_server;
+			print OF $bootinfo_server if $bootinfo_server;
+			print OF $dns if $dns;
+			print OF $booting if $booting;
+			print OF "${spaces}\thardware ethernet $mac;\n";
+			print OF $hostname;
+			print OF "${spaces}\tfixed-address $ip;\n";
+			print OF "${spaces}}\n\n";
+			}
+		} elsif (/(.*\s*)\%\%subboss_ip(.*)/) {
+			my $ip = os_get_ctrlnet_ip();
+			print OF "$1" . $ip . "$2\n";
+		} else {
+		    # It's a regular line
+		    print OF $_;
+		}
+	}
+	close(IF);
+	close(OF);
+
+	if (-e $outfile) {
+		system("cp -fp $outfile ${outfile}.old") == 0 or
+		fatal("Could not backup copy of ${outfile}");
+	}
+	system("mv -f $tmpfile $outfile") == 0 or
+	fatal("Could not install new ${outfile}");
+
+	return 0;
+}
+
+#
 # Convert from MAC to iface name (eth0/fxp0/etc) using little helper program.
 #
 # If the optional second arg is set, it is an IP address with which we
@@ -1026,7 +1169,7 @@ sub genhostsfile($@)
 # interfaces (like vlans and IP aliases on Linux) use the MAC address of
 # the underlying physical device.  Hence, look up by MAC on those will
 # return the physical interface.
-# 
+#
 sub findiface($;$)
 {
     my($mac,$ip) = @_;
@@ -1036,7 +1179,7 @@ sub findiface($;$)
 	or die "Cannot start " . FINDIF . ": $!";
 
     $iface = <FIF>;
-    
+
     if (! close(FIF)) {
 	if (!defined($ip)) {
 	    return 0;
@@ -1046,7 +1189,7 @@ sub findiface($;$)
 	#
 	$iface = "";
     }
-    
+
     $iface =~ s/\n//g;
 
     if (defined($ip)) {
@@ -1104,7 +1247,7 @@ sub getrouterconfig($$)
     #	NEXTHOP=192.168.1.3 COST=0 SRC=192.168.4.5
     #
     # The SRC ip is used to determine which interface the routes are
-    # associated with, since nexthop alone is not enough cause of the 
+    # associated with, since nexthop alone is not enough cause of the
     #
     my $pat = q(ROUTE DEST=([0-9\.]*) DESTTYPE=(\w*) DESTMASK=([0-9\.]*) );
     $pat   .= q(NEXTHOP=([0-9\.]*) COST=([0-9]*) SRC=([0-9\.]*));
@@ -1125,7 +1268,7 @@ sub getrouterconfig($$)
 	    # For IXP.
 	    #
 	    my $rconfig = {};
-		    
+
 	    $rconfig->{"IPADDR"}   = $dip;
 	    $rconfig->{"TYPE"}     = $rtype;
 	    $rconfig->{"IPMASK"}   = $dmask;
@@ -1205,7 +1348,7 @@ sub calcroutes ($)
 	# Links is a string of "$lan1:$ip1 $lan2:$ip2 ..."
 	foreach my $link (split(" ", $links)) {
 	    my ($lan,$ip) = split(":", $link);
-	
+
 	    if (! defined($lans{$lan})) {
 		$lans{$lan} = {};
 		$lans{$lan}->{"members"} = {};
@@ -1225,7 +1368,7 @@ sub calcroutes ($)
 	$lans{$vname}->{"cost"} = $cost;
 	$lans{$vname}->{"mask"} = $mask;
     }
-    
+
     #
     # Construct input for Jon's dijkstra program.
     #
@@ -1239,12 +1382,12 @@ sub calcroutes ($)
     my $edges = 0;
     foreach my $lan (keys(%lans)) {
 	my @members = sort(keys(%{ $lans{$lan}->{"members"} }));
-	
+
 	for (my $i = 0; $i < scalar(@members); $i++) {
 	    for (my $j = $i; $j < scalar(@members); $j++) {
 		my $member1 = $members[$i];
 		my $member2 = $members[$j];
-	    
+
 		$edges++
 		    if ($member1 ne $member2);
 	    }
@@ -1259,16 +1402,16 @@ sub calcroutes ($)
 	my @members = sort(keys(%{ $lans{$lan}->{"members"} }));
 	my $cost    = $lans{$lan}->{"cost"};
 	my $mask    = $lans{$lan}->{"mask"};
-	
+
 	for (my $i = 0; $i < scalar(@members); $i++) {
 	    for (my $j = $i; $j < scalar(@members); $j++) {
 		my $member1 = $members[$i];
 		my $member2 = $members[$j];
-	    
+
 		if ($member1 ne $member2) {
 		    my ($node1,$ip1) = split(":", $member1);
 		    my ($node2,$ip2) = split(":", $member2);
-		
+
 		    print MAP "$node1 " . $ip1 . " " .
 			      "$node2 " . $ip2 . " $cost\n";
 		}
@@ -1280,9 +1423,9 @@ sub calcroutes ($)
     undef(%lans);
 
     #
-    # Now run the dijkstra program on the input. 
+    # Now run the dijkstra program on the input.
     # --compress generates "net" routes
-    # 
+    #
     if (!open(DIJK, "cat $linkmap | $BINDIR/dijkstra --compress --source=$myname |")) {
 	warn("*** WARNING: Could not invoke dijkstra on linkmap!\n");
 	@$rptr  = ();
@@ -1290,7 +1433,7 @@ sub calcroutes ($)
     }
     my $pat = q(ROUTE DEST=([0-9\.]*) DESTTYPE=(\w*) DESTMASK=([0-9\.]*) );
     $pat   .= q(NEXTHOP=([0-9\.]*) COST=([0-9]*) SRC=([0-9\.]*));
-    
+
     while (<DIJK>) {
 	if ($_ =~ /ROUTERTYPE=(.+)/) {
 	    next;
@@ -1302,7 +1445,7 @@ sub calcroutes ($)
 	    my $gate  = $4;
 	    my $cost  = $5;
 	    my $sip   = $6;
-	    
+
 	    my $rconfig = {};
 	    $rconfig->{"IPADDR"}   = $dip;
 	    $rconfig->{"TYPE"}     = $rtype;
@@ -1350,7 +1493,7 @@ sub gettrafgenconfig($)
     foreach my $str (@tmccresults) {
 	if ($str =~ /$pat/) {
 	    my $trafgen = {};
-	    
+
 	    $trafgen->{"NAME"}       = $1;
 	    $trafgen->{"SRCHOST"}    = $2;
 	    $trafgen->{"SRCPORT"}    = $3;
@@ -1389,7 +1532,7 @@ sub gettraceconfig($)
 	warn("*** WARNING: Could not get trace config from server!\n");
 	return -1;
     }
-    
+
     my $pat = q(TRACE LINKNAME=([-\d\w]+) IDX=(\d*) MAC0=(\w*) MAC1=(\w*) );
     $pat   .= q(VNODE=([-\d\w]+) VNODE_MAC=(\w*) );
     $pat   .= q(TRACE_TYPE=([-\d\w]+) );
@@ -1399,7 +1542,7 @@ sub gettraceconfig($)
     foreach my $str (@tmccresults) {
 	if ($str =~ /$pat/) {
 	    my $trace = {};
-	    
+
 	    $trace->{"LINKNAME"}      = $1;
 	    $trace->{"IDX"}           = $2;
 	    $trace->{"MAC0"}          = $3;
@@ -1751,7 +1894,7 @@ sub getfwconfig($$;$)
 
 #
 # All we do is store it away in the file. This makes it avail later.
-# 
+#
 sub dojailconfig()
 {
     my @tmccresults;
@@ -1785,7 +1928,7 @@ sub bootsetup()
 
     # Tell libtmcc to forget anything it knows.
     tmccclrconfig();
-    
+
     #
     # Watch for a change in project membership. This is not supposed
     # to happen, but it is good to check for this anyway just in case.
@@ -1796,7 +1939,7 @@ sub bootsetup()
 	($oldpid) = check_nickname();
 	unlink TMNICKNAME;
     }
-    
+
     #
     # Check allocation. Exit now if not allocated.
     #
@@ -1805,9 +1948,9 @@ sub bootsetup()
 	cleanup_node(1);
 	return undef;
     }
-    
+
     #
-    # Project Change? 
+    # Project Change?
     #
     if (defined($oldpid) && ($oldpid ne $pid)) {
 	print STDOUT "  Node switched projects: $oldpid\n";
@@ -1820,7 +1963,7 @@ sub bootsetup()
     else {
 	#
 	# Cleanup node. Flag indicates to gently clean ...
-	# 
+	#
 	cleanup_node(0);
     }
     print STDOUT "  Allocated! $pid/$eid/$vname\n";
@@ -1839,7 +1982,7 @@ sub bootsetup()
     # is going to tell us.
     #
     tmccgetconfig();
-    
+
     #
     # Get the role of this node from tmcc which can be one of
     # "node", "virthost", "delaynode" or "simhost".
@@ -1880,20 +2023,20 @@ sub shadowsetup($$)
 
     # Tell libtmcc to forget anything it knows.
     tmccclrconfig();
-    
+
     #
     # Check allocation. Exit now if not allocated.
     #
     if (! check_status()) {
 	return undef;
-    } 
+    }
     print STDOUT "  Allocated! $pid/$eid/$vname\n";
 
     #
-    # Tell libtmcc to get the full config. 
+    # Tell libtmcc to get the full config.
     #
     tmccgetconfig();
-    
+
     #
     # Get the role of this node from tmcc which can be one of
     # "node", "virthost", "delaynode" or "simhost".
@@ -1915,7 +2058,7 @@ sub shadowsetup($$)
 }
 
 #
-# This happens inside a jail. 
+# This happens inside a jail.
 #
 sub jailsetup()
 {
@@ -1924,7 +2067,7 @@ sub jailsetup()
     # into the environment so we can get it! See mkjail.pl.
     #
     my $vid = $ENV{'TMCCVNODEID'};
-    
+
     #
     # Set global vnodeid for tmcc commands. Must be before all the rest!
     #
@@ -1933,7 +2076,7 @@ sub jailsetup()
 
     #
     # Create a file inside so that libsetup inside the jail knows its
-    # inside a jail and what its ID is. 
+    # inside a jail and what its ID is.
     #
     system("echo '$vnodeid' > " . TMJAILNAME());
     # Need to unify this with jailname.
@@ -1968,10 +2111,10 @@ sub fakejailsetup()
 
     # Stick this into the environment so that sub processes know.
     $ENV{'FAKEJAIL'} = $vnodeid;
-    
+
     #
     # Create a file inside so that libsetup inside the jail knows its
-    # inside a jail and what its ID is. 
+    # inside a jail and what its ID is.
     #
     system("echo '$vnodeid' > " . TMFAKEJAILNAME());
     # Need to unify this with jailname.
@@ -2029,7 +2172,7 @@ sub vnodejailsetup($)
     }
 
     #
-    # Create /local directories for users. 
+    # Create /local directories for users.
     #
     if (! -e LOCALROOTFS()) {
 	os_mkdir(LOCALROOTFS(), "0755");
@@ -2066,7 +2209,7 @@ sub vnodejailsetup($)
     # to the proper location inside the jail by mkjail.
     #
     tmccgetconfig();
-    
+
     #
     # Get jail config.
     #
@@ -2078,7 +2221,7 @@ sub vnodejailsetup($)
 
 #
 # All we do is store it away in the file. This makes it avail later.
-# 
+#
 sub stashgenvnodeconfig()
 {
     my @tmccresults;
@@ -2127,7 +2270,7 @@ sub getgenvnodeconfig($;$)
     foreach my $line (@tmccresults) {
 	if ($line =~ /^(.*)="(.*)"$/ ||
 	    $line =~ /^(.*)=(.+)$/) {
-	    if ($1 eq 'JAILIP' 
+	    if ($1 eq 'JAILIP'
 		&& $2 =~ /^(\d+\.\d+\.\d+\.\d+),(\d+\.\d+\.\d+\.\d+)$/) {
 		$vconfig{"CTRLIP"} = $1;
 		$vconfig{"CTRLMASK"} = $2;
@@ -2140,7 +2283,7 @@ sub getgenvnodeconfig($;$)
 
     %$rptr = %vconfig;
     return 0;
-} 
+}
 
 #
 # Virtual node vm setup. This happens outside in the root context.
@@ -2178,7 +2321,7 @@ sub genvnodesetup($;$$)
     }
 
     #
-    # Create /local directories for users. 
+    # Create /local directories for users.
     #
     if (! -e LOCALROOTFS()) {
 	os_mkdir(LOCALROOTFS(), "0755");
@@ -2217,7 +2360,7 @@ sub genvnodesetup($;$$)
     tmccclrconfig()
 	if ($issharedhost);
     tmccgetconfig();
-    
+
     #
     # XXX: Get jail config.  For now we just snoop on this, but should do our
     # own later.
@@ -2235,7 +2378,7 @@ sub plabsetup()
 {
     # Tell libtmcc to forget anything it knows.
     tmccclrconfig();
-    
+
     #
     # vnodeid will either be found in BEGIN block or will be passed to
     # vnodeplabsetup, so it doesn't need to be found here
@@ -2282,15 +2425,15 @@ sub vnodeplabsetup($)
 	print "Node is free!\n";
 	return undef;
     }
-    
+
     #
     # Create a file so that libsetup knows it's inside Plab and what
-    # its ID is. 
+    # its ID is.
     #
     system("echo '$vnodeid' > $BOOTDIR/plabname");
     # Need to unify this with plabname.
     system("echo '$vnodeid' > $BOOTDIR/nodeid");
-    
+
     return ($pid, $eid, $vname);
 }
 
@@ -2308,7 +2451,7 @@ sub ixpsetup($)
     libsetup_setvnodeid($vid);
 
     #
-    # Config files go here. 
+    # Config files go here.
     #
     if (! -e CONFDIR()) {
 	die("*** $0:\n".
@@ -2324,15 +2467,15 @@ sub ixpsetup($)
 
     #
     # Different approach for IXPs. The ixp setup code will call the routines
-    # directly. 
-    # 
+    # directly.
+    #
 
     return ($pid, $eid, $vname);
 }
 
 #
 # Report startupcmd status back to TMCD. Called by the runstartup
-# script. 
+# script.
 #
 sub startcmdstatus($)
 {
@@ -2343,11 +2486,11 @@ sub startcmdstatus($)
 
 #
 # Early on in the boot, we want to reset the hostname. This gets the
-# nickname and returns it. 
+# nickname and returns it.
 #
 # This is going to get invoked very early in the boot process, before the
 # normal client initialization. So we have to do a few things to make
-# things are consistent. 
+# things are consistent.
 #
 sub whatsmynickname()
 {
@@ -2390,24 +2533,24 @@ sub getlocalevserver()
 #
 # Put ourselves into the background, directing output to the log file.
 # The caller provides the logfile name, which should have been created
-# with mktemp, just to be safe. Returns the usual return of fork. 
+# with mktemp, just to be safe. Returns the usual return of fork.
 #
 # usage int TBBackGround(char *filename).
-# 
+#
 sub TBBackGround($)
 {
     my($logname) = @_;
-    
+
     my $mypid = fork();
     if ($mypid) {
 	return $mypid;
     }
     select(undef, undef, undef, 0.2);
-    
+
     #
     # We have to disconnect from the caller by redirecting both STDIN and
     # STDOUT away from the pipe. Otherwise the caller (the web server) will
-    # continue to wait even though the parent has exited. 
+    # continue to wait even though the parent has exited.
     #
     open(STDIN, "< /dev/null") or
 	die("opening /dev/null for STDIN: $!");
@@ -2427,7 +2570,7 @@ sub TBBackGround($)
 
 #
 # Fork a process to exec a command. Return the pid to wait on.
-# 
+#
 sub TBForkCmd($) {
     my ($cmd) = @_;
     my($mypid);
@@ -2443,7 +2586,7 @@ sub TBForkCmd($) {
 
 #
 # Return a timestamp. We don't care about day/date/year. Just the time mam.
-# 
+#
 # TBTimeStamp()
 #
 my $imported_hires = 0;
@@ -2458,7 +2601,7 @@ sub TBTimeStamp()
 	$imported_hires = 1;
     }
     my ($seconds, $microseconds) = Time::HiRes::gettimeofday();
-    
+
     if (! $imported_POSIX) {
 	require POSIX;
 	import POSIX qw(strftime);
@@ -2469,7 +2612,7 @@ sub TBTimeStamp()
 
 #
 # Print out a timestamp if the TIMESTAMPS configure variable was set.
-# 
+#
 # usage: void TBDebugTimeStamp(@)
 #
 sub TBDebugTimeStamp(@)
@@ -2483,7 +2626,7 @@ sub TBDebugTimeStamp(@)
 #
 # Turn on timestamps locally. We could do this globally by using an
 # env variable to pass it along, but lets see if we need that.
-# 
+#
 sub TBDebugTimeStampsOn()
 {
     $TIMESTAMPS = 1;

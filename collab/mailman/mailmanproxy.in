@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -28,6 +28,7 @@ my $impotent = 0;
 #
 my $TB         = "@prefix@";
 my $TBOPS      = "@TBOPSEMAIL@";
+my $MAINSITE   = @TBMAINSITE@;
 my $OURDOMAIN  = "@OURDOMAIN@";
 my $MAILMANDIR = "/usr/local/mailman";
 my $MMBINDIR   = "$MAILMANDIR/bin";
@@ -437,8 +438,15 @@ sub AddList(@)
 	# do for now, since we do not expect spammers from within ...
 	print CONFIG "generic_nonmember_action = 2\n";
     }
-    print CONFIG "accept_these_nonmembers = ['^.*\@.*${OURDOMAIN}\$', ".
-	"'^.*\@.*utah.edu\$']\n";
+    if (!$MAINSITE) {
+	#
+	# In Utah, we require an X-NetBed: header on messages from non
+	# members, to reduce the spam, See Moderate.py in this directory, 
+	# which is installed to ops:/usr/local/mailman/Mailman/Handlers.
+	#
+	print CONFIG "accept_these_nonmembers = ['^.*\@.*${OURDOMAIN}\$', ".
+	    "'^.*\@.*utah.edu\$']\n";
+    }
     close(CONFIG);
 
     # Run the config script.
@@ -462,6 +470,7 @@ sub AddList(@)
 	fatal("Could not open $tempfile for writing!");
     print INTRO "From: $TBOPS\n";
     print INTRO "To: " . lc($name) . "\@" . "$OURDOMAIN\n";
+    print INTRO "X-NetBed: mailmanproxy\n";
     print INTRO "Subject: Welcome!\n";
     print INTRO "\n";
     print INTRO "This is the Emulab Mailman archive for $name\n";

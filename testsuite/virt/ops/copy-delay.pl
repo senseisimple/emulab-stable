@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 my @pairList = (1, 2, 5, 10, 15, 20, 25, 30, 35);
 
 my $i = 0;
