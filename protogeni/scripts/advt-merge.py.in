@@ -1,5 +1,3 @@
-#! /usr/bin/env python
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2010 University of Utah and the Flux Group.
@@ -7,7 +5,12 @@
 #
 
 #
-# Merges two RSPEC advertisements
+# Merges two or more RSPEC advertisements
+#
+# [USAGE] advt-merge.py <destination_file> <source_file> [<source_file> ...]
+#
+# If <desination_file> does not exist, it will be created. 
+# If destination file does exist, all the source files will be merged into it
 #
 
 import datetime
@@ -24,7 +27,7 @@ ERROR_INCONSISTENT_LINK_DATA = -1
 ERROR_INVALID_INPUT = -2
 ERROR_INVALID_OUTPUT = -3
 
-TBROOT = "/home/tarunp/git/emulab-devel"
+TBROOT = "@prefix@"
 PGENI_DOMAIN = "@PROTOGENI_DOMAIN@"
 # A few other variables also ought to be added
 # RSPEC_VER = "@RSPEC_VERSION@"
@@ -46,7 +49,7 @@ def printMessageAndReturnError (returnCode):
 		print("Files merged successfully (" + str(returnCode) + ")")
 	else:
 		print("File merging failed (" + str(returnCode) + ")")
-	sys.exit(returnCode)
+	return returnCode
 
 # Returns the earliest date as a string from among the given datetimes
 # ---
@@ -84,7 +87,7 @@ def getUUIDAttr (element, prefix):
 		return prefix + "_urn" 
 	return prefix + "_uuid"
 
-# Returns the name of the uuid attribute (either component_uuid, component_urn) 
+# Returns the name of the uuid attribute, (either component_uuid, component_urn)
 # ---
 # String getUUID (xml.dom.Element, String, String)
 def getUUID (element, prefix, default=""):
@@ -177,7 +180,6 @@ def mergeRSpecs(destFileName, srcFileNames, destFileAction):
 		nodes = xmlDocument.getElementsByTagName("node")
 		for node in nodes:
 			dNodes[getUUID(node, "component")] = node
-			#root.appendChild(node)
 			
 		refs = xmlDocument.getElementsByTagName("external_ref")
 		for ref in refs:
@@ -220,7 +222,7 @@ def mergeRSpecs(destFileName, srcFileNames, destFileAction):
 			else:
 				if(not compareCharacteristics(link, dLinks.get(component_uuid))):
 					print "ERROR: The links are not consistent. Mismatch found in " + component_uuid
-					return ERROR_INCONSISTENT_LINK_DATA
+					return -1
 			root.appendChild(link)
 
 	for key in dExternal_refs.keys():
@@ -260,7 +262,7 @@ def main ():
 			returnCode = os.system(getValidationCmd(destFileName))
 			if (returnCode != SUCCESS):
 				print "ERROR: " + destFileName + " does not validate"
-				return printMessageAndReturnError(ERROR_INVALID_INPUT)
+				return printMessageAndReturnError(returnCode)
 			destFileAction = MERGE_INTO_EXISTING
 		else:
 			destFileAction = CREATE_NEW_DESTINATION
@@ -271,17 +273,21 @@ def main ():
 			# A non-zero return value indicates that the command failed
 			if (returnCode != SUCCESS):
 				print "ERROR: " + sys.argv[index] + " does not validate"
-				return printMessageAndReturnError(ERROR_INVALID_INPUT)
+				return printMessageAndReturnError(returnCode)
 			srcFileNames.append(sys.argv[index])
 			
-		# Merge the advertisements
+		# If the destination file already exists, it has to be included in the
+		# list of consistency checks
+		inputFileNames = srcFileNames
+		if (destFileAction == MERGE_INTO_EXISTING):
+			inputFileNames.append(destFileName)
+		
 		rv = mergeRSpecs(destFileName, srcFileNames, destFileAction)
 		
 		# Check if the destination validates. It should, but just in case
 		returnCode = os.system(getValidationCmd(destFileName))
 		if (returnCode != SUCCESS):
 			print "ERROR: " + destFileName + " does not validate"
-			return printMessageAndReturnError(ERROR_INVALID_OUTPUT)
 		
 	return printMessageAndReturnError(rv)
 		
