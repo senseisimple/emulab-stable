@@ -77,7 +77,7 @@ sub New($$$@)
     $self->{'NODES'}      = {};
     $self->{'PHYSNODES'}  = {};
     $self->{'FAILED'}     = {};
-    $self->{'FAILCOUNT'}  = {};
+    $self->{'FAILCOUNT'}  = 0;
     $self->{'OSMAP'}      = {};
     $self->{'TYPECACHE'}  = {};
     $self->{'OPLIST'}     = {};
@@ -98,7 +98,6 @@ sub New($$$@)
     bless($self, $class);
     # XXX
     $self->noretry(0);
-    $self->failed(0);
     $self->canceled(0);
     return $self;
 }
@@ -120,6 +119,7 @@ sub oplist($)		{ return $_[0]->{'OPLIST'}; }
 sub user($)		{ return $_[0]->{'USER'}; }
 sub experiment($)	{ return $_[0]->{'EXPT'}; }
 sub IncrFailCount($)    { $_[0]->{'FAILCOUNT'}++ }
+sub failed($)           { return $_[0]->{'FAILCOUNT'}; }
 
 # Grab a node by node_id.
 sub node($$)
