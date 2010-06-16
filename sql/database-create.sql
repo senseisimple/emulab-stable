@@ -464,6 +464,17 @@ CREATE TABLE `emulab_indicies` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `emulab_locks`
+--
+
+DROP TABLE IF EXISTS `emulab_locks`;
+CREATE TABLE `emulab_locks` (
+  `name` varchar(64) NOT NULL default '',
+  `value` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `emulab_pubs`
 --
 
