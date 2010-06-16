@@ -8,8 +8,6 @@
  * Base class for the annotater. 
  */
 
-/* This is ugly, but we only really need this file if we are building with XML support */
-
 #ifdef WITH_XML
 
 #ifndef __ANNOTATE_RSPEC_H
@@ -28,7 +26,8 @@
 class annotate_rspec : public annotate
 {
 	private:
-		// Enumeration of which interface in a hop is an interface to a link end point
+		// Enumeration of which interface in a hop 
+		// is an interface to a link end point
 		enum endpoint_interface_enum { NEITHER, SOURCE, DESTINATION, BOTH };
 		std::map< std::string, std::set<std::string> > lan_links_map;
 	
@@ -37,40 +36,76 @@ class annotate_rspec : public annotate
 		~annotate_rspec () { ; }
 		
 		// Annotates nodes and direct links in the rspec
-		 void annotate_element(const char* v_name, const char* p_name);
+		void annotate_element(const char* v_name, const char* p_name);
 	
 		// Annotates intraswitch and interswitch links in the rspec
-		 void annotate_element(const char* v_name, std::list<const char*>* links);
+		void annotate_element(const char* v_name, 
+							   std::list<const char*>* links);
+		
+		// Annotate a trivial link
+		void annotate_element(const char* v_name);
 	
 		// Annotates an interface element on a link
-		 void annotate_interface (const xercesc::DOMElement* plink, xercesc::DOMElement* vlink, int interface_number);
+		void annotate_interface (const xercesc::DOMElement* plink, 
+								 const xercesc::DOMElement* vlink, 
+								 int interface_number,
+								 bool is_trivial_link);
+		
+		// Annotates an interface element on a non-trivial link
+		void annotate_interface (const xercesc::DOMElement* plink, 
+								 const xercesc::DOMElement* vlink, 
+								 int interface_number);
 		 
-		 // Annotate a trivial link
-		 void annotate_trivial_link (const char* v_name);
+		// Annotates an interface element on a trivial link
+		void annotate_interface (const xercesc::DOMElement* vlink,
+								 int interface_number);
+		 			
+		// Creates a hop from a switch till the next end point. 
+		// Adds the hop to the vlink
+		// Returns the hop element that was created
+		xercesc::DOMElement* create_component_hop 
+				 						(const xercesc::DOMElement* plink, 
+										 xercesc::DOMElement* vlink, 
+		   								 int endpoint_interface, 
+			  							 const xercesc::DOMElement* prev_hop);
+		
+		// Creates a component_hop for a trivial link
+		// Adds the hop to the vlink
+		// Returns the hop element that was created
+		xercesc::DOMElement* create_component_hop (xercesc::DOMElement* vlink);
 			
-		// Creates a hop from a switch till the next end point. Adds the hop to the vlink and returns the hop element that was created
-		 xercesc::DOMElement* create_component_hop (const xercesc::DOMElement* plink, xercesc::DOMElement* vlink, int endpoint_interface, const xercesc::DOMElement* prev_component_hop);
-			
-		// If the interface is the end point of a link/path, add two additional attributes to it
-		 void set_interface_as_link_endpoint (xercesc::DOMElement* interface, const char* virtual_node_id, const char* virtual_interface_id);
+		// If the interface is the end point of a link/path, 
+		// add two additional attributes to it
+		void set_interface_as_link_endpoint (xercesc::DOMElement* interface, 
+											  const char* virtual_node_id, 
+			 								  const char* virtual_interface_id);
 	
 		// Finds the next link in the path returned by assign
-		 xercesc::DOMElement* find_next_link_in_path (xercesc::DOMElement *prev, std::list<const char*>* links);
+		xercesc::DOMElement* find_next_link_in_path 
+				 							(xercesc::DOMElement *prev, 
+											 std::list<const char*>* links);
 		
 		// Copies the component spec from the source to the destination
-		void copy_component_spec(const xercesc::DOMElement* src, xercesc::DOMElement* dst);
+		void copy_component_spec(const xercesc::DOMElement* src, 
+								 xercesc::DOMElement* dst);
 		
-		// Copies the component hop from the auto-generated link to the requested link
-		void copy_component_hop(xercesc::DOMElement* requested_link, xercesc::DOMElement* component_hop);
+		// Copies the component hop from the auto-generated link 
+		// to the requested link
+		void copy_component_hop(xercesc::DOMElement* requested_link, 
+								xercesc::DOMElement* component_hop);
 		
-		// Checks if the link contains an interface with virtual_interface_id = id
-		bool has_interface_with_id (std::string link_virtual_id, std::string id);
+		// Checks if the link contains an interface with 
+		// virtual_interface_id = id
+		bool has_interface_with_id (std::string link_id, std::string id);
 		
-		// Removes all the extra tags and generated elements from the XML document
+		// Removes all extra tags and generated elements from the XML document
 		void cleanup ();
 		
-		// Checks whether an element of type tag with attr_name = attr_value is a generated element
-		bool is_generated_element (const char* tag, const char* attr_name, const char* attr_value);
+		// Checks whether an element of type tag 
+		// with attr_name = attr_value is a generated element
+		bool is_generated_element (const char* tag, 
+								   const char* attr_name, 
+									const char* attr_value);
 };
 
 #endif //for __ANNOTATE_RSPEC_H
