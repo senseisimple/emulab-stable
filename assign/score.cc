@@ -207,7 +207,7 @@ void init_score()
 float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
     pvertex dest_pv, tb_vlink *vlink, tb_pnode *pnode, tb_pnode *dest_pnode,
     bool flipped) {
-  SDEBUG(cerr << "   finding link resolutions" << endl);
+  SDEBUG(cerr << "   finding link resolutions from " << pnode->name << " to " << dest_pnode->name << endl);
   /* We need to calculate all possible link resolutions, stick
    * them in a nice datastructure along with their weights, and
    * then select one randomly.
@@ -245,7 +245,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
     info.plinks.push_back(pe);
     resolutions.push_back(info);
     total_weight += LINK_RESOLVE_DIRECT;
-    SDEBUG(cerr << "    direct_link " << pe << endl);
+    SDEBUG(cerr << "    added a direct_link " << pe << endl);
   }
   // Intraswitch link
   pedge first,second;
@@ -253,6 +253,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       switch_it != pnode->switches.end();++switch_it) {
     if (dest_pnode->switches.find(*switch_it) !=
         dest_pnode->switches.end()) {
+      SDEBUG(cerr << "    intraswitch: both are connected to " << *switch_it << endl);
       bool first_link, second_link;
       /*
        * Check to see if either, or both, pnodes are actually
@@ -348,13 +349,17 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       if ((pv == *source_switch_it) || (pv ==
             *dest_switch_it)) {
         first_link = false;
+        SDEBUG(cerr << "    interswitch: not first link in a path" << endl);
       } else {
+        SDEBUG(cerr << "    interswitch: *is* first link in a path" << endl);
         first_link = true;
       }
       if ((dest_pv == *source_switch_it) ||
           (dest_pv == *dest_switch_it)) {
         second_link = false;
+        SDEBUG(cerr << "    interswitch: not second link in a path" << endl);
       } else {
+        SDEBUG(cerr << "    interswitch: *is* second link in a path" << endl);
         second_link = true;
       }
 
@@ -517,6 +522,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
   if (vlink->src != vv) {
     SDEBUG(cerr << "  vlink is flipped" << endl);
     flipped = true;
+    assert(vlink->dst == vv);
   }
 
   /*
@@ -1489,6 +1495,8 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       if (plink->types.find(vlink->type) == plink->types.end()) {
 	  continue;
       }
+
+      SDEBUG(cerr << "         find_best_link: fix_src_iface = " << vlink->fix_src_iface << " check_src_iface = " << check_src_iface << " fix_dst_iface = " << vlink->fix_dst_iface <<  " check_dst_iface = " << check_dst_iface << " flipped = " << flipped << endl);
 
       // If the vlink has a fixed source interface, and it doesn't match
       // this plink, skip it
