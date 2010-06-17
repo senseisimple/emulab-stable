@@ -1496,7 +1496,11 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	  continue;
       }
 
-      SDEBUG(cerr << "         find_best_link: fix_src_iface = " << vlink->fix_src_iface << " check_src_iface = " << check_src_iface << " fix_dst_iface = " << vlink->fix_dst_iface <<  " check_dst_iface = " << check_dst_iface << " flipped = " << flipped << endl);
+      SDEBUG(cerr << "         find_best_link: fix_src_iface = " <<
+              vlink->fix_src_iface << " check_src_iface = " << check_src_iface
+              << " fix_dst_iface = " << vlink->fix_dst_iface
+              << " check_dst_iface = " << check_dst_iface
+              << " flipped = " << flipped << endl);
 
       // If the vlink has a fixed source interface, and it doesn't match
       // this plink, skip it
