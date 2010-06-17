@@ -234,6 +234,8 @@
 					function allowApply():void {
 						okButton.enabled = true;
 						cm.Show = cmCheckbox.selected;
+						if(!cmCheckbox.selected)
+							selectAllCheckBox.selected = false;
 					});
 				
 				cmInfo.addEventListener(MouseEvent.CLICK,
@@ -242,12 +244,20 @@
 					});
 				cmVbox.addChild(cmHbox);
 			}
+			
+			public function selectAllChange():void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					(cmHbox.getChildAt(0) as CheckBox).selected = selectAllCheckBox.selected;
+				}
+			}
 		]]>
 	</mx:Script>
 			
 	<mx:HBox width="100%" horizontalAlign="right">
+	<mx:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true"/>
 	<ns1:ImageButton id="refreshButton" source="@Embed('../images/arrow_refresh.png')" click="startRefreshList()"/>
-	<mx:Button label="Select All" click="selectAll();"/>
 	<mx:Spacer width="100%"/>
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 	<mx:SWFLoader id="waitingIcon" source="@Embed('../../images/waiting.swf')" visible="false"/> 

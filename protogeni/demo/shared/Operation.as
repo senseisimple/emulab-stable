@@ -14,12 +14,13 @@
 
 package
 {
+  import com.mattism.http.xmlrpc.ConnectionImpl;
+  
   import flash.events.ErrorEvent;
   import flash.events.Event;
   import flash.events.SecurityErrorEvent;
-  import flash.utils.Dictionary;
   import flash.system.Security;
-  import com.mattism.http.xmlrpc.ConnectionImpl;
+  import flash.utils.Dictionary;
 
   public class Operation
   {
@@ -113,8 +114,8 @@ package
       catch (e : Error)
       {
 
-        Main.getConsole().appendText("\n\nException on XMLRPC Call: "
-                                     + e.toString() + "\n\n");
+        Main.getConsole().appendMessage(new LogMessage(url, "Error", "\n\nException on XMLRPC Call: "
+                                     + e.toString() + "\n\n", true));
       }
     }
 

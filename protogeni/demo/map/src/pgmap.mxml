@@ -69,6 +69,10 @@
 	    // Start out by asking the user for the CM URL
 	    private function init():void {
 	    	console = new ConsoleWindow();
+			
+			PopUpManager.addPopUp(console, this, false);
+			PopUpManager.removePopUp(console);
+			
 	    	rspecView = new XmlWindow();
 	    	
 	    	Main.setConole(console);
@@ -97,6 +101,7 @@
         public function openConsole():void {
 	    	PopUpManager.addPopUp(console, this, false);
        		PopUpManager.centerPopUp(console);
+			console.groupComboBox.selectedIndex = console.selectedIndex;
 	    }
             
 	    //------------------------------------------

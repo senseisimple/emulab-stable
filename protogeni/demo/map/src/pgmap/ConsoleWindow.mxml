@@ -8,25 +8,130 @@
 	close="PopUpManager.removePopUp(this)"
 	resizable="true">
 	
+	<mx:Style>
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.otherStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+		}
+
+	</mx:Style>
+	
 	<mx:Script>
 		<![CDATA[
+			import mx.controls.Button;
+			import mx.controls.HRule;
+			import mx.controls.Spacer;
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager; 
-
+			
+			public var selectedIndex:int = 0;
+			private var logList:Array = new Array();
+			public var groups:Array = new Array("", Geni.sesUrl, Geni.chUrl);
+			
 			[Bindable]
-			public var output:String;
+			public var groupNames:Array = new Array("All", "Slice Embedding Service", "Clearing House");
 			
 			public function appendText(s:String):void {
-				output += s;
+				// For now, just add
+				var newMsg:LogMessage = new LogMessage("", "", s);
+				logList.push(newMsg);
+				if(groupComboBox.selectedIndex == 0)
+					addMessage(newMsg);
+			}
+			
+			public function appendMessage(msg:LogMessage):void {
+				logList.push(msg);
+				if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
+				{
+					addMessage(msg);
+				}
+			}
+			
+			private function addMessage(msg:LogMessage):void
+			{
+				if(msg.type == LogMessage.TYPE_START)
+				{
+					var split:Spacer = new Spacer();
+					logs.addChild(split);
+				}
+				if(msg.groupId == "")
+				{
+					var generalLabel:Label = new Label();
+					generalLabel.text = msg.details;
+					logs.addChild(generalLabel);
+				} else {
+					var logButton:Button = new Button();
+					logButton.label = msg.name;
+					if(msg.isError)
+					{
+						logButton.setStyle("icon",Common.errorIcon);
+						logButton.styleName = "failedStyle";
+					}
+					else
+						logButton.setStyle("icon",Common.availableIcon);
+					logButton.addEventListener(MouseEvent.CLICK,
+						function openLog():void {
+							var logw:LogMessageWindow = new LogMessageWindow();
+							PopUpManager.addPopUp(logw, Common.Main(), false);
+							PopUpManager.centerPopUp(logw);
+							logw.setMessage(msg);
+						});
+					logs.addChild(logButton);
+				}
 			}
 			
 			public function clear():void {
-				output = "Previous content cleared\n";
+				logs.removeAllChildren();
+			}
+			
+			public function openGroup(id:String):void
+			{
+				groupComboBox.selectedIndex = groups.indexOf(id);
+				refreshView();
+			}
+			
+			public function refreshView():void
+			{
+				clear();
+				if(groupComboBox.selectedIndex == 0)
+				{
+					for each(var allMsg:LogMessage in logList)
+					{
+						addMessage(allMsg);
+					}
+				} else {
+					for each(var msg:LogMessage in logList)
+					{
+						if(msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1)
+							addMessage(msg);
+					}
+				}
+				selectedIndex = groupComboBox.selectedIndex;
 			}
 			
 		]]>
 	</mx:Script>
-	<mx:TextArea id="txt" width="100%" height="100%"
-		text="{output}"  editable="false" wordWrap="true"/>
+	<mx:VBox height="100%" width="100%" id="logs">
+	</mx:VBox>
+	<mx:ControlBar>
+		<mx:Label text="View log messages for"/>
+		<mx:ComboBox id="groupComboBox" dataProvider="{groupNames}" change="refreshView()"></mx:ComboBox>
+	</mx:ControlBar>
 	
 </ResizeWindow>

@@ -17,6 +17,7 @@
 	import com.mattism.http.xmlrpc.MethodFault;
 	
 	import flash.events.ErrorEvent;
+	import flash.events.SecurityErrorEvent;
 	import flash.utils.ByteArray;
 	
 	import mx.controls.Alert;
@@ -82,9 +83,9 @@
 		}
 	    
 	    public function postCall() : void {
-	    		main.console.appendText("Seeing if there are any other method to call...\n");
+	    		//main.console.appendText("Seeing if there are any other method to call...\n");
 	    	if(AfterCall != null) {
-	    		main.console.appendText("Doing a post call...\n");
+	    		//main.console.appendText("Doing a post call...\n");
 	        	AfterCall();
 	        }
 	    }
@@ -99,25 +100,24 @@
 	    
 	    private function outputFailure(event : ErrorEvent, fault : MethodFault) : void
 	    {
-	    	main.console.appendText("****fail****");
+			var failMessage:String = "";
 	    	var msg : String = "";
 	      if (fault != null)
 	      {
 	      	msg = fault.getFaultString();
-	        main.console.appendText("\nFAILURE fault: " + opName + ": "
-	                                + msg);
+			failMessage += "\nFAILURE fault: " + opName + ": " + msg;
 	      }
 	      else
 	      {
 	      	msg = event.toString();
-	        main.console.appendText("\nFAILURE event: " + opName + ": "
-	                                + msg);
+			failMessage += "\nFAILURE event: " + opName + ": " + msg;
 	        if(msg.search("#2048") > -1)
-	        	main.console.appendText("\nStream error, possibly due to server error");
+				failMessage += "\nStream error, possibly due to server error";
 	        else if(msg.search("#2032") > -1)
-	        	main.console.appendText("\nIO Error, possibly due to server problems or you have no SSL certificate");
+				failMessage += "\nIO Error, possibly due to server problems or you have no SSL certificate";
 	      }
-	      main.console.appendText("\nURL: " + op.getUrl());
+		  failMessage += "\nURL: " + op.getUrl();
+		  main.console.appendMessage(new LogMessage(op.getUrl(), "Failure", failMessage, true, LogMessage.TYPE_END));
 	    }
 	    
 	    public function codeFailure() : void
@@ -127,27 +127,16 @@
 	    
 	    public function addSend() : void
 	    {
-	      main.console.appendText("\n-----------------------------------------\n");
-	      main.console.appendText("SEND: " + opName + "\n");
-	      main.console.appendText("URL: " + op.getUrl() + "\n");
-	      main.console.appendText("-----------------------------------------\n\n");
-	      main.console.appendText(op.getSendXml());
-	//      clip.xmlText.scrollV = clip.xmlText.maxScrollV;
+			main.console.appendMessage(new LogMessage(op.getUrl(), "Send (" + opName + ")", op.getSendXml(), false, LogMessage.TYPE_START));
 	    }
-	    
-	    public function addGeniresponse(code:int):void
+
+	    public function addResponse(code:int) : void
 	    {
-	      main.console.appendText("\n-----\n");
-	      main.console.appendText("GENI RESPONSE: " + this.GeniresponseToString(code) + "\n");
-	      main.console.appendText("-----\n\n");
-	    }
-	    
-	    public function addResponse() : void
-	    {
-	      main.console.appendText("\n-----------------------------------------\n");
-	      main.console.appendText("RESPONSE: " + opName + "\n");
-	      main.console.appendText("-----------------------------------------\n\n");
-	      main.console.appendText(op.getResponseXml());
+			// 
+			if(code != GENIRESPONSE_SUCCESS)
+				main.console.appendMessage(new LogMessage(op.getUrl(), GeniresponseToString(code), op.getResponseXml(), true, LogMessage.TYPE_END));
+			else
+				main.console.appendMessage(new LogMessage(op.getUrl(), "Response (" + opName + ")", op.getResponseXml(), false, LogMessage.TYPE_END));
 	    }
 	    
 	    public function startCredential() : void
@@ -157,7 +146,7 @@
 	      opName = "Acquiring credential";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName);
+	      //main.console.appendText(opName);
 	      op.reset(Geni.getCredential);
 		  op.call(completeCredential, failCredential);
 	      addSend();
@@ -181,9 +170,8 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	    	main.console.appendText("Acquiring credential complete...\n");
-	      addResponse();
-	      addGeniresponse(code);
+	    	//main.console.appendText("Acquiring credential complete...\n");
+	      addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	main.pgHandler.CurrentUser.credential = String(response.value);
@@ -202,19 +190,20 @@
 	      opName = "Looking up components";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName + "...\n");
+	      //main.console.appendText(opName + "...\n");
 	      op.reset(Geni.listComponents);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
-	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
+	      //op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
 	      op.call(completeListComponents, failure);
+		  addSend();
 	    }
 	    
 	    public function completeListComponents(code : Number, response : Object) : void
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	    	main.console.appendText("List Components complete...\n");
-	      addGeniresponse(code);
+	    	//main.console.appendText("List Components complete...\n");
+			addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 			for each(var obj:Object in response.value)
@@ -222,17 +211,17 @@
 				var newCm:ComponentManager = new ComponentManager();
 				newCm.Hrn = obj.hrn;
 				newCm.Url = obj.url;
+				main.console.groups.push(newCm.Url);
+				main.console.groupNames.push(newCm.Hrn);
 				newCm.Urn = obj.urn;
 				main.pgHandler.ComponentManagers.addItem(newCm);
 				//break;
 			}
-	      	main.console.appendText(op.getResponseXml());
 	      	postCall();
 	      }
 	      else
 	      {
 	        codeFailure();
-	        main.console.appendText(op.getResponseXml());
 	      }
 	    }
 	    
@@ -277,12 +266,13 @@
 			opName = "Getting " + currentCm.Hrn + " resources";
 			main.setProgress(opName, Common.waitColor);
 			main.startWaiting();
-			main.console.appendText(opName + "...\n");
+			//main.console.appendText(opName + "...\n");
 			op.reset(Geni.discoverResources);
 			op.addField("credentials", new Array(main.pgHandler.CurrentUser.credential));
 			op.addField("compress", true);
 			op.setExactUrl(currentCm.DiscoverResourcesUrl());
 			op.call(completeResourceLookup, failResourceLookup);
+			addSend();
 	    }
 	    
 	    public function failResourceLookup(event : ErrorEvent, fault : MethodFault) : void
@@ -308,8 +298,8 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	    	main.console.appendText("Resource lookup complete...\n");
-	      addGeniresponse(code);
+	    	//main.console.appendText("Resource lookup complete...\n");
+	      addResponse(code);
 
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
@@ -341,21 +331,22 @@
 	      opName = "Resolving user";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName + "...\n");
+	      //main.console.appendText(opName + "...\n");
 	      op.reset(Geni.resolve);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      op.addField("hrn", main.pgHandler.CurrentUser.urn);
 	      op.addField("type", "User");
 	      op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
 	      op.call(completeResolveUser, failure);
+		  addSend();
 	    }
 	    
 	    public function completeResolveUser(code : Number, response : Object) : void
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	    	main.console.appendText("Resolve user complete...\n");
-	    	addGeniresponse(code);
+	    	//main.console.appendText("Resolve user complete...\n");
+			addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	main.pgHandler.CurrentUser.uid = response.value.uid;
@@ -381,7 +372,6 @@
 	      else
 	      {
 	        codeFailure();
-	        main.console.appendText(op.getResponseXml());
 	      }
 	    }
 	    
@@ -399,7 +389,7 @@
 	      opName = "Looking up " + (main.pgHandler.CurrentUser.slices.length - currentIndex) + " more slice(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName);
+	      //main.console.appendText(opName);
 	      op.reset(Geni.resolve);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      op.addField("hrn", currentSlice.hrn);
@@ -413,8 +403,7 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	      addResponse();
-	    	addGeniresponse(code);
+	      addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSlice.uuid = response.value.uuid;
@@ -462,7 +451,7 @@
 	      opName = "Acquiring " + (main.pgHandler.CurrentUser.slices.length - currentIndex) + " more slice credential(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName);
+	      //main.console.appendText(opName);
 	      op.reset(Geni.getCredential);
 	      op.addField("credential", main.pgHandler.CurrentUser.credential);
 	      op.addField("uuid", currentSlice.uuid);
@@ -485,8 +474,7 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	      addResponse();
-	    	addGeniresponse(code);
+	      addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSlice.credential = String(response.value);
@@ -527,7 +515,7 @@
 	      opName = "Acquiring " + (totalCalls - callsMade) + " more sliver credential(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName);
+	      //main.console.appendText(opName);
 	      op.reset(Geni.getSliver);
 	      op.addField("slice_urn", currentSlice.urn);
 	      op.addField("credentials", new Array(currentSlice.credential));
@@ -561,8 +549,7 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	      addResponse();
-	    	addGeniresponse(code);
+	      addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSliver.credential = String(response.value);
@@ -629,7 +616,7 @@
 	      opName = "Acquiring " + (totalCalls - callsMade) + " more sliver status report(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName);
+	      //main.console.appendText(opName);
 	      op.reset(Geni.sliverStatus);
 	      op.addField("slice_urn", currentSlice.urn);
 	      op.addField("credentials", new Array(currentSlice.credential));
@@ -665,8 +652,7 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	      addResponse();
-	    	addGeniresponse(code);
+	      addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	currentSliver.status = response.value.status;
@@ -723,7 +709,7 @@
 	      opName = "Acquiring " + (totalCalls - callsMade) + " more sliver rspec(s)";
 	      main.setProgress(opName, Common.waitColor);
 	      main.startWaiting();
-	      main.console.appendText(opName);
+	      //main.console.appendText(opName);
 	      op.reset(Geni.resolveResource);
 	      op.addField("urn", currentSliver.urn);
 	      op.addField("credentials", new Array(currentSliver.credential));
@@ -760,7 +746,7 @@
 	    {
 	    	main.setProgress("Done", Common.successColor);
 	    	main.stopWaiting();
-	      addResponse();
+	      addResponse(code);
 	      if (code == GENIRESPONSE_SUCCESS)
 	      {
 	      	//currentSliver.rspec = new XML(response.value).descendants("rspec")[0];

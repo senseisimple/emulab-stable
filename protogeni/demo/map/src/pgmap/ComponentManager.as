@@ -33,6 +33,7 @@
 		[Bindable]
 		public var Hrn : String = "";
 		
+		[Bindable]
 		public var Urn : String = "";
 		
 		[Bindable]
