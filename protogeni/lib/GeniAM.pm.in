@@ -145,9 +145,9 @@ sub SliverStatus()
     $status->{'geni_urn'} = 'Unknown';
 
     # Determine geni_status. XXX how to determine 'configuring'?
-    if ($pgstatus->{'status'} == 'ready') {
+    if ($pgstatus->{'status'} eq 'ready') {
         $status->{'geni_status'} = 'ready';
-    } elsif ($pgstatus->{'status'} == 'failed') {
+    } elsif ($pgstatus->{'status'} eq 'failed') {
         $status->{'geni_status'} = 'failed';
     } else {
         $status->{'geni_status'} = 'unknown';
