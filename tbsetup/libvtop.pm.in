@@ -1239,6 +1239,8 @@ sub GenVirtNodes($)
 		if ($vnode->_sharedokay()) {
 		    $ref->{'exclusive'} = 0;
 		}
+		$ref->{'node_type'} = {"type_name"  => "pcvm",
+				       "type_slots" => 1};
 	    }
 	    else {
 		$ref->{'virtualization_type'} = 'raw';
@@ -3170,7 +3172,9 @@ sub AddLinkToSolution($$$$$$$$)
     $self->solution_plinks()->{$vlink} =
 	[$linktag,$virtlan,$trivial,$direct,$member0,$member1];
     if (!$trivial) {
-	$self->printdb("  $vlink $nodeA$portA,$nodeB$portB" .
+	$self->printdb("  $vlink ".
+		       (defined($nodeA) ? "A:$nodeA:$portA " : "") .
+		       (defined($nodeB) ? "B:$nodeB:$portB " : "") .
 		       ($direct ? " (direct)" : "") . "\n");
     }
     else {
@@ -3271,11 +3275,11 @@ sub ReadTextSolution($$)
 	
 	if (!$trivial) {
 	    ($nodeportA,$switchportA) = getnodeport($rawA);
-	    print STDERR "*** Undefined nodeportA in $rawA\n"
-		if (!defined($nodeportA));
-	    # Convert back to node:iface format.
-	    $nodeportA =~ s/\//:/;
-	    ($nodeA,$portA) = split(":", $nodeportA);
+	    if (defined($nodeportA)) {
+		# Convert back to node:iface format.
+		$nodeportA =~ s/\//:/;
+		($nodeA,$portA) = split(":", $nodeportA);
+	    }
 
 	    #
 	    # A direct link between two nodes; $rawA holds both sides
@@ -3287,12 +3291,16 @@ sub ReadTextSolution($$)
 	    }
 	    else {
 		($nodeportB,$switchportB) = getnodeport($rawB);
-		print STDERR "*** Undefined nodeportB in $rawB\n"
-		    if (!defined($nodeportB));
+		if (!defined($nodeportB)) {
+		    print STDERR "*** Undefined nodeportB in $line\n";
+		    return -1;
+		}
 	    }
-	    # Convert back to node:iface format.
-	    $nodeportB =~ s/\//:/;
-	    ($nodeB,$portB) = split(":", $nodeportB);
+	    if (defined($nodeportB)) {
+		# Convert back to node:iface format.
+		$nodeportB =~ s/\//:/;
+		($nodeB,$portB) = split(":", $nodeportB);
+	    }
 	}
 	$self->AddLinkToSolution($vlink, $trivial, $direct,
 				 $nodeA, $portA, $nodeB, $portB);

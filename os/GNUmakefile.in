@@ -60,6 +60,16 @@ endif
 	$(MAKE) -C dijkstra client-install
 	$(MAKE) -C genhostsfile client-install
 
+subboss: client
+	$(MAKE) -C frisbee.redux all
+
+subboss-install: subboss client-install
+ifeq ($(SYSTEM),FreeBSD)
+	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux install
+else
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C frisbee.redux install
+endif
+
 mfs:
 	$(MAKE) -C imagezip client
 	$(MAKE) -C zapdisk mfs

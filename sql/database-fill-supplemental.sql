@@ -20,3 +20,4 @@ INSERT IGNORE INTO os_boot_cmd VALUES ('Linux','9.0','linkdelay','linkdelay');
 
 INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('cur_log_seq', 1);
 INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('next_osid', 10000);
+INSERT IGNORE INTO emulab_locks (name,value) VALUES ('pool_daemon', 0);

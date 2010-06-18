@@ -1465,10 +1465,19 @@ sub LookupURN($)
 sub Credential2SliceAggregate($)
 {
     my ($credential) = @_;
+    my $target_urn   = $credential->target_urn();
     my $target_uuid  = $credential->target_uuid();
+    my $slice;
     my $aggregate;
     
-    my $slice = GeniSlice->Lookup($target_uuid);
+    print STDERR "Credential2SliceAggregate target_urn = $target_urn\n";
+    # First try the target urn, then fall back to the uuid
+    $slice = GeniSlice->Lookup($target_urn);
+    if (! defined($slice)) {
+        # Could not find it by urn, trying uuid
+        print STDERR "Credential2SliceAggregate target_uuid = $target_uuid\n";
+        $slice = GeniSlice->Lookup($target_uuid);
+    }
     if (defined($slice)) {
 	$aggregate = GeniAggregate->SliceAggregate($slice);
     }
