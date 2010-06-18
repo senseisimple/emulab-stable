@@ -478,7 +478,8 @@ sub RunAssign($$)
 	tberror("Could not open $vtopfile: $!\n");
 	return -1;
     }
-    if ($vtop->PrintTop(*VTOPFILE) != 0) {
+#    if ($vtop->PrintTop(*VTOPFILE) != 0) {
+    if ($vtop->PrintRspec(*VTOPFILE) != 0) {
 	tberror("Could not print vtop file for $experiment\n");
 	return -1;
     }

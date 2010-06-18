@@ -31,6 +31,7 @@ use Carp;
 use POSIX;
 use XML::LibXML;
 use XML::Simple;
+use GeniXML;
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -42,10 +43,13 @@ my $OS_SELECT     = "$TB/bin/os_select";
 my $DELAYCAPACITY = @DELAYCAPACITY@;	# Can be overridden by user.
 my $DELAYTHRESH   = @DELAYTHRESH@;
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $OURDOMAIN     = "@OURDOMAIN@";
+my $cmid          = '';
 
 if ($PGENISUPPORT) {
     require libGeni;
     require GeniHRN;
+	$cmid = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 }
 
 # Flags.
@@ -94,7 +98,7 @@ sub Create($$$$)
 			      "links"  => [],
 			      "class"  => [],
 			      "fixed"  => [] };
-    $self->{'RSPEC'}      = undef;
+    $self->{'RSPEC'}      = {};
 
     # Mostly for update mode.
     $self->{'FIXEDNODES'}  = {};
@@ -215,18 +219,18 @@ sub createLink($$$$$$$$)
 # The table could also contain non-default values for latency and packet_loss
 	my ($self, $name, $cm, $src, $dst, $bw, $type, $others) = @_;
 	my $ref = {
-				'client_id'            => $name,
-				'component_manager_id' => $cm,
-				'link_type'            => "$type",
-				'interface_ref'        => [$src, $dst],
-				'capacity'             => $bw,
-				'packet_loss'          => "0",
-				'latency'              => "0"
+				'name'           => $name,
+				'cm'             => $cm,
+				'link_type'      => "$type",
+				'interface_ref'  => [$src, $dst],
+				'capacity'       => $bw,
+				'packet_loss'    => "0",
+				'latency'        => "0"
 			};
 			
 	if ($others) {
 		while ( my ($key, $value) = each %{$others} ) {
-			$ref{$key} = $value;
+			$ref->{$key} = $value;
 		}
 	}
 	if (!exists($self->rspec()->{'link'})) {
@@ -235,22 +239,31 @@ sub createLink($$$$$$$$)
 	push(@{ $self->rspec()->{'link'} }, $ref);
 }
 
-sub createNode ($$$$$$)
+sub createNode ($$$$$$$)
 {
 # $others here will be a hashtable for the desires
 # The key will be the desire name and the value will be a pair
 # of the desire type and the penalty
-	my ($self, $name, $cm, $type, $type_count, $others) = @_;
+	my ($self, $name, $cm, $type, $type_count, $desires, $others) = @_;
+	print "TYPE COUNT: $type_count";
 	my $ref = {
-				'client_id'            => $name,
-				'component_manager_id' => $cm,
-				'node_type'            => $type,
-				'type_count'           => $type_count
+				'name'       => $name,
+				'cm'         => $cm,
+				'node_type'  => $type,
+				'type_slots' => $type_count,
 			};
 	
+	my $desiretable = {};
+	if ($desires) {
+		while ( my ($key, $value) = each %{$others} ) {
+			$desiretable->{$key} = $value;
+		}
+	}
+	$ref->{'desires'} = $desiretable;
+
 	if ($others) {
 		while ( my ($key, $value) = each %{$others} ) {
-			$ref{$key} = $value;
+			$ref->{$key} = $value;
 		}
 	}
 	
@@ -1327,27 +1340,34 @@ sub GenVirtNodes($)
 	    push(@{ $self->rspec()->{'node'} }, $ref);
 	    next;
 	}
-	my $subnodestr = "";
+	my $desires = {};
+	my $others = {};
+#	my $subnodestr = "";
 	if ($vnode->_issubnode()) {
-	    my $parent  = $vnode->_parent();
-	    $subnodestr = "subnode_of:$parent";
+#	    my $parent  = $vnode->_parent();
+#	    $subnodestr = "subnode_of:$parent";
+		$others->{'subnode'} = $vnode->_parent();
 	}
-	my $desirestr = "";
+#	my $desirestr = "";
 	foreach my $desirename (keys(%{ $vnode->_desires() })) {
 	    my $weight = $vnode->_desires()->{$desirename};
-	    $desirestr .= " "
-		if ($desirestr ne "");
-	    $desirestr .= "$desirename:" . sprintf("%f",$weight);
+#	    $desirestr .= " "
+#		if ($desirestr ne "");
+#	    $desirestr .= "$desirename:" . sprintf("%f",$weight);
+		$desires->{$desirename} = ['', $weight];
 	}
 	if ($vnode->_isplabnode() && $experiment->cpu_usage()) {
 	    # Yuck
-	    $desirestr .= " +load:" . (($experiment->cpu_usage() - 1) / 5.0);
+#	    $desirestr .= " +load:" . (($experiment->cpu_usage() - 1) / 5.0);
+		$desires->{'load'} = ['+', (($experiment->cpu_usage() - 1) / 5.0)];
 	}
 	if ($self->updating()) {
-	    $desirestr .= " already_reserved:.2";
+#	    $desirestr .= " already_reserved:.2";
+		$desires->{'already_reserved'} = ['', 0.2];
 	}
 	if (defined($vnode->_startloc())) {
-	    $desirestr .= " area-" . $vnode->_startloc() . ":1";
+#	    $desirestr .= " area-" . $vnode->_startloc() . ":1";
+		$desires->{"area-" . $vnode->_startloc()} = ['', 1];
 	}
 	# Require that this vnode be placed onto a pnode that supports
 	# the OS it is going to run. However, if the OS is one with a
@@ -1364,26 +1384,33 @@ sub GenVirtNodes($)
 	    my $posinfo = $vnode->_parent_osinfo();
 
 	    if ($vnode->_sharedokay()) {
-		if (!defined($posinfo)) {
-		    my $jailosid = $self->nodejailosid($vnode);
-		
-		    $desirestr .= " OS-$jailosid:1";
-		}
-		else {
-		    $desirestr .= " OS-" . $posinfo->osid() . ":1";
-		    $desirestr .= " OS-" . $posinfo->osid() . 
-			"-" . $osinfo->osid() . ":1";
-		}
+			if (!defined($posinfo)) {
+				my $jailosid = $self->nodejailosid($vnode);
+				
+#		    $desirestr .= " OS-$jailosid:1";
+				$desires->{"OS-$jailosid"} = ['', 1];
+				
+			}
+			else {
+#		    $desirestr .= " OS-" . $posinfo->osid() . ":1";
+#		    $desirestr .= " OS-" . $posinfo->osid() . 
+#			"-" . $osinfo->osid() . ":1";
+				$desires->{"OS-$posinfo->osid()"} = ['', 1];
+				$desires->{"OS-$posinfo->osid()-$osinfo->osid()"} = ['', 1];
+			}
 	    }
 	    elsif (!defined($osinfo->path()) || $osinfo->path() eq "") {
-		if (!defined($posinfo)) {
-		    $desirestr .= " OS-" . $osinfo->osid() . ":1";
-		}
-		else {
-		    $desirestr .= " OS-" . $posinfo->osid() . ":1";
-		    $desirestr .= " OS-" . $posinfo->osid() . 
-			"-" . $osinfo->osid() . ":1";
-		}
+			if (!defined($posinfo)) {
+#				$desirestr .= " OS-" . $osinfo->osid() . ":1";
+				$desires->{"OS-$osinfo->osid()"} = ['', 1];
+			}
+			else {
+#				$desirestr .= " OS-" . $posinfo->osid() . ":1";
+#				$desirestr .= " OS-" . $posinfo->osid() . 
+#					"-" . $osinfo->osid() . ":1";
+				$desires->{"OS-$posinfo->osid()"} = ['', 1];
+				$desires->{"OS-$posinfo->osid()-$osinfo->osid()"} = ['', 1];
+			}
 	    }
 	}
 
@@ -1392,19 +1419,22 @@ sub GenVirtNodes($)
 	# simnodes that I do not understand. 
 	#
 	my $typestr = $type;
+	my $nodeweight = '1';
 	if ($vnode->_issimnode()) {
 	    my $query_result =
-		DBQueryWarn("select nodeweight from virt_simnode_attributes ".
-			    "where pid='$pid' and eid='$eid' and ".
-			    "      vname='$vname'");
+			DBQueryWarn("select nodeweight from virt_simnode_attributes ".
+						"where pid='$pid' and eid='$eid' and ".
+						"      vname='$vname'");
 	    if ($query_result && $query_result->numrows) {
-		my ($nodeweight) = $query_result->fetchrow_array();
-		if ($nodeweight) {
-		    $typestr = "$type:$nodeweight";
-		}
+			($nodeweight) = $query_result->fetchrow_array();
+			if ($nodeweight) {
+				$typestr = "$type:$nodeweight";
+			}
 	    }
 	}
-	$self->f("$vname $typestr $subnodestr $desirestr");
+
+	$self->createNode($vname, $cmid, $type, $nodeweight, $desires, $others);
+#	$self->addnode("$vname $typestr $subnodestr $desirestr");
     }
 
     #
@@ -1586,8 +1616,7 @@ sub GenVirtLans($)
 # 		      ],
 # 	    };
 
-# TODO: Insert component manager ID here
-			$self->createLink($name, "TODO:CMID", 
+			$self->createLink($vname, $cmid, 
 								$member0, $member1, 
 								$bw, "tunnel", undef)
 
@@ -2031,8 +2060,7 @@ sub GenVirtLans($)
 	    #
 # 	    $self->addnode("fakelan/$vname $protocol");
 
-# TODO: Insert CM
-		$self->createNode("fakelan/$vname", "TODO:CM", $protocol, 1, undef);
+		$self->createNode("fakelan/$vname", $cmid, $protocol, '1', undef, undef);
 	    
 	    
 	    # So we ignore it when it comes back from assign.
@@ -2054,8 +2082,7 @@ sub GenVirtLans($)
 # 			}
 # 			push(@{ $self->rspec()->{'link'} }, $ref);
 
-# TODO: Insert CM
-			$self->createLink($plink, "TODO:CM", $vnode, "fakelan/$vname",
+			$self->createLink($plink, $cmid, $vnode, "fakelan/$vname",
 								$top_bw, $protocol);
 			next;
 	    }
@@ -2127,8 +2154,7 @@ sub GenVirtLans($)
 # 			],
 # 		};
 
-# TODO: Insert CM
-			$self->createLink($vname, "TODO:CM", $member0, $member1, $bw,
+			$self->createLink($vname, $cmid, $member0, $member1, $bw,
 								"ethernet", undef);
 			next;
 	    }
@@ -2230,9 +2256,9 @@ sub GenVirtLans($)
 			$fixsrc = "$fixi0";
 	    }
 	    if (defined($fixi1) && $fixi1 ne '') {
-			if ($fixall ne "") {
-				$fixall .= " ";
-			}
+#			if ($fixall ne "") {
+#				$fixall .= " ";
+#			}
 # 			$fixsrc1 = "fixsrciface:$fixi1";
 # 			$fixdst1 = "fixdstiface:$fixi1";
 # 			$fixall .= "fixdstiface:$fixi1";
@@ -2263,8 +2289,7 @@ sub GenVirtLans($)
 			if ($self->virtlan_use_linkdelay($vlan, $shaped)) {
 				my $plink = "linksimple/$vname/$member0,$member1";
 	
-# TODO: Component manager ID
-				$self->createLink($plink, "TODO:CM", $vname0, $vname1, 
+				$self->createLink($plink, $cmid, $vname0, $vname1, 
 									max($top_bw, $top_rbw), $protocol,
 									{ 'emulated'   => "1",
 									'trivial_ok' => "1" });
@@ -2298,42 +2323,42 @@ sub GenVirtLans($)
 				my @delayinfo = ($delay,$bw,$backfill,$loss,
 						$rdelay,$rbw,$rbackfill,$rloss,0);
 	
-# TODO: Insert CM ID
-				$self->createNode($delayname, "TODO:CM", "delay", 1,
-									{ "$delaydesirename" 
+				$self->createNode($delayname, $cmid, "delay", '1',
+								  { "$delaydesirename" 
 										=> 
-										[$delaydesiretype, $delaydesirepenalty});
+										[$delaydesiretype, $delaydesirepenalty]},
+								  undef);
 # 				$self->addnode("$delayname delay $delaydesire");
 				
-# TODO: Insert CM
 				my $others = {};
-				if ($fixsrc0 ne '')
-					$others {'fixsrciface'} = $fixsrc0;
+				if ($fixsrc0 ne '') {
+					$others->{'fixsrciface'} = $fixsrc0;
+				}
 					
 				$self->createLink("linksdelaysrc/$vname/$member0,$member1",
-									"TODO:CMID", $vname0, $delayname,
-									($top_bw == 0 ? "*" : $top_bw), $protocol,
-									$others);
+								  $cmid, $vname0, $delayname,
+								  ($top_bw == 0 ? "*" : $top_bw), $protocol,
+								  $others);
 				
 # 				$self->addlink("linksdelaysrc/$vname/$member0,$member1 ".
 # 					"$vname0 $delayname ".
 # 					($top_bw == 0 ? "*" : $top_bw) .
 # 					" 0 0 $protocol $fixsrc0");
 
-# TODO: Insert CM
-				if ($fixdst0 ne '')
-					$others {'fixdstiface'} = $fixdst0;
+				if ($fixdst0 ne '') {
+					$others->{'fixdstiface'} = $fixdst0;
+				}
 				$self->createLink("linksdelaydst/$vname/$member1,$member0",
-									"TODO:CMID", $vname1, $delayname,
-									($top_bw == 0 ? "*" : $top_bw), $protocol,
-									$others);
+								  $cmid, $vname1, $delayname,
+								  ($top_bw == 0 ? "*" : $top_bw), $protocol,
+								  $others);
 									
 # 				$self->addlink("linksdelaydst/$vname/$member1,$member0 ".
 # 					"$vname1 $delayname ".
 # 					($top_bw == 0 ? "*" : $top_bw) .
 # 					" 0 0 $protocol $fixdst1");
 	
-				$self->printdb("Delay node $plink ($delayname) = " . 
+				    $self->printdb("Delay node $plink ($delayname) = " . 
 					join(" ", @delayinfo) . "\n");
 	
 				# Save for the post pass.
@@ -2369,12 +2394,12 @@ sub GenVirtLans($)
 # 			$spec .= " 0 0 $protocol";
 # 			$spec .= " emulated" if ($emulated);
 			if ($emulated) {
-				$others{'emulated'} = 1;
+				$others->{'emulated'} = 1;
 			}
 			
 			if ($trivial_ok) {
 # 				$spec .= " trivial_ok";
-				$others{'trivial_ok'} = 1;
+				$others->{'trivial_ok'} = 1;
 				#
 				# We store this info in case assign actually does turn it
 				# into a trivial link. If that happens, we have to insert
@@ -2395,13 +2420,12 @@ sub GenVirtLans($)
 # 				$spec .= " $fixall";
 # 			}
 			if ($fixsrc ne '') {
-				$others {'fixsrciface'} = $fixsrc;
+				$others->{'fixsrciface'} = $fixsrc;
 			}
 			if ($fixdst ne '') {
-				$others {'fixdstiface'} = $fixdst;
+				$others->{'fixdstiface'} = $fixdst;
 			}
-# TODO: Insert CM
-			$self->createLink($plink, "TODO:CM", $vname0, $vname1, $bw, 
+			$self->createLink($plink, $cmid, $vname0, $vname1, $bw, 
 								$protocol, $others);
 # 			$self->addlink($spec);
 	    }
@@ -2412,8 +2436,7 @@ sub GenVirtLans($)
 	    # Lan node for assign.
 # 	    $self->addnode("lan/$vname lan");
 
-# TODO: Insert CM
-		$self->createNode("lan/$vname", "TODO:CM", "lan", 1, undef);
+		$self->createNode("lan/$vname", $cmid, "lan", '1', undef, undef);
 
 	    # So we ignore it when it comes back from assign.
 	    $self->lannodes()->{"lan/$vname"} = 1;
@@ -2433,7 +2456,7 @@ sub GenVirtLans($)
 				'virtualization_type' => 'raw',
 				'exclusive'           => 1,
 				'node_type'           => {"type_name"  => "lan",
-							"type_slots" => 1},
+										  "type_slots" => 1},
 			};
 			if (!exists($self->rspec()->{'link'})) {
 				$self->rspec()->{'link'} = [];
@@ -2451,62 +2474,62 @@ sub GenVirtLans($)
 				# in the lan have the same CM.
 				#
 				if (defined($fixed) && $fixed ne "") {
-				my ($authority,$type,$nodeid) = GeniHRN::Parse($fixed);
+					my ($authority,$type,$nodeid) = GeniHRN::Parse($fixed);
 				
-				$noderef->{'component_urn'} =
-					GeniHRN::Generate($authority, "node", "*");
+					$noderef->{'component_urn'} =
+						GeniHRN::Generate($authority, "node", "*");
 				}
-	# 		    my $ref = {
-	# 			   'virtual_id'    => "$vname:$member",
-	# 			   # The list references are so XML::Simple does not
-	# 			   # turn them into attributes. Need a better solution.
-	# 			   'latency'       => [0],
-	# 			   'packet_loss'   => [0],
-	# #			   'link_type'     => {"type_name" => "ethernet"},
-	# 			   'link_type'     => "ethernet",
-	# 			   'bandwidth'     => [$bw],
-	# 			   'interface_ref' =>
-	# 			       [
-	# 				{ 'virtual_node_id' => $virtnode->vname(),
-	# 				  'virtual_interface_id' => "$member" },
-	# 				{ 'virtual_node_id' => "lan-$vname",
-	# 				  'virtual_interface_id' => "$member" }
-	# 			       ]
-	# 			       };
+# 		    my $ref = {
+# 			   'virtual_id'    => "$vname:$member",
+# 			   # The list references are so XML::Simple does not
+# 			   # turn them into attributes. Need a better solution.
+# 			   'latency'       => [0],
+# 			   'packet_loss'   => [0],
+# #			   'link_type'     => {"type_name" => "ethernet"},
+# 			   'link_type'     => "ethernet",
+# 			   'bandwidth'     => [$bw],
+# 			   'interface_ref' =>
+# 			       [
+# 				{ 'virtual_node_id' => $virtnode->vname(),
+# 				  'virtual_interface_id' => "$member" },
+# 				{ 'virtual_node_id' => "lan-$vname",
+# 				  'virtual_interface_id' => "$member" }
+# 			       ]
+# 			       };
 	
 				my $ref = {
 					'virtual_id'    => "$vname:$member",
-	# The list references are so XML::Simple does not
-	# turn them into attributes. Need a better solution.
+# The list references are so XML::Simple does not
+# turn them into attributes. Need a better solution.
 					'capacity'      => [$bw],
 					'latency'       => [0],
 					'packet_loss'   => [0],
 					'link_type'     => "ethernet",
 					'property'      => 
 						[
-							{'source'       => $virtnode->$vname(),
-							'dest'         => "lan-$vname",
-							'capacity'     => $bw,
-							'latency'      => 0,
-							'packet_loss'  => 0 },
-							
-							{'source'       => "lan-$vname",
-							'dest'         => $virtnode->$vname(),
-							'capacity'     => $bw,
-							'latency'      => 0,
-							'packet_loss'  => 0 }
-						]
+						 {'source'       => $virtnode->$vname(),
+						  'dest'         => "lan-$vname",
+						  'capacity'     => $bw,
+						  'latency'      => 0,
+						  'packet_loss'  => 0 },
+						 
+						 {'source'       => "lan-$vname",
+						  'dest'         => $virtnode->$vname(),
+						  'capacity'     => $bw,
+						  'latency'      => 0,
+						  'packet_loss'  => 0 }
+						],
 					'interface_ref' =>
 						[
-							{ 'virtual_node_id' => $virtnode->vname(),
-								'virtual_interface_id' => "$member" },
-							{ 'virtual_node_id' => "lan-$vname",
-								'virtual_interface_id' => "$member" }
+						 { 'virtual_node_id' => $virtnode->vname(),
+						   'virtual_interface_id' => "$member" },
+						 { 'virtual_node_id' => "lan-$vname",
+						   'virtual_interface_id' => "$member" }
 						]
 				};
 				
 				if ($emulated) {
-				$ref->{'virtualization_type'} = $vlan->_encapstyle();
+					$ref->{'virtualization_type'} = $vlan->_encapstyle();
 				}
 				push(@{ $self->rspec()->{'link'} }, $ref);
 				push(@nrefs, { 'virtual_id' => "$member"});
@@ -2623,22 +2646,21 @@ sub GenVirtLans($)
 				
 				my @delayinfo = ($delay,$bw,$backfill,$loss,
 						$rdelay,$rbw,$rbackfill,$rloss,0);
-	
+				
 				my $others = {};
 				if ($emulated) {
-					$others{'emulated'} = 1;
+					$others->{'emulated'} = 1;
 				}
 				if ($trivial_ok) {
-					$others{'trivial_ok'} = 1;
+					$others->{'trivial_ok'} = 1;
 				}
 				if ($fixsrc0) {
-					$others{'fixsrciface'} = $fixi0;
+					$others->{'fixsrciface'} = $fixi0;
 				}
-# TODO: Insert CM
-				$self->createLink($plink, "TODO:CM", $vnodevname, "lan/$vname",
-									$top_bw == 0 ? "*" : max($top_bw,$top_rbw),
-									$protocol, $others);
-									
+				$self->createLink($plink, $cmid, $vnodevname, "lan/$vname",
+								  $top_bw == 0 ? "*" : max($top_bw,$top_rbw),
+								  $protocol, $others);
+				
 # 				$self->addlink("$plink $vnodevname lan/$vname " .
 # 						($top_bw == 0 ? "*" :
 # 						max($top_bw,$top_rbw)).
@@ -2646,10 +2668,10 @@ sub GenVirtLans($)
 # 						($emulated ? " emulated" : "") .
 # 						($trivial_ok ? " trivial_ok" : "") . 
 # 						($fixsrc0 ? " $fixsrc0" : ""));
-	
+				
 				$self->printdb("Delay link $plink = " .
-						join(" ", @delayinfo) . "\n");
-	
+							   join(" ", @delayinfo) . "\n");
+				
 				# Save for the post pass.
 				$self->delaylinks()->{$plink} = \@delayinfo;
 		    }
@@ -2660,50 +2682,48 @@ sub GenVirtLans($)
 				my $delaydesirename = $self->delay_desire_name();
 				my $delaydesiretype = $self->delay_desire_type();
 				my $delaydesirepenalty = $self->delay_desire_penalty();
-
-				my @delayinfo   = ($delay,$bw,$backfill,$loss,
-						$rdelay,$rbw,$rbackfill,$rloss,0);
 				
-# TODO: Insert CM
-				$self->createNode($delayname, "TODO:CM", "delay", 1,
-									{ "$delaydesirename" 
+				my @delayinfo   = ($delay,$bw,$backfill,$loss,
+								   $rdelay,$rbw,$rbackfill,$rloss,0);
+				
+				$self->createNode($delayname, $cmid, "delay", '1',
+								  { "$delaydesirename" 
 										=> 
-										[$delaydesiretype, $delaydesirepenalty});
+										[$delaydesiretype, $delaydesirepenalty]}, 
+								  undef);
 # 				$self->addnode("$delayname delay $delaydesire");
 				
-# TODO: Insert CM
 				my $others = {};
 				if ($fixsrc0) {
-					$others{'fixsrciface'} = $fixi0;
+					$others->{'fixsrciface'} = $fixi0;
 				}
-				$self->createLink("linkdelaysrc/$vname/$member", "TODO:CM",
-									$vnodevname, $delayname,
-									$top_bw == 0 ? "*" : $top_bw,
-									$protocol, $others);
-									
+				$self->createLink("linkdelaysrc/$vname/$member", $cmid,
+								  $vnodevname, $delayname,
+								  $top_bw == 0 ? "*" : $top_bw,
+								  $protocol, $others);
+				
 # 				$self->addlink("linkdelaysrc/$vname/$member " .
 # 						"$vnodevname $delayname ".
 # 						($top_bw == 0 ? "*" : $top_bw) .
 # 						" 0 0 $protocol $fixsrc0");
 						
-# TODO: Insert CM
-				$self->createLink("linkdelaysrc/$vname/$member", "TODO:CM",
-									"lan/$vname", $delayname,
-									$top_bw == 0 ? "*" : $top_bw,
-									$protocol, $others);
-									
+				$self->createLink("linkdelaysrc/$vname/$member", $cmid,
+								  "lan/$vname", $delayname,
+								  $top_bw == 0 ? "*" : $top_bw,
+								  $protocol, $others);
+				
 # 				$self->addlink("linkdelaydst/$vname/$member " .
 # 						"lan/$vname $delayname ".
 # 						($top_bw == 0 ? "*" : $top_bw) .
 # 						" 0 0 $protocol");
-	
+				
 				$self->printdb("Delay node $plink ($delayname) = " .
-						join(" ", @delayinfo) . "\n");
+							   join(" ", @delayinfo) . "\n");
 	
 				# Save for the post pass.
 				$self->delaylinks()->{$plink} = \@delayinfo;
 				$self->delaynodes()->{$delayname} = $delayname;
-	
+				
 				# XXX Mark the lan as having delayed members so that
 				# we create a delayed protolan. Bogus.
 				$vlan->_delayed(1);
@@ -2722,23 +2742,23 @@ sub GenVirtLans($)
 # 		    my $spec  = "$plink $vnodevname lan/$vname ";
 			my $others = {};
 			if ($emulated) {
-				$others{'emulated'} = 1;
+				$others->{'emulated'} = 1;
 			}
 			if ($trivial_ok) {
-				$others{'trivial_ok'} = 1;
+				$others->{'trivial_ok'} = 1;
 			}
 			if ($fixsrc0) {
-				$others{'fixsrciface'} = $fixsrc0;
+				$others->{'fixsrciface'} = $fixsrc0;
 			}
-
+			
 		    # Let assign choose bw if top_bw is zero.
 # 		    $spec .= ($top_bw == 0 ? "*" : $top_bw);
 # 		    $spec .= " 0 0 $protocol";
 # 		    $spec .= " emulated" if ($emulated);
-
+			
 # 		    if ($trivial_ok) {
 # 			$spec .= " trivial_ok";
-
+			
 			#
 			# We store this info in case assign actually does
 			# turn it into a trivial link. If that happens, we
@@ -2752,21 +2772,19 @@ sub GenVirtLans($)
 			#
 			if (!$nobwshaping) {
 			    $self->delaylinks()->{$plink} = 
-				[$delay,$bw,$backfill,$loss,
+					[$delay,$bw,$backfill,$loss,
 				 $rdelay,$rbw,$rbackfill,$rloss,1];
 			}
-		    }
 # 		    if ($fixsrc0) {
 # 			$spec .= " $fixsrc0";
 # 		    }
-# TODO: Insert CM
-			$self->createLink("linklan/$vname/$member", "TODO:CM",
-								$vnodename, "lan/$vname", 
-								($top_bw == 0 ? "*" : $top_bw), $protocol,
+			$self->createLink("linklan/$vname/$member", $cmid,
+							  "$vnodevname", "lan/$vname", 
+							  ($top_bw == 0 ? "*" : $top_bw), $protocol,
 								$others);
-		    $self->addlink($spec);
+#		    $self->addlink($spec);
 		}
-	    }
+		}
 	}
     }
     return $errors;
@@ -2803,7 +2821,7 @@ sub PrintTop($;$)
 
 #
 # Print the rspec part of the topo. Eventually the whole thing needs
-# to be in rspec. The RSPEC prints the results in v1 format
+# to be in rspec. The RSPEC prints the results in v2 format
 #
 sub PrintRspec($;$)
 {
@@ -2833,14 +2851,13 @@ sub PrintRspec($;$)
 						
 	$doc->setDocumentElement($root);
 	
-	foreach my $ref (@{$self->results->{'nodeslinks'}}) {
-		my ($which, $what) = @{ $ref };
-		if ($which eq "node") {
-	    	$self->processNode($doc, $root, $what);
-		}
-		else {
-	    	$self->processLink($doc, $root, $what);
-		}
+	foreach my $ref (@{$self->rspec()->{'node'}}) {
+#		my ($which, $what) = @{ $ref };
+    	$self->processNodeRspec($doc, $root, $ref);
+	}
+	foreach my $ref (@{$self->rspec()->{'link'}}) {
+#		my ($which, $what) = @{ $ref };
+		$self->processLinkRspec($doc, $root, $ref);
 	}
 
     print $output $doc->toString(1) . "\n";
@@ -6822,6 +6839,14 @@ sub addNode($$$)
     return $newNode;
 }
 
+sub addNodeRspec ($$$)
+{
+	my ($doc, $root, $name) = @_;
+	my $newnode = $doc->createElement($name);
+	$root->appendChild($newnode);
+	return $newnode;
+}
+
 #
 # Creates a child node with name "nodeName" whose parent is "parent"
 # in the XML document "document" The child node has a textnode within
@@ -6843,12 +6868,16 @@ sub addNodeWithText($$$$)
 #
 sub processNodeRspec ($$$$)
 {
-	my ($self, $xmlDocument, $root, $line) = @_;
+# TODO: Add extensions
+	my ($self, $doc, $root, $node) = @_;
 	
-	my ($nodename, $nodetype, @tokens) = split(/\s+/, $line);
-	
-	my $newNode = addNode ($xmlDocument, $root, "node");
-	
+	my $rspecnode = addNodeRspec ($doc, $root, 'node');
+	$rspecnode->setAttribute('client_id', $node->{'name'});
+	$rspecnode->setAttribute('component_manager_id', $node->{'cm'});
+	my $slivertype = addNodeRspec($doc, $rspecnode, 'sliver_type');
+	$slivertype->setAttribute('name', $node->{'node_type'});
+	my $typecount = addNodeRspec($doc, $slivertype, 'emulab:ext_node_type');
+	$typecount->setAttribute('type_slots', $node->{'type_slots'});
 }
 
 #
@@ -6956,6 +6985,24 @@ sub processNode($$$$)
 	}
     }
     return 0;
+}
+
+sub processLinkRspec ($$$$)
+{
+	my ($self, $doc, $root, $link) = @_;
+	
+	my $rspeclink = addNodeRspec($doc, $root, 'link');
+	$rspeclink->setAttribute('client_id', $link->{'name'});
+	$rspeclink->setAttribute('component_manager_id', $link->{'cm'});
+	my $linktype = addNodeRspec($doc, $rspeclink, 'link_type');
+	$linktype->setAttribute('name', $link->{'link_type'});
+	my $interfaceref;
+	$interfaceref = addNodeRspec($doc, $rspeclink, 'interface_ref');
+	$interfaceref->setAttribute('src', $link->{'interface_ref'}->[0]);
+	$interfaceref->setAttribute('dst', $link->{'interface_ref'}->[1]);
+	$interfaceref->setAttribute('capacity', $link->{'capacity'});
+	$interfaceref->setAttribute('latency', $link->{'latency'});
+	$interfaceref->setAttribute('packet_loss', $link->{'packet_loss'});
 }
 
 #

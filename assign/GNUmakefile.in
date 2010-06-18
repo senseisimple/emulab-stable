@@ -37,7 +37,7 @@ CXXFLAGS += -I/sw/include
 ifeq ($(HAVE_XERCES),yes)
 CXXFLAGS += -DWITH_XML
 LIBS += -L/usr/local/lib -lxerces-c
-OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec.o annotate_vtop.o annotate.o
+OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec.o annotate_vtop.o annotate.o rspec_parser_helper.o rspec_parser.o rspec_parser_v1.o rspec_parser_v2.o
 endif
 
 # Pick either this
@@ -120,6 +120,7 @@ assign.o: assign.cc port.h common.h fstring.h delay.h physical.h \
   solution.h maps.h anneal.h config.h
 config.o: config.cc config.h common.h port.h fstring.h score.h physical.h \
   delay.h featuredesire.h forwarding.h virtual.h anneal.h pclass.h
+emulab_extensions_parser.o: emulab_extensions_parser.cc
 featuredesire.o: featuredesire.cc featuredesire.h common.h port.h \
   fstring.h score.h physical.h delay.h forwarding.h virtual.h
 forwarding.o: forwarding.cc forwarding.h port.h fstring.h physical.h \
@@ -143,6 +144,10 @@ parse_vtop_xml.o: parse_vtop_xml.cc
 parser.o: parser.cc parser.h port.h
 pclass.o: pclass.cc port.h common.h fstring.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h pclass.h
+rspec_parser.o: rspec_parser.cc
+rspec_parser_helper.o: rspec_parser_helper.cc
+rspec_parser_v1.o: rspec_parser_v1.cc
+rspec_parser_v2.o: rspec_parser_v2.cc
 score.o: score.cc port.h common.h fstring.h vclass.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h pclass.h score.h
 solution.o: solution.cc solution.h port.h delay.h physical.h common.h \
