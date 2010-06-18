@@ -572,7 +572,7 @@ sub RestartSliver($)
 {
     my ($argref) = @_;
     my $slice_urn    = $argref->{'slice_urn'};
-    my $sliver_urns  = $argref->{'component_urns'};
+    my $sliver_urns  = $argref->{'sliver_urns'};
     my $credentials  = $argref->{'credentials'};
     my $manifest     = $argref->{'manifest'};
 
@@ -666,19 +666,19 @@ sub SliverAction($$$$$)
 	my ($object, $action) = @_;
 
 	if ($action eq "start") {
-	    if ($object->state() ne "stopped") {
+	    if ($object->state() ne "stopped" && $object->state() ne "mixed") {
 		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 					    "Sliver is not stopped (yet)");
 	    }
 	}
 	elsif ($action eq "stop") {
-	    if ($object->state() ne "started") {
+	    if ($object->state() ne "started" && $object->state() ne "mixed") {
 		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 					    "Sliver is not started (yet)");
 	    }
 	}
 	elsif ($action eq "restart") {
-	    if ($object->state() ne "started") {
+	    if ($object->state() ne "started" && $object->state() ne "mixed") {
 		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 					    "Sliver is not started (yet)");
 	    }
