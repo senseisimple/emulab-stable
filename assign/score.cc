@@ -88,8 +88,18 @@ void score_link_endpoints(pedge pe);
 #define SDEBADD(amount) cerr << "SADD: " << #amount << "=" << amount << " from " << score;score+=amount;cerr << " to " << score << endl
 #define SDEBSUB(amount)  cerr << "SSUB: " << #amount << "=" << amount << " from " << score;score-=amount;cerr << " to " << score << endl
 
+#ifdef SCORE_DEBUG_MAX
+// Handy way to print only the first N debugging messages, since that's usually
+// enough to get the idea
+static unsigned long scoredebugcount = 0;
+#endif
+
 #ifdef SCORE_DEBUG
+#ifdef SCORE_DEBUG_MAX
+#define SDEBUG(a) if (scoredebugcount++ < SCORE_DEBUG_MAX) { a; }
+#else
 #define SDEBUG(a) a
+#endif
 #else
 #define SDEBUG(a) 
 #endif
