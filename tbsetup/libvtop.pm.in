@@ -3292,7 +3292,7 @@ sub ReadTextSolution($$)
 	    else {
 		($nodeportB,$switchportB) = getnodeport($rawB);
 		if (!defined($nodeportB)) {
-		    print STDERR "*** Undefined nodeportB in $vlink,$rawB\n";
+		    print STDERR "*** Undefined nodeportB in $line\n";
 		    return -1;
 		}
 	    }
