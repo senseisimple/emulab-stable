@@ -592,6 +592,46 @@ sub IsReserved($)
     return 1;
 }
 
+
+sub GetSubboss($$)
+{
+    my ($self, $service, $subboss_id) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $ref;
+
+    if (defined $self->{"SUBBOSSES"}) {
+	my $ref = $self->{"SUBBOSSES"}->{$service};
+    }
+
+    if (!defined $ref) {
+	my $nodeid = $self->node_id();
+
+	my $query_result =
+	    DBQueryWarn("select * from subbosses " .
+			"where node_id='$nodeid' and " .
+			"service = '$service'");
+
+	return 0
+	    if (!$query_result);
+	return 0
+	    if (!$query_result->numrows);
+
+	if (!defined($self->{"SUBBOSSES"})) {
+	    $self->{"SUBBOSSES"} = {};
+	}
+
+	$ref = $self->{"SUBBOSSES"}->{$service} =
+	    $query_result->fetchrow_hashref();
+    }
+
+    $$subboss_id = $ref->{'subboss_id'};
+
+    return 0;
+}
+
 #
 # Flush the reserve info so it reloads.
 #
