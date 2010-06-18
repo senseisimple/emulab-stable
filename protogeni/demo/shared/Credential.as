@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -26,5 +26,6 @@ package
     public var base : String;
     public var slice : String;
     public var ssh : Object;
+	public var existing : Boolean;
   }
 }
