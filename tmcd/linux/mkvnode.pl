@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -137,7 +137,7 @@ if ($debug) {
 # Need the domain, but no conistent way to do it. Ask tmcc for the
 # boss node and parse out the domain. 
 #
-my $DOMAINNAME = tmccbossname();
+my ($DOMAINNAME,$BOSSIP) = tmccbossinfo();
 die("Could not get bossname from tmcc!")
     if (!defined($DOMAINNAME));
 
@@ -149,10 +149,8 @@ else {
 }
 
 #
-# Need the bossip, which we get from virthost emulab boot dir:
+# Need the bossip, which was returned above
 #
-my $BOSSIP = `cat $BOOTDIR/bossip`;
-chomp($BOSSIP);
 if ($BOSSIP !~ /^\d+\.\d+\.\d+\.\d+$/) {
     die "Bad bossip '$BOSSIP' in $BOOTDIR/bossip!";
 }
