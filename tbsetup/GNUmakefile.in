@@ -48,6 +48,8 @@ ifeq ($(ISMAINSITE),1)
 SBIN_STUFF     += repos_daemon
 endif
 
+SUBBOSS_SBIN_STUFF = subboss_frisbeelauncher subboss_frisbeeimage
+
 CTRLSBIN_STUFF  = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
 
@@ -265,6 +267,11 @@ endif
 	chmod u+s $(INSTALL_BINDIR)/tbrsync
 	chown root $(INSTALL_SBINDIR)/nfstrace
 	chmod u+s $(INSTALL_SBINDIR)/nfstrace
+
+#
+# Subboss installation
+#
+subboss-install:	$(addprefix $(INSTALL_SBINDIR)/, $(SUBBOSS_SBIN_STUFF))
 
 #
 # Control node installation (okay, plastic)
