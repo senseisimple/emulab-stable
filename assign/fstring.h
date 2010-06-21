@@ -126,7 +126,11 @@ class fstring {
          * Output/debugging functions
          */
         friend ostream &operator<<(ostream &o, const fstring &s) {
-            return(o << s.str);
+            if (s.str != NULL) {
+                return(o << s.str);
+            } else {
+                return(o << "(null)");
+            }
         }
 		
 		

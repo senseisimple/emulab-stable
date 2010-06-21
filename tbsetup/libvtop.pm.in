@@ -3291,10 +3291,6 @@ sub ReadTextSolution($$)
 	    }
 	    else {
 		($nodeportB,$switchportB) = getnodeport($rawB);
-		if (!defined($nodeportB)) {
-		    print STDERR "*** Undefined nodeportB in $line\n";
-		    return -1;
-		}
 	    }
 	    if (defined($nodeportB)) {
 		# Convert back to node:iface format.
