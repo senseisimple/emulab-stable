@@ -466,8 +466,7 @@ sub LightUpNodes($@)
 	    $reconfigs{$node_id} = $node;
 	    $action = "reconfiged";
 	}
-	print STDERR "$node_id will be $action\n"
-	    if ($self->debug());
+	print STDERR "$node_id will be $action\n";
     }
 
     # XXX Caller wants a list. 
