@@ -68,7 +68,11 @@ if ($exitcode) {
     
     # Pull out relevent info
     print SERR "ASSIGN FAILED:\n";
-    while ((shift @out) !~ /^[\w\s]*precheck:$/) {}
+    while (($_ = shift @out) && !/^[\w\s]*precheck:$/) {}
+    if (not defined $_) {
+	tberror({cause=>'internal'}, 
+		"Invalid Assign Output (expected \"precheck:\" line).");
+    }
     while (($_ = shift @out)) {
 	/^[\w\s]*precheck:$/ && do {
 	    next;
@@ -81,7 +85,11 @@ if ($exitcode) {
 	push @err, $_;
     }
     if ($violations) {
-	while ((shift @out) !~ /^Violations:/) {}
+	while (($_ = shift @out) && !/^Violations:/) {}
+	if (not defined $_) {
+	    tberror({cause=>'internal'}, 
+		    "Invalid Assign Output (expected \"Violations:\" line).");
+	}
 	while (($_ = shift @out)) {
 	    if (/^Nodes:/) {
 		last;
