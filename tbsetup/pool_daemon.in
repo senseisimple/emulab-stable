@@ -24,14 +24,8 @@ my $debug    = 0;
 my $impotent = 0;
 my $killme   = 0;
 my $nofree   = 1;
-
-#
-# This should run as root.
-#
-if ($UID != 0) {
-    die("*** $0:\n".
-	"    Only root can run this script!\n");
-}
+my $gotlock  = 0;
+my $mailsent = 0;
 
 #
 # Configure variables
@@ -53,6 +47,14 @@ use Experiment;
 use User;
 use OSinfo;
 use Image;
+
+#
+# This should run as root.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
 
 # We use tblog to determine why swapexp failed.
 tblog_stop_capture();
@@ -144,11 +146,6 @@ my $eid = $experiment->eid();
 if ($experiment->state() eq EXPTSTATE_NEW()) {
     $experiment->SetState(EXPTSTATE_SWAPPED());
 }
-if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
-    print STDERR "Pool Daemon exiting since the experiment is swapped\n";
-    cleanup();
-    exit(0);
-}
 
 #
 # We need this user for running swapexp below.
@@ -190,9 +187,46 @@ while (!$killme) {
 	goto loop;
     }
 
+    #
+    # Serialize this part with the mapper.
+    #
+    if (!$impotent) {
+	my $tries = 0;
+	
+	while (1) {
+	    #
+	    # Use a countup/countdown counter, so that multiple mappers
+	    # can run, but not while the pool_daemon is running.
+	    #
+	    my $lock_result =
+		DBQueryWarn("update emulab_locks set value=-1 ".
+			    "where name='pool_daemon' and value=0");
+	    fatal("DB Error going for lock")
+		if (!defined($lock_result));
+
+	    $gotlock = $lock_result->affectedrows;
+
+	    last
+		if ($gotlock);
+
+	    if ($tries++ > 100) {
+		notify("Cannot get the lock after a really long time");
+		$tries = 0;
+	    }
+	    chat("Waiting for pool daemon lock ...\n");
+	    sleep(10);
+	}
+    }
+    
     Node->FlushAll();
     $experiment->Refresh() == 0
 	or fatal("Could not reload $experiment");
+
+    if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
+	print "Skipping this loop cause the experiment is swapped\n";
+	goto loop;
+    }
+    
     my @nodelist = $experiment->NodeList();
     my %inuse    = ();
     my %tofree   = ();
@@ -205,24 +239,6 @@ while (!$killme) {
     my $minpoolsize  = TBGetSiteVar("general/minpoolsize");
     my $poolnodetype = TBGetSiteVar("general/poolnodetype");
 
-    #
-    # Serialize this part with the mapper.
-    #
-    if (!$impotent) {
-	while (1) {
-	    my $lock_result =
-		DBQueryWarn("select get_lock('pool_daemon', 5)");
-	    fatal("DB Error tring to get pool_daemon lock")
-		if (!defined($lock_result));
-
-	    my ($gotlock) = $lock_result->fetchrow_array();
-	    last
-		if ($gotlock);
-		
-	    print "Waiting for pool daemon lock ...\n";
-	}
-    }
-	
     #
     # Look to see how each of the nodes is packed. This is
     # advisory; we will not know for sure until tables locked
@@ -247,10 +263,11 @@ while (!$killme) {
 	next
 	    if ($vnodecount < 0);
 
-	if ($vnodecount == 0 && !$nofree) {
+	if ($vnodecount == 0) {
 	    print "$node no longer has virtual nodes on it.\n";
 	    # Free the node unless we would go below the minpoolsize.
-	    if (scalar(@nodelist) - scalar(keys(%tofree)) > $minpoolsize) {
+	    if (!$nofree &&
+		scalar(@nodelist) - scalar(keys(%tofree)) > $minpoolsize) {
 		print "  Adding to free list.\n";
 		$tofree{$node->node_id()} = $node;
 	    }
@@ -280,10 +297,12 @@ while (!$killme) {
 	    $newcount++;
 	}
     }
-    if (! (keys(%tofree) || $newcount)) {
-	exit(0)
-	    if ($impotent);
-	goto loop;
+    if (!$debug) {
+	if (! (keys(%tofree) || $newcount)) {
+	    exit(0)
+		if ($impotent);
+	    goto loop;
+	}
     }
 
     #
@@ -338,7 +357,7 @@ while (!$killme) {
     close(NS);
     chmod(0775, $tmpfile);
 
-    exit(0)
+    last
 	if ($impotent || $killme);
 
     # Must do this each time before fork.
@@ -377,12 +396,21 @@ while (!$killme) {
 	die("Could not exec $SWAPEXP\n");
     }
   loop:
-    DBQueryWarn("select release_lock('pool_daemon')")
-	or fatal("Could not release the pool lock");
+    if ($gotlock) {
+	my $lock_result =
+	    DBQueryWarn("update emulab_locks set value=0 ".
+			"where name='pool_daemon'");
+	fatal("DB Error releasing lock")
+	    if (!defined($lock_result));
+	
+	$gotlock = 0;
+    }
     
     # Use a long period; we do not want the pool to change too fast.
     sleep(120);
 }
+cleanup();
+exit(0);
 
 #
 # Subscribe to experiment state change events.
@@ -431,6 +459,7 @@ sub fatal($)
     my ($msg) = @_;
 
     SENDMAIL($TBOPS, "Pool Daemon Died", $msg, $TBOPS);
+    $mailsent = 1;
     cleanup();
     die($msg);
 }
@@ -445,6 +474,24 @@ sub notify($)
 
 sub cleanup()
 {
+    if ($gotlock) {
+	DBQueryWarn("update emulab_locks set value=0 ".
+		    "where name='pool_daemon'");
+	$gotlock = 0;
+    }
+
     MarkDaemonStopped("pool_daemon")
 	if (!$impotent);
+}
+
+END {
+    my $exitcode = $?;
+
+    if ($exitcode && !$mailsent) {
+	SENDMAIL($TBOPS, "Pool Daemon Died",
+		 "Please look at $logfile", $TBOPS);
+    }
+    cleanup();
+
+    $? = $exitcode;
 }
