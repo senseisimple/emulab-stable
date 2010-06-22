@@ -532,9 +532,9 @@ function VALIDUSERPATH($path, $uid="", $pid="", $gid="", $eid="")
     # No ids specified, just make sure it starts with an appropriate prefix.
     #
     if (!$uid && !$pid && !$gid && !$eid) {
-	if (preg_match("/^$TBPROJ_DIR\/.*/", $path) ||
-	    preg_match("/^$TBUSER_DIR\/.*/", $path) ||
-	    preg_match("/^$TBGROUP_DIR\/.*/", $path)) {
+	if (preg_match("#^$TBPROJ_DIR/.*#", $path) ||
+	    preg_match("#^$TBUSER_DIR/.*#", $path) ||
+	    preg_match("#^$TBGROUP_DIR/.*#", $path)) {
 	    return 1;
 	}
 	if ($TBSCRATCH_DIR && preg_match("/^$TBSCRATCH_DIR\/.*/", $path)) {
