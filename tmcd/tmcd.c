@@ -360,7 +360,7 @@ struct command {
         { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
         { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
         { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED, doeventkey},
+        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, doeventkey},
         { "fullconfig",   FULLCONFIG_NONE, F_ALLOCATED, dofullconfig},
         { "routelist",	  FULLCONFIG_PHYS, F_ALLOCATED, doroutelist},
         { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
@@ -3866,12 +3866,10 @@ COMMAND_PROTOTYPE(doloadinfo)
 		return 1;
 	}
 
-
 	if ((nrows = (int)mysql_num_rows(res)) == 0) {
 		mysql_free_result(res);
 		return 0;
 	}
-
 
 	if (nrows > 1 && vers <= 29) {
 
@@ -5972,6 +5970,12 @@ COMMAND_PROTOTYPE(dofullconfig)
 				 * Silently drop commands that are not
 				 * allowed for remote non-ssl connections.
 				 */
+				continue;
+			}
+			/*
+			 * Silently drop all TPM-required commands right now.
+			 */
+			if ((command_array[i].flags & F_REQTPM)) {
 				continue;
 			}
 			OUTPUT(buf, sizeof(buf),
