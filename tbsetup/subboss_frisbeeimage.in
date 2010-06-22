@@ -24,7 +24,7 @@ my $debug    = 1;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $RPCSERVER   = "@OUTERBOSS_NODENAME@";
+my $RPCSERVER   = "@BOSSNODE@";
 my $RPCPORT     = "@OUTERBOSS_XMLRPCPORT@";
 my $RPCCERT     = "@OUTERBOSS_SSLCERTNAME@";
 

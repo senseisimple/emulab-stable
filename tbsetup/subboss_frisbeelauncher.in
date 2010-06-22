@@ -34,7 +34,7 @@ my $MY_IP;
 my $BASEADDR    = "@FRISEBEEMCASTADDR@";
 my $BASEPORT    = "@FRISEBEEMCASTPORT@";
 
-my $RPCSERVER   = "@OUTERBOSS_NODENAME@";
+my $RPCSERVER   = "@BOSSNODE@";
 my $RPCPORT     = "@OUTERBOSS_XMLRPCPORT@";
 my $RPCCERT     = "@SUBBOSS_SSLCERTNAME@";
 
@@ -65,7 +65,7 @@ sub ClearPid();
 sub ClearAddress();
 sub Fatal($);
 sub debug($);
-sub GetImageInfo($$);
+sub GetLoadAddress($$);
 
 # Defines
 my $FRISBEED	= "$TB/sbin/frisbeed";
@@ -154,6 +154,13 @@ my $naddress;
 my $address;
 my $pid;
 
+$naddress = GetLoadAddress($subbossid, $imageid);
+if (defined $naddress) {
+	# Try to discover if some other process is handling this address
+	$address = $$naddress{"address"};
+	$pid     = $$naddress{"frisbee_pid"};
+}
+
 if (!$killmode) {
 	#
 	# Pick an address to use before locking the DB.  Die if unsucessful,
@@ -161,11 +168,6 @@ if (!$killmode) {
 	# already a laucher active, we will wind up wasting this address,
 	# but hey, we can make more!
 	#
-	$naddress = PickAddress($subbossid, $imageid);
-
-	# Try to discover if some other process is handling this address
-	$address = $$naddress{"address"};
-	$pid     = $$naddress{"frisbee_pid"};
 
 
 	#
@@ -174,6 +176,8 @@ if (!$killmode) {
 	if ($pid && $address) {
 	    debug("A server ($address) is already running for image $imageid\n");
 	    exit(0);
+	} else {
+		$address = PickAddress($subbossid, $imageid);
 	}
 
 	if (-e $filename) {
@@ -211,9 +215,6 @@ if (!$killmode) {
 	    }
 	}
 } else {
-    my $result = GetImageInfo($subbossid, $imageid);
-    my $address = $$result{"address"};
-    my $pid = $$result{"frisbee_pid"};
 
     # Nothing running.
     exit(0)
@@ -240,9 +241,9 @@ if (!$killmode) {
 	#
 	sleep(1);
 	# XXX add call to get address and pid
-	$result = GetImageInfo($imageid, $subbossid);
-	$address = $$result{"address"};
-	$pid = $$result{"frisbee_pid"};
+	$naddress = GetLoadAddress($imageid, $subbossid);
+	$address = $$naddress{"address"};
+	$pid = $$naddress{"frisbee_pid"};
 
 	# Okay, situation resolved itself; other frisbeelauncher bailed.
 	exit(0)
@@ -430,7 +431,7 @@ sub debug($)
 sub PickAddress($$)
 {
     my ($subbossid, $imageid) = @_;
-    my $rval = libxmlrpc::CallMethod("subboss", "alloc_load_address",
+    my $rval = libxmlrpc::CallMethod("subboss", "allocate_load_address",
 				     {"imageid" => "$imageid", "subboss_id" => $subbossid});
 
     if (not defined $rval) {
@@ -444,15 +445,15 @@ sub PickAddress($$)
 # Get current load address and frisbeed pid for the specified imageid on the specified
 # subbossid
 #
-sub GetImageInfo($$)
+sub GetLoadAddress($$)
 {
     my ($subbossid, $imageid) = @_;
-    my $rval = libxmlrpc::CallMethod("subboss", "get_image_info",
+    my $rval = libxmlrpc::CallMethod("subboss", "get_load_address",
 				     {"imageid" => $imageid, "subboss_id" => $subbossid});
 
-    if (not defined $rval) {
-	    Fatal("$$: Failed to get mcast address from server!");
-    }
+    #if (not defined $rval) {
+    #	    Fatal("$$: Failed to get mcast address from server!");
+    #}
 
     return $rval;
 }
@@ -465,7 +466,7 @@ sub ClearAddress()
 {
     debug("Clearing out registered load_address and pid\n");
 
-    my $rval = libxmlrpc::CallMethod("subboss", "dealloc_load_address",
+    my $rval = libxmlrpc::CallMethod("subboss", "clear_load_address",
 				     {"imageid" => "$imageid", "subboss_id" => $subbossid});
 
     if (not defined $rval) {
@@ -482,7 +483,7 @@ sub ClearAddress()
 sub SetPid($)
 {
     my ($pid) = @_;
-    my $rval = libxmlrpc::CallMethod("subboss", "set_pid",
+    my $rval = libxmlrpc::CallMethod("subboss", "set_frisbee_pid",
 				     {"imageid" => "$imageid", "subboss_id" => $subbossid,
 				      "frisbee_pid" => $pid});
 
