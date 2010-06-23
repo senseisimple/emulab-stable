@@ -4063,7 +4063,7 @@ sub CheckCredential($)
 
 sub CheckTicket($)
 {
-    my $ticket = GeniCredential->CreateFromSignedTicket($_[0]);
+    my $ticket = GeniTicket->CreateFromSignedTicket($_[0]);
     if (!defined($ticket)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create ticket object");
