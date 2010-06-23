@@ -61,7 +61,7 @@ else {
     $body_str .= "Update last power time for:<br>";
     $body_str .= "<form action='powertime.php3' method=get><br><table>";
     $body_str .= "<tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr>";
-    foreach (preg_split(",", $node_id) as $ni) {
+    foreach (preg_split("/,/", $node_id) as $ni) {
 	if (!TBvalid_node_id($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}

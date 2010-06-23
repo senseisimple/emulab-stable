@@ -64,9 +64,9 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     # Have to convert the date/time to RFC822 format
-    list($date, $hours) = preg_split(' ', $timestamp);
-    list($year,$month,$day) = preg_split('-',$date);
-    list($hour,$min,$sec) = preg_split(':',$hours);
+    list($date, $hours) = preg_split('/ /', $timestamp);
+    list($year,$month,$day) = preg_split('/-/',$date);
+    list($hour,$min,$sec) = preg_split('/:/',$hours);
     $rfc822date = date("r",mktime($hour, $min, $sec, $month, $day, $year));
 
     if ($first) {
