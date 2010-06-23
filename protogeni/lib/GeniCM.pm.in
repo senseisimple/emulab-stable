@@ -1121,6 +1121,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    GeniHRN::ParseInterface( $iface_name );
 		$iface_name = $urn_iface;
 	    }
+	    #
+	    # Hack to catch a loopback (trivial link).
+	    #
+	    if ($iface_name eq "loopback") {
+		$iface_name = "";
+		$trivial_ok = 1;
+	    }
 	    my $iface_vport = $ifacemap{$node_nickname}->{$iface_id}->{"vport"};
 
 	    # XXX
