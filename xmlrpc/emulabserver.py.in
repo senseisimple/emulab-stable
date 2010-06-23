@@ -4971,7 +4971,7 @@ class elabinelab:
             stuff += l
             pass
         
-        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, value=stuff, output=output)
     #
     # Fire up a frisbeed for an image,
     # 
