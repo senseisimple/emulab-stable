@@ -8,16 +8,21 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= protogeni/scripts
+ISMAINSITE	= @TBMAINSITE@
 
 include $(OBJDIR)/Makeconf
 
 SBIN_STUFF	= cleanupslice
 PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
-		  createcerts initsite addauthority getcacerts \
+		  initsite addauthority getcacerts \
 		  gencrlbundle shutdownslice remauthority listusage \
 		  update reregister cleanupticket listhistory \
 		  register_sliver sa_daemon genadmincredential \
           genclrcredentials genallow_extcred
+
+ifeq ($(ISMAINSITE),1)
+SBIN_STUFF     += ch_daemon
+endif
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = 
