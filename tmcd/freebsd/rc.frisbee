@@ -140,6 +140,8 @@ loadone() {
     echo "Loading image #$NUM"
 
     ADDRESS=`echo $LOADINFO | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
+    SERVER=`echo $LOADINFO | sed -e 's/.*SERVER=\([^[:space:]]*\).*/\1/'`
+    SERVER=${SERVER:-$BOSSIP}
     PARTITION=`echo $LOADINFO | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
     PARTITION=${PARTITION:-'0'}
     PARTOS=`echo $LOADINFO | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
@@ -339,8 +341,8 @@ loadone() {
 	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}"
 	    /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}
 	else
-	    echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
-	    $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
+	    echo "Running $BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
+	    $BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
 	fi
         fstat=$?
 
@@ -394,9 +396,6 @@ STATUS=`$BINDIR/tmcc status`
 #LOADINFO='ADDR=234.5.6.69:4444'
 
 BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
-
-# XXX should be part of loadinfo
-LOADIP="-S $BOSSIP"
 
 if [ -x /usr/sbin/ntpdate ]; then
 	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1

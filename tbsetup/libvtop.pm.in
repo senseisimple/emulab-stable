@@ -3368,6 +3368,7 @@ sub ReadRspecSolution($$)
 
 	if (scalar(@ifacerefs) == 2) {
 	    my ($ifaceA,$ifaceB) = @ifacerefs;
+	    my $trivial = 0;
 
 	    my $virtA  = $ifaceA->{'virtual_interface_id'};
 	    my $virtB  = $ifaceB->{'virtual_interface_id'};
@@ -3377,10 +3378,15 @@ sub ReadRspecSolution($$)
 	    my $nodeB  = $self->solution()->{'V2P'}->{$vnodeB};
 	    my $portA  = $ifacemap{$vnodeA}->{$virtA};
 	    my $portB  = $ifacemap{$vnodeB}->{$virtB};
+	    my $vlink  = "linksimple/$virtual_id/$virtA,$virtB";
+
+	    if ($portA eq "loopback" || $portB eq "loopback") {
+		$nodeA = $nodeB = $portA = $portB = undef;
+		$trivial = 1;
+		$virtlan->_trivial_ok(1);
+	    }
 	    
-	    my $vlink = "linksimple/$virtual_id/$virtA,$virtB";
-	    
-	    $self->AddLinkToSolution($vlink, 0, 0,
+	    $self->AddLinkToSolution($vlink, $trivial, 0,
 				     $nodeA, $portA, $nodeB, $portB);
 	}
 	else {
