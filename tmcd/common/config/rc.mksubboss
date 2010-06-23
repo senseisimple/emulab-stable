@@ -36,6 +36,7 @@ sub doboot()
 {
     my $EXTRAFS = "/z";
     my $TFTPBOOT_DIR = "$EXTRAFS/tftpboot";
+    my $IMAGES_DIR = "$EXTRAFS/image_cache";
     my $stuffdir = "$EXTRAFS/tmp";
     my $MFSTARBALL = "tftpboot-subboss.tar.gz";
 
@@ -47,8 +48,9 @@ sub doboot()
     system("/usr/local/etc/rc.d/tftpd-hpa.sh stop");
     RecreateDir($EXTRAFS,1);
     mysystem("$BINDIR/mkextrafs.pl -f $EXTRAFS");
-    mysystem("mkdir -p $TFTPBOOT_DIR $stuffdir");
+    mysystem("mkdir -p $TFTPBOOT_DIR $IMAGES_DIR $stuffdir");
     mysystem("ln -sf $TFTPBOOT_DIR /tftpboot");
+    mysystem("ln -sf $IMAGES_DIR $TB/image_cache");
 
     print "Copying over tftpboot tar file from web server and unpacking\n";
 

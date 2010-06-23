@@ -12,6 +12,8 @@ use Sys::Syslog;
 use English;
 use Socket;
 use Errno qw(EADDRINUSE);
+use File::Basename;
+use File::Path;
 
 #
 # This also kills a running frisbee.
@@ -71,6 +73,7 @@ sub GetLoadAddress($$);
 my $FRISBEED	= "$TB/sbin/frisbeed";
 my $LOGFILE	= "$TB/log/frisbeelauncher";
 my $FRISBEEIMAGE= "$TB/sbin/frisbeeimage";
+my $IMAGE_CACHE = "$TB/image_cache";
 my $child_pid   = 0;
 my $dlfilename  = 0;
 
@@ -123,6 +126,7 @@ usage()
 #
 # XXX hack: use map + regex to get around taint check
 my ($imageid, $filename, $size, $mtime) = map { /(.*)/; $1 } @ARGV;
+$filename = "$IMAGE_CACHE/$filename";
 
 #
 # Get node ID via tmcc
@@ -204,6 +208,10 @@ if (!$killmode) {
 	    SetPid($PID);
 	    $EUID = $UID;
 	    $dlfilename = $filename;
+	    my $image_dir = dirname($filename);
+	    if (! -d $image_dir && !mkpath($image_dir)) {
+		    Fatal("Unable to create path \"$image_dir\"\n");
+	    }
 	    system($FRISBEEIMAGE, $imageid, $filename);
 	    ClearPid();
 	    ClearSyncFlag();
