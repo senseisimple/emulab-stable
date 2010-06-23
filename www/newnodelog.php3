@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,7 +31,7 @@ if (! ($isadmin || OPSGUY())) {
 #
 # Check log type. Strictly letters, not too long. 
 #
-if (! ereg("^[a-zA-Z]+$", $log_type) || strlen($log_type) > 32) {
+if (!preg_match('/^[a-zA-Z]+$/', $log_type) || strlen($log_type) > 32) {
     USERERROR("The log type you gave looks funky!", 1);
 }
 

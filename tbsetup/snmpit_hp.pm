@@ -658,7 +658,7 @@ sub createVlan($$$) {
     my $RetVal = $self->hammer($closure, "$id: creation");
     if (!defined($RetVal)) { return 0; }
     print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-	    "$self->{NAME} ... ";
+	    "$self->{NAME} ...\n";
 
 
     # You'ld think you'ld be able to add IgmpSnoopEnable to the above as one
