@@ -664,27 +664,33 @@ sub MapNodes($$)
 		    }
 		    $node = $pnode;
 		}
-		
-		my $interface = Interface->LookupByIface($node,$iface);
-		if (!defined($interface)) {
-		    print STDERR "Could not map iface for $node,$iface\n";
-		    print STDERR "$manifest_string\n";
-		    return -1;
-		}
-		if (!defined($MAC)) {
-		    print STDERR "No mac (or vmac) for $node,$iface\n";
-		    print STDERR "$manifest_string\n";
-		    return -1;
-		}
-		if (! ($MAC =~ /^[\w]*$/)) {
-		    print STDERR "Bad mac '$MAC' for $node,$iface\n";
-		    print STDERR "$manifest_string\n";
-		    return -1;
-		}
-		if ($interface->Update({"mac" => "$MAC"})) {
-		    print STDERR "Could not update $node,$iface\n";
-		    print STDERR "$manifest_string\n";
-		    return -1;
+
+		#
+		# If the interface is the loopback, then we do not need
+		# to do this.
+		#
+		if ($iface ne "lo0" && $iface ne "loopback") {
+		    my $interface = Interface->LookupByIface($node,$iface);
+		    if (!defined($interface)) {
+			print STDERR "Could not map iface for $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
+		    if (!defined($MAC)) {
+			print STDERR "No mac (or vmac) for $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
+		    if (! ($MAC =~ /^[\w]*$/)) {
+			print STDERR "Bad mac '$MAC' for $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
+		    if ($interface->Update({"mac" => "$MAC"})) {
+			print STDERR "Could not update $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
 		}
 		if (defined($VMAC)) {
 		    my $vinterface =
