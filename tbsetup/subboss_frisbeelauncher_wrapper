@@ -1,0 +1,81 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use Getopt::Std;
+use POSIX 'setsid';	 # For &daemonize
+use POSIX ":sys_wait_h"; # For &WNOHANG
+use Sys::Syslog;
+use English;
+use Socket;
+use Errno qw(EADDRINUSE);
+
+sub Fatal($);
+
+#
+# This also kills a running frisbee.
+#
+sub usage()
+{
+    print "Usage: $0 [-d] [-k] <imageid>\n";
+    print "-k:	Kill running frisbee.\n";
+    print "-d:	Print debugging output.\n";
+    exit(1);
+}
+my $optlist  = "dk";
+my $debug    = 0;
+my $killmode = 0;
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Change to root
+$<=$>=0;
+
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
+}
+usage()
+    if (@ARGV < 5);
+
+# XXX HACK UGLY
+# quick and dirty hack to get around taint checking
+# This isn't really an issue anyway since we use the
+# list form of system() which doesn't run the command
+# via the shell (so no globbing or interpretation of
+# metacharacters is done).
+my ($subboss, $imageid, $path, $size, $mtime) = map { /(.*)/; $1 } @ARGV;
+my @command = ('ssh', $subboss);
+
+push @command, '-d' if ($debug);
+push @command, '-k' if ($killmode);
+push @command, ('/usr/testbed/sbin/subboss_frisbeelauncher', $imageid, $path, $size, $mtime);
+
+system(@command);
+if ($?) {
+	Fatal("Failed to launch frisbee on subboss $subboss");
+}
+
+sub Fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	  "    $msg\n");
+}

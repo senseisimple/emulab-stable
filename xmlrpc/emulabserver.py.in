@@ -4364,6 +4364,7 @@ class subboss:
         if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed imageid value!")
+
         
         verifyerror = self.verifystuff();
         if (verifyerror):
