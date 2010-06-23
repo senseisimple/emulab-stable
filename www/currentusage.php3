@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -291,3 +291,4 @@ else {
     echo "</div>\n";
     echo "</body></html>";
 }
+?>

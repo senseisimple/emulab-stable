@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -61,7 +61,7 @@ else {
     $body_str .= "Update last power time for:<br>";
     $body_str .= "<form action='powertime.php3' method=get><br><table>";
     $body_str .= "<tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr>";
-    foreach (split(",", $node_id) as $ni) {
+    foreach (preg_split(",", $node_id) as $ni) {
 	if (!TBvalid_node_id($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
