@@ -15,17 +15,19 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDOUT "Usage: pool_daemon [-d]\n" .
+    print STDOUT "Usage: pool_daemon [-d] [nsfile]\n" .
 	"Use the -d option to prevent daemonization\n";
     exit(-1);
 }
-my $optlist = "dne";
+my $optlist = "dne1";
 my $debug    = 0;
 my $impotent = 0;
 my $killme   = 0;
 my $nofree   = 1;
 my $gotlock  = 0;
 my $mailsent = 0;
+my $oneshot  = 0;
+my $nsfile;
 
 #
 # Configure variables
@@ -35,6 +37,7 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $BOSSNODE = "@BOSSNODE@";
 my $logfile  = "$TB/log/poollog";
 my $SWAPEXP  = "$TB/bin/swapexp";
+my $tmpfile  = "/tmp/pool-$$.nsfile";
 
 # Testbed Support library
 use lib "@prefix@/lib";
@@ -87,11 +90,11 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 0) {
-    usage();
-}
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"1"})) {
+    $oneshot = 1;
 }
 if (defined($options{"n"})) {
     $impotent = 1;
@@ -99,17 +102,23 @@ if (defined($options{"n"})) {
 if (defined($options{"e"})) {
     $nofree = 1;
 }
+usage()
+    if (@ARGV > 1);
+$nsfile = $ARGV[0]
+    if (@ARGV == 1);
+$oneshot = 1
+    if (defined($nsfile));
 
 if (!$impotent && CheckDaemonRunning("pool_daemon")) {
     fatal("Not starting another pool daemon!");
 }
 # Go to ground.
-if (! ($debug || $impotent)) {
+if (! ($oneshot || $debug || $impotent)) {
     if (TBBackGround($logfile)) {
 	exit(0);
     }
 }
-if (!$impotent && MarkDaemonRunning("pool_daemon")) {
+if (!($impotent || $oneshot) && MarkDaemonRunning("pool_daemon")) {
     fatal("Could not mark daemon as running!");
 }
 #
@@ -120,7 +129,7 @@ sub handler()
     ReOpenLog($logfile);
 }
 $SIG{HUP} = \&handler
-    if (!($debug || $impotent));
+    if (!($oneshot || $debug || $impotent));
 
 print "Pool Daemon starting... pid $$, at ".`date`;
 
@@ -226,6 +235,12 @@ while (!$killme) {
 	print "Skipping this loop cause the experiment is swapped\n";
 	goto loop;
     }
+    if (defined($nsfile)) {
+	print "Copying $nsfile to $tmpfile\n";
+	system("/bin/cp -f $nsfile $tmpfile") == 0
+	    or fatal("Could not copy nsfile");
+	goto skipns;
+    }
     
     my @nodelist = $experiment->NodeList();
     my %inuse    = ();
@@ -309,8 +324,6 @@ while (!$killme) {
     # Generate a new NS file. Be nice to not have to this, but not
     # having an NS file could confuse things for the web interface.
     #
-    my $tmpfile = "/tmp/pool-$$.nsfile";
-
     print "Generating a new NS file in $tmpfile\n";
     
     if (!open(NS, ">$tmpfile")) {
@@ -355,6 +368,7 @@ while (!$killme) {
     print NS "\$ns rtproto Static\n";
     print NS "\$ns run\n";
     close(NS);
+  skipns:
     chmod(0775, $tmpfile);
 
     last
@@ -405,6 +419,8 @@ while (!$killme) {
 	
 	$gotlock = 0;
     }
+    last
+	if ($oneshot);
     
     # Use a long period; we do not want the pool to change too fast.
     sleep(120);
@@ -458,7 +474,9 @@ sub fatal($)
 {
     my ($msg) = @_;
 
-    SENDMAIL($TBOPS, "Pool Daemon Died", $msg, $TBOPS);
+    SENDMAIL($TBOPS, "Pool Daemon Died", $msg, $TBOPS)
+	if (!($impotent || $oneshot));
+    
     $mailsent = 1;
     cleanup();
     die($msg);
@@ -481,13 +499,13 @@ sub cleanup()
     }
 
     MarkDaemonStopped("pool_daemon")
-	if (!$impotent);
+	if (!($impotent || $oneshot));
 }
 
 END {
     my $exitcode = $?;
 
-    if ($exitcode && !$mailsent) {
+    if ($exitcode && !($mailsent || $impotent || $oneshot)) {
 	SENDMAIL($TBOPS, "Pool Daemon Died",
 		 "Please look at $logfile", $TBOPS);
     }
