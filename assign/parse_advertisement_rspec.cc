@@ -89,19 +89,11 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     /*
      * Enable some of the features we'll be using: validation, namespaces, etc.
      */
-<<<<<<< HEAD
     domParser->setValidationScheme(XercesDOMParser::Val_Always);
     domParser->setDoNamespaces(true);
     domParser->setDoSchema(true);
     domParser->setValidationSchemaFullChecking(true);
-	    
-=======
-    parser->setValidationScheme(XercesDOMParser::Val_Always);
-    parser->setDoNamespaces(true);
-    parser->setDoSchema(true);
-    parser->setValidationSchemaFullChecking(true);
-    
->>>>>>> bf86d8b00ab32167f701e9c8e227a9b2a8534ac2
+
     /*
      * Just use a custom error handler - must admin it's not clear to me why
      * we are supposed to use a SAX error handler for this, but this is what
