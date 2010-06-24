@@ -21,7 +21,7 @@ PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
           genclrcredentials genallow_extcred
 
 ifeq ($(ISMAINSITE),1)
-PBIN_STUFF     += ch_daemon
+PSBIN_STUFF     += ch_daemon
 endif
 
 # These scripts installed setuid, with sudo. 
