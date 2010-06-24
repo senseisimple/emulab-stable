@@ -360,7 +360,7 @@ struct command {
         { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
         { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
         { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED, doeventkey},
+        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, doeventkey},
         { "fullconfig",   FULLCONFIG_NONE, F_ALLOCATED, dofullconfig},
         { "routelist",	  FULLCONFIG_PHYS, F_ALLOCATED, doroutelist},
         { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
@@ -3841,9 +3841,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	char		*disktype, *useacpi, *useasf, address[MYBUFSIZE];
+	char            server_address[MYBUFSIZE];
 	char		mbrvers[51];
 	char            *loadpart, *OS, *prepare;
 	int		disknum, nrows, zfill;
+	int             frisbee_pid;
 
 	/*
 	 * Get the address the node should contact to load its image
@@ -3911,6 +3913,46 @@ COMMAND_PROTOTYPE(doloadinfo)
 		OS = row[2];
 		prepare = row[8];
 
+		res2 = mydb_query("select load_address,frisbee_pid,IP from subboss_images as i "
+				 "left join subbosses as s on s.subboss_id = i.subboss_id "
+				 "left join interfaces as n on n.node_id =  s.subboss_id "
+				 "where s.node_id = '%s' and s.service = 'frisbee' and "
+				 "i.imageid = '%s' and i.load_address != '' and "
+				 "n.role='ctrl' and i.sync != 1", 3, reqp->nodeid, row[7]);
+
+		if (!res2) {
+			error("doloadinfo: %s: DB Error getting subboss info!\n",
+			       reqp->nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
+
+		frisbee_pid = 0;
+		address[0] = '\0';
+		server_address[0] = '\0';
+
+		if (mysql_num_rows(res2)) {
+			row2 = mysql_fetch_row(res2);
+
+			if (row2[0] && row2[0][0])
+				strcpy(address, row2[0]);
+
+			if (row2[1] && row2[1][0])
+				frisbee_pid = atoi(row2[1]);
+			
+			strcpy(server_address, row2[2]);
+		} else {
+			if (row[0] && row[0][0])
+				strcpy(address, row[0]);
+
+			if (row[3] && row[3][0])
+				frisbee_pid = atoi(row[3]);
+			
+			strcpy(server_address, BOSSNODE_IP);
+		}
+
+		mysql_free_result(res2);
+
 		/*
 		 * Remote nodes get a URL for the address.
 		 */
@@ -3925,24 +3967,25 @@ COMMAND_PROTOTYPE(doloadinfo)
 			OUTPUT(address, sizeof(address),
 			       "%s/spewimage.php?imageid=%s&access_key=%s",
 			       TBBASE, row[7], row[6]);
+			
+			server_address[0] = 0;
 		}
 		else {
 			/*
 			 * Simple text string.
 			 */
-			if (! row[0] || !row[0][0]) {
+			if (!address[0]) {
 				mysql_free_result(res);
 				return 0;
 			}
-			strcpy(address, row[0]);
 
 			/*
 			 * Sanity check
 			 */
-			if (!row[3] || !row[3][0]) {
+			if (!frisbee_pid) {
 				error("doloadinfo: %s: "
 				      "No pid associated with address %s\n",
-				      reqp->nodeid, row[0]);
+				      reqp->nodeid, address);
 				mysql_free_result(res);
 				return 1;
 			}
@@ -3950,6 +3993,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=%s PART=%s PARTOS=%s", address, loadpart, OS);
+		
+		if (server_address[0] && (vers >= 31)) {
+			bufp += OUTPUT(bufp, ebufp - bufp,
+			               " SERVER=%s", server_address);
+		}
 
 		/*
 		 * Remember zero-fill free space, mbr version fields, and access_key
@@ -5936,6 +5984,12 @@ COMMAND_PROTOTYPE(dofullconfig)
 				 * Silently drop commands that are not
 				 * allowed for remote non-ssl connections.
 				 */
+				continue;
+			}
+			/*
+			 * Silently drop all TPM-required commands right now.
+			 */
+			if ((command_array[i].flags & F_REQTPM)) {
 				continue;
 			}
 			OUTPUT(buf, sizeof(buf),

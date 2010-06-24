@@ -464,12 +464,11 @@ elsif (! $isadmin) {
 #
 UserError("Node Types: Must have at least one node type")
     if ($#mtypes_array < 0);
-my $typeclause = join(" or ", map("type='$_'", @mtypes_array));
 
 # Check validity of mtype_* args, since the keys are dynamically generated.
 my $node_types_selected = 0;
-my @mtype_keys = grep(/^mtype_/, keys(%newimageid_args));
-foreach $key (@mtype_keys) {
+my @mtype_keys = ();
+foreach $key (grep(/^mtype_/, keys(%newimageid_args))) {
     my $value = $newimageid_args{$key};
     print STDERR "mtype: '$key' -> '$value'\n"
 	if ($debug);
@@ -482,10 +481,13 @@ foreach $key (@mtype_keys) {
     }
     elsif ($value eq "1") {
 	$node_types_selected++;
+	push(@mtype_keys, $key);
     }
 }
 UserError("Node Types: Must select at least one node type")
     if ($node_types_selected == 0 && !$force);
+
+my $typeclause = join(" or ", map("type='$_'", @mtype_keys));
 
 #
 # Check sanity of node name and that user can create an image from it.

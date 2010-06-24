@@ -464,6 +464,17 @@ CREATE TABLE `emulab_indicies` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `emulab_locks`
+--
+
+DROP TABLE IF EXISTS `emulab_locks`;
+CREATE TABLE `emulab_locks` (
+  `name` varchar(64) NOT NULL default '',
+  `value` int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `emulab_pubs`
 --
 
@@ -1448,6 +1459,22 @@ CREATE TABLE `image_history` (
   KEY `stamp` (`stamp`),
   KEY `rsrcidx` (`rsrcidx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `subboss_images`
+--
+
+DROP TABLE IF EXISTS `subboss_images`;
+CREATE TABLE `subboss_images` (
+  `subboss_id` varchar(32) NOT NULL default '',
+  `imageid` int(8) unsigned NOT NULL default '0',
+  `load_address` text,
+  `frisbee_pid` int(11) default '0',
+  `load_busy` tinyint(4) NOT NULL default '0',
+  `sync` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`subboss_id`,`imageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
 
 --
 -- Table structure for table `images`

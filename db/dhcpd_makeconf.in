@@ -368,10 +368,10 @@ if ($install) {
 	if (kill('TERM', $dpid) == 0) {
 	    fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
 	}
-    }
 
-    for my $subboss (keys %subboss_dhcp_servers) {
-        RestartSubbossDhcp($subboss, $restart);
+        for my $subboss (keys %subboss_dhcp_servers) {
+            RestartSubbossDhcp($subboss, $restart);
+        }
     }
 
     TBScriptUnlock();

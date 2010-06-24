@@ -1310,6 +1310,9 @@ sub GenVirtNodes($)
 				$ref->{'exclusive'} = 0;
 			}
 		}
+		$ref->{'node_type'} = {"type_name"  => "pcvm",
+				       "type_slots" => 1};
+	    }
 	    else {
 # 			$ref->{'virtualization_type'} = 'raw';
 			$ref->{'exclusive'} = 1;
@@ -3442,7 +3445,9 @@ sub AddLinkToSolution($$$$$$$$)
     $self->solution_plinks()->{$vlink} =
 	[$linktag,$virtlan,$trivial,$direct,$member0,$member1];
     if (!$trivial) {
-	$self->printdb("  $vlink $nodeA$portA,$nodeB$portB" .
+	$self->printdb("  $vlink ".
+		       (defined($nodeA) ? "A:$nodeA:$portA " : "") .
+		       (defined($nodeB) ? "B:$nodeB:$portB " : "") .
 		       ($direct ? " (direct)" : "") . "\n");
     }
     else {
@@ -3543,11 +3548,11 @@ sub ReadTextSolution($$)
 	
 	if (!$trivial) {
 	    ($nodeportA,$switchportA) = getnodeport($rawA);
-	    print STDERR "*** Undefined nodeportA in $rawA\n"
-		if (!defined($nodeportA));
-	    # Convert back to node:iface format.
-	    $nodeportA =~ s/\//:/;
-	    ($nodeA,$portA) = split(":", $nodeportA);
+	    if (defined($nodeportA)) {
+		# Convert back to node:iface format.
+		$nodeportA =~ s/\//:/;
+		($nodeA,$portA) = split(":", $nodeportA);
+	    }
 
 	    #
 	    # A direct link between two nodes; $rawA holds both sides
@@ -3559,12 +3564,12 @@ sub ReadTextSolution($$)
 	    }
 	    else {
 		($nodeportB,$switchportB) = getnodeport($rawB);
-		print STDERR "*** Undefined nodeportB in $rawB\n"
-		    if (!defined($nodeportB));
 	    }
-	    # Convert back to node:iface format.
-	    $nodeportB =~ s/\//:/;
-	    ($nodeB,$portB) = split(":", $nodeportB);
+	    if (defined($nodeportB)) {
+		# Convert back to node:iface format.
+		$nodeportB =~ s/\//:/;
+		($nodeB,$portB) = split(":", $nodeportB);
+	    }
 	}
 	$self->AddLinkToSolution($vlink, $trivial, $direct,
 				 $nodeA, $portA, $nodeB, $portB);
@@ -3636,6 +3641,7 @@ sub ReadRspecSolution($$)
 
 	if (scalar(@ifacerefs) == 2) {
 	    my ($ifaceA,$ifaceB) = @ifacerefs;
+	    my $trivial = 0;
 
 	    my $virtA  = $ifaceA->{'virtual_interface_id'};
 	    my $virtB  = $ifaceB->{'virtual_interface_id'};
@@ -3645,10 +3651,15 @@ sub ReadRspecSolution($$)
 	    my $nodeB  = $self->solution()->{'V2P'}->{$vnodeB};
 	    my $portA  = $ifacemap{$vnodeA}->{$virtA};
 	    my $portB  = $ifacemap{$vnodeB}->{$virtB};
+	    my $vlink  = "linksimple/$virtual_id/$virtA,$virtB";
+
+	    if ($portA eq "loopback" || $portB eq "loopback") {
+		$nodeA = $nodeB = $portA = $portB = undef;
+		$trivial = 1;
+		$virtlan->_trivial_ok(1);
+	    }
 	    
-	    my $vlink = "linksimple/$virtual_id/$virtA,$virtB";
-	    
-	    $self->AddLinkToSolution($vlink, 0, 0,
+	    $self->AddLinkToSolution($vlink, $trivial, 0,
 				     $nodeA, $portA, $nodeB, $portB);
 	}
 	else {

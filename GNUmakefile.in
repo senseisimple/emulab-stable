@@ -219,13 +219,13 @@ endif
 	@$(MAKE) -C tmcd client-install
 
 subboss: client
+	@$(MAKE) -C os subboss
 	@$(MAKE) -C utils subboss
 
 subboss-install: subboss
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client-install
 endif
-	@$(MAKE) -C os client-install
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
@@ -233,9 +233,12 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C utils subboss-install
+	@$(MAKE) -C os subboss-install
 	@$(MAKE) -C db subboss-install
 	@$(MAKE) -C tmcd subboss-install
 	@$(MAKE) -C rc.d subboss-install
+	@$(MAKE) -C dhcpd subboss-install
+	@$(MAKE) -C tbsetup client-install
 	# Hack: this should probably be done by a subboss-install
 	# script, but there isn't a huge need for that yet
 	@rm -f $(INSTALL_RCDIR)/isc-dhcpd

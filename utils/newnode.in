@@ -427,14 +427,8 @@ NODE: foreach my $node_id (@node_ids) {
     # Add some vnodes
     #
     if (defined $nodenum && ($role eq "testnode")) {
-	my $vtype = $type;
-	if (!($vtype =~ s/pc/pcvm/)) {
-	    $vtype = "$vtype-vm";
-	}
 	DBQueryFatal("INSERT INTO node_auxtypes set node_id='$node_id', " .
 	    "type='pcvm', count=$virtnode_capacity");
-	DBQueryFatal("INSERT INTO node_auxtypes set node_id='$node_id', " .
-	    "type='$vtype', count=$virtnode_capacity");
     }
 
     while (my ($card, $aref) = each %interfaces) {

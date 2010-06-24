@@ -335,8 +335,13 @@ sub Create($$$$;$)
     # Insert the sshkey if we got one.
     if (defined($keys)) {
 	foreach my $keyref (@{ $keys }) {
-	    my $safe_key  = DBQuoteSpecial($keyref->{'key'});
-	    my $safe_type = DBQuoteSpecial($keyref->{'type'});
+	    my $key  = $keyref->{'key'};
+	    my $type = $keyref->{'type'};
+	    chomp($key);
+	    chomp($type);
+	    
+	    my $safe_key  = DBQuoteSpecial($key);
+	    my $safe_type = DBQuoteSpecial($type);
 	    
 	    DBQueryWarn("replace into geni_userkeys set ".
 			"  uuid=$safe_uuid, created=now(), ".
@@ -380,8 +385,13 @@ sub Modify($$$$)
 	    if (!DBQueryWarn("delete from geni_userkeys where uuid='$uuid'"));
 	
 	foreach my $keyref (@{ $keys }) {
-	    my $safe_key  = DBQuoteSpecial($keyref->{'key'});
-	    my $safe_type = DBQuoteSpecial($keyref->{'type'});
+	    my $key  = $keyref->{'key'};
+	    my $type = $keyref->{'type'};
+	    chomp($key);
+	    chomp($type);
+	    
+	    my $safe_key  = DBQuoteSpecial($key);
+	    my $safe_type = DBQuoteSpecial($type);
 	    
 	    DBQueryWarn("replace into geni_userkeys set ".
 			"  uuid='$uuid', created=now(), ".

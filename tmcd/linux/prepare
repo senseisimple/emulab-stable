@@ -29,6 +29,7 @@ my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 my $VARACCTDIR  = "/var/account";
 my $IFTAB       = "/etc/iftab";
+my $ANACRON     = "/usr/sbin/anacron";
 
 #
 # Dead wood in $BINDIR
@@ -68,6 +69,7 @@ if (getopts("N", \%options)) {
 	$noumount = 1;
     }
 }
+my $isvm = ((-e "$ETCDIR/genvmtype") ? 1 : 0);
 
 #
 # First clean up the node as it would be if free.
@@ -90,7 +92,7 @@ foreach my $dbfile (@DBFILES) {
 # This allows us to clean up /users and /proj.  We only do the cleanup if
 # if unmount succeeds and even then, we do it in a safe way.
 #
-if (!$noumount && -e "/share/freebsd") {
+if (!($noumount || $isvm) && -e "/share/freebsd") {
     print "Unmounting NFS filesystems ...\n";
     if (!system("umount -at nfs")) {
 	#
@@ -113,19 +115,22 @@ if (!$noumount && -e "/share/freebsd") {
 # to send mail will hang and eventually timeout.  This makes things take a
 # lot longer, so we hack and temporarily move sendmail while we run anacron!
 #
-if (-x "/usr/sbin/sendmail") {
-    my $didrename = 0;
-    print "Running cron jobs (might see failed attempts to mail output).\n";
-    if (rename("/usr/sbin/sendmail", "/usr/sbin/_sendmail")) {
-	$didrename = 1;
+if (-x "$ANACRON") {
+    if (-x "/usr/sbin/sendmail") {
+	my $didrename = 0;
+	print "Running cron jobs ".
+	    "(might see failed attempts to mail output).\n";
+	if (rename("/usr/sbin/sendmail", "/usr/sbin/_sendmail")) {
+	    $didrename = 1;
+	}
+	system("$ANACRON -d -f -s -n");
+	if ($didrename) {
+	    rename("/usr/sbin/_sendmail", "/usr/sbin/sendmail");
+	}
+    } else {
+	print "Running cron jobs.\n";
+	system("$ANACRON -d -f -s -n");
     }
-    system("anacron -d -f -s -n");
-    if ($didrename) {
-	rename("/usr/sbin/_sendmail", "/usr/sbin/sendmail");
-    }
-} else {
-    print "Running cron jobs.\n";
-    system("anacron -d -f -s -n");
 }
 
 #
