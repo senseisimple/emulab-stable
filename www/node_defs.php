@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2009 University of Utah and the Flux Group.
+# Copyright (c) 2006-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include_once("osinfo_defs.php");
@@ -1591,4 +1591,4 @@ function ShowFreeNodes($user, $group)
     $output .= "</table>";
     return $output;
 }
-
+?>

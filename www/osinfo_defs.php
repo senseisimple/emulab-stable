@@ -541,4 +541,4 @@ function SpitOSIDLink($osid)
 	echo "<a href='$url'>$osname</a>\n";
     }
 }
-
+?>

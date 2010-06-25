@@ -1580,5 +1580,4 @@ function ShowExperimentList_internal($templates_only,
     }
     return $html;
 }
-
-    
+?>
