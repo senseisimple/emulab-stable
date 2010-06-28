@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006-2008 University of Utah and the Flux Group.
+# Copyright (c) 2006-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -1269,4 +1269,4 @@ function TBGrpTrust($uid, $pid, $gid)
     }
     return $group->UserTrust($user);
 }
-
+?>

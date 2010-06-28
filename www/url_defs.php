@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007, 2008, 2009, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2006-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -745,5 +745,4 @@ function ValidateArgument($name, $arg)
     }
     return 0;
 }
-
-
+?>
