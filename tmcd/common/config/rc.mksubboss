@@ -50,6 +50,8 @@ sub fix_syslog_conf()
 	print SYSLOG_CONF "*.*\t\t\t\t\t\t/usr/testbed/log/dhcpd.log\n";
 	print SYSLOG_CONF "!tftpd\n";
 	print SYSLOG_CONF "*.*\t\t\t\t\t\t/usr/testbed/log/tftpd.log\n";
+	print SYSLOG_CONF "!frisbeed\n";
+	print SYSLOG_CONF "*.*\t\t\t\t\t\t/usr/testbed/log/frisbeed.log\n";
 	
 	close SYSLOG_CONF;
 }
