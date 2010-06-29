@@ -203,6 +203,7 @@ sub init($) {
     cd_merge();
     my $base = merge_base @branches;
     sys "git $cmd $base";
+    sys "git clean -f -d";
     sys "git commit -q --allow-empty -m Marker";
     sys "git tag -f merge-base";
 }
@@ -242,6 +243,7 @@ sub auto_reset() {
 	} else {
 	    print "Need to reset to $reset_point^\n"; 
 	    sys "git reset -q --hard $reset_point^";
+	    sys "git clean -f -d";
 	}
     }
 }
@@ -283,6 +285,7 @@ if ($op eq 'prep') {
     sys "git fetch -q origin";
     auto_reset() if $auto_reset;
     sys "git reset -q --hard";
+    sys "git clean -f -d";
     foreach (@branches) {
 	unlink ".git/MERGE_HEAD";
 	my $cmd = "git merge -q $_";
