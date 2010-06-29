@@ -28,7 +28,7 @@ sub sys (@) {
     if ($failed && $ops->{ok_exit_code}) {
 	$failed = 0 if $ret == $ops->{ok_exit_code};
     }
-    die "ERROR: @_ failed\n" if $failed;
+    die "ERROR: @_ failed\n" if $failed && !$ops->{ignore_errors};
     return $ret;
 }
 
@@ -251,12 +251,23 @@ sub auto_reset() {
 #
 my $op = shift @ARGV || '';
 if ($op eq 'prep') {
-    die "Merge tree must not exist\n" if -e $merge_tree;
-    sys "git clone -sn . $merge_tree";
-    cd_merge();
-    sys("git config rerere.enabled true");
+    if (-e $merge_tree) {
+	print "Fixing up existing merge tree...\n";
+	cd_merge();
+	sys "git checkout `git rev-parse HEAD`";
+	sys {ignore_errors=>1}, "git branch -D $merge_branch";
+    } else {
+	sys "git clone -sn . $merge_tree";
+	cd_merge();
+    }
+    sys "git config rerere.enabled true";
     init("checkout -q -b $merge_branch");
-    sys "ln -s $source_tree/.merge-build";
+    sys "ln -s $source_tree/.merge-build" unless -e "$merge_tree/.merge-build";
+    print "Writing .git/info/exclude\n";
+    open F, ">.git/info/exclude";
+    print F ".merged\n";
+    print F ".merge-build\n";
+    close F;
 } elsif ($op eq 'reset') {
     cd_merge();
     sys "git fetch -q origin";
