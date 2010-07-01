@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -35,12 +35,12 @@ function INITFORM($formfields, $projlist)
         # this is to have another page for netbuild that does some magic and
         # redirects the browser to this page. 
         #
-	if (isset($nsref) && $nsref != "" && ereg("^[0-9]+$", $nsref))
+	if (isset($nsref) && $nsref != "" && preg_match('/^[0-9]+$/', $nsref))
 	    $defaults["nsref"] = $nsref;
 	else
 	    unset($nsref);
 	
-	if (isset($guid) && $guid != "" &&  ereg("^[0-9]+$", $guid))
+	if (isset($guid) && $guid != "" && preg_match('/^[0-9]+$/', $guid))
 	    $defaults["guid"] = $guid;
 	else
 	    unset($guid);

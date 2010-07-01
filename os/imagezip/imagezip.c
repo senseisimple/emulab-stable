@@ -928,7 +928,7 @@ char *usagestr =
 void
 usage()
 {
-	fprintf(stderr, usagestr);
+	fprintf(stderr, "%s", usagestr);
 	exit(1);
 }
 

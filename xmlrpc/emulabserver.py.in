@@ -4291,7 +4291,7 @@ class subboss:
                                   output="Node is not reserved: " + res[0][0])
         
         # Must be a subboss.
-        if int(res[0][3]) != "subboss":
+        if res[0][1] != "subboss":
             return EmulabResponse(RESPONSE_FORBIDDEN,
                                   output="Not a subboss");
         
@@ -4364,6 +4364,7 @@ class subboss:
         if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed imageid value!")
+
         
         verifyerror = self.verifystuff();
         if (verifyerror):

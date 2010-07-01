@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,11 +9,12 @@ use Getopt::Std;
 use English;
 use Errno;
 use POSIX qw(setsid);
+use POSIX ":sys_wait_h";
 
 #
 # Prototypes
 #
-sub hackwaitandexit();
+sub hackwaitandexit($);
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
@@ -31,11 +32,12 @@ sub usage()
 	" -i creates a fake virtual node.\n".
 	"\n".
 	"Use -b when starting the virtual node at boot time.\n".
+	"Use -r when rebooting the virtual node.\n".
 	"Use -h when halting the virtual node.\n".
 	"Use -k when killing the virtual node (removes filesystems).\n";
     exit(1);
 }
-my $optlist	= "kbdjsVrhpti";
+my $optlist	= "kbdjsVrhptie";
 
 # Locals
 my $killit	= 0;
@@ -47,6 +49,7 @@ my $dojail	= 0;
 my $fakevnode   = 0;
 my $interactive = 0;
 my $usevcnetroutes = 0;
+my $useexisting = 0;
 my $doplab	= 0;
 my $cleaning	= 0;
 my $rebooting   = 0;
@@ -117,6 +120,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"k"})) {
     $killit = 1;
+}
+if (defined($options{"e"})) {
+    $useexisting = 1;
 }
 if (defined($options{"h"})) {
     $haltit = 1;
@@ -280,13 +286,13 @@ unlink($logname)
 # Okay, lets continue on so that ssh from Emulab exits right away.
 # It will figure out we are okay via the ISUP. 
 #
-if (!$debug && !$interactive && TBBackGround($logname)) {
+if (!$debug && !$interactive && (my $cpid = TBBackGround($logname))) {
     #
     # Parent exits normally, but we wait until we think the jail is
     # setup first. This whole approach is wildly hacky.
     #
     if ($dojail) {
-	hackwaitandexit();
+	hackwaitandexit($cpid);
     }
     exit(0);
 }
@@ -353,7 +359,7 @@ $SIG{USR2} = \&handler;
 #
 # Kill existing directory in case its still there.
 #
-if (!$fromboot && -e CONFDIR()) {
+if (!$fromboot && !$useexisting && -e CONFDIR()) {
     removeconfdir(CONFDIR());
 }
 if (! -e CONFDIR()) {
@@ -644,7 +650,7 @@ sub rebootvnode() {
 	return -1;
     }
 
-    hackwaitandexit();
+    hackwaitandexit(0);
     return 0;
 }
 
@@ -856,8 +862,9 @@ sub removeconfdir($)
 # indicates the vnode is running. If nothing after minute, assume the
 # vnode had a problem and exit accordingly. 
 # 
-sub hackwaitandexit()
+sub hackwaitandexit($)
 {
+    my $cpid  = shift();
     my $now   = time();
     my $goofy;
     my $count = 60;
@@ -882,6 +889,12 @@ sub hackwaitandexit()
 	    my ($mtime,$ctime) = (stat($goofy))[8,9];
 	    exit(0)
 		if ($mtime >= $now || $ctime >= $now);
+	}
+	if ($cpid) {
+	    my $kidpid = waitpid($cpid, &WNOHANG);
+	    if ($kidpid == $cpid) {
+		exit($? >> 8);
+	    }
 	}
     }
     exit(1);

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 #
@@ -658,7 +658,7 @@ sub createVlan($$$) {
     my $RetVal = $self->hammer($closure, "$id: creation");
     if (!defined($RetVal)) { return 0; }
     print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-	    "$self->{NAME} ... ";
+	    "$self->{NAME} ...\n";
 
 
     # You'ld think you'ld be able to add IgmpSnoopEnable to the above as one
@@ -1032,7 +1032,7 @@ sub removeSomePortsFromVlan($$@) {
     $self->debug("$id $vlan_number: @portlist\n",2);
 
     foreach my $portIndex (@portlist) {
-	next unless $porthash{$portIndex};
+	next unless exists($porthash{$portIndex});
 	if (@{@$vLists[1]}[$portIndex - 1]) {
 	    # otherwise, port is tagged, or dual; maybe should complain.
 

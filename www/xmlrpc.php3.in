@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # This is an included file. No headers or footers.
@@ -131,7 +131,7 @@ function XMLRPC($uid, $gid, $method, $arghash)
     $return_value = proc_close($process);
 
     if ($return_value || $output == "" ||
-	(($decoded = ParseResponse($output)) == NULL) || $decoded->{"code"}) {
+	(($decoded = ParseResponse($output)) == NULL) || $decoded{"code"}) {
 	TBERROR("XMLRPC backend failure!\n".
 		"$uid $gid $method returned $return_value\n".
 		"Arg Hash:\n" .
@@ -144,4 +144,4 @@ function XMLRPC($uid, $gid, $method, $arghash)
 #    TBERROR(print_r($decoded, true), 0);
     return $decoded{'value'};
 }
-
+?>

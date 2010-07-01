@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -64,9 +64,9 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     # Have to convert the date/time to RFC822 format
-    list($date, $hours) = split(' ', $timestamp);
-    list($year,$month,$day) = split('-',$date);
-    list($hour,$min,$sec) = split(':',$hours);
+    list($date, $hours) = preg_split('/ /', $timestamp);
+    list($year,$month,$day) = preg_split('/-/',$date);
+    list($hour,$min,$sec) = preg_split('/:/',$hours);
     $rfc822date = date("r",mktime($hour, $min, $sec, $month, $day, $year));
 
     if ($first) {

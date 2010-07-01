@@ -466,8 +466,7 @@ sub LightUpNodes($@)
 	    $reconfigs{$node_id} = $node;
 	    $action = "reconfiged";
 	}
-	print STDERR "$node_id will be $action\n"
-	    if ($self->debug());
+	print STDERR "$node_id will be $action\n";
     }
 
     # XXX Caller wants a list. 
@@ -896,7 +895,8 @@ sub AddNode($$)
 }
 
 #
-# Stub function to light up a set of nodes; does nothing.
+# Stub function to light up a set of nodes; calls the big version in the
+# parent.
 #
 sub LightUpNodes($@)
 {

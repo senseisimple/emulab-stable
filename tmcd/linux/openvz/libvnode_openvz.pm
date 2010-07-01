@@ -1122,7 +1122,7 @@ sub vz_vnodePreConfigControlNetwork {
     close(FD);
     open(FD,">$mybootdir/bossip") 
 	or die "vz_vnodePreConfigControlNetwork: could not open bossip for $vnode_id: $!";
-    print FD "$vnode_id\n";
+    print FD "$bossip\n";
     close(FD);
 
     #

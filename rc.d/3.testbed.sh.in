@@ -81,6 +81,11 @@ case "$1" in
 			@prefix@/sbin/protogeni/sa_daemon
 		fi
 
+		if [ -x @prefix@/sbin/protogeni/ch_daemon ]; then
+			echo -n " ch_daemon"
+			@prefix@/sbin/protogeni/ch_daemon
+		fi
+
 		if [ -x @prefix@/sbin/checknodes_daemon  ]; then
 			echo -n " checknodes_daemon"
 			@prefix@/sbin/checknodes_daemon
@@ -143,6 +148,9 @@ case "$1" in
 		fi
 		if [ -r /var/run/sa_daemon.pid ]; then
 			kill `cat /var/run/sa_daemon.pid`
+		fi
+		if [ -r /var/run/ch_daemon.pid ]; then
+			kill `cat /var/run/ch_daemon.pid`
 		fi
 		if [ -r /var/run/checknodes.pid ]; then
 			kill `cat /var/run/checknodes.pid`
