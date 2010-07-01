@@ -41,5 +41,25 @@
 		public var sliver:Sliver;
 
 		public var rspec:XML;
+		
+		public function hasVirtualNode(node:VirtualNode):Boolean
+		{
+			for each(var i:VirtualInterface in interfaces)
+			{
+				if(i.virtualNode == node)
+					return true;
+			}
+			return false;
+		}
+		
+		public function hasPhysicalNode(node:PhysicalNode):Boolean
+		{
+			for each(var i:VirtualInterface in interfaces)
+			{
+				if(i.virtualNode.physicalNode == node)
+					return true;
+			}
+			return false;
+		}
 	}
 }

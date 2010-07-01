@@ -58,15 +58,23 @@
 		
 		public function DiscoverResourcesUrl():String
 		{
-			if(Hrn == "wail.cm" || Hrn == "cmulab.cm" || Hrn == "ukgeni.cm")
-				return Url + "v2";
-			else
-				return Url;
+			return Url;
 		}
 		
 		public function VisitUrl():String
 		{
-			return Url.substr(0, Url.length-3);
+			return Url;
+		}
+		
+		public function getAvailableNodes():ArrayCollection
+		{
+			var availNodes:ArrayCollection = new ArrayCollection();
+			for each(var n:PhysicalNode in AllNodes)
+			{
+				if(n.available)
+					availNodes.addItem(n);
+			}
+			return availNodes;
 		}
 		
 		private static var NODE_PARSE : int = 0;
@@ -211,13 +219,8 @@
 				var n:PhysicalNode = new PhysicalNode(ng);
 				n.name = p.@component_name;
 				n.urn = p.@component_uuid;
-				n.available = p.available == "true";
-				n.exclusive = p.exclusive == "true";
 				n.managerString = p.@component_manager_uuid;
 				n.manager = this;
-				var parentName:String = p.subnode_of;
-				if(parentName.length > 0)
-					subnodeList.addItem({subNode:n, parentName:parentName});
 
 	        	for each(var ix:XML in p.children()) {
 	        		if(ix.localName() == "interface") {
@@ -231,7 +234,17 @@
 	        			t.slots = ix.@type_slots;
 	        			t.isStatic = ix.@static;
 	        			n.types.addItem(t);
-	        		}
+	        		} else if(ix.localName() == "available") {
+						var availString:String = ix.toString();
+						n.available = availString == "true";
+					} else if(ix.localName() == "exclusive") {
+						var exString:String = ix.toString();
+						n.exclusive = exString == "true";
+					} else if(ix.localName() == "subnode_of") {
+						var parentName:String = ix.toString();
+						if(parentName.length > 0)
+							subnodeList.addItem({subNode:n, parentName:parentName});
+					}
 	        	}
 				
 	        	n.rspec = p.copy();
@@ -311,6 +324,94 @@
 	        }
 	        myIndex += idx;
 	    }
+		
+		public function getGraphML():String {
+				var added:Dictionary = new Dictionary();
+				var randId:int = 0;
+				
+				// Start graph
+				var nodes:String = "";
+				var edges:String = "";
+				
+				var nodesToAdd:ArrayCollection = new ArrayCollection(AllNodes.toArray());
+				var nodeGroups:ArrayCollection = new ArrayCollection();
+				
+				// Add nodes and combine similar nodes together
+				for each(var currentNode:PhysicalNode in AllNodes) {
+					
+					// Give nodes any special qualities, otherwise see if they need to be grouped
+					if(currentNode.IsSwitch())
+						nodes += "<node id=\"" + Common.getDotString(currentNode.name) + "\" age=\"10\" name=\"" + currentNode.name + "\" image=\"assets/entrepriseNetwork/switch.swf\"/>";
+					else if(currentNode.subNodeOf != null)
+						nodes += "<node id=\"" + Common.getDotString(currentNode.name) + "\" age=\"10\" name=\"" + currentNode.name + "\" image=\"assets/entrepriseNetwork/printer.swf\"/>";
+					else if(currentNode.subNodes != null && currentNode.subNodes.length > 0)
+						nodes += "<node id=\"" + Common.getDotString(currentNode.name) + "\" age=\"10\" name=\"" + currentNode.name + "\" image=\"assets/entrepriseNetwork/pc.swf\"/>";
+					else {
+						
+						// Group simple nodes connected to same switches
+						var connectedSwitches:ArrayCollection = currentNode.ConnectedSwitches();
+						if(connectedSwitches.length > 0 && connectedSwitches.length == currentNode.GetNodes().length) {
+							// Go through all the groups already made
+							var addedNode:Boolean = false;
+							for each(var switchCombination:Object in nodeGroups) {
+								// See if all switches exist
+								if(connectedSwitches.length == switchCombination.switches.length) {
+									var found:Boolean = true;
+									for each(var connectedSwitch:Object in connectedSwitches) {
+										if(!switchCombination.switches.contains(connectedSwitch)) {
+											found = false;
+											break;
+										}
+									}
+									if(found) {
+										switchCombination.count++;
+										nodesToAdd.removeItemAt(nodesToAdd.getItemIndex(currentNode));
+										addedNode = true;
+										break;
+									}
+								}
+							}
+							if(!addedNode) {
+								var newGroup:Object = {switches: new ArrayCollection(connectedSwitches.toArray()), count: 1, name: Common.getDotString(currentNode.name), original: currentNode};
+								nodeGroups.addItem(newGroup);
+								nodesToAdd.removeItemAt(nodesToAdd.getItemIndex(currentNode));
+							}
+						}
+					}
+				}
+				// Remove any groups with just 1 node
+				for(var i:int = nodeGroups.length-1; i > -1; --i) {
+					if(nodeGroups[i].count == 1) {
+						nodesToAdd.addItem(nodeGroups[i].original);
+						nodeGroups.removeItemAt(i);
+					}
+				}
+				
+				for each(currentNode in nodesToAdd) {
+					// Add connections
+					for each(var connectedNode:PhysicalNode in currentNode.GetNodes()) {
+						if(added[connectedNode.urn] != null || !nodesToAdd.contains(connectedNode))
+							continue;
+						edges += "<edge id=\"e" + (randId++) + "\" source=\"" + Common.getDotString(currentNode.name)  + "\" target=\"" + Common.getDotString(connectedNode.name) + "\"/>"
+					}
+					if(currentNode.subNodes != null && currentNode.subNodes.length > 0) {
+						for each(var subNode:PhysicalNode in currentNode.subNodes) {
+							edges += "<edge id=\"e" + (randId++) + "\" source=\"" + Common.getDotString(currentNode.name)  + "\" target=\"" + Common.getDotString(subNode.name) + "\"/>"
+						}
+					}
+					added[currentNode.urn] = currentNode;
+				}
+				
+				// Build up node groups
+				for each(var nodeGroup:Object in nodeGroups) {
+					nodes += "<node id=\"" + Common.getDotString(nodeGroup.name) + "\" age=\"10\" name=\"" + nodeGroup.name + " (" + nodeGroup.count + ")\" image=\"assets/entrepriseNetwork/pccluster.swf\"/>";
+					for each(connectedNode in nodeGroup.switches) {
+						edges += "<edge id=\"e" + (randId++) + "\" source=\"" + Common.getDotString(connectedNode.name)  + "\" target=\"" + nodeGroup.name + "\"/>"
+					}
+				}
+				
+				return "<graphml>" + nodes + edges + "</graphml>";
+		}
 
 		public function getDotGraph():String {
 			var added:Dictionary = new Dictionary();

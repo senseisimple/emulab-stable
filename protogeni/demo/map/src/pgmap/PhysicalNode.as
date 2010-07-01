@@ -30,9 +30,6 @@
 		public var name:String;
 		
 		[Bindable]
-		public var uuid:String;
-		
-		[Bindable]
 		public var urn:String;
 		
 		[Bindable]

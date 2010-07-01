@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ResizeWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
+<DefaultWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
 	title="Console"
-	implements="LogRoot"
-	showCloseButton="true"
-	borderAlpha=".9" borderColor="#D2E1F0"
-	height="400" width="700"
-	close="PopUpManager.removePopUp(this)"
-	resizable="true">
+	implements="LogRoot">
 	
 	<mx:Style>
 		.failedStyle {
@@ -34,10 +29,12 @@
 	
 	<mx:Script>
 		<![CDATA[
+			import mx.collections.ArrayCollection;
 			import mx.controls.Button;
 			import mx.controls.HRule;
 			import mx.controls.Spacer;
 			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
 			import mx.managers.PopUpManager; 
 			
 			public var selectedIndex:int = 0;
@@ -63,8 +60,17 @@
 				}
 			}
 			
+			private function doScroll(event:FlexEvent): void
+			{
+				verticalScrollPosition=maxVerticalScrollPosition
+				validateNow();
+				removeEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
+			}
+
+			
 			private function addMessage(msg:LogMessage):void
 			{
+				addEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
 				if(msg.type == LogMessage.TYPE_START)
 				{
 					var split:Spacer = new Spacer();
@@ -134,4 +140,4 @@
 		<mx:ComboBox id="groupComboBox" dataProvider="{groupNames}" change="refreshView()"></mx:ComboBox>
 	</mx:ControlBar>
 	
-</ResizeWindow>
+</DefaultWindow>

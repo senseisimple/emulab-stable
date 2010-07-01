@@ -7,6 +7,7 @@
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.containers.HBox;
+			import mx.containers.TabNavigator;
 			import mx.containers.TitleWindow;
 			import mx.controls.Alert;
 			import mx.controls.Button;
@@ -42,15 +43,37 @@
 				Alert.show(cm.errorDescription);
 			}
 			
-			public function openDot():void
+			public function openGraph():void
 			{
-				var cw:ResizeWindow = new ResizeWindow();
+				var cw:DefaultWindow = new DefaultWindow();
 				PopUpManager.addPopUp(cw, main, false);
 	       		PopUpManager.centerPopUp(cw);
-				cw.title = "dot format from " + cm.Hrn;
+				cw.title = "Graph information for " + cm.Hrn;
+				var tabContainer:TabNavigator = new TabNavigator();
+				tabContainer.percentHeight = 100;
+				tabContainer.percentWidth = 100;
+				
+				// DOT graph
+				var dotTab:VBox = new VBox();
+				dotTab.label = "DOT graph";
 				var textd:TextArea = new TextArea();
+				textd.percentHeight = 100;
+				textd.percentWidth = 100;
 				textd.text = cm.getDotGraph();
-				cw.addChild(textd);
+				dotTab.addChild(textd);
+				tabContainer.addChild(dotTab);
+	
+				// GraphML
+				var graphmlTab:VBox = new VBox();
+				graphmlTab.label = "GraphML";
+				var textg:TextArea = new TextArea();
+				textg.percentHeight = 100;
+				textg.percentWidth = 100;
+				textg.text = cm.getGraphML();
+				graphmlTab.addChild(textg);
+				tabContainer.addChild(graphmlTab);
+
+				cw.addChild(tabContainer);
 			}
 			
 			public function viewConsole():void
@@ -78,8 +101,8 @@
 							toolTip="View Advertisement RSPEC" />
 						<pgmap:ImageButton id="dotButton"
 							source="@Embed('../images/chart_organisation.png')"
-							click="openDot()"
-							toolTip="View the DOT graph data" />
+							click="openGraph()"
+							toolTip="View the graph information" />
 						<pgmap:ImageButton id="messageButton"
 							source="@Embed('../images/flag_red.png')"
 							click="viewMessage()"

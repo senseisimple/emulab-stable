@@ -36,9 +36,6 @@
 		public var manager:ComponentManager;
 		
 		[Bindable]
-		public var uuid:String;
-		
-		[Bindable]
 		public var urn:String;
 		
 		[Bindable]

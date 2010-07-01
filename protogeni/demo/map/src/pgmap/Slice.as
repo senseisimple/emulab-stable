@@ -33,7 +33,9 @@
 	    public static var MIXED : String = "mixed";
 	    
 		public var uuid : String = null;
+		[Bindable]
 		public var hrn : String = null;
+		[Bindable]
 		public var urn : String = null;
 		public var creator : User = null;
 		public var credential : String = "";
@@ -54,6 +56,16 @@
 				}
 			}
 			return status;
+		}
+		
+		public function hasSliverFor(cm:ComponentManager):Boolean
+		{
+			for each(var s:Sliver in slivers)
+			{
+				if(s.componentManager == cm)
+					return true;
+			}
+			return false;
 		}
 		
 		public function ReadyIcon():Class {

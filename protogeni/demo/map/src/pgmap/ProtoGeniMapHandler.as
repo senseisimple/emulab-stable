@@ -97,10 +97,8 @@ package pgmap
 					        	
 					  geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
 					        function(event:GeocodingEvent):void {
-					        main.console.appendText("******************\n");
-					        main.console.appendText("Geocoding failed!\n");
-					        main.console.appendText(event.status + "\n"); // 500
-					        main.console.appendText(event.eventPhase + "\n"); //2
+								main.console.appendMessage(
+									new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
 					        });
 		
 					  geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
@@ -199,6 +197,14 @@ package pgmap
 	    public function addPhysicalLink(lg:PhysicalLinkGroup):void {
 	    	// Create the group to be drawn
 	    	var drawGroup:PhysicalLinkGroup = lg;
+			for each(var v:PhysicalLink in drawGroup.collection)
+			{
+				if(v.rspec.toXMLString().indexOf("ipv4") > -1)
+				{
+					main.console.appendText("Skipped");
+					return;
+				}
+			}
 	    	
 	    	if(drawGroup.collection.length > 0 && !main.userResourcesOnly) {
 	    		// Add line

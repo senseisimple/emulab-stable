@@ -62,7 +62,7 @@
 	</mx:Script>
 	<mx:HDividedBox width="100%" height="100%">
 		<mx:List width="25%" height="100%" id="listNodes"
-			dataProvider="{nodes}"
+			dataProvider="{nodes}" dragEnabled="true"
 			labelField="name" change="nodeInfo.load(event.target.selectedItem)"
 			iconFunction="assignAvailableIcon"></mx:List>
 		<PhysicalNodeAdvancedInformation height="100%" width="75%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="nodeInfo" />

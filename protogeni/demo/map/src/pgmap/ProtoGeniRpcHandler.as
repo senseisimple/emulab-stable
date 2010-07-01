@@ -177,13 +177,41 @@
 	      	main.pgHandler.CurrentUser.credential = String(response.value);
 	      	var cred:XML = new XML(response.value);
 	      	main.pgHandler.CurrentUser.urn = cred.credential.owner_urn;
-	        postCall();
+	        startSshLookup();
 	      }
 	      else
 	      {
 	        codeFailure();
 	      }
 	    }
+		
+		public function startSshLookup() : void
+		{
+			opName = "Acquiring SSH Keys";
+			main.setProgress(opName, Common.waitColor);
+			main.startWaiting();
+			op.reset(Geni.getKeys);
+			op.addField("credential",main.pgHandler.CurrentUser.credential);
+			op.call(completeSshLookup, failure);
+			addSend();
+		}
+		
+		public function completeSshLookup(code : Number, response : Object) : void
+		{
+			main.setProgress("Done", Common.successColor);
+			main.stopWaiting();
+			addResponse(code);
+			
+			if (code == GENIRESPONSE_SUCCESS)
+			{
+				main.pgHandler.CurrentUser.keys = response.value;
+				postCall();
+			}
+			else
+			{
+				codeFailure();
+			}
+		}
 	    
 	    public function startListComponents() : void
 	    {
@@ -776,5 +804,107 @@
 	      	
 			startResolveSliver();
 	    }
+		
+		// CREATE SLICE STUFF
+		public function startSlice(name:String) : void
+		{
+			currentSlice = new Slice();
+			currentSlice.hrn = name;
+			currentSlice.urn = Util.makeUrn(Geni.defaultAuthority, "slice", name);
+			currentSlice.creator = main.pgHandler.CurrentUser;
+			AfterCall = startSliceResolve;
+			startSshLookup();
+		}
+		
+		public function startSliceResolve() : void
+		{
+			opName = "Resolving slice";
+			main.setProgress(opName, Common.waitColor);
+			main.startWaiting();
+			op.reset(Geni.resolve);
+			op.addField("credential", main.pgHandler.CurrentUser.credential);
+			op.addField("hrn", currentSlice.hrn);
+			op.addField("type", "Slice");
+			//op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
+			op.call(completeSliceResolve, failure);
+			addSend();
+		}
+		
+		public function completeSliceResolve(code : Number, response : Object) : void
+		{
+			main.setProgress("Done", Common.successColor);
+			main.stopWaiting();
+			addResponse(code);
+			if (code == GENIRESPONSE_SUCCESS)
+			{
+				Alert.show("Slice '" + currentSlice.hrn + "' already exists");
+				main.setProgress("Done", Common.failColor);
+				main.stopWaiting();
+			}
+			else
+			{
+				startSliceDelete();
+			}
+		}
+		
+		public function startSliceDelete() : void
+		{
+			opName = "Deleting existing slice";
+			main.setProgress(opName, Common.waitColor);
+			main.startWaiting();
+			op.reset(Geni.remove);
+			op.addField("credential", main.pgHandler.CurrentUser.credential);
+			op.addField("hrn", currentSlice.urn);
+			op.addField("type", "Slice");
+			op.call(completeSliceDelete, failure);
+			addSend();
+		}
+		
+		public function completeSliceDelete(code : Number, response : Object) : void
+		{
+			main.setProgress("Done", Common.successColor);
+			main.stopWaiting();
+			addResponse(code);
+			if (code == GENIRESPONSE_SUCCESS || code == GENIRESPONSE_SEARCHFAILED)
+			{
+				startSliceCreate();
+			}
+			else
+			{
+				codeFailure();
+			}
+		}
+		
+		public function startSliceCreate() : void
+		{
+			opName = "Creating new slice";
+			main.setProgress(opName, Common.waitColor);
+			main.startWaiting();
+			op.reset(Geni.register);
+			op.addField("credential", main.pgHandler.CurrentUser.credential);
+			op.addField("hrn", currentSlice.urn);
+			op.addField("type", "Slice");
+			//      op.addField("userbindings", new Array(user.uuid));
+			op.call(completeSliceCreate, failure);
+			addSend();
+		}
+		
+		public function completeSliceCreate(code : Number, response : Object) : void
+		{
+			main.setProgress("Done", Common.successColor);
+			main.stopWaiting();
+			addResponse(code);
+			if (code == GENIRESPONSE_SUCCESS)
+			{
+				currentSlice.credential = String(response.value);
+				main.pgHandler.CurrentUser.slices.addItem(currentSlice)
+				Common.viewSlice(currentSlice);
+			}
+			else
+			{
+				codeFailure();
+				main.openConsole();
+			}
+		}
 	}
 }

@@ -30,6 +30,7 @@
 		public var email : String;
 		public var name : String;
 		public var credential : String;
+		public var keys : String;
 		public var urn : String;
 		
 		public var slices:ArrayCollection;

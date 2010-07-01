@@ -20,12 +20,12 @@
  package pgmap
 {
 	import flash.events.MouseEvent;
+	import flash.external.ExternalInterface;
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
 	import mx.core.Application;
 	import mx.managers.PopUpManager;
-	import flash.external.ExternalInterface;
 	
 	public class Common
 	{
@@ -40,6 +40,9 @@
 		public static var tunnelBorderColor:Object = 0xFF0000;
 		public static var nodeColor:Object = 0x092B9F;
 		public static var nodeBorderColor:Object = 0xD2E1F0;
+		
+		public static var windowHeight:int = 400;
+		public static var windowWidth:int = 700;
 		
 		// Embedded images used around the application
 		[Bindable]
@@ -150,6 +153,18 @@
 			var removeChars:int = phrase.length - size + 3;
 			var upTo:int = (phrase.length / 2) - (removeChars / 2);
 			return phrase.substring(0, upTo) + "..." +  phrase.substring(upTo + removeChars);
+		}
+		
+		// Gets a button for the slice
+		public static function getSliceButton(s:Slice):Button {
+			var sButton:Button = new Button();
+			sButton.label = s.hrn;
+			sButton.addEventListener(MouseEvent.CLICK,
+				function openSlice(event:MouseEvent):void {
+					viewSlice(s);
+				}
+			);
+			return sButton;
 		}
 		
 		// Gets a button for the component manager
@@ -282,6 +297,14 @@
 	       		PopUpManager.centerPopUp(ngWindow);
 	       		ngWindow.loadCollection(nc);
 			}
+		}
+		
+		// Opens a component manager in a window
+		public static function viewSlice(s:Slice):void {
+			var sWindow:SliceWindow = new SliceWindow();
+			PopUpManager.addPopUp(sWindow, Main(), false);
+			PopUpManager.centerPopUp(sWindow);
+			sWindow.loadSlice(s);
 		}
 		
 		public static  function getBrowserName():String
