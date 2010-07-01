@@ -4291,7 +4291,7 @@ class subboss:
                                   output="Node is not reserved: " + res[0][0])
         
         # Must be a subboss.
-        if int(res[0][3]) != "subboss":
+        if res[0][1] != "subboss":
             return EmulabResponse(RESPONSE_FORBIDDEN,
                                   output="Not a subboss");
         
@@ -4972,7 +4972,7 @@ class elabinelab:
             stuff += l
             pass
         
-        return EmulabResponse(RESPONSE_SUCCESS, value=stuff, output=output)
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
     #
     # Fire up a frisbeed for an image,
     # 

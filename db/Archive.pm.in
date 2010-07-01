@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2007 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Archive;
@@ -32,7 +32,7 @@ use overload ('""' => 'Stringify');
 my $TB		= "@prefix@";
 my $MAINSITE    = @TBMAINSITE@;
 my $ARCHSUPPORT = @ARCHIVESUPPORT@;
-my $USEARCHIVE  = ($MAINSITE || $ARCHSUPPORT);
+my $USEARCHIVE  = $ARCHSUPPORT;
 my %ALLOWEDPID  = ("testbed" => 1);
 # XXX
 my $ARCHIVEDIR  = "/usr/testbed/exparchive";
