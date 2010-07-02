@@ -1,0 +1,88 @@
+#!/bin/sh
+
+#
+# Find the Emulab control network interface.
+#
+# When called the first time (an invocation on any interface when
+# /var/emulab/boot/controlif does not exist) we run DHCP and find the
+# control network.
+#
+# On all invocations, we check the contents of that file against the
+# interface we were called with and return "cnet" if we are the control
+# net.  Otherwise we just return the physical interface name.
+#
+set -e
+export LANG=C
+iface="$1"
+
+. /etc/emulab/paths.sh
+
+#
+# We use /var/run to store the current idea of the cnet interface
+# because we want it to go away on reboot.
+#
+cnetfile="/var/run/cnet"
+
+cnetif=""
+if [ ! -f $cnetfile ]; then
+    cp /dev/null $cnetfile
+
+    #
+    # Find a list of candidate interfaces.
+    #
+    _iflist=""
+    for _if in `ifconfig -s -a | awk '{ print $1 }' | grep -v Iface`; do
+        case $_if in
+        eth*)
+	    _iflist="$_iflist $_if"
+	    ;;
+        *)
+            ;;
+        esac
+    done
+    echo "`date`: $iface: findcnet running dhclient on: $_iflist"
+
+    #
+    # If dhclient returns success, then it has configured the first interface
+    # and gone into background mode.  At that point we don't care about it any
+    # more and just kill it.  We also shutdown all the other interfaces (which
+    # dhclient will leave "up").
+    #
+    if [ -x /sbin/dhclient ] && /sbin/dhclient -q $_iflist ; then
+        killall dhclient
+	rm -f /var/run/dhclient.pid
+        echo "`date`: $iface: findcnet dhclient returned"
+
+        if [ -f $BOOTDIR/controlif ]; then
+	    cp $BOOTDIR/controlif $cnetfile
+	    cnetif=`cat $cnetfile`
+	    for _if in $_iflist; do
+	        if [ $_if != "lo" -a x$_if != x$cnetif ]
+	        then
+		    echo "`date`: taking $_if down"
+	            ifconfig $_if down
+	        fi
+	    done
+        fi
+    fi
+else
+    cnetif=`cat $cnetfile`
+fi >>$LOGDIR/dhclient.log 2>&1
+
+#
+# In case ifup/ifdown try to feed us anything
+#
+while read foo bar; do
+    echo "`date`: $iface: findcnet got \"$foo $bar\" from caller"
+done >>$LOGDIR/dhclient.log 2>&1
+
+if [ -z "$cnetif" ]; then
+    echo "`date`: $iface: findcnet got empty $cnetfile" >>$LOGDIR/dhclient.log
+fi
+echo "`date`: $iface: cnet is $cnetif" >>$LOGDIR/dhclient.log
+if [ "$cnetif" != "$iface" ]; then
+    echo $iface
+else
+    echo "cnet"
+fi
+exit 0

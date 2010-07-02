@@ -1,0 +1,67 @@
+
+This directory contains a utility that can use ASF (Alert Standards Format)
+over secure (insecure also supported) RMCP (Remote Management and Control
+Protocol) to send power control commands and queries to nodes with ASF-enabled
+NICs.  It does not provide full functionality of a "management console" (i.e.,
+does not listen for autonomous heartbeats/alerts from the managed node), but
+should still be useful for those wanting to do ASF control from Linux/UNIX.
+
+  * Requirements:
+      - motherboard/chipset support for ASF
+      - NIC support for ASF (including a utility that can enable ASF on your
+        NIC and customize the security settings for remote power control)
+      - Should compile fine under FreeBSD/Linux.  Haven't tested on other
+        unixes, but there shouldn't be (much of) a problem.  Will probably not
+	compile on cygwin/windows.
+
+Files:
+
+  * rmanage.c: A simple RMCP client that supports sending ASF commands over
+    RMCP (also secure RMCP if desired).  Note that power cycle/reset/off/on
+    commands are only supported over secure RMCP.  You can also extract
+    capabilities, supported protocols, and current state, in addition to
+    sending power control commands (the output of rmanage for these commands is
+    pretty straightforward).  The usage is pasted in below:
+
+      Usage: ./rmanage [-hHds] [-tmrkgu <arg>] -c <clientname> <command>
+
+        -h         Print this message
+        -d         Turn on debugging (more d's mean more debug info)
+        -s         Use secure RMCP
+        -H         Interpret keys as hex strings instead of char strings
+        -c host    The hostname of the managed client
+        -t timeout Timeout (in seconds) for individual RMCP messages
+                     (default: 3)
+        -m retries Retry N times for unacknowledged RMCP sends
+                     (default: 3)
+        -r role    Use this role (either 'operator' or 'administrator')
+        -k key     Use this key with the role specified by '-r'
+        -g key     Use this generation key
+        -u uid     Send the specified username
+      
+        command    This argument performs an operation on the managed
+                   client.  The available commands are:
+          ping        [Send an RMCP ping and display supported modes.]
+          capabilities        [Get and display RMCP capabilities.]
+          state       [Get and display current node power state.]
+          nop [Open a session if in secure mode; else nothing.]
+          reset       [Send a warm reset command.]
+
+  * rmcp.h: Contains the "API" functions for talking RMCP to a NIC.  This is a
+    pretty quick hack, but it attempts to use a context-based approach, kind of
+    like some of the Openssl libraries.  Kind of.  There's a bunch of very
+    simple high-level functions, but users can get into the guts if they want.
+    I don't recommend this; the code has not been tested beyond what is
+    necessary to get rmanage to work on Dell Optiplex 745s with Broadcom
+    gigabit NICs.  It's a decently complete implementation of RMCP/ASF at the
+    protocol level, anyway.
+
+  * rmcp.c: A quick 'n dirty implementation of RMCP/RSP/RAKP/ASF.  ASF is
+    pretty entangled with RMCP at the moment, but it wouldn't be hard to make
+    it nice and layered so that the library could support IPMI over RMCP, or
+    whatever...
+
+
+David Johnson
+<johnsond@cs.utah.edu>
+December 5, 2006

@@ -1,0 +1,471 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Create a new user from a XML description. 
+#
+sub usage()
+{
+    print("Usage: newuser -t <type> <xmlfile>\n");
+    exit(-1);
+}
+my $optlist = "dt:";
+my $debug   = 0;
+my $type    = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAPPROVAL  = "@TBAPPROVALEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBBASE      = "@TBBASE@";
+my $TBWWW       = "@TBWWW@";
+my $WIKISUPPORT = @WIKISUPPORT@;
+my $TBADMINGROUP= "@TBADMINGROUP@";
+my $checkpass   = "$TB/libexec/checkpass";
+my $addpubkey   = "$TB/sbin/addpubkey";
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($EUID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+# Protos
+sub fatal($);
+sub UserError($);
+sub escapeshellarg($);
+
+# Locals
+my $SAVEUID	= $UID;
+my $keyfile;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"t"})) {
+    $type = $options{"t"};
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $xmlfile  = shift(@ARGV);
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and there
+# is no current user context.
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    fatal("You must have admin privledges to create new users")
+	if (!TBAdmin());
+}
+else {
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+# This first set is required by all types of users
+#
+my %required = ("name"		=> "usr_name",
+		"email"		=> "usr_email",
+		"password"	=> undef);
+
+my %optional = ("login"		=> "uid",
+		"address2"	=> "usr_addr2",
+		"URL"		=> "usr_URL",
+		"shell"		=> "usr_shell",
+		"pubkey"        => undef);
+
+#
+# These are required for most users, but are optional for wiki-only users
+# 
+my %usually_required = ("address"	=> "usr_addr",
+ 		        "city"		=> "usr_city",
+ 		        "state"	        => "usr_state",
+		        "zip"		=> "usr_zip",
+		        "country"	=> "usr_country",
+		        "phone"	        => "usr_phone",
+		        "title"	        => "usr_title",
+		        "affiliation"	=> "usr_affil",
+		        "affiliation_abbreviation" => "usr_affil_abbrev");
+if ($type eq "wikionly") {
+    %optional = (%optional, %usually_required);
+} else {
+    %required = (%required, %usually_required);
+}
+
+($WIKISUPPORT ? \%required : \%optional)->{"wikiname"} = "wikiname";
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+
+#
+# Make sure all the required arguments were provided.
+#
+foreach my $key (keys(%required)) {
+    
+    fatal("Missing required attribute '$key'")
+	if (! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+
+#
+# We build up an array of arguments to pass to User->Create() as we check
+# the attributes.
+#
+my %newuser_args = ();
+
+foreach my $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+    if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+    }
+
+    if ($debug) {
+	print STDERR "User attribute: '$key' -> '$value'\n";
+    }
+
+    my $dbslot;
+
+    # Must be in the allowed lists above, with exceptions handled below
+    if (exists($required{$key})) {
+	$dbslot = $required{$key};
+	next
+	    if (!defined($dbslot));
+	fatal("Null value for required field $key")
+	    if (!defined($value));
+    }
+    elsif (exists($optional{$key})) {
+	$dbslot = $optional{$key};
+	next
+	    if (!defined($dbslot) || !defined($value));
+    }
+    else {
+	fatal("Invalid attribute in XML: '$key' -> '$value'\n");
+    }
+
+    # Now check that the value is legal.
+    if (! TBcheck_dbslot($value, "users", $dbslot,
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	UserError("Illegal data: $key - $value");
+    }
+
+    #
+    # Do a taint check to avoid warnings, since the values are abviously okay.
+    #
+    if ($value =~ /^(.*)$/) {
+	$value = $1;
+    }
+    $newuser_args{$dbslot} = $value;
+}
+
+#
+# Now do special checks.
+#
+
+#
+# If user selected his own uid, must be unique.
+#
+if (exists($newuser_args{'uid'})) {
+    UserError("User already exists; pick another login name!")
+	if (User->Lookup($newuser_args{'uid'}));
+    
+    UserError("Reserved user name; pick another login name!")
+	if (getpwnam($newuser_args{'uid'}));
+}
+
+#
+# User name must be at least two tokens.
+#
+my @foo = split(/\s+/, $newuser_args{'usr_name'});
+
+UserError("User name must be more then a single token!")
+    if (@foo < 2);
+
+#
+# Wikiname must be unique.
+#
+if ($WIKISUPPORT) {
+    UserError("Wikiname already in use; please pick another!")
+	if (User->LookupByWikiName($newuser_args{'wikiname'}));
+}
+
+#
+# And the email address has to be unique.
+#
+UserError("Email address already in use; please pick another!")
+    if ($newuser_args{'usr_email'} ne $TBOPS &&
+	User->LookupByEmail($newuser_args{'usr_email'}));
+
+#
+# Check the password.
+#
+my $pswd = $xmlparse->{'attribute'}->{'password'}->{'value'};
+
+# Admins can "star" the password entry.
+if (defined($this_user) && $this_user->IsAdmin() && $pswd eq "*") {
+    $newuser_args{'usr_pswd'} = "*";
+}
+else {
+    my $checkpass_args = escapeshellarg($pswd);
+    $checkpass_args   .= " " .
+	(exists($newuser_args{'uid'}) ? $newuser_args{'uid'} : "ignored");
+    $checkpass_args   .= escapeshellarg($newuser_args{'usr_name'} . ":" .
+					$newuser_args{'usr_email'});
+    
+    my $pwokay = `$checkpass $checkpass_args`;
+    if ($?) {
+	chomp($pwokay);
+    
+	if (! ($pwokay =~ /^ok$/)) {
+	    UserError("$pwokay");
+	}
+	fatal("Checkpass failed with $?");
+    }
+    $newuser_args{'usr_pswd'} = crypt($pswd, "\$1\$" . substr(time(), 0, 8));
+}
+
+#
+# Do a check on the pubkey if supplied. The safest thing to do is generate
+# a temporary file and pass that to addpubkey to check.
+#
+if (exists($xmlparse->{'attribute'}->{'pubkey'})) {
+    $keyfile = TBMakeTempFile("addpubkey");
+    fatal("Could not create tempfile")
+	if ($?);
+
+    open(KEY, ">> $keyfile") or
+	fatal("Could not open $keyfile");
+    print KEY $xmlparse->{'attribute'}->{'pubkey'}->{'value'};
+    close($keyfile);
+
+    my $result = `$addpubkey -n -f $keyfile`;
+    chomp($result);
+    UserError("Could not parse public key")
+	if ($?);
+}
+
+#
+# Now safe to create the user. Move the uid out of the argument array
+# since its actually an argument to the Create() routine.
+#
+my $new_uid;
+
+if (exists($newuser_args{'uid'})) {
+    $new_uid = $newuser_args{'uid'};
+    delete($newuser_args{'uid'});
+}
+
+#
+# The type modifier comes in on the command line since this is available
+# only from the web interface or locally. The usual case is to create a
+# normal user.
+#
+my $flags = 0;
+if ($type eq "webonly") {
+    $flags = $User::NEWUSER_FLAGS_WEBONLY;
+}
+elsif ($type eq "wikionly") {
+    $flags = $User::NEWUSER_FLAGS_WIKIONLY;
+}
+elsif ($type eq "leader") {
+    $flags = $User::NEWUSER_FLAGS_PROJLEADER;
+}
+my $newuser = User->Create($new_uid, $flags, \%newuser_args);
+if (!defined($newuser)) {
+    fatal("Could not create new user!");
+}
+my $key       = $newuser->verify_key();
+my $usr_uid   = $newuser->uid();
+my $usr_idx   = $newuser->uid_idx();
+my $usr_name  = $newuser->name();
+my $usr_email = $newuser->email();
+	    
+#
+# See if we are in an initial Emulab setup. If so, no email sent.
+#
+my $firstinitstate;
+if (TBGetSiteVar("general/firstinit/state", \$firstinitstate)) {
+    #
+    # The first user gets admin status and some extra groups, etc.
+    #
+    if ($firstinitstate eq "createproject") {
+	DBQueryFatal("update users set ".
+		     " admin=1,status='". $User::USERSTATUS_UNAPPROVED . "' " .
+		     "where uid_idx='$usr_idx'");
+
+	DBQueryFatal("insert into unixgroup_membership set ".
+		     "uid='$new_uid', uid_idx='$usr_idx', gid='wheel'");
+    
+	DBQueryFatal("insert into unixgroup_membership set ".
+		     "uid='$new_uid', uid_idx='$usr_idx', gid='$TBADMINGROUP'");
+	
+	# The web interface requires this line to be printed!
+	print "User $usr_uid/$usr_idx has been created\n";
+	exit(0);
+    }
+}
+
+#
+# Send the email notification.
+#
+SENDMAIL("$usr_name '$usr_uid' <$usr_email>",
+	 "Your New User Key",
+	 "\n".
+	 "Dear $usr_name ($usr_uid):\n\n".
+	 "This is your account verification key: $key\n\n".
+	 "Please use this link to verify your user account:\n".
+	 "\n".
+	 "    ${TBBASE}/login.php3?vuid=$usr_uid&key=$key\n".
+	 "\n".
+	 ($type eq "wikionly" ?
+	  "Once you have verified your account, you will be able to access\n".
+	  "the Wiki. You MUST verify your account first!"
+	  :
+	  ($type eq "webonly" ?
+	   "Once you have verified your account, Testbed Operations will be\n".
+	   "able to approve you. You MUST verify your account first!"
+	   :
+	   ($type eq "leader" ?
+	  "You will then be verified as a user. When you have been both\n".
+	  "verified and approved by Testbed Operations, you will be marked\n".
+	  "as an active user and granted full access to your account.\n".
+	  "You MUST verify your account before your project can be approved!\n"
+	    :
+	    "Once you have verified your account, the project leader will\n".
+	    "be able to approve you.\n\n".
+	    "You MUST verify your account before the project leader can ".
+	    "approve you\n".
+	    "After project approval, you will be marked as an active user,\n".
+	    "and will be granted full access to your user account."))) .
+	 "\n\n".
+	 "Thanks,\n".
+	 "Testbed Operations\n",
+	 "$TBAPPROVAL",
+	 "Bcc: $TBAUDIT");
+
+#
+# Do we have a keyfile? If so, rerun addpubkey for real now that the
+# user is created and email is sent.
+#
+if (defined($keyfile)) {
+    # Set the implied user for addpubkey.
+    $ENV{'HTTP_INVOKING_USER'} = $usr_idx;
+    my $result   = `$addpubkey -u $usr_uid -f $keyfile`;
+    chomp($result);
+    fatal("Could not parse public key: $result")
+	if ($?);
+    unlink($keyfile)
+	if (! $debug);
+    
+}
+
+# The web interface requires this line to be printed!
+print "User $usr_uid/$usr_idx has been created\n";
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    unlink($keyfile)
+	if (defined($keyfile) && !$debug);
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+sub UserError($) {
+    my($mesg) = $_[0];
+
+    unlink($keyfile)
+	if (defined($keyfile) && !$debug);
+
+    print $mesg;
+    exit(1);
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^[:alnum:]]/\\$&/g;
+    return $str;
+}
+	   
+
+	       

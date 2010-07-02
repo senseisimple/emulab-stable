@@ -1,11 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -14,30 +14,21 @@ include("showstuff.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid nodeid.
+# Verify page arguments.
 #
-if (isset($node_id) && strcmp($node_id, "")) {
-    if (! TBvalid_node_id($node_id)) {
-	PAGEARGERROR("Illegal characters in node_id!");
-    }
-    
-    if (! TBValidNodeName($node_id)) {
-	USERERROR("$node_id is not a valid node name!", 1);
-    }
+$reqargs = RequiredPageArguments("node",      PAGEARG_NODE);
+$optargs = OptionalPageArguments("linecount", PAGEARG_INTEGER);
+$node_id = $node->node_id();
 
-    if (!$isadmin &&
-	!TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_READINFO)) {
-        USERERROR("You do not have permission to view the console log ".
-		  "for $node_id!", 1);
-    }
-}
-else {
-    PAGEARGERROR("Must specify a node ID!");
+if (!$isadmin &&
+    !$node->AccessCheck($this_user, $TB_NODEACCESS_READINFO)) {
+    USERERROR("You do not have permission to view the console log ".
+	      "for $node_id!", 1);
 }
 
 #

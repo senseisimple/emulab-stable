@@ -1,0 +1,520 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libplabnodehist;
+
+#
+# This library provides functions for interpreting the plab_nodehist table.
+#
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw (getNodeHistSequences rankNodesByUnavail sequenceToStr);
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use English;
+use POSIX qw(strftime);
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+my $debug = 0;
+
+#
+# Returns up/down sequences derived from the plab_nodehist table.
+# Args:
+#   $1 = plab physnode id
+#   $2 = N, where you want only the sequences derived from the last N seconds
+#        of history
+# Returns:
+#   A hash of phys_node_id->{'up'|'down'}->array of sequences.
+#
+# A 'sequence' is an array with the following elements:
+#  [ starttime, duration, members ]
+# where 
+#  starttime is seconds past Epoch; duration is seconds; 
+#  members is the number of consecutive 'success's or 'failure's in 
+#    the sequence.
+#
+sub getNodeHistSequences($;$$) {
+    my $plcname = shift;
+    my $fpnode = shift;
+    my $fstime = shift;
+
+    my ($cpnode,$cstatus,$cstarttime,$cendtime,$cmembers) = ('','',0,0,0);
+    my ($totalseqs,$totalnodes) = (0,0);
+
+    my %r = ();
+
+    my $now = time();
+
+    # save off "now" for other functions...
+    $r{'__NOW__'} = $now;
+
+    # Note: the "parsing" requires that the statuses be ordered by 
+    # physnodeid, then time.  You know, push as much work to the db as 
+    # possible.
+    my $filter = "";
+    if (defined($fpnode) && $fpnode ne '') {
+	$filter .= " and phys_node_id='$fpnode'";
+    }
+    if (defined($fstime)) {
+	$filter .= " and timestamp > '" . \
+	    strftime("%Y-%m-%d %H:%M:%S",
+		     localtime(time() - $fstime)) . "'";
+    }
+
+    my $q = "select pnh.phys_node_id,unix_timestamp(pnh.timestamp)," . 
+	    "  pnh.status" . 
+	    " from plab_nodehist as pnh" . 
+	    " left join plab_mapping as pm on pnh.phys_node_id=pm.node_id" . 
+	    " left join plab_plc_info as ppi on pm.plc_idx=ppi.plc_idx" . 
+	    " where component='node' and operation='create'" . 
+	    "   and ppi.plc_name='$plcname'" . 
+	    " $filter" . 
+	    " order by phys_node_id,timestamp";
+
+    if ($debug) {
+	print "query = \"$q\"\n";
+    }
+
+    my $res = DBQueryFatal($q);
+
+    if ($debug) {
+	print "getSequences: beginning construction at " . 
+	    (strftime("%Y-%m-%d %H:%M:%S",localtime())) . ".\n";
+    }
+
+    #my $i = 0;
+    my @row;
+    while (@row = $res->fetchrow_array()) {
+	#++$i;
+	# save off any current sequence in the previous pnode/status
+	if (($row[0] ne $cpnode && $cpnode ne '') 
+	    || ($row[2] ne $cstatus && $cstatus ne '')) {
+	    # if this is a new failure/success sequence within the same pnode,
+	    # set the endtime to the starttime of the new sequence.
+	    if ($cpnode eq $row[0] && $cstatus ne $row[2] && $cstatus ne '') {
+		#print "DEBUG: used endtime $row[1]\n";
+		$cendtime = $row[1];
+	    }
+	    # otherwise, just use the current time, cause this is a new set
+	    # of data for another pnode.
+	    else {
+		#print "DEBUG: using default endtime $now\n";
+		$cendtime = $now;
+	    }
+	    my $nseq = [ $cstarttime, ($cendtime - $cstarttime), $cmembers ];
+	    ++$totalseqs;
+	    push @{$r{$cpnode}{$cstatus}}, $nseq;
+	    $r{$cpnode}{'lastseq'} = [ $cstatus, $nseq ];
+	    ($cstatus,$cstarttime,$cendtime,$cmembers) = ('',-1,-1,0);
+	}
+	if ($row[0] ne $cpnode) {
+	    # new pnode
+	    ++$totalnodes;
+	    $cpnode = $row[0];
+	    $r{$cpnode}{'success'} = [];
+	    $r{$cpnode}{'failure'} = [];
+	    $r{$cpnode}{'lastseq'} = [];
+	    #print "DEBUG: new pnode $cpnode\n";
+	}
+	if ($row[2] ne $cstatus) {
+	    # start new sequence within this pnode.
+	    #print "DEBUG: new sequence at row $i\n";
+	    $cstatus = $row[2];
+	    $cstarttime = $row[1];
+	    ++$cmembers;
+	}
+	else {
+	    #print "DEBUG: ${cmembers}th member at row $i\n";
+	    ++$cmembers;
+	}
+    }
+    # add the final sequence not caught in the loop...
+    if ($cpnode ne '' && $cstatus ne '') {
+	if ($cpnode eq $row[0] && $cstatus ne $row[2] && $cstatus ne '') {
+	    #print "DEBUG: used endtime $row[1]\n";
+	    $cendtime = $row[1];
+	}
+	# otherwise, just use the current time, cause this is a new set
+	# of data for another pnode.
+	else {
+	    #print "DEBUG: using default endtime $now\n";
+	    $cendtime = $now;
+	}
+	my $nseq = [ $cstarttime, ($cendtime - $cstarttime), $cmembers ];
+	++$totalseqs;
+	push @{$r{$cpnode}{$cstatus}}, $nseq;
+	$r{$cpnode}{'lastseq'} = [ $cstatus, $nseq ];
+    }
+
+    if ($debug) {
+	print "getSequences: finished construction at " . 
+	    (strftime("%Y-%m-%d %H:%M:%S",localtime())) . ".\n";
+	
+	print "getSequences: added $totalseqs sequences for $totalnodes nodes.\n";
+    }
+
+    return \%r;
+}
+
+my $EWMA_ALPHA = 0.10;
+
+my $MINUTE = 60;
+my $HOUR = $MINUTE * 60;
+my $DAY = $HOUR * 24;
+
+my $BIN_SECONDS = $DAY;
+
+# In order for us to consider that there has been jitter, the avg success
+# and failure sequence lengths must be shorter than this value.
+my $JITTER_DETECTION_TIME = 1 * $HOUR;
+my $JITTER_DEDUCTION_CAP = 0.25;
+# this number is multiplied by the number of failures and successes
+# to compute a deduction to the node rank.  So, if there were 10 failure 
+# and 8 success sequences for one node in a day, we'd subtract .18 from 
+# the final node rank (which is essentially uptime).
+my $JITTER_DEDUCTION_FACTOR = 0.015;
+
+#
+# This function returns a list of hashes, each of which currently has the 
+# 'nodeid' and 'rank' keys; the list is sorted in 
+# increasing order of unavailability (so that the most avail are first).
+#
+# Arguments:
+#   $0 = name of plc.
+#   $1 = a ref to a hash returned by getNodeHistSequences; if undef, this 
+#        function will call getNodeHistSequences.
+#   $2 = boolean; if !0, will increase unavailability rank for a node if it is 
+#        jittery (i.e., often down for brief periods of time).
+#   $3 = boolean; if !0, the function will compute rank based on a simple EWMA
+#        of the data; each successively prior day's unavailability gets a 
+#        decreasing weight.  Could be useful; easy to do.
+#
+sub rankNodesByUnavail($;$$$) {
+    my $plcname = shift;
+    my ($sref,$dojitter,$doewma) = @_;
+
+    if (!defined($plcname)) {
+	return undef;
+    }
+
+    if (!defined($sref)) {
+	$sref = getNodeHistSequences($plcname);
+    }
+    if (!defined($dojitter)) {
+	$dojitter = 0;
+    }
+    if (!defined($doewma)) {
+	$doewma = 0;
+    }
+
+    my %fnstats = ();
+
+    my %nstats = ();
+    my $now = $sref->{'__NOW__'};
+    my @states = ('failure','success');
+
+    foreach my $nodeid (keys(%$sref)) {
+	if ($nodeid =~ /^__/) {
+	    next;
+	}
+	#
+	# Bin the data into N-hour chunks (default is $BIN_SECONDS).  If a 
+	# sequence crosses a day boundary, we count the flip into it on the 
+	# previous day, and add the relevant time to each side of the day
+	# boundary.  Of course, if not using ewma, we don't care about
+	# this kind of split.
+	#
+	my %nstats = ();
+
+	# keep track of the oldest bin we accumulate if doing ewma
+	$nstats{'__MAXBIN__'} = 0;
+	# need to track separately the total length of all failure/success
+	# sequences, and the number of each, so that we can calculate jitter.
+	# Why?  Because jitter is not a bin-able value.
+	$nstats{'totseqnum_failure'} = 0;
+	$nstats{'totseqlen_failure'} = 0;
+	$nstats{'totseqnum_success'} = 0;
+	$nstats{'totseqlen_success'} = 0;
+	$nstats{'jitseqnum_failure'} = 0;
+	$nstats{'jitseqnum_success'} = 0;
+	
+	my $start_slot = 0;
+	my $stop_slot = 0;
+	foreach my $s (@states) {
+	    foreach my $seqr (@{$sref->{$nodeid}{$s}}) {
+		if ($debug) {
+		    print STDERR "" . sequenceToStr($seqr) . "\n";
+		}
+		my @seq = @$seqr;
+		if ($doewma) {
+		    $start_slot = int(($now - $seq[0]) / $BIN_SECONDS);
+		    $stop_slot = int(($now - ($seq[0] + $seq[1])) 
+				     / $BIN_SECONDS);
+
+		    if ($debug) {
+			print STDERR "start_slot=$start_slot; " . 
+			    "stop_slot=$stop_slot\n";
+		    }
+
+		    if ($start_slot > $nstats{'__MAXBIN__'}) {
+			$nstats{'__MAXBIN__'} = $start_slot;
+		    }
+		    
+		    if ($debug) {
+			print STDERR "maxbin=" . $nstats{'__MAXBIN__'} . "\n";
+		    }
+
+		    if ($start_slot == $stop_slot) {
+			if (!defined($nstats{"seqlen_$s"}[$start_slot])) {
+			    $nstats{"seqlen_$s"}[$start_slot] = 0;
+			}
+			$nstats{"seqlen_$s"}[$start_slot] += $seq[1];
+		    }
+		    else {
+			# have to fill in all bins between start/stop; 
+			# they may not be adjacent
+			my $i;
+			for ($i = $stop_slot; $i <= $start_slot; ++$i) {
+			    if (!defined($nstats{"seqlen_$s"}[$i])) {
+				$nstats{"seqlen_$s"}[$i] = 0;
+			    }
+			}
+
+			for ($i = $stop_slot; $i <= $start_slot; ++$i) {
+			    my $curslotend = $now - ($i + 1) * $BIN_SECONDS;
+			    # if the end of the current slot is prior to
+			    # the start of the sequence, only add in the 
+			    # binsize minus the diff between the end of the 
+			    # slot and the start of the sequence
+			    if ($curslotend < $seq[0]) {
+				$nstats{"seqlen_$s"}[$i] += $BIN_SECONDS - 
+				    ($seq[0] - $curslotend);
+			    }
+			    else {
+				$nstats{"seqlen_$s"}[$i] += $BIN_SECONDS;
+			    }
+			}
+
+			#my $start_slot_time = (($seq[1] + $seq[0]) - 
+			#		       ($stop_slot * $BIN_SECONDS)) -
+			#			   $seq[0];
+			#my $stop_slot_time = $seq[1] - $start_slot_time;
+
+			#$nstats{"seqlen_$s"}[$start_slot] += 
+			#    $start_slot_time;
+			#$nstats{"seqlen_$s"}[$stop_slot] +=
+			#    $stop_slot_time;
+		    }
+
+		    if (!defined($nstats{"seqnum_$s"}[$stop_slot])) {
+			$nstats{"seqnum_$s"}[$stop_slot] = 0;
+		    }
+		    ++($nstats{"seqnum_$s"}[$stop_slot]);
+		}
+		else {
+		    if (!defined($nstats{"seqnum_$s"}[0])) {
+                        $nstats{"seqnum_$s"}[0] = 0;
+		    }
+		    ++($nstats{"seqnum_$s"}[0]);
+
+		    if (!defined($nstats{"seqlen_$s"}[0])) {
+                        $nstats{"seqlen_$s"}[0] = 0;
+		    }
+		    $nstats{"seqlen_$s"}[0] += $seq[1];
+		}
+
+		# accumulate stuff for jitter...
+		++($nstats{"totseqnum_$s"});
+		$nstats{"totseqlen_$s"} += $seq[1];
+
+		if ($seq[1] < $JITTER_DETECTION_TIME) {
+		    ++($nstats{"jitseqnum_$s"});
+		}
+	    }
+	}
+
+	#
+	# Now need to compute the average duration of each success/failure
+	# sequence so we can get an idea of the jitter.  It's hard to bin 
+	# (as noted above) since we can't "split" a jittery sequence across
+	# bins.  So, we are going to deduct a bit from the rank depending on
+	# how how short the success/failure sequence average lengths are.
+	# Probably "really short" means 5 mins; if the success/failure seqs
+	# are on average less than 4-8 hrs, we should probably deduct some
+	# jitter points.
+	#
+	if ($nstats{'totseqnum_failure'} > 0) {
+	    $nstats{'avgseqlen_failure'} = $nstats{'totseqlen_failure'} /
+		$nstats{'totseqnum_failure'};
+	}
+	else {
+	    $nstats{'avgseqlen_failure'} = 0;
+	}
+	$nstats{'failures_per_bin'} = $nstats{'totseqnum_failure'} / 
+	    $BIN_SECONDS;
+	if ($nstats{'totseqnum_success'} > 0) {
+	    $nstats{'avgseqlen_success'} = $nstats{'totseqlen_success'} /
+		$nstats{'totseqnum_success'};
+	}
+	else {
+	    $nstats{'avgseqlen_success'} = 0;
+	}
+	$nstats{'successes_per_bin'} = $nstats{'totseqnum_success'} / 
+	    $BIN_SECONDS;
+
+	if ($debug) {
+	    print STDERR 
+		"$nodeid: #failseq=" . $nstats{'totseqnum_failure'} . 
+		",failseqtotlen=" . $nstats{'totseqlen_failure'} . 
+		",#succseq=" . $nstats{'totseqnum_success'} . 
+		",succseqtotlen=" . $nstats{'totseqlen_success'} . 
+		"\n";
+	    print STDERR 
+		"$nodeid: failseqavglen=" . $nstats{'avgseqlen_failure'} . 
+		"succseqavglen=" . $nstats{'avgseqlen_success'} . "\n";
+	    print STDERR
+		"$nodeid: failjitseqnum=" . $nstats{'jitseqnum_failure'} . 
+		    ",succjitseqnum=" . $nstats{'jitseqnum_success'} . "\n";
+	}
+
+	# we defined a "jitter threshold" in terms of (failures|successes)/day
+	# above.  We cap the deduction at JITTER_DEDUCTION_CAP total, because
+	# we don't want to penalize nodes THAT much.
+	my $jitter_deduction = 0;
+	if ($dojitter) {
+#	    if ($nstats{'avgseqlen_failure'} < $JITTER_DETECTION_AVGTIME
+#		&& $nstats{'avgseqlen_success'} < $JITTER_DETECTION_AVGTIME) {
+#		$jitter_deduction += $nstats{'totseqnum_failure'} * 
+#		    $JITTER_DEDUCTION_FACTOR;
+#		$jitter_deduction += $nstats{'totseqnum_success'} * 
+#		    $JITTER_DEDUCTION_FACTOR;
+#	    }
+
+	    $jitter_deduction += $nstats{'jitseqnum_failure'} * 
+		$JITTER_DEDUCTION_FACTOR;
+	    $jitter_deduction += $nstats{'jitseqnum_success'} * 
+		$JITTER_DEDUCTION_FACTOR;
+
+	    if ($jitter_deduction > $JITTER_DEDUCTION_CAP) {
+		if ($debug) {
+		    print STDERR "$nodeid: jitter deduction = $jitter_deduction;" . 
+			" reducing to $JITTER_DEDUCTION_CAP\n";
+		}
+		$jitter_deduction = $JITTER_DEDUCTION_CAP;
+	    }
+	    elsif ($debug) {
+		print STDERR "$nodeid: jitter deduction = $jitter_deduction\n";
+	    }
+	}
+
+	#
+	# After that, we need to handle the bins.  This is easy; foreach bin,
+	# exponentially weight its unavail (i.e., failure sequence) time
+	# as a fraction of the total time in that particular bin (and must be
+	# careful, since the oldest bin might not be BIN_SECONDS long, but only
+	# part).  Then, sum the unavail times and divide by the sum of the
+	# weights (or similar).
+	#
+	my $unavail = 0;
+	if ($doewma) {
+	    my $weight = 0.0;
+	    my $i;
+	    my $currentsum = 0;
+	    for ($i = 0; $i < ($nstats{'__MAXBIN__'} + 1); ++$i) {
+		if ($debug) {
+		    print STDERR "f bin $i =" . $nstats{"seqlen_failure"}[$i] .
+			"; s bin $i = " . $nstats{"seqlen_success"}[$i] . "\n";
+		}
+
+		my $factor = (1 - $EWMA_ALPHA) ** $i;
+		my $denom = 0;
+		if (defined($nstats{"seqlen_failure"}[$i]) 
+		    && $nstats{"seqlen_failure"}[$i] > 0) {
+		    $denom += $nstats{"seqlen_failure"}[$i];
+		}
+		else {
+		    $nstats{"seqlen_failure"}[$i] = 0;
+		}
+		if (defined($nstats{"seqlen_success"}[$i]) 
+		    && $nstats{"seqlen_success"}[$i] > 0) {
+		    $denom += $nstats{"seqlen_success"}[$i];
+		}
+		
+		if ($denom > 0) {
+		    $currentsum += $factor * 
+			($nstats{"seqlen_failure"}[$i] / $denom);
+		}
+		$weight += $factor;
+	    }
+
+	    $unavail = $currentsum / $weight;
+	}
+	else {
+	    $unavail = $nstats{"totseqlen_failure"} / 
+		($nstats{"totseqlen_failure"} + $nstats{"totseqlen_success"});
+	}
+
+	if ($debug) {
+	    print STDERR "$nodeid: unavail = " . $unavail . "\n";
+	}
+
+	# save off stuff we want to return
+	$fnstats{$nodeid}{'rank'} = $unavail + $jitter_deduction;
+	$fnstats{$nodeid}{'jitter_deduction'} = $jitter_deduction;
+	$fnstats{$nodeid}{'totseqlen_failure'} = $nstats{'totseqlen_failure'};
+	$fnstats{$nodeid}{'totseqlen_success'} = $nstats{'totseqlen_success'};
+	$fnstats{$nodeid}{'totseqnum_failure'} = $nstats{'totseqnum_failure'};
+	$fnstats{$nodeid}{'totseqnum_success'} = $nstats{'totseqnum_success'};
+	$fnstats{$nodeid}{'jitseqnum_failure'} = $nstats{'jitseqnum_failure'};
+	$fnstats{$nodeid}{'jitseqnum_success'} = $nstats{'jitseqnum_success'};
+    }
+
+    # finally, sort by rank and return a list of tuples.
+    my @retval = ();
+    my $i = 0;
+    foreach my $n (sort { $fnstats{$a}{'rank'} <=> $fnstats{$b}{'rank'} } keys(%fnstats)) {
+	$retval[$i]{'nodeid'} = $n;
+	$retval[$i]{'rank'} = $fnstats{$n}{'rank'};
+	$retval[$i]{'jitter_deduction'} = $fnstats{$n}{'jitter_deduction'};
+	$retval[$i]{'totseqlen_failure'} = $fnstats{$n}{'totseqlen_failure'};
+	$retval[$i]{'totseqlen_success'} = $fnstats{$n}{'totseqlen_success'};
+	$retval[$i]{'totseqnum_failure'} = $fnstats{$n}{'totseqnum_failure'};
+	$retval[$i]{'totseqnum_success'} = $fnstats{$n}{'totseqnum_success'};
+	$retval[$i]{'jitseqnum_failure'} = $fnstats{$n}{'jitseqnum_failure'};
+	$retval[$i]{'jitseqnum_success'} = $fnstats{$n}{'jitseqnum_success'};
+
+	++$i;
+    }
+
+    return \@retval;
+}
+
+sub sequenceToStr($) {
+    my $seq = shift;
+
+    if (!defined($seq)) {
+	return undef;
+    }
+
+    return sprintf("%s -> %s (%s): %d",
+		   strftime("%Y-%m-%d %H:%M:%S",localtime($$seq[0])),
+		   strftime("%Y-%m-%d %H:%M:%S",localtime($$seq[0]+$$seq[1])),
+		   $$seq[1] . "s",
+		   $$seq[2]);
+}
+
+# Make perl happy
+1;

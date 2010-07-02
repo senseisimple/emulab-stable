@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -30,8 +30,6 @@ my $TB		= "@prefix@";
 my $FSNODE      = "@FSNODE@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT     = "@TBAUDITEMAIL@";
-my $PROJROOT    = "/proj";
-my $CVSREPOS    = "$PROJROOT/cvsrepos";
 my $CVSSUPPORT  = @CVSSUPPORT@;
 my $TESTMODE    = @TESTMODE@;
 
@@ -187,6 +185,8 @@ my $now = time;
 utime $now, $now, $lockfile;
 
 if (defined($pid)) {
+    my $CVSREPOS = PROJROOT() . "/cvsrepos";
+
     #
     # Grab DB data. 
     #

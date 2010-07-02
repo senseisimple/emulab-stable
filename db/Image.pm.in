@@ -1,0 +1,681 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package Image;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use Project;
+use Group;
+use User;
+use OSinfo;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		  = "@prefix@";
+my $BOSSNODE      = "@BOSSNODE@";
+my $CONTROL	  = "@USERNODE@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBAUDIT       = "@TBAUDITEMAIL@";
+my $TBBASE        = "@TBBASE@";
+my $TBWWW         = "@TBWWW@";
+
+# Cache of instances to avoid regenerating them.
+my %images    = ();
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by idx or pid,osname, depending on the args.
+#
+sub Lookup($$;$)
+{
+    my ($class, $arg1, $arg2) = @_;
+    my $imageid;
+
+    #
+    # A single arg is either an index or a "pid,osname" or "pid/osname" string.
+    #
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^(\d*)$/) {
+	    $imageid = $1;
+	}
+	elsif ($arg1 =~ /^([-\w]*),([-\w\.\+]*)$/ ||
+	       $arg1 =~ /^([-\w]*)\/([-\w\.\+]*)$/) {
+	    $arg1 = $1;
+	    $arg2 = $2;
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (! (($arg1 =~ /^[-\w\.\+]*$/) && ($arg2 =~ /^[-\w\.\+]*$/))) {
+	return undef;
+    }
+
+    #
+    # Two args means pid/imagename lookup instead of gid_idx.
+    #
+    if (defined($arg2)) {
+	my $images_result =
+	    DBQueryWarn("select imageid from images ".
+			"where pid='$arg1' and imagename='$arg2'");
+
+	return undef
+	    if (! $images_result || !$images_result->numrows);
+
+	($imageid) = $images_result->fetchrow_array();
+    }
+
+    # Look in cache first
+    return $images{"$imageid"}
+        if (exists($images{"$imageid"}));
+    
+    my $query_result =
+	DBQueryWarn("select * from images where imageid='$imageid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self           = {};
+    $self->{'IMAGE'}   = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $images{"$imageid"} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'IMAGE'}->{$_[1]}); }
+sub imagename($)        { return field($_[0], "imagename"); }
+sub imageid($)          { return field($_[0], "imageid"); }
+sub old_imageid($)      { return field($_[0], "old_imageid"); }
+sub pid($)	        { return field($_[0], "pid"); }
+sub gid($)	        { return field($_[0], "gid"); }
+sub pid_idx($)          { return field($_[0], "pid_idx"); }
+sub gid_idx($)          { return field($_[0], "gid_idx"); }
+sub creator($)          { return field($_[0], "creator"); }
+sub creator_idx($)      { return field($_[0], "creator_idx"); }
+sub created($)          { return field($_[0], "created"); }
+sub description($)      { return field($_[0], "description"); }
+sub loadpart($)         { return field($_[0], "loadpart"); }
+sub loadlength($)       { return field($_[0], "loadlength"); }
+sub part1_osid($)       { return field($_[0], "part1_osid"); }
+sub part2_osid($)       { return field($_[0], "part2_osid"); }
+sub part3_osid($)       { return field($_[0], "part3_osid"); }
+sub part4_osid($)       { return field($_[0], "part4_osid"); }
+sub default_osid($)     { return field($_[0], "default_osid"); }
+sub path($)             { return field($_[0], "path"); }
+sub magic($)            { return field($_[0], "magic"); }
+sub load_address($)     { return field($_[0], "load_address"); }
+sub frisbee_pid($)      { return field($_[0], "frisbee_pid"); }
+sub load_busy($)        { return field($_[0], "load_busy"); }
+sub ezid($)             { return field($_[0], "ezid"); }
+sub shared($)           { return field($_[0], "shared"); }
+sub global($)           { return field($_[0], "global"); }
+sub updated($)          { return field($_[0], "updated"); }
+sub mbr_version($)      { return field($_[0], "mbr_version"); }
+sub access_key($)       { return field($_[0], "access_key"); }
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $imageid = $self->imageid();
+    
+    my $query_result =
+	DBQueryWarn("select * from images where imageid=$imageid");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'IMAGE'} = $query_result->fetchrow_hashref();
+
+    return 0;
+}
+
+#
+# Create a new os_info. This installs the new record in the DB,
+# and returns an instance. There is some bookkeeping along the way.
+#
+sub Create($$$$$$$$)
+{
+    my ($class, $project, $group, $creator,
+	$imagename, $imageid, $argref, $usrerr_ref) = @_;
+
+    return undef
+	if (ref($class) || !ref($project));
+
+    my $isadmin = $creator->IsAdmin();
+
+    # We may ignore particular partN_osid's by deleting them.
+    my @arg_slots = grep(/^part[1-4]_osid$/, keys(%{$argref}));
+
+    # Pass-through a bunch of required slots, ignoring any extras
+    # and stuff we handle explicitly.
+    foreach my $key ("loadpart", "loadlength", "default_osid") {
+	if (!exists($argref->{$key})) {
+	    $$usrerr_ref = "Error: $key missing in Image->Create!";
+	    return undef;
+	}
+	push(@arg_slots, $key);
+    }
+    # Pass-through optional slots, otherwise the DB default is used.
+    foreach my $key ("path", "shared", "global", "ezid", "mbr_version") {
+	if (exists($argref->{$key})) {
+	    push(@arg_slots, $key);
+	}
+    }
+
+    my $pid     = $project->pid();
+    my $pid_idx = $project->pid_idx();
+    my $gid     = $group->gid();
+    my $gid_idx = $group->gid_idx();
+    my $uid     = $creator->uid();
+    my $uid_idx = $creator->uid_idx();
+
+    #
+    # The pid/imageid has to be unique, so lock the table for the check/insert.
+    #
+    DBQueryWarn("lock tables images write, emulab_indicies write")
+	or return undef;
+
+    my $query_result =
+	DBQueryWarn("select imagename from images ".
+		    "where pid_idx='$pid_idx' and imagename='$imagename'");
+
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	$$usrerr_ref = "Error: IMAGE $imagename in project $pid already exists!";
+	return undef;
+    }
+
+    # We allow providing an image descriptor index, so newimageid_ez can use
+    # the same name, description, and index for both the OS and Image it makes.
+    if ($imageid > 0 ) {
+	# Make sure the OS descriptor for it already exists.
+	if (!OSinfo->Lookup($imageid)) {
+	    DBQueryWarn("unlock tables");
+	    $$usrerr_ref = "Error: Missing OSinfo $imagename/$imageid in $pid!";
+	    return undef;
+	}
+    } else {
+	#
+	# Grab unique ID. Table already locked.
+	# 
+	$imageid  = TBGetUniqueIndex("next_osid", undef, 1);
+    }
+    my $uuid  = NewUUID();
+
+    # Some fields special cause of quoting.
+    #
+    my $desc  = "''";
+    if (exists($argref->{'description'})) {
+	$desc = DBQuoteSpecial($argref->{'description'});
+    }
+    
+    my $query = "insert into images set ".
+	join(",", map("$_='" . $argref->{$_} . "'", @arg_slots));
+
+    # Append the rest
+    $query .= ",imagename='$imagename'";
+    $query .= ",imageid='$imageid'";
+    $query .= ",uuid='$uuid'";
+    $query .= ",pid='$pid',pid_idx='$pid_idx'";
+    $query .= ",gid='$gid',gid_idx='$gid_idx'";
+    $query .= ",creator='$uid',creator_idx='$uid_idx'";
+    $query .= ",created=now()";
+    $query .= ",description=$desc";    
+    
+    if (! DBQueryWarn($query)) {
+	DBQueryWarn("unlock tables");
+	tberror("Error inserting new images record for $pid/$imagename!");
+	return undef;
+    }
+
+    my $image = Image->Lookup($imageid);
+    # Create the osidtoimageid mapping.  Admins have an option to do it or not.
+    my $makedefault = exists($argref->{"makedefault"}) && 
+	$argref->{"makedefault"} eq "1";
+    if (!$isadmin || $makedefault) {
+
+	# Lock tables unlocks previous locks as a side-effect.
+	DBQueryWarn("lock tables osidtoimageid write, images write, ".
+		    "nodes as n write, node_type_attributes as a write");
+	#
+	# Need a list of node types. We join this over the nodes table so that
+	# we get a list of just the nodes that are currently in the testbed, not
+	# just in the node_types table.
+	#
+	my $types_result =
+	    DBQueryWarn("select distinct n.type from nodes as n ".
+			 "left join node_type_attributes as a on a.type=n.type ".
+			 "where a.attrkey='imageable' and ".
+			 "      a.attrvalue!='0'");
+	my @mtypes_array;
+	my @map_updates;
+	while (my ($type) = $types_result->fetchrow_array()) {
+	    push(@mtypes_array, $type);
+
+	    # Remember when we get one of the mtype_$type args.  These aren't DB
+	    # columns to update, but instead control re-creating the rows in the
+	    # osidtoimageid table for this imageid, below.
+	    my $mtype = "mtype_$type";
+	    if (exists($argref->{$mtype})) {
+		my $value = $argref->{$mtype};
+		##printf "argref->{$mtype} %s\n", $value;
+		if ($value eq "1") {
+		    push(@map_updates, $type);
+		}
+	    }
+	}
+
+	my @osid_array;
+	for (my $i = 1; $i <= 4; $i++) {
+	    my $foo = $image->field("part${i}_osid");
+	    if (defined($foo)) {
+		push(@osid_array, $foo);
+	    }
+	}
+
+	for (my $i = 0; $i <= $#map_updates; $i++) {
+	    for (my $j = 0; $j <= $#osid_array; $j++) {
+		 my $query = "INSERT INTO osidtoimageid ".
+			     "       (osid, type, imageid) ".
+			     "VALUES ('$osid_array[$j]', ".
+			     "        '$map_updates[$i]', ".
+			     "        '$imageid')";
+		 ##print "$query\n";
+		 if (! DBQueryWarn($query)) {
+		     DBQueryWarn("unlock tables");
+		     tberror("Error inserting new ostoimageid mapping for ".
+			     "$pid/$imagename!");
+		     return undef;
+		 }
+	    }
+	}
+    }
+
+    DBQueryWarn("unlock tables");
+
+    return $image;
+}
+
+#
+# Worker class method to edit image descriptor.
+# Assumes most argument checking was done elsewhere.
+#
+sub EditImageid($$$$)
+{
+    my ($class, $image, $argref, $usrerr_ref) = @_;
+
+    my %mods;
+    my $noreport;
+
+    my $imageid = $image->imageid();
+
+    #
+    # Now update the rest of the information in the DB.
+    # (Others above already did their own updates.)
+    #
+    my %updates;
+    foreach my $col ("description", "path", "load_address", "frisbee_pid" ) {
+	# Copy args we want so that others can't get through.
+	if (exists($argref->{$col})) {
+	    $updates{$col} = $mods{$col} = $argref->{$col};
+	}
+    }
+    # See mtype_$type args below.
+
+    #
+    # Need a list of node types. We join this over the nodes table so that
+    # we get a list of just the nodes that are currently in the testbed, not
+    # just in the node_types table.
+    #
+    my $types_result =
+	DBQueryWarn("select distinct n.type from nodes as n ".
+		     "left join node_type_attributes as a on a.type=n.type ".
+		     "where a.attrkey='imageable' and ".
+		     "      a.attrvalue!='0'");
+    my @mtypes_array;
+    my @map_updates;
+    my $redo_map = 0;
+    while (my ($type) = $types_result->fetchrow_array()) {
+	push(@mtypes_array, $type);
+    }
+    #
+    # Special hack to allow pcvm type -- see SetupReload in os_setup
+    #
+    push @mtypes_array, "pcvm";
+
+    foreach my $type (@mtypes_array) {
+	# Remember when we get one of the mtype_$type args.  These aren't DB
+	# columns to update, but instead control re-creating the rows in the
+	# osidtoimageid table for this imageid, below.
+	my $mtype = "mtype_$type";
+	if (exists($argref->{$mtype})) {
+	    my $value = $argref->{$mtype};
+	    ##printf "argref->{$mtype} %s\n", $value;
+	    $mods{$mtype} = $value;
+	    if ($value eq "1") {
+		push(@map_updates, $type);
+		$redo_map = 1;
+	    }
+	}
+    }
+
+    if (!keys %mods) {
+	if (!$noreport) {
+	    # Warn the user that the submit button was pressed with no effect.
+	    $$usrerr_ref = "Submit: Nothing changed";
+	    return undef;
+	}
+    }
+
+    if (keys %updates || $redo_map) {
+	DBQueryWarn("lock tables images write, os_info write, ".
+		     "osidtoimageid write");
+    }
+    if (keys %updates) {
+	if ($image->Update(\%updates)) {
+	    $$usrerr_ref = "DB: Error updating the images table";
+	    DBQueryWarn("unlock tables");
+	    return undef;
+	}
+    }
+    if ($redo_map) {
+	#
+	# Update the osidtoimageid table too.
+	# 
+	# Must delete old entries first.
+	DBQueryWarn("delete from osidtoimageid ".
+		     "where imageid='$imageid'");
+
+	my @osid_array;
+	for (my $i = 1; $i <= 4; $i++) {
+	    my $foo = $image->field("part${i}_osid");
+	    if (defined($foo)) {
+		push(@osid_array, $foo);
+	    }
+	}
+	for (my $i = 0; $i <= $#map_updates; $i++) {
+	    for (my $j = 0; $j <= $#osid_array; $j++) {
+		 my $query = "REPLACE INTO osidtoimageid ".
+			     "       (osid, type, imageid) ".
+			     "VALUES ('$osid_array[$j]', ".
+			     "        '$map_updates[$i]', ".
+			     "        '$imageid')";
+		 ##print "$query\n";
+		 DBQueryWarn($query);
+	    }
+	}
+    }
+    if (keys %updates || $redo_map) {
+	DBQueryWarn("unlock tables");
+    }
+
+    return 1;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid       = $self->pid();
+    my $imageid   = $self->imageid();
+    my $imagename = $self->imagename();
+
+    return "[Image $imageid: $pid,$imagename]";
+}
+
+#
+# Return the internal DB rowref. Used for code that has not been converted.
+#
+sub DBData($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'IMAGE'}
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $imageid = $self->imageid();
+
+    my $query = "update images set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where imageid='$imageid'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Load the project object for an image
+#
+sub GetProject($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $project = Project->Lookup($self->pid_idx());
+    
+    if (! defined($project)) {
+	print("*** WARNING: Could not lookup project object for $self!", 1);
+	return undef;
+    }
+    return $project;
+}
+
+#
+# Load the group object for an image
+#
+sub GetGroup($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    my $group = Group->Lookup($self->gid_idx());
+    
+    if (! defined($group)) {
+	print("*** WARNING: Could not lookup group object for $self!", 1);
+	return undef;
+    }
+    return $group;
+}
+
+#
+# Check permissions. Note that root may ask permission, which comes in
+# as an undef user.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    if ($access_type < TB_IMAGEID_MIN || $access_type > TB_IMAGEID_MAX) {
+	print "*** Invalid access type $access_type!\n";
+	return 0;
+    }
+    # Admins and root do whatever they want.
+    return 1
+	if ((defined($user) && $user->IsAdmin()) ||
+	    ($UID == 0 || $UID eq "root"));
+
+    my $mintrust;
+    
+    #
+    # Global ImageIDs can be read by anyone.
+    #
+    if ($self->global()) {
+	if ($access_type == TB_IMAGEID_READINFO) {
+	    return 1;
+	}
+	return 0;
+    }
+
+    my $project = $self->GetProject();
+    return 0
+	if (!defined($project));
+    my $group = $self->GetGroup();
+    return 0
+	if (!defined($group));
+
+    #
+    # Otherwise must have proper trust in the group
+    #
+    if ($access_type == TB_IMAGEID_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+        #
+        # Shared imageids are readable by anyone in the project.
+        #
+	if ($self->shared()) {
+	    $group = $project->GetProjectGroup();
+	}
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+
+    #
+    # Either proper permission in the group, or group_root in the project.
+    # This lets group_roots muck with other people's experiments, including
+    # those in groups they do not belong to.
+    #
+    return TBMinTrust($group->Trust($user), $mintrust) ||
+	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT);
+}
+
+#
+# LockTables simply locks the given tables, and then refreshes the
+# instance (thereby getting the data from the DB after the tables are locked).
+#
+sub LockTables($;$)
+{
+    my ($self, $spec) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $spec = "images write"
+	if (!defined($spec));
+    
+    DBQueryWarn("lock tables $spec")
+	or return -1;
+	
+    return $self->Refresh();
+}
+sub UnLockTables($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    DBQueryWarn("unlock tables")
+	or return -1;
+    return 0;
+}
+
+#
+# Bump the busy indicator to keep the frisbeed going.
+#
+sub KeepBusy($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $imageid = $self->imageid();
+
+    DBQueryFatal("update images set load_busy=GREATEST(load_busy,1) " .
+		 "where imageid='$imageid'");
+
+    return 0;
+}
+
+#
+# Mark the update time in the record,
+#
+sub MarkUpdateTime($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $imageid = $self->imageid();
+
+    return -1
+	if (! DBQueryWarn("update images set updated=now() " .
+			  "where imageid='$imageid'"));
+
+    return 0;
+}
+
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

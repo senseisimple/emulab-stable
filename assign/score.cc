@@ -4,6 +4,7 @@
  * All rights reserved.
  */
 
+static const char rcsid[] = "$Id: score.cc,v 1.69 2009-12-09 22:53:44 ricci Exp $";
 
 #include "port.h"
 
@@ -14,7 +15,7 @@
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <ext/hash_map>
 #include <ext/hash_set>
 using namespace __gnu_cxx;
@@ -59,7 +60,8 @@ extern tb_sgraph SG;		// switch fabric
 void score_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 void unscore_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-                    pedge &out_edge);
+                    pedge &out_edge, bool flipped, bool check_src_iface,
+                    bool check_dst_iface);
 int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
 			  pvertex_list &out_switches);
@@ -86,14 +88,70 @@ void score_link_endpoints(pedge pe);
 #define SDEBADD(amount) cerr << "SADD: " << #amount << "=" << amount << " from " << score;score+=amount;cerr << " to " << score << endl
 #define SDEBSUB(amount)  cerr << "SSUB: " << #amount << "=" << amount << " from " << score;score-=amount;cerr << " to " << score << endl
 
+#ifdef SCORE_DEBUG_MAX
+// Handy way to print only the first N debugging messages, since that's usually
+// enough to get the idea
+static unsigned long scoredebugcount = 0;
+#endif
+
 #ifdef SCORE_DEBUG
+#ifdef SCORE_DEBUG_MAX
+#define SDEBUG(a) if (scoredebugcount++ < SCORE_DEBUG_MAX) { a; }
+#else
 #define SDEBUG(a) a
+#endif
 #else
 #define SDEBUG(a) 
 #endif
 
 #define MIN(a,b) (((a) < (b))? (a) : (b))
 #define MAX(a,b) (((a) > (b))? (a) : (b))
+
+/*
+ * 'Constants' used in scoring. These can be changed, but it MUST be
+ * done BEFORE any actual scoring is done.
+ */
+#ifdef PENALIZE_BANDWIDTH
+float SCORE_DIRECT_LINK = 0.0;
+float SCORE_INTRASWITCH_LINK = 0.0;
+float SCORE_INTERSWITCH_LINK = 0.0;
+#else
+float SCORE_DIRECT_LINK = 0.01;
+float SCORE_INTRASWITCH_LINK = 0.02;
+float SCORE_INTERSWITCH_LINK = 0.2;
+#endif
+float SCORE_DIRECT_LINK_PENALTY = 0.5;
+float SCORE_NO_CONNECTION = 0.5;
+float SCORE_PNODE = 0.2;
+float SCORE_PNODE_PENALTY = 0.5;
+float SCORE_SWITCH = 0.5;
+float SCORE_UNASSIGNED = 1.0;
+float SCORE_MISSING_LOCAL_FEATURE = 1.0;
+float SCORE_OVERUSED_LOCAL_FEATURE = 0.5;
+#ifdef NO_PCLASS_PENALTY
+float SCORE_PCLASS = 0.0;
+#else
+float SCORE_PCLASS = 0.5;
+#endif
+float SCORE_VCLASS = 1.0;
+float SCORE_EMULATED_LINK = 0.01;
+float SCORE_OUTSIDE_DELAY = 0.5;
+#ifdef PENALIZE_UNUSED_INTERFACES
+float SCORE_UNUSED_INTERFACE = 0.04;
+#endif
+float SCORE_TRIVIAL_PENALTY = 0.5;
+
+float SCORE_TRIVIAL_MIX = 0.5;
+
+float SCORE_SUBNODE = 0.5;
+float SCORE_MAX_TYPES = 0.15;
+float LINK_RESOLVE_TRIVIAL = 8.0;
+float LINK_RESOLVE_DIRECT = 4.0;
+float LINK_RESOLVE_INTRASWITCH = 2.0;
+float LINK_RESOLVE_INTERSWITCH = 1.0;
+float VIOLATION_SCORE = 1.0;
+
+float opt_nodes_per_sw = 5.0;
 
 /*
  * score()
@@ -159,7 +217,7 @@ void init_score()
 float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
     pvertex dest_pv, tb_vlink *vlink, tb_pnode *pnode, tb_pnode *dest_pnode,
     bool flipped) {
-  SDEBUG(cerr << "   finding link resolutions" << endl);
+  SDEBUG(cerr << "   finding link resolutions from " << pnode->name << " to " << dest_pnode->name << endl);
   /* We need to calculate all possible link resolutions, stick
    * them in a nice datastructure along with their weights, and
    * then select one randomly.
@@ -191,13 +249,13 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
   }
 
   pedge pe;
-  // Direct link
-  if (find_best_link(dest_pv,pv,vlink,pe)) {
+  // Direct link (have to check both interfaces if they are fixed)
+  if (find_best_link(dest_pv,pv,vlink,pe,flipped,true,true)) {
     tb_link_info info(tb_link_info::LINK_DIRECT);
     info.plinks.push_back(pe);
     resolutions.push_back(info);
     total_weight += LINK_RESOLVE_DIRECT;
-    SDEBUG(cerr << "    direct_link " << pe << endl);
+    SDEBUG(cerr << "    added a direct_link " << pe << endl);
   }
   // Intraswitch link
   pedge first,second;
@@ -205,6 +263,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       switch_it != pnode->switches.end();++switch_it) {
     if (dest_pnode->switches.find(*switch_it) !=
         dest_pnode->switches.end()) {
+      SDEBUG(cerr << "    intraswitch: both are connected to " << *switch_it << endl);
       bool first_link, second_link;
       /*
        * Check to see if either, or both, pnodes are actually
@@ -231,7 +290,10 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (first_link) {
-        if (!find_best_link(pv,*switch_it,vlink,first)) {
+        SDEBUG(cerr << "    intraswitch: finding first link" << endl;)
+        // Check only whether the source interface is fixed - this is the
+        // first link in a multi-hop path
+        if (!find_best_link(pv,*switch_it,vlink,first,flipped,true,false)) {
           SDEBUG(cerr << "    intraswitch failed - no link first" <<
               endl;)
             // No link to this switch
@@ -240,7 +302,11 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (second_link) {
-        if (!find_best_link(dest_pv,*switch_it,vlink,second)) {
+        // Check only whether the dest interface is fixed - this is the
+        // last link in a multi-hop path
+        SDEBUG(cerr << "    intraswitch: finding second link (" <<  ")" << endl;)
+        if (!find_best_link(dest_pv,*switch_it,vlink,second,flipped,
+                    false,true)) {
           // No link to this switch
           SDEBUG(cerr << "    intraswitch failed - no link second" <<
               endl;)
@@ -278,51 +344,107 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
   for (pvertex_set::iterator source_switch_it = pnode->switches.begin();
       source_switch_it != pnode->switches.end();
       ++source_switch_it) {
-    int tmp = 0;
     for (pvertex_set::iterator dest_switch_it =
         dest_pnode->switches.begin();
         dest_switch_it != dest_pnode->switches.end();
         ++dest_switch_it) {
       if (*source_switch_it == *dest_switch_it) continue;
       tb_link_info info(tb_link_info::LINK_INTERSWITCH);
-      if (find_interswitch_path(*source_switch_it,*dest_switch_it,vlink->delay_info.bandwidth,
-            info.plinks, info.switches) != 0) {
-        bool first_link, second_link;
-        /*
-         * Check to see if either, or both, pnodes are actually the
-         * switches we are looking for
-         */
-        if ((pv == *source_switch_it) || (pv ==
-              *dest_switch_it)) {
-          first_link = false;
-        } else {
-          first_link = true;
-        }
-        if ((dest_pv == *source_switch_it) ||
-            (dest_pv == *dest_switch_it)) {
-          second_link = false;
-        } else {
-          second_link = true;
-        }
 
-        if (first_link) {
-          if
-            (!find_best_link(pv,*source_switch_it,vlink,first)) {
-              // No link to this switch
-              SDEBUG(cerr << "    interswitch failed - no first link"
-                  << endl;)
-                continue;
-            }
-        }
+      /*
+       * Check to see if either, or both, pnodes are actually the
+       * switches we are looking for
+       */
+      bool first_link, second_link;
+      if ((pv == *source_switch_it) || (pv ==
+            *dest_switch_it)) {
+        first_link = false;
+        SDEBUG(cerr << "    interswitch: not first link in a path" << endl);
+      } else {
+        SDEBUG(cerr << "    interswitch: *is* first link in a path" << endl);
+        first_link = true;
+      }
+      if ((dest_pv == *source_switch_it) ||
+          (dest_pv == *dest_switch_it)) {
+        second_link = false;
+        SDEBUG(cerr << "    interswitch: not second link in a path" << endl);
+      } else {
+        SDEBUG(cerr << "    interswitch: *is* second link in a path" << endl);
+        second_link = true;
+      }
 
-        if (second_link) {
-          if (!find_best_link(dest_pv,*dest_switch_it,vlink,second)) {
-            // No link to tshis switch
-            SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
+      // Get link objects
+      if (first_link) {
+        // Check only whether the source interface is fixed - this is the
+        // first link in a multi-hop path
+        if (!find_best_link(pv,*source_switch_it,vlink,first,flipped,
+                    true,false)) {
+            // No link to this switch
+            SDEBUG(cerr << "    interswitch failed - no first link"
+                << endl;)
               continue;
           }
-        }
+      }
 
+      if (second_link) {
+        // Check only whether the dest interface is fixed - this is the
+        // last link in a multi-hop path
+        if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,flipped,
+                    false,true)) {
+          // No link to tshis switch
+          SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
+            continue;
+        }
+      }
+
+      // For regular links, we just grab the vlink's bandwidth; for links
+      // where we're matching the link speed to the 'native' one for the
+      // interface, we have to look up interface speeds on both ends.
+      int bandwidth;
+      if (vlink->delay_info.adjust_to_native_bandwidth) {
+          // Grab the actual plink objects for both pedges - it's possible for
+          // one or both to be missing if we're linking directly to a switch
+          // (as with a LAN)
+          tb_plink *first_plink = NULL;
+          tb_plink *second_plink = NULL;
+          if (first_link) {
+              first_plink = get(pedge_pmap,first);
+          }
+          if (second_link) {
+              second_plink = get(pedge_pmap,second);
+          }
+
+          if (first_plink != NULL && second_plink != NULL) {
+              // If both endpoints are not switches, we use the minimum
+              // bandwidth
+              bandwidth = min(first_plink->delay_info.bandwidth,
+                      second_plink->delay_info.bandwidth);
+          } else if (first_plink == NULL) {
+              // If one end is a switch, use the bandwidth from the other
+              // end
+              bandwidth = second_plink->delay_info.bandwidth;
+          } else if (second_plink == NULL) {
+              bandwidth = first_plink->delay_info.bandwidth;
+          } else {
+              // Both endpoints are switches! (eg. this might be a link between
+              // two LANs): It is not at all clear what the right semantics
+              // for this would be, and unfortunately, we can't catch this
+              // earlier. So, exiting with an error is crappy, but it's
+              // unlikely to happen in our regular use, and it's the best we
+              // can do.
+              cerr << "*** Using bandwidth adjustment on virutal links " <<
+                      "between switches not allowed " << endl;
+              exit(EXIT_FATAL);
+          }
+      } else {
+          // If not auto-adjusting, just use the specified bandwidth
+          bandwidth = vlink->delay_info.bandwidth;
+      }
+
+      // Find a path on the switch fabric between these two switches
+      if (find_interswitch_path(*source_switch_it,*dest_switch_it,bandwidth,
+            info.plinks, info.switches) != 0) {
+        // Okay, we found a real resolution!
         if (flipped) { // Order these need to go in depends on flipped bit
           if (second_link) {
             info.plinks.push_front(second);
@@ -369,10 +491,13 @@ inline float resolution_cost(tb_link_info::linkType res_type) {
 	    return LINK_RESOLVE_INTERSWITCH; break;
 	case tb_link_info::LINK_UNMAPPED:
 	case tb_link_info::LINK_TRIVIAL:
-	    cerr << "*** Internal error: Should not be here. (resolution_cost)" << endl;
-   	    exit(EXIT_FATAL);
+	default:
+	    // These shouldn't be passed in: fall through to below and die
 	break;
     }
+    
+    cerr << "*** Internal error: Should not be here. (resolution_cost)" << endl;
+    exit(EXIT_FATAL);
 }
 
 /*
@@ -405,7 +530,9 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
    */
   bool flipped = false;
   if (vlink->src != vv) {
+    SDEBUG(cerr << "  vlink is flipped" << endl);
     flipped = true;
+    assert(vlink->dst == vv);
   }
 
   /*
@@ -434,6 +561,8 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
          * doesn't usually get called for trivial links, and
          * letting them fall through into the 'normal' link code
          * below is disatrous!
+         * Note: We can't get here when doing adjust_to_native_bandwidth,
+         * since it's illegal to allow trivial links when it's in use.
          */
         score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
       } else {
@@ -444,43 +573,6 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
       resolution_vector resolutions;
       float total_weight = find_link_resolutions(resolutions, pv, dest_pv,
           vlink,pnode,dest_pnode,flipped);
-      
-      /*
-       * If they have asked for a specific interface, filter out any
-       * resolutions that don't have it
-       */
-      if (vlink->fix_src_iface) {
-	  resolution_vector::iterator rit;
-	  for (rit = resolutions.begin(); rit != resolutions.end();) {
-	      pedge link = (*rit).plinks.front();
-	      tb_plink *plink = get(pedge_pmap,link);
-	      if (plink->srciface != vlink->src_iface) {
-		  // Doesn't match, remove it!
-		   total_weight -= resolution_cost(rit->type_used);
-		   rit = resolutions.erase(rit);
-	       } else {
-		   rit++;
-	       }
-	  }
-      }
-      
-      if (vlink->fix_dst_iface) {
-	  resolution_vector::iterator rit;
-	  for (rit = resolutions.begin(); rit != resolutions.end();) {
-	      pedge link = (*rit).plinks.back();
-	      tb_plink *plink = get(pedge_pmap,link);
-	      // Yes, this really is srciface
-	      // XXX: This only works because we always have the node as the 'source'
-	      // of a plink! Shouldn't depend on this!
-	      if (plink->srciface != vlink->dst_iface) {
-		  // Doesn't match, remove it!
-		  total_weight -= resolution_cost(rit->type_used);
-		  rit = resolutions.erase(rit);
-	      } else {
-		  rit++;
-	      }
-	  }
-      }
       
       int n_resolutions = resolutions.size();
       //int resolution_index = n_resolutions - 1;
@@ -524,6 +616,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
                 choice -= LINK_RESOLVE_INTERSWITCH; break;
               case tb_link_info::LINK_UNMAPPED:
               case tb_link_info::LINK_TRIVIAL:
+	      case tb_link_info::LINK_DELAYED:
                 cerr << "*** Internal error: Should not be here." <<
                   endl;
                 exit(EXIT_FATAL);
@@ -732,6 +825,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	} else {
 	  old_over_bw = 0;
 	}
+        SDEBUG(cerr << "  old trivial bandwidth over by " << old_over_bw << endl);
 
 	src_pnode->trivial_bw_used -= vlink->delay_info.bandwidth;
 
@@ -741,13 +835,15 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	} else {
 	  new_over_bw = 0;
 	}
+        SDEBUG(cerr << "  new trivial bandwidth over by " << new_over_bw << endl);
 
 	if (old_over_bw) {
 	  // Count how many multiples of the maximum bandwidth we're at
-	  int num_violations = (int)(
-	      floor((double)(old_bw -1)/src_pnode->trivial_bw)
-	      - floor((double)(src_pnode->trivial_bw_used -1) /
-		src_pnode->trivial_bw));
+          int new_multiple = src_pnode->trivial_bw_used / src_pnode->trivial_bw;
+          int old_multiple = old_bw / src_pnode->trivial_bw;
+	  int num_violations = old_multiple - new_multiple;
+          SDEBUG(cerr << "  removing " << num_violations <<
+                 " violations for trivial bandwidth" << endl);
 	  violated -= num_violations;
 	  vinfo.bandwidth -= num_violations;
 	  double removed_bandwidth_percent = (old_over_bw - new_over_bw) * 1.0 /
@@ -759,6 +855,12 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
       unscore_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
   }
 #endif
+
+  // If auto-adjusting the vlink bandwidth, we set it to a sentinel value
+  // so that we can detect any problems next time we do a score_link_info()
+  if (vlink->delay_info.adjust_to_native_bandwidth) {
+      vlink->delay_info.bandwidth = -2;
+  }
 
 }
 
@@ -805,7 +907,7 @@ void remove_node(vvertex vv)
   /*
    * Clean up the pnode's state
    */
-  if (!tr->is_static) {
+  if (!tr->is_static()) {
     if (pnode->my_class) {
       pclass_unset(pnode);
     }
@@ -816,7 +918,7 @@ void remove_node(vvertex vv)
 #endif
 
   // pclass
-  if ((!disable_pclasses) && !(tr->is_static) && pnode->my_class
+  if ((!disable_pclasses) && !(tr->is_static()) && pnode->my_class
 	  && (pnode->my_class->used_members == 0)) {
     SDEBUG(cerr << "  freeing pclass" << endl);
     SSUB(SCORE_PCLASS);
@@ -925,8 +1027,8 @@ void remove_node(vvertex vv)
   /*
    * Adjust scores for the pnode
    */
-  int old_load = tr->current_load;
-  tr->current_load -= vnode->typecount;
+  int old_load = tr->get_current_load();
+  tr->remove_load(vnode->typecount);
   pnode->total_load -= vnode->typecount;
 #ifdef LOAD_BALANCE
   // Use this tricky formula to score based on how 'full' the pnode is, so that
@@ -942,7 +1044,8 @@ void remove_node(vvertex vv)
     // ptypes
     tb_pnode::types_list::iterator lit = pnode->type_list.begin();
     while (lit != pnode->type_list.end()) {
-	int removed_violations = (*lit)->ptype->remove_users((*lit)->max_load);
+	int removed_violations =
+	    (*lit)->get_ptype()->remove_users((*lit)->get_max_load());
 	if (removed_violations) {
 	    SSUB(SCORE_MAX_TYPES * removed_violations);
 	    violated -= removed_violations;
@@ -950,13 +1053,15 @@ void remove_node(vvertex vv)
 	}
 	lit++;
     }
-  } else if (old_load > tr->max_load) {
+  } else if (old_load > tr->get_max_load()) {
     // If the pnode was over its load, remove the penalties for the nodes we
     // just removed, down to the max_load.
     SDEBUG(cerr << "  reducing penalty, old load was " << old_load <<
-	    ", new load = " << tr->current_load << ", max load = " <<
-	    tr->max_load << endl);
-    for (int i = old_load; i > MAX(tr->current_load,tr->max_load); i--) {
+	    ", new load = " << tr->get_current_load() << ", max load = " <<
+	    tr->get_max_load() << endl);
+    for (int i = old_load;
+	 i > MAX(tr->get_current_load(),tr->get_max_load());
+	 i--) {
       SSUB(SCORE_PNODE_PENALTY);
       vinfo.pnode_load--;
       violated--;
@@ -992,6 +1097,22 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 {
   tb_vlink *vlink = get(vedge_pmap,ve);
   tb_pnode *the_switch;
+  
+  // If this link is to be adjusted to the native speed of the interface, go
+  // ahead and do that now - we use the minimum of the two endpoint interfaces
+  // Note! Not currently supported on trivial links! (it's illegal for
+  // adjust_to_native_bandwidth and trivial_ok to both be true)
+  if (vlink->delay_info.adjust_to_native_bandwidth &&
+      vlink->link_info.type_used != tb_link_info::LINK_TRIVIAL) {
+    // Check for special sentinel value to make sure we remembered to re-set
+    // the value before
+    assert(vlink->delay_info.bandwidth == -2);
+    tb_plink *front_plink = get(pedge_pmap, vlink->link_info.plinks.front());
+    tb_plink *back_plink = get(pedge_pmap, vlink->link_info.plinks.back());
+    vlink->delay_info.bandwidth =
+      min(front_plink->delay_info.bandwidth, back_plink->delay_info.bandwidth);
+  }
+  
   switch (vlink->link_info.type_used) {
   case tb_link_info::LINK_DIRECT:
     SADD(SCORE_DIRECT_LINK);
@@ -1060,6 +1181,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       } else {
 	old_over_bw = 0;
       }
+      SDEBUG(cerr << "  old trivial bandwidth over by " << old_over_bw << endl);
 
       dst_pnode->trivial_bw_used += vlink->delay_info.bandwidth;
 
@@ -1069,13 +1191,15 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       } else {
 	new_over_bw = 0;
       }
+      SDEBUG(cerr << "  new trivial bandwidth over by " << new_over_bw << endl);
 	
       if (new_over_bw) {
 	// Count how many multiples of the maximum bandwidth we're at
-	int num_violations =
-	  (int)(floor((double)((src_pnode->trivial_bw_used -1)
-			       / src_pnode->trivial_bw))
-		- floor((double)((old_bw -1)/src_pnode->trivial_bw)));
+        int new_multiple = src_pnode->trivial_bw_used / src_pnode->trivial_bw;
+        int old_multiple = old_bw / src_pnode->trivial_bw;
+	int num_violations = new_multiple - old_multiple;
+        SDEBUG(cerr << "  adding " << num_violations <<
+               " violations for trivial bandwidth" << endl);
 	violated += num_violations;
 	vinfo.bandwidth += num_violations;
 
@@ -1087,6 +1211,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
     break;
 #endif
   case tb_link_info::LINK_UNMAPPED:
+  case tb_link_info::LINK_DELAYED:
     cout << "*** Internal error: Should not be here either." << endl;
     exit(EXIT_FATAL);
     break;
@@ -1178,9 +1303,9 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
    * Handle types
    */
   tr = mit->second;
-  if (tr->is_static) {
+  if (tr->is_static()) {
     // XXX: Scoring???
-    if (tr->current_load < tr->max_load) {
+    if (tr->get_current_load() < tr->get_max_load()) {
     } else {
       return 1;
     }
@@ -1201,7 +1326,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
       }
 
       SDEBUG(cerr << "  matching type found (" << pnode->current_type <<
-	  ", max = " << pnode->current_type_record->max_load << ")" << endl);
+	  ", max = " << pnode->current_type_record->get_max_load() << ")" <<
+          endl);
       } else {
 	// The pnode already has a type, let's just make sure it's compatible
 	SDEBUG(cerr << "  pnode already has type" << endl);
@@ -1266,11 +1392,11 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
       resolve_links(vv,pv,vnode,pnode,deterministic);
   }
   
-  int old_load = tr->current_load;
+  int old_load = tr->get_current_load();
   int old_total_load = pnode->total_load;
 
   // finish setting up pnode
-  tr->current_load += vnode->typecount;
+  tr->add_load(vnode->typecount);
   pnode->total_load += vnode->typecount;
 
 #ifdef PENALIZE_UNUSED_INTERFACES
@@ -1279,10 +1405,12 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
   SADD((pnode->total_interfaces - pnode->used_interfaces) * SCORE_UNUSED_INTERFACE);
 #endif
 
-  if (tr->current_load > tr->max_load) {
+  if (tr->get_current_load() > tr->get_max_load()) {
     SDEBUG(cerr << "  load too high - penalty (" <<
-	pnode->current_type_record->current_load << ")" << endl);
-    for (int i = MAX(old_load,tr->max_load); i < tr->current_load; i++) {
+	pnode->current_type_record->get_current_load() << ")" << endl);
+    for (int i = MAX(old_load,tr->get_max_load());
+	 i < tr->get_current_load();
+	 i++) {
       SADD(SCORE_PNODE_PENALTY);
       vinfo.pnode_load++;
       violated++;
@@ -1296,7 +1424,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
     // ptypes
     tb_pnode::types_list::iterator lit = pnode->type_list.begin();
     while (lit != pnode->type_list.end()) {
-	int new_violations = (*lit)->ptype->add_users((*lit)->max_load);
+	int new_violations = 
+	    (*lit)->get_ptype()->add_users((*lit)->get_max_load());
 	if (new_violations) {
 	    SADD(SCORE_MAX_TYPES * new_violations);
 	    violated += new_violations;
@@ -1324,7 +1453,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
   }
 
   // pclass
-  if ((!disable_pclasses) && (!tr->is_static) && pnode->my_class &&
+  if ((!disable_pclasses) && (!tr->is_static()) && pnode->my_class &&
 	  (pnode->my_class->used_members == 0)) {
     SDEBUG(cerr << "  new pclass" << endl);
     SADD(SCORE_PCLASS);
@@ -1341,10 +1470,10 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
     }
   }
 
-  SDEBUG(cerr << "  assignment=" << vnode->assignment << endl);
+  SDEBUG(cerr << "  assignment=" << pnode->name << endl);
   SDEBUG(cerr << "  new score=" << score << " new violated=" << violated << endl);
 
-  if (!tr->is_static) {
+  if (!tr->is_static()) {
     if (pnode->my_class) {
       pclass_set(vnode,pnode);
     }
@@ -1354,18 +1483,16 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
 }
 
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-			 pedge &out_edge)
+			 pedge &out_edge, bool flipped, bool check_src_iface,
+                         bool check_dst_iface)
 {
   pvertex dest_pv;
   double best_distance = 1000.0;
   int best_users = 1000;
-  double best_avail_bandwidth = 0;
   pedge best_pedge;
   bool found_best=false;
   poedge_iterator pedge_it,end_pedge_it;
   tie(pedge_it,end_pedge_it) = out_edges(pv,PG);
-
-  tb_pnode *pnode = get(pvertex_pmap,pv);
 
   for (;pedge_it!=end_pedge_it;++pedge_it) {
     dest_pv = target(*pedge_it,PG);
@@ -1378,6 +1505,61 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       if (plink->types.find(vlink->type) == plink->types.end()) {
 	  continue;
       }
+
+      // XXX: Not 100% sure it's better to do this inside find_best_link rather
+      // than in the caller
+      if (flipped) {
+          // If the endpoints are flipped, then we need to flip our notion of
+          // which ones need to be compared.
+          bool tmp = check_src_iface;
+          check_src_iface = check_dst_iface;
+          check_dst_iface = tmp;
+          SDEBUG(cerr << "         find_best_link: flipping interface comparisons" << endl;)
+      }
+
+      SDEBUG(cerr << "         find_best_link: fix_src_iface = " <<
+              vlink->fix_src_iface << " check_src_iface = " << check_src_iface
+              << " fix_dst_iface = " << vlink->fix_dst_iface
+              << " check_dst_iface = " << check_dst_iface
+              << " flipped = " << flipped << endl);
+
+      // If the vlink has a fixed source interface, and it doesn't match
+      // this plink, skip it
+      if (vlink->fix_src_iface && check_src_iface) {
+          // Whether we check the 'source' or 'destination' on the vlink against
+          // the phyisical link's source interface depends on whether we're
+          // traversing the link if forward or reverse (flipped) order
+          fstring compare_iface = vlink->src_iface;
+          if (plink->srciface != compare_iface) {
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix source: " << plink->srciface << " != " <<
+                      compare_iface << endl);
+              continue;
+          } else {
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix source: " << plink->srciface << " == " <<
+                      compare_iface << endl);
+          }
+      }
+
+      // Same for destination
+      // Yes, this really is srciface
+      // XXX: This only works because we always have the node as the 'source'
+      // of a plink! Shouldn't depend on this!
+      if (vlink->fix_dst_iface && check_dst_iface) {
+          fstring compare_iface = vlink->dst_iface;
+          if (plink->srciface != compare_iface) {
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix dst: " << plink->srciface << " != " <<
+                      compare_iface << endl);
+              continue;
+          } else {
+              SDEBUG(cerr << "          find_best_link (" << vlink->name <<
+                      "): Fix dst: " << plink->srciface << " == " <<
+                      compare_iface << endl);
+          }
+      }
+
 
       // Get delay characteristics - NOTE: Currently does not actually do
       // anything
@@ -1416,25 +1598,36 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	}
       } else {
 	// For non-emulated links, we're just looking for links with few (0,
-	// actually) users, and enough bandwidth
+	// actually) users, and enough bandwidth (if we're adjusting the bw
+        // on the vlink to match what's on the interfaces selected, we don't
+        // even need to check bandwidth)
 	if ((users < best_users) &&
-		(plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)) {
+                (vlink->delay_info.adjust_to_native_bandwidth ||
+		 (plink->delay_info.bandwidth >= vlink->delay_info.bandwidth)
+                 )) {
 	  best_pedge = *pedge_it;
 	  best_distance = distance;
 	  found_best = true;
 	  best_users = plink->emulated+plink->nonemulated;
+          SDEBUG(cerr << "          find_best_link: picked " << plink->name <<
+                  " with " << best_users << " users" << endl;)
 	}
       }
     }
   }
 
   if ((!vlink->emulated) && found_best && (best_users > 0)) {
+      SDEBUG(cerr << "      find_best_link failing (first case) (" <<
+              vlink->emulated << "," << found_best << "," << best_users <<
+              ")" << endl;)
       return false;
   }
   if (found_best) {
     out_edge = best_pedge;
+    SDEBUG(cerr << "      find_best_link succeeding" << endl;)
     return true;
   } else {
+    SDEBUG(cerr << "      find_best_link failing (second case)" << endl;)
     return false;
   }
 }

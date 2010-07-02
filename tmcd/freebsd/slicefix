@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,6 +10,7 @@ if [ -r /etc/emulab/paths.sh ]; then
 else
 	BINDIR=/etc/testbed
 	BOOTDIR=/var/emulab/boot
+	ETCDIR=/etc/emulab
 fi
 
 disk="ad0"
@@ -26,6 +27,51 @@ case $# in
 	echo "Usage: $0 partition [disk]"
 	exit 1
 esac
+
+#
+# Handle pseudo arguments in the environment.
+#   
+ACPI=${SLICEFIX_ACPI:-'unknown'}
+case $ACPI in
+0|no|NO)
+    ACPI=no
+    ;;
+1|yes|YES)
+    ACPI=yes
+    ;;
+*)
+    ACPI=unknown
+    ;;
+esac
+
+ASF=${SLICEFIX_ASF:-'unknown'}
+case $ASF in
+0|no|NO)
+    ASF=no
+    ;;
+1|yes|YES)
+    ASF=yes
+    ;;
+*)
+    ASF=unknown
+    ;;
+esac
+
+#
+# ...or the filesystem
+#
+if [ -r $ETCDIR/isflash ]; then
+    FLASHBOOT=1
+else
+    FLASHBOOT=0
+fi
+
+if [ -r $ETCDIR/bossnode ]; then
+    bossnode=`cat $ETCDIR/bossnode`;
+    setboss=1
+else
+    setboss=0
+fi
 
 dofreebsd() {
 	#
@@ -63,7 +109,7 @@ dofreebsd() {
 	#
 	# This is clearly not a solution.
 	#
-	version=`uname -v | sed -e 's/FreeBSD \([0-9]\).*/\1/'`
+	vers=`uname -v | sed -e 's/FreeBSD \([0-9]\).*/\1/'`
 
 	# see if there is a root ('a') partition on this BSD slice
 	`disklabel ${disk}s${part} 2>&1 | grep -s -E '^[ ]+a:' >/dev/null` || {
@@ -86,23 +132,112 @@ dofreebsd() {
 	#
 	changedisk=0
 	changeentropy=0
+	changeacpi=0
+	changeasf=0
 
-	# If our disk does not appear anywhere in fstab, we need to fix it
-	grep "^/dev/${disk}s" /mnt/etc/fstab >/dev/null 2>&1
+	fixit=0
+
+	# Hardwire the boss?
+	if [ $setboss -eq 1 ]; then
+	    fixit=1
+        fi
+
+	# If our disk/part does not appear anywhere in fstab, we need to fix it
+	grep "^/dev/${disk}s${part}" /mnt/etc/fstab >/dev/null 2>&1
 	case $? in
 	0)
 	    ;;
 	*)
 	    changedisk=1
+	    fixit=1
 	    ;;
 	esac
 
 	# If there is a /entropy file, we need to update it
 	if [ -f /mnt/entropy -a -c /dev/random ]; then
 		changeentropy=1
+		fixit=1
 	fi
 
-	if [ $changedisk -eq 0 -a $changeentropy -eq 0 ]; then
+	#
+	# See if we need to change the ACPI setting.
+	#
+	# If ACPI was not specified via TMCD, leave it along.
+	#
+	# If "acpi_load" does not appear at all in the loader.conf file,
+	# assume the OS cannot handle it (or that we do not know how to
+	# change it) and leave it alone.
+	#
+	if [ $ACPI != "unknown" ]; then
+	    grep "acpi_load=" /mnt/boot/loader.conf >/dev/null 2>&1
+	    case $? in
+	    0)
+		grep "^acpi_load=\"YES\"" /mnt/boot/loader.conf >/dev/null 2>&1
+		case $? in
+		0)
+		    if [ $ACPI = "no" ]; then
+			changeacpi=1
+			fixit=1
+		    fi
+		    ;;
+		*)
+		    if [ $ACPI = "yes" ]; then
+			changeacpi=1
+			fixit=1
+		    fi
+		    ;;
+		esac
+		;;
+	    *)
+		;;
+	    esac
+	fi
+
+	#
+	# See if we need to change the ASF setting.
+	#
+	# Note that, unlike ACPI, we change it even if there was no
+	# previous setting in /boot/loader.conf.
+	#
+	if [ $ASF != "unknown" ]; then
+	    grep "hw.bge.allow_asf=" /mnt/boot/loader.conf >/dev/null 2>&1
+	    case $? in
+	    0)
+		grep "^hw.bge.allow_asf=1" /mnt/boot/loader.conf >/dev/null 2>&1
+		case $? in
+		0)
+		    if [ $ASF = "no" ]; then
+			changeasf=1
+			fixit=1
+		    fi
+		    ;;
+		*)
+		    if [ $ASF = "yes" ]; then
+			changeasf=1
+			fixit=1
+		    fi
+		    ;;
+		esac
+		;;
+	    *)
+	        changeasf=1
+		fixit=1
+		;;
+	    esac
+	fi
+
+        # check to see if we need to download any postconfig scripts:
+	doosconfig=0
+	if [ -x $BINDIR/osconfig ]; then
+	    $BINDIR/osconfig -c -m /mnt -D $rootdev -s FreeBSD postload
+	    if [ $? -eq 0 ]; then
+		doosconfig=1
+		fixit=1
+	    fi
+	fi
+
+	if [ $fixit -eq 0 ]; then
+		echo "  no changes necessary"
 		umount $rootdev
 		return 0
 	fi
@@ -114,14 +249,24 @@ dofreebsd() {
 		return 1
 	}
 
+	# hardwire the boss node
+	if [ $setboss -eq 1 -a -d /mnt/etc/emulab ]; then
+	    echo "  hardwiring boss to $bossnode"
+	    cp $ETCDIR/bossnode /mnt/etc/emulab/bossnode || {
+	        echo "Failed to create /etc/emulab/bossnode"
+		umount $rootdev
+		return 1
+	    }
+	fi
+
 	if [ $changedisk -eq 1 ]; then
-	    echo "  updating /etc/dumpdates"
+	    echo "  updating /etc/fstab"
 	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
 	    }
-	    echo "  updated /etc/fstab"
+	    echo "  updating /etc/dumpdates"
 	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/dumpdates || {
 		echo "Failed to update /etc/dumpdates"
 		umount $rootdev
@@ -134,11 +279,69 @@ dofreebsd() {
 	    dd if=/dev/random of=/mnt/entropy bs=4096 count=1 >/dev/null 2>&1
 	fi
 
+	if [ $changeacpi -eq 1 ]; then
+	    if [ $ACPI = "no" ]; then
+		on="dis"
+	    else
+		on="en"
+	    fi
+	    echo "  ${on}abling ACPI"
+	    sed -E -i .orig -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
+		echo "Failed to update /boot/loader.conf"
+		umount $rootdev
+		return 1
+	    }
+	    if [ $ACPI = "no" ]; then
+		cat <<EOF1 >>/mnt/boot/loader.conf
+# disable ACPI
+acpi_load="NO"
+hint.acpi.0.disabled=1
+loader.acpi_disabled_by_user=1
+EOF1
+	    else
+		cat <<EOF2 >>/mnt/boot/loader.conf
+# enable ACPI
+acpi_load="YES"
+hint.acpi.0.disabled=0
+EOF2
+	    fi
+	fi
+
+	if [ $changeasf -eq 1 ]; then
+	    if [ $ASF = "no" ]; then
+		on="dis"
+	    else
+		on="en"
+	    fi
+	    echo "  ${on}abling ASF"
+	    sed -E -i .orig -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
+		echo "Failed to update /boot/loader.conf"
+		umount $rootdev
+		return 1
+	    }
+	    if [ $ASF = "no" ]; then
+		cat <<EOF1 >>/mnt/boot/loader.conf
+# disable ASF
+hw.bge.allow_asf=0
+EOF1
+	    else
+		cat <<EOF2 >>/mnt/boot/loader.conf
+# enable ASF
+hw.bge.allow_asf=1
+EOF2
+	    fi
+	fi
+
+	# actually run any postconfig scripts if we're supposed to:
+	if [ $doosconfig -eq 1 -a -x $BINDIR/osconfig ]; then
+	    $BINDIR/osconfig -m /mnt -D $rootdev -s FreeBSD postload
+	fi
+
 	umount $rootdev
 
 	# XXX need to fixup FS, see big comment above
-	if [ "x$version" = "x5" ]; then
-		echo "WARNING: FBSD5 may have modified the UFS1 root FS"
+	if [ "x$vers" != "x4" ]; then
+		echo "WARNING: FBSD${vers} may have modified the UFS1 root FS"
 	fi
 
 	return 0
@@ -187,6 +390,11 @@ dolinux() {
 		dtype="sd"
 		lrootdev="8${dunit}${part}"
 		;;
+	# perc
+	mfid[0-15])
+		dtype="sd"
+		lrootdev="8${dunit}${part}"
+		;;
 	# Megaraid
 	amrd[0-7])
 		dunit=`echo $disk | sed -e 's/amrd\([0-7]\)/\1/'`
@@ -209,12 +417,57 @@ dolinux() {
 		return 1
 	}
 
+	# hardwire the boss node
+	if [ $setboss -eq 1 -a -d /mnt/etc/emulab ]; then
+	    echo "  hardwiring boss to $bossnode"
+	    cp $ETCDIR/bossnode /mnt/etc/emulab/bossnode || {
+	        echo "Failed to create /etc/emulab/bossnode"
+		umount $rootdev
+		return 1
+	    }
+	fi
+
 	# change the swap devices in fstab
 	sed -i .orig -e "s;^/dev/[hs]d.\([0-7]\);/dev/${ldisk}\1;" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
 	}
+
+	#
+	# If there's a GRUB config file, update all root=X kernel params.
+	#
+	fgconf=/boot/grub/grub.conf
+	gconf=/mnt$fgconf
+        if [ ! -r $gconf ]; then
+	    echo "Could not find $fgconf; trying /boot/grub/menu.lst"
+	    fgconf=/boot/grub/menu.lst
+	    gconf=/mnt$fgconf
+	fi
+	if [ -r $gconf ]; then
+	    echo "  updating $fgconf"
+	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $gconf || {
+		echo "Failed to update $fgconf"
+	    }
+
+	    #
+	    # Tweak grub's notion of root.
+	    # Note that grub's partition numbering is zero-based.
+	    #
+	    gdisk=`echo $dunit | sed -e 'y/abcdefgh/01234567/'`
+	    gpart=`expr $part - 1`
+	    #
+	    # If we booted from a flash device we also have to further tweak
+	    # grub's notion of root disk since the flash device will be "hd0".
+	    # It appears that we do NOT have to update Linux's drive mapping.
+	    #
+	    if [ $FLASHBOOT -eq 1 ]; then
+	        gdisk=`expr $gdisk + 1`
+	    fi
+	    sed -i '' -e "s;root (hd[0-9],[0-9]);root (hd${gdisk},${gpart});" $gconf || {
+		echo "Failed to update root in $fgconf"
+	    }
+	fi
 
 	#
 	# If using lilo, update lilo.conf and set indicator to tell Emulab
@@ -224,7 +477,7 @@ dolinux() {
 	lconf=/mnt/etc/lilo.conf
 	if [ -r $lconf ]; then
 	    echo "  updating /etc/lilo.conf"
-	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" $lconf || {
+	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.[0-7];\1/${ldisk}${part};" $lconf || {
 		    echo "Failed to update /etc/lilo.conf"
 		    umount $rootdev
 		    return 1
@@ -242,6 +495,13 @@ dolinux() {
 	if [ -f /mnt/var/lib/random-seed -a -c /dev/urandom ]; then
 	    echo "  updating /var/lib/random-seed"
 	    dd if=/dev/urandom of=/mnt/var/lib/random-seed bs=512 count=1 >/dev/null 2>&1
+	fi
+
+	# run any postconfig scripts:
+	if [ -x $BINDIR/osconfig ]; then
+	    echo "Checking for dynamic client-side updates to slice...";
+	    $BINDIR/osconfig -m /mnt -M '-t ext2fs' -f ext2fs \
+		-D $rootdev -s Linux postload
 	fi
 
 	umount $rootdev

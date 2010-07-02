@@ -1,0 +1,230 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(setsid ceil);
+use POSIX ":sys_wait_h";
+
+sub usage ()
+{
+    print STDERR "Usage: $0 [-v] [-p] pid eid\n";
+    print STDERR " -v     - Enables verbose output\n";
+    print STDERR " -n     - Skip the diffs\n";
+    print STDERR " -p     - Turn on assign prepass\n";
+    print STDERR " -m <N> - Set the multiplex factor for the prepass\n";
+    exit(1);
+}
+my $optlist    = "vpm:ns:";
+my $verbose    = 0;
+my $prepass    = 0;
+my $nodiff     = 0;
+my $startwith  = 0;
+my $mfactor;
+my $optarg     = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $MAPPER      = "$TB/bin/mapper";
+my $WRAPPER     = "$TB/libexec/assign_wrapper";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+# Protos
+sub fatal($);
+sub DoRegression($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV && @ARGV != 2) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose++;
+    $optarg = "-v";
+}
+if (defined($options{"n"})) {
+    $nodiff++;
+}
+if (defined($options{"p"})) {
+    $prepass = 1;
+    $optarg  = "$optarg -x";
+}
+if (defined($options{"m"})) {
+    $mfactor = $options{"m"};
+    $optarg  = "$optarg -m $mfactor";
+}
+if (defined($options{"s"})) {
+    $startwith = $options{"s"};
+}
+
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+
+my @builtintests = ( 
+		     ["testbed",      "two-simple"],
+		     ["testbed",      "lan-link-delay"],
+		     ["testbed",      "lan-link-tbdelay"],
+		     ["testbed",      "jail-linklan-delay"],
+		     ["testbed",      "jail-delayed-router"],
+		     ["testbed",      "jail-lan-NN"],
+		     ["testbed",      "myelab"],
+		     ["emulab-ops",   "virt-mesh"],
+		     ["SkyNet",       "100nodebig"],
+		     ["puproj",       "CRAQ-LAN"],
+		     ["DDoS-Defense", "streamPuzzles2"],
+		     ["ShadowCfg",    "pplive-ct-zj"],
+		     ["tbres",        "lt-meshtest"],
+		     ["tbres",        "vnode-pairs"],
+		     ["testbed",      "bigolesnake"],
+		     ["testbed",      "firewall"],
+		     ["testbed",      "fourswitch"],
+		     ["testbed",      "planetlab2"], 
+		     ["tbres",        "mess"],
+		     ["tbres",        "pelab-bt-fake"],
+		     # Template 11361/46
+		     ["tbres",        "T11361-46"], 
+		     # Template 11953/3
+		     ["tbres",        "T11953-3"],
+		     # This takes a long time!
+		     ["SkyNet",       "500nodebig"],
+		   );
+
+if (@ARGV) {
+    @builtintests = ([$ARGV[0], $ARGV[1]]);
+}
+
+foreach my $ref (@builtintests) {
+    my ($pid, $eid) = @{$ref};
+
+    if ($startwith > 0) {
+	$startwith--;
+	next;
+    }
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	fatal("Could not lookup experiment object $pid,$eid!");
+    }
+    if (!TBAdmin() &&
+	! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
+	fatal("You do not have permission to map this experiment!");
+    }
+    DoRegression($experiment);
+}
+exit(0);
+
+sub DoRegression($)
+{
+    my ($experiment) = @_;
+
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    print "Doing a regression test on $pid,$eid\n";
+    
+    if (! -e "Mapper/$pid/$eid") {
+	system("mkdir -p Mapper/$pid/$eid") == 0
+	    or fatal("Could not mkdir Mapper/$pid/$eid");
+    }
+    if (! -e "Wrapper/$pid/$eid") {
+	system("mkdir -p Wrapper/$pid/$eid") == 0
+	    or fatal("Could not mkdir Wrapper/$pid/$eid");
+    }
+    system("/bin/rm -rf Mapper/$pid/$eid/* Wrapper/$pid/$eid/*") == 0
+	or fatal("Could not clean directories");
+
+    my $now = time();
+    print "  Running the wrapper ... \n";
+    system("cd Wrapper/$pid/$eid; ".
+	   "$WRAPPER -r -k $optarg $pid $eid > wrapper.log 2>&1");
+    if ($?) {
+	fatal("Wrapper failed");
+    }
+    my $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+    
+    $now = time();
+    print "  Running the mapper ... \n";
+    system("cd Mapper/$pid/$eid; ".
+	   "$MAPPER -r -z $optarg $pid $eid > mapper.log 2>&1");
+    if ($?) {
+	fatal("Mapper failed");
+    }
+    $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+
+    if (! $nodiff) {
+	print "  Diffing the results ...\n";
+	system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
+	       "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
+	       or fatal("Results differed!");
+    }
+
+    print " Running in reverse mode ...\n";
+
+    system("/bin/rm -rf Mapper/$pid/$eid/* Wrapper/$pid/$eid/*") == 0
+	or fatal("Could not clean directories");
+
+    $now = time();
+    print "  Running the mapper ... \n";
+    system("cd Mapper/$pid/$eid; ".
+	   "$MAPPER -r -k $optarg $pid $eid > mapper.log 2>&1");
+    if ($?) {
+	fatal("Mapper failed");
+    }
+    $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+    
+    $now = time();
+    print "  Running the wrapper ... \n";
+    system("cd Wrapper/$pid/$eid; ".
+	   "$WRAPPER -r -z $optarg $pid $eid > wrapper.log 2>&1");
+    if ($?) {
+	fatal("Wrapper failed");
+    }
+    $howlong = time() - $now;
+    print "    Done in $howlong seconds\n";
+
+    if (! $nodiff) {
+	print "  Diffing the results ...\n";
+	system("diff -r -q Mapper/$pid/$eid/$pid-$eid.pstate ".
+	       "           Wrapper/$pid/$eid/$pid-$eid.pstate") == 0
+	       or fatal("Results differed!");
+    }
+    return 0;
+}
+
+exit(0);
+
+sub fatal($)
+{
+    die("$_[0]\n");
+}

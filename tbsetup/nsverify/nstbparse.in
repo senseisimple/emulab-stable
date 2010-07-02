@@ -1,4 +1,9 @@
 #! @prefix@/libexec/nsverify/nstb
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 # rename set in order to capture the variable names used in the ns file.
 variable last_host {}
@@ -14,6 +19,7 @@ variable links
 # optional items
 variable rtproto "none"
 variable simname
+variable DATASTORE "@PROJROOT_DIR@"
 
 rename puts real_puts
 proc puts {args} {

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -46,9 +46,21 @@ my $daemon  = 1;
 my $reconfig= 0;
 my $action;
 
+# Prototypes
+sub prebootvnodes($$);
+sub postbootvnodes($$);
+sub bootvnode($$$);
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
+#
+# From rc.bootsetup:
+#
+# "-f"        first time boot, use vnode list from TMCC
+# "-f -h"     shutdown, vnodes that are running
+# "-f -c -h"  shutdown during reconfig, vnodes running but not in TMCC list
+# "-f -c -b"  reboot during reconfig
 #
 %options = ();
 if (! getopts($optlist, \%options)) {
@@ -87,15 +99,10 @@ if ($UID != 0) {
 	"    Must be root to run this script!\n");
 }
 
-#
-# XXX
-# Do not run the vnode startup on Linux nodes yet.
-#
+# We need to know this below.
 my $sysname = `uname -s`;
 chomp($sysname);
-if ($sysname eq "Linux") {
-    exit(0);
-}
+my $islinux = ($sysname eq "Linux");
 
 #
 # Put this into the background and log its output. We *must* do this cause
@@ -106,6 +113,191 @@ if ($daemon && TBBackGround($logname)) {
     # Parent exits normally
     #
     exit(0);
+}
+
+#
+# This applies to whatever vnodes are running. Do it and exit.
+# 
+if (defined($action) && !$reconfig) {
+    opendir(DIR, "$vndir") or
+	die("Cannot opendir $vndir: $!\n");
+    my @files = readdir(DIR);
+    closedir(DIR);
+
+    foreach my $file (@files) {
+	if ($file =~ /^((?:pc|homenet)vm[-\w]*)$/) {
+	    bootvnode($1, $action, (-e "$vndir/$file/fakejail" ? 0 : 1));
+	}
+    }
+    exit(0);
+}
+
+my %newvnodelist = ();
+my %curvnodelist = ();
+my $fakejails = 0;
+
+#
+# Get the current set of vnodes that are supposed to be running on
+# this node.
+#
+my @tmccresults;
+
+if (tmcc(TMCCCMD_VNODELIST, undef, \@tmccresults) < 0) {
+    die("*** WARNING: Could not get vnode list from server!\n");
+}
+foreach my $str (@tmccresults) {
+    if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+	$newvnodelist{$1} = $2;
+	$fakejails++
+	    if ($2 eq "0");
+    }
+    else {
+	warn("*** WARNING: Skipping bad subnodeid: '$str'\n");
+    }
+}
+
+#
+# If doing a reconfig, get the current set of vnodes that are running.
+# We want to compare that list against the list we just got from tmcd.
+#
+if ($reconfig) {
+    opendir(DIR, "$vndir") or
+	die("Cannot opendir $vndir: $!\n");
+    my @files = readdir(DIR);
+    closedir(DIR);
+
+    foreach my $file (@files) {
+	if ($file =~ /^((?:pc|homenet)vm[-\w]*)$/) {
+	    if (-e "$vndir/$file/fakejail") {
+		$fakejails++;
+		$curvnodelist{$1} = 0;
+	    } else {
+		$curvnodelist{$1} = 1;
+	    }
+	}
+    }
+
+    #
+    # Reboot nodes that are running and in the current list from tmcd.
+    # Kill nodes that are running but not in the current list from tmcd.
+    #
+    foreach my $vnode (sort(keys(%curvnodelist))) {
+	if (exists($newvnodelist{$vnode})) {
+	    bootvnode($vnode,
+		      (defined($action) ? $action : "reboot"),
+		      $newvnodelist{$vnode});
+	    delete($newvnodelist{$vnode});
+	}
+	else {
+	    bootvnode($vnode, "kill", $curvnodelist{$vnode});
+	}
+    }
+}
+# XXX Exit if specific action requested, and it was not "boot"
+exit(0)
+    if (defined($action) && $action ne "boot");
+
+# Exit if nothing left to do (no new vnodes).
+exit(0)
+    if (! scalar(keys(%newvnodelist)));
+
+prebootvnodes(\%curvnodelist, \%newvnodelist)
+    if (!$fakejails);
+
+foreach my $vnode (sort(keys(%newvnodelist))) {
+    # Blocks until mostly setup. 
+    bootvnode($vnode, "boot", $newvnodelist{$vnode});
+}
+
+postbootvnodes(\%curvnodelist, \%newvnodelist)
+    if (!$fakejails);
+
+exit(0);
+
+#
+# Prepare the vnode host prior to individual vnode setup
+# Takes references to the current and new vnode hashes.
+#
+sub prebootvnodes($$)
+{
+    my ($cvn, $nvn) = @_;
+
+    #
+    # XXX OS dependent stuff.  Should move elsewhere.
+    #
+    if ($islinux) {
+	# This is handled in the libvnode libraries.
+	return;
+    }
+
+    #
+    # For local vnodes, create the extra FS for filesystems and other state.
+    # This will fail if it already exists, so just keep going.
+    #
+    if (!REMOTE()) {
+	my $mntdir = $vndir;
+	system("mkextrafs.pl $mntdir");
+    }
+
+    #
+    # Symlink /local into it.
+    #
+    if (! -e "/local") {
+	system("ln -s " . LOCALROOTFS() . " /local");
+    }
+
+    #
+    # Make sure enough vn devices exist
+    #
+    for (my $i = 0; $i < scalar(keys(%$nvn)) + scalar(keys(%$cvn)); $i++) {
+	my $dev = "vn${i}";
+	if (! -e "/dev/${dev}c") {
+	    system("(cd /dev; ./MAKEDEV $dev)");
+	}
+    }
+
+    #
+    # XXX tweak IP interrupt queue size to accomodate up to 8 x 100Mb
+    # trivial links XXX turn on local hack to retry on NFS EACCES
+    # errors (thanks mountd!)
+    #
+    system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
+    system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
+
+    #
+    # XXX grossed out yet?  Try this one: the mount command will HUP mountd
+    # after every successful mount.  Thus if mounts in one jail overlap NFS
+    # activity in another, the latter may be randomly killed off.
+    #
+    # Elegant solution: rename the mountd.pid file so mount cannot find it!
+    # XXX hmm...mountd_sux hack above should take care of this, and we need
+    # to hup mountd when we modify the exports file.
+    #
+    rename("/var/run/mountd.pid", "/var/run/mountd.thisreallysux")
+	if (-e "/var/run/mountd.pid");
+}
+
+#
+# Final setup of vnode host after individual vnode setup
+# Takes references to the current and new vnode hashes.
+#
+sub postbootvnodes($$)
+{
+    my ($cvn, $nvn) = @_;
+
+    #
+    # XXX OS dependent stuff.  Should move elsewhere
+    #
+    if ($islinux) {
+	return;
+    }
+
+    my $PIDFILE = "/var/run/progagent.pid";
+
+    foreach my $vnode (keys(%$nvn)) {
+	system("rtprio 15 -`cat $vndir/$vnode/root/$PIDFILE`")
+	    if (-e "$vndir/$vnode/root/$PIDFILE");
+    }
 }
 
 #
@@ -133,146 +325,9 @@ sub bootvnode($$$)
 	$opt = "-b";
 	$act = "Booting";
     }
-    $opt .= " -jVt"
-	if ($jailed);
+    $opt .= ($jailed ? " -jVt" : " -i");
     
-    print "$act vnode $vnode ...\n";
+    print "$act vnode $vnode with options '$opt' ...\n";
     system("vnodesetup $opt $vnode");
     return($?);
 }
-
-#
-# This applies to whatever vnodes are running. Do it and exit.
-# 
-if (defined($action) && !$reconfig) {
-    opendir(DIR, "$vndir") or
-	die("Cannot opendir $vndir: $!\n");
-    my @files = readdir(DIR);
-    closedir(DIR);
-
-    foreach my $file (@files) {
-	if ($file =~ /^(pcvm[-\w]*)$/) {
-	    # Assume jailed for now.
-	    bootvnode($1, $action, 1);
-	}
-    }
-    exit(0);
-}
-
-my %newvnodelist = ();
-my %curvnodelist = ();
-
-#
-# Get the current set of vnodes that are supposed to be running on
-# this node.
-#
-my @tmccresults;
-
-if (tmcc(TMCCCMD_VNODELIST, undef, \@tmccresults) < 0) {
-    die("*** WARNING: Could not get vnode list from server!\n");
-}
-foreach my $str (@tmccresults) {
-    if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
-	$newvnodelist{$1} = $2;
-    }
-    else {
-	warn("*** WARNING: Skipping bad subnodeid: '$str'\n");
-    }
-}
-
-#
-# If doing a reconfig, get the current set of vnodes that are running.
-# We want to compare that list against the list we just got from tmcd.
-#
-if ($reconfig) {
-    opendir(DIR, "$vndir") or
-	die("Cannot opendir $vndir: $!\n");
-    my @files = readdir(DIR);
-    closedir(DIR);
-
-    foreach my $file (@files) {
-	if ($file =~ /^(pcvm[-\w]*)$/) {
-	    $curvnodelist{$1} = 1;	# XXX Assume jailed.
-	}
-    }
-
-    #
-    # Reboot nodes that are running and in the current list from tmcd.
-    # Kill nodes that are running but not in the current list from tmcd.
-    #
-    foreach my $vnode (sort(keys(%curvnodelist))) {
-	if (exists($newvnodelist{$vnode})) {
-	    bootvnode($vnode,
-		      (defined($action) ? $action : "reboot"),
-		      $newvnodelist{$vnode});
-	    delete($newvnodelist{$vnode});
-	}
-	else {
-	    bootvnode($vnode, "kill", $curvnodelist{$vnode});
-	}
-    }
-}
-# XXX Exit if specific action requested, and it was not "boot"
-exit(0)
-    if (defined($action) && $action ne "boot");
-
-# Exit if nothing left to do (no new vnodes). 
-exit(0)
-    if (! scalar(keys(%newvnodelist)));
-
-#
-# If booting with vnodes, then see about creating the extra FS.
-# This will fail if it already exists. Keep going on any failure though.
-#
-if (!REMOTE()) {
-    system("mkextrafs.pl $vndir");
-}
-
-#
-# Symlink /local into it.
-#
-if (! -e "/local") {
-    system("ln -s " . LOCALROOTFS() . " /local");
-}
-
-#
-# Make sure enough vn devices exist
-#
-for (my $i = 0;
-     $i < scalar(keys(%newvnodelist)) + scalar(keys(%curvnodelist)); $i++) {
-    my $dev = "vn${i}";
-    if (! -e "/dev/${dev}c") {
-        system("(cd /dev; ./MAKEDEV $dev)");
-    }
-}
-
-#
-# XXX tweak IP interrupt queue size to accomodate up to 8 x 100Mb trivial links
-# XXX turn on local hack to retry on NFS EACCES errors (thanks mountd!)
-#
-system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
-system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
-
-#
-# XXX grossed out yet?  Try this one: the mount command will HUP mountd
-# after every successful mount.  Thus if mounts in one jail overlap NFS
-# activity in another, the latter may be randomly killed off.
-#
-# Elegant solution: rename the mountd.pid file so mount cannot find it!
-#
-rename("/var/run/mountd.pid", "/var/run/mountd.thisreallysux")
-    if (-e "/var/run/mountd.pid");
-
-foreach my $vnode (sort(keys(%newvnodelist))) {
-    # Blocks until mostly setup. 
-    bootvnode($vnode, "boot", $newvnodelist{$vnode});
-}
-
-my $PIDFILE = "/var/run/progagent.pid";
-
-foreach my $vnode (keys(%newvnodelist)) {
-    system("rtprio 15 -`cat $vndir/$vnode/root/$PIDFILE`")
-	if (-e "$vndir/$vnode/root/$PIDFILE");
-}
-
-exit(0);

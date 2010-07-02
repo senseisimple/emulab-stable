@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
@@ -13,13 +19,13 @@ all:	$(PROGRAMS)
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS   += -DDEBUG
-CFLAGS	 += -O -g -static -Wall
+CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 
-LDFLAGS  += -static -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += $(LDSTATIC) -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
-LIBS     += `elvin-config --libs vin4c`
+LIBS     +=  -L/usr/local/lib -lpubsub -lm
 ifeq ($(SYSTEM),Linux)
 LIBS     += -ldl
 endif
@@ -29,6 +35,9 @@ tbrecv:		tbrecv.o
 
 tbsend:		tbsend.o
 	$(CC) $(LDFLAGS) -o $@ tbsend.o $(LIBS)
+
+dumpevsubs:	dumpevsubs.o
+	$(CC) $(LDFLAGS) -o $@ dumpevsubs.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 

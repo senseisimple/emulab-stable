@@ -1,0 +1,255 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+#
+# Fire up ntp from /etc/rc. This is a strict wrapper so it should be
+# invoked from /etc/rc.conf as such:
+#
+#	xntpd_program="/usr/local/etc/emulab/ntpstart"
+#	xntpd_flags="/usr/sbin/ntpd -p /var/run/ntpd.pid"
+#
+# which is to say that this program passes it entire argument list to
+# off to the shell once it sets up the config file. We fire off ntp
+# no matter what happens though.
+#
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Prototypes.
+#
+sub fatal($);
+sub ntpstart();
+sub ntpdate();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Locals
+my @ntpinfo	= ();
+my $useold	= 1;
+my $newfile     = "/tmp/ntp.conf.new";
+my $ntpfile     = "/etc/ntp.conf";
+my $driftfile   = "/etc/ntp.drift";
+my $pidfile	= "/var/run/ntpd.pid";
+my $ntpdate     = "/usr/sbin/ntpdate";
+my $debug       = 0;
+my %tmccresults;
+
+#
+# Since this is a wrapper, we have to try to start ntp no matter what.
+#
+sub ntpstart () {
+    #
+    # No arguments means don't run ntpd, we just wanted to run ntpdate
+    #
+    return 0
+	if (!@ARGV);
+
+    #
+    # XXX FreeBSD 7 prepends "-c <configfile>" to the arguments
+    # which in our case means before the command name!
+    #
+    if ($ARGV[0] eq "-c") {
+	shift @ARGV;
+	shift @ARGV;
+    }
+    if ($debug) {
+	print "@ARGV\n";
+	return 0;
+    }
+    system("@ARGV");
+    return ($? >> 8);
+}
+
+#
+# Run ntpdate to get the time set correctly before starting ntpd
+#
+sub ntpdate() {
+    #
+    # We need to give -b to set time directly (instead of using adjtime()),
+    # and use "ntp1" in the boss node's domain as the server.
+    #
+    my $bossname = tmccbossname();
+    if (!defined($bossname)) {
+	return (1);
+    }
+    if ($bossname !~ /^[^\.]+(\..*)/) {
+	return (1);
+    }
+    my $ntpname = "ntp1$1";
+
+    my $ntpcmd   = "$ntpdate -b -s ";
+    if (REMOTE()) {
+	$ntpcmd .= "-t 5 ";
+    }
+    $ntpcmd .= "$ntpname";
+
+    if ($debug) {
+	print "$ntpcmd\n";
+	return 0;
+    }
+    system("$ntpcmd");
+    return ($? >> 8);
+}
+
+#
+# First, run ntpdate so that we start out with the time set correctly. If
+# it fails, we just warn about it, and let things continue anyway
+#
+if (ntpdate()) {
+    warn "WARNING: ntpdate failed!\n";
+}
+
+#
+# Ask for setup. If none then we are done. If provided with a drift value
+# but no servers/peers, then need to leave the config alone and just
+# replace the drift file.
+#
+if (REMOTE()) {
+    # Do not allow blocking on the network.
+    configtmcc("timeout", 5);
+}
+
+if (tmcc(TMCCCMD_NTPINFO, undef, \%tmccresults) < 0) {
+    warn("*** $0:\n".
+	 "    Failed to get ntpinfo from server! Falling back ...\n");
+    exit(ntpstart());
+}
+
+if (exists $tmccinfo{'peer'}) {
+	my $ref = $tmccinfo{'peer'};
+	if (ref $ref eq 'ARRAY') {
+		map { push @ntpinfo, "PEER=$_\n" } @$ref;
+	}
+	else {
+		push @ntpinfo, "PEER=$ref\n";
+	}
+	$useold = 0;
+}
+
+if (exists $tmccinfo{'server'}) {
+	my $ref = $tmccinfo{'server'};
+	if (ref $ref eq 'ARRAY') {
+		map { push @ntpinfo, "SERVER=$_\n" } @$ref;
+	}
+	else {
+		push @ntpinfo, "SERVER=$ref\n";
+	}
+	$useold = 0;
+}
+
+if (! @ntpinfo) {
+    exit(ntpstart());
+}
+
+#
+# We are going to copy the old file to a new file, munging it as we go.
+# Note that if the server did not provide any servers or peers, we want
+# to use whatever is in the original file, but we still have to read it
+# to find the name of the driftfile. So, just make a copy and throw it
+# away later if it turns out we do not need a new version.
+#
+open(NEW, "> $newfile")
+    or fatal("Could not open $newfile: $!");
+open(NTP, "< $ntpfile")
+    or fatal("Could not open $ntpfile: $!");
+
+while (<NTP>) {
+    chomp();
+    SWITCH1: {
+	/^peer.*$/ && do {
+	    last SWITCH1;
+	};
+	# Leave refclock lines alone
+	/^server.*127\.127.*$/ && do {
+	    print NEW "$_\n";
+	    last SWITCH1;
+	};
+	/^server.*$/ && do {
+	    last SWITCH1;
+	};
+	/^driftfile[\s]*(\/.*)$/ && do {
+	    $driftfile = $1;
+	};
+	print NEW "$_\n";
+    }
+}
+
+#
+# Okay, now tack on the servers and peers to the new file. The drift
+# goes into the driftfile. 
+# 
+foreach my $line (@ntpinfo) {
+    $_ = $line;
+
+    SWITCH1: {
+	/^PEER=(.*)$/ && do {
+	    print NEW "peer $1\n";
+	    last SWITCH1;
+	};
+	/^SERVER=(.*)$/ && do {
+	    print NEW "server $1\n";
+	    last SWITCH1;
+	};
+	/^DRIFT=(.*)$/ && do {
+	    open(DRIFT, "> $driftfile");
+	    print DRIFT "$1\n";
+	    close(DRIFT);
+	    last SWITCH1;
+	};
+    }
+}
+
+close(NTP)
+    or fatal("Could not close $ntpfile: $!");
+close(NEW)
+    or fatal("Could not close $newfile: $!");
+
+#
+# If it turns out we want to use the old file (no servers/peers provided)
+# then start ntp and exit. The new file is thrown away ...
+#
+if ($useold) {
+    exit(ntpstart());
+}
+
+#
+# Okay, back up the old file and replace it with the new file!
+#
+system("cp -fp $ntpfile $ntpfile.old");
+if ($?) {
+    fatal("Could not backup $ntpfile to $ntpfile.old\n");
+}
+system("cp -fp $newfile $ntpfile");
+if ($?) {
+    fatal("Could not replace $ntpfile with $newfile\n");
+}
+exit(ntpstart());
+
+#
+# Print error and exit, but must start ntp anyway!
+#
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    print STDERR "*** $0:\n" .
+	         "    $msg\n";
+    exit(ntpstart());
+}

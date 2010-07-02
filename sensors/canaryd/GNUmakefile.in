@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,9 +21,10 @@ CFLAGS+= -Wall -g -I${OBJDIR} -I/usr/local/include \
 		-I$(TESTBED_SRCDIR)/event/lib \
 		-DCLIENT_BINDIR='"$(CLIENT_BINDIR)"' \
 		-DLOG_TESTBED=$(LOG_TESTBED) \
-		`elvin-config --cflags vin4c`
-LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql -L${OBJDIR}/event/lib -static
-LIBS+= -ltb -levent -lcrypto `elvin-config --libs vin4c`
+		-I/usr/local/include
+LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql -L${OBJDIR}/event/lib
+LDFLAGS+= $(LDSTATIC)
+LIBS+= -ltb -levent -lcrypto -L/usr/local/lib -lpubsub -lm
 CP= cp -pf
 
 SYSTEM  := $(shell uname -s)
@@ -33,7 +34,7 @@ all: $(CDPROGS) client
 include ${TESTBED_SRCDIR}/GNUmakerules
 
 canaryd: canaryd.o childProcess.o networkInterface.o canarydEvents.o auxfuncs.o version.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ canaryd.o childProcess.o networkInterface.o canarydEvents.o auxfuncs.o version.o $(LIBS) -ldevstat
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ canaryd.o childProcess.o networkInterface.o canarydEvents.o auxfuncs.o version.o $(LIBS) -ldevstat
 
 alertlistener: alertlistener.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ alertlistener.o $(LIBS)

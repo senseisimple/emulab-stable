@@ -1,0 +1,155 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+BEGIN {
+  #add localcpan path to library search path
+  if (-f glob("~/lib/perl5/Test/Harness.pm")) {
+    my $localcpan_path = glob('~/lib/perl5');
+    push @INC, $localcpan_path;
+  }
+}
+use lib 'lib';
+use SemiModern::Perl;
+use TBConfig;
+use TestBed::TestSuite;
+use TestBed::XMLRPC::Client::Pretty;
+use Data::Dumper;
+use Tools;
+use Tools::Network;
+use TestBed::Wrap::tevc;
+
+#$TBConfig::DEBUG_XML_CLIENT = 1;
+
+#$SIG{ __DIE__ } = $TestBed::TestSuite::error_trace;
+
+my $ns = <<'NSEND';
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set node1 [$ns node]
+set node2 [$ns node]
+
+set lan1 [$ns make-lan "$node1 $node2" 100Mb 0ms]
+set link1 [$ns duplex-link $node1 $node2 100Mb 50ms DropTail]
+$ns run
+NSEND
+
+sub usage {
+say <<'END'
+ShortCut
+./sc CMD EID ARGS
+
+  CMD = start
+        swapin
+        swapout
+        end
+        endall
+        watch
+        watchall
+        ping
+        tevc
+        linktest
+        single_node_tests
+        ni    // nodeinfo expinfo
+        li    // linkinfo expinfo
+        fqnn  // list fully qualified node names
+        im    // $e->info(aspect => 'mapping'))
+        ip    // $e->info(aspect => 'physical'))
+        it    // $e->info(aspect => 'traces'))
+        il    // $e->info(aspect => 'links'))
+        ex    execute arbitrary perl code
+        rn    // node_reboot pc137
+END
+}
+
+sub end_all_experiments {
+  e->pretty_list;
+  say "";
+  if (Tools::yn_prompt("Are you sure you want to terminate all experiments?")) {
+    my @experiment_names = experiments_hash_to_list(e->getlist_full);
+    for(@experiment_names) { eval { say "Ending " . $_->[0]; e(@{$_->[0]})->end; }; }
+    for(@experiment_names) { eval { e(@{$_->[0]})->ensure_end; }; }
+  }
+}
+
+sub watch {
+  my $e = shift;
+  my $result = "INIT";
+  my $eid = $e->eid;
+  while ($result) {
+    my $result = $e->state;
+    say Tools::prettytimestamp . " Watch $eid = $result";
+    sleep(2);
+  }
+}
+
+sub watchall {
+  while (1) {
+    say Tools::prettytimestamp;
+    e->pretty_list;
+    sleep(5);
+  }
+}
+
+sub parsee {
+  split(/\./, shift);
+}
+
+eval {
+if (@ARGV) {
+  $_ = shift;
+  if (/endall/)      { end_all_experiments; }
+  elsif ($_ eq 'st') { e->pretty_list; }
+  elsif (/end/)      { for(@ARGV) { e(split(/\./, $_))->end; }; }
+  elsif (/watchall/) { watchall; }
+  elsif (/rn/)       { (say Dumper(Tools::Network::node_reboot($_))) for @ARGV; }
+  else {
+    my $e = e(parsee(shift));
+    if (/--help/)               { usage; }
+    elsif (/end/)               { $e->end_wait; }
+    elsif (/ping/ )             { $e->ping_test; }
+    elsif (/swapin/)            { $e->swapin_wait; }
+    elsif (/swapout/)           { $e->swapout_wait; }
+    elsif (/start/)             { $e->startexp_ns_wait($ns); }
+    elsif (/tevc/)              { $e->tevc(@ARGV); }
+    elsif (/linktest/)          { $e->linktest; }
+    elsif (/single_node_tests/) { $e->single_node_tests; }
+    elsif (/fqnn/)              { say Dumper($e->fqnodenames) ;}
+    elsif (/ni/)                { say Dumper($e->nodeinfo) ;}
+    elsif (/li/)                { say Dumper($e->linkinfo) ;}
+    elsif (/im/)                { say Dumper($e->info(aspect => 'mapping')) ;}
+    elsif (/ip/)                { say Dumper($e->info(aspect => 'physical')) ;}
+    elsif (/it/)                { say Dumper($e->info(aspect => 'traces')) ;}
+    elsif (/il/)                { say Dumper($e->info(aspect => 'links')) ;}
+    elsif (/watch/)             { watch($e); }
+    elsif ($_ eq'ex') { 
+      my $code = $ARGV[0];
+      my $cmdstring = "sayd($code);"; 
+      say $cmdstring;
+      my $result = eval $code;
+      sayd($@) if $@;
+      sayd($result);
+    }
+    else {
+      my $cmdstring = "sayd(\$e->$_);"; 
+      say $cmdstring;
+      my $result = eval $cmdstring;
+      sayd($@) if $@;
+      sayd($result);
+    }
+  }
+}
+else {
+  usage;
+  e->pretty_list;
+}
+};
+if ($@) {
+  sayd($@);
+}
+
+# vim: ft=perl:

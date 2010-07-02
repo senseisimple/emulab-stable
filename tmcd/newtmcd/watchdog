@@ -1,0 +1,1042 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# The Emulab watchdog. Currently, not really much of a watchdog. Simply
+# contacts tmcd to find out if it needs to do an update.
+#
+sub usage()
+{
+    print "Usage: watchdog [-dvn] [start | stop]\n";
+    exit(1);
+}
+my $optlist = "Fdvn";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# XXX should be in libsetup
+my $svcslice    = "utah_elab_svc";
+sub PLABSVC() {
+    return (PLAB() &&
+	(defined($ENV{'USER'}) && ($ENV{'USER'} eq $svcslice) ||
+	 defined($ENV{'SUDO_USER'}) && ($ENV{'SUDO_USER'} eq $svcslice)));
+}
+
+# Locals
+my $action	= "start";
+my $logname	= "$LOGDIR/emulab-watchdog.log";
+my $pidfile	= "/var/run/emulab-watchdog.pid";
+my $rusagebin	= "$BINDIR/plabrusage";
+my $keydir	= "/etc/ssh";
+my @keylist     = ("ssh_host_key", "ssh_host_dsa_key", "ssh_host_rsa_key");
+my $battlog     = "/var/emulab/logs/battery.log";
+my $debug	= 0;
+my $verbose     = 0;
+my $updatefailed= 0;
+my $noproxy     = 0;
+my $driftfile;
+my $lastdrift;
+my $rusagestr;
+my $curtime;
+
+# we periodically log something verbose even when verbose is not set
+my $speakupiv	= 300;
+my $speakup     = 0;
+
+# tmcc retries
+my $trytcp = 0;
+my $maxretries  = 3;
+my %retry;
+
+# XXX testing
+my $fakeit;
+my %faketimes;
+
+#
+# Default interval values in seconds.
+# Compatible with old, static watchdog.
+#
+# yeah yeah, all these hashes should be a hash of records or something.
+#
+my %iv = (
+    check   => 0,
+    isalive => ((REMOTE() == 1) ? (PLAB() ? 600 : 60) : (JAILED() ? 600 : 180)),
+    drift   => (60 * 60 * 12),
+    cvsup   => (60 * 60 * 12),
+    rusage  => 0,
+    hkeys   => 0,
+    batt    => (STARGATE() ? 60 : 0),
+    rootpswd=> 0,
+);
+
+my %funcs = (
+    check   => \&setintervals,
+    isalive => \&sendisalive,
+    drift   => \&ntpdrift,
+    cvsup   => \&runcvsup,
+    rusage  => \&sendrusage,
+    hkeys   => \&sendhkeys,
+    batt    => \&sendbatt,
+    rootpswd=> \&setrootpswd,
+);
+
+my %immediate = (
+    check   => 0,
+    isalive => 1,
+    drift   => 0,
+    cvsup   => 0,
+    rusage  => 1,
+    hkeys   => 1,
+    batt    => 1,
+    rootpswd=> 1,
+);
+
+#
+# Forward declarations for prototype checking
+#
+sub setintervals($);
+sub sendisalive($);
+sub ntpdrift($);
+sub runcvsup($);
+sub sendrusage($);
+sub sendhkeys($);
+sub sendbatt($);
+sub setrootpswd($);
+sub logmsg($;$);
+sub saysomething($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+if (defined($options{"n"})) {
+    $noproxy = 1;
+}
+if (defined($options{"F"})) {
+    $fakeit = 1;
+}
+if (@ARGV) {
+    $action = $ARGV[0];
+
+    if (@ARGV != 1 || ($action ne "start" && $action ne "stop")) {
+	usage();
+    }
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# For stop, look to see if the pid file exists. If so, kill it and exit.
+#
+if ($action eq "stop") {
+    if (! -e $pidfile) {
+	exit(0);
+    }
+    system("kill `cat $pidfile`");
+    sleep(1);
+    exit($? >> 8);
+}
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if (!$debug && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    select(undef, undef, undef, 0.25);
+    exit(0);
+}
+
+#
+# Write our pid into the pid file so we can be killed later. We must
+# do this first so that we can be killed before we change the sig
+# handlers.
+#
+system("echo '$PID' > $pidfile") == 0
+    or die("Could not create $pidfile!");
+
+#
+# Setup a handler to catch TERM, and kill our process group.
+#
+my $pgrp = getpgrp(0);
+
+sub handler () {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT} = 'IGNORE';
+    kill('TERM', -$pgrp);
+    unlink($pidfile);
+    sleep(5);
+    exit(0);
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# If jailed, get our jailname. 
+#
+if (JAILED() || PLAB()) {
+    my $vnodeid = libsetup_getvnodeid();
+
+    # Tell the tmcc library. Note that its actually been done via libsetup
+    # but I duplicate it here to make it explicit.
+    configtmcc("subnode", $vnodeid);
+
+    # This doesn't work yet, at least for jails since tmcd
+    # doesn't accept requests from them
+    #configtmcc("noproxy", $noproxy);
+}
+
+#
+# XXX plab UDP calls sometimes fail with EINVAL when reading a reply,
+#     combat this by forcing the last retry of a failing call to use TCP
+#     in the plab service slice.  Maybe we should do this for all plab
+#     slices...
+# XXX ok, really bad idea.  This just causes all our tmcd processes to
+#     get hung with open connections to flaky plab machines
+#
+#$trytcp = 1 if (PLABSVC());
+
+#
+# For sending back ntpdrift.
+# 
+if (-e "/etc/ntp.drift") {
+    $driftfile = "/etc/ntp.drift";
+} elsif (-e "/etc/ntp/drift") {
+    $driftfile = "/etc/ntp/drift";
+} elsif (-e "/var/lib/ntp/drift") {
+    $driftfile = "/var/lib/ntp/drift";
+}
+
+#
+# Initial drift value, we only update if it changes
+#
+if (defined($driftfile)) {
+    $lastdrift = `cat $driftfile`;
+    chomp($lastdrift);
+}
+
+#
+# Retry state for failed tmcc calls
+#
+$retry{check} = 0;
+$retry{isalive} = 0;
+$retry{drift} = 0;
+$retry{rusage} = 0;
+$retry{hkeys} = 0;
+$retry{batt} = 0;
+
+$curtime = time();
+if ($fakeit) {
+    logmsg("Faking it\n");
+} else {
+    logmsg("Dogging it\n");
+}
+
+#
+# Set our initial interval values.
+# This will queue the interval check.
+#
+my $firsttime = 1;
+setintervals($curtime);
+$firsttime = 0;
+
+#
+# If not verbose, log something verbose periodically anyway
+# so that we know we are not hung
+#
+qinsert($curtime + $speakupiv, \&saysomething)
+    if (!$verbose);
+
+#
+# Loop, sleeping and then processing events
+# 
+my $lasttime = 0;
+while (1) {
+    my ($nexttime, $event);
+
+    $curtime = time();
+    if ($curtime < $lasttime) {
+	qfix($lasttime - $curtime);
+    }
+
+    qhead($nexttime, $event) == 0 or
+	die("All timeouts disabled at $date!");
+
+    while ($curtime >= $nexttime) {
+	qpop($nexttime, $event);
+	&$event($curtime);
+	qhead($nexttime, $event) == 0 or
+	    die("All timeouts disabled at $date!");
+	$curtime = time();
+    }
+    $lasttime = $curtime;
+
+    sleep($nexttime - $curtime);
+}
+
+exit(0);
+
+sub sendisalive($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{isalive};
+	$faketimes{isalive} = $curtime;
+	logmsg("sendisalive at +$delta\n");
+	qinsert($curtime + $iv{isalive}, \&sendisalive) if ($iv{isalive});
+	return;
+    }
+
+    if ($retry{isalive} == 0) {
+	logmsg("isalive: sending\n", 1);
+    } else {
+	logmsg("isalive: resending, retry=$retry{isalive}\n", 1);
+    }
+
+    my %tmccargs = ();
+    $tmccargs{nocache} = 1;
+    $tmccargs{timeout} = 3;
+    $tmccargs{useudp} = 1
+	if (!$trytcp || $retry{isalive} != $maxretries);
+
+    my @tmccresults;
+    if (tmcc(TMCCCMD_ISALIVE, undef, \@tmccresults, %tmccargs) != 0 ||
+	scalar(@tmccresults) == 0) {
+	#
+	# Failed, schedule a retry using a backoff.
+	#
+	if ($retry{isalive} < $maxretries) {
+	    my $nexttime = time() + (1 << $retry{isalive});
+	    qinsert($nexttime, \&sendisalive);
+	    $retry{isalive}++;
+	    logmsg("isalive: failed ($?), retry $retry{isalive}\n");
+	    return;
+	}
+	#
+	# Failed miserably, just whine and reschedule at the normal time.
+	#
+	logmsg("isalive: failed ($?) after $maxretries attempts\n");
+    } else {
+	#
+	# Success.  The format of the response is rather simple right now.
+	# Note: if the update failed last time, run it no matter what.
+	#
+	logmsg("isalive: succeeded after $retry{isalive} retries\n")
+	    if ($retry{isalive});
+	if ($updatefailed ||
+	    $tmccresults[0] =~ /^UPDATE=1$/) {
+	    logmsg("isalive: running an account update\n");
+	    system("$BINDIR/update -i -l");
+	    $updatefailed = $?;
+	    logmsg("isalive: update done\n");
+	}
+    }
+
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $retry{isalive} = 0;
+    $curtime = time();
+    qinsert($curtime + $iv{isalive}, \&sendisalive)
+	if ($iv{isalive});
+}
+
+sub setintervals($)
+{
+    my ($curtime) = @_;
+    my $report = 0;
+
+    if ($fakeit) {
+	$iv{check} = 7;
+	$iv{isalive} = 3;
+	$iv{drift} = 9;
+	$iv{cvsup} = 21;
+	$iv{rusage} = 15;
+	$iv{batt} = 25;
+	$iv{rootpswd} = 10;
+
+	my $delta = $curtime - $faketimes{check};
+	$faketimes{check} = $curtime;
+
+	logmsg("setintervals at +$delta\n");
+	qinsert($curtime + $iv{check}, \&setintervals) if ($iv{check});
+	return;
+    }
+
+    if ($retry{check} == 0) {
+	logmsg("setintervals: fetching intervals\n", 1);
+    } else {
+	logmsg("setintervals: refetching intervals, retry=$retry{check}\n", 1);
+    }
+
+    #
+    # Note that the first watchdoginfo call will use the cache.  The info
+    # should be fresh and it helps reduce the boottime load on the tmcd
+    # server.
+    #
+    my %tmccargs = ();
+    $tmccargs{nocache} = !$firsttime;
+    $tmccargs{timeout} = 3;
+    $tmccargs{useudp} = 1
+	if (!$trytcp || $retry{check} != $maxretries);
+
+    my %tmccresults;
+    if (tmcc(TMCCCMD_WATCHDOGINFO, undef, \%tmccresults, %tmccargs) != 0 ||
+	!keys(%tmccresults)) {
+	#
+	# Failed, schedule a retry using a backoff.
+	#
+	if ($retry{check} < $maxretries) {
+	    my $nexttime = time() + (1 << $retry{check});
+	    qinsert($nexttime, \&setintervals);
+	    $retry{check}++;
+	    logmsg("setintervals: failed ($?), retry $retry{check}\n");
+	    return;
+	}
+	#
+	# Failed miserably, just whine and reschedule at the normal time.
+	#
+	logmsg("setintervals: failed ($?) after $maxretries attempts, ".
+	       "using current values\n");
+	$report = 1;
+    } else {
+	#
+	# Success.
+	#
+	logmsg("setintervals: succeeded after $retry{check} retries\n")
+	    if ($retry{check});
+
+	my %oiv;
+	foreach my $key (keys %iv) {
+	    $oiv{$key} = $iv{$key};
+	}
+
+	print $tmccresults[0] . "\n";
+
+	if ($tmccresults[0] =~
+	    /INTERVAL=(-?\d+) ISALIVE=(-?\d+) NTPDRIFT=(-?\d+) CVSUP=(-?\d+) RUSAGE=(-?\d+) HOSTKEYS=(-?\d+) SETROOTPSWD=(-?\d+)/) {
+	    $iv{check} = $tmccresults{'interval'};
+	    $iv{isalive} = $tmccresults{'isalive'};
+	    $iv{drift} = $tmccresults{'ntpdrift'};
+	    $iv{cvsup} = $tmccresults{'cvsup'};
+	    $iv{rusage} = $tmccresults{'rusage'}/60;
+	    $iv{hkeys} = $tmccresults{'hostkeys'};
+	    #$iv{rootpswd} = $tmccresults{'interval'}; # XXX Ryan
+	}
+
+	#
+	# MFS nodes only report isalive
+	#
+	if (MFS()) {
+	    $iv{drift} = 0;
+	    $iv{cvsup} = 0;
+	    $iv{rusage} = 0;
+	    $iv{hkeys} = 0;
+	    $iv{batt} = 0;
+	    $iv{rootpswd} = 0;
+	}
+
+	foreach my $key (keys %iv) {
+	    if ($firsttime || $iv{$key} != $oiv{$key}) {
+		$report = 1;
+
+		#
+		# Special handling of ourselves:
+		# warn if future checks are disabled.
+		#
+		if ($key eq "check") {
+		    if ($iv{$key} == 0) {
+			logmsg("setintervals: ".
+			       "WARNING interval checks disabled!\n");
+		    } else {
+			logmsg("setintervals: scheduling $key\n");
+		    }
+		    next;
+		}
+
+		if ($iv{$key} == 0) {
+		    logmsg("setintervals: descheduling $key\n");
+		    qdelete($funcs{$key});
+		} elsif ($firsttime || $oiv{$key} == 0) {
+		    #
+		    # Some commands need to be run at boottime,
+		    # schedule their first run immediately.
+		    #
+		    if ($firsttime && $immediate{$key}) {
+			logmsg("setintervals: scheduling $key now\n");
+			qinsert($curtime, $funcs{$key});
+		    } else {
+			logmsg("setintervals: scheduling $key\n");
+			qinsert($curtime + $iv{$key}, $funcs{$key});
+		    }
+		} else {
+		    #
+		    # To reschedule an already existing event,
+		    # we recompute when it was last scheduled and
+		    # add the new interval to that.  If the result
+		    # is before the current time, we set it to the
+		    # current time so it will trigger immediately.
+		    #
+		    my $ntime = qfind($funcs{$key});
+		    if (defined($ntime)) {
+			$ntime -= $oiv{$key};
+			$ntime += $iv{$key};
+			$ntime = $curtime
+			    if ($ntime < $curtime);
+		    } else {
+			$ntime = $curtime;
+		    }
+		    logmsg("setintervals: rescheduling $key at $ntime ".
+			   "(now=$curtime)\n");
+		    qinsert($ntime, $funcs{$key});
+		}
+	    }
+	}
+    }
+	
+    if ($report) {
+	logmsg("setintervals: check=$iv{check}, isalive=$iv{isalive}, ".
+	       "drift=$iv{drift}, cvsup=$iv{cvsup}, rusage=$iv{rusage}, ".
+	       "hostkeys=$iv{hkeys}, battery=$iv{batt}, ".
+	       "rootpswd=$iv{rootpswd}\n");
+    }
+
+    #
+    # Set up for another interval.
+    # Since the tmcc call can take awhile, we update curtime
+    #
+    $retry{check} = 0;
+    $curtime = time();
+    qinsert($curtime + $iv{check}, \&setintervals)
+	if ($iv{check});
+}
+
+sub ntpdrift($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{drift};
+	$faketimes{drift} = $curtime;
+	logmsg("ntpdrift at +$delta\n");
+	qinsert($curtime + $iv{drift}, \&ntpdrift) if ($iv{drift});
+	return;
+    }
+
+    logmsg("ntpdrift: reporting NTP drift\n", 1);
+
+    my $drift = `cat $driftfile`;
+    chomp($drift);
+    
+    if ($drift ne $lastdrift && $drift =~ /^([-\d\.]*)$/) {
+	logmsg("ntpdrift: updating NTP drift from $lastdrift to $drift\n");
+
+	# Server also checks the value for sanity.
+	tmcc(TMCCCMD_NTPDRIFT, $1, undef, ("timeout" => 3));
+	$lastdrift = $drift;
+    }
+
+    qinsert($curtime + $iv{drift}, \&ntpdrift)
+	if ($iv{drift});
+}
+
+#
+# Do a cvsup to get updated software.
+# XXX fork this off?
+#
+sub runcvsup($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{cvsup};
+	$faketimes{cvsup} = $curtime;
+	logmsg("runcvsup at +$delta\n");
+	qinsert($curtime + $iv{cvsup}, \&runcvsup) if ($iv{cvsup});
+	return;
+    }
+
+    if (-x "$BINDIR/runcvsup.sh") {
+	logmsg("runcvsup: checking for software updates\n");
+	system("$BINDIR/runcvsup.sh");
+	logmsg("runcvsup: software updates done\n");
+
+	# cvsup can take awhile so update curtime
+	$curtime = time();
+    } else {
+	logmsg("runcvsup: $BINDIR/runcvsup.sh does not exist, disabled\n");
+	$iv{cvsup} = 0;
+    }
+
+    qinsert($curtime + $iv{cvsup}, \&runcvsup)
+	if ($iv{cvsup});
+}
+
+sub sendrusage($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{rusage};
+	$faketimes{rusage} = $curtime;
+	logmsg("sendrusage at +$delta\n");
+	qinsert($curtime + $iv{rusage}, \&sendrusage) if ($iv{rusage});
+	return;
+    }
+
+    if ($retry{rusage} == 0) {
+	logmsg("rusage: sending\n", 1);
+    } else {
+	logmsg("rusage: resending, retry=$retry{rusage}\n", 1);
+    }
+
+    #
+    # Collect the stats
+    #
+    if ($retry{rusage} == 0) {
+	if (! -x $rusagebin) {
+	    logmsg("rusage: no $rusagebin\n");
+	    goto resched;
+	}
+	$rusagestr = `$rusagebin 2>>$LOGDIR/emulab-rusage.log`;
+	if ($?) {
+	    logmsg("rusage: $rusagebin failed ($?)\n");
+	    goto resched;
+	}
+	chomp $rusagestr;
+	if ($rusagestr !~ /LA1=[\d\.]+ LA5=[\d\.]+ LA15=[\d\.]+ DUSED=[\d\.]+/) {
+	    logmsg("rusage: $rusagebin returns gobbledy-gook: $rusagestr\n");
+	    goto resched;
+	}
+    }
+    logmsg("rusage: sending: $rusagestr\n", 1);
+
+    my %tmccargs = ();
+    $tmccargs{nocache} = 1;
+    $tmccargs{timeout} = 3;
+    $tmccargs{useudp} = 1
+	if (!$trytcp || $retry{rusage} != $maxretries);
+
+    my @tmccresults;
+    if (tmcc(TMCCCMD_RUSAGE, $rusagestr, \@tmccresults, %tmccargs) != 0 ||
+	scalar(@tmccresults) == 0) {
+	#
+	# Failed, schedule a retry using a backoff.
+	# XXX: removed so that we know when a plab node is back ASAP.
+        #      Just log the failure and reschedule at the normal time.
+        #
+
+	#
+	# Failed miserably, just whine and reschedule at the normal time.
+	#
+	logmsg("rusage: failed ($?)\n");
+    } else {
+	#
+	# Success.  The format of the response is rather simple right now.
+	# Note: if the update failed last time, run it no matter what.
+	#
+	logmsg("rusage: succeeded after $retry{rusage} retries\n")
+	    if ($retry{rusage});
+	if ($updatefailed ||
+	    $tmccresults[0] =~ /^UPDATE=1$/) {
+	    logmsg("rusage: running an account update\n");
+	    system("$BINDIR/update -i -l");
+	    $updatefailed = $?;
+	    logmsg("rusage: update done\n");
+	}
+    }
+
+resched:
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $retry{rusage} = 0;
+    $curtime = time();
+    qinsert($curtime + $iv{rusage}, \&sendrusage)
+	if ($iv{rusage});
+}
+
+sub sendhkeys($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{hkeys};
+	$faketimes{hkeys} = $curtime;
+	logmsg("sendhkeys at +$delta\n");
+	qinsert($curtime + $iv{hkeys}, \&sendhkeys) if ($iv{hkeys});
+	return;
+    }
+
+    if ($retry{hkeys} == 0) {
+	logmsg("hostkeys: sending\n", 1);
+    } else {
+	logmsg("hostkeys: resending, retry=$retry{hkeys}\n", 1);
+    }
+
+    if (! -d $keydir) {
+	logmsg("hostkeys: no SSH key directory $keydir\n");
+	$iv{hkeys} = 0;
+	return;
+    }
+
+    my $arg="";
+    foreach my $kname (@keylist) {
+	my $kpath = "$keydir/$kname.pub";
+	next
+	    if (! -r $kpath);
+
+	my $key = `cat $kpath`;
+	logmsg("hostkeys: could not read keyfile $kpath\n")
+	    if ($?);
+	chomp($key);
+	$kname =~ tr/a-z/A-Z/;
+
+	$arg .= "$kname='$key' ";
+    }
+
+    if ($arg ne "") {
+	$arg = "\"" . $arg . "\"";
+	print "hostkeys: $arg\n"
+	    if ($debug);
+
+	my %tmccargs = ();
+	$tmccargs{timeout} = 3;
+	# send these with TCP for now
+	#$tmccargs{useudp} = 1 if (!$trytcp || $retry{hkeys} != $maxretries);
+
+	if (tmcc(TMCCCMD_HOSTKEYS, $arg, undef, %tmccargs) != 0) {
+	    #
+	    # Failed, schedule a retry using a backoff.
+	    #
+	    if ($retry{hkeys} < $maxretries) {
+		my $nexttime = time() + (1 << $retry{hkeys});
+		qinsert($nexttime, \&sendhkeys);
+		$retry{hkeys}++;
+		logmsg("hostkeys: failed ($?), retry $retry{hkeys}\n");
+		return;
+	    }
+	    #
+	    # Failed miserably, just whine and reschedule at the normal time.
+	    #
+	    logmsg("hostkeys: failed ($?) after $maxretries attempts\n");
+	} else {
+	    logmsg("hostkeys: succeeded after $retry{hkeys} retries\n")
+		if ($retry{hkeys});
+	}
+    }
+
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $retry{hkeys} = 0;
+    $curtime = time();
+    qinsert($curtime + $iv{hkeys}, \&sendhkeys)
+	if ($iv{hkeys});
+}
+
+sub sendbatt($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{batt};
+	$faketimes{batt} = $curtime;
+	logmsg("sendbatt at +$delta\n");
+	qinsert($curtime + $iv{batt}, \&sendbatt) if ($iv{batt});
+	return;
+    }
+
+    if ($retry{batt} == 0) {
+	logmsg("batt: sending\n", 1);
+    } else {
+	logmsg("batt: resending, retry=$retry{batt}\n", 1);
+    }
+
+    if (! -r $battlog) {
+	logmsg("batt: no battery log yet $battlog\n");
+	goto resched;
+    }
+
+    my $line = `tail -1 $battlog`;
+    my $capacity;
+    my $voltage;
+
+    if ($line =~ /^([-\d\.]*) ([-\d\.]+) ([-\d\.]+).*/) {
+	$capacity = $2;
+	$voltage = $3;
+    }
+    else {
+	logmsg("batt: bad line in log - $line\n");
+	goto resched;
+    }
+
+    my $arg = "CAPACITY=$capacity VOLTAGE=$voltage";
+    if ($arg ne "") {
+	$arg = "\"" . $arg . "\"";
+	print "batt: $arg\n"
+	    if ($debug);
+
+	my %tmccargs = ();
+	$tmccargs{nocache} = 1;
+	$tmccargs{timeout} = 3;
+	$tmccargs{useudp} = 1
+	    if (!$trytcp || $retry{batt} != $maxretries);
+
+	if (tmcc(TMCCCMD_BATTERY, $arg, undef, %tmccargs) != 0) {
+	    #
+	    # Failed, schedule a retry using a backoff.
+	    #
+	    if ($retry{batt} < $maxretries) {
+		my $nexttime = time() + (1 << $retry{batt});
+		qinsert($nexttime, \&sendbatt);
+		$retry{batt}++;
+		logmsg("batt: failed ($?), retry $retry{batt}\n");
+		return;
+	    }
+	    #
+	    # Failed miserably, just whine and reschedule at the normal time.
+	    #
+	    logmsg("batt: failed ($?) after $maxretries attempts\n");
+	} else {
+	    logmsg("batt: succeeded after $retry{batt} retries\n")
+		if ($retry{batt});
+	}
+    }
+
+resched:
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $retry{batt} = 0;
+    $curtime = time();
+    qinsert($curtime + $iv{batt}, \&sendbatt)
+	if ($iv{batt});
+}
+
+sub setrootpswd($)
+{
+    my ($curtime) = @_;
+    
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{rootpswd};
+	$faketimes{rootpswd} = $curtime;
+	logmsg("setrootpswd at +$delta\n");
+	qinsert($curtime + $iv{rootpswd}, \&setrootpswd) if ($iv{rootpswd});
+	return;
+    }
+
+    #
+    # Reset the root password.
+    #
+    if (tmcc(TMCCCMD_ROOTPSWD, undef, \@tmccresults) == 0
+	&& scalar(@tmccresults) &&
+	$tmccresults[0] =~ /^HASH=(.*)$/) {
+	my $hash = $1;
+	logmsg("Resetting root password\n");
+	liblocsetup::os_modpasswd("root", $hash);
+    }
+
+resched:
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $curtime = time();
+    qinsert($curtime + $iv{rootpswd}, \&setrootpswd)
+	if ($iv{rootpswd});
+}
+
+sub saysomething($)
+{
+    my ($curtime) = @_;
+    $speakup = 1;
+    qinsert($curtime + $speakupiv, \&saysomething);
+}
+
+sub logmsg($;$)
+{
+    my ($msg, $verbmsg) = @_;
+
+    if (!defined($verbmsg)) {
+	$verbmsg = 0;
+    } elsif ($speakup) {
+	$verbmsg = 0;
+	$speakup = 0;
+    }
+    print strftime("%b %e %H:%M:%S", localtime)." watchdog[$$]: $msg"
+	if ($verbose || !$verbmsg);
+}
+
+#
+# The following are lifted from stated's TimeoutQueue package
+# Replicated to avoid excess dependencies
+#
+
+@q = (); # The queue
+%i = (); # The index
+
+#
+# qinsert($timeout,$obj) - returns 0
+#   Insert an object.  Object must not already be in the list.
+#
+sub qinsert {
+    my ($timeout, $obj) = @_;
+    if (defined($i{$obj})) {
+	# Already in there... take it out
+	qdelete($obj);
+    }
+    my $loc = qsearch($timeout,0);
+    my @l = ($timeout,$obj);
+    splice(@q,$loc,0,\@l);
+    $i{$obj} = $timeout;
+    return 0;
+}
+
+#
+# qdelete($obj)		 - returns 0, or 1 if not found
+#   Delete an object
+#
+sub qdelete {
+    my ($obj) = @_;
+    if (!defined($i{$obj})) {
+	return 1;
+    }
+    my $timeout = $i{$obj};
+    my $n=qsearch($timeout,1);
+    my $end = @q+0;
+    while (1) {
+	$o = ${$q[$n]}[1];
+	if ($o eq $obj) {
+	    splice(@q,$n,1);
+	    last;
+	}
+	$n++;
+	if ($n > $end) { return 1;}
+    }
+    delete $i{$obj};
+    return 0;
+}
+
+#
+# qhead(\$timeout,\$obj) - returns 0, or 1 if not found
+#   Look at the head item
+#
+sub qhead {
+    if (@q+0 == 0) { $_[0]=undef; $_[1]=undef; return 1; }
+    $_[0] = ${$q[0]}[0];
+    $_[1] = ${$q[0]}[1];
+    return 0;
+}
+
+#
+# qpop(\$timeout,\$obj)	 - returns 0, or 1 if empty
+#   Remove and return the head item
+#
+sub qpop {
+    if (@q+0 == 0) { $_[0]=undef; $_[1]=undef; return 1; }
+    $_[0] = ${$q[0]}[0];
+    $_[1] = ${$q[0]}[1];
+    shift(@q);
+    delete $i{$_[1]};
+    return 0;
+}
+
+#
+# qfind($obj)		 - returns timeout, or undef if not found
+#   Find the timeout for an item
+#
+sub qfind {
+    my ($obj) = @_;
+    return $i{$obj};
+}
+
+#
+# qsearch($timeout,$first) - returns index
+#   Find the index in @q where ($first ? $timout starts : $timeout ends)
+#
+sub qsearch {
+    my ($timeout,$first) = @_;
+    return qbinsearch($timeout,0,@q+0,$first);
+}
+
+#
+# qbinsearch($timeout,$min,$max,$first) - returns index
+#   Find the index in @q where ($first ? $timout starts : $timeout ends)
+#
+sub qbinsearch {
+    my ($timeout,$min,$max,$first) = @_;
+    # Implement a binary search
+    my $len = $max - $min;
+    my $mid = $min + int($len/2);
+    if ($len < 1) { return $mid; }
+    my $val = ${$q[$mid]}[0];
+    if ($first) {
+	if ($val >= $timeout) { return qbinsearch($timeout,$min,$mid,$first); }
+	else { return qbinsearch($timeout,$mid+1,$max,$first); }
+    } else {
+	if ($val > $timeout) { return qbinsearch($timeout,$min,$mid,$first); }
+	else { return qbinsearch($timeout,$mid+1,$max,$first); }
+    }
+}
+
+#
+# qfix($delta)
+#   The clock was set back on us, most likely on Windows as NTP changed the
+#   clock from UTC time to local time.  Set all of the queue item and index
+#   timestamps back by the same amount to compensate.
+#
+sub qfix {
+    my ($delta) = @_;
+    logmsg("qfix: The clock was set back by $delta seconds.\n");
+    foreach my $ikey (keys %i) {
+	$i{$ikey} -= $delta;
+    }
+    for (my $qitem = 0; $qitem <= $#q; $qitem++) {
+	${$q[$qitem]}[0] -= $delta;
+    }
+}

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,9 +40,8 @@ my $TBOPS    = "@TBOPSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
+use User;
+use Project;
 
 #
 # These come from the library.
@@ -50,11 +49,9 @@ $libdb::DBQUERY_MAXTRIES = 30;
 my $NODEDEAD_PID= NODEDEAD_PID;
 my $NODEDEAD_EID= NODEDEAD_EID;
 my $TBOPSPID= TBOPSPID;
-my $HOME= "/users/elabckup";
+my $HOME= USERROOT() . "/elabckup";
 
 sub fatal($);
-sub notify($);
-sub daemonize();
 sub misconfig($$);
 sub IsNodeFree($);
 sub UpdateCheckupState($$$$$);
@@ -91,36 +88,49 @@ if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
 
+#
+# We need this user for running below.
+#
+my $elabckup = User->Lookup("elabckup");
+if (!defined($elabckup)) {
+    fatal("Could not lookup 'elabckup' user. Exiting ...");
+}
+# and the project.
+my $project = Project->Lookup($TBOPSPID);
+fatal("Could not get object for $TBOPSPID project")
+    if (!defined($project));
+
+if (CheckDaemonRunning("checkup_daemon")) {
+    fatal("Not starting another checkup daemon!");
+}
 # Go to ground.
 if (! $debug) {
-    daemonize();
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
 }
+if (MarkDaemonRunning("checkup_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
+    ReOpenLog($logfile);
+    $EUID = $SAVEEUID;
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
 
 print "Checkup daemon starting... pid $$, at ".`date`;
 
-# Switch to the elabckup user.
-my $query_result = 
-    DBQueryFatal("select unix_uid from users where uid='elabckup'");
-
-if (! $query_result || $query_result->numrows == 0) {
-    fatal("Cannot get elabckup uid\n");
+if ($elabckup->FlipTo($project->unix_gid())) {
+    fatal("Could not flipto $elabckup");
 }
-
-my ($ev_uid) = $query_result->fetchrow_array;
-
-my ($unix_gid, $unix_gidname);
-if (! TBGroupUnixInfo($TBOPSPID, $TBOPSPID, \$unix_gid, \$unix_gidname)) {
-    die("*** $0:\n".
-	"    Could not get unix group info for $TBOPSPID!\n");
-}
-
-print "Experiment head: $ev_uid\n"
-    if ($debug);
-
-$GID = $unix_gid;
-$EGID = "$unix_gid";
-$EUID = $UID = $ev_uid;
-
 my $iter = 0;
 
 MAINLOOP: while(1) {
@@ -204,7 +214,8 @@ MAINLOOP: while(1) {
 	    }
 	    elsif ($state eq "running") {
 		# Check the experiment's state.
-		my $report = "/proj/$TBOPSPID/exp/$eid/logs/report.mail";
+		my $report = PROJROOT() .
+		    "/$TBOPSPID/exp/$eid/logs/report.mail";
 
 		if (-e $report) {
 		    # Failed...
@@ -229,7 +240,7 @@ MAINLOOP: while(1) {
 		# Locked waiting for human intervention...
 		if (ExpState($TBOPSPID, $eid) eq EXPTSTATE_SWAPPED) {
 		    # Swapped out...
-		    system("$TB/bin/endexp $TBOPSPID $eid");
+		    system("$TB/bin/endexp $TBOPSPID,$eid");
 		}
 		elsif (!ExptExists($TBOPSPID, $eid)) {
 		    UpdateCheckupState($object, $ctype, $mtype,
@@ -371,6 +382,7 @@ MAINLOOP: while(1) {
 
     $iter += 1;
 }
+MarkDaemonStopped("checkup_daemon");
 
 sub IsNodeFree($)
 {
@@ -427,29 +439,10 @@ sub misconfig($$)
     DBQueryWarn("delete from checkups where type='$ctype'");
 }
 
-#
-# Become a daemon.
-# 
-sub daemonize()
-{
-    my $mypid = fork();
-    if ($mypid) {
-	exit(0);
-    }
+sub fatal($) {
+    my($mesg) = $_[0];
 
-    #
-    # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller will continue to wait
-    # even though the parent has exited. 
-    #
-    open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
-
-    #
-    # Open the batch log and start writing to it. 
-    #
-    open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
-    open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
-
-    return 0;
+    MarkDaemonStopped("checkup_daemon");
+    die("*** $0:\n".
+	"    $mesg\n");
 }

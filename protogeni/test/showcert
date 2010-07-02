@@ -1,0 +1,16 @@
+#!/bin/sh
+
+if [ $# -gt 1 ]; then
+    echo "Usage:
+
+    $0 [certificate]" >&2
+    exit 1
+elif [ $# -eq 1 ]; then
+    if [ "$1" != - ]; then
+        exec < "$1"
+    fi
+else
+    exec < "${PROTOGENI_CERTIFICATE:-$HOME/.ssl/encrypted.pem}"
+fi
+
+exec openssl x509 -text | grep 'Subject: '

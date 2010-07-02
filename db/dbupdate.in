@@ -1,0 +1,252 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Update DB.
+#
+sub usage()
+{
+    print STDERR "Usage: dbupdate [-v] [-s] [-f] <dbname> [<version>]\n";
+    exit(-1);
+}
+my $optlist = "dsfvp:q";
+my $debug   = 0;
+my $force   = 0;
+my $single  = 0;
+my $verify  = 0;
+my $quiet   = 0;
+my $path;
+my $dbname;
+my $version;
+my $dbnumber = 0;	# XXX Core emulab code is very rigid.
+my $verify_count = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $DEFDBNAME	= "@TBDBNAME@";
+my $testbed_srcdir = "@top_srcdir@";
+
+# Protos
+sub Fatal($);
+
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Do not modify the include path if it was specified when invoked.
+# This allows update to run from the build tree.
+#
+BEGIN
+{
+    eval "require emdbi";
+    if ($@) {
+	unshift(@INC, "@prefix@/lib");
+    }
+}
+use emdbi;
+use libtestbed;
+
+# Need this below.
+my $objdir = `/bin/pwd`;
+chomp($objdir);
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"q"})) {
+    $quiet = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (defined($options{"p"})) {
+    $path = $options{"p"};
+    chdir($path) or
+	Fatal("$path does not exist");
+}
+if (defined($options{"s"})) {
+    $single = 1;
+    if (@ARGV != 2) {
+	Fatal("Must provide a version argument when using -s option");
+    }
+}
+if (@ARGV < 1 || @ARGV > 2) {
+    usage();
+}
+$dbname  = shift();
+$version = shift()
+    if (@ARGV);
+
+# Sanity check the args.
+if (! ($dbname =~ /^[-\w]+$/)) {
+    Fatal("'$dbname' does not look like a reasonable database name.");
+}
+
+#
+# Open up a connection to the DB. The core emulab code is all written
+# assuming that the first DB connection is used, so go with that. Be
+# nice to change someday. For the Protogeni code, I can be less rigid.
+#
+if ($dbname eq $DEFDBNAME) {
+    # This will exit on error by default.
+    emdbi::TBDBConnect(0, $dbname);
+}
+else {
+    # This will exit on error by default.
+    $dbnumber = emdbi::NewTBDBHandle($dbname);
+}
+
+#
+# If no version number provided, then grab it from the DB.
+#
+if (!defined($version)) {
+    my $query_result =
+	emdbi::DBQueryN($dbnumber,
+			"select value from version_info ".
+			"where name='dbrev'");
+    if (!$query_result || !$query_result->numrows) {
+	if ($dbname eq $DEFDBNAME) {
+	    $version = "4.0";
+	}
+	else {
+	    $version = "0";
+	}
+    }
+    else {
+	($version) = $query_result->fetchrow_array();
+    }
+}
+if (! ($version =~ /^[\d\.]+$/)) {
+    Fatal("'$version' does not look like a reasonable starting version.");
+}
+
+#
+# Split apart the version number. Assumed to be in dotted notation.
+#
+my @dots  = split(/\./, "$version");
+my $start = pop(@dots);
+
+#
+# If no dots, then assume the current directory. Otherwise, cd down into
+# lowest directory and start. This could get fancier, but I leave that to
+# someone else.
+#
+if (@dots) {
+    my $dir = join("/", @dots);
+    if (!chdir($dir)) {
+	Fatal("Cannot chdir to $dir");
+    }
+}
+my @files;
+
+if ($single) {
+    Fatal("Update file $start does not exist")
+	if (! -e $start);
+    # Just the one file.
+    @files = ($start);
+}
+else {
+    #
+    # Open up the current directory. We want all numbered files.
+    #
+    opendir(DIR, ".") or
+	Fatal("Could not opendir the current directory");
+    @files  = grep { /^\d*$/ } readdir(DIR);
+    closedir(DIR);
+}
+
+#
+# Sort them since we we want to start at the right file, and proceed
+# in order.
+#
+@files = sort {$a <=> $b} @files;
+
+#
+# Now process each file starting at the start version.
+#
+foreach my $file (@files) {
+    next
+	if (!$force && !$single && $file <= $start);
+    next
+	if ($single && $file != $start);
+
+    my $fullpath = join("/", @dots) . "/$file";
+    my $revision = join(".", @dots);
+    $revision .= (@dots ? "." : "") . $file;
+
+    if ($verify) {
+	print "Need DB update $fullpath\n";
+	$verify_count++;
+	next;
+    }
+
+    print "Processing update $fullpath\n";
+
+    # Undefine this to make sure we get a new version each file.
+    undef &DoUpdate;
+
+    # This just loads the file.
+    my $return = do $file;
+    if (!defined($return)) {
+	Fatal("  could not parse $file: $@") if $@;
+	Fatal("  could not do $file: $!")    if $!;
+    }
+    # Then we run it.
+    if (DoUpdate($dbnumber, $dbname, $revision) != 0) {
+	Fatal("  returned non-zero; aborting.\n");
+    }
+    # Mark that we have done it. 
+    emdbi::DBQueryFatalN($dbnumber,
+			 "update version_info set value='$revision' ".
+			 "where name='dbrev'")
+	if (!$single && !$force);
+}
+if ($verify) {
+    exit($verify_count)
+	if (!$verify_count || $quiet);
+
+    my $updatedir = "$testbed_srcdir/sql/updates";
+    $updatedir =~ s/^\.\.\///;
+
+    print "*** Your have DB update scripts that have not been run.\n";
+    print "    As a safety measure, you will not be able to install until\n";
+    print "    this is resolved.\n";
+    exit($verify_count);
+}
+exit(0);
+
+sub Fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+

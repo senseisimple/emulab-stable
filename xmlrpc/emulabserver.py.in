@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -22,6 +22,7 @@ import xmlrpclib
 import signal
 import types
 import datetime
+import syslog
 
 # Configure variables
 TBDIR = "@prefix@"
@@ -29,6 +30,9 @@ BOSSNODE = "@BOSSNODE@"
 BOSSEVENTPORT = "@BOSSEVENTPORT@"
 OURDOMAIN = "@OURDOMAIN@"
 USERNODE = "@USERNODE@"
+BASEADDR = "@FRISEBEEMCASTADDR@"
+BASEPORT = "@FRISEBEEMCASTPORT@"
+SUBBOSS_UID = "elabman"
 
 TBPATH = os.path.join(TBDIR, "lib")
 if TBPATH not in sys.path:
@@ -43,10 +47,11 @@ from emulabclient import *
 VERSION = 0.1
 
 # Well known directories
-PROJROOT = "/proj"
-GROUPROOT = "/groups"
-SHAREROOT = "/share"
-USERSROOT = "/users"
+PROJROOT = "@PROJROOT_DIR@"
+GROUPROOT = "@GROUPSROOT_DIR@"
+SCRATCHROOT = "@SCRATCHROOT_DIR@"
+SHAREROOT = "@SHAREROOT_DIR@"
+USERSROOT = "@USERSROOT_DIR@"
 
 # List of directories exported to nodes via NFS.
 NFS_EXPORTS = [
@@ -54,6 +59,7 @@ NFS_EXPORTS = [
     GROUPROOT,
     SHAREROOT,
     USERSROOT,
+    SCRATCHROOT,
     ]
 
 #
@@ -142,12 +148,20 @@ class TimedOutError(EmulabError):
 def TimeoutHandler(signum, frame):
     raise TimedOutError, 'Timer Expired'
 
+def logit(debug, msg):
+    if debug:
+        print msg
+        pass
+    else:
+        syslog.syslog(syslog.LOG_INFO, msg);
+        pass
+    return
+
 #
 # Arguments to methods are passed as a Dictionary. This converts to a XML
 # "struct" which in Perl/PHP/Ruby would be a hash. So, a client written in
 # pretty much any language should be able to talk to this class.
 #
-
 #
 # A helper function for checking required arguments.
 #
@@ -174,14 +188,14 @@ def CheckRequiredArgs(argdict, arglist):
 #
 # Check user permission to access a project.
 #
-def CheckProjPermission(uid, pid):
+def CheckProjPermission(uid_idx, pid):
     if not re.match("^[-\w]*$", pid):
         return EmulabResponse(RESPONSE_BADARGS,
                               output="Illegal characters in project ID!")
 
     res = DBQueryFatal("SELECT trust FROM group_membership "
-                       "WHERE uid=%s and pid=%s and gid=%s",
-                       (uid, pid, pid))
+                       "WHERE uid_idx=%s and pid=%s and gid=%s and trust!='none'",
+                       (uid_idx, pid, pid))
 
     if len(res) == 0:
         return EmulabResponse(RESPONSE_FORBIDDEN,
@@ -190,10 +204,10 @@ def CheckProjPermission(uid, pid):
     
     return None
 
-def GetProjects(uid):
+def GetProjects(uid_idx):
     res = DBQueryFatal("SELECT distinct pid FROM group_membership "
-                       "WHERE uid=%s",
-                       (uid,))
+                       "WHERE uid_idx=%s",
+                       (uid_idx,))
 
     return [x[0] for x in res]
 
@@ -201,7 +215,7 @@ def GetProjects(uid):
 #
 # Check user permission to access an experiment.
 # 
-def CheckExptPermission(uid, pid, eid):
+def CheckExptPermission(uid_idx, pid, eid):
     if not (re.match("^[-\w]*$", pid) and
             re.match("^[-\w]*$", eid)):
         return EmulabResponse(RESPONSE_BADARGS,
@@ -219,8 +233,8 @@ def CheckExptPermission(uid, pid, eid):
     gid = res[0][0]
     
     res = DBQueryFatal("SELECT trust FROM group_membership "
-                       "WHERE uid=%s and pid=%s and gid=%s",
-                       (uid, pid, gid))
+                       "WHERE uid_idx=%s and pid=%s and gid=%s",
+                       (uid_idx, pid, gid))
 
     if len(res) == 0:
         return EmulabResponse(RESPONSE_FORBIDDEN,
@@ -231,7 +245,7 @@ def CheckExptPermission(uid, pid, eid):
 #
 # Check user permission to access a node.
 # 
-def CheckNodePermission(uid, node):
+def CheckNodePermission(uid_idx, node):
     res = DBQueryFatal("SELECT e.pid,e.eid FROM reserved AS r "
                        "left join experiments as e on "
                        "     e.pid=r.pid and e.eid=r.eid "
@@ -242,20 +256,47 @@ def CheckNodePermission(uid, node):
         return EmulabResponse(RESPONSE_ERROR,
                               output="No such node: " + node)
 
-    return CheckExptPermission(uid, res[0][0], res[0][1])
+    return CheckExptPermission(uid_idx, res[0][0], res[0][1])
 
 #
 # Check if user is an admin person
 # 
-def CheckIsAdmin(uid):
+def CheckIsAdmin(uid_idx):
     res = DBQueryFatal("SELECT admin FROM users "
-                       "WHERE uid=%s",
-                       (uid,))
+                       "WHERE uid_idx=%s and status='active'",
+                       (uid_idx,))
     
     if len(res) == 0:
         return EmulabResponse(RESPONSE_ERROR,
-                              output="No such user: " + uid)
+                              output="No such user: " + uid_idx)
 
+    return res[0][0];
+
+#
+# Template lookup, by exptidx of an experiment.
+#
+def TemplateLookup(exptidx):
+    res = DBQueryFatal("select parent_guid,parent_vers from "
+                       "   experiment_template_instances "
+                       "where exptidx=%s",
+                       (exptidx,))
+    
+    if len(res) == 0:
+        return None
+
+    return (res[0][0], res[0][1])
+
+#
+# Get an experiment index.
+#
+def ExperimentIndex(pid, eid):
+    res = DBQueryFatal("select idx from experiments "
+                       "where pid=%s and eid=%s",
+                       (pid, eid))
+    
+    if len(res) == 0:
+        return None
+    
     return res[0][0];
 
 #
@@ -263,24 +304,33 @@ def CheckIsAdmin(uid):
 # For example experiment.swapexp(...).
 #
 class EmulabServer:
-    def __init__(self, readonly=0, clientip=None):
+    def __init__(self, readonly=0, clientip=None, debug=0):
         self.readonly  = readonly;
         self.clientip  = clientip;
+        self.debug     = debug;
         self.instances = {};
         self.uid       = pwd.getpwuid(os.getuid())[0]
 
-        self.instances["experiment"] = experiment(readonly=self.readonly);
+        res = DBQueryFatal("select uid_idx from users "
+                           "where uid=%s and status='active'",
+                           (self.uid,))
+        if len(res) == 0:
+            return
+        self.uid_idx = res[0][0]
+
+        self.instances["experiment"] = experiment(self);
+        self.instances["template"]   = template(self);
         if readonly:
             return
         
-        self.instances["emulab"]     = emulab(readonly=self.readonly);
-        self.instances["user"]       = user(readonly=self.readonly);
-        self.instances["fs"]         = fs(readonly=self.readonly);
-        self.instances["imageid"]    = imageid(readonly=self.readonly);
-        self.instances["osid"]       = osid(readonly=self.readonly);
-        self.instances["node"]       = node(readonly=self.readonly);
-        self.instances["elabinelab"] = elabinelab(clientip=self.clientip,
-                                                  readonly=self.readonly);
+        self.instances["emulab"]     = emulab(self);
+        self.instances["user"]       = user(self);
+        self.instances["fs"]         = fs(self);
+        self.instances["imageid"]    = imageid(self);
+        self.instances["osid"]       = osid(self);
+        self.instances["node"]       = node(self);
+        self.instances["elabinelab"] = elabinelab(self);
+        self.instances["subboss"] = subboss(self);
         return
 
     def __getattr__(self, name):
@@ -299,10 +349,13 @@ class EmulabServer:
 # whole.
 #
 class emulab:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -350,9 +403,9 @@ class emulab:
         if starting and ending:
             comparison = "BETWEEN %s and %s"
             sub = (starting, ending)
-            pass
         elif starting:
             comparison = "> %s"
+            pass
             sub = (starting,)
             pass
         elif ending:
@@ -486,10 +539,13 @@ class emulab:
 # specific information.
 #
 class user:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -562,10 +618,10 @@ class user:
                                           + permission))
 
         res = DBQueryFatal("SELECT distinct pid,gid FROM group_membership "
-                           "WHERE uid=%s and "
+                           "WHERE uid_idx=%s and "
                            + trust_clause
                            + " ORDER BY pid",
-                           (self.uid,))
+                           (self.uid_idx,))
 
         result = {}
         for proj in res:
@@ -585,6 +641,30 @@ class user:
                               value=result,
                               output=str(result))
 
+    #
+    # Return collab password,
+    #
+    def collabpassword(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        res = DBQueryFatal("select mailman_password from users where uid_idx=%s",
+                           (self.uid_idx,))
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such user!")
+
+        passwd = res[0][0]
+        return EmulabResponse(RESPONSE_SUCCESS, value=passwd, output=passwd)
+
     pass
 
 
@@ -593,10 +673,13 @@ class user:
 # NFS exports.
 #
 class fs:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -749,12 +832,15 @@ class fs:
 
         # ... add the project/group listings.
         projs = DBQueryFatal("SELECT distinct pid,gid FROM group_membership "
-                             "WHERE uid=%s and trust!='none' ORDER BY pid",
-                             (self.uid,))
+                             "WHERE uid_idx=%s and trust!='none' ORDER BY pid",
+                             (self.uid_idx,))
 
         for proj in projs:
             if proj[0] == proj[1]:
                 res.append(PROJROOT + "/" + proj[0])
+                if not SCRATCHROOT == "":
+                    res.append(SCRATCHROOT + "/" + proj[0])
+                    pass
                 pass
             else:
                 res.append(GROUPROOT + "/" + proj[0] + "/" + proj[1])
@@ -772,10 +858,13 @@ class fs:
 # This class implements the server side of the XMLRPC interface to image IDs.
 #
 class imageid:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     def getlist(self, version, argdict):
@@ -793,8 +882,8 @@ class imageid:
         res = DBQueryFatal(
             "SELECT distinct i.imagename,i.description FROM images as i "
             "left join group_membership as g on g.pid=i.pid "
-            "WHERE g.uid=%s or i.global",
-            (self.uid,))
+            "WHERE g.uid_idx=%s or i.global",
+            (self.uid_idx,))
 
         if len(res) == 0:
             return EmulabResponse(RESPONSE_ERROR,
@@ -821,10 +910,13 @@ class imageid:
 # This class implements the server side of the XMLRPC interface to OS IDs.
 #
 class osid:
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     def getlist(self, version, argdict):
@@ -843,8 +935,8 @@ class osid:
                            "o.* FROM "
                            "os_info as o "
                            "left join group_membership as g on g.pid=o.pid "
-                           "where g.uid=%s or o.shared=1",
-                           (self.uid,),
+                           "where g.uid_idx=%s or o.shared=1",
+                           (self.uid_idx,),
                            True)
 
         if len(res) == 0:
@@ -875,7 +967,7 @@ class osid:
         if (argerror):
             return argerror
 
-        if not re.match("^[-\w]*$", argdict["osid"]):
+        if not re.match("^[-\w\.]*$", argdict["osid"]):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed osid!")
 
@@ -884,9 +976,9 @@ class osid:
                            "o.* FROM "
                            "os_info as o "
                            "left join group_membership as g on g.pid=o.pid "
-                           "where (g.uid=%s or o.shared=1) and "
+                           "where (g.uid_idx=%s or o.shared=1) and "
                            "(o.osname=%s or o.osid=%s)",
-                           (self.uid, argdict["osid"], argdict["osid"]),
+                           (self.uid_idx, argdict["osid"], argdict["osid"]),
                            True)
 
         if len(res) == 0:
@@ -900,7 +992,7 @@ class osid:
         if not osid["OS"] or len(osid["OS"]) == 0:
             osid["OS"] = "(None)"
             pass
-        
+
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=scrubdict(osid),
                               output=str(osid))
@@ -915,10 +1007,13 @@ class experiment:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     ##
@@ -1076,6 +1171,7 @@ class experiment:
 
         nsfilename = None
         argstr     = "-q"
+	extrainfo  = False
         
         for opt, val in argdict.items():
             if opt == "batch":
@@ -1155,15 +1251,40 @@ class experiment:
                     return EmulabResponse(RESPONSE_SERVERERROR,
                                          output="Server Error")
                 pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
+                    pass
+                pass
+	    elif opt == "extrainfo":
+		if xbool(val):
+		    argstr += " -X "
+		    extrainfo = True
+		    pass
+                pass
             pass
+
 
         if nsfilename:
             argstr += " " + nsfilename
             pass
 
-        (exitval, output) = runcommand(TBDIR + "/bin/batchexp " + argstr)
+        (exitval, output, errout) = runcommand(TBDIR + "/bin/batchexp " + argstr, 
+                                               separate_stderr=extrainfo);
         if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+	    if extrainfo:
+		try:
+		    value = xmlrpclib.loads(output)[0][0]
+		except:
+		    output = errout + output
+		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+		value["exitval"] = exitval >> 8
+		output = value["output"]
+		del value["output"]
+		value["errout"] = errout
+		return EmulabResponse(RESPONSE_ERROR, value, output=output)
+	    else:
+            	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
@@ -1198,7 +1319,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1209,11 +1330,24 @@ class experiment:
                                   output="direction must be 'in' or 'out'");
 
         argstr = "-q"
+	extrainfo = False
+
         for opt, val in argdict.items():
             if opt == "wait":
                 if xbool(val):
                     argstr += " -w "
                     pass
+                pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
+                    pass
+                pass
+	    elif opt == "extrainfo":
+		if xbool(val):
+		    argstr += " -X "
+		    extrainfo = True
+		    pass
                 pass
             pass
 
@@ -1221,9 +1355,22 @@ class experiment:
         argstr += " " + escapeshellarg(argdict["proj"])
         argstr += " " + escapeshellarg(argdict["exp"])
 
-        (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
+        (exitval, output, errout) = runcommand(TBDIR + "/bin/swapexp " + argstr,
+                                               separate_stderr=extrainfo);
         if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+	    if extrainfo:
+		try:
+		    value = xmlrpclib.loads(output)[0][0]
+		except:
+		    output = errout + output
+		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+		value["exitval"] = exitval >> 8
+		output = value["output"]
+		del value["output"]
+		value["errout"] = errout
+		return EmulabResponse(RESPONSE_ERROR, value, output=output)
+	    else:
+            	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
@@ -1253,13 +1400,14 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
 
         nsfilename = None
         argstr     = "-q"
+	extrainfo  = False
         
         for opt, val in argdict.items():
             if opt == "wait":
@@ -1293,6 +1441,17 @@ class experiment:
                     return EmulabResponse(RESPONSE_SERVERERROR,
                                          output="Server Error")
                 pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
+                    pass
+                pass
+	    elif opt == "extrainfo":
+		if xbool(val):
+		    argstr += " -X "
+		    extrainfo = True
+		    pass
+                pass
             pass
 
         argstr += " -s modify"
@@ -1303,9 +1462,22 @@ class experiment:
             argstr += " " + nsfilename
             pass
 
-        (exitval, output) = runcommand(TBDIR + "/bin/swapexp " + argstr)
+        (exitval, output, errout) = runcommand(TBDIR + "/bin/swapexp " + argstr, 
+                                               separate_stderr=extrainfo)
         if exitval:
-            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+	    if extrainfo:
+		try:
+		    value = xmlrpclib.loads(output)[0][0]
+		except:
+		    output = errout + output
+		    return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+		value["exitval"] = exitval >> 8
+		output = value["output"]
+		del value["output"]
+		value["errout"] = errout
+		return EmulabResponse(RESPONSE_ERROR, value, output=output)
+	    else:
+            	return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
@@ -1334,7 +1506,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1346,10 +1518,15 @@ class experiment:
                     argstr += " -w "
                     pass
                 pass
+            elif opt == "noemail":
+                if xbool(val):
+                    argstr += " -N "
+                    pass
+                pass
             pass
 
         argstr += " " + escapeshellarg(argdict["proj"])
-        argstr += " " + escapeshellarg(argdict["exp"])
+        argstr += "/" + escapeshellarg(argdict["exp"])
 
         (exitval, output) = runcommand(TBDIR + "/bin/endexp " + argstr)
         if exitval:
@@ -1382,7 +1559,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1439,7 +1616,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1482,7 +1659,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1550,7 +1727,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1610,7 +1787,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1727,7 +1904,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -1752,13 +1929,15 @@ class experiment:
                 "(unix_timestamp(now()) - unix_timestamp( "
                 "greatest(na.last_tty_act,na.last_net_act,na.last_cpu_act,"
                 "na.last_ext_act))),ni.load_1min,ni.load_5min,ni.load_15min,"
-                "n.phys_nodeid,r.erole "
+                "n.phys_nodeid,r.erole,GROUP_CONCAT(DISTINCT nx.type) as atype"
                 "  from reserved as r "
                 "left join nodes as n on r.node_id=n.node_id "
                 "left join node_status as ns on ns.node_id=n.node_id "
                 "left join node_activity as na on na.node_id=n.node_id "
                 "left join node_idlestats as ni on ni.node_id=n.node_id "
+		"left join node_auxtypes as nx on nx.node_id=n.phys_nodeid "
                 "where r.pid=%s and r.eid=%s "
+		"group by r.node_id "
                 "order by r.vname",
                 (argdict["proj"], argdict["exp"]))
             osmappings = {}
@@ -1768,6 +1947,9 @@ class experiment:
                 tmp["name"] = res[0]
                 tmp["node"] = res[1]
                 tmp["type"] = res[2]
+		if tmp["type"] == "pcplab":
+		    tmp["auxtype"] = res[12]
+		    pass
                 tmp["pnode"] = res[10]
                 if not osmappings.has_key(res[3]):
                     osres = DBQuery(
@@ -1870,7 +2052,7 @@ class experiment:
                 result["interfaces"].append(scrubdict(intf))
                 pass
             dbres = DBQuery("SELECT i.* FROM reserved as r "
-                            "LEFT JOIN veth_interfaces as i "
+                            "LEFT JOIN vinterfaces as i "
                             " on r.node_id=i.node_id "
                             "WHERE r.pid=%s and r.eid=%s "
                             "and i.ip is not NULL and i.ip!=''",
@@ -1970,7 +2152,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2028,7 +2210,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2091,7 +2273,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2149,7 +2331,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2220,7 +2402,7 @@ class experiment:
         #
         # Check permission.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2318,7 +2500,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2363,7 +2545,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2421,7 +2603,7 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2476,13 +2658,17 @@ class experiment:
         #
         # Check permission. This will check proj/exp for illegal chars.
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
 
         dbres = DBQueryFatal(
-            "select nsfile from nsfiles where pid=%s and eid=%s",
+            "select i.input from experiments as e "
+            "left join experiment_stats as s on s.exptidx=e.idx "
+            "left join experiment_resources as r on r.idx=s.rsrcidx "
+            "left join experiment_input_data as i on i.idx=r.input_data_idx "
+            "where e.pid=%s and e.eid=%s",
             (argdict["proj"], argdict["exp"]))
 
         if len(dbres) == 0:
@@ -2492,7 +2678,7 @@ class experiment:
         result = dbres[0][0]
         
         return EmulabResponse(RESPONSE_SUCCESS,
-                              value=result,
+                              value=str(result),
                               output="ok")
 
     #
@@ -2532,7 +2718,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2540,7 +2726,7 @@ class experiment:
         argstr  = ""
         argstr += " " + escapeshellarg(argdict["action"])
         argstr += " " + escapeshellarg(argdict["proj"])
-        argstr += " " + escapeshellarg(argdict["exp"])
+        argstr += "," + escapeshellarg(argdict["exp"])
         
         (exitval, output) = runcommand(TBDIR + "/bin/eventsys_control "
                                        + argstr)
@@ -2580,7 +2766,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2771,7 +2957,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2792,7 +2978,22 @@ class experiment:
                       (argdict["proj"], argdict["exp"]))
 
         for agent in res:
-            if agent[2] == None:
+            if agent[1] == "ops":
+                nodeid = "ops"
+
+                ipres = DBQuery("select IP from interfaces "
+                                "where node_id=%s and role='ctrl'",
+                                (nodeid))
+
+                if not ipres or len(ipres) == 0:
+                    continue
+
+                ipaddr = ipres[0][0]
+                if not ipaddr:
+                    ipaddr = ""
+                    pass
+                pass
+            elif agent[2] == None:
                 nodeid = ""
                 ipaddr = ""
                 pass
@@ -2819,9 +3020,11 @@ class experiment:
 
         res = DBQuery("select n.phys_nodeid,i.IP from reserved as r "
                       "left join nodes as n on n.node_id=r.node_id "
+                      "left join node_types as nt on nt.type=n.type "
                       "left join interfaces as i on i.node_id=n.phys_nodeid "
                       "  and i.role='ctrl' "
-                      "where r.pid=%s and r.eid=%s and n.type='pcplab' "
+                      "where r.pid=%s and r.eid=%s and nt.isvirtnode=1 and "
+                      "      (n.type='pcplab' or r.sharing_mode is not null) "
                       "group by n.phys_nodeid",
                       (argdict["proj"], argdict["exp"]))
 
@@ -2868,7 +3071,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2908,7 +3111,7 @@ class experiment:
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -2918,27 +3121,31 @@ class experiment:
         #
         result = []
 
-	res = DBQuery("select ex.idx,ex.time,ex.vname,"
-                      " ot.type,et.type,ex.arguments,ex.parent "
-                      "from eventlist as ex "
-                      "left join event_eventtypes as et on "
+	res = DBQuery("SELECT ex.idx,ex.time,ex.vname,"
+                      "ot.type,et.type,ex.arguments,ex.parent,etr.type "
+                      "FROM eventlist AS ex "
+                      "LEFT JOIN event_triggertypes AS etr ON "
+                      "ex.triggertype=etr.idx "
+                      "LEFT JOIN event_eventtypes AS et ON "
                       " ex.eventtype=et.idx "
-                      "left join event_objecttypes as ot on "
+                      "LEFT JOIN event_objecttypes AS ot ON "
                       " ex.objecttype=ot.idx "
-                      "where ex.pid=%s and ex.eid=%s and ot.type!='TIME' "
-                      "order by ex.time,ex.idx ASC",
+                      "WHERE ex.pid=%s AND ex.eid=%s AND ot.type!='TIME' "
+                      "ORDER BY ex.time,ex.idx ASC",
                       (argdict["proj"], argdict["exp"]))
 
         for event in res:
             result.append((str(event[0]), str(event[1]), event[2],
-                           event[3], event[4], event[5], event[6]));
+                           event[3], event[4], event[5], event[6], event[7]));
             pass
         
         res = DBQuery("select n.phys_nodeid,i.IP from reserved as r "
                       "left join nodes as n on n.node_id=r.node_id "
+                      "left join node_types as nt on nt.type=n.type "
                       "left join interfaces as i on i.node_id=n.phys_nodeid "
                       "  and i.role='ctrl' "
-                      "where r.pid=%s and r.eid=%s and n.type='pcplab' "
+                      "where r.pid=%s and r.eid=%s and nt.isvirtnode=1 and "
+                      "      (n.type='pcplab' or r.sharing_mode is not null) "
                       "group by n.phys_nodeid",
                       (argdict["proj"], argdict["exp"]))
 
@@ -2992,7 +3199,7 @@ class experiment:
                            "",
                            "__ns_teardown"))
             pass
-        
+
         return EmulabResponse(RESPONSE_SUCCESS, value=result)
 
     def event_time_start(self, version, argdict):
@@ -3020,11 +3227,16 @@ class experiment:
                 tl_insert = ",parent='%s'" % (argdict["timeline"],)
                 pass
             pass
+
+        exptidx = ExperimentIndex(argdict["proj"], argdict["exp"])
+        if exptidx == None:
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="No such experiment")
         
         #
         # Check permission. 
         #
-        permerror = CheckExptPermission(self.uid,
+        permerror = CheckExptPermission(self.uid_idx,
                                         argdict["proj"], argdict["exp"])
         if (permerror):
             return permerror
@@ -3040,9 +3252,9 @@ class experiment:
 
             if value > 0:
                 DBQueryFatal("INSERT INTO eventlist SET "
-                             "pid=%s,eid=%s,objecttype=3,eventtype=1,"
-                             "arguments=%s" + tl_insert,
-                             (argdict["proj"], argdict["exp"], value))
+                             "exptidx=%d,pid=%s,eid=%s,objecttype=3,"
+                             "eventtype=1,arguments=%s" + tl_insert,
+                             (exptidx, argdict["proj"], argdict["exp"], value))
                 pass
             
             result = "ok"
@@ -3061,6 +3273,50 @@ class experiment:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=`result`, value=result)
     
+    #
+    # Return DP info.
+    #
+    def dpinfo(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+        
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        #
+        # Check permission. 
+        #
+        permerror = CheckExptPermission(self.uid_idx,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        res = DBQuery("SELECT dpdb,dpdbname FROM experiments "
+                      "WHERE pid=%s and eid=%s",
+                      (argdict["proj"], argdict["exp"]));
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        result  = {}
+        result["dbname"] = res[0][1];
+        if result["dbname"] == None:
+            result["dbname"] = ""
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS, value=result, output=str(result))
     pass
 
 #
@@ -3070,10 +3326,13 @@ class node:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
-    def __init__(self, readonly=0):
-        self.readonly = readonly;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
         return
 
     #
@@ -3109,7 +3368,7 @@ class node:
 
         pid_clause = ""
         if argdict.has_key("proj"):
-            permerror = CheckProjPermission(self.uid, argdict["proj"])
+            permerror = CheckProjPermission(self.uid_idx, argdict["proj"])
             if permerror:
                 return permerror
 
@@ -3181,18 +3440,29 @@ class node:
             pass
 
         pid_clause = ""
+        pid_clause_list = ""
         if argdict.has_key("proj"):
-            permerror = CheckProjPermission(self.uid, argdict["proj"])
+            permerror = CheckProjPermission(self.uid_idx, argdict["proj"])
             if permerror:
                 return permerror
 
-            pid_clause = " or p.pid='%s'" % (str(argdict["proj"]),)
+            pid_clause_list = str(argdict["proj"])
+            pid_clause = " or p.pid='%s'" % (pid_clause_list,)
             pass
         else:
-            pid_clause = (" or p.pid in ("
-                          + ",".join([("'" + x + "'")
-                                      for x in GetProjects(self.uid)])
-                          + ")")
+            pid_clause_list = ",".join([("'" + x + "'")
+                                        for x in GetProjects(self.uid_idx)])
+            pid_clause = (" or p.pid in (" + pid_clause_list + ")")
+            pass
+
+        node_clause = ""
+        if argdict.has_key("nodes"):
+            if not re.match("^[-\w]+(,[-\w]+)*$", str(argdict["nodes"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Bad chars in node list!")
+
+            nodestr = "','".join(str(argdict["nodes"]).split(","))
+            node_clause = " and a.node_id in ('" + nodestr + "') "
             pass
 
         res = DBQueryFatal(
@@ -3200,17 +3470,23 @@ class node:
             "  (b.pid=%s and b.eid=%s), "
             "  (a.eventstate='ISUP' or "
             "   a.eventstate='PXEWAIT' or "
-            "   a.eventstate='POWEROFF'),wn.site,nfcpu.weight "
+            "   a.eventstate='POWEROFF'),wn.site,nfcpu.weight, "
+            "  GROUP_CONCAT(DISTINCT aux.type),wn.hostname, "
+            "  a.reserved_pid is null or a.reserved_pid in "
+            "   (" + pid_clause_list + ") "
             "FROM nodes AS a "
             "left join reserved as b on a.node_id=b.node_id "
             "left join node_types as nt on a.type=nt.type "
+            "left join node_auxtypes as aux on aux.node_id=a.node_id "
             "left join nodetypeXpid_permissions as p on a.type=p.type "
             "left join widearea_nodeinfo as wn on wn.node_id=a.phys_nodeid "
             "left join node_features as nfcpu on (nfcpu.node_id=a.phys_nodeid "
             "  and nfcpu.feature='+load') "
             "WHERE a.role='testnode' "
             "  "+ class_test +" and "
-            "      (p.pid is null" + pid_clause + ") " + type_test,
+            "  (p.pid is null" + pid_clause + ") "
+            "  "+ type_test +" "+ node_clause +
+            "group by a.node_id",
             (TBOPSPID, 'plabnodes'))
         
         if len(res) == 0:
@@ -3223,11 +3499,19 @@ class node:
                 result[row[0]] = {
                     "node_id" : row[0],
                     "type" : row[1],
-                    "free" : (row[2] == 1 and row[3] == 1),
+                    "free" : (row[2] == 1 and row[3] == 1 and row[8] == 1),
                     }
                 if row[4]:
                     result[row[0]]["site"] = row[4]
+                    pass
+                if row[5] and row[5] != "":
                     result[row[0]]["cpu"] = row[5]
+                    pass
+                if row[6] and row[6] != "":
+                    result[row[0]]["auxtypes"] = row[6]
+                    pass
+                if row[7] and row[7] != "":
+                    result[row[0]]["hostname"] = row[7]
                     pass
                 pass
             pass
@@ -3255,12 +3539,12 @@ class node:
         res = DBQuery("SELECT distinct nt.* FROM node_types as nt "
                       "left join nodetypeXpid_permissions as p "
                       "  on nt.type=p.type "
-                      "left join group_membership as m on m.uid=%s "
+                      "left join group_membership as m on m.uid_idx=%s "
                       "WHERE (p.pid is null or p.pid=m.pid) and "
                       " nt.isdynamic=0 and nt.class not in ("
                       " 'pcplabphys','switch','shark','power','misc')"
                       + type_test,
-                      (self.uid),
+                      (self.uid_idx),
                       asDict=True)
 
         if len(res) == 0:
@@ -3293,7 +3577,7 @@ class node:
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed node value!")
 
-        if not CheckIsAdmin(self.uid):
+        if not CheckIsAdmin(self.uid_idx):
             # XXX Refactor the trust stuff
             res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
                                "left join experiments as e on "
@@ -3307,8 +3591,8 @@ class node:
                                       argdict["node"])
 
             trust = DBQueryFatal("SELECT trust FROM group_membership "
-                                 "WHERE uid=%s and pid=%s and gid=%s",
-                                 (self.uid, res[0][0], res[0][1]))
+                                 "WHERE uid_idx=%s and pid=%s and gid=%s",
+                                 (self.uid_idx, res[0][0], res[0][1]))
 
             if len(trust) == 0:
                 return EmulabResponse(
@@ -3400,8 +3684,8 @@ class node:
             pass
 
         trust = DBQueryFatal("SELECT trust FROM group_membership "
-                             "WHERE uid=%s and pid=%s and gid=%s",
-                             (self.uid, pid, gid))
+                             "WHERE uid_idx=%s and pid=%s and gid=%s",
+                             (self.uid_idx, pid, gid))
 
         if len(trust) == 0:
             return EmulabResponse(
@@ -3493,8 +3777,8 @@ class node:
                                   output="No such node: " + argdict["node"])
 
         trust = DBQueryFatal("SELECT trust FROM group_membership "
-                             "WHERE uid=%s and pid=%s and gid=%s",
-                             (self.uid, res[0][0], res[0][1]))
+                             "WHERE uid_idx=%s and pid=%s and gid=%s",
+                             (self.uid_idx, res[0][0], res[0][1]))
 
         if len(trust) == 0:
             return EmulabResponse(
@@ -3792,7 +4076,7 @@ class node:
         #
         # Check permission.
         #
-        permerror = CheckNodePermission(self.uid, argdict["node"])
+        permerror = CheckNodePermission(self.uid_idx, argdict["node"])
         if (permerror):
             return permerror
 
@@ -3887,9 +4171,472 @@ class node:
         del(mc)
         
         return EmulabResponse(RESPONSE_SUCCESS, value=retval, output=retval)
+
+    #
+    # Get widearea node configuration params, returned as a dict.
+    #
+    def waconfig(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        argerror = CheckRequiredArgs(argdict, ("node",))
+        if (argerror):
+            return argerror
+
+        if not re.match("^[-\w]*$", str(argdict["node"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed node value!")
+
+        if not CheckIsAdmin(self.uid_idx):
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No permission to access node: " +
+                                  argdict["node"])
+            pass
+
+        res = DBQueryFatal("select wni.hostname,wni.bwlimit,wni.privkey,"
+                           "  wni.IP,wni.gateway,wni.dns,wni.boot_method,"
+                           "  i.mac,i.mask"
+                           " from widearea_nodeinfo as wni"
+                           " left join interfaces as i"
+                           "   on wni.node_id=i.node_id"
+                           " where wni.node_id=%s and i.role=%s",
+                           (argdict["node"],'ctrl'))
+        
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such widearea node: %s" \
+                                  % (argdict["node"],))
+        elif len(res) > 1:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Multiple matches for node: %s" \
+                                  % (argdict["node"],))
+
+        row = res[0]
+
+        retval = dict({})
+        retval['WA_BOOTMETHOD'] = row[6]
+        try:
+            retval['WA_HOSTNAME'] = row[0].split('.',1)[0]
+        except:
+            retval['WA_HOSTNAME'] = row[0]
+        try:
+            retval['WA_DOMAIN'] = row[0].split('.',1)[1]
+        except:
+            retval['WA_DOMAIN'] = ""
+
+        if row[6] == 'static':
+            retval['WA_MAC'] = row[7]
+            retval['WA_IP_ADDR'] = row[3]
+            retval['WA_IP_NETMASK'] = row[8]
+            retval['WA_IP_GATEWAY'] = row[4]
+            retval['WA_IP_DNS1'] = row[5]
+            retval['WA_IP_DNS2'] = "@EXTERNAL_BOSSNODE_IP@"
+            pass
+
+        if row[1] and not row[1] == 0:
+            retval['WA_BWLIMIT'] = row[1]
+
+        retval['PRIVKEY'] = row[2]
+        
+        return EmulabResponse(RESPONSE_SUCCESS,value=retval)
     
     pass
 
+#
+# Hack class to get subbosses working... Note that nothing we do
+# in this class can damage anything or mess up anything outside the expt.
+#
+class subboss:
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
+        self.VERSION  = VERSION
+        self.clientip = server.clientip;
+        self.pid      = None;
+        self.eid      = None;
+        return
+
+    #
+    # Anything we do from this class has to be called by a node,
+    # that node must be reserved, a subboss, and assigned to an
+    # active experiment.  
+    #
+    def verifystuff(self):
+        if self.clientip == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="SSL connections only")
+
+        res = DBQueryFatal("select i.node_id,r.erole "
+                           "  from interfaces as i "
+                           "left join reserved as r on r.node_id=i.node_id "
+                           "where i.IP=%s and i.role='ctrl'",
+                           (self.clientip))
+        
+        # IP must map to a node.
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node for IP: " +
+                                  self.clientip)
+        
+        # Node must be reserved.
+        if res[0][1] == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Node is not reserved: " + res[0][0])
+        
+        # Must be a subboss.
+        if res[0][1] != "subboss":
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                                  output="Not a subboss");
+        
+        if self.uid != SUBBOSS_UID:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                                  output="Invalid UID")
+        
+        return None;
+    #
+    # Return info for a particular image on a given subboss
+    # 
+    def get_load_address(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+		           "imageid=%s and subboss_id=%s", (str(argdict["imageid"]), argdict["subboss_id"]))
+
+        if len(res) == 0:
+ 	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+
+        unlock_tables()
+        result = {}
+        result["address"] = res[0][0]
+        result["frisbee_pid"] = res[0][1]
+
+        return EmulabResponse(RESPONSE_SUCCESS, value=result, output=str(result))
+
+
+    #
+    # Return a multicast_address for subboss_frisbeed
+    # 
+    def allocate_load_address(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        status, msg = next_mcast_address()
+        if not status:
+	       return EmulabResponse(RESPONSE_ERROR, output=msg)
+        else:
+ 	       mcast_address = msg
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+ 		           "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			   str(argdict["imageid"])))
+        if len(res) == 0:
+	       # This pair doesn't exist in the table yet.  Better insert it
+	       res = DBQueryFatal("insert into subboss_images values (%s,%s,'',0,1,0)",
+				  (argdict["subboss_id"], argdict["imageid"]))
+        elif res[0][0] != "":
+	       # Subboss is already running a frisbeed for this image, so just update the
+	       # busy flag
+	       subboss_image_set_busy(argdict["subboss_id"], argdict["imageid"])
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="Frisbee server already running")
+        elif res[0][1] != 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="Bad DB state: frisbeed PID without load_address")
+
+
+	res = DBQueryFatal("update subboss_images set load_address = %s, load_busy = 1 where "
+			   "subboss_id=%s and imageid=%s", (mcast_address,
+			   argdict["subboss_id"], argdict["imageid"]))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS, value=mcast_address, output=mcast_address)
+
+    #
+    # Reset a subboss image entry; called when frisbeed is no longer needed
+    # 
+    def clear_load_address(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+
+ 	res = DBQueryFatal("update subboss_images set load_address = '', frisbee_pid = 0, load_busy = 0 "
+	                   "where subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			   str(argdict["imageid"])))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS)
+
+    #
+    # Set process ID for subboss frisbeed
+    # 
+    def set_frisbee_pid(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid", "frisbee_pid"))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+        elif res[0][0] == "":
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No address for image")
+
+	res = DBQueryFatal("update subboss_images set frisbee_pid=%s where subboss_id=%s and "
+			   "imageid=%s", (argdict["frisbee_pid"], argdict["subboss_id"],
+			   str(argdict["imageid"])))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS)
+
+    #
+    # Set sync flag for an image
+    # 
+    def set_sync_flag(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid", "sync"))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select sync from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       # This pair doesn't exist in the table yet.  Better insert it
+	       res = DBQueryFatal("insert into subboss_images values (%s,%s,'',0,0,%d)",
+				  (argdict["subboss_id"], str(argdict["imageid"]), argdict["sync"]))
+        else:
+		res = DBQueryFatal("update subboss_images set sync=%s where subboss_id=%s and "
+			   "imageid=%s", (argdict["sync"], argdict["subboss_id"],
+			   str(argdict["imageid"])))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS)
+
+    #
+    # See if subboss image 'busy' flag is set; indicates frisbeed should run again
+    # 
+    def image_requested(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid"))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+        busy = 0
+
+        res = DBQueryFatal("select load_address,frisbee_pid,load_busy from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+        elif res[0][0] == "":
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No address for image")
+        elif res[0][1] == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="PID not set for image")
+
+        if res[0][2] > 0:
+	       busy = 1
+	       res = DBQueryFatal("update subboss_images set load_busy = 0 where subboss_id=%s and "
+				   "imageid=%s", (argdict["subboss_id"], str(argdict["imageid"])))
+
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS, value=busy, output=str(busy))
+
+    #
+    # Fire up a frisbeed for an image,
+    # This is essentially the same as the frisbeelauncher method for
+    # elabinelab
+    # 
+    def frisbeelauncher(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+        
+        argstr = escapeshellarg(str(argdict["imageid"]))
+        
+        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        #
+        # Success. Must get the loadinfo out of the DB so we can pass it back.
+        #
+        res = DBQueryFatal("select load_address from images where imageid=%s",
+                           (str(argdict["imageid"]),))
+        
+        # Hmm, something went wrong?
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Imageid is gone: " +
+                                  argdict["imageid"])
+        
+        if (res[0][0] == None or res[0][0] == ""):
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No load_address in DB: " +
+                                  argdict["imageid"])
+        
+        return EmulabResponse(RESPONSE_SUCCESS, str(res[0][0]), output=output)
+    
 
 #
 # Hack class to get ElabInElab limping along ... Note that nothing we do
@@ -3899,11 +4646,14 @@ class elabinelab:
     ##
     # Initialize the object.  Currently only sets the objects 'VERSION' value.
     #
-    def __init__(self, clientip=None, readonly=0):
-        self.readonly = readonly;
-        self.clientip = clientip;
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
         self.VERSION  = VERSION
-        self.uid      = pwd.getpwuid(os.getuid())[0]
+        self.clientip = server.clientip;
         self.pid      = None;
         self.eid      = None;
         return
@@ -4039,7 +4789,7 @@ class elabinelab:
         #
         # Funnel up to node.console() routine
         # 
-        node_instance = node(readonly=self.readonly);
+        node_instance = node(self.server);
         
         return node_instance.console(version, argdict);
     
@@ -4066,9 +4816,11 @@ class elabinelab:
             return verifyerror
 
         if (argdict["op"] != "setup" and
+            argdict["op"] != "list" and
+            argdict["op"] != "trunk" and
             argdict["op"] != "destroy"):
             return EmulabResponse(RESPONSE_BADARGS,
-                                  output="op must be setup or destroy")
+			  output="op must be list, trunk, setup or destroy")
 
         argstr = "-p " + self.pid + " -e " + self.eid + " " + argdict["op"];
      
@@ -4076,10 +4828,10 @@ class elabinelab:
         # Figure out how to convert the stuff we got into something we can
         # pass on the command line to perl backend.
         # 
-        if argdict["op"] == "destroy":
+        if argdict["op"] == "destroy" or argdict["op"] == "list":
             #
-            # Destroy is easy; just pass a list of id numbers out. The backend
-            # script does all the verification.
+            # Destroy and list are easy; just pass a list of id numbers out.
+	    # The backend script does all the verification.
             #
             if (isinstance(argdict["arg"], types.IntType)):
                 argstr += " " + str(argdict["arg"])
@@ -4091,6 +4843,17 @@ class elabinelab:
                     pass
                 pass
             pass
+        elif argdict["op"] == "trunk":
+            #
+            # Trunk is syntactically like destroy or list with two extra args.
+            #
+	    info = argdict["arg"]
+	    argstr += " " + str(info["mode"]) + " " + str(info["port"])
+	    tokens = info["vlans"].split(",")
+	    for token in tokens:
+		argstr += " " + escapeshellarg(token)
+		pass
+	    pass
         else:
             #
             # Setup is harder. Pass a set of strings to the script,
@@ -4119,7 +4882,97 @@ class elabinelab:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Leave the previous one in place or else existing elabinelabs will break.
+    #
+    def vlansnew(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("xmldoc",))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        #
+        # We get an xmldoc as the argument, which we give to the proxy
+        # to decode on its own. Easier then trying to decode a bunch
+        # of stuff to pass on the commandline.
+        #
+        (xmlfp, xmlfilename) = writensfile(argdict["xmldoc"]);
+        if not xmlfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+
+        argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+
+        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxynew " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
     
+    def vlansv2(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("xmldoc",))
+        if (argerror):
+            return argerror
+
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        #
+        # We get an xmldoc as the argument, which we give to the proxy
+        # to decode on its own. Easier then trying to decode a bunch
+        # of stuff to pass on the commandline.
+        #
+        (xmlfp, xmlfilename) = writensfile(argdict["xmldoc"]);
+        if not xmlfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+
+        #
+        # Create a temporary file for the output.
+        #
+        (outfp, outfilename) = writensfile("");
+        if not outfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
+
+        argstr  = "-o " + outfilename + " ";
+        argstr += "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+
+        (exitval,output) = runcommand(TBDIR + "/sbin/snmpit.proxyv2 " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+
+        #
+        # Results are in the outfile.
+        #
+        stuff = ""
+        for l in outfp:
+            stuff += l
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
     #
     # Fire up a frisbeed for an image,
     # 
@@ -4146,7 +4999,7 @@ class elabinelab:
         if (verifyerror):
             return verifyerror
         
-        argstr = escapeshellarg(argdict["imageid"])
+        argstr = escapeshellarg(str(argdict["imageid"]))
         
         (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
         if exitval:
@@ -4203,8 +5056,9 @@ class elabinelab:
                              "   i.node_id=r.node_id "
                              "left join wires as s on s.node_id1=i.node_id "
                              "   and s.card1=i.card "
-                             "where r.pid=%s and r.eid=%s and "
-                             "   r.inner_elab_role='node' "
+                             "where r.pid=%s and r.eid=%s "
+                             "   and r.inner_elab_role='node' "
+			     "   and s.node_id2!='' "
                              "order by r.node_id,iface",
                              (self.pid,self.eid,))
         
@@ -4215,7 +5069,8 @@ class elabinelab:
             #
             # The current control network becomes the outer control network.
             # The experimental network with an IP assigned becomes the
-            # inner control network.
+            # inner control network.  Interfaces other than experimental
+            # or control (e.g., fake IXP interfaces) are ignored.
             #
             role = res[3]
             IP   = res[7]
@@ -4226,6 +5081,8 @@ class elabinelab:
             elif role == "expt" and IP != "":
                 role = "ctrl"
                 pass
+            elif role != "expt":
+                continue
             
             tmp["mac"]         = res[1]
             tmp["iface"]       = res[2]
@@ -4293,6 +5150,7 @@ class elabinelab:
                              "left join wires as s on s.node_id1=i.node_id "
                              "   and s.card1=i.card "
                              "where r.node_id=%s "
+			     "   and s.node_id2!='' "
                              "order by r.node_id,iface",
                              (nodeid,))
         
@@ -4328,7 +5186,7 @@ class elabinelab:
             tmp["card"]        = res[5]
             tmp["type"]        = res[6]
             tmp["switch_id"]   = res[7]
-            tmp["switch_card"] = res[9]
+            tmp["switch_card"] = res[8]
             tmp["switch_port"] = res[9]
             interfaces[res[1]] = tmp
             pass
@@ -4336,6 +5194,601 @@ class elabinelab:
         result["interfaces"] = interfaces
         
         return EmulabResponse(RESPONSE_SUCCESS, result, output=str(result))
+    pass
+
+
+#
+# This class implements the server side of the XMLRPC interface to experiments.
+#
+class template:
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
+        self.VERSION  = VERSION
+        return
+
+    def addprogevent(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict,
+                                     ("proj", "exp", "when", "vnode", "cmd"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"]) and
+                re.match("^[-\w]*$", argdict["vnode"]) and
+                re.match("^[-\w]*$", argdict["when"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed arguments")
+
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(self.uid_idx,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        # Need to pass experiment index to script.
+        dbres = DBQueryFatal("SELECT idx FROM experiments "
+                             "WHERE pid=%s and eid=%s",
+                             (argdict["proj"], argdict["exp"]))
+        
+        if len(dbres) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        exptidx = dbres[0][0]
+        (guid,version) = TemplateLookup(exptidx)
+        if guid == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such template instance")
+
+        argstr  = " -a addevent " + str(guid) + "/" + str(version)
+        argstr += " -i " + str(exptidx)
+        argstr += " -t " + str(argdict["when"])
+        argstr += " -n " + argdict["vnode"]
+        argstr += " -c " + escapeshellarg(argdict["cmd"])
+        
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_control " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Commit (modify) a template.
+    #
+    def template_commit(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argstr  = "-q"
+
+        for opt, val in argdict.items():
+            if opt == "exp":
+                argstr += " -e "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "proj":
+                argstr += " -p "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "description":
+                argstr += " -E "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "tid":
+                argstr += " -t "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "tag":
+                argstr += " -r "
+                argstr += escapeshellarg(val);
+                pass
+            pass
+
+        if argdict.has_key("guid"):
+            if not (re.match("^[-\w\/]*$", argdict["guid"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed arguments")
+
+            argstr += " "
+            argstr += str(argdict["guid"])
+            pass
+        elif argdict.has_key("path"):
+            argstr += " -q -f "
+            argstr += escapeshellarg(argdict["path"]);
+            pass
+        
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_commit " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Checkout a template.
+    #
+    def checkout(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "path"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w\/]*$", argdict["guid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed arguments")
+
+        argstr  = "-q -f " + escapeshellarg(argdict["path"])
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_checkout " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Export a template.
+    #
+    def export(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("instance",))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["instance"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed arguments")
+
+        argstr  = "-q"
+
+        for opt, val in argdict.items():
+            if opt == "instance":
+                argstr += " -i "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "run":
+                argstr += " -r "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_export " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Instantiate a template.
+    #
+    def instantiate(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "exp"))
+        if (argerror):
+            return argerror
+        
+        xmlfilename = None
+        argstr      = "-q"
+        
+        for opt, val in argdict.items():
+            if opt == "batch":
+                if not xbool(val):
+                    argstr += " -b"
+                    pass
+                pass
+            elif opt == "preload":
+                if not xbool(val):
+                    argstr += " -p"
+                    pass
+                pass
+            elif opt == "description":
+                argstr += " -E "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "swappable":
+                if not xbool(val):
+                    if not argdict.has_key("noswap_reason"):
+                        return EmulabResponse(RESPONSE_BADARGS,
+                                       output="Must supply noswap reason!");
+                    argstr += " -S "
+                    argstr += escapeshellarg(argdict["noswap_reason"])
+                    pass
+                pass
+            elif opt == "noswap_reason":
+                pass
+            elif opt == "idleswap":
+                if val == 0:
+                    if not argdict.has_key("noidleswap_reason"):
+                        return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Must supply noidleswap reason!");
+                    argstr += " -L "
+                    argstr += escapeshellarg(argdict["noidleswap_reason"])
+                    pass
+                else:
+                    argstr += " -l "
+                    argstr += escapeshellarg(str(val))
+                    pass
+                pass
+            elif opt == "noidleswap_reason":
+                pass
+            elif opt == "autoswap" or opt == "max_duration":
+                argstr += " -a "
+                argstr += escapeshellarg(str(val))
+                pass
+            elif opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "xmlfilepath":
+                # Backend script will verify this local path. 
+                xmlfilename = escapeshellarg(val)
+                pass
+            elif opt == "xmlfilestr":
+                xmlfilestr = val
+            
+                if len(xmlfilestr) > (1024 * 512):
+                    return EmulabResponse(RESPONSE_TOOBIG,
+                                         output="XML File way too big!");
+        
+                (xmlfp, xmlfilename) = writensfile(xmlfilestr)
+                if not xmlfilename:
+                    return EmulabResponse(RESPONSE_SERVERERROR,
+                                         output="Server Error")
+                pass
+            pass
+
+        if xmlfilename:
+            argstr += " -x " + xmlfilename
+            pass
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_instantiate " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # swapin a preloaded template instance
+    #
+    def swapin(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "exp"))
+        if (argerror):
+            return argerror
+
+        argstr = "-q"
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "quiet":
+                if xbool(val):
+                    argstr += " -q "
+                    pass
+                pass
+            pass
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_swapin " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+    pass
+
+    #
+    # Start a new run
+    #
+    def newrun(self, action, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("exp", ))
+        if (argerror):
+            return argerror
+
+        pid         = None
+        xmlfilename = None
+        argstr      = "-q"
+        
+        for opt, val in argdict.items():
+            if opt == "description":
+                argstr += " -E "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "clear":
+                argstr += " -c "
+                pass
+            elif opt == "runid":
+                argstr += " -r "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "pid":
+                pid = escapeshellarg(val)
+                pass
+            elif opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "modify":
+                if xbool(val):
+                    argstr += " -m "
+                    pass
+                pass
+            elif opt == "params":
+                argstr += " -y "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "xmlfilepath":
+                # Backend script will verify this local path. 
+                xmlfilename = escapeshellarg(val)
+                pass
+            elif opt == "xmlfilestr":
+                xmlfilestr = val
+            
+                if len(xmlfilestr) > (1024 * 512):
+                    return EmulabResponse(RESPONSE_TOOBIG,
+                                         output="XML File way too big!");
+        
+                (xmlfp, xmlfilename) = writensfile(xmlfilestr)
+                if not xmlfilename:
+                    return EmulabResponse(RESPONSE_SERVERERROR,
+                                         output="Server Error")
+                pass
+            pass
+
+        if pid == None and not argdict.has_key("guid"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Must supply pid or guid")
+
+        if xmlfilename:
+            argstr += " -x " + xmlfilename
+            pass
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " -a " + action + " "
+
+        if pid == None:
+            argstr += " " + escapeshellarg(argdict["guid"])
+            pass
+        else:
+            argstr += " -p " + pid
+            pass
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_exprun " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    def startrun(self, version, argdict):
+        return self.newrun("start", version, argdict)
+                
+    def modrun(self, version, argdict):
+        return self.newrun("modify", version, argdict)
+    
+    #
+    # Stop current run.
+    #
+    def stoprun(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("exp",))
+        if (argerror):
+            return argerror
+        
+        pid    = None
+        argstr = "-q"
+        
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "token":
+                argstr += " -t "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "quiet":
+                if xbool(val):
+                    argstr += " -q "
+                    pass
+                pass
+            elif opt == "ignoreerrors":
+                if xbool(val):
+                    argstr += " -i "
+                    pass
+                pass
+            elif opt == "pid":
+                pid = escapeshellarg(val)
+                pass
+            pass
+        
+        if pid == None and not argdict.has_key("guid"):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Must supply pid or guid")
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " -a stop"
+        
+        if pid == None:
+            argstr += " " + escapeshellarg(argdict["guid"])
+            pass
+        else:
+            argstr += " -p " + pid
+            pass
+        
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_exprun " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Terminate an instance
+    #
+    def swapout(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("guid", "exp"))
+        if (argerror):
+            return argerror
+
+        argstr = "-q"
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if xbool(val):
+                    argstr += " -w "
+                    pass
+                pass
+            pass
+
+        argstr += " -e " + escapeshellarg(argdict["exp"])
+        argstr += " " + escapeshellarg(argdict["guid"])
+
+        (exitval, output) = runcommand(TBDIR +
+                                       "/bin/template_swapout " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
     pass
 
 #
@@ -4361,17 +5814,20 @@ def escapeshellarg(s):
 # Run a command. args is a list of strings to pass as arguments to cmd.
 # Return the exitcode and the output as a tuple.
 # 
-def runcommand(cmd):
-    child  = popen2.Popen4(cmd)
-    output = ""
-    while (True):
-        foo = child.fromchild.read(1024 * 16)
-        if foo == "":
-            break
-        output += foo
-        pass
-    
-    return (child.wait(), output)
+def runcommand(cmd, separate_stderr=None):
+    from subprocess import *
+    if separate_stderr == True:
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=PIPE, shell=True, close_fds=True)
+    	(stdoutdata, stderrdata) = p.communicate()
+        return (p.returncode << 8, stdoutdata, stderrdata)
+    elif separate_stderr == False:
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True, close_fds=True)
+    	(stdoutdata, stderrdata) = p.communicate()
+        return (p.returncode << 8, stdoutdata, stderrdata)
+    else:
+    	p = Popen(cmd, stdin=None, stdout=PIPE, stderr=STDOUT, shell=True, close_fds=True)
+    	(stdoutdata, stderrdata) = p.communicate()
+        return (p.returncode << 8, stdoutdata)
 
 def writensfile(str):
     tempfile.tempdir = "/var/tmp"
@@ -4485,7 +5941,7 @@ def nfspath(value):
 
     found = False
     for export in NFS_EXPORTS:
-        if retval.startswith(export):
+        if export != "" and retval.startswith(export):
             found = True
             break
         pass
@@ -4494,6 +5950,8 @@ def nfspath(value):
         raise OSError(errno.EPERM, "Path is not an NFS export", value)
 
     return retval
+
+from sets import Set
 
 ##
 # Scrub a dictionary returned by an SQL query so that it can be sent through
@@ -4513,6 +5971,9 @@ def scrubdict(retval, prunelist=[], defaultvals={}):
                 del retval[key]
                 pass
             pass
+        elif isinstance(retval[key], Set):
+            retval[key] = list(retval[key])
+            pass
         elif isinstance(retval[key], datetime.datetime):
             retval[key] = xmlrpclib.DateTime(
                 time.strptime(str(retval[key]), "%Y-%m-%d %H:%M:%S"))
@@ -4520,3 +5981,54 @@ def scrubdict(retval, prunelist=[], defaultvals={}):
         pass
     
     return retval
+
+def subboss_image_set_busy(subboss, imageid):
+	res = DBQueryFatal("update subboss_images set load_busy=1 where "
+			   "imageid=%s and subboss_id=%s", (imageid, subboss))
+	# XXX make sure update worked
+
+#
+# Get the next mcast address to use for frisbeed
+# tables must be unlocked for this to work
+#
+def next_mcast_address():
+	res = DBQueryFatal("update emulab_indicies set idx=LAST_INSERT_ID(idx+1) "
+		           "where name='frisbee_index'")
+
+	# XXX what if index doesn't exist yet?  should in practice though
+
+	res = DBQueryFatal("select LAST_INSERT_ID()")
+	idx = res[0][0] # XXX what is the right way to do this?
+
+	dotted = map(int, BASEADDR.split("."))
+	if len(dotted) < 4:
+		dotted.extend([1, 1, 1])
+		dotted = dotted[0:4]
+
+	dotted[3] += idx
+	if dotted[3] > 254:
+		dotted[2] += dotted[3] / 254
+		dotted[3] = dotted[3] % 254 + 1
+
+	if dotted[2] > 254:
+		dotted[1] += dotted[2] / 254
+		dotted[2] = dotted[2] % 254 + 1
+
+	if dotted[1] > 254:
+		return (False, "No more multicast addresses")
+
+	port = int(BASEPORT) + (((dotted[2] << 8) | dotted[3]) & 0x7FFF)
+
+	return (True, "%d.%d.%d.%d:%d" % (dotted[0], dotted[1], dotted[2], dotted[3], port))
+
+#
+# Locks the subboss_images table
+#
+def lock_subboss_image_table():
+	return DBQueryFatal("lock tables subboss_images write")
+
+#
+# Unlocks any tables we've locked
+#
+def unlock_tables():
+	return DBQueryFatal("unlock tables")

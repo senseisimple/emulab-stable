@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,7 +23,9 @@ if (@ARGV && $ARGV[0] eq "-i") {
 #
 my $DBNAME = '@TBDBNAME@';
 
-my $mysqldump = "mysqldump";
+my $isvers5   = system("mysql -V | egrep -q -s 'Distrib 5.'") == 0;
+my $extraopts = ($isvers5 ? "--skip-opt" : "");
+my $mysqldump = "mysqldump $extraopts";
 
 #
 # We use the bare Mysql module instead of the testbed libdb, so that this

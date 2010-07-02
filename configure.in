@@ -1,10 +1,44 @@
-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
 AC_PREREQ(2.13)
 
 AC_INIT(Makeconf.in)
 AC_CONFIG_AUX_DIR(${srcdir}/autoconf)
 AC_PREFIX_DEFAULT(/usr/testbed)
 AC_CONFIG_HEADER(config.h)
+
+# We use separate source and obj trees in Emulab.  Configuring in a source
+# tree messes it up, so throw an error.
+#
+# Check that $srcdir, (which defaults to the argv[0] path to the configure
+# script,) is different from the current directory.
+#
+if test `(cd $srcdir; pwd)` = `pwd`; then
+    if test "$ac_srcdir_defaulted" = yes; then
+	AC_MSG_ERROR(
+	    [You are running the configure script in the current directory.
+Output from configure must go into an Emulab obj tree, not a source tree!
+cd to the top of an obj tree, and run the configure in your source tree.])
+    else
+	AC_MSG_ERROR(
+	    [You specified --srcdir= to be the current directory.
+Output from configure should go into an Emulab obj tree, not a source tree!
+cd to the top of an obj tree, and run the configure in your source tree.
+Then --srcdir= will be unnecessary.])
+    fi
+fi
+#
+# Double-check that there isn't a Makeconf.in (the UNIQUE-FILE-IN-SOURCE-DIR)
+# in the current directory.
+#
+if test -f $ac_unique_file; then
+    AC_MSG_ERROR([The current directory is a source tree containing $ac_unique_file .
+Output from configure should go into an Emulab obj tree, not a source tree!
+cd to the top of an obj tree, and run the configure in your source tree.])
+fi
 
 for tbarch in arm/3.4.1; do
     PATH="/usr/local/$tbarch/bin:${PATH}"
@@ -54,6 +88,8 @@ AC_EXEEXT
 AC_PATH_PROG(ELVIN_CONFIG,elvin-config)
 AC_PATH_PROG(JAVAC,javac)
 AC_PATH_PROG(JAR,jar)
+AC_PATH_PROG(SUDO,sudo)
+AC_PATH_PROG(UUIDGEN,uuidgen)
 
 AC_CHECK_TOOL(SSH,ssh)
 
@@ -65,8 +101,9 @@ AC_SUBST(optional_subdirs)
 # These get defined in the definitions file (--with-TBDEFS).
 # NB: See AC_DEFINE_UNQUOTED() calls below, if you want a variable
 # to appear in config.h.
-# 
+#
 AC_SUBST(TBDBNAME)
+AC_SUBST(TBERRORLOGDBNAME)
 AC_SUBST(TBADMINGROUP)
 AC_SUBST(DELAYCAPACITY)
 AC_SUBST(IPBASE)
@@ -78,10 +115,16 @@ AC_SUBST(FSNODE)
 AC_SUBST(EVENTSERVER)
 AC_SUBST(BOSSEVENTPORT)
 AC_SUBST(OURDOMAIN)
+AC_SUBST(USERSROOT_DIR)
+AC_SUBST(PROJROOT_DIR)
+AC_SUBST(GROUPSROOT_DIR)
+AC_SUBST(SCRATCHROOT_DIR)
+AC_SUBST(SHAREROOT_DIR)
 AC_SUBST(FSDIR_PROJ)
 AC_SUBST(FSDIR_GROUPS)
 AC_SUBST(FSDIR_USERS)
 AC_SUBST(FSDIR_SHARE)
+AC_SUBST(FSDIR_SCRATCH)
 AC_SUBST(FS_WITH_QUOTAS)
 AC_SUBST(TRACK_INTERSWITCH_BANDWIDTH)
 AC_SUBST(TIMESTAMPS)
@@ -98,6 +141,7 @@ AC_SUBST(SNMP_RW_COMMUNITY)
 AC_SUBST(WWWHOST)
 AC_SUBST(WWW)
 AC_SUBST(TBBASE)
+AC_SUBST(TBDEFS)
 AC_SUBST(TBDOCBASE)
 AC_SUBST(TBWWW)
 AC_SUBST(THISHOMEBASE)
@@ -106,20 +150,21 @@ AC_SUBST(TBCOOKIESUFFIX)
 AC_SUBST(TBAUTHDOMAIN)
 AC_SUBST(TBAUTHTIMEOUT)
 AC_SUBST(TBMAINSITE)
+AC_SUBST(FANCYBANNER)
 AC_SUBST(SFSSUPPORT)
 AC_SUBST(ELABINELAB)
 AC_SUBST(OUTERBOSS_NODENAME)
 AC_SUBST(OUTERBOSS_XMLRPCPORT)
 AC_SUBST(OUTERBOSS_SSLCERTNAME)
+AC_SUBST(SUBBOSS_SSLCERTNAME)
 AC_SUBST(PLABSUPPORT)
+AC_SUBST(PUBSUPPORT)
 AC_SUBST(WIKISUPPORT)
 AC_SUBST(MAILMANSUPPORT)
 AC_SUBST(BUGDBSUPPORT)
+AC_SUBST(OPSDBSUPPORT)
 AC_SUBST(NFSTRACESUPPORT)
 AC_SUBST(TBLOGFACIL)
-AC_SUBST(PLAB_ROOTBALL)
-AC_SUBST(PLAB_SLICEPREFIX)
-AC_SUBST(LINKTEST_NSPATH)
 AC_SUBST(TESTBED_NETWORK)
 AC_SUBST(EXTERNAL_TESTBED_NETWORK)
 AC_SUBST(TESTBED_NETMASK)
@@ -139,6 +184,8 @@ AC_SUBST(PRIVATE_NETMASK)
 AC_SUBST(PUBLIC_NETWORK)
 AC_SUBST(PUBLIC_ROUTER)
 AC_SUBST(PUBLIC_NETMASK)
+AC_SUBST(VIRTNODE_NETWORK)
+AC_SUBST(VIRTNODE_NETMASK)
 AC_SUBST(DHCPD_DYNRANGE)
 AC_SUBST(DHCPD_CONTROLNET_DECL)
 AC_SUBST(NAMED_FORWARDERS)
@@ -149,12 +196,29 @@ AC_SUBST(SSLCERT_ORGNAME)
 AC_SUBST(FRISEBEEMCASTADDR)
 AC_SUBST(FRISEBEEMCASTPORT)
 AC_SUBST(WINSUPPORT)
+AC_SUBST(NSVERIFY)
 AC_SUBST(CVSSUPPORT)
+AC_SUBST(TRACSUPPORT)
 AC_SUBST(CHATSUPPORT)
+AC_SUBST(STAMPS)
+AC_SUBST(ARCHIVESUPPORT)
 AC_SUBST(MIN_UNIX_UID)
 AC_SUBST(MIN_UNIX_GID)
 AC_SUBST(DELAYTHRESH)
 AC_SUBST(PELABSUPPORT)
+AC_SUBST(ELVIN_COMPAT)
+AC_SUBST(ISOLATEADMINS)
+AC_SUBST(DYNAMICROOTPASSWORDS)
+AC_SUBST(TPM)
+AC_SUBST(REMOTEWIKIDOCS)
+AC_SUBST(PROTOGENI_SUPPORT)
+AC_SUBST(PROTOGENI_CLEARINGHOUSE)
+AC_SUBST(PROTOGENI_DOMAIN)
+AC_SUBST(STANDALONE_CLEARINGHOUSE)
+AC_SUBST(GMAP_API_KEY)
+AC_SUBST(NODE_USAGE_SUPPORT)
+AC_SUBST(NOSTACKMIB)
+AC_SUBST(EXP_VIS_SUPPORT)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -187,7 +251,8 @@ AC_SUBST(TBERRORSEMAIL_NOSLASH)
 
 #
 # Defaults for for above variables.
-# 
+#
+TBERRORLOGDBNAME="errorlog"
 TBADMINGROUP="flux"
 CLIENT_ETCDIR="/etc/emulab"
 CLIENT_BINDIR="/usr/local/etc/emulab"
@@ -195,27 +260,34 @@ CLIENT_VARDIR="/var/emulab"
 CLIENT_MANDIR="/usr/local/man"
 TBSECURECOOKIES=1
 TBMAINSITE=0
-JAILIPBASE=172.16.0.0
-JAILIPMASK=255.240.0.0
+FANCYBANNER=0
+VIRTNODE_NETWORK=172.16.0.0
+VIRTNODE_NETMASK=255.240.0.0
+JAILIPBASE=$VIRTNODE_NETWORK
+JAILIPMASK=$VIRTNODE_NETMASK
 IPBASE=10
 SFSSUPPORT=0
 ELABINELAB=0
 OUTERBOSS_NODENAME=""
 OUTERBOSS_XMLRPCPORT=3069
 OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
+SUBBOSS_SSLCERTNAME="/etc/subboss.pem"
 PLABSUPPORT=0
-PLAB_ROOTBALL="change.me"
-PLAB_SLICEPREFIX="utah_elab"
+PUBSUPPORT=0
 WIKISUPPORT=0
 BUGDBSUPPORT=0
+OPSDBSUPPORT=0
 MAILMANSUPPORT=0
 WINSUPPORT=0
+NSVERIFY=1
 CVSSUPPORT=0
+TRACSUPPORT=0
 CHATSUPPORT=0
+STAMPS=0
+ARCHIVESUPPORT=0
 NFSTRACESUPPORT=0
 TBLOGFACIL="local5"
-LINKTEST_NSPATH="/share/linktest-ns"
-BOSSEVENTPORT=2927
+BOSSEVENTPORT=16505
 UNIFIED_BOSS_AND_OPS=0
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
@@ -223,6 +295,28 @@ MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 DELAYTHRESH=2
 PELABSUPPORT=0
+ELVIN_COMPAT=0
+ISOLATEADMINS=1
+DYNAMICROOTPASSWORDS=1
+TPM=0
+REMOTEWIKIDOCS=1
+PROTOGENI_SUPPORT=0
+PROTOGENI_CLEARINGHOUSE=0
+PROTOGENI_DOMAIN="unknown"
+STANDALONE_CLEARINGHOUSE=0
+NODE_USAGE_SUPPORT=0
+EXP_VIS_SUPPORT=0
+NOSTACKMIB=0
+
+#
+# XXX You really don't want to change these!
+# They are ingrained and who knows what might break if you change them.
+#
+USERSROOT_DIR="/users"
+PROJROOT_DIR="/proj"
+GROUPSROOT_DIR="/groups"
+SHAREROOT_DIR="/share"
+SCRATCHROOT_DIR=""
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -231,13 +325,16 @@ AC_ARG_WITH(TBDEFS,
 [  --with-TBDEFS=name	Specify definitions file (defs-default default)],
 [
     if test "$withval" = "yes"; then
-	AC_MSG_ERROR(Invalid TBDEFS - Must specify the value)
+	AC_MSG_ERROR([Invalid TBDEFS - Must specify the value])
     fi
     TBDEFS="$withval"
     TBPATH=`dirname $withval`
 ],[
-    TBDEFS="$srcdir/defs-default"
-    TBPATH="$srcdir"
+    AC_MSG_ERROR(
+	[The required --with-TBDEFS= argument was not given.
+The value of --with-TBDEFS= must be the path to your Emulab defs file.
+Copy and modify the defs-example file for your Emulab installation.
+defs-default has values for Utah, including client-side image compilations.])
 ])
 
 if test -f $TBDEFS; then
@@ -252,6 +349,11 @@ else
 	AC_MSG_ERROR([Definitions file $TBDEFS was not found.])
 fi
 
+# XXX this can optionally be set in the defs file
+if test -n "$FSDIR_SCRATCH"; then
+    SCRATCHROOT_DIR="/scratch"
+fi
+
 #
 # These must come after the "eval" above, since the variables are not
 # defined until the defs file is taken in.
@@ -264,14 +366,17 @@ else
     AC_DEFINE_UNQUOTED(TBROOT, "$prefix")
 fi
 AC_DEFINE_UNQUOTED(TBDBNAME, "$TBDBNAME")
+AC_DEFINE_UNQUOTED(TBERRORLOGDBNAME, "$TBERRORLOGDBNAME")
 AC_DEFINE_UNQUOTED(TBADMINGROUP, "$TBADMINGROUP")
 AC_DEFINE_UNQUOTED(IPBASE, "$IPBASE")
 AC_DEFINE_UNQUOTED(JAILIPBASE, "$JAILIPBASE")
 AC_DEFINE_UNQUOTED(JAILIPMASK, "$JAILIPMASK")
 AC_DEFINE_UNQUOTED(BOSSNODE, "$BOSSNODE")
 AC_DEFINE_UNQUOTED(BOSSNODE_IP, "$BOSSNODE_IP")
+AC_DEFINE_UNQUOTED(EXTERNAL_BOSSNODE_IP, "$EXTERNAL_BOSSNODE_IP")
 AC_DEFINE_UNQUOTED(USERNODE, "$USERNODE")
 AC_DEFINE_UNQUOTED(USERNODE_IP, "$USERNODE_IP")
+AC_DEFINE_UNQUOTED(EXTERNAL_USERNODE_IP, "$EXTERNAL_USERNODE_IP")
 AC_DEFINE_UNQUOTED(FSNODE, "$FSNODE")
 if test -n "$FSNODE_IP"; then
 	AC_DEFINE_UNQUOTED(FSNODE_IP, "$FSNODE_IP")
@@ -281,23 +386,44 @@ fi
 AC_DEFINE_UNQUOTED(CONTROL_ROUTER_IP, "$CONTROL_ROUTER_IP")
 AC_DEFINE_UNQUOTED(CONTROL_NETWORK, "$CONTROL_NETWORK")
 AC_DEFINE_UNQUOTED(CONTROL_NETMASK, "$CONTROL_NETMASK")
+AC_DEFINE_UNQUOTED(USERSROOT_DIR, "$USERSROOT_DIR")
+AC_DEFINE_UNQUOTED(PROJROOT_DIR, "$PROJROOT_DIR")
+AC_DEFINE_UNQUOTED(GROUPSROOT_DIR, "$GROUPSROOT_DIR")
+AC_DEFINE_UNQUOTED(SCRATCHROOT_DIR, "$SCRATCHROOT_DIR")
+AC_DEFINE_UNQUOTED(SHAREROOT_DIR, "$SHAREROOT_DIR")
 AC_DEFINE_UNQUOTED(FSDIR_PROJ, "$FSDIR_PROJ")
 AC_DEFINE_UNQUOTED(FSDIR_GROUPS, "$FSDIR_GROUPS")
 AC_DEFINE_UNQUOTED(FSDIR_USERS, "$FSDIR_USERS")
 if test -n "$FSDIR_SHARE"; then
     AC_DEFINE_UNQUOTED(FSDIR_SHARE, "$FSDIR_SHARE")
 fi
+if test -n "$FSDIR_SCRATCH"; then
+    AC_DEFINE_UNQUOTED(FSDIR_SCRATCH, "$FSDIR_SCRATCH")
+fi
 AC_DEFINE_UNQUOTED(BOSSEVENTPORT, "$BOSSEVENTPORT")
 
-if test $PLABSUPPORT -eq 1; then
-    if test "$PLAB_ROOTBALL" = "change.me"; then
-        AC_MSG_ERROR([plab support included but PLAB_ROOTBALL not defined.])
-    fi
+if test $OPSDBSUPPORT -eq 1; then
+    AC_DEFINE_UNQUOTED(OPSDBSUPPORT, 1)
+fi
+
+if test $ELVIN_COMPAT -eq 1; then
+    AC_DEFINE_UNQUOTED(ELVIN_COMPAT, 1)
 fi
 
 if test $ELABINELAB -eq 1; then
     AC_DEFINE_UNQUOTED(ELABINELAB, 1)
 fi
+
+if test $ISOLATEADMINS -eq 1; then
+    AC_DEFINE_UNQUOTED(ISOLATEADMINS, 1)
+fi
+if test $DYNAMICROOTPASSWORDS -eq 1; then
+    AC_DEFINE_UNQUOTED(DYNAMICROOTPASSWORDS, 1)
+fi
+if test $TPM -eq 1; then
+    AC_DEFINE_UNQUOTED(TPM, 1)
+fi
+
 
 LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
 AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
@@ -307,7 +433,7 @@ AC_SUBST(LOG_TESTBED)
 # If the private network is different then the control network, we need
 # an extra subnet decl for it in dhcpd.conf.template. This is enormously
 # crude and simplistic, but works for the local case!
-# 
+#
 if test "$PRIVATE_NETWORK" != "$CONTROL_NETWORK"; then
     DHCPD_CONTROLNET_DECL="subnet $PRIVATE_NETWORK netmask $PRIVATE_NETMASK {}"
 fi
@@ -410,6 +536,8 @@ fi
 if test -z "$TBWWW"; then
     TBWWW="<$TBBASE/>"
 fi
+AC_DEFINE_UNQUOTED(TBBASE, "$TBBASE")
+
 if test -z "$THISHOMEBASE"; then
     THISHOMEBASE="Emulab.Net"
 fi
@@ -534,7 +662,7 @@ AC_SUBST(OPT_CFLAGS)
 
 #
 # Disable event system. Relies on Elvin. On by default.
-# 
+#
 AC_ARG_ENABLE(events,
 [  --disable-events      Disable events (requires Elvin libraries)])
 
@@ -545,7 +673,7 @@ else
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
 		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
-		    event/sched/GNUmakefile event/test/GNUmakefile \
+		    event/sched/GNUmakefile \
                     event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
@@ -563,6 +691,7 @@ else
 		    event/stated/GNUmakefile event/stated/stated \
 		    event/linktest/GNUmakefile \
 		    event/linktest/iperf/GNUmakefile \
+		    event/linktest/rude/GNUmakefile \
 		    event/linktest/linktest.pl \
 		    event/linktest/weblinktest event/linktest/linktest.proxy \
 		    event/linktest/linktest_control \
@@ -579,14 +708,16 @@ AC_SUBST(EVENTSYS)
 if test $PELABSUPPORT -eq 0; then
 	pelabfiles="";
 else
-	pelabfiles="pelab/GNUmakefile pelab/db/GNUmakefile ";
+	pelabfiles="pelab/GNUmakefile pelab/db/GNUmakefile \
+		    pelab/bgmon/GNUmakefile ";
+	optional_subdirs="$optional_subdirs pelab";
 fi
 
 #
 # Enable Windows support.
 # Right now this means NTFS support in imagezip, maybe more things later.
 # Relies on Linux NTFS library.
-# 
+#
 AC_ARG_ENABLE(windows,
 [  --enable-windows      Enable Windows XP support (default)])
 
@@ -637,6 +768,15 @@ fi
 AC_SUBST(HAVE_MEZZANINE)
 
 #
+# Check for Xerces (required for XML support in assign).
+#
+AC_LANG_SAVE
+AC_LANG_CPLUSPLUS
+AC_CHECK_HEADER([xercesc/dom/DOM.hpp],[HAVE_XERCES=yes])
+AC_LANG_RESTORE
+AC_SUBST(HAVE_XERCES)
+
+#
 # Testing mode.  In testing mode scripts should not effect hardware state.
 # This is designed to be used with the testsuite software which operates
 # on a test copy of the DB.
@@ -667,26 +807,37 @@ if test x"$RSYNC" = x"" || test ! -x "$RSYNC"; then
     AC_MSG_WARN([Rsync is required for logholes to work, see www.rsync.org.])
 fi
 
+# Turn on the new fancy banner - normally turned on only at Utah, but
+# overridable for other sites
+if test "$TBMAINSITE" = 1; then
+    FANCYBANNER=1
+fi
+
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
         named/GNUmakefile firewall/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
-	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
+	db/GNUmakefile \
+	db/Experiment.pm db/Group.pm db/Interface.pm db/Node.pm \
+	db/NodeType.pm db/Project.pm db/User.pm db/Image.pm db/OSinfo.pm \
+	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
+	db/dumperrorlog.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
-	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
+	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
+	db/emdb.pm db/emdbi.pm \
+	db/dhcpd_makeconf db/nodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
 	db/update_permissions \
-	db/grabron db/webnfree db/stategraph db/readycount \
-	db/idletimes db/idlemail db/webidlemail db/xmlconvert \
-	db/webnewwanode db/libdb.py db/elabinelab_bossinit \
+	db/grabron db/stategraph db/readycount \
+	db/idletimes db/idlemail db/xmlconvert \
+	db/libdb.py db/elabinelab_bossinit \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
-	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile \
+	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
 	os/imagezip/shd/GNUmakefile os/imagezip/hashmap/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
         os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
@@ -699,24 +850,27 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	sensors/powermon/GNUmakefile sensors/powermon/powermon \
 	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
-	account/GNUmakefile account/tbacct account/webtbacct \
-	account/addpubkey account/webaddpubkey \
-	account/addsfskey account/webaddsfskey \
-	account/quotamail account/mkusercert account/webmkusercert  \
+	sensors/nfstrace/nfsdump2/GNUmakefile \
+	account/GNUmakefile account/tbacct \
+	account/addpubkey account/addsfskey account/genpubkeys \
+	account/quotamail account/mkusercert account/newproj account/newuser \
+	backend/GNUmakefile backend/moduserinfo backend/newgroup \
+	backend/newmmlist backend/editexp backend/editimageid \
+	backend/editnodetype backend/editsitevars backend/newimageid \
+	backend/editgroup backend/newimageid_ez \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/spewrpmtar tbsetup/gentopofile tbsetup/power_sgmote.pm \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/power_mail.pm tbsetup/power_whol.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
-	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
+	tbsetup/node_reboot tbsetup/nscheck \
 	tbsetup/resetvlans tbsetup/rmuser tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \
 	tbsetup/batchexp tbsetup/batch_daemon tbsetup/repos_daemon \
-	tbsetup/webdelay_config tbsetup/webbatchexp tbsetup/webreport \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
-	tbsetup/webswapexp tbsetup/swapexp \
-	tbsetup/endexp tbsetup/webendexp tbsetup/elabinelab \
+	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
 	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
+	tbsetup/subboss_frisbeelauncher tbsetup/subboss_frisbeeimage \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
@@ -731,80 +885,89 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/assign_wrapper2 \
-	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \
-	tbsetup/savelogs tbsetup/setgroups tbsetup/websetgroups \
-	tbsetup/savelogs.proxy \
-	tbsetup/rmgroup tbsetup/webrmuser tbsetup/webrmgroup tbsetup/mkexpdir \
-	tbsetup/webnodecontrol tbsetup/node_control tbsetup/node_attributes \
-        tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \
-	tbsetup/eventsys_control tbsetup/webeventsys_control \
-	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
+	tbsetup/frisbeelauncher tbsetup/node_update \
+	tbsetup/savelogs tbsetup/setgroups \
+	tbsetup/savelogs.proxy tbsetup/rmgroup tbsetup/mkexpdir \
+	tbsetup/node_control tbsetup/node_attributes \
+        tbsetup/mkgroup tbsetup/eventsys_start \
+	tbsetup/eventsys_control \
+	tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
-	tbsetup/checkports tbsetup/webnodereboot tbsetup/libaudit.pm \
+	tbsetup/smbpasswd_setup.proxy \
+	tbsetup/checkports tbsetup/libaudit.pm \
 	tbsetup/libreboot.pm tbsetup/libosload.pm tbsetup/libadminmfs.pm \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
-	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
-	tbsetup/newnode_reboot tbsetup/webnodeattributes \
+	tbsetup/idleswap tbsetup/switchmac \
+	tbsetup/newnode_reboot \
         tbsetup/libtestbed.py \
 	tbsetup/libArchive.pm tbsetup/archive_control \
-	tbsetup/webarchive_control \
-	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
+	tbsetup/tarfiles_setup \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
         tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
         tbsetup/plab/mod_PLCNM.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
+        tbsetup/plab/plabrenewonce \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
-	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \
+	tbsetup/plab/plabmonitord tbsetup/plab/libplabmon.pm \
+        tbsetup/plab/plabmon_badpool.pm tbsetup/plab/plabmon_goodpool.pm \
+        tbsetup/plab/plablinkdata \
 	tbsetup/plab/libdslice/GNUmakefile tbsetup/plab/etc/GNUmakefile \
 	tbsetup/plab/plabdist tbsetup/plab/plabhttpd \
 	tbsetup/plab/plabdiscover tbsetup/plab/etc/netbed_files/GNUmakefile \
 	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
-	tbsetup/panic tbsetup/webpanic \
-        tbsetup/tbrsync tbsetup/nfstrace \
+	tbsetup/panic tbsetup/tbrsync tbsetup/nfstrace \
 	tbsetup/checkup/GNUmakefile tbsetup/checkup/checkup_daemon \
-	tbsetup/libtblog.pm \
+	tbsetup/libtblog.pm tbsetup/template_cvsroot/GNUmakefile \
 	tip/GNUmakefile tip/console \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
 	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
 	tmcd/freebsd/GNUmakefile tmcd/freebsd/init/GNUmakefile \
 	tmcd/freebsd/init/4/GNUmakefile tmcd/freebsd/init/5/GNUmakefile \
-	tmcd/freebsd/init/6/GNUmakefile \
+	tmcd/freebsd/init/6/GNUmakefile tmcd/freebsd/init/7/GNUmakefile \
+	tmcd/freebsd/init/8/GNUmakefile \
 	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
 	tmcd/linux/GNUmakefile tmcd/linux/supfile \
 	tmcd/linux/sethostname.dhclient \
+	tmcd/linux/xen/emulab-cnet \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
-        tmcd/linux-sg/GNUmakefile \
+	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
+        tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
-	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile \
-	tmcd/freebsd6/netif-emulab \
-	tmcd/cygwinxp/GNUmakefile \
+	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
+	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \
+	tmcd/cygwinxp/GNUmakefile tmcd/dp/GNUmakefile \
 	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
-	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
+	utils/sshtb utils/create_image utils/node_admin \
 	utils/firstuser utils/export_tables utils/eventping \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
-	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
-	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
+	utils/link_config utils/import_commitlog \
+	utils/opsreboot utils/deletenode utils/spewleds \
 	utils/grabwebcams utils/loghole utils/webcopy \
-	utils/setdest utils/websetdest utils/grabswitchconfig \
+	utils/setdest utils/grabswitchconfig \
         utils/backupswitches utils/setbuildinfo utils/checkquota \
-	utils/spewconlog utils/webspewconlog utils/xlogin \
+	utils/spewconlog utils/xlogin \
+	utils/opsdb_control utils/opsdb_control.proxy \
+	utils/remove_old_www utils/epmodeset \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
 	www/xmlrpcpipe.php3 \
-	www/swish.conf www/websearch www/garcia-telemetry/GNUmakefile \
+	www/swish.conf www/websearch \
+	www/garcia-telemetry/GNUmakefile www/tutorial/GNUmakefile \
+	www/sec-check/GNUmakefile www/emusearch.xml \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
 	vis/prerender vis/prerender_all vis/render \
 	vis/floormap vis/webfloormap \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/2.elvind.sh rc.d/3.plab.sh rc.d/2.dhcpd.sh rc.d/3.and.sh \
+	rc.d/3.elvin_gateway.sh rc.d/pelab.sh rc.d/capture.sh \
 	tools/GNUmakefile rc.d/1.mysql-server.sh tools/svn/GNUmakefile \
 	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
         tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \
-        tools/selectapplet/GNUmakefile \
+        tools/selectapplet/GNUmakefile tools/rmanage/GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	$pelabfiles \
@@ -816,10 +979,15 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
+	flash/GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
+	dhcpd/dhcpd.conf.subboss.template \
 	install/GNUmakefile \
 	install/ops-install install/boss-install install/fs-install \
+	install/load-descriptors install/dump-descriptors \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
+        install/clrhouse-install \
+	install/libinstall.pm install/update-install install/update-testbed \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
 	mote/sgtools/GNUmakefile \
 	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
@@ -838,17 +1006,30 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	wiki/usertemplate wiki/webhometemplate wiki/LocalSite.cfg \
         wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
         bugdb/GNUmakefile bugdb/bugdbproxy \
+        protogeni/GNUmakefile protogeni/security/GNUmakefile \
+        protogeni/xmlrpc/GNUmakefile protogeni/lib/GNUmakefile \
+        protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
+        protogeni/test/GNUmakefile protogeni/rspec/GNUmakefile \
+        protogeni/rspec/0.1/GNUmakefile \
         collab/GNUmakefile \
+        collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \
-        collab/mailman/GNUmakefile collab/cvs/GNUmakefile \
+        collab/mailman/GNUmakefile collab/cvstools/GNUmakefile \
 	collab/mailman/mmlistmembership \
 	collab/mailman/addmmlist collab/mailman/mmsetup \
 	collab/mailman/delmmlist collab/mailman/mmxlogin \
 	collab/mailman/genaliases collab/mailman/setmmlistmembers \
 	collab/mailman/mailmanproxy collab/mailman/setmmpasswd \
-	collab/cvs/cvsrepo_ctrl.proxy collab/cvs/cvsrepo_ctrl \
-	collab/cvs/webcvsrepo_ctrl \
-	daikon/GNUmakefile daikon/daikonize daikon/find_perl "
+	collab/cvstools/cvs.proxy collab/cvstools/cvs_ctrl \
+	collab/cvstools/cvsrepo_ctrl.proxy collab/cvstools/cvsrepo_ctrl \
+	collab/cvstools/webcvsrepo_ctrl \
+	collab/exp-vis/GNUmakefile collab/exp-vis/fetch-vis \
+	node_usage/GNUmakefile node_usage/mk-plots \
+	node_usage/analy node_usage/publish \
+	node_usage/analy2 node_usage/refresh \
+	node_usage/from_ptop node_usage/sanity \
+	node_usage/gather node_usage/mk-php-pages \
+	node_usage/get-start-date"
 
 #
 # Do this for easy distclean.

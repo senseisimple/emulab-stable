@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -13,14 +13,21 @@ include("defs.php3");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$dbid      = $this_user->dbid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
+				 "formfields",   PAGEARG_ARRAY);
 
 #
 # See what projects the uid can do this in.
 #
-$projlist = TBProjList($uid, $TB_PROJECT_READINFO);
+$projlist = $this_user->ProjectAccessList($TB_PROJECT_READINFO);
 
 if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".
@@ -116,7 +123,7 @@ function SPITFORM($formfields, $errors)
     while (list($project) = each($projlist)) {
 	$selected = "";
 
-	if ($formfields[pid] == $project)
+	if ($formfields["pid"] == $project)
 	    $selected = "selected";
 	
 	echo "        <option $selected value='$project'>$project </option>\n";
@@ -134,7 +141,7 @@ function SPITFORM($formfields, $errors)
                   <input type=text
                          onChange='Changed(myform);'
                          name=\"formfields[listname]\"
-                         value=\"" . $formfields[listname] . "\"
+                         value=\"" . $formfields["listname"] . "\"
 	                 size=$TBDB_MMLENGTH
                          maxlength=$TBDB_MMLENGTH>
               </td>
@@ -149,7 +156,7 @@ function SPITFORM($formfields, $errors)
                   <input type=text
                          readonly 
                          name=\"formfields[fullname]\"
-                         value=\"" . $formfields[fullname] . "\"
+                         value=\"" . $formfields["fullname"] . "\"
 	                 size=$TBDB_MMLENGTH
                          maxlength=$TBDB_MMLENGTH>
               </td>
@@ -164,6 +171,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=password
                          name=\"formfields[password1]\"
+                         value=\"" . $formfields["password1"] . "\"
                          size=8></td>
           </tr>\n";
 
@@ -172,6 +180,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=password
                          name=\"formfields[password2]\"
+                         value=\"" . $formfields["password2"] . "\"
                          size=8></td>
          </tr>\n";
 
@@ -205,8 +214,13 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
+if (!isset($submit)) {
     $defaults = array();
+    $defaults["pid"]  = "";
+    $defaults["password1"]   = "";
+    $defaults["password2"]   = "";
+    $defaults["listname"]    = "";
+    $defaults["fullname"]    = "";
 
     #
     # Allow formfields that are already set to override defaults
@@ -225,35 +239,36 @@ if (! $submit) {
 #
 # Otherwise, must validate and redisplay if errors
 #
-$errors = array();
+$errors  = array();
+$project = null;
 
 #
 # Project:
-# 
-if (!isset($formfields[pid]) ||
-    strcmp($formfields[pid], "") == 0) {
+#
+if (!isset($formfields["pid"]) ||
+    strcmp($formfields["pid"], "") == 0) {
     $errors["Project"] = "Not Selected";
 }
-elseif (!TBvalid_pid($formfields[pid])) {
-    $errors["Project"] = "Invalid Characters";
+elseif (!TBvalid_pid($formfields["pid"])) {
+    $errors["Project"] = "Invalid project name";
 }
-elseif (!TBValidProject($formfields[pid])) {
-    $errors["Project"] = "No such project";
+elseif (! ($project = Project::Lookup($formfields["pid"]))) {
+    $errors["Project"] = "Invalid project name";
 }
-elseif (!TBProjAccessCheck($uid, $formfields[pid],
-			   $formfields[pid], $TB_PROJECT_READINFO)) {
+elseif (! $project->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
     $errors["Project"] = "Not enough permission";
 }
-else {
-    #
-    # List Name, but only if pid was okay.
-    #
-    if (!isset($formfields[listname]) ||
-	strcmp($formfields[listname], "") == 0) {
+
+#
+# List Name, but only if pid was okay.
+#
+if ($project) {
+    if (!isset($formfields["listname"]) ||
+	strcmp($formfields["listname"], "") == 0) {
 	$errors["List Name"] = "Missing Field";
     }
     else {
-	$listname = $formfields[pid] . "-" . $formfields[listname];
+	$listname = $project->pid() . "-" . $formfields["listname"];
 	
 	if (! TBvalid_mailman_listname($listname)) {
 	    $errors["List Name"] =
@@ -268,9 +283,11 @@ else {
             #
             # Before we proceed, lets see if the list already exists.
             #
+	    $safe_name = addslashes($listname);
+	    
 	    $query_result =
 		DBQueryFatal("select * from mailman_listnames ".
-			     "where listname='$listname'");
+			     "where listname='$safe_name'");
 	
 	    if (mysql_num_rows($query_result)) {
 		$errors["List Name"] = "Name already in use; pick another";
@@ -282,18 +299,18 @@ else {
 #
 # Password
 #
-if (!isset($formfields[password1]) ||
-    strcmp($formfields[password1], "") == 0) {
+if (!isset($formfields["password1"]) ||
+    strcmp($formfields["password1"], "") == 0) {
     $errors["Password"] = "Missing Field";
 }
-if (!isset($formfields[password2]) ||
-    strcmp($formfields[password2], "") == 0) {
+if (!isset($formfields["password2"]) ||
+    strcmp($formfields["password2"], "") == 0) {
     $errors["Confirm Password"] = "Missing Field";
 }
-elseif (strcmp($formfields[password1], $formfields[password2])) {
+elseif (strcmp($formfields["password1"], $formfields["password2"])) {
     $errors["Confirm Password"] = "Does not match Password";
 }
-elseif (! TBvalid_userdata($formfields[password1])) {
+elseif (! TBvalid_userdata($formfields["password1"])) {
     $errors["Password"] = "Invalid Characters";
 }
 
@@ -307,45 +324,105 @@ if (count($errors)) {
     return;
 }
 
-$listname = $formfields[pid] . "-" . $formfields[listname];
-$password = $formfields[password1];
-
 #
-# Need to lock the table for this. 
-# 
-DBQueryFatal("lock tables mailman_listnames write");
+# Build up argument array to pass along.
+#
+$args = array();
 
-$query_result =
-    DBQueryFatal("select * from mailman_listnames ".
-		 "where listname='$listname'");
-if (mysql_num_rows($query_result)) {
-    DBQueryFatal("unlock tables");
-    $errors["List Name"] = "Name already in use; pick another";
+if (isset($formfields["password1"]) && $formfields["password1"] != "") {
+    $args["password1"]	= $formfields["password1"];
+}
+if (isset($formfields["password2"]) && $formfields["password2"] != "") {
+    $args["password2"]	= $formfields["password2"];
+}
+if (isset($formfields["listname"]) && $formfields["listname"] != "") {
+    $args["listname"]	= $formfields["listname"];
+}
+if (isset($formfields["fullname"]) && $formfields["fullname"] != "") {
+    $args["fullname"]	= $formfields["fullname"];
+}
+
+if (! ($result = NewMmList($uid, $project, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
 }
 
-DBQueryFatal("insert into mailman_listnames (listname, owner_uid, created) ".
-	     "values ('$listname', '$uid', now())");
-DBQueryFatal("unlock tables");
-
-#
-# Okay, call out to the backend to create the actual list. 
-#
-$retval = SUEXEC($uid, $TBADMINGROUP,
-		 "webaddmmlist -u $listname $uid " . escapeshellarg($password),
-		 SUEXEC_ACTION_IGNORE);
-
-# Failed? Remove the DB entry.
-if ($retval != 0) {
-    DBQueryFatal("delete from mailman_listnames ".
-		 "where listname='$listname'");
-    SUEXECERROR(SUEXEC_ACTION_DIE);
-}
-
 #
 # Okay, redirect the user over to the listadmin page to finish configuring.
 #
-header("Location: ${MAILMANURL}/admin/${listname}/?adminpw=${password}");
+header("Location: ${MAILMANURL}/admin/${listname}/?adminpw=${formfields["password1"]}");
+
+#
+# When there's an MmList class, this will be a Class function to make a new one...
+#
+function NewMmList($uid, $project, $args, &$errors) {
+    global $suexec_output, $suexec_output_array, $TBADMINGROUP;
+
+    #
+    # Generate a temporary file and write in the XML goo.
+    #
+    $xmlname = tempnam("/tmp", "newmmlist");
+    if (! $xmlname) {
+	TBERROR("Could not create temporary filename", 0);
+	$errors[] = "Transient error(1); please try again later.";
+	return null;
+    }
+    if (! ($fp = fopen($xmlname, "w"))) {
+	TBERROR("Could not open temp file $xmlname", 0);
+	$errors[] = "Transient error(2); please try again later.";
+	return null;
+    }
+
+    # Add these. Maybe caller should do this?
+    $args["project"]  = $project->pid_idx();
+
+    fwrite($fp, "<MmList>\n");
+    foreach ($args as $name => $value) {
+	fwrite($fp, "<attribute name=\"$name\">");
+	fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	fwrite($fp, "</attribute>\n");
+    }
+    fwrite($fp, "</MmList>\n");
+    fclose($fp);
+    chmod($xmlname, 0666);
+
+    $retval = SUEXEC($uid, $TBADMINGROUP, "webnewmmlist $xmlname",
+		     SUEXEC_ACTION_IGNORE);
+
+    if ($retval) {
+	if ($retval < 0) {
+	    $errors[] = "Transient error(3, $retval); please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	}
+	else {
+	    # unlink($xmlname);
+	    if (count($suexec_output_array)) {
+		for ($i = 0; $i < count($suexec_output_array); $i++) {
+		    $line = $suexec_output_array[$i];
+		    if (preg_match("/^([-\w]+):\s*(.*)$/",
+				   $line, $matches)) {
+			$errors[$matches[1]] = $matches[2];
+		    }
+		    else
+			$errors[] = $line;
+		}
+	    }
+	    else
+		$errors[] = "Transient error(4, $retval); please try again later.";
+	}
+	return null;
+    }
+
+    # There are no return value(s) to parse at the end of the output.
+
+    # Unlink this here, so that the file is left behind in case of error.
+    # We can then create the MmList by hand from the xmlfile, if desired.
+    unlink($xmlname);
+
+    return true; 
+}
+
 ?>

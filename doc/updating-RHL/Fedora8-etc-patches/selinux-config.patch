@@ -1,0 +1,11 @@
+--- config~	2008-01-30 09:20:40.000000000 -0700
++++ config	2008-02-12 20:50:43.000000000 -0700
+@@ -4,7 +4,7 @@
+ #	enforcing - SELinux security policy is enforced.
+ #	permissive - SELinux prints warnings instead of enforcing.
+ #	disabled - No SELinux policy is loaded.
+-SELINUX=enforcing
++SELINUX=disabled
+ # SELINUXTYPE= can take one of these two values:
+ #	targeted - Targeted processes are protected,
+ #	mls - Multi Level Security protection.

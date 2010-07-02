@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // log.h
 
 #ifndef _LOG_H
@@ -44,7 +50,7 @@ void logCleanup(void);
 // act just like a normal printf call. This is where you actually
 // write your message. It will be written to the logging file.
 void logWrite(int flags, struct timeval const * timestamp,
-	      char const * format, ...);
+              char const * format, ...);
 
 enum LOG_TYPE
 {

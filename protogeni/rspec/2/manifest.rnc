@@ -1,0 +1,20 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Schema for a manifest RSpec, to be used by ProtoGENI
+#
+
+include "request.rnc"
+
+NodeContents &=
+  attribute sliver_id { text }
+
+LinkContents &=
+  attribute sliver_id { text }
+
+InterfaceContents &=
+  attribute mac_address { text } ?

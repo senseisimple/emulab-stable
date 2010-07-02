@@ -1,0 +1,34 @@
+#
+# Add extenal references slots to nodes table, as for geni.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("reserved", "external_resource_index")) {
+	DBQueryFatal("alter table reserved add ".
+		     "external_resource_index int(10) unsigned default NULL ".
+		     "after genisliver_idx");
+    }
+    if (!DBSlotExists("reserved", "external_resource_id")) {
+	DBQueryFatal("alter table reserved add ".
+		     "external_resource_id tinytext ".
+		     "after external_resource_index");
+    }
+    DBQueryFatal("alter table virt_lans change `fixed_iface` `fixed_iface` ".
+		 "varchar(128) default ''");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "('virt_nodes','fixed','text','redirect', ".
+		 " 'default:tinytext',0,128,NULL)");
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES ".
+		 "('virt_lans','fixed_iface','text','redirect', ".
+		 " 'default:tinytext',0,128,NULL)");
+
+    return 0;
+}
+1;

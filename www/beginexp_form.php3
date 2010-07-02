@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,68 +14,16 @@ function INITFORM($formfields, $projlist)
     
     $defaults = array();
 
+    # These defaults possibly set below.
+    $defaults["exp_pid"]          = "";
+    $defaults["exp_gid"]          = "";
+    $defaults["exp_id"]           = "";
+    $defaults["exp_description"]  = "";
+
     #
     # This is for experiment copying ...
     #
     if (isset($copyid) && $copyid != "") {
-	unset($copypid);
-	unset($copyeid);
-	
-	#
-	# See what kind of copy.
-	#
-	if (preg_match("/^(\d+)(?::([-\w]*))?$/", $copyid, $matches)) {
-	    $exptidx = $matches[1];
-	    
-	    if (TBvalid_integer($exptidx)) {
-		#
-		# See if its a current experiment.
-		#
-		$query_result =
-		    DBQueryFatal("select pid,eid from experiments ".
-				 "where idx='$exptidx'");
-		
-		if (mysql_num_rows($query_result)) {
-		    $row = mysql_fetch_row($query_result);
-
-		    $copypid = $row[0];
-		    $copyeid = $row[1];
-		}
-	    }
-	}
-	elseif (preg_match("/^([-\w]+),([-\w]+)(?::([-\w]*))?$/",
-		       $copyid, $matches)) {
-	    $copypid = $matches[1];
-	    $copyeid = $matches[2];
-	}
-
-	#
-	# Current experiment; we can get some additional stuff.
-	#
-	if (isset($copypid) && isset($copyeid)) {
-	    if (TBvalid_pid($copypid) && TBvalid_eid($copyeid)) {
-		$query_result =
-		    DBQueryFatal("select expt_name from experiments ".
-				 "where eid='$copyeid' and pid='$copypid'");
-
-		if (mysql_num_rows($query_result)) {
-		    $row = mysql_fetch_row($query_result);
-		    
-		    $defaults["exp_description"] = $row[0];
-		}
-	    }
-	    
-	    # See if already a copy.
-	    if (preg_match("/^([-\w]*)-Copy(\d*)$/", $copyeid, $matches2)) {
-		$copyeid   = $matches2[1];
-		$copycount = "Copy" . (((int) $matches2[2]) + 1);
-	    }
-	    else
-		$copycount = "Copy0";
-
-	    $defaults["exp_pid"] = $copypid;
-	    $defaults["exp_id"]  = "${copyeid}-${copycount}";
-	}
 	$defaults["copyid"] = $copyid;
     }
     else {
@@ -87,13 +35,13 @@ function INITFORM($formfields, $projlist)
         # this is to have another page for netbuild that does some magic and
         # redirects the browser to this page. 
         #
-	if (isset($nsref) && $nsref != "" && ereg("^[0-9]+$", $nsref))
-	    $defaults[nsref] = $nsref;
+	if (isset($nsref) && $nsref != "" && preg_match('/^[0-9]+$/', $nsref))
+	    $defaults["nsref"] = $nsref;
 	else
 	    unset($nsref);
 	
-	if (isset($guid) && $guid != "" &&  ereg("^[0-9]+$", $guid))
-	    $defaults[guid] = $guid;
+	if (isset($guid) && $guid != "" && preg_match('/^[0-9]+$/', $guid))
+	    $defaults["guid"] = $guid;
 	else
 	    unset($guid);
     }
@@ -107,28 +55,28 @@ function INITFORM($formfields, $projlist)
 	list($project, $grouplist) = each($projlist);
 
 	if (count($grouplist) <= 2) {
-	    $defaults[exp_pid] = $project;
+	    $defaults["exp_pid"] = $project;
 	    if (count($grouplist) == 1 || strcmp($project, $grouplist[0]))
-		$defaults[exp_gid] = $grouplist[0];
+		$defaults["exp_gid"] = $grouplist[0];
 	    else
-		$defaults[exp_gid] = $grouplist[1];
+		$defaults["exp_gid"] = $grouplist[1];
 	}
 	reset($projlist);
     }
 
-    $defaults[exp_swappable]         = "1";
-    $defaults[exp_noswap_reason]     = "";
-    $defaults[exp_idleswap]          = "1";
-    $defaults[exp_noidleswap_reason] = "";
-    $defaults[exp_idleswap_timeout]  = TBGetSiteVar("idle/threshold");
-    $defaults[exp_autoswap]          = TBGetSiteVar("general/autoswap_mode");
-    $defaults[exp_autoswap_timeout]  = TBGetSiteVar("general/autoswap_threshold");
-    $defaults[exp_localnsfile]       = "";
-    $defaults[exp_nsfile]            = ""; # Multipart data.
-    $defaults[exp_preload]           = "no";
-    $defaults[exp_batched]           = "no";
-    $defaults[exp_linktest]          = 3;
-    $defaults[exp_savedisk]          = "no";
+    $defaults["exp_swappable"]         = "1";
+    $defaults["exp_noswap_reason"]     = "";
+    $defaults["exp_idleswap"]          = "1";
+    $defaults["exp_noidleswap_reason"] = "";
+    $defaults["exp_idleswap_timeout"]  = TBGetSiteVar("idle/threshold");
+    $defaults["exp_autoswap"]          = TBGetSiteVar("general/autoswap_mode");
+    $defaults["exp_autoswap_timeout"]  = TBGetSiteVar("general/autoswap_threshold");
+    $defaults["exp_localnsfile"]       = "";
+    $defaults["exp_nsfile"]            = ""; # Multipart data.
+    $defaults["exp_preload"]           = "no";
+    $defaults["exp_batched"]           = "no";
+    $defaults["exp_linktest"]          = 3;
+    $defaults["exp_savedisk"]          = "no";
 
     #
     # Allow formfields that are already set to override defaults
@@ -154,7 +102,7 @@ function CHECKFORM(&$formfields, $projlist)
     # Must convert uploaded file for the XML page. We pass it along inline.
     # Check size though. 
     #
-    $formfields[exp_nsfile] = "";
+    $formfields['exp_nsfile'] = "";
     
     if (isset($_FILES['exp_nsfile']) && $_FILES['exp_nsfile']['size'] != 0) {
 	if ($_FILES['exp_nsfile']['size'] > (1024 * 500)) {
@@ -177,7 +125,7 @@ function CHECKFORM(&$formfields, $projlist)
         # the php temporary file name. Note that there appears to be some kind
         # of breakage, at least in opera; filename has no path.
         #
-        $formfields[exp_nsfile] = $_FILES['exp_nsfile']['name'];
+        $formfields['exp_nsfile'] = $_FILES['exp_nsfile']['name'];
 
 	if (count($errors)) {
 	    SPITFORM($formfields, $errors);
@@ -193,7 +141,7 @@ function CHECKFORM(&$formfields, $projlist)
 	    PAGEFOOTER();
 	    exit(1);
 	}
-	$formfields[exp_nsfile_contents] = urlencode($file_contents);
+	$formfields["exp_nsfile_contents"] = urlencode($file_contents);
     }
     $args    = array();
     $args[0] = $formfields;
@@ -210,6 +158,8 @@ function SPITFORM($formfields, $errors)
     global $view, $view_style, $projlist, $linktest_levels;
     global $EXPOSELINKTEST, $EXPOSEARCHIVE;
     global $EXPOSESTATESAVE;
+    global $TBVALIDDIRS_HTML;
+    global $WIKIDOCURL;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -259,32 +209,20 @@ function SPITFORM($formfields, $errors)
     }
     else {
        if (! isset($formfields['copyid'])) {
-	if (!isset($formfields[nsref]) && !isset($view['quiet'])) {
-	  if (STUDLY()) {
-            echo "<p><ul>
-	    <li><b>If you have an NS file:</b><br> You may want to
-                <b><a href='nscheck_form.php3'>syntax check it first</a></b>
-            <li><b>If you do not have an NS file:</b><br>
-                <b><a href='clientui.php3'>New GUI editor</a></b> - An enhanced Java applet for editing topologies.<br>
-                <b><a href='buildui/bui.php3'>The NetBuild GUI</a></b>
-		can be used to graphically create topologies.<font size=-2>
-		(<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
-		information</a>)</font>.
-            </ul></p><br>";
-	  } else {
-	    echo "<p><ul>
-	    <li><b>If you have an NS file:</b><br> You may want to
-                <b><a href='nscheck_form.php3'>syntax check it first</a></b>
-	    <li><b>If you do not have an NS file:</b><br> You may want to
-		<b><a href='buildui/bui.php3'>go to the NetBuild GUI</a></b>
-		to graphically create one online<font size=-2>
-		(<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
-		information</a>)</font>.<br>
-                Or, you can download the Emulab
-                <a href='netlab/client.php3'><b>client</b></a> and graphically
-                create one from your desktop.
-	     </ul></p><br>";
-	  }
+	if (!isset($formfields['nsref']) && !isset($view['quiet'])) {
+          echo "<p><ul>
+          <li><b>If you have an NS file:</b><br> You may want to
+              <b><a href='nscheck_form.php3'>syntax check it first</a></b>
+          <li><b>If you do not have an NS file:</b><br>
+              <b><a href='clientui.php3'>New GUI editor</a></b> - An enhanced Java applet for editing topologies.<br>
+              The older <b><a href='buildui/bui.php3'>NetBuild GUI</a></b>
+              can be used to graphically create topologies.<font size=-2>
+              (<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
+              information</a>)</font>.<br>
+              Or, you can download the Emulab
+              <a href='netlab/client.php3'><b>client</b></a> and graphically
+              create one from your desktop.
+          </ul></p><br>";
 	} else {
 	    if (isset($view['plab_ns_message'])) {
 		echo "<center>
@@ -293,10 +231,10 @@ function SPITFORM($formfields, $errors)
                               Submit.  PlanetLab <font size=+1 color=red>  
                               requires</font>  users
                               to provide detail on what their slice will
-                              be doing via it's description (i.e. what kind 
+                              be doing via its description (i.e., what kind 
                               of network traffic it will be producing).
                               Be sure to read over the
-                              <a href='https://www.planet-lab.org/php/aup/'>
+                              <a href='http://www.planet-lab.org/php/aup/'>
                               PlanetLab AUP</a> if you haven't already.
                        </b></p>
                       </center>\n";
@@ -347,7 +285,7 @@ function SPITFORM($formfields, $errors)
 	while (list($project) = each($projlist)) {
 	    $selected = "";
 
-	    if (strcmp($formfields[exp_pid], $project) == 0)
+	    if (strcmp($formfields["exp_pid"], $project) == 0)
 		$selected = "selected";
 
 	    echo "        <option $selected value=\"$project\">
@@ -362,7 +300,7 @@ function SPITFORM($formfields, $errors)
     # Select a group
     #
     if (isset($view['hide_group'])) {
-	if ($formfields['group']) {
+	if (isset($formfields['group'])) {
 	    $group = $formfields['group'];
 	} else {
 	    $group = "";
@@ -383,10 +321,10 @@ function SPITFORM($formfields, $errors)
 		if (strcmp($project, $group)) {
 		    $selected = "";
 
-		    if (isset($formfields[exp_gid]) &&
-			isset($formfields[exp_pid]) &&
-			strcmp($formfields[exp_pid], $project) == 0 &&
-			strcmp($formfields[exp_gid], $group) == 0)
+		    if (isset($formfields["exp_gid"]) &&
+			isset($formfields["exp_pid"]) &&
+			strcmp($formfields["exp_pid"], $project) == 0 &&
+			strcmp($formfields["exp_gid"], $group) == 0)
 			$selected = "selected";
 
 		    echo "<option $selected value=\"$group\">
@@ -410,7 +348,7 @@ function SPITFORM($formfields, $errors)
               <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[exp_id]\"
-                         value=\"" . $formfields[exp_id] . "\"
+                         value=\"" . $formfields['exp_id'] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
               </td>
@@ -419,15 +357,16 @@ function SPITFORM($formfields, $errors)
     #
     # Description
     #
-    if (isset($view[plab_descr])) {
+    if (isset($view["plab_descr"])) {
           echo "<tr>
                     <td class='pad4'>Slice Description:<br>
                         <font size='-1'>(Please be detailed)</font></td>
                     <td class='pad4' class=left>
                         <textarea
                                name=\"formfields[exp_description]\"
-                               value=\"" . $formfields[exp_description] . "\"
-	                       rows=5 cols=50></textarea>
+	                       rows=5 cols=50>" .
+	                       $formfields['exp_description'] .
+                       "</textarea>
                     </td>
                 </tr>\n";
     } else {
@@ -437,7 +376,7 @@ function SPITFORM($formfields, $errors)
                     <td class='pad4' class=left>
                         <input type=text
                                name=\"formfields[exp_description]\"
-                               value=\"" . $formfields[exp_description] . "\"
+                               value=\"" . $formfields['exp_description'] . "\"
 	                       size=60>
                     </td>
                 </tr>\n";
@@ -450,30 +389,20 @@ function SPITFORM($formfields, $errors)
 	$copyid = $formfields['copyid'];
 
 	echo "<tr>
-               <td class='pad4'>Copy of experiment: &nbsp</td>
+               <td class='pad4'>Copy of experiment $copyid: &nbsp</td>
                <td class='pad4'>
                    <a target=nsfile href=spitnsdata.php3?copyid=$copyid>
-                      $copyid</a>\n";
+                      Click for NS File</a>\n";
 
-	if ($EXPOSEARCHIVE) {
-	    $checked = "";
-
-	    if ($formfields[exp_branch] == "1") {
-		$checked = "checked=1";
-	    }
-	    echo "&nbsp <input type='checkbox' $checked
-			 name='formfields[exp_branch]' value='1'> ";
-	    echo "&nbsp Branch?";
-	}
         echo "  </td>
                 <input type=hidden name=\"formfields[copyid]\" value='$copyid'>
               </tr>\n";
     }
-    elseif (isset($formfields[nsref])) {
-	$nsref = $formfields[nsref];
+    elseif (isset($formfields['nsref'])) {
+	$nsref = $formfields['nsref'];
 	
-	if (isset($formfields[guid])) {
-	    $guid = $formfields[guid];
+	if (isset($formfields['guid'])) {
+	    $guid = $formfields['guid'];
 	    
 	    echo "<tr>
                   <td class='pad4'>Your auto-generated NS file: &nbsp</td>
@@ -510,7 +439,7 @@ function SPITFORM($formfields, $errors)
                         <input type=hidden name=MAX_FILE_SIZE value=512000>
 	                <input type=file
                                name=exp_nsfile
-                               value=\"" . $formfields[exp_nsfile] . "\"
+                               value=\"" . $formfields['exp_nsfile'] . "\"
 	                       size=30
 			       onchange=\"this.form.syntax.disabled=(this.value=='')\">
                       </td>
@@ -518,12 +447,12 @@ function SPITFORM($formfields, $errors)
                     <td>&nbsp;&nbsp;<b>or</b></td><td></td>
                     </tr><tr>
                       <td class='pad4'>On Server<br>
-                              <font size='-1'>(<code>/proj</code>,
-                        <code>/groups</code>, <code>/users</code>)</font></td>
+                              <font size='-1'>(" . $TBVALIDDIRS_HTML .
+	    		      ")</font></td>
                       <td class='pad4'>
 	                <input type=text
                                name=\"formfields[exp_localnsfile]\"
-                               value=\"" . $formfields[exp_localnsfile] . "\"
+                               value=\"" . $formfields['exp_localnsfile'] . "\"
 	                       size=40
 			       onchange=\"this.form.syntax.disabled=(this.value=='')\">
                       </td>
@@ -536,9 +465,9 @@ function SPITFORM($formfields, $errors)
     # Add in hidden fields to send swappable and noswap_reason, since
     # they do not show on the form
     echo "<input type=hidden name=\"formfields[exp_swappable]\"
-                 value='$formfields[exp_swappable]'>\n";
+                 value='" . $formfields['exp_swappable'] . "'>\n";
     echo "<input type=hidden name=\"formfields[exp_noswap_reason]\" value='";
-    echo htmlspecialchars($formfields[exp_noswap_reason], ENT_QUOTES);
+    echo htmlspecialchars($formfields['exp_noswap_reason'], ENT_QUOTES);
     echo "'>\n";
     
     if (isset($view['hide_swap'])) {
@@ -555,47 +484,46 @@ function SPITFORM($formfields, $errors)
     else {
 	echo "<tr>
 		  <td class='pad4'>
-		    <a href='$TBDOCBASE/docwrapper.php3?".
-	                 "docname=swapping.html#swapping'>
+		    <a href='$WIKIDOCURL/Swapping#swapping'>
 		    Swapping:</td>
 		  <td>
 		  <table cellpadding=0 cellspacing=0 border=0><tr>
 		  <td><input type='checkbox'
 			 name='formfields[exp_idleswap]'
 			 value='1'";
-	if ($formfields[exp_idleswap] == "1") {
+	if (isset($formfields['exp_idleswap']) &&
+	    $formfields['exp_idleswap'] == "1") {
 	    echo " checked='1'";
 	}
 	echo "></td>
-		  <td><a href='$TBDOCBASE/docwrapper.php3?".
-	                    "docname=swapping.html#idleswap'>
+		  <td><a href='$WIKIDOCURL/Swapping#idleswap'>
 		  <b>Idle-Swap:</b></a> Swap out this experiment
 		  after 
 		  <input type='text' name='formfields[exp_idleswap_timeout]'
 			 value='";
-	echo htmlspecialchars($formfields[exp_idleswap_timeout], ENT_QUOTES);
+	echo htmlspecialchars($formfields['exp_idleswap_timeout'], ENT_QUOTES);
 	echo "' size='3'> hours idle.</td>
 		  </tr><tr>
 		  <td> </td>
 		  <td>If not, why not?<br><textarea rows=2 cols=50
 			      name='formfields[exp_noidleswap_reason]'>";
 			      
-	echo htmlspecialchars($formfields[exp_noidleswap_reason], ENT_QUOTES);
+	echo htmlspecialchars($formfields['exp_noidleswap_reason'],ENT_QUOTES);
 	echo "</textarea></td>
 		  </tr><tr>
 		  <td><input type='checkbox'
 			 name='formfields[exp_autoswap]'
 			 value='1' ";
-	if ($formfields[exp_autoswap] == "1") {
+	if (isset($formfields['exp_autoswap']) &&
+	    $formfields['exp_autoswap'] == "1") {
 	    echo " checked='1'";
 	}
 	echo "></td>
-		  <td><a href='$TBDOCBASE/docwrapper.php3?".
-	                    "docname=swapping.html#autoswap'>
+		  <td><a href='$WIKIDOCURL/Swapping#autoswap'>
 		  <b>Max. Duration:</b></a> Swap out after
 		  <input type='text' name='formfields[exp_autoswap_timeout]'
 			 value='";
-	echo htmlspecialchars($formfields[exp_autoswap_timeout], ENT_QUOTES);
+	echo htmlspecialchars($formfields['exp_autoswap_timeout'], ENT_QUOTES);
 	echo "' size='3'> hours, even if not idle.</td>
 		  </tr>";
 
@@ -604,14 +532,13 @@ function SPITFORM($formfields, $errors)
 	         <input type=checkbox name='formfields[exp_savedisk]'
 	         value='Yep'";
 
-	    if (isset($formfields[exp_savedisk]) &&
-		strcmp($formfields[exp_savedisk], "Yep") == 0) {
+	    if (isset($formfields['exp_savedisk']) &&
+		strcmp($formfields['exp_savedisk'], "Yep") == 0) {
 		    echo " checked='1'";
 	    }
 
 	    echo "></td>\n";
-	    echo "<td><a href='$TBDOCBASE/docwrapper.php3?".
-		              "docname=swapping.html#swapstatesave'>
+	    echo "<td><a href='$WIKIDOCURL/Swapping#swapstatesave'>
 		  <b>State Saving:</b></a> Save disk state on swapout</td>
 		  </tr>";
 	}
@@ -623,29 +550,27 @@ function SPITFORM($formfields, $errors)
     #
     if (STUDLY() || $EXPOSELINKTEST) {
       if (isset($view['hide_linktest'])) {
-        if ($formfields[exp_linktest]) {
+        if ($formfields['exp_linktest']) {
           echo "<input type='hidden' name='formfields[exp_linktest]'
-                       value='$formfields[exp_linktest]'\n";
+                       value='" . $formfields['exp_linktest'] . "'\n";
         }
       } else {
     echo "<tr>
-              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
-	                  "docname=linktest.html'>Linktest</a> Option:</td>
+              <td><a href='$WIKIDOCURL/linktest'>Linktest</a> Option:</td>
               <td><select name=\"formfields[exp_linktest]\">
                           <option value=0>Skip Linktest </option>\n";
 
     for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
 	$selected = "";
 
-	if (strcmp($formfields[exp_linktest], "$i") == 0)
+	if (strcmp($formfields['exp_linktest'], "$i") == 0)
 	    $selected = "selected";
 	
 	echo "        <option $selected value=$i>Level $i - " .
 	    $linktest_levels[$i] . "</option>\n";
     }
     echo "       </select>";
-    echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
-	"docname=linktest.html'><b>Whats this?</b></a>)";
+    echo "    (<a href='$WIKIDOCURL/linktest'><b>What is this?</b></a>)";
     echo "    </td>
           </tr>\n";
       }
@@ -657,7 +582,7 @@ function SPITFORM($formfields, $errors)
     if (isset($view['hide_batch'])) {
 	if ($formfields['exp_batched']) {
 	    echo "<input type='hidden' name='formfields[exp_batched]'
-                         value='$formfields[$value]'\n";
+                         value='" . $formfields['exp_batched'] . "'\n";
 	}
     } else {
 	echo "<tr>
@@ -665,15 +590,15 @@ function SPITFORM($formfields, $errors)
 		  <input type=checkbox name='formfields[exp_batched]'
                          value='Yep'";
 
-	if (isset($formfields[exp_batched]) &&
-	    strcmp($formfields[exp_batched], "Yep") == 0) {
+	if (isset($formfields['exp_batched']) &&
+	    strcmp($formfields['exp_batched'], "Yep") == 0) {
 		echo " checked='1'";
 	    }
 
 	echo ">\n";
 	echo "Batch Mode Experiment &nbsp;
 	      <font size='-1'>(See
-	      <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>Tutorial</a>
+	      <a href='$WIKIDOCURL/Tutorial'>Tutorial</a>
 	      for more information)</font>
 	      </td>
 	      </tr>\n";
@@ -685,7 +610,7 @@ function SPITFORM($formfields, $errors)
     if (isset($view['hide_preload'])) { 
 	if ($formfields['exp_preload']) {
 	    echo "<input type='hidden' name='formfields[exp_preload]'
-                         value='$formfields[$value]'>\n";
+                         value='" . $formfields['exp_preload'] . "'>\n";
 	}
     } else {
 	echo "<tr>
@@ -693,8 +618,8 @@ function SPITFORM($formfields, $errors)
 		      <input type=checkbox name='formfields[exp_preload]'
                              value='Yep'";
 
-	if (isset($formfields[exp_preload]) &&
-	    strcmp($formfields[exp_preload], "Yep") == 0) {
+	if (isset($formfields['exp_preload']) &&
+	    strcmp($formfields['exp_preload'], "Yep") == 0) {
 		echo " checked='1'";
 	    }
 
@@ -716,8 +641,9 @@ function SPITFORM($formfields, $errors)
 	echo "<p>
 	      <h3>Handy Links:</h3>
 	      <ul>
-		 <li> View a <a href='showosid_list.php3'>list of OSIDs</a>
-		      that are available for you to use in your NS file.</li>
+                  <li> View a <a href='showosid_list.php3' target='_blank'>list
+                      of OSIDs</a> that are available for you to use in your NS
+                      file.</li>
 		 <li> Create your own <a href='newimageid_ez.php3'>
 		      custom disk images</a>.</li>
 	      </ul>\n";

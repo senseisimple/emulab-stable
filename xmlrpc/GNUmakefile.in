@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -27,18 +27,22 @@ EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 # These are the ones installed on plastic (users, control, etc). 
 # 
 CLIENTBINS      = sshxmlrpc_client.py script_wrapper.py sslxmlrpc_client.py
-USERLIBS	= sshxmlrpc.py emulabclient.py libxmlrpc.pm
+USERLIBS	= sshxmlrpc.py emulabclient.py libxmlrpc.pm \
+		  BasicXMLRPCServers.py
 SYMLINKS        = node_admin node_reboot os_load create_image node_list \
-		  delay_config link_config savelogs portstats eventsys_control \
+		  delay_config wilink_config savelogs portstats eventsys_control \
 		  readycount nscheck startexp batchexp startexp swapexp endexp \
-		  modexp expinfo node_avail tbuisp expwait
+		  modexp expinfo node_avail tbuisp expwait template_commit \
+		  template_export template_swapin template_swapout \
+		  template_stoprun template_instantiate template_startrun \
+		  template_checkout node_avail_list
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
 all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIB_STUFF) $(LIBEXEC_STUFF) \
-	$(DOWNLOAD_STUFF) $(DEBUG_STUFF) $(CLIENTBINS)
+	$(DOWNLOAD_STUFF) $(DEBUG_STUFF) $(CLIENTBINS) BasicXMLRPCServers.py
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -89,7 +93,8 @@ LINKS=	cd $(INSTALL_BINDIR) && \
 			ln -s script_wrapper.py $$file; \
 		done;
 endif
-control-install:	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
+control-install:	$(CLIENTBINS) $(USERLIBS) \
+			$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS)) \
 			$(addprefix $(INSTALL_BINDIR)/, $(CLIENTBINS))
 	$(LINKS)
 

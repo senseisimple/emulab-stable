@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Startup command in rc.ixp. Use old version.
@@ -11,6 +11,8 @@ use Getopt::Std;
 use Socket;
 use IO::Handle;
 use POSIX qw(strftime);
+
+sub ddijkstra($);
 
 #
 # Boot an ixp.
@@ -161,6 +163,8 @@ if (scalar(@tmccresults)) {
 
     close(RUN);
     chmod(0755, $bootscript);
+} else {
+    unlink($bootscript);
 }
 
 #
@@ -238,7 +242,7 @@ foreach my $conf (keys(%config)) {
 print RC "export HOST_CNTL_I=" . `$BINDIR/control_interface`;
 print UC "HOST_CNTL_I=" . `$BINDIR/control_interface`;
 # And this. Could be done elsewhere ...
-my (undef,undef,undef,undef,@ipaddrs) = gethostbyname("fs.emulab.net");
+my (undef,undef,undef,undef,@ipaddrs) = gethostbyname("fs");
 $FSIP = inet_ntoa($ipaddrs[0]);
 print RC "export FS_IP=$FSIP\n";
 print UC "FS_IP=$FSIP\n";
@@ -352,6 +356,9 @@ my $type      = "";
 
 if (getrouterconfig(\@routelist, \$type)) {
     die("Could not get router configuration from libsetup!\n");
+}
+if ($type eq "gated" || $type eq "ospf") {
+	die("Cannot do session routing on IXP!\n");
 }
 
 if (@routelist) {

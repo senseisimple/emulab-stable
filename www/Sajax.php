@@ -93,7 +93,6 @@ if (!isset($SAJAX_INCLUDED)) {
 	function sajax_get_common_js() {
 		global $sajax_debug_mode;
 		global $sajax_request_type;
-		global $sajax_remote_uri;
 		
 		$t = strtoupper($sajax_request_type);
 		if ($t != "GET" && $t != "POST") 
@@ -136,12 +135,10 @@ if (!isset($SAJAX_INCLUDED)) {
 				sajax_debug("Could not create connection object.");
 			return A;
 		}
-		function sajax_do_call(func_name, args) {
+		function sajax_do_call(uri, func_name, args) {
 			var i, x, n;
-			var uri;
 			var post_data;
 			
-			uri = "<?php echo $sajax_remote_uri; ?>";
 			if (sajax_request_type == "GET") {
 				if (uri.indexOf("?") == -1) 
 					uri = uri + "?rs=" + escape(func_name);
@@ -164,8 +161,11 @@ if (!isset($SAJAX_INCLUDED)) {
 				x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 			}
 			x.onreadystatechange = function() {
-				if (x.readyState != 4) 
+				if (x.readyState != 4)
 					return;
+				if (x.status != 200)
+					return;
+				
 				sajax_debug("received " + x.responseText);
 				
 				var status;
@@ -190,33 +190,6 @@ if (!isset($SAJAX_INCLUDED)) {
 			sajax_debug(func_name + " waiting..");
 			delete x;
 		}
-
-		function getObjbyName(name) {
-		  if (document.getElementById) {
-		    return document.getElementById(name);
-		  }
-		  else if (document.all) {
-		    return document.all[name];
-		  }
-		  else if (document.layers) {
-		    return getObjNN4(document,name);
-		  }
-		  return null;
-		}
-		function getObjNN4(obj,name) {
-		  var x = document.layers;
-		  var foundLayer;
-		    
-		  for (var i=0; i < x.length; i++) {
-		    if (x[i].id == name)
-		      foundLayer = x[i];
-		    else if (x[i].layers.length)
-		      var tmp = getObjNN4(x[i],name);
-		      
-		    if (tmp) foundLayer = tmp;
-		  }
-		  return foundLayer;
-		}
 		<?php
 		$html = ob_get_contents();
 		ob_end_clean();
@@ -234,14 +207,16 @@ if (!isset($SAJAX_INCLUDED)) {
 	}
 
 	function sajax_get_one_stub($func_name) {
+		global $sajax_remote_uri;
 		ob_start();	
 		?>
 		
 		// wrapper for <?php echo $func_name; ?>
 		
 		function x_<?php echo $func_name; ?>() {
-			sajax_do_call("<?php echo $func_name; ?>",
-				x_<?php echo $func_name; ?>.arguments);
+		    sajax_do_call("<?php echo $sajax_remote_uri; ?>",
+				  "<?php echo $func_name; ?>",
+				  x_<?php echo $func_name; ?>.arguments);
 		}
 		
 		<?php

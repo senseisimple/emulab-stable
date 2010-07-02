@@ -1,0 +1,881 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2007, 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno qw(EEXIST);
+use strict;
+
+#
+# Control the privilege tables on the ops DB.
+#
+sub usage()
+{
+    print STDOUT "Usage: opsdb_control adduser <uid>\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
+
+# Locals
+my $SSH         = "$TB/bin/sshtb";
+my $OPSDBPROXY  = "$TB/sbin/opsdb_control.proxy";
+my $SAVEUID	= $UID;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Protos
+sub AddUser(@);
+sub DelUser(@);
+sub AddProj(@);
+sub AddGroup(@);
+sub DelProj(@);
+sub DelGroup(@);
+sub SetGroups(@);
+sub SetGroupsAux(@);
+sub AddExpDB(@);
+sub DelExpDB(@);
+sub AddTempDB(@);
+sub LoadTempDB(@);
+sub DelTempDB(@);
+sub DumpExpDB(@);
+sub CleanExpDB(@);
+sub GraphDB(@);
+sub DoOpsStuff($;$);
+sub Initialize();
+sub fatal($);
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Group;
+use Experiment;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no opsdb support, just exit. 
+#
+if (! $OPSDBSUPPORT) {
+    print "OPS DB support is not enabled. Exiting ...\n";
+    exit(0);
+}
+
+#
+# Verify user and get his DB uid.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+my $user_dbid  = $this_user->dbid();
+my $user_uid   = $this_user->uid();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+usage()
+    if (@ARGV < 1);
+
+my $action = shift(@ARGV);
+
+if ($action eq "adduser") {
+    exit(AddUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelUser(@ARGV));
+}
+elsif ($action eq "addproj") {
+    exit(AddProj(@ARGV));
+}
+elsif ($action eq "addgroup") {
+    exit(AddGroup(@ARGV));
+}
+elsif ($action eq "delproj") {
+    exit(DelProj(@ARGV));
+}
+elsif ($action eq "delgroup") {
+    exit(DelGroup(@ARGV));
+}
+elsif ($action eq "setgroups") {
+    exit(SetGroups(@ARGV));
+}
+elsif ($action eq "addexpdb") {
+    exit(AddExpDB(@ARGV));
+}
+elsif ($action eq "delexpdb") {
+    exit(DelExpDB(@ARGV));
+}
+elsif ($action eq "addtempdb") {
+    exit(AddTempDB(@ARGV));
+}
+elsif ($action eq "deltempdb") {
+    exit(DelTempDB(@ARGV));
+}
+elsif ($action eq "loadtempdb") {
+    exit(LoadTempDB(@ARGV));
+}
+elsif ($action eq "dumpexpdb") {
+    exit(DumpExpDB(@ARGV));
+}
+elsif ($action eq "cleanexpdb") {
+    exit(CleanExpDB(@ARGV));
+}
+elsif ($action eq "graphdb") {
+    exit(GraphDB(@ARGV));
+}
+elsif ($action eq "setup") {
+    exit(Initialize());
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Add user. The user ID and password are added to the user table on ops,
+# but with no privs to do anything.
+#
+sub AddUser(@)
+{
+    my ($target_uid) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    #
+    # Untaint args.
+    #
+    if ($target_uid =~ /^([-\w]+)$/) {
+	$target_uid= $1;
+    }
+    else {
+	die("Bad data in uid: $target_uid");
+    }
+
+    # Map target user to object.
+    my $target_user = User->Lookup($target_uid);
+    fatal("No such user in DB: $target_uid!")
+	if (!defined($target_uid));
+
+    my $password = $target_user->mailman_password();
+    fatal("No password defined for $target_uid!")
+	if (!defined($password) || $password eq "");
+
+    print "Adding user '$target_uid' to mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("adduser $target_uid", $password);
+    if ($retval) {
+	if ($retval == EEXIST()) {
+	    # Not an error.
+	    return 0;
+	}
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Delete user.
+#
+sub DelUser(@)
+{
+    my ($target_uid) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    #
+    # Untaint args.
+    #
+    if ($target_uid =~ /^([-\w]+)$/) {
+	$target_uid= $1;
+    }
+    else {
+	die("Bad data in uid: $target_uid");
+    }
+
+    # Map target user to object.
+    my $target_user = User->Lookup($target_uid);
+    fatal("No such user in DB: $target_uid!")
+	if (!defined($target_uid));
+
+    print "Removing user '$target_uid' from mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("deluser $target_uid");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Add a project or group to the list of DBs on ops.
+#
+sub AddProj(@)
+{
+    my ($pid) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    return AddGroup($pid, $pid);
+}
+
+sub AddGroup(@)
+{
+    usage()
+	if (@_ < 1 || @_ > 3);
+
+    my $group = Group->Lookup($_[0], $_[1]);
+    if (!defined($group)) {
+	fatal("No such group: @_!");
+    }
+    my $pid    = $group->pid();
+    my $gid    = $group->gid();
+    my $dbname = ($pid eq $gid ? $pid : "$pid,$gid");
+
+    print "Adding DB '$dbname' to mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("adddb $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Delete project or group from the list of DBs on ops.
+#
+sub DelProj(@)
+{
+    my ($pid) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    return DelGroup($pid, $pid);
+}
+
+sub DelGroup(@)
+{
+    usage()
+	if (@_ < 1 || @_ > 3);
+
+    my $group = Group->Lookup($_[0], $_[1]);
+    if (!defined($group)) {
+	fatal("No such group: @_!");
+    }
+    my $pid    = $group->pid();
+    my $gid    = $group->gid();
+    my $dbname = ($pid eq $gid ? $pid : "$pid,$gid");
+
+    print "Removing DB '$dbname' from mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("deldb $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Set the groups for a user; the list of DBs they can use on OPS.
+#
+sub SetGroups(@)
+{
+    my @userlist  = ();
+
+    usage()
+	if (@_ < 1);
+
+    foreach my $uid (@_) {
+	my $user = User->Lookup($uid);
+	if (! defined($user)) {
+	    fatal("No such user $uid!");
+	}
+	push(@userlist, $user);
+    }
+    return SetGroupsAux(@userlist);
+}
+
+sub SetGroupsAux(@)
+{
+    my @userlist  = @_;
+    my @uids      = ();
+    my $input     = "";
+
+    foreach my $user (@userlist) {
+	my @groups  = ();
+	my @glist   = ();
+	my $uid     = $user->uid();
+	my $uid_idx = $user->uid_idx();
+
+	next
+	    if ($user->status() ne $User::USERSTATUS_ACTIVE);
+
+	# Debug printf below.
+	push(@uids, $uid);
+
+	$user->GroupMembershipList(\@groups) == 0 or
+	    fatal("Could not get group list for $user");
+
+	foreach my $group (@groups) {
+	    my $pid = $group->pid();
+	    my $gid = $group->gid();
+
+	    if ($pid eq $gid) {
+		push(@glist, "$pid");
+	    }
+	    else {
+		push(@glist, "$pid,$gid");
+	    }
+
+	    #
+	    # Now get the per-experiment DBs inside this group.
+	    #
+	    my $experiment_result =
+		$group->TableLookUp("experiments", "dpdbname", "dpdb!=0");
+
+	    while (my ($dbname) = $experiment_result->fetchrow_array()) {
+		if (defined($dbname) && $dbname ne "") {
+		    push(@glist, $dbname);
+		}
+	    }
+	    
+	    #
+	    # Now get additional temporary DBs.
+	    #
+	    my $databases_result =
+		$group->TableLookUp("datapository_databases", "dbname");
+
+	    while (my ($dbname) = $databases_result->fetchrow_array()) {
+		if (defined($dbname) && $dbname ne "") {
+		    push(@glist, $dbname);
+		}
+	    }
+	    
+	}
+	$input .= "$uid @glist\n";
+    }
+    
+    print "Setting DB access list for user(s) '@uids' on $CONTROL.\n"
+	if ($debug);
+    my $retval = DoOpsStuff("setdbs", $input);
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Add and delete a DB for a specific experiment. We use the pid,gid of
+# the experiment to set the access list.
+# 
+sub AddExpDB(@)
+{
+    my @uids = ();
+
+    usage()
+	if (@_ < 1 || @_ > 3);
+
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	fatal("No such experiment: @_!");
+    }
+    my $pid    = $experiment->pid();
+    my $eid    = $experiment->eid();
+    my $gid    = $experiment->gid();
+    my $dbname = "${pid}+${eid}";
+    my $exptidx= $experiment->idx();
+
+    if (defined($experiment->dpdbname())) {
+	# Allow override.
+	$dbname = $experiment->dpdbname();
+    }
+    my $dpdbpassword = $experiment->dpdbpassword();
+	
+    if (!defined($dpdbpassword)) {
+	$dpdbpassword = TBGenSecretKey();
+	$dpdbpassword = substr($dpdbpassword, 0, 10);
+    }
+
+    #
+    # XXX See if there are any traced links. 
+    #
+    my $query_result =
+	$experiment->TableLookUp("virt_lans", "vname", "trace_db!=0");
+					     
+    my $traceflag = ($query_result->numrows ? "-s" : "");
+
+    print "Adding DB '$dbname' to mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("adddb $dbname $traceflag");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+
+    $experiment->Update({"dpdbpassword" => "$dpdbpassword",
+			 "dpdbname"     => "$dbname"}) == 0 or
+	fatal("Could not update dpdbname,dpdbpassword for $experiment");
+
+    $experiment->TableUpdate("experiment_stats",
+			     {"dpdbname" => "$dbname"}) == 0 or
+	fatal("Could not update experiment_stats for $experiment");
+
+    #
+    # Add a user that is named by this DB, with the password from above.
+    # Basically, a per-experiment DB user for the DB.
+    #
+    my $dbuser = "E${exptidx}";
+    
+    print "Adding user '$dbuser' to mysql database on $CONTROL.\n";
+    $retval = DoOpsStuff("adduser $dbuser", $dpdbpassword);
+    if ($retval && $retval != EEXIST()) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    $retval = DoOpsStuff("setdbs", "$dbuser $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+
+    #
+    # Now we need to update the access list for everyone in the group.
+    #
+    my $group = $experiment->GetGroup();
+    my @userlist;
+
+    $group->MemberList(\@userlist) == 0 or
+	fatal("Could not get user list for $group");
+
+    SetGroupsAux(@userlist) == 0
+	or fatal("Could not setgroups for $experiment!");
+
+    return 0;
+}
+
+sub DelExpDB(@)
+{
+    usage()
+	if (@_ < 1 || @_ > 3);
+
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	return 0;
+    }
+    my $dbname = $experiment->dpdbname();
+    my $exptidx= $experiment->idx();
+
+    return -1
+	if (!defined($dbname));
+
+    #
+    # Always do a DB removal if the experiment has a dbname set.
+    #
+    my $dbuser = "E${exptidx}";
+    
+    print "Deleting user '$dbuser' from mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("deluser $dbuser");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+
+    print "Removing DB '$dbname' from mysql database on $CONTROL.\n";
+    $retval = DoOpsStuff("deldb $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    #
+    # No need to do a setgroups here since the proxy on ops removed the
+    # DB and any user entries for that DB.
+    #
+    return 0;
+}
+
+sub DumpExpDB(@)
+{
+    usage()
+	if (@_ < 2 || @_ > 4);
+
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	return 0;
+    }
+    my $dbname   = $experiment->dpdbname();
+    my $filename = $_[2];
+
+    if ($filename =~ /^([-\w\/\.\+,]+)$/) {
+	$filename = $1;
+    }
+    else {
+	die("Bad data in filename: $filename");
+    }
+
+    return -1
+	if (!defined($dbname));
+
+    print "Dumping mysql DB '$dbname' to $filename on $CONTROL.\n";
+    my $retval = DoOpsStuff("dumpdb $dbname $filename");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+sub CleanExpDB(@)
+{
+    usage()
+	if (@_ < 2 || @_ > 3);
+
+    my $experiment = Experiment->Lookup($_[0], $_[1]);
+    if (!defined($experiment)) {
+	return 0;
+    }
+    my $dbname   = $experiment->dpdbname();
+
+    return -1
+	if (!defined($dbname));
+
+    print "Cleaning mysql DB '$dbname' on $CONTROL.\n";
+    my $retval = DoOpsStuff("cleandb $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Add a temporary DB to ops.
+#
+sub AddTempDB(@)
+{
+    usage()
+	if (@_ < 2 || @_ > 4);
+
+    my $group = Group->Lookup($_[0], $_[1]);
+    if (!defined($group)) {
+	fatal("No such group: @_!");
+    }
+    my $dbname = $_[2];
+
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+
+    my $pid     = $group->pid();
+    my $gid     = $group->gid();
+    my $pid_idx = $group->pid_idx();
+    my $gid_idx = $group->gid_idx();
+
+    #
+    # Add DB record for it.
+    #
+    if (! DBQueryWarn("insert into datapository_databases set ".
+		      "  pid='$pid', gid='$gid', ".
+		      "  pid_idx='$pid_idx', gid_idx='$gid_idx', ".
+		      "  uid='$user_uid', uid_idx='$user_dbid', ".
+		      "  dbname='$dbname', created=now()")) {
+	fatal("Failed to add temporary dbname to database");
+    }
+
+    print "Adding temporary DB '$dbname' to mysql database on $CONTROL.\n";
+    my $retval = DoOpsStuff("adddb $dbname -t");
+    if ($retval) {
+	DBQueryWarn("delete from datapository_databases ".
+		    "where dbname='$dbname'");
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+
+    #
+    # Now we need to update the access list for everyone in the group.
+    #
+    my @userlist;
+
+    $group->MemberList(\@userlist) == 0 or
+	fatal("Could not get user list for $group");
+
+    SetGroupsAux(@userlist) == 0
+	or fatal("Could not setgroups for $group!");
+
+    return 0;
+}
+
+sub LoadTempDB(@)
+{
+    my ($dbname, $filename) = @_;
+
+    usage()
+	if (@_ != 2);
+
+    #
+    # Untaint args.
+    #
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+    if ($filename =~ /^([-\w\/\.\+,]+)$/) {
+	$filename = $1;
+    }
+    else {
+	die("Bad data in filename: $filename");
+    }
+    
+    print "Loading mysql DB '$dbname' from $filename on $CONTROL.\n";
+    my $retval = DoOpsStuff("loaddb $dbname $filename");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+#
+# Delete a temporary DB from ops.
+#
+sub DelTempDB(@)
+{
+    my ($dbname) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    #
+    # Untaint args.
+    #
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+
+    print "Deleting temporary DB '$dbname' from mysql database on $CONTROL.\n"
+	if ($debug);
+    my $retval = DoOpsStuff("deldb $dbname");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    DBQueryFatal("delete from datapository_databases ".
+		 "where dbname='$dbname'");
+    return 0;
+}
+
+#
+# Hack graph support.
+#
+sub GraphDB(@)
+{
+    usage()
+	if (@_ < 2);
+
+    my $dbname   = shift(@_);
+    my $which    = shift(@_);
+    my @optargs  = ();
+
+    #
+    # Untaint args.
+    #
+    if ($dbname =~ /^([-\w,\+]+)$/) {
+	$dbname = $1;
+    }
+    else {
+	die("Bad data in dbname: $dbname");
+    }
+    if ($which =~ /^([\w]*)$/) {
+	$which = $1;
+    }
+    else {
+	die("Bad data in which: $which");
+    }
+
+    # Check the rest of the args with a generic test.
+    foreach my $arg (@_) {
+	# Note different taint check (allow /).
+	if ($arg =~ /^([-\w\.\/\:]+)$/) {
+	    $arg = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $arg");
+	}
+	push(@optargs, $arg);
+    }
+
+    print "Graphing DB '$dbname' from mysql database on $CONTROL.\n"
+	if ($debug);
+    my $retval = DoOpsStuff("graphdb $dbname $which @optargs");
+    if ($retval) {
+	fatal("$OPSDBPROXY failed on $CONTROL!");
+    }
+    return 0;
+}
+
+# Wrapper for ssh.
+sub DoOpsStuff($;$)
+{
+    my ($remote_command, $input) = @_;
+    my $retval = 0;
+    my $flag   = ($debug ? "-d" : "");
+    my ($command);
+    
+    # For ssh.
+    $UID = $EUID;
+
+    $command = "$SSH -host $CONTROL $OPSDBPROXY $flag $remote_command";
+
+    print "Running command '$command'\n"
+	if ($debug);
+
+    # Echo stuff to remote stdin
+    if (defined($input) && $input ne "") {
+	if (!open(OPS, "| $command")) {
+	    print "Could not start '$SSH'\n";
+	    $retval = -1;
+	}
+	else {
+	    print OPS $input;
+	    if (! close(OPS)) {
+		print(($! ? "Error closing pipe: $!\n"
+		          : "Exit status $? from pipe\n"));
+		$retval = -1;
+	    }
+	}
+    }
+    else {
+	system($command);
+	if ($?) {
+	    $retval = $? >> 8;
+	}
+    }
+    $EUID = $SAVEUID;
+    
+    return $retval;
+}
+
+#
+# Initial setup for pre-existing emulabs.
+#
+sub Initialize()
+{
+    my @uids = ();
+    
+    #
+    # Initialize a mailman password for all users, just in case not set.
+    #
+    my $query_result =
+	DBQueryFatal("select uid,uid_idx from users ".
+		     "where mailman_password is NULL");
+
+    while (my ($uid,$uid_idx) = $query_result->fetchrow_array()) {
+	print "Setting initial mailman password for $uid ($uid_idx)\n"
+	    if ($debug);
+
+	my $password = TBGenSecretKey();
+	$password = substr($password, 0, 10);
+
+	DBQueryFatal("update users set mailman_password='$password' ".
+		     "where uid_idx='$uid_idx'");
+    }
+
+    #
+    # Now add all active users.
+    # 
+    my $users_result =
+	DBQueryFatal("select distinct g.uid ".
+		     "  from group_membership as g ".
+		     "left join users as u on u.uid_idx=g.uid_idx ".
+		     "where u.status='active' or u.status='frozen' ".
+#  		     "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
+#		     "       g.pid='tbres' or g.pid='utahstud')" .
+		     "order by u.admin");
+
+    while (my ($uid) = $users_result->fetchrow_array()) {
+	AddUser(($uid)) == 0
+	    or fatal("Could not add user $uid to DB on $CONTROL");
+    }
+
+    #
+    # Add project and group DBs.
+    #
+    my $projects_result =
+	DBQueryFatal("select g.pid,g.gid from groups as g ".
+		     "left join projects as p on p.pid_idx=g.pid_idx ".
+		     "where p.approved=1 ".
+#		     "and (p.pid='testbed' or p.pid='emulab-ops' or ".
+#		     "     p.pid='tbres' or p.pid='utahstud') ".
+		     "");
+
+    while (my ($pid,$gid) = $projects_result->fetchrow_array()) {
+	AddGroup(($pid, $gid)) == 0
+	    or fatal("Could not add database for $pid,$gid to DB on $CONTROL");
+    }
+
+    #
+    # Now go back to the users list and set the access lists
+    #
+    $users_result->dataseek(0);
+    
+    while (my ($uid) = $users_result->fetchrow_array()) {
+	push(@uids, $uid);
+    }
+    SetGroups(@uids) == 0
+	or fatal("Could not set groups for @uids!");
+    
+    return 0;
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

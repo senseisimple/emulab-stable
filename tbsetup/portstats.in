@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,6 +41,8 @@ Usage: $0 [-h] <-p | <pid> <eid> > [vname ...] [vname:port ...]
 -c    Print absolute, rather than relative, counts
 -p    The machines given are physical, not virtual, node IDs. No pid and
       eid should be given when using this option.
+-s    Ports are specified in switch.port syntax
+-C    List control net, rather than experimental net, ports
 
 If only pid and eid are given, prints out information about all ports in the
 experiment. Otherwise, output is limited to the nodes and/or ports given.
@@ -60,7 +62,8 @@ END
 # Process command-line arguments
 #
 my %opt = ();
-GetOptions(\%opt,'h','a','e','p','b','z','q','c');
+Getopt::Long::Configure("no_ignore_case");
+GetOptions(\%opt,'h','a','e','p','b','z','q','c','s','C');
 
 if ($opt{h}) {
     exit &usage;
@@ -81,7 +84,7 @@ if ($opt{a}) {
 }
 
 my ($pid, $eid);
-if (!$opt{p}) {
+if (!$opt{p} && !$opt{s}) {
     if (@ARGV < 2) {
 	exit &usage;
     }
@@ -91,7 +94,7 @@ if (!$opt{p}) {
     # Untaint args.
     #
     if ($pid =~ /^([-\w]+)$/) {
-        $pid = $1;
+	$pid = $1;
     }
     else {
         tbdie("Bad data in pid: $pid.");
@@ -110,11 +113,20 @@ if (!$opt{p}) {
 # 
 my @passedPorts = ();
 foreach my $arg (@ARGV) {
-    if ($arg =~ /^([-\w\.:]+)$/) {
-        $arg = $1;
-    }
-    else {
-        tbdie("Bad data in arg: $arg.");
+    if ($opt{s}) {
+        if ($arg =~ /^([-\w\.\/]+)$/) {
+            $arg = $1;
+        }
+        else {
+            tbdie("Bad data in arg: $arg.");
+        }
+    } else {
+        if ($arg =~ /^([-\w\.:]+)$/) {
+            $arg = $1;
+        }
+        else {
+            tbdie("Bad data in arg: $arg.");
+        }
     }
     push(@passedPorts, $arg);
 }
@@ -140,7 +152,7 @@ my %oids = (
 #
 # First, make sure the experiment exists
 #
-if (!$opt{p}) {
+if (!$opt{p} && !$opt{s}) {
     if (!ExpState($pid,$eid)) {
 	die "There is no experiment $eid in project $pid\n";
     }
@@ -149,7 +161,11 @@ if (!$opt{p}) {
 #
 # Make sure they have access to it
 #
-if ($opt{p}) {
+if ($opt{s}) {
+    if ($UID && !TBAdmin($UID)) {
+        die("Only root or TB admins can use -s.");
+    }
+} elsif ($opt{p}) {
     my @nodes = map { /^([^:]+)(:(\d+))?$/; $1; } @passedPorts;
     if (!TBNodeAccessCheck($UID,TB_NODEACCESS_READINFO,@nodes)) {
 	die "You do not have permission to view one or more of @nodes\n";
@@ -170,12 +186,25 @@ if ($ELABINELAB) {
 
 snmpit_lib::init(0);
 
+my @ports;
+#
+# If using "switch" syntax, make sure all names are in the correct format
+#
+if ($opt{s}) {
+    foreach my $port (@passedPorts) {
+        if ($port =~ /^[^.]+\.\d+\/\d+$/) {
+	    push @ports, $port;
+	} else {
+	    print "'$port' not in correct switch.port syntax, ignoring\n";
+	}
+    }
+
+}
 #
 # If using physical port IDs, just use the list passed on the command line -
 # For an experiment, figure out which one(s) they wanted.
 #
-my @ports;
-if ($opt{p}) {
+elsif ($opt{p}) {
     #
     # If they gave a node:port form, use just that port. Otherwise, try to find
     # all the node's ports
@@ -185,7 +214,7 @@ if ($opt{p}) {
 	my ($hostname,$portnumber) = ($1,$3);
 	if (defined $portnumber) {
 	    push @ports, $port;
-	} else {
+	} else  {
 	    my $interfaces = DBQueryFatal("select card from interfaces " .
 		"where node_id = '$hostname'");
 	    while (my ($card) = $interfaces->fetchrow()) {
@@ -194,7 +223,17 @@ if ($opt{p}) {
 	}
     }
 } else {
-    my @experimentPorts = getExperimentPorts($pid,$eid);
+    my @experimentPorts;
+    #
+    # Get control net or experimental net ports, depending on what they
+    # asked for
+    #
+    if ($opt{C}) {
+        @experimentPorts = getExperimentControlPorts($pid,$eid);
+    } else {
+        @experimentPorts = getExperimentPorts($pid,$eid);
+    }
+    #print "ep: " . join(";",@experimentPorts) . "\n";
     if (@passedPorts) {
 	#
 	# Handle a set of passed-in ports
@@ -234,7 +273,7 @@ if ($opt{p}) {
 my %portMap = mapPortsToDevices(@ports);
 
 my @stats;
-foreach my $name (keys %portMap) {
+DEVICE: foreach my $name (keys %portMap) {
     my @ports = @{$portMap{$name}};
 
     #
@@ -263,9 +302,15 @@ foreach my $name (keys %portMap) {
 	    $device = new snmpit_nortel($name);
 	    last;
 	};
+	/hp/ && do {
+	    require snmpit_hp;
+	    $device = new snmpit_hp($name);
+	    last;
+	};
 
 	# 'default' case
-	die "Unknown switch type ($type) for $name\n";
+	warn "WARNING: Unknown switch type ($type) for $name, skipping some ports\n";
+        last DEVICE;
     }
     my @results = $device->getFields(\@ports,\@oids);
 
@@ -275,7 +320,14 @@ foreach my $name (keys %portMap) {
 	#
 	# Figure out which port on which switch this corresponds to
 	#
-	my $switchport = portnum($port);
+	my $switchport;
+	if ($opt{s}) {
+	    if ($port =~ /^([^.]+)\.(\d+)\/(\d+)$/) {
+		$switchport = "$1:$2.$3";
+	    }
+	} else {
+	    $switchport = portnum($port);
+	}
 	if (!($switchport && ($switchport =~ /(.+):(\d+)\.(\d+)/))) {
 	    warn "WARNING: No switch port found for $port\n";
 	} else {
@@ -344,7 +396,7 @@ foreach my $name (keys %portMap) {
 	    }
 	}
 
-	if (!$opt{p}) {
+	if (!$opt{p} && !$opt{s}) {
 	    #
 	    # Try to translate the port name to the node's vname
 	    #

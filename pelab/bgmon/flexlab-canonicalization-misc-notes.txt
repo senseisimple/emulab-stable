@@ -1,0 +1,59 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+NOTICE: The "measured_by" field in the table "pair_data" is
+a short integer... should be longer (?)
+
+
+TODO:
+2) Change bgmon queuing so that different tools of the
+same class do not overwrite each other.
+3) Add generalization into the managerclient
+4) Make Iperfwrapper do the iperf timeout stuff.
+5) move probe "target" into the actual param list? NO:
+   don't want a new entry in tool_idx for every destination!
+6) make "outage detection system" a separate tool.
+
+Data Collector
+Gets result packet from path prober, containing extra
+info about the tool type and actual parameters used.
+Find the proper ToolID in the "ToolParamTable" indexing with
+toolname and actual_params. If no match, add new entry
+with new ID number.
+
+
+
+Manager:
+For now, just "hardwires" the tool parameters so that the
+managerclient does not need to be changed
+
+Managerclient:
+no changes for now.
+
+
+Wrapper scripts for iperf, fping, and ping:
+- iperf
+  - input: list of arguments, e.g.:  duration=5,target=plab222
+  - output: result, e.g: 500
+wrapper executes actual tool with appropriate command-lines
+wrapper outputs a key-value pair of results and error codes.
+
+
+Path Prober:  
+  
+bgmon.pl receives probe request:
+cmdtype: INIT
+toolname: iperf
+type: one-shot
+duration: 12000
+wrapper_path: /tmp/iperfwrapper
+required_params: target=plab222,period=600,port=6666,duration=5
+optional_params: 
+
+bgmon.pl stores request into "testevents"
+Test is started at appropriate time by running the wrapper_path with the argument fields. Wrapper output read from file, as is currently done.
+
+

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -46,7 +46,8 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || JAILED() || REMOTE() || PLAB());
+    if (MFS() || (JAILED() && !LINUXJAILED()) ||
+	(REMOTE() && !(REMOTEDED() || FAKEJAILED())) || PLAB());
 
 # Protos.
 sub doboot();
@@ -115,14 +116,13 @@ sub doboot()
     # Get the iface list from libsetup, which handles parsing the stuff
     # we get back from tmcd.
     #
-    if (getifconfig(\@ifacelist) != 0) {
-	fatal("Could not get ifconfig from libsetup!");
-    }
+    mygetifconfig(\@ifacelist);
     return 0
 	if (! @ifacelist);
 
+    my %oscookie = ();
     foreach my $ifconfig (@ifacelist) {
-	if (! $ifconfig->{ISVETH}) {
+	if (! $ifconfig->{ISVIRT}) {
 	    my $inet     = $ifconfig->{IPADDR};
 	    my $type     = $ifconfig->{TYPE};
 	    my $mask     = $ifconfig->{IPMASK};
@@ -132,6 +132,7 @@ sub doboot()
 	    my $aliases  = $ifconfig->{ALIASES};
 	    my $iface    = $ifconfig->{IFACE};
 	    my $settings = $ifconfig->{SETTINGS};
+	    my $lan      = $ifconfig->{LAN};
 	    my $ifrtabid = undef;
 
 	    #
@@ -147,25 +148,74 @@ sub doboot()
 		$ifrtabid = $rtabid;
 	    }
 
-	    my ($upline, $downline) =
-		os_ifconfig_line($iface, $inet, $mask,
-				 $speed, $duplex, $aliases,
-				 $type, $settings, $ifrtabid);
-		    
-	    $upcmds   .= "$upline\n    "
-		if (defined($upline));
-	    $upcmds   .= TMROUTECONFIG . " $inet up\n    "
-		if ($inet ne "");
-		
-	    $downcmds .= TMROUTECONFIG . " $inet down\n    "
-		if ($inet ne "");
-	    $downcmds .= "$downline\n    "
-		if (defined($downline));
+            #
+            # XXX: GNU Radio hack
+            #
+            # I don't want to have to change the os_ifconfig_line
+            # prototype to include the mac address yet.  It's probably
+            # the way to go, but will require changing the interface
+            # in all of the various liblocsetup.pm modules.
+            # 
+            if (defined($settings)) {
+                $settings->{'mac'} = $mac;
+            }
 
-	    # There could be routes for each alias.
-	    foreach my $alias (split(',', $aliases)) {
-		$upcmds   .= TMROUTECONFIG . " $alias up\n    ";
-		$downcmds .= TMROUTECONFIG . " $alias down\n    ";
+	    my ($upline, $downline) =
+		&os_ifconfig_line($iface, $inet, $mask,
+				 $speed, $duplex, $aliases,
+				 $type, $lan, $settings,
+				 $ifrtabid, \%oscookie);
+		    
+	    if (defined($upline) && $upline) {
+		$upcmds .= "$upline\n    ";
+		$upcmds .= TMROUTECONFIG . " $inet up\n    "
+		    if ($inet ne "");
+	    }
+		
+	    if (defined($downline)) {
+		$downcmds .= TMROUTECONFIG . " $inet down\n    "
+		    if ($inet ne "");
+		$downcmds .= "$downline\n    ";
+	    }
+
+	    # Trivially parsable map for users, which associate an IP
+	    # with a local interface. 
+	    push(@ifacemap, "$iface $inet $mac");
+	}
+	elsif ($ifconfig->{ISVIRT}
+	       && (INXENVM() || (GENVNODE() && GENVNODETYPE() eq 'openvz'))) {
+	    #
+	    # Yes, these are veths, but we config them from the inside just
+	    # like for a phys node!
+	    #
+	    my $inet     = $ifconfig->{IPADDR};
+	    my $type     = $ifconfig->{ITYPE};
+	    my $mask     = $ifconfig->{IPMASK};
+	    my $mac      = $ifconfig->{VMAC};
+	    my $speed    = $ifconfig->{SPEED};
+	    my $duplex   = $ifconfig->{DUPLEX};
+	    my $aliases  = $ifconfig->{ALIASES};
+	    my $iface    = $ifconfig->{IFACE};
+	    my $settings = $ifconfig->{SETTINGS};
+	    my $lan      = $ifconfig->{LAN};
+	    my $ifrtabid = undef;
+
+	    my ($upline, $downline) =
+		&os_ifconfig_line($iface, $inet, $mask,
+				 $speed, $duplex, $aliases,
+				 $type, $lan, $settings,
+				 $ifrtabid, \%oscookie);
+		    
+	    if (defined($upline) && $upline) {
+		$upcmds .= "$upline\n    ";
+		$upcmds .= TMROUTECONFIG . " $inet up\n    "
+		    if ($inet ne "");
+	    }
+		
+	    if (defined($downline)) {
+		$downcmds .= TMROUTECONFIG . " $inet down\n    "
+		    if ($inet ne "");
+		$downcmds .= "$downline\n    ";
 	    }
 
 	    # Trivially parsable map for users, which associate an IP
@@ -173,12 +223,14 @@ sub doboot()
 	    push(@ifacemap, "$iface $inet $mac");
 	}
 	else {
+	    my $itype	 = $ifconfig->{ITYPE};
 	    my $inet     = $ifconfig->{IPADDR};
 	    my $mask     = $ifconfig->{IPMASK};
 	    my $id       = $ifconfig->{ID};
 	    my $vmac     = $ifconfig->{VMAC};
 	    my $pmac     = $ifconfig->{PMAC};
 	    my $iface    = $ifconfig->{IFACE};
+	    my $viface   = $ifconfig->{VIFACE};
 	    my $ifrtabid = undef;
 	    my $encap    = $ifconfig->{ENCAP};
 	    my $vtag	 = $ifconfig->{VTAG};
@@ -206,14 +258,20 @@ sub doboot()
 
 	    my ($upline, $downline) =
 		os_ifconfig_veth($iface, $inet, $mask, $id, $vmac,
-				 $ifrtabid, $encap, $vtag);
+				 $ifrtabid, $encap, $vtag, $itype, \%oscookie);
 		    
-	    $upcmds   .= "$upline\n    ";
-	    $upcmds   .= TMROUTECONFIG . " $inet up\n    ";
-		
-	    $downcmds .= TMROUTECONFIG . " $inet down\n    ";
-	    $downcmds .= "$downline\n    "
-		if (defined($downline));
+	    if (defined($upline) && $upline) {
+		$upcmds   .= "$upline\n    ";
+		$upcmds   .= TMROUTECONFIG . " $inet up\n    ";
+	    }
+	    if (defined($downline)) {
+		$downcmds .= TMROUTECONFIG . " $inet down\n    ";
+		$downcmds .= "$downline\n    ";
+	    }
+
+	    # Trivially parsable map for users, which associate an IP
+	    # with a local interface. 
+	    push(@ifacemap, "$viface $inet $vmac");
 	}
     }
 
@@ -288,4 +346,58 @@ sub docleanup()
 {
     unlink $TMIFC;
     unlink $TMIFMAP;
+}
+
+#
+# Total ICK!
+#
+# We may have to retry the getifconfig call if the experiment involves
+# "vlan" devices.  Since the VLAN tag (number) comes from the switch,
+# and switch setup happens in parallel with us, it is possible that some
+# VLANs may not yet be assigned.  So we keep calling getifconfig until
+# we have tags for all such interfaces.
+#
+sub mygetifconfig($)
+{
+    my ($listref) = @_;
+
+    #
+    # How long it takes can be proportional to the number of VLANs that
+    # have to be setup--could be seconds, could be minutes.  Arbitrarily
+    # pick 10 minutes.  In the long run, it probably doesn't matter because
+    # the higher level node setup timeout is likely to trigger at around
+    # 8-10 minutes, rebooting us anyway.
+    #
+    my $maxtries = 40;
+    my $sleeptime = 15;
+
+    my @ifacelist = ();
+    if (getifconfig(\@ifacelist) != 0) {
+	fatal("Could not get ifconfig from libsetup!");
+    }
+
+    for (my $tries = 0; $tries < $maxtries; $tries++) {
+	my $bad = 0;
+	foreach my $ifconfig (@ifacelist) {
+	    if (!INXENVM() &&
+		$ifconfig->{ISVIRT} &&
+		$ifconfig->{ITYPE} eq "vlan" && $ifconfig->{VTAG} == 0) {
+		$bad++;
+	    }
+	}
+	if (!$bad) {
+	    @$listref = @ifacelist;
+	    return;
+	}
+
+	warning("$bad vlan devices do not yet have tags, trying again...");
+	sleep($sleeptime);
+
+	@ifacelist = ();
+	if (getifconfig(\@ifacelist, 1) != 0) {
+	    fatal("Could not re-get ifconfig from libsetup!");
+	}
+    }
+
+    fatal("Could not get all VLAN tags after $maxtries tries");
 }

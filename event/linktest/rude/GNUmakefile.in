@@ -1,0 +1,67 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= event/linktest/rude
+
+# be sure to change version in rude-fetch.sh too
+VERSION		= 0.70
+
+include $(OBJDIR)/Makeconf
+
+SYSTEM         := $(patsubst CYGWIN%,CYGWIN,$(shell uname -s))
+
+ifeq ($(host_cpu),arm)
+# not on stargates
+TARGETS =
+ITARGETS =
+else
+TARGETS = src/emulab-rude
+ITARGETS = rude-install crude-install
+endif
+
+all: $(TARGETS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+# Next two rules for linux, where make=gmake.
+%-am:		Makefile force
+	$(MAKE) -f Makefile $@
+
+%-recursive:	Makefile force
+	$(MAKE) -f Makefile $@
+
+src/emulab-rude:	rude-$(VERSION) config.status build-rude
+
+build-rude: Makefile
+	$(MAKE) -f Makefile all
+
+client: all
+
+rude-install: build-rude
+	$(INSTALL_PROGRAM) -s rude/rude $(DESTDIR)$(CLIENT_BINDIR)/emulab-rude
+
+crude-install: build-rude
+	$(INSTALL_PROGRAM) -s crude/crude $(DESTDIR)$(CLIENT_BINDIR)/emulab-crude
+
+client-install: $(ITARGETS)
+
+# Note: GNU make wants to pass options in MAKEFLAGS (w) that are incompatible
+# with BSD make.  So we just force configure to assume/use gmake for BSD.
+config.status:
+	MAKE=$(MAKE) $(SRCDIR)/rude-$(VERSION)/configure $(CONFIG_ARGS)
+
+rude-$(VERSION):
+	$(SRCDIR)/rude-fetch.sh $(SRCDIR)
+
+clean:
+	@if [ -r Makefile ]; then $(MAKE) -f Makefile clean; fi
+
+Makefile: config.status
+
+force: ;

@@ -1,11 +1,12 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
+use Getopt::Std;
 
 #
 # Back up the DB, rolling the base and update logs. The approach is to
@@ -20,7 +21,16 @@ use English;
 # made since backup.XXX was made). This should give you a DB that is the
 # same as backup.XXX+1. You can go back further, and just apply all the
 # subsequent update.XXX files. 
-# 
+#
+sub usage()
+{
+    print("Usage: backup [-o] [-c -y]\n");
+    exit(-1);
+}
+my $optlist = "docy";
+my $debug   = 0;
+my $opsmode = 0;
+my $clean   = 0;
 
 #
 # Configure variables
@@ -31,11 +41,21 @@ my $TBOPS       = "@TBOPSEMAIL@";
 
 my $BACKUPDIR	= "$TB/backup";
 my $LOGDIR	= "$TB/log/mysql";
+my $HOTCOPY     = "/usr/local/bin/mysqlhotcopy";
+my $MYSQLDUMP   = "/usr/local/bin/mysqldump";
+my $SETSITEVAR  = "$TB/sbin/setsitevar";
+my $DBCONF      = "$TB/etc/mysqld.pwd";
+my $TAR         = "/usr/bin/tar";
 my $BASE	= "base";
 my $UPD		= "update";
 my $SLOW	= "slowqueries";
 my $BACK	= "tbdb";
+my $BACKUPDAYS  = "30";
 my $extension;
+my $dohotcopy   = 0;
+my $dbname      = "mysql";
+my $dbuser      = "root";
+my $dbpass;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -64,6 +84,54 @@ if ($UID != 0) {
 }
 
 #
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"c"})) {
+    $clean++;
+}
+if (defined($options{"y"})) {
+    $clean++;
+}
+if (defined($options{"o"})) {
+    $opsmode = 1;
+}
+if ($opsmode && ($dohotcopy || $clean)) {
+    fatal("Cannot do hotcopy or clean mode on ops");
+}
+
+if ($clean) {
+    if (! chdir($BACKUPDIR)) {
+	fatal("Could not chdir to $BACKUPDIR: $!");
+    }
+    my $doit = ($clean > 1 ? "-delete" : "");
+
+    print "These files will be removed in $BACKUPDIR\n";
+    if ($clean == 1) {
+	print "Add the -y option to actually remove.\n";
+    }
+    system("find . \\\( -name 'tbdb.*.gz' \\\) -mtime +${BACKUPDAYS} -print $doit");
+
+    if (! chdir($LOGDIR)) {
+	fatal("Could not chdir to $LOGDIR: $!");
+    }
+    print "These files will be removed in $LOGDIR\n";
+    if ($clean == 1) {
+	print "Add the -y option to actually remove.\n";
+    }
+    system("find . \\\( -name 'base.*.gz' -o -name 'update.*.gz' ".
+	   "         -o -name 'slowqueries.*.gz' \\\) ".
+	   "-mtime +${BACKUPDAYS} -print $doit");
+    exit(0);
+}
+
+#
 # Create a temporary name for a log file and untaint it.
 #
 #
@@ -84,8 +152,29 @@ if ($logname =~ /^([-\@\w.\/]+)$/) {
 open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
 open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
-if (! chdir($BACKUPDIR)) {
-    fatal("Could not chdir to $BACKUPDIR: $!");
+if ($opsmode) {
+    require libtbdb;
+    import libtbdb;
+
+    if (`cat $DBCONF` =~ /^([\w]*)$/) {
+	$dbpass = $1;
+    }
+    else {
+	fatal("Could not get mysql password from $DBCONF!");
+    }
+    if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+	fatal("Could not connect to ops database!");
+    }
+}
+else {
+    if (! chdir($BACKUPDIR)) {
+	fatal("Could not chdir to $BACKUPDIR: $!");
+    }
+    #
+    # Let people know the system will be sluggish.
+    #
+    system("$SETSITEVAR web/message '<font color=red>".
+	   "Nightly backup in progress; system might be sluggish</font>'");
 }
 
 #
@@ -107,12 +196,28 @@ while (<IDX>) {
 close(IDX);
 print "Extension:        $extension\n";
 
+#
+# Use mysqlhotcopy if installed.
+#
+if ($dohotcopy) {
+    #
+    # We use hotcopy, so make sure the target directory we are going to use
+    # does not already exist.
+    #
+    if (-e "tbdb") {
+	system("/bin/rm -r tbdb") == 0
+	    or fatal("Could not remove old backup directory!");
+    }
+    $BACK .= ".tgz";
+}
+
 my $backname  = "$BACK.$extension";
 my $basename  = "$BASE.$extension";
 my $updname   = "$UPD.$extension";
 my $slowname  = "$SLOW.$extension";
 
-print "Backup file name: $backname\n";
+print "Backup file name: $backname\n"
+    if (!$opsmode);
 print "Base file name:   $basename\n";
 print "Update file name: $updname\n";
 print "Slow file name:   $slowname\n";
@@ -131,23 +236,44 @@ if (-e "$LOGDIR/$SLOW") {
     }
 }
 
-#
-# Do a mysqldump. This will reset the log files.
-#
-if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $backname")) {
-    fatal("mysqldump failed!");
+if ($opsmode) {
+    #
+    # This will reset the log files.
+    #
+    if (! DBQueryWarn("flush logs")) {
+	fatal("mysqladmin failed!");
+    }
 }
+elsif ($dohotcopy) {
+    #
+    # Do a hotcopy. This will reset the log files.
+    #
+    if (system("$HOTCOPY --noindices --flushlog $DBNAME $BACKUPDIR")) {
+	fatal("$HOTCOPY failed!");
+    }
 
-#
-# Compress the files.
-# 
-if (system("nice gzip $backname")) {
-    fatal("gzip $backname failed!");
+    #
+    # Tar and compress the directory.
+    # 
+    if (system("$TAR -zcf $backname $DBNAME")) {
+	fatal("$TAR -zcf $backname failed!");
+    }
 }
+else {
+    #
+    # Do a mysqldump. This will reset the log files.
+    #
+    if (system("$MYSQLDUMP --all ".
+	       "--flush-logs --lock-tables $DBNAME > $backname")) {
+	fatal("mysqldump failed!");
+    }
 
-# Should do this too, but right now I do it by hand ...
-if (0) {
-    system("find . \( -name 'tbdb.*.gz' \) -mtime +40 -print -delete");
+    #
+    # Compress the files.
+    # 
+    if (system("nice gzip $backname")) {
+	fatal("gzip $backname failed!");
+    }
 }
 
 if (! chdir($LOGDIR)) {
@@ -166,15 +292,17 @@ if (-e "$slowname" && system("nice gzip $slowname")) {
     fatal("gzip $slowname failed!");
 }
 
-# Should do this too, but right now I do it by hand ...
-if (0) {
-    system("find . \( -name 'base.*.gz' -o -name 'update.*.gz' ".
-	   "         -o -name 'slowqueries.*.gz' \) ".
-	   "-mtime +35 -print -delete");
+# Do this now that the backup is complete.
+if ($dohotcopy && -e "$BACKUPDIR/tbdb") {
+    system("/bin/rm -r $BACKUPDIR/tbdb") == 0
+	or fatal("Could not remove old backup directory!");
 }
 
 #SENDMAIL("stoller@flux.utah.edu",
 #	 "DB Backup Finished", "", undef, undef, ($logname));
+
+system("$SETSITEVAR web/message -")
+    if (!$opsmode);
 unlink("$logname");
 exit 0;
 
@@ -184,6 +312,7 @@ sub fatal($) {
     print STDERR "$msg\n";
 
     SENDMAIL($TBOPS, "DB Backup Failed", $msg, undef, undef, ($logname));
+    system("$SETSITEVAR web/message -");
     unlink("$logname");
     exit(1);
 }

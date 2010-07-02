@@ -1,11 +1,32 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+
+#
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Only admins can do this!
+#
+if (!$isadmin) {
+    USERERROR("Only TB admins can do this!", 1);
+}
+
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING,
+				 "force",      PAGEARG_BOOLEAN);
 
 #
 # Standard Testbed Header
@@ -13,38 +34,14 @@ include("showstuff.php3");
 PAGEHEADER("Request a Swap/Terminate");
 
 #
-# Only known and logged in users can end experiments.
+# Need these below
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$pcs = $experiment->PCCount();
 
-#
-# Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-
-#
-# Only admins can do this!
-#
-if (! ISADMIN($uid)) {
-    USERERROR("Only TB admins can do this!", 1);
-}
-
-#
-# Check to make sure this is a valid PID/EID tuple.
-#
-if (! TBValidExperiment($pid, $eid)) {
-    USERERROR("The experiment $eid is not a valid experiment ".
-	      "in project $pid.", 1);
-}
+echo $experiment->PageHeader();
+echo "<br>";
 
 #
 # We run this twice. The first time we are checking for a confirmation
@@ -52,41 +49,29 @@ if (! TBValidExperiment($pid, $eid)) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
-    echo <<<END
-<center><h2>Swap request canceled!</h2>
-<p>
-<a href="showexp.php3?pid=$pid&eid=$eid">Back to experiment $pid/$eid</a>
-</p></center>
-END;
-    
+if (isset($canceled) && $canceled) {
+    echo "<center><h3>Swap request canceled!</h3>
+          </center>\n";
     PAGEFOOTER();
     return;
 }
 
-# We only send to the proj leader after we've sent $tell_proj_head requests
+# We only send to the proj leader after we have sent $tell_proj_head requests
 $tell_proj_head = TBGetSiteVar("idle/cc_grp_ldrs");
 $q = DBQueryWarn("select swappable, swap_requests,
                   date_format(last_swap_req,\"%T\") as lastreq
                   from experiments
                   where eid='$eid' and pid='$pid'");
 $r = mysql_fetch_array($q);
-$swappable = $r["swappable"];
-$swap_requests = $r["swap_requests"];
-$last_swap_req = $r["lastreq"];
 
-$q=DBQueryWarn("select count(*) as c from reserved as r
-left join nodes as n on r.node_id=n.node_id 
-left join node_types as nt on n.type=nt.type 
-where nt.class='pc' and pid='$pid' and eid='$eid'");
+$swappable     = $experiment->swappable();
+$swap_requests = $experiment->swap_requests();
+$last_swap_req = $experiment->last_swap_req();
 
-$r=mysql_fetch_array($q);
-$c=$r["c"];
-
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><h3>
-Expt. '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
-      " reserved,<br>\nand has been sent $swap_requests swap request".
+           Expt. '$eid' in project '$pid' has $pcs Emulab node(s) ".
+     "reserved,<br>\nand has been sent $swap_requests swap request".
       ($swap_requests!=1?"s":"")." since it went idle.<br>\n";
     if ($swap_requests > 0) {
       echo "The most recent one was sent at $last_swap_req.<br>\n";
@@ -101,10 +86,12 @@ Expt. '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
 
     #
     # Dump experiment record.
-    # 
-    SHOWEXP($pid, $eid);
-    
-    echo "<form action='request_swapexp.php3?pid=$pid&eid=$eid' method=post>";
+    #
+    $experiment->Show();
+
+    $url = CreateURL("request_swapexp", $experiment);
+
+    echo "<form action='$url' method=post>";
     echo "<p><input type=checkbox name=force value=1>Force: ".
 	"Send message even if not idle</p>\n";
     echo "<input type=submit name=confirmed value=Confirm>\n";
@@ -117,25 +104,28 @@ Expt. '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
 }
 
 # Confirmed and ready to go...
-if ($force) {
+if (isset($force) && $force) {
     $force="-f";
-} else {
+}
+else {
     $force="";
 }
 
+STARTBUSY("Sending request");
 SUEXEC($uid, $TBADMINGROUP,
        "webidlemail $force $pid $eid", SUEXEC_ACTION_IGNORE);
-# sets some globals for us...
+CLEARBUSY();
 
 if ($suexec_retval == 0) {
     echo "<p><center>
          Message successfully sent!
          </center></p>\n";
 } elseif ($suexec_retval == 2) {
+    $url = CreateURL("request_swapexp", $experiment);
+
     echo "<p><center>
          No message was sent, because it wasn't time for a message.<br>
-	 Use the <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">Force</a>
-	 option to send a message anyway.
+	 Use the <a href=\"$url\">Force</a> option to send a message anyway.
          </center></p>\n";
 } else {
     echo "<p><center>
@@ -143,12 +133,6 @@ if ($suexec_retval == 0) {
 	 Output was:<pre>$suexec_output</pre>
          </center></p>\n";
 }
-
-echo <<<END
-<p><center>
-<a href="showexp.php3?pid=$pid&eid=$eid">Back to experiment $pid/$eid</a>
-</center></p>
-END;
 
 #
 # Standard Testbed Footer

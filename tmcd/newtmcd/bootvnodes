@@ -1,0 +1,331 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# Startup vnodes, if there are any!
+#
+# NB: This script should not be run in foreground mode on a remote node
+# when booting; if boss is down the boot will hang. On local nodes, its
+# okay to hang.
+#
+sub usage()
+{
+    print "Usage: bootvnodes [-d] [-f] [-k | -h | -r | -b | -c]\n";
+    exit(1);
+}
+my $optlist = "kdfhrcb";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Locals
+my $logname = "$LOGDIR/bootvnodes.debug";
+my $vndir   = "$VARDIR/jails";
+my $debug   = 0;
+my $daemon  = 1;
+my $reconfig= 0;
+my $action;
+
+# Prototypes
+sub prebootvnodes($$);
+sub postbootvnodes($$);
+sub bootvnode($$$);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug  = 1;
+}
+if (defined($options{"f"})) {
+    $daemon = 0;
+}
+if (defined($options{"r"})) {
+    $action = "reboot";
+}
+if (defined($options{"k"})) {
+    $action = "kill";
+}
+if (defined($options{"h"})) {
+    $action = "halt";
+}
+if (defined($options{"b"})) {
+    $action = "boot";
+}
+if (defined($options{"c"})) {
+    $reconfig = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# We need to know this below.
+my $sysname = `uname -s`;
+chomp($sysname);
+my $islinux = ($sysname eq "Linux");
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if ($daemon && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# This applies to whatever vnodes are running. Do it and exit.
+# 
+if (defined($action) && !$reconfig) {
+    opendir(DIR, "$vndir") or
+	die("Cannot opendir $vndir: $!\n");
+    my @files = readdir(DIR);
+    closedir(DIR);
+
+    foreach my $file (@files) {
+	if ($file =~ /^((?:pc|homenet)vm[-\w]*)$/) {
+	    bootvnode($1, $action, (-e "$vndir/$file/fakejail" ? 0 : 1));
+	}
+    }
+    exit(0);
+}
+
+my %newvnodelist = ();
+my %curvnodelist = ();
+my $fakejails = 0;
+
+#
+# Get the current set of vnodes that are supposed to be running on
+# this node.
+#
+my %tmccresults;
+
+if (tmcc(TMCCCMD_VNODELIST, undef, \%tmccresults) < 0) {
+    die("*** WARNING: Could not get vnode list from server!\n");
+}
+
+my $rptr = $tmccresults{'vnode'};
+if (ref $rptr ne 'ARRAY') {
+	$rptr = [ $ref ];
+}
+foreach my $vnode (@$rptr) {
+	my $vnodeid = $$vnode{'vnodeid'};
+	my $jailed = $$vnode{'jailed'};
+	if ($vnodeid =~ /^VNODEID=([-\w]+)$/ && $jailed =~ /^JAILED=(\d)$/) {
+		$newvnodelist{$vnodeid} = $jailed;
+		$fakejails++ if ($jailed eq "0");
+	}
+	else {
+		warn("*** WARNING: Skipping bad subnodeid: 'VNODEID=$vnodeid JAILED=$jailed'\n");
+	}
+}
+
+#
+# If doing a reconfig, get the current set of vnodes that are running.
+# We want to compare that list against the list we just got from tmcd.
+#
+if ($reconfig) {
+    opendir(DIR, "$vndir") or
+	die("Cannot opendir $vndir: $!\n");
+    my @files = readdir(DIR);
+    closedir(DIR);
+
+    foreach my $file (@files) {
+	if ($file =~ /^((?:pc|homenet)vm[-\w]*)$/) {
+	    if (-e "$vndir/$file/fakejail") {
+		$fakejails++;
+		$curvnodelist{$1} = 0;
+	    } else {
+		$curvnodelist{$1} = 1;
+	    }
+	}
+    }
+
+    #
+    # Reboot nodes that are running and in the current list from tmcd.
+    # Kill nodes that are running but not in the current list from tmcd.
+    #
+    foreach my $vnode (sort(keys(%curvnodelist))) {
+	if (exists($newvnodelist{$vnode})) {
+	    bootvnode($vnode,
+		      (defined($action) ? $action : "reboot"),
+		      $newvnodelist{$vnode});
+	    delete($newvnodelist{$vnode});
+	}
+	else {
+	    bootvnode($vnode, "kill", $curvnodelist{$vnode});
+	}
+    }
+}
+# XXX Exit if specific action requested, and it was not "boot"
+exit(0)
+    if (defined($action) && $action ne "boot");
+
+# Exit if nothing left to do (no new vnodes).
+exit(0)
+    if (! scalar(keys(%newvnodelist)));
+
+prebootvnodes(\%curvnodelist, \%newvnodelist)
+    if (!$fakejails);
+
+foreach my $vnode (sort(keys(%newvnodelist))) {
+    # Blocks until mostly setup. 
+    bootvnode($vnode, "boot", $newvnodelist{$vnode});
+}
+
+postbootvnodes(\%curvnodelist, \%newvnodelist)
+    if (!$fakejails);
+
+exit(0);
+
+#
+# Prepare the vnode host prior to individual vnode setup
+# Takes references to the current and new vnode hashes.
+#
+sub prebootvnodes($$)
+{
+    my ($cvn, $nvn) = @_;
+
+    #
+    # For local vnodes, create the extra FS for filesystems and other state.
+    # This will fail if it already exists, so just keep going.
+    #
+    if (!REMOTE()) {
+	my $mntdir = $islinux ? "/vservers" : $vndir;
+	system("mkextrafs.pl $mntdir");
+    }
+
+    #
+    # Symlink /local into it.
+    #
+    if (! -e "/local") {
+	system("ln -s " . LOCALROOTFS() . " /local");
+    }
+
+    #
+    # XXX OS dependent stuff.  Should move elsewhere
+    #
+    if ($islinux) {
+	return;
+    }
+
+    #
+    # Make sure enough vn devices exist
+    #
+    for (my $i = 0; $i < scalar(keys(%$nvn)) + scalar(keys(%$cvn)); $i++) {
+	my $dev = "vn${i}";
+	if (! -e "/dev/${dev}c") {
+	    system("(cd /dev; ./MAKEDEV $dev)");
+	}
+    }
+
+    #
+    # XXX tweak IP interrupt queue size to accomodate up to 8 x 100Mb
+    # trivial links XXX turn on local hack to retry on NFS EACCES
+    # errors (thanks mountd!)
+    #
+    system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
+    system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
+
+    #
+    # XXX grossed out yet?  Try this one: the mount command will HUP mountd
+    # after every successful mount.  Thus if mounts in one jail overlap NFS
+    # activity in another, the latter may be randomly killed off.
+    #
+    # Elegant solution: rename the mountd.pid file so mount cannot find it!
+    # XXX hmm...mountd_sux hack above should take care of this, and we need
+    # to hup mountd when we modify the exports file.
+    #
+    rename("/var/run/mountd.pid", "/var/run/mountd.thisreallysux")
+	if (-e "/var/run/mountd.pid");
+}
+
+#
+# Final setup of vnode host after individual vnode setup
+# Takes references to the current and new vnode hashes.
+#
+sub postbootvnodes($$)
+{
+    my ($cvn, $nvn) = @_;
+
+    #
+    # XXX OS dependent stuff.  Should move elsewhere
+    #
+    if ($islinux) {
+	return;
+    }
+
+    my $PIDFILE = "/var/run/progagent.pid";
+
+    foreach my $vnode (keys(%$nvn)) {
+	system("rtprio 15 -`cat $vndir/$vnode/root/$PIDFILE`")
+	    if (-e "$vndir/$vnode/root/$PIDFILE");
+    }
+}
+
+#
+# Helper function to boot/kill/halt/reboot a specific vnode.
+#
+sub bootvnode($$$)
+{
+    my ($vnode, $action, $jailed) = @_;
+    my $opt;
+    my $act;
+
+    if ($action eq "halt") {
+	$opt = "-h";
+	$act = "Halting";
+    }
+    elsif ($action eq "reboot") {
+	$opt = "-r";
+	$act = "Rebooting";
+    }
+    elsif ($action eq "kill") {
+	$opt = "-k";
+	$act = "Killing";
+    }
+    else {
+	$opt = "-b";
+	$act = "Booting";
+    }
+    $opt .= ($jailed ? " -jVt" : " -i");
+    
+    print "$act vnode $vnode ...\n";
+    system("vnodesetup $opt $vnode");
+    return($?);
+}

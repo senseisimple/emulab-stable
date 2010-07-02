@@ -1,0 +1,29 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+BEGIN {
+  #add localcpan path to library search path
+  if (-f glob("~/lib/perl5/Test/Harness.pm")) {
+    my $localcpan_path = glob('~/lib/perl5');
+    my $p5l = $ENV{PERL5LIB};
+    unless ( (defined $p5l) && ($p5l =~ /$localcpan_path/)) {
+      my $sep = (defined $p5l) ? ":" : "";
+      $ENV { PERL5LIB} .= "$sep" . " $localcpan_path";
+      push @INC, $localcpan_path;
+    }
+    push @INC, $localcpan_path;
+  }
+  $ENV{PERL5LIB} .= ":tests";
+}
+
+use lib qw(lib tests);
+use SemiModern::Perl;
+use Data::Dumper;
+use TBConfig;
+use TestBed::Harness;
+
+my $testfile = shift @ARGV;
+runharness($testfile);

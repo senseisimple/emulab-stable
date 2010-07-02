@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -66,8 +66,15 @@ DEFAULT_LOGHOLES = ["/var/emulab/logs", "/local/logs"]
 
 DELAYLOG2XPLOT = os.path.join(prefix, "bin", "delaylog2xplot")
 
+MERGECAP = "/usr/X11R6/bin/mergecap"
+TCPTRACE = "/usr/local/bin/tcptrace"
+TEVC     = os.path.join(prefix, "bin", "tevc")
+
 PID = None
 EID = None
+
+COLLAB_PW = None
+DPDBNAME  = None
 
 try:
     pw = pwd.getpwuid(os.getuid())
@@ -93,6 +100,11 @@ VERBOSITY = VERBOSITY_HUMAN
 
 SERVER = None
 
+# For compressfile stuff
+COMPRESSFILE_THRESHOLD  = 512 * 1024
+COMPRESSFILE_EXTENSIONS = [ ".zip", ".gz", ".bz2" ]
+COMPRESSFILE_PROGRAM    = "/usr/bin/gzip"
+
 OSIDS = {}
 
 JOB_TRIES = 3
@@ -108,30 +120,6 @@ if len(RSYNC) == 0:
     sys.stderr.write("internal error: RSYNC is empty\n")
     sys.exit(2)
     pass
-
-IDENTITY = None
-
-try:
-    auth = open(os.path.join(HOME, ".ssh", "authorized_keys"), "r").read()
-
-    for (pub, full) in ((os.path.join(HOME, ".ssh", "identity.pub"),
-                         (1, os.path.join(HOME, ".ssh", "identity"))),
-                        (os.path.join(HOME, ".ssh", "id_rsa.pub"),
-                         (2, os.path.join(HOME, ".ssh", "id_rsa")))):
-        try:
-            idpub = open(pub, "r").read()
-            
-            if auth.find(idpub) != -1:
-                IDENTITY = full
-                break
-            pass
-        except IOError:
-            pass
-        pass
-    pass
-except IOError:
-    pass
-
 
 def loghole_include(path):
     retval = ""
@@ -264,7 +252,7 @@ def usage():
 # Print the usage statement for the "sync" action.
 #
 def sync_usage():
-    print "Usage: loghole sync [-nPs] [-r remotedir] [-l localdir] [node1 ...]"
+    print "Usage: loghole sync [-nPsR] [-r remotedir] [-l localdir] [node1 ...]"
     print
     print "Synchronize the experiment's log holes with a local directory."
     print
@@ -284,6 +272,8 @@ def sync_usage():
     print "               Do not do any additional post processing."
     print "  -s, --snapshot"
     print "               Send a SNAPSHOT event to any link trace agents."
+    print "  -R, --root"
+    print "               Use sudo on remote nodes to read files as root."
     print "  node1 ...    The names of the virtual or physical nodes that "
     print "               should be synced.  The default behavior is to sync "
     print "               all of the nodes in an experiment."
@@ -446,7 +436,7 @@ def validate_usage():
 # Print the usage statement for the "clean" action.
 #
 def clean_usage():
-    print "Usage: loghole clean [-fne] [node1 ...]"
+    print "Usage: loghole clean [-fneR] [node1 ...]"
     print
     print "Clean the experiment log directory by removing any subdirectories"
     print "and/or clean the log holes on the nodes.  The default behavior is"
@@ -456,6 +446,7 @@ def clean_usage():
     print "  -f, --force         Do not ask for confirmation."
     print "  -n, --nodes         Clean only the nodes log directories."
     print "  -e, --experiment    Clean only the experiment log directory."
+    print "  -R, --root          Use sudo to clean nodes as root."
     print
     print "Examples:"
     print "  $ loghole clean"
@@ -900,34 +891,42 @@ def do_show(args):
 # @param *args The list of directories to sync.
 # @retval The exit status of the rsync command-line.
 #
-def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
-          delay = 0):
+def rsync(host, base, dlpath = None, paths = ["/"], port = None,
+          output = False, delay = 0, as_root = False, relative = True):
     global RSYNC, HOME, DEBUG
     
     retval = 0
     for path in paths:
-        fullpath = os.path.join("", base, path[1:], "")
+        if relative == True:
+            fullpath = os.path.join("", base, path[1:], "")
+        else:
+            fullpath = base
+            pass
         try:
             os.makedirs(fullpath)
             pass
         except OSError:
             pass
         cmd = [RSYNC,
-               "-rtgoDlz",
+               "-rtgoDl",
+               "-z", # rsync compression, ssh compression turned off below
                "-v", # XXX
-               "--copy-unsafe-links",
-               "--include-from=" + dlpath]
+               "--copy-unsafe-links"]
+        if dlpath != None:
+            cmd.append("--include-from=" + dlpath)
+            pass
         if VERBOSITY > VERBOSITY_HUMAN:
             cmd.append("-v")
             pass
         ssh_args = ("ssh -o BatchMode=yes -o StrictHostKeyChecking=no "
+                    + "-o Compression=no "
                     + "-o UserKnownHostsFile="
                     + os.path.join(HOME, ".ssh", "emulab_known_hosts"))
-        if IDENTITY:
-            ssh_args += " -o Protocol=%d -i %s" % IDENTITY
-            pass
         if port:
             ssh_args += " -p " + str(port)
+            pass
+        if as_root:
+            cmd.append("--rsync-path=sudo rsync")
             pass
         cmd.extend([("--rsh=" + ssh_args),
                     host + ":" + path,
@@ -955,7 +954,14 @@ def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
                                      0664)
                         os.dup2(fd, 2)
                         pass
-                    os.execve(RSYNC, cmd, os.environ)
+                    try:
+                        os.execve(RSYNC, cmd, os.environ)
+                    except OSError, e:
+                        sys.stderr.write(
+                            "error: unable to exec '%s' - %s\n"
+                            "error: args=%s\n"
+                            % (RSYNC, e.strerror, `cmd`))
+                        pass
                     os._exit(127)
                     pass
                 except:
@@ -967,7 +973,7 @@ def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
     
     return retval
 
-def rmstar(host, port, delay, *args):
+def rmstar(host, port, delay, as_root, *args):
     global HOME, DEBUG
 
     retval = 0
@@ -980,7 +986,10 @@ def rmstar(host, port, delay, *args):
         if port:
             cmd.extend([ "-p", str(port) ])
             pass
-        cmd.extend([ host, "rm", "-rf", path ])
+        cmd.extend([ host ])
+        if as_root:
+            cmd.extend(["sudo"])
+        cmd.extend(["rm", "-rf", path ])
         if DEBUG:
             print `cmd`
             retval = -1
@@ -1010,6 +1019,36 @@ def print_status(msg):
     sys.stdout.flush()
     
     return
+
+#
+# Compress a file. Return False if file is skipped for whatever reason.
+#
+def compressfile(root, file, threshold):
+    pathname = os.path.join(root, file)
+    if not os.path.exists(pathname):
+        return False
+    statinfo = os.stat(pathname)
+    mode     = statinfo[stat.ST_MODE]
+    size     = statinfo[stat.ST_SIZE]
+    # Only regular files
+    if not stat.S_ISREG(mode):
+        return False
+    # Only files greater then threshold
+    if not size >= threshold:
+        return False
+    first, last = os.path.splitext(pathname)
+    # Try to avoid compressing things that are already compressed.
+    if last in COMPRESSFILE_EXTENSIONS:
+        return False
+    # Lets be careful of foo and foo.gz, which is from a previous run.
+    if os.path.exists(pathname + ".gz"):
+        os.unlink(pathname + ".gz")
+        pass
+    print_status("Compressing " + pathname + " --> " + pathname + ".gz\n")
+    exitval = os.system(COMPRESSFILE_PROGRAM + " %s " % (pathname,))
+    if exitval != 0:
+        return False
+    return True
 
 def print_job_status(mode, hosts, jobs, hoststatus, hoststart):
     if not sys.stdout.isatty() or VERBOSITY < VERBOSITY_HUMAN:
@@ -1077,37 +1116,14 @@ def making_progress(jobs, logsize, logdir):
 # @param traces Sequence of dictionaries describing the active link tracers.
 #
 def trace_pre(traces):
-    at = address_tuple()
-    at.eventtype = "SNAPSHOT"
-    at.expt = "%s/%s" % (PID, EID)
-    at.scheduler = 1
-
-    tv = timeval()
-    tv.tv_sec = int(time.time())
+    if len(traces) == 0:
+        return;
     
-    notified = {}
-    ec = EventClient(server="event-server",
-                     keyfile=os.path.join("/proj", PID, "exp", EID,
-                                          "tbdata", "eventkey"))
-
-    for trace in traces:
-        if trace["trace_type"] == "monitor":
-            continue
-        
-        lvn = trace["linkvname"]
-        if lvn not in notified:
-            at.objname = "%s-tracemon" % (lvn,)
-            en = ec.create_notification(at)
-            ec.schedule(en, tv)
-            notified[lvn] = 1
-            pass
-        
+    rc = os.system(TEVC + " -w -t 30 -e %s/%s now __all_tracemon snapshot" %
+                   (PID, EID))
+    if rc != 0:
+        print "Could not SNAPSHOT the trace agents!";
         pass
-
-    if len(notified) > 0:
-        time.sleep(1)
-        pass
-    
     return
 
 ##
@@ -1118,6 +1134,8 @@ def trace_pre(traces):
 #
 def trace_post(link2trace):
     lpc = 1
+    sql = []
+    
     for linkvname in link2trace.keys():
         print_status("linktrace post processing %d/%d  " %
                      (lpc, len(link2trace)))
@@ -1130,13 +1148,21 @@ def trace_post(link2trace):
             al = args.get(ext, [])
             al.append(filename)
             args[ext] = al
+
+            stuff = base.split(".");
+            trace_db = link2trace[linkvname][stuff[0]]["trace_db"]
+            if trace_db != "0":
+                sql.append(linkvname + "/" + filename)
+                pass
             pass
         for ext in args.keys():
             if ext == ".recv":
                 continue
             dst = "__all.recv%s" % (ext,)
             print_status(".")
-            os.system("mergecap -w %s %s" % (dst, " ".join(args[ext])))
+            if os.path.exists(MERGECAP):
+                os.system(MERGECAP + " -w %s %s" % (dst, " ".join(args[ext])))
+                pass
             print_status(".")
             if ext != ".0":
                 if not os.path.exists(ext[1:]):
@@ -1145,7 +1171,9 @@ def trace_post(link2trace):
                 os.chdir(ext[1:])
                 dst = os.path.join(os.path.pardir, dst)
                 pass
-            os.system("tcptrace -G %s > .tcptrace.out" % (dst,))
+            if os.path.exists(TCPTRACE):
+                os.system(TCPTRACE + " -y -G %s > .tcptrace.out" % (dst,))
+                pass
             if ext != ".0":
                 os.chdir(os.path.pardir)
                 pass
@@ -1159,6 +1187,41 @@ def trace_post(link2trace):
         print_status("\n")
         pass
 
+    # Now do the DB enters.
+    if len(sql) != 0:
+        SNORTCONF  = ".snort.conf"
+        SNORTOUT   = ".snort.out"
+        USERRULES  = "snort.rules"
+        
+        print_status("Entering trace data into mysql DB %s" % DPDBNAME)
+
+        # snort needs a config file to do anything useful
+        os.system("/bin/rm -f %s %s" % (SNORTCONF, SNORTOUT))
+        
+        fp = open(SNORTCONF, 'w')
+        os.chmod(SNORTCONF, 0600)
+        fp.write("output database: log, mysql, user=%s dbname=%s password=%s\n" %
+                 (USER, DPDBNAME, COLLAB_PW))
+
+        # Allow user to override default rules.
+        if os.path.exists(USERRULES):
+            fp.write("include ./%s" % (USERRULES,))
+            pass
+        else:
+            fp.write("log ip any any -> any any\n")
+            pass
+        fp.close()
+        
+        for filename in sql:
+            print_status(".")
+            os.system("snort -k none -l ./ -c ./%s -r %s > %s 2>&1" %
+                      (SNORTCONF, filename, SNORTOUT))
+            print_status(".")
+            pass
+        print_status("\n")
+        os.system("/bin/rm -f %s" % (SNORTCONF,))
+        pass
+    
     return
 
 ##
@@ -1169,23 +1232,27 @@ def trace_post(link2trace):
 #
 # @param args Action-specific command line arguments.
 #
-def do_sync(args, mode="sync", must_be_active=1):
+def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     from emulabclient import RESPONSE_SUCCESS
     global OSIDS, SERVER, DOT_LOGHOLES, JOB_PROGRESS_INDEX
+    global DPDBNAME, COLLAB_PW
     
     retval = 0
+    delete_dir = False
 
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    # Special dir for local program agent (or other stuff).
+    opsdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "ops")
 
     standard_logholes = True
     snapshot_traces = False
     post_process = True
+    compress = False
     extra_logholes = []
 
     try:
-        opts, node_list = getopt.getopt(args, "nl:r:Ps", [
-            "no-standard", "local=", "remote=",
-            ])
+        opts, node_list = getopt.getopt(args, "nl:r:PsdcR", [
+            "no-standard", "local=", "remote=", "delete", "compress", "root"])
         for opt, val in opts:
             if opt in ("-n", "--no-standard"):
                 standard_logholes = False
@@ -1205,6 +1272,14 @@ def do_sync(args, mode="sync", must_be_active=1):
                 pass
             elif opt in ("-s", "--snapshot"):
                 snapshot_traces = True
+                pass
+            elif opt in ("-d", "--delete"):
+                delete_dir = True
+                pass
+            elif opt in ("-c", "--compress"):
+                compress = True
+            elif opt in ("-R", "--root"):
+                as_root = True
                 pass
             pass
         pass
@@ -1259,6 +1334,8 @@ def do_sync(args, mode="sync", must_be_active=1):
         info_method = getattr(SERVER, "experiment.info")
         osinfo_method = getattr(SERVER, "osid.info")
         ssh_method = getattr(SERVER, "node.sshdescription")
+        collabpw_method = getattr(SERVER, "user.collabpassword")
+        dpinfo_method = getattr(SERVER, "experiment.dpinfo")
 
         # Get any bits of information we need from the RPC server.
         physical = info_method(PACKAGE_VERSION, {
@@ -1277,9 +1354,15 @@ def do_sync(args, mode="sync", must_be_active=1):
             "proj" : PID,
             "exp" : EID
             })
+
+        collab_data = collabpw_method(PACKAGE_VERSION, { })
+        dpinfo_data = dpinfo_method(PACKAGE_VERSION, { "proj" : PID,
+                                                       "exp" : EID, })
         
         if ((physical["code"] != RESPONSE_SUCCESS) or
             (traces["code"] != RESPONSE_SUCCESS) or
+            (collab_data["code"] != RESPONSE_SUCCESS) or
+            (dpinfo_data["code"] != RESPONSE_SUCCESS) or
             (ssh_data["code"] != RESPONSE_SUCCESS)):
             sys.stderr.write("error: xmlrpc failed - %s\n" %
                              (physical["output"],))
@@ -1289,6 +1372,8 @@ def do_sync(args, mode="sync", must_be_active=1):
             physical = physical["value"]
             traces = traces["value"]
             ssh_data = ssh_data["value"]
+            COLLAB_PW = collab_data["value"]
+            DPDBNAME  = dpinfo_data["value"]["dbname"]
 
             if snapshot_traces:
                 trace_pre(traces)
@@ -1319,6 +1404,22 @@ def do_sync(args, mode="sync", must_be_active=1):
                     sys.stderr.write("warning: '%s' is down, its logs will "
                                      "not be retrieved\n" % (host[1],))
                     pass
+                pass
+
+            #
+            # Do the local ops directory first.
+            #
+            if os.path.exists(opsdir):
+                if mode == "sync":
+                    pid = rsync("localhost", logdir,
+                                paths = [opsdir], output = True,
+                                relative = False)
+                    pass
+                elif mode == "clean":
+                    pid = rmstar("localhost", None, 0, False, opsdir + "/*")
+                    pass
+                else:
+                    assert 0
                 pass
 
             known_nodes = sets.Set(node_list) & (phosts | vhosts)
@@ -1359,7 +1460,9 @@ def do_sync(args, mode="sync", must_be_active=1):
                         continue
                     else:
                         vos = OSIDS[physical[vhost]["osid"]]
-                        if "ssh" not in vos["osfeatures"]:
+                        if ("osfeatures" not in vos or
+                            not vos["osfeatures"] or
+                            "ssh" not in vos["osfeatures"]):
                             if VERBOSITY > VERBOSITY_HUMAN:
                                 sys.stderr.write("warning: %s OS, %s, does "
                                                  "not support ssh, skipping\n"
@@ -1377,15 +1480,17 @@ def do_sync(args, mode="sync", must_be_active=1):
                         pass
                     if mode == "sync":
                         pid = rsync(phost, os.path.join(logdir, vhost),
-                                    dlhandle.name,
+                                    dlpath = dlhandle.name,
                                     port = ssh_data[phost].get("port", None),
                                     output = True,
-                                    delay = delay)
+                                    delay = delay,
+                                    as_root = as_root)
                         pass
                     elif mode == "clean":
                         pid = rmstar(phost,
                                      ssh_data[phost].get("port", None),
                                      delay,
+                                     as_root,
                                      "/local/logs/*")
                         pass
                     else:
@@ -1494,9 +1599,9 @@ def do_sync(args, mode="sync", must_be_active=1):
             for trace in traces:
                 if trace["trace_type"] == "monitor":
                     continue
-                
-                tl = link2trace.get(trace["linkvname"], [])
-                tl.append(trace)
+
+                tl = link2trace.get(trace["linkvname"], {})
+                tl[trace["vnode"]] = trace
                 link2trace[trace["linkvname"]] = tl
                 
                 fullpath = os.path.join(logdir, trace["linkvname"])
@@ -1552,7 +1657,19 @@ def do_sync(args, mode="sync", must_be_active=1):
             
             pass
         pass
+
+    # Do compression
+    if compress:
+        do_compress("", as_root = as_root)
+        pass
     
+    # Schedule clean
+    if delete_dir:
+        os.chdir(logdir)
+        open(CLEANFILE, 'w')
+        os.chmod(CLEANFILE, 0664)
+        pass
+
     return retval
 
 ##
@@ -1855,7 +1972,7 @@ def validate_visitor(arg, dirname, names):
                 
                 status = {}
                 for line in open(os.path.join(dirname, name)):
-                    (key, value) = line.split("=")
+                    (key, value) = line.split("=",1)
                     status[key] = value
                     pass
                 
@@ -1927,11 +2044,12 @@ def do_clean(args):
     do_nodes = 1
     do_experiment = 1
     confirm_msg = "Are you sure you want to remove ALL log files? [y/N] "
+    as_root = False
 
     # Parse action-specific options and arguments.
     try:
-        opts, args = getopt.getopt(args, "fne", [
-            "force", "nodes", "experiment", ])
+        opts, args = getopt.getopt(args, "fneR", [
+            "force", "nodes", "experiment", "root", ])
         for opt, val in opts:
             if opt in ("-f", "--force"):
                 force = 1
@@ -1948,11 +2066,13 @@ def do_clean(args):
                 confirm_msg = ("Are you sure you want to remove log files "
                                "from the experiment log directory? [y/N] ")
                 pass
+            elif opt in ("-R", "--root"):
+                as_root = True
             pass
         pass
     except getopt.error, e:
         print e.args[0]
-        archive_usage()
+        clean_usage()
         return 2
 
     if not force:
@@ -1982,8 +2102,75 @@ def do_clean(args):
         pass
     
     if do_nodes:
-        do_sync(args, mode="clean", must_be_active=0)
+        do_sync(args, mode="clean", must_be_active=0, as_root = as_root)
         pass
+
+    return retval
+
+##
+# Performs the "compress" action, which compresses logs in the experiment
+# log directory.
+#
+# @param args Action-specific command line arguments.
+#
+def do_compress(args, as_root=False):
+    retval     = 0
+    force      = 0
+    as_root    = False
+    compressed = []
+
+    # Parse action-specific options and arguments.
+    try:
+        opts, args = getopt.getopt(args, "fr", [
+            "force", "root", ])
+        for opt, val in opts:
+            if opt in ("-f", "--force"):
+                force = 1
+                pass
+            elif opt in ("-r", "--root"):
+                as_root = True
+            pass
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        clean_usage()
+        return 2
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    os.chdir(logdir)
+    for entry in os.listdir(logdir):
+        path = os.path.join(logdir, entry)
+        if os.path.isdir(path):
+            for root, dirs, files in os.walk(path, topdown=False):
+                for file in files:
+                    if compressfile(root, file, COMPRESSFILE_THRESHOLD):
+                        filename = os.path.join(root, file)
+                        relname  = filename[len(logdir) + 1:]
+                        compressed.append(relname)
+                        pass
+                    pass
+                pass
+            pass
+        else:
+            if compressfile(logdir, entry, COMPRESSFILE_THRESHOLD):
+                compressed.append(entry)
+                pass
+            pass
+        pass
+
+    # Write out list of files compressed in this run.
+    compressname = ".compressed"
+    if os.path.exists(compressname):
+        os.unlink(compressname)
+        pass
+    fp = open(compressname, 'w')
+    for file in compressed:
+        fp.write(file)
+        fp.write("\n")
+        pass
+    fp.close();
 
     return retval
 
@@ -2127,6 +2314,12 @@ try:
             pass
         elif opt in ("-a", "--all"):
             all_experiments = True
+            if 'get' or 'sync' in ACTIONS:
+                raise getopt.error(
+                    "\nError: You cannot use -a/--all and sync together.  When using the 'sync' action\n"
+                    "       you must specify an experiment with the -e flag or the --experiment flag\n"
+                    "       or be in an experiment directory. \n")
+                pass
             pass
         elif opt in ("-P", "--port"):
             XMLRPC_PORT = int(val)

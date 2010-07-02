@@ -1,0 +1,16 @@
+#
+# Add sitevariable for subboss dhcpd configuration updates
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    DBQueryFatal("INSERT INTO `sitevariables` VALUES ".
+                 "('watchdog/dhcpdconf',NULL,'5','Time in minutes between DHCPD configuration updates (0==never update)',0)")
+	if (!TBSiteVarExists("watchdog/dhcpdconf"));
+
+    return 0;
+}
+1;

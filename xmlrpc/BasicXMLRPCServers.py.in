@@ -1,0 +1,216 @@
+#!/usr/local/bin/python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+# 
+
+#
+# A couple simple XMLRPC server extensions.
+#
+
+import os
+import pwd
+import xmlrpclib
+import SimpleXMLRPCServer
+import SocketServer
+import sys
+import types
+import exceptions
+import traceback
+
+debug = True
+
+# XXX: hack.
+# Have to override the
+# SimpleXMLRPCServer.SimpleXMLRPCDispatcher._marshaled_dispatch method
+# so that we can marshal None values.  If SimpleXMLRPCDispatcher changes,
+# this will need to be hacked so it complies again...
+class AllowNoneOptXMLRPCDispatcher(SimpleXMLRPCServer.SimpleXMLRPCDispatcher):
+    #
+    # Taken straight from SimpleXMLRPCServer.py in the python stdlib.
+    #
+    def _marshaled_dispatch(self, data, dispatch_method = None):
+        params, method = xmlrpclib.loads(data,)
+
+        # generate response
+        try:
+            if dispatch_method is not None:
+                response = dispatch_method(method, params)
+            else:
+                response = self._dispatch(method, params)
+            # wrap response in a singleton tuple
+            response = (response,)
+            response = xmlrpclib.dumps(response, methodresponse=1,
+                                       allow_none=self._allow_none)
+        except Fault, fault:
+            response = xmlrpclib.dumps(fault,allow_none=self._allow_none)
+        except:
+            # report exception back to server
+            response = xmlrpclib.dumps(
+                xmlrpclib.Fault(1, "%s:%s" % (sys.exc_type, sys.exc_value)),
+                allow_none=self._allow_none
+                )
+
+        return response
+    
+    pass
+
+class NetworkAuthFault(xmlrpclib.Fault):
+    pass
+
+class SimpleObjectXMLRPCServer(SocketServer.ThreadingMixIn,
+                               SimpleXMLRPCServer.SimpleXMLRPCServer,
+                               AllowNoneOptXMLRPCDispatcher,
+                               object):
+    """
+    Extension to the simple xmlrpc server that registers member functions
+    of a class as xmlrpc functions, so they can be called as
+    <classname>.<method>.  The whole point is to be compatible with existing
+    Emulab xmlrpc infrastructure (i.e., emulabserver.py classes).
+    """
+    def __init__(self,addr,**kwargs):
+        super(SimpleObjectXMLRPCServer,self).__init__(addr,**kwargs)
+        self.classfuncs = dict({})
+        self.classinitargs = dict({})
+
+        self._allow_none = True
+
+        return
+
+    """
+    Register all non-private functions, or only the supplied method names,
+    in a class as RPCs.  Passes initargs to __init__ on class instantiation.
+    """
+    def register_class_functions(self,myclass,methods=None,initargs=()):
+        for f in dir(myclass):
+            if (type(myclass.__dict__[f]) == types.FunctionType \
+                and not f.startswith('_')) \
+                or (methods != None and f in methods):
+                myname = myclass.__name__ + "." + f
+                self.register_function(myclass.__dict__[f],myname)
+                self.classfuncs[myname] = myclass
+                self.classinitargs[myname] = initargs
+                pass
+            pass
+        return
+
+    """
+    Add class object instantiation prior to method calls on the object for
+    rpc methods added via register_class_functions; else use normal _dispatch.
+    """
+    def _dispatch(self,method,params):
+        if self.classfuncs.has_key(method):
+            try:
+                myclass = self.classfuncs[method]
+                myargs = self.classinitargs[method]
+                obj = myclass(*myargs)
+                # ugh, nasty way to get reflectiveness
+                return myclass.__dict__[self.funcs[method].func_name](obj,
+                                                                      *params)
+            except:
+                traceback.print_exc()
+            pass
+        else:
+            return super(SimpleObjectXMLRPCServer,self)._dispatch(method,params)
+        pass
+
+    pass
+
+class InetAclXMLRPCServer(SimpleObjectXMLRPCServer):
+
+    def __init__(self,addr,netacllist=[],**kwargs):
+        super(InetAclXMLRPCServer,self).__init__(addr,**kwargs)
+
+        self.acllist = []
+        
+        for acl in netacllist:
+            explicitmask = False
+            sa = acl.split('/')
+            matchbits = 32
+            if len(sa) > 1:
+                explicitmask = True
+                matchbits = int(sa[1])
+                pass
+            
+            sa = sa[0].split('.')
+            if sa[len(sa)-1] == '':
+                sa[len(sa)-1] = 0
+                pass
+            if (len(sa) < 4):
+                for i in range(len(sa)-1,4):
+                    sa[i] = 0
+                    pass
+                pass
+            # 192.168/16 == 192.168.0.0
+            if not explicitmask:
+                for i in range(len(sa)-1,-1,-1):
+                    if (sa[i]) == 0:
+                        matchbits = matchbits - 8
+                    else:
+                        break
+                    pass
+                # 0.0.0.0 == all
+                if i == 0:
+                    matchbits = 0
+                    pass
+                pass
+                
+            shiftamt = 24
+            netbits = 0
+            for i in range(0,4):
+                netbits = netbits | ((int(sa[i]) & 0xff) << shiftamt)
+                shiftamt -= 8
+                pass
+
+            mask = 0
+            for i in range(31,matchbits-1,-1):
+                mask |= (0x1 << i)
+                pass
+
+            # now we can check addresses via
+            # if ((addr|netbits)&mask == netbits); then valid.
+            if debug:
+                print "allowing from %s: net=%s,mask=%s" \
+                      % (str(acl),str(netbits),str(mask))
+            self.acllist.append((netbits,mask))
+            pass
+        
+        return
+
+    def verify_request(self,request,client_address):
+        if debug:
+            print "request = '" + str(request) + "'"
+            print "client_address = '" + str(client_address) + "'"
+            pass
+
+        if self.acllist == None or self.acllist == []:
+            if debug:
+                print "no acls, verify_request returning True"
+                pass
+            return True
+
+        (cip,cport) = client_address
+        match = False
+        clientbits = 0
+        sa = cip.split('.')
+        shiftamt = 24
+        for i in range(0,len(sa)):
+            clientbits = clientbits | (int(sa[i]) << shiftamt)
+            shiftamt = shiftamt - 8
+            pass
+
+        if debug:
+            print "client "+cip+": clientbits="+str(clientbits)
+        
+        for (netbits,mask) in self.acllist:
+            if clientbits & mask == netbits & mask:
+                match = True
+                break
+            pass
+        if debug:
+            print "verify_request returning " + str(match)
+        
+        return match
+
+    pass

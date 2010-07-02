@@ -46,6 +46,18 @@ if [ -x /sbin/dhclient ] && /sbin/dhclient -q ; then
 	        ifconfig $_if down
 	    fi >>$LOGDIR/dhclient.log 2>&1
 	done
+
+        #
+        # Now probe for wifi interfaces.  We don't want to
+        # do this before dhcp'ing on the wired interfaces since
+        # there is a possibility that the wifi interface will
+        # grab an address and become the control net!
+        #
+        # This expects to load the madwifi-ng driver; the param states
+        # that no "virtual AP" device is to be created on module load.
+        # This is deferred until Emulab interface configuration time.
+        #
+        modprobe -q ath_pci autocreate=none
     fi
     ONBOOT="no"
 else

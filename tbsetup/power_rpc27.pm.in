@@ -196,7 +196,7 @@ sub syncandsend($$$) {
     my ($controller,$TIP,$cmd,$statusp) = @_;
 
     #
-    # Send a couple of newlines to get the command prompt, and then wait
+    # Send a newline to get the command prompt, and then wait
     # for it to print out the command prompt. This loop is set for a small
     # number since if it cannot get the prompt quickly, then something has
     # gone wrong.
@@ -206,7 +206,7 @@ sub syncandsend($$$) {
     for (my $i = 0; $i < 20; $i++) {
 	my $line;
 
-	if (syswrite($TIP, "\r\n") == 0) {
+	if (syswrite($TIP, "\r") == 0) {
 	    print STDERR
 		"*** Power control sync write failed ($controller/$outlet)\n";
 	    return 1;
@@ -239,7 +239,7 @@ sub syncandsend($$$) {
     #
     # These things have an annoying tendency to fail sometimes by losing
     # the command part of the string (e.g., "6" instead of "reboot 6").
-    # I think we are overrunning the UART with "\r\n" since we put out
+    # I think we are overrunning the UART with "\r" since we put out
     # a pair after every line we read that is not a prompt and when the
     # RPC puts out its banner, it is a good 10 lines before we see the
     # prompt.  So allow some time for the RPC to digest everything before
@@ -252,7 +252,7 @@ sub syncandsend($$$) {
     }
 
     # Okay, got a prompt. Send it the string:
-    if (syswrite($TIP, "$cmd\r\n") == 0) {
+    if (syswrite($TIP, "$cmd\r") == 0) {
     	print STDERR "*** Power control write failed ($controller/$outlet)\n";
     	return 1;
     }
@@ -280,9 +280,17 @@ sub syncandsend($$$) {
 	}
 	#
 	# Got the following prompt, all done.
+	#
 	# XXX the prompt+command does not always get echoed correctly
 	# (e.g. "atatus" or "ststus" instead of "status") so we also
 	# exit if we parsed any status data.
+	#
+	# XXX RPC28 units split up the power data into columns for outlets
+	# 1-10 and then for outlets 11-21, ala:
+	#
+	#    RPC28:  True RMS Current:     3.9 Amps      :      4.7 Amps
+	#
+	# hence the unusual REs for power and current.
 	#
 	if (($gotcmd || $gotstatus) && $line =~ $RPC27_PROMPT) {
 	    last;
@@ -291,11 +299,19 @@ sub syncandsend($$$) {
 	    if ($line =~ /Temperature:\s+(\d+\.\d+) C/) {
 		$status{tempC} = $1;
 		$gotstatus = 1;
-	    } elsif ($line =~ /Average Power:\s+(\d+) Watts/) {
+	    } elsif ($line =~ /Average\ Power:\s+(\d+)\ Watts\s+ 
+				(Apparent|\:\s+(\d+)\ Watts)/x) {
 		$status{power} = $1;
+		if ($3) {
+		    $status{power} += $3;
+		}
 		$gotstatus = 1;
-	    } elsif ($line =~ /True RMS Current:\s+(\d+\.\d+) Amps/) {
+	    } elsif ($line =~ /True\ RMS\ Current:\s+(\d+\.\d+)\ Amps\s+
+				(Maximum|\:\s+(\d+\.\d+)\ Amps)/x) {
 		$status{current} = $1;
+		if ($3) {
+		    $status{current} += $3;
+		}
 		$gotstatus = 1;
 	    }
 	    # note the /g, controllers with 20 ports put two outlets per line

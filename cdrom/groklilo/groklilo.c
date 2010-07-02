@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2004-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -16,6 +16,14 @@
 #define INBOOTLOADER
 #endif
 
+/* Enable Large File Support for Linux.  This wouldn't be necessary
+ * if we didn't need to deal with FreeBSD's bizarre behavior of 
+ * preventing root from writing to partition bootblocks.
+ */
+#if defined(__linux__)
+#define _FILE_OFFSET_BITS 64
+#endif
+
 #include <string.h>
 
 #ifdef INBOOTLOADER
@@ -29,6 +37,7 @@
 #endif
 #else
 #include <sys/types.h>
+#include <stdint.h>
 #include <stdio.h>
 
 static int debug;
@@ -231,7 +240,7 @@ main(int argc, char **argv)
 	char *cmdline = 0, *progname;
 
 	progname = argv[0];
-	while ((ch = getopt(argc, argv, "c:dn")) != -1)
+	while ((ch = getopt(argc, argv, "p:c:dn")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;

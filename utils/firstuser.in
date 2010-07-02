@@ -1,12 +1,12 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-
+#
+# WARNING: See db/genelists.in for clause testing for protouser names.
+#
 use English;
 use strict;
 use Getopt::Std;
@@ -14,6 +14,7 @@ use Getopt::Std;
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use User;
 
 my $tbadmin    = '@TBADMINGROUP@';
 my $ELABINELAB = @ELABINELAB@;
@@ -24,17 +25,22 @@ my $wap     = '@prefix@/sbin/withadminprivs';
 my $mkproj  = '@prefix@/sbin/mkproj';
 my $mkgroup = '@prefix@/sbin/mkgroup';
 my $mkacct  = '@prefix@/sbin/tbacct';
+my $modgrps = '@prefix@/sbin/modgroups';
 
 my $protouser       = 'elabman';
 my $protouser_name  = 'Emulab Manager';
 my $protouser_email = '@TBOPSEMAIL@';
 my $protouser_shell = 'tcsh';
-my $HOMEDIR         = "/users";
+my $protouser_notes = "DO NOT DELETE THIS ACCOUNT!";
+my $HOMEDIR         = USERROOT();
 my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
 my $batchmode       = 0;
-my $webonly         = 1;
+my $pid_idx         = 1; # Initial IDX for protoproj.
 my $trust           = "project_root";
+my $binshell        = "/bin/nologin";
+my $uid_uuid;
+my $gid_uuid;
 my $password;
 my $encpass;
 my %opts;
@@ -61,7 +67,6 @@ if (defined($opts{p})) {
 }
 if (defined($opts{u})) {
     $protouser = $opts{u};
-    $webonly = 0;
     $trust = "local_root";
 }
 if (defined($opts{n})) {
@@ -71,9 +76,9 @@ if (defined($opts{e})) {
     $protouser_email = $opts{e};
 }
 
-my $result = DBQueryFatal("select * from users where uid='$protouser'");
-if ($result->num_rows()) {
-    die "This script has already been run, there is no need to run it again\n";
+my $user = User->Lookup('$protouser');
+if (defined($user)) {
+    die("This script has already been run, no need to run it again!\n");
 }
 
 if ($UID != 0) {
@@ -115,7 +120,7 @@ if (!defined($encpass)) {
 # Get uid for the user and a gid for the project
 
 # For non-initial users, get the next available index.
-$result = DBQueryFatal("select idx from emulab_indicies ".
+my $result = DBQueryFatal("select idx from emulab_indicies ".
 		       "where name='next_uid'");
 if ($result->numrows() > 0) {
     ($MINUID) = $result->fetchrow_array();
@@ -126,9 +131,6 @@ while (getpwuid($uid)) { $uid++; }
 
 my $gid = $MINGID;
 while (getgrgid($gid)) { $gid++; }
-
-my $ggid = $gid + 1;
-while (getgrgid($ggid)) { $ggid++; }
 
 # We put the proto-user in the tbadmin group, because the emulab-ops
 # group does not exist yet
@@ -150,72 +152,101 @@ if (!$batchmode) {
     }
 }
 
+# Initial protouser gets a real shell until actively frozen later.
+# Also setup a notes entry.
+if (!defined($opts{u})) {
+    $binshell = "/bin/tcsh";
+    $protouser_notes = "This account can be frozen after your Emulab ".
+	"is fully setup and running. DO NOT DELETE THIS ACCOUNT!";
+}
+
 print "Creating user on boss...\n";
-if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G \"$Ggid\" -h - " .
-    "-m -d $HOMEDIR/$protouser -s /bin/nologin -c \"$protouser_name\"\n") {
-       die "Unable to add user to the password file!\n";
+if (system("/usr/sbin/pw useradd $protouser -u $uid -g $agid ".
+	   "-G \"$Ggid\" -h - " .
+	   "-m -d $HOMEDIR/$protouser -s $binshell ".
+	   "-c \"$protouser_name\"")) {
+    die "Unable to add user to the password file!\n";
 }
 
 if ($CONTROL ne $BOSSNODE) {
     print "Creating user on ops...\n";
     
-    if (system("ssh $CONTROL ".
+    if (system("ssh -2 $CONTROL ".
 	       "'/usr/sbin/pw useradd $protouser -u $uid -g $agid ".
-	       "-G \"$Ggid\" -h - -d $HOMEDIR/$protouser -s /bin/nologin ".
+	       "-G \"$Ggid\" -h - -d $HOMEDIR/$protouser -s $binshell ".
 	       "-c \"$protouser_name\"'")) {
 	die "Unable to add user to the ops password file!\n";
     }
 }
+
+# These users do not really need a uuid, but give them one anyway.
+$uid_uuid = NewUUID();
 
 # Initialize the index value;
 DBQueryFatal("replace into emulab_indicies set name='next_uid',idx=$uid+1");
 
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
-	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".
-	"usr_modified=now(), admin=1, webonly=$webonly, status='active', ".
-	"usr_shell='$protouser_shell', usr_email='$protouser_email', ".
-	"mailman_password='$mailman_password'");
+	     "usr_name='$protouser_name', uid_uuid='$uid_uuid', ".
+	     "usr_addr='DO NOT DELETE THIS ACCOUNT', ".
+	     "usr_pswd='$encpass', unix_uid=$uid, notes='$protouser_notes', ".
+	     "usr_modified=now(), admin=1, webonly=0, status='active',".
+	     "usr_shell='$protouser_shell', usr_email='$protouser_email', ".
+	     "mailman_password='$mailman_password',uid_idx=$uid");
+DBQueryFatal("insert into user_stats set ".
+	     "  uid='$protouser', uid_idx=$uid, uid_uuid='$uid_uuid'");
 
 if (!defined($opts{u})) {
+    $gid_uuid = NewUUID();
     
     print "Creating project in database...\n";
     DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
 		 "name='$protoproj_desc', head_uid='$protouser', ".
-		 "unix_gid=$gid,approved=1");
+		 "head_idx=$uid, unix_gid=$gid,approved=1,pid_idx=$pid_idx");
+    DBQueryFatal("insert into project_stats set ".
+		 "pid='$protoproj',pid_idx=$pid_idx");
 
     print "Creating group in database...\n";
     DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', ".
-		 "leader='$protouser', created=now(), ".
+		 "leader='$protouser', leader_idx=$uid, created=now(), ".
 		 "description='Default Group', " .
-		 "unix_gid=$ggid, unix_name='$protoproj'");
-}
+		 "unix_gid=$gid, gid_idx=$pid_idx, pid_idx=$pid_idx, ".
+		 "unix_name='$protoproj', gid_uuid='$gid_uuid'");
+    DBQueryFatal("insert into group_stats set ".
+		 "   pid='$protoproj',gid='$protoproj', ".
+		 "   gid_idx=$pid_idx, gid_uuid='$gid_uuid'");
 
-print "Putting user in group...\n";
-DBQueryFatal("insert into group_membership set uid='$protouser', " .
-	"pid='$protoproj', gid='$protoproj',  trust='$trust'," .
-	"date_applied=now(), date_approved=now()");
+    DBQueryFatal("replace into emulab_indicies set name='next_gid',idx=10000");
+}
 
 # Flip UID to the new user so that the mk* scripts are happy - they can't
 # be run as root for accountability reasons
 $EUID = $UID = $uid;
 $EGID = $GID = $gid;
 
-if (!defined($opts{u})) {
+if (defined($opts{u})) {
+    #
+    # Creating specific user; it is implied that the user will go into
+    # the proto project, which must already exist of course.
+    #
+    print "Running mkacct...\n";
+    if (system "$wap $mkacct -b add $protouser") {
+	die "Unable to create account for initial user $protouser\n";
+    }
+
+    print "Running modgroups...\n";
+    if (system "$wap $modgrps -a $protoproj:$protoproj:$trust $protouser") {
+	die "Unable to add initial user $protouser to project $protoproj\n";
+    }
+}
+else {
+    #
+    # Creating the initial project. This handles everything.
+    #
     print "Running mkproj...\n";
     if (system "$wap $mkproj $protoproj") {
 	die "Unable to create initial project $protoproj\n";
     }
-
-    print "Running mkgrp...\n";
-    if (system "$wap $mkgroup $protoproj $protoproj") {
-	die "Unable to create group for initial project $protoproj\n";
-    }
-}
-
-print "Running mkacct...\n";
-if (system "$wap $mkacct -b add $protouser") {
-    die "Unable to create account for initial user $protouser\n";
 }
 
 if (defined($opts{u})) {

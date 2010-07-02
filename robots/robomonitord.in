@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,14 +42,11 @@ my $idleswap = "$TB/sbin/idleswap";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
+use Experiment;
 
 #
 # Function phototypes
 #
-
 sub SwapWarn($$$);
 sub SwapIt($$$);
 
@@ -287,20 +284,17 @@ exit(0);
 sub SwapWarn($$$)
 {
     my ($pid, $eid, $timeleft) = @_;
-    my ($user_name, $user_email);
 
-    my $query_result =
-	DBQueryWarn("select expt_swap_uid from experiments ".
-		    "where eid='$eid' and pid='$pid'");
-    return -1
-	if (!$query_result);
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	fatal("No such experiment $pid/$eid in the Emulab Database.");
+    }
+    my $swapper     = $experiment->GetSwapper();
+    my $swapper_uid = $swapper->uid();
+    my $user_name   = $swapper->name();
+    my $user_email  = $swapper->email();
     
-    my ($swapper) = $query_result->fetchrow_array();
-
-    return -1
-	if (!UserDBInfo($swapper, \$user_name, \$user_email));
-
-    print "Sending swap warning email to $swapper at ".
+    print "Sending swap warning email to $swapper_uid at ".
 	TBDateTimeFSSafe() . "\n";
 
     SENDMAIL("$user_name <$user_email>",
@@ -340,5 +334,5 @@ sub SwapIt($$$)
     #
     my $optarg = ($force ? "-f" : "-a");
     
-    return(system("$idleswap $optarg -r $pid, $eid"));
+    return(system("$idleswap $optarg -r $pid,$eid"));
 }

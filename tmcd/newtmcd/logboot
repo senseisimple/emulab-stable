@@ -1,0 +1,61 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " . scriptname() . " <logfile>\n";
+    exit(1);
+}
+my $optlist    = "d";
+my $debug      = 0;
+my $logfile;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'d'})) {
+    $debug = 1;
+}
+usage()
+    if (! @ARGV);
+$logfile = $ARGV[0];
+
+if (! -e $logfile) {
+    die("*** $0:\n".
+	"    $logfile does not exist or cannot be read!\n");
+}
+
+if (tmcc(TMCCCMD_BOOTLOG, "", undef, ("datafile" => $logfile)) < 0) {
+    die("*** $0:\n".
+	"    Error sending TBFAILED to Emulab Control!\n");
+}
+exit(0);
+
+

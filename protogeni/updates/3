@@ -1,0 +1,18 @@
+#
+# Add a URI column to the certificate table, for storing new GENI identifiers.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault( $dbhandle );
+
+    DBQueryFatal( "ALTER TABLE `geni_certificates` ADD `uri` text" )
+	unless DBSlotExists( "geni_certificates", "uri" );
+    
+    return 0;
+}
+1;

@@ -1,11 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 /*
- *
+ * Dave swears we use this on plab nodes. Hand installed into the rootball.
  */
 #include <stdio.h>
 #include <ctype.h>
@@ -14,6 +14,7 @@
 #include <time.h>
 #include <math.h>
 #include <paths.h>
+#include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -25,6 +26,9 @@
 #include <map>
 #include <string>
 #include <iostream>
+#include <cstring>
+
+#define IPADDRFILE "/var/emulab/boot/myip"
 
 static int debug = 0;
 static event_handle_t localhandle;
@@ -36,7 +40,8 @@ static char nodeidstr[BUFSIZ], ipaddr[32];
 void
 usage(char *progname)
 {
-    fprintf(stderr, "Usage: %s [-s server] [-p port] -n pnodeid -l local_elvin_port\n", progname);
+    fprintf(stderr, "Usage: %s [-s server] [-p port] [-l local_elvin_port] "
+	    "-n pnodeid \n", progname);
     exit(-1);
 }
 
@@ -55,10 +60,13 @@ sched_callback(event_handle_t handle,
 static void subscribe_callback(event_handle_t handle,  int result,
 			       event_subscription_t es, void *data);
 
-static void async_callback(event_handle_t handle,  int result,
-			   event_subscription_t es, void *data);
+static void status_callback(pubsub_handle_t *handle,
+                            pubsub_status_t status, void *data,
+                            pubsub_error_t *error);
 
 static void schedule_updateevent();
+
+static int do_remote_register(char *server);
 
 
 int
@@ -75,6 +83,8 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	int			c;
 	struct in_addr		myip;
+        int                     o1, o2, o3, o4;
+        int                     scanres;
 	FILE			*fp;
 
 	progname = argv[0];
@@ -109,9 +119,8 @@ main(int argc, char **argv)
 	if (argc)
 		usage(progname);
 
-	if ((! pnodeid) || (! lport))
-	   fatal("Must provide pnodeid and local elvin port"); 
-
+	if (! pnodeid)
+	   fatal("Must provide pnodeid"); 
 
 	if (debug) {
 	        loginit(0, 0);
@@ -121,14 +130,41 @@ main(int argc, char **argv)
 	 * Get our IP address. Thats how we name this host to the
 	 * event System. 
 	 */
-	if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
-		fatal("could not get hostname: %s\n", strerror(errno));
-	}
-	if (! (he = gethostbyname(hostname))) {
-		fatal("could not get IP address from hostname: %s", hostname);
-	}
-	memcpy((char *)&myip, he->h_addr, he->h_length);
-	strcpy(ipaddr, inet_ntoa(myip));
+        if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
+                fatal("could not get hostname: %s\n", strerror(errno));
+        }
+
+        if ((he = gethostbyname(hostname)) != NULL) {
+                memcpy((char *)&myip, he->h_addr, he->h_length);
+                strcpy(ipaddr, inet_ntoa(myip));
+        } else {
+                error("could not get IP address from hostname: %s\n"
+                      "Attempting to get it from local config file...\n", 
+                      hostname);
+                fp = fopen(IPADDRFILE, "r");
+                if (fp != NULL) {
+                        scanres = fscanf(fp, "%3u.%3u.%3u.%3u", 
+                                         &o1, &o2, &o3, &o4);
+                        (void) fclose(fp);
+                        if (scanres != 4) {
+                                fatal("IP address not found on first "
+                                      "line of file!\n");
+                        }
+                        if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+                                fatal("IP address inside file is "
+                                      "invalid!\n");
+                        }
+                        snprintf(ipaddr, sizeof(ipaddr), 
+                                 "%u.%u.%u.%u", o1, o2, o3, o4);
+                } else {
+                        fatal("could not get IP from local file %s either!", 
+                              IPADDRFILE);
+                }
+        }
+
+        if (debug) {
+                printf("My IP: %s\n", ipaddr);
+        }
 
 	/*
 	 * If server is not specified, then it defaults to EVENTSERVER.
@@ -148,43 +184,129 @@ main(int argc, char **argv)
 		 server,
 		 (port ? ":"  : ""),
 		 (port ? port : ""));
-	server = buf;
+	server = strdup(buf);
 
-	/*
-	 * Construct an address tuple for generating the event.
-	 */
-	tuple = address_tuple_alloc();
-	if (tuple == NULL) {
-		fatal("could not allocate an address tuple");
-	}
-	
-	/* Register with the event system on boss */
-	bosshandle = event_register(server, 0);
-	if (bosshandle == NULL) {
-		fatal("could not register with remote event system");
-	}
-        /* Setup handle to periodically ping remote event server */
-        event_set_idle_period(bosshandle, 120);
-
-	snprintf(buf, sizeof(buf), "elvin://localhost:%s",lport);
+        /* Create nodeid string from pnode id passed in. */
+	snprintf(nodeidstr, sizeof(nodeidstr), "__%s_proxy", pnodeid);
 
 	/* Register with the event system on the local node */
+	snprintf(buf, sizeof(buf), "elvin://localhost%s%s",
+		 (lport ? ":"  : ""),
+		 (lport ? lport : ""));
 	localhandle = event_register(buf, 0);
 	if (localhandle == NULL) {
 		fatal("could not register with local event system");
 	}
 	
+        /*
+         * Setup local subscriptions:
+         */
+	tuple = address_tuple_alloc();
+        
+        tuple->host = ADDRESSTUPLE_ALL;
+        tuple->scheduler = 1;
+	
+	if (! event_subscribe(localhandle, sched_callback, tuple,
+			      NULL)) {
+		fatal("could not subscribe to events on local server");
+	}
+
+        info("Successfully connected to local pubsubd.\n");
+
+	/*
+	 * Stash the pid away.
+	 */
+	snprintf(buf, sizeof(buf), "%s/evproxy.pid", _PATH_VARRUN);
+	fp = fopen(buf, "w");
+	if (fp != NULL) {
+		fprintf(fp, "%d\n", getpid());
+		(void) fclose(fp);
+	}
+
+	/*
+	 * Do this now, once we have had a chance to fail on the above
+	 * event system calls.
+	 */
+	if (!debug) {
+		daemon(0, 0);
+		loginit(0, "/var/emulab/logs/evproxy.log");
+	}
+	
+	/* Begin the event loop, waiting to receive event notifications */
+        info("Entering main event loop.\n");
+        while (1) {
+          /* 
+           * Register with the remote event system.
+           * Keep trying until we get a connection.
+           */
+          while (do_remote_register(server) == 0) {
+            event_unregister(bosshandle); /* just to be safe... */
+            error("Failed to register with remote event system!\n"
+                  "Sleeping for a bit before trying again...\n");
+            sleep(10);
+          }
+          info("Remote pubsub registration complete.\n");
+          /* Jump into the main event loop. */
+          event_main(bosshandle);
+          /* 
+           * If we drop out of the event loop, it's because there was/is
+           * some kind of problem with the connection to the remote event
+           * server. So, clean up and re-register (re-subscribe).
+           */
+          error("exited event_main: retrying remote registration.\n");
+          event_unregister(bosshandle);
+          exptmap.clear(); /* clear our list of subs - it's invalid now. */
+        }
+
+	/* Unregister with the remote event system: */
+	if (event_unregister(bosshandle) == 0) {
+		fatal("could not unregister with remote event system");
+	}
+	/* Unregister with the local event system: */
+	if (event_unregister(localhandle) == 0) {
+		fatal("could not unregister with local event system");
+	}
+
+	return 0;
+}
+
+
+int do_remote_register(char *server) {
+        address_tuple_t		tuple;
+	char			buf[BUFSIZ];
+
+	/* Register with the event system on boss */
+	while ((bosshandle = event_register(server, 0)) == 0) {
+		error("Could not register with remote event system\n"
+                      "\tSleeping for a bit, then trying again.\n");
+                sleep(60);
+	}
+
+        /* Setup handle to periodically ping remote event server */
+        event_set_idle_period(bosshandle, 30);
+
+        /* Turn off failover on the remote connection - we'll manage it
+           ourselves via the status callback. */
+        event_set_failover(bosshandle, 0);
+
+        /* Setup a status callback to watch the remote connection. */
+        if (pubsub_set_status_callback(bosshandle->server,
+				       status_callback,
+				       server, &bosshandle->status) != 0) {
+          error("Could not register status callback!");
+        }
+
 	/*
 	 * Create a subscription to pass to the remote server. We want
 	 * all events for this node, or all events for the experiment
 	 * if the node is unspecified (we want to avoid getting events
 	 * that are directed at specific nodes that are not us!). 
 	 */
-	snprintf(nodeidstr, sizeof(nodeidstr), "__%s_proxy", pnodeid);
 	snprintf(buf, sizeof(buf), "%s,%s,%s", 
                  TBDB_EVENTTYPE_UPDATE, TBDB_EVENTTYPE_CLEAR,
                  TBDB_EVENTTYPE_RELOAD);
 
+        tuple = address_tuple_alloc();
 	tuple->eventtype = buf;
 	tuple->host = ipaddr;
 	tuple->objname = nodeidstr;
@@ -193,7 +315,8 @@ main(int argc, char **argv)
 	/* Subscribe to the test event: */
 	if (! event_subscribe(bosshandle, callback, tuple, 
 			      (void *)"event received")) {
-		fatal("could not subscribe to events on remote server");
+		error("could not subscribe to events on remote server");
+                return 0;
         }
 
         /* Setup the global event passthru */
@@ -208,61 +331,13 @@ main(int argc, char **argv)
 
 	if (! event_subscribe(bosshandle, expt_callback, tuple, 
 			      NULL)) {
-		fatal("could not subscribe to events on remote server");
+		error("could not subscribe to events on remote server");
+                return 0;
         }
 
-        /*
-         * Setup local elvind subscriptions:
-         */
-	address_tuple_free(tuple);
-	tuple = address_tuple_alloc();
-        
-        tuple->host = ADDRESSTUPLE_ALL;
-        tuple->scheduler = 1;
-	
-	if (! event_subscribe(localhandle, sched_callback, tuple,
-			      NULL)) {
-		fatal("could not subscribe to events on local server");
-	}
+        schedule_updateevent();
 
-        info("Successfully setup initial event subscriptions.\n");
-
-	/*
-	 * Stash the pid away.
-	 */
-	snprintf(buf, sizeof(buf), "%s/evproxy.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
-	if (fp != NULL) {
-		fprintf(fp, "%d\n", getpid());
-		(void) fclose(fp);
-	}
-
-        /* Tell the schedulers on ops that we want a subscription update. */
-	schedule_updateevent();
-
-	/*
-	 * Do this now, once we have had a chance to fail on the above
-	 * event system calls.
-	 */
-	if (!debug) {
-		daemon(0, 0);
-		loginit(0, "/var/emulab/logs/evproxy.log");
-	}
-	
-	/* Begin the event loop, waiting to receive event notifications */
-        info("Entering main event loop.\n");
-	event_main(bosshandle);
-
-	/* Unregister with the remote event system: */
-	if (event_unregister(bosshandle) == 0) {
-		fatal("could not unregister with remote event system");
-	}
-	/* Unregister with the local event system: */
-	if (event_unregister(localhandle) == 0) {
-		fatal("could not unregister with local event system");
-	}
-
-	return 0;
+        return 1;
 }
 
 
@@ -310,7 +385,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      }
 	      
 	      tuple->expt = expt;
-	      tuple->scheduler = 2;
 		  
 	      /* malloc data -- to be freed in subscribe_callback */
 	      char *data = (char *) xmalloc(sizeof(expt));
@@ -323,17 +397,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      if (! retval) {
 		error("could not subscribe to events on remote server.\n");
 	      }
-
-	      tuple->scheduler = 0;
-		  
-	      retval = event_async_subscribe(bosshandle, 
-					  expt_callback, tuple, NULL,
-					  async_callback, 
-					  NULL, 1);
-	      if (! retval) {
-		error("could not subscribe to events on remote server.\n");
-	      } 
-
               info("Subscribing to experiment: %s\n", expt);
 
 	      address_tuple_free(tuple);
@@ -357,7 +420,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      
 	      if (!success) {
 		error("not able to delete the subscription.\n");
-		elvin_error_fprintf(stderr, handle->status);
+		pubsub_error_fprintf(stderr, &handle->status);
 	      } else {
 		exptmap.erase(key);
                 info("Unsubscribing from experiment: %s\n", expt);
@@ -382,7 +445,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      
 	      if (!success) {
 		error("not able to delete the subscription.\n");
-		elvin_error_fprintf(stderr, handle->status);
+		pubsub_error_fprintf(stderr, &handle->status);
 	      }
 	    }
 	      
@@ -407,7 +470,6 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 	char		objecttype[TBDB_FLEN_EVOBJTYPE];
         char		objectname[TBDB_FLEN_EVOBJNAME];
 	char            expt[TBDB_FLEN_PID + TBDB_FLEN_EID + 1];
-	int		plabsched = 0;
 
 	event_notification_get_objtype(handle,
 				       notification, objecttype, sizeof(objecttype));
@@ -420,21 +482,10 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 	}
 
 	if (strcmp(objecttype,TBDB_OBJECTTYPE_EVPROXY) != 0) {
-	  /*
-           * Filter <plabsched,1> events, and for rest resend the notification 
-	   * to the local elvind server.
-           */
-	  int ret = event_notification_get_int32(handle, notification,
-						 TBDB_PLABSCHED, &plabsched);
-	  
-	  if ((!ret) || (plabsched != 1)) {
-	    
-	    if (! event_notify(localhandle, notification))
-	      error("Failed to deliver notification!\n");
-	  }
+	  if (! event_notify(localhandle, notification))
+	    error("Failed to deliver notification!\n");
 	}
 }
-
 
 static void
 sched_callback(event_handle_t handle,
@@ -448,18 +499,17 @@ sched_callback(event_handle_t handle,
 
 
 
-
 /* Callback functions for asysn event subscribe */
 
 void subscribe_callback(event_handle_t handle,  int result,
 			event_subscription_t es, void *data) {
-  if (result) {
+  if (!result) {
     std::string key((char *)data);
     exptmap[key] = es;
     info("Subscription for %s added successfully.\n", (char *)data);
   } else {
     error("not able to add the subscription.\n");
-    elvin_error_fprintf(stderr, handle->status);
+    pubsub_error_fprintf(stderr, &handle->status);
   }
   
   free(data);
@@ -467,21 +517,36 @@ void subscribe_callback(event_handle_t handle,  int result,
 }
 
 
-/* Callback functions for async event subscribe/unsubscribe */
+/* Status callback function - tries to maintain remote connection */
+static void status_callback(pubsub_handle_t *handle,
+                            pubsub_status_t status, void *data,
+                            pubsub_error_t *ignored)
+{
+  switch (status) {
 
-void async_callback(event_handle_t handle,  int result,
-			event_subscription_t es, void *data) {
-  if (!result) {
-    error("Error in async callback\n");
-    elvin_error_fprintf(stderr, handle->status);
+  case PUBSUB_STATUS_CONNECTION_FAILED:
+    /* sleep, and try to connect again. */
+    error("Failed to connect to remote server");
+    /* XXX: may need to do something more. */
+    break;
+
+  case PUBSUB_STATUS_CONNECTION_LOST:
+    error("Connection loss/failure, trying to reconnect...\n");
+    event_stop_main(bosshandle);
+    break;
+
+  case PUBSUB_STATUS_CONNECTION_FOUND:
+    info("Remote connection established.");
+    break;
+
+  default:
+    break;
   }
-  
-
 }
 
 
 void schedule_updateevent() {
-  /* send a message to elvind on ops */
+  /* send a message to event server on ops */
   address_tuple_t tuple = address_tuple_alloc();
 
   struct timeval now;

@@ -1,15 +1,18 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
-# Standard Testbed Header
+# Standard Testbed Header if not looking for xml returned.
 #
+$optargs = OptionalPageArguments("xml",     PAGEARG_STRING,
+				 "slice",   PAGEARG_STRING,
+				 "records", PAGEARG_INTEGER);
+
 if (!isset($xml)) {
     PAGEHEADER("Emulab on Planetlab Stats");
 }
@@ -17,11 +20,14 @@ if (!isset($xml)) {
 #
 # Get current user, if any. We return info to logged in admin users,
 # or to someone who has the right key.
-# 
-$uid = GETLOGIN();
-if ($uid) {
-    LOGGEDINORDIE($uid);
-    if (!ISADMIN($uid)) {
+#
+$this_user = CheckLogin($check_status);
+
+if ($this_user) {
+    CheckLoginOrDie();
+    $isadmin = ISADMIN();
+
+    if (!$isadmin) {
 	USERERROR("You do not have permission to view this page!", 1);
     }
 }
@@ -40,7 +46,7 @@ else {
 	strcmp($subnet_c, "134.134.248.0") &&
 	strcmp($subnet_c, "134.134.136.0") &&
         strcmp($subnet_b, "128.112.0.0")) {
-	USERERROR("You do not have permission to view this page ($subnet)!",
+	USERERROR("You do not have permission to view this page ($REMOTE_ADDR)!",
 		  1);
     }
 }
@@ -77,7 +83,7 @@ $query_result =
 		 " from experiment_resources as r ".
 		 "left join experiment_stats as s on r.exptidx=s.exptidx ".
 		 "left join testbed_stats as t on t.rsrcidx=r.idx ".
-		 "left join users as u on u.uid=t.uid ".
+		 "left join users as u on u.uid_idx=t.uid_idx ".
 		 "where r.plabnodes!=0 and t.exitcode=0 and ".
 		 "     (t.action='start' or t.action='swapin' or ".
 		 "      t.action='swapout') $wclause ".
@@ -114,16 +120,16 @@ else {
 }
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $pid     = $row[pid];
-    $eid     = $row[eid];
-    $uid     = $row[uid];
-    $name    = $row[usr_name];
-    $email   = $row[usr_email];
-    $start   = $row[start_time];
-    $ustart  = $row[ustart];
-    $action  = $row[action];
-    $pnodes  = $row[plabnodes];
-    $exptidx = $row[exptidx];
+    $pid     = $row["pid"];
+    $eid     = $row["eid"];
+    $uid     = $row["uid"];
+    $name    = $row["usr_name"];
+    $email   = $row["usr_email"];
+    $start   = $row["start_time"];
+    $ustart  = $row["ustart"];
+    $action  = $row["action"];
+    $pnodes  = $row["plabnodes"];
+    $exptidx = $row["exptidx"];
     $slice   = "emulab_${exptidx}";
 
     if (!strcmp($action, "start")) {

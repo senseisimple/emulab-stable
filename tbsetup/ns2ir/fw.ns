@@ -1,4 +1,10 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # This file is intended to be included into another NS file. It is not
 # a stand alone file.
 # 
@@ -16,7 +22,7 @@ if {${::GLOBALS::explicit_firewall}} {
     $fw set-type ipfw2-vlan
         
     if {${::GLOBALS::security_level} == 1} {
-	$fw set-style open
+	$fw set-style basic
     } elseif {${::GLOBALS::security_level} == 2} {
 	$fw set-style basic	
     } elseif {${::GLOBALS::security_level} == 3} {

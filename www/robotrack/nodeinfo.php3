@@ -1,21 +1,25 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 include("defs.php3");
 
 #
-# Only known and logged in users can watch LEDs
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Verify page arguments. Allow user to optionally specify building/floor.
+# Verify page args
 #
+$optargs = OptionalPageArguments("building",      PAGEARG_STRING,
+				 "floor",         PAGEARG_STRING);
+
 if (isset($building) && $building != "") {
     # Sanitize for the shell.
     if (!preg_match("/^[-\w]+$/", $building)) {
@@ -56,7 +60,7 @@ $query_result =
 		 "left join nodes as n on n.node_id=loc.node_id ".
 		 "left join node_types as nt on nt.type=n.type ".
 		 "where loc.building='$building' and ".
-		 "      loc.floor='$floor' $stamp_clause ".
+		 "      loc.floor='$floor' ".
 		 "order by n.type,n.node_id");
 
 while ($row = mysql_fetch_array($query_result)) {

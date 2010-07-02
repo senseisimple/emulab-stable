@@ -1,19 +1,17 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 require("defs.php3");
 
-# Page arguments.
-$printable = $_GET['printable'];
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 
-# Pedantic page argument checking. Good practice!
-if (isset($printable) && !($printable == "1" || $printable == "0")) {
-    PAGEARGERROR();
-}
 if (!isset($printable))
     $printable = 0;
 
@@ -50,6 +48,8 @@ function NLCLINKFIG2($link, $value, $caption, $explanation)
 # Drop into html mode
 #
 ?>
+<h1 id="doctitle">
+THIS PAGE IS OBSOLETE; MOBILE WIRELESS NO LONGER SUPPORTED</h1>
 
 <h2 id="doctitle">Emulab Tutorial - Mobile Wireless Networking</h2>
 
@@ -201,7 +201,7 @@ Real Mobility, Real Wireless: A New Kind of Testbed</a>
 <h1>Introduction</h1>
 <p>
 <a name="INTRO"></a>
-In addition to <a href="docwrapper.php3?docname=wireless.html">fixed wireless
+In addition to <a href="<? echo "$WIKIDOCURL/wireless" ?>">fixed wireless
 nodes</a> (currently predominantly 802.11), Emulab also features wireless nodes attached
 to robots that can move
 around a small area.  These robots consist of a small body (shown on the right)
@@ -214,8 +214,7 @@ For
 example, mobile nodes could be used to realistically test and evaluate an
 ad-hoc routing algorithm in a fairly repeatable manner.  This document is
 intended as a tutorial for those interested in making use of this testbed;
-there is also a short <a href="<?php echo
-$TBBASE?>/doc/docwrapper.php3?docname=mobilewireless.html">reference manual</a>
+there is also a short <a href="<? echo "$WIKIDOCURL/wireless" ?>">reference manual</a>
 available that gives a few details about the workings of the system.
 </p>
 
@@ -413,9 +412,8 @@ much time has elapsed since the robots have reached their initial positions.
 The elapsed time is also connected to when <code>"$ns at"</code> events in the
 NS file are run.  In this case, there were no events in the NS file, so we'll
 be moving the robot by sending dynamic SETDEST events, much like sending START
-and STOP events to <a href="docwrapper.php3?docname=advanced.html">traffic
-generators</a> and <a
-href="docwrapper.php3?docname=advanced.html#ProgramObjects">program
+and STOP events to <a href="<? echo "$WIKIDOCURL/AdvancedExample" ?>">traffic
+generators</a> and <a href="<? echo "$WIKIDOCURL/AdvancedExample#ProgramObjects" ?>">program
 objects</a>.
 
 <!-- XXX We need to give them a clue on which way the webcam is pointing in -->
@@ -688,7 +686,7 @@ Alternatively, if you don't have a local TinyOS build environment, just load
 ours onto an Emulab PC in your experiment.  You can do this by setting the node
 operating system to <b>RHL90-TINYOS</b> using the <code>tb-set-node-os</code>
 command (as shown in the Emulab <a
-href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html">tutorial</a>).  This image is based off Emulab's
+href="<? echo "$WIKIDOCURL/Tutorial" ?>">tutorial</a>).  This image is based off Emulab's
 default RedHat 9.0 image and has an installation of a TinyOS 1.1.14 CVS
 snapshot.  When you log in to the node, the $TOSROOT and $TOSDIR environment
 variables will be set to /opt/tinyos-1.x and /opt/tinyos-1.x/tos,

@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // log.c
 
 #include "stub.h"
@@ -87,14 +93,14 @@ static void logPrefix(int flags, struct timeval const * timestamp)
       gettimeofday(&now, NULL);
       timeptr = &now;
     }
-    fprintf(logFile, "%d.%d ", (int)(timeptr->tv_sec),
-	    (int)((timeptr->tv_usec)/1000));
+    fprintf(logFile, "%f ", (double)(timeptr->tv_sec) +
+            ((timeptr->tv_usec)/1000)/1000.0);
   }
   fprintf(logFile, ": ");
 }
 
 void logWrite(int flags, struct timeval const * timestamp,
-	      char const * format, ...)
+              char const * format, ...)
 {
   va_list va;
   va_start(va, format);

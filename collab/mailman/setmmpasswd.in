@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -19,7 +19,6 @@ sub usage()
 }
 my $optlist = "dau";
 my $debug   = 0;
-my $dbuid;
 my $listtype;
 my $listname;
 my $listowner;
@@ -59,6 +58,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 #
 # We don't want to run this script unless its the real version.
@@ -86,12 +86,13 @@ if (! $MAILMANSUPPORT) {
 }
 
 #
-# Get user DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-        "    You do not exist in the Emulab Database!\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -187,7 +188,7 @@ if ($CONTROL ne $BOSSNODE) {
 
     SENDMAIL($TBAUDIT, "Mailman list password changed",
 	     "The mailman list password for list '$listname' has been ".
-	     "changed by '$dbuid'",
+	     "changed by '$user_uid'",
 	     $TBOPS);
 }
 exit(0);

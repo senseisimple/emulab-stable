@@ -1,4 +1,9 @@
 #!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 ########################
 # TODO:
@@ -13,22 +18,31 @@
 
 use lib '/usr/testbed/lib';
 use libtbdb;
-#require Mysql;
-#use libpelabdb;
-use event;
+use libwanetmon;
 use Getopt::Std;
 use strict;
+use IO::Socket::INET;
+use IO::Select;
+use Time::HiRes qw(gettimeofday);
 
 # node and site id caches
 my %nodeids;
 my %siteids;
 
+# ipaddr cache, since nodes are addressed via IP in the event system.
+my %ipaddrs;
+
 # Batch up insertions. Simple string.
 my $insertions = "";
+my @queued_data;
 my $batchsize  = 0;
 my $maxbatch   = 30;
 my $maxidletime= 5;	# Seconds before forced insert.
 my $lastinsert = 0;	# Timestamp.
+
+my %lasttimestamp;  #prevents adding duplicate entries in DB
+my %duplicatecnt;   #counters keeping track of duplicate entries.
+my $duplicateKillThresh = 50; #kill node if this many duplicates occur per index
 
 #
 # Turn off line buffering on output
@@ -36,17 +50,31 @@ my $lastinsert = 0;	# Timestamp.
 $| = 1;
 
 sub usage {
-	warn "Usage: $0 ";
+	print "Usage: $0 [-p receiveport] [-a sendport] [-e pid/eid]".
+	    " [-d debuglevel] [-i]\n";
 	return 1;
 }
+
 my $debug    = 0;
 my $impotent = 0;
-
+my $debug = 0;
+my ($port, $sendport, $expid);
 my %opt = ();
-getopt(\%opt,"s:p:h");
+if (!getopts("p:a:e:d:ih", \%opt)) {
+    exit &usage;
+}
+if ($opt{p}) { $port = $opt{p}; } else { $port = 5051; }
+if ($opt{a}) { $sendport = $opt{a}; } else { $sendport = 5050; }
+if ($opt{h}) { exit &usage; }
+if ($opt{e}) { $expid = $opt{e}; } else { $expid = "none"; }
+if ($opt{d}) { $debug = $opt{d}; } else { $debug = 0; }
+if ($opt{i}) { $impotent = 1; } 
 
-#if ($opt{h}) { exit &usage; }
 if (@ARGV !=0) { exit &usage; }
+
+print "pid/eid = $expid\n";
+print "receiveport = $port\n";
+print "sendport = $sendport\n";
 
 my $PWDFILE = "/usr/testbed/etc/pelabdb.pwd";
 ##TODO: CHANGE TO "pelab" and "pelab"
@@ -61,127 +89,148 @@ if( $DBPWD =~ /^([\w]*)\s([\w]*)$/ ) {
 }else{
     fatal("Bad chars in password!");
 }
-#print "PWD: $DBPWD\n";
 
 #connect to database
 my ($DB_data, $DB_sitemap);
 TBDBConnect($DBNAME,$DBUSER,$DBPWD);
-#DBConnect(\$DB_data, $DBNAME,$DBUSER,$DBPWD);
-#DBConnect(\$DB_sitemap, $DBNAME,$DBUSER,$DBPWD);
 
-my ($server,$port);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
-if ($opt{p}) { $port = $opt{p}; }
+# set sql_mode to STRICT_ALL_TABLES to match it with
+# dp database mode
+DBQueryWarn("set SESSION sql_mode='STRICT_ALL_TABLES'");
 
-my $URL = "elvin://$server";
-if ($port) { $URL .= ":$port"; }
-
-my $handle = event_register($URL,0);
-if (!$handle) { die "Unable to register with event system\n"; }
-
-my $tuple = address_tuple_alloc();
-if (!$tuple) { die "Could not allocate an address tuple\n"; }
+my $socket_rcv = IO::Socket::INET->new( LocalPort => $port,
+					Proto     => 'udp' );
+#my $socket_snd = IO::Socket::INET->new( PeerPort => $sendport,
+#					Proto    => 'udp',
+#					PeerAddr => "$linksrc");
 
 
-#watch for notifications to ops
-%$tuple = ( host      => $event::ADDRESSTUPLE_ALL,
-	    objtype   => "BGMON",
-	    objname   => "ops"
-	    , expt      => "__none"
-	    , scheduler => 1
-	    );
+my $sel = IO::Select->new();
+$sel->add($socket_rcv);
 
-if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
-	die "Could not subscribe to event\n";
-}
-
-
-#############################################################################
-# Note a difference from tbrecv.c - we don't yet have event_main() functional
-# in perl, so we have to poll. (Nothing special about the select, it's just
-# a wacky way to get usleep() )
-#############################################################################
-#main()
+#
+# MAIN LOOP
+#
 
 while (1) {
 
     #check for pending received events
-    event_poll_blocking($handle, 1000);
+#    event_poll_blocking($handle, 1000);
 
     SendBatchedInserts()
 	if ($batchsize && (time() - $lastinsert) > $maxidletime);
+
+    handleincomingmsgs();
+
 }
 
 #############################################################################
 
-if (event_unregister($handle) == 0) {
-    die "Unable to unregister with event system\n";
-}
-
 exit(0);
 
 
-sub callbackFunc($$$) {
-	my ($handle,$notification,$data) = @_;
-
-	my $time      = time();
-	my $site      = event_notification_get_site($handle, $notification);
-	my $expt      = event_notification_get_expt($handle, $notification);
-	my $group     = event_notification_get_group($handle, $notification);
-	my $host      = event_notification_get_host($handle, $notification);
-	my $objtype   = event_notification_get_objtype($handle, $notification);
-	my $objname   = event_notification_get_objname($handle, $notification);
-	my $eventtype = event_notification_get_eventtype($handle,
-							 $notification);
-#	print "Event: $time $site $expt $group $host $objtype $objname " .
-#		"$eventtype\n";
-
-	print "EVENT: $time $objtype $eventtype\n"
-	    if ($debug);
-
-        my $linksrc = event_notification_get_string($handle,
-						    $notification,
-						    "linksrc");
-        my $linkdest = event_notification_get_string($handle,
-						     $notification,
-						     "linkdest");
-	my $testtype = event_notification_get_string($handle,
-						     $notification,
-						     "testtype");
-	my $result = event_notification_get_string($handle,
-						     $notification,
-						     "result");
-	my $tstamp = event_notification_get_string($handle,
-						   $notification,
-						   "tstamp");
-#	my $scheduler = event_notification_get_string($handle,
-#						      $notification,
-#						      "SCHEDULER");
-
-	#change values and/or initialize
-	if ( $debug && $eventtype eq "RESULT" ){
-	    print "***GOT RESULT***\n";
-	}
-				      
-	print("linksrc=$linksrc\n".
-	      "linkdest=$linkdest\n".
-	      "testtype =$testtype\n".
-	      "result=$result\n".
-	      "tstamp=$tstamp\n")
-	    if ($debug);
-
-	saveTestToDB(linksrc   => $linksrc,
-		     linkdest  => $linkdest,
-		     testtype  => $testtype,
-		     result    => $result,
-		     tstamp    => $tstamp );
-
-
-#	if (event_unregister($handle) == 0) {
-#	    die "Unable to unregister with event system\n";
+sub handleincomingmsgs()
+{
+    my $inmsg;
+    #check for pending received results
+    my @ready = $sel->can_read(1000);
+    foreach my $handle (@ready){
+	$socket_rcv->recv( $inmsg, 2048 );
+	chomp $inmsg;
+	print "debug: got a udp message: $inmsg\n" if( $debug > 2 );
+	my %inhash = %{ deserialize_hash( $inmsg )};
+#	foreach my $key (keys %inhash){
+#	    print "key=$key\n";
+#	    print "$key  \t$inhash{$key}\n";
 #	}
-#	exit(0);
+	my ($exp_in, $linksrc, $linkdest, $testtype, $result, $tstamp, $index)
+	    = ($inhash{expid}, $inhash{linksrc}, $inhash{linkdest},
+	       $inhash{testtype}, $inhash{result}, $inhash{tstamp},
+	       $inhash{index});
+
+	# if incoming result is not of this expid, return
+	if( $exp_in ne $expid ){
+	    print "ignored msg from expid=$exp_in\n" if( $debug > 2 );
+	    return;
+	}
+
+	print "\n" if( $debug > 1 );
+	print("linksrc =$linksrc\n".
+	      "linkdest=$linkdest\n".
+	      "testtype=$testtype\n".
+	      "result  =$result\n".
+	      "index   =$index\n".
+	      "tstamp  =$tstamp\n") if( $debug > 1 );
+
+	if( defined $linksrc ){
+	    my $socket_snd;
+	    eval{
+		$socket_snd = 
+		  IO::Socket::INET->new( PeerPort => $sendport,
+					 Proto    => 'udp',
+					 PeerAddr => "$linksrc");
+	    };
+	    if( $@ ){
+		#socket creation was fatal
+		warn "Socket creation failed: $@\n";
+	    }
+	    my %ack = ( expid   => $expid,
+			cmdtype => "ACK",
+			index   => $index,
+			tstamp  => $tstamp );
+	    if( defined %ack && defined $socket_snd ){
+		my $ack_serial = serialize_hash( \%ack );
+		$socket_snd->send($ack_serial);
+		print "**SENT ACK**\n" if( $debug > 1 );
+
+		if( !defined $lasttimestamp{$linksrc}{$index} ||
+		    $tstamp ne $lasttimestamp{$linksrc}{$index} )
+		{
+		    saveTestToDB(linksrc   => $linksrc,
+				 linkdest  => $linkdest,
+				 testtype  => $testtype,
+				 result    => $result,
+				 tstamp    => $tstamp );
+		    #clear duplicatecnt for corresponding result index
+		    if( defined($duplicatecnt{$linksrc}{$index}) ){
+			delete $duplicatecnt{$linksrc}{$index};
+		    }
+		}else{
+		    print("++++++duplicate data\n".
+		          "linksrc=$linksrc\n".
+			  "linkdest=$linkdest\n".
+			  "testtype =$testtype\n".
+			  "result=$result\n".
+			  "index=$index\n".
+			  "tstamp=$tstamp\n") if( $debug > 0);
+
+		    #increment duplicatecnt for this src and index number
+		    if( defined($duplicatecnt{$linksrc}{$index}) ){
+			$duplicatecnt{$linksrc}{$index}++;
+			#kill off offending node, if > threshold
+			if( $duplicatecnt{$linksrc}{$index}
+			    > $duplicateKillThresh )
+			{
+			    killnode($linksrc);
+			    print "KILLING OFF BGMON at $linksrc".
+				" for index $index\n" if( $debug > 0 );
+			    delete $duplicatecnt{$linksrc};
+			}
+		    }else{
+			$duplicatecnt{$linksrc}{$index} = 1;
+		    }
+		    
+
+		}
+		$lasttimestamp{$linksrc}{$index} = $tstamp;
+	    }
+
+	}
+
+    }
+
 }
+
 
 #############################################################################
 
@@ -225,6 +274,21 @@ sub saveTestToDB()
 	$dstnode = $nodeids{$results{linkdest}};
     }
 
+    my $testtype = $results{'testtype'};
+    my $result   = $results{'result'};
+    my $tstamp   = $results{'tstamp'};
+    my $latency  = ($testtype eq "latency" ? "$result" : "NULL");
+    my $loss     = ($testtype eq "loss"    ? "$result" : "NULL");
+    my $bw       = ($testtype eq "bw"      ? "$result" : "NULL");
+
+    # TODO: hacky... log "outage" markers of 100% loss
+    if( $testtype eq "outage" && $result eq "down"){
+	$loss = "1";
+	print "     LOSS = 100%\n\n" if( $debug > 2 );
+    }
+
+
+    # Check for valid DB id's.. RETURN from sub if invalid
     if( $srcsite eq "" || $srcnode eq "" || $dstsite eq "" || $dstnode eq "" ){
 	warn "No results matching node id's $results{linksrc} and/or ".
 	    "$results{linkdest}. Results:\n";
@@ -234,18 +298,21 @@ sub saveTestToDB()
 	warn "dstnode=$dstnode\n";
 	return;
     }
-    my $testtype = $results{'testtype'};
-    my $result   = $results{'result'};
-    my $tstamp   = $results{'tstamp'};
-    my $latency  = ($testtype eq "latency" ? "$result" : "0");
-    my $loss     = ($testtype eq "loss"    ? "$result" : "0");
-    my $bw       = ($testtype eq "bw"      ? "$result" : "0");
+   
+    
 
     if ($bw eq "") {
 	my $src = $results{'linksrc'};
 	my $dst = $results{'linkdest'};
 	
 	warn("BW came in as null string at $tstamp for $src,$dst\n");
+	return;
+    }
+    if ($latency eq "") {
+	my $src = $results{'linksrc'};
+	my $dst = $results{'linkdest'};
+	
+	warn("Latency came in as null string at $tstamp for $src,$dst\n");
 	return;
     }
 
@@ -261,6 +328,7 @@ sub saveTestToDB()
     $insertions .=
 	"($srcsite, $srcnode, $dstsite, $dstnode, $tstamp, ".
 	" $latency, $loss, $bw)";
+    push @queued_data, sprintf("RECORD ADDED $results{linksrc} $results{linkdest} : %.6f", $results{tstamp});
 
     $batchsize++;
     SendBatchedInserts()
@@ -273,9 +341,18 @@ sub SendBatchedInserts()
 	DBQueryWarn($insertions)
 	    if (!$impotent);
 	print "$insertions\n"
-	    if ($debug);
+	    if ($debug > 2);
 	$lastinsert = time();
+    }
+    my ($seconds, $microseconds) = gettimeofday;
+    my $time = $seconds + $microseconds/1000000;
+    foreach my $d (@queued_data) {
+      printf "$d %.6f\n", $time;
     }
     $batchsize  = 0;
     $insertions = "";
+    @queued_data = ();
 }
+
+
+#############################################################################

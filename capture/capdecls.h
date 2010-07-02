@@ -1,10 +1,11 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2002, 2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 #define SERVERPORT	855
+#define LOGGERPORT	858
 #define DEVPATH		"/dev"
 #define TIPPATH		"/dev/tip"
 #ifdef HPBSD
@@ -42,6 +43,18 @@ typedef struct {
 } whoami_t;
 
 /*
+ * This is for the cap logger handshake, which passes additional stuff.
+ */
+typedef struct {
+    secretkey_t		secretkey;
+    char		node_id[128];
+    int			offset;
+    unsigned int	flags;
+} logger_t;
+#define CAPLOGFLAG_NOFLAGS	0x0
+#define CAPLOGFLAG_TAIL		0x1
+
+/*
  * Return Status. Define a constant size return to ensure that the
  * status is read as an independent block, distinct from any output
  * that might be sent. An int is a reasonable thing to use.
@@ -51,4 +64,5 @@ typedef struct {
 #define CAPOK		0
 #define CAPBUSY		1
 #define CAPNOPERM	2
+#define CAPERROR        3
 typedef int		capret_t;

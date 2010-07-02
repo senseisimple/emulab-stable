@@ -1,0 +1,17 @@
+source tb_compat.tcl
+set ns [new Simulator]
+
+tb-elab-in-elab 1
+
+namespace eval TBCOMPAT {
+       set elabinelab_hardware("boss") pc3000
+       set elabinelab_hardware("ops")  pc3000
+       # Need two nodes plus a delay node for Traffic Shaping.
+       set elabinelab_maxpcs 3
+       set elabinelab_nodeos("boss") FBSD61-STD
+       set elabinelab_nodeos("ops") FBSD61-STD
+}
+
+$ns run
+
+

@@ -14,6 +14,7 @@ WITH_GD=yes
 WITH_MCRYPT=yes
 WITH_MYSQL=yes
 WITH_XML=yes
+WITH_APACHE=yes
 # Additions for mediawiki
 #WITH_ICONV=yes
 #WITH_IMAGICK=yes
@@ -36,7 +37,9 @@ BATCH=yes
 # 4.4.2, so this can go when we upgrade our base to that (currently at
 # 4.4.1).
 #
-.MAKEFLAGS+=    EXTRA_CFLAGS=-DHAVE_OPENSSL_EXT WITH_OPENSSL=yes
+# And, with 4.4.7 we need to add WITH_APACHE as well
+#
+.MAKEFLAGS+=    EXTRA_CFLAGS=-DHAVE_OPENSSL_EXT WITH_OPENSSL=yes WITH_APACHE=yes
 
 #
 # But need this too!

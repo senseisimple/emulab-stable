@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -9,19 +9,24 @@ require("defs.php3");
 $NSGEN         = "webnsgen";
 $TMPDIR        = "/tmp/";
 
-# Page arguments.
-$template = $_GET['template'];
-$advanced = $_GET['advanced'];
-
-if (!isset($template)) {
-    PAGEARGERROR();
-}
-
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify Page Arguments.
+#
+$reqargs = RequiredPageArguments("template",        PAGEARG_STRING);
+$optargs = OptionalPageArguments("submit",          PAGEARG_STRING,
+				 "advanced",        PAGEARG_STRING,
+				 "templatevalues",  PAGEARG_ARRAY);
+
+if (!isset($advanced)) {
+    $advanced = 0;
+}
 
 #
 # Check to see if the template file actually exists
@@ -62,13 +67,14 @@ xml_parser_free($xml_parser);
 #
 # Body - Either make the NS file or ask the user for the form parameters 
 #
-if ($submit == "Begin Experiment" || $submit == "Show NS File") {
+if (isset($submit) &&
+    ($submit == "Begin Experiment" || $submit == "Show NS File")) {
     global $TMPDIR;
     $nsref = MAKENS($template,$templatefields,$templatevalues);
     if ($submit == "Begin Experiment") {
         BEGINEXP($nsref);
     } else {
-        $filename =  $TMPDIR . GETUID() . "-$nsref.nsfile";
+        $filename =  $TMPDIR . $uid . "-$nsref.nsfile";
         header("Content-type: text/plain");
         readfile($filename);
         unlink($filename);
@@ -79,6 +85,24 @@ if ($submit == "Begin Experiment" || $submit == "Show NS File") {
     #
 
     PAGEHEADER("Automatic NS file Generation");
+
+    #
+    # JavaScript for the Show NS option
+    #
+    echo "<script language=JavaScript>
+          <!--
+            function NormalSubmit() {
+              document.form1.target='_self';
+              document.form1.submit();
+            }
+            function ShowNS() {
+                var oldtarget = document.form1.target;
+                document.form1.target='nsgen';
+                document.form1.submit();
+                document.form1.target = oldtarget;
+            }
+          //-->
+          </script>\n";
 
     SPITFORM($advanced,$templatefields,$templateorder);
 
@@ -108,8 +132,9 @@ function SPITFORM($advanced,$templatefields,$templateorder) {
     echo "<tr><th colspan=2>Template Parameters</th></tr>";
     for ($i = 0; $i < sizeof($templateorder); $i++) {
         $param = $templateorder[$i];
-        if ($templatefields[$param]['advanced'] && $advanced = 0) {
-            next;
+        if (isset($templatefields[$param]['advanced']) &&
+	    $templatefields[$param]['advanced'] && $advanced = 0) {
+            continue;
         }
         
         $default = $templatefields[$param]['default'];
@@ -123,8 +148,8 @@ function SPITFORM($advanced,$templatefields,$templateorder) {
     }
 
     echo "<tr><th colspan=2><center>";
-    echo "<input type=submit name=submit value='Begin Experiment'>&nbsp;";
-    echo "<input type=submit name=submit value='Show NS File'>&nbsp;";
+    echo "<input type=submit name=submit value='Begin Experiment' onclick=\"NormalSubmit();\">&nbsp;";
+    echo "<input type=submit id=showns name=submit value='Show NS File' onclick=\"ShowNS();\">&nbsp;";
     echo "<input type=reset name=reset value='Reset'>";
     echo "</center></th></tr>\n";
 
@@ -165,7 +190,7 @@ function startElement($parser,$name,$attrs)
     if ($name == "VARIABLE") {
 
         #
-        # Let's assume the template file is well-formed. I should write a DTD
+        # Lets assume the template file is well-formed. I should write a DTD
         # and validate it.
         #
         $varname = $attrs['NAME'];
@@ -208,7 +233,7 @@ function startElement($parser,$name,$attrs)
         $templateauthor = "";
         if (isset($attrs['AUTHOR'])) {
             if (isset($attrs['AUTHORUID'])) {
-                $templateauthor = "<a href='showuser.php3?target_uid=$attrs[AUTHORUID]'>";
+                $templateauthor = "<a href='showuser.php3?user=$attrs[AUTHORUID]'>";
                 $templateauthor .= $attrs['AUTHOR'] . "</a>";
             } else {
                 $templateauthor = isset($attrs['AUTHOR']);
@@ -228,7 +253,7 @@ function startElement($parser,$name,$attrs)
 function MAKENS($template,$templatefields,$templatevalues) {
     global $NSGEN;
     global $TMPDIR;
-    global $templatefile;
+    global $templatefile, $uid;
     
     #
     # Pick out some defaults for the exp. creation page
@@ -240,7 +265,7 @@ function MAKENS($template,$templatefields,$templatevalues) {
     list($usec, $sec) = explode(' ', microtime());
     srand((float) $sec + ((float) $usec * 100000));
     $nsref = rand();
-    $outfile = $TMPDIR . GETUID() . "-$nsref.nsfile";
+    $outfile = $TMPDIR . $uid . "-$nsref.nsfile";
 
     #
     # Pick out the parameters for command-line arguments
@@ -252,10 +277,11 @@ function MAKENS($template,$templatefields,$templatevalues) {
         }
 
         #
-        # Don't include default values as command-line args
+        # Do not include default values as command-line args
         #
-        if ($value == $templatefields[$name]['default']) {
-            next;
+	if (isset($templatefields[$name]['default']) &&
+	    $templatefields[$name]['default'] == $value) {
+            continue;
         }
 
         #
@@ -287,3 +313,5 @@ function BEGINEXP($nsref)
     $url .= "&nsref=$nsref";
     header("Location: $url");
 }
+
+?>

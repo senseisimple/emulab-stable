@@ -1,0 +1,514 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+# Note slightly different interface for special jail mount hack. 
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid path usenfs]".
+	               " boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Script specific goo
+my $MOUNTDB	= "$VARDIR/db/mountdb";
+my $SFSMOUNTDB  = "$VARDIR/db/sfsmountdb";
+my $vnodeid;
+my $rootpath;
+my $usenfs;
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use liblocsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (REMOTE() || JAILED() || PLAB());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+
+    # Grab the other two options.
+    usage()
+	if (@ARGV != 3);
+    $rootpath = shift(@ARGV);
+    $usenfs   = shift(@ARGV);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# More protos
+sub jailmount();
+sub jailunmount();
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    # Special Case.
+    return jailmount()
+	if (defined($vnodeid));
+	
+    #
+    # Process mount directives from TMCD. We keep track of all the
+    # mounts we have added in here so that we delete just the mounts
+    # we added, when project membership changes. Same goes for project
+    # directories on shared nodes. We use a simple perl DB for that.
+    #
+    my %MDB;
+    my %mounts;
+    my %deletes;
+    my %sfsmounts;
+    my %sfsdeletes;
+    my %tmccresults;
+    my %curmounts;
+
+    print STDOUT "Mounting project and home directories ... \n";    
+
+    if (tmcc(TMCCCMD_MOUNTS, undef , \%tmccresults) < 0) {
+	fatal("Could not get mount list from server!");
+    }
+
+    if ($ptr = $tmccresults{"MOUNT"}) {
+	    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+
+	    foreach my $mount (@$ptr) {
+		my $remote = $$mount{'REMOTE'};
+		my $local = $$mount{'LOCAL'};
+
+		if (($remote =~ /^[-:\@\w\.\/]+$/) && ($local =~ /^[-\@\w\.\/]+$/)) {
+		    $mounts{$remote} = $local;
+		}
+		else {
+		    warning("Malformed mount information: REMOTE=$remote LOCAL=$local");
+		}
+	    }
+    }
+
+    if ($ptr = $tmccresults{"SFS"}) {
+	    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+
+	    foreach my $sfs (@$ptr) {
+		my $remote = $$sfs{'REMOTE'};
+		my $local = $$sfs{'LOCAL'};
+
+		if (($remote =~ /^[-:\@\w\.\/]+$/) && ($local =~ /^[-\@\w\.\/]+$/)) {
+		    $$sfs{$remote} = $local;
+		}
+		else {
+		    warning("Malformed sfs information: REMOTE=$remote LOCAL=$local");
+		}
+	    }
+    }
+    
+    #
+    # The MFS version does not support (or need) this DB stuff. Just mount
+    # them up.
+    #
+    if (MFS()) {
+	while (($remote, $local) = each %mounts) {
+	    if (! -e $local) {
+		if (! os_mkdir($local, "0770")) {
+		    warning("Could not make directory $local");
+		    next;
+		}
+	    }
+	
+	    print STDOUT "  Mounting $remote on $local\n";
+	    if (system("$NFSMOUNT $remote $local")) {
+		warning("Could not $NFSMOUNT $remote on $local\n");
+		next;
+	    }
+	}
+	return;
+    }
+
+    # On CygWin, the Samba mount is set up per-user by rc.cygwinxp-user, and what is
+    # available through the mount is controlled by the smb.conf file on the file
+    # server.  All that's left is to CygWin mount the //fs directory paths.
+    if (WINDOWS()) {
+	while (($remote, $local) = each %mounts) {
+	    my $host = "fs";
+	    print "Mount $local from //$host\n";
+	    os_samba_mount($local, $host, 0);
+	}
+	return;
+    }
+
+    dbmopen(%MDB, $MOUNTDB, 0660) or
+	fatal("Could not open $MOUNTDB");
+
+    if (os_getnfsmounts(\%curmounts) < 0) {
+	fatal("Could not get current NFS mounts!");
+    }
+    
+    #
+    # First mount all the mounts we are told to. For each one that is not
+    # currently mounted, and can be mounted, add it to the DB.
+    # 
+    while (($remote, $local) = each %mounts) {
+	if (defined($curmounts{$remote})) {
+	    if ($curmounts{$remote} eq $local) {
+		#
+		# Already mounted in the right spot, skip.
+		# Lets check to make sure the DB is consistent though.
+		#
+		if (defined($MDB{$remote}) && $MDB{$remote} eq $local) {
+		    # Perfect!
+		    next;
+		}
+	    }
+	    # Hmm, different mount point. Warn and skip.
+	    warning("$remote already mounted on ". $curmounts{$remote});
+	    next;
+	}
+
+	if (! -d $local) {
+	    # Leftover SFS link.
+	    if (-l $local) {
+		if (!unlink($local)) {
+		    warning("Could not unlink $local: $!");
+		    next;
+		}
+	    }
+	    if (! os_mkdir($local, "0770")) {
+		warning("Could not make directory $local: $!");
+		next;
+	    }
+	}
+	
+	print STDOUT "  Mounting $remote on $local\n";
+	if (system("$NFSMOUNT $remote $local")) {
+	    warning("Could not $NFSMOUNT $remote on $local: $!");
+	    next;
+	}
+	$curmounts{$remote} = $local;
+	$MDB{$remote} = $local;
+    }
+
+    #
+    # Now unmount the ones that we mounted previously, but are now no longer
+    # in the mount set (as told to us by the TMCD). Note, we cannot delete 
+    # them directly from MDB since that would mess up the foreach loop, so
+    # just stick them in temp and postpass it.
+    #
+    while (($remote, $local) = each %MDB) {
+	if (defined($mounts{$remote})) {
+	    next;
+	}
+
+	print STDOUT "  Unmounting $local\n";
+	if (system("$UMOUNT $local")) {
+	    warning("Could not unmount $local");
+	    next;
+	}
+	
+	#
+	# Only delete from set if we can actually unmount it. This way
+	# we can retry it later (or next time).
+	# 
+	$deletes{$remote} = $local;
+    }
+    while (($remote, $local) = each %deletes) {
+	delete($MDB{$remote});
+    }
+
+    # Write the DB back out!
+    dbmclose(%MDB);
+
+    #
+    # Now, do basically the same thing over again, but this time for
+    # SFS mounted stuff. If no mounts, we are done.
+    #
+    return
+	if (!scalar(%sfsmounts));
+
+    dbmopen(%MDB, $SFSMOUNTDB, 0660);
+	
+    #
+    # First symlink all the mounts we are told to. For each one that
+    # is not currently symlinked, and can be, add it to the DB.
+    #
+    while (($remote, $local) = each %sfsmounts) {
+	if (-l $local) {
+	    if (readlink($local) eq ("/sfs/" . $remote)) {
+		$MDB{$remote} = $local;
+		next;
+	    }
+	    if (readlink($local) ne ("/sfs/" . $remote)) {
+		print STDOUT "  Unlinking incorrect symlink $local\n";
+		if (! unlink($local)) {
+		    warning("Could not unlink $local: $!");
+		    next;
+		}
+	    }
+	}
+	elsif (-d $local) {
+	    if (! rmdir($local)) {
+		warning("Could not rmdir $local: $!");
+		next;
+	    }
+	}
+	    
+	$dir = $local;
+	$dir =~ s/(.*)\/[^\/]*$/$1/;
+	if ($dir ne "" && ! -e $dir) {
+	    print STDOUT "  Making directory $dir\n";
+	    if (! os_mkdir($dir, "0755")) {
+		warning("Could not make directory $local: $!");
+		next;
+	    }
+	}
+	print STDOUT "  Symlinking $remote on $local\n";
+	if (! symlink("/sfs/" . $remote, $local)) {
+	    warning("Could not make symlink $local: $!");
+	    next;
+	}
+	    
+	$MDB{$remote} = $local;
+    }
+
+    #
+    # Now delete the ones that we symlinked previously, but are now no
+    # longer in the mount set (as told to us by the TMCD).  Note, we
+    # cannot delete them directly from MDB since that would mess up
+    # the foreach loop, so just stick them in temp and postpass it.
+    #
+    while (($remote, $local) = each %MDB) {
+	if (defined($sfsmounts{$remote})) {
+	    next;
+	}
+	    
+	if (! -e $local) {
+	    $sfsdeletes{$remote} = $local;
+	    next;
+	}
+	    
+	print STDOUT "  Deleting symlink $local\n";
+	if (! unlink($local)) {
+	    warning("Could not delete $local: $!");
+	    next;
+	}
+	    
+	#
+	# Only delete from set if we can actually unlink it.  This way
+	# we can retry it later (or next time).
+	#
+	$sfsdeletes{$remote} = $local;
+    }
+    while (($remote, $local) = each %sfsdeletes) {
+	delete($MDB{$remote});
+    }
+
+    # Write the DB back out!
+    dbmclose(%MDB);	
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Special Case.
+    return jailunmount()
+	if (defined($vnodeid));
+	
+    # Otherwise nothing.
+    # The mounts will get taken care of if the node reboots.
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # doboot will handle adding and deleting mounts. No need to call
+    # the shutdown routine; wasted effort.
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state). We do not
+# unmount though.
+#
+sub docleanup()
+{
+    my $mdb = $MOUNTDB . ".db";
+    my $sdb = $SFSMOUNTDB . ".db";
+    
+    unlink $mdb
+	if (-e $mdb);
+    unlink $sdb
+	if (-e $sdb);
+}
+
+#
+# Aux function called from the mkjail code to do mounts outside of a
+# jail. Can use either NFS or local loopback. Maybe SFS someday. Local
+# only, of course.
+#
+# mkjail calls this routine to both mount and unmount since when a jail
+# exits it cannot leave any mounts around. Any failures in unmount has
+# to stop mkjail, since otherwise really really bad things can happen
+# (homedirs getting deleted on the file server)!
+# 
+sub jailmount()
+{
+    my $JAILDB    = CONFDIR() . "/mounts";
+    my $mountstr;
+
+    #
+    # No NFS mounts on remote nodes.
+    # 
+    if (REMOTE()) {
+	return ();
+    }
+
+    if ($usenfs) {
+	$mountstr = $NFSMOUNT;
+    }
+    elsif (defined($LOOPBACKMOUNT)) {
+	$mountstr = $LOOPBACKMOUNT;
+    }
+
+    #
+    # We mount all the mounts that the physical node has mounted, into
+    # the jail. Since this is not going to be updated (no support for
+    # updating mounts yet), we construct a copy of the DB in the jail
+    # directory so we know exactly what we did when it comes time to do
+    # the unmounts. In the meantime, the physical node might change its
+    # mount set, but we will not care (of course, if a dir is unmounted
+    # from the pnode, something is probably going to break). 
+    # 
+    dbmopen(%MDB, $MOUNTDB, 0444);
+    dbmopen(%SDB, $JAILDB,  0644);
+    
+    while (my ($remote, $path) = each %MDB) {
+	$local = "$rootpath$path";
+	    
+	if (! -e $local) {
+	    if (! os_mkdir($local, "0770")) {
+		warning("Could not make directory $local");
+		next;
+	    }
+	}
+	
+	if (! $usenfs) {
+	    $remote = $path;
+	}
+
+	print STDOUT "  Mounting $remote on $local\n";
+	if (system("$mountstr $remote $local")) {
+	    warning("Could not $mountstr $remote on $local");
+	    next;
+	}
+	$SDB{$remote} = $local;	
+    }
+    dbmclose(%MDB);	   
+    dbmclose(%SDB);
+    return 0;
+}
+
+#
+# Undo what the previous function did. Unmount all the mounts in the DB.
+# Must be sure to delete the DB file at the end so that the jail directory
+# is not left with crud in it.
+# 
+sub jailunmount()
+{
+    my $JAILDB = CONFDIR() . "/mounts";
+    my $errors = 0;
+
+    #
+    # No NFS mounts on remote nodes.
+    # 
+    if (REMOTE()) {
+	return 0;
+    }
+
+    #
+    # Get all the mounts from the DB and unmount. Any failures *MUST*
+    # be reported back via failure code.
+    #
+    dbmopen(%SDB, $JAILDB,  0444);
+    
+    while (my ($remote, $path) = each %SDB) {
+	print STDOUT "  Unmounting $path\n";
+	
+	if (system("$UMOUNT $path")) {
+	    warning("Could not unmount $local");
+	    $errors++;
+	}
+    }
+    dbmclose(%SDB);
+
+    fatal("Could not unmount some jailed mounts!")
+	if ($errors);
+
+    unlink $JAILDB . ".db";
+    return 0;
+}
+

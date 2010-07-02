@@ -1,0 +1,71 @@
+#!/usr/bin/perl
+
+# 
+# EMULAB-COPYRIGHT 
+# Copyright (c) 2009 University of Utah and the Flux Group. 
+# All rights reserved. 
+#
+
+#
+# Gather statictics, in the form of files that can be passed as datafiles to
+# gnuplot, for a set of tests that have already been run
+#
+
+require common;
+
+use strict;
+
+#
+# Read config from file passed on command line
+#
+die "Usage: $0 <testfile>" unless @ARGV==1;
+my ($testfile) = @ARGV;
+readtestfile($testfile);
+
+setglobals();
+
+#
+# Read stats on the top and ptop files for this test
+#
+my ($topinfo,$ptopinfo)  = readfileinfo();
+
+my (@pnode_time, @vnode_time, @plink_time, @vlink_time, @feature_time,
+    @pclass_time);
+
+#
+# Loop through every test, gathering stats
+#
+foreach my $test (enumeratetests()) {
+    if (passed($test)) {
+        my $assigninfo = parseassignlog(logfile($test));
+        my $top = top($test);
+        my $ptop = ptop($test);
+        my $time = $$assigninfo{'runtime'};
+        my $pclasses = $$assigninfo{'pclasses'};
+
+        my $topnodes = $$topinfo{$top}{'nodes'};
+        my $toplinks = $$topinfo{$top}{'links'};
+        my $ptopnodes = $$ptopinfo{$ptop}{'nodes'};
+        my $ptoplinks = $$ptopinfo{$ptop}{'links'};
+        my $topfds = $$topinfo{$top}{'fds'};
+        my $ptopfds = $$ptopinfo{$ptop}{'fds'};
+
+        push @pnode_time, [$ptopnodes, $time];
+        push @vnode_time, [$topnodes, $time];
+        push @plink_time, [$ptoplinks, $time];
+        push @vlink_time, [$toplinks, $time];
+        push @feature_time, [$ptopfds, $time];
+        push @pclass_time, [$pclasses, $time];
+
+    } else {
+        print "NOTICE: Test $test failed, skipping\n";
+    }
+}
+
+print "Writing statistics files\n";
+write_sortedfile(statfile("pnode_time"), \@pnode_time);
+write_sortedfile(statfile("vnode_time"), \@vnode_time);
+write_sortedfile(statfile("plink_time"), \@plink_time);
+write_sortedfile(statfile("vlink_time"), \@vlink_time);
+write_sortedfile(statfile("feature_time"), \@feature_time);
+write_sortedfile(statfile("pclass_time"), \@pclass_time);

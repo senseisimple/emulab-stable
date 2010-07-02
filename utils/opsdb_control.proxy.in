@@ -1,0 +1,805 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+use File::Basename;
+use strict;
+use GD::Graph::lines;
+
+#
+# A wrapper for messing with the OPS DB from boss.
+#
+sub usage()
+{
+    print "Usage: opsdb_control.proxy adduser [-m] <uid> or\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $OURDOMAIN= "@OURDOMAIN@";
+my $DBCONF   = "/usr/testbed/etc/mysqld.pwd";
+my $MYSQLDUMP= "/usr/local/bin/mysqldump";
+my $MYSQL    = "/usr/local/bin/mysql";
+my $GZIP     = "/usr/bin/gzip";
+my $TRACESCHEMA = "/usr/local/share/examples/snort/create_mysql";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname = "mysql";
+my $dbuser = "root";
+my $dbpass;
+
+# Protos
+sub AddUser(@);
+sub DelUser(@);
+sub AddDB(@);
+sub DelDB(@);
+sub SetDBs(@);
+sub DumpDB(@);
+sub LoadDB(@);
+sub GraphDB(@);
+sub CleanDB(@);
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+
+#
+# The DB passwd is stored in the config file, hopefully not world
+# readable. Open and parse that file, then open a connection to the
+# DB.
+#
+if (`cat $DBCONF` =~ /^([\w]*)$/) {
+    $dbpass = $1;
+}
+else {
+    fatal("Bad characters in password!");
+}
+
+if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+    fatal("Could not connect to ops database!");
+}
+
+my $action = shift(@ARGV);
+
+if ($action eq "adduser") {
+    exit(AddUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelUser(@ARGV));
+}
+elsif ($action eq "adddb") {
+    exit(AddDB(@ARGV));
+}
+elsif ($action eq "deldb") {
+    exit(DelDB(@ARGV));
+}
+elsif ($action eq "setdbs") {
+    exit(SetDBs(@ARGV));
+}
+elsif ($action eq "dumpdb") {
+    exit(DumpDB(@ARGV));
+}
+elsif ($action eq "loaddb") {
+    exit(LoadDB(@ARGV));
+}
+elsif ($action eq "graphdb") {
+    exit(GraphDB(@ARGV));
+}
+elsif ($action eq "cleandb") {
+    exit(CleanDB(@ARGV));
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Utility function to see if a DB already exists.
+#
+sub DBExists($)
+{
+    my ($dbname) = @_;
+
+    my $query_result =
+	DBQueryWarn("show databases like '$dbname'");
+
+    return -1
+	if (! $query_result);
+    return $query_result->numrows;
+}
+
+#
+# Utility function to see if a DB is an emulab DB
+#
+sub IsEmulabDB($)
+{
+    my ($dbname) = @_;
+
+    my $query_result =
+	DBQueryWarn("select * from emulab_dbs where dbname='$dbname'");
+
+    return -1
+	if (! $query_result);
+    
+    return $query_result->numrows;
+}
+
+#
+# Add user.
+#
+sub AddUser(@)
+{
+    my ($uid) = @_;
+    my ($password);
+
+    usage()
+	if (@_ != 1);
+    
+    # Password comes in from STDIN.
+    
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*)$/) {
+	$password   = $1;
+    }
+    else {
+	fatal("AddUser: Bad line in input: $_");
+    }
+
+    #
+    # Default for users is no privs on anything. They get privs later
+    # on a per-db basis.
+    #
+    DBQueryFatal("replace into user (Host, User, Password) ".
+		 "values ('localhost','$uid', PASSWORD('$password'))")
+	or return -1;
+
+    # Eventually, we want to allow remote access.
+    DBQueryFatal("replace into user (Host, User, Password) ".
+		 "values ('%.${OURDOMAIN}','$uid', PASSWORD('$password'))")
+	or return -1;
+
+    DBQueryFatal("flush privileges")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Delete user.
+#
+sub DelUser(@)
+{
+    my ($uid) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    DBQueryFatal("delete from db where User='$uid'")
+	or return -1;
+    
+    DBQueryFatal("delete from user where User='$uid'")
+	or return -1;
+    
+    DBQueryFatal("flush privileges")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Add a DB
+#
+# The withtrace argument is a temp hack; need to figure out a better way
+# to do this.
+#
+sub AddDB(@)
+{
+    my ($dbname, $option) = @_;
+    my $withtrace = 0;
+    my $temporary = 0;
+
+    usage()
+	if (@_ < 1 || @_ > 2);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    # XXX use getopt ...
+    if (defined($option)) {
+	$withtrace = 1
+	    if ($option eq "-s");
+	$temporary = 1
+	    if ($option eq "-t");
+    }
+
+    #
+    # We do not want to create a DB if there already is one of that
+    # name, and its not in the emulab DB table. That means its a
+    # pre-existing DB and we are screwed. 
+    #
+    if ($exists && !$isemulab) {
+	print "DB '$dbname' already exists! Must be a conflict.\n";
+	return -1;
+    }
+
+    DBQueryFatal("create database if not exists `$dbname`")
+	or return -1;
+
+    # This table tells us what belongs to Emulab.
+    DBQueryFatal("replace into emulab_dbs (dbname, date_created, temporary) ".
+		 "  values ('$dbname', now(), $temporary)")
+	or return -1;
+
+    #
+    # If the DB is newly created and we are going to insert trace data,
+    # run the schema file into it. Sorta silly, I know.
+    #
+    if ($withtrace && !$exists) {
+	if (! open(INPUT, $TRACESCHEMA)) {
+	    print "Could not open schema file: $!\n";
+	    return -1;
+	}
+	open(SCHEMA, "| $MYSQL -u root -p $dbname >/dev/null") or
+	    fatal("Could not start $MYSQL!");
+	print SCHEMA "$dbpass\n";
+	# So as not to lose input while mysql resets the tty.
+	sleep(1);
+
+	while (<INPUT>) {
+	    print SCHEMA $_;
+	}
+	close(INPUT);
+	close(SCHEMA) or
+	    fatal($! ? "Error closing $MYSQL pipe: $!"
+		     : "Exit status $? from $MYSQL");
+    }
+    
+    return 0;
+}
+
+#
+# Remove a DB. 
+#
+sub DelDB(@)
+{
+    my ($dbname) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    #
+    # We do not want to remove a DB if there is no entry in the emulab_dbs
+    # table; it belongs to someone else!
+    #
+    if ($exists && !$isemulab) {
+	print "DB '$dbname' is not an Emulab DB! Not removing!\n";
+	return -1;
+    }
+
+    DBQueryFatal("drop database if exists `$dbname`")
+	or return -1;
+
+    # Remove any dangling entries in the Db table ...
+    DBQueryFatal("delete from db where Db='$dbname'")
+	or return -1;
+
+    # This table tells us what belongs to Emulab. Delete as last step.
+    DBQueryFatal("delete from emulab_dbs where dbname='$dbname'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Set DBs for a list of users.
+#
+sub SetDBs(@)
+{
+    my @input    = ();
+
+    usage()
+	if (@_ != 0);
+
+    #
+    # Grab all the input.
+    #
+    while (<STDIN>) {
+	push(@input, $_);
+    }
+
+    foreach my $line (@input) {
+	my @tokens   = split(/\s/, $line);
+	my $uid      = shift(@tokens);
+	my %newglist = ();
+	my %oldglist = ();
+
+	print "Setting dbs for $uid to @tokens\n"
+	    if ($debug);
+
+	# List of new DBs to grant access to.
+	foreach my $db (@tokens) {
+	    $newglist{$db} = $db;
+	}
+	
+	my $query_result =
+	    DBQueryFatal("select * from user where User='$uid'");
+	return -1
+	    if (!$query_result);
+
+	if (!$query_result->numrows) {
+	    print "User $uid does not exist in the user table!\n";
+	    return 0;
+	}
+
+	# Generate existing DB access list.
+	$query_result =
+	    DBQueryFatal("select Db from db where User='$uid'");
+	while (my ($db) = $query_result->fetchrow_array()) {
+	    $oldglist{$db} = $db;
+	}
+
+	# First do deletions.
+	foreach my $db (keys(%oldglist)) {
+	    next
+		if (exists($newglist{$db}));
+
+	    # Do not delete user if not an Emulab created DB.
+	    my $isemulab = IsEmulabDB($db);
+	    return -1
+		if ($isemulab < 0);
+	    next
+		if (!$isemulab);
+
+	    DBQueryFatal("delete from db where User='$uid' and Db='$db'")
+		or return -1;
+	}
+
+	# Then do additions.
+	foreach my $db (keys(%newglist)) {
+	    next
+		if (exists($oldglist{$db}));
+
+	    # Do not add user if not an Emulab created DB.
+	    my $isemulab = IsEmulabDB($db);
+	    return -1
+		if ($isemulab < 0);
+	    next
+		if (!$isemulab);
+
+	    DBQueryFatal("grant all on `${db}`.* to '$uid'\@'localhost'")
+		or return -1;
+
+	    # Eventually, we want to allow remote access.
+	    DBQueryFatal("grant all on `${db}`.* to '$uid'\@'%.${OURDOMAIN}'")
+		or return -1;
+	}
+    }
+    DBQueryFatal("flush privileges")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Dump a DB to a file.
+#
+sub DumpDB(@)
+{
+    my ($dbname, $filename) = @_;
+
+    usage()
+	if (@_ != 2);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+
+    #
+    # For NFS, lets not overwrite the samefile, but *create* a new one.
+    #
+    if (-e $filename) {
+	system("/bin/mv $filename ${filename}.old") == 0 or
+	    fatal("Could not mv $filename");
+    }
+
+    open(DUMP, "| $MYSQLDUMP -u root -p -a -e $dbname | $GZIP > $filename") or
+	fatal("Could not start $MYSQLDUMP!");
+    print DUMP "$dbpass\n";
+    close(DUMP) or
+	fatal($! ? "Error closing $MYSQLDUMP pipe: $!"
+	         : "Exit status $? from $MYSQLDUMP");
+
+    unlink("${filename}.old")
+	if (-e "${filename}.old");
+
+    return 0;
+}
+
+#
+# Clean a DB.
+#
+sub CleanDB(@)
+{
+    my ($dbname) = @_;
+
+    usage()
+	if (@_ != 1);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+
+    # This is called as root, so just switch to the proper DB.
+    if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+	fatal("Could not connect to $dbname database!");
+    }
+
+    my $query_result =
+	DBQueryFatal("show tables");
+
+    while (my ($table) = $query_result->fetchrow_array()) {
+	DBQueryFatal("delete from `$table`");
+    }
+    return 0;
+}
+
+#
+# Load a DB from a file
+#
+sub LoadDB(@)
+{
+    my ($dbname, $filename) = @_;
+
+    usage()
+	if (@_ != 2);
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+
+    # Check to see if the file is a .gz file.
+    my $openwith = $filename;
+    my (undef,undef,$suffix) = fileparse($filename, ".gz");
+
+    if ($suffix eq ".gz") {
+	$openwith = "zcat $filename |";
+    }
+
+    if (! open(INPUT, $openwith)) {
+	print "Could not open '$openwith': $!\n";
+	return -1;
+    }
+    open(SQL, "| $MYSQL -u root -p $dbname >/dev/null") or
+	fatal("Could not start $MYSQL!");
+    print SQL "$dbpass\n";
+    # So as not to lose input while mysql resets the tty.
+    sleep(1);
+
+    while (<INPUT>) {
+	print SQL $_;
+    }
+    close(INPUT);
+    close(SQL) or
+	fatal($! ? "Error closing $MYSQL pipe: $!"
+	         : "Exit status $? from $MYSQL");
+
+    return 0;
+}
+
+#
+# Very hacky graphing support. Initially, I'm supporting a couple of
+# different kinds of graphs just to get the ball rolling. I have no
+# idea where this stuff is going to go.
+#
+sub SaveGraph($$)
+{
+    my ($gd, $filename) = @_;
+
+    # Spew to stdout.
+    if (!defined($filename)) {
+	binmode STDOUT;
+	print STDOUT $gd->gd->gif();
+	return 0;
+    }
+    
+    if (! open(OUT, ">$filename")) {
+	print "Could not open $filename for writing!\n";
+	return -1;
+    }
+    binmode OUT;
+    print OUT $gd->gd->gif();
+    close OUT;
+
+    return 0;
+}
+
+sub GraphDB(@)
+{
+    usage()
+	if (@_ < 2);
+
+    my $dbname   = shift(@_);
+    my $which    = shift(@_);
+    my $filename;
+    my $start;
+    my $stop;
+    my $srcip;
+    my $dstip;
+
+    # Parse the rest of the options.
+    while (@_) {
+	my $arg = shift(@_);
+
+	if ($arg eq "-f") {
+	    usage()
+		if (@_ == 0);
+	    $filename = shift(@_);
+	}
+	elsif ($arg eq "-r") {
+	    usage()
+		if (@_ == 0);
+
+	    $arg = shift(@_);
+	    if ($arg =~ /^(\d*):(\d*)$/) {
+		$start = $1;
+		if ($2) {
+		    $stop = $2;
+		}
+	    }
+	    else {
+		usage();
+	    }
+	}
+	elsif ($arg eq "-s") {
+	    usage()
+		if (@_ == 0);
+	    $srcip = shift(@_);
+	}
+	elsif ($arg eq "-t") {
+	    usage()
+		if (@_ == 0);
+	    $dstip = shift(@_);
+	}
+	else {
+	    usage();
+	}
+    }
+
+    my $exists = DBExists($dbname);
+    return -1
+	if ($exists < 0);
+    my $isemulab = IsEmulabDB($dbname);
+    return -1
+	if ($isemulab < 0);
+
+    if (!$exists) {
+	print "DB '$dbname' does not exist!\n";
+	return -1;
+    }
+    my $gd = new GD::Graph::lines(500,325);
+    if (!$gd) {
+	print "Could not create a new graph object!\n";
+	return -1;
+    }
+    # This is called as root, so just switch to the proper DB.
+    if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+	fatal("Could not connect to $dbname database!");
+    }
+    my $xlabel;
+    my $ylabel;
+    my $title;
+    my @x_data = ();
+    my @y_data = ();
+
+    if ($which eq "pps") {
+	$xlabel = "Seconds Since Time Start";
+	$ylabel = "Packets per Second";
+	$title  = "Aggregate Packets per Second";
+    }
+    elsif ($which eq "bps") {
+	$xlabel = "Seconds Since Time Start";
+	$ylabel = "Bytes per Second";
+	$title  = "Aggregate Bytes per Second";
+    }
+    else {
+	print "Do not know how to graph $which!\n";
+	return -1;
+    }
+	
+    $gd->set(x_label       => $xlabel,
+	     y_label       => $ylabel,
+	     title         => $title,
+	     r_margin      => 30,
+	     y_tick_number => 'auto',
+	     x_tick_number => 'auto',
+	     box_axis      => 0,
+	     line_width    => 3,
+	     transparent   => 0,
+	     );
+
+    if ($which eq "pps" || $which eq "bps") {
+	my $query_result;
+	my $timeclause;
+	my $ipclause;
+	my $whereclause = "";
+
+	if (defined($start) && defined($stop)) {
+	    $timeclause = "(timestamp >= FROM_UNIXTIME('$start') and ".
+		"timestamp <= FROM_UNIXTIME('$stop')) ";
+	}
+	elsif (defined($start)) {
+	    $timeclause = "(timestamp >= FROM_UNIXTIME('$start')) ";
+	}
+	elsif (defined($stop)) {
+	    $timeclause = "(timestamp <= FROM_UNIXTIME('$stop')) ";
+	}
+
+	if (defined($srcip) && defined($dstip)) {
+	    $ipclause = "(ip_src=INET_ATON('$srcip') ".
+		"and ip_dst=INET_ATON('$dstip'))";
+	}
+	elsif (defined($srcip)) {
+	    $ipclause = "(ip_src=INET_ATON('$srcip'))";
+	}
+	elsif (defined($dstip)) {
+	    $ipclause = "(ip_dst=INET_ATON('$dstip'))";
+	}
+
+	if (defined($timeclause) && defined($ipclause)) {
+	    $whereclause = "where $timeclause and $ipclause ";
+	}
+	elsif (defined($timeclause)) {
+	    $whereclause = "where $timeclause ";
+	}
+	elsif (defined($ipclause)) {
+	    $whereclause = "where $ipclause ";
+	}
+
+	if ($which eq "pps") {
+	    $query_result =
+		DBQueryFatal("select UNIX_TIMESTAMP(timestamp),count(*) ".
+			     "  from event as e ".
+			     "left join iphdr as i on ".
+			     "     i.sid=e.sid and i.cid=e.cid ".
+			     $whereclause . " " .
+			     "group by timestamp order by timestamp");
+	}
+	else {
+	    $query_result =
+		DBQueryFatal("select UNIX_TIMESTAMP(timestamp),sum(ip_len) ".
+			     "  from event as e ".
+			     "left join iphdr as i on ".
+			     "  i.sid=e.sid and i.cid=e.cid ".
+			     $whereclause . " " .
+			     "group by timestamp order by timestamp");
+	}
+	return 0
+	    if (! $query_result->numrows);
+	
+	my ($tstart,$first) = $query_result->fetchrow_array();
+
+	@x_data = (0);
+	@y_data = ($first);
+
+	my $last = 0;
+
+	while (my ($timestamp, $count) = $query_result->fetchrow_array()) {
+	    my $now = $timestamp - $tstart;
+
+	    #
+	    # Need to add explicit zero values for gaps.
+	    #
+	    $last++;
+	    while ($last < $now) {
+		push(@x_data, $last);
+		push(@y_data, 0);
+		$last++;
+	    }
+	    push(@x_data, $now);
+	    push(@y_data, $count);
+	    $last = $now;
+	}
+    }
+    
+    my @data = ( \@x_data , \@y_data );
+    $gd->plot(\@data);
+    SaveGraph($gd, $filename);
+    return 0;
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

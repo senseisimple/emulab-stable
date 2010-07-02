@@ -1,20 +1,12 @@
 /*
- * LinkWidget.java
- *
- * Created on July 11, 2005, 8:24 AM
- *
- * To change this template, choose Tools | Options and locate the template under
- * the Source Creation and Management node. Right-click the template and choose
- * Open. You can then make changes to the template in the Source Editor.
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
+ * All rights reserved.
  */
 
 import java.awt.*;
 import java.awt.geom.*;
 
-/**
- *
- * @author david
- */
 public class LinkWidget extends Widget {
     
     private int x1,y1;
@@ -28,8 +20,10 @@ public class LinkWidget extends Widget {
     private java.awt.geom.Point2D.Float p2;
     private java.awt.geom.Point2D.Float pHalf;
     private float theta;
-    private float quality1To2;
-    private float quality2To1;
+    private Float percent1To2;
+    private Float percent2To1;
+    private Object quality1To2;
+    private Object quality2To1;
     private boolean bidi;
     
     private static int DEFAULT_BUFFER = 10;
@@ -38,16 +32,16 @@ public class LinkWidget extends Widget {
         return "LinkWidget["+theta+"]";
     }
     
-    public LinkWidget(NodeWidget nw1,NodeWidget nw2,float linkQuality1To2,float linkQuality2To1) {
-        this(null,nw1.getX(),nw1.getY(),nw2.getX(),nw2.getY(),DEFAULT_BUFFER,linkQuality1To2,linkQuality2To1);
+    public LinkWidget(NodeWidget nw1,NodeWidget nw2,Float percent1To2,Float percent2To1,Object linkQuality1To2,Object linkQuality2To1) {
+        this(null,nw1.getX(),nw1.getY(),nw2.getX(),nw2.getY(),DEFAULT_BUFFER,percent1To2,percent2To1,linkQuality1To2,linkQuality2To1);
     }
     
-    public LinkWidget(NodeWidget nw1,NodeWidget nw2,float linkQuality) {
-        this(null,nw1.getX(),nw1.getY(),nw2.getX(),nw2.getY(),DEFAULT_BUFFER,linkQuality,-1.0f);
+    public LinkWidget(NodeWidget nw1,NodeWidget nw2,Float percent,Object linkQuality) {
+        this(null,nw1.getX(),nw1.getY(),nw2.getX(),nw2.getY(),DEFAULT_BUFFER,percent,null,linkQuality,null);
     }
     
     /** Creates a new instance of LinkWidget */
-    public LinkWidget(String title,int x1,int y1,int x2,int y2,int buffer,float quality1To2,float quality2To1) {
+    public LinkWidget(String title,int x1,int y1,int x2,int y2,int buffer,Float percent1To2,Float percent2To1,Object quality1To2,Object quality2To1) {
         super(title,0,0);
         
         
@@ -56,10 +50,12 @@ public class LinkWidget extends Widget {
         this.y1 = y1;
         this.y2 = y2;
         this.buffer = buffer;
+        this.percent1To2 = percent1To2;
+        this.percent2To1 = percent2To1;
         this.quality1To2 = quality1To2;
         //this.quality2To1 = -1.0f;
         this.quality2To1 = quality2To1;
-        this.bidi = (this.quality2To1 >= 0.0f && this.quality1To2 >= 0.0f)?true:false;
+        this.bidi = (this.quality2To1 != null && this.quality1To2 != null)?true:false;
         
         // calculate insets based on buffer size; buffer is actually more like swing's `Insets'
 //        if (x2 != x1) {
@@ -169,9 +165,16 @@ public class LinkWidget extends Widget {
             Color oldColor = g2.getColor();
             
             Color titleColor = null;
+            int[] defColor = { 0,0,0 };
             
             if (!bidi) {
-                int color[] = getLinkColor(this.quality1To2);
+                int[] color;
+                if (this.percent1To2 != null) {
+                    color = getLinkColor(this.percent1To2);
+                }
+                else {
+                    color = defColor;
+                }
                 //g2.setColor(java.awt.Color.DARK_GRAY);
                 g2.setColor(new Color(color[0],color[1],color[2]));
                 // first draw the base line
@@ -186,12 +189,24 @@ public class LinkWidget extends Widget {
                 titleColor = new Color(color[0],color[1],color[2]);
             }
             else {
-                int color1To2[] = getLinkColor(this.quality1To2);
+                int[] color1To2;
+                if (this.percent1To2 != null) {
+                    color1To2 = getLinkColor(this.percent1To2);
+                }
+                else {
+                    color1To2 = defColor;
+                }
                 g2.setColor(new Color(color1To2[0],color1To2[1],color1To2[2]));
                 g2.draw(linkLine1To2);
                 g2.fill(head2);
                 
-                int color2To1[] = getLinkColor(this.quality2To1);
+                int[] color2To1;
+                if (this.percent2To1 != null) {
+                    color2To1 = getLinkColor(this.percent2To1);
+                }
+                else {
+                    color2To1 = defColor;
+                }
                 g2.setColor(new Color(color2To1[0],color2To1[1],color2To1[2]));
                 g2.draw(linkLine2To1);
                 g2.fill(head1);
@@ -206,11 +221,12 @@ public class LinkWidget extends Widget {
             int avgCharSize = 6;
             if (title == null) {
                 if (!bidi) {
-                    title = ""+(int)(Math.round(quality1To2*100))+" %";
+                    //title = ""+(int)(Math.round(quality1To2*100))+" %";
+                    title = quality1To2.toString();
                 }
                 else {
                     // gotta figure out which quality goes first:
-                    float one, two;
+                    Object one, two;
                     if (theta > 0) {
                         if (y1 > y2) {
                             one = quality1To2;
@@ -232,7 +248,8 @@ public class LinkWidget extends Widget {
                         }
                     }
                     //title = ""+(int)(Math.round(quality2To1*100))+" % / "+(int)(Math.round(quality1To2*100))+" %";
-                    title = ""+(int)(Math.round(one*100))+" % / "+(int)(Math.round(two*100))+" %";
+                    //title = ""+(int)(Math.round(one*100))+" % / "+(int)(Math.round(two*100))+" %";
+                    title = one.toString() + " / " + two.toString();
                 }
             }
             int estTitleLen = title.length()*avgCharSize;
@@ -259,9 +276,18 @@ public class LinkWidget extends Widget {
         }
     }
     
+    private int[] getLinkColor(Float p) {
+        if (p != null) {
+            return getLinkColor(p.floatValue());
+        }
+        else {
+            return null;
+        }
+    }
+    
     // returns an array of [r,g,b]
     private int[] getLinkColor(float percent) {
-        int ticks = (int)((100.0f*percent)*(510.0/100));
+        int ticks = (int)((percent)*(510.0/100));
         int retvals[] = new int[3];
         retvals[1] = 0;
         retvals[0] = 255;
@@ -276,15 +302,24 @@ public class LinkWidget extends Widget {
             retvals[1] += ticks;
         }
         
+        //System.out.println("getLinkColor returning {"+retvals[0]+","+retvals[1]+","+retvals[2]+"}; percent was "+percent);
+        
         return retvals;
     }
     
-    public float getForwardQuality() {
+    public Object getForwardQuality() {
         return quality1To2;
     }
     
-    public float getBackwardQuality() {
+    public Object getBackwardQuality() {
         return quality2To1;
     }
     
+    public Float getForwardPercent() {
+        return percent1To2;
+    }
+    
+    public Float getBackwardPercent() {
+        return percent2To1;
+    }
 }

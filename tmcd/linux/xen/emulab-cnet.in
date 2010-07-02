@@ -1,0 +1,97 @@
+#!/bin/sh
+#
+# Invoked by xmcreate script to configure the control network for a vnode.
+# Usage:
+#   emulab-cnet vmid host_ip vnode_name vnode_ip (online | offline)
+#
+# NOTE: vmid should be an integer ID.
+#
+
+#boss=@BOSSNODE_IP@
+#ops=@USERNODE_IP@
+#fs=@FSNODE_IP@
+boss=155.98.32.70
+ops=155.98.33.74
+fs=155.98.33.74
+
+# XXX should be configed
+tmcd_port=7777
+slothd_port=8509
+evproxy_port=16505
+LOGDIR=/var/emulab/logs
+
+if [ $# < 3 ]; then
+    echo "usage: $0 vmid host_ip vnode_name vnode_ip [ other_args ]"
+    exit 1
+fi
+
+# $vif comes from the environment
+vmid=$1; shift
+host_ip=$1; shift
+vhost_id=$1; shift
+vif_ip=$1; shift
+
+local_tmcd_port=`expr $tmcd_port \+ $vmid`
+
+#echo "${vhost_id}: op=$1, host_ip=$host_ip, vmid=$vmid, [vif=$vif], vnode_ip=$vif_ip, other=$*" >> /var/emulab/logs/xen-cnet.log
+
+# xen's configuration for a vif
+sh /etc/xen/scripts/vif-bridge $*
+
+iptables=/sbin/iptables
+
+do_offline() {
+    # dhcp
+    $iptables -D OUTPUT -j DROP -o $vif -m pkttype --pkt-type broadcast -m physdev --physdev-out $vif
+
+    # tmcc
+    $iptables -t nat -D PREROUTING -j DNAT -p tcp --dport $tmcd_port -d $boss -s $vif_ip --to-destination $host_ip:$local_tmcd_port
+    $iptables -t nat -D PREROUTING -j DNAT -p udp --dport $tmcd_port -d $boss -s $vif_ip --to-destination $host_ip:$local_tmcd_port
+    if [ -f /var/run/tmcc-$vhost_id.pid ]; then
+	kill `cat /var/run/tmcc-$vhost_id.pid`
+    fi
+
+    # slothd
+    $iptables -t nat -D POSTROUTING -j SNAT -p udp --dport $slothd_port --to-source $host_ip -s $vif_ip --destination $boss -o eth0
+
+    $iptables -t nat -D POSTROUTING -j SNAT --to-source $host_ip -s $vif_ip --destination $fs -o eth0
+
+    # evproxy
+    $iptables -t nat -D PREROUTING -j DNAT -p tcp --dport $evproxy_port -d $ops -s $vif_ip --to-destination $host_ip:$evproxy_port
+}
+
+do_online() {
+    # prevent dhcp requests from reaching eth0
+    $iptables -A OUTPUT -j DROP -o $vif -m pkttype --pkt-type broadcast -m physdev --physdev-out $vif
+
+    # reroute tmcd calls to the proxy on the physical host
+    $iptables -t nat -A PREROUTING -j DNAT -p tcp --dport $tmcd_port -d $boss -s $vif_ip --to-destination $host_ip:$local_tmcd_port
+    $iptables -t nat -A PREROUTING -j DNAT -p udp --dport $tmcd_port -d $boss -s $vif_ip --to-destination $host_ip:$local_tmcd_port
+
+    # start a tmcc proxy (handles both TCP and UDP)
+    /usr/local/etc/emulab/tmcc.bin -d -t 15 -n $vhost_id -X $host_ip:$local_tmcd_port -s $boss -p $tmcd_port -o $LOGDIR/tmccproxy.$vhost_id.log &
+    echo "$!" > /var/run/tmcc-$vhost_id.pid
+
+    # slothd
+    $iptables -t nat -A POSTROUTING -j SNAT -p udp --dport $slothd_port --to-source $host_ip -s $vif_ip --destination $boss -o eth0
+
+    # source-nat all traffic to fs node to come from vnode host
+    # XXX "fs" is usually "ops", so make sure other ops redirects happen first
+    #
+    # TODO: only forward ports the mount server needs (use rpcinfo on fs node)
+    # TODO: also only route back to the vif ip 
+    $iptables -t nat -A POSTROUTING -j SNAT --to-source $host_ip -s $vif_ip --destination $fs -o eth0
+
+    # reroute evproxy packets
+    $iptables -t nat -A PREROUTING -j DNAT -p tcp --dport $evproxy_port -d $ops -s $vif_ip --to-destination $host_ip:$evproxy_port
+}
+
+case "$1" in
+    'online')
+        do_online
+    ;;
+    'offline')
+        do_offline
+    ;;
+esac
+exit 0

@@ -1,0 +1,272 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008, 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Report network traffic from nodes' control network.
+#
+sub usage()
+{
+    print STDOUT "Usage: node_traffic [-C] [node...]\n";
+    print STDOUT "-h         This message\n";
+    print STDOUT "-a         Show all nodes regardless of node state\n";
+    print STDOUT "-r	     Show only traffic received by each node\n";
+    print STDOUT "-s	     Show only traffic sent by each node\n";
+    print STDOUT "-i seconds Show stats over a <seconds>-period interval\n";
+    print STDOUT "-E	     Aggregate by experiment\n";
+#    print STDOUT "-C	     Show control net traffic\n";
+    exit(-1);
+}
+
+sub gather($$);
+
+my $optlist  = "CEi:ars";
+my $debug = 0;
+my $interval = 0;
+my $doall = 0;
+my $send = 1;
+my $recv = 1;
+my $byexpt = 0;
+
+# XXX only does control net right now
+my $controlnet = 1;
+
+#
+# Configure variables
+#
+#my $TB = "@prefix@";
+my $TB = "/usr/testbed";
+
+#
+# Testbed Support libraries
+#
+#use lib "/usr/testbed/lib";
+use lib "@prefix@/lib";
+use libdb;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# 
+#
+my $portstats	= "$TB/bin/portstats";
+my @nodes       = ();
+my %switches	= ();
+my %pcs		= ();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"h"})) {
+    usage();
+}
+if (defined($options{"a"})) {
+    $doall = 1;
+}
+if (defined($options{"r"})) {
+    $recv = 1;
+    $send = 0;
+}
+if (defined($options{"s"})) {
+    $recv = 0;
+    $send = 1;
+}
+if (defined($options{"i"})) {
+    $interval = int($options{"i"});
+    if ($interval < 0) {
+	die("Bogus interval $interval\n");
+    }
+}
+if (defined($options{"E"})) {
+    $byexpt = 1;
+}
+if (defined($options{"C"})) {
+    $controlnet = 1;
+}
+else {
+    @nodes = @ARGV;
+}
+
+#
+# No nodes specified, get stats for all nodes that are in an experiment.
+#
+my $nclause = "";
+if (@nodes > 0) {
+	$nclause = "and n.node_id in (" . join(",", map("'$_'", @nodes)) . ")";
+}
+
+my $query_result =
+    DBQueryWarn("select r.pid,r.eid,node_id1,eventstate,card1,node_id2".
+		" from wires as w,nodes as n,reserved as r".
+		" where w.node_id1=n.node_id and w.node_id1=r.node_id".
+		"  and node_id2 like 'cisco%' and w.type='Control'".
+		"  and n.role='testnode' $nclause".
+		" order by node_id2,card2,port2");
+if (! $query_result || $query_result->numrows == 0) {
+    exit(0);
+}
+while (my %row = $query_result->fetchhash()) {
+    my $switch = $row{'node_id2'};
+    my $pc = $row{'node_id1'};
+    my $pceth = $row{'card1'};
+    my $exp = $row{'pid'} . "/" . $row{'eid'};
+    my $cnet = "$pc:$pceth";
+
+    push(@{$switches{$switch}}, $cnet);
+    $pcs{$cnet}{'exp'} = $exp;
+    $pcs{$cnet}{'state'} = $row{'eventstate'};
+}
+
+my %before = ();
+if ($interval > 0) {
+    gather(\%pcs, \%before);
+    print STDERR "Waiting $interval seconds ...\n";
+    sleep($interval);
+}
+my %after = ();
+gather(\%pcs, \%after);
+
+my %expcounts = ();
+
+# weed out bad boys
+my @list = ();
+foreach my $node (keys %pcs) {
+    if (!exists($after{$node}{'counts'})) {
+	print STDERR "*** $node: got no portstats!?\n";
+	next;
+    }
+
+    # XXX
+    if (!exists($before{$node})) {
+	$before{$node}{'totals'} = [ 0, 0, 0, 0 ];
+    }
+
+    if (!$doall && $pcs{$node}{'state'} ne "ISUP") {
+	print STDERR "*** $node: not up (", $pcs{$node}{'state'}, ")\n";
+	next;
+    }
+    my $total = $after{$node}{'totals'}->[3] - $before{$node}{'totals'}->[3];
+    if ($total <= 0) {
+	next;
+    }
+    $pcs{$node}{'total'} = $total;
+    push(@list, $node);
+
+    if ($byexpt) {
+	my $cb = $before{$node}{'totals'};
+	my $ca = $after{$node}{'totals'};
+	my $exp = $pcs{$node}{'exp'};
+	if (!exists($expcounts{$exp})) {
+	    $expcounts{$exp} = [ 0, 0, 0, 0 ];
+	}
+	$expcounts{$exp}->[0] += ($ca->[0] - $cb->[0]);
+	$expcounts{$exp}->[1] += ($ca->[1] - $cb->[1]);
+	$expcounts{$exp}->[2] += ($ca->[2] - $cb->[2]);
+	$expcounts{$exp}->[3] += ($ca->[3] - $cb->[3]);
+    }
+}
+
+if ($byexpt) {
+    printf("%25s %12s %12s %12s %12s\n",
+	   "Experiment", "Tot Pkts", "Unicast", "Non-Uni", "Tot Bytes");
+    foreach my $exp (sort esortem keys %expcounts) {
+	printf("%25s %12d %12d %12d %12d\n",
+	       $exp, $expcounts{$exp}->[3],
+	       $expcounts{$exp}->[1],
+	       $expcounts{$exp}->[2],
+	       $expcounts{$exp}->[0]);
+    }
+} else {
+    @list = sort sortem @list;
+
+    printf("%12s %25s %12s %12s %12s %12s\n",
+	   "Node", "Experiment", "Tot Pkts", "Unicast", "Non-Uni", "Tot Bytes");
+    foreach my $node (@list) {
+	my $cb = $before{$node}{'totals'};
+	my $ca = $after{$node}{'totals'};
+	my $exp = $pcs{$node}{'exp'};
+	my $s = $pcs{$node}{'state'};
+
+	printf("%12s %25s %12d %12d %12d %12d\n",
+	       $node, $exp,
+	       $ca->[3]-$cb->[3], $ca->[1]-$cb->[1],
+	       $ca->[2]-$cb->[2], $ca->[0]-$cb->[0]);
+    }
+}
+
+sub esortem($$)
+{
+    my ($a, $b) = @_;
+
+    my $atot = $expcounts{$a}->[3];
+    my $btot = $expcounts{$b}->[3];
+    return $btot <=> $atot;
+}
+
+sub sortem($$)
+{
+    my ($a, $b) = @_;
+
+    my $atot = $pcs{$a}{'total'};
+    my $btot = $pcs{$b}{'total'};
+    return $btot <=> $atot;
+}
+
+sub gather($$)
+{
+    my ($pcref, $resref) = @_;
+
+    foreach my $switch (keys %switches) {
+	my $slist = join(' ', @{$switches{$switch}});
+	open(PS, "$portstats -p $slist 2>&1 |") or
+	    die "Could not get portstats\n";
+	while (<PS>) {
+	    next if ($_ !~ /^\w+:\d/);
+	    my ($node, @counts) = split;
+	    if (@counts != 6) {
+		print STDERR "*** $node: invalid portstats!?\n"; 
+		next;
+	    }
+	    next if (!exists($pcref->{$node}));
+	    $resref->{$node}{'counts'} = @counts;
+	    my $oct = 0;
+	    my $upkts = 0;
+	    my $npkts = 0;
+	    if ($send) {
+		$oct += $counts[0];
+		$upkts += $counts[1];
+		$npkts += $counts[2];
+	    }
+	    if ($recv) {
+		$oct += $counts[3];
+		$upkts += $counts[4];
+		$npkts += $counts[5];
+	    }
+	    $resref->{$node}{'totals'} =
+		[ $oct, $upkts, $npkts, $upkts + $npkts ];
+	}
+	close(PS);
+    }
+}
+
+exit(0);

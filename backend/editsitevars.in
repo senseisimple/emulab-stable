@@ -1,0 +1,325 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Back-end script to edit site variables.
+#
+sub usage()
+{
+    print("Usage: editsitevars [-v] <xmlfile>\n");
+    exit(-1);
+}
+my $optlist = "dv";
+my $debug   = 0;
+my $verify  = 0;	# Check data and return status only. 
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+
+# Protos
+sub fatal($);
+sub UserError(;$);
+sub escapeshellarg($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $xmlfile  = shift(@ARGV);
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and the
+# current user context is "implied" (see tbauth.php3).
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    fatal("You must have admin privledges to edit site variables.")
+	if (!$this_user->IsAdmin());
+}
+else {
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+
+    # The web interface (and in the future the xmlrpc interface) sets this.
+    $this_user = User->ImpliedUser();
+
+    if (! defined($this_user)) {
+	fatal("Cannot determine implied user!");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+#
+# XXX We should encode all of this in the DB so that we can generate the
+# forms on the fly, as well as this checking code.
+#
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("name"		=> ["name",		$SLOT_REQUIRED],
+     "value"		=> ["value",		$SLOT_OPTIONAL],
+     "reset"		=> ["reset",		$SLOT_OPTIONAL]);
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+#
+# Process and dump the errors (formatted for the web interface).
+# We should probably XML format the errors instead but not sure I want
+# to go there yet.
+#
+my %errors = ();
+
+#
+# Make sure all the required arguments were provided.
+#
+my $key;
+foreach $key (keys(%xmlfields)) {
+    my (undef, $required, undef) = @{$xmlfields{$key}};
+
+    $errors{$key} = "Required value not provided"
+	if ($required & $SLOT_REQUIRED  &&
+	    ! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+UserError()
+    if (keys(%errors));
+
+#
+# We build up an array of arguments to reference as we check
+# the attributes.
+#
+my %editsitevars_args = ();
+
+#
+# Wildcard keys have one or more *'s in them like simple glob patterns.
+# This allows multiple key instances for categories of attributes, and
+# putting a "type signature" in the key for arg checking, as well.
+#
+# Wildcards are made into regex's by anchoring the ends and changing each * to
+# a "word" (group of alphahumeric.)  A tail * means "the rest", allowing
+# multiple words separated by underscores or dashes.
+#
+my $wordpat = '[a-zA-Z0-9]+';
+my $tailpat = '[-\w]+';
+my %wildcards;
+foreach $key (keys(%xmlfields)) {
+    if (index($key, "*") >= 0) {
+	my $regex = '^' . $key . '$';
+	$regex =~ s/\*\$$/$tailpat/;
+	$regex =~ s/\*/$wordpat/g;
+	$wildcards{$key} = $regex;
+    }
+}
+# Key ordering is lost in a hash.
+# Put longer matching wildcard keys before their prefix.
+my @wildkeys = reverse(sort(keys(%wildcards)));
+
+foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+    if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+    }
+
+    print STDERR "User attribute: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $field = $key;
+    my $wild;
+    if (!exists($xmlfields{$key})) {
+
+	# Not a regular key; look for a wildcard regex match.
+        foreach my $wildkey (@wildkeys) {
+	    my $regex = $wildcards{$wildkey};
+	    if ($wild = $key =~ /$regex/) {
+		$field = $wildkey;
+		print STDERR "Wildcard: '$key' matches '$wildkey'\n"
+		    if ($debug);
+		last; # foreach $wildkey
+	    }
+	}
+	if (!$wild) {
+	    $errors{$key} = "Unknown attribute";
+	    next; # foreach $key
+	}
+    }
+
+    my ($dbslot, $required, $default) = @{$xmlfields{$field}};
+
+    if ($required & $SLOT_REQUIRED) {
+	# A slot that must be provided, so do not allow a null value.
+	if (!defined($value)) {
+	    $errors{$key} = "Must provide a non-null value";
+	    next;
+	}
+    }
+    if ($required & $SLOT_OPTIONAL) {
+	# Optional slot. If value is null skip it. Might not be the correct
+	# thing to do all the time?
+	if (!defined($value)) {
+	    next
+		if (!defined($default));
+	    $value = $default;
+	}
+    }
+    if ($required & $SLOT_ADMINONLY) {
+	# Admin implies optional, but thats probably not correct approach.
+	$errors{$key} = "Administrators only"
+	    if (! $this_user->IsAdmin());
+    }
+	
+    # Now check that the value is legal.
+    if (! TBcheck_dbslot($value, "sitevariables",
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+	$errors{$key} = TBFieldErrorString();
+	next;
+    }
+
+    $editsitevars_args{$key} = $value;
+}
+UserError()
+    if (keys(%errors));
+
+#
+# Now do special checks.
+#
+
+if (!exists($editsitevars_args{"value"}) && 
+    !exists($editsitevars_args{"reset"})) {
+    UserError("Site Var: Must give a new value, or reset it to default.");
+}
+if (exists($editsitevars_args{"value"}) && 
+    exists($editsitevars_args{"reset"})) {
+    UserError("Site Var: Can't both give a new value, and reset to default.");
+}
+
+exit(0)
+    if ($verify);
+
+#
+# Now safe to set the site variable value.
+#
+my $name = $editsitevars_args{"name"};
+my $value = (exists($editsitevars_args{"reset"}) ?
+	     "NULL" : DBQuoteSpecial($editsitevars_args{"value"}));
+
+DBQueryFatal("UPDATE sitevariables ".
+	     "SET value=$value ".
+	     "WHERE name='$name'");
+exit(0);
+
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    # Exit with negative status so web interface treats it as system error.
+    exit(-1);
+}
+
+sub UserError(;$)
+{
+    my ($mesg) = @_;
+
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+    }
+    print "$mesg\n"
+	if (defined($mesg));
+
+    # Exit with positive status so web interface treats it as user error.
+    exit(1);
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^[:alnum:]]/\\$&/g;
+    return $str;
+}

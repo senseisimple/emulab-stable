@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -156,8 +156,7 @@ if ($UID) {
     }
 }
 
-# XXX
-$expdir = "/proj/$pid/exp/$eid";
+my $expdir = TBExptUserDir($pid, $eid);
 
 # Figure out which mode we are in and act accordingly.
 if ($mode eq "clear") {
@@ -180,9 +179,8 @@ if ($mode eq "record") {
     print STDOUT "Starting tracers...\n";
 
     # Just need to send a START event to all of the canaryds.
-    my $handle = event_register_withkeyfile("elvin://boss",
-					    0,
-					    "/proj/$pid/exp/$eid/tbdata/eventkey");
+    my $handle = event_register_withkeyfile("elvin://event-server",
+					    0, "$expdir/tbdata/eventkey");
     if (!$handle) { die "Unable to register with event system\n"; }
 
     my $tuple = address_tuple_alloc();
@@ -297,13 +295,14 @@ if ($mode eq "record") {
     
     # Get the addresses for veth interfaces and
     $result =
-	DBQueryFatal("select i.IP,i.mac,i.iface from reserved as r ".
-		     "left join veth_interfaces as i on r.node_id=i.node_id ".
+	DBQueryFatal("select i.IP,i.mac,i.type,i.unit from reserved as r ".
+		     "left join vinterfaces as i on r.node_id=i.node_id ".
 		     "where r.pid='$pid' and r.eid='$eid' and ".
 		     "      i.IP is not NULL and i.IP!=''");
     
     # ... add the MAC and node vname to the memmap.
-    while (($ip,$mac,$iface) = $result->fetchrow_array()) {
+    while (($ip,$mac,$itype,$unit) = $result->fetchrow_array()) {
+	my $iface = "$itype$unit";
 	if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
 	    $mac = "$1:$2:$3:$4:$5:$6";
 	}
@@ -336,9 +335,9 @@ if ($mode eq "record") {
 
     if ($result->numrows) {
 	while (my %row = $result->fetchhash()) {
-	    $pipemap{$row{pipe}} = $row{vname};
+	    $pipemap{$row{pipe}} = $row{vnode};
 	    if ($row{type} eq "duplex") {
-		$pipemap{$row{rpipe}} = $row{vname};
+		$pipemap{$row{rpipe}} = $row{vnode};
 	    }
 	}
     }
@@ -346,7 +345,7 @@ if ($mode eq "record") {
     # Start digest-slothd with all of the slothd logs, tee its output to the
     # feedback file, and
     open(DIGESTER,
-	 "| $digest_slothd - ${vhost_logs} ".
+	 "| $digest_slothd /dev/null ${vhost_logs} ".
 	 " | tee ${expdir}/tbdata/feedback_data.tcl") or
 	     fatal("Could not run digest-slothd!");
     

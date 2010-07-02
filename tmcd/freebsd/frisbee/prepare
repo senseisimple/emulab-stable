@@ -1,5 +1,11 @@
 #!/bin/sh
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Minimize the number of files downloaded via TFTP by the frisbee boot process.
 #
 # First, combine configuration files as much as possible.

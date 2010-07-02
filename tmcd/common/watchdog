@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -15,10 +15,11 @@ use POSIX qw(strftime);
 #
 sub usage()
 {
-    print "Usage: watchdog [-dvn] [start | stop]\n";
+    print "Usage: watchdog [-dvn] [-j vnodeid] [start | stop]\n";
     exit(1);
 }
-my $optlist = "Fdvn";
+my $optlist = "Fdvnj:";
+my $vnodeid;
 
 #
 # Turn off line buffering on output
@@ -30,8 +31,8 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
+# library and initialize itself.
+#
 use libsetup;
 use libtmcc;
 
@@ -45,9 +46,10 @@ sub PLABSVC() {
 
 # Locals
 my $action	= "start";
-my $logname	= "$LOGDIR/emulab-watchdog.log";
+my $logname	= LOGDIR() . "/emulab-watchdog.log";
 my $pidfile	= "/var/run/emulab-watchdog.pid";
 my $rusagebin	= "$BINDIR/plabrusage";
+my $uptimebin	= "/usr/bin/uptime";
 my $keydir	= "/etc/ssh";
 my @keylist     = ("ssh_host_key", "ssh_host_dsa_key", "ssh_host_rsa_key");
 my $battlog     = "/var/emulab/logs/battery.log";
@@ -81,12 +83,15 @@ my %faketimes;
 #
 my %iv = (
     check   => 0,
-    isalive => ((REMOTE() == 1) ? (PLAB() ? 600 : 60) : (JAILED() ? 600 : 180)),
+    isalive => ((REMOTE() == 1) ? (PLAB() ? 600 : 60) : ((JAILED()
+							  || GENVNODE()) ? 600 : 180)),
     drift   => (60 * 60 * 12),
     cvsup   => (60 * 60 * 12),
     rusage  => 0,
     hkeys   => 0,
     batt    => (STARGATE() ? 60 : 0),
+    rootpswd=> 0,
+    dhcpdconf=> 0,
 );
 
 my %funcs = (
@@ -97,6 +102,8 @@ my %funcs = (
     rusage  => \&sendrusage,
     hkeys   => \&sendhkeys,
     batt    => \&sendbatt,
+    rootpswd=> \&setrootpswd,
+    dhcpdconf=> \&dhcpdconf,
 );
 
 my %immediate = (
@@ -107,6 +114,8 @@ my %immediate = (
     rusage  => 1,
     hkeys   => 1,
     batt    => 1,
+    rootpswd=> 1,
+    dhcpdconf=> 1,
 );
 
 #
@@ -119,8 +128,10 @@ sub runcvsup($);
 sub sendrusage($);
 sub sendhkeys($);
 sub sendbatt($);
+sub setrootpswd($);
 sub logmsg($;$);
 sub saysomething($);
+sub dhcpdconf($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -139,6 +150,13 @@ if (defined($options{"v"})) {
 if (defined($options{"n"})) {
     $noproxy = 1;
 }
+if (defined($options{'j'})) {
+    #
+    # This allows us to override what libsetup says, as for SHADOW().
+    #
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
 if (defined($options{"F"})) {
     $fakeit = 1;
 }
@@ -152,7 +170,7 @@ if (@ARGV) {
 
 #
 # Must be root.
-# 
+#
 if ($UID != 0) {
     die("*** $0:\n".
 	"    Must be root to run this script!\n");
@@ -173,7 +191,7 @@ if ($action eq "stop") {
 #
 # Put this into the background and log its output. We *must* do this cause
 # we do not want to halt the boot if the testbed is down!
-# 
+#
 if (!$debug && TBBackGround($logname)) {
     #
     # Parent exits normally
@@ -207,18 +225,17 @@ $SIG{TERM} = \&handler;
 $SIG{INT}  = \&handler;
 
 #
-# If jailed, get our jailname. 
+# If jailed, get our jailname.
 #
-if (JAILED() || PLAB()) {
+if (JAILED() || GENVNODE() || PLAB()) {
     my $vnodeid = libsetup_getvnodeid();
 
     # Tell the tmcc library. Note that its actually been done via libsetup
     # but I duplicate it here to make it explicit.
     configtmcc("subnode", $vnodeid);
 
-    # This doesn't work yet, at least for jails since tmcd
-    # doesn't accept requests from them
-    #configtmcc("noproxy", $noproxy);
+    configtmcc("noproxy", 1)
+	if (SHADOW());
 }
 
 #
@@ -233,11 +250,22 @@ if (JAILED() || PLAB()) {
 
 #
 # For sending back ntpdrift.
-# 
+#
 if (-e "/etc/ntp.drift") {
     $driftfile = "/etc/ntp.drift";
 } elsif (-e "/etc/ntp/drift") {
     $driftfile = "/etc/ntp/drift";
+} elsif (-e "/var/lib/ntp/drift") {
+    $driftfile = "/var/lib/ntp/drift";
+}
+
+#
+# Location of dhcpd.conf
+#
+if (-e "/etc/dhcpd.conf") {
+	$dhcpdconf = "/etc/dhcpd.conf";
+} elsif (-e "/usr/local/etc/dhcpd.conf") {
+	$dhcpdconf = "/usr/local/etc/dhcpd.conf";
 }
 
 #
@@ -282,7 +310,7 @@ qinsert($curtime + $speakupiv, \&saysomething)
 
 #
 # Loop, sleeping and then processing events
-# 
+#
 my $lasttime = 0;
 while (1) {
     my ($nexttime, $event);
@@ -312,7 +340,7 @@ exit(0);
 sub sendisalive($)
 {
     my ($curtime) = @_;
-    
+
     if ($fakeit) {
 	my $delta = $curtime - $faketimes{isalive};
 	$faketimes{isalive} = $curtime;
@@ -357,12 +385,14 @@ sub sendisalive($)
 	#
 	logmsg("isalive: succeeded after $retry{isalive} retries\n")
 	    if ($retry{isalive});
-	if ($updatefailed ||
-	    $tmccresults[0] =~ /^UPDATE=1$/) {
-	    logmsg("isalive: running an account update\n");
-	    system("$BINDIR/update -i -l");
-	    $updatefailed = $?;
-	    logmsg("isalive: update done\n");
+	if (!SUBBOSS()) {
+	   if ($updatefailed ||
+		$tmccresults[0] =~ /^UPDATE=1$/) {
+		logmsg("isalive: running an account update\n");
+	        system("$BINDIR/update -i -l");
+	        $updatefailed = $?;
+	        logmsg("isalive: update done\n");
+	    }
 	}
     }
 
@@ -388,6 +418,13 @@ sub setintervals($)
 	$iv{cvsup} = 21;
 	$iv{rusage} = 15;
 	$iv{batt} = 25;
+	$iv{rootpswd} = 10;
+
+	if (SUBBOSS()) {
+		$iv{dhcpdconf} = 5;
+	} else {
+		$iv{dhcpdconf} = 0;
+	}
 
 	my $delta = $curtime - $faketimes{check};
 	$faketimes{check} = $curtime;
@@ -445,21 +482,65 @@ sub setintervals($)
 	    $oiv{$key} = $iv{$key};
 	}
 
-	if ($tmccresults[0] =~
-	    /INTERVAL=(-?\d+) ISALIVE=(-?\d+) NTPDRIFT=(-?\d+) CVSUP=(-?\d+) RUSAGE=(-?\d+) HOSTKEYS=(-?\d+)/) {
-	    $iv{check} = $1
-		if ($1 >= 0);
-	    $iv{isalive} = $2
-		if ($2 >= 0);
-	    $iv{drift} = $3
-		if ($3 >= 0);
-	    $iv{cvsup} = $4
-		if ($4 >= 0);
-	    $iv{rusage} = int($5)/60
-		if ($5 >= 0); # XXX: hack - undo the conversion to minutes
-                              #      to enable finer granularity on plab.
-	    $iv{hkeys} = $6
-		if ($6 >= 0);
+	print $tmccresults[0] . "\n";
+
+	my @tokens = split(/\s+/, $tmccresults[0]);
+	foreach my $token (@tokens) {
+	    my $key;
+	    my $val;
+
+	    if ($token =~ /^(.*)=(-?\d+)$/) {
+		$key = $1;
+		$val = $2;
+	    }
+	    else {
+		logmsg("setintervals: unknown '$token'\n");
+		next;
+	    }
+	    print "$key => $val\n";
+
+	    SWITCH: for ($key) {
+		/^INTERVAL$/ && do {
+		    $iv{check} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+		/^ISALIVE$/ && do {
+		    $iv{isalive} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+		/^NTPDRIFT$/ && do {
+		    $iv{drift} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+		/^CVSUP$/ && do {
+		    $iv{cvsup} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+		/^RUSAGE$/ && do {
+		    $iv{rusage} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+		/^HOSTKEYS$/ && do {
+		    $iv{hkeys} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+		/^SETROOTPSWD$/ && do {
+		    $iv{rootpswd} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+		/^DHCPDCONF$/ && do {
+		    $iv{dhcpdconf} = $val
+			if ($val >= 0);
+		    last SWITCH;
+		};
+	    };
 	}
 
 	#
@@ -471,6 +552,16 @@ sub setintervals($)
 	    $iv{rusage} = 0;
 	    $iv{hkeys} = 0;
 	    $iv{batt} = 0;
+	    $iv{rootpswd} = 0;
+	    $iv{dhcpdconf} = 0;
+	}
+
+	#
+	# Only sub-bosses run dhcpd
+	#
+	if (!SUBBOSS()) {
+		$iv{dhcpdconf} = 0;
+		$immediate{dhcpdconf} = 0;
 	}
 
 	foreach my $key (keys %iv) {
@@ -530,11 +621,12 @@ sub setintervals($)
 	    }
 	}
     }
-	
+
     if ($report) {
 	logmsg("setintervals: check=$iv{check}, isalive=$iv{isalive}, ".
 	       "drift=$iv{drift}, cvsup=$iv{cvsup}, rusage=$iv{rusage}, ".
-	       "hostkeys=$iv{hkeys}, battery=$iv{batt}\n");
+	       "hostkeys=$iv{hkeys}, battery=$iv{batt}, ".
+	       "rootpswd=$iv{rootpswd} dhcpdconf=$iv{dhcpdconf}\n");
     }
 
     #
@@ -550,7 +642,7 @@ sub setintervals($)
 sub ntpdrift($)
 {
     my ($curtime) = @_;
-    
+
     if ($fakeit) {
 	my $delta = $curtime - $faketimes{drift};
 	$faketimes{drift} = $curtime;
@@ -563,7 +655,7 @@ sub ntpdrift($)
 
     my $drift = `cat $driftfile`;
     chomp($drift);
-    
+
     if ($drift ne $lastdrift && $drift =~ /^([-\d\.]*)$/) {
 	logmsg("ntpdrift: updating NTP drift from $lastdrift to $drift\n");
 
@@ -583,7 +675,7 @@ sub ntpdrift($)
 sub runcvsup($)
 {
     my ($curtime) = @_;
-    
+
     if ($fakeit) {
 	my $delta = $curtime - $faketimes{cvsup};
 	$faketimes{cvsup} = $curtime;
@@ -592,14 +684,17 @@ sub runcvsup($)
 	return;
     }
 
-    logmsg("runcvsup: checking for software updates\n");
+    if (-x "$BINDIR/runcvsup.sh") {
+	logmsg("runcvsup: checking for software updates\n");
+	system("$BINDIR/runcvsup.sh");
+	logmsg("runcvsup: software updates done\n");
 
-    system("$BINDIR/runcvsup.sh");
-
-    logmsg("runcvsup: software updates done\n");
-
-    # cvsup can take awhile so update curtime
-    $curtime = time();
+	# cvsup can take awhile so update curtime
+	$curtime = time();
+    } else {
+	logmsg("runcvsup: $BINDIR/runcvsup.sh does not exist, disabled\n");
+	$iv{cvsup} = 0;
+    }
 
     qinsert($curtime + $iv{cvsup}, \&runcvsup)
 	if ($iv{cvsup});
@@ -608,7 +703,7 @@ sub runcvsup($)
 sub sendrusage($)
 {
     my ($curtime) = @_;
-    
+
     if ($fakeit) {
 	my $delta = $curtime - $faketimes{rusage};
 	$faketimes{rusage} = $curtime;
@@ -627,18 +722,34 @@ sub sendrusage($)
     # Collect the stats
     #
     if ($retry{rusage} == 0) {
-	if (! -x $rusagebin) {
-	    logmsg("rusage: no $rusagebin\n");
-	    goto resched;
+	if (-x $rusagebin) {
+	    $rusagestr = `$rusagebin 2>>$LOGDIR/emulab-rusage.log`;
+	    if ($?) {
+		logmsg("rusage: $rusagebin failed ($?)\n");
+		goto resched;
+	    }
+	    chomp $rusagestr;
+	    if ($rusagestr !~
+		/LA1=[\d\.]+ LA5=[\d\.]+ LA15=[\d\.]+ DUSED=[\d\.]+/) {
+		logmsg("rusage: ".
+		       "$rusagebin returns gobbledy-gook: $rusagestr\n");
+		goto resched;
+	    }
 	}
-	$rusagestr = `$rusagebin 2>>$LOGDIR/emulab-rusage.log`;
-	if ($?) {
-	    logmsg("rusage: $rusagebin failed ($?)\n");
-	    goto resched;
+	elsif (-x $uptimebin) {
+	    my $upstr = `$uptimebin`;
+	    chomp($upstr);
+	    if ($upstr =~ /load averages?: ([\d\.]+), ([\d\.]+), ([\d\.]+)/) {
+		$rusagestr = "LA1=$1 LA5=$2 LA15=$3 DUSED=0";
+	    }
+	    else {
+		logmsg("rusage: ".
+		       "$uptimebin returns gobbledy-gook: $upstr\n");
+		goto resched;
+	    }
 	}
-	chomp $rusagestr;
-	if ($rusagestr !~ /LA1=[\d\.]+ LA5=[\d\.]+ LA15=[\d\.]+ DUSED=[\d\.]+/) {
-	    logmsg("rusage: $rusagebin returns gobbledy-gook: $rusagestr\n");
+	else {
+	    logmsg("rusage: no way to get the averages\n");
 	    goto resched;
 	}
     }
@@ -656,8 +767,8 @@ sub sendrusage($)
 	#
 	# Failed, schedule a retry using a backoff.
 	# XXX: removed so that we know when a plab node is back ASAP.
-        #      Just log the failure and reschedule at the normal time.
-        #
+	#      Just log the failure and reschedule at the normal time.
+	#
 
 	#
 	# Failed miserably, just whine and reschedule at the normal time.
@@ -670,12 +781,14 @@ sub sendrusage($)
 	#
 	logmsg("rusage: succeeded after $retry{rusage} retries\n")
 	    if ($retry{rusage});
-	if ($updatefailed ||
-	    $tmccresults[0] =~ /^UPDATE=1$/) {
-	    logmsg("rusage: running an account update\n");
-	    system("$BINDIR/update -i -l");
-	    $updatefailed = $?;
-	    logmsg("rusage: update done\n");
+	if (!SUBBOSS()) {
+	    if ($updatefailed ||
+		$tmccresults[0] =~ /^UPDATE=1$/) {
+	        logmsg("rusage: running an account update\n");
+	        system("$BINDIR/update -i -l");
+	        $updatefailed = $?;
+	        logmsg("rusage: update done\n");
+	    }
 	}
     }
 
@@ -693,7 +806,7 @@ resched:
 sub sendhkeys($)
 {
     my ($curtime) = @_;
-    
+
     if ($fakeit) {
 	my $delta = $curtime - $faketimes{hkeys};
 	$faketimes{hkeys} = $curtime;
@@ -773,7 +886,7 @@ sub sendhkeys($)
 sub sendbatt($)
 {
     my ($curtime) = @_;
-    
+
     if ($fakeit) {
 	my $delta = $curtime - $faketimes{batt};
 	$faketimes{batt} = $curtime;
@@ -848,6 +961,67 @@ resched:
     $curtime = time();
     qinsert($curtime + $iv{batt}, \&sendbatt)
 	if ($iv{batt});
+}
+
+sub setrootpswd($)
+{
+    my ($curtime) = @_;
+
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{rootpswd};
+	$faketimes{rootpswd} = $curtime;
+	logmsg("setrootpswd at +$delta\n");
+	qinsert($curtime + $iv{rootpswd}, \&setrootpswd) if ($iv{rootpswd});
+	return;
+    }
+
+    #
+    # Reset the root password.
+    #
+    if (tmcc(TMCCCMD_ROOTPSWD, undef, \@tmccresults) == 0
+	&& scalar(@tmccresults) &&
+	$tmccresults[0] =~ /^HASH=(.*)$/) {
+	my $hash = $1;
+	logmsg("Resetting root password\n");
+	liblocsetup::os_modpasswd("root", $hash);
+    }
+
+resched:
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $curtime = time();
+    qinsert($curtime + $iv{rootpswd}, \&setrootpswd)
+	if ($iv{rootpswd});
+}
+
+sub dhcpdconf($)
+{
+    my ($curtime) = @_;
+
+    if ($fakeit) {
+	my $delta = $curtime - $faketimes{dhcpdconf};
+	$faketimes{dhcpdconf} = $curtime;
+	logmsg("dhcpdconf at +$delta\n");
+	qinsert($curtime + $iv{dhcpdconf}, \&dhcpdconf) if ($iv{dhcpdconf});
+	return;
+    }
+
+    #
+    # Generate the dhcp configuration
+    #
+    system("$BINDIR/subboss_dhcpd_makeconf -r") == 0
+    	or warn("Could not generate dhcpd.conf");
+
+resched:
+    #
+    # Set up for another interval.
+    # Since the tmcc call and update can take awhile, we update curtime
+    #
+    $curtime = time();
+    qinsert($curtime + $iv{dhcpdconf}, \&dhcpdconf)
+	if ($iv{dhcpdconf});
 }
 
 sub saysomething($)

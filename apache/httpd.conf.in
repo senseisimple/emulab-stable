@@ -109,7 +109,7 @@ AccessConfig   /dev/null
 #
 # Timeout: The number of seconds before receives and sends time out.
 #
-Timeout 30
+Timeout 300
 
 #
 # KeepAlive: Whether or not to allow persistent connections (more than
@@ -371,6 +371,11 @@ ServerAdmin @TBOPSEMAIL_NOSLASH@
 #ServerName new.host.name
 
 #
+# Emulab likes a limited request size. 
+#
+LimitRequestBody 2097152
+
+#
 # DocumentRoot: The directory out of which you will serve your
 # documents. By default, all requests are taken from this directory, but
 # symbolic links and aliases may be used to point to other locations.
@@ -454,6 +459,11 @@ DocumentRoot "@prefix@/www"
     AllowOverride All
 </Directory>
 
+<Directory @prefix@/www/webdb>
+    AllowOverride None
+    Order deny,allow
+    deny from all
+</Directory>
 
 #
 # This should be changed to whatever you set DocumentRoot to.
@@ -1313,7 +1323,49 @@ SetEnvIf User-Agent ".*MSIE.*" \
 CustomLog @prefix@/log/apache_ssl_request_log \
           "%t %h %{SSL_PROTOCOL}x %{SSL_CIPHER}x \"%r\" %b"
 
-</VirtualHost>                                  
+<IfDefine PGENI>
+# A bundle of trusted protogeni sites.
+SSLCACertificateFile @prefix@/etc/genica.bundle
+# Another bundle of CRLs.
+SSLCARevocationFile @prefix@/etc/genicrl.bundle
+#
+# THIS HAS TO BE optional! Why? Cause recent security patches disables SSL
+# renegotiation, which is needed when a subdir turns on ssl client
+# verification (as we used to). Now, we set it to "optional",
+# which avoids the renegotiation problem. The backend scripts MUST
+# check their environment to ensure they are always invoked by a client
+# supplying a verifiable certificate. 
+#
+SSLVerifyClient optional
+SSLVerifyDepth  10
 
+# Reject the unencrypted certs that all users get. 
+<Location />
+SSLRequire ( %{SSL_CLIENT_S_DN_OU} ne "sslxmlrpc" )
+</Location>
+
+ScriptAlias /protogeni/xmlrpc/ch @prefix@/protogeni/xmlrpc/protogeni-ch.pl
+ScriptAlias /protogeni/xmlrpc/cm @prefix@/protogeni/xmlrpc/protogeni-cm.pl
+ScriptAlias /protogeni/xmlrpc/sa @prefix@/protogeni/xmlrpc/protogeni-sa.pl
+ScriptAlias /protogeni/xmlrpc/ses @prefix@/protogeni/xmlrpc/protogeni-ses.pl
+<IfDefine GENI_AM>
+ScriptAlias /protogeni/xmlrpc/am @prefix@/protogeni/xmlrpc/geni-am.pl
+</IfDefine>
+<Directory "@prefix@/www/protogeni">
+	SSLRequireSSL
+	Order deny,allow
+	allow from all
+</Directory>
+<Directory "@prefix@/protogeni/">
+	SSLRequireSSL
+	Order deny,allow
+	allow from all
+	SSLOptions +StdEnvVars +ExportCertData
+	Options +ExecCGI +FollowSymLinks
+	SetHandler cgi-script
+	SetEnv USER "nobody"
+</Directory>
+</IfDefine>
+</VirtualHost>                                  
 </IfDefine>
 

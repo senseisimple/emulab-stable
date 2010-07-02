@@ -22,6 +22,9 @@ CREATE TABLE experiment_templates (
   -- Pointer to parent, for modification.
   parent_guid varchar(16) default NULL,
   parent_vers smallint(5) unsigned default NULL,
+  -- Pointer to most recent child, for modification.
+  child_guid varchar(16) default NULL,
+  child_vers smallint(5) unsigned default NULL,
   -- Project ID
   pid varchar(12) NOT NULL default '',
   -- Group ID
@@ -29,11 +32,14 @@ CREATE TABLE experiment_templates (
   -- Template ID (something unique that the user specifies)
   tid varchar(32) NOT NULL default '',
   -- Creator of the template
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   uid varchar(8) NOT NULL default '',
   -- Eric says these are really metadata. Probably true.
   description mediumtext,
-  -- EID of the underlying parsed experiment. I think this is temporary.
+  -- EID of the underlying parsed experiment. 
   eid varchar(32) NOT NULL default '',
+  -- The Archive for the template. This is shared with derived templates.
+  archive_idx int(10) unsigned default NULL,
   -- These are all mirrors of what is in the existing experiments table
   created datetime default NULL,
   modified datetime default NULL,
@@ -45,6 +51,10 @@ CREATE TABLE experiment_templates (
   logfile tinytext,
   logfile_open tinyint(4) NOT NULL default '0',
   prerender_pid int(11) default '0',
+  -- Hide this template in the graph.
+  hidden tinyint(1) NOT NULL default '0',
+  -- Make this template an active template within its graph
+  active tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (guid, vers),
   KEY pidtid (pid,tid),
   KEY pideid (pid,eid)
@@ -56,6 +66,8 @@ CREATE TABLE experiment_templates (
 CREATE TABLE experiment_template_graphs (
   -- Backlink to the template the input belongs to.
   parent_guid varchar(16) NOT NULL default '',
+  -- Current scale factor. 
+  scale float(10,3) NOT NULL default '1.0',
   image mediumblob,
   imap mediumtext,
   PRIMARY KEY  (parent_guid)
@@ -97,7 +109,7 @@ CREATE TABLE experiment_template_input_data (
   -- Auto generated unique index.
   idx int(10) unsigned NOT NULL auto_increment,
   -- MD5 of the input file.
-  md5 varchar(32) NOT NULL,
+  md5 varchar(32) NOT NULL default '',
   -- The actual text of the input
   input mediumtext,
   PRIMARY KEY  (idx),
@@ -153,26 +165,49 @@ CREATE TABLE experiment_template_settings (
 ) TYPE=MyISAM;
 
 #
-# This is versioned metadata that goes with each template. Not sure what
-# goes into this table yet ...
+# This is versioned metadata that goes with each template. We store the
+# guid and version of the corresponding record in the table below.
 #
 CREATE TABLE experiment_template_metadata (
-  -- Globally Unique ID. Okay, how global is global? 
+  -- Globally Unique ID of the ExperimentTemplate this record belongs to.
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  -- GUID of the metadata item.
+  metadata_guid varchar(16) NOT NULL default '',
+  metadata_vers smallint(5) unsigned NOT NULL default '0',
+  -- Internal metadata items, handled specially.
+  internal tinyint(1) NOT NULL default '0',
+  -- Hidden metadata items
+  hidden tinyint(1) NOT NULL default '0',
+  -- A type descriptor for the metadata, when not user generated.
+  metadata_type enum('tid','template_description','parameter_description') default NULL,
+  PRIMARY KEY  (parent_guid, parent_vers, metadata_guid, metadata_vers)
+) TYPE=MyISAM;
+
+#
+# The actual versioned metadata.
+#
+CREATE TABLE experiment_template_metadata_items (
+  -- Globally Unique ID. 
   guid varchar(16) NOT NULL default '',
   -- Version number for tracking modifications
   vers smallint(5) unsigned NOT NULL default '0',
   -- Backlink to the previous version of this metadata item.
   parent_guid varchar(16) default NULL,
   parent_vers smallint(5) unsigned NOT NULL default '0',
-  -- Backlink to the template this metadata item belongs to.
+  -- Record the template GUID this metadata associated with. This is for
+  -- permission checks and for deletion.
   template_guid varchar(16) NOT NULL default '',
-  template_vers smallint(5) unsigned NOT NULL default '0',
+  -- Creator of this record
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
+  uid varchar(8) NOT NULL default '',
+  -- Key/Value pairs.
   name varchar(64) NOT NULL default '',
-  value tinytext,
+  value mediumtext,
   created datetime default NULL,
-  PRIMARY KEY  (guid, vers, name),
-  KEY  (parent_guid,parent_vers),
-  KEY  (template_guid,template_vers)
+  PRIMARY KEY (guid, vers),
+  KEY parent (parent_guid,parent_vers),
+  KEY template (template_guid)
 ) TYPE=MyISAM;
 
 #
@@ -208,6 +243,9 @@ CREATE TABLE experiment_template_parameters (
   tid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext,
+  -- These point to the optional metadata description.
+  metadata_guid varchar(16) default NULL,
+  metadata_vers smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (parent_guid, parent_vers, name),
   KEY pidtid (pid,tid)
 ) TYPE=MyISAM;
@@ -215,12 +253,33 @@ CREATE TABLE experiment_template_parameters (
 #
 # Hmm, the above table is a problem wrt experiment parsing. 
 #
-CREATE TABLE virt_parameters (
-  pid varchar(12) NOT NULL default '',
-  eid varchar(32) NOT NULL default '',
-  name varchar(64) NOT NULL default '',
-  value tinytext,
-  PRIMARY KEY  (pid,eid,name)
+CREATE TABLE `virt_parameters` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `name` varchar(64) NOT NULL default '',
+  `value` tinytext,
+  `description` text,
+  PRIMARY KEY  (`exptidx`,`name`),
+  UNIQUE KEY `pideid` (`pid`,`eid`,`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+#
+# Events that are dynamically created by the user, as for analysis.
+# Assumed to be just program agent events; generalize later, perhaps.
+#
+CREATE TABLE experiment_template_events (
+  -- Globally Unique ID of the ExperimentTemplate this record belongs to.
+  parent_guid varchar(16) NOT NULL default '',
+  -- Version number for tracking modifications
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  -- stuff for the eventlist table
+  vname varchar(64) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  time float(10,3) NOT NULL default '0.000',
+  objecttype smallint(5) unsigned NOT NULL default '0',
+  eventtype smallint(5) unsigned NOT NULL default '0',
+  arguments text,
+  PRIMARY KEY  (parent_guid, parent_vers, vname)
 ) TYPE=MyISAM;
 
 #
@@ -238,6 +297,8 @@ CREATE TABLE virt_parameters (
 # to "ExperimentRecord." 
 #
 CREATE TABLE experiment_template_instances (
+  -- Auto generated unique index.
+  idx int(10) unsigned NOT NULL auto_increment,  
   -- Backlink to the template.
   parent_guid varchar(16) NOT NULL default '',
   parent_vers smallint(5) unsigned NOT NULL default '0',
@@ -248,16 +309,29 @@ CREATE TABLE experiment_template_instances (
   -- The actual eid (for the experiments table)
   eid varchar(32) NOT NULL default '',
   -- Creator of the instance.
+  uid_idx mediumint(8) unsigned NOT NULL default '0',
   uid varchar(8) NOT NULL default '',
+  -- A short description; not sure I really want this. 
+  description tinytext,
   -- A little bit of duplication ...
   start_time datetime default NULL,
   stop_time datetime default NULL,
+  pause_time datetime default NULL,
+  continue_time datetime default NULL,
+  runtime int(10) unsigned default 0,
   -- The current experiment that is running (see below). One at a time!
   runidx int(10) unsigned default NULL,
-  PRIMARY KEY  (exptidx),
+  -- The tag for the template at the time of instantiation.
+  template_tag varchar(64) default NULL,
+  -- Date of last export.
+  export_time datetime default NULL,
+  -- A lock to prevent mayhem.
+  locked datetime default NULL,
+  locker_pid int(11) default '0',
+  PRIMARY KEY  (idx),
+  KEY  (exptidx),
   KEY  (parent_guid,parent_vers),
-  KEY  (pid,eid),
-  KEY  (exptidx, runidx)
+  KEY  (pid,eid)
 ) TYPE=MyISAM;
 
 #
@@ -270,6 +344,8 @@ CREATE TABLE experiment_template_instances (
 # are permanent. 
 #
 CREATE TABLE experiment_template_instance_bindings (
+  -- Backlink to the instance above.
+  instance_idx int(10) unsigned NOT NULL default '0',
   -- Backlink to the template.
   parent_guid varchar(16) NOT NULL default '',
   parent_vers smallint(5) unsigned NOT NULL default '0',
@@ -281,8 +357,8 @@ CREATE TABLE experiment_template_instance_bindings (
   eid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext NOT NULL,
-  PRIMARY KEY  (exptidx, name),
-  KEY  (parent_guid,parent_vers),
+  PRIMARY KEY  (instance_idx, name),
+  KEY parent_guid (parent_guid,parent_vers),
   KEY pidtid (pid,eid)
 ) TYPE=MyISAM;
 
@@ -299,9 +375,17 @@ CREATE TABLE experiment_runs (
   runid varchar(32) NOT NULL default '',
   -- A short description; not sure I really want this. 
   description tinytext,
+  -- The archive tags for the start and end of the run.
+  starting_archive_tag varchar(64) default NULL,
+  ending_archive_tag varchar(64) default NULL,
+  -- The tag for the commit at the end of the run.
+  archive_tag varchar(64) default NULL,
   -- Timestamps
   start_time datetime default NULL,
   stop_time datetime default NULL,
+  -- If the run specified swapmod, record that with this flag.
+  -- The NS file is stored in the archive.
+  swapmod tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (exptidx, idx)
 ) TYPE=MyISAM;
 
@@ -317,5 +401,23 @@ CREATE TABLE experiment_run_bindings (
   name varchar(64) NOT NULL default '',
   value tinytext NOT NULL,
   PRIMARY KEY  (exptidx, runidx, name)
+) TYPE=MyISAM;
+
+#
+# This table holds the names of nodes that failed to respond during a start
+# or stop run. This is mostly informational at this point.
+#
+CREATE TABLE experiment_template_instance_deadnodes (
+  -- Backlink to the instance above.
+  instance_idx int(10) unsigned NOT NULL default '0',
+  -- The experiment index (into the current experiments table).
+  exptidx int(10) unsigned NOT NULL default '0',
+  -- The run index 
+  runidx int(10) unsigned NOT NULL default '0',
+  -- The node that failed.
+  node_id varchar(32) NOT NULL default '',
+  -- The vname of the node since that is typically more useful.
+  vname varchar(32) NOT NULL default '',
+  PRIMARY KEY  (instance_idx, runidx, node_id)
 ) TYPE=MyISAM;
 

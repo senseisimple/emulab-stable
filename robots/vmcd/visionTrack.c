@@ -563,12 +563,13 @@ static float orientationToSemiCircle(float o) {
  * @param new The data to add to the moving average.
  * @param avg The output from this function; contains the latest moving avg.
  */
-static void updateMovingAverage(struct moving_average *ma,
-				struct robot_position *new) {
-    int i;
+static void updateSMA(struct moving_average *ma,
+		      struct robot_position *new) {
+    int i,j;
     int vp;
     int quads[4] = {0,0,0,0};
     int quad_count = 0;
+    int first_idx = 0;
     
     assert(ma != NULL);
     assert(ma->positions != NULL);
@@ -578,6 +579,7 @@ static void updateMovingAverage(struct moving_average *ma,
     
     /* update data samples array */
     ma->positions[ma->oldest_index] = *new;
+    first_idx = ma->oldest_index;
     
     /* point to the next piece of data to be replaced */
     ma->oldest_index = (ma->oldest_index + 1) % ma->positions_len;
@@ -615,8 +617,9 @@ static void updateMovingAverage(struct moving_average *ma,
      *      if qi are adjacent, calculate simple average.
      */
     
+    j = first_idx;
     for (i = 0; i < vp; ++i) {
-	float tt = ma->positions[i].theta;
+	float tt = ma->positions[j].theta;
 
 	if (tt >= 0.0f && tt < M_PI_2) {
 	    if (quads[0] == 0) {
@@ -646,12 +649,23 @@ static void updateMovingAverage(struct moving_average *ma,
 	    info("FATAL ERROR: orientation not in range 0,PI or 0,-PI !!!\n");
 	    assert(0);
 	}
+
+	j = (j - 1);
+	if (j < 0) {
+	    j = ma->positions_len - 1;
+	}
     }
 
     /* handle positions like normal */
+    j = first_idx;
     for (i = 0; i < vp; ++i) {
-	ma->current_avg.x += ma->positions[i].x;
-	ma->current_avg.y += ma->positions[i].y;
+	ma->current_avg.x += ma->positions[j].x;
+	ma->current_avg.y += ma->positions[j].y;
+
+	j = (j - 1);
+	if (j < 0) {
+	    j = ma->positions_len - 1;
+	}
     }
     
     ma->current_avg.x = ma->current_avg.x / vp;
@@ -667,8 +681,14 @@ static void updateMovingAverage(struct moving_average *ma,
     }
     else if (quad_count == 1) {
 	/* calculate simple average, a la positions */
+	j = first_idx;
 	for (i = 0; i < vp; ++i) {
-	    ma->current_avg.theta += ma->positions[i].theta;
+	    ma->current_avg.theta += ma->positions[j].theta;
+
+	    j = (j - 1);
+	    if (j < 0) {
+		j = ma->positions_len - 1;
+	    }
 	}
 	ma->current_avg.theta = ma->current_avg.theta / vp;
     }
@@ -677,9 +697,15 @@ static void updateMovingAverage(struct moving_average *ma,
 	    float *to = (float *)malloc(sizeof(float)*(vp));
 
 	    /* convert, then calculate avg... then convert avg back */
+	    j = first_idx;
 	    for (i = 0; i < vp; ++i) {
-		to[i] = orientationToCircle(ma->positions[i].theta);
+		to[i] = orientationToCircle(ma->positions[j].theta);
 		ma->current_avg.theta += to[i];
+
+		j = (j - 1);
+		if (j < 0) {
+		    j = ma->positions_len - 1;
+		}
 	    }
 	    
 	    ma->current_avg.theta = 
@@ -692,11 +718,17 @@ static void updateMovingAverage(struct moving_average *ma,
 		 (quads[2] && quads[3]) ||
 		 (quads[0] && quads[3])) {
 	     /* calculate simple avg */
-	     for (i = 0; i < vp; ++i) {
-		 ma->current_avg.theta += ma->positions[i].theta;
-	     }
-	     
-	     ma->current_avg.theta = ma->current_avg.theta / vp;
+	    j = first_idx;
+	    for (i = 0; i < vp; ++i) {
+		ma->current_avg.theta += ma->positions[j].theta;
+
+		j = (j - 1);
+		if (j < 0) {
+		    j = ma->positions_len - 1;
+		}
+	    }
+	    
+	    ma->current_avg.theta = ma->current_avg.theta / vp;
 	}
 	else {
 	    /* set current to new orient */
@@ -717,7 +749,203 @@ static void updateMovingAverage(struct moving_average *ma,
     return;
 }
 
-void vtSmooth(struct lnMinList *tracks) {
+/**
+ * yech, I'm in a hurry
+ */
+extern double smoothing_alpha;
+
+static void updateEWMA(struct moving_average *ma,struct robot_position *new) {
+    int i,j;
+    int vp;
+    int quads[4] = {0,0,0,0};
+    int quad_count = 0;
+    int first_idx = 0;
+    
+    assert(ma != NULL);
+    assert(ma->positions != NULL);
+    assert(new != NULL);
+
+    /* setup */
+    
+    /* update data samples array */
+    ma->positions[ma->oldest_index] = *new;
+    first_idx = ma->oldest_index;
+    
+    /* point to the next piece of data to be replaced */
+    ma->oldest_index = (ma->oldest_index + 1) % ma->positions_len;
+    /* if the ring buffer isn't full yet, incr the number of valid data pts */
+    if (ma->number_valid_positions < ma->positions_len) {
+	++(ma->number_valid_positions);
+    }
+    
+    ma->current_avg.x = 0.0f;
+    ma->current_avg.y = 0.0f;
+    ma->current_avg.theta = 0.0f;
+
+    vp = ma->number_valid_positions;
+
+    /* make sure that the theta is BETWEEN 0 and 2PI -- otherwise an improper
+     * average could be calculated (i.e., if it's flipping between +PI and -PI)
+     */
+
+    /** 
+     * this gets tricky.  here's the algorithm, and it should do well in 
+     * almost every case (certainly, in every case for which incoming data
+     * is "sensible."
+     *
+     * 1) see how many and which quadrants we have data for.
+     * 2) if |q| > 2, return latest orientation as avg.  Can't do much better
+     *    here, except maybe to cut out all data that's not in the two most
+     *    populous quadrants.
+     * 3) if |q| == 1, calculate the simple average.
+     * 4) if |q| == 2:
+     *      if q == {2,3}, convert to full circle coords (i.e., convert 
+     *         [-PI,0) -> [PI,2PI), and calculate
+     *         simple average.  If answer is in [-PI,2PI], convert back to
+     *         [-PI,0).
+     *      if qi are NOT adjacent, return latest orientation as average.
+     *      if qi are adjacent, calculate simple average.
+     */
+    
+    j = first_idx;
+    for (i = 0; i < vp; ++i) {
+	float tt = ma->positions[j].theta;
+
+	if (tt >= 0.0f && tt < M_PI_2) {
+	    if (quads[0] == 0) {
+		++quad_count;
+	    }
+	    ++(quads[0]);
+	}
+	else if (tt >= M_PI_2 && tt <= M_PI) {
+	    if (quads[1] == 0) {
+                ++quad_count;
+            }
+	    ++(quads[1]);
+	}
+	else if (tt >= -M_PI && tt <= -M_PI_2) {
+	    if (quads[2] == 0) {
+                ++quad_count;
+            }
+	    ++(quads[2]);
+	}
+	else if (tt > -M_PI_2 && tt < 0.0f) {
+	    if (quads[3] == 0) {
+                ++quad_count;
+            }
+	    ++(quads[3]);
+	}
+	else {
+	    info("FATAL ERROR: orientation not in range 0,PI or 0,-PI !!!\n");
+	    assert(0);
+	}
+
+	j = (j - 1);
+	if (j < 0) {
+	    j = ma->positions_len - 1;
+	}
+    }
+
+    /* handle positions */
+    j = first_idx;
+    double weight = 0.0;
+    for (i = 0; i < vp; ++i) {
+	double factor = pow((1 - smoothing_alpha),i);
+	ma->current_avg.x += (ma->positions[j].x)*factor;
+	ma->current_avg.y += (ma->positions[j].y)*factor;
+
+	weight += factor;
+
+	j = (j - 1);
+	if (j < 0) {
+	    j = ma->positions_len - 1;
+	}
+    }
+    
+    ma->current_avg.x = ma->current_avg.x / weight;
+    ma->current_avg.y = ma->current_avg.y / weight;
+    
+    /* now, handle the various orientations we may have... */
+    if (quad_count > 2) {
+	ma->current_avg.theta = new->theta;
+	info("S WARNING: had to use only latest theta "
+	     "(> 2 quadrants); no avg!\n");
+	info("S QUADS: q0 = %d, q1 = %d, q2 = %d, q3 = %d\n",
+	     quads[0],quads[1],quads[2],quads[3]);
+    }
+    else if (quad_count == 1) {
+	/* calculate simple average, a la positions */
+	j = first_idx;
+	for (i = 0; i < vp; ++i) {
+	    ma->current_avg.theta += ma->positions[j].theta;
+
+	    j = (j - 1);
+	    if (j < 0) {
+		j = ma->positions_len - 1;
+	    }
+	}
+	ma->current_avg.theta = ma->current_avg.theta / vp;
+    }
+    else if (quad_count == 2) {
+	if (quads[1] && quads[2]) {
+	    float *to = (float *)malloc(sizeof(float)*(vp));
+
+	    /* convert, then calculate avg... then convert avg back */
+	    j = first_idx;
+	    for (i = 0; i < vp; ++i) {
+		to[i] = orientationToCircle(ma->positions[j].theta);
+		ma->current_avg.theta += to[i];
+
+		j = (j - 1);
+		if (j < 0) {
+		    j = ma->positions_len - 1;
+		}
+	    }
+	    
+	    ma->current_avg.theta = 
+		orientationToSemiCircle(ma->current_avg.theta / vp);
+
+	    free(to);
+
+	}
+	else if ((quads[0] && quads[1]) || 
+		 (quads[2] && quads[3]) ||
+		 (quads[0] && quads[3])) {
+	     /* calculate simple avg */
+	    j = first_idx;
+	    for (i = 0; i < vp; ++i) {
+		ma->current_avg.theta += ma->positions[j].theta;
+
+		j = (j - 1);
+		if (j < 0) {
+		    j = ma->positions_len - 1;
+		}
+	    }
+	    
+	    ma->current_avg.theta = ma->current_avg.theta / vp;
+	}
+	else {
+	    /* set current to new orient */
+	    ma->current_avg.theta = new->theta;
+	    info("S WARNING: had to use only latest theta "
+		 "(non-adj); no avg!\n");
+	}
+	
+    }
+
+#if 1
+    if (debug > 2) {
+	info("UPDATING moving avg: %d valid positions\n",vp);
+    }
+
+#endif
+
+    return;
+}
+
+static void vtSmoothWrapper(struct lnMinList *tracks,
+			    void (*update_func)(struct moving_average *ma,
+						struct robot_position *new)) {
     struct vision_track *vt = NULL;
     struct robot_object *ro = NULL;
     struct moving_average *ma = NULL;
@@ -731,9 +959,8 @@ void vtSmooth(struct lnMinList *tracks) {
 	if ((ro = vt->vt_userdata) != NULL) {
 	    ma = &(vt->ma);
 	    
-	    /* using the latest position in ro->position, calc moving avg */
-	    updateMovingAverage(ma,
-				&(vt->vt_position));
+	    /* using the latest position in ro->position, calc whichever avg */
+	    update_func(ma,&(vt->vt_position));
 
 	    if (debug > 2) {
 		info("SMOOTHED position for robot %d from (%f,%f,%f) to "
@@ -776,4 +1003,12 @@ void vtSmooth(struct lnMinList *tracks) {
     }
     
     return;
+}
+
+void vtSmoothEWMA(struct lnMinList *tracks) {
+    vtSmoothWrapper(tracks,updateEWMA);
+}
+
+void vtSmoothSMA(struct lnMinList *tracks) {
+    vtSmoothWrapper(tracks,updateSMA);
 }

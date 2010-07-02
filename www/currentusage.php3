@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -12,13 +12,13 @@ require("Sajax.php");
 
 #
 # Get current user.
-# 
-$uid = GETLOGIN();
+#
+$this_user = CheckLogin($check_status);
 
 #
 # For anonymous users, show experiment stats.
 #
-function SHOWSTATS()
+function SHOWSTATS($mini = 0)
 {
     $query_result =
 	DBQueryFatal("select count(*) from experiments as e " .
@@ -50,7 +50,7 @@ function SHOWSTATS()
 
     $query_result =
 	DBQueryFatal("select count(*) from experiments where ".
-		     "swap_requests > 0 and idle_ignore=0 ".
+		     "state='active' and swap_requests > 0 and idle_ignore=0 ".
 		     "and pid!='emulab-ops' and pid!='testbed'");
     if (mysql_num_rows($query_result) != 1) {
 	$idle_expts = "ERR";
@@ -61,7 +61,8 @@ function SHOWSTATS()
     }
     $freepcs = TBFreePCs();
 
-    $output = "<table valign=top align=center width=100% height=100% border=1>
+    $output = "<table valign=top align=center width=100% height=100%
+                    cellpadding=0 cellspacing=1 border=0>
                 <tr><th nowrap colspan=2 class='usagetitle'>
 	            Current Experiments</th></tr>
                 <tr><td class=menuoptusage align=right>$active_expts</td>
@@ -73,11 +74,42 @@ function SHOWSTATS()
                 <tr><td align=right class=menuoptusage>$swapped_expts</td>
                     <td align=left  class=menuoptusage>
                         <a target=_parent href=explist.php3#swapped>Swapped</a>
-                    </td></tr>
-                <tr><td align=right class=menuoptusage><b>$freepcs</b></td>
-                    <td align=left  class=menuoptusage><b>Free PCs</b></td>
-                </tr>
-               </table>\n";
+                    </td></tr>";
+    if (!$mini) {
+	$output .= "<tr><td align=right class=menuoptusage>
+                        <font size=+1>$freepcs</font></td>
+                    <td align=left  class=menuoptusage>
+                        <font size=+1>Free PCs</font></td>
+                </tr>";
+    }
+    $output .= "</table>\n";
+    return $output;
+}
+
+#
+# Logged in users, show free node counts.
+#
+function ShowStatus()
+{
+    $freepcs = TBFreePCs();
+    $reload  = TBReloadingPCs();
+    $users   = TBLoggedIn();
+    $active  = TBActiveExperiments();
+    $output  = "";
+
+    $output .= "<table valign=top align=center width=100% height=100% 
+		 cellspacing=1 cellpadding=0>";
+
+    $output .= "<tr><td nowrap class=usagefreenodes>$freepcs Free PCs</td>".
+	"</tr>\n";
+    $output .= "<tr><td nowrap class=usagefreenodes>$reload PCs reloading</td>".
+	"</tr>\n";
+    $output .= "<tr><td nowrap class=usagefreenodes>$users active users</td>".
+	"</tr>\n";
+    $output .= "<tr><td nowrap class=usagefreenodes>$active active expts.</td>".
+	"</tr>\n";
+    
+    $output .= "</table>";
     return $output;
 }
 
@@ -86,6 +118,8 @@ function SHOWSTATS()
 #
 function SHOWFREENODES()
 {
+    $freecounts = array();
+    
     # Get typelist and set freecounts to zero.
     $query_result =
 	DBQueryFatal("select n.type from nodes as n ".
@@ -95,7 +129,11 @@ function SHOWFREENODES()
 	$type              = $row[0];
 	$freecounts[$type] = 0;
     }
-    
+
+    if (!count($freecounts)) {
+	return "";
+    }
+	
     # Get free totals by type.
     $query_result =
 	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
@@ -117,47 +155,60 @@ function SHOWFREENODES()
 	}
     }
     $output = "";
-	
+
     $freepcs   = TBFreePCs();
     $reloading = TBReloadingPCs();
 
-    $output .= "<table valign=top align=center width=100% height=100% border=1>
-                 <tr><td nowrap colspan=4 class=menuoptusage align=center>
- 	           <font size=+1>$freepcs Free PCs</font></td></tr>\n";
+    $output .= "<table valign=top align=center width=100% height=100% border=1
+		 cellspacing=1 cellpadding=0>
+                 <tr><td nowrap colspan=8 class=usagefreenodes align=center>
+ 	           <b>$freepcs Free PCs, $reloading reloading</b></td></tr>\n";
 
     $pccount = count($freecounts);
     $newrow  = 1;
+    $maxcols = (int) ($pccount / 3);
+    if ($pccount % 3)
+	$maxcols++;
+    $cols    = 0;
     foreach($freecounts as $key => $value) {
 	$freecount = $freecounts[$key];
 
-	if ($newrow || $pccount <= 3) 
+	if ($newrow) {
 	    $output .= "<tr>\n";
-	$newrow = ($newrow ? 0 : 1);
+	}
 	
-	$output .= "<td class=menuoptusage align=right>
+	$output .= "<td class=usagefreenodes align=right>
                      <a target=_parent href=shownodetype.php3?node_type=$key>
                         $key</a></td>
-                    <td class=menuoptusage align=left>${freecount}</td>\n";
+                    <td class=usagefreenodes align=left>${freecount}</td>\n";
 
-	if ($newrow || $pccount <= 3) {
+	$cols++;
+	$newrow = 0;
+	if ($cols == $maxcols || $pccount <= 3) {
+	    $cols   = 0;
+	    $newrow = 1;
+	}
+
+	if ($newrow) {
 	    $output .= "</tr>\n";
 	}
     }
-    if (! $newrow && $pccount > 3) {
-	$output .= "<td></td><td></td></tr>\n";
+    if (! $newrow) {
+        # Fill out to $maxcols
+	for ($i = $cols + 1; $i <= $maxcols; $i++) {
+	    $output .= "<td class=usagefreenodes>&nbsp</td>";
+	    $output .= "<td class=usagefreenodes>&nbsp</td>";
+	}
+	$output .= "</tr>\n";
     }
     # Fill in up to 3 rows.
     if ($pccount < 3) {
 	for ($i = $pccount + 1; $i <= 3; $i++) {
-	    $output .= "<tr><td class=menuoptusage>&nbsp</td>
-                            <td class=menuoptusage>&nbsp</td></tr>\n";
+	    $output .= "<tr><td class=usagefreenodes>&nbsp</td>
+                            <td class=usagefreenodes>&nbsp</td></tr>\n";
 	}
     }
 
-    $output .= "<tr>
-                 <td class=menuoptusage colspan=4 align=center>
-                    <b>$reloading PCs reloading</b></td>
-               </tr>\n";
     $output .= "</table>";
     return $output;
 }
@@ -165,23 +216,50 @@ function SHOWFREENODES()
 #
 # This is for the Sajax request.
 #
-function FreeNodeHtml() {
-    global $uid;
-    
-    if ($uid) {
-	return SHOWFREENODES();
+function FreeNodeHtml($usagemode = null) {
+    global $this_user;
+
+    if ($this_user) {
+	if ($usagemode == null || $usagemode == "status") {
+	    return ShowStatus();
+	}
+	elseif ($usagemode == "stats") {
+	    return SHOWSTATS(1);
+	}
+	else {
+	    return SHOWFREENODES();
+	}
     }
     else {
 	return SHOWSTATS();
     }
 }
+
+#
+# We need all errors to come back this function so that the Sajax request
+# fails and the timer is terminated. See below.
+# 
+function handle_error($message, $death)
+{
+    echo "failed:$message";
+    # Always exit; ignore $death.
+    exit(1);
+}
      
 #
 # If user is anonymous, show experiment stats, otherwise useful info.
 # 
-if ($uid) {
+if ($this_user) {
     sajax_init();
     sajax_export("FreeNodeHtml");
+
+    # If this call is to client request function, then turn off
+    # interactive mode; errors will cause the Sajax request to fail
+    # and the timer to stop.
+    if (sajax_client_request()) {
+	$session_interactive  = 0;
+	$session_errorhandler = 'handle_error';
+    }
     sajax_handle_client_request();
 
     PAGEBEGINNING("Free Node Summary", 1, 1);
@@ -190,18 +268,19 @@ if ($uid) {
 
     ?>
     function FreeNodeHtml_CB(stuff) {
-	getObjbyName('usage').innerHTML = stuff;
+	getObjbyName('usagefreenodes').innerHTML = stuff;
+	setTimeout('GetFreeNodeHtml()', 60000);
     }
-    setInterval('GetFreeNodeHtml()', 30000);
-
     function GetFreeNodeHtml() {
 	x_FreeNodeHtml(FreeNodeHtml_CB);
     }
+    setTimeout('GetFreeNodeHtml()', 60000);
+    
     <?php
     echo "</script>\n";
 	  
-    echo "<div id=usage>\n";
-    echo   SHOWFREENODES();
+    echo "<div id=usagefreenodes>\n";
+    echo   ShowStatus();
     echo "</div>\n";
     echo "</body></html>";
 }
@@ -212,3 +291,4 @@ else {
     echo "</div>\n";
     echo "</body></html>";
 }
+?>

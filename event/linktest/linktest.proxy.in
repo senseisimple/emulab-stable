@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,10 +21,10 @@ use POSIX ":sys_wait_h";
 sub usage()
 {
     print "Usage: linktest.proxy [-d level] -u user -g gid -e pid/eid ".
-	"-l level -o logfile -t timeout\n";
+	"-l level -o logfile -t timeout -r\n";
     exit(-1);
 }
-my $optlist = "d:u:g:e:l:o:t:";
+my $optlist = "d:u:g:e:l:o:t:r";
 my $debug   = 0;
 my $user;
 my $gid;
@@ -33,6 +33,7 @@ my $eid;
 my $level;
 my $logfile;
 my $timeout;
+my $reportonly = 0;
 
 #
 # Configure variables
@@ -105,6 +106,9 @@ if (defined($options{"t"})) {
 if (defined($options{"o"})) {
     $output = $options{"o"};
 }
+if (defined($options{"r"})) {
+    $reportonly = $options{"r"};
+}
 
 #
 # Okay, now flip to user before running linktest. Must put the user
@@ -138,6 +142,8 @@ push(@cmdandargs, ("-t", $timeout))
     if (defined($timeout));
 push(@cmdandargs, ("-o", $output))
     if (defined($output));
+push(@cmdandargs, "-r")
+    if ($reportonly);
 
 exec(@cmdandargs);
 die("*** $0:\n".

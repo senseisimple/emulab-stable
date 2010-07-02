@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,6 +22,7 @@ my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
 my $FSDIR_PROJ = "@FSDIR_PROJ@";
 my $FSDIR_USERS = "@FSDIR_USERS@";
 my $FSDIR_SHARE = "@FSDIR_SHARE@";
+my $FSDIR_SCRATCH = "@FSDIR_SCRATCH@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
@@ -113,6 +114,12 @@ use libdb;
 use libtestbed;
 use libArchive;
 
+my $PROJROOT    = PROJROOT();
+my $GROUPROOT   = GROUPROOT();
+my $USERROOT    = USERROOT();
+my $SHAREROOT   = SHAREROOT();
+my $SCRATCHROOT = SCRATCHROOT();
+
 $UID = 0;
 
 if ($cmd eq "add") {
@@ -156,10 +163,13 @@ if ($cmd eq "get" || $cmd eq "transfer") {
 	}
 	($exptidx, $rsrcidx) = $query_result->fetchrow_array();
     }
-    $cmdline .= " -m $FSDIR_GROUPS:/groups";
-    $cmdline .= " -m $FSDIR_PROJ:/proj";
-    $cmdline .= " -m $FSDIR_USERS:/users";
-    $cmdline .= " -m $FSDIR_SHARE:/share";
+    $cmdline .= " -m $FSDIR_GROUPS:$GROUPROOT";
+    $cmdline .= " -m $FSDIR_PROJ:$PROJROOT";
+    $cmdline .= " -m $FSDIR_USERS:$USERROOT";
+    $cmdline .= " -m $FSDIR_SHARE:SHAREROOT";
+    if ($FSDIR_SCRATCH) {
+	$cmdline .= " -m $FSDIR_SCRATCH:$SCRATCHROOT";
+    }
     $cmdline .= " $pid $eid";
 }
 elsif ($cmd eq "gc") {
@@ -181,16 +191,18 @@ if ($cmd eq "gc" && defined($pid)) {
 	DBQueryFatal("select r.vname,i.IP from reserved as r ".
 		     "left join nodes on r.node_id=nodes.node_id ".
 		     "left join node_types on node_types.type=nodes.type ".
-		     "left join interfaces as i on i.node_id=r.node_id and ".
-		     "  i.card=node_types.control_net ".
-		     " where nodes.role='testnode' ".
+		     "left join interfaces as i on i.node_id=r.node_id ".
+		     "where nodes.role='testnode' ".
 		     "       and node_types.isvirtnode=0 ".
 		     "       and node_types.isremotenode=0 ".
-		     "       and node_types.control_net is not null ".
+		     "       and i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
 		     "       and pid='$pid' and eid='$eid'");
     
     while (my ($vname,$ip) = $nodes_result->fetchrow_array) {
-	print NT_WRITER "$vname:$ip\n";
+	# not all devices have an IP address on the control net
+	if ($ip) {
+	    print NT_WRITER "$vname:$ip\n";
+	}
     }
 }
 
@@ -201,10 +213,13 @@ sub InsertFile($)
     my ($fn) = @_;
     my $retval = -1;
     
-    $fn =~ s|^$FSDIR_GROUPS|/groups|;
-    $fn =~ s|^$FSDIR_PROJ|/proj|;
-    $fn =~ s|^$FSDIR_USERS|/users|;
-    $fn =~ s|^$FSDIR_SHARE|/share|;
+    $fn =~ s|^$FSDIR_GROUPS|$GROUPROOT|;
+    $fn =~ s|^$FSDIR_PROJ|$PROJROOT|;
+    $fn =~ s|^$FSDIR_USERS|$USERROOT|;
+    $fn =~ s|^$FSDIR_SHARE|$SHAREROOT|;
+    if ($FSDIR_SCRATCH) {
+	$fn =~ s|^$FSDIR_SCRATCH|$SCRATCHROOT|;
+    }
     
     $fn = DBQuoteSpecial($fn);
 

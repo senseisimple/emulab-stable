@@ -1,11 +1,12 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+use strict;
 
 #
 # Modify groups (add and subtract in DB) for a user, and then call
@@ -49,9 +50,6 @@ my $SETGROUPS	   = "$TB/sbin/setgroups";
 my $SSH		   = "$TB/bin/sshtb";
 my $SAVEUID	   = $UID;
 
-# Locals
-my $dbuid;
-
 #
 # Untaint the path
 #
@@ -70,6 +68,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
 
 # Protos
 sub fatal($);
@@ -86,7 +85,7 @@ if ($UID == 0) {
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -151,12 +150,16 @@ else {
     die("Bad user name: $user.");
 }
 
-#
-# Get user DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-        "    You do not exist in the Emulab Database!\n");
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
 }
 
 #
@@ -178,40 +181,42 @@ if (AuditStart(0)) {
 #
 foreach my $token (@addlist) {
     my ($pid,$gid,$trust) = split(":", $token);
+    my $sendemail = 1;
+
+    my $group = Group->LookupByPidGid($pid, $gid);
+    if (! defined($group)) {
+	fatal("Cannot find group object for $pid/$gid");
+    }
 
     #
     # Look to see if there is already an entry; this happens as the result
     # of either a join request or a new project request. The row is inserted
     # but with a trust value of "none". We probably want a pending table ...
     #
-    my $query_result =
-	DBQueryFatal("select trust from group_membership ".
-		     "where pid='$pid' and gid='$gid' and uid='$user'");
+    my $membership = $group->LookupUser($target_user);
 
-    if ($query_result->num_rows) {
+    if (defined($membership)) {
 	#
 	# Sanity check; better be trust=none.
 	#
-	my ($curtrust) = $query_result->fetchrow_array();
+	my $curtrust = $membership->trust();
 
 	fatal("Group membership table problem; ".
 	      "$user,$pid,$gid,$trust,$curtrust\n")
 	    if ($curtrust ne "none" && $curtrust ne $trust && !$ELABINELAB);
 
-	DBQueryFatal("update group_membership set ".
-		     "     trust='$trust', ".
-		     "     date_approved=now() ".
-		     "where pid='$pid' and gid='$gid' and uid='$user'");
+	$membership->ModifyTrust($trust) == 0
+	    or fatal("Could not modify $membership to $trust");
+
+	$sendemail = 0
+	    if ($ELABINELAB &&
+		$group->IsProjectGroup() && $group->IsLeader($target_user));
     }
     else {
-	DBQueryFatal("insert into group_membership set ".
-		     "     uid='$user', ".
-		     "     pid='$pid', ".
-		     "     gid='$gid', ".
-		     "     trust='$trust', ".
-		     "     date_applied=now(), ".
-		     "     date_approved=now()");
+	$group->AddMemberShip($target_user, $trust) == 0
+	    or fatal("Could not add $user to $group with trust $trust");
     }
+
     #
     # Tell chat subsystem to change groups ...
     #
@@ -225,6 +230,11 @@ foreach my $token (@addlist) {
 		fatal("$SETCHATMEMBERS '-g $gid $pid' failed!");
 	}
     }
+
+    if ($sendemail) {
+	$group->SendApprovalEmail($this_user, $target_user) == 0 or
+	    fatal("Could not send approval email to $target_user in $group");
+    }
 }
 
 #
@@ -233,8 +243,19 @@ foreach my $token (@addlist) {
 foreach my $token (@modlist) {
     my ($pid,$gid,$trust) = split(":", $token);
 
-    DBQueryFatal("update group_membership set trust='$trust' ".
-		 "where pid='$pid' and gid='$gid' and uid='$user'");
+    my $group = Group->LookupByPidGid($pid, $gid);
+    if (! defined($group)) {
+	fatal("Cannot find group object for $pid/$gid");
+    }
+    my $membership = $group->LookupUser($target_user);
+    if (! defined($membership)) {
+	fatal("Cannot find membership object for $user in $group");
+    }
+    $membership->ModifyTrust($trust) == 0
+	    or fatal("Could not modify $membership to '$trust'");
+
+    $group->SendTrustChangeEmail($this_user, $target_user) == 0
+	or fatal("Could not send trust change email to $target_user");
 }
 
 #
@@ -244,28 +265,31 @@ foreach my $token (@remlist) {
     my ($pid,$gid)  = split(":", $token);
     my @delgroups   = ();
 
+    my $group = Group->LookupByPidGid($pid, $gid);
+    if (! defined($group)) {
+	fatal("Cannot find group object for $pid/$gid");
+    }
+
     #
     # Special case; if pid==gid then delete from the project entirely.
     # However, we want to get a list of the groups about to be deleted
     # so we know what to hand off to the callouts.
     #
     if ($pid eq $gid) {
-	my $query_result =
-	    DBQueryFatal("select gid from group_membership ".
-			 "where uid='$user' and pid='$pid'");
-
-	while (my ($gid) = $query_result->fetchrow_array()) {
-	    push(@delgroups, $gid);
+	my $project = Project->LookupByPid($pid);
+	
+	if (! defined($project)) {
+	    fatal("Cannot find group object for $pid/$gid");
 	}
+	$project->DeleteUser($target_user, \@delgroups) == 0
+	    or fatal("Could not delete $user from $project");
     }
     else {
-	@delgroups = ($gid);
+	@delgroups = ($group);
+
+	$group->DeleteMemberShip($target_user) == 0
+	    or fatal("Could not delete $user from $group");
     }
-    
-    DBQueryFatal("delete from group_membership ".
-		 "where pid='$pid' and ".
-		 (($pid ne $gid) ? "gid='$gid' and " : " ") .
-		 "      uid='$user'");
 
     #
     # When deleting a user from a group, need to call genelists on the
@@ -282,13 +306,15 @@ foreach my $token (@remlist) {
     if ($CHATSUPPORT) {
 	my @optlist = ();
 
-	foreach my $group (@delgroups) {
-	    push(@optlist, "$pid:$group");
+	foreach my $delgroup (@delgroups) {
+	    my $groupname = $delgroup->gid();
+	    
+	    push(@optlist, "$pid:$groupname");
 
 	    # Does not work yet.
 	    if (0) {
-		system("$SETCHATMEMBERS $optarg -g $group $pid") == 0 or
-		    fatal("$SETCHATMEMBERS '-g $group $pid' failed!");
+		system("$SETCHATMEMBERS $optarg -g $groupname $pid") == 0 or
+		    fatal("$SETCHATMEMBERS '-g $groupname $pid' failed!");
 	    }
 	}
 	if (@optlist) {

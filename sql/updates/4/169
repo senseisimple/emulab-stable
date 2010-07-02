@@ -1,0 +1,28 @@
+#
+# This is the first DB update script. It adds a new table to the DB
+# to track version info for doing this.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("version_info")) {
+	DBQueryFatal("CREATE TABLE `version_info` ( ".
+		     " `name` varchar(32) NOT NULL default '', ".
+		     " `value` tinytext NOT NULL, ".
+		     "  PRIMARY KEY  (`name`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    
+    # Initialize new table.
+    my $query_result =
+	DBQueryFatal("select value from version_info where name='dbrev'");
+    if (! $query_result->numrows) {
+	DBQueryFatal("replace into `version_info` values ('dbrev', '4.168')");
+    }
+    return 0;
+}
+1;

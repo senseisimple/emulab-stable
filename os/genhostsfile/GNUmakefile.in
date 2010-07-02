@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ SUBDIR		= os/genhostsfile
 
 include $(OBJDIR)/Makeconf
 
-CFLAGS	= -Wall -O2 -g -static -I${OBJDIR} -I${TESTBED_SRCDIR}/lib/libtb
+CFLAGS	= -Wall -O2 -g $(LDSTATIC) -I${OBJDIR} -I${TESTBED_SRCDIR}/lib/libtb
 LIBS    = ${OBJDIR}/lib/libtb/libtb.a
 
 all:	genhostsfile genfromdb genfromtopo

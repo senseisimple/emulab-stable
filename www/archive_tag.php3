@@ -1,45 +1,45 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can look at experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("submit", PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
+
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$gid = $experiment->gid();
+
+# Permission
+if (!$isadmin &&
+    !$experiment->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+    USERERROR("You do not have permission to view tags for ".
+	      "archive in $pid/$eid!", 1);
 }
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-if (!TBvalid_pid($pid)) {
-    PAGEARGERROR("Invalid project ID.");
-}
-if (!TBvalid_eid($eid)) {
-    PAGEARGERROR("Invalid experiment ID.");
-}
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Commit and Tag");
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $pid, $eid, $TBDB_ARCHIVE_TAGLEN;
-
-    #
-    # Standard Testbed Header
-    #
-    PAGEHEADER("Commit/Tag archive for experiment $pid/$eid");
+    global $experiment, $TBDB_ARCHIVE_TAGLEN, $referrer;
 
     echo "<center>
           Commit/Tag Archive
@@ -68,8 +68,13 @@ function SPITFORM($formfields, $errors)
     }
 
     echo "<table align=center border=1> 
-          <form action=archive_tag.php3?pid=$pid&eid=$eid method=post>\n";
+          <form action='" . CreateURL("archive_tag", $experiment) . "' ".
+	        "method=post>\n";
 
+    if (isset($referrer)) {
+	echo "<input type=hidden name=referrer value=$referrer>\n";
+    }
+    
     echo "<tr>
               <td align=center>
                <b>Please enter a tag[<b>1</b>]</b>
@@ -80,7 +85,7 @@ function SPITFORM($formfields, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[tag]\"
-                         value=\"" . $formfields[tag] . "\"
+                         value=\"" . $formfields["tag"] . "\"
 	                 size=$TBDB_ARCHIVE_TAGLEN
                          maxlength=$TBDB_ARCHIVE_TAGLEN>
           </tr>\n";
@@ -96,7 +101,7 @@ function SPITFORM($formfields, $errors)
               <td align=center class=left>
                   <textarea name=\"formfields[message]\"
                     rows=10 cols=70>" .
-	            ereg_replace("\r", "", $formfields[message]) .
+	            ereg_replace("\r", "", $formfields["message"]) .
 	            "</textarea>
               </td>
           </tr>\n";
@@ -124,8 +129,14 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
+if (! isset($submit)) {
     $defaults = array();
+    $defaults["tag"]     = "";
+    $defaults["message"] = "";
+    
+    if (!isset($referrer))
+	$referrer = $_SERVER['HTTP_REFERER'];
+    
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -196,35 +207,52 @@ if (count($errors)) {
     return;
 }
 
-if (!TBExptGroup($pid, $eid, $gid)) {
-    TBERROR("Could not get experiment gid for $pid/$eid!", 1);
-}
+STARTBUSY("Committing and Tagging!");
 
 #
 # First lets make sure the tag is unique. 
 #
-$retval = SUEXEC($uid, "$pid,$gid",
-		 "webarchive_control checktag $pid $eid $tag",
-		 SUEXEC_ACTION_IGNORE);
-#
-# Fatal Error. 
-# 
-if ($retval < 0) {
-    SUEXECERROR(SUEXEC_ACTION_DIE);
-}
+if ($tag != "") {
+    $retval = SUEXEC($uid, "$pid,$gid",
+		     "webarchive_control checktag $pid $eid $tag",
+		     SUEXEC_ACTION_IGNORE);
 
-# User error. Tell user and exit.
-if ($retval) {
-    $errors["Tag"] = "Already in use; pick another";
+    /* Clear the various 'loading' indicators. */
+    if ($retval) 
+	CLEARBUSY();
+
+    #
+    # Fatal Error. 
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_DIE);
+    }
+
+    # User error. Tell user and exit.
+    if ($retval) {
+	$errors["Tag"] = "Already in use; pick another";
     
-    SPITFORM($formfields, $errors);
-    PAGEFOOTER();
-    return;
+	SPITFORM($formfields, $errors);
+	PAGEFOOTER();
+	return;
+    }
 }
 
 SUEXEC($uid, "$pid,$gid",
-       "webarchive_control $tagarg $message commit $pid $eid",
+       "webarchive_control $tagarg $message -u commit $pid $eid",
        SUEXEC_ACTION_DIE);
 
-header("Location: archive_view.php3?pid=$pid&eid=$eid");
+STOPBUSY();
+
+if (!isset($referrer)) {
+    $exptidx  = $experiment->idx();
+    $referrer = "archive_view.php3/$exptidx/?exptidx=$exptidx";
+}
+
+PAGEREPLACE($referrer);
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

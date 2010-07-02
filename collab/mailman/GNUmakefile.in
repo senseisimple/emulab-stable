@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,13 +13,20 @@ include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= addmmlist delmmlist setmmlistmembers mmsetup \
 			  setmmpasswd mmlistmembership mmmodifymember \
-			  addmmuser delmmuser
+			  addmmuser delmmuser \
+			  addprojadminlist closeprojadminlist
 LIBEXEC_SCRIPTS		= webaddmmlist webdelmmlist websetmmpasswd mmxlogin \
 			  webmmlistmembership
 CTRL_LIBEXEC_SCRIPTS	= genaliases
 CTRL_LIB_FILES		= mmscript.py
-
 CTRL_SBIN_SCRIPTS	= mailmanproxy
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = addmmuser delmmuser addmmlist delmmlist \
+			setmmlistmembers setmmpasswd mmlistmembership \
+			mmmodifymember addprojadminlist closeprojadminlist
+SETUID_LIBX_SCRIPTS  = mmxlogin
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -57,6 +64,8 @@ post-install:
 	chmod u+s $(INSTALL_LIBEXECDIR)/mmxlogin
 	chown root $(INSTALL_SBINDIR)/mmmodifymember
 	chmod u+s $(INSTALL_SBINDIR)/mmmodifymember
+	chown root $(INSTALL_SBINDIR)/mmmodifymember
+	chmod u+s $(INSTALL_SBINDIR)/addprojadminlist
 
 #
 # Control node installation (okay, plastic)

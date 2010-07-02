@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -31,9 +31,9 @@ function GENPLIST ($query_result)
           </tr>\n";
 
     while ($projectrow = mysql_fetch_array($query_result)) {
-	$pname  = $projectrow[name];
-	$url    = $projectrow[URL];
-	$affil  = $projectrow[usr_affil];
+	$pname  = $projectrow["name"];
+	$url    = $projectrow["URL"];
+	$affil  = $projectrow["usr_affil"];
 
 	echo "<tr>\n";
 
@@ -56,7 +56,7 @@ function GENPLIST ($query_result)
 #
 $query_result =
     DBQueryFatal("SELECT pid,name,URL,usr_affil FROM projects ".
-		 "left join users on projects.head_uid=users.uid ".
+		 "left join users on projects.head_idx=users.uid_idx ".
 		 "where public=1 and approved=1 and expt_count>0 ".
 		 "order by name");
 
@@ -72,7 +72,7 @@ if (mysql_num_rows($query_result)) {
 #
 $query_result =
     DBQueryFatal("SELECT pid,name,URL,usr_affil FROM projects ".
-		 "left join users on projects.head_uid=users.uid ".
+		 "left join users on projects.head_idx=users.uid_idx ".
 		 "where public=1 and approved=1 and expt_count=0 ".
 		 "order by name");
 

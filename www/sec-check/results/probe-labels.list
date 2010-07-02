@@ -1,0 +1,6 @@
+            Probe label: \'**{kb-manage.php3:formfields[xref_tag]}**
+            Probe label: \'**{kb-manage.php3:formfields[body]}**
+            Probe label: \'**{kb-manage.php3:formfields[new_section]}**
+            Probe label: \'**{kb-manage.php3:formfields[title]}**
+            Probe label: '**{newimageid.php3:formfields[part1_osid]}**
+Probe label: \'**{newproject.php3:formfields[proj_funders]}**

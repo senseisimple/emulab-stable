@@ -1,21 +1,24 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
-SUBDIR		= collab/cvs
+SUBDIR		= collab/cvstools
 
 include $(OBJDIR)/Makeconf
 
-SBIN_SCRIPTS		= cvsrepo_ctrl
+SBIN_SCRIPTS		= cvsrepo_ctrl cvs_ctrl
 LIBEXEC_SCRIPTS		= webcvsrepo_ctrl
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= cvsd.conf.head
-CTRL_SBIN_SCRIPTS	= cvsrepo_ctrl.proxy
+CTRL_SBIN_SCRIPTS	= cvsrepo_ctrl.proxy cvs.proxy
+
+# These scripts installed setuid, with sudo. 
+SETUID_SBIN_SCRIPTS     = cvsrepo_ctrl cvs_ctrl
 
 #
 # Force dependencies on the scripts so that they will be rerun through

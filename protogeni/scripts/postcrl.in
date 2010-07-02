@@ -1,0 +1,121 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Post the current CRL to Utah, for distribution everywhere. 
+# 
+sub usage()
+{
+    print "Usage: postcrl [-f]\n";
+    exit(1);
+}
+my $optlist = "f";
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $SACERT	  = "$TB/etc/genisa.pem";
+my $CRL		  = "$TB/ssl/crl.pem";
+my $GENCRL        = "$TB/sbin/protogeni/gencrl";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use libaudit;
+use GeniDB;
+use GeniCertificate;
+use GeniAuthority;
+use GeniRegistry;
+use Genixmlrpc;
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+
+# Record output in case of error.
+LogStart(0);
+
+#
+# Generate the new crl.
+#
+system("$GENCRL" . ($force ? " -f" : "")) >= 0
+    or fatal("Could not generate new CRL!");
+
+if ($? >> 8 == 1 && !$force) {
+    # No change in the CRL, so do not post it.
+    print STDERR "No change in CRL. Not posting.\n";
+    AuditAbort();
+    # exit value important; tells caller nothing happened.
+    exit(1);
+}
+
+#
+# Load the SA cert to act as caller context.
+#
+my $certificate = GeniCertificate->LoadFromFile($SACERT);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $SACERT\n");
+}
+my $context = Genixmlrpc->Context($certificate);
+if (!defined($context)) {
+    fatal("Could not create context to talk to clearinghouse");
+}
+my $clearinghouse = GeniRegistry::ClearingHouse->Create($context);
+if (!defined($clearinghouse)) {
+    fatal("Could not create a clearinghouse client");
+}
+
+my $certstring = `cat $CRL`;
+
+if ($clearinghouse->PostCRL($certstring)) {
+    fatal("Could not post CRL to the clearinghouse");
+}
+# No errors at this point, nothing to report.
+AuditAbort();
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $msg\n";
+    # exit value important.
+    exit(-1);
+}

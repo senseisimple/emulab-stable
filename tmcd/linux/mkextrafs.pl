@@ -18,10 +18,10 @@ sub mysystem($);
 
 sub usage()
 {
-    print("Usage: mkextrafs.pl [-f] <mountpoint>\n");
+    print("Usage: mkextrafs.pl [-f] [-lM] [-v <vglist>] <mountpoint>\n");
     exit(-1);
 }
-my  $optlist = "f";
+my  $optlist = "flv:M";
 
 #
 # Yep, hardwired for now.  Should be options or queried via TMCC.
@@ -31,6 +31,10 @@ my $slice      = "4";
 my $partition  = "";
 
 my $forceit    = 0;
+
+my $lvm        = 0;
+my @vglist     = ();
+my $lmonster   = 0;
 
 #
 # Turn off line buffering on output
@@ -56,14 +60,34 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"f"})) {
     $forceit = 1;
 }
-if (@ARGV != 1) {
-    usage();
+if (defined($options{"l"})) {
+    $lvm = 1;
 }
-my $mountpoint  = $ARGV[0];
-
-if (! -d $mountpoint) {
-    die("*** $0:\n".
-	"    $mountpoint does not exist!\n");
+if (defined($options{"v"})) {
+    @vglist = split(/,/,$options{"v"});
+}
+if (defined($options{"M"})) {
+    $lmonster = 1;
+    if (scalar(@vglist)) {
+	die("*** $0:\n".
+	    "    If you want a single giant LVM-based filesystem, you can" . 
+	    "    only specify a single volume group name!\n");
+    }
+}
+if (scalar(@vglist) == 0) {
+    @vglist = ('emulab',);
+}
+my $mountpoint;
+if (!$lvm || ($lvm && $lmonster)) {
+    if (@ARGV != 1) {
+	usage();
+    }
+    $mountpoint  = $ARGV[0];
+    
+    if (! -d $mountpoint) {
+	die("*** $0:\n".
+	    "    $mountpoint does not exist!\n");
+    }
 }
 
 #
@@ -119,6 +143,38 @@ if (!$forceit) {
 }
 
 #
+# Before we do anything, do lvm if necessary and do not make any filesystems
+# inside the vgs unless they want a single monster fs.
+#
+if ($lvm) {
+    my $retval = 0;
+
+    my $blockdevs = "$fsdevice";
+    if ($retval = system("pvcreate $blockdevs")) {
+	die("*** $0:\n".
+	    "    'pvcreate $blockdevs' failed!\n");
+    }
+
+    foreach my $vg (@vglist) {
+	if (system("vgcreate $vg $blockdevs")) {
+	    die("*** $0:\n".
+		"    'vgcreate $vg $blockdevs' failed!\n");
+	}
+    }
+
+    if ($lmonster) {
+	if (system("lvcreate -n emulab -l 100\%VG $vglist[0]")) {
+	    die("*** $0:\n".
+		"    'lvcreate -n emulab -l 100\%VG $vglist[0]' failed!\n");
+	}
+	$fsdevice = "/dev/$vglist[0]/emulab";
+    }
+    else {
+	exit(0);
+    }
+}
+
+#
 # Set the partition type to Linux if not already set.
 #
 # XXX sfdisk appears to stomp on partition one's bootblock, at least if it
@@ -130,15 +186,23 @@ if (!$forceit) {
 # Would it seek out and destroy other BSD partitions?  Don't know.
 # I cannot find the source for sfdisk.
 #
-if ($stype != 131) {
+if (!$lvm && $stype != 131) {
     die("*** $0:\n".
 	"    No $DOSTYPE program, cannot set type of DOS partition\n")
 	if (! -e "$DOSTYPE");
     mysystem("$DOSTYPE -f /dev/$disk $slice 131");
 }
 
-mysystem("mkfs $fsdevice");
-mysystem("echo \"$fsdevice $mountpoint ext2 defaults 0 0\" >> /etc/fstab");
+# eh, quick try for ext3 -- no way we can consistently check the kernel for 
+# support, off the top of my head
+if ( -e "/sbin/mkfs.ext3") {
+    mysystem("mke2fs -j $fsdevice");
+    mysystem("echo \"$fsdevice $mountpoint ext3 defaults 0 0\" >> /etc/fstab");
+}
+else {
+    mysystem("mkfs $fsdevice");
+    mysystem("echo \"$fsdevice $mountpoint ext2 defaults 0 0\" >> /etc/fstab");
+}
 
 mysystem("mount $mountpoint");
 mysystem("mkdir $mountpoint/local");

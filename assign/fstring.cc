@@ -1,3 +1,11 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+static const char rcsid[] = "$Id: fstring.cc,v 1.4 2009-05-20 18:06:08 tarunp Exp $";
+
 #include "fstring.h"
 
 fstring::stringmap fstring::all_strings;

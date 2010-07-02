@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,11 +16,21 @@ SUBDIRS		= libdslice etc
 
 SBIN_STUFF	= plabslice plabnode plabrenewd plabmetrics plabstats \
 		  plabmonitord plablinkdata plabdist plabhttpd plabdiscover \
-		  plabrenewonce
+		  plabrenewonce plabnodehistclean plabnodehistmetrics \
+		  plabfed
 
-LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py mod_PLCNM.py
+LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py mod_PLCNM.py \
+		  mod_PLC4.py sshhttp.py \
+		  plabmon_badpool.pm plabmon_goodpool.pm libplabmon.pm \
+		  aspects.py timer_advisories.py \
+		  libplabnodehist.pm
 
 LIBEXEC_STUFF	= webplabstats
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = plabslice plabnode plabrenewd
+SETUID_LIBX_SCRIPTS  =
 
 #
 # Force dependencies on the scripts so that they will be rerun through

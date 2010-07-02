@@ -1,4 +1,4 @@
-This directory contains diffs for a clean FreeBSD 4.10 RELEASE tree.
+This directory contains diffs for a clean FreeBSD 6.2 RELEASE tree.
 These diffs, for the lib/libstand and sys/boot source directories,
 are necessary to build the "pxeboot" first-stage boot loader used on
 Emulab nodes.
@@ -30,10 +30,7 @@ sysboot.diffs:
   conditionally compiled/assembled via the 'TESTBED' symbol).  There
   are new options in sys/boot/i386/Makefile.inc for forcing the serial
   console, or changing its speed or port number, make sure these are
-  correct for your site.  The ETHERBOOT_* conditionals are a hack to
-  get our pxeboot to load and run when booted via an older, modified
-  version of etherboot.  These changes no longer for newer versions
-  of etherboot.
+  correct for your site.
 
   There is also a directory (sys/boot/i386/emuboot0) which is a slightly
   modified version of boot0 (the MBR-resident boot loader) that just

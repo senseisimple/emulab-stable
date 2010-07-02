@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -10,30 +10,30 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <paths.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <errno.h>
 #include <mysql/mysql.h>
 #include <sys/time.h>
+#include <signal.h>
 #include <grp.h>
 #include "capdecls.h"
 #include "config.h"
+#include "tbdb.h"
 
 #define TESTMODE
 
-/* Defined in configure and passed in via the makefile */
-#define DBNAME_SIZE	64
-#define DEFAULT_DBNAME	TBDBNAME
-
 static int	debug = 0;
 static int	portnum = SERVERPORT;
-static char     *dbname = DEFAULT_DBNAME;
 static gid_t	admingid;
-MYSQL_RES *	mydb_query(char *query, int ncols, ...);
-int		mydb_update(char *query, ...);
+char		*Pidname;
+void		sigterm(int);
+void		cleanup(void);
 
 char *usagestr = 
  "usage: capserver [-d] [-p #]\n"
@@ -54,10 +54,12 @@ main(int argc, char **argv)
 	MYSQL_RES		*res;	
 	MYSQL_ROW		row;
 	int			tcpsock, ch;
-	int			length, i, err = 0;
+	int			length, i;
 	struct sockaddr_in	name;
 	struct timeval		timeout;
 	struct group		*group;
+	struct sigaction	sa;
+	sigset_t		actionsigmask;
 
 	while ((ch = getopt(argc, argv, "dp:")) != -1)
 		switch(ch) {
@@ -83,6 +85,20 @@ main(int argc, char **argv)
 
 	if (!debug)
 		(void)daemon(0, 0);
+
+	if (!dbinit()) {
+		syslog(LOG_ERR, "Could not connect to DB!");
+		exit(1);
+	}
+
+	sigemptyset(&actionsigmask);
+	sigaddset(&actionsigmask, SIGINT);
+	sigaddset(&actionsigmask, SIGTERM);
+	memset(&sa, 0, sizeof sa);
+	sa.sa_handler = sigterm;
+	sa.sa_mask = actionsigmask;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
 
 	/*
 	 * Grab the GID for the default group.
@@ -129,13 +145,25 @@ main(int argc, char **argv)
 	}
 	syslog(LOG_NOTICE, "listening on TCP port %d", ntohs(name.sin_port));
 
+	if (!getuid()) {
+		FILE	*fp;
+		char    mybuf[BUFSIZ];
+	    
+		sprintf(mybuf, "%s/capserver.pid", _PATH_VARRUN);
+		fp = fopen(mybuf, "w");
+		if (fp != NULL) {
+			fprintf(fp, "%d\n", getpid());
+			(void) fclose(fp);
+			Pidname = strdup(mybuf);
+		}
+	}
+
 	while (1) {
 		struct sockaddr_in client;
 		int		   clientsock, length = sizeof(client);
 		int		   cc, port;
 		whoami_t	   whoami;
-		unsigned char	   buf[BUFSIZ], node_id[64];
-		secretkey_t        secretkey;
+		unsigned char	   node_id[64];
 		tipowner_t	   tipown;
 		void		  *reply = &tipown;
 		size_t		   reply_size = sizeof(tipown);
@@ -143,7 +171,12 @@ main(int argc, char **argv)
 		if ((clientsock = accept(tcpsock,
 					 (struct sockaddr *)&client,
 					 &length)) < 0) {
-			syslog(LOG_ERR, "accept failed: %m");
+			if (errno == ECONNABORTED) {
+				syslog(LOG_ERR, "accept failed: %m; "
+				       "continuing");
+				continue;
+			}
+			syslog(LOG_ERR, "accept failed: %m; exiting");
 			exit(1);
 		}
 		port = ntohs(client.sin_port);
@@ -257,12 +290,12 @@ main(int argc, char **argv)
 		/*
 		 * Update the DB.
 		 */
-		else if (mydb_update("update tiplines set portnum=%d, "
-				     "keylen=%d, keydata='%s' "
-				     "where tipname='%s'", 
-				     whoami.portnum,
-				     whoami.key.keylen, whoami.key.key,
-				     whoami.name)) {
+		else if (! mydb_update("update tiplines set portnum=%d, "
+				       "keylen=%d, keydata='%s' "
+				       "where tipname='%s'", 
+				       whoami.portnum,
+				       whoami.key.keylen, whoami.key.key,
+				       whoami.name)) {
 			syslog(LOG_ERR, "DB Error updating tiplines for %s!",
 			       whoami.name);
 			goto done;
@@ -291,90 +324,22 @@ main(int argc, char **argv)
 	}
 	close(tcpsock);
 	syslog(LOG_NOTICE, "daemon terminating");
+	cleanup();
 	exit(0);
 }
 
-/*
- * DB stuff
- */
-MYSQL_RES *
-mydb_query(char *query, int ncols, ...)
+void
+sigterm(int sig)
 {
-	MYSQL		db;
-	MYSQL_RES	*res;
-	char		querybuf[2*BUFSIZ];
-	va_list		ap;
-	int		n;
-
-	va_start(ap, ncols);
-	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
-		syslog(LOG_ERR, "query too long for buffer");
-		return (MYSQL_RES *) 0;
-	}
-
-	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, "capserver", 0, dbname, 0, 0, 0) == 0) {
-		syslog(LOG_ERR, "%s: connect failed: %s",
-			dbname, mysql_error(&db));
-		return (MYSQL_RES *) 0;
-	}
-
-	if (mysql_real_query(&db, querybuf, n) != 0) {
-		syslog(LOG_ERR, "%s: query failed: %s",
-			dbname, mysql_error(&db));
-		mysql_close(&db);
-		return (MYSQL_RES *) 0;
-	}
-
-	res = mysql_store_result(&db);
-	if (res == 0) {
-		syslog(LOG_ERR, "%s: store_result failed: %s",
-			dbname, mysql_error(&db));
-		mysql_close(&db);
-		return (MYSQL_RES *) 0;
-	}
-	mysql_close(&db);
-
-	if (ncols && ncols != (int)mysql_num_fields(res)) {
-		syslog(LOG_ERR, "%s: Wrong number of fields returned "
-		       "Wanted %d, Got %d",
-			dbname, ncols, (int)mysql_num_fields(res));
-		mysql_free_result(res);
-		return (MYSQL_RES *) 0;
-	}
-	return res;
+	cleanup();
+	exit(0);
 }
 
-int
-mydb_update(char *query, ...)
+void
+cleanup(void)
 {
-	MYSQL		db;
-	char		querybuf[BUFSIZ];
-	va_list		ap;
-	int		n;
+	syslog(LOG_NOTICE, "daemon exiting by signal");
 
-	va_start(ap, query);
-	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
-		syslog(LOG_ERR, "query too long for buffer");
-		return 1;
-	}
-
-	mysql_init(&db);
-	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
-		syslog(LOG_ERR, "%s: connect failed: %s",
-			dbname, mysql_error(&db));
-		return 1;
-	}
-
-	if (mysql_real_query(&db, querybuf, n) != 0) {
-		syslog(LOG_ERR, "%s: query failed: %s",
-			dbname, mysql_error(&db));
-		mysql_close(&db);
-		return 1;
-	}
-	mysql_close(&db);
-	return 0;
+	if (Pidname)
+	    (void) unlink(Pidname);
 }
-

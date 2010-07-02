@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,27 +21,31 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
-LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+LIBS     += -L/usr/local/lib -lpubsub -lm
+LDFLAGS  += $(LDSTATIC)
 
-ifeq ($(host_cpu),arm)
+# Deal with the presence/absence of kerberos in the linux ssl library
+ifeq ($(SYSTEM),Linux)
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
 else
-LDFLAGS  += -static
-ifeq ($(SYSTEM),Linux)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
-ifeq ($(NEEDKERB),0)
- CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
- LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+NOKERB := 1
 endif
-LIBS     += -ldl
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
+endif
 endif
 endif
 
 ifeq ($(SYSTEM),Linux)
-LIBS     += -ldl
+LIBS     += -ldl -lz
 endif
 
 link-agent-debug:	link-agent.o
@@ -56,4 +60,4 @@ client-install: client
 	$(INSTALL_PROGRAM) link-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/link-agent$(EXE)
 
 clean:
-	/bin/rm -f *.o $(PROGRAMS)
+	/bin/rm -f *.o $(PROGRAMS) *-debug

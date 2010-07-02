@@ -1,0 +1,263 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Errno;
+use Mail::Internet;
+use Mail::Address;
+
+sub usage()
+{
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $OURDOMAIN= "@OURDOMAIN@";
+my $FLYEMAIL = "flyspray\@" . $OURDOMAIN;
+my $FLYCONF  = "/usr/local/etc/flyspray.conf.php";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname;
+my $dbuser;
+my $dbpass;
+my %tickets = ();
+
+# Protos
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+#
+# The DB user/passwd are stored in the flyspray config file, which is
+# hopefully not group readable. Open and parse that file, then open a
+# connection to the DB.
+#
+$FLYCONF = "$TB/etc/flyspray.conf.php"
+    if (! -e $FLYCONF);
+
+open(FLY, $FLYCONF) or
+    die("*** $0:\n".
+	"    Could not open $FLYCONF for reading!\n");
+
+while (<FLY>) {
+    if ($_ =~ /^([-\w]*)\s*=\s*"([-\w]*)"$/) {
+	if ($1 eq "dbname") {
+	    $dbname = $2;
+	}
+	elsif ($1 eq "dbuser") {
+	    $dbuser = $2;
+	}
+	elsif ($1 eq "dbpass") {
+	    $dbpass = $2;
+	}
+    }
+}
+close(FLY);
+
+# Make sure we have everything we need.
+if (!defined($dbname) ||
+    !defined($dbuser) ||
+    !defined($dbpass)) {
+    fatal("Could not find db parameters in $FLYCONF!");
+}
+if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+    fatal("Could not connect to flyspray database!");
+}
+
+my $query_result =
+    DBQueryFatal("select project_id from flyspray_projects ".
+		 "where project_title='Emulab'");
+fatal("Could not project ID for Emulab")
+    if (!defined($query_result) || !$query_result->numrows);
+my ($project_id) = $query_result->fetchrow_array();
+
+my %types = ( "1" => "Bug Report",
+	      "2" => "Feature Request",
+	      "3" => "Support Request",
+	      "4" => "Gripe",
+	      );
+
+my %severities = ( "1" => "Very Low",
+		   "2" => "Low",
+		   "3" => "Medium",
+		   "4" => "High",
+		   "5" => "Critical",
+		   );
+
+my %resolutions = ( "0" => '',
+		    "1" => '',
+		    "2" => "invalid",
+		    "3" => "wontfix",
+		    "4" => "wontfix",
+		    "5" => "worksforme",
+		    "6" => "duplicate",
+		    "7" => "wontfix",
+		    "8" => "fixed",
+		    "9" => "fixed",
+		    );
+
+my %status_list = ( "1" => 'new',
+		    "2" => 'new',
+		    "3" => 'assigned',
+		    "4" => 'foo',
+		    );
+
+$query_result =
+    DBQueryFatal("select t.*,u.email_address as opened_by, ".
+		 "      a.email_address as assigned_to ".
+		 "   from flyspray_tasks as t ".
+		 "left join flyspray_users as u on u.user_id=t.opened_by ".
+		 "left join flyspray_users as a on a.user_id=t.assigned_to ".
+		 "where t.attached_to_project=$project_id ".
+		 "order by task_id");
+
+while (my $row = $query_result->fetchrow_hashref()) {
+    my $task_id      = $row->{'task_id'};
+    my $task_type    = $row->{'task_type'};
+    my $date_opened  = $row->{'date_opened'};
+    my $opened_by    = $row->{'opened_by'};
+    my $is_closed    = $row->{'is_closed'};
+    my $date_closed  = $row->{'date_closed'};
+    my $closed_by    = $row->{'closed_by'};
+    my $summary      = $row->{'item_summary'};
+    my $description  = $row->{'detailed_desc'};
+    my $item_status  = $row->{'item_status'};
+    my $assigned_to  = $row->{'assigned_to'};
+    my $resolution_reason = $row->{'resolution_reason'};
+    my $task_severity = $row->{'task_severity'};
+    my $task_priority = $row->{'task_priority'};
+
+    $date_closed = ""
+	if (!defined($date_closed));
+    $assigned_to = ""
+	if (!defined($assigned_to));
+
+#    print "$task_id, $task_type, $date_opened, $opened_by, $is_closed, ".
+#	"$date_closed, $closed_by, $item_status, $assigned_to, ".
+#	"$resolution_reason, $task_severity, $task_priority\n";
+
+    my $ticket = {};
+    $ticket->{'type'}          = $types{"$task_type"};
+    $ticket->{'time'}          = $date_opened;
+    $ticket->{'changetime'}    = ''; # XXX
+    $ticket->{'component'}     = '';
+    $ticket->{'severity'}      = $severities{"$task_severity"};
+    $ticket->{'priority'}      = "normal";
+    $ticket->{'owner'}         = $assigned_to;
+    $ticket->{'reporter'}      = $opened_by;
+    $ticket->{'cc'}            = '';
+    $ticket->{'version'}       = '';
+    $ticket->{'milestone'}     = '';
+    $ticket->{'resolution'}    = $resolutions{$resolution_reason};
+    $ticket->{'summary'}       = DBQuoteSpecial($summary);
+    $ticket->{'description'}   = DBQuoteSpecial($description);
+    $ticket->{'status'}        = '';
+
+    if ($is_closed) {
+	$ticket->{'status'}     = 'closed';
+	$ticket->{'changetime'} = $date_closed;
+    }
+    else {
+	if ($item_status > 3) {
+	    print STDERR "Setting item_status to foo\n";
+	    $item_status = 4;
+	}
+	$ticket->{'status'}    = $status_list{$item_status};
+    }
+
+    my $comments_query =
+	DBQueryFatal("select c.*,u.email_address from flyspray_comments as c ".
+		     "left join flyspray_users as u on u.user_id=c.user_id ".
+		     "where task_id=$task_id order by comment_id");
+    if ($comments_query->numrows) {
+	my $comment_id = 1;
+	while (my $comrow = $comments_query->fetchrow_hashref()) {
+	    my $comment_date  = $comrow->{'date_added'};
+	    my $comment_email = $comrow->{'email_address'};
+	    my $comment_text  = DBQuoteSpecial($comrow->{'comment_text'});
+
+	    print "replace into ticket_change values ".
+		"($task_id, $comment_date, '$comment_email', 'comment', ".
+		" '$comment_id', $comment_text);\n";
+	    $comment_id++;
+	    $ticket->{'changetime'} = $comment_date;
+	}
+    }
+		     
+    {
+    my $idx          = $task_id;
+    my $type         = $ticket->{'type'};
+    my $time         = $ticket->{'time'};
+    my $changetime   = $ticket->{'changetime'};
+    my $component    = $ticket->{'component'};
+    my $severity     = $ticket->{'severity'};
+    my $priority     = $ticket->{'priority'};
+    my $owner        = $ticket->{'owner'};
+    my $reporter     = $ticket->{'reporter'};
+    my $cc           = $ticket->{'cc'};
+    my $version      = $ticket->{'version'};
+    my $milestone    = $ticket->{'milestone'};
+    my $status       = $ticket->{'status'};
+    my $resolution   = $ticket->{'resolution'};
+    my $summary      = $ticket->{'summary'};
+    my $description  = $ticket->{'description'};
+
+    print "replace into ticket values ".
+	"($task_id, '$type', $time, '$changetime', '$component', ".
+	" '$severity', '$priority', '$owner', '$reporter', '$cc', ".
+	" '$version', '$milestone', '$status', '$resolution', ".
+	" $summary, $description, '');\n";
+    }
+}
+exit(0);
+
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR
+	"*** $0:\n".
+	"    $mesg\n";
+    exit(-1);
+}
+

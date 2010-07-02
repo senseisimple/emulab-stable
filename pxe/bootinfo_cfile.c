@@ -54,7 +54,7 @@ open_bootinfo_db(void)
 }
 
 int
-query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
+query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info, char *key)
 {
 	struct config *configp;
 

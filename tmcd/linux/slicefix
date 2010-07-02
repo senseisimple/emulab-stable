@@ -1,0 +1,486 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/testbed
+	BOOTDIR=/var/emulab/boot
+	ETCDIR=/etc/emulab
+fi
+
+freebsd_disk="ad0"
+OS=`uname -s`
+
+case $# in
+1)
+	part=$1
+	;;
+2)
+	part=$1
+	freebsd_disk=$2
+	;;
+*)
+	echo "Usage: $0 partition [disk]"
+	exit 1
+esac
+
+linux_disk=`$BINDIR/freebsd_to_linux_disk $freebsd_disk`
+old_linux_disk=${linux_disk#* }
+linux_disk=${linux_disk%% *}
+
+if [ $OS = Linux ]; then
+	disk=$linux_disk
+elif [ $OS = FreeBSD ]; then
+	disk=$freebsd_disk
+fi
+
+#
+# Handle pseudo arguments in the environment.
+#
+ACPI=${SLICEFIX_ACPI:-'unknown'}
+case $ACPI in
+0|no|NO)
+    ACPI=no
+    ;;
+1|yes|YES)
+    ACPI=yes
+    ;;
+*)
+    ACPI=unknown
+    ;;
+esac
+
+ASF=${SLICEFIX_ASF:-'unknown'}
+case $ASF in
+0|no|NO)
+    ASF=no
+    ;;
+1|yes|YES)
+    ASF=yes
+    ;;
+*)
+    ASF=unknown
+    ;;
+esac
+
+#
+# ...or the filesystem
+#
+if [ -r $ETCDIR/isflash ]; then
+    FLASHBOOT=1
+else
+    FLASHBOOT=0
+fi
+
+if [ -r $ETCDIR/bossnode ]; then
+    bossnode=`cat $ETCDIR/bossnode`;
+    setboss=1
+else
+    setboss=0
+fi
+
+dofreebsd() {
+	#
+	# ARGH!  FreeBSD 5, which primarily uses UFS2, internally converts
+	# UFS1 filesystems to an updated, UFS2 compatible form.  However,
+	# some of the converted fields leak back to disk when the filesystem
+	# is unmounted, creating the potential for corruption in the following
+	# scenerio:
+	#
+	# 1. mount, update, and unmount a UFS1 FS under FBSD5
+	# 2. mount, update, and unmount the FS under FBSD4
+	# 3. go back and access the FS under FBSD5
+	#
+	# #2 will update the old version of the csum structure.  At step
+	# #3, the mount will see some of the leaked info from the unmount
+	# in #1 and determine that it has already "upgraded" this FS and
+	# thus doesn't need to copy the old csum into the new one.  The
+	# result is that it will use stale csum info.
+	#
+	# In theory we could encounter this problem when we slicefix
+	# a newly loaded FBSD image (#1), boot up and update stuff on
+	# the image (#2), and then create a new image with imagezip
+	# (#3, as imagezip uses the FBSD5 filesystem logic).
+	#
+	# How do we deal with this?  What we will have to do is either
+	# fix the FBSD5 filesystem code or we will have to run a little
+	# hack after the slicefix unmount to undo the damage that FBSD5
+	# does.  Currently I have not done either.  Instead we avoid the
+	# problem as follows.  Before making any change to the FS with
+	# slicefix, we first RO-mount the FS to see if anything needs to
+	# be done.  If not, we just leave it alone.  Since I currently
+	# create all new images on machines with "ad" disks and that is
+	# what the default fstab contains for its root device, we avoid
+	# making any mods with slicefix and thus avoid #1 above.
+	#
+	# This is clearly not a solution.
+	#
+	if [ $OS = FreeBSD ]; then
+		vers=`uname -v | sed -e 's/FreeBSD \([0-9]\).*/\1/'`
+
+		# see if there is a root ('a') partition on this BSD slice
+		`disklabel ${disk}s${part} 2>&1 | grep -s -E '^[ ]+a:' >/dev/null` || {
+			return 1
+		}
+
+		rootdev=/dev/${disk}s${part}a
+		echo "fixing FreeBSD root partition ${disk}s${part}a"
+		fsck -p $rootdev || {
+			echo "Fsck of $rootdev failed"
+			return 1
+		}
+
+		fstype=ufs
+		fsopts=ro
+	elif [ $OS = Linux ]; then
+		echo "Reloading partition table for $disk..."
+		echo w | /sbin/fdisk /dev/$disk > /dev/null 2>&1
+		rootdev=/dev/`$BINDIR/check_disklabel $disk $part`
+		[ "$rootdev" = /dev/ ] && exit 1
+		fstype=ufs
+		fsopts="ro,ufstype=44bsd"
+	fi
+
+	# Try mounting the filesystem as UFSv1 first,
+	# then try UFSv2 if that doesn't work.
+
+	mount -t $fstype -o $fsopts $rootdev /mnt 2> /dev/null || {
+		fsopts=ro,ufstype=ufs2
+		mount -t $fstype -o $fsopts $rootdev /mnt 2> /dev/null || {
+			echo "RO-mount of $rootdev failed"
+			return 1
+		}
+	}
+
+	#
+	# See if we need to modify anything in the image
+	#
+	changedisk=0
+	changeentropy=0
+	changeacpi=0
+	changeasf=0
+
+	fixit=0
+
+	# Hardwire the boss?
+	if [ $setboss -eq 1 ]; then
+	    fixit=1
+        fi
+
+	# If our disk/part does not appear anywhere in fstab, we need to fix it
+	grep "^/dev/${freebsd_disk}s${part}" /mnt/etc/fstab >/dev/null 2>&1
+	case $? in
+	0)
+	    ;;
+	*)
+	    changedisk=1
+	    fixit=1
+	    ;;
+	esac
+
+	# If there is a /entropy file, we need to update it
+	if [ -f /mnt/entropy -a -c /dev/random ]; then
+		changeentropy=1
+		fixit=1
+	fi
+
+	#
+	# See if we need to change the ACPI setting.
+	#
+	# If ACPI was not specified via TMCD, leave it along.
+	#
+	# If "acpi_load" does not appear at all in the loader.conf file,
+	# assume the OS cannot handle it (or that we do not know how to
+	# change it) and leave it alone.
+	#
+	if [ $ACPI != "unknown" ]; then
+	    grep "acpi_load=" /mnt/boot/loader.conf >/dev/null 2>&1
+	    case $? in
+	    0)
+		grep "^acpi_load=\"YES\"" /mnt/boot/loader.conf >/dev/null 2>&1
+		case $? in
+		0)
+		    if [ $ACPI = "no" ]; then
+			changeacpi=1
+			fixit=1
+		    fi
+		    ;;
+		*)
+		    if [ $ACPI = "yes" ]; then
+			changeacpi=1
+			fixit=1
+		    fi
+		    ;;
+		esac
+		;;
+	    *)
+		;;
+	    esac
+	fi
+
+	#
+	# See if we need to change the ASF setting.
+	#
+	# Note that, unlike ACPI, we change it even if there was no
+	# previous setting in /boot/loader.conf.
+	#
+	if [ $ASF != "unknown" ]; then
+	    grep "hw.bge.allow_asf=" /mnt/boot/loader.conf >/dev/null 2>&1
+	    case $? in
+	    0)
+		grep "^hw.bge.allow_asf=1" /mnt/boot/loader.conf >/dev/null 2>&1
+		case $? in
+		0)
+		    if [ $ASF = "no" ]; then
+			changeasf=1
+			fixit=1
+		    fi
+		    ;;
+		*)
+		    if [ $ASF = "yes" ]; then
+			changeasf=1
+			fixit=1
+		    fi
+		    ;;
+		esac
+		;;
+	    *)
+	        changeasf=1
+		fixit=1
+		;;
+	    esac
+	fi
+
+        # check to see if we need to download any postconfig scripts:
+	doosconfig=0
+	if [ -x $BINDIR/osconfig ]; then
+	    $BINDIR/osconfig -c -m /mnt -D $rootdev -s FreeBSD postload
+	    if [ $? -eq 0 ]; then
+		doosconfig=1
+		fixit=1
+	    fi
+	fi
+
+	if [ $fixit -eq 0 ]; then
+		echo "  no changes necessary"
+		umount $rootdev
+		return 0
+	fi
+
+	# We need to change something, remount RW and change it
+	if [ $OS = FreeBSD ]; then
+		umount $rootdev
+		mount $rootdev /mnt || {
+			echo "Mount of $rootdev failed"
+			return 1
+		}
+	elif [ $OS = Linux ]; then
+		mount -o remount,rw $rootdev || {
+			echo "Remount of $rootdev failed"
+			return 1
+		}
+	fi
+
+	# hardwire the boss node
+	if [ $setboss -eq 1 -a -d /mnt/etc/emulab ]; then
+	    echo "  hardwiring boss to $bossnode"
+	    cp $ETCDIR/bossnode /mnt/etc/emulab/bossnode || {
+	        echo "Failed to create /etc/emulab/bossnode"
+		umount $rootdev
+		return 1
+	    }
+	fi
+
+	if [ $changedisk -eq 1 ]; then
+	    if [ -f /mnt/etc/fstab ]; then
+	    	    echo "  updating /etc/fstab"
+		    cp -fp /mnt/etc/fstab /mnt/etc/fstab.orig
+		    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/fstab || {
+			echo "Failed to update /etc/fstab"
+			umount $rootdev
+			return 1
+		    }
+    	    fi
+	    if [ -f /mnt/etc/dumpdates ]; then
+		    echo "  updating /etc/dumpdates"
+		    cp -fp /mnt/etc/dumpdates /mnt/etc/dumpdates.orig
+		    sed -i -e "s;^/dev/[a-zA-Z][a-zA-Z]*[0-9][0-9]*s[0-9][0-9]*;/dev/${freebsd_disk}s${part};" /mnt/etc/dumpdates || {
+			echo "Failed to update /etc/dumpdates"
+			umount $rootdev
+			return 1
+		    }
+	    fi
+	fi
+
+	if [ $changeentropy -eq 1 ]; then
+	    echo "  updating /entropy"
+	    dd if=/dev/random of=/mnt/entropy bs=4096 count=1 >/dev/null 2>&1
+	fi
+
+	if [ $changeacpi -eq 1 ]; then
+	    if [ $ACPI = "no" ]; then
+		on="dis"
+	    else
+		on="en"
+	    fi
+	    echo "  ${on}abling ACPI"
+	    cp -fp /mnt/boot/loader.conf /mnt/boot/loader.conf.orig
+	    sed -i -e "/[Aa][Cc][Pp][Ii]/d" /mnt/boot/loader.conf || {
+		echo "Failed to update /boot/loader.conf"
+		umount $rootdev
+		return 1
+	    }
+	    if [ $ACPI = "no" ]; then
+		cat <<EOF1 >>/mnt/boot/loader.conf
+# disable ACPI
+acpi_load="NO"
+hint.acpi.0.disabled=1
+loader.acpi_disabled_by_user=1
+EOF1
+	    else
+		cat <<EOF2 >>/mnt/boot/loader.conf
+# enable ACPI
+acpi_load="YES"
+hint.acpi.0.disabled=0
+EOF2
+	    fi
+	fi
+
+	if [ $changeasf -eq 1 ]; then
+	    if [ $ASF = "no" ]; then
+		on="dis"
+	    else
+		on="en"
+	    fi
+	    echo "  ${on}abling ASF"
+	    cp -fp /mnt/boot/loader.conf /mnt/boot/loader.conf.orig
+	    sed -i -e "/[Aa][Ss][Ff]/d" /mnt/boot/loader.conf || {
+		echo "Failed to update /boot/loader.conf"
+		umount $rootdev
+		return 1
+	    }
+	    if [ $ASF = "no" ]; then
+		cat <<EOF1 >>/mnt/boot/loader.conf
+# disable ASF
+hw.bge.allow_asf=0
+EOF1
+	    else
+		cat <<EOF2 >>/mnt/boot/loader.conf
+# enable ASF
+hw.bge.allow_asf=1
+EOF2
+	    fi
+	fi
+
+	# actually run any postconfig scripts if we're supposed to:
+	if [ $doosconfig -eq 1 -a -x $BINDIR/osconfig ]; then
+	    $BINDIR/osconfig -m /mnt -D $rootdev -s FreeBSD postload
+	fi
+
+	umount $rootdev
+	if [ $OS = FreeBSD ]; then
+		# XXX need to fixup FS, see big comment above
+		if [ "x$vers" != "x4" ]; then
+			echo "WARNING: FBSD${vers} may have modified the UFS1 root FS"
+		fi
+
+	fi
+
+	return 0
+}
+
+#
+# echo the name of the kernel that lilo will boot by default
+#
+lilogetkernel() {
+    _lconf=$1
+    _re='[a-zA-Z0-9][-_\.a-zA-Z0-9]*'
+
+    # see if there is a default= line and prefer that
+    linux=`grep -E "default=$_re" $_lconf | sed -e "s/default=\($_re\).*/\1/"`
+
+    # no explicit default, use first kernel listed
+    if [ "x${linux}" = x ]; then
+	linux=`grep -E "label=$_re" $_lconf | head -1 | \
+		sed -e "s/label=\($_re\).*/\1/"`
+    fi
+
+    # still no hit, just use 'linux'
+    linux=${linux:-'linux'}
+
+    echo $linux
+}
+
+dolinux() {
+
+	$BINDIR/linux_slicefix.pl /dev/$linux_disk$part /dev/$old_linux_disk$part
+	return $?
+}
+
+fixone() {
+    if [ $OS = FreeBSD ]; then
+    	echo "*** ${disk}s${part}:"
+    	ptype=`fdisk -${part} ${disk} | grep sysid | sed 's/^sysid \([0-9][0-9]*\).*/\1/'`
+    elif [ $OS = Linux ]; then
+    	echo "*** ${disk}${part}:"
+    	ptype=`fdisk -l /dev/$disk | awk /${disk}${part}/'{sub(/\*/,""); print "0x"$5}'`
+    fi
+    ptype=${ptype:-0}
+
+    case $ptype in
+    165|0xa5)
+	dofreebsd
+	return $?
+	;;
+    131|0x83)
+	dolinux
+	return $?
+	;;
+    130|0x82)
+	echo "ignoring Linux swap partition"
+	;;
+    7|0x7)
+	echo "ignoring NTFS partition"
+	;;
+    0|0x0)
+	echo "ignoring unused partition"
+	;;
+    *)
+	echo "ignoring partition type $ptype"
+	;;
+    esac
+    return 0
+}
+
+case $part in
+0)
+    part=1; fixone
+    part=2; fixone
+    part=3; fixone
+    part=4; fixone
+
+    # when fixing all partitions, do not fail on an error
+    if [ $? -ne 0 ]; then
+    	echo "WARNING: failed to fix one or more partitions, BEWARE!"
+    fi
+
+    # for the CD boot, we need to intialize the magic boot block
+    if [ -e /cdrom.inf -a -x $BINDIR/tbbootconfig ]; then
+	$BINDIR/tbbootconfig -f -c 1 -k 0 -m 1 /dev/${disk}
+    fi
+    ;;
+1|2|3|4)
+    fixone
+    ;;
+*)
+    echo "bad partition: $part"
+    false
+    ;;
+esac
+
+exit $?

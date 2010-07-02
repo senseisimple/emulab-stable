@@ -14,11 +14,13 @@ use Fcntl;
 # Check DB consistency.
 #
 sub usage() {
-    print STDOUT "Usage: pelab_dbpush [-d]\n";
+    print STDOUT "Usage: pelab_dbpush [-d] [-l limit] [-r]\n";
     exit(-1);
 }
-my $optlist  = "d";
+my $optlist  = "dl:r";
 my $debug    = 0;
+my $remove_archived = 0;
+my $limit;
 
 #
 # Configure variables
@@ -27,7 +29,8 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CURL	= "/usr/local/bin/curl";
 my $DATAPOSCGI  = "http://www.datapository.net/input/upload.cgi";
-my $MAXAGE	= (24 * 60 * 60);
+my $CUTAGE      = (1 * 60 * 60);	# All data older then this goes to DP.
+my $MAXAGE	= (24 * 60 * 60);       # All data older then this is deleted.
 
 my $PWDFILE   = "/usr/testbed/etc/pelabdb.pwd";
 my $tempfile  = "/var/tmp/testbed_pelab_dbpush_tempfile";
@@ -86,6 +89,12 @@ if (@ARGV) {
 }
 if (defined($options{"d"})) {
     $debug++;
+}
+if (defined($options{"r"})) {
+    $remove_archived = 1;
+}
+if (defined($options{"l"})) {
+    $limit = $options{"l"};
 }
 
 #
@@ -152,7 +161,7 @@ unlink("${tempfile}.pair_data")
 # Compute the cutoff age; We leave MAXAGE old entries here, and ship
 # the rest over to the DP.
 #
-my $cutoffage = (time() - $MAXAGE) * 1.0;
+my $cutoffage = (time() - $CUTAGE) * 1.0;
 
 #
 # Must lock the table of course
@@ -160,42 +169,72 @@ my $cutoffage = (time() - $MAXAGE) * 1.0;
 DBQueryFatal("lock tables pair_data write");
 
 #
-# Grab all of the new entries and store to the file
+# See what the max IDX we want to get is. 
 #
-DBQueryFatal("select * from pair_data ".
-	     "where idx > $lastidx and unixstamp < $cutoffage ".
-	     "into outfile '${tempfile}.pair_data' ".
-	     "fields terminated by ' '");
+if (defined($limit)) {
+    $query_result =
+	DBQueryFatal("select idx from pair_data ".
+		     "where idx > $lastidx ".
+		     "order by idx asc limit $limit,1");
+}
+else {
+    $query_result =
+	DBQueryFatal("select MAX(idx) from pair_data");
+}
+my ($maxidx) = $query_result->fetchrow_array();
 
 #
-# Now we need to find out what the last index really was. 
-# 
-$query_result =
-    DBQueryFatal("select idx from pair_data ".
-		 "where idx > $lastidx and unixstamp < $cutoffage " .
-		 "order by idx desc limit 1");
-# Save for later.
-$lastidx = $query_result->fetchrow_array();
+# Grab all of the new entries and store to the file
+#
+if ($debug) {
+    print "pair_data query: select * from pair_data ".
+          "where idx > $lastidx and idx <= $maxidx ".
+          "into outfile '${tempfile}.pair_data' ".
+          "     fields terminated by ' '\n";
+}
+
+if ($maxidx > $lastidx) {
+    DBQueryFatal("select * from pair_data ".
+		 "where idx > $lastidx and idx <= $maxidx ".
+		 "into outfile '${tempfile}.pair_data' ".
+		 "     fields terminated by ' '");
+}
 
 DBQueryFatal("unlock tables");
 
 #
 # Might not be any new entries ...
 # 
-if (defined($lastidx)) {
+if ($maxidx > $lastidx) {
+    #
+    # Does not return if any error!
+    #
     SendToDatapository("pair_data");
     
     #
     # Okay, now that we have really archived them away, update the idx
     # 
-    DBQueryFatal("update emulab_indicies set idx='$lastidx' ".
+    DBQueryFatal("update emulab_indicies set idx='$maxidx' ".
 		 "where name='pair_data_idx'");
 
-    #
-    # Delete those entries.
-    #
-    DBQueryFatal("delete from pair_data ".
-		 "where idx <= $lastidx ");
+    $cutoffage = (time() - $MAXAGE) * 1.0;
+
+    if ($remove_archived) {
+        #
+        # Delete all rows that we just archived
+        #
+        print("delete from pair_data ".
+                     "where idx > $lastidx and idx <= $maxidx\n");
+        DBQueryFatal("delete from pair_data ".
+                     "where idx > $lastidx and idx <= $maxidx");
+    } else {
+        #
+        # Delete anything older then MAXAGE that has been archived. This leaves
+        # a cache of data on ops.
+        #
+        DBQueryFatal("delete from pair_data ".
+                     "where idx <= $lastidx and unixstamp < $cutoffage");
+    }
 }
 
 unlink("${tempfile}.pair_data")

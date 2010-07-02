@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,14 +41,14 @@ ifeq ($(EVENTSYS),1)
 BI_DBSRC += event-support.c
 BI_DBOBJ += event-support.o
 
-CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib \
-		`elvin-config --cflags vin4c`
-LFLAGS  += $(OBJDIR)/event/lib/libevent.a `elvin-config --libs vin4c` -lcrypto
+CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib -I/usr/local/include
+LFLAGS  += $(OBJDIR)/event/lib/libevent.a -L/usr/local/lib -lpubsub -lcrypto
 endif
 
-bootinfo: bootinfo.o bootinfo.h bootinfo_version.o bootwhat.h $(BI_DBOBJ)
+bootinfo: main.o bootinfo.o bootinfo.h bootinfo_version.o \
+		bootwhat.h $(BI_DBOBJ)
 	cc $(CFLAGS) $(DBFLAG) $(INCS) \
-		-o bootinfo bootinfo.o bootinfo_version.o $(BI_DBOBJ) \
+		-o bootinfo main.o bootinfo.o bootinfo_version.o $(BI_DBOBJ) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
 bootinfosend: bootinfosend.o bootinfo.h bootinfo_version.o bootwhat.h $(BI_DBOBJ)
@@ -57,10 +57,11 @@ bootinfosend: bootinfosend.o bootinfo.h bootinfo_version.o bootwhat.h $(BI_DBOBJ
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
 bootinfoclient: bootinfoclient.o bootinfo.h bootinfo_version.o bootwhat.h
-	cc -static $(CFLAGS) $(DBFLAG) $(INCS) \
+	cc $(LDSTATIC) $(CFLAGS) $(DBFLAG) $(INCS) \
 		-o bootinfoclient bootinfoclient.o bootinfo_version.o
 
 bootinfo_mysql.o:	bootinfo.h bootwhat.h
+main.o:			bootinfo.h bootwhat.h
 
 testbootinfo_mysql: bootinfo_mysql.c
 	cc $(CFLAGS) -DUSE_MYSQL_DB -DTEST $(INCS) \

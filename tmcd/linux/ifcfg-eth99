@@ -1,7 +1,7 @@
 #/bin/sh -
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,12 +19,14 @@
 . /etc/emulab/paths.sh
 
 DEVICE="eth99"
-IFACETYPES="3c59x eepro100 e1000 tulip"
+IFACETYPES="3c59x eepro100 e1000 r8169 tulip"
 
 #
 # First, probe for all our supported ethernet types
 #
 modprobe -qa $IFACETYPES
+
+interfaces=`ifconfig -a | sed -n 's/^\([^ ]*\).*encap:Ethernet.*$/\1/p'`
 
 #
 # If dhclient returns success, then it has configured the first interface
@@ -33,7 +35,7 @@ modprobe -qa $IFACETYPES
 # dhclient will leave "up") and set ONBOOT=no to prevent ifup (our caller)
 # from doing any further configuration on this fake interface.
 #
-if [ -x /sbin/dhclient ] && /sbin/dhclient -q ; then
+if [ -x /sbin/dhclient ] && /sbin/dhclient -q $interfaces; then
     killall dhclient
 
     if [ -e $BOOTDIR/controlif ]; then

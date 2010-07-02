@@ -1,31 +1,29 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
 use Getopt::Std;
 
 #
-# Spew the current log file for an experiment to stdout. This is for
-# use by the web interface, so it can send the lofgile to the user in
-# a web page.
+# Spew the current log file for an experiment or template to stdout.
+# This is for use by the web interface, so it can send the logfile to
+# the user in a web page.
 #
 # The wrinkle is that the logfile only exists while the experiment is
 # in transition, and we have to quit when the experiment is no longer in
 # transition so that the web page can finish.
 #
-
 sub usage()
 {
-    print STDOUT "Usage: spewlogfile <pid> <eid>\n".
-	"Spew the logfile for an experiment.\n";
+    print("Usage: spewlogfile -i logid\n".
+	  "Spew a logfile to stdout, as for the web interface\n");
     exit(-1);
 }
-my $optlist = "w";
+my $optlist = "we:t:i:";
 my $fromweb = 0;
   
 #
@@ -37,6 +35,7 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 
 my $logname;
 my $isopen;
+my $logfile;
 
 #
 # Load the Testbed support stuff. 
@@ -44,6 +43,8 @@ my $isopen;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
+use Logfile;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -56,34 +57,22 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"w"})) {
     $fromweb = 1;
 }
-if (@ARGV != 2) {
-    usage();
+if (defined($options{"i"})) {
+    $logfile = Logfile->Lookup($options{"i"});
+    if (! $logfile) {
+	die("*** $0:\n".
+	    "    No such logfile in the Emulab Database.\n");
+    }
 }
-my $pid   = $ARGV[0];
-my $eid   = $ARGV[1];
-
-#
-# Untaint the arguments.
-#
-if ($pid =~ /^([-\@\w]+)$/) {
-    $pid = $1;
-}
-else {
-    die("*** Bad data in pid: $pid\n");
-}	
-if ($eid =~ /^([-\@\w]+)$/) {
-    $eid = $1;
-}
-else {
-    die("*** Bad data in eid: $eid\n");
-}
+usage()
+    if (@ARGV || !$logfile);
 
 #
 # This script is setuid, so please do not run it as root. Hard to track
@@ -95,54 +84,50 @@ if ($UID == 0) {
 }
 
 #
-# Verify that this person is allowed to do this. 
+# Verify user and get his DB uid and other info for later.
 #
-if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
     die("*** $0:\n".
-	"    You do not have permission to view log files for $pid/$eid!\n");
+	"    You ($UID) do not exist!");
 }
 
 #
-# Get the logfile name.
+# Verify that this person is allowed to do this. 
 #
-if (! TBExptGetLogFile($pid, $eid, \$logname, \$isopen)) {
+if (!$logfile->AccessCheck($this_user)) {
     die("*** $0:\n".
-	"    There is no logfile to view for $pid/$eid!\n");
+	"    You do not have permission to view logfile!\n");
 }
+$logname = $logfile->filename();
+$isopen  = $logfile->isopen();
 
 use Fcntl;
 use IO::Handle;
 STDOUT->autoflush(1);
 
 #
-# If not an admin type, flip back to the UID now to enforce normal
-# permissions. 
+# Open the file up while still root. We verified permission above, and the
+# added check using the filesystems permissions if more of a pain then it
+# buys us. Well, might revisit this.
 #
-if (! TBAdmin($UID)) {
-    $EUID = $UID;
-}
-
 sysopen(LOG, $logname, O_RDONLY | O_NONBLOCK) or
     die("*** $0:\n".
 	"    Could not open $logname: $!\n");
 
-#
-# If an admin type, flip back to the UID now that the file is open.
-#
-if (TBAdmin($UID)) {
-    $EUID = $UID;
-}
+# Now flip back to user.
+$EUID = $UID;
 
 my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
     $atime,$mtime,$ctime,$blksize,$blocks) = stat(LOG);
 
 #
 # Icky. If the file is open and less then 1024 bytes, send out some
-# stuff at the beginning to make the browser do something. This terrible,
+# stuff at the beginning to make the browser do something. This is terrible,
 # but not sure what else to do.
 #
 if ($fromweb && $isopen && $size < 1024) {
-    for ($i = $size; $i < 1024; $i++) {
+    for (my $i = $size; $i <= 1024; $i++) {
 	print " ";
     }
     print "\n";
@@ -154,14 +139,15 @@ if ($fromweb && $isopen && $size < 1024) {
 #
 while (1) {
     my $tmp;
+    my $buf;
     
     while (sysread(LOG, $buf, 2048)) {
 	print STDOUT "$buf";
     }
-    if (! TBExptGetLogFile($pid, $eid, \$tmp, \$isopen) || !$isopen ||
-	$tmp ne $logname) {
-	last;
-    }
+    # Stop if the logfile object becomes invalid (deleted by someone).
+    last
+	if ($logfile->Refresh() != 0 || !$logfile->isopen());
+
     sleep(2);
 }
 close(LOG);

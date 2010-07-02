@@ -1,0 +1,87 @@
+Version 1.2:
+
+* Implement the "symmetric LAN" optimization where we only test each
+  "leg" of a LAN once if every leg has the same attributes.  We perform
+  this optimization for loss and bandwidth tests, other tests continue as
+  N-by-N.
+
+* Optional "ARP" pass.  Performs a single ping to all directly connected
+  hosts.  Intended to force the ARP protocol to avoid excessive first-packet
+  latency during the real latency test.  Obviously this is not going to do
+  much for high-loss links.  Currently enabled by default, can be disabled
+  with DOARP=0 command line option.
+
+* gentopomap now provides a second second map file (ltpmap) with "physical"
+  information about the topology.  This includes the canonical host names,
+  OSes being run on the nodes, MAC addresses of interfaces, and type of
+  link multiplexing in use.
+
+* Allow a linktest run to involve only a subset of an experiment's nodes.
+  The subset could be passed as an argument, but currently we only use this
+  option to exclude nodes that do not support linktest (determined on the
+  nodes themselves via the ltpmap).
+
+* Have everyone read/parse the topofile up front, so that the barrier
+  master can be chosen dynamically if necessary (i.e., if the synchserver
+  node is not part of the run).
+
+* Custom version of rude which supports sleeping rather than spinning
+  between intervals.  Used on vnodes.
+
+* Adjust the way parallelism is handled on vnodes: allow a small number
+  of test pairs (currently 2) to run on each vnode host machine rather
+  than allowing one test pair per vnode!
+
+* Run crude at a higher priority than rude, we value receiving packets
+  more highly during the loss tests.
+
+* Start crude listener up at the beginning along with the iperf listener.
+  The hope is to even further minimize any chance that crude isn't ready
+  when the loss test starts (still looking for Missing Packet 401 :-).
+
+* Reduce iperf (bandwidth test) packet size to 1450 to avoid fragmentation
+  with encapsulating veths.
+
+* Don't report during the bandwidth tests, just wait til the end like all
+  the other tests.  Reduces the barrier synchs.
+
+* Add a "print schedule" option which causes linktest to just record the
+  order in which it would have run tests in /var/emulab/logs/linktest.sched
+  rather than actually running the tests.  The new script, schedmerge.pl,
+  can then be used to merge the schedule files from all nodes to show
+  how much parallelism we manage (and also to check for missing tests).
+
+* Add a "report only" option telling linktest to run the tests but not
+  to analyse the results, just to send back the results.
+
+* Compensate for variable header overheads due to linkdelays and veth
+  encapsulated devices.
+
+* Compensate for decreased accuracy of latency measurements when using
+  FreeBSD linkdelays.
+
+* Arrange to print physical node/link attributes when reporting errors.
+  Post-mortem analysis is easier if you don't have to go back and reconstruct
+  what machine "node0" was mapped to during a specific swapin, and what
+  interface got mapped to "link0".
+
+Other changes:
+
+* "Fix" dummynet.  A previous official fix to dummynet (unfortunately inspired
+  by a comment in my bug report) caused the per-tick bandwidth "credit"
+  (aka "numbytes") to be cleared whenever the BW queue was idle.  For low
+  bandwidth usage, this meant that there was never any credit when a new
+  packet arrived.  The result is that every packet would get queued to the
+  next tick before it could move on and thus, when just shaping BW, every
+  packet incurred up to 1 tick of delay.  This did have a beneficial effect
+  on delays, as every packet would enter the delay queue (if any) on exactly
+  a tick boundary when the BW queues were processed, so delays were "exact".
+  Now, when packets bypass the BW queue (due to there being sufficient credit),
+  they move to the delay queue at an arbitrary time during the current tick,
+  and the resulting delay will be from 0-1 tick short of the specified value.
+
+* Fix the Linux linkdelay setup script.  Linux tc apparently considers
+  "kilobits" to be 1024 bits, not 1000 bits as we were assuming.  So we now
+  specify bandwidth in raw bits rather than kilobits.
+
+

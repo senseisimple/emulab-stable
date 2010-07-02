@@ -1,23 +1,23 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
-# Display a simpler version of this page
-$simple = 0;
-if (isset($_REQUEST['simple'])) {
-    $simple = $_REQUEST['simple'];
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("simple", PAGEARG_BOOLEAN,
+				 "reset",  PAGEARG_STRING,
+				 "email",  PAGEARG_STRING,
+				 "phone",  PAGEARG_STRING);
+
+# Display a simpler version of this page.
+if (!isset($simple)) {
+    $simple = 0;
 }
-
-# Form arguments.
-$reset = $_POST['reset'];
-
-# Might come from URL
-$email = $_REQUEST['email'];
-$phone = $_REQUEST['phone'];
 
 #
 # Turn off some of the decorations and menus for the simple view
@@ -30,25 +30,23 @@ if ($simple) {
 }
 
 # Must use https!
-if (!isset($SSL_PROTOCOL)) {
-    PAGEHEADER("Forgot Your Username or Password?", $view);
+if (!isset($_SERVER["SSL_PROTOCOL"])) {
+    PAGEHEADER("Forgot Your Password?", $view);
     USERERROR("Must use https:// to access this page!", 1);
 }
 
 #
 # Must not be logged in.
 # 
-if (($known_uid = GETUID()) != FALSE) {
-    if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
-	PAGEHEADER("Forgot Your Username or Password?", $view);
+if (CheckLogin($check_status)) {
+    PAGEHEADER("Forgot Your Password?", $view);
 
-	echo "<h3>
+    echo "<h3>
               You are logged in. You must already know your password!
-              </h3>\n";
-
-	PAGEFOOTER($view);
-	die("");
-    }
+          </h3>\n";
+    
+    PAGEFOOTER($view);
+    die("");
 }
 
 #
@@ -57,13 +55,14 @@ if (($known_uid = GETUID()) != FALSE) {
 function SPITFORM($email, $phone, $failed, $simple, $view)
 {
     global	$TBBASE;
+    global	$WIKIDOCURL;
     
-    PAGEHEADER("Forgot Your Username or Password?", $view);
+    PAGEHEADER("Forgot Your Password?", $view);
 
     if ($failed) {
 	echo "<center>
               <font size=+1 color=red>
-              The email/phone you provided does not match.
+              $failed
 	      Please try again.
               </font>
               </center><br>\n";
@@ -94,8 +93,6 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
              <td align=center colspan=2>
                  <b><input type=submit value=\"Reset Password\"
                            name=reset></b>
-                 <b><input type=submit value=\"Mail my Username\"
-                           name=tellme></b>
              </td>
           </tr>\n";
     
@@ -116,7 +113,7 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
           your password.
 
           <br><br>
-          <b>Please read this <a href='kb-show.php3?xref_tag=forgotpassword'>
+          <b>Please read this <a href='$WIKIDOCURL/kb69'>
           Knowledge Base Entry</a> if you get an error
           when trying to use the link we email to you!</b>
           </blockquote>\n";
@@ -125,7 +122,7 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
 #
 # If not clicked, then put up a form.
 #
-if (!isset($reset) && !isset($tellme)) {
+if (!isset($reset)) {
     if (!isset($email))
 	$email = "";
     if (!isset($phone))
@@ -141,59 +138,48 @@ if (!isset($reset) && !isset($tellme)) {
 #
 if (!isset($phone) || $phone == "" || !TBvalid_phone($phone) ||
     !isset($email) || $email == "" || !TBvalid_email($email)) {
-    SPITFORM($email, $phone, 1, $simple, $view);
+    SPITFORM($email, $phone,
+	     "The email or phone contains invalid characters.",
+	     $simple, $view);
     return;
 }
 
-$query_result =
-    DBQueryFatal("select uid,usr_phone from users ".
-		 "where LCASE(usr_email)=LCASE('$email')");
-
-if (! mysql_num_rows($query_result)) {
-    SPITFORM($email, $phone, 2, $simple, $view);
+if (! ($user = User::LookupByEmail($email))) {
+    SPITFORM($email, $phone,
+	     "The email or phone does not match an existing user.",
+	     $simple, $view);
     return;
 }
-$row = mysql_fetch_row($query_result);
-$uid = $row[0];
-$usr_phone = $row[1];
+$uid       = $user->uid();
+$usr_phone = $user->phone();
+$uid_name  = $user->name();
+$uid_email = $user->email();
 
 #
 # Compare phone by striping out anything but the numbers.
 #
 if (preg_replace("/[^0-9]/", "", $phone) !=
     preg_replace("/[^0-9]/", "", $usr_phone)) {
-    SPITFORM($email, $phone, 3, $simple, $view);
+    SPITFORM($email, $phone,
+	     "The email or phone does not match an existing user.",
+	     $simple, $view);
     return;
 }
 
-TBUserInfo($uid, $uid_name, $uid_email);
-
 #
-# If just telling the user his account uid, send it and be done.
+# A matched user, but if frozen do not go further. Confuses users.
 #
-if (isset($tellme)) {
-    PAGEHEADER("Forgot Your Username?", $view);
-    
-    TBMAIL("$uid_name <$uid_email>",
-	   "Login ID requested by '$uid'",
-	   "\n".
-	   "Your Emulab login ID is '$uid'. Please use this ID when logging\n".
-	   "in at ${TBBASE}.\n".
-	   "\n".
-	   "The request originated from IP: " . $_SERVER['REMOTE_ADDR'] . "\n".
-	   "\n".
-	   "Thanks,\n".
-	   "Testbed Operations\n",
-	   "From: $TBMAIL_OPS\n".
-	   "Bcc: $TBMAIL_AUDIT\n".
-	   "Errors-To: $TBMAIL_WWW");
-
-    echo "<br>
-          An email message has been sent to your account. In it you will find
-          your login ID.\n";
-
-    PAGEFOOTER();
-    exit(0);
+if ($user->weblogin_frozen()) {
+    PAGEHEADER("Forgot Your Password?", $view);
+    echo "<center>
+	     The password cannot be changed; please contact $TBMAILADDR.<br>
+             <br>
+          <font size=+1 color=red>
+            Please do not attempt to change your password again;
+                it will not work!
+          </font>
+          </center><br>\n";
+    return;
 }
 
 #
@@ -209,12 +195,9 @@ setcookie($TBAUTHCOOKIE, $keyA, 0, "/",
 	  $TBAUTHDOMAIN, $TBSECURECOOKIES);
 
 # It is okay to spit this now that we have sent the cookie.
-PAGEHEADER("Forgot Your Username or Password?", $view);
+PAGEHEADER("Forgot Your Password?", $view);
 
-DBQueryFatal("update users set ".
-	     "       chpasswd_key='$key', ".
-	     "       chpasswd_expires=UNIX_TIMESTAMP(now())+(60*30) ".
-	     "where uid='$uid'");
+$user->SetChangePassword($key, "UNIX_TIMESTAMP(now())+(60*30)");
 
 TBMAIL("$uid_name <$uid_email>",
        "Password Reset requested by '$uid'",
@@ -224,7 +207,7 @@ TBMAIL("$uid_name <$uid_email>",
        "password. If the link expires, you can request a new one from the\n".
        "web interface.\n".
        "\n".
-       "    ${TBBASE}/chpasswd.php3?reset_uid=$uid&key=$keyB&simple=$simple\n".
+       "    ${TBBASE}/chpasswd.php3?user=$uid&key=$keyB&simple=$simple\n".
        "\n".
        "The request originated from IP: " . $_SERVER['REMOTE_ADDR'] . "\n".
        "\n".

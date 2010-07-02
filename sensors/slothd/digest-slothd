@@ -1,8 +1,8 @@
-#! /usr/bin/awk -f
+#! /usr/local/bin/gawk -f
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -430,7 +430,6 @@ END {
 	    printf("link,%s,%s\n",
 		   mac2link[mac],
 		   mac2node[mac]) > alert_file;
-
 	    error = 3;
 	}
     }

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -14,15 +14,21 @@ include $(OBJDIR)/Makeconf
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 
 ifeq ($(FBSDVERSION),FreeBSD4)
-SUBDIR	       = 4
+FSUBDIR	       = 4
 endif
 ifeq ($(FBSDVERSION),FreeBSD5)
-SUBDIR	       = 5
+FSUBDIR	       = 5
 endif
 ifeq ($(FBSDVERSION),FreeBSD6)
-SUBDIR	       = 6
+FSUBDIR	       = 6
 endif
-SUBDIRS	       = $(SUBDIR)
+ifeq ($(FBSDVERSION),FreeBSD7)
+FSUBDIR	       = 7
+endif
+ifeq ($(FBSDVERSION),FreeBSD8)
+FSUBDIR	       = 8
+endif
+SUBDIRS	       = $(FSUBDIR)
 
 all:
 
@@ -30,8 +36,11 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 install:
 
+client-mkdirs:
+	-mkdir -p $(DESTDIR)/sbin
+
 client:		client-subdirs
-client-install: client client-install-subdirs
+client-install: client client-mkdirs client-install-subdirs
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs

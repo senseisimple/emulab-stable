@@ -22,31 +22,58 @@ CONF_PATHNAME = r"/usr/testbed/viewcvs-1.0/viewcvs.conf"
 import sys
 import os
 import re
+import getopt
 
 sys.path.insert(0, LIBRARY_DIR)
 
 #
 # We must get a -repo argument.
 #
-if len(sys.argv) != 3:
+repodir  = False;
+embedded = False;
+
+try:
+    # Parse the options,
+    opts, req_args = getopt.getopt(sys.argv[1:], "",
+                     [ "repo=", "embedded"])
+    # ... act on them appropriately, and
+    for opt, val in opts:
+        if opt == "--repo":
+	    repodir = val
+            pass
+        elif opt == "--embedded":
+	    embedded = True;
+            pass
+        pass
+    pass
+except getopt.error, e:
     sys.exit(1)
     pass
 
-if sys.argv[1] != "-repo":
+if repodir == False:
     sys.exit(1)
     pass
-repodir = sys.argv[2]
 
 # go do the work
 import sapi
 import viewcvs
 
+viewcvs._legal_params['instance'] = viewcvs._re_validate_number
+viewcvs._sticky_vars.append('instance')
+viewcvs._legal_params['experiment'] = viewcvs._re_validate_number
+viewcvs._sticky_vars.append('experiment')
+viewcvs._legal_params['guid'] = re.compile('^[-_a-zA-Z0-9]+$')
+viewcvs._sticky_vars.append('guid')
+viewcvs._legal_params['version'] = viewcvs._re_validate_number
+viewcvs._sticky_vars.append('version')
 viewcvs._legal_params['exptidx'] = viewcvs._re_validate_number
 viewcvs._sticky_vars.append('exptidx')
 viewcvs._legal_params['eid'] = re.compile('^[-_a-zA-Z0-9]+$')
 viewcvs._sticky_vars.append('eid')
 viewcvs._legal_params['pid'] = viewcvs._re_validate_number
 viewcvs._sticky_vars.append('pid')
+viewcvs._legal_params['embedded'] = viewcvs._re_validate_number
+viewcvs._sticky_vars.append('embedded')
 
 server = sapi.CgiServer()
 cfg = viewcvs.load_config(CONF_PATHNAME, server)
@@ -59,5 +86,9 @@ cfg.options.http_expiration_time = 10
 cfg.options.generate_etags = 1
 cfg.options.use_localtime  = 1
 cfg.general.address      = "<a href='mailto:@TBOPSEMAIL_NOSLASH@'>@TBOPSEMAIL_NOSLASH@</a>"
+
+if embedded:
+    cfg.templates.directory = "templates/dir_emulab.ezt"
+    pass
 
 viewcvs.main(server, cfg)

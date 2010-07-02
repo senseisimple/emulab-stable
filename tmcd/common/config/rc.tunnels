@@ -1,12 +1,14 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2008, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
 use POSIX qw(setsid);
+use Data::Dumper;
+use strict;
 
 sub usage()
 {
@@ -41,6 +43,7 @@ my @vtundpids   = ();
 # library and initialize itself. 
 # 
 use libsetup;
+use liblocsetup;
 use libtmcc;
 use librc;
 
@@ -59,12 +62,16 @@ sub doboot();
 sub doshutdown();
 sub doreconfig();
 sub docleanup();
+sub DoVtun($);
+sub DoGRE($);
 
 # After libsetup include; tunnels run outside in fake vnode setup.
 my $PIDFILE        = CONFDIR() . "/tunnel.pid";
 my $VTUNDCONFIG    = CONFDIR() . "/vtund.conf";
+my $LOGFILE        = $LOGDIR   . "/vtund.debug";
 
 # Parse command line.
+my %options;
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -122,20 +129,27 @@ sub Pcleanup($)
 #
 sub doboot()
 {
-    my @tunnels;
+    my $tunnels;
 
     print STDOUT "Checking Testbed tunnel configuration ... \n";
 
-    if (gettunnelconfig(\@tunnels)) {
+    if (gettunnelconfig(\$tunnels)) {
 	fatal("Could not get tunnel configuration from libsetup!");
     }
 
     unlink $VTUNDCONFIG;
     return
-	if (!@tunnels);
+	if (!keys(%{ $tunnels }));
 
     # XXX
-    system("kldload if_tap");
+    my $sysname = `uname -s`;
+    chomp($sysname);
+    if ($sysname eq "Linux") {
+	system("insmod ip_gre");
+    }
+    else {
+	system("kldload if_tap");
+    }
 
     #
     # Write our pid to a file so we can be killed later.
@@ -146,6 +160,39 @@ sub doboot()
     $SIG{TERM} = \&Pcleanup;
     $SIG{INT}  = \&Pcleanup;
     $SIG{HUP}  = \&Pcleanup;
+
+    #
+    # First check for vtun.
+    #
+    DoVtun($tunnels);
+    DoGRE($tunnels);
+
+    # No reason to daemonize ...
+    return
+	if (!@vtundpids);
+
+    #
+    # Now daemonize and let the boot continue.
+    #
+    if (TBBackGround($LOGFILE)) {
+	sleep(1);
+	exit(0);
+    }
+    # Fully disconnect from bootup. 
+    setsid();
+    
+    #
+    # Just wait. We will die via the signal handler above.
+    #
+    while (1) {
+	sleep(10000);
+    }
+    return;
+}
+
+sub DoVtun($)
+{
+    my ($tunnels) = @_;
 
     my ($pid, $eid, $vname) = check_nickname();
 
@@ -166,21 +213,29 @@ sub doboot()
 	  "  type        ether;\n".
 	  "}\n".
 	  "\n");
-    
+
     #
     # First construct the config file.
     # 
-    foreach my $tunnel (@tunnels) {
-	my $name     = $tunnel->{"NAME"};
-	my $isserver = $tunnel->{"ISSERVER"};
-	my $peeraddr = $tunnel->{"PEERIPADDR"};
-	my $peerport = $tunnel->{"PEERPORT"};
-	my $password = $tunnel->{"PASSWORD"};
-	my $encrypt  = ($tunnel->{"ENCRYPT"}  ? "yes" : "no");
-	my $compress = ($tunnel->{"COMPRESS"} ? "yes" : "no");
-	my $inetip   = $tunnel->{"IPADDR"};
-	my $mask     = $tunnel->{"IPMASK"};
-	my $proto    = $tunnel->{"PROTO"};
+    foreach my $tunnel (values(%{ $tunnels })) {
+	next
+	    if ($tunnel->{"tunnel_style"} ne "vtun");
+	
+	my $name     = $tunnel->{"tunnel_lan"};
+	my $isserver = $tunnel->{"tunnel_isserver"};
+	my $destaddr = $tunnel->{"tunnel_dstip"};
+	my $dstport  = $tunnel->{"tunnel_serverport"};
+	my $password = $tunnel->{"tunnel_secretkey"};
+	my $encrypt  = $tunnel->{"tunnel_encrypt"};
+	my $compress = $tunnel->{"tunnel_compress"};
+	my $inetip   = $tunnel->{"tunnel_ip"};
+	my $mask     = $tunnel->{"tunnel_ipmask"};
+	my $proto    = $tunnel->{"tunnel_proto"};
+
+	$proto = "udp"
+	    if (!defined($proto));
+	$encrypt  = (defined($encrypt) && $encrypt ? "yes" : "no");
+	$compress = (defined($compress) && $compress ? "yes" : "no");
 
 	#
 	# Sheesh, vtund fails if it sees "//" in a path. 
@@ -217,20 +272,24 @@ sub doboot()
     #
     # Now fire off the vtund processes
     # 
-    foreach my $tunnel (@tunnels) {
-	my $name     = $tunnel->{"NAME"};
-	my $isserver = $tunnel->{"ISSERVER"};
-	my $peeraddr = $tunnel->{"PEERIPADDR"};
-	my $peerport = $tunnel->{"PEERPORT"};
-	my $password = $tunnel->{"PASSWORD"};
-	my $encrypt  = ($tunnel->{"ENCRYPT"}  ? "yes" : "no");
-	my $compress = ($tunnel->{"COMPRESS"} ? "yes" : "no");
-	my $inetip   = $tunnel->{"IPADDR"};
-	my $mask     = $tunnel->{"IPMASK"};
-	my $proto    = $tunnel->{"PROTO"};
+    foreach my $tunnel (values(%{ $tunnels })) {
+	next
+	    if ($tunnel->{"tunnel_style"} ne "vtun");
+	
+	my $name     = $tunnel->{"tunnel_lan"};
+	my $isserver = $tunnel->{"tunnel_isserver"};
+	my $destaddr = $tunnel->{"tunnel_dstip"};
+	my $dstport  = $tunnel->{"tunnel_serverport"};
+	my $password = $tunnel->{"tunnel_secretkey"};
+	my $encrypt  = $tunnel->{"tunnel_encrypt"};
+	my $compress = $tunnel->{"tunnel_compress"};
+	my $inetip   = $tunnel->{"tunnel_ip"};
+	my $mask     = $tunnel->{"tunnel_ipmask"};
+	my $proto    = $tunnel->{"tunnel_proto"};
+	my $didserver= 0;
 
 	my $log;
-	my $cmd = "$VTUND -n -P $peerport -f $VTUNDCONFIG ";
+	my $cmd = "$VTUND -n -P $dstport -f $VTUNDCONFIG ";
 
 	if ($isserver) {
 	    if (!$didserver) {
@@ -240,7 +299,7 @@ sub doboot()
 	    }
 	}
 	else {
-	    $cmd .= "$name $peeraddr";
+	    $cmd .= "$name $destaddr";
 	    $log  = "$LOGDIR/vtun-${pid}-${eid}-${name}.debug";
 	}
 
@@ -278,13 +337,33 @@ sub doboot()
 		"    Could not exec $cmd\n");
 	}
     }
+}
+
+sub DoGRE($)
+{
+    my ($tunnels) = @_;
+
+    my ($pid, $eid, $vname) = check_nickname();
+
     #
-    # Just wait. We will die via the signal handler above.
-    #
-    while (1) {
-	sleep(10000);
+    # First construct the config file.
+    # 
+    foreach my $tunnel (values(%{ $tunnels })) {
+	next
+	    if ($tunnel->{"tunnel_style"} ne "gre");
+	
+	my $name     = $tunnel->{"tunnel_lan"};
+	my $srchost  = $tunnel->{"tunnel_srcip"};
+	my $dsthost  = $tunnel->{"tunnel_dstip"};
+	my $inetip   = $tunnel->{"tunnel_ip"};
+	my $peerip   = $tunnel->{"tunnel_peerip"};
+	my $mask     = $tunnel->{"tunnel_ipmask"};
+	my $unit     = $tunnel->{"tunnel_unit"};
+
+	os_config_gre($name, $unit,
+		      $inetip, $peerip, $mask, $srchost, $dsthost)
+	    == 0 or fatal("Could not configure gre tunnel!");
     }
-    return;
 }
 
 #

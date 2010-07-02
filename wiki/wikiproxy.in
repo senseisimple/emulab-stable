@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -71,6 +71,9 @@ sub fatal($);
 # 
 $ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Avoid quota and out of space on /tmp.
+$ENV{'TMPDIR'} = "/var/tmp";
 
 #
 # Only real root, cause the script has to read/write a pid file that
@@ -472,7 +475,7 @@ sub AddWikiProject(@)
     system("chown ${WIKIUSER}:${WIKIGROUP} *.txt")
 	== 0 or fatal("Could not chown *.txt to ${WIKIUSER}:${WIKIGROUP}");
 
-    system("sudo -u nobody ci -l '-mInitial Revision by wikiproxy:\n".
+    system("sudo -u nobody ci -u '-mInitial Revision by wikiproxy:\n".
 	   "AddWikiProject $pid $wikiname' ".
 	   "      '-t-Initial Revision by wikiproxy' *.txt") == 0
         or fatal("Could not create new RCS control files.");
@@ -488,7 +491,8 @@ sub AddWikiProject(@)
     while (<PREFS>) {
 	if ($_ =~ /^.* Set (ALLOWWEB.*) = \r$/ ||
 	    $_ =~ /^.* Set (ALLOWWEB.*) = $/) {
-	    $data .= "\t\t* Set $1 = " . "%MAINWEB%.${wikiname}Group\n";
+	    $data .= "\t\t* Set $1 = " .
+		"%MAINWEB%.${wikiname}Group, %MAINWEB%.TWikiAdminGroup\n";
 	}
 	elsif ($_ =~ /^(.* Set ALLOWTOPIC.*)\r$/ ||
 	       $_ =~ /^(.* Set ALLOWTOPIC.*)$/) {
@@ -563,7 +567,7 @@ sub AddWikiGroup(@)
 }
 
 #
-# Fix a wiki group. 
+# Fix a wiki project.
 #
 sub FixWikiProject(@)
 {
@@ -572,13 +576,34 @@ sub FixWikiProject(@)
 
     my ($pid, $wikiname) = @_;
 
-    FixWikiGroup($pid, "${wikiname}Group", "${wikiname}Group");
+    chdir("$WIKIDATADIR/$wikiname") or
+	fatal("Could not chdir to $WIKIDATADIR/$wikiname");
+
+    open(PREFS, "$WIKIDATADIR/_default/WebPreferences.txt") or
+	fatal("Could not open WebPreferences.txt for reading");
+
+    while (<PREFS>) {
+	if ($_ =~ /^.* Set (ALLOWWEB.*) = \r$/ ||
+	    $_ =~ /^.* Set (ALLOWWEB.*) = $/) {
+	    $data .= "\t\t* Set $1 = " .
+		"%MAINWEB%.${wikiname}Group , %MAINWEB%.TWikiAdminGroup\n";
+	}
+	else {
+	    $data .= $_;
+	}
+    }
+    close(PREFS);
 
     #
-    # And another group for the project leaders and group roots, who are
-    # allowed to change the preferences for the web.
+    # Now write the file out and check it in.
     #
-    FixWikiGroup("${pid}Root", "${wikiname}RootGroup", "${wikiname}Group");
+    open(PREFS, ">WebPreferences.txt") or
+	fatal("Could not open WebPreferences.txt for writing");
+    print PREFS $data;
+    close(PREFS);
+
+    CI("WebPreferences.txt", "AddWikiProject $pid $wikiname") == 0
+        or fatal("Could not ci WebPreferences.txt");
 
     return 0;
 }

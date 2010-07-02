@@ -1,20 +1,19 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 
-# Page arguments.
-$printable = $_GET['printable'];
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 
-# Pedantic page argument checking. Good practice!
-if (isset($printable) && !($printable == "1" || $printable == "0")) {
-    PAGEARGERROR();
-}
-if (!isset($printable))
+if (!isset($printable)) {
     $printable = 0;
+}
 
 #
 # Standard Testbed Header
@@ -511,7 +510,7 @@ experiments.
   
   <br>
   <li><tt><b>startexp</b></tt>: Create an experiment. By default, the experiment
-  is started as a <a href="tutorial/tutorial.php3#BatchMode"><em>batch</em></a>
+  is started as a <a href="<? echo "$WIKIDOCURL/Tutorial#BatchMode" ?>"><em>batch</em></a>
   experiment, but you can use the <tt>batchmode</tt> option described below to
   alter that behavior. You can pass an NS file inline, or you can give the
   path of a file already on the Emulab fileserver.
@@ -566,7 +565,7 @@ experiments.
     <td>boolean</td>
     <td>true</td>
     <td>Create a
-         <a href="tutorial/tutorial.php3#BatchMode"><em>batch</em></a>
+         <a href="<? echo "$WIKIDOCURL/Tutorial#BatchMode" ?>"><em>batch</em></a>
          experiment. Value is either "true" or "false"</td>
    </tr>
    <tr>
@@ -593,7 +592,7 @@ experiments.
     <td>integer</td>
     <td>variable</td>
     <td>How long (in minutes) before your idle experiment can be 
-         <a href="docwrapper.php3?docname=swapping.html#idleswap">idle
+         <a href="<? echo "$WIKIDOCURL/Swapping#idleswap" ?>">idle
 	 swapped</a>. Defaults to a value between two and four hours.  A
 	 value of zero means never idleswap (you must provide a reason in
 	 <tt>noidleswap_reason</tt>)</td>
@@ -609,7 +608,7 @@ experiments.
     <td>integer</td>
     <td>0</td>
     <td>How long (in minutes) before your experiment
-     should be <a href="docwrapper.php3?docname=swapping.html#autoswap">
+     should be <a href="<? echo "$WIKIDOCURL/Swapping#autoswap" ?>">
      unconditionally swapped</a>. A value of zero means never
      unconditionally swap this experiment.
    </tr>
@@ -1231,7 +1230,7 @@ experiments.
   In addition to the required arguments, you must also supply at least
   one parameter to change in the <tt>params</tt> argument. The reader is
   encouraged to read the
-  <a href=tutorial/docwrapper.php3?docname=wireless.html>wireless
+  <a href="<? echo "$WIKIDOCURL/wireless" ?>">wireless
   tutorial</a> to see what parameters can be changed.
   <br>
 

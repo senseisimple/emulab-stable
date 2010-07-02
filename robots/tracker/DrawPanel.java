@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 import java.awt.*;
 import java.awt.geom.*;
 import java.util.*;

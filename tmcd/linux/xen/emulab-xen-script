@@ -1,0 +1,20 @@
+#!/bin/sh
+
+echo "what script" > /tmp/bridge
+echo $vif >> /tmp/bridge
+sh /etc/xen/scripts/vif-bridge $*
+echo blah >> /tmp/bridge
+# /sbin/ifconfig $vif up 172.18.54.0 2>&1 >> /tmp/bridge
+/sbin/iptables -A OUTPUT -j DROP -o $vif -m pkttype --pkt-type broadcast -m physdev --physdev-out $vif
+
+# tmcd on boss
+/sbin/iptables -t nat -A POSTROUTING -j SNAT --to-source 155.98.39.54 -s 172.18.54.0/255.255.255.0 --destination 155.98.32.70 -o peth0
+
+# route mount points and evproxy server
+/sbin/iptables -t nat -A POSTROUTING -j SNAT --to-source 155.98.39.54 -s 172.18.54.0/255.255.255.0 --destination 155.98.33.74 -o peth0
+
+# /sbin/iptables -t nat -F
+# /sbin/ifconfig $vif 2>&1 >> /tmp/bridge
+echo "Starting dhcpd" >> /tmp/bridge
+/etc/init.d/dhcpd restart
+success

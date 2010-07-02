@@ -1,0 +1,58 @@
+Experiment Options
+Show Group Information
+has been successfully queued
+is being created
+has been approved
+Creating project group
+This will take a few moments
+please be patient
+canceled
+As a pending user of the Testbed
+you will receive a key via email
+Membership status for user
+was <b>granted</b> membership
+Starting experiment configuration
+You will be notified via email
+Attempting to reboot
+Successful
+Knowledge Base Entry:
+Knowledge Base search results
+Your new SSL certificate has been created
+Log for node
+Commit/Tag Archive
+has been deleted
+let's be sure
+Are you <b>REALLY REALLY</b> sure
+Your NS file looks good
+This template is for creating
+To finish creating your slice
+public keys for user
+Click to visit archive
+Done!
+mailing list administration
+Basic Options
+More Options
+Node Options
+Use this page to alter the
+now being replayed
+There are [0-9 a-z]* users
+you want to run linktest
+New Users Approved
+successfully modified
+Your experiment has been dequeued
+is being removed
+Updated power time for
+Range:
+A message has been sent
+Taking a snapshot
+Please enter the new UID
+#{ The following few lines are for pages that don't have any success text,
+#  to keep them from being UNKNOWN.
+# archive_missing.php3
+Add Missing Files
+# editnodetype.php3
+Edit Node Type
+Edit Image Descriptor
+# editsitevars.php3
+batch/retry_wait
+#}

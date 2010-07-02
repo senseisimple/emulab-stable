@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,50 +12,39 @@ include("defs.php3");
 #
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
+#
+$reqargs = RequiredPageArguments("experiment",   PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("zoom",         PAGEARG_NUMERIC,
+				 "detail",       PAGEARG_BOOLEAN,
+				 "thumb",        PAGEARG_INTEGER);
 
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-$exp_eid = $eid;
-$exp_pid = $pid;
+#
+# Need these below
+#
+$pid = $experiment->pid();
+$eid = $experiment->eid();
 
 # if they dont exist, or are non-numeric, use defaults.
-# note: one can use is_numeric in php4 instead of ereg.
-if (!isset($zoom) || !ereg("^[0-9]{1,50}.?[0-9]{0,50}$", $zoom)) { $zoom = 1; }
-if (!isset($detail) || !ereg("^[0-9]{1,50}$", $detail)) { $detail = 0; }
-if (!isset($thumb) || !ereg("^[0-9]{1,50}$", $detail)) { $thumb = 0; }
-
-if ($zoom > 8.0) { $zoom = 8.0; }
-if ($zoom <= 0.0) { $zoom = 1.0; }
-
+if (!isset($zoom))       { $zoom   = 1; }
+if (!isset($detail))     { $detail = 0; }
+if (!isset($thumb))      { $thumb  = 0; }
+if ($zoom > 8.0)   { $zoom = 8.0; }
+if ($zoom <= 0.0)  { $zoom = 1.0; }
 if ($thumb > 1024) { $thumb = 1024; }
-
-#
-# Check to make sure this is a valid PID/EID tuple.
-#
-if (! TBValidExperiment($exp_pid, $exp_eid)) {
-  USERERROR("The experiment $exp_eid is not a valid experiment ".
-            "in project $exp_pid.", 1);
-}
 
 #
 # Verify Permission.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to view experiment $exp_eid!", 1);
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+    USERERROR("You do not have permission to view experiment $eid!", 1);
 }
 
 #
@@ -69,6 +58,24 @@ if (!$query_result || !mysql_num_rows($query_result)) {
     # No Data. Spit back a stub image.
     header("Content-type: image/gif");
     readfile("coming-soon-thumb.gif");
+    return;
+}
+
+#
+# See if we have a copy of the image in the desired zoom/detail level
+# cached in the DB. If so, that is what we return.
+#
+$query_result =
+    DBQueryFatal("select image from vis_graphs ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 "      zoom='$zoom' and detail='$detail'");
+
+if (mysql_num_rows($query_result)) {
+    $row   = mysql_fetch_array($query_result);
+    $image = $row['image'];
+    
+    header("Content-type: image/png");
+    echo $image;
     return;
 }
 

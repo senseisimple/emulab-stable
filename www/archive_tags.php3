@@ -1,87 +1,126 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
-
-#
-# Standard Testbed Header
-#
-PAGEHEADER("Experiment Tags");
 
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("index",      PAGEARG_INTEGER,
+				 "experiment", PAGEARG_EXPERIMENT,
+				 "template",   PAGEARG_TEMPLATE,
+				 "instance",   PAGEARG_INSTANCE,
+				 "records",    PAGEARG_INTEGER,
+				 "tag",        PAGEARG_STRING);
+
+#
+# An instance might be a current or historical. If its a template, use
+# the underlying experiment of the template.
+#
+if (isset($instance)) {
+    if (($foo = $instance->GetExperiment()))
+	$experiment = $foo;
+    else
+	$index = $instance->exptidx();
+    $template = $instance->GetTemplate();
+}
+elseif (isset($template)) {
+    $experiment = $template->GetExperiment();
+}
+elseif (isset($index)) {
+    $experiment = Experiment::Lookup($index);
+}
+
+#
+# If we got a current experiment, great. Otherwise we have to lookup
+# data for a historical experiment.
+#
+if (isset($experiment) && $experiment) {
+    # Need these below.
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    $exptidx = $experiment->idx();
+
+    $stats = $experiment->GetStats();
+    if (!$stats) {
+	TBERROR("Could not load stats object for experiment $pid/$eid", 1);
+    }
+    $archive_idx = $stats->archive_idx();
+
+    # Permission
+    if (!$isadmin &&
+	!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view tags for ".
+		  "archive in $pid/$eid!", 1);
+    }
+}
+elseif (isset($index)) {
+    $stats = ExperimentStats::Lookup($index);
+    if (!$stats) {
+	PAGEARGERROR("Invalid experiment index: $index");
+    }
+
+    # Need these below.
+    $pid = $stats->pid();
+    $eid = $stats->eid();
+    $exptidx = $index;
+    $archive_idx = $stats->archive_idx();
+
+    # Permission
+    if (!$isadmin &&
+	!$stats->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
+	USERERROR("You do not have permission to view tags for ".
+		  "archive in $pid/$eid!", 1);
+    }
+}
+else {
+    PAGEARGERROR("Must provide a current or former experiment index");
+}
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Archive Tags");
 
 # Show just the last N records unless request is different.
-if (!isset($records) || !strcmp($records, "")) {
+if (!isset($records)) {
     $records = 100;
 }
 
-if (! isset($which) || $which == "") {
-    USERERROR("Must supply an experiment to view!", 1);
+echo "<center>\n";
+if (isset($instance)) {
+    echo $instance->PageHeader();
+    $url = CreateURL("archive_view", $instance);
 }
-if (!TBvalid_integer($which)) {
-    USERERROR("Invalid characters in $which!", 1);
+elseif (isset($template)) {
+    echo $template->PageHeader();
+    $url = CreateURL("archive_view", $template);
 }
-
-#
-# We get an index. Must map that to a pid/eid to do the permission
-# check, and note that it might not be an current experiment. Not
-# sure I like this so I am not going to permit it for mere users
-# just yet.
-#
-$query_result =
-DBQueryFatal("select pid,eid from experiments where idx='$which'");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("No such experiment index $which!", 1);
+else {
+    echo $stats->PageHeader();
+    $url = CreateURL("archive_view", "index", $exptidx);
 }
-$row   = mysql_fetch_array($query_result);
-$pid   = $row["pid"];
-$eid   = $row["eid"];
-
-if (!$isadmin) {
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view tags for ".
-		  "experiment $pid/$eid ($which)!", 1);
-    }
-}
-
-echo "<center><font size=+1>".
-     "Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a> ".
-     "(<a href='showstats.php3?showby=expt&which=$which'>$which</a>) ".
-     "</b></font>\n";
-     "</center><br>";
+echo "</center>\n";
 echo "<br>\n";
 
-#
-# We need the archive index so we can find its view.
-#
-$query_result =
-    DBQueryFatal("select s.archive_idx from experiments as e ".
-		 "left join experiment_stats as s on s.exptidx=e.idx ".
-		 "where e.pid='$pid' and e.eid='$eid'");
-if (mysql_num_rows($query_result) == 0) {
-    TBERROR("Could not get archive index for experiment $pid/$eid", 1);
-}
-$row   = mysql_fetch_array($query_result);
-$archive_idx = $row["archive_idx"];
-		    
 #
 # Grab all the (commit/user) tags.
 #
 $query_result =
-    DBQueryFatal("select * from archive_tags ".
-		 "where archive_idx='$archive_idx' and view='$which' and ".
-		 "      (tagtype='user' or tagtype='commit')");
+    DBQueryFatal("select *,FROM_UNIXTIME(date_created) as date_created ".
+		 "  from archive_revisions ".
+		 "where archive_idx='$archive_idx' and view='$exptidx' " .
+		 "order by date_created desc");
 
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No tags for experiment $pid/$eid", 1);
@@ -90,23 +129,23 @@ if (mysql_num_rows($query_result) == 0) {
 echo "<table align=center border=1>
       <tr>";
 echo "  <th>Run</th>";
-echo "  <th>Tag</th>";
+echo "  <th>Tag (Click to visit archive)</th>";
 echo "  <th>Date</th>";
 echo "  <th>Description</th>";
 echo "</tr>\n";
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $archive_tag = $row["tag"];
-    $date_tagged = $row["date_created"];
-    $description = $row["description"];
+    $archive_tag  = $row["tag"];
+    $date_tagged  = $row["date_created"];
+    $description  = $row["description"];
+    $archive_view = $url . "&tag=$archive_tag";
 
     echo "<tr>";
     echo "  <td align=center>
-                <a href=beginexp_html.php3?copyid=$which:$archive_tag>
+                <a href=beginexp_html.php3?copyid=$exptidx:$archive_tag>
                     <img border=0 alt=Run src=greenball.gif></a></td>";
     echo "  <td>".
-	     "<a href='cvsweb/cvswebwrap.php3/$which/history/".
-		    "$archive_tag/?exptidx=$which'>$archive_tag</a>".
+	     "<a href='$archive_view'>$archive_tag</a>".
 	 "  </td>";
     
     echo "  <td>$date_tagged</td>";

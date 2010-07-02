@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # This page needs more work to make user friendly and flexible.
@@ -13,32 +12,38 @@ include("showstuff.php3");
 # 
 
 #
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$uid_idx   = $this_user->uid_idx();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("record", PAGEARG_INTEGER);
+
+#
 # Standard Testbed Header
 #
 PAGEHEADER("Show Experiment Information");
 
 #
-# Only known and logged in users can end experiments.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-
-#
 # Right now we show just the last N records entered, unless the user
 # requested a specific record. 
 #
-if (isset($record) && strcmp($record, "")) {
+if (isset($record)) {
     $wclause = "";
     if (! $isadmin) {
-	$wclause = "and s.creator='$uid'";
+	$wclause = "and s.creator_idx='$uid_idx'";
     }
     $query_result =
 	DBQueryFatal("select s.*,'foo',r.* from experiment_stats as s ".
 		     "left join experiment_resources as r on ".
 		     " r.exptidx=s.exptidx ".
 		     "where s.exptidx=$record $wclause ".
-		     "order by r.idx desc");
+		     "order by r.tstamp desc");
 
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("No such experiment record $record in the system!", 1);
@@ -47,7 +52,7 @@ if (isset($record) && strcmp($record, "")) {
 else {
     $wclause = "";
     if (! $isadmin) {
-	$wclause = "where s.creator='$uid'";
+	$wclause = "where s.creator_idx='$uid_idx'";
     }
     $query_result =
 	DBQueryFatal("select s.*,'foo',r.* from experiment_stats as s ".
@@ -84,8 +89,8 @@ $print_header = 0;
 $last_exptidx = 0;
 
 while ($row = mysql_fetch_assoc($query_result)) {
-    $rsrcidx = $row[idx];
-    $exptidx = $row[exptidx];
+    $rsrcidx = $row["idx"];
+    $exptidx = $row["exptidx"];
 
     $skipping = 1;
 
@@ -99,6 +104,11 @@ while ($row = mysql_fetch_assoc($query_result)) {
 	if ($key == "thumbnail") {
 	    echo "<td nowrap>
                      <a href='showthumb.php3?idx=$rsrcidx'>Thumbnail</a>
+                  </td>\n";
+	}
+	elseif ($key == "input_data_idx") {
+	    echo "<td nowrap>
+                     <a href='spitnsdata.php3?record=$rsrcidx'>$value</a>
                   </td>\n";
 	}
 	else {

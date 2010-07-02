@@ -1,0 +1,142 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Register local resources at the clearinghouse.
+#
+# 
+sub usage()
+{
+    print "Usage: register_resources [-f] [-r]\n";
+    exit(1);
+}
+my $optlist = "fr";
+my $force   = 0;
+my $remove  = 0;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $OURDOMAIN	   = "@OURDOMAIN@";
+my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT   = @PROTOGENI_SUPPORT@;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"r"})) {
+    $remove = 1;
+}
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-cm";
+
+use lib '@prefix@/lib';
+use libdb qw(DBQueryFatal);
+use Node;
+require GeniDB;
+require GeniCertificate;
+require GeniComponent;
+require GeniRegistry;
+require GeniHRN;
+
+# List of nodes.
+my @nodes = ();
+
+if (!@ARGV) {
+    my $query_result =
+	DBQueryFatal("select n.node_id from nodes as n ".
+		     "left join node_types as t on t.type=n.type ".
+		     "where t.class='pc'");
+    while (my ($node_id) = $query_result->fetchrow_array()) {
+	push(@nodes, $node_id);
+    }
+}
+else {
+    @nodes = @ARGV;
+}
+
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    print STDERR "You ($UID) do not exist!\n";
+    exit(-1);
+}
+
+#
+# The RPC context for this script is as the CM.
+#
+my $cmcertificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($cmcertificate)) {
+    die("*** $0:\n".
+	"    Could not get uuid from $EMULAB_PEMFILE\n");
+}
+
+Genixmlrpc->SetContext(Genixmlrpc->Context($cmcertificate));
+
+my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+if (!defined($clearinghouse)) {
+    die("*** $0:\n".
+	"    Could not create client for clearinghouse\n");
+}
+
+foreach my $node_id (@nodes) {
+    my $node    = Node->Lookup($node_id);
+    my $certificate;
+    
+    if (!defined($node)) {
+	die("*** $0:\n".
+	    "    Could not map $node_id to object\n");
+    }
+    my $component = GeniComponent->Lookup($node->uuid());
+    if (defined($component) && $remove) {
+	$component->Delete();
+	$component = undef;
+    }
+    if (!defined($component)) {
+	$certificate = GeniCertificate->Lookup($node->uuid());
+	if (!defined($certificate)) {
+	    $certificate = GeniCertificate->Create("Node",
+						   GeniHRN::Generate(
+						       $OURDOMAIN, "node",
+						       ${node_id} ),
+						   "${PGENIDOMAIN}.${node_id}",
+						   $TBOPS, $node->uuid(),
+						   $cmcertificate->URL());
+	    if (!defined($certificate)) {
+		die("*** $0:\n".
+		    "    Could not generate certificate for $node\n");
+	    }
+	}
+	$component = GeniComponent->Create($certificate);
+	if (!defined($component)) {
+	    die("*** $0:\n".
+		"    Could not create component object for $node\n");
+	}
+    }
+    elsif (!$force) {
+	next;
+    }
+    $certificate = $component->GetCertificate();
+    
+    print "Registering $node_id\n";
+    if ($clearinghouse->Register("Component",
+				 $certificate->cert(), {}) != 0) {
+	die("*** $0:\n".
+	    "    Could not register $node_id at the clearinghouse\n");
+    }
+}
+

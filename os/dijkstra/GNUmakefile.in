@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,7 @@ SUBDIR		= os/dijkstra
 include $(OBJDIR)/Makeconf
 
 CXXFLAGS	= -Wall -O2 -I/usr/local/include -ftemplate-depth-40 -g
+CXXFLAGS	+= $(LDSTATIC)
 
 all:	dijkstra
 
@@ -25,7 +26,7 @@ dijkstra-debug: Compressor.o TreeCompressor.o dijkstra.o \
                 IpTree.h SingleSource.h dijkstra.h \
                 NoneCompressor.h TreeCompressor.h lib.h
 
-	$(CXX) $(CXXFLAGS) -static Compressor.o TreeCompressor.o dijkstra.o \
+	$(CXX) $(CXXFLAGS) Compressor.o TreeCompressor.o dijkstra.o \
                 NoneCompressor.o VoteIpTree.o SingleSource.o \
                 OptimalIpTree.o bitmath.o $(LIBS) -o $@
 

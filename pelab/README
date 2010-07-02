@@ -1,0 +1,27 @@
+
+** iperf.ns - sample ns file 
+
+** send-streams 
+   This program starts an iperf server, and initiates simultaneous iperf
+    client connections to host specified using -d for duration specified
+    by -t.
+
+      usage: $0 [-h] [-m num] [-d ip -t time] [-w directory]
+
+     -h        : this (help) message
+     -v        : verbose output
+     -m num    : become master node for synchronization purpose of num nodes
+     -d ip     : destination ip address or full name
+     -t time   : iperf duration in secs
+     -w dir    : working directory
+
+   example: $0 -d 192.168.1.1 -t 30 -d 192.168.4.2 -t 45
+
+
+** runiperfmesh
+   * to be run at node-startup 
+   * takes care of FC2/FC4 dependency of iperf
+   * currently starts all pair iperf for 10 secs
+   -- result files are stored in /local/logs/iperfmesh directory 
+      (you can use loghole to get them)
+

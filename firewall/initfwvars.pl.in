@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -75,13 +75,12 @@ DBQueryFatal($str)
 # XXX assumptions, assumptions (as of 9/05).  We could allow up to a /8 network
 # but we assign a unique port as well as address and a port is only 16 bits,
 # so use a /16.
+# XXX assumptions II (as of 2/08).  frisbeelauncher ticks up the MC address
+# all the way to /8 (it wraps the port number as needed), so lets make it
+# so here.
 #
 my @mcaddr = split /\./, $FRISBEE_MCASTADDR, 4;
-if (@mcaddr < 2) {
-    $FRISBEE_MCASTADDR = $mcaddr[0] . ".0.0.0/16";
-} else {
-    $FRISBEE_MCASTADDR = $mcaddr[0] . "." . $mcaddr[1] . ".0.0/16";
-}
+$FRISBEE_MCASTADDR = $mcaddr[0] . ".0.0.0/8";
 $FRISBEE_MCASTPORT = $FRISBEE_MCASTPORT . "-65535";
 
 $str = "replace into default_firewall_vars values ('EMULAB_MCADDR', '$FRISBEE_MCASTADDR')";

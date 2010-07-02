@@ -1,0 +1,47 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= node_usage
+
+include $(OBJDIR)/Makeconf
+
+ifeq ($(NODE_USAGE_SUPPORT),1)
+LIBEXEC_NODE_USAGE = analy mk-plots refresh analy2 gather publish mk-php-pages get-start-date
+else
+LIBEXEC_NODE_USAGE =
+endif
+
+#
+# These are Utah emulab specific
+#
+NODE_USAGE_OTHER = from_ptop sanity
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(LIBEXEC_NODE_USAGE)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: \
+	$(addprefix $(INSTALL_LIBEXECDIR)/node_usage/, $(LIBEXEC_NODE_USAGE))
+
+$(INSTALL_LIBEXECDIR)/node_usage/%: %
+	@echo "Installing $<"
+	sudo mkdir -p @prefix@/data/node_usage
+	sudo chmod 775 @prefix@/data/node_usage
+	mkdir -p $(INSTALL_LIBEXECDIR)/node_usage
+	chmod 775 $(INSTALL_LIBEXECDIR)/node_usage
+	$(INSTALL) $< $@
+
+post-install:
+
+clean:
+

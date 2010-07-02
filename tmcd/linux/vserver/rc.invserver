@@ -1,0 +1,180 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+my $DOSETUP = 1;
+
+sub usage()
+{
+    print "Usage: [-dN] start|stop\n";
+    exit(1);
+}
+my $optlist    = "dN";
+my $debug      = 0;
+my $action     = "start";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the emulab libraries. It will now
+#
+use libsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub BootFatal($);
+sub DoBoot();
+
+# Script specific goo.
+my $RCDIR	 = "$BINDIR/rc";
+
+# Parse command line.
+my %options;
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'d'})) {
+    $debug = 1;
+}
+if (defined($options{'N'})) {
+    $DOSETUP = 0;
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+usage()
+    if ($action ne "stop" && $action ne "start");
+
+#
+# On shutdown kill everything.
+#
+if ($action eq "stop") {
+    print "Killing all processes and exiting ...\n";
+    $SIG{TERM} = 'IGNORE';
+    system("kill -TERM -1");
+    sleep(1);
+    #system("kill -KILL -1");
+    exit(0);
+}
+# So that rc will know to invoke us to stop.
+system("touch /var/lock/subsys/invserver") == 0
+    or die("Could not create lock file!\n");
+
+if (! -e "$BOOTDIR/realname") {
+    print "$BOOTDIR/realname does not exit!\n";
+    exit(1);
+}
+my $vnodeid = `cat $BOOTDIR/realname`;
+chomp($vnodeid);
+
+#
+# Put this into the environment, which is the protocol for setting up jails.
+#
+$ENV{'TMCCVNODEID'} = $vnodeid;
+
+DoBoot();
+exit(0);
+
+#
+# Boot Action.
+#
+sub DoBoot()
+{
+    if (!$DOSETUP) {
+	TBDebugTimeStamp("rc.invserver WARNING not starting up");
+	system("touch $BOOTDIR/vrunning");
+	return;
+    }
+
+    TBDebugTimeStamp("rc.invserver starting up");
+
+    print("Checking Testbed reservation status\n");
+    my ($pid, $eid, $vname) = jailsetup();
+
+    #
+    # At this point, if we are a free node just return. Something went wacky.
+    #
+    if (!defined($pid)) {
+	return;
+    }
+
+    #
+    # Do this *before* config scripts. At the moment we use a hacky test
+    # in vnodesetup to see if the watchdog is running, which tells vnodesetup
+    # that the vnode has finished setting up. By doing it now, we allow vnode
+    # setup to proceed in parallel (okay, at most two are going to partially
+    # overlap, but that is better then nothing at all!
+    # 
+    TBDebugTimeStamp("rc.invserver starting watchdog");
+    if (-x "$BINDIR/watchdog") {
+        print("Starting testbed watchdog daemon\n");
+	system("$BINDIR/watchdog start");
+	if ($?) {
+	    BootFatal("Error running $BINDIR/watchdog");
+	}
+    }
+
+    #
+    # This is where we run all of the config scripts. These talk to the
+    # DB and setup the node the way it is supposed to be. 
+    # 
+    TBDebugTimeStamp("rc.invserver running config scripts");
+    print("Running config scripts\n");
+    system("$RCDIR/rc.config boot");
+    if ($?) {
+	BootFatal("Error running $RCDIR/rc.config");
+    }
+    TBDebugTimeStamp("rc.invserver done running config scripts");
+
+    # Linktest daemon now runs inside (local) jails.
+    if (-x "$RCDIR/rc.linktest" && !REMOTE()) {
+	system("$RCDIR/rc.linktest start");
+	if ($?) {
+	    BootFatal("Error running $RCDIR/rc.linktest");
+	}
+    }
+
+    print("Informing the testbed that we are up and running\n");
+    if (tmcc(TMCCCMD_STATE(), "ISUP") < 0) {
+	BootFatal("Error sending ISUP to Emulab Control!");
+    }
+
+    #
+    # Very hacky ... with vservers it is difficult to return an exit
+    # code to the outer environment. So, touch this file and the outer
+    # environment knows we got this far okay. 
+    #
+    system("touch $BOOTDIR/vrunning");
+}
+
+#
+# This version of fatal sends boot status to tmcd, and then generates
+# a TBFAILED state transition. 
+#
+sub BootFatal($)
+{
+    my ($msg) = @_;
+    
+    # XXX "--" ensures that -1 is not interpreted as a tmcc cmdline arg
+    if (tmcc(TMCCCMD_BOOTERRNO(), "-- -1") < 0) {
+	print "Error sending boot errno to Emulab Control!\n";
+    }
+    
+    if (tmcc(TMCCCMD_STATE(), "TBFAILED") < 0) {
+	print "Error sending TBFAILED to Emulab Control!\n";
+    }
+    exit(-1);
+}
+

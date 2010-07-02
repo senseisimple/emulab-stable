@@ -1,0 +1,119 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# XXX ONLY RUN THIS INSTALL ON A FREEBSD 6 TESTBED NODE!
+#
+# Trivial. These things just need to be installed into the right place
+# on a testbed node before cutting an image.
+#
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tmcd/freebsd7
+
+include $(OBJDIR)/Makeconf
+
+SCRIPTS		= 
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	supfile netif-emulab $(SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+SYSETCDIR	= $(DESTDIR)/etc
+JAILDIR		= $(SYSETCDIR)/jail
+ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
+BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
+VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
+RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
+ISMFS		= $(ETCDIR)/ismfs
+INSTALL		= /usr/bin/install -c
+
+destdircheck:
+	@if [ -z "$(DESTDIR)" ]; then \
+	    echo "You must define DESTDIR for this target!"; \
+	    false; \
+	fi
+	@if [ "$(DESTDIR)" = "/" ]; then \
+	    echo "DESTDIR is '/', really really bad idea!"; \
+	    false; \
+	fi
+
+install client-install:	bincheck basefbsd-install etc-install \
+			sup-install script-install bin-install
+
+subboss-install:	bincheck basefbsd-subboss-install etc-install \
+			sup-install script-install bin-install
+
+simple-install:	script-install bin-install
+
+bincheck:
+	@if [ ! -x /usr/local/sbin/dhclient ]; then \
+		echo "Need to install net/isc-dhcp3-client port"; \
+		false; \
+	fi
+
+dir-install:
+	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/rc.d
+	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/rc.conf.d
+	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/db
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/sup
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/lock
+	-rm -rf $(DESTDIR)/etc/testbed
+	ln -s emulab $(DESTDIR)/etc/testbed
+	-rm -rf $(DESTDIR)/usr/local/etc/testbed
+	ln -s emulab $(DESTDIR)/usr/local/etc/testbed
+
+basefbsd-install: dir-install
+	(cd ../freebsd5; $(MAKE) all install)
+	rm -rf $(SYSETCDIR)/rc.conf.d
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+basefbsd-subboss-install: dir-install
+	(cd ../freebsd5; $(MAKE) all subboss-install)
+	rm -rf $(SYSETCDIR)/rc.conf.d
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+# Do not even pretend to do cvsup anymore
+sup-install:	dir-install supfile
+	rm -f $(ETCDIR)/supfile
+
+bin-install:	dir-install
+
+etc-install:	dir-install sysetc-install
+	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
+	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(ETCDIR)/master.passwd
+
+sysetc-install:	dir-install netif-emulab
+	$(INSTALL) -m 444 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 444 $(SRCDIR)/sysctl.conf $(SYSETCDIR)/sysctl.conf
+	$(INSTALL) -m 555 ./netif-emulab $(SYSETCDIR)/rc.d/netif-emulab
+
+script-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/rc.freebsd $(BINDIR)/rc
+
+frisbee-mfs-install: destdircheck
+	(cd ../freebsd; $(MAKE) frisbee-mfs-install)
+	rm -f $(SYSETCDIR)/rc.early
+	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
+	$(INSTALL) -m 444 $(SRCDIR)/rc.dhclient $(SYSETCDIR)/rc.conf.d/dhclient
+

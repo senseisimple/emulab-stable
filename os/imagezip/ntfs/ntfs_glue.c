@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -22,6 +22,10 @@
 #include "sliceinfo.h"
 #include "global.h"
 
+#ifdef OLD_LIBNTFS
+#define ntfschar uchar_t
+#endif
+
 /********Code to deal with NTFS file system*************/
 /* Written by: Russ Christensen <rchriste@cs.utah.edu> */
 
@@ -39,7 +43,7 @@ struct ntfs_cluster {
 };
 
 static __inline__ int
-ntfs_isAllocated(char *map, __s64 pos)
+ntfs_isAllocated(char *map, s64 pos)
 {
 	int result;
 	char unmasked;
@@ -117,7 +121,7 @@ ntfs_read_data_attr(ntfs_attr *na)
 		assert(tmp != 0 && "Not supposed to happen error!  "
 		       "Either na->data_size is wrong or there is another "
 		       "problem");
-#ifndef linux
+#if !defined(linux) && defined(OLD_LIBNTFS)
 		assert(tmp % secsize == 0 && "Not supposed to happen");
 #endif
 		pos += tmp;
@@ -144,19 +148,19 @@ ntfs_read_data_attr(ntfs_attr *na)
 }
 
 static struct ntfs_cluster *
-ntfs_compute_freeblocks(ntfs_attr *na, void *cluster_map, __s64 num_clusters)
+ntfs_compute_freeblocks(ntfs_attr *na, void *cluster_map, s64 num_clusters)
 {
 	struct ntfs_cluster *result;
 	struct ntfs_cluster *curr;
 	struct ntfs_cluster *tmp;
-	__s64 pos = 1;
+	s64 pos = 1;
 	int total_free = 0;
 	result = curr = NULL;
 	assert(num_clusters <= na->data_size * 8 && "If there are more "
 	       "clusters than bits in the free space file then we have a "
 	       "problem.  Fewer clusters than bits is okay.");
 	if(debug)
-		fprintf(stderr,"num_clusters==%qd\n",num_clusters);
+		fprintf(stderr,"num_clusters==%lld\n", (long long)num_clusters);
 	while(pos < num_clusters) {
 		if(!ntfs_isAllocated(cluster_map,pos++)) {
 			curr->length++;
@@ -197,7 +201,7 @@ ntfs_skipfile(ntfs_volume *vol, char *filename, u_int32_t offset)
 	MFT_REF File;
 	runlist_element *rl;
 	int ulen;
-	uchar_t *ufilename;
+	ntfschar *ufilename;
 	int i;
 	int amount_skipped;
 
@@ -208,13 +212,13 @@ ntfs_skipfile(ntfs_volume *vol, char *filename, u_int32_t offset)
 		ntfs_umount(vol,TRUE);
 		exit(1);
 	}
-	/* Subgoal: get the uchar_t name for filename */
-	ufilename = malloc(sizeof(uchar_t)*(strlen(filename)+1));
+	/* Subgoal: get the ntfschar name for filename */
+	ufilename = malloc(sizeof(ntfschar)*(strlen(filename)+1));
 	if(!ufilename) {
 		fprintf(stderr, "Out of memory\n");
 		exit(1);
 	}
-	bzero(ufilename,sizeof(uchar_t)*strlen(filename)+1);
+	memset(ufilename,0,sizeof(ntfschar)*strlen(filename)+1);
 	ulen = ntfs_mbstoucs(filename, &ufilename, strlen(filename)+1);
 	if(ulen == -1) {
 		perror("ntfs_mbstoucs failed");
@@ -230,8 +234,6 @@ ntfs_skipfile(ntfs_volume *vol, char *filename, u_int32_t offset)
 	}
   	free(ufilename);
 	ufilename = NULL;
-	if(debug > 1 ) fprintf(stderr,"vol->nr_mft_records==%lld\n",
-			       vol->nr_mft_records);
 	/*Goal: Skip the file*/
 	if(!(ni = ntfs_inode_open(vol, File))) {
 	  perror("calling ntfs_inode_open (0)");
@@ -299,8 +301,8 @@ ntfs_skipfile(ntfs_volume *vol, char *filename, u_int32_t offset)
 			rl[i].length*sectors_per_cluster);
 	}
 	if (debug) {
-	    fprintf(stderr, "For NTFS file %s skipped %d bytes\n", filename,
-		    amount_skipped*512);
+	    fprintf(stderr, "For NTFS file %s skipped %lld bytes\n", filename,
+		    (long long)amount_skipped*512);
 	}
 }
 
@@ -333,8 +335,8 @@ read_ntfsslice(int slice, int stype, u_int32_t start, u_int32_t size,
 	else
 		offset = sectobytes(start);
 	if (debug)
-		fprintf(stderr, "Using %s at offset %qu for NTFS slice %d\n",
-			openname, offset, slice+1);
+		fprintf(stderr, "Using %s at offset %lld for NTFS slice %d\n",
+			openname, (long long)offset, slice+1);
 	/*The volume must be mounted to find out what clusters are free*/
 	if(!(vol = ntfs_mount_with_offset(openname, MS_RDONLY, offset))) {
 		perror(openname);
@@ -364,8 +366,8 @@ read_ntfsslice(int slice, int stype, u_int32_t start, u_int32_t size,
 		fprintf(stderr, "      start %10d, size %10d\n", start, size);
 		fprintf(stderr, "        Sector size: %u, Cluster size: %u\n",
 			vol->sector_size, vol->cluster_size);
-		fprintf(stderr, "        Volume size in clusters: %qd\n",
-			vol->nr_clusters);
+		fprintf(stderr, "        Volume size in clusters: %lld\n",
+			(long long)vol->nr_clusters);
 		fprintf(stderr, "        Free clusters:\t\t %u\n",
 			ntfs_freeclusters(cfree));
 	}

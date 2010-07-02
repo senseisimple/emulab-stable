@@ -1,0 +1,72 @@
+#!/usr/bin/perl 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(strftime floor ceil);
+use Data::Dumper;
+use Carp;
+
+use strict;
+use warnings;
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+chdir "@prefix@/data/node_usage";
+
+my $qr = DBQueryFatal("select t.idx,action,t.exptidx,eid,pid,UNIX_TIMESTAMP(start_time), UNIX_TIMESTAMP(end_time) from testbed_stats as t left join experiment_stats as e on t.exptidx = e.exptidx where (t.action='swapin' or t.action='start') and exitcode=0 and start_time >= '2005-09-03' order by t.idx");
+
+
+while (my ($idx,$action,$exptidx,$eid,$pid,$start,$stop) = $qr->fetchrow()) {
+
+    unless (defined $pid) {
+	print "xxx $exptidx\n";
+	next;
+    }
+
+    my $dir = "/usr/testbed/expinfo/$pid/$eid/$exptidx";
+
+    my @res;
+    foreach my $fn (<$dir/*.ptop>) {
+	next if $fn =~ /-empty.ptop$/;
+	my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+	    $atime,$mtime,$ctime,$blksize,$blocks) = stat("$fn") or die;
+	next unless $start <= $mtime && $mtime <= $stop;
+	push @res, [$fn,$mtime];
+    }
+    
+    next unless @res == 1;
+
+    my %tally;
+
+    my $fn = $res[0][0];
+    my $mtime = $res[0][1];
+
+    open F, $fn or die;
+    while (<F>) {
+	next unless /^node pc\d+/;
+	if (/^node (pc\d+) (pc[\d\w]+):1/) {
+	    $tally{$2}++;
+	} else {
+	    print STDERR "SKIPPING: $idx $fn $.: $_";
+	}
+    }
+
+    print "$mtime $idx $fn ::";
+    foreach my $k (sort keys %tally) {
+	print " $k: $tally{$k}";
+    }
+    print "\n";
+    
+}

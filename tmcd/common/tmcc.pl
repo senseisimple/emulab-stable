@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -25,14 +25,16 @@ sub usage()
     print STDERR " -u		Use UDP instead of TCP\n";
     print STDERR " -l path	Use named unix domain socket instead of TCP\n";
     print STDERR " -t timeout	Timeout waiting for the controller.\n";
-    print STDERR " -x path	Be a proxy using the unix domain socket\n";
+    print STDERR " -x path	Be a unix domain proxy listening on the named socket\n";
+    print STDERR " -X ip:port	Be an inet domain proxy listening on the given IP:port\n";
     print STDERR " -o path	Specify log file name for -x option\n";
     print STDERR " -i   	Do not use SSL protocol\n";
     print STDERR " -c   	Clear tmcc cache first (must be root)\n";
     print STDERR " -D   	Force command to use a direct, UDP request\n";
+    print STDERR " -T   	Use TPM\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcDi:f:";
+my $optlist	= "ds:p:v:n:k:ul:t:x:X:o:bcDif:T";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -91,6 +93,9 @@ sub ParseOptions()
     if (defined($options{"i"})) {
         libtmcc::configtmcc("nossl", 1);
     }
+    if (defined($options{"T"})) {
+        libtmcc::configtmcc("usetpm", 1);
+    }
     if (defined($options{"c"})) {
 	if ($UID) {
 	    print STDERR "Must be root to use the -c option!\n";
@@ -130,6 +135,9 @@ sub ParseOptions()
     }
     if (defined($options{"x"})) {
         libtmcc::configtmcc("beproxy" , $options{"x"});
+    }
+    if (defined($options{"X"})) {
+        libtmcc::configtmcc("beinetproxy", $options{"X"});
     }
     if (defined($options{"o"})) {
         libtmcc::configtmcc("logfile" , $options{"o"});

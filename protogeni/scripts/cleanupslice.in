@@ -1,0 +1,180 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Cleanup a dead slice on the machine running a CM.
+# 
+sub usage()
+{
+    print "Usage: cleanupslice [-f] -c | -m | -s <uuid>\n";
+    exit(1);
+}
+sub fatal($);
+my $optlist = "cmsf";
+my $doch    = 0;
+my $docm    = 0;
+my $dosa    = 0;
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use GeniDB;
+use GeniSlice;
+use GeniRegistry;
+use GeniUtil;
+use GeniCM;
+use Genixmlrpc;
+use GeniCertificate;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"c"})) {
+    $doch = 1;
+}
+if (defined($options{"m"})) {
+    $docm = 1;
+}
+if (defined($options{"s"})) {
+    $dosa = 1;
+}
+usage()
+    if (@ARGV != 1 ||
+	($dosa + $doch + $docm) == 0 || ($dosa + $doch + $docm) > 1);
+my $uuid = $ARGV[0];
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+# Connect to the proper DB.
+DBConnect(($doch ? GENICH_DBNAME() :
+	   ($docm ? GENICM_DBNAME() : GENISA_DBNAME())));
+
+my $slice = GeniSlice->Lookup($uuid);
+if (!defined($slice)) {
+    fatal("No such slice for $uuid");
+}
+if ($slice->Lock() && !$force) {
+    fatal("Could not lock slice $slice");
+}
+GeniUtil::FlipToGeniUser();
+
+sub DoCM()
+{
+    #
+    # Need an RPC context for this to work.
+    #
+    my $certificate = GeniCertificate->LoadFromFile("$TB/etc/genicm.pem");
+    fatal("Could not load CM certificate")
+	if (!defined($certificate));
+    Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+    $ENV{'MYUUID'} = $certificate->uuid();
+    $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
+
+    if (GeniCM::CleanupDeadSlice($slice) != 0) {
+	fatal("Could not clean up slice $slice");
+    }
+}
+
+sub DoCH()
+{
+    if ($slice->Delete()) {
+	fatal("Could not delete $slice from clearinghouse DB!");
+    }
+}
+
+sub DoSA()
+{
+    #
+    # Not allowed to delete a slice that has not expired since that would
+    # make it impossible to control any existing slivers.
+    #
+    if (!$slice->IsExpired() && !$force) {
+	print STDERR "Slice has not expired; use -f option!\n";
+	exit(1);
+    }
+    
+    #
+    # Need an RPC context for this to work.
+    #
+    my $certificate = GeniCertificate->LoadFromFile("$TB/etc/genisa.pem");
+    fatal("Could not load SA certificate")
+	if (!defined($certificate));
+    Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+    $ENV{'MYUUID'} = $certificate->uuid();
+    $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+sa";
+    
+    if ($slice->UnRegister()) {
+	print STDERR "Could not unregister $slice from clearinghouse!\n";
+	exit(1)
+	    if (!$force);
+	
+	print STDERR "Deleting locally anyway ...\n";
+    }
+    # Needs to move.
+    GeniRegistry::ClientSliver->SliceDelete($slice);
+
+    if ($slice->Delete()) {
+	fatal("Could not delete $slice from slice authority DB!");
+    }
+}
+
+if ($doch) {
+    DoCH();
+}
+elsif ($docm) {
+    DoCM();
+}
+else {
+    DoSA();
+}
+exit(0);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}

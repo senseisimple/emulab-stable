@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,15 +32,23 @@ namespace eval TBCOMPAT {
 
     # Substitutions for "/proj",
     variable FSDIR_PROJ "@FSDIR_PROJ@"
+    variable PROJROOT	"@PROJROOT_DIR@"
 
     # ... "/groups",
     variable FSDIR_GROUPS "@FSDIR_GROUPS@"
+    variable GROUPROOT	  "@GROUPSROOT_DIR@"
 
-    # ... "/users", and
+    # ... "/users",
     variable FSDIR_USERS "@FSDIR_USERS@"
+    variable USERROOT	 "@USERSROOT_DIR@"
 
-    # ... "/share".
+    # ... "/share", and
     variable FSDIR_SHARE "@FSDIR_SHARE@"
+    variable SHAREROOT	 "@SHAREROOT_DIR@"
+
+    # ... "/scratch".
+    variable FSDIR_SCRATCH "@FSDIR_SCRATCH@"
+    variable SCRATCHROOT   "@SCRATCHROOT_DIR@"
 
     # This is a general procedure that takes a node, an object (lan or link)
     # it is connected to, and an IP address, and sets the IP address
@@ -95,12 +103,17 @@ namespace eval TBCOMPAT {
     # A mapping of event objects and types.
     variable objtypes
     variable eventtypes
+    variable triggertypes
 
     # Existing (reserved nodes).
     variable reserved_list
     variable reserved_type
     variable reserved_node
     set reserved_list {}
+
+    # Input parameters for Templates
+    variable parameter_list_defaults
+    array set parameter_list_defaults {}
 
     # Physical node names
     variable physnodes
@@ -117,6 +130,14 @@ namespace eval TBCOMPAT {
     variable elabinelab_nodeos
     variable elabinelab_source_tarfile ""
     variable elabinelab_tarfiles
+
+    # Elabinelab attribute stuff.
+    variable elabinelab_attributes
+    set elabinelab_attributes {}
+    variable EINEROLE  {^(all|boss|ops|fs|router|node)$}
+    variable EINEKEY   {^([-\w\.]+)$}
+    variable EINEVALUE {^([-\w\.\+\,\s\/]+)$}
+    variable EINEORDER {^\d+$}
 
     # Mapping of "resource classes" and "reservation types" to bootstrap
     # values, where a resource class is a symbolic string provided by the user
@@ -135,7 +156,9 @@ namespace eval TBCOMPAT {
 
     # The experiment directory, this is where the feedback related files will
     # be read from and dumped to.  XXX Hacky
-    set expdir "${FSDIR_PROJ}/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
+    # XXX Hacky II: we must use PROJROOT and not FSDIR_PROJ since these
+    # sourced file paths get recorded and used on boss.
+    set expdir "${PROJROOT}/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
 
     # XXX Just for now...
     variable tbxlogfile
@@ -250,10 +273,13 @@ namespace eval TBCOMPAT {
     # @param url The URL to check.
     # @return True if "url" looks like a URL.
     #
+    # What is xxx:// you might ask? Its part of experimental template code.
+    #
     proc verify-url {url} {
 	if {[string match "http://*" $url] ||
 	    [string match "https://*" $url] ||
-	    [string match "ftp://*" $url]} {
+	    [string match "ftp://*" $url] ||
+	    [string match "xxx://*" $url]} {
 	    set retval 1
 	} else {
 	    set retval 0
@@ -367,15 +393,24 @@ proc tb-set-hardware {node type args} {
     $node set_hwtype $type $remote $isv $issub
 }
 
-proc tb-set-node-os {node os} {
+proc tb-set-node-os {node os {parentos 0}} {
     if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
 	var_import ::TBCOMPAT::osids
 	if {! [info exists osids($os)]} {
 	    perror "\[tb-set-node-os] Invalid osid $os."
 	    return
 	}
+	if {$parentos != {} && $parentos != 0} {
+	    if {! [info exists osids($parentos)]} {
+		perror "\[tb-set-node-os] Invalid parent osid $parentos."
+		return
+	    }
+	}
     }
     $node set osid $os
+    if {$parentos != {} && $parentos != 0} {
+	$node set parent_osid $parentos
+    }
 }
 proc tb-set-node-cmdline {node cmdline} {
     $node set cmdline $cmdline
@@ -412,6 +447,7 @@ proc tb-set-node-tarfiles {node args} {
 	set dir [lindex $args 0]
 	set tarfile [lindex $args 1]
 	
+	#
 	# Check the install directory to make sure it is not an NFS mount.
 	# This check can also act as an alert to the user that the arguments
 	# are wrong.  For example, the following line will pass the above
@@ -419,11 +455,15 @@ proc tb-set-node-tarfiles {node args} {
 	#
 	#   tb-set-node-tarfiles $node /proj/foo/bar.tgz /proj/foo/baz.tgz
 	#
-	# XXX /proj is hardcoded since the subst is /q/proj.
-	if {[string match "/proj/*" $dir] ||
-	    [string match "${::TBCOMPAT::FSDIR_GROUPS}/*" $dir] ||
-	    [string match "${::TBCOMPAT::FSDIR_USERS}/*" $dir] ||
-	    [string match "${::TBCOMPAT::FSDIR_SHARE}/*" $dir]} {
+	# XXX This is a hack check because they can specify '/' and have
+	# "proj/foo/..." in the tarball and still clobber themselves.
+	#
+	if {[string match "${::TBCOMPAT::PROJROOT}/*" $dir] ||
+	    [string match "${::TBCOMPAT::GROUPROOT}/*" $dir] ||
+	    [string match "${::TBCOMPAT::USERROOT}/*" $dir] ||
+	    [string match "${::TBCOMPAT::SHAREROOT}/*" $dir] ||
+	    (${::TBCOMPAT::SCRATCHROOT} != "" &&
+	     [string match "${::TBCOMPAT::SCRATCHROOT}/*" $dir])} {
 	    perror "\[tb-set-node-tarfiles] '$dir' refers to an NFS directory instead of the node's local disk."
 	    return
 	} elseif {![string match "/*" $dir]} {
@@ -443,9 +483,11 @@ proc tb-set-node-tarfiles {node args} {
 		perror "\[tb-set-node-tarfiles] '$tarfile' is not an http, https, or ftp URL."
 		return
 	    }
-	} elseif {![string match "/proj/*" $tarfile] &&
-	          ![string match "/groups/*" $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not in '/proj' or '/groups'"
+	} elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $tarfile] &&
+	          ![string match "${::TBCOMPAT::GROUPROOT}/*" $tarfile] &&
+	          (${::TBCOMPAT::SCRATCHROOT} == "" ||
+	           ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $tarfile])} {
+	    perror "\[tb-set-node-tarfiles] '$tarfile' is not in an allowed directory"
 	    return
 	} elseif {![file exists $tarfile]} {
 	    perror "\[tb-set-node-tarfiles] '$tarfile' does not exist."
@@ -486,6 +528,12 @@ proc tb-set-ip-routing {type} {
     }
     set default_ip_routing_type $type
 }
+proc tb-set-node-usesharednode {node weight} {
+    $node add-desire "pcshared" $weight
+}
+proc tb-set-node-sharingmode {node sharemode} {
+    $node set sharing_mode $sharemode
+}
 
 # Lan/Link state routines.
 
@@ -508,7 +556,7 @@ proc tb-set-link-loss {srclink args} {
 	set lossrate [lindex $args 0]
     }
     if {([regexp $FLOAT $lossrate] == 0) ||
-	($lossrate > 1.0)} {
+	(($lossrate != 0) && ($lossrate > 1.0) || ($lossrate < 0.000005))} {
 	perror "\[tb-set-link-loss] $lossrate is not a valid loss rate."
     }
     $reallink instvar loss
@@ -546,6 +594,64 @@ proc tb-set-link-est-bandwidth {srclink args} {
     }
 }
 
+# This takes two possible formats:
+# tb-set-link-backfill <link> <bw>
+# tb-set-link-backfill <src> <dst> <bw>
+proc tb-set-link-backfill {srclink args} {
+    if {[llength $args] == 2} {
+	set dst [lindex $args 0]
+	set bw [lindex $args 1]
+	set sim [$srclink set sim]
+	set reallink [$sim find_link $srclink $dst]
+	if {$reallink == {}} {
+	    perror "\[tb-set-link-backfill] No link between $srclink and $dst."
+	    return
+	}
+    } else {
+	if {[$srclink info class] != "Link"} {
+	    perror "\[tb-set-link-backfill] $srclink is not a link."
+	    return
+	}
+	set reallink $srclink
+	set bw [lindex $args 0]
+    }
+    $reallink instvar bandwidth
+    $reallink instvar backfill
+    $reallink instvar rbackfill
+    foreach pair [array names bandwidth] {
+	set backfill($pair) [parse_bw $bw]
+	set rbackfill($pair) [parse_bw $bw]
+    }
+}
+
+# This takes two possible formats:
+# tb-set-link-backfill <link> <src> <bw>
+proc tb-set-link-simplex-backfill {link src bw} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-simplex-backfill] $link is not a link."
+	return
+    }
+    if {[$src info class] != "Node"} {
+	perror "\[tb-set-link-simplex-backfill] $src is not a node."
+	return
+    }
+    set port [$link get_port $src]
+    if {$port == {}} {
+	perror "\[tb-set-link-simplex-params] $src is not in $link."
+	return
+    }
+    set np [list $src $port]
+    foreach nodeport [$link set nodelist] {
+	if {$nodeport != $np} {
+	    set onp $nodeport
+	}
+    }
+    set realbw [parse_bw $bw]
+    $link set backfill($np) $realbw
+    $link set rbackfill($onp) $realbw
+}
+
 proc tb-set-lan-loss {lan lossrate} {
     var_import ::TBCOMPAT::FLOAT
     if {[$lan info class] != "Lan"} {
@@ -553,7 +659,7 @@ proc tb-set-lan-loss {lan lossrate} {
 	return
     }
     if {([regexp $FLOAT $lossrate] == 0) ||
-	($lossrate > 1.0)} {
+	(($lossrate != 0) && ($lossrate > 1.0) || ($lossrate < 0.000005))} {
 	perror "\[tb-set-lan-loss] $lossrate is not a valid loss rate."
     }
     $lan instvar loss
@@ -580,6 +686,21 @@ proc tb-set-lan-est-bandwidth {lan bw} {
     }
 }
 
+proc tb-set-lan-backfill {lan bw} {
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-lan-backfill] $lan is not a lan."
+	return
+    }
+
+    $lan instvar bandwidth
+    $lan instvar backfill
+    $lan instvar rbackfill
+    foreach pair [array names bandwidth] {
+	set backfill($pair) [parse_bw $bw]
+	set rbackfill($pair) [parse_bw $bw]
+    }
+}
+
 proc tb-set-node-lan-delay {node lan delay} {
     if {[$node info class] != "Node"} {
 	perror "\[tb-set-node-lan-delay] $node is not a node."
@@ -594,8 +715,10 @@ proc tb-set-node-lan-delay {node lan delay} {
 	perror "\[tb-set-node-lan-delay] $node is not in $lan."
 	return
     }
-    $lan set delay([list $node $port]) [parse_delay $delay]
-    $lan set rdelay([list $node $port]) [parse_delay $delay]
+
+    set rdelay [parse_delay $delay]
+    $lan set delay([list $node $port]) $rdelay
+    $lan set rdelay([list $node $port]) $rdelay
 }
 
 
@@ -633,23 +756,40 @@ proc tb-set-node-lan-est-bandwidth {node lan bw} {
     $lan set ebandwidth([list $node $port]) [parse_bw $bw]
     $lan set rebandwidth([list $node $port]) [parse_bw $bw]
 }
-proc tb-set-node-lan-loss {node lan loss} {
-    var_import ::TBCOMPAT::FLOAT
+proc tb-set-node-lan-backfill {node lan bw} {
     if {[$node info class] != "Node"} {
-	perror "\[tb-set-node-lan-delay] $node is not a node."
+	perror "\[tb-set-node-lan-backfill] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "\[tb-set-node-lan-delay] $lan is not a lan."
+	perror "\[tb-set-node-lan-backfill] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "\[tb-set-node-lan-delay] $node is not in $lan."
+	perror "\[tb-set-node-lan-backfill] $node is not in $lan."
+	return
+    }
+    $lan set backfill([list $node $port]) [parse_bw $bw]
+    $lan set rbackfill([list $node $port]) [parse_bw $bw]
+}
+proc tb-set-node-lan-loss {node lan loss} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-lan-loss] $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-node-lan-loss] $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "\[tb-set-node-lan-loss] $node is not in $lan."
 	return
     }
     if {([regexp $FLOAT $loss] == 0) ||
-	($loss > 1.0)} {
+	(($loss != 0) && ($loss > 1.0) || ($loss < 0.000005))} {
 	perror "\[tb-set-link-loss] $loss is not a valid loss rate."
     }
     $lan set loss([list $node $port]) $loss
@@ -737,7 +877,7 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
 	return
     }
     if {[$src info class] != "Node"} {
-	perror "\[tb-set-link-simplex-params] $src is not a link."
+	perror "\[tb-set-link-simplex-params] $src is not a node."
 	return
     }
     set port [$link get_port $src]
@@ -745,7 +885,8 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
 	perror "\[tb-set-link-simplex-params] $src is not in $link."
 	return
     }
-    if {([regexp $FLOAT $loss] == 0) || ($loss > 1.0)} {
+    if {([regexp $FLOAT $loss] == 0) ||
+	(($loss != 0) && ($loss > 1.0) || ($loss < 0.000005))} {
 	perror "\[tb-set-link-simplex-params] $loss is not a valid loss rate."
 	return
     }
@@ -767,25 +908,49 @@ proc tb-set-link-simplex-params {link src delay bw loss} {
     $link set rloss($onp) [expr $adjloss]
 }
 
-proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {
+proc tb-set-lan-simplex-backfill {lan node tobw frombw} {
     var_import ::TBCOMPAT::FLOAT
     if {[$node info class] != "Node"} {
-	perror "\[tb-set-node-lan-delay] $node is not a node."
+	perror "\[tb-set-lan-simplex-params] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "\[tb-set-node-lan-delay] $lan is not a lan."
+	perror "\[tb-set-lan-simplex-params] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "\[tb-set-node-lan-delay] $node is not in $lan."
+	perror "\[tb-set-lan-simplex-params] $node is not in $lan."
 	return
     }
-    if {([regexp $FLOAT $toloss] == 0) || ($toloss > 1.0)} {
+    set realtobw [parse_backfill $tobw]
+    set realfrombw [parse_backfill $frombw]
+
+    $lan set backfill([list $node $port]) $realtobw
+    $lan set rbackfill([list $node $port]) $realfrombw
+}
+
+proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fromloss} {
+    var_import ::TBCOMPAT::FLOAT
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-lan-simplex-params] $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-lan-simplex-params] $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "\[tb-set-lan-simplex-params] $node is not in $lan."
+	return
+    }
+    if {([regexp $FLOAT $toloss] == 0) ||
+	(($toloss != 0) && ($toloss > 1.0) || ($toloss < 0.000005))} {
 	perror "\[tb-set-link-loss] $toloss is not a valid loss rate."
     }
-    if {([regexp $FLOAT $fromloss] == 0) || ($fromloss > 1.0)} {
+    if {([regexp $FLOAT $fromloss] == 0) ||
+	(($fromloss != 0) && ($fromloss > 1.0) || ($fromloss < 0.000005))} {
 	perror "\[tb-set-link-loss] $fromloss is not a valid loss rate."
     }
 
@@ -889,14 +1054,61 @@ proc tb-set-noshaping {lanlink onoff} {
 
 #
 # For emulated links, allow veth device to be used. Not a user option.
+# XXX backward compat, use tb-set-link-encap now.
 # 
 proc tb-set-useveth {lanlink onoff} {
     if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
 	perror "\[tb-set-useveth] $link is not a link or a lan."
 	return
     }
-    $lanlink set useveth $onoff
+    if {$onoff == 0} {
+	$lanlink set encap "default"
+    } else {
+	$lanlink set encap "veth"
+    }
 }
+
+#
+# For emulated links, allow specifying encapsulation style.
+# Generalizes tb-set-useveth.
+# 
+proc tb-set-link-encap {lanlink style} {
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+	perror "\[tb-set-link-encap] $link is not a link or a lan."
+	return
+    }
+
+    switch -- $style {
+	"alias" {
+	    set style "alias"
+	}
+	"gre" {
+	    set style "gre"
+	}
+	"egre" {
+	    set style "egre"
+	}
+	"vtun" {
+	    set style "vtun"
+	}
+	"veth" {
+	    set style "veth"
+	}
+	"veth-ne" {
+	    set style "veth-ne"
+	}
+	"vlan" {
+	    set style "vlan"
+	}
+	default {
+	    perror "\[tb-set-link-encap] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
+	    return
+	}
+    }
+
+    $lanlink set encap $style
+}
+
 
 #
 # Control linkdelays for lans and links
@@ -1032,13 +1244,51 @@ proc tb-fix-current-resources {onoff} {
 # Control veth encapsulation. 
 # 
 proc tb-set-encapsulate {onoff} {
-    var_import ::GLOBALS::veth_encapsulate
+    var_import ::GLOBALS::vlink_encapsulate
 
-    if {$onoff < 0 || $onoff > 1} {
-	perror "\[tb-set-encapsulate] must be 0 or 1."
-	return
+    if {$onoff == 0} {
+	set vlink_encapsulate "veth-ne"
+    } elseif {$onoff == 1} {
+	set vlink_encapsulate "default"
+    } else {
+	perror "\[tb-set-encapsulate] $onoff must be 0/1"
     }
-    set veth_encapsulate $onoff
+}
+
+#
+# Control virtual link emulation style.
+# 
+proc tb-set-vlink-emulation {style} {
+    var_import ::GLOBALS::vlink_encapsulate
+
+    switch -- $style {
+	"alias" {
+	    set style "alias"
+	}
+	"gre" {
+	    set style "gre"
+	}
+	"egre" {
+	    set style "egre"
+	}
+	"vtun" {
+	    set style "vtun"
+	}
+	"veth" {
+	    set style "veth"
+	}
+	"veth-ne" {
+	    set style "veth-ne"
+	}
+	"vlan" {
+	    set style "vlan"
+	}
+	default {
+	    perror "\[tb-set-encapsulate] one of: 'alias', 'veth', 'veth-ne', 'vlan'"
+	    return
+	}
+    }
+    set vlink_encapsulate $style
 }
 
 #
@@ -1089,6 +1339,17 @@ proc tb-set-delay-capacity {cap} {
 proc tb-set-lan-protocol {lanlink protocol} {
     if {[$lanlink info class] != "Lan"} {
 	perror "\[tb-set-lan-protocol] $lanlink is not a lan."
+	return
+    }
+    $lanlink set protocol $protocol
+}
+
+#
+# Allow type of links (but not LANs) to be changed.
+#
+proc tb-set-link-protocol {lanlink protocol} {
+    if {[$lanlink info class] != "Link"} {
+	perror "\[tb-set-lan-protocol] $lanlink is not a link."
 	return
     }
     $lanlink set protocol $protocol
@@ -1453,8 +1714,21 @@ proc tb-elab-in-elab {onoff} {
 	set elab_in_elab 0
     }
 }
+
 #
-# Change the default topography.
+# Mark this experiment as needing a per-experiment DB on ops.
+#
+proc tb-set-dpdb {onoff} {
+    var_import ::GLOBALS::dpdb
+
+    if {$onoff} {
+	set dpdb 1
+    } else {
+	set dpdb 0
+    }
+}
+#
+# Change the default topology.
 #
 proc tb-elab-in-elab-topology {topo} {
     var_import ::GLOBALS::elabinelab_topo
@@ -1471,6 +1745,100 @@ proc tb-set-elabinelab-cvstag {cvstag} {
 
     set elabinelab_cvstag $cvstag
 }
+proc tb-elabinelab-singlenet {args} {
+    var_import ::GLOBALS::elabinelab_singlenet
+    set onoff 1
+
+    if {$args != {}} {
+	set onoff [lindex $args 0]
+    }
+    set elabinelab_singlenet $onoff
+}
+
+#
+# Set/clear elabinelab attributes:
+#    tb-set-elabinelab-attribute <key> <value> [<order>]
+#    tb-unset-elabinelab-attribute <key>
+#    tb-set-elabinelab-role-attribute <role> <key> <value> [<order>]
+#    tb-unset-elabinelab-role-attribute <role> <key>
+#
+proc tb-set-elabinelab-attribute {key value {order 0}} {
+    tb-set-elabinelab-role-attribute "all" $key $value $order
+}
+
+proc tb-unset-elabinelab-attribute {key} {
+    tb-unset-elabinelab-role-attribute "all" $key
+}
+
+proc tb-set-elabinelab-role-attribute {role key value {order 0}} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::EINEVALUE;
+    var_import ::TBCOMPAT::EINEORDER;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
+    if {[regexp $EINEROLE $role] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
+	return
+    }
+    if {[regexp $EINEKEY $key] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
+	return
+    }
+    if {[regexp $EINEVALUE $value] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$value\" is not a valid elabinelab value"
+	return
+    }
+    if {[regexp $EINEORDER $order] == 0} {
+	perror "\[tb-set-elabinelab-attribute] - \"$order\" is not a valid elabinelab order"
+	return
+    }
+
+    if {$role == "all"} {
+	set roles {"boss" "ops" "fs" "router" "node"}
+    } else {
+	set roles $role
+    }
+
+    foreach r $roles {
+	#
+	# If role/key/ordering exactly matches an existing value,
+	# replace it to preserve uniqueness, otherwise just add it.
+	#
+	set i [lsearch -glob $elabinelab_attributes "$r,$key,*,$order"]
+	if {$i > -1} {
+	    set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+	}
+	lappend elabinelab_attributes "$r,$key,$value,$order"
+    }
+}
+
+proc tb-unset-elabinelab-role-attribute {role key} {
+    var_import ::TBCOMPAT::EINEROLE;
+    var_import ::TBCOMPAT::EINEKEY;
+    var_import ::TBCOMPAT::elabinelab_attributes;
+
+    if {[regexp $EINEROLE $role] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$role\" is not a valid elabinelab role"
+	return
+    }
+    if {[regexp $EINEKEY $key] == 0} {
+	perror "\[tb-unset-elabinelab-attribute] - \"$key\" is not a valid elabinelab key"
+	return
+    }
+    if {$role == "all"} {
+	set roles {"boss" "ops" "fs" "router" "node"}
+    } else {
+	set roles $role
+    }
+
+    foreach r $roles {
+	while {[lsearch -glob $elabinelab_attributes "$r,$key,*"] > -1} {
+	    set i [lsearch -glob $elabinelab_attributes "$r,$key,*"]
+	    set elabinelab_attributes [lreplace $elabinelab_attributes $i $i]
+	}
+    }
+}
 
 #
 # Set the inner elab role for a node.
@@ -1485,6 +1853,44 @@ proc tb-set-node-inner-elab-role {node role} {
 	return
     }
     $node set inner_elab_role $role
+}
+
+#
+# Set a plab role for a node.
+#
+proc tb-set-node-plab-role {node role} {
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-plab-role] $node is not a node."
+	return
+    }
+    if {[lsearch -exact {plc node none} $role] == -1} {
+	perror "\[tb-set-node-plab-role] type must be one of plc|node|none"
+	return
+    }
+    $node set plab_role $role
+}
+
+#
+# Set the default inner plab network.  Can be a linklan, "CONTROL", or
+# "EXPERIMENTAL".  If user sets CONTROL
+#
+
+#
+# Set the interface on which a node will be/access PLC.
+# Both a plc and a normal planetlab node can call this.
+#
+proc tb-set-node-plab-plcnet {node lanlink} {
+    if {[$node info class] != "Node"} {
+        perror "\[tb-set-node-plab-plcnet] $node is not a node."
+        return
+    }
+    if {$lanlink != "control" && $lanlink != "exp" &&
+        ([$lanlink info class] != "Link" && [$lanlink info class] != "Lan")} {
+	perror "\[tb-set-node-plab-plcnet] $lanlink must be a link, lan, \"control\", or \"exp\"."
+	return
+    }
+    # don't do checking here, wait til we have Total Information Awareness.
+    $node set plab_plcnet $lanlink
 }
 
 #
@@ -1533,3 +1939,36 @@ proc tb-set-node-id {vnode myid} {
     }
     $vnode set_numeric_id $myid
 }
+
+#
+# Fix a particular node interface to a lanlink
+#
+proc tb-fix-interface {vnode lanlink iface} {
+    if {[$vnode info class] != "Node"} {
+        perror "\[tb-fix-interface] $vnode is not a node."
+        return
+    }
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+        perror "\[tb-fix-interface] $lanlink must be a link or lan!"
+        return
+    }
+
+    $lanlink set_fixed_iface $vnode $iface
+}
+
+#
+# Set the layer.
+#
+proc tb-set-link-layer {link mylayer} {
+    if {[$link info class] != "Link"} {
+	perror "\[tb-set-link-layer] $link is not a link."
+	return
+    }
+    if {$mylayer != 1} {
+	perror "\[tb-set-link-layer] Only layer 1 is allowed."
+	return
+    }
+    $link instvar layer
+    $link set layer $mylayer
+}
+

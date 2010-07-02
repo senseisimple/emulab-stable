@@ -1,0 +1,101 @@
+\documentclass[12pt]{article}
+
+\title{Emulab Delay Agent Presentation}			% used by \maketitle
+\author{Jon Duerig and Ryan Jackson }		% used by \maketitle
+\date{April 18, 2008}					% used by \maketitle
+
+\begin{document}
+\maketitle						% automatic title!
+\section{Emulab Delay Agent}
+
+\subsection{Purpose of delay agent}
+\begin{itemize}
+\item
+Control link properties: bandwidth, delay, packet loss, etc.
+\end{itemize}
+
+\subsection{Problems with existing implementation}
+\begin{itemize}
+\item
+Dependent on FreeBSD's DummyNet
+\end{itemize}
+
+\subsection{Goals of New Implementation}
+\begin{itemize}
+\item
+Support link up/down, bandwith limits, and delay
+\item
+Support Linux in end-node shaping configuration
+\item
+Support Linux as delay node
+\item
+Clean API between OS-independent front-end and OS-dependent back-end
+\end{itemize}
+
+\section{New Delay Agent Capabilities}
+
+\begin{itemize}
+\item
+New delay agent can currently bring link up or down, modify
+bandwidth limits, and change packet delay.
+\begin{itemize}
+\item
+Modifications to packet loss rate are handled by front-end, but
+not yet passed to back-end.  However, back-end uses the kernel's
+packet loss code to implement link up/down.
+\end{itemize}
+\end{itemize}
+
+\begin{itemize}
+\item
+Support for joth FreeBSD and Linux
+\begin{itemize}
+\item
+Runs in both delay node and end node shaping configurations on FreeBSD.
+\item
+Runs in end node shaping configuration on Linux.  Delay node configuration not tested, but there is no reason it should not work.
+\end{itemize}
+\end{itemize}
+
+\section{Design}
+
+\subsection{Agent has two main parts}
+\begin{itemize}
+\item
+OS-independent front-end
+\item
+OS-dependent back-end
+\end{itemize}
+
+\section{Front-End}
+
+\begin{itemize}
+\item
+Front end receives events from the Emulab event system
+\begin{itemize}
+\item
+Events are used to modify link parameters or bring it up/down.
+
+\item
+Event includes information about which link or pipe to modify.
+
+\end{itemize}
+\item
+The event is parsed and a Parameter object is constructed.
+\item
+The front end uses the link or pipe information in the event to look up the correct back-end pipe object.
+\item
+Parameter object is passed to the OS-dependent back-end.
+\end{itemize}
+
+\section{Back-End}
+
+\begin{itemize}
+\item
+Back-end receives parameter from front-end.
+\item
+Parameter is handled based on type (i.e. BANDWIDTH, DELAY, etc.)
+\item
+Back-end object calls OS-dependent routines to modify the desired parameter and make it take effect
+\end{itemize}
+\end{document}             % End of document.

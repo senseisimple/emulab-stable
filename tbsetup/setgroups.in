@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,8 +47,10 @@ my $ADMINGRP= "@TBADMINGROUP@";
 my $ELABINELAB    = @ELABINELAB@;
 my $WIKISUPPORT   = @WIKISUPPORT@;
 my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
+my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
 my $SETWIKIGROUPS = "$TB/sbin/setwikigroups";
 my $SETBUGDBGROUPS= "$TB/sbin/setbugdbgroups";
+my $OPSDBCONTROL  = "$TB/sbin/opsdb_control";
 
 my $SSH     = "$TB/bin/sshtb";
 my $USERMOD = "/usr/sbin/pw usermod";
@@ -57,8 +59,6 @@ my $SAVEUID = $UID;
 my $dbuid;
 my @userlist = ();
 my $pid;
-my $user_name;
-my $user_email;
 my $logname;
 my @db_row;
 my $query_result;
@@ -86,6 +86,7 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
 
 #
 # We do not want to run this script unless its the real version.
@@ -153,21 +154,13 @@ if (!defined($pid) && !scalar(@userlist)) {
     usage();
 }
 
-#
-# Get user DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-        "    You do not exist in the Emulab Database!\n");
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
-
-#
-# Get email info.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-        "    Cannot determine email info for you!\n");
-}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
 #
 # This script always does the right thing, so it does not matter who
@@ -213,9 +206,12 @@ foreach my $uid (@userlist) {
     my $groupargument;
     my $project;
 
-    $query_result = DBQueryFatal("select webonly from users ".
-				 "where uid='$uid' and webonly=1");
-    if ($query_result->numrows) {
+    my $user = User->Lookup($uid);
+    fatal("Could not map user $uid to object")
+	if (!defined($user));
+    my $uid_idx = $user->uid_idx();
+
+    if ($user->webonly()) {
 	print "Skipping $uid; webonly account!\n";
 	next;
     }
@@ -229,7 +225,8 @@ foreach my $uid (@userlist) {
     $query_result =
 	DBQueryFatal("select g.unix_name from group_membership as m ".
 		     "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
-		     "where m.uid='$uid' and m.pid=m.gid and m.trust!='none'");
+		     "where m.uid_idx='$uid_idx' and m.pid=m.gid and ".
+		     "      m.trust!='none'");
 
     if (!$query_result->numrows) {
 	#
@@ -238,13 +235,8 @@ foreach my $uid (@userlist) {
 	# (non-fatal) since there can be group members not approved,
 	# and this is called from the editgroups web page.
 	#
-	$query_result =
-	    DBQueryFatal("select status from users ".
-			 "where uid='$uid' and webonly=0 ".
-			 " and status='" . USERSTATUS_ACTIVE . "'");
-
-	if (!$query_result->numrows) {
-	    print "Skipping $uid; not in any groups!\n";
+	if ($user->status() ne USERSTATUS_ACTIVE()) {
+	    print "Skipping $uid; not an active user yet!\n";
 	    next;
 	}
 	push(@groupnames, "guest");
@@ -267,8 +259,8 @@ foreach my $uid (@userlist) {
     $query_result =
 	DBQueryFatal("select g.unix_name from group_membership as m ".
 		     "left join groups as g on m.pid=g.pid and m.gid=g.gid ".
-		     "where m.uid='$uid' and m.pid!=m.gid ".
-		     " and m.trust!='none'");
+		     "where m.uid_idx='$uid_idx' and m.pid!=m.gid and ".
+		     "      m.trust!='none'");
 
     while (@db_row = $query_result->fetchrow_array() ) {
 	    my $groupname = $db_row[0];
@@ -326,7 +318,10 @@ foreach my $uid (@userlist) {
     # users can have more unix groups than just the projects/groups they are
     # in. These groups must already exist.
     #
-    my @extragrouplist = TBUnixGroupList($uid);
+    my @extragrouplist = ();
+    if ($user->UnixGroupList(\@extragrouplist) != 0) {
+	fatal("Could not extra group list for $user");
+    }
 
     #
     # Add special admin group. Check to make sure that its not a dup
@@ -386,7 +381,7 @@ $UID  = $SAVEUID;
 $EUID = $UID;
 
 # and the twiki.
-if ($WIKISUPPORT || $BUGDBSUPPORT) {
+if ($WIKISUPPORT || $BUGDBSUPPORT || $OPSDBSUPPORT) {
     foreach $user (@userlist) {
 	if ($WIKISUPPORT) {
 	    system("$SETWIKIGROUPS $optarg $user") == 0 or
@@ -396,6 +391,11 @@ if ($WIKISUPPORT || $BUGDBSUPPORT) {
 	    system("$SETBUGDBGROUPS $optarg $user") == 0 or
 		fatal("$SETBUGDBGROUPS $user failed!");
 	}
+	if ($OPSDBSUPPORT) {
+	    system("$OPSDBCONTROL $optarg setgroups $user") == 0 or
+		fatal("$OPSDBCONTROL setgroups $user failed!");
+	}
+	
     }
 }
 

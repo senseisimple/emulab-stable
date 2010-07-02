@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -8,6 +8,7 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= assign
 MAKEFILE_IN	= @srcdir@/GNUmakefile.in
+HAVE_XERCES	= @HAVE_XERCES@
 
 include $(OBJDIR)/Makeconf
 
@@ -18,15 +19,26 @@ include $(OBJDIR)/Makeconf
 #CPP=cpp33
 #CXX=g++33	
 
-all: assign 
+all: assign
+
+SCHEMATA = vtop.xsd ptop.xsd vtop-top.xsd ptop-top.xsd
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o config.o score.o \
-     parser.o solution.o anneal.o featuredesire.o neighborhood.o fstring.o
+OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o score.o \
+     parser.o solution.o anneal.o featuredesire.o neighborhood.o fstring.o \
+     config.o
 LIBS+= -lm
 LDFLAGS+= -pipe -O3
 CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-40
+# For OSX w/ fink
+CXXFLAGS += -I/sw/include
+
+ifeq ($(HAVE_XERCES),yes)
+CXXFLAGS += -DWITH_XML
+LIBS += -L/usr/local/lib -lxerces-c
+OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec.o annotate_vtop.o annotate.o
+endif
 
 # Pick either this
 CXXFLAGS += -O3 
@@ -63,6 +75,8 @@ CXXFLAGS += -DFIX_PLINK_ENDPOINTS
 CXXFLAGS += -DTRIVIAL_LINK_BW
 # Use the old acceptance criteria, which gives special treatment to violations
 CXXFLAGS += -DSPECIAL_VIOLATION_TREATMENT
+# Pass the Emulab installation root directory
+CXXFLAGS += -DTBROOT='"$(TBROOT)"'
 
 # If you're looking to turn on or off USE_OPTIMAL, its now a cmdline
 # option. Use OP={0,1} on the command line at run time... :)
@@ -72,34 +86,67 @@ DEPLIBS=$(OBJS)
 assign: ${MAKEFILE_IN} ${DEPLIBS} ${OBJS}
 	${CXX} -o assign ${LIBS} $(OBJS) ${LDFLAGS}
 
-install: $(INSTALL_LIBEXECDIR)/assign 
+install: install-schemata $(INSTALL_LIBEXECDIR)/assign
+
+install-schemata: $(addprefix $(INSTALL_LIBDIR)/assign/, $(SCHEMATA))
+
+# XXX: This is a hack having to do with the fact that there have, historically,
+# been both a config.c and a config.cc, and CVS doesn't always delete config.c
+# on an update. This confuses make. So, here's an explicit rule to build
+# config.o from config.cc (note that the dependencies for config.cc are below)
+config.o:
+	${CXX} -c -o $@ ${CXXFLAGS} $(SRCDIR)/config.cc
 
 clean:
 	-${RM} *.o assign 
+
+$(INSTALL_LIBDIR)/assign/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/assign
+	$(INSTALL) $< $@
 
 #
 # All this crap generated with 'g++ -MM' - don't want to do all the makefile goo
 # to make this automatic, since none of it ever changes
 #
-anneal.o: anneal.cc anneal.h port.h delay.h physical.h common.h \
- config.h featuredesire.h pclass.h virtual.h maps.h score.h solution.h \
- vclass.h ${MAKEFILE_IN}
-assign.o: assign.cc port.h common.h config.h delay.h physical.h \
- featuredesire.h virtual.h vclass.h pclass.h score.h solution.h maps.h \
- anneal.h ${MAKEFILE_IN}
-config.o: config.cc config.h ${MAKEFILE_IN}
-featuredesire.o: featuredesire.cc featuredesire.h common.h config.h \
- ${MAKEFILE_IN}
-parse_ptop.o: parse_ptop.cc port.h delay.h physical.h common.h \
- config.h featuredesire.h parser.h ${MAKEFILE_IN}
-parse_top.o: parse_top.cc port.h common.h config.h vclass.h delay.h \
- physical.h featuredesire.h virtual.h parser.h anneal.h pclass.h ${MAKEFILE_IN}
-parser.o: parser.cc parser.h port.h ${MAKEFILE_IN}
-pclass.o: pclass.cc port.h common.h config.h delay.h physical.h \
- featuredesire.h virtual.h pclass.h ${MAKEFILE_IN}
-score.o: score.cc port.h common.h config.h vclass.h delay.h physical.h \
- featuredesire.h virtual.h pclass.h score.h /usr/include/math.h ${MAKEFILE_IN}
+anneal.o: anneal.cc anneal.h port.h delay.h physical.h common.h fstring.h \
+  featuredesire.h forwarding.h pclass.h virtual.h maps.h score.h \
+  solution.h vclass.h neighborhood.h
+annotate.o: annotate.cc
+annotate_rspec.o: annotate_rspec.cc
+annotate_vtop.o: annotate_vtop.cc
+assign.o: assign.cc port.h common.h fstring.h delay.h physical.h \
+  featuredesire.h forwarding.h virtual.h vclass.h pclass.h score.h \
+  solution.h maps.h anneal.h config.h
+config.o: config.cc config.h common.h port.h fstring.h score.h physical.h \
+  delay.h featuredesire.h forwarding.h virtual.h anneal.h pclass.h
+featuredesire.o: featuredesire.cc featuredesire.h common.h port.h \
+  fstring.h score.h physical.h delay.h forwarding.h virtual.h
+forwarding.o: forwarding.cc forwarding.h port.h fstring.h physical.h \
+  common.h delay.h featuredesire.h
+fstring.o: fstring.cc fstring.h port.h
+fstringtest.o: fstringtest.cc fstring.h port.h
+neighborhood.o: neighborhood.cc neighborhood.h port.h common.h fstring.h \
+  physical.h delay.h featuredesire.h forwarding.h vclass.h virtual.h \
+  pclass.h
+parse_advertisement_rspec.o: parse_advertisement_rspec.cc
+parse_error_handler.o: parse_error_handler.cc
+parse_policy_xml.o: parse_policy_xml.cc
+parse_ptop.o: parse_ptop.cc port.h delay.h physical.h common.h fstring.h \
+  featuredesire.h forwarding.h parser.h
+parse_ptop_xml.o: parse_ptop_xml.cc
+parse_request_rspec.o: parse_request_rspec.cc
+parse_top.o: parse_top.cc port.h common.h fstring.h vclass.h delay.h \
+  physical.h featuredesire.h forwarding.h virtual.h parser.h anneal.h \
+  pclass.h
+parse_vtop_xml.o: parse_vtop_xml.cc
+parser.o: parser.cc parser.h port.h
+pclass.o: pclass.cc port.h common.h fstring.h delay.h physical.h \
+  featuredesire.h forwarding.h virtual.h pclass.h
+score.o: score.cc port.h common.h fstring.h vclass.h delay.h physical.h \
+  featuredesire.h forwarding.h virtual.h pclass.h score.h
 solution.o: solution.cc solution.h port.h delay.h physical.h common.h \
- config.h featuredesire.h virtual.h maps.h vclass.h ${MAKEFILE_IN}
-vclass.o: vclass.cc port.h common.h config.h vclass.h delay.h \
- physical.h featuredesire.h virtual.h ${MAKEFILE_IN}
+  fstring.h featuredesire.h forwarding.h virtual.h maps.h vclass.h
+vclass.o: vclass.cc port.h common.h fstring.h vclass.h delay.h physical.h \
+  featuredesire.h forwarding.h virtual.h
+xmlhelpers.o: xmlhelpers.cc

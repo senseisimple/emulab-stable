@@ -1,11 +1,14 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+
+# XXX should not be hardwired
+my $ELABDOMAIN = "emulab.net";
 
 #
 # This script is the plab vserver equiv of ../common/rc.bootsetup. It runs
@@ -34,6 +37,8 @@ if ($EUID != 0) {
 my $RCDIR	 = "$BINDIR/rc";
 my $PLABCONFIG   = "$BOOTDIR/rc.plab";
 my $SVCFILE      = "$BOOTDIR/svcslice";
+my $IPADDRFILE   = "$BOOTDIR/myip";
+my $PWDFILE      = "/etc/passwd";
 my $TMPLPWDFILE  = "/etc/passwd.tmpl";
 
 #
@@ -116,13 +121,14 @@ sub doboot()
     }
 
     #
-    # Fire up elvin and evproxy if we are the service sliver on this node
+    # Fire up event server and evproxy if we are the service sliver
+    # on this node
     #
-    if (-e $SVCFILE and -x "$BINDIR/runelvin") {
-        print("Starting elvind and evproxy");
-        system("$BINDIR/runelvin");
+    if (-e $SVCFILE and -x "$BINDIR/runevents") {
+        print("Starting event server and evproxy");
+        system("$BINDIR/runevents");
         if ($?) {
-            fatal("Error starting up elvind and/or evproxy!");
+            fatal("Error starting up event server and/or evproxy!");
         }
     }
 
@@ -215,21 +221,40 @@ sub doplabconfig()
     # XXX: need to actually use the slice name, but we don't really have
     #      it stored anywhere yet.
     print "Fixing up the passwd file.\n";
-    my $sliceuserent = `grep "^utah_" /etc/passwd`;
-    chomp $sliceuserent;
-    defined($sliceuserent) and $sliceuserent or 
-        fatal("Can't find slice user entry!");
-    my @pwdfields = split /:/, $sliceuserent;
-    $pwdfields[1] = "*";
-    $sliceuserent = join(":", @pwdfields);
-    open(TMPLPWD, ">>$TMPLPWDFILE") or 
-        fatal("Can't open passwd template file");
-    print TMPLPWD "$sliceuserent\n";
-    close(TMPLPWD);
-    !system("cp -f /etc/passwd /etc/passwd.orig") and
-        !system("cp -f $TMPLPWDFILE /etc/passwd") or
-            fatal("Couldn't fix up passwd file!");
+    my $slicename = `cat /etc/slicename`;
+    chomp($slicename);
+    my $sliceuserent = "";
+    open(PWD, "< $PWDFILE") or
+        fatal("Can't open password file for reading!");
+    while (my $pwln = <PWD>) {
+        chomp($pwln);
+        if ($pwln =~ /^$slicename/) {
+            my @pwdfields = split /:/, $pwln;
+            $pwdfields[1] = "*";
+            $sliceuserent = join(":", @pwdfields);
+            last;
+        }
+    }
+    close(PWD);
+    if (!$sliceuserent) {
+        fatal("Couldn't find slice user entry in passwd file!");
+    }
+    !system("cp -f $TMPLPWDFILE $PWDFILE.new") or
+        fatal("Can't copy template file!");
+    open(PWNEW, ">> $PWDFILE.new") or
+        fatal("Can't open new password file for append!");
+    print PWNEW $sliceuserent . "\n";
+    close(PWNEW);
+    if (! -e "$PWDFILE.orig") {
+        !system("cp -f $PWDFILE $PWDFILE.orig") or
+            fatal("Can't backup passwd file!");
+    }
+    !system("mv -f $PWDFILE.new $PWDFILE") or
+        fatal("Could not move new password file into place!");
 
+    #
+    # Grab plab specific config data and process it.
+    #
     if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
 	fatal("Could not get plabconfig from server!");
     }
@@ -240,6 +265,7 @@ sub doplabconfig()
     # plabconfig defaults
     my $sshdport = 0;
     my $svcslice = 0;
+    my $ipaddr = "0.0.0.0";
 
     # parse the config line
     PLCONFPARSE: for ($plabconfig) {
@@ -250,6 +276,10 @@ sub doplabconfig()
         /SVCSLICE=(\d)/ && do {
             $svcslice = $1;
         };
+
+        /IPADDR=([\d\.]+)/ && do {
+            $ipaddr = $1;
+        };
     }
 
     # Create the svcslice file if this is the service sliver.
@@ -259,6 +289,12 @@ sub doplabconfig()
         print SVCFILE "$svcslice\n";
         close(SVCFILE);
     }
+
+    # Create the control_ipaddr file
+    open(IPADDR, ">$IPADDRFILE")
+        or fatal("Could not open $IPADDRFILE: $!");
+    print IPADDR "$ipaddr\n";
+    close(IPADDR);
 
     open(RC, ">$PLABCONFIG")
 	or fatal("Could not open $PLABCONFIG: $!");
@@ -284,9 +320,22 @@ sub doplabconfig()
 	      "}\n\n");
 
 	# Make it look like it's in Emulab domain
-	# XXX This shouldn't be hardcoded
-	print RC "setconfigopt /etc/resolv.conf domain emulab.net\n";
-	print RC "setconfigopt /etc/resolv.conf search emulab.net\n\n";
+	print RC "setconfigopt /etc/resolv.conf domain $ELABDOMAIN\n";
+	print RC "setconfigopt /etc/resolv.conf search $ELABDOMAIN\n\n";
+
+	# XXX make sure we can resolve our own name
+	print RC "if ! ping -c 1 `hostname` >/dev/null 2>&1; then\n".
+	         "    myip=`cat /var/emulab/boot/myip`\n".
+	         "    myhn=`hostname`\n".
+	         "    if [ -n \"\$myip\" -a -n \"\$myhn\" ]; then\n".
+		 "        myal=\"\"\n".
+	         "        mynn=`cat /var/emulab/boot/nickname`\n".
+	         "        if [ -n \"\$mynn\" ]; then\n".
+		 "            myal=\"\$mynn.$ELABDOMAIN\"\n".
+	         "        fi\n".
+	         "        setconfigopt /etc/hosts \$myip \"\$myhn \$myal\"\n".
+	         "    fi\n".
+		 "fi\n";
 
 	# No SSH X11 Forwarding
 	print RC "setconfigopt /etc/ssh/sshd_config X11Forwarding no\n";
@@ -315,4 +364,3 @@ sub doplabconfig()
     chmod(0755, $PLABCONFIG);
     return 0;
 }
-

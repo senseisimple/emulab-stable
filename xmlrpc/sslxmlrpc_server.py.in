@@ -1,12 +1,13 @@
 #!/usr/local/bin/python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
 import getopt
 import os, os.path
+import pwd
 import traceback
 import syslog
 import string
@@ -150,7 +151,11 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
 	ctx.set_allow_unknown_ca(0)
 	#ctx.set_info_callback()
         
-        SimpleXMLRPCDispatcher.__init__(self)
+        dargs = (self,)
+        if sys.version_info[0] >= 2 and sys.version_info[1] >= 5:
+            dargs = (self,False,None)
+            pass
+        SimpleXMLRPCDispatcher.__init__(*dargs)
         SSL.SSLServer.__init__(self, (ADDR, PORT),
                                MyXMLRPCRequestHandler, ctx)
 	pass
@@ -193,7 +198,8 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
             from emulabserver import EmulabServer
             
             self.emulabserver = EmulabServer(readonly=0,
-                                             clientip=client_address[0])
+                                             clientip=client_address[0],
+                                             debug=self.debug)
             pass
         return
     
@@ -216,24 +222,27 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
     #
     # Get the unix_uid for the user. User must be active. 
     #
-    def getuserid(self, uid):
-        userQuery = DBQueryFatal("select unix_uid,status from users "
-                                 "where uid=%s",
-                                 (uid,))
+    def getuserid(self, uuid):
+        userQuery = DBQueryFatal("select uid,uid_idx,unix_uid,status "
+                                 "  from users "
+                                 "where (uid_uuid=%s or uid=%s) and "
+                                 "       status='active'",
+                                 (uuid, uuid))
         
         if len(userQuery) == 0:
-            return 0
+            return (None, None, 0);
         
-        if (userQuery[0][1] != "active"):
-            return -1
+        if (userQuery[0][3] != "active"):
+            return (None, None, -1);
         
-        return int(userQuery[0][0])
+        return (userQuery[0][0], int(userQuery[0][1]), int(userQuery[0][2]))
 
     #
     # Check if the user is an stud.
     #
-    def isstuduser(self, uid):
-        res = DBQueryFatal("select stud from users where uid=%s", (uid,))
+    def isstuduser(self, uid_idx):
+        res = DBQueryFatal("select stud from users where uid_idx=%s",
+                           (str(uid_idx),))
 
         if len(res) == 0:
             return 0
@@ -243,26 +252,26 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
     #
     # Check the certificate serial number. 
     #
-    def checkcert(self, uid, serial):
+    def checkcert(self, uid_idx, serial):
         res = DBQueryFatal("select idx from user_sslcerts "
-                           "where uid=%s and idx=%s",
-                           (uid, serial))
+                           "where uid_idx=%s and idx=%s and revoked is null ",
+                           (str(uid_idx), serial))
 
         return len(res)
     
     #
     # Get the group list for the user.
     #
-    def getusergroups(self, user):
+    def getusergroups(self, uid_idx):
         result = []
         
         res = DBQueryFatal("select distinct g.gid,g.unix_gid "
                            "  from group_membership as m "
                            "left join groups as g on "
-                           "  g.pid=m.pid and g.gid=m.gid "
-                           "where m.uid=%s "
+                           "  g.pid_idx=m.pid_idx and g.gid_idx=m.gid_idx "
+                           "where m.uid_idx=%s "
                            "order by date_approved asc ",
-                           (user,))
+                           (str(uid_idx),))
         
         for group in res:
             result.append(int(group[1]));
@@ -278,22 +287,28 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
         if self.debug:
             self.logit(str(subject))
             pass
+
+        #
+        # The CN might look like UUID,serial so split it up.
+        #
+        cnwords = getattr(subject, "CN").split(",")
+        self.uuid = cnwords[0]
         
-        self.user = getattr(subject, "CN");
         #
         # Must be a valid and non-zero unix_uid from the DB.
         #
-        self.uid = self.getuserid(self.user)
+        (self.uid,self.uid_idx,self.unix_uid) = self.getuserid(self.uuid)
         
-        if self.uid == 0:
-            self.logit('No such user: "%s"' % self.user)
-            raise Exception('No such user: "%s"' % self.user)
+        if self.unix_uid == 0:
+            self.logit('No such user: "%s"' % self.uuid)
+            raise Exception('No such user: "%s"' % self.uuid)
         
-        if self.uid == -1:
-            self.logit('User "%s" is not active' % self.user)
-            raise Exception('User "%s" is not active' % self.user)
+        if self.unix_uid == -1:
+            self.logit('User "%s,%d" is not active' % (self.uid,self.uid_idx))
+            raise Exception('User "%s,%d" is not active' %
+                            (self.uid,self.uid_idx))
 
-        self.stud = self.isstuduser(self.user)
+        self.stud = self.isstuduser(self.uid_idx)
         if self.stud:
             try:
                 ALLOWED_PATHS.extend(map(lambda x:
@@ -304,13 +319,14 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
                 pass
             pass
         
-        self.glist = self.getusergroups(self.user);
+        self.glist = self.getusergroups(self.uid_idx);
         if len(self.glist) == 0:
-            self.logit('No groups for user: "%s"' % self.user)
-            raise Exception('No groups for user: "%s"' % self.user)
+            self.logit('No groups for user: "%s,%d"' % (self.uid,self.uid_idx))
+            raise Exception('No groups for user: "%s,%d"' %
+                            (self.uid,self.uid_idx))
 
-        self.logit("Connect from %s: %s %s" %
-                   (client[0], self.user, str(self.glist)))
+        self.logit("Connect from %s: %s,%d %s" %
+                   (client[0], self.uid, self.uid_idx, str(self.glist)))
         
         #
         # Check the certificate serial number. At the moment, the serial
@@ -319,17 +335,19 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
         #
         serial = request.get_peer_cert().get_serial_number()
         
-        if self.checkcert(self.user, serial) == 0:
+        if self.checkcert(self.uid_idx, serial) == 0:
             self.logit('No such cert with serial "%s"' % serial)
             raise Exception('No such cert with serial "%s"' % serial)
         
         try:
             os.setgid(self.glist[0])
             os.setgroups(self.glist)
-            os.setuid(self.uid)
+            os.setuid(self.unix_uid)
+            pwddb = pwd.getpwuid(self.unix_uid);
 
-            os.environ["USER"]    = self.user;
-            os.environ["LOGNAME"] = self.user;
+            os.environ["HOME"]    = pwddb[5];
+            os.environ["USER"]    = self.uid;
+            os.environ["LOGNAME"] = self.uid;
             pass
         except:
             traceback.print_exc()

@@ -1,0 +1,46 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    my $type = DBSlotType("delays", "lossrate0");
+    if (!$type) {
+	Fatal("No 'lossrate0' slot in 'delays' table");
+    }
+    if (! ($type =~ /10,8/)) {
+	DBQueryFatal("alter table delays change `lossrate0` `lossrate0` ".
+		     "  float(10,8) NOT NULL default '0.00000000'");
+	DBQueryFatal("alter table delays change `lossrate1` `lossrate1` ".
+		     "  float(10,8) NOT NULL default '0.00000000'");
+    }
+    $type = DBSlotType("linkdelays", "lossrate");
+    if (!$type) {
+	Fatal("No 'lossrate' slot in 'linkdelays' table");
+    }
+    if (! ($type =~ /10,8/)) {
+	DBQueryFatal("alter table linkdelays change `lossrate` `lossrate` ".
+		     "  float(10,8) NOT NULL default '0.00000000'");
+	DBQueryFatal("alter table linkdelays change `rlossrate` `rlossrate` ".
+		     "  float(10,8) NOT NULL default '0.00000000'");
+    }
+    $type = DBSlotType("virt_lans", "lossrate");
+    if (!$type) {
+	Fatal("No 'lossrate' slot in 'virt_lans' table");
+    }
+    if (! ($type =~ /10,8/)) {
+	DBQueryFatal("alter table virt_lans change `lossrate` `lossrate` ".
+		     "  float(10,8) default NULL");
+	DBQueryFatal("alter table virt_lans change `rlossrate` `rlossrate` ".
+		     "  float(10,8) default NULL");
+    }
+    DBQueryFatal("replace into table_regex values ".
+		 "  ('virt_lans','lossrate','float','function', ".
+		 "   '_checklossrate',0,1,NULL)");
+    DBQueryFatal("replace into table_regex values ".
+		 "  ('virt_lans','rlossrate','float','function', ".
+		 "   '_checklossrate',0,1,NULL)");
+    return 0;
+}
+1;

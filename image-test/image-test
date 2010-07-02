@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 ########################################################################
 
 # This value is prefixed to all experiments to avoid conflicts with
@@ -60,6 +66,7 @@ sub help() {
      "  -e FILE    exceptions file to use\n".
      "  -u         don't swap an experment out with unexpected failed tests\n".
      "  -h         halt on failed swapouts\n".
+     "  --eid-prefix STR  (default \"it-\")\n".
      "  --skip-std-tests  skip standard tests expect for ssh-*\n");
 }
 
@@ -107,6 +114,7 @@ GetOptions
     "u" => \$dont_swapout_unexpected,
     "h" => \$halt_failed_swapouts,
     "l|list" => \$just_list,
+    "eid-prefix=s" => \$eid_prefix,
     "skip-std-tests" => \$skip_std_tests
   or usage();
 
@@ -720,13 +728,13 @@ sub results_summary($$) {
   return "requires cleanup and had failed tests: ".failed_tests($exp)
     if $res == (ERR_FAILED | STATUS_CLEANUP);
 
-  return "had one of more fatal errors"
+  return "had one or more fatal errors"
     if $res == (ERR_FATAL | STATUS_NONE);
-  return "had one of more fatal errors and is still swapped in"
+  return "had one or more fatal errors and is still swapped in"
     if $res == (ERR_FATAL | STATUS_SWAPPEDIN);
-  return "had one of more fatal errors and still exists"
+  return "had one or more fatal errors and still exists"
     if $res == (ERR_FATAL | STATUS_EXISTS);
-  return "had one of more fatal errors and requires cleanup"
+  return "had one or more fatal errors and requires cleanup"
     if $res == (ERR_FATAL | STATUS_CLEANUP);
 
   return "was interrupted"

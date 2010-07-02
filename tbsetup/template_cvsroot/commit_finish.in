@@ -1,0 +1,82 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use File::Basename;
+
+#
+# Configure variables
+#
+my $TBROOT          = "@prefix@";
+my $template_commit = "$TBROOT/bin/template_commit";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# CVS sets this.
+my $CVSROOT = $ENV{'CVSROOT'};
+
+#print "Finish: @ARGV\n";
+
+#
+# First argument is a space separated list of tokens, and the first token
+# is the directory of the commit.
+#
+my @tokens = split(' ', $ARGV[0]);
+my $directory = $tokens[0];
+
+# See commit_prep
+my $id            = getpgrp();
+my $lastdir_file  = "/tmp/#cvs.files.lastdir.${id}";
+my $docommit_file = "/tmp/#cvs.docommit.${id}";
+my $logmsg_file   = "/tmp/#cvs.logmsg.${id}";
+
+exit(0)
+    if (!-e $lastdir_file);
+
+# See if we are processing the last directory in the commit
+my $lastdirectory = `cat $lastdir_file`;
+chomp($lastdirectory);
+
+#print "$lastdirectory, $directory\n";
+
+if (! ($lastdirectory =~ /\/$directory$/)) {
+    exit(0);
+}
+
+# unlink($lastdir_file);
+
+# This is the last directory. See if we are supposed to fire off a commit.
+exit(0)
+    if (!-e $docommit_file);
+
+# Grab the tag out of the file, which is passed along to template_commit.
+open(COM, $docommit_file) or
+    die("Could not open $docommit_file!\n");
+my $tag = <COM>;
+close(COM);
+chomp($tag);
+
+#
+# Suck the guid out of the magic cookie file.
+#
+my $guid = `cat $CVSROOT/CVSROOT/GUID`;
+chomp($guid);
+
+my $logmsg = `cat $logmsg_file`;
+chomp($logmsg);
+
+print "Running template_commit -r $tag $guid\n";
+print "Starting a template modify using repository tag $tag ... Be patient!\n";
+
+system("$template_commit -r $tag -E '$logmsg' $guid") == 0
+    or exit(1);
+exit(0);
+
+    

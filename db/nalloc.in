@@ -1,9 +1,10 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -16,9 +17,9 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print("Usage: nalloc [-v] [-p] <pid> <eid> <node> <node> <...>\n".
+    print("Usage: nalloc [-d] [-p] <pid> <eid> <node> <node> <...>\n".
 	  "		-p enables partial allocation mode\n".
-	  "		-v enables debugging output\n");
+	  "		-d enables debugging output\n");
     exit(-1);
 }
 my $optlist = "dp";
@@ -38,6 +39,10 @@ my $exportsetup = "$TB/sbin/exports_setup";
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use Experiment;
+use Project;
+use User;
+use Node;
 
 #
 # Turn off line buffering on output
@@ -51,7 +56,8 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
+
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -73,51 +79,56 @@ my @node_names	= @ARGV;
 # 
 my $error	  = 0;
 my $noalloc	  = 0;
-my @newvals	  = ();
 my @oldnodes	  = ();
 my @nodes	  = ();
-my @need_consetup = 0;
+my $need_consetup = 0;
 my @need_history  = ();
 my @need_clearbl  = ();
 
 TBDebugTimeStamp("nalloc started");
+
 #
 # Experiment must exist.
 # 
-if (!ExpState($pid,$eid)) {
-    warn "There is no experiment $eid in project $pid\n";
-    exit -1;
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! $experiment) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid in the Emulab Database.\n");
 }
-TBDebugTimeStamp("nalloc checked exp state");
-
+my $exptidx = $experiment->idx();
+my $project = $experiment->GetProject();
+if (!defined($project)) {
+    die("*** $0:\n".
+	"    Could not get project for experiment $experiment!\n");
+}
+    
 #
 # User must have permission to modify the experiment.
 #
-if ($UID) {
-    if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-        warn("*** You not have permission to allocate nodes in $pid/$eid!\n");
-        exit -1;
-    }
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("*** $0:\n".
+	"    You ($UID) do not exist in the Emulab DB!\n");
 }
-TBDebugTimeStamp("nalloc checked exp permission");
+if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to allocate nodes in $pid/$eid\n");
+}
 
 #
 # Before locking any tables, do a quick check to make sure the project
 # is allowed to allocate the nodes, by type/class, plus other checks.
 #
 foreach my $n (@node_names) {
-    # Make sure a valid node name first!
-    if (! TBValidNodeName($n)) {
-	warn("*** $0:\n".
-	     "    No such node $n!\n");
-        exit -1;
+    my $node = Node->Lookup($n);
+    if (!defined($node)) {
+	die("*** $0:\n".
+	    "    No such node $n!\n");
     }
-
-    # Project allowed to allocated this node type/class?
-    if (! TBNodeAllocCheck($pid, $n)) {
-	warn("*** $0:\n".
-	     "    You are not allowed to allocate $n to project $pid!\n");
-        exit -1;
+    # Project allowed to allocate this node type/class?
+    if (!$this_user->IsAdmin() && !$node->AllocCheck($project)) {
+	die("*** $0:\n".
+	    "    You are not allowed to allocate $n to project $pid!\n");
     }
 
     # XXX
@@ -125,15 +136,12 @@ foreach my $n (@node_names) {
     # console_setup. We want to avoid calling console_setup if all we
     # got is a zillion virtual nodes on the command line; wasted work.
     #
-    my $tiplines_result =
-	DBQueryFatal("select tipname,server from tiplines ".
-		     "where node_id='$n'");
-
-    if ($tiplines_result->numrows) {
+    my $tipserver;
+    if ($node->TipServer(\$tipserver) == 0 && defined($tipserver)) {
 	$need_consetup++;
     }
 }
-TBDebugTimeStamp("nalloc checked node permission ");
+TBDebugTimeStamp("nalloc checked all node permissions");
 
 # Must lock this table!
 DBQueryFatal("lock tables reserved write");
@@ -141,65 +149,84 @@ TBDebugTimeStamp("nalloc locked tables");
 
 # Make a list of nodes to reserve.
 foreach my $n (@node_names) {
-    my ($r_pid, $r_eid);
+    my $node = Node->Lookup($n);
+    if (!defined($node)) {
+	die("*** $0:\n".
+	    "    No such node $n!\n");
+    }
+    # Force reload after table lock.
+    $node->FlushReserved();
     
-    if (NodeidToExp($n, \$r_pid, \$r_eid)) {
+    my $reserved_experiment = $node->ReservationID();
+    if ($reserved_experiment) {
 	# Someone has already reserved this node
-	if (($r_pid eq $pid) && ($r_eid eq $eid)) {
-	    print "Already reserved: '$n'\n";
+	if ($reserved_experiment == $experiment->idx()) {
+	    print "$node already reserved to $experiment.\n";
 	    # Do not increment error code since that throws off caller.
 	    next;
 	}
-	elsif (NodeidToExpOldReserved($n, \$r_pid, \$r_eid) &&
-	       (($r_pid eq $pid) && ($r_eid eq $eid))) {
-	    print "Already reserved in holding reservation: '$n'\n";
-	    push(@oldnodes, $n);
+	my $oldreserved_experiment = $node->OldReservationID();
+	if ($oldreserved_experiment &&
+	    $oldreserved_experiment eq $experiment->idx()) {
+	    print "$node already reserved in holding reservation.\n";
+	    push(@oldnodes, $node);
 	    next;
 	}
 	else {
-	    print "Someone else has already reserved node '$n'.\n";
+	    print "Someone else has already reserved node $node.\n";
 	    $noalloc++;
 	    next;
 	}
     }
     else {
 	# Freshly allocated nodes need a history entry.
-	push(@need_history, $n);
+	push(@need_history, $node);
         # ... and need to have their bootlogs purged.
-        push(@need_clearbl, $n);
+        push(@need_clearbl, $node);
     }
 
     #
     # Add info the list of nodes to reserve; done in a single query below.
     # 
-    push(@newvals,  "('$n','$pid','$eid','$n','','')");
-    push(@nodes, "$n");
+    push(@nodes, $node);
 }
 TBDebugTimeStamp("nalloc checked all nodes");
 
 if ($debug) {
-    print "List Ready: @newvals\nError=$error\n";
+    print "List Ready: @nodes\nError=$error\n";
 }
 
 # Now make the reservations in the DB.
-if ((!$noalloc || $partial) && (@newvals || @oldnodes)) {
+if ((!$noalloc || $partial) && (@nodes || @oldnodes)) {
     print "Reserving nodes...\n"
 	if ($debug);
 
-    if (@newvals &&
-	! DBQueryWarn("replace into reserved ".
-		      "  (node_id,pid,eid,vname,old_pid,old_eid) ".
-		      "values ". join(",",@newvals))) {
-	$error++;
+    # Generate strings for a single query. Could use perl map().
+    if (@nodes) {
+	my @values = ();
+	foreach my $node (@nodes) {
+	    my $node_id = $node->node_id();
+	    
+	    push(@values,
+		 "('$node_id',$exptidx,'$pid','$eid','$node_id','','')");
+	}
+	if (! DBQueryWarn("replace into reserved ".
+			  " (node_id,exptidx,pid,eid,vname,old_pid,old_eid) ".
+			  "values ". join(",",@values))) {
+	    $error++;
+	}
     }
+    
     # Do this instead of creating new entries so as not to lose any
     # other info in the reserved table entries. I think this might be;
     # wrong; might need to rethink this.
     foreach my $node (@oldnodes) {
+	my $node_id = $node->node_id();
+	
 	if (!DBQueryWarn("update reserved " .
-			 "set pid='$pid',eid='$eid', ".
-			 "    old_pid='', old_eid='' ".
-			 "where node_id='$node'")) {
+			 "set exptidx=$exptidx,pid='$pid',eid='$eid', ".
+			 "    old_exptidx=0, old_pid='', old_eid='' ".
+			 "where node_id='$node_id'")) {
 	    $error++;
 	}
     }
@@ -208,7 +235,6 @@ TBDebugTimeStamp("nalloc allocated all nodes");
 
 # Unlock tables.
 DBQueryFatal("unlock tables");
-TBDebugTimeStamp("nalloc unlocked tables");
 
 # Okay, not safe to do this
 
@@ -218,27 +244,33 @@ if (!$error && (!$noalloc || $partial) && @nodes) {
 	if ($debug);
 
     # It isn't an error if this fails...
-    DBQueryWarn("update node_activity set last_ext_act=now() ".
-		"where " . join(" or ",map("node_id='$_'", @nodes)));
+    DBQueryWarn("update node_activity set last_ext_act=now() where ".
+		join(" or ",
+		     map("node_id='" . $_->node_id() . "'", @nodes)));
 
-    TBDebugTimeStamp("nalloc updated node_activity table");
-
-    foreach my $n (@need_history) {
-	TBSetNodeHistory($n, TB_NODEHISTORY_OP_ALLOC, $UID, $pid, $eid);
+    foreach my $node (@nodes) {
+	$node->NewRootPasswd();
+    }
+    foreach my $node (@need_history) {
+	$node->SetNodeHistory(TB_NODEHISTORY_OP_ALLOC,
+			      $this_user, $experiment);
     }
 
     # Clear boot logs - maybe this should be done before alloc?
     #  - only a small window of opportunity at any rate.
     # This is sort of wasteful as it should be the same set of nodes
     # as in the node history loop above, but that could change at some point.
-    foreach my $n (@need_clearbl) {
-        DBQueryWarn("delete from node_bootlogs where node_id='$n'");
+    foreach my $node (@need_clearbl) {
+	$node->ClearBootLog();
     }
 }
+TBDebugTimeStamp("updated node_activity, history, and bootlogs");
 
 # Now setup consoles if needed.
 if ($need_consetup && !$error && @nodes) {
-    system("$consetup @nodes") == 0 or
+    my @nodeids = map($_->node_id(), @nodes);
+    
+    system("$consetup @nodeids") == 0 or
 	print STDERR "WARNING: $consetup @nodes failed!\n";
     TBDebugTimeStamp("nalloc finished console setup");
 }

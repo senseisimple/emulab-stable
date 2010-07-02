@@ -9,6 +9,9 @@
 #ifndef GRAPH_CONVERTER_H_IP_ASSIGN_2
 #define GRAPH_CONVERTER_H_IP_ASSIGN_2
 
+// The purpose of GraphConverter is to convert the graph to the
+// representation required by METIS.
+
 // GraphConverter uses a GraphData as a representation of the source graph.
 // The interface of GraphData must be as follows:
 

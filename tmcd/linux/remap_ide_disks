@@ -1,0 +1,99 @@
+#! /bin/sh
+
+ide_disks="a b c d e f g h i j k l end"
+pata_controllers=""
+
+sd_to_hd_map() {
+	# Find all IDE controllers and guess which ones are PATA
+	for pci_device in /sys/devices/pci*/*; do
+		[ -f $pci_device/class ] || continue
+		class=`cat $pci_device/class`
+
+		# IDE devices are in class 0x0101
+		case $class in
+			0x0101*) ;;
+			*) continue; ;;
+		esac
+
+		# See if there is a SATA device on the controller.  If so,
+		# the controller isn't PATA.  Skip it.
+		# This falls down if the controller isn't PATA but there
+		# are no devices attached.  We then assume the controller
+		# is PATA and consume IDE devices unnecessarily.  This
+		# itself is only an issue if there are PATA devices on
+		# another controller, since they will get the wrong names.
+		is_pata=1
+		for disk in `find $pci_device | grep 'block[:/][^/]*$'`; do
+			disk=${disk##*/}
+			disk=${disk#block:}
+
+			if hdparm -I /dev/$disk | grep -q SATA; then
+				is_pata=0
+				break
+			fi
+		done
+		# See what lspci thinks of the controller.  If it doesn't
+		# think it's SATA, assume it's PATA.
+		#lspci -s ${pci_device##*/} | grep -iq SATA && is_pata=0
+
+		[ $is_pata -ne 1 ] && continue
+
+		pata_controllers="$pata_controllers `ls -d $pci_device/host*`"
+	done
+
+	# This is really nasty.  Sort the host adapters in order
+	# by adapter number.
+	pata_controllers=`echo $pata_controllers | tr ' ' '\n' | \
+	                  sed 's/^\(.*host\)\(.*\)$/\2 \1\2/'  | \
+			  sort -k1 -n | cut -d' ' -f2`
+
+	# Try mapping SCSI devices to IDE devices.  Note that each controller
+	# always consumes two devices even if they're not present.
+	for host in $pata_controllers; do
+		host_num=${host##*host}
+		target=$host/target$host_num:0:0/$host_num:0:0:0
+		if [ -e $target/block:* ]; then
+			scsi_disk=`ls -d $target/block:*`
+			scsi_disk=${scsi_disk##*:}
+			echo $scsi_disk=hd${ide_disks%% *}
+		elif [ -d $target/block ]; then
+			scsi_disk=`ls -d $target/block/*`
+			scsi_disk=${scsi_disk##*/}
+			echo $scsi_disk=hd${ide_disks%% *}
+		fi
+		ide_disks=${ide_disks#* }
+
+		target=$host/target$host_num:0:1/$host_num:0:1:0
+		if [ -e $target/block:* ]; then
+			scsi_disk=`ls -d $target/block:*`
+			scsi_disk=${scsi_disk##*:}
+			echo $scsi_disk=hd${ide_disks%% *}
+		elif [ -d $target/block ]; then
+			scsi_disk=`ls -d $target/block/*`
+			scsi_disk=${scsi_disk##*/}
+			echo $scsi_disk=hd${ide_disks%% *}
+		fi
+		ide_disks=${ide_disks#* }
+
+		[ "$ide_disks" = end ] && break
+	done
+}
+
+sd_to_hd_map > /tmp/ide_disks
+
+# Remap any remaining SCSI devices to account for the ones mapped to IDE
+# devices.  SCSI disks always proceed in order, with the first being 'a', the
+# second being 'b', and so on.
+scsi_disks="a b c d e f g h i j k l m n o p"
+rm -f /tmp/scsi_disks
+for dev in /sys/block/sd*; do
+	dev=${dev##*/}
+	if ! grep "^$dev=" /tmp/ide_disks > /dev/null; then
+		echo $dev=sd${scsi_disks%% *} >> /tmp/scsi_disks
+		scsi_disks=${scsi_disks#* }
+	fi
+done
+
+[ -f /tmp/ide_disks ] && cat /tmp/ide_disks
+[ -f /tmp/scsi_disks ] && cat /tmp/scsi_disks
+rm -f /tmp/ide_disks /tmp/scsi_disks

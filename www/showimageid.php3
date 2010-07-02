@@ -1,40 +1,36 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include("imageid_defs.php");
+
+#
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("image", PAGEARG_IMAGE);
 
 #
 # Standard Testbed Header
 #
 PAGEHEADER("Image Descriptor");
 
-#
-# Only known and logged in users can end experiments.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-
-#
-# Verify form arguments.
-# 
-if (!isset($imageid) ||
-    strcmp($imageid, "") == 0) {
-    USERERROR("You must provide an ImageID.", 1);
-}
-
-if (! TBValidImageID($imageid)) {
-    USERERROR("ImageID '$imageid' is not a valid ImageID!", 1);
-}
+# Need these below.
+$imageid = $image->imageid();
 
 #
 # Verify permission.
 #
-if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_READINFO)) {
+if (!$image->AccessCheck($this_user, $TB_IMAGEID_READINFO)) {
     USERERROR("You do not have permission to access ImageID $imageid.", 1);
 }
 
@@ -51,7 +47,7 @@ WRITESUBMENUBUTTON("Create a New Image Descriptor",
 		   "newimageid_ez.php3");
 if ($isadmin) {
     WRITESUBMENUBUTTON("Create a new OS Descriptor",
-		       "newosid_form.php3");
+		       "newosid.php3");
 }
 WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
@@ -62,44 +58,41 @@ SUBMENUEND();
 #
 # Dump record.
 # 
-SHOWIMAGEID($imageid, 0);
+$image->Show();
 
 echo "<br>\n";
 
 #
 # Show experiments using this image - we have to handle all four partitions.
-# Also we don't put OSIDs directly into the virt_nodes table, so we have to
-# get the pid and osname for the image, and use that to look into the virt_nodes
-# table.
+# Also we do not put OSIDs directly into the virt_nodes table, so we have to
+# get the pid and osname for the image, and use that to look into the 
+# virt_nodes table.
 #
-$query_result = DBQueryFatal("select part1_osid, part2_osid, " .
-	"part3_osid, part4_osid from images where imageid='$imageid'");
-if (mysql_num_rows($query_result) != 1) {
-    USERERROR("Error getting partition information for $imageid.", 1);
-}
-
-$row = mysql_fetch_array($query_result);
-
-$parts  = array($row["part1_osid"], $row["part2_osid"],
-		$row["part3_osid"], $row["part4_osid"]);
-
-foreach ($parts as $osid) {
-    if ($osid) {
-	echo "<h3 align='center'>Experiments using OS ";
-	SPITOSINFOLINK($osid);
-	echo "</h3>\n";
-	$query_result =
-	    DBQueryFatal("select pid, osname from os_info where osid='$osid'");
-	if (mysql_num_rows($query_result) != 1) {
-	    echo "<h4>Error getting os_info for $osid!</h4>\n";
-	    continue;
-	}
-	$row = mysql_fetch_array($query_result);
-	SHOWOSIDEXPTS($row["pid"],$row["osname"],$uid);
+function SHOWIT($osid) {
+    global $this_user;
+    
+    if (! ($osinfo = OSinfo::Lookup($osid))) {
+	TBERROR("Could not map osid to its object: $osid", 1);
     }
+    echo "<h3 align='center'>Experiments using OS ";
+    $osinfo->SpitLink();
+    echo "</h3>\n";
+
+    $osinfo->ShowExperiments($this_user);
 }
 
-
+if ($image->part1_osid()) {
+    SHOWIT($image->part1_osid());
+}
+if ($image->part2_osid()) {
+    SHOWIT($image->part2_osid());
+}
+if ($image->part3_osid()) {
+    SHOWIT($image->part3_osid());
+}
+if ($image->part4_osid()) {
+    SHOWIT($image->part4_osid());
+}
 SUBPAGEEND();
 
 #

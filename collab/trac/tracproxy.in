@@ -1,0 +1,331 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+
+#
+# A wrapper for messing with the Bug DB from boss.
+#
+sub usage()
+{
+    print "Usage: tracproxy adduser <uid> or\n";
+    print "       tracproxy deluser <uid> or\n";
+    print "       tracproxy xlogin [-p] <uid> or\n";
+    exit(-1);
+}
+my $optlist = "dw:";
+my $debug   = 0;
+my $wiki;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $TRACTOPDIR  = "/usr/local/www/data/trac";
+my $TRACDIR;
+my $TRACPASSWD;
+my $TRACADMIN   = "/usr/local/bin/trac-admin";
+my $TRACUSER    = "nobody";
+my $TRACGROUP   = "nobody";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname;
+my $dbuser;
+my $dbpass;
+
+# Protos
+sub AddUser(@);
+sub DelUser(@);
+sub xLogin(@);
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"w"})) {
+    $wiki     = $options{"w"};
+    $TRACDIR  = "$TRACTOPDIR/" . $options{"w"};
+}
+else {
+    $wiki     = "emulab";
+    $TRACDIR  = "$TRACTOPDIR/emulab";
+}
+# This lives in the trac project dir.
+$TRACPASSWD  = "$TRACDIR/.htpasswd";
+
+if (! @ARGV) {
+    usage();
+}
+my $action = shift(@ARGV);
+
+#
+# We need access to the DB for doing xlogin.
+#
+my $uri = `grep mysql: $TRACDIR/conf/trac.ini`;
+if ($?) {
+    fatal("Could not get mysql data from $TRACDIR/conf/trac.ini");
+}
+if ($uri =~ /mysql:\/\/(\w*):(\w*)\@localhost\/([\+\w]*)$/) {
+    $dbname = $3;
+    $dbuser = $1;
+    $dbpass = $2;
+}
+else {
+    fatal("Could not parse mysql uri from $TRACDIR/conf/trac.ini");
+}
+
+if ($action eq "adduser") {
+    exit(AddUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelUser(@ARGV));
+}
+elsif ($action eq "xlogin") {
+    exit(xLogin(@ARGV));
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Add entry (or update password) for a user.
+#
+sub AddUser(@)
+{
+    my ($user, $isadmin) = @_;
+    my ($password) = ();
+    
+    usage()
+	if (@_ != 2);
+
+    # Other info for list comes in from STDIN.
+    
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*)$/) {
+	$password = $1;
+    }
+    else {
+	fatal("AddUser: Bad line in input: $_");
+    }
+
+    #
+    # If the password file does not have the entry, just tack it onto
+    # the end of the file. Otherwise we have to get fancier so we 
+    # change the password atomically. It appears that the TWiki code
+    # does not lock the password file when it makes it own changes! 
+    #
+    if (system("egrep -q -s '^${user}:' $TRACPASSWD")) {
+	print "Adding $user to $TRACPASSWD\n"
+	    if ($debug);
+	
+	open(PWD, ">> $TRACPASSWD") or
+	    fatal("Could not open $TRACPASSWD for appending");
+	print PWD "${user}:${password}\n";
+	close(PWD);
+    }
+    else {
+	#
+	# Open up the file and read it, creating a new version.
+	#
+	my $data = "";
+	
+	print "Updating $user in $TRACPASSWD\n"
+	    if ($debug);
+	
+	open(PWD, "$TRACPASSWD") or
+	    fatal("Could not open $TRACPASSWD for reading");
+	
+	while (<PWD>) {
+	    if ($_ =~ /^${user}:.*$/) {
+		$data .= "${user}:${password}\n";
+	    }
+	    else {
+		$data .= $_;
+	    }
+	}
+	close(PWD);
+
+	open(PWD, "> ${TRACPASSWD}.$$") or
+	    fatal("Could not open ${TRACPASSWD}.$$ for writing");
+	print PWD $data;
+	close(PWD);
+
+	system("chown ${TRACUSER}:${TRACGROUP} ${TRACPASSWD}.$$") == 0
+	    or fatal("Could not chown ${TRACPASSWD}.$$");
+
+	rename("${TRACPASSWD}.$$", $TRACPASSWD)
+	    or fatal("Could not rename ${TRACPASSWD}.$$");
+    }
+
+    #
+    # Add user to the trac admin group if an admin. Need to do a remove first
+    # cause the script is not smart enough to replace if already exists.
+    #
+    system("$TRACADMIN $TRACDIR permission remove $user admininstrators");
+    if ($isadmin) {
+	system("$TRACADMIN $TRACDIR permission add $user admininstrators");
+	if ($?) {
+	    fatal("Could not set admin status for $user in $TRACDIR");
+	}
+    }
+    return 0;
+}
+
+#
+# Delete entry for a user.
+#
+sub DelUser(@)
+{
+    my ($user) = @_;
+    
+    usage()
+	if (@_ != 1);
+
+    #
+    # Remove all permissions from the DB.
+    #
+    system("$TRACADMIN $TRACDIR permission remove $user '*'") == 0
+	or fatal("Could not remove trac permissions for $user");
+
+    # Then from the passwd file.
+    if (! system("egrep -q -s '^${user}:' $TRACPASSWD")) {
+	#
+	# Open up the file and read it, creating a new version.
+	#
+	my $data = "";
+	
+	print "Removing $user from $TRACPASSWD\n"
+	    if ($debug);
+	
+	open(PWD, "$TRACPASSWD") or
+	    fatal("Could not open $TRACPASSWD for reading");
+	
+	while (<PWD>) {
+	    if ($_ =~ /^${user}:.*$/) {
+		;
+	    }
+	    else {
+		$data .= $_;
+	    }
+	}
+	close(PWD);
+
+	open(PWD, "> ${TRACPASSWD}.$$") or
+	    fatal("Could not open ${TRACPASSWD}.$$ for writing");
+	print PWD $data;
+	close(PWD);
+
+	system("chown ${TRACUSER}:${TRACGROUP} ${TRACPASSWD}.$$") == 0
+	    or fatal("Could not chown ${TRACPASSWD}.$$");
+
+	rename("${TRACPASSWD}.$$", $TRACPASSWD)
+	    or fatal("Could not rename ${TRACPASSWD}.$$");
+    }
+
+    return 0;
+}
+
+#
+# Backdoor Login
+#
+sub xLogin(@)
+{
+    my $priv = 0;
+    
+    usage()
+	if (@_ < 2 || @_ > 3);
+
+    if ($_[0] eq "-p") {
+	$priv = 1;
+	shift(@_);
+    }
+    my ($user, $IP) = @_;
+    my $hash = TBGenSecretKey();
+
+  again:
+    if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+	fatal("Could not connect to trac database!");
+    }
+    # Remove old/stale auth cookies to avoid buildup.
+    DBQueryFatal("delete from auth_cookie ".
+		 "where name='$user' and ipnr='$IP' and ".
+		 "      time < (UNIX_TIMESTAMP(now()) - (60 * 60 * 24))");
+    DBQueryFatal("replace into auth_cookie set ".
+		 "   cookie='$hash', name='$user', ipnr='$IP', ".
+		 "   time=UNIX_TIMESTAMP(now())");
+    DBQueryFatal("replace into session set ".
+		 "   sid='$user', authenticated=1, ".
+		 "   last_visit=UNIX_TIMESTAMP(now())");
+    DBQueryFatal("replace into session_attribute set ".
+		 "  sid='$user', authenticated=1, name='name', ".
+		 "  value='$user'");
+    DBQueryFatal("replace into session_attribute set ".
+		 "  sid='$user', authenticated=1, name='email', ".
+		 "  value='${user}\@${OURDOMAIN}'");
+
+    # Wow, what a HACK!
+    if ($priv) {
+	$priv = 0;
+	TBDBDisconnect();
+	$wiki = "${wiki}-priv";
+	$dbname = $dbname . "+priv";
+	goto again;
+    }
+    print "$hash\n";
+    return 0;
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

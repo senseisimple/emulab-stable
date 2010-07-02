@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,8 +13,11 @@
 use lib '@prefix@/lib';
 
 use libdb;
+use libtestbed;
 use libxmlrpc;
+use NodeType;
 use English;
+use OSinfo;
 use Getopt::Std;
 
 use strict;
@@ -82,14 +85,21 @@ if (!TBAdmin()) {
 sub usage() {
     die "Usage: $0 [-f] <node_id> ...\n";
 }
+my $noreboot = 0;
+my $quiet    = 0;
 my $force_unconnected_interfaces = 0;
 my %options = ();
-if (! getopts("f", \%options)) {
+if (! getopts("fnq", \%options)) {
     usage();
 }
-
 if ($options{f}) {
     $force_unconnected_interfaces = 1;
+}
+if ($options{'n'}) {
+    $noreboot = 1;
+}
+if ($options{'q'}) {
+    $quiet = 1;
 }
 
 #
@@ -176,18 +186,35 @@ NODE: foreach my $node_id (@node_ids) {
     # Make sure that the new node is of a valid type, and grab a few other
     # things to fill in as initial values
     #
-    $query_result = DBQueryFatal("SELECT control_iface,virtnode_capacity,adminmfs_osid ".
-				 "FROM node_types WHERE type='$type'");
-    if (!$query_result->num_rows()) {
-	warn "Node $node_id failed: Type $type does not exist!\n";
+    my $typeinfo = NodeType->Lookup($type);
+    if (!defined($typeinfo)) {
+	warn "No such nodetype $type is defined in the DB!\n";
 	next NODE;
     }
-    my ($control_iface,$virtnode_capacity,$admin_mfs) =
-	$query_result->fetchrow();
+    my ($control_iface,$virtnode_capacity,$adminmfs,$adminmfs_osid);
+
+    if ($typeinfo->control_interface(\$control_iface) || !$control_iface) {
+	warn "No control interface for $type is defined in the DB!\n";
+	next NODE;
+    }
+    if ($typeinfo->virtnode_capacity(\$virtnode_capacity)) {
+	warn "Failure looking up virtnode_capacity for $type in the DB!\n";
+	next NODE;
+    }
+    if ($typeinfo->adminmfs_osid(\$adminmfs_osid)) {
+	warn "Failure looking up adminmfs_osid for $type in the DB!\n";
+	next NODE;
+    }
     $virtnode_capacity = 0
 	if (!defined($virtnode_capacity));
-    $admin_mfs = $MFS_INITIAL
-	if (!defined($admin_mfs));
+
+    # Find object for the adminfs.
+    if (defined($adminmfs_osid)) {
+	$adminmfs = OSinfo->Lookup($adminmfs_osid);
+    }
+    else {
+	$adminmfs = OSinfo->Lookup(TBOPSPID(), $MFS_INITIAL);
+    }
 
     #
     # Grab the node's MACs from the new_interfaces table
@@ -263,24 +290,20 @@ NODE: foreach my $node_id (@node_ids) {
     }
 
     #
-    # Figure out what OS this node should run
+    # Figure out what osid/opmode this node should run
     #
-    my $osid;
+    my ($osid,$opmode);
+    
     if ($role eq "ctrlnode") {
-	$osid = $OS_OPSNODE;
-    } else {
-	$osid = $admin_mfs;
-    }
+	my $osinfo = OSinfo->Lookup(TBOPSPID(), $OS_OPSNODE);
 
-    #
-    # Figure out which opmode the OS runs in
-    #
-    my $result = DBQueryFatal("select op_mode from os_info where " .
-	" osid='$osid'");
-    if ($result->numrows() != 1) {
-	die "Unable to find OS information for $osid\n";
+	$osid   = $osinfo->osid();
+	$opmode = $osinfo->op_mode();
     }
-    my ($opmode) = $result->fetchrow();
+    else {
+	$osid   = $adminmfs->osid();
+	$opmode = $adminmfs->op_mode();
+    }
 
     #
     # Figure out what state to start the node in
@@ -305,8 +328,16 @@ NODE: foreach my $node_id (@node_ids) {
 			   "cert"    => $RPCCERT,
 			   "portnum" => $RPCPORT});
 
+	#
+	# XXX force MAC to a string since simple XML parser may otherwise
+	# think it is an int (i.e., all digits) or even a double (i.e.,
+	# all digits with an 'e' in the middle).  Don't laugh, I spent a
+	# lot of time figuring this out when it really happened!
+	#
+	my $macstr = RPC::XML::string->new($interfaces{0}[0]);
+
 	my $rval = libxmlrpc::CallMethod("elabinelab", "newnode_info",
-					 {"mac" => $interfaces{0}[0]});
+					 {"mac" => $macstr});
 
 	if (!defined($rval)) {
 	    print "XMPRPC server did not return control iface info!\n";
@@ -338,11 +369,17 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Okay, time to actually add the node!
     #
+    my $uuid = NewUUID();
+    if (!defined($uuid)) {
+	print "Could not generate a UUID!\n";
+	next NODE;
+    }
     
     DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
 	"phys_nodeid='$node_id', role='$role', priority=$priority, " .
-    	"eventstate='$state', op_mode='$opmode', " .
-	"def_boot_osid='$MFS_INITIAL', " .
+    	"eventstate='$state', op_mode='$opmode', uuid='$uuid', " .
+	"def_boot_osid='$osid', " .
+	"inception=now(), ".
 	"state_timestamp=unix_timestamp(NOW()), " .
 	"op_mode_timestamp=unix_timestamp(NOW())");
 
@@ -352,6 +389,8 @@ NODE: foreach my $node_id (@node_ids) {
 		 "(node_id, status, status_timestamp) ".
 		 "values ('$node_id', 'down', now()) ");
     DBQueryFatal("insert into node_activity ".
+		 "(node_id) values ('$node_id')");
+    DBQueryFatal("insert into node_utilization ".
 		 "(node_id) values ('$node_id')");
 
     #
@@ -388,14 +427,8 @@ NODE: foreach my $node_id (@node_ids) {
     # Add some vnodes
     #
     if (defined $nodenum && ($role eq "testnode")) {
-	my $vtype = $type;
-	if (!($vtype =~ s/pc/pcvm/)) {
-	    $vtype = "$vtype-vm";
-	}
 	DBQueryFatal("INSERT INTO node_auxtypes set node_id='$node_id', " .
 	    "type='pcvm', count=$virtnode_capacity");
-	DBQueryFatal("INSERT INTO node_auxtypes set node_id='$node_id', " .
-	    "type='$vtype', count=$virtnode_capacity");
     }
 
     while (my ($card, $aref) = each %interfaces) {
@@ -435,8 +468,11 @@ NODE: foreach my $node_id (@node_ids) {
 
 	DBQueryFatal("INSERT INTO interfaces SET node_id='$node_id', " .
 	    "card=$card, port=1, mac='$MAC', IP='$iface_IP', " .
-	    "interface_type='$iface_type', iface='$iface', " .
+	    "interface_type='$iface_type', iface='$iface', uuid=UUID(), " .
 	    "current_speed='$max_speed', duplex=$duplex, role='$iface_role'");
+
+	DBQueryFatal("INSERT INTO interface_state SET node_id='$node_id', " .
+	    "card=$card, port=1, iface='$iface'");
 
 	if (!$switch_id) {
 	    print "No switch found for ${node_id}:$iface - skipping\n";
@@ -526,16 +562,19 @@ if ($exports_rv) {
 #
 # Start rebooting nodes
 #
-print "Rebooting nodes...\n";
-foreach my $IP (@reboot_IPs) {
-    print "Rebooting $IP\n";
-    system "$newnode_reboot $IP\n";
+if (!$noreboot) {
+    print "Rebooting nodes...\n";
+    foreach my $IP (@reboot_IPs) {
+	print "Rebooting $IP\n";
+	system "$newnode_reboot $IP\n";
+    }
 }
-
-print "\n\n";
-print "Finished - when you are satisifed that the nodes are working\n";
-print "correctly, use nfree on boss to free them from the emulab-ops/hwdown\n";
-print "experiment.\n";
+if (!$quiet) {
+    print "\n\n";
+    print "Finished - when you are satisifed that the nodes are working\n";
+    print "correctly, use nfree on boss to free them from the emulab-ops/hwdown\n";
+    print "experiment.\n";
+}
 
 #
 # TODO -

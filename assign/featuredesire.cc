@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,7 +8,11 @@
  * featuredesire.cc - implementation of the objects from featuredesire.h
  */
 
+static const char rcsid[] = "$Id: featuredesire.cc,v 1.6 2009-05-20 18:06:08 tarunp Exp $";
+
 #include "featuredesire.h"
+#include "score.h"
+
 #include <iostream>
 using namespace std;
 
@@ -18,6 +22,8 @@ using namespace std;
 tb_featuredesire::name_featuredesire_map
     tb_featuredesire::featuredesires_by_name;
 
+int tb_featuredesire::highest_id(0);
+
 /*
  * Constructor
  */
@@ -25,9 +31,10 @@ tb_featuredesire::tb_featuredesire(fstring _my_name) : my_name(_my_name),
 				    global(false), local(false),
 				    l_additive(false), g_one_is_okay(false),
 				    g_more_than_one(false),
-				    in_use_globally(0) { 
-    static int highest_id = 0;
-		
+				    in_use_globally(0), desire_policy(),
+				    feature_policy(), desire_users(0),
+				    desire_total_weight(0.0f) { 
+  
     // Pick a unique numeric identifier for this feature/desire
     id = highest_id++;
 
@@ -76,26 +83,80 @@ tb_featuredesire::tb_featuredesire(fstring _my_name) : my_name(_my_name),
 }
 
 /*
+ * Alternate constuctor, including the type of the FD explicitly
+ */
+tb_featuredesire::tb_featuredesire(fstring _my_name,
+				   featuredesire::fd_type _fd_type) : 
+	global(false), local(false), l_additive(false), g_one_is_okay(false),
+	g_more_than_one(false), my_name(_my_name), in_use_globally(0),
+	desire_policy(), feature_policy(), desire_users(0),
+	desire_total_weight(0.0f) { 
+    // Pick a unique numeric identifier for this feature/desire
+    id = highest_id++;
+    // Determine the type of this feature/desire
+    switch (_fd_type) {
+	case featuredesire::FD_TYPE_NORMAL:
+	    break;
+	case featuredesire::FD_TYPE_LOCAL_ADDITIVE:
+	    local = true;
+	    l_additive = true;
+	    break;
+	case featuredesire::FD_TYPE_GLOBAL_ONE_IS_OKAY:
+	    global = true;
+	    g_one_is_okay = true;
+	    break;
+	case featuredesire::FD_TYPE_GLOBAL_MORE_THAN_ONE:
+	    global = true;
+	    g_more_than_one;
+    }
+	
+	
+    // Place this into the map for finding featuredesire objects by
+    // name
+    assert(featuredesires_by_name.find(my_name)
+	       == featuredesires_by_name.end());
+    featuredesires_by_name[my_name] = this;
+}	
+
+/*
  * Operators
  */
 ostream &operator<<(ostream &o, const tb_featuredesire &fd) {
     // Perhaps this should print more information like the flags and/or global
     // use count
-    o << fd.my_name;
+    return (o << fd.my_name);
 }
 
 
 /*
  * Static functions
  */
-tb_featuredesire *tb_featuredesire::get_featuredesire_obj(const fstring name) {
+tb_featuredesire *tb_featuredesire::get_featuredesire_by_name(const fstring name) {
     name_featuredesire_map::iterator it =
 	featuredesires_by_name.find(name);
     if (it == featuredesires_by_name.end()) {
-	return new tb_featuredesire(name);
+	return NULL;
     } else {
 	return it->second;
     }
+}
+
+tb_featuredesire *tb_featuredesire::get_or_create_featuredesire(const fstring name) {
+    tb_featuredesire *fd_obj = get_featuredesire_by_name(name);
+    if (fd_obj == NULL) {
+	fd_obj = new tb_featuredesire(name);
+    }
+    return fd_obj;
+}
+
+tb_featuredesire *tb_featuredesire::get_or_create_featuredesire(const fstring name,
+						featuredesire::fd_type type) {
+    tb_featuredesire *fd_obj = get_featuredesire_by_name(name);
+    // TODO: Should probably check to make sure type is consistent
+    if (fd_obj == NULL) {
+	fd_obj = new tb_featuredesire(name,type);
+    }
+    return fd_obj;
 }
 
 /*
@@ -112,6 +173,72 @@ void tb_featuredesire::remove_global_user(int howmany) {
     assert(in_use_globally >= 0);
 }
 
+/*
+ * Functions for manipulating policies
+ */
+void tb_featuredesire::disallow_desire() {
+    desire_policy.disallow();
+}
+void tb_featuredesire::allow_desire() {
+    desire_policy.allow();
+}
+void tb_featuredesire::limit_desire(double limit) {
+    desire_policy.limit_use(limit);
+}
+void tb_featuredesire::unlimit_desire() {
+    desire_policy.unlimit_use();
+}
+
+/*
+ * Bookkeeping functions
+ */
+void tb_featuredesire::add_desire_user(double weight) {
+    desire_users++;
+    desire_total_weight += weight;
+}
+int tb_featuredesire::get_desire_users() {
+    return desire_users;
+}
+double tb_featuredesire::get_desire_total_weight() {
+    return desire_total_weight;
+}
+
+/*
+ * Check desire violations - true means everything was okay, false otherwise
+ */
+bool tb_featuredesire::check_desire_policies() {
+    int errors = 0;
+    name_featuredesire_map::const_iterator it = featuredesires_by_name.begin();
+    while (it != featuredesires_by_name.end()) {
+	tb_featuredesire *fd = it->second;
+	if (!fd->desire_policy.is_allowable() && fd->desire_users) {
+	    cout << "  *** Policy violation: " << endl
+		<< "      Feature " << it->first
+		<< " requested, but prohibited by policy" << endl;
+	    errors++;
+	} else {
+	    if (fd->desire_policy.is_limited() &&
+		(fd->desire_total_weight > fd->desire_policy.get_limit())) {
+		cout << "  *** Policy violation: " << endl
+		    << "    Feature " << it->first
+		    << " requested with weight " << fd->desire_total_weight
+		    << " but limted to " << fd->desire_policy.get_limit()
+		    << " by policy" << endl;
+		errors++;
+	    }
+	}
+	it++;
+    }
+    
+    if (errors) {
+	return false;
+    } else {
+	return true;
+    }
+}
+
+
+
 /*********************************************************************
  * tb_node_featuredesire
  *********************************************************************/
@@ -123,11 +250,22 @@ tb_node_featuredesire::tb_node_featuredesire(fstring _name, double _weight) :
 	weight(_weight), violateable(false), used_local_capacity(0.0f) {
     // We'll want to change in the in the future to seperate out the notions of
     // score and violations
-    if (weight >= FD_VIOLATION_WEIGHT) {
+    if (weight >= featuredesire::FD_VIOLATION_WEIGHT) {
 	violateable = true;
     }
-    featuredesire_obj = tb_featuredesire::get_featuredesire_obj(_name);
+    featuredesire_obj = tb_featuredesire::get_or_create_featuredesire(_name);
     assert(featuredesire_obj != NULL);
+}
+
+/*
+ * Alternate constructor
+ */
+tb_node_featuredesire::tb_node_featuredesire(fstring _name, double _weight,
+					     bool _violateable,
+					     featuredesire::fd_type _type):
+	weight(_weight), violateable(_violateable), used_local_capacity(0.0f) {
+    featuredesire_obj = tb_featuredesire::get_or_create_featuredesire(_name,
+								      _type);
 }
 
 /*

@@ -1,11 +1,10 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
@@ -64,14 +63,10 @@ my $TBOPS  = "@TBOPSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-# Be careful not to exit on transient error; 0 means infinite retry.
-$libdb::DBQUERY_MAXTRIES = 0;
+use Experiment;
+use User;
 
 my $snmpit    = "$TB/bin/snmpit";
-my $dbuid;
-my $user_name;
-my $user_email;
     
 #
 # Untaint the path
@@ -88,69 +83,59 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
 if (@ARGV != 2) {
     usage();
 }
-my $pid   = $ARGV[0];
-my $eid   = $ARGV[1];
 if (defined($options{"r"})) {
     $reset = 1;
 }
 
-#
-# Untaint the arguments.
-#
-if ($pid =~ /^([-\w\.]+)$/) {
-    $pid = $1;
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-else {
-    die("Tainted argument $pid!\n");
+my $user_uid = $this_user->uid();
+
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($ARGV[0], $ARGV[1]);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object!")
 }
-if ($eid =~ /^([-\w\.]+)$/) {
-    $eid = $1;
-}
-else {
-    die("Tainted argument $eid!\n");
-}
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
 
 #
 # See if the experiment is firewalled. Error if not.
 #
-my $firewalled = TBExptFirewall($pid, $eid);
-if (!$firewalled) {
+if (!$experiment->IsFirewalled()) {
     die("*** $0:\n".
-	"    Experiment $pid/$eid is not firewalled!\n");
-}
-
-#
-# Verify user and get his DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
-}
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
+	"    $experiment is not firewalled!\n");
 }
 
 #
 # Verify that this person is allowed to press the panic button.
 # Note that any script down the line has to do an admin check also. 
 #
-if ($UID && !TBAdmin($UID) &&
-    !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_MODIFY)) {
+if ($UID && !$this_user->IsAdmin() &&
+    !$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
     die("*** $0:\n".
 	"    You do not have permission to end this experiment!\n");
 }
+
+#
+# Get email info for user.
+#
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+
+# Get email for current swapper.
+my $swapper        = $experiment->GetSwapper();
+my $swapper_name   = $swapper->name();
+my $swapper_email  = $swapper->email();
 
 #
 # We have to protect against trying to end an experiment that is currently
@@ -159,38 +144,28 @@ if ($UID && !TBAdmin($UID) &&
 # terminating consists of a couple of different experiment states down inside
 # the tb scripts. 
 #
-DBQueryFatal("lock tables experiments write");
-
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result->numrows) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid exists!\n");
-}
-my %hashrow = $query_result->fetchhash();
-my $expt_head_login = $hashrow{'expt_head_uid'};
-my $estate          = $hashrow{'state'};
+$experiment->LockTables() == 0
+    or fatal("Could not lock experiment tables for $pid/$eid!");
 
 #
 # Called from user (via web interface).
 #
 if ($reset) {
     ExitWithStatus(1, "Experiment $pid/$eid is not paniced!\n")
-	if ($estate ne EXPTSTATE_PANICED);
+	if ($experiment->state() ne EXPTSTATE_PANICED);
 }
 else {
     ExitWithStatus(1, "Experiment $pid/$eid is not active!\n")
-	if (! ($estate eq EXPTSTATE_ACTIVE ||
-	       $estate eq EXPTSTATE_ACTIVATING ||
-	       $estate eq EXPTSTATE_SWAPPING));
+	if (! ($experiment->state() eq EXPTSTATE_ACTIVE ||
+	       $experiment->state() eq EXPTSTATE_ACTIVATING ||
+	       $experiment->state() eq EXPTSTATE_SWAPPING));
 }
 
 #
-# Change experiment state and lock it.
-# 
-TBLockExp($pid, $eid, ($reset ? EXPTSTATE_ACTIVE : EXPTSTATE_PANICED));
-DBQueryFatal("unlock tables");
+# Change experiment state and lock it. Unlock tables at same time.
+#
+$experiment->Lock(($reset ? EXPTSTATE_ACTIVE : EXPTSTATE_PANICED), 1) == 0
+    or fatal("Could not lock $experiment");
 
 #
 # XXX - At this point a failure is going to leave things in an
@@ -201,26 +176,11 @@ DBQueryFatal("unlock tables");
 #
 
 #
-# Get email address of the experiment head, which may be different than
-# the person who is actually terminating the experiment, since its polite
-# to let the original creator know whats going on. 
-#
-my $expt_head_name;
-my $expt_head_email;
-
-if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
-    print "*** WARNING: ".
-	  "Could not determine name/email for $expt_head_login.\n";
-    $expt_head_name  = "TBOPS";
-    $expt_head_email = $TBOPS;
-}
-
-#
 # Get firewall node and port info
 #
 my ($firewall, $port);
-if (!TBExptFirewallAndPort($pid, $eid, \$firewall, \$port)) {
-    fatal("Could not determine firewall port for $pid/$eid!");
+if ($experiment->FirewallAndPort(\$firewall, \$port) != 0) {
+    fatal("Could not determine firewall port for $experiment");
 }
 
 #
@@ -231,7 +191,7 @@ if ($reset) {
     if ($?) {
 	fatal("snmpit exited with $?!");
     }
-    TBExptClearPanicBit($pid, $eid);
+    $experiment->SetPanicBit(0);
     print "Panic situation has been cleared!\n";
 }
 else {
@@ -239,10 +199,10 @@ else {
     if ($?) {
 	fatal("snmpit exited with $?!");
     }
-    TBExptSetPanicBit($pid, $eid);
+    $experiment->SetPanicBit(1);
     print "Panic Button has been pressed!\n";
 }
-TBUnLockExp($pid, $eid);
+$experiment->Unlock();
 
 #
 # Send email notification to user *and* to tbops.
@@ -250,10 +210,10 @@ TBUnLockExp($pid, $eid);
 SENDMAIL("$user_name <$user_email>",
 	 "Panic Button ". ($reset ? "Cleared" : "Pressed") .
 	    " for Experiment $pid/$eid",
-	 "$dbuid has " . ($reset ? "cleared" : "pressed") .
+	 "$user_uid has " . ($reset ? "cleared" : "pressed") .
 	   " the panic button for experiment $pid/$eid",
 	 "$user_name <$user_email>",
-	 "Cc:  $expt_head_name <$expt_head_email>\n".
+	 "Cc:  $swapper_name <$swapper_email>\n".
 	 "Bcc: $TBOPS");
 
 exit 0;
@@ -267,12 +227,12 @@ sub fatal($)
     #
     SENDMAIL("$user_name <$user_email>",
 	     "Panic Button Failure for Experiment $pid/$eid",
-	     "$dbuid ". ($reset ? "cleared" : "pressed") .
+	     "$user_uid ". ($reset ? "cleared" : "pressed") .
 	       " the panic button for experiment $pid/$eid,\n".
 	     "BUT there was a failure!\n\n".
 	     "$mesg\n",
 	     "$user_name <$user_email>",
-	     "Cc:  $expt_head_name <$expt_head_email>\n".
+	     "Cc:  $swapper_name <$swapper_email>\n".
 	     "Bcc: $TBOPS");
 
     die("*** $0:\n".

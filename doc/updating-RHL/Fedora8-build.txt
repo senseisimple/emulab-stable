@@ -1,0 +1,317 @@
+#
+# Stuff to do in order to make a fresh Fedora 8 testbed ready
+#   for both the 32 bit and 64 bit (x86_64) versions
+#
+
+#
+# NOTE: Not meant to be run as a script.
+#       SO DON'T!
+# Copy and past into bash
+#
+
+##
+##
+
+# make ext2 fs on /dev/hda4 and then mount it.  I recommend putting all
+# working files on this partition so that they won't appear in the
+# final image
+
+mount /dev/hda4 /z
+
+# Copy the testbed source to /z/testbed somehow.
+
+export testbed_src=/z/testbed
+export etc_patches=${testbed_src}/doc/updating-RHL/Fedora8-etc-patches
+
+export tz=MST7MDT
+
+## Mount /share to make some things easier.
+##
+cd /
+mkdir -p "/share"
+mount -o hard,intr,udp "fs:/share" "/share"
+
+## Disable kudzu at boot-time.
+# XXX no need if the kudzu rpms are removed
+#/sbin/chkconfig kudzu off
+# 
+
+## Kill off CUPS.
+
+/sbin/chkconfig cups off
+
+## Enable ssh 1
+##
+patch /etc/ssh/sshd_config < $etc_patches/sshd_config.patch
+
+## Install an appropriate /etc/inittab:
+## - Run a getty in ttyS0
+## - Do not run getty's for most virtual consoles (tty1, ...)
+##
+patch /etc/inittab < $etc_patches/inittab.patch
+
+## Enable all wheel members to `sudo'.
+##
+patch /etc/sudoers < $etc_patches/sudoers.patch
+
+## Log `ssh' logins to `users.emulab.net'.
+##
+patch /etc/rsyslog.conf < $etc_patches/rsyslog.conf.patch
+
+# * /etc/localtime
+#   Copy the correct file over from /usr/share/zoneinfo
+# XXX: should be necessary if correct timezone was selected at install time
+#rm -f /etc/localtime
+#install -o root -g root -m 644 "/usr/share/zoneinfo/${tz}" /etc/localtime
+
+####
+
+# Make the default locale "C"
+patch /etc/sysconfig/i18n < $etc_patches/sysconfig-i18n.patch
+
+## Add sbin to path for all users not just root
+##
+patch /etc/profile < $etc_patches/profile.patch
+patch /etc/csh.login < $etc_patches/csh.login.patch
+
+## Remove 000-delay.cron from cron.daily//weekly/monthly
+##
+## These files will cause problems for "prepare".
+##
+rm /etc/cron.daily/000-delay.cron /etc/cron.weekly/000-delay.cron \
+   /etc/cron.monthly/000-delay.cron
+
+## Disable selinux
+##
+patch /etc/selinux/config < $etc_patches/selinux-config.patch
+
+## Remove ccache
+##
+## It will cause gcc to hang since it tries to store the contents of the
+## cache in the home directory (.cccahe).  Which doesn't work over nfs
+## on emulab for some reason.
+rpm -e ccache
+
+## Disable the firewall
+##
+## This will cause problems with some of emulab client software
+##
+chkconfig iptables off
+
+## Fix up device drivers
+##
+# disable udev-post, as it adds persistent udev rules, and as a result
+#  eth devices will get high-numbered names like eth8+
+chkconfig udev-post
+# now go though /etc/udev/70-persistent-cd.rules and
+#   /etc/udev/70-persistent-net.rules and remove any devices settings
+# also fix up /etc/modprobe.conf, must remove eth* aliases, also need to add
+#   scci_hostadapter aliases, best to just use the one in $etc_patches:
+cp etc_patches/modprobe.conf /etc
+
+## Add wireless cards to /etc/modprobe.d/blacklist
+##
+patch /etc/modprobe.d/blacklist < $etc_patches/blacklist.patch
+
+## For the 64 bit image enable listing the arch when using "rpm -qa"
+##
+echo '%_query_all_fmt  %%{name}-%%{version}-%%{release}.%%{arch}' > /etc/rpm/macros
+
+## Reinstall grub
+##
+## For some reason the f8 installer may hardcoded the bios boot drive
+## address, which may cause problems with the wireless nodes that
+## boot off a USB memory stick.
+sudo grub
+grub> find /boot/grub/grub.conf
+grub> root (hd0,1)
+grub> setup (hd0,1)
+grub> quit
+
+## Fix up grub.conf
+##
+# Change the terminal line to
+#   terminal --dumb --timeout=0 serial console
+
+## Install tcsh
+##
+## Only bash is installed by default, however the c shell is needed by
+## the program agent.
+yum install tcsh
+
+
+###############################################################################
+
+## Install Keys 
+## emulab-keys.tar.gz created by running 
+##   sh ${testbed_src}/doc/updating-RHL/tar-keys
+## on an exiting node
+
+# Note: root password will get installed by prepare
+
+###############################################################################
+
+## Install "pubsub"
+##
+# download from cvs 
+
+## Install Boost.
+##  XXX no need, now standard rpm
+
+## Install the Emulab client stuff. 
+##
+#
+mkdir testbed-obj
+../testbed/configure  --with-TBDEFS=../testbed/defs-default
+make client
+make client-install
+
+###############################################################################
+
+##
+## Add/remove rpms.
+##
+
+# Done manually, compare your RPM list to Fedora8-rpm-list.txt using something 
+# like:
+#   cut -f1 < Fedora8-rpm-list.txt | uniq > Fedora8-rpm-names.txt
+#   rpm -qa --queryformat '%{NAME}\n' | sort -u > mine.txt
+#   comm Fedora8-rpm-names.txt mine.txt
+#
+# For the 64 bit image, also remove most of the 32 bit libraries
+# The file Fedora8-rpm-list.txt contains the arch as the third column
+# grep for "i.86" to figure out which 32 bit libraries where kept.
+# 
+# You may also find Fedora8-rpm-list-install.txt usefull.  It is the rpm list
+# after the initial install for the 32 bit Fedora image.
+#
+# NOTE: used 'rpm -qa --queryformat '%{NAME}\t%{VERSION}\t%{ARCH}\n' | sort'
+#   to create Fedora8-rpm-list.txt
+# ALSO NOTE: The set of packages on the 32 bit and 64 bit Fedora are the same
+#   except for a few extra 32 bit libraries on the 64 bit image, thus the package
+#   list Fedora8-rpm-list.txt is good to compare against for both versions.
+
+###############################################################################
+
+##
+## Fine tune services
+##
+
+Enable the following and only the following services using "sudo ntsysv"
+
+  [*] acpid        
+  [*] anacron      
+  [ ] atd          
+  [ ] autofs       
+  [ ] avahi-daemon 
+  [ ] bgpd         
+  [ ] cpuspeed     
+  [*] crond        
+  [ ] cups         
+  [ ] gated        
+  [ ] gpm          
+  [ ] ip6tables    
+  [ ] iptables     
+  [*] irqbalance   
+  [ ] lm_sensors   
+  [ ] mdmonitor    
+  [*] messagebus   
+  [ ] netconsole   
+  [*] netfs        
+  [ ] netplugd     
+  [*] network      
+  [ ] nfs          
+  [*] nfslock      
+  [*] ntpd         
+  [ ] ospf6d       
+  [ ] ospfd        
+  [ ] psacct       
+  [ ] racoon       
+  [ ] rdisc        
+  [ ] restorecond  
+  [ ] ripd         
+  [ ] ripngd       
+  [*] rpcbind      
+  [ ] rpcgssd      
+  [*] rpcidmapd    
+  [ ] rpcsvcgssd   
+  [*] rsyslog      
+  [ ] saslauthd    
+  [*] sendmail     
+  [ ] smartd       
+  [*] sshd         
+  [ ] udev-post    
+  [ ] xfs          
+  [ ] zebra        
+
+###############################################################################
+
+##
+## Optional: Install jove from source: 
+##   ftp://ftp.cs.toronto.edu/cs/ftp/pub/hugh/jove-dev/
+
+###############################################################################
+
+##
+## Update to latest version.  Note this may also update the kernel.
+##
+
+yum update
+
+###############################################################################
+
+#
+# NOW REBOOT TO MAKE SURE IT WORKS
+#
+
+###############################################################################
+
+## Install rude/crude.
+##
+cd "${local_build_root}"
+wget http://prdownloads.sourceforge.net/rude/rude-0.70.tar.gz
+tar zxf rude-0.70.tar.gz 
+cd rude
+./configure
+gmake
+gmake install
+
+## Install `gated'.
+## XXX --- compile w/o debugging?
+##
+
+#cd "${local_build_root}"
+## wget http://ftp.rge.com/pub/networking/gated/gated-3-6.tar.gz
+#wget http://www.funet.fi/pub/unix/tcpip/gated/gated-3-6.tar.gz
+#tar zxf gated-3-6.tar.gz
+#cd gated-public-3_6
+#./configure
+#gmake depend
+#gmake
+#gmake install
+## Installs just `/usr/local/sbin/gated'.
+
+# Version built from source doesn't work, install RHL7.3 RPM instead
+rpm -i /share/redhat/7.3/RPMS/gated-3.6-14.i386.rpm
+
+###############################################################################
+
+## Install kernel
+
+## /share/fedora/F8/src on ops.emulab.net
+
+###############################################################################
+
+When all done testing create a final image. 
+
+# Prep the image
+
+yum clean all
+find /var/cache/man -type f | xargs rm
+
+# NOTE prepare now run automataically
+
+# Create an image via the web interface. 
+
+######
+

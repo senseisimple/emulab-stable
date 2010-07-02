@@ -1,19 +1,27 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can see this information
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-if ($node_id) {
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("node",       PAGEARG_NODE,
+				 "formfields", PAGEARG_ARRAY);
+
+if (isset($node)) {
+    $node_id = $node->node_id();
+    
     PAGEHEADER("Wide Area Link Characteristics For $node_id");
 } else {
     PAGEHEADER("Wide Area Link Characteristics");
@@ -24,13 +32,12 @@ if ($node_id) {
 #
 function SPITDATA($table, $title, $formfields)
 {
-
     #
-    # Grab a couple of the formfields that we're gonna use a lot
+    # Grab a couple of the formfields that we are gonna use a lot
     #
-    $node_id     = $formfields[node_id];
-    $dst_sortby  = $formfields[dst_node_id];
-    $sortby      = $formfields[sortby];
+    $node_id     = $formfields["node_id"];
+    $dst_node_id = $formfields["dst_node_id"];
+    $sortby      = $formfields["sortby"];
 
     #
     # Provide a default sort order
@@ -38,7 +45,6 @@ function SPITDATA($table, $title, $formfields)
     if (!$sortby) {
 	$sortby = "node";
     }
-
 
     #
     # Figure out what order to sort in
@@ -62,37 +68,39 @@ function SPITDATA($table, $title, $formfields)
     } else {
 	$whereclause = "1";
     }
-    if ($formfields[dst_node_id]) {
-	$whereclause .= " and t.node_id2='$formfields[dst_node_id]'";
+    if ($dst_node_id) {
+	$whereclause .= " and t.node_id2='$dst_node_id'";
     }
 
     #
     # Handle constraints on the bandwidth, latency, and PLR
     #
-    if ($formfields[min_bw]) {
-	$whereclause .= " and t.bandwidth >= $formfields[min_bw]";
+    if ($formfields["min_bw"]) {
+	$min_bw = $formfields["min_bw"];
+	$whereclause .= " and t.bandwidth >= $min_bw";
     }
-    if ($max_bw) {
-	$whereclause .= " and t.bandwidth <= $formfields[max_bw]";
+    if ($formfields["max_bw"]) {
+	$max_bw = $formfields["max_bw"];
+	$whereclause .= " and t.bandwidth <= $max_bw";
     }
 
     # Convert from percent to fractional
-    $min_plr = $formfields[min_plr] / 100.0;
-    $max_plr = $formfields[max_plr] / 100.0;
-    if ($min_plr) {
+    if ($formfields["min_plr"]) {
+	$min_plr = $formfields["min_plr"] / 100.0;
 	$whereclause .= " and t.lossrate >= $min_plr";
     }
-    if ($max_plr) {
+    if ($formfields["max_plr"]) {
+	$max_plr = $formfields["max_plr"] / 100.0;
 	$whereclause .= " and t.lossrate <= $max_plr";
     }
 
     # Convert from ms to seconds
-    $min_latency = $formfields[min_latency] / 1000.0;
-    $max_latency = $formfields[max_latency] / 1000.0;
-    if ($min_latency) {
+    if ($formfields["min_latency"]) {
+	$min_latency = $formfields["min_latency"] / 1000.0;
 	$whereclause .= " and t.time >= $min_latency";
     }
-    if ($max_latency) {
+    if ($formfields["max_latency"]) {
+	$max_latency = $formfields["max_latency"] / 1000.0;
 	$whereclause .= " and t.time <= $max_latency";
     }
 
@@ -114,7 +122,7 @@ function SPITDATA($table, $title, $formfields)
 	   <tr>";
 
     #
-    # Make the column headers links to change the sort order, unless we're
+    # Make the column headers links to change the sort order, unless we are
     # aready sorting by the column - also, if we have a desitnation node (and
     # thus are only displaying one row), sorting is pointless,
     #
@@ -164,14 +172,14 @@ function SPITDATA($table, $title, $formfields)
 		     " where $whereclause order by $sortclause");
 
     while ($row = mysql_fetch_array($query_result)) {
-	$node_id1 = $row[node_id1];
-	$node_id2 = $row[node_id2];
-	$time     = $row[time];
-	$bw       = $row[bandwidth];
-	$plr      = $row[lossrate];
-	$start    = $row[start_time];
-	$end      = $row[end_time];
-	$hostname = $row[hostname];
+	$node_id1 = $row["node_id1"];
+	$node_id2 = $row["node_id2"];
+	$time     = $row["time"];
+	$bw       = $row["bandwidth"];
+	$plr      = $row["lossrate"];
+	$start    = $row["start_time"];
+	$end      = $row["end_time"];
+	$hostname = $row["hostname"];
     
 	#
 	# Convert a few columns to the right formats
@@ -267,6 +275,8 @@ function SPITFORM($formfields) {
 		<td><input name='formfields[max_plr]'
 		     value='$formfields[max_plr]' size=4></td>
 	    </tr>
+            <input type=hidden name='formfields[sortby]'
+                      value='$formfields[sortby]'>
 	    <tr>
 		<td colspan=2 align='center'>
 		    <input type='submit' name='Submit' value='Submit'>
@@ -285,27 +295,82 @@ function SPITFORM($formfields) {
 function makeURL($text,$formfields,$node_id,$sortby) {
     $fieldcopy = $formfields;
     if ($node_id) {
-	$fieldcopy[node_id] = $node_id;
+	$fieldcopy["node_id"] = $node_id;
     }
     if ($sortby) {
-	$fieldcopy[sortby] = $sortby;
+	$fieldcopy["sortby"] = $sortby;
     }
     $fieldstrings = array();
     foreach ($fieldcopy as $field => $value) {
-	if ($value) {
-	    array_push($fieldstrings, "formfields[$field]=$value");
-	}
+	array_push($fieldstrings, "formfields[$field]=$value");
     }
     $args = implode("&",$fieldstrings);
     return "<a href=\"widearea_nodeinfo.php3?$args\">$text</a>";
 }
 
-SPITFORM($formfields);
-if ($formfields[node_id] || $formfields[min_bw] || $formfields[max_bw] ||
-    $formfields[min_latency] || $formfields[max_latency] ||
-    $formfields[min_plr] || $formfields[max_plr]) {
-    SPITDATA("widearea_recent", "Most Recent Data", $formfields);
-    SPITDATA("widearea_delays", "Aged Data", $formfields);
+$err = false;
+if (!isset($formfields)) {
+    $formfields = array();
+    
+    $formfields["node_id"]	= "";
+    $formfields["dst_node_id"]	= "";
+    $formfields["min_bw"]	= "";
+    $formfields["max_bw"]	= "";
+    $formfields["min_latency"]	= "";
+    $formfields["max_latency"]	= "";
+    $formfields["min_plr"]	= "";
+    $formfields["max_plr"]	= "";
+    $formfields["sortby"]	= "node";
+    
+    SPITFORM($formfields);
+}
+else {
+    if ($formfields["node_id"] &&
+	!TBvalid_node_id($formfields["node_id"])) {
+	$err = true;
+	USERERROR("Invalid characters in node_id");
+    }
+    if ($formfields["dst_node_id"] &&
+	!TBvalid_node_id($formfields["dst_node_id"])) {
+	$err = true;
+	USERERROR("Invalid characters in dst_node_id");
+    }
+    if ($formfields["min_bw"] &&
+	!TBvalid_integer($formfields["min_bw"])) {
+	$err = true;
+	USERERROR("Invalid characters in min_bw");
+    }
+    if ($formfields["max_bw"] &&
+	!TBvalid_integer($formfields["max_bw"])) {
+	$err = true;
+	USERERROR("Invalid characters in max_bw");
+    }
+    if ($formfields["min_latency"] &&
+	!TBvalid_integer($formfields["min_latency"])) {
+	$err = true;
+	USERERROR("Invalid characters in min_latency");
+    }
+    if ($formfields["max_latency"] &&
+	!TBvalid_integer($formfields["max_latency"])) {
+	$err = true;
+	USERERROR("Invalid characters in max_latency");
+    }
+    if ($formfields["min_plr"] &&
+	!TBvalid_float($formfields["min_plr"])) {
+	$err = true;
+	USERERROR("Invalid characters in min_plr");
+    }
+    if ($formfields["max_plr"] &&
+	!TBvalid_float($formfields["max_plr"])) {
+	$err = true;
+	USERERROR("Invalid characters in max_plr");
+    }
+    
+    SPITFORM($formfields);
+    if (! $err) {
+	SPITDATA("widearea_recent", "Most Recent Data", $formfields);
+	SPITDATA("widearea_delays", "Aged Data", $formfields);
+    }
 }
 
 #

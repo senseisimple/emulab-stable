@@ -1,0 +1,257 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use POSIX qw(setsid);
+use POSIX qw(strftime);
+
+#
+# Delete an experiment template (and optionally its children).
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_delete [-q] [-r] <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-q          - be less chatty\n".
+	  "-r          - Delete recursively\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qdr";
+my $quiet        = 0;
+my $debug        = 0;
+my $recursive    = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL	= "@USERNODE@";
+
+# Programs we need
+my $endexp      = "$TB/bin/endexp";
+my $makegraph   = "$TB/bin/template_graph";
+
+# Locals
+my $guid;
+my $version;
+my $logname;
+my $template;
+my @templates   = ();
+my %instances   = ();	# Indexed by vers.
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub sighandler($);
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+use libaudit;
+use User;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# Grab template info.
+#
+$template = Template->Lookup($guid, $version);
+
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! $template->AccessCheck($this_user, TB_EXPT_DESTROY())) {
+    tberror("You do not have permission to delete template $guid/$version");
+    exit(1);
+}
+
+#
+# Ask for the children. If not in recursive mode, there better not be any!
+#
+my @children;
+
+$template->Children(\@children) == 0
+    or tbdie("Could not construct list of child templates for $guid/$version");
+
+if ($recursive) {
+    @templates = (@children, $template);
+}
+else {
+    tbdie("Cannot delete template $template cause it has children @children")
+	if (@children);
+
+    # Just one.
+    @templates = ($template);
+}
+
+if ($debug) {
+    print STDERR "Looking at @templates\n"
+	if ($debug);
+}
+
+#
+# Now get the instance lists for each template and see if any are active.
+#
+my $active = 0;
+
+foreach my $template (@templates) {
+    my @instance_list;
+
+    $template->InstanceList(1, \@instance_list) == 0
+	or tbdie("Could not get instance list for $template!");
+
+    print STDERR "Instances for $template: @instance_list\n"
+	if ($debug);
+
+    # Check each instance to make sure its not a current instance.
+    foreach my $instance (@instance_list) {
+	my $current = $instance->Instantiated();
+	exit(-1)
+	    if ($current < 0);
+    
+	if ($current) {
+	    tberror("Instance $instance is still instantiated!");
+	    $active++;
+	}
+    }
+    $instances{$template->vers()} = [ @instance_list ];
+}
+exit(1)
+    if ($active);
+
+# Use the logonly option to audit so that we get a record mailed.
+LogStart(0);
+
+#
+# Okay, do the deletions.
+#
+foreach my $template (@templates) {
+    my @instance_list = @{ $instances{$template->vers()} };
+
+    print STDERR "Deleting instances: @instance_list\n"
+	if ($debug && @instance_list);
+
+    foreach my $instance (@instance_list) {
+	print "Deleting template instance $instance ... \n";
+
+	$instance->Delete() == 0
+	    or tbdie("Could not delete instance $instance");
+    }
+    my $pid = $template->pid();
+    my $eid = $template->eid();
+
+    # This is the hidden experiment under the template.
+    if (ExpState($pid, $eid)) {
+	system("$endexp -x -q -w $pid,$eid");
+	exit(-1)
+	    if ($?);
+    }
+
+    # And finally the template record.
+    print "Deleting template $template ...\n";
+    
+    $template->Delete() == 0
+	or tbdie("Could not delete template $template");
+}
+
+#
+# Recreate the graph.
+#
+system("$makegraph $guid");
+
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    my %options;
+    
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 1) {
+	usage();
+    }
+    #
+    # Pick up guid/version first and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"r"})) {
+	$recursive = 1;
+    }
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 1;
+    }
+}

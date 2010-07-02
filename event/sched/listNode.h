@@ -1,12 +1,7 @@
 /*
- * listNode.h
- *
- * Copyright (c) 2003, 2004 The University of Utah and the Flux Group.
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
  * All rights reserved.
- *
- * This file is licensed under the terms of the GNU Public License.  
- * See the file "license.terms" for restrictions on redistribution 
- * of this file, and for a DISCLAIMER OF ALL WARRANTIES.
  */
 
 /**

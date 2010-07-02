@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef FSTRING_H_
 #define FSTRING_H_
 
@@ -15,11 +21,13 @@
  *      - O(1) hashing time for any string
  */
 
+#include "port.h"
+
 #include <iostream>
 #include <map>
 using namespace std;
 
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <ext/hash_fun.h>
 using namespace __gnu_cxx;
 #else
@@ -118,7 +126,11 @@ class fstring {
          * Output/debugging functions
          */
         friend ostream &operator<<(ostream &o, const fstring &s) {
-            return(o << s.str);
+            if (s.str != NULL) {
+                return(o << s.str);
+            } else {
+                return(o << "(null)");
+            }
         }
 		
 		
@@ -140,8 +152,8 @@ class fstring {
         }
 
     private:
-        // This is the only actual intatiable data method of an fstring
-        const char *str;
+        // This is the only a pointer to the One True Copy of the the string
+	const char *str;
 
         /*
          * Used so that we can put char*s in maps
@@ -177,7 +189,7 @@ class fstring {
 };
 
 // A hash function for fstrings
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 namespace __gnu_cxx {
 #endif
 template<> struct hash<fstring> {
@@ -186,8 +198,8 @@ template<> struct hash<fstring> {
   	return (size_t)__str.hash();
   }
 };
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
-};
+#ifdef NEW_GCC
+}
 #endif
 
 #endif /*FSTRING_H_*/

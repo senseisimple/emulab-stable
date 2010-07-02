@@ -1,33 +1,31 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # Only known and logged in users can watch LEDs
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-#
 # Verify page arguments.
-#
-if (!isset($node) || strcmp($node, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
+$reqargs = RequiredPageArguments("node", PAGEARG_STRING);
 
 if (!TBvalid_node_id($node)) {
     USERERROR("Invalid node ID.", 1);
 }
 
-if (!TBValidNodeName($node)) {
+if (! ($target_node = Node::Lookup($node))) {
     USERERROR("Invalid node ID.", 1);
 }
 
-if (!TBNodeAccessCheck($uid, $node, $TB_NODEACCESS_READINFO)) {
+if (!$target_node->AccessCheck($this_user, $TB_NODEACCESS_READINFO)) {
     USERERROR("Not enough permission.", 1);
 }
 

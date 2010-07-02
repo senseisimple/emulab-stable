@@ -1,0 +1,147 @@
+================ success ================
+approveproject.php3.html
+     <b>Project 'testproj3' is being created</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+approveuser.php3.html
+     	 <title>MyEmulab.Net - New Users Approved</title>
+     New Users Approved</h2></div>
+      User testusr3 was <b>granted</b> membership in
+beginexp_html.php3.html
+     <b>Starting experiment configuration!</b> Since you are only pre-loading the experiment, this will typically
+boot.php3.html
+     reboot (pc59): Attempting to reboot ...
+     reboot (pc63): Attempting to reboot ...
+     reboot (pc84): Attempting to reboot ...
+     reboot (pc59): Successful!
+     reboot (pc63): Successful!
+     reboot (pc84): Successful!
+changeuid.php.html
+      Please enter the new UID for user 'testusr3'<br><br>
+deletegroup.php3.html
+     <b>Group 'testgroup3' in project 'testproj3' is being removed!</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+deleteimageid.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+      Image '3' in project testproj3 has been deleted!
+deleteosid.php3.html
+      OS Descriptor 'testosid3' in Project testproj3 has been deleted!
+deleteproject.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+deletepubkey.php3.html
+     	 <title>MyEmulab.Net - SSH Public Keys for user: testusr3</title>
+     SSH Public Keys for user: testusr3</h2></div>
+      Current ssh public keys for user testusr3.
+      Enter ssh public keys for user
+deleteuser.php3.html
+     <b>User 'testusr3' is being removed!</b> ...<br>
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+editexp.php3.html
+     <h3 class=submenuheader>Experiment Options</h3>
+editgroup.php3.html
+     <div id='fullcontentbody'><!-- begin content --><center><h3>Done!</h3></center>
+editimageid.php3.html
+     	 <title>MyEmulab.Net - Edit Image Descriptor</title>
+     Edit Image Descriptor</h2></div>
+editnodetype.php3.html
+     	 <title>MyEmulab.Net - Edit Node Type</title>
+     Edit Node Type</h2></div>
+editsitevars.php3.html
+     	 </tr><tr><td>&nbsp;<b>batch/retry_wait</b>&nbsp;</td>
+endexp.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+      You will be notified via email when termination has completed
+feedback.php3.html
+     <div id='fullcontentbody'><!-- begin content --><center><h3><br>Done!</h3></center>
+freenode.php3.html
+      Operation canceled!
+freezeuser.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+gensslcert.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+joinproject.php3.html
+      As a pending user of the Testbed you will receive a key via email.
+      application, and you will be notified via email as soon as
+kb-manage.php3.html
+     <center><b>Knowledge Base Entry: 282 test_tag</b><br>(<a href="https://myboss.vulnelab.testbed.emulab.net/kb-search.php3">Search Again</a>)</center>
+kb-search.php3.html
+     <font size=+2>Knowledge Base search results</font>
+linktest.php3.html
+      Are you <b>sure</b> you want to run linktest?
+loadimage.php3.html
+      Taking a snapshot of node 'pc84' into image 'testimg3' ...
+modifyexp.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     <b>Your experiment is being modified!</b> You will be notified via email when the experiment has finished modifying and you are able to proceed. This typically takes less than 10 minutes, depending on the number of nodes in the experiment. If you do not receive email notification within a reasonable amount time, please contact <a href="mailto:testbed-ops@myops.vulnelab.testbed.emulab.net">
+moduserinfo.php3.html
+     <div id='fullcontentbody'><!-- begin content --><center><h3>Done!</h3></center>
+newgroup.php3.html
+     <div id='fullcontentbody'><!-- begin content --><br>Creating project group testgroup3.<br>
+     <center><h3>Done!</h3></center>
+newimageid.php3.html
+     <h3 class=submenuheader>More Options</h3>
+newimageid_ez.php3.html
+     <h3 class=submenuheader>More Options</h3>
+newnodelog.php3.html
+      Log for node pc84.
+newosid.php3.html
+     <div id='fullcontentbody'><!-- begin content --><center><h3>Done!</h3></center>
+newproject.php3.html
+      Your project request has been successfully queued.
+nodecontrol.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+nscheck.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     ClearBusyIndicators('<center><b>Done!</b></center>');
+     <center><br><h2>Your NS file looks good!</h2></center>
+nsgen.php3.html
+      This template is for creating a DevBox for building software
+plab_ez.php3.html
+      <p><b>To finish creating your slice, edit the 
+powertime.php3.html
+     <div id='fullcontentbody'><!-- begin content --><center>Updated power time for:<br><br><b>pc84</b><br></center>
+prereserve_node.php3.html
+     <h3 class=submenuheader>Node Options</h3>
+replayexp.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     Events for your experiment are now being replayed.
+resendapproval.php.html
+      <h2>Done!</h2>
+showpubkeys.php3.html
+     	 <title>MyEmulab.Net - SSH Public Keys for user: testuser</title>
+     SSH Public Keys for user: testuser</h2></div>
+      Current ssh public keys for user testuser.
+      Enter ssh public keys for user
+showsumstats.php3.html
+     <b>Range: <a class='static'
+showuser_list.php3.html
+      There are 1 logged in users.
+template_create.php.html
+     This will take a few moments; please be <em>patient</em>.<br>
+updateaccounts.php3.html
+     This will take a few moments; please be <em>patient</em>.<br>
+     You will be notified via email when the update has completed on
+================ failure ================
+newmmlist.php3.html
+      &nbsp;Oops, please fix the following errors!&nbsp;
+      <font color=red>Name already in use; pick another</font></td>
+template_export.php.html
+     	 <title>MyEmulab.Net - Page Error</title>
+     Page Error</h2></div>
+      Invalid page arguments: /template_export.php?experiment=9<br><br>Must provide a template or an instance to export
+================ problem ================
+archive_tags.php3.html
+      No tags for experiment testbed/testexp1
+newmmlist.php3.html
+      <font color=red>Name already in use; pick another</font></td>
+newnodes_list.php3.html
+      At least one node must be selected!
+template_export.php.html
+      Invalid page arguments: /template_export.php?experiment=9<br><br>Must provide a template or an instance to export
+================ UNKNOWN ================

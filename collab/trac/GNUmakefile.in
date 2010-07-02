@@ -1,0 +1,78 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= collab/trac
+
+include $(OBJDIR)/Makeconf
+
+SBIN_SCRIPTS		= tracuser tracsetup
+LIBEXEC_SCRIPTS		= tracxlogin 
+CTRL_LIBEXEC_SCRIPTS	= 
+CTRL_LIB_FILES		= 
+CTRL_SBIN_SCRIPTS	= tracproxy email2trac
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = tracuser
+SETUID_LIBX_SCRIPTS  = tracxlogin
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(CTRL_LIBEXEC_SCRIPTS) \
+	$(CTRL_LIB_FILES) $(LIBEXEC_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/libexec/trac/, $(CTRL_LIBEXEC_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRL_SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/lib/trac/, $(CTRL_LIB_FILES))
+
+boss-install: install
+
+post-install: 
+	chown root $(INSTALL_SBINDIR)/tracuser
+	chmod u+s $(INSTALL_SBINDIR)/tracuser
+	chown root $(INSTALL_LIBEXECDIR)/tracxlogin
+	chmod u+s $(INSTALL_LIBEXECDIR)/tracxlogin
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:	\
+	$(addprefix $(INSTALL_SBINDIR)/, $(CTRL_SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBDIR)/trac/, $(CTRL_LIB_FILES)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/trac/, $(CTRL_LIBEXEC_FILES))
+
+clean:
+	rm -f *.o core
+
+$(INSTALL_DIR)/opsdir/sbin/tracproxy: tracproxy
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/email2trac: email2trac
+	@echo "Installing (setuid nobody) $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(SUDO) $(INSTALL) -o nobody -m 4755 $< $@
+
+$(INSTALL_DIR)/opsdir/lib/trac/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib/trac
+	$(INSTALL_DATA) $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/trac/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec/trac
+	$(INSTALL) $< $@
+

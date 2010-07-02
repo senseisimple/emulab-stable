@@ -16,6 +16,9 @@ NS_VERSION=2.29
 NS_TAR_VERSION=2.29.2
 TCLCL_VERSION=1.17
 NS_SRC_TARBALL=ns-allinone-$(NS_TAR_VERSION).tar.gz
+LOCALPKGHOST	= @OUTERBOSS_NODENAME@
+PKGHOST		= www.emulab.net
+FETCH		= fetch -m
 
 include $(OBJDIR)/Makeconf
 
@@ -23,7 +26,12 @@ LIB_STUFF = tb_compat.tcl
 LIBEXEC_STUFF = nstbparse
 BOSSLIBEXEC = verify-ns
 
-all: $(LIB_STUFF) $(LIBEXEC_STUFF)
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  = verify-ns
+
+all: $(LIB_STUFF) $(LIBEXEC_STUFF) $(BOSSLIBEXEC)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -42,11 +50,15 @@ ns-allinone-$(NS_VERSION):
 		echo "Unpacking $(NS_SRC_TARBALL)"; \
 		tar xfz /share/tarballs/$(NS_SRC_TARBALL); \
 	else \
-		echo "Downloading $(NS_SRC_TARBALL)"; \
-		wget --quiet \
-		  http://www.emulab.net/downloads/ns-allinone-$(NS_TAR_VERSION).tar.gz; \
+		( echo "Downloading $(NS_SRC_TARBALL)"; \
+		if [ -n "$(LOCALPKGHOST)" ]; then \
+		   $(FETCH) http://$(LOCALPKGHOST)/downloads/$(NS_SRC_TARBALL);\
+		fi ; \
+		if [ ! -s $(NS_SRC_TARBALL) ]; then \
+		    $(FETCH) http://$(PKGHOST)/downloads/$(NS_SRC_TARBALL); \
+		fi ;\
 		echo "Unpacking $(NS_SRC_TARBALL)"; \
-		tar xfz $(NS_SRC_TARBALL); \
+		tar xfz $(NS_SRC_TARBALL); ) \
 	fi
 
 patch-ns-$(NS_VERSION):

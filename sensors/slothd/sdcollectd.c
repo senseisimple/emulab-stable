@@ -1,13 +1,17 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 #include "sdcollectd.h"
+#include <paths.h>
+
+char *Pidname;
 
 void siginthandler(int signum) {
-
+  if (Pidname)
+    (void) unlink(Pidname);
   info("Daemon exiting.\n");
   exit(0);
 }
@@ -121,6 +125,19 @@ int main(int argc, char **argv) {
     }
     info("sdcollectd started successfully");
     info(build_info);
+  }
+
+  if (!getuid()) {
+    FILE	*fp;
+    char    mybuf[BUFSIZ];
+	    
+    sprintf(mybuf, "%s/sdcollectd.pid", _PATH_VARRUN);
+    fp = fopen(mybuf, "w");
+    if (fp != NULL) {
+      fprintf(fp, "%d\n", getpid());
+      (void) fclose(fp);
+      Pidname = strdup(mybuf);
+    }
   }
 
   /*
@@ -274,6 +291,11 @@ int ParseRecord(IDLE_DATA *iddata) {
   
   /* Parse out fields */
   itemptr = strtok(iddata->buf, " \t");
+  if (itemptr == NULL) {
+    error("No valid data; rejecting.");
+    return 0;
+  }
+
   do {
 
     if (strstr(itemptr, "vers")) {

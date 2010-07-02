@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Fcntl ':flock';
@@ -27,6 +27,7 @@ sub usage() {
 sub ActiveUsers();
 sub RecentUsers();
 sub RecentProjects();
+sub RecentProjectLeaders();
 sub Users();
 sub WideAreaPeople();
 sub ProjectLeaders();
@@ -50,8 +51,6 @@ my $USERS       = "@USERNODE@";
 my $OURDOMAIN   = "@OURDOMAIN@";
 my $TBACTIVE    = "@TBACTIVEARCHIVE@";
 my $TBALL       = "@TBUSERSARCHIVE@";
-my $PROJROOT	= "/proj";
-my $GRPROOT	= "/groups";
 my $ELISTS      = "$TB/lists";
 my $ELABINELAB  = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
@@ -74,6 +73,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use User;
 
 #
 # We don't want to run this script unless its the real version.
@@ -107,6 +107,9 @@ if (@ARGV) {
 }
 if (defined($options{"d"})) {
     $debug++;
+}
+if (defined($options{"f"})) {
+    $force = 1;
 }
 if (defined($options{"a"})) {
     $all = 1;
@@ -241,6 +244,9 @@ RecentUsers()
 RecentProjects()
     if ($all || $activity || $update);
 
+RecentProjectLeaders()
+    if ($all || $activity || $update);
+
 Users()
     if ($all || defined($user));
 
@@ -297,8 +303,8 @@ sub ActiveUsers()
     if (! ($query_result =
 	   DBQuery("SELECT DISTINCT u.usr_email from experiments as e ".
 		   "left join group_membership as p ".
-		   "     on e.pid=p.pid and p.pid=p.gid ".
-		   "left join users as u on u.uid=p.uid ".
+		   "     on e.pid_idx=p.pid_idx and p.pid_idx=p.gid_idx ".
+		   "left join users as u on u.uid_idx=p.uid_idx ".
 		   "where u.status='active' and ".
 		   "      e.state='active' ".
 		   "order by u.usr_email"))) {
@@ -323,7 +329,7 @@ sub RecentUsers()
 
     if (! ($query_result =
 	   DBQuery("select distinct u.usr_email from user_stats as s ".
-		   "left join users as u on u.uid=s.uid ".
+		   "left join users as u on u.uid_idx=s.uid_idx ".
 		   "where ((UNIX_TIMESTAMP(now()) - ".
 		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
 		   "order by u.usr_email"))) {
@@ -349,8 +355,8 @@ sub RecentProjects()
     if (! ($query_result =
 	   DBQuery("select distinct u.usr_email from project_stats as s ".
 		   "left join group_membership as g on ".
-		   "  g.pid=s.pid and g.gid=g.pid ".
-		   "left join users as u on u.uid=g.uid ".
+		   "  g.pid_idx=s.pid_idx and g.gid_idx=g.pid_idx ".
+		   "left join users as u on u.uid_idx=g.uid_idx ".
 		   "where u.status='active' and ".
 		   "      ((UNIX_TIMESTAMP(now()) - ".
 		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
@@ -361,6 +367,36 @@ sub RecentProjects()
     $userlist .= "$TBACTIVE";
 
     genelist($query_result, $userlist, "emulab-recently-active-projects", 0);
+}
+
+#
+# Recently active projects (leaders).
+#
+sub RecentProjectLeaders()
+{
+    my $userlist;
+    my $query_result;
+
+    my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
+
+    if (! ($query_result =
+	   DBQuery("select distinct u.usr_email from project_stats as s ".
+		   "left join group_membership as g on ".
+		   "  g.pid_idx=s.pid_idx and g.gid_idx=g.pid_idx ".
+		   "left join users as u on u.uid_idx=g.uid_idx ".
+                   "left join projects as p on u.uid_idx=p.head_idx ".
+		   "where u.status='active' and ".
+		   "      ((UNIX_TIMESTAMP(now()) - ".
+		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
+                   " and p.pid is not null " .
+		   "order by u.usr_email"))) {
+	DBFatal("Getting Recently Active Project Leaders!");
+    }
+    $userlist  = "$TBOPS\n";
+    $userlist .= "$TBACTIVE";
+
+    genelist($query_result, $userlist,
+             "emulab-recently-active-project-leaders", 0);
 }
 
 #
@@ -391,8 +427,8 @@ sub WideAreaPeople()
 {
     my $query_result =
 	DBQueryFatal("SELECT DISTINCT u.usr_email from projects as p ".
-		     "left join group_membership as m on m.pid=p.pid ".
-		     "left join users as u on u.uid=m.uid ".
+		     "left join group_membership as m on m.pid_idx=p.pid_idx ".
+		     "left join users as u on u.uid_idx=m.uid_idx ".
 		     "where p.approved!=0 and p.pcremote_ok is not null ".
 		     "      and m.trust!='none' and u.status='active' ".
 		     "order by usr_email");
@@ -410,7 +446,7 @@ sub ProjectLeaders()
 		     ($MAILMANSUPPORT ?
 		      ", u.uid ,u.usr_name, u.mailman_password " : "") .
 		     "  from projects as p ".
-		     "left join users as u on u.uid=p.head_uid ".
+		     "left join users as u on u.uid_idx=p.head_idx ".
 		     "where p.approved!=0 ".
 		     "order by usr_email");
 
@@ -432,7 +468,7 @@ sub ProjectLists($$)
 		     ($MAILMANSUPPORT ?
 		      ", u.uid ,u.usr_name, u.mailman_password " : "") .
 		     " from group_membership as p ".
-		     "left join users as u on u.uid=p.uid ".
+		     "left join users as u on u.uid_idx=p.uid_idx ".
 		     "where p.pid='$pid' and p.gid='$gid' and ".
 		     " p.trust!='none' and u.status='active' ".
 		     "order by u.usr_email");
@@ -475,6 +511,12 @@ sub genelist($$$$)
 	if (! defined($user_email)) {
 	    next;
 	}
+	# HACK! These special accounts should be flagged in the DB
+	next 
+	    if ($usemailman &&
+		(!defined($uid) || ($uid eq "elabman" || $uid eq "elabckup" ||
+				    $uid eq "operator")));
+	
 	if ($usemailman && $MAILMANSUPPORT) {
 	    print LIST "$uid $user_email $mailman_password '$user_name'\n";
 	}

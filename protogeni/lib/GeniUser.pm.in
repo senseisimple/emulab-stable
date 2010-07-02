@@ -1,0 +1,794 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniUser;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+use GeniDB;
+use GeniRegistry;
+use GeniAuthority;
+use GeniCertificate;
+use GeniHRN;
+use emutil qw(TBGetUniqueIndex);
+use English;
+use overload ('""' => 'Stringify');
+use vars qw();
+
+# Do not load this for the Clearinghouse XML server.
+BEGIN { 
+    if (! defined($main::GENI_ISCLRHOUSE)) {
+	require User;
+	require emdb;
+    }
+}
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $CONTROL	   = "@USERNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+
+# Cache of instances to avoid regenerating them.
+my %users      = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%users); }
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by URN, idx, or uuid.
+#
+sub Lookup($$;$)
+{
+    my ($class, $token, $includelocal) = @_;
+    my $query_result;
+    my $idx;
+
+    $includelocal = 0
+	if (!defined($includelocal));
+
+    if( GeniHRN::IsValid( $token ) ) {
+	$token = GeniHRN::Normalise( $token );
+	my ($authority, $type, $id) = GeniHRN::Parse( $token );
+
+	return undef if $type ne "user";
+
+	if( GeniHRN::Authoritative( $token, "@OURDOMAIN@" ) ) {
+	    # A local name, so look only for local users...
+	    $query_result =
+		DBQueryWarn("select idx from geni_users ".
+			    "where hrn='${PGENIDOMAIN}.$id' " .
+			    "and status='active'");
+
+	    return undef
+		if (!$query_result);
+
+	    if (!$query_result->numrows) {
+		return undef
+		    if (!$includelocal);
+
+		#
+		# Check Emulab users table. 
+		#
+		my $user = User->Lookup($id);
+		return undef
+		    if (!defined($user));
+		return GeniUser->CreateFromLocal($user);
+	    }
+	} else {
+	    # A foreign name: check against names in certificates.
+	    $query_result = DBQueryWarn(
+		"SELECT geni_users.idx FROM geni_users, geni_certificates " .
+		"WHERE geni_users.uuid = geni_certificates.uuid AND " .
+		"geni_certificates.urn = '$token';" );
+	    return undef unless $query_result and $query_result->numrows;
+	}
+	($idx) = $query_result->fetchrow_array();	
+    }
+    elsif ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_users ".
+			"where uuid='$token' and status='active'");
+
+	return undef
+	    if (!$query_result);
+
+	if (!$query_result->numrows) {
+	    return undef
+		if (!$includelocal);
+
+	    #
+	    # Check Emulab users table. 
+	    #
+	    my $user = User->LookupByUUID($token);
+	    return undef
+		if (!defined($user));
+	    return GeniUser->CreateFromLocal($user);
+	}
+	($idx) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^[-\w\.]*$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_users ".
+			"where hrn='$token' and status='active'");
+
+	return undef
+	    if (!$query_result);
+
+	if (!$query_result->numrows) {
+	    return undef
+		if (!$includelocal);
+
+	    #
+	    # Check Emulab users table for last part of hrn.
+	    #
+	    ($token) = ($token =~ /\.(\w*)$/);
+
+	    my $user = User->Lookup($token);
+	    return undef
+		if (!defined($user));
+	    return GeniUser->CreateFromLocal($user);
+	}
+	($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    
+    # Look in cache first
+    return $users{"$idx"}
+        if (exists($users{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_users where idx='$idx'");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'USER'}  = $query_result->fetchrow_hashref();
+    bless($self, $class);
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $uuid = $self->{'USER'}->{'uuid'};
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for user $idx ($uuid)\n";
+	return undef;
+    }
+    $self->{'CERT'} = $certificate;
+    
+    # Add to cache. 
+    $users{$self->{'USER'}->{'idx'}} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub uid($)		{ return field($_[0], "uid"); }
+sub hrn($)		{ return field($_[0], "hrn"); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub expires($)		{ return field($_[0], "expires"); }
+sub status($)		{ return field($_[0], "status"); }
+sub created($)		{ return field($_[0], "created"); }
+sub archived($)		{ return field($_[0], "archived"); }
+sub name($)		{ return field($_[0], "name"); }
+sub email($)		{ return field($_[0], "email"); }
+sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
+sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $hrn = $self->hrn();
+    my $idx = $self->idx();
+
+    return "[GeniUser: $hrn, IDX: $idx]";
+}
+
+#
+# Flush from our little cache.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($users{$self->idx()});
+}
+
+# Return the URN.
+#
+# Return the URN. This is complicated by the fact that the DB does
+# not store the urn, but is in the certificate. Further, it might
+# be a slice from an SA not doing URNs yet, in which case set it to
+# the uuid and hope for the best.
+#
+sub urn($)
+{
+    my ($self) = @_;
+    my $urn = $self->GetCertificate()->urn();
+
+    return $urn
+	if (defined($urn) && $urn ne "");
+
+    return $self->uuid();
+}
+
+#
+# Class method to check for an existing user that has the same
+# uid/email. Lets not allow this for now. Return the number of
+# users that match or -1 if an error. 
+#
+sub CheckConflict($$)
+{
+    my ($class, $certificate) = @_;
+
+    my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
+    my $safe_email = DBQuoteSpecial($certificate->email());
+
+    my $query_result =
+	DBQueryFatal("select idx from geni_users ".
+		     "where hrn=$safe_hrn or email=$safe_email");
+    return -1
+	if (!defined($query_result));
+
+    return $query_result->numrows;
+}
+
+#
+# Class function to create new Geni user in the DB and return object. 
+#
+sub Create($$$$;$)
+{
+    my ($class, $certificate, $authority, $info, $keys) = @_;
+    my $idx;
+    my @insert_data = ();
+
+    # Every user gets a new unique index.
+    if (defined($main::GENI_ISCLRHOUSE) && $main::GENI_ISCLRHOUSE) {
+	$idx = TBGetUniqueIndex('next_geniuser', 1);
+    }
+    else {
+	$idx = User->NextIDX();
+    }	
+
+    if (!defined($authority)) {
+	print STDERR "Need to specify an authority!\n";
+	return undef;
+    }
+    my $sa_uuid = $authority->uuid();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "status='active'");
+
+    my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
+    my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
+    my $safe_email = DBQuoteSpecial($certificate->email());
+    push(@insert_data, "hrn=$safe_hrn");
+    push(@insert_data, "uuid=$safe_uuid");
+    push(@insert_data, "email=$safe_email");
+    push(@insert_data, "sa_uuid='$sa_uuid'");
+
+    #
+    # uid comes from last component of the hrn.
+    #
+    my ($uid) = ($certificate->hrn() =~ /^.*\.(\w*)$/);
+    if (!defined($uid)) {
+	print STDERR "HRN is not dotted: " . $certificate->hrn() . "\n";
+	return undef;
+    }
+
+    #
+    # This comes from either an info record or the cert.
+    #
+    my $safe_name;
+    if (defined($info) && exists($info->{'name'})) {
+	$safe_name = DBQuoteSpecial($info->{'name'});
+    }
+    else {
+	$safe_name = DBQuoteSpecial($uid);
+    }
+    my $safe_uid = DBQuoteSpecial($uid);
+
+    push(@insert_data, "uid=$safe_uid");
+    push(@insert_data, "name=$safe_name");
+
+    if ($certificate->Store() != 0) {
+	print STDERR "Could not store certificate for new user.\n";
+	return undef;
+    }
+
+    # Insert the sshkey if we got one.
+    if (defined($keys)) {
+	foreach my $keyref (@{ $keys }) {
+	    my $key  = $keyref->{'key'};
+	    my $type = $keyref->{'type'};
+	    chomp($key);
+	    chomp($type);
+	    
+	    my $safe_key  = DBQuoteSpecial($key);
+	    my $safe_type = DBQuoteSpecial($type);
+	    
+	    DBQueryWarn("replace into geni_userkeys set ".
+			"  uuid=$safe_uuid, created=now(), ".
+			"  `key`=$safe_key, `type`=$safe_type")
+		or return undef;
+	}
+    }
+
+    # Insert into DB.
+    if (! DBQueryWarn("insert into geni_users set " .
+		      join(",", @insert_data))) {
+	DBQueryWarn("delete from geni_userkeys where uuid=$safe_uuid");
+	return undef;
+    }
+
+    return GeniUser->Lookup($idx);
+}
+
+#
+# Modify a record; only partial.
+#
+sub Modify($$$$)
+{
+    my ($self, $name, $email, $keys) = @_;
+    my @insert_data = ();
+
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
+    my $safe_name  = DBQuoteSpecial($name || $self->name());
+    my $safe_email = DBQuoteSpecial($email || $self->email());
+
+    if (defined($name) || defined($email)) {
+	return -1
+	    if (!DBQueryWarn("update geni_users set ".
+			     " name=$safe_name, email=$safe_email ".
+			     "where idx='$idx'"));
+    }
+
+    if (defined($keys)) {
+	return -1
+	    if (!DBQueryWarn("delete from geni_userkeys where uuid='$uuid'"));
+	
+	foreach my $keyref (@{ $keys }) {
+	    my $key  = $keyref->{'key'};
+	    my $type = $keyref->{'type'};
+	    chomp($key);
+	    chomp($type);
+	    
+	    my $safe_key  = DBQuoteSpecial($key);
+	    my $safe_type = DBQuoteSpecial($type);
+	    
+	    DBQueryWarn("replace into geni_userkeys set ".
+			"  uuid='$uuid', created=now(), ".
+			"  `key`=$safe_key, `type`=$safe_type")
+		or return undef;
+	}
+    }
+    return 0;
+}
+
+#
+# We wrap up local users so that the interface to them is consistent, but
+# do not want to duplicate any data, so use a different class wrapper.
+#
+sub CreateFromLocal($$)
+{
+    my ($class, $user) = @_;
+
+    return GeniUser::LocalUser->Create($user);
+}
+
+#
+# Delete the user.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
+
+    DBQueryWarn("delete from geni_bindings where user_uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_userkeys where uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_users where idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Get the sshkeys for a user.
+#
+sub GetSSHKeys($$)
+{
+    my ($self, $pref) = @_;
+    my @results = ();
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uuid = $self->uuid();
+    my $query_result =
+	DBQueryWarn("select `key` from geni_userkeys ".
+		    "where uuid='$uuid' and type='ssh'");
+    return -1
+	if (!$query_result);
+
+    while (my ($sshkey) = $query_result->fetchrow_array()) {
+	push(@results, $sshkey);
+    }
+    @$pref = @results;
+    return 0;
+}
+
+#
+# Get the keys for a user. See the SA. 
+#
+sub GetKeyBundle($$)
+{
+    my ($self, $pref) = @_;
+    my @results = ();
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uuid = $self->uuid();
+    my $query_result =
+	DBQueryWarn("select `type`,`key` from geni_userkeys ".
+		    "where uuid='$uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($type,$key) = $query_result->fetchrow_array()) {
+	push(@results, {"type" => $type,
+			"key"  => $key});
+    }
+    @$pref = @results;
+    return 0;
+}
+
+#
+# Create a nonlocal user.
+#
+sub CreateNonLocal($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my @sshkeys = ();
+    $self->GetSSHKeys(\@sshkeys);
+
+    return User::NonLocal->Create($self->idx(),
+				  $self->uid(),
+				  $self->uuid(),
+				  $self->name(),
+				  $self->email(),
+				  \@sshkeys);
+}
+
+#
+# Bind user to slice, which is another way of saying bind the nonlocal
+# user to the experiment (for tmcd).
+#
+sub BindToSlice($$)
+{
+    my ($self, $slice) = @_;
+
+    return -1
+	if (! (ref($self) && ref($slice)));
+
+    my $emulab_user = User::NonLocal->Lookup($self->uuid());
+    if (!defined($emulab_user)) {
+	$emulab_user = $self->CreateNonLocal();
+	if (!defined($emulab_user)) {
+	    print STDERR "Could not create nonlocal user for $self\n";
+	    return -1;
+	}
+    }
+    else {
+	my @sshkeys = ();
+	if ($self->GetSSHKeys(\@sshkeys) == 0) {
+	    if ($emulab_user->ModifyKeys(\@sshkeys)) {
+		print STDERR "Could not update keys for user $self\n";
+		return -1;
+	    }
+	}
+    }
+    my $experiment = $slice->GetExperiment();
+    if (!defined($experiment)) {
+	print STDERR "Could not locate experiment object for $slice\n";
+	return -1;
+    }
+    return $emulab_user->BindToExperiment($experiment);
+}
+
+sub UnBindFromSlice($$)
+{
+    my ($self, $slice) = @_;
+
+    return -1
+	if (! (ref($self) && ref($slice)));
+
+    my $emulab_user = User::NonLocal->Lookup($self->uuid());
+    return 0
+	if (!defined($emulab_user));
+
+    my $experiment = $slice->GetExperiment();
+    if (!defined($experiment)) {
+	print STDERR "Could not locate experiment object for $slice\n";
+	return -1;
+    }
+    return $emulab_user->UnBindFromExperiment($experiment);
+}
+
+#
+# Archive user. 
+#
+sub Archive($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("update geni_users set status='archived' ".
+		"where idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Is this a local user. 
+#
+sub IsLocal($)
+{
+    my ($self) = @_;
+
+    return ref($self) eq "GeniUser::LocalUser";
+}
+
+#
+# Delete all users for an authority.
+#
+sub DeleteAll($$)
+{
+    my ($class, $authority) = @_;
+
+    my $uuid = $authority->uuid();
+    my $query_result =
+	DBQueryWarn("select uuid from geni_users ".
+		    "where sa_uuid='$uuid'");
+
+    return -1
+	if (! $query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($uuid) = $query_result->fetchrow_array()) {
+	my $user = GeniUser->Lookup($uuid);
+	if (!defined($user)) {
+	    print STDERR "Could not lookup user $uuid\n";
+	    return -1;
+	}
+	#
+	# Do not allow users with active slices to be deleted.
+	#
+	my $active_result =
+	    DBQueryWarn("select uuid from geni_slices ".
+			"where creator_uuid='$uuid'");
+	return -1
+	    if (!$active_result);
+	if ($active_result->numrows()) {
+	    print STDERR "$user is heading up active slices\n";
+	}
+
+	$active_result =
+	    DBQueryWarn("select uuid from geni_slivers ".
+			"where creator_uuid='$uuid'");
+	return -1
+	    if (!$active_result);
+	if ($active_result->numrows()) {
+	    print STDERR "$user is heading up active slivers\n";
+	}
+	
+	if ($user->Delete() != 0) {
+	    print STDERR "Could not delete $user\n";
+	    return -1;
+	}
+    }
+
+    return 0;
+}
+
+#
+# List All users.
+#
+sub ListAll($$)
+{
+    my ($class, $pref) = @_;
+    my @result = ();
+    @$pref = ();
+
+    my $query_result =
+	DBQueryWarn("select uuid from geni_users");
+
+    return -1
+	if (! $query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($uuid) = $query_result->fetchrow_array()) {
+	my $user = GeniUser->Lookup($uuid);
+	if (!defined($user)) {
+	    print STDERR "Could not lookup user $uuid\n";
+	    return -1;
+	}
+	push(@result, $user);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+############################################################################
+#
+# Wrapper for local users.
+#
+package GeniUser::LocalUser;
+use vars qw(@ISA);
+@ISA = "GeniUser";
+
+use English;
+use GeniDB;
+use GeniUser;
+use GeniHRN;
+use GeniCertificate;
+use overload ('""' => 'Stringify');
+
+#
+# Create a wrapper, with the same access names.
+#
+sub Create($$)
+{
+    my ($class, $user) = @_;
+
+    my $self         = {};
+    $self->{'USER'}  = $user;
+
+    # And the certificate wrapper.
+    my $certificate = GeniCertificate::LocalUser->Create($user);
+    if (!defined($certificate)) {
+	print STDERR "No certificate found for $user\n";
+	return undef;
+    }
+    $self->{'CERT'} = $certificate;
+
+    bless($self, $class);
+    return $self;
+}
+
+sub emulab_user()       { return $_[0]->{'USER'}; }
+sub idx($)		{ return $_[0]->{'USER'}->uid_idx(); }
+sub uid($)		{ return $_[0]->{'USER'}->uid(); }
+sub uuid                { return $_[0]->{'USER'}->uuid(); }
+sub created($)		{ return $_[0]->{'USER'}->created(); }
+sub name($)		{ return $_[0]->{'USER'}->name(); }
+sub email($)		{ return $_[0]->{'USER'}->email(); }
+sub SSLPassPhrase($$$)  { return $_[0]->{'USER'}->SSLPassPhrase($_[1],$_[2]); }
+sub HomeDir($)          { return $_[0]->{'USER'}->HomeDir(); }
+sub admin($)		{ return $_[0]->{'USER'}->admin(); }
+
+# Need to construct this since not in User structure.
+sub hrn($)		{ return "${PGENIDOMAIN}." . $_[0]->uid(); }
+
+# And this is in another structure.
+sub cert($)             { return $_[0]->{'CERT'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
+
+# Return the URN.
+sub urn($)
+{
+    my ($self) = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "user", $self->uid());
+}
+
+#
+# Register this local user at the ClearingHouse.
+#
+sub Register($)
+{
+    my ($self) = @_;
+
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return -1
+	if (!defined($clearinghouse));
+
+    return $clearinghouse->RegisterUser($self->name(), $self->email(),
+					$self->cert());
+}
+
+#
+# Get the key bundle for a local user, which are just sshkeys. 
+# This function is intended to be used only by the SA to get the
+# key bundle from the emulab ssh keys for the local user. 
+#
+sub GetKeyBundle($$)
+{
+    my ($self, $pref) = @_;
+    my @results = ();
+
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uuid = $self->uuid();
+    my @sshkeys    = ();
+    $self->emulab_user()->GetSSHKeys(\@sshkeys);
+    
+    foreach my $sshkey (@sshkeys) {
+	push(@results, {"type" => 'ssh',
+			"key"  => $sshkey});
+    }
+    @$pref = @results;
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    my $user = $self->{'USER'};
+    
+    return "$user";
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

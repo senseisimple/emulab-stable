@@ -1,20 +1,23 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 include("defs.php3");
 
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-PAGEHEADER("Node Selector Applet");
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify page arguments. Allow user to optionally specify building/floor.
 #
+$optargs = OptionalPageArguments("building",    PAGEARG_STRING,
+				 "floor",       PAGEARG_STRING,
+				 "experiment",  PAGEARG_EXPERIMENT);
+
 if (isset($building) && $building != "") {
     # Sanitize for the shell.
     if (!preg_match("/^[-\w]+$/", $building)) {
@@ -32,25 +35,6 @@ if (isset($building) && $building != "") {
 else {
     $building = "MEB-ROBOTS";
     $floor    = 4;
-}
-
-if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
-    if (!preg_match("/^[-\w]+$/", $pid)) {
-	PAGEARGERROR("Invalid pid argument.");
-    }
-    if (!preg_match("/^[-\w]+$/", $eid)) {
-	PAGEARGERROR("Invalid eid argument.");
-    }
-    #
-    # Check to make sure this is a valid PID/EID tuple.
-    #
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("Experiment $pid/$eid is not a valid experiment.", 1);
-    }
-}
-else {
-    unset($pid);
-    unset($eid);
 }
 
 #
@@ -75,6 +59,11 @@ else {
 if (! mysql_num_rows($query_result)) {
     USERERROR("No such building/floor", 1);
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node Selector Applet");
 
 #
 # Draw the legend and some explanatory text.
@@ -131,7 +120,10 @@ while (($row = mysql_fetch_array($query_result))) {
     $index++;
 }
 echo "      <param name='ppm' value='$ppm'>";
-if (isset($pid)) {
+if (isset($experiment)) {
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    
     echo "  <param name='pid' value='$pid'>
             <param name='eid' value='$eid'>\n";
 }

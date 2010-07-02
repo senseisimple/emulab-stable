@@ -1,0 +1,145 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo
+my $RUNSTARTUP = "$BINDIR/runstartup";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my %tmccresults;
+
+    print STDOUT "Checking Testbed Experiment Startup Command ... \n";
+
+    if (tmcc(TMCCCMD_STARTUP, undef, \%tmccresults) < 0) {
+	fatal("Could not get startupcmd from server!");
+    }
+    unlink TMSTARTUPCMD();
+    return 0 if (! keys(%tmccresults));
+
+    #
+    # Need to create the config file for secondary program.
+    # 
+    if (!open(RUN, ">" . TMSTARTUPCMD)) {
+	fatal("Could not open " . TMSTARTUPCMD . ": $!");
+    }
+    print RUN "$tmccresults{CMD}";
+    close(RUN);
+    chmod(0755, TMSTARTUPCMD);
+
+    #
+    # Okay, now arrange for it to be fired off in just a little bit.
+    # The aux program will pick up the config file, delay a short while,
+    # and then run. 
+    #
+    print STDOUT "Scheduling startup command to run in a little bit ...\n";
+    system("$RUNSTARTUP");
+    if ($?) {
+	fatal("Error in $RUNSTARTUP");
+    }
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Currently no handle on the startupcmd ... This should not really matter
+    # though since the startcmd is used just system stuff these days.
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    unlink TMSTARTUPCMD()
+	if (-e TMSTARTUPCMD);
+}

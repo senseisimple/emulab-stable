@@ -1,17 +1,20 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 /*
- * Link Agent; very linux/wireless specific at the moment!
+ * Link Agent: supports up/down, parameterized modifications to interfaces.  
+ * Commands are passed to a perl script and interpreted and executed in 
+ * OS/device specific ways; this makes life easier for us all.
  */
 
 #include <stdio.h>
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <string.h>
 #include <paths.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -25,6 +28,7 @@
 static char	*progname;
 static int	debug = 0;
 static int	verbose = 0;
+static char     *ifdynconfig = "/usr/local/etc/emulab/ifdynconfig";
 
 static void	callback(event_handle_t handle,
 			 event_notification_t notification, void *data);
@@ -41,21 +45,6 @@ typedef struct ifmap {
 	struct ifmap	*next;
 } ifmap_t;
 ifmap_t			*mapping = (ifmap_t *) NULL;
-
-/*
- * List of allowed settings we can change. We do not worry about verifying
- * the arguments; people are free to screw themselves. 
- *
- * XXX Very iwconfig specific!
- */
-char	*settings[] = {
-	"sensitivity",
-	"txpower",
-	"channel",
-	"rate",
-	"bitrate",
-	"accesspoint"
-};
 
 void
 usage()
@@ -317,8 +306,6 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	char		eventtype[TBDB_FLEN_EVEVENTTYPE];
 	char		args[2 * BUFSIZ];
 	char		cmd[2 * BUFSIZ];
-	char		updown[BUFSIZ];
-	int		doupdown = 0;	/* 1 = before, 2 = after */
 	ifmap_t		*mp;
 
 	event_notification_get_objname(handle, notification,
@@ -354,20 +341,23 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	 */
 	if (strcmp(eventtype, TBDB_EVENTTYPE_UP) == 0) {
 		/* sprintf(cmd, "iwconfig %s txpower auto", mp->iface); */
-		sprintf(cmd, "ifconfig %s up", mp->iface);
+	        sprintf(cmd, "%s %s up", ifdynconfig, mp->iface);
 		runcommand(cmd);
 	}
 	else if (strcmp(eventtype, TBDB_EVENTTYPE_DOWN) == 0) {
 		/* sprintf(cmd, "iwconfig %s txpower off", mp->iface); */
-		sprintf(cmd, "ifconfig %s down", mp->iface);
+		sprintf(cmd, "%s %s down", ifdynconfig, mp->iface);
 		runcommand(cmd);
 	}
 	else if (strcmp(eventtype, TBDB_EVENTTYPE_MODIFY) == 0) {
 		char	*ap = args;
 		char    *cp = cmd, *ecp = &cmd[sizeof(cmd)-1];
 		int	cmdlen;
+		char    cargs[2 * BUFSIZ];
+		char    *cap = cargs, *ecap = &cargs[sizeof(cargs)-1];
+		int     found_enable = 0;
 
-		cp += OUTPUT(cp, sizeof(cmd), "iwconfig %s ", mp->iface);
+		cp += OUTPUT(cp,sizeof(cmd),"%s %s ",ifdynconfig,mp->iface);
 		cmdlen = strlen(cmd);
 
 		/*
@@ -428,82 +418,32 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 				 * Alias for UP/DOWN events above. Note that
 				 * we want to run this first/last. 
 				 */
+				found_enable = 1;
 				if (! strcasecmp("yes", value)) {
-					doupdown = 2;
-					sprintf(updown,
-						"ifconfig %s up", mp->iface);
+					cp += OUTPUT(cp,ecp - cp, " up");
 				}
 				else if (! strcasecmp("no", value)) {
-					doupdown = 1;
-					sprintf(updown,
-						"ifconfig %s down", mp->iface);
+					cp += OUTPUT(cp,ecp - cp, " down");
 				}
 				else {
 					error("Ignoring setting: %s=%s\n",
 					      setting, value);
+					found_enable = 0;
 					continue;
 				}
-			}
-			else if (! strcasecmp("sensitivity", setting)) {
-				cp += OUTPUT(cp, ecp - cp, " sens %s", value);
-			}
-			else if (! strcasecmp("txpower", setting)) {
-				if (*value == '\0')
-					value = "auto";
-					
-				cp += OUTPUT(cp, ecp - cp, " txpower %s",
-					     value);
-			}
-			else if (! strcasecmp("rate", setting) ||
-				 ! strcasecmp("bitrate", setting)) {
-				if (*value == '\0')
-					value = "auto";
 				
-				cp += OUTPUT(cp, ecp - cp, " rate %s", value);
-			}
-			else if (! strcasecmp("channel", setting)) {
-				if (*value == '\0')
-					value = "3";
-
-				cp += OUTPUT(cp, ecp - cp, " channel %s",
-					     value);
-			}
-			else if (! strcasecmp("accesspoint", setting)) {
-				char *mac = value;
-
-				if (! index(mac, ':')) {
-					mac = convertmac(mac);
-					if (mac == NULL)
-						continue;
-				}
-				
-				if (strcasecmp(mac, mp->mac)) {
-					cp += OUTPUT(cp, ecp - cp,
-						     " mode Managed ap %s",
-						     mac);
-				}
-				else {
-					cp += OUTPUT(cp, ecp - cp,
-						     " mode Master");
-				}
 			}
 			else {
-				error("Ignoring setting: %s=%s\n",
-				      setting, value);
-				continue;
+			    cap += OUTPUT(cap,ecap - cap," %s=%s",
+					  setting,value);
 			}
-			info("%s\n", cmd);
 		}
-		if (doupdown == 1) {
-			runcommand(updown);
+		if (!found_enable) {
+			cp += OUTPUT(cp,ecp - cp," modify");
 		}
-		
+		cp += OUTPUT(cp,ecp - cp," %s",cargs);
 		if (strlen(cmd) > cmdlen)
 			runcommand(cmd);
-		
-		if (doupdown == 2) {
-			runcommand(updown);
-		}
 	}
 	else if (debug) {
 		info("Ignoring event: %s %s %s\n", objname, eventtype, args);

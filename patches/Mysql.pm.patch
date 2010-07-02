@@ -1,0 +1,56 @@
+--- Mysql.pm.orig	Sun Aug 27 01:31:42 2006
++++ Mysql.pm	Mon Aug 28 04:24:06 2006
+@@ -80,15 +80,36 @@
+     $self;
+ }
+ 
+-sub DESTROY {
+-    my $self = shift;
+-    my $dbh = $self->{'dbh'};
+-    if ($dbh) {
+-	local $SIG{'__WARN__'} = sub {};
+-	$dbh->disconnect();
++#
++# setInactiveDestroy and getInactiveDestroy added by
++# kevina@flux.utah.edu.  See InactiveDestroy attribute in DBI(3).
++#
++
++sub setInactiveDestroy($) {
++    my ($self, $newvalue) = @_;
++    if ($self->{'dbh'}) {
++	my $oldvalue = $self->{'dbh'}->{'InactiveDestroy'};
++	$self->{'dbh'}->{'InactiveDestroy'} = $newvalue;
++	return $oldvalue;
++    } else {
++	return undef;
++    }
++}
++
++sub getInactiveDestroy() {
++    my ($self) = @_;
++    if ($self->{'dbh'}) {
++	return $self->{'dbh'}->{'InactiveDestroy'};
++    } else {
++	return undef;
+     }
+ }
+ 
++sub DESTROY {
++    # NoOp: The database handle will automatically be closed
++    #       by the DBI driver. -- kevina@flux.utah.edu
++}
++
+ sub selectdb ($$) {
+     my($self, $db) = @_;
+     my $dsn = "DBI:mysql:database=$db:host=" . $self->{'host'};
+@@ -98,10 +119,6 @@
+ 	$self->{'errno'} = $DBI::err;
+ 	undef;
+     } else {
+-	if ($self->{'dbh'}) {
+-	    local $SIG{'__WARN__'} = sub {};
+-	    $self->{'dbh'}->disconnect();
+-	}
+ 	$self->{'dbh'} = $dbh;
+ 	$self->{'db'} = $db;
+ 	$self;

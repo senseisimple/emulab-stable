@@ -1,21 +1,22 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
+# Only known and logged in users can begin experiments.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
 # Standard Testbed Header
 #
 PAGEHEADER("Syntax Check your NS file");
-
-#
-# Only known and logged in users can begin experiments.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
 
 ?>
 <table align="center" border="1"> 
@@ -43,7 +44,7 @@ echo "<tr>
                                    <br>
                                    Or<br>
                                    <br>
-                              On Server <br> (/proj, /groups, /users)
+                              On Server <br> ($TBVALIDDIRS)
                       </center></td>
 
           <td rowspan>

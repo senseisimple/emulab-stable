@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Starts portmap.
+#
+
+# Make sure the dropbearkey progam exists
+[ -f /usr/bin/dropbearkey ] || exit 0
+
+start() {
+ 	echo -n "Starting portmap: "
+	umask 077
+	start-stop-daemon -S -q --exec /sbin/portmap
+	echo "OK"
+}
+stop() {
+	echo -n "Stopping portmap: "
+	start-stop-daemon -K -q --exec /sbin/portmap
+	echo "OK"
+}
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+  	start
+	;;
+  stop)
+  	stop
+	;;
+  restart|reload)
+  	restart
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?
+

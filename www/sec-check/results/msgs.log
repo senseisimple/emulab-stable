@@ -1,0 +1,24 @@
+** Sources: 107 separate forms are on 89 code pages. **
+** (See src_forms.list and src_files.list
+**  in ../../../testbed/www/sec-check/results .) **
+**
+** Spider: 1773 ( 3 + 1770 ) forms instances are in 55 ( 3 + 55 ) web pages. **
+** (See *_{forms,files}.list in ../../../testbed/www/sec-check/results .) **
+**
+** Forms: 34 out of 89 forms files are not covered. **
+** (See ../../../testbed/www/sec-check/results/files_missing.list .) **
+**
+** Inputs: 9965 input fields, 343 unique, 123 over-ridden. **
+** (See site_inputs.list and input_names.list
+**  in ../../../testbed/www/sec-check/results,
+** and input_values.list in ../../../testbed/www/sec-check .) **
+**
+** Run analysis: success 47, failure 6, problem 2, UNKNOWN 0 **
+** (See analyze_output.txt in ../../../testbed/www/sec-check/results .) **
+**
+** Probe analysis: 408 probes out of 408 executed: 166 showed success,
+**     242 failure (or probes caught), 38 dups, 0 UNKNOWN.
+** Probes to 53 pages gave 13 hits: 13 backslashed, 0 UNCAUGHT in 0 pages.
+** (See probe-labels.list and uncaught-files.list
+**  in ../../../testbed/www/sec-check/results .) **
+**

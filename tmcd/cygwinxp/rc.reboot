@@ -21,6 +21,7 @@ function logit () {
     echo "$msg"
 }
 
+logit "----------------------------------------------------------------"
 logit "Entering rc.reboot"
 
 # Tell Emulab that a reboot is required.

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -11,17 +11,7 @@ include("defs.php3");
 # just spit back an image. The thumbs are public, so no checking is done.
 # To obfuscate, do not use pid/eid, but rather use the resource index. 
 #
-
-#
-# Verify page arguments.
-# 
-if (!isset($idx) ||
-    strcmp($idx, "") == 0) {
-    USERERROR("You must provide an ID.", 1);
-}
-if (!preg_match("/^\d+$/", $idx)) {
-    PAGEARGERROR("Invalid ID argument.");
-}
+$reqargs = RequiredPageArguments("idx", PAGEARG_INTEGER);
 
 #
 # Get the thumb from the DB. 
@@ -32,7 +22,7 @@ $query_result =
 
 if ($query_result && mysql_num_rows($query_result)) {
     $row  = mysql_fetch_array($query_result);
-    $data = $row[thumbnail];
+    $data = $row["thumbnail"];
 
     if (strlen($data)) {
 	header("Content-type: image/png");

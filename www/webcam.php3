@@ -1,10 +1,27 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+
+#
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("camheight",   PAGEARG_INTEGER,
+				 "camwidth",    PAGEARG_INTEGER,
+				 "camfps",      PAGEARG_INTEGER,
+				 "refreshrate", PAGEARG_INTEGER,
+				 "camera",      PAGEARG_INTEGER,
+				 "applet",      PAGEARG_BOOLEAN);
 
 #
 # Standard Testbed Header
@@ -12,13 +29,8 @@ include("defs.php3");
 PAGEHEADER("Robot Web Cams");
 
 #
-# Only known and logged in users can end experiments.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-
 # Helper function.
+#
 function MyError($msg)
 {
     # No Data. Spit back a stub image.
@@ -39,7 +51,7 @@ if (!$admins_can_view || (!$anyone_can_view && !$isadmin)) {
 #
 # Now check permission.
 #
-if (!$isadmin && !TBWebCamAllowed($uid)) {
+if (!$isadmin && !$this_user->WebCamAllowed()) {
     MyError("Not enough permission to view the robot cameras!");
 }
 

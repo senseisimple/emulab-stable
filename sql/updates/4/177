@@ -1,0 +1,18 @@
+#
+# Add slot to the experiments table. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("experiments", "virtnode_count")) {
+	DBQueryFatal("alter table experiments add ".
+		     "virtnode_count int(6) unsigned default NULL ".
+		     "after minimum_nodes");
+    }
+    return 0;
+}
+1;

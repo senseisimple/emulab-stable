@@ -1,31 +1,36 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
-
-#
-# Standard Testbed Header
-#
-PAGEHEADER("Node History");
+include_once("node_defs.php");
 
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (! ($isadmin || OPSGUY())) {
     USERERROR("Cannot view node history.", 1);
 }
 
 #
-# Verify form arguments.
-# 
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("showall",   PAGEARG_BOOLEAN,
+				 "reverse",   PAGEARG_BOOLEAN,
+				 "count",     PAGEARG_INTEGER,
+				 "node",      PAGEARG_NODE);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Node History");
+
 if (!isset($showall)) {
     $showall = 0;
 }
@@ -35,17 +40,7 @@ if (!isset($count)) {
 if (!isset($reverse)) {
     $reverse = 1;
 }
-
-if (!isset($node_id) || strcmp($node_id, "") == 0) {
-    $node_id = "";
-} else {
-    #
-    # Check to make sure that this is a valid nodeid
-    #
-    if (!TBValidNodeName($node_id)) {
-	USERERROR("$node_id is not a valid node name!", 1);
-    }
-}
+$node_id = (isset($node) ? $node->node_id() : "");
 
 $opts="node_id=$node_id&count=$count&reverse=$reverse";
 echo "<b>Show records: ";
@@ -85,7 +80,7 @@ if ($count != 0) {
     echo "all";
 }
 
-SHOWNODEHISTORY($node_id, $showall, $count, $reverse);
+ShowNodeHistory((isset($node) ? $node : null), $showall, $count, $reverse);
 
 #
 # Standard Testbed Footer

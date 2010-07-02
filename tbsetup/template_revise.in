@@ -1,0 +1,278 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use Data::Dumper;
+
+#
+# Revise the end of run record for a run. At the moment, the new record
+# archive comes from the same place we export to.
+#
+# XXX The only record of the change is within the archive (as a new
+# revision), cross referenced from the experiment_runs table, by setting
+# the ending_archive_tag. Maybe we need a better history mechanism.
+#
+# XXX Only the ending archive for a run can be revised right now ...
+#
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_revise [-m mfile] [-t tag] -r runidx -i <idx>\n".
+	  "switches and arguments:\n".
+	  "-q           - be less chatty\n".
+	  "-t           - Tag to use in archive revision\n".
+	  "-m <file>    - File holding text of the message\n".
+	  "-i <idx>     - Instance index to export\n".
+	  "-r <runidx>  - Run index to export\n");
+    exit(-1);
+}
+my $optlist	 = "qi:dr:m:t:";
+my %options      = ();
+my $quiet        = 0;
+my $debug        = 0;
+my $mfile;
+my $tag;
+my $exptidx;
+my $runidx;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL     = "@USERNODE@";
+my $checkquota  = "$TB/sbin/checkquota";
+my $TAR         = "/usr/bin/tar";
+
+# Locals
+my $template;
+my $instance;
+my $run;
+my $pid;
+my $project;
+my $archive;
+my $guid;
+my $version;
+
+# Protos
+sub ParseArgs();
+sub fatal($);
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+use User;
+use Project;
+use Archive;
+use Experiment;
+
+# In libdb
+my $projroot = PROJROOT();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# Grab instance info and do access check via the template.
+#
+$instance = Template::Instance->LookupByExptidx($exptidx);
+if (!defined($instance)) {
+    fatal("Could not get instance record for experiment $exptidx!");
+}
+$template = $instance->template();
+$project  = $template->GetProject();
+$pid      = $project->pid();
+$archive  = $template->GetArchive();
+$guid     = $template->guid();
+$version  = $template->vers();
+$run      = $instance->LookupRunByID($runidx);
+
+if (! $instance->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    tberror("You do not have permission to revise records in $instance");
+    exit(1);
+}
+
+if (!defined($run)) {
+    fatal("Could not get run record $runidx in $instance!");
+}
+
+# The checkout directory corresponds to where it was exported to by
+# template_export ... 
+my $newdir = "$projroot/$pid/export/$guid/$version/$exptidx/$runidx";
+
+# Better exist; eventually support upload.
+if (! -e $newdir) {
+    tberror("$newdir does not exist!");
+    exit(2);
+}
+
+# Need the ending archive tag, since this is what we revise.
+my $oldtag = $run->stop_tag();
+
+# Generate a new tag.
+$tag = $archive->GenerateTag($tag);
+
+#
+# Maybe we should do a diff, but that means checking out another original?
+#
+$archive->Revise($oldtag, $tag, "Revise Record $oldtag",
+		 $mfile, $instance->exptidx(), $newdir)
+    == 0 or fatal("Could not revise record");
+
+# Update the run record since we want to remember this as the tag.
+$run->Update({"ending_archive_tag" => $tag}) == 0 or
+    return -1;
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (defined($options{"i"})) {
+	usage()
+	    if (@ARGV);
+	
+	$exptidx = $options{"i"};
+    
+	if (! TBcheck_dbslot($exptidx, "default", "int",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment index!");
+	}
+	# real check.
+	if ($exptidx =~ /^([\d]*)$/) {
+	    $exptidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $exptidx");
+	}
+    }
+
+    if (defined($options{"r"})) {
+	$runidx = $options{"r"};
+    
+	if (! TBcheck_dbslot($runidx, "default", "int",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper run index!");
+	}
+	# real check.
+	if ($runidx =~ /^([\d]*)$/) {
+	    $runidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $runidx");
+	}
+    }
+
+    if (defined($options{"m"})) {
+	#
+	# Argument is a pathname to a tempfile.
+	#
+	$mfile = $options{"m"};
+
+	if ($mfile =~ /^([-\w\/\.]+)$/) {
+	    $mfile = $1;
+	}
+	else {
+	    tbdie("Illegal characters in $mfile");
+	}
+	
+	if (! -e $mfile) {
+	    tbdie("$mfile does not exist!");
+	}
+    }
+
+    if (defined($options{"t"})) {
+	$tag = $options{"t"};
+    
+	if (! TBcheck_dbslot($tag, "archive_tags", "tag",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper tag!");
+	}
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 2;
+    }
+
+    usage()
+	if (! (defined($runidx) && defined($exptidx)));
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting ...";
+    cleanup();
+
+    exit(-1);
+}
+

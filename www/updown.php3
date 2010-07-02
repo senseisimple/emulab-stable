@@ -1,12 +1,13 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 
-if ($output == "xml") {
+if (isset($_REQUEST["output"]) &&
+    $_REQUEST["output"] == "xml") {
     header("Content-type: text/xml");
 
     $query_result =

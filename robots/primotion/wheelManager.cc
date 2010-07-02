@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -292,6 +292,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
 	distance = -distance;
     }
 
+    /* For small distances, drop the sensor thresholds so we can maneuver. */
     if (distance <= 0.60f)
 	tl = THRESH_LOW;
     else
@@ -303,7 +304,16 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
 
     mgt = this->wm_dashboard->getTelemetry();
     diff = fabsf(mgt->rear_ranger_left - mgt->rear_ranger_right);
+    /*
+     * If the rear rangers detect an obstacle that is not perpendicular to the
+     * robot, we might need to pivot in the opposite direction so the tail
+     * doesn't hit the obstacle.
+     */
     if (diff > 0.08f) {
+	/*
+	 * Make sure the direction we want to pivot is clear, otherwise, pivot
+	 * the opposite direction.
+	 */
 	if ((mgt->rear_ranger_right == 0.0f) ||
 	    (mgt->rear_ranger_left < mgt->rear_ranger_right)) {
 	    if (angle < 0.0f) {
@@ -535,6 +545,10 @@ void wheelManager::motionFinished(acpObject *behavior,
 	}
 
 	this->wm_dashboard->endMove(left_odometer, right_odometer);
+	/*
+	 * If both wheels moved the same direction it was a straight move,
+	 * otherwise, it was a pivot.
+	 */
 	if ((left_odometer / fabsf(left_odometer)) ==
 	    (right_odometer / fabsf(right_odometer))) {
 	    printf(" %f %f -- %f %f\n",

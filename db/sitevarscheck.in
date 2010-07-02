@@ -1,8 +1,7 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -30,11 +29,14 @@ my $DBNAME         = "@TBDBNAME@";
 my $master_sitevars = "$testbed_srcdir/sql/sitevars-create.sql";
 my $sitevarsdiff = "$testbed_srcdir/utils/sitevarsdiff";
 
+my $isvers5   = system("mysql -V | egrep -q -s 'Distrib 5.'") == 0;
+my $extraopts = ($isvers5 ? "--skip-opt" : "");
+
 #
 # XXX: Requires that mysqldump be in caller's $PATH - probably an OK
 # assumption, but maybe not always
 #
-my $mysqldump = "mysqldump -t $DBNAME sitevariables";
+my $mysqldump = "mysqldump $extraopts -t $DBNAME sitevariables";
 
 #
 # We use Mysql module instead of the testbed libraries, so that we can get
@@ -80,23 +82,9 @@ my $diff = (system("$sitevarsdiff $db_sitevars $master_sitevars") >> 8);
 unlink($db_sitevars);
 
 if ($diff) {
-
-    print << "EOSTR";
-
-The sitevariables from $master_sitevars differs from
-the running database. As a safety measure, you will not be able to install
-until this is resolved.
-
-If you are a user of the emulab software outside of Utah, this is probably
-because your site variables have not been updated since the installation
-of an older version of the emulab software.
-Contact testbed-ops\@emulab.net for help in updating your database.
-
-If you're a developer at Utah, this is probably because you (or someone else)
-forgot to update sql/sitevars-create.sql .
-
-EOSTR
-
+    print "*** Your sitevariables are out of date with $master_sitevars.\n";
+    print "    As a safety measure, you will not be able to install until\n";
+    print "    this is resolved.\n";
     exit(1);
 } else {
     exit(0);

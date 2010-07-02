@@ -1,0 +1,33 @@
+Modifications to Dummynet & delay-agent to add Backfill:
+-------------------------------------------------------
+
+The files in the current directory (ip_dummynet.c/.h & dummynet_callback.c) are for
+the delay node with FBSD-5.4 ( FBSD54-DNODE-PUBSUB image ).
+
+Compilation instrctions: 
+
+a) Kernel:
+----------
+1) Start with the FreeBSD source of the FBSD54-DNODE-PUBSUB image. Copy the ip_dummynet.h file
+to /usr/include/netinet/ip_dummynet.h. 
+2) Copy ip_dummynet.h and ip_dummynet.c to kernel_src/sys/netinet/
+3) Compile the kernel.
+4) The delay node Image ID with these modifications is FBSD54-DNODE-DNETMOD.
+
+b) Delay agent:
+---------------
+After step(1) above, overwrite the callback.c in the delay-agent cvs source with the file
+dummynet_callback.c & run make.
+
+
+Steps to build a FBSD-4.10 Delay kernel with Backfill:
+------------------------------------------------------
+
+The required files are in the fbsd410/kernel & fbsd410/delay-agent directories. For the kernel
+follow the same steps as above(starting with the source of FBSD410-STD). 
+For the delay agent, overwrite the cvs files main.h & callback.c
+of the cvs source with the modified versions and run make.
+
+The delay node Image ID with these modifications is FBSD410-DEL-DNETMOD.
+
+Pramod ( pramod@cs.utah.edu )

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Kernel, jail, netstat, route, ifconfig, ipfw, header files.
@@ -16,7 +16,8 @@ use Fcntl ':flock';
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-use libsetup qw(REMOTE LOCALROOTFS TMTOPOMAP TMLTMAP TBDebugTimeStamp);
+use libsetup qw(REMOTE SHAREDHOST
+		LOCALROOTFS TMTOPOMAP TMLTMAP TMLTPMAP TBDebugTimeStamp);
 use libtmcc;
 
 #
@@ -569,6 +570,9 @@ sub mkrootfs($)
     if (-e TMLTMAP()) {
 	mysystem("cp -fp " . TMLTMAP() . " $path/root/var/emulab/boot");
     }
+    if (-e TMLTPMAP()) {
+	mysystem("cp -fp " . TMLTPMAP() . " $path/root/var/emulab/boot");
+    }
 
     #
     # Stash the control net IP if not the same as the host IP
@@ -640,7 +644,7 @@ sub mkrootfs($)
     # more efficient (less tmcd work), and besides, the physnode starts with
     # exactly the same accounts.
     #
-    if (REMOTE()) {
+    if (REMOTE() || SHAREDHOST()) {
 	mysystem("cp -p $ETCJAIL/group $path/root/etc");
 	mysystem("cp -p $ETCJAIL/master.passwd $path/root/etc");
 	mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
@@ -761,6 +765,9 @@ sub restorerootfs($)
     }
     if (-e TMLTMAP()) {
 	mysystem("cp -fp " . TMLTMAP() . " $path/root/var/emulab/boot");
+    }
+    if (-e TMLTPMAP()) {
+	mysystem("cp -fp " . TMLTPMAP() . " $path/root/var/emulab/boot");
     }
 
     #
@@ -945,8 +952,8 @@ sub cleanup()
     }
 
     # Unmounts.
-    if (!REMOTE()) {
-	# If this fails, fail, we do want to continue. Dangerous!
+    if (! REMOTE()) {
+	# If this fails, fail, we do not want to continue. Dangerous.
 	system("$BINDIR/rc/rc.mounts ".
 	       "-j $vnodeid foo $NFSMOUNT_REMOTE shutdown");
 

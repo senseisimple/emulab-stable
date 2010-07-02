@@ -1,10 +1,17 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
  *
  * netmond, a 'server' for libnetmon - simply repeat what a process being
  * monitored with libnetmon tell us on a unix-domian socket
  */
+
+/*
+ * Get unitstd.h on Linux to declare getopt()
+ */
+#ifdef __linux__
+#define _GNU_SOURCE
+#endif
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -16,6 +23,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <strings.h>
 
 #include "netmon.h"
 
@@ -31,7 +39,7 @@ const unsigned int MAX_SOCKS = 256;
 /*
  * Output version clients should use
  */
-unsigned int output_version = 2;
+unsigned int output_version = 3;
 
 /*
  * Limit the maximum socket size
@@ -44,6 +52,16 @@ unsigned int max_socksize = 0;
 unsigned int forced_socksize = 0;
 
 /*
+ * Only enable a specific set of reports
+ */
+char *reports = NULL;
+
+/*
+ * Enable UDP mointoring
+ */
+bool monitor_udp = false;
+
+/*
  * Give a client a report on what settings it should use.
  *
  * Returns non-zero if it gets an error - probably means the client should
@@ -53,6 +71,8 @@ unsigned int write_status(int fd) {
     generic_m message;
     max_socket_m *sockrep;
     out_ver_m *verrep;
+    reports_m *reprep;
+    monitorudp_m *udprep;
 
     /*
      * Report on the maximum socket size
@@ -91,6 +111,37 @@ unsigned int write_status(int fd) {
         return 1;
     }
 
+    /*
+     *  Report on which reports we want
+     */
+    if (reports != NULL) {
+        reprep = (reports_m *)&(message);
+        reprep-> type = CM_REPORTS;
+        strcpy(reprep->reports,reports);
+        reprep->reports[strlen(reports)] = '\0';
+
+        if (write(fd,&message,CONTROL_MESSAGE_SIZE) != CONTROL_MESSAGE_SIZE) {
+            /* Client probably disconnected */
+            return 1;
+        }
+    }
+
+    /*
+     * Report on whether or not we want to monitor UDP sockets. Older versions
+     * of libnetmon won't know what to do with this, so only report if it's
+     * turned on
+     */
+    if (monitor_udp) {
+        udprep = (monitorudp_m *)&(message);
+        udprep->type = CM_MONITORDUP;
+        udprep->enable = true;
+
+        if (write(fd,&message,CONTROL_MESSAGE_SIZE) != CONTROL_MESSAGE_SIZE) {
+            /* Client probably disconnected */
+            return 1;
+        }
+    }
+
     return 0;
 }
 
@@ -99,6 +150,8 @@ void usage() {
     fprintf(stderr,"    -v version      Specify output version (default is 2)\n");
     fprintf(stderr,"    -l size         Maximum socket buffer size\n");
     fprintf(stderr,"    -f size         Force a socket buffer size\n");
+    fprintf(stderr,"    -r reports      Enable listed reports\n");
+    fprintf(stderr,"    -u              Monitor UDP sockets\n");
     exit(-1);
 }
 
@@ -117,22 +170,29 @@ int main(int argc, char **argv) {
     /*
      * Process command-line args
      */
-    while ((ch = getopt(argc, argv, "f:l:v:")) != -1) {
+    while ((ch = getopt(argc, argv, "f:l:v:r:u")) != -1) {
         switch(ch) {
             case 'f':
-                if (sscanf(optarg,"%i",&forced_socksize) != 1) {
+                if (sscanf(optarg,"%u",&forced_socksize) != 1) {
                     usage();
                 }
                 break;
             case 'l':
-                if (sscanf(optarg,"%i",&max_socksize) != 1) {
+                if (sscanf(optarg,"%u",&max_socksize) != 1) {
                     usage();
                 }
                 break;
             case 'v':
-                if (sscanf(optarg,"%i",&output_version) != 1) {
+                if (sscanf(optarg,"%u",&output_version) != 1) {
                     usage();
                 }
+                break;
+            case 'r':
+                reports = (char*)malloc(strlen(optarg) + 1);
+                strcpy(reports,optarg);
+                break;
+            case 'u':
+                monitor_udp = true;
                 break;
             default:
                 usage();
@@ -157,7 +217,7 @@ int main(int argc, char **argv) {
     unlink(SOCKPATH);
     servaddr.sun_family = AF_LOCAL;
     strcpy(servaddr.sun_path, SOCKPATH);
-    
+
     if (bind(sockfd, (struct sockaddr*) &servaddr, sizeof(servaddr))) {
         perror("Failed to bind() socket\n");
         return 1;
@@ -181,7 +241,7 @@ int main(int argc, char **argv) {
     unlink(CONTROLSOCK);
     cservaddr.sun_family = AF_LOCAL;
     strcpy(cservaddr.sun_path, CONTROLSOCK);
-    
+
     if (bind(controlsockfd, (struct sockaddr*) &cservaddr, sizeof(cservaddr))) {
         perror("Failed to bind() control socket\n");
         return 1;
@@ -209,14 +269,14 @@ int main(int argc, char **argv) {
 
     while (1) {
         /*
-         * Make a blocking call to select() to wait for a client to connect or 
+         * Make a blocking call to select() to wait for a client to connect or
          * send us data
          */
         /* fprintf(stderr,"Waiting for clients\n"); */
         bcopy(&real_fdset,&returned_fdset,sizeof(fd_set));
 
         if (select(max_clientfd + 1,&returned_fdset,NULL,NULL,NULL) <= 0) {
-            /* 
+            /*
              * Just repeat in case of failure
              */
             continue;
@@ -233,7 +293,7 @@ int main(int argc, char **argv) {
             clientfd = accept(sockfd, (struct sockaddr*)&clientaddr, &clientlen);
 
             if (clientfd) {
-                fprintf(stderr,"A new client connected\n");
+//                fprintf(stderr,"A new client connected\n");
 
                 FD_SET(clientfd,&real_fdset);
                 sock_types[clientfd] = DATA;
@@ -259,7 +319,7 @@ int main(int argc, char **argv) {
                     &clientlen);
 
             if (clientfd) {
-                fprintf(stderr,"A new client connected to the control socket\n");
+//                fprintf(stderr,"A new client connected to the control socket\n");
 
                 FD_SET(clientfd,&real_fdset);
                 sock_types[clientfd] = CONTROL;
@@ -304,7 +364,7 @@ int main(int argc, char **argv) {
                          * If we get back a 0 length read, or an error, boot the
                          * client
                          */
-                        printf("A client disconnected\n");
+                        //printf("A client disconnected\n");
                         close(i);
                         FD_CLR(i,&real_fdset);
                     }
@@ -330,7 +390,7 @@ int main(int argc, char **argv) {
                             }
                         }
                     } else {
-                        printf("A control client disconnected\n");
+                        //printf("A control client disconnected\n");
                         close(i);
                         FD_CLR(i,&real_fdset);
                     }

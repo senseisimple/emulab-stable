@@ -1,8 +1,8 @@
 -- MySQL dump 8.23
 --
 -- Host: localhost    Database: tbdb
----------------------------------------------------------
--- Server version	3.23.58-log
+-- -------------------------------------------------------
+-- Server version	3.23.59-nightly-20050301-log
 
 --
 -- Dumping data for table `causes`
@@ -15,6 +15,7 @@ REPLACE INTO causes VALUES ('internal','Internal Error');
 REPLACE INTO causes VALUES ('software','Software Problem');
 REPLACE INTO causes VALUES ('hardware','Hardware Problem');
 REPLACE INTO causes VALUES ('unknown','Cause Unknown');
+REPLACE INTO causes VALUES ('canceled','Canceled');
 
 --
 -- Dumping data for table `comments`
@@ -101,6 +102,7 @@ REPLACE INTO event_eventtypes VALUES (21,'SNAPSHOT');
 REPLACE INTO event_eventtypes VALUES (22,'RELOAD');
 REPLACE INTO event_eventtypes VALUES (23,'CLEAR');
 REPLACE INTO event_eventtypes VALUES (24,'CREATE');
+REPLACE INTO event_eventtypes VALUES (25,'STOPRUN');
 
 --
 -- Dumping data for table `event_objecttypes`
@@ -145,6 +147,8 @@ REPLACE INTO exported_tables VALUES ('state_triggers');
 REPLACE INTO exported_tables VALUES ('table_regex');
 REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
+REPLACE INTO exported_tables VALUES ('emulab_pubs_month_map');
+REPLACE INTO exported_tables VALUES ('event_triggertypes');
 
 --
 -- Dumping data for table `foreign_keys`
@@ -206,6 +210,7 @@ REPLACE INTO foreign_keys VALUES ('virt_nodes','osname','os_info','osname');
 REPLACE INTO foreign_keys VALUES ('vlans','pid,eid','experiments','pid,eid');
 REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid,vname','virt_nodes','eid,pid,vname');
 REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid','experiments','eid,pid');
+REPLACE INTO foreign_keys VALUES ('virt_nodes','parent_osname','os_info','osname');
 
 --
 -- Dumping data for table `mode_transitions`
@@ -272,6 +277,8 @@ REPLACE INTO mode_transitions VALUES ('ALWAYSUP','SHUTDOWN','RELOAD-MOTE','SHUTD
 REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','SHUTDOWN','ReloadStart');
 REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','ISUP','ReloadStart');
 REPLACE INTO mode_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','ALWAYSUP','ISUP','ReloadDone');
+REPLACE INTO mode_transitions VALUES ('PCVM','SHUTDOWN','RELOAD-PCVM','SHUTDOWN','ReloadSetup');
+REPLACE INTO mode_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','PCVM','SHUTDOWN','ReloadDone');
 
 --
 -- Dumping data for table `priorities`
@@ -418,6 +425,7 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','PXEBOOTING','KernelCha
 REPLACE INTO state_transitions VALUES ('NODEALLOC','FREE_CLEAN','RES_INIT_CLEAN','Reserve');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAIT','PXEBOOTING','Retry');
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEBOOTING','PXEWAIT','Free');
+REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXELIMBO','PXEBOOTING','Bootinfo-Restart');
 REPLACE INTO state_transitions VALUES ('BATCHSTATE','ACTIVATING','SWAPPED','NonBatch');
 REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','SHUTDOWN','Reboot');
@@ -520,6 +528,12 @@ REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBSETUP','ISUP','Boo
 REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBSETUP','TBSETUP','LongSetup');
 REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBSETUP','TBFAILED','BootFail');
 REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBFAILED','SHUTDOWN','RebootAfterFail');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADSETUP','RELOADOLDMFS','');
+REPLACE INTO state_transitions VALUES ('RELOAD','RELOADOLDMFS','SHUTDOWN','');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADSETUP','RELOADING','ReloadStart');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADING','RELOADDONE','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADDONE','SHUTDOWN','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','RELOADSETUP','ReloadSetup');
 
 --
 -- Dumping data for table `state_triggers`
@@ -529,13 +543,15 @@ REPLACE INTO state_transitions VALUES ('GARCIA-STARGATEv1','TBFAILED','SHUTDOWN'
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADDONE','RESET, RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADDONEV2','RESET, RELOADDONEV2');
 REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
-REPLACE INTO state_triggers VALUES ('*','*','ISUP','RESET');
+REPLACE INTO state_triggers VALUES ('*','*','ISUP','RESET, CHECKPORTREG');
 REPLACE INTO state_triggers VALUES ('*','*','PXEBOOTING','PXEBOOT');
 REPLACE INTO state_triggers VALUES ('*','*','BOOTING','BOOTING, CHECKGENISUP');
 REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','RELOAD-MOTE','RELOADDONE','RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
 REPLACE INTO state_triggers VALUES ('*','NORMALv2','WEDGED','POWERCYCLE');
+REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADOLDMFS','RELOADOLDMFS');
+REPLACE INTO state_triggers VALUES ('*','RELOAD-PCVM','RELOADDONE','RESET, RELOADDONE');
 
 --
 -- Dumping data for table `table_regex`
@@ -551,7 +567,10 @@ REPLACE INTO table_regex VALUES ('eventlist','objecttype','int','redirect','defa
 REPLACE INTO table_regex VALUES ('eventlist','eventtype','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','arguments','text','redirect','default:text',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('eventlist','atstring','text','redirect','default:text',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('eventlist','triggertype','int','redirect','default:tinyint',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('experiments','eid','text','regex','^[a-zA-Z0-9][-a-zA-Z0-9]+$',2,19,'Must ensure not too long for the database. PID is 12, and the max is 32, so the user is not allowed to specify an EID more than 19, since other parts of the system may concatenate them together with a hyphen');
+REPLACE INTO table_regex VALUES ('experiments','eid_idx','text','regex','^[\\d]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','forcelinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','uselinkdelays','int','redirect','default:boolean',0,0,NULL);
@@ -560,34 +579,75 @@ REPLACE INTO table_regex VALUES ('experiments','uselatestwadata','int','redirect
 REPLACE INTO table_regex VALUES ('experiments','wa_delay_solverweight','float','redirect','default:float',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_bw_solverweight','float','redirect','default:float',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_plr_solverweight','float','redirect','default:float',0,1024,NULL);
-REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','default:tinyint',0,5,NULL);
-REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','virt_nodes:vname',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('groups','project','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('groups','pid_idx','text','redirect','projects:pid_idx',0,0,NULL);
 REPLACE INTO table_regex VALUES ('groups','gid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('groups','gid_idx','text','regex','^[\\d]+$',1,12,NULL);
+REPLACE INTO table_regex VALUES ('groups','group_id','text','redirect','groups:gid',2,12,NULL);
+REPLACE INTO table_regex VALUES ('groups','group_leader','text','redirect','users:uid',2,8,NULL);
+REPLACE INTO table_regex VALUES ('groups','group_description','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('groups','change','text','regex','^permit$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('groups','add','text','regex','^permit$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('groups','trust','text','regex','^(user|local_root|group_root)$',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('nodes','node_id','text','regex','^[-\\w]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','vname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','nseconfig','text','regex','^[\\040-\\176\\012\\011\\015]*$',0,16777215,NULL);
-REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+$',2,20,NULL);
+
+REPLACE INTO table_regex VALUES ('projects','newuser_xml','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
 REPLACE INTO table_regex VALUES ('projects','newpid','text','regex','^[a-zA-Z][-a-zA-Z0-9]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('projects','head_uid','text','redirect','users:uid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('projects','name','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('projects','funders','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('projects','public','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('projects','linked_to_us','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('projects','public_whynot','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('projects','default_user_interface','text','regex','^(emulab|plab)$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[-\\w]+$',2,12,NULL);
+REPLACE INTO table_regex VALUES ('projects','pid_idx','text','regex','^[\\d]+$',1,12,NULL);
+REPLACE INTO table_regex VALUES ('projects','URL','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
+
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][\\w]+$',2,8,NULL);
+REPLACE INTO table_regex VALUES ('users','uid_idx','text','regex','^[\\d]+$',1,12,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_name','text','regex','^[-\\w\\. ]+$',4,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\\.]+)\\@([-\\w\\.]+)$',3,64,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_shell','text','regex','^(csh|sh|bash|tcsh|zsh)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_title','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_affil','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO `table_regex` VALUES ('users','usr_affil_abbrev','text','regex','^[\\040-\\176]*$',0,16,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_addr','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_addr2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_state','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_city','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_zip','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_country','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_URL','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','usr_pswd','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','password1','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','password2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','w_password1','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','w_password2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','user_interface','text','regex','^(emulab|plab)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('users','notes','text','redirect','default:fulltext',0,65535,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_agents','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','vname','text','redirect','eventlist:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','vnode','text','regex','^([-\\w]+)|(\\*{1})$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_agents','objecttype','int','redirect','default:tinyint',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','delay','float','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','bandwidth','int','redirect','default:int',0,2147483647,NULL);
-REPLACE INTO table_regex VALUES ('virt_lans','lossrate','float','redirect','default:float',0,1,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','lossrate','float','function','_checklossrate',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','q_limit','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','q_maxthresh','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','q_minthresh','int','redirect','default:int',0,0,NULL);
@@ -605,30 +665,39 @@ REPLACE INTO table_regex VALUES ('virt_lans','member','text','regex','^[-\\w]+:[
 REPLACE INTO table_regex VALUES ('virt_lans','mask','text','regex','^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$',0,15,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rdelay','float','redirect','virt_lans:delay',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rbandwidth','int','redirect','virt_lans:bandwidth',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_lans','rlossrate','float','redirect','virt_lans:lossrate',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','rlossrate','float','function','_checklossrate',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','cost','float','redirect','default:float',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','widearea','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','emulated','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','uselinkdelay','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','nobwshaping','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','usevethiface','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','encap_style','text','redirect','experiments:encap_style',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trivial_ok','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','traced','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_type','text','regex','^(header|packet|monitor)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_expr','text','redirect','default:text',1,255,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_snaplen','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trace_endnode','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','trace_db','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','fixed_iface','text','redirect','default:tinytext',0,128,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','modbase','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','compat','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','layer','int','redirect','default:tinyint',1,2,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','ofenabled','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','ofcontroller','text','redirect','default:tinytext',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_node_desires','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','vname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_node_desires','desire','text','regex','^[-\\w?+]+$',1,30,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_desires','desire','text','regex','^[\\?\\*]?[\\+\\!\\&]?[-\\w?+]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','weight','int','redirect','default:float',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','eid','text','redirect','experiments:eid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','ips','text','regex','^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','ips','text','regex','^(\\d{1,2}:\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} {0,1})*$',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','cmd_line','text','redirect','default:tinytext',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','rpms','text','regex','^([-\\w\\.\\/\\+:~]+;{0,1})*$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','rpms','text','regex','^([-\\w\\.\\/\\+:~]+;{0,1})*$',0,4096,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','deltas','text','regex','^([-\\w\\.\\/\\+]+:{0,1})*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','startupcmd','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','tarfiles','text','regex','^([-\\w\\.\\/\\+]+\\s+[-\\w\\.\\/\\+:~]+;{0,1})*$',0,1024,NULL);
@@ -636,7 +705,9 @@ REPLACE INTO table_regex VALUES ('virt_nodes','vname','text','regex','^[-\\w]+$'
 REPLACE INTO table_regex VALUES ('virt_nodes','type','text','regex','^[-\\w]*$',0,30,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','failureaction','text','regex','^(fatal|nonfatal|ignore)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','routertype','text','regex','^(none|ospf|static|manual|static-ddijk|static-old)$',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','regex','^[-\\w]*$',0,32,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','redirect','default:tinytext',0,128,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','sharing_mode','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','parent_osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
@@ -666,7 +737,7 @@ REPLACE INTO table_regex VALUES ('virt_trafgens','target_ip','text','redirect','
 REPLACE INTO table_regex VALUES ('virt_trafgens','generator','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','eid','text','redirect','experiments:eid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_vtypes','name','text','regex','^[-\\w]+$',1,12,NULL);
+REPLACE INTO table_regex VALUES ('virt_vtypes','name','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','weight','float','redirect','default:float',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_vtypes','members','text','regex','^([-\\w]+ ?)+$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('default','tinytext','text','regex','^[\\040-\\176]*$',0,256,NULL);
@@ -682,21 +753,33 @@ REPLACE INTO table_regex VALUES ('projects','num_members','int','redirect','defa
 REPLACE INTO table_regex VALUES ('projects','num_pcs','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('projects','num_pcplab','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('projects','num_ron','int','redirect','default:int',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('experiments','encap_style','text','regex','^(alias|veth|veth-ne|vlan|vtun|egre|gre|default)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','veth_encapsulate','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','allowfixnode','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','jail_osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','delay_osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','use_ipassign','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','ipassign_args','text','regex','^[\\w\\s-]*$',0,255,NULL);
-REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
-REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:fulltext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','dpdb','int','redirect','default:tinyint',0,1,NULL);
+
+REPLACE INTO table_regex VALUES ('experiments','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('experiments','idle_ignore','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','swappable','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','noswap_reason','text','redirect','default:tinytext',1,255,NULL);
-REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','idleswap','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','idleswap_timeout','int','redirect','default:int',1,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',1,255,NULL);
+REPLACE INTO table_regex VALUES ('experiments','autoswap','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','autoswap_timeout','int','redirect','default:int',1,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('experiments','savedisk','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','cpu_usage','int','redirect','default:tinyint',0,5,NULL);
+REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','default:tinyint',0,5,NULL);
+REPLACE INTO table_regex VALUES ('experiments','batchmode','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','linktest_level','int','redirect','default:tinyint',0,4,NULL);
+
 REPLACE INTO table_regex VALUES ('virt_lans','protocol','text','redirect','default:tinytext',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','is_accesspoint','int','redirect','default:boolean',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','linktest_level','int','redirect','default:tinyint',0,4,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_settings','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_settings','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_settings','vname','text','redirect','virt_lans:vname',0,0,NULL);
@@ -710,6 +793,8 @@ REPLACE INTO table_regex VALUES ('virt_lan_member_settings','capkey','text','red
 REPLACE INTO table_regex VALUES ('virt_lan_member_settings','capval','text','redirect','virt_lan_settings:capval',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','est_bandwidth','int','redirect','default:int',0,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','rest_bandwidth','int','redirect','default:int',0,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','backfill','int','redirect','default:int',0,2147483647,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','rbackfill','int','redirect','default:int',0,2147483647,NULL);
 REPLACE INTO table_regex VALUES ('location_info','floor','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('location_info','building','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('location_info','loc_x','int','redirect','default:int',0,2048,NULL);
@@ -737,10 +822,63 @@ REPLACE INTO table_regex VALUES ('firewall_rules','fwname','text','redirect','vi
 REPLACE INTO table_regex VALUES ('firewall_rules','ruleno','int','redirect','default:int',0,50000,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','rule','text','regex','^\\w[-\\w \\t,/\\{\\}\\(\\)!:\\.]*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','inner_elab_role','text','regex','^(boss|boss\\+router|router|ops|ops\\+fs|fs|node)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','plab_role','text','regex','^(plc|node|none)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','elabinelab_singlenet','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_cvstag','text','regex','^[-\\w\\@\\/\\.]+$',0,0,NULL);
-REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',0,45,NULL);
+
 REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
+REPLACE INTO table_regex VALUES ('images','imageid','text','redirect','default:int',0,100000000,NULL);
+REPLACE INTO table_regex VALUES ('images','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','gid','text','redirect','groups:gid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('images','loadpart','text','redirect','default:tinyint',0,4,NULL);
+REPLACE INTO table_regex VALUES ('images','loadlength','text','redirect','default:tinyint',1,4,NULL);
+REPLACE INTO table_regex VALUES ('images','part1_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','part2_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','part3_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','part4_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','default_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','path','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('images','shared','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','global','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','makedefault','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','mtype','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','node_id','text','redirect','nodes:node_id',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','load_address','text','redirect','default:text',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','frisbee_pid','text','redirect','default:int',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('images','nodetype','text','redirect','node_types:node_type',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','OS','text','redirect','os_info:OS',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','version','text','redirect','os_info:version',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','osfeatures','text','redirect','os_info:osfeatures',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','op_mode','text','redirect','os_info:op_mode',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','wholedisk','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','mbr_version','text','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','max_concurrent','text','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','reboot_waittime','text','redirect','default:int',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('node_types','new_type','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','node_type','text','regex','^[-\\w]+$',1,30,NULL);
+REPLACE INTO table_regex VALUES ('node_types','class','text','regex','^[\\w]+$',1,30,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isvirtnode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isjailed','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isswitch','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isdynamic','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isremotenode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','issubnode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isplabdslice','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','issimnode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isgeninode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','isfednode','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_name','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_osid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_imageid','text','redirect','images:imageid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_boolean','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_integer','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_float','float','redirect','default:float',0,0,NULL);
+REPLACE INTO table_regex VALUES ('node_types','attr_string','text','redirect','default:tinytext',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('experiments','security_level','int','redirect','default:tinyuint',0,4,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','pid','text','redirect','projects:pid',0,0,NULL);
@@ -771,26 +909,86 @@ REPLACE INTO table_regex VALUES ('virt_firewalls','eid','text','redirect','exper
 REPLACE INTO table_regex VALUES ('virt_firewalls','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_firewalls','type','text','regex','^(ipfw|ipfw2|ipchains|ipfw2-vlan)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('mailman_lists','pid_idx','text','redirect','projects:pid_idx',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','password1','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','password2','text','redirect','default:tinytext',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','fullname','text','redirect','users:usr_email',0,0,NULL);
+REPLACE INTO table_regex VALUES ('mailman_lists','listname','text','redirect','mailman_listnames:listname',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('mailman_listnames','listname','text','regex','^[-\\w\\.\\+]+$',3,64,NULL);
+
 REPLACE INTO table_regex VALUES ('default','fulltext','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,20000,NULL);
 REPLACE INTO table_regex VALUES ('node_attributes','attrkey','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('node_attributes','attrvalue','text','regex','^[-\\w\\.+,\\s]+$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('archive_tags','description','text','redirect','projects:why',1,2048,NULL);
-REPLACE INTO table_regex VALUES ('archive_tags','tag','text','regex','^[a-zA-Z][-\\w\\.\\+]+$',3,64,NULL);
+REPLACE INTO table_regex VALUES ('archive_tags','tag','text','regex','^[a-zA-Z][-\\w\\.\\+]+$',2,64,NULL);
 REPLACE INTO table_regex VALUES ('experiment_templates','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,4096,NULL);
 REPLACE INTO table_regex VALUES ('experiment_templates','guid','text','regex','^[\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('experiment_template_metadata','name','text','regex','^[\\040-\\176]*$',1,64,NULL);
-REPLACE INTO table_regex VALUES ('experiment_template_metadata','value','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,2048,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_metadata','value','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,4096,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_metadata','metadata_type','text','regex','^[\\w]*$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_parameters','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_parameters','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_parameters','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('virt_parameters','value','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('virt_parameters','description','text','redirect','experiment_templates:description',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiment_template_instance_bindings','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('experiment_template_instance_bindings','value','text','redirect','default:tinytext',0,256,NULL);
 REPLACE INTO table_regex VALUES ('experiment_runs','runid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiment_runs','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
 REPLACE INTO table_regex VALUES ('experiment_run_bindings','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('experiment_run_bindings','value','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_instances','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','logfileid','text','regex','^[-\\w\\.+]+$',2,45,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO `table_regex` VALUES ('virt_nodes','plab_plcnet','text','regex','^[\\w\\_\\d]+$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
+REPLACE INTO table_regex VALUES ('os_info','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('os_info','pid_idx','text','redirect','projects:pid_idx',0,0,NULL);
+REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+$',2,20,NULL);
+REPLACE INTO table_regex VALUES ('os_info','description','text','redirect','default:fulltext',1,256,NULL);
+REPLACE INTO table_regex VALUES ('os_info','OS','text','regex','^[-\\w]*$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('os_info','version','text','regex','^[-\\w\\.]*$',1,12,NULL);
+REPLACE INTO table_regex VALUES ('os_info','path','text','regex','^[-\\w\\.\\/:]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('os_info','magic','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('os_info','shared','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('os_info','mfs','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('os_info','mustclean','int','redirect','default:tinyint',0,1,NULL);
+REPLACE INTO table_regex VALUES ('os_info','osfeatures','text','regex','^[-\\w,]*$',1,128,NULL);
+REPLACE INTO table_regex VALUES ('os_info','op_mode','text','regex','^[-\\w]*$',1,20,NULL);
+REPLACE INTO table_regex VALUES ('os_info','nextosid','text','redirect','os_info:osid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('os_info','reboot_waittime','int','redirect','default:int',0,2000,NULL);
+
+REPLACE INTO table_regex VALUES ('sitevariables','name','text','regex','^[\\w\\/]+$',1,255,NULL);
+REPLACE INTO table_regex VALUES ('sitevariables','value','text','redirect','default:text',0,0,NULL);
+REPLACE INTO table_regex VALUES ('sitevariables','reset','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('sitevariables','defaultvalue','text','redirect','default:text',0,0,NULL);
+REPLACE INTO table_regex VALUES ('sitevariables','description','text','redirect','default:text',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_searches','name','text','regex','^[-\\w]*$',2,64,NULL);
+
+REPLACE INTO table_regex VALUES ('user_pubkeys','verify','text','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('user_pubkeys','user','text','redirect','users:uid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('user_pubkeys','keyfile','text','regex','^[-_\\w\\.\\/:+]*$',1,256,NULL);
+
+REPLACE INTO table_regex VALUES ('virt_paths','pathname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_paths','segmentname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_paths','segmentindex','int','redirect','default:tinyuint',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_paths','layer','int','redirect','default:tinyint',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_path','text','redirect','virt_paths:pathname',1,128,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','implemented_by_link','text','redirect','default:tinytext',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('elabinelab_attributes','role','text','regex','^(boss|router|ops|fs|node)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('elabinelab_attributes','attrkey','text','regex','^[-\\w\\.]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('elabinelab_attributes','attrvalue','text','regex','^[-\\w\\.\\+,\\s\\/]+$',0,255,NULL);
+REPLACE INTO table_regex VALUES ('elabinelab_attributes','ordering','int','redirect','default:tinyint',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,256,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
+REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
+REPLACE INTO table_regex VALUES ('default','fulltext_utf8','text','regex','^(?:[\\x09\\x0A\\x0D\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 
 
 --
@@ -851,3 +1049,36 @@ REPLACE INTO webdb_table_permissions VALUES ('projects',1,1,0);
 REPLACE INTO webdb_table_permissions VALUES ('osidtoimageid',1,0,1);
 REPLACE INTO webdb_table_permissions VALUES ('table_regex',1,1,1);
 
+
+--
+-- Dumping data for table `emulab_pubs_month_map`
+--
+
+REPLACE INTO `emulab_pubs_month_map` VALUES (1,0.0,'');
+REPLACE INTO `emulab_pubs_month_map` VALUES (2,1.0,'Jan');
+REPLACE INTO `emulab_pubs_month_map` VALUES (3,2.0,'Feb');
+REPLACE INTO `emulab_pubs_month_map` VALUES (4,3.0,'Mar');
+REPLACE INTO `emulab_pubs_month_map` VALUES (5,4.0,'Apr');
+REPLACE INTO `emulab_pubs_month_map` VALUES (6,5.0,'May');
+REPLACE INTO `emulab_pubs_month_map` VALUES (7,6.0,'Jun');
+REPLACE INTO `emulab_pubs_month_map` VALUES (8,7.0,'Jul');
+REPLACE INTO `emulab_pubs_month_map` VALUES (9,8.0,'Aug');
+REPLACE INTO `emulab_pubs_month_map` VALUES (10,9.0,'Sep');
+REPLACE INTO `emulab_pubs_month_map` VALUES (11,10.0,'Oct');
+REPLACE INTO `emulab_pubs_month_map` VALUES (12,11.0,'Nov');
+REPLACE INTO `emulab_pubs_month_map` VALUES (13,12.0,'Dec');
+REPLACE INTO `emulab_pubs_month_map` VALUES (14,1.5,'Jan-Feb');
+REPLACE INTO `emulab_pubs_month_map` VALUES (15,2.5,'Feb-Mar');
+REPLACE INTO `emulab_pubs_month_map` VALUES (16,3.5,'Mar-Apr');
+REPLACE INTO `emulab_pubs_month_map` VALUES (17,4.5,'Apr-May');
+REPLACE INTO `emulab_pubs_month_map` VALUES (18,5.5,'May-Jun');
+REPLACE INTO `emulab_pubs_month_map` VALUES (19,6.5,'Jun-Jul');
+REPLACE INTO `emulab_pubs_month_map` VALUES (20,7.5,'Jul-Aug');
+REPLACE INTO `emulab_pubs_month_map` VALUES (21,8.5,'Aug-Sep');
+REPLACE INTO `emulab_pubs_month_map` VALUES (22,9.5,'Sep-Oct');
+REPLACE INTO `emulab_pubs_month_map` VALUES (23,10.5,'Oct-Nov');
+REPLACE INTO `emulab_pubs_month_map` VALUES (24,11.5,'Nov-Dec');
+REPLACE INTO `emulab_pubs_month_map` VALUES (25,12.5,'Dec-Jan');
+
+REPLACE INTO `event_triggertypes`  VALUES (0,'TIMER');
+REPLACE INTO `event_triggertypes`  VALUES (2,'SWAPOUT');

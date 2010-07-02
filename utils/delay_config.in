@@ -2,12 +2,13 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use English;
 use Getopt::Std;
+use XML::Simple;
 
 #
 # Change delay params for a link.
@@ -17,6 +18,7 @@ sub usage()
     print(STDERR
 	  "Usage: delay_config [-m] [-d] [-s vnode] <pid> <eid> <link>".
 	  " PARAM=VALUE ...\n".
+	  "       delay_config [-d] -X <xmlfile>\n".
 	  "Required: pid, eid, link, and at least one parameter to change!\n".
 	  "  pid = Project ID\n".
 	  "  eid = Experiment ID\n".
@@ -26,6 +28,7 @@ sub usage()
 	  "   -d = turn on debugging\n".
 	  "   -s = Select the source of the link to determine which pipe\n".
 	  "   -m = Modify the base experiment in addition to current state.\n".
+	  "   -X = Get args and parameters from an XML file.\n".
 	  "Parameters:\n".
 	  " BANDWIDTH=NNN    - N=bandwidth (10-100000 Kbits per second)\n",
 	  " PLR=NNN          - N=lossrate (0 <= plr < 1)\n".
@@ -40,7 +43,7 @@ sub usage()
     # Web interface cares about this return value!
     exit(2);
 }
-my  $optlist = "dms:";
+my  $optlist = "dms:cX:";
 
 #
 # Configure variables
@@ -49,7 +52,18 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TEVC        = "$TB/bin/tevc";
 my $GENTOPO     = "$TB/libexec/gentopofile";
-my $debug	= 0;
+
+# Locals
+my $pid;
+my $eid;
+my $link;
+my $modify     = 0;
+my $srcvnode;
+my %config;
+my $pipeno;
+my $pipe;
+my $debug      = 0;
+my $compatmode = 0;
 
 #
 # Testbed Support libraries
@@ -57,6 +71,42 @@ my $debug	= 0;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+#
+# Function prototypes
+#
+sub ChangeDelayConfig();
+sub ChangeLinkDelayConfig();
+sub ChangeVirtLans();
+sub ParseXmlArgs($$$$$$);
+sub fatal($);
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+my $this_user;			# Used for $SLOT_ADMINONLY.
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("pid"		=> ["pid",		$SLOT_REQUIRED],
+     "eid"		=> ["eid",		$SLOT_REQUIRED],
+     "link"		=> ["vname",		$SLOT_REQUIRED],
+
+     "vnode"		=> ["vnode",		$SLOT_OPTIONAL],
+     "modify"		=> ["modbase",		$SLOT_OPTIONAL,	   0],
+     "compat"		=> ["compat",		$SLOT_OPTIONAL,	   0],
+
+     "bandwidth"	=> ["bandwidth",	$SLOT_OPTIONAL],
+     "plr"		=> ["lossrate",		$SLOT_OPTIONAL],
+     "delay"		=> ["delay",		$SLOT_OPTIONAL],
+     "limit"		=> ["q_limit",		$SLOT_OPTIONAL],
+     "queue-in-bytes"	=> ["q_bytes",		$SLOT_OPTIONAL],
+     "thresh"		=> ["q_maxthresh",	$SLOT_OPTIONAL],
+     "minthresh"	=> ["q_minthresh",	$SLOT_OPTIONAL],
+     "linterm"		=> ["q_linterm",	$SLOT_OPTIONAL],
+     "q_weight"		=> ["q_weight",		$SLOT_OPTIONAL]);
 
 #
 # Turn off line buffering on output
@@ -73,33 +123,70 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-if (@ARGV < 4) {
-    usage();
-}
 %options = ();
 if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV < 4 && !defined($options{"X"}) ) {
     usage();
 }
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"c"})) {
+    $compatmode = 1;
+}
+if (!defined($options{"X"})) {
+    $pid  = shift(@ARGV);
+    $eid  = shift(@ARGV);
+    $link = shift(@ARGV);
+}
+else {
+    $xmlfile = $options{"X"};
 
-# Functions
+    my %xmlargs = (); 
+    my %errors = ();
+    ParseXmlArgs($xmlfile, "virt_lans", \%xmlfields, $debug,
+		 \%xmlargs, \%errors);
+    if (keys(%errors)) {
+	foreach my $errkey (keys(%errors)) {
+	    my $errval = $errors{$errkey};
+	    print "${errkey}: $errval\n";
+	}
+	fatal("XML arg error");
+    }
 
-sub ChangeDelayConfig();
-sub ChangeLinkDelayConfig();
-sub ChangeVirtLans();
+    # There should be no other trailing args along with -X <xmlfile>.
+    usage()
+	if (@ARGV > 0);
 
-# Locals
-my $pid    = shift(@ARGV);
-my $eid    = shift(@ARGV);
-my $link   = shift(@ARGV);
-my $modify = 0;
-my $srcvnode;
-my %config;
-my $pipeno;
-my $pipe;
-
+    foreach my $arg (keys(%xmlargs)) {
+	# Required.
+	if ($arg eq "pid") {
+	    $pid = $xmlargs{"pid"};
+	}
+	elsif ($arg eq "eid") {
+	    $eid = $xmlargs{"eid"};
+	}
+	elsif ($arg eq "link") {
+	    $link = $xmlargs{"link"};
+	}
+	# Optional.
+	elsif ($arg eq "modify") {
+	    $modify = $xmlargs{"modify"};
+	}
+	elsif ($arg eq "compat") {
+	    $compatmode = $xmlargs{"compat"};
+	}
+	elsif ($arg eq "vnode") {
+	    $srcvnode = $xmlargs{"vnode"};
+	}
+	# Push parameters onto ARGV for handling below.
+	else {
+	    push(@ARGV, "$arg=" . $xmlargs{$arg});
+	}
+    }
+}
 if (defined($options{"m"})) {
     $modify = 1;
 }
@@ -113,6 +200,7 @@ if (defined($options{"s"})) {
 	die("*** Bad srcvnode name: $srcvnode.\n");
     }
 }
+
 #
 # Untaint args.
 #
@@ -239,7 +327,7 @@ foreach my $key (keys(%config)) {
 }
 
 #
-# These map the names I'm using in the config hash (which correspond
+# These map the names I am using in the config hash (which correspond
 # to the DB slot names) into the event parameter names to send over to the
 # delay agent.
 #
@@ -309,7 +397,25 @@ $inject_string .= " modify ";
 foreach my $key (keys(%config)) {
     my $val = $config{$key};
     my $str = $agentmap{$key};
-    
+
+    #
+    # When changing an entire lan, we have to adjust delay/loss since
+    # there is a delay *to* the lan and a delay *from* the lan.
+    # We do not do this for links since there is just a single delay.
+    # When changing a single node in a lan, we fall back to the way things
+    # operate in the parser, which is that the user intended to change both
+    # directions to exactly this value. 
+    #
+    if (!$islink && !defined($srcvnode) && !$compatmode) {
+        if ($key eq "delay") {
+	    # This follows what is done in the parser.
+	    $val = $val / 2.0;
+	}
+        elsif ($key eq "lossrate") {
+	    # This follows what is done in the parser.
+	    $val = 1-sqrt(1-$val);
+	}
+    }
     $inject_string .= "${str}=$val ";
 }
 if ($debug) {
@@ -319,6 +425,13 @@ if ($debug) {
 system($inject_string) &&
     die("*** $0:\n".
 	"    Failed to inject delay update event!\n");
+
+print "*** WARNING:\n";
+print "    You should *always* test your links and lans to make sure they\n";
+print "    are behaving as you expect. You can do this by hand with ping,\n";
+print "    or you can use Emulab's LinkTest feature.\n";
+print "    Type 'linktest' into the Emulab search box to find out how to ".
+    "use it.\n";
     
 exit(0);
 
@@ -395,6 +508,25 @@ sub ChangeDelayConfig() {
 		$query_clause .= "q0_${1}=$val,q1_${1}=$val";
 	    }
 	    else {
+		#
+		# When changing an entire lan, we have to adjust delay/loss
+		# since there is a delay *to* the lan and a delay *from*
+		# the lan.  We do not do this for links since there is just
+		# a single delay.  When changing a single node in a lan, we
+		# fall back to the way things operate in the parser, which
+		# is that the user intended to change both directions to
+		# exactly this value.
+		#
+		if (!$islink && !defined($srcvnode) && !$compatmode) {
+		    if ($key eq "delay") {
+			# This follows what is done in the parser.
+			$val = $val / 2.0;
+		    }
+		    elsif ($key eq "lossrate") {
+			# This follows what is done in the parser.
+			$val = 1-sqrt(1-$val);
+		    }
+		}
 		$query_clause .= "${key}0=$val,${key}1=$val";
 	    }
 	}
@@ -448,8 +580,10 @@ sub ChangeLinkDelayConfig() {
 	my $OS    = $row->{'OS'};
 
 	if ($OS eq "Linux") {
-	    die("*** $0:\n".
-		"    Oops, dynamic events do not yet work on Linux!\n");
+	    print STDERR
+		"*** $0:\n".
+		"    Oops, dynamic events do not yet work on Linux!\n";
+	    exit(2);
 	}
     }
 
@@ -460,6 +594,16 @@ sub ChangeLinkDelayConfig() {
     foreach my $key (keys(%config)) {
 	my $val = $config{$key};
 
+	if (!$islink && !defined($srcvnode) && !$compatmode) {
+	    if ($key eq "delay") {
+		# This follows what is done in the parser.
+		$val = $val / 2.0;
+	    }
+	    elsif ($key eq "lossrate") {
+		# This follows what is done in the parser.
+		$val = 1-sqrt(1-$val);
+	    }
+	}
 	push(@query_clauses, "${key}=$val");
 	
 	#
@@ -498,68 +642,15 @@ sub ChangeVirtLans() {
     my @query_clauses;
     my $query_string;
     my @query_clauses2;
-    
+
     #
-    # When changing an entire link or lan symmetrically its easy; they can
-    # be done the same. When changing one node in a lan (symmetrically),
-    # the numbers are slightly different for delay/lossrate, but otherwise
-    # its the same operation, except for operating on a single node.
+    # The first case is for changing a node in a duplex link asymmetrically.
     #
-    if (!defined($srcvnode) || !$islink) {
-	foreach my $key (keys(%config)) {
-	    my $val = $config{$key};
-
-	    if ($key eq "delay") {
-		my $delay = $val;
-
-		# This follows what is done in the parser.
-		$delay = $delay / 2.0
-		    if ($islink);
-
-		push(@query_clauses, "delay=$delay");
-		push(@query_clauses, "rdelay=$delay");
-	    }
-	    elsif ($key eq "lossrate") {
-		my $lossrate = $val;
-
-		# This follows what is done in the parser.
-		$lossrate = 1-sqrt(1-$lossrate)
-		    if ($islink);
-
-		push(@query_clauses, "lossrate=$lossrate");
-		push(@query_clauses, "rlossrate=$lossrate");
-	    }
-	    elsif ($key eq "bandwidth") {
-		push(@query_clauses, "bandwidth=$val");
-		push(@query_clauses, "rbandwidth=$val");
-	    }
-	    else {
-		push(@query_clauses, "$key=$val");
-	    }
-	}
-
-	$query_string = "update virt_lans set ".
-	    join(",", @query_clauses) .
-	    " where pid='$pid' and eid='$eid' and vname='$link'";
-
+    if ($islink && defined($srcvnode)) {
 	#
-	# A lan node change since it cannot be a link if srcvnode defined.
-	# 
-	if (defined($srcvnode)) {
-	    $query_string .= " and member like '${srcvnode}:%'";
-	}
-
-	if ($debug) {
-	    print "$query_string\n";
-	}
-	DBQueryFatal($query_string);
-    }
-    else {
-	#
-	# Here we change a duplex link asymmetrically. In a duplex link
-	# the delay/bw/plr params are split between the two virt_lan
-	# members using the "r" params to hold the "from switch" half of
-	# the value. This makes it rather confusing. 
+	# In a duplex link the delay/bw/plr params are split between the
+	# two virt_lan members using the "r" params to hold the "from
+	# switch" half of the value. This makes it rather confusing.
 	# 
 	foreach my $key (keys(%config)) {
 	    my $val = $config{$key};
@@ -607,6 +698,63 @@ sub ChangeVirtLans() {
 	    DBQueryFatal($query_string);
 	}
     }
+    else {
+	#
+	# When changing an entire link or lan symmetrically its easy; they can
+	# be done the same. When changing one node in a lan (symmetrically),
+	# the numbers are slightly different for delay/lossrate, but otherwise
+	# its the same operation, except for operating on a single node.
+	#
+	foreach my $key (keys(%config)) {
+	    my $val = $config{$key};
+
+	    if ($key eq "delay") {
+		my $delay = $val;
+
+		# This follows what is done in the parser;
+		# See tb-set-node-lan-delay
+		$delay = $delay / 2.0
+		    if (!defined($srcvnode));
+
+		push(@query_clauses, "delay=$delay");
+		push(@query_clauses, "rdelay=$delay");
+	    }
+	    elsif ($key eq "lossrate") {
+		my $lossrate = $val;
+
+		# This follows what is done in the parser.
+		# See tb-set-node-lan-lossrate
+		$lossrate = 1-sqrt(1-$lossrate)
+		    if (!defined($srcvnode));
+
+		push(@query_clauses, "lossrate=$lossrate");
+		push(@query_clauses, "rlossrate=$lossrate");
+	    }
+	    elsif ($key eq "bandwidth") {
+		push(@query_clauses, "bandwidth=$val");
+		push(@query_clauses, "rbandwidth=$val");
+	    }
+	    else {
+		push(@query_clauses, "$key=$val");
+	    }
+	}
+
+	$query_string = "update virt_lans set ".
+	    join(",", @query_clauses) .
+	    " where pid='$pid' and eid='$eid' and vname='$link'";
+
+	#
+	# A lan node change since it cannot be a link if srcvnode defined.
+	# 
+	if (defined($srcvnode)) {
+	    $query_string .= " and member like '${srcvnode}:%'";
+	}
+
+	if ($debug) {
+	    print "$query_string\n";
+	}
+	DBQueryFatal($query_string);
+    }
     #
     # Now we need to regen the linktest map file ...
     #
@@ -615,4 +763,99 @@ sub ChangeVirtLans() {
 	die("*** $0:\n".
 	    "    $GENTOPO failed!\n");
     }
+}
+
+sub ParseXmlArgs($$$$$$) {
+    my ($xmlfile, $table_name, $fields_ref, $debug, 
+	$args_ref, $errs_ref) = @_;
+    #
+    # Input args:
+    #  $xmlfile	   - XML file path.
+    #  $table_name - table_regex table_name for low-level checking patterns.
+    #  $fields_ref - xmlfields specification (hash reference.)
+    #  $debug
+    #
+    # Output args:
+    #  $args_ref   - Parsed argument values (hash reference.)
+    #  $errs_ref   - Error messages on failure (hash reference.)
+
+    #
+    # Must wrap the parser in eval since it exits on error.
+    #
+    my $xmlparse = eval { XMLin($xmlfile,
+				VarAttr => 'name',
+				ContentKey => '-content',
+				SuppressEmpty => undef); };
+    if ($@) {
+	$errs_ref->{"XML Parse Error"} = "Return code $@";
+	return;
+    }
+
+    #
+    # Make sure all the required arguments were provided.
+    #
+    my $key;
+    foreach $key (keys(%{ $fields_ref })) {
+	my (undef, $required, undef) = @{$fields_ref->{$key}};
+
+	$errs_ref->{$key} = "Required value not provided"
+	    if ($required & $SLOT_REQUIRED  &&
+		! exists($xmlparse->{'attribute'}->{"$key"}));
+    }
+    return
+	if (keys(%{ $errs_ref }));
+
+    foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+	my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+	if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	    $xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+	}
+
+	if ($debug) {
+	    print STDERR "User attribute: '$key' -> '$value'\n";
+	}
+
+	$errs_ref->{$key} = "Unknown attribute"
+	    if (!exists($fields_ref->{$key}));
+
+	my ($dbslot, $required, $default) = @{$fields_ref->{$key}};
+
+	if ($required & $SLOT_REQUIRED) {
+	    # A slot that must be provided, so do not allow a null value.
+	    if (!defined($value)) {
+		$errs_ref->{$key} = "Must provide a non-null value";
+		next;
+	    }
+	}
+	if ($required & $SLOT_OPTIONAL) {
+	    # Optional slot. If value is null skip it. Might not be the correct
+	    # thing to do all the time?
+	    if (!defined($value)) {
+		next
+		    if (!defined($default));
+		$value = $default;
+	    }
+	}
+	if ($required & $SLOT_ADMINONLY) {
+	    # Admin implies optional, but thats probably not correct approach.
+	    $errs_ref->{$key} = "Administrators only"
+		if (! $this_user->IsAdmin());
+	}
+
+	# Now check that the value is legal.
+	if (! TBcheck_dbslot($value, $table_name, $dbslot, 
+			     TBDB_CHECKDBSLOT_ERROR)) {
+	    $errs_ref->{$key} = TBFieldErrorString();
+	    next;
+	}
+
+	$args_ref->{$key} = $value;
+    }
+}
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
 }

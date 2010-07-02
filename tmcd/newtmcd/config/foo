@@ -1,0 +1,292 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX ":sys_wait_h";
+use POSIX qw(setsid);
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libnewtmcc;
+use librc;
+
+# This runs as a separate Local System service on XP.  Change to root.
+if (WINDOWS()) { $EUID = $UID = 0; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || (REMOTE() && !(PLAB() || FAKEJAILED() || JAILED())));
+
+# Script specific goo. 
+my $LOGFILE = LOGDIR() . "/progagent.debug";
+my $WRAPLOG = LOGDIR() . "/progwrap.debug";
+my $PIDFILE = (FAKEJAILED() ?
+	       CONFDIR() . "/progagent.pid" : "/var/run/progagent.pid");
+my $CONFIG  = CONFDIR() . "/progagents";
+my $PAGENT  = "$BINDIR/program-agent";
+my $TOKEN   = "/var/tmp/progagent-token";
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my %agents = ();
+    my %userenv = ();
+
+    #
+    # Need the pid/eid. 
+    # 
+    my ($pid, $eid, $vname) = check_nickname();
+
+    #
+    # Daemonize and let the boot continue. We have to disconnect and
+    # change our session id so that we do not killed off (nor the
+    # trafgen children) when boot script terminates. The downside is
+    # that we cannot report errors to the caller. 
+    #
+    if (my $childpid = TBBackGround($WRAPLOG)) {
+	sleep(2);
+
+	# This catches most startup problems.
+	my $foo = waitpid($childpid, &WNOHANG);
+	if ($foo) {
+	    my $status = $?;
+	    unlink($PIDFILE);
+
+	    system("cat $WRAPLOG")
+		if (-s $WRAPLOG);
+	
+	    fatal("Failed to program agent: $foo $status!");
+	}
+	exit(0);
+    }
+    # Fully disconnect from bootup. 
+    setsid();
+
+    $TOKEN .= ".$$";
+    my $uid;
+
+    while (1) {
+	if (tmcc(TMCCCMD_PROGRAMS, undef, \%agents) < 0) {
+	    fatal("Could not get progagent config from server!");
+	}
+	if (tmcc(TMCCCMD_USERENV, undef, \%userenv) < 0) {
+	    fatal("Could not get user environment from server!");
+	}
+	unlink $CONFIG;
+
+	#
+	# We want to run program-agent even if there are currently no
+	# registered agents.  But to do that, we need a UID which we
+	# get from the TMCC creator command.  Note that if we do not
+	# get a UID, we just exit normally without starting the agent.
+	# This is backward compatible and enables us to boot up unallocated
+	# nodes (though I am not sure they would ever reach this script).
+	#
+	if (@agents == 0) {
+	    my %tmccresults;
+	    if (tmcc(TMCCCMD_CREATOR, undef, \%tmccresults) < 0) {
+		fatal("Could not get UID for progagent from server!");
+	    }
+	    if ($tmccresults{"SWAPPER"} =~ /^[-\w]*$/) {
+		$uid = $tmccresults{"SWAPPER"});
+	    } elsif ($tmccresults{"CREATOR"} =~ /^[-\w]*$/) {
+		$uid = $tmccresults{"CREATOR"});
+	    } else {
+		warning("Cannot determine UID for program agent, not running");
+		exit(0);
+	    }
+	}
+
+	#
+	# Write the data to the file. The rc script will interpret it.
+	# Note that one of the lines (the first) indicates what user to
+	# run the agent as. 
+	# 
+	if (!open(RUN, ">$CONFIG")) {
+	    fatal("Could not open $CONFIG: $!");
+	}
+	$ptr = $agents{'agent'};
+	$ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+	
+	foreach my $agent (@$ptr) {
+	    print RUN "AGENT=" . $$agent{"AGENT"};
+	    print RUN " DIR=" . $$agent{"DIR"}
+	    	if $$agent{"DIR"};
+	    print RUN " TIMEOUT=" . $$agent{"TIMEOUT"}
+	    	if $$agent{"TIMEOUT"};
+	    print RUN " EXPECTED_EXIT_CODE=" . $$agent{"EXPECTED_EXIT_CODE"}
+	    	if $$agent{"EXPECTED_EXIT_CODE"};
+	    print RUN " COMMAND=" . $$agent{"COMMAND"}
+	    	if $$agent{"COMMAND"};
+	    print RUN "\n";
+	}
+
+	foreach my $key (keys %userenv) {
+	    printf RUN "ENV \"%s=%s\"\n", uc($key), $userenv{$key};
+	}
+	close(RUN);
+
+	print "Starting Program Agent ...\n";
+
+	my $server = getlocalevserver();
+
+	#
+	# PlanetLab nodes don't have a fixed elvind port, so we need to
+	# look that up and pass it in.  Also for plab, we always restart
+	# a dead program-agent, regardless of the cause.
+	#
+	if (PLAB()) {
+	    my $elvind_port;
+
+	    if (tmcc(TMCCCMD_PLABCONFIG, undef, \%tmccresults) < 0) {
+		# this failure does happen...
+		warning("Could not get plabconfig from server, ".
+			"waiting awhile and trying again...");
+		sleep(5);
+		next;
+	    }
+	    if ($tmccresults{"ELVIND_PORT"} =~ /(\d+)/) {
+		$elvind_port = $1;
+	    }
+	    else {
+		# this failure should not happen
+		fatal("invalid format for plabconfig info");
+	    }
+	    system("$PAGENT -P -e $pid/$eid -s $server -l $LOGFILE ".
+		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG ".
+		   "-v $vname -r -p $elvind_port -t $TOKEN");
+	}
+	else {
+	    system("$PAGENT -e $pid/$eid -s $server -l $LOGFILE ".
+		   "-v $vname -t $TOKEN ".
+		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
+	    exit(0)
+		if (! $?);
+
+	    # Like the magic exit code? This means the agent was told by boss
+	    # to exit so that we can regen the config file and then restart.
+	    # There is most certainly a better way to do this.
+	    if ($? >> 8 != 45) {
+		fatal("program agent exited with non-zero status: $?");
+	    }
+	}
+	
+	print "Program Agent died ($?), restarting...\n";
+
+	#
+	# We want to restart, go around the loop again. Turn the cache off.
+	#
+	libnewtmcc::configtmcc("nocache", 1);
+    }
+    return;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    #
+    # Kill the process.
+    #
+    if (-e $PIDFILE) {
+	system("kill `cat $PIDFILE`");
+	# Does not unlink its own pidfile.
+	unlink $PIDFILE;
+    }
+    return;
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Same as booting
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to clean state, as if just allocated).
+#
+sub docleanup()
+{
+    # Remove config file; will be regenerated at next boot.
+    if (-e $CONFIG) {
+	unlink $CONFIG;
+    }
+}

@@ -1,26 +1,38 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+
+$optargs = OptionalPageArguments("protogeni", PAGEARG_BOOLEAN);
+
+if (! isset($protogeni) || !$protogeni) {
+    $protogeni = 0;
+}
+else {
+    $protogeni = 1;
+}
+$db_table = ($protogeni ? "webnews_protogeni" : "webnews");
 
 header("Content-type: text/xml");
 
 $query_result=
     DBQueryFatal("SELECT subject, author, body, msgid, ".
-    		 "date, usr_name, usr_email " .
-		 "FROM webnews ".
-                 "LEFT JOIN users on webnews.author = users.uid " .
-                 "WHERE archived=0 " .
-		 "ORDER BY date DESC " .
+    		 "date, usr_name " .
+		 "FROM $db_table as w ".
+                 "LEFT JOIN users on w.author = users.uid " .
+                 "WHERE w.archived=0 " .
+		 "ORDER BY w.date DESC " .
                  "LIMIT 5");
 
 ?>
 <rss version="2.0"> <channel>
     <title><? echo $THISHOMEBASE ?> News</title>
-    <link><? echo $TBBASE?>/news.php3</link>
+<?
+echo "<link>$TBBASE/news.php3?protogeni=$protogeni</link>\n";
+?>
     <description>News items for <? echo $THISHOMEBASE ?></description>
     <docs>http://blogs.law.harvard.edu/tech/rss</docs>
     <managingEditor><? echo $TBMAILADDR_OPS ?></managingEditor>
@@ -30,12 +42,12 @@ $query_result=
 
 $first = 1;
 while ($row = mysql_fetch_array($query_result)) {
-    $subject     = $row[subject];
+    $subject     = $row["subject"];
     $timestamp   = $row['date'];
-    $author      = $row[author];
-    $author_name = $row[usr_name];
-    $body        = $row[body];
-    $msgid       = $row[msgid];
+    $author      = $row["author"];
+    $author_name = $row["usr_name"];
+    $body        = $row["body"];
+    $msgid       = $row["msgid"];
 
     # Strip HTML from the body
     $stripped = strip_tags($body);
@@ -52,10 +64,10 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     # Have to convert the date/time to RFC822 format
-    list($date, $hours) = split(' ', $timestamp);
-    list($year,$month,$day) = split('-',$date);
-    list($hour,$min,$sec) = split(':',$hours);
-    $rfc822date = date(r,mktime($hour, $min, $sec, $month, $day, $year));
+    list($date, $hours) = preg_split('/ /', $timestamp);
+    list($year,$month,$day) = preg_split('/-/',$date);
+    list($hour,$min,$sec) = preg_split('/:/',$hours);
+    $rfc822date = date("r",mktime($hour, $min, $sec, $month, $day, $year));
 
     if ($first) {
         # If this is the 'first' article (the most recent), include it as
@@ -63,11 +75,17 @@ while ($row = mysql_fetch_array($query_result)) {
         echo "    <lastBuildDate>" . $rfc822date . "</lastBuildDate>\n";
         $first = 0;
     }
+    if ($protogeni) {
+	$url = "$TBBASE/pgeninews.php?single=$msgid";
+    }
+    else {
+	$url = "$TBBASE/news.php3?single=$msgid";
+    }
 
     echo "    <item>\n";
     echo "        <title>$subject</title>\n";
-    echo "        <link>$TBBASE/news.php3?single=$msgid</link>\n";
-    echo "        <guid isPermaLink=\"true\">$TBBASE/news.php3?single=$msgid</guid>\n";
+    echo "        <link>$url</link>\n";
+    echo "        <guid isPermaLink=\"true\">$url</guid>\n";
     echo "        <description>$summary</description>\n";
     echo "        <pubDate>$rfc822date</pubDate>\n";
     echo "        <author>$author_name</author>\n";

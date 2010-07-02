@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -9,6 +9,12 @@
  *
  *      Testbed event library.  Currently uses the Elvin publish/
  *      subscribe system for routing event notifications.
+ *
+ * TODO:
+ *	check all pubsub_* call sites to get return value sense correct.
+ *	make sure handle->status (and error args in general) is correct.
+ *	make sure _t types are passed as pointers-to
+ *	deal with hmac_traverse
  */
 
 #include <stdio.h>
@@ -17,11 +23,17 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <limits.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/time.h>
 #include <sys/param.h>
 #include <time.h>
 #include "event.h"
+
+#ifdef ELVIN_COMPAT
+#include <pubsub/elvin_hash.h>
+#endif
 
 #define ERROR(fmt,...) \
  { fputs(__FUNCTION__,stderr); fprintf(stderr,": " fmt, ## __VA_ARGS__); }
@@ -33,6 +45,8 @@
 #else
 #define TRACE(fmt,...)
 #endif
+
+#define IPADDRFILE "/var/emulab/boot/myip"
 
 static int event_notification_check_hmac(event_handle_t handle,
 					  event_notification_t notification);
@@ -79,7 +93,8 @@ event_register(char *name, int threaded)
 
 event_handle_t
 event_register_withkeyfile(char *name, int threaded, char *keyfile) {
-  return event_register_withkeyfile_withretry(name, threaded, keyfile, -1);
+  return event_register_withkeyfile_withretry(name,
+					      threaded, keyfile, INT_MAX);
 }
 
 event_handle_t
@@ -118,7 +133,7 @@ event_handle_t
 event_register_withkeydata(char *name, int threaded,
 			   unsigned char *keydata, int keylen){
     return event_register_withkeydata_withretry(name, threaded, keydata,
-						keylen, -1);
+						keylen, INT_MAX);
 
 }
 
@@ -127,11 +142,14 @@ event_register_withkeydata_withretry(char *name, int threaded,
 			   unsigned char *keydata, int keylen,
 			   int retrycount)
 {
+    extern int pubsub_is_threaded[] __attribute__ ((weak));
+    
     event_handle_t	handle;
-    elvin_handle_t	server;
-    elvin_error_t	status;
+    pubsub_handle_t    *server;
     struct hostent     *he;
     struct in_addr	myip;
+    char	       *sstr = 0, *pstr = 0, *cp;
+    int			port = PUBSUB_SERVER_PORTNUM;
 
     if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
         ERROR("could not get hostname: %s\n", strerror(errno));
@@ -142,11 +160,35 @@ event_register_withkeydata_withretry(char *name, int threaded,
      * Get our IP address. Thats how we name ourselves to the
      * Testbed Event System. 
      */
-    if (! (he = gethostbyname(hostname))) {
-	ERROR("could not get IP address from hostname: %s", hostname);
+    if ((he = gethostbyname(hostname)) != NULL) {
+        memcpy((char *)&myip, he->h_addr, he->h_length);
+        strcpy(ipaddr, inet_ntoa(myip));
+    } else {
+	unsigned int        o1, o2, o3, o4;
+	int                 scanres;
+	FILE               *fp;
+
+	ERROR("could not get IP address from hostname: %s, "
+              "reading IP from %s.\n", hostname, IPADDRFILE);
+        /* Try getting the node's ID from BOOTDIR/myip before giving up. */
+	fp = fopen(IPADDRFILE, "r");
+	if (fp != NULL) {
+            scanres = fscanf(fp, "%3u.%3u.%3u.%3u", &o1, &o2, &o3, &o4);
+	    (void) fclose(fp);
+            if (scanres != 4) {
+                ERROR("IP address not found on first line of file!\n");
+                return 0;
+            }
+            if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+                ERROR("IP address inside file is invalid!\n");
+                return 0;
+            }
+            snprintf(ipaddr, sizeof(ipaddr), "%u.%u.%u.%u", o1, o2, o3, o4);
+        } else {
+            ERROR("could not get IP from local file %s either!", IPADDRFILE);
+            return 0;
+        }
     }
-    memcpy((char *)&myip, he->h_addr, he->h_length);
-    strcpy(ipaddr, inet_ntoa(myip));
 
     TRACE("registering with event system (hostname=\"%s\")\n", hostname);
 
@@ -162,93 +204,71 @@ event_register_withkeydata_withretry(char *name, int threaded,
 	handle->keydata[keylen] = (unsigned char)0;
     }
 
-    /* Set up the Elvin interface pointers: */
-    if (threaded) {
+    /* Set up the interface pointers: */
+    handle->connect = pubsub_connect;
+    handle->disconnect = pubsub_disconnect;
 #ifdef THREADED
-        handle->init = elvin_threaded_init_default;
-        handle->connect = elvin_threaded_connect;
-        handle->disconnect = elvin_threaded_disconnect;
-        handle->cleanup = elvin_threaded_cleanup;
-        handle->mainloop = NULL; /* no mainloop for mt programs */
-        handle->notify = elvin_threaded_notify;
-        handle->subscribe = elvin_threaded_add_subscription;
-        handle->unsubscribe = elvin_threaded_delete_subscription;
+    assert(threaded == 1);
+    assert(pubsub_is_threaded != NULL);
+    handle->mainloop = NULL; /* no mainloop for mt programs */
 #else
-	ERROR("Threaded API not linked in with the program!\n");
-	goto bad;
+    assert(threaded == 0);
+    assert(pubsub_is_threaded == NULL);
+    handle->mainloop = pubsub_mainloop;
 #endif
-    } else {
-        handle->init = elvin_sync_init_default;
-        handle->connect = elvin_sync_connect;
-        handle->disconnect = elvin_sync_disconnect;
-        handle->cleanup = elvin_sync_cleanup;
-        handle->mainloop = elvin_sync_default_mainloop;
-        handle->notify = elvin_sync_notify;
-        handle->subscribe = elvin_sync_add_subscription;
-        handle->unsubscribe = elvin_sync_delete_subscription;
+    handle->notify = pubsub_notify;
+    handle->subscribe = pubsub_add_subscription;
+    handle->unsubscribe = pubsub_rem_subscription;
+
+    /* XXX parse server and port from "elvin://host:port" */
+    cp = strdup(name);
+    if (cp) {
+      sstr = strrchr(cp, '/');
+    }
+    if (!sstr) {
+      ERROR("could not parse: %s", name);
+      goto bad;
+    }
+    *sstr++ = '\0';
+    pstr = strrchr(sstr, ':');
+    if (pstr) {
+	    *pstr++ = '\0';
+	    port = atoi(pstr);
     }
 
-    /* Initialize the elvin interface: */
-
-    status = handle->init();
-    if (status == NULL) {
-        ERROR("could not initialize Elvin\n");
+    /* Preallocate a pubsub handle so we can set the retry count */
+    if (pubsub_alloc_handle(&server) != 0) {
+        ERROR("could not allocate event server handle\n");
 	goto bad;
-    }
-    server = elvin_handle_alloc(status);
-    if (server == NULL) {
-        ERROR("elvin_handle_alloc failed: ");
-        elvin_error_fprintf(stderr, status);
-	goto bad;
-    }
-
-    /* Set the discovery scope to "testbed", so that we only interact
-       with testbed elvin servers. */
-    if (elvin_handle_set_discovery_scope(server, "testbed", status) == 0) {
-        ERROR("elvin_handle_set_discovery_scope failed: ");
-        elvin_error_fprintf(stderr, status);
-	goto bad;
-    }
-
-    /* Set the server URL, if we were passed one by the user. */
-    if (name) {
-        if (elvin_handle_append_url(server, name, status) == 0) {
-            ERROR("elvin_handle_append_url failed: ");
-            elvin_error_fprintf(stderr, status);
-	    goto bad;
-        }
     }
 
     /* set connection retries */
-    if (retrycount >= 0) {
-      if (elvin_handle_set_connection_retries(server, retrycount, 
-					      status) == 0) {
-	ERROR("elvin_handle_set_connection_retries failed: ");
-	elvin_error_fprintf(stderr, status);
+    if (pubsub_set_connection_retries(server,
+				      retrycount, &handle->status) != 0) {
+	ERROR("pubsub_set_connection_retries failed\n");
 	goto bad;
-      }
     }
 
-    /* Connect to the elvin server: */
-    if (handle->connect(server, status) == 0) {
-        ERROR("could not connect to Elvin server: ");
-        elvin_error_fprintf(stderr, status);
+    /* Connect to the event server */
+    if (handle->connect(sstr, port, &server) != 0) {
+        ERROR("could not connect to event server\n");
 	goto bad;
     }
 
     handle->server = server;
-    handle->status = status;
 
     /*
      * Keep track of how many handles we have outstanding
      */
     handles_in_use++;
+    free(cp);
     return handle;
 
  bad:
     if (handle->keydata)
         free(handle->keydata);
     free(handle);
+    free(cp);
     return 0;
 }
 
@@ -268,34 +288,13 @@ event_unregister(event_handle_t handle)
 
     TRACE("unregistering with event system (hostname=\"%s\")\n", hostname);
 
-    /* Disconnect from the elvin server: */
-    if (handle->disconnect(handle->server, handle->status) == 0) {
-        ERROR("could not disconnect from Elvin server: ");
-        elvin_error_fprintf(stderr, handle->status);
+    /* Disconnect from the server: */
+    if (handle->disconnect(handle->server) != 0) {
+        ERROR("could not disconnect from Pubsub server\n");
         return 0;
     }
 
     TRACE("disconnect completed\n");
-
-    /* Clean up: */
-
-    if (elvin_handle_free(handle->server, handle->status) == 0) {
-        ERROR("elvin_handle_free failed: ");
-        elvin_error_fprintf(stderr, handle->status);
-        return 0;
-    }
-
-    TRACE("free completed\n");
-
-    if (handles_in_use == 1) {
-	if (handle->cleanup(1, handle->status) == 0) {
-	    ERROR("could not clean up Elvin state: ");
-	    elvin_error_fprintf(stderr, handle->status);
-	    return 0;
-	}
-
-	TRACE("cleanup completed\n");
-    }
 
     handles_in_use--;
 
@@ -306,18 +305,30 @@ event_unregister(event_handle_t handle)
     return 1;
 }
 
+/*
+ * Callback for event_poll timeout that just records that the timeout
+ * happened.
+ */
+static int
+timeout_callback(pubsub_handle_t *handle, pubsub_timeout_t *timeout,
+		 void *data, pubsub_error_t *error)
+{
+	assert(data != 0);
+	assert(*(int *)data == 0);
+	*(int *)data = 1;
+
+	return 0;
+}
 
 /*
  * An internal function to handle the two different event_poll calls, without
  * making the library user mess around with arguments they don't care about.
  */
-
 int
 internal_event_poll(event_handle_t handle, int blocking, unsigned int timeout)
 {
-	extern int depth;
-	int rv;
-	elvin_timeout_t elvin_timeout = NULL;
+	int rv, triggered = 0;
+	pubsub_timeout_t *pubsub_timeout = NULL;
 
 	if (!handle->mainloop) {
 		ERROR("multithreaded programs cannot use event_poll\n");
@@ -330,22 +341,24 @@ internal_event_poll(event_handle_t handle, int blocking, unsigned int timeout)
 	 * actually do anything.
 	 */
 	if (timeout) {
-		elvin_timeout = elvin_sync_add_timeout(NULL, timeout, NULL,
-				NULL, handle->status);
-		if (!elvin_timeout) {
-			ERROR("Elvin elvin_sync_add_timeout failed\n");
-			elvin_error_fprintf(stderr, handle->status);
-			return elvin_error_get_code(handle->status);
+		pubsub_timeout = pubsub_add_timeout(handle->server, NULL,
+						    timeout,
+						    timeout_callback,
+						    (void *)&triggered,
+						    &handle->status);
+		if (!pubsub_timeout) {
+			ERROR("Elvin pubsub_sync_add_timeout failed\n");
+			pubsub_error_fprintf(stderr, &handle->status);
+			return pubsub_error_get_code(&handle->status);
 		}
 	}
-
-	depth++;
-	rv = elvin_sync_default_select_and_dispatch(blocking, handle->status);
-	depth--;
-	if (rv == 0) {
-		ERROR("Elvin select_and_dispatch failed\n");
-		elvin_error_fprintf(stderr, handle->status);
+	rv = pubsub_dispatch(handle->server, blocking, &handle->status);
+	if (rv != 0) {
+		ERROR("Pubsub dispatcher failed\n");
+		pubsub_error_fprintf(stderr, &handle->status);
 	}
+
+/*	rv = pubsub_error_get_code(&handle->status); */
 
 	/*
 	 * Try to remove the timeout - if it didn't go off, we don't want to
@@ -353,18 +366,17 @@ internal_event_poll(event_handle_t handle, int blocking, unsigned int timeout)
 	 * off (and we don't really have a good way of knowing that), it's not
 	 * there any more, so it looks like an error.
 	 */
-	if (timeout && elvin_timeout) {
-		elvin_error_t error;
-		elvin_sync_remove_timeout(elvin_timeout, error);
-	}
+	if (timeout && pubsub_timeout && !triggered)
+		pubsub_remove_timeout(handle->server, pubsub_timeout,
+				      &handle->status);
 
-	return elvin_error_get_code(handle->status);
+	return rv;
 }
 
 /*
- * A non-blocking poll of the event system
+ * A non-blocking poll of the event system.
+ * XXX not an actual poll, rather a "dispatch at most once".
  */
-
 int
 event_poll(event_handle_t handle)
 {
@@ -373,8 +385,8 @@ event_poll(event_handle_t handle)
 
 /*
  * A blocking poll of the event system, with an optional timeout
+ * XXX not an actual poll either, rather a "dispatch for awhile".
  */
-
 int event_poll_blocking(event_handle_t handle, unsigned int timeout)
 {
 	return internal_event_poll(handle,1,timeout);
@@ -407,9 +419,9 @@ event_main(event_handle_t handle)
     TRACE("entering event loop...\n");
 
     handle->do_loop = 1;
-    if (handle->mainloop(&handle->do_loop, handle->status) == 0) {
-        ERROR("Elvin mainloop failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+    if (handle->mainloop(handle->server, &handle->do_loop, &handle->status)) {
+        ERROR("Event mainloop failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -466,11 +478,10 @@ event_notify(event_handle_t handle, event_notification_t notification)
     TRACE("sending event notification %p\n", notification);
 
     /* Send notification to Elvin server for routing: */
-    if (handle->notify(handle->server, notification->elvin_notification,
-		       1, NULL, handle->status)
-        == 0) {
+    if (handle->notify(handle->server, notification->pubsub_notification,
+		       &handle->status)) {
         ERROR("could not send event notification: ");
-        elvin_error_fprintf(stderr, handle->status);
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -510,7 +521,8 @@ event_schedule(event_handle_t handle, event_notification_t notification,
      * Add an attribute that signifies its a scheduler operation.
      */
     if (! event_notification_remove(handle, notification, "SCHEDULER") ||
-	! event_notification_put_int32(handle, notification, "SCHEDULER", 1)) {
+	! event_notification_put_int32(handle,
+				       notification, "SCHEDULER", 1)) {
 	ERROR("could not add scheduler attribute to notification %p\n",
               notification);
         return 0;
@@ -551,7 +563,7 @@ event_notification_t
 event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 {
     event_notification_t notification;
-    elvin_notification_t elvin_notification;
+    pubsub_notification_t *pubsub_notification;
 
     if (!handle) {
         ERROR("invalid paramater\n");
@@ -561,13 +573,14 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
     TRACE("allocating notification (tuple=%p)\n", tuple);
 
     notification = xmalloc(sizeof(struct event_notification));
-    elvin_notification = elvin_notification_alloc(handle->status);
-    if (elvin_notification == NULL) {
-        ERROR("elvin_notification_alloc failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+    pubsub_notification = pubsub_notification_alloc(handle->server,
+						    &handle->status);
+    if (pubsub_notification == NULL) {
+        ERROR("pubsub_notification_alloc failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
         return NULL;
     }
-    notification->elvin_notification = elvin_notification;
+    notification->pubsub_notification = pubsub_notification;
     notification->has_hmac = 0;
 
     if (tuple == NULL)
@@ -580,7 +593,7 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 	\
 	event_notification_put_string(handle, notification, name, foo); \
 })
-    
+
     /* Add the target address stuff to the notification */
     if (!EVPUT("SITE", site) ||
 	!EVPUT("EXPT", expt) ||
@@ -590,7 +603,9 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 	!EVPUT("OBJNAME", objname) ||
 	!EVPUT("EVENTTYPE", eventtype) ||
 	!EVPUT("TIMELINE", timeline) ||
-	! event_notification_put_int32(handle, notification, "SCHEDULER", tuple->scheduler)) {
+	!event_notification_put_int32(handle,
+				      notification, "SCHEDULER",
+				      tuple->scheduler)) {
 	ERROR("could not add attributes to notification %p\n", notification);
         return NULL;
     }
@@ -608,25 +623,21 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 
 int
 event_notification_free(event_handle_t handle,
-                        event_notification_t notification)
+			event_notification_t notification)
 {
     if (!notification) {
 	return 1;
     }
     
-    if (!handle || !notification->elvin_notification) {
+    if (!handle || !notification->pubsub_notification) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
     TRACE("freeing notification %p\n", notification);
 
-    if (elvin_notification_free(notification->elvin_notification,
-				handle->status) == 0) {
-        ERROR("elvin_notification_free failed: ");
-        elvin_error_fprintf(stderr, handle->status);
-        return 0;
-    }
+    pubsub_notification_free(handle->server, notification->pubsub_notification,
+			     &handle->status);
     free(notification);
 
     return 1;
@@ -642,7 +653,7 @@ event_notification_clone(event_handle_t handle,
 {
     event_notification_t clone;
 
-    if (!handle || !notification || !notification->elvin_notification) {
+    if (!handle || !notification || !notification->pubsub_notification) {
         ERROR("invalid parameter\n");
         return 0;
     }
@@ -650,11 +661,12 @@ event_notification_clone(event_handle_t handle,
     TRACE("cloning notification %p\n", notification);
 
     clone = xmalloc(sizeof(struct event_notification));
-    if (! (clone->elvin_notification =
-	   elvin_notification_clone(notification->elvin_notification,
-				    handle->status))) {
-        ERROR("elvin_notification_clone failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+    if (! (clone->pubsub_notification =
+	   pubsub_notification_clone(handle->server,
+				     notification->pubsub_notification,
+				     &handle->status))) {
+        ERROR("pubsub_notification_clone failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
 	free(clone);
         return 0;
     }
@@ -662,50 +674,6 @@ event_notification_clone(event_handle_t handle,
 
     return clone;
 
-}
-
-
-struct attr_traverse_arg {
-    char *name;
-    elvin_value_t *value;
-};
-
-static int attr_traverse(void *rock, char *name, elvin_basetypes_t type,
-                         elvin_value_t value, elvin_error_t error);
-
-/*
- * Get the attribute with name NAME from the event notification
- * NOTIFICATION.
- * Writes the value of the attribute to *VALUE and returns
- * non-zero if the named attribute is found, 0 otherwise.
- */
-
-static int
-event_notification_get(event_handle_t handle,
-                       event_notification_t notification,
-                       char *name, elvin_value_t *value)
-{
-    struct attr_traverse_arg arg;
-
-    if (!handle || !notification || !name || !value) {
-        ERROR("invalid parameter\n");
-        return 0;
-    }
-
-    arg.name = name;
-    arg.value = value;
-
-    /* attr_traverse returns 0 to indicate that it has found the
-       desired attribute. */
-    if (elvin_notification_traverse(notification->elvin_notification,
-				    attr_traverse, &arg, handle->status)
-        == 0) {
-        /* Found it. */
-        return 1;
-    }
-
-    /* Didn't find it. */
-    return 0;
 }
 
 
@@ -721,20 +689,17 @@ event_notification_get_double(event_handle_t handle,
                               event_notification_t notification,
                               char *name, double *value)
 {
-    elvin_value_t v;
-
     if (!handle || !notification || !name || !value) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
-    if (event_notification_get(handle, notification, name, &v) == 0) {
+    if (pubsub_notification_get_real64(notification->pubsub_notification,
+				       name, value, &handle->status) != 0) {
         ERROR("could not get double attribute \"%s\" from notification %p\n",
               name, notification);
         return 0;
     }
-
-    *value = v.d;
 
     return 1;
 }
@@ -752,20 +717,17 @@ event_notification_get_int32(event_handle_t handle,
                              event_notification_t notification,
                              char *name, int32_t *value)
 {
-    elvin_value_t v;
-
     if (!handle || !notification || !name || !value) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
-    if (event_notification_get(handle, notification, name, &v) == 0) {
+    if (pubsub_notification_get_int32(notification->pubsub_notification,
+				      name, value, &handle->status) != 0) {
         ERROR("could not get int32 attribute \"%s\" from notification %p\n",
               name, notification);
         return 0;
     }
-
-    *value = v.i;
 
     return 1;
 }
@@ -783,24 +745,75 @@ event_notification_get_int64(event_handle_t handle,
                              event_notification_t notification,
                              char *name, int64_t *value)
 {
-    elvin_value_t v;
-
     if (!handle || !notification || !name || !value) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
-    if (event_notification_get(handle, notification, name, &v) == 0) {
+    if (pubsub_notification_get_int64(notification->pubsub_notification,
+				      name, value, &handle->status) != 0) {
         ERROR("could not get int64 attribute \"%s\" from notification %p\n",
               name, notification);
         return 0;
     }
 
-    *value = v.h;
-
     return 1;
 }
 
+
+/*
+ * Return the length of a attribute with name NAME.
+ * Used to dynamically size buffers for the event_notification_get_* calls.
+ * Returns the length or -1 on error.
+ *
+ * Note that we only do this for opaques and strings as the other types
+ * all have a "standard" size.
+ */
+
+int
+event_notification_get_opaque_length(event_handle_t handle,
+				     event_notification_t notification,
+				     char *name)
+{
+    char *v;
+    int len;
+
+    if (!handle || !notification || !name) {
+        ERROR("invalid parameter\n");
+        return -1;
+    }
+
+    if (pubsub_notification_get_opaque(notification->pubsub_notification,
+				       name, &v, &len, &handle->status) != 0) {
+        ERROR("could not get opaque attribute \"%s\" from notification %p\n",
+              name, notification);
+        return -1;
+    }
+
+    return len;
+}
+
+int
+event_notification_get_string_length(event_handle_t handle,
+				     event_notification_t notification,
+				     char *name)
+{
+    char *v;
+
+    if (!handle || !notification || !name) {
+        ERROR("invalid parameter\n");
+        return -1;
+    }
+
+    if (pubsub_notification_get_string(notification->pubsub_notification,
+				       name, &v, &handle->status) != 0) {
+        ERROR("could not get string attribute \"%s\" from notification %p\n",
+              name, notification);
+        return -1;
+    }
+
+    return strlen(v);
+}
 
 /*
  * Get the opaque attribute with name NAME from the event
@@ -814,20 +827,27 @@ event_notification_get_opaque(event_handle_t handle,
                               event_notification_t notification,
                               char *name, void *buffer, int length)
 {
-    elvin_value_t v;
+    char *v;
+    int len;
 
     if (!handle || !notification || !name || !buffer || !length) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
-    if (event_notification_get(handle, notification, name, &v) == 0) {
+    if (pubsub_notification_get_opaque(notification->pubsub_notification,
+				       name, &v, &len, &handle->status) != 0) {
         ERROR("could not get opaque attribute \"%s\" from notification %p\n",
               name, notification);
         return 0;
     }
 
-    memcpy(buffer, v.o.data, length);
+    if (len < length) {
+	memcpy(buffer, v, len);
+	memset(buffer+len, 0, length-len);
+    } else {
+	memcpy(buffer, v, length);
+    }
 
     return 1;
 }
@@ -845,19 +865,20 @@ event_notification_get_string(event_handle_t handle,
                               event_notification_t notification,
                               char *name, char *buffer, int length)
 {
-    elvin_value_t v;
+    char *v;
 
     if (!handle || !notification || !name || !buffer || !length) {
         ERROR("invalid parameter\n");
         return 0;
     }
 
-    if (event_notification_get(handle, notification, name, &v) == 0) {
+    if (pubsub_notification_get_string(notification->pubsub_notification,
+				       name, &v, &handle->status) != 0) {
 	buffer[0] = '\0';
         return 0;
     }
 
-    strncpy(buffer, v.s, length);
+    strncpy(buffer, v, length);
 
     return 1;
 }
@@ -882,12 +903,11 @@ event_notification_put_double(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=%f) to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_real64(notification->elvin_notification,
-				      name, value, handle->status)
-        == 0)
+    if (pubsub_notification_add_real64(notification->pubsub_notification,
+				       name, value, &handle->status) != 0)
     {
-        ERROR("elvin_notification_add_real64 failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+        ERROR("pubsub_notification_add_real64 failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -904,7 +924,7 @@ event_notification_put_double(event_handle_t handle,
 int
 event_notification_put_int32(event_handle_t handle,
                              event_notification_t notification,
-                             char *name, int32_t value)
+                             char *name, int value)
 {
     if (!handle || !notification || !name) {
         ERROR("invalid parameter\n");
@@ -914,12 +934,11 @@ event_notification_put_int32(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=%d) to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_int32(notification->elvin_notification,
-				     name, value, handle->status)
-        == 0)
+    if (pubsub_notification_add_int32(notification->pubsub_notification,
+				      name, value, &handle->status) != 0)
     {
-        ERROR("elvin_notification_add_int32 failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+        ERROR("pubsub_notification_add_int32 failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -946,12 +965,11 @@ event_notification_put_int64(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=%lld) to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_int64(notification->elvin_notification,
-				     name, value, handle->status)
-        == 0)
+    if (pubsub_notification_add_int64(notification->pubsub_notification,
+				      name, value, &handle->status) != 0)
     {
-        ERROR("elvin_notification_add_int64 failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+        ERROR("pubsub_notification_add_int64 failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -979,12 +997,12 @@ event_notification_put_opaque(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=<opaque>) "
           "to notification %p\n", name, notification);
 
-    if (elvin_notification_add_opaque(notification->elvin_notification,
-				      name, buffer, length, handle->status)
-        == 0)
+    if (pubsub_notification_add_opaque(notification->pubsub_notification,
+				       name, buffer, length,
+				       &handle->status) != 0)
     {
-        ERROR("elvin_notification_add_opaque failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+        ERROR("pubsub_notification_add_opaque failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -1011,12 +1029,11 @@ event_notification_put_string(event_handle_t handle,
     TRACE("adding attribute (name=\"%s\", value=\"%s\") to notification %p\n",
           name, value, notification);
 
-    if (elvin_notification_add_string(notification->elvin_notification,
-				      name, value, handle->status)
-        == 0)
+    if (pubsub_notification_add_string(notification->pubsub_notification,
+				       name, value, &handle->status) != 0)
     {
-        ERROR("elvin_notification_add_string failed: ");
-        elvin_error_fprintf(stderr, handle->status);
+        ERROR("pubsub_notification_add_string failed: ");
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -1042,10 +1059,10 @@ event_notification_remove(event_handle_t handle,
     TRACE("removing attribute \"%s\" from notification %p\n",
           name, notification);
 
-    if (elvin_notification_remove(notification->elvin_notification,
-				  name, handle->status) == 0) {
-        ERROR("elvin_notification_remove of %s failed: ", name);
-        elvin_error_fprintf(stderr, handle->status);
+    if (pubsub_notification_remove(notification->pubsub_notification,
+				   name, &handle->status) != 0) {
+        ERROR("pubsub_notification_remove of %s failed: ", name);
+        pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
 
@@ -1060,10 +1077,10 @@ struct notify_callback_arg {
     int do_auth;
 };
 
-static void notify_callback(elvin_handle_t server,
-                            elvin_subscription_t subscription,
-                            elvin_notification_t notification, int is_secure,
-                            void *rock, elvin_error_t status);
+static void notify_callback(pubsub_handle_t *server,
+                            pubsub_subscription_t *subscription,
+                            pubsub_notification_t *notification,
+			    void *rock);
 
 struct subscription_callback_arg {
     event_subscription_callback_t callback;
@@ -1071,13 +1088,12 @@ struct subscription_callback_arg {
     event_handle_t handle;
 };
 
-static void subscription_callback(elvin_handle_t server,
+static void subscription_callback(pubsub_handle_t *server,
 				  int result,
-				  elvin_subscription_t subscription,
-				  void *rock,
-				  elvin_error_t status);
+				  pubsub_subscription_t *subscription,
+				  void *rock, pubsub_error_t *myerror);
 
-#define EXPRESSION_LENGTH 1024
+#define EXPRESSION_LENGTH 8192
 
 /*
  * Subscribe to events of type TYPE.  Event notifications that match
@@ -1104,8 +1120,8 @@ addclause(char *tag, char *clause, char *exp, int size, int *index)
 {
 	int	count = 0;
 	char	*bp;
-	char    clausecopy[BUFSIZ], *strp = clausecopy;
-	char	buf[BUFSIZ];
+	char    clausecopy[EXPRESSION_LENGTH], *strp = clausecopy;
+	char	buf[EXPRESSION_LENGTH];
 	int     needglob = 1;
 
 	/* Must copy clause since we use strsep! */
@@ -1221,7 +1237,7 @@ event_subscription_t
 event_subscribe_auth(event_handle_t handle, event_notify_callback_t callback,
 		     address_tuple_t tuple, void *data, int do_auth)
 {
-    elvin_subscription_t subscription;
+    pubsub_subscription_t *subscription;
     struct notify_callback_arg *arg;
     char expression[EXPRESSION_LENGTH];
 
@@ -1246,11 +1262,11 @@ event_subscribe_auth(event_handle_t handle, event_notify_callback_t callback,
     arg->handle = handle;
     arg->do_auth = do_auth;
 
-    subscription = handle->subscribe(handle->server, expression, NULL, 1,
-                                     notify_callback, arg, handle->status);
+    subscription = handle->subscribe(handle->server, expression,
+                                     notify_callback, arg, &handle->status);
     if (subscription == NULL) {
         ERROR("could not subscribe to event %s: ", expression);
-        elvin_error_fprintf(stderr, handle->status);
+        pubsub_error_fprintf(stderr, &handle->status);
 	free(arg);
         return NULL;
     }
@@ -1296,22 +1312,19 @@ event_async_subscribe(event_handle_t handle, event_notify_callback_t callback,
     sarg->data = scb_data;
     sarg->handle = handle;
 
-    retval = elvin_async_add_subscription(handle->server,
-					  expression,
-					  NULL,
-					  1,
-					  notify_callback,
-					  arg,
-					  subscription_callback,
-					  sarg,
-					  handle->status);
-    
-    if (retval == 0) {
+    retval = pubsub_add_subscription_async(handle->server,
+					   expression,
+					   notify_callback,
+					   arg,
+					   subscription_callback,
+					   sarg,
+					   &handle->status);
+    if (retval != 0) {
       free(arg);
       free(sarg);
     }
 
-    return retval;
+    return (retval == 0);
 }
 
 int
@@ -1324,15 +1337,14 @@ event_async_unsubscribe(event_handle_t handle, event_subscription_t es)
       return 0;
     }
 
-    free(es->rock);
-    es->rock = NULL;
-    retval = elvin_async_delete_subscription(handle->server,
-					     es,
-					     NULL,
-					     NULL,
-					     handle->status);
+/*    free(es->rock);
+      es->rock = NULL; */
 
-    return retval;
+    retval = pubsub_rem_subscription_async(handle->server, es,
+					   NULL, NULL,
+					   &handle->status);
+
+    return (retval == 0);
 }
 
 int
@@ -1340,47 +1352,21 @@ event_unsubscribe(event_handle_t handle, event_subscription_t es)
 {
     int retval;
 
-    free(es->rock);
-    es->rock = NULL;
-    retval = handle->unsubscribe(handle->server, es, handle->status);
+/*    free(es->rock);
+      es->rock = NULL; */
+    retval = handle->unsubscribe(handle->server, es, &handle->status);
     
     return retval;
 }
-
-/*
- * Callback passed to elvin_notification_traverse in
- * event_notification_attr_get.
- * Returns 0 if the desired attribute is found, 1 otherwise.
- */
-
-static int
-attr_traverse(void *rock, char *name, elvin_basetypes_t type,
-              elvin_value_t value, elvin_error_t error)
-{
-    struct attr_traverse_arg *arg = (struct attr_traverse_arg *) rock;
-
-    assert(arg);
-
-    /* If this is the name, then set the result value parameter to
-       VALUE. */
-    if (strcmp(name, arg->name) == 0) {
-        *arg->value = value;
-        return 0;
-    }
-
-    return 1;
-}
-
 
 /*
  * Callback passed to handle->subscribe in event_subscribe. Used to
  * provide our own callback above Elvin's.
  */
 static void
-notify_callback(elvin_handle_t server,
-                elvin_subscription_t subscription,
-                elvin_notification_t elvin_notification, int is_secure,
-                void *rock, elvin_error_t status)
+notify_callback(pubsub_handle_t *server,
+                pubsub_subscription_t *subscription,
+                pubsub_notification_t *pubsub_notification, void *rock)
 {
     struct notify_callback_arg *arg = (struct notify_callback_arg *) rock;
     struct event_notification notification;
@@ -1404,7 +1390,7 @@ notify_callback(elvin_handle_t server,
       return;
     }
 
-    notification.elvin_notification = elvin_notification;
+    notification.pubsub_notification = pubsub_notification;
     notification.has_hmac = 0;
     handle = arg->handle;
 
@@ -1435,11 +1421,10 @@ notify_callback(elvin_handle_t server,
  * provide our own callback above Elvin's.
  */
 static void
-subscription_callback(elvin_handle_t server,
+subscription_callback(pubsub_handle_t *server,
 		      int result,
-		      elvin_subscription_t subscription,
-		      void *rock,
-		      elvin_error_t status)
+		      pubsub_subscription_t *subscription,
+		      void *rock, pubsub_error_t *myerror)
 {
     struct subscription_callback_arg *arg =
 	(struct subscription_callback_arg *) rock;
@@ -1481,7 +1466,7 @@ address_tuple_free(address_tuple_t tuple)
 }
 
 /*
- * Insert an HMAC into the notifcation. 
+ * Insert an HMAC into the notification. 
  */
 #include <openssl/opensslv.h>
 #include <openssl/hmac.h>
@@ -1490,37 +1475,54 @@ address_tuple_free(address_tuple_t tuple)
  * The traversal function callback. Add to the hmac for each attribute.
  */
 static int
-hmac_traverse(void *rock, char *name, elvin_basetypes_t type,
-              elvin_value_t value, elvin_error_t status)
+hmac_traverse(void *rock, char *name,
+	      pubsub_type_t type, pubsub_value_t value,
+	      pubsub_error_t *status)
 {
 	HMAC_CTX	*ctx = (HMAC_CTX *) rock;
 
 	/*
-	 * Do not include hmac in hmac computation!
+	 * Do not include hmac in hmac computation.
 	 */
-	if (!strcmp(name, "__hmac__"))
+	if (!strcmp(name, "__hmac__")) 
+		return 1;
+
+	/*
+	 * The elvin gateway sticks this flag in, but we need to ignore it
+	 * when doing hmac computation.
+	 */
+	if (!strcmp(name, "___elvin_ordered___"))
 		return 1;
 
 	switch (type) {
-	case ELVIN_INT32:
-		HMAC_Update(ctx, (unsigned char *)&(value.i), sizeof(value.i));
+	case INT32_TYPE:
+		HMAC_Update(ctx,
+			    (unsigned char *)&(value.pv_int32),
+			    sizeof(value.pv_int32));
 		break;
 		
-	case ELVIN_INT64:
-		HMAC_Update(ctx, (unsigned char *)&(value.h), sizeof(value.h));
+	case INT64_TYPE:
+		HMAC_Update(ctx,
+			    (unsigned char *)&(value.pv_int64),
+			    sizeof(value.pv_int64));
 		break;
 		
-	case ELVIN_REAL64:
-		HMAC_Update(ctx, (unsigned char *)&(value.d), sizeof(value.d));
+	case REAL64_TYPE:
+		HMAC_Update(ctx,
+			    (unsigned char *)&(value.pv_real64),
+			    sizeof(value.pv_real64));
 		break;
 		
-	case ELVIN_STRING:
-		HMAC_Update(ctx, (unsigned char *)(value.s), strlen(value.s));
+	case STRING_TYPE:
+		HMAC_Update(ctx,
+			    (unsigned char *)(value.pv_string),
+			    strlen(value.pv_string));
 		break;
 		
-	case ELVIN_OPAQUE:
-		HMAC_Update(ctx, (unsigned char *)(value.o.data),
-			    value.o.length);
+	case OPAQUE_TYPE:
+		HMAC_Update(ctx,
+			    (unsigned char *)(value.pv_opaque.data),
+			    value.pv_opaque.length);
 		break;
 
 	default:
@@ -1528,6 +1530,63 @@ hmac_traverse(void *rock, char *name, elvin_basetypes_t type,
 		return 0;
 	}
 	return 1;
+}
+
+#ifdef ELVIN_COMPAT
+static int
+hmac_fill_hash(void *rock, char *name,
+	       pubsub_type_t type, pubsub_value_t value,
+	       pubsub_error_t *status)
+{
+	struct elvin_hashtable	*table = (struct elvin_hashtable *) rock;
+
+	if (elvin_hashtable_add(table, name, value, type, status) == -1)
+		return 0;
+	
+	return 1;
+}
+#endif
+
+static int
+notification_hmac(pubsub_notification_t *notification, HMAC_CTX *ctx,
+		  pubsub_error_t *status)
+{
+	int retval = 0;
+#ifdef ELVIN_COMPAT
+	struct elvin_hashtable  *table;
+	int			elvin_ordered;
+
+	if (pubsub_notification_get_int32(notification,
+					  "___elvin_ordered___",
+					  &elvin_ordered, status) == 0) {
+		if (!pubsub_notification_traverse(notification, hmac_traverse,
+						  ctx, status)) {
+			return -1;
+		}
+		return 0;
+	}
+	if ((table = elvin_hashtable_alloc(0, status)) == NULL) {
+		return -1;
+	}
+	else if (!pubsub_notification_traverse(notification, hmac_fill_hash,
+					       table, status)) {
+		retval = -1;
+	}
+	else if (!elvin_hashtable_traverse(table, hmac_traverse,
+					   ctx, status)) {
+		retval = -1;
+	}
+
+	elvin_hashtable_free(table);
+	table = NULL;
+#else
+	if (!pubsub_notification_traverse(notification, hmac_traverse,
+					  ctx, status)) {
+		return -1;
+	}
+#endif
+	
+	return retval;
 }
 
 int
@@ -1546,7 +1605,15 @@ event_notification_insert_hmac(event_handle_t handle,
 		event_notification_remove(handle, notification, "__hmac__");
 		notification->has_hmac = 0;
 	}
-
+#ifdef  ELVIN_COMPAT
+	/*
+	 * Remove this so we recompute the elvin ordering above, since the
+	 * notification might have changed, and the exiting linear order
+	 * will no longer correspond to elvin ordering.
+	 */
+	pubsub_notification_remove(notification->pubsub_notification,
+				   "___elvin_ordered___", &handle->status);
+#endif	
 	memset(&ctx, 0, sizeof(ctx));
 #if (OPENSSL_VERSION_NUMBER < 0x0090703f)
 	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
@@ -1554,8 +1621,8 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_CTX_init(&ctx);
 	HMAC_Init_ex(&ctx, handle->keydata, handle->keylen, EVP_sha1(), NULL);
 #endif
-	if (!elvin_notification_traverse(notification->elvin_notification,
-				 hmac_traverse, &ctx, handle->status)) {
+	if (notification_hmac(notification->pubsub_notification,
+			      &ctx, &handle->status) == -1) {
 		HMAC_cleanup(&ctx);
 		return 1;
 	}
@@ -1563,20 +1630,23 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_cleanup(&ctx);
 
 	if (0) {
+		unsigned char   *up;
+		
 		INFO("event_notification_insert_hmac: %d\n", len);
-		for (i = 0; i < len; i += 4) {
-			INFO("%x", *((unsigned int *)(&mac[i])));
-		}
-		INFO("\n");
+		up = (unsigned char *) mac;
+		for (i = 0; i < len; i++, up++) {
+			fprintf(stderr, "%02hhx", *up);
+		}		
+		fprintf(stderr, "\n");
 	}
 
 	/*
 	 * Okay, now insert the MAC into the notification as an opaque field.
 	 */
-	if (!elvin_notification_add_opaque(notification->elvin_notification,
-				   "__hmac__", mac, len, handle->status)) {
-		ERROR("elvin_notification_add_opaque failed: ");
-		elvin_error_fprintf(stderr, handle->status);
+	if (pubsub_notification_add_opaque(notification->pubsub_notification,
+				"__hmac__", mac, len, &handle->status) != 0) {
+		ERROR("pubsub_notification_add_opaque failed: ");
+		pubsub_error_fprintf(stderr, &handle->status);
 		return 1;
 	}
 	notification->has_hmac = 1;
@@ -1592,9 +1662,8 @@ event_notification_check_hmac(event_handle_t handle,
 {
 	HMAC_CTX	ctx;
 	unsigned char	srcmac[EVP_MAX_MD_SIZE], mac[EVP_MAX_MD_SIZE];
+	char		*pmac;
 	int		i, srclen, len = EVP_MAX_MD_SIZE;
-	elvin_value_t	value;
-	elvin_basetypes_t type;
 
 	if (0)
 	    INFO("event_notification_check_hmac: %d %s\n",
@@ -1603,22 +1672,24 @@ event_notification_check_hmac(event_handle_t handle,
 	/*
 	 * Pull out the MAC from the notification so we can compare it.
 	 */
-	if (!elvin_notification_get(notification->elvin_notification,
-			    "__hmac__", &type, &value, handle->status)) {
+	if (pubsub_notification_get_opaque(notification->pubsub_notification,
+			"__hmac__", &pmac, &srclen, &handle->status) != 0) {
 		ERROR("MAC not present!\n");
 		notification->has_hmac = 0;
 		return -1;
 	}
-	srclen = value.o.length;
 	assert(srclen <= EVP_MAX_MD_SIZE);
-	memcpy(srcmac, (unsigned char *)value.o.data, value.o.length);
+	memcpy(srcmac, pmac, srclen);
 
 	if (0) {
+		unsigned char   *up;
+		
 		INFO("event_notification_check_hmac1: %d\n", srclen);
-		for (i = 0; i < srclen; i += 4) {
-			INFO("%x", *((unsigned int *)(&srcmac[i])));
-		}
-		INFO("\n");
+		up = (unsigned char *) srcmac;
+		for (i = 0; i < srclen; i++, up++) {
+			fprintf(stderr, "%02hhx", *up);
+		}		
+		fprintf(stderr, "\n");
 	}
 	
 	memset(&ctx, 0, sizeof(ctx));
@@ -1630,8 +1701,8 @@ event_notification_check_hmac(event_handle_t handle,
 #endif
 	
 	/* Compute the MAC */
-	if (!elvin_notification_traverse(notification->elvin_notification,
-				 hmac_traverse, &ctx, handle->status)) {
+	if (notification_hmac(notification->pubsub_notification,
+			      &ctx, &handle->status) == -1) {
 		HMAC_cleanup(&ctx);
 		return -1;
 	}
@@ -1639,11 +1710,14 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_cleanup(&ctx);
 
 	if (0) {
+		unsigned char   *up;
+		
 		INFO("event_notification_check_hmac2: %d\n", len);
-		for (i = 0; i < len; i += 4) {
-			INFO("%x", *((unsigned int *)(&mac[i])));
-		}
-		INFO("\n");
+		up = (unsigned char *) mac;
+		for (i = 0; i < len; i++, up++) {
+			fprintf(stderr, "%02hhx", *up);
+		}		
+		fprintf(stderr, "\n");
 	}
 
 	if (srclen != len || memcmp(srcmac, mac, len)) {
@@ -1653,6 +1727,8 @@ event_notification_check_hmac(event_handle_t handle,
 	notification->has_hmac = 1;
     	return 0;
 }
+
+#ifdef NOTYET
 
 /*
  * Support for packing and unpacking a notification. Packing a notification
@@ -1681,8 +1757,8 @@ struct pack_bin {
  * The traversal function callback.
  */
 static int
-pack_traverse(void *rock, char *name, elvin_basetypes_t type,
-              elvin_value_t value, elvin_error_t status)
+pack_traverse(void *rock, char *name, pubsub_basetypes_t type,
+              pubsub_value_t value, pubsub_error_t status)
 {
 	struct pack_traverse_arg *packarg = (struct pack_traverse_arg *) rock;
 	struct pack_bin		 *bin;
@@ -1770,8 +1846,8 @@ event_notification_pack(event_handle_t handle,
 	packarg.len    = 0;
 	packarg.data   = data;
 	
-	if (!elvin_notification_traverse(notification->elvin_notification,
-				 pack_traverse, &packarg, handle->status)) {
+	if (!pubsub_notification_traverse(notification->pubsub_notification,
+				 pack_traverse, &packarg, &handle->status)) {
 		return 1;
 	}
 	*len = packarg.len;
@@ -1788,7 +1864,7 @@ event_notification_unpack(event_handle_t handle,
 {
 	event_notification_t newnote = event_notification_alloc(handle, NULL);
 	int		     rval, offset = 0;
-	elvin_value_t	     value;
+	pubsub_value_t	     value;
 	
 	if (! newnote)
 		return -1;
@@ -1841,6 +1917,8 @@ event_notification_unpack(event_handle_t handle,
 	*notification = newnote;
 	return 0;
 }
+
+#endif
 
 static char *match_quote(char *str)
 {
@@ -2107,16 +2185,12 @@ int event_set_idle_period(event_handle_t handle, int seconds) {
     ERROR("invalid parameter\n");
     return 0;
   }
-
-  retval = elvin_handle_set_idle_period(handle->server, seconds,
-				     handle->status);
-  if (retval == 0) {
+  retval = pubsub_set_idle_period(handle->server, seconds, &handle->status);
+  if (retval != 0) {
     ERROR("could not set elvin idle period to %i", seconds);
-    elvin_error_fprintf(stderr, handle->status);
+    pubsub_error_fprintf(stderr, &handle->status);
   }
-
   return retval;
-
 }
 
 
@@ -2127,14 +2201,10 @@ int event_set_failover(event_handle_t handle, int dofail) {
     ERROR("invalid parameter\n");
     return 0;
   }
-
-  retval = elvin_handle_set_failover(handle->server, dofail,
-				     handle->status);
-  if (retval == 0) {
+  retval = pubsub_set_failover(handle->server, dofail, &handle->status);
+  if (retval != 0) {
     ERROR("Could not set failover on event handle: ");
-    elvin_error_fprintf(stderr, handle->status);
+    pubsub_error_fprintf(stderr, &handle->status);
   }
-
   return retval;
-
 }

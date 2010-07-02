@@ -22,7 +22,7 @@ view "internal" {
     match-clients {
         127.0.0.0/8;
 	%internal_network_withmask%;
-        172.16.0.0/12;
+	%virtnode_network_withmask%;
     };
 
     zone "@OURDOMAIN@" in {
@@ -40,10 +40,7 @@ view "internal" {
 	      file "named.root";
 	  };
 
-    zone "%internal_network_dotted_reverse%.in-addr.arpa" in {
-        type master;
-        file "reverse/%internal_network_dotted%.db";
-    };
+    %internal_network_reverse_zones%
 };
 
 view "external" {
@@ -66,9 +63,6 @@ view "external" {
 	      file "named.root";
 	  };
 
-    zone "%external_network_dotted_reverse%.in-addr.arpa" in {
-        type master;
-        file "reverse/%external_network_dotted%.db";
-    };
+    %external_network_reverse_zones%
 };
 

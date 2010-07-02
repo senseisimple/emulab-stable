@@ -1,0 +1,816 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2003, 2005-2007 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+body {
+  background-color: #FFF;
+}
+
+td, th {
+  border: solid 0px #669;
+  background-color: #F1FAFA;
+  margin: 0px;
+  padding: 2px;
+}
+
+th {
+  background-color: #E1EAEA;
+  text-align: left;
+  vertical-align: bottom;
+}
+caption {
+  padding-bottom: 4px;
+}
+
+table {
+  border: 0px;
+  background-color: #99A
+}
+
+table.nogrid { border: solid 1px #669; background-color:#99A; }
+table.stealth { border: 0px; background-color:#FFF; }
+table.invisible { margin-top: 0px; margin-bottom: 0px; display: none; }
+div.invisible { margin-top: 0px; margin-bottom: 0px; display: none; }
+span.invisible { margin-top: 0px; margin-bottom: 0px; display: none; }
+
+td.stealth { background-color:#FFF; }
+img.stealth { background-color:#FFF; }
+
+table.topbar { border-bottom: solid 2px #000; }
+table.bottombar { border-top: solid 2px #000; }
+
+/* Sortable tables */
+thead.sort {
+    color:#2222BB;
+    font-weight: bold;
+    cursor: default;
+}
+
+td.pad4 { padding: 4px; }
+td.paddedcell { padding-left: 0.5em; padding-right: 0.5em; padding-top: 0.75em; }
+td.paddedcell2 { padding: 0.5em; }
+
+/* BEGIN Banner - Draw and size the banner div across the top. */
+#bannercell {
+  background-color: #dae3e9;
+  background-image: url("logo-background.gif");
+  background-repeat: repeat-x;
+  background-position: 45px 0px;
+  border-bottom: solid 2px black;
+  padding: 0px;
+  margin: 0px;
+  width: 100%;
+  height: 100px;
+}
+#fancybannercell {
+  background-color: #000000;
+  background-image: url("fancy-header-background.jpg");
+  background-repeat: no-repeat;
+  border-bottom: solid 2px #666666;
+  padding: 0px;
+  margin: 0px;
+  width: 100%;
+  height: 100px;
+}
+
+/* Styling for the usage box title and cells. */
+iframe.usageframe, iframe.transparentusageframe {
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+  background-color: #444444;
+  float: right;
+  overflow: hide;
+}
+iframe.transparentusageframe, iframe.navbarusageframe {
+  background-color: #444444;
+  opacity: 0.85;
+  /* Why, IE, why?! */
+  filter: alpha(opacity=85);
+  /* Mozilla at least has an excuse - they support 'opacity', now that it's a
+     standard */
+  -moz-opacity: 0.85;
+}
+iframe.usageframe, iframe.transparentusageframe {
+  width: 198px;
+  height: 100px;
+}
+iframe.navbarusageframe {
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+  background-color: #444444;
+  width: 90px;
+  height: 54px;
+}
+iframe.outputframe {
+  width: 98%;
+  min-width: 98%;
+  border: 1px;
+  overflow: auto;
+  scrolling: auto;
+}
+iframe.downloader {
+  width: 0px;
+  height: 0px;
+  border: 0px;
+  frameborder: 0px;
+  overflow: auto;
+  scrolling: auto;
+}
+
+div#usage table {
+    border-width: 0px;
+    background-color: #666666;
+    /* Force the same height as the banner */
+    height: 100px;
+}
+div#showexpusagefreenodes {
+  border: solid 2px black;
+}
+div#showexpusagefreenodes table {
+  border: 0px;
+}
+div#showexpusagefreenodes table td {
+  border: 1px;
+  background-color: #FFF;
+  color: #000;
+}
+div#showexpusagefreenodes table td a {
+  color: #2222BB;
+}
+
+.usagetitle {
+  color: #fff;
+  background-color: #222222;
+  text-align: center;
+  font-size: 10pt;
+}
+
+/* END Banner */
+
+
+/* 
+ * The main body of page is split between the "leftcell", which contains the
+ * menus, and the "content" which is a container used to positon the
+ * "contentbody" to the right of the leftcell.
+ */
+/* BEGIN Left cell */
+.leftcell {
+  /* Border for the entire group of menus. */
+  border: solid 2px black;
+
+  /* Style for text inlined between menus. */
+  background-color: #def;
+  text-align: center;
+  font-size: 10pt;
+
+  /* Position the menus on the left side of the page. */
+  position: absolute;
+  left: 8px;
+  margin-top: 8px;
+  width: 198px;
+}
+/* region across the top. */
+div.topcell {
+  /* Border for the entire group of menus. Put the border only on the top and
+    bottom so that setting the width to 100% doesn't force a scrollbar. */
+  border-top: solid 1px black;
+  border-bottom: solid 1px black;
+
+  background-image: url("fancy-header-background-short.jpg");
+  background-position: 0px 0px;
+  background-repeat: repeat;
+  background-color: #000; 
+  padding: 0px;
+  margin-bottom: 4px;
+
+  top: 0px;
+  left: 0px;
+  display: block;
+  width: 100%;
+  /* So we goto a scroll bar before the top nav menus go to hell */
+  min-width: 800px;
+  clear: both;
+/*  height: 54px; */
+}
+table#topcelltable, table#topcelltable tr, table#topcelltable tr td {
+  background-color: #111;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+table#topcelltable tr td {
+  border-right: solid 3px #555;
+}
+#topcellimage {
+/*  float: left; */
+  border: 0px;
+}
+#topcellimage img {
+  border: 0px;
+}
+div.midtopcell {
+  padding: 0px;
+  margin: 0px;
+  /* IE: so menus appear on top */
+  z-index: 1;
+}
+div.midtopcell table#navmenus, div.midtopcell table#navmenus td {
+  background-color: #111;
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+  font-size: 14px;
+  vertical-align: middle;
+}
+div.midtopcell table#navmenus {
+  padding-left: 4px;
+  padding-right: 4px;
+/*  height: 54px; */
+  width: 520px;
+}
+div.midtopcell table#navmenus tr {
+  /* The height allows for extra separation between upper/lower row */
+  vertical-align: middle;
+  height: 16px;
+}
+div.midtopcell table#navmenus td {
+  height: 16px;
+}
+div.midtopcell table#navmenus tr#spacer,
+div.midtopcell table#navmenus td#spacer {
+  height: 10px;
+}
+a.midtopcell:link, a.midtopcell:visited { color: #FFF; text-decoration: none;}
+
+/* This lives in the topcell table. */
+div#usagefreenodes table {
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+  background-color: #666666;
+}
+td.menuoptusage,
+div#showexpusagefreenodes table tr td.usagefreenodes,
+div#usagefreenodes table tr td.usagefreenodes {
+  font:bold 8pt arial,Helvetica,sans-serif;
+  border: solid 0px #666;
+  padding-left: 1px;
+  padding-right: 1px;
+  padding-top: 0px; 
+  padding-bottom: 0px;
+  margin: 0px; 
+  border: 0px;
+  line-height: 12px;
+}
+td.menuoptusage,
+div#usagefreenodes table tr td.usagefreenodes {
+  background-color: #000;
+  color: #ffffff;
+}
+td.menuoptusage,
+div#usagefreenodes table tr td.usagefreenodes a {
+    /* Change link color to be more visible on a dark background */
+    color: #ccccff;
+}
+
+div#cbody {
+  clear: left;
+  padding: 6px;
+}
+
+/*
+ * The menus are made up of a heading (e.g. h2) and an unordered list that
+ * contains the menu-items.  The .menuheader class makes the black bars with
+ * the menu title and the ul.* styles make plain rows of text/links.
+ */
+.menuheader {
+  background-color: #000;
+  color: #FFF;
+  padding: 0px 0px;
+  font-size: medium;
+  margin: 0px;
+  text-align: left;
+}
+ul.navmenu {
+  background-color: #cde;
+  text-align: left;
+  margin: 0px;
+  padding: 3px 6px 6px 6px; /* Padding for menu items and at the bottom. */
+}
+ul.navmenu-collapsed {
+  background-color: #cde;
+  text-align: left;
+  margin: 0px;
+  padding: 3px 6px 6px 6px; /* Padding for menu items and at the bottom. */
+  display: none;
+}
+ul.navmenu li {
+  list-style: none; /* Get rid of the bullets. */
+  margin-left: 2px;
+  margin-bottom: 2px;
+}
+ul.navmenu li.newgroup {
+  /* Start of a new group of menu items, add some extra space to visually */
+  /* separate them. */
+  list-style: none;
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+#topcellsearchrow {
+  display: inline;
+  border: 0px;
+}
+#topcellsearchrow form {
+  display: inline;
+}
+/* Firefox does not understand inline-table. */
+#topcellsearchrow table {
+  display: inline;
+  height: 16px;
+  border: 0px;
+  margin: 0px;
+  padding: 0px;
+}
+#topcellsearchrow table {
+  display: inline-table;
+}
+/* Make the search box wide enough to be useful. */
+#topcellsearchrow #searchbox {
+  background-color: #666;
+  border: 1px solid #aaa;
+}
+#topcellsearchrow #searchbox.textInput {
+  color: #000;
+  background-color: #eee;
+  font-size: small;
+}
+#topcellsearchrow #searchbox.textInputEmpty {
+  color: #bbb;
+  font-size: small;
+}
+#searchrow {
+  /* Add some horizontal separators. */
+  padding: 1px;
+  border-top: solid 2px black;
+  border-bottom: solid 2px black;
+}
+#searchrow {
+  /*position: relative; */
+  top: 5px;
+  padding: 0px;
+  margin: 0px;
+}
+#searchrow form, #searchrow table, #searchrow table td {
+  /* Make sure the background is the same for the table that makes up the
+   * search box. */
+  background-color: #def;
+  margin: 0px;
+}
+#topcellsearchrow table, #topcellsearchrow table tr,
+#topcellsearchrow table tr td {
+  /* Make sure the background is the same for the table that makes up the
+   * search box. */
+  background-color: #000;
+  height: 16px;
+  vertical-align: middle;
+}
+
+/* The text box. */
+#searchbox {
+  padding: 0px;
+  margin-right: 0px;
+  width: 100%; /* Force a width, the default value is actually too wide. */
+}
+.textInput {
+  color: #000;
+  font-size: small;
+}
+.textInputEmpty {
+  color: #888;
+  font-size: small;
+}
+/* The submit button. */
+#searchsub {
+  padding: 0px;
+  margin-left: 3px;
+  font-size: small;
+  border: solid 1px black;
+}
+
+/* The web/message text. */
+.notice {
+  display: block; /* Break the line. */
+  font-weight: bold;
+  padding-bottom: 2px;
+}
+.webmessage {
+  display: block; /* Break the line. */
+  position: static;
+  font-weight: bold;
+  padding: 0px;
+  /* Counteract bottom margin of topcell so that we take less room. */
+  margin-top: -3px;
+  margin-bottom: 2px;
+  text-align: center;
+  font-size: 10pt;
+  clear: left;
+}
+
+#loginbox {
+  display: block; /* Break the line for the login/request buttons. */
+  margin-top: 4px;
+  text-align: center;
+}
+/* The login message. */
+#loginbox strong {
+  text-align: center;
+  font-weight: bold;
+  display: block;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+/* Web temporarily disabled. */
+#webdisabled {
+  padding-top: 3px;
+  display: block;
+  color: red;
+  font-weight: normal;
+}
+/* END Left cell */
+
+
+/* Definition for regular pages that have a menu. */
+.content {
+  padding-top: 0px;
+}
+.rightcontent {
+  position: absolute;
+  left: 214px; /* Push it to the right of the menu. */
+  margin-top: 8px;
+  right: 8px;
+}
+/* Definition for pages with no menu, like nscheck. */
+.fullcontent {
+  margin: 0px;
+}
+
+/*
+ * For fullwidth pages, the content header is under the topcell, all the
+ * way across.
+ */
+#contentheader {
+  background-color: #DDD;
+  color: #000;
+  border: 0;
+  margin: 0;
+  padding: 0px 6px 0px 6px;
+}
+#rightcontentheader {
+  background-color: #000;
+  color: #FFF;
+}
+
+/*   BEGIN Content */
+.contentbody, #fullcontentbody {
+  background-color: #FFF;
+
+  /*
+   * XXX Very important.  We float the body so that any tables that are wider
+   * than the viewport will cause the div to expand.  This works so long as the
+   * wide table is the direct descendent of this div, otherwise, no joy.
+   */
+  margin-bottom: 0px;
+  padding-bottom: 0px;
+}
+.contentbody {
+  float: left;
+  min-width: 95%; /* XXX Safari doesn't expand the div to fill the viewport. */
+  border: solid 2px black;
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-left: 0px;
+  margin-right: 0px;
+}
+#fullcontentbody {
+  padding: 6px;
+  margin: 0px;
+}
+
+/* The black bar containing the page title. */
+.contenttitle, .rightcontenttitle {
+  margin: 0px;
+  padding: 0px;
+  line-height: 30px;
+  clear: none; /* Let the version/login floats share the line.  XXX IE6 */
+}
+.contenttitle {
+  padding-left: 0px;
+  padding-bottom: 0px;
+}
+.rightcontenttitle {
+  background-color: #000;
+  color: #FFF;
+  margin-left: -16px;
+  margin-right: -16px;
+  margin-bottom: 16px; /* Simulate padding for the actual content. */
+  padding-left: 3px;
+  padding-bottom: 12px;
+}
+.headernotice {
+  color: red;
+  font-size: 14pt;
+  width: 50%; /* This is how it gets centered */
+  float: right;
+  display: inline;
+  margin-right: 10px;
+  line-height: 30px; /* Match the height of the header so the text is */
+		     /* vertically centered. */
+}
+
+#versioninfo {
+/*  color: #FFF; */
+  font-size: x-small;
+  /* Float the version info and add some space between #logintime. */
+  float: right;
+  display: inline;
+  margin-right: 10px;
+  line-height: 30px; /* Match the height of the header so the text is */
+		     /* vertically centered. */
+}
+#logintime {
+/*  color: #FFF; */
+  /* Also float the login and timestamp to the right. */
+  float: right;
+  display: inline;
+  text-align: right;
+  font-size: 10pt;
+  line-height: 14px; /* Smaller line-height to fit the login and timestamp. */
+  padding: 0px;
+}
+#logintime .uid {
+  font-weight: bold;
+}
+#logintime .uid:before, #logintime .uid:after {
+  font-weight: normal;
+  content: "'"; /* XXX Doesn't work in IE6. */
+}
+.loggedin {
+/*  color: #FFF; */
+  display: block; /* Break the line between login and timestamp. */
+  margin: 0px;
+  padding: 0px;
+  text-align: right;
+}
+
+
+/* The submenus are pretty much the same as the main ones. */
+.submenuheader {
+  background-color: #000;
+  color: #FFF;
+  border-top: solid 2px black;
+  border-right: solid 4px black;
+  border-left: solid 4px black;
+  font-size: medium;
+  text-align: left;
+  margin: 0px;
+  white-space: nowrap;
+}
+ul.submenu {
+  background-color: #FFF;
+  margin: 0px;
+  padding: 3px 6px 6px 6px;
+  border: solid 2px black;
+  text-align: left;
+}
+ul.submenu li {
+  font-size: 10pt;
+  list-style: none;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+ul.submenu li.newgroup {
+  list-style: none;
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
+
+/* The footer with a list of links, contact, and copyright. */
+.contentfooter {
+  background-color: #FFF; 
+  padding: 8px 16px 8px 16px;
+  margin: 0px;
+  text-align: center;
+  clear: both;
+}
+.contentfooter .navlist {
+  margin-bottom: 0px;
+}
+/* The navlist is the list of links at the bottom of the page. */
+.contentfooter .navlist li {
+  display: inline; /* Make the list horizontal. */
+  font-size: small;
+}
+.copyright {
+  font-size: x-small;
+}
+.builtwith {
+  position: absolute; /* Take it out of the normal flow. */
+  margin-top: 8px; /* Add some space between the leftcell and the link. */
+  left: 0px; /* XXX IE pushes it to the right without this. */
+  width: 100%; /* Same size as parent so it centers. */
+  display: inline;
+}
+.rightsidebuiltwith {
+  display: inline;
+  float: right;
+  padding: 0;
+  margin: 0;
+  border: solid 5px black;
+}
+.rightsidebuiltwith img {
+  border: 0px;
+}
+.gripe {
+  position: absolute; /* Take it out of the normal flow. */
+  margin-top: 8px; /* Add some space between the leftcell and the link. */
+  left: 0px; /* XXX IE pushes it to the right without this. */
+  width: 100%; /* Same size as parent so it centers. */
+  display: inline;
+  font-size: x-small;
+  font-weight: bold;
+}
+.contact {
+  background-color:#FFF;
+  font-size: x-small;
+  text-align: right;
+  margin-bottom: 0px;
+}
+.pagenotworking {
+  background-color:#FFF;
+  font-size: x-small;
+  position: relative;
+  display: inline;
+  float: right;
+  padding: 0px;
+  margin-bottom: 2px;
+  margin-top: 2px;
+  font-weight: bold;
+}
+.reportbug {
+  background-color:#FFF;
+  font-size: x-small;
+  text-align: left;
+  margin-bottom: 0px;
+}
+/*   END Content */
+
+
+.topbaropt {
+  background-color: #fff;
+  padding-bottom: 0px;
+  padding-left: 8px;
+  padding-right: 8px;
+  text-align: center;
+}
+
+.picture { float: right; margin: 4px; }
+
+a { color: #2222BB; text-decoration: underline; }
+
+a:link    { color: #2222BB; text-decoration: none; }
+a:visited { color: #662299; text-decoration: none; }
+a:hover   { text-decoration: underline; }
+a:active  { color: #5555EE; text-decoration: underline; }
+a.whitelink { color: #FFFFFF; }
+
+a.static:link    { color: #2222BB; text-decoration: none; }
+a.static:visited { color: #2222BB; text-decoration: none; }
+a.static:hover   { text-decoration: underline; }
+a.static:active  { color: #5555EE; text-decoration: underline; }
+
+a2  { padding: 4px; }
+a2:hover   { background-color: #E7E7F0; border: solid 1px #007; text-decoration: none; padding: 3px;}
+
+span.topbaroption { background-color:#E1E1EA; }
+span.printable {
+  font-size: small;
+  font-weight: bold;
+  float: right;
+  display: inline;
+}
+
+.walayer {
+  font-size: small;
+  width: 21ex;
+  height: 2.4em;
+  overflow: hidden;
+  position: relative;
+}
+.walayer:hover {
+  overflow: visible;
+  position: static;
+}
+.wahover {
+  height: 2.4em;
+  min-width: 21ex;
+}
+.wahover:hover {
+  background-color: #def;
+  border: dotted 1px black;
+  margin-top: -2px;
+  margin-left: -2px;
+  padding: 1px;
+  position: absolute;
+}
+.wasite, .wahost {
+  display: block;
+  white-space: nowrap;
+}
+
+/*
+ * showexp page topbar
+ */
+#topnavbar
+{
+  padding: 3px 0;
+  margin: 0;
+  font: bold 12px Verdana, sans-serif;
+}
+#topnavbarbottom
+{
+  height: 4px;
+  min-width: 100%;
+  border-top: 1px solid #778;
+  margin-top: 0;
+  margin-bottom: 8px;
+  padding-top: 0;
+  background: #FFF;
+}
+		
+#topnavbar li
+{
+  list-style: none;
+  margin: 0;
+  display: inline;
+}
+	
+#topnavbar li a.topnavbar
+{
+  padding: 3px 0.5em;
+  margin-left: 3px;
+  border: 1px solid #778;
+  background: #DDE;
+  text-decoration: none;
+  color: #667;
+}
+
+/* outline property gets rid of the dashed outline after clicking. */
+#topnavbar li a.topnavbar:link    { color: #667; background: #DDE}
+#topnavbar li a.topnavbar:active  { color: #667; background: #DDE;
+                                   outline: none;}
+#topnavbar li a.topnavbar:visited { color: #667; background: #DDE}
+#topnavbar li a.topnavbar:focus   { -moz-outline-style: none;}
+#topnavbar li a.topnavbar:focus   { outline: none;}
+		
+#topnavbar li a.topnavbar:hover
+{
+  color: #000;
+  background: #DDE;
+  border-color: #227;
+}
+
+.showexp_codeblock
+{
+	display: block;
+        position: relative;
+        width: 90%;
+        height: 450px;
+        overflow: auto;
+	color: #333;
+	background-color: #fff;
+	margin: 0 0 20px 30px;
+	padding: 10px;
+	border: 2px solid black;
+	white-space: pre;
+	line-height: 110%;
+}
+
+dl {
+    padding-left: 10px;
+}
+
+dl dt {
+    font-weight: bold;
+}
+
+dl.envlist {
+    border: #ffff00 solid 2px;
+    background: #ffffcc;
+}
+

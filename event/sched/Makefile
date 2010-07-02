@@ -1,6 +1,11 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Makefile for building event scheduler
 #
-# $Id: Makefile,v 1.4 2002-02-19 15:47:46 imurdock Exp $
+# $Id: Makefile,v 1.5 2006-12-01 22:59:37 mike Exp $
 
 CC		= gcc
 CFLAGS		= -g -I. -I../lib -Wall -DDEBUG

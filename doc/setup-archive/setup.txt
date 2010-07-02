@@ -1,0 +1,355 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2001-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#####
+##### Setting up the Utah Network Testbed software.
+##### Most recently tested on FreeBSD 6.2 .
+#####
+
+##### Important notes
+
+In order to save your time and ours when building and installing an
+Emulab, we make some up-front requirements.  We need explicit
+agreement to these conditions, in advance.
+
+1. We need to be satisfied that you have appropriate technical
+expertise, that those who have it will be directly involved, and that
+"management" will exercise appropriate supervision.  This may take the
+form of some sort of teleconference "interview" procedure with the
+project lead and your people.  The ideal people to bring up an Emulab
+are quality system and network administrators; good student versions
+of such people can work.
+
+2. We must be closely involved in designing the overall network
+architecture of your Emulab, and approve the planned hardware.  This
+aspect is not as simple technically as it appears, and includes
+financial, security, and support tradeoffs.
+
+3. To be able to help you debug any problems you run into or answer
+certain questions, we'll need to have accounts, preferably with root
+access if allowed by your institution's AUP, on your Emulab's servers
+('boss', 'ops', and possibly 'fs' if you separate the ops/fs functions),
+and will need to be able to access the webserver on boss.  This is crucial
+during testbed installation and bringup; after that it's not so important,
+except when you are upgrading to a new version of our software.
+
+4. Serial line consoles and remote power controllers must be connected
+to at least two experimental nodes, so we can help debug.
+
+
+Supported environment:
+This software does make some assumptions about the environment in which it is
+run. Some of the most basic ones are listed below. In general, we don't have
+the resources to adapt it to every possible environment. So, you will need to
+either work out a way to match the environment outlined below, or be willing to
+invest some work in adapting the software.
+
+(0) We assume a minimum of two dedicated server machines, known hereafter
+as 'boss' and 'ops', for Emulab setup.  While the 'ops' server normally
+hosts the Emulab shared filesystems, we also support the use of a separate,
+dedicated filesystem server, hereafter referred to as 'fs'.
+
+(1) You will need at least two network interfaces on each experimental node:
+one for the control network and one for the experimental network. The
+experimental network needs to be one on which we can make VLANs with SNMP.
+Currently, Emulab supports
+* Cisco 6500 and 4000 series switches (though not all switches in these lines
+  have been tested - the 6513, 6509, 6506, 4006, and 4506 are known to work,
+  running both CatOS and IOS).  Cisco 3750's probably work but have not been
+  tested.  The 2950 and 2980 switches are known to work, though they are limited
+  to a small number (64) of VLANs.
+* many Nortel switches (those with RAPID-CITY Nortel mibs, ie, 5510-24T 5510-48T
+  5520-24T 5520-48T, and reasonably recent Accellars).
+* some Foundry switches
+* Intel 510T (probably a bit bit-rotted since we haven't used it in a long time,
+  but likely easy to fix)
+* HP Procurve switch support has been written (by Cornell) but not yet
+  fully tested.
+Emulab's Cisco support is the best, because those are the switches we have.
+The control net must have full multicast support, including IGMP
+snooping. Nodes' control network interfaces must support PXE.
+
+(2) We highly, highly recommend that boss, ops, fs, and all the nodes be in
+publicly routed IP space. If this is not possible, then boss, ops and fs
+should be given two interfaces: One in the nodes' control network, and one in
+public IP space. If you must use private IP space for the nodes' control net,
+we suggest using the 192.168/16 subnet, which leaves the larger 10/8 subnet
+available for the experimental network.  The defs-example-privatecnet file
+shows an example configuration like this.
+
+(3) If you have a firewall, you will need to be able to get certain standard
+ports through to boss and ops, such as the ports for http, https, ssh, named
+(domain), and smtp. Any other strange network setup (such as NAT) between the
+boss/ops/fs and the outside world will cause really big headaches.
+
+(4) The whole testbed should be in a domain or subdomain for which boss can be
+the name server.
+
+(5) The nodes must be able to reach boss with DHCP requests on the control
+network - this means either being in the same broadcast domain (ie. LAN), or,
+if there is a router in between, the router must be capable of forwarding
+DHCP/BOOTP packets. Since the nodes will DHCP from boss, it is important that
+there not be another DHCP server (ie. one for another part of your lab)
+answering their requests.
+
+(6) The boss node should have its own local disk space, for various reasons:
+* For logistical reasons, /usr/testbed cannot be shared between boss and
+  ops, or between boss and fs, or between ops and fs.  All three install
+  different (and alas, sometimes conflicting) subsets of the Emulab software.
+* For security reasons, /usr/testbed/images, which is the home of the
+  "trusted" default disk images, should not be hosted on ops/fs since they
+  are potentially more vulnerable.
+* Similarly, home directories for "real" (admin) users on boss should not be
+  shared with, or hosted from, ops and fs.  See shellonboss.txt for details.
+
+##### Other docs:
+
+Useful summary info and diagrams can be found in "build-operate.ppt" and
+"security-all.ppt" in http://www.cs.utah.edu/flux/testbed-docs/internals/
+
+##### Step 1 - Set up "fs" and "ops"
+
+Follow the instructions in the setup-ops.txt file before the ones in this file!
+
+##### Step 2 - OS installation and setup
+
+Install FreeBSD on the machine you'll be using for your boss node, using the
+standard FreeBSD installation process.  When asked by the installer, it's best
+to choose the 'Developer' distribution set - this gets you full sources.  When
+it asks if you want to install the ports collection, answer *no*. You will
+be able to install ports later.
+
+As with setting up ops, you need to create partitions large enough:
+
+/usr	      - Needs space for the ports tree and a system object tree.
+	                At least 10GB. Be sure to build with plenty of
+			inodes (the ports tree itself uses about 200000, so
+			be safe and build with at least a million).
+/usr/testbed  - Needs space for testbed software and logs, as well as
+			many disk images. At least 10GB, but more is better!
+                        You may simply make sure this space is available in
+                        /usr, and not make this a separate partition.
+/var          - Holds the database, so at least a few hundred MB. 
+
+
+Do *not* create any users yet, and just log in as root for the time being.
+Our software will create users later, once you get boss set up. BE SURE to
+give root a password and REMEMBER it! You are going to need it later.  To
+set the root password use "passwd root".
+
+If you already created any users, then delete them with the "pw" command
+and make sure the home directories for them are removed as well!
+
+##### Step 3 - Installing packages
+
+Again, almost the same as on ops. Use the same tarball you downloaded before,
+unpack it on this machine (in say /usr/tmp) and follow the same pkg_add
+procedure, except this time, you're going to install the emulab-boss package
+instead of emulab-ops:
+
+	env PKG_PATH=/usr/tmp/packages pkg_add emulab-boss-2.0
+
+Also grab a copy of our approved ports tree and install it, the same as
+described in setup-ops.txt.
+
+##### Step 4 -  Unpacking source and creating a defs file
+
+Unpack the source tarball:
+
+	mkdir -p /usr/testbed/src/testbed
+	mkdir -p /usr/testbed/obj/testbed
+	cd /usr/testbed/src/testbed
+	tar ....
+
+Now, you'll need to create a 'defs file', which is used by the configure
+script to describe your environment, such as the hostnames of your boss and ops
+nodes, and email addresses that certain types of mail will be sent to.
+
+Use the 'defs-example' file in the root of our source distribution as a
+template. It contains comments explaining the important variables to set.
+defs-example-privatecnet is the same configuration but with an unroutable
+control net.
+
+##### Step 5 - Configuring an object tree
+
+This works the same as it did on ops. Remember, you have to use the same
+defs file on boss that you used on ops!
+
+
+	cd /usr/testbed/obj/testbed
+	/usr/testbed/src/testbed/configure \
+		--with-TBDEFS=/path/to/your/defs-file
+
+##### Step 6 - Running the boss installation script
+
+Again, this works the same as it did on ops, except that you run
+boss-install in the object tree, instead of ops-install. Just run this
+script as root (note the same package directory argument as above).
+
+	cd install
+	perl boss-install -p /usr/tmp/packages
+
+Like the ops-install script, boss-install sets up passwordless sudo for
+anyone in the wheel group.
+
+Also note that boss-install (really, the installing from source step below)
+requires internet access so it can grab some files 
+
+##### Step 7 - Installing from source.
+
+This step is now done as part of boss-install.  You can check it or fix up
+problems by doing the makes yourself, as follows:
+
+In your object directory, do a 'gmake && gmake boss-install'. Then, as root, do
+a 'gmake post-install'. The post-install target needs to run as root, so that
+it can make certain scripts setuid, etc.
+
+##### Step 8 - Setting up root ssh from boss to ops
+
+This step is now done as part of boss-install/ops-install. To confirm
+this, make sure this works:
+
+	boss> sudo ssh ops ls /
+
+If this *FAILS*, you will need to do this by hand, typing a password:
+
+	scp /root/.ssh/identity.pub ops:/root/.ssh/authorized_keys
+	
+##### Step 9 - Setting up named
+
+The testbed software manipulates DNS zone files for two reasons. First, it
+adds your nodes to them so that you don't have to. Second, it creates CNAMEs
+for all the nodes in every experiment. (so that you can use, for example,
+'nodeA.myexp.myproj.emulab.net' to refer to your node regardless of which
+physical node it got mapped to.)
+
+The named_setup script does this by generating zone files - in general, it
+concatenates a '.head' file, written by you, with it's own generated entries.
+The main zone file is /etc/namedb/OURDOMAIN.db, where OURDOMAIN is from your
+defs file. (OURDOMAIN, unless explicitly specified, is taken to be the domain
+portion of BOSSNODE). We also generate reverse zone files (for inverse
+lookups, ie. turning IP addresses back into names) in
+/etc/named/reverse/SUBNET.db, where SUBNET is the the class-C subnet in which
+the addresses reside (ie. 10.0.0.db). This value is defined in the defs
+file created above, as TESTBED_NETWORK.
+
+boss-install makes a reasonable attempt to create a set of named config
+files for your, placing them in /etc/namedb. If your testbed consists of
+a single class-C network, then these files will most likely be correct,
+although you want to look at them to make sure. Look at these files to make
+sure:
+
+	/etc/named/OURDOMAIN.db.head
+	/etc/named/reverse/SUBNET.db.head
+	/etc/named/named.conf
+
+If you have more than one class-C subnet for your testbed, you'll need a
+copy of the reverse zone file for each one. You want to put boss, ops, and
+any 'infrastructure' equipment (such as routers and switches) into the zone
+files.  These zone files do not need to include the nodes - the nodes will
+be added to them automatically. Be sure to edit /etc/named/namedb.conf if
+you add any reverse map files (follow the format for the existing entry).
+
+Once you think you've got things set up, run /usr/testbed/sbin/named_setup,
+and make sure that it doesn't give you any error messages. It will generate
+the following files:
+
+	/etc/namedb/OURDOMAIN.db
+	/etc/namedb/reverse/SUBNET.db
+
+##### If you are using unroutable private IP addresses for part of the
+      testbed:
+
+In order to handle this situation, we'll need to use a feature of bind called
+`views` so that the private addresses are only exposed to clients within the
+testbed. See the bind documentation for more details on this feature. Note
+that you'll want to make sure that loopback queries from boss itself see the
+internal view - you want boss to resolve its own hostname to its private
+address, not its public one.
+
+In order to use multiple views, we generate multiple zone files.  In addition
+to OURDOMAIN.db, which will be used for the 'external' view, we create
+OURDOMAIN.internal.db for use with the 'internal' view. So, you'll also need
+to create OURDOMAIN.internal.db.head .  When we generate the zone files, only
+publicly-routable addresses are put into OURDOMAIN.db .
+OURDOMAIN.internal.db contains all addresses, both public and private.  So,
+basically, you'll want to put the public addresses for boss, ops, etc.  into
+OURDOMAIN.db.head, and their private addresses into
+OURDOMAIN.internal.db.head . 
+
+##### Step 10 - Other miscellaneous things to set up
+
+There are a few things we haven't been able to completely automate just yet,
+though we hope to soon. 
+
+hosts file - You want to put boss/ops name/IP addresses in /etc/hosts on
+both boss and ops to avoid boottime circular dependencies (cause of NFS
+cross mounts). This is done for you in ops-install and boss-install, but
+you might want to confirm it was done properly. If you change the IP
+addresses of boss/ops later, you will want to be sure to update /etc/hosts
+on both machines.
+
+SSL certificates - Our apache config file expects to find SSL certificates
+in: 
+	/usr/local/etc/apache/ssl.crt/www.<sitename>.crt
+	/usr/local/etc/apache/ssl.key/www.<sitename>.key
+	
+(where <sitename> is OURDOMAIN from the configure defs file, which defaults
+to boss's domain name).
+
+boss-install already generated a temporary no-passphrase certificate for you
+and placed them in the locations specified above. However, we recommend
+that you get a "real" certificate from Verisign (or one of the others).
+
+DHCPD - boss-install generated a dhcpd.conf.template and installed it in
+/usr/local/etc (the template is derived from information you provided in
+defs file). It then generated an actual dhcpd.conf file and started up
+dhcpd for you. Do not edit the dhcpd.conf file directly! If you need need to
+make changes, change the template instead and then run:
+
+	/usr/testbed/sbin/dhcpd_makeconf -i -r
+
+tftpboot - There are a few bootloaders, mini-kernels, and MFSes that are used
+to boot, reload, etc. testbed machines, which live in /tftpboot . For the time
+being, these are not distributed with our source, and require some site
+customizations, so ask Utah for the boot loaders, etc.
+
+disk images - You'll also, of course, need disk images to go on your nodes.
+Right now, we have no automatic way of generating these, so you'll have to ask
+Utah for some.
+
+locate database - It can be useful to update the 'locate' database to help you
+find files as you're learning the system. This normally happens nightly, but
+you can force it to happen now by running '/usr/libexec/locate.updatedb' as
+root. This will take several minutes. You can then find foo.conf by running
+'locate foo.conf'.
+
+dhclient - If you don't control the public network to which boss and ops (and
+perhaps tipserv) are attached, your network admins may want you to run dhclient
+on those interfaces (and you may want to as well so that your boss
+/etc/resolv.conf contains the correct nameserver returned by dhclient, to avoid
+configuring it statically).  However, boss runs its own nameserver that
+ops and the experimental nodes must contact to resolve internal names, so you
+must get dhclient to correctly write /etc/resolv.conf (i.e., boss must be the
+first nameserver).  The easiest way to solve this problem is to add the
+following line to boss's /etc/dhclient.conf:
+   prepend domain-name-servers 127.0.0.1
+and add the following line to ops's (and any other non-experimental nodes, such
+as tipservs) /etc/dhclient.conf:
+   prepend domain-name-server <bossip>
+where <bossip> is replaced by a valid IP address for your boss.  Make sure to
+restart dhclient on these machines since dhclient will continue to overwrite
+/etc/resolv.conf incorrectly.
+
+##### Step 11 - Reboot boss
+
+Okay, go ahead and reboot boss now, and make sure it comes up okay.
+
+##### Step 12 - Filling the database
+
+See the file setup-db.txt in this directory for instructions on getting the
+proper information about your site and nodes into the database.
+

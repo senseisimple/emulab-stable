@@ -1,0 +1,13 @@
+<project>
+<attribute name="leader">  <value>geniuser</value></attribute>
+<attribute name="name">  <value>GeniSlices</value></attribute>
+<attribute name="short description">  <value>Holding Project for geni slices -- DO NOT DELETE</value></attribute>
+<attribute name="URL">  <value>@TBDOCBASE@</value></attribute>
+<attribute name="members">  <value>1</value></attribute>
+<attribute name="num_pcs">  <value>1</value></attribute>
+<attribute name="long description">  <value>DO NOT DELETE THIS PROJECT</value></attribute>
+<attribute name="funders">  <value>none</value></attribute>
+<attribute name="whynotpublic">  <value></value></attribute>
+<attribute name="public">  <value>1</value></attribute>
+<attribute name="linkedtous">  <value>1</value></attribute>
+</project>

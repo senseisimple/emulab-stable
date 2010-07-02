@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Check a list of Emulab records, optionally adding fixup records
 # to take care of inconsistencies.
 #

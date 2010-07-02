@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -15,6 +15,7 @@
 #include <math.h>
 #include <paths.h>
 #include <errno.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

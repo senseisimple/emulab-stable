@@ -1,0 +1,105 @@
+# planetlab.ns - NS script to allocate PlanetLab nodes on Emulab/Netbed
+#
+# September 17, 2003
+#
+# Questions and comments to testbed-ops@flux.utah.edu
+
+#
+# Boilerplate
+#
+source tb_compat.tcl
+set ns [new Simulator]
+tb-set-colocate-factor 1
+
+#
+# Estimated resource use on each node by this experiment, used to determine
+# if there are enough available resources on PlanetLab for this experiment.
+# The scale is from 1 to 5, with 1 being negligible usage on a node,
+# and 5 an experiment that, ideally, should have nodes to itself.
+# If omitted, defaults to 3.
+#
+tb-set-cpu-usage 3
+tb-set-mem-usage 3
+
+#
+# How many nodes to ask for
+#
+set num_nodes 3
+
+#
+# Possibly use a fixed set of nodes (if set, overrides num_nodes setting!)
+#
+set nodelist {plab736 plab111 plab14}
+if { [llength $nodelist] > 0 } {
+    set num_nodes [llength $nodelist]
+}
+
+#
+# Type of PlanetLab nodes to request.  Current choices, with counts:
+#    pcplab      Any PlanetLab node (127)
+# The following are mutually exclusive sets:
+#    pcplabdsl   Plab nodes on DSL lines (3)
+#    pcplabinet  Plab nodes on the commodity Internet, in North America (12)
+#    pcplabintl  Plab nodes outside North America (24)
+#    pcplabinet2 Plab end-hosts (not colo sites) on Internet2 (88)
+#
+# Can mix and match these types all you want with, say, multiple loops below.
+#
+# Instead of by type, you could also request specific nodes; for example:
+#   tb-fix-node $nodeA plab15
+#   tb-fix-node $nodeB plab33
+#
+set hwtype "pcplab"
+set node_version "Production"
+set basePath "/bw-bottleneck"
+set port "1690"
+
+#
+# Select the N approximately least-loaded nodes of the given type.  Fails if
+# insufficient nodes are found due to excessive loads or inadequate disk space.
+#
+for {set i 1} {$i <= $num_nodes} {incr i} {
+    set node($i) [$ns node]
+    tb-set-hardware $node($i) $hwtype
+
+    if { [llength $nodelist] > 0 } {
+        tb-fix-node $node($i) [lindex $nodelist [expr $i - 1]]
+    }
+
+    # Allow experiment setup to succeed even if setup of some vnodes fails.
+    # Your choice, but currently recommended due to flaky Plab nodes.
+    tb-set-node-failure-action $node($i) "nonfatal"
+
+    # Select nodes with a specific software status.
+    # If you have selected the default, "Production", no desire will be set.
+    if { $node_version != "Production" } {
+        $node($i) add-desire "plabstatus-$node_version" 1.0
+    }
+
+    for {set j 1} {$j <= $num_nodes} {incr j} {
+      set "node-$i-to-node-$j" [$node($i) program-agent -command "sh $basePath/run-client.sh node-$j.bw-bottleneck.tbres.emulab.net $port $basePath"]
+    }
+    set "node-$i-to-server" [$node($i) program-agent -command "sh $basePath/run-server.sh $port $basePath"]
+
+    # Entirely optional stuff; see comments below.
+    #tb-set-node-tarfiles $node($i) /somedir /proj/yourproj/tarfiles/yourtarball.tar.gz
+    #tb-set-node-rpms     $node($i) /proj/yourproj/rpms/yourrpm.rpm
+    #tb-set-node-startup  $node($i) /somepath/yourstartupcmd
+}
+
+# The above loop includes three optional features:
+# 1) install tarballs,  2) install rpms,  3) Command execution at boot time.
+#
+# You can specify tarfiles and/or RPMs to install on the vnodes.
+# These files must exist in your /proj directory on ops.emulab.net.
+# 1) "tarfiles" syntax is an alternating space-separated list of the
+#     dir from which that untar should start, and the path to the tarball.
+# 2) "rpms" syntax is simply a space-separated list of paths to RPMs.
+# 3) The "startup" command will be executed every time the vnode boots:
+#    at experiment startup, swapin, and vnode reboot.  Of course, it needs
+#    to exist on the vnode, probably from a tarball or RPM you installed.
+
+#
+# Boilerplate
+#
+$ns run

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,7 +24,7 @@ CC?=gcc
 CFLAGS+= -Wall -I${OBJDIR} -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb \
 		-DCLIENT_BINDIR='"$(CLIENT_BINDIR)"' \
 		-DLOG_TESTBED=$(LOG_TESTBED)
-LDFLAGS+= -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql
+LDFLAGS+= $(LDSTATIC) -L${OBJDIR}/lib/libtb -L/usr/local/lib/mysql
 SDLIBS+= -ltb -lmysqlclient
 LIBS= $(MLIBS)
 CP= cp -pf
@@ -42,16 +42,16 @@ IDLEMONEXE = $(DESTDIR)$(CLIENT_BINDIR)/idlemon$(EXE)
 
 endif
 
-all: $(SDPROGS) client
+all: $(SDPROGS) client $(SBIN_SCRIPTS) webfeedback
 
 include ${TESTBED_SRCDIR}/GNUmakerules
 
 slothd-debug: slothd.o slothd.h version.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ slothd.o version.o $(LIBS)
 
 # This is started up at user login on Windows to monitor desktop events for slothd.
 idlemon-debug: idlemon.o version.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ idlemon.o version.o $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ idlemon.o version.o $(LIBS)
 
 sdcollectd: sdcollectd.o sdcollectd.h version.o $(TBLIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o version.o $(SDLIBS)
@@ -87,4 +87,4 @@ endif
 control-install:
 
 clean:
-	rm -f *.o $(SDPROGS) $(WINPROGS) *~ core *.core version.c
+	rm -f *.o $(SDPROGS) $(WINPROGS) slothd-debug *~ core *.core version.c

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -21,7 +21,7 @@ HTMLINSTALL     = $(INSTALL_SBINDIR)/htmlinstall
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = garcia-telemetry
+SUBDIRS = garcia-telemetry tutorial
 
 #
 # Force dependencies to make sure configure regenerates if the .in file
@@ -51,10 +51,15 @@ FILES  += $(wildcard $(SRCDIR)/*.js)
 FILES  += $(wildcard $(SRCDIR)/*.htc)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml \
 	  $(SRCDIR)/ssh-mime.pl $(SRCDIR)/rdp-mime.pl \
+	  $(SRCDIR)/emulab.app \
 	  $(SRCDIR)/ssh-mime-winxp.pl $(SRCDIR)/rdp-mime-winxp.pl \
 	  $(SRCDIR)/ssh-mime-winxp.c $(SRCDIR)/rdp-mime-winxp.c \
 	  $(SRCDIR)/ssh-mime-winxp.exe $(SRCDIR)/rdp-mime-winxp.exe \
-	  $(SRCDIR)/emulab-mime-winxp.zip $(SRCDIR)/emulab-mime-winxp.reg
+	  $(SRCDIR)/emulab-mime-winxp.zip $(SRCDIR)/emulab-mime-winxp.reg \
+	  $(SRCDIR)/emusearch.xml
+ifeq ($(TBROOT),/usr/testbed)
+FILES  += robots.txt
+endif 
 
 AUTOICONS  = $(wildcard $(SRCDIR)/autostatus-icons/*.gif)
 AUTOICONS += $(wildcard $(SRCDIR)/autostatus-icons/*.png)
@@ -111,8 +116,15 @@ HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.html)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.jpg)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.gif)
 
-SDRFILES  = $(wildcard $(SRCDIR)/sdr/*.php3)
-SDRFILES += $(wildcard $(SRCDIR)/sdr/*.html)
+TTFILES  = $(wildcard $(SRCDIR)/timetree/*.png)
+TTFILES += $(wildcard $(SRCDIR)/timetree/*.js)
+TTFILES += $(wildcard $(SRCDIR)/timetree/*.css)
+
+UMFILES  = $(wildcard $(SRCDIR)/usermap/*.php)
+UMFILES += $(wildcard $(SRCDIR)/usermap/*.png)
+UMFILES += $(wildcard $(SRCDIR)/usermap/*.js)
+
+JSFILES += $(wildcard $(SRCDIR)/js/*.js)
 
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
@@ -165,7 +177,9 @@ ALLOPSCVSWEB = $(notdir $(OPSCVSWEBFILES))
 ALLBUI    = $(notdir $(BUIFILES))
 ALLNL     = $(notdir $(NLFILES))
 ALLHY     = $(notdir $(HYFILES))
-ALLSDR   = $(notdir $(SDRFILES))
+ALLTT     = $(notdir $(TTFILES))
+ALLUM     = $(notdir $(UMFILES))
+ALLJS     = $(notdir $(JSFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
 ALLWISTATS = $(notdir $(WIRELESSSTATSFILES))
 
@@ -180,7 +194,9 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
 	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
-	$(addprefix $(INSTALL_WWWDIR)/sdr/, $(ALLSDR)) \
+	$(addprefix $(INSTALL_WWWDIR)/timetree/, $(ALLTT)) \
+	$(addprefix $(INSTALL_WWWDIR)/usermap/, $(ALLUM)) \
+	$(addprefix $(INSTALL_WWWDIR)/js/, $(ALLJS)) \
 	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
 	$(addprefix $(INSTALL_WWWDIR)/wireless-stats/, $(ALLWISTATS)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
@@ -188,10 +204,12 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB)) \
 	$(addprefix $(INSTALL_DIR)/opsdir/www/cvsweb/, $(ALLOPSCVSWEB)) \
+	$(INSTALL_WWWDIR)/wikidocs/wiki/ignore.html \
 	$(INSTALL_WWWDIR)/doc/LICENSE.txt \
 	$(addprefix $(INSTALL_ETCDIR)/, swish.conf)
 
 install: $(INSTALLFILES)
+	-mkdir -p $(INSTALL_WWWDIR)/wikidocs/wiki
 	(swish-e -c ./swish.conf)
 	cd $(INSTALL_WWWDIR) && \
 		rm -f tbdb.html; \
@@ -215,7 +233,7 @@ uninstall:
 
 force-install:	uninstall install
 
-$(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/LICENSE
+$(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/AGPL-COPYING
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@)
@@ -239,6 +257,9 @@ $(INSTALL_DIR)/opsdir/www/%: %
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
+
+clean:		clean-subdirs
+distclean:	distclean-subdirs
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.

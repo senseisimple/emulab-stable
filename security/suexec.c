@@ -54,6 +54,11 @@
  * project, please see <http://www.apache.org/>.
  *
  */
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 /*
  * suexec.c -- "Wrapper" support program for suEXEC behaviour for Apache
@@ -93,6 +98,8 @@
 #include <grp.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <time.h>
 #include "suexec.h"
 
 /*
@@ -493,10 +500,27 @@ int main(int argc, char *argv[])
      * Log the transaction here to be sure we have an open log 
      * before we setuid().
      */
-    log_err("info: (target/actual) uid: (%s/%s) gid: (%s/%s) cmd: %s\n",
-	    target_uname, actual_uname,
-	    target_gname, actual_gname,
-	    cmd);
+    {
+        char argbuf[2*BUFSIZ], *bp = argbuf;
+	int i, size = sizeof(argbuf) - 1;
+
+	*bp = (char) NULL;
+
+	for (i = 4; i < argc; i++) {
+	    int count = snprintf(bp, size, "%s ", argv[i]);
+
+	    if (count >= size)
+	        break;
+	    
+	    size -= count;
+	    bp   += count;
+	}
+    
+	log_err("info: (target/actual) uid: (%s/%s) gid: (%s/%s) cmd: %s %s\n",
+		target_uname, actual_uname,
+		target_gname, actual_gname,
+		cmd, argbuf);
+    }
 
     /*
      * Error out if attempt is made to execute as root or as

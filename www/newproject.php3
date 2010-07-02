@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,8 +12,15 @@ include("defs.php3");
 
 #
 # Get current user.
-# 
-$uid = GETLOGIN();
+#
+$this_user = CheckLogin($check_status);
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("submit",       PAGEARG_STRING,
+				 "finished",     PAGEARG_BOOLEAN,
+				 "formfields",   PAGEARG_ARRAY);
 
 #
 # See if we are in an initial Emulab setup.
@@ -25,11 +32,11 @@ $FirstInitState = (TBGetFirstInitState() == "createproject");
 # If the login is not valid. We require that the user be logged in
 # to start a second project.
 #
-if ($uid && !$FirstInitState) {
+if ($this_user && !$FirstInitState) {
     # Allow unapproved users to create multiple projects ...
     # Must be verified though.
-    LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED|CHECKLOGIN_WEBONLY);
-    $proj_head_uid = $uid;
+    CheckLoginOrDie(CHECKLOGIN_UNAPPROVED|CHECKLOGIN_WEBONLY);
+    $proj_head_uid = $this_user->uid();
     $returning = 1;
 }
 else {
@@ -38,6 +45,7 @@ else {
     #
     $returning = 0;
 }
+unset($addpubkeyargs);
 
 $ACCOUNTWARNING =
     "Before continuing, please make sure your username " .
@@ -57,7 +65,8 @@ function SPITFORM($formfields, $returning, $errors)
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDOCBASE, $WWWHOST;
     global $usr_keyfile, $FirstInitState;
     global $ACCOUNTWARNING, $EMAILWARNING;
-    global $WIKISUPPORT, $WIKIHOME;
+    global $WIKISUPPORT, $WIKIHOME, $USERSELECTUIDS;
+    global $WIKIDOCURL;
     
     PAGEHEADER("Start a New Testbed Project");
 
@@ -76,7 +85,7 @@ function SPITFORM($formfields, $returning, $errors)
                  If you are a <font color=red>student
                  (undergrad or graduate)</font>, please
                  do not try to start a project! <br>Your advisor must do it.
-                 <a href=docwrapper.php3?docname=auth.html target='_blank'>
+                 <a href='$WIKIDOCURL/Auth' target='_blank'>
                  Read this for more info.</a>
               </font></center><br>\n";
 
@@ -158,38 +167,40 @@ function SPITFORM($formfields, $returning, $errors)
                       Project Head Information:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
                       <font size=-2>
                        (Prospective project leaders please read our
-                       <a href='docwrapper.php3?docname=policies.html' target='_blank'>
+                       <a href='$WIKIDOCURL/AdminPolicies' target='_blank'>
                        Administrative Policies</a>)</font>
                   </th>
               </tr>\n";
 
         #
-        # UserName:
+        # UID:
         #
-        echo "<tr>
-                  <td colspan=2>*<a
-                         href='docwrapper.php3?docname=security.html'
-                         target=_blank>Username</a>
-                            (alphanumeric, lowercase):</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[proj_head_uid]\"
-                             value=\"" . $formfields[proj_head_uid] . "\"
-	                     size=$TBDB_UIDLEN
-                             onchange=\"alert('$ACCOUNTWARNING')\"
-	                     maxlength=$TBDB_UIDLEN>
-                  </td>
-              </tr>\n";
+	if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+	    echo "<tr>
+                      <td colspan=2>*<a
+                             href='$WIKIDOCURL/SecReqs'
+                             target=_blank>Username</a>
+                                (alphanumeric, lowercase):</td>
+                      <td class=left>
+                          <input type=text
+                                 name=\"formfields[proj_head_uid]\"
+                                 value=\"" . $formfields["proj_head_uid"] . "\"
+	                         size=$TBDB_UIDLEN
+                                 onchange=\"alert('$ACCOUNTWARNING')\"
+	                         maxlength=$TBDB_UIDLEN>
+                      </td>
+                  </tr>\n";
+	}
 
 	#
 	# Full Name
 	#
         echo "<tr>
-                  <td colspan=2>*Full Name:</td>
+                  <td colspan=2>*Full Name (first and last):</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_name]\"
-                             value=\"" . $formfields[usr_name] . "\"
+                             value=\"" . $formfields["usr_name"] . "\"
                              onchange=\"SetWikiName(myform);\"
 	                     size=30>
                   </td>
@@ -205,7 +216,7 @@ function SPITFORM($formfields, $returning, $errors)
                             target=_blank>WikiName</a>:<td class=left>
                           <input type=text
                                  name=\"formfields[wikiname]\"
-                                 value=\"" . $formfields[wikiname] . "\"
+                                 value=\"" . $formfields["wikiname"] . "\"
 	                         size=30>
                       </td>
                   </tr>\n";
@@ -215,11 +226,11 @@ function SPITFORM($formfields, $returning, $errors)
 	# Title/Position:
 	# 
 	echo "<tr>
-                  <td colspan=2>*Title/Position:</td>
+                  <td colspan=2>*Job Title/Position:</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_title]\"
-                             value=\"" . $formfields[usr_title] . "\"
+                             value=\"" . $formfields["usr_title"] . "\"
 	                     size=30>
                   </td>
               </tr>\n";
@@ -228,13 +239,24 @@ function SPITFORM($formfields, $returning, $errors)
 	# Affiliation:
 	# 
 	echo "<tr>
-                  <td colspan=2>*Institutional<br>Affiliation:</td>
-                  <td class=left>
-                      <input type=text
-                             name=\"formfields[usr_affil]\"
-                             value=\"" . $formfields[usr_affil] . "\"
-	                     size=40>
-                  </td>
+                      <td colspan=2>*Institutional Affiliation:</td>
+                      <td class=left>
+			<table>
+                          <tr>
+                          <td>Name</td>
+                          <td><input type=text
+                                 name=\"formfields[usr_affil]\"
+                                 value=\"" . $formfields["usr_affil"] . "\"
+	                         size=40></td></tr>
+			  <tr>
+                          <td>Abbreviation:</td>
+                          <td><input type=text
+                                 name=\"formfields[usr_affil_abbrev]\"
+                                 value=\"" . $formfields["usr_affil_abbrev"] . "\"
+	                         size=16 maxlength=16> (e.g. MIT)</td>
+			  </tr>
+        		</table>
+                      </td>
               </tr>\n";
 
 	#
@@ -245,7 +267,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_URL]\"
-                             value=\"" . $formfields[usr_URL] . "\"
+                             value=\"" . $formfields["usr_URL"] . "\"
 	                     size=45>
                   </td>
               </tr>\n";
@@ -258,7 +280,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_email]\"
-                             value=\"" . $formfields[usr_email] . "\"
+                             value=\"" . $formfields["usr_email"] . "\"
                              onchange=\"alert('$EMAILWARNING')\"
 	                     size=30>
                   </td>
@@ -270,32 +292,32 @@ function SPITFORM($formfields, $returning, $errors)
 		  <tr><td>Line 1</td><td colspan=3>
                     <input type=text
                            name=\"formfields[usr_addr]\"
-                           value=\"" . $formfields[usr_addr] . "\"
+                           value=\"" . $formfields["usr_addr"] . "\"
 	                   size=45></td></tr>
 		  <tr><td>Line 2</td><td colspan=3>
                     <input type=text
                            name=\"formfields[usr_addr2]\"
-                           value=\"" . $formfields[usr_addr2] . "\"
+                           value=\"" . $formfields["usr_addr2"] . "\"
 	                   size=45></td></tr>
 		  <tr><td>City</td><td>
                     <input type=text
                            name=\"formfields[usr_city]\"
-                           value=\"" . $formfields[usr_city] . "\"
+                           value=\"" . $formfields["usr_city"] . "\"
 	                   size=25></td>
 		      <td>State/Province</td><td>
                     <input type=text
                            name=\"formfields[usr_state]\"
-                           value=\"" . $formfields[usr_state] . "\"
+                           value=\"" . $formfields["usr_state"] . "\"
 	                   size=2></td></tr>
 		  <tr><td>ZIP/Postal Code</td><td>
                     <input type=text
                            name=\"formfields[usr_zip]\"
-                           value=\"" . $formfields[usr_zip] . "\"
+                           value=\"" . $formfields["usr_zip"] . "\"
 	                   size=10></td>
 		      <td>Country</td><td>
                     <input type=text
                            name=\"formfields[usr_country]\"
-                           value=\"" . $formfields[usr_country] . "\"
+                           value=\"" . $formfields["usr_country"] . "\"
 	                   size=15></td></tr>
                </table></center></td></tr>";
 
@@ -307,7 +329,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=text
                              name=\"formfields[usr_phone]\"
-                             value=\"" . $formfields[usr_phone] . "\"
+                             value=\"" . $formfields["usr_phone"] . "\"
 	                     size=15>
                   </td>
               </tr>\n";
@@ -316,32 +338,20 @@ function SPITFORM($formfields, $returning, $errors)
 	# SSH public key
 	#
 	echo "<tr>
-                  <td rowspan><center>
-                               Your SSH Pub Key: &nbsp<br>
-                                    [<b>2</b>]
-                              </center></td>
-
-                  <td rowspan><center>Upload (1K max)[<b>3</b>]<br>
-                                  <b>Or</b><br>
-                                 Insert Key
-                              </center></td>
-
-                  <td rowspan>
+                 <td colspan=2>Upload your SSH Pub Key[<b>2</b>]:<br>
+                                   (1K max)</td>
+   
+                 <td>
                       <input type=hidden name=MAX_FILE_SIZE value=1024>
                       <input type=file
                              name=usr_keyfile
-                             value=\"" . $_FILES['usr_keyfile']['name'] . "\"
+                             value=\"" .
+	                           (isset($_FILES['usr_keyfile']) ?
+				    $_FILES['usr_keyfile']['name'] : "") . "\"
 	                     size=50>
-                      <br>
-                      <br>
-	              <input type=text
-                             name=\"formfields[usr_key]\"
-                             value=\"$formfields[usr_key]\"
-	                     size=50
-	                     maxlength=1024>
                   </td>
               </tr>\n";
-
+	
 	#
 	# Password. Note that we do not resend the password. User
 	# must retype on error.
@@ -351,6 +361,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password1]\"
+                             value=\"" . $formfields["password1"] . "\"
                              size=8></td>
               </tr>\n";
 
@@ -359,6 +370,7 @@ function SPITFORM($formfields, $returning, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password2]\"
+                             value=\"" . $formfields["password2"] . "\"
                              size=8></td>
              </tr>\n";
     }
@@ -380,7 +392,7 @@ function SPITFORM($formfields, $returning, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[pid]\"
-                         value=\"" . $formfields[pid] . "\"
+                         value=\"" . $formfields["pid"] . "\"
 	                 size=$TBDB_PIDLEN maxlength=$TBDB_PIDLEN>
               </td>
           </tr>\n";
@@ -393,7 +405,7 @@ function SPITFORM($formfields, $returning, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_name]\"
-                         value=\"" . $formfields[proj_name] . "\"
+                         value=\"" . $formfields["proj_name"] . "\"
 	                 size=40>
               </td>
           </tr>\n";
@@ -406,7 +418,7 @@ function SPITFORM($formfields, $returning, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_URL]\"
-                         value=\"" . $formfields[proj_URL] . "\"
+                         value=\"" . $formfields["proj_URL"] . "\"
                          size=45>
               </td>
           </tr>\n";
@@ -414,6 +426,9 @@ function SPITFORM($formfields, $returning, $errors)
     #
     # Publicly visible.
     #
+    if (!isset($formfields["proj_public"])) {
+	$formfields["proj_public"] = "";
+    }
     echo "<tr>
               <td colspan=2>*Can we list your project publicly as
                              an \"Emulab User?\":
@@ -423,13 +438,13 @@ function SPITFORM($formfields, $returning, $errors)
               </td>
               <td><input type=checkbox value=checked
                          name=\"formfields[proj_public]\"
-                         " . $formfields[proj_public] . ">
+                         " . $formfields["proj_public"] . ">
                          Yes &nbsp
  	          <br>
                   *If \"No\" please tell us why not:<br>
                   <input type=text
                          name=\"formfields[proj_whynotpublic]\"
-                         value=\"" . $formfields[proj_whynotpublic] . "\"
+                         value=\"" . $formfields["proj_whynotpublic"] . "\"
 	                 size=45>
              </td>
       </tr>\n";
@@ -437,13 +452,16 @@ function SPITFORM($formfields, $returning, $errors)
     #
     # Will you add a link?
     #
+    if (!isset($formfields["proj_linked"])) {
+	$formfields["proj_linked"] = "";
+    }
     echo "<tr>
               <td colspan=2>*Will you add a link on your project page
-                             to <a href=\"$TBDOCBASE\" target='_blank'>$WWWHOST</a>?
+                        to <a href=\"$TBDOCBASE\" target='_blank'>$WWWHOST</a>?
               </td>
               <td><input type=checkbox value=checked
                          name=\"formfields[proj_linked]\"
-                         " . $formfields[proj_linked] . ">
+                         " . $formfields["proj_linked"] . ">
                          Yes &nbsp
               </td>
       </tr>\n";
@@ -457,7 +475,7 @@ function SPITFORM($formfields, $returning, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_funders]\"
-                         value=\"" . $formfields[proj_funders] . "\"
+                         value=\"" . $formfields["proj_funders"] . "\"
 	                 size=45>
               </td>
           </tr>\n";
@@ -470,44 +488,44 @@ function SPITFORM($formfields, $returning, $errors)
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_members]\" 
-                         value=\"" . $formfields[proj_members] . "\"
+                         value=\"" . $formfields["proj_members"] . "\"
                          size=4>
               </td>
           </tr>\n";
 
     echo "<tr>
               <td colspan=2>*Estimated #of
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=hardware.html#tbpcs\" target='_blank'>
+        <a href=\"$TBDOCBASE/hardware.php#tbpcs\" target='_blank'>
                              PCs</a>:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[proj_pcs]\"
-                         value=\"" . $formfields[proj_pcs] . "\"
+                         value=\"" . $formfields["proj_pcs"] . "\"
                          size=4>
               </td>
           </tr>\n";
 
     echo "<tr>
               <td colspan=2>Request Access to 
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\" target='_blank'>
-                             Planetlab PCs</a>:</td>
+                  <a href=\"$WIKIDOCURL/widearea\"
+                      target='_blank'>Planetlab PCs</a>:</td>
               <td class=left>
                   <input type=checkbox value=checked
-                         name=\"formfields[proj_plabpcs]\"
-                         " . $formfields[proj_plabpcs] . ">
-                         Yes &nbsp
+                         name=\"formfields[proj_plabpcs]\" " .
+	                  (isset($formfields["proj_plabpcs"]) ?
+			   $formfields["proj_plabpcs"] : "") . ">Yes &nbsp
               </td>
           </tr>\n";
 
     echo "<tr>
               <td colspan=2>Request Access to 
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\" target='_blank'>
-                             wide-area PCs</a>:</td>
+                 <a href=\"$WIKIDOCURL/widearea\"
+                    target='_blank'>wide-area PCs</a>:</td>
               <td class=left>
                   <input type=checkbox value=checked
-                         name=\"formfields[proj_ronpcs]\"
-                         " . $formfields[proj_ronpcs] . ">
-                         Yes &nbsp
+                         name=\"formfields[proj_ronpcs]\" " .
+	                  (isset($formfields["proj_ronpcs"]) ?
+			   $formfields["proj_ronpcs"] : "") . ">Yes &nbsp
               </td>
           </tr>\n";
 
@@ -523,7 +541,7 @@ function SPITFORM($formfields, $returning, $errors)
               <td colspan=3 align=center class=left>
                   <textarea name=\"formfields[proj_why]\"
                     rows=10 cols=60>" .
-	            ereg_replace("\r", "", $formfields[proj_why]) .
+	            ereg_replace("\r", "", $formfields["proj_why"]) .
 	            "</textarea>
               </td>
           </tr>\n";
@@ -540,12 +558,12 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html' target='_blank'>
+                 <a href = '$WIKIDOCURL/SecReqs' target='_blank'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (! $returning) {
 	echo "<li> If you want us to use your existing ssh public key,
-                   then either paste it in or specify the path to your
+                   then please specify the path to your
                    your identity.pub file. <font color=red>NOTE:</font>
                    We use the <a href=http://www.openssh.org target='_blank'>OpenSSH</a>
                    key format,
@@ -553,13 +571,8 @@ function SPITFORM($formfields, $returning, $errors)
                    than some of the commercial vendors such as
                    <a href=http://www.ssh.com target='_blank'>SSH Communications</a>. If you
                    use one of these commercial vendors, then please
-                   upload the public  key file and we will convert it
-                   for you. <i>Please do not paste it in.</i>\n
-
-              <li> Note to <a href=http://www.opera.com target='_blank'><b>Opera 5</b></a>
-                   users: The file upload mechanism is broken in Opera, so
-                   you cannot specify a local file for upload. Instead,
-                   please paste your public key in.\n";
+                   upload the public key file and we will convert it
+                   for you.\n";
     }
     echo "</ol>
           </blockquote></blockquote>
@@ -569,7 +582,7 @@ function SPITFORM($formfields, $returning, $errors)
 #
 # The conclusion of a newproject request. See below.
 # 
-if (isset($_GET['finished'])) {
+if (isset($finished)) {
     PAGEHEADER("Start a New Testbed Project");
 
     echo "<center><h2>
@@ -595,23 +608,46 @@ if (isset($_GET['finished'])) {
 #
 # On first load, display a virgin form and exit.
 #
-if (! isset($_POST['submit'])) {
+if (! isset($submit)) {
     $defaults = array();
-    $defaults[proj_URL] = "$HTTPTAG";
-    $defaults[usr_URL] = "$HTTPTAG";
-    $defaults[usr_country] = "USA";
-    $defaults[proj_ronpcs]  = "";
-    $defaults[proj_plabpcs] = "";
-    $defaults[proj_public] = "checked";
-    $defaults[proj_linked] = "checked";
+    $defaults["proj_head_uid"]  = "";
+    $defaults["usr_name"]       = "";
+    $defaults["wikiname"]       = "";
+    $defaults["usr_title"]      = "";
+    $defaults["usr_affil"]      = "";
+    $defaults["usr_affil_abbrev"] = "";
+    $defaults["usr_URL"]        = "$HTTPTAG";
+    $defaults["usr_email"]      = "";
+    $defaults["usr_addr"]       = "";
+    $defaults["usr_addr2"]      = "";
+    $defaults["usr_city"]       = "";
+    $defaults["usr_state"]      = "";
+    $defaults["usr_zip"]        = "";
+    $defaults["usr_country"]    = "USA";
+    $defaults["usr_phone"]      = "";
+    $defaults["password1"]      = "";
+    $defaults["password2"]      = "";
+    
+    $defaults["pid"]            = "";
+    $defaults["proj_name"]      = "";
+    $defaults["proj_URL"]       = "$HTTPTAG";
+    $defaults["proj_public"]    = "checked";
+    $defaults["proj_whynotpublic"] = "";
+    $defaults["proj_linked"]    = "checked";
+    $defaults["proj_funders"]   = "";
+    $defaults["proj_members"]   = "";
+    $defaults["proj_pcs"]       = "";
+    $defaults["proj_ronpcs"]    = "";
+    $defaults["proj_plabpcs"]   = "";
+    $defaults["proj_why"]       = "";
 
     if ($FirstInitState == "createproject") {
-	$defaults[pid]          = "testbed";
-	$defaults[proj_pcs]     = "256";
-	$defaults[proj_members] = "256";
-	$defaults[proj_funders] = "none";
-	$defaults[proj_name]    = "Your Testbed Project";
-	$defaults[proj_why]     = "This project is used for testbed ".
+	$defaults["pid"]          = "testbed";
+	$defaults["proj_pcs"]     = "256";
+	$defaults["proj_members"] = "256";
+	$defaults["proj_funders"] = "none";
+	$defaults["proj_name"]    = "Your Testbed Project";
+	$defaults["proj_why"]     = "This project is used for testbed ".
 	    "administrators to develop and test new software. ";
     }
     
@@ -619,14 +655,13 @@ if (! isset($_POST['submit'])) {
     PAGEFOOTER();
     return;
 }
-else {
-    # Form submitted. Make sure we have a formfields array and a target_uid.
-    if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields'])) {
-	PAGEARGERROR("Invalid form arguments.");
-    }
-    $formfields = $_POST['formfields'];
+
+# Form submitted. Make sure we have a formfields array.
+if (!isset($formfields)) {
+    PAGEARGERROR("Invalid form arguments.");
 }
+
+#TBERROR("A\n\n" . print_r($formfields, TRUE), 0);
 
 #
 # Otherwise, must validate and redisplay if errors
@@ -637,225 +672,234 @@ $errors = array();
 # These fields are required!
 #
 if (! $returning) {
-    if (!isset($formfields[proj_head_uid]) ||
-	strcmp($formfields[proj_head_uid], "") == 0) {
-	$errors["Username"] = "Missing Field";
+    if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+	if (!isset($formfields["proj_head_uid"]) ||
+	    strcmp($formfields["proj_head_uid"], "") == 0) {
+	    $errors["Username"] = "Missing Field";
+	}
+	elseif (!TBvalid_uid($formfields["proj_head_uid"])) {
+	    $errors["UserName"] = TBFieldErrorString();
+	}
+	elseif (User::Lookup($formfields["proj_head_uid"]) ||
+		posix_getpwnam($formfields["proj_head_uid"])) {
+	    $errors["UserName"] = "Already in use. Pick another";
+	}
     }
-    elseif (!TBvalid_uid($formfields[proj_head_uid])) {
-	$errors["UserName"] = TBFieldErrorString();
+    if (!isset($formfields["usr_title"]) ||
+	strcmp($formfields["usr_title"], "") == 0) {
+	$errors["Job Title/Position"] = "Missing Field";
     }
-    elseif (TBCurrentUser($formfields[proj_head_uid]) ||
-	    posix_getpwnam($formfields[proj_head_uid])) {
-	$errors["UserName"] = "Already in use. Pick another";
+    elseif (! TBvalid_title($formfields["usr_title"])) {
+	$errors["Job Title/Position"] = TBFieldErrorString();
     }
-    if (!isset($formfields[usr_title]) ||
-	strcmp($formfields[usr_title], "") == 0) {
-	$errors["Title/Position"] = "Missing Field";
-    }
-    elseif (! TBvalid_title($formfields[usr_title])) {
-	$errors["Title/Position"] = TBFieldErrorString();
-    }
-    if (!isset($formfields[usr_name]) ||
-	strcmp($formfields[usr_name], "") == 0) {
+    if (!isset($formfields["usr_name"]) ||
+	strcmp($formfields["usr_name"], "") == 0) {
 	$errors["Full Name"] = "Missing Field";
     }
-    elseif (! TBvalid_usrname($formfields[usr_name])) {
+    elseif (! TBvalid_usrname($formfields["usr_name"])) {
 	$errors["Full Name"] = TBFieldErrorString();
     }
     # Make sure user name has at least two tokens!
-    $tokens = preg_split("/[\s]+/", $formfields[usr_name],
+    $tokens = preg_split("/[\s]+/", $formfields["usr_name"],
 			 -1, PREG_SPLIT_NO_EMPTY);
     if (count($tokens) < 2) {
 	$errors["Full Name"] = "Please provide a first and last name";
     }
     if ($WIKISUPPORT) {
-	if (!isset($formfields[wikiname]) ||
-	    strcmp($formfields[wikiname], "") == 0) {
+	if (!isset($formfields["wikiname"]) ||
+	    strcmp($formfields["wikiname"], "") == 0) {
 	    $errors["WikiName"] = "Missing Field";
 	}
-	elseif (! TBvalid_wikiname($formfields[wikiname])) {
+	elseif (! TBvalid_wikiname($formfields["wikiname"])) {
 	    $errors["WikiName"] = TBFieldErrorString();
 	}
-	elseif (TBCurrentWikiName($formfields[wikiname])) {
+	elseif (User::LookupByWikiName($formfields["wikiname"])) {
 	    $errors["WikiName"] = "Already in use. Pick another";
 	}
     }
-    if (!isset($formfields[usr_affil]) ||
-	strcmp($formfields[usr_affil], "") == 0) {
-	$errors["Affiliation"] = "Missing Field";
+    if (!isset($formfields["usr_affil"]) ||
+	strcmp($formfields["usr_affil"], "") == 0) {
+	$errors["Affiliation Name"] = "Missing Field";
     }
-    elseif (! TBvalid_affiliation($formfields[usr_affil])) {
-	$errors["Affiliation"] = TBFieldErrorString();
+    elseif (! TBvalid_affiliation($formfields["usr_affil"])) {
+	$errors["Affiliation Name"] = TBFieldErrorString();
     }
-    if (!isset($formfields[usr_email]) ||
-	strcmp($formfields[usr_email], "") == 0) {
+    if (!isset($formfields["usr_affil_abbrev"]) ||
+	strcmp($formfields["usr_affil_abbrev"], "") == 0) {
+	$errors["Affiliation Abbreviation"] = "Missing Field";
+    }
+    elseif (! TBvalid_affiliation_abbreviation($formfields["usr_affil_abbrev"])) {
+	$errors["Affiliation Name"] = TBFieldErrorString();
+    }
+    if (!isset($formfields["usr_email"]) ||
+	strcmp($formfields["usr_email"], "") == 0) {
 	$errors["Email Address"] = "Missing Field";
     }
-    elseif (! TBvalid_email($formfields[usr_email])) {
+    elseif (! TBvalid_email($formfields["usr_email"])) {
 	$errors["Email Address"] = TBFieldErrorString();
     }
-    elseif (TBCurrentEmail($formfields[usr_email])) {
+    elseif (User::LookupByEmail($formfields["usr_email"])) {
         #
         # Treat this error separate. Not allowed.
         #
-	PAGEHEADER("Start a New Testbed Project");
-	USERERROR("The email address '$formfields[usr_email]' is already in ".
-		  "use by another user.<br>Perhaps you have ".
-		  "<a href='password.php3?email=$formfields[usr_email]'>".
-		  "forgotten your username.</a>", 1);
+	$errors["Email Address"] =
+	    "Already in use. <b>Did you forget to login?</b>";
     }
-    if (isset($formfields[usr_URL]) &&
-	strcmp($formfields[usr_URL], "") &&
-	strcmp($formfields[usr_URL], $HTTPTAG) &&
-	! CHECKURL($formfields[usr_URL], $urlerror)) {
+    if (isset($formfields["usr_URL"]) &&
+	strcmp($formfields["usr_URL"], "") &&
+	strcmp($formfields["usr_URL"], $HTTPTAG) &&
+	! CHECKURL($formfields["usr_URL"], $urlerror)) {
 	$errors["Home Page URL"] = $urlerror;
     }
-    if (!isset($formfields[usr_addr]) ||
-	strcmp($formfields[usr_addr], "") == 0) {
+    if (!isset($formfields["usr_addr"]) ||
+	strcmp($formfields["usr_addr"], "") == 0) {
 	$errors["Address 1"] = "Missing Field";
     }
-    elseif (! TBvalid_addr($formfields[usr_addr])) {
+    elseif (! TBvalid_addr($formfields["usr_addr"])) {
 	$errors["Address 1"] = TBFieldErrorString();
     }
     # Optional
-    if (isset($formfields[usr_addr2]) &&
-	!TBvalid_addr($formfields[usr_addr2])) {
+    if (isset($formfields["usr_addr2"]) &&
+	!TBvalid_addr($formfields["usr_addr2"])) {
 	$errors["Address 2"] = TBFieldErrorString();
     }
-    if (!isset($formfields[usr_city]) ||
-	strcmp($formfields[usr_city], "") == 0) {
+    if (!isset($formfields["usr_city"]) ||
+	strcmp($formfields["usr_city"], "") == 0) {
 	$errors["City"] = "Missing Field";
     }
-    elseif (! TBvalid_city($formfields[usr_city])) {
+    elseif (! TBvalid_city($formfields["usr_city"])) {
 	$errors["City"] = TBFieldErrorString();
     }
-    if (!isset($formfields[usr_state]) ||
-	strcmp($formfields[usr_state], "") == 0) {
+    if (!isset($formfields["usr_state"]) ||
+	strcmp($formfields["usr_state"], "") == 0) {
 	$errors["State"] = "Missing Field";
     }
-    elseif (! TBvalid_state($formfields[usr_state])) {
+    elseif (! TBvalid_state($formfields["usr_state"])) {
 	$errors["State"] = TBFieldErrorString();
     }
-    if (!isset($formfields[usr_zip]) ||
-	strcmp($formfields[usr_zip], "") == 0) {
+    if (!isset($formfields["usr_zip"]) ||
+	strcmp($formfields["usr_zip"], "") == 0) {
 	$errors["ZIP/Postal Code"] = "Missing Field";
     }
-    elseif (! TBvalid_zip($formfields[usr_zip])) {
+    elseif (! TBvalid_zip($formfields["usr_zip"])) {
 	$errors["Zip/Postal Code"] = TBFieldErrorString();
     }
-    if (!isset($formfields[usr_country]) ||
-	strcmp($formfields[usr_country], "") == 0) {
+    if (!isset($formfields["usr_country"]) ||
+	strcmp($formfields["usr_country"], "") == 0) {
 	$errors["Country"] = "Missing Field";
     }
-    elseif (! TBvalid_country($formfields[usr_country])) {
+    elseif (! TBvalid_country($formfields["usr_country"])) {
 	$errors["Country"] = TBFieldErrorString();
     }
-    if (!isset($formfields[usr_phone]) ||
-	strcmp($formfields[usr_phone], "") == 0) {
+    if (!isset($formfields["usr_phone"]) ||
+	strcmp($formfields["usr_phone"], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
     }
-    elseif (!TBvalid_phone($formfields[usr_phone])) {
+    elseif (!TBvalid_phone($formfields["usr_phone"])) {
 	$errors["Phone #"] = TBFieldErrorString();
     }
-    if (!isset($formfields[password1]) ||
-	strcmp($formfields[password1], "") == 0) {
+    if (!isset($formfields["password1"]) ||
+	strcmp($formfields["password1"], "") == 0) {
 	$errors["Password"] = "Missing Field";
     }
-    if (!isset($formfields[password2]) ||
-	strcmp($formfields[password2], "") == 0) {
+    if (!isset($formfields["password2"]) ||
+	strcmp($formfields["password2"], "") == 0) {
 	$errors["Confirm Password"] = "Missing Field";
     }
-    elseif (strcmp($formfields[password1], $formfields[password2])) {
+    elseif (strcmp($formfields["password1"], $formfields["password2"])) {
 	$errors["Confirm Password"] = "Does not match Password";
     }
-    elseif (! CHECKPASSWORD($formfields[proj_head_uid],
-			    $formfields[password1],
-			    $formfields[usr_name],
-			    $formfields[usr_email], $checkerror)) {
+    elseif (! CHECKPASSWORD((($USERSELECTUIDS ||
+			     $FirstInitState == "createproject") ?
+			     $formfields["proj_head_uid"] : "ignored"),
+			    $formfields["password1"],
+			    $formfields["usr_name"],
+			    $formfields["usr_email"], $checkerror)) {
 	$errors["Password"] = "$checkerror";
     }
 }
 
-if (!isset($formfields[pid]) ||
-    strcmp($formfields[pid], "") == 0) {
+if (!isset($formfields["pid"]) ||
+    strcmp($formfields["pid"], "") == 0) {
     $errors["Project Name"] = "Missing Field";
 }
 else {
-    if (!TBvalid_newpid($formfields[pid])) {
+    if (!TBvalid_newpid($formfields["pid"])) {
 	$errors["Project Name"] = TBFieldErrorString();
     }
-    elseif (TBValidProject($formfields[pid])) {
+    elseif (Project::LookupByPid($formfields["pid"])) {
 	$errors["Project Name"] =
 	    "Already in use. Select another";
     }
 }
 
-if (!isset($formfields[proj_name]) ||
-    strcmp($formfields[proj_name], "") == 0) {
+if (!isset($formfields["proj_name"]) ||
+    strcmp($formfields["proj_name"], "") == 0) {
     $errors["Project Description"] = "Missing Field";
 }
-elseif (! TBvalid_description($formfields[proj_name])) {
+elseif (! TBvalid_description($formfields["proj_name"])) {
     $errors["Project Description"] = TBFieldErrorString();
 }
-if (!isset($formfields[proj_URL]) ||
-    strcmp($formfields[proj_URL], "") == 0 ||
-    strcmp($formfields[proj_URL], $HTTPTAG) == 0) {    
+if (!isset($formfields["proj_URL"]) ||
+    strcmp($formfields["proj_URL"], "") == 0 ||
+    strcmp($formfields["proj_URL"], $HTTPTAG) == 0) {    
     $errors["Project URL"] = "Missing Field";
 }
-elseif (! CHECKURL($formfields[proj_URL], $urlerror)) {
+elseif (! CHECKURL($formfields["proj_URL"], $urlerror)) {
     $errors["Project URL"] = $urlerror;
 }
-if (!isset($formfields[proj_funders]) ||
-    strcmp($formfields[proj_funders], "") == 0) {
+if (!isset($formfields["proj_funders"]) ||
+    strcmp($formfields["proj_funders"], "") == 0) {
     $errors["Funding Sources"] = "Missing Field";
 }
-elseif (! TBvalid_description($formfields[proj_funders])) {
+elseif (! TBvalid_description($formfields["proj_funders"])) {
     $errors["Funding Sources"] = TBFieldErrorString();
 }
-if (!isset($formfields[proj_members]) ||
-    strcmp($formfields[proj_members], "") == 0) {
+if (!isset($formfields["proj_members"]) ||
+    strcmp($formfields["proj_members"], "") == 0) {
     $errors["#of Members"] = "Missing Field";
 }
-elseif (! TBvalid_num_members($formfields[proj_members])) {
+elseif (! TBvalid_num_members($formfields["proj_members"])) {
     $errors["#of Members"] = TBFieldErrorString();
 }
-if (!isset($formfields[proj_pcs]) ||
-    strcmp($formfields[proj_pcs], "") == 0) {
+if (!isset($formfields["proj_pcs"]) ||
+    strcmp($formfields["proj_pcs"], "") == 0) {
     $errors["#of PCs"] = "Missing Field";
 }
-elseif (! TBvalid_num_pcs($formfields[proj_pcs])) {
+elseif (! TBvalid_num_pcs($formfields["proj_pcs"])) {
     $errors["#of PCs"] = TBFieldErrorString();
 }
 
-if (isset($formfields[proj_plabpcs]) &&
-    strcmp($formfields[proj_plabpcs], "") &&
-    strcmp($formfields[proj_plabpcs], "checked")) {
+if (isset($formfields["proj_plabpcs"]) &&
+    strcmp($formfields["proj_plabpcs"], "") &&
+    strcmp($formfields["proj_plabpcs"], "checked")) {
     $errors["Planetlab Access"] = "Bad Value";
 }
-if (isset($formfields[proj_ronpcs]) &&
-    strcmp($formfields[proj_ronpcs], "") &&
-    strcmp($formfields[proj_ronpcs], "checked")) {
+if (isset($formfields["proj_ronpcs"]) &&
+    strcmp($formfields["proj_ronpcs"], "") &&
+    strcmp($formfields["proj_ronpcs"], "checked")) {
     $errors["Ron Access"] = "Bad Value";
 }
-if (!isset($formfields[proj_why]) ||
-    strcmp($formfields[proj_why], "") == 0) {
+if (!isset($formfields["proj_why"]) ||
+    strcmp($formfields["proj_why"], "") == 0) {
     $errors["How and Why?"] = "Missing Field";
 }
-elseif (! TBvalid_why($formfields[proj_why])) {
+elseif (! TBvalid_why($formfields["proj_why"])) {
     $errors["How and Why?"] = TBFieldErrorString();
 }
-if ((!isset($formfields[proj_public]) ||
-     strcmp($formfields[proj_public], "checked")) &&
-    (!isset($formfields[proj_whynotpublic]) ||
-     strcmp($formfields[proj_whynotpublic], "") == 0)) {
+if ((!isset($formfields["proj_public"]) ||
+     strcmp($formfields["proj_public"], "checked")) &&
+    (!isset($formfields["proj_whynotpublic"]) ||
+     strcmp($formfields["proj_whynotpublic"], "") == 0)) {
     $errors["Why Not Public?"] = "Missing Field";
 }
-if (isset($formfields[proj_linked]) &&
-    strcmp($formfields[proj_linked], "") &&
-    strcmp($formfields[proj_linked], "checked")) {
+if (isset($formfields["proj_linked"]) &&
+    strcmp($formfields["proj_linked"], "") &&
+    strcmp($formfields["proj_linked"], "checked")) {
     $errors["Link to Us"] = "Bad Value";
 }
 
+# Present these errors before we call out to do anything else.
 if (count($errors)) {
     SPITFORM($formfields, $returning, $errors);
     PAGEFOOTER();
@@ -863,361 +907,129 @@ if (count($errors)) {
 }
 
 #
+# Create the User first, then the Project/Group.
 # Certain of these values must be escaped or otherwise sanitized.
 #
 if (!$returning) {
-    $proj_head_uid     = $formfields[proj_head_uid];
-    $usr_title         = addslashes($formfields[usr_title]);
-    $usr_name          = addslashes($formfields[usr_name]);
-    $usr_affil         = addslashes($formfields[usr_affil]);
-    $usr_email         = $formfields[usr_email];
-    $usr_addr          = addslashes($formfields[usr_addr]);
-    $usr_city          = addslashes($formfields[usr_city]);
-    $usr_state         = addslashes($formfields[usr_state]);
-    $usr_zip           = addslashes($formfields[usr_zip]);
-    $usr_country       = addslashes($formfields[usr_country]);
-    $usr_phone         = $formfields[usr_phone];
-    $password1         = $formfields[password1];
-    $password2         = $formfields[password2];
-    $wikiname          = ($WIKISUPPORT ? $formfields[wikiname] : "");
-    $usr_returning     = "No";
-
-    if (! isset($formfields[usr_URL]) ||
-	strcmp($formfields[usr_URL], "") == 0 ||
-	strcmp($formfields[usr_URL], $HTTPTAG) == 0) {
-	$usr_URL = "";
-    }
-    else {
-	$usr_URL = addslashes($formfields[usr_URL]);
-    }
-    
-    if (! isset($formfields[usr_addr2])) {
-	$usr_addr2 = "";
-    }
-    else {
-	$usr_addr2 = addslashes($formfields[usr_addr2]);
+    $args = array();
+    $args["name"]	   = $formfields["usr_name"];
+    $args["email"]         = $formfields["usr_email"];
+    $args["address"]       = $formfields["usr_addr"];
+    $args["address2"]      = $formfields["usr_addr2"];
+    $args["city"]          = $formfields["usr_city"];
+    $args["state"]         = $formfields["usr_state"];
+    $args["zip"]           = $formfields["usr_zip"];
+    $args["country"]       = $formfields["usr_country"];
+    $args["phone"]         = $formfields["usr_phone"];
+    $args["shell"]         = 'tcsh';
+    $args["title"]         = $formfields["usr_title"];
+    $args["affiliation"]   = $formfields["usr_affil"];
+    $args["affiliation_abbreviation"] = $formfields["usr_affil_abbrev"];
+    $args["password"]      = $formfields["password1"];
+    if ($WIKISUPPORT) {
+        $args["wikiname"] = $formfields["wikiname"];
     }
 
-    #
-    # Pub Key.
-    #
-    if (isset($formfields[usr_key]) &&
-	strcmp($formfields[usr_key], "")) {
-        #
-        # This is passed off to the shell, so taint check it.
-        # 
-	if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	    $errors["PubKey"] = "Invalid characters";
-	}
-	else {
-            #
-            # Replace any embedded newlines first.
-            #
-	    $formfields[usr_key] =
-		ereg_replace("[\n]", "", $formfields[usr_key]);
-	    $usr_key = $formfields[usr_key];
-	    $addpubkeyargs = "-k $proj_head_uid '$usr_key' ";
-	}
+
+    if (isset($formfields["usr_URL"]) &&
+	$formfields["usr_URL"] != $HTTPTAG && $formfields["usr_URL"] != "") {
+	$args["URL"] = $formfields["usr_URL"];
+    }
+    if ($USERSELECTUIDS || $FirstInitState == "createproject") {
+	$args["login"] = $formfields["proj_head_uid"];
     }
 
-    #
-    # If usr provided a file for the key, it overrides the paste in text.
-    #
+    # Backend verifies pubkey and returns error.
     if (isset($_FILES['usr_keyfile']) &&
 	$_FILES['usr_keyfile']['name'] != "" &&
 	$_FILES['usr_keyfile']['name'] != "none") {
 
 	$localfile = $_FILES['usr_keyfile']['tmp_name'];
-
-	if (! stat($localfile)) {
-	    $errors["PubKey File"] = "No such file";
-	}
-        # Taint check shell arguments always! 
-	elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
-	    $errors["PubKey File"] = "Invalid characters";
-	}
-	else {
-	    $addpubkeyargs = "$proj_head_uid $usr_keyfile";
-	    chmod($usr_keyfile, 0644);	
-	}
-    }
-    #
-    # Verify key format.
-    #
-    if (isset($addpubkeyargs) &&
-	ADDPUBKEY($proj_head_uid, "webaddpubkey -n $addpubkeyargs")) {
-	$errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
+	$args["pubkey"] = file_get_contents($localfile);
     }
 
-    if (count($errors)) {
+    # Just collect the user XML args here and pass the file to NewNewProject.
+    # Underneath, newproj calls newuser with the XML file.
+    #
+    # Calling newuser down in Perl land makes creation of the leader account
+    # and the project "atomic" from the user's point of view.  This avoids a
+    # problem when the DB is locked for daily backup: in newproject, the call
+    # on NewNewUser would block and then unblock and get done; meanwhile the
+    # PHP thread went away so we never returned here to call NewNewProject.
+    #
+    if (! ($newuser_xml = User::NewNewUserXML($args, $errors)) != 0) {
+	$errors["Error Creating User XML"] = $error;
+	TBERROR("B\n${error}\n\n" . print_r($args, TRUE), 0);
 	SPITFORM($formfields, $returning, $errors);
 	PAGEFOOTER();
 	return;
     }
 }
-else {
-    #
-    # Grab info from the DB for the email message below. Kinda silly.
-    #
-    $query_result =
-	DBQueryFatal("select * from users where uid='$proj_head_uid'");
-    
-    $row = mysql_fetch_array($query_result);
-    
-    $usr_title	   = $row[usr_title];
-    $usr_name	   = $row[usr_name];
-    $usr_affil	   = $row[usr_affil];
-    $usr_email	   = $row[usr_email];
-    $usr_addr	   = $row[usr_addr];
-    $usr_addr2     = $row[usr_addr2];
-    $usr_city	   = $row[usr_city];
-    $usr_state	   = $row[usr_state];
-    $usr_zip	   = $row[usr_zip];
-    $usr_country   = $row[usr_country];
-    $usr_phone	   = $row[usr_phone];
-    $usr_URL       = $row[usr_URL];
-    $wikiname      = $row[wikiname];
-    $usr_returning = "Yes";
-}
-$pid               = $formfields[pid];
-$proj_name	   = addslashes($formfields[proj_name]);
-$proj_URL          = addslashes($formfields[proj_URL]);
-$proj_funders      = addslashes($formfields[proj_funders]);
-$proj_whynotpublic = addslashes($formfields[proj_whynotpublic]);
-$proj_members      = $formfields[proj_members];
-$proj_pcs          = $formfields[proj_pcs];
-$proj_why	   = addslashes($formfields[proj_why]);
-$proj_expires      = date("Y:m:d", time() + (86400 * 120));
-
-if (!isset($formfields[proj_public]) ||
-    strcmp($formfields[proj_public], "checked")) {
-    $proj_public = "No";
-    $public = 0;
-}
-else {
-    $proj_public = "Yes";
-    $public = 1;
-}
-if (!isset($formfields[proj_linked]) ||
-    strcmp($formfields[proj_linked], "checked")) {
-    $proj_linked = "No";
-    $linked = 0;
-}
-else {
-    $proj_linked = "Yes";
-    $linked = 1;
-}
-if (isset($formfields[proj_plabpcs]) &&
-    $formfields[proj_plabpcs] == "checked") {
-    $proj_plabpcs = "Yes";
-    $plabpcs = 1;
-}
-else {
-    $proj_plabpcs = "No";
-    $plabpcs = 0;
-}
-if (isset($formfields[proj_ronpcs]) &&
-    $formfields[proj_ronpcs] == "checked") {
-    $proj_ronpcs = "Yes";
-    $ronpcs = 1;
-}
-else {
-    $proj_ronpcs = "No";
-    $ronpcs = 0;
-}
-
-#
-# Check that we can guarantee uniqueness of the unix group name.
-# 
-$query_result =
-    DBQueryFatal("select gid from groups where unix_name='$pid'");
-
-if (mysql_num_rows($query_result)) {
-    TBERROR("Could not form a unique Unix group name for $pid!", 1);
-}
-
-#
-# For a new user:
-# * Create a new account in the database.
-# * Generate a mail message to the user with the verification key.
-# 
-if (! $returning) {
-    $encoding    = crypt("$password1");
-
-    #
-    # Must be done before user record is inserted!
-    # XXX Since, user does not exist, must run as nobody. Script checks. 
-    # 
-    if (isset($addpubkeyargs)) {
-	ADDPUBKEY($proj_head_uid, "webaddpubkey $addpubkeyargs");
-    }
-    # Initial mailman_password.
-    $mailman_password = substr(GENHASH(), 0, 10);
-
-    # Unique Unix UID.
-    $unix_uid = TBGetUniqueIndex('next_uid');
-
-    DBQueryFatal("INSERT INTO users ".
-	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
-	 " usr_URL,usr_title,usr_affil,usr_phone,usr_shell,usr_pswd,unix_uid,".
-	 " status,pswd_expires,usr_modified,wikiname,mailman_password) ".
-	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
-         "'$usr_email', ".
-	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
-	 "'$usr_country', ".
-	 "'$usr_URL', '$usr_title', '$usr_affil', ".
-	 "'$usr_phone', 'tcsh', '$encoding', $unix_uid, 'newuser', ".
-	 "date_add(now(), interval 1 year), now(), '$wikiname', ".
-	 "'$mailman_password')");
-
-    DBQueryFatal("INSERT INTO user_stats (uid, uid_idx) ".
-		 "VALUES ('$proj_head_uid', $unix_uid)");
-
-    if (! $FirstInitState) {
-	$key = TBGenVerificationKey($proj_head_uid);
-
-	TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
-	   "Your New User Key",
-	   "\n".
-	   "Dear $usr_name:\n\n".
-	   "This is your account verification key: $key\n\n".
-	   "Please use this link to verify your user account:\n".
-	   "\n".
-	   "    ${TBBASE}/login.php3?vuid=$proj_head_uid&key=$key\n".
-	   "\n".
-	   "You will then be verified as a user. When you have been both\n".
-	   "verified and approved by Testbed Operations, you will be marked\n".
-	   "as an active user and granted full access to your account.\n".
-	   "\n".
-	   "Thanks,\n".
-	   "Testbed Operations\n",
-	   "From: $TBMAIL_APPROVAL\n".
-	   "Bcc: $TBMAIL_AUDIT\n".
-	   "Errors-To: $TBMAIL_WWW");
-    }
-}
 
 #
 # Now for the new Project
-# * Create a new project in the database.
-# * Create a new default group for the project.
-# * Create a new group_membership entry in the database, default trust=none.
-# * Generate a mail message to testbed ops.
 #
-DBQueryFatal("INSERT INTO projects ".
-	     "(pid, created, expires, name, URL, head_uid, ".
-	     " num_members, num_pcs, why, funders, unix_gid, ".
-	     " num_pcplab, num_ron, public, public_whynot, linked_to_us)".
-	     "VALUES ('$pid', now(), '$proj_expires','$proj_name', ".
-	     "        '$proj_URL', '$proj_head_uid', '$proj_members', ".
-	     "        '$proj_pcs', '$proj_why', ".
-	     "        '$proj_funders', NULL, $plabpcs, $ronpcs, ".
-	     "         $public, '$proj_whynotpublic', $linked)");
+$args = array();
+if (isset($newuser_xml)) {
+    $args["newuser_xml"]   = $newuser_xml;
+}
+if ($returning) {
+    # An existing, logged-in user is starting the project.
+    $args["leader"]	   = $this_user->uid();
+}
+$args["name"]		   = $formfields["pid"];
+$args["short description"] = $formfields["proj_name"];
+$args["URL"]               = $formfields["proj_URL"];
+$args["members"]           = $formfields["proj_members"];
+$args["num_pcs"]           = $formfields["proj_pcs"];
+$args["long description"]  = $formfields["proj_why"];
+$args["funders"]           = $formfields["proj_funders"];
+$args["whynotpublic"]      = $formfields["proj_whynotpublic"];
 
-DBQueryFatal("INSERT INTO project_stats (pid) VALUES ('$pid')");
-
-DBQueryFatal("INSERT INTO groups ".
-	     "(pid, gid, leader, created, description, unix_gid, unix_name) ".
-	     "VALUES ('$pid', '$pid', '$proj_head_uid', now(), ".
-	     "        'Default Group', NULL, '$pid')");
-
-DBQueryFatal("INSERT INTO group_stats (pid, gid) VALUES ('$pid', '$pid')");
-
-DBQueryFatal("insert into group_membership ".
-	     "(uid, gid, pid, trust, date_applied) ".
-	     "values ('$proj_head_uid','$pid','$pid','none', now())");
-
-#
-# If a new user, do not send the full blown message until verified.
-#
-if ($returning || $FirstInitState) {
-    #
-    # Grab the unix GID that was assigned.
-    #
-    TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
-
-    #
-    # The mail message to the approval list.
-    # 
-    TBMAIL($TBMAIL_APPROVAL,
-	   "New Project '$pid' ($proj_head_uid)",
-	   "'$usr_name' wants to start project '$pid'.\n".
-	   "\n".
-	   "Name:            $usr_name ($proj_head_uid)\n".
-	   "Returning User?: $usr_returning\n".
-	   "Email:           $usr_email\n".
-	   "User URL:        $usr_URL\n".
-	   "Project:         $proj_name\n".
-	   "Expires:         $proj_expires\n".
-	   "Project URL:     $proj_URL\n".
-	   "Public URL:      $proj_public\n".
-	   "Why Not Public:  $proj_whynotpublic\n".
-	   "Link to Us?:     $proj_linked\n".
-	   "Funders:         $proj_funders\n".
-	   "Title:           $usr_title\n".
-	   "Affiliation:     $usr_affil\n".
-	   "Address 1:       $usr_addr\n".
-	   "Address 2:       $usr_addr2\n".
-	   "City:            $usr_city\n".
-	   "State:           $usr_state\n".
-	   "ZIP/Postal Code: $usr_zip\n".
-	   "Country:         $usr_country\n".
-	   "Phone:           $usr_phone\n".
-	   "Members:         $proj_members\n".
-	   "PCs:             $proj_pcs\n".
-	   "Planetlab PCs:   $proj_plabpcs\n".
-	   "RON PCs:         $proj_ronpcs\n".
-	   "Unix GID:        $unix_name ($unix_gid)\n".
-	   "Reasons:\n$proj_why\n\n".
-	   "Please review the application and when you have made a \n".
-	   "decision, go to $TBWWW and\n".
-	   "select the 'Project Approval' page.\n\n".
-	   "They are expecting a result within 72 hours.\n", 
-	   "From: $usr_name '$proj_head_uid' <$usr_email>\n".
-	   "Reply-To: $TBMAIL_APPROVAL\n".
-	   "Errors-To: $TBMAIL_WWW");
+if (!isset($formfields["proj_public"]) ||
+    $formfields["proj_public"] != "checked") {
+    $args["public"] = 0;
 }
 else {
-    TBMAIL($TBMAIL_APPROVAL,
-	   "New Project '$pid' ($proj_head_uid)",
-	   "'$usr_name' wants to start project '$pid'.\n".
-	   "\n".
-	   "Name:            $usr_name ($proj_head_uid)\n".
-	   "Returning User?: No\n".
-	   "\n".
-	   "No action is necessary until the user has verified the account.\n",
-	   "From: $usr_name '$proj_head_uid' <$usr_email>\n".
-	   "Reply-To: $TBMAIL_APPROVAL\n".
-	   "Errors-To: $TBMAIL_WWW");
+    $args["public"] = 1;
+}
+if (!isset($formfields["proj_linked"]) ||
+    $formfields["proj_linked"] != "checked") {
+    $args["linkedtous"] = 0;
+}
+else {
+    $args["linkedtous"] = 1;
+}
+if (isset($formfields["proj_plabpcs"]) &&
+    $formfields["proj_plabpcs"] == "checked") {
+    $args["plab"] = 1;
+}
+if (isset($formfields["proj_ronpcs"]) &&
+    $formfields["proj_ronpcs"] == "checked") {
+    $args["ron"] = 1;
 }
 
+if (! ($project = Project::NewNewProject($args, $error))) {
+    $errors["Error Creating Project"] = $error;
+    TBERROR("C\n${error}\n\n" . print_r($args, TRUE), 0);
+    SPITFORM($formfields, $returning, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Need to do some extra work for the first project; eventually move to backend
+# 
 if ($FirstInitState) {
-    #
-    # The first user gets admin status and some extra groups, etc.
-    #
-    DBQueryFatal("update users set ".
-		 "  admin=1,status='". TBDB_USERSTATUS_UNAPPROVED . "' " .
-		 "where uid='$proj_head_uid'");
-
-    DBQueryFatal("insert into unixgroup_membership set ".
-		 "uid='$proj_head_uid', gid='wheel'");
+    $leader = $project->GetLeader();
+    $proj_head_uid = $leader->uid();
+    # Set up the management group (emulab-ops).
+    Group::Initialize($proj_head_uid);
     
-    DBQueryFatal("insert into unixgroup_membership set ".
-		 "uid='$proj_head_uid', gid='$TBADMINGROUP'");
-    
-    DBQueryFatal("insert into group_membership ".
-		 "(uid, gid, pid, trust, date_applied) ".
-		 "values ('$proj_head_uid','$TBOPSPID','$TBOPSPID', ".
-		 "'" . TBDB_TRUSTSTRING_GROUPROOT . "', now())");
-
-    DBQueryFatal("update group_membership set ".
-		 "  trust='" . TBDB_TRUSTSTRING_PROJROOT . "' ".
-		 "where uid='$proj_head_uid' and pid='$pid'");
-
     #
     # Move to next phase. 
     # 
+    $pid = $formfields["pid"];
     TBSetFirstInitPid($pid);
     TBSetFirstInitState("approveproject");
     header("Location: approveproject.php3?pid=$pid&approval=approve");

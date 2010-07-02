@@ -1,0 +1,58 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= flash
+
+SYSETCDIR	= $(DESTDIR)/etc
+ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
+BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
+VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
+RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
+INSTALL		= /usr/bin/install -c
+
+include $(OBJDIR)/Makeconf
+
+all:	
+
+destdircheck:
+	@if [ -z "$(DESTDIR)" ]; then \
+	    echo "You must define DESTDIR for this target!"; \
+	    false; \
+	fi
+	@if [ "$(DESTDIR)" = "/" ]; then \
+	    echo "DESTDIR is '/', really really bad idea!"; \
+	    false; \
+	fi
+
+client:
+	$(MAKE) -C ../cdrom/groklilo client
+	$(MAKE) -C ../cdrom/tbbootconfig client
+
+client-install: destdircheck client
+	$(MAKE) -C ../cdrom/groklilo client-install
+	$(MAKE) -C ../cdrom/tbbootconfig client-install
+	$(INSTALL) -m 644 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 555 $(SRCDIR)/cdroot $(SYSETCDIR)/rc.d/cdroot
+	$(INSTALL) -m 644 $(SRCDIR)/fstab $(SYSETCDIR)/fstab
+	$(INSTALL) -m 644 $(SRCDIR)/loader.rc $(DESTDIR)/boot/loader.rc
+	$(INSTALL) -m 440 $(SRCDIR)/sudoers $(DESTDIR)/usr/local/etc/sudoers
+	rm -f $(SYSETCDIR)/rc.conf.d/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/emulab/dhclient
+	rm -f $(DESTDIR)/etc/emulab/frisbee $(DESTDIR)/etc/emulab/growdisk
+	rm -rf $(DESTDIR)/etc/emulab/supfile $(DESTDIR)/root/.cvsup
+	cp /dev/null $(DESTDIR)/etc/emulab/nosup
+	rm -rf $(DESTDIR)/etc/jail
+	date '+FLASHBOOT-%y%m%d' > $(DESTDIR)/etc/emulab/emuboot-volid
+	@echo "NOTE: you will need to install $(DESTDIR)/etc/emulab/mbr*.dd"
+
+clean:
+	$(MAKE) -C ../cdrom/groklilo clean
+	$(MAKE) -C ../cdrom/tbbootconfig clean
+
+include $(TESTBED_SRCDIR)/GNUmakerules

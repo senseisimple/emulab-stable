@@ -1,11 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # No PAGEHEADER since we spit out a redirect later.
@@ -14,53 +13,49 @@ include("showstuff.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-# Page arguments.
-$target_uid = $_GET['target_uid'];
-$key        = $_GET['key'];
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("target_user", PAGEARG_USER,
+				 "key",         PAGEARG_STRING);
+$optargs = OptionalPageArguments("canceled",    PAGEARG_BOOLEAN,
+				 "confirmed",   PAGEARG_BOOLEAN);
 
-# Pedantic argument checking.
-if (!isset($target_uid) || $target_uid == "" || !TBvalid_uid($target_uid) ||
-    !isset($key) || $key == "" || !preg_match("/^[-\w\.\@\#]+$/", $key)) {
+# Pedantic argument checking of the key.
+if (! preg_match("/^[-\w\.\@\#]+$/", $key)) {
     PAGEARGERROR();
 }
 
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("The user $target_uid is not a valid user", 1);
-}
+# Need these below
+$target_uid   = $target_user->uid();
 
 #
 # Verify that this uid is a member of one of the projects that the
 # target_uid is in. Must have proper permission in that group too. 
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-
-    if (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_MODIFYINFO)) {
-	USERERROR("You do not have permission to change ${user}'s keys!", 1);
-    }
+if (!$isadmin && 
+    !$target_user->AccessCheck($this_user, $TB_USERINFO_MODIFYINFO)) {
+    USERERROR("You do not have permission!", 1);
 }
 
 #
 # Get the actual key.
 #
-$query_result =
-    DBQueryFatal("select * from user_sfskeys ".
-		 "where uid='$target_uid' and comment='$key'");
+$query_result =& $target_user->TableLookUp("user_sfskeys",
+					   "pubkey,comment",
+					   "comment='$key'");
 
 if (! mysql_num_rows($query_result)) {
     USERERROR("SFS Key '$key' for user '$target_uid' does not exist!", 1);
 }
 
 $row    = mysql_fetch_array($query_result);
-$pubkey = $row[pubkey];
-$comment= $row[comment];
+$pubkey = $row['pubkey'];
+$comment= $row['comment'];
 $chunky = chunk_split("$pubkey $comment", 70, "<br>\n");
 
 #
@@ -69,31 +64,33 @@ $chunky = chunk_split("$pubkey $comment", 70, "<br>\n");
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     PAGEHEADER("SFS Public Key Maintenance");
     
     echo "<center><h2><br>
           SFS Public Key deletion canceled!
           </h2></center>\n";
 
+    $url = CreateURL("deletesfskey", $target_user);
+
     echo "<br>
-          Back to <a href='showsfskeys.php3?target_uid=$target_uid'>
-                 sfs public keys</a> for user '$uid'.\n";
+          Back to <a href='$url'>sfs public keys</a> for user '$uid'.\n";
     
     PAGEFOOTER();
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     PAGEHEADER("SFS Public Key Maintenance");
 
     echo "<center><h3><br>
           Are you <b>REALLY</b>
           sure you want to delete this SFS Public Key for user '$target_uid'?
           </h3>\n";
+
+    $url = CreateURL("deletesfskey", $target_user, "key", $key);
     
-    echo "<form action='deletesfskey.php3?target_uid=$target_uid&key=$key'
-                method=post>";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -112,8 +109,11 @@ if (!$confirmed) {
 #
 # Audit
 #
-TBUserInfo($uid, $uid_name, $uid_email);
-TBUserInfo($target_uid, $targuid_name, $targuid_email);
+$uid_name  = $this_user->name();
+$uid_email = $this_user->email();
+
+$targuid_name  = $target_user->name();
+$targuid_email = $target_user->email();
 
 TBMAIL("$targuid_name <$targuid_email>",
      "SFS Public Key for '$target_uid' Deleted",
@@ -128,8 +128,7 @@ TBMAIL("$targuid_name <$targuid_email>",
      "Bcc: $TBMAIL_AUDIT\n".
      "Errors-To: $TBMAIL_WWW");
 
-DBQueryFatal("delete from user_sfskeys ".
-	     "where uid='$target_uid' and comment='$key'");
+$target_user->TableDelete("user_sfskeys", "comment='$key'");
 
 #
 # update sfs_users files and nodes if appropriate.
@@ -141,6 +140,10 @@ else {
     SUEXEC("nobody", "nobody", "webaddsfskey -w $target_uid", 0);
 }
 
-header("Location: showsfskeys.php3?target_uid=$target_uid");
+PAGEREPLACE(CreateURL("showsfskeys", $target_user));
 
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>

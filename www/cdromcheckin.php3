@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
+include_once("node_defs.php");
 
 # These error codes must match whats in register.pl on the cd.
 define("CDROMSTATUS_OKAY"	,	0);
@@ -17,6 +18,36 @@ define("CDROMSTATUS_BADREMOTEIP",	105);
 define("CDROMSTATUS_IPADDRINUSE",	106);
 define("CDROMSTATUS_UPGRADEERROR",	107);
 define("CDROMSTATUS_OTHER",		199);
+
+#
+# Config setup.  This should not be hard-coded in the long term.
+
+$slicexbase = "slicex_slice=3\nslicex_mount=/users\n";
+$confslicex = "slicex_tarball=slicex.tar.gz
+slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig
+";
+
+$version_tags[5] = "24a4f173a7716d47bbc047f8387c86af";
+$confmaps["24a4f173a7716d47bbc047f8387c86af"] = "fdisk=image.fdisk
+fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig
+slice1_image=slice1.ndz
+slice1_alt_image=http://${WWWHOST}/images/slice1-v5.ndz
+slice1_sig=https://${WWWHOST}/images/slice1-v5.ndz.sig
+slice1_md5=24a4f173a7716d47bbc047f8387c86af
+" . $slicexbase;
+
+$version_tags[4] = "c9f8578517f5ebb0eca70b69dce144d";
+$confmaps["c9f8578517f5ebb0eca70b69dce144d"] = "fdisk=image.fdisk
+fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig
+slice1_image=slice1.ndz
+slice1_alt_image=http://${WWWHOST}/images/slice1-v4.ndz
+slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig
+slice1_md5=c9f8578517f5ebb0eca70b69dce144db
+" . $slicexbase;
+
+$confmaps["d326a1f604489c43b488fa80a88221f4"] = "slice1_image=slice1.ndz
+slice1_sig=slice1.ndz.sig
+slice1_md5=d326a1f604489c43b488fa80a88221f4\n" . $slicexbase;
 
 #
 # Spit back a text message we can display to the user on the console
@@ -36,6 +67,29 @@ function SPITSTATUS($status)
     }
 }
 
+# Shuffle stuff out of REQUEST to avoid a bunch of silly changes.
+if (isset($_REQUEST["cdkey"])) {
+    $cdkey = $_REQUEST["cdkey"];
+}
+if (isset($_REQUEST["needscript"])) {
+    $needscript = $_REQUEST["needscript"];
+}
+if (isset($_REQUEST["privkey"])) {
+    $privkey = $_REQUEST["privkey"];
+}
+if (isset($_REQUEST["IP"])) {
+    $IP = $_REQUEST["IP"];
+}
+if (isset($_REQUEST["wahostname"])) {
+    $wahostname = $_REQUEST["wahostname"];
+}
+if (isset($_REQUEST["roottag"])) {
+    $roottag = $_REQUEST["roottag"];
+}
+if (isset($_REQUEST["updated"])) {
+    $updated = $_REQUEST["updated"];
+}
+
 #
 # This page is not intended to be invoked by humans!
 #
@@ -44,7 +98,7 @@ if ((!isset($cdkey) || !strcmp($cdkey, ""))) {
     return;
 }
 
-if (!ereg("[0-9a-zA-Z]+", $cdkey)) {
+if (!preg_match('/[0-9a-zA-Z]+/', $cdkey)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
@@ -59,7 +113,7 @@ if (! mysql_num_rows($query_result)) {
     return;
 }
 $row    = mysql_fetch_array($query_result);
-$cdvers = $row[version];
+$cdvers = $row["version"];
 
 #
 # Node is requesting latest instructions. Give it the script. This could
@@ -78,13 +132,17 @@ if (isset($needscript)) {
 	echo "URL=https://${WWWHOST}/images/netbed-setup-v69.pl\n";
 	echo "SIG=https://${WWWHOST}/images/netbed-setup-v69.pl.sig\n";
     }
+    elseif ($cdvers == 4) {
+	echo "URL=https://${WWWHOST}/images/netbed-setup-v4.pl\n";
+	echo "SIG=https://${WWWHOST}/images/netbed-setup-v4.pl.sig\n";
+    }
     elseif ($cdvers == 5) {
 	echo "URL=https://${WWWHOST}/images/netbed-setup-v5.pl\n";
 	echo "SIG=https://${WWWHOST}/images/netbed-setup-v5.pl.sig\n";
     }
     else {
-	echo "URL=https://${WWWHOST}/images/netbed-setup-v4.pl\n";
-	echo "SIG=https://${WWWHOST}/images/netbed-setup-v4.pl.sig\n";
+      SPITSTATUS(CDROMSTATUS_INVALIDARGS);
+      return;
     }
     echo "emulab_status=0\n";
     return;
@@ -99,14 +157,14 @@ if ((!isset($privkey) || !strcmp($privkey, "")) ||
     return;
 }
 
-if (!ereg("[0-9a-zA-Z ]+", $privkey) ||
-    !ereg("[0-9\.]+", $IP)) {
+if (!preg_match('/[0-9a-zA-Z ]+/', $privkey) ||
+    !preg_match('/[0-9\.]+/', $IP)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
 
 if (isset($wahostname) &&
-    !ereg("[-_0-9a-zA-Z\.]+", $wahostname)) {
+    !preg_match('/[-_0-9a-zA-Z\.]+/', $wahostname)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
@@ -125,7 +183,7 @@ if (isset($wahostname)) {
 }
 
 if (isset($roottag) &&
-    !ereg("[0-9a-zA-Z]+", $roottag)) {
+    !preg_match('/[0-9a-zA-Z]+/', $roottag)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
@@ -143,7 +201,7 @@ if (!mysql_num_rows($query_result)) {
     return;
 }
 $warow  = mysql_fetch_array($query_result);
-$privIP = $warow[IP];
+$privIP = $warow["IP"];
 
 #
 # If the node is reporting that its finished updating, then make its
@@ -219,8 +277,9 @@ if (isset($updated) && $updated == 1) {
     # Update with new nickname. Nice if node changes its real hostname.
     #
     if (isset($nickname)) {
-	$nodeid = TBIPtoNodeID($IP);
-	if ($nodeid) {
+	if (($node = Node::LookupByIP($IP))) {
+	    $nodeid = $node->node_id();
+	    
 	    DBQueryFatal("update reserved set vname='$nickname' ".
 			 "where node_id='$nodeid'");
 	}
@@ -262,37 +321,9 @@ if (strcmp($privIP, "1.1.1.1")) {
 	    DBQueryFatal("update widearea_updates set update_started=now() ".
 			 "where IP='$IP'");
 
-	    switch ($newroot) {
-	    case "d326a1f604489c43b488fa80a88221f4":
-		$upgrade_instructions =
-		    "slice1_image=slice1.ndz\n" .
-		    "slice1_sig=slice1.ndz.sig\n" .
-		    "slice1_md5=d326a1f604489c43b488fa80a88221f4\n" .
-		    "slicex_slice=3\n" .
-		    "slicex_mount=/users";
-		break;
-		    
-	    case "c9f8578517f5ebb0eca70b69dce144db":
-		$upgrade_instructions =
-		    "slice1_image=slice1.ndz\n" .
-		    "slice1_alt_image=http://${WWWHOST}/images/slice1-v4.ndz\n" .
-		    "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n".
-		    "slice1_md5=c9f8578517f5ebb0eca70b69dce144db\n" .
-		    "slicex_slice=3\n" .
-		    "slicex_mount=/users";
-		break;
-
-
-            case "24a4f173a7716d47bbc047f8387c86af":
-		$upgrade_instructions =
-		    "slice1_image=slice1.ndz\n" .
-		    "slice1_alt_image=http://${WWWHOST}/images/slice1-v5.ndz\n" .
-		    "slice1_sig=https://${WWWHOST}/images/slice1-v5.ndz.sig\n".
-                    "slice1_md5=24a4f173a7716d47bbc047f8387c86af\n" .
-		    "slicex_slice=3\n" .
-		    "slicex_mount=/users";
+	    $upgrade_instructions = $confmaps[$newroot];
 		
-	    default:
+	    if (!$upgrade_instructions) {
 		SPITSTATUS(CDROMSTATUS_UPGRADEERROR);
 		return;
 	    }
@@ -363,22 +394,12 @@ if ($cdvers == 1) {
     }
 }
 elseif ($cdvers == 2) {
-    if (0) {
-	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
-	echo "slice1_image=http://${WWWHOST}/images/slice1-v2.ndz\n";
-	echo "slice1_md5=402f00f2e46d22507cef3d19846b48f8\n";
-	echo "slicex_mount=/users\n";
-	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v2.tar.gz\n";
-	echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
-    }
-    else {
-	echo "fdisk=image.fdisk\n";
-	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_md5=402f00f2e46d22507cef3d19846b48f8\n";
-	echo "slicex_mount=/users\n";
-	echo "slicex_tarball=slicex.tar.gz\n";
-	echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
-    }
+    echo "fdisk=image.fdisk\n";
+    echo "slice1_image=slice1.ndz\n";
+    echo "slice1_md5=402f00f2e46d22507cef3d19846b48f8\n";
+    echo "slicex_mount=/users\n";
+    echo "slicex_tarball=slicex.tar.gz\n";
+    echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
 }
 elseif ($cdvers == 3) {
     if (0) {
@@ -418,46 +439,15 @@ elseif ($cdvers == 69) {
 	echo "slice1_md5=20d04a3ba96043788e2d31d52e7e7165\n";
     }
 }
-elseif ($cdvers == 5) {
-	# FreeBSD 5.3 CD-ROM, 2005-2006.
-	echo "fdisk=image.fdisk\n";
-	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
-	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_alt_image=http://${WWWHOST}/images/slice1-v5.ndz\n";
-	echo "slice1_sig=https://${WWWHOST}/images/slice1-v5.ndz.sig\n";
-	# Still return this for the root tag. Might change later.
-        echo "slice1_md5=24a4f173a7716d47bbc047f8387c86af\n";
-	echo "slicex_slice=3\n";
-	echo "slicex_mount=/users\n";
-	echo "slicex_tarball=slicex.tar.gz\n";
-	echo "slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
-}
 else {
-    # This is netbed-1.0.iso in the distributions directory!
-    if (0) {
-	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
-	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
-	echo "slice1_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
-	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
-	# Still return this for the root tag. Might change later.
-	echo "slice1_md5=c9f8578517f5ebb0eca70b69dce144db\n";
-	echo "slicex_slice=3\n";
-	echo "slicex_mount=/users\n";
-	echo "slicex_tarball=https://${WWWHOST}/images/slicex-v4.tar.gz\n";
-	echo "slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
+    if ($version_tags[$cdvers]) {
+        echo $confmaps[$version_tags[$cdvers]];
+	echo $confslicex;
     }
     else {
-	echo "fdisk=image.fdisk\n";
-	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
-	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_alt_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
-	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
-	# Still return this for the root tag. Might change later.
-	echo "slice1_md5=c9f8578517f5ebb0eca70b69dce144db\n";
-	echo "slicex_slice=3\n";
-	echo "slicex_mount=/users\n";
-	echo "slicex_tarball=slicex.tar.gz\n";
-	echo "slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
+        SPITSTATUS(CDROMSTATUS_OTHER);
+	return;
     }
 }
+
 echo "emulab_status=0\n";

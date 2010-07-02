@@ -1,17 +1,18 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # Only admin people!
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (! $isadmin) {
     USERERROR("You do not have permission to pre-reserve nodes!", 1);
@@ -19,37 +20,32 @@ if (! $isadmin) {
 
 #
 # Verify page arguments.
-# 
-if (!isset($node_id) ||
-    strcmp($node_id, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
-if (!TBvalid_node_id($node_id)) {
-    PAGEARGERROR("Illegal characters in node_id");
-}
+#
+$reqargs = RequiredPageArguments("node",    PAGEARG_NODE);
+$optargs = OptionalPageArguments("clear",   PAGEARG_BOOLEAN,
+				 "submit",  PAGEARG_STRING,
+				 "project", PAGEARG_PROJECT);
 
 #
-# Check to make sure that this is a valid nodeid
+# Need these below
 #
-if (! TBValidNodeName($node_id)) {
-    USERERROR("$node_id is not a valid node name!", 1);
-}
+$node_id = $node->node_id();
 
 #
 # Clear and zap back.
 #
-if (isset($clear)) {
+if (isset($clear) && $clear) {
     DBQueryFatal("update nodes set reserved_pid=NULL ".
 		 "where node_id='$node_id'");
 
-    header("Location: $TBBASE/shownode.php3?node_id=$node_id");
+    header("Location: " . CreateURL("shownode", $node));
     return;
 }
 
 #
 # Spit the form out using the array of data. 
 # 
-function SPITFORM($node_id, $reserved_pid, $error)
+function SPITFORM($node, $reserved_pid, $error)
 {
     #
     # Standard Testbed Header
@@ -73,16 +69,17 @@ function SPITFORM($node_id, $reserved_pid, $error)
               </center>\n";
     }
 
+    $url = CreateURL("prereserve_node", $node);
     echo "<br>
           <table align=center border=1> 
-          <form action='prereserve_node.php3?node_id=$node_id' method=post>\n";
+          <form action='$url' method=post>\n";
 
     #
     # Select Project
     #
     echo "<tr>
               <td>Select Project:</td>
-              <td><select name=\"reserved_pid\">
+              <td><select name=\"pid\">
                       <option value=''>Please Select &nbsp</option>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
@@ -111,8 +108,8 @@ function SPITFORM($node_id, $reserved_pid, $error)
 #
 # On first load, display a virgin form and exit.
 #
-if (! $submit) {
-    SPITFORM($node_id, $TBOPSPID, False);
+if (!isset($submit)) {
+    SPITFORM($node, $TBOPSPID, null);
     PAGEFOOTER();
     return;
 }
@@ -120,30 +117,19 @@ if (! $submit) {
 #
 # Otherwise, must validate and redisplay if errors.
 #
-$error = False;
-
-#
-# Project:
-#
-if (!isset($reserved_pid) || $reserved_pid == "") {
-    $error = "Must supply a project name";
-}
-elseif (!TBvalid_pid($reserved_pid)) {
-    $error = "Illegal characters in project name";
-}
-elseif (!TBValidProject($reserved_pid)) {
-    $error = "Invalid project name";
-}
-if ($error) {
-    SPITFORM($node_id, $TBOPSPID, $error);
+if (!isset($project)) {
+    SPITFORM($node, $TBOPSPID, "Must supply a project name");
     PAGEFOOTER();
     return;
 }
+$pid = $project->pid();
 
 #
 # Set the pid and zap back to shownode page.
 #
-DBQueryFatal("update nodes set reserved_pid='$reserved_pid' ".
+DBQueryFatal("update nodes set reserved_pid='$pid' ".
 	     "where node_id='$node_id'");
 
-header("Location: $TBBASE/shownode.php3?node_id=$node_id");
+header("Location: " . CreateURL("shownode", $node));
+
+?>

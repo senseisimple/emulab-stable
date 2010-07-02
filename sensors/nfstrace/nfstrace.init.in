@@ -5,6 +5,11 @@
 #
 # processname: nfstrace
 #
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -91,7 +91,7 @@ if ($state ne EXPTSTATE_ACTIVE) {
 if (!$DISABLE_EVENTS) {
     print "Stopping the event system.\n";
     TBDebugTimeStamp("eventsys_control started");
-    if (system("eventsys_control stop $pid $eid")) {
+    if (system("eventsys_control stop $pid,$eid")) {
 	die("*** $0:\n".
 	    "    Failed to stop the event system.\n");
     }
@@ -171,7 +171,7 @@ if ($failed) {
 if (!$DISABLE_EVENTS) {
     print "Starting the event system.\n";
     TBDebugTimeStamp("eventsys_control started");
-    if (system("eventsys_control start $pid $eid")) {
+    if (system("eventsys_control start $pid,$eid")) {
 	die("*** $0:\n".
 	    "    Failed to start the event system.\n");
     }

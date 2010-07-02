@@ -13,6 +13,7 @@ THISHOMEBASE=Example.Emulab.Net
 #
 
 # Host name of our web server (or host:port)
+# This name should resolve to boss's IP address - though it can be a CNAME
 WWWHOST=www.example.emulab.net
 
 # Fully-quailified hostname of the boss node
@@ -82,19 +83,27 @@ TBACTIVEARCHIVE=testbed-active-users-archive@example.emulab.net
 #
 # Real paths (no symlinks) to the directories that get exported from ops
 #
-FSDIR_GROUPS=/groups
+# FSDIR_SCRATCH is optional.  The intent is that it provides per-project
+# space that is not "guaranteed" (for the Utah Emulab that means we do
+# not back it up to tape).  If defined, you would either set no quotas,
+# or higher quotas than for FSDIR_PROJ, on this filesystem.  If you are
+# not providing guarantees and are not doing quotas, you might as well
+# just put all your space in /proj and leave FSDIR_SCRATCH= blank.
+#
+FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 FSDIR_SHARE=/share
+FSDIR_SCRATCH=
 
 #
 # Filesystems on which quotas should be enforced.
 # Note that if multiple of the FSDIR_* vars above are on the same filesystem
-# (e.g., /q/proj and /q/users) then you should only specify the base of the
+# (e.g., /q/proj and /q/groups) then you should only specify the base of the
 # common filesystem on which they all reside here (e.g., /q).
 # Set to the empty string to turn off quota checking.
 #
-FS_WITH_QUOTAS="/q /groups /users"
+FS_WITH_QUOTAS="/q /users"
 
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
@@ -118,8 +127,8 @@ SSLCERT_ORGNAME="Utah Network Testbed"
 # For boss this is an address on the private segment of the control net.
 # For users this is an address on the public segment of the control net.
 #
-BOSSNODE_IP=155.98.32.70
-USERNODE_IP=155.98.33.74
+BOSSNODE_IP=10.1.32.70
+USERNODE_IP=10.1.33.74
 FSNODE_IP=$USERNODE_IP
 
 #
@@ -130,7 +139,7 @@ FSNODE_IP=$USERNODE_IP
 #
 EXTERNAL_BOSSNODE_IP=$BOSSNODE_IP
 EXTERNAL_USERNODE_IP=$USERNODE_IP
-EXTERNAL_FSNODE_IP=$USERNODE_IP
+EXTERNAL_FSNODE_IP=$EXTERNAL_USERNODE_IP
 
 #
 # Network definitions - see doc/setup-network.txt for a description of how
@@ -141,8 +150,8 @@ EXTERNAL_FSNODE_IP=$USERNODE_IP
 # The overall control network range - this subnet should cover the
 # CONTROL, PRIVATE, and PUBLIC networks below.
 #
-TESTBED_NETWORK=155.98.32.0
-TESTBED_NETMASK=255.255.240.0
+TESTBED_NETWORK=10.1.32.0
+TESTBED_NETMASK=255.255.255.0
 
 #
 # As above, if you have internal and external networks, define the
@@ -154,22 +163,22 @@ EXTERNAL_TESTBED_NETMASK=$TESTBED_NETMASK
 #
 # The node control network segment.
 #
-CONTROL_ROUTER_IP=155.98.36.1
-CONTROL_NETWORK=155.98.36.0
-CONTROL_NETMASK=255.255.252.0
+CONTROL_ROUTER_IP=10.1.36.1
+CONTROL_NETWORK=10.1.36.0
+CONTROL_NETMASK=255.255.255.0
 
 #
 # The private network segment.
 #
-PRIVATE_NETWORK=155.98.32.0
-PRIVATE_ROUTER=155.98.32.1
+PRIVATE_NETWORK=10.1.32.0
+PRIVATE_ROUTER=10.1.32.1
 PRIVATE_NETMASK=255.255.255.0
 
 #
 # The public network segment.
 #
-PUBLIC_NETWORK=155.98.33.0
-PUBLIC_ROUTER=155.98.33.1
+PUBLIC_NETWORK=10.1.33.0
+PUBLIC_ROUTER=10.1.33.1
 PUBLIC_NETMASK=255.255.255.0
 
 #
@@ -177,11 +186,15 @@ PUBLIC_NETMASK=255.255.255.0
 # to use for new nodes being added to the testbed.
 # You need at least one.
 #
-DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
+DHCPD_DYNRANGE="10.1.36.200 10.1.36.249"
 
 #
-# If you have forwarders for your named, specify them here for named.conf
-# generation in the named directory.
+# Fill in the nameservers for your campus network here - the nameserver on boss
+# will forward requests for domains other than your own to these nameservers
+# OR
+# Leave this variable empty to have boss ignore any local nameservers and go
+# straight to the roots itself. This is NOT recommended, as you won't get the
+# benefit of local caches, and may be blocked on some campuses.
 #
 NAMED_FORWARDERS="1.1.1.1 1.1.2.1"
 
@@ -197,6 +210,12 @@ NAMED_FORWARDERS="1.1.1.1 1.1.2.1"
 # subnet!).
 #
 WINSUPPORT=0
+
+#
+# Enable an NS verification path using a clean version of NS.
+# There is no reason to disable this unless NS won't build on your ops node.
+#
+NSVERIFY=1
 
 #
 # Virtual node network configuration (if you don't want virtual nodes,
@@ -218,6 +237,41 @@ JAILIPBASE=$VIRTNODE_NETWORK
 JAILIPMASK=$VIRTNODE_NETMASK
 
 #
+# Selective disable of a couple of features.
+#
+# DISABLE_NAMED_SETUP	If you are not running a name server on your boss.
+#			This will prevent you from using the virtual node
+#			names (e.g., node1.eid.pid.<your-domain>).
+#
+# DISABLE_EXPORTS_SETUP	Prevent dynamic configuration of the exports file
+#			on your "fs" node.  You will need to use this if
+#			your fs node is not running FreeBSD or is otherwise
+#			not under your control.  If you set this option, you
+#			will need to ensure that ALL your Emulab filesystems
+#			(e.g., /proj, /users) are exported to ALL your nodes.
+#			This has obvious security implications and YOU REALLY
+#			SHOULD NOT DO THIS. 
+#
+DISABLE_NAMED_SETUP=0
+DISABLE_EXPORTS_SETUP=0
+
+#
+# Only supported on the Mother Ship (emulab.net) right now.
+#
+WIKISUPPORT=0
+BUGDBSUPPORT=0
+MAILMANSUPPORT=0
+CVSSUPPORT=0
+CHATSUPPORT=0
+NFSTRACESUPPORT=0
+ARCHIVESUPPORT=0
+OPSDBSUPPORT=0
+SFSSUPPORT=0
+PELABSUPPORT=0
+PLABSUPPORT=0
+PLAB_ROOTBALL="plabroot-18.tar.bz2"
+
+#
 # You shouldn't have to change anything below this point
 #
 
@@ -225,7 +279,6 @@ TBADMINGROUP=tbadmin
 TBDBNAME=tbdb
 IPBASE=10
 DELAYCAPACITY=2
-SFSSUPPORT=0
 DISABLE_NSE=1
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
@@ -234,3 +287,8 @@ FRISEBEEMCASTPORT=3564
 # No trailing '/'!
 #WWW=www.example.emulab.net/emulab-www
 
+# Some switches do not support the stack MIB. This means snmpit cannot
+# set the port/duplex during swapin, so youare stuck at a particular
+# bandwidth, and have to change them from the console. Set to 1 if
+# your switch has no stack MIB.
+NOSTACKMIB=0

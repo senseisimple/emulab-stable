@@ -1,21 +1,38 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Users Approval Form");
-
-#
 # Only known and logged in users can be verified.
 #
-$auth_usr = GETLOGIN();
-LOGGEDINORDIE($auth_usr);
+$this_user   = CheckLoginOrDie();
+$auth_usr    = $this_user->uid();
+$auth_usridx = $this_user->uid_idx();
+
+#
+# The reason for this call is to make sure that globals are set properly.
+#
+$reqargs = RequiredPageArguments();
+
+#
+# Find all of the groups that this person has project/group root in, and 
+# then in all of those groups, all of the people who are awaiting to be
+# approved (status = none).
+#
+$approvelist = $this_user->ApprovalList(1);
+
+if (count($approvelist) == 0) {
+    USERERROR("You have no new project members who need approval.", 1);
+}
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New User Approval");
 
 echo "
       <h2>Approve new users in your Project or Group</h2>
@@ -71,51 +88,13 @@ echo "
       </table>
       <br />
       <b>Important group
-       <a href='docwrapper.php3?docname=groups.html#SECURITY'>
+       <a href='$WIKIDOCURL/Groups#SECURITY'>
        security issues</a> are discussed in the
-       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
+       <a href='$WIKIDOCURL/Groups'>Groups Tutorial</a>.
       </b>
       </center><br />
 
       \n";
-
-#
-# Find all of the groups that this person has project/group root in, and 
-# then in all of those groups, all of the people who are awaiting to be
-# approved (status = none).
-#
-# First off, just determine if this person has group/project root anywhere.
-#
-$query_result =
-    DBQueryFatal("SELECT pid FROM group_membership WHERE uid='$auth_usr' ".
-		 "and (trust='group_root' or trust='project_root')");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("You do not have Root permissions in any Project or Group.", 1);
-}
-
-#
-# Okay, so this operation sucks out the right people by joining the
-# group_membership table with itself. Kinda obtuse if you are not a natural
-# DB guy. Sorry. Well, obtuse to me.
-# 
-$query_result =
-    DBQueryFatal("select g.* from group_membership as authed ".
-		 "left join group_membership as g on ".
-		 " g.pid=authed.pid and g.gid=authed.gid ".
-		 "left join users as u on u.uid=g.uid ".
-		 "where u.status!='".
-		 TBDB_USERSTATUS_UNVERIFIED . "' and ".
-		 " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
-		 "' and g.uid!='$auth_usr' and ".
-		 "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
-		 "  and authed.uid='$auth_usr' and ".
-		 "  (authed.trust='group_root' or ".
-		 "   authed.trust='project_root') ".
-		 "ORDER BY g.uid,g.pid,g.gid");
-
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("You have no new project members who need approval.", 1);
-}
 
 #
 # Now build a table with a bunch of selections. The thing to note about the
@@ -151,11 +130,22 @@ echo "<tr>
 
 echo "<form action='approveuser.php3' method='post'>\n";
 
-while ($usersrow = mysql_fetch_array($query_result)) {
-    $newuid        = $usersrow[uid];
-    $pid           = $usersrow[pid];
-    $gid           = $usersrow[gid];
-    $date_applied  = $usersrow[date_applied];
+while (list ($uid_idx, $grouplist) = each ($approvelist)) {
+  if (! ($user = User::Lookup($uid_idx))) {
+    TBERROR("Could not lookup user $uid_idx", 1);
+  }
+
+  # Iterate over groups for this user.
+  for ($i = 0; $i < count($grouplist); $i++) {
+    $group        = $grouplist[$i];
+    
+    $newuid       = $user->uid();
+    $gid          = $group->gid();
+    $gid_idx      = $group->gid_idx();
+    $pid          = $group->pid();
+    $pid_idx      = $group->pid_idx();
+
+    $group->MemberShipInfo($user, $trust, $date_applied, $date_approved);
 
     #
     # Cause this field was added late and might be null.
@@ -164,21 +154,17 @@ while ($usersrow = mysql_fetch_array($query_result)) {
 	$date_applied = "--";
     }
 
-    $userinfo_result =
-	DBQueryFatal("SELECT * from users where uid='$newuid'");
-
-    $row	= mysql_fetch_array($userinfo_result);
-    $name	= $row[usr_name];
-    $email	= $row[usr_email];
-    $title	= $row[usr_title];
-    $affil	= $row[usr_affil];
-    $addr	= $row[usr_addr];
-    $addr2	= $row[usr_addr2];
-    $city	= $row[usr_city];
-    $state	= $row[usr_state];
-    $zip	= $row[usr_zip];
-    $country	= $row[usr_country];
-    $phone	= $row[usr_phone];
+    $name	= $user->name();
+    $email	= $user->email();
+    $title	= $user->title();
+    $affil	= $user->affil();
+    $addr	= $user->addr();
+    $addr2	= $user->addr2();
+    $city	= $user->city();
+    $state	= $user->state();
+    $zip	= $user->zip();
+    $country	= $user->country();
+    $phone	= $user->phone();
 
      echo "<tr>
               <td rowspan=2>$newuid</td>
@@ -186,7 +172,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
               <td rowspan=2>$gid</td>
               <td rowspan=2>$date_applied</td>
               <td rowspan=2>
-                  <select name=\"$newuid\$\$approval-$pid/$gid\">
+                  <select name=\"U${uid_idx}\$\$approval-$pid/$gid\">
                           <option value='postpone'>Postpone </option>
                           <option value='approve'>Approve </option>
                           <option value='deny'>Deny </option>
@@ -194,15 +180,17 @@ while ($usersrow = mysql_fetch_array($query_result)) {
                   </select>
               </td>
               <td rowspan=2>
-                  <select name=\"$newuid\$\$trust-$pid/$gid\">\n";
-    if (TBCheckGroupTrustConsistency($newuid, $pid, $gid, "user", 0)) {
+                  <select name=\"U${uid_idx}\$\$trust-$pid/$gid\">\n";
+     
+    if ($group->CheckTrustConsistency($user, TBDB_TRUSTSTRING_USER, 0)) {
 	echo  "<option value='user'>User </option>\n";
     }
-    if (TBCheckGroupTrustConsistency($newuid, $pid, $gid, "local_root", 0)) {       
+    if ($group->CheckTrustConsistency($user, TBDB_TRUSTSTRING_LOCALROOT, 0)) {
 	# local_root means any root is valid.
         echo  "<option value='local_root'>Local Root </option>\n";
-	if (TBProjAccessCheck($auth_usr, $pid, $gid,
-                              $TB_PROJECT_BESTOWGROUPROOT)) {
+
+	# Allowed to set to group root?
+	if ($group->AccessCheck($this_user, $TB_PROJECT_BESTOWGROUPROOT)) {
 	    echo  "<option value='group_root'>Group Root </option>\n";
 	}
     }	
@@ -225,6 +213,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
                             &nbsp;$zip&nbsp;
                             &nbsp;$country&nbsp;</td>
           </tr>\n";
+  }
 }
 echo "<tr>
           <td align=center colspan=11>

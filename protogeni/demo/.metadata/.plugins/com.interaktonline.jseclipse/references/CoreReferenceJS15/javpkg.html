@@ -1,0 +1,123 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:15:36">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="javobj.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="math.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193137" id="1193137"></a> <a name="JavaPackage" id="JavaPackage"></a> <span class="sansserif"><b>JavaPackage</b></span>
+      </p>
+      <p>
+        <a name="1193151" id="1193151"></a> <span class="sansserif">A JavaScript reference to a Java package.<br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193140" id="1193140"></a> <span class="sansserif"><i>Core object</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193142" id="1193142"></a> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <p>
+              <a name="1193144" id="1193144"></a> <span class="sansserif"><i>Implemented in</i></span> &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193146" id="1193146"></a> <span class="sansserif">JavaScript 1.1, NES 2.0</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <br>
+         <a name="1193152" id="1193152"></a> <a name="Created by" id="Created by"></a> <span class="sansserif"><b>Created by</b></span><br>
+         <a name="1193153" id="1193153"></a> <span class="sansserif">A reference to the package name used with the <span class="mono">Packages</span> keyword:</span>
+      </p>
+      <p>
+        <a name="1196676" id="1196676"></a> <span class="mono">Packages.<i>JavaPackage</i></span>
+      </p>
+      <p>
+        <a name="1196829" id="1196829"></a> <span class="sansserif">where <i>JavaPackage</i> is the name of the object's Java package. If the package is in the <span class="mono">java</span>, <span class="mono">netscape</span>, or <span class="mono">sun</span> packages, the <span class="mono">Packages</span> keyword is optional.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193162" id="1193162"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1197167" id="1197167"></a> <span class="sansserif">In Java, a package is a collection of Java classes or other Java packages. For example, the <span class="mono">netscape</span> package contains the package <span class="mono">netscape.javascript</span>; the <span class="mono">netscape.javascript</span> package contains the classes <span class="mono">JSObject</span> and <span class="mono">JSException.</span></span>
+      </p>
+      <p>
+        <a name="1198245" id="1198245"></a> <span class="sansserif">In JavaScript, a <span class="mono">JavaPackage</span> is a reference to a Java package. For example, a reference to <span class="mono">netscape</span> is a <span class="mono">JavaPackage</span>. <span class="mono">netscape.javascript</span> is both a <span class="mono">JavaPackage</span> and a property of the <span class="mono">netscape</span> <span class="mono">JavaPackage</span>.</span>
+      </p>
+      <p>
+        <a name="1198297" id="1198297"></a> <span class="sansserif">A <span class="mono">JavaClass</span> object is a reference to one of the classes in a package, such as <span class="mono">netscape.javascript.JSObject</span>. The <span class="mono">JavaPackage</span> and <span class="mono">JavaClass</span> hierarchy reflect the Java package and class hierarchy.</span>
+      </p>
+      <p>
+        <a name="1198523" id="1198523"></a> <span class="sansserif">Although the packages and classes contained in a <span class="mono">JavaPackage</span> are its properties, you cannot use a <span class="mono">for...in</span> statement to enumerate them as you can enumerate the properties of other objects.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1197132" id="1197132"></a> <a name="Property Summary" id="Property Summary"></a> <span class="sansserif"><b>Property Summary</b></span><br>
+         <a name="1197133" id="1197133"></a> <span class="sansserif">The properties of a <span class="mono">JavaPackage</span> are the <span class="mono">JavaClass</span> objects and any other <span class="mono">JavaPackage</span> objects it contains.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193209" id="1193209"></a> <a name="Examples" id="Examples"></a> <span class="sansserif"><b>Examples</b></span><br>
+         <a name="1194739" id="1194739"></a> <span class="sansserif">Suppose the Redwood corporation uses the Java <span class="mono">redwood</span> package to contain various Java classes that it implements. The following code creates the <span class="mono">JavaPackage</span> <span class="mono">red</span>:</span>
+      </p>
+      <p>
+        <a name="1198136" id="1198136"></a><span class="mono">var red = Packages.redwood</span>
+      </p>
+      <p>
+        <br>
+         <a name="1198334" id="1198334"></a> <a name="See also" id="See also"></a> <span class="sansserif"><b>See also</b></span><br>
+         <a name="1198347" id="1198347"></a> <span class="sansserif"><a href="javarray.html#1193137">JavaArray</a>, <a href="javclass.html#1193137">JavaClass</a>, <a href="javobj.html#1193137">JavaObject</a>, <a href="packages.html#1193137">Packages</a></span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="javobj.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="math.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

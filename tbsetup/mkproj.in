@@ -1,50 +1,69 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
+use Getopt::Std;
 
 #
-# Make a project directory hierarchy. Must be called as tbroot.
-# Creates a directory rooted /proj/pid. The directory is setuid
-# to the project leader, and setgid to the project gid. We get
-# this info from the database.
+# Perform project approval. Does a lot of stuff, see below!
 #
-# usage: mkproj <pid>
-#
+sub usage()
+{
+    print(STDERR
+	  "Usage: mkproj [-s] [-h leader_uid] [-m <message> | -f <file>] ".
+	  "<pid>\n".
+	  "switches and arguments:\n".
+	  "-s         - silent; do not send approval email to leader\n".
+	  "-h <uid>   - switch project leader to specified uid\n".
+	  "-m <text>  - Include text in approval email message\n".
+	  "-f <file>  - Include text from file in approval email message\n".
+	  "<pid>      - project to approve.\n");
+    exit(-1);
+}
+my $optlist    = "qsh:m:f:";
+my $quiet      = 0;
+my $silent     = 0;
+my $newleader_uid;
+my $message;
+my $mfilename;
+my $pid;
 
+# Protos
 sub fatal($);
 
 #
 # Configure variables
 #
-my $TB       = "@prefix@";
-my $TBOPS    = "@TBOPSEMAIL@";
-my $MKGROUP  = "$TB/sbin/mkgroup";
-my $MODGROUPS= "$TB/sbin/modgroups";
-my $MKACCT   = "$TB/sbin/tbacct add";
-my $CVSBIN   = "/usr/bin/cvs";
-my $CHOWN    = "/usr/sbin/chown";
-my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
+my $TB            = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBAPPROVAL    = "@TBAPPROVALEMAIL@";
+my $TBAUDIT	  = "@TBAUDITEMAIL@";
+my $TBBASE        = "@TBBASE@";
+my $TBWWW         = "@TBWWW@";
+my $MKGROUP       = "$TB/sbin/mkgroup";
+my $MODGROUPS     = "$TB/sbin/modgroups";
+my $MKACCT        = "$TB/sbin/tbacct add";
+my $CVSBIN        = "/usr/bin/cvs";
+my $CHOWN         = "/usr/sbin/chown";
+my $GRANTTYPE     = "$TB/sbin/grantnodetype -d";
+my $UPDATEPERMS   = "$TB/sbin/update_permissions";
+my $ELABINELAB    = @ELABINELAB@;
 my $WIKISUPPORT   = @WIKISUPPORT@;
 my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
+my $OPSDBSUPPORT  = @OPSDBSUPPORT@;
 my $CVSSUPPORT    = @CVSSUPPORT@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
-my $ADDWIKIPROJ = "$TB/sbin/addwikiproj";
-my $ADDBUGDBPROJ= "$TB/sbin/addbugdbproj";
-my $ADDMMLIST   = "$TB/sbin/addmmlist";
-
-my $PROJROOT = "/proj";
-my $GRPROOT  = "/groups";
-my $TFTPROOT = "/tftpboot";
-my $CVSREPOS = "$PROJROOT/cvsrepos";
+my $ADDWIKIPROJ   = "$TB/sbin/addwikiproj";
+my $ADDBUGDBPROJ  = "$TB/sbin/addbugdbproj";
+my $ADDMMLIST     = "$TB/sbin/addmmlist";
+my $OPSDBCONTROL  = "$TB/sbin/opsdb_control";
+my $CLOSEPROJADMINLIST = "$TB/sbin/closeprojadminlist";
+	  
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
 		"groups", "tiplogs", "images/sigs", "templates");
-my $projhead;
 
 #
 # Untaint the path
@@ -64,9 +83,25 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
+use Project;
+
+my $PROJROOT     = PROJROOT();
+my $GRPROOT      = GROUPROOT();
+my $SCRATCHROOT  = SCRATCHROOT();
 
 #
-# We don't want to run this script unless its the real version.
+# XXX semi-hardwired, oddball paths
+#
+my $TFTPDIR  = "/tftpboot/$PROJROOT";
+my $CVSREPOS = "$PROJROOT/cvsrepos";
+
+# Locals
+my $leader;
+my $oldleader;
+
+#
+# We do not want to run this script unless its the real version.
 #
 if ($EUID != 0) {
     die("*** $0:\n".
@@ -85,36 +120,53 @@ if ($UID == 0) {
 #
 # Check args.
 #
-if ($#ARGV < 0) {
-    die("Usage: mkprojdir <pid>\n");
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
 }
-my $pid = $ARGV[0];
+if (defined($options{"q"})) {
+    $quiet = 1;
+}
+if (defined($options{"s"})) {
+    $silent = 1;
+}
+if (defined($options{"m"})) {
+    $message = $options{"m"};
+}
+if (defined($options{"f"})) {
+    $mfilename = $options{"f"};
+    fatal("$mfilename does not exist!")
+	if (! -e $mfilename);
+}
+if (defined($options{"h"})) {
+    $newleader_uid = $options{"h"};
+}
+usage()
+    if (! @ARGV);
+
+$pid = $ARGV[0];
 
 #
 # Untaint the argument.
 #
-if ($pid =~ /^([-\@\w.]+)$/) {
+if ($pid =~ /^([-\w]+)$/) {
     $pid = $1;
 }
 else {
     die("Invalid pid '$pid' contains illegal characters.\n");
 }
 
-#
-# Figure out who called us. Only with admin status in the DB can run
-# this script.
-#
-if (!TBAdmin($UID)) {
-    die("*** $0:\n".
-	"    You must be a TB administrator to run this script!\n");
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
 
 #
-# We need the project leader name.
+# Figure out who called us. Must have admin status to do this.
 #
-if (! ($projhead = ProjLeader($pid))) {
-    die("*** $0:\n".
-	"    Could not get project leader for project $pid!\n");
+if (!TBAdmin()) {
+    fatal("You must be a TB administrator to run this script!");
 }
 
 #
@@ -128,6 +180,79 @@ if (AuditStart(0)) {
 }
 
 #
+# Map project name to object.
+#
+my $target_project = Project->Lookup($pid);
+if (! defined($target_project)) {
+    fatal("Could not map project $pid to its object!");
+}
+my $pid_idx = $target_project->pid_idx();
+my $gid_idx = $target_project->gid_idx();
+
+#
+# The welcome message ...
+#
+if (defined($mfilename)) {
+    open(MFILE, $mfilename) or
+	fatal("Could not open $mfilename");
+
+    $message = "";
+    while (<MFILE>) {
+	$message .= $_;
+    }
+    close(MFILE);
+}
+
+#
+# If a leader uid was provided on the command line, we are changing the
+# leader. Note that this is allowed *only* for projects that have not
+# been approved yet. 
+#
+if (defined($newleader_uid)) {
+    $leader = User->Lookup($newleader_uid);
+    if (!defined($leader)) {
+	fatal("Could not map user $newleader_uid to its object!");
+    }
+    # See if already did this; is so skip the following checks.
+    my $curleader = $target_project->GetLeader();
+    if (!defined($curleader)) {
+	fatal("Could not map current leader of project $pid to its object!");
+    }
+    if (! $curleader->SameUser($leader)) {
+	fatal("Not allowed to change the leader of an approved project!")
+	    if ($target_project->approved());
+
+	# Save for email below.
+	$oldleader = $curleader;
+
+	# Update the project structure with the new leader. We are going
+	# to set the approved bit below, so this is the last chance to do
+	# this until we have code in place to change it later.
+	$target_project->ChangeLeader($leader) == 0 or
+	    fatal("Could not change leader for $pid to $newleader_uid!");
+    }
+}
+else {
+    $leader = $target_project->GetLeader();
+    if (!defined($leader)) {
+	fatal("Could not map current leader of project $pid to its object!");
+    }
+}
+# Avoid taint check problem.
+$leader_uid = $leader->uid();
+
+# Approve the project; we are committed to the leader.
+$target_project->SetApproved(1) == 0 or
+    fatal("Could not set the approval bit on project $target_project!");
+
+#
+# Leader needs to have his approved bit set. Eventually this should be done
+# in mkaccount when that code moves from the web interface.
+#
+$leader->SetStatus(USERSTATUS_ACTIVE()) == 0 or
+    fatal("Could not change $leader to active!");
+
+#
 # Before we can proceed, we need to create the project (unix) group
 # and then create an account for the project leader. We pass this off
 # to sub scripts, but because they are also setuid, we need to flip
@@ -135,7 +260,7 @@ if (AuditStart(0)) {
 #
 $EUID = $UID;
 
-system("$MKGROUP $pid $pid") == 0 or
+system("$MKGROUP $gid_idx") == 0 or
     fatal("$MKGROUP $pid failed!");
 
 if ($WIKISUPPORT) {
@@ -146,24 +271,28 @@ if ($BUGDBSUPPORT) {
     system("$ADDBUGDBPROJ $pid") == 0 or
 	fatal("$ADDBUGDBPROJ $pid failed!");
 }
+if ($OPSDBSUPPORT) {
+    system("$OPSDBCONTROL addproj $pid") == 0 or
+	fatal("$OPSDBCONTROL addproj $pid failed!");
+}
 if ($MAILMANSUPPORT) {
     system("$ADDMMLIST -a ${pid}-users") == 0 or
 	fatal("$ADDMMLIST -a ${pid}-users failed!");
 }
 
-system("$MKACCT $projhead") == 0 or
-    fatal("$MKACCT $projhead failed!");
+system("$MKACCT $leader_uid") == 0 or
+    fatal("$MKACCT $leader_uid failed!");
 
-system("$MODGROUPS -a $pid:$pid:project_root $projhead") == 0 or
-    fatal("$MODGROUPS -a $pid:$pid:project_root $projhead failed!");
+system("$MODGROUPS -a $pid:$pid:project_root $leader_uid") == 0 or
+    fatal("$MODGROUPS -a $pid:$pid:project_root $leader_uid failed!");
 
 $EUID = 0;
 
 #
 # This acts as check (and we need the numeric uid) in case mkacct failed!
 # 
-my (undef,undef,$uid) = getpwnam($projhead)
-    or fatal("$projhead not in passwd file");
+my (undef,undef,$uid) = getpwnam($leader_uid)
+    or fatal("$leader_uid not in passwd file");
 
 my (undef,undef,$gid) = getgrnam($pid)
     or fatal("$pid not in group file");
@@ -182,6 +311,25 @@ if (! -e "$PROJROOT/$pid") {
 
     if (! chown($uid, $gid, "$PROJROOT/$pid")) {
 	fatal("Could not chown $PROJROOT/$pid to $uid/$gid: $!");
+    }
+}
+if ($SCRATCHROOT && ! -e "$SCRATCHROOT/$pid") {
+    if (! -e "$SCRATCHROOT") {
+        if (! mkdir("$SCRATCHROOT", 0770)) {
+            fatal("Could not make a directory $SCRATCHROOT: $!");
+        }
+    }
+
+    if (! mkdir("$SCRATCHROOT/$pid", 0770)) {
+	fatal("Could not make directory $SCRATCHROOT/$pid: $!");
+    }
+
+    if (! chmod(0770, "$SCRATCHROOT/$pid")) {
+	fatal("Could not chmod directory $SCRATCHROOT/$pid: $!");
+    }
+
+    if (! chown($uid, $gid, "$SCRATCHROOT/$pid")) {
+	fatal("Could not chown $SCRATCHROOT/$pid to $uid/$gid: $!");
     }
 }
 
@@ -205,15 +353,15 @@ foreach my $dir (@DIRLIST) {
 #
 # Create a tftp directory for oskit kernels.
 #
-if (! -e "$TFTPROOT/proj/$pid") {
-    if (! mkdir("$TFTPROOT/proj/$pid", 0770)) {
-	fatal("Could not make directory $TFTPROOT/proj/$pid: $!");
+if (! -e "$TFTPDIR/$pid") {
+    if (! mkdir("$TFTPDIR/$pid", 0770)) {
+	fatal("Could not make directory $TFTPDIR/$pid: $!");
     }
-    if (! chmod(0777, "$TFTPROOT/proj/$pid")) {
-	fatal("Could not chmod directory $TFTPROOT/proj/$pid: $!");
+    if (! chmod(0777, "$TFTPDIR/$pid")) {
+	fatal("Could not chmod directory $TFTPDIR/$pid: $!");
     }
-    if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
-	fatal("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!");
+    if (! chown($uid, $gid, "$TFTPDIR/$pid")) {
+	fatal("Could not chown $TFTPDIR/$pid to $uid/$gid: $!");
     }
 }
 
@@ -287,6 +435,23 @@ if (! -e $workdir) {
 }
 
 #
+# Create experiment info (long term archive) directory.
+#
+my $infodir = "$TB/expinfo/$pid";
+
+if (! -e $infodir) {
+    if (! mkdir("$infodir", 0775)) {
+	fatal("Could not make directory $infodir: $!");
+    }
+    if (! chmod(0775, "$infodir")) {
+	fatal("Could not chmod directory $infodir: $!");
+    }
+    if (! chown($uid, $gid, "$infodir")) {
+	fatal("Could not chown $infodir to $uid/$gid: $!");
+    }
+}
+
+#
 # If approved to use remote nodes, then grant permission to use the
 # specific types of virtual nodes on those remote physical nodes.
 # Unfortunately, the node_types table does not store a relationship
@@ -294,38 +459,109 @@ if (! -e $workdir) {
 # Need to add that I guess, but in the meantime we have just 3 remote
 # phys types to worry about. 
 #
-my $query_result =
-    DBQueryFatal("select pcremote_ok from projects where pid='$pid'");
-if ($query_result->num_rows) {
-    my ($pcremote) = $query_result->fetchrow_array();
+if (!$ELABINELAB) {
+    my $query_result =
+	DBQueryFatal("select pcremote_ok from projects where pid='$pid'");
+    if ($query_result->num_rows) {
+	my ($pcremote) = $query_result->fetchrow_array();
 
-    if (defined($pcremote)) {
-	print "$pcremote\n";
+	if (defined($pcremote)) {
+	    print "$pcremote\n";
 	
-	foreach my $type (split(",", $pcremote)) {
-	    print "$type\n";
-	    
-	    if ($type eq "pcplabphys") {
-		$type = "pcplab";
-	    }
-	    elsif ($type eq "pcron") {
-		$type = "pcvwa";
-	    }
-	    elsif ($type eq "pcwa") {
-		$type = "pcvwa";
-	    }
-	    else {
-		fatal("Unknown remote type $type!");
-	    }
-	    print "$type\n";
+	    foreach my $type (split(",", $pcremote)) {
+		print "$type\n";
+		
+		if ($type eq "pcplabphys") {
+		    $type = "pcplab";
+		}
+		elsif ($type eq "pcron") {
+		    $type = "pcvwa";
+		}
+		elsif ($type eq "pcwa") {
+		    $type = "pcvwa";
+		}
+		else {
+		    fatal("Unknown remote type $type!");
+		}
+		print "$type\n";
 
-	    $EUID = $UID;
+		$EUID = $UID;
 
-	    system("$GRANTTYPE -p $pid $type") == 0 or
-		fatal("Could not grant permission to use type $type!");
-
-	    $EUID = 0;
+		system("$GRANTTYPE -p $pid $type") == 0 or
+		    fatal("Could not grant permission to use type $type!");
+		
+		$EUID = 0;
+	    }
 	}
+    }
+    else {
+	#
+	# Need to update the permissions table.
+	#
+	$EUID = $UID;
+
+	system("$UPDATEPERMS") == 0 or
+	    fatal("Could not update permissions table!");
+		
+	$EUID = 0;
+    }
+}
+
+#
+# Close proj admin list and remove testbed-approval as a member
+#
+#
+# XXX: DISABLED FOR NOW.
+#
+#if ($MAILMANSUPPORT) {
+#    $EUID = $UID;
+#    system("$CLOSEPROJADMINLIST $pid") == 0 or
+#        fatal("$CLOSEPROJADMINLIST failed");
+#    $EUID = 0;
+#}
+
+# Send email, unless silent option given.
+if (!$silent) {
+    my $leader_name  = $leader->name();
+    my $leader_email = $leader->email();
+    
+    SendProjAdminMail
+	($pid, "ADMIN", "$leader_name <$leader_email>",
+	 "Project '$pid' Approval",
+	 "\n".
+	 "This message is to notify you that your project '$pid'\n".
+	 "has been approved.  We recommend that you save this link so that\n".
+	 "you can send it to people you wish to have join your project.\n".
+	 "Otherwise, tell them to go to ${TBBASE} and join it.\n".
+	 "\n".
+	 "    ${TBBASE}/joinproject.php3?target_pid=$pid\n".
+	 (defined($message) ? "\n${message}\n" : "") .
+	 "\n".
+	 "Thanks,\n".
+	 "Testbed Operations\n",
+	 "Bcc: $TBAPPROVAL");
+
+    #
+    # If the leader was switched, then generate a second message to the
+    # new leader telling him to approve the original leader to the project.
+    #
+    if (defined($oldleader)) {
+	my $oldleader_uid   = $oldleader->uid();
+	my $oldleader_name  = $oldleader->name();
+	my $oldleader_email = $oldleader->email();
+	
+	SENDMAIL
+	    ("$leader_name <$leader_email>",
+	     "$oldleader_uid $pid Project Join Request",
+	     "$oldleader_name wants to join project $pid.\n".
+	     "\n".
+	     "Please return to $TBWWW,\n".
+	     "log in, select the 'New User Approval' page, and enter\n".
+	     "your decision regarding ${oldleader_name}'s membership.\n".
+	     "\n".
+	     "Thanks,\n".
+	     "Testbed Operations\n",
+	     "$oldleader_name <$oldleader_email>");
     }
 }
 

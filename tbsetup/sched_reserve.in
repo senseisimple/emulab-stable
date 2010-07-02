@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,6 +26,7 @@ my $TB     = "@prefix@";
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
 use libdb;
+use Experiment;
 
 my $nalloc      = "$TB/bin/nalloc";
 my $debug       = 0;
@@ -71,24 +72,47 @@ if ($UID && !TBAdmin($UID)) {
   die("Only root or TB administrators can schedule reservations.\n");
 }
 
-if (! ExpLeader($pid,$eid)) {
-    die("You experiment $pid/$eid does not exist.\n");
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! $experiment) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid in the Emulab Database.\n");
+}
+my $exptidx = $experiment->idx();
+
+#
+# Use the awesome power of left join:
+#
+# - if we get no row returned, then the node does not exist,
+# - if we get a nodes entry but no reserved entry, the node is free,
+# - if we get both, then it is allocated and pid/eid is where it is now.
+#
+# This single query on all nodes replaces the three queries per-node
+# we used to do.
+#
+my $nlist = "(" . join(",", map("'$_'", @nodes)) . ")";
+my $sth = DBQueryFatal("SELECT n.node_id AS nt,r.node_id AS rt,r.pid,r.eid".
+		       " FROM nodes AS n LEFT JOIN reserved AS r".
+		       " ON n.node_id=r.node_id WHERE n.node_id in $nlist");
+#
+# Make a list of the nodes we got nodes table info for, others don't exist
+#
+my %nmap = ();
+while (my $rref = $sth->fetchrow_hashref()) {
+  $nmap{$rref->{'nt'}} = $rref;
 }
 
 foreach my $node (@nodes) {
   my $pc = $node;
   my $allocated = 0;
+  my $nref = $nmap{$node};
 
-  $sth = DBQueryFatal("select * from nodes where node_id='$pc'");
-  if ($sth->num_rows() != 1) {
+  if (!defined($nref)) {
     print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
     next;
   }
 
   print "Checking if $pc is reserved...";
-  $sth = DBQueryFatal("select * from reserved where node_id='$pc'");
-
-  if ( ($sth->num_rows()) < 1) {
+  if (!$nref->{'rt'}) {
     print "Available - Reserving...\n";
     #print STDERR "Using proj $pid, expt $eid, I am ",`whoami`;
     my $cmd = "$nalloc $pid $eid $pc";
@@ -96,12 +120,11 @@ foreach my $node (@nodes) {
       print STDERR "WARNING: Could not reserve $pc!\n";
     }
   } else {
-    $sth = DBQueryFatal("select * from reserved where node_id='$pc' and ".
-		       "pid='$pid' and eid='$eid'");
-    if ( ($sth->num_rows()) < 1) {
+    if (!($pid eq $nref->{'pid'} && $eid eq $nref->{'eid'})) {
       print "Reserved  - Scheduling next reservation...\n";
-      $sth = DBQueryFatal("replace into next_reserve (node_id,pid,eid) ".
-			  "values ('$pc','$pid','$eid')");
+      $sth = DBQueryFatal("REPLACE INTO next_reserve ".
+			  " (node_id,exptidx,pid,eid) ".
+			  "VALUES ('$pc','$exptidx','$pid','$eid')");
     } else {
       print "Reserved  - Already reserved to $pid/$eid\n";
     }

@@ -1,0 +1,18 @@
+<user>
+<attribute name="name">  <value>Geni User</value></attribute>
+<attribute name="email">  <value>root@@OURDOMAIN@</value></attribute>
+<attribute name="address">  <value>DO NOT DELETE THIS USER</value></attribute>
+<attribute name="address2">  <value>DO NOT DELETE THIS USER</value></attribute>
+<attribute name="city">  <value>Any Town</value></attribute>
+<attribute name="state">  <value>SS</value></attribute>
+<attribute name="zip">  <value>00000</value></attribute>
+<attribute name="country">  <value>USA</value></attribute>
+<attribute name="phone">  <value>555-555-5555</value></attribute>
+<attribute name="shell">  <value>tcsh</value></attribute>
+<attribute name="title">  <value>Geni User</value></attribute>
+<attribute name="affiliation">  <value>Any University</value></attribute>
+<attribute name="affiliation_abbreviation">  <value>AnyU</value></attribute>
+<attribute name="password">  <value>*</value></attribute>
+<attribute name="wikiname">  <value>GeniUser</value></attribute>
+<attribute name="login">  <value>geniuser</value></attribute>
+</user>

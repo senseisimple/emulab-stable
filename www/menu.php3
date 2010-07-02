@@ -1,15 +1,22 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
+$login_user       = null;
 $login_status     = CHECKLOGIN_NOTLOGGEDIN;
-$login_uid        = 0;
 $drewheader       = 0;
 $noheaders	  = 0;
 $autorefresh      = 0;
+$javascript_debug = 0;
+$currentusage     = 1;
+$currently_busy   = 0;
+$sortedtables     = array();
+$bodyclosestring  = "";
+$navmenu          = null;
+$navmenuopen      = FALSE;
 
 #
 # This has to be set so we can spit out http or https paths properly!
@@ -35,8 +42,15 @@ else {
 
 # Blank space dividers in the menus are handled by adding a class to the menu
 # item that starts a new group.
-$nextsidebarcl    = "";
-$nextsubmenucl    = "";
+$nextnavbarcl     = null;
+$nextsubmenucl    = null;
+
+# Add a table id to the list of sorted tables to initialize on current page.
+function AddSortedTable($id) {
+    global $sortedtables;
+
+    $sortedtables[] = $id;
+}
 
 #
 # TOPBARCELL - Make a cell for the topbar. Actually, the name lies, it can be
@@ -65,12 +79,113 @@ function WRITETOPBARBUTTON_NEW($text, $base, $link ) {
 }
 
 #
-# WRITESIDEBARDIVIDER(): Put a bit of whitespace in the sidebar
+# Start the primary navmenu.
 #
-function WRITESIDEBARDIVIDER() {
-    global $nextsidebarcl;
-    
-    $nextsidebarcl = "newgroup";
+function NavMenuStart() {
+    global $navmenu, $login_user;
+
+    if ($login_user) 
+	$navmenu = new menuBar();
+}
+
+#
+# Start a new navmenu section (a new dropdown menu).
+#
+function NavMenuSection($id, $title) {
+    global $navmenu, $login_user, $navmenuopen;
+
+    if ($login_user)
+	$navmenu->addMenu($title, $id);
+    else {
+	if ($navmenuopen) {
+	    echo "</ul>\n";
+	}
+	$navmenuopen = TRUE;
+	STARTSIDEBARMENU($id, $title);
+    }
+}
+function NavMenuSectionEnd() {
+    global $navmenu, $login_user, $navmenuopen;
+
+    if (! $login_user) {
+	if ($navmenuopen) {
+	    echo "</ul>\n";
+	}
+	$navmenuopen = FALSE;
+    }
+}
+
+#
+# Add a new button to the current dropdown menu.
+# 
+function NavMenuButton($text, $link = null, $extratext = null,
+		       $target = null, $divider = FALSE, $mouseover = null)
+{
+    global $navmenu, $login_user;
+
+    if ($login_user)
+	$navmenu->addItem($link, $text, $target, $divider,
+			  $extratext, $mouseover);
+    else
+	WRITESIDEBARBUTTON($text, $link, $extratext);
+	
+}
+# Ditto, but with a new icon.
+function NavMenuButtonNew($text, $link = null, $divider = FALSE)
+{
+    global $navmenu, $login_user;
+
+    if ($login_user)
+	NavMenuButton($text, $link, "&nbsp;<img src=\"/new.gif\">",
+		      null, $divider);
+    else
+	WRITESIDEBARBUTTON($text, $link, "&nbsp;<img src=\"/new.gif\" />");
+}
+# Ditto, but with a divider
+function NavMenuButtonDivider($text, $link = null)
+{
+    global $navmenu, $login_user;
+
+    if ($login_user) 
+	NavMenuButton($text, $link, null, null, TRUE);
+    else {
+	WRITESIDEBARDIVIDER();
+	WRITESIDEBARBUTTON($text, $link);
+    }
+}
+
+#
+# Render the menu ...
+# 
+function NavMenuRender()
+{
+    global $navmenu, $navmenuopen, $BASEPATH, $TBBASE, $login_user;
+
+    if (!$login_user) {
+	if ($navmenuopen)
+	    echo "</ul>\n";
+	$navmenuopen = FALSE;
+	return;
+    }
+
+    $navmenu->writeMenuBar();
+}
+
+#
+# STARTSIDEBARMENU(). Start a menu section.
+#
+function STARTSIDEBARMENU($id, $title, $visible = true) {
+    $arrow = "";
+    $class = "navmenu";
+    if (0) {
+	$png   = ($visible ? 'menu-expanded.png' : 'menu-collapsed.png');
+	$class = ($visible ? 'navmenu' : 'navmenu-collapsed');
+	$arrow = "<img class=menuarrow src='$png' ".
+	    "onclick=\"return toggle_menu('${id}_list', '${id}_arrow');\" ".
+	    "id='${id}_arrow'>";
+    }
+    echo "<h3 class='menuheader' id='${id}_header'>$arrow $title</h3>";
+    echo "<ul class='$class' id='${id}_list'>\n";
 }
 
 #
@@ -78,11 +193,9 @@ function WRITESIDEBARDIVIDER() {
 # We do not currently try to match the current selection so that its
 # link looks different. Not sure its really necessary.
 #
-function WRITESIDEBARBUTTON($text, $base, $link, $extratext="") {
+function WRITESIDEBARBUTTON($text, $link, $extratext="") {
     global $nextsidebarcl;
     
-    if ($base)
-	$link = "$base/$link";
     $cl = "";
     if ($nextsidebarcl != "") {
 	$cl = "class='$nextsidebarcl'";
@@ -99,22 +212,6 @@ function WRITESIDEBARBUTTON_NEW($text, $base, $link) {
 		       "&nbsp;<img src=\"/new.gif\" />");
 }
 
-# same as above with "cool" gif next to it.
-function WRITESIDEBARBUTTON_COOL($text, $base, $link ) {
-    $link = "$base/$link";
-    echo "<li><a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" /></li>\n";
-}
-
-function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
-    $link = "$link";
-    echo "<li><a href=\"$link\">$text</a></li>\n";
-}
-
-function WRITESIDEBARBUTTON_ABSCOOL($text, $base, $link ) {
-    $link = "$link";
-    echo "<li><a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" /></li>\n";
-}
-
 # writes a message to the sidebar, without clickability.
 function WRITESIDEBARNOTICE($text) {
     echo "<span class='notice'>$text</span>\n";
@@ -127,7 +224,7 @@ function WRITESIDEBARNOTICE($text) {
 #
 function WRITEPLABTOPBAR() {
     echo "<table class=\"topbar\" width=\"100%\" cellpadding=\"2\" cellspacing=\"0\" align=\"center\">\n";
-    global $login_status, $login_uid;
+    global $login_status, $login_user;
     global $TBBASE, $TBDOCBASE, $BASEPATH;
     global $THISHOMEBASE;
 
@@ -138,37 +235,14 @@ function WRITEPLABTOPBAR() {
         $TBBASE, "plabmetrics.php3");
 
     WRITETOPBARBUTTON("My Testbed",
-	$TBBASE,
-	"showuser.php3?target_uid=$login_uid");
-
+		      $TBBASE, CreateURL("showuser", $login_user));
 
     WRITETOPBARBUTTON("Advanced Experiment",
         $TBBASE, "beginexp_html.php3");
 
-    if ($login_status & CHECKLOGIN_TRUSTED) {
-	# Only project/group leaders can do these options
-	# Show a "new" icon if there are people waiting for approval
-	$query_result =
-	DBQueryFatal("select g.* from group_membership as authed ".
-		     "left join group_membership as g on ".
-		     " g.pid=authed.pid and g.gid=authed.gid ".
-		     "left join users as u on u.uid=g.uid ".
-		     "where u.status!='".
-		     TBDB_USERSTATUS_UNVERIFIED . "' and ".
-		     " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
-		     "' and g.uid!='$login_uid' and ".
-		     "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
-		     "  and authed.uid='$login_uid' and ".
-		     "  (authed.trust='group_root' or ".
-		     "   authed.trust='project_root') ".
-		     "ORDER BY g.uid,g.pid,g.gid");
-	if (mysql_num_rows($query_result) > 0) {
-	     WRITETOPBARBUTTON_NEW("Approve Users",
-				   $TBBASE, "approveuser_form.php3");
-	} else {
-	    WRITETOPBARBUTTON("Approve Users",
+    if ($login_status & CHECKLOGIN_TRUSTED && $login_user->ApprovalList(0)) {
+	WRITESIDEBARBUTTON_NEW("Approve Users",
 			       $TBBASE, "approveuser_form.php3");
-	}
     }
 
     WRITETOPBARBUTTON("Log Out", $TBBASE, "logout.php3?next_page=" .
@@ -185,11 +259,12 @@ function WRITEPLABTOPBAR() {
 # across the bottom of the page rather than the top
 #
 function WRITEPLABBOTTOMBAR() {
-    global $login_status, $login_uid;
+    global $login_status, $login_user;
     global $TBBASE, $TBDOCBASE, $BASEPATH;
     global $THISHOMEBASE;
+    global $WIKIDOCURL;
 
-    if ($login_uid) {
+    if ($login_user) {
 	$newsBase = $TBBASE; 
     } else {
 	$newsBase = $TBDOCBASE;
@@ -200,7 +275,7 @@ function WRITEPLABBOTTOMBAR() {
 	   <br>
 	   <font size=-1>
 	   <form method=get action=$TBDOCBASE/search.php3>
-	   [ <a href='$TBDOCBASE/doc.php3'>
+	   [ <a href='$WIKIDOCURL'>
 		Documentation</a> : <input name=query size = 15/>
 		  <input type=submit style='font-size:10px;' value='Search' /> ]
 	   [ <a href='$newsBase/news.php3'>
@@ -217,19 +292,16 @@ function WRITEPLABBOTTOMBAR() {
 # sees depends on the login status and the DB status.
 #
 function WRITESIDEBAR() {
-    global $login_status, $login_uid, $pid, $gid;
+    global $login_status, $login_user, $pid, $gid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
-    global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT;
-    global $CHECKLOGIN_WIKINAME;
+    global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT, $TRACSUPPORT;
+    global $PROTOGENI;
+    global $CHECKLOGIN_WIKINAME, $TBMAINSITE;
     global $THISHOMEBASE;
     global $EXPOSETEMPLATES;
+    global $currentusage, $FANCYBANNER, $ELABINELAB, $PLABSUPPORT;
+    global $WIKIDOCURL;
     $firstinitstate = TBGetFirstInitState();
-
-    #
-    # The document base cannot be a mix of secure and nonsecure.
-    #
-    
-    # create the main menu list
 
     #
     # get post time of most recent news;
@@ -248,90 +320,161 @@ function WRITESIDEBAR() {
     #
     # This is so an admin can use the editing features of news.
     #
-    if ($login_uid) { # && ISADMIN($login_uid)) { 
+    if ($login_user) {
 	$newsBase = $TBBASE; 
     } else {
 	$newsBase = $TBDOCBASE;
     }
 
     if ($row = mysql_fetch_array($query_result)) {
-	$newsDate = "(".$row[prettydate].")";
-	if ($row[age] < 7) {
+	$newsDate = "(".$row["prettydate"].")";
+	if ($row["age"] < 7) {
 	    $newNews = 1;
 	}
     }
 
-?>
-  <script type='text/javascript' language='javascript' src='textbox.js'></script>
-    <h3 class="menuheader">Information</h3>
-  <ul class="menu">
-<?php
+    if ($login_user) {
+	echo "<td>\n";
+	echo "<div class='midtopcell'>\n";
+	echo "<!-- main navigation menu begins -->\n";
+
+	echo "<table id='navmenus' cellspacing='0' cellpadding='0'>".
+	    "<tr><td>\n";
+
+	# Logout option on first row.
+	if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+	    echo "<a class=midtopcell ".
+		"href='$TBBASE/" . CreateURL("showuser", $login_user) . "'>".
+		"My Emulab</a>\n";
+
+	    echo " <font color=grey>|</font> ";
+
+            # Logout option. No longer take up space with an image.
+	    echo "<a class=midtopcell ".
+		"href='$TBBASE/" . CreateURL("logout", $login_user) . "'>".
+		"Logout</a>\n";
+	    
+	    echo " <font color=grey>|</font> ";
+
+	    # News
+	    echo "<a class=midtopcell ".
+		"href='$newsBase/news.php3'>News</a>";
+	    if ($newNews) {
+		echo "&nbsp;<img src=\"/new.gif\">\n";
+	    }
+	    
+	    echo " <font color=grey>|</font> ";
+
+	    echo "<a class=midtopcell href='$TBBASE/emailus.php3'>".
+		"Contact Us</a>\n";
+
+	    if (ISADMINISTRATOR()) {
+		echo " <font color=grey>|</font> ";
+
+		if (ISADMIN()) {
+		    $url = CreateURL("toggle", $login_user,
+				     "type", "adminon", "value", 0);
+		
+		    echo "<a href=\"$TBBASE/$url\">
+                             <img src='/redball.gif'
+                                  border='0' alt='Admin On'></a>\n";
+		}
+		else {
+		    $url = CreateURL("toggle", $login_user,
+				     "type", "adminon", "value", 1);
+
+		    echo "<a href=\"$TBBASE/$url\">
+                              <img src='/greenball.gif'
+                                   border='0' alt='Admin Off'></a>\n";
+		}
+	    }
+        }
+        # The search box.
+	echo "<span id='topcellsearchrow'>";
+	echo "<table id='topcellsearchtable' cellspacing='0' cellpadding='0'>";
+	echo "<form method='get' action='$newsBase/search.php3'>";
+	echo "<tr><td>";
+	echo "<input class='textInputEmpty' name='query'
+                     value='Search Documentation' id='searchbox'
+                     onfocus='focus_text(this, \"Search Documentation\")'
+                     onblur='blur_text(this, \"Search Documentation\")' />";
+	echo "</td><td>";
+	echo "<input type='submit' id='searchsub' value=Go />";
+	echo "</td></tr>";
+        echo "</form>";
+        echo "</table>";
+	echo "</span>";
+	echo "</td></tr>";
+	# Extra row to force two rows to top and bottom of midtopcell.
+	# See height value for tr/td in the style file.
+	echo "<tr id=spacer><td id=spacer></td></tr>";
+	echo "<tr><td>";
+    }
+   
+    NavMenuStart();
+    NavMenuSection("information", "Information");
+    NavMenuButton("Home", "$TBDOCBASE/index.php3?stayhome=1");
+
     if (0 == strcasecmp($THISHOMEBASE, "emulab.net")) {
 	$rootEmulab = 1;
     } else {
 	$rootEmulab = 0;
     }
-
-    WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3?stayhome=1");
-
-
     if ($rootEmulab) {
-	WRITESIDEBARBUTTON("Other Emulabs", $TBDOCBASE,
-			       "docwrapper.php3?docname=otheremulabs.html");
+	NavMenuButton("Other Emulabs", 
+		      "$WIKIDOCURL/OtherEmulabs");
     } else {
-	WRITESIDEBARBUTTON_ABS("Utah Emulab", $TBDOCBASE,
-			       "http://www.emulab.net/");
-
+	NavMenuButton("Utah Emulab", "http://www.emulab.net/");
     }
 
     if ($newNews) {
-	WRITESIDEBARBUTTON_NEW("News $newsDate", $newsBase, "news.php3");
+	NavMenuButtonNew("News $newsDate", "$newsBase/news.php3");
     } else {
-	WRITESIDEBARBUTTON("News $newsDate", $newsBase, "news.php3");
+	NavMenuButton("News $newsDate", "$newsBase/news.php3");
     }
 
-    WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
+    NavMenuButton("Documentation", "$WIKIDOCURL");
 
     if ($rootEmulab) {
-	# Leave _NEW here about 2 weeks
-	WRITESIDEBARBUTTON_NEW("Papers and Talks (Feb 22)", $TBDOCBASE, "pubs.php3");
-	WRITESIDEBARBUTTON("Software (Jul 18)",
-			       $TBDOCBASE, "software.php3");
-	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
-	#		    $TBDOCBASE, "cdrom.php");
+	# Leave New here about 2 weeks
+        NavMenuButton("Papers and Talks (Apr 4)", "$TBDOCBASE/pubs.php3");
+	NavMenuButton("Emulab Software (Sep 1)", "$TBDOCBASE/software.php3");
 
-	echo "<li><a href=\"$TBDOCBASE/people.php3\">People</a> and " .
-	     "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a>" .
-	     "&nbsp;<img src=\"/new.gif\" /></li>";
-
-	echo "<li>Emulab <a href=\"$TBDOCBASE/doc/docwrapper.php3? " .
-	     "docname=users.html\">Users</a> and " .
-	     "<a href=\"$TBDOCBASE/docwrapper.php3? " .
-	     "docname=sponsors.html\">Sponsors</a></li>";
-    } else {
-	# Link ALWAYS TO UTAH
-	#WRITESIDEBARBUTTON_ABSCOOL("Add Widearea Node (CD)",
-	#		       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
-	WRITESIDEBARBUTTON("Projects on Emulab", $TBDOCBASE,
-		"projectlist.php3");
+	NavMenuButton("List People",
+		      "$TBDOCBASE/people.php3");
+	NavMenuButton("Photo Gallery",
+		      "$TBDOCBASE/gallery/gallery.php3");
+	NavMenuButton("Emulab Users",
+		      "$TBDOCBASE/doc/docwrapper.php3?docname=users.html");
+	NavMenuButton("Emulab Sponsors",
+		      "$TBDOCBASE/docwrapper.php3?docname=sponsors.html");
     }
-    
-    echo "</ul>\n";
+    else {
+	NavMenuButton("Projects on Emulab", "$TBDOCBASE/projectlist.php3");
+    }
+    if ($TBMAINSITE) {
+	NavMenuButton("<font color=red>In Memoriam</font>",
+		      "$TBDOCBASE/jay.php");
+    }
 
     # The search box.  Placed in a table so the text input fills available
     # space.
-    echo "<div id='searchrow'>
-        <FORM method=get ACTION=$newsBase/search.php3>
-        <table border=0 cellspacing=0 cellpadding=0><tr>
-             <td width=100%><input class='textInputEmpty' name=query
-                        value='Search String' id='searchbox'
-                        onfocus='focus_text(this, \"Search String\")'
-                        onblur='blur_text(this, \"Search String\")' /></td>
-	     <td><input type=submit id='searchsub' value=Search /></td>
+    if (! $login_user) {
+	NavMenuSectionEnd();
+	echo "<div id='searchrow'>
+        <form method='get' action='$newsBase/search.php3'>
+        <table border='0' cellspacing='0' cellpadding='0'><tr>
+             <td width='100%'><input class='textInputEmpty' name='query'
+                        value='Search Documentation' id='searchbox'
+                        onfocus='focus_text(this, \"Search Documentation\")'
+                        onblur='blur_text(this, \"Search Documentation\")' />
+               </td>
+	     <td><input type='submit' id='searchsub' value=Go /></td>
         </table>
         </form>
 	</div>\n";
-
+    }
+    
     #
     # Cons up a nice message.
     # 
@@ -370,205 +513,162 @@ function WRITESIDEBAR() {
 	if (!$firstinitstate) {
 	    echo "<a href=\"$TBBASE/reqaccount.php3\">";
 	    echo "<img alt=\"Request Account\" border=0 ";
-	    echo "src=\"$BASEPATH/requestaccount.gif\" width=144 height=32></a>";
+	    echo "src=\"$BASEPATH/requestaccount.gif\" width=\"144\" height=\"32\"></a>";
 
 	    echo "<strong>or</strong>";
 	}
 
 	echo "<a href=\"$TBBASE/login.php3\">";
 	echo "<img alt=\"logon\" border=0 ";
-	echo "src=\"$BASEPATH/logon.gif\" width=144 height=32></a>\n";
+	echo "src=\"$BASEPATH/logon.gif\" width=\"144\" height=\"32\"></a>\n";
 
 	echo "</div>";
-    }
-
-    #
-    # Login message. Set via 'web/message' site variable
-    #
-    $message = TBGetSiteVar("web/message");
-    if (0 != strcmp($message,"")) {
-	WRITESIDEBARNOTICE($message);
+        #
+        # Login message. Set via 'web/message' site variable
+        #
+        $message = TBGetSiteVar("web/message");
+        if (0 != strcmp($message,"")) {
+	    WRITESIDEBARNOTICE($message);
+	}
     }
 
     #
     # Basically, we want to let admin people continue to use
     # the web interface even when nologins set. But, we want to make
     # it clear its disabled.
-    # 
-    if (NOLOGINS()) {
+    #
+    if (!$login_user && NOLOGINS()) {
 	echo "<a id='webdisabled' href='$TBDOCBASE/nologins.php3'>".
 	    "Web Interface Temporarily Unavailable</a>";
-
-        if (!$login_uid || !ISADMIN($login_uid)) {	
-	    WRITESIDEBARNOTICE("Please Try Again Later");
-        }
+	WRITESIDEBARNOTICE("Please Try Again Later");
+	
+        $message = TBGetSiteVar("web/message");
+        if ($message != "") {
+	    WRITESIDEBARNOTICE($message);
+	}
     }
 
     # Start Interaction section if going to spit out interaction options.
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-	echo "<h3 class='menuheader'>Experimentation</h3>
-              <ul class=menu>\n";
+	NavMenuSection("experimentation", "Experimentation");
     }
 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
 	if ($firstinitstate != null) {    
 	    if ($firstinitstate == "createproject") {
-		WRITESIDEBARBUTTON("Create First Project",
-				   $TBBASE, "newproject.php3");
+		NavMenuButton("<font color=red> Create First Project </font>&nbsp",
+			      "$TBBASE/newproject.php3");
 	    }
 	    elseif ($firstinitstate == "approveproject") {
 		$firstinitpid = TBGetFirstInitPid();
 		
-		WRITESIDEBARBUTTON("Approve First Project",
-				   $TBBASE,
-				   "approveproject.php3?pid=$firstinitpid".
-				   "&approval=approve");
+		NavMenuButton("Approve First Project",
+			      "$TBBASE/approveproject.php3?pid=$firstinitpid".
+			      "&approval=approve");
 	    }
 	}
 	elseif ($login_status & CHECKLOGIN_ACTIVE) {
 	    if ($login_status & CHECKLOGIN_PSWDEXPIRED) {
-		WRITESIDEBARBUTTON("Change Your Password",
-				   $TBBASE, "moduserinfo.php3");
+		NavMenuButton("Change Your Password",
+			      "$TBBASE/moduserinfo.php3");
 	    }
 	    elseif ($login_status & (CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY)) {
-		WRITESIDEBARBUTTON("My Emulab",
-				   $TBBASE,
-				   "showuser.php3?target_uid=$login_uid");
-
 		if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
 		    $wikiname = $CHECKLOGIN_WIKINAME;
 		
-		    WRITESIDEBARBUTTON_ABSCOOL("My Wikis",
-			       "gotowiki.php3?redurl=Main/$wikiname",
-			       "gotowiki.php3?redurl=Main/$wikiname");
+		    NavMenuButton("My Wikis",
+				  "gotowiki.php3?redurl=Main/$wikiname");
 		}
-
-		WRITESIDEBARBUTTON("Update User Information",
-				   $TBBASE, "moduserinfo.php3");
+		NavMenuButton("Update User Information",
+			      "$TBBASE/" .
+			         CreateURL("moduserinfo", $login_user));
 	    }
 	    else {
-		WRITESIDEBARBUTTON("My Emulab",
-				   $TBBASE,
-				   "showuser.php3?target_uid=$login_uid");
+		NavMenuButton("My Emulab",
+			      "$TBBASE/" . CreateURL("showuser", $login_user));
 
 		#
                 # Since a user can be a member of more than one project,
                 # display this option, and let the form decide if the 
                 # user is allowed to do this.
                 #
- 		WRITESIDEBARBUTTON("Begin an Experiment",
-				   $TBBASE, "beginexp_html.php3");
+ 		NavMenuButton("Begin an Experiment",
+			      "$TBBASE/beginexp_html.php3");
 
 		if ($EXPOSETEMPLATES) {
-		    WRITESIDEBARBUTTON("Create a Template",
-				       $TBBASE, "template_create.php");
+		    NavMenuButton("Create a Template",
+				  "$TBBASE/template_create.php");
 		}
-	
-		# Put _NEW back when Plab is working again.
-		WRITESIDEBARBUTTON("Create a PlanetLab Slice",
-				       $TBBASE, "plab_ez.php3");
 
-		WRITESIDEBARBUTTON("Experiment List",
-				   $TBBASE, "showexp_list.php3");
+		if ($PLABSUPPORT) {
+                    # Put _NEW back when Plab is working again.
+		    NavMenuButton("Create a PlanetLab Slice",
+				  "$TBBASE/plab_ez.php3");
+		}
 
-		WRITESIDEBARDIVIDER();
-		
-		WRITESIDEBARBUTTON("Node Status",
-				   $TBBASE, "nodecontrol_list.php3");
+		NavMenuButton("Experiment List", "$TBBASE/showexp_list.php3");
 
-		echo "<li>List <a " .
-			"href=\"$TBBASE/showimageid_list.php3\">" .
-	        	"ImageIDs</a> or <a " .
-	                "href=\"$TBBASE/showosid_list.php3\">OSIDs</a></li>";
+		NavMenuButtonDivider("Node Status",
+				     "$TBBASE/nodecontrol_list.php3");
 
-		if ($login_status & CHECKLOGIN_TRUSTED) {
-		  WRITESIDEBARDIVIDER();
-                  # Only project/group leaders can do these options
-                  # Show a "new" icon if there are people waiting for approval
-		  $query_result =
-		    DBQueryFatal("select g.* from group_membership as authed ".
-				 "left join group_membership as g on ".
-				 " g.pid=authed.pid and g.gid=authed.gid ".
-				 "left join users as u on u.uid=g.uid ".
-				 "where u.status!='".
-				 TBDB_USERSTATUS_UNVERIFIED . "' and ".
-				 " u.status!='" . TBDB_USERSTATUS_NEWUSER . 
-				 "' and g.uid!='$login_uid' and ".
-				 "  g.trust='". TBDB_TRUSTSTRING_NONE . "' ".
-				 "  and authed.uid='$login_uid' and ".
-				 "  (authed.trust='group_root' or ".
-				 "   authed.trust='project_root') ".
-				 "ORDER BY g.uid,g.pid,g.gid");
-		  if (mysql_num_rows($query_result) > 0) {
-		    WRITESIDEBARBUTTON_NEW("New User Approval",
-					   $TBBASE, "approveuser_form.php3");
-		  } else {
+		NavMenuButton("List ImageIDs",
+			      "$TBBASE/showimageid_list.php3");
 
-		      WRITESIDEBARBUTTON("New User Approval",
-				       $TBBASE, "approveuser_form.php3");
-		  }
+		NavMenuButton("List OSIDs",
+			      "$TBBASE/showosid_list.php3");
+
+		if ($login_status & CHECKLOGIN_TRUSTED &&
+		    $login_user->ApprovalList(0)) {
+		    # This includes a divider argument.
+		    NavMenuButtonNew("New User Approval",
+				     "$TBBASE/approveuser_form.php3", TRUE);
 		}
 	    }
 	}
 	elseif ($login_status & (CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER)) {
-	    WRITESIDEBARBUTTON("New User Verification",
-			       $TBBASE, "verifyusr_form.php3");
-	    WRITESIDEBARBUTTON("Update User Information",
-			       $TBBASE, "moduserinfo.php3");
+	    NavMenuButton("New User Verification",
+			  "$TBBASE/verifyusr_form.php3");
+	    NavMenuButton("Update User Information",
+			  "$TBBASE/" . CreateURL("moduserinfo", $login_user));
 	}
 	elseif ($login_status & (CHECKLOGIN_UNAPPROVED)) {
-	    WRITESIDEBARBUTTON("Update User Information",
-			       $TBBASE, "moduserinfo.php3");
+	    NavMenuButton("Update User Information",
+			  "$TBBASE/" . CreateURL("moduserinfo", $login_user));
 	}
 	#
 	# Standard options for logged in users!
 	#
 	if (!$firstinitstate) {
-	    echo "<li class='newgroup'><a href=\"$TBBASE/newproject.php3\">Start</a> or " .
-		"<a href=\"$TBBASE/joinproject.php3\">Join</a> a Project</li>";
+	    NavMenuButtonDivider("Start New Project",
+				 "$TBBASE/newproject.php3");
+	    NavMenuButton("Join Existing Project",
+			  "$TBBASE/joinproject.php3");
 	}
-    }
-    #WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
-    #    $TBDOCBASE, "survey.php3");
-
-    # Terminate Interaction menu.
-    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-        # Logout option. No longer take up space with an image.
-	WRITESIDEBARBUTTON("<b>Logout</b>",
-			   $TBBASE, "logout.php3?target_uid=$login_uid");
-	
-	echo "</ul>\n";
     }
 
     # And now the Collaboration menu.
     if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
 	($WIKISUPPORT || $MAILMANSUPPORT || $BUGDBSUPPORT ||
 	 $CVSSUPPORT  || $CHATSUPPORT)) {
-	echo "<h3 class='menuheader'>Collaboration</h3>
-              <ul class=menu>";
+
+	NavMenuSection("collaboration", "Collaboration");
 
 	if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
 	    $wikiname = $CHECKLOGIN_WIKINAME;
 		
-	    WRITESIDEBARBUTTON("My Wikis", $TBBASE,
-			       "gotowiki.php3?redurl=Main/$wikiname");
+	    NavMenuButton("My Wikis",
+			  "$TBBASE/gotowiki.php3?redurl=Main/$wikiname");
 	}
 	if ($MAILMANSUPPORT || $BUGDBSUPPORT) {
 	    if (!isset($pid) || $pid == "") {
-		$query_result =
-		    DBQueryFatal("select pid from group_membership where ".
-				 "uid='$login_uid' and pid=gid and ".
-				 "trust!='none' ".
-				 "order by date_approved asc limit 1");
-		if (mysql_num_rows($query_result)) {
-		    $row = mysql_fetch_array($query_result);
-		    $firstpid = $row[pid];
+		if (($project = $login_user->FirstApprovedProject())) {
+		    $firstpid = $project->pid();
 		}
 	    }
 	}
 	if ($MAILMANSUPPORT) {
-	    $mmurl  = "showmmlists.php3?target_uid=$login_uid";
-	    WRITESIDEBARBUTTON("My Mailing Lists", $TBBASE, $mmurl);
+	     NavMenuButton("My Mailing Lists",
+			   "$TBBASE/" . CreateURL("showmmlists", $login_user));
 	}
 	if ($BUGDBSUPPORT) {
 	    $bugdburl = "gotobugdb.php3";
@@ -579,57 +679,100 @@ function WRITESIDEBAR() {
 	    elseif (isset($firstpid)) {
 		$bugdburl .= "?project_title=$firstpid";
 	    }
-	    WRITESIDEBARBUTTON("My Bug Databases", $TBBASE, $bugdburl);
+	    NavMenuButton("My Bug Databases", "$TBBASE/$bugdburl");
 	}
 	if ($CVSSUPPORT) {
-	    WRITESIDEBARBUTTON("My CVS Repositories", $TBBASE,
-			       "listrepos.php3?target_uid=$login_uid");
+	    NavMenuButton("My CVS Repositories",
+			  "$TBBASE/" . CreateURL("listrepos", $login_user));
 	}
 	if ($CHATSUPPORT) {
-	    WRITESIDEBARBUTTON("My Chat Buddies", $TBBASE,
-			       "mychat.php3?target_uid=$login_uid");
+	    NavMenuButton("My Chat Buddies",
+			  "$TBBASE/" . CreateURL("mychat", $login_user));
 	}
-	echo "</ul>\n";
+	if ($TBMAINSITE && $TRACSUPPORT) {
+	    $geniproject = Project::Lookup("geni");
+	    $approved    = 0;
+	    
+	    if ($geniproject &&
+		(ISADMIN() ||
+		 ($geniproject->IsMember($login_user, $approved) &&
+		  $approved))) {
+		NavMenuButton("ProtoGENI Trac Wiki",
+			      "$TBBASE/" . CreateURL("gototrac", $login_user,
+						     "wiki", "geni"));
+	    }
+	    if (STUDLY()) {
+		NavMenuButton("Emulab Trac Wiki",
+			      "$TBBASE/" . CreateURL("gototrac", $login_user,
+						     "wiki", "emulab"));
+	    }
+	}
     }
 
     # Optional ADMIN menu.
-    if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN($login_uid)) {
-	echo "<h3 class='menuheader'>Administration</h3>
-              <ul class=menu>";
+    if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN()) {
+	NavMenuSection("administration", "Administration");
 	
-	echo "<li>List <a " .
-	    " href=\"$TBBASE/showproject_list.php3\">" .
-	    "Projects</a> or <a " .
-	    "href=\"$TBBASE/showuser_list.php3\">Users</a></li>";
+	NavMenuButton("List Projects",
+		      "$TBBASE/showproject_list.php3");
+	NavMenuButton("List Users",
+		      "$TBBASE/showuser_list.php3");
 
-	WRITESIDEBARBUTTON("View Testbed Stats",
-			   $TBBASE, "showstats.php3");
+	NavMenuButton("View Testbed Stats",
+		      "$TBBASE/showstats.php3");
 
-	WRITESIDEBARBUTTON("Approve New Projects",
-			   $TBBASE, "approveproject_list.php3");
+	NavMenuButton("Resource Usage Visualization",
+		      "$TBBASE/rusage_viz.php");
 
-	WRITESIDEBARBUTTON("Edit Site Variables",
-			   $TBBASE, "editsitevars.php3");
+	NavMenuButton("Approve New Projects",
+		      "$TBBASE/approveproject_list.php3");
 
-	WRITESIDEBARBUTTON("Edit Knowledge Base",
-			   $TBBASE, "kb-manage.php3");
+	NavMenuButton("Edit Site Variables",
+		      "$TBBASE/editsitevars.php3");
+
+	NavMenuButton("Edit Knowledge Base",
+		      "$TBBASE/kb-manage.php3");
 		    
 	$query_result = DBQUeryFatal("select new_node_id from new_nodes");
 	if (mysql_num_rows($query_result) > 0) {
-	    WRITESIDEBARBUTTON_NEW("Add Testbed Nodes",
-				   $TBBASE, "newnodes_list.php3");
+	    NavMenuButtonNew("Add Testbed Nodes",
+			     "$TBBASE/newnodes_list.php3");
 	}
 	else {
-	    WRITESIDEBARBUTTON("Add Testbed Nodes",
-			       $TBBASE, "newnodes_list.php3");
+	    NavMenuButtonNew("Add Testbed Nodes",
+			     "$TBBASE/newnodes_list.php3");
 	}
-	WRITESIDEBARBUTTON("Approve Widearea User",
-			   $TBBASE, "approvewauser_form.php3");
-
-	# Link ALWAYS TO UTAH
-	WRITESIDEBARBUTTON("Add Widearea Node (CD)",
-			   $TBDOCBASE, "http://www.emulab.net/cdrom.php");
-	echo "</ul>\n";
+	NavMenuButtonNew("Approve Widearea User",
+			 "$TBBASE/approvewauser_form.php3");
+	if ($PROTOGENI) {
+	    NavMenuButton("ProtoGeni Slices",
+			  "$TBBASE/genislices.php");
+	    NavMenuButton("ProtoGeni History",
+			  "$TBBASE/genihistory.php");
+	}
+    }
+    if (0 && $login_user) {
+	NavMenuSection("Status", "Status");
+	
+	$freepcs = TBFreePCs();
+	$reload  = TBReloadingPCs();
+	$users   = TBLoggedIn();
+	$active  = TBActiveExperiments();
+	NavMenuButton("Status",
+		      "$TBBASE/nodecontrol_list.php3",
+		      null, null, FALSE,
+		      "$freepcs Free PCs, $reload PCs reloading<br> ".
+		      "$users users logged in, $active active experiments");
+    }
+    # Terminate Interaction menu and render.
+    NavMenuRender();
+    
+    if ($login_user) {
+	echo "</td></tr></table>\n";
+	
+	# Close up div at start of navmenu
+	echo "</div>\n";
+	echo "</td>\n";
     }
 }
 
@@ -640,7 +783,7 @@ function WRITESIMPLESIDEBAR($menudefs) {
     $menutitle = $menudefs['title'];
     
     echo "<h3 class='menuheader'>$menutitle</h3>
-          <ul class=menu>";
+          <ul class='navmenu'>";
 
     each($menudefs);    
     while (list($key, $val) = each($menudefs)) {
@@ -654,11 +797,11 @@ function WRITESIMPLESIDEBAR($menudefs) {
 #
 function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
         $extra_headers = NULL ) {
-    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $ELABINELAB;
+    global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $ELABINELAB, $FANCYBANNER;
     global $TBDIR, $WWW;
     global $MAINPAGE;
     global $TBDOCBASE;
-    global $autorefresh;
+    global $autorefresh, $currentusage, $javascript_debug, $login_user;
 
     $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/");
 
@@ -667,76 +810,172 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	<html>
 	  <head>
 	    <title>$THISHOMEBASE - $title</title>
-            <!--<link rel=\"SHORTCUT ICON\" HREF=\"netbed.ico\">-->
-            <link rel=\"SHORTCUT ICON\" HREF=\"netbed.png\" TYPE=\"image/png\">
+            <link rel=\"shortcut icon\" href=\"$BASEPATH/favicon.ico\" TYPE=\"image/vnd.microsoft.icon\">
+            <link rel=\"search\" type=\"application/opensearchdescription+xml\" title=\"$THISHOMEBASE Search\" href=\"emusearch.xml\">
     	    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
-	    <link REL='stylesheet' HREF='$BASEPATH/common-style.css' TYPE='text/css' />
+	    <link rel='stylesheet' href='$BASEPATH/common-style.css' type='text/css' />
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
-            <!-- @import url($BASEPATH/style.css); -->";
-
-    if (!$MAINPAGE) {
+            <!-- @import url($BASEPATH/style.css?version=1); -->
+            <!-- @import url($BASEPATH/cssmenu-new.css); -->";
+    
+    if (1 && !$MAINPAGE) {
 	echo "<!-- @import url($BASEPATH/style-nonmain.css); -->";
-    } 
-
+    }
     echo "</style>\n";
+    echo "<!-- [if gt IE 6.0]><style type=\"text/css\">".
+	".menu ul li a:hover ul { top: 18px; }</style><![endif]> -->\n";
 
     if ($TBMAINSITE) {
-	echo "<meta NAME=\"keywords\" ".
-	           "CONTENT=\"network, emulation, internet, emulator, ".
+	echo "<meta name=\"keywords\" ".
+	           "content=\"network, emulation, internet, emulator, ".
 	           "mobile, wireless, robotic\">\n";
-	echo "<meta NAME=\"robots\" ".
-	           "CONTENT=\"NOARCHIVE\">\n";
-	echo "<meta NAME=\"description\" ".
-                   "CONTENT=\"emulab - network emulation testbed home\">\n";
+	echo "<meta name=\"robots\" ".
+	           "content=\"NOARCHIVE\">\n";
+	echo "<meta name=\"description\" ".
+                   "content=\"emulab - network emulation testbed home\">\n";
     }
+    # This needs to stay first! It defines things that might get used by
+    # later scripts
+    echo "<script type='text/javascript'
+                  src='${BASEPATH}/onload.js'></script>\n";
     if ($extra_headers) {
         echo $extra_headers;
     }
-    echo "</head>
-            <body bgcolor='#FFFFFF' 
-             topmargin='0' leftmargin='0' marginheight='0' marginwidth='0'>\n";
+    if ($javascript_debug) {
+	echo "<script type='text/javascript'
+                      src='${BASEPATH}/js/inline-console.js'></script>\n";
+    }
+    echo "</head><body>\n";
     
     if ($autorefresh) {
-	echo "<meta HTTP-EQUIV=\"Refresh\" CONTENT=\"$autorefresh\">\n";
+	echo "<meta HTTP-EQUIV=\"Refresh\" content=\"$autorefresh\">\n";
     }
-    if (! $nobanner ) {
-	echo "<map name=overlaymap>
-                 <area shape=rect coords=\"100,60,369,100\"
-                       href='http://www.emulab.net/index.php3'>
-                 <area shape=rect coords=\"0,0,369,100\"
-                       href='$TBDOCBASE/index.php3'>
-              </map>
-            <div class='bannercell'>
-	       <iframe src=$BASEPATH/currentusage.php3 class='usageframe'
-                 scrolling=no frameborder=0></iframe></td>
-              <img width=369 height=100 border=0 usemap=\"#overlaymap\" ";
+    echo "<script type='text/javascript' language='javascript'
+                  src='${BASEPATH}/emulab_sup.js'></script>\n";
+    echo "<script type='text/javascript' language='javascript'
+                  src='${BASEPATH}/sorttable.js'></script>\n";
+    echo "<script type='text/javascript' language='javascript'
+                  src='${BASEPATH}/textbox.js'></script>\n";
 
-	if ($ELABINELAB) {
-	    echo "src='$BASEPATH/overlay.elabinelab.gif' ";
+    if (!$nobanner) {
+        #
+        # We do the banner differently for the Utah site and other sites.
+        # The process of generating the fancy Utah banner is kind of 
+        # complicated
+        #
+	if ($login_user) {
+		echo "<div class='topcell'>\n";
 	}
 	else {
-	    echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
+	    if ($FANCYBANNER) {
+		echo "<div id='fancybannercell'>\n";
+	    }
+	    else {
+		echo "<div id='bannercell'>\n";
+	    }
 	}
-	echo "alt='$THISHOMEBASE - the network testbed'>\n";
-        if (!$MAINPAGE) {
-	     echo "<span class='devpagename'>$WWW</span>";
+
+        # NOTE: This has to come before any images in the div for the float to
+        # work correctly.
+	if ($currentusage && !$login_user) {
+	    if ($FANCYBANNER) {
+		$class = "transparentusageframe";
+	    }
+	    else {
+		$class = "usageframe";
+	    }
+	    echo "<iframe src='$BASEPATH/currentusage.php3' class='$class'
+                          scrolling='no' frameborder='0'></iframe>\n";
 	}
-        echo "</div>\n";
+	if ($login_user) {
+	    #
+	    # It is a violation of Emulab licensing restrictions to remove
+	    # this logo!
+            #
+            # NOTE: This has to come before any images in the div for the
+	    # float to work correctly.
+	    #
+	    if (!$TBMAINSITE) {
+		echo "<a class='rightsidebuiltwith' ".
+		    "href='http://www.emulab.net'>";
+		echo "<img src='$BASEPATH/fancy-builtwith.png'></a>\n";
+	    }
+	    echo "<table id=topcelltable ".
+		     "cellspacing=0 cellpadding=0 border=0><tr>";
+	    
+	    echo "<td>\n";
+	    echo "<a id='topcellimage' href='$TBDOCBASE/index.php3'>";
+	    echo "<img border='0' ";
+	    echo "alt='$THISHOMEBASE - the network testbed' ";
+	    if ($FANCYBANNER)
+		echo "src='$BASEPATH/fancy-sheader-" .
+		    strtolower($THISHOMEBASE) . ".png' ";
+	    elseif ($ELABINELAB) {
+		echo "height='54' ";
+		echo "src='$BASEPATH/overlay.elabinelab.gif' ";
+	    }
+	    else {
+		echo "height='54' ";
+		echo "src='$BASEPATH/overlay." .
+			strtolower($THISHOMEBASE) . ".gif' ";
+	    }
+	    echo "></a>\n";
+	    echo "</td>\n";
+	}
+	else {
+	    if ($FANCYBANNER) {
+		echo "<a href='$TBDOCBASE/index.php3'>
+                        <img height='100px' width='365px' border='0' ";
+		echo "src='$BASEPATH/fancy-header-" .
+			strtolower($THISHOMEBASE) . ".png' ";
+		echo "></a>\n";
+	    }
+	    else {
+		echo "<map name='overlaymap'>
+                         <area shape=\"rect\" coords=\"100,60,339,100\"
+                               href='http://www.emulab.net/index.php3'>
+                         <area shape=\"rect\" coords=\"0,0,339,100\"
+                               href='$TBDOCBASE/index.php3'>
+                      </map>\n";
+		echo "<img height='100' border='0' usemap=\"#overlaymap\" ";
+		if ($ELABINELAB) {
+		    echo "width='239' ";
+		    echo "src='$BASEPATH/overlay.elabinelab.gif' ";
+		}
+		else {
+		    echo "width='339' ";
+		    echo "src='$BASEPATH/overlay." .
+			strtolower($THISHOMEBASE) . ".gif' ";
+		}
+		echo "alt='$THISHOMEBASE - the network testbed'>\n";
+            }
+	}
+        if (!$login_user) 
+	    echo "</div>\n";
+    }
+    else {
+	# Need this to force no top margin/padding. No idea why! 
+	echo "<div id='nobannercell'></div>\n";
     }
     if (! $nocontent ) {
-	echo "<div class='leftcell'>
-                  <!-- sidebar begins -->";
+	if ($login_user) {
+	    ;
+	}
+	else {
+	    echo "<div class='leftcell'>\n";
+	    echo "<!-- sidebar begins -->\n";
+	}
     }
 }
 
 #
 # finishes sidebar td
 #
-function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
+function FINISHSIDEBAR($nocontent = 0)
 {
-    global $TBMAINSITE;
+    global $TBMAINSITE, $TBBASE, $BASEPATH, $currentusage, $login_user;
 
     if (!$nocontent) {
 	if (!$TBMAINSITE) {
@@ -744,23 +983,38 @@ function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 	    # It is a violation of Emulab licensing restrictions to remove
 	    # this logo!
 	    #
-	    echo "       <a class='builtwith' href='http://www.emulab.net'>
-                         <img src='$BASEPATH/builtwith.png'></a>";
+	    if (!$login_user) {
+		echo "       <a class='builtwith' href='http://www.emulab.net'>
+                             <img src='$BASEPATH/builtwith.png'></a>";
+	    }
+	}
+	if ($currentusage && $login_user) {
+	    $class = "navbarusageframe";
+	    echo "<td>\n";
+	    if (0) {
+		echo "<iframe src='$BASEPATH/currentusage.php3' class='$class'
+                              scrolling='no' frameborder='0'></iframe>\n";
+	    }
+	    else {
+		echo "<div onclick=\"ToggleUsageTable();\" ".
+		     "onmouseover='return escape(\"Click to toggle mode\")' ".
+		     "id=usagefreenodes>\n";
+		echo "</div>\n";
+	    }
+	    echo "</td></tr></table>\n";
 	}
 	echo "<!-- sidebar ends -->
               </div>";
     }
-
-    echo "
-        <div class='$contentname'>
-          <!-- content body -->";
 }
 
 #
 # Spit out a vanilla page header.
 #
-function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
-    global $login_status, $login_uid, $TBBASE, $TBDOCBASE, $THISHOMEBASE;
+function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
+		    $notice = NULL) {
+    global $login_status, $login_user;
+    global $TBBASE, $TBDOCBASE, $THISHOMEBASE;
     global $BASEPATH, $SSL_PROTOCOL, $drewheader, $autorefresh;
     global $TBMAINSITE;
 
@@ -771,15 +1025,10 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 
     #
     # Figure out who is logged in, if anyone.
-    # 
-    if (($known_uid = GETUID()) != FALSE) {
-        #
-        # Check to make sure the UID is logged in (not timed out).
-        #
-        $login_status = CHECKLOGIN($known_uid);
-	if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-	    $login_uid = $known_uid;
-	}
+    #
+    if (($login_user = CheckLogin($status)) != null) {
+	$login_status = $status;
+	$login_uid    = $login_user->uid();
     }
 
     #
@@ -794,12 +1043,13 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     # We want to allow admin types to continue using the web interface,
     # and logout anyone else that is currently logged in!
     #
-    if (NOLOGINS() && $login_uid && !ISADMIN($login_uid)) {
-	DOLOGOUT($login_uid);
+    if (NOLOGINS() && $login_user && !ISADMIN()) {
+	DOLOGOUT($login_user);
 	$login_status = CHECKLOGIN_NOTLOGGEDIN;
-	$login_uid    = 0;
+	$login_user   = null;
     }
     
+    header('Content-type: text/html; charset=utf-8');
     header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
     
     if (1) {
@@ -811,80 +1061,130 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 	header("Expires: " . gmdate("D, d M Y H:i:s", time() + 300) . " GMT"); 
     }
 
-    if (isset($view['hide_banner'])) {
+    if (VIEWSET($view, 'hide_banner')) {
 	$nobanner = 1;
     } else {
 	$nobanner = 0;
     }
-    $contentname = "content";
-    $nocontent = isset($view['hide_sidebar']) && !isset($view['menu']);
+    $contentname = ($login_user ? "content" : "rightcontent");
+    $nocontent = VIEWSET($view, 'hide_sidebar') && !VIEWSET($view, 'menu');
     PAGEBEGINNING( $title, $nobanner,
 		   $nocontent,
 		   $extra_headers );
-    if (!isset($view['hide_sidebar'])) {
+    if (VIEWSET($view, 'show_protogeni')) {
+	echo "<table id=topcelltablefoo ".
+	    "cellspacing=0 cellpadding=0 border=0><tr>".
+	    "<td>".
+	    "<img border='0' alt='ProtoGENI' src='$BASEPATH/protogeni.png'>".
+	    "</td></tr></table>\n";
+	$contentname = "fullcontent";
+    }
+    elseif (!VIEWSET($view, 'hide_sidebar')) {
 	WRITESIDEBAR();
     }
-    elseif (isset($view['menu'])) {
+    elseif (VIEWSET($view, 'menu')) {
 	WRITESIMPLESIDEBAR($view['menu']);
     }
     else {
 	$contentname = "fullcontent";
     }
-    FINISHSIDEBAR($contentname, $nocontent);
+    FINISHSIDEBAR($nocontent);
 
-    echo "<div class='contentbody'>";
-    echo "<div id='logintime'>";
-    echo "<span id='loggedin'>";
-    $now = date("D M d g:ia T");
-    if ($login_uid) {
-	echo "<span class='uid'>$login_uid</span> Logged in.";
-    }
-    echo "</span>";
-    echo "<span class='timestamp'>$now</span>\n";
-    echo "</div>";
-    
-    $major = "";
-    $minor = "";
-    $build = "";
-    TBGetVersionInfo($major, $minor, $build);
-    if ($view['hide_versioninfo'] == 1)
-	$versioninfo = "";
-    else
-	$versioninfo = "Vers: $major.$minor Build: $build";
-    echo "<div id='versioninfo'>$versioninfo</div>";
-
-    echo "<h2 class='contenttitle'>\n";
-    if ($login_uid && ISADMINISTRATOR()) {
-	if (ISADMIN($login_uid)) {
-	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=1><img src='/redball.gif'
-                          border=0 alt='Admin On'></a>\n";
+    if ($login_user) {
+	# This is only going to happen when its an admin person
+	# still logged in while web interface disabled. Want to make it
+	# clear that the web interface is disabled.
+	if (NOLOGINS() && ISADMIN()) {
+	    echo "<div class=webmessage>";
+	    echo "Web Interface Temporarily Unavailable</div>\n";
 	}
 	else {
-	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=0><img src='/greenball.gif'
-                          border=0 alt='Admin Off'></a>\n";
+	    $message = TBGetSiteVar("web/message");
+	    if ($message != "") {
+		echo "<div class=webmessage>$message</div>\n";
+	    }
 	}
     }
-    echo "$title</h2>\n";
 
-    echo "<!-- begin content -->\n";
-    if ($view['show_topbar'] == "plab") {
+    echo "<div class='$contentname'>\n";
+    echo "<!-- content body -->\n";
+
+    if (! VIEWSET($view, 'hide_title')) {
+	if ($login_user)
+	    echo "<div id='contentheader'>";
+	else {
+	    echo "<div class='contentbody'>";
+	    echo "<div id='rightcontentheader'>";
+	}
+	echo "<div id='logintime'>";
+	echo "<span class='loggedin'>";
+	$now = date("D M d g:ia T");
+	if ($login_user) {
+	    echo "<span class='uid'>$login_uid</span> Logged in.";
+	}
+	echo "</span>";
+	echo "<span class='timestamp'>$now</span>\n";
+	echo "</div>";
+    
+	if ($login_user || VIEWSET($view, 'hide_versioninfo')) {
+	    $versioninfo = "";
+	    $commithash  = "";
+	}
+	else {
+	    $major = "";
+	    $minor = "";
+	    $build = "";
+	    TBGetVersionInfo($major, $minor, $build);
+	
+	    $versioninfo = "Vers: $major.$minor Build: $build";
+	    $commithash  = TBGetCommitHash();
+	    if (!$commithash) {
+		$commithash = "";
+	    }
+	}
+	echo "<div id='versioninfo'>$versioninfo";
+	if ($commithash != "") {
+	    echo "<br>";
+	    echo substr($commithash, 0, 24);
+	}
+	echo "</div>";
+	if ($notice) {
+	    echo "<span class='headernotice'>$notice</span>";
+	}
+
+	if ($login_user)
+	    echo "<h2 class='contenttitle'>\n";
+	else
+	    echo "<h2 class='rightcontenttitle'>\n";
+	echo "$title</h2>";
+        # Close off 'contentheader' (rightcontentheader);
+	echo "</div>\n";
+	if ($commithash != "") {
+	    echo "<!-- This site is running commit $commithash -->\n";
+	}
+	if ($login_user) {
+        # And start the contentbody.
+	    echo "<div id='fullcontentbody'>";
+	}
+    }
+    echo "<!-- begin content -->";
+    if (VIEWSET($view, 'show_topbar', "plab")) {
 	WRITEPLABTOPBAR();
     }
-}
-
-#
-# ENDPAGE(): This terminates the div started above.
-# 
-function ENDPAGE() {
-  echo "</div>";
 }
 
 #
 # Spit out a vanilla page footer.
 #
 function PAGEFOOTER($view = NULL) {
-    global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH;
-    global $TBMAINSITE, $SSL_PROTOCOL;
+    global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH, $TBBASE;
+    global $TBMAINSITE, $SSL_PROTOCOL, $bodyclosestring, $currently_busy;
+    global $login_user, $javascript_debug, $sortedtables;
+
+    if ($currently_busy) {
+	CLEARBUSY();
+	$currently_busy = 0;
+    }
 
     if (!$view) {
 	$view = GETUSERVIEW();
@@ -893,52 +1193,126 @@ function PAGEFOOTER($view = NULL) {
     $today = getdate();
     $year  = $today["year"];
 
-    echo "<!-- end content -->\n";
-
-    if ($view['show_bottombar'] == "plab") {
+    if (VIEWSET($view, 'show_bottombar', "plab")) {
 	WRITEPLABBOTTOMBAR();
     }
 
     echo "
-              <div class=contentfooter>\n";
-    if (!$view['hide_copyright']) {
+              <div class='contentfooter'>\n";
+    if (!VIEWSET($view, 'hide_copyright')) {
 	echo "
                 <ul class='navlist'>
-		<li>[ <a href=http://www.cs.utah.edu/flux/>
-                    Flux&nbsp;Research&nbsp;Group</a> ]</li>
-	        <li>[ <a href=http://www.cs.utah.edu/>
-                    School&nbsp;of&nbsp;Computing</a> ]</li>
-		<li>[ <a href=http://www.utah.edu/>
-                    University&nbsp;of&nbsp;Utah</a> ]</li>
+		<li>[&nbsp;<a href=\"http://www.cs.utah.edu/flux/\"
+                    >Flux&nbsp;Research&nbsp;Group</a>&nbsp;]</li>
+	        <li>[&nbsp;<a href=\"http://www.cs.utah.edu/\"
+                    >School&nbsp;of&nbsp;Computing</a>&nbsp;]</li>
+		<li>[&nbsp;<a href=\"http://www.utah.edu/\"
+                    >University&nbsp;of&nbsp;Utah</a>&nbsp;]</li>
                 </ul>
                 <!-- begin copyright -->
                 <span class='copyright'>
-                <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
+                <a href=$TBDOCBASE/copyright.php>
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </span>\n";
     }
-    echo "
-                <p class='contact'>
-                    Problems?
-	            Contact $TBMAILADDR.
-                </p>
-                <!-- end copyright -->\n";
+    echo "      <br>\n";
+    echo "      <table class=stealth width=100% ".
+	               "border='0' cellspacing='0' cellpadding='0'>";
+    echo "       <tr>\n";
+    
+    if ($login_user) {
+	echo "    <td class=reportbug>";
+	echo "      <a href='$TBBASE/gototrac.php3?do=newticket&login=1'>";
+	echo "        Report Bug, Gripe, Request Feature</a>";
+	echo "    </td>";
+    }
+    echo "        <td class=contact>Questions? Contact $TBMAILADDR</td>";
+    echo "       </tr>\n";
+    echo "      </table>\n";
+    echo "      <!-- end copyright -->\n";
     echo "</div>";
     echo "</div>";
 
-    ENDPAGE();
+    if ($javascript_debug) {
+	echo "<div id='inline-console'></div>\n";
+    }
 
     # Plug the home site from all others.
-    echo "\n<p><a href=\"www.emulab.net/netemu.php3\"></a>\n";
+    echo "\n<a href=\"www.emulab.net/netemu.php3\"></a>\n";
 
+    if ($login_user) {
+	echo "<script>\n";
+	sajax_show_javascript();
+	?>
+	    var cookieresults =
+		document.cookie.match('usagetablemode=(.*?)(;|$)');
+	    var usagetablemode =
+		(cookieresults ? cookieresults[1] : "status");
+	    
+	    function x_FreeNodeHtml() {
+		sajax_do_call("<?php echo $TBBASE; ?>/currentusage.php3",
+			      "FreeNodeHtml",
+			      x_FreeNodeHtml.arguments);
+	    }
+	    function FreeNodeHtml_CB(stuff) {
+		getObjbyName('usagefreenodes').innerHTML = stuff;
+		setTimeout('GetFreeNodeHtml()', 60000);
+	    }
+	    function GetFreeNodeHtml() {
+		x_FreeNodeHtml(usagetablemode, FreeNodeHtml_CB);
+	    }
+            function ToggleUsageTable() {
+		if (usagetablemode == "status") {
+		    usagetablemode = "freenodes";
+		}
+		else if (usagetablemode == "freenodes") {
+		    usagetablemode = "stats";
+		}
+		else {
+		    usagetablemode = "status";
+		}
+		document.cookie = "usagetablemode=" + usagetablemode;
+		GetFreeNodeHtml();
+            }
+	    GetFreeNodeHtml();
+	<?php
+	echo "</script>\n";
+    }
+    
+    # Prime all the sortable tables.
+    if (count($sortedtables)) {
+	echo "<script type='text/javascript' language='javascript'>\n";
+	foreach ($sortedtables as $i => $id) {
+	    echo "sorttable.makeSortable(getObjbyName('$id'));\n";
+	}
+	echo "</script>\n";
+    }
+
+    # This has to be after all the tooltip definitions.
+    echo "<script type='text/javascript' src='${TBBASE}/js/wz_tooltip.js'>".
+	"</script>";
+    echo $bodyclosestring;
+    echo "\n";
+    if ($login_user) {
+        # This closes the fullcontentbody div.
+	echo "</div>\n";
+    }
     echo "</body></html>\n";
 }
 
-function PAGEERROR($msg) {
+define("HTTP_400_BAD_REQUEST", 400);
+define("HTTP_403_FORBIDDEN", 403);
+define("HTTP_404_NOT_FOUND", 404);
+
+function PAGEERROR($msg, $status_code = 0) {
     global $drewheader, $noheaders;
 
-    if (! $drewheader && ! $noheaders)
+    if (! $drewheader && $status_code != 0)
+        header(' ', true, $status_code);
+
+    if (! $drewheader && ! $noheaders) {
 	PAGEHEADER("Page Error");
+    }
 
     echo "$msg\n";
 
@@ -950,22 +1324,27 @@ function PAGEERROR($msg) {
 #
 # Sub Page/Menu Stuff
 #
-function WRITESUBMENUBUTTON($text, $link, $target = "") {
+function WRITESUBMENUBUTTON($text, $link = null, $target = null) {
     global $nextsubmenucl;
 
     #
     # Optional 'target' agument, so that we can pop up new windows
     #
+    $targettext = "";
     if ($target) {
 	$targettext = "target='$target'";
     }
     $cl = "";
-    if ($nextsubmenucl != "") {
+    if ($nextsubmenucl) {
 	$cl = "class='$nextsubmenucl'";
-	$nextsubmenucl = "";
+	$nextsubmenucl = null;
     }
-
-    echo "<li $cl><a href='$link' $targettext>$text</a></li>\n";
+    if ($link) {
+	echo "<li $cl><a href='$link' $targettext>$text</a></li>\n";
+    }
+    else {
+	echo "<li $cl>$text</li>\n";
+    }
 }
 
 function WRITESUBMENUDIVIDER() {
@@ -982,7 +1361,7 @@ function SUBPAGESTART() {
     echo "<table class=\"stealth\"
 	  cellspacing='0' cellpadding='0' width='100%' border='0'>\n
             <tr>\n
-              <td class=\"stealth\"valign=top>\n";
+              <td class=\"stealth\" valign=\"top\">\n";
 }
 
 function SUBPAGEEND() {
@@ -996,69 +1375,229 @@ function SUBPAGEEND() {
 # Start/End a sub menu, located in the upper left of the main frame.
 # Note that these cannot be used outside of the SUBPAGE macros above.
 #
-function SUBMENUSTART($title) {
-?>
-    <!-- begin submenu -->
-    <h3 class="submenuheader"><?php echo "$title";?></h3>
-    <ul class="submenu">
-<?php
+function SUBMENUSTART($title = null) {
+    echo "<!-- begin submenu -->\n";
+    if ($title)
+	echo "<h3 class=submenuheader>$title</h3>\n";
+    echo "<ul class=submenu>\n";
 }
 
 function SUBMENUEND() {
-?>
-    </ul>
-    <!-- end submenu -->
-  </td>
-  <td class="stealth" valign=top align=left width='100%'>
-<?php
+    echo "</ul>\n" .
+	 "<!-- end submenu -->\n".
+	 "</td>\n".
+	 "<td class=stealth valign=top align=left width='100%'>\n";
 }
 
 # Start a new section in an existing submenu
 # This includes ending the one before it
 function SUBMENUSECTION($title) {
     SUBMENUSECTIONEND();
-?>
-      <!-- new submenu section -->
-      </ul>
-      <h3 class="submenuheader"><?php echo "$title";?></h3>
-      <ul class="submenu">
-<?php
+    echo "<!-- new submenu section -->\n";
+    echo "</ul>\n";
+    echo "<h3 class=submenuheader>$title</h3>\n";
+    echo "<ul class=submenu>\n";
 }
 
 # End a submenu section - only need this on the last one of the list.
 function SUBMENUSECTIONEND() {
-?>
-      </ul>
-<?php
+    if (0)
+	;/* Nothing to do */
+    else 
+	echo "</ul>\n";
 }
 
-# These are here so you can wedge something else under the menu in the left column.
+# These are here so you can wedge something else under the menu in the left
+# column.
 
 function SUBMENUEND_2A() {
-?>
-    </ul>
-    <!-- end submenu -->
-<?php
+    echo "</ul>\n";
+    echo "<!-- end submenu -->\n";
 }
 
 function SUBMENUEND_2B() {
-?>
-  </td>
-  <td class="stealth" valign=top align=left width='85%'>
-<?php
+    echo "</td><td class=stealth valign=top align=left width='85%'>";
 }
 
 #
 # Get a view, for use with PAGEHEADER and PAGEFOOTER, for the current user
 #
 function GETUSERVIEW() {
-    if (GETUID() && ISPLABUSER()) {
+    if (GETUID() && (ISPLABUSER() || isset($_REQUEST["plab_interface"]))) {
 	return array('hide_sidebar' => 1, 'hide_banner' => 1,
 	    'show_topbar' => "plab", 'show_bottombar' => 'plab',
 	    'hide_copyright' => 1);
     } else {
-	# Most users get the default view
 	return array();
+    }
+}
+
+#
+# Do we view something.
+#
+function VIEWSET($view, $thing, $value = null) {
+    if (! array_key_exists($thing, $view))
+	return 0;
+    if ($value) {
+	return $view[$thing] == $value;
+    }
+    $val = $view[$thing];
+    return ! empty($val);
+}
+
+function STARTBUSY($msg) {
+    global $currently_busy;
+
+    # Allow for a repeated call; Do nothing.
+    if ($currently_busy)
+	return;
+
+    echo "<div id='outer_loaddiv'>\n";
+    echo "<center><div id='inner_loaddiv'>\n";
+    echo "<b>$msg</b> ...<br>\n";
+    echo "This will take a few moments; please be <em>patient</em>.<br>\n";
+    echo "</div>\n";
+    echo "<img id='busy' src='busy.gif'>".
+	   "<span id='loading'> Working ...</span>";
+    echo "<br><br>\n";
+    echo "</center>\n";
+    echo "</div>\n";
+    flush();
+    $currently_busy = 1;
+}
+
+function STOPBUSY() {
+    global $currently_busy;
+
+    if (!$currently_busy)
+	return;
+
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "ClearBusyIndicators('<center><b>Done!</b></center>');\n";
+    echo "</script>\n";
+    flush();
+    $currently_busy = 0;
+    sleep(1);
+}
+
+function CLEARBUSY() {
+    global $currently_busy;
+    
+    if (!$currently_busy)
+	return;
+
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "ClearBusyIndicators('');\n";
+    echo "</script>\n";
+    flush();
+    $currently_busy = 0;
+}
+
+function HIDEBUSY() {
+    global $currently_busy;
+    
+    if (!$currently_busy)
+	return;
+
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "HideBusyIndicators();\n";
+    echo "</script>\n";
+    flush();
+    $currently_busy = 0;
+}
+
+function PAGEREPLACE($newpage) {
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "PageReplace('$newpage');\n";
+    echo "</script>\n";
+    flush();
+}
+
+class menuBar
+{
+    var $jj;
+    var $kk;
+    var $mO;
+
+    #
+    # Constructor.
+    #
+    function menuBar() {
+	$this->jj = -1;
+	$this->kk = -1;
+	$this->mO = array();
+    }
+
+    function addMenu($title, $id = null) {
+	$this->jj++;
+	$this->mO[$this->jj] = array('#title'   => $title,
+				     '#links'   => array(),
+				     '#id'      => $id);
+    }
+
+    function addItem($link, $text, $target = null,
+		     $divider = FALSE, $extratext = null, $mouseover = null) {
+	$this->mO[$this->jj]['#links'][] = array('#link'      => $link,
+						 '#text'      => $text,
+						 '#target'    => $target,
+						 '#divider'   => $divider,
+						 '#mouseover' => $mouseover,
+						 '#extratext' => $extratext);
+    }
+
+    function writeMenuBar() {
+	echo "<div class=\"menu\">\n";
+	
+	foreach ($this->mO as $i => $menu) {
+	    $title = $menu['#title'];
+	    $index = $i + 1;
+
+	    if (count($menu['#links']) == 1) {
+		$item = $menu['#links'][0];
+		$link = $item['#link'];
+		$text = $item['#text'];
+
+		if ($link == null || $link == "")
+		    echo "$text\n";
+		else {
+		    $mouseover = "";
+		    if ($item['#mouseover']) {
+			$string = htmlentities($item['#mouseover']);
+			$mouseover =
+			    "onmouseover=\"return escape('$string')\"";
+		    }
+		    echo "<li class=toplevel><a $mouseover href=\"$link\">$text</a></li>\n";
+		}
+	    }
+	    else {
+		echo "<ul>\n";
+		echo "<li> <a href=/index.php3>$title <img class=droparrow src=menu-expanded.png>";
+		echo "<!--[if gt IE 6]><!--></a><!--<![endif]-->";
+		echo "<!--[if lt IE 7]>";
+		echo "<table border=0 cellpadding=0 cellspacing=0><tr><td>";
+		echo "<![endif]-->";
+		echo "<ul>\n";
+
+		foreach ($menu['#links'] as $h => $item) {
+		    $link  = $item['#link'];
+		    $text  = $item['#text'];
+		    $extra = $item['#extratext'];
+		    $div   = "";
+
+                    # The divider comes before the item.
+		    if ($item['#divider'])
+			$div = "class=divider";
+
+		    echo "<li $div><a href=\"$link\">$text $extra</a></li>\n";
+		}
+		echo "</ul>";
+#		echo "</td></tr></table></a>";
+		echo "<!--[if lte IE 6]></td></tr></table></a><![endif]-->";
+		echo "</li>\n";
+		echo "</ul>\n";
+	    }
+	}
+	echo "</div>\n";
     }
 }
 

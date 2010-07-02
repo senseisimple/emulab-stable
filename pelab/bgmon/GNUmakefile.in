@@ -1,0 +1,39 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= pelab/bgmon
+
+USERSBIN_STUFF	= opsrecv.pl manager.pl automanagerclient.pl
+USERSLIB_STUFF	= libwanetmon.pm
+
+include $(OBJDIR)/Makeconf
+
+all: $(USERSLIB_STUFF) $(USERSBIN_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBIN_STUFF)) \
+                 $(addprefix $(INSTALL_LIBDIR)/, $(USERSLIB_STUFF))
+
+install: $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(USERSBIN_STUFF)) \
+         $(addprefix $(INSTALL_DIR)/opsdir/lib/, $(USERSLIB_STUFF))
+
+boss-install: install
+
+clean:
+
+$(INSTALL_DIR)/opsdir/lib/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@

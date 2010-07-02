@@ -1223,6 +1223,91 @@ sub debug($$:$) {
     }
 }
 
+#
+# Enable Openflow
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Intel switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Intel swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Disable Openflow
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Intel switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Intel swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set controller
+#
+sub setOpenflowController($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $RetVal;
+    
+    #
+    # Intel switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Intel swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set listener
+#
+sub setOpenflowListener($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $RetVal;
+    
+    #
+    # Intel switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Intel swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Get used listener ports
+#
+sub getUsedOpenflowListenerPorts($) {
+    my $self = shift;
+    my %ports = ();
+
+    warn "ERROR: Intel swith doesn't support Openflow now\n";
+
+    return %ports;
+}
+
+#
+# Check if Openflow is supported on this switch
+#
+sub isOpenflowSupported($) {
+    #
+    # Intel switch doesn't support Openflow yet.
+    #
+    return 0;
+}
+
+
 # End with true
 1;
 

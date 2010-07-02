@@ -1,0 +1,204 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package Logfile;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use English;
+use Group;
+use Data::Dumper;
+
+# Configure variables
+my $TB		  = "@prefix@";
+my $TBAUDIT       = "@TBAUDITEMAIL@";
+
+#
+# Lookup by uuid. For now, just knowing the uuid says you can read the file. 
+#
+sub Lookup($$)
+{
+    my ($class, $logid) = @_;
+    my $logfile;
+
+    #
+    # Argument must be alphanumeric.
+    #
+    if ($logid =~ /^([\w]*)$/) {
+	$logid = $1;
+    }
+    else {
+	return undef;
+    }
+
+    my $query_result =
+	DBQueryWarn("select * from logfiles where logid='$logid'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self           = {};
+    $self->{'LOGFILE'} = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'LOGFILE'}->{$_[1]}); }
+sub logid($)            { return field($_[0], "logid"); }
+sub filename($)         { return field($_[0], "filename"); }
+sub isopen($)           { return field($_[0], "isopen"); }
+sub gid_idx($)          { return field($_[0], "gid_idx"); }
+sub date_created($)     { return field($_[0], "date_created"); }
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $logid = $self->logid();
+    
+    my $query_result =
+	DBQueryWarn("select * from logfiles where logid='$logid'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'LOGFILE'} = $query_result->fetchrow_hashref();
+
+    return 0;
+}
+
+#
+# Create a new logfile. We are given the optional filename, otherwise
+# generate one. 
+#
+sub Create($$;$)
+{
+    my ($class, $gid_idx, $filename) = @_;
+
+    return undef
+	if (ref($class));
+
+    $filename = TBMakeLogname("logfile")
+	if (!defined($filename));
+
+    # Plain secret key, which is used to reference the file.
+    my $logid = TBGenSecretKey();
+
+    if (!DBQueryWarn("insert into logfiles set ".
+		     "  logid='$logid', ".
+		     "  isopen=0, ".
+		     "  filename='$filename', ".
+		     "  gid_idx='$gid_idx', ".
+		     "  date_created=now()")) {
+	return undef;
+    }
+    return Logfile->Lookup($logid);
+}
+
+#
+# Delete a logfile record. Optionally delete the logfile too.
+#
+sub Delete($;$)
+{
+    my ($self, $delete) = @_;
+
+    return -1
+	if (!ref($self));
+
+    $delete = 0
+	if (!defined($delete));
+
+    my $logid    = $self->logid();
+    my $filename = $self->filename();
+    if ($delete) {
+	unlink($filename);
+    }
+    return -1
+	if (!DBQueryWarn("delete from logfiles where logid='$logid'"));
+
+    return 0;
+}
+
+#
+# AccessCheck. The user needs to be a member of the group that the logfile
+# was created in. 
+#
+sub AccessCheck($$)
+{
+    my ($self, $user) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    # Admins do whatever they want.
+    return 1
+	if ($user->IsAdmin());
+
+    my $group = Group->Lookup($self->gid_idx());
+    return 0
+	if (!defined($group));
+
+    # Membership in group.
+    return 1
+	if (defined($group->LookupUser($user)));
+
+    return 0;
+}
+
+#
+# Mark a file open so that the web interface knows to watch it.
+#
+sub Open($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $logid = $self->logid();
+    DBQueryWarn("update logfiles set isopen=1 where logid='$logid'")
+	or return -1;
+    
+    return $self->Refresh();
+}
+
+#
+# Mark file closed, which is used to stop the web interface from spewing.
+#
+sub Close($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $logid = $self->logid();
+    DBQueryWarn("update logfiles set isopen=0 where logid='$logid'")
+	or return -1;
+    
+    return $self->Refresh();
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

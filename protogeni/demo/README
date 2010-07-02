@@ -1,0 +1,33 @@
+The demo for the flash ProtoGENI client consists of three basic
+parts.
+
+test.fla is the base flash file which contains the basic structure and
+  art assets of the demo.
+src/*.as is the set of classes which implement the demo
+src/com/mattism/http/xmlrpc/* is the xmlrpc library which has been
+  modified to act as the network channel.
+
+-----
+Build
+-----
+
+The only way to build the flash demo is with the flash authoring tool. Start the flash authoring tool and open test.fla. Select File -> Publish.
+
+test.swf will be created in the same directory as test.fla.
+
+------------------
+Basic Architecture
+------------------
+
+The demo is organized at a fundamental level as a set of menus only
+one of which is active at any time. Main.as contains the basic
+functionality to select and move between menus. MenuSliceSelect,
+MenuSliceCreate, and MenuSliceDetail provide the implementations for
+the three menus.
+
+The canvas which is used to manage and modify a slice is
+MenuSliceDetail. It delegates the work to three different objects: an
+ActiveNodes object which manages the nodes and links between them, a
+ComponentManager object which maintains the combo box and selection
+list for nodes, and a Console which executes any xmlrpc calls needed
+and update the console text box.

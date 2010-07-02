@@ -1,0 +1,1203 @@
+diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c syslinux-3.71+dfsg/com32/modules/bootinfo.c
+--- syslinux-3.71+dfsg.orig/com32/modules/bootinfo.c	2008-12-18 16:00:21.502810222 -0700
++++ syslinux-3.71+dfsg/com32/modules/bootinfo.c	2008-12-19 16:59:48.000000000 -0700
+@@ -0,0 +1,861 @@
++/*
++ * EMULAB-COPYRIGHT
++ * Copyright (c) 2008 University of Utah and the Flux Group.
++ * All rights reserved.
++ */
++
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
++#include <console.h>
++#include <getkey.h>
++#include <sys/times.h>
++#include <consoles.h>
++#include <syslinux/pxe.h>
++#include <syslinux/reboot.h>
++#include <syslinux/boot.h>
++#include <com32.h>
++#include "bootwhat.h"
++
++const char *progname = "bootinfo.c32";
++
++
++#define	USER_ABORT		-2
++#define MAX_CMD_LENGTH		512 /* XXX Is this sane? */
++#define MAX_CMD_ARGS		64
++
++#define DHCP_SERVER_IP_OFFSET	20
++#define DHCP_SNAME_OFFSET	44
++#define DHCP_FILE_OFFSET	108
++#define DHCP_OPTIONS_OFFSET	236
++
++#define DHCP_OPTION_PAD		0
++#define DHCP_OPTION_OVERLOAD	52
++#define DHCP_OPTION_SERVERID	54
++#define DHCP_OPTION_END		255
++
++int debug = 0;
++
++int udp_open(in_addr_t src_ip)
++{
++	com32sys_t regs;
++	t_PXENV_UDP_OPEN *uo = __com32.cs_bounce;
++
++	uo->status = PXENV_STATUS_FAILURE;
++	uo->src_ip = src_ip;
++
++	memset(&regs, 0, sizeof regs);
++	regs.eax.w[0] = 0x0009;
++	regs.ebx.w[0] = PXENV_UDP_OPEN;
++	regs.es       = SEG(uo);
++	regs.edi.w[0] = OFFS(uo);
++
++	__intcall(0x22, &regs, &regs);
++
++	if (regs.eflags.l & EFLAGS_CF)
++		return -1;
++
++	if (uo->status)
++		return uo->status;
++
++	return 0;
++}
++
++int udp_close(void)
++{
++	com32sys_t regs;
++	t_PXENV_UDP_CLOSE *uc = __com32.cs_bounce;
++	uc->status = PXENV_STATUS_FAILURE;
++	memset(&regs, 0, sizeof regs);
++	regs.eax.w[0] = 0x0009;
++	regs.ebx.w[0] = PXENV_UDP_CLOSE;
++	regs.es       = SEG(uc);
++	regs.edi.w[0] = OFFS(uc);
++
++	__intcall(0x22, &regs, &regs);
++
++	if (regs.eflags.l & EFLAGS_CF)
++		return -1;
++
++	if (uc->status)
++		return uc->status;
++
++	return 0;
++}
++
++
++int udp_read(in_addr_t dest_ip, uint16_t d_port, void *buf, uint16_t *size)
++{
++	com32sys_t regs;
++	t_PXENV_UDP_READ *ur;
++	void *bbuf;
++       
++	ur = __com32.cs_bounce;
++	bbuf = &ur[1];
++	ur->status = PXENV_STATUS_FAILURE;
++	ur->buffer.seg  = SEG(bbuf);
++	ur->buffer.offs = OFFS(bbuf);
++	ur->buffer_size = *size;
++	ur->dest_ip = dest_ip;
++	ur->d_port = d_port;
++
++	memset(&regs, 0, sizeof regs);
++	regs.eax.w[0] = 0x0009;
++	regs.ebx.w[0] = PXENV_UDP_READ;
++	regs.es       = SEG(ur);
++	regs.edi.w[0] = OFFS(ur);
++
++	__intcall(0x22, &regs, &regs);
++
++	if (regs.eflags.l & EFLAGS_CF)
++		return -1;
++
++	if (ur->status)
++		return ur->status;
++
++	memcpy(buf, bbuf, ur->buffer_size);
++
++	*size = ur->buffer_size;
++
++	return 0;
++}
++
++int udp_write(in_addr_t dest_ip, uint16_t d_port, uint16_t s_port,
++              in_addr_t gw, void *buf, uint16_t length)
++{
++	com32sys_t regs;
++	t_PXENV_UDP_WRITE *uw = __com32.cs_bounce;
++	void *bbuf = &uw[1];
++
++	memset(&regs, 0, sizeof regs);
++	regs.eax.w[0] = 0x0009;
++	regs.ebx.w[0] = PXENV_UDP_WRITE;
++	regs.es       = SEG(uw);
++	regs.edi.w[0] = OFFS(uw);
++
++	memcpy(bbuf, buf, length);
++
++	uw->status = PXENV_STATUS_FAILURE;
++	uw->ip = dest_ip;
++	uw->gw = gw;
++	uw->src_port = s_port;
++	uw->dst_port = d_port;
++	uw->buffer_size = length;
++	uw->buffer.seg = SEG(bbuf);
++	uw->buffer.offs = OFFS(bbuf);
++
++	__intcall(0x22, &regs, &regs);
++
++	if (regs.eflags.l & EFLAGS_CF)
++		return -1;
++
++	if (uw->status)
++		return uw->status;
++
++	return 0;
++}
++
++/* IPv4-only version of inet_pton */
++int pton(const char *string, in_addr_t *addr)
++{
++	int o1, o2, o3, o4;
++
++	if (sscanf(string, "%d.%d.%d.%d",
++			&o1, &o2, &o3, &o4) < 0) {
++		return -1;
++	}
++
++	/* make sure no bits > 7 are set */
++	if ((o1 & ~0xff) || (o2 & ~0xff) ||
++	    (o3 & ~0xff) || (o4 & ~0xff)) {
++		return -1;
++	}
++
++	*addr = htonl(o4 << 24 | o3 << 16 | o2 << 8 | o1);
++
++	return 0;
++}
++
++/* IPv4-only version of inet_ntop */
++const char *ntop(const in_addr_t *src, char *dest, int cnt)
++{
++	in_addr_t addr = ntohl(*src);
++
++	snprintf(dest, cnt, "%d.%d.%d.%d",
++		       addr >> 24 & 0xff,
++		       addr >> 16 & 0xff,
++		       addr >>  8 & 0xff,
++		       addr >>  0 & 0xff);
++
++	return dest;
++}
++
++in_addr_t find_boss_ip(void *dhcpdata, size_t dhcplen)
++{
++	in_addr_t server_id = 0;
++	int option_overload = 0;
++	uint8_t type, length;
++	char address[16];
++
++	/* offset of 'next server' field */
++	printf("Checking DHCP data for TFTP server address...");
++	server_id = *(in_addr_t *)(dhcpdata + DHCP_SERVER_IP_OFFSET);
++	if (server_id) {
++		ntop(&server_id, address, sizeof(address));
++		printf(" ok (%s)\n", address);
++		/* printf("Using TFTP server %s as boss server\n", address); */
++		return server_id;
++	}
++	printf(" failed!\n");
++
++	/* Start looking through the DHCP options
++	 * for the Server Identifier option.  Options
++	 * start at offset 240 (after the DHCP magic
++	 * cookie).
++	 */
++
++	printf("Checking DHCP data for DHCP server address...");
++	void *p = dhcpdata + DHCP_OPTIONS_OFFSET + 4; /* 4 for the cookie */
++	do {
++		if (p > dhcpdata + dhcplen) {
++			break;
++		}
++
++		if (option_overload & 2) {
++			/* 'file' field used for options */
++			p = dhcpdata + DHCP_FILE_OFFSET;
++			option_overload &= 1;
++		}
++		else if (option_overload & 1) {
++			/* 'sname' field used for options */
++			p = dhcpdata + DHCP_SNAME_OFFSET;
++			option_overload = 0;
++		}
++		while (*(uint8_t *)p != DHCP_OPTION_END) {
++			type = *(uint8_t *)p;
++
++			if (type == DHCP_OPTION_PAD)
++				length = 1;
++			else
++				length = *(uint8_t *)(p + 1);
++
++			if (type == DHCP_OPTION_OVERLOAD && length == 1) {
++				option_overload = *(uint8_t *)(p + 2);
++			} else if (type == DHCP_OPTION_SERVERID && length == 4) {
++				server_id = *(in_addr_t *)(p + 2);
++				ntop(&server_id, address, sizeof(address));
++				printf(" ok (%s)\n", address);
++				/* printf("Using DHCP server %s as boss server\n", address); */
++			}
++
++			p += length + 2;
++		}
++	} while (option_overload);
++
++	if (!server_id)
++		printf(" failed!\n");
++
++	return server_id;
++}
++
++in_addr_t resolve_hostname(const char *name)
++{
++  com32sys_t reg;
++
++  if (name == NULL)
++	  return 0;
++
++  strcpy((char *)__com32.cs_bounce, name);
++
++  memset(&reg, 0, sizeof(reg));
++  reg.eax.w[0] = 0x0010;
++  reg.ebx.w[0] = OFFS(__com32.cs_bounce);
++  reg.es = SEG(__com32.cs_bounce);
++
++  __intcall(0x22, &reg, &reg);
++
++  if (reg.eflags.l & EFLAGS_CF)
++	  reg.eax.l = 0;
++
++  /* Hmmm... didn't resolve.  See if name is really an IP address. */
++  if (reg.eax.l == 0) {
++	  pton(name, (in_addr_t *)(&reg.eax.l));
++  }
++
++  return reg.eax.l;
++}
++
++#if 0
++/* Munge the kernel name and initrd argument to use the PXELINUX
++ * host::path syntax.  Ugly.
++ *
++ * Returns a pointer to a dynamically-allocated buffer containing
++ * the newly-munged kernel name and commandline as a single string.
++ *
++ * FIXME should probably have the buffer be allocated by the caller, but then I
++ * have to pass in the size of the buffer and do all sorts of nasty bounds
++ * checking.
++ *
++ * FIXME also, doesn't yet support multiple initrd files (comma-separated)
++ */
++char *create_linux_commandline(char *boss_name, char *kernel, char *commandline)
++{
++	char *buffer;
++	char *p;
++
++	/* The buffer doesn't need to be any longer than the combined lengths of
++	 * the kernel and command line, a space to separate them, a terminating
++	 * null byte (duh), plus the additional "boss_name::" prefixes to the
++	 * kernel name and initrd argument (if necessary).
++	 *
++	 * Allocating the buffer here means that I don't need to do bounds
++	 * checking.
++	 */
++	int buffer_length = strlen(kernel) + strlen(commandline) +
++	             2 * strlen(boss_name) + 1 + 4 + 1;
++
++	buffer = malloc(buffer_length);
++	if (buffer == NULL)
++		return NULL;
++
++	/* Leave the kernel name alone if it appears to be
++	 * in pxelinux host::path (or ::path) format.  */
++	if (strstr(kernel, "::") == NULL) {
++		/* Copy host part of name to buffer */
++		if ((p = strchr(kernel, ':'))) {
++			int length = p - kernel;
++			strncpy(buffer, kernel, length);
++			buffer[length] = '\0';
++			p++;
++		}
++		else {
++			/* Doesn't look like we have a host,
++			 * so just assume boss is the host.
++			 */
++			strcpy(buffer, boss_name);
++			p = kernel;
++		}
++
++		/* Append the kernel path */
++		strcat(buffer, "::");
++		strcat(buffer, p);
++		strcat(buffer, " ");
++	} else if (strncmp(kernel, "::", 2) == 0) {
++		/* If the host portion of the string is empty,
++		 * assume boss.  */
++		sprintf(buffer, "%s%s ", boss_name, kernel);
++	} else {
++		sprintf(buffer, "%s ", kernel);
++	}
++
++	p = commandline;
++	/* Eat any whitespace preceeding first argument */
++	while ((*p == ' ') || (*p == '\t'))
++		p++;
++
++	while (*p) {
++		/* look for the next whitespace character */
++		char *q = strchr(p, ' ');
++		if (!q) {
++			q = strchr(p, '\t');
++			if (!q)
++				q = p + strlen(p);
++		}
++
++		if (strncmp(p, "initrd=", 7) == 0) {
++			char *initrd = strchr(p, '=') + 1;
++			strcat(buffer, "initrd=");
++
++			/* Leave the initrd name alone if it appears to be
++			 * in pxelinux host::path (or ::path) format.  */
++			p = strstr(initrd, "::");
++			if ((p == NULL) || (p >= q)) {
++				/* Copy host part of name to buffer */
++				if ((p = strchr(initrd, ':')) && p < q) {
++					int length = p - initrd;
++					strncat(buffer, initrd, length);
++					p++;
++				}
++				else {
++					/* No host, so assume boss */
++					strcat(buffer, boss_name);
++					p = initrd;
++				}
++
++				strcat(buffer, "::");
++			} else if (strncmp(initrd, "::", 2) == 0) {
++				/* If the host portion of the string is empty,
++				 * assume boss.  */
++				strcat(buffer, boss_name);
++			} else {
++				p = initrd;
++			}
++		}
++
++		/* Append argument to command line */
++		strncat(buffer, p, q - p);
++		strcat(buffer, " ");
++
++		p = q;
++		/* Eat any whitespace preceeding next argument */
++		while ((*p == ' ') || (*p == '\t'))
++			p++;
++	}
++
++	return buffer;
++}
++#endif
++
++int send_request(in_addr_t boss_ip, boot_info_t *boot_info)
++{
++	int rc = udp_write(boss_ip, htons(BOOTWHAT_DSTPORT),
++	               htons(BOOTWHAT_SRCPORT), 0, boot_info,
++	               sizeof(boot_info_t));
++	if (rc != PXENV_STATUS_SUCCESS) {
++		fprintf(stderr, "udp_write() returned %d\n", rc);
++	}
++
++	return rc;
++}
++
++void print_packet(char *buffer, int length)
++{
++	int i;
++
++	for (i = 0; i < length; i++) {
++		if (i % 8 == 0) {
++			printf("\n");
++		}
++		printf("%02x ", buffer[i]);
++	}
++}
++
++/* Try to get a bootinfo response
++ *
++ * my_ip: destination ip to accept packets for
++ * buffer: where to store the response
++ * legnth: size of buffer
++ * timeout: the time to wait for a response (in clock ticks), or 0 for polling mode
++ *
++ * This tries to approximate the behavior of having a socket with a receive timeout
++ * by polling for approximately timeout clock ticks.
++ *
++ * returns PXENV_STATUS_SUCCESS if a packet was read.  'length' will now contain
++ * the size of the packet.
++ *
++ * returns PXENV_STATUS_FAILURE if no packet was read or an unknown error occurs.
++ */
++int get_response(in_addr_t my_ip, uint8_t *buffer, size_t *length, clock_t timeout)
++{
++	int rc;
++	int key;
++	clock_t start;
++
++	start = times(NULL);
++	do {
++		/* We have to handle Ctrl-C events here too. Yuck. */
++		key = get_key(stdin, 1);
++		if (key == KEY_CTRL('C')) {
++			rc = USER_ABORT;
++			break;
++		}
++		rc = udp_read(my_ip, htons(BOOTWHAT_SRCPORT),
++			      buffer, (uint16_t *)length);
++		if (rc == PXENV_STATUS_SUCCESS) {
++			/* print_packet(buffer, *length); */
++			break;
++		}
++		else if (rc == -1) {
++			rc = PXENV_STATUS_FAILURE;
++		}
++		else if (rc != PXENV_STATUS_FAILURE) {
++			fprintf(stderr, "WARNING: udp_read() returned %d\n", rc);
++			break;
++		}
++	} while (!timeout || (times(NULL) - start < timeout));
++
++	return rc;
++}
++
++extern int chain_main(int argc, char **argv);
++
++/*
++ * XXX EVIL HACK: for efficiency reasons we link this with
++ * com32/modules/chain.c from the syslinux source tree.  The
++ * existing interface to the code takes a command line in
++ * (int argc, char **argv) format.  Rather than write a new
++ * interface to the code in chain.c, we just build a
++ * commandline here and pass it in to chain_main() just as
++ * syslinux itself would.  This way all I need to add to
++ * chain.c is a handful of lines and a few ifdefs.
++ */
++int chain_boot(char *disk, int partition)
++{
++	char command[MAX_CMD_LENGTH];
++	char *args[MAX_CMD_ARGS + 1];
++	int arg_count;
++	char *p;
++
++	printf("Booting from disk %s, partition %d\n", disk,
++	       partition);
++
++	if (partition > 0)
++		snprintf(command, sizeof(command), "chain.c32 %s %d",
++			 disk, partition);
++	else
++		snprintf(command, sizeof(command), "chain.c32 %s",
++			 disk);
++
++#if 0
++	syslinux_run_command(command);
++	return 0;
++#else
++	p = strtok(command, " ");
++	arg_count = 0;
++	while (p && arg_count < MAX_CMD_ARGS) {
++		args[arg_count++] = p;
++		p = strtok(NULL, " ");
++	}
++	args[arg_count] = NULL;
++	return chain_main(arg_count, args);
++#endif
++}
++
++/*
++ * Mangle the supplied filename to make sure it's in
++ * the syslinux "host::file" format.
++ */
++char *mangle_name(char *boss_name, char *file)
++{
++	char *mangled_name;
++	char *p;
++	int length;
++
++	mangled_name = NULL;
++
++	if ((p = strstr(file, "::"))) {
++		if (p == file) {
++			length = strlen(boss_name) + strlen(file) + 1;
++			mangled_name = malloc(length);
++			if (!mangled_name)
++				return NULL;
++			sprintf(mangled_name, "%s%s", boss_name, file);
++		} else {
++			length = strlen(file) + 1;
++			mangled_name = malloc(length);
++			if (!mangled_name)
++				return NULL;
++			sprintf(mangled_name, "%s", file);
++		}
++	} else {
++		if ((p = strchr(file, ':'))) {
++			length = strlen(file) + 1 + 1;
++			mangled_name = malloc(length);
++			if (!mangled_name)
++				return NULL;
++			strncpy(mangled_name, file, p - file);
++			strcpy(mangled_name + (p - file), "::");
++			strcat(mangled_name, p + 1);
++		} else {
++			length = strlen(boss_name) + strlen(file) + 2 + 1;
++			mangled_name = malloc(length);
++			if (!mangled_name)
++				return NULL;
++			sprintf(mangled_name, "%s::%s", boss_name, file);
++		}
++	}
++
++	return mangled_name;
++}
++
++/*
++ * syslinux can load multiple initramfs files. In order
++ * to support this we must mangle every one of the comma-
++ * separated filenames to make sure it's in the correct
++ * format. Ugh.
++ */
++char *mangle_initrd(char *boss_name, char *initrd)
++{
++	char *new_initrd;
++	char *p, *t;
++	char *file, *new_file;
++
++	size_t length = strlen(initrd) + 1;
++	size_t used;
++
++	new_initrd = malloc(length);
++	if (!new_initrd)
++		return NULL;
++
++	sprintf(new_initrd, "initrd=");
++	used = strlen(new_initrd);
++
++	p = new_initrd + used;
++	file = strtok(initrd + used, ",");
++	if (!file) {
++		new_initrd = mangle_name(boss_name, initrd + used);
++	} else {
++		while(file) {
++			new_file = mangle_name(boss_name, file);
++			if ((used + strlen(new_file)) >= length) {
++				/* plus 1 for comma */
++				length = used + strlen(new_file) + 1;
++				/* plus 1 for null */
++				t = realloc(new_initrd, length + 1);
++				if (t == NULL) {
++					if (new_initrd)
++						free(new_initrd);
++					return NULL;
++				}
++				new_initrd = t;
++				p = new_initrd + used;
++			}
++
++			/*start after the "initrd=" */
++			if (new_initrd[7]) {
++				sprintf(p, ",%s", new_file);
++				p += 1;
++			} else {
++				sprintf(p, "%s", new_file);
++			}
++
++			p += strlen(new_file);
++			free(new_file);
++
++			used = p - new_initrd;
++
++			file = strtok(NULL, ",");
++		}
++	}
++
++	return new_initrd;
++}
++
++extern int linux_main(int argc, char **argv);
++
++/* The cached DHCP response is written to /dhcpinfo.dat
++ * in the initramfs, eliminating the need to do another
++ * DHCP request from inside the OS.
++ *
++ * XXX EVIL HACK: for efficiency reasons we link this with
++ * com32/modules/linux.c from the syslinux source tree.  The
++ * existing interface to the code takes a command line in
++ * (int argc, char **argv) format.  Rather than write a new
++ * interface to the code in linux.c, we just build a
++ * commandline here and pass it in to linux_main() just as
++ * syslinux itself would.  This way all I need to add to
++ * linux.c is a handful of lines and a few ifdefs.
++ */
++int kernel_boot(char *boss_name, char *kernel, char *cmdline)
++{
++	char *kernel_name;
++        char *initrd_string = NULL;
++	char *args[MAX_CMD_ARGS + 1];
++	int arg_count;
++	int initrd_index = -1;
++	int rc;
++
++	char *p;
++
++	kernel_name = mangle_name(boss_name, kernel);
++	if (kernel_name == NULL)
++		return 1;
++
++	args[0] = "linux.c32";
++	args[1] = "-dhcpinfo";
++	args[2] = kernel_name;
++	arg_count = 3;
++
++	p = strtok(cmdline, " ");
++	while (p && arg_count < MAX_CMD_ARGS) {
++		if (strncmp(p, "initrd=", 7) == 0) {
++			initrd_index = arg_count;
++		}
++		args[arg_count] = p;
++		arg_count++;
++		p = strtok(NULL, " ");
++	}
++	args[arg_count] = NULL;
++
++	if (initrd_index >= 0) {
++		initrd_string = mangle_initrd(boss_name, args[initrd_index]);
++		if (initrd_string == NULL) {
++			free(kernel_name);
++			return 1;
++		}
++
++		args[initrd_index] = initrd_string;
++	}
++
++	rc = linux_main(arg_count, args);
++
++	free(kernel_name);
++	if (initrd_string)
++		free(initrd_string);
++
++	return rc;
++}
++
++int main(int argc, char *argv[])
++{
++	boot_info_t *boot_info;
++	boot_what_t *boot_what;
++	uint8_t buffer[sizeof(boot_info_t) + MAX_BOOT_CMDLINE];
++	size_t length;
++	in_addr_t my_ip;
++	in_addr_t boss_ip;
++	void *dhcpdata;
++	size_t dhcplen;
++	int rc = 0;
++	char *boss_name = NULL;
++	char foobar[256];
++	int key;
++
++	openconsole(&dev_rawcon_r, &dev_stdcon_w);
++
++	boss_ip = 0;
++	if (argc >= 3) {
++	       if (strcmp(argv[1], "-debug") == 0) {
++			debug = 1;
++	       		boss_name = argv[2];
++	       }
++	       else {
++	       		boss_name = argv[1];
++	       }
++	}
++	else if (argc >= 2) {
++		boss_name = argv[1];
++	}
++
++	printf("Press any key to enter interactive mode...\n");
++	key = get_key(stdin, 5 * CLK_TCK);
++	if (key != KEY_NONE) {
++		return 1;
++	}
++
++	if (boss_name) {
++		printf("Resolving supplied boss name (%s)...", boss_name);
++		boss_ip = resolve_hostname(boss_name);
++		printf(" %s\n", boss_ip ?
++		       ntop(&boss_ip, foobar, sizeof(foobar)) : "failed!");
++	}
++
++	boot_info = (boot_info_t *)buffer;
++
++	/* Extract our IP address from the cached DHCP data */
++	if (pxe_get_cached_info(PXENV_PACKET_TYPE_DHCP_ACK, &dhcpdata,
++	                        &dhcplen) != PXENV_STATUS_SUCCESS) {
++		fprintf(stderr, "ERROR: could not get current IP address\n");
++		return -1;
++	}
++
++	my_ip = *(in_addr_t *)(dhcpdata + 16);
++	if (boss_ip == 0) {
++		boss_ip = find_boss_ip(dhcpdata, dhcplen);
++		if (boss_ip == 0) {
++			fprintf(stderr, "Unable to find boss address\n");
++			free(dhcpdata);
++			return -1;
++		}
++
++		ntop(&boss_ip, foobar, sizeof(foobar));
++		boss_name = foobar;
++	}
++
++	free(dhcpdata);
++
++	memset(buffer, 0, sizeof(buffer));
++	boot_info->version = BIVERSION_CURRENT;
++	boot_info->opcode  = BIOPCODE_BOOTWHAT_REQUEST;
++
++	udp_close();
++	rc = udp_open(my_ip);
++	if (rc != PXENV_STATUS_SUCCESS) {
++		fprintf(stderr, "udp_open returned %d\n", rc);
++		return rc;
++	}
++	
++	printf("Requesting bootinfo data from %s...", boss_name);
++	while(1) {
++		rc = send_request(boss_ip, boot_info);
++		if (rc != PXENV_STATUS_SUCCESS && rc != PXENV_STATUS_FAILURE) {
++			printf("\n");
++			return rc;
++		}
++		
++		printf(".");
++
++		boot_what = (boot_what_t *)boot_info->data;
++		boot_what->type = 0;
++
++		length = sizeof(buffer);
++
++		/* Wait up to 10 seconds(-ish) for a response */
++		rc = get_response(my_ip, boot_info, &length, 10 * CLK_TCK);
++		if (rc != PXENV_STATUS_SUCCESS && rc != PXENV_STATUS_FAILURE) {
++			printf("\n");
++			return rc;
++		}
++
++		if (rc == PXENV_STATUS_SUCCESS)
++			printf(" ok\n");
++
++		while (boot_what->type == BIBOOTWHAT_TYPE_WAIT) {
++			printf("Polling for bootinfo response... ");
++			length = sizeof(buffer);
++			rc = get_response(my_ip, boot_info, &length, 0);
++			if (rc != PXENV_STATUS_SUCCESS) {
++				printf("\n");
++				return rc;
++			}
++			printf(" ok\n");
++		}
++
++		switch (boot_what->type) {
++			case BIBOOTWHAT_TYPE_REBOOT:
++				printf("Rebooting...\n");
++				syslinux_reboot(0);
++				break;
++			case BIBOOTWHAT_TYPE_PART:
++				return chain_boot("hd0", boot_what->what.partition);
++				break;
++			case BIBOOTWHAT_TYPE_MFS:
++				return kernel_boot(boss_name, boot_what->what.mfs,
++				            boot_what->cmdline);
++				break;
++			case BIBOOTWHAT_TYPE_AUTO:
++				printf("query: will query again\n");
++				break;
++			case BIBOOTWHAT_TYPE_SYSID:
++				printf("request to boot partition type 0x%02x not supported\n",
++						boot_what->what.sysid);
++				break;
++		}
++
++		/* Only sleep if we got a bogus response or we are to
++		 * go through the loop again.
++		 *
++		 * Use get_key() to do the sleep so we can catch Ctrl-C
++		 * keypresses.
++		 */
++		if (rc != PXENV_STATUS_FAILURE) {
++			key = get_key(stdin, 5 * CLK_TCK);
++			if (key == KEY_CTRL('C')) {
++				printf("\n");
++				rc = 1;
++				break;
++			}
++		}
++
++	}
++
++#if 0
++	rc = udp_close();
++	if (rc != PXENV_STATUS_SUCCESS) {
++		fprintf(stderr, "udp_close() returned %d\n", rc);
++		return rc;
++	}
++#endif
++
++	return rc;
++}
+diff -Nru syslinux-3.71+dfsg.orig/com32/modules/bootwhat.h syslinux-3.71+dfsg/com32/modules/bootwhat.h
+--- syslinux-3.71+dfsg.orig/com32/modules/bootwhat.h	1969-12-31 17:00:00.000000000 -0700
++++ syslinux-3.71+dfsg/com32/modules/bootwhat.h	2008-09-24 15:51:47.000000000 -0600
+@@ -0,0 +1,105 @@
++/*
++ * EMULAB-COPYRIGHT
++ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
++ * All rights reserved.
++ *
++ * boot/bootwhat.h from the OSKit.
++ */
++
++#ifndef _OSKIT_BOOT_BOOTWHAT_H_
++#define _OSKIT_BOOT_BOOTWHAT_H_
++
++#define BOOTWHAT_DSTPORT		6969
++#define BOOTWHAT_SRCPORT		9696
++#define BOOTWHAT_SENDPORT		6970
++
++/*
++ * This is the structure we pass back and forth between pxeboot on a node
++ * and a server running on some other machine, that tells what to do.
++ *
++ * The structure below was changed, adding the version slot by splitting
++ * the opcode from an int into a short. Old clients conveniently look like a
++ * version zero client. The same was done for the "type" field, splitting 
++ * that into "flags" and "type" shorts.
++ */
++#define  MAX_BOOT_DATA		512
++#define  MAX_BOOT_PATH		256
++#define  MAX_BOOT_CMDLINE	((MAX_BOOT_DATA - MAX_BOOT_PATH) - 32)
++
++typedef struct boot_info {
++	short   version;
++	short	opcode;
++	int	status;
++	char	data[MAX_BOOT_DATA];
++} boot_info_t;
++
++/* Opcode */
++#define BIOPCODE_BOOTWHAT_REQUEST	1	/* What to boot request */
++#define BIOPCODE_BOOTWHAT_REPLY		2	/* What to boot reply */
++#define BIOPCODE_BOOTWHAT_ACK		3	/* Ack to Reply */
++#define BIOPCODE_BOOTWHAT_ORDER		4	/* Unsolicited command */
++#define BIOPCODE_BOOTWHAT_INFO		5	/* Request for bootinfo */
++
++/* Version */
++#define BIVERSION_CURRENT		1	/* Old version is zero */
++
++/* Status */
++#define BISTAT_SUCCESS			0
++#define BISTAT_FAIL			1
++
++/* BOOTWHAT Reply */
++typedef struct boot_what {
++	short	flags;
++	short	type;
++	union {
++		/*
++		 * Type is BIBOOTWHAT_TYPE_PART
++		 *
++		 * Specifies the partition number.
++		 */
++		int			partition;
++		
++		/*
++		 * Type is BIBOOTWHAT_TYPE_SYSID
++		 *
++		 * Specifies the PC BIOS filesystem type.
++		 */
++		int			sysid;
++		
++		/*
++		 * Type is BIBOOTWHAT_TYPE_MB
++		 *
++		 * Specifies a multiboot kernel pathway suitable for TFTP.
++		 */
++		struct {
++			struct in_addr	tftp_ip;
++			char		filename[MAX_BOOT_PATH];
++		} mb;
++
++		/*
++		 * Type is BIBOOTWHAT_TYPE_MFS
++		 *
++		 * Specifies network path to MFS (boss:/tftpboot/frisbee)
++		 * With no host spec, defaults to bootinfo server IP.
++		 */
++		char			mfs[MAX_BOOT_PATH];
++	} what;
++	/*
++	 * Kernel and command line to pass to boot loader or multiboot kernel.
++	 */
++	char	cmdline[1];
++} boot_what_t;
++
++/* What type of thing to boot */
++#define BIBOOTWHAT_TYPE_PART	1	/* Boot a partition number */
++#define BIBOOTWHAT_TYPE_SYSID	2	/* Boot a system ID */
++#define BIBOOTWHAT_TYPE_MB	3	/* Boot a multiboot image */
++#define BIBOOTWHAT_TYPE_WAIT    4	/* Wait, no boot until later */
++#define BIBOOTWHAT_TYPE_REBOOT	5	/* Reboot */
++#define BIBOOTWHAT_TYPE_AUTO	6	/* Do a bootinfo query */
++#define BIBOOTWHAT_TYPE_MFS	7	/* Boot an MFS from server:/path */
++
++/* Flags */
++#define BIBOOTWHAT FLAGS_CMDLINE	0x01	/* Kernel to boot */ 
++
++#endif /* _OSKIT_BOOT_BOOTWHAT_H_ */
+diff -Nru syslinux-3.71+dfsg.orig/com32/modules/chain.c syslinux-3.71+dfsg/com32/modules/chain.c
+--- syslinux-3.71+dfsg.orig/com32/modules/chain.c	2008-07-31 18:21:15.000000000 -0600
++++ syslinux-3.71+dfsg/com32/modules/chain.c	2008-09-24 15:51:47.000000000 -0600
+@@ -645,7 +645,11 @@
+   return 0;			/* ok */
+ }
+ 
++#ifndef BOOTINFO
+ int main(int argc, char *argv[])
++#else
++int chain_main(int argc, char *argv[])
++#endif
+ {
+   char *mbr, *p;
+   void *boot_sector = NULL;
+@@ -656,7 +660,9 @@
+   int i;
+   size_t boot_size = SECTOR;
+ 
++#ifndef BOOTINFO
+   openconsole(&dev_null_r, &dev_stdcon_w);
++#endif
+ 
+   drivename = "boot";
+   partition = NULL;
+diff -Nru syslinux-3.71+dfsg.orig/com32/modules/linux.c syslinux-3.71+dfsg/com32/modules/linux.c
+--- syslinux-3.71+dfsg.orig/com32/modules/linux.c	2008-07-31 18:21:15.000000000 -0600
++++ syslinux-3.71+dfsg/com32/modules/linux.c	2008-09-24 15:51:47.000000000 -0600
+@@ -45,7 +45,11 @@
+ #include <syslinux/linux.h>
+ #include <syslinux/pxe.h>
+ 
++#ifndef BOOTINFO
+ const char *progname = "linux.c32";
++#else
++extern const char *progname;
++#endif
+ 
+ /* Find the last instance of a particular command line argument
+    (which should include the final =; do not use for boolean arguments) */
+@@ -135,7 +139,11 @@
+   return cmdline;
+ }
+ 
++#ifndef BOOTINFO
+ int main(int argc, char *argv[])
++#else
++int linux_main(int argc, char *argv[])
++#endif
+ {
+   uint32_t mem_limit = 0;
+   uint16_t video_mode = 0;
+@@ -150,7 +158,9 @@
+   size_t dhcplen;
+   char **argp, *arg, *p;
+ 
++#ifndef BOOTINFO
+   openconsole(&dev_null_r, &dev_stdcon_w);
++#endif
+ 
+   (void)argc;
+   argp = argv+1;
+diff -Nru syslinux-3.71+dfsg.orig/com32/modules/Makefile syslinux-3.71+dfsg/com32/modules/Makefile
+--- syslinux-3.71+dfsg.orig/com32/modules/Makefile	2008-07-31 18:21:15.000000000 -0600
++++ syslinux-3.71+dfsg/com32/modules/Makefile	2008-09-24 15:51:47.000000000 -0600
+@@ -54,7 +54,7 @@
+ 
+ MODULES	  = chain.c32 ethersel.c32 mboot.c32 dmitest.c32 cpuidtest.c32 \
+ 	    pcitest.c32 elf.c32 linux.c32 reboot.c32 pmload.c32 meminfo.c32 \
+-	    sdi.c32 sanboot.c32 ifcpu64.c32
++	    sdi.c32 sanboot.c32 ifcpu64.c32 bootinfo.c32
+ 
+ TESTFILES =
+ 
+@@ -87,6 +87,12 @@
+ %.c32: %.elf
+ 	$(OBJCOPY) -O binary $< $@
+ 
++%_bootinfo.o: %.c
++	$(CC) $(CFLAGS) -DBOOTINFO -c -o $@ $<
++
++bootinfo.elf: bootinfo.o linux_bootinfo.o chain_bootinfo.o $(LIBS)
++	$(LD) $(LDFLAGS) -o $@ $^
++
+ pcitest.elf : pcitest.o $(LIBS)
+ 	$(LD) $(LDFLAGS) -o $@ $^
+ 
+diff -Nru syslinux-3.71+dfsg.orig/core/Makefile syslinux-3.71+dfsg/core/Makefile
+--- syslinux-3.71+dfsg.orig/core/Makefile	2008-07-31 18:21:15.000000000 -0600
++++ syslinux-3.71+dfsg/core/Makefile	2008-09-24 15:51:47.000000000 -0600
+@@ -46,6 +46,10 @@
+ 
+ PERL     = perl
+ 
++ELABFLAGS_VGA = -DEMULAB
++ELABFLAGS_SERIAL0 = -DEMULAB -DHAS_SERIAL -DBAUD_RATE=115200 -DSERIAL_PORT=0 -DFLOW_CONTROL=3
++ELABFLAGS_SERIAL1 = -DEMULAB -DHAS_SERIAL -DBAUD_RATE=115200 -DSERIAL_PORT=1 -DFLOW_CONTROL=3
++
+ # This is very similar to cp437; technically it's for Norway and Denmark,
+ # but it's unlikely the characters that are different will be used in
+ # filenames by other users.
+@@ -55,6 +59,7 @@
+ BTARGET  = kwdhash.gen \
+ 	   ldlinux.bss ldlinux.sys ldlinux.bin \
+ 	   pxelinux.0 isolinux.bin isolinux-debug.bin \
++	   pxelinux.vga.0 pxelinux.ttyS0.0 pxelinux.ttyS1.0 \
+ 	   extlinux.bin extlinux.bss extlinux.sys
+ 
+ # All primary source files for the main syslinux files
+@@ -91,6 +96,21 @@
+ %.bin: %.elf
+ 	$(OBJCOPY) -O binary $< $@
+ 
++pxelinux.vga.o: pxelinux.asm kwdhash.gen ../version.gen
++	$(NASM) $(NASMOPT) -f elf -g -F stabs -DDATE_STR="'$(DATE)'" \
++		-DHEXDATE="$(HEXDATE)" $(ELABFLAGS_VGA) \
++		-l $(@:.o=.lsr) -o $@ $<
++
++pxelinux.ttyS0.o: pxelinux.asm kwdhash.gen ../version.gen
++	$(NASM) $(NASMOPT) -f elf -g -F stabs -DDATE_STR="'$(DATE)'" \
++		-DHEXDATE="$(HEXDATE)" $(ELABFLAGS_SERIAL0) \
++		-l $(@:.o=.lsr) -o $@ $<
++
++pxelinux.ttyS1.o: pxelinux.asm kwdhash.gen ../version.gen
++	$(NASM) $(NASMOPT) -f elf -g -F stabs -DDATE_STR="'$(DATE)'" \
++		-DHEXDATE="$(HEXDATE)" $(ELABFLAGS_SERIAL1) \
++		-l $(@:.o=.lsr) -o $@ $<
++
+ %.o: %.asm kwdhash.gen ../version.gen
+ 	$(NASM) $(NASMOPT) -f elf -g -F stabs -DDATE_STR="'$(DATE)'" \
+ 		-DHEXDATE="$(HEXDATE)" \
+@@ -104,6 +124,15 @@
+ pxelinux.0: pxelinux.bin
+ 	cp -f $< $@
+ 
++pxelinux.vga.0: pxelinux.vga.bin
++	cp -f $< $@
++
++pxelinux.ttyS0.0: pxelinux.ttyS0.bin
++	cp -f $< $@
++
++pxelinux.ttyS1.0: pxelinux.ttyS1.bin
++	cp -f $< $@
++
+ ldlinux.bss: ldlinux.bin
+ 	dd if=$< of=$@ bs=512 count=1
+ 
+diff -Nru syslinux-3.71+dfsg.orig/core/parseconfig.inc syslinux-3.71+dfsg/core/parseconfig.inc
+--- syslinux-3.71+dfsg.orig/core/parseconfig.inc	2008-07-31 18:21:15.000000000 -0600
++++ syslinux-3.71+dfsg/core/parseconfig.inc	2008-09-24 15:51:47.000000000 -0600
+@@ -180,7 +180,8 @@
+ ;
+ ; "serial" command
+ ;
+-pc_serial:	call getint
++pc_serial:
++		call getint
+ 		jc .err
+ 		push bx				; Serial port #
+ 		xor ax,ax
+@@ -213,6 +214,14 @@
+ 		mov ebx,DEFAULT_BAUD		; No baud rate given
+ .parse_baud:
+ 		pop di				; Serial port #
++%ifdef EMULAB
++		jmp pc_serial_noconfig
++.err:
++		mov [SerialPort], word 0
++		ret
++
++pc_serial_noconfig:
++%endif
+ 		cmp ebx,byte 75
+ 		jb .err				; < 75 baud == bogus
+ 		mov eax,BAUD_DIVISOR
+diff -Nru syslinux-3.71+dfsg.orig/core/pxelinux.asm syslinux-3.71+dfsg/core/pxelinux.asm
+--- syslinux-3.71+dfsg.orig/core/pxelinux.asm	2008-07-31 18:21:15.000000000 -0600
++++ syslinux-3.71+dfsg/core/pxelinux.asm	2008-09-24 15:52:59.000000000 -0600
+@@ -56,6 +56,14 @@
+ 
+ %define HAVE_IDLE 1			; idle is not a noop
+ 
++%ifdef EMULAB
++%ifndef HAS_SERIAL
++%define SERIAL_PORT=0
++%define BAUD_RATE=0
++%define FLOW_CONTROL=0
++%endif
++%endif
++
+ %if HAVE_IDLE
+ %macro	RESET_IDLE 0
+ 	call reset_idle
+@@ -704,6 +712,25 @@
+ 		call writestr_early
+ 		call crlf
+ 
++%ifdef EMULAB 
++%ifdef HAS_SERIAL
++		mov bx, FLOW_CONTROL
++		and bh,0Fh			; FlowIgnore
++		shl bh,4
++		mov [FlowIgnore],bh
++		mov bh,bl
++		and bx,0F003h			; Valid bits
++		mov [FlowControl],bx
++		mov di, SERIAL_PORT
++		mov ebx, BAUD_RATE
++		call pc_serial_noconfig
++%endif
++		mov si,bootinfo_cmd
++		mov di,default_cmd
++		mov cx,(max_cmd_len+4) >> 2
++		rep movsd
++		jmp auto_boot
++%endif
+ ;
+ ; Load configuration file
+ ;
+@@ -2730,6 +2757,9 @@
+ syslinux_banner	db CR, LF, 'PXELINUX ', VERSION_STR, ' ', DATE_STR, ' ', 0
+ cfgprefix	db 'pxelinux.cfg/'		; No final null!
+ cfgprefix_len	equ ($-cfgprefix)
++%ifdef EMULAB
++bootinfo_cmd	db 'bootinfo.c32', 0
++%endif
+ 
+ ; This one we make ourselves
+ bootif_str	db 'BOOTIF='

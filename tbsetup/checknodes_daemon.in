@@ -1,0 +1,381 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Attempt to determine if nodes are really messed up.
+#
+sub usage()
+{
+    print "Usage: checknodes_daemon [-d]\n";
+    exit(1);
+}
+my $optlist   = "dn";
+my $debug     = 0;
+my $impotent  = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $LOGFILE       = "$TB/log/checknodes.log";
+my $PIDFILE       = "/var/run/checknodes.pid";
+my $SUDO          = "/usr/local/bin/sudo";
+my $PROTOUSER     = "elabman";
+my $WAP           = "$TB/sbin/withadminprivs";
+my $BATCHEXP      = "$TB/bin/batchexp";
+my $NAMED_SETUP   = "$TB/sbin/named_setup";
+my $EXPORTS_SETUP = "$TB/sbin/exports_setup";
+my $GENTOPOFILE   = "$TB/libexec/gentopofile";
+my $NFREE         = "$TB/bin/nfree";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub NodeIsDead($);
+sub NodeIsOkay($);
+	  
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+if ($UID != 0) {
+    die("Must be root to run this script\n");
+}
+
+#
+# Check args early so we get the right DB.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libosload;
+use libtestbed;
+use Experiment;
+use Node;
+use User;
+
+my $NODEILL_PID = NODEILL_PID();
+my $NODEILL_EID = NODEILL_EID();
+
+#
+# Only one please.
+#
+if (CheckDaemonRunning("checknodes_daemon")) {
+    fatal("Not starting another checknodes daemon!");
+}
+
+#
+# We need this user for running below.
+#
+my $elabman = User->Lookup($PROTOUSER);
+if (!defined($elabman)) {
+    fatal("Could not lookup $PROTOUSER user. Exiting ...");
+}
+
+#
+# Grab the expeiment we use,
+#
+my $experiment = Experiment->Lookup($NODEILL_PID, $NODEILL_EID);
+if (!defined($experiment)) {
+    #
+    # Create if it does not exist.
+    #
+    system("$SUDO -u $PROTOUSER $WAP $BATCHEXP ".
+	   " -q -i -k -j -w -f -n -S 'System Experiment' ".
+	   " -L 'System Experiment' ".
+	   " -E 'Check failed nodes before moving to hwdown - DO NOT DELETE' ".
+	   " -p $NODEILL_PID -e $NODEILL_EID");
+    if ($?) {
+ 	fatal("Could not create experiment for $NODEILL_PID/$NODEILL_EID\n");
+    }
+    $experiment = Experiment->Lookup($NODEILL_PID, $NODEILL_EID);
+}
+if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
+    $experiment->SetState(EXPTSTATE_ACTIVE());
+}
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
+
+#
+# We need the hwdown experiment below.
+#
+my $hwdown_experiment = Experiment->Lookup(NODEDEAD_PID(), NODEDEAD_EID());
+if (!defined($hwdown_experiment)) {
+    fatal("Cannot find the hwdown experiment.");
+}
+
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($LOGFILE)) {
+	exit(0);
+    }
+}
+if (MarkDaemonRunning("checknodes_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+print "Check Nodes Daemon starting ... pid $$, at ".`date`;
+
+if ($elabman->FlipTo($experiment->unix_gid())) {
+    fatal("Could not flipto $elabman ($experiment)");
+}
+
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
+    ReOpenLog($LOGFILE);
+    $EUID = $SAVEEUID;
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
+while (1) {
+    my @informtbopsfatal = ();
+    my @informtbopswarn  = ();
+    my @tmp = ();
+    my $disabled;
+
+    print "Running at ".
+	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
+
+    if (! TBGetSiteVar("web/nologins", \$disabled) || $disabled) {
+	print "  Skipping this loop cause of nologins\n";
+	goto loop;
+    }
+
+    #
+    # Look for nodes in a wierd state. Lets test them.
+    #
+    my $query_result = 
+	DBQueryWarn("select n.node_id,n.eventstate, ".
+	    "   FROM_UNIXTIME(n.state_timestamp) from nodes as n ".
+	    "left join reserved as r on r.node_id=n.node_id ".
+	    "left join node_types as t on t.type=n.type ".
+	    "where (n.eventstate!='". TBDB_NODESTATE_ISUP ."' and ".
+	    "       n.eventstate!='". TBDB_NODESTATE_PXEWAIT ."' and ".
+	    "       n.eventstate!='". TBDB_NODESTATE_PXELIMBO ."' and ".
+	    "       n.eventstate!='". TBDB_NODESTATE_ALWAYSUP ."' and ".
+	    "       n.eventstate!='". TBDB_NODESTATE_POWEROFF ."') and ".
+            "       r.pid is null and n.role='testnode' and ".
+	    "       t.isvirtnode=0 and ".
+            "       (UNIX_TIMESTAMP(now()) - n.state_timestamp) > 600");
+    goto loop
+	if (!$query_result);
+
+    while (my ($nodeid,$eventstate,$stamp) = $query_result->fetchrow_array()) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    print STDERR "Cannot find object for $nodeid\n";
+	    next;
+	}
+	#
+	# Skip nodes that are not imageable; we cannot load them
+	# to test them.
+	#
+	next
+	    if (!$node->imageable() ||
+		!defined($node->default_imageid()));
+
+	print "Node in unknown state: $nodeid,$eventstate,$stamp\n";
+
+	next
+	    if ($impotent);
+	
+	#
+	# The node is not in any experiment, so we have to explicitly
+	# push it into the hwcheckup experiment.
+	#
+	if ($node->MoveReservation($experiment)) {
+	    print STDERR "Could not move $node to $experiment\n";
+	    next;
+	}
+	$node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
+				  "'Moved to hwcheckup by checknodes daemon; ".
+				  "stuck in $eventstate since $stamp'");
+    }
+
+    $experiment->Flush();
+    Node->FlushAll();
+
+    my @nodelist = $experiment->NodeList();
+    goto loop
+	if (!@nodelist);
+
+    if ($impotent) {
+	print "Would check @nodelist\n";
+	goto loop;
+    }
+
+    foreach my $node (@nodelist) {
+	if ($node->ClearBootAttributes()) {
+	    print STDERR "$node: Could not clear boot attributes.\n";
+	    next;
+	}
+	if (! $node->imageable()) {
+	    print STDERR "$node is not imageable.\n";
+	    NodeIsDead($node);
+	    push(@informtbopsfatal, $node->node_id());
+	    next;
+	}
+	push(@tmp, $node);
+    }
+    @nodelist = @tmp;
+
+    print "Checking nodes @nodelist\n";
+
+    if (@nodelist) {
+	print "Running $GENTOPOFILE ...\n";
+	if (system("$GENTOPOFILE $pid $eid")) {
+	    print STDERR "$GENTOPOFILE failed\n";
+	    next;
+	}
+	print "Running $EXPORTS_SETUP ...\n";
+	if (system("$EXPORTS_SETUP")) {
+	    print STDERR "$EXPORTS_SETUP failed\n";
+	    next;
+	}
+	# The nodes will not boot locally unless there is a DNS
+	# record.
+	print "Running $NAMED_SETUP ...\n";
+	if (system("$NAMED_SETUP")) {
+	    print STDERR "$NAMED_SETUP failed\n";
+	    next;
+	}
+	my @nodenames       = map { $_->node_id() } @nodelist;
+	my %reload_args     = ();
+	my %reload_results  = ();
+
+	$reload_args{'debug'}     = $debug;
+	$reload_args{'waitmode'}  = 2; # XXX Wait till reboot after reload.
+	$reload_args{'nodelist'}  = [ @nodenames ];
+	print "Running osload on @nodenames\n";
+	my $failures = osload(\%reload_args, \%reload_results);
+	if ($failures) {
+	    print STDERR "osload returned $failures failures\n";
+	}
+
+	foreach my $node (@nodelist) {
+	    if ($reload_results{$node->node_id()}) {
+		push(@informtbopsfatal, $node->node_id());
+		NodeIsDead($node);
+	    }
+	    else {
+		push(@informtbopswarn, $node->node_id());
+		NodeIsOkay($node);
+	    }
+	}
+    }
+    if (@informtbopsfatal) {
+	my $count = scalar(@informtbopsfatal);
+	SENDMAIL($TBOPS, "$count nodes are down",
+		 "Nodes:\n".
+		 "  " . join(" ", @informtbopsfatal) . "\n".
+		 "appear to be dead.\n\n".
+		 "The nodes have been taken out of the pool.\n");
+    }
+    if (@informtbopswarn) {
+	my $count = scalar(@informtbopswarn);
+
+	system("$NFREE $pid $eid @informtbopswarn");
+	if ($?) {
+	    fatal("Could not free nodes: @informtbopswarn");
+	}
+	else {
+	    SENDMAIL($TBOPS, "$count nodes appear to be okay",
+		     "Nodes:\n".
+		     "  " . join(" ", @informtbopswarn) . "\n".
+		     "have reloaded and rebooted okay.\n\n".
+		     "The nodes have been freed.\n");
+	}
+    }
+
+    print "Running $GENTOPOFILE ...\n";
+    if (system("$GENTOPOFILE $pid $eid")) {
+	print STDERR "$GENTOPOFILE failed\n";
+	next;
+    }
+    print "Running $EXPORTS_SETUP ...\n";
+    if (system("$EXPORTS_SETUP")) {
+	print STDERR "$EXPORTS_SETUP failed\n";
+	next;
+    }
+    # The nodes will not boot locally unless there is a DNS record.
+    print "Running $NAMED_SETUP ...\n";
+    if (system("$NAMED_SETUP")) {
+	print STDERR "$NAMED_SETUP failed\n";
+	next;
+    }
+  loop:
+    sleep(($debug ? 10 : 60));
+}
+MarkDaemonStopped("checknodes_daemon");
+exit(0);
+
+sub NodeIsDead($)
+{
+    my ($node) = @_;
+    
+    if ($node->MoveReservation($hwdown_experiment)) {
+	print STDERR "Could not move $node to $hwdown_experiment\n";
+	return;
+    }
+    print STDERR "$node is fatally ill; moving to hwdown.\n";
+    $node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
+			      "Moved to hwdown by checknodes daemon");
+}
+
+sub NodeIsOkay($)
+{
+    my ($node) = @_;
+
+    print STDERR "$node appears to be okay; releasing.\n";
+    $node->InsertNodeLogEntry($elabman, TB_DEFAULT_NODELOGTYPE(),
+			      "Released by checknodes daemon");
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "Check Nodes Daemon died",
+	     $msg,
+	     $TBOPS);
+
+    MarkDaemonStopped("checknodes_daemon");
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+

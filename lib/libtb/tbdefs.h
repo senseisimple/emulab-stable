@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -21,6 +21,8 @@
 #define TBDB_FLEN_EVEVENTTYPE	128
 #define TBDB_FLEN_PRIVKEY	64
 #define TBDB_FLEN_SFSHOSTID	128
+#define TBDB_FLEN_RPMS		4096
+#define TBDB_FLEN_TINYTEXT	(256 + 1)
 
 /*
  * Event system stuff.
@@ -78,6 +80,7 @@
 #define TBDB_EVENTTYPE_MESSAGE	"MESSAGE"
 #define TBDB_EVENTTYPE_RUN	"RUN"
 #define TBDB_EVENTTYPE_CREATE	"CREATE"
+#define TBDB_EVENTTYPE_STOPRUN	"STOPRUN"
 
 /*
  * Global event passthru sentinal - does _NOT_ go in either event array

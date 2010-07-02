@@ -1,0 +1,297 @@
+Assorted notes - Shared bottleneck estimation and the hybrid model
+                - A bit about effects of reverse path congestion on throughput
+                - Heirarchical token bucket
+------------------------------------------------------------------------------
+
+1) Shared bottleneck detection code works very well in practice. I created
+a planetlab experiment with 8 nodes. They were distributed at 3 sites - 4(utah),2,2 at
+each site. The results are in /proj/tbres/pramod/bottleneck-emulab/devel/plab-runs/run3_8nodes/WaveletResults.txt.
+
+Note: This run was without using Sirius.
+
+I verified that there were no errors during the run - all the nodes at the same site were detected as having
+a shared bottleneck from the other sites.
+
+Note: The wavelet/rubenstein techniques are vulnerable to run-away clocks. Node-8 in this experiment
+had its clock time decreasing like crazy - so, all the results involving that node put it in a different
+cluster. This is a safe approach for now - will have to look into this sort of thing in the future...
+
+2) Both the wavelets and rubenstein method work very well in Emulab runs too, with controlled TCP cross-traffic.
+
+The results are in /proj/tbres/pramod/bottleneck-emulab/devel/emulab-runs/Link*/WaveletResults.txt (Or RubensteinResults.txt).
+The topology used for these experiments and the link-capacities are in
+
+/proj/tbres/pramod/bottleneck-emulab/devel/emulab-runs/(waveletCongestionTopology.png, waveletCongestionNotes.txt).
+
+3) Now that we can detect bottlenecks, the big question is "How do we set the bandwidth for them while
+simulating the paths with our static models? "
+
+Note: Make sure that the IPerfs used by Flexmon run with maximum window sizes ( both server and client ).
+A cursory look at the flexmon code made me think that they are NOT! - but I could be wrong.
+
+Flexmon measures throughput for individual IPerf connections between two plab sites. So, if two target
+sites happen to share a bottleneck, setting the throughput to the maximum of those two path measurements
+should be better (in theory) than what the cloud model does. But, in practice, it grossly underestimates
+the capacity available to two simultaneous TCP streams passing through the bottleneck.
+
+The reasoning is : Let us assume that the bottleneck *capacity* is 10 Mbps and there are 9 flows passing
+through it. Assuming TCP to be fair over the long term (which it is not, but this is an approximation for
+the argument sake), flexmon will report a throughput of 1 Mbps for its Iperf measurement stream to both
+the destinations.
+
+However, when we send 2 streams simultaneously to the two paths involved, the total number of streams
+at the bottleneck is 11 - so each of our streams would probably get (again, under ideal conditions...)
+0.9 Mbps - although this might be a little less/more in the real world, due to RTT unfairness. In any case,
+modelling the bottleneck in Emulab as having 1 Mbps available bandwidth limits the two flows in Emulab to 500 Kbps
+at the most. With the cloud model, we would end up setting 1 Mbps available bandwidth to each path - which
+is a slight over-estimation, but is a lot closer to the real world in this case than our current hybrid approach.
+
+However, if the bottleneck link were to have low level of statistical multiplexing, say 2 flows excluding the flexmon
+flow - then the reported available bandwidth is going to be around 3.3 Mbps for each path. Then our two flows
+in the real world get around 2.5 Mbps each. The cloud model sets up each path as being 3.3 Mbps, whereas the hybrid
+restricts the combined throughput of both paths to 3.3 Mbps. Again, cloud model overestimates the throughput and
+the hybrid underestimates it.
+
+In order for the hybrid to correctly emulate the "real" world behaviour at the bottleneck, we need an estimate
+of the level of statistical multiplexing at the bottleneck router - the holy grail :)
+See Note(7) for more discussion on this.
+
+4) TCP throughputs between planetlab nodes does not seem to be limited by the host conditions.
+A single IPerf stream gets "x" Mbps. Sending 6 such parallel streams results
+in a total of "6x" Mbps - this is counter intuitive. Look at the 
+log file "Planet1_Planet3_Parallel.log".
+
+In this particular example, x = 1.6 Mbps, and the window(sender & receiver) size
+was 250 Kbytes.
+
+The RTT in this case was =~ 110 ms. So, the streams are not limited by their
+bandwidth-delay product. In the single case stream, If the stream was getting
+all the available bandwidth - this would imply that there is a high-level
+of multiplexing at the bottleneck link.
+
+However, if that was the case, then the 6 streams should get throughput less
+than the single stream. But,they seem to be getting throughput almost equal
+to the single stream case. Eg: 8.96 - 9.32 Mbps for 6 streams - an avg of
+1.49 - 1.55 Mbps. ( there are other factors of course, some streams might
+have left the contention at the bottleneck, might have changed
+their congestion window, RTT differences may be playing a role ...)
+But this behaviour seems to be reproducible over a relatively long period of
+time (5-10 minutes), on a given path.
+
+5) Read about the HTB(Bandwidth limits - plab) in detail. It basically limits
+the amount of data released to the network card, based on how many slices
+are currently trying to transmit data. The impression I got is that the
+timer granularity is 1 milli sec. So, If the path happens to be Non-Inet2,
+a cap is enforced, otherwise HTB enforces fair sharing, but no caps.
+
+We need to be careful not to select nodes which have very low caps ( 1000 kbps for all the slices, in
+the case of node4 in Kevin's latest plab test, as of Monday Oct 01/07, this
+might have caused the asymmetry that we saw in the results.)
+
+I tested sending a udp stream of 8 Mbps (Planet1_Planet3_Parallel.log). Throughput
+was around 7.66 Mbps - so this exonerates HTB. Whatever we are seeing in terms
+of the TCP bandwidth is happening somewhere in the network - NOT due to
+planetlab weirdness.
+
+
+6) Effect of reverse path congestion on forward path throughput:
+
+I ran a series of planet-lab experiments(3-4) with single stream and 4 streams. I don't have the logs at hand at the moment,
+  but Kevin's runs essentially sum up what I have seen. There is no drop in forward path throughput, irrespective of us
+  generating traffic on the reverse path. However, this is clearly happening in Emulab, with delay nodes.
+
+
+  So, here goes my thinking about why this may be happening in Emulab and not in Planetlab.
+  Reference: "Zhang, L., Shenker, S. and Clark, D.D., Observations on the dynamics of a congestion control algorithm: the effects of two-way traffic. ACM SIGCOMM Comput. Commun. Rev. v21. 133-147."
+
+  (See paper above). In Emulab(simple topologies):
+  ----------------------------------------
+      TCP sends window_size/MSS number of packets at once on to the forward path. Every other
+  segment results in an ACK - meaning that ACKs are also going to be closely spaced. At the same time, the reverse path IPerf TCP also
+  sends bunches of packets periodically. The problem arises when these two groups collide at the delay node on the reverse path. If the
+  reverse path has less throughput than the forward path ( ie. asymmetric paths ), then we would expect to see some ACK packet loss
+  for the forward path IPerf stream. If some of the ACKs in a batch make it through:
+
+  a) Only the starting ACKs in the batch make it through the bottleneck on the reverse path - then TCP sends some more data ( not the full
+      window though, because some ACKs did not get through..) and can only increase its window after getting an ACK back - ie. after
+  one RTT - this affects the throughput. 
+
+  b) Only the ACKs towards the end of the batch made it through - in this case, because the ACKs are cumulative, all we need is the last
+  ACK to get back to the forward path sender - and it will chug along happily. This should not cause any throughput drops for the
+  forward path.
+
+  c) What is going to be really devastating for the forward path throughput is a timeout - if all the ACKs for a window full of
+  packets got lost on the reverse path. The congestion window is reset to 1, slow start etc... Meanwhile, the reverse path
+  TCP will ramp up to full speed and will probably cause another loss session for the ACKs - this might cause a vicious cycle
+  causing the forward path to see consistently low throughput.
+
+
+  In Planetlab:
+  -------------
+
+  Each path(forward/reverse) has around 10 edges/routers to be passed through. Due to bursty nature of Internet traffic
+  arrival at the routers, it is very likely that both the forward path data packets and ACK packets do not travel
+  in batches as they do in Emulab. Due to this fundamental difference, even if some of the ACKs are lost at the
+  bottlenecks ( or somewhere else in the path... wireless links etc), some ACKs will eventually reach the sender.
+  This is one possible explanation for not seeing the same effect on planetlab paths. The key is the lack of
+  synchronization between ACKs for the forward path data and the reverse path IPerf session - they will 
+  be randomly be affected by the queuing at the intermediate links...
+
+
+7) If TCP was completely fair, we can derive the number of flows through the bottleneck link as follows:
+
+Assuming that the cross-traffic flows are long-lived: send 1 TCP flow and observe its throughput "X". Let the 
+capacity of the bottleneck link be "C" and assume that there are "N" cross-traffic flows.
+
+So, we have X = C/(N+1) 
+
+Now, send 5 flows through the path and note their throughput values - let the sum be Y.
+
+Y = C/(N+5)
+
+For the above equations, eliminate C by substitution and get the value of N - the degree of 
+statistical multiplexing. 
+
+This is of course naive and doesn't work because of RTT unfairness - we need a way of approximating
+this number.
+
+For now, I plan to test two approaches - assuming a low (3-4) statistical multiplexing value for the detected bottlenecks Or assuming a high(10-12) value. 
+
+a) I'll do a couple of planet lab runs using the Circular IPerf mesh
+
+b)Then run shared congestion detection (wavelet/rubenstein) algorithm on the nodes. 
+
+c) Calculate the available bandwidth at the detected bottlenecks based on
+the assumed (fixed) statistical multiplexing value.
+
+d) Observe which model - cloud, low multiplexing, high multiplexing comes
+closer to reality - probably none of the 3 would be a slam-dunk. But, a
+step forward until we figure out a way to get the multiplexing number.
+
+
+8) Possible remedy to reverse path Ack problems observed in Emulab:
+-------------------------------------------------------------------
+
+When we set the available bandwidth to paths ( either in a cloud or in a
+shared-lan) in Emulab - we deviate in one significant way from what goes on
+in the real world routers. Most of the routers have a high throughput ( even
+the bottleneck router ) on Inet2 - typically 20 Mbps or more - but the
+available bandwidth to a TCP flow might be less than 500 kbps ( on the Harvard
+-> Princeton path for example ) - this happens due to a large degree of
+multiplexing. However, the Acks and the packets are still processed at the
+line rate of (say) 20 Mbps - so there isn't much of a delay variation even on
+congested bottleneck links. The Harvard->Princeton path exhibits virtually 
+insignificant changes in the RTT of full sized (1400 bytes) PING packets sent
+once every 50-100 milli seconds(+/- 2 msec variation over the base rtt of 10 msec). 
+More to the point, the Acks of a forward path TCP
+connection do not experience large queuing delays on the reverse path.
+
+With an Emulab reverse path setting of 500 Kbits/sec, we are artificially
+introducing very large queuing delays(on the order of 300-400 msec). By the time the Acks of the forward
+path get to the head of the queue on the reverse path, the reverse path
+IPerf's packets have made the round trip back and congest the queue again.
+This effectively increases the RTT of the forward path IPerf to 300-400 msec.
+We know that TCP's throughput drops for large bandwidth delay product paths. I
+did not observe any significant Ack packet loss for the forward path TCP
+connection - so this seems to be the explanation for the throughput drop.
+
+One way we could make this better is to set the delay agent bandwidth to the
+capacity of the bottleneck path - but introduce a large number of flows so
+that any new flow on the path effectively gets a throughput approx. equal to
+our available bandwidth estimate. As and when we change the value of the
+available bandwidth, the delay agent has to change the number of background
+flows on that path - assuming that the bottleneck capacity remains the same.
+I tested this with background UDP traffic and a large number of TCP flows(40)
+in the background - the PING times are now stable like the ones seen on Inet2.
+
+9) Estimating statistical multiplexing ?
+
+We *might* be able to side-step the whole TCP RTT fairness debate.
+
+a) Find out the capacity of the bottleneck link.
+b) We already know the throughput of a single IPerf flow on that path(from
+flexmon).
+c) Setup the delay agent bandwidth to the bottleneck capacity and introduce
+background TCP flows to make sure that a new TCP flow gets the available
+bandwidth. The number of background flows may not be equal to the number of
+flows in the real world ( there will not be any RTT variation, as well as no
+mix of short/long-lived flows... ). But I hypothesize that the results will be
+closer to the results seen on Inet2 paths.
+
+10) How reliable are the shared congestion detection methods ?
+
+In congested paths, the bottleneck link router's queue remains almost always
+full - hence producing insignificant delay variations. The shared congestion
+detection methods ( both rubenstein and wavelets ) depend on there being
+delay variations. If there is no variation - we currently assume that there is 
+no shared bottleneck. While this is true for paths where the router queues are
+on average empty, we will also observe no variance for paths which are
+congested most of the time.
+
+This seems to be a condition, which at least for now, we are not in a position
+to properly detect as being a shared bottleneck.
+
+References:
+-----------------------
+1) Instability effects of two-way traffic in a TCP/AQM system
+Source  Computer Communications archive
+Volume 30 ,  Issue 10  (July 2007) table of contents
+Pages: 2172-2179  
+Year of Publication: 2007 
+
+2) The performance of TCP/IP for networks with high bandwidth-delayproducts and random loss
+Lakshman, T.V.; Madhow, U.
+Networking, IEEE/ACM Transactions on
+Volume 5, Issue 3, Jun 1997 Page(s):336 - 350
+
+3) The TCP Bandwidth-Delay Product Revisited: Network Buffering, Cross Traffic, and Socket Buffer Autosizing,
+    with R. Prasad and C. Dovrolis, Technical Report GIT-CERCS-03-2, Feb 2003, Georgia Tech.
+
+4) "Zhang, L., Shenker, S. and Clark, D.D., Observations on the dynamics of a congestion control algorithm: the effects of two-way traffic. ACM SIGCOMM Comput. Commun. Rev. v21. 133-147."
+
+5) L. Kalampoukas, A. Varma, and K. K. Ramakrishnan.
+Performance of Two-Way TCP Traffic over Asymmetric
+Access Links. In Proc. Interop ’97 Engineers’ Conference,
+       May 1997.
+
+6) T. V. Lakshman, U. Madhow, and B. Suter. Windowbased
+Error Recovery and Flow Control with a Slow
+Acknowledgement Channel: A study of TCP/IP Performance.
+In Proc. Infocom 97, April 1997.
+
+7) The effects of asymmetry on TCP performance.
+
+Hari Balakrishnan, Venkata N. Padmanabhan and Randy H. Katz
+Mobicom 1997
+
+8) Provisioning for bursty Internet traffic: Implications for Industry and
+Internet Infrastructure.
+
+David Clark(MIT), William Lehr, Ian Liu
+@ MIT ITC Workshop on Internet QoS, 1999
+
+9) Update on buffer sizing in internet routers
+    
+    Yashar Ganjali(Stanford University)
+    Nick McKeown(Stanford)
+
+    ACM CCR 2006
+
+
+10) Issues and trends in router design
+Keshav, S.   Sharma, R.  
+Cornell Univ., Ithaca, NY;
+
+Communications Magazine, IEEE
+Publication Date: May 1998
+
+11) Sizing router buffers
+Guido Appenzeller    Stanford University
+Isaac Keslassy   Stanford University
+Nick McKeown     Stanford University
+
+SIGCOMM 2004
+
+
+
+

@@ -1,5 +1,11 @@
 #! /usr/local/bin/python
 
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 import re
 import pwd
 import sys
@@ -19,6 +25,8 @@ PACKAGE_VERSION = 0.1
 # Default server
 XMLRPC_SERVER = "@BOSSNODE@"
 XMLRPC_PORT   = 3069
+
+PROJROOT = "@PROJROOT_DIR@"
 
 try:
     pw = pwd.getpwuid(os.getuid())
@@ -72,7 +80,7 @@ except getopt.error, e:
 
 pid, eid = req_args
 
-expdir = os.path.join("/proj", pid, "exp", eid)
+expdir = os.path.join(PROJROOT, pid, "exp", eid)
 
 sys.path.append(os.path.join(prefix, "lib"))
 from sshxmlrpc import *

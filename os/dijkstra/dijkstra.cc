@@ -16,6 +16,7 @@
 #include "TreeCompressor.h"
 #include "VoteIpTree.h"
 #include "OptimalIpTree.h"
+#include <cstring>
 
 using namespace std;
 
@@ -297,15 +298,6 @@ void printRouteToSubnet(string sourceIp, string firstHopIp, string destSubnet,
              << ipToString(netMask) << " NEXTHOP=" << firstHopIp << " COST="
              << cost << " SRC=" << sourceIp << endl;
     }
-}
-
-//-----------------------------------------------------------------------------
-
-string intToString(int num)
-{
-    ostringstream stream;
-    stream << num;
-    return stream.str();
 }
 
 //-----------------------------------------------------------------------------

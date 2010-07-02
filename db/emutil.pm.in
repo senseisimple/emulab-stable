@@ -1,0 +1,490 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Utility routines for Emulab.
+#
+package emutil;
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+@ISA = "Exporter";
+@EXPORT = qw (TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
+	      TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
+	      TBGetUniqueIndex ParRun NoLogins);
+
+use emdb;
+use English;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $EVENTSYS    = "@EVENTSYS@";
+
+if ($EVENTSYS) {
+    require event;
+    import event;
+}
+
+# Constants for checkslot code.
+sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
+sub TBDB_CHECKDBSLOT_WARN()	{ 0x1; }
+sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
+
+#
+# Support for checking field values against what is specified.
+#
+my %DBFieldData;
+my $DBFieldErrstr = "";
+
+sub TBFieldErrorString() { return $DBFieldErrstr; }
+
+#
+# Download all data from the DB and store in hash for latter access.
+#
+sub TBGrabFieldData()
+{
+    %DBFieldData = ();
+
+    my $query_result =
+	emdb::DBQueryFatal("select * from table_regex");
+
+    while (my %row = $query_result->fetchhash()) {
+	my $table_name  = $row{"table_name"};
+	my $column_name = $row{"column_name"};
+
+	$DBFieldData{$table_name . ":" . $column_name} =
+	    { "check"       => $row{"check"},
+	      "check_type"  => $row{"check_type"},
+	      "column_type" => $row{"column_type"},
+	      "min"         => $row{"min"},
+	      "max"         => $row{"max"}
+	    };
+    }
+}
+
+#
+# Return the field data for a specific table/slot. If none, return the default
+# entry.
+#
+# The top level entry defines some stuff that is not to be overidden by the
+# redirected entries. For example, the top level entry is the only place we
+# can specify a field is optional when inserting a record. We could do this
+# with default entries in the DB table defintion, but I do not like that idea.
+# The min/max lengths also override, unless they are both zero in which case
+# let the first non-zero defs set them.
+#
+sub TBFieldData($$;$)
+{
+    my ($table, $column, $flag) = @_;
+    my $toplevel;
+    my $fielddata;
+
+    if (! %DBFieldData) {
+	TBGrabFieldData();
+    }
+    my $key = $table . ":" . $column;
+
+    while (exists($DBFieldData{$key})) {
+	$fielddata = $DBFieldData{$key};
+
+	#
+	# See if a redirect to another entry.
+	#
+	if ($fielddata->{"check_type"} eq "redirect") {
+	    if (!defined($toplevel)) {
+		$toplevel = $fielddata;
+	    }
+
+	    $key = $fielddata->{"check"};
+#	    print STDERR "Redirecting to $key for $table/$column!\n";
+	    next;
+	}
+	last;
+    }
+    # Resort to a default entry.
+    if (!defined($fielddata)) {
+	$DBFieldErrstr = "Error-checking pattern missing from the database";
+	
+	if (defined($flag)) {
+	    if ($flag & TBDB_CHECKDBSLOT_WARN()) {
+		print STDERR "*** $0:\n" .
+		             "    WARNING: No slot data for $table/$column!\n";
+	    }
+	    return undef
+		if ($flag & TBDB_CHECKDBSLOT_ERROR());
+	}
+	$fielddata = $DBFieldData{"default:default"};
+    }
+    # Return both entries.
+    if (defined($toplevel) &&
+	($toplevel->{"min"} || $toplevel->{"max"})) {
+	return ($fielddata, $toplevel);
+    }
+    return ($fielddata);
+}
+
+#
+# Generic wrapper to check a slot.
+#
+sub TBcheck_dbslot($$$;$)
+{
+    my ($token, $table, $column, $flag) = @_;
+    
+    $DBFieldErrstr = "Unknown Error";
+
+    my ($fielddata,$toplevel) = TBFieldData($table, $column, $flag);
+
+    return 0
+	if (!defined($fielddata));
+
+    my $check       = $fielddata->{"check"};
+    my $check_type  = $fielddata->{"check_type"};
+    my $column_type = $fielddata->{"column_type"};
+    my $min         = (defined($toplevel) ?
+		       $toplevel->{"min"} : $fielddata->{"min"});
+    my $max         = (defined($toplevel) ?
+		       $toplevel->{"max"} : $fielddata->{"max"});
+
+#    print STDERR "Using $check/$check_type/$column_type/$min/$max for ".
+#	"$table/$column\n";
+
+    #
+    # Functional checks partly implemented. Needs work.
+    #
+    if ($check_type eq "function") {
+	if (defined(&$check)) {
+	    my $func = \&$check;
+	    return &$func($token);   
+	}
+	else {
+	    die("*** $0:\n" .
+		"    Functional DB checks not implemented: $table/$column!\n");
+	}
+    }
+
+    # Make sure the regex is anchored. Its a mistake not to be!
+    $check = "^" . $check
+	if (! ($check =~ /^\^/));
+
+    $check = $check . "\$"
+	if (! ($check =~ /\Q$/));
+
+    # Check regex.
+    if (! ("$token" =~ /$check/)) {
+	$DBFieldErrstr = "Illegal Characters";
+	return 0;
+    }
+
+    # Check min/max.
+    if ($column_type eq "text") {
+	my $len = length($token);
+
+	# Any length is okay if no min or max. 
+	return 1
+	    if ((!($min || $max)) ||
+		($len >= $min && $len <= $max));
+	$DBFieldErrstr = "Too Short"
+	    if ($min && $len < $min);
+	$DBFieldErrstr = "Too Long"
+	    if ($max && $len > $max);
+    }
+    elsif ($column_type eq "int" ||
+	   $column_type eq "float") {
+	# If both min/max are zero, then skip check; allow anything.
+	return 1
+	    if ((!($min || $max)) || ($token >= $min && $token <= $max));
+	$DBFieldErrstr = "Too Small"
+	    if ($min && $token < $min);
+	$DBFieldErrstr = "Too Big"
+	    if ($max && $token > $max);
+    }
+    else {
+	die("*** $0:\n" .
+	    "    Unrecognized column_type $column_type\n");
+    }
+    return 0;
+}
+
+#
+# A helper function for checking lossrates. Bad place for this, I know.
+#
+sub _checklossrate($)
+{
+    my ($token) = @_;
+
+    return 1
+	if ("$token" eq "0");
+
+    # floating point, no exponent. Stole this out of the perl tutorial.
+    if (! ($token =~ /^[+-]?(\d+\.\d+|\d+\.|\.\d+)([eE][+-]?\d+)?$/)) {
+	$DBFieldErrstr = "Improper floating number";
+	return 0;
+    }
+    if ($token > 1.0) {
+	$DBFieldErrstr = "Too big; must be < 1.0";
+	return 0;
+    }
+    if ($token < 0.0) {
+	$DBFieldErrstr = "Too small; must be > 0.0";
+	return 0;
+    }
+    if ($token > 0.0 && $token < 0.000001) {
+	$DBFieldErrstr = "Too small; must be >= 0.000001";
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Return a unique index from emulab_indicies for the indicated name.
+# Updates the index to be, well, unique.
+# Eats flaming death on error.
+#
+# WARNING: this will unlock all locked tables, be careful where you call it!
+#
+sub TBGetUniqueIndex($;$$)
+{
+    my ($name, $initval, $nolock) = @_;
+
+    #
+    # Lock the table to avoid conflict, but not if the caller already did it.
+    #
+    $nolock = 0
+	if (!defined($nolock));
+    
+    DBQueryFatal("lock tables emulab_indicies write")
+	if (!$nolock);
+
+    my $query_result =
+	DBQueryFatal("select idx from emulab_indicies ".
+		     "where name='$name'");
+    my ($curidx) = $query_result->fetchrow_array();
+    if (!defined($curidx)) {
+	$curidx = (defined($initval) ? $initval : 1);
+    }
+    my $nextidx = $curidx + 1;
+
+    DBQueryFatal("replace into emulab_indicies (name, idx) ".
+		 "values ('$name', $nextidx)");
+    DBQueryFatal("unlock tables")
+	if (!$nolock);
+
+    return $curidx;
+}
+
+#
+# A utility function for forking off a bunch of children and
+# waiting for them.
+#
+# TODO: A fatal error will leave children. Need to catch that.
+#
+sub ParRun($$$@)
+{
+    my ($options, $pref, $function, @objects) = @_;
+    my %children = ();
+    my @results  = ();
+    my $counter  = 0;
+    my $signaled = 0;
+
+    # options.
+    my $maxchildren = 10;
+    my $maxwaittime = 200;
+
+    if (defined($options)) {
+	$maxchildren = $options->{'maxchildren'}
+	    if (exists($options->{'maxchildren'}));
+	$maxwaittime = $options->{'maxwaittime'}
+	    if (exists($options->{'maxwaittime'}));
+    }
+
+    #
+    # Set up a signal handler in the parent to handle termination.
+    #
+    my $coderef = sub {
+	my ($signame) = @_;
+
+	print STDERR "Caught SIG${signame}! Killing parrun ...";
+
+	$SIG{TERM} = 'IGNORE';
+	$signaled = 1;
+
+	foreach my $pid (keys(%children)) {
+	    kill('TERM', $pid);
+	}
+	sleep(1);
+    };
+    local $SIG{QUIT} = $coderef;
+    local $SIG{TERM} = $coderef;
+    local $SIG{HUP}  = $coderef;
+    local $SIG{INT}  = 'IGNORE';
+
+    #
+    # Initialize return.
+    #
+    for (my $i = 0; $i < scalar(@objects); $i++) {
+	$results[$i] = -1;
+    }
+
+    while (@objects || keys(%children)) {
+	#
+	# Something to do and still have free slots.
+	#
+	if (@objects && keys(%children) < $maxchildren && !$signaled) {
+	    # Space out the invocation of child processes a little.
+	    sleep(1);
+	    
+	    #
+	    # Run command in a child process, protected by an alarm to
+	    # ensure that whatever happens is not hung up forever in
+	    # some funky state.
+	    #
+	    my $object = shift(@objects);
+	    my $syspid = fork();
+
+	    if ($syspid) {
+		#
+		# Just keep track of it, we'll wait for it finish down below
+		#
+		$children{$syspid} = [$object, $counter, time()];
+		$counter++;
+	    }
+	    else {
+		$SIG{TERM} = 'DEFAULT';
+		$SIG{QUIT} = 'DEFAULT';
+		$SIG{HUP}  = 'DEFAULT';
+		
+		if ($EVENTSYS) {
+		    # So we get the event system fork too ...
+		    EventFork();
+		}
+		exit(&$function($object));
+	    }
+	}
+	elsif ($signaled) {
+	    my $childpid   = wait();
+	    my $exitstatus = $?;
+
+	    if (exists($children{$childpid})) {
+		delete($children{$childpid});
+	    }
+	}
+	else {
+	    #
+	    # We have too many of the little rugrats, wait for one to die
+	    #
+	    #
+	    # Set up a timer - we want to kill processes after they
+	    # hit timeout, so we find the first one marked for death.
+	    #
+	    my $oldest;
+	    my $oldestpid = 0;
+	    my $oldestobj;
+	    
+	    while (my ($pid, $aref) = each %children) {
+		my ($object, $which, $birthtime) = @$aref;
+
+		if ((!$oldestpid) || ($birthtime < $oldest)) {
+		    $oldest    = $birthtime;
+		    $oldestpid = $pid;
+		    $oldestobj = $object;
+		}
+	    }
+
+	    #
+	    # Sanity check
+	    #
+	    if (!$oldest) {
+		print STDERR 
+		    "*** ParRun: ".
+		    "Uh oh, I have no children left, something is wrong!\n";
+	    }
+
+	    #
+	    # If the oldest has already expired, just kill it off
+	    # right now, and go back around the loop
+	    #
+	    my $now = time();
+	    my $waittime = ($oldest + $maxwaittime) - time();
+
+	    #
+	    # Kill off the oldest if it gets too old while we are waiting.
+	    #
+	    my $childpid = -1;
+	    my $exitstatus = -1;
+
+	    eval {
+		local $SIG{ALRM} = sub { die "alarm clock" };
+
+		if ($waittime <= 0) {
+		    print STDERR
+			"*** ParRun: timeout waiting for child: $oldestpid\n";
+		    kill("TERM", $oldestpid);
+		}
+		else {
+		    alarm($waittime);
+		}
+		$childpid = wait();
+		alarm 0;
+		$exitstatus = $?;
+	    };
+	    if ($@) {
+		die unless $@ =~ /alarm clock/;
+		next;
+	    }
+
+	    #
+	    # Another sanity check
+	    #
+	    if ($childpid < 0) {
+		print STDERR
+		    "*** ParRun:\n".
+		    "wait() returned <0, something is wrong!\n";
+		next;
+	    }
+
+	    #
+	    # Look up to see what object this was associated with - if we
+	    # do not know about this child, ignore it
+	    #
+	    my $aref = $children{$childpid};
+	    next unless @$aref;	
+	    my ($object, $which, $birthtime) = @$aref;
+	    delete($children{$childpid});
+	    $results[$which] = $exitstatus;
+	}
+    }
+    @$pref = @results
+	if (defined($pref));
+    return -1
+	if ($signaled);
+    return 0;
+}
+
+#
+# Check for nologins; web interface disabled means other interfaces
+# should be disabled. Not using libdb:GetSiteVar cause do not want to
+# drag all that stuff in. Predicate; retun 1 if no logins is set.
+#
+sub NoLogins()
+{
+    my $query_result =
+	DBQueryWarn("select value from sitevariables ".
+		    "where name='web/nologins'");
+
+    return 1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+    my ($value) = $query_result->fetchrow_array();
+
+    return ($value ? 1 : 0);
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;
+

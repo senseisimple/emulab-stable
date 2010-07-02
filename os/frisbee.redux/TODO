@@ -54,6 +54,10 @@ NEW FEATURES:
    for the request, we also send back a list of chunk hashes for every
    chunk in the file.  This is very like the HCP work at Stanford.
 
+   [ 10/22/09: a quick investigation of 171 unique images from our standard
+     collection (/usr/testbed/images) shows very little commonality (3068 of
+     94379 chunks, 3%, were repeated).  This is a bit surprising for images
+     that are derived from each other. ]
 
 ENHANCEMENTS:
 

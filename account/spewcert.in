@@ -1,0 +1,97 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Spew encypted certificate for invoking user.
+#
+sub usage()
+{
+    print(STDOUT "Usage: spewcert\n");
+    exit(-1);
+}
+my $optlist   = "";
+my $debug     = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $ELABINELAB  = @ELABINELAB@;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub UserError($);
+
+#
+# Turn off line buffering on output. Very important for this script!
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+my $USERDIR	= USERROOT();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+usage()
+    if (@ARGV);
+
+# Map invoking user to object.
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+my $user_uid  = $this_user->uid();
+my $ssldir    = "$USERDIR/$user_uid/.ssl";
+my $sslfile   = "$USERDIR/$user_uid/.ssl/encrypted.p12";
+if (! -d $ssldir) {
+    fatal("$ssldir does not exist");
+}
+if (! -e $sslfile) {
+    UserError("You do not have an encrypted certificate. Please create one");
+}
+my $certificate = `cat $sslfile`;
+if ($?) {
+    fatal("Failed to cat $sslfile");
+}
+print $certificate;
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+sub UserError($) {
+    my($mesg) = $_[0];
+
+    print $mesg;
+    exit(1);
+}

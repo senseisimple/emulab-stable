@@ -1,0 +1,40 @@
+#!/bin/sh
+
+if [ $# -lt 2 ]; then
+    echo "usage: myinstall [-m mode] src-file dst-file"
+    exit 1
+fi
+
+if [ $1 = "-m" ]; then
+    shift
+    MODE=$1
+    shift
+else
+    MODE=644
+fi
+
+SRC=$1
+DST=$2
+
+if [ ! -e $SRC ]; then
+    echo "myinstall: no such file $SRC"
+    exit 1
+fi
+
+if [ -e $DST ]; then
+    if [ ! -f $SRC -o ! -f $DST ]; then
+	echo "myinstall: only works with regular files"
+	exit 1
+    fi
+    cmp -s $SRC $DST || {
+	install -m $MODE $SRC $DST
+	echo "$SRC installed $MODE as $DST"
+    }
+else
+    if [ ! -f $SRC ]; then
+	echo "myinstall: only works with regular files"
+	exit 1
+    fi
+    install -m $MODE $SRC $DST
+    echo "$SRC installed $MODE as $DST"
+fi

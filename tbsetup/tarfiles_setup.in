@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -79,31 +79,40 @@ use lib "@prefix@/lib";
 use libtestbed;
 use libdb;
 use libtblog;
+use Template;
+use libArchive;
+use Experiment;
+use User;
 
 if (@ARGV != 2) {
     usage();
 }
 my ($pid, $eid) = @ARGV;
 
-my $dbuid;
+my %tofetch   = ();
+my %toarchive = ();
 
 #
-# Verify user and get his DB uid.
-#   
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("Go Away! You do not exist in the Emulab Database.");
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
+
 #
 # First, make sure the experiment exists
 #
-if (!ExpState($pid,$eid)) {
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! $experiment) {
     tbdie("There is no experiment $eid in project $pid");
 }
 
 #
 # User must have at least MODIFY permissions to use this script
 #
-if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
+if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY())) {
     tbdie("You are not allowed to modify experiment $eid in project $pid");
 }
 
@@ -111,35 +120,30 @@ if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
 # Get the experiment's directory - that's where we'll stash any files we
 # fetch
 #
-my $expdir = TBExptUserDir($pid,$eid);
-if (!$expdir) {
-    tbdie("Unable to get experiment directory");
-}
+my $expdir  = $experiment->UserDir();
+my $exptidx = $experiment->idx();
 
 #
 # Get a list of all RPMs and tarballs to fetch
 #
-my $result = DBQueryFatal("SELECT vname, rpms, tarfiles FROM virt_nodes WHERE " .
-    "pid='$pid' and eid='$eid'");
+my $result = $experiment->TableLookUp("virt_nodes", "vname,rpms,tarfiles");
 
 while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
     #
     # Find out the pnode where the this vnode is mapped, if any
     #
-    my $physnode;
-    VnameToNodeid($pid,$eid,$vname,\$physnode); 
+    my $physnode = $experiment->VnameToNode($vname);
     
     # The if block below is needed for simulated nodes which do not
     # have a reserved table entry. A tarfile specified for a simulated
     # node ends up on its host PC
-    if ( ! $physnode ) {
-	my $query_result = 
-	DBQueryFatal("select node_id from v2pmap where pid='$pid' and eid='$eid'".  
-	     	     " and vname='$vname'");
-	if ( $query_result->numrows ) {
-	    ($physnode) = $query_result->fetchrow_array();
-	}
+    if (! defined($physnode)) {
+	$physnode = $experiment->VnameToPmap($vname);
     }
+    $rpms = ""
+	if (!defined($rpms));
+    $tarfiles = ""
+	if (!defined($tarfiles));
 
     #
     # Go through the list of RPMs looking for files to fetch
@@ -171,7 +175,34 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	    # will be uploaded to the nodes table
 	    #
 	    $tofetch{$URL} = $localfile;
+	    $toarchive{$localfile} = $localfile;
 	    $rpms =~ s/$URL/$localfile/g;
+	}
+	elsif ($rpm =~ /^xxx:\/\/(.*)$/) {
+	    #
+	    # XXX (well, what else did you expect!). This is a template
+	    # "url" that refers to a file in the template datastore tree.
+	    #
+	    my $instance = Template::Instance->LookupByExptidx($exptidx);
+	    if (!defined($instance)) {
+		tbdie("Invalid RPM URL for non-template experiment: $rpm");
+	    }
+	    my $localfile = $instance->path() . "/datastore/" . $1;
+
+	    tbdie("$rpm cannot be found; $localfile does not exist")
+		if (! -e $localfile);
+
+	    # no need to archive these since they are saved in the template
+	    $rpms =~ s/$rpm/$localfile/g;
+	}
+	else {
+	    #
+	    # Should be a regular path.
+	    #
+	    tbdie("$rpm cannot be found; local file does not exist")
+		if (! -e $rpm);
+
+	    $toarchive{$rpm} = $rpm;
 	}
     }
     
@@ -195,8 +226,36 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	    $ext =~ /(\.tar|\.tar\.Z|\.tar\.gz|\.tgz|\.tar\.bz2)$/;
 	    $ext = $1;
 	    my $localfile = $expdir . "/" . $md5 . $ext;
+	    $toarchive{$localfile} = $localfile;
 	    $tofetch{$URL} = $localfile;
 	    $tarfiles =~ s/$URL/$localfile/g;
+	}
+	elsif ($tarfile =~ /^xxx:\/\/(.*)$/) {
+	    #
+	    # XXX (well, what else did you expect!). This is a template
+	    # "url" that refers to a file in the template datastore tree.
+	    #
+	    my $instance = Template::Instance->LookupByExptidx($exptidx);
+	    if (!defined($instance)) {
+		tbdie("Invalid tarball URL for non-template experiment: ".
+		      "$tarfile");
+	    }
+	    my $localfile = $instance->path() . "/datastore/" . $1;
+
+	    tbdie("$tarfile cannot be found; $localfile does not exist")
+		if (! -e $localfile);
+
+	    # no need to archive these since they are saved in the template
+	    $tarfiles =~ s/$tarfile/$localfile/g;
+	}
+	else {
+	    #
+	    # Should be a regular path.
+	    #
+	    tbdie("$tarfile cannot be found; local file does not exist")
+		if (! -e $tarfile);
+
+	    $toarchive{$tarfile} = $tarfile;
 	}
     }
 
@@ -210,9 +269,9 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
     #
     # If this virtual node is allocated, update the nodes table
     #
-    if ($physnode) {
-	DBQueryFatal("UPDATE nodes SET tarballs='$tarfiles', rpms='$rpms' " .
-	    "WHERE node_id='$physnode'");
+    if (defined($physnode)) {
+	$physnode->Update({'tarballs' => $tarfiles, 'rpms' => $rpms}) == 0
+	    or tbdie("Could not update tarballs,rpms for $physnode");
     }
 }
 
@@ -233,7 +292,7 @@ while (my ($URL, $localfile) = each %tofetch) {
     # Build up a new command line to do the fetch on ops
     #
     my $cmdargs = "$TB/bin/fetchtar.proxy ";
-    $cmdargs .= " -u $dbuid $URL $localfile ";
+    $cmdargs .= " -u $user_uid $URL $localfile ";
 
     #
     # Must flip to real root for the ssh, and then flip back afterwards.
@@ -245,6 +304,17 @@ while (my ($URL, $localfile) = each %tofetch) {
     if ($?) {
 	tbdie("Fetch of Tarball/RPM failed!");
     }
+}
+
+#
+# Now add to the archive.
+#
+while (my ($localfile, $ignored) = each %toarchive) {
+    # Lets not do this as root. 
+    $EUID = $UID;
+    libArchive::TBExperimentArchiveAddFile($pid, $eid, $localfile) == 0 or
+	tbdie("Failed to add $localfile to the archive!");
+    $EUID = 0;
 }
 
 #

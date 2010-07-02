@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 set ns [new Simulator]
 source tb_compat.tcl
 
@@ -6,6 +12,12 @@ set node1 [$ns node]
 set node2 [$ns node]
 set node3 [$ns node]
 set node4 [$ns node]
+
+tb-set-node-os $node0 @OS@
+tb-set-node-os $node1 @OS@
+tb-set-node-os $node2 @OS@
+tb-set-node-os $node3 @OS@
+tb-set-node-os $node4 @OS@
 
 tb-set-sync-server $node0
 

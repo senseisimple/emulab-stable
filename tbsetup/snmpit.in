@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,11 +14,14 @@
 #
 
 use lib '@prefix@/lib';
-my $TESTMODE = @TESTMODE@;
+my $TESTMODE   = @TESTMODE@;
 my $ELABINELAB = @ELABINELAB@;
+my $NOSTACKMIB = @NOSTACKMIB@;
 my $TB = '@prefix@';
 
 use libdb;
+use User;
+use Experiment;
 use snmpit_lib;
 use snmpit_remote;
 use libtblog;
@@ -34,22 +37,32 @@ sub doListVlans($);
 sub doListPorts($);
 sub doPortStatus($@);
 sub doGetStats($);
-sub doVlansFromTables($@);
+sub doVlansFromTables($$@);
+sub syncVlansFromTables($$);
 sub doReset($@);
 sub doMakeVlan($$@);
 sub doDeleteVlan($@);
 sub doVlanNumber($$);
 sub doPortControl($$@);
 sub doRecreateVlans($);
-sub doTrunkEnable($$@);
+sub doTrunkEnable($$$@);
 sub doTrunkDisable($$);
 sub doRestorePortStatus($@);
+sub doSynchLeader($);
+sub CreateOneVlan($$@);
+sub doOpenflowEnable($$);
+sub doOpenflowDisable($$);
+sub doSetOpenflowController($$$);
+sub doSetOpenflowListener($$$);
+sub doEnableOpenflowListener($$);
 
 #
 # Defaults
 #
 my $debug = 0;
 my $quiet = 0;
+my $minOpenflowListenerPort = 5000;
+my $maxOpenflowListenerPort = 65535;
 
 ######################################################################
 # Step 1 - Process command-line arguments
@@ -60,21 +73,25 @@ my $quiet = 0;
 ######################################################################
 sub usage {
     print << "END";
-Usage: $0 [-h] [-v] [-q] [-n] [-i device] [-S stack]
-	  [-l] [-s] [-g]
-	  [-m name [ports]]
+Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
+	  [-l] [-s] [-g] [-O]
+	  [-m name pid eid [ports]]
 	  [-T port name]
 	  [-U port]
-	  [-o name]
-          [ -N name]
+	  [-o name pid eid]
+          [-N name]
           [-r pid eid]
 	  [-t pid eid]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
+          [--of-disable name pid eid]
+          [--of-enable name pid eid]
+          [--of-controller name pid eid tcp:ip:port]
+          [--of-listener name pid eid]
 General:
   -h          Display this help message
-  -v          Verbose mode
+  -v <level>  Verbose mode
   -q          Quiet mode
   -n          Test mode - don't actually make any changes
   -i <device> Operate on <device>, overriding default device list. Can be
@@ -86,21 +103,45 @@ VLAN Control:
   -t <pid> <eid>    Create all VLANs for an experiment
   -r <pid> <eid>    Remove all VLANs for an experiment
                         (you can provide an optional list of vlan ids)
-  -l                List all VLANs
+  -l                List all VLANs associated with experiments.
+                        A second -l will list ALL vlans.
   -w                Used with -l, includes device-specific VLAN number
   -M                Used with -l, print MAC addresses instead of port numbers
-  -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
-                        and put [ports] in it
+  -O                Used with -l, list only orphaned VLANs
+  -L <out#in[,o2#i2,...]> stylized -l for snmpit.proxy of specific vlans
+  -m <name> <pid> <eid> [ports]
+                    Create a new VLAN with name <name>, if it doesn't exist,
+                        and put [ports] in it. The new VLAN will be
+                        associated with the priject and experiment given
   -y <type>         When used with -m, the new VLAN becomes a private VLAN
                         of type <type>
   -x <primary>      When used with -y, assocates the new private VLAN with
                         the primary VLAN named <primary>
   -z <port>         Used with -y and -x, to specify which port is to be used
                         with the private VLAN
-  -o <name>         Delete the VLAN with name <name>
+  -o <name> <pid> <eid>
+                    Delete the VLAN with name <name>, which is associated with
+                        the given experiment
   -N <name>         Print out the VLAN number for the named VLAN
   -c                Delete ALL VLANs, and recreate from the database. ** USE
                         WITH EXTREME CAUTION **
+  -F                Create all vlans in the given stack on the leader for
+		    use in leader->{ALLVLANSONLEADER} (Internal use only)
+  --of-enable <name> <pid> <eid> 
+                    Enable Openflow on VLAN with the name <name> that is 
+		        associated with the given experiment 
+  --of-disable <name> <pid> <eid>
+                    Disable Openflow on VLAN with the name <name> that is 
+		        associated with the given experiment
+  --of-controller <name> <pid> <eid> tcp:ip:port
+                    Set controller for Openflow-enabled VLAN with the 
+		        name <name> that is associated with the given 
+			experiment
+  --of-listener <name> <pid> <eid> 
+                    Enable listener for Openflow-enabled VLAN with the 
+		        name <name> that is associated with the given 
+			experiment, snmpit will print out the listener 
+			connection string
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -112,9 +153,12 @@ Port Control:
   -u <half|full> <ports> Set duplex of <ports> to half or full
   -T <port> <names>      Enable trunking on the given <port>, and allow VLANs
                              with the given <names> across it
+  -E <port> <names>      Like -T, but "Equal" mode; PVID is also tagged
   -U <port>              Turn off trunking for the given <port>
   -b <ports>             Print out port status for a set of ports
   -B <statstring>        Pass in a stat string from -b to restore status
+  -D <pid> <eid>         Disable all control net ports for an experiment
+  -R <pid> <eid>         (Re)enable all control net ports for an experiment
 
 More than one operation can be specified - However, beware that the order in
 which operations will occur is undefined, and some combinations of operations
@@ -124,12 +168,13 @@ END
     return 1;
 }
 
-
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
-GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n',
-    'N=s@','o=s@','p=s','q','r','s', 'S=s@', 't','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s');
+GetOptions(\%opt,
+    'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
+    'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
+    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -143,21 +188,58 @@ if ($opt{v}) {
 
 if ($opt{q}) {
     $quiet = 1;
+    if ($opt{m} || $opt{o} || $opt{t} || $opt{r} || $opt{X} || $opt{T} ||
+	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e} ||
+	  $opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-controller'} || 
+	  $opt{'of-listener'}) {
+	my $nulldev;
+        open($nulldev, ">>/dev/null");
+	select $nulldev; # supresses print foo(); without explicit fileglob
+    }
 }
 
-#
+#if ($opt{F}) { push @commands, ["synchleader"]; }
 # Values that may have been passed on the command line
 #
 my $pid;
 my $eid;
+my $experiment;
 my @ports;
 my @optvlanids = ();
+my $equaltrunking = 0;
+my $this_user;
+my $ofconnstr; # Openflow connection string, for controller 
+our $next_vlan_tag; # XXX see doMakeVlan for explanation
+
+#
+# Verify user and get his DB uid for later. 
+#
+if ($UID) {
+    $this_user = User->ThisUser();
+    if (! defined($this_user)) {
+	die("*** $0:\n".
+	    "    You ($UID) do not exist!\n");
+    }
+}
 
 #
 # Some operations have mandatory agruments - for others, make sure that
 # the user didn't give any extraneous arguments
 #
-if ($opt{t} || $opt{r}) {
+if ($opt{m} || $opt{o}) {
+    if (@ARGV < 2 ||
+	($opt{m} && ($ARGV[0] =~ /:/ || $ARGV[1] =~ /:/)) ||
+	($opt{o} && ($ARGV[0] =~ /^\d+$/ || $ARGV[1] =~ /^\d+$/))) {
+	if (! $opt{f}) {
+	    tberror "pid/eid reqired!";
+	    exit(usage());
+	}
+    }
+    else {
+	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }
+}
+if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
     #
     # Options that take 'pid eid'
     #
@@ -176,12 +258,13 @@ if ($opt{t} || $opt{r}) {
     # Options that take a list of ports
     #
     @ports = @ARGV;
-} elsif ($opt{T}) {
+} elsif ($opt{T} || $opt{E}) {
     #
     # Options that take both a port and a list of VLANs - we require at least
     # one VLAN to be given
     #
-    if (!@ARGV) {
+    if ($opt{E}) { $opt{T} = $opt{E}; $equaltrunking = 1;}
+    elsif (!@ARGV) {
 	tberror "At least one VLAN required";
 	exit &usage;
     }
@@ -191,12 +274,40 @@ if ($opt{t} || $opt{r}) {
     # Set the @ports array so that we'll do proper permission checking on it
     #
     @ports = ($opt{T});
+} elsif ($opt{'of-controller'}) {
+    #
+    # Options that take the pid eid and connection string
+    #
+    if (@ARGV < 2) {
+	tberror "pid/eid reqired!";
+	exit &usage;
+    } else {
+	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }
+    if (@ARGV < 0) {
+	tberror "Controller connection string reqired!";
+	exit &usage;
+    } else {
+	$ofconnstr = shift @ARGV;
+    }
+} elsif ($opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-listener'}) {
+    #
+    # Options that need pid eid
+    #
+    if (@ARGV < 1) {
+	tberror "pid/eid reqired!";
+	exit &usage;
+    } else {
+	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }    
 } else {
     #
     # Everything else
     #
     if (@ARGV) {
-	tberror "Too many arguments!";
+	tberror({type => 'primary', severity => SEV_ERROR,
+		 error => ['too_many_arguments']},
+		"Too many arguments!");
 	exit &usage;
     }
 }
@@ -212,21 +323,30 @@ my @commands;
 # Simple commands
 #
 if ($opt{l}) { push @commands, ["listvlans"]; }
+if ($opt{L}) { push @commands, ["listvlans"]; }
 if ($opt{s}) { push @commands, ["listports"]; }
 if ($opt{g}) { push @commands, ["getstats"]; }
 if ($opt{t}) { push @commands, ["tables"]; }
 if ($opt{r}) { push @commands, ["reset"]; }
+if ($opt{X}) { push @commands, ["synctables"]; }
 if ($opt{c}) { push @commands, ["recreate"]; }
 if ($opt{U}) { push @commands, ["trunkdisable"]; }
 if ($opt{b}) { push @commands, ["portstatus"]; }
+if ($opt{F}) { push @commands, ["synchleader"]; }
 
 #
-# Commands that can appear once, and take an agurment
+# Commands that can appear once, and take an argument
 #
 if ($opt{d}) { push @commands, ["portcontrol","disable"]; }
 if ($opt{e}) { push @commands, ["portcontrol","enable"]; }
 if ($opt{a}) { push @commands, ["portcontrol","auto"]; }
+if ($opt{D}) { push @commands, ["expcnetcontrol", "disable"]; }
+if ($opt{R}) { push @commands, ["expcnetcontrol", "enable"]; }
 if ($opt{T}) { push @commands, ["trunkenable", $opt{T}]; }
+if ($opt{'of-enable'}) { push @commands, ["ofenable", $opt{'of-enable'}]; }
+if ($opt{'of-disable'}) { push @commands, ["ofdisable", $opt{'of-disable'}]; }
+if ($opt{'of-controller'}) { push @commands, ["ofcontroller", $opt{'of-controller'}]; }
+if ($opt{'of-listener'}) { push @commands, ["oflistener", $opt{'of-listener'}]; }
 
 #
 # Commands that can occur more than once
@@ -279,6 +399,7 @@ if ($opt{p}) {
     } elsif ($opt{p} =~ /^10/) {
 	push @commands, ["portcontrol","10mbit"];
     } else {
+	tbreport(SEV_ERROR, 'bad_data', 'port_speed', $opt{p});
 	die "Bad port speed: $opt{p}. Valid values are 10, 100, and 1000\n";
     }
 }
@@ -296,6 +417,7 @@ if ($opt{u}) {
 }
 
 if (!@commands) {
+    tbreport(SEV_ERROR, 'no_operation');
     die "No operation given\n";
 }
 
@@ -315,12 +437,20 @@ if ($opt{i}) {
 }
 if ($opt{S}) {
     foreach my $stack (@{$opt{S}}) {
-	$supplied_switches = 1;
-	my @switches = getSwitchesInStack($stack);
-	if (@switches) {
-	    push @supplied_stacks, $stack;
-	} else {
-	    tbdie "No such switch stack: $stack";
+	if ($ELABINELAB) {
+	    # We are going to pass the stack argument through in the rpc call.
+	    push(@supplied_stacks, $stack);
+	}
+	else {
+	    $supplied_switches = 1;
+	    my @switches = getSwitchesInStack($stack);
+	    if (@switches) {
+		push @supplied_stacks, $stack;
+	    } else {
+		tbdie({type => 'primary', severity => SEV_ERROR,
+		       error => ['invalid_switch_stack', $stack]},
+		      "No such switch stack: $stack");
+	    }
 	}
     }
 }
@@ -376,10 +506,12 @@ if ($pid && $eid) {
     #
     # First, make sure the experiment exists
     #
-    if (!ExpState($pid,$eid)) {
+    $experiment = Experiment->Lookup($pid,$eid);
+    if (!defined($experiment)) {
 	die "There is no experiment $eid in project $pid\n";
     }
-    if ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_MODIFY)) {
+    if (defined($this_user) &&
+	!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	die "You do not have permission to modify experiment $pid/$eid\n";
     }
 }
@@ -414,11 +546,13 @@ if (@ports) {
 		    "argument has been given\n";
 	    }
 	} else {
+	    tbreport(SEV_ERROR, 'bad_data', 'port', $port);
 	    die "Bad format for port $port\n"
 	}
     }
 
     if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
+	tbreport(SEV_ERROR, 'insufficient_permissions');
 	die "You do not have permission to modify some or all of the nodes\n" .
 		"that will be affected by the operation you requested\n";
     }
@@ -440,7 +574,7 @@ if ($TESTMODE) {
 snmpit_lib::init($debug);
 
 my $exitval = 0;
-foreach my $command (@commands) {
+COMMAND: foreach my $command (@commands) {
 
     #
     # Pull the operation and the arugments to it.
@@ -452,12 +586,14 @@ foreach my $command (@commands) {
     #
     # Discover the set of devices we need to talk to. This differs depending
     # on the operation which we're performing. We also get a list of all ports
-    # and vlan IDs involved in this operation, if appropriate
+    # and vlan IDs involved in this operation, if appropriate. We use this
+    # opportunity to bail out of the command if it appears we have no work
+    # to do
     #
     my @devicenames;
     my @vlans;
     SWITCH: for ($operation) {
-	(/listvlans/ || /getstats/ || /make/ || /remove/ || /vlannumber/) && do {
+	(/listvlans/ || /getstats/ || /vlannumber/ || /synchleader/) && do {
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
@@ -467,26 +603,145 @@ foreach my $command (@commands) {
 	    (@ports? getDeviceNames(@ports) : getTestSwitches());
 	    last;
 	};
-	(/tables/) && do {
-	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
-	    @ports = getVlanPorts(@vlans);
-	    @devicenames = $supplied_switches?
-			   @supplied_switches : getTestSwitches();
+	( /make/ ) && do {
+            if ($supplied_switches) {
+                @devicenames = @supplied_switches;
+            } elsif (@ports) {
+                # Have to operate on whole stacks so that trunks work
+                @devicenames =
+                    getSwitchesInStacks(getStacksForSwitches(getDeviceNames(@ports)));
+            } else {
+                @devicenames = getTestSwitches();
+            }
 	    last;
 	};
+        (/remove/) && do {
+            # Three levels of possible sources for device names (in order):
+            #   passed in on command line
+            #   stack name recorded in database
+            #   if others fail, default to experimental switches
+	    my ($vlan_name) = @args;
+            my ($vlanobj, $stack);
+            if ($supplied_switches) {
+                debug("Remove: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } elsif (defined($experiment) &&
+                     defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
+                     defined($stack = $vlanobj->GetStack())) {
+                debug("Remove: found stack $stack in database\n");
+                @devicenames = getSwitchesInStack($stack);
+            } else {
+                debug("Remove: using test switches\n");
+                @devicenames = getTestSwitches();
+            }
+            last;
+        };
+        (/^tables$/) && do {
+            # Grab all stacks that any ports in the experiment are members
+            # of.
+            # (We need the entire stack, since the VLAN may have to traverse
+            # devices that don't explicitly have a port in the VLAN.)
+            @vlans = getExperimentVlans($pid,$eid,@optvlanids);
+            if (!@vlans) {
+                print "snmpit: $pid/$eid has no VLANs to create, skipping\n"
+		    if (!$quiet);
+                next COMMAND;
+            }
+            if ($supplied_switches) {
+                debug("Tables: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } else {
+                @devicenames =
+                    getSwitchesInStacks(getPlannedStacksForVlans(@vlans));
+                debug("Tables: list from database: " . join(",",@devicenames) .
+                    "\n");
+            }
+            if (scalar(@devicenames == 0)) {
+                debug("Tables: falling back to test swtiches\n");
+                @devicenames = getTestSwitches();
+            }
+            last;
+        };
 	(/reset/) && do {
 	    #
-	    # When we reset, we operate on all test switches, just to be safe
+            # We operate on all stacks that we have recorded as having VLANs
+            # that belong to this experiment.
 	    #
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
-	    @devicenames = $supplied_switches?
-			   @supplied_switches : getTestSwitches();
+            if (!@vlans) {
+                print "snmpit: $pid/$eid has no VLANs, skipping\n"
+		    if (!$quiet);
+                next COMMAND;
+            }
+            @vlans = filterPlannedVlans(@vlans);
+            if (!@vlans) {
+                print "snmpit: $pid/$eid has VLANs, but none have been " .
+                    "created on switches\n  ... skipping\n";
+                next COMMAND;
+            }
+            if ($supplied_switches) {
+                debug("Reset: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } else {
+                @devicenames =
+                    getSwitchesInStacks(getActualStacksForVlans(@vlans));
+                debug("Reset: list from database: " . join(",",@devicenames) .
+                    "\n");
+            }
+
+            # Fallthrough - if we haven't found any switches yet, operate
+            # on the whole experimetnal net
+            if (scalar(@devicenames) == 0) {
+                debug("Reset: falling back to test swtiches\n");
+                @devicenames = getTestSwitches();
+            }
+	    last;
+	};
+	(/synctables/) && do {
+            # We operate on all stacks on which we think VLANs do, or should,
+            # exist
+            if ($supplied_switches) {
+                debug("Sync: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } else {
+                # Get both the VLANs that do exist and the VLANs that should
+                # exist
+                my @newvlans = getExperimentVlans($pid,$eid,@optvlanids);
+                @devicenames =
+                    getSwitchesInStacks(getPlannedStacksForVlans(@newvlans));
+                debug("Sync: New devices are " . join(",",@devicenames) .
+                    "\n");
+
+                my @oldvlans;
+                VLan->StaleVlanList($experiment,\@oldvlans);
+                my @oldports;
+                foreach my $oldvlan (@oldvlans) {
+                    push @oldports, getExperimentVlanPorts($oldvlan);
+                }
+                push @devicenames,
+                    getSwitchesInStacks(getStacksForSwitches(getDeviceNames(@oldports)));
+                debug("Sync: With old devices, list is " .
+                    join(",",@devicenames) .  "\n");
+
+                @devicenames = uniq(@devicenames);
+            }
+
+            # Fallthrough - if we haven't found any switches yet, operate
+            # on the whole experimetnal net
+            if (scalar(@devicenames) == 0) {
+                debug("Reset: falling back to test swtiches\n");
+                @devicenames = getTestSwitches();
+            }
 	    last;
 	};
 	(/portcontrol/ || /trunkdisable/ || /portstatus/) && do {
 	    @devicenames = $supplied_switches?
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    last;
+	};
+	(/expcnetcontrol/) && do {
+	    @ports = getExperimentControlPorts($pid, $eid);
+	    @devicenames = getDeviceNames(@ports);
 	};
 	(/recreate/) && do {
 	    #
@@ -523,6 +778,25 @@ foreach my $command (@commands) {
             @args = %args;
             last;
         };
+	(/ofenable/ || /ofdisable/ || /ofcontroller/ || /oflistener/) && do {
+	    @vlans = @args;
+
+	    # Same to 'remove', we find stacks by VLAN 
+	    my ($vlanobj, $stack);
+            if ($supplied_switches) {
+                debug("Openflow operations: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } elsif (defined($experiment) &&
+                     defined($vlanobj = VLan->Lookup($experiment,$vlans[0])) &&
+                     defined($stack = $vlanobj->GetStack())) {
+                debug("Openflow operations: found stack $stack in database\n");
+                @devicenames = getSwitchesInStack($stack);
+            } else {
+                debug("Openflow operations: using test switches\n");
+                @devicenames = getTestSwitches();
+            }
+	    last;
+	};
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
@@ -572,25 +846,19 @@ foreach my $command (@commands) {
 	    (/cisco/ || /catalyst/) && do {
 		require snmpit_cisco_stack;
 		$stack = new snmpit_cisco_stack($stack_id,$debug,$single_domain,
-		    @{$stacks{$stack_id}});
+ 						@{$stacks{$stack_id}});
 		last;
 	    }; # /cisco/
 	    /intel/ && do {
 		require snmpit_intel_stack;
 		$stack = new snmpit_intel_stack($stack_id,$debug,
-		    @{$stacks{$stack_id}});
-		last;
-	    };
-	    /nortel/ && do {
-		require snmpit_nortel;
-		$stack = new snmpit_nortel($stack_id,$debug,
-		    @{$stacks{$stack_id}});
+						@{$stacks{$stack_id}});
 		last;
 	    };
 	    /generic/ && do {
 		require snmpit_stack;
 		$stack = new snmpit_stack($stack_id,$debug,
-		    @{$stacks{$stack_id}});
+					  @{$stacks{$stack_id}});
 		last;
 	    }; # /generic/
 
@@ -626,10 +894,18 @@ foreach my $command (@commands) {
 		}
 	    }
 	    if (!$matched) {
-		tbdie "One or more ports are on $device, but no " .
-		    "stack containing it was specified!";
+		tbdie({type => 'primary', severity => SEV_ERROR,
+		       error => ['device_not_in_stack', $device]},
+		      "One or more ports are on $device, but no " .
+		      "stack containing it was specified!");
 	    }
 	}
+    }
+    if ($ELABINELAB) {
+	#
+	# Okay, now that we skipped all that stack stuff ...
+	#
+	@stacks = @supplied_stacks;
     }
 
 ######################################################################
@@ -648,6 +924,10 @@ foreach my $command (@commands) {
 	    $exitval += doListVlans(\@stacks);
 	    last;
 	}; # /listvlans/ && do 
+	/synchleader/ && do {
+	    $exitval += doSynchLeader(\@stacks);
+	    last;
+	}; # /listvlans/ && do 
 	/listports/ && do {
 	    $exitval += doListPorts(\@stacks);
 	    last;
@@ -656,8 +936,12 @@ foreach my $command (@commands) {
 	    $exitval += doGetStats(\@stacks);
 	    last;
 	}; # /ports/ && do
-	/tables/ && do {
-	    $exitval += doVlansFromTables(\@stacks,@vlans);
+	/^tables$/ && do {
+	    $exitval += doVlansFromTables($experiment,\@stacks,@vlans);
+	    last;
+	}; # /tables/ && do
+	/synctables/ && do {
+	    $exitval += syncVlansFromTables($experiment,\@stacks);
 	    last;
 	}; # /tables/ && do
 	/reset/ && do {
@@ -679,17 +963,22 @@ foreach my $command (@commands) {
 	    $exitval += doPortControl(\@stacks,$portcommand,@ports);
 	    last;
 	};
+	/expcnetcontrol/ && do {
+	    my ($portcommand) = @args;
+	    $exitval += doPortControl(\@stacks,$portcommand,@ports);
+	    last;
+	};
 	/recreate/ && do {
 	    $exitval += doRecreateVlans(\@stacks);
 	    last;
 	};
 	/trunkenable/ && do {
-	    my ($port) = @args;
-	    $exitval += doTrunkEnable(\@stacks,$port,@vlans);
+	    $exitval += doTrunkEnable(\@stacks,$ports[0],
+				      $equaltrunking,@vlans);
 	    last;
 	}; # /trunkenable/ && do
 	/trunkdisable/ && do {
-	    $exitval += doTrunkDisable(\@stacks,@ports);
+	    $exitval += doTrunkDisable(\@stacks,$ports[0]);
 	    last;
 	}; # /trunkdisable/ && do
 	/portstatus/ && do {
@@ -705,6 +994,22 @@ foreach my $command (@commands) {
 	    $exitval += doRestorePortStatus(\@stacks,@args);
 	    last;
 	}; # /portstatus/ && do
+	(/ofenable/) && do {
+	    $exitval += doOpenflowEnable(\@stacks,$vlans[0]);
+	    last;
+	}; # /ofenable/ && do
+	(/ofdisable/) && do {
+	    $exitval += doOpenflowDisable(\@stacks,$vlans[0]);
+	    last;
+	}; # /ofdisable/ && do
+	(/ofcontroller/) && do {
+	    $exitval += doSetOpenflowController(\@stacks,$vlans[0],$ofconnstr);
+	    last;
+	}; # /ofcontroller/ && do
+	(/oflistener/) && do {
+	    $exitval += doEnableOpenflowListener(\@stacks,$vlans[0]);
+	    last;
+	}; # /oflistener/ && do
     }
 }
 
@@ -749,22 +1054,51 @@ sub parseStatusString($) {
 sub doListVlans ($) {
 
     my $stacks = shift;
-    
     my %vlans;
+    my @vlanList;
 
     #
     # We need to 'coallate' the results from each stack by putting together
     # the results from each stack, based on the VLAN identifier
     #
+if ($ELABINELAB) {
+    #
+    # Sklower deliberately uglified this.  The intent is that eventually
+    # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
+    # it will just work.  For now, we dup the code.
+    #
+    @vlanList = RemoteDoList();
+    foreach my $vlan (@vlanList) {
+	my ($id,$ddep,$memberref) = @$vlan;
+	${$vlans{$id}}[0] = $ddep;
+	push @{${$vlans{$id}}[1]}, @$memberref;
+    }
+} else {
     foreach my $stack (@$stacks) {
-	my @vlanList = $stack->listVlans();
+	@vlanList = $stack->listVlans();
 	foreach my $vlan (@vlanList) {
 	    my ($id,$ddep,$memberref) = @$vlan;
 	    ${$vlans{$id}}[0] = $ddep;
 	    push @{${$vlans{$id}}[1]}, @$memberref;
 	}
     }
+}
 
+    #
+    # less code to do this for snmpit.proxy than for it to popen snmpit
+    # parse the output, and glue it back together.
+    #
+    if ($opt{L}) {
+	my @results;
+	foreach my $pair (split ',', $opt{L}) {
+	    my ($out,$in) = split "#", $pair;
+	    my $vlan = "$in#" . ${$vlans{$out}}[0] . "#" .
+				    join(' ', @{${$vlans{$out}}[1]});
+	    push @results, $vlan;
+	}
+	print join(',', @results);
+	exit(0);
+    }
     #
     # These need to be declared here for the benefit of the format string
     # See perlform(1) for help with formats
@@ -800,30 +1134,49 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	$FORMAT_NAME = 'vlanlist2';
 }
 
-    foreach $vlan_id (sort {tbsort($a,$b)} keys %vlans) {
+    foreach my $vid (sort {tbsort($a,$b)} keys %vlans) {
+        $vlan_id = $vid;
 	my $memberref;
-	($ddep,$memberref) = @{$vlans{$vlan_id}};
-
-	#
-	# Find which, if any, experiment this VLAN belongs to.
-	#
-	my $result = DBQueryFatal("select pid, eid, virtual from " .
-				  "vlans where id='$vlan_id'");
-	my ($eid,$pid);
-	($pid,$eid,$vname) = $result->fetchrow();
+	($ddep,$memberref) = @{$vlans{$vid}};
+        
+        my $vlan = VLan->Lookup($vlan_id);
+        if (!defined($vlan)) {
+	    &debug("No such VLAN $vlan_id in lans table\n");
+	    next
+		if ($opt{l} == 1);
+	    $vname = $vlan_id;
+	    $experiment = undef;
+        }
+	else {
+	    $vname         = $vlan->vname();
+	    $experiment    = $vlan->GetExperiment();
+	}
 
 	#
 	# Permissions check - people only get to see their own VLANs
 	#
-	if ((!$eid) || (!$pid)) {
+	if (!defined($experiment)) {
+            # If only printing orphaned VLANs, consider only ones that have IDs
+            # that look like the ones we assign in the database
+            if ($opt{O} && $vid !~ /^\d+$/) {
+                next;
+            }
 	    if (!TBAdmin()) {
 		&debug("Failed TBAdmin check\n");
 		next;
 	    }
-	} elsif ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
-	    &debug("Failed TBExptAccessCheck($UID,$pid,$eid)\n");
-	    next;
-	}
+	} else {
+            # If only printing orphaned VLANs, skip ones for which we know the
+            # pid and ied
+            if ($opt{O}) {
+                next;
+            }
+            if ($UID &&
+		!$experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
+                &debug("$this_user failed access check to $experiment\n");
+                next;
+            }
+        }
 
 
 	if (!$vname) { $vname = ""; }
@@ -844,8 +1197,8 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 	#
 	# Setup $pideid for a more compact display
 	#
-	if ($eid && $pid) {
-	    $pideid = "$pid/$eid";
+	if (defined($experiment)) {
+	    $pideid = $experiment->pid() . "/" . $experiment->eid();
 	} else {
 	    $pideid = "";
 	}
@@ -853,6 +1206,35 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
     }
 
     return 0;
+}
+
+#
+# This routine does a number of illegal things.  It is used
+# to make sure the leader of a stack contains all vlans on all switches
+# in the stack and is only useful for moving a stack back and forth
+# between types "cisco" and "generic" (where $stack->{ALLVLANSONLEADER} must be
+# set to 1.
+#
+sub doSynchLeader ($) {
+
+    my $stacks = shift;
+    my $errors = 0;
+    if (!TBAdmin()) {
+	die "Only admins are allowed to synchronize stacks\n";
+    }
+
+    foreach my $stack (@$stacks) {
+	my $leader = $stack->{LEADER};
+	my %vlans = $stack->findVlans();
+	while (my ($id,$num) = each %vlans) {
+	    if (($num >= $leader->{MIN_VLAN}) &&
+		($num <= $leader->{MAX_VLAN}) &&
+		!($leader->vlanNumberExists($num))) {
+			$errors += $leader->createVlan($id, $num);
+	    }
+	}
+    }
+    return $errors;
 }
 
 #
@@ -971,7 +1353,9 @@ sub doPortStatus($@) {
     #
     foreach my $port (keys %ports) {
         if (!$ports{$port}) {
-            tberror "Unable to get status information for $port!";
+	    tberror({type => 'primary', severity => SEV_ERROR,
+		     error => ['get_port_status_failed', $port]},
+		    "Unable to get status information for $port!");
             $errors++;
         } else {
             print "port=$port;$ports{$port}\n";
@@ -1000,7 +1384,7 @@ sub doRestorePortStatus($@) {
 
     if (@$stacks > 1) {
 	die "Port restoration accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
@@ -1104,59 +1488,229 @@ $port,    $inoctets, $inunicast,$innunicast,$indiscards,$inerr,  $inunk,    $out
 # Creates all VLANs given. Looks up identifiers in the database to determine
 # the membership.
 #
-sub doVlansFromTables($@) {
-    my $stacks = shift;
-    my @vlans = @_;
+sub doVlansFromTables($$@) {
+    my $experiment = shift;
+    my $stacks  = shift;
+    my @vlanids = @_;
+    my %vlans   = ();
 
     my $errors = 0;
+    my $vlan_number;
 
     if (@$stacks > 1) {
 	die "VLAN creation accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
-    my ($stack) = @$stacks;
-
+    
     #
     # Hand over to outer boss.
     # 
     if ($ELABINELAB) {
-	return RemoteDoVlansFromTables(@vlans);
+	return RemoteDoVlansFromTables($experiment, @vlanids);
     }
 
-    foreach my $vlan (@vlans) {
-	my @ports = getVlanPorts($vlan);
-	if ($stack->vlanExists($vlan)) {
-	    print "  VLAN $vlan already exists\n"
-		if (!$quiet);
-	    $errors += $stack->setPortVlan($vlan,@ports);
-	} else {
-	    if (!$stack->createVlan($vlan,\@ports)) {
-		tberror "Failed to create VLAN with id $vlan";
-		#
-		# Don't try to put ports in a VLAN if it couldn't be created
-		#
-		$errors++;
-	    }
-	}
+    my ($stack) = @$stacks;
+    my @trunkedPorts = getExperimentTrunks($pid,$eid);
+    my %trunkedPorts = map { $_ => $_ } @trunkedPorts;
 
+    #
+    # Look for a lan that requires dual mode trunking. The ports in that
+    # lan need to be trunked after the native lan is created, so that we
+    # can call doTrunkEnable with dual mode instead of equalmode. This is
+    # not a general solution to this, but I have not found a solution I am
+    # really happy with. 
+    #
+    foreach my $id (@vlanids) {
+	my $vlan = VLan->Lookup($id);
+	if (!defined($vlan)) {
+	    die("Could not locate vlan $id in the DB\n");
+	}
+	$vlans{"$id"} = $vlan;
+    }
+    foreach my $vlan (values(%vlans)) {
+	my $vlanid = $vlan->id();
+	my $trunk_mode;
+	$vlan->GetAttribute("trunk_mode", \$trunk_mode);
+
+	# This is set in libvtop.
+	if (defined($trunk_mode) && $trunk_mode eq "dual") {
+	    my @ports = getVlanPorts($vlanid);
+	    
+	    # Create this vlan now.
+	    if (CreateOneVlan($stack, $vlanid, @ports))  {
+		die("Could not create dual trunked $vlan\n");
+	    }
+	    # Trunk these ports, removing from list.
+	    foreach my $port (@ports) {
+		if (doTrunkEnable($stacks,$port,0,$vlanid)) {
+		    die("Could not put $port ($vlan) into dual trunk mode\n");
+		}
+		delete($trunkedPorts{$port});
+	    }
+	    
+	    #
+	    # Set openflow
+	    #
+	    # A much more right place for the openflow settings is CreateOneVlan,
+	    # however, it is called by sync vlan function and others, which don't destroy
+	    # the existing vlan_arrtibutes rows.
+	    #
+	    # TODO: Move this part to CreateOneVlan and Make sure the existed 
+	    #       vlan_attributes rows are deleted
+	    #
+	    my $ofenabled;
+	    $vlan->GetAttribute("ofenabled", \$ofenabled);
+	    if (defined($ofenabled) && $ofenabled == 1) {
+	        $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	        my $ofcontroller;
+	        $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	        if (defined($ofcontroller) && $ofcontroller ne "") {
+	            $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	        }
+	    
+	        $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	        # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	        # should refresh itself. But here vlan will not be used any more, so
+	        # maybe we can comment this refresh.
+	        $vlan->Refresh();	    
+	    }
+	    
+	    # Delete this vlan from the list that will be created below.
+	    delete($vlans{"$vlanid"});
+	}
+    }
+    # Do the rest of the trunked ports in equalmode.
+    foreach my $port (keys(%trunkedPorts)) {
+	$errors += doTrunkEnable($stacks,$port,1);
+    }
+
+    #
+    # Sanity check: make sure that this experiment does not use more VLANs than
+    # we can put on the stack. Note that we don't try to check how many are
+    # available (ie. total - used), because getting the 'used' value is not
+    # trivial.
+    #
+    my $leader = getStackLeader($stack->{STACKID});
+    if (!defined $leader) {
+        tberror "Unable to get stack leader for $stack->{STACKID}";
+        return 1;
+    }
+    my $switch_options = getDeviceOptions($leader);
+    if (!defined $switch_options) {
+        tberror "Unable to get stack leader for $stack->{STACKID}";
+        return 1;
+    }
+    my $vlan_count = $switch_options->{'max_vlan'} -
+                     $switch_options->{'min_vlan'};
+    my $expt_vlan_count = scalar(keys(%vlans));
+    if ($expt_vlan_count > $vlan_count) {
+        tberror "Too many VLANs in experiment: $expt_vlan_count requested, " .
+                "$vlan_count available";
+        return 1;
+    }
+
+    foreach my $vlan (values(%vlans)) {
+	my $vlanid = $vlan->id();
+	my @ports  = getVlanPorts($vlanid);
+
+	$errors += CreateOneVlan($stack, $vlanid, @ports);
+	
 	#
-	# Set the speed and duplex of each interface depending on the
-	# value in the database
+	# Set openflow
+	# 
+	# A much more right place for the openflow settings is CreateOneVlan,
+	# however, it is called by sync vlan function and others, which don't destroy
+	# the existing vlan_arrtibutes rows.
 	#
+	# TODO: Move this part to CreateOneVlan and Make sure the existed 
+	#       vlan_attributes rows are deleted
+	#
+	my $ofenabled;
+	$vlan->GetAttribute("ofenabled", \$ofenabled);
+	if (defined($ofenabled) && $ofenabled == 1) {
+	    $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	    my $ofcontroller;
+	    $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	    if (defined($ofcontroller) && $ofcontroller ne "") {
+	        $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	    }
+	    
+	    $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	    # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	    # should refresh itself. But here vlan will not be used any more, so
+	    # maybe we can comment this refresh.
+	    $vlan->Refresh();	    
+	}
+    }
+    return $errors;
+}
+
+#
+# Create a single vlan.
+#
+sub CreateOneVlan($$@)
+{
+    my $stack  = shift();
+    my $vlanid = shift();
+    my @ports  = @_;
+    my $errors = 0;
+
+    if ($stack->vlanExists($vlanid)) {
+	print "  VLAN $vlanid already exists\n"
+	    if (!$quiet);
+	if ($stack->setPortVlan($vlanid,@ports)) {
+	    $errors++;
+	}
+	else {
+	    # Convert the ports to node:iface for the next call.
+	    my @conports = map { portiface($_) } @ports;
+
+	    VLan->RecordVLanModification($vlanid, \@conports, undef);
+	}
+    }
+    else {
+	my $vlan_number = $stack->createVlan($vlanid,\@ports);
+	if (!$vlan_number) {
+	    tberror({type => 'secondary', severity => SEV_SECONDARY,
+		     error => ['create_vlan_failed', $vlanid]},
+		    "Failed to create VLAN with id $vlanid");
+	    #
+	    # Don't try to put ports in a VLAN if it couldn't be created
+	    #
+	    $errors++;
+	}
+	else {
+	    setVlanTag($vlanid, $vlan_number);
+	    VLan->RecordVlanInsertion($experiment, $vlanid,$stack->{STACKID});
+	}
+    }
+    return $errors
+	if ($errors);
+
+    #
+    # Set the speed and duplex of each interface depending on the
+    # value in the database
+    #
+    if (!$NOSTACKMIB) {
 	foreach my $port (@ports) {
 	    my ($speed,$duplex) = getInterfaceSettings($port);
 	    #
 	    # If either is not set, we do nothing. We could make
 	    # a 0 mean 'auto'
 	    #
-	    # For now, we ignore it if the switch doesn't support the commands.
+	    # For now, we ignore it if the switch doesn't support the
+	    # commands.
+	    #
 	    if ($speed) {
 		my $cmd = $speed . "mbit";
 		my $rv = $stack->portControl($cmd, $port);
 		if ($rv > 0) {
 		    $errors += $rv;
 		}
-
 	    }
 	    if ($duplex) {
 		my $rv = $stack->portControl($duplex, $port);
@@ -1166,7 +1720,6 @@ sub doVlansFromTables($@) {
 	    }
 	}
     }
-
     return $errors;
 }
 
@@ -1183,12 +1736,17 @@ sub doReset($@) {
     # Hand over to outer boss.
     # 
     if ($ELABINELAB) {
-	return RemoteDoReset(@vlans);
+	return RemoteDoReset($experiment, scalar(@optvlanids) == 0, @vlans);
     }
 
     my $errors = 0;
+    my @trunkedPorts = getExperimentTrunks($pid,$eid);
+    foreach my $port (@trunkedPorts) {
+	$errors += doTrunkDisable($stacks,$port);
+    }
+
     #
-    # Just remove the VLAN from evey stack on which it exists. We keep a
+    # Just remove the VLAN from every stack on which it exists. We keep a
     # list and do them all at once for efficiency.
     #
     foreach my $stack (@$stacks) {
@@ -1196,8 +1754,319 @@ sub doReset($@) {
 	if (!$stack->removeVlan(@existant_vlans)) {
 	    $errors++;
 	}
+	foreach my $vlan (@existant_vlans) {
+	    setVlanTag($vlan, 0);
+	    VLan->RecordVLanDeletion($vlan);
+	}
     }
     return $errors;
+}
+
+#
+# Sync vlans from the DB for a single experiment. This is a swapmod helper
+# to avoid churning the switches.
+#
+sub syncVlansFromTables($$) {
+    my $experiment = shift;
+    my $stacks     = shift;
+    my %expvlans   = ();
+    my %curvlans   = ();
+    my %stale      = ();
+    my $impotent   = 0;
+    my $errors     = 0;
+    my $vlan_number;
+
+    $debug = 1;
+
+    if (@$stacks > 1) {
+	die "VLAN creation accross multiple stacks is not yet supported\n" .
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
+    }
+    my ($stack) = @$stacks;
+    my @needTrunking = getExperimentTrunks($pid,$eid);
+    my %needTrunking = map { $_ => $_ } @needTrunking;
+
+    debug("Trunk Ports: @needTrunking\n");
+
+    #
+    # Get list of vlans that should exist.
+    #
+    my @tmp;
+    VLan->ExperimentVLans($experiment, \@tmp) == 0 or
+	die("Could not get current vlans for $experiment\n");
+    foreach my $vlan (@tmp) {
+	$expvlans{$vlan->id()} = $vlan;
+    }
+    debug("Experiment vlans: " . join(" ", keys(%expvlans)) . "\n");;
+
+    #
+    # Get list of vlans that we think are on the switch (vlans table).
+    #
+    @tmp = ();
+    VLan->StaleVlanList($experiment, \@tmp) == 0 or
+	die("Could not get stale vlans for $experiment\n");
+    foreach my $vlanid (@tmp) {
+	$curvlans{$vlanid} = 1;
+	
+	# Not in the new set; must delete.
+	$stale{$vlanid} = 1
+	    if (!exists($expvlans{$vlanid}));
+    }
+    debug("Existing vlans: @tmp\n");
+    debug("Stale vlans: " . join(" ", keys(%stale)) . "\n");
+
+    #
+    # Get a list of interfaces that are currently trunked.
+    #
+    my @currentTrunks = getExperimentCurrentTrunks($pid,$eid);
+    my %currentTrunks = map { $_ => $_ } @currentTrunks;
+
+    #
+    # Okay, kill off stale vlans.
+    #
+    if (keys(%stale)) {
+	my @existant_vlans = $stack->existantVlans(keys(%stale));
+
+	if (@existant_vlans) {
+	    debug("Removing stale vlans @existant_vlans\n");
+
+	    if (!$impotent) {
+		foreach my $vlanid (@existant_vlans) {
+		    my @curports   = getExperimentVlanPorts($vlanid);
+		    my @trunkports = ();
+
+		    foreach my $port (@curports) {
+			if (exists($currentTrunks{$port})) {
+			    push(@trunkports, $port);
+			}
+		    }
+		    if (@trunkports) {
+			$stack->removeSomePortsFromTrunk($vlanid, @trunkports)
+			    or goto bad;
+
+			# Convert the ports to node:iface for the next call.
+			@trunkports = map { portiface($_) } @trunkports;
+
+			VLan->RecordVLanModification($vlanid,
+						     undef, \@trunkports)
+			    == 0 or goto bad;
+		    }
+		    if (!$stack->removeVlan($vlanid)) {
+			print STDERR "Could not remove vlan: $vlanid\n";
+			goto bad;
+		    }
+		    VLan->RecordVLanDeletion($vlanid) == 0
+			or goto bad;
+		}
+	    }
+	}
+    }
+
+    #
+    # Remove stale ports from existing vlans. 
+    #
+    foreach my $vlanid (keys(%expvlans)) {
+	# This one will be built later.
+	next
+	    if (!exists($curvlans{$vlanid}));
+	    
+	my @expports   = getVlanPorts($vlanid);
+	my @curports   = getExperimentVlanPorts($vlanid);
+	my @staleports = ();
+	my @staletrunks= ();
+
+	#
+	# As a simplification for the backend, keep trunked ports separate
+	# from regular ports. Better then the backend figuring it out.
+	#
+	foreach my $port (@curports) {
+	    if (! grep {$_ eq $port} @expports) {
+		if (exists($currentTrunks{$port})) {
+		    push(@staletrunks, $port);
+		}
+		else {
+		    push(@staleports, $port);
+		}
+	    }
+	}
+	next
+	    if (! (@staleports || @staletrunks));
+	    
+	if (@staleports) {
+	    debug("Removing stale ports from vlan $vlanid: @staleports\n");
+
+	    if (!$impotent) {
+		$stack->removeSomePortsFromVlan($vlanid, @staleports)
+		    or goto bad;
+
+		# Convert the ports to node:iface for the next call.
+		@staleports = map { portiface($_) } @staleports;
+
+		VLan->RecordVLanModification($vlanid, undef, \@staleports) == 0
+		    or goto bad;
+	    }
+	}
+	if (@staletrunks) {
+	    debug("Removing stale trunked ports from vlan $vlanid: @staletrunks\n");
+	    
+	    if (!$impotent) {
+		$stack->removeSomePortsFromTrunk($vlanid, @staletrunks)
+		    or goto bad;
+
+		# Convert the ports to node:iface for the next call.
+		@staletrunks = map { portiface($_) } @staletrunks;
+
+		VLan->RecordVLanModification($vlanid, undef, \@staletrunks) == 0
+		    or goto bad;
+	    }
+	}
+    }
+
+    #
+    # Now untrunk the ports that are no longer trunked.
+    #
+    foreach my $port (keys(%currentTrunks)) {
+	if (!exists($needTrunking{$port})) {
+	    debug("Disabling trunking on $port\n");
+	    
+	    next
+		if ($impotent);
+	
+	    doTrunkDisable($stacks, $port) == 0
+		or goto bad;
+
+	    delete($currentTrunks{$port});
+	}
+    }
+
+    #
+    # Look for special vlans that need dual trunking.
+    #
+    foreach my $vlanid (keys(%expvlans)) {
+	my $vlan = $expvlans{$vlanid};
+	my $trunk_mode;
+	$vlan->GetAttribute("trunk_mode", \$trunk_mode);
+
+	# This is set in libvtop.
+	if (defined($trunk_mode) && $trunk_mode eq "dual") {
+	    my @ports = getVlanPorts($vlanid);
+	    my @saveports = @ports;
+
+	    #
+	    # If the vlan exists, still want to call CreateOneVlan(),
+	    # but only if some ports are not yet in the vlan.
+	    #
+	    if (exists($curvlans{$vlanid})) {
+		my @curports = getExperimentVlanPorts($vlanid);
+		my @newports = ();
+
+		foreach my $port (@ports) {
+		    push(@newports, $port)
+			if (! grep {$_ eq $port} @curports);
+		}
+		@ports = @newports;
+	    }
+	    
+	    # Create this vlan now. 
+	    debug("Creating dual mode trunking vlan $vlanid: @ports\n")
+		if (@ports);
+		
+	    if (!$impotent && @ports &&
+		CreateOneVlan($stack, $vlanid, @ports))  {
+		print STDERR "Could not create dual trunked $vlan\n";
+		goto bad;
+	    }
+	    # So it is not created below.
+	    $curvlans{$vlanid} = 1;
+	    
+	    # Trunk ports.
+	    foreach my $port (@saveports) {
+		if (!exists($currentTrunks{$port})) {
+		    debug("Enabling dual mode trunking on $port:$vlanid\n");
+		    
+		    if (!$impotent &&
+			doTrunkEnable($stacks,$port,0,$vlanid)) {
+			print STDERR
+			    "Could not put $port ($vlanid) into ".
+			    "dual trunk mode\n";
+			goto bad;
+		    }
+		}
+		# Mark is as being trunked.
+		$currentTrunks{$port} = $port;
+	    }
+	}
+    }
+
+    #
+    # And add trunking on any port that needs it.
+    #
+    foreach my $port (keys(%needTrunking)) {
+	if (!exists($currentTrunks{$port})) {
+	    debug("Enabling trunking on $port\n");
+	    
+	    next
+		if ($impotent);
+	
+	    doTrunkEnable($stacks, $port, 1) == 0
+		or goto bad;
+
+	    # Mark is as being trunked.
+	    $currentTrunks{$port} = $port;
+	}
+    }
+
+    #
+    # Now add ports to existing vlans.
+    #
+    foreach my $vlanid (keys(%expvlans)) {
+	# This one will be built later.
+	next
+	    if (!exists($curvlans{$vlanid}));
+	    
+	my @expports   = getVlanPorts($vlanid);
+	my @curports   = getExperimentVlanPorts($vlanid);
+	my @newports   = ();
+
+	foreach my $port (@expports) {
+	    push(@newports, $port)
+		if (! grep {$_ eq $port} @curports);
+	}
+	next
+	    if (!@newports);
+	    
+	debug("Adding new ports to vlan $vlanid: @newports\n");
+
+	next
+	    if ($impotent);
+	
+	if (CreateOneVlan($stack, $vlanid, @newports)) {
+	    goto bad;
+	}
+    }
+
+    #
+    # Now create vlans that did not exist.
+    #
+    foreach my $vlanid (keys(%expvlans)) {
+	next
+	    if (exists($curvlans{$vlanid}));
+	    
+	my @ports  = getVlanPorts($vlanid);
+
+	debug("Creating new vlan $vlanid: @ports\n");
+
+	next
+	    if ($impotent);
+	
+	if (CreateOneVlan($stack, $vlanid, @ports)) {
+	    goto bad;
+	}
+    }
+    return 0;
+
+ bad:
+    return -1;
 }
 
 #
@@ -1209,48 +2078,160 @@ sub doMakeVlan($$@) {
     my $stacks = shift;
     my $vlan_name = shift;
     my @ports = @_;
-
     my $errors = 0;
+    my $target_vlan;
+    my $source_vlan;
+    my $vlan_id = $vlan_name;
 
     if (@$stacks > 1) {
 	die "VLAN creation accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
     #
+    # We require a target VLan object for all vlans related to experiments,
+    # unless we are moving ports back into the control network. There are
+    # probably other special caes as well, but this is all we need at the
+    # moment. 
+    #
+    if (defined($experiment)) {
+	my $stackid = ($ELABINELAB ? $stack : $stack->{STACKID});
+
+	if (defined($stackid) &&
+	    $stackid eq "Control" && $vlan_name eq "Control") {
+	    #
+	    # These ports should be in another vlan object. If not,
+	    # something went wrong, not sure what though.
+	    #
+	    foreach my $port (@ports) {
+		my $vlan = VLan->FindVlanByPort($experiment, $port);
+		if (!defined($vlan)) {
+		    print STDERR "$port is not in a vlan object\n";
+		    # Tell caller. 
+		    exit(2);
+		}
+		if (defined($source_vlan) && !$vlan->SameVlan($source_vlan)) {
+		    die("Ports must be in a single vlan\n");
+		}
+		$source_vlan = $vlan;
+	    }
+	}
+	else {
+	    #
+	    # Sanity check; should this port exist in another vlan object?
+	    # Perhaps, but cannot think of any situation right now. 
+	    #
+	    foreach my $port (@ports) {
+		if (VLan->FindVlanByPort($experiment, $port)) {
+		    die("$port already in vlan\n");
+		}
+	    }
+	    
+	    $target_vlan = VLan->Lookup($experiment, $vlan_name);
+	    if (!defined($target_vlan)) {
+		#
+		# Create a new vlan object and put the ports into it.
+		#
+		$target_vlan = VLan->Create($experiment, $vlan_name);
+		if (!defined($target_vlan)) {
+		    die("Could not create VLan object for $vlan_name\n");
+		}
+		$target_vlan->MarkManual();
+                # XXX: Need a better way to figure out whether class is
+                # Experimental or Control
+                if ($stackid eq "Control") {
+                    $target_vlan->SetClass("Control");
+                } else {
+                    $target_vlan->SetClass("Experimental");
+                }
+	    }
+	    $vlan_id = $target_vlan->id();
+	    # This will add the port *only* if not already in the vlan.
+	    foreach my $port (@ports) {
+		$target_vlan->AddPort($port);
+	    }
+	}
+    }
+
+    #
+    # Pass to outer boss.
+    #
+    if ($ELABINELAB) {
+	if ($target_vlan) {
+	    return RemoteDoVlansFromTables($experiment, $target_vlan->id());
+	}
+	else {
+	    return RemoteMakeVlan($stack, $vlan_id, @ports);
+	}
+    }
+
+    #
+    # special temporary case for using a specific vlan number
+    # will go away when tags are allocated from the database.
+    #
+    if ($next_vlan_tag = $opt{'vlan_tag'}) {
+	my %vlans = $stack->findVlans();
+	my $number = $vlans{$vlan_name};
+	if (defined($number)) {
+	    if ($number != $next_vlan_tag) {
+	bad:	print "VLAN $vlan_name already has vlan_tag $number\n";
+		return 1;
+	    }
+	    goto old_number;
+	} else {
+	    while (my ($id, $tag) = each %vlans) {
+		if ($tag == $next_vlan_tag)
+		    { $vlan_name = $id; $number = $tag; goto bad; }
+	    }
+	    goto new_number;
+	}
+    }
+    #
     # Create it if it doesn't already exist
     #
-    if ($stack->vlanExists($vlan_name)) {
+    if ($stack->vlanExists($vlan_id)) {
+    old_number:
 	print "VLAN $vlan_name already exists\n"
 	    if (!$quiet);
+
 	#
 	# Put requested ports into the VLAN
 	#
 	if (@ports) {
 	    print "Putting ports in VLAN ...\n"
 		if (!$quiet);
-	    my $perrors = $stack->setPortVlan($vlan_name,@ports);
+	    my $perrors = $stack->setPortVlan($vlan_id,@ports);
 	    if (!$quiet) {
 		print "VLAN change ";
 		print $perrors? "failed":"succeeded",".\n";
 	    }
 	    $errors += $perrors;
-
 	}
     } else {
+    new_number:
 	print "Creating VLAN $vlan_name ...\n"
 	    if (!$quiet);
-	my $ok = $stack->createVlan($vlan_name,\@ports,@pvlanArgs);
+	my $vlan_number = $stack->createVlan($vlan_id,\@ports,@pvlanArgs);
 	if (!$quiet) {
 	    print "VLAN creation ";
-	    print $ok? "succeeded":"failed",".\n";
+	    print $vlan_number? "succeeded":"failed",".\n";
 	}
-	if (!$ok) {
+	if (!$vlan_number) {
 	    $errors++;
 	}
+	$target_vlan->SetTag($vlan_number)
+	    if (!$errors && defined($target_vlan));
     }
-
+    if (!$errors) {
+	if (defined($source_vlan)) {
+	    VLan->RecordVLanDeletion($source_vlan->id());
+	}
+	if (defined($target_vlan)) {
+	    VLan->RecordVlanInsertion($experiment, $target_vlan->id(),
+                $stack->{STACKID});
+	}
+    }
     return $errors;
 }
 
@@ -1260,14 +2241,55 @@ sub doMakeVlan($$@) {
 sub doDeleteVlan($@) {
     my $stacks = shift;
     my @vlan_names = @_;
-
+    my %vlans  = ();
     my $errors = 0;
+    my %notdeleted = ();
+    my %vlan_ids = ();
+
+    #
+    # We require a VLan object for all vlans related to experiments.
+    #
+    if (defined($experiment)) {
+	foreach my $vlan_name (@vlan_names) {
+	    my $vlan = VLan->Lookup($experiment, $vlan_name);
+	    if (!defined($vlan)) {
+		die("VLan object for $vlan_name does not exist\n");
+	    }
+	    $vlans{$vlan_name} = $vlan;
+	    $vlan_ids{$vlan_name} = $vlan->id();
+	}
+    }
+    elsif ($ELABINELAB) {
+	die("Must provide an experiment for this operation\n");
+    }
+    else {
+	foreach my $vlan_name (@vlan_names) {
+	    $vlan_ids{$vlan_name} = $vlan_name;
+	}
+    }
+
+    #
+    # Hand over to outer boss.
+    # 
+    if ($ELABINELAB) {
+	foreach my $vlan (values(%vlans)) {
+	    if (RemoteDeleteVlan($vlan) == 0) {
+		if ($vlan->Destroy() != 0) {
+		    print STDERR "*** Could not destroy $vlan\n";
+		}
+	    }
+	    else {
+		$errors++;
+	    }
+	}
+	return $errors;
+    }
 
     my %exists = ();
     foreach my $stack (@$stacks) {
 	my @existant_vlans;
 	foreach my $vlan_name (@vlan_names) {
-	    if ($stack->vlanExists($vlan_name)) {
+	    if ($stack->vlanExists($vlan_ids{$vlan_name})) {
 		$exists{$vlan_name} = 1;
 		push @existant_vlans, $vlan_name;
 	    }
@@ -1275,24 +2297,50 @@ sub doDeleteVlan($@) {
 	if (@existant_vlans) {
 	    print "Deleting VLAN(s) " . join(",",@existant_vlans) . " ...\n"
 		if (!$quiet);
-	    my $ok = $stack->removeVlan(@existant_vlans);
+	    my $ok = $stack->removeVlan(map { $vlan_ids{$_} } @existant_vlans);
 	    if (!$quiet) {
 		print "VLAN deletion ";
 		print $ok? "succeeded":"failed",".\n";
 	    }
 	    if (!$ok) {
+		# Be nice if the stack module told us what was not removed?
+		foreach my $vlan_name (@existant_vlans) {
+		    if ($stack->vlanExists($vlan_name)) {
+			print "  $vlan_name was not deleted.\n";
+			$notdeleted{$vlan_name} = 1;
+		    }
+		}
 		$errors++;
 	    }
 	}
     }
-
     foreach my $vlan_name (@vlan_names) {
+	my $vlan_id = $vlan_ids{$vlan_name};
+
+	# Do not throw an error on this. No point, confuses callers.
 	if (!$exists{$vlan_name}) {
-	    print "VLAN $vlan_name does not exist\n";
-	    $errors++;
+	    print "VLAN $vlan_name does not exist on any switch\n";
+	}	
+	
+	#
+	# Skip if this was not deleted
+	#	
+	next
+	    if ($errors && exists($notdeleted{$vlan_name}));
+
+	# Always delete from the vlans table.
+	VLan->RecordVLanDeletion($vlan_id) == 0
+	    or $errors++;
+
+	next
+	    if (!exists($vlans{$vlan_name}));
+	my $vlan = $vlans{$vlan_name};
+
+	if ($vlan->IsManual()) {
+	    $vlan->Destroy() == 0
+		or $errors++;
 	}
     }
-
     return $errors;
 }
 
@@ -1303,7 +2351,6 @@ sub doVlanNumber ($$) {
 
     my $stacks = shift;
     my $name = shift;
-
     my $found = 0;
 
     #
@@ -1342,21 +2389,36 @@ sub doPortControl($$@) {
     my $stacks = shift;
     my $command = shift;
     my @ports = @_;
+    my $errors;
+
+    if ($ELABINELAB) {
+	# As below, only one stack.
+	my ($stack) = @$stacks;
+	$errors = RemoteDoPortControl($stack,$command,@ports);
+	goto finish;
+    }
 
     if (@$stacks > 1) {
 	die "Port control accross multiple stacks is not yet supported\n" .
-	    "Stacks are " . join(",",@$stacks) . "\n";
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
     print "Applying command '$command' to ports " . join(",",@ports) . " ...\n"
 	if (!$quiet);
-    my $errors = $stack->portControl($command,@ports);
+    $errors = $stack->portControl($command,@ports);
     if (!$quiet) {
 	print "Port command ";
 	print $errors? "failed":"succeeded",".\n";
     }
-
+  finish:
+    return $errors
+	if ($errors);
+    if ($command eq "enable" || $command eq "disable") {
+	foreach my $port (@ports) {
+	    setPortEnabled($port, ($command eq "enable" ? 1 : 0));
+	}
+    }
     return $errors;
 
 }
@@ -1418,26 +2480,34 @@ sub doRecreateVlans($) {
     #
     # Get a list of all experiments, so that we can re-create their VLANs
     #
-    my @expts = ();
-    my $result = DBQueryFatal("select pid,eid from experiments ".
-    	"where state = '". EXPTSTATE_ACTIVE. "'");
-    while (my ($pid,$eid) = $result->fetchrow()) {
-	my @vlans = getExperimentVlans($pid,$eid);
-	doVlansFromTables($stacks,@vlans);
+    my @experiments = Experiment->AllActive();
+    foreach my $experiment (@experiments) {
+	my @vlans = getExperimentVlans($experiment->pid(), $experiment->eid());
+	
+	doVlansFromTables($experiment, $stacks, @vlans)
+	    if (@vlans);
     }
-
     return 1;
-
 }
 
 #
 # Enable trunking on a port, and enable a set of VLANs on it 
 #
-sub doTrunkEnable($$@) {
+sub doTrunkEnable($$$@) {
     my $stacks = shift;
     my $port = shift;
+    my $equaltrunking = shift;
     my @vlans = @_;
+    my $errors = 0;
 
+
+    if ($ELABINELAB) {
+	my $mode = $equaltrunking ? "-E" : "-T";
+	# As below, only one stack.
+	my ($stack) = @$stacks;
+	$errors = RemoteDoTrunking($stack,$mode,$port,@vlans);
+	goto finish;
+    }
     #
     # Sanity checking
     #
@@ -1450,9 +2520,15 @@ sub doTrunkEnable($$@) {
     # Simple, just call the right function on the stack
     #
     my $stack = $$stacks[0];
-    print "Enabling trunking on $port ...\n"
+    print "Enabling trunking (tagging) on $port ...\n"
 	if (!$quiet);
-    return !($stack->enableTrunking($port,@vlans));
+    if (!$stack->enableTrunking2($port,$equaltrunking,@vlans)) {
+	$errors++;
+    }
+  finish:
+    setPortTagged($port, 1)
+	if (!$errors);
+    return $errors;
 }
 
 #
@@ -1461,7 +2537,15 @@ sub doTrunkEnable($$@) {
 sub doTrunkDisable($$) {
     my $stacks = shift;
     my $port = shift;
+    my $errors = 0;
 
+    if ($ELABINELAB) {
+	my @vlans=();
+	# As below, only one stack.
+	my ($stack) = @$stacks;
+	$errors = RemoteDoTrunking($stack,"-U",$port,@vlans);
+	goto finish;
+    }
     #
     # Sanity checking
     #
@@ -1474,13 +2558,202 @@ sub doTrunkDisable($$) {
     # Simple, just call the right function on the stack
     #
     my $stack = $$stacks[0];
-    my $errors = 0;
-    foreach my $port (@ports) {
-	print "Disabling trunking on port $port ...\n"
-	    if (!$quiet);
-	if (!$stack->disableTrunking($port)) {
-	    $errors++;
-	}
+    print "Disabling trunking (tagging) on port $port ...\n"
+	if (!$quiet);
+    if (!$stack->disableTrunking($port)) {
+	$errors++;
     }
+  finish:
+    setPortTagged($port, 0)
+	if (!$errors);
+    return $errors;
+}
+
+
+#
+# Openflow lock and functions
+# 
+use libtestbed;
+
+my $of_lock_held = 0;
+
+sub oflock() {
+    my $token = "of_snmpit";
+    my $old_umask = umask(0);
+    die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
+    umask($old_umask);
+    $of_lock_held = 1;
+}
+
+sub ofunlock() {
+	if ($of_lock_held) { TBScriptUnlock(); $of_lock_held = 0;}
+}
+
+#
+# doOpenflowEnable(stacks, vlan)
+# Enable Openflow on a VLAN
+#
+sub doOpenflowEnable($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $errors = 0;
+
+    #
+    # Enabling Openflow on each stack
+    #
+    print "Enabling Openflow on VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	$errors += $stack->enableOpenflow($vlan);	
+    }
+
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+    
+    return $errors;
+}
+
+#
+# doOpenflowDisable(stack, vlan)
+# Disable Openflow on a VLAN
+#
+sub doOpenflowDisable($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $errors = 0;
+
+    #
+    # Disabling Openflow on each stack
+    #
+    print "Disabling Openflow on VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	$errors += $stack->disableOpenflow($vlan);	
+    }
+             
+    #
+    # TODO:clear controllers/listeners here. Now in HP stack code.
+    #
+
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+    
+    return $errors;
+}
+
+#
+# doSetOpenflowController(stack, vlan, controller)
+# Set controller for an Openflow-enabled VLAN
+#
+sub doSetOpenflowController($$$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $errors = 0;
+
+    #
+    # Set controller on each stack
+    #
+    print "Set controller for VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+        $errors += $stack->setOpenflowController($vlan, $controller);	
+    }
+    
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+
+    return $errors;
+}
+
+#
+# doSetOpenflowListener(stack, vlan, listener)
+# Set listener for an Openflow-enabled VLAN
+#
+sub doSetOpenflowListener($$$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $errors = 0;
+
+    #
+    # Set controller on each stack
+    #
+    print "Set listener for VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	$errors += $stack->setOpenflowListener($vlan, $listener);	
+    }
+
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+
+    return $errors;
+}
+
+#
+# doEnableOpenflowListener(stacks, vlan)
+# enable openflow listener on the given VLAN
+# this function prints out the connection string of the listener
+#
+sub doEnableOpenflowListener($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+
+    my %usedports = ();
+    my $port = $minOpenflowListenerPort;
+    my $errors = 0;
+    my $set_ok = 0;
+    my $listenerConnStr;
+
+    #
+    # get used ports
+    #
+    # Here a big lock is better than many small locks, it avoids dead locks
+    # because multiple small locks have to be held one by one, which
+    # brings the risk of dead lock.
+    #
+    oflock();
+    foreach my $stack (@$stacks) {
+        my %tmports = $stack->getUsedOpenflowListenerPorts($vlan);
+	@usedports{ keys %tmports } = values %tmports;
+    }
+
+    # get the available port
+    while (defined($usedports{$port}) && $port <= $maxOpenflowListenerPort) {
+	$port++;
+    }
+    
+    if ($port > $maxOpenflowListenerPort) {
+	print "ERROR: No port available for Openflow listener on VLAN $vlan. \n";
+	$errors++;
+    } else {
+	#
+	# set listener
+	#
+	$listenerConnStr = "ptcp:".$port;
+        my $err = doSetOpenflowListener($stacks, $vlan, $listenerConnStr);
+        if ($err == 0 && $set_ok == 0) {
+            $set_ok = 1;
+        }
+    }
+
+    if ($set_ok) {
+        print "Openflow listener connection string for VLAN $vlan is $listenerConnStr \n";
+    }
+
+    ofunlock();
+    
+    #
+    # update the vlan object with the new listener string
+    # other openflow functions may also need this, especially doOpenflowEnable/doOpenflowDisable
+    #
+    my $vlaninst = VLan->Lookup($vlan);
+    $vlaninst->SetAttribute('oflistener', $listenerConnStr, 'string');
+
     return $errors;
 }

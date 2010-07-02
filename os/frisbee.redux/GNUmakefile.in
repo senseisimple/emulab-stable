@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,13 +14,22 @@ DISTFILES	= TODO client.c decls.h event.c event.h log.c log.h \
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
 SYSTEM	:= $(shell uname -s)
+
+# FreeBSD specific goop
 ifeq ($(SYSTEM),FreeBSD)
 FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
-# XXX 5.3 and linuxthreads don't see to get along
-ifeq ($(FBSDREL),5.3)
+FBSDMAJ := $(basename $(FBSDREL))
+
 WITH_LTHREADS	= 0
-else
+
+# XXX 5.3 and linuxthreads don't see to get along
+# 7.0 and beyond should not need it
+ifneq ($(FBSDREL),5.3)
+ifneq ($(FBSDMAJ),7)
+ifneq ($(FBSDMAJ),8)
 WITH_LTHREADS	= 1
+endif
+endif
 endif
 endif
 
@@ -41,21 +50,39 @@ ifeq ($(WITH_LTHREADS),1)
 PTHREADCFLAGS	= -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
 else
-PTHREADCFLAGS	= -DCONDVARS_WORK
+PTHREADCFLAGS	= -D_THREAD_SAFE -DCONDVARS_WORK
 PTHREADLIBS	= -lpthread
 endif
 endif
 
 CLIENTFLAGS	= $(CFLAGS)
 CLIENTLIBS	= -lz $(PTHREADLIBS)
-CLIENTOBJS	= client.o frisbee.o $(SHAREDOBJS)
+CLIENTOBJS	= client.o frisbee.o disksize.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
 SERVEROBJS	= server.o $(SHAREDOBJS)
 
-CFLAGS		= -O2 -g -Wall -fno-builtin-log -static $(PTHREADCFLAGS) -DSTATS
-LDFLAGS		= -static
+CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS
+LDFLAGS		= $(LDSTATIC)
+
+#
+# Define this to break chunks into 8192 byte rather than 1024 byte blocks
+#
+ifeq ($(WITH_JUMBO),1)
+CFLAGS		+= -DJUMBO
+endif
+
+#
+# Define this to run the client and server on the same physical machine
+# over the loopback interface.  You will also have to setup an alias on
+# the loopback interface so that client and server can use different IPs:
+#
+#   ifconfig lo0 alias 127.0.0.2 netmask 255.255.255.255
+#
+# and just use unicast and not multi/broadcast.
+#
+#CFLAGS		+= -DSAME_HOST_HACK
 
 #
 # Define this if your implementation of cond_vars works well
@@ -65,7 +92,7 @@ LDFLAGS		= -static
 #CFLAGS		+= -DCONDVARS_WORK
 
 # Define this to a non-zero value to enable recording of trace data
-#CFLAGS		+= -DNEVENTS=50000
+#CFLAGS		+= -DNEVENTS=500000
 
 # Turn on client event handling
 #CFLAGS		+= -DDOEVENTS
@@ -91,6 +118,9 @@ event.o:	$(SRCDIR)/event.c decls.h log.h event.h
 	$(CC) $(EVENTFLAGS) -c $(SRCDIR)/event.c
 
 $(FRISBEEDIR)/imageunzip.c: $(FRISBEEDIR)/imagehdr.h $(FRISBEEDIR)/queue.h
+
+disksize.o:	$(FRISBEEDIR)/disksize.c
+	$(CC) -c $(CFLAGS) -I$(FRISBEEDIR) -o disksize.o $<
 
 frisbee.o:	$(FRISBEEDIR)/imageunzip.c
 	$(CC) -c $(CFLAGS) -DFRISBEE -I$(FRISBEEDIR) -o frisbee.o $<

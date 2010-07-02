@@ -1,0 +1,116 @@
+Survey of papers from top conferences(SIGCOMM,OSDI & NSDI,2004-2007) which use 
+some kind of network topology with or without background traffic in their
+evaluation.
+
+Original Source - Amin's Usenix '08 paper - "Does Background Traffic Matter?"
+
+Out of a total of 23 papers:
+
+1) 4-5 papers used the correct setup - with separation of capacity vs abw, 
+   background traffic and appropriate queue sizes.
+2) Around 8 papers used the wrong kind of setup ( in one way or the other,
+   Eg: no background traffic, no mention of queue sizes etc ).
+3) The other papers are not relevant to this topic.
+
+1) SIGCOMM '06: Minimizing Churn in distributed systems
+
+Simulations with a discrete event simulator - mainly for demonstrating churn in a DHT. No background traffic. Latencies + capacities
+are mentioned for links ( latencies are taken from publicly available traces ). 
+
+It appears that each link was modeled on its own without bottlenecks & without reactivity. ( and no mention of the queue sizes ).
+
+2) SIGCOMM '06: Speakup ( DDoS defense by offense )
+
+Used Emulab - “various emulated topologies”
+
+Most important: Dumbbell shaped link(40Mbps) with a server on one side and 30 clients on the other with access links of 2 Mbps each.
+No background traffic was mentioned. The paths are probably modeled as single links.
+
+3) SIGCOMM '04: Modeling and Performance Analysis of BitTorrent-Like Peer-to-Peer Networks 
+
+Simulated a P2P network with a fixed upload/download bandwidth per client. No mention of background traffic and capacity/abw separation or queue sizes.
+
+4) SIGCOMM '04: Mercury: Supporting Scalable Multi-Attribute Range Queries 
+
+Simulation of large topologies ( 50k nodes ) for the purpose of routing. Does not have queuing delays or links. Our method is not applicable here because
+sending traffic is not important in this expt.
+
+5) OSDI 04: FUSE: Lightweight Guaranteed Distributed Failure Notification.
+
+Used Modelnet with OC3 ( 155 Mbps ) and T3 links and realistic latencies. The topologies are real with 100k links and 100k nodes. No mention of background traffic or the queue sizes on the links.
+
+6) NSDI 05: Quorum: Flexible Quality of Service for Internet Services
+
+No mention of any topology: At a high level, Internet clients are connect to a load balancer, which leads to a cluster of machines in a LAN.
+
+“Replayed the Internet trace from some referred deployment”. Probably used links to represent paths, without background traffic.
+
+7)  NSDI 05: Bandwidth-efficient Management of DHT Routing Tables 
+
+Simuation of large topologies ( 3k nodes ) for the purpose of routing. Does not have queuing delays or links. Our method is not applicable here because
+sending traffic is not important in this expt.
+
+8) NSDI 04: Macedon - not applicable, because they were comparing their implementation against the results from the original papers.
+
+9) NSDI 04:  TimeLine: A High Performance Archive for a Distributed Object Store
+
+Not applicable - being compared to an earlier version of Thor. Network topology/abw is hardly a concern in this paper.
+
+10) SIGCOMM '07: Structured streams
+
+Simulates access links (1.5 Mbps). No background traffic - but probably ok because the bottleneck will probably be the access link.
+
+11) NSDI 07: Exploiting Similarity for Multi-Source Downloads Using File Handprints
+
+Uses Emulab to create topologies: Paths modeled with links and no capacity/abw separation. No mention of queue sizes and no background traffic.
+
+12) SIGCOMM '04: Capprobe
+
+Capacity estimation technique: Is interested in the characteristics of a single link - modeled with capacity and varying amount of tcp/udp cross traffic. No queue size, but that is probably ok.
+
+13) NSDI '06: An Architecture for Internet Data Transfer
+
+In some cases of the eval. section - “wan” like characteristics were probably modeled (on Emulab) with links. No background traffic or queue sizes or capacity/abw separation.
+
+14) NSDI '06: Colyseus
+
+Models paths as links with fixed latencies ( in Emulab ) - does not at all consider bandwidth/capacity, even though data is transferred between nodes.
+
+15) NSDI '05: Trickles
+
+Dumbbell topology: with a path being modeled using a link. No mention of queue sizes, although they do have background traffic.
+
+16) NSDI '05: Debunking Some Myths About Structured and Unstructured Overlays 
+
+Not applicable. Routing queries in overlays.
+
+17) SIGCOMM 2005: One more bit is enough ( VCP )
+
+Uses different amounts of bottleneck bandwidth, with cross-traffic. They talk about the impact of router queue size too, although it is not explicitly mentioned as a parameter in the expts, which it probably is - Good setup.
+
+18) NSDI '06: PCP
+
+Used RON and simulation. Simulation setup is good with background traffic and queue size set to BDP.
+
+19) SIGCOMM '05: TFRC
+
+Simulation: background traffic and queue size BDP - Good setup
+
+20) SIGCOMM '07: Emulating AQM from End Hosts
+
+Simulation: background traffic and queue size BDP - Good setup
+
+21) NSDI '06: Connection Handoff Policies for TCP Offload Network Interfaces.
+
+Not applicable - testing wire throughput.
+
+22) NSDI '06: Connection conditioning
+
+Not applicable - not network related.
+
+23) NSDI '06: Nakika
+
+Not applicable - meta paper and not network related.
+
+
+

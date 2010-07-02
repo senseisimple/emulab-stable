@@ -1,0 +1,62 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use strict;
+use warnings;
+
+our ($START);
+require "@prefix@/etc/node_usage.conf";
+
+chdir "@prefix@/data/node_usage";
+
+open F, "node_usage.raw" or die;
+
+my @hunt_for;
+
+if (@ARGV == 0 || @ARGV % 2 != 0) {
+    print "Usage: $0 <pc1> <num1> [<pc2> <num2> ...]\n";
+    exit 1;
+}
+
+while (@ARGV) {
+    push @hunt_for, [shift @ARGV, shift @ARGV];
+}
+
+while (<F>) {
+    chop;
+    s/^(\d+) (\d+) // or die;
+    my $time = $2;
+    my %d;
+    while (s/^ ([\w\d\-\?]+): (\d+) (\d+) (\d+) //) {
+	$d{$1} = [$2, $3, $4];
+    }
+
+    my $num_satisfied = 0;
+    foreach my $e (@hunt_for) {
+	$num_satisfied++ if defined $d{$e->[0]} && ($d{$e->[0]}[0]) == $e->[1];
+    }
+    if ($num_satisfied == @hunt_for) {
+	print "$time\n";
+	exit 0;
+    }
+}
+
+print STDERR "No sutable date found.\n";
+exit 2;
+
+
+
+
+
+
+
+
+
+
+
+
+

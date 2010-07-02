@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -33,17 +33,27 @@ if ($EUID != 0) {
 	"    Must be root to run this script!\n");
 }
 
-# Script specific goo.
-my $RCDIR   = "$BINDIR/rc";
-my $LOGFILE = "$LOGDIR/bootsetup.debug";
-
 #
 # Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
+# library and initialize itself.
+#
 use libsetup;
 use libtmcc;
 use librc;
+use libtestbed ('TB_EVENTSERVER', 'TB_BOSSNODE');
+
+# Script specific goo.
+my $RCDIR	= "$BINDIR/rc";
+my $LOGFILE	= "$LOGDIR/bootsetup.debug";
+my $BOOTLOG     = "/var/log/emulab.bootlog";
+my %TMCCTIMEOUT	= (REMOTE() ? ("timeout" => 5) : ());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+sub BootFatal($$);
 
 #
 # If this is the MFS, hand off to that script.
@@ -53,13 +63,6 @@ if (MFS()) {
     die("*** $0:\n".
 	"    Could not exec $RCDIR/rc.mfs!\n");
 }
-
-# Protos.
-sub doboot();
-sub doshutdown();
-sub doreconfig();
-sub docleanup();
-sub BootFatal($$);
 
 # Parse command line.
 if (! getopts($optlist, \%options)) {
@@ -73,10 +76,29 @@ if (@ARGV) {
     $action = $ARGV[0];
 }
 
+#
+# Booting up. If this is a widearea node, we do not want to hang
+# on boss if its down, but instead let the machine boot and do this
+# stuff later.
+#
+if (REMOTE() && $action eq "boot") {
+    require POSIX;
+    import POSIX;
+
+    if (TBBackGround($BOOTLOG)) {
+	sleep(1);
+	exit(0);
+    }
+    # Fully disconnect from bootup. 
+    POSIX::setsid();
+    # Let the boot continue on for a bit.
+    sleep(5);
+}
+
+#
+# We want to save all of the output off, but also dup it to the console.
+#
 if ($action eq "boot" || $action eq "reconfig") {
-    #
-    # We want to save all of the output off, but also dup it to the console.
-    #
     open(LOG, "> $LOGFILE") or
 	BootFatal(-1, "Could not open $LOGFILE!");
     my $ofh = select(LOG);
@@ -87,11 +109,17 @@ if ($action eq "boot" || $action eq "reconfig") {
     # This open implicitly forks a child, which goes on to execute the rest
     # of the script. The parent is going to sit in this loop and capture the
     # output of the child, writing it to the logfile and to the console.
-    # 
-    if (open(FOO, "-|")) {
+    #
+    my $pid = open(FOO, "-|");
+    BootFatal($? >> 8, "Boot Failure; popen failed!")
+	if (!defined($pid));
+    
+    if ($pid) {
 	while (<FOO>) {
 	    print LOG $_;
-	    print "$_";
+	    if ($action ne "reconfig") {
+		print "$_";
+	    }
 	}
 	close(LOG);
 	close(FOO);
@@ -100,7 +128,15 @@ if ($action eq "boot" || $action eq "reconfig") {
 	}
 	exit(0);
     }
-    open(STDERR, ">&STDOUT");
+
+    if ($action eq "reconfig") {
+	# Need this or ssh will hang, even though it was called with -n option.
+	open(STDIN, "</dev/null");
+    }
+    if (REMOTE()) {
+	# Maybe just do this all the time. 
+	open(STDERR, ">&STDOUT");
+    }
 }
 
 # Execute the action.
@@ -133,19 +169,23 @@ sub BootFatal($$)
 {
     my ($code, $msg) = @_;
     
+    print "$msg\n";
+
     #
     # Send the console log to the server.
     #
     if (-e $LOGFILE && -s $LOGFILE &&
-	tmcc(TMCCCMD_BOOTLOG, "", undef, ("datafile" => $LOGFILE)) < 0) {
+	tmcc(TMCCCMD_BOOTLOG, "", undef,
+	     ("datafile" => $LOGFILE, "timeout" => 5)) < 0) {
 	print "Error sending TBFAILED to Emulab Control!\n";
     }
     
-    if (tmcc(TMCCCMD_BOOTERRNO, $code) < 0) {
+    # XXX "--" ensures that code < 0 is not interpreted as a tmcc cmdline arg
+    if (tmcc(TMCCCMD_BOOTERRNO, "-- $code", undef, %TMCCTIMEOUT) < 0) {
 	print "Error sending boot errno to Emulab Control!\n";
     }
     
-    if (tmcc(TMCCCMD_STATE, "TBFAILED") < 0) {
+    if (tmcc(TMCCCMD_STATE, "TBFAILED", undef, %TMCCTIMEOUT) < 0) {
 	print "Error sending TBFAILED to Emulab Control!\n";
     }
     exit($code);
@@ -163,6 +203,33 @@ sub doboot()
     my ($bossname, $bossip) = tmccbossinfo();
     if (!defined($bossname)) {
 	fatal("Could not determine the name of the boss server!");
+    }
+
+    #
+    # We need a hostname that resolves to something. If we get here and
+    # there is no hostname, set it.
+    #
+    if (REMOTE()) {
+	my $curname = `hostname -s`;
+	if (! ($curname =~ /.+/)) {
+	    my ($domain) = ($bossname =~ /^[^\.]+\.(.*)$/);
+	    my @tmccresults;
+	    
+	    if (tmcc(TMCCCMD_NODEID, undef, \@tmccresults) < 0) {
+		fatal("Could not get nodeid from tmccd!");
+	    }
+	    my $nodeid = $tmccresults[0];
+	    chomp($nodeid);
+	
+	    print STDERR
+		"Hostname not set. Setting it to ${nodeid}.${domain}\n";
+	    
+	    if (system("hostname", "${nodeid}.${domain}")) {
+		fatal("sethostname failed!");
+	    }
+	    # Delay a moment to let things settle down.
+	    sleep(5);
+	}
     }
 
     #
@@ -213,13 +280,13 @@ sub doboot()
 	# This is allowed to fail; ipod might not be supported.
     }
 
-    if (-x "$RCDIR/rc.healthd" && ! WINDOWS()) {
+    if (-x "$RCDIR/rc.healthd" && ! (WINDOWS() || REMOTE())) {
 	print("Starting node health monitoring daemon\n");
 	system("$RCDIR/rc.healthd start");
 	# If it fails, that is okay. Keep going.
     }
     
-    if (-x "$RCDIR/rc.slothd") {
+    if (-x "$RCDIR/rc.slothd" && !(REMOTE() || GENVNODE())) {
 	print("Starting slothd usage detector\n");
 	system("$RCDIR/rc.slothd start");
 	if ($?) {
@@ -266,11 +333,31 @@ sub doboot()
     #
     # Start the elvin proxy.
     #
-    if (-x "$BINDIR/evproxy") {
-	print("Starting elvin proxy daemon\n");
-	system("$BINDIR/evproxy -s event-server -e $pid/$eid");
-	if ($?) {
-	    fatal("Error running $BINDIR/evproxy");
+    if (SHAREDHOST() || (!(REMOTE() && !REMOTEDED()) && !GENVNODE())) {  
+	my $evproxy =
+	    (SHAREDHOST() ? "$BINDIR/evproxy_shared" : "$BINDIR/evproxy");
+
+	if (-x $evproxy) {
+	    my $eventserver = "event-server";
+	    if (REMOTE()) {
+		$eventserver = TB_EVENTSERVER();
+	    }
+	    print("Starting elvin proxy daemon\n");
+	    if (SHAREDHOST()) {
+		my $file    = TMNODEID();
+		my $pnodeid = `cat $file`;
+		chomp($pnodeid);
+		system("$evproxy -s $eventserver -n $pnodeid");
+	    }
+	    else {
+		system("$evproxy -s $eventserver -e $pid/$eid");
+	    }
+	    if ($?) {
+		fatal("Error running $evproxy");
+	    }
+	}
+	else {
+	    print("$evproxy does not exist!\n");
 	}
     }
 
@@ -284,7 +371,7 @@ sub doboot()
 	fatal("Error running $RCDIR/rc.config");
     }
 
-    if (-x "$RCDIR/rc.canaryd" && -x "$BINDIR/canaryd") {
+    if (-x "$RCDIR/rc.canaryd" && -x "$BINDIR/canaryd" && !REMOTE()) {
 	print("Starting canaryd usage tracer\n");
 	system("$RCDIR/rc.canaryd start");
 	if ($?) {
@@ -296,7 +383,7 @@ sub doboot()
     # Start the linktest daemon. This script will exit without running
     # linktest is the node is hosting SIM or JAILS.
     #
-    if (-x "$RCDIR/rc.linktest") {
+    if (-x "$RCDIR/rc.linktest" && !REMOTE()) {
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
 	    fatal("Error running $RCDIR/rc.linktest");
@@ -395,7 +482,7 @@ sub doshutdown()
     }
 
     print("Informing Emulab Control that we are are rebooting\n");
-    if (tmcc(TMCCCMD_STATE, "SHUTDOWN") < 0) {
+    if (tmcc(TMCCCMD_STATE, "SHUTDOWN", undef, %TMCCTIMEOUT) < 0) {
 	fatal("Error sending SHUTDOWN to Emulab Control!");
     }
 }

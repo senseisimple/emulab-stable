@@ -1,9 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -26,6 +27,7 @@ my $optlist  = "hnwe:c:";
 my $waitmode = 0;
 my $reboot   = 1;
 my $runcmd   = "";
+my $onoff;
 
 #
 # Configure variables
@@ -39,6 +41,9 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libadminmfs;
+use User;
+use Node;
+use Experiment;
 
 #
 # Turn off line buffering on output
@@ -62,7 +67,7 @@ my @nodes       = ();
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -75,13 +80,11 @@ if (defined($options{"n"})) {
 if (defined($options{"w"})) {
     $waitmode = 1;
 }
-
-my $onoff;
-
 if (defined($options{"c"})) {
     $runcmd = $options{"c"};
     $onoff = "on";
-} else {
+}
+else {
     if (!@ARGV) {
 	usage();
     }
@@ -92,6 +95,15 @@ if ($onoff ne "on" && $onoff ne "off") {
     usage();
 }
 
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("*** $0:\n".
+	"    You ($UID) do not exist!\n");
+}
+
 if (defined($options{"e"})) {
     #
     # Reboot all nodes in an experiment
@@ -99,18 +111,10 @@ if (defined($options{"e"})) {
     if (@ARGV) {
 	usage();
     }
-
-    my $eidmode = $options{"e"};
-    my $pid;
-    my $eid;
-    
-    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
-	$pid = $1;
-	$eid = $2;
-    }
-    else {
+    my $experiment = Experiment->Lookup($options{"e"});
+    if (!defined($experiment)) {
 	die("*** $0:\n".
-	    "    Invalid argument to -e option: $eidmode\n");
+	    "    Unknown experiment!\n");
     }
 
     #
@@ -118,23 +122,15 @@ if (defined($options{"e"})) {
     # permission problems early; the nodes are indvidually checked later
     # in the library.
     #
-    if ($UID && !TBAdmin($UID) &&
-	! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    if ($UID && !$this_user->IsAdmin() &&
+	! $experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	die("*** $0:\n".
-	    "    You not have permission to reboot nodes in $pid/$eid!\n");
+	    "    You not have permission to reboot nodes in $experiment!\n");
     }
-
-    my $query_result =
-	DBQueryFatal("select node_id from reserved where ".
-		     "pid='$pid' and eid='$eid'");
-
-    if ($query_result->numrows == 0) {
+    @nodes = $experiment->NodeList();
+    if (! @nodes) {
 	die("*** $0:\n".
-            "    There are no nodes reserved in pid/eid $pid/$eid\n");
-    }
-    
-    while (my ($nodeid) = $query_result->fetchrow_array()) {
-	push(@nodes, $nodeid);
+            "    There are no nodes reserved in $experiment\n");
     }
 }
 else {
@@ -142,33 +138,26 @@ else {
 	usage();
     }
 
-    # Untaint the nodes.
-    foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
-	}
-	else {
-	    die("*** Tainted node name: $node\n");
-	}
-	if (!TBValidNodeName($node)) {
+    foreach my $n (@ARGV) {
+	my $node = Node->Lookup($n);
+	if (!defined($node)) {
 	    die("*** $0:\n".
-		"    Node does not exist: $node\n");
+		"    Node $n does not exist!\n");
+	}
+	if (!$node->IsReserved()) {
+	    die("*** $0:\n".
+		"    Node $n is not reserved; reserve it first!\n");
+	}    
+	if ($UID && !$this_user->IsAdmin() &&
+	    ! $node->AccessCheck($this_user, TB_NODEACCESS_LOADIMAGE)) {
+	    die("*** $0:\n".
+		"    You are not allowed to put $node into admin mode!\n");
 	}
 	push(@nodes, $node);
     }
-
-    #
-    # Root and admin types can do whatever they want. Normal users
-    # can only run this on nodes in their own experiments.
-    #
-    if ($UID && !TBAdmin($UID)) {
-	if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
-	    die("*** $0:\n".
-		"    You are not allowed to put some nodes into admin mode\n");
-	}
-    }
 }
 
+my @nodeids = map($_->node_id(), @nodes);
 my @bad;
 my %args;
 
@@ -179,9 +168,9 @@ if ($runcmd ne "") {
     %args = ();
     $args{'name'} = $0;
     $args{'command'} = $runcmd;
-    if (TBAdminMfsRunCmd(\%args, undef, @nodes)) {
+    if (TBAdminMfsRunCmd(\%args, undef, @nodeids)) {
 	die("*** $0:\n".
-	    "    Failed to run '$runcmd' on some of @nodes!\n");
+	    "    Failed to run '$runcmd' on some of @nodeids!\n");
     }
 
     #
@@ -191,7 +180,7 @@ if ($runcmd ne "") {
     $args{'name'} = $0;
     $args{'on'} = 0;
     $args{'clearall'} = 0;
-    if (TBAdminMfsSelect(\%args, \@bad, @nodes)) {
+    if (TBAdminMfsSelect(\%args, \@bad, @nodeids)) {
 	die("*** $0:\n".
 	    "    Could not turn admin mode off for @bad!\n");
     }
@@ -202,7 +191,7 @@ if ($runcmd ne "") {
 	$args{'on'} = 0;
 	$args{'reboot'} = $reboot;
 	$args{'wait'} = $waitmode;
-	if (TBAdminMfsBoot(\%args, \@bad, @nodes)) {
+	if (TBAdminMfsBoot(\%args, \@bad, @nodeids)) {
 	    die("*** $0:\n".
 		"    Did not properly reboot @bad after command!\n");
 	}
@@ -213,7 +202,7 @@ if ($runcmd ne "") {
 $args{'name'} = $0;
 $args{'on'} = ($onoff eq "on");
 $args{'clearall'} = 0;
-if (TBAdminMfsSelect(\%args, \@bad, @nodes)) {
+if (TBAdminMfsSelect(\%args, \@bad, @nodeids)) {
     die("*** $0:\n".
 	"    Could not turn admin mode $onoff for @bad!\n");
 }
@@ -223,7 +212,7 @@ if ($reboot) {
     $args{'on'} = ($onoff eq "on");
     $args{'reboot'} = $reboot;
     $args{'wait'} = $waitmode;
-    if (TBAdminMfsBoot(\%args, \@bad, @nodes)) {
+    if (TBAdminMfsBoot(\%args, \@bad, @nodeids)) {
 	die("*** $0:\n".
 	    "    Did not properly reboot @bad!\n");
     }

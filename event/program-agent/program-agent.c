@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -12,7 +12,9 @@
 
 #include <config.h>
 
+#include <errno.h>
 #include <stdio.h>
+#include <string.h>
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -42,7 +44,11 @@
 #include "systemf.h"
 #include "be_user.h"
 #include "event.h"
+
+#ifdef HAVE_ELVIN
 #include <elvin/elvin.h>
+#endif
+
 #ifdef __CYGWIN__
 #include <w32api/windows.h>
 #include <sys/cygwin.h>
@@ -54,7 +60,7 @@
  * since a "chatty" program can fill it up, which might cause odd behavior to
  * happen.
  */
-#define LOGDIR		"/local/logs"
+static char		*LOGDIR = "/local/logs";
 
 /**
  * Maximum number of agents to be managed by this daemon.
@@ -82,6 +88,11 @@ static event_handle_t	handle;
 static char		debug;
 
 /**
+ * Flag indicating the program agent is running on ops.
+ */
+static int		isops;
+
+/**
  * The actual number of agents being managed by this daemon.
  */
 static int		numagents;
@@ -91,6 +102,11 @@ static int		numagents;
  * setup steps have completed.
  */
 static char		*user;
+
+/**
+ * Our vnode name, for subscribing to events for the program agent itself.
+ */
+static char		*vnode;
 
 /**
  * Pipe used by the SIGCHLD handler to notify the main event loop that one or
@@ -104,14 +120,34 @@ static int		childpipe[2];
 static char		*configfile;
 
 /**
+ * The environment file, which can be in a different place then configfile.
+ */
+static char		*envfile;
+
+/**
  * The project and experiment ID that this daemon is running in.
  */
 static char		*pideid;
 
 /**
+ * The name of the token file, which holds a completion token.
+ */
+static char		*tokenfile;
+
+/**
+ * Non-zero if this is a plab node
+ * XXX hack to allow adjustment of NODE environment variable
+ */
+static int		isplab;
+
+#ifdef HAVE_ELVIN
+/**
  * Elvin error object.
  */
 static elvin_error_t elvin_error;
+#elif HAVE_PUBSUB
+static pubsub_error_t pubsub_error;
+#endif
 
 /**
  * Flags for the proginfo structure.
@@ -119,10 +155,12 @@ static elvin_error_t elvin_error;
 enum {
 	PIB_TIMEOUT_FIRED,	/*< Indicates that the process was terminated
 				  via a timeout and not a regular signal. */
+	PIB_HALT_COMPLETION,
 };
 
 enum {
-	PIF_TIMEOUT_FIRED = (1L << PIB_TIMEOUT_FIRED),
+	PIF_TIMEOUT_FIRED   = (1L << PIB_TIMEOUT_FIRED),
+	PIF_HALT_COMPLETION = (1L << PIB_HALT_COMPLETION),
 };
 
 /**
@@ -141,11 +179,17 @@ struct proginfo {
 	unsigned long	timeout;
 	int		initial_expected_exit_code;
 	int		expected_exit_code;
-	
+
+#ifdef HAVE_ELVIN
 	elvin_timeout_t	timeout_handle;
+#elif HAVE_PUBSUB
+	pubsub_timeout_t *timeout_handle;
+#endif
+	
 	int		pid;
 	struct timeval  started;
 	unsigned long	token;
+	unsigned long	halt_token;
 	unsigned long	flags;
 	struct proginfo *next;
 };
@@ -179,6 +223,18 @@ static void	callback(event_handle_t handle,
 static void	start_callback(event_handle_t handle,
 			       event_notification_t notification,
 			       void *data);
+
+/**
+ * Handler for the RELOAD event, which tells the program agent to reload
+ * its environment.
+ *
+ * @param handle The connection to the event system.
+ * @param notification The start event.
+ * @param data NULL
+ */
+static void	reload_callback(event_handle_t handle,
+				  event_notification_t notification,
+				  void *data);
 
 /**
  * Start a program.
@@ -227,9 +283,16 @@ static int	parse_configfile_env(char *filename);
  * @param rock The proginfo that executed passed the timeout.
  * @param eerror The elvin error object to use.
  */
+#ifdef HAVE_ELVIN
 static int	timeout_callback(elvin_timeout_t timeout,
 				 void *rock,
 				 elvin_error_t eerror);
+#elif HAVE_PUBSUB
+static int	timeout_callback(pubsub_handle_t *handle,
+				 pubsub_timeout_t *timeout,
+				 void *rock,
+				 pubsub_error_t *eerror);
+#endif
 
 /**
  * Callback triggered when there are children to be reaped.
@@ -240,10 +303,18 @@ static int	timeout_callback(elvin_timeout_t timeout,
  * @param elvin_error Elvin error structure.
  * @return zero
  */
+#ifdef HAVE_ELVIN
 static int	child_callback(elvin_io_handler_t handler,
 			       int fd,
 			       void *rock,
 			       elvin_error_t eerror);
+#elif HAVE_PUBSUB
+static int	child_callback(pubsub_handle_t *handle,
+			       pubsub_iohandler_t *handler,
+			       int fd,
+			       void *rock,
+			       pubsub_error_t *eerror);
+#endif
 
 /**
  * Handler for SIGCHLD that writes a byte to "childpipe" in order to wake up
@@ -314,6 +385,29 @@ dump_proginfos(void)
 #endif
 
 /**
+ * Handler for SIGTERM that kills everything off and exits nicely.
+ *
+ * @param sig The actual signal number received.
+ */
+static void
+sigterm(int sig)
+{
+	struct proginfo *pinfo;
+
+	/*
+	 * Stop all running programs so that their log files
+	 * are complete.
+	 */
+	for (pinfo = proginfos; pinfo != NULL; pinfo = pinfo->next) {
+		if (pinfo->pid != 0) {
+			stop_program(pinfo, NULL);
+		}
+	}
+
+	exit(0);
+}
+
+/**
  * Print the usage statement to standard error.
  *
  * @param progname The name of the program as given on the command line.
@@ -361,7 +455,6 @@ main(int argc, char **argv)
 	char *keyfile = NULL;
 	char buf[BUFSIZ], agentlist[BUFSIZ];
 	char pid[MAXHOSTNAMELEN], eid[MAXHOSTNAMELEN];
-	elvin_io_handler_t eih;
 	struct proginfo *pinfo;
 	struct sigaction sa;
 	struct passwd *pw;
@@ -375,7 +468,7 @@ main(int argc, char **argv)
 	progname = argv[0];
 	bzero(agentlist, sizeof(agentlist));
 	
-	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:")) != -1) {
+	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:f:o:v:t:P")) != -1){
 		switch (c) {
 		case 'h':
 			usage(progname);
@@ -402,8 +495,14 @@ main(int argc, char **argv)
 		case 'c':
 			configfile = optarg;
 			break;
+		case 'f':
+			envfile = optarg;
+			break;
 		case 'u':
 			user = optarg;
+			break;
+		case 'o':
+			LOGDIR = optarg;
 			break;
 		case 'i':
 			pidfile = optarg;
@@ -438,6 +537,17 @@ main(int argc, char **argv)
 		case 'k':
 			keyfile = optarg;
 			break;
+		case 't':
+			tokenfile = optarg;
+			break;
+		case 'v':
+			vnode = optarg;
+			if (strcmp(vnode, "ops") == 0)
+				isops = 1;
+			break;
+		case 'P':
+			isplab = 1;
+			break;
 		default:
 			usage(progname);
 		}
@@ -450,6 +560,8 @@ main(int argc, char **argv)
 			"error: pid/eid and config file flags are required\n");
 		usage(progname);
 	}
+	if (!envfile)
+	        envfile = configfile;
 	
 	if (parse_configfile(configfile) != 0)
 		exit(1);
@@ -473,7 +585,7 @@ main(int argc, char **argv)
 			"cannot set real-time priority\n");
 	    }
 	    else if (rtprio(RTP_SET, 0, &rtp) < 0) {
-		pwarning("main: cannot set real-time priority\n");
+		pwarning("main: cannot set real-time priority");
 	    }
 	}
 #elif defined(linux)
@@ -498,7 +610,8 @@ main(int argc, char **argv)
 		else
 			loginit(1, "program-agent");
 	}
-
+	signal(SIGTERM, sigterm);
+	
 	/*
 	 * Must be a valid user of course.
 	 */
@@ -529,13 +642,18 @@ main(int argc, char **argv)
 	}
 	info("agentlist: %s\n", agentlist);
 	info("user: %s\n", user);
-	
-	if ((stat(LOGDIR, &st) < 0) &&
-	    (system("mkdir -p -m 0775 " LOGDIR) != 0)) {
-		fatal("Could not make log directory: %s", LOGDIR);
+
+	if (stat(LOGDIR, &st) < 0) {
+		sprintf(buf, "mkdir -p -m 0775 %s", LOGDIR);
+	    
+		if (system(buf) != 0) {
+			fatal("Could not make directory: %s", LOGDIR);
+		}
+
+		(void) stat(LOGDIR, &st);
 	}
 
-	if (st.st_uid != pw->pw_uid) {
+	if (st.st_uid != pw->pw_uid || st.st_gid != pw->pw_gid) {
 		chown(LOGDIR, pw->pw_uid, pw->pw_gid);
 	}
 
@@ -581,26 +699,88 @@ main(int argc, char **argv)
 	setenv("HOME", pw->pw_dir, 1);
 	setenv("PID", pid, 1);
 	setenv("EID", eid, 1);
+
+	/*
+	 * Find the host's control net name/IP.  This will always be the
+	 * fully qualified name.  Note that if we cannot resolve the FQN
+	 * (which often happens on planetlab nodes) we dig the IP out of
+	 * the Emulab DB info.
+	 */
 	gethostname(buf, sizeof(buf));
-	if ((idx = strchr(buf, '.')) != NULL) {
-	    *idx = '\0';
-	}
-	setenv("NODE", buf, 1);
 	if ((he = gethostbyname(buf)) == NULL) {
-	    warning("warning: cannot get hostname for '%s', "
-		    "assuming no network links available\n", buf);
+		/* XXX should not be hardwired */
+		char *ipfile = "/var/emulab/boot/myip";
+
+		warning("WARNING: cannot resolve hostname '%s'"
+			" to obtain IP address, reading IP from %s instead\n",
+			buf, ipfile);
+		fp = fopen(ipfile, "r");
+		if (fp == NULL)
+			warning("WARNING: cannot get IP address for hostname '%s',"
+				" assuming no network links available\n", buf);
+		else {
+			char ipbuf[BUFSIZ];
+
+			fgets(ipbuf, sizeof(ipbuf), fp);
+			(void) fclose(fp);
+			if ((idx = strchr(ipbuf, '\n')) != NULL)
+				*idx = '\0';
+			setenv("NODECNETIP", ipbuf, 1);
+		}
 	}
 	else {
 	    struct in_addr ia;
 
 	    memcpy(&ia, he->h_addr, he->h_length);
-	    setenv("NODEIP", inet_ntoa(ia), 1);	    
+	    setenv("NODECNETIP", inet_ntoa(ia), 1);	    
+	}
+
+	/*
+	 * XXX for planetlab, hostname is the official hostname as opposed
+	 * to the per-experiment Emulab alias.  To be consistent, we want
+	 * NODECNET (and hence NODE) to reflect the Emulab name.
+	 */
+	if (isplab) {
+		/* XXX should not be hardwired */
+		char *alfile = "/var/emulab/boot/nickname";
+
+		fp = fopen(alfile, "r");
+		if (fp != NULL) {
+			fgets(buf, sizeof(buf), fp);
+			(void) fclose(fp);
+			if ((idx = strchr(buf, '\n')) != NULL) {
+				*idx++ = '.';
+				strncat(buf, OURDOMAIN,
+					sizeof(buf) - (idx - buf) - 1);
+			}
+			setenv("NODECNET", buf, 1);
+		}
+	} else
+		setenv("NODECNET", buf, 1);
+
+	/*
+	 * Now find "the default" experimental network interface by stripping
+	 * the domain qualifier and looking that up.  If the short name fails
+	 * to resolve, we assume there are no experimental interfaces.
+	 *
+	 * XXX for backwards compat, we always set NODE even if it does not
+	 * resolve.  It might still be useful as a tag.
+	 */
+	if ((idx = strchr(buf, '.')) != NULL) {
+	    *idx = '\0';
+	}
+	setenv("NODE", buf, 1);
+	if ((he = gethostbyname(buf)) != NULL) {
+		struct in_addr ia;
+
+		memcpy(&ia, he->h_addr, he->h_length);
+		setenv("NODEIP", inet_ntoa(ia), 1);	    
 	}
 
 	/* XXX Need to eval the ENV parts of the config file after we've
 	 * setup the environment.
 	 */
-	if (parse_configfile_env(configfile) != 0)
+	if (parse_configfile_env(envfile) != 0)
 		exit(1);
 	
 	/*
@@ -641,10 +821,13 @@ main(int argc, char **argv)
 	/*
 	 * Register with the event system. 
 	 */
-	if (remote){
+#if 0
+	if (remote) {
 	        handle = event_register_withkeyfile_withretry(server, 0, 
 							      keyfile, 3);
-	} else {
+	} else
+#endif
+	{
 	        handle = event_register_withkeyfile(server, 0, keyfile);
 	}
 	if (handle == NULL) {
@@ -665,17 +848,29 @@ main(int argc, char **argv)
 	if (pipe(childpipe) < 0) {
 		fatal("could not create pipe");
 	}
+#ifdef HAVE_ELVIN
 	else if ((elvin_error = elvin_error_alloc()) == NULL) {
 		fatal("could not allocate elvin error");
 	}
-	else if ((eih = elvin_sync_add_io_handler(NULL,
-						  childpipe[0],
-						  ELVIN_READ_MASK,
-						  child_callback,
-						  NULL,
-						  elvin_error)) == NULL) {
+	else if (elvin_sync_add_io_handler(NULL,
+					   childpipe[0],
+					   ELVIN_READ_MASK,
+					   child_callback,
+					   NULL,
+					   elvin_error) == NULL) {
 		fatal("could not register I/O callback");
 	}
+#elif HAVE_PUBSUB
+	else if (pubsub_add_iohandler(handle->server,
+				      NULL,
+				      childpipe[0],
+				      0,
+				      child_callback,
+				      NULL,
+				      &pubsub_error) == NULL) {
+		fatal("could not register I/O callback");
+	}
+#endif
 	fcntl(childpipe[0], F_SETFL, O_NONBLOCK);
 	/* Don't leak the descriptors into the children. */
 	fcntl(childpipe[0], F_SETFD, FD_CLOEXEC);
@@ -699,6 +894,7 @@ main(int argc, char **argv)
 		TBDB_EVENTTYPE_RUN ","
 		TBDB_EVENTTYPE_START ","
 		TBDB_EVENTTYPE_STOP ","
+		TBDB_EVENTTYPE_HALT ","
 		TBDB_EVENTTYPE_KILL;
 
 	/*
@@ -719,6 +915,43 @@ main(int argc, char **argv)
 		fatal("could not subscribe to event");
 	}
 
+	snprintf(buf, sizeof(buf), "__%s_program-agent", vnode);
+			 
+	tuple->objtype   = TBDB_OBJECTTYPE_PROGRAM;
+	tuple->objname   = buf;
+	tuple->eventtype = TBDB_EVENTTYPE_RELOAD;
+
+	if (tokenfile && access(tokenfile, R_OK) == 0) {
+		FILE	*fp;
+		unsigned long	token = ~0;
+		
+		if ((fp = fopen(tokenfile, "r")) != NULL) {
+			if (fscanf(fp, "%lu", &token) == 1) {
+				event_do(handle,
+					 EA_Experiment, pideid,
+					 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+					 EA_Name, buf,
+					 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+					 EA_ArgInteger, "ERROR", 0,
+					 EA_ArgInteger, "CTOKEN", token,
+					 EA_TAG_DONE);
+			}
+			else {
+				error("tokenfile could not be parsed!\n");
+			}
+		}
+		else {
+			errorc("Could not open token file for reading!");
+		}
+	}
+
+	/*
+	 * Subscribe to the RELOAD start event we specified above.
+	 */
+	if (! event_subscribe(handle, reload_callback, tuple, NULL)) {
+		fatal("could not subscribe to reload event");
+	}
+
 	/*
 	 * Begin the event loop, waiting to receive event notifications:
 	 */
@@ -732,8 +965,6 @@ main(int argc, char **argv)
 		}
 #endif
 	}
-
-	elvin_sync_remove_io_handler(eih, elvin_error);
 
 	/*
 	 * Unregister with the event system:
@@ -848,6 +1079,27 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		}
 	}
 	else if (strcmp(event, TBDB_EVENTTYPE_STOP) == 0) {
+		stop_program(pinfo, args);
+	}
+	else if (strcmp(event, TBDB_EVENTTYPE_HALT) == 0) {
+		/*
+		 * HALT is special; it sends an event to the caller when
+		 * the program actually exits.
+		 */
+		if (! pinfo->pid) {
+			event_do(handle,
+				 EA_Experiment, pideid,
+				 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+				 EA_Name, pinfo->name,
+				 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+				 EA_ArgInteger, "ERROR", 0,
+				 EA_ArgInteger, "CTOKEN", token,
+				 EA_TAG_DONE);
+			return;
+		}
+		pinfo->halt_token = token;
+		pinfo->flags |= PIF_HALT_COMPLETION;
+		
 		stop_program(pinfo, args);
 	}
 	else if (strcmp(event, TBDB_EVENTTYPE_KILL) == 0) {
@@ -982,6 +1234,73 @@ start_callback(event_handle_t handle,
 	}
 }
 
+static void
+reload_callback(event_handle_t handle,
+		  event_notification_t notification,
+		  void *data)
+{
+	char		event[TBDB_FLEN_EVEVENTTYPE];
+	char		objname[TBDB_FLEN_EVOBJTYPE];
+	unsigned long	token = ~0;
+
+	assert(handle != NULL);
+	assert(notification != NULL);
+	assert(data == NULL);
+
+	if (! event_notification_get_eventtype(handle, notification,
+					       event, sizeof(event))) {
+		error("Could not get event from notification!\n");
+		return;
+	}
+	if (! event_notification_get_objname(handle, notification,
+					     objname, sizeof(objname))) {
+		error("Could not get objname from notification!\n");
+		return;
+	}
+	event_notification_get_int32(handle, notification,
+				     "TOKEN", (int32_t *)&token);
+
+	if (strcmp(event, TBDB_EVENTTYPE_RELOAD) == 0) {
+		info("startrun_callback: Got a reload event.\n");
+
+		/*
+		 * Ops is special since the file is local and there is no
+		 * tmcd or wrapper.
+		 */
+		if (isops) {
+			parse_configfile_env(envfile);
+
+			event_do(handle,
+				 EA_Experiment, pideid,
+				 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+				 EA_Name, objname,
+				 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+				 EA_ArgInteger, "ERROR", 0,
+				 EA_ArgInteger, "CTOKEN", token,
+				 EA_TAG_DONE);
+
+			return;
+		}
+		
+		/*
+		 * Wrapper will restart us but first write the token to a
+		 * file so that we can send a completion upon restart.
+		 */
+		if (tokenfile) {
+			FILE	*fp;
+			
+			if ((fp = fopen(tokenfile, "w")) == NULL) {
+				errorc("Could not open token file");
+				exit(-1);
+			}
+			fprintf(fp, "%lu\n", token);
+			fflush(fp);
+			fclose(fp);
+		}
+		exit(45);
+	}
+}
+
 /*
  * There are three commands:
  *
@@ -1079,6 +1398,11 @@ set_program(struct proginfo *pinfo, char *args)
 		char *value;
 		int rc;
 
+		/*
+		 * COMMAND is special. For backward compat it can contain
+		 * whitespace but need not be quoted.  In fact, if the string
+		 * is quoted, we just pass the quotes through to the program.
+		 */
 		if ((rc = event_arg_get(args, "COMMAND", &value)) > 0) {
 			if (pinfo->cmdline != NULL) {
 				if (pinfo->cmdline != pinfo->initial_cmdline) {
@@ -1086,6 +1410,13 @@ set_program(struct proginfo *pinfo, char *args)
 					pinfo->cmdline = NULL;
 				}
 			}
+			/*
+			 * XXX event_arg_get will return a pointer beyond
+			 * any initial quote character.  We need to back the
+			 * pointer up if that is the case.
+			 */
+			if (value[-1] == '\'' || value[-1] == '{')
+				value--;
 			asprintf(&pinfo->cmdline, "%s", value);
 			value = NULL;
 		}
@@ -1147,7 +1478,7 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 	if (pinfo->pid != 0) {
 		warning("start_program: %s is still running: %d\n",
 			pinfo->name, pinfo->pid);
-		return 0;
+		return -1;
 	}
 
 	set_program(pinfo, args);
@@ -1155,6 +1486,7 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 	gettimeofday(&pinfo->started, NULL);
 	pinfo->token = token;
 
+#ifdef HAVE_ELVIN
 	if ((pinfo->timeout > 0) &&
 	    (pinfo->timeout_handle =
 	     elvin_sync_add_timeout(NULL,
@@ -1165,7 +1497,20 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 		error("Could not add timeout for %s!", pinfo->name);
 		return -1;
 	}
-
+#elif HAVE_PUBSUB
+	if ((pinfo->timeout > 0) &&
+	    (pinfo->timeout_handle =
+	     pubsub_add_timeout(handle->server,
+				NULL,
+				pinfo->timeout * 1000,
+				timeout_callback,
+				pinfo,
+				&pubsub_error)) == NULL) {
+		error("Could not add timeout for %s!", pinfo->name);
+		return -1;
+	}
+#endif
+	
 	/*
 	 * The command is going to be run via the shell. 
 	 * We do not know anything about the command line, so we reinit
@@ -1547,30 +1892,32 @@ parse_configfile_env(char *filename)
 	
 	while (fgets(buf, sizeof(buf), fp)) {
 		int cc = strlen(buf);
+		char *bp;
+		FILE *file;
+		
 		if (buf[cc-1] == '\n')
 			buf[cc-1] = (char) NULL;
 
-		if (!strncmp(buf, "ENV ", 4)) {
-			FILE *file;
-			
-			/* XXX Kind of a stupid way to eval any variables. */
-			if ((file = popenf("echo %s", "r", &buf[4])) != NULL) {
-				if (fgets(buf, sizeof(buf), file) != NULL) {
-					char *idx;
-
-					if ((idx = strchr(buf, '\n')) != NULL)
-						*idx = '\0';
-					if ((idx = strchr(buf, '=')) != NULL) {
-						*idx = '\0';
-						setenv(strdup(buf),
-						       idx + 1,
-						       1);
-					}
-				}
-				pclose(file);
-				file = NULL;
-			}
+		if (isops)
+			bp = buf;
+		else if (!strncmp(buf, "ENV ", 4))
+			bp = &buf[4];
+		else
 			continue;
+		
+		/* XXX Kind of a stupid way to eval any variables. */
+		if ((file = popenf("echo %s", "r", bp)) != NULL) {
+			if (fgets(buf, sizeof(buf), file) != NULL) {
+				char *idx;
+
+				if ((idx = strchr(buf, '\n')) != NULL)
+					*idx = '\0';
+				if ((idx = strchr(buf, '=')) != NULL) {
+					*idx = '\0';
+					setenv(strdup(buf), idx + 1, 1);
+				}
+			}
+			pclose(file);
 		}
 	}
 	
@@ -1578,8 +1925,16 @@ parse_configfile_env(char *filename)
 	return 0;
 }
 
+#ifdef HAVE_ELVIN
 static int
 timeout_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
+#elif HAVE_PUBSUB
+static int
+timeout_callback(pubsub_handle_t *handle,
+		 pubsub_timeout_t *timeout,
+		 void *rock,
+		 pubsub_error_t *eerror)
+#endif
 {
 	struct proginfo *pi = (struct proginfo *)rock;
 	int retval = 0;
@@ -1596,11 +1951,20 @@ timeout_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
 	return retval;
 }
 
+#ifdef HAVE_ELVIN
 static int
 child_callback(elvin_io_handler_t handler,
 	       int fd,
 	       void *rock,
 	       elvin_error_t eerror)
+#elif HAVE_PUBSUB
+static int
+child_callback(pubsub_handle_t *pshandle,
+	       pubsub_iohandler_t *handler,
+	       int fd,
+	       void *rock,
+	       pubsub_error_t *eerror)
+#endif
 {
 	struct timeval now;
 	struct rusage ru;
@@ -1753,11 +2117,31 @@ child_callback(elvin_io_handler_t handler,
 			
 			pi->token = ~0;
 			pi->flags &= ~(PIF_TIMEOUT_FIRED);
+			
+			if (pi->flags & PIF_HALT_COMPLETION) {
+				event_do(handle,
+					 EA_Experiment, pideid,
+					 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+					 EA_Name, pi->name,
+					 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+					 EA_ArgInteger, "ERROR", exit_code,
+					 EA_ArgInteger, "CTOKEN",
+					    pi->halt_token,
+					 EA_TAG_DONE);
+				pi->flags &= ~(PIF_HALT_COMPLETION);
+			}
 			if (pi->timeout_handle != NULL) {
+#ifdef HAVE_ELVIN
 				elvin_sync_remove_timeout(pi->timeout_handle,
 							  eerror);
+#elif HAVE_PUBSUB
+				pubsub_remove_timeout(pshandle,
+						      pi->timeout_handle,
+						      eerror);
+#endif
 				pi->timeout_handle = NULL;
 			}
+
 		}
 	}
 	

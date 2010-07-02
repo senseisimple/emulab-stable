@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -34,7 +34,6 @@ my $nobody    = 0;
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT     = "@TBAUDITEMAIL@";
-my $HOMEDIR	= "/users";
 my $SFSUPDATE   = "$TB/sbin/sfskey_update";
 
 # Locals
@@ -53,6 +52,8 @@ use libtestbed;
 # Function prototypes
 #
 sub fatal($);
+
+my $HOMEDIR	= USERROOT();
 
 #
 # Turn off line buffering on output

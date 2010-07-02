@@ -16,6 +16,7 @@
 #include <sstream>
 #include <iostream>
 #include <map>
+#include <iomanip>
 
 #include "Exception.h"
 
@@ -204,8 +205,9 @@ void printBuckets(map<int, int> const & ranges)
     map<int, int>::const_iterator limit = ranges.end();
     while(forward != limit)
     {
-        cout << pos->first << " " << forward->first << " "
-             << forward->second << endl;
+        cout << setw(4) << pos->first << " "
+             << setw(4) << forward->first << " "
+             << setw(6) << forward->second << endl;
 
         ++pos;
         ++forward;

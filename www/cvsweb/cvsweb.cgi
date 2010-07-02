@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.7 2006-02-27 15:58:14 stoller Exp $
+# $Id: cvsweb.cgi,v 1.10 2007-07-20 18:52:07 stoller Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
@@ -312,7 +312,7 @@ $maycompress =
 # their current value) to any link/query string
 # you construct
 @stickyvars = qw(cvsroot hideattic sortby logsort f only_with_tag
-		 pid eid exptidx);
+		 pid eid exptidx guid version);
 @unsafevars = qw(logsort only_with_tag r1 r2 rev sortby tr1 tr2);
 
 if (-f $config) {
@@ -360,7 +360,7 @@ if (defined($input{"content-type"})) {
 }
 
 # Emulab Hacks!
-if (@ARGV && $ARGV[0] eq "-repo") {
+if (@ARGV && $ARGV[0] eq "--repo") {
     $license = undef;
     @CVSrepositories = (
 	'top'   => [$ARGV[1], $ARGV[1]],
@@ -623,7 +623,7 @@ if ($input{tarball}) {
 			print "Content-Type: application/x-gzip\r\n\r\n";
 
 			system
-			    "$CMD{tar} @tar_options -cf - -C $tmpexportdir $basedir | $CMD{gzip} @gzip_options -c"
+			    "$CMD{gtar} @tar_options -cf - -C $tmpexportdir $basedir | $CMD{gzip} @gzip_options -c"
 			    and @fatal =
 				("500 Internal Error",
 				 'tar zc failure: %s: %s',

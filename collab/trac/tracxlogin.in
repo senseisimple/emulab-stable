@@ -1,0 +1,159 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Cross machine login for a user, to a list. The type is one of "user"
+# or "admin". The admin tag lets the user into the admin interface. 
+#
+sub usage()
+{
+    print STDOUT "Usage: tracxlogin [-p] [-w wiki] <uid> <ipaddr>\n";
+    exit(-1);
+}
+my $optlist = "dw:p";
+my $debug   = 0;
+my $wiki    = "emulab";
+my $privopt = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $TRACSUPPORT = @TRACSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $TRACPROXY   = "$TB/sbin/tracproxy";
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no mailman support, just exit. 
+#
+if (! $TRACSUPPORT) {
+    print "Trac support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"p"})) {
+    $privopt = "-p";
+}
+if (defined($options{"w"})) {
+    $wiki = $options{"w"};
+
+    if ($wiki =~ /^([-\w]+)$/) {
+	$wiki = $1;
+    }
+    else {
+	die("Bad data in wiki: $wiki");
+    }
+}
+usage()
+    if (@ARGV != 2);
+    
+my $user   = $ARGV[0];
+my $ipaddr = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($user =~ /^([-\w]+)$/) {
+    $user = $1;
+}
+else {
+    die("Bad data in user: $user.");
+}
+if ($ipaddr =~ /^([\d\.]+)$/) {
+    $ipaddr = $1;
+}
+else {
+    die("Bad data in ipaddr: $ipaddr");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+
+#
+# For ssh.
+#
+$UID = $EUID;
+
+open(COOKIE,
+     "$SSH -host $CONTROL $TRACPROXY -w $wiki xlogin $privopt $user $ipaddr |")
+    or fatal("$TRACPROXY failed on $CONTROL!");
+my $cookie = <COOKIE>;
+close(COOKIE) or
+    fatal("$TRACPROXY failed on $CONTROL!");
+
+exit(1)
+    if (!defined($cookie));
+
+# Send back to PHP.
+print $cookie;
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

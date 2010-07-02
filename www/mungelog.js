@@ -1,10 +1,10 @@
-
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006-2008, 2010 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 var LOG_STATE_LOADING = 1;
 var LOG_STATE_LOADED = 2;
-
-/* The experiment pid/eid used when getting the pnode list. */
-var exp_pid = "";
-var exp_eid = "";
 
 var pnodes = new Array(); // List of pnode names in longest to shortest order.
 var lastLength = 0; // The length of the download text at the last check.
@@ -19,7 +19,7 @@ var lastLine = ""; // The last line of the download text.
 var getPNodeProgress = 0;
 
 var nextState = LOG_STATE_LOADING; // The state of the log download.
-var docTriesLeft = 2; // Tries before giving up on getting the document.
+var docTriesLeft = 5; // Tries before giving up on getting the document.
 
 var lastError = -2;
 var maxLineLength = 110;
@@ -43,27 +43,38 @@ function GetPNodes_cb(data) {
     ml_handleReadyState(nextState);
 }
 
+/*
+ * Handle init state for Safari, which does not appear to support an onload
+ * event for iframes. 
+ */
+if (is_safari) {
+    addLoadFunction(function() {
+        ml_handleReadyState(LOG_STATE_LOADED);
+    });
+}
+
 /* Clear the various 'loading' indicators. */
 function ml_loadFinished() {
-    clearInterval(upInterval);
+    /* Clear the various loading indicators. */
+    var busyimg     = getObjbyName('load_busy');
+    var loadingspan = getObjbyName('load_loading');
 
-    var busyimg = document.getElementById('busy');
-    var loadingspan = document.getElementById('loading');
-
-    loadingspan.innerHTML = "";
     busyimg.style.display = "none";
-    busyimg.src = "1px.gif";
+    busyimg.src           = "1px.gif";
+    loadingspan.innerHTML = "<center><b>Done!</b></center>";
+
     nextState = LOG_STATE_LOADED;
 }
 
 function ml_getInnerText(el) {
-	if (typeof el == "string") return el;
-	if (typeof el == "undefined") { return ""; };
-	if (el.innerText) return el.innerText;	//Not needed but it is faster
-	var str = "";
+	if (typeof el == "string")    { return el; }
+	if (typeof el == "undefined") { return ""; }
+	if (el.innerText)             { return el.innerText; }
 	
+	var str = "";
 	var cs = el.childNodes;
 	var l = cs.length;
+
 	for (var i = 0; i < l; i++) {
 		switch (cs[i].nodeType) {
 			case 1: //ELEMENT_NODE
@@ -82,23 +93,21 @@ function ml_getInnerText(el) {
  * @return The text in the given iframe.  If the text is surrounded by '<pre>'
  * tags (mozilla, IE), they will be stripped.
  */
-function ml_getBodyText(ifr) {
+function ml_getBodyText(oDoc) {
     var retval = null;
 
     try {
-	var oDoc = (ifr.contentWindow || ifr.contentDocument);
-	if (oDoc.document) {
-	    oDoc = oDoc.document;
-	}
 	for (lpc = 0; lpc < oDoc.childNodes.length; lpc++) {
 	    text = ml_getInnerText(oDoc.childNodes[lpc]);
 	    if (text != "") {
-		if (retval == null)
-		  retval = "";
+		if (retval == null) {
+		    retval = "";
+                }
 		retval += text;
 	    }
 	}
-	if (retval.indexOf("<pre>") != -1 || retval.indexOf("<PRE>") != -1) {
+        if (retval != null &&
+	    (retval.indexOf("<pre>") != -1 || retval.indexOf("<PRE>") != -1)) {
 	    retval = retval.substring(5, retval.length - 6);
 	}
     }
@@ -111,8 +120,8 @@ function ml_getBodyText(ifr) {
 /* @return The innerHeight of the window. */
 function ml_getInnerHeight() {
     var retval;
-    var win = document.getElementById('outputframe').contentWindow;
-    var doc = document.getElementById('outputframe').contentWindow.document;
+    var win = getObjbyName('outputframe').contentWindow;
+    var doc = getObjbyName('outputframe').contentWindow.document;
 
     if (win.innerHeight) // all except Explorer
       retval = win.innerHeight;
@@ -128,8 +137,8 @@ function ml_getInnerHeight() {
 /* @return The scrollTop of the window. */
 function ml_getScrollTop() {
     var retval;
-    var win = document.getElementById('outputframe').contentWindow;
-    var doc = document.getElementById('outputframe').contentWindow.document;
+    var win = getObjbyName('outputframe').contentWindow;
+    var doc = getObjbyName('outputframe').contentWindow.document;
 
     if (win.pageYOffset) // all except Explorer
       retval = win.pageYOffset;
@@ -144,8 +153,8 @@ function ml_getScrollTop() {
 /* @return The height of the document. */
 function ml_getScrollHeight() {
     var retval;
-    var win = document.getElementById('outputframe').contentWindow;
-    var doc = document.getElementById('outputframe').contentWindow.document;
+    var win = getObjbyName('outputframe').contentWindow;
+    var doc = getObjbyName('outputframe').contentWindow.document;
     var test1 = doc.body.scrollHeight;
     var test2 = doc.body.offsetHeight;
 
@@ -165,12 +174,32 @@ function ml_getScrollHeight() {
  * @param state The state of the download.
  */
 function ml_handleReadyState(state) {
-    var Iframe = document.getElementById('outputframe');
-    var idoc   = Iframe.contentWindow.document;
-    var oa = Iframe.contentWindow.document.getElementById('outputarea');
-    var dl = document.getElementById('downloader');
+    if (is_chrome || is_safari) {
+	if (state == LOG_STATE_LOADING) {
+	    clearInterval(upInterval);
+	}
+	else if (state == LOG_STATE_LOADED) {
+	    ml_loadFinished();
+        }
+	return;
+    }
+    var Iframe = getObjbyName('outputframe');
+    var idoc   = IframeDocument('outputframe');
+    var oa     = idoc.getElementById('outputarea');
+    var dl     = getObjbyName('downloader');
+    var ddoc   = IframeDocument('downloader');
 
-    if ((rt = ml_getBodyText(dl)) == null) {
+    //warn("state = " + state + ", docTriesLeft = " + docTriesLeft);
+
+    if (docTriesLeft < 0) {
+        /* Already decided we were broken; just waiting for loader to finish */
+	if (state == LOG_STATE_LOADED) {
+	    ml_loadFinished();
+	}
+        return;
+    }
+
+    if (ddoc == null ||	((rt = ml_getBodyText(ddoc)) == null)) {
 	/* 
 	 * Browsers that do not support DOMs for text/plain files or are a
 	 * little slow in getting it setup will end up here.  If we fail to
@@ -178,50 +207,47 @@ function ml_handleReadyState(state) {
 	 * make the iframe visible.
 	 */
 	docTriesLeft -= 1;
-	if (docTriesLeft < 0) {
-	    /* Give up, turn off the spinner and */
-	    ml_loadFinished();
-	    
-	    /* ... try to make the iframe visible. */
-	    dl.border = 1;
-	    dl.width = "90%";
-	    
-	    dl.height = 500;
-	    
-	    dl.style.width = "90%";
-	    dl.style.height = 500;
-	    dl.style.border = 1;
-	}
+	if (docTriesLeft < 0 || state == LOG_STATE_LOADED) {
+	    /* Give up, wait for downloader window to signal loaded. */
+	    clearInterval(upInterval);
 
+	    // We get this if the page finished loading before docTriesLeft
+	    // get to zero.
+	    if (state == LOG_STATE_LOADED) {
+		ml_loadFinished();
+	    }
+	    
+            /* Hide the outputarea */
+            HideFrame("outputframe");
+
+            /* Make the downloader frame visible. */
+	    var winheight = GetMaxHeight('downloader');
+
+	    dl.style.border = "2px solid";
+	    dl.style.height = winheight + "px";
+	    dl.style.width  = "100%";
+	    dl.style.scrolling = "auto";
+	    dl.style.overflow  = "auto";
+	    dl.height       = winheight + "px";
+	    dl.width        = "100%";
+	    dl.scrolling    = "auto";
+	    dl.overflow     = "auto";
+	    dl.frameBorder  = "1";
+	}
 	return;
     }
 
     if (state == LOG_STATE_LOADED) {
+	clearInterval(upInterval);
 	ml_loadFinished();
     }
-    
+
     if (state == LOG_STATE_LOADING || state == LOG_STATE_LOADED) {
 	/*
 	 * Get any new data and append it to the last line from the previous
 	 * iteration (in case the line was only partially downloaded).
 	 */
 	var newData = lastLine + rt.substring(lastLength);
-
-	/* Look for assigns "signal" that the pnode list is available. */
-	/* XXX Turned off since it is slow. */
-	if (0 && newData.indexOf('Mapped to physical reality!') != -1) {
-	    if (getPNodeProgress == 1) {
-		/* Still waiting for the reply. */
-		return;
-	    }
-	    else if (getPNodeProgress == 0) {
-		/* Send the request. */
-		getPNodeProgress = 1;
-		x_GetPNodes(exp_pid, exp_eid, GetPNodes_cb);
-		
-		return;
-	    }
-	}
 
 	lastLength = rt.length;
 	lastLine = "";
@@ -357,8 +383,8 @@ function ml_handleReadyState(state) {
 
 	/* See if we should scroll the window down. */
 	if ((h - (y + ih)) < (y == 0 ? 200 : 10)) {
-	    Iframe.contentWindow.document.documentElement.scrollTop = nh;
-	    Iframe.contentWindow.document.body.scrollTop = nh;
+	    idoc.documentElement.scrollTop = nh;
+	    idoc.body.scrollTop = nh;
 	}
     }
 }

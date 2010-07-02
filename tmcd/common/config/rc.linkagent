@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -45,7 +45,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || JAILED() || REMOTE());
+    if (MFS() || JAILED() || (REMOTE() && !REMOTEDED()));
 
 # Protos.
 sub doboot();
@@ -132,10 +132,11 @@ sub doboot()
 
     print "Starting Link Agent ...\n";
     
-    system("$LAGENT -v -e $pid/$eid -s localhost -l $LOGFILE ".
+    my $server = getlocalevserver();
+    system("$LAGENT -v -e $pid/$eid -s $server -l $LOGFILE ".
 	   "-i $PIDFILE -k " . TMEVENTKEY() . "$args\n");
     if ($?) {
-	fatal("Could not start program agent!");
+	fatal("Could not start link agent!");
     }
     return;
 }

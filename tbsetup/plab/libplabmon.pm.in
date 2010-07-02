@@ -1,0 +1,96 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libplabmon;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw (MIN TimeStamp getLA OpenLog Log STATUSLOG STATUSLOGPATH);
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use English;
+use IO::File;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+# package consts
+my $UPTIME       = "/usr/bin/uptime";
+
+# package vars
+my %logs = ();
+
+sub STATUSLOG { 
+    my $log = shift || '';
+    return "StatusLog-$log";
+}
+sub STATUSLOGPATH { 
+    my $log = shift || '';
+    return "$TB/log/plabnodestatus-$log.log";
+}
+
+sub MIN($$) {
+    my ($a, $b) = @_;
+
+    my $res =  $a < $b ? $a : $b;
+
+    return $res;
+}
+
+sub TimeStamp() {
+    return POSIX::strftime("%m/%d/%y %H:%M:%S", localtime());
+}
+
+sub getLA() {
+    my ($LAstr) = `$UPTIME` =~ /load averages:\s+([\d\.]+),/;
+    return int($LAstr);
+}
+
+#
+# Open a log file for writing
+#
+sub OpenLog($$) {
+    my $loghandlename = shift;
+    my $logfile = shift;
+    my $loghandle = new IO::File;
+
+    if (exists($logs{$loghandlename})) {
+        return 1;
+    }
+
+    if (!open ($loghandle, ">> $logfile")) {
+        print STDERR "Unable to open logfile $logfile for append!";
+        return 0;
+    }
+    $logs{$loghandlename} = $loghandle;
+    return 1;
+}
+
+#
+# Print out a timestamped log entry to a particular file.
+#
+sub Log($$) {
+    my $loghandlename = shift;
+    my $logmsg = shift;
+
+    if (!exists($logs{$loghandlename})) {
+        print STDERR "Log $loghandlename is not open!\n";
+        return;
+    }
+    my $loghandle = $logs{$loghandlename};
+    print $loghandle TimeStamp() . ": "  . $logmsg . "\n";
+    return;
+}
+
+# Make perl happy
+1;

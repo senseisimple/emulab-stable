@@ -17,7 +17,7 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print("Usage: gentopofile [-d] [-n] <pid> <eid>\n".
+    print("Usage: gentopofile [-n] <pid> <eid>\n".
 	  "  Use -n to print to stdout/stderr, but leave the file alone.\n");
     exit(-1);
 }
@@ -25,6 +25,7 @@ my $optlist  = "n";
 my $impotent = 0;
 my $toponame = "topomap";
 my $ltname   = "ltmap";
+my $ltpname  = "ltpmap";
 
 #
 # Configure variables
@@ -127,25 +128,34 @@ my %lans  = ();
 # Since the port numbers are totally pointless outside of assign_wrapper.
 #
 my $query_result =
-    DBQueryFatal("select v.vname,v.ips from virt_nodes as v " .
+    DBQueryFatal("select v.vname from virt_nodes as v " .
 		 "where v.pid='$pid' and v.eid='$eid' " .
 		 "      order by v.vname");
 
-while (my ($vname,$ips) = $query_result->fetchrow_array()) {
+while (my ($vname) = $query_result->fetchrow_array()) {
     $nodes{$vname} = {};
     
     print $LTOUT "h $vname\n";
-    foreach my $ipinfo (split(" ", $ips)) {
-	my ($port,$ip) = split(":", $ipinfo);
-	
-	$ips{"$vname:$port"} = $ip;
-    }
+}
+$query_result =
+    DBQueryFatal("select vnode,vport,ip from virt_lans " .
+		 "where pid='$pid' and eid='$eid'");
+
+while (my ($vnode,$vport,$ip) = $query_result->fetchrow_array()) {
+    $ips{"$vnode:$vport"} = $ip;
 }
 
 #
 # Generate the linktest config for links, which looks like:
 #
-#   l node0 node1 100000 0.0 0.0
+#   l node0 node1 bw delay loss lname dropstyle
+#
+# where node0 and node1 are the user-given names of the end points,
+# bw is the bandwidth in bits/sec,
+# delay is the latency in (fractional) seconds,
+# loss is the packet loss rate as a fraction,
+# lname is the user-given name of the link,
+# dropstyle is "droptail" or "gred".
 #
 my %virt_lans = ();
 
@@ -178,71 +188,85 @@ foreach my $lan (keys(%virt_lans)) {
 	my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$members[0]};
 	my $member1 = $virt_lans{$lan}->{"MEMBERS"}->{$members[1]};
 
-	my $node0   = $member0->{"vnode"};
-	my $delay0  = $member0->{"delay"};
-	my $loss0   = $member0->{"lossrate"};
-	my $bw0     = $member0->{"bandwidth"};
-	my $rdelay0 = $member0->{"rdelay"};
-	my $rloss0  = $member0->{"rlossrate"};
-	my $rbw0    = $member0->{"rbandwidth"};
+	my $node0      = $member0->{"vnode"};
+	my $delay0     = $member0->{"delay"};
+	my $loss0      = $member0->{"lossrate"};
+	my $bw0        = $member0->{"bandwidth"};
+	my $backfill0  = $member0->{"backfill"};
+	my $rdelay0    = $member0->{"rdelay"};
+	my $rloss0     = $member0->{"rlossrate"};
+	my $rbw0       = $member0->{"rbandwidth"};
+	my $rbackfill0 = $member0->{"rbackfill"};
 	my $qtype0  = "droptail";
 	if ($member0->{"q_red"}) {
 	    $qtype0 = ($member0->{"q_gentle"} ? "gred" : "red");
 	}
 
-	my $node1   = $member1->{"vnode"};
-	my $delay1  = $member1->{"delay"};
-	my $loss1   = $member1->{"lossrate"};
-	my $bw1     = $member1->{"bandwidth"};
-	my $rdelay1 = $member1->{"rdelay"};
-	my $rloss1  = $member1->{"rlossrate"};
-	my $rbw1    = $member1->{"rbandwidth"};
-	my $qtype1  = "droptail";
+	my $node1      = $member1->{"vnode"};
+	my $delay1     = $member1->{"delay"};
+	my $loss1      = $member1->{"lossrate"};
+	my $bw1        = $member1->{"bandwidth"};
+	my $backfill1  = $member1->{"backfill"};
+	my $rdelay1    = $member1->{"rdelay"};
+	my $rloss1     = $member1->{"rlossrate"};
+	my $rbw1       = $member1->{"rbandwidth"};
+	my $rbackfill1 = $member1->{"rbackfill"};
+	my $qtype1     = "droptail";
 	if ($member1->{"q_red"}) {
 	    $qtype1 = ($member1->{"q_gentle"} ? "gred" : "red");
 	}
 	
+	# ebw stands for effective bandwith, it is bw - backfill
 	my $delay = ($delay0+$rdelay1) / 1000.0 ;
 	my $loss = 1-(1-$loss0)*(1-$rloss1);
 	my $bw = &min($bw0,$rbw1) * 1000;
+	my $backfill = &max($backfill0,$rbackfill1) * 1000;
+	my $ebw = $bw - $backfill;
 	my $rdelay = ($rdelay0+$delay1) / 1000.0;
 	my $rloss = 1-(1-$rloss0)*(1-$loss1);
 	my $rbw = &min($rbw0,$bw1) * 1000;
+	my $rbackfill = &max($rbackfill0,$backfill1) * 1000;
+	my $rebw = $rbw - $rbackfill;
 
 	printf $LTOUT
-	    "l $node0 $node1 $bw %.4f %.6f $lan $qtype0\n", $delay, $loss;
+	    "l $node0 $node1 $ebw %.4f %.6f $lan $qtype0\n", $delay, $loss;
 	printf $LTOUT
-	    "l $node1 $node0 $rbw %.4f %.6f $lan $qtype1\n", $rdelay, $rloss;
+	    "l $node1 $node0 $rebw %.4f %.6f $lan $qtype1\n", $rdelay, $rloss;
     }
     else {
 	foreach my $memb0 (@members) {
 	    my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$memb0};
 	    
-	    my $node0   = $member0->{"vnode"};
-	    my $delay0  = $member0->{"delay"};
-	    my $loss0   = $member0->{"lossrate"};
-	    my $bw0     = $member0->{"bandwidth"};
+	    my $node0     = $member0->{"vnode"};
+	    my $delay0    = $member0->{"delay"};
+	    my $loss0     = $member0->{"lossrate"};
+	    my $bw0       = $member0->{"bandwidth"};
+	    my $backfill0 = $member0->{"backfill"};
 	    
 	    foreach my $memb1 (@members) {
 		next
 		    if ($memb0 eq $memb1);
 
-		my $member1 = $virt_lans{$lan}->{"MEMBERS"}->{$memb1};
-		my $node1   = $member1->{"vnode"};
-		my $rdelay1 = $member1->{"rdelay"};
-		my $rloss1  = $member1->{"rlossrate"};
-		my $rbw1    = $member1->{"rbandwidth"};
+		my $member1    = $virt_lans{$lan}->{"MEMBERS"}->{$memb1};
+		my $node1      = $member1->{"vnode"};
+		my $rdelay1    = $member1->{"rdelay"};
+		my $rloss1     = $member1->{"rlossrate"};
+		my $rbw1       = $member1->{"rbandwidth"};
+		my $rbackfill1 = $member1->{"rbackfill"};
 		my $qtype1  = "droptail";
 		if ($member1->{"q_red"}) {
 		    $qtype1 = ($member1->{"q_gentle"} ? "gred" : "red");
 		}
 
+		# ebw stands for effective bandwith, it is bw - backfill
 		my $delay = ($delay0+$rdelay1) / 1000.0;
 		my $loss = 1-(1-$loss0)*(1-$rloss1);
 		my $bw = &min($bw0,$rbw1) * 1000;
+		my $backfill = &max($backfill0,$rbackfill1) * 1000;
+		my $ebw = $bw - $backfill;
 
 		printf $LTOUT
-		    "l $node0 $node1 $bw %.4f %.6f $lan $qtype1\n",
+		    "l $node0 $node1 $ebw %.4f %.6f $lan $qtype1\n",
 		    $delay, $loss;
 	    }
 	}
@@ -325,12 +349,198 @@ foreach my $lan (sort keys(%lans)) {
     print $OUT "$lan,$mask,$cost\n";
 }
 
+#
+# Finally generate a "physical resource" map for linktest if the
+# experiment is swapped in.  It is a dual of the virtual ltmap,
+# containing "instantiation" information about nodes and links.
+# First we have a version number:
+#
+# V number
+#
+# What a forward-thinking concept!
+#
+# A node info line looks like:
+#
+#   H vname pname phost ptype OSID OS-name OS-version OS-features
+#
+# where vname is the experimenter given name like in the ltmap,
+# pname is the physical node name (e.g., "pc10", "pcvm10-2"),
+# phost is the "hosting" physical node for vnodes (or pname for regular nodes),
+# OSID is the emulab OS identifier for the OS running (e.g., "FBSD410-STD"),
+# OS-name is OS (e.g., "FreeBSD", "Linux"),
+# OS-version is the version of that OS (e.g., "4.10", "9.0"),
+# OS-features is a comma separated list of features supported by the OS
+#  (including "linktest").
+#
+# A link info line looks like:
+#
+#   L node0 node1 lname node0-mac mpx-style shaping-method
+#
+# where node0 and node1 are the user-specified node names,
+# lname is the user-specified link/lan name,
+# node0-mac is the MAC address of node0's interface
+# (can be mapped to interface name with findif),
+# mpx-style is the multiplexing style: "none" for physical links,
+# "veth" for encapsulated veth, or "veth-ne" for non-encapsulated veth,
+# shaping-method is either "dnode" for delay node shaping or "linkdelay"
+# for end node shaping.
+#
+
+#
+# Note the regular joins here, not left joins, so that we do not
+# get lines for delay nodes and virtnode hosts that are in reserved
+# but not in virt_nodes.
+#
+my $havepmap = 0;
+$query_result =
+    DBQueryFatal("select v.vname,n.node_id,n.phys_nodeid,n.type,".
+		 " o.osid,o.OS,o.version,o.osfeatures".
+		 " from virt_nodes as v,reserved as r,nodes as n,os_info as o".
+		 " where v.pid=r.pid and v.eid=r.eid and v.vname=r.vname".
+		 " and r.node_id=n.node_id and n.def_boot_osid=o.osid and".
+		 " v.pid='$pid' and v.eid='$eid'");
+if ($query_result->numrows) {
+    $havepmap = 1;
+    if ($impotent) {
+	$LTPOUT = *STDERR;
+    } else {
+	unlink("${ltpname}.new")
+	    if (-e "${ltpname}.new");
+    
+	open(LTPMAP, "> ${ltpname}.new") or
+	    die("Could not create ${ltpname}.new: $!\n");
+
+	$LTPOUT = *LTPMAP;
+    }
+    #
+    # Version 2 added osfeatures field
+    #
+    print $LTPOUT "V 2\n";
+    while (my ($vname,$node,$pnode,$ptype,$osid,$os,$osvers,$osfeatures) =
+	   $query_result->fetchrow_array) {
+	$os = "UNKNOWN" if (!$os);
+	$osvers = "0" if (!$osvers);
+	$osfeatures = "UNKNOWN" if (!$osfeatures);
+	print $LTPOUT
+	    "H $vname $node $pnode $ptype $osid $os $osvers $osfeatures\n";
+    }
+
+    #
+    # The MAC address is either in interfaces (for physical interfaces)
+    # or vinterfaces (for virtual interfaces).
+    #
+    # The multiplexing style is either "veth" if there is a row in the
+    # vinterfaces table or "none" otherwise.  This is reflected in
+    # the following query as: style is "veth" if vmac!=NULL.
+    #
+    # Linkdelays are in use if the link has a row in the linkdelays table.
+    # This is reflected in the following query as: linkdelays if iface!=NULL.
+    # We could look in the delays table to further distinguish unshaped
+    # links, but at the moment, we don't need that info.  We do look at the
+    # virt_lans nobwshaping field to see if the link is being shaped.
+    #
+    # Argh...further complicated by the reserved table node_id being either
+    # a pnode or a vnode name while vinterfaces identifies a pnode with
+    # node_id if vnode_id==NULL and a vnode with vnode_id if vnode_id!=NULL.
+    #
+    $query_result =
+	DBQueryFatal("select v.member,v.vname,i.mac,vi.mac,vi.type,l.iface,v.nobwshaping".
+		     " from reserved as r join virt_lans as v".
+		     " left join interfaces as i".
+		     "  on v.ip=i.IP and r.node_id=i.node_id".
+		     " left join linkdelays as l".
+		     "  on r.pid=l.pid and r.eid=l.eid and".
+		     "   v.vname=l.vlan and v.vnode=l.vnode and v.ip=l.ip".
+		     " left join vinterfaces as vi".
+		     "  on v.ip=vi.IP and".
+		     "    (vi.vnode_id is NULL and r.node_id=vi.node_id".
+		     "      or".
+		     "    vi.vnode_id is not NULL and r.node_id=vi.vnode_id)".
+		     " where".
+		     "  r.pid=v.pid and r.eid=v.eid and r.vname=v.vnode and".
+		     "  r.pid='$pid' and r.eid='$eid'");
+    if ($query_result->numrows) {
+	while (my ($memb,$vlan,$imac,$vmac,$vtype,$iface,$noshape) =
+	       $query_result->fetchrow_array) {
+	    if (exists($virt_lans{$vlan}->{"MEMBERS"}->{$memb})) {
+		my $member = $virt_lans{$vlan}->{"MEMBERS"}->{$memb};
+		if (defined($vmac)) {
+		    $member->{"mac"} = $vmac;
+		    if ($vtype eq "veth") {
+			$member->{"encap"} = "veth";
+		    } else {
+			$member->{"encap"} = "none";
+		    }
+		} else {
+		    $member->{"mac"} = $imac;
+		    $member->{"encap"} = "none";
+		}
+		if ($noshape) {
+		    #
+		    # XXX "noshaping" means just no BW shaping,
+		    # other shaping still happens.  So we identify it
+		    # as such here.  We continue to distinguish linkdelays
+		    # as the presence of on-node shaping has other
+		    # implications for linktest.
+		    #
+		    if (defined($iface)) {
+			$member->{"dstyle"} = "linkdelay-nobw";
+		    } else {
+			$member->{"dstyle"} = "dnode-nobw";
+		    }
+		} elsif (defined($iface)) {
+		    $member->{"dstyle"} = "linkdelay";
+		} else {
+		    $member->{"dstyle"} = "dnode";
+		}
+	    } else {
+		print $LTPOUT "E Bogus lan/member $vlan/$memb\n";
+	    }
+	}
+    }
+}
+
+#
+# Now dump the link info
+#
+if ($havepmap) {
+    foreach my $vlan (keys(%virt_lans)) {
+	my @members = @{$virt_lans{$vlan}->{"MEMBERLIST"}};
+	foreach my $memb0 (@members) {
+	    my $member0 = $virt_lans{$vlan}->{"MEMBERS"}->{$memb0};
+	    my $node0 = $member0->{"vnode"};
+
+	    my $mac0 = $member0->{"mac"};
+	    if (!defined($mac0)) {
+		print $LTPOUT "E No link info found for $vlan/$memb0\n";
+		next;
+	    }
+	    my $encap0 = $member0->{"encap"};
+	    my $dstyle0 = $member0->{"dstyle"};
+	    
+	    foreach my $memb1 (@members) {
+		next
+		    if ($memb0 eq $memb1);
+		my $member1 = $virt_lans{$vlan}->{"MEMBERS"}->{$memb1};
+		my $node1 = $member1->{"vnode"};
+
+		print $LTPOUT
+		    "L $node0 $node1 $vlan $mac0 $encap0 $dstyle0\n";
+	    }
+	}
+    }
+    close(LTPMAP)
+	if (!$impotent);
+}
+
 if (! $impotent) {
     close(MAP);
     close(LTMAP);
 
     system("mv -f ${toponame}.new $toponame");
     system("mv -f ${ltname}.new $ltname");
+    system("mv -f ${ltpname}.new $ltpname")
+	if ($havepmap);
 
     #
     # Create a compressed copy of the file. The experiment nodes will look
@@ -338,6 +548,8 @@ if (! $impotent) {
     #
     system("rm -f ${toponame}.gz ; cat $toponame | gzip > ${toponame}.gz");
     system("rm -f ${ltname}.gz ; cat $ltname | gzip > ${ltname}.gz");
+    system("rm -f ${ltpname}.gz ; cat $ltpname | gzip > ${ltpname}.gz")
+	if ($havepmap);
 
     #
     # Now copy over to the user exp directory since in a normal create/modify
@@ -349,5 +561,7 @@ if (! $impotent) {
 
     system("cp -fp $toponame ${toponame}.gz $userdir/tbdata");
     system("cp -fp $ltname ${ltname}.gz $userdir/tbdata");
+    system("cp -fp $ltpname ${ltpname}.gz $userdir/tbdata")
+	if ($havepmap);
 }
 exit(0);

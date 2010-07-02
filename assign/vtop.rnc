@@ -1,0 +1,142 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Description of a virtual topology
+#
+default namespace = "http://emulab.net/resources/vtop/0.2"
+
+#
+# We include the common topology specification schema, but override a few
+# elements
+#
+include "top.rnc" 
+
+## "Legacy" assign node flags - will be replaced with properties, and in some
+## cases, explicit links
+NodeFlagSpec =
+    ## Specify that this node is a subnode of another node. We MIGHT
+    ## try to do this with properties in the future
+    ## Valid for both virtual and physical nodes
+    element subnode_of { text }?,
+    ## Indicates that this node should never be considered identical to any
+    ## other node. Could be done with a property
+    ## Valid only for physical nodes
+    element unique { empty }?,
+    ## Indicates that virtual links must either all be trivial (loopback), or
+    ## none of them must be. Possibly expressible with properties?
+    element disallow_trivial_mix { empty }?
+
+## A node in the topology
+NodeSpec = element node { NodeContents }
+  
+NodeContents =
+    ## Name of the node - each node name must be unique within the 
+    ## top element
+        attribute name { text },
+		attribute assigned_to { text }?,
+		attribute hint_to { text }?,
+    ## Type specification - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+        NodeTypeSpec,
+    ## Legacy flags
+        NodeFlagSpec,
+    ## Legacy features and desires
+        FeatureDesireSpec*,
+    ## Types of virtual nodes that this physical node can satisfy
+    ## Desires of this node, which should (or must) be matched by the
+    ## physical node we are assigned to
+        PropertySpec*
+
+## Links in the topology - zero or more
+LinkSpec = element link { LinkContents }
+
+LinkContents =
+    ## Name of the link - must be unique in the top
+        attribute name { text },
+    ## The two interfaces which form the endpoints of this link.
+        LinkEndPoints,
+    ## The characteristics (bandwidth, latency, loss) which affect traffic.
+        LinkCharacteristics,
+    ## Type of this link - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+        LinkTypeSpec,
+	## "Legacy" link flags used by assign. Will be replaced by properties
+		LinkFlagSpec, 
+	## The annotated link/path
+		LinkMapping?,
+    ## Properties of this link
+        PropertySpec*
+
+## The path to which a link has been mapped
+## For the moment only 2 interface mappings are specified because
+## every link only has 2 interfaces for the moment.
+LinkMapping =
+  element component_hop { 
+		attribute assigned_to { text }, 
+		InterfaceMapping, 
+		InterfaceMapping 
+  }+
+
+# Each interface represents a particular physical interface. If that
+# interface is one of the link end points, it is also mapped to that
+# virtual node and its interface name.
+InterfaceMapping = element interface {
+  attribute physical_node_name { text }, 
+  attribute physical_interface_name { text },
+  attribute virtual_node_name { text }?,
+  attribute virtual_interface_name { text }?
+}
+
+
+## Specify a virtual class - assign allows you to define classes for virtual
+## nodes, and specify that all nodes using that class should, or must, be
+## assigned to physical nodes of the same type
+VclassSpec = element vclass {
+    ## Name of the virtual class
+    attribute name { text },
+    ## Specify whether the vclass is hard (ie. all nodes *must* be of the same
+    ## type) or soft (ie. violating it is allowed, but penalize)
+    (element hard { empty } |
+     (element soft { empty },
+      element weight { xsd:float { minInclusive = "0.0" } } )),
+	element physical_type { text }+
+}
+
+## "Legacy" link flags used by assign. Will be replaced by properties
+LinkFlagSpec = 
+    ## Indicates that it is not okay to use a delay node to artificially
+    ## shape/delay traffic for this link. Replace by using type system.
+    element nodelay { empty }?,
+    ## Indicates whether it is okay to multiplex this link with other virtual
+    ## links onto the same physical link (old name: emulated) Probably replace
+    ## by using the type system (ie. have an 'Ethernet' type that can only
+    ## hold one slot,  and an 'Ethernet-tagged' type that can hold more).
+    element multiplex_ok { empty }?,
+    ## Indicates whether it is okay to satisfy this link with a trivial
+    ## (loopback) link. Replace using type system.
+    element trivial_ok { empty }?,
+    ## Gives the name of the interface that must be used to satisfy the source
+    ## of this link - note that the interface name is given, not the node name
+    element fixsrciface { string }?,
+    ## Same as fixsrciface, for destination of the link
+    element fixdstiface { string }?
+
+## Virtual topology
+start = element vtop {
+    ## Project ID
+    attribute pid { text },
+    ## Experiment ID
+    attribute eid { text },
+    ## Group ID (optional)
+    attribute gid { text }?,
+    ## User ID owning the experiment (optional)
+    attribute uid { text }?,
+    ## Nodes, links and vclasses in the topology - zero or more
+    (NodeSpec | LinkSpec | VclassSpec)*
+}

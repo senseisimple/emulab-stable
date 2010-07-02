@@ -1,0 +1,534 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT);
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Commit/Modify a template.
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_commit [-q] -f <path>\n".
+	  "       template_commit [-q] [-e eid | -r tag] <guid/vers>\n".
+	  "       template_commit [-q] -p pid -e eid\n".
+	  "switches and arguments:\n".
+	  "-q          - be less chatty\n".
+	  "-e <eid>    - Experiment instance to commit from\n".
+	  "-E <str>    - A pithy sentence describing the new template\n".
+	  "-t <tid>    - The template name (alphanumeric, no blanks)\n".
+	  "-p <pid>    - Project for -e option\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qe:dp:f:t:E:r:";
+my %options      = ();
+my $quiet        = 0;
+my $debug        = 0;
+my $frompath;
+my $repotag;
+my $tid;
+my $description;
+my $eid;
+my $pid;
+my $guid;
+my $version;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL     = "@USERNODE@";
+my $checkquota  = "$TB/sbin/checkquota";
+my $modify      = "$TB/bin/template_create";
+my $archcontrol = "$TB/bin/archive_control";
+my $TAR         = "/usr/bin/tar";
+my $RSYNC	= "/usr/local/bin/rsync";
+
+# Locals
+my $template;
+my $child_template;
+my $cookie;
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub sighandler($);
+sub cleanup();
+sub CommitFromRepo();
+sub CommitFromInstance();
+sub CommitFromTemplate();
+sub CommitFromCheckout();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+use Experiment;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# Grab template info and do access check.
+#
+if (defined($pid)) {
+    # Eid is also defined.
+    my $experiment = Experiment->Lookup($pid, $eid);
+    
+    if (!defined($experiment)) {
+	fatal(-1, "Could not get experiment record for experiment $pid/$eid!");
+    }
+
+    $template = Template->LookupByExptidx($experiment->idx());
+
+    if (!defined($template)) {
+	tbdie("Cannot find template for $pid/$eid!");
+    }
+    $guid    = $template->guid();
+    $version = $template->vers();
+}
+else {
+    if (defined($frompath)) {
+	#
+	# Figure out what template from cookie file.
+	#
+	$cookie  = "$frompath/.template";
+
+	if (open(COOKIE, $cookie)) {
+	    while (<COOKIE>) {
+		if ($_ =~ /^GUID:\s*([\w]*)\/([\d]*)$/) {
+		    $guid    = $1;
+		    $version = $2;
+		}
+	    }
+	    close(COOKIE);
+	}
+	else {
+	    tbdie("Could not open $cookie!");
+	}
+	if (!(defined($guid) && defined($version))) {
+	    tbdie("Could not parse $cookie!");
+	}
+    }
+    $template = Template->Lookup($guid, $version);
+
+    if (!defined($template)) {
+	tbdie("Experiment template $guid/$version does not exist!");
+    }
+}
+
+if (! $template->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    tberror("You do not have permission to commit template $guid/$version");
+    exit(1);
+}
+
+#
+# Catch this so we can clean up.
+#
+$SIG{TERM} = \&sighandler;
+
+if (defined($repotag)) {
+    CommitFromRepo();
+}
+elsif (defined($eid)) {
+    CommitFromInstance();
+}
+else {
+    tbdie("Unsupported template commit operation!");
+    
+    if (defined($frompath)) {
+	CommitFromCheckout();
+    }
+    else {
+	CommitFromTemplate();
+    }
+}
+exit(0);
+
+#
+# Commit from a Repo.
+#
+sub CommitFromRepo()
+{
+    my $pid     = $template->pid();
+    my $gid     = $template->gid();
+    my $optarg  = ($quiet ? "-q" : "");
+
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+    
+    #
+    # Template modify to give us a new version. Giving it $frompath causes
+    # the datastore to be imported from the directory instead of the parent
+    # template.
+    #
+    system("$modify -w -m $guid/$version $optarg -g $gid -r $repotag ".
+	   "$pid $tid");
+    if ($?) {
+	fatal($? >> 8, "Failed to modify $template!");
+    }
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+    $child->SetDescription($description)
+	if (defined($description));
+
+    return 0;
+}
+
+#
+# Commit from a checkout. 
+#
+sub CommitFromCheckout()
+{
+    my $pid     = $template->pid();
+    my $gid     = $template->gid();
+    my $nsfile  = "$frompath/tbdata/nsfile.ns";
+    my $optarg  = ($quiet ? "-q" : "");
+
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+    
+    #
+    # The NS file is taken from the checkout.
+    #
+    fatal(1, "There is no NS file in $frompath/tbdata!")
+	if (! -e $nsfile);
+  
+    #
+    # Template modify to give us a new version. Giving it $frompath causes
+    # the datastore to be imported from the directory instead of the parent
+    # template.
+    #
+    system("$modify -m $guid/$version -w $optarg -g $gid -f $frompath ".
+	   "$pid $tid $nsfile");
+    if ($?) {
+	fatal($? >> 8, "Failed to modify $template!");
+    }
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+    $child->SetDescription($description)
+	if (defined($description));
+
+    # Update the cookie so that the checkout refers to the new template
+    # not the original template.
+    unlink($cookie)
+	if (-e $cookie);
+
+    open(COOKIE, "> $cookie") or
+	fatal(-1, "Could not create $cookie\n");
+    print COOKIE "# Do not remove this file!\n";
+    print COOKIE "GUID: $child_guid/$child_vers\n";
+    print COOKIE "TIME: " . time() . "\n";
+    close(COOKIE);
+
+    return 0;
+}
+
+#
+# Commit a template. This is basically a template modify operation.
+#
+sub CommitFromTemplate()
+{
+    my $pid     = $template->pid();
+    my $gid     = $template->gid();
+    my $userdir = $template->path();
+    my $nsfile  = "$userdir/tbdata/nsfile.ns";
+    my $optarg  = ($quiet ? "-q" : "");
+    
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+
+    #
+    # The NS file is taken from the template.
+    #
+    fatal(1, "There is no NS file in $userdir/tbdata!")
+	if (! -e $nsfile);
+
+    #
+    # Do a template modify of the current template.
+    #
+    system("$modify -m $guid/$version -w $optarg -g $gid $pid $tid $nsfile");
+    if ($?) {
+	fatal($? >> 8, "Failed to modify template!");
+    }
+
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+    $child->SetDescription($description)
+	if (defined($description));
+
+    return 0;
+}
+
+#
+# Commit from an instance.
+#
+sub CommitFromInstance()
+{
+    my $pid = $template->pid();
+    my $gid = $template->gid();
+    
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	fatal(-1, "Could not get experiment record for experiment $pid/$eid!");
+    }
+
+    my $idx      = $experiment->idx();
+    my $instance = Template::Instance->LookupByExptidx($idx);
+    if (!defined($instance)) {
+	fatal(-1, "Could not get instance record for experiment index $idx!");
+    }
+
+    my $userdir = $instance->path();
+    my $nsfile  = "$userdir/tbdata/nsfile.ns";
+
+    #
+    # The NS file is taken from the instance. 
+    #
+    fatal(1, "There is no NS file in $userdir/tbdata!")
+	if (! -e $nsfile);
+
+    # Optional override from commandline
+    $tid = $template->tid()
+	if (!defined($tid));
+
+    #
+    # Start with a plain template modify of the current template.
+    #
+    system("$modify -f $frompath ".
+	   "  -m $guid/$version -w -g $gid $pid $tid $nsfile");
+    if ($?) {
+	fatal($? >> 8, "Failed to commit instance to template!");
+    }
+    # Pick up changes to child guid/vers.
+    # Pick up changes to child guid/vers.
+    $template->Refresh();
+    my $child_guid = $template->child_guid();
+    my $child_vers = $template->child_vers();
+    my $child      = Template->Lookup($child_guid, $child_vers);
+    if (!defined($child)) {
+	fatal(-1, "Lookup of child template failed!");
+    }
+    $child->SetDescription($description)
+	if (defined($description));
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    #
+    # Allow pid to be used instead of GUID.
+    #
+    if (@ARGV == 1) {
+	#
+	# Pick up guid/version first and untaint.
+	#
+	my $tmp = shift(@ARGV);
+
+	if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	    $guid = $1;
+	    $version = $2;
+	}
+	else {
+	    tbdie("Bad data in argument: $tmp");
+	}
+    }
+    elsif (defined($options{"p"})) {
+	usage()
+	    if (!defined($options{"e"}));
+	
+	$pid = $options{"p"};
+
+	if ($pid =~ /^([-\w]+)$/) {
+	    $pid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $pid.");
+	}
+	if (! TBcheck_dbslot($pid, "projects", "pid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper project name (pid)!");
+	}
+    }
+    elsif (defined($options{"f"})) {
+	$frompath = $options{"f"};
+
+	# The Archive library has a nice routine to validate this path.
+	if (Archive::ValidatePath(\$frompath) != 0) {
+	    tbdie("Invalid path $frompath");
+	}
+    }
+    else {
+	usage();
+    }
+
+    if (defined($options{"e"})) {
+	$eid = $options{"e"};
+
+	if ($eid =~ /^([-\w]+)$/) {
+	    $eid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $eid.");
+	}
+	if (! TBcheck_dbslot($eid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment name (id)!");
+	}
+    }
+    elsif (defined($options{"r"})) {
+	$repotag = $options{"r"};
+
+	if ($repotag =~ /^([-\w:]+)$/) {
+	    $repotag = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $repotag");
+	}
+    }
+
+    if (defined($options{"t"})) {
+	$tid = $options{"t"};
+
+	if ($tid =~ /^([-\w]+)$/) {
+	    $tid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $tid.");
+	}
+	if (! TBcheck_dbslot($tid, "experiments", "eid",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template name (id)!");
+	}
+    }
+
+    if (defined($options{"E"})) {
+	if (! TBcheck_dbslot($options{"E"},
+			     "experiment_templates", "description",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template description!");
+	}
+	$description = $options{"E"};
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 2;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+    $child_template->Delete()
+	if (defined($child_template));
+}
+
+sub sighandler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    fatal(-1, "Caught SIG${signame}! Cleaning up ...");
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+    cleanup();
+    exit($errorstat);
+}
+

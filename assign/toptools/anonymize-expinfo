@@ -1,0 +1,76 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Script for anonymizing directories from /usr/testbed/expinfo on boss. Parses
+# the names of top-level directories, remvoving the <eid> and <pid> portions,
+# leaving only the <id> portion of the directory name.
+#
+# If it finds any potential errors, does nothing. 
+#
+
+use strict;
+
+if (@ARGV != 1) {
+    die "Usage: $0 <directory>\n";
+}
+
+my ($dirname) = @ARGV;
+
+my @names;
+if ($dirname eq "-") {
+    @names = <STDIN>;
+} else {
+    @names = `ls -1 $dirname`;
+}
+
+chomp @names;
+
+my $errors = 0;
+
+# Check for duplicate IDs
+my %ids;
+
+# Build up a list of commands - only execute them if there are no errors
+my @commands;
+
+foreach my $name (@names) {
+    # Find the ID # in the filename
+    my $id;
+    if ($name =~ /\.(\d{3,})$/) {
+        $id = $1;
+    } elsif ($name =~ /-(\d+-\d+\.\d+\.\d+)$/) {
+        $id = $1;
+    } else {
+        warn "***: Unable to find ID number in '$name'\n";
+        $errors++;
+        next;
+    }
+    if ($ids{$id}) {
+        warn "***: Duplicate ID number $id ('$name') ";
+        $errors++;
+        next;
+    } else {
+        $ids{$id} = 1;
+    }
+#    if (-d $name) {
+#        # Recurse into the directory
+#        system "cd $name && $0 .\n";
+#    }
+    push @commands, "mv $name $id";
+}
+
+if ($errors) {
+    exit(1);
+} else {
+    foreach my $cmd (@commands) {
+        if (system $cmd) {
+            print "*** Error running '$cmd'!\n";
+        }
+    }
+    exit(0);
+}

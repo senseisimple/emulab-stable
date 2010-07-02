@@ -1,0 +1,66 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(strftime);
+
+#
+# Mail the daily contents of the php errors log to tbops to annoy us,
+# and maybe even fix them. This should be run from cron just after
+# midnight.  Note that I am not rolling the log, except by hand. Once
+# things get settled, the php errors log should not get very big.
+#
+# Oh, only at emulab,net; no reason for external sites to run this, and
+# so I did not bother to configure or install it (do it by hand).
+#
+
+#
+# Configure variables
+#
+my $TB		= "/usr/testbed";
+my $TBOPS       = "testbed-ops\@flux.utah.edu";
+my $PHPLOG      = "/usr/testbed/log/php-errors.log";
+my $EGREP       = "/usr/bin/egrep";
+my $FGREP       = "/usr/bin/fgrep";
+my $TMPFILE     = "/tmp/phperrors.$$";
+my $ERRFILE     = "/tmp/greperror.$$";
+
+use lib '/usr/testbed/lib';
+use libtestbed;
+
+#
+# This script will run a little after midnight, so back up a bit to
+# get the previous day logs. 
+#
+my ($sec,$min,$hours) = localtime();
+
+my $stamp = POSIX::strftime("%d-%b-%G",
+			    localtime(time() - (100 + $sec + (60 * $min) +
+						(3600 * $hours))));
+
+#
+# egrep the file for the above stamp.
+#
+system("$EGREP '^\\[$stamp' $PHPLOG 2>${ERRFILE} | ".
+       "$FGREP -v -i openssl | ".
+       "$FGREP -v 'in /usr/testbed/devel/' | " .
+       "$FGREP -v 'in /usr/testbed/www/dev/' > $TMPFILE 2>&1");
+
+if (-s $ERRFILE) {
+    SENDMAIL($TBOPS, "Failed to parse PHP error log",
+	     "Failed to parse $PHPLOG for errors: $?",
+	     $TBOPS, undef, $ERRFILE);
+}
+if (-s $TMPFILE) {
+    SENDMAIL($TBOPS, "PHP Errors for $stamp",
+	     "Yesterday's PHP errors:",
+	     $TBOPS, undef, $TMPFILE);
+}
+unlink($TMPFILE);
+unlink($ERRFILE);
+exit(0);

@@ -46,6 +46,7 @@ FLUXPERSON("eeide", "Eric Eide");
 FLUXPERSON("fish", "Russ Fish");
 FLUXPERSON("shash", "Shashi Guruprasad");
 FLUXPERSON("mike", "Mike Hibler");
+FLUXPERSON("johnsond", "David Johnson");
 MAILPERSON("rolke@gmx.net", "Roland Kempter");
 FLUXPERSON("newbold", "Mac Newbold");
 FLUXPERSON("ricci", "Robert Ricci");

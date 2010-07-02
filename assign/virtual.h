@@ -7,11 +7,13 @@
 #ifndef __VIRTUAL_H
 #define __VIRTUAL_H
 
+#include "port.h"
+
 /*
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <queue>
 using namespace std;
 #else
@@ -78,6 +80,7 @@ public:
     case LINK_INTRASWITCH : o << "LINK_INTRASWITCH"; break;
     case LINK_INTERSWITCH : o << "LINK_INTERSWITCH"; break;
     case LINK_TRIVIAL : o << "LINK_TRIVIAL"; break;
+    case LINK_DELAYED : o << "LINK_DELAYED"; break;
     }
     o << " Path: ";
     for (pedge_path::const_iterator it=link.plinks.begin();
@@ -96,9 +99,23 @@ public:
 
 class tb_vnode {
 public:
-  tb_vnode(): vclass(NULL), fixed(false), assigned(false), subnode_of(NULL),
-      subnode_of_name(""), typecount(1) {;}
+//  tb_vnode(): vclass(NULL), fixed(false), assigned(false), subnode_of(NULL),
+//      subnode_of_name(""), typecount(1) {;}
 
+    tb_vnode(fstring _name, fstring _type, int _typecount):
+	name(_name), type(_type), typecount(_typecount),
+	desires(), vclass(NULL),
+        fixed(false), assigned(false), assignment(),
+	disallow_trivial_mix(false), nontrivial_links(0), trivial_links(0),
+	subnode_of(NULL), subnode_of_name(""), subnodes(),
+#ifdef PER_VNODE_TT
+	num_links(0), total_bandwidth(0),
+#endif
+        link_counts()
+    {
+	;
+    }
+    
   friend ostream &operator<<(ostream &o, const tb_vnode& node)
   {
     o << "tb_vnode: " << node.name << " (" << &node << ")" << endl;

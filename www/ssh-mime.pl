@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -19,6 +19,7 @@ use Getopt::Std;
 sub usage()
 {
     print(STDERR "ssh-mime.pl <control-file>\n");
+    exit(1);
 }
 my $optlist = "";
 my $config;
@@ -28,6 +29,11 @@ my $hostname;
 my $gateway;
 my $port    = "";
 my $login   = "";
+
+# Protos
+sub DoOSX();
+sub StartXterm();
+sub StartOSXTerm();
 
 #
 # Turn off line buffering on output
@@ -82,11 +88,98 @@ close(CONFIG);
 if (!defined($hostname)) {
     die("Config file must specify a hostname\n");
 }
+if ($OSNAME eq "darwin") {
+    # Path is all screwey on the Mac.
+    $ENV{'PATH'} .= ":/usr/X11R6/bin";
 
-if (!defined($gateway)) {
-    exec "xterm -T $hostname -e ssh $port $login $hostname \|\| read userinput";
+    # Cause its a folder action ...
+    system("/bin/rm -f $config");
+    
+    DoOSX();
+    exit(0);
 }
-else {
-    exec "xterm -T $hostname -e ssh $login -tt $gateway ".
-	 "ssh -o StrictHostKeyChecking=no $port $hostname \|\| read userinput";
+StartXterm();
+exit(0);
+
+#
+# Start up the xterms.
+#
+sub StartXterm()
+{
+    if (!defined($gateway)) {
+	exec "xterm -T $hostname -e ssh $port $login $hostname ".
+	    "\|\| read userinput";
+    }
+    else {
+	my $sshcmd = "ssh -o StrictHostKeyChecking=no $port";
+
+	# for IXPs at Utah Emulab
+	if ($gateway =~ /^ixp\d+-gw\.emulab\.net$/) {
+	    $sshcmd = "telnet -l root";
+	}
+
+	exec "xterm -T $hostname -e ssh $login -tt $gateway ".
+	    "$sshcmd $hostname ".
+	    "\|\| read userinput";
+    }
+}
+
+#
+# Mac OSX support; try to deduce the DISPLAY variable.
+#
+sub DoOSX()
+{
+    my $display;
+    
+    for (my $i = 0; $i < 20; $i++) {
+	if (-e "/tmp/.X${i}-lock") {
+	    $display = ":${i}.0";
+	    last;
+	}
+    }
+    if (!defined($display)) {
+	StartOSXTerm();
+	return;
+    }
+
+    $ENV{'DISPLAY'} = $display;
+
+    # Tell X to activate.
+    system("osascript -e 'tell application \"X11\" to activate'");
+    StartXterm();
+}
+
+#
+# This is going to start up Terminal.app ... but it depends on you
+# having your SSH agent available. The easies way to do that is to
+# go here: http://www.sshkeychain.org ... install this application
+# and following the instructions to make sure it is launched when
+# you log in. 
+#
+sub StartOSXTerm()
+{
+    my $command;
+    
+    if (!defined($gateway)) {
+	$command = "ssh $port $login $hostname";
+    }
+    else {
+	my $sshcmd = "ssh -o StrictHostKeyChecking=no $port";
+
+	# for IXPs at Utah Emulab
+	if ($gateway =~ /^ixp\d+-gw\.emulab\.net$/) {
+	    $sshcmd = "telnet -l root";
+	}
+
+	$command = "ssh $login -tt $gateway ".
+	    "$sshcmd $hostname";
+    }
+    
+    exec "osascript -e 'tell application \"Terminal\" \n".
+	 " activate \n".
+	 " do script with command \"$command ; exit\" \n".
+	 " tell window 1 \n".
+	 "    set custom title to \"$hostname\" \n".
+	 " end tell \n".
+	 "end tell'";
 }

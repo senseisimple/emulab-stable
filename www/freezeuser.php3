@@ -1,29 +1,28 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Freeze User Account");
-
-#
 # Only known and logged in users allowed.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Verify arguments.
-# 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
-    USERERROR("You must provide a User ID.", 1);
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("target_user",     PAGEARG_USER);
+$optargs = OptionalPageArguments("action",	    PAGEARG_STRING,
+				 "request",	    PAGEARG_BOOLEAN,
+				 "canceled",        PAGEARG_STRING,
+				 "confirmed",       PAGEARG_STRING,
+				 "confirmed_twice", PAGEARG_STRING);
+
 if (isset($action)) {
     if (strcmp($action, "freeze") && strcmp($action, "thaw")) {
 	USERERROR("You can freeze a user or you can thaw a user!", 1);
@@ -41,19 +40,14 @@ else {
     $tag      = "frozen";
     $dbaction = TBDB_USERSTATUS_FROZEN;
 }
-$isadmin = ISADMIN($uid);
 
-#
-# Confirm target is a real user.
-#
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("No such user '$target_uid'", 1);
-}
+# Need these below.
+$target_uid = $target_user->uid();
+$userstatus = $target_user->status();
 
 #
 # Confirm a valid op.
 #
-$userstatus = TBUserStatus($target_uid);
 if (!strcmp($action, "thaw") &&
      strcmp($userstatus, TBDB_USERSTATUS_FROZEN)) {
     USERERROR("You cannot thaw someone who is not frozen!", 1);
@@ -68,10 +62,16 @@ if (!strcmp($action, "freeze")) {
 }
 
 #
+# Standard Testbed Header
+#
+PAGEHEADER("Freeze User Account");
+
+#
 # Requesting? Fire off email and we are done. 
 # 
 if (isset($request) && $request) {
-    TBUserInfo($uid, $uid_name, $uid_email);
+    $uid_name  = $this_user->name();
+    $uid_email = $this_user->email();
 
     TBMAIL($TBMAIL_OPS,
 	   "$action User Request: '$target_uid'",
@@ -100,7 +100,7 @@ if (!$isadmin) {
 #
 # We do a double confirmation, running this script multiple times. 
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     echo "<center><h2><br>
           The $action has been canceled!
           </h2></center>\n";
@@ -109,14 +109,14 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><br>\n";
 
     echo "Are you <b>REALLY</b> sure you want to $action user '$target_uid'\n";
+
+    $url = CreateURL("freezeuser", $target_user, "action", $action);
     
-    echo "<form action=freezeuser.php3 method=post>";
-    echo "<input type=hidden name=target_uid value=\"$target_uid\">\n";
-    echo "<input type=hidden name=action value=\"$action\">\n";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -126,17 +126,17 @@ if (!$confirmed) {
     return;
 }
 
-if (!$confirmed_twice) {
+if (!isset($confirmed_twice)) {
     echo "<center><br>
 	  Okay, lets be sure.<br>\n";
 
     echo "Are you <b>REALLY REALLY</b> sure you want to $action user
               '$target_uid'\n";
     
-    echo "<form action=freezeuser.php3 method=post>";
-    echo "<input type=hidden name=target_uid value=\"$target_uid\">\n";
+    $url = CreateURL("freezeuser", $target_user, "action", $action);
+    
+    echo "<form action='$url' method=post>";
     echo "<input type=hidden name=confirmed value=Confirm>\n";
-    echo "<input type=hidden name=action value=\"$action\">\n";
     echo "<b><input type=submit name=confirmed_twice value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -146,25 +146,15 @@ if (!$confirmed_twice) {
     return;
 }
 
-echo "<br>
-      User '$target_uid' is being ${tag}!<br><br>
-      This will take a minute or two. <b>Please</b> do not click the Stop
-      button during this time. If you do not receive notification within
-      a reasonable amount of time, please contact $TBMAILADDR.\n";
-flush();
+# Change the DB first; backend requires it.
+$target_user->SetStatus($dbaction);
 
-DBQueryFatal("update users set status='$dbaction' ".
-	     "where uid='$target_uid'");
+STARTBUSY("User '$target_uid' is being ${tag}!");
+SUEXEC($uid, $TBADMINGROUP, "webtbacct $action $target_uid",SUEXEC_ACTION_DIE);
+STOPBUSY();
 
-#
-# All the real work is done in the script.
-#
-SUEXEC($uid, $TBADMINGROUP, "webtbacct $action $target_uid", 1);
-
-#
-# Warm fuzzies.
-#
-echo "<br><br><b>Done</b><br>\n";
+# Back to user display.
+PAGEREPLACE(CreateURL("showuser", $target_user));
 
 #
 # Standard Testbed Footer

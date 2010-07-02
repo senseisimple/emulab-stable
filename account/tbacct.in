@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -19,17 +19,21 @@ use Getopt::Std;
 # allows users to do things on behalf of other users, and we want to track
 # that in the audit log.
 #
-# This script always does the right thing ...
+# Use -u for update mode, which skips the checks on current status,
+# and forces the target user into that state. Eventually, this should
+# be the default mode of operation (independent of web interface).
 #
 sub usage()
 {
-    print("Usage: tbacct [-f] [-b] ".
-	  "<add|del|mod|passwd|wpasswd|freeze|thaw> <user>\n");
+    print("Usage: tbacct [-f] [-b] [-u] ".
+	  "<add|del|mod|passwd|wpasswd|email|freeze|thaw|verify> ".
+	  "<user> [args]\n");
     exit(-1);
 }
-my $optlist = "fb";
+my $optlist = "fbu";
 my $force   = 0;
 my $batch   = 0;
+my $update  = 0;
 
 #
 # Configure variables
@@ -37,19 +41,23 @@ my $batch   = 0;
 my $TB		= "@prefix@";
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
+my $TRACSUPPORT = @TRACSUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
 my $CHATSUPPORT = @CHATSUPPORT@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $THISHOMEBASE= "@THISHOMEBASE@";
 my $PROTOUSER   = 'elabman';
+my $ELABINELAB  = @ELABINELAB@;
 
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
 my $SMBPASSWD	= "/usr/local/bin/smbpasswd";
 
-my $HOMEDIR	= "/users";
 my $USERPATH	= "$TB/bin";
 my $ADDKEY	= "$TB/sbin/addpubkey";
 my $USERADD	= "/usr/sbin/pw useradd";
@@ -64,6 +72,8 @@ my $PBAG	= "$TB/sbin/paperbag";
 my $EXPORTSSETUP= "$TB/sbin/exports_setup";
 my $ADDWIKIUSER = "$TB/sbin/addwikiuser";
 my $DELWIKIUSER = "$TB/sbin/delwikiuser";
+my $ADDTRACUSER = "$TB/sbin/tracuser";
+my $DELTRACUSER = "$TB/sbin/tracuser -r";
 my $ADDBUGDBUSER= "$TB/sbin/addbugdbuser";
 my $DELBUGDBUSER= "$TB/sbin/delbugdbuser";
 my $ADDCHATUSER = "$TB/sbin/addjabberuser";
@@ -71,6 +81,9 @@ my $DELCHATUSER = "$TB/sbin/deljabberuser";
 my $MMMODIFYUSER= "$TB/sbin/mmmodifymember";
 my $ADDMMUSER   = "$TB/sbin/addmmuser";
 my $DELMMUSER   = "$TB/sbin/delmmuser";
+my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
+my $ADDHOOK     = "$TB/sbin/adduserhook";
+my $SETGROUPS   = "$TB/sbin/setgroups";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -78,7 +91,8 @@ my $NOSUCHUSER  = 67;
 my $USEREXISTS  = 65;
 # Nasty. Should do this with /etc/pw.conf shellpath.
 my %shellpaths  = ("csh"  => "/bin/csh", "sh" => "/bin/sh",
-		   "tcsh" => "/bin/tcsh", "bash" => "/usr/local/bin/bash");
+		   "tcsh" => "/bin/tcsh", "bash" => "/usr/local/bin/bash",
+		   "zsh" => "/usr/local/bin/zsh");
 
 my $errors      = 0;
 my $sfsupdate   = 0;
@@ -120,6 +134,8 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
+use Project;
 
 #
 # Function prototypes
@@ -131,9 +147,23 @@ sub UpdateWindowsPassword();
 sub UpdateUser(;$);
 sub FreezeUser();
 sub ThawUser();
+sub VerifyUser();
+sub UpdateEmail();
 sub CheckDotFiles();
 sub GenerateSFSKey();
 sub fatal($);
+
+my $HOMEDIR	= USERROOT();
+
+#
+# Rewrite audit version of ARGV to prevent password in mail logs.
+#
+if (scalar(@ARGV) == 3 && $ARGV[0] eq "passwd") {
+    my @NEWARGV = @ARGV;
+
+    $NEWARGV[scalar(@NEWARGV) - 1] = "**********";
+    AuditSetARGV(@NEWARGV);
+}
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -149,11 +179,14 @@ if (defined($options{"f"})) {
 if (defined($options{"b"})) {
     $batch = 1;
 }
-if (@ARGV != 2) {
+if (defined($options{"u"})) {
+    $update = 1;
+}
+if (@ARGV < 2) {
     usage();
 }
-my $cmd  = $ARGV[0];
-my $user = $ARGV[1];
+my $cmd  = shift(@ARGV);
+my $user = shift(@ARGV);
 
 #
 # Untaint the arguments.
@@ -164,7 +197,7 @@ if ($user =~ /^([-\w]+)$/i) {
 else {
     die("Tainted argument: $user\n");
 }
-if ($cmd =~ /^(add|del|mod|freeze|passwd|wpasswd|thaw)$/) {
+if ($cmd =~ /^(add|del|mod|freeze|passwd|wpasswd|thaw|email|verify)$/) {
     $cmd = $1;
 }
 else {
@@ -174,6 +207,31 @@ else {
 # Only admins can use force mode.
 if ($force && ! TBAdmin($UID)) {
     fatal("Only admins can use force mode!");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" its for a user with no actual account, and so
+# just set the current user to that user. If we make any callouts it will
+# fail (verbosely of course).
+#
+my $this_user;
+
+if (getpwuid($UID) eq "nobody") {
+    $this_user = $target_user;
+}
+else {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
 }
 
 #
@@ -189,46 +247,34 @@ if (AuditStart(0)) {
 #
 # Get the user info (the user being operated on).
 #
-$query_result =
-    DBQueryFatal("select u.usr_pswd,u.unix_uid,u.usr_name, ".
-		 " u.usr_email,u.status,u.webonly,u.usr_shell,admin, ".
-		 " u.usr_w_pswd,u.wikionly ".
-		 "from users as u ".
-		 "where u.uid='$user'");
-
-if ($query_result->numrows == 0) {
-    fatal("$user is not in the DB. This is bad.\n");
-}
-@row            = $query_result->fetchrow_array();
-my $pswd        = $row[0];
-my $user_number = $row[1];
-my $fullname    = $row[2];
-my $user_email  = $row[3];
-my $status      = $row[4];
-my $webonly     = $row[5];
-my $usr_shell   = $row[6];
-my $usr_admin   = $row[7];
-my $wpswd       = $row[8];
-my $wikionly    = $row[9];
+my $dbid        = $target_user->dbid();
+my $pswd        = $target_user->pswd();
+my $user_number = $target_user->unix_uid();
+my $fullname    = $target_user->name();
+my $user_email  = $target_user->email();
+my $status      = $target_user->status();
+my $webonly     = $target_user->webonly();
+my $usr_shell   = $target_user->shell();
+my $usr_admin   = $target_user->admin();
+my $wpswd       = $target_user->w_pswd();
+my $wikionly    = $target_user->wikionly();
 
 #
 # Get the users earliest project membership to use as the default group
 # for the case that the account is being (re)created. We convert that to
 # the unix info.
 #
+my $firstproject;
 my $default_groupname;
 my $default_groupgid;
 
-$query_result =
-    DBQueryFatal("select m.pid from group_membership as m ".
-		 "where m.uid='$user' and m.pid=m.gid and m.trust!='none' ".
-		 "order by date_approved asc limit 1");
+if ($target_user->FirstApprovedProject(\$firstproject) < 0) {
+    fatal("Could not determine first approved project for $target_user");
+}
 
-if (my ($defpid) = $query_result->fetchrow_array) {
-    if (! TBGroupUnixInfo($defpid, $defpid,
-			  \$default_groupgid, \$default_groupname)) {
-	fatal("No info for default project $defpid!");
-    }
+if (defined($firstproject)) {
+    $default_groupname = $firstproject->unix_name();
+    $default_groupgid  = $firstproject->unix_gid();
 }
 else {
     print "No group membership for $user; using the guest group!\n";
@@ -256,6 +302,10 @@ SWITCH: for ($cmd) {
 	UpdateWindowsPassword();
 	last SWITCH;
     };
+    /^email$/ && do {
+	UpdateEmail();
+	last SWITCH;
+    };
     /^mod$/ && do {
 	UpdateUser();
 	last SWITCH;
@@ -266,6 +316,10 @@ SWITCH: for ($cmd) {
     };
     /^thaw$/ && do {
 	ThawUser();
+	last SWITCH;
+    };
+    /^verify$/ && do {
+	VerifyUser();
 	last SWITCH;
     };
 }
@@ -301,6 +355,13 @@ sub AddUser()
     #
     if ($webonly || $wikionly || $status ne USERSTATUS_ACTIVE) {
 	if ($webonly) {
+	    return 0;
+	}
+	#
+	# Allow for users to be initialized to frozen in an inner Emulab.
+	#
+	if ($ELABINELAB && $status eq USERSTATUS_FROZEN) {
+	    print STDERR "Ignoring frozen user in elabinelab\n";
 	    return 0;
 	}
 	if ($wikionly) {
@@ -343,10 +404,34 @@ sub AddUser()
 	if (system("$SSH -host $CONTROL ".
 		   "'$USERADD $user -u $user_number -c \"$fullname\" ".
 		   "-k /usr/share/skel -h - -m -d $HOMEDIR/$user ".
-		   "-g $default_groupname -s /bin/tcsh'")) {
+		   "-g $default_groupname -s $shellpaths{$usr_shell}'")) {
 	    if (($? >> 8) != $USEREXISTS) {
 		fatal("Could not add user $user ($user_number) to $CONTROL.");
 	    }
+	}
+
+	#
+	# Leave the password "starred" on elabinelab; safer.
+	#
+	if (!$ELABINELAB) {
+	    # shell escape.
+	    $pswd =~ s/\$/\\\$/g;
+	    $pswd =~ s/\*/\\\*/g;
+
+	    print "Initializing user $user password on $CONTROL.\n";
+	    if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
+		fatal("Could not initialize password for $user on $CONTROL!");
+	    }
+	}
+
+	#
+	# Extra hook added for CMU. Generalize later.
+	#
+	if ($THISHOMEBASE =~ /^cmuemulab$/i) {
+	    print "Running post create hook for user $user on $CONTROL.\n";
+
+	    # Do not worry about failure. 
+	    system("$SSH -host $CONTROL $ADDHOOK $user");
 	}
     }
     $UID = $SAVEUID;
@@ -355,7 +440,7 @@ sub AddUser()
     # Do the ssh thing. Invoke as real user for auditing.
     #
     $EUID = $UID;
-    if (system("$ADDKEY -i $user")) {
+    if ($user ne $PROTOUSER && system("$ADDKEY -i $user")) {
 	fatal("Could not generate initial ssh key for $user");
     }
     # Add to elists.
@@ -370,6 +455,10 @@ sub AddUser()
     system("$ADDBUGDBUSER $user")
 	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
 
+    # And to the OPS db if enabled.
+    system("$OPSDBCONTROL adduser $user")
+	if ($OPSDBSUPPORT && $user ne $PROTOUSER);
+
     # And to the chat server if enabled.
     system("$ADDCHATUSER $user")
 	if ($CHATSUPPORT && $user ne $PROTOUSER);
@@ -378,6 +467,10 @@ sub AddUser()
     system("$ADDMMUSER $user")
 	if ($MAILMANSUPPORT);
     
+    # And to the trac system if enabled.
+    system("$ADDTRACUSER $user")
+	if ($TRACSUPPORT && $user ne $PROTOUSER);
+
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
 
@@ -400,8 +493,7 @@ sub AddUser()
     if ($CONTROL ne $BOSSNODE) {
 	GenerateSFSKey();
     }
-
-    return UpdatePassword();
+    return 0;
 }
 
 #
@@ -466,6 +558,10 @@ sub DelUser()
     system("$DELMMUSER $user")
 	if ($MAILMANSUPPORT);
     
+    # And to the trac system if enabled.
+    system("$DELTRACUSER $user")
+	if ($TRACSUPPORT);
+
     $EUID = 0;
 
     $sfsupdate = 1;
@@ -478,38 +574,114 @@ sub DelUser()
 #
 sub UpdatePassword()
 {
-    # shell escape.
-    $pswd     =~ s/\$/\\\$/g;
-    $pswd     =~ s/\*/\\\*/g;
+    #
+    # New password (encrypted) comes in on the command line. 
+    #
+    usage()
+	if (! @ARGV);
 
-    #
-    # Check status. Ignore if user is not active.
-    #
-    if ($status ne USERSTATUS_ACTIVE) {
-	print("$user is not active! Not updating the password!\n");
+    my $new_pswd  = shift(@ARGV);
+
+    # Lets not do this if no changes.
+    if ($new_pswd eq $target_user->pswd()) {
+	print "Password has not changed ...\n";
 	return 0;
     }
 
-    if (! $wikionly) {
+    # Lets prevent any odd characters.
+    if ($new_pswd =~ /[\'\\\"\&]+/) {
+	fatal("Invalid characters in new password encryption string!");
+    }
+
+    #
+    # Insert into database. When changing password for someone else,
+    # always set the expiration to right now so that the target user
+    # is "forced" to change it. 
+    #
+    my $expires;
+    
+    if (! $target_user->SameUser($this_user)) {
+	$expires = "now()";
+    }
+    else {
+	$expires = "date_add(now(), interval 1 year)";
+    }
+
+    if ($target_user->SetPassword($new_pswd, $expires)) {
+	fatal("Could not update password encryption string for $target_user");
+    }
+
+    # Send auditing email before next step in case of failure.
+    SENDMAIL("$fullname <$user_email>",
+	     "Password for '$user' has been changed",
+	     "\n".
+	     "Emulab password for '$user' has been changed by " .
+	            $this_user->uid() ."\n".
+	     "\n".
+	     "Name:              " . $target_user->name()  . "\n".
+	     "IDX:               " . $target_user->uid_idx()  . "\n".
+	     "\n".
+	     "If this is unexpected, please contact Testbed Operations\n".
+	     "($TBOPS) immediately!\n".
+	     "\n",
+	     "$TBOPS",
+	     "Bcc: $TBAUDIT");
+
+    # Go no further if a webonly user.
+    return 0
+	if ($webonly);
+
+    #
+    # Go no further if user is not active or frozen.
+    #
+    return 0
+	if (! ($status eq USERSTATUS_ACTIVE || $status eq USERSTATUS_FROZEN));
+
+    #
+    # Change on ops only if there is a real account there.
+    # For ELABINELAB, safer to leave the password "starred".
+    #
+    if (!$wikionly && !$ELABINELAB) {
+	#
+	# Grab from the DB to avoid taint checking sillyness.
+	#
+	my $safe_pswd = $target_user->pswd();
+	# shell escape.
+	$safe_pswd    =~ s/\$/\\\$/g;
+	$safe_pswd    =~ s/\*/\\\*/g;
+	
 	$UID = 0;
 	if ($CONTROL ne $BOSSNODE) {
 	    print "Updating user $user password on $CONTROL.\n";
 	    
-	    if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
+	    if (system("$SSH -host $CONTROL $CHPASS -p '$safe_pswd' $user")) {
 		fatal("Could not change password for user $user on $CONTROL!");
 	    }
 	}
 	$UID = $SAVEUID;
     }
+
+    #
+    # Ick. If invoked as "nobody" then the user was either frozen or
+    # inactive. Lets skip the rest of this for now. Needs more thought
+    # and cleanup in the web interface to this, since we cannot call
+    # out to these scripts as "nobody" (yet).
+    #
+    return 0
+	if (getpwuid($UID) eq "nobody");
     
     $EUID = $UID;
-    # And to the wiki if enabled.
+    # And the wiki if enabled.
     system("$ADDWIKIUSER -u $user")
-	if ($WIKISUPPORT && $user ne $PROTOUSER);
+	if ($WIKISUPPORT && $user ne $PROTOUSER && !$webonly);
 
     # And to the bugdb if enabled.
     system("$ADDBUGDBUSER -m $user")
-	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
+	if ($BUGDBSUPPORT && $user ne $PROTOUSER && ! ($wikionly || $webonly));
+
+    system("$ADDTRACUSER -u $user")
+	if ($TRACSUPPORT && $user ne $PROTOUSER && !$webonly);
+
     $EUID = 0;
     
     return 0;
@@ -521,28 +693,55 @@ sub UpdatePassword()
 #
 sub UpdateWindowsPassword()
 {
-    # shell escape.
-    $wpswd     =~ s/\$/\\\$/g;
+    #
+    # New password (encrypted) comes in on the command line. 
+    #
+    usage()
+	if (! @ARGV);
+    my $new_wpswd  = shift(@ARGV);
 
-    #
-    # Check status. Ignore if user is not active.
-    #
-    if ($status ne USERSTATUS_ACTIVE) {
-	print("$user is not active! Not updating the password!\n");
+    # Lets not do this if no changes.
+    if ($new_wpswd eq $target_user->w_pswd()) {
+	print "Password has not changed ...\n";
 	return 0;
     }
 
-    $UID = 0;
-    print "Updating user $user Samba password on $SAMBANODE.\n";
-    # -s = silent, -a = add user if necessary.
-    open( SPCMD, "| $SSH -host $SAMBANODE $SMBPASSWD -s -a $user")
-        || fatal("Opening $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
-    local $SIG{PIPE} = sub { die "smbpasswd spooler pipe broke" };
-    print SPCMD "$wpswd\n$wpswd\n";
-    close SPCMD 
-	|| fatal("Closing $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+    #
+    # Insert into database.
+    #
+    if ($target_user->SetWindowsPassword($new_wpswd)) {
+	fatal("Could not update Windows password string for $target_user");
+    }
 
-    $UID = $SAVEUID;
+    # Go no further if a webonly user.
+    return 0
+	if ($webonly);
+
+    #
+    # Go no further if user is not active or frozen.
+    #
+    return 0
+	if (! ($status eq USERSTATUS_ACTIVE || $status eq USERSTATUS_FROZEN));
+
+    #
+    # Change on ops for Samba only if there is a real account there.
+    #
+    if (! $wikionly) {
+	# shell escape.
+	$new_wpswd     =~ s/\$/\\\$/g;
+
+	$UID = 0;
+	print "Updating user $user Samba password on $SAMBANODE.\n";
+	# -s = silent, -a = add user if necessary.
+	open( SPCMD, "| $SSH -host $SAMBANODE $SMBPASSWD -s -a $user")
+	    || fatal("Opening $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+	local $SIG{PIPE} = sub { die "smbpasswd spooler pipe broke" };
+	print SPCMD "$new_wpswd\n$new_wpswd\n";
+	close SPCMD 
+	    || fatal("Closing $SMBPASSWD pipe, user $user on $SAMBANODE: $! $?");
+
+	$UID = $SAVEUID;
+    }
     return 0;
 }
 
@@ -574,7 +773,7 @@ sub UpdateUser(;$)
     }
 
     # Shell is different on local vs control node.
-    if ((defined($freezeopt) && $freezeopt) || $user eq $PROTOUSER) {
+    if (defined($freezeopt) && $freezeopt) {
 	$locshellarg = "-s $NOLOGIN";
 	$remshellarg = "-s $NOLOGIN";
     }
@@ -582,6 +781,9 @@ sub UpdateUser(;$)
 	# Leave local shell alone if an admin.
 	$locshellarg = "-s $PBAG"
 	    if (!$usr_admin);
+	# Special treatment for PROTUSER
+	$locshellarg = "-s " . $shellpaths{"tcsh"} . " "
+	    if ($usr_admin && $user eq $PROTOUSER);
 
 	if (!defined($usr_shell) ||
 	    !exists($shellpaths{$usr_shell})) {
@@ -627,6 +829,84 @@ sub UpdateUser(;$)
 }
 
 #
+# Change email address for user.
+#
+sub UpdateEmail()
+{
+    my $forward = "$HOMEDIR/$user/.forward";
+    
+    #
+    # Only admin people can do this.
+    #
+    if (! TBAdmin($UID)) {
+	fatal("You do not have permission to update email for user $user.");
+    }
+
+    #
+    # New email comes in on the command line. 
+    #
+    usage()
+	if (! @ARGV);
+
+    my $new_email = shift(@ARGV);
+
+    # Lets not do this if no changes.
+    return 0
+	if ($new_email eq $user_email);
+
+    # Must be valid.
+    if (! TBcheck_dbslot($new_email, "users", "usr_email",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	fatal("Invalid characters in email address!");
+    }
+
+    my %args = ();
+    $args{"usr_email"} = $new_email;
+
+    if ($target_user->Update(\%args)) {
+	fatal("Could not update email address for $target_user");
+    }
+
+    # Send auditing email before next step in case of failure.
+    SENDMAIL("$fullname <$user_email>",
+	     "Email Address for '$user' Modified",
+	     "\n".
+	     "Email Address for '$user' changed by " . $this_user->uid() ."\n".
+	     "\n".
+	     "Name:              " . $target_user->name()  . "\n".
+	     "IDX:               " . $target_user->uid_idx()  . "\n".
+	     "Old Email:         " . $user_email . "\n".
+	     "New Email:         " . $new_email . "\n".
+	     "\n".
+	     "If this is unexpected, please contact Testbed Operations\n".
+	     "($TBOPS) immediately!\n".
+	     "\n",
+	     "$TBOPS",
+	     "CC: $new_email\n".
+	     "Bcc: $TBAUDIT");
+
+    # Change global in this script. 
+    $user_email = $target_user->email();
+
+    $EUID = $UID;
+
+    # Update mailman elists.
+    system("$MMMODIFYUSER $user")
+	if ($MAILMANSUPPORT);
+    
+    # Update system elists.
+    system("$GENELISTS -m -u $user");
+
+    $EUID = 0;
+
+    # Remove the users current .forward file to force regen.
+    unlink($forward)
+	if (-e $forward);
+    
+    return 0;
+}
+
+#
 # Freeze a user.
 #
 sub FreezeUser()
@@ -641,7 +921,11 @@ sub FreezeUser()
     # Check status.
     #
     if ($status ne USERSTATUS_FROZEN) {
-	fatal("$user is still active! Cannot freeze the account!");
+	fatal("$user is still active! Cannot freeze the account!")
+	    if (!$update);
+
+	$target_user->SetStatus(USERSTATUS_FROZEN());
+	$status = USERSTATUS_FROZEN();
     }
     $sfsupdate = 1;
 
@@ -663,11 +947,66 @@ sub ThawUser()
     # Check status.
     #
     if ($status ne USERSTATUS_ACTIVE) {
-	fatal("$user is not active! Cannot thaw the account!");
+	fatal("$user is not active! Cannot thaw the account!")
+	    if (!$update);
+	$target_user->SetStatus(USERSTATUS_ACTIVE());
+	$status = USERSTATUS_ACTIVE();
     }
     $sfsupdate = 1;
 
-    return UpdateUser(0);
+    #
+    # This lets users start off as frozen in an ELABINELAB, and then
+    # get created later. Saves a lot of time.
+    #
+    if ($ELABINELAB &&
+	system("egrep -q -s '^${user}:' /etc/passwd")) {
+	
+	AddUser() == 0
+	    or fatal("Cannot thaw $user");
+
+	system("$USERMOD -n $user -s /bin/tcsh");
+    }
+    else {
+	UpdateUser(0) == 0
+	    or fatal("Cannot thaw $user");
+    }
+
+    #
+    # Invoke as real user for auditing.
+    #
+    $EUID = $UID;
+    system("$SETGROUPS $user");
+    $EUID = 0;
+    
+    return 0;
+}
+
+#
+# Verify a user. Converts status and sends email
+#
+sub VerifyUser()
+{
+    #
+    # Only admin people can do this unless its the user himself.
+    #
+    if (! $target_user->SameUser($this_user) && ! TBAdmin()) {
+	fatal("You do not have permission to verify user $user.");
+    }
+
+    if ($target_user->status() ne USERSTATUS_NEWUSER) {
+	fatal("$user is not a newuser! Cannot verify the account!");
+    }
+
+    my $newstatus = ($target_user->wikionly() ?
+		     USERSTATUS_ACTIVE() : USERSTATUS_UNAPPROVED());
+
+    $target_user->SetStatus($newstatus) == 0 or
+	fatal("Could not set user status to '$newstatus' for $target_user");
+
+    $target_user->SendVerifiedEmail() == 0 or
+	fatal("Could not send verified email for $target_user");
+
+    return 0;
 }
 
 #

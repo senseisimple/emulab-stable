@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,47 +9,42 @@ include("defs.php3");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid experiment.
+# Verify page arguments.
 #
-if (isset($pid) && strcmp($pid, "") &&
-    isset($eid) && strcmp($eid, "")) {
-    if (! TBvalid_eid($eid)) {
-	PAGEARGERROR("$eid contains invalid characters!");
-    }
-    if (! TBvalid_pid($pid)) {
-	PAGEARGERROR("$pid contains invalid characters!");
-    }
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("$pid/$eid is not a valid experiment!", 1);
-    }
-    if (TBExptState($pid, $eid) != $TB_EXPTSTATE_ACTIVE) {
-	USERERROR("$pid/$eid is not currently swapped in!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to run linktest on $pid/$eid!",
-		  1);
-    }
-}
-else {
-    PAGEARGERROR("Must specify pid and eid!");
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "linklan",    PAGEARG_STRING,
+				 "action",     PAGEARG_STRING);
+$optargs = OptionalPageArguments("vnode",      PAGEARG_STRING);
+
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
+
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to run linktest on $pid/$eid!", 1);
 }
 
 #
-# Verify the object name (a link/lan and maybe the vnode on that link/lan)
+# Must be active. The backend can deal with changing the base experiment
+# when the experiment is swapped out, but we need to generate a form based
+# on virt_lans instead of delays/linkdelays. Thats harder to do. 
 #
-if (!isset($linklan) || strcmp($linklan, "") == 0) {
-    USERERROR("You must provide a link name.", 1);
+if ($experiment->state() != $TB_EXPTSTATE_ACTIVE) {
+    USERERROR("Experiment $eid must be active to monitor its links!", 1);
 }
+
 if (! TBvalid_linklanname($linklan)) {
     PAGEARGERROR("$linklan contains invalid characters!");
 }
 
 #
-# Must also supply the node on the link or lan we care about.
+# Optional vnode on the link.
 #
 if (isset($vnode) && $vnode != "") {
     if (! TBvalid_node_id($vnode)) {
@@ -63,9 +58,6 @@ else {
 #
 # And we need the action to apply. 
 # 
-if (!isset($action) || strcmp(action, "") == 0) {
-    USERERROR("You must provide an action to apply", 1);
-}
 if ($action != "pause" && $action != "restart" &&
     $action != "kill" && $action != "snapshot") {
     USERERROR("Invalid action to apply", 1);
@@ -85,11 +77,6 @@ if (mysql_num_rows($query_result) == 0) {
 # Build up a command; basically the backend is going to do nothing except
 # call tevc, but we indirect through a script.
 #
-if (!TBExptGroup($pid, $eid, $gid)) {
-    TBERROR("Could not get gid for $pid/$eid", 1);
-}
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
 $cmd = "weblinkmon_ctl " .
        ((isset($vnode) ? "-s $vnode " : "")) .
        "$pid $eid $linklan $action";
@@ -111,7 +98,8 @@ if ($retval) {
 #
 # Otherwise, return the user to the list page.
 #
-header("Location: linkmon_list.php3".
-       "?pid=$pid&eid=$eid&linklan=$linklan&action=$action&vnode=$vnode");
+header("Location: ". CreateURL("linkmon_list", $experiment,
+			       "linklan", $linklan, "action", $action,
+			       "vnode", (isset($vnode) ? $vnode : "")));
 
 ?>

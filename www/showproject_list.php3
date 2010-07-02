@@ -1,10 +1,22 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+
+#
+# Only known and logged in users can do this.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("splitview",   PAGEARG_BOOLEAN);
 
 #
 # Standard Testbed Header
@@ -12,59 +24,24 @@ include("defs.php3");
 PAGEHEADER("Project Information List");
 
 #
-# Only known and logged in users can do this.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#
 # Admin users can see all projects, while normal users can only see
 # projects for which they are the leader.
 #
 # XXX Should we form the list from project members instead of leaders?
 #
-$isadmin = ISADMIN($uid);
-
 if (!isset($splitview) || !$isadmin)
     $splitview = 0;
-if (!isset($sortby))
-    $sortby = "pid";
-$eorder = 0;
-$norder = 0;
 
-if ($isadmin) {
+    if ($isadmin) {
     if (! $splitview) {
-	echo "<b><a href='showproject_list.php3?splitview=1&sortby=$sortby'>
-                    Split View</a>
+	echo "<b><a href='showproject_list.php3?splitview=1'>Split View</a>
               </b><br>\n";
     }
     else {
-	echo "<b><a href='showproject_list.php3?sortby=$sortby'>
-                    Normal View</a>
+	echo "<b><a href='showproject_list.php3'>Normal View</a>
               </b><br>\n";
     }
 }
-
-if (! strcmp($sortby, "name"))
-    $order = "p.name";
-elseif (! strcmp($sortby, "pid"))
-    $order = "p.pid";
-elseif (! strcmp($sortby, "uid"))
-    $order = "p.head_uid";
-elseif (! strcmp($sortby, "idle"))
-    $order = "idle";
-elseif (! strcmp($sortby, "created"))
-    $order = "p.expt_count DESC";
-elseif (! strcmp($sortby, "running")) {
-    $eorder = 1;
-    $order  = "p.pid";
-}
-elseif (! strcmp($sortby, "nodes")) {
-    $norder = 1;
-    $order  = "p.pid";
-}
-else 
-    $order = "p.pid";
 
 $allproj_result =
     DBQueryFatal("SELECT pid,expt_count FROM projects as p");
@@ -75,6 +52,7 @@ $allproj_result =
 #
 $ecounts = array();
 $ncounts = array();
+$pcounts = array();
 
 $query_result =
     DBQueryFatal("select e.pid, count(distinct e.eid) as ecount ".
@@ -99,21 +77,35 @@ while ($row = mysql_fetch_array($query_result)) {
     $ncounts[$pid] = $count;
 }
 
+# Here we get just the PC counts.
+
+$query_result =
+    DBQueryFatal("select r.pid,nt.class,count(distinct r.node_id) as ncount ".
+		 "  from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id ".
+		 "left join node_types as nt on nt.type=n.type ".
+		 "where nt.class='pc' ".
+		 "group by r.pid,nt.class");
+
+while ($row = mysql_fetch_array($query_result)) {
+    $pid   = $row[0];
+    $count = $row[2];
+
+    $pcounts[$pid] = $count;
+}
+
 while ($projectrow = mysql_fetch_array($allproj_result)) {
-    $pid = $projectrow[pid];
+    $pid = $projectrow["pid"];
 
     if (!isset($ecounts[$pid])) 
 	$ecounts[$pid] = 0;
 	    
     if (!isset($ncounts[$pid])) 
 	$ncounts[$pid] = 0;
+
+    if (!isset($pcounts[$pid])) 
+	$pcounts[$pid] = 0;
 }
-
-if ($eorder) 
-     arsort($ecounts, SORT_NUMERIC);
-
-if ($norder) 
-     arsort($ncounts, SORT_NUMERIC);
 
 if ($isadmin) {
     mysql_data_seek($allproj_result, 0);
@@ -126,13 +118,12 @@ if ($isadmin) {
     $active_projects = 0;
 
     while ($projectrow = mysql_fetch_array($allproj_result)) {
-	$expt_count = $projectrow[expt_count];
+	$expt_count = $projectrow["expt_count"];
 
 	if ($expt_count > 0) {
 	    $active_projects++;
 	}
     }
-    mysql_data_seek($query_result, 0);
     $never_active = $total_projects - $active_projects;
 
     echo "<table border=0 align=center cellpadding=0 cellspacing=2>
@@ -153,51 +144,24 @@ if ($isadmin) {
 
 function GENPLIST ($query_result)
 {
-    global $isadmin, $splitview, $eorder, $ecounts, $norder, $ncounts;
+    global $isadmin, $splitview, $ecounts, $ncounts, $pcounts;
 
-    echo "<table width='100%' border=2
+    $tablename = "SPL" . rand();
+
+    echo "<table width='100%' border=2 id='$tablename'
                  cellpadding=2 cellspacing=2 align=center>
+          <thead class='sort'>
           <tr>\n";
 
-    echo "<th><a href='showproject_list.php3?splitview=$splitview&sortby=pid'>
-               PID</a></th>\n";
-    
-    echo "<th>(Approved?)
-              <a href='showproject_list.php3?splitview=$splitview&sortby=name'>
-               Description</a></th>\n";
-
-    echo "<th><a href='showproject_list.php3?splitview=$splitview&sortby=uid'>
-               Leader</a></th>\n";
-
-    echo "<th>
-              <a href='showproject_list.php3?splitview=$splitview&sortby=idle'>
-              Days<br>Idle</a></th>\n";
-
-    echo "<th colspan=2>Expts<br>
-           <a href='showproject_list.php3?splitview=$splitview&sortby=created'>
-              Cr</a>,
-           <a href='showproject_list.php3?splitview=$splitview&sortby=running'>
-              Run</a></th>\n";
-
-    echo "<th>
-             <a href='showproject_list.php3?splitview=$splitview&sortby=nodes'>
-             Nodes</a></th>\n";
-
-    #
-    # This ordering stuff is a pain cause of the split joins, but a combined
-    # join takes too long (hammers the DB to hard).
-    #
-    $projectrows = array();
-    while ($projectrow = mysql_fetch_array($query_result)) {
-	$pid = $projectrow[pid];
-
-	$projectrows[$pid] = $projectrow;
-    }
-    $showby = $projectrows;
-    if ($eorder)
-	$showby = $ecounts;
-    if ($norder)
-	$showby = $ncounts;
+    echo "<th>PID</th>\n";
+    echo "<th>(Approved?) Description</th>\n";
+    echo "<th>Leader</th>\n";
+    echo "<th>Affil</th>\n";
+    echo "<th>Days<br>Idle</th>\n";
+    echo "<th>Expts<br>Created</th>\n";
+    echo "<th>Expts<br>Run</th>\n";
+    echo "<th>Nodes<br>All</th>\n";
+    echo "<th>Nodes<br>PCs</th>\n";
 
     #
     # Admin users get other fields.
@@ -206,18 +170,27 @@ function GENPLIST ($query_result)
 	echo "<th align=center>Pub?</th>\n";
     }
     echo "</tr>\n";
+    echo "</thead>\n";
 
-    while (list($pid, $foo) = each($showby)) {
-	$projectrow = $projectrows[$pid];
-	$headuid    = $projectrow[head_uid];
-	$Pname      = stripslashes($projectrow[name]);
-	$approved   = $projectrow[approved];
-	$expt_count = $projectrow[expt_count];
-	$public     = $projectrow[public];
-	$idle       = $projectrow[idle];
+    while ($projectrow = mysql_fetch_array($query_result)) {
+	$pid        = $projectrow["pid"];
+	$headidx    = $projectrow["head_idx"];
+	$Pname      = $projectrow["name"];
+	$approved   = $projectrow["approved"];
+	$expt_count = $projectrow["expt_count"];
+	$public     = $projectrow["public"];
+	$idle       = $projectrow["idle"];
 	$ecount     = $ecounts[$pid];
 	$ncount     = $ncounts[$pid];
+	$pcount     = $pcounts[$pid];
 
+	if (! ($head_user = User::Lookup($headidx))) {
+	    TBERROR("Could not lookup object for user $headidx", 1);
+	}
+	$showuser_url = CreateURL("showuser", $head_user);
+	$headuid      = $head_user->uid();
+	$affil        = $head_user->affil_abbrev();
+	
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                   <td>\n";
@@ -228,13 +201,14 @@ function GENPLIST ($query_result)
 	    echo "    <img alt='N' src='redball.gif'>\n";
 	}
 	echo "             $Pname</td>
-                  <td><A href='showuser.php3?target_uid=$headuid'>
-                         $headuid</A></td>\n";
+                  <td><A href='$showuser_url'>$headuid</A></td>\n";
+	echo "<td>$affil</td>\n";
 
 	echo "<td>$idle</td>\n";
 	echo "<td>$expt_count</td>\n";
 	echo "<td>$ecount</td>\n";
 	echo "<td>$ncount</td>\n";
+	echo "<td>$pcount</td>\n";
 
 	if ($isadmin) {
 	    if ($public) {
@@ -247,12 +221,18 @@ function GENPLIST ($query_result)
 	echo "</tr>\n";
     }
     echo "</table>\n";
+
+    echo "<script type='text/javascript' language='javascript'>
+	  sorttable.makeSortable(getObjbyName('$tablename'));
+          </script>\n";
 }
 
 #
 # Get the project list for non admins.
 #
 if (! $isadmin) {
+    $uid_idx = $this_user->uid_idx();
+    
     $query_result =
 	DBQueryFatal("SELECT p.*, ".
 		     "IF(p.expt_last, ".
@@ -261,8 +241,8 @@ if (! $isadmin) {
 		     "FROM projects as p ".
 		     "left join group_membership as g on ".
 		     " p.pid=g.pid and g.pid=g.gid ".
-		     "where g.uid='$uid' and g.trust!='none' ".
-		     "group by p.pid order by $order");
+		     "where g.uid_idx='$uid_idx' and g.trust!='none' ".
+		     "group by p.pid order by p.pid");
 				   
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("You are not a member of any projects!", 1);
@@ -279,7 +259,7 @@ else {
 			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
 			 "FROM projects as p ".
 			 "where expt_count>0 ".
-			 "group by p.pid order by $order");
+			 "group by p.pid order by p.pid");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<center>
@@ -295,7 +275,7 @@ else {
 			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
 			 "FROM projects as p ".
 			 "where expt_count=0 ".
-			 "group by p.pid order by $order");
+			 "group by p.pid order by p.pid");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<br><center>
@@ -312,7 +292,7 @@ else {
 			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
 			 "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
 			 " FROM projects as p ".
-			 "group by p.pid order by $order");
+			 "group by p.pid order by p.pid");
 
 	if (mysql_num_rows($query_result)) {
 	    GENPLIST($query_result);

@@ -1,43 +1,38 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("node_defs.php");
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Must provide the EID!
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-  USERERROR("The project ID was not provided!", 1);
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-  USERERROR("The experiment ID was not provided!", 1);
-}
-
-if (isset($nodeid) && strcmp($nodeid, "")) {
-    $nodeid = addslashes($nodeid);
-}
-else {
-    unset($nodeid);
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("node",       PAGEARG_NODE,
+				 "canceled",   PAGEARG_BOOLEAN,
+				 "confirmed",  PAGEARG_BOOLEAN);
 
 # Canceled operation redirects back to showexp page. See below.
-if ($canceled) {
-    header("Location: showexp.php3?pid=$pid&eid=$eid");
+if (isset($canceled) && $canceled) {
+    header("Location: " . CreateURL("showexp", $experiment));
     return;
 }
+
+# Need these below
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
+$node_id  = (isset($node) ? $node->node_id() : "");
 
 #
 # Standard Testbed Header
@@ -45,38 +40,20 @@ if ($canceled) {
 PAGEHEADER("Update Experimental Nodes");
 
 #
-# Check to make sure thats this is a valid PID/EID tuple.
-#
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE ".
-		 "eid='$eid' and pid='$pid'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The experiment $eid is not a valid experiment ".
-            "in project $pid.", 1);
-}
-$row = mysql_fetch_array($query_result);
-$gid = $row[gid];
-
-#
 # Verify permissions.
 #
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_UPDATE)) {
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_UPDATE)) {
     USERERROR("You do not have permission to initiate node updates!", 1);
 }
-if (isset($nodeid) && !TBValidNodeName($nodeid)) {
-    USERERROR("Node $nodeid is not a valid nodeid!", 1);
-}
 
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+echo $experiment->PageHeader();
 
 #
 # We run this twice. The first time we are checking for a confirmation
 # by putting up a form. The next time through the confirmation will be
 # set. Or, the user can hit the cancel button (see above).
 #
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<br><br><b>
           Confirming this operation will initiate various updates to be
           performed, including updating the password and group files,
@@ -87,27 +64,26 @@ if (!$confirmed) {
     echo "<center><h2><br>
           Are you sure you want to perform an update on ";
 
-    if (isset($nodeid)) {
-	echo "node $nodeid in experiment '$eid?'\n";
+    if (isset($node)) {
+	echo "node $node_id in experiment '$eid?'\n";
     }
     else {
 	echo "all of the nodes in experiment '$eid?'\n";
     }
     echo "</h2>\n";
 
-    if (isset($nodeid)) {
-	SHOWNODE($nodeid, SHOWNODE_SHORT);
+    if (isset($node)) {
+	$node->Show(SHOWNODE_SHORT);
+	$url = CreateURL("updateaccounts", $experiment, $node);
     }
     else {
-	SHOWEXP($pid, $eid, 1);
+	$experiment->Show(1);
+	$url = CreateURL("updateaccounts", $experiment);
     }
     
-    echo "<form action='updateaccounts.php3?pid=$pid&eid=$eid' method=post>";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
-    if (isset($nodeid)) {
-	echo "<input type=hidden name=nodeid value=$nodeid>\n";
-    }
     echo "</form>\n";
     echo "</center>\n";
 
@@ -123,25 +99,11 @@ if (!$confirmed) {
     return;
 }
 
-#
-# We need the unix gid for the project for running the scripts below.
-# Note usage of default group in project.
-#
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-#
-# Start up a script to do this.
-#
-echo "<center><br>";
-echo "<h2>Starting node update. Please wait a moment ...
-      </h2></center>";
-
-flush();
-
+STARTBUSY("Starting node update");
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webnodeupdate -b $pid $eid" .
-		 (isset($nodeid) ? " $nodeid" : ""),
+		 "webnode_update -b $pid $eid $node_id",
 		 SUEXEC_ACTION_IGNORE);
+CLEARBUSY();
 
 #
 # Fatal Error. Report to the user, even though there is not much he can

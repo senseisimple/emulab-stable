@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,10 +11,12 @@ require("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+$dbedit    = $this_user->dbedit();
 
-if (! TBWebdbAllowed($uid)) {
+if (! $dbedit) {
     USERERROR("You do not have permission to use WEBDB!", 1);
 }
 

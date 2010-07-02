@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 import javax.swing.*;
 import java.awt.*;
@@ -12,60 +17,53 @@ import java.util.*;
 
 public class MoteLinkViewer extends javax.swing.JFrame {
 
-    private Image bgImage;
-    private java.awt.image.ImageObserver io;
     private Hashtable datasets;
-    private Hashtable mapImages;
     
-    public MoteLinkViewer() {
+    public MoteLinkViewer(Dataset[] sets) {
         this.datasets = new Hashtable();
-        this.mapImages = new Hashtable();
         
-        io = new java.awt.Component() {
-            public boolean updateImage(Image img, int infoflags, int x, int y, int width, int height) {
-                System.out.println("w = "+width+",h = "+height);
-                
-                return true;
-            }
-        };
-        
-        bgImage = Toolkit.getDefaultToolkit().getImage("/home/david/work/java/floormap.jpg");
-        mapImages.put("Floor4/WSN",bgImage);
-        
-        try {
-            MediaTracker tracker = new MediaTracker(this);
-            tracker.addImage(bgImage, 0);
-            tracker.waitForID(0);
-            //System.out.println("width = "+bgImage.getWidth(io));
-        }
-        catch (InterruptedException ex) {
-            ex.printStackTrace();
-        }
-        
-        // in the applet, we'll read in the possible datasets and 
-        
-        WirelessData defaultData = null;
-        NodePosition defaultPositions = null;
-        MapDataModel defaultModel = null;
-        String defaultDatasetName = "Floor4/WSN";
-        
-        try {
-            defaultData = ILEStats.parseDumpFile("/home/david/work/java/nn_client.log");
-            defaultPositions = NodePositions.parseFile("/home/david/work/java/mote_positions");
+        for (int i = 0; i < sets.length; ++i) {
+            java.awt.image.ImageObserver io;
+            java.awt.Image bgImage;
             
-            defaultModel = new MapDataModel(defaultData,defaultPositions);
-            datasets.put(defaultDatasetName,defaultModel);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            System.exit(-2);
+            io = new java.awt.Component() {
+                public boolean updateImage(Image img, int infoflags, int x, int y, int width, int height) {
+                    System.out.println("w = "+width+",h = "+height);
+
+                    return true;
+                }
+            };
+            
+            sets[i].addFloor(0);
+            sets[i].addScale(1);
+            Image ti = Toolkit.getDefaultToolkit().getImage(sets[i].image_path);
+            sets[i].addImage(ti,0,1);
+            
+            try {
+                MediaTracker tracker = new MediaTracker(this);
+                tracker.addImage(ti, 0);
+                tracker.waitForID(0);
+                //System.out.println("width = "+bgImage.getWidth(io));
+            }
+            catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
+            
+            // in the applet, we'll read in the possible datasets and 
+            try {
+                sets[i].data = GenericStats.parseDumpFile(sets[i].dataFile);
+                sets[i].positions = NodePositions.parseFile(sets[i].positionFile);
+
+                sets[i].model = new MapDataModel(sets[i]);
+                datasets.put(sets[i].name,sets[i]);
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                System.exit(-2);
+            }
         }
         
         initComponents();
-        
-        
-        
-        ;
         
     }
     
@@ -78,7 +76,7 @@ public class MoteLinkViewer extends javax.swing.JFrame {
         //nodeMapPanel.setBackgroundImage(bgImage);
         //nodeMapPanel.setPositions(positions);
         //nodeMapPanel.setILEStats(model);
-        controlPanel = new ControlPanel(datasets,mapImages,nodeMapPanel);
+        controlPanel = new ControlPanel(datasets,nodeMapPanel);
 
         getContentPane().setLayout(new java.awt.GridBagLayout());
 
@@ -100,13 +98,39 @@ public class MoteLinkViewer extends javax.swing.JFrame {
         getContentPane().add(controlPanel, gridBagConstraints);
 
         pack();
-    }
-    // </editor-fold>//GEN-END:initComponents
+    }// </editor-fold>//GEN-END:initComponents
         
     public static void main(final String args[]) {
+        int floor;
+        float ppm;
+        String name,positionFile,dataFile,image_path,building;
+        
+        Vector dsaV = new Vector();
+        
+        for (int i = 0; i < args.length; ++i) {
+            String[] aa = args[i].split(",");
+            if (aa.length == 7) {
+                name = aa[0];
+                positionFile = aa[1];
+                dataFile = aa[2];
+                building = aa[3];
+                floor = Integer.parseInt(aa[4]);
+                image_path = aa[5];
+                ppm = Float.parseFloat(aa[6]);
+                
+                dsaV.add(new Dataset(name,positionFile,dataFile,building,floor,image_path,ppm));
+            }
+        }
+        
+        final Dataset[] dsa = new Dataset[dsaV.size()];
+        int i = 0;
+        for (Enumeration e1 = dsaV.elements(); e1.hasMoreElements(); ) {
+            dsa[i++] = (Dataset)e1.nextElement();
+        }
+        
         java.awt.EventQueue.invokeLater(new Runnable() {
             public void run() {
-                new MoteLinkViewer().setVisible(true);
+                new MoteLinkViewer(dsa).setVisible(true);
             }
         });
     }

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,16 +12,14 @@ if (!$WIKISUPPORT) {
 }
 
 # No Pageheader since we spit out a redirection below.
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
 
 #
-# The page to zap to on the other side
+# Verify page arguments. project_title is the project to zap to.
 #
-if (isset($redurl) && $redurl == "") {
-    unset($redurl);
-}
+$optargs = OptionalPageArguments("redurl", PAGEARG_STRING);
 
 #
 # Look for our wikicookie. If the browser has it, then there is nothing

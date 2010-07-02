@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -10,7 +10,11 @@
 
 #include "config.h"
 
+#include <string.h>
+#include <errno.h>
 #include <assert.h>
+#include <errno.h>
+#include <string.h>
 
 #include "rpc.h"
 #include "timeline-agent.h"
@@ -229,10 +233,12 @@ int sequence_agent_handle_complete(event_handle_t handle,
 				ag = seq_se->agent.m[0];
 			else
 				ag = seq_se->agent.s;
+//info("Am I failing here?\n");
 			event_notification_get_int32(handle,
 						     seq_se->notification,
 						     "TOKEN",
 						     &token);
+//info("End question\n");
 		}
 		
 		if ((ag == NULL) || (ag != agent) || (ctoken != token)) {

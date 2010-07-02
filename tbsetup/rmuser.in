@@ -1,22 +1,30 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
+#
+# Users are deleted by removing all of the table entries except the
+# entry in the "users" table; this is entry is modified, setting the
+# status to "archived". This is causes the entry to be ignored in
+# most cases, but allows the stats tables to refer to deleted users.
+# That is, when looking at an old experiment record, you can still see
+# info about the user that created the experiment.
+#
 sub usage()
 {
     print STDOUT "Usage: rmuser [-p <pid> [-n]] uid\n" .
 	"Use the -p option to remove user from a specific project\n";
     exit(-1);
 }
-
-sub fatal($);
-
-my  $optlist = "p:n";
+my $optlist = "p:n";
+my $nuke    = 0;
+my $pid;
 
 #
 # Configure variables
@@ -27,16 +35,15 @@ my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
 
-my $HOMEDIR	= "/users";
 my $MODGROUPS	= "$TB/sbin/modgroups";
 my $DELACCT	= "$TB/sbin/tbacct del";
 
-my $dbuid;
+# Locals
 my $user;
-my $query_result;
-my $pidmode	= 0;
-my $nuke	= 0;
-my $pid;
+my $project;
+
+# Protos
+sub fatal($);
 
 #
 # We don't want to run this script unless its the real version.
@@ -71,6 +78,11 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
+use Project;
+use Experiment;
+
+my $HOMEDIR	= USERROOT();
 
 #
 # Check args.
@@ -79,26 +91,17 @@ use libtestbed;
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"p"})) {
     $pid     = $options{"p"};
-    $pidmode = 1;
-
-    # untaint;
-    if ($pid =~ /^([-\@\w.]+)$/) {
-	$pid = $1;
-    }
-    else {
-	die("Tainted argument $pid!\n");
-    }
 }
 if (defined($options{"n"})) {
     $nuke = 1;
 }
-if ($nuke && !$pidmode) {
+if ($nuke && !defined($pid)) {
     usage();
 }
 if (@ARGV != 1) {
@@ -106,19 +109,27 @@ if (@ARGV != 1) {
 }
 $user = $ARGV[0];
 
-#
-# Untaint the argument.
-#
-if ($user =~ /^([a-z0-9_]+)$/i) {
-    $user = $1;
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
 }
-else {
-    die("Tainted argument $user!\n");
+my $target_dbid  = $target_user->dbid();
+my $target_uid   = $target_user->uid();
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
 
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You are not a valid emulab user!\n");
+# And map pid.
+if (defined($pid)) {
+    $project = Project->Lookup($pid);
+    if (!defined($project)) {
+	fatal("No such project $pid!");
+    }
+    $pid = $project->pid();
 }
 
 #
@@ -126,77 +137,76 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 # leaders to delete accounts in their projects, but for now lets not.
 # There are issues of people in multiple projects.
 #
-if (!TBAdmin($UID)) {
-    if (! defined($pid) ||
-	! TBProjAccessCheck($UID, $pid, $pid, TB_PROJECT_DELUSER)) {
-	die("*** $0:\n".
-	    "    You do not have enough permission to remove user $user!\n");
+if (! $this_user->IsAdmin()) {
+    if (! defined($project) ||
+	! $project->AccessCheck($this_user, TB_PROJECT_DELUSER)) {
+	fatal("You do not have permission to remove user $target_user!");
     }
 }
 
 #
-# Note hardwired control node. 
-# 
-my $control_node = $CONTROL;
-
-#
 # Sanity check. Must not be the head of any experiments (in the project).
 #
-$query_result =
-    DBQueryFatal("select * from experiments ".
-		 "where expt_head_uid='$user' ".
-		 (defined($pid) ? "and pid='$pid'" : ""));
-
-if ($query_result->numrows) {
-    die("*** $0:\n".
-	"    $user is still heading up experiments! Please terminate them.\n");
+my @explist;
+if (Experiment->UserExperimentList($target_user, \@explist) != 0) {
+    fatal("Could not get experiment list for $target_user");
+}
+if (@explist) {
+    if (defined($project)) {
+	foreach my $experiment (@explist) {
+	    if ($experiment->pid_idx() == $project->pid_idx()) {
+		fatal("$target_user is still heading up experiments in ".
+		      "project $project!");
+	    }
+	}
+    }
+    else {
+	fatal("$target_uid is still heading up experiments!");
+    }
 }
 
 #
 # Must not be the head of the project being removed from, or any projects
 # if being completely removed.
 #
-if ($pidmode) {
-    if (ProjLeader($pid) eq $user) {
-	die("*** $0:\n".
-	    "    $user is the leader of project $pid!\n");
+if (!$nuke) {
+    if (defined($project)) {
+	if ($target_user->SameUser($project->GetLeader())) {
+	    fatal("$target_user is the leader of project $project!");
+	}
+    }
+    else {
+	my @leaderlist;
+
+	if ($target_user->ProjectLeaderList(\@leaderlist) != 0) {
+	    fatal("Could not get project leader list for $target_user");
+	}
+	if (@leaderlist) {
+	    fatal("$target_user is still heading up projects!");
+	}
     }
 }
-else {
-    $query_result =
-	DBQueryFatal("select pid from projects where head_uid='$user'");
-
-    if ($query_result->numrows) {
-	die("*** $0:\n".
-	    "    $user is still heading up projects! Please fix that.\n");
-    }
-}
-
-# Get current status.
-$query_result =
-    DBQueryFatal("select status from users where uid='$user'");
-my ($status) = $query_result->fetchrow_array();
-
 #
 # If nuke mode is also specified, then the account is being nuked from
 # web page because of a project join denial. Check to make sure user
 # is not an active user (must be newuser or unapproved).
 #
 if ($nuke) {
-    if ($status ne USERSTATUS_NEWUSER &&
-	$status ne USERSTATUS_UNAPPROVED) {
-	die("*** $0:\n".
-	    "    $user is not an unapproved user in project $pid!\n");
+    if ($target_user->status() ne $User::USERSTATUS_NEWUSER &&
+	$target_user->status() ne $User::USERSTATUS_UNAPPROVED) {
+	fatal("$target_user is not an unapproved user in project $project!");
     }
 
-    $query_result =
-	DBQueryFatal("select pid from group_membership ".
-		     "where uid='$user' and pid!='$pid'");
-
-    if ($query_result->numrows) {
-	die("*** $0:\n".
-	    "    $user is a member of other projects!\n");
+    # Extra sanity check.
+    my @grouplist;
+    if ($target_user->GroupMembershipList(\@grouplist, "") != 0) {
+	fatal("Could not get group membership list for $target_user");
     }
+    foreach my $group (@grouplist) {
+	if ($group->pid_idx() != $project->pid_idx()) {
+	    fatal("$target_user is a member of other projects!");
+	}
+    }	
 }
 
 #
@@ -215,67 +225,76 @@ if (AuditStart(0)) {
 # to access the web interface and tmcd will no longer return account
 # info for the user.
 #
-# In pidmode (removed from a project), hand the operation of too modgroups
+# In pidmode (removed from a project), hand the operation off to modgroups
 # to do the rest.
 #
-if ($pidmode) {
+if (defined($project)) {
     #
     # Drop root for calling modgroups.
     #
     $EUID = $UID;
-    system("$MODGROUPS -r $pid:$pid $user");
+    system("$MODGROUPS -r $pid:$pid $target_uid");
+    my $estatus = ($? >> 8);
 
-    exit($? >> 8)
+    #
+    # Update all nodes in the project so that account will be removed
+    # and homedir unmounted.
+    #
+    if (!$estatus) {
+	TBNodeUpdateAccountsByPid($pid)
+    }
+
+    exit($estatus)
 	if (!$nuke);
     
     $EUID = 0;
 }
 else {
-    DBQueryFatal("update users set status='" . TBDB_USERSTATUS_FROZEN . "'" .
-		 "where uid='$user'");
+    #
+    # Remove the user from all projects.
+    #
+    my @projectlist;
+    if ($target_user->ProjectMembershipList(\@projectlist, "") != 0) {
+	fatal("Could not get project membership list for $target_user");
+    }
+    $EUID = $UID;
+    foreach my $project (@projectlist) {
+	my $this_pid = $project->pid();
+	
+	system("$MODGROUPS -r $this_pid:$this_pid $target_uid");
+
+	exit($? >> 8)
+	    if ($?);
+    }
+    $EUID = 0;
+
+    # The freeze is for the update that follows.
+    $target_user->Update({'status' => $User::USERSTATUS_FROZEN}) == 0
+	or fatal("Could not update status for $target_user!");
 
     #
     # Now schedule account updates; Once the user is frozen, all accounts
     # will be terminated.
     #
-    TBNodeUpdateAccountsByUID($user);
+    TBNodeUpdateAccountsByUID($target_uid);
 }
 
 #
 # Not in pidmode. Kill the user's entire group membership.
 # Must be done *after* the account update!
-# 
-DBQueryFatal("delete from group_membership where uid='$user'");
+#
+$target_user->Purge() == 0
+    or fatal("Could not purge $target_user from the DB!");
 
 #
-# Then the pubkey tables.
-# 
-DBQueryFatal("delete from user_pubkeys where uid='$user'");
-DBQueryFatal("delete from user_sfskeys where uid='$user'");
-
-#
-# Must do widearea_accounts too!
-#
-DBQueryFatal("delete from widearea_accounts where uid='$user'");
-
-#
-# Then some other pidly tables.
-# 
-DBQueryFatal("delete from login where uid='$user'");
-DBQueryFatal("delete from nodeuidlastlogin where uid='$user'");
-DBQueryFatal("delete from uidnodelastlogin where uid='$user'");
-DBQueryFatal("delete from unixgroup_membership where uid='$user'");
-DBQueryFatal("delete from userslastlogin where uid='$user'");
-
-#
-# Remove user from both local and control node. No need to do this in
+# Remove user account from both local and control node. No need to do this in
 # nukemode (not allowed anyway) since the account never existed.
 #
 if (! $nuke) {
     $EUID = $UID;
 
-    system("$DELACCT $user") == 0 or
-	fatal("$DELACCT $user failed!");
+    system("$DELACCT $target_uid") == 0 or
+	fatal("$DELACCT $target_uid failed!");
 
     $EUID = 0;
 }
@@ -283,10 +302,10 @@ if (! $nuke) {
 #
 # Rename the users home dir if its there.
 #
-if (-d "$HOMEDIR/$user") {
-    my $newname = "$HOMEDIR/$user-" . TBDateTimeFSSafe();
+if (-d "$HOMEDIR/$target_uid") {
+    my $newname = "$HOMEDIR/$target_uid-" . TBDateTimeFSSafe();
 
-    if (rename("$HOMEDIR/$user", $newname)) {
+    if (rename("$HOMEDIR/$target_uid", $newname)) {
 	print "Renamed homedir to $newname. Remember to delete it!\n";
 	
 	#
@@ -305,27 +324,25 @@ if (-d "$HOMEDIR/$user") {
     }
 }
 
-# Note that we no longer delete from the user_stats table. We maintain
-# deleted user records.
-DBQueryFatal("replace into deleted_users ".
-	     " (uid, usr_deleted, uid_idx, usr_created, usr_name, ".
-	     "  usr_title, usr_affil, usr_email, usr_URL, ".
-	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
-	     "  usr_country, usr_phone, webonly, wikionly, notes) ".
-	     " select '$user', now(), unix_uid, usr_created, usr_name, ".
-	     "  usr_title, usr_affil, usr_email, usr_URL, ".
-	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
-	     "  usr_country, usr_phone, webonly, wikionly, notes ".
-	     " from users where uid='$user'")
-    if ($status eq USERSTATUS_ACTIVE || $status eq USERSTATUS_FROZEN);
-
 #
-# Then the users table. This is the very last step, since if there were
-# any failures above, we can still rerun the script without it barfing.
-# 
-DBQueryFatal("delete from users where uid='$user'");
-
-print "User removal Complete!\n";
+# In nuke mode, we really do kill the account, since its from a denied
+# project join request and there is no reason to keep the account around
+# to pollute the table.
+#
+# Otherwise, the user is "archived" by setting his status accordingly.
+#
+if ($nuke) {
+    $target_user->Delete() == 0
+	or fatal("Could not delete $target_user from the DB!");
+    
+    print "$target_user has been removed!\n";
+}
+else {
+    $target_user->SetStatus($User::USERSTATUS_ARCHIVED) == 0
+	or fatal("Could not archive $target_user");
+    
+    print "$target_user has been archived!\n";
+}
 exit(0);
 
 sub fatal($) {

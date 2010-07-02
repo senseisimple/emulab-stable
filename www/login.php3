@@ -1,31 +1,44 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 
-# Page arguments. First two are for verification passthru.
-$key	   = $_GET['key'];
-$vuid      = $_GET['vuid'];
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("login",    PAGEARG_STRING,
+				 "uid",      PAGEARG_STRING,
+				 "password", PAGEARG_PASSWORD,
+				 "key",      PAGEARG_STRING,
+				 "vuid",     PAGEARG_STRING,
+				 "simple",   PAGEARG_BOOLEAN,
+				 "adminmode",PAGEARG_BOOLEAN,
+				 "refer",    PAGEARG_BOOLEAN,
+				 "referrer", PAGEARG_STRING,
+				 "error",    PAGEARG_STRING);
+				 
 # Allow adminmode to be passed along to new login. Handy for letting admins
-# log in when NOLOGINS() is on. 
-$adminmode = $_GET['adminmode'];
-# Display a simpler version of this page
-if (isset($_REQUEST['simple'])) {
-    $simple = $_REQUEST['simple'];
+# log in when NOLOGINS() is on.
+if (!isset($adminmode)) {
+    $adminmode = 0;
 }
-# Form arguments.
-$login     = $_POST['login'];
-$uid       = $_POST['uid'];
-$password  = $_POST['password'];
-# Allow referrer to be passed along to new login.
-$referrer  = $_POST['referrer'];
+# Display a simpler version of this page
+if (! isset($simple)) {
+    $simple = 0;
+}
+if (! isset($key)) {
+    $key = null;
+}
+if (! isset($error)) {
+    $error = null;
+}
 
 # See if referrer page requested that it be passed along so that it can be
 # redisplayed after login. Save the referrer for form below.
-if (isset($_GET['refer']) && $_GET['refer'] &&
+if (isset($refer) &&
     isset($_SERVER['HTTP_REFERER']) && $_SERVER['HTTP_REFERER'] != "") {
     $referrer = $_SERVER['HTTP_REFERER'];
 
@@ -33,6 +46,8 @@ if (isset($_GET['refer']) && $_GET['refer'] &&
     # the user may have visited the last page with http. If they did, send them
     # back through https
     $referrer = preg_replace("/^http:/i","https:",$referrer);
+} else if (! isset($referrer)) {
+    $referrer = null;
 }
 
 #
@@ -45,17 +60,18 @@ if ($simple) {
     $view = array();
 }
 
-
 #
-# Must not be logged in already!
-# 
-if (($known_uid = GETUID()) != FALSE) {
-    if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
+# Must not be logged in already.
+#
+if (($this_user = CheckLogin($status))) {
+    $this_webid = $this_user->webid();
+    
+    if ($status & CHECKLOGIN_LOGGEDIN) {
 	#
 	# If doing a verification for the logged in user, zap to that page.
 	# If doing a verification for another user, then must login in again.
 	#
-	if (isset($key) && (!isset($vuid) || $vuid == $known_uid)) {
+	if (isset($key) && (!isset($vuid) || $vuid == $this_webid)) {
 	    header("Location: $TBBASE/verifyusr.php3?key=$key");
 	    return;
 	}
@@ -74,24 +90,42 @@ if (($known_uid = GETUID()) != FALSE) {
 
 #
 # Spit out the form.
+#
+# The uid can be an email address, and in fact defaults to that now. 
 # 
-function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
+function SPITFORM($uid, $key, $referrer, $error, $adminmode, $simple, $view)
 {
     global $TBDB_UIDLEN, $TBBASE;
     
     PAGEHEADER("Login",$view);
+ 
+    $premessage = "Please login to our secure server.";
 
-    if ($failed) {
-	echo "<center>
-              <font size=+1 color=red>
-	      Login attempt failed! Please try again.
-              </font>
-              </center><br>\n";
+    if ($error) {
+	echo "<center>";
+        echo "<font size=+1 color=red>";
+    	switch ($error) {
+        case "failed": 
+            echo "Login attempt failed! Please try again.";
+            break;
+        case "notloggedin":
+	    echo "You do not appear to be logged in!";
+	    $premessage = "Please log in again.";
+            break;
+        case "timedout":
+	    echo "Your login has timed out!";
+	    $premessage = "Please log in again.";
+	    break;
+	default:
+	    echo "Unknown Error ($error)!";
+        }
+        echo "</font>";
+        echo "</center><br>\n";
     }
 
     echo "<center>
           <font size=+1>
-          Please login to our secure server.<br>
+          $premessage<br>
           (You must have cookies enabled)
           </font>
           </center>\n";
@@ -105,10 +139,11 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
     echo "<table align=center border=1>
           <form action='${TBBASE}/login.php3${pagearg}' method=post>
           <tr>
-              <td>Username:</td>
+              <td>Email Address:<br>
+                   <font size=-2>(or UserName)</font></td>
               <td><input type=text
                          value=\"$uid\"
-                         name=uid size=20></td>
+                         name=uid size=30></td>
           </tr>
           <tr>
               <td>Password:</td>
@@ -131,7 +166,7 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
           </table>\n";
 
     echo "<center><h2>
-          <a href='password.php3'>Forgot your username or password?</a>
+          <a href='password.php3'>Forgot your password?</a>
           </h2></center>\n";
 }
 
@@ -139,9 +174,17 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode, $simple, $view)
 # If not clicked, then put up a form.
 #
 if (! isset($login)) {
-    # Allow page arg to override what we think is the UID to log in as. 
-    SPITFORM((isset($vuid) ? $vuid : $known_uid),
-	     $key, $referrer, 0, $adminmode, $simple, $view);
+    # Allow page arg to override what we think is the UID to log in as.
+    # Use email address now, for the login uid. Still allow real uid though.
+    if (isset($vuid)) {
+	# For login during verification step, from email message.
+	$login_id = $vuid;
+    }
+    else {
+	$login_id = REMEMBERED_ID();
+    }
+
+    SPITFORM($login_id, $key, $referrer, $error, $adminmode, $simple, $view);
     PAGEFOOTER($view);
     return;
 }
@@ -158,13 +201,29 @@ if (!isset($uid) || $uid == "" || !isset($password) || $password == "") {
     $login_status = $STATUS_LOGINFAIL;
 }
 else {
-    if (DOLOGIN($uid, $password, $adminmode)) {
+    $dologin_status = DOLOGIN($uid, $password, $adminmode);
+
+    if ($dologin_status == DOLOGIN_STATUS_WEBFREEZE) {
+	# Short delay.
+	sleep(1);
+
+	PAGEHEADER("Login", $view);
+	echo "<h3>
+              Your account has been frozen due to earlier login attempt
+              failures. You must contact $TBMAILADDR to have your account
+              restored. <br> <br>
+              Please do not attempt to login again; it will not work!
+              </h3>\n";
+	PAGEFOOTER($view);
+	die("");
+    }
+    else if ($dologin_status == DOLOGIN_STATUS_OKAY) {
+	$login_status = $STATUS_LOGGEDIN;
+    }
+    else {
 	# Short delay.
 	sleep(1);
 	$login_status = $STATUS_LOGINFAIL;
-    }
-    else {
-	$login_status = $STATUS_LOGGEDIN;
     }
 }
 
@@ -172,7 +231,7 @@ else {
 # Failed, then try again with an error message.
 # 
 if ($login_status == $STATUS_LOGINFAIL) {
-    SPITFORM($uid, $key, $referrer, 1, $adminmode, $simple, $view);
+    SPITFORM($uid, $key, $referrer, "failed", $adminmode, $simple, $view);
     PAGEFOOTER($view);
     return;
 }

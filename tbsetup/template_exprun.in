@@ -1,0 +1,1306 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT ETIMEDOUT);
+use XML::Simple;
+use File::Find;
+use File::stat;
+use Data::Dumper;
+
+#
+# Start/Stop/Pause experiment runs ...
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_exprun [-q] [-w] [-r <runid>] ".
+	  "-a <action> -e <eid> [-p <pid> | <guid/vers>]\n".
+	  "switches and arguments:\n".
+	  "-a <action> - pause, continue, start or stop\n".
+	  "-w          - wait for run to start\n".
+	  "-s          - save DB contents at end of run; default is clean\n".
+	  "-q          - be less chatty\n".
+	  "-E <str>    - A pithy sentence describing the run\n".
+	  "-r <runid>  - A token ... we will make on up for you\n".
+	  "-x <file>   - XML file of parameter bindings\n".
+	  "-e <eid>    - The instance name\n".
+          "-p <pid>    - Use the pid/eid to find the template GUID\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qwx:p:E:a:r:e:dscft:iy:m";
+my %options      = ();
+my $quiet        = 0;
+my $waitmode     = 0;
+my $debug        = 0;
+my $foreground   = 0;
+my $ignoreerrors = 0;
+my $clean        = 0;
+my $doswapmod    = 0;
+my $paramwhich;
+my $paramfile;
+my %parameters   = ();
+my %deadnodes    = ();
+my $action;
+my $description;
+my $runid;
+my $pid;
+my $eid;
+my $guid;
+my $version;
+my $inputfile;
+my $handle;
+my $ctoken;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL	= "@USERNODE@";
+my $PARAMS      = "parameters.xml";
+my $STAMPS      = @STAMPS@;
+
+# Locals
+my $logfile;
+my $logname;
+my $exptidx;
+my $template;
+my $newrun;
+my $oldrun;
+my $instance;
+my $locktoken;
+# For the END block below.
+my $cleaning    = 0;
+my $justexit    = 0;
+
+# Programs we need
+my $swapexp     = "$TB/bin/swapexp";
+my $checkquota  = "$TB/sbin/checkquota";
+my $archcontrol = "$TB/bin/archive_control";
+my $eventcontrol= "$TB/bin/eventsys_control";
+my $tevc        = "$TB/bin/tevc";
+my $CVSBIN      = "/usr/bin/cvs";
+my $CVSCTRL     = "/usr/testbed/sbin/cvs_ctrl";
+my $FIND        = "/usr/bin/find";
+my $RCS         = "/usr/bin/rcs";
+my $SSH		= "$TB/bin/sshtb";
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub sighandler($);
+sub SignalProgAgents($);
+sub SendCompletionEvent();
+sub CheckForDeadNodes($);
+sub GenXML($$$);
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use User;
+use Template;
+use Experiment;
+use Archive;
+use event;
+
+# In libdb
+my $projroot = PROJROOT();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+my $user_uid   = $this_user->uid();
+
+$libtestbed::SYSTEM_DEBUG = 1;
+
+#
+# Before doing anything else, check for overquota ... lets not waste
+# our time. Make sure user sees the error by exiting with 1.
+#
+if (system("$checkquota $user_uid") != 0) {
+    tberror("You are over your disk quota on $CONTROL; ".
+	    "please login there and cleanup!");
+    exit(1);
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# In wait mode, block SIGINT until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
+
+#
+# This script allows pid/eid to be used to find the template.
+#
+if (defined($guid)) {
+    $template = Template->Lookup($guid, $version);
+
+    if (!defined($template)) {
+	tbdie("Experiment template $guid/$version does not exist!");
+    }
+    $pid = $template->pid();    
+}
+
+#
+# Find the experiment ...
+#
+my $experiment = Experiment->Lookup($pid, $eid);
+    
+if (! defined($experiment)) {
+    tbdie("Experiment $pid/$eid does not exist!");
+}
+
+#
+# And then the template instance from that ...
+#
+$instance = Template::Instance->LookupByExptidx($experiment->idx());
+
+if (!defined($instance)) {
+    tbdie("Experiment instance $eid in project $pid does not exist!");
+}
+
+# In case we got here by the pid instead of guid.
+if (!defined($template)) {
+    $template = $instance->template();
+
+    if (!defined($template)) {
+	tbdie("Cannot find template for $instance!");
+    }
+    $guid    = $template->guid();
+    $version = $template->vers();
+}
+my $archive = $template->GetArchive();
+if (!defined($archive)) {
+    fatal(-1, "Could net archive object for $template");
+}
+   
+#
+# Check permission.
+#
+if (! $template->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    tberror("You do not have permission to start/stop runs in $instance!");
+    exit(1);
+}
+
+if ($experiment->state() ne EXPTSTATE_ACTIVE()) {
+    tberror("Template instance experiment $pid/$eid in not active!");
+    exit(1);
+}
+
+#
+# Lets use a lock to prevent confusion; it appears to happen more then I
+# thought it would.
+#
+if ($instance->TryLock(\$locktoken) != 0) {
+    if ($instance->locked()) {
+	tberror("$instance is locked!\n".
+		"Another operation started at ". $instance->locked() . "\n");
+	exit(1);
+    }
+    else {
+	tberror("Could not lock the instance!");
+	exit(-1);
+    }
+}
+
+#
+# Pause and Continue are easy
+#
+if ($action eq "pause") {
+    exit($instance->PauseTime());
+}
+elsif ($action eq "continue") {
+    exit($instance->ContinueTime());
+}
+elsif ($action eq "start" && !defined($runid)) {
+    if ($instance->NewRunID(\$runid) < 0) {
+	tbdie("Could not determine a new runid; please use the -r option!");
+    }
+    else {
+	print "Using new run ID '$runid' ...\n";
+    }
+}
+elsif ($action eq "modify") {
+    # Better get a new runid if currently between runs since we want to
+    # "speculatively start a new run.
+    if (!defined($instance->runidx()) && !defined($runid)) {
+	tbdie("Must provide a runid; please use the -r option!");
+    }
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "starting", "action", $action);
+}
+
+#
+# If we have a parameter file, we need to copyin the values and store
+# them in the DB for this experiment. Note that these override existing
+# values, so we start with those first.
+#
+# Start with the requested set of params, and then let the XML file override
+# them as needed.
+#
+if (defined($paramwhich)) {
+    if ($paramwhich eq "template") {
+	$template->FormalParameterList(\%parameters) == 0
+	    or tbdie("Could not get formal parameters for $template");
+    }
+    elsif ($paramwhich eq "instance") {
+	$instance->BindingList(\%parameters) == 0
+	    or tbdie("Could not get binding list for $instance");
+    }
+    elsif ($paramwhich eq "lastrun") {
+	my $lastrun;
+
+	if (defined($instance->runidx())) {
+	    $lastrun =
+		Template::Instance::Run->LookupByID($instance->exptidx(),
+						    $instance->runidx());
+	}
+	else {
+	    $lastrun = $instance->LastRun();
+	}
+	defined($lastrun) 
+	    or tbdie("Could not get run for $instance");
+
+	$lastrun->BindingList(\%parameters) == 0
+	    or tbdie("Could not get binding list for $lastrun");
+    }
+}
+else {
+    # Default to the instance bindings. 
+    $instance->BindingList(\%parameters) == 0
+	or tbdie("Could not get binding list for $instance");
+}
+
+if (defined($paramfile)) {
+    my $donebad = 0;
+    
+    my $parse  = XMLin($paramfile,
+		       VarAttr => 'name',
+		       ForceArray => ['parameter'],
+		       ContentKey => '-content',
+		       SuppressEmpty => undef);
+
+    foreach my $name (keys(%{ $parse->{'parameter'} })) {
+	my $value = $parse->{'parameter'}->{$name}->{'value'};
+
+	if (! TBcheck_dbslot($name,
+			     "experiment_template_instance_bindings", "name",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tberror("Illegal characters in parameter name: $name");
+	    $donebad++;
+	}
+	if (defined($value) &&
+	    ! TBcheck_dbslot($value,
+			     "experiment_template_instance_bindings", "value",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tberror("Illegal characters in parameter value: $value");
+	    $donebad++;
+	}
+	# DB records inserted below, once experiment is pre-loaded.
+	# Watch for unwanted parameters.
+	$parameters{$name} = $value
+	    if (exists($parameters{$name}));
+    }
+    # User sees this error.
+    exit(1)
+	if ($donebad);
+    
+    # Save away for later since returning to web interface deletes it.
+    system("/bin/cp", $paramfile, $instance->workdir() . "/$PARAMS") == 0
+	or fatal(-1, "Could not save $paramfile to workdir");
+}
+
+#
+# Catch this so we can clean up.
+#
+$SIG{TERM} = \&sighandler;
+
+#
+# If not in batch mode, go into the background. Parent exits.
+#
+if (! ($debug || $foreground)) {
+    $logfile = $experiment->CreateLogFile("run");
+    if (!defined($logfile)) {
+	fatal(-1, "Could not create logfile!");
+    }
+    $logname = $logfile->filename();
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
+
+    if (my $childpid = TBBackGround($logname)) {
+	#
+	# Parent exits normally, unless in waitmode. We have to set
+	# justexit to make sure the END block below does not run.
+	#
+	$justexit = 1;
+
+	if (!$waitmode) {
+	    print((($action eq "start") ?
+		   "A new run is being started for $pid/$eid.\n" :
+		   "Stopping current run in $pid/$eid.\n"))
+		if (! $quiet);
+	    exit(0);
+	}
+	print("Waiting for run to $action ...\n")
+	    if (! $quiet);
+	    
+	if (-t STDIN && !$quiet) {
+	    print("You may type ^C at anytime.".
+		  "\n".
+		  "You will not interrupt the operation.\n");
+	}
+	
+	# Give child a chance to run.
+	select(undef, undef, undef, 0.25);
+	
+	#
+	# Reset signal handlers. User can now kill this process, without
+	# stopping the child.
+	#
+	$SIG{TERM} = 'DEFAULT';
+	$SIG{INT}  = 'DEFAULT';
+	$SIG{QUIT} = 'DEFAULT';
+
+	#
+	# Wait until child exits or until user gets bored and types ^C.
+	#
+	waitpid($childpid, 0);
+	
+	print("Done. Exited with status: $?\n")
+	    if (! $quiet);
+	exit($? >> 8);
+    }
+    TBdbfork();
+}
+
+#
+# When in waitmode, must put ourselves in another process group so that
+# an interrupt to the parent will not have any effect on the backend.
+#
+if ($waitmode) {
+    POSIX::setsid();
+}
+
+#
+# Might not be a current run, which is okay.
+#
+if (defined($instance->runidx())) {
+    $oldrun = $instance->CurrentRun();
+
+    if (!defined($oldrun)) {
+	tbdie("Cannot get current run object for $instance!");
+    }
+
+    if ($experiment->HaveProgramAgents()) {
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "stopping agents");
+	}
+	print "Asking program agents to stop ... this will take a moment.\n";
+	SignalProgAgents("HALT") == 0
+	    or $ignoreerrors
+	    or CheckForDeadNodes($oldrun);
+
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "agents stopped");
+	}
+    }
+
+    #
+    # Modify is going to reuse the current run, so do not do anything else
+    # at this point. 
+    #
+    if ($action eq "modify") {
+	goto domodify;
+    }
+
+    # This sets the stop time.
+    $instance->StopCurrentRun() == 0
+	or fatal(-1, "Could not stop run for $instance!");
+
+    if ($action eq "abort") {
+	# XXX What about the tag?
+	$instance->FinalizeCurrentRun() == 0
+	    or fatal(-1, "Could not finalize run for $instance!");
+
+	print "Run has been aborted!\n";    
+	
+	# Send completion event only on "stop/abort"; otherwise it gets lost.
+	SendCompletionEvent();
+	goto done;
+    }
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "loghole starting");
+    }
+    # This runs loghole.
+    print "Asking loghole to sync the logfiles ... this will take a minute.\n";
+    $instance->LogHole() == 0
+	or $ignoreerrors
+        or CheckForDeadNodes($oldrun);
+
+    if ($STAMPS) {
+	my $du = 0;
+	$experiment->DU(\$du);
+	$instance->Stamp("template_exprun", "loghole done", "userdu", $du);
+	$instance->Stamp("template_exprun", "dumpdb starting");
+    }
+
+    print "Dumping the instance database ... this will take a minute.\n";
+    $instance->DumpDB() == 0
+	or $ignoreerrors
+	or fatal(-1, "Dump Database failed");
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "dumpdb done");
+    }
+
+    #
+    # Commit the archive. 
+    #
+    my $this_runid = $oldrun->runid();
+    
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "commit starting");
+    }
+    system("$archcontrol -d -t stoprun_${this_runid} ".
+	   "-c 'Stopping Run $this_runid' commit $pid $eid")
+	== 0 or	fatal(-1, "Aborting the stoprun cause the commit failed");
+	   
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "commit done");
+    }
+
+    #
+    # Do the CVS stuff.
+    #
+    my $runidx       = $oldrun->idx();
+    my $exptidx      = $instance->exptidx();
+    my $instance_dir = $instance->path();
+    my $cvsdir       = "$projroot/$pid/templates/$guid/cvsrepo";
+    my $cvssubdir    = "records/$exptidx,$runidx";
+    my $tag          = "R${exptidx}-${runidx}_import";
+    my $instance_tag = "I${exptidx}";
+    my $xmlfile      = "$instance_dir/info.xml";
+    my @symlinklist  = ();
+
+    if (-e $cvsdir) {
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "cvs stuff starting");
+	}
+	# If the repo subdir exists, it is likely left over from a previous
+	# attempt to stop the run, that failed for some reason. Kill it.
+	if (-e "$cvsdir/$cvssubdir") {
+	    fatal(-1, "Could not remove old $cvsdir/$cvssubdir")
+		if (System("/bin/rm -rf $cvsdir/$cvssubdir"));
+	}
+
+	fatal(-1, "Could not generate XML description for $oldrun")
+	    if (GenXML($instance, $xmlfile, \@symlinklist) != 0);
+
+	# Remove all the symlinks before the import. Bogus!
+	foreach my $ref (@symlinklist) {
+	    unlink($instance_dir . "/" . $ref->{'pathname'});
+	}
+
+	# This imports the experiment directory into the records subdir.
+	System("$CVSCTRL -w $instance_dir -- ".
+	       "  -d $cvsdir import -kb -I \"datastore\" ".
+	       "  -m \"Import record for run $this_runid\" ".
+	       "  $cvssubdir ${tag}_branch $tag")
+	    == 0 or fatal(-1, "Could not import new record into $cvsdir");
+
+	unlink($xmlfile);
+
+	# Restore all the symlinks after the import. Bogus!
+	foreach my $ref (@symlinklist) {
+	    my $pathname  = $ref->{'pathname'};
+	    my $linkvalue = $ref->{'linkvalue'};
+	    symlink($linkvalue, "$instance_dir/$pathname");
+	}
+
+	# Now tag it with the same tag that was applied for the instance.
+	# Apply to the branch tag directly instead of symbolically since that
+	# does not work properly for some reason.
+	System("$CVSCTRL -- ".
+	       " -d $cvsdir rtag -n -r 1.1.1 $instance_tag $cvssubdir")
+	    == 0 or fatal(-1, "Could not rtag new record in $cvsdir");
+
+	if ($STAMPS) {
+	    $instance->Stamp("template_exprun", "cvs stuff done");
+	}
+    }
+
+    # This has to be done after the archive commit, so we can find the tag.
+    $instance->FinalizeCurrentRun() == 0
+	or fatal(-1, "Could not finalize run for $instance!");
+
+    print "Run '$this_runid' has been stopped.\n";
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "run stopped");
+    }
+}
+
+if ($action eq "stop") {
+    # Send completion event only on "stop"; otherwise it gets lost.
+    SendCompletionEvent();
+    goto done;
+}
+
+#
+# If this is a startrun, lets see if the record changed. If it did,
+# commit a new version of the previous stoprun so that these changes
+# are recorded as being part of the previous run, not the current run.
+#
+if (!defined($oldrun)) {
+    my $diff = $archive->Diff($instance->path(), $instance->exptidx(),
+			      ("run.log"));
+
+    fatal(-1, "Failed to diff archive!")
+	if ($diff < 0);
+
+    if ($diff) {
+	my $lastrun = $instance->LastRun();
+	fatal(-1, "Could not lookup previous run for $instance")
+	    if (!defined($lastrun));
+
+	print "Files for previous run $lastrun changed; revising archive.\n";
+	
+        # Commit the archive for the run.
+	$lastrun->ArchiveCommit("stoprun_revised") == 0 or
+	    fatal(-1, "Could not commit revised archive for previous run!");
+    }
+}
+
+domodify:
+#
+# Clean/Clear if requested before generating the new run, in case there
+# is a problem.
+#
+if ($clean) {
+    # This runs loghole.
+    print "Asking loghole to clean the logs ... this will take a moment.\n";
+    $instance->LogClean() == 0
+	or fatal(-1, "Loghole failed");
+
+    print "Cleaning the instance database ... this will take a moment.\n";
+    $instance->CleanDB() == 0
+	or fatal(-1, "Dump Database failed");
+
+    if ($STAMPS) {
+	$instance->Stamp("template_exprun", "cleaned");
+    }
+}
+
+#
+# Generate a new run. (modify uses existing run if there is one).
+#
+if ($action eq "modify" && defined($oldrun)) {
+    $newrun = $oldrun;
+    $runid  = $oldrun->runid();
+}
+else {
+    $newrun = $instance->NewRun($runid, $this_user, $description);
+
+    if (!defined($newrun)) {
+	fatal(-1, "Could not create new run for $instance!");
+    }
+}
+
+# Mark the start time of the run.
+$instance->StartRun(($action eq "modify" || $doswapmod ?
+		     Template::STARTRUN_FLAGS_SWAPMOD() : 0)) == 0
+    or fatal(-1, "Could not mark start of run for $instance!");
+
+#
+# And the bindings for the run ... This actually uses a "replace" so its okay
+# to do this for a modify operation.
+#
+foreach my $name (keys(%parameters)) {
+    my $value = $parameters{$name};
+
+    $instance->NewRunBinding($name, $value) == 0
+	or fatal(-1, "Could not create run binding for $instance!");
+}
+
+if ($action eq "modify" || $doswapmod) {
+    #
+    # Now do the swapmod, using the original NS file for now. The environ
+    # variables will be passed to the NS reparse by parse-ns wrapper script.
+    #
+    my $oldtag     = $experiment->archive_tag();
+    my $userdir    = $instance->path();
+    my $nsfile     = "$userdir/tbdata/nsfile.ns";
+    my @arguments  = ($swapexp, "-q", "-x", "-s", "modify",
+		      $pid, $eid, $nsfile);
+
+    print "Starting a swap modify ...\n";
+    system(@arguments);
+    fatal($? >> 8, "Swap modify failed!")
+	if ($?);
+
+    $instance->Refresh();
+    $experiment->Refresh();
+
+    # XXX - Need to move the tag out of the resources table. Dumb idea.
+    my $rsrcidx = $experiment->rsrcidx();
+    $experiment->TableUpdate("experiment_resources",
+			     "archive_tag='$oldtag'", "idx='$rsrcidx'") == 0
+	or return -1;
+
+    # This has to be redone since the batchexp will have written
+    # incomplete data.
+    print "Writing program agent info ...\n";
+    $instance->WriteProgramAgents() == 0
+	or fatal(-1, "Could not write program agent info");
+}
+else {
+    #
+    # The swapmod would have rewritten the environment strings, but otherwise
+    # it has to be done by hand.
+    #
+    $instance->InitializeEnvVariables() == 0
+	or fatal(-1, "Could not update environment variables for $instance");
+    
+    print "Writing new environment strings ...\n";
+    $instance->WriteEnvVariables() == 0
+	or fatal(-1, "Could not rewrite environment strings for $instance");
+}
+
+#
+# Now we stash the parameter file for the next version of the archive.
+#
+if (defined($paramfile)) {
+    my $source = $instance->workdir() . "/$PARAMS";
+    my $target = $instance->path() . "/$PARAMS";
+
+    unlink($target)
+	if (-e $target);
+    
+    system("/bin/cp", $source, $target) == 0
+	or fatal(-1, "Could not copy $source to $target");
+}
+
+if ($experiment->HaveProgramAgents()) {
+    print "Asking program agents to reload ... this will take a moment.\n";
+    SignalProgAgents("RELOAD") == 0
+	or $ignoreerrors
+	or CheckForDeadNodes($newrun);
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "starting commit");
+}
+
+# Commit the archive for the run.
+if ($action eq "modify" && defined($oldrun)) {
+    $newrun->ArchiveReplace($newrun->start_tag()) == 0 or
+	fatal(-1, "Could not replace archive for run!");
+}
+else {
+    $newrun->ArchiveCommit("startrun") == 0 or
+	fatal(-1, "Could not commit archive for run!");
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "starting event system");
+}
+
+#
+# Restart the event stream from the beginning.
+#
+print "Asking the event system to replay events ...\n";
+system("$eventcontrol replay $pid,$eid") == 0
+    or fatal(-1, "Could not restart the event system!");
+
+# We lose the log info for this commit if we do not copy it out to the
+# user directory.
+$experiment->CopyLogFiles()
+    if (defined($logname));
+
+if ($STAMPS) {
+    $instance->Stamp("template_exprun", "run started");
+}
+print "Run '$runid' has been " .
+    ($action eq "modify" && defined($oldrun) ? "modified" : "started") . "\n";
+done:
+
+if (keys(%deadnodes)) {
+    my $subject;
+    my $message = "";
+
+    foreach my $node_id (keys(%deadnodes)) {
+	$message .= "$node_id appears to be unresponsive\n";
+    }
+
+    if ($action eq "stop") {
+	$subject = "Node failures during Stop Run";
+    }
+    else {
+	$subject = "Node failures during Start New Run ($runid)";
+    }
+    SENDMAIL($user_uid, $subject, $message, $TBOPS, "CC: $TBOPS");
+}
+
+# log file gets copied out to the user directory.
+$experiment->CopyLogFiles()
+    if (defined($logname));
+
+# Stop the web interface from spewing.
+$experiment->CloseLogFile()
+    if (defined($logname));
+
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+    
+    #
+    # Allow pid to be used instead of GUID.
+    #
+    if (@ARGV == 1) {
+	#
+	# Pick up guid/version first and untaint.
+	#
+	my $tmp = shift(@ARGV);
+
+	if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	    $guid = $1;
+	    $version = $2;
+	}
+	else {
+	    tbdie("Bad data in argument: $tmp");
+	}
+    }
+    elsif (defined($options{"p"})) {
+	$pid = $options{"p"};
+
+	if ($pid =~ /^([-\w]+)$/) {
+	    $pid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $pid.");
+	}
+	if (! TBcheck_dbslot($pid, "projects", "pid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper project name (pid)!");
+	}
+    }
+    else {
+	tberror("Must provide GUID or -p option!");
+	exit(1);
+    }
+    
+    if (defined($options{"e"})) {
+	$eid = $options{"e"};
+
+	if ($eid =~ /^([-\w]+)$/) {
+	    $eid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $eid.");
+	}
+	if (! TBcheck_dbslot($eid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment name (id)!");
+	}
+    }
+    else {
+	tberror("Must provide an experiment ID (-e option)!");
+	exit(1);
+    }
+
+    if (defined($options{"r"})) {
+	$runid = $options{"r"};
+
+	if ($runid =~ /^([-\w]+)$/) {
+	    $runid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $runid.");
+	}
+	if (! TBcheck_dbslot($runid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment name (id)!");
+	}
+    }
+    
+    if (defined($options{"a"})) {
+	$action = $options{"a"};
+
+	if ($action ne "start" && $action ne "stop" &&
+	    $action ne "pause" && $action ne "continue" &&
+	    $action ne "abort" && $action ne "modify") {
+	    tbdie("Improper -a argument: $action.");
+	}
+	# Need the equiv of a taint check.
+	if ($action =~ /^([\w]+)$/) {
+	    $action = $1;
+	}
+    }
+    else {
+	tbdie("Must provide an action (-a argument)!");
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"w"})) {
+	$waitmode = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 1;
+    }
+    if (defined($options{"f"})) {
+	$foreground = 1;
+    }
+    if (defined($options{"c"})) {
+	$clean = 1;
+    }
+    if (defined($options{"i"})) {
+	$ignoreerrors = 1;
+    }
+    if (defined($options{"m"})) {
+	$doswapmod = 1;
+    }
+    if (defined($options{"t"})) {
+	$ctoken = $options{"t"};
+
+	if ($ctoken =~ /^([-\w]+)$/) {
+	    $ctoken = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $ctoken.");
+	}
+    }
+    if (defined($options{"E"})) {
+	if (! TBcheck_dbslot($options{"E"},
+			     "experiment_templates", "description",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template description!");
+	}
+	$description = $options{"E"};
+    }
+    if (defined($options{"y"})) {
+	$paramwhich = $options{"y"};
+
+	if ($paramwhich ne "template" && $paramwhich ne "instance" &&
+	    $paramwhich ne "lastrun") {
+	    tbdie("Improper -y argument: $paramwhich");
+	}
+	# Need the equiv of a taint check.
+	if ($paramwhich =~ /^([\w]+)$/) {
+	    $paramwhich = $1;
+	}
+    }
+
+    if (defined($options{"x"})) {
+	my $inputfile = $options{"x"};
+
+	# Note different taint check (allow /).
+	if ($inputfile =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data in parameter file: $inputfile");
+	}
+
+	#
+	# Called from ops interactively. Make sure NS file in /proj or /users.
+	#
+	# Use realpath to resolve any symlinks.
+	#
+	my $translated = `realpath $inputfile`;
+	if ($translated =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data returned by realpath: $translated");
+	}
+
+	#
+	# The file must reside in an acceptible location. Since this script
+	# runs as the caller, regular file permission checks ensure it is a
+	# file the user is allowed to use.  So we don't have to be too tight
+	# with the RE matching /tmp and /var/tmp files.  These .xml files
+	# are allowed since this script is invoked directly from web interface
+	# which generates a name that should not be guessable.
+	#
+	if (! ($inputfile =~ /^\/tmp\/[-\w]+-\d+\.xml/) &&
+	    ! ($inputfile =~ /^\/tmp\/\d+\.xml/) &&
+	    ! ($inputfile =~ /^\/var\/tmp\/php\w+/) &&
+	    ! TBValidUserDir($inputfile, 0)) {
+	    tberror("$inputfile does not resolve to an allowed directory!");
+	    # Note positive status; so error goes to user not tbops.
+	    exit(1);
+	}
+	$paramfile = $inputfile;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+    # only for start new run; stop run failures do not do this!
+    # Do not kill the oldrun on a modify either.
+    $instance->DeleteCurrentRun()
+	if (defined($instance) && defined($newrun) && !defined($oldrun));
+
+    $instance->UnLock($locktoken)
+	if (defined($instance) && defined($locktoken));
+
+    # log file gets copied out to the user directory.
+    $experiment->CopyLogFiles()
+	if (defined($experiment) && defined($logname));
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+
+    # Stop the web interface from spewing.
+    $experiment->CloseLogFile()
+	if (defined($logname));
+
+    #
+    # This exit will drop into the END block below.
+    # 
+    exit($errorstat);
+}
+
+sub sighandler($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    fatal(-1, "Caught SIG${signame}!");
+}
+
+#
+# Use tevc to send an event and wait for completion.
+#
+sub SignalProgAgents($)
+{
+    my ($action) = @_;
+    my $agent;
+
+    if ($action eq "HALT") {
+	$agent = "__all_programs";
+    }
+    else {
+	$agent = "__all_program-agents";
+    }
+
+    system("$tevc -w -t 30 -e $pid/$eid now $agent $action");
+    if ($?) {
+	#
+	# Timeout is important; other errors are real errors.
+	#
+	return ETIMEDOUT
+	    if ($? >> 8 == ETIMEDOUT);
+
+	fatal(-1, "Could not send event notification!");
+    }
+    return 0;
+}
+
+sub SendCompletionEvent()
+{
+    return
+	if (!defined($ctoken));
+    
+    my $arguments = " CTOKEN=$ctoken ERROR=0 ";
+
+    #
+    # Easier to use tevc, and besides the perl swig wrappers are broken
+    # in some way cause event_notificaton_set_arguments does not work.
+    #
+    system("$tevc -e $pid/$eid now ns COMPLETE $arguments") == 0
+	or fatal(-1, "Could not send completion event notification!");
+}
+
+#
+# Look to see if any nodes have died. This is currently our best way to
+# determine likely non-responders to the events and loghole operations,
+# since right now there is no information from the event scheduler about
+# it.  Will probably need to add that, but lets try this for now. The main
+# problem is plab nodes.
+#
+sub CheckForDeadNodes($)
+{
+    my ($thisrun) = @_;
+    
+    my %nodestatuslist;
+    
+    $experiment->NodeStatusList(\%nodestatuslist) == 0
+	or fatal(-1, "Could not get node status list");
+
+    foreach my $node_id (keys(%nodestatuslist)) {
+	next
+	    if ($nodestatuslist{$node_id});
+
+	#
+	# Node is dead. Need to record this as part of the template record.
+	# This hash is for later, to send a summary report to the user.
+	#
+	$thisrun->MarkNodeDead($node_id) == 0
+	    or fatal(-1, "Could not mark node as dead in $thisrun");
+
+	tbwarn("$node_id appears to be dead during start/stop run");
+
+	#
+	# This is for email message at the end.
+	#
+	$deadnodes{$node_id} = $node_id;
+    }
+}
+
+#
+# Callback to generate the file listing.
+#
+my @allfiles = ();
+my @symlinks = ();
+
+sub FindCallBack
+{
+    my $name    = $_;
+    my $linkval = "";
+
+    return
+	if ($name eq "." || $name eq "..");
+
+    my $st = stat($name) or
+	fatal(-1, "Failed to stat $name!");
+
+    # Force taint check
+    my $fullpath = "$File::Find::dir/$name";
+    if ($fullpath =~ /^(.*)$/) {
+	$fullpath = $1;
+    }
+    if (-l $name) {
+	$linkval = readlink($name);
+	if ($linkval =~ /^(.*)$/) {
+	    $linkval = $1;
+	}
+	push(@symlinks, {'pathname'  => $fullpath,
+			 'linkvalue' => $linkval});
+    }
+
+    push(@allfiles, {'pathname' => $fullpath,
+		     'mode'     => $st->mode,
+		     'linkval'  => $linkval,
+		     'uid'      => $st->uid,
+		     'gid'      => $st->gid,
+		     'atime'    => $st->atime,
+		     'mtime'    => $st->mtime,
+		     'ctime'    => $st->ctime});
+}
+
+#
+# Generate an XML file describing the just finished run.
+#
+sub GenXML($$$)
+{
+    my ($instance, $outputfile, $psymlinks) = @_;
+    my $root     = {};
+    my $template = $instance->GetTemplate();
+    my $run      = $instance->CurrentRun();
+    my %bindings;
+    my %mlist;
+
+    $root->{"infoversion"}= "1.0";
+    $root->{"guid"}       = $instance->guid() . "/" . $instance->vers();
+    $root->{"pid"}        = $template->pid();
+    $root->{"pid_idx"}    = $template->pid_idx();
+    $root->{"eid"}        = $instance->eid();
+    $root->{"exptidx"}    = $instance->exptidx();
+    $root->{"uid"}        = $instance->uid();
+    $root->{"uid_idx"}    = $instance->uid_idx();
+    $root->{"runid"}      = $run->runid();
+    $root->{"run_idx"}    = $run->idx();
+    $root->{"start_time"} = $run->start_time();
+    $root->{"stop_time"}  = $run->stop_time();
+
+    # Fill in the bindings
+    $run->BindingList(\%bindings) == 0
+	or fatal(-1, "Could not get bindings for $run");
+    if (keys(%bindings)) {
+	$root->{"bindings"} = {};
+	foreach my $name (keys(%bindings)) {
+	    my $value = $bindings{$name};
+	    my $description;
+
+	    $template->FormalParameterDescription($name, \$description);
+	
+	    $root->{"bindings"}->{$name} = {'value' => $value,
+					    'description' => $description};
+	}
+    }
+
+    # Fill in the metadata
+    $template->MetadataList(\%mlist) == 0
+	or fatal(-1, "Could not get Metadata list for $instance");
+    if (keys(%mlist)) {
+	$root->{"metadata"} = {};
+	foreach my $name (keys(%mlist)) {
+	    my $value = $mlist{$name};
+	
+	    $root->{"metadata"}->{$name} = $value;
+	}
+    }
+
+    # File listing to preserve attributes, just in case.
+    my $cwd = `/bin/pwd`;
+    # Must do the taint check too.
+    if ($cwd =~ /^(.*)$/) {
+	$cwd = $1;
+    }
+    if (! chdir($instance->path())) {
+	print STDERR "*** Could not chdir to instance path\n";
+	return -1;
+    }
+    find({'wanted' => \&FindCallBack, 'untaint' => 1}, ".");
+    chdir($cwd);
+    $root->{"files"} = {"file" => [@allfiles]};
+
+    if ($debug) {
+	print Dumper($root);
+	print "\n";
+    }
+    my %xmloptions = ('RootName' => 'run',
+		      'XMLDecl' => 1,
+		      'SuppressEmpty' => undef,
+		      'NoAttr' => 1);
+
+    my $xml = XMLout($root, %xmloptions);
+
+    if ($debug) {
+	print "$xml\n";
+
+	$root = XMLin($xml, KeyAttr => "name",
+		      "ForceArray" => ["metadata", "runs", "bindings"]);
+	print Dumper($root);
+	print "\n";
+    }
+
+    unlink($outputfile)
+	if (-e $outputfile);
+    if (open(DUMP, ">$outputfile")) {
+	print DUMP "$xml\n";
+	close(DUMP);
+    }
+    else {
+	print STDERR "*** Could not open $outputfile for writing";
+	return -1;
+    }
+    @$psymlinks = @symlinks;
+    return 0;
+}
+
+END {
+    # Normal exit, nothing to do.
+    return
+	if ($justexit);
+    
+    if (!$?) {
+        #
+        # Unlock ... safe cause the unlock routine will only let the original
+        # process do the unlock, and only if its locked.
+	#
+	$instance->UnLock($locktoken)
+	    if (defined($instance) && defined($locktoken));
+	return;
+    }
+    my $saved_exitcode = $?;
+    
+    if ($cleaning) {
+	#
+	# We are screwed; a recursive error. Someone will have to clean
+	# up by hand. 
+	#
+	SENDMAIL($TBOPS, 
+		 "Template Creation Failure: $pid/$eid",
+		 "Recursive error in cleanup! This is very bad.");
+	$? = $saved_exitcode;
+	return;
+    }
+    $cleaning = 1;
+    cleanup();
+    $? = $saved_exitcode;
+}
+

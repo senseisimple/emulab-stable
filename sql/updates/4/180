@@ -1,0 +1,29 @@
+#
+# Update to change the meaning of the lan_attributes 'stack' attribute
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    # Changed the name of this attribute
+    DBQueryFatal("UPDATE lan_attributes SET attrkey='class' " .
+                 "WHERE attrkey='stack';");
+
+    # Changed the type of this column
+    my $type = DBSlotType("vlans", "stack");
+    if (!$type) {
+	Fatal("No 'stack' slot in 'vlans' table");
+    }
+    if ($type =~ /Experimental/) {
+        DBQueryFatal("ALTER TABLE vlans MODIFY stack varchar(32);");
+    }
+
+    # Changed the meaning of this column
+    DBQueryFatal("UPDATE vlans SET stack='' WHERE stack='Experimental';");
+
+    return 0;
+}
+1;

@@ -1,0 +1,584 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Check DB consistency.
+#
+sub usage() {
+    print STDOUT "Usage: checkstats [-d] [-v] [-i] [-b] \n".
+	"Use the -d option to see debugging output instead of emailing it.\n";
+    exit(-1);
+}
+my $optlist  = "vdib";
+my $debug    = 0;
+my $verbose  = 1;
+my $impotent = 0;
+my $backup   = 0;
+my $RESOURCES= "experiment_resources_backup";
+my $ESTATS   = "experiment_stats_backup";
+my $TSTATS   = "testbed_stats";
+my $USTATS   = "user_stats_backup";
+my $GSTATS   = "group_stats_backup";
+my $PSTATS   = "project_stats_backup";
+my %group_stats = ();
+my %user_stats  = ();
+
+sub fatal($);
+sub Regenerate();
+sub CheckStatConsistency($);
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Group;
+
+#
+# Only real root can call this.
+# 
+#if ($UID != 0) {
+#    print STDERR "You must be root to run this script!\n";
+#    exit(-1);
+#}
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+if (defined($options{"v"})) {
+    $verbose++;
+}
+if (defined($options{"i"})) {
+    $impotent++;
+}
+if (defined($options{"b"})) {
+    $backup++;
+}
+
+if ($backup) {
+    DBQueryFatal("create table if not exists experiment_resources_backup ".
+		 "like experiment_resources");
+    DBQueryFatal("delete from experiment_resources_backup");
+    DBQueryFatal("insert into experiment_resources_backup ".
+		 "select * from experiment_resources");
+
+    DBQueryFatal("create table if not exists experiment_stats_backup ".
+		 "like experiment_stats");
+    DBQueryFatal("delete from experiment_stats_backup");
+    DBQueryFatal("insert into experiment_stats_backup ".
+		 "select * from experiment_stats");
+
+    DBQueryFatal("create table if not exists user_stats_backup ".
+		 "like user_stats");
+    DBQueryFatal("delete from user_stats_backup");
+    DBQueryFatal("insert into user_stats_backup ".
+		 "select * from user_stats");
+
+    DBQueryFatal("create table if not exists group_stats_backup ".
+		 "like group_stats");
+    DBQueryFatal("delete from group_stats_backup");
+    DBQueryFatal("insert into group_stats_backup ".
+		 "select * from group_stats");
+
+    DBQueryFatal("create table if not exists project_stats_backup ".
+		 "like project_stats");
+    DBQueryFatal("delete from project_stats_backup");
+    DBQueryFatal("insert into project_stats_backup ".
+		 "select * from project_stats");
+}
+
+#
+# Form a temp name.
+#
+my $logname = TBMakeLogname("checkstats");
+
+sub MyDBQ($)
+{
+    my ($query) = @_;
+
+    if ($impotent) {
+	print "$query\n"
+	    if ($verbose > 2);
+	return;
+    }
+    DBQueryFatal($query);
+}
+
+#
+# Look for resource records that are inconsistent.
+#
+my $query_result =
+    DBQueryFatal("select r.*,s.rsrcidx,e.state, ".
+		 "    UNIX_TIMESTAMP(s.destroyed) as destroyed, ".
+		 "    UNIX_TIMESTAMP(s.swapout_last) as swapout_last ".
+		 "  from $RESOURCES as r ".
+		 "left join $ESTATS as s on s.exptidx=r.exptidx ".
+		 "left join experiments as e on e.idx=r.exptidx ".
+		 "order by s.exptidx,UNIX_TIMESTAMP(r.tstamp)");
+
+while (my $row = $query_result->fetchrow_hashref()) {
+    my $exptidx      = $row->{'exptidx'};
+    my $swapin_time  = $row->{'swapin_time'};
+    my $swapmod_time = $row->{'swapmod_time'};
+    my $swapout_time = $row->{'swapout_time'};
+    my $pnodes       = $row->{'pnodes'};
+    my $vnodes       = $row->{'vnodes'};
+    my $state        = $row->{'state'};
+    my $thisidx      = $row->{'idx'};
+    my $rsrcidx      = $row->{'rsrcidx'};
+    my $lastidx      = $row->{'lastidx'};
+    my $destroyed    = $row->{'destroyed'};
+    my $swapout_last = $row->{'swapout_last'};
+    my $byswapmod    = $row->{'byswapmod'};
+    my $stats_result;
+
+    #
+    # nodes and no swapin_time. See if we can fix things up using the
+    # $TSTATS records,
+    #
+    if (($pnodes || $vnodes) && !$swapin_time) {
+	if ($byswapmod) {
+	    $stats_result =
+		DBQueryFatal("select UNIX_TIMESTAMP(start_time) ".
+			     "  from $TSTATS ".
+			     "where rsrcidx=$thisidx and ".
+			     "      action='swapmod' and exitcode=0");
+	    if ($stats_result->numrows) {
+		my ($newtime) = $stats_result->fetchrow_array();
+		print "$exptidx (rsrc:$thisidx); ".
+		    "setting swapin/swapmod to $newtime from testbed_stats\n"
+		    if ($verbose);
+		
+		MyDBQ("update $RESOURCES set ".
+		      "  swapin_time=$newtime ".
+		      "where idx=$thisidx");
+		MyDBQ("update $RESOURCES set ".
+		      "  swapmod_time=$newtime ".
+		      "where idx=$lastidx");
+		next;
+	    }
+	}
+	#
+	# Check for a failure that left crud in the resource record.
+	#
+	$stats_result =
+	    DBQueryFatal("select UNIX_TIMESTAMP(start_time) ".
+			 "  from $TSTATS ".
+			 "where rsrcidx=$thisidx and ".
+			 "      ((action='start' and exitcode!=0) or  ".
+			 "       (action='preload' and exitcode=0))");
+	if ($stats_result->numrows) {
+	    print "$exptidx (rsrc:$thisidx); ".
+		"setting node counts to zero cause startexp failed\n"
+		if ($verbose);
+	    MyDBQ("update $RESOURCES set ".
+		  "  pnodes=0,vnodes=0,jailnodes=0,delaynodes=0,plabnodes=0 ".
+		  "where idx=$thisidx");
+	    next;
+	}
+
+	#
+	# Look for a testbed stats record with a swapin/swapout
+	#
+	if (!$byswapmod) {
+	    $stats_result =
+		DBQueryFatal("select action,UNIX_TIMESTAMP(end_time) ".
+			     "  from $TSTATS ".
+			     "where rsrcidx=$thisidx and exitcode=0 and ".
+			     "      (action='swapin' or action='swapout') ".
+			     "order by end_time");
+	    if ($stats_result->numrows == 2) {
+		my ($action1,$time1) = $stats_result->fetchrow_array();
+		my ($action2,$time2) = $stats_result->fetchrow_array();
+
+		if ($action1 eq "swapin" and $time2 > $time1) {
+		    print "$exptidx (rsrc:$thisidx); ".
+			"setting swapin/swapout to $time1/$time2\n"
+			if ($verbose);
+		    
+		    MyDBQ("update $RESOURCES set ".
+			  "  swapin_time=$time1,swapout_time=$time2 ".
+			  "where idx=$thisidx");
+		    next;
+		}
+	    }
+	}
+
+	#
+	# If we get here, we did not know how to fix it or ignore it.
+	#
+	print "*** HELP: $exptidx (rsrc:$thisidx); p:$pnodes, v:$vnodes\n";
+    }
+}
+
+$query_result =
+    DBQueryFatal("select r.*,s.rsrcidx,e.state, ".
+		 "    UNIX_TIMESTAMP(s.destroyed) as destroyed, ".
+		 "    UNIX_TIMESTAMP(s.swapout_last) as swapout_last ".
+		 "  from $RESOURCES as r ".
+		 "left join $ESTATS as s on s.exptidx=r.exptidx ".
+		 "left join experiments as e on e.idx=r.exptidx ".
+		 "order by s.exptidx,UNIX_TIMESTAMP(r.tstamp)");
+
+while (my $row = $query_result->fetchrow_hashref()) {
+    my $exptidx      = $row->{'exptidx'};
+    my $swapin_time  = $row->{'swapin_time'};
+    my $swapmod_time = $row->{'swapmod_time'};
+    my $swapout_time = $row->{'swapout_time'};
+    my $pnodes       = $row->{'pnodes'};
+    my $vnodes       = $row->{'vnodes'};
+    my $state        = $row->{'state'};
+    my $thisidx      = $row->{'idx'};
+    my $rsrcidx      = $row->{'rsrcidx'};
+    my $lastidx      = $row->{'lastidx'};
+    my $destroyed    = $row->{'destroyed'};
+    my $swapout_last = $row->{'swapout_last'};
+    my $byswapmod    = $row->{'byswapmod'};
+
+    if ($swapin_time && !($swapout_time || $swapmod_time)) {
+	if (defined($state) && $state eq "active" && $thisidx == $rsrcidx) {
+	    print "$exptidx (rsrc:$rsrcidx) is active; p:$pnodes, v:$vnodes\n"
+		if ($verbose);
+	    next;
+	}
+	#
+	# If there are no pnodes or vnodes, just clear the swapin time.
+	#
+	if (! ($pnodes || $vnodes)) {
+	    print "$exptidx (rsrc:$thisidx) no pnodes, clearing swapin.\n"
+		if ($verbose);
+	    
+	    MyDBQ("update $RESOURCES set ".
+		  " swapin_time=0 ".
+		  "where idx=$thisidx");
+	    next;
+	}
+
+	#
+	# No recorded swapout, look in testbed_stats to see if we have
+	# something there.
+	#
+	if ($pnodes || $vnodes) {
+	    my $stats_result =
+		DBQueryFatal("select UNIX_TIMESTAMP(start_time) ".
+			     "  from $TSTATS ".
+			     "where rsrcidx=$thisidx and action='swapout'");
+	    if ($stats_result->numrows) {
+		my ($newtime) = $stats_result->fetchrow_array();
+		if (defined($newtime)) {
+		    print "$exptidx (rsrc:$thisidx); ".
+			"setting swapout to $newtime from testbed_stats\n"
+			if ($verbose);
+
+		    MyDBQ("update $RESOURCES set ".
+			  "  swapout_time=$newtime ".
+			  "where idx=$thisidx");
+		    next;
+		}
+	    }
+	}
+
+	#
+	# No recorded swapout time but there are nodes, so choose a
+	# reasonable swapout from the experiments stats record, but only
+	# if the current resource record is the actual last record.
+	#
+	if (($pnodes || $vnodes) && $thisidx == $rsrcidx &&
+	    defined($destroyed)) {
+	    if (defined($swapout_last) && $swapout_last > $swapin_time) {
+		print "$exptidx (rsrc:$thisidx) destroyed at $destroyed; ".
+		    "setting swapout to $swapout_last\n"
+		    if ($verbose);
+
+		MyDBQ("update $RESOURCES set ".
+		      "  swapout_time=$swapout_last ".
+		      "where idx=$thisidx");
+		next;
+	    }
+	    elsif ($destroyed > $swapin_time) {
+		print "$exptidx (rsrc:$thisidx) destroyed at $destroyed; ".
+		    "setting swapout to $destroyed\n"
+		    if ($verbose);
+
+		MyDBQ("update $RESOURCES set ".
+		      "  swapout_time=$destroyed ".
+		      "where idx=$thisidx");
+		next;
+	    }
+	}
+
+	#
+	# If we get here, we did not know how to fix it or ignore it.
+	#
+	print "*** HELP: $exptidx (rsrc:$thisidx); p:$pnodes, v:$vnodes\n";
+    }
+}
+
+Regenerate();
+exit(0);
+
+#
+# This regenerates the epoch stats from the resources tables once they
+# have been scanned and corrected.
+#
+sub Regenerate()
+{
+    print "Checking user/group stats tables for inconsistencies ... \n";
+    
+    my $query_result =
+	DBQueryFatal("select * from $USTATS");
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $uid_idx = $row->{'uid_idx'};
+	
+	$user_stats{"$uid_idx"} = {'allexpt_duration' => 0,
+				   'allexpt_vnodes'   => 0,
+				   'allexpt_vnode_duration' => 0,
+				   'allexpt_pnodes'   => 0,
+				   'allexpt_pnode_duration' => 0,
+				   'oldstats' => $row};
+    }
+    
+    $query_result =
+	DBQueryFatal("select * from $GSTATS");
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $gid_idx = $row->{'gid_idx'};
+	
+	$group_stats{"$gid_idx"} = {'allexpt_duration' => 0,
+				    'allexpt_vnodes'   => 0,
+				    'allexpt_vnode_duration' => 0,
+				    'allexpt_pnodes'   => 0,
+				    'allexpt_pnode_duration' => 0,
+				    'oldstats' => $row};
+    }
+
+    $query_result =
+	DBQueryFatal("select s.exptidx,s.gid_idx,u.uid_idx,r.pnodes,r.vnodes,".
+		     "   swapin_time,swapout_time,swapmod_time,byswapmod, ".
+		     "   e.state,r.idx,r.lastidx,byswapin ".
+		     " from $RESOURCES as r ".
+		     "left join $ESTATS as s on ".
+		     "     r.exptidx=s.exptidx ".
+		     "left join experiments as e on e.idx=s.exptidx ".
+		     "left join users as u on u.uid_idx=r.uid_idx ".
+		     "order by s.exptidx,UNIX_TIMESTAMP(r.tstamp)");
+
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $exptidx      = $row->{"exptidx"};
+	my $gid_idx      = $row->{"gid_idx"};
+	my $uid_idx      = $row->{"uid_idx"};
+	my $pnodes       = $row->{"pnodes"};
+	my $vnodes       = $row->{"vnodes"};
+	my $swapin_time  = $row->{"swapin_time"};
+	my $swapout_time = $row->{"swapout_time"};
+	my $swapmod_time = $row->{"swapmod_time"};
+	my $byswapmod    = $row->{"byswapmod"};
+	my $byswapin     = $row->{"byswapin"};
+	my $state        = $row->{"state"};
+	my $rsrcidx      = $row->{"idx"};
+	my $lastidx      = $row->{"lastidx"};
+	my $swapseconds  = 0;
+	my $begin        = 0;
+	my $end          = 0;
+
+	# Skip if no resources we care about.
+	next
+	    if (! ($pnodes || $vnodes));
+
+	#
+	# If no swapin for the record skip it, but not supposed to happen.
+	#
+	if ($swapin_time == 0) {
+	    print "$exptidx: skipping resource record $rsrcidx; ".
+		"no swapin time set\n"
+		if ($verbose);
+	    next;
+	}
+
+	# Ditto no swapout or swapmod and not active.
+	if ($swapout_time == 0 && $swapmod_time == 0) {
+	    next
+		if (defined($state) and $state eq "active");
+	    
+	    print "$exptidx: skipping resource record $rsrcidx; ".
+		"no swapout/swapmod time set\n"
+		if ($verbose);
+	    next;
+	}
+	elsif ($swapout_time) {
+	    $swapseconds = $swapout_time - $swapin_time;
+	}
+	else {
+	    $swapseconds = $swapmod_time - $swapin_time;
+	}
+
+	if ($swapseconds < 0) {
+	    print "$exptidx: skipping resource record $rsrcidx; ".
+		"swapseconds is negative\n"
+		if ($verbose);
+	    next;
+	}
+
+	if (defined($uid_idx) && $uid_idx) {
+	    my $record = $user_stats{"$uid_idx"};
+
+	    if ($uid_idx == 12 || $uid_idx == 1182) {
+		print "$exptidx: $rsrcidx, s:$swapseconds, p:$pnodes, v:$vnodes\n";
+	    }
+
+	    $record->{'allexpt_duration'} += $swapseconds;
+	    $record->{'allexpt_vnodes'} += $vnodes;
+	    $record->{'allexpt_pnodes'} += $pnodes;
+	    $record->{'allexpt_vnode_duration'} += ($vnodes * $swapseconds);
+	    $record->{'allexpt_pnode_duration'} += ($pnodes * $swapseconds);
+	}
+	if (defined($gid_idx) && $gid_idx) {
+	    my $record = $group_stats{"$gid_idx"};
+
+	    $record->{'allexpt_duration'} += $swapseconds;
+	    $record->{'allexpt_vnodes'} += $vnodes;
+	    $record->{'allexpt_pnodes'} += $pnodes;
+	    $record->{'allexpt_vnode_duration'} += ($vnodes * $swapseconds);
+	    $record->{'allexpt_pnode_duration'} += ($pnodes * $swapseconds);
+	}
+    }
+    foreach my $uid_idx (keys(%user_stats)) {
+	my $record = $user_stats{"$uid_idx"};
+
+	# Lets not change anything if no records in the system.
+	next
+	    if (! $record->{'allexpt_duration'});
+
+	print "user: $uid_idx: ".
+	    "duration: " . $record->{'allexpt_duration'} . ", ".
+	    "pnodes: "   . $record->{'allexpt_pnodes'}   . ", ".
+	    "vnodes: "   . $record->{'allexpt_vnodes'}   . ", ".
+	    "ptotal: "   . $record->{'allexpt_pnode_duration'} . ", ".
+	    "vtotal: "   . $record->{'allexpt_vnode_duration'} . "\n"
+	    if ($verbose > 2);
+
+	# Warn of any changes.
+	if (CheckStatConsistency($record) != 0) {
+	    print "user $uid_idx: Mismatch in stats records\n";
+	    FixStat("user_stats", $record);
+	}
+    }
+    foreach my $gid_idx (keys(%group_stats)) {
+	my $record   = $group_stats{"$gid_idx"};
+	my $oldstats = $record->{'oldstats'};
+
+	# Lets not change anything if no records in the system.
+	next
+	    if (! $record->{'allexpt_duration'});
+
+	print "group: $gid_idx: ".
+	    "duration: " . $record->{'allexpt_duration'} . ", ".
+	    "pnodes: "   . $record->{'allexpt_pnodes'}   . ", ".
+	    "vnodes: "   . $record->{'allexpt_vnodes'}   . ", ".
+	    "ptotal: "   . $record->{'allexpt_pnode_duration'} . ", ".
+	    "vtotal: "   . $record->{'allexpt_vnode_duration'} . "\n"
+	    if ($verbose > 2);
+
+	# Warn of any changes.
+	if (CheckStatConsistency($record) != 0) {
+	    if ($oldstats->{'pid_idx'} == $oldstats->{'gid_idx'}) {
+		print "project $gid_idx: Mismatch in stats records\n";
+		FixStat("project_stats", $record)
+	    }
+	    else {
+		print "group $gid_idx: Mismatch in stats records\n";
+	    }
+	    FixStat("group_stats", $record);
+	}
+    }
+}
+
+sub CheckStatConsistency($)
+{
+    my ($record) = @_;
+    my $oldstats = $record->{'oldstats'};
+    my $rval     = 0;
+
+    foreach my $key (keys(%{ $record })) {
+	next
+	    if ($key eq "oldstats");
+
+	return -1
+	    if ($record->{$key} != $oldstats->{$key});
+    }
+    return 0;
+}
+
+sub FixStat($$)
+{
+    my ($which, $record) = @_;
+    my $oldstats = $record->{'oldstats'};
+    my $sets;
+
+    foreach my $key (keys(%{ $record })) {
+	next
+	    if ($key eq "oldstats");
+
+	if ($record->{$key} != $oldstats->{$key}) {
+	    my $set = "$key=" . $record->{$key};
+		
+	    if (defined($sets)) {
+		$sets .= ", $set";
+	    }
+	    else {
+		$sets = $set;
+	    }
+	}
+    }
+    return
+	if (!defined($sets));
+
+    my $query = "update ";
+    if ($which eq "user_stats") {
+	$query .= "$USTATS set $sets where uid_idx=" . $oldstats->{'uid_idx'};
+    }
+    elsif ($which eq "group_stats") {
+	$query .= "$GSTATS set $sets where gid_idx=" . $oldstats->{'gid_idx'};
+    }
+    elsif ($which eq "project_stats") {
+	$query .= "$PSTATS set $sets where pid_idx=". $oldstats->{'pid_idx'};
+    }
+    
+    MyDBQ($query);
+    return 0;
+}
+
+			 

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -43,6 +43,7 @@ my $TESTMODE = @TESTMODE@;
 my $parser   = "$TB/lib/ns2ir/parse.tcl";
 my $vlib     = "$TB/lib/nsverify";
 my $vparser  = "$TB/libexec/nsverify/nstbparse";
+my $debug    = 0;
 
 # Locals
 my $tempdir  = "/tmp/parse-$$";
@@ -164,7 +165,7 @@ if (!defined($pid)) {
 #
 if (! $pid) {
     # Set the CPU limit for us.
-    setrlimit(RLIMIT_CPU, 600, 600);
+    setrlimit(RLIMIT_CPU, 1200, 1200);
     
     # Give parent a chance to react.
     sleep(1);
@@ -174,7 +175,10 @@ if (! $pid) {
 	$nsfile = $tempdir . "/" . $nsfile;
     }
 
+    # Piping the output through "|tee" changes the exit status of this
+    # script so only use for debugging
     exec("nice -15 $parser @ARGV $nsfile");
+    # exec("nice -15 $parser @ARGV $nsfile|tee $tempdir/output.txt");
     die("Could not exec the parser!\n");
 }
 
@@ -195,13 +199,18 @@ if (($exit_status & 0xff) == SIGKILL) {
 	     undef, undef, ($nsfile));
     
     print STDERR "$msg\n";
-    if (-d $tempdir) {
-	system("/bin/rm -r $tempdir");
+    unless($debug) {
+      if (-d $tempdir) {
+        system("/bin/rm -r $tempdir");
+      }
     }
     exit(15);
 }
-if (-d $tempdir) {
-    system("/bin/rm -r $tempdir");
+unless($debug) {
+     if (-d $tempdir) {
+          system("/bin/rm -r $tempdir");
+     }
 }
+
 exit($exit_status >> 8);
 

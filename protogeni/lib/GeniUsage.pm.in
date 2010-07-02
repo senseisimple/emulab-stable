@@ -1,0 +1,324 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniUsage;
+
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+use GeniDB;
+use XML::Simple;
+use Data::Dumper;
+use File::Temp qw(tempfile);
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+
+#
+# Create an entry in the sliver history table.
+#
+sub NewSliver($$$$)
+{
+    my ($class, $sliver, $slice, $owner) = @_;
+    my @insert_data = ();
+
+    my $sliver_idx     = $sliver->idx();
+    my $sliver_uuid    = $sliver->uuid();
+    my $sliver_hrn     = $sliver->hrn();
+    my $slice_uuid     = $slice->uuid();
+    my $slice_hrn      = $slice->hrn();
+    my $owner_uuid     = $owner->uuid();
+    my $owner_hrn      = $owner->hrn();
+    my $resource_uuid  = $sliver->resource_uuid();
+    my $resource_type  = $sliver->resource_type();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "idx='$sliver_idx'");
+    push(@insert_data, "uuid='$sliver_uuid'");
+    push(@insert_data, "hrn=" . DBQuoteSpecial($sliver_hrn));
+    push(@insert_data, "slice_uuid='$slice_uuid'");
+    push(@insert_data, "slice_hrn=" . DBQuoteSpecial($slice_hrn));
+    push(@insert_data, "creator_uuid='$owner_uuid'");
+    push(@insert_data, "creator_hrn=" . DBQuoteSpecial($owner_hrn));
+    push(@insert_data, "resource_uuid='$resource_uuid'");
+    push(@insert_data, "resource_type='$resource_type'");
+    push(@insert_data, "created=now()");
+
+    if (defined($sliver->component_uuid())) {
+	my $component = $sliver->GetComponent();
+	if (!defined($component)) {
+	    print STDERR
+		"GeniUsage::AddSliver: Could not get component for $sliver\n";
+	}
+	else {
+	    push(@insert_data, "component_uuid='" . $component->uuid() . "'");
+	    push(@insert_data, "component_hrn='" . $component->hrn() . "'");
+	}
+    }
+    if (defined($sliver->rspec())) {
+	my $rspec_string = GeniXML::Serialize($sliver->rspec());
+	my $safe_rspec   = DBQuoteSpecial($rspec_string);
+
+	push(@insert_data, "rspec_string=$safe_rspec");
+    }
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into sliver_history set " .
+		     join(",", @insert_data))) {
+	return -1;
+    }
+
+    return 0;
+}
+
+#
+# Update the destroyed/shutdown times for a sliver. 
+#
+sub DestroySliver($$$)
+{
+    my ($class, $sliver, $purge) = @_;
+
+    my $idx = $sliver->idx();
+
+    if ($purge) {
+        #
+	# Delete, as for errors. No point keeping it in the history.
+	#
+	return -1
+	    if (!DBQueryWarn("delete from sliver_history ".
+			     "where idx='$idx'"));
+    }	
+    else {
+	return -1
+	    if (!DBQueryWarn("update sliver_history set destroyed=now() ".
+			     "where idx='$idx'"));
+    }
+    return 0;
+}
+
+#
+# Create an entry in the aggregate history table.
+#
+sub NewAggregate($$$$)
+{
+    my ($class, $aggregate, $slice, $owner) = @_;
+    my @insert_data = ();
+
+    my $aggregate_idx  = $aggregate->idx();
+    my $aggregate_uuid = $aggregate->uuid();
+    my $aggregate_hrn  = $aggregate->hrn();
+    my $aggregate_type = $aggregate->type();
+    my $slice_uuid     = $slice->uuid();
+    my $slice_hrn      = $slice->hrn();
+    my $owner_uuid     = $owner->uuid();
+    my $owner_hrn      = $owner->hrn();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "idx='$aggregate_idx'");
+    push(@insert_data, "uuid='$aggregate_uuid'");
+    push(@insert_data, "hrn=" . DBQuoteSpecial($aggregate_hrn));
+    push(@insert_data, "type='$aggregate_type'");
+    push(@insert_data, "slice_uuid='$slice_uuid'");
+    push(@insert_data, "slice_hrn=" . DBQuoteSpecial($slice_hrn));
+    push(@insert_data, "creator_uuid='$owner_uuid'");
+    push(@insert_data, "creator_hrn=" . DBQuoteSpecial($owner_hrn));
+    push(@insert_data, "created=now()");
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into aggregate_history set " .
+		     join(",", @insert_data))) {
+	return -1;
+    }
+
+    return 0;
+}
+
+#
+# Delete, as for errors. No point keeping it in the history.
+#
+sub DeleteAggregate($$)
+{
+    my ($class, $aggregate) = @_;
+
+    my $idx = $aggregate->idx();
+
+    return -1
+	if (!DBQueryWarn("delete from aggregate_history ".
+			 "where idx='$idx'"));
+
+    return 0;
+}
+
+#
+# Update the destroyed/shutdown times for an aggregate. 
+#
+sub DestroyAggregate($$)
+{
+    my ($class, $aggregate) = @_;
+
+    my $aggregate_idx = $aggregate->idx();
+
+    return -1
+	if (!DBQueryWarn("update aggregate_history set destroyed=now() ".
+			 "where idx='$aggregate_idx'"));
+
+    return 0;
+}
+
+#
+# Create an entry in the ticket history table.
+#
+sub NewTicket($$)
+{
+    my ($class, $ticket) = @_;
+    my @insert_data = ();
+
+    my $ticket_idx     = $ticket->idx();
+    my $ticket_uuid    = $ticket->uuid();
+    my $slice_uuid     = $ticket->slice_uuid();
+    my $slice_hrn      = $ticket->slice_hrn();
+    my $owner_uuid     = $ticket->owner_uuid();
+    my $owner_hrn      = $ticket->owner_hrn();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "idx='$ticket_idx'");
+    push(@insert_data, "uuid='$ticket_uuid'");
+    push(@insert_data, "slice_uuid=" . DBQuoteSpecial($slice_uuid));
+    push(@insert_data, "slice_hrn=" . DBQuoteSpecial($slice_hrn));
+    push(@insert_data, "owner_uuid=" . DBQuoteSpecial($owner_uuid));
+    push(@insert_data, "owner_hrn=" . DBQuoteSpecial($owner_hrn));
+    push(@insert_data, "created=now()");
+
+    if (defined($ticket->component_uuid())) {
+	my $component = $ticket->component();
+	if (!defined($component)) {
+	    print STDERR
+		"GeniUsage::AddTicket: Could not get component for $ticket\n";
+	}
+	else {
+	    push(@insert_data, "component_uuid='" . $component->uuid() . "'");
+	    push(@insert_data, "component_hrn='" . $component->hrn() . "'");
+	}
+    }
+    if (defined($ticket->rspec())) {
+	my $safe_rspec = DBQuoteSpecial($ticket->rspecXML());
+
+	push(@insert_data, "rspec_string=$safe_rspec");
+    }
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into ticket_history set " .
+		     join(",", @insert_data))) {
+	return -1;
+    }
+
+    return 0;
+}
+
+#
+# Delete, as for errors. No point keeping it in the history.
+#
+sub DeleteTicket($$)
+{
+    my ($class, $ticket) = @_;
+
+    my $idx = $ticket->idx();
+
+    return -1
+	if (!DBQueryWarn("delete from ticket_history ".
+			 "where idx='$idx'"));
+
+    return 0;
+}
+
+#
+# Update the values for a ticket.
+#
+sub RedeemTicket($$)
+{
+    my ($class, $ticket) = @_;
+
+    my $idx = $ticket->idx();
+
+    return -1
+	if (!DBQueryWarn("update ticket_history set redeemed=now() ".
+			 "where idx='$idx'"));
+
+    return 0;
+}
+sub ExpireTicket($$)
+{
+    my ($class, $ticket) = @_;
+
+    my $idx = $ticket->idx();
+
+    return -1
+	if (!DBQueryWarn("update ticket_history set expired=now() ".
+			 "where idx='$idx'"));
+
+    return 0;
+}
+sub ReleaseTicket($$)
+{
+    my ($class, $ticket) = @_;
+
+    my $idx = $ticket->idx();
+
+    return -1
+	if (!DBQueryWarn("update ticket_history set released=now() ".
+			 "where idx='$idx'"));
+
+    return 0;
+}
+
+sub ListTickets($$)
+{
+    my ($class, $pref) = @_;
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select * from ticket_history order by idx");
+    return -1
+	if (!$query_result);
+
+    while (my $row = $query_result->fetchrow_hashref()) {
+	push(@result, $row);
+
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
+# Create an entry in the manifest history table.
+#
+sub NewManifest($$$)
+{
+    my ($class, $aggregate, $manifest) = @_;
+    my @insert_data = ();
+
+    my $aggregate_uuid  = $aggregate->uuid();
+    my $manifest_string = GeniXML::Serialize($manifest);
+    my $safe_manifest   = DBQuoteSpecial($manifest_string);
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into manifest_history set " .
+		     " idx=NULL, aggregate_uuid='$aggregate_uuid', ".
+		     " created=now(), manifest=$safe_manifest")) {
+	return -1;
+    }
+    return 0;
+}
+

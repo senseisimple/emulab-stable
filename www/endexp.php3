@@ -1,40 +1,32 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
 
 #
-# Must provide the EID!
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-  USERERROR("The project ID was not provided!", 1);
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-  USERERROR("The experiment ID was not provided!", 1);
-}
-
-$exp_eid = $eid;
-$exp_pid = $pid;
-
+# Verify Page Arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING);
+				 
 # Canceled operation redirects back to showexp page. See below.
-if ($canceled) {
-    header("Location: showexp.php3?pid=$pid&eid=$eid");
+if (isset($canceled) && $canceled) {
+    header("Location: ". CreateURL("showexp", $experiment));
     return;
 }
 
@@ -43,32 +35,35 @@ if ($canceled) {
 #
 PAGEHEADER("Terminate Experiment");
 
-#
-# Check to make sure thats this is a valid PID/EID, while getting the
-# experiment GID.
-#
-if (! TBExptGroup($exp_pid, $exp_eid, $exp_gid)) {
-    USERERROR("The experiment $exp_eid is not a valid experiment ".
-	      "in project $exp_pid.", 1);
-}
+# Need these below.
+$lockdown = $experiment->lockdown();
+$geniflags = $experiment->geniflags();
+$exptidx  = $experiment->idx();
+$pid      = $experiment->pid();
+$eid      = $experiment->eid();
 
-$query_result =
-    DBQueryFatal("select lockdown FROM experiments WHERE ".
-		 "eid='$exp_eid' and pid='$exp_pid'");
-$row       = mysql_fetch_array($query_result);
-$lockdown  = $row["lockdown"];
+# Must go through the geni interfaces.
+if ($geniflags) {
+    USERERROR("You must terminate ProtoGeni experiments via the ".
+	      "the ProtoGeni APIs!", 1);
+}
 
 #
 # Verify permissions.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_DESTROY)) {
-    USERERROR("You do not have permission to end experiment $exp_eid!", 1);
+if (! $experiment->AccessCheck($this_user, $TB_EXPT_DESTROY)) {
+    USERERROR("You do not have permission to end experiment $pid/$eid!", 1);
 }
 
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$exp_pid'>$exp_pid</a>/".
-     "<a href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>".
-     "</b></font><br>\n";
+# Template Instance Experiments get special treatment in this page.
+$instance = TemplateInstance::LookupByExptidx($exptidx);
+if ($instance && ($experiment->state() != $TB_EXPTSTATE_SWAPPED)) {
+    PAGEARGERROR("Invalid action for template instance");
+}
+
+# Spit experiment pid/eid at top of page.
+echo $experiment->PageHeader();
+echo "<br>\n";
 
 # A locked down experiment means just that!
 if ($lockdown) {
@@ -82,18 +77,17 @@ if ($lockdown) {
 # set. Or, the user can hit the cancel button, in which case redirect the
 # browser back up a level.
 #
-if (!$confirmed) {
-    echo "<center><br><font size=+2>
-          Are you <b>REALLY</b>
-          sure you want to terminate Experiment '$exp_eid?'
-          </font>\n";
-    echo "<br>(This will <b>completely</b> destroy all trace of the
-           experiment)<br><br>\n";
+if (!isset($confirmed)) {
+    echo "<center><br><font size=+2>Are you <b>REALLY</b> sure ";
+    echo "you want to terminate " . ($instance ? "Instance " : "Experiment ");
+    echo "'$eid?' </font>\n";
+    echo "<br>(This will <b>completely</b> destroy all trace)<br><br>\n";
 
-    SHOWEXP($exp_pid, $exp_eid, 1);
+    $experiment->Show(1);
+
+    $url = CreateURL("endexp", $experiment);
     
-    echo "<form action='endexp.php3?pid=$exp_pid&eid=$exp_eid' method=post>";
-    echo "<input type=hidden name=exp_pideid value=\"$exp_pideid\">\n";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -102,20 +96,31 @@ if (!$confirmed) {
     PAGEFOOTER();
     return;
 }
+flush();
 
 #
 # We need the unix gid for the project for running the scripts below.
-# Note usage of default group in project.
 #
-TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
+$unix_gid = $experiment->UnixGID();
 
-flush();
+if ($instance) {
+    $guid = $instance->guid();
+    $vers = $instance->vers();
+    
+    $command = "webtemplate_swapout -e $eid $guid/$vers";
+}
+else {
+    $command = "webendexp $exptidx";
+}
+
+STARTBUSY("Terminating " . ($instance ? "Instance." : "Experiment."));
 
 #
 # Run the backend script.
 #
-$retval = SUEXEC($uid, "$exp_pid,$unix_gid", "webendexp $exp_pid $exp_eid",
-		 SUEXEC_ACTION_IGNORE);
+$retval = SUEXEC($uid, "$pid,$unix_gid", $command, SUEXEC_ACTION_IGNORE);
+
+HIDEBUSY();
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -133,23 +138,20 @@ if ($retval < 0) {
 # Exit status >0 means the operation could not proceed.
 # Exit status =0 means the experiment is terminating in the background.
 #
-echo "<br>\n";
 if ($retval) {
-    echo "<h3>Experiment termination could not proceed</h3>";
+    echo "<h3>Termination could not proceed</h3>";
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    echo "<b>Your experiment is terminating!</b> 
-          You will be notified via email when the experiment has been torn
-	  down, and you can reuse the experiment name.
+    echo "<b>Termination has started!</b> 
+          You will be notified via email when termination has completed
+	  and you can reuse the name.
           This typically takes less than two minutes, depending on the
-          number of nodes in the experiment.
+          number of nodes.
           If you do not receive email notification within a reasonable amount
           of time, please contact $TBMAILADDR.\n";
-
-    echo "<br><br>
-          Watch the experiment die in realtime:<br>\n";
-    STARTLOG($exp_pid, $exp_eid);
+    echo "<br><br>\n";
+    STARTLOG($experiment);
 }
 
 #

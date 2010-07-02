@@ -1,50 +1,45 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+include_once("osinfo_defs.php");
 
 #
-# Standard Testbed Header
+# Only known and logged in users.
 #
-PAGEHEADER("OS Descriptor Information");
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Only known and logged in users can end experiments.
+# Verify page arguments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-
-#
-# Verify form arguments.
-# 
-if (!isset($osid) ||
-    strcmp($osid, "") == 0) {
-    USERERROR("You must provide an OSID.", 1);
-}
-
-if (! TBValidOSID($osid)) {
-    USERERROR("The OS Descriptor '$osid' is not valid!", 1);
-}
+$reqargs = RequiredPageArguments("osinfo", PAGEARG_OSINFO);
 
 #
 # Verify permission.
 #
-if (!TBOSIDAccessCheck($uid, $osid, $TB_OSID_READINFO)) {
-    USERERROR("You do not have permission to access OS Descriptor $osid!", 1);
+if (!$osinfo->AccessCheck($this_user, $TB_OSID_READINFO)) {
+    USERERROR("You do not have permission to access this OS Descriptor!", 1);
 }
+$osid = $osinfo->osid();
+$osname = $osinfo->osname();
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("OSID $osname");
 
 SUBPAGESTART();
-SUBMENUSTART("More Options");
+SUBMENUSTART("OSID Options");
 WRITESUBMENUBUTTON("Delete this OS Descriptor",
-		   "deleteosid.php3?osid=$osid");
+		   CreateURL("deleteosid", $osinfo));
 if ($isadmin) {
      WRITESUBMENUBUTTON("Create a new OS Descriptor",
-			"newosid_form.php3");
+			"newosid.php3");
 }
 WRITESUBMENUBUTTON("Create a new Image Descriptor",
 		   "newimageid_ez.php3");
@@ -53,22 +48,13 @@ WRITESUBMENUBUTTON("OS Descriptor list",
 WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
 SUBMENUEND();
+echo "<br><br>\n";
 
 #
 # Dump os_info record.
 # 
-SHOWOSINFO($osid);
-
-#
-# Show experiments using this OS
-#
-
-$query_result =
-    DBQueryFatal("select pid, osname from os_info where osid='$osid'");
-$row = mysql_fetch_array($query_result);
-echo "<h3 align='center'>Experiments using this OS</h3>\n";
-SHOWOSIDEXPTS($row["pid"],$row["osname"],$uid);
-
+$osinfo->Show();
+$osinfo->ShowExperiments($this_user);
 SUBPAGEEND();
 
 #

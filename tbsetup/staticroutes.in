@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -131,6 +131,12 @@ my $query_result =
 if (!$query_result->numrows) {
     tbwarn("No nodes in experiment $pid/$eid!");
     exit(0);
+}
+
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid!");
 }
 
 # A map of ips for each node, indexed by vname:port. 
@@ -777,8 +783,10 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 	    }
 	} else {
 	    DBQueryFatal("insert into virt_routes ".
-			 " (pid,eid,vname,src,dst,nexthop,dst_type,dst_mask) ".
-			 " values ('$pid', '$eid', '$src', '$srcip', '$dstipprefix', ".
+			 " (exptidx,pid,eid,vname,src,dst,nexthop,dst_type, ".
+			 "  dst_mask) ".
+			 " values ('$exptidx', '$pid', '$eid', '$src', ".
+			 "         '$srcip', '$dstipprefix', ".
 			 "         '$hopip', 'net', '$EXPTNETMASK')");		
 	}
     } else {
@@ -819,9 +827,10 @@ for( my $srcid = 0 ; $srcid < $index ; $srcid++ ) {
 		}
 	    } else {
 		DBQueryFatal("insert into virt_routes ".
-			     " (pid,eid,vname,src,dst,nexthop,dst_type,".
-			     "  dst_mask) ".
-			     " values ('$pid', '$eid', '$src', '$srcip', ".
+			     " (exptidx,pid,eid,vname,src,dst,nexthop,".
+			     "  dst_type,dst_mask) ".
+			     " values ('$exptidx', ".
+			     "         '$pid', '$eid', '$src', '$srcip', ".
 			     "         '$dstip', '$hopip', '$type', '$mask')");
 	    }
 	}

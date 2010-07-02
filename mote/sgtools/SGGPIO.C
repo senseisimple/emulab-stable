@@ -1,24 +1,13 @@
 /*
- * $Id: SGGPIO.C,v 1.1 2004-12-16 17:53:32 ricci Exp $
+ * $Id: SGGPIO.C,v 1.2 2006-12-01 22:59:37 mike Exp $
  *
  ****************************************************************************
  *
  * uisp - The Micro In-System Programmer for Atmel AVR microcontrollers.
- * Copyright (C) 2003 University of Utah and The Flux Group
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2003 University of Utah and the Flux Group.
+ * All rights reserved.
  *
  ****************************************************************************
  */

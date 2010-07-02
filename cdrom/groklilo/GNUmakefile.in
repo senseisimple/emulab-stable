@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,7 +19,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS	+= -O -g -Wall -I${OBJDIR} -UINBOOTLOADER
 
 groklilo: groklilo.c
-	$(CC) $(CFLAGS) -static -g -o groklilo $< $(LFLAGS)
+	$(CC) $(CFLAGS) $(LDSTATIC) -g -o groklilo $< $(LFLAGS)
 
 client: groklilo
 

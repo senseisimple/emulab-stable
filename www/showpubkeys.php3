@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,75 +9,54 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Verify page/form arguments. Note that the target uid comes initially as a
-# page arg, but later as a form argument, hence this odd check.
+# Verify page/form arguments.
 #
-if (! isset($_POST['submit'])) {
-    # First page load. Default to current user.
-    if (! isset($_GET['target_uid']))
-	$target_uid = $uid;
-    else
-	$target_uid = $_GET['target_uid'];
-}
-else {
-    # Form submitted. Make sure we have a formfields array and a target_uid.
-    if (!isset($_POST['formfields']) ||
-	!is_array($_POST['formfields']) ||
-	!isset($_POST['formfields']['target_uid'])) {
-	PAGEARGERROR("Invalid form arguments.");
-    }
-    $formfields = $_POST['formfields'];
-    $target_uid = $formfields['target_uid'];
-}
+$optargs = OptionalPageArguments("target_user",   PAGEARG_USER,
+				 "submit",        PAGEARG_STRING,
+				 "formfields",    PAGEARG_ARRAY);
 
-# Pedantic check of uid before continuing.
-if ($target_uid == "" || !TBvalid_uid($target_uid)) {
-    PAGEARGERROR("Invalid uid: '$target_uid'");
+# Default to current user.
+if (!isset($target_user)) {
+    $target_user = $this_user;
 }
-
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("The user $target_uid is not a valid user", 1);
-}
+$target_uid = $target_user->uid();
 
 #
 # Verify that this uid is a member of one of the projects that the
 # target_uid is in. Must have proper permission in that group too. 
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-
-    if (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
-	USERERROR("You do not have permission to view ${user}'s keys!", 1);
-    }
+if (!$isadmin && 
+    !$target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+    USERERROR("You do not have permission to view ${target_uid}'s keys!", 1);
 }
 
+#
+# Spit the form out using the array of data.
+#
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $target_uid, $BOSSNODE;
+    global $isadmin, $target_user, $BOSSNODE;
+    global $WIKIDOCURL;
+
+    $target_uid = $target_user->uid();
+    $uid_idx    = $target_user->uid_idx();
+    $webid      = $target_user->webid();
 
     #
     # Standard Testbed Header, now that we know what we want to say.
     #
-    if (strcmp($uid, $target_uid)) {
-	PAGEHEADER("SSH Public Keys for user: $target_uid");
-    }
-    else {
-	PAGEHEADER("My SSH Public Keys");
-    }
+    PAGEHEADER("SSH Public Keys for user: $target_uid");
 
     #
     # Get the list and show it.
     #
-    $query_result =
-	DBQueryFatal("select * from user_pubkeys where uid='$target_uid'");
+    $query_result =&
+	$target_user->TableLookUp("user_pubkeys", "*");
 
     if (mysql_num_rows($query_result)) {
 	echo "<table align=center border=1 cellpadding=2 cellspacing=2>\n";
@@ -92,10 +71,10 @@ function SPITFORM($formfields, $errors)
               </tr>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {
-	    $comment = $row[comment];
-	    $pubkey  = $row[pubkey];
-	    $date    = $row[stamp];
-	    $idx     = $row[idx];
+	    $comment = $row['comment'];
+	    $pubkey  = $row['pubkey'];
+	    $date    = $row['stamp'];
+	    $idx     = $row['idx'];
 	    $fnote   = "";
 
 	    if (strstr($comment, $BOSSNODE)) {
@@ -103,10 +82,12 @@ function SPITFORM($formfields, $errors)
 	    }
 	    $chunky  = chunk_split("$pubkey $fnote", 75, "<br>\n");
 
+	    $delurl = CreateURL("deletepubkey", $target_user, "key", $idx);
+
 	    echo "<tr>
                      <td align=center>
-                       <A href='deletepubkey.php3?target_uid=$target_uid" .
-	                  "&key=$idx'><img alt=X src=redball.gif></A>
+                       <A href='$delurl'>
+                          <img alt='Delete Key' src=redball.gif></A>
                      </td>
                      <td>$chunky</td>
                   </tr>\n";
@@ -154,35 +135,28 @@ function SPITFORM($formfields, $errors)
 	}
 	echo "</table><br>\n";
     }
+    $url = CreateURL("showpubkeys", $target_user);
 
     echo "<table align=center border=1> 
           <form enctype=multipart/form-data
-                action=showpubkeys.php3 method=post>\n";
-    echo "<input type=hidden name=\"formfields[target_uid]\" ".
-	         "value=$target_uid>\n";
+                action='$url' method=post>\n";
 
     #
     # SSH public key
     # 
     echo "<tr>
-              <td rowspan><center>Upload (4K max)[<b>3,4</b>]<br>
-                              <b>Or</b><br>
-                           Insert Key
-                          </center></td>
+              <td>Upload Public Key[<b>3,4</b>]:<br>
+                    (4K max)
+              </td>
 
-              <td rowspan>
+              <td>
                   <input type=hidden name=MAX_FILE_SIZE value=4096>
 	          <input type=file
                          name=usr_keyfile
-                         value=\"" . $_FILES['usr_keyfile']['name'] . "\"
+                         value=\"" .
+	                           (isset($_FILES['usr_keyfile']) ?
+				    $_FILES['usr_keyfile']['name'] : "") . "\"
 	                 size=50>
-                  <br>
-                  <br>
-	          <input type=text
-                         name=\"formfields[usr_key]\"
-                         value=\"$formfields[usr_key]\"
-	                 size=50
-	                 maxlength=1024>
               </td>
           </tr>\n";
 
@@ -211,7 +185,7 @@ function SPITFORM($formfields, $errors)
     echo "<blockquote><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html#SSH'>
+                 <a href = '$WIKIDOCURL/SecReqs#SSH'>
                  security policies</a> for information
                  regarding ssh public keys.
             <li> You should not hand edit your your authorized_keys file on
@@ -235,19 +209,25 @@ function SPITFORM($formfields, $errors)
           different protocol 2 public key format than some of the commercial 
           vendors such as <a href=www.ssh.com>SSH Communications</a>. If you
           use one of these commercial vendors, then please upload the public
-          key file and we will convert it for you. <i>Please do not paste
-          it in.</i>\n";
+          key file and we will convert it for you.\n";
 }
 
 #
 # On first load, display a form of current values.
 #
-if (! isset($_POST['submit'])) {
+if (!isset($submit)) {
     $defaults = array();
-    
+    $defaults["password"] = "";
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
+}
+
+# Form submitted. Make sure we have a formfields array.
+if (!isset($formfields)) {
+    # The only thing in formfields in this page is "password", which
+    # is skipped for admins.  But we have to re-spit the page below.
+    $formfields = array();
 }
 
 #
@@ -255,27 +235,8 @@ if (! isset($_POST['submit'])) {
 #
 $errors = array();
 
-if (isset($formfields[usr_key]) &&
-    strcmp($formfields[usr_key], "")) {
-
-    #
-    # This is passed off to the shell, so taint check it.
-    # 
-    if (! preg_match("/^[-\w\s\.\@\+\/\=]*$/", $formfields[usr_key])) {
-	$errors["PubKey"] = "Invalid characters";
-    }
-    else {
-        #
-        # Replace any embedded newlines first.
-        #
-	$formfields[usr_key] = ereg_replace("[\n]", "", $formfields[usr_key]);
-	$usr_key = $formfields[usr_key];
-	$addpubkeyargs = "-k $target_uid '$usr_key' ";
-    }
-}
-
 #
-# If usr provided a file for the key, it overrides the paste in text.
+# If usr provided a file for the key ...
 #
 if (isset($_FILES['usr_keyfile']) &&
     $_FILES['usr_keyfile']['name'] != "" &&
@@ -291,7 +252,7 @@ if (isset($_FILES['usr_keyfile']) &&
 	$errors["PubKey File"] = "Invalid characters";
     }
     else {
-	$addpubkeyargs = "$target_uid $localfile";
+	$keyfile = $localfile;
 	chmod($localfile, 0644);	
     }
 }
@@ -299,19 +260,19 @@ if (isset($_FILES['usr_keyfile']) &&
 #
 # Must verify passwd to add keys.
 #
-if (isset($addpubkeyargs)) {
+if (isset($keyfile)) {
     if (! $isadmin) {
-	if (!isset($formfields[password]) ||
-	    strcmp($formfields[password], "") == 0) {
+	if (!isset($formfields["password"]) ||
+	    strcmp($formfields["password"], "") == 0) {
 	    $errors["Password"] = "Must supply a verification password";
 	}
-	elseif (VERIFYPASSWD($target_uid, $formfields[password]) != 0) {
+	elseif (VERIFYPASSWD($target_uid, $formfields["password"]) != 0) {
 	    $errors["Password"] = "Incorrect password";
 	}
     }
 }
 else {
-    $errors["Missing Args"] = "Please supply a key or a keyfile";
+    $errors["Missing Args"] = "Please supply keyfile";
 }
 
 # Spit the errors
@@ -322,22 +283,115 @@ if (count($errors)) {
 }
 
 #
+# Build up argument array to pass along.
+#
+$args = array();
+
+$args["user"] = $target_uid;
+
+if (isset($keyfile) && $keyfile != "") {
+    $args["keyfile"] = $keyfile;
+}
+
+#
 # Okay, first run the script in verify mode to see if the key is
 # parsable. If it is, then do it for real.
 #
-if (ADDPUBKEY($uid, "webaddpubkey -n $addpubkeyargs")) {
+$args["verify"] = 1;
+if (! ($result = NewPubKey($uid, $args, $errors))) {
     $errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
+
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
     SPITFORM($formfields, $errors);
     PAGEFOOTER();
     return;
 }
+
 #
 # Insert key, update authkeys files and nodes if appropriate.
 #
-ADDPUBKEY($uid, "webaddpubkey $addpubkeyargs");
+$args["verify"] = 0;
+if (! ($result = NewPubKey($uid, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    return;
+}
 
 #
 # Redirect back, avoiding a POST in the history.
 # 
-header("Location: showpubkeys.php3?target_uid=$target_uid");
+header("Location: ". CreateURL("showpubkeys", $target_user));
+
+#
+# When there's a PubKeys class, this will be a Class function to edit them...
+#
+function NewPubKey($uid, $args, &$errors) {
+    global $suexec_output, $suexec_output_array, $TBADMINGROUP;
+
+    #
+    # Generate a temporary file and write in the XML goo.
+    #
+    $xmlname = tempnam("/tmp", "addpubkey");
+    if (! $xmlname) {
+	TBERROR("Could not create temporary filename", 0);
+	$errors[] = "Transient error(1); please try again later.";
+	return null;
+    }
+    if (! ($fp = fopen($xmlname, "w"))) {
+	TBERROR("Could not open temp file $xmlname", 0);
+	$errors[] = "Transient error(2); please try again later.";
+	return null;
+    }
+
+    fwrite($fp, "<PubKey>\n");
+    foreach ($args as $name => $value) {
+	fwrite($fp, "<attribute name=\"$name\">");
+	fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	fwrite($fp, "</attribute>\n");
+    }
+    fwrite($fp, "</PubKey>\n");
+    fclose($fp);
+    chmod($xmlname, 0666);
+
+    # Invoke the back-end script as the user if an admin for permissions.
+    $suexec_uid = ISADMIN() ? $uid : "nobody";
+    $retval = SUEXEC($suexec_uid, "nobody", "webaddpubkey -X $xmlname",
+		     SUEXEC_ACTION_IGNORE);
+
+    if ($retval) {
+	if ($retval < 0) {
+	    $errors[] = "Transient error(3, $retval); please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	}
+	else {
+	    # unlink($xmlname);
+	    if (count($suexec_output_array)) {
+		for ($i = 0; $i < count($suexec_output_array); $i++) {
+		    $line = $suexec_output_array[$i];
+		    if (preg_match("/^([-\w]+):\s*(.*)$/",
+				   $line, $matches)) {
+			$errors[$matches[1]] = $matches[2];
+		    }
+		    else
+			$errors[] = $line;
+		}
+	    }
+	    else
+		$errors[] = "Transient error(4, $retval); please try again later.";
+	}
+	return null;
+    }
+
+    # There are no return value(s) to parse at the end of the output.
+
+    # Unlink this here, so that the file is left behind in case of error.
+    # We can then edit the pubkeys by hand from the xmlfile, if desired.
+    unlink($xmlname);
+
+    return true; 
+}
+
 ?>

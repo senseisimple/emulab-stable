@@ -1,0 +1,22 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+Pelab - Wanetmon
+Meeting July 6, 2006
+Discussed issues and other potential problems.
+
++ "Rolling our own" reliability with UDP is difficult. There are many issues to address and test. Perhaps finding something with this already done is worthwhile (the event system... but it has its own problems).
++ Push vs. Pull model for bgmon control. Push is more scalable (what is currently used). Pull is used for Emulab Watchdog. Pull model moves more logic onto bgmon (?).
++ How should "rogue nodes" be detected and handled? A rogue node, for example, is one that is not receiving commands and may still be operating/measuring autonomously when it shouldn't be. Should the bgmon have a "saftey shutoff" that halts its measurements if it hasn't heard from ops for a while (or can't talk to ops in a pull model). If so, it seems to violate the goal of bgmons which run autonomously without hearing from ops... maybe a compromise such as a carefully determined timeout (to coincide with expected history buffer fillup)?
+
+Failure (?) Modes and concequences:
+- Rogue nodes: see above.
+- Not receiving ACK's for measurement data: if a node receives no, or very few, acks for data it sends to ops, its database will fill, allowing no new cached results. Thus, data could be lost due to normal hickups.
+- A malicious user could hose ops or a node with false/invalid commands/data. Encryption/authentication obviously needed to prevent data corruption, but won't solve DoS.
+- A node may not have the port numbers available that are used for communication. This would render the node unusable, but automanage will detect this and not use it. However, if another experiementer is running a very-wide scale experiment using these ports, it would pose a problem by not letting many, if any, nodes operate.
+- If a bgmon dies (weird error, can't open file it needs, etc..), that node will become inoperable unless a device is in place to restart it. 
+- There is a question of what should be done if bgmon needs restarting (if bgmon itself dies, or a node restarts). Should the bgmon state be saved/restored on the node side, or handled by a manager app? We probably don't want the case where a node at a site restarts, the automanager selects a new "bestnode" at that site, and the original node restores its settings, doing measurements that the automanager doesn't want it to. I lean toward not restoring state and putting the logic in the manager.
+- A node could be started unintentially: an INIT or EDIT is sent from the manager, but delayed such that the manager thinks the node is down. A STOP command is then sent to the node and processed immediately (the node stops). The original INIT or EDIT then arrives, re-starting the node's tests against the wishes of the manager.
+- Perhaps a node can be locked out of control by an EDIT that sets the test freq very high. If all incoming TCP connections for control are denied (why would they be?), the node cannot be stopped (except for a timeout on the EDIT).

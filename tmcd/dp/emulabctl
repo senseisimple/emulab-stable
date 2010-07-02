@@ -1,0 +1,156 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# Start/Stop the emulab support. Since we do not want to hold up the boot
+# on a remote node, this goes into the background, and exits when done.
+# The stop event kills one on progress. 
+#
+sub usage()
+{
+    print STDERR "Usage: emulabctl [-n] <start | stop>\n";
+    exit(1);
+}
+my $optlist = "nd";
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Locals
+my $logname = "$LOGDIR/emulab-boot.debug";
+my $pidfile = "/var/run/emulab-boot.pid";
+my $debug   = 0;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $action = $ARGV[0];
+if ($action ne "start" && $action ne "stop") {
+    usage();
+}
+
+#
+# For stop, look to see if the pid file exists. If so, kill it and exit.
+#
+if ($action eq "stop") {
+    system("$BINDIR/watchdog stop");
+    if (! -e $pidfile) {
+	exit(0);
+    }
+    system("kill `cat $pidfile`");
+    exit($? >> 8);
+}
+
+#
+# Go to background. 
+# 
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if (!$debug && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Write our pid into the pid file so we can be killed later (when the
+# experiment is torn down). We must do this first so that we can be
+# killed before we change the sig handlers.
+#
+system("echo '$PID' > $pidfile") == 0
+    or die("Could not create $pidfile!");
+
+#
+# Setup a handler to catch TERM, and kill our process group. Generally,
+# you do not want to send this a TERM, but use the stop argument instead.
+#
+my $pgrp = getpgrp(0);
+
+sub handler () {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT} = 'IGNORE';
+    unlink($pidfile);
+    tmcc(TMCCCMD_STATE, "SHUTDOWN");
+    kill('TERM', -$pgrp);
+    sleep(1);
+    exit(0);
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# Run the tmcc commands in blocking mode. No point in continuing if we
+# cannot get a tmcd connection formed to tell it we are rebooting.
+# 
+print "Informing Emulab Operations that we've rebooted ...\n";
+tmcc(TMCCCMD_STATE, "TBSETUP");
+
+#
+# At bootup, look for new accounts.
+#
+print "Looking for new Emulab accounts ...\n";
+system("$BINDIR/update -i");
+
+#
+# And start the watchdog.
+#
+print "Starting up the watchdog ...\n";
+system("$BINDIR/watchdog");
+
+#
+# Inform TMCD that we are up and running.
+#
+print "Informing Emulab Operations that we're up and running ...\n";
+tmcc(TMCCCMD_STATE, "ISUP");
+
+# Done!
+while (1) {
+    #
+    # Loop until killed. 
+    #
+    sleep(1000);
+}
+exit(0);
+

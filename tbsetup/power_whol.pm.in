@@ -182,7 +182,7 @@ sub whacksome($@) {
     #
     # Put all ports in the WhOL VLAN, snmpit will enable them.
     #
-    if (system("$SNMPIT -m $whollan $portstr")) {
+    if (system("$SNMPIT -f -m $whollan $portstr")) {
 	warn "WhOL: could not place ports in WHOL LAN\n";
 	$failed++;
     }

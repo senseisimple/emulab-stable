@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.13 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.39 2003/02/22 00:19:26 mckusick Exp $
+ * $FreeBSD: src/sys/ufs/ffs/fs.h,v 1.50.2.1.2.1 2009/10/25 01:10:29 kensmith Exp $
  */
 
 #ifndef _UFS_FFS_FS_H_
@@ -107,8 +103,8 @@
  * 2^32 with only two levels of indirection, MINBSIZE is set to 4096.
  * MINBSIZE must be big enough to hold a cylinder group block,
  * thus changes to (struct cg) must keep its size within MINBSIZE.
- * Note that super blocks are always of size SBSIZE,
- * and that both SBSIZE and MAXBSIZE must be >= MINBSIZE.
+ * Note that super blocks are always of size SBLOCKSIZE,
+ * and that both SBLOCKSIZE and MAXBSIZE must be >= MINBSIZE.
  */
 #define MINBSIZE	4096
 
@@ -172,7 +168,7 @@
  * which tell the system the average file size and the average number
  * of files per directory. These defaults are well selected for typical
  * filesystems, but may need to be tuned for odd cases like filesystems
- * being used for sqiud caches or news spools.
+ * being used for squid caches or news spools.
  */
 #define AVFILESIZ	16384	/* expected average file size */
 #define AFPDIR		64	/* expected number of files per directory */
@@ -210,7 +206,12 @@
 #define	FFS_DIR_FREE		 4	/* free specified dir inodes in map */
 #define	FFS_FILE_FREE		 5	/* free specified file inodes in map */
 #define	FFS_SET_FLAGS		 6	/* set filesystem flags */
-#define	FFS_MAXID		 7	/* number of valid ffs ids */
+#define	FFS_ADJ_NDIR		 7	/* adjust number of directories */
+#define	FFS_ADJ_NBFREE		 8	/* adjust number of free blocks */
+#define	FFS_ADJ_NIFREE		 9	/* adjust number of free inodes */
+#define	FFS_ADJ_NFFREE		10 	/* adjust number of free frags */
+#define	FFS_ADJ_NUMCLUSTERS	11	/* adjust number of free clusters */
+#define	FFS_MAXID		12	/* number of valid ffs ids */
 
 /*
  * Command structure passed in to the filesystem to adjust filesystem values.
@@ -316,21 +317,22 @@ struct fs {
 /* these fields retain the current block allocation info */
 	int32_t	 fs_cgrotor;		/* last cg searched */
 	void 	*fs_ocsp[NOCSPTRS];	/* padding; was list of fs_cs buffers */
-	u_int8_t *fs_contigdirs;	/* # of contiguously allocated dirs */
-	struct	csum *fs_csp;		/* cg summary info buffer for fs_cs */
-	int32_t	*fs_maxcluster;		/* max cluster in each cyl group */
-	u_int	*fs_active;		/* used by snapshots to track fs */
+	u_int8_t *fs_contigdirs;	/* (u) # of contig. allocated dirs */
+	struct	csum *fs_csp;		/* (u) cg summary info buffer */
+	int32_t	*fs_maxcluster;		/* (u) max cluster in each cyl group */
+	u_int	*fs_active;		/* (u) used by snapshots to track fs */
 	int32_t	 fs_old_cpc;		/* cyl per cycle in postbl */
 	int32_t	 fs_maxbsize;		/* maximum blocking factor permitted */
-	int64_t	 fs_sparecon64[17];	/* old rotation block list head */
+	int64_t	 fs_unrefs;		/* number of unreferenced inodes */
+	int64_t	 fs_sparecon64[16];	/* old rotation block list head */
 	int64_t	 fs_sblockloc;		/* byte offset of standard superblock */
-	struct	csum_total fs_cstotal;	/* cylinder summary information */
+	struct	csum_total fs_cstotal;	/* (u) cylinder summary information */
 	ufs_time_t fs_time;		/* last time written */
 	int64_t	 fs_size;		/* number of blocks in fs */
 	int64_t	 fs_dsize;		/* number of data blocks in fs */
 	ufs2_daddr_t fs_csaddr;		/* blk addr of cyl grp summary area */
-	int64_t	 fs_pendingblocks;	/* blocks in process of being freed */
-	int32_t	 fs_pendinginodes;	/* inodes in process of being freed */
+	int64_t	 fs_pendingblocks;	/* (u) blocks being freed */
+	int32_t	 fs_pendinginodes;	/* (u) inodes being freed */
 	int32_t	 fs_snapinum[FSMAXSNAP];/* list of snapshot inode numbers */
 	int32_t	 fs_avgfilesize;	/* expected average file size */
 	int32_t	 fs_avgfpdir;		/* expected # of files per directory */
@@ -361,6 +363,7 @@ CTASSERT(sizeof(struct fs) == 1376);
  */
 #define	FS_UFS1_MAGIC	0x011954	/* UFS1 fast filesystem magic number */
 #define	FS_UFS2_MAGIC	0x19540119	/* UFS2 fast filesystem magic number */
+#define	FS_BAD_MAGIC	0x19960408	/* UFS incomplete newfs magic number */
 #define	FS_OKAY		0x7c269d38	/* superblock checksum */
 #define FS_42INODEFMT	-1		/* 4.2BSD inode format */
 #define FS_44INODEFMT	2		/* 4.4BSD inode format */
@@ -404,6 +407,7 @@ CTASSERT(sizeof(struct fs) == 1376);
 #define FS_INDEXDIRS  0x08	/* kernel supports indexed directories */
 #define FS_ACLS       0x10	/* file system has ACLs enabled */
 #define FS_MULTILABEL 0x20	/* file system is MAC multi-label */
+#define FS_GJOURNAL   0x40	/* gjournaled file system */
 #define FS_FLAGS_UPDATED 0x80	/* flags have been moved to new location */
 
 /*
@@ -411,6 +415,14 @@ CTASSERT(sizeof(struct fs) == 1376);
  */
 #define	ACTIVECGNUM(fs, cg)	((fs)->fs_active[(cg) / (NBBY * sizeof(int))])
 #define	ACTIVECGOFF(cg)		(1 << ((cg) % (NBBY * sizeof(int))))
+#define	ACTIVESET(fs, cg)	do {					\
+	if ((fs)->fs_active)						\
+		ACTIVECGNUM((fs), (cg)) |= ACTIVECGOFF((cg));		\
+} while (0)
+#define	ACTIVECLEAR(fs, cg)	do {					\
+	if ((fs)->fs_active)						\
+		ACTIVECGNUM((fs), (cg)) &= ~ACTIVECGOFF((cg));		\
+} while (0)
 
 /*
  * The size of a cylinder group is calculated by CGSIZE. The maximum size
@@ -465,7 +477,8 @@ struct cg {
 	int32_t	 cg_nclusterblks;	/* number of clusters this cg */
 	int32_t  cg_niblk;		/* number of inode blocks this cg */
 	int32_t	 cg_initediblk;		/* last initialized inode */
-	int32_t	 cg_sparecon32[3];	/* reserved for future use */
+	int32_t	 cg_unrefs;		/* number of unreferenced inodes */
+	int32_t	 cg_sparecon32[2];	/* reserved for future use */
 	ufs_time_t cg_time;		/* time last written */
 	int64_t	 cg_sparecon64[3];	/* reserved for future use */
 	u_int8_t cg_space[1];		/* space for cylinder group maps */
@@ -483,13 +496,13 @@ struct cg {
 #define cg_clustersfree(cgp) \
     ((u_int8_t *)((u_int8_t *)(cgp) + (cgp)->cg_clusteroff))
 #define cg_clustersum(cgp) \
-    ((int32_t *)((u_int8_t *)(cgp) + (cgp)->cg_clustersumoff))
+    ((int32_t *)((uintptr_t)(cgp) + (cgp)->cg_clustersumoff))
 
 /*
  * Turn filesystem block numbers into disk block addresses.
  * This maps filesystem blocks to device size blocks.
  */
-#define fsbtodb(fs, b)	((b) << (fs)->fs_fsbtodb)
+#define	fsbtodb(fs, b)	((daddr_t)(b) << (fs)->fs_fsbtodb)
 #define	dbtofsb(fs, b)	((b) >> (fs)->fs_fsbtodb)
 
 /*

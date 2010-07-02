@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 TMPSUDOERS=/tmp/sudoers
 ME=`whoami`
@@ -28,5 +33,9 @@ $ME     ALL=(ALL) NOPASSWD: ALL
 EOF
 
 su -c "install -c -m 440 $TMPSUDOERS /etc/sudoers"
+
+# hack to ensure non-root users can't overwrite /etc/slicename
+# XXX: shouldn't go here, but it's easy!
+su -c "chmod 664 /etc/slicename"
 
 exit $?

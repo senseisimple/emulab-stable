@@ -1,0 +1,1218 @@
+--- kexec-tools-20080324.orig/debian/changelog
++++ kexec-tools-20080324/debian/changelog
+@@ -0,0 +1,125 @@
++kexec-tools (20080324-2) unstable; urgency=low
++
++  * Updated init script to check for new boolean value of LOAD_KEXEC (closes:
++    Bug#479961)
++  * Added french translation for debconf (closes: Bug#470921,Bug#479688)
++  * Added czech translation for debconf (closes: Bug#480301)
++
++ -- Khalid Aziz <khalid@debian.org>  Fri, 09 May 2008 12:03:29 -0600
++
++kexec-tools (20080324-1) unstable; urgency=low
++
++  * New upstream version
++  * Fixed a typo in x86-64 makefile that causes kexec load to fail on
++    amd64 (closes: Bug#473547)
++  * Added a patch from upstream to enable compilation on powerpc (closes:
++    Bug#477260)
++  * Added portugese translation for debconf (closes: Bug#469960,Bug#478358)
++  * Added german translation for debconf (closes: Bug#470499)
++  * Added galician translation (closes: Bug#477940)
++  * Added russian translation (closes: Bug#477983)
++  * Added finnish translation (closes: Bug#477984)
++  * Added vietnamese translation (closes: Bug#478221)
++  * Changed debconf variable type to boolean (closes: Bug#469256)
++  * Added debian/watch file (closes: Bug#474752)
++
++ -- Khalid Aziz <khalid@debian.org>  Tue, 01 Apr 2008 09:53:50 -0600
++
++kexec-tools (20080227-2) unstable; urgency=low
++
++  * Fixed a bad dependency in kexec-load init script 
++  * Changed the priority of debconf question to medium.
++
++ -- Khalid Aziz <khalid@debian.org>  Mon, 03 Mar 2008 09:08:09 -0700
++
++kexec-tools (20080227-1) unstable; urgency=low
++
++  * New upstream version
++  * Updated init scripts to remove bash'ism (closes: Bug#465000, Bug#462554)
++  * Updated init scripts to add reverse dependency on umountroot 
++    (closes: Bug#458983)
++  * Added autofs to Required-Stop for kexec-load init script to ensure 
++    a kexec load of a kernel on an automounted filesystem is successful 
++    (closes: Bug#440979)
++  * Changed the kexec-load init script execution order to run before autofs
++    (closes: Bug#440979)
++  * Added debconf options to ask user whether to enable kexec by default 
++    or not
++  * Updated package description in control file
++  * Updated kexec man page to remove the note about lack of support for 
++    compressed kernels (closes: Bug#464813)
++
++ -- Khalid Aziz <khalid@debian.org>  Thu, 28 Feb 2008 14:19:40 -0700
++
++kexec-tools (20070330-4) unstable; urgency=low
++
++  * Added another condition around strip command to address build failure on
++    architectures that do not generate kexec_test.static image.
++
++ -- Khalid Aziz <khalid@debian.org>  Thu, 01 Nov 2007 14:19:13 -0600
++
++kexec-tools (20070330-3) unstable; urgency=low
++
++  * Made command to strip kexec_test binary conditional (closes: Bug#437251)
++  * Removed mv command that caused build failure on a few architectures 
++    (closes: Bug#441128)
++  * Dropped powerpc and alpha architectures from supported arch list (closes:
++    Bug#338846)
++
++ -- Khalid Aziz <khalid@debian.org>  Wed, 31 Oct 2007 15:12:11 -0600
++
++kexec-tools (20070330-2) unstable; urgency=low
++
++  * Changed /etc/default/kexec to enable kexec reboots by default 
++    (closes: Bug#426506)
++  * Cleaned up unnecessary files
++  * Updated LSB header in init scripts (closes: Bug#429633)
++  * closes: Bug#392231 (upstream has removed the offending code)
++
++ -- Khalid Aziz <khalid@debian.org>  Mon, 11 Jun 2007 16:03:25 -0600
++
++kexec-tools (20070330-1) experimental; urgency=low
++
++  * New upstream version from Simon Horman's kexec-tools-testing tree. 
++
++ -- Khalid Aziz <khalid@debian.org>  Fri, 30 Mar 2007 09:32:27 -0600
++
++kexec-tools (1.101-kdump10-2) unstable; urgency=low
++
++  * Moved the install location for kexec_test to /usr/lib (closes: Bug#392395)
++
++ -- Khalid Aziz <khalid@debian.org>  Fri, 13 Oct 2006 08:31:16 -0600
++
++kexec-tools (1.101-kdump10-1) unstable; urgency=low
++
++  * Applied -kdump10 patch from http://lse.sf.net/kdump
++  * man page updated from -kdump10 patch (closes: Bug#344486)
++  * Better error reporting for when kexec_load fails on x86_64 (closes:
++    Bug#385611)
++  * Fixed a typo in x86_64 code (closes: Bug#385611)
++  * Improved init scripts
++  * Update architecture list in control file with the supported architectures
++    only (closes: Bug#338846)
++
++ -- Khalid Aziz <khalid@debian.org>  Mon, 09 Oct 2006 14:58:48 -0600
++
++kexec-tools (1.101-2.1) unstable; urgency=low
++
++  * Non-maintainer upload.
++  * Add support for init scripts (Closes: #387599, #378880, #344489)
++  * Bumped Standards Version
++
++ -- Julien Danjou <acid@debian.org>  Mon,  2 Oct 2006 14:42:42 +0200
++
++kexec-tools (1.101-2) unstable; urgency=low
++
++  * Fixed build failures (closes: Bug#327639, Bug#327715)
++
++ -- Khalid Aziz <khalid@debian.org>  Thu, 15 Sep 2005 08:57:43 -0600
++
++kexec-tools (1.101-1) unstable; urgency=low
++
++  * Initial release (closes: Bug#320202, Bug#318881)
++
++ -- Khalid Aziz <khalid@debian.org>  Fri, 09 Sep 2005 14:06:19 -0600
++
+--- kexec-tools-20080324.orig/debian/kexec.init.d
++++ kexec-tools-20080324/debian/kexec.init.d
+@@ -0,0 +1,44 @@
++#! /bin/sh
++### BEGIN INIT INFO
++# Provides:		kexec
++# Required-Start:	
++# Required-Stop:   	reboot
++# X-Stop-After:		umountroot
++# Default-Start:
++# Default-Stop:		6
++# Short-Description: Execute the kexec -e command to reboot system
++# Description:
++### END INIT INFO
++
++PATH=/usr/sbin:/usr/bin:/sbin:/bin
++
++. /lib/lsb/init-functions
++
++test -r /etc/default/kexec && . /etc/default/kexec
++
++do_stop () {
++	test "x`cat /sys/kernel/kexec_loaded`y" = "x1y" || exit 0
++	test -x /sbin/kexec || exit 0
++
++	log_action_msg "Will now restart with kexec"
++        kexec -e
++        log_failure_msg "kexec failed"
++}
++
++case "$1" in
++  start)
++	# No-op
++	;;
++  restart|reload|force-reload)
++	echo "Error: argument '$1' not supported" >&2
++	exit 3
++	;;
++  stop)
++	do_stop
++	;;
++  *)
++	echo "Usage: $0 start|stop" >&2
++	exit 3
++	;;
++esac
++exit 0
+--- kexec-tools-20080324.orig/debian/kexec-load.init.d
++++ kexec-tools-20080324/debian/kexec-load.init.d
+@@ -0,0 +1,53 @@
++#! /bin/sh
++### BEGIN INIT INFO
++# Provides:		kexec-load
++# Required-Start:
++# Required-Stop:	$remote_fs kexec
++# Should-Stop:		autofs
++# Default-Start:
++# Default-Stop:		6
++# Short-Description: Load kernel image with kexec
++# Description:
++### END INIT INFO
++
++PATH=/usr/sbin:/usr/bin:/sbin:/bin
++
++. /lib/lsb/init-functions
++
++test -r /etc/default/kexec && . /etc/default/kexec
++
++do_stop () {
++	test "$LOAD_KEXEC" = "true" || exit 0
++	test -x /sbin/kexec || exit 0
++	test "x`cat /sys/kernel/kexec_loaded`y" = "x1y" && exit 0
++
++	REAL_APPEND="$APPEND"
++
++	test -z "$REAL_APPEND" && REAL_APPEND="`cat /proc/cmdline`"
++	log_action_begin_msg "Loading new kernel image into memory"
++	if [ -z "$INITRD" ]
++	then
++		kexec -l "$KERNEL_IMAGE" --append="$REAL_APPEND"
++	else
++		kexec -l "$KERNEL_IMAGE" --initrd="$INITRD" --append="$REAL_APPEND"
++	fi
++	log_action_end_msg $?
++}
++
++case "$1" in
++  start)
++	# No-op
++	;;
++  restart|reload|force-reload)
++	echo "Error: argument '$1' not supported" >&2
++	exit 3
++	;;
++  stop)
++	do_stop
++	;;
++  *)
++	echo "Usage: $0 start|stop" >&2
++	exit 3
++	;;
++esac
++exit 0
+--- kexec-tools-20080324.orig/debian/docs
++++ kexec-tools-20080324/debian/docs
+@@ -0,0 +1,2 @@
++News
++TODO
+--- kexec-tools-20080324.orig/debian/kexec.default
++++ kexec-tools-20080324/debian/kexec.default
+@@ -0,0 +1,12 @@
++# Defaults for kexec initscript
++# sourced by /etc/init.d/kexec and /etc/init.d/kexec-load
++
++# Load a kexec kernel (true/false)
++LOAD_KEXEC=true
++
++# Kernel and initrd image
++KERNEL_IMAGE="/vmlinuz"
++INITRD="/initrd.img"
++
++# If empty, use current /proc/cmdline
++APPEND=""
+--- kexec-tools-20080324.orig/debian/copyright
++++ kexec-tools-20080324/debian/copyright
+@@ -0,0 +1,23 @@
++This package was debianized by Khalid Aziz <khalid@debian.org> on
++Wed, 27 Jul 2005 10:55:17 -0600.
++
++It was originally downloaded from: http://www.xmission.com/~ebiederm/files/kexec/
++Versions 20070330 and newer were downloaded from: http://www.kernel.org/pub/linux/kernel/people/horms/kexec-tools/
++
++Copyright: 2003-2005 Eric Biederman (ebiederm@xmission.com)
++
++Upstream Author: Eric Biederman (ebiederm@xmission.com), Albert Herranz, Jesse Barnes (jbarnes@sgi.com), Khalid Aziz (khalid.aziz@hp.com), Hariprasad Nelliteertha (hari@in.ibm.com), Tim Deegan (tjd21@cl.cam.ac.uk)
++
++License: 
++
++ This program is free software; you can redistribute it and/or modify
++ it under the terms of the GNU General Public License as published by
++ the Free Software Foundation (version 2 of the License).
++
++ This program is distributed in the hope that it will be useful,
++ but WITHOUT ANY WARRANTY; without even the implied warranty of
++ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ GNU General Public License for more details. 
++
++ Full text of the license can be found under /usr/share/common-licenses/GPL
++
+--- kexec-tools-20080324.orig/debian/conffile
++++ kexec-tools-20080324/debian/conffile
+@@ -0,0 +1,3 @@
++kexec.init.d 
++kexec-load.init.d
++kexec.default
+--- kexec-tools-20080324.orig/debian/rules
++++ kexec-tools-20080324/debian/rules
+@@ -0,0 +1,96 @@
++#!/usr/bin/make -f
++# -*- makefile -*-
++# Sample debian/rules that uses debhelper.
++# This file was originally written by Joey Hess and Craig Small.
++# As a special exception, when this file is copied by dh-make into a
++# dh-make output file, you may use that output file without restriction.
++# This special exception was added by Craig Small in version 0.37 of dh-make.
++
++# Uncomment this to turn on verbose mode.
++#export DH_VERBOSE=1
++
++include /usr/share/dpatch/dpatch.make
++
++
++CFLAGS = -Wall -g
++
++ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
++	CFLAGS += -O0
++else
++	CFLAGS += -O2
++endif
++
++configure: patch configure-stamp
++configure-stamp: 
++	dh_testdir
++	# Add here commands to configure the package.
++	./configure --prefix=/usr --sbindir=/sbin --mandir=/usr/share/man --datadir=/usr/share
++
++	touch configure-stamp
++
++
++build: patch build-stamp
++
++build-stamp: configure-stamp 
++	dh_testdir
++
++	# Add here commands to compile the package.
++	$(MAKE)
++
++	touch build-stamp
++
++clean: tidy unpatch
++
++tidy: patch configure-stamp 
++	dh_testdir
++	dh_testroot
++	rm -f build-stamp configure-stamp 
++	rm -fr tmp-source
++
++	# Add here commands to clean up after the build process.
++	$(MAKE) dist-clean
++
++	dh_clean 
++	debconf-updatepo
++
++install: build
++	dh_testdir
++	dh_testroot
++	dh_clean -k 
++	dh_installdirs
++
++	# Add here commands to install the package into debian/tmp.
++	$(MAKE) install DESTDIR=$(CURDIR)/debian/kexec-tools
++ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
++	[ ! -f $(CURDIR)/debian/kexec-tools/usr/lib/kexec-tools-testing/kexec_test.static ] || strip $(CURDIR)/debian/kexec-tools/usr/lib/kexec-tools-testing/kexec_test.static
++endif
++
++
++# Build architecture-independent files here.
++binary-indep: build install
++# We have nothing to do by default.
++
++# Build architecture-dependent files here.
++binary-arch: build install
++	dh_testdir
++	dh_testroot
++	dh_installchangelogs 
++	dh_installdocs
++	dh_installdebconf
++	dh_installinit --no-start -r --name=kexec -- start 85 6 .
++	dh_installinit --no-start -r --name=kexec-load -- stop 18 6 .
++	dh_installexamples
++	dh_install
++	dh_installman
++	dh_link
++	dh_strip
++	dh_compress
++	dh_fixperms
++	dh_installdeb
++	dh_shlibdeps
++	dh_gencontrol
++	dh_md5sums
++	dh_builddeb
++
++binary: binary-indep binary-arch
++.PHONY: build clean binary-indep binary-arch binary install configure
+--- kexec-tools-20080324.orig/debian/kexec-tools.dirs
++++ kexec-tools-20080324/debian/kexec-tools.dirs
+@@ -0,0 +1 @@
++sbin
+--- kexec-tools-20080324.orig/debian/control
++++ kexec-tools-20080324/debian/control
+@@ -0,0 +1,13 @@
++Source: kexec-tools
++Section: admin
++Priority: optional
++Maintainer: Khalid Aziz <khalid@debian.org>
++Build-Depends: debhelper (>= 4.0.0), dpatch, gnu-efi (>=3.0a-4)[ia64], libz-dev[ia64], po-debconf
++Standards-Version: 3.7.3
++
++Package: kexec-tools
++Architecture: i386 amd64 ppc64 powerpc ia64 s390
++Depends: ${shlibs:Depends}, ${misc:Depends}, debconf
++Description: kexec tool for kexec reboots
++ This tool is used to load a kernel in memory and reboot into the kernel
++ loaded in memory using the kexec system call.
+--- kexec-tools-20080324.orig/debian/kexec-tools.postrm
++++ kexec-tools-20080324/debian/kexec-tools.postrm
+@@ -0,0 +1,38 @@
++#! /bin/sh
++# postrm script for kexec-tools
++#
++# see: dh_installdeb(1)
++
++set -e
++
++# summary of how this script can be called:
++#        * <postrm> `remove'
++#        * <postrm> `purge'
++#        * <old-postrm> `upgrade' <new-version>
++#        * <new-postrm> `failed-upgrade' <old-version>
++#        * <new-postrm> `abort-install'
++#        * <new-postrm> `abort-install' <old-version>
++#        * <new-postrm> `abort-upgrade' <old-version>
++#        * <disappearer's-postrm> `disappear' <r>overwrit>r> <new-version>
++# for details, see http://www.debian.org/doc/debian-policy/ or
++# the debian-policy package
++
++
++case "$1" in
++       purge|remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
++
++
++        ;;
++
++    *)
++        echo "postrm called with unknown argument \`$1'" >&2
++        exit 1
++
++esac
++
++# dh_installdeb will replace this with shell code automatically
++# generated by other debhelper scripts.
++
++#DEBHELPER#
++
++exit 0
+--- kexec-tools-20080324.orig/debian/watch
++++ kexec-tools-20080324/debian/watch
+@@ -0,0 +1,2 @@
++version=3
++http://www.kernel.org/pub/linux/kernel/people/horms/kexec-tools/kexec-tools-testing-(.*)\.tar\.gz
+--- kexec-tools-20080324.orig/debian/kexec-tools.postinst
++++ kexec-tools-20080324/debian/kexec-tools.postinst
+@@ -0,0 +1,97 @@
++#! /bin/sh 
++# postinst script for kexec-tools
++#
++# see: dh_installdeb(1)
++
++set -e
++
++update_param() {                                                               
++        eval old=\"'$'$1\"
++        eval new=\"'$'new_$1\"
++
++        if test "$old" = "$new"; then
++                return
++        fi
++
++        if test -z "$old"; then
++                grep -Eq "^ *$1=" "$INITCONFFILE" || echo "$1=" \
++                       >> "$INITCONFFILE"
++        fi
++
++	sed -e "s/^ *$1=.*/$1=$new/" < $INITCONFFILE > $INITCONFFILE.$$
++	mv -f $INITCONFFILE.$$ $INITCONFFILE
++}
++
++# summary of how this script can be called:
++#        * <postinst> `configure' <most-recently-configured-version>
++#        * <old-postinst> `abort-upgrade' <new version>
++#        * <conflictor's-postinst> `abort-remove' `in-favour' <package>
++#          <new-version>
++#        * <deconfigured's-postinst> `abort-deconfigure' `in-favour'
++#          <failed-install-package> <version> `removing'
++#          <conflicting-package> <version>
++# for details, see http://www.debian.org/doc/debian-policy/ or
++# the debian-policy package
++#
++
++case "$1" in
++    configure)
++	if [ -L /etc/rc6.d/K39kexec-load ]; then
++	    # remove this old entry, we'll add correct one below
++	    update-rc.d -f kexec-load remove > /dev/null || exit 0
++	fi
++    ;;
++
++    abort-upgrade|abort-remove|abort-deconfigure)
++    exit 0	
++    ;;
++
++    *)
++        echo "postinst called with unknown argument \`$1'" >&2
++        exit 1
++    ;;
++esac
++
++# Handle debconf
++. /usr/share/debconf/confmodule
++                                                                                                                              
++INITCONFFILE=/etc/default/kexec
++ 
++# We generate several files during the postinst, and we don't want
++#       them to be readable only by root.
++umask 022
++ 
++# Generate configuration file if it does not exist, using default values.
++[ -r "${INITCONFFILE}" ] || {
++        echo Generating ${INITCONFFILE}... >&2
++        cat >${INITCONFFILE} <<'EOFMAGICNUMBER1234'
++# Defaults for kexec initscript
++# sourced by /etc/init.d/kexec and /etc/init.d/kexec-load
++
++# Load a kexec kernel (true/false)
++LOAD_KEXEC=true
++
++# Kernel and initrd image
++KERNEL_IMAGE="/vmlinuz"
++INITRD="/initrd.img"
++
++# If empty, use current /proc/cmdline
++APPEND=""
++EOFMAGICNUMBER1234
++}
++
++. ${INITCONFFILE}
++# ------------------------- Debconf questions start ---------------------
++
++db_get kexec-tools/load_kexec || RET=true
++new_LOAD_KEXEC="${RET}"
++update_param LOAD_KEXEC
++db_stop
++                                                                                                                              
++# ------------------------- Debconf questions end ---------------------
++
++#DEBHELPER#
++
++exit 0
++
++
+--- kexec-tools-20080324.orig/debian/kexec-tools.config
++++ kexec-tools-20080324/debian/kexec-tools.config
+@@ -0,0 +1,23 @@
++#!/bin/sh -e
++CONFFILE=/etc/default/kexec
++
++# Source debconf library.
++. /usr/share/debconf/confmodule
++ 
++CONFIG_MODE=""
++
++if test -e "$CONFFILE"; then
++	. "$CONFFILE"
++
++	# Guard against admin writing silly things into the
++	# config file...
++	if test "$LOAD_KEXEC" != "1" -a "$LOAD_KEXEC" != "true" ; then 
++		db_set kexec-tools/load_kexec "false"
++	else
++		db_set kexec-tools/load_kexec "true"
++	fi
++fi
++
++# Setup and select the configuration mode
++db_input medium kexec-tools/load_kexec || true
++db_go
+--- kexec-tools-20080324.orig/debian/kexec-tools.templates
++++ kexec-tools-20080324/debian/kexec-tools.templates
+@@ -0,0 +1,7 @@
++Template: kexec-tools/load_kexec
++Type: boolean
++Default: true
++_Description: Should kexec-tools handle reboots?
++ If you choose this option, a system reboot will trigger a restart
++ into a kernel loaded by kexec instead of going through the full
++ system bootloader process.
+--- kexec-tools-20080324.orig/debian/compat
++++ kexec-tools-20080324/debian/compat
+@@ -0,0 +1 @@
++4
+--- kexec-tools-20080324.orig/debian/po/fr.po
++++ kexec-tools-20080324/debian/po/fr.po
+@@ -0,0 +1,33 @@
++# kexec-tools debconf .
++# Copyright (C) 2008 Steve Petruzzello <dlist@debian.org>
++# This file is distributed under the same license as the kexec-tools package.
++# Khalid Aziz <khalid@debian.org>
++#
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools 20080227-2\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-04-28 21:34+2\n"
++"Last-Translator: Steve Petruzzello <dlist@bluewin.ch>\n"
++"Language-Team: French <debian-l10n-french@lists.debian.org>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=utf-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "Faut-il gérer les redémarrages avec kexec-tools ?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
++"Si vous choisissez cette option, le système redémarrera avec un noyau chargé "
++"par kexec plutôt que par le programme de démarrage habituel. "
+--- kexec-tools-20080324.orig/debian/po/gl.po
++++ kexec-tools-20080324/debian/po/gl.po
+@@ -0,0 +1,33 @@
++# Galician translation of kexec-tools's debconf templates
++# This file is distributed under the same license as the kexec-tools package.
++# Jacobo Tarrio <jtarrio@debian.org>, 2008.
++#
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-04-25 21:26+0100\n"
++"Last-Translator: Jacobo Tarrio <jtarrio@debian.org>\n"
++"Language-Team: Galician <proxecto@trasno.net>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=UTF-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "¿Debe kexec-tools xestionar os reinicios?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
++"Se escolle esta opción, o reinicio do sistema ha facer que se cargue un "
++"núcleo cargado mediante kexec no canto de pasar por todo o proceso de inicio "
++"do sistema."
+--- kexec-tools-20080324.orig/debian/po/pt.po
++++ kexec-tools-20080324/debian/po/pt.po
+@@ -0,0 +1,33 @@
++# Portuguese translation of kexec-tool's debconf messages.
++# Copyright (C) 2008
++# This file is distributed under the same license as the kexec-tools package.
++# Ricardo Silva <ardoric@gmail.com>, 2008.
++#
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools \n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-04-28 22:48+0100\n"
++"Last-Translator: Ricardo Silva <ardoric@gmail.com>\n"
++"Language-Team: Portuguese <traduz@debianpt.org>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=UTF-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "Usar o kexec-tools para reiniciar o computador?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
++"Se escolher esta opção, reiniciar o sistema irá carregar um kernel usando "
++"o kexec em vez de passar por todo o processo de reiniciar o computador."
+--- kexec-tools-20080324.orig/debian/po/cs.po
++++ kexec-tools-20080324/debian/po/cs.po
+@@ -0,0 +1,33 @@
++# Czech translation of kexec-tools debconf messages.
++# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
++# This file is distributed under the same license as the kexec-tools package.
++# Miroslav Kure <kurem@debian.cz>, 2008
++#
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-05-09 14:04+0200\n"
++"Last-Translator: Miroslav Kure <kurem@debian.cz>\n"
++"Language-Team: Czech <debian-l10n-czech@lists.debian.org>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=UTF-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "Mají se kexec-tools starat o restarty?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
++"Zvolíte-li tuto možnost, nebude se při restartu systému provádět celá "
++"zaváděcí sekvence, ale restartuje se do jádra zavedeného přes kexec."
+--- kexec-tools-20080324.orig/debian/po/POTFILES.in
++++ kexec-tools-20080324/debian/po/POTFILES.in
+@@ -0,0 +1 @@
++[type: gettext/rfc822deb] kexec-tools.templates
+--- kexec-tools-20080324.orig/debian/po/ru.po
++++ kexec-tools-20080324/debian/po/ru.po
+@@ -0,0 +1,38 @@
++# translation of ru.po to Russian
++# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
++# This file is distributed under the same license as the PACKAGE package.
++#
++# Yuri Kozlov <kozlov.y@gmail.com>, 2008.
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools 20080324-1\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-04-26 09:17+0400\n"
++"Last-Translator: Yuri Kozlov <kozlov.y@gmail.com>\n"
++"Language-Team: Russian <debian-l10n-russian@lists.debian.org>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=UTF-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++"X-Generator: KBabel 1.11.4\n"
++"Plural-Forms:  nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "Использовать kexec-tools для обработки команд на перезагрузку?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
++"Если вы ответите утвердительно, при перезагрузке системы "
++"будет выполнен перезапуск в ядро, загруженное с помощью "
++"kexec, а не как обычно, с полным перезапуском системы с использованием "
++"загрузчика."
++
+--- kexec-tools-20080324.orig/debian/po/vi.po
++++ kexec-tools-20080324/debian/po/vi.po
+@@ -0,0 +1,33 @@
++# Vietnamese translation for Kexec-Tools.
++# Copyright © 2008 Free Software Foundation, Inc.
++# Clytie Siddall <clytie@riverland.net.au>, 2008.
++#
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools 20080324-1\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-04-28 16:06+0930\n"
++"Last-Translator: Clytie Siddall <clytie@riverland.net.au>\n"
++"Language-Team: Vietnamese <vi-VN@googlegroups.com>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=UTF-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++"Plural-Forms: nplurals=1; plural=0;\n"
++"X-Generator: LocFactoryEditor 1.7b3\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "kexec-tools nên quản lý việc khởi động lại không?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
++"Bật tùy chọn này thì việc khởi động hệ thống sẽ gây ra tiến trình khởi chạy lại vào một hạt nhân được kexec nạp, thay vào chạy tiến trình nạp và thực hiện hệ thống hoàn toàn."
+--- kexec-tools-20080324.orig/debian/po/templates.pot
++++ kexec-tools-20080324/debian/po/templates.pot
+@@ -0,0 +1,32 @@
++# SOME DESCRIPTIVE TITLE.
++# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
++# This file is distributed under the same license as the PACKAGE package.
++# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
++#
++#, fuzzy
++msgid ""
++msgstr ""
++"Project-Id-Version: PACKAGE VERSION\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
++"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
++"Language-Team: LANGUAGE <LL@li.org>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=CHARSET\n"
++"Content-Transfer-Encoding: 8bit\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr ""
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
+--- kexec-tools-20080324.orig/debian/po/fi.po
++++ kexec-tools-20080324/debian/po/fi.po
+@@ -0,0 +1,26 @@
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-04-26 08:30+0200\n"
++"Last-Translator: Esko Arajärvi <edu@iki.fi>\n"
++"Language-Team: Finnish <debian-l10n-finnish@lists.debian.org>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=UTF-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++"X-Poedit-Language: Finnish\n"
++"X-Poedit-Country: FINLAND\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "Tulisiko kexec-toolsin hallinnoida järjestelmän uudelleenkäynnistystä?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "If you choose this option, a system reboot will trigger a restart into a kernel loaded by kexec instead of going through the full system bootloader process."
++msgstr "Jos valitset tämän vaihtoehdon, järjestelmä käynnistetään uudelleen käyttäen kexecin lataamaa ydintä täyden alkulatausohjelman avulla tehtävän prosessin sijaan."
++
+--- kexec-tools-20080324.orig/debian/po/de.po
++++ kexec-tools-20080324/debian/po/de.po
+@@ -0,0 +1,34 @@
++# German translation of the kexec-tools debconf template
++# Copyright 2008 Kai Wasserbäch <debian@carbon-project.org>
++# This file is distributed under the same license as the kexec-tools package.
++#
++msgid ""
++msgstr ""
++"Project-Id-Version: kexec-tools 20080324-1\n"
++"Report-Msgid-Bugs-To: kexec-tools@packages.debian.org\n"
++"POT-Creation-Date: 2008-04-25 10:38-0600\n"
++"PO-Revision-Date: 2008-04-28 19:31+0200\n"
++"Last-Translator: Kai Wasserbäch <debian@carbon-project.org>\n"
++"Language-Team: German <debian-l10n-german@lists.debian.org>\n"
++"MIME-Version: 1.0\n"
++"Content-Type: text/plain; charset=UTF-8\n"
++"Content-Transfer-Encoding: 8bit\n"
++"Plural-Forms:  nplurals=2; plural=(n != 1);\n"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid "Should kexec-tools handle reboots?"
++msgstr "Soll »kexec-tools« Neustarts verwalten?"
++
++#. Type: boolean
++#. Description
++#: ../kexec-tools.templates:1001
++msgid ""
++"If you choose this option, a system reboot will trigger a restart into a "
++"kernel loaded by kexec instead of going through the full system bootloader "
++"process."
++msgstr ""
++"Falls Sie diese Option wählen, führt ein Systemneustart zum Start eines von "
++"»kexec« geladenen Kernels, anstatt den gesamten Bootloader-Prozess "
++"zu durchlaufen."
+--- kexec-tools-20080324.orig/debian/patches/update_kexec_manpage.dpatch
++++ kexec-tools-20080324/debian/patches/update_kexec_manpage.dpatch
+@@ -0,0 +1,21 @@
++#!/bin/sh /usr/share/dpatch/dpatch-run
++## update_kexec_manpage.dpatch by  <khalid@debian.org>
++##
++## All lines beginning with `## DP:' are a description of the patch.
++## DP: This patch updates kexec man page
++
++@DPATCH@
++diff -urN --exclude=debian kexec-tools-testing-20080227/kexec/kexec.8 kexec-tools-20080227.debian/kexec/kexec.8
++--- kexec-tools-testing-20080227/kexec/kexec.8	2008-02-28 14:23:18.000000000 -0700
+++++ kexec-tools-20080227.debian/kexec/kexec.8	2008-02-28 14:23:48.000000000 -0700
++@@ -55,10 +55,6 @@ where
++ .I kernel\-image
++ is the kernel file that you intend to reboot to.
++ .PP
++-Note: Compressed kernel images such as bzImage are not supported by
++-.BR kexec .
++-Use the uncompressed vmlinux.
++-.PP
++ Insert the command-line parameters that must be passed to the new
++ kernel into
++ .IR command\-line\-options .
+--- kexec-tools-20080324.orig/debian/patches/crashdump_warning.dpatch
++++ kexec-tools-20080324/debian/patches/crashdump_warning.dpatch
+@@ -0,0 +1,95 @@
++#! /bin/sh /usr/share/dpatch/dpatch-run
++## crashdump_warning.dpatch by  <mckinstry@debian.org>
++##
++## All lines beginning with `## DP:' are a description of the patch.
++## DP: Adds warnings if crashdump kernel fails to load
++
++@DPATCH@
++diff -urNp --exclude=debian kexec-tools-0.20070319.rc/kexec/arch/x86_64/crashdump-x86_64.c kexec-tools-testing-20070319-rc/kexec/arch/x86_64/crashdump-x86_64.c
++--- kexec-tools-0.20070319.rc/kexec/arch/x86_64/crashdump-x86_64.c	2007-03-07 01:52:54.000000000 -0700
+++++ kexec-tools-testing-20070319-rc/kexec/arch/x86_64/crashdump-x86_64.c	2007-03-29 17:30:45.000000000 -0600
++@@ -593,7 +593,9 @@ int load_crashdump_segments(struct kexec
++ 	memset(memmap_p, 0, sz);
++ 	add_memmap(memmap_p, BACKUP_SRC_START, BACKUP_SRC_SIZE);
++ 	sz = crash_reserved_mem.end - crash_reserved_mem.start +1;
++-	add_memmap(memmap_p, crash_reserved_mem.start, sz);
+++	if (add_memmap(memmap_p, crash_reserved_mem.start, sz) < 0) {
+++		return ENOCRASHKERNEL;
+++	}
++ 
++ 	/* Create a backup region segment to store backup data*/
++ 	sz = (BACKUP_SRC_SIZE + align - 1) & ~(align - 1);
++@@ -602,14 +604,14 @@ int load_crashdump_segments(struct kexec
++ 	info->backup_start = add_buffer(info, tmp, sz, sz, align,
++ 				0, max_addr, 1);
++ 	if (delete_memmap(memmap_p, info->backup_start, sz) < 0)
++-		return -1;
+++		return EFAILED;
++ 
++ 	/* Create elf header segment and store crash image data. */
++ 	if (crash_create_elf64_headers(info, &elf_info,
++ 				       crash_memory_range, nr_ranges,
++ 				       &tmp, &sz,
++ 				       ELF_CORE_HEADER_ALIGN) < 0)
++-		return -1;
+++		return EFAILED;
++ 
++ 	/* Hack: With some ld versions (GNU ld version 2.14.90.0.4 20030523),
++ 	 * vmlinux program headers show a gap of two pages between bss segment
++diff -urNp --exclude=debian kexec-tools-0.20070319.rc/kexec/arch/x86_64/kexec-elf-x86_64.c kexec-tools-testing-20070319-rc/kexec/arch/x86_64/kexec-elf-x86_64.c
++--- kexec-tools-0.20070319.rc/kexec/arch/x86_64/kexec-elf-x86_64.c	2007-03-07 01:52:54.000000000 -0700
+++++ kexec-tools-testing-20070319-rc/kexec/arch/x86_64/kexec-elf-x86_64.c	2007-03-29 17:31:42.000000000 -0600
++@@ -241,7 +241,7 @@ int elf_x86_64_load(int argc, char **arg
++ 			rc = load_crashdump_segments(info, modified_cmdline,
++ 							max_addr, 0);
++ 			if (rc < 0)
++-				return -1;
+++				return rc;
++ 			/* Use new command line. */
++ 			command_line = modified_cmdline;
++ 			command_line_len = strlen(modified_cmdline) + 1;
++diff -urNp --exclude=debian kexec-tools-0.20070319.rc/kexec/kexec.c kexec-tools-testing-20070319-rc/kexec/kexec.c
++--- kexec-tools-0.20070319.rc/kexec/kexec.c	2007-03-18 22:38:50.000000000 -0600
+++++ kexec-tools-testing-20070319-rc/kexec/kexec.c	2007-03-29 17:36:06.000000000 -0600
++@@ -625,10 +625,20 @@ static int my_load(const char *type, int
++ 			}
++ 		}
++ 	}
++-	if (file_type[i].load(argc, argv, kernel_buf,
++-			      kernel_size, &info) < 0) {
++-		fprintf(stderr, "Cannot load %s\n", kernel);
++-		return -1;
+++	result = file_type[i].load(argc, argv, kernel_buf, kernel_size, &info);
+++	if (result < 0) {
+++		switch (result) {
+++		case ENOCRASHKERNEL:
+++			fprintf(stderr,
+++				"No crash kernel segment found in /proc/iomem\n"
+++				"Please check the crashkernel= boot parameter.\n");
+++				break;
+++		case EFAILED:
+++		default:
+++			fprintf(stderr, "Cannot load %s\n", kernel);
+++			break;
+++		}
+++		return result;
++ 	}
++ 	/* If we are not in native mode setup an appropriate trampoline */
++ 	if (arch_compat_trampoline(&info) < 0) {
++diff -urNp --exclude=debian kexec-tools-0.20070319.rc/kexec/kexec.h kexec-tools-testing-20070319-rc/kexec/kexec.h
++--- kexec-tools-0.20070319.rc/kexec/kexec.h	2007-03-18 22:38:50.000000000 -0600
+++++ kexec-tools-testing-20070319-rc/kexec/kexec.h	2007-03-29 17:38:13.000000000 -0600
++@@ -52,6 +52,13 @@
++ #error unknwon BYTE_ORDER
++ #endif
++ 
+++/*
+++ * Document some of the reasons why crashdump may fail, so we can give
+++ * better error messaging
+++ */
+++
+++#define		EFAILED		-1	/* default error code */
+++#define		ENOCRASHKERNEL	-2	/* no memory reserved for crashkernel */
++ 
++ #if 0
++ /*
+--- kexec-tools-20080324.orig/debian/patches/static_binary_warning.dpatch
++++ kexec-tools-20080324/debian/patches/static_binary_warning.dpatch
+@@ -0,0 +1,33 @@
++#! /bin/sh /usr/share/dpatch/dpatch-run
++## static_binary_warning.dpatch by  <khalid@debian.org>
++##
++## All lines beginning with `## DP:' are a description of the patch.
++## DP: This patch adds fixes to keep lintian happy
++
++@DPATCH@
++diff -urN --exclude=debian kexec-tools-testing-20080227/kexec_test/Makefile kexec-tools-20080227.debian/kexec_test/Makefile
++--- kexec-tools-testing-20080227/kexec_test/Makefile	2008-02-21 01:09:02.000000000 -0700
+++++ kexec-tools-20080227.debian/kexec_test/Makefile	2008-02-27 10:12:20.000000000 -0700
++@@ -20,7 +20,7 @@
++ KEXEC_TEST_OBJS = $(call objify, $(KEXEC_TEST_SRCS))
++ KEXEC_TEST_DEPS = $(call depify, $(KEXEC_TEST_OBJS))
++ 
++-KEXEC_TEST = $(PKGLIBDIR)/kexec_test
+++KEXEC_TEST = $(PKGLIBDIR)/kexec_test.static
++ 
++ clean += $(KEXEC_TEST_OBJS) $(KEXEC_TEST_DEPS) $(KEXEC_TEST)
++ 
++diff -urN --exclude=debian kexec-tools-testing-20080227/Makefile.in kexec-tools-20080227.debian/Makefile.in
++--- kexec-tools-testing-20080227/Makefile.in	2008-02-27 10:12:52.000000000 -0700
+++++ kexec-tools-20080227.debian/Makefile.in	2008-02-27 10:12:08.000000000 -0700
++@@ -103,8 +103,8 @@
++ 
++ MAN_PAGES:= $(MANDIR)/man8/kexec.8
++ MAN_PAGES+= $(MANDIR)/man8/kdump.8
++-BINARIES_i386:=  $(SBINDIR)/kexec $(PKGLIBDIR)/kexec_test
++-BINARIES_x86_64:=$(SBINDIR)/kexec $(PKGLIBDIR)/kexec_test
+++BINARIES_i386:=  $(SBINDIR)/kexec $(PKGLIBDIR)/kexec_test.static
+++BINARIES_x86_64:=$(SBINDIR)/kexec $(PKGLIBDIR)/kexec_test.static
++ BINARIES:=$(SBINDIR)/kexec $(SBINDIR)/kdump $(BINARIES_$(ARCH))
++ 
++ TARGETS:=$(BINARIES) $(MAN_PAGES)
+--- kexec-tools-20080324.orig/debian/patches/powerpc_fix.dpatch
++++ kexec-tools-20080324/debian/patches/powerpc_fix.dpatch
+@@ -0,0 +1,79 @@
++#! /bin/sh /usr/share/dpatch/dpatch-run
++## powerpc_fix.dpatch by  <khalid@debian.org>
++##
++## All lines beginning with `## DP:' are a description of the patch.
++## DP: This patch enables compilation on powerpc architecture
++
++@DPATCH@
++diff -urN --exclude=debian kexec-tools-20080324/kexec/arch/ppc/kexec-ppc.c kexec-tools.debian/kexec/arch/ppc/kexec-ppc.c
++--- kexec-tools-20080324/kexec/arch/ppc/kexec-ppc.c	2007-12-18 22:50:06.000000000 -0700
+++++ kexec-tools.debian/kexec/arch/ppc/kexec-ppc.c	2008-05-05 09:05:37.000000000 -0600
++@@ -27,62 +27,21 @@ static struct memory_range memory_range[
++ int get_memory_ranges(struct memory_range **range, int *ranges,
++ 					unsigned long kexec_flags)
++ {
++-	int memory_ranges = 0;
++ #ifdef WITH_GAMECUBE
+++	int memory_ranges = 0;
+++
++ 	/* RAM - lowmem used by DOLs - framebuffer */
++ 	memory_range[memory_ranges].start = 0x00003000;
++ 	memory_range[memory_ranges].end = 0x0174bfff;
++ 	memory_range[memory_ranges].type = RANGE_RAM;
++ 	memory_ranges++;
++-#else
++-#error Please, fix this for your platform
++-	const char *iomem = proc_iomem();
++-	char line[MAX_LINE];
++-	FILE *fp;
++-	unsigned long long start, end;
++-	char *str;
++-	int type, consumed, count;
++-
++-	fp = fopen(iomem, "r");
++-	if (!fp) {
++-		fprintf(stderr, "Cannot open %s: %s\n", iomem, strerror(errno));
++-		return -1;
++-	}
++-	while (fgets(line, sizeof(line), fp) != 0) {
++-		if (memory_ranges >= MAX_MEMORY_RANGES)
++-			break;
++-		count = sscanf(line, "%Lx-%Lx : %n", &start, &end, &consumed);
++-		if (count != 2)
++-			continue;
++-		str = line + consumed;
++-		end = end + 1;
++-#if 0
++-		printf("%016Lx-%016Lx : %s\n", start, end, str);
++-#endif
++-		if (memcmp(str, "System RAM\n", 11) == 0) {
++-			type = RANGE_RAM;
++-		} else if (memcmp(str, "reserved\n", 9) == 0) {
++-			type = RANGE_RESERVED;
++-		} else if (memcmp(str, "ACPI Tables\n", 12) == 0) {
++-			type = RANGE_ACPI;
++-		} else if (memcmp(str, "ACPI Non-volatile Storage\n", 26) == 0) {
++-			type = RANGE_ACPI_NVS;
++-		} else {
++-			continue;
++-		}
++-		memory_range[memory_ranges].start = start;
++-		memory_range[memory_ranges].end = end;
++-		memory_range[memory_ranges].type = type;
++-#if 0
++-		printf("%016Lx-%016Lx : %x\n", start, end, type);
++-#endif
++-		memory_ranges++;
++-	}
++-	fclose(fp);
++-#endif
++ 	*range = memory_range;
++ 	*ranges = memory_ranges;
++ 	return 0;
+++#else
+++	fprintf(stderr, "%s(): Unsupported platform\n", __func__);
+++	return -1;
+++#endif
++ }
++ 
++ struct file_type file_type[] = {
+--- kexec-tools-20080324.orig/debian/patches/debianize.dpatch
++++ kexec-tools-20080324/debian/patches/debianize.dpatch
+@@ -0,0 +1,30 @@
++#! /bin/sh /usr/share/dpatch/dpatch-run
++## debianize.dpatch by  <khalid@debian.org>
++##
++## All lines beginning with `## DP:' are a description of the patch.
++## DP: This patch adds fixes to keep lintian happy
++
++@DPATCH@
++diff -urN --exclude=debian kexec-tools-testing-20080227/Makefile.in kexec-tools-20080227.debian/Makefile.in
++--- kexec-tools-testing-20080227/Makefile.in	2008-02-26 18:07:12.000000000 -0700
+++++ kexec-tools-20080227.debian/Makefile.in	2008-02-27 10:09:12.000000000 -0700
++@@ -86,7 +86,7 @@
++ LOCALSTATEDIR=$(BUILD_PREFIX)/var
++ LIBDIR=$(BUILD_PREFIX)/lib
++ INFODIR=$(BUILD_PREFIX)/info
++-MANDIR=$(BUILD_PREFIX)/man
+++MANDIR=$(BUILD_PREFIX)/share/man
++ MAN1DIR=$(MANDIR)/man1
++ MAN2DIR=$(MANDIR)/man2
++ MAN3DIR=$(MANDIR)/man3
++@@ -101,8 +101,8 @@
++ PKGLIBDIR=$(LIBDIR)/$(PACKAGE_NAME)
++ PKGINCLUDEIR=$(INCLUDEDIR)/$(PACKAGE_NAME)
++ 
++-MAN_PAGES:= kexec/kexec.8
++-MAN_PAGES+= kdump/kdump.8
+++MAN_PAGES:= $(MANDIR)/man8/kexec.8
+++MAN_PAGES+= $(MANDIR)/man8/kdump.8
++ BINARIES_i386:=  $(SBINDIR)/kexec $(PKGLIBDIR)/kexec_test
++ BINARIES_x86_64:=$(SBINDIR)/kexec $(PKGLIBDIR)/kexec_test
++ BINARIES:=$(SBINDIR)/kexec $(SBINDIR)/kdump $(BINARIES_$(ARCH))
+--- kexec-tools-20080324.orig/debian/patches/distclean_fix.dpatch
++++ kexec-tools-20080324/debian/patches/distclean_fix.dpatch
+@@ -0,0 +1,19 @@
++#! /bin/sh /usr/share/dpatch/dpatch-run
++## distclean_fix.dpatch by  <khalid@debian.org>
++##
++## All lines beginning with `## DP:' are a description of the patch.
++## DP: This patch updates distclean to clean up stamp files upstream fails to
++
++@DPATCH@
++diff -urN --exclude=debian kexec-tools-testing-20080324/Makefile.in kexec-tools-20080324.debian/Makefile.in
++--- kexec-tools-testing-20080324/Makefile.in	2008-04-25 09:26:40.000000000 -0600
+++++ kexec-tools-20080324.debian/Makefile.in	2008-04-25 09:27:52.000000000 -0600
++@@ -231,7 +231,7 @@ clean:
++ distclean: dist-clean
++ 
++ dist-clean: clean
++-	$(RM) -f config.log config.status config.cache Makefile include/config.h
+++	$(RM) -f config.log config.status config.cache Makefile include/config.h include/stamp-h*
++ 
++ install: $(TARGETS)
++ 	for file in $(TARGETS) ; do \
+--- kexec-tools-20080324.orig/debian/patches/00list
++++ kexec-tools-20080324/debian/patches/00list
+@@ -0,0 +1,6 @@
++debianize.dpatch
++crashdump_warning.dpatch
++static_binary_warning.dpatch
++update_kexec_manpage.dpatch
++distclean_fix.dpatch
++powerpc_fix.dpatch

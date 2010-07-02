@@ -1,0 +1,225 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Initialize an emulab to act as a protogeni emulab. Add optional -c
+# option if this is a clearinghouse.
+# 
+sub usage()
+{
+    print "Usage: initclrhouse\n";
+    exit(1);
+}
+my $optlist = "";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $geniuserid    = "geniuser";
+my $geniprojid    = "GeniSlices";
+my $PROTOUSER	  = "elabman";
+my $NEWUSER	  = "$TB/sbin/newuser";
+my $NEWPROJ	  = "$TB/sbin/newproj";
+my $MKPROJ	  = "$TB/sbin/mkproj";
+my $TBACCT	  = "$TB/sbin/tbacct";
+my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
+my $GETCACERTS    = "$TB/sbin/protogeni/getcacerts";
+my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
+my $GENCRL        = "$TB/sbin/protogeni/gencrl";
+my $GENCRLBUNDLE  = "$TB/sbin/protogeni/gencrlbundle";
+my $MKSYSCERT	  = "$TB/sbin/mksyscert";
+my $WAP           = "$TB/sbin/withadminprivs";
+my $SACERT	  = "$TB/etc/genisa.pem";
+my $CMCERT	  = "$TB/etc/genicm.pem";
+my $CHCERT	  = "$TB/etc/genich.pem";
+my $SUDO	  = "/usr/local/bin/sudo";
+my $MYSQL         = "/usr/local/bin/mysql";
+my $MYSQLADMIN    = "/usr/local/bin/mysqladmin";
+my $MYSQLSHOW     = "/usr/local/bin/mysqlshow";
+my $MYSQLDUMP     = "/usr/local/bin/mysqldump";
+my $PKG_INFO      = "/usr/sbin/pkg_info";
+my $FETCH	  = "/usr/bin/fetch";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+#
+# Packages.
+#
+my %packlist = ("libxml2>=2.6.26"       => "/usr/ports/textproc/libxml2",
+		"p5-Frontier-RPC"       => "/usr/ports/net/p5-Frontier-RPC",
+		"p5-XML-LibXML"         => "/usr/ports/textproc/p5-XML-LibXML",
+		"xmlsec1"               => "/usr/ports/security/xmlsec1",
+		"p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay"
+		);
+my $needpkgs = 0;
+
+foreach my $pkgname (sort(keys(%packlist))) {
+    my $pkgdir = $packlist{$pkgname};
+    
+    print STDERR "Checking for package $pkgname\n";
+
+    next
+	if (system("$PKG_INFO -E '${pkgname}*' >/dev/null") == 0);
+
+    print STDERR "Please install $pkgdir\n";
+    $needpkgs++;
+}
+if ($needpkgs) {
+    print STDERR "Then return to this script and start again.\n";
+    exit(1);
+}
+
+#
+# The web server needs to do client authentication, for the geni xmlrpc
+# interface. A bundle of CA certs from the trusted roots (emulabs) will
+# be used. This bundle will periodically update as sites come online.
+#
+if (! -e "$TB/etc/genica.bundle") {
+    system("/bin/cp $TB/etc/emulab.pem $TB/etc/genica.bundle") == 0
+	or fatal("Could not initialize $TB/etc/genica.bundle");
+}
+if (! -e "$TB/etc/genicrl.bundle") {
+    system("/usr/bin/touch $TB/etc/genicrl.bundle") == 0
+	or fatal("Could not initialize $TB/etc/genicrl.bundle");
+}
+
+if (! -e "$TB/www/genica.bundle") {
+    system("/bin/cp $TB/etc/emulab.pem $TB/www/genica.bundle") == 0
+	or fatal("Could not initialize $TB/www/genica.bundle");
+}
+chmod(0644, "$TB/www/genica.bundle");
+
+# CRL 
+if (! -e "$TB/www/genicrl.bundle") {
+    system("/usr/bin/touch $TB/www/genicrl.bundle") == 0
+	or fatal("Could not initialize $TB/www/genicrl.bundle");
+}
+chmod(0644, "$TB/www/genicrl.bundle");
+
+#
+# This is a pain. xmlsec1 cannot deal with a bundle of certs and so we
+# need to split up the bundle into a directory of certs. I hope to deal
+# with this at some point.
+#
+if (! -e "$TB/etc/genicacerts") {
+    mkdir("$TB/etc/genicacerts", 0755)
+	or fatal("Could not mkdir $TB/etc/genicacerts");
+}
+system("/bin/cp $TB/etc/emulab.pem $TB/etc/genicacerts") == 0
+    or fatal("Could not initialize $TB/etc/genicacerts");
+chmod(0644, "$TB/etc/genicacerts/emulab.pem");
+
+#
+# I do not understand where this file comes from.
+#
+if (! -e "$TB/ssl/index.txt.attr" ||
+    system("egrep -q -s 'no' $TB/ssl/index.txt.attr")) {
+    system("echo 'unique_subject = no' > $TB/ssl/index.txt.attr") == 0
+	or fatal("Could not update $TB/ssl/index.txt.attr");
+}
+
+if (!system("egrep -q -s 'apache_flags=\"-DSSL' " .
+	    "/usr/local/etc/rc.d/apache.sh")) {
+    system("sed -i .backup 's/apache_flags=\"-DSSL/" .
+	   "apache_flags=\"\${apache_flags--DSSL}/' " .
+	   "/usr/local/etc/rc.d/apache.sh");
+}
+
+system("/usr/local/etc/rc.d/apache.sh restart") == 0
+    or fatal("Could not restart apache");
+
+#
+# Databases.
+#
+print "Creating Databases ...\n";
+foreach my $dbname ("geni", "geni-ch", "geni-cm") {
+    if (system("$MYSQLSHOW $dbname >/dev/null 2>/dev/null")) {
+	system("$MYSQLADMIN create $dbname") == 0
+	    or fatal("Could not create DB: $dbname");
+    }
+    if (system("$MYSQLDUMP -d $dbname geni_users >/dev/null 2>/dev/null")) {
+	system("$MYSQL $dbname < $TB/etc/protogeni/protogeni.sql") == 0
+	    or fatal("Could not initialize DB: $dbname");
+    }
+}
+
+#
+# Now we can load the libraries.
+#
+require Genixmlrpc;
+require GeniRegistry;
+
+print "Creating CH certificate ...\n";
+system("$SUDO -u geniuser $MKSYSCERT -o $CHCERT ".
+       "  -u $TBBASE/protogeni/xmlrpc/ch $PGENIDOMAIN.ch") == 0
+    or fatal("Could not generate $CHCERT");
+
+#
+# Copy the CH certificate out to the web interface, but only the public
+# key of course. 
+#
+my $chcertificate = GeniCertificate->LoadFromFile($CHCERT);
+fatal("Could not load certificate from $CHCERT")
+    if (!defined($chcertificate));
+    
+my $certfile = $chcertificate->WriteToFile();
+if (system("$SUDO /bin/mv $certfile $TB/www/genich.pem")) {
+    $chcertificate->Delete();
+    unlink($certfile);
+    fatal("Could not mv $certfile to $TB/www/genich.pem");
+}
+chmod(0644, "$TB/www/genich.pem");
+
+#
+# Add the cert to the DB directly.
+#
+system("$ADDAUTHORITY -c $CHCERT ma") == 0
+    or fatal("Could not add MA certificate");
+
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

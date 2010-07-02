@@ -1,0 +1,240 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use lib "@prefix@/lib";
+
+use English;
+use libdb;
+
+my %events = ();
+my $currentEvents = ();
+
+# "bounds" for an event...
+my %startBounds = (template_instantiate => ['start'],
+		   template_exprun => ['starting','cleaned'],
+		   template_swapout => ['starting'],
+		   template_create => ['creating','batchexp','modified'],
+		   );
+my %stopBounds = (template_instantiate => ['done'],
+		  template_exprun => ['run started','run stopped'],
+		  template_swapout => ['endexp done'],
+		  template_create => ['created'],
+ 		  );
+
+my $guid = (scalar(@ARGV) > 0)?$ARGV[0]:'';
+my $gss = '';
+if ($guid ne '') {
+    $gss = " where guid='$guid' ";
+}
+
+sub isBound {
+    my ($boundhash,$stamp_type,$modifier) = @_;
+
+    if (!defined($boundhash)) {
+	#print "isBound bad hash\n";
+	return 0;
+    }
+
+    my %bH = %$boundhash;
+
+    if (!defined($stamp_type) || !defined($modifier)) {
+	#print "isBound bad args\n";
+	return 0;
+    }
+
+    if (defined($bH{$stamp_type})) {
+	foreach my $i (@{$bH{$stamp_type}}) {
+	    #print "isBound tried mod '$i'\n";
+	    if ($i eq $modifier) {
+		return 1;
+	    }
+	}
+    }
+    else {
+	#print "isBound no st key\n";
+    }
+
+    return 0;
+}
+
+sub isStartBound {
+    my ($stamp_type,$modifier) = @_;
+
+    return isBound(\%startBounds,$stamp_type,$modifier);
+}
+
+sub isStopBound {
+    my ($stamp_type,$modifier) = @_;
+
+    return isBound(\%stopBounds,$stamp_type,$modifier);
+}
+
+
+my $q = DBQueryFatal("select * from template_stamps " . 
+		     " $gss" . 
+		     " order by guid,vers,id,stamp");
+
+#my $q = DBQueryFatal("select * from template_stamps where guid=10279 and stamp_type='template_instantiate' order by guid,vers,id,stamp");
+
+my ($maxst,$maxmod) = (0,0);
+
+my $lastG = '';
+while (my ($g,$v,$id,$instance,
+	   $stype,$mod,$stamp,$at,$ad) = $q->fetchrow_array()) {
+
+    if (!defined($instance)) {
+	$instance = -1;
+    }
+    if (!defined($at)) {
+	$at = '';
+    }
+    if (!defined($ad)) {
+	$ad = '';
+    }
+
+    #print "DEBUG: $g $v $id $stype $mod $stamp $at $ad\n";
+
+    # if it's a start bound, start a new "event"
+    if (isStartBound($stype,$mod)) {
+	# if for some reason there's still a current event (i.e., one that
+	# didn't have a stop bound, add a final FAIL event and close it off.
+	if (defined($currentEvents{$lastG})
+	    && scalar(keys(%{$currentEvents{$lastG}})) > 0) {
+	    if (!defined($events{$lastG})) {
+		$events{$lastG} = [];
+	    }
+
+	    #print "recording a parse FAIL\n";
+
+	    # record a parse fail event
+	    #my @elist = @{$eventInfo{'elist'}};
+	    #my $idx = scalar(@elist);
+	    push @{$currentEvents{$lastG}{'elist'}}, [ 'DB_PARSE_FAIL',
+						       #$currentEvents{$g}{'stop_time'},
+						       0,
+						       '',0.0 ];
+	    
+	    $currentEvents{$lastG}{"stop_mod"} = 'unknown';
+	    $currentEvents{$lastG}{"stop_auxt"} = '';
+	    $currentEvents{$lastG}{"stop_auxd"} = 0.0;
+
+	    push @{$events{$lastG}}, \%{$currentEvents{$g}};
+	    # undef current event for this guid:
+	    delete $currentEvents{$lastG};
+	    
+	}
+
+	if (!defined($currentEvents{$g})) {
+	    my %tmp = ();
+	    $currentEvents{$g} = \%tmp;
+	}
+	
+	#print "found start bound\n";
+
+	$currentEvents{$g}{"start_time"} = $stamp;
+	$currentEvents{$g}{"guid"} = $guid;
+	$currentEvents{$g}{"tvers"} = $v;
+	$currentEvents{$g}{"src"} = $stype;
+	$currentEvents{$g}{"instance"} = $instance;
+	$currentEvents{$g}{"start_mod"} = $mod;
+	$currentEvents{$g}{"start_auxt"} = $at;
+	$currentEvents{$g}{"start_auxd"} = $ad;
+	#my @eventList = ();
+	$currentEvents{$g}{"elist"} = [];
+	# push the start event
+	push @{$currentEvents{$g}{"elist"}}, [$mod,
+					      0,
+					      $at,$ad];
+	#$eventList[scalar(@eventList)] = [$mod,$stamp,$at,$ad];
+    }
+    elsif (isStopBound($stype,$mod)) {
+	#print "found stop bound\n";
+	$currentEvents{$g}{"stop_time"} = $stamp;
+	$currentEvents{$g}{"stop_mod"} = $mod;
+	$currentEvents{$g}{"stop_auxt"} = $at;
+	$currentEvents{$g}{"stop_auxd"} = $ad;
+	#my @eventList = @{$eventInfo{"elist"}};
+	push @{$currentEvents{$g}{"elist"}}, [$mod,
+					      $stamp-$currentEvents{$g}{"start_time"},
+					      $at,$ad];
+	#$eventList[scalar(@eventList)] = [$mod,
+	#				  $stamp - $eventInfo{"start_time"},
+	#				  $at,$ad];
+	# save to main events list.
+	if (!defined($events{$g})) {
+	    my @tmp = ();
+	    $events{$g} = \@tmp;
+	}
+	push @{$events{$g}}, \%{$currentEvents{$g}};
+	# undef current event for this guid:
+	delete $currentEvents{$g};
+    }
+    else {
+	#print "found seq item\n";
+	# must be in a sequence; if not, error:
+	if (!defined($currentEvents{$g}{"start_time"})) {
+	    print "ERROR: first modifier $stype/$mod invalid start token!\n";
+	    next;
+	}
+	else {
+	    # always save it off in case this sequence ends unexpectedly
+	    #if ($stamp) {
+		$currentEvents{$g}{"stop_time"} = $stamp;
+	    #}
+	    # also always save off the instance number cause often
+	    # this isn't known at the beginning.
+	    $currentEvents{$g}{"instance"} = $instance;
+	    push @{$currentEvents{$g}{"elist"}}, [$mod,
+					  $stamp-$currentEvents{$g}{"start_time"},
+					  $at,$ad];
+	    #print "while adding seq item, len = " . scalar(@{$currentEvents{$g}{"elist"}}) . "\n";
+	}
+    }
+
+    if (length($stype) > $maxst) {
+	$maxst = length($stype);
+    }
+    if (length($mod) > $maxmod) {
+	$maxmod = length($mod);
+    }
+
+    $lastG = $g;
+
+}
+
+# dump nicely:
+#printf("%8s %8s %8s %".$maxst."s %".$maxmod."s %8s %8s %8s\n",
+#       'GUID','Version','Instance','Source','Action',
+#       'Offset','Aux Type','Aux Data');
+
+foreach my $g (keys(%events)) {
+    my @ga = @{$events{$g}};
+    foreach my $ei (@ga) {
+	my %eventInfo = %$ei;
+	# print out header info, then subsequent events, offsets, data sz
+	printf("Template %s/%s (%d): %s (%s/%s) \n" . 
+	       "  Start date: %s\n" . 
+	       "  Total time: %ds; data: start(%s=%.2f), end(%s=%.2f)\n" . 
+	       "  Subevents:\n",
+	       $g,$eventInfo{'tvers'},$eventInfo{'instance'},$eventInfo{'src'},
+	       $eventInfo{'start_mod'},$eventInfo{'stop_mod'},
+	       scalar(localtime($eventInfo{'start_time'})),
+	       (defined($eventInfo{'stop_time'}))?($eventInfo{'stop_time'} - $eventInfo{'start_time'}):0,
+	       $eventInfo{'start_auxt'},$eventInfo{'start_auxd'},
+	       $eventInfo{'stop_auxt'},$eventInfo{'stop_auxd'});
+	# subevents:
+	my @seList = @{$eventInfo{'elist'}};
+	foreach my $se (@seList) {
+	    printf("    %${maxmod}s  +%d  %s\n",
+		   $se->[0],$se->[1],
+		   ($se->[2] eq '')?'':sprintf("%s %.2f",$se->[2],$se->[3]));
+	}
+	print "\n";
+    }
+}
+
+exit;

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,15 +12,19 @@ package snmpit_remote;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( RemoteDoVlansFromTables RemoteDoReset );
+@EXPORT = qw( RemoteDoVlansFromTables RemoteDoReset RemoteDoPortControl
+		RemoteDoTrunking RemoteDoList RemoteMakeVlan RemoteDeleteVlan);
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use English;
 use libdb;
 use libtestbed;
+use libtblog qw(tbdie);
 use snmpit_lib;
+use Lan;
 use libxmlrpc;
+use RPC::XML;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -48,91 +52,321 @@ sub ConfigXMLRPC()
     $didsetup = 1;
     return 0;
 }
+#
+# All of these routines end in exactly the same way
+# differing only in what the "op", and "arg" value of the hashes are.
+#
+
+sub commonTail($$)
+{
+    my $op = shift();
+    my $arg = shift();
+
+    ConfigXMLRPC();
+
+    #
+    # Okay, the new approach is to pass an xml doc through the rpc server
+    # into the proxy, and let it get this exact same object. This is a
+    # lot easier then trying to parse this cruft in the python rpc server,
+    # so we can pass it on the command line, just to reinterpret it all
+    # over again.
+    #
+    my $args  = {"op"    => $op, "args"   => $arg};
+    my ($obj) = RPC::XML::smart_encode($args);
+
+    my $response = libxmlrpc::CallMethod0("elabinelab", "vlansv2",
+					  {"xmldoc" => $obj->as_string()});
+
+    # sklower is temporarily going to way violate layering
+    # and reach down into the internals of libxmlrpc to
+    # grab the returned output string, until he can figure out
+    # the proper python for returning a blob.
+
+    if (($config{"verbose"} || $response->{"code"}) &&
+	defined($response->{"output"}) && $response->{"output"} ne "") {
+	print $response->{"output"};
+    }
+    return $response;
+}
+
 
 #
 # Ask outer boss to setup a bunch of vlans for an experiment.
 #
-sub RemoteDoVlansFromTables(@)
+sub RemoteDoVlansFromTables($@)
 {
-    my @vlans     = @_;
-    my $vlantable = {};
+    my $experiment = shift();
+    my @vlanids    = @_;
+    my $vlantable  = {};
+    my %vlans      = ();
 
     return 0
-	if (! @vlans);
+	if (! @vlanids);
 
-    my $result =
-	DBQueryFatal("select virtual,members,id from vlans where " .
-		     # Join "id='foo'" with ORs
-		     join(' OR ', map("id='$_'",@vlans)));
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
 
-    return 0
-	if (! $result->numrows);
-    
-    while (my ($virtual,$members,$id) = $result->fetchrow()) {
-	# $members is a space-seprated list
+    foreach my $vlanid (@vlanids) {
+	my $vlan = VLan->Lookup($vlanid);
+	return -1
+	    if (!defined($vlan));
+	$vlans{"$vlanid"} = $vlan;
+    }
+
+    foreach my $id (keys(%vlans)) {
+	my $vlan  = $vlans{"$id"};
+	my @members;
+	my $trunk_mode;
+	$vlan->GetAttribute("trunk_mode", \$trunk_mode);
 
 	$vlantable->{$id} = {};
-	$vlantable->{$id}->{"virtual"} = $virtual;
-	$vlantable->{$id}->{"members"} = {};
-	
-	foreach my $port (split /\s+/,$members) {
-	    # Due to the inconsistent nature of our tables (curses!), we
-	    # have to do some conversion here
-	    $port =~ /^(.+):(.+)/;
-	    my ($node,$iface) = ($1,$2);
+	$vlantable->{$id}->{"virtual"}    = $vlan->vname();
+	$vlantable->{$id}->{"stack"}      = $vlan->GetClass();
+	$vlantable->{$id}->{"trunk_mode"} = $trunk_mode
+	    if (defined($trunk_mode));
+	$vlantable->{$id}->{"members"}    = {};
+
+	if ($vlan->MemberList(\@members) != 0) {
+	    warn "WARNING: Could not get members for $vlan\n";
+	    return -1;
+	}
+	foreach my $member (@members) {
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		warn "WARNING: Could not get nodeport for $member\n";
+		return -1;
+	    }
 	    if (!defined($node) || !defined($iface)) {
-		warn "WARNING: Bad node in VLAN: $port - skipping\n";
+		warn "WARNING: Bad node in VLAN member: $member - skipping\n";
 		next;
 	    }
+	    my $node_id = $node->node_id();
+	    my $port    = "$node_id:$iface";
+	    
 	    my $result =
-		DBQueryFatal("select current_speed,duplex from interfaces " .
-			     "where node_id='$node' and iface='$iface'");
+		DBQueryFatal("select current_speed,duplex,trunk ".
+			     "  from interfaces " .
+			     "where node_id='$node_id' and iface='$iface'");
 	    if (!$result->num_rows()) {
-		warn "WARNING: Bad node/iface pair in VLAN: $port - skipping\n";
+		warn "WARNING: Bad node/iface pair in VLAN: ".
+		    "$port - skipping\n";
 		next;
 	    }
-	    my ($speed,$duplex) = $result->fetchrow();
+	    my ($speed,$duplex,$trunk) = $result->fetchrow();
+
+	    if ($prefix ne "") {
+		$port =~ s/$prefix// ;
+	    }
 
 	    $vlantable->{$id}->{"members"}->{$port} = {};
-	    $vlantable->{$id}->{"members"}->{$port}->{"speed"} = $speed;
+	    $vlantable->{$id}->{"members"}->{$port}->{"speed"}  = $speed;
 	    $vlantable->{$id}->{"members"}->{$port}->{"duplex"} = $duplex;
+	    $vlantable->{$id}->{"members"}->{$port}->{"trunk"}  = $trunk;
 	}
     }
     return 0
 	if (! keys(%$vlantable));
 
-    ConfigXMLRPC();
+    my $errors = 0;
+    my $response = commonTail("setup", $vlantable);
+    return 1
+	if ($response->{"code"});
+    my $xmlback = $response->{"value"};
 
-    my $rval = libxmlrpc::CallMethod("elabinelab", "vlans",
-				     {"op"    => "setup",
-				      "arg"   => $vlantable});
-    if (!defined($rval)) {
-	return -1;
+    if (defined($xmlback) && $xmlback ne "") {
+	foreach my $vlres (split ',', $xmlback) {
+	    my ($vlanid, $tag) = split '#', $vlres;
+	    
+	    if (!exists($vlans{$vlanid})) {
+		print STDERR "Bad vlanid $vlanid in returned vlan map\n";
+		$errors++;
+		next;
+	    }
+	    my $vlan = $vlans{$vlanid};
+
+	    if ($vlan->SetTag($tag) != 0) {
+		print STDERR "could not set vlan tag for $vlan\n";
+		$errors++;
+	    }
+	    VLan->RecordVlanInsertion($vlan->GetExperiment(), $vlan->lanid(),
+				      $vlan->GetClass());
+	}
     }
-    return $rval;
+    else {
+	$errors = 1;
+    }
+    return $errors;
+}
+
+#
+# Create a vlan and put some ports into it. For elabinelab, we are not
+# going to allow arbitrary vlans, so they will always be associated
+# with an experiment and thus a vlan object.
+#
+sub RemoteMakeVlan($$@)
+{
+    my $class     = shift();
+    my $vlan_name = shift();
+    my @ports     = @_;
+
+    $args->{"stack"}     = $class
+	if (defined($class));
+    $args->{"vlan_name"} = $vlan_name;
+    $args->{"ports"}     = [ @ports ];
+    
+    my $response = commonTail("makevlan", $args);
+    return 1
+	if ($response->{"code"});
+
+    return 0;
+}
+
+sub RemoteDeleteVlan($)
+{
+    my $vlan      = shift();
+
+    return RemoteDoReset($vlan->id(), 0);
 }
 
 #
 # Ask outer boss to tear down a bunch of vlans for an experiment.
 #
-sub RemoteDoReset(@)
+sub RemoteDoReset($$@)
 {
-    my @vlans     = @_;
+    my $experiment  = shift();
+    my $cleartrunks = shift();
+    my @vlans = @_;
     
     return 0
 	if (! @vlans);
-    
-    ConfigXMLRPC();
 
-    my $rval = libxmlrpc::CallMethod("elabinelab", "vlans",
-				     {"op"    => "destroy",
-				      "arg"   => join(",", @vlans)});
-    if (!defined($rval)) {
-	return -1;
+    my $arg = {};
+    $arg->{"cleartrunks"} = $cleartrunks;
+    $arg->{"vlans"}       = [ @vlans ];
+    
+    my $response = commonTail("destroy", $arg);
+    return 1
+	if ($response->{"code"});
+
+    foreach my $vlan (@vlans) {
+	VLan->RecordVLanDeletion($vlan);
     }
-    return $rval;
+    return 0;
+}
+
+#
+# Ask outer boss to do portcontrol functions on a list of ports
+#
+sub RemoteDoPortControl($$@)
+{
+    my $class   = shift();
+    my $command = shift();
+    my @ports   = @_;
+
+    my $arg = {};
+    $arg->{"command"} = $command;
+    $arg->{"stack"} = $class
+	if (defined($class));
+
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+    if ($prefix ne "") {
+	my @tmp = ();
+	foreach my $port (@ports) {
+	    $port =~ s/$prefix// ;
+	    push(@tmp, $port);
+	}
+	@ports = @tmp;
+    }
+    $arg->{"ports"} = [ @ports ];
+    my $response = commonTail("portcontrol", $arg);
+    return 1
+	if ($response->{"code"});
+
+    return 0;
+}
+
+#
+# Ask outer boss to set a port into trunk mode (snmpit -T or -E )
+# 1st arg (mode) is "-T" (dual), "-E" (regular i.e. normal or equal)
+# or "-U" to reset to the usual un-trunked mode.
+#
+sub RemoteDoTrunking($$$@)
+{
+    my $class = shift();
+    my $arg = {};
+    $arg->{"mode"} = shift();
+    my $port = shift();
+    my @vlans     = @_;
+    $arg->{"stack"} = $class
+	if (defined($class));
+    $arg->{"vlans"} = [ @vlans ];
+    
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+    if ($prefix ne "") {
+	$port =~ s/$prefix// ;
+    }
+    $arg->{"port"} = $port;
+
+    my $response = commonTail("trunk", $arg);
+    return 1
+	if ($response->{"code"});
+
+    return 0;
+}
+
+#
+# Ask outer boss to send the vlan names , numbers , and members
+# snmpit -l -w (or restrict to a specific list of vlans)
+# Result is returned in the format as if it were from a switch module.
+#
+sub RemoteDoList(@)
+{
+    my @vlans     = @_;
+    my %Names = ();
+    my %Members = ();
+    my @list = ();
+
+    my $arg = {};
+    $arg->{"vlans"} = [ @vlans ];
+
+    my $response = commonTail("list",$arg);
+    tbdie({cause => 'hardware'},
+          "elabinelab::vlansv2 returns '" . $response->{"code"} . "'\n")
+	if ($response->{"code"});
+    my $xmlback = $response->{"value"};
+    if (!defined($xmlback) || $xmlback eq "") { return @list; }
+
+    my $prefix = "" ;
+    TBGetSiteVar("federation/localprefix",\$prefix);
+    #
+    #  Walk the table for the VLAN members
+    #
+    foreach my $vlres (split ',', $xmlback) {
+	my ($name, $num, $mems) = split '#', $vlres;
+	tbdie({cause => 'hardware'},
+	      "elabinelab::vlansv2 returned bogus info: '$xmlback'\n")
+	    if (!defined($num) || !defined($mems));
+	$Names{$num} = $name;
+        @{$Members{$num}} = ();
+	foreach my $mem (split " ", $mems) {
+	    push @{$Members{$num}}, $prefix . $mem;
+	}
+    }
+
+    #
+    # Build a list from the name and membership lists
+    #
+    foreach my $vlan_id (sort keys %Names) {
+	if ($vlan_id !=  1) {
+	    push @list, [$Names{$vlan_id},$vlan_id,$Members{$vlan_id}];
+	}
+    }
+    return @list;
 }
 
 # End with true
 1;
-

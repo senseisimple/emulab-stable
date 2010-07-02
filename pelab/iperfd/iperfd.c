@@ -11,6 +11,8 @@
  *       Use non-blocking accept() to prevent blocking in some (hopefully
  *         rare) cases.
  *       Use non-blocking IO for logging messages      
+ *       Check return value of close(), ie. EINTR
+ *       Should we block (or ignore) some signals?
  */
 
 
@@ -42,12 +44,30 @@
 
 #include <netinet/in.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 /*
  * We do huge read()s so that if the machine is busy, and we may have gotten
  * multiple packets, we can hopefully fetch them all in a single read
  */
 const int max_readsize = 1024 * 1024;
+
+/*
+ * How many errors before we give up?
+ */
+const int max_errors = 10;
+
+/*
+ * How long (in seconds) do we wait to clear the error count if we haven't had
+ * any more errors?
+ */
+const int error_lifetime = 60;
+
+/*
+ * These are global so that error-handling functions can use them easily
+ */
+int recent_error_count = 0;
+struct timeval last_error;
 
 /*
  * Some defaults
@@ -67,6 +87,7 @@ void croak_perror(const char *str);
 bool parsenum(char *numstr, int *out);
 void fprinttimestamp(FILE *file);
 void fprintaddr(FILE *file, struct sockaddr_in *addr);
+void error();
 
 /*
  * Command-line options we support, from iperf
@@ -111,6 +132,8 @@ int main(int argc, char **argv) {
         }
     }
     printf("\n");
+    fprinttimestamp(stdout);
+    printf(" Maximum number of clients: %i \n", FD_SETSIZE);
 
     
     /*
@@ -139,7 +162,7 @@ int main(int argc, char **argv) {
                 }
                 break;
             case 'p':
-                if (sscanf(optarg,"%i",&port) != 1) {
+                if (!parsenum(optarg,&port)) {
                     croak("Bad port parameter\n");
                 }
                 break;
@@ -153,7 +176,7 @@ int main(int argc, char **argv) {
                 croak("iperfd cannot be used as a client");
                 break;
             case 'w':
-                if (sscanf(optarg,"%i",&windowsize) != 1) {
+                if (!parsenum(optarg,&windowsize)) {
                     croak("Bad window size parameter\n");
                 }
                 break;
@@ -206,6 +229,16 @@ int main(int argc, char **argv) {
     }
 
     /*
+     * Set the listen socket to nonblocking to deal with some obscure DOS-type
+     * problems with clients dropping or being kicked in between select() and
+     * accept()
+     */
+    int oldflags = fcntl(listenfd,F_GETFL);
+    if (fcntl(listenfd, F_SETFL, oldflags | O_NONBLOCK)) {
+        croak_perror("Unable to set listen socket to nonblocking\n");
+    }
+
+    /*
      * Listen for clients
      */
     if (listen(listenfd, backlog) < 0) {
@@ -236,14 +269,32 @@ int main(int argc, char **argv) {
     int maxfd = listenfd;
     unsigned char buffer[readsize];
     int client_count = 0;
-    while (1) {
+
+    /*
+     * According to the manpage, this can't fail in this circumstance
+     */
+    gettimeofday(&last_error,NULL);
+    recent_error_count = 0;
+
+    while (recent_error_count < max_errors) {
+
+        /*
+         * Reset the error count if enough time has passed
+         */
 	bcopy(&master_fdset, &tmp_fdset, sizeof(master_fdset));
 	if (select(maxfd + 1, &tmp_fdset, NULL, NULL, NULL) < 0) {
 	    if (errno == EINTR) {
 		/* We just got interrupted, try again */
 		continue;
 	    } else {
-		croak_perror("Error from select()");
+                /* Log this error, sleep for a while, and try again. Yes,
+                 * sleeping could fubar bandwidth for current tests, but I
+                 * don't want this process to go nuts and do syscalls in a
+                 * tight loop
+                 */
+                perror("select() failed");
+                error();
+                sleep(1);
 	    }
 	}
 
@@ -267,35 +318,60 @@ int main(int argc, char **argv) {
                 fprinttimestamp(stdout);
 		printf(" Too many clients, dropping ");
                 fprintaddr(stdout,&clientaddr);
-                printf("\n");
+                printf(" [%i]\n", newclient);
                 close(newclient);
-	    } else {
-
-                client_count++;
+	    } else if (newclient == -1) {
+                if (errno == EINTR        || errno == EWOULDBLOCK ||
+                    errno == ECONNABORTED || errno == EPROTO) {
+                    /*
+                     * These are non-fatal, they client somehow got
+                     * disconnected before we could accept() it, just ignore
+                     * this accept() and go on with life
+                     */
+                } else {
+                    /*
+                     * Something more serious has happened, log it
+                     */
+                    perror("Error from accept()");
+                    error();
+                }
+            } else {
 
                 fprinttimestamp(stdout);
                 printf(" New client: ");
                 fprintaddr(stdout,&clientaddr);
-                printf("\n");
+                printf(" [%i]\n",newclient);
 
                 /*
-                 * TODO: Drop client, not croak, on failures here
+                 * Try to set the socket buffer size
                  */
+                bool sockopterr = false;
                 if (windowsize != 0) {
                     if (setsockopt(newclient,SOL_SOCKET,SO_SNDBUF,
                                 &windowsize,sizeof(windowsize)) == -1) {
-                        croak_perror("Unable to set send buffer size");
+                        perror("Unable to set send buffer size");
+                        sockopterr = true;
                     }
                     if (setsockopt(newclient,SOL_SOCKET,SO_RCVBUF,
                                 &windowsize,sizeof(windowsize)) == -1) {
-                        croak_perror("Unable to set recieve buffer size");
+                        perror("Unable to set recieve buffer size");
+                        sockopterr = true;
                     }
                 }
-                FD_SET(newclient,&master_fdset);
-                if (newclient > maxfd) {
-                    maxfd = newclient;
+
+                if (sockopterr) {
+                    fprintf(stderr,"Dropping client due to sockopt error\n");
+                    close(newclient);
+                    error();
+                    continue;
+                } else {
+                    client_count++;
+                    FD_SET(newclient,&master_fdset);
+                    if (newclient > maxfd) {
+                        maxfd = newclient;
+                    }
+                    bcopy(&clientaddr, clients + newclient, sizeof(clientaddr));
                 }
-                bcopy(&clientaddr, clients + newclient, sizeof(clientaddr));
             }
 	}
 
@@ -309,13 +385,44 @@ int main(int argc, char **argv) {
 		/*
 		 * TODO: Do non-blocking I/O and more than one read?
 		 * TODO: Do we need to handle signals, like SIGPIPE?
+                 * TODO: Can we flush the FD without actually reading data?
 		 */
                 ssize_t readbytes = read(i,buffer,readsize);
+                bool close_connection = false;
                 if (readbytes == 0) {
                     fprinttimestamp(stdout);
                     printf(" Client disconnected: ");
                     fprintaddr(stdout,clients + i);
-                    printf("\n");
+                    printf(" [%i]\n",i);
+
+                    close_connection = true;
+                } else if (readbytes == -1) {
+                    if (errno == EINTR) {
+                        /*
+                         * Transient error, just try again later
+                         */
+                        continue;
+                    } else {
+                        /*
+                         * Could be a serious error - log and drop the client
+                         */
+                        perror("read() failed");
+                        fprintf(stderr,"Client was ");
+                        fprintaddr(stderr, clients + i);
+                        fprintf(stderr,"\n");
+
+                        error();
+                        
+                        close_connection = true;
+                    }
+                }
+
+                /*
+                 * Close the client if it disconnected normally or had any
+                 * errors
+                 */
+                if (close_connection) {
+                    close(i);
                     client_count--;
                     FD_CLR(i,&master_fdset);
                     while (!FD_ISSET(maxfd,&master_fdset)) {
@@ -327,9 +434,10 @@ int main(int argc, char **argv) {
     }
 
     /*
-     * Cleanup code - will only be reached if something in the top loop calls
-     * break - which nothing does yet
+     * Cleanup code - will only be reached if something in the above loop
+     * exits due to too many errors
      */
+    fprintf(stderr,"Too many errors, exiting\n");
     int i;
     for (i = 0; i <= maxfd; i++) {
 	if (FD_ISSET(i,&master_fdset)) {
@@ -364,14 +472,27 @@ bool parsenum(char *str, int *out) {
     int len = strlen(str);
     int multiplier = 1;
     if (str[len-1] == 'k') {
-        multiplier = 1024;
+        multiplier = 1000;
         str[len-1] = '\0';
     } else if (str[len-1] == 'm') {
+        multiplier = 1000 * 1000;
+        str[len-1] = '\0';
+    } else if (str[len-1] == 'g') {
+        multiplier = 1000 * 1000 * 1000;
+        str[len-1] = '\0';
+    } else if (str[len-1] == 'K') {
+        multiplier = 1024;
+        str[len-1] = '\0';
+    } else if (str[len-1] == 'M') {
         multiplier = 1024 * 1024;
         str[len-1] = '\0';
-    }
+    } else if (str[len-1] == 'G') {
+        multiplier = 1024 * 1024 * 1024;
+        str[len-1] = '\0';
+    } 
     if (sscanf(str,"%i",out) == 1) {
         *out = *out * multiplier;
+        //printf("Returning %i\n",*out);
         return true;
     } else {
         return false;
@@ -400,4 +521,27 @@ void fprintaddr(FILE *file, struct sockaddr_in *addr) {
             htonl(addr->sin_addr.s_addr) >> 8 & 0xff,
             htonl(addr->sin_addr.s_addr) >> 0 & 0xff,
             htons(addr->sin_port));
+}
+
+void error() {
+    /*
+     * What time is it, Mr. Fox?
+     */
+    struct timeval now;
+    gettimeofday(&now,NULL);
+
+    /*
+     * If enough time has passed since the last error, reset the error count.
+     * The reason that I do this here is that I don't want to be calling it
+     * every time through the main loop, which will get run all the time when
+     * we have a client. And, it only really matters when we get a new error.
+     */
+    if (now.tv_sec > (last_error.tv_sec + error_lifetime)) {
+        recent_error_count = 0;
+    }
+
+    recent_error_count++;
+    bcopy(&now,&last_error,sizeof(now));
+
+    return;
 }

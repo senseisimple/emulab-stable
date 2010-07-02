@@ -2,7 +2,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,24 +11,43 @@ sys.path.append("@prefix@/lib")
 import libplab
 from libtestbed import *
 
-def usage(me):
-    print "Usage: %s [ -vd ] [pid eid]" % me
-    sys.exit(1)
-
+usage = "\t%prog [-vdf] [-p plcname] [-e pid/eid] [-s slicename]"
 
 def main(args):
     me = args[0]
-    parser = TBParser()
-    opts, args = parser.parse_args()
-    pid = eid = None
+    parser = TBParser(usage)
+    parser.add_option("-f","--force",dest="force",action="store",
+                      help="Force slice renewal",default=None)
+    parser.add_option("-p","--plc",dest="plc",action="store",
+                      help="PLC name",default=None)
+    parser.add_option("-e","--expt",dest="expt",action="store",
+                      help="pid/eid",default=None)
+    parser.add_option("-s","--slicename",dest="slicename",action="store",
+                      help="slice name",default=None)
 
-    plab = libplab.Plab()
-    if len(args) == 2:
-        pid, eid = args
+    slicename = None
+    pid,eid = None,None
+    expt = None
+
+    (opts,args) = parser.parse_args()
+
+    libplab.debug = opts.debug
+    libplab.verbose = opts.verbose
+
+    if opts.expt:
+        try:
+            pid,eid = opts.expt.split('/')
+        except:
+            parser.error("Improper pid/eid")
         pass
 
-    plab.renew(pid, eid, 1)
-    
+    if len(args) > 0:
+        parser.error("Incorrect number of arguments")
+        pass
+
+    plab = libplab.Plab()
+    plab.renew(opts.plc,pid,eid,opts.slicename,opts.force)
+
     return
 
 if __name__ == "__main__":

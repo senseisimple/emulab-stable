@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,6 +47,9 @@ destdircheck:
 	    false; \
 	fi
 
+subboss-install:	basefbsd-subboss-install etc-install \
+			sup-install script-install bin-install
+
 install client-install:	basefbsd-install etc-install \
 			sup-install script-install bin-install # jail-install
 
@@ -60,13 +63,14 @@ mfs-install:	destdircheck basefbsdmfs-install etc-install \
 
 frisbee-mfs-install: destdircheck
 	(cd ../freebsd; $(MAKE) frisbee-mfs-install)
+	rm -f $(SYSETCDIR)/rc.early
 	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.conf $(SYSETCDIR)/rc.conf
 	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
 	$(INSTALL) -m 444 $(SRCDIR)/rc.dhclient $(SYSETCDIR)/rc.conf.d/dhclient
 
 cdboot-install:	destdircheck basefbsdcdboot-install etc-install \
 			script-install bin-install
-	rm -f $(SYSETCDIR)/start_if.*
+	rm -f $(SYSETCDIR)/start_if.* $(SYSETCDIR)/rc.early
 	rm -f $(SYSETCDIR)/rc.cdroot $(SYSETCDIR)/fstab.lbs
 	rm -f $(DESTDIR)/boot/loader.rc.lbs
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.conf $(SYSETCDIR)/rc.conf
@@ -100,14 +104,19 @@ dir-install:
 
 basefbsd-install: dir-install
 	(cd ../freebsd; $(MAKE) all install)
-	rm -f $(SYSETCDIR)/start_if.* $(BINDIR)/dhclient
+	rm -f $(SYSETCDIR)/start_if.* $(SYSETCDIR)/rc.early $(BINDIR)/dhclient
+
+basefbsd-subboss-install: dir-install
+	(cd ../freebsd; $(MAKE) all subboss-install)
+	rm -f $(SYSETCDIR)/start_if.* $(SYSETCDIR)/rc.early $(BINDIR)/dhclient
 
 basefbsdmfs-install: dir-install
 	(cd ../freebsd; $(MAKE) mfs-install)
-	rm -f $(SYSETCDIR)/start_if.* $(BINDIR)/dhclient
+	rm -f $(SYSETCDIR)/start_if.* $(SYSETCDIR)/rc.early $(BINDIR)/dhclient
 
 basefbsdcdboot-install: dir-install
 	(cd ../freebsd; $(MAKE) DESTDIR=$(DESTDIR) all cdboot-install)
+	rm -f $(SYSETCDIR)/start_if.* $(SYSETCDIR)/rc.early $(BINDIR)/dhclient
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile

@@ -1,3 +1,10 @@
+Image test is a utility with takes a specified image, and then runs a
+set of standard experiments on the image.  Each experiment consists of
+an Emulab experiment which is designed to test specific functionally
+on an image, such as static routing.  After an experiment is swapped
+in it runs a number tests on the experiment to check that everything
+is working.
+
 SETUP
 
 Checkout a copy of the image-test directory into the /proj/PID/ directory,
@@ -57,6 +64,12 @@ force all the experiments to run in series.
 Setting -m sets a soft limit to the number of nodes to use.  To set a
 hard limit use "-M NUM".  If an experiment will use more nodes than NUM
 it will simply not be run.
+
+NOTE: Image test does not currently handle temporary resource shortage
+(ie not enough pcs) in an intelligent manner, thus it is best to set
+NUM to something smaller than the number of PCs currently available.
+Otherwise, you will have failed tests due to not being able to swap
+the experient in.
 
 If an experiment fails to swap out, the number of available nodes will
 decrees, but other experiments will continue to run as long as there
@@ -221,3 +234,4 @@ and extra whitespace are ignored, as well as anything after the "#"
 
 Like with the experiments specified on the command line a base name of
 an experiment may also be specified.
+

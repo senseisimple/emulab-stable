@@ -1,0 +1,186 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Change the creator of a swapped out experiment.
+#
+sub usage()
+{
+    print(STDERR "Usage: changecreator <pid,eid> <newuid>\n");
+    exit(-1);
+}
+my $optlist = "df";
+my $debug   = 0;
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $CHOWN       = "/usr/sbin/chown";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use Experiment;
+use Project;
+use User;
+
+# libdb
+my $EXPT_PRELOAD  = TBDB_STATS_PRELOAD();
+my $EXPT_START    = TBDB_STATS_START();
+
+# Protos.
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+# Only admin types!
+if (! $this_user->IsAdmin()) {
+    die("*** $0:\n".
+	"    Only TB administrators can run this script!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pideid = shift(@ARGV);
+my $newuid = shift(@ARGV);
+
+# Map project to object.
+my $experiment = Experiment->Lookup($pideid);
+if (! defined($experiment)) {
+    fatal("$pideid does not exist!");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($newuid);
+if (! defined($target_user)) {
+    fatal("$newuid does not exist!");
+}
+my $target_idx  = $target_user->uid_idx();
+my $target_uid  = $target_user->uid();
+
+#
+# User must be in the same project as the experiment.
+#
+if (!defined($experiment->GetProject()->LookupUser($target_user))) {
+    fatal("$target_user is not in the same project as $experiment");
+}
+
+#
+# Only operate on approved users and swapped out experiments.
+# 
+if ($target_user->status() ne USERSTATUS_ACTIVE()) {
+    fatal("User '$newuid' must be an active user!");
+}
+if ($experiment->state() ne EXPTSTATE_SWAPPED()) {
+    fatal("$experiment must be swapped out!");
+}
+my $exptidx = $experiment->idx();
+
+#
+# Only change the resource record if the experiment was never swapped in
+# or modified, so that the first resource record matches the creator in
+# the experiment_stats and experiments table.
+#
+if (!defined($experiment->lastidx())) {
+    my $rsrcidx = $experiment->rsrcidx();
+
+    DBQueryFatal("update experiment_resources set uid_idx=$target_idx ".
+		 "where idx=$rsrcidx");
+}
+
+DBQueryFatal("update experiment_stats set ".
+	     "  creator='$target_uid',creator_idx=$target_idx ".
+	     "where exptidx=$exptidx");
+
+#
+# Change the very first testbed_stats record to be consistent.
+#
+DBQueryFatal("update testbed_stats set ".
+	     "  uid='$target_uid',uid_idx=$target_idx ".
+	     "where exptidx=$exptidx and ".
+	     "      (action='$EXPT_PRELOAD' or action='$EXPT_START')");
+
+#
+# No need to change the swapper; if it was never swapped in there is
+# no swapper, and if it was swapped in, its obviously swapped out now,
+# and it is safe to leave it as is.
+#
+DBQueryFatal("update experiments set ".
+	     "  expt_head_uid='$target_uid',creator_idx=$target_idx ".
+	     "where idx=$exptidx");
+
+#
+# Now chown the three directories.
+#
+my $workdir = $experiment->WorkDir();
+my $userdir = $experiment->UserDir();
+my $infodir = $experiment->InfoDir();
+
+if (system("$CHOWN $target_uid $workdir")) {
+    fatal("Failed: '$CHOWN $target_user $workdir'");
+}
+if (system("$CHOWN $target_uid $userdir")) {
+    fatal("Failed: '$CHOWN $target_user $userdir'");
+}
+if (system("$CHOWN $target_uid $infodir")) {
+    fatal("Failed: '$CHOWN $target_user $infodir'");
+}
+	     
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

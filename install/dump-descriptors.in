@@ -1,0 +1,224 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use strict;
+
+#
+# Dump out an SQL file of statements to initialize the images and osids
+# on a new testbed. Or maybe even an old testbed? Note that the output
+# of thie script is the input to load-descriptors in this directory.
+#
+sub usage()
+{
+    print STDERR "Usage: dump-descriptors [-v vers] [-m] filename\n";
+    print STDERR "  -m      dump just the MFS descriptors.\n";
+    print STDERR "  -v 1    first generation STD images (FBSD410, RHL90)\n";
+    print STDERR "  -v 2    second generation STD images (FBSD62, FC6)\n";
+    print STDERR "Default version is 1.\n";
+    exit(-1);
+}
+
+my $optlist = "v:m";
+my $version = 1;
+my $mfsonly = 0;
+
+#
+# These are the images/osids we dump out. We of course get the embedded osids.
+# We should probably add an export flag to the tables so we can avoid this
+# hardwired list. Note that all of these are assumed to live in the emulab-ops
+# project.
+#
+my %imagenames    = (
+    "1" => ['FBSD410+RHL90-STD', 'FBSD410-STD', 'RHL90-STD', 'FBSD410-IPFW2'],
+    # XXX note that the FBSD410* images may not work on all HW but are
+    # included here to resolve nextosid entries for FW-IPFW and FBSD-JAIL
+    "2" => ['FBSD62+FC6-STD', 'FBSD62-STD', 'FC6-STD', 'FBSD410-STD', 'FBSD410-IPFW2'],
+);
+
+my @osnames	  = ('FREEBSD-MFS', 'FRISBEE-MFS', 'NEWNODE-MFS',
+		     'OPSNODE-BSD', 'FW-IPFW', 'FW-IPFW2',
+		     'RHL-STD', 'FBSD-STD', 'FBSD-JAIL', 'POWER-CONTROLLER');
+
+my @osids	   = ();
+
+#
+# Need to map these dynamically since we do not want to hardwire the actual
+# nextosid IDs (numbers) into this table.
+#
+my %mappings       = (
+    "1" => {
+	"RHL-STD"  => "RHL90-STD",
+	"FBSD-STD" => "FBSD410-STD",
+    },
+    "2" => {
+	"RHL-STD"  => "FC6-STD",
+	"FBSD-STD" => "FBSD62-STD",
+    }
+);
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $DUMPDESC    = "$TB/sbin/dumpdescriptor";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use Image;
+use OSinfo;
+
+# Locals
+my %tempkeys  = ();
+my $protouser = "elabman";
+my $protoproj = TBOPSPID();
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"v"})) {
+    my $vers = $options{"v"};
+    if (!exists($imagenames{$vers})) {
+	usage();
+    }
+    $version = $vers;
+}
+if (defined($options{"m"})) {
+    $mfsonly    = 1;
+    %mappings   = ();
+    %imagenames = ();
+}
+usage()
+    if (@ARGV != 1);
+my $filename = $ARGV[0];
+
+my %images  = ();
+my %osinfos = ();
+
+#
+# Gather up the images and any osinfos they reference.
+#
+foreach my $imagename (@{$imagenames{$version}}) {
+    my $image = Image->Lookup("$protoproj,$imagename");
+    if (!defined($image)) {
+	fatal("Cannot find image descriptor for $imagename");
+    }
+    $images{$image->imageid()} = $image;
+
+    #
+    # Get the osids it references.
+    #
+    foreach my $key (('part1_osid', 'part2_osid',
+		      'part3_osid', 'part4_osid', 'default_osid')) {
+	my $osid = $image->$key();
+	next
+	    if (!defined($osid));
+
+	my $osinfo = OSinfo->Lookup($osid);
+	if (!defined($osinfo)) {
+	    fatal("Cannot find OS descriptor for $osid");
+	}
+	$osinfos{$osinfo->osid()} = $osinfo;
+    }
+}
+#
+# And the OSs
+#
+foreach my $osname (@osnames) {
+    my $osinfo = OSinfo->Lookup("$protoproj,$osname");
+    if (!defined($osinfo)) {
+	fatal("Cannot find os descriptor for $osname");
+    }
+    $osinfos{$osinfo->osid()} = $osinfo;
+}
+foreach my $osname (keys(%{$mappings{$version}})) {
+    my $nextosname = $mappings{$version}{$osname};
+
+    my $osinfo = OSinfo->Lookup("$protoproj,$nextosname");
+    if (!defined($osinfo)) {
+	fatal("Cannot find os descriptor for $nextosname");
+    }
+    $osinfos{$osinfo->osid()} = $osinfo;
+}
+#
+# Open tempfile.
+#
+open(OUTPUT, ">$filename") or
+    die("Could not open $filename for writing!\n");
+print OUTPUT "<descriptors>\n";
+foreach my $osname (keys(%{$mappings{$version}})) {
+    my $nextosname = $mappings{$version}{$osname};
+
+    print OUTPUT "<mapping name=\"$osname\">\n";
+    print OUTPUT "    <value>$nextosname</value>\n";
+    print OUTPUT "</mapping>\n";
+}
+close(OUTPUT);
+
+#
+# Hmm, this is interesting. We reuse OSids that were created via the EZ
+# path, typically in the combo images. We need to delete those from the
+# osinfos list since they get created when processing the EZ images in
+# the load-descriptors script. Ordering is going to be important when
+# loading them in.
+#
+foreach my $osid (keys(%osinfos)) {
+    my $osinfo = $osinfos{$osid};
+
+    next
+	if ($osinfo->ezid());
+    next
+	if ($mfsonly && !$osinfo->mfs());
+
+    system("$DUMPDESC -o $osid >> $filename") == 0
+	or fatal("Could not dump $osinfo");
+}
+foreach my $imageid (keys(%images)) {
+    my $image = $images{$imageid};
+    
+    system("$DUMPDESC -i $imageid >> $filename") == 0
+	or fatal("Could not dump $image");
+}
+open(OUTPUT, ">>$filename") or
+    die("Could not open $filename for writing!\n");
+print OUTPUT "</descriptors>\n";
+close(OUTPUT);
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+

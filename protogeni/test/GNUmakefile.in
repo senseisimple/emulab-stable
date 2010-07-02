@@ -1,0 +1,52 @@
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= protogeni/test
+
+include $(OBJDIR)/Makeconf
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  =
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+FILES	 = $(wildcard *.py)
+FILES   += $(wildcard $(SRCDIR)/*.py)
+FILES   += $(wildcard $(SRCDIR)/*.rspec)
+ALLFILES = $(notdir $(FILES))
+TARBALL  = $(INSTALL_WWWDIR)/downloads/protogeni-tests.tar.gz
+
+install:	install-mkdir \
+	$(addprefix $(INSTALL_TOPDIR)/opsdir/protogeni/test/, $(ALLFILES)) \
+	$(TARBALL)
+
+control-install:
+
+install-mkdir:
+	-mkdir -p $(INSTALL_TOPDIR)/opsdir/protogeni/test
+
+clean:
+	rm -f *.o core *.pl *.pm *.py
+
+$(INSTALL_TOPDIR)/opsdir/protogeni/test/%: %
+	@echo "Installing $<"
+	$(INSTALL_PROGRAM) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
+
+$(TARBALL): $(ALLFILES)
+	-mkdir -p $(INSTALL_WWWDIR)/downloads
+	rm -f $(TARBALL)
+	tar czf $(TARBALL) -C $(SRCDIR) $(ALLFILES)

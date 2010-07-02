@@ -1,50 +1,57 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 include("defs.php3");
 
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#$TARGET_FILE = "wireless-stats.data.zip";
-$TARGET_FILE = "wireless-stats.data";
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 function death($msg) {
     PAGEHEADER("Wireless Connectivity Data");
     PAGEARGERROR($msg);
     PAGEFOOTER();
-
     exit(1);
 }
 
+#
+# Verify page arguments
+#
+$reqargs = RequiredPageArguments("type",    PAGEARG_STRING,
+				 "dataset", PAGEARG_STRING);
+
+$optargs = OptionalPageArguments("building", PAGEARG_STRING,
+				 "floor",    PAGEARG_INTEGER,
+				 "scale",    PAGEARG_INTEGER);
+
 ## we need a type and a dataset.
-if (isset($type) && isset($dataset) && !preg_match("/^[-\w]+$/", $dataset)) {
+if (isset($type) && isset($dataset) 
+    && preg_match("/^[a-zA-Z0-9\-_]+$/", $dataset)) {
     $dbq = DBQueryFatal("select * from wireless_stats where name='$dataset'");
 
     if (mysql_num_rows($dbq)) {
         $row = mysql_fetch_array($dbq);
-        $floor = $row["floor"];
-        $building = $row["building"];
+        $dbFloor = $row["floor"];
+        $dbBuilding = $row["building"];
         $eid = $row["data_eid"];
         $pid = $row["data_pid"];
         $altsrc = $row["altsrc"];
 
         ## generate the data
 	if ($type == "data") {
-            ## find the file...
-            #$path = "/proj/$pid/exp/$eid/logs/$TARGET_FILE";
-            $path = "./wireless-stats/$pid.$eid-$TARGET_FILE";
-            if (file_exists($path)) {
-                ## read and dump the file:
+	    ## find the file...
+	    $path = "/usr/testbed/www/wireless-stats/$dataset-$pid-$eid.log";
+	    if (file_exists($path)) {
+		## read and dump the file:
                 #header("Content-Type: application/zip");
                 #header("Content-Length: " . (filesize($path)));
-                header("Content-Type: text/plain");
-                ## obviously, this duplication of headers might not
-                ## make all browsers very happy... if there's a 
+		header("Content-Type: text/plain");
+		## obviously, this duplication of headers might not
+		## make all browsers very happy... if there's a 
                 ## problem with the readfile call.
                 readfile($path) or death("Error while reading data file!");
             }
@@ -52,56 +59,98 @@ if (isset($type) && isset($dataset) && !preg_match("/^[-\w]+$/", $dataset)) {
                 header("Content-Type: text/plain");
                 header("Content-Length: " . (filesize($altsrc)));
                 readfile($altsrc) 
-                    or death("Error while reading alternate data file!");
+                   or death("Error while reading alternate data file!");
             }
             else {
                 death("Unable to find any data file at $path !");
             }
         }
         else if ($type == "map") {
-            ## generate a map and dump the data.  then unlink it...
-            $tmpfile = tempnam("/tmp","wimap");
-            $gen_args = "-o $tmpfile -t -z -y -f $floor $building";
-            $retval = SUEXEC($uid,"nobody","webfloormap $gen_args",
-                             SUEXEC_ACTION_IGNORE);
-	    sleep(1);
-            if ($retval) {
-                SUEXECERROR(SUEXEC_ACTION_USERERROR);
-                # Never returns.
-                die("");
+            ## first check for required params
+            if ((isset($building) && preg_match("/^[A-Za-z0-9\-]+$/", $building))
+                && (isset($scale) && preg_match("/^[-\d\.]+$/", $scale))
+                && (isset($floor) && preg_match("/^[-\d\.]+$/", $floor))) {
+                ;
+            }
+            else {
+                death("Improper map request argument!");
+            }
+
+            $pushfile = '';
+
+            # the one special case... reason is, we want the obstacles
+            # overlaid, so we have to generate any of these right off.
+            if ($building == 'MEB-ROBOTS') {
+                ## generate a map and dump the data.  then unlink it...
+                $tmpfile = tempnam("/tmp","wimap");
+                $gen_args = "-o $tmpfile -t -z -y -f $floor $building";
+                $retval = SUEXEC($uid,"nobody","webfloormap $gen_args",
+                                 SUEXEC_ACTION_IGNORE);
+	        sleep(1);
+                if ($retval) {
+                    SUEXECERROR(SUEXEC_ACTION_USERERROR);
+                    # Never returns.
+                    die("");
+                }
+                $pushfile = $tmpfile . ".jpg";
+            }
+            else {
+                # grab path from db
+                $query = "select image_path from floorimages where " .
+                    "building='$building' and floor=$floor and scale=$scale";
+                $dbq = DBQueryFatal($query);
+                if (mysql_num_rows($dbq)) {
+                    $row = mysql_fetch_array($dbq);
+                    $if = $row['image_path'];
+                    $if = "/usr/testbed/www/floormap/$if";
+                    $pushfile = $if;
+                }
+                else {
+                    death("No image file in db!");
+                }
+
             }
 
             #header("Content-type: image/jpg");
-            #header("Content-Length: " . (filesize($tmpfile . ".jpg")));
-            if (($fp = fopen("$tmpfile.jpg", "r"))) {
-                header("Content-type: image/jpg");
+            #header("Content-Length: " . (filesize($tmpfile)));
+            if (($fp = fopen("$pushfile", "r"))) {
+                header("Content-type: image/jpeg");
                 fpassthru($fp);
             }
 	    else {
 	        death("Error while reading image file!");
             }
 
-	    $gen_args = "-k -o $tmpfile";
-	    $retval = SUEXEC($uid,"nobody","webfloormap $gen_args",
-                             SUEXEC_ACTION_IGNORE);
+            # clean up if building was MEB-ROBOTS
+            if ($building == 'MEB-ROBOTS') {
+                $gen_args = "-k -o $tmpfile";
+	        $retval = SUEXEC($uid,"nobody","webfloormap $gen_args",
+                                 SUEXEC_ACTION_IGNORE);
 
-            #unlink($tmpfile . ".jpg");
-	    #unlink($tmp
+                #unlink($tmpfile . ".jpg");
+	        #unlink($tmp
+            }
         }
         else if ($type == "posit") {
-            $dbq = DBQueryFatal("select node_id,loc_x,loc_y,loc_z from " . 
-                "location_info where floor=$floor and building='$building'");
+            $dbq = DBQueryFatal("select node_id,loc_x,loc_y,loc_z,floor from " . 
+                "location_info where building='$dbBuilding'");
+
             if (mysql_num_rows($dbq)) {
                 header("Content-Type: text/plain");
 
                 while ($row = mysql_fetch_array($dbq)) {
+                    $z = '';
+                    if ($row["loc_z"] == '') {
+                        $z = '0';
+                    }
                     echo "" . $row["node_id"] . " \t" . $row["loc_x"] . 
-                        " \t" . $row["loc_y"] . " \t" . $row["loc_z"] . "\n";
+                        " \t" . $row["loc_y"] . " \t" . $z . 
+                        " \t" . $row["floor"] . "\n";
                 }
             }
             else {
-                death("No position information for floor $floor and " . 
-                      "building $building!");
+                death("No position information for floor $dbFloor and " . 
+                      "building $dbBuilding!");
             }
           
         }

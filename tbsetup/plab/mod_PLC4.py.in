@@ -1,0 +1,1256 @@
+# -*- python -*-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003, 2007-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+import sys
+sys.path.append("@prefix@/lib")
+
+import xmlrpclib
+import getopt
+import fcntl
+import time
+import calendar
+import cPickle
+import os
+import socket
+
+import libdb
+from libtestbed import *
+from aspects import wrap_around
+from timer_advisories import timeAdvice
+
+import popen2
+import random
+
+#
+# output control vars
+#
+verbose = 0
+debug = 0
+
+#
+# Constants
+#
+DEF_NM_PORT = "812"
+
+#
+# A bunch of time constants / intervals (in seconds)
+#
+MAX_PLC_LEASELEN = 2*MONTH-5*DAY   # defined by PLC as ~two months (56 days)
+                                   # but have to use 55 now cause PLC won't
+                                   # take 56.
+MIN_LEASE_WINDOW = 2*MONTH-12*DAY  # minimum time until expiration
+MAX_LEASE_SLOP = 600 # (ten minutes)
+MAX_CACHE_TIME = HOUR # (one hour)
+
+DEF_SLICE_DESC = "Slice created by Emulab"
+DEF_EMULAB_URL = "http://www.emulab.net"
+
+INSTMETHOD_NMCONTROLLER = "nm-controller"
+INSTMETHOD_DELEGATED = "delegated"
+INSTMETHOD_PLCINST = "plc-instantiated"
+DEF_EMULAB_INSTMETHOD = INSTMETHOD_DELEGATED
+
+DEF_NM_SSHCMD = "/usr/bin/ssh -q -o StrictHostKeyChecking=no" \
+                " -o PasswordAuthentication=no -o NumberOfPasswordPrompts=0" \
+                " -l %s -i %s %s"
+
+class NM4agent:
+    def __init__(self,IP,nodeid,del_acct,del_key,nmport=DEF_NM_PORT):
+        # Instead of ssh xmlrpc transport, we use xmlrpclib load/dumps.
+        self._isopen = False
+        self.delacct = del_acct
+        self.delkey = del_key
+        
+        self.__vers = [4,0,0]
+        self.IP = IP
+        self.nodeid = nodeid
+        pass
+
+    def _open(self):
+        if not self._isopen:
+            if debug:
+                print "connecting to NM over ssh with command '%s'" % \
+                      (DEF_NM_SSHCMD % (self.delacct,self.delkey,self.IP),)
+                pass
+            try:
+                self.__agentconn = popen2.Popen3(DEF_NM_SSHCMD % (self.delacct,
+                                                                  self.delkey,
+                                                                  self.IP),
+                                                 capturestderr=True)
+                self._isopen = True
+            except:
+                raise
+            pass
+        pass
+
+    def _close(self):
+        if self._isopen:
+            # Nothing else we can do except wait for the connection to die,
+            # and that's silly... or kill the pid ourself---but the connection
+            # will naturally die after the response.
+            self._isopen = False
+        pass
+
+    def _xcall(self,cmd,args=()):
+        
+        self._open()
+        try:
+            if debug:
+                print "NM4: xmlrpc send(%s/%s): %s%s" % (self.nodeid,self.IP,
+                                                         cmd,str(args))
+                pass
+            print >>self.__agentconn.tochild, xmlrpclib.dumps(args,cmd)
+            self.__agentconn.tochild.close()
+            retval = self.__agentconn.fromchild.read()
+            if debug:
+                print "NM4: xmlrpc raw response(%s/%s): '%s'" % (self.nodeid,
+                                                                 self.IP,
+                                                                 str(retval))
+                pass
+            #if retval == None or retval == '':
+            #    raise RuntimeError("no response from NM")
+            retval = xmlrpclib.loads(retval)
+            if debug:
+                print "NM4: xmlrpc response(%s/%s): '%s'" % (self.nodeid,
+                                                             self.IP,
+                                                             str(retval))
+                pass
+            self.__agentconn.wait()
+            if debug:
+                print "NM4: xmlrpc done(%s/%s)" % (self.nodeid,self.IP)
+                pass
+            self._close()
+        except:
+            if self.__agentconn.poll() == -1:
+                # Try waiting for it...
+                self.__agentconn.wait()
+                pass
+
+            if self.__agentconn.poll() == 65280:
+                self._close()
+                raise RuntimeError, "Error: SSH failure to %s/%s" % \
+                      (self.nodeid,self.IP)
+            else:
+                # always close; we can only send one xmlrpc request at a time
+                self._close()
+                if debug:
+                    print "ssh returned %s" % str(self.__agentconn.poll())
+                    pass
+                raise
+                #raise RuntimeError, "Error: xmlrpc call failed!"
+            pass
+        
+        # XXX: we whack the retval to be compat with NMv3
+        rret = retval[0][0]
+        if not rret == 0:
+            rret = 0
+            pass
+        else:
+            rret = 1
+            pass
+        retval = [ rret, [''] ]
+        
+        return retval
+    
+    def deliver_ticket(self,ticket):
+        if debug:
+            print "NM4: deliver_ticket(%s/%s)" % (self.nodeid,self.IP)
+            pass
+        return self._xcall('Ticket',(ticket,))
+    
+    def create_sliver(self,slice_name,tries=2,interval=5):
+        if debug:
+            print "NM4: create_sliver(%s/%s), slice %s" % (self.nodeid,self.IP,
+                                                           slice_name)
+            pass
+        (success,rtries) = (False,tries)
+        while not success and rtries > 0:
+            rtries -= 1
+            try:
+                retval = self._xcall('Create',(slice_name,))
+                retval = self._xcall('Start',(slice_name,))
+                success = True
+            except:
+                if rtries == 0:
+                    raise
+                else:
+                    print "NM4: create_sliver(%s/%s) failed" \
+                          % (self.nodeid,self.IP)
+                    time.sleep(interval)
+                    pass
+                pass
+            pass
+        # munge the retval for compat with old NMagent
+        return (retval,'')
+    
+    def delete_sliver(self,slice_name):
+        if debug:
+            print "NM4: delete_sliver(%s/%s), slice %s" % (self.nodeid,self.IP,
+                                                           slice_name)
+        return self._xcall('Destroy',(slice_name,))
+
+    def start_sliver(self,slice_name):
+        if debug:
+            print "NM4: start_sliver(%s/%s), slice %s" % (self.nodeid,self.IP,
+                                                          slice_name)
+        return self._xcall('Start',(slice_name,))
+
+    def stop_sliver(self,slice_name):
+        if debug:
+            print "NM4: stop_sliver(%s/%s), slice %s" % (self.nodeid,self.IP,
+                                                         slice_name)
+        return self._xcall('Stop',(slice_name,))
+
+    # NM v4 does not have a version method...
+    def version(self):
+        return self.__vers
+
+    def ping(self):
+        try:
+            # No better way to ping v4 than to call Help.
+            res = self._xcall('Help')
+            if res[0] == 0:
+                return True
+            pass
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        return False
+    
+    def getAgentClass(self):
+        return self.__class__
+    pass
+
+#
+# The real PLC agent.  Wraps up standard arguments to the
+# PLC XMLRPC interface.
+#
+class PLCagent:
+    def __init__(self, plc, slicename):
+        self.slicename = slicename
+        self.auth = plc.getAuthParameter()
+        
+        try:
+            # Need allow_none=1 to marshal `None' since PLC4 uses it
+            # in wildcard situations...
+            self.__server = xmlrpclib.ServerProxy(plc.url,allow_none=1)
+        except:
+            print "Failed to create XML-RPC proxy"
+            raise
+        return
+
+    def getSliceName(self):
+        return self.slicename
+
+    def SliceCreate(self,
+                    sliceurl = DEF_EMULAB_URL,
+                    slicedesc = DEF_SLICE_DESC,
+                    instmethod = DEF_EMULAB_INSTMETHOD):
+        return self.__server.AddSlice(self.auth,
+                                      { 'url' : sliceurl,
+                                        'instantiation' : instmethod,
+                                        'name' : self.slicename,
+                                        'description' : slicedesc })
+
+    def SliceDelete(self):
+        return self.__server.DeleteSlice(self.auth, self.slicename)
+
+    def SliceUpdate(self,slicedesc = DEF_SLICE_DESC,sliceURL = DEF_EMULAB_URL):
+        return self.__server.UpdateSlice(self.auth, self.slicename,
+                                         { 'url' : sliceURL,
+                                           'description' : slicedesc })
+
+    def SliceRenew(self,expdate):
+        return self.__server.UpdateSlice(self.auth, self.slicename,
+                                         { 'expires' : expdate })
+
+    def SliceNodesAdd(self,nodelist):
+        if not type(nodelist) == list:
+            nodelist = [nodelist]
+            pass
+        return self.__server.AddSliceToNodes(self.auth,self.slicename,
+                                             nodelist)
+    
+    def SliceNodesDel(self,nodelist):
+        if not type(nodelist) == list:
+            nodelist = [nodelist,]
+        return self.__server.DeleteSliceFromNodes(self.auth,self.slicename,
+                                                  nodelist)
+
+    # Ick, have to use GetSlices and GetNodes.  Ick!  Ick!
+    def SliceNodesList(self):
+        # use a return filter to get only the node ids.
+        retval = self.__server.GetSlices(self.auth,[ self.slicename ])
+        # well, there's a bug in PLC with return filters in GetSlices...
+        #                                 [ 'node_ids' ])
+
+        if len(retval) > 0 and retval[0]['name'] == self.slicename:
+            nidlist = retval[0]['node_ids']
+            # then use a node filter to GetNodes to get the names.
+            # XXX: probably should convert over to using node ids at
+            # some point.
+            retval = self.__server.GetNodes(self.auth,nidlist,[ 'hostname' ])
+        else:
+            retval = []
+        
+        nhostlist = map(lambda x: x['hostname'], retval)
+
+        return nhostlist
+
+    # PLC 4's default behavior is to add one user at a time.  Thus, we
+    # just call their function for each list item; if a fault occurs, it'll
+    # go back to the caller.  The reason we can do it this way is because
+    # subsequent calls to AddPersonToSlice don't fail if the person is already
+    # a member of the slice.  It's nasty, but whatever.
+    def SliceUsersAdd(self, userlist):
+        if type(userlist) != list:
+            userlist = [userlist]
+            pass
+        for user in userlist:
+            retval = self.__server.AddPersonToSlice(self.auth,user,
+                                                    self.slicename)
+            pass
+        # this is 1 if all (i.e., the last) call succeeds
+        return retval
+
+    # Same PLC 4 behavior change as for AddPersonToSlice.
+    def SliceUsersDel(self, userlist):
+        if type(userlist) != list:
+            userlist = [userlist]
+            pass
+        for user in userlist:
+            retval = self.__server.DeletePersonFromSlice(self.auth,user,
+                                                         self.slicename)
+            pass
+        return retval
+
+    # Ick, have to implement this in terms of GetSlices and GetPersons
+    # just as for the node hostnames in SliceNodesList.
+    def SliceUsersList(self):
+        retval = self.__server.GetSlices(self.auth,[ self.slicename ])
+        # XXX PLC bug
+        #                                 [ 'name','person_ids' ])
+        if len(retval) > 0 and retval[0]['name'] == self.slicename:
+            uidlist = retval[0]['person_ids']
+            retval = self.__server.GetPersons(self.auth,uidlist,[ 'email' ])
+        else:
+            retval = []
+        
+        usernamelist = map(lambda x: x['email'], retval)
+
+        return usernamelist
+    
+    def SliceGetTicket(self):
+        return self.__server.GetSliceTicket(self.auth,self.slicename)
+
+    def SliceInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetSlices(self.auth,infilter,outfilter)
+
+    def NodeInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetNodes(self.auth,infilter,outfilter)
+
+    def NodeGroupInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetNodeGroups(self.auth,infilter,outfilter)
+
+    def PersonInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetPersons(self.auth,infilter,outfilter)
+    
+    def KeyInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetKeys(self.auth,infilter,outfilter)
+
+    def NodeNetworkInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetNodeNetworks(self.auth,infilter,outfilter)
+
+    def SiteInfo(self,infilter=None,outfilter=None):
+        return self.__server.GetSites(self.auth,infilter,outfilter)
+
+    def AuthCheck(self):
+        return self.__server.AuthCheck(self.auth)
+
+    def SliceAddAttribute(self,attrname,attrvalue,node=None):
+        if attrname == None or attrvalue == None \
+           or attrname == '' or attrvalue == '':
+            return 0
+        if node:
+            return self.__server.AddSliceAttribute(self.auth,self.slicename,
+                                                   attrname,attrvalue,node)
+        else:
+            return self.__server.AddSliceAttribute(self.auth,self.slicename,
+                                                   attrname,attrvalue)
+        pass
+
+    def SiteAdd(self,name,url,longitude,latitude):
+        return self.__server.AddSite(self.auth,
+                                     { 'name':name,'login_base':name,
+                                       'abbreviated_name':name,'url':url,
+                                       'longitude':longitude,
+                                       'latitude':latitude,
+                                       'enabled':True,'is_public':False,
+                                       'max_slices':20,'max_slivers':1000 })
+
+    def SiteUpdate(self,id,url,longitude,latitude):
+        return self.__server.UpdateSite(self.auth,id,
+                                        { 'url':url,
+                                          'longitude':longitude,
+                                          'latitude':latitude })
+
+    def SiteDelete(self,id):
+        return self.__server.DeleteSite(self.auth,id)
+
+    def SiteId(self,id):
+        retval = self.SiteInfo(id,['site_id'])
+        if retval and 'site_id' in retval:
+            return retval['site_id']
+        return None
+
+    def __keygen(self):
+        astr = "abcdefghijklmnopqrstuvwxyz"
+        astr = astr + astr.upper() + '0123456789'
+        tpasslist = random.sample(astr,32)
+        tkey = ''
+        for char in tpasslist:
+            tkey += char
+            pass
+        return tkey
+
+    def NodeAdd(self,site,hostname):
+        nid = self.__server.AddNode(self.auth,site,{ 'hostname':hostname })
+        self.__server.UpdateNode(self.auth,nid,{ 'key':self.__keygen() })
+        return nid
+
+    def NodeUpdate(self,id,hostname,networks):
+        nni = self.NodeNetworkInfo(infilter={ 'node_id':id })
+        # we just ensure that any network in networks is bound to this node;
+        # we leave any other bound ones alone.
+        _all_check_keys = [ 'broadcast','is_primary','network','ip','dns1',
+                            'dns2','hostname','netmask','gateway','mac',
+                            'bwlimit','type','method' ]
+        _most_check_keys = [ 'hostname','ip','mac','netmask' ]
+        # find the primary node network -- if we have a primary net that
+        # doesn't match, must remove this one first.
+        primary_nn = None
+        for ni in nni:
+            if ni['is_primary']:
+                primary_nn = ni
+                break
+            pass
+        # check the existing networks for _most_check_keys; if at least two
+        # of these match, we have a match and may need to update that nnid.
+        for ni in networks:
+            found = None
+            for exni in nni:
+                if exni.has_key('__done'):
+                    continue
+                match_count = 0
+                for k in _most_check_keys:
+                    if ni.has_key(k) and ni[k] == exni[k]:
+                        match_count += 1
+                        pass
+                    pass
+                if match_count > 1:
+                    found = exni
+                    exni['__done'] = True
+                    break
+                pass
+
+            if not found:
+                ad = {}
+                for k in _all_check_keys:
+                    if ni.has_key(k):
+                        ad[k] = ni[k]
+                        pass
+                    pass
+                # if we are adding the primary network, delete the old primary
+                if ad.has_key('is_primary') and ad['is_primary'] \
+                       and primary_nn:
+                    self.__server.DeleteNodeNetwork(self.auth,
+                                                    primary_nn['nodenetwork_id'])
+                    pass
+
+                self.__server.AddNodeNetwork(self.auth,id,ad)
+                pass
+            else:
+                # see if we need to do an update:
+                update = False
+                ad = {}
+                for k in _all_check_keys:
+                    if ni.has_key(k) and ni[k] != exni[k]:
+                        ad[k] = ni[k]
+                        pass
+                    pass
+                if len(ad.keys()) > 0:
+                    self.__server.UpdateNodeNetwork(self.auth,
+                                                    exni['nodenetwork_id'],ad)
+                    pass
+                pass
+            pass
+
+        if hostname:
+            self.__server.UpdateNode(self.auth,id,{ 'hostname':hostname })
+            pass
+
+        return
+
+    def NodeDelete(self,id):
+        return self.__server.DeleteNode(self.auth,id)
+
+    def NodeId(self,id):
+        retval = self.NodeInfo(id,['node_id'])
+        if retval and 'node_id' in retval:
+            return retval['node_id']
+        return None
+
+    def NodeSetBootState(self,id,boot_state):
+            self.__server.UpdateNode(self.auth,id,{ 'boot_state':boot_state })
+            pass
+
+    def PersonAdd(self,name,email,url,phone,passwd,roles):
+        sr = name.rsplit(" ",1)
+        if len(sr) == 1:
+            fname = lname = name
+        else:
+            fname = sr[0]
+            lname = sr[1]
+            pass
+        pid =  self.__server.AddPerson(self.auth,
+                                       { 'first_name':fname,'last_name':lname,
+                                         'url':url,'phone':phone,'email':email,
+                                         'password':passwd,'enabled':True })
+        for role in roles:
+            self.__server.AddRoleToPerson(self.auth,role,pid)
+            pass
+        return pid
+
+    def PersonUpdate(self,id,name,email,url,phone,passwd,roles,keys,sites):
+        # first figure out if we need to update the person
+        upd = {}
+        if name:
+            sr = name.rsplit(" ",1)
+            if len(sr) == 1:
+                upd['first_name'] = upd['last_name'] = name
+            else:
+                upd['first_name'] = sr[0]
+                upd['last_name'] = sr[1]
+                pass
+            pass
+        if email:
+            upd['email'] = email
+        if url:
+            upd['url'] = url
+        if phone:
+            upd['phone'] = phone
+        if passwd:
+            upd['passwd'] = passwd
+
+        # add doesn't enable, so we always force this.
+        upd['enabled'] = True
+
+        if len(upd.keys()) > 0:
+            self.__server.UpdatePerson(self.auth,id,upd)
+            pass
+
+        # now the role:
+        if roles:
+            for role in roles:
+                self.__server.AddRoleToPerson(self.auth,role,id)
+                pass
+            pass
+
+        # now the keys:
+        kil = self.KeyInfo(infilter={'person_id':id},outfilter=['key'])
+        for k in keys:
+            found = False
+            for ki in kil:
+                if ki['key'] == k:
+                    found = True
+                    break
+                pass
+            if not found:
+                try:
+                    self.__server.AddPersonKey(self.auth,id,{ 'key_type':'ssh',
+                                                              'key':k })
+                except xmlrpclib.Fault,ex:
+                    if ex.faultString.find("Invalid SSH version 2 public key") \
+                       > -1:
+                        pass
+                    else:
+                        raise
+                pass
+            pass
+
+        # and last the sites
+        for site in sites:
+            self.__server.AddPersonToSite(self.auth,id,site)
+            pass
+
+        return
+
+    def PersonDelete(self,id):
+        return self.__server.DeletePerson(self.auth,id)
+
+    def PersonId(self,id):
+        retval = self.PersonInfo(id,['person_id'])
+        if retval and 'person_id' in retval:
+            return retval['person_id']
+        return None
+
+    pass # end of PLCagent class
+
+class mod_PLC4:
+    
+    def __init__(self,plc):
+        self.modname = "mod_PLC4"
+        self.plc = plc
+        self.__PLCagent = None
+        self.__defAgent = None
+        self.__sliceexpdict = {}
+        self.__sliceexptime = 0
+
+        self.nmuid = plc.getAttrVal("nm_username",required=True)
+        self.nmkey = plc.getAttrVal("nm_key",required=True)
+
+        # setup translation attributes
+        self.sync_tr = dict()
+        self.sync_tr['node'] = { 'add':'NodeAdd',
+                                 'add_accepts':['site','hostname'],
+                                 'upd':'NodeUpdate',
+                                 'upd_accepts':['id','hostname','networks'],
+                                 'del':'NodeDelete' }
+        self.sync_tr['user'] = { 'add':'PersonAdd',
+                                 'add_accepts':['name','email','url','phone',
+                                                'passwd','roles'],
+                                 'upd':'PersonUpdate',
+                                 'upd_accepts':['id','name','email','url',
+                                                'phone','passwd','roles',
+                                                'keys','sites'],
+                                 'del':'PersonDelete' }
+        self.sync_tr['project'] = { 'add':'SiteAdd',
+                                    'add_accepts':['name','url',
+                                                   'longitude','latitude'],
+                                    'upd':'SiteUpdate',
+                                    'upd_accepts':['id','url',
+                                                   'longitude','latitude'],
+                                    'del':'SiteDelete' }
+
+        self.mgmt_tr = dict()
+        self.mgmt_tr['node'] = { 'setstate':'NodeSetBootState' }
+
+        return
+
+    def setdebug(self,sdebug,sverbose):
+        global debug, verbose
+        debug = sdebug
+        verbose = sverbose
+        pass
+
+    def __filterdict(self,d,key_list):
+        retval = dict()
+        for k in key_list:
+            if d.has_key(k):
+                retval[k] = d[k]
+                pass
+            pass
+        return retval
+
+    def syncSupport(self):
+        return self.sync_tr.keys()
+
+    def syncObject(self,objtype,properties):
+        agent = self.__getAgent(None)
+        if not properties.has_key("id"):
+            method = getattr(agent,self.sync_tr[objtype]['add'])
+            args = self.sync_tr[objtype]['add_accepts']
+            fargs = self.__filterdict(properties,args)
+            if debug:
+                print "adding object of type '%s' with args '%s'" \
+                      % (objtype,fargs)
+            retval = tryXmlrpcCmd(method,fargs)
+            # NOTE: we also have to add the `id' field to properties so that
+            # the subsequent update call works.
+            properties['id'] = retval
+        else:
+            # cheat :-)
+            retval = properties['id']
+            pass
+
+        method = getattr(agent,self.sync_tr[objtype]['upd'])
+        args = self.sync_tr[objtype]['upd_accepts']
+        fargs = self.__filterdict(properties,args)
+        if debug:
+            print "updating object of type '%s' with args '%s'" \
+                  % (objtype,fargs)
+        tryXmlrpcCmd(method,self.__filterdict(properties,args))
+
+        return retval
+
+    def manageObject(self,objtype,objid,op,opargs=[]):
+        agent = self.__getAgent(None)
+
+        method = getattr(agent,self.mgmt_tr[objtype][op])
+        fargs = list(opargs)
+        fargs.insert(0,objid)
+        if debug:
+            print "managing object of type '%s' with args '%s'" \
+                  % (objtype,fargs)
+        fargs = tuple(fargs)
+        tryXmlrpcCmd(method,fargs)
+
+        return objid
+
+    def deleteObject(self,objtype,id):
+        agent = self.__getAgent(None)
+
+        method = getattr(agent,self.sync_tr[objtype]['del'])
+        tryXmlrpcCmd(method,(id,))
+
+        return
+
+    def createSlice(self,slice):
+        agent = self.__getAgent(slice.slicename)
+        res = None
+        now = calendar.timegm(time.gmtime())
+
+        # fix up some slice info just in case
+        if slice.instmethod == None:
+            slice.instmethod = DEF_EMULAB_INSTMETHOD
+            pass
+        
+        try:
+            # XXX: fix to take desc and url args! (i.e., SliceUpdate)
+            res = tryXmlrpcCmd(agent.SliceCreate,(slice.sliceurl,
+                                                  slice.description,
+                                                  slice.instmethod))
+            if debug:
+                print "SliceCreate result: %s" % res
+                pass
+            pass
+        except:
+            print "Failed to create slice %s at %s" % (slice.slicename,
+                                                       self.plc.name)
+            raise
+
+        PLCticket = ''
+        # We can only get the tickets if the slice is in delegated mode.
+        if slice.instmethod == INSTMETHOD_DELEGATED:
+            try:
+                PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
+                pass
+            except:
+                print "Failed to get PLC ticket for slice %s at %s" % \
+                      (slice.slicename,self.plc.name)
+                raise
+            pass
+        
+        # XXX: fix for PLC 4
+        leaseend = now + MAX_PLC_LEASELEN
+        return (res, cPickle.dumps(PLCticket),leaseend)
+
+    def configureSlice(self,slice):
+        agent = self.__getAgent(slice.slicename)
+        res = None
+        now = calendar.timegm(time.gmtime())
+
+        # fix up some slice info just in case
+        if slice.instmethod == None:
+            slice.instmethod = DEF_EMULAB_INSTMETHOD
+            pass
+        
+        # If the slice is delegated, make sure to set the `delegations` attr
+        # to our nm-controller slice
+        if slice.instmethod == INSTMETHOD_DELEGATED:
+            try:
+                del_acct = self.plc.getAttrVal("nm_username",required=True)
+                res = tryXmlrpcCmd(agent.SliceAddAttribute,
+                                   ('delegations',del_acct),
+                                   OKstrs = ['Slice attribute already exists'])
+                if debug:
+                    print "SliceAddAttribute(delegations) result: %s" % res
+                    pass
+                pass
+            except:
+                print "Failed to set 'delegations' attribute on slice %s" \
+                      % slice.slicename
+                raise
+            pass
+
+        # Allow slice attributes to be set "generically" via the db
+        # Also see below where we add slice attributes on a per-node basis
+        sas = self.plc.getAttrVal("slice_attributes",required=False)
+        if sas:
+            try:
+                kvpairs = sas.split(',')
+                for kvp in kvpairs:
+                    (k,v) = kvp.split(':',1)
+
+                    res = tryXmlrpcCmd(agent.SliceAddAttribute,(k,v),
+                                       OKstrs = ['Slice attribute already exists'])
+                    if debug:
+                        print "SliceAddAttribute(%s,%s) result: %s" \
+                              % (str(k),str(v),res)
+                        pass
+                    pass
+                pass
+            except:
+                print "Failed to set slice attribute %s=%s on slice %s" \
+                      % (str(k),str(v),slice.slicename)
+                raise
+            pass
+
+        try:
+            userlist = slice.getSliceUsers()
+            # XXX: we might not always want to add emulabman
+            if userlist == None:
+                userlist = []
+                pass
+            elabman_acct = self.plc.getAttrVal("emulabman")
+            if not elabman_acct == None:
+                if not elabman_acct in userlist:
+                    userlist.append(elabman_acct)
+                    pass
+                pass
+            else:
+                print "No emulabman account set for PLC %s or slice %s;\n" \
+                      "  the portal will not work fully!" % (slice.plc.name,
+                                                             slice.slicename)
+                pass
+
+            res = tryXmlrpcCmd(agent.SliceUsersAdd,
+                               userlist)
+            if debug:
+                print "SliceUsersAdd result: %s" % res
+                pass
+        except:
+            print "Failed to assign users %s to slice %s" % \
+                  (str(userlist),slice.slicename)
+            raise
+
+        # The new NM will check to see if the slice has been added to the
+        # nodes, and will delete the ticket if when it contacts PLC it finds
+        # that the slice doesn't include the local NM's node... or something
+        # like that... so we must add the nodes to the slice.
+        try:
+            tnodelist = slice.getSliceNodes()
+            if tnodelist == None or tnodelist == []:
+                pass
+            else:
+                nodelist = map(lambda x: x[2], tnodelist)
+                res = tryXmlrpcCmd(agent.SliceNodesAdd, nodelist)
+                if debug:
+                    print "SliceNodesAdd result: %s" % res
+                    pass
+                pass
+            pass
+        except:
+            print "Failed to add nodes to slice %s" % slice.slicename
+            raise
+
+        # add any per-node or per-nodegroup attributes:
+        #
+        # XXX: will not work as above -- need to fix above and add this
+        # code in a way that works with the plab_attributes table.
+        #
+
+        # XXX: this is currently locked out to pi/user roles, although the docs
+        # say otherwise, so we can't use it automatically yet.
+        #
+        # Add a proper_op, mount_dir, so that we can eventually replace
+        # our current rootball load mechanism with proper.
+        # NOTE: this is secure, even though it seems like we're not specifying
+        # any access control.  ACLs consist of ".exportdir" and ".importdir"
+        # files in the vserver directories to be imported into ("reverse
+        # export") or exported.
+        #try:
+        #    res = tryXmlrpcCmd(agent.SliceAddAttribute,('proper_op',
+        #                                                'mount_dir',))
+        #    if debug:
+        #        print "SliceAddAttribute result: %s" % str(res)
+        #        pass
+        #    pass
+        #except:
+        #    print "Failed to add proper_op:mount_dir to slice %s" \
+        #          % slice.slicename
+        #    raise
+
+        PLCticket = ''
+        # We can only get the tickets if the slice is in delegated mode.
+        if slice.instmethod == INSTMETHOD_DELEGATED:
+            try:
+                PLCticket = tryXmlrpcCmd(agent.SliceGetTicket)
+                pass
+            except:
+                print "Failed to get PLC ticket for slice %s" % slice.slicename
+                raise
+            pass
+        
+        # XXX: fix for PLC 4
+        leaseend = now + MAX_PLC_LEASELEN
+        return (res, cPickle.dumps(PLCticket),leaseend)
+
+    def loadSliceInfo(self,slice):
+        """
+        Retrieves basic slice data from PLC and stores it in the slice obj.
+        """
+        agent = self.__getAgent(slice.slicename)
+        outfilter = ['instantiation','created','url','max_nodes','expires',
+                     'description','node_ids','person_ids']
+        retval = tryXmlrpcCmd(agent.SliceInfo,([slice.slicename],outfilter))
+        sdict = retval[0]
+
+        # grab the basic stuff
+        self.instmethod = sdict['instantiation']
+        self.description = sdict['description']
+        self.sliceurl = sdict['url']
+        
+        # now resolve the nodes...
+        retval = tryXmlrpcCmd(agent.NodeInfo,(sdict['node_ids'],['hostname']))
+        self.nodelist = []
+        for d in retval:
+            self.nodelist.append(d['hostname'])
+            pass
+
+        # now resolve the users...
+        retval = tryXmlrpcCmd(agent.PersonInfo,(sdict['person_ids'],['email']))
+        self.userlist = []
+        for d in retval:
+            self.userlist.append(d['email'])
+            pass
+
+        return
+    
+    def deleteSlice(self, slice):
+        agent = self.__getAgent(slice.slicename)
+        # XXX: fix OKstrs based on what plc actually returns
+        tryXmlrpcCmd(agent.SliceDelete, OKstrs = ["does not exist"])
+        pass
+
+    def renewSlice(self, slice, force = False):
+        """
+        Returns -1 if did not need to renew; 0 if renew succeeded;
+        1 if renew failed.
+        """
+        agent = self.__getAgent(slice.slicename)
+        ret = 0
+        now = int(time.time()) # seconds since the epoch (UTC)
+ 
+        # Get current PLC timeout for this slice
+        leaseend = self.getSliceExpTime(slice.slicename)
+
+        if debug:
+            print "%s says %s/%s expires at %s" % \
+                  (slice.plc.name,slice.eid,slice.pid,
+                   time.strftime("%Y-%m-%d %H:%M:%S",
+                                 time.gmtime(leaseend)))
+
+        # Warn that we weren't able to get the exp. time from PLC,
+        # but don't fail - try to renew anyway.
+        if not leaseend:
+            print "Couldn't get slice expiration time from %s !" % \
+                  slice.plc.name
+            leaseend = slice.leaseend
+            pass
+
+        # Allow some slop in our recorded time versus PLC's.  This is necessary
+        # since we calculate the expiration locally.  If we are off by too much
+        # then adjust to PLC's recorded expiration.
+        if abs(leaseend - slice.leaseend) > MAX_LEASE_SLOP:
+            print "Warning: recorded lease for %s doesn't agree with PLC" % \
+                  slice.slicename
+            print "\tRecorded: %s  Actual: %s" % (slice.leaseend, leaseend)
+            slice.leaseend = leaseend
+            pass
+
+        # Expired!  Just bitch about it; try renewal anyway.  The renewal
+        # code in libplab will send email.
+        if leaseend < now:
+            print "Slice %s (%s/%s) has expired!" % \
+                  (slice.slicename, slice.pid, slice.eid)
+            pass
+
+        # If the lease is at least as large as the minimum window,
+        # don't bother renewing it.
+        if leaseend - now > MIN_LEASE_WINDOW and not force:
+            print "Slice %s (%s/%s) doesn't need to be renewed" % \
+                  (slice.slicename, slice.pid, slice.eid)
+            return -1
+
+        # Max out leaseend as far as (politically) possible
+        newleaseend = now + MAX_PLC_LEASELEN
+
+        if debug:
+            print "Renewing until %s (adding now +%d s)" % \
+                  (time.strftime("%Y-%m-%d %H:%M:%S",
+                                 time.gmtime(newleaseend)),
+                   newleaseend - now)
+        
+        try:
+            # XXX: again fix NOKstrs as necessary
+            res = tryXmlrpcCmd(agent.SliceRenew,
+                               newleaseend,
+                               NOKstrs = ["does not exist"])
+            # Get the updated ticket.
+            slice.slicemeta = self.getSliceMeta(slice)
+            slice.slicemeta_legacy = None
+
+            ret = 0
+            if debug:
+                print "SliceRenew returns: %s" % res
+                pass
+            pass
+        except:
+            print "Failed to renew lease for slice %s" % slice.slicename
+            traceback.print_exc()
+            ret = 1
+            pass
+        else:
+            slice.leaseend = newleaseend
+            pass
+        
+        return ret
+
+    def getNodes(self,infilter=None,outfilter=None):
+        """
+        Basically, wraps the GetNodes method, but also lets the caller
+        optimize the call by filtering.
+        """
+        agent = self.__getAgent(None)
+        return tryXmlrpcCmd(agent.NodeInfo,(infilter,outfilter))
+
+    def getNodeGroups(self,infilter=None,outfilter=None):
+        """
+        Basically, wraps the GetNodeGroups method, but also lets the caller
+        optimize the call by filtering.
+        """
+        agent = self.__getAgent(None)
+        return tryXmlrpcCmd(agent.NodeGroupInfo,(infilter,outfilter))
+
+    def getNodeNetworks(self,infilter=None,outfilter=None):
+        """
+        Basically, wraps the GetNodeNetworks method, but also lets the caller
+        optimize the call by filtering.
+        """
+        agent = self.__getAgent(None)
+        return tryXmlrpcCmd(agent.NodeNetworkInfo,(infilter,outfilter))
+
+    def getSites(self,infilter=None,outfilter=None):
+        """
+        Basically, wraps the GetSites method, but also lets the caller
+        optimize the call by filtering.
+        """
+        agent = self.__getAgent(None)
+        return tryXmlrpcCmd(agent.SiteInfo,(infilter,outfilter))
+
+    def getSliceMetaLegacy(self, slice):
+        agent = self.__getAgent(slice.slicename)
+
+        # We can only get the tickets if the slice is in delegated mode.
+        if slice.instmethod != INSTMETHOD_DELEGATED:
+            return cPickle.dumps('')
+        
+        try:
+            PLCticket = tryXmlrpcCmd(agent.SliceGetTicketLegacy)
+            pass
+        except:
+            print "Failed to get legacy PLC ticket for slice %s" % slice.slicename
+            raise
+
+        return cPickle.dumps(PLCticket)
+
+    def getSliceMeta(self,slice):
+        agent = self.__getAgent(slice.slicename)
+        
+        try:
+            retval = tryXmlrpcCmd(agent.SliceGetTicket)
+            pass
+        except:
+            print "Failed to get PLC ticket for slice %s" % slice.slicename
+            raise
+        return cPickle.dumps(retval)
+
+    def pingNM(self,node):
+        plcagent = self.__getAgent(node.slice.slicename)
+        node.nmagent = NM4agent(node.IP,node.nodeid,self.nmuid,self.nmkey)
+
+        try:
+            res = node.nmagent.ping()
+            return res
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        return False
+
+    def createNode(self, node):
+        plcagent = self.__getAgent(node.slice.slicename)
+
+        if debug:
+            print "createNode for node %s (%s/%s) starting" \
+                  % (str(node.nodeid),str(node.hostname),str(node.IP))
+            pass
+
+        ticketdata = cPickle.loads(node.slice.slicemeta)
+        node.nmagent = NM4agent(node.IP,node.nodeid,self.nmuid,self.nmkey)
+
+        res = tryXmlrpcCmd(plcagent.SliceNodesAdd, node.hostname,
+                           OKstrs = ["already assigned"])
+
+        try:
+            res = node.nmagent.deliver_ticket(ticketdata)
+            if not res[0] == 0:
+                raise RuntimeError, "deliver_ticket(%s/%s) failed: %d, %s" % \
+                      (node.nodeid,node.IP,realres[0], realres[1])
+            pass
+        except:
+            print "deliver_ticket(%s/%s), slice %s: exception\n%s" \
+                  % (node.nodeid,node.IP,node.slice.slicename,
+                     traceback.format_exc())
+            # XXX: Can we clean up on the plab side here?
+            #      delete_sliver requires an rcap, but we don't have one
+            #      in this case (since sliver creation failed).
+            # self.freeNode(node)
+            raise
+
+        try:
+            res = node.nmagent.create_sliver(node.slice.slicename)
+            if not res[0][0] == 0:
+                raise RuntimeError, "create_sliver(%s/%s) failed: %d, %s" % \
+                      (node.nodeid,node.IP,realres[0], realres[1])
+            pass
+        except:
+            print "create_sliver(%s/%s), slice %s: exception\n%s" \
+                  % (node.nodeid,node.IP,node.slice.slicename,
+                     traceback.format_exc())
+            # XXX: Can we clean up on the plab side here?
+            #      delete_sliver requires an rcap, but we don't have one
+            #      in this case (since sliver creation failed).
+            # self.freeNode(node)
+            raise
+
+        # send back the rcap
+        #return (res, cPickle.dumps(res[1][0]), node.slice.leaseend)
+        # instead, we send back whatever the wrapped agent sends back... which
+        # is some form of rcap.
+        return (res[0],'',node.slice.leaseend)
+    
+    def freeNode(self, node):
+        rcap = None
+        try:
+            rcap = cPickle.loads(node.nodemeta)
+        except:
+            #print "WARNING: couldn't load rcap"
+            pass
+        node.nmagent = NM4agent(node.IP,node.nodeid,self.nmuid,self.nmkey)
+        res = None
+
+        try:
+            res = node.nmagent.delete_sliver(node.slice.slicename)
+            if not res[0] == 0:
+                raise RuntimeError, "delete_sliver failed: %d" % res[0]
+            pass
+        except:
+            print "Failed to release node %s/%s from slice %s" % \
+                  (node.nodeid,node.IP,node.slice.slicename)
+            raise
+        
+        return res
+
+    def renewNode(self, node, length = 0):
+        return self.createNode(node)
+    
+    def startNode(self,node):
+        node.nmagent = NM4agent(node.IP,node.nodeid,self.nmuid,self.nmkey)
+        try:
+            res = node.nmagent.start_sliver(node.slice.slicename)
+        except:
+            print "Failed to start node %s/%s from slice %s" % \
+                  (node.nodeid,node.IP,node.slice.slicename)
+            raise
+        return res
+
+    def stopNode(self,node):
+        node.nmagent = NM4agent(node.IP,node.nodeid,self.nmuid,self.nmkey)
+        try:
+            res = node.nmagent.stop_sliver(node.slice.slicename)
+        except:
+            print "Failed to stop node %s/%s from slice %s" % \
+                  (node.nodeid,node.IP,node.slice.slicename)
+            raise
+        return res
+
+    def restartNode(self,node):
+        node.nmagent = NM4agent(node.IP,node.nodeid,self.nmuid,self.nmkey)
+        try:
+            res = node.nmagent.restart_sliver(node.slice.slicename)
+        except:
+            print "Failed to restart node %s/%s from slice %s" % \
+                  (node.nodeid,node.IP,node.slice.slicename)
+            raise
+        return res
+    
+    # XXX: this is broken, appears to be bug in GetSlices xmlrpc call in PLC4
+    def getSliceExpTime(self, slicename):
+        """
+        Grab the expiration time for a slice according to PLC.
+        Entries are cached for a time specified in this module by
+        MAX_CACHE_TIME.  Returns seconds since the epoch in UTC.
+        """
+        agent = self.__getAgent(slicename)
+        # Refresh the slice expiration cache if:
+        # 1) cache is cold
+        # 2) cache is too old
+        # 3) given slice is not in cache
+        if not self.__sliceexpdict or \
+           self.__sliceexptime < time.time() - MAX_CACHE_TIME or \
+           not self.__sliceexpdict.has_key(slicename):
+            #
+            # This behavior (of getting ALL our slice expiration times)
+            # can only be emulated by getting the slice list, and then
+            # checking the expiration times for ALL slices in the list...
+            # GetSlices in PLC 4 doesn't give you everything if you ask for
+            # nothing.
+            #
+            sdict = tryXmlrpcCmd(agent.SliceInfo,[slicename])
+            # bug in PLC return filter...
+            #                     ([slicename],['name','expires']))
+            for entry in sdict:
+                self.__sliceexpdict[entry['name']] = entry
+                pass
+            self.__sliceexptime = time.time()
+            pass
+
+        if not self.__sliceexpdict.has_key(slicename):
+            print "Slice %s unknown to PLC" % slicename
+            return None
+
+        leaseend = self.__sliceexpdict[slicename]['expires']
+
+        return leaseend
+
+    def doAuthCheck(self,slicename):
+        return tryXmlrpcCmd(self.__getAgent(slicename).AuthCheck)
+
+    def __getAgent(self, slicename):
+        """
+        Returns a PLC agent object for the specified slice.  May cache.
+        """
+        # sometimes we're not asking about a particular slice
+        if not slicename:
+            if not self.__defAgent:
+                self.__defAgent = PLCagent(self.plc,None)
+                pass
+            return self.__defAgent
+
+        if not self.__PLCagent or \
+           not self.__PLCagent.getSliceName() == slicename:
+            self.__PLCagent = PLCagent(self.plc,slicename)
+            pass
+
+        return self.__PLCagent
+
+    pass # end of mod_PLC class

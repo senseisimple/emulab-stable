@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<signed-credential xmlns="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#">
+  <credential xml:id="Ref2">
+  <type>privilege</type>
+  <serial>2</serial>
+  <owner_uuid>foo bar</owner_uuid>
+  <this_uuid>foo bar</this_uuid>
+  <privileges>
+    <privilege>
+      <name>frazzle</name>
+      <can_delegate>1</can_delegate>
+    </privilege>
+    <privilege>
+      <name>drazzle</name>
+      <can_delegate>1</can_delegate>
+    </privilege>
+  </privileges>
+  <parent>
+  <credential xml:id="Ref1">
+  <type>privilege</type>
+  <serial>3</serial>
+  <owner_uuid>foo bar</owner_uuid>
+  <this_uuid>foo bar</this_uuid>
+  <privileges>
+    <privilege>
+      <name>frazzle</name>
+      <can_delegate>1</can_delegate>
+    </privilege>
+  </privileges>
+</credential>
+</parent>
+</credential>
+  <signatures>
+    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#" xml:id="Sig_Ref1">
+ <SignedInfo>
+  <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+  <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+  <Reference URI="#Ref1">
+    <Transforms>
+      <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+    </Transforms>
+    <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+    <DigestValue>jvLhG8xpXc+ABKP8KRMnHMWFi98=</DigestValue>
+    </Reference>
+ </SignedInfo>
+ <SignatureValue>EZPbg858GFUvV/+b1RdfQfJc51ADq9r/Vov1ahEYcUXDrPjrNQQ4jTiHPWDMmwqX
+kDDvwDHIkP8WlWF+Pk1NJNZRpmUFLtPdRG2DTWG/ySwp8UBJRLgkSno7N5ULmbxm
+pA74Pi0YLOq2yLJpdm+HdDa1uqpI7YSgMSPoEUqTVX0=</SignatureValue>
+ <KeyInfo>
+  <X509Data>
+
+
+
+  <X509Certificate>MIIEAzCCA2ygAwIBAgIBADANBgkqhkiG9w0BAQQFADCBuDELMAkGA1UEBhMCVVMx
+DTALBgNVBAgTBFV0YWgxFzAVBgNVBAcTDlNhbHQgTGFrZSBDaXR5MR0wGwYDVQQK
+ExRVdGFoIE5ldHdvcmsgVGVzdGJlZDEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0
+aG9yaXR5MRgwFgYDVQQDEw9ib3NzLmVtdWxhYi5uZXQxKDAmBgkqhkiG9w0BCQEW
+GXRlc3RiZWQtb3BzQGZsdXgudXRhaC5lZHUwHhcNMDUwMjAzMjIyOTU2WhcNMTAw
+NzI3MjIyOTU2WjCBuDELMAkGA1UEBhMCVVMxDTALBgNVBAgTBFV0YWgxFzAVBgNV
+BAcTDlNhbHQgTGFrZSBDaXR5MR0wGwYDVQQKExRVdGFoIE5ldHdvcmsgVGVzdGJl
+ZDEeMBwGA1UECxMVQ2VydGlmaWNhdGUgQXV0aG9yaXR5MRgwFgYDVQQDEw9ib3Nz
+LmVtdWxhYi5uZXQxKDAmBgkqhkiG9w0BCQEWGXRlc3RiZWQtb3BzQGZsdXgudXRh
+aC5lZHUwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAMP7pPJRZQgRUmn+3G8N
+fTdaIKEY3yQMnHKnh39F08xEdIu1GBZybssQjyNoabBpfICvA8cAVHvzaqumMnMw
+7GUEKfeQ/yxcah4B4ClEUi1HyC9NPKekLjMbYdmvfucI8113bnYB1aVNh8mGkcUA
+9xc3YWBUqtWLx9Tay4a4iZCVAgMBAAGjggEZMIIBFTAdBgNVHQ4EFgQU4f2YM843
+s33w03Ux36fYMaD2mCAwgeUGA1UdIwSB3TCB2oAU4f2YM843s33w03Ux36fYMaD2
+mCChgb6kgbswgbgxCzAJBgNVBAYTAlVTMQ0wCwYDVQQIEwRVdGFoMRcwFQYDVQQH
+Ew5TYWx0IExha2UgQ2l0eTEdMBsGA1UEChMUVXRhaCBOZXR3b3JrIFRlc3RiZWQx
+HjAcBgNVBAsTFUNlcnRpZmljYXRlIEF1dGhvcml0eTEYMBYGA1UEAxMPYm9zcy5l
+bXVsYWIubmV0MSgwJgYJKoZIhvcNAQkBFhl0ZXN0YmVkLW9wc0BmbHV4LnV0YWgu
+ZWR1ggEAMAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQEEBQADgYEAg7cwFrcUW9uN
+pvAv9BVbJA2IeyHNAj1URCIf3lAFSeOGWk0WGLJxO6QN0nm+K8O7DdtPXx6qPUdv
+a/b6J+OtSE2lGXqQ4Nxczpjl8347M7EirbJA4mRJ+j06evbKKRHZ5dFfULb/T8sE
+R9aYU3O/0/sCYeYySu+GedtfOk7zcaM=</X509Certificate>
+<X509SubjectName>emailAddress=testbed-ops@flux.utah.edu,CN=boss.emulab.net,OU=Certificate Authority,O=Utah Network Testbed,L=Salt Lake City,ST=Utah,C=US</X509SubjectName>
+<X509IssuerSerial>
+<X509IssuerName>emailAddress=testbed-ops@flux.utah.edu,CN=boss.emulab.net,OU=Certificate Authority,O=Utah Network Testbed,L=Salt Lake City,ST=Utah,C=US</X509IssuerName>
+<X509SerialNumber>0</X509SerialNumber>
+</X509IssuerSerial>
+</X509Data>
+  <KeyValue>
+<RSAKeyValue>
+<Modulus>
+w/uk8lFlCBFSaf7cbw19N1ogoRjfJAyccqeHf0XTzER0i7UYFnJuyxCPI2hpsGl8
+gK8DxwBUe/Nqq6YyczDsZQQp95D/LFxqHgHgKURSLUfIL008p6QuMxth2a9+5wjz
+XXdudgHVpU2HyYaRxQD3FzdhYFSq1YvH1NrLhriJkJU=
+</Modulus>
+<Exponent>
+AQAB
+</Exponent>
+</RSAKeyValue>
+</KeyValue>
+ </KeyInfo>
+</Signature>
+  </signatures>
+</signed-credential>

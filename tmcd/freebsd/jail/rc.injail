@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -86,7 +86,8 @@ sub BootFatal($)
 {
     my ($msg) = @_;
     
-    if (tmcc(TMCCCMD_BOOTERRNO, "-1") < 0) {
+    # XXX "--" ensures that -1 is not interpreted as a tmcc cmdline arg
+    if (tmcc(TMCCCMD_BOOTERRNO, "-- -1") < 0) {
 	print "Error sending boot errno to Emulab Control!\n";
     }
     

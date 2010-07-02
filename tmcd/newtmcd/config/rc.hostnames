@@ -1,0 +1,282 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# This takes a special argument so it can be called by ixpsetup to create
+# a specific hosts file other than /etc/hosts.
+# 
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] [-f file] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:f:";
+my $action  = "boot";
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Script specific goo
+my $DEFAULT    = "$ETCDIR/hosts";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use liblocsetup;
+use libtmcc;
+use librc;
+
+my $pathname   = $HOSTSFILE;  # Default path from liblocsetup.
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || (REMOTE() && !(PLAB() || JAILED())));
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'f'})) {
+    $pathname = $options{'f'};
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# More protos
+sub fromtopo($);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my %tmccresults;
+    my @topo;
+    my @hosts;
+
+    print STDOUT "Checking Testbed hostnames configuration ... \n";
+
+    #
+    # Firewall hostname setup is done much earlier (rc.firewall)
+    #
+    return 0
+	if (ISFW());
+
+    #
+    # First see if we have a topo file; we can generate our own hosts
+    # file if we do, saving a lot of load on tmcd in big experiments.
+    #
+    if (fromtopo(\@topo) < 0 &&
+	tmcc(TMCCCMD_HOSTS, undef, \%tmccresults) < 0) {
+	fatal("Could not get hosts file from server!");
+    }
+    # Important; if no results then do nothing. Do not want to kill
+    # the existing hosts file.
+    return 0 if (! exists($tmccresults{'HOST'}));
+
+    my $ptr = $tmccresults{'HOST'};
+    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+
+    for my $host (@$ptr) {
+    	my $vname = $$host{'VNAME'};
+    	my $vlan = $$host{'VLAN'};
+    	my $ip = $$host{'IP'};
+    	my $virtiface = $$host{'VIRTIFACE'};
+    	my $aliases = $$host{'ALIASES'};
+
+	my $string = sprintf "NAME=%s-%s IP=%s ALIASES='%s-%i %s'\n",
+                             $vname, $vlan, $ip, $vname, $virtiface,
+                             $aliases;
+        push @hosts, $string;		     
+    }
+
+    if (genhostsfile($pathname, @hosts) != 0) {
+	fatal("Could not update $pathname!");
+    }
+
+    return 0;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+    system("$CP -f $DEFAULT $HOSTSFILE");
+    if ($?) {
+	fatal("Could not copy default $HOSTSFILE into place!");
+    }
+}
+
+#
+# Generate hosts file (as if it came from tmcd) locally if we have a topo file.
+#
+sub fromtopo($)
+{
+    my ($rptr)	= @_;
+    my @results = ();
+    my $topomap;
+    my $mapfile = "$BOOTDIR/hostmap";
+    my ($pid, $eid, $vname) = check_nickname();
+    my %nodes = ();
+    my %lans  = ();;
+
+    if (gettopomap(\$topomap)) {
+	return -1;
+    }
+
+    # Special case of experiment with no lans; no hostfile stuff needed.
+    if (! scalar(@{ $topomap->{"lans"} })) {
+	@$rptr = ();
+	return 0;
+    }
+
+    # The nodes section tells us the name of each node, and all its links.
+    foreach my $noderef (@{ $topomap->{"nodes"} }) {
+	my $vname  = $noderef->{"vname"};
+	my $links  = $noderef->{"links"};
+	my $count  = 0;
+
+	next
+	    if (!defined($links));
+
+	$nodes{$vname} = [];
+
+	# Links is a string of "$lan1:$ip1 $lan2:$ip2 ..."
+	foreach my $link (split(" ", $links)) {
+	    my ($lan,$ip) = split(":", $link);
+
+	    push(@{ $nodes{$vname} }, "$count:$ip");
+	    $lans{"$vname:$count"} = $lan;
+	    $count++;
+	}
+    }
+
+    #
+    # Construct input for external program. 
+    #
+    if (! open(MAP, ">$mapfile")) {
+	warn("*** WARNING: Could not create $mapfile!\n");
+	@$rptr  = ();
+	return -1;
+    }
+
+    #
+    # First spit out virt_nodes
+    #
+    print MAP scalar(keys(%nodes)) . "\n";
+
+    foreach my $node (keys(%nodes)) {
+	my @members = @{ $nodes{$node} };
+
+	print MAP "$node,";
+	print MAP join(" ", @members);
+	print MAP "\n";
+    }
+    #
+    # Then spit out virt_lans.
+    # 
+    print MAP scalar(keys(%lans)) . "\n";
+
+    foreach my $member (keys(%lans)) {
+	my $lan = $lans{$member};
+
+	print MAP "$lan,$member\n";
+    }
+    close(MAP);
+
+    #
+    # Now run the dijkstra program on the input. 
+    # 
+    if (!open(GENH, "cat $mapfile | $BINDIR/genhostsfile $vname |")) {
+	warn("*** WARNING: Could not invoke genhostsfile on mapfile!\n");
+	@$rptr  = ();
+	return -1;
+    }
+    while (<GENH>) {
+	push(@results, $_);
+    }
+    if (! close(GENH)) {
+	if ($?) {
+	    warn("*** WARNING: genhostsfile exited with status $?!\n");
+	}
+	else {
+	    warn("*** WARNING: Error closing genhostsfile pipe: $!\n");
+	}
+	@$rptr  = ();
+	return -1;
+    }
+    @$rptr = @results;
+    return 0;
+}

@@ -1,11 +1,12 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+use XML::Simple;
 
 #
 # Parse ssh public keys and enter into the DB. The default format is
@@ -16,17 +17,21 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print "Usage: addpubkeys [-n] [-k] <user> [<keyfile> | <key>]\n";
-    print "       addpubkeys [-i [-f] | -w] <user>\n";
+    print "Usage: addpubkeys [-d] [-k | -f] [-n | -u <user>] [<keyfile> | <key>]\n";
+    print "       addpubkeys [-d] -X <xmlfile>\n";
+    print "       addpubkeys [-d] [-i [-r] | -w] <user>\n";
     print "Options:\n";
+    print " -d      Turn on debugging\n";
     print " -k      Indicates that key was passed in on the command line\n";
+    print " -f      Indicates that key was passed in as a filename\n";
     print " -n      Verify key format only; do not enter into into DB\n";
+    print " -X      Get args from an XML file: verify, user, keyfile.\n";
     print " -w      Generate new authkeys (protocol 1 and 2) file for user\n";
     print " -i      Initialize mode; generate initial key for user\n";
-    print " -f      Force a generate of initial key for user\n";
+    print " -r      Force a regenerate of initial key for user\n";
     exit(-1);
 }
-my $optlist   = "kniwf";
+my $optlist   = "dkniwfu:rX:";
 my $iskey     = 0;
 my $verify    = 0;
 my $initmode  = 0;
@@ -34,6 +39,7 @@ my $force     = 0;
 my $genmode   = 0;
 my $nobody    = 0;
 my $noemail   = 0;
+my $xmlfile;
 
 #
 # Configure variables
@@ -42,18 +48,22 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT     = "@TBAUDITEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
-my $HOMEDIR	= "/users";
 my $KEYGEN	= "/usr/bin/ssh-keygen";
 my $USERUID;
 
 # Locals
 my $user;
+my $this_user;
+my $target_user;
 my $keyfile;
 my $keyline;
 my $key;
 my $comment;
 my $user_name;
 my $user_email;
+my $user_dbid;
+my $user_uid;
+my $debug = 0;
 
 #
 # Testbed Support libraries
@@ -69,7 +79,22 @@ use libtestbed;
 sub ParseKey($);
 sub InitUser();
 sub GenerateKeyFile();
+sub ParseXmlArgs($$$$$$);
 sub fatal($);
+
+my $HOMEDIR = USERROOT();
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("verify"		=> ["verify",		$SLOT_OPTIONAL,	   0],
+     "user"		=> ["user",		$SLOT_OPTIONAL],
+     "keyfile"		=> ["keyfile",		$SLOT_REQUIRED]);
 
 #
 # Turn off line buffering on output
@@ -106,8 +131,14 @@ if ($UID == 0) {
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"d"})) {
+    $debug = 1;
+}
 if (defined($options{"k"})) {
     $iskey = 1;
+}
+if (defined($options{"f"})) {
+    $iskey = 0;
 }
 if (defined($options{"n"})) {
     $verify = 1;
@@ -115,62 +146,111 @@ if (defined($options{"n"})) {
 if (defined($options{"i"})) {
     $initmode = 1;
 }
-if (defined($options{"f"})) {
+if (defined($options{"r"})) {
     $force = 1;
 }
 if (defined($options{"w"})) {
     $genmode = 1;
 }
+if (defined($options{"u"})) {
+    $user = $options{"u"};
+}
+if (defined($options{"X"})) {
+    $xmlfile = $options{"X"};
+
+    my %xmlargs = (); 
+    my %errors = ();
+    ParseXmlArgs($xmlfile, "user_pubkeys", \%xmlfields, $debug,
+		 \%xmlargs, \%errors);
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+	fatal("XML arg error");
+    }
+
+    $verify = $xmlargs{"verify"};
+    $user = $xmlargs{"user"}
+	if (exists($xmlargs{"user"}));
+    $ARGV[0] = $xmlargs{"keyfile"};
+}
+
 if ($verify && $genmode) {
     usage();
 }
 if ($initmode || $genmode) {
-    if (@ARGV != 1) {
-	usage();
-    }
-}
-elsif (@ARGV == 2) {
-    $keyfile = $ARGV[1];
+    usage()
+	if (@ARGV != 1);
+
+    $user = $ARGV[0];
 }
 else {
-    usage();
-}    
-$user = $ARGV[0];
+    usage()
+	if (@ARGV != 1);
+    usage()
+	if (!$verify && !defined($user));
+    
+    $keyfile = $ARGV[0];
+}
 
 #
 # Untaint the arguments.
 #
-if ($user =~ /^([-\w_]+)$/i) {
-    $user = $1;
-}
-else {
-    fatal("Tainted username: $user");
+if (defined($user)) {
+    if ($user =~ /^([-\w]+)$/i) {
+	$user = $1;
+    }
+    else {
+	fatal("Tainted username: $user");
+    }
+    # Map user to object.
+    $target_user = User->Lookup($user);
+    if (! defined($target_user)) {
+	fatal("$user does not exist!")
+    }
+
+    $user_name  = $target_user->name();
+    $user_email = $target_user->email();
+    $user_dbid  = $target_user->dbid();
+    $user_uid   = $target_user->uid();
+    $USERUID    = $target_user->unix_uid();
 }
 
 #
-# If invoked as "nobody" its for a user with no actual account.
+# If invoked as "nobody" we came from the web interface. We have to have
+# a credential in the environment, unless its just a key verification
+# operation, which anyone can do. 
 # 
 if (getpwuid($UID) eq "nobody") {
-    if ($initmode || $genmode) {
-	fatal("Bad usage as 'nobody'");
+    $this_user = User->ImpliedUser();
+    
+    if (($initmode || $genmode || !$verify) && !defined($this_user)) {
+	fatal("Bad usage from web interface");
     }
     $nobody = 1;
 }
 else {
-    $USERUID = getpwnam($user);
+    # From the command line; map invoking user to object.
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
 }
 
 #
-# Initmode or genmode, do it and exit.
+# Initmode or genmode, do it and exit. Eventually get rid of the switch
+# to the target user.
 #
 if ($initmode) {
     # Drop root privs, switch to target user.
-    $EUID = $USERUID;
+    $EUID = $UID = $USERUID;
     exit InitUser();
 }
 if ($genmode) {
     # Drop root privs, switch to target user.
-    $EUID = $USERUID;
+    $EUID = $UID = $USERUID;
     exit GenerateKeyFile();
 }
 
@@ -202,33 +282,21 @@ else {
 #
 if (!$verify) {
     # If its the user himself, then we can generate a new authkeys file. 
-    if (!$nobody && getpwuid($UID) ne "$user" && !TBAdmin($UID)) {
-	fatal("You are not allowed to set pubkeys for $user.\n");
+    if (!$target_user->SameUser($this_user) && !TBAdmin()) {
+	fatal("You are not allowed to set pubkeys for $target_user\n");
     }
-    if (-d "$HOMEDIR/$user/.ssh") {    
+    if (-d "$HOMEDIR/$user_uid/.ssh") {
+	# Drop root privs, switch to target user.
+	$EUID = $UID = $USERUID;
 	$genmode = 1;
     }
-
+    
     #
     # This script is audited when not in verify mode. Since all keys are first
     # checked with verify mode, this should not cause any extra email from bad
     # keys.
     #
     AuditStart(0);
-
-    if (! UserDBInfo($user, \$user_name, \$user_email)) {
-	if ($nobody) {
-	    $noemail = 1;
-	}
-	else {
-	    fatal("No DB info for $user!");
-	}
-    }
-}
-
-# Drop root privs, switching to user.
-if (!$nobody) {
-    $EUID = $USERUID;
 }
 
 #
@@ -258,6 +326,11 @@ exit 1;
 
 sub ParseKey($) {
     my ($keyline) = @_;
+
+    # Remove trailing newlines which screws the patterns below.
+    # First convert dos newlines since many people upload from windoze.
+    $keyline =~ s/\r/\n/g;
+    $keyline =~ s/\n//g;
 
     # Enforce a reasonable length on the key.
     if (length($keyline) > 4096) {
@@ -311,12 +384,13 @@ sub ParseKey($) {
     $key = "$key $comment";
 
     DBQueryFatal("replace into user_pubkeys ".
-		 "values ('$user', 0, '$key', now(), '$comment')");
+		 "values ('$user_uid', '$user_dbid', ".
+		 "        0, '$key', now(), '$comment')");
 
     #
     # Mark user record as modified so nodes are updated.
     #
-    TBNodeUpdateAccountsByUID($user);
+    TBNodeUpdateAccountsByUID($user_uid);
 
     my $chunked = "";
 
@@ -336,8 +410,8 @@ sub ParseKey($) {
 
     if (! $noemail) {
 	SENDMAIL("$user_name <$user_email>",
-		 "SSH Public Key for '$user' Added",
-		 "SSH Public Key for '$user' added:\n".
+		 "SSH Public Key for '$user_uid' Added",
+		 "SSH Public Key for '$user_uid' added:\n".
 		 "\n".
 		 "$chunked\n",
 		 "$TBOPS");
@@ -352,7 +426,7 @@ sub ParseKey($) {
 #
 sub InitUser()
 {
-    my $sshdir  = "$HOMEDIR/$user/.ssh";
+    my $sshdir  = "$HOMEDIR/$user_uid/.ssh";
 
     #
     # Set up the ssh key, but only if not done so already.
@@ -372,7 +446,7 @@ sub InitUser()
 
 	    if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([-\w\@\.]*)/) {
 		DBQueryFatal("delete from user_pubkeys ".
-			     "where uid='$user' and pubkey='$1 $2'");
+			     "where uid_idx='$user_dbid' and pubkey='$1 $2'");
 	    }
 	    unlink("$sshdir/identity");
 	}
@@ -392,7 +466,8 @@ sub InitUser()
 
 	if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([-\w\@\.]*)/) {
 	    DBQueryFatal("replace into user_pubkeys ".
-			 "values ('$user', 0, '$1 $2', now(), '$2')");
+			 "values ('$user_uid', '$user_dbid', ".
+			 "        0, '$1 $2', now(), '$2')");
 	}
 	else {
 	    fatal("Bad protocol 1 public key: $ident\n");
@@ -413,7 +488,7 @@ sub InitUser()
 	    if ($ident =~
 		/^(ssh-rsa [-\w\.\@\+\/\=]*) ([-\w\@\.\ ]*)$/) {
 		DBQueryFatal("delete from user_pubkeys ".
-			     "where uid='$user' and pubkey='$1 $2'");
+			     "where uid_idx='$user_dbid' and pubkey='$1 $2'");
 	    }
 	    unlink("$sshdir/id_rsa");
 	}
@@ -434,13 +509,8 @@ sub InitUser()
 	if ($ident =~
 	    /^(ssh-rsa [-\w\.\@\+\/\=]*) ([-\w\@\.\ ]*)$/) {
 	    DBQueryFatal("replace into user_pubkeys ".
-			 "values ('$user', 0, '$1 $2', now(), '$2')");
-
-	    #
-	    # Backwards compat. Remove later.
-	    #
-	    DBQueryFatal("update users set emulab_pubkey='$1 $2' ".
-			 "where uid='$user'");
+			 "values ('$user_uid', '$user_dbid', ".
+			 "        0, '$1 $2', now(), '$2')");
 	}
 	else {
 	    fatal("Bad protocol 2 public key: $ident\n");
@@ -456,7 +526,7 @@ sub InitUser()
 sub GenerateKeyFile()
 {
     my @pkeys   = ();
-    my $sshdir  = "$HOMEDIR/$user/.ssh";
+    my $sshdir  = "$HOMEDIR/$user_uid/.ssh";
     my $keyfile = "$sshdir/authorized_keys";
 	
     if (! -e $sshdir) {
@@ -466,7 +536,8 @@ sub GenerateKeyFile()
 	}
     }
     my $query_result =
-	DBQueryFatal("select pubkey from user_pubkeys where uid='$user'");
+	DBQueryFatal("select pubkey from user_pubkeys ".
+		     "where uid_idx='$user_dbid'");
 
     while (my ($key) = $query_result->fetchrow_array()) {
 	push(@pkeys, $key);
@@ -514,6 +585,96 @@ sub GenerateKeyFile()
 	unlink("$sshdir/authorized_keys2");
     }
     return 0;
+}
+
+sub ParseXmlArgs($$$$$$) {
+    my ($xmlfile, $table_name, $fields_ref, $debug,
+	$args_ref, $errs_ref) = @_;
+    #
+    # Input args:
+    #  $xmlfile	   - XML file path.
+    #  $table_name - table_regex table_name for low-level checking patterns.
+    #  $fields_ref - xmlfields specification (hash reference.)
+    #  $debug
+    #
+    # Output args:
+    #  $args_ref   - Parsed argument values (hash reference.)
+    #  $errs_ref   - Error messages on failure (hash reference.)
+
+    $debug = 0;
+
+    #
+    # Must wrap the parser in eval since it exits on error.
+    #
+    my $xmlparse = eval { XMLin($xmlfile,
+				VarAttr => 'name',
+				ContentKey => '-content',
+				SuppressEmpty => undef); };
+    if ($@) {
+	$errs_ref->{"XML Parse Error"} = "Return code $@";
+	return;
+    }
+
+    #
+    # Make sure all the required arguments were provided.
+    #
+    my $key;
+    foreach $key (keys(%{ $fields_ref })) {
+	my (undef, $required, undef) = @{$fields_ref->{$key}};
+
+	$errs_ref->{$key} = "Required value not provided"
+	    if ($required & $SLOT_REQUIRED  &&
+		! exists($xmlparse->{'attribute'}->{"$key"}));
+    }
+    return
+	if (keys(%{ $errs_ref }));
+
+    foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+	my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+	if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	    $xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+	}
+
+	if ($debug) {
+	    print STDERR "User attribute: '$key' -> '$value'\n";
+	}
+
+	$errs_ref->{$key} = "Unknown attribute"
+	    if (!exists($fields_ref->{$key}));
+
+	my ($dbslot, $required, $default) = @{$fields_ref->{$key}};
+
+	if ($required & $SLOT_REQUIRED) {
+	    # A slot that must be provided, so do not allow a null value.
+	    if (!defined($value)) {
+		$errs_ref->{$key} = "Must provide a non-null value";
+		next;
+	    }
+	}
+	if ($required & $SLOT_OPTIONAL) {
+	    # Optional slot. If value is null skip it. Might not be the correct
+	    # thing to do all the time?
+	    if (!defined($value)) {
+		next
+		    if (!defined($default));
+		$value = $default;
+	    }
+	}
+	if ($required & $SLOT_ADMINONLY) {
+	    # Admin implies optional, but thats probably not correct approach.
+	    $errs_ref->{$key} = "Administrators only"
+		if (! $this_user->IsAdmin());
+	}
+
+	# Now check that the value is legal.
+	if (! TBcheck_dbslot($value, $table_name, $dbslot, 
+			     TBDB_CHECKDBSLOT_ERROR)) {
+	    $errs_ref->{$key} = TBFieldErrorString();
+	    next;
+	}
+
+	$args_ref->{$key} = $value;
+    }
 }
 
 sub fatal($) {

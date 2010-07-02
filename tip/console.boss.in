@@ -1,0 +1,136 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+use File::Temp qw(tempfile);
+
+#
+# Wrapper for console program; grab tipacl from XMLRPC server, and feed it
+# to the console binary.
+#
+sub usage()
+{
+    print(STDOUT "Usage: console [-d] pcXXX\n");
+    exit(-1);
+}
+my $optlist  = "dp:";
+my @opts = ();
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONSOLEBIN  = "$TB/bin/console.bin";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output. Very important for this script!
+#
+$| = 1; 
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use Node;
+use User;
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+# pass through select options
+if (defined($options{"d"})) {
+    push @opts, "-d";
+}
+if (defined($options{"p"})) {
+    push @opts, "-p";
+    push @opts, $options{"p"};
+}
+
+usage()
+    if (@ARGV != 1);
+my $nodeid = $ARGV[0];
+
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+#
+# Figure out who called us. Must have admin status to do this.
+#
+if (!$this_user->IsAdmin()) {
+    fatal("You must be a TB administrator to run this script!");
+}
+
+my $node = Node->Lookup($nodeid);
+if (!defined($node)) {
+    fatal("No such node $nodeid");
+}
+
+#
+# Grab what we need out of the DB.
+#
+my ($tipserver, $tipname, $portnum, $keydata);
+if ($node->TipServer(\$tipserver, \$tipname, \$portnum, \$keydata)) {
+    fatal("Could not find tipserver info for $nodeid");
+}
+
+#
+# Make a temp file for the acl.
+#
+$ENV{'TMPDIR'} = "/tmp";
+
+my ($fh, $tempfile) = tempfile(UNLINK => 0);
+fatal("Could not create tempfile for acl stuff")
+    if (!defined($fh));
+
+print $fh "server: $tipserver\n";
+print $fh "portnum: $portnum\n";
+print $fh "keydata: $keydata\n";
+close($fh);
+
+#
+# Do not want to leave the acl file around, and do not want to wait for
+# the user to quit the program, so fork a child to wait a moment and remove
+# the file. We have the child do it so as to avoid messing with the session
+# and tty goo.
+#
+my $syspid = fork();
+
+# Child delays a moment and exits. 
+if (!$syspid) {
+    sleep(1);
+    unlink($tempfile);
+    exit(0);
+}
+my @cmdargs = ($CONSOLEBIN, "-a", "$tempfile", @opts, "$nodeid");
+exec(@cmdargs);
+die("*** $0:\n".
+    "    Exec failure: '@cmdargs'\n");

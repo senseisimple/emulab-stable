@@ -9,19 +9,23 @@ use English;
 use HTTP::Daemon;
 use HTTP::Status;
 use URI::http;
+use Data::Dumper;
 
 #
 # Trivial web server that redirects everthing back to emulab.
 #
 sub usage()
 {
-    die("Usage: webserver.pl <start | stop>\n");
+    die("Usage: webserver.pl <start | stop> [config_file]\n");
 }
 my $logname = "/var/emulab/logs/webserver.log";
 my $pidfile = "/var/run/emulab-webserver.pid";
 my $webpage = "http://www.emulab.net/widearea_redirect.php";
 my $IP;
 my $dpid;
+my $conf_file = "/usr/local/etc/emulab/webserver.conf";
+
+my %redirect_ports = ();
 
 #
 # Untaint path
@@ -35,12 +39,39 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1;
 
 # Parse command line.
-if (@ARGV != 1) {
+if (@ARGV > 2 or @ARGV < 1) {
     usage();
 }
 my $action = $ARGV[0];
 if ($action ne "start" && $action ne "stop") {
     usage();
+}
+
+# read the config file if one was given
+if (defined $ARGV[1]) {
+    my $conf_file = $ARGV[1];
+    if (!-f $conf_file) {
+	die( "Config file $conf_file doesn't exist" );
+    }
+}
+if (-f $conf_file) {
+    open (CONF, "<$conf_file") or die ("Can't read conf file $conf_file");
+    my @c = <CONF>;
+    close (CONF);
+
+    foreach my $line (@c) {
+	if( $line =~ /^\#/ ) {
+	    next;
+	} elsif( $line =~ /^logname (\S+)$/ ) {
+	    $logname = $1;
+	} elsif( $line =~ /^pidfile (\S+)$/ ) {
+	    $pidfile = $1;
+	} elsif( $line =~ /^webpage (\S+)$/ ) {
+	    $webpage = $1;
+	} elsif( $line =~ /^domainport (\S+) (\d+)$/ ) {
+	    $redirect_ports{$1} = $2;
+	}
+    }
 }
 
 #
@@ -150,11 +181,31 @@ $EUID = $UID = $unix_uid;
 # 
 while (my $c = $webserver->accept) {
     while (my $r = $c->get_request) {
+
+	my $response_sent = 0;
+	
+	foreach my $domain (keys(%redirect_ports)) {
+
+	    my $host = $r->header( "host" );
+
+	    if ($host =~ /$domain$/ ) {
+		$c->send_redirect ("http://" . $host . ":" . 
+				   $redirect_ports{$domain}, 302);
+
+		$response_sent = 1;
+		last;
+	    }
+
+	}
+
 	#
-	# We do not actually care what the request is. Just send
-	# back a redirect. 
+	# We do not actually care what the request 
+	# is. Just send back a redirect. 
 	#
-	$c->send_redirect($webpage);
+	if (!$response_sent) {
+	    $c->send_redirect($webpage);
+	}
+
     }
     $c->close;
     undef($c);

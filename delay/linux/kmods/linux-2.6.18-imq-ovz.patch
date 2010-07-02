@@ -1,0 +1,707 @@
+--- drivers/net/imq.c.orig	2009-02-03 11:55:57.000000000 -0700
++++ drivers/net/imq.c	2009-04-24 17:24:49.000000000 -0600
+@@ -64,68 +64,281 @@
+ #endif
+ #include <linux/imq.h>
+ #include <net/pkt_sched.h>
++#ifdef CONFIG_VE
++#include <linux/ve.h>
++#include <linux/ve_task.h>
++#include <linux/sched.h>
++#include <linux/notifier.h>
++//#define IMQ_DEBUG
++#endif
+ 
+ extern int qdisc_restart1(struct net_device *dev);
+ 
+ static nf_hookfn imq_nf_hook;
+ 
+-static struct nf_hook_ops imq_ingress_ipv4 = {
+-       .hook           = imq_nf_hook,
+-       .owner          = THIS_MODULE,
+-       .pf             = PF_INET,
+-       .hooknum        = NF_IP_PRE_ROUTING,
+-#if defined(CONFIG_IMQ_BEHAVIOR_BA) || defined(CONFIG_IMQ_BEHAVIOR_BB)
+-       .priority       = NF_IP_PRI_MANGLE + 1
++#if defined(CONFIG_IMQ_NUM_DEVS)
++static unsigned int numdevs = CONFIG_IMQ_NUM_DEVS;
+ #else
+-       .priority       = NF_IP_PRI_NAT_DST + 1
++static unsigned int numdevs = 2;
++#endif
++
++static struct net_device *imq_devs;
++
++struct imq_nf_hook_set {
++        struct nf_hook_ops *ingress_ipv4;
++        struct nf_hook_ops *egress_ipv4;
++#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
++        struct nf_hook_ops *ingress_ipv6;
++        struct nf_hook_ops *egress_ipv6;
+ #endif
+ };
+ 
+-static struct nf_hook_ops imq_egress_ipv4 = {
+-       .hook           = imq_nf_hook,
+-       .owner          = THIS_MODULE,
+-       .pf             = PF_INET,
+-       .hooknum        = NF_IP_POST_ROUTING,
++static struct imq_nf_hook_set *root_hook_set;
++
++/*
++ * Construct a bunch of nf_hook_ops for use in a specific VE.  We have to make
++ * new ones for each VE since each nf_hook_ops is part of a list...
++ */
++static int build_hook_set(struct imq_nf_hook_set **hs) {
++	struct nf_hook_ops *hops;
++
++	*hs = kmalloc(sizeof(struct imq_nf_hook_set), GFP_KERNEL);
++	if (!*hs) 
++	        return -ENOMEM;
++
++	(*hs)->ingress_ipv4 = kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
++	if ((*hs)->ingress_ipv4 == NULL) {
++	        kfree(*hs);
++	        *hs = NULL;
++	        return -ENOMEM;
++	}
++
++	(*hs)->egress_ipv4 = kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
++	if ((*hs)->egress_ipv4 == NULL) {
++	        kfree((*hs)->ingress_ipv4);
++	        kfree(*hs);
++	        *hs = NULL;
++	        return -ENOMEM;
++	}
++
++#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
++	(*hs)->ingress_ipv6 = kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
++	if ((*hs)->ingress_ipv6 == NULL) {
++	        kfree((*hs)->egress_ipv4);
++	        kfree((*hs)->ingress_ipv4);
++	        kfree(*hs);
++	        *hs = NULL;
++	        return -ENOMEM;
++	}
++
++	(*hs)->egress_ipv6 = kmalloc(sizeof(struct nf_hook_ops), GFP_KERNEL);
++	if ((*hs)->egress_ipv6 == NULL) {
++	        kfree((*hs)->ingress_ipv6);
++	        kfree((*hs)->egress_ipv4);
++	        kfree((*hs)->ingress_ipv4);
++	        kfree(*hs);
++	        *hs = NULL;
++	        return -ENOMEM;
++	}
++#endif
++
++	memset((*hs)->ingress_ipv4,0,sizeof(struct nf_hook_ops));
++	memset((*hs)->egress_ipv4,0,sizeof(struct nf_hook_ops));
++#if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
++	memset((*hs)->ingress_ipv6,0,sizeof(struct nf_hook_ops));
++	memset((*hs)->egress_ipv6,0,sizeof(struct nf_hook_ops));
++#endif
++
++	hops = (*hs)->ingress_ipv4;
++	hops->hook           = imq_nf_hook;
++	hops->owner          = THIS_MODULE;
++	hops->pf             = PF_INET;
++	hops->hooknum        = NF_IP_PRE_ROUTING;
++#if defined(CONFIG_IMQ_BEHAVIOR_BA) || defined(CONFIG_IMQ_BEHAVIOR_BB)
++	hops->priority       = NF_IP_PRI_MANGLE + 1;
++#else
++	hops->priority       = NF_IP_PRI_NAT_DST + 1;
++#endif
++
++	hops = (*hs)->egress_ipv4;
++	hops->hook           = imq_nf_hook;
++	hops->owner          = THIS_MODULE;
++	hops->pf             = PF_INET;
++	hops->hooknum        = NF_IP_POST_ROUTING;
+ #if defined(CONFIG_IMQ_BEHAVIOR_AA) || defined(CONFIG_IMQ_BEHAVIOR_BA)
+-       .priority       = NF_IP_PRI_LAST
++	hops->priority       = NF_IP_PRI_LAST;
+ #else
+-       .priority       = NF_IP_PRI_NAT_SRC - 1
++	hops->priority       = NF_IP_PRI_NAT_SRC - 1;
+ #endif
+-};
+ 
+ #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
+-static struct nf_hook_ops imq_ingress_ipv6 = {
+-       .hook           = imq_nf_hook,
+-       .owner          = THIS_MODULE,
+-       .pf             = PF_INET6,
+-       .hooknum        = NF_IP6_PRE_ROUTING,
++	hops = (*hs)->ingress_ipv6;
++	hops->hook           = imq_nf_hook;
++	hops->owner          = THIS_MODULE;
++	hops->pf             = PF_INET6;
++	hops->hooknum        = NF_IP6_PRE_ROUTING;
+ #if defined(CONFIG_IMQ_BEHAVIOR_BA) || defined(CONFIG_IMQ_BEHAVIOR_BB)
+-       .priority       = NF_IP6_PRI_MANGLE + 1
++	hops->priority       = NF_IP6_PRI_MANGLE + 1;
+ #else
+-       .priority       = NF_IP6_PRI_NAT_DST + 1
++	hops->priority       = NF_IP6_PRI_NAT_DST + 1;
+ #endif
+-};
+ 
+-static struct nf_hook_ops imq_egress_ipv6 = {
+-       .hook           = imq_nf_hook,
+-       .owner          = THIS_MODULE,
+-       .pf             = PF_INET6,
+-       .hooknum        = NF_IP6_POST_ROUTING,
++	hops = (*hs)->egress_ipv6;
++	hops->hook           = imq_nf_hook;
++	hops->owner          = THIS_MODULE;
++	hops->pf             = PF_INET6;
++	hops->hooknum        = NF_IP6_POST_ROUTING;
+ #if defined(CONFIG_IMQ_BEHAVIOR_AA) || defined(CONFIG_IMQ_BEHAVIOR_BA)
+-       .priority       = NF_IP6_PRI_LAST
++	hops->priority       = NF_IP6_PRI_LAST;
+ #else
+-       .priority       = NF_IP6_PRI_NAT_SRC - 1
++	hops->priority       = NF_IP6_PRI_NAT_SRC - 1;
+ #endif
+-};
+ #endif
+ 
+-#if defined(CONFIG_IMQ_NUM_DEVS)
+-static unsigned int numdevs = CONFIG_IMQ_NUM_DEVS;
+-#else
+-static unsigned int numdevs = 2;
++	return 0;
++}
++
++static void free_hook_set(struct imq_nf_hook_set **hs) {
++        kfree((*hs)->egress_ipv6);
++        kfree((*hs)->ingress_ipv6);
++	kfree((*hs)->egress_ipv4);
++	kfree((*hs)->ingress_ipv4);
++	kfree(*hs);
++	*hs = NULL;
++}
++
++#ifdef CONFIG_VE
++struct imq_nf_hook_map {
++        int imqnum;
++        struct net_device *dev;
++        struct imq_nf_hook_set *hook_set;
++};
++
++static struct imq_nf_hook_map *hook_map;
++static struct notifier_block *notblk;
++
++static int imq_init_hooks(struct imq_nf_hook_set *hs,int reg);
++static void imq_unhook(struct imq_nf_hook_set *hs,int reg);
++
++static int imq_dev_notify(struct notifier_block *nb,unsigned long event,
++			  void *egg) {
++        struct ve_struct *cur;
++	struct net_device *dev;
++	struct net_device *ind;	
++	struct imq_nf_hook_set *hs;
++	int offset = -1;
++	int i,found = 0;
++
++	dev = (struct net_device *)egg;
++	cur = get_exec_env();
++
++	/* find this device */
++	for (i = 0; i <= numdevs; ++i) {
++	        if ((imq_devs + i)->ifindex == dev->ifindex) {
++		        offset = i;
++			break;
++		}
++	}
++	if (offset < 0) {
++#if defined(IMQ_DEBUG)
++	        printk(KERN_INFO "IMQ: notify could not find dev %s\n", dev->name);
+ #endif
++	        return 0;
++	}
+ 
+-static struct net_device *imq_devs;
++	if (event == NETDEV_REGISTER) {
++		printk(KERN_INFO "IMQ: dev reg: %s in %d\n", dev->name, cur->veid);
++		/*
++		 * So, a device is moving into a VE (0 or N).  If 0, do
++		 * nothing, since we always maintain nf_hooks in VE0.  If N,
++		 * and none of our devices are already in VE N, register our
++		 * hooks there too.
++		 */
++	        if (cur->veid == 0) {
++			(hook_map + offset)->hook_set = root_hook_set;
++		        return 0;
++		}
++
++		for (i = 0; i <= numdevs; ++i) {
++			ind = (hook_map + i)->dev;
++			if (ind->owner_env->veid == cur->veid 
++			    && ind->ifindex != dev->ifindex) {
++				found = 1;
++				break;
++			}
++		}
++		if (!found) {
++			/* register: */
++			if (build_hook_set(&hs)) 
++			        printk(KERN_ERR "IMQ: no kmem when registering nf hooks for %s!\n",
++				       dev->name);
++			imq_init_hooks(hs,0);
++			(hook_map + offset)->hook_set = hs;
++			printk(KERN_INFO "IMQ: init_hooks for %s in %d\n",
++			       dev->name,cur->veid);
++		}
++		else {
++			(hook_map + offset)->hook_set = (hook_map + i)->hook_set;
++			printk(KERN_INFO "IMQ: reusing old hooks for %s in %d (old: %s, %d)\n",
++			       dev->name,cur->veid,
++			       ((hook_map + i)->dev) ? (hook_map + i)->dev->name : NULL,
++			       ((hook_map + i)->dev) ? (hook_map + i)->dev->owner_env->veid : -1);
++		}
++	}
++	else if (event == NETDEV_UNREGISTER) {
++		printk(KERN_ERR "IMQ: dev unreg: %s in %d\n", dev->name, cur->veid);
++		/*
++		 * So, a device is leaving a VE (0 or N).  If 0, do
++		 * nothing, since we always maintain nf_hooks in VE0.  If N,
++		 * we're the last device for this VE, unregister.
++		 */
++	        if (cur->veid == 0) {
++			(hook_map + offset)->hook_set = NULL;
++		        return 0;
++		}
++
++		for (i = 0; i <= numdevs; ++i) {
++			ind = (hook_map + i)->dev;
++			if (ind->owner_env->veid == cur->veid 
++			    && ind->ifindex != dev->ifindex) {
++				found = 1;
++				break;
++			}
++		}
++		if (!found) {
++			/* unregister: */
++		        imq_unhook((hook_map + offset)->hook_set,0);
++			free_hook_set(&((hook_map + offset)->hook_set));
++		}
++		(hook_map + offset)->hook_set = NULL;
++	}
++
++	return 0;
++}
++
++/*
++ * Check if the imq device with this number is really in this VE.
++ */
++int imq_dev_in_ve(unsigned todev) {
++        if (todev > numdevs) 
++	        return 0;
++
++	if (imq_devs + todev == NULL)
++	        printk(KERN_ERR "IMQ: imq_devs+todev NULL!\n");
++
++	if ((imq_devs + todev)->owner_env == NULL)
++	        printk(KERN_ERR "IMQ: (imq_devs+todev)->owner_env NULL!\n");
++
++	if (get_exec_env() == NULL)
++	        printk(KERN_ERR "IMQ: get_exec_env() NULL!\n");
++
++	if ((imq_devs + todev)->owner_env->veid == get_exec_env()->veid) 
++	        return 1;
++
++	return 0;
++}
++EXPORT_SYMBOL(imq_dev_in_ve);
++#endif
+ 
+ static struct net_device_stats *imq_get_stats(struct net_device *dev)
+ {
+@@ -143,6 +356,12 @@
+                if (info->outdev)
+                        dev_put(info->outdev);
+                kfree(info);
++
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++	       ve_printk(VE_LOG, KERN_INFO "imq_skb_destructor (%s,%d)\n",
++		      (skb->dev ? skb->dev->name : NULL),
++		      (skb->owner_env ? skb->owner_env->veid : -1));
++#endif
+        }
+ }
+ 
+@@ -150,6 +369,11 @@
+ {
+        struct net_device_stats *stats = (struct net_device_stats*) dev->priv;
+ 
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++       ve_printk(VE_LOG, KERN_INFO "IMQ: dev_xmit (%s,%d)\n",
++	      dev->name,(dev->owner_env ? dev->owner_env->veid : -1));
++#endif
++
+        stats->tx_bytes += skb->len;
+        stats->tx_packets++;
+ 
+@@ -170,11 +394,19 @@
+        unsigned int index = skb->imq_flags&IMQ_F_IFMASK;
+        int ret = -1;
+ 
+-       if (index > numdevs) 
++       if (index > numdevs) {
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++  	       ve_printk(VE_LOG, KERN_INFO "imq_nf_queue: %d > %d\n",index,numdevs);
++#endif
+                return -1;
++       }
+ 
+        dev = imq_devs + index;
+        if (!(dev->flags & IFF_UP)) {
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++	       ve_printk(VE_LOG, KERN_INFO "IMQ: nf_queue: if %d down, clearing and reinjecting\n",
++		       index);
++#endif
+                skb->imq_flags = 0;
+                nf_reinject(skb, info, NF_ACCEPT);
+                return 0;
+@@ -184,9 +416,13 @@
+        if (skb->destructor) {
+                skb2 = skb;
+                skb = skb_clone(skb, GFP_ATOMIC);
+-               if (!skb)
++               if (!skb) {
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++		       ve_printk(VE_LOG, KERN_INFO "IMQ: nf_queue: skb_clone failed\n");
++#endif
+                        return -1;
+        }
++       }
+        skb->nf_info = info;
+ 
+        stats = (struct net_device_stats *)dev->priv;
+@@ -216,6 +452,10 @@
+        if (skb2)
+                kfree_skb(ret ? skb : skb2);
+ 
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++       ve_printk(VE_LOG, KERN_INFO "IMQ: nf_queue returning %d\n",ret);
++#endif
++
+        return ret;
+ }
+ 
+@@ -229,30 +469,53 @@
+                   const struct net_device *outdev,
+                   int (*okfn)(struct sk_buff *))
+ {
+-       if ((*pskb)->imq_flags & IMQ_F_ENQUEUE)
++       if ((*pskb)->imq_flags & IMQ_F_ENQUEUE) {
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++	       ve_printk(VE_LOG, KERN_INFO "IMQ: nf_hook says queue\n");
++#endif
+                return NF_QUEUE;
++       }
++
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++       ve_printk(VE_LOG, KERN_INFO "imq_nf_hook says accept (0x%x,0x%x)\n",*pskb,(*pskb)->imq_flags);
++       ve_printk(VE_LOG, KERN_INFO "imq_nf_hook accept indev (%s,%d)\n",
++	      (indev ? indev->name : NULL),
++	      (indev && indev->owner_env ? indev->owner_env->veid : -1));
++       ve_printk(VE_LOG, KERN_INFO "imq_nf_hook accept outdev (%s,%d)\n",
++	      (outdev ? outdev->name : NULL),
++	      (outdev && outdev->owner_env ? outdev->owner_env->veid : -1));
++       ve_printk(VE_LOG, KERN_INFO "imq_nf_hook accept pskb (0x%x,%s,%d)\n",*pskb,
++	      ((*pskb)->dev ? (*pskb)->dev->name : NULL),
++	      ((*pskb)->owner_env ? (*pskb)->owner_env->veid : -1));
++#endif
+ 
+        return NF_ACCEPT;
+ }
+ 
+-
+-static int __init imq_init_hooks(void)
++static int imq_init_hooks(struct imq_nf_hook_set *hs,int reg)
+ {
+        int err;
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++       ve_printk(VE_LOG, KERN_INFO "imq_init_hooks\n");
++#endif
+ 
++       if (reg) {
+        err = nf_register_queue_handler(PF_INET, &nfqh);
+        if (err > 0)
+                goto err1;
+-       if ((err = nf_register_hook(&imq_ingress_ipv4)))
++       }
++       if ((err = nf_register_hook(hs->ingress_ipv4)))
+                goto err2;
+-       if ((err = nf_register_hook(&imq_egress_ipv4)))
++       if ((err = nf_register_hook(hs->egress_ipv4)))
+                goto err3;
+ #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
++       if (reg) {
+        if ((err = nf_register_queue_handler(PF_INET6, &nfqh)))
+                goto err4;
+-       if ((err = nf_register_hook(&imq_ingress_ipv6)))
++       }
++       if ((err = nf_register_hook(hs->ingress_ipv6)))
+                goto err5;
+-       if ((err = nf_register_hook(&imq_egress_ipv6)))
++       if ((err = nf_register_hook(hs->egress_ipv6)))
+                goto err6;
+ #endif
+ 
+@@ -260,29 +523,37 @@
+ 
+ #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
+ err6:
+-       nf_unregister_hook(&imq_ingress_ipv6);
++       nf_unregister_hook(hs->ingress_ipv6);
+ err5:
++       if (reg)
+        nf_unregister_queue_handler(PF_INET6);
+ err4:
+-       nf_unregister_hook(&imq_egress_ipv6);
++       nf_unregister_hook(hs->egress_ipv6);
+ #endif
+ err3:
+-       nf_unregister_hook(&imq_ingress_ipv4);
++       nf_unregister_hook(hs->ingress_ipv4);
+ err2:
++       if (reg)
+        nf_unregister_queue_handler(PF_INET);
+ err1:
+        return err;
+ }
+ 
+-static void __exit imq_unhook(void)
++static void imq_unhook(struct imq_nf_hook_set *hs,int reg)
+ {
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++        ve_printk(VE_LOG, KERN_INFO "imq_unhook\n");
++#endif
++
+ #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
+-       nf_unregister_hook(&imq_ingress_ipv6);
+-       nf_unregister_hook(&imq_egress_ipv6);
++       nf_unregister_hook(hs->ingress_ipv6);
++       nf_unregister_hook(hs->egress_ipv6);
++       if (reg)
+        nf_unregister_queue_handler(PF_INET6);
+ #endif
+-       nf_unregister_hook(&imq_ingress_ipv4);
+-       nf_unregister_hook(&imq_egress_ipv4);
++       nf_unregister_hook(hs->ingress_ipv4);
++       nf_unregister_hook(hs->egress_ipv4);
++       if (reg)
+        nf_unregister_queue_handler(PF_INET);
+ }
+ 
+@@ -310,6 +581,9 @@
+ static int __init imq_init_devs(void)
+ {
+        struct net_device *dev;
++#ifdef CONFIG_VE
++       struct imq_nf_hook_map *hme;
++#endif
+        int i,j;
+        j = numdevs;
+ 
+@@ -324,24 +598,60 @@
+                return -ENOMEM;
+        memset(imq_devs, 0, sizeof(struct net_device) * numdevs);
+ 
++#ifdef CONFIG_VE
++       notblk = kmalloc(sizeof(struct notifier_block), GFP_KERNEL);
++       if (!notblk) {
++	       kfree(imq_devs);
++               return -ENOMEM;
++       }
++       memset(notblk, 0, sizeof(struct notifier_block));
++       notblk->notifier_call = imq_dev_notify;
++       notblk->priority = 0; /* XXX: ? */
++       register_netdevice_notifier(notblk);
++
++       hook_map = kmalloc(sizeof(struct imq_nf_hook_map) * numdevs, GFP_KERNEL);
++       if (!hook_map) {
++	       kfree(notblk);
++	       kfree(imq_devs);
++	       return -ENOMEM;
++       }
++       memset(hook_map, 0, sizeof(struct imq_nf_hook_map) * numdevs);
++#endif
++
+        /* we start counting at zero */
+        numdevs--;
+ 
++#ifdef CONFIG_VE
++       for (i = 0, dev = imq_devs, hme = hook_map; 
++	    i <= numdevs; 
++	    i++, dev++, hme++) {
++#else
+        for (i = 0, dev = imq_devs; i <= numdevs; i++, dev++) {
++#endif
+                SET_MODULE_OWNER(dev);
+                strcpy(dev->name, "imq%d");
+                dev->init   = imq_dev_init;
+                dev->uninit = imq_dev_uninit;
+-
++#ifdef CONFIG_VE
++	       hme->imqnum = i;
++	       hme->dev = dev;
++	       hme->hook_set = root_hook_set;
++#endif
+                if (register_netdev(dev) < 0)
+                        goto err_register;
+        }
++       
+        printk(KERN_INFO "IMQ starting with %u devices...\n", j);
+        return 0;
+ 
+ err_register:
+        for (; i; i--)
+                unregister_netdev(--dev);
++#ifdef CONFIG_VE
++       unregister_netdevice_notifier(notblk);
++       kfree(notblk);
++       kfree(hook_map);
++#endif
+        kfree(imq_devs);
+        return -EIO;
+ }
+@@ -354,6 +664,11 @@
+        for (i = 0; i <= numdevs; i++)
+                unregister_netdev(dev++);
+ 
++#ifdef CONFIG_VE
++       unregister_netdevice_notifier(notblk);
++       kfree(notblk);
++       kfree(hook_map);
++#endif
+        kfree(imq_devs);
+ }
+ 
+@@ -361,12 +676,18 @@
+ {
+        int err;
+ 
++       if (build_hook_set(&root_hook_set)) {
++	       printk(KERN_ERR "IMQ: Error trying to build root hook set\n");
++	       return -ENOMEM;
++       }
+        if ((err = imq_init_devs())) {
+                printk(KERN_ERR "IMQ: Error trying imq_init_devs()\n");
++	       free_hook_set(&root_hook_set);
+                return err;
+        }
+-       if ((err = imq_init_hooks())) {
++       if ((err = imq_init_hooks(root_hook_set,1))) {
+                printk(KERN_ERR "IMQ: Error trying imq_init_hooks()\n");
++	       free_hook_set(&root_hook_set);
+                imq_cleanup_devs();
+                return err;
+        }
+@@ -389,7 +710,8 @@
+ 
+ static void __exit imq_cleanup_module(void)
+ {
+-       imq_unhook();
++       imq_unhook(root_hook_set,1);
++       free_hook_set(&root_hook_set);
+        imq_cleanup_devs();
+        printk(KERN_INFO "IMQ driver unloaded successfully.\n");
+ }
+--- net/ipv4/netfilter/ipt_IMQ.c.orig	2009-02-03 11:55:57.000000000 -0700
++++ net/ipv4/netfilter/ipt_IMQ.c	2009-04-23 17:24:18.000000000 -0600
+@@ -6,6 +6,13 @@
+ #include <linux/netfilter_ipv4/ip_tables.h>
+ #include <linux/netfilter_ipv4/ipt_IMQ.h>
+ #include <linux/imq.h>
++#ifdef CONFIG_VE
++#include <linux/sched.h>
++#include <linux/ve.h>
++//#define IMQ_DEBUG
++
++extern int imq_dev_in_ve(unsigned todev);
++#endif
+ 
+ static unsigned int imq_target(struct sk_buff **pskb,
+                               const struct net_device *in,
+@@ -19,6 +26,28 @@
+ 
+        (*pskb)->imq_flags = mr->todev | IMQ_F_ENQUEUE;
+ 
++#if defined(IMQ_DEBUG) && defined(CONFIG_VE)
++       /* Note that above, we don't need to check if todev is actually in the
++	* VE we're in -- since devices can only be added/removed to/from VEs
++	* when they are stopped, the checkentry function is enough.  As for
++	* VE0, we don't care if rules in there send packets *into* other VEs --
++	* that should be allowed.  So we're secure.
++	*/
++
++       ve_printk(VE_LOG, KERN_INFO "imq_target: marking skbuff for iface %d\n",mr->todev);
++
++       ve_printk(VE_LOG, KERN_INFO "imq_target: marking, pskb (0x%x,0x%x)\n",*pskb,(*pskb)->imq_flags);
++       ve_printk(VE_LOG, KERN_INFO "imq_target: marking, indev (%s,%d)\n",
++	      (in ? in->name : NULL),
++	      (in && in->owner_env ? in->owner_env->veid : -1));
++       ve_printk(VE_LOG, KERN_INFO "imq_target: marking, outdev (%s,%d)\n",
++	      (out ? out->name : NULL),
++	      (out && out->owner_env ? out->owner_env->veid : -1));
++       ve_printk(VE_LOG, KERN_INFO "imq_target: marking, pskb (0x%x,%s,%d)\n",*pskb,
++	      ((*pskb)->dev ? (*pskb)->dev->name : NULL),
++	      ((*pskb)->owner_env ? (*pskb)->owner_env->veid : -1));
++#endif
++
+        return IPT_CONTINUE;
+ }
+ 
+@@ -32,22 +61,47 @@
+        struct ipt_imq_info *mr;
+ 
+        if (targinfosize != IPT_ALIGN(sizeof(struct ipt_imq_info))) {
++#ifdef CONFIG_VE
++	       ve_printk(VE_LOG, KERN_WARNING "IMQ: invalid targinfosize\n");
++#else
+                printk(KERN_WARNING "IMQ: invalid targinfosize\n");
++#endif
+                return 0;
+        }
+        mr = (struct ipt_imq_info*)targinfo;
+ 
++#ifdef CONFIG_VE
++       /* check if the dev indicated is actually bound to this ve */
++       if (!ve_is_super(get_exec_env()) && !imq_dev_in_ve(mr->todev)) {
++	       ve_printk(VE_LOG, KERN_WARNING "IMQ: device %d not in VE %d!\n",
++			 mr->todev,(get_exec_env())->veid);
++	       return 0;
++       }
++#endif
++
+        if (strcmp(tablename, "mangle") != 0) {
++#ifdef CONFIG_VE
++               ve_printk(VE_LOG, KERN_WARNING
++                      "IMQ: IMQ can only be called from \"mangle\" table, not \"%s\"\n",
++                      tablename);
++#else
+                printk(KERN_WARNING
+                       "IMQ: IMQ can only be called from \"mangle\" table, not \"%s\"\n",
+                       tablename);
++#endif
+                return 0;
+        }
+ 
+        if (mr->todev > IMQ_MAX_DEVS) {
++#ifdef CONFIG_VE
++               ve_printk(VE_LOG, KERN_WARNING
++                      "IMQ: invalid device specified, highest is %u\n",
++                      IMQ_MAX_DEVS);
++#else
+                printk(KERN_WARNING
+                       "IMQ: invalid device specified, highest is %u\n",
+                       IMQ_MAX_DEVS);
++#endif
+                return 0;
+        }
+ 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -192,6 +192,10 @@ use lib '@prefix@/lib';
 use English;
 use libdb;
 use libtestbed;
+use libtblog;
+use Experiment;
+use User;
+use Group;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -219,6 +223,9 @@ sub TBADMINCTRL_POLICY_CLASS()		{ "class"; }
 sub TBADMINCTRL_POLICY_ATTR()		{ "attribute"; }
 sub TBADMINCTRL_POLICY_MEMBERSHIP()	{ "membership"; }
 
+my $MINUS_GIDIDX	= 0;
+my $PLUS_GIDIDX		= 999999;
+
 #
 # The current usage data structure, filled in below.
 #
@@ -239,7 +246,7 @@ sub Declare($)
 {
     my ($msg) = @_;
     
-    print STDERR "*** Admission Control: $msg\n";
+    tberror({cause => 'user'}, "Admission Control: $msg\n");
 }
 
 # Debug stuff
@@ -537,8 +544,8 @@ sub TestGlobalPolicy($$$$$)
 	    if (!$query_result);
 
 	if (! $query_result->numrows) {
-	    Declare("You must be a member of these projects to swapin any ".
-		    "experiments: $auxdata");
+	    Declare("You are not a member of a project with permission to ".
+		    "swapin experiments.");
 	    return 0;
 	}
     }
@@ -770,7 +777,7 @@ sub TestPolicies($$$$)
     $query_result =
 	DBQueryWarn("select distinct * from group_policies ".
 		    "where (pid='$pid' and (pid=gid or gid='$gid')) or ".
-		    "      pid='+' or pid='-' ".
+		    "      pid='' or pid='-' ".
 		    "order by pid,gid desc");
     return -1
 	if (!$query_result);
@@ -856,86 +863,6 @@ sub TestPolicies($$$$)
 	$failcount++
 	    if (!$result);
     }
-    # Skip Robot Lab checks if already failed.
-    return 0
-	if ($failcount);
-
-    #
-    # The Robot lab stuff is handled specially until I come up with a better
-    # approach for global policies.
-    #
-    my $robotlab_isopen;
-    return -1
-	if (! TBGetSiteVar("robotlab/open", \$robotlab_isopen));
-
-    if ($robotlab_isopen) {
-	#
-	# If the lab is open, then normal policies apply, except for
-	# exclusive use of the lab.
-	#
-	my $robotlab_exclusive;
-
-	return -1
-	    if (! TBGetSiteVar("robotlab/exclusive", \$robotlab_exclusive));
-
-	if ($robotlab_exclusive) {
-	    # See who is using the Robot lab.
-	    my ($rpid, $reid);
-
-	    if (TBRobotLabExpt(\$rpid, \$reid) &&
-		! ($pid eq $rpid && $eid eq $reid)) {
-		#
-		# Lab in use by another experiment.
-		#
-		foreach my $type (keys(%node_types)) {
-		    my $class = $node_types{$type};
-
-		    if ($class eq "robot") {
-			if ($assignflag) {
-			    UpdateForAssign($type, 0);
-			}
-			else {
-			    #
-			    # If user wants a robot type, then fail cause
-			    # the lab is currently closed.
-			    # 
-			    if (exists($virt_types{$type}) ||
-				exists($virt_classes{$class})) {
-				Declare("The Robot Lab is already in use!");
-				$failcount++;
-			    }
-			}
-		    }
-		}
-	    }
-	}
-    }
-    else {
-	#
-	# Lab is closed. Make sure assign gets zeros for the types, or if
-	# doing the prepass, check for user defined usage. 
-	#
-	foreach my $type (keys(%node_types)) {
-	    my $class = $node_types{$type};
-
-	    if ($class eq "robot") {
-		if ($assignflag) {
-		    UpdateForAssign($type, 0);
-		}
-		else {
-		    #
-		    # If user wants a robot type, then fail cause the lab
-		    # is currently closed.
-		    # 
-		    if (exists($virt_types{$type}) ||
-			exists($virt_classes{$class})) {
-			Declare("The Robot Lab is closed!");
-			$failcount++;
-		    }
-		}
-	    }
-	}
-    }
     return 0
 	if ($failcount);
     return 1;
@@ -950,10 +877,31 @@ sub UpdateNodeTypeXpidPermissions()
     my %plus_policies   = ();
     my %permissions     = ();
 
+    my $defgroup = Group->Lookup(TBOPSPID(), TBOPSPID());
+    if (!defined($defgroup)) {
+	Declare("Could not get operations group\n");
+	return -1;
+    }
+
+    #
+    # For non-zero defaults, we have to explicitly grant permission
+    # to everyone. It will get revoked below if there is a group
+    # policy.
+    #
+    my $query_result =
+	DBQueryWarn("select pid_idx from projects");
+    return -1
+	if (!$query_result);
+    my @allprojects = ();
+    while (my ($pid_idx) = $query_result->fetchrow_array()) {
+	push(@allprojects, $pid_idx);
+	$permissions{$pid_idx} = {};
+    }
+
     #
     # Get global policies
     # 
-    my $query_result =
+    $query_result =
 	DBQueryWarn("select * from group_policies ".
 		    "where pid='+' or pid='-' ".
 		    "order by pid,gid desc");
@@ -980,6 +928,24 @@ sub UpdateNodeTypeXpidPermissions()
 	elsif ($ppid eq "-") {
 	    $minus_policies{$auxdata} = $count;
 	}
+
+	#
+	# Anything that has a default must be in the table for it to
+	# work right. At some point, this table must go away, but for
+	# now the use emulab-ops for the default cause emulab-ops always
+	# has access to everything.
+	#
+	$permissions{$defgroup->gid_idx()}->{$auxdata} = $count;
+
+	#
+	# And if the number is positive, must insert an entry for
+	# everyone, which might get removed below.
+	#
+	if ($count) {
+	    foreach my $pid_idx (@allprojects) {
+		$permissions{$pid_idx}->{$auxdata} = $count;
+	    }
+	}
     }
 
     #
@@ -993,6 +959,7 @@ sub UpdateNodeTypeXpidPermissions()
 	if (!$query_result);
 
     while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $gid_idx = $rowref->{'gid_idx'};
 	my $ppid    = $rowref->{'pid'};
 	my $pgid    = $rowref->{'gid'};
 	my $policy  = $rowref->{'policy'};
@@ -1003,17 +970,23 @@ sub UpdateNodeTypeXpidPermissions()
 	    print "Type Perm: $ppid, $pgid, $count, $auxdata\n";
 	}
 
+	my $group = Group->Lookup($gid_idx);
 	next
-	    if ($count == 0);
+	    if (!defined($group) || !$group->IsProjectGroup());
 
-	next
-	    if (exists($plus_policies{$auxdata}) &&
-		plus_policies{$auxdata} == 0);
-
-	$permissions{"$ppid"} = {}
-	    if (!exists($permissions{"$ppid"}));
+	$permissions{"$gid_idx"} = {}
+	    if (!exists($permissions{"$gid_idx"}));
 	
-	$permissions{"$ppid"}->{$auxdata} = 1;
+	if ($count == 0 ||
+	    (exists($plus_policies{$auxdata}) &&
+	     plus_policies{$auxdata} == 0)) {
+
+	    delete($permissions{"$gid_idx"}->{$auxdata})
+		if (exists($permissions{"$gid_idx"}->{$auxdata}));
+	    
+	    next;
+	}
+	$permissions{"$gid_idx"}->{$auxdata} = 1;
     }
 
     #
@@ -1036,13 +1009,16 @@ sub UpdateNodeTypeXpidPermissions()
     return -1
 	if (!DBQueryWarn($create_def));
     
-    foreach my $pid (keys(%permissions)) {
-	my @typelist = keys(%{ $permissions{$pid} });
+    foreach my $gid_idx (keys(%permissions)) {
+	my @typelist = keys(%{ $permissions{$gid_idx} });
+	my $group    = Group->Lookup($gid_idx);
+	my $pid      = $group->pid();
 
 	foreach my $type (@typelist) {
 	    return -1
-		if (! DBQueryWarn("insert into libadminctrl_table (pid, type)".
-				  "  values ('$pid', '$type')"));
+		if (! DBQueryWarn("insert into libadminctrl_table ".
+				  " (pid_idx, pid, type)".
+				  "  values ($gid_idx, '$pid', '$type')"));
 	}
     }
     $query_result = 
@@ -1065,15 +1041,19 @@ sub UpdateNodeTypeXpidPermissions()
 # current node count plus the minimum number of nodes needed by the
 # experiment.
 # 
-sub TBAdmissionControlCheck($$$$)
+sub TBAdmissionControlCheck($$$)
 {
-    my ($uid, $pid, $eid, $ptypearray) = @_;
-    my $gid = ExpGroup($pid, $eid);
+    my ($user, $experiment, $ptypearray) = @_;
+    my $gid = $experiment->gid();
 
     $assignflag = 1
 	if (defined($ptypearray));
 
-    $uid = MapNumericUID($uid);
+    $user = User->ThisUser()
+	if (!defined($user));
+    my $uid  = $user->uid();
+    my $pid  = $experiment->pid();
+    my $eid  = $experiment->eid();
 
     #
     # Check to see if admin control is even on.
@@ -1236,7 +1216,7 @@ sub LoadCurrent($$$)
 		    "      (expt_swap_uid='$uid' or ".
 		    "       pid='$pid' or gid='$gid')");
 
-    return -1
+    return undef
 	if (!$query_result);
 
     while (my ($c_uid,$c_pid,$c_gid) = $query_result->fetchrow_array()) {
@@ -1272,7 +1252,7 @@ sub LoadCurrent($$$)
 		     "       r.pid='$pid' and e.gid='$gid') and ".
 		     "      r.pid!='" . TBOPSPID() . "' and ".
 		     "      n.role='testnode'");
-    return -1
+    return undef
 	if (!$query_result);
 
     while (my ($c_uid,$c_pid,$c_gid,$c_type,$c_class) =
@@ -1322,7 +1302,7 @@ sub LoadCurrent($$$)
 	}
     }
     
-    return 0;
+    return \%curusage;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

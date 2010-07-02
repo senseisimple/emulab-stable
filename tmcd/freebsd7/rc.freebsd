@@ -1,0 +1,133 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+my $FSTAB = "/etc/fstab";
+my $script = $0;
+
+#
+# Figure out if there is a swap device and add it to fstab.
+# We used to do this in slicefix as part of the post-frisbee customization,
+# but it is difficult to do a good job of it just using sh and sed given
+# that the swap partition might be in a different slice than the filesystems.
+#
+sub swapenable();
+sub addswap($$);
+
+# Turn off line buffering on output
+$| = 1;
+
+swapenable();
+exit(0);
+
+sub swapenable()
+{
+    my $rootfs;
+
+    if (!open(FD, "<$FSTAB")) {
+	print STDERR "*** WARNING: could not open $FSTAB for reading, ".
+	    "no swap enabled\n";
+	return;
+    }
+    while (<FD>) {
+	my ($fs,$mpt,$type,$opt) = split;
+	if ($mpt eq "/") {
+	    $rootfs = $fs;
+	    next;
+	}
+	if ($type eq "swap") {
+	    close(FD);
+	    return;
+	}
+    }
+    close(FD);
+
+    #
+    # No swap device found, see if the disklabel of the root disk reveals one
+    #
+    my ($dtype, $dnum, $snum, $part);
+    if ($rootfs !~ /([a-zA-Z]+)(\d+)s(\d+)([a-z])/) {
+	print STDERR "*** WARNING: could not parse root device $rootfs, ".
+	    "no swap enabled\n";
+	return;
+    } else {
+	$dtype = $1;
+	$dnum = $2;
+	$snum = $3;
+	$part = $4;
+    }
+
+    my $disk = "${dtype}${dnum}";
+    my $slice = "${disk}s${snum}";
+    my @lines = `disklabel $slice 2>/dev/null`;
+    if ($? != 0) {
+	print STDERR "*** WARNING: could not read disklabel of /dev/$slice, ".
+	    "no swap enabled\n";
+	return;
+    }
+
+    chomp(@lines);
+    foreach $line (@lines) {
+	if ($line =~ /\s*([a-z]):\s+(\d+)\s+\d+\s+(\S+)/) {
+	    my $part = $1;
+	    my $size = $2;
+	    my $fstype = $3;
+	    if ($fstype eq "swap") {
+		addswap("$slice$part", $size);
+		return;
+	    }
+	}
+    }
+
+    #
+    # Still nothing, look at the MBR to see if there is a Linux swap partition
+    # we can use.
+    #
+    @lines = `fdisk -s $disk 2>/dev/null`;
+    if ($? != 0) {
+	print STDERR "*** WARNING: could not read MBR of /dev/$disk, ".
+	    "no swap enabled\n";
+	return;
+    }
+
+    chomp(@lines);
+    foreach $line (@lines) {
+	if ($line =~ /\s*(\d):\s+\d+\s+(\d+)\s+(\S+)/) {
+	    my $part = $1;
+	    my $size = $2;
+	    my $ptype = $3;
+	    if ($ptype eq "0x82") {
+		addswap("${disk}s${part}", $size);
+		return;
+	    }
+	}
+    }
+
+    print STDERR "*** WARNING: could not locate a suitable swap device, ".
+	"no swap enabled\n";
+}
+
+sub addswap($$)
+{
+    my ($dev,$size) = @_;
+
+    print "Using /dev/$dev ($size sectors) for swap\n";
+    if (system("swapon /dev/$dev")) {
+	print STDERR "*** WARNING: could not enable swap on /dev/$dev, ".
+	    "no swap enabled\n";
+	exit(0);
+    }
+    if (!open(FD, ">>$FSTAB")) {
+	print STDERR "*** WARNING: could not add /dev/$dev to $FSTAB, ".
+	    "swap enabled this boot only\n";
+    }
+    print FD "# the following added by $script\n";
+    print FD "/dev/$dev\t\tnone\tswap\tsw\t0\t0\n";
+    close(FD);
+    print "Swap enabled\n";
+}

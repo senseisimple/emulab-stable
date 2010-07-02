@@ -1,27 +1,51 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
+
+#
+# Verify page arguments
+#
+$reqargs = RequiredPageArguments("template",   PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("modify",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY);
+
+# Need these below.
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$unix_gid = $template->UnixGID();
+
+if (! $template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to export in template ".
+	      "$guid/$vers!", 1);
+}
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify Experiment Template");
 
 #
 # Spit the form out using the array of data.
 #
-function SPITFORM($formfields, $errors)
+function SPITFORM($template, $formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
-    global $guid, $version;
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -45,14 +69,12 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
 
-    echo "<font size=+2>Experiment Template <b>" .
-            MakeLink("template",
-		     "guid=$guid&version=$version", "$guid/$version") . 
-	   "</b></font>\n";
+    echo $template->PageHeader();
     echo "<br><br>\n";
 
-    echo "<form action='template_modify.php?guid=$guid&version=$version'
-                method='post'>";
+    $url = CreateURL("template_modify", $template);
+
+    echo "<form action='$url' method='post'>";
     echo "<table align=center border=1>\n";
 
     #
@@ -64,10 +86,10 @@ function SPITFORM($formfields, $errors)
               <td class='pad4' class=left>
                   <input type=text
                          name=\"formfields[tid]\"
-                         value=\"" . $formfields[tid] . "\"
+                         value=\"" . $formfields["tid"] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
-              &nbsp (optional; we will generate one for you).
+              &nbsp (optionally change this to something informative).
               </td>
           </tr>\n";
 
@@ -80,7 +102,7 @@ function SPITFORM($formfields, $errors)
               <td colspan=2 align=center class=left>
                   <textarea name=\"formfields[description]\"
                     rows=4 cols=100>" .
-	            ereg_replace("\r", "", $formfields[description]) .
+	            ereg_replace("\r", "", $formfields["description"]) .
 	           "</textarea>
               </td>
           </tr>\n";
@@ -89,7 +111,7 @@ function SPITFORM($formfields, $errors)
     echo "<tr>
               <td colspan=2>
               <textarea name=\"formfields[nsdata]\"
-                   cols=100 rows=40>" . $formfields[nsdata] . "</textarea>
+                   cols=100 rows=40>" . $formfields["nsdata"] . "</textarea>
               </td>
           </tr>\n";
 
@@ -103,58 +125,19 @@ function SPITFORM($formfields, $errors)
 }
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Modify Experiment Template");
-
-#
-# Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a Template ID.", 1);
-}
-if (!isset($version) ||
-    strcmp($version, "") == 0) {
-    USERERROR("You must provide a Template version", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-if (!TBvalid_integer($version)) {
-    PAGEARGERROR("Invalid characters in version!");
-}
-
-#
-# Check to make sure this is a valid template.
-#
-if (! TBValidExperimentTemplate($guid, $version)) {
-    USERERROR("The experiment template $guid/$version is not a valid ".
-              "experiment template!", 1);
-}
-
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to modify experiment template ".
-	      "$guid/$version!", 1);
-}
-
-#
 # Put up the modify form on first load.
 # 
 if (! isset($modify)) {
     #
     # Grab NS file for the template.
     #
-    $input_list  = TBTemplateInputFiles($guid, $version);
-    TBTemplateDescription($guid, $version, $description);
+    $input_list  = $template->InputFiles();
 
     $defaults = array();
+    $defaults["tid"] = $template->NextTID();
     $defaults["nsdata"] = $input_list[0];
-    $defaults["description"] = $description;
-    SPITFORM($defaults, 0);
+    $defaults["description"] = $template->description();
+    SPITFORM($template, $defaults, 0);
     PAGEFOOTER();
     exit();
 }
@@ -176,56 +159,50 @@ srand((float) $sec + ((float) $usec * 100000));
 $foo = rand();
 
 #
-# Get template group so we can get the unix_gid.
-#
-if (! TBGuid2PidGid($guid, $pid, $gid)) {
-    TBERROR("Could not get pid,gid for experiment template $guid/$version", 1);
-}
-    
-#
 # TID
 #
-if (!isset($formfields[tid]) || $formfields[tid] == "") {
+if (!isset($formfields["tid"]) || $formfields["tid"] == "") {
     #
-    # Generate a unique one.
+    # Generate a new one.
     #
-    $tid = "T" . substr(md5(uniqid($foo, true)), 0, 10);
+    $tid = $template->NextTID();
 }
-elseif (!TBvalid_eid($formfields[tid])) {
+elseif (!TBvalid_eid($formfields["tid"])) {
     $errors["Template ID"] = TBFieldErrorString();
 }
-elseif (TBValidExperimentTemplate($pid, $formfields[tid])) {
-    $errors["Template ID"] = "Already in use";
-}
 else {
-    $tid = $formfields[tid];
+    $tid = $formfields["tid"];
 }
 
 #
 # Description:
 # 
-if (!isset($formfields[description]) || $formfields[description] == "") {
+if (!isset($formfields["description"]) || $formfields["description"] == "") {
     $errors["Description"] = "Missing Field";
 }
-elseif (!TBvalid_template_description($formfields[description])) {
+elseif (!TBvalid_template_description($formfields["description"])) {
     $errors["Description"] = TBFieldErrorString();
 }
 else {
-    $command_args .= " -E " . escapeshellarg($formfields[description]);
+    $command_args .= " -E " . escapeshellarg($formfields["description"]);
 }
 
 #
 # NS File.
 #
-if (!isset($formfields[nsdata]) || $formfields[nsdata] == "") {
+if (!isset($formfields["nsdata"]) || $formfields["nsdata"] == "") {
     $errors["NS File"] = "Missing Field";
 }
 
 if (count($errors)) {
-    SPITFORM($formfields, $errors);
+    SPITFORM($template, $formfields, $errors);
     PAGEFOOTER();
     exit(1);
 }
+
+echo "<script type='text/javascript' language='javascript' ".
+     "        src='template_sup.js'>\n";
+echo "</script>\n";
 
 #
 # Generate a unique and hard to guess filename, and write NS to it.
@@ -235,46 +212,55 @@ $nsfile = "/tmp/$uid-$foo.nsfile";
 if (! ($fp = fopen($nsfile, "w"))) {
     TBERROR("Could not create temporary file $nsfile", 1);
 }
-fwrite($fp, $formfields[nsdata]);
+fwrite($fp, $formfields["nsdata"]);
 fclose($fp);
 chmod($nsfile, 0666);
 
-# Need this for running scripts.
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
-
-echo "<b>Starting template modification!</b> ... ";
-echo "this will take a few moments; please be patient.";
-echo "<br><br>\n";
-flush();
+STARTBUSY("Starting template modification!");
 
 # And run that script!
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_create -w -q ".
-		 "-m $guid/$version $command_args $pid $tid $nsfile",
+		 "webtemplate_create ".
+		 "-m $guid/$vers $command_args $pid $tid $nsfile",
 		 SUEXEC_ACTION_IGNORE);
-
 unlink($nsfile);
+/* Clear the various 'loading' indicators. */
+HIDEBUSY();
 
-#
-# Fatal Error. Report to the user, even though there is not much he can
-# do with the error. Also reports to tbops.
-# 
-if ($retval < 0) {
-    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
-}
-
-# User error. Tell user and exit.
 if ($retval) {
+    #
+    # Fatal Error. Report to the user, even though there is not much he can
+    # do with the error. Also reports to tbops.
+    # 
+    if ($retval < 0) {
+	SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+    }
+    # User error. Tell user and exit.
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
     return;
 }
 
-echo "Done!";
-echo "<br><br>\n";
+#
+# Parse the last line of output. Ick.
+#
+if (preg_match("/^Template\s+(\w+)\/(\w+)\s+is being/",
+	       $suexec_output_array[count($suexec_output_array)-1],
+	       $matches)) {
+    $guid = $matches[1];
+    $vers = $matches[2];
 
-if (TBPidTid2Template($pid, $tid, $guid, $version)) {
-    SHOWTEMPLATE($guid, $version);
+    $template = Template::Lookup($guid, $vers);
+    if (! $template) {
+	TBERROR("Could not lookup template object for $guid/$vers", 1);
+	return;
+    }
+    echo $template->PageHeader();
+    echo "<br><br>\n";
+    STARTLOG($template);
 }
+else {
+    SUEXECERROR(SUEXEC_ACTION_DIE);
+}    
 
 #
 # Standard Testbed Footer

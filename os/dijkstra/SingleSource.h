@@ -12,6 +12,7 @@
 #ifndef SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 #define SINGLE_SOURCE_H_DISTRIBUTED_DIJKSTRA_1
 
+#include <climits>
 #include <boost/config.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
@@ -87,6 +88,11 @@ public:
     int getVertexCount(void) const;
     // What is the index of the source host?
     int getSource(void) const;
+    // Get the vector of first hops
+    std::vector<int> const & getAllFirstHops(void) const
+    {
+        return first_hop;
+    }
 private:
     // Use an adjacency_list graph instead of an adjacency_matrix
     // graph, based on the assumption that there will be many fewer

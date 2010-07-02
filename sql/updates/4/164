@@ -1,0 +1,31 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("user_sslcerts", "DN")) {
+	DBQueryFatal("DROP TABLE IF EXISTS `user_sslcerts`");
+	DBQueryFatal("CREATE TABLE `user_sslcerts` ( ".
+		     " `uid` varchar(8) NOT NULL default '', ".
+		     " `uid_idx` mediumint(8) unsigned NOT NULL default '0', ".
+		     " `idx` int(10) unsigned NOT NULL default '0', ".
+		     " `created` datetime default NULL, ".
+		     " `expires` datetime default NULL, ".
+		     " `revoked` datetime default NULL, ".
+		     " `password` tinytext, ".
+		     " `encrypted` tinyint(1) NOT NULL default '0', ".
+		     " `DN` text, ".
+		     " `cert` text, ".
+		     " `privkey` text, ".
+		     " PRIMARY KEY  (`idx`), ".
+		     " KEY `uid` (`uid`), ".
+		     " KEY `uid_idx` (`uid_idx`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+	print "  *** NOTE: See the comments in doc/UPDATING\n";
+	print "  ***       You must run sql/initcerts.pl after install.\n";
+    }
+    return 0;
+}
+1;

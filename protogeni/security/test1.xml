@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<signed-credential xmlns="http://www.protogeni.net/resources/credential/0.1" xmlns:sig="http://www.w3.org/2000/09/xmldsig#">
+<credential xml:id="Ref1">
+  <type>privilege</type>
+  <serial>0</serial>
+  <owner_uuid>foo bar</owner_uuid>
+  <this_uuid>foo bar</this_uuid>
+  <privileges>
+    <privilege>
+      <name>frazzle</name>
+      <can_delegate>1</can_delegate>
+    </privilege>
+  </privileges>
+</credential>
+</signed-credential>

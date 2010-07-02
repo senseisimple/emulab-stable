@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,10 +16,19 @@ Class Program -superclass NSObject
 
 namespace eval GLOBALS {
     set new_classes(Program) {}
+    variable all_programs {}
 }
 
 Program instproc init {s} {
     global ::GLOBALS::last_class
+    global ::GLOBALS::all_programs
+
+    if {$all_programs == {}} {
+	# Create a default event group to hold all program agents.
+	set foo [uplevel \#0 "set __all_programs [new EventGroup $s]"]
+	set all_programs $foo
+    }
+    $all_programs add $self
 
     $self set sim $s
     $self set node {}
@@ -35,9 +44,11 @@ Program instproc init {s} {
 }
 
 Program instproc rename {old new} {
+    global ::GLOBALS::all_programs
     $self instvar sim
 
     $sim rename_program $old $new
+    $all_programs rename-agent $old $new
 }
 
 # updatedb DB
@@ -61,12 +72,16 @@ Program instproc updatedb {DB} {
 	perror "\[updatedb] $self has disallowed newline in command: $command"
 	return
     }
-
     set progvnode $node
+
+    #
     # if the attached node is a simulated one, we attach the
     # program to the physical node on which the simulation runs
-    if { [$node set simulated] == 1 } {
-	set progvnode [$node set nsenode]
+    #
+    if {$progvnode != "ops"} {
+	if { [$node set simulated] == 1 } {
+	    set progvnode [$node set nsenode]
+	}
     }
 
     # Update the DB

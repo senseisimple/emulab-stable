@@ -1,0 +1,20 @@
+#
+# Fix to update 4.185
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    #
+    # Fixup a bad value for the check field.
+    #
+    DBQueryFatal("REPLACE INTO table_regex VALUES" . 
+		 " ('virt_nodes','parent_osname','text','redirect'," . 
+		 " 'os_info:osname',0,0,NULL)");
+
+    return 0;
+}
+1;

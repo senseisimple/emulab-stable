@@ -26,7 +26,7 @@ client-install:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS		= mtp.o mtp_xdr.o listNode.o
+OBJS		= mtp.o mtp_xdr.o listNode.o xdr_sizeof.o
 CFLAGS	       += -O -g -Wall -I. -I${SRCDIR} -I${OBJDIR} -I/usr/local/include
 
 libmtp.a: $(OBJS)
@@ -35,7 +35,7 @@ libmtp.a: $(OBJS)
 
 mtp.h: mtp_xdr.h
 
-mtp.o:		mtp.h mtp_xdr.o
+mtp.o:		mtp.h mtp_xdr.o xdr_sizeof.o
 mtp_test.o:	mtp.h
 mtp_send.o:	mtp.h
 mtp_recv.o:	mtp.h
@@ -56,7 +56,6 @@ mtp_dump: mtp_dump.o $(MTPLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_dump.o -L. -lmtp -lm
 
 CLASSES_SRC = $(wildcard $(SRCDIR)/*.java)
-
 CLASSES = $(patsubst $(SRCDIR)/%.java,net/emulab/%.class,$(CLASSES_SRC))
 
 $(CLASSES): $(CLASSES_SRC)

@@ -1,0 +1,401 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <meta content="HTML Tidy for Cygwin (vers 1st February 2003), see www.w3.org" name="generator">
+    <meta name="keywords" content="electronic commerce, ecommerce, ebusiness, e-business, e-commerce, enterprise software, net economy, Netscape, Sun Microsystems, DevEdge Archive, iPlanet, internet software">
+    <meta name="description" content="The DevEdge Archive, a strategic alliance formed by America Online and Sun Microsystems, Inc., is delivering iPlanet e-commerce software and enterprise solutions that enable companies to compete successfully in the Net Economy">
+    <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+    <meta name="TEMPLATEBASE" content="Authored in FrameMaker. Converted to HTML in WebWorks Publisher 2000. manual wdt 1.5">
+    <meta name="LASTUPDATED" content="09/28/00 13:16:28">
+    <title>
+      Core JavaScript Reference 1.5:
+    </title>
+    <link rel="stylesheet" type="text/css" href="js15ref.css">
+  </head>
+  <body>
+    <table width="100%" border="0" cellspacing="4">
+      <tr>
+        <td valign="top">
+          <b><a class="sansserifPurple" href="lcjsexc.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="partapp.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp;
+        </td>
+      </tr>
+      <tr>
+        <td class="sansserifBlack" valign="top" align="right" bgcolor="#CCCCCC">
+          <b>Core JavaScript Reference 1.5</b>
+        </td>
+      </tr>
+    </table><br>
+     
+    <blockquote>
+      <br>
+      <br>
+      <br>
+      <br>
+       
+      <p>
+        <a name="1193143" id="1193143"></a> <a name="JSObject" id="JSObject"></a> <span class="sansserif"><b>JSObject</b></span>
+      </p>
+      <p>
+        <a name="1193144" id="1193144"></a> <span class="sansserif">The public final class <span class="mono">netscape.javascript.JSObject</span> extends <span class="mono">Object</span>.</span>
+      </p>
+      <p>
+        <a name="1193145" id="1193145"></a> <span class="mono">java.lang.Object<br>
+         &nbsp;&nbsp;&nbsp;|<br>
+         &nbsp;&nbsp;&nbsp;+----netscape.javascript.JSObject</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193426" id="1193426"></a> <a name="Description" id="Description"></a> <span class="sansserif"><b>Description</b></span><br>
+         <a name="1195346" id="1195346"></a> <span class="sansserif">JavaScript objects are wrapped in an instance of the class <span class="mono">netscape.javascript.JSObject</span> and passed to Java. <span class="mono">JSObject</span> allows Java to manipulate JavaScript objects.</span>
+      </p>
+      <p>
+        <a name="1195303" id="1195303"></a> <span class="sansserif">When a JavaScript object is sent to Java, the runtime engine creates a Java wrapper of type <span class="mono">JSObject</span>; when a <span class="mono">JSObject</span> is sent from Java to JavaScript, the runtime engine unwraps it to its original JavaScript object type. The <span class="mono">JSObject</span> class provides a way to invoke JavaScript methods and examine JavaScript properties.</span>
+      </p>
+      <p>
+        <a name="1195291" id="1195291"></a> <span class="sansserif">Any JavaScript data brought into Java is converted to Java data types. When the JSObject is passed back to JavaScript, the object is unwrapped and can be used by JavaScript code. See the <a href="/devedge-srce/library/manuals/2000/javascript/1.5/guide/"><i>Core JavaScript Guide</i></a> for more information about data type conversions.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193160" id="1193160"></a> <a name="Method Summary" id="Method Summary"></a> <span class="sansserif"><b>Method Summary</b></span><br>
+         <a name="1193222" id="1193222"></a> <span class="sansserif">The <span class="mono">netscape.javascript.JSObject</span> class has the following methods:</span>
+      </p>
+      <p>
+        <a name="1193778" id="1193778"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193163" id="1193163"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193165" id="1193165"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193170" id="1193170"></a> <span class="mono"><a href="lcjsobj.html#1193239">call</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193172" id="1193172"></a> <span class="sansserif">Calls a JavaScript method.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1194485" id="1194485"></a> <span class="mono"><a href="lcjsobj.html#1194386">equals</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1194487" id="1194487"></a> <span class="sansserif">Determines if two <span class="mono">JSObject</span> objects refer to the same instance.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193177" id="1193177"></a> <span class="mono"><a href="lcjsobj.html#1193245">eval</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193179" id="1193179"></a> <span class="sansserif">Evaluates a JavaScript expression.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193184" id="1193184"></a> <span class="mono"><a href="lcjsobj.html#1193251">getMember</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193186" id="1193186"></a> <span class="sansserif">Retrieves the value of a property of a JavaScript object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193191" id="1193191"></a> <span class="mono"><a href="lcjsobj.html#1193257">getSlot</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193193" id="1193193"></a> <span class="sansserif">Retrieves the value of an array element of a JavaScript object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193198" id="1193198"></a> <span class="mono"><a href="lcjsobj.html#1193269">removeMember</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193200" id="1193200"></a> <span class="sansserif">Removes a property of a JavaScript object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193205" id="1193205"></a> <span class="mono"><a href="lcjsobj.html#1193275">setMember</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193207" id="1193207"></a> <span class="sansserif">Sets the value of a property of a JavaScript object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193212" id="1193212"></a> <span class="mono"><a href="lcjsobj.html#1193281">setSlot</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193214" id="1193214"></a> <span class="sansserif">Sets the value of an array element of a JavaScript object.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193219" id="1193219"></a> <span class="mono"><a href="lcjsobj.html#1193287">toString</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193221" id="1193221"></a> <span class="sansserif">Converts a <span class="mono">JSObject</span> to a string.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1193235" id="1193235"></a> <span class="sansserif">The <span class="mono">netscape.javascript.JSObject</span> class has the following static methods:</span>
+      </p>
+      <p>
+        <a name="1193828" id="1193828"></a> <span class="sansserif"><br></span>
+      </p><br>
+       
+      <table width="90%" border="1" cellpadding="5" cellspacing="0">
+        <tr bgcolor="#CCCCCC" align="left" valign="top">
+          <th valign="top" align="left">
+            <a name="1193225" id="1193225"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Method</b></span>
+            </p>
+          </th>
+          <th valign="top" align="left">
+            <a name="1193227" id="1193227"></a> 
+            <p class="alignleft">
+              <span class="sansserif"><b>Description</b></span>
+            </p>
+          </th>
+        </tr>
+        <tr>
+          <td valign="top">
+            <a name="1193232" id="1193232"></a> <span class="mono"><a href="lcjsobj.html#1193263">getWindow</a></span> 
+            <p>
+              &nbsp;
+            </p>
+          </td>
+          <td valign="top">
+            <p>
+              <a name="1193234" id="1193234"></a> <span class="sansserif">Gets a <span class="mono">JSObject</span> for the window containing the given applet.</span> &nbsp;
+            </p>
+          </td>
+        </tr>
+      </table>
+      <p>
+        <a name="1193236" id="1193236"></a> <span class="sansserif">The following sections show the declaration and usage of these methods.</span>
+      </p>
+      <p>
+        <a name="1193239" id="1193239"></a> <a name="call" id="call"></a> <span class="sansserif"><b>call</b></span>
+      </p>
+      <p>
+        <a name="1193240" id="1193240"></a> <span class="sansserif">Method. Calls a JavaScript method. Equivalent to "<span class="mono">this.methodName(args[0], args[1], ...)</span>" in JavaScript.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193241" id="1193241"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193242" id="1193242"></a> <span class="mono">public Object call(String methodName,<br>
+         &nbsp;&nbsp;&nbsp;Object args[])</span>
+      </p>
+      <p>
+        <a name="1194386" id="1194386"></a> <a name="equals" id="equals"></a> <span class="sansserif"><b>equals</b></span>
+      </p>
+      <p>
+        <a name="1194387" id="1194387"></a> <span class="sansserif">Method. Determines if two <span class="mono">JSObject</span> objects refer to the same instance.</span>
+      </p>
+      <p>
+        <a name="1194388" id="1194388"></a> <span class="sansserif">Overrides: <span class="mono">equals</span> in class <span class="mono">java.lang.Object</span></span>
+      </p>
+      <p>
+        <br>
+         <a name="1194330" id="1194330"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1194293" id="1194293"></a> <span class="mono">public boolean equals(Object obj)</span>
+      </p>
+      <p>
+        <br>
+         <a name="1194702" id="1194702"></a> <a name="Backward Compatibility" id="Backward Compatibility"></a> <span class="sansserif"><b>Backward Compatibility</b></span><br>
+         <a name="1194703" id="1194703"></a> <span class="sansserif"><b>JavaScript 1.3.</b> In JavaScript 1.3 and earlier versions, you can use either the <span class="mono">equals</span> method of <span class="mono">java.lang.Object</span> or the <span class="mono">==</span> operator to evaluate two <span class="mono">JSObject</span> objects.</span>
+      </p>
+      <p>
+        <a name="1196215" id="1196215"></a> <span class="sansserif">In more recent versions, the same <span class="mono">JSObject</span> can appear as different Java objects. You can use the <span class="mono">equals</span> method to determine whether two <span class="mono">JSObject</span>s refer to the same instance.</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193245" id="1193245"></a> <a name="eval" id="eval"></a> <span class="sansserif"><b>eval</b></span>
+      </p>
+      <p>
+        <a name="1193246" id="1193246"></a> <span class="sansserif">Method. Evaluates a JavaScript expression. The expression is a string of JavaScript source code which will be evaluated in the context given by "this".</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193247" id="1193247"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193248" id="1193248"></a> <span class="mono">public Object eval(String s)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193251" id="1193251"></a> <a name="getMember" id="getMember"></a> <span class="sansserif"><b>getMember</b></span>
+      </p>
+      <p>
+        <a name="1193252" id="1193252"></a> <span class="sansserif">Method. Retrieves the value of a property of a JavaScript object. Equivalent to "<span class="mono">this.name</span>" in JavaScript.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193253" id="1193253"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193254" id="1193254"></a> <span class="mono">public Object getMember(String name)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193257" id="1193257"></a> <a name="getSlot" id="getSlot"></a> <span class="sansserif"><b>getSlot</b></span>
+      </p>
+      <p>
+        <a name="1193258" id="1193258"></a> <span class="sansserif">Method. Retrieves the value of an array element of a JavaScript object. Equivalent to "<span class="mono">this[index]</span>" in JavaScript.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193259" id="1193259"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193260" id="1193260"></a> <span class="mono">public Object getSlot(int index)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193263" id="1193263"></a> <a name="getWindow" id="getWindow"></a> <span class="sansserif"><b>getWindow</b></span>
+      </p>
+      <p>
+        <a name="1193264" id="1193264"></a> <span class="sansserif">Static method. Returns a <span class="mono">JSObject</span> for the window containing the given applet. This method is useful in client-side JavaScript only.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193265" id="1193265"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193266" id="1193266"></a> <span class="mono">public static JSObject getWindow(Applet applet)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193269" id="1193269"></a> <a name="removeMember" id="removeMember"></a> <span class="sansserif"><b>removeMember</b></span>
+      </p>
+      <p>
+        <a name="1193270" id="1193270"></a> <span class="sansserif">Method. Removes a property of a JavaScript object.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193271" id="1193271"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193272" id="1193272"></a> <span class="mono">public void removeMember(String name)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193275" id="1193275"></a> <a name="setMember" id="setMember"></a> <span class="sansserif"><b>setMember</b></span>
+      </p>
+      <p>
+        <a name="1193276" id="1193276"></a> <span class="sansserif">Method. Sets the value of a property of a JavaScript object. Equivalent to "<span class="mono">this.name&nbsp;=&nbsp;value</span>" in JavaScript.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193277" id="1193277"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193278" id="1193278"></a> <span class="mono">public void setMember(String name,<br>
+         &nbsp;&nbsp;&nbsp;Object value)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193281" id="1193281"></a> <a name="setSlot" id="setSlot"></a> <span class="sansserif"><b>setSlot</b></span>
+      </p>
+      <p>
+        <a name="1193282" id="1193282"></a> <span class="sansserif">Method. Sets the value of an array element of a JavaScript object. Equivalent to "<span class="mono">this[index]&nbsp;=&nbsp;value</span>" in JavaScript.</span>
+      </p>
+      <p>
+        <br>
+         <a name="1193283" id="1193283"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193284" id="1193284"></a> <span class="mono">public void setSlot(int index,<br>
+         &nbsp;&nbsp;&nbsp;Object value)</span>
+      </p>
+      <p>
+        <br>
+      </p>
+      <p>
+        <a name="1193287" id="1193287"></a> <a name="toString" id="toString"></a> <span class="sansserif"><b>toString</b></span>
+      </p>
+      <p>
+        <a name="1193288" id="1193288"></a> <span class="sansserif">Method. Converts a <span class="mono">JSObject</span> to a <span class="mono">String</span>.</span>
+      </p>
+      <p>
+        <a name="1193289" id="1193289"></a> <span class="sansserif">Overrides: <span class="mono">toString</span> in class <span class="mono">java.lang.Object</span></span>
+      </p>
+      <p>
+        <br>
+         <a name="1193290" id="1193290"></a> <a name="Declaration" id="Declaration"></a> <span class="sansserif"><b>Declaration</b></span><br>
+         <a name="1193291" id="1193291"></a> <span class="mono">public String toString()</span>
+      </p>
+    </blockquote>
+    <blockquote>
+      <br>
+       <b><a class="sansserifPurple" href="lcjsexc.html">Previous</a></b>&nbsp;&nbsp;&nbsp;&nbsp; <a href="contents.html"><b class="sansserifPurple">Contents</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="ix.html"><b class="sansserifPurple">Index</b></a>&nbsp;&nbsp;&nbsp;&nbsp; <a href="partapp.html"><b class="sansserifPurple">Next</b></a> &nbsp;&nbsp;&nbsp;&nbsp; 
+      <hr noshade="noshade" size="1">
+      <span class="sansserif">Copyright &copy; 2000 <a href="http://www.netscape.com">Netscape Communications Corp.</a> All rights reserved.</span>
+    </blockquote>
+    <p class="alignright">
+      <span class="sansserif">Last Updated <b>September 28, 2000</b></span>
+    </p>
+  </body>
+</html>

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # deletenode - a script for deleting a node from the database
@@ -36,11 +36,11 @@ if (!TBAdmin()) {
 # Handle command-line arguments
 #
 sub usage {
-    die "usage: deletenode [-b] [-f] [-q] <node>\n";
+    die "usage: deletenode [-b] [-f] [-q] [-n] [-S] <node>\n";
 }
 
 my %options = ();
-if (!getopts("bfq",\%options)) {
+if (!getopts("bfqnS",\%options)) {
     usage();
 }
 
@@ -83,6 +83,29 @@ if ($allocated && (($pid ne NODEDEAD_PID) || ($eid ne NODEDEAD_EID))) {
 }
 
 #
+# Find any subnodes of the node and delete them as well (if that is really,
+# really what they want to do).
+#
+my @subnodes;
+$result = DBQueryFatal("select node_id from nodes where ".
+		       "node_id!=phys_nodeid and phys_nodeid='$node' ".
+		       "and role='testnode'");
+while (my ($subnode) = $result->fetch_row()) {
+    push(@subnodes, $subnode);
+}
+if (@subnodes > 0) {
+    unless ($options{b}) {
+	print "*** WARNING: $node has subnodes: ", join(", ", @subnodes), "\n";
+	print "This procedure will remove those as well, continue? ";
+	my $answer = <>;
+	if ($answer !~ /^y/i) {
+	    print "Okay, aborting...\n";
+	    exit(1);
+	}
+    }
+}
+
+#
 # Make sure they know what they are getting themselves into
 #
 # Note: the -b (batch) option is intentionally undocumented, it should only be
@@ -99,39 +122,73 @@ unless ($options{b}) {
     }
 }
 
+push(@subnodes, $node);
+
 #
-# Okay, let's clean out them tables
+# Save off DB info we are about to delete
 #
-while (my ($table, $clist) = each %clean_tables) {
-    foreach my $column (@$clist) {
-	print "Removing from table $table, column $column\n"
-	    if (! defined($options{"q"}));
+if ($options{"S"}) {
+    foreach $node (@subnodes) {
+	my $savefile = "/var/tmp/$node-delete.log";
+	print "Saving table data for $node to $savefile\n";
+	if (-e "$savefile") {
+	    print STDERR "*** Savefile already exists, aborting\n";
+	    exit(1);
+	}
 	
-	DBQueryFatal("DELETE FROM $table WHERE $column='$node';");
+	my $dumpopts = "--compact --no-create-info --add-locks";
+	while (my ($table, $clist) = each %clean_tables) {
+	    foreach my $column (@$clist) {
+		if (system("mysqldump $dumpopts -w \"$column='$node'\" tbdb $table >> $savefile")) {
+		    print STDERR "*** Failed to save $table info for $node, aborting\n";
+		    exit(1);
+		}
+	    }
+	}
+    }
+}
+
+foreach $node (@subnodes) {
+    my $pre = $options{"n"} ? "NOT " : "";
+    print "${pre}Removing $node...\n";
+
+    #
+    # Okay, let's clean out them tables
+    #
+    while (my ($table, $clist) = each %clean_tables) {
+	foreach my $column (@$clist) {
+	    print "${pre}Removing from table $table, column $column\n"
+		if (! defined($options{"q"}));
+	    
+	    DBQueryFatal("DELETE FROM $table WHERE $column='$node';")
+		if (!defined($options{"n"}));
+	}
     }
 }
 
 #
 # Need to run a bunch of stuff to really kill off the node.
 #
-print "Regenerating exports file and restarting daemon.\n"
-    if (! defined($options{"q"}));
-if (system("$TB/sbin/exports_setup")) {
-    print STDERR "*** Failed to reset mountpoints.\n";
-}
-print "Regenerating named maps and restarting daemon.\n"
-    if (! defined($options{"q"}));
-if (system("$TB/sbin/named_setup")) {
-    print STDERR "*** Failed to reset named maps.\n";
-}
-print "Regenerating DHCPD config file and restarting daemon.\n"
-    if (! defined($options{"q"}));
-if (system("$TB/sbin/dhcpd_makeconf -i -r")) {
-    print STDERR "*** Failed to reset DHCPD config file.\n";
-}
-print "Hupping stated so that it will reload its tables\n"
-    if (! defined($options{"q"}));
-if (system("sudo $KILL -HUP `cat /var/run/stated.pid`")) {
-    print STDERR "*** Failed to HUP stated.\n";
+if (!defined($options{"n"})) {
+    print "Regenerating exports file and restarting daemon.\n"
+	if (! defined($options{"q"}));
+    if (system("$TB/sbin/exports_setup")) {
+	print STDERR "*** Failed to reset mountpoints.\n";
+    }
+    print "Regenerating named maps and restarting daemon.\n"
+	if (! defined($options{"q"}));
+    if (system("$TB/sbin/named_setup")) {
+	print STDERR "*** Failed to reset named maps.\n";
+    }
+    print "Regenerating DHCPD config file and restarting daemon.\n"
+	if (! defined($options{"q"}));
+    if (system("$TB/sbin/dhcpd_makeconf -i -r")) {
+	print STDERR "*** Failed to reset DHCPD config file.\n";
+    }
+    print "Hupping stated so that it will reload its tables\n"
+	if (! defined($options{"q"}));
+    if (system("sudo $KILL -HUP `cat /var/run/stated.pid`")) {
+	print STDERR "*** Failed to HUP stated.\n";
+    }
 }
 exit 0;

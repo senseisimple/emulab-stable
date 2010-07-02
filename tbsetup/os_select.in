@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,12 +17,14 @@ Usage: os_select [-h] [-d] [-c] [-1 | -t] [<osid>] <node> [<node> ...]
  -c    Clear the specified boot osid for nodes. Do not provide an osid.
  -1    Apply change to one-time boot field
  -t    Apply change to temporary boot field
+ -b    Reset to default boot osid. Do not provide an osid.
+ -l    Show the current settings.
  osid  OS identifier for the selected OS (see web interface for listing)
  node  Node identifiers (ie pcXX)
 EOF
     exit(-1);
 }
-my $optlist = "hdc1t";
+my $optlist = "hdc1tbl";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -39,6 +41,8 @@ my $TBLOG	= "@TBLOGFACIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use OSinfo;
+use Node;
 use English;
 use Getopt::Std;
 use Sys::Syslog;
@@ -64,9 +68,11 @@ my $debug	= 0; # debug/verbose
 my $oneshot	= 0; # apply change to next_boot_osid.
 my $tempmode	= 0; # apply change to temp_boot_osid.
 my $clear       = 0; # Clear the selected boot (def,temp,next).
+my $default     = 0; # Reset back to default osid.
+my $list	= 0; # Just list the current settings.
 my @nodes       = ();
-my $osid	= "";
-my $opmode;
+my $osid;
+my $osinfo;
 
 # Set up syslog
 openlog("osselect", "pid", $TBLOG);
@@ -78,13 +84,15 @@ openlog("osselect", "pid", $TBLOG);
 %options = ();
 if (! getopts($optlist, \%options)) { usage(); }
 if (defined($options{"h"})) { usage(); }
-if (defined($options{"d"})) { $debug++; }
+if (defined($options{"d"})) { $debug=1; }
 if (defined($options{"1"})) { $oneshot=1; }
 if (defined($options{"t"})) { $tempmode=1; }
 if (defined($options{"c"})) { $clear=1; }
+if (defined($options{"b"})) { $default=1; }
+if (defined($options{"l"})) { $list=1; }
 
 # In clearmode, there is no OSID. Just a list of nodes.
-if (! $clear) {
+if (! ($clear || $list || $default)) {
     usage()
 	if (@ARGV < 2);
     $osid = shift();
@@ -117,121 +125,68 @@ foreach my $node ( @ARGV ) {
 # Figure out who called us. Only root, people with admin status
 # in the DB, or members of the right project can do this.
 #
-if ($UID && !TBAdmin($UID) &&
-    !TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, @nodes)) {
-    fatal("os_select: You do not have permission to modify ".
-	  "one or more of the nodes.\n");
+if ($UID && !TBAdmin($UID)) {
+    if ($list && !TBNodeAccessCheck($UID, TB_NODEACCESS_READINFO, @nodes)) {
+	fatal("os_select: You do not have permission to access ".
+	      "one or more of the nodes.\n");
+    }
+    if (!$list && !TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO, @nodes)) {
+	fatal("os_select: You do not have permission to modify ".
+	      "one or more of the nodes.\n");
+    }
 }
 
 #
 # Grab the info for the OSID. 
 #
-if (! $clear) {
-    my $query_result =
-	DBQueryFatal("select * from os_info where osid='$osid'");
-    if ($query_result->numrows != 1) {
-	fatal("Improper DB entry for OSID: $osid");
-    }
-    my %dbrow  = $query_result->fetchhash();
-    $opmode = $dbrow{"op_mode"};
+if (! ($clear || $list || $default)) {
+    $osinfo = OSinfo->Lookup($osid);
+    fatal("Improper DB entry for OSID: $osid")
+	if (!defined($osinfo));
+}
+elsif ($default) {
+    $osinfo = "<DEFAULT>";
 }
 
 foreach my $node (@nodes) {
-    my $curmode = node_opmode($node);
+    my $nodeobject = Node->Lookup($node);
 
-    # Why? When will this happen?
-    next
-	if (!$curmode);
-    
-    debug("Current opmode for $node is $curmode.\n");
-
-    # Set/Clear the osid.
-    set_boot_osid($node);
-
-    #
-    # Determine what osid the node will now boot. We need to know this so we
-    # can set the next opmode. This call has to return *something* or we are
-    # screwed since we will not be able to figure out the opmode.
-    #
-    my ($bootosid, $bootopmode) = TBBootWhat($node, $debug);
-
-    fatal("Bootwhat query failed for $node!")
-	if (!$bootosid);
-    debug("Bootwhat says: $node => $bootosid\n");
-
-    #
-    # If its different then what the node is currently booting, then
-    # set up a transition in stated. If no change, be sure to clear
-    # is since stated does not like a transition to be specified when
-    # none is actually going to be made.
-    #
-    if ($curmode ne $bootopmode) {
-	set_nextmode($node, $bootopmode);
+    # In list mode, show all the IDs
+    if ($list) {
+	my $tb = $nodeobject->temp_boot_osid();
+	my $nb = $nodeobject->next_boot_osid();
+	my $db = $nodeobject->def_boot_osid();
+	print "$node: ";
+	if ($tb) {
+	    $info = OSinfo->Lookup($tb);
+	    print "temp=$info";
+	    print ", ";
+	}
+	if ($nb) {
+	    $info = OSinfo->Lookup($nb);
+	    print "next=$info";
+	    print ", ";
+	}
+	if ($db) {
+	    $info = OSinfo->Lookup($db);
+	    print "default=$info";
+	}
+	print "\n";
+	next;
     }
-    else {
-	# Must clear it.
-	set_nextmode($node, "");
-    }
-}
-exit(0);
 
-#
-# Subroutines
-#
-
-# Set the next_op_mode field for a node.
-sub set_nextmode($;$)
-{
-    my ($node, $opmode) = @_;
-
-    if ($opmode eq "") {
-	debug("Clearing next_op_mode for $node.\n");
-    }
-    else {
-	debug("Setting next_op_mode for $node to $opmode.\n");    
-    }
-    
-    DBQueryFatal("update nodes set next_op_mode='$opmode' ".
-		 "where node_id='$node'");
-    return 0;
-}
-
-# Set (or clear) the boot osid.
-sub set_boot_osid($) {
-    my ($node) = @_;
+    # The field to change in the DB. 
     my $field  = "def_boot_osid";
-
     $field = "next_boot_osid"
 	if ($oneshot);
     $field = "temp_boot_osid"
 	if ($tempmode);
 
-    if ($clear) {
-	debug("Clearing $field for $node.\n");
+    if ($nodeobject->OSSelect($osinfo, $field, $debug) != 0) {
+	fatal("OSSelect(): " . ($osinfo ? "$osinfo " : "") ."failed on $node");
     }
-    else {
-	debug("Setting $field for $node to $osid.\n");
-    }
-    
-    DBQueryFatal("update nodes set ${field}='$osid' where node_id='$node'");
 }
-
-# Return current opmode that a node is set to.
-sub node_opmode($)
-{
-    my ($node) = @_;
-    my $opmode;
-
-    if (! TBGetNodeOpMode($node, \$opmode)) {
-	fatal("Could not get opmode for node $node!");
-    }
-    if (!defined($opmode) || $opmode eq "" ||
-	$opmode eq TBDB_NODEOPMODE_UNKNOWN) {
-	warning("Invalid opmode $opmode for $node.\n");
-	return 0;
-    }
-    return $opmode;
-}
+exit(0);
 
 sub debug($;$)
 {

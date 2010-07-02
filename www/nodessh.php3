@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # This script generates an "tbc" file, to be passed to ./ssh-mime.pl
@@ -14,21 +15,23 @@ include("defs.php3");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
 # Verify form arguments.
-# 
-if (!isset($node_id) ||
-    strcmp($node_id, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
-}
+#
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
+
+# Need these below
+$node_id = $node->node_id();
 
 $query_result =
     DBQueryFatal("select n.jailflag,n.jailip,n.sshdport, ".
 		 "       r.vname,r.pid,r.eid, ".
-		 "       t.isvirtnode,t.isremotenode,t.isplabdslice, oi.OS ".
+		 "       t.isvirtnode,t.isremotenode,t.isplabdslice, ".
+		 "       t.issubnode,t.isfednode,t.class ".
 		 " from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "left join node_types as t on t.type=n.type ".
@@ -40,16 +43,23 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 $row = mysql_fetch_array($query_result);
-$jailflag = $row[jailflag];
-$jailip   = $row[jailip];
-$sshdport = $row[sshdport];
-$vname    = $row[vname];
-$pid      = $row[pid];
-$eid      = $row[eid];
-$isvirt   = $row[isvirtnode];
-$iswindowsnode = $row[OS]=='Windows';
-$isremote = $row[isremotenode];
-$isplab   = $row[isplabdslice];
+$jailflag = $row["jailflag"];
+$jailip   = $row["jailip"];
+$sshdport = $row["sshdport"];
+$vname    = $row["vname"];
+$pid      = $row["pid"];
+$eid      = $row["eid"];
+$isvirt   = $row["isvirtnode"];
+$isremote = $row["isremotenode"];
+$isplab   = $row["isplabdslice"];
+$issubnode= $row["issubnode"];
+$class    = $row["class"];
+$isfednode= $row["isfednode"];
+
+#
+# XXX hack to determine if target node is on a routable network
+#
+$unroutable = ($ELABINELAB || !strncmp($CONTROL_NETWORK, "192.168.", 8));
 
 if (!isset($pid)) {
     USERERROR("$node_id is not allocated to an experiment!", 1);
@@ -69,7 +79,7 @@ if ($isvirt) {
 	# Remote nodes run sshd on another port since they so not
 	# have per-jail IPs. Of course, might not even be jailed!
 	#
-	if ($jailflag || $isplab) {
+	if ($jailflag || $isplab || $isfednode) {
 	    echo "port: $sshdport\n";
 	}
     }
@@ -82,9 +92,17 @@ if ($isvirt) {
 	echo "gateway: $USERNODE\n";
     }
 }
-elseif ($ELABINELAB) {
+elseif ($unroutable) {
+    #
+    # If nodes are unroutable, gateway via the user node
+    #
     echo "gateway: $USERNODE\n";
+}
+elseif ($issubnode && $class == 'ixp') {
+    #
+    # IXP hack: pass <node-id>-gw as the gateway address
+    #
+    echo "gateway: $node_id-gw.$OURDOMAIN\n";
 }
 
 ?>
-

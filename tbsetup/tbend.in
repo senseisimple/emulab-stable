@@ -1,33 +1,44 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
+use Getopt::Std;
 
-# tbend
-
+#
 # This is the fourth and final program in the
 # tbprerun/tbswapin/tbswapout/.../tbend sequences.  It's purpose is to
 # reverse what tbprerun did.  I.e. clear the virt_nodes and virt_lans
 # tables.
+#
 sub usage()
 {
-    print STDERR "Usage: $0 [-force] pid eid\n";
+    print STDERR "Usage: $0 [-f] -e eid\n";
     exit(-1);
 }
+my $optlist = "fe:";
+my $pideid;
+my $force   = 0;
 
 #
 # Configure variables
 #
-my $TBROOT   = "@prefix@";
+my $TBROOT       = "@prefix@";
+my $OPSDBSUPPORT = @OPSDBSUPPORT@;
+my $dbcontrol    = "$TBROOT/sbin/opsdb_control";
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
     ":$TBROOT/libexec/vis:$TBROOT/sbin:$TBROOT/bin";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 #
 # Testbed Support libraries
@@ -35,51 +46,64 @@ $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" .
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-require exitonwarn; # exitonwarn isn't really a module, so just require it
-
-#
-# Turn off line buffering on output
-#
-$| = 1;
-
-my $force  = 0;
-my $errors = 0;
-my $state;
-
-while ($#ARGV > 1) {
-    $arg = shift;
-    if ($arg eq "-force") {
-	$force = 1;
-    } else {
-	usage();
-    }
+use libtblog;
+use Experiment;
+if ($PGENISUPPORT) {
+    require libGeni;
 }
-if ($#ARGV < 1) {
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
     usage();
 }
-my ($pid,$eid) = @ARGV;
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"e"})) {
+    $pideid = $options{"e"};
+}
+if (!defined($pideid) || @ARGV) {
+    usage();
+}
+
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($pideid);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object for $pideid!")
+}
+# Need these below.
+my $pid      = $experiment->pid();
+my $eid      = $experiment->eid();
+my $state    = $experiment->state();
+my $errors   = 0;
 
 print "Beginning cleanup for $pid/$eid. " . TBTimeStamp() . "\n";
 
-if (! ($state = ExpState($pid, $eid))) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid\n");
-}
 # Sanity check the state.
 if (!$force && $state ne EXPTSTATE_TERMINATING) {
-    die("*** $0:\n".
-	"    Experiment is in the wrong state: $state.\n");
+    tbdie("Experiment is in the wrong state: $state.\n");
 }
 
+if ($PGENISUPPORT) {
+    if (libGeni::UnRegister($experiment)) {
+	tbdie("Could not delete protogeni slice\n");
+    }
+}
 print "Clearing out virtual state.\n";
-$errors += TBExptRemoveVirtualState( $pid, $eid );
+$experiment->RemoveVirtualState() == 0 or $errors++;
 
 # This will kill a running prerender.
 print "Removing visualization data...\n";
 system("prerender -r $pid $eid");
 
+system("$dbcontrol delexpdb $pid $eid")
+    if ($OPSDBSUPPORT);
+
 print "Cleanup finished! " . TBTimeStamp() . "\n";
 
-# We exit with whether we had errors or not.
 exit $errors;
 

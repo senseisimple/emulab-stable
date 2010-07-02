@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,30 +9,25 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-
-#
-# Verify form arguments.
-# 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
-    USERERROR("You must provide a User ID.", 1);
-}
-
-PAGEHEADER("Send a Test Message");
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (!$isadmin) {
     USERERROR("You do not have permission to view this page!", 1);
 }
 
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("$target_uid is not a valid user ID!", 1);
-}
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("target_user",  PAGEARG_USER);
 
-# Get email info and Key,
-TBUserInfo($target_uid, $usr_name, $usr_email);
+# Need these below
+$target_uid = $target_user->uid();
+$usr_name   = $target_user->name();
+$usr_email  = $target_user->email();
+
+PAGEHEADER("Send a Test Message");
 
 # Send the email.
 TBMAIL("$usr_name '$target_uid' <$usr_email>",

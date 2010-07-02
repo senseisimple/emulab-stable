@@ -1,0 +1,142 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Data::Dumper;
+
+#
+# Ask all components managers for a list of resources used.
+# 
+sub usage()
+{
+    print "Usage: listusage\n";
+    exit(1);
+}
+my $optlist    = "";
+my $errors     = 0;
+sub fatal($);
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV);
+
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-ch";
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use libtestbed;
+require GeniDB;
+require Genixmlrpc;
+use GeniResponse;
+require GeniCertificate;
+require GeniCredential; 
+require GeniAuthority;
+require GeniSlice;
+
+#
+# The RPC context for this script is as the CH
+#
+my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
+my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $EMULAB_PEMFILE");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+Genixmlrpc->SetTimeout(15);
+
+#
+# The credential will be issued to the ClearingHouse.
+#
+my $authority = GeniAuthority->Lookup($certificate->uuid());
+if (!defined($authority)) {
+    fatal("Could not find local authority object");
+}
+
+#
+# List of all CMs.
+#
+my $query_result =
+    GeniDB::DBQueryWarn("select uuid from geni_authorities where type='cm'");
+fatal("Could not lookup CM list")
+    if (!defined($query_result));
+fatal("No managers listed in the DB; is this a ClearingHouse?")
+    if (!$query_result->numrows);
+
+while (my ($manager_uuid) = $query_result->fetchrow_array()) {
+    my $manager = GeniAuthority->Lookup($manager_uuid);
+    print STDERR "Could not lookup up CM $manager_uuid\n"
+	if (!defined($manager));
+
+    my $manager_credential = GeniCredential->Create($manager, $authority);
+    if (!defined($manager_credential)) {
+	fatal("Could not create new credential for $manager");
+    }
+    if ($manager_credential->Sign($certificate) != 0) {
+	fatal("Could not sign credential for $manager");
+    }
+
+    print "$manager\n";
+	
+    my $response =
+	Genixmlrpc::CallMethod($manager->url(), undef,
+			       "ListUsage",
+			       { "credential" =>
+				     $manager_credential->asString() });
+    if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR
+	    "Could not listusage on $manager: ". $response->output();
+	    $errors++;
+    }
+    foreach my $ref (@{$response->value()}) {
+	my $slice_hrn  = $ref->{'slice_hrn'};
+	my @slivers    = @{$ref->{'slivers'}};
+
+	print "$slice_hrn\n";
+	foreach my $sliver (@slivers) {
+	    my $sliver_hrn    = $sliver->{'sliver_hrn'};
+	    my $component_hrn =
+		(exists($sliver->{'component_hrn'}) ?
+		 "(" . $sliver->{'component_hrn'} . ")" : "");
+			
+	    print "  $sliver_hrn $component_hrn\n";
+	}
+
+    }
+    $manager_credential->Delete();
+}
+exit($errors);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -37,10 +37,19 @@ RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
 ISMFS		= $(ETCDIR)/ismfs
 INSTALL		= /usr/bin/install -c
 
-install client-install:	basefbsd-install etc-install \
+install client-install:	bincheck basefbsd-install etc-install \
+			sup-install script-install bin-install
+
+subboss-install:	bincheck basefbsd-subboss-install etc-install \
 			sup-install script-install bin-install
 
 simple-install:	script-install bin-install
+
+bincheck:
+	@if [ ! -x /usr/local/sbin/dhclient ]; then \
+		echo "Need to install net/isc-dhcp3-client port"; \
+		false; \
+	fi
 
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)
@@ -64,6 +73,14 @@ dir-install:
 basefbsd-install: dir-install
 	(cd ../freebsd5; $(MAKE) all install)
 	rm -f $(SYSETCDIR)/rc.conf.d/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+basefbsd-subboss-install: dir-install
+	(cd ../freebsd5; $(MAKE) all subboss-install)
+	rm -f $(SYSETCDIR)/rc.conf.d/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
@@ -80,3 +97,35 @@ sysetc-install:	dir-install netif-emulab
 
 script-install:	dir-install
 #	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+
+#
+# NOTES:
+#  * We still use rc.conf.d/dhclient right now
+#    (til we switch to 6.x rc.d files)
+#
+frisbee-mfs-install:
+	(cd ../freebsd5; $(MAKE) all frisbee-mfs-install)
+	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+mfs-install:
+	(cd ../freebsd5; $(MAKE) all mfs-install)
+	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+
+#
+# CD/Flash install DOES have the FreeBSD 6 stuff
+#
+cdboot-install:
+	(cd ../freebsd5; $(MAKE) all cdboot-install)
+	rm -f $(SYSETCDIR)/rc.conf.d/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
+	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(ETCDIR)/master.passwd
+	$(INSTALL) -m 444 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+			$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 555 ./netif-emulab $(SYSETCDIR)/rc.d/netif-emulab

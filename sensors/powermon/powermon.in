@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -39,6 +39,8 @@ use strict;
 use English;
 use Getopt::Std;
 use POSIX qw(strftime);
+
+sub dostatus(@);
 
 sub usage() {
     print << "END";
@@ -204,25 +206,39 @@ sub dostatus(@) {
 		$errors++;
 		next;
 	    }
-	    my $msg = "$ctrl: ";
-	    $msg .= $status{current} . "A, "
-		if ($docurrent && defined($status{current}));
-	    $msg .= $status{power} . "W, "
-		if ($dopower && defined($status{power}));
-	    if ($dotemps &&
-		defined($status{tempF}) || defined($status{tempC})) {
-		my $temp = $status{tempF};
-		if (!defined($temp)) {
-		    $temp = $status{tempC} * 9 / 5 + 32;
-		}
-		$msg .= ${temp} . "F";
+	} elsif ($ctrls{$ctrl} =~ /^APC/) {
+	    my $device = new snmpit_apc($ctrl, 0);
+	    if (!defined($device) || $device->status(\%status)) {
+		logit("Could not get status for $ctrl.");
+		$errors++;
+		next;
 	    }
-	    logit($msg);
 	} elsif (!$doall) {
 	    logit("Cannot get status for $ctrl (type " .
 		$ctrls{$ctrl} . ") yet");
 	    $errors++;
+	    next;
 	}
+
+	if (!defined($status{current}) && !defined($status{power}) &&
+	    !defined($status{tempF}) && !defined($status{tempC})) {
+	    next;
+	}
+
+	my $msg = "$ctrl: ";
+	$msg .= $status{current} . "A, "
+	    if ($docurrent && defined($status{current}));
+	$msg .= $status{power} . "W, "
+	    if ($dopower && defined($status{power}));
+	if ($dotemps &&
+	    defined($status{tempF}) || defined($status{tempC})) {
+	    my $temp = $status{tempF};
+	    if (!defined($temp)) {
+		$temp = $status{tempC} * 9 / 5 + 32;
+	    }
+	    $msg .= ${temp} . "F";
+	}
+	logit($msg);
     }
     close(WHINE);
     exit($errors);

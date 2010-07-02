@@ -1,0 +1,207 @@
+#! /bin/sh
+
+EDD_PATH=/sys/firmware/edd
+
+get_mbr_signature()
+{
+	local device=$1
+
+	local sig=`dd if=$device bs=1 count=4 skip=440 2>/dev/null | od -X | \
+			sed -n '1s/^[0-9a-f]* *\([0-9a-f]*\) *\([0-9a-f]*\) *$/\1\2/p'`
+
+	while [ ${#sig} -lt 8 ]; do
+		sig="0$sig"
+	done
+
+	if [ -n "$sig" ]; then
+		echo "0x$sig"
+	else
+		return 1
+	fi
+}
+
+get_host_bus()
+{
+        local device=$1
+        local bus
+        local busid
+        local channel
+
+        if [ -f $EDD_PATH/int13_dev$device/host_bus ]; then
+                bus=`cat $EDD_PATH/int13_dev$device/host_bus | sed 's/  */ /g'`
+                channel=`echo $bus | sed 's/.*channel: *\(.*\)$/\1/'`
+                busid=`echo $bus | cut -d' ' -f 2`
+                bus=${bus%% *}
+        else
+                return 1
+        fi
+
+        echo "$bus $busid $channel"
+}
+
+get_interface()
+{
+        local device=$1
+        local interface
+        local device
+        local lun
+        if [ -f $EDD_PATH/int13_dev$device/host_bus ]; then
+                interface=`cat $EDD_PATH/int13_dev$device/interface | \
+                           sed 's/  */ /g'`
+                lun=`echo $interface | sed -n 's/.*lun: *\(.*\)$/\1/p'`
+                [ -z "$lun" ] && lun=0
+                device=`echo $interface | sed -n 's/.*id: *\([0-9]*\) .*$/\1/p'`
+                if [ -z "$device" ]; then
+                        device=`echo $interface | \
+                                sed -n 's/.*device: *\([0-9]*\) .*$/\1/p'`
+                fi
+                interface=${interface%% *}
+        else
+                return 1
+        fi
+
+        echo "$interface $device $lun"
+}
+
+find_host_adapter()
+{
+        local device=$1
+        local channel=$2
+
+        local pcidev_path=$EDD_PATH/int13_dev$device/pci_dev
+
+        if [ -L $pcidev_path ]; then
+                channel=`expr $channel + 1`
+		number=`ls $pcidev_path/ | sed -n 's/^host\([0-9]*\)/\1/p' | \
+			sort -n | sed -n ${channel}p`
+		if [ -z "$number" ]; then
+			number=`ls $pcidev_path/ | sed -n 's/^ide\([0-9]*\)/\1/p' | \
+				sort -n | sed -n ${channel}p`
+		fi            
+
+        else
+                return 1
+        fi
+
+        echo $number
+}
+
+if ! [ -d $EDD_PATH ]; then
+	modprobe edd
+fi
+
+for bdev in /sys/firmware/edd/int13_dev8*; do
+	[ `cat $bdev/version` = 0x00 ] && continue
+	if [ -e $bdev/pci_dev ]; then
+		bdev=${bdev##*_dev}
+		bus_info=`get_host_bus $bdev`
+		bus=`echo $bus_info | cut -d' ' -f 1`
+		busid=`echo $bus_info | cut -d' ' -f 2`
+		channel=`echo $bus_info | cut -d' ' -f 3`
+
+		interface_info=`get_interface $bdev`
+		interface=`echo $interface_info | cut -d' ' -f 1`
+		device=`echo $interface_info | cut -d' ' -f 2`
+		lun=`echo $interface_info | cut -d' ' -f 3`
+
+		host_adapter=`find_host_adapter $bdev $channel`
+
+		path=$EDD_PATH/int13_dev$bdev/pci_dev/host$host_adapter
+		if [ -e $path ]; then
+			device_path=$path/target${host_adapter}:0:$device
+			lun_path=$device_path/${host_adapter}:0:$device:$lun
+		else
+			path=$EDD_PATH/int13_dev$bdev/pci_dev/ide$host_adapter
+			device_path=$path/$host_adapter.$device
+			lun_path=$device_path
+		fi
+		if [ ! -e $lun_path ]; then
+			# Some versions of the kernel read the wrong offset
+			# in the EDD structure to find the LUN.  Assume LUN 0
+			# if that is the case here.
+			path=$device_path/${host_adapter}:0:$device:0
+		else
+			path=$lun_path
+		fi
+
+		if [ -e $path/block ]; then
+			kdev=`ls $path/block`
+		elif [ -e $path/block:* ]; then
+			kdev=`ls -d $path/block:*`
+		fi
+	else
+		bdev=${bdev##*_dev}
+	fi
+	
+	### FIXME should also try IDE layer
+
+	kdev=${kdev##*/}
+	kdev=${kdev##*:}
+	if [ -n "$kdev" ]; then
+		echo $kdev=$bdev
+		eval map_bdev_$bdev=$kdev
+		eval map_kdev_$kdev=$bdev
+	else
+		if [ -z "$unmapped_bios_devices" ]; then
+			unmapped_bios_devices=$bdev
+		else
+			unmapped_bios_devices="$unmapped_bios_devices $bdev"
+		fi
+	fi
+done
+
+for kdev in /sys/block/[hs]d[a-z]; do
+	kdev=${kdev##*/}
+	if eval "[ -n \"\${map_kdev_$kdev}\" ]"; then
+		continue
+	fi
+	if [ -z "$unmapped_kernel_devices" ]; then
+		unmapped_kernel_devices="$kdev"
+	else
+		unmapped_kernel_devices="$unmapped_kernel_devices $kdev"
+	fi
+done
+
+# Hmmm, we couldn't figure out the device using EDD 3.0.  Try based on size
+# and MBR signature
+new_unmapped_bdevs=''
+for bdev in $unmapped_bios_devices; do
+	sectors=`cat $EDD_PATH/int13_dev$bdev/sectors`
+	mbr_signature=`cat $EDD_PATH/int13_dev$bdev/mbr_signature`
+	
+	match=''
+	nomatch=''
+	for kdev in $unmapped_kernel_devices; do
+		kdev_sectors=`cat /sys/block/$kdev/size`
+		kdev_mbr_signature=`get_mbr_signature /dev/$kdev`
+
+		if [ $sectors -eq $kdev_sectors ] && \
+		   [ "$mbr_signature" = $kdev_mbr_signature ]; then
+		   	match="$match $kdev"
+		else
+			nomatch="$nomatch $kdev"
+		fi
+	done
+
+	match=${match# }
+	nomatch=${nomatch# }
+
+	if [ `echo $match | wc -w` -ne 1 ]; then
+		new_unmapped_bdevs="$new_unmapped_bdevs $bdev"
+		unmapped_kernel_devices="$match $nomatch"
+	else
+		unmapped_kernel_devices="$nomatch"
+		echo $match=$bdev
+		#eval map_kdev_$match="$bdev"
+		#eval map_bdev_$bdev="$match"
+	fi
+done
+unmapped_bios_devices="$new_unmapped_bdevs"
+
+#echo "### Found the following mappings ###"
+#set | grep map_
+
+#echo "bios_devices: $unmapped_bios_devices"
+#echo "kernel_devices: $unmapped_kernel_devices"
+exit 0
+

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -32,7 +32,8 @@ usage()
 		"options:\n"
 		"-d         - Turn on debugging\n"
 		"-q         - Tell node to query bootinfo again\n"
-		"-r         - Tell node to reboot\n",
+		"-r         - Tell node to reboot\n"
+		"-R         - Tell node to restart (re-DHCP to change server)\n",
 		progname);
 	exit(-1);
 }
@@ -40,7 +41,8 @@ usage()
 int
 main(int argc, char **argv)
 {
-	int			sock, err, c, reboot = 0, query = 0;
+	int			sock, err, c;
+	int			reboot = 0, restart = 0, query = 0;
 	struct sockaddr_in	name, target;
 	boot_info_t		boot_info;
 	boot_what_t	       *boot_whatp = (boot_what_t *) &boot_info.data;
@@ -49,13 +51,16 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "dhvrq")) != -1) {
+	while ((c = getopt(argc, argv, "dhvrRq")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
 			break;
 		case 'r':
 			reboot++;
+			break;
+		case 'R':
+			restart++;
 			break;
 		case 'q':
 			query++;
@@ -75,7 +80,7 @@ main(int argc, char **argv)
 
 	if (!argc)
 		usage();
-	if (query && reboot)
+	if (query && (reboot || restart))
 		usage();
 
 	if (debug) 
@@ -131,37 +136,43 @@ main(int argc, char **argv)
 
 	bzero(&boot_info, sizeof(boot_info));
 	boot_info.version = BIVERSION_CURRENT;
-	if (reboot) {
-		boot_whatp->type = BIBOOTWHAT_TYPE_REBOOT;
+	if (reboot || restart) {
+		boot_whatp->type = reboot ?
+			BIBOOTWHAT_TYPE_REBOOT : BIBOOTWHAT_TYPE_RESTART;
 #ifdef	EVENTSYS
-		bievent_send(target.sin_addr, TBDB_NODESTATE_SHUTDOWN);
+		bievent_send(target.sin_addr, (void *) NULL,
+			     TBDB_NODESTATE_SHUTDOWN);
 #endif
 	}
 	else if (query) {
 		boot_whatp->type = BIBOOTWHAT_TYPE_AUTO;
 #ifdef	EVENTSYS
-		bievent_send(target.sin_addr, TBDB_NODESTATE_PXEWAKEUP);
+		bievent_send(target.sin_addr, (void *) NULL,
+			     TBDB_NODESTATE_PXEWAKEUP);
 #endif
 	}
 	else {
-		err = query_bootinfo_db(target.sin_addr,
+		err = query_bootinfo_db(target.sin_addr, NULL,
 					boot_info.version,
-					boot_whatp);
+					boot_whatp, NULL);
 		if (err) {
 			fatal("Could not send bootinfo packet!");
 		}
 #ifdef	EVENTSYS
-		bievent_send(target.sin_addr, TBDB_NODESTATE_PXEBOOTING);
+		bievent_send(target.sin_addr, (void *) NULL,
+			     TBDB_NODESTATE_PXEBOOTING);
 		switch (boot_whatp->type) {
 		case BIBOOTWHAT_TYPE_PART:
 		case BIBOOTWHAT_TYPE_SYSID:
 		case BIBOOTWHAT_TYPE_MB:
 		case BIBOOTWHAT_TYPE_MFS:
-			bievent_send(target.sin_addr, TBDB_NODESTATE_BOOTING);
+			bievent_send(target.sin_addr, (void *) NULL,
+				     TBDB_NODESTATE_BOOTING);
 			break;
 				
 		case BIBOOTWHAT_TYPE_WAIT:
-			bievent_send(target.sin_addr, TBDB_NODESTATE_PXEWAIT);
+			bievent_send(target.sin_addr, (void *) NULL,
+				     TBDB_NODESTATE_PXEWAIT);
 			break;
 		default:
 			error("%s: invalid boot directive: %d\n",

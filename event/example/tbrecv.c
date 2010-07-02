@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * This is a sample client to run on a testbed node to capture TBEXAMPLE
  * events for the node. Modify as needed of course.
  */
@@ -7,7 +13,9 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <string.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

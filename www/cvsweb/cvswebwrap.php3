@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,36 +11,46 @@
 chdir("../");
 require("defs.php3");
 
-#
-# We look for anon access, and if so, redirect to ops web server.
-# WARNING: See the LOGGEDINORDIE() calls below.
-#
-$uid = GETLOGIN();
+# Must be logged in.
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-# Redirect now, to avoid phishing.
-if ($uid) {
-    LOGGEDINORDIE($uid);
-}
-else {
-    $url = $OPSCVSURL . "?cvsroot=$pid";
-	
-    header("Location: $url");
-    return;
+#
+# Verify form arguments.
+#
+$optargs = OptionalPageArguments("template",   PAGEARG_TEMPLATE,
+				 "project",    PAGEARG_PROJECT,
+				 "embedded",   PAGEARG_BOOLEAN);
+if (!isset($embedded)) {
+    $embedded = 0;
 }
 
 #
 # Form the real url.
 #
-$newurl = preg_replace("/cvswebwrap/", "cvsweb", $_SERVER['REQUEST_URI']);
+$newurl  = preg_replace("/cvswebwrap/", "cvsweb", $_SERVER['REQUEST_URI']);
+$newurl = preg_replace("/php3/","php3/",$newurl);
 
 #
 # Standard Testbed Header
 #
 PAGEHEADER("Emulab CVS Repository");
 
-echo "<iframe width=100% height=800 scrolling=yes src='$newurl' border=0 ".
-     "style=\"width:100%; height:800; border: 0px\"> ".
-     "</iframe>\n";
+if (isset($project)) {
+    ;
+}
+elseif (isset($template)) {
+    echo $template->PageHeader();
+}
+
+echo "<div><iframe src='$newurl' class='outputframe' ".
+	"id='outputframe' name='outputframe'></iframe></div>\n";
+echo "</center><br>\n";
+
+echo "<script type='text/javascript' language='javascript'>\n";
+echo "SetupOutputArea('outputframe', false);\n"; 
+echo "</script>\n";
 
 #
 # Standard Testbed Footer

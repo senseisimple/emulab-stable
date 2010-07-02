@@ -1,22 +1,34 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 require("defs.php3");
 chdir("doc");
 
-# Page arguments.
-$printable = $_GET['printable'];
-$docname   = $_GET['docname'];
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("docname",    PAGEARG_STRING);
+$optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 
-# Pedantic page argument checking. Good practice!
-if (!isset($docname) ||
-    (isset($printable) && !($printable == "1" || $printable == "0"))) {
-    PAGEARGERROR();
+#
+# Need to sanity check the path! Allow only [word].{html,txt} files
+#
+if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
+    USERERROR("Illegal document name: $docname!", 1, HTTP_400_BAD_REQUEST);
 }
+
+#
+# Make sure the file exists
+#
+$fh = @fopen("$docname", "r");
+if (!$fh) {
+    USERERROR("Can't read document file: $docname!", 1, HTTP_404_NOT_FOUND);
+}
+
 if (!isset($printable))
     $printable = 0;
 
@@ -25,13 +37,6 @@ if (!isset($printable))
 #
 if (!$printable) {
     PAGEHEADER("Emulab Documentation");
-}
-
-#
-# Need to sanity check the path! Allow only [word].{html,txt} files
-#
-if (!preg_match("/^[-\w]+\.(html|txt)$/", $docname)) {
-    USERERROR("Illegal document name: $docname!", 1);
 }
 
 #
@@ -62,7 +67,8 @@ if ($textfile) {
     echo "<XMP>\n";
 }
 
-readfile("$docname");
+fpassthru($fh);
+fclose($fh);
 
 if ($textfile) {
     echo "</XMP>\n";
@@ -79,4 +85,9 @@ else {
     PAGEFOOTER();
 }
 ?>
+
+
+
+
+
 

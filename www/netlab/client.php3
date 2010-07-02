@@ -1,19 +1,17 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 require("defs.php3");
 
-# Page arguments.
-$printable = $_GET['printable'];
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("printable",  PAGEARG_BOOLEAN);
 
-# Pedantic page argument checking. Good practice!
-if (isset($printable) && !($printable == "1" || $printable == "0")) {
-    PAGEARGERROR();
-}
 if (!isset($printable))
     $printable = 0;
 
@@ -146,7 +144,7 @@ The current list of features are:
 <li>Build and interact with the topology from a single interface.
 <li>Interact with existing topologies.
 <li>Support for Emulab-specific <a
-href="<? echo $TBBASE ?>/tutorial/docwrapper.php3?docname=nscommands.html"
+href="<? echo $WIKIDOCURL ?>/nscommands"
 >extensions</a> to the NS syntax.
 <li>Uses the Emulab <a href="<? echo $TBBASE ?>/xmlrpcapi.php3">XML-RPC</a>
 interface.
@@ -545,8 +543,7 @@ PING node1 (10.1.1.2): 56(84) data bytes
 </blockquote>
 
 You can read more about the intricacies of the experimental and control
-networks <a href="<?php echo $TBBASE
-?>/tutorial/docwrapper.php3?docname=tutorial.html#ControlNet">here</a>.
+networks <a href="<?php echo $WIKIDOCURL ?>Tutorial#ControlNet">here</a>.
 
 <?php NLCBODYEND() ?>
 

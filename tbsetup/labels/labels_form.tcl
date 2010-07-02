@@ -1,4 +1,4 @@
-#!/usr/local/bin/tclsh
+#!/usr/local/bin/tclsh8.4
 
 set y 24
 set yi 18

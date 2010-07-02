@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,6 +24,7 @@
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use Experiment;
 use English;
 use Getopt::Std;
 
@@ -117,7 +118,7 @@ if ($pid eq "" || $eid eq "") {
 
     my @idle=();
     # Grab a list of inactive expts, so we know who to reset when we're done
-    my $sql = "select pid,eid from experiments where swap_requests > 0";
+    my $sql = "select pid,eid from experiments where state='active' and swap_requests > 0";
     my $q = DBQueryFatal($sql);
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
@@ -223,7 +224,7 @@ EOT
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
-	system("$TB/sbin/idleswap -r -i $pid $eid > /dev/null") &&
+	system("$TB/sbin/idleswap -r -i $pid,$eid > /dev/null") &&
 	  warn("idlemail: Problem idleswapping $pid/$eid: $!\n");
     }
 
@@ -239,7 +240,7 @@ EOT
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
-	system("$TB/sbin/idleswap -r -a $pid $eid > /dev/null") &&
+	system("$TB/sbin/idleswap -r -a $pid,$eid > /dev/null") &&
 	  warn("idlemail: Problem autoswapping $pid/$eid: $!\n");
     }
 
@@ -416,20 +417,30 @@ sub SendMessage {
 	      "idle $idlehrs hrs $idlemin min, total $time hrs\n";
 	}
     }
-
-    my $expleader_name;
-    my $expleader_email;
-    my $uid = ExpSwapper($pid,$eid);
-    my $uid2 = ExpLeader($pid,$eid);
-    if ($uid eq "") { $uid=$uid2; }
-    UserDBInfo($uid,\$expleader_name,\$expleader_email);
-    if ($uid ne $uid2) {
-	UserDBInfo($uid2,\$expcreator_name,\$expcreator_email);
+    my $experiment = Experiment->Lookup($pid, $eid);
+    if (!defined($experiment)) {
+	die("*** $0:\n".
+	    "    Could not lookup object for experiment $pid/$eid\n");
     }
-    my $leaders = TBLeaderMailList($pid,$gid);
+    my $creator = $experiment->GetCreator();
+    if (!defined($creator)) {
+	die("*** $0:\n".
+	    "    Could not lookup object for creator of $pid/$eid\n");
+    }
+    my $swapper = $experiment->GetSwapper();
+    if (!defined($swapper)) {
+	$swapper = $creator;
+    }
+    my $expcreator_uid   = $creator->uid();
+    my $expcreator_name  = $creator->name();
+    my $expcreator_email = $creator->email();
+    my $expswapper_name  = $swapper->name();
+    my $expswapper_email = $swapper->email();
+    my $leaders =          $experiment->GetGroup()->LeaderMailList();
+    
     if ($d > 1) {
 	print "expt=$pid/$eid (gid=$gid)\n".
-	  "uid=$uid  ($expleader_name <$expleader_email>)\n".
+	  "uid=$expcreator_uid  ($expcreator_name <$expcreator_email>)\n".
 	  "leaders=$leaders\n";
     }
 
@@ -495,10 +506,8 @@ sub SendMessage {
 	       "Testbed Operations <$TBMAILADDR_OPS>.",$wrapwidth);
     $msg .= "\nThanks!\nTestbed Operations\n";
 
-    # expleader is really the swapper here
-    # the real leader is expcreator
     $cclist="";
-    if ($uid ne $uid2) {
+    if ($expcreator_name ne $expswapper_name) {
 	# creator and swapper are different
 	$cclist="Cc: $expcreator_name <$expcreator_email>";
     }
@@ -522,7 +531,7 @@ sub SendMessage {
     if ($n) {
 	# no mail mode: don't send mail or update db counters
 	print "----NO-MAIL-MODE----\n";
-	print "To: $expleader_name <$expleader_email>\n";
+	print "To: $expswapper_name <$expswapper_email>\n";
 	print "From: $TBMAIL_OPS\n".
 	  $cclist.
 	  "Bcc: $TBMAIL_AUTOMAIL\n".
@@ -537,7 +546,7 @@ sub SendMessage {
 
 	# For debugging:
 	#SENDMAIL("Expt Leader <$TBMAILADDR_OPS>",
-	SENDMAIL("$expleader_name <$expleader_email>",
+	SENDMAIL("$expswapper_name <$expswapper_email>",
 		 $subj,
 		 $msg,
 		 "$TBMAIL_OPS",

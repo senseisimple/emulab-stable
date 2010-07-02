@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,18 +12,42 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys
-LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert
+SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert quotamail genpubkeys \
+		  newuser newproj mksyscert spewcert
+LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert \
+		  webnewuser webnewproj webspewcert
+CTRLSBIN_STUFF  = adduserhook
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = tbacct addpubkey mkusercert mksyscert
+SETUID_LIBX_SCRIPTS  =
+
+#
+# Targets
+#
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+TARGETS	= $(SBIN_STUFF) $(LIBEXEC_STUFF) $(CTRLSBIN_STUFF)
+else
+TARGETS = mksyscert
+SETUID_SBIN_SCRIPTS  = mksyscert
+endif
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SBIN_STUFF) $(LIBEXEC_STUFF)
+all:	$(TARGETS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: all script-install
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+install: boss-install
+else
+install: clrhouse-install
+endif
+
+boss-install: all script-install
 	@echo "Don't forget to do a post-install as root"
 
 script-install:	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -41,8 +65,28 @@ post-install:
 	chown root $(INSTALL_SBINDIR)/mkusercert
 	chmod u+s $(INSTALL_SBINDIR)/mkusercert
 
-control-install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF))
+control-install:
+
+hook-install: $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLSBIN_STUFF))
+
+# Clearinghouse install.
+clrhouse-install: $(INSTALL_SBINDIR)/mksyscert
+
+# This rule says what web* script depends on which installed binary directory.
+$(LIBEXEC_STUFF): $(INSTALL_SBINDIR)
+
+# Just in case the dirs are not yet created,
+$(INSTALL_SBINDIR):
+
+# And then how to turn the template into the actual script. 
+$(LIBEXEC_STUFF): $(TESTBED_SRCDIR)/WEBtemplate.in
+	@echo "Generating $@"
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$(subst web,,$@),' > $@
 
 clean:
 	rm -f *.o core
 
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@

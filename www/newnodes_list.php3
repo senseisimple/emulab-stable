@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -13,19 +13,36 @@ require("newnode-defs.php3");
 #
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("New Testbed Nodes");
-
-#
 # Only admins can see this page
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
 if (! $isadmin) {
     USERERROR("You do not have admin privileges!", 1);
 }
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("selected",     PAGEARG_ARRAY,
+				 "remap",        PAGEARG_ARRAY,
+				 "delete",       PAGEARG_STRING,
+				 "calc",         PAGEARG_STRING,
+				 "create",       PAGEARG_STRING,
+				 "ignoreifaces", PAGEARG_BOOLEAN,
+				 "research",     PAGEARG_STRING,
+				 "swap",         PAGEARG_STRING,
+				 "newtype",      PAGEARG_STRING,
+				 "newprefix",    PAGEARG_STRING,
+				 "addnumber",    PAGEARG_STRING,
+				 "renumber",     PAGEARG_STRING);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("New Testbed Nodes");
 
 #
 # XXX - a hack
@@ -35,10 +52,21 @@ $gid = "nobody";
 #
 # Start out by performing any operations they may have asked for
 #
-if ($selected) {
+if (isset($selected)) {
     $selected_nodes = $selected;
 } else {
     $selected_nodes = array();
+}
+
+# Remove these to make the code below easier.
+if (isset($newtype) && $newtype == "") {
+    unset($newtype);
+}
+if (isset($newprefix) && $newprefix == "") {
+    unset($newprefix);
+}
+if (isset($addnumber) && $addnumber == "") {
+    unset($addnumber);
 }
 
 #
@@ -53,8 +81,9 @@ if (count($selected_nodes)) {
     $whereclause = implode(" OR ",$equal_clauses);
     $whereclause_qualified = implode(" OR ",$equal_clauses_qualified);
 } else {
-    if ($delete || $calc || $create || $research || $swap || $newtype ||
-	    $newprefix || $addnumber || $renumber) {
+    if (isset($delete) || isset($calc) || isset($create) ||
+	isset($research) || isset($swap) || isset($newtype) ||
+	isset($newprefix) || isset($addnumber) || isset($renumber)) {
 	USERERROR("At least one node must be selected!",1);
     }
 }
@@ -62,7 +91,7 @@ if (count($selected_nodes)) {
 #
 # Delete nodes
 #
-if ($delete) {
+if (isset($delete)) {
     DBQueryFatal("DELETE FROM new_nodes WHERE $whereclause");
     DBQueryFatal("DELETE FROM new_interfaces WHERE $whereclause");
 }
@@ -70,7 +99,7 @@ if ($delete) {
 #
 # Recalculate IPs
 #
-if ($calc) {
+if (isset($calc)) {
    $query_result = DBQueryFatal("SELECT new_node_id, node_id FROM new_nodes " .
    	"WHERE $whereclause ORDER BY new_node_id");
     while ($row = mysql_fetch_array($query_result)) {
@@ -96,7 +125,7 @@ if ($calc) {
 #
 # Create the nodes in the real database
 #
-if ($create) {
+if (isset($create)) {
     $nodenames = array();
     $query_result = DBQueryFatal("SELECT node_id FROM new_nodes " .
 	"WHERE $whereclause");
@@ -104,10 +133,11 @@ if ($create) {
         $nodenames[] = $row["node_id"];
     }
     $nodelist = implode(" ",$nodenames);
+    $option   = ((isset($ignoreifaces) && $ignoreifaces) ? "-f" : "");
     echo "<h3>Creating nodes - this could take a while, please wait</h3>\n";
     echo "<hr>\n";
     echo "<pre>\n";
-    passthru("$TBSUEXEC_PATH $uid $gid newnode $nodelist 2>&1");
+    passthru("$TBSUEXEC_PATH $uid $gid webnewnode $option $nodelist 2>&1");
     echo "</pre>\n";
     echo "<hr>\n";
 }
@@ -115,23 +145,31 @@ if ($create) {
 #
 # Look for the nodes on the switch again
 #
-if ($research) {
+if (isset($research)) {
     #
     # Get the MACs we are supposed to be looking for
     #
-    $query_result = DBQueryFatal("SELECT i.mac, i.new_node_id, n.node_id, " .
-	"i.card, i.card=t.control_net AS is_control " .
-	"FROM new_interfaces as i LEFT JOIN new_nodes as n " .
-	"ON i.new_node_id = n.new_node_id " .
-	"LEFT JOIN node_types as t on n.type = t.type " .
-	"WHERE $whereclause_qualified");
+    $query_result =
+	DBQueryFatal("select i.mac, i.new_node_id, n.node_id, i.card, n.type ".
+		     "   from new_interfaces as i ".
+		     "left join new_nodes as n on ".
+		     "    i.new_node_id = n.new_node_id " .
+		     "left join node_types as t on n.type = t.type " .
+		     "where $whereclause_qualified");
     $mac_list = array();
     while ($row = mysql_fetch_array($query_result)) {
+	$type  = $row["type"];
+	$card  = $row["card"];
+	$iface = "eth${card}";
+
+	# Figure out if this interface is the control interface for the type.
+	NodeTypeAttribute($type, "control_interface", $control_iface);
+	
         if ($ELABINELAB) {
             # See find_switch_macs().
             $class = NULL;
         }
-        elseif ($row["is_control"]) {
+        elseif ($iface == $control_iface) {
 	    $class = TBDB_IFACEROLE_CONTROL;
 	}
 	else {
@@ -182,7 +220,7 @@ if ($research) {
 	}
     }
     foreach ($mac_list as $mac => $switchport) {
-        if ($switchport["switch"]) {
+        if (isset($switchport["switch"])) {
 	    $extra_set = "";
 	    
             if ($ELABINELAB) {
@@ -214,7 +252,7 @@ if ($research) {
 #
 # Swap the IDs and IPs of two nodes
 #
-if ($swap) {
+if (isset($swap)) {
     if (count($selected_nodes) != 2) {
        USERERROR("Exactly two nodes must be selected for swapping",0);
     } else {
@@ -241,14 +279,14 @@ if ($swap) {
 #
 # Change node types
 #
-if ($newtype) {
+if (isset($newtype)) {
     DBQueryFatal("UPDATE new_nodes SET type='$newtype' WHERE $whereclause");
 }
 
 #
 # Change node name prefix
 #
-if ($newprefix || $addnumber) {
+if (isset($newprefix) || isset($addnumber)) {
    $query_result = DBQueryFatal("SELECT new_node_id, node_id FROM new_nodes " .
    	"WHERE $whereclause");
     while ($row = mysql_fetch_array($query_result)) {
@@ -258,14 +296,14 @@ if ($newprefix || $addnumber) {
 	    preg_match("/^(.*-)([a-zA-Z])$/",$name,$matches)) {
 	    $prefix = $matches[1];
 	    $number = $matches[2];
-	    if ($addnumber) {
+	    if (isset($addnumber)) {
 	        if (is_numeric($number)) {
 		    $number = $number + $addnumber;
 		} else {
 		    $number = chr(ord($number) + $addnumber);
 		}
 	    }
-	    if ($newprefix) {
+	    if (isset($newprefix)) {
 	        $prefix = $newprefix;
 	    }
 	    $newname = $prefix . $number;
@@ -280,7 +318,7 @@ if ($newprefix || $addnumber) {
 #
 # Re-number interfaces
 #
-if ($renumber) {
+if (isset($renumber)) {
     #
     # Move them out of the way
     #
@@ -306,16 +344,12 @@ if ($renumber) {
 #
 # Okay, now get the node information and display the form
 #
-$query_result = DBQueryFatal("SELECT n.new_node_id, node_id, n.type, IP, " .
-	"DATE_FORMAT(created,'%M %e %H:%i:%s') as created, i.MAC, " .
-	"i.switch_id, i.switch_card, i.switch_port, n.temporary_IP, n.dmesg, " .
-	"n.identifier, n.building " .
-	"FROM new_nodes AS n " .
-	"LEFT JOIN node_types AS t on n.type=t.type " .
-	"LEFT JOIN new_interfaces AS i ON n.new_node_id=i.new_node_id " .
-	"    AND t.control_net = i.card " .
-	"ORDER BY n.new_node_id");
-
+$nodes_result =
+    DBQueryFatal("select n.new_node_id, node_id, n.type, IP, " .
+		 "    DATE_FORMAT(created,'%M %e %H:%i:%s') as created, ".
+		 "    n.temporary_IP, n.dmesg, n.identifier, n.building " .
+		 "  from new_nodes as n " .
+		 "order BY n.new_node_id");
 ?>
 
 <h3><a href="newnodes_list.php3">Refresh this page</a></h3>
@@ -355,28 +389,53 @@ function deselectAll(form) {
 
 <?
 
-while ($row = mysql_fetch_array($query_result)) {
+while ($row = mysql_fetch_array($nodes_result)) {
 	$id         = $row["new_node_id"];
 	$node_id    = $row["node_id"];
 	$type       = $row["type"];
 	$IP         = $row["IP"];
 	$created    = $row["created"];
-	$mac        = $row["MAC"];
 	$tempIP     = $row["temporary_IP"];
 	$dmesg      = $row["dmesg"];
 	$identifier = $row["identifier"];
 	$building   = $row["building"];
-	if ($row["switch_id"]) {
-	    $port = "$row[switch_id].$row[switch_card]/$row[switch_port]";
-	} else {
-	    $port = "unknown";
-	}
-	$checked = in_array($id,$selected_nodes) ? "checked" : "";
+	$mac        = "";
+	$port       = "";
 
-        $iface_query_result = DBQueryFatal("SELECT COUNT(*) AS count " .
-	    "FROM new_interfaces WHERE new_node_id=$id");
-        $iface_row = mysql_fetch_array($iface_query_result);
-	$interfaces = $iface_row["count"];
+	# Get the control interface token for the type.
+	NodeTypeAttribute($type, "control_interface", $control_iface);
+
+	# Grab the interfaces for the node.
+	$ifaces_result =
+	    DBQueryFatal("select * from new_interfaces ".
+			 "where new_node_id='$id'");
+
+	# The total count ...
+	$interfaces = mysql_num_rows($ifaces_result);
+
+	# Search through to find the control interface.
+	while ($irow = mysql_fetch_array($ifaces_result)) {
+	    $card  = $irow["card"];
+	    $iface = "eth${card}";
+
+	    if ($iface == $control_iface) {
+		$mac = $irow["mac"];
+		
+		if ($irow["switch_id"]) {
+		    $switch_id   = $irow["switch_id"];
+		    $switch_card = $irow["switch_card"];
+		    $switch_port = $irow["switch_port"];
+			
+		    $port = "${switch_id}.${switch_card}/${switch_port}";
+		}
+		else {
+		    $port = "unknown";
+		}
+		break;
+	    }
+	}
+	
+	$checked = in_array($id,$selected_nodes) ? "checked" : "";
 
 	echo "	<tr>\n";
 	echo "		<td><input type=\"checkbox\" name=\"selected[]\" " .
@@ -501,6 +560,8 @@ while ($row = mysql_fetch_array($query_result)) {
 <input type="submit" value="Search switch ports for selected nodes" name="research">
 <br><br>
 <input type="submit" value="Create selected nodes" name="create">
+  &nbsp <input type="checkbox" value=1 name=ignoreifaces>
+    Ignore unconnected interfaces (not attached to a switch)
 <br><br>
 <input type="submit" value="Delete selected nodes" name="delete">
 

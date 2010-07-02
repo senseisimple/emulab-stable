@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -16,7 +16,9 @@
 
 #include <stdio.h>
 #include <stdarg.h>
-#include <elvin/elvin.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <pubsub/pubsub.h>
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
@@ -28,40 +30,38 @@ extern "C" {
 
 /* Handle to the event server: */
 struct event_handle {
-    elvin_handle_t server;
-    elvin_error_t status;
+    pubsub_handle_t *server;
+    pubsub_error_t status;
     unsigned char *keydata;
     int keylen;
     int do_loop;
     /* API function pointers: */
-    elvin_error_t (*init)(void);
-    int (*connect)(elvin_handle_t handle, elvin_error_t error);
-    int (*disconnect)(elvin_handle_t handle, elvin_error_t error);
-    int (*cleanup)(int force, elvin_error_t error);
-    int (*mainloop)(int *do_loop, elvin_error_t error);
-    int (*notify)(elvin_handle_t handle, elvin_notification_t notification,
-                  int deliver_insecure, elvin_keys_t keys,
-                  elvin_error_t error);
-    elvin_subscription_t (*subscribe)(elvin_handle_t handle, char *sub_exp,
-                                      elvin_keys_t keys, int accept_insecure,
-                                      elvin_notify_cb_t callback, void *rock,
-                                      elvin_error_t error);
-    int (*unsubscribe)(elvin_handle_t handle,
-		       elvin_subscription_t subscription,
-		       elvin_error_t error);
+    int (*connect)(char *server, int portnum, pubsub_handle_t **);
+    int (*disconnect)(pubsub_handle_t *handle);
+    int (*mainloop)(pubsub_handle_t *handle, int *go, pubsub_error_t *error);
+    int (*notify)(pubsub_handle_t *handle, pubsub_notification_t *notification,
+		  pubsub_error_t *error);
+    pubsub_subscription_t *(*subscribe)(pubsub_handle_t *handle,
+					char *expression,
+					pubsub_notify_callback_t notify_cb,
+					void *notify_arg,
+					pubsub_error_t *error);
+    int (*unsubscribe)(pubsub_handle_t *handle,
+		       pubsub_subscription_t *subscription,
+		       pubsub_error_t *error);
 };
 typedef struct event_handle * event_handle_t;
 
 /* Event notification: */
 struct event_notification {
-	elvin_notification_t elvin_notification;
+	pubsub_notification_t *pubsub_notification;
 	int		     has_hmac;
 	
 };
 typedef struct event_notification *event_notification_t;
 
 /* Event subscription: */
-typedef elvin_subscription_t event_subscription_t;
+typedef pubsub_subscription_t *event_subscription_t;
 
 /*
  * A tuple defines the target of the event, or if you are a subscriber,
@@ -133,6 +133,8 @@ int		address_tuple_free(address_tuple_t);
         event_notification_get_string(handle, note, "___SENDER___", buf, len)
 #define event_notification_set_sender(handle, note, buf) \
         event_notification_put_string(handle, note, "___SENDER___", buf)
+#define event_notification_clr_sender(handle, note) \
+        event_notification_remove(handle, note, "___SENDER___")
 #endif /* ifndef NO_EVENT_MACROS */
 #endif /* ifndef SWIG */
 
@@ -202,6 +204,12 @@ int event_notification_get_int32(event_handle_t handle,
 int event_notification_get_int64(event_handle_t handle,
                                  event_notification_t notification,
                                  char *name, int64_t *value);
+int event_notification_get_opaque_length(event_handle_t handle,
+					 event_notification_t notification,
+					 char *name);
+int event_notification_get_string_length(event_handle_t handle,
+					 event_notification_t notification,
+					 char *name);
 int event_notification_get_opaque(event_handle_t handle,
                                   event_notification_t notification,
                                   char *name, void *buffer, int length);
@@ -242,12 +250,14 @@ int event_unsubscribe(event_handle_t handle, event_subscription_t es);
 int event_async_unsubscribe(event_handle_t handle, event_subscription_t es);
 int event_notification_insert_hmac(event_handle_t handle,
 				   event_notification_t notification);
+#ifdef NOTYET
 int event_notification_pack(event_handle_t handle,
 			    event_notification_t notification,
 			    unsigned char *data, int *len);
 int event_notification_unpack(event_handle_t handle,
 			    event_notification_t *notification,
 			    unsigned char *data, int len);
+#endif
 int event_set_idle_period(event_handle_t handle, int seconds) ;
 int event_set_failover(event_handle_t handle, int dofail) ;
 
@@ -283,6 +293,7 @@ int event_do(event_handle_t handle, ea_tag_t tag, ...);
 /* util.c */
 void *xmalloc(int size);
 void *xrealloc(void *p, int size);
+void make_timestamp(char * buf, const struct timeval * t_timeval);
 
 #ifdef __cplusplus
 }

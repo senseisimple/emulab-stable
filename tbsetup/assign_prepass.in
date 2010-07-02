@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -96,10 +96,11 @@ $newgraph = combine_links($newgraph);
 
 # Make a filename for our coarsened topfile
 my $tmp_topfile = $topfile;
-$tmp_topfile =~ s/(\.top)?$/-coarsened$1/;
+$tmp_topfile =~ s/(\.v?top)?$/-coarsened$1/;
 
-
+print "Generating new topfile\n";
 my @topfile = generate_topfile($newgraph);
+print "Running assign\n";
 my ($nodes, $edges) = run_assign($assign_bin, join(" ",@assign_args),
     $tmp_topfile, \@topfile, $logfile);
 
@@ -211,7 +212,10 @@ sub parse_top($) {
 		last;
 	    };
 	    (/^make-vclass$/) && do {
-		die "Sorry, vclasses are not yet supported\n";
+                # XXX: Hack, all top files now include pclasses, but almost
+                # nobody uses the pre-defined ones. Bad Things will happen
+                # if they do...
+                #die "Sorry, vclasses are not yet supported\n";
 		last;
 	    };
 	    (/^fix-node$/) && do {
@@ -315,6 +319,10 @@ sub parse_ptop($) {
 	my @tokens = split /\s+/,$line;
 	next unless (@tokens); # Skip blank lines
 	SWITCH: for (shift @tokens) {
+	    /^set-type-limit$/ && do {
+		# Skip these.
+		last;
+	    };
 	    /^node$/ && do {
 		my $name = shift @tokens;
 		my @types;
@@ -324,6 +332,11 @@ sub parse_ptop($) {
 		    #
 		    last if ($type eq "-");
 		    my ($typename, $count) = split /:/, $type;
+
+                    # Handle types that are 'static' (we mostly use this
+                    # for lans and switches) by simply removing the static
+                    # qualifier, which will not appear in the top file
+                    $typename =~ s/^\*//;
 
 		    # Handle types with no count or an 'infinite' count
 		    if (!$count) {
@@ -420,6 +433,7 @@ sub run_assign($$$$$) {
 
     open(ASSIGN,"|$assignbin $assignargs $topfile_name > $logfile");
     close ASSIGN;  # This will wait for the child process to die
+    print "assign completed\n";
     if ($?) {
 	# Assign failed, just pass through the exit code and the assign output
 	warn "Assign failed\n";
@@ -810,16 +824,15 @@ sub read_metis_partfile($$) {
 #
 sub run_metis($$$$;$) {
     my ($metisfile,$nodes,$metisfilename,$metislogfile,$colocate) = @_;
+
+    if (!$colocate) {
+	$colocate = $AVG_NODES_PER_PARTITION;
+    }
     print "run_metis called with colocate of $colocate\n";
 
     # Pick a number of partitions such that the average parition size
     # will be $AVG_NODES_PER_PARTITION
-    my $npart;
-    if ($colocate) {
-	$npart = POSIX::ceil(scalar(keys %$nodes) / $colocate);
-    } else {
-	$npart = POSIX::ceil(scalar(keys %$nodes) /$AVG_NODES_PER_PARTITION);
-    }
+    my $npart = POSIX::ceil(scalar(keys %$nodes) / $colocate);
     if ($npart <= 1) {
 	# No point in running METIS, just give the list of nodes back
 	return [values(%$nodes)];
@@ -980,7 +993,10 @@ sub node_fits_in_conglomerate($$) {
     #
     my $colocate = $::colocate{$type};
     if (!$colocate) {
-	die "Don't know colocate factor for $node->{type}\n";
+	print "Don't know colocate factor for $node->{type}\n";
+	return 0;
+
+	#die "Don't know colocate factor for $node->{type}\n";
     }
     if (defined $max_multiplex_factor && ($colocate > $max_multiplex_factor)) {
 	$colocate = $max_multiplex_factor;

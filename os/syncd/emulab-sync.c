@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -27,6 +27,7 @@
 #include <setjmp.h>
 #include "decls.h"
 #include "config.h"
+#include "tmcc.h"
 
 #ifndef SYNCSERVER
 #define SYNCSERVER	"/var/emulab/boot/syncserver"
@@ -73,7 +74,7 @@ main(int argc, char **argv)
 	unsigned char		**hal;
 	FILE			*fp;
 	struct in_addr		serverip;
-	int			portnum = SERVER_PORTNUM;
+	int			portnum = 0;
 	int			useudp  = 0;
 	char			*server = NULL;
 	int			initme  = 0;
@@ -269,6 +270,37 @@ main(int argc, char **argv)
 			if (memcmp((char *)&serverip, *hal, he->h_length) == 0)
 				exit(0);
 		exit(1);
+	}
+
+	/*
+	 * Lookup the port.
+	 */
+	if (portnum == 0) {
+		char nodename[BUFSIZ];
+		int  rc;
+
+		while (1) {
+			rc = PortLookup(SERVER_SERVNAME, nodename,
+					sizeof(nodename), &portnum);
+
+			/* Got the port; we do not care about the nodename */
+			if (rc == 0 && portnum != 0) {
+				if (debug) {
+					printf("Sync Server at %s:%d\n",
+					       nodename, portnum);
+				}
+				break;
+			}
+
+			if (rc == 0 && portnum == 0) {
+				fprintf(stderr,
+					"Could not lookup service with tmcd!");
+				exit(1);
+			}
+
+			/* Delay */
+			sleep(5);
+		}
 	}
 	
 	/*

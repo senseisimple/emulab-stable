@@ -1,67 +1,319 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<element name="top" xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" ns="http://emulab.net/resources/vtop/1.0" xmlns="http://relaxng.org/ns/structure/1.0">
-  <attribute name="pid">
-    <a:documentation>Project ID</a:documentation>
-  </attribute>
-  <attribute name="eid">
-    <a:documentation>Experiment ID</a:documentation>
-  </attribute>
-  <optional>
-    <attribute name="gid">
-      <a:documentation>Group ID (optional)</a:documentation>
-    </attribute>
-  </optional>
-  <optional>
-    <attribute name="uid">
-      <a:documentation>User ID owning the experiment (optional)</a:documentation>
-    </attribute>
-  </optional>
-  <zeroOrMore>
-    <element name="node">
-      <a:documentation>Nodes in the topology - zero or more</a:documentation>
-      <attribute name="name"/>
-      <element name="node_type">
-        <element name="type_name">
-          <text/>
-        </element>
-        <optional>
-          <element name="type_slots">
-            <a:documentation>TODO - Change type</a:documentation>
-            <text/>
-          </element>
-        </optional>
+<grammar xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" xmlns="http://relaxng.org/ns/structure/1.0" datatypeLibrary="http://www.w3.org/2001/XMLSchema-datatypes">
+  <!--
+    
+    EMULAB-COPYRIGHT
+    Copyright (c) 2005-2007 University of Utah and the Flux Group.
+    All rights reserved.
+    
+  -->
+  <!--
+    
+    Definition of common data structures used for representing topologies -
+    shared between vtop (virtual topology) and ptop (physical topology)
+    formats.
+    
+  -->
+  <define name="NodeTypeSpec">
+    <a:documentation>Representation of a single node type</a:documentation>
+    <element name="node_type">
+      <element name="type_name">
+        <a:documentation>Name of the type - will almost certainly not be unique</a:documentation>
+        <text/>
       </element>
-      <zeroOrMore>
-        <element name="desire">
-          <element name="desire_name">
-            <text/>
-          </element>
-          <element name="desire_weight">
-            <text/>
-          </element>
-          <optional>
-            <element name="violatable">
+      <choice>
+        <a:documentation>How many virtual nodes of this type this physical node can
+handle.</a:documentation>
+        <element name="type_slots">
+          <data type="integer">
+            <param name="minInclusive">0</param>
+          </data>
+        </element>
+        <element name="unlimited">
+          <empty/>
+        </element>
+      </choice>
+      <optional>
+        <element name="static">
+          <a:documentation>A flag that indicates that this physical node *always*
+has this type - a node is only allowed to have one dynamic
+(ie. not flagged as static) type at a time, but any number
+of static types at a time</a:documentation>
+          <empty/>
+        </element>
+      </optional>
+    </element>
+  </define>
+  <define name="NodeSpec">
+    <a:documentation>A node in the topology</a:documentation>
+    <element name="node">
+      <ref name="NodeContents"/>
+    </element>
+  </define>
+  <define name="NodeContents">
+    <attribute name="name">
+      <a:documentation>Name of the node - each node name must be unique within the 
+top element</a:documentation>
+    </attribute>
+    <ref name="NodeSpec.NodeType">
+      <a:documentation>Type specification - we use a named pattern here (defined below), so
+that it can be overriden in the virtual topology schema, where you are
+only allowed to have one</a:documentation>
+    </ref>
+    <ref name="NodeFlagSpec">
+      <a:documentation>Legacy flags</a:documentation>
+    </ref>
+    <zeroOrMore>
+      <ref name="FeatureDesireSpec">
+        <a:documentation>Legacy features and desires</a:documentation>
+      </ref>
+    </zeroOrMore>
+    <zeroOrMore>
+      <ref name="PropertySpec">
+        <a:documentation>Types of virtual nodes that this physical node can satisfy
+Desires of this node, which should (or must) be matched by the
+physical node we are assigned to</a:documentation>
+      </ref>
+    </zeroOrMore>
+  </define>
+  <define name="NodeSpec.NodeType">
+    <a:documentation>A node can (by default) have one or more types</a:documentation>
+    <oneOrMore>
+      <ref name="NodeTypeSpec"/>
+    </oneOrMore>
+  </define>
+  <define name="LinkTypeSpec">
+    <a:documentation>Link types are currently just a siple string. They will almost certainly 
+have to get more complicated, for two reasons:
+    First, I want to allow virtual links to specify more than one type, so
+      that we can ask for links that are, say, 'ethernet or loopback'
+    Second, I want to have a lot more control over links that get mapped to
+      multi-hop paths
+TODO: MAYBE this should be combined with NodeTypeSpec</a:documentation>
+    <element name="link_type">
+      <element name="type_name">
+        <text/>
+      </element>
+    </element>
+  </define>
+  <define name="LinkSpec">
+    <a:documentation>Links in the topology - zero or more</a:documentation>
+    <element name="link">
+      <ref name="LinkContents"/>
+    </element>
+  </define>
+  <define name="LinkContents">
+    <attribute name="name">
+      <a:documentation>Name of the link - must be unique in the top</a:documentation>
+    </attribute>
+    <element name="source_interface">
+      <a:documentation>First interface for this link - links are assumed to be
+symmetric, so the order of the interfaces does not currently
+matter</a:documentation>
+      <ref name="InterfaceSpec"/>
+    </element>
+    <element name="destination_interface">
+      <a:documentation>Second interface for this link</a:documentation>
+      <ref name="InterfaceSpec"/>
+    </element>
+    <element name="bandwidth">
+      <a:documentation>TODO: In the future, the bandwidth, latency, and packet loss will be
+moved to features and/or properties
+Bandwidth of the link in kbps</a:documentation>
+      <data type="float">
+        <param name="minExclusive">0.0</param>
+      </data>
+    </element>
+    <element name="latency">
+      <a:documentation>Latency of the link in ms</a:documentation>
+      <data type="float">
+        <param name="minInclusive">0.0</param>
+      </data>
+    </element>
+    <element name="packet_loss">
+      <a:documentation>Static packet loss probability of the link as a fraction
+(ie. 0.01 == 1%)</a:documentation>
+      <data type="float">
+        <param name="minInclusive">0.0</param>
+      </data>
+    </element>
+    <ref name="LinkSpec.LinkType">
+      <a:documentation>Type of this link - we use a named pattern here (defined below), so
+that it can be overriden in the virtual topology schema, where you are
+only allowed to have one</a:documentation>
+    </ref>
+    <zeroOrMore>
+      <ref name="PropertySpec">
+        <a:documentation>Properties of this link</a:documentation>
+      </ref>
+    </zeroOrMore>
+  </define>
+  <define name="LinkSpec.LinkType">
+    <a:documentation>A link can (by default) have zero or more types</a:documentation>
+    <zeroOrMore>
+      <ref name="LinkTypeSpec"/>
+    </zeroOrMore>
+  </define>
+  <define name="FeatureDesireSpec">
+    <a:documentation>"Legacy" assign features and desires - will be phased out in favor of
+properties</a:documentation>
+    <element name="fd">
+      <element name="fd_name">
+        <a:documentation>Name of this feature or desire</a:documentation>
+        <text/>
+      </element>
+      <element name="fd_weight">
+        <a:documentation>Weight assocated with the feature or desire</a:documentation>
+        <data type="float"/>
+      </element>
+      <optional>
+        <element name="violatable">
+          <a:documentation>A flag indicating whether or not a failure to match the desire with a
+a feature is a constraint violation</a:documentation>
+          <empty/>
+        </element>
+      </optional>
+      <optional>
+        <choice>
+          <a:documentation>Type information expressed in features and desires</a:documentation>
+          <group>
+            <element name="global">
               <empty/>
             </element>
-          </optional>
-        </element>
-      </zeroOrMore>
-      <zeroOrMore>
-        <element name="node_option">
-          <element name="option_name">
-            <text/>
-          </element>
-          <element name="option_value">
-            <text/>
-          </element>
-        </element>
-      </zeroOrMore>
+            <element name="operator">
+              <choice>
+                <value>OnceOnly</value>
+                <value>FirstFree</value>
+              </choice>
+            </element>
+          </group>
+          <group>
+            <element name="local">
+              <empty/>
+            </element>
+            <element name="operator">
+              <value>+</value>
+            </element>
+          </group>
+        </choice>
+      </optional>
     </element>
-  </zeroOrMore>
-  <zeroOrMore>
-    <element name="link">
-      <a:documentation>Links in the topology - zero or more</a:documentation>
+  </define>
+  <define name="NodeFlagSpec">
+    <a:documentation>"Legacy" assign node flags - will be replaced with properties, and in some
+cases, explicit links</a:documentation>
+    <optional>
+      <group>
+        <a:documentation>Gives the amount of bandwidth this node can forward through its loopback
+interface. In the future, we will make the loopback interface/link
+explicit in the topology
+Valid only for physical nodes</a:documentation>
+        <element name="trivial_bandwidth">
+          <data type="integer"/>
+        </element>
+      </group>
+    </optional>
+    <optional>
+      <element name="subnode_of">
+        <a:documentation>Specify that this node is a subnode of another node. We MIGHT
+try to do this with properties in the future
+Valid for both virtual and physical nodes</a:documentation>
+        <text/>
+      </element>
+    </optional>
+    <optional>
+      <element name="unique">
+        <a:documentation>Indicates that this node should never be considered identical to any
+other node. Could be done with a property
+Valid only for physical nodes</a:documentation>
+        <empty/>
+      </element>
+    </optional>
+    <optional>
+      <element name="disallow_trivial_mix">
+        <a:documentation>Indicates that virtual links must either all be trivial (loopback), or
+none of them must be. Possibly expressible with properties?</a:documentation>
+        <empty/>
+      </element>
+    </optional>
+  </define>
+  <define name="InterfaceSpec">
+    <a:documentation>Interfaces</a:documentation>
+    <element name="interface">
+      <ref name="InterfaceContents"/>
+    </element>
+  </define>
+  <define name="InterfaceContents">
+    <element name="node_name">
+      <a:documentation>Name of the node, which must match one of the nodes in this topology</a:documentation>
       <text/>
     </element>
-  </zeroOrMore>
-</element>
+    <element name="interface">
+      <a:documentation>Name of the interface itself</a:documentation>
+      <text/>
+    </element>
+    <zeroOrMore>
+      <ref name="PropertySpec">
+        <a:documentation>Properties of the interface</a:documentation>
+      </ref>
+    </zeroOrMore>
+  </define>
+  <define name="PropertySpec">
+    <a:documentation>Properties - new: replacements for features and desires. Not yet implemented
+in assign, and not yet fully fleshed out in this schema.</a:documentation>
+    <element name="property">
+      <element name="property_name">
+        <a:documentation>Name of this property</a:documentation>
+        <text/>
+      </element>
+      <element name="property_value">
+        <a:documentation>Value associated with this property
+TODO: Add ranges and other types from rspec</a:documentation>
+        <choice>
+          <text/>
+          <data type="float"/>
+        </choice>
+      </element>
+      <element name="property_penalty">
+        <a:documentation>The penalty associated with this property</a:documentation>
+        <data type="float">
+          <param name="minInclusive">0.0</param>
+        </data>
+      </element>
+      <optional>
+        <element name="violatable">
+          <a:documentation>If this flag is present, not having the property is considered a violation</a:documentation>
+          <empty/>
+        </element>
+      </optional>
+      <optional>
+        <choice>
+          <a:documentation>TODO: Add more operators - equality, range test, etc
+Flags for special types of operators</a:documentation>
+          <group>
+            <element name="global">
+              <empty/>
+            </element>
+            <element name="operator">
+              <choice>
+                <value>OnceOnly</value>
+                <value>FirstFree</value>
+              </choice>
+            </element>
+          </group>
+          <group>
+            <element name="local">
+              <empty/>
+            </element>
+            <element name="operator">
+              <choice>
+                <value>=</value>
+                <value>+</value>
+              </choice>
+            </element>
+          </group>
+        </choice>
+      </optional>
+    </element>
+  </define>
+</grammar>

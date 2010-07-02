@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -35,6 +35,12 @@ $| = 1;
 # 
 use libsetup;
 use libtmcc;
+
+# Do not do this on remote nodes. Let their DHCP server or static hostname
+# take precedence. We will check to make sure there is a hostname later
+# in the bootsetup.
+exit(0)
+    if (REMOTE());
 
 #
 # Check to see if hostname actually set yet. The dhclient exit hook gets

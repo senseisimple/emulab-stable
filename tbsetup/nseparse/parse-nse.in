@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -44,7 +44,7 @@ my $TESTMODE = @TESTMODE@;
 my $infile   = "nse.parse.input";
 my $outfile  = "nse.parse.output";
 my $SAVEUID  = $UID;
-my $dbuid;
+my $this_user;
 my $pid;
 my $eid;
 
@@ -82,6 +82,7 @@ if ($UID == 0) {
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -128,7 +129,8 @@ if (!$TESTMODE) {
     # Get DB uid for sending over to ops. In testmode, it runs locally
     # as the user running the testsuite, obviously.
     #
-    if (! UNIX2DBUID($UID, \$dbuid)) {
+    $this_user = User->ThisUser();
+    if (! defined($this_user)) {
 	die("*** $0:\n".
 	    "    You do not exist in the Emulab Database!\n");
     }
@@ -173,8 +175,8 @@ system("touch $outfile") == 0 or
 # user ID to flip to, when not in testmode.
 #
 my $cmdargs = "$TB/libexec/nseparse/nse.parse.proxy ";
-$cmdargs .= " -u $dbuid"
-    if (defined($dbuid));
+$cmdargs .= " -u " . $this_user->uid() . " "
+    if (defined($this_user));
 $cmdargs .= " -n"
     if (defined($options{"n"}));
 $cmdargs .= " -q"
@@ -270,7 +272,8 @@ sub GenDefsFile($)
 		     "left join virt_nodes as vn on vn.pid=v.pid " .
 		     "and vn.eid=v.eid and vn.vname=v.vname " .
 		     "left join reserved as r on r.node_id=v.node_id " .
-		     "where v.pid='$pid' and v.eid='$eid'");
+		     "where r.erole!='delaynode' and " .
+		     "v.pid='$pid' and v.eid='$eid'");
     while (my ($vnode,$vtype,$ipports,$pnode) = $query_result->fetchrow_array()) {
 	print TCL "set v2pmapinfo($vnode) [list $vtype [list $ipports] $pnode]\n";
     }

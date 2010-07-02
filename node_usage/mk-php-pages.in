@@ -1,0 +1,114 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use warnings;
+use POSIX qw(strftime);
+
+our ($START);
+require "@prefix@/etc/node_usage.conf";
+
+chdir "@prefix@/data/node_usage";
+
+$start_date_short = strftime("%b %G", localtime($START));
+sub mk_page ($$$);
+
+our $avail_link = << '---';
+<center>
+[<a href="usage.php">Show Node Usage by Percentage Utilization</a>]
+</center>
+---
+
+our $usage_link = << '---';
+<center>
+[<a href="./">Show Node Usage by Available Nodes</a>]
+</center>
+---
+
+mk_page ("index.php", "avail", "Availability");
+mk_page ("usage.php", "usage", "Usage");
+
+sub mk_page ($$$) {
+    my ($file, $tag, $desc) = @_;
+    open F, ">$file" or die "Unable to write index.php";
+
+    print F <<"---"
+<?php
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+require("../defs.php3");
+
+PAGEHEADER("Testbed Node $desc Stats");
+
+?>
+
+${"${tag}_link"}
+
+${"${tag}_header"}
+
+<h2 align=center>Recent $desc</h2>
+
+<p align=center>
+<b>Last 2 Weeks (hourly)</b>
+<br>
+<img src="node_${tag}-hourly_last2weeks.png">
+<br> 
+<p align=center>
+
+<b>Last 2 Months (daily)</b>
+<br>
+<img src="node_${tag}-daily_last2months.png">
+
+<p align=center>
+<hr>
+
+<h2 align=center>Diurnal</h2>
+
+<p align=center>
+<b>A Typical Week (hourly, average since $start_date_short)</b>
+<br>
+<img src="node_${tag}-by_hourofweek.png">
+
+<p align=center>
+<hr>
+
+<h2 align=center>Long-Term Trends</h2>
+
+<p align=center>
+<b>Since $start_date_short (yearly)</b>
+
+<br>
+<img src="node_${tag}-yearly.png">
+
+<p align=center>
+
+<b>Since $start_date_short (monthly)</b>
+
+<br>
+<img src="node_${tag}-monthly.png">
+
+<p align=center>
+
+<b>Since $start_date_short (weekly)</b>
+
+<br>
+<img src="node_${tag}-weekly.png">
+
+<p align=center>
+
+${"${tag}_footer"}
+
+<?php
+
+PAGEFOOTER();
+
+?>
+---
+
+}

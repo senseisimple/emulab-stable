@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -27,6 +27,8 @@ Class EventGroup -superclass NSObject
 Class Firewall -superclass NSObject
 
 Simulator instproc init {args} {
+    var_import ::GLOBALS::program_group
+    
     # A counter for internal ids
     $self set id_counter 0
 
@@ -45,6 +47,8 @@ Simulator instproc init {args} {
     array set lanlink_list {}
     $self instvar subnets;		# Indexed by IP subnet
     array set subnets {}
+    $self instvar path_list;		# Indexed by path id
+    array set path_list {}
 
     # link_map is indexed by <node1>:<node2> and contains the
     # id of the lanlink connecting them.  In the case of
@@ -89,6 +93,8 @@ Simulator instproc init {args} {
 
     $self instvar parameter_list;
     array set parameter_list {}
+    $self instvar parameter_descriptions;
+    array set parameter_descriptions {}
 
     var_import ::GLOBALS::last_class
     set last_class $self
@@ -254,6 +260,11 @@ Simulator instproc make-lan {nodelist bw delay args} {
     # Convert bandwidth and delay
     set rbw [parse_bw $bw]
     set rdelay [parse_delay $delay]
+
+    # Warn about potential rounding of delay values due to implementation
+    if { ($rdelay % 2) == 1 } {
+	puts stderr "*** WARNING: due to delay implementation, odd delay value $rdelay for LAN may be rounded up"
+    }
     
     Lan $curlan $self $nodelist $rbw $rdelay {}
     set lanlink_list($curlan) {}
@@ -262,11 +273,30 @@ Simulator instproc make-lan {nodelist bw delay args} {
     return $curlan
 }
 
-Simulator instproc make-cloud {nodelist args} {
+# make-path <linklist>
+Simulator instproc make-path {linklist args} {
+    var_import ::GLOBALS::last_class
+    $self instvar id_counter
+    $self instvar path_list
+
+    set curpath tbpath-path[incr id_counter]
+    
+    Path $curpath $self $linklist
+    set path_list($curpath) {}
+    set last_class $curpath
+    
+    return $curpath
+}
+
+Simulator instproc make-cloud {nodelist bw delay args} {
     $self instvar event_list
     $self instvar event_count
 
-    set retval [$self make-lan $nodelist 100Mbps 0ms]
+    if {($args != {})} {
+	punsup "Arguments for make-cloud: $args"
+    }
+
+    set retval [$self make-lan $nodelist $bw $delay]
 
     $retval set iscloud 1
     $retval mustdelay
@@ -336,6 +366,7 @@ Simulator instproc event-group {{list {}}} {
 # method casues the 'ran' variable to be set to 1.
 Simulator instproc run {} {
     $self instvar lanlink_list
+    $self instvar path_list
     $self instvar node_list
     $self instvar event_list
     $self instvar prog_list
@@ -347,6 +378,7 @@ Simulator instproc run {} {
     $self instvar tiptunnel_list
     $self instvar topography_list
     $self instvar parameter_list
+    $self instvar parameter_descriptions
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -371,21 +403,27 @@ Simulator instproc run {} {
     var_import ::GLOBALS::cpu_usage
     var_import ::GLOBALS::mem_usage
     var_import ::GLOBALS::fix_current_resources
-    var_import ::GLOBALS::veth_encapsulate
+    var_import ::GLOBALS::vlink_encapsulate
     var_import ::GLOBALS::jail_osname
     var_import ::GLOBALS::delay_osname
     var_import ::GLOBALS::delay_capacity
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::TBCOMPAT::triggertypes
     var_import ::GLOBALS::modelnet_cores
     var_import ::GLOBALS::modelnet_edges
     var_import ::GLOBALS::elab_in_elab
     var_import ::GLOBALS::elabinelab_topo
     var_import ::GLOBALS::elabinelab_eid
     var_import ::GLOBALS::elabinelab_cvstag
+    var_import ::GLOBALS::elabinelab_singlenet
+    var_import ::TBCOMPAT::elabinelab_attributes
     var_import ::GLOBALS::security_level
     var_import ::GLOBALS::explicit_firewall
     var_import ::GLOBALS::sourcefile_list
+    var_import ::GLOBALS::optarray_order
+    var_import ::GLOBALS::optarray_count
+    var_import ::GLOBALS::dpdb
     
     if {$ran == 1} {
 	perror "The Simulator 'run' statement can only be run once."
@@ -560,9 +598,12 @@ Simulator instproc run {} {
     foreach tg [array names topography_list] {
 	$tg updatedb "sql"
     }
+    foreach path [array names path_list] {
+	$path updatedb "sql"
+    }
 
-    set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
-    set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $veth_encapsulate $fix_current_resources]
+    set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "encap_style" "allowfixnode"]
+    set values [list $mem_usage $cpu_usage $forcelinkdelays $uselinkdelays $usewatunnels $uselatestwadata $wa_delay_solverweight $wa_bw_solverweight $wa_plr_solverweight $vlink_encapsulate $fix_current_resources]
 
     if { $multiplex_factor != {} } {
 	lappend fields "multiplex_factor"
@@ -610,6 +651,8 @@ Simulator instproc run {} {
     if {$elab_in_elab} {
 	lappend fields "elab_in_elab"
 	lappend values 1
+	lappend fields "elabinelab_singlenet"
+	lappend values $elabinelab_singlenet
 
 	if { $elabinelab_eid != {} } {
 	    lappend fields "elabinelab_eid"
@@ -626,6 +669,11 @@ Simulator instproc run {} {
 	lappend fields "security_level"
 	lappend values $security_level
     }
+
+    if {$dpdb} {
+	lappend fields "dpdb"
+	lappend values $dpdb
+    }
     
     $self spitxml_data "experiments" $fields $values
 
@@ -638,33 +686,56 @@ Simulator instproc run {} {
     $self spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list "*" "slothd" $objtypes(SLOTHD) ]
     
     if {[array exists ::opt]} {
-	foreach {oname ovalue} [array get ::opt] {
+	for {set i 0} {$i < $optarray_count} {incr i} {
+	    set oname  $optarray_order($i)
+	    set ovalue $::opt($oname)
+	
 	    $self spitxml_data "virt_user_environment" [list "name" "value" ] [list "$oname" "$ovalue" ]
 	}
     }
 
     foreach event $event_list {
-	set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ]
-	set values [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6]]
-	if {[llength $event] > 7} {
+	if {[string equal [lindex $event 0] "swapout"]} {
+               set event [lreplace $event 0 0 0]
+	       set triggertype "SWAPOUT"
+	} else {
+	       set triggertype "TIMER"
+	}
+	set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "triggertype" ]
+	set values [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] $triggertypes($triggertype)]
+	if {[llength $event] > 8} {
+
 	    lappend fields "parent"
-	    lappend values [lindex $event 7]
+	    lappend values [lindex $event 8]
 	}
 	$self spitxml_data "eventlist" $fields $values
     }
 
-    foreach sourcefile $sourcefile_list {
-	$self spitxml_data "external_sourcefiles" [list "pathname" ] [list $sourcefile ]
-    }
-
     foreach name [array names parameter_list] {
 	set default_value $parameter_list($name)
+	set description $parameter_descriptions($name)
 
-	$self spitxml_data "virt_parameters" [list "name" "value"] [list $name $default_value ]	
+	set p_fields [list "name" "value"]
+	set p_values [list $name $default_value]
+
+	if {$description != {}} {
+	    lappend p_fields "description"
+	    lappend p_values $description
+	}
+
+	$self spitxml_data "virt_parameters" $p_fields $p_values
     }
 	
     foreach sourcefile $sourcefile_list {
 	$self spitxml_data "external_sourcefiles" [list "pathname" ] [list $sourcefile ]
+    }
+
+    if {$elab_in_elab} {
+	foreach attr $elabinelab_attributes {
+	    set fields [list "role" "attrkey" "attrvalue" "ordering"]
+	    set values [split $attr ","]
+	    $self spitxml_data "elabinelab_attributes" $fields $values
+	}
     }
 
     $self spitxml_finish
@@ -699,6 +770,7 @@ Simulator instproc attach-agent {node agent} {
 Simulator instproc agentinit {agent} {
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
+    var_import ::TBCOMPAT::triggertypes
 
     if {[$agent info class Application/Traffic/CBR]} {
 	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "parent" ] [list "0" [$agent get_node] $agent $objtypes(TRAFGEN) $eventtypes(MODIFY) [$agent get_params] "" "__ns_sequence"]
@@ -757,12 +829,18 @@ Simulator instproc at {time eventstring} {
 	return
     }
 
-    set ptime [::GLOBALS::reltime-to-secs $time]
-    if {$ptime == -1} {
-	perror "Invalid time spec: $time"
-	return
+    if {[string equal $time "swapout"]} {
+# "swapout" will be preserved as the time until we're at a point
+# where we can shunt it into a code path where it changes the
+# trigger type.
+    } else {
+       set ptime [::GLOBALS::reltime-to-secs $time]
+       if {$ptime == -1} {
+               perror "Invalid time spec: $time"
+               return
+       }
+       set time $ptime
     }
-    set time $ptime
 
     $self instvar event_list
     $self instvar event_count
@@ -895,6 +973,12 @@ Simulator instproc rename_topography {old new} {
     $self instvar topography_list
     unset topography_list($old)
     set topography_list($new) {}
+}
+
+Simulator instproc rename_path {old new} {
+    $self instvar path_list
+    unset path_list($old)
+    set path_list($new) {}
 }
 
 # find_link <node1> <node2>
@@ -1088,15 +1172,35 @@ Simulator instproc add_topography {tg} {
     return 0
 }
 
-Simulator instproc define_template_parameter {name args} {
+Simulator instproc define-template-parameter {name args} {
     $self instvar parameter_list
+    $self instvar parameter_descriptions
+    var_import ::TBCOMPAT::parameter_list_defaults
 
-    if {[llength $args] == 0} {
-	set parameter_list($name) {}
-    } else {
-	set parameter_list($name) [lindex $args 0]
+    if {$args == {}} {
+	perror "\[define-template-parameter] not enough arguments!"
+	return
+    }
+    if {[llength $args] > 2} {
+	perror "\[define-template-parameter] too many arguments!"
+	return
+    }
+    set value [lindex $args 0]
+    set description {}
+    
+    if {[llength $args] == 2} {
+	set description [lindex $args 1]
     }
 
+    if {[info exists parameter_list_defaults($name)]} {
+	set value $parameter_list_defaults($name)
+    }
+    set parameter_list($name) $value
+    set parameter_descriptions($name) $description
+    
+    # And install the name/value in the outer environment.
+    uplevel 1 real_set \{$name\} \{$value\}
+    
     return 0
 }
 
@@ -1245,6 +1349,9 @@ Simulator instproc make_event {outer event} {
 	    set vname $obj
 	    
 	    switch -- $cmd {
+		"create"    {set etype CREATE}
+		"clear"     {set etype CLEAR}
+		"reset"     {set etype RESET}
 		"up"	    {set etype UP}
 		"down"	    {set etype DOWN}
 		"bandwidth" {
@@ -1502,6 +1609,9 @@ Simulator instproc make_event {outer event} {
 			    set args "${args}TIMEOUT={$to} "
 			}
 		    }
+		    # Put the command last so the program-agent can assume everything
+		    # up to the end of the string is part of the command and we don't
+		    # have to deal with quoting...  XXX
 		    if {$(-command) != {}} {
 			set args "${args}COMMAND=$(-command)"
 		    }
@@ -1566,6 +1676,10 @@ Simulator instproc make_event {outer event} {
 		    set otype SIMULATOR
 		    set etype SWAPOUT
 		}
+		"stoprun" {
+		    set otype SIMULATOR
+		    set etype STOPRUN
+		}
 		"trace-for" {
 		    set vname "slothd"
 		    set otype SLOTHD
@@ -1598,11 +1712,21 @@ Simulator instproc make_event {outer event} {
 		    set etype REPORT
 		    ::GLOBALS::named-args $evargs {
 			-digester {}
+			-archive {}
 		    }
 		    if {$(-digester) != {}} {
 			set args "DIGESTER={$(-digester)}"
 		    }
+		    if {$(-archive) != {}} {
+			set args "ARCHIVE={$(-archive)} ${args}"
+		    }
+		    
 		}
+		"snapshot" {
+		    set otype SIMULATOR
+		    set etype SNAPSHOT
+		    set args "LOGHOLE_ARGS='-s'"
+		}		
 		"cleanlogs" {
 		    set otype SIMULATOR
 		    set etype RESET
@@ -1621,6 +1745,11 @@ Simulator instproc make_event {outer event} {
 		    }
 		    set args "STARTAT=1 STOPAT=$(-stopat)"
 		}
+		"reset-lans" {
+		    set otype LINK
+		    set vname "__all_lans"
+		    set etype RESET
+		}
 		unknown {
 		    punsup "$obj $cmd $evargs"
 		    return
@@ -1634,7 +1763,7 @@ Simulator instproc make_event {outer event} {
     }
 
     if { $otype == "" } {
-	perror "\[make_event] otype was empty; event was $event"
+	perror "\[make_event] otype was empty; event $event, class $cl"
     }
 
     return [list $vnode $vname $otype $etype $args $atstring]

@@ -1,15 +1,21 @@
 #
-# Insert Copyright Here.
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2009 University of Utah and the Flux Group.
+# All rights reserved.
 #
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= sensors
 EVENTSYS	= @EVENTSYS@
+ISMAINSITE	= @TBMAINSITE@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= slothd powermon nfstrace
+SUBDIRS	= slothd powermon
+ifeq ($(ISMAINSITE),1)
+SUBDIRS += nfstrace
+endif
 
 SYSTEM            := $(shell uname -s)
 

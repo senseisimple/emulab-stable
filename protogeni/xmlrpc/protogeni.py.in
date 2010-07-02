@@ -1,0 +1,27 @@
+#! /usr/bin/env python
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+import sys
+from SimpleXMLRPCServer import CGIXMLRPCRequestHandler
+
+class myexampleclass:
+    def method1 (self, meta, oneargument, anotherone):
+        return str(meta) + "," + str(oneargument)
+
+    def method2 (self, meta, *args):
+        sys.exit(0)
+        pass
+    pass
+
+myinstance = myexampleclass()
+server = CGIXMLRPCRequestHandler()
+server.register_instance(myinstance)
+server.handle_request()
+
+
+
+
+

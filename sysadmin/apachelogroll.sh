@@ -1,4 +1,9 @@
 #! /bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2001-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 # CONSTANTS INIT
 PIDFILE=/var/run/apache.pid

@@ -1,11 +1,13 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
+use HTML::Entities;
 
 #
 # Quickie graph layout.
@@ -13,24 +15,26 @@ use Getopt::Std;
 sub usage()
 {
     print(STDERR
-	  "Usage: template_graph <guid>\n".
+	  "Usage: template_graph [-a] <guid>\n".
 	  "switches and arguments:\n".
-	  "-v          - be more chatty\n".
+	  "-a          - Show all templates (ignore hidden bit)\n".
 	  "-p <prefix> - prefix for output files.\n".
 	  "<guid>      - GUID to graph\n");
     exit(-1);
 }
-my $optlist	 = "vp:";
+my $optlist	 = "p:z:ds";
 my %options      = ();
-my $verbose      = 0;
+my $debug	 = 0;
+my $silent	 = 0;
 my $prefix       = "/tmp/dot$$";
+my $scale        = 1.0;
+my $zoom;
 my $guid;
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $PROJROOT	= "/proj";
 my $EVENTSYS	= @EVENTSYS@;
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
@@ -40,6 +44,7 @@ my $CONTROL	= "@USERNODE@";
 
 # Protos
 sub ParseArgs();
+sub SetParent($@);
 
 # Locals
 my $DOT         = "/usr/local/bin/dot";
@@ -52,7 +57,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
-use libTemplates;
+use Template;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -88,29 +93,199 @@ my $giffile	= "$prefix.gif";
 # Grab all the parent pointers.
 #
 my $query_result =
-    DBQueryFatal("select vers, parent_vers from experiment_templates ".
+    DBQueryFatal("select vers,parent_vers,hidden,tid,description ".
+		 "  from experiment_templates ".
 		 "where guid='$guid' ".
 		 "order by vers");
 
+#
+# If nothing left, remove the graph entry.
+#
+if (! $query_result->num_rows) {
+    print "Clearing graph entry for template $guid ...\n";
+    
+    DBQueryFatal("delete from experiment_template_graphs ".
+		 "where parent_guid='$guid'");
+    exit(0);
+}
+
+#
+# Build up lists of children (and associated stuff like hidden,description).
+#
+my %hidden	= ();
+my %tids        = ();
+my %children    = ();
+my %parents     = ();
+my %descriptions= ();
+my $rootnode    = 1;	# XXX
+
+while (my ($vers,$parent_vers,$hidden,$tid,$description) =
+       $query_result->fetchrow_array()) {
+    $tids{$vers}         = $tid;
+    $hidden{$vers}       = $hidden;
+    $descriptions{$vers} = $description;
+
+    next
+	if (!defined($parent_vers));
+
+    $children{$parent_vers} = []
+	if (!exists($children{$parent_vers}));
+    push(@{ $children{$parent_vers} }, $vers);
+}
+
+#
+# We overload the hidden bit on the root template. If its set, that means
+# to hide hidden templates, otherwise it means to show hidden templates.
+#
+my $showall = ($hidden{$rootnode} == 0);
+$hidden{$rootnode} = 0;
+
+# Defaults;
+my $size     = 8;
+my $fontsize = 10;
+my $bwidth   = 0.75;
+my $bheight  = 0.25;
+my $arrowsize= 0.7;
+my $nodesep  = 0.25;
+my $ranksep  = 0.50;
+
+#
+# Grab the current scale so we know what to do.
+#
+$query_result =
+    DBQueryFatal("select scale from experiment_template_graphs ".
+		 "where parent_guid='$guid'");
+
+my $curscale = ($query_result->num_rows ?
+		($query_result->fetchrow_array())[0] : 1);
+
+#
+# Change scale if zooming and then recalc the defaults.
+#
+if (defined($zoom)) {
+    if ($zoom eq "in") {
+	$scale = $curscale * 1.25;
+    }
+    else {
+	$scale = $curscale / 1.25;
+    }
+}
+else {
+    $scale = $curscale;
+}
+$bwidth    = $bwidth  * $scale;
+$bheight   = $bheight * $scale;
+$arrowsize = $arrowsize * $scale;
+$nodesep   = $nodesep * $scale;
+$ranksep   = $ranksep * $scale;
+
 open(DOT, "> $dotfile") or
-    tbdie("Could not opern $dotfile!");
+    tbdie("Could not open $dotfile!");
 
 print DOT "digraph TemplateGraph {\n";
-print DOT "  node [shape=ellipse]\n";
-print DOT "  edge [fontsize=8]\n";
+print DOT "  rankdir=\"LR\"\n";
+print DOT "  nodesep=$nodesep\n";
+print DOT "  ranksep=$ranksep\n";
+print DOT "  fontname=\"Courier\"\n";
+print DOT "  node [shape=rectangle,fontsize=$fontsize,".
+            "height=$bheight,width=$bwidth,fixedsize=true]\n";
+print DOT "  edge [arrowsize=$arrowsize]\n";
 print DOT "  subgraph guid {\n";
 print DOT "    label = \"$guid\";\n";
 
-while (my ($vers, $parent_vers) = $query_result->fetchrow_array()) {
-    my $url = "$TBBASE/template_show.php?guid=$guid&version=$vers";
+#
+# Do a recursive decent to figure out the parent for each template.
+# We do this cause we want to skip hidden templates, but pick it up
+# again down the line when hidden=0.
+#
+sub SetParent($@)
+{
+    my ($parent, @kids) = @_;
+
+    foreach my $kid (@kids) {
+	if (!$showall && $hidden{$kid}) {
+	    # pass our parent to children, thereby skipping a level.
+	    SetParent($parent, @{ $children{$kid} })
+		if (exists($children{$kid}));
+	}
+	else {
+	    $parents{$kid} = $parent;
+	    SetParent($kid, @{ $children{$kid} })
+		if (exists($children{$kid}));
+	}
+    }
+}
+$parents{$rootnode} = undef;
+SetParent($rootnode, @{ $children{$rootnode} });
+
+#
+# The parents hash now has all the templates that are visible. 
+#
+foreach my $kid (sort {$a <=> $b} keys(%parents)) {
+    my $vers   = $kid;
+    my $parent = $parents{$vers};
+    my $tid    = $tids{$vers};
+    my $url    = "$TBBASE/template_show.php".
+	           "?show=graph&guid=$guid&version=$vers";
+    my $color  = "black";
+
+    print DOT "    $parent -> $kid;\n"
+	if (defined($parent));
+
+    # Shorten the description
+    my $description = $descriptions{$vers};
+    if (length($description) > 50) {
+	$description = substr($description, 0, 50) . " <b>...</b>";
+    }
+
+    # Encode to avoid confusing things.
+    $description = encode_entities($description, '\'\r\n');
+    $description = encode_entities($description);
+
+    my $query_result =
+	DBQueryFatal("select name,value from experiment_template_parameters ".
+		     "where parent_guid='$guid' and parent_vers='$vers'");
+
+    my $table = "<table cellpadding=0 cellspacing=0 border=0> ".
+	"<tr><td>Version:</td><td>$vers</td></tr>".
+	"<tr><td>TID:</td><td>$tid</td></tr>".
+        "<tr><td>Description:</td><td>$description</td></tr>";
+
+    if ($query_result->num_rows) {
+	$table .= "<tr><td>Parameters:</td>".
+	    "<td><table cellpadding=0 cellspacing=0 border=1>";
+
+	while (my ($name, $value) = $query_result->fetchrow_array()) {
+	    $table .= "<tr><td>${name}:</td><td>$value</td></tr>";
+	}
+	$table .= "</table></td>";
+    }
+
+    $table .= "</table>";
+	
+    my $tooltip = "return escape(\'$table\');";
+
+    #
+    # Figure out a point size that makes the label fit inside. We do not
+    # want to go too big of course.
+    #
+    # Target labelwidth is 80% of the box, converted to points.
+    my $labelwidth = ($bwidth * 0.80) / 0.0139;
+
+    # And the fontsize ... I made this up.
+    my $fontsize   = int((($labelwidth / length($tid)) * 1.8) + 0.5);
+
+    # But we do not want the font arbitrarily large.
+    $fontsize = 12
+	if ($fontsize > 12);
+    $color = "blue"
+	if ($hidden{$vers});
 	
     if (!exists($versions{"$vers"})) {
-	print DOT "    $vers [label=\"$vers\",href=\"$url\"];\n";
+	print DOT "    $vers [fontsize=$fontsize,color=$color,".
+	    "label=\"$tid\",href=\"$url\",tooltip=\"$tooltip\"];\n";
 	$versions{"$vers"} = $vers;
     }
-    print DOT "    $parent_vers -> $vers;\n"
-	if (defined($parent_vers));
-    
 }
 print DOT "  }\n";
 print DOT "}\n";
@@ -119,8 +294,10 @@ close(DOT);
 #
 # Now run dot and generate both a gif and an image map file.
 #
-system("$DOT -Tgif -o $giffile  $dotfile");
-system("$DOT -Tcmapx -o $imapfile $dotfile");
+my $redirect = ($silent ? "> /dev/null 2>&1" : "");
+
+system("$DOT -Tgif -o $giffile $dotfile $redirect");
+system("$DOT -Tcmapx -o $imapfile $dotfile $redirect");
 
 #
 # Grab the input data. 
@@ -128,17 +305,26 @@ system("$DOT -Tcmapx -o $imapfile $dotfile");
 my $gifdata = `cat $giffile`;
 my $imapdata = `cat $imapfile`;
 
+#
+# Massage the mapfile; tooltips --> onmouseovers
+#
+$imapdata =~ s/title=/onmouseover=/g;
+$imapdata =~ s/version=(\d*)\"/version=$1\" id=Tarea${1}/g;
+
+#print "$imapdata\n";
+
 $gifdata = DBQuoteSpecial($gifdata);
 $imapdata = DBQuoteSpecial($imapdata);
 
 DBQueryFatal("replace into experiment_template_graphs set ".
 	     "    parent_guid='$guid', ".
+	     "    scale='$scale', ".
 	     "    image=$gifdata, ".
 	     "    imap=$imapdata");
 
-#unlink($dotfile, $gifdata, $imapdata);
+unlink($dotfile, $giffile, $imapfile)
+    if (!$debug);
 exit(0);
-
 
 #
 # Parse command arguments. Once we return from getopts, all that are
@@ -173,6 +359,19 @@ sub ParseArgs()
 	}
 	else {
 	    tbdie("Bad data in argument: $prefix");
+	}
+    }
+    if (defined($options{"d"})) {
+	$debug = 1;
+    }
+    if (defined($options{"s"})) {
+	$silent = 1;
+    }
+    if (defined($options{"z"})) {
+	$zoom = $options{"z"};
+
+	if ($zoom ne "in" && $zoom ne "out") {
+	    die("Improper zoom request: $zoom!\n");
 	}
     }
 }

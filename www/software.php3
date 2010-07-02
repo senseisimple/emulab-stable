@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -16,54 +16,55 @@ PAGEHEADER("Emulab Software Distributions");
 ?>
 
 <ul>
+<li><img src="/new.gif" alt="&lt;NEW&gt;"> The latest version of the Emulab
+    software is available upon request from our <a href="http://users.emulab.net/trac/emulab/wiki/GitRepository">git repository</a>
+</li>
+<li>
+    <a href="/downloads/emulab-080901.tar.gz">
+    Emulab network testbed software</a>,
+    Version 5.0, released September 1, 2008.
+    This is an update of the 4.9 source release and should be considered
+    the "official" Emulab release to be used for all fresh installs and
+    upgrades.
+    Includes source for everything except the GUI Client, which is available below.
+    See the <a href = "README">README</a> and the
+    <a href = "http://users.emulab.net/trac/emulab/wiki/InstallRoot">
+    online installation and upgrading documentation</a>.
+    If for some reason you cannot access the online documentation, there is
+    <a href="http://www.emulab.net/downloads/emulab-install-docs-080901.tar.gz">
+    a tarball of the installation documents</a>
+    that you can download and unpack locally.
+    </li><p>
+<li> <a href="/downloads/emulab-080630.tar.gz">
+    Emulab network testbed software</a>,
+    Version 4.9.0, released June 30, 2008.
+    Includes source for everything except the GUI Client, which is available below.
+    See the <a href = "README">README</a> and the
+    <a href = "http://users.emulab.net/trac/emulab/wiki/InstallDocs">
+    online installation documentation</a>.
+    </li><p>
+
 <li> 
-     Emulab GUI Client v0.1.1
+     Emulab GUI Client v0.2
      <a href="/downloads/netlab-client.jar">(JAR</a>,
-     <a href="/downloads/netlab-client-0.1.0b.tar.gz">source tarball</a>
-     <img src="/new.gif" alt="&lt;NEW&gt;">).
-     This is the initial release of a new GUI client for creating and
+     <a href="/downloads/netlab-client-0.2.tar.gz">source tarball</a>
+     <!-- <img src="/new.gif" alt="&lt;NEW&gt;"> -->).
+     This is the fancier of the GUI clients for creating and
      interacting with experiments.  The GUI provides an alternative to using
      the web-based interface or logging into users.emulab.net and using the
-     command line tools.
-     Please take a look at the
+     command line tools.  Take a look at the
      <a href="netlab/client.php3">tutorial</a>
      for more information.
-<li> <a href="/downloads/frisbee-snapshot-20040312.tar.gz">
-     Updated Frisbee Server and Client Source Snapshot</a>.
-     This is a ``snapshot'' of the current development tree.  This version
-     includes improved Linux support.  The frisbee client will now build
-     under Linux and the Linux image zipper can make partition images
-     and supports filesystems other than ext2fs.
-     Please take a look at the
-     <a href="/downloads/frisbee-README-20040312.txt">README</a>
-     file for more information on the changes.
-     This
-     <a href="/downloads/frisbee-fs-20040312.iso">updated ISO image</a>
-     includes binaries built from the current sources.
-<li> <a href="/downloads/frisbee-snapshot-20031021.tar.gz">
-     Updated Frisbee Server and Client Source Snapshot</a>.
-     This is a ``snapshot'' of the current development tree.  It includes the
-     NTFS framework that was not in the previous release as well as some
-     bug fixes and additional features.
-     Please take a look at the
-     <a href="/downloads/frisbee-README-20031021.txt">README</a>
-     file for more information on the changes.
-     This
-     <a href="/downloads/frisbee-fs-20031021.iso">updated ISO image</a>
-     includes binaries built from the current sources.
-<li> <a href="/downloads/frisbee-20030618.tar.gz">Frisbee Server and
-     Client</a>,
-     as described in our paper <cite><a href="pubs.php3">Fast, Scalable Disk
-     Imaging with Frisbee</a></cite>, to appear at
-     <a href='http://www.usenix.org/events/usenix03/'>USENIX 2003</a>.
-     Please take a look at the
-     <a href="/downloads/frisbee-README-20030618.txt">README</a>
-     file for a better
-     idea of how we use Frisbee in the Testbed, and how to setup a
-     simple Frisbee demonstration on your network.   Use this
-     <a href="/downloads/frisbee-fs-20030618.iso">ISO image</a>
-     to create a bootable FreeBSD 4.6 system from which to run the
-     image creation and installation tools.
+     </li><p>
+
+<li> Frisbee disk loader.
+     The latest frisbee and imagezip sources can be found in the
+     <a href="/downloads/emulab-080630.tar.gz">Emulab release</a>.
+     The last standalone ISO image for a bootable Frisbee client
+     is still <a href="/downloads/frisbee5-fs-20050819.iso">
+     frisbee5-fs-20050819.iso</a> which includes binaries built from the
+     5/16/2005 sources.
+     </li>
 <ul>
 
 <?php

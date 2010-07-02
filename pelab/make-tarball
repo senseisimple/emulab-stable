@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+files="pelab/auto-pelab.ns pelab/common-env.sh pelab/init-elabnodes.pl pelab/run-sanity.sh pelab/dbmonitor pelab/libnetmon pelab/magent pelab/monitor pelab/pelabdb.pwd pelab/stub pelab/iperfd"
+
+if [ $# != 1 ]; then
+    echo "usage: $0 tarball-path"
+    exit 1
+fi
+
+path=$1
+
+if [ ! -d ../pelab ]; then
+   echo "should be run from 'pelab' subdir"
+   exit 1
+fi
+
+echo "##### cleaning up a little"
+rm -f magent/*.o stub/*.o UDP/UdpServerDir/*.o
+strip magent/magent stub/stubd libnetmon/netmonup magent/UDP/UdpServerDir/UdpServer
+
+echo "##### creating tarball $path from .."
+tar czf $path -C .. $files

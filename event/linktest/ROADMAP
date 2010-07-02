@@ -1,5 +1,16 @@
 ROADMAP FOR LINKTEST
 
+The overly convoluted flow of control looks like:
+
+The Web:
+	<user> ->
+Boss:
+	-> www/linktest.php3 -> weblinktest -> linktest_control ->
+Ops:
+	-> linktest.proxy -> run_linktest.pl
+Nodes:
+	-> linktest -> linktest.pl
+
 Description of files...
 
 Name:
@@ -7,11 +18,13 @@ Name:
 Description:
 	A daemon that waits for LINKTEST events.
 Where it runs:
-	On nodes only. It should be invoked by rc.setup
-	so that it is running before any events arrive.
+	On nodes only. Invoked at boot time by rc.linktest
+	(tmcd/common/rc.linktest) so that it is running before
+	any events arrive.  Runs in the current directory.
 What it does:
 	After receiving the START event, forks linktest.pl
-	to conduct tests. Waits for linktest.pl to exit.
+	to conduct tests. Waits for linktest.pl to exit or
+	for a KILL event.
 Who it should run as:
 	experiment swapper
 	
@@ -21,68 +34,45 @@ Name:
 Description:
 	A test suite for Emulab experiments.
 Where it runs:
-	On nodes only.
-	The synch node does some extra processing, so it will
-	cd to a directory where it finds tb_compat.tcl. Otherwise
-	the directory is default.
+	On nodes only.  Runs in the current directory.
 What it does:
-	Parses the experiment ns script, then conducts
+	Parses the experiment link maps (ltmap, ltpmap)
+	to reconstruct the topology and then conducts
 	various tests for connectivity and link attributes.
 	If errors are found, it saves them to a directory
-	under tbdata for the experiment. It also sends
-	a STOP event when all tests are completed.
+	under tbdata for the experiment. It sends LOG and
+	REPORT events to report on its progress and ultimately,
+	a COMPLETE event when all tests are completed.
 Who it should run as:
 	Invoked by linktest; therefore experiment swapper.
-
-Name:
-	ns-patchfile
-Description:
-	A patchfile for NS that adds extra data structures
-	useful for parsing experiment datafiles.
-Where it runs:
-	The patched version of NS is run by the synch node in linktest.pl
-	inside a directory where it can find tb_compat.tcl
-What it does:
-	N/A
-Who it should run as:
-	N/A
-
-Name:
-	tb_compat.tcl
-Description:
-	A modified version of testbed tb_compat.tcl that
-	has support for parsing NS scripts using
-	a patched version of ns (using ns-patchfile).
-Where it runs:
-	N/A
-What it does:
-	N/A
-Who it should run as:
-	N/A
 
 Name:
 	run_linktest.pl.in
 Description:
 	A script to run Linktest and report results.
 Where it runs:
-	Nodes, ops or boss.
+	Nodes or ops.
 What it does:
-	Sends a START event to Linktest, then waits for the 
-	STOP event. If errors were found, exit code is 1, else 0.
+	Wrapper for starting linktest remotely.  Sends initial START
+	command and waits for report and status events.
+	If errors were found, exit code is 1, else 0.
 	Prints out contents of error files saved by Linktest.
 	This script could be used by boss to run linktest when
 	starting up the experiment.
 	Important usage note: -q to skip the (time-consuming)
 	bandwidth test.
 Who it should run as:
-	Experimenter.
+	Experimenter either manually or as invoked indirectly from
+	boss at swapin or during explicit web-page invocation.
 
 Name:
 	ltevent.c
 Description:
 	A program to either send an event or wait for an event.
 Where it runs:
-	Anywhere run_linktest.pl.in is called, or linktest.pl.in.
+	On nodes by linktest.pl.in to inject events.
+	On nodes or ops by run_linktest.pl.in to inject or extract
+	events to/from linktest on the nodes.
 What it does:
 	Accepts command line arguments to either send or wait for
 	an event.
@@ -90,6 +80,38 @@ Who it should run as:
 	Experiment swapper when invoked by linktest.pl;
 	experimenter when invoked by run_linktest.pl
 
+Name:
+	linktest.proxy.in
+Description:
+	A shim run on ops to run run_linktest.pl as the correct user.
+Where it runs:
+	On ops, invoked via ssh from boss as root.
+What it does:
+	Runs run_linktest.pl on ops as correct user with the correct groups.
+Who it should run as:
+	Root, changes to correct user.
 
+Name:
+	linktest_control.in
+Description:
+	A setuid-root wrapper script run on boss to communicate between
+	web pages on boss and run_linktest (via linktest.proxy) on ops.
+Where it runs:
+	On boss.
+What it does:
+	Primary action script for running linktest from the web/DB server.
+	Performs authentication and invokes run_linktest.pl on ops.
+Who it should run as:
+	Anyone, typically the non-privileged web user.
 
-
+Name:
+	weblinktest.in
+Description:
+	Yet another wrapper script, called by PHP code to invoke
+	linktest_control on boss.
+Where it runs:
+	On boss.
+What it does:
+	Adds another layer of indirection for no apparent reason.
+Who it should run as:
+	Web user.

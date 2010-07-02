@@ -1,6 +1,6 @@
 .\"
 .\" EMULAB-COPYRIGHT
-.\" Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+.\" Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 .\" All rights reserved.
 .\"
 .TH PROGRAM-AGENT 8 "November 6, 2004" "Emulab" "Emulab Commands Manual"
@@ -221,14 +221,29 @@ The project ID for the experiment this agent is running within.
 .B EID
 The experiment ID for the experiment this agent is running within.
 .TP
-.B NODE
-The name of the node this program agent is running on.  Note that this is the
-short name and
+.B NODECNET
+The fully-qualified name of the node this program agent is running on.
+This name resolves to the IP address of the control network interface
+of the node.
+.TP
+.B NODECNETIP
+The IP address of the control network interface.
+This address should
 .I not
-the fully qualified host name that would refer to the control interface.
+be advertised to, or used by, applications within an experiment as it will
+cause all traffic to flow over the control network rather than the experimental
+network.
+.TP
+.B NODE
+The unqualified name of the node this program agent is running on.
+For nodes with experimental interfaces,
+this name resolves to the IP address of an experimental interface on the node.
+For nodes with more than one experimental interface, there is no guarantee
+which one it will resolve to.
+For nodes with no experimental interfaces, the name will not resolve.
 .TP
 .B NODEIP
-The IP address of the experiment network interface that the node name maps to.
+The IP address of the experiment network interface that NODE resolves to.
 For nodes with no experimental interfaces, this variable will not be set.
 .TP
 set opt(\f(BIVAR\fR) \f(BIvalues\fR

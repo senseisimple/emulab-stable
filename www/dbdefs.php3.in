@@ -1,5 +1,9 @@
 <?php
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Database Constants
 #
 require("dbcheck.php3");
@@ -49,6 +53,15 @@ define("TBDB_USERSTATUS_NEWUSER",	"newuser");
 define("TBDB_USERSTATUS_UNAPPROVED",	"unapproved");
 define("TBDB_USERSTATUS_UNVERIFIED",	"unverified");
 define("TBDB_USERSTATUS_FROZEN",	"frozen");
+define("TBDB_USERSTATUS_ARCHIVED",	"archived");
+
+#
+# Type of new account.
+#
+define("TBDB_NEWACCOUNT_REGULAR",	0x0);
+define("TBDB_NEWACCOUNT_PROJLEADER",	0x1);
+define("TBDB_NEWACCOUNT_WIKIONLY",	0x2);
+define("TBDB_NEWACCOUNT_WEBONLY",	0x4);
 
 #
 # Trust. Define the trust level as an increasing value. Then define a
@@ -237,925 +250,6 @@ function TBMinTrust($trust_value, $minimum)
 }
 
 #
-# Determine the trust level for a uid/pid/gid. That is, each uid will have
-# a different trust level depending on the project/group in question.
-# Return that trust level as one of the numeric values above. 
-# 
-function TBGrpTrust($uid, $pid, $gid)
-{
-    global $TBDB_TRUST_NONE;
-
-    #
-    # No group, then use the default group.
-    #
-    if (! $gid) {
-	$gid = $pid;
-    }
-
-    $query_result =
-	DBQueryFatal("select trust from group_membership ".
-		     "where uid='$uid' and pid='$pid' and gid='$gid'");
-
-    #
-    # No membership is the same as no trust. True? Maybe an error instead?
-    # 
-    if (mysql_num_rows($query_result) == 0) {
-	return $TBDB_TRUST_NONE;
-    }
-    $row = mysql_fetch_array($query_result);
-    $trust_string = $row[trust];
-
-    return TBTrustConvert($trust_string);
-}
-
-#
-# Determine the project trust level for a uid/pid. This is the trust level
-# for the default group in the project.
-# 
-function TBProjTrust($uid, $pid)
-{
-    return TBGrpTrust($uid, $pid, $pid);
-}
-
-#
-# Project permission checks. The group id (gid) can be zero, in which case
-# the pid is used (ie: a default group check is made).
-#
-# Usage: TBProjAccessCheck($uid, $pid, $gid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-# 
-function TBProjAccessCheck($uid, $pid, $gid, $access_type)
-{
-    global $TB_PROJECT_READINFO;
-    global $TB_PROJECT_MAKEGROUP;
-    global $TB_PROJECT_EDITGROUP;
-    global $TB_PROJECT_GROUPGRABUSERS;
-    global $TB_PROJECT_BESTOWGROUPROOT;
-    global $TB_PROJECT_DELGROUP;
-    global $TB_PROJECT_LEADGROUP;
-    global $TB_PROJECT_ADDUSER;
-    global $TB_PROJECT_DELUSER;
-    global $TB_PROJECT_MAKEOSID;
-    global $TB_PROJECT_DELOSID;
-    global $TB_PROJECT_MAKEIMAGEID;
-    global $TB_PROJECT_DELIMAGEID;
-    global $TB_PROJECT_CREATEEXPT;
-    global $TB_PROJECT_MIN;
-    global $TB_PROJECT_MAX;
-    global $TBDB_TRUST_USER;
-    global $TBDB_TRUST_LOCALROOT;
-    global $TBDB_TRUST_GROUPROOT;
-    global $TBDB_TRUST_PROJROOT;
-    $mintrust;
-
-    if ($access_type < $TB_PROJECT_MIN ||
-	$access_type > $TB_PROJECT_MAX) {
-	TBERROR("Invalid access type: $access_type!", 1);
-    }
-
-    #
-    # Admins do whatever they want!
-    # 
-    if (ISADMIN($uid)) {
-	return 1;
-    }
-
-    #
-    # No group, then use the default group.
-    #
-    if (! $gid) {
-	$gid = $pid;
-    }
-
-    if ($access_type == $TB_PROJECT_READINFO) {
-	$mintrust = $TBDB_TRUST_USER;
-    }
-    elseif ($access_type == $TB_PROJECT_MAKEGROUP ||
-	    $access_type == $TB_PROJECT_DELGROUP) {
-	$mintrust = $TBDB_TRUST_GROUPROOT;
-    }
-    elseif ($access_type == $TB_PROJECT_LEADGROUP) {
-	#
-	# Allow mere user (in default group) to lead a subgroup.
-	# 
-	$mintrust = $TBDB_TRUST_USER;
-    }
-    elseif ($access_type == $TB_PROJECT_MAKEOSID ||
-	    $access_type == $TB_PROJECT_MAKEIMAGEID ||
-	    $access_type == $TB_PROJECT_CREATEEXPT) {
-	$mintrust = $TBDB_TRUST_LOCALROOT;
-    }
-    elseif ($access_type == $TB_PROJECT_ADDUSER ||
-	    $access_type == $TB_PROJECT_EDITGROUP) {
-	#
-	# If user is project_root or group_root in default group, 
-	# allow them to add/edit/remove users in any group.
-	#
-	if (TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
-	    return 1;
-	}
-	#
-	# Otherwise, editing a group requires group_root 
-	# in that group.
-	#	
-	$mintrust = $TBDB_TRUST_GROUPROOT;
-    }
-    elseif ($access_type == $TB_PROJECT_BESTOWGROUPROOT) {
-	#
-	# If user is project_root, 
-	# allow them to bestow group_root in any group.
-	#
-	if (TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_PROJROOT)) {
-	    return 1;
-	}
-
-	if (strcmp($gid, $pid) == 0)  {
-	    #
-	    # Only project_root can bestow group_root in default group, and
-	    # we already established that they are not project_root, so fail.
-	    #
-	    return 0;
-	}
-	else {
-	    #
-	    # Non-default group.
-	    # group_root in default group may bestow group_root.
-	    #
-	    if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
-			   $TBDB_TRUST_GROUPROOT)) {
-		return 1;
-	    }
-
-	    #
-	    # group_root in the group in question may also bestow group_root.
-	    #
-	    $mintrust = $TBDB_TRUST_GROUPROOT;
-	}
-    }
-    elseif ($access_type == $TB_PROJECT_GROUPGRABUSERS) {
-	#
-	# Only project_root or group_root in default group
-	# may grab (involuntarily add) users into groups.
-	#
-	$gid = $pid;
-	$mintrust = $TBDB_TRUST_GROUPROOT;
-    }
-    elseif ($access_type == $TB_PROJECT_DELUSER) {
-	$mintrust = $TBDB_TRUST_PROJROOT;
-    }
-    else {
-	TBERROR("Unexpected access type: $access_type!", 1);
-    }
-
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
-}
-
-
-#
-# Checks proposed Group trust change for consistency.
-#
-# Usage: TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail) 
-#        returns 1 if proposed change is valid
-#        returns 0 if proposed change is invalid and $fail == 0
-#        does not return if proposed change is invalid and $fail == 1.
-#
-
-function TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail)
-{
-    global $TBDB_TRUST_USER;
-
-    # 
-    # set $newtrustisroot to 1 if attempting to set a rootful trust,
-    # 0 otherwise.
-    #
-    $newtrustisroot = TBTrustConvert($newtrust) > $TBDB_TRUST_USER ? 1 : 0;
-
-    #
-    # If changing subgroup trust level, then compare levels.
-    # A user may not have root privs in the project and user privs
-    # in the subgroup; it makes no sense to do that and can violate trust.
-    #
-    if (strcmp($pid, $gid)) {
-	#
-	# Setting non-default "sub"group.
-	# Verify that if user has root in project,
-	# we are setting a rootful trust for him in 
-	# the subgroup as well.
-	#
-	$projtrustisroot = TBProjTrust($user, $pid) > $TBDB_TRUST_USER ? 1 : 0;
-
-	if ($projtrustisroot > $newtrustisroot) {
-	    if (!$fail) { return 0; }
-	    TBERROR("User $user may not have a root trust level in ".
-		      "the default group of $pid, ".
-		      "yet be non-root in subgroup $gid!", 1);
-	}
-    }
-    else {
-	#
-	# Setting default group.
-	# Do not verify anything (yet.)
-	#
-	$projtrustisroot = $newtrustisroot;
-    }
-
-    #
-    # Get all the subgroups not equal to the subgroup being changed.
-    # 
-    $query_result =
-	DBQueryFatal("select trust,gid from group_membership ".
-		     "where uid='$user' and pid='$pid' and trust!='none' ".
-		     " and gid!=pid and gid!='$gid'");
-
-    while ($row = mysql_fetch_array($query_result)) {
-	$grptrust = $row[0];
-	$ogid     = $row[1];
-	
-	# 
-	# Get what the users trust level is in the 
-	# current subgroup we're looking at.
-	#
-	$grptrustisroot = 
-	    TBTrustConvert( $grptrust ) > $TBDB_TRUST_USER ? 1 : 0;
-
-	#
-	# If users trust level is higher in the default group than in the
-	# subgroup we are looking at, this is wrong.
-	#
-	if ($projtrustisroot > $grptrustisroot) {
-	    if (!$fail) { return 0; }
-	    TBERROR("User $user may not have a root trust level in ".
-		      "the default group of $pid, ".
-		      "yet be non-root in subgroup $ogid!", 1);
-	}
-
-	if (strcmp($pid, $gid)) {
-            #
-	    # Iff we are modifying a subgroup, 
-	    # Make sure that the trust we are setting is as
-	    # rootful as the trust we already have set in
-	    # every other subgroup.
-	    # 
-	    if ($newtrustisroot != $grptrustisroot) { 
-		if (!$fail) { return 0; }
-		TBERROR("User $user may not mix root and ".
-			  "non-root trust levels in ".
-			  "different subgroups of $pid!", 1);
-	    }
-	}
-    }
-    return 1;
-}
-
-
-# Usage: TBExptGroup($pid, $eid, &$gid)
-#	 returns 0 if expt does not exist.
-#        returns 1 if expt exists.
-function TBExptGroup($pid, $eid, &$gid)
-{
-    $query_result =
-	DBQueryFatal("SELECT gid FROM experiments WHERE ".
-		     "eid='$eid' and pid='$pid'");
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row  = mysql_fetch_array($query_result);
-    $gid  = $row[gid];
-    return 1;
-}
-
-#
-# Experiment permission checks.
-#
-# Usage: TBExptAccessCheck($uid, $pid, $eid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-# 
-function TBExptAccessCheck($uid, $pid, $eid, $access_type)
-{
-    global $TB_EXPT_READINFO;
-    global $TB_EXPT_MODIFY;
-    global $TB_EXPT_DESTROY;
-    global $TB_EXPT_UPDATE;
-    global $TB_EXPT_MIN;
-    global $TB_EXPT_MAX;
-    global $TBDB_TRUST_USER;
-    global $TBDB_TRUST_LOCALROOT;
-    global $TBDB_TRUST_GROUPROOT;
-    global $TBDB_TRUST_PROJROOT;
-    $mintrust;
-
-    if ($access_type < $TB_EXPT_MIN ||
-	$access_type > $TB_EXPT_MAX) {
-	TBERROR("Invalid access type: $access_type!", 1);
-    }
-
-    #
-    # Admins do whatever they want!
-    # 
-    if (ISADMIN($uid)) {
-	return 1;
-    }
-
-    $query_result =
-	DBQueryFatal("SELECT gid,expt_head_uid FROM experiments WHERE ".
-		     "eid='$eid' and pid='$pid'");
-    
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row  = mysql_fetch_array($query_result);
-    $gid  = $row[gid];
-    $head = $row[expt_head_uid];
-
-    if ($access_type == $TB_EXPT_READINFO) {
-	$mintrust = $TBDB_TRUST_USER;
-    }
-    else {
-	$mintrust = $TBDB_TRUST_LOCALROOT;
-    }
-
-    #
-    # Either proper permission in the group, or group_root in the project.
-    # This lets group_roots muck with other peoples experiments, including
-    # those in groups they do not belong to.
-    #
-
-   return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
-}
-
-#
-# Determine if uid can access a node (read or modify).
-#
-# Usage: TBNodeAccessCheck($uid, $node_id, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-# 
-function TBNodeAccessCheck($uid, $node_id, $access_type)
-{
-    global $TB_NODEACCESS_READINFO;
-    global $TB_NODEACCESS_MODIFYINFO;
-    global $TB_NODEACCESS_LOADIMAGE;
-    global $TB_NODEACCESS_REBOOT;
-    global $TB_NODEACCESS_POWERCYCLE;
-    global $TB_NODEACCESS_MIN;
-    global $TB_NODEACCESS_MAX;
-    global $TBDB_TRUST_USER;
-    global $TBDB_TRUST_GROUPROOT;
-    global $TBDB_TRUST_LOCALROOT;
-    global $TBOPSPID;
-    $mintrust;
-
-    if ($access_type < $TB_NODEACCESS_MIN ||
-	$access_type > $TB_NODEACCESS_MAX) {
-	TBERROR("Invalid access type: $access_type!", 1);
-    }
-
-    $query_result =
-	DBQueryFatal("select e.pid,e.gid from reserved as r ".
-		     "left join experiments as e on ".
-		     "     e.pid=r.pid and e.eid=r.eid ".
-		     "where r.node_id='$node_id'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	#
-	# If the current user is in the emulab-ops project and has sufficient
-	# privs, then he can muck with free nodes as if he were an admin type.
-	#
-	if ($uid == GETUID() && OPSGUY()) {
-	    return(TBMinTrust(TBGrpTrust($uid, $TBOPSPID, $TBOPSPID),
-			      $TBDB_TRUST_LOCALROOT));
-	}
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $pid = $row[pid];
-    $gid = $row[gid];
-
-    if ($access_type == $TB_NODEACCESS_READINFO) {
-	$mintrust = $TBDB_TRUST_USER;
-    }
-    else {
-	$mintrust = $TBDB_TRUST_LOCALROOT;
-    }
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
-}
-
-#
-# Determine if uid can access a another user record (read or modify).
-#
-# Usage: TBUserInfoAccessCheck($uid, $target_uid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-# 
-function TBUserInfoAccessCheck($uid, $target_uid, $access_type)
-{
-    global $TB_USERINFO_READINFO;
-    global $TB_USERINFO_MODIFYINFO;
-    global $TB_USERINFO_MIN;
-    global $TB_USERINFO_MAX;
-
-    if ($access_type < $TB_USERINFO_MIN || $access_type > $TB_USERINFO_MAX) {
-	TBERROR("Invalid access type $access_type!", 1);
-    }
-
-    if (strcmp($uid, $target_uid) == 0) {
-	return 1;
-    }
-
-    #
-    # Admins do whatever they want!
-    # 
-    if (ISADMIN($uid)) {
-	return 1;
-    }
-
-    #
-    # This join will allow the operation if the current user is in the same
-    # group (any group) as the target user, but with root permissions.
-    # 
-    $query_result =
-	DBQueryFatal("select g.trust from group_membership as g ".
-		     "left join group_membership as authed on ".
-		     "     g.pid=authed.pid and g.gid=authed.gid and ".
-		     "     g.uid='$target_uid' ".
-		     "where authed.uid='$uid' and ".
-		     "      (authed.trust='group_root' or ".
-		     "       authed.trust='project_root')");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Access checks for an OSID. Tests for tbadmin.
-#
-# Usage: TBOSIDAccessCheck($uid, $osid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-# 
-function TBOSIDAccessCheck($uid, $osid, $access_type)
-{
-    global $TB_OSID_READINFO;
-    global $TB_OSID_MODIFYINFO;
-    global $TB_OSID_DESTROY;
-    global $TB_OSID_MIN;
-    global $TB_OSID_MAX;
-    global $TBDB_TRUST_USER;
-    global $TBDB_TRUST_LOCALROOT;
-    $mintrust;
-
-    if ($access_type < $TB_OSID_MIN || $access_type > $TB_OSID_MAX) {
-	TBERROR("Invalid access type $access_type!", 1);
-    }
-
-    #
-    # Admins do whatever they want!
-    # 
-    if (ISADMIN($uid)) {
-	return 1;
-    }
-
-    #
-    # No GIDs yet.
-    #
-    $query_result =
-	DBQueryFatal("SELECT pid,shared FROM os_info WHERE osid='$osid'");
-    
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $pid    = $row[pid];
-    $shared = $row[shared];
-
-    #
-    # Global OSIDs can be read by anyone.
-    # 
-    if ($shared) {
-	if ($access_type == $TB_OSID_READINFO) {
-	    return 1;
-	}
-	return 0;
-    }
-    
-    #
-    # Otherwise must have proper trust in the project.
-    # 
-    if ($access_type == $TB_OSID_READINFO) {
-	$mintrust = $TBDB_TRUST_USER;
-    }
-    else {
-	$mintrust = $TBDB_TRUST_LOCALROOT;
-    }
-
-    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
-}
-
-#
-# Access checks for an ImageID
-#
-# Usage: TBImageIDAccessCheck($uid, $imageid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-# 
-function TBImageIDAccessCheck($uid, $imageid, $access_type)
-{
-    global $TB_IMAGEID_READINFO;
-    global $TB_IMAGEID_MODIFYINFO;
-    global $TB_IMAGEID_DESTROY;
-    global $TB_IMAGEID_ACCESS;
-    global $TB_IMAGEID_MIN;
-    global $TB_IMAGEID_MAX;
-    global $TBDB_TRUST_USER;
-    global $TBDB_TRUST_GROUPROOT;
-    global $TBDB_TRUST_LOCALROOT;
-    $mintrust;
-
-    if ($access_type < $TB_IMAGEID_MIN || $access_type > $TB_IMAGEID_MAX) {
-	TBERROR("Invalid access type $access_type!", 1);
-    }
-
-    #
-    # Admins do whatever they want!
-    # 
-    if (ISADMIN($uid)) {
-	return 1;
-    }
-
-    $query_result =
-	DBQueryFatal("SELECT pid,gid,shared,global FROM images ".
-		     "WHERE imageid='$imageid'");
-    
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row    = mysql_fetch_array($query_result);
-    $shared = $row[shared];
-    $global = $row["global"];
-    $pid    = $row[pid];
-    $gid    = $row[gid];
-
-    #
-    # Global ImageIDs can be read by anyone but written by Admins only.
-    # 
-    if ($global) {
-	if ($access_type == $TB_IMAGEID_READINFO) {
-	    return 1;
-	}
-	return 0;
-    }
-
-    #
-    # Otherwise must have proper trust in the project.
-    # 
-    if ($access_type == $TB_IMAGEID_READINFO) {
-	$mintrust = $TBDB_TRUST_USER;
-        #
-        # Shared imageids are readable by anyone in the project.
-        #
-	if ($shared)
-	    $gid = $pid;
-    }
-    else {
-	$mintrust = $TBDB_TRUST_LOCALROOT;
-    }
-
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT);
-}
-
-#
-# Return the Unix GID Name and Number for a group. This is distinct from
-# the name we use within the Testbed system.
-#
-# usage: TBGroupUnixInfo($pid, $gid, &$unix_gid, &$unix_name)
-#
-function TBGroupUnixInfo($pid, $gid, &$unix_gid, &$unix_name)
-{
-    $query_result =
-	DBQueryFatal("select unix_name,unix_gid from groups ".
-		     "where pid='$pid' and gid='$gid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	TBERROR("No such group $gid in project $pid!", 1);
-    }
-    $row = mysql_fetch_array($query_result);
-    $unix_gid  = $row[unix_gid];
-    $unix_name = $row[unix_name];
-}
-
-#
-# Get name and email info for a uid. Args are pass by reference.
-#
-# usage: TBUserInfo($uid, $user_name, $user_email)
-#
-function TBUserInfo($uid, &$user_name, &$user_email)
-{
-    $query_result =
-	DBQueryFatal("select usr_name,usr_email from users where uid='$uid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	TBERROR("No such user $uid!", 1);
-    }
-    $row = mysql_fetch_array($query_result);
-    $user_name  = $row[usr_name];
-    $user_email = $row[usr_email];
-}
-
-#
-# Confirm a current user or not.
-#
-# usage TBCurrentUser($uid)
-#       returns 1 if a valid user.
-#       returns 0 if not a valid user.
-#
-function TBCurrentUser($uid)
-{
-    $query_result =
-	DBQueryFatal("SELECT usr_pswd FROM users WHERE uid='$uid'");
-
-    return mysql_num_rows($query_result);
-}
-
-#
-# Confirm a current WikiName or not.
-#
-# usage TBCurrentWikiName($uid)
-#       returns 1 if a current wikiname.
-#       returns 0 if not a current wikiname
-#
-function TBCurrentWikiName($wikiname)
-{
-    $query_result =
-	DBQueryFatal("SELECT usr_pswd FROM users WHERE wikiname='$wikiname'");
-
-    return mysql_num_rows($query_result);
-}
-
-#
-# Check to see if an email is being used twice.
-#
-# usage TBCurrentEmail($email)
-#       returns 1 if a valid email for someone.
-#       returns 0 if no such email address used by anyone.
-#
-function TBCurrentEmail($email)
-{
-    $query_result =
-	DBQueryFatal("SELECT uid FROM users WHERE usr_email='$email'");
-
-    return mysql_num_rows($query_result);
-}
-
-#
-# Get user status,
-#
-# usage TBUserStatus($uid)
-#       returns status if a valid user.
-#       returns 0 if not a valid user.
-#
-function TBUserStatus($uid)
-{
-    $query_result =
-	DBQueryFatal("SELECT status FROM users WHERE uid='$uid'");
-
-    if (! mysql_num_rows($query_result)) {
-	return 0;
-    }
-    $row = mysql_fetch_row($query_result);
-    return $row[0];
-}
-
-#
-# Confirm a valid pid/gid
-#
-# usage TBValidGroup($pid, $gid)
-#       returns 1 if a valid group.
-#       returns 0 if not a valid group
-#
-function TBValidGroup($pid, $gid)
-{
-    $query_result =
-	DBQueryFatal("select pid,gid from groups as g ".
-		     "where pid='$pid' and gid='$gid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-
-    #
-    # XXX String compare to ensure case match. 
-    #
-    $row = mysql_fetch_row($query_result);
-    if (strcmp($row[0], $pid) ||
-	strcmp($row[1], $gid)) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Confirm a valid project.
-#
-# usage TBValidProject($pid)
-#       returns 1 if a valid project.
-#       returns 0 if not a valid project.
-#
-function TBValidProject($pid)
-{
-    return TBValidGroup($pid, $pid);
-}
-
-#
-# Confirm a group member.
-#
-# usage TBGroupMember($uid, $pid, $gid, &$approved)
-#       returns 1 if a member.
-#       returns 0 if not a member.
-#
-function TBGroupMember($uid, $pid, $gid, &$approved)
-{
-    global $TBDB_TRUST_USER;
-	
-    $approved = 0;
-    
-    $query_result =
-	DBQueryFatal("select trust from group_membership ".
-		     "where uid='$uid' and pid='$pid' and gid='$gid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_row($query_result);
-    $trust = $row[0];
-
-    $approved = TBMinTrust($trust, $TBDB_TRUST_USER);
-    return 1;
-}
-
-#
-# Confirm a valid OS Descriptor in the specified project.
-#
-# usage TBValidOS($pid, $imagename)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBValidOS($pid, $osname)
-{
-    $query_result =
-	DBQueryFatal("select osid from os_info where ".
-		     "pid='$pid' and osname='$osname'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Confirm a valid osid.
-#
-# usage TBValidOSID($osid)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBValidOSID($osid)
-{
-    $query_result =
-	DBQueryFatal("select osid from os_info where osid='$osid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Confirm a valid image in the specified project.
-#
-# usage TBValidImage($pid, $imagename)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBValidImage($pid, $imagename)
-{
-    $query_result =
-	DBQueryFatal("select imageid from images where ".
-		     "pid='$pid' and imagename='$imagename'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Confirm a valid imageid (imageids are globally unique).
-#
-# usage TBValidImageID($imageid)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBValidImageID($imageid)
-{
-    $query_result =
-	DBQueryFatal("select imageid from images where imageid='$imageid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Return info for an imageid.
-# 
-# usage TBImageInfo($imageid, &$imagename, &$pid)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBImageInfo($imageid, &$imagename, &$pid)
-{
-    $query_result =
-	DBQueryFatal("select * from images where imageid='$imageid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $imagename = $row[imagename];
-    $pid       = $row[pid];
-    return 1;
-}
-
-#
-# Return info for an osid.
-# 
-# usage TBOSInfo($osid, &$osname, &$pid)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBOSInfo($osid, &$osname, &$pid)
-{
-    $query_result =
-	DBQueryFatal("select * from os_info where osid='$osid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $osname = $row[osname];
-    $pid    = $row[pid];
-    return 1;
-}
-
-#
-# Confirm a valid experiment.
-#
-# usage TBValidExperiment($pid, $eid)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBValidExperiment($pid, $eid)
-{
-    $pid = addslashes($pid);
-    $eid = addslashes($eid);
-
-    $query_result =
-	DBQueryFatal("select eid from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Confirm a valid node name.
-#
-# usage TBValidNodeName($node)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBValidNodeName($node)
-{
-    $query_result =
-	DBQueryFatal("select node_id from nodes where node_id='$node'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
 # Confirm a valid node type
 #
 # usage TBValidNodeType($type)
@@ -1171,207 +265,6 @@ function TBValidNodeType($type)
 	return 0;
     }
     return 1;
-}
-
-#
-# Return mail addresses for project_root and group_root people.
-#
-# usage TBLeaderMailList($pid, $gid)
-#       Uses default group (pid=gid) if gid not given.
-#       returns string like "Leader Name (uid) <email>[, ...]"
-#       returns the empty string if not valid
-function TBLeaderMailList($pid, $gid)
-{
-  # No group, then use the default group.
-  if (! $gid) { $gid = $pid; }
-  
-  $query_result =
-    DBQueryFatal("select distinct usr_name,u.uid,usr_email from users as u ".
-		 "left join group_membership as gm on gm.uid=u.uid ".
-		 "where (trust='". TBDB_TRUSTSTRING_PROJROOT .
-		 "' and pid='$pid') or (trust='". TBDB_TRUSTSTRING_GROUPROOT .
-		 "' and pid='$pid' and gid='$gid') ".
-		 "order by trust DESC, usr_name");
-  
-  if (mysql_num_rows($query_result) == 0) {
-    return "";
-  }
-  $mailstr="";
-  while ($row = mysql_fetch_array($query_result)) {
-    if ($mailstr != "") { $mailstr .=", "; }
-    $mailstr .= '"'.$row[usr_name]." (".$row[uid].")\" <".$row[usr_email].">";
-  }
-  return $mailstr;
-}
-
-#
-# Return Project Leader.
-#
-# usage TBProjLeader($pid, &$projleader)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBProjLeader($pid, &$projleader)
-{
-    $query_result =
-	DBQueryFatal("select head_uid from projects where pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $projleader  = $row[head_uid];
-    
-    return 1;
-}
-
-#
-# Return Group Leader.
-#
-# usage TBGroupLeader($pid, $gid, &$groupleader)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBGroupLeader($pid, $gid, &$groupleader)
-{
-    $query_result =
-	DBQueryFatal("select leader from groups ".
-		     "where pid='$pid' and gid='$gid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $groupleader  = $row[leader];
-    
-    return 1;
-}
-
-#
-# Return Experiment Leader.
-#
-# usage TBExpLeader($pid, $eid, &$expleader)
-#       returns 1 if valid
-#       returns 0 if not valid
-#
-function TBExpLeader($pid, $eid, &$expleader)
-{
-    $query_result =
-	DBQueryFatal("select expt_head_uid from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_array($query_result);
-    $expleader  = $row[expt_head_uid];
-    
-    return 1;
-}
-
-#
-# Return a list of projects for which the uid is allowed to perform the
-# requested operation. Only a couple of access options are supported since
-# to be totally general would require too many DB operations. Not worth
-# the effort or the expense.
-#
-# Returns an indexed array (by pid) of lists (of gids).
-#
-function TBProjList($uid, $access_type)
-{
-    global $TB_PROJECT_CREATEEXPT;
-    global $TB_PROJECT_MAKEOSID;
-    global $TB_PROJECT_MAKEIMAGEID;
-    global $TB_PROJECT_MAKEGROUP;
-    global $TB_PROJECT_READINFO;
-    $result = array();
-    $user_clause = "where uid='$uid' and";
-    
-    if ($access_type == $TB_PROJECT_READINFO) {
-	$trust_clause = "trust!='none'";
-    }
-    elseif ($access_type == $TB_PROJECT_MAKEGROUP) {
-	$trust_clause = "trust='project_root'";
-    }
-    elseif ($access_type == $TB_PROJECT_CREATEEXPT) {
-	$trust_clause = "(trust='project_root' or trust='group_root' or ".
-	                " trust='local_root')";
-    }
-    elseif ($access_type == $TB_PROJECT_MAKEOSID ||
-	    $access_type == $TB_PROJECT_MAKEIMAGEID) {
-        if (ISADMIN($uid)) {
-            $user_clause = "";
-	}
-        else {
-  	    $trust_clause = "(trust='project_root' or trust='group_root' or ".
-	                    " trust='local_root')";
-        }
-    }
-    else {
-	TBERROR("Invalid access type $access_type!", 1);
-    }
-    
-    $query_result =
-	DBQueryFatal("SELECT distinct pid,gid FROM group_membership ".
-		     "$user_clause $trust_clause order by pid");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return $result;
-    }
-
-    $i = 0;
-    while ($row = mysql_fetch_array($query_result)) {
-	$pid = $row['pid'];
-	$gid = $row['gid'];
-	
-	$result[$pid][] = $gid;
-
-	$i++;
-    }
-    return $result;
-}
-
-function TBExptState($pid, $eid)
-{
-    $query_result =
-	DBQueryFatal("select state from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row   = mysql_fetch_array($query_result);
-    $state = $row[state];
-    return $state;
-}
-
-function TBExptIndex($pid, $eid)
-{
-    $query_result =
-	DBQueryFatal("select idx from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    $idx   = $row[idx];
-    return $idx;
-}
-
-function TBrsrcIndex($pid, $eid)
-{
-    $query_result =
-	DBQueryFatal("select s.rsrcidx from experiments as e ".
-		     "left join experiment_stats as s on s.exptidx=e.idx ".
-		     "where e.pid='$pid' and e.eid='$eid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    $idx   = $row[rsrcidx];
-    return $idx;
 }
 
 function TBUidNodeLastLogin($uid)
@@ -1421,22 +314,6 @@ function TBUsersLastLogin($uid)
     }
     $row   = mysql_fetch_array($query_result);
     return $row;
-}
-
-#
-# Return number of events in an experiment.
-#
-function TBEventCount($pid, $eid)
-{
-    $query_result =
-	DBQueryFatal("select count(*) from eventlist ".
-		     "where pid='$pid' and eid='$eid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_row($query_result);
-    return $row[0];
 }
 
 #
@@ -1492,20 +369,36 @@ function TBFreePCs()
 }
 
 #
-# Number of PCs a user has reserved to his experiments.
+# Number of logged in users
 #
-function TBUserPCs($uid)
+function TBLoggedIn()
 {
     $query_result =
-	DBQueryFatal("select a.node_id from nodes as a ".
-		     "left join reserved as b on a.node_id=b.node_id ".
-		     "left join node_types as nt on a.type=nt.type ".
-                     "left join experiments as e on b.pid=e.pid and ".
-                     " b.eid=e.eid ".
-		     "where e.expt_head_uid='$uid' and e.pid!='emulab-ops' ".
-		     "  and a.role='testnode' and nt.class = 'pc'");
+	DBQueryFatal("select count(distinct uid) from login ".
+		     "where timeout > UNIX_TIMESTAMP(now())");
 
-    return mysql_num_rows($query_result);
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
+}
+
+#
+# Number of active experiments.
+#
+function TBActiveExperiments()
+{
+    $query_result =
+	DBQueryFatal("select count(*) from experiments where ".
+		     "state='active' and pid!='emulab-ops' and ".
+		     "pid!='testbed'");
+    
+    if (mysql_num_rows($query_result) != 1) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    return $row[0];
 }
 
 #
@@ -1525,320 +418,6 @@ function TBReloadingPCs()
 	return 0;
     }
     $row = mysql_fetch_row($query_result);
-    return $row[0];
-}
-
-function TBExptLogFile($pid, $eid)
-{
-    $query_result =
-	DBQueryFatal("select logfile from experiments ".
-		     "where pid='$pid' and eid='$eid' and ".
-		     " logfile is not null");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row = mysql_fetch_row($query_result);
-    return $row[0];
-}
-
-function TBWebdbAllowed($uid) {
-    $query_result =
-        DBQueryFatal("select dbedit from users ".
-		     "WHERE uid='$uid' and dbedit=1");
-
-    return mysql_num_rows($query_result);
-}
-
-function TBCvswebAllowed($uid) {
-    $query_result =
-        DBQueryFatal("select cvsweb from users ".
-		     "WHERE uid='$uid' and cvsweb=1");
-
-    return mysql_num_rows($query_result);
-}
-
-function TBWikiOnlyUser($uid) {
-    $query_result =
-        DBQueryFatal("select wikionly from users ".
-		     "WHERE uid='$uid' and wikionly=1");
-
-    return mysql_num_rows($query_result);
-}
-
-#
-# Returns > 0 if a node has a serial console, 0 if it does not
-#
-function TBHasSerialConsole($node_id) {
-    $query_result =
-	DBQueryFatal("select tipname from tiplines WHERE node_id='$node_id'");
-    return mysql_num_rows($query_result);
-}
-
-#
-# Generate a verification key, and stash it in the database
-#
-function TBGenVerificationKey($name) {
-    $key = md5(uniqid(rand(),1));
-    DBQueryFatal("update users set verify_key='$key' where uid='$name'");
-    return $key;
-}
-
-#
-# Get a verification key from the database
-#
-function TBGetVerificationKey($name) {
-    $query_result =
-	DBQueryFatal("select verify_key from users where uid='$name'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	# Can we signal error somehow?
-	return "";
-    }
-    $row   = mysql_fetch_array($query_result);
-    return $row[verify_key];
-}
-
-#
-# Map IP to nodeid.
-#
-function TBIPtoNodeID($ip) {
-    $query_result =
-	DBQueryFatal("select n.node_id from interfaces as i ".
-		     "left join nodes as n on n.node_id=i.node_id ".
-		     "left join node_types as t ".
-		     "   on t.type=n.type and i.iface=t.control_iface ".
-		     "where i.IP='$ip'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row   = mysql_fetch_array($query_result);
-    return $row[node_id];
-}
-
-#
-# Map nodeid to pid,eid,gid. Return 0 if not reserved. 
-#
-function TBNodeIDtoExpt($nodeid, &$pid, &$eid, &$gid) {
-    $query_result =
-	DBQueryFatal("select r.pid,r.eid,e.gid from reserved as r ".
-		     "left join experiments as e on r.pid=e.pid and ".
-		     "     r.eid=e.eid where node_id='$nodeid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row   = mysql_fetch_array($query_result);
-    $pid   = $row["pid"];
-    $eid   = $row["eid"];
-    $gid   = $row["gid"];
-    return 1;
-}
-
-#
-# Get the class of a node.
-#
-function TBNodeClass($nodeid) {
-    $query_result =
-	DBQueryFatal("select nt.class from nodes as n ".
-		     "left join node_types as nt on nt.type=n.type ".
-		     "  where n.node_id='$nodeid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return "";
-    }
-
-    $row = mysql_fetch_array($query_result);
-    return $row["class"];
-}
-
-#
-# Get the status of a node.
-#
-function TBNodeStatus($nodeid) {
-    $query_result =
-	DBQueryFatal("select status from nodes as n where node_id='$nodeid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return "";
-    }
-
-    $row = mysql_fetch_array($query_result);
-    return $row["status"];
-}
-
-#
-# Functions related to idle times
-#
-
-$lastact_query = "greatest(last_tty_act,last_net_act,last_cpu_act,".
-                 "last_ext_act)";
-
-#
-# Gets the time of last activity for a node
-#
-function TBGetNodeLastAct($pc) {
-    global $lastact_query;
-    $query_result =
-	DBQueryWarn("select $lastact_query as last_act from node_activity ".
-		    "where node_id='$pc'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    return $row[last_act];
-}
-
-#
-# Gets the time of idleness for a node, in hours by default (ie '2.75')
-#
-function TBGetNodeIdleTime($pc, $format = 0) {
-    global $lastact_query;
-    $query_result =
-	DBQueryWarn("select (unix_timestamp(now()) - unix_timestamp( ".
-		    "$lastact_query)) as idle_time from node_activity ".
-		    "where node_id='$pc'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    $t = $row[idle_time];
-    # if it is less than 5 minutes, it is not idle at all...
-    $t = ($t < 300 ? 0 : $t);
-    if (!$format) {
-	$t = round($t/3600,2);
-    } else {
-	$t = date($format,mktime(0,0,$t));
-    }
-    return $t;
-}
-
-#
-# Find out if a node's idle reports are stale
-#
-function TBGetNodeIdleStale($pc) {
-    global $lastact_query;
-
-    # We currently have a 5 minute interval for slothd between reports
-    # So give some slack in case a node reboots without reporting for a while
-    $staletime = 10; # in minutes
-    $stalesec = 60 * $staletime;
-    $query_result =
-	DBQueryWarn("select (unix_timestamp(now()) - ".
-		    "unix_timestamp(last_report )) as t ".
-		    "from node_activity where node_id='$pc'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    return ($row[t]>$stalesec);
-}
-
-#
-# Gets the time of last activity for an expt
-#
-function TBGetExptLastAct($pid, $eid) {
-    global $lastact_query;
-    $query_result =
-	DBQueryWarn("select max($lastact_query) as last_act ".
-		    "from node_activity as na ".
-		    "left join reserved as r on na.node_id=r.node_id ".
-		    "where pid='$pid' and eid='$eid' ".
-		    "group by pid,eid");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    return $row[last_act];
-}
-
-#
-# Gets the time of idleness for an expt, in hours
-#
-function TBGetExptIdleTime($pid, $eid, $format = 0) {
-    global $lastact_query;
-    $query_result =
-	DBQueryWarn("select (unix_timestamp(now()) - unix_timestamp( ".
-		    "max($lastact_query))) as idle_time ".
-		    "from node_activity as na ".
-		    "left join reserved as r on na.node_id=r.node_id ".
-		    "where pid='$pid' and eid='$eid' ".
-		    "group by pid,eid");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    $t = $row[idle_time];
-    # if it is less than 5 minutes, it is not idle at all...
-    $t = ($t < 300 ? 0 : $t);
-    if (!$format) {
-	$t = round($t/3600,2);
-    } else {
-	$t = date($format,mktime(0,0,$t,1,1));
-    }
-    return $t;
-}
-
-#
-# Find out if an expt's idle report is stale
-#
-function TBGetExptIdleStale($pid, $eid) {
-    global $lastact_query;
-
-    # We currently have a 5 minute interval for slothd between reports
-    # So give some slack in case a node reboots without reporting for a while
-    $staletime = 10; # in minutes
-    $stalesec = 60 * $staletime;
-    $query_result =
-	DBQueryWarn("select (unix_timestamp(now()) - ".
-		    "unix_timestamp(min(last_report) )) as t ".
-		    "from node_activity as na ".
-		    "left join reserved as r on na.node_id=r.node_id ".
-		    "where pid='$pid' and eid='$eid' ".
-		    "group by pid,eid");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return -1;
-    }
-    $row   = mysql_fetch_array($query_result);
-    return ($row[t]>$stalesec);
-}
-
-#
-# Find out if an expt's idleness should be ignored
-#
-function TBGetExptIdleIgnore($pid,$eid) {
-    global $lastact_query;
-
-    $query_result =
-	DBQueryWarn("select idle_ignore from experiments ".
-		    "where pid='$pid' and eid='$eid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row   = mysql_fetch_array($query_result);
-    return $row[idle_ignore];
-}
-
-#
-# Get the default user interface that has been selected for the project.
-#
-function TBGetDefaultProjectUserInterface($pid) {
-    $query_result =
-	DBQueryWarn("select default_user_interface from projects ".
-		    "where pid='$pid'");
-
-    if (mysql_num_rows($query_result) == 0) {
-	return 0;
-    }
-    $row   = mysql_fetch_array($query_result);
     return $row[0];
 }
 
@@ -1888,8 +467,8 @@ function TBGetSiteVar($name)
     if (mysql_num_rows($query_result) > 0) {    
 	$row = mysql_fetch_array($query_result);
 
-	$value = $row[value];
-	$defaultvalue = $row[defaultvalue];
+	$value = $row["value"];
+	$defaultvalue = $row["defaultvalue"];
 	if (isset($value)) { return $value; }
 	if (isset($defaultvalue)) { return $defaultvalue; }
     }
@@ -1952,53 +531,6 @@ function TBPlabAvail() {
 }
 
 #
-# Is an experiment firewalled.
-# 
-function TBExptFirewall($pid, $eid) {
-    #
-    # Short form: is there a firewall?
-    #
-    $query_result =
-	DBQueryWarn("SELECT eid FROM virt_firewalls ".
-		    "WHERE pid='$pid' and eid='$eid' ".
-		    "AND type LIKE '%-vlan'");
-    if (!$query_result || !mysql_num_rows($query_result))
-	return 0;
-   
-    return 1;
-}
-
-#
-# See if user has enough permission to view the webcams. If not an admin
-# person, then must be a project with permission to use the robots.
-# Eventually this needs to be a much more restrictive test.
-#
-function TBWebCamAllowed($uid) {
-    $query_result =
-	DBQueryFatal("select distinct class from group_membership as g ".
-		     "left join nodetypeXpid_permissions as p on g.pid=p.pid ".
-		     "left join node_types as nt on nt.type=p.type ".
-		     "where uid='$uid' and class='robot'");
-    return mysql_num_rows($query_result);
-}
-
-#
-# Return lockeddown bit
-#
-function TBExptLockedDown($pid, $eid)
-{
-    $query_result =
-	DBQueryFatal("select lockdown from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-
-    if (!$query_result || !mysql_num_rows($query_result))
-	return 0;
-
-    $row = mysql_fetch_array($query_result);
-    return $row[0];
-}
-
-#
 # Return firstinit state.
 #
 function TBGetFirstInitState()
@@ -2031,36 +563,66 @@ function TBSetFirstInitPid($pid)
 function TBGetVersionInfo(&$major, &$minor, &$build)
 {
     $query_result = 
-	DBQueryFatal("select name,value from sitevariables ".
-		     "where name='general/version/major' or ".
-		     "      name='general/version/minor' or ".
-		     "      name='general/version/build'");
+	DBQueryFatal("select value from sitevariables ".
+		     "where name='general/version/build'");
 
-    while (($row = mysql_fetch_row($query_result))) {
-	$name  = $row[0];
-	$value = $row[1];
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	$build = $row[0];
+    }
+    else {
+	$build = "Unknown";
+    }
 
-	if ($name == "general/version/major")
-	    $major = $value;
-	elseif ($name == "general/version/minor")
-	    $minor = $value;
-	elseif ($name == "general/version/build")
-	    $build = $value;
+    $query_result =
+	DBQuery("select value from version_info where name='dbrev'");
+    if ($query_result && mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	list($a,$b) = preg_split('/\./', $row[0]);
+	$a = (isset($a) && $a != "" ? $a : "x");
+	$b = (isset($b) && $b != "" ? $b : "y");
+	$major = $a;
+	$minor = $b;
+    }
+    else {
+	$major = "X";
+	$minor = "Y";
     }
     return 1;
 }
 
 #
-# Is email address unique?
+# Get the commit hash.
 #
-function TBUniqueEmail($uid, $email)
+function TBGetCommitHash()
+{
+    $query_result = 
+	DBQueryFatal("select value from version_info ".
+		     "where name='commithash'");
+
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	return $row[0];
+    }
+    return null;
+}
+
+#
+# Return a node_tye attribute entry.
+#
+function NodeTypeAttribute($type, $key, &$value)
 {
     $query_result =
-	DBQueryFatal("select usr_email from users where ".
-		     "usr_email='$email' and uid!='$uid'");
-
-    if (mysql_num_rows($query_result))
+	DBQueryFatal("select attrvalue from node_type_attributes ".
+		     "where type='$type' and attrkey='$key'");
+    
+    if (!mysql_num_rows($query_result)) {
+	$value = null;
 	return 0;
+    }
+
+    $row = mysql_fetch_row($query_result);
+    $value = $row[0];
     return 1;
 }
 
@@ -2096,6 +658,56 @@ function TBGetUniqueIndex($name)
 }
 
 #
+# Trivial wrapup of Logile table so we can use it in url_defs.
+# 
+class Logfile
+{
+    var	$logfile;
+
+    #
+    # Constructor by lookup on unique index.
+    #
+    function Logfile($logid) {
+	$safe_id = addslashes($logid);
+
+	$query_result =
+	    DBQueryWarn("select * from logfiles ".
+			"where logid='$safe_id'");
+
+	if (!$query_result || !mysql_num_rows($query_result)) {
+	    $this->logfile = NULL;
+	    return;
+	}
+	$this->logfile   = mysql_fetch_array($query_result);
+    }
+
+    # Hmm, how does one cause an error in a php constructor?
+    function IsValid() {
+	return !is_null($this->logfile);
+    }
+
+    # Lookup by ID
+    function Lookup($logid) {
+	$foo = new Logfile($logid);
+
+	if (!$foo || !$foo->IsValid())
+	    return null;
+
+	return $foo;
+    }
+
+    # accessors
+    function field($name) {
+	return (is_null($this->logfile) ? -1 : $this->logfile[$name]);
+    }
+    function logid()	     { return $this->field("logid"); }
+    function filename()	     { return $this->field("filename"); }
+    function isopen()        { return $this->field("isopen"); }
+    function uid_idx()       { return $this->field("uid_idx"); }
+    function gid_idx()       { return $this->field("gid_idx"); }
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
@@ -2109,10 +721,35 @@ while ($maxtries) {
     sleep(1);
 }
 if (! $DBlinkid) {
-    TBERROR("Could not connect to mysqld after several attempts!", 1);
+    USERERROR("Temporary resource error; ".
+	      "please try again in a few minutes", 1);
 }
 if (!mysql_select_db($TBDBNAME)) {
     TBERROR("Could not select DB after connecting!", 1);
+}
+$DBlinkids = array();
+$DBlinkids[$TBDBNAME] = $DBlinkid;
+
+#
+# Connect to alternate DB.
+#
+function DBConnect($dbname)
+{
+    global $SCRIPT_NAME;
+    global $DBlinkids;
+
+    if (array_key_exists($dbname, $DBlinkids)) {
+	return $DBlinkids[$dbname];
+    }
+
+    $linkid = mysql_connect("localhost", basename($SCRIPT_NAME), "none", 1);
+    if ($linkid) {
+	if (!mysql_select_db($dbname, $linkid)) {
+	    return null;
+	}
+    }
+    $DBlinkids[$dbname] = $linkid;
+    return $linkid;
 }
 
 #
@@ -2137,18 +774,33 @@ $DBErrorString = "";
 # the error string from the DB module. Use DBFatal (below) to print/email
 # that string, and then exit.
 #
-function DBQuery($query)
+function DBQuery($query, $linkid = NULL)
 {
     global	$TBDBNAME;
     global	$DBErrorString;
     global      $DBlinkid;
+
+    $linkid = is_null($linkid) ? $DBlinkid : $linkid;
     
-    $result = mysql_query($query, $DBlinkid);
+    # Support for SQL-injection vulnerability checking.  Labeled probe strings
+    # should be caught in page input argument checking before they get here.
+    $lbl = strpos($query, "**{");
+    if ( $lbl !== FALSE ) {
+	$end = strpos($query, "}**") + 3;
+	# Look for a preceeding single quote, and see if it's backslashed.
+	if ( substr($query, $lbl-1, 1) == "'" ) {
+	    $lbl--;
+	    if ( substr($query, $lbl-1, 1) == '\\' ) $lbl--;
+	}
+	USERERROR("Probe label: " . substr($query, $lbl, $end-$lbl), 1);
+    }
+
+    $result = mysql_query($query, $linkid);
 
     if (! $result) {
 	$DBErrorString =
 	    "  Query: $query\n".
-	    "  Error: " . mysql_error();
+	    "  Error: " . mysql_error($linkid);
     }
     return $result;
 }
@@ -2156,9 +808,9 @@ function DBQuery($query)
 #
 # Same as above, but die on error. 
 # 
-function DBQueryFatal($query)
+function DBQueryFatal($query, $linkid = NULL)
 {
-    $result = DBQuery($query);
+    $result = DBQuery($query, $linkid);
 
     if (! $result) {
 	DBFatal("DB Query failed");
@@ -2170,9 +822,9 @@ function DBQueryFatal($query)
 # Same as above, but just send email on error. This info is useful
 # to the TB system, but the caller has to retain control.
 # 
-function DBQueryWarn($query)
+function DBQueryWarn($query, $linkid = NULL)
 {
-    $result = DBQuery($query);
+    $result = DBQuery($query, $linkid);
 
     if (! $result) {
 	DBWarn("DB Query failed");
@@ -2217,11 +869,13 @@ function DBFatal($message)
 # Return the number of affected rows, for the last query. Why is this
 # not stored in the query result?
 # 
-function DBAffectedRows()
+function DBAffectedRows($linkid = NULL)
 {
     global      $DBlinkid;
 
-    return mysql_affected_rows($DBlinkid);
+    $linkid = is_null($linkid) ? $DBlinkid : $linkid;
+
+    return mysql_affected_rows($linkid);
 }
 
 ?>

@@ -1,6 +1,0 @@
-#!/bin/sh
-
-if [ -x /etc/testbed/rc.frisbee ]; then
-       	echo "Playing Frisbee ..."
-        /etc/testbed/rc.frisbee
-fi

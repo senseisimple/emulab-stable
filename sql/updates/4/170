@@ -1,0 +1,26 @@
+#
+# HomeNet changes provided by Pat Gunn.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("sw_configfiles")) {
+	DBQueryFatal("CREATE TABLE `sw_configfiles` ( ".
+		     " `id` int(11) NOT NULL auto_increment, ".
+		     " `node_id` varchar(32) NOT NULL, ".
+		     " `connection_id` int(11) NOT NULL default '0', ".
+		     " `file` varchar(4) NOT NULL, ".
+		     " `data` text, ".
+		     " `swid` varchar(20) NOT NULL, ".
+		     " PRIMARY KEY(`id`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    DBQueryFatal("ALTER TABLE images MODIFY mbr_version VARCHAR(50) ".
+		 "NOT NULL default '1'");
+    return 0;
+}
+1;

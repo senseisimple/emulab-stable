@@ -1,0 +1,15 @@
+#
+# This is the definitions file for Leigh on Emulab.Net.
+#
+. defs-default
+
+TBOPSEMAIL=kevina@flux.utah.edu
+TBLOGSEMAIL=kevina@flux.utah.edu
+TBWWWEMAIL=kevina@flux.utah.edu
+TBAPPROVALEMAIL=kevina@flux.utah.edu
+TBAUDITEMAIL=kevina@flux.utah.edu
+TBSTATEDEMAIL=kevina@fast.cs.utah.edu
+TBTESTSUITEEMAIL=kevina@fast.cs.utah.edu
+WWW=www.emulab.net/dev/kevina
+THISHOMEBASE=Kevina.Emulab.Net
+NODE_USAGE_SUPPORT=1

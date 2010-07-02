@@ -1,0 +1,147 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniSES;
+
+#
+# The server side of the SES interface. The SES is currently just an
+# XMLRPC wrapper around "assign" (from Emulab).
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use User;
+use Genixmlrpc;
+use GeniResponse;
+use GeniUser;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniAuthority;
+use GeniHRN;
+use English;
+use XML::Simple;
+use Data::Dumper;
+use File::Temp qw/tempfile/;
+use Scalar::Util;
+use MIME::Base64;
+use Compress::Zlib;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $HAVE_XERCES    = "@HAVE_XERCES@";
+my $ASSIGN	   = "$TB/libexec/assign";
+
+my $API_VERSION = 1;
+
+#
+# Tell the client what API revision we support.  The correspondence
+# between revision numbers and API features is to be specified elsewhere.
+# No credentials are required.
+#
+sub GetVersion()
+{
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+}
+
+#
+# Map a virtual topology onto (a subset of) an advertised physical
+# topology.
+#
+sub Map($)
+{
+    my ($argref) = @_;
+    my $credential = $argref->{'credential'};
+    my $ad = $argref->{'advertisement'};
+    my $req = $argref->{'request'};
+
+    return GeniResponse->MalformedArgsResponse() unless
+	defined( $credential ) && defined( $ad ) && defined( $req );
+
+    my $user_uuid  = $ENV{'GENIUSER'};
+
+    $credential = GeniCredential->CreateFromSigned($credential);
+    if (!defined($credential)) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Could not create GeniCredential object");
+    }
+    # The credential owner/slice has to match what was provided.
+    if ($user_uuid ne $credential->owner_uuid()) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Invalid credentials for operation");
+    }
+
+    # This is a nasty way to check, but we can't do anything useful
+    # if assign wasn't compiled with XML (i.e. rspec) support.
+    return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED )
+	unless $HAVE_XERCES eq "yes";
+
+    # If the ad is Binary typed (and therefore base64 encoded), assume
+    # it is compressed.
+    if( Scalar::Util::blessed( $ad ) && $ad->isa( "Frontier::RPC2::Base64" ) ) {
+	$ad = uncompress( decode_base64( $ad->value ) );
+    }
+
+    #
+    # Use assign in xml mode to spit back an xml file. 
+    #
+    my ( $adfile, $adfilename ) = tempfile();
+    my ( $reqfile, $reqfilename ) = tempfile();
+
+    return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				 "Could not store advertisement" )
+	unless defined $adfile;
+    print $adfile $ad;
+    close $adfile;
+
+    return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				 "Could not store request" )
+	unless defined $reqfile;
+    print $reqfile $req;
+    close $reqfile;
+
+    open( ASSIGN, "$ASSIGN -P -q $adfilename -w $reqfilename 2>&1 |" )
+	or return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+					"Assign process failed" );
+
+    my $assignverbosity = "";
+    while( <ASSIGN> ) {
+	$assignverbosity .= $_;
+    }
+    close ASSIGN;
+
+    unlink $adfilename;
+    unlink $reqfilename;
+
+    $reqfilename =~ m{(.*/)([^/]+)};
+    my $annfilename = $1 . "annotated-" . $2;
+
+    open( ANNOTATED, "<$annfilename" ) or
+	return GeniResponse->Create( GENIRESPONSE_ERROR, undef,
+				     "Failed to map topolgy:\n" .
+				     $assignverbosity );
+
+    my $xml = "";
+    while ( <ANNOTATED> ) {
+	$xml .= $_;
+    }
+    close ANNOTATED;
+    unlink $annfilename;
+
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $xml );
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

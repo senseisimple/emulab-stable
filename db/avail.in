@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,8 +20,8 @@ my $d = 0; #debug mode
 
 if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) { 
   die("Usage:\navail [help] [type[=<type>]] [OS[=<OS>]] [ver[=<OS_ver>]]\n".
-      "              [[includevirt] or [virtonly[=<phys>]]] [rand] [limit=N]".
-      "\n".
+      "              [[includevirt] or [virtonly[=<phys>]]] [rand]\n".
+      "              [limit=N] [aslist]\n".
       "\n".
       "type \t= pc | shark\n"."OS \t= Linux | FreeBSD | NetBSD | ...\n".
       "ver \t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n".#"deltas \t= anetd | ...\n".
@@ -105,23 +105,14 @@ if (defined($args{"ver"})) {
   $cols .= ",d.version";
   $cond .= " and d.version='".$args{"ver"}."'" if $args{"ver"} ne '='; 
 }
-# if (defined($args{"deltas"})) { 
-#   $os = 1;
-#   $delta=1;
-#   $cols .= ",e.delta_id";
-#   $cond .= " and e.delta_id='".$args{"deltas"}."'" if $args{"deltas"} ne '='; 
-# }
-
 if ($os) {
   $join .= " left join partitions as c on a.node_id=c.node_id";
   $join .= " left join os_info as d on c.osid=d.osid";
 }
-
-# if ($delta) {
-#   $join .= " left join delta_inst as e on c.node_id=e.node_id ".
-#     "and c.partition=e.partition";
-# }
-
+if (defined($args{"prereserve"})) {
+    $pid = $args{"prereserve"};
+    $cond .= " and a.reserved_pid='$pid' ";
+}
 
 my $cmd = "select $cols from $join where $cond order by $order $limit";
 
@@ -129,7 +120,14 @@ print "Sending cmd:\n$cmd\n" if $d;
 
 my $result = DBQueryFatal($cmd);
 
-print $result->as_string();
+if ($args{"aslist"}) {
+    while (my ($node_id) = $result->fetchrow_array()) {
+	print "$node_id\n";
+    }
+}
+else { 
+    print $result->as_string();
+}
 
 # Hacky. Batch daemon depends on this exit code.
 exit($result->numrows);

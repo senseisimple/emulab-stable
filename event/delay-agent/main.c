@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -53,19 +53,15 @@ char *myexp  = NULL;
 
 /* The list of linknames in tuple format, for the event subscription */
 char myobjects[1024];
+char lanobjects[1024];
 
 int debug = 0;
 
 char buf_link [MAX_LINKS][MAX_LINE_LENGTH];
-/************************GLOBALS*****************************************/
 
-
-/************************** FUNCTION DEFS *******************************/
-
-
-/************************* main **************************************
-
- ************************* main **************************************/
+void reset_callback(event_handle_t handle,
+		    event_notification_t notification, void *data);
+char *myvnode;
 
 int main(int argc, char **argv)
 {
@@ -87,7 +83,7 @@ int main(int argc, char **argv)
   opterr = 0;
 
   /* get params from the optstring */
-  while ((c = getopt(argc, argv, "s:p:f:dE:l:i:k:")) != -1) {
+  while ((c = getopt(argc, argv, "s:p:f:dE:l:i:k:j")) != -1) {
         switch (c) {
 	  case 'd':
 	      debug++;
@@ -112,6 +108,9 @@ int main(int argc, char **argv)
 	      break;
 	  case 'k':
 	      keyfile = optarg;
+	      break;
+	  case 'j':
+	      myvnode = optarg;
 	      break;
 	  case '?':
           default:
@@ -192,10 +191,15 @@ int main(int argc, char **argv)
       /* Do not have name yet, so add it to the string */
       if (strlen(myobjects)) {
         strcat(myobjects, ",");
+        strcat(lanobjects, ",");
       }
       sprintf(&myobjects[strlen(myobjects)], "%s,%s",
 	      link_map[link_index].linkname,
 	      link_map[link_index].linkvnodes[0]);
+
+      /* For the reset event below */
+      sprintf(&lanobjects[strlen(lanobjects)], "%s",
+	      link_map[link_index].linkname);
 
       if(!strcmp(link_map[link_index].linktype,"duplex") &&
 	 !link_map[link_index].islan) {
@@ -297,6 +301,19 @@ int main(int argc, char **argv)
         return 1;
       }
 
+  strcat(lanobjects, ",");
+  strcat(lanobjects, ADDRESSTUPLE_ALL);
+  event_t->objname   = lanobjects;
+  event_t->objtype   = TBDB_OBJECTTYPE_LINK;
+  event_t->eventtype = TBDB_EVENTTYPE_RESET;
+  event_t->host      = ADDRESSTUPLE_ANY;
+  event_t->expt      = myexp;
+    
+  if (event_subscribe(handle, reset_callback, event_t, NULL) == NULL) {
+    error("could not subscribe to %d event\n", event_t->eventtype);
+    return 1;
+  }
+  
   info("subscribed...\n");
   /* free the memory for the address tuple*/
   address_tuple_free(event_t);
@@ -342,7 +359,8 @@ void fill_tuple(address_tuple_t at)
   /* fill the objectname, objecttype and the eventtype from the file*/
   at->objname = myobjects;
   at->objtype = TBDB_OBJECTTYPE_LINK;
-  at->eventtype = ADDRESSTUPLE_ANY;
+  at->eventtype = TBDB_EVENTTYPE_UP ","
+	  TBDB_EVENTTYPE_DOWN "," TBDB_EVENTTYPE_MODIFY;
   at->expt = myexp;
   at->host = ADDRESSTUPLE_ANY;
 
@@ -403,3 +421,37 @@ void dump_link_map(){
   }
 }
 /************************** FUNCTION DEFS *******************************/
+
+void
+reset_callback(event_handle_t handle,
+		event_notification_t notification, void *data)
+{
+	char		buf[BUFSIZ];
+	char		objname[TBDB_FLEN_EVOBJNAME];
+	char		*prog = "delaysetup";
+	unsigned long	token = ~0;
+	int		errcode = 0;
+
+	info("Got a RESET event!\n");
+
+	if (myvnode)
+		sprintf(buf, "%s -r -j %s", prog, myvnode);
+	else
+		sprintf(buf, "%s -r", prog);
+	errcode = system(buf);
+
+	event_notification_get_int32(handle, notification,
+				     "TOKEN", (int32_t *)&token);
+	event_notification_get_objname(handle, notification,
+				       objname, sizeof(objname));
+
+	/* ... notify the scheduler of the completion. */
+	event_do(handle,
+		 EA_Experiment, myexp,
+		 EA_Type, TBDB_OBJECTTYPE_LINK,
+		 EA_Name, objname,
+		 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+		 EA_ArgInteger, "ERROR", errcode,
+		 EA_ArgInteger, "CTOKEN", token,
+		 EA_TAG_DONE);
+}

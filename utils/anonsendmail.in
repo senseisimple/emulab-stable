@@ -1,0 +1,41 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+
+#
+#
+#
+
+if ($EUID != 0) {
+    # We don't want to run this script unless its the real version.
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# Set the Real UID to 0 otherwise the real userid might end up in one
+# of the Received lines.
+$UID = $EUID;
+
+# Even with the UID and EUID set to 0, sendmail will still manager to
+# find the real user and use it for the envelope sender unless we
+# explicitly set it to root.
+exec("/usr/sbin/sendmail -t -froot");
+
+

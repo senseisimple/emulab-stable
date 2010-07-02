@@ -1,10 +1,31 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+
+#
+# Only known and logged in users can do this.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+
+# Verify page arguments.
+$reqargs = RequiredPageArguments("project",  PAGEARG_PROJECT,
+				 "approval", PAGEARG_STRING);
+$optargs = OptionalPageArguments("head_uid", PAGEARG_STRING,
+				 "user_interface", PAGEARG_STRING,
+				 "message", PAGEARG_ANYTHING,
+				 "silent", PAGEARG_BOOLEAN,
+				 "pcplab_okay", PAGEARG_BOOLEAN,
+				 "ron_okay", PAGEARG_BOOLEAN);
+
+$sendemail = 1;
+if (isset($silent) && $silent) {
+    $sendemail = 0;
+}
 
 #
 # Standard Testbed Header
@@ -12,15 +33,9 @@ include("defs.php3");
 PAGEHEADER("New Project Approved");
 
 #
-# Only known and logged in users can do this.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#
 # Of course verify that this uid has admin privs!
 #
-$isadmin = ISADMIN($uid);
+$isadmin = ISADMIN();
 if (! $isadmin) {
     USERERROR("You do not have admin privileges to approve projects!", 1);
 }
@@ -30,29 +45,37 @@ if (! $isadmin) {
 #
 $FirstInitState = (TBGetFirstInitState() == "approveproject");
 
-echo "<center><h1>
-      Approving Project '$pid' ...
-      </h1></center>";
-
 #
 # Grab the head_uid for this project. This verifies it is a valid project.
 #
-$query_result = 
-    DBQueryFatal("SELECT head_uid from projects where pid='$pid'");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    TBERROR("Unknown project $pid", 1);
+if (! ($this_project = $project)) {
+    TBERROR("Unknown project", 1);
 }
-$headuid = $row[0];
+# For error messages.
+$pid = $this_project->pid();
+
+echo "<center><h2>
+      Approving Project '$pid' ...
+      </h2></center>";
+
+if (! ($leader = $this_project->GetLeader())) {
+    TBERROR("Error getting leader for $pid", 1);
+}
+$headuid = $this_project->head_uid();
 
 #
 # If the user wanted to change the head uid, do that now (we change both
 # the head_uid and the leader of the default project)
 #
-if (isset($head_uid) && strcmp($head_uid,"")) {
+if ($approval == "approve" && isset($head_uid) && $head_uid != "") {
+    if (! ($newleader = User::Lookup($head_uid))) {
+	TBERROR("Unknown user $head_uid", 1);
+    }
+    if ($this_project->ChangeLeader($newleader) < 0) {
+	TBERROR("Error changing leader to $head_uid", 1);
+    }
+    $leader  = $newleader;
     $headuid = $head_uid;
-    DBQueryFatal("UPDATE projects set head_uid='$headuid' where pid='$pid'");
-    DBQueryFatal("UPDATE groups set leader='$headuid' where pid='$pid' and " .
-	    "gid='$pid'");
 }
 
 if (!isset($user_interface) ||
@@ -70,26 +93,17 @@ if (!isset($user_interface) ||
 # and we will change it to "unapproved" or "active", respectively.
 # If the status is "active", we leave it alone. 
 #
-$query_result = 
-    DBQueryFatal("SELECT status,usr_email,usr_name from users ".
-		 "where uid='$headuid'");
-if (mysql_num_rows($query_result) == 0) {
-    TBERROR("Unknown user $headuid", 1);
-}
-$row = mysql_fetch_row($query_result);
-$curstatus     = $row[0];
-$headuid_email = $row[1];
-$headname      = $row[2];
+$curstatus     = $leader->status();
+$headuid_email = $leader->email();
+$headname      = $leader->name();
+#$headidx       = $leader->uid_idx();
 #echo "Status = $curstatus, Email = $headuid_email<br>\n";
 
 #
 # Then we check that the headuid is really listed in the group_membership
 # table (default group), just to be sure. 
 #
-$query_result =
-    DBQueryFatal("SELECT trust from group_membership where ".
-		 "uid='$headuid' and pid='$pid' and gid='$pid'");
-if (mysql_num_rows($query_result) == 0) {
+if (! $this_project->IsMember($leader, $ignore)) {
     USERERROR("User $headuid is not the leader of project $pid.", 1);
 }
 
@@ -97,12 +111,34 @@ if (mysql_num_rows($query_result) == 0) {
 # Well, looks like everything is okay. Change the project approval
 # value appropriately.
 #
-if (strcmp($approval, "postpone") == 0) {
-    if (isset($message) && strcmp($message, "")) {
-	USERERROR("You requested postponement for $pid, but there is a ".
-		  "message in the text box which will vanish. If that is ".
-		  "not what you intended, the back button will give you ".
-		  "another chance, with text intact.", 1);
+if ($approval == "postpone") {
+    if (isset($message) && $message != "") {
+	echo "<table class=stealth align=center border=0>";
+	echo "<tr><td class=stealth>";
+	echo "You requested postponement for $pid, but there is a ".
+	    "message in the text box which will vanish. If that is ".
+	    "not what you intended, the Back button below will give you ".
+	    "another chance, with text intact";
+	echo "</td></tr>";
+	echo "<tr><td class=stealth align=center>";
+	echo "<form action='approveproject_form.php3?project=$pid'
+               method=post>";
+
+	if (isset($head_uid)) {
+	    echo "<input type=hidden name=head_uid value=$head_uid>\n";
+	}
+	echo "<input type=hidden name=user_interface value=$user_interface>\n";
+	echo "<input type=hidden name=silent value=$silent>\n";
+	echo "<input type=hidden name=pcplab_okay value=$pcplab_okay>\n";
+	echo "<input type=hidden name=ron_okay value=$ron_okay>\n";
+	echo "<input type=hidden name=message value='".
+	    htmlspecialchars($message, ENT_QUOTES) . "'>\n";
+    
+	echo "<b><input type=submit name=back value=Back></b>\n";
+	echo "</form>\n";
+	echo "</td></tr></table>";
+	PAGEFOOTER();
+	return;
     }
     echo "<p><h3>
              Project approval for project $pid (User: $headuid) was
@@ -110,19 +146,18 @@ if (strcmp($approval, "postpone") == 0) {
           </h3>\n";
 }
 elseif (strcmp($approval, "moreinfo") == 0) {
-    TBMAIL("$headname '$headuid' <$headuid_email>",
+    SendProjAdminMail
+        ($pid, "ADMIN", "$headname '$headuid' <$headuid_email>",
          "Project '$pid' Approval Postponed",
          "\n".
          "This message is to notify you that your project application\n".
-         "for $pid has been postponed until we have more information.\n".
-         "You can just reply to this message to provide more information.\n".
+         "for $pid has been postponed until we have more information\n".
+         "or you take certain actions.  You can just reply to this message\n".
+         "to provide that information or report your actions.\n".
          "\n$message".
          "\n\n".
          "Thanks,\n".
-         "Testbed Operations\n",
-         "From: $TBMAIL_APPROVAL\n".
-         "Bcc: $TBMAIL_APPROVAL\n".
-         "Errors-To: $TBMAIL_WWW");
+         "Testbed Operations\n");
 
     echo "<p><h3>
              Project approval for project $pid (User: $headuid) was
@@ -130,11 +165,82 @@ elseif (strcmp($approval, "moreinfo") == 0) {
           </h3>\n";
 }
 elseif ((strcmp($approval, "deny") == 0) ||
-	(strcmp($approval, "annihilate") == 0) ||
 	(strcmp($approval, "destroy") == 0)) {
-    SUEXEC($uid, $TBADMINGROUP, "rmproj $pid", 1);
     
-    if (strcmp($approval, "annihilate")) {
+    #
+    # If the "destroy" option was given, kill the users account.
+    #
+    if (strcmp($approval, "destroy") == 0) {
+	#
+	# Take the user out of the project group first.
+	#
+	SUEXEC($uid, $TBADMINGROUP, "webmodgroups -r $pid:$pid $headuid", 1);
+
+	#
+	# See if user is in any other projects (even unapproved).
+	#
+	$project_list = $leader->ProjectMembershipList();
+
+	#
+	# If yes, then we cannot safely delete the user account.
+	#
+	if (count($project_list)) {
+	    echo "<p>
+                  User $headuid was <b>denied</b> starting project $pid.
+                  <br>
+                  Since the user is a member (or requesting membership)
+		  in other projects, the account cannot be safely removed.
+		  <br>\n";
+	}
+	else {
+	    #
+	    # No other project membership. If the user is unapproved/newuser,
+	    # it means he was never approved in any project, and so will
+	    # likely not be missed. He will be unapproved if he did his
+	    # verification.
+	    #
+	    if (strcmp($curstatus, "newuser") &&
+		strcmp($curstatus, "unapproved")) {
+		echo "<p>
+		      User $headuid was <b>denied</b> starting project $pid.
+		      <br>
+		      Since the user has been approved by, or was active in other
+		      projects in the past, the account cannot be safely removed.
+		      \n";
+	    }
+	    else {
+		SUEXEC($uid, $TBADMINGROUP, "webrmuser -n -p $pid $headuid", 1); 
+
+		if ($sendemail) {
+		    TBMAIL("$headname '$headuid' <$headuid_email>",
+			   "Account '$headuid' Terminated",
+			   "\n".
+			   "This message is to notify you that your account has \n".
+			   "been terminated because your project $pid was denied.\n".
+			   "\n\n".
+			   "Thanks,\n".
+			   "Testbed Operations\n",
+			   "From: $TBMAIL_APPROVAL\n".
+			   "Bcc: $TBMAIL_APPROVAL\n".
+			   "Errors-To: $TBMAIL_WWW");
+		}
+		echo "<h3><p>
+			User $headuid was <b>denied</b> starting project $pid.
+			<br>
+			The account has also been <b>terminated</b>!
+		      </h3>\n";
+	    }
+	}
+    }
+    else {
+	echo "<h3><p>
+		  Project $pid (User: $headuid) has been denied.
+	      </h3>\n";
+    }
+
+    SUEXEC($uid, $TBADMINGROUP, "webrmproj $pid", 1);
+
+    if ($sendemail) {
 	TBMAIL("$headname '$headuid' <$headuid_email>",
 	       "Project '$pid' Denied",
 	       "\n".
@@ -149,58 +255,17 @@ elseif ((strcmp($approval, "deny") == 0) ||
 	       "Errors-To: $TBMAIL_WWW");
     }
 
-    #
-    # Well, if the "destroy" option was given, kill the users account.
-    #
-    if ((strcmp($approval, "annihilate") == 0) ||
-	(strcmp($approval, "destroy") == 0)) {
-	SUEXEC($uid, $TBADMINGROUP, "webrmuser $headuid", 1); 
-	
-	if (strcmp($approval, "annihilate")) {
-	    TBMAIL("$headname '$headuid' <$headuid_email>",
-		   "Account '$headuid' Terminated",
-		   "\n".
-		   "This message is to notify you that your account has \n".
-		   "been terminated because your project $pid was denied.\n".
-		   "\n\n".
-		   "Thanks,\n".
-		   "Testbed Operations\n",
-		   "From: $TBMAIL_APPROVAL\n".
-		   "Bcc: $TBMAIL_APPROVAL\n".
-		   "Errors-To: $TBMAIL_WWW");
-	}
-    }
-
-    echo "<h3><p>
-              Project $pid (User: $headuid) has been denied.
-          </h3>\n";
 }
 elseif (strcmp($approval, "approve") == 0) {
-
-    #
-    # Change the status if necessary. This only happens for new users
-    # being approved in their first project. After this, the status is
-    # going to be "active", and we just leave it that way.
-    #
-    if (strcmp($curstatus, "active")) {
-        if (strcmp($curstatus, "unapproved") == 0) {
-	    $newstatus = "active";
-        }
-        else {
-	    TBERROR("Invalid $headuid status $curstatus in ".
-                    "approveproject.php3", 1);
-        }
-	DBQueryFatal("UPDATE users set status='$newstatus', ".
-		     "       user_interface='$user_interface' ".
-		     "WHERE uid='$headuid'");
+    $optargs = "";
+    
+    # Sanity check the leader status.
+    if ($curstatus != TBDB_USERSTATUS_ACTIVE &&
+	$curstatus != TBDB_USERSTATUS_UNAPPROVED) {
+	TBERROR("Invalid $headuid status $curstatus", 1);
     }
-
-    #
-    # Set the project "approved" field to true. 
-    #
-    DBQueryFatal("update projects set approved='1', ".
-		 "       default_user_interface='$user_interface' ".
-		 "where pid='$pid'");
+    # Why is this here?
+    $leader->SetUserInterface($user_interface);
 
     #
     # XXX
@@ -219,45 +284,46 @@ elseif (strcmp($approval, "approve") == 0) {
     }
     if (count($pcremote_ok)) {
 	    $foo = implode(",", $pcremote_ok);
-	    DBQueryFatal("UPDATE projects set pcremote_ok='$foo' ".
-			 "WHERE pid='$pid'");
+	    $this_project->SetRemoteOK($foo);
+    }
+
+    unset($tmpfname);
+    if (isset($message)) {
+	$tmpfname = tempnam("/tmp", "approveproj");
+	$fp = fopen($tmpfname, "w");
+	fwrite($fp, $message);
+	fclose($fp);
+	
+	$optargs = " -f " . escapeshellarg($tmpfname);
     }
 
     #
     # Invoke the script. This does it all. If it fails, we will find out
     # about it.
     #
-    echo "<br>
-          Project '$pid' is being created!<br><br>
-          This will take a minute or two. <b>Please</b> do not click the Stop
-          button during this time. If you do not receive notification within
-          a reasonable amount of time, please contact $TBMAILADDR.\n";
-    flush();
+    STARTBUSY("Project '$pid' is being created");
+    
+    $retval = SUEXEC($uid, $TBADMINGROUP, "webmkproj $optargs $pid",
+		     SUEXEC_ACTION_IGNORE);
 
-    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", SUEXEC_ACTION_DIE);
+    CLEARBUSY();
 
-    TBMAIL("$headname '$headuid' <$headuid_email>",
-         "Project '$pid' Approval",
-         "\n".
-	 "This message is to notify you that your project '$pid'\n".
-	 "has been approved.  We recommend that you save this link so that\n".
-	 "you can send it to people you wish to have join your project.\n".
-	 "Otherwise, tell them to go to ${TBBASE} and join it.\n".
-	 "\n".
-	 "    ${TBBASE}/joinproject.php3?target_pid=$pid\n".
-         "\n".
-	 "$message\n".
-         "\n".
-         "Thanks,\n".
-         "Testbed Operations\n",
-         "From: $TBMAIL_APPROVAL\n".
-         "Bcc: $TBMAIL_APPROVAL\n".
-         "Errors-To: $TBMAIL_WWW");
+    if (isset($tmpfname)) {
+	unlink($tmpfname);
+    }
+    if ($retval) {
+	# Lets tack the message onto the output so we have a record.
+	if (isset($message)) {
+	    $suexec_output .= "\n\n*** Saved approval message text:\n\n";
+	    $suexec_output .= $message;
+	}
+	SUEXECERROR(SUEXEC_ACTION_DIE);
+	return;
+    }
 
     if (!$FirstInitState) {
-	echo "<p><b>
-                 Project $pid (User: $headuid) has been approved.
-                </b>\n";
+	sleep(1);
+	PAGEREPLACE(CreateURL("showproject", $this_project));
     }
     else {
 	echo "<br><br><font size=+1>\n";
@@ -267,12 +333,6 @@ elseif (strcmp($approval, "approve") == 0) {
               using the account you just
               created so that you can continue setting up your new Emulab!
               </font><br>\n";
-        #
- 	# Freeze the initial user.
-        #
-        DBQueryFatal("update users set ".
-                     "  status='" . TBDB_USERSTATUS_FROZEN . "' ".
-	             "where uid='$FIRSTUSER'");
 
         #
         # Move to next phase. 

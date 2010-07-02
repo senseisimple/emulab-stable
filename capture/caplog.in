@@ -1,0 +1,90 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+#
+# Wrapper for caplog program; grab tipacl from XMLRPC server, and feed it
+# to the caplog binary.
+#
+sub usage()
+{
+    print(STDOUT "Usage: caplog [-/+line] [-f] [-p port] pcXXX\n");
+    exit(-1);
+}
+my @opts = ();
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $WRAPPER     = "$TB/bin/script_wrapper.py";
+my $CAPLOGBIN   = "$TB/bin/caplog.bin";
+my $aclfile;
+
+#
+# Turn off line buffering on output. Very important for this script!
+#
+$| = 1;
+
+#
+# All args pass right through except the last one.
+#
+usage()
+    if (@ARGV < 1);
+my $node = $ARGV[scalar(@ARGV)-1];
+@ARGV = @ARGV[0..(scalar(@ARGV)-2)];
+
+#
+# Make a temp file for the acl.
+#
+$ENV{'TMPDIR'} = "/tmp";
+
+my $tempfile = `mktemp -t tipacl`;
+if ($?) {
+    die("*** $0:\n".
+	"    Could not create a temporary file!\n");
+}
+if ($tempfile =~ /^([-\w\/\.]*)$/) {
+    $tempfile = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Bad data in tag: $tempfile\n");
+}
+
+#
+# Ask the XMLRPC server for the tipacl. The current user has to have proper
+# permission of course.
+#
+if (system("$WRAPPER tipacl $node >> $tempfile")) {
+    unlink($tempfile);
+    die("*** $0:\n".
+	"    $WRAPPER failed\n");
+}
+
+#
+# Do not want to leave the acl file around, and do not want to wait for
+# the user to quit the program, so fork a child to wait a moment and remove
+# the file. We have the child do it so as to avoid messing with the session
+# and tty goo.
+#
+my $syspid = fork();
+
+# Child delays a moment and exits. 
+if (!$syspid) {
+    sleep(1);
+    unlink($tempfile);
+    exit(0);
+}
+my @cmdargs = ($CAPLOGBIN, "-a", "$tempfile", @ARGV, "$node");
+exec(@cmdargs);
+die("*** $0:\n".
+    "    Exec failure: '@cmdargs'\n");

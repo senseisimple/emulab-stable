@@ -1,0 +1,50 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use File::Basename;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# CVS sets this.
+my $CVSROOT = $ENV{'CVSROOT'};
+
+#print "logtag: @ARGV\n";
+
+#
+# Record any tags made to the .template file. 
+#
+my $tagname = shift(@ARGV);
+my $op      = shift(@ARGV);
+my $repo    = shift(@ARGV);
+
+while (@ARGV) {
+    my $file = shift(@ARGV);
+    my $rev  = shift(@ARGV);
+    
+    if ($file eq ".template") {
+	open(TAGLOG, ">>$CVSROOT/CVSROOT/tags")
+	    or die("Could not open $CVSROOT/CVSROOT/tags!\n");
+	print TAGLOG "$tagname, $op, $rev\n";
+	close(TAGLOG);
+
+	if ($op eq "add" || $op eq "mov") {
+	    # Generate a marker to tell the post tag function
+	    my $module = basename($repo);
+	    my $id = getpgrp();
+	    my $docommit = "/tmp/#cvs.docommit.${id}";
+	    open(COM, ">$docommit")
+		or die("Could not write $docommit");
+	    print COM "$module, $tagname\n";
+	    close(COM);
+	}
+	last;
+    }
+}
+exit(0);

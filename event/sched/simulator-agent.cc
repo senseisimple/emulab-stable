@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -13,10 +13,13 @@
 #include "config.h"
 
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 
 #include "popenf.h"
 #include "systemf.h"
 #include "rpc.h"
+#include "log.h"
 #include "simulator-agent.h"
 
 using namespace emulab;
@@ -209,12 +212,15 @@ static void dump_report_data(FILE *file,
 	}
 }
 
-int send_report(simulator_agent_t sa, char *args)
+static int real_send_report(simulator_agent_t sa, char *args, bool error_report)
 {
 	struct lnList error_records;
 	char loghole_name[BUFSIZ];
 	int rc, retval;
 	FILE *file;
+	bool archive;
+	char * tmp;
+	const char * report_file_name;
 
 	assert(sa != NULL);
 	assert(args != NULL);
@@ -230,6 +236,15 @@ int send_report(simulator_agent_t sa, char *args)
 	assert(lnEmptyList(&sa->sa_error_records));
 	if (pthread_mutex_unlock(&sa->sa_local_agent.la_mutex) != 0)
 		assert(0);
+	
+	if (debug) {
+		char time_buf[24];
+		struct timeval now;
+		gettimeofday(&now, NULL);
+		make_timestamp(time_buf, &now);
+		info("Sending %sReport at %s with args \"%s\"\n",
+		     error_report ? "Error " : "", time_buf, args);
+	}
 
 	/*
 	 * Get the logs off the nodes so we can generate summaries from the
@@ -240,8 +255,12 @@ int send_report(simulator_agent_t sa, char *args)
 		errorc("failed to sync log holes %d\n", rc);
 	}
 
-	if ((file = fopen("logs/report.mail", "w")) == NULL) {
-		errorc("could not create report.mail\n");
+	report_file_name = error_report 
+		? "logs/error-report.mail" 
+		: "logs/report.mail";
+
+	if ((file = fopen(report_file_name, "w")) == NULL) {
+		errorc("could not create %s\n", report_file_name);
 		retval = -1;
 	}
 	else {
@@ -331,30 +350,52 @@ int send_report(simulator_agent_t sa, char *args)
 		fclose(file);
 		file = NULL;
 	}
-
-	if ((file = popenf("loghole --port=%d --quiet archive --delete", "r",
-			   DEFAULT_RPC_PORT)) == NULL) {
-		strcpy(loghole_name, eid);
-		error("failed to archive log holes\n");
+	
+	if (error_report) {
+		archive = false;
+	} else if ((rc = event_arg_get(args, "ARCHIVE", &tmp)) > 0) {
+		if (rc == 4 && strncmp(tmp, "true", 4) == 0) {
+			archive = true;
+		} else if (rc == 5 && strncmp(tmp, "false", 5) == 0) {
+			archive = false;
+		} else {
+			error("ARCHIVE must be \"true\" or \"false\", assuming \"false\"\n");
+			archive = false;
+		}
+	} else {
+		archive = true;
+	}
+	
+	if (archive) {
+		if ((file = popenf("loghole --port=%d --quiet archive --delete", 
+				   "r", DEFAULT_RPC_PORT)) == NULL) {
+			strcpy(loghole_name, eid);
+			error("failed to archive log holes\n");
+		}
+		else {
+			int len;
+			
+			fgets(loghole_name, sizeof(loghole_name), file);
+			pclose(file);
+			file = NULL;
+			
+			len = strlen(loghole_name);
+			if (loghole_name[len - 1] == '\n')
+				loghole_name[len - 1] = '\0';
+		}
 	}
 	else {
-		int len;
-		
-		fgets(loghole_name, sizeof(loghole_name), file);
-		pclose(file);
-		file = NULL;
-
-		len = strlen(loghole_name);
-		if (loghole_name[len - 1] == '\n')
-			loghole_name[len - 1] = '\0';
+		loghole_name[0] = '\0';
 	}
 
-	if (systemf("mail -s \"%s: %s/%s experiment report\" %s "
-		    "< logs/report.mail",
+	if (systemf("mail -s \"%s: %s/%s experiment %sreport\" %s "
+		    "< %s",
 		    OURDOMAIN,
 		    pid,
-		    loghole_name,
-		    getenv("USER")) != 0) {
+		    loghole_name[0] ? loghole_name : eid,
+		    error_report ? "error " : "",
+		    getenv("USER"),
+		    report_file_name) != 0) {
 		errorc("could not execute send report\n");
 		retval = -1;
 	}
@@ -366,6 +407,14 @@ int send_report(simulator_agent_t sa, char *args)
 	return retval;
 }
 
+int send_report(simulator_agent_t sa, char *args) {
+	return real_send_report(sa, args, false);
+}
+
+int send_error_report(simulator_agent_t sa, char *args) {
+	return real_send_report(sa, args, true);
+}
+
 static int do_reset(simulator_agent_t sa, char *args)
 {
 	int retval = 0;
@@ -373,9 +422,48 @@ static int do_reset(simulator_agent_t sa, char *args)
 	assert(sa != NULL);
 	assert(args != NULL);
 
-	if (systemf("loghole --port=%d --quiet clean",
+	if (systemf("loghole --port=%d --quiet clean --force",
 		    DEFAULT_RPC_PORT) != 0) {
 		error("failed to clean log holes\n");
+	}
+
+	return retval;
+}
+
+static int do_snapshot(simulator_agent_t sa, char *args)
+{
+	char *loghole_args;
+	int retval = 0;
+
+	assert(sa != NULL);
+	assert(args != NULL);
+	
+	if (event_arg_get(args, "LOGHOLE_ARGS", &loghole_args) <= 0) {
+		loghole_args = "";
+	}
+	
+	if (systemf("loghole --port=%d sync %s",
+		    DEFAULT_RPC_PORT, loghole_args) != 0) {
+		error("failed to sync log holes\n");
+	}
+
+	return retval;
+}
+
+static int do_stoprun(simulator_agent_t sa, int token, char *args)
+{
+	int retval = 0;
+
+	assert(sa != NULL);
+	assert(args != NULL);
+
+	/*
+	 * Not allowed to use waitmode; will deadlock the event system!
+	 */
+	if (systemf("template_stoprun -t %d -p %s -e %s",
+		    token, pid, eid) != 0) {
+		error("failed to stop current run\n");
+		retval = -1;
 	}
 
 	return retval;
@@ -465,6 +553,9 @@ static void *simulator_agent_looper(void *arg)
 						     (int32_t *)&token);
 			argsbuf[sizeof(argsbuf) - 1] = '\0';
 
+			/* Strictly for the event viewer */
+			event_notify(handle, se.notification);
+
 			if (strcmp(evtype, TBDB_EVENTTYPE_SWAPOUT) == 0) {
 				EmulabResponse er;
 				
@@ -503,12 +594,20 @@ static void *simulator_agent_looper(void *arg)
 			else if (strcmp(evtype, TBDB_EVENTTYPE_RESET) == 0) {
 				do_reset(sa, argsbuf);
 			}
+			else if (strcmp(evtype, TBDB_EVENTTYPE_SNAPSHOT) == 0){
+				do_snapshot(sa, argsbuf);
+			}
+			else if (strcmp(evtype, TBDB_EVENTTYPE_STOPRUN) == 0){
+				do_stoprun(sa, token, argsbuf);
+			}
 			else {
 				error("cannot handle SIMULATOR event %s.",
 				      evtype);
 			}
 			if (strcmp(evtype, TBDB_EVENTTYPE_RESET) == 0 ||
 			    strcmp(evtype, TBDB_EVENTTYPE_REPORT) == 0 ||
+			    strcmp(evtype, TBDB_EVENTTYPE_LOG) == 0 ||
+			    strcmp(evtype, TBDB_EVENTTYPE_SNAPSHOT) == 0 ||
 			    strcmp(evtype, TBDB_EVENTTYPE_MODIFY) == 0) {
 				event_do(handle,
 					 EA_Experiment, pideid,

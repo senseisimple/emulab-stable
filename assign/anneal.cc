@@ -1,8 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
+
+static const char rcsid[] = "$Id: anneal.cc,v 1.46 2009-05-20 18:06:07 tarunp Exp $";
 
 #include "anneal.h"
 
@@ -47,6 +49,35 @@ name_name_map node_hints;
 #ifdef GNUPLOT_OUTPUT
 extern FILE *scoresout, *tempout, *deltaout;
 #endif
+
+/*
+ * Parameters used to control annealing
+ */
+int init_temp = 10;
+int temp_prob = 130;
+#ifdef LOW_TEMP_STOP
+float temp_stop = .005;
+#else
+float temp_stop = 2;
+#endif
+int CYCLES = 20;
+
+// The following are basically arbitrary constants
+// Initial acceptance ratio for melting
+float X0 = .95;
+#ifdef LOCAL_DERIVATIVE
+float epsilon = 0.0001;
+#else
+float epsilon = 0.01;
+#endif
+float delta = 2;
+
+// Number of runs to spend melting
+int melt_trans = 1000;
+int min_neighborhood_size = 1000;
+
+float temp_rate = 0.9;
+
 
 // Determines whether to accept a change of score difference 'change' at
 // temperature 'temperature'.
@@ -171,8 +202,9 @@ void smart_unmap_part2() {
 double temp;
 
 /* When this is finished the state will reflect the best solution found. */
-void anneal(bool scoring_selftest, double scale_neighborhood,
-	double *initial_temperature, double use_connected_pnode_find)
+void anneal(bool scoring_selftest, bool check_fixed_nodes,
+        double scale_neighborhood, double *initial_temperature,
+        double use_connected_pnode_find)
 {
   cout << "Annealing." << endl;
 
@@ -187,15 +219,10 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   double scorediff;
 
   int nnodes = num_vertices(VG);
-  int npnodes = num_vertices(PG);
+  //int npnodes = num_vertices(PG);
   int npclasses = pclasses.size();
   
   float cycles = CYCLES*(float)(nnodes + num_edges(VG) + PHYSICAL(npnodes));
-  float optimal = OPTIMAL_SCORE(num_edges(VG),nnodes);
-    
-#ifdef STATS
-  cout << "STATS_OPTIMAL = " << optimal << endl;
-#endif
 
   int mintrans = (int)cycles;
   int trans;
@@ -214,7 +241,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   vvertex_int_priority_queue unassigned_nodes;
 
 #ifdef VERBOSE
-  cout << "Initialized to cycles="<<cycles<<" optimal="<<optimal<<" mintrans="
+  cout << "Initialized to cycles="<<cycles<<" mintrans="
        << mintrans<<" naccepts="<<naccepts<< endl;
 #endif
 
@@ -222,18 +249,25 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   init_score();
 
   /* Set up fixed nodes */
+  /* Count of nodes which could not be fixed - we wait until we've tried to fix
+   * all nodes before bailing, so that the user gets to see all of the
+   * messages.
+   */
+  int fix_failed = 0;
   for (name_name_map::iterator fixed_it=fixed_nodes.begin();
        fixed_it!=fixed_nodes.end();++fixed_it) {
     if (vname2vertex.find((*fixed_it).first) == vname2vertex.end()) {
-      cout << "*** Fixed node: " << (*fixed_it).first <<
+      cout << "*** Fixed virtual node: " << (*fixed_it).first <<
 	" does not exist." << endl;
-      exit(EXIT_UNRETRYABLE);
+      fix_failed++;
+      continue;
     }
     vvertex vv = vname2vertex[(*fixed_it).first];
     if (pname2vertex.find((*fixed_it).second) == pname2vertex.end()) {
-      cout << "*** Fixed node: " << (*fixed_it).second <<
+      cout << "*** Fixed physical node: " << (*fixed_it).second <<
 	" not available." << endl;
-      exit(EXIT_UNRETRYABLE);
+      fix_failed++;
+      continue;
     }
     pvertex pv = pname2vertex[(*fixed_it).second];
     tb_vnode *vn = get(vvertex_pmap,vv);
@@ -251,13 +285,15 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
           // For now, if we find more than one match, we pick the first. It's
           // possible that picking some other type would give us a better
           // score, but let's noty worry about that
-          if (vn->vclass->has_type((*i)->ptype->name())) {
-            vn->type = (*i)->ptype->name();
+          if (vn->vclass->has_type((*i)->get_ptype()->name())) {
+            vn->type = (*i)->get_ptype()->name();
             break;
           }
         }
       }
       if (vn->type.empty()) {
+        // This is an internal error, so it's okay to handle it in a different
+        // way from the others
         cout << "*** Unable to find a type for fixed, vtyped, node " << vn->name
           << endl;
         exit(EXIT_FATAL);
@@ -266,10 +302,21 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
           << vn->type << "\n";
       }
     }
-    if (add_node(vv,pv,false,true,false) == 1) {
+
+    /*
+     * Normally, we want to bypass some checks in add_node for fixed nodes -
+     * but not always (usually for testing purposes).
+     */
+    bool skip_checks = true;
+    if (check_fixed_nodes) {
+        skip_checks = false;
+    }
+
+    if (add_node(vv,pv,false,skip_checks,false) == 1) {
       cout << "*** Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
-      exit(EXIT_UNRETRYABLE);
+      fix_failed++;
+      continue;
     }
     vn->fixed = true;
     /*
@@ -279,6 +326,11 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
     }
     */
     num_fixed++;
+  }
+
+  if (fix_failed){
+    cout << "*** Some fixed nodes failed to map" << endl;
+    exit(EXIT_UNRETRYABLE);
   }
 
   // Subtract the number of fixed nodes from nnodes, since they don't really
@@ -402,7 +454,6 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   // Crap added by ricci
 #ifdef MELT
   bool melting;
-  double meltstart;
 #endif
   int nincreases, ndecreases;
   double avgincrease;
@@ -463,7 +514,8 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 #endif
 
   /*
-   * Calculate the number of iterations to stay at this temperature step
+   * When melting, this is the number of different solutions we will try during
+   * this temperature step
    */
   melt_trans = neighborsize;
   
@@ -585,9 +637,9 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       if (vn->vclass != NULL) {
 	vn->type = vn->vclass->choose_type();
 #ifdef SCORE_DEBUG
-	cerr << "vclass " << vn->vclass->name  << ": choose type for " <<
+	cerr << "vclass " << vn->vclass->get_name()  << ": choose type for " <<
 	    vn->name << " = " << vn->type << " dominant = " <<
-	    vn->vclass->dominant << endl;
+	    vn->vclass->get_dominant() << endl;
 #endif
       }
       
@@ -730,13 +782,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
        * this transition
        */
       bool accepttrans = false;
-      if (newscore < optimal) {
-        // If this score is smaller than the one we think is optimal, of course we
-        // take it!
-        accepttrans = true;
-	RDEBUG(cout << "accept: optimal (" << newscore << "," << optimal
-	       << ")" << endl;)
-      } else if (melting) {
+      if (melting) {
         // When melting, we take everything!
 	accepttrans = true;
 	RDEBUG(cout << "accept: melting" << endl;)
@@ -854,10 +900,10 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 #endif // SCORE_DEBUG
 	  tie(vit,veit) = vertices(VG);
 	  for (;vit!=veit;++vit) {
-	      tb_vnode *vn = get(vvertex_pmap,*vit);
-	      if (vn->assigned) {
-		  best_solution.set_assignment(*vit,vn->assignment);
-		  best_solution.set_vtype_assignment(*vit,vn->type);
+	      tb_vnode *vnode = get(vvertex_pmap,*vit);
+	      if (vnode->assigned) {
+		  best_solution.set_assignment(*vit,vnode->assignment);
+		  best_solution.set_vtype_assignment(*vit,vnode->type);
 	      } else {
 		  best_solution.clear_assignment(*vit);
 	      }
@@ -866,14 +912,14 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	    //abstypes[*vit] = get(vvertex_pmap,*vit)->type;
 	  }
 	  
-	  vedge_iterator eit, eeit;
-	  tie(eit, eeit) = edges(VG);
-	  for (;eit!=eeit;++eit) {
-	      tb_vlink *vlink = get(vedge_pmap, *eit);
+	  vedge_iterator edge_it, edge_it_end;
+	  tie(edge_it, edge_it_end) = edges(VG);
+	  for (;edge_it!=edge_it_end;++edge_it) {
+	      tb_vlink *vlink = get(vedge_pmap, *edge_it);
 	      if (vlink->link_info.type_used != tb_link_info::LINK_UNMAPPED) {
-		  best_solution.set_link_assignment(*eit,vlink->link_info);
+		  best_solution.set_link_assignment(*edge_it,vlink->link_info);
 	      } else {
-		  best_solution.clear_link_assignment(*eit);
+		  best_solution.clear_link_assignment(*edge_it);
 	      }
 	  }	
 	  
@@ -883,10 +929,6 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 #ifdef SCORE_DEBUG
 	  cerr << "New best recorded" << endl;
 #endif
-	}
-	if (newscore < optimal) {
-	  cout << "OPTIMAL ( " << optimal << ")" << endl;
-	  goto DONE;
 	}
 	// Accept change
       } else { // !acceptrans

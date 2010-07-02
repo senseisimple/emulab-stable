@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+cd @prefix@/data/node_usage/
+
+mkdir -p @prefix@/www/node_usage/
+
+cp *.png index.php usage.php @prefix@/www/node_usage/
+

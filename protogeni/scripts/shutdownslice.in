@@ -1,0 +1,208 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Shutdown a slice. This has two modes of operation; 1) on the SA (Emulab)
+# it will mark the slice as shutdown and make sure the Clearinghouse is
+# notified. 2) On the clearinghouse, it will mark the slice as shutdown,
+# and make sure that every CM is notified. This is somewhat crude.
+# 
+sub usage()
+{
+    print "Usage: shutdownslice [-c] <uuid>\n";
+    exit(1);
+}
+my $optlist    = "c";
+my $asch       = 0;
+sub fatal($);
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"c"})) {
+    $asch = 1;
+}
+usage()
+    if (@ARGV != 1);
+
+use vars qw($GENI_DBNAME);
+if ($asch) {
+    $GENI_DBNAME = "geni-ch";
+}
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use libtestbed;
+require GeniDB;
+require Genixmlrpc;
+use GeniResponse;
+require GeniCertificate;
+require GeniCredential; 
+require GeniAuthority;
+require GeniSlice;
+
+my $uuid = $ARGV[0];
+
+#
+# Taint check.
+#
+if ($uuid =~ /^([\w\-]+)$/) {
+    $uuid = $1;
+}
+else {
+    die("*** Bad data in $uuid\n");
+}
+my $slice = GeniSlice->Lookup($uuid);
+if (!defined($slice)) {
+    fatal("No such slice for $uuid");
+}
+
+#
+# 
+#
+if ($asch) {
+    #
+    # The RPC context for this script is as the CH
+    #
+    my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
+    my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+    if (!defined($certificate)) {
+	fatal("Could not load certificate from $EMULAB_PEMFILE");
+    }
+    Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+    my $authority = GeniAuthority->Lookup($certificate->uuid());
+    if (!defined($authority)) {
+	fatal("Could not find local authority object");
+    }
+
+    #
+    # The credential we use needs to be a slice credential, since that
+    # makes it easier for anyone to shutdown a slice at a CM.
+    #
+    my $slice_credential = GeniCredential->Create($slice, $authority);
+    if (!defined($slice_credential)) {
+	fatal("Could not create new credential for $slice");
+    }
+    if ($slice_credential->Sign($certificate) != 0) {
+	fatal("Could not sign credential for $slice");
+    }
+
+    my $query_result =
+	GeniDB::DBQueryWarn("select uuid from geni_authorities ".
+			    "where type='cm'");
+    fatal("Could not lookup CM list")
+	if (!defined($query_result));
+
+    #
+    # Go into the background now, so as not to block the caller for
+    # a long time. Mail will be sent if there is an error.
+    # XXX Cannot use libaudit cause there is already an audit running
+    # via the xmlrpc invocation.
+    #
+    my $logname = TBMakeLogname("shutdownslice");
+    if (TBBackGround($logname)) {
+	#
+	# Parent exits normally.
+	#
+	exit(0);
+    }
+    my $errors = 0;
+
+    while (my ($manager_uuid) = $query_result->fetchrow_array()) {
+	my $manager = GeniAuthority->Lookup($manager_uuid);
+	print STDERR "Could not lookup up CM $manager_uuid\n"
+	    if (!defined($manager));
+
+	print STDERR "Calling out to $manager at " .
+	    TBTimeStamp() . " to do shutdown\n";
+
+	my $response =
+	  Genixmlrpc::CallMethod($manager->url(), undef,
+				 "Shutdown",
+				 { "clear" => 0,
+				   "credential" =>
+				       $slice_credential->asString() });
+	if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
+	    print STDERR
+		"Could not shutdown $slice on $manager: " .
+		    $response->output();
+	    $errors++;
+	}
+    }
+    if ($errors) {
+	SENDMAIL($TBOPS,
+		 "Error doing emergency shutdown",
+		 "Error doing emergency shutdown of slice $uuid",
+		 undef, undef, $logname);
+    }
+    else {
+	SENDMAIL($TBOPS,
+		 "ClearingHouse did an emergency shutdown",
+		 "ClearingHouse did an emergency shutdown of slice $uuid",
+		 undef, undef, $logname);
+    }
+    exit($errors);
+}
+else {
+    #
+    # Mark the slice as shutdown but do not overwrite original time.
+    #
+    if (!defined($slice->shutdown()) || $slice->shutdown() eq "") {
+	$slice->SetShutdown() == 0
+	    or fatal("Could not set the shutdown time for $slice");
+    }
+    
+    #
+    # The RPC context for this script is as the SA
+    #
+    my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
+    my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+    if (!defined($certificate)) {
+	fatal("Could not load certificate from $EMULAB_PEMFILE");
+    }
+    Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    if (!defined($clearinghouse)) {
+	fatal("Could not create client for clearinghouse");
+    }
+    if ($clearinghouse->Shutdown($uuid, 1) != 0) {
+	fatal("Could not tell the clearinghouse to shutdown $slice");
+    }
+}
+exit(0);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}

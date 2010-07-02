@@ -1,0 +1,277 @@
+#!/bin/sh
+
+#
+# Simple script to "fix" serial config for a Fedora image.
+#
+# Args: [-s <speed> -p <parity> -a <portaddr> -d <databits>] <device>
+#   (device can be COMX, ttySX ;
+#    portaddr is something like 0x2f8 (physical port addr) ;
+#    speed is baud rate (some number);
+#    parity is (no|odd|even) ;
+#    databits is the number of data bits .
+#
+
+#
+# Need to fix up 
+#   * /boot/grub/grub.conf (or /boot/grub/menu.lst)
+#   * /etc/securetty (make sure we require a passwd for login)
+#   * /etc/inittab (fix where we start a getty)
+#
+
+# little util function                                                                 
+checkAndMount() {
+    if [ "$ELAB_UPD_MNT" != "" ]; then
+        mount | grep -q "on ${ELAB_UPD_MNT}"
+        if [ "$?" = "0" ]; then
+            return 0
+        elif [ "$ELAB_UPD_DEV" != "" -a "$ELAB_UPD_MNTARGS" != "" ]; then
+            /bin/sh -c "mount ${ELAB_UPD_MNTARGS} ${ELAB_UPD_DEV} ${ELAB_UPD_MNT}"
+            if [ "$?" != "0" ]; then
+                echo "mount of ${ELAB_UPD_DEV} at ${ELAB_UPD_MNT} failed!";
+                return 1;
+            fi
+            return 0;
+        else
+            echo "not enough info to mount ${ELAB_UPD_MNT}!";
+            return 1;
+        fi
+    elif [ "$ELAB_UPD_DEV" != "" -a "$ELAB_UPD_MNTARGS" != "" ]; then
+        /bin/sh -c "/sbin/mount ${ELAB_UPD_MNTARGS} ${ELAB_UPD_DEV} ${ELAB_UPD_MNT}"
+        if [ "$?" != "0" ]; then
+            echo "mount of ${ELAB_UPD_DEV} at ${ELAB_UPD_MNT} failed!";
+            return 1;
+        fi
+        return 0;
+    fi
+
+    echo "total failure to mount a slice to work on!";
+    return 1;
+}
+
+# defaults: we must have non-null for speed, parity, and data bits
+speed="115200"
+parity="no"
+bits="8"
+addr=""
+# they must give us a device
+device=""
+
+while [ $# -gt 1 ]; do 
+#    shift
+#    arg=$1
+    case $1 in
+	"-s") shift
+	    speed=$1
+	    echo "$speed" | grep -q '^[0-9][0-9]*$'
+	    if [ $? != 0 ]; then
+		echo "Speed must be a number!"
+		exit 1
+	    fi
+	    ;;
+	"-p") shift
+	    parity=$1
+	    if [ "$parity" != "even" -a "$parity" != "odd" \
+	        -a "$parity" != "no" ]; then
+		echo "Parity must be one of (even|odd|no)!"
+		exit 1
+	    fi
+	    ;;
+	"-a") shift
+	    addr=$1
+	    echo "$addr" | grep -q '^0x[0-9a-fA-F][0-9a-fA-F]*$'
+	    if [ $? != 0 ]; then
+		echo "Port address must be a hex number starting with 0x!"
+		exit 1
+	    fi
+	    ;;
+	"-d") shift
+	    bits=$1
+	    echo "$bits" | grep -q '^[0-9][0-9]*$'
+	    if [ $? != 0 ]; then
+		echo "Data bits must be a decimal number!"
+		exit 1
+	    fi
+	    ;;
+	*) echo "Bad argument ${1}!"
+	    exit 1
+	    ;;
+    esac
+    # do this last to pick up the first arg...
+    shift
+done
+
+echo "after arg parsing, '$@'"
+
+#shift
+device=$1
+echo "$device" | grep -q '^ttyS[0-9][0-9]*$'
+if [ "$?" != "0" ]; then
+    comdevnum=`echo "$device" | grep '^COM[0-9][0-9]*' | sed -e 's/^COM\([0-9][0-9]*\)$/\1/'`
+    if [ "$comdevnum" != "" ]; then
+	comdevnum=`expr $comdevnum - 1`
+	device="ttyS${comdevnum}"
+    else
+	echo "Incorrect device name ${device}!"
+	exit 2
+    fi
+fi
+
+# ok, we're good, let's move on..
+echo "Fixing serial configuration for Fedora..."
+checkAndMount()
+if [ "$?" != 0 ]; then
+    exit 4
+fi
+
+mnt="$ELAB_UPD_MNT"
+
+#
+# /etc/securetty: just append our device if it's not there.
+#
+grep -q "^[ \t]*${device}" $mnt/etc/securetty
+if [ "$?" != "0" ]; then
+    cp -p $mnt/etc/securetty $mnt/etc/securetty.pre.fixserial
+    echo "" >> $mnt/etc/securetty
+    echo "${device}" >> $mnt/etc/securetty
+fi
+
+#
+# /etc/inittab: just make sure there's an agetty entry for our device; don't 
+# remove anything
+#
+# XXX don't hardcode these agetty args, crib off what's there instead
+agetty_args="-L ${speed} $device vt100"
+grep -q "^[^#].*agetty.*-L[ \t]*${speed}[ \t]*${device}.*$" $mnt/etc/inittab
+if [ "$?" != "0" ]; then
+    snum=`echo "$device" | sed -e 's/tty\(S[0-9][0-9]*\)/\1/'`
+    if [ "$snum" != "$device" ]; then
+	cp -p $mnt/etc/inittab $mnt/etc/inittab.pre.fixserial
+	# if it has an uncommented line about this serial device, we comment 
+	# it out first
+	grep -q "^[^#].*${device}.*$" $mnt/etc/inittab
+	if [ "$?" = "0" ]; then
+	    echo "commenting out old line in inittab for ${device}!"
+	    sed -e "s/^\([^#].*${device}.*\)$/#\1/" $mnt/etc/inittab \
+		> $mnt/etc/inittab.sed
+	    mv $mnt/etc/inittab.sed $mnt/etc/inittab
+	fi
+	# now make our addition
+	echo "" >> $mnt/etc/inittab
+	echo "# Emulab updater addition" >> $mnt/etc/inittab
+	echo "${snum}:2345:respawn:/sbin/agetty ${agetty_args}" \
+	    >> $mnt/etc/inittab
+    else
+	echo "error: could not grok device name ${device}; inittab not updated!"
+    fi
+fi
+
+#
+# /boot/grub/(grub.conf|menu.lst): make sure that serial, terminal, and kernel
+# commands are fixed up properly.
+#
+grubconf=$mnt/boot/grub/grub.conf
+if [ ! -e $grubconf ]; then
+    grubconf=$mnt/boot/grub/menu.lst
+    if [ ! -e $grubconf ]; then
+	echo "could not find grub.conf, not updating!"
+	exit 6
+    fi
+fi
+
+cp -p $grubconf ${grubconf}.pre.fixserial
+# replace whatever kernel console=ttySX[,<speed>] line was there with the 
+# specified device and speed.
+repstr="${device},${speed}"
+if [ "$parity" != "" ]; then
+    case $parity in 
+	odd) repstr="${repstr}o"
+	    ;;
+	even) repstr="${repstr}e"
+	    ;;
+	no) repstr="${repstr}n"
+	    ;;
+	*) ;;
+    esac
+fi
+if [ "$bits" != "" ]; then
+    repstr="${repstr}${bits}"
+fi
+#if [ "$hwflowctl" != "" ]; then
+#    repstr="r"
+#fi
+sed -e "s/^\([ \t]*kernel.*console=\)\(ttyS[0-9][0-9]*[,0-9]*\)\(.*\)$/\1${repstr}\3/" \
+    $grubconf > ${grubconf}.tmp
+mv ${grubconf}.tmp $grubconf
+
+# replace serial command unit number
+snum=`echo "$device" | sed -e 's/ttyS\([0-9][0-9]*\)/\1/'`
+grep -q "^[ \t]*serial.*--unit.*$" $grubconf
+if [ "$?" = 0 ]; then
+    sed -e "s/^\([ \t]*serial.*\)\(--unit=\)\([^ \t]*\)\(.*\)$/\1\2${snum}\4/" $grubconf > ${grubconf}.tmp
+    mv ${grubconf}.tmp $grubconf
+else
+    sed -e "s/^\([ \t]*serial[ \t]*\)\(.*\)$/\1 --unit=${snum} \2/" $grubconf > ${grubconf}.tmp
+    mv ${grubconf}.tmp $grubconf
+fi
+
+# replace serial command with correct port address
+if [ "$addr" != "" ]; then 
+    grep -q "^[ \t]*serial.*--port.*$" $grubconf
+    if [ "$?" = "0" ]; then
+	sed -e "s/^\([ \t]*serial.*\)\(--port=\)\([^ \t]*\)\(.*\)$/\1\2${addr}\4/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    else
+	sed -e "s/^\([ \t]*serial[ \t]*\)\(.*\)$/\1 --port=${addr} \2/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    fi
+fi
+
+# replace serial command parity
+if [ "$parity" != "" ]; then 
+    grep -q "^[ \t]*serial.*--parity.*$" $grubconf
+    if [ "$?" = "0" ]; then
+	sed -e "s/^\([ \t]*serial.*\)\(--parity=\)\([^ \t]*\)\(.*\)$/\1\2${parity}\4/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    else
+	sed -e "s/^\([ \t]*serial[ \t]*\)\(.*\)$/\1 --parity=${parity} \2/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    fi
+fi
+
+# replace serial command speed
+if [ "$speed" != "" ]; then 
+    grep -q "^[ \t]*serial.*--speed.*$" $grubconf
+    if [ "$?" = "0" ]; then
+	sed -e "s/^\([ \t]*serial.*\)\(--speed=\)\([^ \t]*\)\(.*\)$/\1\2${speed}\4/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    else
+	sed -e "s/^\([ \t]*serial[ \t]*\)\(.*\)$/\1 --speed=${speed} \2/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    fi
+fi
+
+# replace serial command data bits
+if [ "$bits" != "" ]; then 
+    grep -q "^[ \t]*serial.*--data.*$" $grubconf
+    if [ "$?" = "0" ]; then
+	sed -e "s/^\([ \t]*serial.*\)\(--data=\)\([^ \t]*\)\(.*\)$/\1\2${bits}\4/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    else
+	sed -e "s/^\([ \t]*serial[ \t]*\)\(.*\)$/\1 --data=${bits} \2/" $grubconf > ${grubconf}.tmp
+	mv ${grubconf}.tmp $grubconf
+    fi
+fi
+
+# rearrange terminal command to ensure serial has precedence, add --dumb
+sed -e 's/^\([ \t]*terminal.*\)\(console\)\(.*\)\(serial\)\(.*\)/\1 serial \3 console \5/' \
+    $grubconf > ${grubconf}.tmp
+mv ${grubconf}.tmp $grubconf
+grep -q "^[ \t]*terminal.*--dumb.*$" $grubconf
+if [ "$?" != "0" ]; then
+    # add "--dumb" -- no curses please
+    sed -e "s/^\([ \t]*terminal[ \t]*\)\(.*\)$/\1 --dumb \2/" $grubconf > ${grubconf}.tmp
+    mv ${grubconf}.tmp $grubconf
+fi
+
+# whewph!
+exit 0

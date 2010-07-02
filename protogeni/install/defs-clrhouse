@@ -1,0 +1,23 @@
+#
+# For the standalone clearinghouse, change only these.
+#
+. defs-example
+
+# The name of this installation
+THISHOMEBASE=ClearingHouse.Emulab.Net
+
+# Hostname
+WWWHOST=mynode.example.net
+BOSSNODE=mynode.example.net
+
+# Email for errors.
+TBOPSEMAIL=someone@mynode.example.net
+TBLOGSEMAIL=someone@mynode.example.net
+TBWWWEMAIL=someone@mynode.example.net
+TBAUDITEMAIL=someone@mynode.example.net
+
+# Make sure you change this!
+PROTOGENI_DOMAIN="mynode"
+
+PROTOGENI_SUPPORT=1
+PROTOGENI_CLEARINGHOUSE=1

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -103,16 +103,7 @@ if ($setlogin) {
 	#
 	# Find all non admins and log them out.
 	# 
-	my $query_result =
-	    DBQueryFatal("select users.uid from login ".
-			 "left join users on login.uid=users.uid ".
-			 "where users.admin=0");
-	
-	while (my @row = $query_result->fetchrow_array()) {
-	    my $uid = $row[0];
-
-	    DBQueryFatal("delete from login where uid='$uid'");
-	}
+	DBQueryFatal("delete from login where adminon=0");
     }
 }
 

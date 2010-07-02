@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,7 +12,8 @@ use BSD::Resource;
 use POSIX qw(:signal_h);
     
 #
-# Fetch tarballs and RPMs on behalf of a user
+# Fetch tarballs and RPMs on behalf of a user.
+# This script runs on ops.
 #
 sub usage()
 {
@@ -28,6 +29,8 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $FSDIR_PROJ = "@FSDIR_PROJ@";
 my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
+my $FSDIR_SCRATCH = "@FSDIR_SCRATCH@";
+my $ISFS = ("@USERNODE_IP@" eq "@FSNODE_IP@") ? 1 : 0;
 
 # Locals
 my $WGET = "/usr/local/bin/wget";
@@ -101,10 +104,12 @@ if (!($localfile =~ /^([\w\.\_\-+\/]+)$/)) {
     $localfile = $1;
     my $realpath = `$REALPATH $localfile`;
     chomp $realpath;
-    if ($realpath !~ /^(($FSDIR_PROJ|$FSDIR_GROUPS)\/.*)$/) {
+    if (!TBValidUserDir($realpath, $ISFS)) {
 	die("*** $0:\n".
-	    "    Local file must be in /proj or /groups: $localfile, $realpath \n");
-    } else {
+	    "    Local file must be in one of " .
+	    join(' or ', TBValidUserDirList()) . ".\n");
+    }
+    if ($realpath =~ /^([\w\.\_\-+\/]+)$/) {
 	$localfile = $1;
     }
 }
@@ -155,7 +160,7 @@ if (! $pid) {
     # Give parent a chance to react.
     sleep(1);
 
-    exec("nice -15 $WGET --timestamping --non-verbose -O $localfile $URL");
+    exec("nice -15 $WGET --timestamping --no-verbose -O $localfile $URL");
     die("Could not exec wget!\n");
 }
 
@@ -174,16 +179,18 @@ if (($exit_status & 0xff) == SIGKILL) {
 
     SENDMAIL($TBOPS, "wget Exceeded CPU Limit", $msg);
     
-    print STDERR "$msg\n";
+    print STDERR "*** $msg\n";
     exit(15);
+} elsif ($exit_status) {
+    print STDERR "*** wget exited with status $exit_status\n";
+} else {
+    #
+    # Change the permissions on the file so that other group members can
+    # overwrite it
+    #
+    system("$CHMOD g+w $localfile") == 0
+	or die ("*** ERROR - Unable to change permissions on $localfile!");
 }
-
-#
-# Change the permissions on the file so that other group members can overwrite
-# it
-#
-system("$CHMOD g+w $localfile") == 0
-    or die ("*** ERROR - Unable to change permissions on $localfile!");
 
 exit($exit_status >> 8);
 

@@ -1,0 +1,108 @@
+# Gotta do this stuff with admin privs.
+! gmake admin
+
+!expidx=sql "select idx from experiments where pid='testproj3' and eid='testexp3'"
+! if ( "$expidx" != "" ) then
+
+    # Deal with an experiment "stuck in transition".
+    !expstate=sql "select state from experiments where pid='testproj3' and eid='testexp3'"
+    ! if ( "$expstate" == "terminating" ) then
+	!sql "update experiments set state="active" where pid='testproj3' and eid='testexp3'"
+    ! endif
+    !explocked=sql "select expt_locked from experiments"
+    ! if ( "$explocked" == "1" ) then
+	!sql "update experiments set expt_locked=NULL where pid='testproj3' and eid='testexp3'"
+    ! endif
+
+    # We want to get here with testexp3 swapped out.
+    ! if ( "$expstate" == "swapping" ) then
+	! ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
+    ! endif
+
+    ! if ( "$expstate" != "swapped" ) then
+	/swapexp.php3
+	# Wait for the swapout to finish if a probe gets through.
+	-ssh $MYBOSS  ./waitexp testproj3 testexp3 swapped
+    ! endif
+
+    # Don't go on until it's actually swapped out.
+    ! ssh $MYBOSS ./waitexp testproj3 testexp3 swapped
+
+    # Now kill the experiment.
+    /endexp.php3
+    - $SRCDIR/undo-probe.pl -t -p testproj3 exp testexp3
+
+! else
+!     echo "*** No experiment testproj3/testexp3! ***"
+! endif
+
+/freenode.php3
+
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3'"
+! if ( "$imgidx" != "" ) then
+    /deleteimageid.php3
+! else
+!     echo "*** No image testimg3! ***"
+! endif
+
+!imgidx=sql "select imageid from images where pid='testproj3' and imagename='testimg3a'"
+! if ( "$imgidx" != "" ) then
+    /deleteimageid.php3
+! else
+!     echo "*** No image testimg3a! ***"
+! endif
+
+!osidx=sql "select osid from os_info where pid='testproj3' and osname='testosid3'"
+! if ( "$osidx" != "" ) then
+    /deleteosid.php3
+! else
+!     echo "*** No os id testosid3! ***"
+! endif
+
+!usridx=sql "select uid_idx from users where uid='testusr3'"
+! if ( "$usridx" != "" ) then
+
+    /deletepubkey.php3
+    ###/deletesfskey.php3
+    /freezeuser.php3
+    /deleteuser.php3
+
+! else
+!     echo "*** No user testusr3! ***"
+! endif
+# Allow creating testusr3 again in setup.
+!sql "delete from deleted_users where uid='testusr3'"
+!sql "delete from users where uid='testusr3' and status='archived'"
+
+!grpidx=sql "select gid_idx from groups where gid='testgroup3'"
+! if ( "$grpidx" != "" ) then
+    /deletegroup.php3
+! else
+!     echo "*** No group testgroup3! ***"
+! endif
+
+# Place-holder...
+/delmmlist.php3
+
+!projidx=sql "select pid_idx from projects where pid='testproj3'"
+! if ( "$projidx" != "" ) then
+
+    # Currently, once a template has been created, a project can never be deleted.
+    !sql "delete from experiments where pid = 'testproj3' and eid like'T%-%'"
+    /deleteproject.php3
+
+! else
+!     echo "*** No project testproj3! ***"
+! endif
+
+# No other way to delete xref_tags?
+!sql "delete from knowledge_base_entries where xref_tag like'test_tag%'"
+
+# Users don't actually get deleted anymore, they get archived.  Clean up.
+!sql "delete from users where uid='testusr3'"
+!sql "delete from group_membership where uid='testusr3'"
+
+# Remove the user w.r.t. getpwnam as well.
+! ssh $MYBOSS sudo pw userdel -n testusr3
+# Clear the error return if it fails, for gmake.
+! echo Done.

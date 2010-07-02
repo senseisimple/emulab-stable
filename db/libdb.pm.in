@@ -2,13 +2,15 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 #
 # A library of useful DB stuff. Mostly things that get done a lot.
 # Saves typing.
+#
+# NOTE: Overrides perl's builtin fork()
 #
 # XXX: The notion of "uid" is a tad confused. A unix uid is a number,
 #      while in the DB a user uid is a string (equiv to unix login).
@@ -20,6 +22,7 @@ use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
+
 @EXPORT =
     qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
 	 OLDRESERVED_PID OLDRESERVED_EID NFREELOCKED_PID NFREELOCKED_EID 
@@ -27,9 +30,11 @@ use vars qw(@ISA @EXPORT);
 	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
 	 PROJMEMBERTRUST_PROJROOT PROJMEMBERTRUST_LOCALROOT
+	 NODEILL_PID NODEILL_EID
 
-	 PROJROOT GROUPROOT USERROOT TBOPSPID EXPTLOGNAME
+	 TBOPSPID EXPTLOGNAME
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
+         PLABTESTING_PID PLABTESTING_EID PLABDOWN_PID PLABDOWN_EID
 
 	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust MapNumericUID
 
@@ -59,10 +64,12 @@ use vars qw(@ISA @EXPORT);
 
 	 TB_OSID_READINFO TB_OSID_CREATE
 	 TB_OSID_DESTROY TB_OSID_MIN TB_OSID_MAX
+	 TB_OSID_OSIDLEN TB_OSID_OSNAMELEN TB_OSID_VERSLEN
 
 	 TB_IMAGEID_READINFO TB_IMAGEID_MODIFYINFO
 	 TB_IMAGEID_CREATE TB_IMAGEID_DESTROY
 	 TB_IMAGEID_ACCESS TB_IMAGEID_MIN TB_IMAGEID_MAX
+	 TB_IMAGEID_IMAGEIDLEN TB_IMAGEID_IMAGENAMELEN
 
 	 DBLIMIT_NSFILESIZE NODERELOADPENDING_EID
 
@@ -74,7 +81,7 @@ use vars qw(@ISA @EXPORT);
 	 EXPTSTATE_MODIFY_PARSE EXPTSTATE_MODIFY_REPARSE EXPTSTATE_MODIFY_RESWAP
 	 EXPTSTATE_RESTARTING
 	 BATCHSTATE_LOCKED BATCHSTATE_UNLOCKED
-	 EXPTCANCEL_CLEAR EXPTCANCEL_TERM EXPTCANCEL_SWAP
+	 EXPTCANCEL_CLEAR EXPTCANCEL_TERM EXPTCANCEL_SWAP EXPTCANCEL_DEQUEUE
 
 	 TBSetCancelFlag TBGetCancelFlag
 
@@ -95,14 +102,15 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_RELOADDONE_V2
 	 TBDB_NODESTATE_UNKNOWN
 	 TBDB_NODESTATE_PXEWAIT TBDB_NODESTATE_PXEWAKEUP
+	 TBDB_NODESTATE_PXEFAILED TBDB_NODESTATE_PXELIMBO
 	 TBDB_NODESTATE_PXEBOOTING TBDB_NODESTATE_ALWAYSUP
 	 TBDB_NODESTATE_MFSSETUP TBDB_NODESTATE_TBFAILED
 	 TBDB_NODESTATE_POWEROFF
 
 	 TBDB_NODEOPMODE_NORMAL TBDB_NODEOPMODE_DELAYING
 	 TBDB_NODEOPMODE_UNKNOWNOS TBDB_NODEOPMODE_RELOADING
-	 TBDB_NODEOPMODE_NORMALv1 TBDB_NODEOPMODE_MINIMAL
-	 TBDB_NODEOPMODE_RELOAD TBDB_NODEOPMODE_RELOADMOTE
+	 TBDB_NODEOPMODE_NORMALv1 TBDB_NODEOPMODE_MINIMAL TBDB_NODEOPMODE_PCVM
+	 TBDB_NODEOPMODE_RELOAD TBDB_NODEOPMODE_RELOADMOTE TBDB_NODEOPMODE_RELOADPCVM
 	 TBDB_NODEOPMODE_DELAY
 	 TBDB_NODEOPMODE_BOOTWHAT
 	 TBDB_NODEOPMODE_ANY
@@ -127,6 +135,7 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_STATS_SWAPIN TBDB_STATS_SWAPOUT TBDB_STATS_SWAPMODIFY
 	 TBDB_STATS_FLAGS_IDLESWAP TBDB_STATS_FLAGS_PREMODIFY
 	 TBDB_STATS_FLAGS_START TBDB_STATS_FLAGS_PRESWAPIN
+	 TBDB_STATS_FLAGS_MODHOSED TBDB_STATS_SWAPUPDATE
 
 	 TBDB_JAILIPBASE TBDB_JAILIPMASK
 
@@ -151,29 +160,29 @@ use vars qw(@ISA @EXPORT);
 
 	 TBDB_PHYSICAL_NODE_TABLES
 
-	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
-	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
-	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp NodeidToExpOldReserved
-	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
-	 NewTBDBHandle DBQueryN DBQueryFatalN DBQueryWarnN DBErrN
-	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
+	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck 
+	 TBExptAccessCheck NodeidToExp 
+	 ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
-	 DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
-	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
-	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
-	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
+	 DBDateTime DefaultImageID 
+	 TBSetNodeLogEntry
+	 MapNodeOSID 
+	 TBOSID TBOSMaxConcurrent TBOSCountInstances
 	 TBResolveNextOSID TBOsidToPid TBOSIDRebootWaittime
-	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID ExpSwapper
-	 TBdbfork TBDBDisconnect VnameToNodeid TBExpLocked
-	 TBIsNodeRemote TBExptSetLogFile TBExptClearLogFile TBExptGetLogFile
-	 TBIsNodeImageable TBIsNodeVirtual TBControlNetIP TBPhysNodeID
-	 TBExptOpenLogFile TBExptCloseLogFile TBExptCreateLogFile
+	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID 
+	 TBdbfork VnameToNodeid 
+	 TBIsNodeRemote 
+	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBNodeUpdateAccountsByUID
-	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
-	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
-	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
-	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
+	 TBExptWorkDir TBExptUserDir
+	 TBIPtoNodeID TBNodeBootReset TBNodeStateWait
+	 TBExptSetSwapUID TBExptSetThumbNail
+	 TBPlabNodeUsername MarkPhysNodeDown
+	 TBExptIsElabInElab TBExptIsPlabInElab
+	 TBExptPlabInElabPLC TBExptPlabInElabNodes
+	 TBBatchUnLockExp TBExptIsBatchExp
+	 
 	 TBExptFirewall TBNodeFirewall TBExptFirewallAndPort
 	 TBSetExptFirewallVlan TBClearExptFirewallVlan
 	 TBNodeConsoleTail TBExptGetSwapoutAction TBExptGetSwapState
@@ -182,12 +191,6 @@ use vars qw(@ISA @EXPORT);
 	 TBNodeAdminOSID TBNodeDiskloadOSID
 	 TBNodeType TBNodeTypeProcInfo TBNodeTypeBiosWaittime
 
-	 TBExptRemoveVirtualState TBExptBackupVirtualState
-	 TBExptRestoreVirtualState
-
-	 TBExptRemovePhysicalState TBExptBackupPhysicalState
-	 TBExptRestorePhysicalState TBExptClearBackupState
-
 	 TBExptPortRange
 
 	 TBDB_WIDEAREA_LOCALNODE
@@ -195,7 +198,7 @@ use vars qw(@ISA @EXPORT);
 
 	 TBSiteVarExists TBGetSiteVar TBSetSiteVar
 
-	 TBActivityReport GatherSwapStats GatherAssignStats
+	 TBActivityReport GatherAssignStats
 	 TBAvailablePCs
 
 	 TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT
@@ -204,11 +207,10 @@ use vars qw(@ISA @EXPORT);
 
 	 TBDB_ROUTERTYPE_NONE	TBDB_ROUTERTYPE_OSPF
 	 TBDB_ROUTERTYPE_STATIC TBDB_ROUTERTYPE_MANUAL
+	 TBDB_USER_INTERFACE_EMULAB TBDB_USER_INTERFACE_PLAB
 	 TBDB_EVENTKEY TBDB_WEBKEY
-	 TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN TBDB_CHECKDBSLOT_ERROR
-         max min TBcheck_dbslot
+         max min 
 	 hash_recurse array_recurse hash_recurse2 array_recurse2
-	 TBGetUniqueIndex
 
 	 TBExptMinMaxNodes TBExptSecurityLevel TBExptIDX
 	 TBDB_SECLEVEL_GREEN TBDB_SECLEVEL_BLUE TBDB_SECLEVEL_YELLOW
@@ -224,18 +226,24 @@ use vars qw(@ISA @EXPORT);
 	 TBRobotLabExpt
 
 	 TBExptContainsNodeCT
-
 	 );
 
-# Must come after package declaration!
-use lib '@prefix@/lib';
+use emdb;
+use emutil;
 use libtblog_simple;
 use English;
 use File::Basename;
 use POSIX qw(strftime);
-require Mysql;
-use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES @EXPORT_OK @virtualTables
-	    @physicalTables);
+
+# This line has to come before the requires.
+@EXPORT = (@emutil::EXPORT, @emdb::EXPORT, @EXPORT);
+# These are requires because of cross dependency hell.
+require User;
+require Project;
+require Group;
+require Node;
+require NodeType;
+require Lan;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -245,99 +253,19 @@ my $EVENTSYS    = "@EVENTSYS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPSPID	= "emulab-ops";
-my $SCRIPTNAME  = "Unknown";
-my $PROJROOT    = "/proj";
-my $GROUPROOT   = "/groups";
-my $USERROOT    = "/users";
 my $EXPTLOGNAME = "activity.log";
+my $PROJROOT    = "@PROJROOT_DIR@";
 
 if ($EVENTSYS) {
     require event;
     import event;
 }
-
-# Untainted scriptname for email below.
-if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
-    $SCRIPTNAME = basename($1);
-}
-else {
-    $SCRIPTNAME = "Tainted";
-}
-
-#
-# Set up for querying the database. Note that fork causes a reconnect
-# to the DB in the child.
-#
-my @DB;
-$DBQUERY_MAXTRIES = 1;
-$DBCONN_MAXTRIES  = 5;
-@EXPORT_OK        = qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES);
-
-sub TBDBConnect($)
-{
-    my ($dbnum) = @_;
-    my $maxtries = $DBCONN_MAXTRIES;
-
-    #
-    # Construct a 'username' from the name of this script and the user who
-    # ran it. This is for accounting purposes.
-    #
-    my $name = getpwuid($UID);
-    if (!$name) {
-	$name = "uid$UID";
-    }
-    my $dbuser = "$SCRIPTNAME:$name:$PID";
-
-    while ($maxtries) {
-	$DB[$dbnum] = Mysql->connect("localhost", $DBNAME, $dbuser, "none");
-	if (defined($DB[$dbnum])) {
-	    last;
-	}
-	$maxtries--;
-	sleep(1);
-    }
-    if (!defined($DB[$dbnum])) {
-	print STDERR "Cannot connect to DB after several attempts!\n";
-	# Ensure consistent error value. 
-	exit(-1);
-    }
-    $DB[$dbnum]->{'dbh'}->{'PrintError'} = 0;
-    $Mysql::QUIET = 1;
-}
-TBDBConnect(0);
-
 sub TBdbfork()
 {
-    select(undef, undef, undef, 0.3);
-    for (my $i = 0; $i < @DB; $i++) {
-	undef($DB[$i]);
-	TBDBConnect($i);
-    }
     if ($EVENTSYS) {
 	EventFork();
     }
 }
-
-# To avoid keeping a mysql connection around.
-sub TBDBDisconnect()
-{
-    for (my $i = 0; $i < @DB; $i++) {
-	undef($DB[$i]);
-    }
-    select(undef, undef, undef, 0.3);
-}
-
-# Create a new DB handle and return the handle number
-sub NewTBDBHandle() {
-    my $dbnum = @DB;
-    TBDBConnect($dbnum);
-    return $dbnum;
-}
-
-#
-# Record last DB error string.
-#
-my $DBErrorString = "";
 
 #
 # Needs to be config'ed.
@@ -357,17 +285,20 @@ sub NODEREPOSITIONING_EID()	{ "repositioning"; }
 sub NODEREPOSPENDING_EID()	{ "repositionpending"; }
 sub NODEDEAD_PID()		{ $TBOPSPID; }
 sub NODEDEAD_EID()		{ "hwdown"; }
+sub NODEILL_PID()		{ $TBOPSPID; }
+sub NODEILL_EID()		{ "hwcheckup"; }
 sub PLABMOND_PID()		{ $TBOPSPID; }
 sub PLABMOND_EID()		{ "plab-monitor"; }
+sub PLABTESTING_PID()		{ $TBOPSPID; }
+sub PLABTESTING_EID()		{ "plab-testing"; }
 sub PLABHOLDING_PID()		{ $TBOPSPID; }
 sub PLABHOLDING_EID()		{ "plabnodes"; }
+sub PLABDOWN_PID()		{ $TBOPSPID; }
+sub PLABDOWN_EID()		{ "hwdown"; }
 sub OLDRESERVED_PID()		{ $TBOPSPID; }
 sub OLDRESERVED_EID()		{ "oldreserved"; }
 sub NFREELOCKED_PID()		{ $TBOPSPID; }
 sub NFREELOCKED_EID()		{ "nfree-locked"; }
-sub PROJROOT()			{ $PROJROOT; }
-sub GROUPROOT()			{ $GROUPROOT; }
-sub USERROOT()			{ $USERROOT; }
 sub TBOPSPID()			{ $TBOPSPID; }
 sub EXPTLOGNAME()		{ $EXPTLOGNAME; }
 
@@ -403,12 +334,14 @@ sub BATCHSTATE_UNLOCKED()	{ "unlocked";}
 sub EXPTCANCEL_CLEAR()		{ 0 ;}
 sub EXPTCANCEL_TERM()		{ 1 ;}
 sub EXPTCANCEL_SWAP()		{ 2 ;}
+sub EXPTCANCEL_DEQUEUE()	{ 3 ;}
 
 sub USERSTATUS_ACTIVE()		{ "active"; }
 sub USERSTATUS_FROZEN()		{ "frozen"; }
 sub USERSTATUS_UNAPPROVED()	{ "unapproved"; }
 sub USERSTATUS_UNVERIFIED()	{ "unverified"; }
 sub USERSTATUS_NEWUSER()	{ "newuser"; }
+sub USERSTATUS_ARCHIVED()	{ "archived"; }
 
 #
 # We want valid project membership to be non-zero for easy membership
@@ -473,6 +406,9 @@ sub TB_OSID_CREATE()		{ 2; }
 sub TB_OSID_DESTROY()		{ 3; }
 sub TB_OSID_MIN()		{ TB_OSID_READINFO; }
 sub TB_OSID_MAX()		{ TB_OSID_DESTROY; }
+sub TB_OSID_OSIDLEN()		{ 35; }
+sub TB_OSID_OSNAMELEN()		{ 20; }
+sub TB_OSID_VERSLEN()		{ 12; }
 
 # Magic OSID constants
 sub TB_OSID_MBKERNEL()          { "_KERNEL_"; } # multiboot kernel OSID
@@ -494,6 +430,8 @@ sub TB_IMAGEID_DESTROY()	{ 4; }
 sub TB_IMAGEID_ACCESS()		{ 5; }
 sub TB_IMAGEID_MIN()		{ TB_IMAGEID_READINFO; }
 sub TB_IMAGEID_MAX()		{ TB_IMAGEID_ACCESS; }
+sub TB_IMAGEID_IMAGEIDLEN()	{ 45; }
+sub TB_IMAGEID_IMAGENAMELEN()	{ 30; }
 
 # Node Log Types
 sub TB_NODELOGTYPE_MISC		{ "misc"; }
@@ -547,7 +485,9 @@ sub TBDB_NODESTATE_RELOADDONE()	{ "RELOADDONE"; }
 sub TBDB_NODESTATE_RELOADDONE_V2(){ "RELOADDONEV2"; }
 sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
 sub TBDB_NODESTATE_PXEWAIT()	{ "PXEWAIT"; }
+sub TBDB_NODESTATE_PXELIMBO()	{ "PXELIMBO"; }
 sub TBDB_NODESTATE_PXEWAKEUP()	{ "PXEWAKEUP"; }
+sub TBDB_NODESTATE_PXEFAILED()	{ "PXEFAILED"; }
 sub TBDB_NODESTATE_PXEBOOTING()	{ "PXEBOOTING"; }
 sub TBDB_NODESTATE_POWEROFF()	{ "POWEROFF"; }
 
@@ -558,8 +498,10 @@ sub TBDB_NODEOPMODE_UNKNOWNOS	{ "UNKNOWNOS"; }
 sub TBDB_NODEOPMODE_RELOADING	{ "RELOADING"; }
 sub TBDB_NODEOPMODE_NORMALv1	{ "NORMALv1"; }
 sub TBDB_NODEOPMODE_MINIMAL	{ "MINIMAL"; }
+sub TBDB_NODEOPMODE_PCVM	{ "PCVM"; }
 sub TBDB_NODEOPMODE_RELOAD	{ "RELOAD"; }
 sub TBDB_NODEOPMODE_RELOADMOTE	{ "RELOAD-MOTE"; }
+sub TBDB_NODEOPMODE_RELOADPCVM	{ "RELOAD-PCVM"; }
 sub TBDB_NODEOPMODE_DELAY	{ "DELAY"; }
 sub TBDB_NODEOPMODE_BOOTWHAT	{ "_BOOTWHAT_"; } # A redirection opmode
 sub TBDB_NODEOPMODE_UNKNOWN	{ "UNKNOWN"; }
@@ -631,11 +573,13 @@ sub TBDB_STATS_TERMINATE()	{ "destroy"; }
 sub TBDB_STATS_SWAPIN()		{ "swapin"; }
 sub TBDB_STATS_SWAPOUT()	{ "swapout"; }
 sub TBDB_STATS_SWAPMODIFY()	{ "swapmod"; }
+sub TBDB_STATS_SWAPUPDATE()	{ "swapupdate"; }
 sub TBDB_STATS_FLAGS_IDLESWAP()	{ 0x01; }
 sub TBDB_STATS_FLAGS_PREMODIFY(){ 0x02; }
 sub TBDB_STATS_FLAGS_START()    { 0x04; }
 sub TBDB_STATS_FLAGS_PRESWAPIN(){ 0x08; }
 sub TBDB_STATS_FLAGS_BATCHCTRL(){ 0x10; }
+sub TBDB_STATS_FLAGS_MODHOSED() { 0x20; }
 # Do not export these variables!
 my $TBDB_STATS_STARTCLOCK;
 my $TBDB_STATS_SAVEDSWAPUID;
@@ -665,14 +609,13 @@ sub TBDB_ROUTERTYPE_OSPF()	{ "ospf"; }
 sub TBDB_ROUTERTYPE_STATIC()	{ "static"; }
 sub TBDB_ROUTERTYPE_MANUAL()	{ "manual"; }
 
+# User Interface types.
+sub TBDB_USER_INTERFACE_EMULAB(){ "emulab"; }
+sub TBDB_USER_INTERFACE_PLAB()	{ "plab"; }
+
 # Key Stuff
 sub TBDB_EVENTKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/eventkey"; }
 sub TBDB_WEBKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/webkey"; }
-
-# Regex stuff
-sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
-sub TBDB_CHECKDBSLOT_WARN()	{ 0x1; }
-sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
 
 # Security Levels.
 sub TBDB_SECLEVEL_GREEN()	{ 0; }
@@ -695,6 +638,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'iface_counters'	=> [ 'node_id' ],
 	'interfaces'		=> [ 'node_id' ],
 	'interface_settings'	=> [ 'node_id' ],
+	'interface_state'	=> [ 'node_id' ],
 	'last_reservation'	=> [ 'node_id' ],
 	'linkdelays'		=> [ 'node_id' ],
 	'location_info'		=> [ 'node_id' ],
@@ -712,6 +656,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'nodeuidlastlogin'	=> [ 'node_id' ],
 	'ntpinfo'		=> [ 'node_id' ],
 	'outlets'		=> [ 'node_id' ],
+	'outlets_remoteauth'	=> [ 'node_id' ],
 	'partitions'		=> [ 'node_id' ],
 	'plab_slice_nodes'	=> [ 'node_id' ],
 	'port_counters'		=> [ 'node_id' ],
@@ -721,18 +666,19 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'switch_stacks'		=> [ 'node_id' ],
 	'tiplines'		=> [ 'node_id' ],
 	'tmcd_redirect'		=> [ 'node_id' ],
-	'tunnels'		=> [ 'node_id' ],
 	'uidnodelastlogin'	=> [ 'node_id' ],
 	'v2pmap'		=> [ 'node_id' ],
-	'veth_interfaces'	=> [ 'node_id' ],
+	'vinterfaces'		=> [ 'node_id' ],
+	'widearea_nodeinfo'	=> [ 'node_id' ],
 	'widearea_accounts'	=> [ 'node_id' ],
 	'widearea_delays'	=> [ 'node_id1', 'node_id2' ],
-	'widearea_nodeinfo'	=> [ 'node_id' ],
 	'widearea_recent'	=> [ 'node_id1', 'node_id2' ],
 	'wires'			=> [ 'node_id1', 'node_id2' ],
 	'node_startloc'		=> [ 'node_id' ],
 	'node_history'		=> [ 'node_id' ],
 	'node_bootlogs'		=> [ 'node_id' ],
+        'plab_mapping'          => [ 'node_id' ],
+        'node_utilization'      => [ 'node_id' ],
     );
 }
 
@@ -816,25 +762,22 @@ sub TBGrpTrust($$$)
     #
     # No group, then use the default group.
     #
-    if (! $gid) {
-	$gid = $pid;
-    }
-
-    my $query_result =
-	DBQueryFatal("select trust from group_membership ".
-		     "where uid='$uid' and pid='$pid' and gid='$gid'");
+    $gid = $pid
+	if (! $gid);
 
     #
-    # No membership is the same as no trust. True? Maybe an error instead?
+    # Must map to an existing user to be trusted, obviously.
     #
-    if ($query_result->numrows == 0) {
-	return PROJMEMBERTRUST_NONE;
-    }
+    my $target_user = User->Lookup($uid);
+    return PROJMEMBERTRUST_NONE
+	if (! defined($target_user));
 
-    my @row = $query_result->fetchrow_array();
-    my $trust_string = $row[0];
+    # Ditto the group.
+    my $target_group = Group->Lookup($pid, $gid);
+    return PROJMEMBERTRUST_NONE
+	if (! defined($target_group));
 
-    return TBTrustConvert($trust_string);
+    return $target_group->Trust($target_user)
 }
 
 #
@@ -853,79 +796,20 @@ sub TBProjTrust($$)
 }
 
 #
-# Test admin status. Optional argument is the UID or Name to test. If not
-# provided, then test the current UID.
+# Test admin status. Ignore argument; we only care if the current user
+# has admin privs turned on.
 #
-# XXX Argument is *either* a numeric UID, or a string name.
-#
-# usage: TBAdmin([int or char* uid]);
+# usage: TBAdmin();
 #        returns 1 if an admin type.
 #        returns 0 if a mere user.
 #
 sub TBAdmin(;$)
 {
-    my($uid) = @_;
-    my($name);
+    my $this_user = User->ThisUser();
+    return 0
+	if (! defined($this_user));
 
-    #
-    # No one is considered an admin unless they have the magic environment
-    # variable set (so that you have to be a bit more explict about wanting
-    # admin privs.) Use the withadminprivs script to get this variable set.
-    # Also check with HTTP_ at the front of the name, since this is required
-    # to get it through suexec from the web scripts.
-    #
-    if (!($ENV{WITH_TB_ADMIN_PRIVS} || $ENV{HTTP_WITH_TB_ADMIN_PRIVS})) {
-	return 0;
-    }
-
-    if (!defined($uid)) {
-	$uid = $UID;
-    }
-
-    #
-    # Test if numeric. Map to name if it is.
-    #
-    if ($uid =~ /^[0-9]+$/) {
-	($name) = getpwuid($uid)
-	    or die "$uid not in passwd file\n";
-    }
-    else {
-	$name = $uid;
-    }
-
-    my $query_result =
-	DBQueryFatal("select admin from users where uid='$name'");
-
-    my @row = $query_result->fetchrow_array();
-    if ($row[0] == 1) {
-	return 1;
-    }
-    return 0;
-}
-
-#
-# Test whether current user is a member of the emulab-ops project.
-# 
-sub TBOpsGuy(;$)
-{
-    my($uid) = @_;
-    my($name);
-
-    if (!defined($uid)) {
-	$uid = $UID;
-    }
-
-    #
-    # Test if numeric. Map to name if it is.
-    #
-    if ($uid =~ /^[0-9]+$/) {
-	($name) = getpwuid($uid)
-	    or die "$uid not in passwd file\n";
-    }
-    else {
-	$name = $uid;
-    }
-    return TBMinTrust(TBProjTrust($name, $TBOPSPID), PROJMEMBERTRUST_USER());
+    return $this_user->IsAdmin();
 }
 
 #
@@ -939,46 +823,20 @@ sub TBOpsGuy(;$)
 sub TBProjAccessCheck($$$$)
 {
     my ($uid, $pid, $gid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_PROJECT_MIN ||
-	$access_type > TB_PROJECT_MAX) {
-	die("*** Invalid access type: $access_type!");
-    }
 
     #
-    # Admins do whatever they want!
+    # Must map to an existing user to be trusted, obviously.
     #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
+    my $target_user = User->LookupByUnixId($uid);
+    return 0
+	if (! defined($target_user));
 
-    #
-    # No group, then use the default group.
-    #
-    if (! defined($gid)) {
-	$gid = $pid;
-    }
+    # Ditto the group
+    my $target_group = Group->Lookup($pid, $gid);
+    return 0
+	if (! defined($target_group));
 
-    if ($access_type == TB_PROJECT_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    elsif ($access_type == TB_PROJECT_CREATEEXPT) {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-    elsif ($access_type == TB_PROJECT_DELUSER) {
-	$mintrust = PROJMEMBERTRUST_PROJROOT;
-    }
-    elsif ($access_type == TB_PROJECT_MAKEGROUP ||
-	   $access_type == TB_PROJECT_DELGROUP) {
-	$mintrust = PROJMEMBERTRUST_GROUPROOT;
-    }
-    else {
-	die("*** Unexpected access type: $access_type!");
-    }
-
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
+    return $target_group->AccessCheck($target_user, $access_type);
 }
 
 #
@@ -991,50 +849,20 @@ sub TBProjAccessCheck($$$$)
 sub TBExptAccessCheck($$$$)
 {
     my ($uid, $pid, $eid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_EXPT_MIN ||
-	$access_type > TB_EXPT_MAX) {
-	die("*** Invalid access type: $access_type!");
-    }
 
     #
-    # Admins do whatever they want!
+    # Must map to an existing user to be trusted, obviously.
     #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
+    my $target_user = User->LookupByUnixId($uid);
+    return 0
+	if (! defined($target_user));
 
-    my $query_result =
-	DBQueryFatal("SELECT gid,expt_head_uid FROM experiments WHERE ".
-		     "eid='$eid' and pid='$pid'");
+    # Ditto the group
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return 0
+	if (! defined($experiment));
 
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    my $gid     = $row[0];
-    my $creator = $row[1];
-
-    #
-    # An experiment may be destroyed by the experiment creator or the
-    # project/group leader.
-    #
-    if ($access_type == TB_EXPT_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-
-    #
-    # Either proper permission in the group, or group_root in the project.
-    # This lets group_roots muck with other people's experiments, including
-    # those in groups they do not belong to.
-    #
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
+    return $experiment->AccessCheck($target_user, $access_type);
 }
 
 #
@@ -1048,390 +876,25 @@ sub TBNodeAccessCheck($$@)
 {
     my ($uid, $access_type) = (shift, shift);
     my @nodelist = @_;
-    my $mintrust;
-
-    if ($access_type < TB_NODEACCESS_MIN ||
-	$access_type > TB_NODEACCESS_MAX) {
-	die("*** Invalid access type: $access_type!");
-    }
 
     #
-    # Admins do whatever they want!
+    # Must map to an existing user to be trusted, obviously.
     #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
+    my $target_user = User->LookupByUnixId($uid);
+    return 0
+	if (! defined($target_user));
+    return 1
+	if ($target_user->IsAdmin());
 
-    if ($access_type == TB_NODEACCESS_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
+    foreach my $nodeid (@nodelist) {
+	my $node = Node->Lookup($nodeid);
+	return 0
+	    if (!defined($node));
 
-    foreach my $node (@nodelist) {
-	my $query_result =
-	    DBQueryFatal("select e.pid,e.gid from reserved as r ".
-			 "left join experiments as e on ".
-			 "     e.pid=r.pid and e.eid=r.eid ".
-			 "where r.node_id='$node'");
-
-	if ($query_result->numrows == 0) {
-	    return 0;
-	}
-	my @row = $query_result->fetchrow_array();
-	my $pid = $row[0];
-	my $gid = $row[1];
-
-	#
-	# Either proper permission in the group, or group_root in the
-	# project. This lets group_roots muck with other people's
-	# nodes, including those in groups they do not belong to.
-	#
-	if (! TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) &&
-	    ! TBMinTrust(TBGrpTrust($uid, $pid, $pid),
-			 PROJMEMBERTRUST_GROUPROOT)) {
-	    return 0;
-	}
+	return 0
+	    if (!$node->AccessCheck($target_user, $access_type));
     }
     return 1;
-}
-
-#
-# Access checks for an OSID. Tests for tbadmin.
-#
-# Usage: TBOSIDAccessCheck($uid, $osid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-#
-sub TBOSIDAccessCheck($$$)
-{
-    my ($uid, $osid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_OSID_MIN || $access_type > TB_OSID_MAX) {
-	die("*** Invalid access type $access_type!");
-    }
-
-    #
-    # Admins do whatever they want!
-    #
-    if (TBAdmin($uid)) {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
-
-    #
-    # No GIDs yet.
-    #
-    my $query_result =
-	DBQueryFatal("SELECT pid,shared FROM os_info WHERE osid='$osid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    my $pid = $row[0];
-    my $shared = $row[1];
-
-    #
-    # Global OSIDs can be read by anyone, but must be admin to read.
-    #
-    if ($shared) {
-	if ($access_type == TB_OSID_READINFO) {
-	    return 1;
-	}
-	return 0;
-    }
-
-    #
-    # Otherwise must have proper trust in the project.
-    #
-    if ($access_type == TB_OSID_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-
-    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
-}
-
-#
-# Access checks for an ImageID
-#
-# Usage: TBImageIDAccessCheck($uid, $imageid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-#
-sub TBImageIDAccessCheck($$$)
-{
-    my ($uid, $imageid, $access_type) = @_;
-    my $mintrust;
-
-    if ($access_type < TB_IMAGEID_MIN || $access_type > TB_IMAGEID_MAX) {
-	die("*** Invalid access type $access_type!");
-    }
-
-    #
-    # Admins and root do whatever they want!
-    #
-    if (TBAdmin($uid) || !$UID || $UID eq "root" || $uid eq "root") {
-	return 1;
-    }
-    $uid = MapNumericUID($uid);
-
-    #
-    # No GIDs yet.
-    #
-    my $query_result =
-	DBQueryFatal("SELECT pid,gid,shared,global FROM images ".
-		     "WHERE imageid='$imageid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    my $pid = $row[0];
-    my $gid = $row[1];
-    my $shared = $row[2];
-    my $global = $row[3];
-
-    #
-    # Global ImageIDs can be read by anyone.
-    #
-    if ($global) {
-	if ($access_type == TB_IMAGEID_READINFO) {
-	    return 1;
-	}
-	return 0;
-    }
-
-    #
-    # Otherwise must have proper trust in the pid/gid
-    #
-    if ($access_type == TB_IMAGEID_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
-        #
-        # Shared imageids are readable by anyone in the project.
-        #
-	if ($shared) {
-	    $gid = $pid;
-	}
-    }
-    else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
-    }
-
-    #
-    # Either proper permission in the group, or group_root in the project.
-    # This lets group_roots muck with other people's experiments, including
-    # those in groups they do not belong to.
-    #
-    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
-	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
-}
-
-#
-# Determine if a node can be allocated to a project.
-#
-# Usage: TBNodeAllocCheck($pid, $node_id)
-#	 returns 0 if not allowed or error.
-#        returns 1 if allowed.
-#
-sub TBNodeAllocCheck($$)
-{
-    my ($pid, $node_id) = @_;
-
-    #
-    # Admins do whatever they want!
-    #
-    if (TBAdmin()) {
-	return 1;
-    }
-
-    #
-    # Hmm. The point of this join is to find rows in the permissions table
-    # with the corresponding type of the node. If no rows come back, its
-    # a non-existent node! If the values are NULL, then there are no rows
-    # with that type/class, and thus the type/class is free to be allocated
-    # by anyone. Otherwise we get the list of projects that are allowed,
-    # and so we have to look at those.
-    #
-    my $query_result =
-	DBQueryFatal("select distinct p.* from nodes as n ".
-		     "left join node_types as nt on n.type=nt.type ".
-		     "left join nodetypeXpid_permissions as p on ".
-		     "     (p.type=nt.type or p.type=nt.class) ".
-		     "where node_id='$node_id'");
-
-    if (!$query_result->numrows) {
-	print STDERR "TBNodeAllocCheck: No such node $node_id!\n";
-	return 0;
-    }
-    my ($ptype,$ppid) = $query_result->fetchrow_array();
-
-    # No rows, or a pid match.
-    if (!defined($ptype) || $ppid eq $pid) {
-	return 1;
-    }
-
-    # Okay, must be rows in the permissions table. Check each pid for a match.
-    while (my ($ptype,$ppid) = $query_result->fetchrow_array()) {
-	if ($ppid eq $pid) {
-	    return 1;
-	}
-    }
-    return 0;
-}
-
-#
-# Return Project leader. First argument pid.
-#
-# usage: ProjLeader(char *pid)
-#        returns char *leader if a valid pid.
-#        returns 0 if an invalid pid.
-#
-sub ProjLeader($)
-{
-    my($pid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select head_uid from projects where pid='$pid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return Group leader.
-#
-# usage: GroupLeader(char *pid, char *gid)
-#        returns char *leader if a valid pid.
-#        returns 0 if an invalid pid.
-#
-sub GroupLeader($$)
-{
-    my($pid, $gid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select leader from groups where ".
-		     "pid='$pid' and gid='$gid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return Experiment leader. First argument pid. Second argument is eid.
-#
-# usage: ExpLeader(char *pid, char *eid)
-#        returns char *leader if a valid pid/eid.
-#        returns 0 if an invalid pid/eid.
-#
-sub ExpLeader($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select expt_head_uid from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return Experiment swapper. First argument pid. Second argument is eid.
-#
-# usage: ExpSwapper(char *pid, char *eid)
-#        returns char *swapper if a valid pid/eid.
-#        returns 0 if an invalid pid/eid.
-#
-sub ExpSwapper($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select expt_swap_uid from experiments ".
-		     "where eid='$eid' and pid='$pid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Return a list of leaders (proj/group roots) for a given pid/gid,
-# in the format of an email address list. If no gid, assumes gid=pid.
-#
-# usage: TBLeaderMailList($pid,[$gid])
-#	 returns string like "name <email>[, name2 <email2>[, ...]]"
-#
-sub TBLeaderMailList($;$) {
-    # Based on the php version in dbdefs.php
-
-    my $pid = shift;
-    my $gid = shift || $pid;
-
-    # XXX: hardcode project_root and group_root here because we don't
-    # have the strings in variables...
-    my $query_result =
-    DBQueryFatal("select distinct usr_name,u.uid,usr_email from users as u ".
-                 "left join group_membership as gm on gm.uid=u.uid ".
-                 "where (trust='project_root' and pid='$pid') or ".
-		 "(trust='group_root' and pid='$pid' and gid='$gid') ".
-                 "order by trust DESC, usr_name");
-
-    if ($query_result->numrows() == 0) {
-	return 0;
-    }
-    my $mailstr="";
-    while (my @row = $query_result->fetchrow_array()) {
-	if ($mailstr ne "") { $mailstr .=", "; }
-	$mailstr .= '"'.$row[0]." (".$row[1].")\" <".$row[2].">";
-    }
-    return $mailstr;
-}
-
-#
-# Return Experiment group.
-#
-# usage: ExpGroup(char *pid, char *eid)
-#        returns gid if a valid pid/eid.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub ExpGroup($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryWarn("select gid from experiments ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
 }
 
 #
@@ -1443,150 +906,33 @@ sub ExpGroup($$)
 #
 sub ExpState($$)
 {
-    my($pid, $eid) = @_;
+    my ($pid, $eid) = @_;
 
-    my $query_result =
-	DBQueryWarn("select state from experiments ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Set Experiment state.
-#
-# usage: SetExpState(char *pid, char *eid, char *state)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub SetExpState($$$)
-{
-    my($pid, $eid, $state) = @_;
-
-    if ($EVENTSYS) {
-	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		      objname   => "$pid/$eid",
-		      eventtype => $state,
-		      expt      => "$pid/$eid",
-		      host      => $BOSSNODE);
-    }
-
-    my $query_result =
-	DBQueryWarn("update experiments set state='$state' ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Set the swap in/out time for an experiment.
-#
-# usage: TBSetExpSwapTime(char *pid, char *eid)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBSetExpSwapTime($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryWarn("update experiments set expt_swapped=now() ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Lock Experiment. Can also provide an optional new state.
-#
-# usage: TBLockExp(char *pid, char *eid, char *newstate)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBLockExp($$;$)
-{
-    my($pid, $eid, $newstate) = @_;
-
-    my $query_result =
-	DBQueryWarn("update experiments set expt_locked=now() ".
-		    (defined($newstate) ? ",state='$newstate' " : "") .
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    if ($EVENTSYS && defined($newstate)) {
-	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		      objname   => "$pid/$eid",
-		      eventtype => $newstate,
-		      expt      => "$pid/$eid",
-		      host      => $BOSSNODE);
-    }
-    return 1;
-}
-
-#
-# Test if Experiment is locked. Can provide optional pointer to return state.
-#
-# usage: TBExpLocked(char *pid, char *eid, char **state)
-#        returns 1 if locked.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBExpLocked($$;$)
-{
-    my($pid, $eid, $curstate) = @_;
-
-    my $query_result =
-	DBQueryWarn("select expt_locked,state from experiments ".
-		    "where eid='$eid' and pid='$pid'");
-
-    if (! $query_result ||
-	$query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-
-    $$curstate = $row[1]
-	if (defined($curstate));
+    my $experiment = Experiment->Lookup($pid, $eid);
     return 0
-	if (! defined($row[0]));
-    return 1;
+	if (!defined($experiment));
+    return $experiment->state();
 }
 
 #
-# UnLock Experiment. Can also provide an optional new state.
+# Helper function for batch system.
 #
-# usage: TBUnLockExp(char *pid, char *eid, char *newstate)
-#        returns 1 if okay.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub TBUnLockExp($$;$)
+sub TBBatchUnLockExp($$;$)
 {
     my($pid, $eid, $newstate) = @_;
-
+    my $BSTATE_UNLOCKED       = BATCHSTATE_UNLOCKED;
+    
     my $query_result =
-	DBQueryWarn("update experiments set expt_locked=NULL ".
+	DBQueryWarn("update experiments set expt_locked=NULL, ".
+		    "       batchstate='$BSTATE_UNLOCKED' ".
 		    (defined($newstate) ? ",state='$newstate' " : "") .
 		    "where eid='$eid' and pid='$pid'");
-
+    
     if (! $query_result ||
 	$query_result->numrows == 0) {
 	return 0;
     }
+    
     if ($EVENTSYS && defined($newstate)) {
 	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
 		      objname   => "$pid/$eid",
@@ -1643,53 +989,6 @@ sub TBGetCancelFlag($$$)
 }
 
 #
-# Return a list of all the nodes in an experiment
-# that were moved to OLDRESERVED_PID/OLDRESERVED_EID
-# holding reservation
-#
-# usage: ExpNodesOldReserved(char *pid, char *eid)
-#        returns the list if a valid pid/eid.
-#        returns 0 if an invalid pid/eid or if an error.
-#
-sub ExpNodesOldReserved($$)
-{
-    my($pid, $eid) = @_;
-    my(@row);
-    my(@nodes);
-
-    my $oldreserved_pid = OLDRESERVED_PID;
-    my $oldreserved_eid = OLDRESERVED_EID;
-    my $query_result =
-	DBQueryWarn("select r.node_id from reserved as r ".
-		    "left join nodes as n on n.node_id=r.node_id ".
-		    "left join node_types as nt on nt.type=n.type ".
-		    "where (r.pid='$oldreserved_pid' and r.old_pid='$pid') ".
-		    "and (r.pid='$oldreserved_eid' and r.old_eid='$eid') ");
-
-    if (! $query_result or
-	$query_result->numrows == 0) {
-	return ();
-    }
-    while (@row = $query_result->fetchrow_array()) {
-	my $node = $row[0];
-
-	#
-	# Taint check. I do not understand this sillyness, but if I
-	# taint check these node names, I avoid warnings throughout.
-	#
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
-
-	    push(@nodes, $node);
-	}
-	else {
-	    print "*** $0: WARNING: Bad node name: $node.\n";
-	}
-    }
-    return @nodes;
-}
-
-#
 # Return a list of all the nodes in an experiment.
 #
 # usage: ExpNodes(char *pid, char *eid, [bool islocal])
@@ -1697,16 +996,20 @@ sub ExpNodesOldReserved($$)
 #	 If the optional flag is set, returns only local nodes.
 #        Returns 0 if an invalid pid/eid or if an error.
 #
-sub ExpNodes($$;$)
+sub ExpNodes($$;$$)
 {
-    my($pid, $eid, $flag) = @_;
+    my($pid, $eid, $localonly, $physonly) = @_;
     my(@row);
     my(@nodes);
     my $clause = "";
 
-    if (defined($flag)) {
-	$clause = "and nt.isremotenode=0";
+    if (defined($localonly) && $localonly) {
+	$clause .= " and nt.isremotenode=0";
     }
+    if (defined($physonly) && $physonly) {
+	$clause .= " and nt.isvirtnode=0";
+    }
+
     my $query_result =
 	DBQueryWarn("select r.node_id from reserved as r ".
 		    "left join nodes as n on n.node_id=r.node_id ".
@@ -1792,72 +1095,6 @@ sub ExpNodeVnames($$;$$)
 }
 
 #
-# Mark a node as down. We schedule a next reservation for it so that it
-# remains in the users experiment through the termination so that there
-# are no permission errors (say, from snmpit).
-#
-# usage: MarkNodeDown(char *nodeid)
-#
-sub MarkNodeDown($)
-{
-    my($node) = $_[0];
-    my($pid, $eid);
-
-    $pid = NODEDEAD_PID;
-    $eid = NODEDEAD_EID;
-
-    my $query_result =
-	DBQueryFatal("replace into next_reserve " .
-		     "(node_id, pid, eid) " .
-		     "values ('$node', '$pid', '$eid')");
-
-    if ($query_result->num_rows < 1) {
-	DBWarn("WARNING: Could not mark $node down");
-    }
-}
-
-#
-# Set the boot status for a node.
-#
-# usage: SetNodeBootStatus(char *status)
-#
-sub SetNodeBootStatus($$)
-{
-    my($node, $bstat) = @_;
-
-    DBQueryFatal("update nodes set bootstatus='$bstat' ".
-		 "where node_id='$node'");
-}
-
-#
-# Check if a particular feature is supported by an OSID.
-#
-# usage: OSFeatureSupported(char *osid, char *feature)
-#        returns 1 if supported, 0 if not.
-#
-sub OSFeatureSupported($$) {
-    my($osid, $feature) = @_;
-
-    my $query_result =
-	DBQueryFatal("select osfeatures from os_info where osid='$osid'");
-
-    # Invalid OSID?
-    if ($query_result->numrows < 1) {
-	return 0;
-    }
-
-    my $osfeatures = $query_result->fetchrow_array();
-    if (defined($osfeatures)) {
-	foreach my $osfeature (split(',', $osfeatures)) {
-	    if ($feature eq $osfeature) {
-		return 1; 
-	    }
-	} 
-    }
-    return 0;
-}
-
-#
 # Find out what osid a node will boot next time it comes up,
 # Usually (but not always) the currently running OS as well.
 #
@@ -1871,7 +1108,8 @@ sub TBBootWhat($;$)
     # WARNING!!!
     #
     # DO NOT change this function without making corresponding changes to
-
+    # pxe/bootinfo_mysql.c.
+    #
     # ALWAYS find exactly the same resulting OSID given the same inputs.
     #
     my $query_result =
@@ -1896,67 +1134,14 @@ sub TBBootWhat($;$)
     # The priority would seem pretty clear.
     #
     return ($next_boot_osid, $next_boot_opmode)
-	if (defined($next_boot_osid) && $next_boot_osid ne "");
+	if (defined($next_boot_osid) && $next_boot_osid ne 0);
     return ($temp_boot_osid, $temp_boot_opmode)
-	if (defined($temp_boot_osid) && $temp_boot_osid ne "");
+	if (defined($temp_boot_osid) && $temp_boot_osid ne 0);
     return ($def_boot_osid, $def_boot_opmode)
-	if (defined($def_boot_osid) && $def_boot_osid ne "");
+	if (defined($def_boot_osid) && $def_boot_osid ne 0);
 
     print("*** Warning: node '$node': All boot info was null!\n");
     return undef;
-}
-
-#
-# Ah, what a hack! I'm tired of seeing regexs for sharks scattered around
-# the code. Anyway, this checks to see if a node is a shelf, and fills
-# in the shelf/node, return 1 if it is. The shelf/node arguments are
-# optional, if all you want to do is see if its a shelf type thing.
-#
-# usage: IsShelved(char *nodeid, [\$shelf], [\$node])
-#        returns 1 if the node is a shelf type thing. Optionally fills in info.
-#        returns 0 if the node is just a normal kind of node.
-#
-sub IsShelved ($;$$) {
-    my($nodeid, $shelf, $node) = @_;
-
-    if ($nodeid =~ /sh(\d+)-(\d+)/) {
-	if (defined($shelf)) {
-	    $$shelf = $1;
-	}
-	if (defined($node)) {
-	    $$node = $2;
-	}
-	return 1;
-    }
-    return 0;
-}
-
-#
-# Map nodeid to its pid/eid in the oldreserved holding reservation
-#
-# usage: NodeidToExpOldReserved(char *nodeid, \$pid, \$eid, \$vname)
-#        returns 1 if the node is reserved.
-#        returns 0 if the node is not reserved.
-#
-sub NodeidToExpOldReserved ($$$) {
-    my($nodeid, $pid, $eid) = @_;
-
-    my $oldreserved_pid = OLDRESERVED_PID;
-    my $oldreserved_eid = OLDRESERVED_EID;
-    my $query_result =
-	DBQueryWarn("select old_pid,old_eid from reserved ".
-		    "where node_id='$nodeid' and pid='$oldreserved_pid' ".
-		    "and eid='$oldreserved_eid'");
-
-    if (! $query_result ||
-	! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    $$pid = $row[0];
-    $$eid = $row[1];
-    return 1;
 }
 
 #
@@ -2018,7 +1203,7 @@ sub VnameToNodeid ($$$$) {
 
 
 #
-# Get the default ImageID for a particular node, from the node_types table.
+# Get the default ImageID for a particular node.
 #
 # usage: DefaultImageID(char *nodeid, \*imageid)
 #        returns 1 if the node is valid and has a default imageid.
@@ -2026,24 +1211,20 @@ sub VnameToNodeid ($$$$) {
 #        returns 0 if there are problems.
 #
 sub DefaultImageID ($$) {
-    my($nodeid,$imageid) = @_;
+    my ($nodeid, $imageid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select imageid from nodes as n ".
-		     "left join node_types as t on t.type=n.type ".
-		     "where n.node_id='$nodeid'");
+    my $node = Node->Lookup($nodeid);
 
-    if (! $query_result->num_rows) {
+    if (! $node) {
 	$$imageid = undef;
 	return 0;
     }
 
-    my ($res) = $query_result->fetchrow_array();
-    if (!defined($res) || $res eq "") {
+    if ($node->NodeTypeAttribute("default_imageid", $imageid) ||
+	$$imageid eq "") {
 	$$imageid = undef;
 	return 0;
     }
-    $$imageid = $res;
     return 1;
 }
 
@@ -2076,19 +1257,15 @@ sub TBImageID ($$) {
 #        returns osid if its valid.
 #        returns 0 if not valid.
 #
-sub TBOSID ($$) {
-    my($pid, $osname) = @_;
+sub TBOSID($$) {
+    my ($pid, $osname) = @_;
 
-    my $query_result =
-	DBQueryFatal("select osid from os_info ".
-		     "where pid='$pid' and osname='$osname'");
+    require OSinfo;
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
+    my $osinfo = OSinfo->Lookup($pid, $osname);
+    return 0
+	if (!defined($osinfo));
+    return $osinfo->osid();
 }
 
 #
@@ -2101,14 +1278,12 @@ sub TBOSID ($$) {
 sub TBOsidToPid ($$) {
     my($osid, $ppid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select pid from os_info where osid='$osid'");
+    require OSinfo;
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-    my ($pid) = $query_result->fetchrow_array();
-    $$ppid = $pid;
+    my $osinfo = OSinfo->Lookup($osid);
+    return 0
+	if (!defined($osinfo));
+    $$ppid = $osinfo->pid();
     return 1;
 }
 
@@ -2122,40 +1297,14 @@ sub TBOsidToPid ($$) {
 #
 sub TBOSMaxConcurrent ($)
 {
-    my($osid) = @_;
+    my ($osid) = @_;
 
-    my $query_result =
-	DBQueryFatal("select max_concurrent from os_info where osid='$osid'");
+    require OSinfo;
 
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
-
-#
-# Returns the reboot waittime.
-#
-# usage: TBOSIDRebootWaittime(char *osid)
-#        returns >= 1 if there is a waittime
-#        returns undef if there is no waittime
-#        returns 0 if not valid.
-#
-sub TBOSIDRebootWaittime ($)
-{
-    my($osid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select reboot_waittime from os_info where osid='$osid'");
-
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
+    my $osinfo = OSinfo->Lookup($osid);
+    return 0
+	if (!defined($osinfo));
+    return $osinfo->max_concurrent();
 }
 
 #
@@ -2195,80 +1344,26 @@ sub TBOSCountInstances ($;@)
 sub TBResolveNextOSID($;$$)
 {
     my ($osid,$pid,$eid) = @_;
-    my $next_osid = $osid;
-    my $input_osid = $osid;
+    my $experiment;
 
-    my $count = 0;
-    do {
-	#
-	# Just a guard to make sure we don't end up in a loop
-	#
-	if ($count++ > 10) {
-	    warn "Resolving $input_osid: Circular reference\n";
-	}
+    require OSinfo;
 
-	$osid = $next_osid;
-	my $result = DBQueryWarn("select nextosid from os_info where
-	    osid='$osid';");
-
-	if ($result->num_rows() != 1) {
-	    warn "Resolving $input_osid: Unable to fetch os_info for $osid!\n";
+    if (defined($pid) && defined($eid)) {
+	$experiment = Experiment->Lookup($pid, $eid);
+	if (! defined($experiment)) {
+	    warn "TBResolveNextOSID: No such experiment $pid/$eid\n";
 	    return undef;
 	}
-	($next_osid) = $result->fetchrow();
-
-	#
-	# See if we need to resolve using a map.
-	# Maps currently are only indexed by modification time;
-	# i.e., we look at the last modification time of the experiment to
-	# determine what OSID should be used.
-	#
-	# NOTE: mapping used to be done based on experiment *creation* time
-	# but that left no ability to "update" an experiment to use current
-	# images, at least short of creating a new experiment with the same
-	# ns file.
-	#
-	if ($next_osid && $next_osid =~ /^MAP:(\w+)/) {
-	    my $map = $1;
-
-	    my $timestr;
-	    if (defined($pid) && defined($eid)) {
-		my $m_result =
-		    DBQueryWarn("select e.expt_created, s.swapmod_last ".
-				"from experiments as e, experiment_stats as s ".
-				"where e.idx=s.exptidx and ".
-				"e.pid='$pid' and e.eid='$eid'");
-		if (!$m_result || $m_result->num_rows() == 0) {
-		    warn "Resolving $input_osid: no experiment $pid/$eid!\n";
-		    return undef;
-		}
-		my ($ctime,$mtime) = $m_result->fetchrow();
-		if (defined($mtime) && $mtime ne "") {
-		    $timestr = "'$mtime'";
-		} else {
-		    $timestr = "'$ctime'";
-		}
-	    } else {
-		$timestr = "now()";
-	    }
-
-	    $result = DBQueryWarn("select nextosid from $map ".
-				  "where osid='$osid' and ".
-				  "$timestr between btime and etime");
-	    if (!$result) {
-		warn "No such osid map $map!\n";
-		return undef;
-	    }
-
-	    if ($result->num_rows() == 0) {
-		warn "Resolving $input_osid: Unable to map $osid!\n";
-		return undef;
-	    }
-	    ($next_osid) = $result->fetchrow();
-	}
-    } while ($next_osid);
-    
-    return $osid;
+    }
+    my $osinfo = OSinfo->Lookup($osid);
+    if (! defined($osinfo)) {
+	warn "TBResolveNextOSID: No such osid $osid\n";
+	return undef;
+    }
+    my $nextosinfo = $osinfo->ResolveNextOSID($experiment);
+    return undef
+	if (!defined($nextosinfo));
+    return $nextosinfo->osid();
 }
 
 #
@@ -2341,132 +1436,6 @@ sub TBImageLoadMaxOkay($$;@)
 }
 
 #
-# Map login (db uid) to a user_name and user_email.
-#
-# usage: UserDBInfo(char *dbuid, \$name, \$email)
-#        returns 1 if the UID is okay.
-#        returns 0 if the UID is bogus.
-#
-sub UserDBInfo ($$$) {
-    my($dbuid, $username, $useremail) = @_;
-
-    my $query_result =
-	DBQueryWarn("select usr_name,usr_email from users ".
-		    "where uid='$dbuid'");
-
-    if (!$query_result || $query_result->num_rows < 1) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    $$username  = $row[0];
-    $$useremail = $row[1];
-    return 1;
-}
-
-#
-# Map pid,gid to its unix_gid and unix_name.
-#
-# usage: TBGroupUnixInfo(char $pid, char *gid, \$unix_gid, \$unix_name)
-#        returns 1 if okay.
-#        returns 0 if bogus.
-#
-sub TBGroupUnixInfo ($$$$) {
-    my($pid, $gid, $unix_gid, $unix_name) = @_;
-
-    my $query_result =
-	DBQueryFatal("select unix_gid,unix_name from groups ".
-		     "where pid='$pid' and gid='$gid'");
-
-    if ($query_result->num_rows < 1) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    $$unix_gid  = $row[0];
-    $$unix_name = $row[1];
-    return 1;
-}
-
-#
-# Return a list of the additional Unix groups a user is in.
-#
-# usage: TBUnixGroupList(char $dbuid)
-#        returns list if there is one.
-#        returns () if failed or no list.
-#
-sub TBUnixGroupList ($) {
-    my($dbuid) = @_;
-    my @glist = ();
-
-    my $query_result =
-	DBQueryFatal("select gid from unixgroup_membership ".
-		     "where uid='$dbuid'");
-
-    if ($query_result->num_rows == 0) {
-	return ();
-    }
-
-    while (my @row = $query_result->fetchrow_array()) {
-	push(@glist, $row[0]);
-    }
-    return @glist;
-}
-
-#
-# Map UID to DB UID (login). Does a DB check to make sure user is known to
-# the DB (user obviously has a regular account), and that account will
-# always match what the DB says. Redundant, I know. But consider it a
-# sanity (or consistency) check.
-#
-# usage: UNIX2DBUID(int uid, \$login)
-#        returns 1 if the UID is okay.
-#        returns 0 if the UID is bogus.
-#
-sub UNIX2DBUID ($$) {
-    my($unix_uid, $userlogin) = @_;
-
-    my $query_result =
-	DBQueryFatal("select uid from users where unix_uid='$unix_uid'");
-
-    if ($query_result->num_rows < 1) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-
-    my ($pwname) = getpwuid($unix_uid) or
-	die("*** $unix_uid is not in the password file!");
-
-    if ($row[0] ne $pwname) {
-	warn("*** WARNING: $pwname does not match $row[0]\n");
-	return 0;
-    }
-
-    $$userlogin = $row[0];
-    return 1;
-}
-
-#
-# Validate a node log type.
-#
-# usage: TBValidNodeLogType(char *type)
-#        Returns 1 if the type string is valid.
-#        Returns 0 if not.
-#
-sub TBValidNodeLogType($)
-{
-    my($type) = @_;
-
-    foreach my $actype ( TB_NODELOGTYPES ) {
-	if ($actype eq $type) {
-	    return 1;
-	}
-    }
-
-    return 0;
-}
-
-#
 # Insert a Log entry for a node.
 #
 # usage: TBSetNodeLogEntry(char *node, char *uid, char *type, char *message)
@@ -2475,58 +1444,14 @@ sub TBValidNodeLogType($)
 #
 sub TBSetNodeLogEntry($$$$)
 {
-    my($node, $dbuid, $type, $message) = @_;
+    my ($node_id, $dbuid, $type, $message) = @_;
 
-    if (! TBValidNodeName($node) || !TBValidNodeLogType($type)) {
-	return 0;
-    }
-    return DBQueryWarn("insert into nodelog ".
-		       "values ".
-                       "('$node', NULL, '$type', '$dbuid', $message, now())");
-}
+    my $node = Node->Lookup($node_id);
+    return 0
+	if (! defined($node));
 
-#
-# Validate a node name.
-#
-# usage: TBValidNodeName(char *name)
-#        Returns 1 if the node is valid.
-#        Returns 0 if not.
-#
-sub TBValidNodeName($)
-{
-    my($node) = @_;
-
-    my $query_result =
-	DBQueryWarn("select node_id from nodes where node_id='$node'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    return 1;
-}
-
-#
-# Set the scheduled_reloads for a node. Type is optional and defaults to
-# testbed default load type. See above.
-#
-# usage: TBSetSchedReload(char *node, char *imageid, [char *reload_type])
-#        Returns 1 if okay.
-#        Returns 0 if failed.
-#
-sub TBSetSchedReload($$;$)
-{
-    my ($node, $imageid, $type) = @_;
-
-    if (!defined($type)) {
-	$type = TB_DEFAULT_RELOADTYPE;
-    }
-
-    if (DBQueryWarn("replace into scheduled_reloads ".
-		    "(node_id, image_id, reload_type) values ".
-		    "('$node', '$imageid', '$type')")) {
-	return 1;
-    }
-    return 0;
+    return ($node->InsertNodeLogEntry(User->Lookup($dbuid),
+				      $type, $message) == 0 ? 1 : 0);
 }
 
 #
@@ -2770,30 +1695,6 @@ sub TBGetNodeAllocState($$)
 }
 
 #
-# Is a node imageable?
-#
-# usage TBIsNodeImageable(char *node)
-#        Returns 1 if yes.
-#        Returns 0 if no.
-#
-sub TBIsNodeImageable($)
-{
-    my ($nodeid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select nt.imageable from nodes as n ".
-		     "left join node_types as nt on nt.type=n.type ".
-		     "where n.node_id='$nodeid'");
-
-    if (! $query_result->num_rows) {
-	return 0;
-    }
-
-    my @row = $query_result->fetchrow_array();
-    return($row[0]);
-}
-
-#
 # Is a node remote?
 #
 # usage TBIsNodeRemote(char *node)
@@ -2889,107 +1790,18 @@ sub MarkPhysNodeDown($)
 
     $pid = NODEDEAD_PID;
     $eid = NODEDEAD_EID;
-
-    DBQueryFatal("lock tables reserved write");
+    
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return -1;
+    }
 
     DBQueryFatal("update reserved set " .
-		 "  pid='$pid',eid='$eid',rsrv_time=now() ".
+		 "  exptidx=$exptidx, pid='$pid',eid='$eid',rsrv_time=now() ".
 		 "where node_id='$pnode'");
 
-    DBQueryFatal("unlock tables");
-
     TBSetNodeHistory($pnode, TB_NODEHISTORY_OP_MOVE, $UID, $pid, $eid);
-}
-
-#
-# Set/Clear the current logfile for an experiment. The idea is to provide
-# a way to look at what is going on from the web interface!
-#
-# usage TBExptSetLogFile(char *pid, char *eid, char *logname)
-#
-sub TBExptSetLogFile($$$)
-{
-    my ($pid, $eid, $logname) = @_;
-
-    DBQueryWarn("update experiments set logfile='$logname' ".
-		 "where pid='$pid' and eid='$eid'");
-}
-
-sub TBExptClearLogFile($$)
-{
-    my ($pid, $eid) = @_;
-
-    DBQueryWarn("update experiments set logfile=NULL,logfile_open=0 ".
-		"where pid='$pid' and eid='$eid'");
-}
-
-#
-# Flag the logfile as either open or closed. This allows the spew code
-# to determine when the log is no longer being appended to. Is there a
-# system oriented way to do this?
-#
-# usage TBExptOpenLogFile(char *pid, char *eid)
-# usage TBExptCloseLogFile(char *pid, char *eid)
-#
-sub TBExptOpenLogFile($$)
-{
-    my ($pid, $eid) = @_;
-
-    DBQueryWarn("update experiments set logfile_open=1 ".
-		 "where pid='$pid' and eid='$eid'");
-}
-
-sub TBExptCloseLogFile($$)
-{
-    my ($pid, $eid) = @_;
-
-    DBQueryWarn("update experiments set logfile_open=0 ".
-		 "where pid='$pid' and eid='$eid'");
-}
-
-#
-# Get the current logfile for an experiment.
-#
-# usage TBExptGetLogFile(char *pid, char *eid, char \*logname, int \isopen)
-#	Return 1 if there is a valid logname, and sets logname.
-#	Return 0 if no logfile or error.
-#
-sub TBExptGetLogFile($$$$)
-{
-    my ($pid, $eid, $logname, $isopen) = @_;
-
-    my $query_result =
-	DBQueryFatal("select logfile,logfile_open from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-
-    if ($query_result->numrows == 0) {
-	return 0;
-    }
-    my @row = $query_result->fetchrow_array();
-    if (defined($row[0])) {
-	$$logname = $row[0];
-	$$isopen  = $row[1];
-	return 1;
-    }
-    return 0;
-}
-
-#
-# Return the working directory name for an experiment. This is where
-# the scripts work. The logs are copied over to the user's version of
-# the directory later.
-#
-sub TBExptLogDir($$)
-{
-    my($pid, $eid) = @_;
-
-    my $query_result =
-	DBQueryFatal("select idx from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-
-    my ($idx) = $query_result->fetchrow_array;
-
-    return "$TB/expinfo/${pid}-${eid}.${idx}";
 }
 
 #
@@ -3045,35 +1857,6 @@ sub TBExptUserDir($$)
 }
 
 #
-# Create a temp logfile name for an experiment, create it, and untaint it!
-# The file is created the experiment working directory and moved later
-# to the user visible directory.
-#
-sub TBExptCreateLogFile($$$)
-{
-    my($pid, $eid, $prefix) = @_;
-    my $logdir;
-    my $logname;
-
-    $logdir  = TBExptWorkDir($pid, $eid);
-    $logname = `mktemp $logdir/${prefix}.XXXXXX`;
-
-    if ($logname =~ /^([-\@\w\.\/]+)$/) {
-	$logname = $1;
-    }
-    else {
-	die("*** $0:\n".
-	    "    Bad data in logfile name: $logname");
-    }
-
-    chmod(0664, $logname) or
-	die("*** $0:\n".
-	    "    Could not chmod $logname to 0644: $!\n");
-
-    return $logname;
-}
-
-#
 # Return the min/max node counts for an experiment.
 #
 # usage: TBExptMinMaxNodes(char $pid, char *gid, int \$min, int \$max)
@@ -3124,60 +1907,6 @@ sub TBExptSecurityLevel($$$)
 	if (defined($levelp));
     return 1;
 }
-
-#
-# Destroy an experiment and cleanup all traces. Used from several
-# different scripts, so localized here.
-#
-sub TBExptDestroy($$)
-{
-    my($pid, $eid) = @_;
-
-    my $workdir = TBExptWorkDir($pid, $eid);
-    my $userdir = TBExptUserDir($pid, $eid);
-    my $gid     = ExpGroup($pid, $eid);
-
-    #
-    # Try to remove experiment directory. We allow for it not being there
-    # cause we often run the tb programs directly. We also allow for not
-    # having permission, in the case that an admin type is running this,
-    # in which case it won't be allowed cause of directory permissions. Thats
-    # okay since admin types should rarely end experiments in other projects.
-    #
-    print "Removing experiment directories ... \n";
-    if (defined($userdir) && system("/bin/rm -rf $userdir")) {
-	print "*** WARNING: Not able to remove $userdir\n";
-	print "             Someone will need to do this by hand.\n";
-	# NFS errors usually the result. Sometimes its cause there is
-	# someone in the directory, so its being held open.
-        libtestbed::SENDMAIL($TBOPS, "TBExptDestroy: Could not remove directory",
-			     "Could not remove $userdir.\n".
-			     "Someone will need to do this by hand.\n");
-    }
-    if (system("/bin/rm -rf $workdir")) {
-	print "*** WARNING: Not able to remove $workdir\n";
-	print "             Someone will need to do this by hand.\n";
-    }
-    # Yuck.
-    if ($pid ne $gid) {
-	my $eidlink = "$PROJROOT/$pid/exp/$eid";
-	unlink($eidlink)
-	    if (-l $eidlink);
-    }
-    libArchive::TBDeleteExperimentArchive($pid, $eid);
-
-    #
-    # Remove all trace from the DB.
-    #
-    DBQueryWarn("DELETE from exppid_access ".
-		"WHERE exp_eid='$eid' and exp_pid='$pid'");
-
-    DBQueryWarn("DELETE from experiments ".
-		"WHERE eid='$eid' and pid='$pid'");
-
-    return 0;
-}
-
 
 #
 # Check if a site-specific variable exists.
@@ -3318,71 +2047,10 @@ sub TBExptContainsNodeCT($$$)
 			  "where v.pid='$pid' and v.eid='$eid' and " .
 			  "(nt.class='$ntc' or nt.type='$ntc')");
 
-
-#"select r.pid,r.eid,r.node_id from reserved as r " .
-#"left join nodes as n on n.node_id=r.node_id " . 
-#"left join node_types as nt on nt.type=n.type " . 
-#"where r.pid='$pid' and r.eid='$eid' and " . 
-#"(nt.class='$ntc' or nt.type='$ntc')");
-
     return 0 
 	if (!$dbq || !$dbq->numrows());
 
     return 1;
-}
-
-#
-# List of tables used for experiment removal/backup/restore.
-#
-@virtualTables  = ("virt_nodes",
-		   "virt_lans",
-		   "virt_lan_lans",
-		   "virt_lan_settings",
-		   "virt_lan_member_settings",
-		   "virt_trafgens",
-		   "virt_agents",
-		   "virt_routes",
-		   "virt_vtypes",
-		   "virt_programs",
-		   "virt_node_desires",
-		   "virt_node_startloc",
-		   "virt_simnode_attributes",
-		   "virt_user_environment",
-		   "virt_parameters",
-		   # vis_nodes is locked during update in prerender, so we
-		   # will get a consistent dataset when we backup.
-		   "vis_nodes",
-		   "nseconfigs",
-		   "eventlist",
-		   "event_groups",
-		   "virt_firewalls",
-		   "firewall_rules",
-		   "virt_tiptunnels",
-		   "ipsubnets",
-		   "nsfiles");
-
-@physicalTables = ("delays",
-		   "vlans",
-		   "tunnels",
-		   "ipport_ranges",
-		   "v2pmap",
-		   "linkdelays",
-		   "traces",
-		   "portmap");
-
-#
-# Clear the backup crap we create below.
-#
-sub TBExptClearBackupState($$)
-{
-    my ($pid, $eid) = @_;
-    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
-    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
-
-    system("/bin/rm -rf $pstateDir")
-	if (-e $pstateDir);
-    system("/bin/rm -rf $vstateDir")
-	if (-e $vstateDir);
 }
 
 #
@@ -3397,7 +2065,8 @@ sub TBNodeSubNodes($)
     my $result = DBQueryFatal("SELECT n.node_id FROM nodes AS n " .
 			      "LEFT JOIN node_types " .
 			      "    AS nt ON n.type = nt.type " .
-			      "WHERE n.phys_nodeid='$node' and nt.issubnode");
+			      "WHERE n.phys_nodeid='$node' and ".
+			      "      nt.issubnode!=0");
     
     if (! $result or $result->numrows == 0) {
 	return ();
@@ -3451,39 +2120,41 @@ sub TBNodeType($)
 
 sub TBNodeAdminOSID($)
 {
-    my ($node) = @_;
+    my ($nodeid) = @_;
 
-    my $result = DBQueryFatal("SELECT nt.adminmfs_osid FROM nodes AS n ".
-			      "LEFT JOIN node_types as nt ".
-			      "on nt.type = n.type ".
-			      "WHERE n.node_id='$node'");
-    if ($result->num_rows() != 1) {
-	return undef;
-    }
+    my $node = Node->Lookup($nodeid);
+
+    return 0
+	if (!defined($node));
+
+    my $mfs;
     
-    my ($mfs) = $result->fetchrow();
-    if (!$mfs) {
-	$mfs = TB_OSID_FREEBSD_MFS();
-    }
+    return 0
+	if ($node->NodeTypeAttribute("adminmfs_osid", \$mfs) != 0);
+
+    $mfs = TB_OSID_FREEBSD_MFS()
+	if (!defined($mfs));
+
     return $mfs;
 }
 
 sub TBNodeDiskloadOSID($)
 {
-    my ($node) = @_;
+    my ($nodeid) = @_;
 
-    my $result = DBQueryFatal("SELECT nt.diskloadmfs_osid FROM nodes AS n ".
-			      "LEFT JOIN node_types as nt ".
-			      "on nt.type = n.type ".
-			      "WHERE n.node_id='$node'");
-    if ($result->num_rows() != 1) {
-	return undef;
-    }
+    my $node = Node->Lookup($nodeid);
+
+    return 0
+	if (!defined($node));
+
+    my $mfs;
     
-    my ($mfs) = $result->fetchrow();
-    if (!$mfs) {
-	$mfs = TB_OSID_FRISBEE_MFS();
-    }
+    return 0
+	if ($node->NodeTypeAttribute("diskloadmfs_osid", \$mfs) != 0);
+
+    $mfs = TB_OSID_FREEBSD_MFS()
+	if (!defined($mfs));
+
     return $mfs;
 }
 
@@ -3494,14 +2165,19 @@ sub TBNodeDiskloadOSID($)
 sub TBNodeTypeProcInfo($)
 {
     my ($type) = @_;
-    my $result = DBQueryFatal("SELECT proc, speed FROM node_types " .
-			      "WHERE type='$type'");
-    if ($result->num_rows() != 1) {
-	return undef;
-    }
-    
-    my ($proc, $speed) = $result->fetchrow();
-    return ($proc, $speed);
+
+    my $typeinfo = NodeType->Lookup($type);
+
+    return undef
+	if (!defined($typeinfo));
+
+    my ($processor, $frequency);
+
+    return undef
+	if ($typeinfo->processor(\$processor) ||
+	    $typeinfo->frequency(\$frequency));
+
+    return ($processor, $frequency);
 }
 
 #
@@ -3513,129 +2189,18 @@ sub TBNodeTypeProcInfo($)
 sub TBNodeTypeBiosWaittime($)
 {
     my ($type) = @_;
-    my $query_result = DBQueryFatal("SELECT bios_waittime FROM node_types " .
-				    "WHERE type='$type'");
-    if (! $query_result->num_rows) {
-	return 0;
-    }
 
-    my @row = $query_result->fetchrow_array();
-    return $row[0];
-}
+    my $typeinfo = NodeType->Lookup($type);
 
-#
-# Remove the virtual state of an experiment from the DB,
-# returning the number of queries which didn't work.
-#
-sub TBExptRemoveVirtualState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors = 0;
+    return 0
+	if (!defined($typeinfo));
 
-    foreach my $table (@virtualTables) {
-	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
-	    or $errors++;
-    }
-    return $errors;
-}
+    my $bios_waittime;
 
-#
-# Remove the physical state of an experiment from the DB,
-# returning the number of queries which didn't work.
-#
-sub TBExptRemovePhysicalState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors = 0;
+    return 0
+	if ($typeinfo->bios_waittime(\$bios_waittime));
 
-    foreach my $table (@physicalTables) {
-	DBQueryWarn("DELETE FROM $table WHERE pid='$pid' AND eid='$eid'")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Backs up specified virtual state of pid/eid into directory in tmp.
-#
-sub TBExptBackupVirtualState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
-
-    if (! -e $vstateDir) {
-	mkdir($vstateDir, 0777)
-	    or return 1;
-
-	chmod(0777, $vstateDir)
-	    or return 1;
-    }
-
-    foreach my $table (@virtualTables) {
-	DBQueryWarn("SELECT * FROM $table ".
-		    "WHERE pid='$pid' AND eid='$eid' ".
-		    "INTO OUTFILE '$vstateDir/$table' ")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Backs up specified physical state of pid/eid into directory in tmp.
-#
-sub TBExptBackupPhysicalState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
-
-    if (! -e $pstateDir) {
-	mkdir($pstateDir, 0777)
-	    or return 1;
-
-	chmod(0777, $pstateDir)
-	    or return 1;
-    }
-
-    foreach my $table (@physicalTables) {
-	DBQueryWarn("SELECT * FROM $table WHERE pid='$pid' AND eid='$eid' ".
-		    "INTO OUTFILE '$pstateDir/$table' ")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Restores backed up virtual state of pid/eid from directory in /tmp.
-#
-sub TBExptRestoreVirtualState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $vstateDir = TBExptWorkDir($pid, $eid) . "/vstate";
-
-    foreach my $table (@virtualTables) {
-	DBQueryWarn("LOAD DATA INFILE '$vstateDir/$table' INTO TABLE $table")
-	    or $errors++;
-    }
-    return $errors;
-}
-
-#
-# Restores backed up virtual state of pid/eid from directory in /tmp.
-#
-sub TBExptRestorePhysicalState($$)
-{
-    my ($pid, $eid) = @_;
-    my $errors    = 0;
-    my $pstateDir = TBExptWorkDir($pid, $eid) . "/pstate";
-
-    foreach my $table (@physicalTables) {
-	DBQueryWarn("LOAD DATA INFILE '$pstateDir/$table' INTO TABLE $table")
-	    or $errors++;
-    }
-    return $errors;
+    return $bios_waittime;
 }
 
 #
@@ -3732,6 +2297,90 @@ sub TBExptIsElabInElab($$$;$)
 }
 
 #
+# Get plabinelab info for an experiment. Returns 1 in plabinelab
+# if any node in the experiment is either a plab 'plc' or 'node'.
+#
+# usage TBExptIsPlabInElab(char *pid, char *eid, int \*plabinelab)
+#	Return 1 if success.
+#	Return 0 if error.
+#
+sub TBExptIsPlabInElab($$$)
+{
+    my ($pid, $eid, $plabinelab) = @_;
+
+    my $query_result =
+	DBQueryFatal("select plab_role from virt_nodes ".
+		     "where pid='$pid' and eid='$eid' ".
+		     "and plab_role!='none'");
+
+    if ($query_result->numrows == 0) {
+	$$plabinelab = 0;
+    } else {
+	$$plabinelab = 1;
+    }
+    return 1;
+}
+
+#
+# Return the PLC node for a swapped in plabinelab experiment.
+# Returns 0 if no PLC.  Returns 1 and the name of the node otherwise.
+#
+sub TBExptPlabInElabPLC($$$)
+{
+    my ($pid, $eid, $plcnode) = @_;
+
+    my $query_result =
+	DBQueryFatal("select node_id from reserved ".
+		     "where pid='$pid' and eid='$eid' and plab_role='plc'");
+    if ($query_result->numrows > 0) {
+	my @row = $query_result->fetchrow_array();
+	if (defined($row[0])) {
+	    $$plcnode = $row[0];
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+#
+# Return a list of inner plab nodes for a swapped in plabinelab experiment.
+# Returns 0 on failure.  Returns 1 and a list of nodes otherwise.
+#
+sub TBExptPlabInElabNodes($$$)
+{
+    my ($pid, $eid, $nodes) = @_;
+
+    my $query_result =
+	DBQueryFatal("select node_id from reserved ".
+		     "where pid='$pid' and eid='$eid' and plab_role='node'");
+
+    while (my @row = $query_result->fetchrow_array()) {
+	push(@{$nodes}, $row[0]);
+    }
+
+    return 0;
+}
+
+#
+# Similar function for batchmode.
+#
+sub TBExptIsBatchExp($$$)
+{
+    my ($pid, $eid, $batchmode) = @_;
+
+    my $query_result =
+	DBQueryFatal("select batchmode from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    $$batchmode     = $row[0];
+    return 1;
+}
+
+#
 # Get the control network IP for a node (underlying physical node!).
 #
 # usage TBControlNetIP(char *nodeid, char \*ip)
@@ -3745,9 +2394,9 @@ sub TBControlNetIP($$)
     my $query_result =
 	DBQueryFatal("select IP from nodes as n2 ".
 		     "left join nodes as n1 on n1.node_id=n2.phys_nodeid ".
-		     "left join node_types as nt on n1.type=nt.type ".
 		     "left join interfaces as i on ".
-		     "i.node_id=n1.node_id and i.iface=nt.control_iface ".
+		     "     i.node_id=n1.node_id and ".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "' " .
 		     "where n2.node_id='$nodeid'");
 
     if ($query_result->numrows == 0) {
@@ -3773,11 +2422,9 @@ sub TBIPtoNodeID($$)
     my ($ip, $pnodeid) = @_;
 
     my $query_result =
-	DBQueryFatal("select n.node_id from interfaces as i ".
-		     "left join nodes as n on n.node_id=i.node_id ".
-		     "left join node_types as t ".
-		     "   on t.type=n.type and i.iface=t.control_iface ".
-		     "where i.IP='$ip'");
+	DBQueryFatal("select i.node_id from interfaces as i ".
+		     "where i.IP='$ip' and ".
+		     "      role='" . TBDB_IFACEROLE_CONTROL() . "'");
 
     if ($query_result->numrows == 0) {
 	return 0;
@@ -3912,14 +2559,16 @@ sub TBNodeUpdateAccountsByUID($)
 {
     my ($uid) = @_;
 
-    DBQueryFatal("update users set usr_modified=now() where uid='$uid'");
+    DBQueryFatal("update users set usr_modified=now() ".
+		 "where uid='$uid' and status!='archived'");
 
     my $query_result =
 	DBQueryFatal("select p.pid,pcremote_ok from users as u ".
 		     "left join group_membership as g on ".
-		     "  u.uid=g.uid and g.pid=g.gid ".
-		     "left join projects as p on p.pid=g.pid ".
-		     "where u.uid='$uid' and p.pid is not null");
+		     "  u.uid_idx=g.uid_idx and g.pid_idx=g.gid_idx ".
+		     "left join projects as p on p.pid_idx=g.pid_idx ".
+		     "where u.uid='$uid' and u.status='active' and ".
+		     "      p.pid is not null");
 
     while (my %row = $query_result->fetchhash()) {
 	my $pid      = $row{'pid'};
@@ -3940,6 +2589,30 @@ sub TBNodeUpdateAccountsByUID($)
     $query_result =
 	DBQueryFatal("select node_id from widearea_accounts ".
 		     "where uid='$uid' and trust!='none'");
+
+    while (my %row = $query_result->fetchhash()) {
+	my $node_id = $row{'node_id'};
+
+	DBQueryFatal("update nodes set update_accounts=update_accounts+1 ".
+		     "where node_id='$node_id' and update_accounts<2");
+    }
+
+    #
+    # Finally update nodes who are accessible by the user via the 'dp_projects'
+    # node attribute.
+    #
+    # XXX big ugly query alert!
+    #
+    $query_result = 
+	DBQueryFatal("select n.node_id from projects as p, ".
+		     "  groups as g, group_membership as gm, ".
+		     "  nodes as n, node_attributes as na ".
+		     "where p.pid=g.pid and p.approved!=0 ".
+		     "  and g.gid=gm.gid and p.pid=gm.pid ".
+		     "  and n.node_id=na.node_id ".
+		     "  and FIND_IN_SET(g.gid_idx, na.attrvalue) > 0 ".
+		     "  and na.attrkey='dp_projects' ".
+		     "  and gm.uid='$uid'");
 
     while (my %row = $query_result->fetchhash()) {
 	my $node_id = $row{'node_id'};
@@ -4029,13 +2702,15 @@ sub TBNodeStateWait ($$$$@) {
 	$waittime = time - $waitstart;
 	if ($waittime > $maxwait) {
 	    $minutes = int($waittime / 60);
-	    print "*** Giving up on $pc - it's been $minutes minute(s).\n";
+	    print "*** Giving up on $pc ($state) - ",
+	          "it's been $minutes minute(s).\n";
 	    TBNodeConsoleTail($pc, *STDOUT);
 	    return 1;
 	}
 	if (int($waittime / 60) > $minutes) {
 	    $minutes = int($waittime / 60);
-	    print "Still waiting for $pc - it's been $minutes minute(s).\n";
+	    print "Still waiting for $pc ($state) - ",
+	          "it's been $minutes minute(s).\n";
 	}
 	sleep(1);
     }
@@ -4159,6 +2834,12 @@ sub TBSetExptFirewallVlan($$$$) {
 	return 0;
     }
 
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return 0;
+    }
+
     #
     # Need the virtual name since we use that to ensure uniqness in the
     # firewalls table.
@@ -4167,7 +2848,7 @@ sub TBSetExptFirewallVlan($$$$) {
 	DBQueryWarn("select fwname from virt_firewalls ".
 		    "WHERE pid='$pid' AND eid='$eid'");
 
-    return -1
+    return 0
 	if (!$query_result || $query_result->num_rows == 0);
 
     my ($fwname) = $query_result->fetchrow_array();
@@ -4175,14 +2856,19 @@ sub TBSetExptFirewallVlan($$$$) {
     #
     # Change the firewalls table entry to reflect the VLAN
     #
-    DBQueryWarn("replace into firewalls (pid,eid,fwname,vlan,vlanid) ".
-		"values ('$pid', '$eid', '$fwname', $fwvlan, $fwvlanid)");
+    DBQueryWarn("replace into firewalls (exptidx,pid,eid,fwname,vlan,vlanid) ".
+		"values ('$exptidx', '$pid', '$eid', ".
+		"        '$fwname', $fwvlan, $fwvlanid)")
+	or return 0;
 
     #
     # Change the reserved table entries for all firewalled nodes to reflect it.
     #
     DBQueryWarn("UPDATE reserved set cnet_vlan=$fwvlan ".
-		"WHERE pid='$pid' AND eid='$eid' AND node_id!='$fwnode'");
+		"WHERE pid='$pid' AND eid='$eid' AND node_id!='$fwnode'")
+	or return 0;
+
+    return 1;
 }
 
 #
@@ -4369,173 +3055,6 @@ sub TBExptGetSwapoutAction($$$) {
 }
 
 #
-# Issue a DB query. Argument is a string. Returns the actual query object, so
-# it is up to the caller to test it. I would not for one moment view this
-# as encapsulation of the DB interface. I'm just tired of typing the same
-# silly stuff over and over.
-#
-# usage: DBQuery(char *str)
-#        returns the query object result.
-#
-# Sets $DBErrorString is case of error; saving the original query string and
-# the error string from the DB module. Use DBFatal (below) to print/email
-# that string, and then exit.
-#
-sub DBQueryOld($)
-{
-    my($query) = $_[0];
-    my($result);
-
-    $result = $DB[0]->query($query);
-
-    if (! $result) {
-	$DBErrorString =
-	    "  Query: $query\n".
-	    "  Error: " . $DB[0]->errstr;
-    }
-    return $result;
-}
-
-sub DBQueryN($$)
-{
-    my($dbnum, $query)   = @_;
-    my $maxtries = $DBQUERY_MAXTRIES;
-    my $result;
-    my $db = $DB[$dbnum];
-
-    # Not really forever :-)
-    if (!$maxtries) {
-	$maxtries = 100000;
-    }
-
-    while ($maxtries) {
-	$result = $db->query($query);
-	if (! defined($result)) {
-	    my $err = $db->err;
-
-	    $DBErrorString =
-		"  Query: $query\n".
-		"  Error: " . $db->errstr . " ($err)";
-	}
-	if (defined($result) ||
-	    ($db->err != 2006) && ($db->err != 1053) && ($db->err != 2013) &&
-	    ($db->err != 1046)) {
-	    last;
-	}
-
-	$maxtries--;
-	DBWarn("mysqld went away. $maxtries tries left", 0);
-	sleep(1);
-    }
-    return $result;
-}
-sub DBQuery($) {return DBQueryN(0,$_[0]);}
-
-#
-# Same as above, but die on error.
-#
-sub DBQueryFatalN($$)
-{
-    my($dbnum, $query) = @_;
-    my($result);
-
-    $result = DBQueryN($dbnum, $query);
-
-    if (! $result) {
-	DBFatal("DB Query failed");
-    }
-    return $result;
-}
-sub DBQueryFatal($) {return DBQueryFatalN(0,$_[0]);}
-
-#
-# Same as above, but just send email on error. This info is useful
-# to the TB system, but the caller has to retain control.
-#
-sub DBQueryWarnN($$)
-{
-    my($dbnum, $query) = @_;
-    my($result);
-
-    $result = DBQueryN($dbnum, $query);
-
-    if (! $result) {
-	DBWarn("DB Query failed");
-    }
-    return $result;
-}
-sub DBQueryWarn($) {return DBQueryWarnN(0,$_[0]);}
-
-#
-# Warn and send email after a failed DB query. First argument is the error
-# message to display. The contents of $DBErrorString is also printed.
-#
-# usage: DBWarn(char *message)
-#
-sub DBWarn($;$)
-{
-    my($message, $nomail) = @_;
-    
-    DBError(\&tbwarn, $message, $nomail);
-}
-
-#
-# Same as above, but die after the warning.
-#
-# usage: DBFatal(char *message);
-#
-sub DBFatal($)
-{
-    my($message) = $_[0];
-    
-    DBError(\&tbdie, $message);
-}
-
-#
-# DBError, common parts of DBWarn and DBFatal
-#
-# usage: DBError(log function, message, nomail)
-#
-sub DBError($$;$) 
-{
-    my($f, $message, $nomail) = @_;
-    
-    if (! defined($nomail)) {
-	libtestbed::SENDMAIL($TBOPS, "DBError - $message",
-			     "$message - In $SCRIPTNAME\n".
-			     "$DBErrorString\n");
-    }
-
-    $f->({cause=>'software'}, "$message:\n$DBErrorString");
-}
-
-#
-# Quote a string for DB insertion.
-#
-# usage: char *DBQuoteSpecial(char *string);
-#
-sub DBQuoteSpecial($)
-{
-    my($string) = $_[0];
-
-    $string = Mysql->quote($string);
-
-    return $string;
-}
-
-#
-# Get the Error From the Last Database query
-#
-sub DBErrN($)
-{
-    return $DB[$_[0]]->err;
-}
-sub DBErr()
-{
-    return $DB[0]->err;
-}
-
-#
 # Return a (current) string suitable for DB insertion in datetime slot.
 # Of course, you can use this for anything you like!
 #
@@ -4561,8 +3080,11 @@ sub MapNumericUID($)
     my $name;
 
     if ($uid =~ /^[0-9]+$/) {
-	UNIX2DBUID($uid, \$name)
-	    or die("*** $uid not a valid Emulab user!\n");
+	my $user = User->LookupByUnixId($uid);
+	if (!defined($user)) {
+	    die("*** $uid not a valid Emulab user!\n");
+	}
+	$name = $user->uid();
     }
     else {
 	$name = $uid;
@@ -4638,25 +3160,6 @@ sub MapNodeOSID($$)
 }
 
 #
-# Save off the log files for an experiment.
-#
-sub TBSaveExpLogFiles($$)
-{
-    my($pid, $eid) = @_;
-
-    my $workdir = TBExptWorkDir($pid, $eid);
-    my $logdir  = TBExptLogDir($pid, $eid);
-
-    # What the hell is this file! Very annoying.
-    if (-e "$workdir/.rnd") {
-	system("/bin/rm -f $workdir/.rnd");
-    }
-    system("/bin/cp -Rpf $workdir/ $logdir");
-
-    return 1;
-}
-
-#
 # Grab the tipserver list and return.
 #
 sub TBTipServers()
@@ -4718,358 +3221,6 @@ sub TBAvailablePCs(;$)
 }
 
 #
-# Gather Swap stats.
-#
-# usage: GatherExptStats(char *pid, char *eid, char *uid,
-#			 char *mode, int code, int flags)
-#        Mode is one of preload, start, in, out, modify, end.
-#
-sub GatherSwapStats($$$$$;$)
-{
-    my ($pid, $eid, $uid, $mode, $ecode, $flags) = @_;
-    my ($pnodes,$vnodes,$duration);
-    my $batchctrl = 0;
-
-    # Optional argument to modify the stats gathering.
-    $flags = 0
-	if (!defined($flags));
-
-    #
-    # If this is a start time marker, then just record the time in a global
-    # variable and return. This is cheezy, but the interface I'm providing
-    # allows for fancier stuff later if desired.
-    #
-    if ($flags & TBDB_STATS_FLAGS_START) {
-	$TBDB_STATS_STARTCLOCK = time();
-	return;
-    }
-    my $session = tblog_session();
-    $session = 'NULL' unless defined $session;
-
-    local $DBQUERY_MAXTRIES = 0;
-
-    my $query_result =
-	DBQueryWarn("select e.state,e.gid,e.idx,s.rsrcidx,s.lastrsrc, ".
-		    "       e.expt_swap_uid,s.swapin_count,e.batchmode ".
-		    "  from experiments as e ".
-		    "left join experiment_stats as s on e.idx=s.exptidx ".
-		    "where e.pid='$pid' and e.eid='$eid'");
-    if (!$query_result || !$query_result->numrows) {
-	return;
-    }
-    my ($curstate, $gid, $exptidx, $rsrcidx, $lastrsrc,	$lastswapuid,
-	$swapin_count, $batchmode) = $query_result->fetchrow_array;
-    # This overrides when doing a swapmod.
-    $lastswapuid = $TBDB_STATS_SAVEDSWAPUID
-	if (defined($TBDB_STATS_SAVEDSWAPUID));
-    # This happens at first swapin.
-    $lastswapuid = $uid
-	if (!defined($lastswapuid) || $lastswapuid eq "");
-
-    #
-    # A non-zero ecode indicates error. If op is a preload/swapin/start/modify
-    # then we do not want to gather anymore stats beyond the error code
-    # since the results are not well defined. swapout,terminate
-    # errors do normal processing.
-    #
-    if ($ecode) {
-	DBQueryWarn("update experiment_stats set ".
-		    "  swap_errors=swap_errors+1, ".
-		    "  swap_exitcode=$ecode, ".
-		    "  last_error=$session ".
-		    "where pid='$pid' and eid='$eid' and exptidx=$exptidx");
-
-	#
-	# What about SWAPOUT errors? Well, 99.9 percent of the time,
-	# the nodes are going to be released even if the swapout fails.
-	# Since that is what we really care about wrt resource consumption,
-	# we let swapout errors fall through to the stats code below.
-	# I could probably check for this case (nodes actually released)
-	# but not bothering to do so. 
-	# 
-	if ($mode eq TBDB_STATS_START ||
-	    $mode eq TBDB_STATS_PRELOAD) {
-	    goto logit;
-	}
-
-	#
-	# If a modify or swapin failed, we need to revert back to the old
-	# resource record since the current one is bogus.
-	#
-	if ($mode eq TBDB_STATS_SWAPMODIFY || $mode eq TBDB_STATS_SWAPIN) {
-	    if (defined($lastrsrc)) {
-		DBQueryWarn("update experiment_stats set ".
-			    "  rsrcidx=$lastrsrc,lastrsrc=NULL ".
-			    "where pid='$pid' and eid='$eid' and ".
-			    "      exptidx=$exptidx");
-		DBQueryWarn("delete from experiment_resources ".
-			    "where idx=$rsrcidx");
-		$rsrcidx = $lastrsrc;
-	    }
-	    goto logit;
-	}
-    }
-
-    #
-    # Termination is easy; just one field to update.
-    #
-    if ($mode eq TBDB_STATS_TERMINATE) {
-	DBQueryWarn("update experiment_stats ".
-		    "set destroyed=now() ".
-		    "where pid='$pid' and eid='$eid' and exptidx=$exptidx");
-    }
-
-    #
-    # Pre-modify. Need to generate a new resource record. If the experiment
-    # fails to modify, we revert back to the old resource record later.
-    #
-    if (($mode eq TBDB_STATS_SWAPMODIFY &&
-	 $flags & TBDB_STATS_FLAGS_PREMODIFY) ||
-	($mode eq TBDB_STATS_SWAPIN &&
-	 $flags & TBDB_STATS_FLAGS_PRESWAPIN)) {
-	# This check to catch preloaded experiments, which have an
-	# unused resources record.
-	if (($mode eq TBDB_STATS_SWAPMODIFY) ||
-	    (($mode eq TBDB_STATS_SWAPIN) and $swapin_count)) {
-	    $query_result =
-		DBQueryWarn("insert into experiment_resources ".
-			    " (idx, tstamp, exptidx, lastidx) ".
-			    "values (0, now(), $exptidx, $rsrcidx)");
-	    if (! $query_result ||
-		! $query_result->insertid) {
-		print STDERR
-		    "*** WARNING $0:\n".
-		    "    Failed to insert a new resource record for ".
-			"$pid/$eid\n";
-	    }
-	    $lastrsrc = $rsrcidx;
-	    $rsrcidx  = $query_result->insertid;
-	    DBQueryWarn("update experiment_stats set ".
-			"  rsrcidx=$rsrcidx,lastrsrc=$lastrsrc ".
-			"where pid='$pid' and eid='$eid' and ".
-			"      exptidx=$exptidx");
-
-	    #
-	    # In SWAPIN, copy over the thumbnail. This is temporary; I think
-	    # the thumbnail is going to end up going someplace else. 
-	    #
-	    if ($mode eq TBDB_STATS_SWAPIN) {
-		$query_result =
-		    DBQueryWarn("select thumbnail from experiment_resources ".
-				"where idx=$lastrsrc");
-		if ($query_result &&
-		    $query_result->numrows) {
-		    my ($thumbdata) = $query_result->fetchrow_array();
-		    TBExptSetThumbNail($pid, $eid, $thumbdata);
-		}
-	    }
-	}
-	#
-	# When doing a (pre)swapmod, save off the previous swap uid
-	# so we can do accounting later. Might be the same as the current
-	# uid of course.
-	#
-	if ($mode eq TBDB_STATS_SWAPMODIFY) {
-	    $TBDB_STATS_SAVEDSWAPUID = $lastswapuid;
-	}
-	return;
-    }
-
-    #
-    # On a swapout/modify complete, update the duration counters. We
-    # want to update the aggregates too below, so get the numbers we
-    # need for that first. Modify is a bit of a complication since we
-    # want to charge for the experiment as it *was* until this point,
-    # since the number of nodes has changed. So, each modify changes
-    # the time we use to determine the resource usage; the start time is
-    # the greater of the swapin time or the last modify time.
-    #
-    $pnodes   = 0;
-    $vnodes   = 0;
-    $duration = 0;
-
-    if ($mode eq TBDB_STATS_SWAPOUT ||
-	($mode eq TBDB_STATS_SWAPMODIFY && $curstate eq EXPTSTATE_ACTIVE && 
-	 ($flags & TBDB_STATS_FLAGS_PREMODIFY) == 0)) {
-	$query_result =
-	    DBQueryWarn("select r.pnodes,r.vnodes, ".
-			"       IF(s.swapmod_last is not NULL and ".
-			"          UNIX_TIMESTAMP(s.swapmod_last) > ".
-			"          UNIX_TIMESTAMP(s.swapin_last),  ".
-			"         UNIX_TIMESTAMP(now()) - ".
-			"         UNIX_TIMESTAMP(s.swapmod_last), ".
-			"         UNIX_TIMESTAMP(now()) - ".
-			"         UNIX_TIMESTAMP(s.swapin_last)) ".
-			" from experiment_stats as s ".
-			"left join experiment_resources as r on ".
-			" r.idx=s.rsrcidx ".
-			"where s.exptidx=$exptidx");
-
-	if ($query_result && $query_result->numrows) {
-	    ($pnodes,$vnodes,$duration) = $query_result->fetchrow_array;
-	    # Might happen if swapin stats got losts.
-	    $duration = 0
-		if (! defined($duration));
-	}
-
-	#
-	# Increment idleswap indicator, but only valid on swapout.
-	#
-	if ($flags & TBDB_STATS_FLAGS_IDLESWAP) {
-	    DBQueryWarn("update experiment_stats ".
-			"set idle_swaps=idle_swaps+1 ".
-			"where pid='$pid' and eid='$eid' and ".
-			"      exptidx=$exptidx");
-	}
-    }
-
-    #
-    # Per project/group/user aggregates.
-    #
-    if ($mode eq TBDB_STATS_PRELOAD ||
-	$mode eq TBDB_STATS_START ||
-	$mode eq TBDB_STATS_SWAPOUT ||
-	$mode eq TBDB_STATS_SWAPIN ||
-	$mode eq TBDB_STATS_SWAPMODIFY) {
-	DBQueryWarn("update project_stats ".
-		    "set expt${mode}_count=expt${mode}_count+1, ".
-		    "    expt${mode}_last=now(), ".
-		    "    allexpt_duration=allexpt_duration+${duration}, ".
-		    "    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
-		    "    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
-		    "    allexpt_vnode_duration=".
-		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
-		    "    allexpt_pnode_duration=".
-		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
-		    "where pid='$pid'");
-	DBQueryWarn("update group_stats ".
-		    "set expt${mode}_count=expt${mode}_count+1, ".
-		    "    expt${mode}_last=now(), ".
-		    "    allexpt_duration=allexpt_duration+${duration}, ".
-		    "    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
-		    "    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
-		    "    allexpt_vnode_duration=".
-		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
-		    "    allexpt_pnode_duration=".
-		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
-		    "where pid='$pid' and gid='$gid'");
-	DBQueryWarn("update user_stats ".
-		    "set expt${mode}_count=expt${mode}_count+1, ".
-		    "    expt${mode}_last=now(), ".
-		    "    allexpt_duration=allexpt_duration+${duration}, ".
-		    "    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
-		    "    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
-		    "    allexpt_vnode_duration=".
-		    "        allexpt_vnode_duration+($vnodes * ${duration}), ".
-		    "    allexpt_pnode_duration=".
-		    "        allexpt_pnode_duration+($pnodes * ${duration}) ".
-		    "where uid=".
-		    ((($mode eq TBDB_STATS_SWAPOUT) ||
-		      ($mode eq TBDB_STATS_SWAPMODIFY)) ?
-		     "'$lastswapuid'" : "'$uid'"));
-
-	#
-	# Project/group aggregate is a little more convenient to work with
-	# in some places.
-	#
-	if ($mode eq TBDB_STATS_SWAPIN ||
-	    $mode eq TBDB_STATS_START) {
-	    DBQueryWarn("update projects set ".
-			" expt_last=now(),expt_count=expt_count+1 ".
-			"where pid='$pid'");
-	    DBQueryWarn("update groups set ".
-			" expt_last=now(),expt_count=expt_count+1 ".
-			"where pid='$pid' and gid='$gid'");
-	}
-
-	#
-	# Update the per-experiment record.
-	# Note that we map start into swapin.
-	#
-	if ($mode eq TBDB_STATS_SWAPOUT ||
-	    $mode eq TBDB_STATS_SWAPIN ||
-	    $mode eq TBDB_STATS_START ||
-	    $mode eq TBDB_STATS_SWAPMODIFY) {
-	    my $tmp = $mode;
-	    if ($mode eq TBDB_STATS_START) {
-		$tmp = TBDB_STATS_SWAPIN;
-	    }
-
-	    
-
-	    DBQueryWarn("update experiment_stats ".
-			"set ${tmp}_count=${tmp}_count+1, ".
-			"    ${tmp}_last=now(), ".
-			"    swapin_duration=swapin_duration+${duration}, ".
-			"    swap_exitcode=0, ".
-			"    last_error=NULL ".
-			"where pid='$pid' and eid='$eid' and  ".
-			"      exptidx=$exptidx");
-	}
-
-	# Batch mode info.
-	if ($mode eq TBDB_STATS_SWAPIN ||
-	    $mode eq TBDB_STATS_START) {
-	    DBQueryWarn("update experiment_resources set ".
-			"    batchmode=$batchmode ".
-			"where idx=$rsrcidx");
-	}
-    }
-
-    #
-    # On successful swapin, get the number of pnodes. assign_wrapper
-    # has filled in everything else, but until the experiment actually
-    # succeeds in swapping, do not set the pnode count. This intent
-    # is to avoid counting experiments that ultimately fail as taking
-    # up physical resources, but I think this is misguided.
-    #
-    if ($mode eq TBDB_STATS_START ||
-	$mode eq TBDB_STATS_SWAPIN ||
-	$mode eq TBDB_STATS_SWAPMODIFY) {
-	$query_result =
-	    DBQueryWarn("select r.node_id from reserved as r ".
-			"left join nodes as n on r.node_id=n.node_id ".
-			"where r.pid='$pid' and r.eid='$eid' and ".
-			"      n.role='testnode'");
-
-	if ($query_result) {
-	    my $pnodes = $query_result->numrows;
-
-	    DBQueryWarn("update experiment_resources set pnodes=$pnodes ".
-			"where idx=$rsrcidx");
-	}
-    }
-
-    #
-    # Okay, Jay wants a log file but I am not crazy about that. Instead we
-    # have a tiny table of testbed wide stats, which cross indexes with the
-    # experiment_stats table via the idx field (which comes from the
-    # experiments table of course). For each operation insert a record. We
-    # can then construct a complete record of what happened from this
-    # table, when correlated with experiment_stats. We could probably not
-    # have an errorcode in experiment_stats, but since its a tinyint, not
-    # worth worrying about.
-    #
-  logit:
-    my $starttime = (!defined($TBDB_STATS_STARTCLOCK) ? "NULL" :
-		     "FROM_UNIXTIME($TBDB_STATS_STARTCLOCK)");
-
-    DBQueryWarn("insert into testbed_stats ".
-		"(idx, uid, start_time, end_time, exptidx, rsrcidx, ".
-		" action, exitcode, log_session) ".
-		"values (0, '$uid', $starttime, now(), $exptidx, $rsrcidx, ".
-		"        '$mode', $ecode, $session)");
-
-    # We do these here since even failed operations implies activity
-    DBQueryWarn("update user_stats set last_activity=now() ".
-		"where uid='$uid'");
-    DBQueryWarn("update project_stats set last_activity=now() ".
-		"where pid='$pid'");
-    DBQueryWarn("update group_stats set last_activity=now() ".
-		"where pid='$pid' and gid='$gid'");
-}
-
-#
 # Gather Assign stats. Its expected that the hash that comes in
 # will reflect the slot names in the DB.
 #
@@ -5081,8 +3232,6 @@ sub GatherAssignStats($$%)
 {
     my ($pid, $eid, %stats) = @_;
     my @updates = ();
-
-    local $DBQUERY_MAXTRIES = 5;
 
     my $query_result =
 	DBQueryWarn("select e.gid,e.idx,s.rsrcidx from experiments as e ".
@@ -5180,228 +3329,52 @@ sub array_recurse2($%) {
     return $str;
 }
 
-#
-# Support for checking field values against what is specified.
-#
-my %DBFieldData;
-my $DBFieldErrstr = "";
-
-sub TBFieldErrorString() { return $DBFieldErrstr; }
-
-#
-# Download all data from the DB and store in hash for latter access.
-#
-sub TBGrabFieldData()
-{
-    %DBFieldData = ();
-
-    my $query_result =
-	DBQueryFatal("select * from table_regex");
-
-    while (my %row = $query_result->fetchhash()) {
-	my $table_name  = $row{"table_name"};
-	my $column_name = $row{"column_name"};
-
-	$DBFieldData{$table_name . ":" . $column_name} =
-	    { "check"       => $row{"check"},
-	      "check_type"  => $row{"check_type"},
-	      "column_type" => $row{"column_type"},
-	      "min"         => $row{"min"},
-	      "max"         => $row{"max"}
-	    };
-    }
-}
-
-#
-# Return the field data for a specific table/slot. If none, return the default
-# entry.
-#
-# The top level entry defines some stuff that is not to be overidden by the
-# redirected entries. For example, the top level entry is the only place we
-# can specify a field is optional when inserting a record. We could do this
-# with default entries in the DB table defintion, but I do not like that idea.
-# The min/max lengths also override, unless they are both zero in which case
-# let the first non-zero defs set them.
-#
-sub TBFieldData($$;$)
-{
-    my ($table, $column, $flag) = @_;
-    my $toplevel;
-    my $fielddata;
-
-    if (! %DBFieldData) {
-	TBGrabFieldData();
-    }
-    my $key = $table . ":" . $column;
-
-    while (exists($DBFieldData{$key})) {
-	$fielddata = $DBFieldData{$key};
-
-	#
-	# See if a redirect to another entry.
-	#
-	if ($fielddata->{"check_type"} eq "redirect") {
-	    if (!defined($toplevel)) {
-		$toplevel = $fielddata;
-	    }
-
-	    $key = $fielddata->{"check"};
-#	    print STDERR "Redirecting to $key for $table/$column!\n";
-	    next;
-	}
-	last;
-    }
-    # Resort to a default entry.
-    if (!defined($fielddata)) {
-	if (defined($flag)) {
-	    if ($flag & TBDB_CHECKDBSLOT_WARN()) {
-		print STDERR "*** $0:\n" .
-		             "    WARNING: No slot data for $table/$column!\n";
-	    }
-	    return undef
-		if ($flag & TBDB_CHECKDBSLOT_ERROR());
-	}
-	$fielddata = $DBFieldData{"default:default"};
-    }
-    # Return both entries.
-    if (defined($toplevel) &&
-	($toplevel->{"min"} || $toplevel->{"max"})) {
-	return ($fielddata, $toplevel);
-    }
-    return ($fielddata);
-}
-
-#
-# Generic wrapper to check a slot.
-#
-sub TBcheck_dbslot($$$;$)
-{
-    my ($token, $table, $column, $flag) = @_;
-
-    my ($fielddata,$toplevel) = TBFieldData($table, $column, $flag);
-
-    return 0
-	if (!defined($fielddata));
-
-    my $check       = $fielddata->{"check"};
-    my $check_type  = $fielddata->{"check_type"};
-    my $column_type = $fielddata->{"column_type"};
-    my $min         = (defined($toplevel) ?
-		       $toplevel->{"min"} : $fielddata->{"min"});
-    my $max         = (defined($toplevel) ?
-		       $toplevel->{"max"} : $fielddata->{"max"});
-
-#    print STDERR "Using $check/$check_type/$column_type/$min/$max for ".
-#	"$table/$column\n";
-
-    #
-    # Functional checks not implemented yet.
-    #
-    if ($check_type eq "function") {
-	die("*** $0:\n" .
-	    "    Functional DB checks not implemented: $table/$column!\n");
-    }
-
-    # Make sure the regex is anchored. Its a mistake not to be!
-    $check = "^" . $check
-	if (! ($check =~ /^\^/));
-
-    $check = $check . "\$"
-	if (! ($check =~ /\Q$/));
-
-    # Check regex.
-    return 0
-	if (! ("$token" =~ /$check/));
-
-    # Check min/max.
-    if ($column_type eq "text") {
-	return 1
-	    if ((!$min && !$max) ||
-		(length($token) >= $min &&
-		 length($token) <= $max));
-    }
-    elsif ($column_type eq "int" ||
-	   $column_type eq "float") {
-	# If both min/max are zero, then skip check; allow anything.
-	return 1
-	    if ((!$min && !$max) || ($token >= $min && $token <= $max));
-    }
-    else {
-	die("*** $0:\n" .
-	    "    Unrecognized column_type $column_type\n");
-    }
-    return 0;
-}
-
-#
-# Return a unique index from emulab_indicies for the indicated name.
-# Updates the index to be, well, unique.
-# Eats flaming death on error.
-#
-# WARNING: this will unlock all locked tables, be careful where you call it!
-#
-sub TBGetUniqueIndex($;$)
-{
-    my ($name, $initval) = @_;
-
-    #
-    # Lock the table to avoid conflicts
-    #
-    DBQueryFatal("lock tables emulab_indicies write");
-
-    my $query_result =
-	DBQueryFatal("select idx from emulab_indicies ".
-		     "where name='$name'");
-    my ($curidx) = $query_result->fetchrow_array();
-    if (!defined($curidx)) {
-	$curidx = (defined($initval) ? $initval : 1);
-    }
-    my $nextidx = $curidx + 1;
-
-    DBQueryFatal("replace into emulab_indicies (name, idx) ".
-		 "values ('$name', $nextidx)");
-    DBQueryFatal("unlock tables");
-
-    return $curidx;
-}
-
 sub TBSetNodeHistory($$$$$)
 {
     my ($nodeid, $op, $uid, $pid, $eid) = @_;
     my $exptidx;
 
-    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    #
+    # XXX Eventually this should change, but the use of $UID is funky.
+    #
+    my $dbid;
+    my $node = Node->Lookup($nodeid);
+    my $experiment = Experiment->Lookup($pid, $eid);
+    my $this_user;
+
+    if (!defined($node)) {
+	print "*** WARNING: No such node $nodeid!\n";
+	return 0;
+    }
+    if (!defined($experiment)) {
 	print "*** WARNING: No such experiment $pid/$eid!\n";
 	return 0;
     }
-    if ($uid =~ /^[0-9]+$/) {
-	$uid = ($uid == 0 ? "root" : MapNumericUID($uid));
-    }
-    
-    return DBQueryWarn("insert into node_history set ".
-		       "  history_id=0, node_id='$nodeid', op='$op', ".
-		       "  uid='$uid', stamp=UNIX_TIMESTAMP(now()), ".
-		       "  exptidx=$exptidx");
-}
 
-sub TBGetOSBootCmd($$$)
-{
-    my ($osid, $role, $default_cmdline) = @_;
-    my $retval = $default_cmdline;
-    
-    my $query_result =
-	DBQueryFatal("SELECT ob.boot_cmd_line FROM os_info as oi ".
-		     "LEFT JOIN os_boot_cmd as ob on ob.OS=oi.OS and ".
-		     "  ob.version=oi.version ".
-		     "WHERE oi.osid='$osid' and ob.role='$role'");
-    
-    if ($query_result->num_rows == 1) {
-	($retval) = $query_result->fetchrow_array();
+    if ($uid =~ /^[0-9]+$/) {
+	if ($uid == 0) {
+	    # Node->SetNodeHistory() is okay with this.
+	    $this_user = undef;
+	}
+	else {
+	    $this_user = User->LookupByUnixId($uid);
+	    if (! defined($this_user)) {
+		print "*** WARNING: $UID does not exist in the DB!";
+		return 0;
+	    }
+	}
     }
-    
-    return $retval;
+    else {
+	$this_user = User->Lookup($uid);
+	if (! defined($this_user)) {
+	    print "*** WARNING: $UID does not exist in the DB!";
+	    return 0;
+	}
+    }
+    return $node->SetNodeHistory($op, $this_user, $experiment);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
 
 1;
+

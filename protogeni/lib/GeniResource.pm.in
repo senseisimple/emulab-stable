@@ -1,0 +1,1889 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniResource;
+
+#
+# Mapping between geni resources and Emulab resources.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+use GeniDB;
+use Genixmlrpc;
+use GeniResponse;
+use GeniRegistry;
+use GeniTicket;
+use GeniCredential;
+use GeniAuthority;
+use GeniComponent;
+use GeniUser;
+use GeniHRN;
+use GeniXML;
+use emutil qw(TBGetUniqueIndex);
+use User;
+use Project;
+use Group;
+use Node;
+use Interface;
+use English;
+use XML::Simple;
+use Date::Parse;
+use Data::Dumper;
+use POSIX qw(strftime);
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $SACERT         = "$TB/etc/genisa.pem";
+
+#
+# Lookup by uuid.
+#
+sub Lookup($$;$)
+{
+    my ($class, $arg1, $arg2) = @_;
+    my $query_result;
+
+    if (!defined($arg2)) {
+	if ($arg1 =~ /^(\d*)$/) {
+	    $query_result =
+		DBQueryWarn("select * from geni_resources ".
+			    "where idx='$arg1'");
+	}
+	else {
+	    return undef;
+	}
+    }
+    elsif (($arg1 =~ /^\d*$/) && GeniHRN::IsValid($arg2)) {
+	$query_result =
+	    DBQueryWarn("select * from geni_resources ".
+			"where exptidx='$arg1' and manager_urn='$arg2'");
+    }
+    else {
+	return undef;
+    }
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self              = {};
+    $self->{'DBROW'}      = $query_result->fetchrow_hashref();
+    $self->{'NEWTICKET'}  = undef;
+    $self->{'manager_version'} = undef;
+    $self->{'last_rpc_error'}  = 0;
+    $self->{'last_rpc_value'}  = undef;
+    $self->{'last_rpc_output'} = undef;
+    bless($self, $class);
+
+    return $self;
+}
+
+#
+# Lookup by experiment.
+#
+sub LookupAll($$)
+{
+    my ($class, $arg1) = @_;
+
+    if (ref($arg1)) {
+	$arg1 = $arg1->idx();
+    }
+    my $query_result =
+	DBQueryWarn("select idx from geni_resources where exptidx='$arg1'");
+
+    return undef
+	if (!$query_result);
+    return ()
+	if (!$query_result->numrows);
+
+    my @result = ();
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $resource = GeniResource->Lookup($idx);
+	if (!defined($resource)) {
+	    print STDERR "Could not get GeniResource for $idx\n";
+	    return undef
+	}
+	push(@result, $resource);
+    }
+    return @result;
+}
+
+sub SliceResources($)
+{
+    my ($class, $slice) = @_;
+    my $slice_idx = $slice->idx();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_resources ".
+		    "where slice_idx='$slice_idx'");
+
+    return undef
+	if (!$query_result);
+    return ()
+	if (!$query_result->numrows);
+
+    my @result = ();
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $resource = GeniResource->Lookup($idx);
+	if (!defined($resource)) {
+	    print STDERR "Could not get GeniResource for $idx\n";
+	    return undef
+	}
+	push(@result, $resource);
+    }
+    return @result;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $idx = $self->idx();
+    my $urn = $self->manager_urn();
+
+    return "[GeniResource: $idx, $urn]";
+}
+
+#
+# Create a GeniResource in the DB.
+#
+sub Create($$$)
+{
+    my ($class, $experiment, $manager_urn) = @_;
+    my @insert_data = ();
+
+    my $slice = GeniSlice->LookupByExperiment($experiment);
+    if (!defined($slice)) {
+	print STDERR "*** GeniResource::Create: ".
+	    "No slice registered for $experiment\n";
+	return undef;
+    }
+
+    # Every one gets a new unique index.
+    my $idx = TBGetUniqueIndex('next_geniidx', 1);
+
+    my $safe_urn = DBQuoteSpecial($manager_urn);
+    my $pid      = $experiment->pid();
+    my $eid      = $experiment->eid();
+    my $exptidx  = $experiment->idx();
+    my $slice_idx= $slice->idx();
+    
+    # Now tack on other stuff we need.
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "slice_idx='$slice_idx'");
+    push(@insert_data, "created=now()");
+    push(@insert_data, "manager_urn=$safe_urn");
+    push(@insert_data, "pid='$pid'");
+    push(@insert_data, "eid='$eid'");
+    push(@insert_data, "exptidx=$exptidx");
+
+    # Insert into DB.
+    DBQueryWarn("replace into geni_resources set " . join(",", @insert_data))
+	or return undef;
+
+    return GeniResource->Lookup($idx);
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub exptidx($)		{ return field($_[0], "exptidx"); }
+sub pid($)		{ return field($_[0], "pid"); }
+sub eid($)		{ return field($_[0], "eid"); }
+sub created($)          { return field($_[0], "created"); }
+sub updated($)          { return field($_[0], "updated"); }
+sub expires($)          { return field($_[0], "expires"); }
+sub manager_urn($)      { return field($_[0], "manager_urn"); }
+sub slice_idx($)        { return field($_[0], "slice_idx"); }
+sub credential_idx($)   { return field($_[0], "credential_idx"); }
+sub manifest_idx($)     { return field($_[0], "manifest_idx"); }
+sub ticket_idx($)       { return field($_[0], "ticket_idx"); }
+sub newticket_idx($)    { return field($_[0], "newticket_idx"); }
+sub manager_version($)  { return $_[0]->{'manager_version'}; }
+sub last_rpc_error($)   { return $_[0]->{'last_rpc_error'}; }
+sub last_rpc_output($)  { return $_[0]->{'last_rpc_output'}; }
+sub last_rpc_value($)   { return $_[0]->{'last_rpc_value'}; }
+sub manifest_string($)  { return $_[0]->{'MANIFESTSTR'}; }
+
+#
+# Delete a resource record from the DB.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    DBQueryWarn("delete from geni_resources ".
+		"where idx='$idx'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Compare two refs.
+#
+sub SameResource($$)
+{
+    my ($self, $other) = @_;
+
+    return 0
+	if (! (ref($self) && ref($other)));
+
+    return $self->idx() eq $other->idx();
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select * from geni_resources where idx='$idx'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'DBROW'}     = $query_result->fetchrow_hashref();
+    $self->{'NEWTICKET'} = undef;
+    $self->{'MANIFEST'}  = undef;
+    return 0;
+}
+
+#
+# Update Fields.
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    my $query = "update geni_resources set ".
+	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}),
+		      keys(%{$argref})));
+
+    $query .= " where idx='$idx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Set the expiration time.
+#
+sub SetExpiration($$)
+{
+    my ($self, $expires) = @_;
+    my $idx = $self->idx();
+
+    if (!defined($expires)) {
+	$expires = "NULL";
+    }
+    elsif ($expires =~ /^\d+$/) {
+	$expires = "FROM_UNIXTIME($expires)";
+    }
+    else {
+	$expires = "'$expires'";
+    }
+    my $query_result =
+	DBQueryWarn("update geni_resources set expires=$expires " .
+		    "where idx='$idx'");
+    
+    return -1
+	if (!$query_result);
+
+    # Has to be in the correct format.
+    $query_result =
+	DBQueryWarn("select expires from geni_resources where idx='$idx'");
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    ($expires) = $query_result->fetchrow_array();
+    
+    $self->{'DBROW'}->{'expires'} = $expires;
+    return 0;
+}
+
+#
+# Return the ticket.
+#
+sub Ticket($)
+{
+    my ($self) = @_;
+
+    return $self->{'NEWTICKET'}
+        if (defined($self->{'NEWTICKET'}));
+
+    if (!$self->newticket_idx()) {
+	print STDERR "*** No new ticket defined for $self.\n";
+	return undef;
+    }
+    my $ticket = GeniTicket->Lookup($self->newticket_idx());
+    if (!defined($ticket)) {
+	print STDERR "*** Could not get new ticket for $self.\n";
+	return undef;
+    }
+    $self->{'NEWTICKET'} = $ticket;
+    return $ticket;
+}
+
+sub Manifest($)
+{
+    my ($self) = @_;
+
+    return $self->{'MANIFEST'}
+        if (defined($self->{'MANIFEST'}));
+
+    if (!$self->manifest_idx()) {
+	print STDERR "*** No manifest defined for $self.\n";
+	return undef;
+    }
+    my $manifest_idx = $self->manifest_idx();
+
+    my $query_result =
+	DBQueryWarn("select manifest from geni_manifests ".
+		    "where idx=$manifest_idx");
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "Could not locate manifest for $self\n";
+	return undef;
+    }
+    my ($manifest_string) = $query_result->fetchrow_array();
+    my $manifest = GeniXML::Parse($manifest_string);
+    if (!defined($manifest)) {
+	print STDERR "Could not getmanifest for $self\n";
+	return undef;
+    }
+    $self->{'MANIFEST'}    = $manifest;
+    $self->{'MANIFESTSTR'} = $manifest_string;
+    return $manifest;
+}
+
+sub UpdateManifest($$)
+{
+    my ($self, $manifest) = @_;
+
+    if (! $self->manifest_idx()) {
+	print STDERR "No manifest to update for $self\n";
+	return -1;
+    }
+    my $manifest_idx = $self->manifest_idx();
+    my $manifest_string = GeniXML::Serialize($manifest);
+
+    my $query_result =
+	DBQueryWarn("update geni_manifests set ".
+		    "  manifest=". DBQuoteSpecial($manifest_string) . ", " .
+		    "  created=now() ".
+		    "where idx=$manifest_idx");
+    return -1
+	if (!defined($query_result));
+
+    $self->{'MANIFEST'}    = $manifest;
+    $self->{'MANIFESTSTR'} = $manifest_string;
+    return 0;
+}
+
+#
+# Get Version. Ask the CM what version it is running. 
+#
+sub ManagerVersion($)
+{
+    my ($self) = @_;
+
+    return $self->manager_version()
+	if (defined($self->manager_version()));
+
+    my $manager_urn = $self->manager_urn();
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "*** Could not load certificate from $SACERT\n";
+	return undef;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "*** Could not create context to talk to clearinghouse\n";
+	return undef;
+    }
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    my $authority = GeniAuthority->Lookup($manager_urn);
+    if (!defined($authority)) {
+	$authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+	if (!defined($authority)) {
+	    print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	    return undef;
+	}
+    }
+    $self->{'manager_version'} = $authority->Version();
+    return $self->{'manager_version'};
+}
+
+#
+# Convert an rspec structure (as from libvtop) into proper format.
+# This is horrible.
+#
+sub ConvertRspec($)
+{
+    my ($rspec) = @_;
+    my $template;
+
+    if (1) {
+	$template =
+	    "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.2\" ".
+	    "       type=\"request\" generated_by=\"libvtop\">".
+	    "</rspec>";
+    }
+    else {
+	$template =
+	    "<rspec xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ".
+	    "       xsi:schemaLocation=".
+	    "\"http://www.protogeni.net/resources/rspec/0.2 ".
+	    "  http://www.protogeni.net/resources/rspec/0.2/request.xsd\" ".
+	    "       type=\"request\" generated_by=\"libvtop\"> ".
+	    "</rspec>";
+    }
+
+    my $new = GeniXML::Parse($template);
+    if (!defined($new)) {
+	print STDERR "ConvertRspec: Could not create new document\n";
+	return undef;
+    }
+    # ???
+    my $root = $new;
+
+    foreach my $ref (@{ $rspec->{'node'} }) {
+	my $node = GeniXML::AddElement("node", $root);
+	
+	foreach my $key ('virtual_id', 'component_urn', 'exclusive',
+			 'component_manager_urn', 'component_manager_uuid',
+			 'virtualization_type', 'virtualization_subtype',
+			 'startup_command', 'tarfiles') {
+	    GeniXML::SetText($key, $node, $ref->{$key})
+		if (exists($ref->{$key}));
+	}
+	foreach my $ifaceref (@{ $ref->{'interface'} }) {
+	    my $iface = GeniXML::AddElement("interface", $node);
+	    foreach my $key ('virtual_id', 'component_id') {
+		GeniXML::SetText($key, $iface, $ifaceref->{$key})
+		    if (exists($ifaceref->{$key}));
+	    }
+	}
+    }
+    if (exists($rspec->{'link'})) {
+	foreach my $linkref (@{ $rspec->{'link'} }) {
+	    my $link = GeniXML::AddElement("link", $root);
+	    foreach my $key ('virtual_id', 'link_type',
+			     'virtualization_type') {
+		GeniXML::SetText($key, $link, $linkref->{$key})
+		    if (exists($linkref->{$key}));
+	    }
+	    # These are special; see libvtop.
+	    foreach my $key ('bandwidth', 'latency', 'packet_loss') {
+		if (exists($linkref->{$key})) {
+		    my ($val) = @{ $linkref->{$key} };
+
+		    GeniXML::SetText($key, $link, $val);
+		}
+	    }
+	    foreach my $ifaceref (@{ $linkref->{'interface_ref'} }) {
+		my $iface = GeniXML::AddElement("interface_ref", $link);
+		
+		foreach my $key ('virtual_node_id', 'virtual_interface_id',
+				 'tunnel_ip') {
+		    GeniXML::SetText($key, $iface, $ifaceref->{$key})
+			if (exists($ifaceref->{$key}));
+		}
+	    }
+	    foreach my $cmref (@{ $linkref->{'component_manager'} }) {
+		my $cm = GeniXML::AddElement("component_manager", $link);
+		
+		foreach my $key ('id') {
+		    GeniXML::SetText($key, $cm, $cmref->{$key})
+			if (exists($cmref->{$key}));
+		}
+	    }
+	}
+    }
+    return $new;
+}
+
+#
+# Add Resources. We get an rspec to replace the current rspec.
+# Ask for a ticket, and then redeem it.
+#
+sub GetTicket($$$$)
+{
+    my ($self, $user, $rspec_string, $impotent) = @_;
+    my $ticket;
+    my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** AddResources: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "*** Could not load certificate from $SACERT\n";
+	return -1;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "*** Could not create context to talk to clearinghouse\n";
+	return -1;
+    }
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Generate a slice credential for the user. 
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	print STDERR
+	    "*** Could not create a slice credential for $slice/$geniuser!\n";
+	return -1;
+    }
+
+    #
+    # Load sliver credential if we have it.
+    #
+    my $sliver_credential;
+    if ($self->credential_idx()) {
+	$sliver_credential = GeniCredential->Lookup($self->credential_idx());
+	if (!defined($sliver_credential)) {
+	    print STDERR "*** Could not get sliver credential for $self.\n";
+	    return -1;
+	}
+    }
+
+    my $method_name = undef;
+    my $method_args = {};
+
+    #
+    # Already have a credential for a sliver, then we want to update
+    # the existing ticket we also have on file, and then redeem that.
+    #
+    if (defined($sliver_credential)) {
+	if ($self->newticket_idx()) {
+	    print STDERR "*** Still have a new ticket defined for $self.\n";
+	    return -1;
+	}
+	if (!$self->ticket_idx()) {
+	    print STDERR "*** No ticket defined for $self.\n";
+	    return -1;
+	}
+	$ticket = GeniTicket->Lookup($self->ticket_idx());
+	if (!defined($ticket)) {
+	    print STDERR "*** Could not get ticket for $self.\n";
+	    return -1;
+	}
+	$method_name = "UpdateTicket";
+	$method_args->{'ticket'} = $ticket->asString();
+    }
+    else {
+	$method_name = "GetTicket";
+    }
+    $method_args->{'impotent'} = $impotent;
+    $method_args->{'rspec'}    = $rspec_string;
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $slice_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR "GeniResource::GetTicket Unknown version at $authority\n";
+	return -1;
+    }
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR "*** Internal error getting/updating ticket for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	if ($ticket) {
+	    print STDERR "Could not update ticket $ticket. Error: ";
+	}
+	else {
+	    print STDERR "Could not get new ticket. Error: ";
+	}
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    my $newticket = GeniTicket->CreateFromSignedTicket($response->value());
+    if (!defined($newticket)) {
+	print STDERR "*** Cannot create new ticket object from:\n";
+	print STDERR $response->value() . "\n";
+	return -1;
+    }
+    $newticket->SetSlice($slice);
+    if ($newticket->Store(TICKET_NOSTATS) != 0) {
+	print STDERR "*** Could not store $newticket\n";
+	return -1;
+    }
+    $self->Update({"newticket_idx" => $newticket->idx()});
+    $self->{'NEWTICKET'} = $newticket;
+
+    return 0;
+}
+
+#
+# Redeem the ticket.
+#
+sub RedeemTicket($$)
+{
+    my ($self, $user) = @_;
+    my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** AddResources: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "*** Could not load certificate from $SACERT\n";
+	return -1;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "*** Could not create context to talk to clearinghouse\n";
+	return -1;
+    }
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    my @keys;
+    if ($geniuser->GetKeyBundle(\@keys) != 0) {
+	print STDERR "Could not get keys for $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Generate a slice credential for the user. 
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	print STDERR
+	    "*** Could not create a slice credential for $slice/$geniuser!\n";
+	return -1;
+    }
+
+    #
+    # Load sliver credential if we have it.
+    #
+    my $sliver_credential;
+    if ($self->credential_idx()) {
+	$sliver_credential = GeniCredential->Lookup($self->credential_idx());
+	if (!defined($sliver_credential)) {
+	    print STDERR "*** Could not get sliver credential for $self.\n";
+	    return -1;
+	}
+    }
+
+    if (!$self->newticket_idx()) {
+	print STDERR "*** No ticket defined for $self.\n";
+	return -1;
+    }
+    my $ticket = GeniTicket->Lookup($self->newticket_idx());
+    if (!defined($ticket)) {
+	print STDERR "*** Could not get new ticket for $self.\n";
+	return -1;
+    }
+    my $oldticket;
+    if ($self->ticket_idx()) {
+	$oldticket = GeniTicket->Lookup($self->ticket_idx());
+	if (!defined($oldticket)) {
+	    print STDERR "*** Could not get old ticket for $self.\n";
+	    return -1;
+	}
+    }
+    
+    #
+    # Redeem it. 
+    #
+    my $method_name = "RedeemTicket";
+    my $method_args = { "ticket"     => $ticket->asString(),
+			"keys"       => \@keys };
+
+    if ($manager_version == 1.0) {
+	$method_name = "UpdateSliver"
+	    if (defined($sliver_credential));
+	$method_args->{'credential'} = $slice_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR
+	    "GeniResource::RedeemTicket Unknown version at $authority\n";
+	return -1;
+    }
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR
+	    "*** Internal error redeeming/updating sliver for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	if ($sliver_credential) {
+	    print STDERR "Could not update sliver $sliver_credential Error: ";
+	}
+	else {
+	    print STDERR "Could not redeem ticket $ticket. Error: ";
+	}
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    #
+    # It worked, so mark the expiration time for the resource.
+    #
+    if ($self->SetExpiration($slice->expires())) {
+	print STDERR "RenewAll: Could not set expiration for $self!\n";
+    }
+
+    #
+    # Okay, so that worked. Store the new credential and the ticket and
+    # the manifest.
+    #
+    my $manifest;
+    if (!defined($sliver_credential)) {
+	my $credstring;
+	($credstring,$manifest) = @{ $response->value() };
+
+	$sliver_credential = GeniCredential->CreateFromSigned($credstring);
+	if (!defined($sliver_credential)) {
+	    print STDERR
+		"** Could not create new credential from $credstring\n";
+	    return -1;
+	}
+	if ($sliver_credential->Store()) {
+	    print STDERR "** Could not store $sliver_credential\n";
+	    return -1;
+	}
+	$self->Update({"credential_idx" => $sliver_credential->idx()});
+    }
+    else {
+	$manifest = $response->value();
+    }
+    if (defined($oldticket)) {
+	$oldticket->Delete(TICKET_DELETED);
+    }
+    $self->Update({"newticket_idx" => 0,
+		   "ticket_idx"    => $ticket->idx()});
+	
+    #
+    # Move this elsewhere.
+    #
+    my $manifest_idx = ($self->manifest_idx() ?
+			$self->manifest_idx() : "NULL");
+    my $sliver_uuid  = $sliver_credential->uuid();
+    my $query_result =
+	DBQueryWarn("replace into geni_manifests set ".
+		    "  manifest=". DBQuoteSpecial($manifest) . ", " .
+		    "  idx=$manifest_idx, slice_uuid='$sliver_uuid', ".
+		    "  created=now()");
+    return -1
+	if (!defined($query_result));
+
+    if (!$self->manifest_idx()) {
+	$manifest_idx = $query_result->insertid;
+	
+	$self->Update({"manifest_idx" => $manifest_idx});
+    }
+    return 0;
+}
+
+#
+# Update the manifest.
+#
+sub GetManifest($$)
+{
+    my ($self, $user) = @_;
+    my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** GetManifest: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Load sliver credential.
+    #
+    if (!$self->credential_idx()) {
+	print STDERR "*** No credential defined for $self.\n";
+	return -1;
+    }
+    my $sliver_credential = GeniCredential->Lookup($self->credential_idx());
+    if (!defined($sliver_credential)) {
+	print STDERR "*** Could not get sliver credential for $self.\n";
+	return -1;
+    }
+
+    #
+    # Doit it. 
+    #
+    my $method_name = "Resolve";
+    my $method_args = { 'credentials' => [$sliver_credential->asString()],
+			'urn'         => $sliver_credential->target_urn(),
+		    };
+
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR
+	    "*** Internal error getting manifest for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'}  = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not get manifest for $self. Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    #
+    # Okay, so that worked. Store the new manifest.
+    #
+    my $manifest = $response->value()->{'manifest'};
+
+    #
+    # Move this elsewhere.
+    #
+    my $manifest_idx = ($self->manifest_idx() ?
+			$self->manifest_idx() : "NULL");
+    my $sliver_uuid  = $sliver_credential->uuid();
+    my $query_result =
+	DBQueryWarn("replace into geni_manifests set ".
+		    "  manifest=". DBQuoteSpecial($manifest) . ", " .
+		    "  idx=$manifest_idx, slice_uuid='$sliver_uuid', ".
+		    "  created=now()");
+    return -1
+	if (!defined($query_result));
+
+    if (!$self->manifest_idx()) {
+	$manifest_idx = $query_result->insertid;
+	
+	$self->Update({"manifest_idx" => $manifest_idx});
+    }
+    return 0;
+}
+
+#
+# Clear all resources. 
+#
+sub Clear($$)
+{
+    my ($self, $user) = @_;
+    my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** ClearResources: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "*** Could not load certificate from $SACERT\n";
+	return -1;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "*** Could not create context to talk to clearinghouse\n";
+	return -1;
+    }
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Generate a slice credential for the user. 
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	print STDERR
+	    "*** Could not create a slice credential for ".
+	    "$slice/$geniuser!\n";
+	return -1;
+    }
+
+    #
+    # Load sliver credential if we have it.
+    #
+    my $sliver_credential;
+    if ($self->credential_idx()) {
+	$sliver_credential = GeniCredential->Lookup($self->credential_idx());
+	if (!defined($sliver_credential)) {
+	    print STDERR "*** Could not get sliver credential for $self.\n";
+	    return -1;
+	}
+    }
+    my $newticket;
+    if ($self->newticket_idx()) {
+	$newticket = GeniTicket->Lookup($self->newticket_idx());
+	if (!defined($newticket)) {
+	    print STDERR "*** Could not get new ticket for $self.\n";
+	    return -1;
+	}
+    }
+    my $oldticket;
+    if ($self->ticket_idx()) {
+	$oldticket = GeniTicket->Lookup($self->ticket_idx());
+	if (!defined($oldticket)) {
+	    print STDERR "*** Could not get old ticket for $self.\n";
+	    return -1;
+	}
+    }
+
+    if (defined($newticket)) {
+	my $method_name = "ReleaseTicket";
+	my $method_args = { "ticket" => $newticket->asString() };
+
+	if ($manager_version == 1.0) {
+	    $method_args->{'credential'} = $slice_credential->asString();
+	}
+	elsif ($manager_version == 2.0) {
+	    $method_args->{'credentials'} = [$slice_credential->asString()];
+	    $method_args->{'slice_urn'}   = $slice->urn();
+	}
+	else {
+	    print STDERR
+		"GeniResource::Clear Unknown version at $authority\n";
+	    return -1;
+	}
+	print STDERR "Deleting $newticket on $authority\n";
+	$response =
+	    Genixmlrpc::CallMethod($authority->url(), $usercontext,
+				   $method_name, $method_args);
+	if (!defined($response)) {
+	    $self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	    print STDERR "*** Internal error releasing ticket for $self\n";
+	    return -1;
+	}
+	$self->{'last_rpc_error'} = $response->code();
+	$self->{'last_rpc_output'} = $response->output();
+	$self->{'last_rpc_value'}  = $response->value();
+	if ($response->code() != GENIRESPONSE_SUCCESS &&
+	    $response->code() != GENIRESPONSE_SEARCHFAILED) {
+	    print STDERR "Could not release ticket for $self. Error: ";
+	    print STDERR "  " . $response->output() . "\n";
+	    return -1;
+	}
+	$newticket->Delete(TICKET_DELETED);
+	$self->Update({"newticket_idx" => 0});
+    }
+    if (defined($oldticket)) {
+	$oldticket->Delete(TICKET_DELETED);
+	$self->Update({"ticket_idx" => 0});
+    }
+
+    my $method_name = "DeleteSlice";
+    my $method_args = undef;
+
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $slice_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR "GeniResource::Clear Unknown version at $authority\n";
+	return -1;
+    }
+    print STDERR "Deleting sliver on $authority\n";
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR "*** Internal error deleting sliver for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS &&
+	$response->code() != GENIRESPONSE_SEARCHFAILED) {
+	print STDERR "Could not delete sliver for $self. Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    #
+    # Delete this now; no point in waiting for the CM to tell us.
+    #
+    # Needs to move elsewhere I think.
+    #
+    my $clientsliver =
+	GeniRegistry::ClientSliver->LookupByAuthority($slice,
+						      $manager_urn);
+    $clientsliver->Delete()
+	if (defined($clientsliver));
+    
+    if (defined($sliver_credential)) {
+	$sliver_credential->Delete();
+	$self->Update({"credential_idx" => 0});
+    }
+
+    #
+    # Move this elsewhere.
+    #
+    if ($self->manifest_idx()) {
+	my $manifest_idx = $self->manifest_idx();
+
+	DBQueryWarn("delete from geni_manifests ".
+		    "where idx=$manifest_idx");
+	
+	$self->Update({"manifest_idx" => 0});
+    }
+    return 0;
+}
+
+#
+# Purge all resources. 
+#
+sub Purge($$)
+{
+    my ($self, $user) = @_;
+    my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** ClearResources: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Generate a slice credential for the user. 
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	print STDERR
+	    "*** Could not create a slice credential for $slice/$geniuser!\n";
+	return -1;
+    }
+
+    if ($self->credential_idx()) {
+	my $sliver_credential =
+	    GeniCredential->Lookup($self->credential_idx());
+	if (defined($sliver_credential)) {
+	    $sliver_credential->Delete();	
+	    $self->Update({"credential_idx" => 0});
+	}
+    }
+    if ($self->newticket_idx()) {
+	my $newticket = GeniTicket->Lookup($self->newticket_idx());
+	if (defined($newticket)) {
+	    $newticket->Delete(TICKET_DELETED);
+	    $self->Update({"newticket_idx" => 0});
+	}
+    }
+    if ($self->ticket_idx()) {
+	my $ticket = GeniTicket->Lookup($self->ticket_idx());
+	if (defined($ticket)) {
+	    $ticket->Delete(TICKET_DELETED);
+	    $self->Update({"ticket_idx" => 0});
+	}
+    }
+    #
+    # Move this elsewhere.
+    #
+    if ($self->manifest_idx()) {
+	my $manifest_idx = $self->manifest_idx();
+
+	DBQueryWarn("delete from geni_manifests ".
+		    "where idx=$manifest_idx");
+	
+	$self->Update({"manifest_idx" => 0});
+    }
+    my $method_name = "DeleteSlice";
+    my $method_args = {};
+
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $slice_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR
+	    "GeniResource::Purge Unknown version at $authority\n";
+	return -1;
+    }
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR "*** Internal error deleting sliver for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS &&
+	$response->code() != GENIRESPONSE_SEARCHFAILED) {
+	print STDERR "Could not delete sliver for $self. Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    #
+    # Delete this now; no point in waiting for the CM to tell us.
+    #
+    # Needs to move elsewhere I think.
+    #
+    my $clientsliver =
+	GeniRegistry::ClientSliver->LookupByAuthority($slice,
+						      $manager_urn);
+    $clientsliver->Delete()
+	if (defined($clientsliver));
+    return 0;
+}
+
+#
+# Start/Stop/Restart a sliver.
+#
+sub SliverAction($$$$)
+{
+    my ($self, $action, $user, $urn) = @_;
+    my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    #
+    # Load sliver credential if we have it.
+    #
+    my $sliver_credential;
+    if ($self->credential_idx()) {
+	$sliver_credential = GeniCredential->Lookup($self->credential_idx());
+	if (!defined($sliver_credential)) {
+	    print STDERR "*** Could not get sliver credential for $self.\n";
+	    return -1;
+	}
+    }
+    else {
+	print STDERR "*** No sliver credential for $self.\n";
+	return -1;
+    }
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** AddResources: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Generate a slice credential for the user. 
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	print STDERR
+	    "*** Could not create a slice credential for $slice/$geniuser!\n";
+	return -1;
+    }
+    if (!defined($self->Manifest())) {
+	print STDERR "*** Could not load manifest\n";
+	return -1;
+    }
+
+    #
+    # Do it. 
+    #
+    my $method_name = "${action}Sliver";
+    my $method_args = { "manifest" => $self->{'MANIFESTSTR'} };
+
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $sliver_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR
+	    "GeniResource::${action}Sliver Unknown version at $authority\n";
+	return -1;
+    }
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR
+	    "*** Internal error ${action}ing sliver for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not ${action} sliver $sliver_credential Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    return 0;
+}
+sub StartSliver($$)
+{
+    my ($self, $user) = @_;
+
+    return $self->SliverAction("Start", $user);
+}
+sub StopSliver($$)
+{
+    my ($self, $user) = @_;
+
+    return $self->SliverAction("Stop", $user);
+}
+sub RestartSliver($$)
+{
+    my ($self, $user) = @_;
+
+    return $self->SliverAction("Restart", $user);
+}
+
+#
+# Call the sliver status function, returning an array.
+#
+sub SliverStatus($$$)
+{
+    my ($self, $user, $pref) = @_;
+    my ($response);
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    #
+    # Load sliver credential if we have it.
+    #
+    my $sliver_credential;
+    if ($self->credential_idx()) {
+	$sliver_credential = GeniCredential->Lookup($self->credential_idx());
+	if (!defined($sliver_credential)) {
+	    print STDERR "*** Could not get sliver credential for $self.\n";
+	    return -1;
+	}
+    }
+    else {
+	print STDERR "*** No sliver credential for $self.\n";
+	return -1;
+    }
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** SliverStatus: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Do it. 
+    #
+    my $method_name = "SliverStatus";
+    my $method_args = {};
+
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $sliver_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$sliver_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR
+	    "GeniResource::SliverStatus Unknown version at $authority\n";
+	return -1;
+    }
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR
+	    "*** Internal error getting sliver status for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not get sliver status $sliver_credential Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    } 
+    my $blob = {
+	"state"   => "unknown",
+	"status"  => $response->value()->{'status'},
+    };
+    if ($manager_version == 1.0) {
+	$blob->{'details'} = $response->value()->{'detailsNew'};
+    }
+    elsif ($manager_version == 2.0) {
+	$blob->{'state'}   = $response->value()->{'state'};
+	$blob->{'details'} = $response->value()->{'details'};
+    }
+    $$pref = $blob
+	if (defined($pref));
+    
+    return 0;
+}
+
+#
+# Call the Discover function, returning the advertisement (xml string).
+#
+sub Discover($$$)
+{
+    my ($self, $user, $pref) = @_;
+    my $response;
+
+    # Always clear for caller.
+    $self->{'last_rpc_error'} = 0;
+    $self->{'last_rpc_output'} = undef;
+    $self->{'last_rpc_value'}  = undef;
+
+    my $slice = GeniSlice->Lookup($self->slice_idx());
+    if (!defined($slice)) {
+	print STDERR "*** Discover: No slice for $self\n";
+	return -1;
+    }
+    my $manager_urn = $self->manager_urn();
+    my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
+	return -1;
+    }
+    my $manager_version = $self->ManagerVersion();
+
+    #
+    # Create a Geni user from current user doing the operation.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "*** Could not create a geni user from $user\n";
+	return -1;
+    }
+    my $usercontext = Genixmlrpc->UserContext($geniuser);
+    if (!defined($usercontext)) {
+	print STDERR "*** Could not create user context from $geniuser\n";
+	return -1;
+    }
+
+    #
+    # Generate a slice credential for the user. 
+    #
+    my $slice_credential =
+	GeniCredential->CreateSigned($slice,
+				     $geniuser,
+				     $GeniCredential::LOCALSA_FLAG);
+    if (!defined($slice_credential)) {
+	print STDERR
+	    "*** Could not create a slice credential for $slice/$geniuser!\n";
+	return -1;
+    }
+
+    #
+    # Do it. 
+    #
+    my $method_name = "DiscoverResources";
+    my $method_args = { "available" => "true" };
+
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $slice_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+    }
+    else {
+	print STDERR
+	    "GeniResource::DiscoverResources Unknown version at $authority\n";
+	return -1;
+    }
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR
+	    "*** Internal error doing DiscoverResources for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not discover resources $slice_credential Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    $$pref = $response->value()
+	if (defined($pref));
+    
+    return 0;
+}
+
+#
+# Class method to renew resources for an experiment/slice.
+#
+sub RenewExperimentResources($;$)
+{
+    my ($experiment, $force) = @_;
+
+    my $slice = GeniSlice->LookupByExperiment($experiment);
+    if (!defined($slice)) {
+	print STDERR
+	    "*** RenewExperimentResources: No slice for $experiment\n";
+	return -1;
+    }
+    return RenewSliceResources($slice, $force);
+}
+
+sub RenewSliceResources($;$)
+{
+    my ($slice, $force) = @_;
+
+    $force = 0
+	if (!defined($force));
+
+    #
+    # Get the resource objects.
+    #
+    my @resources = GeniResource->SliceResources($slice);
+    return 0
+	if (!@resources);
+
+    #
+    # If the expiration is more then 30 days out, do not bother.
+    #
+    my $when = str2time($slice->expires());
+    return 0
+	if (!$force && $when > time() + (3600 * 24 * 30));
+
+    # Good default
+    my $expires = time() + (3600 * 24 * 90);
+
+    if ($slice->SetExpiration($expires)) {
+	print STDERR "RenewSliceResources: ".
+	    "Could not set expiration for $slice!\n";
+	return -1
+    }
+
+    #
+    # Cull out resources that are more then 30 days out.
+    #
+    if (!$force) {
+	my @tmp = ();
+	foreach my $resource (@resources) {
+	    # Nothing to renew yet
+	    next
+		if ($resource->credential_idx());
+	    
+	    if (!defined($resource->expires())) {
+		push(@tmp, $resource);
+		next;
+	    }
+	    my $resource_expires = str2time($resource->expires());
+	    push(@tmp, $resource)
+		if (time() + (3600 * 24 * 30) > $resource_expires);
+	}
+	@resources = @tmp;
+	return 0
+	    if (!@resources);
+    }
+    return RenewResources(@resources);
+}
+
+#
+# Class method to renew a set of resources.
+#
+sub RenewResources(@)
+{
+    my @resources = @_;
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "*** Could not load certificate from $SACERT\n";
+	return -1;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "*** Could not create context to talk to clearinghouse\n";
+	return -1;
+    }
+    
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    # Hash the slice credentials so we generate them only once.
+    my %credentials;
+
+    foreach my $resource (@resources) {
+	# No sliver, skip.
+	next
+	    if (! $resource->credential_idx());
+
+	# Always clear for caller.
+	$resource->{'last_rpc_error'} = 0;
+	$resource->{'last_rpc_output'} = undef;
+	$resource->{'last_rpc_value'}  = undef;
+
+	my $slice = GeniSlice->Lookup($resource->slice_idx());
+	if (!defined($slice)) {
+	    print STDERR "RenewAll: No slice for $resource\n";
+	    next;
+	}
+
+	my $manager_urn = $resource->manager_urn();
+	my $authority   = GeniAuthority->Lookup($manager_urn);
+	if (!defined($authority)) {
+	    print STDERR "RenewAll: Could not locate $manager_urn\n";
+	    next;
+	}
+	my $manager_version = $resource->ManagerVersion();
+
+	#
+	# Generate a slice credential.
+	#
+	if (!exists($credentials{$slice->uuid()})) {
+	    my $credential = GeniCredential->Create($slice, $certificate);
+	    if (!defined($credential)) {
+		print STDERR
+		    "RenewAll: Could not create credential for $slice!\n";
+		next;
+	    }
+	    if ($credential->Sign($GeniCredential::LOCALSA_FLAG) != 0) {
+		print STDERR
+		    "RenewAll: Could not sign credential $credential!\n";
+		next;
+	    }
+	    $credentials{$slice->uuid()} = $credential;
+	}
+	my $slice_credential = $credentials{$slice->uuid()};
+	
+	#
+	# Do it. 
+	#
+	print STDERR "Renewing $slice on $authority\n";
+	
+	my $method_name = "RenewSlice";
+	my $method_args = { };
+
+	if ($manager_version == 1.0) {
+	    $method_args->{'credential'} = $slice_credential->asString();
+	}
+	elsif ($manager_version == 2.0) {
+	    $method_args->{'credentials'} = [$slice_credential->asString()];
+	    $method_args->{'slice_urn'}   = $slice->urn();
+	}
+	else {
+	    print STDERR
+		"GeniResource::RenewAll Unknown version at $authority\n";
+	    return -1;
+	}
+	my $response =
+	    Genixmlrpc::CallMethod($authority->url(), $context,
+				   $method_name, $method_args);
+	if (!defined($response)) {
+	    $resource->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	    print STDERR
+		"RenewAll: Internal error doing renew for $resource\n";
+	    next;
+	}
+	$resource->{'last_rpc_error'} = $response->code();
+	$resource->{'last_rpc_output'} = $response->output();
+	$resource->{'last_rpc_value'}  = $response->value();
+	if ($response->code() != GENIRESPONSE_SUCCESS) {
+	    print STDERR "RenewAll: Could not renew $slice_credential Error: ";
+	    print STDERR "  " . $response->output() . "\n";
+	    next;
+	}
+	#
+	# It worked, so mark this resource as renewed. Since an individual
+	# resource could fail to renew, we want to know which ones to come
+	# back to later.
+	#
+	if ($resource->SetExpiration($slice->expires())) {
+	    print STDERR "RenewAll: Could not set expiration for $resource!\n";
+	    next;
+	}
+    }
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

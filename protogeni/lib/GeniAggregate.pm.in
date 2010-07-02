@@ -1,0 +1,1587 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniAggregate;
+
+#
+# Some simple aggregate stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use GeniDB;
+use GeniCredential;
+use GeniCertificate;
+use GeniSliver;
+use GeniSlice;
+use GeniRegistry;
+use GeniUtil;
+use GeniUser;
+use GeniComponent;
+use GeniHRN;
+use GeniXML;
+use emutil;
+use Lan;
+use Data::Dumper;
+use English;
+use overload ('""' => 'Stringify');
+use XML::Simple;
+use POSIX qw(strftime);
+use Time::Local;
+use Date::Parse;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $PGENIDOMAIN    = "@PROTOGENI_DOMAIN@";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
+my $NODEREBOOT	   = "$TB/bin/node_reboot";
+my $VNODESETUP     = "$TB/sbin/vnode_setup";
+my $POWER          = "$TB/bin/power";
+my $OSLOAD         = "$TB/bin/os_load";
+my $SNMPIT         = "$TB/bin/snmpit";
+my $NAMEDSETUP     = "$TB/sbin/named_setup";
+my $EXPORTS_SETUP  = "$TB/sbin/exports_setup";
+my $GENTOPOFILE    = "$TB/libexec/gentopofile";
+
+# Cache of instances to avoid regenerating them.
+my %aggregates     = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%aggregates); }
+
+#
+# Lookup by URN, idx, or uuid.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+    my $idx;
+
+    if (GeniHRN::IsValid($token)) {
+	my ($authority, $type, $id) = GeniHRN::Parse($token);
+	return undef if $type ne "sliver";
+
+	if( GeniHRN::Authoritative($token, "@OURDOMAIN@") ) {
+	    # Very simple: we put the index of our own aggregates right
+	    # in the name.
+	    $idx = $id;
+	} else {
+	    # Look up the aggregate's certificate.
+	    $token = GeniHRN::Normalise( $token );
+	    $query_result = DBQueryWarn(
+		"SELECT geni_aggregates.idx FROM geni_aggregates, " .
+		"geni_certificates WHERE geni_aggregates.uuid = " .
+		"geni_certificates.uuid AND " .
+		"geni_certificates.urn='$token';" );
+
+	    return undef if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+	}
+    }
+    elsif ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_aggregates ".
+			"where uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    # Look in cache first
+    return $aggregates{"$idx"}
+        if (exists($aggregates{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_aggregates where idx='$idx'");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self              = {};
+    $self->{'AGGREGATE'}  = $query_result->fetchrow_hashref();
+    $self->{'CREDENTIAL'} = undef;
+    $self->{'SLICE'}      = undef;
+    $self->{'PARENT'}     = undef;
+
+    # Bless into sub package if called for.
+    my $type = $self->{'AGGREGATE'}->{'type'};
+    if (defined($type) && $type ne "" && $type ne "Aggregate") {
+	bless($self, $class . "::" . $type);
+    }
+    else {
+	bless($self, $class);
+    }
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $uuid = $self->{'AGGREGATE'}->{'uuid'};
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for aggregate $idx ($uuid)\n";
+	return undef;
+    }
+    $self->{'CERTIFICATE'} = $certificate;
+    
+    # Add to cache. 
+    $aggregates{$self->{'AGGREGATE'}->{'idx'}} = $self;
+    
+    return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uuid = $self->uuid();
+    my $hrn  = $self->hrn();
+    my $idx  = $self->idx();
+
+    return "[GeniAggregate: $hrn, IDX: $idx]";
+}
+
+#
+# Create a Geni aggregate in the DB. This happens on the server side only
+# for now. The client side does not actually know its an aggregate, at
+# least not yet.
+#
+sub Create($$$$$$)
+{
+    my ($class, $slice, $owner, $aggregate_type, $hrn, $nickname) = @_;
+    my @insert_data = ();
+
+    # Every aggregate gets a new unique index.
+    my $idx = TBGetUniqueIndex('next_sliver', 1);
+
+    # Create a cert pair, which gives us a new uuid.
+    my $urn = GeniHRN::Generate( "@OURDOMAIN@", "sliver", $idx );
+    my $certificate = GeniCertificate->Create("aggregate", $urn, $hrn, $TBOPS);
+    if (!defined($certificate)) {
+	print STDERR "GeniAggregate::Create: ".
+	    "Could not generate new certificate and UUID for $hrn\n";
+	return undef;
+    }
+    my $uuid        = $certificate->uuid();
+    my $slice_uuid  = $slice->uuid();
+    my $owner_uuid  = $owner->uuid();
+    $aggregate_type = "Aggregate"
+    	if (! defined($aggregate_type));
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "hrn=" . DBQuoteSpecial($hrn));
+    push(@insert_data, "nickname=" . DBQuoteSpecial($nickname));
+    push(@insert_data, "uuid='$uuid'");
+    push(@insert_data, "creator_uuid='$owner_uuid'");
+    push(@insert_data, "slice_uuid='$slice_uuid'");
+    push(@insert_data, "type='$aggregate_type'");
+    # Start out new aggregates, as new.
+    push(@insert_data, "state='new'");
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into geni_aggregates set " .
+		     join(",", @insert_data))) {
+	$certificate->Delete();
+	return undef;
+    }
+    my $aggregate = GeniAggregate->Lookup($idx);
+    return undef
+	if (!defined($aggregate));
+
+    if (GeniUsage->NewAggregate($aggregate, $slice, $owner)) {
+	print STDERR "GeniAggregate::Create: ".
+	    "GeniUsage->NewAggregate($aggregate) failed\n";
+    }
+    return $aggregate;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'AGGREGATE'}->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub nickname($)		{ return field($_[0], "nickname"); }
+sub type($)		{ return field($_[0], "type"); }
+sub slice_uuid($)	{ return field($_[0], "slice_uuid"); }
+sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
+sub created($)		{ return field($_[0], "created"); }
+sub registered($)	{ return field($_[0], "registered"); }
+sub credential_idx($)	{ return field($_[0], "credential_idx"); }
+sub aggregate_idx($)	{ return field($_[0], "aggregate_idx"); }
+sub status($)		{ return field($_[0], "status"); }
+sub state($)		{ return field($_[0], "state"); }
+sub cert($)		{ return $_[0]->{'CERTIFICATE'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
+
+# An alias so that slivers look like aggregates.
+sub resource_type($)	{ return field($_[0], "type"); }
+
+# Return the URN.
+sub urn($)
+{
+    my ($self) = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "sliver", $self->idx());
+}
+
+#
+# Destroy all the slivers in the aggregate, and then the aggregate if there
+# is nothing in it. Leave it around if something goes wrong.
+#
+sub Delete($$)
+{
+    my ($self, $purge) = @_;
+    my $broken = 0;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->status() eq "broken") {
+	    print STDERR "Could not delete 'broken' $sliver from $self\n";
+	    $broken++;
+	    last;
+	}
+	if ($sliver->Delete($purge) != 0) {
+	    print STDERR "Could not delete $sliver from $self\n";
+	    $sliver->SetStatus("broken");
+	    $broken++;
+	    last;
+	}
+    }
+    return -1
+	if ($broken);
+    
+    if (GeniUsage->DestroyAggregate($self, $purge)) {
+	print STDERR "GeniAggregate::Delete: ".
+	    "GeniUsage->DestroyAggregate($self) failed\n";
+    }
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
+
+    DBQueryWarn("delete from geni_credentials where this_uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
+	or return -1;
+    DBQueryWarn("delete from geni_aggregates where idx='$idx'")
+	or return -1;
+    
+    # Delete from cache. 
+    delete($aggregates{$idx});
+
+    return 0;
+}
+
+#
+# Cons up an hrn.
+#
+sub hrn($)
+{
+    my ($self) = @_;
+
+    my $hrn = field($self, "hrn");
+
+    if (defined($hrn) && $hrn ne "") {
+	return $hrn;
+    }
+    return "${PGENIDOMAIN}.aggregate_" . $self->idx();
+}
+
+#
+# Look up toplevel aggregate for a locally instantiated slice. 
+#
+sub SliceAggregate($$)
+{
+    my ($class, $slice) = @_;
+
+    my $slice_uuid = $slice->uuid();
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_aggregates ".
+		    "where slice_uuid='$slice_uuid' and type='Aggregate'");
+    return undef
+	if (!$query_result);
+    return undef
+	if ($query_result->numrows != 1);
+
+    my ($idx) = $query_result->fetchrow_array();
+    my $aggregate = GeniAggregate->Lookup($idx);
+    return undef
+	if (!defined($aggregate));
+
+    return $aggregate;
+}
+
+#
+# Look up a list of aggregates for a locally instantiated slice. 
+# Used by the CM.
+#
+sub SliceAggregates($$$)
+{
+    my ($class, $slice, $pref) = @_;
+
+    my $slice_uuid = $slice->uuid();
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_aggregates ".
+		    "where slice_uuid='$slice_uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $aggregate = GeniAggregate->Lookup($idx);
+	return -1
+	    if (!defined($aggregate));
+	push(@result, $aggregate);
+    }
+    @$pref = @result;
+    return 0;
+}
+
+#
+# List of slivers for this aggregate.
+#
+sub SliverList($$)
+{
+    my ($self, $pref) = @_;
+    my @result = ();
+    
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $idx  = $self->idx();
+    my $uuid = $self->uuid();
+    my $query_result =
+	DBQueryWarn("select idx from geni_slivers ".
+		    "where aggregate_uuid='$uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($sliver_idx) = $query_result->fetchrow_array()) {
+	my $sliver = GeniSliver->Lookup($sliver_idx);
+	if (!defined($sliver)) {
+	    print STDERR "Could not find sliver object for $sliver_idx\n";
+	    return -1;
+	}
+	push(@result, $sliver);
+    }
+
+    #
+    # And any aggregates that are children.
+    #
+    $query_result =
+	DBQueryWarn("select idx from geni_aggregates ".
+		    "where aggregate_idx='$idx'");
+    return -1
+	if (!$query_result);
+
+    while (my ($aggregate_idx) = $query_result->fetchrow_array()) {
+	my $aggregate = GeniAggregate->Lookup($aggregate_idx);
+	if (!defined($aggregate_idx)) {
+	    print STDERR
+		"Could not find aggregate object for $aggregate_idx\n";
+	    return -1;
+	}
+	push(@result, $aggregate);
+    }
+    @$pref = @result;
+    return 0;
+    
+}
+
+#
+# Set the aggregate for an aggregate.
+#
+sub SetAggregate($$)
+{
+    my ($self, $aggregate) = @_;
+
+    return -1
+	if (! (ref($self) && ref($aggregate)));
+
+    my $idx      = $self->idx();
+    my $agg_idx  = $aggregate->idx();
+    my $agg_uuid = $aggregate->uuid();
+
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  aggregate_idx='$agg_idx' ".
+			 "where idx='$idx'"));
+    
+    if (!DBQueryWarn("update aggregate_history set ".
+		     "  aggregate_uuid='$agg_uuid' ".
+		     "where idx='$idx'")) {
+	print STDERR "GeniAggregate::SetAggregate: ".
+	    "Failed to update aggregate_history for $self\n";
+    }
+
+    $self->{'AGGREGATE'}->{'aggregate_idx'} = $agg_idx;
+    $self->{'PARENT'} = $aggregate;
+    return 0;
+}
+
+#
+# Get the aggregate for an aggregate.
+#
+sub GetAggregate($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'PARENT'} if (defined($self->{'PARENT'}));
+    return undef
+	if (!defined($self->aggregate_idx()));
+
+    my $aggregate = GeniAggregate->Lookup($self->aggregate_idx());
+    if (!defined($aggregate)) {
+	print STDERR "Could not get aggregate object associated with $self\n";
+	return undef;
+    }
+    $self->{'PARENT'} = $aggregate;
+    return $aggregate;
+}
+
+#
+# Is object in the aggregate.
+#
+sub IsMember($$)
+{
+    my ($self, $object) = @_;
+
+    return -1
+	if (! (ref($self) && ref($object)));
+
+    my $aggregate = $object->GetAggregate();
+    return 0
+	if (!$aggregate);
+    return -1
+	if ($self->idx() != $aggregate->idx());
+    return 1;
+}
+
+#
+# Set the status for the aggregate
+#
+sub SetStatus($$)
+{
+    my ($self, $status) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  status='$status' ".
+			 "where idx='$idx'"));
+    
+    $self->{'AGGREGATE'}->{'status'} = $status;
+    return 0;
+}
+
+#
+# Set the state for the aggregate
+#
+sub SetState($$)
+{
+    my ($self, $state) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  state='$state' ".
+			 "where idx='$idx'"));
+    
+    $self->{'AGGREGATE'}->{'state'} = $state;
+    return 0;
+}
+
+#
+# Set the registered datetime for the aggregate
+#
+sub SetRegistered($$)
+{
+    my ($self, $yesno) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $idx = $self->idx();
+    my $val = ($yesno ? "now()" : "NULL");
+    
+    return -1
+	if (!DBQueryWarn("update geni_aggregates set ".
+			 "  registered=$val ".
+			 "where idx='$idx'"));
+    
+    return 0;
+}
+
+#
+# Get the slice for the aggregate.
+#
+sub GetSlice($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    return $self->{'SLICE'} if (defined($self->{'SLICE'}));
+
+    if (!defined($self->slice_uuid())) {
+	print STDERR "No slice associated with $self\n";
+	return undef;
+    }
+    my $slice = GeniSlice->Lookup($self->slice_uuid());
+    if (!defined($slice)) {
+	print STDERR "Could not get slice object associated with $self\n";
+	return undef;
+    }
+    $self->{'SLICE'} = $slice;
+    return $slice;
+}
+
+#
+# The expiration time for an aggregate is when the slice expires.
+# The DB field is ignored.
+#
+sub expires($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $slice = $self->GetSlice();
+    return undef
+	if (!defined($slice));
+
+    return $slice->expires();
+}
+
+#
+# Get the creator for the aggregate.
+#
+sub GetCreator($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+
+    if (!defined($self->creator_uuid())) {
+	print STDERR "No creator associated with $self\n";
+	return undef;
+    }
+    return GeniUser->Lookup($self->creator_uuid(), 1);
+}
+
+#
+# Create a signed credential for this aggregate, issued to the provided user.
+# The credential will grant all permissions for now.
+#
+# Should we store these credentials in the DB, recording what we hand out?
+#
+sub NewCredential($$)
+{
+    my ($self, $owner) = @_;
+
+    return undef
+	if (! (ref($self) && ref($owner)));
+
+    my $credential = GeniCredential->Create($self, $owner);
+    if (!defined($credential)) {
+	print STDERR "Could not create credential for $self, $owner\n";
+	return undef;
+    }
+    if (defined($self->nickname())) {
+	$credential->AddExtension("nickname", $self->nickname());
+    }
+    if ($credential->Sign($self->GetCertificate()) != 0) {
+	print STDERR "Could not sign credential for $self, $owner\n";
+	return undef;
+    }
+    return $credential;
+}
+
+#
+# Get the manifest for an aggregate. Returns the XML string.
+#
+sub GetManifest($$)
+{
+    my ($self, $asxml) = @_;
+
+    return undef
+	if (! ref($self));
+
+    my $slice      = $self->GetSlice();
+    return undef
+	if (!defined($slice));
+    my $slice_uuid = $slice->uuid();
+
+    my $query_result =
+	DBQueryWarn("select manifest from geni_manifests ".
+		    "where slice_uuid='$slice_uuid'");
+    
+    if (!$query_result || !$query_result->numrows) {
+	print STDERR "GetManifest: Could not locate manifest for $self\n";
+	return undef;
+    }
+    my ($xml) = $query_result->fetchrow_array();
+
+    my $manifest = GeniXML::Parse($xml);
+    if (!defined($manifest)) {
+	return undef;
+    }
+
+    #
+    # Update the manifest ticket to reflect the current expiration time.
+    #
+    my $valid_date = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+				     gmtime(str2time($slice->expires())));
+    GeniXML::SetText("valid_until", $manifest, $valid_date);
+
+    return $manifest
+	if (!$asxml);
+    
+    $xml = GeniXML::Serialize($manifest);
+    return $xml;
+}
+
+#
+# Process the manifest. Just hand off to the slivers.
+#
+sub ProcessManifest($$)
+{
+    my ($self, $manifest) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+
+    foreach my $sliver (@slivers) {
+	next
+	    if (ref($sliver) ne "GeniSliver::Node");
+
+	if ($sliver->ProcessManifest($manifest) != 0) {
+	    return -1;
+	}
+    }
+    return 0;
+}
+
+#
+# Start all the slivers in the aggregate. Start is special since it
+# sorta means reboot, and the only thing we reboot are nodes. And,
+# since we might have multiple vnodes on a pnode, we want to be efficient
+# about it.
+#
+# XXX Is is assumed that there is a single toplevel aggregate for the
+# slice, so we can get all the nodes.
+#
+sub Start($$$)
+{
+    my ($self, $version, $restart) = @_;
+
+    return -1
+	if (! ref($self));
+    $restart = 0
+	if (!defined($restart));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    my %reboots  = ();
+    my %vnodes   = ();
+    my %poweron  = ();
+    my %reloads  = ();
+
+    foreach my $sliver (@slivers) {
+	next
+	    if (ref($sliver) ne "GeniSliver::Node");
+
+	my $node = Node->Lookup($sliver->uuid());
+	if (!defined($node)) {
+	    print STDERR "Could not map $sliver to a node\n";
+	    return -1;
+	}
+	my $reservation = $node->Reservation();
+	if (!defined($reservation)) {
+	    print STDERR "$node no long belongs to $self\n";
+	    return -1;
+	}
+	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the started state. Skip those, unless doing a restart.
+	    #
+	    next
+		if ($sliver->state() eq "started" && !$restart);
+	    
+	    if ($node->isvirtnode()) {
+		$vnodes{$node->node_id} = $node;
+
+		# A virtnode on a shared physical node needs nothing else.
+		next
+		    if ($node->sharing_mode());
+
+		# But if non-shared, have to make sure that the phys node
+		# gets loaded.
+		my $physnodeid = $node->phys_nodeid();
+		next
+		    if (exists($poweron{$physnodeid}) ||
+			exists($reboots{$physnodeid}) ||
+			exists($reloads{$physnodeid}));
+		$node = Node->Lookup($physnodeid);
+		if (!defined($node)) {
+		    print STDERR "Could not lookup $physnodeid\n";
+		    return -1;
+		}
+	    }
+	    #
+	    # Look to see if local physical node was stopped (powered off).
+	    #
+	    if (!$node->isremotenode() &&
+		$sliver->state() eq "stopped") {
+		$poweron{$node->node_id} = $node;
+	    }
+	    else {
+		# node_reboot is smart enough to know that if a pnode
+		# is rebooted it can ignore the vnodes on it, so do
+		# not optimize this here.
+		$reboots{$node->node_id} = $node;
+	    }
+	    next
+		if (!$node->imageable());
+
+	    my $osinfo = OSinfo->Lookup($node->def_boot_osid());
+	    if (!defined($osinfo)) {
+		print STDERR "Could not get osinfo for $node\n";
+		return -1;
+	    }
+	    print STDERR "$node wants to boot $osinfo.\n";
+	    if ($osinfo->IsGeneric()) {
+		#
+		# Map generic OSID to the specific one.
+		#
+		my $tmp = $osinfo->ResolveNextOSID($experiment);
+		if (!defined($tmp)) {
+		    print STDERR "No next mapping for $osinfo on $node!\n";
+		    return -1;
+		}
+		print STDERR "  Mapping $osinfo on $node to $tmp\n";
+		$osinfo = $tmp;
+	    }
+	    #
+	    # Make sure this OSID is actually loaded on the machine.
+	    #
+	    my $isloaded = $node->IsOSLoaded($osinfo);
+	    if ($isloaded < 0) {
+		print STDERR
+		    "Error determining if $osinfo is loaded on $node\n";
+		return -1;
+	    }
+	    if (! $isloaded) {
+		print STDERR "  Setting up a reload for $node\n";
+		
+		my $image = $osinfo->MapToImage($node->type());
+		if (!defined($image)) {
+		    print STDERR "  No image for $osinfo on $node\n";
+		    return -1;
+		}
+		if (!exists($reloads{$image->imageid()})) {
+		    $reloads{$image->imageid()} = [ ];
+		} 
+		push(@{ $reloads{$image->imageid()} }, $node);
+	    }
+	    else {
+		#
+		# Make sure boot is set correctly.
+		#
+		if ($node->OSSelect($osinfo, "def_boot_osid", 0)) {
+		    print STDERR "  Could not os_select $node to $osinfo\n";
+		    return -1;
+		}
+	    }
+	}
+	else {
+	    print STDERR "$node is reserved to another, not $self\n";
+	    # Signal error so we can look at what happened.
+	    return -1;
+	}
+    }
+    #
+    # Cull out vnodes that are going to get rebooted cause the
+    # physnode is getting rebooted. 
+    #
+    my %tmp = %vnodes;
+    foreach my $vnode (values(%vnodes)) {
+	if (! (exists($reboots{$vnode->phys_nodeid()}) ||
+	       exists($poweron{$vnode->phys_nodeid()}))) {
+	    $tmp{$vnode->node_id()} = $vnode;
+	}
+    }
+    %vnodes = %tmp;
+
+    #
+    # Setup the reloads. We do not reboot the nodes until below.
+    #
+    if (keys(%reloads)) {
+	foreach my $imageid (keys(%reloads)) {
+	    my @nodes = @{ $reloads{$imageid} };
+	    my @node_ids = map { $_->node_id() } @nodes;
+
+	    # No wait, no reboot. reload runs completely in the background.
+	    system("$OSLOAD -s -r -m $imageid @node_ids");
+	    return -1
+		if ($?);
+	}
+    }
+
+    if ($version >= 2) {
+	if (system("$GENTOPOFILE $pid $eid")) {
+	    print STDERR "$GENTOPOFILE failed\n";
+	    return -1;
+	}
+	if (system("$EXPORTS_SETUP")) {
+	    print STDERR "$EXPORTS_SETUP failed\n";
+	    return -1;
+	}
+	# The nodes will not boot locally unless there is a DNS record.
+	if (system("$NAMEDSETUP")) {
+	    print STDERR "$NAMEDSETUP failed\n";
+	    return -1;
+	}
+	if ($restart) {
+	    my @diff = ();
+	    my @same = ();
+	    
+	    if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same)) {
+		print STDERR "CompareVlansWithSwitches failed!\n";
+		return -1;
+	    }
+	    if (@diff) {
+		system("$SNMPIT -f ". join(" ", map("-o $_", @diff)));
+		if ($?) {
+		    print STDERR "Failed to remove obsolete VLANs.\n";
+		    return -1;
+		}
+	    }
+	}
+	system("$SNMPIT -q -t $pid $eid");
+	if ($?) {
+	    print STDERR "$SNMPIT failed\n";
+	    return -1;
+	}
+    }
+
+    #
+    # First power on any physical nodes that had been stopped.
+    # Then reboot the physical nodes, then any leftover virtual nodes.
+    #
+    if (keys(%poweron)) {
+	my @node_ids = keys(%poweron);
+
+	#
+	# Should waiting be an option?
+	#
+	system("$POWER on @node_ids");
+	return -1
+	    if ($?);
+    }
+    if (keys(%reboots)) {
+	my @node_ids = keys(%reboots);
+
+	#
+	# Should waiting be an option?
+	#
+	system("$NODEREBOOT @node_ids");
+	return -1
+	    if ($?);
+    }
+    if (keys(%vnodes)) {
+	my @node_ids = keys(%vnodes);
+
+	#
+	# Should waiting be an option?
+	#
+	system("$VNODESETUP -j -m $pid $eid @node_ids");
+	return -1
+	    if ($?);
+    }
+    #
+    # Worked? Set the new state. Needs more thought ...
+    #
+    foreach my $sliver (@slivers) {
+	$sliver->SetState("started")
+	    if (ref($sliver) eq "GeniSliver::Node");
+    }
+    return 0;
+}
+
+#
+# Stop all the slivers in the aggregate. Stop is brutal, better to
+# use restart!
+#
+sub Stop($$)
+{
+    my ($self, $version) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    my %pnodes = ();
+    my %vnodes = ();
+
+    foreach my $sliver (@slivers) {
+	next
+	    if (ref($sliver) ne "GeniSliver::Node");
+
+	my $node = Node->Lookup($sliver->uuid());
+	if (!defined($node)) {
+	    print STDERR "Could not map $sliver to a node\n";
+	    return -1;
+	}
+	my $reservation = $node->Reservation();
+	if (!defined($reservation)) {
+	    print STDERR "$node no longer belongs to $self\n";
+	    return -1;
+	}
+	if ($reservation->SameExperiment($experiment)) {
+	    #
+	    # Since this is an aggregate, some slivers may already be
+	    # in the stopped state. Skip those.
+	    #
+	    next
+		if ($sliver->state() eq "stopped");
+	    
+	    if ($node->isvirtnode()) {
+		$vnodes{$node->node_id} = $node;
+	    }
+	    else {
+		# node_reboot is smart enough to know that if a pnode
+		# is rebooted it can ignore the vnodes on it, so do
+		# not optimize this here.
+		$pnodes{$node->node_id} = $node;
+	    }
+	}
+	else {
+	    print STDERR "$node is reserved to another, not $self\n";
+	    # Signal error so we can look at what happened.
+	    return -1;
+	}
+    }
+    #
+    # Cull out vnodes that are going to get killed cause the
+    # physnode is getting powered down.
+    #
+    my %tmp = %vnodes;
+    foreach my $vnode (values(%vnodes)) {
+	if (!exists($pnodes{$vnode->phys_nodeid()})) {
+	    $tmp{$vnode->node_id()} = $vnode;
+	}
+    }
+    %vnodes = %tmp;
+
+    if ($version >= 2) {
+	system("$SNMPIT -q -r $pid $eid");
+	if ($?) {
+	    print STDERR "$SNMPIT failed\n";
+	    return -1;
+	}
+    }
+    
+    #
+    # Now power down the physical nodes, then any leftover virtual nodes.
+    #
+    if (keys(%pnodes)) {
+	my @node_ids = keys(%pnodes);
+
+	#
+	# Should waiting be an option?
+	#
+	system("$POWER off @node_ids");
+	return -1
+	    if ($?);
+    }
+    if (keys(%vnodes)) {
+	my @node_ids = keys(%vnodes);
+
+	#
+	# Should waiting be an option?
+	#
+	system("$VNODESETUP -j -k -m $pid $eid @node_ids");
+	return -1
+	    if ($?);
+    }
+    #
+    # Worked? Set the new state. Needs more thought ...
+    #
+    foreach my $sliver (@slivers) {
+	$sliver->SetState("stopped")
+	    if (ref($sliver) eq "GeniSliver::Node");
+    }
+    return 0;
+}
+
+#
+# Provision all the slivers in the aggregate.
+#
+sub Provision($;$)
+{
+    my ($self, $extraargs) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    foreach my $sliver (@slivers) {
+	if ($sliver->Provision($extraargs) != 0) {
+	    print STDERR "Could not provision $sliver in $self\n";
+	    next;
+	}
+    }
+    return 0;
+}
+
+#
+# Unprovision all the slivers in the aggregate.
+#
+sub UnProvision($;$)
+{
+    my ($self, $nophysfree) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+
+    #
+    # Might be an aggregate that includes link aggregates. Lets do those
+    # first to avoid work when tearing down the nodes.
+    #
+    my @links = ();
+    my @nodes = ();
+
+    foreach my $sliver (@slivers) {
+	if (ref($sliver) eq "GeniAggregate::Link" ||
+	    ref($sliver) eq "GeniAggregate::Tunnel") {
+	    push(@links, $sliver);
+	}
+	elsif (ref($sliver) eq "GeniAggregate") {
+	    print STDERR "Unprovision: Unknown aggregate $sliver in $self\n";
+	    return -1;
+	}
+	elsif (ref($sliver) eq "GeniSliver::Node") {
+	    push(@nodes, $sliver);
+	}
+    }
+    foreach my $sliver (@links) {
+	if ($sliver->UnProvision() != 0) {
+	    print STDERR "Could not unprovision $sliver in $self\n";
+	    $sliver->SetStatus("broken");
+	    next;
+	}
+    }
+    foreach my $sliver (@nodes) {
+	if ($sliver->UnProvision($nophysfree) != 0) {
+	    print STDERR "Could not unprovision $sliver in $self\n";
+	    $sliver->SetStatus("broken");
+	    next;
+	}
+    }
+    return 0;
+}
+
+sub ComputeState($)
+{
+    my ($self) = @_;
+    my $started = 0;
+    my $stopped = 0;
+    my $unknown = 0;
+    my $ready   = 0;
+    my $notready= 0;
+    my $failed  = 0;
+    my $changing= 0;
+    my $count   = 0;
+
+    return -1
+	if (! ref($self));
+
+    my @slivers = ();
+    if ($self->SliverList(\@slivers) != 0) {
+	print STDERR "Could not get sliver list for $self\n";
+	return -1;
+    }
+    
+    foreach my $sliver (@slivers) {
+	#
+	# Just nodes for now.
+	#
+	next
+	    if (ref($sliver) ne "GeniSliver::Node");
+
+	my $status;
+	my $state = $sliver->state();
+	if (!defined($state)) {
+	    print STDERR "Could not determine state for $sliver in $self\n";
+	    return -1;
+	}
+	if ($sliver->ComputeStatus(\$status)) {
+	    print STDERR "Could not determine status for $sliver in $self\n";
+	    return -1;
+	}
+	if ($state eq "started") {
+	    $started++;
+	}
+	elsif ($state eq "stopped" || $state eq "new") {
+	    $stopped++;
+	}
+	else {
+	    $unknown++;
+	}
+	if ($status eq "ready") {
+	    $ready++;
+	}
+	elsif ($status eq "notready") {
+	    $notready++;
+	}
+	elsif ($status eq "failed" ||
+	       $status eq "broken") {
+	    $failed++;
+	}
+	elsif ($status eq "changing") {
+	    $changing++;
+	}
+	$count++;
+    }
+    if ($stopped == $count) {
+	$self->SetState("stopped");
+    }
+    elsif ($started == $count) {
+	$self->SetState("started");
+    }
+    else {
+	$self->SetState("mixed");
+    }
+    if ($ready == $count) {
+	$self->SetStatus("ready");
+    }
+    elsif ($notready == $count) {
+	$self->SetStatus("notready");
+    }
+    elsif ($changing == $count) {
+	$self->SetStatus("changing");
+    }
+    elsif ($failed) {
+	$self->SetStatus("failed");
+    }
+    else {
+	$self->SetStatus("mixed");
+    }
+    return 0;
+}
+
+############################################################################
+#
+# Link aggregates need special handling.
+#
+package GeniAggregate::Link;
+use vars qw(@ISA);
+@ISA = "GeniAggregate";
+
+use GeniDB;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniAggregate;
+use Experiment;
+use Interface;
+
+sub Create($$$)
+{
+    my ($class, $slice, $owner, $linkname) = @_;
+
+    #
+    # Form an hrn using the slicename and linkname
+    #
+    my $hrn = "${PGENIDOMAIN}." . $slice->slicename() . "." . $linkname;
+
+    return GeniAggregate->Create($slice, $owner, "Link", $hrn, $linkname);
+}
+
+#
+# Provision all the slivers in the aggregate. For links, this is done
+# for the entire aggregate (experiment) at once.
+#
+sub Provision($;$)
+{
+    my ($self, $extraargs) = @_;
+
+    return -1
+	if (! ref($self));
+
+    $self->SetStatus("ready");
+    return 0;
+
+  bad:
+    return -1
+}
+
+#
+# Unprovision all the slivers in the aggregate. For links, this is done
+# for the entire aggregate (experiment) at once.
+#
+sub UnProvision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+#
+# Nothing to do yet.
+#
+sub Start($$)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+#
+# Nothing to do yet.
+#
+sub Stop($$)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+
+############################################################################
+#
+# Tunnel aggregates need special handling too
+#
+package GeniAggregate::Tunnel;
+use vars qw(@ISA);
+@ISA = "GeniAggregate";
+
+use GeniDB;
+use GeniSlice;
+use GeniCredential;
+use GeniCertificate;
+use GeniRegistry;
+use GeniAggregate;
+use GeniUtil;
+use Experiment;
+use Interface;
+use Data::Dumper;
+
+sub Create($$$$$$)
+{
+    my ($class, $slice, $owner, $node1sliver, $node2sliver,
+	$linkrspec, $node1rspec, $node2rspec) = @_;
+    my $clearinghouse;
+
+    my $linkname = GeniXML::GetVirtualId($linkrspec);
+    return undef
+	if (!defined($linkname));
+    my @interfaces = GeniXML::FindNodes("n:interface_ref",
+					$linkrspec)->get_nodelist();
+    
+    my $experiment = Experiment->Lookup($slice->uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $slice to its experiment\n";
+	return -1;
+    }
+
+    #
+    # Form an hrn using the slicename and linkname
+    #
+    my $hrn = "${PGENIDOMAIN}." . $slice->slicename() . "." . $linkname;
+
+    my $aggregate = GeniAggregate->Create($slice, $owner, "Tunnel",
+					  $hrn, $linkname);
+    goto bad
+	if (!defined($aggregate));
+
+    #
+    # Create a tunnel entry in the lans table.
+    #
+    my $tunnel = Tunnel->Create($experiment, $aggregate->uuid(), "", "gre");
+    if (!defined($tunnel)) {
+	print STDERR "Could not create tunnel entry in lans table\n";
+	return undef;
+    }
+
+    my $iface1ref = $interfaces[0];
+    my $iface2ref = $interfaces[1];
+
+    # These are the ips of the tunnel.
+    my $ip1      = GeniXML::GetText("tunnel_ip", $iface1ref);
+    my $ip2      = GeniXML::GetText("tunnel_ip", $iface2ref);
+    my $ctrlip1;
+    my $ctrlip2;
+    my $iface1;
+    my $iface2;
+
+    # We need the control network addresses, but it is possible that
+    # one of the nodes is not on this testbed.
+    if (defined($node1sliver)) {
+	my $node1 = Node->Lookup($node1sliver->resource_uuid());
+	if (!defined($node1)) {
+	    print STDERR "Tunnel: Could not lookup node for $node1sliver\n";
+	    goto bad;
+ 	}
+	my $interface = Interface->LookupControl($node1);
+	goto bad
+	    if (!defined($interface));
+	$ctrlip1 = $interface->IP();
+	$iface1  = $tunnel->AddMember($node1);
+	if (!defined($iface1)) {
+	    print STDERR "Could not add $node1 to $tunnel\n";
+	    goto bad;
+	}
+    }
+    else {
+	my $node_uuid = GeniXML::GetNodeId($node1rspec);
+	my $component = GeniComponent->CreateFromRegistry($node_uuid);
+	
+	if (!defined($component)) {
+	    print STDERR "Could not create component for $node_uuid\n";
+	    goto bad;
+	}
+	my $blob = $component->Resolve();
+	if (!defined($blob)) {
+	    print STDERR "Could not Resolve $component\n";
+	    goto bad;
+	}
+	if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
+	    print STDERR "Could not get control IP for $component\n";
+	    goto bad;
+	}
+	$ctrlip1 = $blob->{'physctrl'};
+    }
+    if (defined($node2sliver)) {
+	my $node2 = Node->Lookup($node2sliver->resource_uuid());
+	if (!defined($node2)) {
+	    print STDERR "Tunnel: Could not lookup node for $node2sliver\n";
+	    goto bad;
+ 	}
+	my $interface = Interface->LookupControl($node2);
+	goto bad
+	    if (!defined($interface));
+	$ctrlip2 = $interface->IP();
+	$iface2  = $tunnel->AddMember($node2);
+	if (!defined($iface2)) {
+	    print STDERR "Could not add $node2 to $tunnel\n";
+	    goto bad;
+	}
+    }
+    else {
+	my $node_uuid = GeniXML::GetNodeId($node2rspec);
+	my $component = GeniComponent->CreateFromRegistry($node_uuid);
+	
+	if (!defined($component)) {
+	    print STDERR "Could not create component for $node_uuid\n";
+	    goto bad;
+	}
+	my $blob = $component->Resolve();
+	if (!defined($blob)) {
+	    print STDERR "Could not Resolve $component\n";
+	    goto bad;
+	}
+	if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
+	    print STDERR "Could not get control IP for $component\n";
+	    goto bad;
+	}
+	$ctrlip2 = $blob->{'physctrl'};
+    }
+    # print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
+
+    if (defined($iface1)) {
+	$iface1->SetAttribute("tunnel_ip", $ip1);
+	$iface1->SetAttribute("tunnel_peerip", $ip2);
+	$iface1->SetAttribute("tunnel_srcip", $ctrlip1);
+	$iface1->SetAttribute("tunnel_dstip", $ctrlip2);
+	$iface1->SetAttribute("tunnel_ipmask", "255.255.255.0");
+	$iface1->SetAttribute("tunnel_lan", $linkname);
+	$iface1->SetAttribute("tunnel_unit", $iface1->memberid() + 1);
+	$iface1->SetAttribute("tunnel_style", "gre");
+    }
+    if (defined($iface2)) {
+	$iface2->SetAttribute("tunnel_ip", $ip2);
+	$iface2->SetAttribute("tunnel_peerip", $ip1);
+	$iface2->SetAttribute("tunnel_srcip", $ctrlip2);
+	$iface2->SetAttribute("tunnel_dstip", $ctrlip1);
+	$iface2->SetAttribute("tunnel_ipmask", "255.255.255.0");
+	$iface2->SetAttribute("tunnel_lan", $linkname);
+	$iface2->SetAttribute("tunnel_unit", $iface2->memberid() + 1);
+	$iface2->SetAttribute("tunnel_style", "gre");
+    }
+    return $aggregate;
+
+  bad:
+    $tunnel->Destroy()
+	if (defined($tunnel));
+    $aggregate->Delete(GENI_PURGEFLAG)
+	if (defined($aggregate));
+    return undef;
+}
+
+#
+# All the work done above.
+#
+sub Provision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    $self->SetStatus("ready");
+    return 0;
+}
+
+#
+# Destroy the underlying tunnel in the lans table.
+#
+sub UnProvision($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+
+    my $tunnel = Tunnel->Lookup($experiment, $self->uuid());
+    if (! defined($tunnel)) {
+	print STDERR "No tunnel associated with $self\n";
+	return 0;
+    }
+    if ($tunnel->Destroy() != 0) {
+	print STDERR "Could not destroy $tunnel\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# Nothing to do yet.
+#
+sub Start($$)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+#
+# Nothing to do yet.
+#
+sub Stop($$)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    return 0;
+}
+
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

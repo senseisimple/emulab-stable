@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Admin MFS library.  Routines related to getting into and out of the
@@ -28,6 +28,13 @@ use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use StateWait;
+
+#
+# Function prototypes
+#
+sub TBAdminMfsBoot($$@);
+sub TBAdminMfsSelect($$@);
+sub TBAdminMfsRunCmd($$@);
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -289,7 +296,7 @@ sub TBAdminMfsSelect($$@)
     #
     if ($on) {
 	# clear one-shot boots
-	if ($only && system("os_select -c -1 @nodes")) {
+	if ($only && system("$osselect -c -1 @nodes")) {
 	    print STDERR "*** $me:\n".
 		"    Failed to clear one-shot boot for @nodes!\n";
 	    @{$failedref} = @nodes
@@ -317,7 +324,7 @@ sub TBAdminMfsSelect($$@)
 	}
 
 	# clear partition boots for successful nodes
-	if ($only && system("os_select -c @good")) {
+	if ($only && system("$osselect -c @good")) {
 	    print STDERR "*** $me:\n".
 		"    Failed to clear partition boot for @good!\n";
 	    @{$failedref} = @nodes
@@ -340,12 +347,14 @@ sub TBAdminMfsSelect($$@)
     # set by the user when we enter admin mode, or those set by us when
     # we leave admin mode.
     #
-    my $cond = "node_id in (" . join(",", map("'$_'", @good)) . ")";
-    if (!DBQueryWarn("update nodes set startupcmd='', startstatus='none' ".
-		     "where $cond")) {
+    if (@good > 0) {
+	my $cond = "node_id in (" . join(",", map("'$_'", @good)) . ")";
+	if (!DBQueryWarn("update nodes set startupcmd='', startstatus='none' ".
+			 "where $cond")) {
 	    print STDERR "*** $me:\n".
 		"    Failed to clear startup state for @good!\n";
 	    push(@bad, @good);
+	}
     }
 
     @{$failedref} = @bad
@@ -530,7 +539,7 @@ sub TBAdminMfsRunCmd($$@)
     if (scalar(@nodes) != scalar(@succeeded)) {
 	if (scalar(@failed) > 0) {
 	    print STDERR "*** $me:\n".
-		"    Failed to run command on @failed\n";
+		"    Command run failed on @failed\n";
 	    push(@{$failedref}, @failed)
 		if (defined($failedref));
 	}

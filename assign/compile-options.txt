@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 This file documents the compile-time options for assign, and known caveats.
 
 Clearly, there are WAY too many of these! Many of these can/should be make into
@@ -127,8 +133,7 @@ PER_VNODE_TT		Normally, assign keeps a 'type table' indicating which
 			helpful information up-from about which nodes cannot
 			be mapped, and could be used to prune down the size of
 			the search space, since we can ignore nodes that are not
-			in any node's TT. Unfortunately, breaks vclasses, so 
-			it's off for now
+			in any node's TT.
 SMART_UNMAP		When assign decides that it needs to unmap some existing
 			mapping, because there are no potential matches for a
 			vnode, causes it to intelligently unmap a pnode that

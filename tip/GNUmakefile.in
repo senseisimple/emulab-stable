@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
@@ -5,7 +10,7 @@ SUBDIR		= tip
 
 include $(OBJDIR)/Makeconf
 
-all:	tip tiptunnel console.bin console tippty
+all:	tip tiptunnel console.bin console console.boss tippty
 client: tippty
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -16,8 +21,7 @@ PTYLIBS  =
 SYSTEM := $(shell uname -s)
 PTYLIBS += -lutil
 ifeq ($(SYSTEM),Linux)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
-ifeq ($(NEEDKERB),0)
+ifneq ($(wildcard /usr/kerberos/bin/krb5-config),)
  SSLFLAGS += `/usr/kerberos/bin/krb5-config --cflags`
  SSLLIBS  += `/usr/kerberos/bin/krb5-config --libs krb5`
 endif
@@ -35,8 +39,8 @@ TUNNELOBJS = tiptunnel.o
 #
 LIBS=
 
-#tip:	$(OBJS)
-#	$(CC) -static -o tip $(OBJS) $(LIBS)
+tip.old:	$(OBJS)
+	$(CC) $(LDSTATIC) -o tip $(OBJS) $(LIBS)
 
 tip:	$(TESTBED_SRCDIR)/tip/tip.deprecation
 	cp $(TESTBED_SRCDIR)/tip/tip.deprecation tip
@@ -45,7 +49,7 @@ tiptunnel.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
 	$(CC) $(SSLFLAGS) -o tiptunnel.o -c $<
 
 tiptunnel: tiptunnel.o
-	$(CC) -static -o tiptunnel tiptunnel.o $(SSLLIBS)
+	$(CC) $(LDSTATIC) -o tiptunnel tiptunnel.o $(SSLLIBS)
 
 # 'console' is tiptunnel, without SSL, and with localmode on by default.
 
@@ -68,8 +72,11 @@ client-install: client
 
 control-install tipserv-install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel $(INSTALL_BINDIR)/console.bin $(INSTALL_BINDIR)/console
 
-install:	control-install
+install:	all $(INSTALL_BINDIR)/tip \
+		$(INSTALL_BINDIR)/tiptunnel \
+		$(INSTALL_BINDIR)/console.bin 
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	$(INSTALL_PROGRAM) console.boss $(INSTALL_DIR)/bin/console
 	$(INSTALL_PROGRAM) tiptunnel $(INSTALL_DIR)/opsdir/bin/tiptunnel
 	$(INSTALL_PROGRAM) tip $(INSTALL_DIR)/opsdir/bin/tip
 	$(INSTALL_PROGRAM) console $(INSTALL_DIR)/opsdir/bin/console

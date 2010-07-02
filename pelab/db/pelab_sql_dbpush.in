@@ -1,0 +1,438 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Script to dump measurement data from ops to datapository (DP) regularly.
+# Uses direct mysql connection to DP. Typically run every hour using cron.
+#
+
+use English;
+use Getopt::Std;
+use Socket;
+use IO::Handle;     # thousands of lines just for autoflush :-(
+use Fcntl;
+
+# Options Description:
+#  -d      : To enable debug mode
+#
+#  -l limit: To specify the max idx for data sync
+#            (not recommended, a 'limit' query on ops database takes forever)
+#
+#  -r      : To enable deletion of all data transferred to DP
+#            (defult opiton is to delete records older than a day)
+#
+#  -e      : To sync the data tagged as erroneous entries (i.e., the data for
+#            which data sync failed to happen). 'idx' of these entries are stored
+#            in sync_errors table in database. Typically one will have to manually
+#            fix the data, and then call this script with -e option
+
+sub usage() {
+    print STDOUT "Usage: pelab_sql_dbpush [-d] [-l limit] [-r] [-e]\n";
+    exit(-1);
+}
+
+my $optlist  = "dl:re";
+my $debug    = 0;
+my $remove_archived = 0;
+my $limit;
+my $errors_only = 0;
+
+#
+# Configure variables
+#
+my $TB          = "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CUTAGE      = (1 * 60 * 60);	# All data older then this goes to DP.
+my $MAXAGE	= (24 * 60 * 60);       # All data older then this is deleted.
+
+my $PWDFILE   = "/usr/testbed/etc/pelabdb.pwd";
+my $DPPWDFILE   = "/usr/testbed/etc/pelabdb-dp.pwd";
+my $DBNAME    = "pelab";
+my $DBUSER    = "pelab";
+my $DPHOST    = "nfs.emulab.net";
+my $DPDBUSER    = "flexlabpush";
+my $DPDBNAME   = "nodesamples";
+my $LOCKFILE   = "/var/run/pelab_sql_dump.lock";
+
+# Transfer data to DP in chunks of 30 records
+my $CHUNK_SIZE = 30;
+
+# stop pushing data after encountering these many errors
+my $MAX_ERRORS = 5; 
+
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libtbdb;
+use libtestbed;
+
+# Protos
+sub fatal($);
+sub DeleteExceptions;
+sub PushErrorEntries;
+sub pelabWarn($);
+sub PelabDBQueryFatal;
+
+#
+# Form a temp name.
+#
+my $logname = TBMakeLogname("dumperrorlog");
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+if (defined($options{"r"})) {
+    $remove_archived = 1;
+}
+if (defined($options{"l"})) {
+    $limit = $options{"l"};
+}
+if (defined($options{"e"})) {
+    $errors_only = 1;
+}
+
+#
+# Reopen both stdout and stderr so that we can record all the output for
+# later mailing.
+#
+if (! $debug) {
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+}
+
+#
+# check for the lock, and create one if it does not exist
+#
+if (-e $LOCKFILE) {
+    fatal("Could not run due to existence of a lock file\n");
+}
+
+open(FH, ">$LOCKFILE")  ||   
+    fatal("couldn't create lock file $LOCKFILE\n");
+print FH time . "\n";
+close(FH);
+
+
+#
+# Grab the passwords we need.
+#
+my $dbpwd;
+my $dppwd;
+if (`cat $PWDFILE` =~ /^([\w]*)\s([\w]*)$/) {
+    $dbpwd = $1;
+}
+else {
+    fatal("Bad characters in password!");
+}
+
+if (`cat $DPPWDFILE` =~ /^([\S]*)$/) {
+    $dppwd = $1;
+}
+else {
+    fatal("Bad characters in password!");
+}
+
+
+# database handles to ops and dp
+my $opshandle;
+my $dphandle;
+
+
+if (TBDBConnect($DBNAME, $DBUSER, $dbpwd, "localhost", $opshandle) < 0) {
+    fatal("Could not connect to Ops DB!");
+}
+
+if (TBDBConnect($DPDBNAME, $DPDBUSER, $dppwd, $DPHOST, $dphandle) < 0) {
+    fatal("Could not connect to DP DB!");
+}
+
+
+# Handle -e option mode to transfer errorneous entries to DP. 
+
+if ($errors_only) {
+    PushErrorEntries();
+    exit(0);
+}
+
+# Transfer site_mappings to DP
+
+my $query_result = PelabDBQueryFatal("select * from site_mapping",
+				$opshandle);
+my @results;
+while (@results = $query_result->fetchrow()) {
+    my $result = DBBinaryQuery($dphandle, "replace into site_mapping ".
+			       "values (?,?,?,?)",
+			       @results);
+    if (! defined($result)) {
+	# send email to tbops
+	DBFatal("DB push failed to transfer site_mappings");
+    }
+}
+
+#
+# Get the last index we archived out.
+#
+$query_result =
+    PelabDBQueryFatal("select idx from emulab_indicies ".
+		 "where name='pair_data_idx'", $opshandle);
+
+
+my ($lastidx) = $query_result->fetchrow_array();
+if (!defined($lastidx)) {
+    PelabDBQueryFatal("insert into emulab_indicies (name, idx) ".
+		 "values ('pair_data_idx', 0)", $opshandle);
+    $lastidx = 0;
+}
+
+
+#
+# Compute the cutoff age; We leave MAXAGE old entries here, and ship
+# the rest over to the DP.
+#
+my $cutoffage = (time() - $CUTAGE) * 1.0;
+
+
+#
+# See what the max IDX we want to get is. 
+#
+if (defined($limit)) {
+    $query_result =
+	PelabDBQueryFatal("select idx from pair_data ".
+		     "where idx > $lastidx ".
+		     "order by idx asc limit $limit,1", $opshandle);
+}
+else {
+    $query_result =
+	PelabDBQueryFatal("select MAX(idx) from pair_data", $opshandle);
+}
+my ($maxidx) = $query_result->fetchrow_array();
+
+
+
+#
+# Grab all of the new entries and send it to DP
+#
+if ($debug) {
+    print "pair_data query: select * from pair_data ".
+	"where idx > $lastidx and idx <= $maxidx \n";
+}
+
+
+# To speed up insertion, we will prepare a stmt in advance
+# and use that again and again
+
+my $dbh = $dphandle->{'DB'}->{'dbh'};
+my $statement = "insert into pair_data values (?,?,?,?,?,?,?,?,?,?,?)";
+my $sth = $dbh->prepare($statement);
+if (!$sth) {
+    my $ErrorString = 
+	"Unable to prepare: $statement \n".
+	    "  Error: " . $dbh->errstr() . " ( " . $dbh->err() . ")";
+    fatal($ErrorString);
+}
+
+$sth->{'PrintError'} = !$Mysql::QUIET;
+
+if ($maxidx > $lastidx) {
+    # Transfer data to DP in chunks of 30 records
+    my $start = $lastidx, $end = $lastidx + $CHUNK_SIZE;
+    my $numOfErrors = 0;
+    my $errorStatus = 0;
+    my $endidx = $lastidx; # last idx sent to dp        
+    
+    while ($start < $maxidx) {
+	my $query_result = PelabDBQueryFatal("select * from pair_data ".
+					"where idx > $start and idx <= $end ", 
+					$opshandle);
+	my @results;
+	while (@results = $query_result->fetchrow()) {
+	    # dump it to dp
+	    my $idx = $results[0];
+	    my $query_result = $sth->execute(@results);
+	    if (!$query_result) {
+		my $ErrorString =
+		    "  Inserting pair data in DP\n".
+			"  Error: " . $dbh->errstr() . " ( " . $dbh->err() . ")";
+		
+		# send email to tbops
+		if ($debug) {  print " DP push failed for idx $idx\n"; }
+		pelabWarn("DB push failed for idx number $idx\n $ErrorString");
+		
+		# insert idx into sync error table
+		PelabDBQueryFatal("replace into sync_errors values ($idx)",
+			     $opshandle);
+		
+		$numOfErrors++;
+		
+		if ($numOfErrors >= $MAX_ERRORS) {
+		    $errorStatus = 1;
+		    $endidx = $idx;
+		    last;
+		}
+	    }
+	    $endidx = $idx;
+	}
+	
+	# update of idx
+	PelabDBQueryFatal("update emulab_indicies set idx='$endidx' ".
+		     "where name='pair_data_idx'", $opshandle);
+
+	if ($errorStatus) { 
+	    last;
+	}
+
+	$start = $end;
+	$end = $start + $CHUNK_SIZE;
+    }
+    
+    # Now that we have archived them away, let's delete the local cache at ops
+
+    $cutoffage = (time() - $MAXAGE) * 1.0;
+
+    # Let's first prepare a list of ids not to be deleted
+    my $except = DeleteExceptions();
+    
+    if ($remove_archived) {
+        #
+        # Delete all rows that we just archived
+        #
+	if ($debug) {
+	    print("delete from pair_data ".
+		  "where idx > $lastidx and idx <= $endidx\n");
+	}
+        PelabDBQueryFatal("delete from pair_data ".
+                     "where idx > $lastidx and idx <= $endidx $except", $opshandle);
+    } else {
+        #
+        # Delete anything older then MAXAGE that has been archived. This leaves
+        # a cache of data on ops.
+        #
+        PelabDBQueryFatal("delete from pair_data ".
+                     "where idx <= $lastidx and unixstamp < $cutoffage $except", $opshandle);
+    }
+}
+
+
+unlink("$logname")
+    if (-e $logname);
+unlink("$LOCKFILE");
+exit(0);
+
+
+#
+# Creates of string of idx stored in sync_errors table. These records are not
+# to be deleted as they are not synced yet with DP.
+#
+sub DeleteExceptions
+{
+    my $tmp = "";
+    my $query_result = PelabDBQueryFatal("select * from sync_errors", $opshandle);
+    my @results;
+    while (@results = $query_result->fetchrow()) {
+	# dump it to dp
+	$tmp .= "and idx <> " . $results[0] . " ";
+    }
+    return $tmp;
+}
+
+
+#
+# Pushes the errorneous entries stored in sync_errors table to
+# DP. Typically run after manual fixing of data on ops database.
+#
+
+sub PushErrorEntries
+{
+    my $query_result = PelabDBQueryFatal("select pair_data.* from pair_data, sync_errors ".
+				    "where pair_data.idx = sync_errors.idx",
+				    $opshandle);
+    my @results;
+    while (@results = $query_result->fetchrow()) {
+	# dump it to dp
+	my $result = DBBinaryQuery($dphandle, "insert into pair_data ".
+				   "values (?,?,?,?,?,?,?,?,?,?,?)", 
+				   @results);
+	my $idx = $results[0];
+	
+	# check error status
+	if (! defined($result)) {
+	    DBWarn("DB push failed for idx number $idx");
+	} else {
+	    # remove idx into sync error table
+	    PelabDBQueryFatal("delete from sync_errors where idx = $idx",
+			 $opshandle);
+	}
+    }
+}
+
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "Pelab DP Push Failed", $msg, undef, undef, ($logname));
+   
+    unlink("$logname")
+	if (-e $logname);
+    
+    unlink("$LOCKFILE");
+    
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+sub pelabWarn($) {
+    my($message) = @_;
+    my($text);
+    
+    print STDERR "*** $message";
+
+    if (exists($INC{'libtestbed.pm'})) {
+      libtestbed::SENDMAIL($TBOPS, "DBError in pelab_sql_dbpush", $message);
+    }
+}
+
+sub PelabDBQueryFatal($;$) {
+    my ($query, $handle) = @_;
+    my($result);
+
+    $result = DBQueryWarn($query, $handle);
+
+    if (! $result) {
+	fatal("DB Query Failed");
+    }
+
+    return $result;
+}

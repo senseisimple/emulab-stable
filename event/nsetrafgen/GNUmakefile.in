@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -52,15 +52,18 @@ sup-install:
 
 # XXX requires Shashi-magic right now
 tmpmsg:
-	@echo "WARNING: do 'make real-<target>' if you really mean it"
+	@echo "WARNING: just installing scripts"
+	@echo "         do 'make real-<target>' if you want to install NSE"
+
 client: tmpmsg
 client-install: client
+	$(INSTALL_PROGRAM) $(INSTALL_FILES) $(DESTDIR)$(CLIENT_BINDIR)
 
 real-client: all
 real-client-install:
 	cp -p $(INSTALL_FILES) $(DESTDIR)$(CLIENT_BINDIR)
 	if [ -x $(INSTALL_NSE) ]; then \
-	    $(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/bin; \
+	    $(INSTALL) -m 755 -o root -d $(DESTDIR)/usr/local/bin; \
 	    cp -p $(INSTALL_NSE) $(DESTDIR)/usr/local/bin; \
 	fi
 

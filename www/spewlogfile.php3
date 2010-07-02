@@ -1,58 +1,29 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
-# Standard Testbed Header
+# Only known and logged in users.
 #
-#PAGEHEADER("Watch Experiment Log");
-
-#
-# Only known and logged in users can end experiments.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
 
 #
 # Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
+#
+$reqargs = RequiredPageArguments("logfile", PAGEARG_LOGFILE);
+
+if (! isset($logfile)) {
+    PAGEARGERROR("Must provide either a logfile ID");
 }
 
-#
-# Check to make sure this is a valid PID/EID tuple.
-
-if (! TBValidExperiment($pid, $eid)) {
-    USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
-}
-
-#
-# Verify permission.
-#
-if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-    USERERROR("You do not have permission to view the log for $pid/$eid!", 1);
-}
-
-#
-# Check for a logfile. This file is transient, so it could be gone by
-# the time we get to reading it.
-#
-if (! TBExptLogFile($pid, $eid)) {
-    USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
-}
+# Check permission in the backend. The user is logged in, so its safe enough
+# to pass it through.
+$logfileid = $logfile->logid();
 
 #
 # A cleanup function to keep the child from becoming a zombie, since
@@ -73,7 +44,8 @@ function SPEWCLEANUP()
 ignore_user_abort(1);
 register_shutdown_function("SPEWCLEANUP");
 
-if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $pid $eid", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH $uid nobody ".
+		"spewlogfile -w -i " . escapeshellarg($logfileid), "r")) {
     header("Content-Type: text/plain");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
     header("Cache-Control: no-cache, must-revalidate");
@@ -89,7 +61,7 @@ if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $pid $eid", "r")) {
     $fp = 0;
 }
 else {
-    USERERROR("Experiment $pid/$eid is no longer in transition!", 1);
+    USERERROR("Logfile $logfileid is no longer valid!", 1);
 }
 
 ?>

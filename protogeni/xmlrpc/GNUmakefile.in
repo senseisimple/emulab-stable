@@ -1,0 +1,65 @@
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= protogeni/xmlrpc
+
+include $(OBJDIR)/Makeconf
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  =
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	protogeni-cm.pl protogeni-ch.pl protogeni-sa.pl protogeni-ses.pl \
+	Genixmlrpc.pm GeniResponse.pm geni-am.pl
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install-libs: $(INSTALL_LIBDIR)/Genixmlrpc.pm \
+         $(INSTALL_LIBDIR)/GeniResponse.pm \
+         $(INSTALL_DIR)/opsdir/lib/Genixmlrpc.pm \
+         $(INSTALL_DIR)/opsdir/lib/GeniResponse.pm
+
+install-scripts: $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl \
+		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl \
+		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl \
+		$(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl \
+		$(INSTALL_DIR)/protogeni/xmlrpc/geni-am.pl
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-sa.pl
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ch.pl
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-cm.pl
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/protogeni-ses.pl
+	$(SUDO) chown root $(INSTALL_DIR)/protogeni/xmlrpc/geni-am.pl
+	$(SUDO) chmod u+s  $(INSTALL_DIR)/protogeni/xmlrpc/geni-am.pl
+
+install: install-libs install-scripts
+
+control-install:
+
+clean:
+	rm -f *.o core *.pl *.pm *.py
+
+$(INSTALL_DIR)/protogeni/xmlrpc/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/protogeni/xmlrpc
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@
+

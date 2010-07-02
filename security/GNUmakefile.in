@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,6 +13,11 @@ include $(OBJDIR)/Makeconf
 
 BINS		= suexec
 SBINS		= genlastlog lastlog_daemon
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  = suexec
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -32,13 +37,14 @@ suexec:		suexec.c suexec.h
 		-o suexec $<
 
 genlastlog:	genlastlog.c
-	$(CC) $(CFLAGS) -I/usr/local/include \
+	$(CC) $(CFLAGS) -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb \
 		-DTBDBNAME='"$(TBDBNAME)"' \
 		-DUSERSVAR='"$(prefix)/usersvar"' \
 		-DOURDOMAIN='"$(OURDOMAIN)"' \
                 -DUSERNODE='"$(USERNODE)"' \
 		-DLOG_TESTBED=$(LOG_TESTBED) \
-		-o genlastlog $< -L/usr/local/lib/mysql -lmysqlclient
+		-o genlastlog $< ${OBJDIR}/lib/libtb/libtb.a \
+		-L/usr/local/lib/mysql -lmysqlclient
 
 install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBINS))

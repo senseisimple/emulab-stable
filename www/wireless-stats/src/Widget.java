@@ -1,21 +1,12 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006-2007 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 import java.util.*;
 import java.awt.*;
 
-/*
- * Widget.java
- *
- * Created on July 11, 2005, 8:26 AM
- *
- * To change this template, choose Tools | Options and locate the template under
- * the Source Creation and Management node. Right-click the template and choose
- * Open. You can then make changes to the template in the Source Editor.
- */
-
-/**
- *
- * @author david
- */
 public class Widget {
     
     protected String title;
@@ -27,7 +18,6 @@ public class Widget {
     
     public static Color selectedColor = new Color(37,160,231);
     
-    /** Creates a new instance of Widget */
     public Widget() {
         this.properties = new Hashtable();
         this.title = null;
@@ -104,7 +94,13 @@ public class Widget {
             g2.setFont(newf);
             int avgCharSize = 6;
             int estTitleLen = title.length()*avgCharSize;
-            g2.drawString(this.title,this.x - estTitleLen/2,this.y - 16);
+            //g2.drawString(this.title,this.x - estTitleLen/2,this.y - 16);
+            // fix from Russ to ensure draw on canvas...
+            int x = this.x - estTitleLen/2;
+     	    if ( x < 0 ) x = 0;	// Left edge.
+            int y = this.y - 16;
+            if ( y < 16 ) y = this.y + 24; // Top edge.
+            g2.drawString(this.title,x,y);
             //g2.rotate(-0.52360);
             g2.setFont(oldf);
             g2.setColor(oldColor);

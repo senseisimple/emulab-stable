@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -19,25 +19,22 @@ function MyError($msg)
     exit(0);
 }
 
+#
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Only known and logged in users can end experiments.
+# Verify page arguments
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-
-#
-# Verify page arguments.
-# 
-if (!isset($webcamid) ||
-    strcmp($webcamid, "") == 0) {
-    MyError("You must provide a WebCam ID.");
-}
-
-if (! preg_match("/^[\d]+$/", $webcamid)) {
-    MyError("Invalid characters in WebCam ID.");
-}
+$optargs = OptionalPageArguments("camheight",   PAGEARG_INTEGER,
+				 "camwidth",    PAGEARG_INTEGER,
+				 "camfps",      PAGEARG_INTEGER,
+				 "fromtracker", PAGEARG_INTEGER,
+				 "webcamid",    PAGEARG_INTEGER,
+				 "applet",      PAGEARG_BOOLEAN);
 
 #
 # And check for entry in webcams table, which tells us the server name
@@ -87,7 +84,7 @@ if (!$admins_can_view || (!$anyone_can_view && !$isadmin)) {
 #
 # Now check permission.
 #
-if (!$isadmin && !TBWebCamAllowed($uid)) {
+if (!$isadmin && !$this_user->WebCamAllowed()) {
     MyError("Not enough permission to view the robot cameras!");
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -36,6 +36,7 @@ my $waninfoargs = "-b -m -p";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Node;
 
 # Functions
 sub runwansolver();
@@ -251,7 +252,8 @@ while (my ($vname,$type,$fixed,$isremote,$isvirt) =
 	$isvirt = 0;
     }
     if ($fixed) {
-	if (! TBValidNodeName($fixed)) {
+	my $node = Node->Lookup($fixed);
+	if (! defined($node)) {
 	    fatal("Fixed node error ($vname): No such physnode $fixed!");
 	}
     }

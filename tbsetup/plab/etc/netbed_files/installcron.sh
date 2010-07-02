@@ -1,7 +1,7 @@
 #!/bin/sh
 
 CRONTAB=/usr/bin/crontab
-CRONLINE="@reboot cd /home/utah_elab_svc; ./netbed_files/sbin/thttpd.restart"
+CRONLINE="@reboot cd $HOME; ./netbed_files/sbin/thttpd.restart"
 
 #
 # For now, just install the new crontab - we don't really have a reason to 

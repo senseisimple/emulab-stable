@@ -9,6 +9,13 @@ use Getopt::Std;
 use English;
 use POSIX;
 
+#
+# XXX config stuff that does not belong on the client-side
+#
+my $TB            = "@prefix@";
+my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
+my $EVENTSERVER   = "@EVENTSERVER@";
+my $PROJROOT      = "@PROJROOT_DIR@";
 
 #
 # Wrapper for running the linktest daemon. This script is currently
@@ -17,17 +24,19 @@ use POSIX;
 sub usage()
 {
     print "Usage: run_linktest.pl ".
-	  "[-q] [-d level] [-t timeout] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
+	  "[-q] [-r] [-d level] [-t timeout] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
 	  "Use -q for quick termination mode, which skips the Bandwidth test\n".
+	  "Use -r to report results, but not errors\n" .
           "Use -v for verbose feedback messages\n" .
 	  "Use -t <time> to set a timeout in seconds\n";
 	     
     exit(1);
 }
-my $optlist = "vqd:s:p:k:e:L:l:o:t:";
+my $optlist = "vqrd:s:p:k:e:L:l:o:t:";
 my $debug   = 0;
 my $verbose = 0;
 my $timeout = 0;
+my $reportonly = 0;
 my $server;
 my $keyfile;
 my $port;
@@ -39,9 +48,8 @@ my $startAt = 1; # default start level
 my $stopAt = 4 ; # default stop level
 
 # Local goo
-my $TB          = "@prefix@";
-my $TMCC	= "@CLIENT_BINDIR@/tmcc";
-my $LTEVENT     = "@CLIENT_BINDIR@/ltevent";
+my $TMCC	= "$CLIENT_BINDIR/tmcc";
+my $LTEVENT     = "$CLIENT_BINDIR/ltevent";
 my $LOGHOLE     = "$TB/bin/loghole";
 my $LTEVENTOPS  = "$TB/libexec/ltevent";
 my $STOPEVENT   = "STOP"; # XXX Left in here for backwards compat.
@@ -171,6 +179,9 @@ if (defined($options{"p"})) {
 	    "    Bad data in port: $port\n");
     }
 }
+if (defined($options{"r"})) {
+    $reportonly = 1;
+}
 if (defined($options{"e"})) {
     ($pid,$eid) = split(/\//, $options{"e"});
 }
@@ -201,18 +212,18 @@ else {
 # Default to the standard event server.
 #
 if (!defined($server)) {
-    $server = "@EVENTSERVER@";
+    $server = "$EVENTSERVER";
 }
 
 #
 # These days, must use a keyfile!
 #
 if (!defined($keyfile)) {
-    $keyfile = "/proj/$pid/exp/$eid/tbdata/eventkey";
+    $keyfile = "$PROJROOT/$pid/exp/$eid/tbdata/eventkey";
 }
 
-my $linktest_path; # path to linktest data.
-$linktest_path = "/proj/" . $pid . "/exp/" . $eid . "/tbdata/linktest";
+# path to linktest data.
+my $linktest_path = "$PROJROOT/$pid/exp/$eid/tbdata/linktest";
 
 # send the startup event.
 my $args = starter();
@@ -221,6 +232,14 @@ $args .=  " -x START";
 $args .= " STARTAT=$startAt STOPAT=$stopAt";
 $args .= " DEBUG=$debug"
     if ($debug);
+$args .= " REPORTONLY=1"
+    if ($reportonly);
+
+#
+# Remain compatible with older linktests.  This will turn off the ARP
+# test and force an otherwise pointless barrier synch.
+#
+$args .= " DOARP=0 COMPAT=1.1";
 
 system($args);
 if ($?) {
@@ -454,7 +473,7 @@ sub kill_linktest_run {
 }
 
 sub run_loghole {
-    my $ltlogs = "/proj/$pid/exp/$eid/tbdata/ltlogs";
+    my $ltlogs = "$PROJROOT/$pid/exp/$eid/tbdata/ltlogs";
 
     print "Downloading logs...\n";
 

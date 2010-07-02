@@ -16,6 +16,7 @@ TBTESTSUITEEMAIL=testbed-testsuite@changeme
 TBAUTOMAILEMAIL=testbed-automail@changeme
 TBACTIVEARCHIVE=testbed-active-users-archive@changeme
 TBUSERSARCHIVE=testbed-users-archive@changeme
+TBCOOKIESUFFIX=changeme
 JAILIPBASE=172.17.0.0
 JAILIPMASK=255.240.0.0
 DELAYCAPACITY=1
@@ -27,22 +28,30 @@ FSDIR_GROUPS=/q/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/q/users
 FSDIR_SHARE=/share
+FSDIR_SCRATCH=changeme
 WWWHOST=changeme
 TBMAINSITE=0
 THISHOMEBASE=changeme
 PLABSUPPORT=0
+PELABSUPPORT=0
 WIKISUPPORT=changeme
 BUGDBSUPPORT=changeme
 MAILMANSUPPORT=changeme
+OPSDBSUPPORT=changeme
 WINSUPPORT=0
+NSVERIFY=changeme
 SFSSUPPORT=0
 CVSSUPPORT=changeme
 NFSTRACESUPPORT=0
+ARCHIVESUPPORT=changeme
 DISABLE_NSE=1
 # This means it is an inner elab!
 ELABINELAB=1
+# If we can run old images ... depends on whther elvind is installed.
+ELVIN_COMPAT=changeme
 # The name of the outer boss for inner boss to request services from.
 OUTERBOSS_NODENAME=changeme
+TBCOOKIESUFFIX=changeme
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.

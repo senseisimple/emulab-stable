@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -11,8 +11,7 @@ use Errno qw(EEXIST);
 #
 # A wrapper for messing with Mailman from boss.
 #
-sub usage()
-{
+sub usage() {
     print "Usage: mailmanproxy addlist <listname> <listtype> or\n";
     print "       mailmanproxy setlistmembers <listname> or\n";
     print "       mailmanproxy modifymember <uid> <email> or\n";
@@ -29,6 +28,7 @@ my $impotent = 0;
 #
 my $TB         = "@prefix@";
 my $TBOPS      = "@TBOPSEMAIL@";
+my $MAINSITE   = @TBMAINSITE@;
 my $OURDOMAIN  = "@OURDOMAIN@";
 my $MAILMANDIR = "/usr/local/mailman";
 my $MMBINDIR   = "$MAILMANDIR/bin";
@@ -375,7 +375,7 @@ sub AddList(@)
     # a carriage return!
     #
     if (! -d "$MMLISTDIR/" . lc($name)) {
-	my $optarg = ($listtype eq "admin" ? "-q" : "");
+	my $optarg = ($listtype =~ /admin$/ ? "-q" : "");
 
 	if ($reconfig) {
 	    print "List '$name' does not exist; exiting ...\n";
@@ -387,7 +387,7 @@ sub AddList(@)
 	    fatal("AddList: Could not create mailing list!");
     }
     elsif (! $reconfig) {
-	print "List '$name' and already exists; exiting ...\n";
+	print "List '$name' already exists; exiting ...\n";
 	return EEXIST();
     }
 
@@ -409,7 +409,7 @@ sub AddList(@)
     print CONFIG "send_reminders = False\n";
     print CONFIG "send_welcome_msg = False\n";
     print CONFIG "send_goodbye_msg = False\n";
-    if ($listtype eq "admin") {
+    if ($listtype =~ /admin$/) {
 	# No need for tbops to see any of this.
 	print CONFIG "admin_notify_mchanges = 0\n";
 	# Users may not unsubscribe from our lists. Only their own.
@@ -427,12 +427,26 @@ sub AddList(@)
     print CONFIG "archive = True\n";
     print CONFIG "archive_private = 1\n";
     print CONFIG "digestable = 0\n";
-    # Be default, lists are closed unless the mail originates in the domain.
-    # The point is to allow admin people to post to the lists, but this will
-    # do for now, since we do not expect spammers from within ...
-    print CONFIG "generic_nonmember_action = 2\n";
-    print CONFIG "accept_these_nonmembers = ['^.*\@.*${OURDOMAIN}\$', ".
-	"'^.*\@.*utah.edu\$']\n";
+    if ($listtype eq "projadmin") {
+	# projadmin lists are open by default ...
+	print CONFIG "generic_nonmember_action = 0\n";
+	print CONFIG "require_explicit_destination = 0\n";
+	print CONFIG "subject_prefix = ''\n";
+    } else {
+	# Be default, lists are closed unless the mail originates in the domain.
+	# The point is to allow admin people to post to the lists, but this will
+	# do for now, since we do not expect spammers from within ...
+	print CONFIG "generic_nonmember_action = 2\n";
+    }
+    if (!$MAINSITE) {
+	#
+	# In Utah, we require an X-NetBed: header on messages from non
+	# members, to reduce the spam, See Moderate.py in this directory, 
+	# which is installed to ops:/usr/local/mailman/Mailman/Handlers.
+	#
+	print CONFIG "accept_these_nonmembers = ['^.*\@.*${OURDOMAIN}\$', ".
+	    "'^.*\@.*utah.edu\$']\n";
+    }
     close(CONFIG);
 
     # Run the config script.
@@ -456,6 +470,7 @@ sub AddList(@)
 	fatal("Could not open $tempfile for writing!");
     print INTRO "From: $TBOPS\n";
     print INTRO "To: " . lc($name) . "\@" . "$OURDOMAIN\n";
+    print INTRO "X-NetBed: mailmanproxy\n";
     print INTRO "Subject: Welcome!\n";
     print INTRO "\n";
     print INTRO "This is the Emulab Mailman archive for $name\n";

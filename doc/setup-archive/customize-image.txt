@@ -1,0 +1,469 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+I. Introduction
+
+These are instructions for creating a site-customized image from a "generic"
+image provided by Utah.  The basic procedure is:
+
+  - load the image on a testbed machine
+  - customize both FreeBSD and Linux filesystems
+  - save customized image
+
+We will provide you with a generic disk image tarball.  This tarball will
+include a multi-OS "full disk" combo image and one or more auxiliary "single
+partition" images.  The combo image is one which has both a FreeBSD partition
+and a Linux partition.  You will need to customize both.  By convention
+FreeBSD is in DOS partition #1 and Linux in DOS partition #2.
+
+
+II. Which generic image do I need?
+
+It depends largely on the hardware in your testbed and what advanced Emulab
+features you might need.  The choices are:
+
+  * FBSD62+FC6-GENERIC.ndz
+    Includes FreeBSD 6.2 and Fedora 6.
+    Download http://www.emulab.net/downloads/generic-image.tar for this.
+
+  * FBSD410+RHL90-GENERIC.ndz
+    Includes FreeBSD 4.10 and RedHat 9.
+    Download http://www.emulab.net/downloads/generic-image-old.tar for this.
+
+Generally, you will want to use the former as your default image that disks
+are loaded with.  The reason the second image is included at all is that it
+must be used for "virtual node" support, which right now is only available
+in our modified FreeBSD 4.10 kernel.  Unfortunately, the 4.10 kernel, being
+more than 5 years old, doesn't run on all modern hardware, due to lack of
+drivers and/or buggy ACPI support.  So you may be stuck without vnodes for
+awhile if your hardware is in the unsupported category.  There is also a
+lesser dependency on FreeBSD 4.10 for the control net firewall support.
+
+So, if you want/need vnodes or firewalls but your node hardware won't boot
+FreeBSD 4.10, contact us and we'll figure something out.
+
+
+III. Prerequisites
+
+You will need to have the Emulab network-booted, memory-filesystem-based,
+FreeBSD systems (hereafter known as the MFSes).  If you have not done this
+yet, do it now.  For this you will need to download the MFS tarball:
+
+	http://www.emulab.net/downloads/tftpboot-lastest.tar.gz
+
+extract the README, and follow the directions there.
+
+You will also need to have at least one test node integrated into your
+testbed.  If you haven't done that yet, go back to the setup documentation
+under "Adding Nodes" and add one!
+
+
+IV. The Process
+
+The customization of the disk partitions is done using a testbed node booted
+into the "admin" MFS.  If you have followed the Emulab setup directions and
+have added nodes to your testbed to the point where they are now in the
+"hwdown" experiment, they should already be in the admin MFS.  At this point
+you should be able to pick one and slogin as root from your boss machine.
+
+If the node does not respond to slogin and you have serial consoles hooked
+up, connect to the console, reboot the node and wait for the Emulab pxeboot
+prompt:
+
+	Type a key for interactive mode (quick, quick!)
+
+So hit the space bar (quick, quick!) and you go into interactive mode
+where you can tell it to boot from the admin MFS:
+
+	loader:/tftpboot/freebsd
+
+Another option is to use this command on your boss node:
+	node_admin on pc1
+(Where pc1 is replaced with the name of the actual testbed pc...)
+
+Now on with the show.
+
+
+A. Load the image on a testbed machine.
+
+We will assume the machine is called "pc1" in the following directions.
+
+* Put the Utah-provided generic image in /usr/testbed/images on your
+  boss machine.  The generic image will be loaded, and the custom
+  image saved, using this directory.
+
+* Boot pc1 into the admin MFS as described above
+
+* Figure out what your root disk is.  You can look through the boot
+  time output of FreeBSD on pc1 to find it.  If you missed that output,
+  you can ssh into pc1 and run "dmesg":
+
+      sudo ssh pc1 dmesg
+
+  If you have IDE disks, the disk you want will probably be "ad0".
+  If you have SCSI disks, it will be "da0".  For SATA disks, it will
+  probably be "ad4".  RAID controllers are variously things like: "ar",
+  "aacd", "twed", depending on the controller you have.  If you cannot
+  find anything in the output that looks like a disk, you may have an
+  unsupported disk controller.  Contact testbed-ops@flux.utah.edu if this
+  happens (and be sure to have your "dmesg" output handy!)
+
+  If your disk is anything other than "ad0", there are several files
+  under both FreeBSD and Linux that will need to be "fixed".  The good
+  news is that the post-disk-load customization pass should do this
+  for you.  Just make sure that the Emulab database node_types table
+  has the correct value of disktype for each node type.  But, you still
+  need to know the disk type for the following steps, so lets set a
+  shell variable:
+
+      set DSK=<your-disk-here> # e.g. "ad0", "da0", "ad4"
+
+  for csh, or:
+
+      DSK=<your-disk-here>; export DSK
+
+  for sh or bash.
+
+* Use 'imageunzip' to load the disk.
+  If all has gone well, the node should be up and accessible via ssh.
+  To copy the generic image onto the test machine disk, first set some
+  variables based on what image you are customizing:
+
+  FBSD62+FC6 (csh):
+     set FULL=FBSD62+FC6
+     set BSD=FBSD62
+     set LNX=FC6
+
+  FBSD62+FC6 (sh):
+     FULL=FBSD62+FC6; export FULL
+     BSD=FBSD62; export BSD
+     LNX=FC6; export LNX
+
+  FBSD410+RHL90 (csh):
+     set FULL=FBSD410+RHL90
+     set BSD=FBSD410
+     set LNX=RHL90
+
+  FBSD410+RHL90 (sh):
+     FULL=FBSD410+RHL90; export FULL
+     BSD=FBSD410; export BSD
+     LNX=RHL90; export LNX
+
+  Now do the following on boss:
+
+      sudo ssh pc1 imageunzip - /dev/$DSK \
+	< /usr/testbed/images/$FULL-GENERIC.ndz
+
+  Image loading should take anywhere from 45 seconds, to several minutes.
+
+  If the ssh returns with "Killed" then imageunzip ran out of memory.
+  By default, imageunzip will consume memory without bound for buffering
+  of pending disk writes.  If imageunzip grows too big, the system will
+  kill it.  In this case, retry the imageunzip with "-W <num-MB>" where
+  <num-MB> is a number of MB maximum to use for disk buffering.
+  Using about half of the available physical memory should be safe
+  (e.g., if the machine are loading has 512MB of memory, try "-W 256").
+
+Now you can begin customizing the FreeBSD and Linux partitions.
+
+
+B. Customize FreeBSD:
+
+First, login as root from boss and set that magic disk variable:
+
+      sudo slogin pc1
+      set DSK=<your-disk-here>  # you *will* be in csh here
+
+and mount the FreeBSD filesystems on the disk:
+
+      mount /dev/${DSK}s1a /mnt
+      mount /dev/${DSK}s1e /mnt/var
+      mount /dev/${DSK}s1f /mnt/usr
+
+Now you can update the necessary files as follows.
+	
+The MFS has a much scaled-down set of binaries.  To get access to a more
+full-featured system, you can run binaries from the disk image itself:
+
+     ldconfig /mnt/usr/lib /mnt/usr/X11R6/lib /mnt/usr/local/lib
+     set path=($path /mnt/sbin /mnt/bin /mnt/usr/sbin /mnt/usr/bin /mnt/usr/local/bin)
+
+Now update the following files:
+
+* /mnt/etc/localtime
+
+  Copy the correct file over from /mnt/usr/share/zoneinfo.  Note that these
+  zoneinfo files have been updated to reflect the new (as of 2007) DST rules
+  in the US.
+
+* /mnt/etc/master.passwd
+
+  Change the root password.  The password needs to be changed in the
+  etc/emulab subdirectory as well:
+
+      chroot /mnt passwd root
+      <set password>
+      cp -p /mnt/etc/master.passwd /mnt/etc/emulab/
+
+* /mnt/etc/ssh/ssh_host*
+
+  We use the same host key for all images and all OSes.  If you correctly
+  customized your MFSes, you have already generated a set of site-specific
+  host keys, and you can copy them to the disk with:
+
+      cp -p /etc/ssh/ssh_host* /mnt/etc/ssh/
+
+  and then skip to the next bullet item.
+
+  If you did NOT generate host keys for your MFSes, you can generate
+  keys now with:
+
+      ssh-keygen -t rsa1 -N "" -f /mnt/etc/ssh/ssh_host_key
+      ssh-keygen -t rsa -N "" -f /mnt/etc/ssh/ssh_host_rsa_key
+      ssh-keygen -t dsa -N "" -f /mnt/etc/ssh/ssh_host_dsa_key
+
+  This installs them in the disk image, you will still have to go back and
+  install these same keys in the sources for your frisbee/freebsd MFSes later
+  using the updating instructions in the README file in the MFS tarball.
+  So save the keys from /mnt/etc/ssh off somewhere.
+
+* /mnt/etc/emulab/{client,emulab}.pem
+
+  These should have been created on your boss node when you did the boss
+  setup.  So from your boss node do:
+
+      sudo scp -p /usr/testbed/etc/{client,emulab}.pem pc1:/mnt/etc/emulab/
+
+That is it for FreeBSD.  Now remount the filesystems read-only so you
+can still run binaries but don't accidentally clobber anything:
+
+      cd /
+      mount -u -o ro /mnt/usr
+      mount -u -o ro /mnt/var
+      mount -u -o ro /mnt
+
+and move on to updating the Linux partition on the disk.
+
+
+C. Customize Linux:
+
+Mount the Linux filesystems (recall that the FreeBSD filesystems are
+still mounted on /mnt, so we use another directory):
+
+      mkdir /mnt2
+      mount -t ext2fs /dev/${DSK}s2 /mnt2
+
+Now you can update the necessary files as follows.
+	
+* /mnt2/etc/shadow
+
+  Using your favorite editor, copy in the password hash for root from
+  the FreeBSD password file (/mnt/etc/master.passwd) to /mnt2/etc/shadow.
+  The password hash is the second colon-separated field in the "root"
+  password file line.  Note that these two files are not the same format
+  just the password hash field of the file, so do NOT just copy the FreeBSD
+  password file to /mnt2/etc/shadow.  Finally copy the newly modified file
+  to the emulab subdirectory:
+
+      cp -p /mnt2/etc/shadow /mnt2/etc/emulab/
+
+* /mnt2/etc/localtime
+
+  Copy the correct file over from /mnt2/usr/share/zoneinfo
+
+* /mnt2/etc/ssh/ssh_host*
+
+  Copy the host keys you created for FreeBSD above:
+
+      cp -p /mnt/etc/ssh/ssh_host* /mnt2/etc/ssh/
+
+* /etc/testbed/{client,emulab}.pem
+
+  Copy over from the FreeBSD side:
+
+      cp -p /mnt/etc/emulab/*.pem /mnt2/etc/emulab/
+
+Now unmount the Linux filesystem:
+
+      umount /mnt2
+
+and fsck it for good luck.  Actually, not only good luck but also to reset
+the time stamp that forces a periodic fsck:
+
+      e2fsck -f -y /dev/${DSK}s2
+
+
+D. Testing the image
+
+   Before you save a copy of your customization, you can test out
+   the image and make sure it works.
+
+   NOTE: you will need console access to the node at this point, either
+   the VGA or the serial line depending on which version of pxeboot you
+   are using.
+
+   From your slogin session on the node do:
+
+       reboot
+
+   and wait for the pxeboot prompt to appear on the console as described
+   earlier.  When the "Type a key..." message appears, hit space and then
+   at the prompt type:
+
+       part:1
+
+   which tells pxeboot to boot from partition 1 (aka, the FreeBSD partition).
+   The machine should proceed to boot all the way to a login prompt.  Watch
+   for startup problems, like account setup or mount failures.  If your
+   kernel panics reporting unknown/missing bus errors, you may need to
+   enable ACPI.  You can either do this directly in /boot/loader.conf by
+   setting acpi_load="YES", or by invoking our slicefix script while in
+   the admin-MFS:
+   
+       set SLICEFIX_ACPI=YES
+       /usr/local/etc/emulab/slicefix 0 <disk>  # e.g. ad4, etc.
+       
+   If all goes well, login to the console with the root password you set
+   and reboot again.  When you get the pxeboot prompt again, type space
+   and then:
+
+       part:2
+
+   to boot into the Linux partition.  Again watch for problems.  If
+   everything worked, skip the next step and proceed to "Saving the
+   customized image" below.  If there was a catastrophic failure,
+   you can reboot the node into the admin MFS and reload the disk
+   either with the image snapshot you made or, worst case, the generic
+   image.  If you just need to make some minor changes, make them 
+   and proceed with "Saving the customized image" step (F).
+
+
+E. Recreating the image
+
+   If you need to tweak either the FreeBSD or Linux partitions, you will
+   need to save the image again if you already have.  Doing this 
+   properly involves cleaning up anything that the Emulab node self 
+   configuration might have done. While you are running either FreeBSD 
+   or Linux you do the following from the console:
+
+       shutdown now
+       <wait for single user root prompt>
+       cd /usr/local/etc/emulab
+       ./prepare
+       reboot
+
+   As the node reboots, catch the pxeboot prompt and boot into the admin
+   MFS.  Go back to the "Testing the image" step (D).
+
+
+F. Saving the customized image
+
+   The "whole disk" image is the one used most frequently, but we also
+   create single partition images of FreeBSD and Linux as well.  Put the
+   images onto a test area at first, and install them permanently later
+   (in step G.) Make sure you're in the admin-MFS on the node.
+
+   From boss do:
+
+       cd /proj/emulab-ops/images
+       sudo ssh pc1 imagezip /dev/$DSK - > $FULL-STD.ndz
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > $BSD-STD.ndz
+       sudo ssh pc1 imagezip -s 2 /dev/$DSK - > $LNX-STD.ndz
+
+
+G. Installing the images
+
+   Once you have a working image, do the following from boss:
+
+       mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
+
+   The boss installation process should have created image (and OS)
+   descriptors for these standard images.  You can verify via the web
+   page by clicking on "List ImageIDs" on the left menu and ensuring
+   that FBSD-STD, RHL-STD, FBSD62-STD, FBSD410-STD, FC6-STD, and RHL90-STD
+   are all shown.
+
+H. Additional images
+
+   If you have chosen FBSD62+FC6-GENERIC as your default image, you may
+   also want the FBSD410 image for firewall and vnode support (this is
+   assuming that FreeBSD 4.10 will run on your hardware).  To do this,
+   you need to customize one or both of:
+
+       FBSD410-IPFW2-GENERIC.ndz
+       FBSD410-GENERIC.ndz
+
+   (Note that we do not use the combo image containing FBSD410 here, we use
+   a "single partition" image with just BSD, which is smaller).  Now, before
+   you free up the node you have been using to customize the standard image,
+   is the time to customize these.
+
+   To do this, make sure you node is in the admin MFS and then do (from
+   your boss node):
+
+      sudo ssh pc1 imageunzip -s 1 - /dev/$DSK \
+	< /usr/testbed/images/FBSD410-IPFW2-GENERIC.ndz
+
+   Note the "-s 1" argument to imageunzip.  This tells it that the image
+   should be loaded in the first DOS partition rather than at the beginning
+   of the disk.  This is why you should not attempt to customize the firewall
+   image before you have done the standard image; the latter contains a DOS
+   partition table necessary for this step.
+
+   Now proceed to customize as in B. (Customize FreeBSD) above.  After
+   customization (don't forget the final step of remounting the FSes readonly!)
+   save the image from boss via:
+
+       cd /proj/emulab/ops/images
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-IPFW2.ndz
+
+   Finally, move it into place on boss:
+
+       mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
+
+   Again, an image descriptor (FW-IPFW2) should already exist in the database.
+     
+   Repeat for the vnode kernel:
+
+      sudo ssh pc1 imageunzip -s 1 - /dev/$DSK \
+	< /usr/testbed/images/FBSD410-GENERIC.ndz
+
+       cd /proj/emulab-ops/images
+       sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-STD.ndz
+
+       mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
+
+
+I. Dealing with SCSI disks (or RAID) and unrecognized hardware.
+
+* For completeness here are the files that need to be changed if you have
+  other than IDE disks:
+
+      FreeBSD /etc/fstab: needs "ad0" changed to appropriate type
+          ("ad4" for SATA, "da0" for SCSI, "aac", "twe" or various
+            others for RAID)
+      Linux /etc/fstab: needs "hda" changed to appropriate type
+          ("sda" for SATA or SCSI, ?? for RAID)
+      Linux /etc/lilo.conf: ditto, plus /sbin/lilo must be rerun
+
+  However, you should not need to mess with these files, the post-disk-loader
+  script will do it for you.
+
+* For FreeBSD, we have five different FreeBSD 4.10 kernels that are used
+  for various purposes.  All of them are based on the GENERIC configuration.
+  If the default kernel ("/kernel" aka "/kernel.100HZ") does not boot on your
+  machine or your disk or Ethernet interfaces are not recognized, you will
+  have to move to the FreeBSD 6.2 based solution above.
+
+* For Linux, it is even more of a PITA.  We currently don't even have a
+  generic Linux kernel in the image.  So if Linux doesn't boot in the image,
+  you will have to configure/build a new kernel on some external machine.
+  Since the default Linux image is either Fedora 6 with a 2.6 kernel or
+  RedHat 9 with a 2.4 kernel, it is also possible that it just doesn't
+  support newer hardware.  Contact us if this happens.
+
+[ This file is a copy of doc/customize-image.txt in the Emulab source tree. ]
+[ Last updated 07/22/08 ]

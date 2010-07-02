@@ -1,45 +1,39 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-#
-# Beware empty spaces (cookies)!
-# 
 require("defs.php3");
 
-#
-# This page gets loaded as the result of a logout click.
-#
-# $uid optionally comes in as a variable so admins can logout other users.
-#
-$target_uid = $_GET['target_uid'];
-$next_page  = $_GET['next_page'];
-
-# Pedantic page argument checking. Good practice!
-if (isset($target_uid) && $target_uid == "") {
-    PAGEARGERROR();
-}
-
 # Get current login.
-# Only admin users can logout someone other then themself.
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_MODMASK);
+$this_user = CheckLoginOrDie(CHECKLOGIN_MODMASK);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-if (!isset($target_uid))
-    $target_uid = $uid;
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("target_user",   PAGEARG_USER,
+				 "next_page",     PAGEARG_STRING);
 
-if ($target_uid != $uid && !ISADMIN($uid)) {
-    PAGEHEADER("Logout");
-    echo "<center>
-          <h3>You do not have permission to logout '$target_uid'
-          </h3></center>\n";
-    PAGEFOOTER();
-    return;
+if (isset($target_user)) {
+    # Only admin users can logout someone other then themself.
+    if (!$isadmin && !$target_user->SameUser($this_user)) {
+	PAGEHEADER("Logout");
+	echo "<center>
+                  <h3>You do not have permission to logout other users!</h3>
+              </center>\n";
+	PAGEFOOTER();
+    }
 }
+else {
+    $target_user = $this_user;
+}
+$target_user = $this_user;
+$target_uid  = $uid;
 
-if (DOLOGOUT($target_uid) != 0) {
+if (DOLOGOUT($target_user) != 0) {
     PAGEHEADER("Logout");
     echo "<center><h3>Logout '$target_uid' failed!</h3></center>\n";
     PAGEFOOTER();
@@ -50,7 +44,7 @@ if (DOLOGOUT($target_uid) != 0) {
 # Success. Zap the user back to the front page, in nonsecure mode, or a page
 # the caller specified
 # 
-if ($next_page) {
+if (isset($next_page)) {
     header("Location: $next_page");
 } else {
     header("Location: $TBBASE/");

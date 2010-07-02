@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -16,12 +16,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print "Usage: delaysetup [-i | -u] [-j <vnodeid>]\n";
+    print "Usage: delaysetup [-i | -u | -r] [-j <vnodeid>]\n";
     exit(1);
 }
-my $optlist	= "iuj:";
+my $optlist	= "iurj:";
 my $install	= 0;
 my $uninstall	= 0;
+my $reinstall   = 0;
 my $vnodeid;
 
 # Drag in path stuff so we can find emulab stuff.
@@ -61,6 +62,9 @@ if (defined($options{"i"})) {
 if (defined($options{"u"})) {
     $uninstall = 1;
 }
+if (defined($options{"r"})) {
+    $reinstall = 1;
+}
 if (defined($options{"j"})) {
     $vnodeid = $options{"j"};
     libsetup_setvnodeid($vnodeid);
@@ -70,7 +74,13 @@ if (defined($options{"j"})) {
 if (@ARGV) {
     usage();
 }
-sub checkkernel($);
+
+# XXX not yet
+if (INXENVM()) {
+    exit(0);
+}
+
+sub checkkernel($$);
 
 $FBSD_VERSION = `uname -v`;
 
@@ -82,18 +92,53 @@ else {
 	"    Cannot determine version\n");
 }
 
+my $canbackfill = 0;
+
 #
 # Delay node configuration goop.
+# First figure out our kernels.
 #
-my $KERNEL100	= "/kernel.100HZ";
-my $KERNEL1000  = "/kernel.1000HZ";
-my $KERNEL10000 = "/kernel.10000HZ";
-my $KERNELDELAY = "/kernel.delay";	# New images. Linked to kernel.10000HZ
-my $KERNELJAIL  = "/kernel.jail";	# Specific to jails (with linkdelays).
-my $KERNELLDELAY= "/kernel.linkdelay";	# Link delay kernel.
+my $KERNELDELAY;	# kernel for delay nodes
+my $KERNELDELAYHZ;	# HZ for delay node kernel
+my $KERNELLDELAY;	# kernel for linkdelays
+my $KERNELLDELAYHZ;	# HZ for linkdelay kernel
+my $KERNELJAIL;		# kernel for jails (implies linkdelays)
+my $KERNELJAILHZ;	# HZ for jail kernel
+
+if ($FBSD_VERSION <= 4) {
+    if (-e "/kernel") {
+	# newer 4.x setup
+	$KERNELDELAY  = "/kernel.delay";
+	$KERNELLDELAY = "/kernel.linkdelay";
+	$KERNELJAIL   = "/kernel.jail";
+    } else {
+	# old 4.x setup
+	$KERNELDELAY  = "/kernel.10000HZ";
+	$KERNELLDELAY = "/kernel.1000HZ";
+	$KERNELJAIL   = "/kernel.1000HZ";
+    }
+    $canbackfill = 1;
+}
+elsif ($FBSD_VERSION == 5) {
+    # 5.x
+    $KERNELDELAY = "/boot/kernel.delay/kernel";
+    $KERNELJAIL  = "/boot/kernel.linkdelay/kernel";
+    $KERNELLDELAY= "/boot/kernel.linkdelay/kernel";
+}
+else {
+    # for 6.x and above, we use the same kernel for all.
+    # XXX ok not quite yet til we characterize the effect of polling.
+    $KERNELDELAY = "/boot/kernel.poll/kernel";
+    $KERNELJAIL = $KERNELLDELAY = "/boot/kernel/kernel";
+}
+
+# for all kernels right now
+$KERNELDELAYHZ  = 10000;
+$KERNELLDELAYHZ = 1000;
+$KERNELJAILHZ   = 1000;
 
 # This should never happen!
-if (REMOTE() || MFS()) {
+if ((REMOTE() && !REMOTEDED()) || MFS()) {
     print "Skipping delay configuration on remote/MFS node!\n";
     exit(0);
 }
@@ -101,13 +146,25 @@ if (REMOTE() || MFS()) {
 print "Checking Testbed delay configuration ... \n";
 
 # Uninstall just looks for the files, runs them, and exits.
-if ($uninstall) {
+if ($reinstall || $uninstall) {
     system(TMDELAY . " disable")
 	if (-e TMDELAY);
 
     system(TMLINKDELAY . " disable")
 	if (-e TMLINKDELAY);
-    exit(0);
+    exit(0)
+	if ($uninstall);
+}
+
+#
+# Figure out the current clock rate
+#
+my $currenthz = 0;
+if ($FBSD_VERSION >= 6) {
+    $currenthz = `sysctl -n kern.clockrate 2>/dev/null`;
+    if ($currenthz =~ /hz = (\d+),/) {
+	$currenthz = int($1);
+    }
 }
 
 #
@@ -115,17 +172,21 @@ if ($uninstall) {
 # the changes. Since a node cannot be doing delays and linkdelays at the
 # same time, try each and exit.
 #
-DelaySetup();
+if (DelaySetup()) {
+    exit(1);
+}
 if (-e TMDELAY) {
     system(TMDELAY . " enable")
-	if ($install);
+	if ($install || $reinstall);
     exit(0);
 }
 
-LinkDelaySetup();
+if (LinkDelaySetup()) {
+    exit(1);
+}
 if (-e TMLINKDELAY) {
     system(TMLINKDELAY . " enable")
-	if ($install);
+	if ($install || $reinstall);
     exit(0);
 }
 exit(0);
@@ -136,8 +197,8 @@ exit(0);
 sub DelaySetup
 {
     my @delays;
-    my $checkreplace = 0;
     my $kernel;
+    my $kernelhz;
 
     # Lets clean out old instructions.
     unlink TMDELAY;
@@ -149,8 +210,20 @@ sub DelaySetup
     }
 
     if (@delays) {
-	my $count    = 69;
 	my $mindelay = 10000;
+	my @bridges  = ();
+
+	# before going any further, see if we need to boot a new kernel
+ 	if (-e $KERNELDELAY) {
+ 	    $kernel = $KERNELDELAY;
+ 	    $kernelhz = $KERNELDELAYHZ;
+ 	} else {
+ 	    $kernel = $KERNELLDELAY;
+ 	    $kernelhz = $KERNELLDELAYHZ;
+ 	}
+	if (checkkernel($kernel, $kernelhz)) {
+	    return -1;
+	}
 
 	open(MAP, ">" . TMDELMAP)
 	    or die("Could not open " . TMDELMAP . ": $!");
@@ -158,46 +231,229 @@ sub DelaySetup
 	open(DEL, ">" . TMDELAY)
 	    or die("Could not open " . TMDELAY . ": $!");
 
-	print DEL "#!/bin/sh\n";
-	# Turn these off before setting bridge_cfg.
-	if ($FBSD_VERSION <= 4) {
-	    print DEL "sysctl -w net.link.ether.bridge=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge_cfg=";
-	}
-	else {
-	    print DEL "sysctl -w net.link.ether.bridge.enable=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge.ipfw=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge.config=";
-	}
-
+	my $bix = 1;
 	foreach $delay (@delays) {
 	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
 	    my $iface1 = findiface($1);
 	    my $iface2 = findiface($2);
-
-	    print DEL "$iface1:$count,$iface2:$count,";
-	    $count++;
+	    push @bridges, [ $bix, $iface1, $iface2 ];
+	    $bix++;
 	}
-	print DEL "\n";
-	# Now turn them back on.
+
+	print DEL "#!/bin/sh\n";
+	print DEL "# auto-generated by delaysetup.pm, DO NOT EDIT\n";
+	print DEL "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
+
+	#
+	# Shutdown: undo only the stuff that might get redone during
+	# a reconfig.
+	#
+	print DEL "if [ \"\$action\" = \"disable\" ]; then\n";
+
+	# bridging
 	if ($FBSD_VERSION <= 4) {
-	    print DEL "sysctl -w net.link.ether.bridge=1\n";
-	    print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
+	    print DEL "    sysctl -w net.link.ether.bridge=0\n";
+	    print DEL "    sysctl -w net.link.ether.bridge_ipfw=0\n";
+	}
+	elsif ($FBSD_VERSION <= 6) {
+	    print DEL "    sysctl -w net.link.ether.bridge.enable=0\n";
+	    print DEL "    sysctl -w net.link.ether.bridge.ipfw=0\n";
 	}
 	else {
-	    print DEL "sysctl -w net.link.ether.bridge.enable=1\n";
-	    print DEL "sysctl -w net.link.ether.bridge.ipfw=1\n";
+	    foreach my $bridge (@bridges) {
+		my ($bix) = @$bridge;
+		print DEL "    ifconfig bridge$bix down destroy\n";
+	    }
+	    print DEL "    sysctl -w net.link.bridge.ipfw=0\n";
+	    print DEL "    sysctl -w net.link.bridge.ipfw_arp=0\n";
 	}
+
+	# ipfw pipes
+	print DEL "    ipfw -f pipe flush\n";
+	print DEL "    ipfw -f flush\n";
+	if ($FBSD_VERSION >= 6) {
+	    print DEL "    ipfw add 65534 allow all from any to any\n";
+	}
+
+	# polling
+	print DEL "    if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
+	if ($FBSD_VERSION >= 6) {
+	    foreach my $bridge (@bridges) {
+		my (undef,$if1,$if2) = @$bridge;
+		print DEL "        ifconfig $if1 -polling\n";
+		print DEL "        ifconfig $if2 -polling\n";
+	    }
+	} else {
+	    print DEL "        sysctl -w kern.polling.enable=0\n";
+	}
+	print DEL "    fi\n";
+
+	print DEL "    exit 0\n";
+	print DEL "fi\n";
+
+	#
+	# For FreeBSD 6 and beyond we must configure the number of kernel
+	# mbuf clusters via sysctl, there is no param in the kernel anymore.
+	#
+	# We also load the bridge, IPFW2 and dummynet code if necessary.
+	#
+	if ($FBSD_VERSION >= 7) {
+	    my $MPATH = $KERNELDELAY;
+	    $MPATH =~ s/\/[^\/]+$//;
+
+	    print DEL "if [ `sysctl -n kern.ipc.nmbclusters` -lt 65536 ]; then\n";
+	    print DEL "    sysctl -w kern.ipc.nmbclusters=65536\n";
+	    print DEL "fi\n";
+	    print DEL "if ! kldstat -q -m if_bridge >/dev/null 2>&1; then\n";
+	    print DEL "    echo \"Loading bridge module...\"\n";
+	    print DEL "    kldload $MPATH/if_bridge.ko || {\n";
+	    print DEL "        echo '  *** Could not load bridge code'\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "fi\n";
+	    print DEL "if ! kldstat -q -m ipfw >/dev/null 2>&1; then\n";
+	    print DEL "    echo \"Loading ipfw module...\"\n";
+	    print DEL "    kldload $MPATH/ipfw.ko || {\n";
+	    print DEL "        echo '  *** Could not load ipfw code'\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "    ipfw add 65534 allow all from any to any\n";
+	    print DEL "fi\n";
+
+	    print DEL "if ! kldstat -q -m dummynet >/dev/null 2>&1; then\n";
+	    print DEL "    echo \"Loading dummynet module...\"\n";
+	    print DEL "    kldload $MPATH/dummynet.ko || {\n";
+	    print DEL "        echo '  *** Could not load dummynet code'\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "fi\n";
+
+	} elsif ($FBSD_VERSION >= 6) {
+	    my $MPATH = $KERNELDELAY;
+	    $MPATH =~ s/\/[^\/]+$//;
+
+	    print DEL "if [ `sysctl -n kern.ipc.nmbclusters` -lt 65536 ]; then\n";
+	    print DEL "    sysctl -w kern.ipc.nmbclusters=65536\n";
+	    print DEL "fi\n";
+
+	    print DEL "if ! sysctl net.link.ether.bridge >/dev/null 2>&1; then\n";
+	    print DEL "    kldload $MPATH/bridge.ko || {\n";
+	    print DEL "        echo \"Could not load bridge code\"\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "fi\n";
+
+	    print DEL "if ! sysctl net.inet.ip.fw.enable >/dev/null 2>&1; then\n";
+	    print DEL "    kldload $MPATH/ipfw.ko || {\n";
+	    print DEL "        echo \"Could not load IPFW code\"\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "    ipfw add 65534 allow all from any to any\n";
+	    print DEL "fi\n";
+
+	    print DEL "if ! sysctl net.inet.ip.dummynet.curr_time >/dev/null 2>&1; then\n";
+	    print DEL "    kldload $MPATH/dummynet.ko || {\n";
+	    print DEL "        echo \"Could not load dummynet code\"\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "fi\n";
+	}
+
+	#
+	# Starting with FreeBSD 7, we use the new if_bridge module
+	#
+	if ($FBSD_VERSION >= 7) {
+	    # Turn these off before setting bridge_cfg.
+	    print DEL "sysctl -w net.link.bridge.ipfw=0\n";
+	    print DEL "sysctl -w net.link.bridge.ipfw_arp=0\n";
+	    
+	    foreach my $bridge (@bridges) {
+		my ($bix,$if1,$if2) = @$bridge;
+		print DEL "ifconfig bridge$bix create || {\n";
+		print DEL "    echo \"Could not create bridge$bix\"\n";
+		print DEL "    exit 1\n";
+		print DEL "}\n";
+		print DEL "ifconfig bridge$bix addm $if1 addm $if2 up || {\n";
+		print DEL "    echo \"Could not add $if1/$if2 to bridge$bix\"\n";
+		print DEL "    ifconfig bridge$bix down destroy\n";
+		print DEL "    exit 1\n";
+		print DEL "}\n";
+	    }
+
+	    # Now turn them back on.
+	    print DEL "sysctl -w net.link.bridge.ipfw=1\n";
+	    print DEL "sysctl -w net.link.bridge.ipfw_arp=1\n";
+	} else {
+	    # Turn these off before setting bridge_cfg.
+	    if ($FBSD_VERSION <= 4) {
+		print DEL "sysctl -w net.link.ether.bridge=0\n";
+		print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
+		print DEL "sysctl -w net.link.ether.bridge_cfg=";
+	    }
+	    else {
+		print DEL "sysctl -w net.link.ether.bridge.enable=0\n";
+		print DEL "sysctl -w net.link.ether.bridge.ipfw=0\n";
+		print DEL "sysctl -w net.link.ether.bridge.config=";
+	    }
+	    foreach my $bridge (@bridges) {
+		my ($count,$iface1,$iface2) = @$bridge;
+		$count += 68;	# XXX backward compat
+
+		print DEL "$iface1:$count,$iface2:$count,";
+	    }
+	    print DEL "\n";
+	    # Now turn them back on.
+	    if ($FBSD_VERSION <= 4) {
+		print DEL "sysctl -w net.link.ether.bridge=1\n";
+		print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
+	    }
+	    else {
+		print DEL "sysctl -w net.link.ether.bridge.enable=1\n";
+		print DEL "sysctl -w net.link.ether.bridge.ipfw=1\n";
+	    }
+	}
+	print DEL "ipfw -f pipe flush\n";
 	print DEL "ipfw -f flush\n";
+	if ($FBSD_VERSION >= 6) {
+	    print DEL "ipfw add 65534 allow all from any to any\n";
+	}
 
  	#
- 	# If we are in a new-style image that uses a polling-based kernel
- 	# turn on polling.
+	# Turn on polling if possible.
+	# For FreeBSD 6 and beyond, we turn it on only for the interfaces
+	# in question.  For older FreeBSDs, we just have to turn it on
+	# globally.
  	#
- 	if (-e $KERNELDELAY) {
- 	    print DEL "sysctl -w kern.polling.enable=1\n";
- 	}
+	print DEL "if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
+	if ($FBSD_VERSION >= 6) {
+	    print DEL "    sysctl -w kern.polling.enable=0\n";
+	    foreach my $bridge (@bridges) {
+		my (undef,$if1,$if2) = @$bridge;
+		print DEL "    ifconfig $if1 polling\n";
+		print DEL "    ifconfig $if2 polling\n";
+	    }
+
+	    #
+	    # Our kernel is running hot (10000HZ) so adjust some params.
+	    # XXX this check should be done in the generated shell script,
+	    # but I am too lazy to parse sysctl output with awk/sed and it
+	    # doesn't matter right now as we always rerun this perl wrapper
+	    # to produce the shell script.
+	    #
+	    if ($currenthz > 1000) {
+		print DEL "    # adjustments for kernel at $currenthz HZ\n";
+		# limit register accesses to 50 times a second
+		print DEL "    sysctl -w kern.polling.reg_frac=200\n";
+
+		# 80% of CPU can be used for polling activities
+		print DEL "    sysctl -w kern.polling.user_frac=80\n";
+	    }
+	} else {
+	    print DEL "    sysctl -w kern.polling.enable=1\n";
+	}
+	print DEL "else\n";
+	print DEL "    echo '*** WARNING: no DEVICE_POLLING in delay kernel!'\n";
+	print DEL "fi\n";
 
 	foreach $delay (@delays) {
 	    my $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
@@ -216,7 +472,8 @@ sub DelaySetup
 	    $pat .= q(MEANPSIZE1=(\d+) WAIT1=(\d+) SETBIT1=(\d+) );
 	    $pat .= q(DROPTAIL1=(\d+) GENTLE1=(\d+) );
 	    $pat .= q(VNODE0=([-\d\w]+) VNODE1=([-\d\w]+) );
-	    $pat .= q(NOSHAPING=(\d+));
+	    $pat .= q(NOSHAPING=(\d+) );
+	    $pat .= q(BACKFILL0=(\d+) BACKFILL1=(\d+));
 
 	    $delay =~ /$pat/;
 
@@ -268,6 +525,20 @@ sub DelaySetup
 	    my $vnode0     = $38;
 	    my $vnode1     = $39;
 	    my $noshaping  = $40;
+
+	    my $backfill1  = $41;
+	    my $backfill2  = $42;
+
+	    my $bf1arg = $bf2arg = "";
+	    if ($backfill1 > 0) {
+		$bf1arg = "backfill ${backfill1}Kbits/s";
+	    }
+	    if ($backfill2 > 0) {
+		$bf2arg = "backfill ${backfill2}Kbits/s";
+	    }
+	    if (!$canbackfill && ($bf1arg || $bf2arg)) {
+		print STDOUT "*** WARNING: IPFW does not support backfill\n";
+	    }
 
 	    #
 	    # Noshaping. All we wanted was to set up the bridge (above).
@@ -351,12 +622,34 @@ sub DelaySetup
 		$redparams2 .= "$weight2/$minthresh2/$maxthresh2/$max_p";
 	    }
 
-	    print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
-	    print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
+	    #
+	    # To allow addition of more specific, per-interface rules
+	    # (e.g., for pelab) we put the general rules toward the
+	    # end of the table.  We don't know what the max general rule
+	    # fed to us out of the DB will be, but lets assume that starting
+	    # at 60000 provides us with enough room for those.
+	    #
+	    $p1 += 60000
+		if ($p1 + 60000 < 65535);
+	    $p2 += 60000
+		if ($p2 + 60000 < 65535);
+
+	    #
+	    # As of FreeBSD 7, when filtering at the bridge level, packets are
+	    # only processed by IPFW at the output interface.  Thus we must
+	    # use "out" rather than "in" or packets won't match.
+	    #
+	    if ($FBSD_VERSION < 7) {
+		print DEL "ipfw add $p1 pipe $p1 ip from any to any in recv $iface1\n";
+		print DEL "ipfw add $p2 pipe $p2 ip from any to any in recv $iface2\n";
+	    } else {
+		print DEL "ipfw add $p1 pipe $p1 ip from any to any out recv $iface1\n";
+		print DEL "ipfw add $p2 pipe $p2 ip from any to any out recv $iface2\n";
+	    }
 	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
-	    print DEL "bw ${bandw1}Kbit/s plr $plr1 $queue1 $redparams1\n";
+	    print DEL "bw ${bandw1}Kbit/s $bf1arg plr $plr1 $queue1 $redparams1\n";
 	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
-	    print DEL "bw ${bandw2}Kbit/s plr $plr2 $queue2 $redparams2\n";
+	    print DEL "bw ${bandw2}Kbit/s $bf2arg plr $plr2 $queue2 $redparams2\n";
 
 	    print STDOUT "  $iface1/$iface2 pipe $p1 config delay ";
 	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1 ";
@@ -375,6 +668,7 @@ sub DelaySetup
 	printf DEL "%s %s 0\n", TMCC(), TMCCCMD_STARTSTAT();
 
 	print DEL "echo \"Delay Configuration Complete\"\n";
+	print DEL "exit 0\n";
 	close(DEL);
 	chmod(0755, TMDELAY);
 	close(MAP);
@@ -383,20 +677,6 @@ sub DelaySetup
 	# node. See routing setup. Need to avoid fastforwarding whenever we
 	# have link delays.
 	system("touch " . ISDELAYNODEPATH());
-
-	#
-	# Now do kernel configuration. All of the above work is wasted,
-	# but such is life.
-	#
- 	if (-e $KERNELDELAY) {
- 	    $kernel = $KERNELDELAY;
- 	} else {
- 	    $kernel = $KERNEL1000;
- 	}
-	$checkreplace = 1;
-    }
-    if ($checkreplace) {
-	checkkernel($kernel);
     }
     return 0;
 }
@@ -409,7 +689,6 @@ sub LinkDelaySetup
     my @delays;
     my @jails;
     my $kernel;
-    my $checkreplace = 0;
     my $gotjails = (defined($vnodeid) ? 1 : 0);
     my $upcmds   = "";
     my $downcmds = "";
@@ -420,7 +699,9 @@ sub LinkDelaySetup
 
     #
     # We need to know if any jailed nodes. That changes which kernel
-    # we want to boot. Temporary until the jail stuff is better tested.
+    # we want to boot.
+    #
+    # XXX Temporary until the jail stuff is better tested.
     #
     if (!$gotjails) {
 	if (tmcc(TMCCCMD_VNODELIST, undef, \@jails) < 0) {
@@ -437,7 +718,10 @@ sub LinkDelaySetup
     }
     if ($gotjails) {
 	$kernel = $KERNELJAIL;
-	$checkreplace = 1;
+	$kernelhz = $KERNELJAILHZ;
+    } else {
+	$kernel = $KERNELLDELAY;
+	$kernelhz = $KERNELLDELAYHZ;
     }
 
     # Get delay config.
@@ -447,6 +731,11 @@ sub LinkDelaySetup
     }
 
     if (@delays) {
+	# before going any further, see if we need to boot a new kernel
+	if (checkkernel($kernel, $kernelhz)) {
+	    return -1;
+	}
+
 	open(MAP, ">" . TMDELMAP)
 	    or die("Could not open " . TMDELMAP . ": $!");
 
@@ -470,7 +759,7 @@ sub LinkDelaySetup
 	    #
 	    # tmcd returns the interfaces as MAC addrs.
 	    #
-	    my $iface     = findiface($1);
+	    my $iface     = $1;
 	    my $type      = $2;
 	    my $linkname  = $3;
 	    my $vnode     = $4;
@@ -502,6 +791,17 @@ sub LinkDelaySetup
 	    my $setbit    = $25;
 	    my $droptail  = $26;
 	    my $gentle    = $27;
+
+	    #
+	    # tmcd returns the interfaces as MAC addrs, so convert to
+	    # an interface name.  Note that we also use the given IP
+	    # address which is the unique characteristic for some forms
+	    # of virtual interface.
+	    # 
+	    if (!($iface = findiface($iface,$inet))) {
+		warn("*** WARNING: Could not map $1/$inet to an interface!\n");
+		return -1;
+	    }
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
@@ -549,17 +849,26 @@ sub LinkDelaySetup
 		$redparams .= "$weight/$minthresh/$maxthresh/$max_p";
 	    }
 
-	    $upcmds .= "ifconfig $iface media 100baseTX mediaopt full-duplex";
-	    $upcmds .= "\n";
+	    #
+	    # XXX don't try to set the speed/duplex of virtual devices
+	    # XXX we should not be hardwiring the speed/duplex here anyway
+	    #
+	    if ($iface !~ /^(vlan|veth)/) {
+		$upcmds .= "ifconfig $iface media 100baseTX ".
+		           "mediaopt full-duplex\n    ";
+	    }
 
 	    $upcmds .= "ipfw add $pipeno pipe $pipeno ip from any to ".
-		       "any out xmit $iface nexthop $inet:$mask\n";
+		       "any out xmit $iface\n    ";
 
 	    $upcmds .= "ipfw pipe $pipeno config delay ${delay}ms " .
-	               "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
+	               "bw ${bandw}Kbit/s plr $plr $queue $redparams\n    ";
 
-	    $downcmds .= "ipfw pipe delete $pipeno\n";
-	    $downcmds .= "ipfw delete $pipeno\n";
+	    # not needed due to flush commands output below
+	    if (defined($vnodeid)) {
+		$downcmds .= "ipfw pipe delete $pipeno\n    ";
+		$downcmds .= "ipfw delete $pipeno\n    ";
+	    }
 
 	    if ($type eq "duplex") {
 		#
@@ -568,13 +877,16 @@ sub LinkDelaySetup
 		# 1 queue slot is not enough. Make it 4 instead.
 		#
 		$upcmds .= "ipfw add $rpipeno pipe $rpipeno ip from any ".
-		           "to any in recv $iface\n";
+		           "to any in recv $iface\n    ";
 
 		$upcmds .= "ipfw pipe $rpipeno config delay ${rdelay}ms ".
-		           "bw ${rbandw}Kbit/s plr $rplr queue 5\n";
+		           "bw ${rbandw}Kbit/s plr $rplr queue 5\n    ";
 
-		$downcmds .= "ipfw pipe delete $rpipeno\n";
-		$downcmds .= "ipfw delete $rpipeno\n";
+		# not needed due to flush commands output below
+		if (defined($vnodeid)) {
+		    $downcmds .= "ipfw pipe delete $rpipeno\n    ";
+		    $downcmds .= "ipfw delete $rpipeno\n    ";
+		}
 	    }
 
 	    if ($type eq "duplex") {
@@ -588,22 +900,57 @@ sub LinkDelaySetup
 	close(MAP);
 
 	print DEL "#!/bin/sh\n";
-	print DEL "# auto-generated by libsetup.pm, DO NOT EDIT\n";
+	print DEL "# auto-generated by delaysetup.pm, DO NOT EDIT\n";
+
+	#
+	# For FreeBSD 6 and beyond we must configure the number of kernel
+	# mbuf clusters via sysctl, there is no param in the kernel anymore.
+	#
+	# We also load the IPFW2 and dummynet code if necessary.
+	#
+	if ($FBSD_VERSION >= 6) {
+	    my $MPATH = $KERNELLDELAY;
+	    $MPATH =~ s/\/[^\/]+$//;
+
+	    print DEL "if [ `sysctl -n kern.ipc.nmbclusters` -lt 65536 ]; then\n";
+	    print DEL "    sysctl -w kern.ipc.nmbclusters=65536\n";
+	    print DEL "fi\n";
+
+	    print DEL "if ! sysctl net.inet.ip.fw.enable >/dev/null 2>&1; then\n";
+	    print DEL "    kldload $MPATH/ipfw.ko || {\n";
+	    print DEL "        echo \"Could not load IPFW code\"\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "    ipfw add 65534 allow all from any to any\n";
+	    print DEL "fi\n";
+
+	    print DEL "if ! sysctl net.inet.ip.dummynet.curr_time >/dev/null 2>&1; then\n";
+	    print DEL "    kldload $MPATH/dummynet.ko || {\n";
+	    print DEL "        echo \"Could not load dummynet code\"\n";
+	    print DEL "        exit 1\n";
+	    print DEL "    }\n";
+	    print DEL "fi\n";
+	}
+
 	# Main boot only.
 	if (!defined($vnodeid)) {
+	    print DEL "ipfw -f pipe flush\n";
 	    print DEL "ipfw -f flush\n";
+	    if ($FBSD_VERSION >= 6) {
+		print DEL "ipfw add 65534 allow all from any to any\n";
+	    }
 	}
 	print DEL "if [ x\$1 = x ]; then action=enable; else action=\$1; fi\n";
 	print DEL "case \"\$action\" in\n";
 	print DEL "  enable)\n";
-	print DEL "     $upcmds\n";
+	print DEL "    $upcmds\n";
 	# Turn off Flow-based IP (fast) forwarding since it causes packets
 	# to bypass traffic shaping and ipfw. Stupid!
-	print DEL "     sysctl -w net.inet.ip.fastforwarding=0\n";
-	print DEL "     ;;\n";
+	print DEL "    sysctl -w net.inet.ip.fastforwarding=0\n";
+	print DEL "    ;;\n";
 	print DEL "  disable)\n";
-	print DEL "     $downcmds\n";
-	print DEL "     ;;\n";
+	print DEL "    $downcmds\n";
+	print DEL "    ;;\n";
 	print DEL "esac\n";
 	close(DEL);
 	chmod(0755, TMLINKDELAY);
@@ -612,57 +959,141 @@ sub LinkDelaySetup
 	# node. See routing setup. Need to avoid fastforwarding whenever we
 	# have link delays.
 	system("touch " . ISDELAYNODEPATH());
-
-	#
-	# Now do kernel configuration. All of the above work is wasted,
-	# but such is life.
-	#
-	if (!$gotjails) {
-	    $kernel = $KERNELLDELAY;
-	}
-	$checkreplace = 1;
-    }
-    if ($checkreplace) {
-	checkkernel($kernel);
     }
     return 0;
 }
 
 #
 # Check kernel config, and reboot.
+# Returns 0 if kernel is already ok, non-zero if kernel could not be fixed.
 #
-sub checkkernel($)
+sub checkkernel($$)
 {
-    my($kernel) = @_;
+    my ($kernel,$kernelhz) = @_;
+    my $needreboot = 0;
+    my $failed = 0;
 
-    print STDOUT "Making sure node is running $kernel ... \n";
+    print STDOUT "Making sure node is running $kernel at ${kernelhz}HZ ...\n";
 
+    #
+    # See if kernel is running at the correct HZ.
+    # Update the loader.conf file and reboot if not.
+    #
+    # XXX we only do this for FreeBSD 6 and above since before since,
+    # before that, we had special kernels with hardwired HZ for delay nodes.
+    #
+    if ($FBSD_VERSION >= 6) {
+	if ($currenthz > 0) {
+	    if ($currenthz != $kernelhz) {
+		print STDOUT "Updating kernel HZ ($currenthz -> $kernelhz) ...\n";
+		#
+		# See if there is a custom Emulab command line setting.
+		# If so, warn and do not change.
+		#
+		my $binfo = `$BINDIR/tmcc bootwhat`;
+		if ($binfo =~ /HZ=(\d+)/ && int($1) == $currenthz) {
+		    print "*** WARNING: custom HZ value on command line, ".
+			  "not changing to $kernelhz.\n";
+		    return 0;
+		}
+		if (-e "/boot/loader.conf") {
+		    #
+		    # If already running a custom HZ rate, don't change it.
+		    # Just warn and continue.
+		    #
+		    if (!system("grep '^kern.hz=' /boot/loader.conf 2>&1 >/dev/null")) {
+			print "*** WARNING: kernel running custom HZ value, ".
+			      "not changing to $kernelhz.\n";
+			return 0;
+		    }
+		    #
+		    # Otherwise back up the existing config before changing
+		    #
+		    if (system("cp -fp /boot/loader.conf /boot/loader.conf.bak")) {
+			print "Could not backup loader.conf! ".
+			    "Aborting HZ change.\n";
+			return 1;
+		    }
+		}
+		if (!open(FD, ">>/boot/loader.conf")) {
+		    print "Could not set new HZ value in loader.conf! ".
+			"Aborting HZ change.\n";
+		    return 1;
+		}
+		print FD "\n# The following was added by delay setup.\n";
+		print FD "kern.hz=$kernelhz\n";
+		close(FD);
+		$needreboot = 1;
+	    }
+	} else {
+	    print "*** WARNING: Could not determine HZ value of kernel! ".
+		  "Continuing anyway.\n";
+	}
+    }
+
+    #
+    # Make sure we are running the desired kernel.
+    #
     if (-e $kernel) {
-	if (system("cmp -s /kernel $kernel") != 0) {
-	    if (system("cp -f /kernel /kernel.save")) {
+	#
+	# In FreeBSD 5 and above, the command line is used to ensure we
+	# boot the correct kernel.  So just complain if it is not right,
+	# as we have no way to fix it.
+	#
+	if ($FBSD_VERSION >= 5) {
+	    my $curkernel = `sysctl -n kern.bootfile`;
+	    chomp($curkernel);
+	    if ($curkernel ne $kernel) {
+		print "*** WARNING: FreeBSD 5+ running wrong kernel ".
+		      "'$curkernel', should be '$kernel'. ".
+		      "Continuing anyway.\n";
+	    }
+	}
+	elsif (system("cmp -s /kernel $kernel") != 0) {
+	    print STDOUT "Copying $kernel to /kernel ...\n";
+	    if (system("cp -fp /kernel /kernel.save")) {
 		print "Could not backup /kernel! Aborting kernel change\n";
+		$failed++;
 	    }
-	    elsif (! unlink("/kernel")) {
+	    elsif (!unlink("/kernel")) {
 		print "Could not unlink /kernel! Aborting kernel change\n";
+		unlink("/kernel.save");
+		$failed++;
 	    }
-	    elsif (system("cp -f $kernel /kernel")) {
+	    elsif (system("cp -fp $kernel /kernel")) {
 		print "Could not cp $kernel to /kernel!\n";
+		rename("/kernel.save", "/kernel");
+		$failed++;
 	    }
 	    else {
-		print "Copied $kernel to /kernel.\n";
-		
-		system("sync");
-		system("reboot");
-		#
-		# Make sure that, even if the reboot command returns
-		# before the node is totally down, this process doesn't
-		# exit (otherwise, we would proceed with testbed setup)
-		#
-		sleep(10000);
+		$needreboot = 1;
 	    }
 	}
     }
     else {
-	print "Kernel $kernel does not exist!\n";
+	print "*** WARNING: $kernel does not exist! ".
+	      "Continuing anyway.\n";
     }
+    if ($failed) {
+	return 1;
+    }
+
+    #
+    # Finally, reboot if necessary.
+    #
+    if ($needreboot) {
+	print STDOUT "Rebooting to $kernel ...\n";
+	system("sync");
+	system("reboot");
+	#
+	# Make sure that, even if the reboot command returns
+	# before the node is totally down, this process doesn't
+	# exit (otherwise, we would proceed with testbed setup)
+	#
+	sleep(10000);
+	print "Failed to reboot! Aborting.\n";
+	return 1;
+    }
+
+    return 0;
 }

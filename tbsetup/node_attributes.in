@@ -1,9 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -13,9 +14,9 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print("Usage: node_attributes {-m|a} name=value [name=value ...] node [node ...]\n".
-          "       node_attributes -r attr [attr ... ] node\n".
-          "       node_attributes -r attr [attr ... ] nodelist: node [node ...]\n".
+    print("Usage: node_attributes -m|a name=value [name=value ...] node ...\n".
+          "       node_attributes -r attr [attr ...] node\n".
+          "       node_attributes -r attr [attr ...] nodelist: node ...\n".
           "       node_attributes -l node [node ...]\n".
           "\n".
           "Must specify one of: ".
@@ -24,10 +25,9 @@ sub usage()
           "       -r remove attributes\n".
           "       -l list attributes\n".
           "\n".
-          "For multi-node attribute removal, use the \"nodelist:\" syntax");
+          "For multi-node attribute removal, use the \"nodelist:\" syntax\n");
     exit(-1);
 }
-
 my  $optlist = "mardl";
 
 #
@@ -60,11 +60,9 @@ my $list_attrs   = 0;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-if (!TBAdmin($UID)) {
-    print "Error: You must be an admin to use this command!\n";
-    exit(-1);
-}
+use Node;
+use User;
+use Experiment;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -119,6 +117,19 @@ if (! @ARGV) {
 }
 
 #
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("*** $0:\n".
+	"    You ($UID) do not exist!\n");
+}
+if (!$this_user->IsAdmin()) {
+    die("*** $0:\n".
+	"    You must be an admin to use this command!\n");
+}
+
+#
 # Shift off the set strings (name=value). Verify that each one is in the
 # proper format.
 #
@@ -165,19 +176,13 @@ if (! @ARGV) {
 }
     
 # Untaint the nodes.
-foreach my $node ( @ARGV ) {
-    if ($node =~ /^([-\w]+)$/) {
-        $node = $1;
+foreach my $n ( @ARGV ) {
+    my $node = Node->Lookup($n);
+    if (!defined($node)) {
+	die("*** $0:\n".
+	    "    Node $n does not exist!\n");
     }
-    else {
-        die("Bad node name: $node.");
-    }
-
-    if (!TBValidNodeName($node)) {
-        die("Node is not a valid node: $node\n");
-    }
-    
-    push(@nodes, $node);
+    push(@nodes, $node->node_id());
 }
 
 if ($debug) {

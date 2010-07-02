@@ -1,4 +1,8 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Anytime you change database-create.sql, but sure to put any special
 # (sql) instructions that need to be executed to bring an existing DB
 # into compliance.
@@ -2080,7 +2084,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table firewalls add vlan int(11) default NULL;
 
-       update table_regex set check='^(ipfw|ipfw2|ipchains|ipfw2-vlan)$' \
+       update table_regex set `check`='^(ipfw|ipfw2|ipchains|ipfw2-vlan)$' \
            where table_name='firewalls' and column_name='type';
 
        INSERT INTO os_info VALUES ('FW-IPFW2','emulab-ops','FW-IPFW2', \
@@ -2179,7 +2183,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	 enum('open','closed','basic','emulab') not NULL default 'basic';
        ALTER table default_firewall_rules MODIFY style \
 	 enum('open','closed','basic','emulab') not NULL default 'basic';
-       UPDATE table_regex SET check='^(open|closed|basic|emulab)$' WHERE \
+       UPDATE table_regex SET `check`='^(open|closed|basic|emulab)$' WHERE \
 	 table_name='firewalls' AND column_name='style';
 
        and update the default rules:
@@ -2801,9 +2805,10 @@ last_net_act,last_cpu_act,last_ext_act);
 4.9: Add a 'global_vtypes' table to allow admins to create vtypes that apply
     to all users:
 
-        create table global_vtypes (vtype varchar(30) primary key, \
-                                    weight float not null default 0.5, \
-                                    types text not null default "");
+        create table global_vtypes \
+	 (vtype varchar(30) not null default '' primary key, \
+          weight float not null default 0.5, \
+          types text not null default "");
 
 4.10: New inner_elab roles to support separate ops and fs nodes.
       While I'm here, add future roles for distinguishing boss and the router.
@@ -3025,7 +3030,7 @@ last_net_act,last_cpu_act,last_ext_act);
 4.25: Modify tables for the logging subsystem
 
   alter table log
-    modify level tinyint(2) not null,
+    modify level tinyint(2) not null default '0',
     add sublevel tinyint(2) NOT NULL default 0 after level,
     modify type 
       enum('normal','entering','exiting','thecause','extra','summary')
@@ -3033,7 +3038,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
   alter table scripts change name script_name varchar(24) NOT NULL default '';
 
-  alter table priorities change name priority_name varchar(8) NOT NULL;
+  alter table priorities change name priority_name varchar(8) \
+      NOT NULL default '';
 
 4.26: Add tables for the checkup_daemon.
 
@@ -3178,12 +3184,12 @@ last_net_act,last_cpu_act,last_ext_act);
      structured fashion:
 
 	CREATE TABLE errors (
-	  session int unsigned NOT NULL,
-	  stamp int unsigned NOT NULL,
-	  exptidx int NOT NULL,
-	  script smallint(3) NOT NULL,
-	  cause varchar(16) NOT NULL,
-	  confidence float NOT NULL,
+	  session int(1) unsigned NOT NULL default '0',
+	  stamp int(10) unsigned NOT NULL default '0',
+	  exptidx int(11) NOT NULL default '0',
+	  script smallint(3) NOT NULL default '0',
+	  cause varchar(16) NOT NULL default '',
+	  confidence float NOT NULL default '0',
 	  mesg text NOT NULL,
 	  primary key (session)
 	);
@@ -3195,14 +3201,14 @@ last_net_act,last_cpu_act,last_ext_act);
 	  add log_session int unsigned;
 
 	CREATE TABLE causes (
-	  cause varchar(16) NOT NULL,
-	  cause_desc varchar(32) NOT NULL,
+	  cause varchar(16) NOT NULL default '',
+	  cause_desc varchar(32) NOT NULL default '',
 	  primary key (cause),
 	  unique key (cause_desc)
 	);
 
         ALTER TABLE log 
-          change cause cause varchar(16) NOT NULL,
+          change cause cause varchar(16) NOT NULL default '',
           change pidx exptidx int NOT NULL default '0';
 
 	INSERT INTO exported_tables values ('causes');
@@ -3267,4 +3273,1320 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table nodes drop column next_pxe_boot_path;
 
 4.44: Changes to templates.sql. Skip this revision for now.
+
+4.45: More changes to templates.sql. Also:
+
+	alter table experiments add column instance_idx int(10) \
+	    unsigned NOT NULL default '0' AFTER locpiper_port;
+
+4.46: Changes to templates.sql. Skip this revision for now.
+
+4.47: Ack, need another field in the primary key for virt_node_motelog:
+
+      alter table virt_node_motelog drop primary key;
+      alter table virt_node_motelog add primary key(pid,eid,vname,logfileid);
+
+4.48: Add index to log table.
+
+      alter table log add key stamp (stamp);
+
+4.49: Ugh, node_types.pxe_boot_path is back.  Allows alternate PXE boot
+      path for a whole type of node, e.g., one which does not support a
+      serial console.  Put it right back where it was before.
+
+      alter table node_types add column pxe_boot_path text \
+          after modelnetedge_osid;
+
+4.50: Make 'state' an index in the experiment table to knock down a couple
+      of frequent heavyweight queries.
+
+      alter table experiments add index (state);
+
+4.51: Another index to improve lookup in linkdelays.
+
+      alter table linkdelays add index id (pid,eid);
+
+4.52: Mr. Index strikes again.  Take a nodecontrol_form query from 21 to 1 sec.
+
+      alter table partitions add index (osid);
+
+4.53: Changes to templates.sql. Skip this revision for now.
+
+4.54: Minor changes to schema; add some quotes around field names that
+      are now reserved words mysql 5.X. Skip to the next entry ...
+
+4.55: Changes to templates.sql. Skip this revision for now.
+
+4.56: Refactor "log" table to move some stuff into a new table.
+
+      CREATE TABLE session_info (
+        session int(11) NOT NULL default '0',
+        uid int(11) NOT NULL default '0',
+        exptidx int(11) NOT NULL default '0',
+        PRIMARY KEY  (session)
+      );
+
+      lock tables log write, session_info write;
+
+      insert into session_info
+        select session, uid, exptidx from log 
+        where uid != 0 or exptidx != 0
+        group by session;
+
+      [If either of the above queries failed.  Stop now and fix it as
+       the next will destroy the information.]
+
+      alter table log
+        drop column uid,
+        drop column exptidx;
+
+      lock tables log read, session_info read;
+
+      [Now install the new code, do it before you unlock the table, as
+       the last statement made an incompatible change to the "log" table]
+
+      unlock tables;
+
+4.57: Changes to templates.sql. Skip this revision for now.
+
+4.58: Fix to the schema in last revision; Skip to next extry.
+
+4.59: Add reserved table plab_role field to distinguish nodes in an
+      "inner planetlab".
+
+      alter table reserved add plab_role enum('plc','node','none') \
+	NOT NULL default 'none' after inner_elab_boot;
+
+      alter table reserved add plab_boot tinyint(1) \
+	default '0' after plab_role;
+
+      alter table virt_nodes add plab_role enum('plc','node','none') \
+	NOT NULL default 'none' after inner_elab_role;
+
+4.60: Various changes to templates.
+
+      **** Skip this if you just did 4.41 above.
+
+      alter table experiment_template_metadata_items \
+               change value value mediumtext;
+
+      alter table experiment_template_metadata \
+               add hidden tinyint(1) NOT NULL default '0';
+
+      alter table experiment_template_metadata \
+               add metadata_type enum('tid','template_description',\
+                        'parameter_description') default NULL;
+
+      alter table experiment_template_parameters add \
+               metadata_guid varchar(16) default NULL;
+      alter table experiment_template_parameters add \
+               metadata_vers smallint(5) unsigned NOT NULL default '0';
+
+4.61: Add archive_tag slot to experiment runs so we can find the
+      corresponding spot in the archive.
+
+      **** Skip this if you just did 4.41 above.
+
+      alter table experiment_runs add \
+            archive_tag varchar(32) default NULL after description;
+
+4.62:
+4.63: Add a slot to the hold the name of optional per-experiment DB.
+
+      alter table experiments add dpdb tinyint(1) NOT NULL default '0';
+      alter table experiments add dpdbname varchar(64) default NULL;
+      alter table experiment_stats add dpdbname varchar(64) default NULL;
+
+4.64: Fix archive tags to be proper size.
+
+      alter table experiment_resources change archive_tag \
+          archive_tag varchar(64) default NULL;
+
+      **** Skip this statement if you just did 4.41 above.
+
+      alter table experiment_runs change archive_tag \
+          archive_tag varchar(64) default NULL;
+
+4.65: Minor fix; skip to next entry;
+4.66: More fixes; skip to next entry;
+
+4.67: Add a foreign_admin field to the users table for testbed-admins elsewhere.
+       alter table users add column foreign_admin tinyint(4) default '0' after admin;
+
+4.68: Changes to the login table to allow users to be logged in from
+      more then one browser at a time.
+
+      drop table login;
+
+      CREATE TABLE login (
+        uid varchar(10) NOT NULL default '',
+        hashkey varchar(64) NOT NULL default '',
+        hashhash varchar(64) NOT NULL default '',
+        timeout varchar(10) NOT NULL default '',
+        adminon tinyint(1) NOT NULL default '0',
+        PRIMARY KEY  (uid,hashkey),
+        UNIQUE KEY hashhash (uid,hashhash)
+      ) TYPE=MyISAM;
+
+      This immediately logs everyone out from the web interface. but
+      thats not really a big deal.
+
+4.69: Add template_tag to experiment_template_instances table.
+
+      **** Skip this if you just did 4.41 above.
+
+      	alter table experiment_template_instances add \
+		template_tag varchar(64) default NULL;
+
+4.70: Add latitude and longitude to the widearea_nodeinfo table.
+
+      alter table widearea_nodeinfo
+          add latitude latitude float default NULL,
+          add longitude longitude float default NULL;
+ 
+4.71: Support for 802.1q tagged VLAN based virtual interfaces.
+      First, generalize the encapsulation field.  For compatibility,
+      we create a new field, we'll delete the old veth_encapsulate at
+      some future time.  We also add a VLAN number field to the vlans
+      table, create
+
+        alter table experiments add encap_style \
+		enum('alias','veth','veth-ne','vlan','default') \
+		NOT NULL default 'default' after veth_encapsulate;
+	insert into table_regex values \
+		('experiments','encap_style','text','regex','^(alias|veth|veth-ne|vlan|default)$',0,0,NULL);
+	update experiments set encap_style='veth-ne' where veth_encapsulate=0;
+
+	alter table virt_lans add encap_style \
+		enum('alias','veth','veth-ne','vlan','default') \
+		NOT NULL default 'default' after usevethiface;
+	insert into table_regex values \
+		('virt_lans','encap_style','text','redirect','experiments:encap_style',0,0,NULL);
+	update virt_lans set encap_style='veth' where usevethiface=1;
+
+	alter table vlans add tag smallint(5) NOT NULL default '0' \
+		after id;
+        alter table vlans drop index pid;
+        alter table vlans add index pid (pid,eid,virtual);
+
+	alter table interfaces drop column IPalias;
+
+	CREATE TABLE vinterfaces (
+	  node_id varchar(32) NOT NULL default '',
+	  unit int(10) unsigned NOT NULL auto_increment,
+	  mac varchar(12) NOT NULL default '000000000000',
+	  IP varchar(15) default NULL,
+	  mask varchar(15) default NULL,
+	  type enum('alias','veth','veth-ne','vlan') NOT NULL default 'veth',
+	  iface varchar(10) default NULL,
+	  rtabid smallint(5) unsigned NOT NULL default '0',
+	  vnode_id varchar(32) default NULL,
+	  PRIMARY KEY (node_id, unit),
+	  KEY bynode (node_id, iface),
+	  KEY type (type)
+	) TYPE=MyISAM;
+
+      To populate the vinterfaces table run:
+
+        sudo ./initvinterfaces.pl
+
+4.72: Re-add changes I made in revision 4.54 which got lost when Rob
+      did revision 4.70. Skip to next entry please ...
+
+4.73: Add two columns for to "log" table for better error reporting:
+
+       alter table log
+          add attempt tinyint(1) not null default 0 after session,
+          add cleanup tinyint(1) not null default 0 after attempt;
+
+4.74: Add new node_type_attributes table:
+
+	CREATE TABLE node_type_attributes (
+	  type varchar(30) NOT NULL default '',
+	  attrkey varchar(32) NOT NULL default '',
+	  attrvalue tinytext NOT NULL,
+	  attrtype enum('integer','float','boolean','string') default 'string',
+	  PRIMARY KEY  (type,attrkey),
+	  KEY node_id (type)
+	) TYPE=MyISAM;
+
+      To populate:
+
+         ./init_nodeattrs.pl | mysql tbdb
+
+      Now it is safe to do this:
+
+	create table node_types_save like node_types;
+	insert into node_types_save select * from node_types;
+	alter table node_types drop proc;
+	alter table node_types drop speed;
+	alter table node_types drop RAM;
+	alter table node_types drop HD;
+	alter table node_types drop max_interfaces;
+	alter table node_types drop osid;
+	alter table node_types drop control_net;
+	alter table node_types drop power_time;
+	alter table node_types drop imageid;
+	alter table node_types drop imageable;
+	alter table node_types drop delay_capacity;
+	alter table node_types drop virtnode_capacity;
+	alter table node_types drop control_iface;
+	alter table node_types drop disktype;
+	alter table node_types drop bootdisk_unit;
+	alter table node_types drop delay_osid;
+	alter table node_types drop jail_osid;
+	alter table node_types drop pxe_boot_path;
+	alter table node_types drop simnode_capacity;
+	alter table node_types drop trivlink_maxspeed;
+	alter table node_types drop isrebootable;
+	alter table node_types drop bios_waittime;
+	alter table node_types drop adminmfs_osid;
+	alter table node_types drop diskloadmfs_osid;
+
+      At some point you will want to drop the node_types_save table
+      ...
+
+4.75: Add table to cache last viewed visualization, to avoid
+      regeneration delays.
+  
+	CREATE TABLE vis_graphs (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  zoom decimal(8,3) NOT NULL default '0',
+	  detail tinyint(2) NOT NULL default '0',
+	  image mediumblob,
+	  PRIMARY KEY  (pid,eid)
+	) TYPE=MyISAM;
+
+
+      Also add a "active" flag to the experiment_template to use in
+      determining which templates the user is currently interested in.
+
+      **** Skip this if you just did 4.41 above.
+
+      alter table experiment_templates add \
+            active tinyint(1) NOT NULL default '0.000';
+
+4.76: Change to previous revision; skip to next entry.
+
+4.77: Add a child template pointer to experiment_templates to store
+      the guid of the most recent child (modification). Better then
+      passing this info back in a print statement to be parsed.
+
+      **** Skip this if you just did 4.41 above.
+
+      alter table experiment_templates add \
+          child_guid varchar(16) default NULL after parent_vers;
+      alter table experiment_templates add \
+          child_vers smallint(5) unsigned default NULL after child_guid;
+
+4.78: Add trace_db flags to virt_lans and traces tables.
+
+      alter table virt_lans add \
+               trace_db tinyint(1) NOT NULL default '0';
+      alter table traces add \
+               trace_db tinyint(1) NOT NULL default '0';
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      Add timestamp the experiment_template_instances to note when the
+      last export was done. 
+       
+      alter table experiment_template_instances add \
+                export_time datetime default NULL;
+
+4.79: Add a table to record temporary databases created on ops, that
+      are not associated with an experiment (or a project/group). This
+      is to make it easier to generate the proper permission lists for
+      db access.
+       
+	CREATE TABLE datapository_databases (
+	  dbname varchar(64) NOT NULL default '',
+	  pid varchar(12) NOT NULL default '',
+	  gid varchar(16) NOT NULL default '',
+	  uid varchar(8) NOT NULL default '',
+	  created datetime default NULL,
+	  PRIMARY KEY  (dbname)
+	) TYPE=MyISAM;
+
+4.80: Fix to previous revision; Skip to next entry.
+
+4.81: Add a table to store dynamic template events. These events are
+      copied into the event stream when creating an instance (added to
+      the eventlist for the experiment).
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+	CREATE TABLE experiment_template_events (
+	  parent_guid varchar(16) NOT NULL default '',
+	  parent_vers smallint(5) unsigned NOT NULL default '0',
+	  vname varchar(64) NOT NULL default '',
+	  vnode varchar(32) NOT NULL default '',
+	  time float(10,3) NOT NULL default '0.000',
+	  objecttype smallint(5) unsigned NOT NULL default '0',
+	  eventtype smallint(5) unsigned NOT NULL default '0',
+	  arguments text,
+	  PRIMARY KEY  (parent_guid, parent_vers, vname)
+	) TYPE=MyISAM;
+
+4.82: Add Support For Mike Kasick Reporter Mechanism.  This need to be
+      done in two parts.
+  
+      1) Add report_* tables:
+
+         mysql tbdb < tbreport.sql
+
+      2) Modify exiting tables:     
+
+         lock tables log write, emulab_indicies write;
+
+         insert into emulab_indicies (name,idx) 
+             select 'cur_log_seq', max(seq) from log;
+
+         alter table log 
+            change seq seq int unsigned not null default '0', 
+            change type type enum('normal','entering','exiting','thecause',
+                                  'extra','summary','primary','secondary') 
+                             default 'normal';
+
+         lock tables log read, emulab_indicies read;
+
+         [Now install the new code, do it before you unlock the table, 
+          otherwise risk cur_log_seq getting out if sync.]
+
+         unlock tables;
+
+4.83: Add a per-experiment port registration table. See tmcd.c
+
+	CREATE TABLE port_registration (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  service varchar(64) NOT NULL default '',
+	  node_id varchar(32) NOT NULL default '',
+	  port int(11) unsigned NOT NULL default '0',
+	  PRIMARY KEY  (pid,eid,service)
+	) TYPE=MyISAM;
+
+4.84: Add "invocation" column to report_error
+
+      alter table report_error
+          add column invocation integer unsigned not null after session;
+
+4.85: Fix to previous revision; Skip to next entry.
+
+4.86: Fix up column definitions for latitude and longitude in 
+      widearea_nodeinfo table.
+
+      alter table widearea_nodeinfo
+          change latitude latitude float default NULL,
+          change longitude longitude float default NULL;
+
+4.87: Add description field to virt_parameters so that we can pass
+      through a default description from the NS file for parameters.
+
+      **** Skip this stuff below if you just did 4.41 above.
+      
+      alter table virt_parameters add description text;
+
+4.88: Add bwlimit field to widearea_nodinfo table to track the bandwidth
+      caps for plab nodes.
+
+      alter table widearea_nodeinfo add bwlimit varchar(32) default NULL;
+
+4.89: Add starting and ending archive tags to experiment run, to
+      replace the single end of run archive tag.
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      alter table experiment_runs add \
+        starting_archive_tag varchar(64) default NULL after description;
+      alter table experiment_runs add \
+        ending_archive_tag varchar(64) default NULL after starting_archive_tag;
+      update experiment_runs set ending_archive_tag=archive_tag \
+           where archive_tag is not null and archive_tag!='';
+      update experiment_runs set starting_archive_tag=archive_tag \
+           where archive_tag is not null and archive_tag!='';
+
+4.90: Add a swapmod flag to the experiment run to indicate that a swapmod
+      was resquested by the user.
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      alter table experiment_runs add swapmod tinyint(1) NOT NULL default '0';
+
+4.91: Add a table to store the ids of nodes that fail during an
+      instance (well, run). 
+
+	CREATE TABLE experiment_template_instance_deadnodes (
+	  instance_idx int(10) unsigned NOT NULL default '0',
+	  exptidx int(10) unsigned NOT NULL default '0',
+	  runidx int(10) unsigned NOT NULL default '0',
+	  node_id varchar(32) NOT NULL default '',
+	  vname varchar(32) NOT NULL default '',
+	  PRIMARY KEY  (instance_idx, runidx, node_id)
+	) TYPE=MyISAM;
+
+4.92: Add a per-experiment DP password so that users do not need to
+      use their own.
+
+      alter table experiments add dpdbpassword varchar(64) default NULL;
+
+4.93: Add pause_time field to template instance to track when user
+      stops time. Since this is strictly for the purposes of setting
+      the timestamps on "record" events, its very simple. In other
+      words, this ain't gonna support time travel!
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      alter table experiment_template_instances add \
+         pause_time datetime default NULL after stop_time;
+      alter table experiment_template_instances add \
+         continue_time datetime default NULL after stop_time;
+      alter table experiment_template_instances add \
+         runtime int(10) unsigned default 0 after continue_time;
+
+4.94: Minor fix to last revision; skip to next entry please.
+
+4.95: Add a locked field to the instances table.
+
+      alter table experiment_template_instances add \
+           locked datetime default NULL;
+
+4.96: Oops, forgot part of last revision!
+
+      alter table experiment_template_instances add \
+             locker_pid int(11) default '0';
+
+4.97: Add description to instances table, to hold until the swapin is
+      done. Cannot be modified (yet).
+
+      **** Skip this stuff below if you just did 4.41 above.
+
+      alter table experiment_template_instances add \
+             description tinytext after uid;
+
+4.98: Drop the columns from the node_types table, that were supposed
+      to be done in revision 4.74 above. Skip to next revision ...
+
+4.99: Add columns to errors table for better information on errors
+
+      alter table errors
+          add column rank tinyint(1) not null default 0 after session,
+	  drop primary key,
+	  add primary key (session, rank),
+	  add column inferred tinyint(1) null after confidence,
+	  add column need_more_info tinyint(1) null after inferred,
+	  add column tblog_revision varchar(8) not null after mesg;
+
+4.100: Add uid_idx column to users table, to become the new unique id
+       for all users.
+       Add pid_idx column to projects table, to become the new unique id
+       for all projects.
+       Add gid_idx column to groups table, to become the new unique id
+       for all groups.
+
+       Order matters ...
+
+       alter table users add 
+           uid_idx mediumint(8) unsigned NOT NULL default '0' after uid;
+       alter table users drop primary key;
+       alter table users add UNIQUE KEY uid (uid);
+       
+       alter table user_stats change uid_idx 
+           uid_idx mediumint(8) unsigned NOT NULL default '0';
+
+       alter table deleted_users change uid_idx 
+           uid_idx mediumint(8) unsigned NOT NULL default '0';
+
+       alter table projects add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after pid;
+       alter table projects drop primary key;
+       alter table projects add UNIQUE KEY pid (pid);
+
+       alter table project_stats add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after pid;
+       alter table project_stats drop primary key;
+       alter table project_stats add UNIQUE KEY pid (pid);
+	   
+       alter table groups add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after gid;
+       alter table groups add 
+           gid_idx mediumint(8) unsigned NOT NULL default '0' after pid_idx;
+       alter table groups drop primary key;
+       alter table groups add KEY pididx (pid_idx,gid_idx);
+       alter table groups add UNIQUE KEY pidgid (pid,gid);
+
+       alter table group_stats add 
+           gid_idx mediumint(8) unsigned NOT NULL default '0' after gid;
+       alter table group_stats drop primary key;
+       alter table group_stats add UNIQUE KEY pidgid (pid,gid);
+
+       alter table group_membership add 
+           uid_idx mediumint(8) unsigned NOT NULL default '0' after pid;
+       alter table group_membership add 
+           pid_idx mediumint(8) unsigned NOT NULL default '0' after uid_idx;
+       alter table group_membership add 
+           gid_idx mediumint(8) unsigned NOT NULL default '0' after pid_idx;
+       alter table group_membership drop primary key;
+       alter table group_membership add UNIQUE KEY uid (uid,pid,gid);
+       
+       # Now run this script to populate the indexes and create new KEYS.
+
+         ./init_newids.pl
+
+4.101: Add a dual/single elabinelab control network flag to
+       experiments table.
+
+	alter table experiments add elabinelab_singlenet tinyint(1) \
+            NOT NULL default '0' after elabinelab_nosetup;
+
+4.102: Fixes to report tables for mysql 3.23; must provide defaults
+       when declared NOT NULL.
+
+	alter table report_assign_violation change `seq`
+                  `seq` int(10) unsigned NOT NULL default '0';
+
+	alter table report_context change `seq`
+                  `seq` int(10) unsigned NOT NULL default '0';
+
+	alter table errors change tblog_revision
+                  tblog_revision varchar(8) NOT NULL default '';
+
+	alter table report_error
+            change `seq` `seq` int(10) unsigned NOT NULL default '0',
+            change `stamp` `stamp` int(10) unsigned NOT NULL default '0',
+            change `session` `session` int(10) unsigned NOT NULL default '0',
+            change `invocation` `invocation` int(10) unsigned NOT NULL default '0',
+            change `attempt` `attempt` tinyint(1) NOT NULL default '0',
+            change `severity` `severity` smallint(3) NOT NULL default '0',
+            change `script` `script` smallint(3) NOT NULL default '0',
+            change `error_type` `error_type` varchar(255) NOT NULL default '';
+
+4.103: Change the login table to use the uid_idx field, but also map
+       from the uid_idx to the uid for compatability with unchanged
+       code.
+
+        drop table login;
+	
+	CREATE TABLE login (
+	  uid_idx mediumint(8) unsigned NOT NULL default '0',
+	  uid varchar(10) NOT NULL default '',
+	  hashkey varchar(64) NOT NULL default '',
+	  hashhash varchar(64) NOT NULL default '',
+	  timeout varchar(10) NOT NULL default '',
+	  adminon tinyint(1) NOT NULL default '0',
+	  PRIMARY KEY  (uid_idx,hashkey),
+	  UNIQUE KEY hashhash (uid_idx,hashhash),
+	  UNIQUE KEY uidkey (uid,hashkey)
+	) TYPE=MyISAM;
+       
+
+4.104: More uid changes. First, add new status to users table:
+
+       alter table users change status 
+          status enum('newuser','unapproved','unverified','active',
+                      'frozen','archived','other') NOT NULL default 'newuser';
+
+       All of the other sql differences are made in the following script:
+
+         ./step2_newids.pl
+
+4.105: New type of metadata; annotations on templates, instances,
+       runs.
+
+       alter table experiment_template_metadata change metadata_type
+         metadata_type enum('tid','template_description',
+              'parameter_description', 'annotation') default NULL;
+
+4.106: More new metadata_types,
+
+       alter table experiment_template_metadata change metadata_type
+         metadata_type enum('tid','template_description',
+              'parameter_description', 'annotation',
+              'instance_description', 'run_description') default NULL;
+
+4.107: Fix to previous revision; skip to next entry.
+
+4.108: Add a table to store remote power cycling keys.  Should do fine for ASF
+       or IPMI.  Neither key_role nor key_uid is numeric since different specs
+       define the notions of roles and uids differently.  The auth_meta field
+       provides some expandability for additional operational metadata down the
+       road.
+
+       DROP TABLE IF EXISTS `outlets_remoteauth`;
+       CREATE TABLE `outlets_remoteauth` (
+         `node_id` varchar(32) NOT NULL,
+	 `key_type` varchar(64) NOT NULL,
+	 `key_role` varchar(64) NOT NULL default '',
+	 `key_uid` varchar(64) NOT NULL default '',
+	 `mykey` text NOT NULL,
+	 PRIMARY KEY  (`node_id`,`key_type`,`key_role`,`key_uid`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.109: More pid/gid changes.
+
+       All of the sql changes are made in the following script:
+
+         ./step3_newids.pl
+
+4.110: Minor fix to schema file; skip to next entry.
+
+4.111: Minor fix to schema file; skip to next entry.
+
+4.112: OSIDs and IMAGEIDs are now globally unique.
+
+       All of the sql changes are made in the following script:
+
+         ./step4_newids.pl
+
+4.113: Minor fix to schema file; skip to next entry.
+
+4.114: Add a workbench flag to the project table.
+
+       alter table projects add 
+           `allow_workbench` tinyint(1) NOT NULL default '0'
+	    after cvsrepo_public;
+
+4.115: Add custom history table for planetlab nodes.
+
+       DROP TABLE IF EXISTS `plab_nodehist`;
+       CREATE TABLE `plab_nodehist` (
+           `idx` mediumint(10) unsigned NOT NULL auto_increment,
+	   `node_id` varchar(32) NOT NULL,
+	   `phys_node_id` varchar(32) NOT NULL,
+	   `timestamp` datetime NOT NULL,
+	   `component` varchar(64) NOT NULL,
+	   `operation` varchar(64) NOT NULL,
+	   `status` enum('success','failure','unknown') NOT NULL default 'unknown',
+	   `msg` text,
+	   PRIMARY KEY  (`idx`,`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.116: Add a field to specify to which network a private PLC is connected.
+
+       alter table virt_nodes add 
+           `plab_plcnet` varchar(32) NOT NULL default 'none'
+	   after plab_role;
+
+4.117: Add a field to hold a legacy PLC slice ticket (since the migration from
+       3.x to 4.x continues).
+
+       alter table plab_slices add 
+           `slicemeta_legacy` text 
+	   after slicemeta;
+
+4.118: Add UUIDs to lots of tables.
+
+       All of the sql changes are made in the following script:
+
+         ./step5_newids.pl
+
+4.119: Add MBR "version number" to images table.  This might be considered
+       a step backward since it is not a GUID, but this field is viewed as
+       a temporary step.  Ultimately, OSIDs will have to have max sizes
+       associated with them so that MBRs (or GPTs or ...) can be dynamically
+       created per-image based on the OSIDs in the image, where they reside,
+       and what machine type they are being loaded on.
+
+       alter table images add
+	  `mbr_version` tinyint(4) NOT NULL default '1'
+	  after global;
+
+4.120: Convert to zip archives.
+
+	CREATE TABLE `archive_revisions` (
+	  `archive_idx` int(10) unsigned NOT NULL default '0',
+	  `revision` int(10) unsigned NOT NULL auto_increment,
+	  `parent_revision` int(10) unsigned default NULL,
+	  `tag` varchar(64) NOT NULL default '',
+	  `view` varchar(64) NOT NULL default '',
+	  `date_created` int(10) unsigned NOT NULL default '0',
+	  `description` text,
+	  `converted` tinyint(1) default '0',
+	  PRIMARY KEY  (`archive_idx`,`revision`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table archive_views add `revision` int(10) unsigned
+                default NULL after archive_idx;
+	alter table archive_views add `parent_revision` int(10) unsigned
+                default NULL after parent_view;
+	alter table archive_views change current_tag
+	        `current_tag` varchar(64) default NULL;
+	alter table archive_tags add `version` tinyint(1)
+	            default '0' after tagtype;
+
+4.121: Add a hidden bit to the runs table.
+
+	alter table experiment_runs add hidden tinyint(1) NOT NULL default '0';
+
+4.122: Add a table to store PlanetLab CoMon data, and another to store
+       cache latest statistics about planetlab nodes (a reduction of the data
+       in plab_nodehist).
+
+       CREATE TABLE `plab_comondata` (
+         `node_id` varchar(32) NOT NULL,
+	 `resptime` float default NULL,
+	 `uptime` float default NULL,
+	 `lastcotop` float default NULL,
+	 `date` double default NULL,
+	 `drift` float default NULL,
+	 `cpuspeed` float default NULL,
+	 `busycpu` float default NULL,
+	 `syscpu` float default NULL,
+	 `freecpu` float default NULL,
+	 `1minload` float default NULL,
+	 `5minload` float default NULL,
+	 `numslices` int(11) default NULL,
+	 `liveslices` int(11) default NULL,
+	 `connmax` float default NULL,
+	 `connavg` float default NULL,
+	 `timermax` float default NULL,
+	 `timeravg` float default NULL,
+	 `memsize` float default NULL,
+	 `memact` float default NULL,
+	 `freemem` float default NULL,
+	 `swapin` int(11) default NULL,
+	 `swapout` int(11) default NULL,
+	 `diskin` int(11) default NULL,
+	 `diskout` int(11) default NULL,
+	 `gbfree` float default NULL,
+	 `swapused` float default NULL,
+	 `bwlimit` float default NULL,
+	 `txrate` float default NULL,
+	 `rxrate` float default NULL,
+	 PRIMARY KEY  (`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+       CREATE TABLE `plab_nodehiststats` (
+         `node_id` varchar(32) NOT NULL,
+	 `unavail` float default NULL,
+	 `jitdeduct` float default NULL,
+	 `succtime` int(11) default NULL,
+	 `succnum` int(11) default NULL,
+	 `succjitnum` int(11) default NULL,
+	 `failtime` int(11) default NULL,
+	 `failnum` int(11) default NULL,
+	 `failjitnum` int(11) default NULL,
+	 PRIMARY KEY  (`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.123: Improvements to stats gathering code for experiments.
+
+	alter table experiment_resources 
+          add `uid_idx` mediumint(8) unsigned NOT NULL default '0'
+             after tstamp,
+	  add `swapin_time` int(10) unsigned NOT NULL default '0'
+	     after uid_idx,
+	  add `swapout_time` int(10) unsigned NOT NULL default '0'
+	     after swapin_time,
+	  add `swapmod_time` int(10) unsigned NOT NULL default '0'
+	     after swapout_time,
+	  add  `byswapmod` tinyint(1) unsigned default '0'
+	     after swapmod_time,
+	  add `byswapin` tinyint(1) unsigned default '0'
+	     after byswapmod;
+
+	Then run the following script. It is better if the testbed is
+	not in use at the time.
+
+	./resources.pl
+
+4.124: Add summary node utilization support.
+
+	CREATE TABLE `node_utilization` (
+	  `node_id` varchar(32) NOT NULL default '',
+	  `allocated` int(10) unsigned NOT NULL default '0',
+	  `down` int(10) unsigned NOT NULL default '0',
+	  PRIMARY KEY  (`node_id`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table nodes add `inception` datetime default NULL after role;
+
+	Then run the following script. It is better if the testbed is
+	not in use at the time.
+
+	./nodeutil.pl
+
+4.125: Minor fix to schema file; skip to next entry.
+
+4.126: The recent changes made to the firewalls table in step3_newids.pl were
+       omitted.  Nothing to do unless you had already passed version 4.109 .
+       Otherwise, re-run ./step3_newids.pl .
+
+4.127: Increase vtype name from 12 to 32 chars.
+
+	alter table virt_vtypes change name
+                  `name` varchar(32) NOT NULL default '';
+
+4.128: More historical data for experiments.
+
+	CREATE TABLE `experiment_input_data` (
+	  `idx` int(10) unsigned NOT NULL auto_increment,
+	  `md5` varchar(32) NOT NULL default '',
+	  `compressed` tinyint(1) unsigned default '0',
+	  `input` mediumblob,
+	  PRIMARY KEY  (`idx`),
+	  UNIQUE KEY `md5` (`md5`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	DROP TABLE IF EXISTS `experiment_pmapping`;
+	CREATE TABLE `experiment_pmapping` (
+	  `rsrcidx` int(10) unsigned NOT NULL default '0',
+	  `vname` varchar(32) NOT NULL default '',
+	  `node_id` varchar(32) NOT NULL default '',
+	  `node_type` varchar(30) NOT NULL default '',
+	  `node_erole` varchar(30) NOT NULL default '',
+	  PRIMARY KEY  (`rsrcidx`,`vname`,`node_id`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	CREATE TABLE `experiment_inputs` (
+	  `rsrcidx` int(10) unsigned NOT NULL default '0',
+	  `exptidx` int(10) unsigned NOT NULL default '0',
+	  `input_data_idx` int(10) unsigned NOT NULL default '0',
+	  PRIMARY KEY  (`rsrcidx`,`input_data_idx`),
+	  KEY `rsrcidx` (`rsrcidx`),
+	  KEY `exptidx` (`exptidx`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table experiment_resources add 
+           `input_data_idx` int(10) unsigned default NULL after archive_tag;
+	alter table experiment_resources add
+	    KEY `inputdata` (`input_data_idx`);
+
+	And then run this script:
+
+	./nsfiles.pl
+
+4.129: Minor fix to previous revision; skip to next entry.
+4.130: Minor fix to previous revision; skip to next entry.
+
+4.131: Add some new WA support.
+
+	alter table widearea_nodeinfo
+          add `privkey` varchar(128) default NULL,
+	  add `IP` varchar(15) default NULL,
+	  add KEY `IP` (`IP`),
+	  add KEY `privkey` (`privkey`);
+
+4.132: Add an access key to images table for distribution to
+       widearea nodes.
+
+       alter table images add `access_key` varchar(64) default NULL;
+
+4.133: Add a table to save template searches.
+
+	CREATE TABLE `experiment_template_searches` (
+	  `parent_guid` varchar(16) NOT NULL default '',
+	  `parent_vers` smallint(5) unsigned NOT NULL default '0',
+	  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+	  `name` varchar(64) NOT NULL default '',
+	  `expr` mediumtext,
+	  `created` datetime default NULL,
+	  PRIMARY KEY  (`parent_guid`,`parent_vers`,`uid_idx`,`name`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.134: Start cleaning up logfiles.
+
+	CREATE TABLE `logfiles` (
+	  `logid` varchar(40) NOT NULL default '',
+	  `filename` tinytext,
+	  `isopen` tinyint(4) NOT NULL default '0',
+	  `gid_idx` mediumint(8) unsigned NOT NULL default '0',
+	  `date_created` datetime default NULL,
+	  PRIMARY KEY  (`logid`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table experiment_template_instances add \
+	    `logfileid` varchar(40) default NULL after uid_idx;
+
+4.135: Change to previous revision. Run the following script.
+
+        ./logfiles.pl
+	
+4.136: Fix to previous revision; skip to next entry.
+
+4.137: Add support for fixing link interfaces:
+
+       alter table virt_lans add `fixed_iface` varchar(16) default '';
+
+       insert into table_regex values \
+         ('virt_lans','fixed_iface','text','redirect','default:tinytext',0,0,'');
+
+4.138: Add backpointers from vinterfaces to its virt_lan and underlying vlan to
+       avoid problems upcoming cutover to new lans stuff. Besides, the
+       join hoops we jump through are kinda silly.
+
+       alter table vinterfaces add `exptidx` int(10) NOT NULL default '0';
+       alter table vinterfaces add `virtlanidx` int(11) NOT NULL default '0';
+       alter table vinterfaces add `vlanid` int(11) NOT NULL default '0';
+
+       update vinterfaces as vi left join reserved as r on
+       if(vi.vnode_id is
+       null,r.node_id=vi.node_id,r.node_id=vi.vnode_id) left join
+       virt_lans as vl on vl.exptidx=r.exptidx and vl.vnode=r.vname
+       and vl.ip=vi.IP left join virt_lan_lans as vll on
+       vll.exptidx=vl.exptidx and vll.vname=vl.vname left join vlans
+       as vn on vn.exptidx=vl.exptidx and vn.virtual=vl.vname set
+       vi.exptidx=r.exptidx,vi.virtlanidx=vll.idx,vi.vlanid=vn.id;
+
+4.139: Change to previous revision; Skip to next entry.
+
+4.140: Big changes to vlans table. That table is deprecated in favor of
+       these new tables. You want to make these changes while the
+       system is quiet (disable web interface to prevent swapping).
+
+       CREATE TABLE `lans` (
+	  `lanid` int(11) NOT NULL auto_increment,
+	  `exptidx` int(11) NOT NULL default '0',
+	  `pid` varchar(12) NOT NULL default '',
+	  `eid` varchar(32) NOT NULL default '',
+	  `vname` varchar(64) NOT NULL default '',
+	  `vidx` int(11) NOT NULL default 0,
+	  `type` varchar(32) NOT NULL default '',
+	  `link` int(11) default NULL,
+	  `ready` tinyint(1) default '0',
+	  PRIMARY KEY  (`lanid`),
+	  KEY `pideid` (`pid`,`eid`),
+	  KEY `exptidx` (`exptidx`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	CREATE TABLE `lan_attributes` (
+	  `lanid` int(11) NOT NULL default '0',
+	  `attrkey` varchar(32) NOT NULL default '',
+	  `attrvalue` tinytext NOT NULL,
+	  `attrtype` enum('integer','float','boolean','string') default 'string',
+	  PRIMARY KEY  (`lanid`,`attrkey`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+	
+	CREATE TABLE `lan_members` (
+	  `lanid` int(11) NOT NULL default '0',
+	  `memberid` int(11) NOT NULL auto_increment,
+  	  PRIMARY KEY  (`lanid`,`memberid`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+	
+	CREATE TABLE `lan_member_attributes` (
+	  `lanid` int(11) NOT NULL default '0',
+	  `memberid` int(11) NOT NULL default '0',
+	  `attrkey` varchar(32) NOT NULL default '',
+	  `attrvalue` tinytext NOT NULL,
+	  `attrtype` enum('integer','float','boolean','string') default 'string',
+	  PRIMARY KEY  (`lanid`,`memberid`,`attrkey`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+	
+	CREATE TABLE `ifaces` (
+	  `lanid` int(11) NOT NULL default '0',
+	  `ifaceid` int(11) NOT NULL default '0',
+	  `exptidx` int(11) NOT NULL default '0',
+	  `pid` varchar(12) NOT NULL default '',
+	  `eid` varchar(32) NOT NULL default '',
+	  `node_id` varchar(32) NOT NULL default '',
+	  `vnode` varchar(32) NOT NULL default '',
+	  `vname` varchar(32) NOT NULL default '',
+	  `vidx` int(11) NOT NULL default 0,
+	  `vport` tinyint(3) NOT NULL default '0',
+	  PRIMARY KEY  (`lanid`,`ifaceid`),
+	  KEY `pideid` (`pid`,`eid`),
+	  KEY `exptidx` (`exptidx`),
+	  KEY `lanid` (`lanid`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	Run the following script. The testbed should be quiet (no swaps).
+
+		./newlans.pl
+
+        Run this query to fix a previous problem (after doing an install).
+	
+	update experiment_resources as r left join testbed_stats as s
+	on s.rsrcidx=r.idx set swapin_time=UNIX_TIMESTAMP(tstamp)
+	where action='start' and exitcode=0 and swapin_time=0;
+
+4.141: Bump pnode/vnode duration counters to floats since several
+       users/projects have overflowed an unsigned int.
+
+       alter table group_stats change `allexpt_vnode_duration`
+         `allexpt_vnode_duration` double(14,0) unsigned default '0';
+       alter table group_stats change `allexpt_pnode_duration`
+         `allexpt_pnode_duration` double(14,0) unsigned default '0';
+
+       alter table project_stats change `allexpt_vnode_duration`
+         `allexpt_vnode_duration` double(14,0) unsigned default '0';
+       alter table project_stats change `allexpt_pnode_duration`
+         `allexpt_pnode_duration` double(14,0) unsigned default '0';
+
+       alter table user_stats change `allexpt_vnode_duration`
+         `allexpt_vnode_duration` double(14,0) unsigned default '0';
+       alter table user_stats change `allexpt_pnode_duration`
+         `allexpt_pnode_duration` double(14,0) unsigned default '0';
+
+4.142: GRE and EGRE tunnels.
+
+       ALTER TABLE virt_lans MODIFY encap_style
+        enum('alias','veth','veth-ne','vlan','vtun','egre','gre','default')
+        NOT NULL default 'default'; 
+
+       ALTER TABLE experiments MODIFY encap_style
+        enum('alias','veth','veth-ne','vlan','vtun','egre','gre','default')
+        NOT NULL default 'default'; 
+
+       DROP TABLE IF EXISTS `tunnels`;
+
+       alter table lan_members add `node_id` varchar(32) NOT NULL default '';
+       alter table lan_members add  KEY `node_id` (`node_id`);
+       
+       update lan_members as lm left join lan_member_attributes as lma
+       on lma.lanid=lm.lanid and lma.memberid=lm.memberid and
+       attrkey='node_id' set node_id=attrvalue;
+
+4.143: Support management of and operations on multiple PLCs, including
+       support for slices from multiple PLCs in one experiment.
+
+       If you have data in these tables (extremely unlikely!), ask Utah for
+       instructions on how to change over to multiple PLC support.
+
+       	alter table plab_mapping 
+	  add column `deleted` tinyint(1) NOT NULL default '0', 
+          add column `plc_idx` int(10) unsigned NOT NULL default '0';
+
+	CREATE TABLE `plab_plc_attributes` (
+	  `plc_idx` int(10) unsigned NOT NULL default '0',
+	  `attrkey` varchar(64) NOT NULL default '',
+	  `attrvalue` tinytext NOT NULL,
+	  PRIMARY KEY  (`plc_idx`,`attrkey`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	CREATE TABLE `plab_plc_info` (
+	  `plc_idx` int(10) unsigned NOT NULL auto_increment,
+	  `plc_name` varchar(64) NOT NULL default '',
+	  `api_url` varchar(255) NOT NULL default '',
+	  `def_slice_prefix` varchar(32) NOT NULL default '',
+	  `nodename_prefix` varchar(30) NOT NULL default '',
+	  `node_type` varchar(30) NOT NULL default '',
+	  `svc_slice_name` varchar(64) NOT NULL default '',
+	  PRIMARY KEY  (`plc_idx`),
+	  KEY `plc_name` (`plc_name`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table plab_site_mapping
+	  add column `plc_idx` int(10) unsigned NOT NULL default '0',
+	  drop primary key,
+	  add primary key (`site_name`,`site_idx`,`node_idx`,`plc_idx`);
+
+	CREATE TABLE `plab_slice_attributes` (
+	  `plc_idx` int(10) unsigned NOT NULL default '0',
+	  `slicename` varchar(64) NOT NULL default '',
+	  `attrkey` varchar(64) NOT NULL default '',
+	  `attrvalue` tinytext NOT NULL,
+	  PRIMARY KEY  (`plc_idx`,`slicename`,`attrkey`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table plab_slice_nodes
+	  drop key `exptidx`,
+	  drop column `pid`,
+	  drop column `eid`,
+	  drop column `exptidx`,
+	  add column `plc_idx` int(10) unsigned NOT NULL default '0',
+	  drop primary key,
+	  add primary key (`slicename`,`plc_idx`,`node_id`);
+
+	alter table plab_slices
+	  add column `plc_idx` int(10) unsigned NOT NULL default '0',
+	  add column `is_created` tinyint(1) default '0',
+	  add column `is_configured` tinyint(1) default '0',
+	  add column `no_cleanup` tinyint(1) default '0',
+	  add column `no_destroy` tinyint(1) default '0',
+	  drop key `pideid`,
+	  drop primary key,
+	  add primary key (`exptidx`,`slicename`,`plc_idx`);
+
+4.144: Add daily stats for generating reports and graphs?
+
+	CREATE TABLE `daily_stats` (
+          `theday` date NOT NULL default '0000-00-00',
+	  `exptstart_count` int(11) unsigned default '0',
+	  `exptpreload_count` int(11) unsigned default '0',
+	  `exptswapin_count` int(11) unsigned default '0',
+	  `exptswapout_count` int(11) unsigned default '0',
+	  `exptswapmod_count` int(11) unsigned default '0',
+	  `allexpt_duration` int(11) unsigned default '0',
+	  `allexpt_vnodes` int(11) unsigned default '0',
+	  `allexpt_vnode_duration` int(11) unsigned default '0',
+	  `allexpt_pnodes` int(11) unsigned default '0',
+	  `allexpt_pnode_duration` int(11) unsigned default '0',
+	  PRIMARY KEY  (`theday`)
+	) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+	alter table experiment_stats add
+	      `last_activity` datetime default NULL after destroyed;
+
+	# this is fine for an initial value.
+	update experiment_stats set last_activity=created
+	      where last_activity is NULL;
+
+4.145: Fix error in previous revision; skip to next entry;
+
+4.146: Add columns in widearea_nodeinfo to specify a boot method (i.e., static
+       IP or DHCP), a default gateway, and dns servers, for widearea nodes:
+
+       alter table widearea_nodeinfo 
+         add column `gateway` varchar(15) NOT NULL default '' after `IP`;
+
+       alter table widearea_nodeinfo 
+         add column `dns` tinytext NOT NULL default '' after `gateway`;
+
+       alter table widearea_nodeinfo 
+         add column `boot_method` enum('static','dhcp','') NOT NULL 
+           default '' after `dns`;
+
+4.147: Add a more general notion of plab attributes (attributes are now keyed
+       off plc,slice,nodegroup,node_id tuples, as appropriate).  Also add
+       support for sucking down plab nodegroups.
+
+       CREATE TABLE `plab_attributes` (
+         `attr_idx` int(11) unsigned NOT NULL auto_increment,
+	 `plc_idx` int(10) unsigned default NULL,
+	 `slicename` varchar(64) default NULL,
+	 `nodegroup_idx` int(10) unsigned default NULL,
+	 `node_id` varchar(32) default NULL,
+	 `attrkey` varchar(64) NOT NULL default '',
+	 `attrvalue` tinytext NOT NULL,
+	 PRIMARY KEY  (`attr_idx`),
+	 UNIQUE KEY `realattrkey` (`plc_idx`,`slicename`,`nodegroup_idx`,`node_id`,`attrkey`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+       CREATE TABLE `plab_nodegroup_members` (
+         `plc_idx` int(10) unsigned NOT NULL default '0',
+	 `nodegroup_idx` int(10) unsigned NOT NULL default '0',
+	 `node_id` varchar(32) NOT NULL default '',
+	 PRIMARY KEY  (`plc_idx`,`nodegroup_idx`,`node_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+       CREATE TABLE `plab_nodegroups` (
+         `plc_idx` int(10) unsigned NOT NULL default '0',
+	 `nodegroup_idx` int(10) unsigned NOT NULL default '0',
+	 `name` varchar(64) NOT NULL default '',
+	 `description` text NOT NULL,
+	 PRIMARY KEY  (`plc_idx`,`nodegroup_idx`,`name`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.148: Add a table to map Emulab objects that have been synchronized at a PLC
+       to the corresponding object at that PLC.
+
+       CREATE TABLE `plab_objmap` (
+         `plc_idx` int(10) unsigned NOT NULL,
+	 `objtype` varchar(32) NOT NULL,
+	 `elab_id` varchar(64) NOT NULL,
+	 `plab_id` varchar(255) NOT NULL,
+	 `plab_name` tinytext NOT NULL,
+	 PRIMARY KEY  (`plc_idx`,`objtype`,`elab_id`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.149: Add usr_affil_abbrev column to users and deleted users tables
+       and add 'slot' to table_regex
+
+       alter table users add usr_affil_abbrev varchar(16) after usr_affil;
+       alter table deleted_users add usr_affil_abbrev varchar(16) after usr_affil;
+
+       REPLACE INTO `table_regex` VALUES ('users','usr_affil_abbrev','text','regex','^[\\040-\\176]*$',0,16,NULL);
+
+4.150: Improvements to the sslcerts table for GENI support.
+       Generally, its nice to support real revocation, but
+       specifically, we want to remember expired and revoked
+       certificates so we can generate crls, and we also want to store
+       the passwords associated with the (encrypted) keys so that
+       users do not have to remember them; they can get them from us
+       if they know their Emulab password.
+
+       alter table user_sslcerts
+       	 add `status` enum('valid','revoked','expired') default 'valid',
+	 add `orgunit` tinytext,
+         add `revoked` datetime default NULL,
+	 add `password` tinytext,
+	 add KEY `uid` (`uid`),
+	 add KEY `uid_idx` (`uid_idx`);
+
+4.151: Add a uuid slot to the nodes table, for protogeni.
+
+       alter table nodes add `uuid` varchar(40) NOT NULL default '';
+       update nodes set uuid=UUID();
+
+4.152: Add a marker to the reserved table to indicate the node is part of
+       a sliver.
+
+       alter table reserved add `genisliver_idx` int(10) unsigned
+            default NULL;
+       
+4.153: Federation (Geni) support; table of non-local users. I thought
+       about putting these into the users table, but that worries me
+       cause of so many queries in the system that join with uid
+       instead of uid_idx.
+
+       CREATE TABLE `nonlocal_users` (
+        `uid` varchar(8) NOT NULL default '',
+        `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+        `uid_uuid` varchar(40) NOT NULL default '',
+        `created` datetime default NULL,
+        `name` tinytext,
+        `email` tinytext,
+        PRIMARY KEY  (`uid_idx`),
+        KEY `uid` (`uid`),
+        UNIQUE KEY `uid_uuid` (`uid_uuid`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.154: Addition to previous revision. This table is for tmcd, to find
+       out what nonlocal users need to be created on slivers (nodes).
+
+       CREATE TABLE `nonlocal_user_bindings` (
+        `uid` varchar(8) NOT NULL default '',
+        `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+        `exptidx` int(11) NOT NULL default '0',
+        PRIMARY KEY  (`uid_idx`),
+        KEY `uid` (`uid`)
+       ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+4.155: Add uuids to the interfaces table.
+
+       alter table interfaces add `uuid` varchar(40) NOT NULL default '';
+       alter table interfaces add  KEY `uuid` (`uuid`);
+       update interfaces set uuid=UUID();
+
+4.156: Create emulab_pubs and related tables.
+       Add support for UTF-8 fields in table_regex.
+
+       mysql tbdb < emulab_pubs.sql
+
+4.157: Add isgeninode column in node_types table. A geninode can be
+       either physical or virtual, as indicated by the isvirtnode flag.
+
+       alter table node_types add isgeninode tinyint(4) not null default 0;
+
+4.158: Add isfednode column in node_types table. A fednode can be
+       either physical or virtual, as indicated by the isvirtnode flag.
+
+       alter table node_types add isfednode tinyint(4) not null default 0;
+
+4.159: Fix spelling mistake.
+
+       alter table interface_types change manufacturuer
+                `manufacturer` varchar(30) default NULL;
+
+4.160: Add current and near-future speed values for interfaces.
+
+       alter table interfaces modify current_speed \
+           enum('0','10','100','1000','4000','10000','40000','100000') \
+           NOT NULL default '0';
+
+NOTE: The above entry (4.160) is the last entry in this file. Database
+updates are now scripted. After you have built your object tree,
+please go to your src directory, and cd into the sql/updates subdir.
+Then run the following:
+
+	/your/objdir/db/dbupdate tbdb
+
+For developers, please look in the updates/4/1 file for an example of
+how to do updates. For each revision in database-create.sql, create a
+corresponding script and add it to the repository. The scripts will be
+applied in numeric order (see db/dbupdate.in), starting with the
+version recorded in the version_info table. This table is updated by
+dbupdate as it runs each script.
+
 

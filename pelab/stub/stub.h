@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 #ifndef _STUB_H
 #define _STUB_H
@@ -25,38 +30,40 @@ extern "C"
 #include <netdb.h>
 #include <math.h>
 #include <pcap.h>
-#include <netinet/if_ether.h> 
+#include <netinet/if_ether.h>
 #include <net/ethernet.h>
-#include <netinet/ether.h> 
-#include <netinet/ip.h> 
+#include <netinet/ether.h>
+#include <netinet/ip.h>
 #include <netinet/udp.h>
 #include <netinet/tcp.h>
 
 #define STDIN 0 // file descriptor for standard input
 #define QUANTA 500    //feed-loop interval in msec
 #define MONITOR_PORT 4200 //the port the monitor connects to
-#define SENDER_PORT  3491 //the port the stub senders connect to 
-#define PENDING_CONNECTIONS  10	 //the pending connections the queue will hold
-#define CONCURRENT_SENDERS   50	 //concurrent senders the stub maintains
-#define CONCURRENT_RECEIVERS 50	 //concurrent receivers the stub maintains
-#define MAX_PAYLOAD_SIZE     64000 //size of the traffic payload 
-
-// This is the low water mark of the send buffer. That is, if select
-// says that a write buffer is writable, this is the minimum amount of
-// buffer space available.
-#define LOW_WATER_MARK 110000
+#define SENDER_PORT  3491 //the port the stub senders connect to
+#define PENDING_CONNECTIONS  10  //the pending connections the queue will hold
+#define CONCURRENT_SENDERS   50  //concurrent senders the stub maintains
+#define CONCURRENT_RECEIVERS 50  //concurrent receivers the stub maintains
+#define MAX_PAYLOAD_SIZE     64000 //size of the traffic payload
 
 #define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
 #define SIZEOF_LONG sizeof(long) //message bulding block
 #define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
 #define SNIFF_WINSIZE 131071 //from min(net.core.rmem_max, max(net.ipv4.tcp_rmem)) on Plab linux
-#define SNIFF_TIMEOUT 0 //in msec 
+#define SNIFF_TIMEOUT 0 //in msec
 
 //magic numbers
-#define CODE_BANDWIDTH  0x00000001 
-#define CODE_DELAY      0x00000002 
-#define CODE_LOSS       0x00000003 
+#define CODE_BANDWIDTH  0x00000001
+#define CODE_DELAY      0x00000002
+#define CODE_LOSS       0x00000003
 #define CODE_LIST_DELAY 0x00000004
+#define CODE_MAX_DELAY  0x00000005
+
+//magic numbers for alternative algorithms
+#define BANDWIDTH_AVERAGE 0
+#define BANDWIDTH_MAX 1
+#define BANDWIDTH_VEGAS 2
+#define BANDWIDTH_BUFFER 3
 
 #define MONITOR_RECORD_SIZE (sizeof(long)*3 + sizeof(unsigned short)*3)
 
@@ -72,6 +79,49 @@ typedef void (*handle_index)(int);
 // This returns 1 for success and 0 for failure.
 typedef int (*send_to_monitor)(int, int);
 
+// Information about each write that is going to happen.
+typedef struct
+{
+  long size;
+  // delta is a time difference in milliseconds
+  long delta;
+} pending_write;
+
+// The total number of writes we will queue up before discarding.
+enum { PENDING_SIZE = 40 };
+
+// The data structure which hold the writes pending for a particular connection
+typedef struct
+{
+  // This should start out false. If it is false, then the rest of the
+  // data in this struct is undefined.
+  int is_pending;
+  // When is the earliest moment at which we should try a write?
+  struct timeval deadline;
+  // When did the last write occur? Used to determine inter-write times.
+  struct timeval last_write;
+  // The list of the actual writes themselves. This is a circular
+  // queue. When it runs out of room it overwrites the oldest pending
+  // write.
+  pending_write writes[PENDING_SIZE];
+  // The index of the current write under consideration.
+  int current_index;
+  // The index of the next free slot. This may be the same as
+  // 'current_index'. If this is so, then the write indexed by
+  // 'current_index' is the oldest write pending and is to be
+  // overridden if another write comes along.
+  int free_index;
+} pending_list;
+
+// Initializes the pending write structure.
+void init_pending_list(int index, long size, struct timeval time);
+
+// Adds a pending write onto the tail of the list.
+void push_pending_write(int index, pending_write current);
+
+// Removes the oldest pending write.
+void pop_pending_write(int index);
+
 typedef struct {
   short  valid;
   int    sockfd;
@@ -80,12 +130,13 @@ typedef struct {
   unsigned short source_port;
   unsigned short dest_port;
   time_t last_usetime; //last monitor access time
-  int pending; // How many bytes are pending to this peer?
+  pending_list pending; // What writes are pending?
 } connection;
 typedef struct {
   struct timeval captime;
   unsigned long  seq_start;
   unsigned long  seq_end;
+  unsigned int   pkt_size;
 } sniff_record;
 typedef struct {
   sniff_record records[SNIFF_WINSIZE];
@@ -108,7 +159,8 @@ typedef struct {
 } delay_record;
 
 extern short  flag_debug;
-    extern short flag_standalone;
+extern short flag_standalone;
+extern int bandwidth_method;
 extern int pcapfd;
 extern int maxfd;
 extern connection snddb[CONCURRENT_SENDERS];
@@ -122,13 +174,19 @@ extern unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 extern delay_record delay_records[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
 extern int is_live;
 
+extern int last_through[CONCURRENT_RECEIVERS];
+extern int buffer_full[CONCURRENT_RECEIVERS];
+
 extern unsigned long max_throughput[CONCURRENT_RECEIVERS];
 extern unsigned long base_rtt[CONCURRENT_RECEIVERS];
+
+extern int max_delay[CONCURRENT_RECEIVERS];
+extern int last_max_delay[CONCURRENT_RECEIVERS];
 
 extern void sniff(void);
 extern void init_pcap(int to_ms, unsigned short port, char * device);
 extern void append_delay_sample(int path_id, long sample_value,
-				struct timeval const * timestamp);
+                                struct timeval const * timestamp);
 extern void remove_delay_samples(int path_id);
 extern void clean_exit(int);
 extern void update_stats(void);
@@ -140,6 +198,7 @@ typedef struct
   unsigned int firstUnknown;
   unsigned int nextSequence;
   unsigned int ackSize;
+  unsigned int fullAckSize; //full packet size
   unsigned int repeatSize;
   struct timeval beginTime;
   struct timeval endTime;
@@ -152,7 +211,7 @@ extern ThroughputAckState throughput[CONCURRENT_RECEIVERS];
 // throughputTick() call.
 extern unsigned int throughputTick(ThroughputAckState * state);
 extern void throughputInit(ThroughputAckState * state, unsigned int sequence,
-			   struct timeval const * firstTime);
+                           struct timeval const * firstTime);
 extern unsigned int bytesThisTick(ThroughputAckState * state);
 
 // Add a potential sender to the pool.

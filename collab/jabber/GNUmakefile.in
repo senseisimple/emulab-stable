@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,11 +13,17 @@ include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= jabbersetup addjabberuser deljabberuser \
 			  modjabberbuddies addjabberchat deljabberchat \
-			  setchatmembers chatsup.py
+			  setchatmembers
 LIBEXEC_SCRIPTS		= 
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= 
 CTRL_SBIN_SCRIPTS	= jabberproxy
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = addjabberuser deljabberuser addjabberchat \
+			modjabberbuddies deljabberchat setchatmembers
+SETUID_LIBX_SCRIPTS  = 
 
 #
 # Force dependencies on the scripts so that they will be rerun through

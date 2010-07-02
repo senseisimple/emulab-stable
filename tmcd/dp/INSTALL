@@ -1,0 +1,106 @@
+Selective client install on DP node.  Assumes $SRC is the Emulab
+source directory and $OBJ is the build directory.
+
+1. Build client-side.
+
+   cd $OBJ/tmcd
+   make client
+   make fullclient
+
+   Entire client will not build without installing boost and who knows
+   what else.  But we do not need route calculation so don't bother.
+
+2. Create the emulabman user:
+
+   cd $SRC/tmcd/dp
+   sudo ./mkemuman.sh
+
+3. Create emulab directories:
+
+   sudo install -c -m 755 -o emulabman -g root -d /etc/emulab
+   sudo install -c -m 755 -o emulabman -g root -d /usr/local/etc/emulab
+   sudo install -c -m 755 -o emulabman -g root -d /usr/local/etc/emulab/rc
+   sudo install -c -m 755 -o emulabman -g root -d /var/emulab
+   sudo install -c -m 755 -o emulabman -g root -d /var/emulab/boot
+   sudo install -c -m 755 -o emulabman -g root -d /var/emulab/boot/tmcc
+   sudo install -c -m 755 -o emulabman -g root -d /var/emulab/db
+   sudo install -c -m 755 -o emulabman -g root -d /var/emulab/logs
+   sudo install -c -m 755 -o emulabman -g root -d /var/emulab/lock
+
+4. Install certs from boss:
+
+   <copy them over from boss:/usr/testbed/etc>
+   sudo install -c -m 640 emulab.pem /etc/emulab/emulab.pem
+   sudo install -c -m 640 pcwa.pem /etc/emulab/client.pem
+
+5. Install client stuff:
+
+   cd $OBJ
+   echo boss.emulab.net | sudo cp /dev/stdin /etc/emulab/bossnode
+   sudo touch /etc/emulab/isrem
+
+   cd tmcd
+   sudo install -c -m 755 tmcc /usr/local/etc/emulab/tmcc.bin
+
+   cd common
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/paths.pm /etc/emulab/paths.pm
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/paths.sh /etc/emulab/paths.sh
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/libsetup.pm /usr/local/etc/emulab/libsetup.pm
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/libtmcc.pm /usr/local/etc/emulab/libtmcc.pm
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/libtestbed.pm /usr/local/etc/emulab/libtestbed.pm
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/tmcc.pl /usr/local/etc/emulab/tmcc
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/watchdog /usr/local/etc/emulab/watchdog
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/common/update /usr/local/etc/emulab/update
+
+   cd config
+   sudo install -c -o emulabman -m 755 ../../../../src/tmcd/common/config/librc.pm /usr/local/etc/emulab/librc.pm
+   sudo install -c -o emulabman -m 755 ../../../../src/tmcd/common/config/rc.config /usr/local/etc/emulab/rc
+   sudo install -c -o emulabman -m 755 ../../../../src/tmcd/common/config/rc.mounts /usr/local/etc/emulab/rc
+   sudo install -c -o emulabman -m 755 ../../../../src/tmcd/common/config/rc.accounts /usr/local/etc/emulab/rc
+   sudo install -c -o emulabman -m 755 ../../../../src/tmcd/common/config/rc.rpms /usr/local/etc/emulab/rc
+   sudo install -c -o emulabman -m 755 ../../../../src/tmcd/common/config/rc.tarfiles /usr/local/etc/emulab/rc
+
+   cd ../../linux
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/linux/liblocsetup.pm /usr/local/etc/emulab/liblocsetup.pm
+
+   cd ../dp
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/dp/emulabctl /usr/local/etc/emulab/emulabctl
+   sudo install -c -o emulabman -m 755 ../../../src/tmcd/dp/mkemuman.sh /usr/local/etc/emulab/mkemuman.sh
+   sudo install -c ../../../src/tmcd/dp/emulab.sh /etc/init.d/emulab
+   sudo ln -sf ../init.d/emulab /etc/rc0.d/K96emulab
+   sudo ln -sf ../init.d/emulab /etc/rc1.d/K96emulab
+   sudo ln -sf ../init.d/emulab /etc/rc2.d/S96emulab
+   sudo ln -sf ../init.d/emulab /etc/rc3.d/S96emulab
+   sudo ln -sf ../init.d/emulab /etc/rc4.d/S96emulab
+   sudo ln -sf ../init.d/emulab /etc/rc5.d/S96emulab
+   sudo ln -sf ../init.d/emulab /etc/rc6.d/K96emulab
+
+6. On boss, manually insert node into the widearea_nodeinfo table:
+
+   Create foo.xml file:
+
+     <opt>
+      <machine_type value='pcdp' />
+      <connect_type value='Inet2' />
+      <city value='Pittsburgh' />
+      <state value='PA' />
+      <zip value='15213' />
+     </opt>
+
+   and run wanodecreate:
+
+     wap wanodecreate sn001 foo.xml
+
+7. On boss, run wanodecheckin to create the node in the DB:
+
+   wanodecheckin -d -h sn001.datapository.net PRIVKEY IPADDR
+
+   where PRIVKEY comes from the DB widearea_nodeinfo table entry just created
+   and IPADDR is the IP address of the machine.
+
+8. Store privkey on node:
+
+   echo PRIVKEY | sudo cp /dev/stdin /etc/emulab/emulab-privkey
+   sudo chmod 600 /etc/emulab/emulab-privkey
+
+   Again, where PRIVKEY is what was put in the DB.

@@ -1,6 +1,9 @@
 #
-# Insert Copyright Here.
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
+# All rights reserved.
 #
+
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
@@ -14,7 +17,7 @@ COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
                     libtmcc.pm libsetup.pm libtestbed.pm startcmddone)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
-                    rc.inplab plabrusage pa-wrapper runelvin)
+                    rc.inplab plabrusage runevents)
 OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
 		    install-tarfile install-rpm)
 EVSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/event/lib/, \
@@ -57,7 +60,7 @@ rootball:	$(ROOTBALLNAME)
 
 $(ROOTBALLNAME): copyfiles mkhosts
 	chown -R 0:0 plabroot
-	tar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
+	gtar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
 
 copyfiles: $(ALLSCRIPTS) $(ALLCONFS) $(ALLCERTS) $(PKGSRCTREE) mkdirtree
 	(cd ../common/config; $(MAKE) script-install DESTDIR=$(THISDIR)/plabroot)
@@ -75,6 +78,7 @@ copyfiles: $(ALLSCRIPTS) $(ALLCONFS) $(ALLCERTS) $(PKGSRCTREE) mkdirtree
 	$(INSTALL_DATA) /usr/testbed/etc/emulab.pem \
 			plabroot/usr/local/etc/emulab
 	cp -pR $(PKGSRCTREE)/ plabroot
+	chmod 4555 plabroot/usr/local/etc/emulab/program-agent
 	echo "@BOSSNODE@" > plabroot/usr/local/etc/emulab/bossnode
 	cp /dev/null plabroot/usr/local/etc/emulab/isrem
 

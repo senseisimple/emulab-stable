@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -9,8 +9,11 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <ctype.h>
+#include <unistd.h>
 #include <time.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

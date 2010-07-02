@@ -1,0 +1,213 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+sub usage()
+{
+    print STDERR "Usage: daemon_wrapper [-i interval] [-p pidfile] [-l logfile] [-n name] command args ...\n";
+    exit(1);
+}
+my $optlist  = "di:p:l:n:";
+my $debug    = 0;
+my $mininterval = 1;
+my $maxinterval = (24 * 60 * 60);
+my $interval = $mininterval;
+
+my $TBOPS      = "@TBOPSEMAIL@";
+my $pidfile;
+my $logfile;
+my $daemon;
+my $cmd;
+my $cmdargs;
+my $childpid;
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Parse arguments
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"i"})) {
+    $interval = int($options{"i"});
+    if ($interval < $mininterval || $interval > $maxinterval) {
+	usage();
+    }
+    $mininterval = $interval;
+}
+if (defined($options{"p"})) {
+    $pidfile = $options{"p"};
+}
+if (defined($options{"l"})) {
+    $logfile = $options{"l"};
+}
+if (defined($options{"n"})) {
+    if ($options{"n"} =~ /^([-\w]+)$/) {
+	$daemon = $1;
+    } else {
+	print STDERR "Bogus characters in name string\n";
+	exit(1);
+    }
+    
+}
+if (@ARGV < 1) {
+    usage();
+}
+$cmd = shift;
+if (!defined($daemon)) {
+    if ($cmd =~ /.*\/([-\w]+)$/) {
+	$daemon = $1;
+    } else {
+	$daemon = "pid$$";
+    }
+}
+$cmdargs = join(' ', @ARGV);
+
+$pidfile = "/var/run/${daemon}_wrapper.pid"
+    if (!defined($pidfile));
+$logfile = "/var/log/${daemon}_wrapper.log"
+    if (!defined($logfile));
+
+# Only root.
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed support libs.
+# 
+use lib "@prefix@/lib";
+use libtestbed;
+
+# Signal handler to initiate cleanup in parent and the children.
+sub Pcleanup($)
+{
+    my ($signame) = @_;
+
+    $SIG{TERM} = 'IGNORE';
+
+    if (defined($childpid)) {
+	system("kill $childpid");
+	waitpid($childpid, 0);
+    }
+    unlink $pidfile;
+    print TBTimeStampWithDate(),
+          " [$PID]: wrapper exiting\n";
+    exit(0);
+}
+
+# Daemonize;
+if (!$debug && TBBackGround($logfile)) {
+    sleep(1);
+    exit(0);
+}
+
+#
+# Write our pid into the pid file so we can be killed later. 
+#
+system("echo '$PID' > $pidfile") == 0 or
+    die("*** $0:\n".
+	"    Could not create $pidfile!");
+
+# Okay, cleanup function.
+$SIG{TERM} = \&Pcleanup;
+
+# Fully disconnect from bootup. 
+setsid();
+
+print TBTimeStampWithDate(),
+      " [$PID]: wrapper starting '$cmd",
+      $cmdargs ? " $cmdargs" : "", "'\n";
+
+# Loop forever, restarting the daemon if it ever dies.
+while (1) {
+    my $runtime = time();
+
+    $childpid = fork();
+
+    die("*** $0:\n".
+	"    Could not fork!\n")
+	if ($childpid < 0);
+
+    if ($childpid == 0) {
+	if (!exec("$cmd $cmdargs")) {
+	    print STDERR "*** $0:\n".
+		         "    Could not exec $cmd!\n";
+	    exit(1);
+	}
+    }
+    print TBTimeStampWithDate(),
+          " [$PID]: $daemon ($childpid) started\n";
+
+    waitpid($childpid, 0);
+    my $exitstat = $?;
+    my $ecode = $exitstat >> 8;
+    my $esig = $exitstat & 0x3F;
+    my $lpid = $childpid;
+    undef $childpid;
+
+    my $msg;
+    if ($esig != 0) {
+	$msg = "killed by signal $esig";
+    } else {
+	$msg = "died with exit code $ecode";
+    }
+
+    $runtime = time() - $runtime;
+    print TBTimeStampWithDate(),
+          " [$PID]: $daemon ($lpid) $msg ",
+          "after $runtime seconds, ";
+
+    if ($ecode == 1) {
+	print "not restarting!\n";
+	SENDMAIL($TBOPS, "$daemon died",
+		 "$daemon died with exit code 1\n".
+		 "Not restarting it; might be a configuration error",
+		 $TBOPS);
+	unlink $pidfile;
+	die("*** $0:\n".
+	    "    Could not start $daemon! Might be a configuration error.\n");
+    }
+    #
+    # Anytime it exits, send email (unless TERM).
+    #
+    if ($exitstat != 15) {
+	SENDMAIL($TBOPS, "$daemon died",
+		 "$daemon $msg after $runtime seconds; restarting it.",
+		 $TBOPS);
+    }
+
+    #
+    # If the process ran for less than 5 seconds, there may be a problem
+    # with daemon startup.  To avoid spamming testbed-ops for a process
+    # that will never start, back off the checks exponentially up to some
+    # maximum interval.
+    #
+    if ($runtime < 5) {
+	$interval *= 2;
+	if ($interval > $maxinterval) {
+	    $interval = $maxinterval;
+	}
+    } else {
+	$interval = $mininterval;
+    }
+
+    print "restarting in $interval seconds\n";
+
+    sleep($interval);
+}
+exit(0);
+

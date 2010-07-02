@@ -1,0 +1,523 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Optional flag argument says "do not reboot"
+#
+reboot=1
+if [ $# -eq 1 -a "$1" = "-noreboot" ]; then
+    reboot=0
+fi
+
+#
+# Amount of memory in MB to leave for everyone else in the system.  If you
+# get out-of-memory or vm_pager error while running frisbee, increase this.
+#
+RESIDMEM=32
+
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/testbed
+	BOOTDIR=/etc/testbed
+	ETCDIR=/etc/testbed
+fi
+
+# Behave a little different on widearea nodes.
+isrem=0
+if [ -e $ETCDIR/isrem ]; then
+    isrem=1
+fi
+
+#
+# Update the MBR of the given disk to the indicated "version."
+#
+# XXX this is somewhat of a hack right now.  We recognize two
+# versions of the MBR:
+#	v1 (partition 1 size 6281352)
+#	v2 (partition 1 size 12305790)
+# Currently we only install a new MBR if the existing one is the
+# wrong size, just in case the user has customized the boot program.
+#
+tweakmbr() {
+    _DSK=$1
+    _NEW=$2
+
+    dd if=/dev/$_DSK of=/dev/null bs=512 count=1 2>/dev/null || {
+	echo "WARNING: could not read from $_DSK, MBR not changed"
+	return
+    }
+
+    _size=`fdisk -s $_DSK 2>/dev/null | sed -n -e 's/^ *1: *[0-9][0-9]* *\([0-9][0-9]*\).*$/\1/p'`
+    case ${_size}s in
+    6281352s)
+	_CUR=1
+	;;
+    12305790s)
+	_CUR=2   
+	;;
+#    s)
+    *)
+        # special case: no part1 so probably no MBR at all, make sure we install
+	echo "Found no MBR on $_DSK, installing version $_NEW"   
+	_CUR=1000000
+	;;
+#    *)
+#	echo "WARNING: custom MBR on $_DSK, not changed"
+#	return
+#    	;;
+    esac
+
+    if [ $_CUR = $_NEW ]; then
+	return
+    fi
+
+    # now set it if we can
+    if [ ! -r "/etc/emulab/mbr${_NEW}.dd" ]; then
+	echo "WARNING: cannot find MBR version $_NEW, not installed"
+	return
+    fi
+
+    echo "Installing MBR version $_NEW ..."
+    dd if=/etc/emulab/mbr${_NEW}.dd of=/dev/$_DSK bs=512 count=1
+}
+
+#
+# Function to zero all potential superblocks in the DOS partitions that
+# could interfere with the OSes on the image being loaded.
+#
+# FreeBSD 4 or 5 goes out of its way to make this hard.  In FBSD4, we
+# cannot overwrite the beginning of partitions that have a legit superblock.
+# In FBSD5, DOS partitions that have a zero type cannot even be accessed.
+# So we have to use the whole-disk special file using offsets extracted
+# via fdisk.
+#
+zapsuperblocks() {
+    DSK=$1
+
+    #
+    # Note we are not overly concerned about the consequences of misparsing
+    # the fdisk output.  If we whack random blocks, it doesn't hurt anything.
+    #
+    offs=`fdisk -s $DSK 2>/dev/null | sed -n -e 's/^[ 0-9]*: *\([0-9]*\).*$/\1/p'`
+
+    if [ x"$offs" = x ]; then
+        return
+    fi
+
+    echo -n "Invalidating old potential superblocks: "
+    for off in $offs; do
+        echo -n "$off "
+	dd if=/dev/zero of=/dev/${DISK} oseek=$off count=16 >/dev/null 2>&1 || {
+	    echo "WARNING: failed to invalidate $off"
+	}
+    done
+    echo ""
+
+    return
+}
+
+#
+# Only blast the partition tables if we're in reloading.
+#
+cleandisks() {
+    /usr/local/etc/emulab/tmcc status | grep -q 'ALLOCATED=emulab-ops/reloading'
+
+    if [ "$?" != "0" ]; then
+	return 1
+    fi
+
+    echo "Cleaning disk partition tables..."
+
+    disks=`find /dev | egrep '/(ad|da)[0-9][0-9]*$'`
+
+    # we will whack any disk that doesn't have a mounted filesystem!
+    # (i.e., not the boot dongle, if it exists)
+    for d in $disks; do
+	mount | grep -q "$d"
+	if [ "$?" != "0" ]; then
+	    dd if=/dev/zero of=${d} bs=512 count=1 >/dev/null 2>&1
+	    echo "  wiped $d"
+	fi
+    done
+
+    return 0
+}
+
+#
+# Intended to be used only if we're a remote node and we need to download
+# a whole-disk image.  Have to put it somewhere, not on the 4th part of the 
+# boot hdd.  We're obviously not too inventive...
+#
+findsparedisk() {
+    DSK=$1
+    SPAREDISK=""
+    
+    disks=`find /dev | egrep '/(ad|da)[0-9][0-9]*$' | sed -n -e 's/\/dev\/\([a-zA-Z0-9]\)/\1/p'`
+    dd if=/dev/zero of=/tmp/.rc.frisbee.blank bs=512 count=1 >/dev/null 2>&1
+
+    for d in $disks; do 
+	# skip reload dev, obviously
+	if [ "$d" = "${DSK}" ]; then
+	    continue
+	fi
+
+	# filter out small disks
+	dsize=`diskinfo "$d" | cut -f 3`
+	if [ "$dsize" = "" -o $dsize -lt 8589934592 ]; then
+	    continue
+	fi
+
+	# filter out mounted disks
+	mount | grep -q "$d"
+	if [ "$?" = "0" ]; then
+	    continue
+	fi
+
+	# see if disk is obviously unused:
+	dd if=/dev/$d of=/tmp/.rc.frisbee.s0 bs=512 count=1 >/dev/null 2>&1
+	diff /tmp/.rc.frisbee.blank /tmp/.rc.frisbee.s0 >/dev/null 2>&1
+	if [ "$?" = "0" ]; then
+	    SPAREDISK="$d"
+	    break
+	fi
+
+	# see if fdisk can grok the partition table; if it can't, we assume
+	# it's a safe disk to use
+	# XXX: don't do this now; it's too much a leap
+#	fdisk -s "$d" >/dev/null 2>&1
+#	if [ "$?" != "0" ]; then 
+#	    SPAREDISK="$d"
+#	    break
+#	fi
+
+    done
+}
+
+SPAREDISK=""
+
+$BINDIR/tmcc state RELOADSETUP
+
+BOSSINFO=`$BINDIR/tmcc bossinfo`
+LOADINFO=`$BINDIR/tmcc loadinfo`
+
+# For testing purposes.
+#BOSSINFO='boss.emulab.net 155.101.128.70'
+#LOADINFO='ADDR=234.5.6.69:4444'
+
+BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
+
+# XXX should be part of loadinfo
+LOADIP="-S $BOSSIP"
+
+if [ -x /usr/sbin/ntpdate ]; then
+	/usr/sbin/ntpdate -b $BOSSIP >/dev/null 2>&1
+fi
+
+ADDRESS=`echo $LOADINFO | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
+PARTITION=`echo $LOADINFO | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
+PARTITION=${PARTITION:-'0'}
+PARTOS=`echo $LOADINFO | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
+DISK=`echo $LOADINFO | sed -e 's/.*DISK=\([^[:space:]]*\).*/\1/'`
+DISK=${DISK:-'ad0'}
+ZFILL=`echo $LOADINFO | sed -e 's/.*ZFILL=\([^[:space:]]*\).*/\1/'`
+ZFILL=${ZFILL:-'0'}
+ACPI=`echo $LOADINFO | sed -e 's/.*ACPI=\([^[:space:]]*\).*/\1/'`
+ACPI=${ACPI:-'unknown'}
+ASF=`echo $LOADINFO | sed -e 's/.*ASF=\([^[:space:]]*\).*/\1/'`
+ASF=${ASF:-'unknown'}
+MBR=`echo $LOADINFO | sed -e 's/.*MBRVERS=\([^[:space:]]*\).*/\1/'`
+MBR=${MBR:-'1'}
+
+if [ "$PARTITION" != "0" ]; then
+	SLICE="-s $PARTITION"
+	case $PARTOS in
+	FreeBSD)
+		SLICE="$SLICE -D 165"
+		PTYPE=165
+		;;
+	OpenBSD)
+		SLICE="$SLICE -D 166"
+		PTYPE=166
+		;;
+	Fedora|Linux)
+		SLICE="$SLICE -D 131"
+		PTYPE=131
+		;;
+	*)
+		;;
+	esac
+fi
+
+# Enable IPoD
+if [ -r $BINDIR/rc.ipod ]; then
+	. $BINDIR/rc.ipod
+fi
+
+#
+# set memory limits:
+#	allow $RESIDMEM MB for non-frisbee stuff
+#	split remaining memory (min of 2MB) between network/disk buffering
+#
+HOSTMEM=`sysctl -n hw.usermem`
+HOSTMEM=`expr $HOSTMEM / 1048576`
+if [ $HOSTMEM -ge `expr $RESIDMEM + 2` ]; then
+	HOSTMEM=`expr $HOSTMEM - $RESIDMEM`
+	BYTES=`expr $HOSTMEM \* 1024`
+	DATASEGSZ=`ulimit -d`
+	if [ $BYTES -gt $DATASEGSZ ]; then
+	    BYTES=$DATASEGSZ
+	    HOSTMEM=`expr $BYTES / 1024`
+	    echo "WARNING: kernel limits buffering to $HOSTMEM MB"
+	fi
+	ulimit -v $BYTES
+
+	## For GaTech we use more memory for disks since the disks are so slow
+	#NETMEM=`expr $HOSTMEM \* 1 / 3`
+	#DISKMEM=`expr $HOSTMEM \* 2 / 3`
+	#MEMARGS="-C $NETMEM -W $DISKMEM"
+
+	# For Utah, we let the client split up the memory
+	# (50/50, but no more chunk buffers than there are chunks in the image)
+	MEMARGS="-M $HOSTMEM"
+fi
+
+#
+# Make sure the necessary device files exist (only necessary on FreeBSD 4.x)
+# Note that we create partition files for all slices, not just slice 1,
+# for the benefit of the slicefix script.
+#
+if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
+	(cd /dev; ./MAKEDEV $DISK ${DISK}s2a ${DISK}s3a ${DISK}s4a)
+fi 
+
+if [ x"$ADDRESS" != x ]; then
+	isurl=`echo $ADDRESS | grep http -`
+	ispath=`echo $ADDRESS | grep '^/' -`
+
+	if [ x"$isurl" != x ]; then
+	    echo "Need to download $ADDRESS"
+
+	    isurl=1
+	    if [ ! -d /images ]; then
+		echo "Need to create or mount /images directory!"
+		exit 1
+	    fi
+	    
+	    #
+	    # This needs a lot more work ...
+	    #
+	    imagefile=`echo $ADDRESS | sed -e 's,^http[s]*://[^/]*/,,'`
+	    imagefile="/images/$imagefile"
+	elif [ x"$ispath" != x ]; then
+	    ispath=1
+	    
+	    if [ ! -e $ADDRESS ]; then
+		echo "$ADDRESS does not exist!"
+		exit 1
+	    fi
+	    imagefile="$ADDRESS"
+	else
+	    PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`
+	    MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`
+	    if [ -e $BOOTDIR/myip ]; then
+		MCASTIF="-i `cat $BOOTDIR/myip`"
+	    else
+		MCASTIF=""
+	    fi
+	    MCASTADDR="-m $MCAST -p $PORT"
+	    isurl=0
+	    ispath=0
+	fi
+	    
+	#
+	# ZFILL==1: use frisbee
+	# ZFILL==2: separate disk-wipe pass (not yet implemented)
+	#
+	if [ "$ZFILL" != "0" ]; then
+	    ZFILL="-z"
+	else
+	    ZFILL=""
+	fi
+
+	#
+	# Make sure the write-cache is enabled on SCSI disks.  It makes a
+	# huge difference.  We don't worry about data corruption in the
+	# case of a crash, because we will just reload the disk again anyway
+	# in that situation.
+	#
+	turncacheoff=0
+	case $DISK in
+	da*)
+	    if [ -x $BINDIR/camwce ] && $BINDIR/camwce on $DISK; then
+		turncacheoff=1;
+	    fi
+	    ;;
+	esac
+
+	# blow away the irrelevant partition tables
+	cleandisks
+
+	#
+	# For slice images, ensure that the MBR is the correct version
+	# and replace if not.
+	#
+	if [ "$PARTITION" != "0" ]; then
+	    tweakmbr $DISK $MBR
+	fi
+
+	#
+	# If a remote node and we have a URL, make sure that we have a place
+	# to put it. Done after the MBR tweak of course. Then download the URL.
+	#
+	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
+	    echo "Downloading image \'$ADDRESS\' to /images directory ..."
+
+	    RDISK=$DISK
+	    RSLICE=4
+	    # if this is a full disk image, we need to select a spare disk
+	    # to hold the downloaded image
+	    if [ "$PARTITION" = "0" ]; then
+		findsparedisk "${DISK}"
+		if [ "$SPAREDISK" = "" ]; then
+		    echo "Could not find a spare disk to save the full image!"
+		    exit 1
+		fi
+		echo "Using spare disk $SPAREDISK to hold full-disk image..."
+		# need to setup a partition and label since mkextrafs doesn't,
+		# since the disk's partition table has been cleared.
+		# We make a single 16GB partition to make newfs go fast on
+		# giant yet slow disks.
+		config="p 1 165 63 33554432"
+		echo "$config" | fdisk -f - $SPAREDISK
+		# note that we set the type to 0 because mkextrafs wants it
+		# that way (and fdisk won't let us do it that way :-))
+		$BINDIR/dostype -f /dev/$SPAREDISK 1 0
+		#bsdlabel -w "${SPAREDISK}s1"
+		RDISK="$SPAREDISK"
+		RSLICE=1
+	    fi
+
+	    $BINDIR/mkextrafs.pl -c -s $RSLICE -r $RDISK /images || {
+		$BINDIR/mkextrafs.pl -n -f -s $RSLICE -r $RDISK /images || {
+		    echo "Could not create /images partition"
+		    exit 1
+		}
+	    }
+
+	    wget -nv -N -P /images "$ADDRESS"
+	    wstat=$?
+	    case $wstat in
+	    0)
+		echo "wget succeeded getting the image"
+		;;
+	    *)
+		echo "wget failed, status $wstat"
+		exit 1
+		;;
+	    esac
+	fi
+
+	#
+	# If not zeroing the disk and we are loading a full disk image
+	# we need to ensure that we at least invalidate any old superblocks
+	# that might leak through (most likely in partition 4 which isn't
+	# touched by our current image).  We do this before running frisbee
+	# so that any legit filesystems loaded from the image work.
+	#
+	# Since we do it before frisbee, we are counting on the current
+	# MBR being the same as the MBR being layed down.  While not
+	# a reasonable assumption in general, it mostly works in our
+	# environment and at least won't hurt anything if not true.
+	#
+	if [ $isrem -eq 0 -a x"$ZFILL" = x -a "$PARTITION" = "0" ]; then
+	    zapsuperblocks $DISK
+	fi
+
+        $BINDIR/tmcc state RELOADING
+
+	if [ x"$imagefile" != x ]; then
+	    UNZIPDEV="/dev/${DISK}s${PARTITION}"
+	    if [ "$PARTITION" = "0" ]; then
+		UNZIPDEV="/dev/${DISK}"
+	    fi
+	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile ${UNZIPDEV}"
+	    /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile ${UNZIPDEV}
+	else
+	    echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
+	    $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
+	fi
+        fstat=$?
+
+	#
+	# If we mounted a partition from the disk to store the image,
+	# we must unmount it now so that slicefix and others don't fail
+	# due to an in-use partition.
+	#
+	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
+	    umount /images || {
+	        echo "WARNING: could not unmount /images"
+	    }
+	fi
+
+	#
+	# Turn the cache back off if we turned it on.
+	# Is this sufficient to ensure the cache gets flushed?
+	#
+	if [ $turncacheoff -eq 1 ]; then
+	    $BINDIR/camwce off $DISK
+	fi
+
+	case $fstat in
+	0)
+		echo "Frisbee run finished"
+		echo "Resizing final disk partition"
+		$BINDIR/growdisk -vW /dev/$DISK
+		echo "Adjusting slice-related files"
+		export SLICEFIX_ACPI=$ACPI
+		export SLICEFIX_ASF=$ASF
+		$BINDIR/slicefix $PARTITION $DISK
+		echo "Image load complete at `date`"
+
+		#
+		# If requested to reboot, do so.
+		#
+		# Note: there is a race condition with stated here.
+		# If we reboot immediately after sending RELOADDONE,
+		# it is possible that, under heavy server load, we will
+		# finish the reboot and reach the bootinfo stage before
+		# stated gets and processes our RELOADDONE.  So now we
+		# wait around after sending the RELOADDONE.  stated should
+		# force us to reboot when the transition takes place.
+		# For backward compatibility we use a new state: RELOADDONEV2.
+		# For paranoia we just wait around for awhile and then
+		# reboot anyway, just in case stated's reboot fails for
+		# some reason.
+		#
+		if [ $reboot -eq 1 ]; then
+		    $BINDIR/tmcc state RELOADDONEV2
+		    echo "Waiting for server to reboot us ..."
+		    if [ $isrem -eq 1 ]; then
+			sleep 30
+		    else
+			sleep 240
+		    fi
+		    echo "No response from server, rebooting myself ..."
+		    /sbin/reboot
+		    sleep 100
+		else
+		    $BINDIR/tmcc state RELOADDONE
+		fi
+	        exit 0
+		;;
+	*)
+		echo "Frisbee run failed, status $fstat"
+		;;
+	esac
+else
+	echo "Unable to get address for loading image"
+fi
+echo "Failed to load disk, dropping to login prompt at `date`"
+exit 1

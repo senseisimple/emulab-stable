@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # This is an included file. No headers or footers.
@@ -13,7 +13,10 @@ include("defs.php3");
 
 $RPCSERVER  = "@BOSSNODE@";
 $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
-$FSDIR_USERS = "@FSDIR_USERS@";
+$FSDIR_USERS = "@USERSROOT_DIR@";
+
+# So errors are sent back in short form.
+$session_interactive = 0;
 
 #
 # Emulab XMLRPC defs.
@@ -35,9 +38,27 @@ define("XMLRPC_RESPONSE_TIMEDOUT",	8);
 #
 define("XMLRPC_PACKAGE_VERSION",	0.1);
 
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+#
+# Check the XML to make sure it is well formed.
+#
+$all_data = file_get_contents("php://input");
+
+if (!isset($all_data) || $all_data == "") {
+    USERERROR("Where is the XML?", 1);
+}
+$mypipe = popen("/usr/local/bin/xmllint --noout - 2>&1", "w");
+if ($mypipe == false) {
+    TBERROR("Could not start xmllint", 1);
+}
+fwrite($mypipe, $all_data);
+fflush($mypipe);
+$return_value = pclose($mypipe);
+if ($return_value) {
+    USERERROR("Invalid XML", 1);
+}
 
 #
 # Invoke the ssl xmlrpc client in raw mode, passing it an encoded XMLRPC
@@ -58,16 +79,16 @@ $process = proc_open("$TBSUEXEC_PATH $uid nobody webxmlrpc -r ".
 		     $descriptorspec, $pipes);
 
 if (! is_resource($process)) {
-	TBERROR("Could not invoke XMLRPC backend!\n".
-		"$uid nobody $method\n".
-		print_r($arghash, true), 1);
+    TBERROR("Could not invoke XMLRPC backend!\n".
+	    "Invoked as $uid,nobody\n".
+	    "XML:\n" .
+	    "$all_data\n\n", 1);
 }
 
 # $pipes now looks like this:
 # 0 => writeable handle connected to child stdin
 # 1 => readable handle connected to child stdout
 
-$all_data = $HTTP_RAW_POST_DATA;
 fwrite($pipes[0], $all_data);
 fflush($pipes[0]);
 
@@ -86,12 +107,12 @@ fclose($pipes[1]);
 $return_value = proc_close($process);
 
 if ($return_value || $output == "") {
-	TBERROR("XMLRPC backend failure!\n".
-		"$uid returned $return_value\n".
-		"XML:\n" .
-		"$all_data\n\n" .
-		"Output:\n" .
-		"$output\n", 1);
+    TBERROR("XMLRPC backend failure!\n".
+	    "Invoked as $uid,nobody. Returned $return_value\n".
+	    "XML:\n" .
+	    "$all_data\n\n" .
+	    "Output:\n" .
+	    "$output\n", 1);
 }
 
 header("content-length: " . strlen($output));

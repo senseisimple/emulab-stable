@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -52,7 +52,7 @@ int
 read_bsdslice(int slice, int bsdtype, u_int32_t start, u_int32_t size,
 	      char *sname, int infd)
 {
-	int		cc, i, rval = 0, npart;
+	int		cc, i, rval = 0, npart, absoffset;
 	union {
 		struct disklabel	label;
 		char			pad[BBSIZE];
@@ -97,8 +97,8 @@ read_bsdslice(int slice, int bsdtype, u_int32_t start, u_int32_t size,
 		 * and let it rip.
 		 */
 		if (size == 0) {
-			fprintf(stderr,
-				"No disklabel, assuming single partition\n");
+			fprintf(stderr, "P%d: WARNING: No disklabel, "
+				"assuming single partition\n", slice+1);
 			dlabel.label.d_partitions[0].p_offset = 0;
 			dlabel.label.d_partitions[0].p_size = 0;
 			dlabel.label.d_partitions[0].p_fstype = FS_BSDFFS;
@@ -117,13 +117,37 @@ read_bsdslice(int slice, int bsdtype, u_int32_t start, u_int32_t size,
 	 */
 	npart = dlabel.label.d_npartitions;
 	assert(npart >= 0 && npart <= 16);
-	if (debug)
-		fprintf(stderr, "  P%d: %d partitions\n", slice+1, npart);
-	for (i = 0; i < npart; i++) {
-		if (! dlabel.label.d_partitions[i].p_size)
-			continue;
 
-		if (dlabel.label.d_partitions[i].p_fstype == FS_UNUSED)
+	/*
+	 * XXX partition table offsets were traditionally absolute, but
+	 * at least with FBSD 8.x, they became relative to the slice.
+	 * So we attempt to differentiate them here by looking for
+	 * slice starts that are less than the DOS partition offset.
+	 * Such a slice would indicate relative addressing.
+	 */
+	absoffset = 1;
+	if (start != 0) {
+		for (i = 0; i < npart; i++) {
+			if (dlabel.label.d_partitions[i].p_size == 0 ||
+			    dlabel.label.d_partitions[i].p_fstype == FS_UNUSED)
+				continue;
+			if (bsdtype == DOSPTYP_OPENBSD && i >= 8 && i < 16)
+				continue;
+			if (dlabel.label.d_partitions[i].p_offset < start) {
+				fprintf(stderr, "P%d: WARNING: BSD label appears to use relative offsets, adjusting...\n", slice+1);
+				absoffset = 0;
+				break;
+			}
+		}
+	}
+	if (debug) {
+		fprintf(stderr, "  P%d: %d ", slice+1, npart);
+		if (absoffset == 0)
+			fprintf(stderr, "(slice relative) ");
+		fprintf(stderr, "BSD partitions\n");
+	}
+	for (i = 0; i < npart; i++) {
+		if (dlabel.label.d_partitions[i].p_size == 0)
 			continue;
 
 		/*
@@ -137,6 +161,17 @@ read_bsdslice(int slice, int bsdtype, u_int32_t start, u_int32_t size,
 					BSDPARTNAME(i), i - 6);
 			continue;
 		}
+
+		/*
+		 * Make relative offsets absolute.  We do this even for
+		 * unused partitions so that any reloc entries created
+		 * below are correct.
+		 */
+		if (absoffset == 0)
+			dlabel.label.d_partitions[i].p_offset += start;
+
+		if (dlabel.label.d_partitions[i].p_fstype == FS_UNUSED)
+			continue;
 
 		if (debug) {
 			fprintf(stderr, "    '%c' ", BSDPARTNAME(i));
@@ -167,6 +202,9 @@ read_bsdslice(int slice, int bsdtype, u_int32_t start, u_int32_t size,
 	/*
 	 * Record a fixup for the partition table, adjusting the
 	 * partition offsets to make them slice relative.
+	 *
+	 * Note that event if partitions were relative (absoffset == 0) we
+	 * have converted the value in dlabel to absolute by this point.
 	 */
 	if (dorelocs &&
 	    start != 0 && dlabel.label.d_partitions[0].p_offset == start) {
@@ -237,7 +275,8 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 
 	if (debug) {
 		fprintf(stderr, "        bfree %9lld, bsize %9d, cgsize %9d\n",
-			fs.fs_cstotal.cs_nbfree, fs.fs_bsize, fs.fs_cgsize);
+			(long long)fs.fs_cstotal.cs_nbfree,
+			fs.fs_bsize, fs.fs_cgsize);
 	}
 	assert(fs.fs_cgsize <= MAXBSIZE);
 	assert((fs.fs_cgsize % secsize) == 0);
@@ -251,7 +290,8 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
 			warn("BSD Partition '%c': "
 			     "Could not seek to cg %d at %lld",
-			     BSDPARTNAME(part), i, sectobytes(cgoff));
+			     BSDPARTNAME(part), i,
+			     (long long)sectobytes(cgoff));
 			return 1;
 		}
 		if ((cc = devread(infd, &cg, fs.fs_cgsize)) < 0) {
@@ -296,8 +336,8 @@ read_bsdsblock(int infd, u_int32_t offset, int part, struct fs *fsp)
 		char pad[SBLOCKSIZE];
 	} fsu;
 	struct fs *fs = &fsu.fs;
-	int sblockloc = 0, altsblockloc = -1;
-	int cc, i;
+	int64_t sblockloc = 0;
+	int cc, i, altsblockloc = -1;
 
 	/*
 	 * Try reading the superblock in each of its possible locations.
@@ -324,7 +364,6 @@ read_bsdsblock(int infd, u_int32_t offset, int part, struct fs *fsp)
 			      BSDPARTNAME(part));
 			return 1;
 		}
-
 		sblockloc = sblock_try[i];
 		if ((fs->fs_magic == FS_UFS1_MAGIC ||
 		     (fs->fs_magic == FS_UFS2_MAGIC &&
@@ -368,7 +407,7 @@ read_bsdsblock(int infd, u_int32_t offset, int part, struct fs *fsp)
 		      BSDPARTNAME(part));
 
 	if (debug)
-		fprintf(stderr, "    '%c' UFS%d, superblock at %d\n",
+		fprintf(stderr, "    '%c' UFS%d, superblock at %lld\n",
 			BSDPARTNAME(part),
 			fs->fs_magic == FS_UFS2_MAGIC ? 2 : 1,
 			sblockloc);
@@ -416,7 +455,7 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, int cg, u_int32_t offset)
 	 * we add the bitmap offset. All blocks before cgdmin() will always
 	 * be allocated, but we scan them anyway. 
 	 */
-	assert(cgbase(fsp, cg) == cgstart(fsp, cg));
+	//assert(cgbase(fsp, cg) == cgstart(fsp, cg));
 	dbstart = fsbtodb(fsp, cgbase(fsp, cg)) + offset;
 
 	if (debug > 2)

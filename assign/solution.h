@@ -19,7 +19,6 @@
 #include "virtual.h"
 #include "maps.h"
 
-
 /*
  * Stucture to hold a potential solution
  */
@@ -37,6 +36,7 @@ class solution {
 	// TODO: make sure copying the assignments doesn't alias!
 	this->vnode_assignments = other.vnode_assignments;
 	this->vtype_assignments = other.vtype_assignments;
+	return(*this);
     };
     
     inline bool is_assigned(const vvertex &vv) const {
@@ -114,6 +114,10 @@ extern tb_pgraph PG;
 
 /* Print a solution */
 void print_solution(const solution &s);
+
+/* Print a summary of the solution and annotate the rspec with the assignment
+   This is only called when an rspec file is given as input */
+void print_solution(const solution &s, const char* output_rspec_filename);
 
 /* Print a summary of the solution */
 void print_solution_summary(const solution &s);

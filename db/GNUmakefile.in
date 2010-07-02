@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -11,37 +11,73 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= nalloc nfree nodeip readycount 
+SUBBOSS_SBIN_SCRIPTS	= subboss_dhcpd_makeconf
+
+BIN_SCRIPTS	= nalloc nfree nodeip readycount
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
 		  idletimes idlemail setsitevar audit changeuid changepid \
 		  elabinelab_bossinit update_permissions mysqld_watchdog \
-		  dumperrorlog
-LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
-LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm
+		  dumperrorlog changeleader checkstats changecreator \
+		  dbupdate geni_control
+
+WEB_SBIN_SCRIPTS= webnodelog webnewwanode webidlemail webchangeuid \
+		  webchangeleader
+WEB_BIN_SCRIPTS = webnfree
+LIBEXEC_SCRIPTS = $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS) xmlconvert
+LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
+		  NodeType.pm Interface.pm User.pm Group.pm Project.pm \
+		  Image.pm OSinfo.pm Archive.pm Logfile.pm Lan.pm emdbi.pm \
+		  emdb.pm emutil.pm Firewall.pm VirtExperiment.pm libGeni.pm
 
 # Stuff installed on plastic.
-USERSBINS	= genelists.proxy dumperrorlog.proxy
-USERLIBS	= libtbdb.pm
+USERSBINS	= genelists.proxy dumperrorlog.proxy backup
+USERLIBS	= libtbdb.pm libdb.py
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = genelists dhcpd_makeconf elabinelab_bossinit \
+                       changecreator
+SETUID_LIBX_SCRIPTS  =
+
+#
+# Targets
+#
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+TARGETS	= $(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS) \
+	$(USERSBINS) $(USERLIBS) schemacheck dbfillcheck
+else
+TARGETS = emdb.pm emutil.pm emdbi.pm
+SETUID_SBIN_SCRIPTS =
+endif
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS) \
-	$(USERSBINS) $(USERLIBS)
+all:	$(TARGETS)
+
+$(SUBBOSS_SBIN_SCRIPTS):
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+install: boss-install
+else
+install: clrhouse-install
+endif
+
+subboss-install: $(addprefix $(INSTALL_SBINDIR)/, $(SUBBOSS_SBIN_SCRIPTS))
+	ln -sf $(INSTALL_SBINDIR)/subboss_dhcpd_makeconf \
+		$(CLIENT_BINDIR)/subboss_dhcpd_makeconf
+
+boss-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
         $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(USERSBINS)) \
         $(addprefix $(INSTALL_DIR)/opsdir/lib/, $(USERLIBS))
-
-boss-install: install
 
 post-install: 
 	chown root $(INSTALL_SBINDIR)/genelists
@@ -56,6 +92,21 @@ post-install:
 #
 control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBINS)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS))
+
+# Clearinghouse install.
+clrhouse-install: $(addprefix $(INSTALL_LIBDIR)/, $(TARGETS))
+
+# This rule says what web* script depends on which installed binary directory.
+$(WEB_SBIN_SCRIPTS): $(INSTALL_SBINDIR)
+$(WEB_BIN_SCRIPTS):  $(INSTALL_BINDIR)
+
+# Just in case the dirs are not yet created,
+$(INSTALL_SBINDIR) $(INSTALL_BINDIR):
+
+# And then how to turn the template into the actual script. 
+$(WEB_SBIN_SCRIPTS) $(WEB_BIN_SCRIPTS): $(TESTBED_SRCDIR)/WEBtemplate.in
+	@echo "Generating $@"
+	cat $< | sed -e 's,@PROGTOINVOKE@,$(word 2,$^)/$(subst web,,$@),' > $@
 
 clean:
 

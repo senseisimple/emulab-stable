@@ -1,39 +1,45 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # Only known and logged in admins can update last_power times.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (!$isadmin && !STUDLY()) {
     USERERROR("Not enough permission.", 1);
 }
 
 #
-# Verify page arguments.
+# Verify page arguments. Note that "node_id" appears to be a comma separated
+# list of nodes, while "nodes" is an array passed by the form.
 #
+$optargs = OptionalPageArguments("node_id",   PAGEARG_STRING,
+				 "nodes",     PAGEARG_ARRAY,
+				 "poweron",   PAGEARG_STRING,
+				 "confirmed", PAGEARG_STRING);
+
 if ((!isset($node_id) || strcmp($node_id, "") == 0) && !isset($nodes)) {
     USERERROR("You must provide a node ID.", 1);
 }
 
 $body_str = "<center>";
 
-if ($confirmed) {
+if (isset($confirmed)) {
     $body_str .= "Updated power time for:<br><br>";
     foreach ($nodes as $ni) {
 	if (!TBvalid_node_id($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
-	
-	if (!TBValidNodeName($ni)) {
+	if (! ($node = Node::Lookup($ni))) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
 
@@ -55,12 +61,11 @@ else {
     $body_str .= "Update last power time for:<br>";
     $body_str .= "<form action='powertime.php3' method=get><br><table>";
     $body_str .= "<tr><th>Update?</th><th>Node ID</th><th>Last Power</th></tr>";
-    foreach (split(",", $node_id) as $ni) {
+    foreach (preg_split("/,/", $node_id) as $ni) {
 	if (!TBvalid_node_id($ni)) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
-	
-	if (!TBValidNodeName($ni)) {
+	if (! ($node = Node::Lookup($ni))) {
 	    USERERROR("Invalid node ID: $ni", 1);
 	}
 	

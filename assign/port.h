@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -18,7 +18,11 @@
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#if (__GNUC__ == 3 && __GNUC_MINOR__ > 0) || (__GNUC__ > 3)
+#define NEW_GCC
+#endif
+
+#ifdef NEW_GCC
 #include <ext/slist>
 using namespace __gnu_cxx;
 #else

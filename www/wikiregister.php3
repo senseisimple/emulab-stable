@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 
-$forwikionly = 1;
+$forwikionly = True;
 
 include("joinproject.php3");
 

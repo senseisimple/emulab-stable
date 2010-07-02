@@ -1,35 +1,34 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
-# Only known and logged in users can end experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
 
 #
-# Must provide the EID!
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("The project ID was not provided!", 1);
-}
-
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("The experiment ID was not provided!", 1);
-}
-
+# Verify Page Arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT,
+				 "inout",      PAGEARG_STRING);
+$optargs = OptionalPageArguments("canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING,
+				 "force",      PAGEARG_BOOLEAN,
+				 "forcetype",  PAGEARG_STRING,
+				 "idleswap",   PAGEARG_BOOLEAN,
+				 "autoswap",   PAGEARG_BOOLEAN);
+				 
 if (!isset($inout) ||
     (strcmp($inout, "in") && strcmp($inout, "out") &&
      strcmp($inout, "pause") && strcmp($inout, "restart") &&
@@ -38,8 +37,8 @@ if (!isset($inout) ||
 }
 
 # Canceled operation redirects back to showexp page. See below.
-if ($canceled) {
-    header("Location: showexp.php3?pid=$pid&eid=$eid");
+if (isset($canceled) && $canceled) {
+    header("Location: ". CreateURL("showexp", $experiment));
     return;
 }
 
@@ -52,7 +51,7 @@ PAGEHEADER("Swap Control");
 # Only admins can issue a force swapout
 # 
 if (isset($force) && $force == 1) {
-	if (! ISADMIN($uid)) {
+	if (! $isadmin) {
 		USERERROR("Only testbed administrators can forcibly swap ".
 			  "an experiment out!", 1);
 	}
@@ -63,47 +62,54 @@ if (isset($force) && $force == 1) {
 	if ($forcetype=="autoswap") { $autoswap=1; }
 }
 else {
-	$force = 0;
-	$idleswap=0;
-	$autoswap=0;
+    # Must go through the geni interfaces.
+    if ($experiment->geniflags()) {
+	USERERROR("You must use forceable swap on ProtoGeni experiments", 1);
+    }
+    
+    #
+    # If the user is not a member of the group, it
+    # must be an admin, and in that case we want him to use the force
+    # swapout path to avoid permission issues.
+    #
+    $group = $experiment->Group();
+    if (!isset($group)) {
+	TBERROR("Could not get group object for $pid/eid", 1);
+    }
+    if (!$group->IsMember($this_user, $ignore) && $isadmin) {
+	USERERROR("Since you are an administrator trying to swap out ".
+		  "an experiment in a project/group you do not belong to, ".
+		  "please go back and use the forcible swap options instead.",
+		  1);
+    }
+    $force = 0;
+    $idleswap=0;
+    $autoswap=0;
 }
 
-$exp_eid = $eid;
-$exp_pid = $pid;
-
-#
-# Check to make sure thats this is a valid PID/EID tuple.
-#
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE ".
-		 "eid='$exp_eid' and pid='$exp_pid'");
-if (mysql_num_rows($query_result) == 0) {
-    USERERROR("The experiment $exp_eid is not a valid experiment ".
-	      "in project $exp_pid.", 1);
-}
-$row           = mysql_fetch_array($query_result);
-$exp_gid       = $row[gid];
-$isbatch       = $row[batchmode];
-$state         = $row[state];
-$exptidx       = $row[idx];
-$swappable     = $row[swappable];
-$idleswap_bit  = $row[idleswap];
-$idleswap_time = $row[idleswap_timeout];
-$idlethresh    = min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
-$lockdown      = $row["lockdown"];
+# Need these below
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$unix_gid = $experiment->UnixGID();
 
 #
 # Verify permissions.
 #
-if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission for $exp_eid!", 1);
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission for $eid!", 1);
 }
 
+$isbatch       = $experiment->batchmode();
+$state         = $experiment->state();
+$exptidx       = $experiment->idx();
+$swappable     = $experiment->swappable();
+$idleswap_bit  = $experiment->idleswap();
+$idleswap_time = $experiment->idleswap_timeout();
+$idlethresh    = min($idleswap_time/60.0,TBGetSiteVar("idle/threshold"));
+$lockdown      = $experiment->lockdown();
+
 # Template Instance Experiments get special treatment in this page.
-$isinstance = $EXPOSETEMPLATES && TBIsTemplateInstanceExperiment($exptidx);
-if ($isinstance && $inout != "out") {
-    PAGEARGERROR("Invalid action for template instance");
-}
+$instance = TemplateInstance::LookupByExptidx($exptidx);
 
 # Convert inout to informative text.
 if (!strcmp($inout, "in")) {
@@ -130,18 +136,26 @@ elseif (!strcmp($inout, "pause")) {
     $action = "dequeue";
 }
 elseif (!strcmp($inout, "restart")) {
+    if ($instance)
+        PAGEARGERROR("Invalid action for template instance");
     $action = "restart";
 }
 
-if ($isinstance) {
-    echo "<font size=+2>Template Instance <b>";
+if ($instance) {
+    $guid = $instance->guid();
+    $version = $instance->vers();
+    
+    echo "<font size=+2>Template <b>" .
+          MakeLink("template",
+		   "guid=$guid&version=$version", "$guid/$version") .
+	"</b>, Instance <b>";
 }
 else {
     echo "<font size=+2>Experiment <b>";
 }
-echo "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
-echo "<br>\n";
+echo MakeLink("project", "pid=$pid", $pid) . "/" .
+     MakeLink("experiment", "pid=$pid&eid=$eid", $eid);
+echo "</b></font><br>\n";
 flush();
 
 # A locked down experiment means just that!
@@ -156,24 +170,24 @@ if ($lockdown) {
 # set. Or, the user can hit the cancel button, in which case we 
 # redirect the browser back to the experiment page (see above).
 #
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><h2><br>
           Are you sure you want to ";
     if ($force) {
 	echo "<font color=red><br>forcibly</br></font> ";
     }
-    if ($isinstance) {
-	echo "terminate template instance";
+    if ($instance) {
+	echo "$action template instance";
     }
     else {
 	echo "$action experiment";
     }
-    echo " '$exp_eid?'
+    echo " '$eid?'
           </h2>\n";
     
-    SHOWEXP($exp_pid, $exp_eid, 1);
+    $experiment->Show(1);
 
-    echo "<form action='swapexp.php3?inout=$inout&pid=$exp_pid&eid=$exp_eid'
+    echo "<form action='swapexp.php3?inout=$inout&pid=$pid&eid=$eid'
                 method=post>";
 
     if ($force) {
@@ -220,21 +234,14 @@ if (!$confirmed) {
     return;
 }
 
-#
-# We need the unix gid for the project for running the scripts below.
-# Note usage of default group in project.
-#
-TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
+STARTBUSY("Starting");
 
-if ($isinstance) {
-    if (! TBPidEid2Template($exp_pid, $exp_eid, $guid, $version)) {
-	TBERROR("Could not map $pid/$eid to its template!", 1);
-    }
-    echo "<br>\n";
-    echo "<b>Terminating template instance!</b> ... ";
-    echo "this will take a few minutes; please be patient.";
-    echo "<br>\n";
-    flush();
+if ($instance) {
+    $guid = $instance->guid();
+    $version = $instance->vers();
+
+    if ($inout == "pause")
+	$inout = "out";
 }
 
 #
@@ -250,13 +257,15 @@ set_time_limit(0);
 # plain force swap, it passes -f for us.
 $args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 
-$retval = SUEXEC($uid, "$exp_pid,$unix_gid",
+$retval = SUEXEC($uid, "$pid,$unix_gid",
 		  ($force ?
-		   "webidleswap $args $exp_pid $exp_eid" :
-		   ($isinstance ?
-		    "webtemplate_swapout -e $exp_eid $guid/$version" :
-		    "webswapexp -s $inout $exp_pid $exp_eid")),
+		   "webidleswap $args $pid,$eid" :
+		   ($instance ?
+		    "webtemplate_swap$inout -e $eid $guid/$version" :
+		    "webswapexp -s $inout $pid $eid")),
 		 SUEXEC_ACTION_IGNORE);
+
+HIDEBUSY();
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
@@ -279,8 +288,14 @@ if ($retval) {
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    if ($isinstance) {
-	STARTLOG($pid, $eid);
+    if ($instance) {
+	if ($isbatch) {
+	    STARTWATCHER($experiment);
+	    STARTLOG($instance);
+	}
+	else {
+	    STARTLOG($experiment);
+	}
     }
     elseif ($isbatch) {
 	if (strcmp($inout, "in") == 0) {
@@ -303,9 +318,10 @@ else {
                   please contact $TBMAILADDR.\n";
 	}
 	elseif (strcmp($inout, "pause") == 0) {
-	    echo "Your experiment has been dequeued. You may requeue your
-		  experiment at any time.\n";
+	    echo "Your experiment has been dequeued.
+		  You may requeue your experiment at any time.\n";
 	}
+	STARTWATCHER($experiment);
     }
     else {
 	echo "<div>";
@@ -332,11 +348,9 @@ else {
 	echo "If you do not receive
               email notification within a reasonable amount of time,
               please contact $TBMAILADDR.\n";
-
-	echo "<br><br>
-              While you are waiting, you can watch the log in realtime:<br>\n";
 	echo "</div>";
-	STARTLOG($pid, $eid);
+	echo "<br>\n";
+	STARTLOG($experiment);
     }
 }
 

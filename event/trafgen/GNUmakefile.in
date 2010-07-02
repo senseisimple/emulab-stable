@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -40,19 +40,16 @@ CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g #-Wall
 CFLAGS   += -I. -I$(TGSRCDIR) -I${OBJDIR}
 CFLAGS   += -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 CFLAGS	 += -DUSEEVENTS
 
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
 # Expand the elvin-config list now so it can be filtered below.
-LIBS     += $(shell $(ELVIN_CONFIG) --libs vin4c)
+LIBS     += -L/usr/local/lib -lpubsub -lm
+LDFLAGS  += $(LDSTATIC)
 
 SYSTEM   := $(shell uname -s)
-
-ifneq ($(host_cpu),arm)
-LDFLAGS  += -static
-endif
 
 ifeq ($(SYSTEM),FreeBSD)
 # FreeBSD
@@ -75,13 +72,18 @@ LIBS     := $(filter-out -lc,$(LIBS))
 LIBS	 += -lfl
 endif
 
-ifneq ($(host_cpu),arm)
+# Deal with the presence/absence of kerberos in the linux ssl library
 ifeq ($(SYSTEM),Linux)
-# Linux
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
-ifeq ($(NEEDKERB),0)
- CFLAGS  += `/usr/kerberos/bin/krb5-config --cflags`
- LIBS    += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NOKERB := 1
+endif
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
 endif
 endif
 endif
@@ -89,7 +91,7 @@ endif
 ifeq ($(SYSTEM),Linux)
 CFLAGS	 += -DLINUX
 YCFLAGS	 += -I. -I$(TGSRCDIR) -DUSEEVENTS -DLINUX -t
-LIBS	 += -ldl
+LIBS     += -ldl -lz
 endif
 
 LEX	 = flex -l
@@ -115,7 +117,7 @@ client-install: client
 	$(INSTALL_PROGRAM) trafgen$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/trafgen$(EXE)
 
 clean:
-	/bin/rm -f lex.yy.c y.* *.o $(PROGRAMS)
+	/bin/rm -f lex.yy.c y.* *.o $(PROGRAMS) *-debug
 
 tg2.0:
 	@echo ""

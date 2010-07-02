@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,6 +19,8 @@ all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
 	localnode.pem capture.sha1fingerprint apache.pem apache-ops.pem \
 	ctrlnode.pem jabber.pem
+
+clearinghouse:	emulab.pem apache.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -252,9 +254,7 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/emulab_privkey.pem \
 		$(INSTALL_ETCDIR)/emulab_pubkey.pem \
-		usercert.cnf
-	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
-	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
+		install-conf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 600 $(INSTALL_ETCDIR)/emulab.key
@@ -269,6 +269,11 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 644 $(INSTALL_ETCDIR)/capture.fingerprint
 	chmod 644 $(INSTALL_ETCDIR)/capture.sha1fingerprint
 
+install-conf:	usercert.cnf syscert.cnf ca.cnf
+	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
+	$(INSTALL_DATA) syscert.cnf $(INSTALL_LIBDIR)/ssl/syscert.cnf
+	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
+
 remote-site-boss-install:	install-dirs \
 		$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/emulab.key \
@@ -277,9 +282,7 @@ remote-site-boss-install:	install-dirs \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/ctrlnode.pem \
 		$(INSTALL_ETCDIR)/server.pem \
-		usercert.cnf
-	$(INSTALL_DATA) usercert.cnf $(INSTALL_LIBDIR)/ssl/usercert.cnf
-	$(INSTALL_DATA) ca.cnf $(INSTALL_LIBDIR)/ssl/ca.cnf
+		install-conf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 600 $(INSTALL_ETCDIR)/emulab.key
@@ -302,6 +305,13 @@ control-install:	$(INSTALL_ETCDIR)/capture.pem \
 	chmod 640 $(INSTALL_ETCDIR)/capture.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+
+clearinghouse-install:	install-dirs \
+		$(INSTALL_ETCDIR)/emulab.pem \
+		$(INSTALL_ETCDIR)/emulab.key \
+		install-conf
+	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
+	chmod 600 $(INSTALL_ETCDIR)/emulab.key
 
 tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
 	chmod 640 $(INSTALL_SBINDIR)/capture.pem

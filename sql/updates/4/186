@@ -1,0 +1,27 @@
+#
+# Updates to add support for TPM info
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    #
+    # Update the schema...
+    #
+
+    # Add a new osfeature
+    if (!DBSlotExists("node_hostkeys", "tpmblob")) {
+	    DBQueryFatal("ALTER TABLE node_hostkeys ADD COLUMN" .
+			 " tpmblob mediumtext");
+    }
+    if (!DBSlotExists("node_hostkeys", "tpmx509")) {
+	    DBQueryFatal("ALTER TABLE node_hostkeys ADD COLUMN" .
+			 " tpmx509 mediumtext");
+    }
+
+    return 0;
+}
+1;

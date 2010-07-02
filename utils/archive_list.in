@@ -1,0 +1,299 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Archive::Zip qw( :ERROR_CODES :CONSTANTS );
+use POSIX qw(strftime);
+use File::Basename;
+
+#
+# Command line interface to experiment archive module.
+#
+sub usage()
+{
+    print STDERR
+	"Usage: archive_list [-t tag] [-i file] <idx> <view>\n";
+    exit(-1);
+}
+my $optlist = "dt:i:q:";
+my $debug   = 0;
+my $tag     = undef;
+my $file    = undef;
+my $query   = undef;
+
+#
+# Configure variables
+#
+my $TB		    = "@prefix@";
+my $TBOPS           = "@TBOPSEMAIL@";
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libaudit;
+use Archive;
+use User;
+use Experiment;
+
+#
+# Map invoking user to object.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+    Archive->setdebug(1);
+}
+if (defined($options{"q"})) {
+    $query = $options{"q"};
+}
+if (defined($options{"t"})) {
+    $tag = $options{"t"};
+
+    if ($tag =~ /^([-\w]*)$/) {
+	$tag = $1;
+    }
+    else {
+	fatal("Bad data in tag: $tag");
+    }
+}
+if (defined($options{"i"})) {
+    $file = $options{"i"};
+
+    if ($file =~ /^([\d]*)$/) {
+	$file = $1;
+    }
+    else {
+	fatal("Bad data in file: $file");
+    }
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $archive_idx  = $ARGV[0];
+my $archive_view = $ARGV[1];
+
+if ($archive_view =~ /^([-\w]*)$/) {
+    $archive_view = $1;
+}
+else {
+    fatal("Bad data in view: $archive_view");
+}
+
+# Derive the URL we need to use. Need to scrub out the file argument since
+# we are going to replace that.
+my $url = "archive_list.php?";
+if (defined($query)) {
+    $query =~ s/&file=\d*//;
+    $url   .= $query . "&";
+}
+
+#
+#
+#
+my $archive = Archive->Lookup($archive_idx);
+if (!defined($archive)) {
+    fatal("Could not map archive $archive_idx to its object");
+}
+my $zipfile = $archive->ZipFile($archive_view, $tag);
+if (!defined($zipfile)) {
+    fatal("Could not find zipfile for $archive_view in $archive");
+}
+if (! -e $zipfile) {
+    fatal("Could not find zipfile $zipfile");
+}
+
+#
+# I guess this code should be in the Archive Library?
+#
+my $zip     = Archive::Zip->new($zipfile);
+my @members = $zip->members();
+my $index    = 0;
+
+#
+# Spit a member
+#
+sub SpitMember($$$)
+{
+    my ($index, $member, $fname) = @_;
+
+    my $size  = sprintf("%10s", $member->uncompressedSize());
+    my $mtime = $member->lastModTime();
+    
+#    $size =~ s/ /&nbsp;/g;
+#    $size .= "&nbsp;&sbsp;";
+
+    return "${size} " . strftime("%+", gmtime($mtime)) .
+	"  " . "<a href=${url}file=$index>$fname</a>\n";
+}
+
+#
+# Spit out the header info.
+#
+sub SpitHeader($;$)
+{
+    my ($type, $fname) = @_;
+
+    if ($type eq "listing") {
+	return "Content-Type: text/html\n";
+    }
+    elsif ($type eq "textfile") {
+	return "Content-Type: text/plain\n";
+    }
+    elsif ($type eq "binary") {
+	return "Content-Type: application/octet-stream\n".
+	       "Content-Disposition: attachment; filename=$fname\n";
+    }
+    return "";
+}
+
+#
+# No target file/dir, find the top level entries and spit back.
+#
+if (!defined($file)) {
+    print SpitHeader("listing") . "\n";
+    print "<pre>";
+    
+    foreach my $member (@members) {
+	my $fname = $member->fileName();
+
+	if ($fname =~ /^([^\/]*)\/$/) {
+	    print SpitMember($index, $member, $fname);
+	}
+	$index++;
+    }
+    print "</pre>\n";
+    exit(0);
+}
+
+#
+# Handle a directory, expanding it.
+#
+sub HandleDirectory($$)
+{
+    my ($index, $dirmember) = @_;
+
+    print SpitHeader("listing") . "\n";
+    print "<pre>";
+
+    # Show .
+    print SpitMember($index, $dirmember, ".");
+
+    # Find directory one level up and show ..
+    my $dotdotname = dirname($dirmember->fileName()) . "/";
+    $index = 0;
+    foreach my $member (@members) {
+	my $fname = $member->fileName();
+
+	if ($dotdotname eq $fname) {
+	    print SpitMember($index, $member, "..");
+	    last;
+	}
+	$index++;
+    }
+
+    #
+    # We want to find all the toplevel entries in the directory.
+    #
+    my $dirname = $dirmember->fileName();
+    $index = 0;
+
+    foreach my $member (@members) {
+	my $fname = $member->fileName();
+
+	if ($dirname eq $fname) {
+	    ;
+	}
+	elsif ($fname =~ /^${dirname}([^\/]*(\/)?)$/) {
+	    print SpitMember($index, $member, $1);
+	}
+	$index++;
+    }
+    print "</pre>\n";
+    return 0;
+}
+
+#
+# Handle a file; spitting it out.
+#
+sub HandleFile($$)
+{
+    my ($index, $member) = @_;
+
+    if ($member->isTextFile()) {
+	print SpitHeader("textfile") . "\n";
+    }
+    elsif ($member->isBinaryFile()) {
+	
+	print SpitHeader("binary", basename($member->fileName())) . "\n";
+    }
+    print $member->contents();
+    return 0;
+}
+
+#
+# Handle a single member, whatever it is.
+#
+sub HandleMember($$)
+{
+    my ($index, $member) = @_;
+
+    if ($member->isDirectory()) {
+	return HandleDirectory($index, $member);
+    }
+    elsif ($member->isTextFile() || $member->isBinaryFile()) {
+	return HandleFile($index, $member);
+    }
+    fatal("HandleMember: Unknown type for ". $member->fileName());
+}
+
+#
+# Find the target. If its a directory, do another listing. Otherwise
+# spit out the file.
+#
+foreach $member (@members) {
+    if ($index == $file) {
+	exit(HandleMember($index, $member));
+    }
+    $index++;
+}
+fatal("Could not find archive member $file in $zipfile");
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+

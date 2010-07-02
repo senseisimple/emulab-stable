@@ -1,0 +1,332 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+
+#
+# Do various things to templates.
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_control -a <action> <guid/vers> [args ...]\n".
+	  "switches and arguments:\n".
+	  "-a <action>    - add, delete or modify\n".
+	  "<guid/vers>    - GUID and version of template\n");
+    exit(-1);
+}
+my $optlist	 = "a:";
+my %options      = ();
+my $action;
+my $template_guid;
+my $template_vers;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS	= "@TBOPSEMAIL@";
+
+# Locals
+my $template;
+my $instance;
+# For the END block below.
+my $cleaning    = 0;
+my $justexit    = 1;
+
+# Protos
+sub ParseArgs();
+sub HideTemplate();
+sub ShowTemplate();
+sub ShowHidden();
+sub HideHidden();
+sub Activate();
+sub InActivate();
+sub AddEvent();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+use User;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+my $user_uid   = $this_user->uid();
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# Grab template and do access check.
+#
+$template = Template->Lookup($template_guid, $template_vers);
+
+if (!defined($template)) {
+    tbdie("Experiment template $template_guid/$template_vers does not exist!");
+}
+if (! $template->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+    tberror("You do not have permission to modify $template");
+    exit(1);
+}
+
+#
+# Do the action.
+#
+if ($action eq "hide") {
+    exit(HideTemplate());
+}
+elsif ($action eq "show") {
+    exit(ShowTemplate());
+}
+elsif ($action eq "showhidden") {
+    exit(ShowHidden());
+}
+elsif ($action eq "hidehidden") {
+    exit(HideHidden());
+}
+elsif ($action eq "activate") {
+    exit(Activate());
+}
+elsif ($action eq "inactivate") {
+    exit(InActivate());
+}
+elsif ($action eq "addevent") {
+    exit(AddEvent());
+}
+usage();
+
+sub HideTemplate()
+{
+    my $optlist   = "r";
+    my $recursive = 0;
+    my %options;
+    
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+    if (defined($options{"r"})) {
+	$recursive = 1;
+    }
+    $template->Hide($recursive) == 0
+	or return -1;
+    
+    return 0;
+}
+
+sub ShowTemplate()
+{
+    my $optlist   = "r";
+    my $recursive = 0;
+    my %options;
+    
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+    if (defined($options{"r"})) {
+	$recursive = 1;
+    }
+    $template->Show($recursive) == 0
+	or return -1;
+    
+    return 0;
+}
+
+sub ShowHidden()
+{
+    if (! $template->IsRoot()) {
+	print STDERR "Must apply to the root template!\n";
+	return -1;
+    }
+    # We overload the hidden bit on the root template
+    $template->Show(0) == 0
+	or return -1;
+    
+    return 0;
+}
+sub HideHidden()
+{
+    if (! $template->IsRoot()) {
+	print STDERR "Must apply to the root template!\n";
+	return -1;
+    }
+    # We overload the hidden bit on the root template
+    $template->Hide(0) == 0
+	or return -1;
+   
+    return 0;
+}
+
+sub Activate()
+{
+    $template->Activate() == 0
+	or return -1;
+    
+    return 0;
+}
+sub InActivate()
+{
+    $template->InActivate() == 0
+	or return -1;
+   
+    return 0;
+}
+
+#
+# Add a dynamic event.
+#
+sub AddEvent()
+{
+    my $timestamp;
+    my $commandline;
+    my $vnode;
+    my $exptidx;
+    
+    # Parse the rest of the options.
+    while (@ARGV) {
+	my $arg = shift(@ARGV);
+
+	if ($arg eq "-t") {
+	    usage()
+		if (@ARGV == 0);
+	    
+	    $timestamp = shift(@ARGV);
+
+	    if ("$timestamp" eq "now") {
+		$timestamp = time();
+	    }
+	    elsif ($timestamp =~ /^([\d]*)$/) {
+		$timestamp = $1;
+	    }
+	    else {
+		tbdie("Illegal characters in timestamp!");
+	    }
+	}
+	elsif ($arg eq "-c") {
+	    usage()
+		if (@ARGV == 0);
+
+	    $arg = shift(@ARGV);
+	    
+	    if (! TBcheck_dbslot($arg, 'eventlist','arguments',
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		tbdie("Illegal characters in commandline!");
+	    }
+	    $commandline = $arg;
+	}
+	elsif ($arg eq "-n") {
+	    usage()
+		if (@ARGV == 0);
+
+	    $arg = shift(@ARGV);
+	    
+	    if (! TBcheck_dbslot($arg, 'virt_nodes','vname',
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		tbdie("Illegal characters in node name!");
+	    }
+	    $vnode = $arg;
+	}
+	elsif ($arg eq "-i") {
+	    usage()
+		if (@ARGV == 0);
+
+	    $arg = shift(@ARGV);
+	    
+	    if (! TBcheck_dbslot($arg, "default", "int",
+			TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+		tbdie("Illegal characters in experiment index!");
+	    }
+	    $exptidx = $arg;
+	}
+	else {
+	    usage();
+	}
+    }
+    usage()
+	if (! (defined($timestamp) && defined($commandline) &&
+	       defined($vnode) && defined($exptidx)));
+
+    my $instance = $template->LookupInstance($exptidx);
+    if (!defined($instance)) {
+	tbdie("Could not get instance record for experiment $exptidx!");
+    }
+
+    $instance->AddEvent($timestamp, $vnode, $commandline) == 0
+	or tbdie("Could not add dynamic event to $instance!");
+    
+    return 0;
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    my %options;
+    
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV < 1) {
+	usage();
+    }
+
+    #
+    # Pick up guid/version and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$template_guid = $1;
+	$template_vers = $2;
+    }
+    else {
+	usage();
+    }
+
+    if (!defined($options{"a"})) {
+	tbdie("Must supply -a option");
+    }
+    $action = $options{"a"};
+}
+

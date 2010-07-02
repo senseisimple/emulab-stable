@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -68,8 +68,8 @@ public:
 
 class tb_pclass {
 public:
-  tb_pclass() : name(), size(0), used_members(0), refcount(0), disabled(false)
-      {;}
+  tb_pclass() : name(), size(0), used_members(0), refcount(0), disabled(false),
+    is_dynamic(false) {;}
 
   typedef map<fstring,tb_pnodelist*> pclass_members_map;
   typedef hash_set<tb_pnode*,hashptr<tb_pnode*> > tb_pnodeset;
@@ -91,13 +91,14 @@ public:
   // For use with PRUNE_PCLASSES
   int refcount;
 
-  // Just used for debugging
-  bool is_own_class;
+  // Is this a dynamic plcass? If false, it's a "real" one
+  bool is_dynamic;
 
   friend ostream &operator<<(ostream &o, const tb_pclass& p)
   {
-    o << p.name << "(" << &p << ") size=" << p.size <<
-      " used_members=" << p.used_members << " disabled=" << p.disabled << "\n";
+    o << p.name << " size=" << p.size <<
+      " used_members=" << p.used_members << " disabled=" << p.disabled <<
+      " is_dynamic=" << p.is_dynamic << "\n";
     pclass_members_map::const_iterator dit;
     for (dit=p.members.begin();dit!=p.members.end();++dit) {
       o << "  " << (*dit).first << ":\n";

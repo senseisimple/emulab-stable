@@ -1,7 +1,15 @@
 #!/bin/sh
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Script to run the monitor, collecting data from libnetmon
 #
+
+ARGS=$*
 
 #
 # Let common-env know what role we're playing
@@ -13,12 +21,24 @@ export HOST_ROLE="monitor"
 #
 . `dirname $0`/../common-env.sh
 
+REAL_PLAB=0
 if [ $# != 0 ]; then
-    if [ $# != 1 ]; then
+    if [ $# -ge 3 ]; then
       echo "Usage: $0 [stub-ip]"
       exit 1;
     fi
-    SIP=$1
+    if [ $1 = "-p" ]; then
+        REAL_PLAB=1
+        SIP=$2
+    else
+        SIP=$1
+    fi
+
+fi
+
+# XXX can we possibly get any more lame than this?
+if [ -e /proj/$PROJECT/exp/$EXPERIMENT/tmp/real_plab ]; then
+    REAL_PLAB=1
 fi
 
 if ! [ -x "$NETMON_DIR/$NETMOND" ]; then
@@ -30,8 +50,22 @@ if ! [ -x "$NETMON_DIR/$NETMOND" ]; then
     exit 1;
 fi
 
-echo "Generating IP mapping file into $IPMAP";
-$PERL ${MONITOR_DIR}/$GENIPMAP > $IPMAP
+if [ $REAL_PLAB -eq 1 ]; then
+    echo "Generating IP mapping file for the real PlanetLab into $IPMAP";
+    $PERL ${MONITOR_DIR}/$GENIPMAP -p > $IPMAP
+else
+    echo "Generating IP mapping file for fake PlanetLab into $IPMAP";
+    $PERL ${MONITOR_DIR}/$GENIPMAP > $IPMAP
+fi
 
-echo "Starting up monitor for $PROJECT/$EXPERIMENT $PELAB_IP $SIP";
-exec $NETMON_DIR/$NETMOND -v 2 | $PYTHON $MONITOR_DIR/$MONITOR $IPMAP $PROJECT/$EXPERIMENT $PELAB_IP $SIP
+INITARG=""
+if [ -r "/proj/$PROJECT/exp/$EXPERIMENT/tmp/initial-conditions.txt" ]; then
+    echo "Copy over initial conditions file for the real PlanetLab nodes";
+    cp -p /proj/$PROJECT/exp/$EXPERIMENT/tmp/initial-conditions.txt $INITCOND
+    INITARG="--initial=$INITCOND"
+fi
+
+
+#echo "Starting up monitor for $PROJECT/$EXPERIMENT $PELAB_IP $SIP";
+echo "Starting up monitor with options --mapping=$IPMAP --experiment=$PROJECT/$EXPERIMENT --ip=$PELAB_IP $INITARG $ARGS";
+exec $NETMON_DIR/$NETMOND -v 3 -u -f 262144 | tee $LOGDIR/libnetmon.out | $PYTHON $MONITOR_DIR/$MONITOR --mapping=$IPMAP --experiment=$PROJECT/$EXPERIMENT --ip=$PELAB_IP $INITARG $ARGS

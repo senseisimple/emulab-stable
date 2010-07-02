@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,7 +8,10 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <string.h>
+#include <errno.h>
 #include <paths.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
@@ -420,7 +423,11 @@ void sigchld_handler(int sig) {
 	     * this daemon. If that's the case, group_kill
 	     * has already been sent.
 	     */
-	    info("Linktest killed by signal %d.\n", WTERMSIG(status));
+	    sig = WTERMSIG(status);
+	    info("Linktest killed by signal %d.\n", sig);
+	    if (sig != SIGTERM)
+		    exit_code = sig;
+
 	  } else {
 	    /*
 	     * Linktest is stopped unexpectedly.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.1"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd"
+       type="request">
+  <node component_uuid="urn:publicid:IDN+emulab.net+node+pc175"
+        component_manager_uuid="urn:publicid:IDN+emulab.net+authority+cm"
+        virtual_id="pc175"
+        virtualization_type="emulab-vnode"
+        exclusive="1">
+    <node_type type_name="pc" type_slots="1"/>
+    <interface virtual_id="control"/>
+  </node>
+</rspec>

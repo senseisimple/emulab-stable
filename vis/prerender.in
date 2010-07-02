@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -102,6 +102,11 @@ KillOldRender();
 if (defined($options{"r"})) {
     DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");
     exit 0;
+}
+
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    fatal("No such experiment $pid/$eid!");
 }
 
 #
@@ -305,9 +310,12 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	my $mungedName = mungeName( $node );
 	if (exists $nodeProps{$mungedName}{"pos"}) {
 	    $s = $nodeProps{$mungedName}{"pos"};
-	    $s =~ /^\s*(\d+)\s+(\d+)/;
-	    $nodes{ $node }{"x"} = $1;
-	    $nodes{ $node }{"y"} = $2;
+	    if ($s =~ /^\s*(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/) {
+		$nodes{ $node }{"x"} = int($1 + 0.5);
+		$nodes{ $node }{"y"} = int($2 + 0.5);
+	    } else {
+		warn "Bad position information ($s) for $node (mungedName=$mungedName)";
+	    }
 	} else {
 	    warn "No position information returned for $node (mungedName=$mungedName)";
 	}
@@ -484,8 +492,8 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	foreach $node (keys %nodes) {
 	    $result =
 		DBQueryWarn("INSERT INTO vis_nodes ".
-			    "(vname, pid, eid, vis_type, x, y) VALUES".
-			    " ('$node', '$pid', '$eid', " .
+			    "(vname, exptidx,pid, eid, vis_type, x, y) VALUES".
+			    " ('$node', '$exptidx', '$pid', '$eid', " .
 			    "'" . $nodes{ $node }{"type"} . "', " .
 			    "'" . $nodes{ $node }{"x"}    . "', " .
 			    "'" . $nodes{ $node }{"y"}    . "') ");

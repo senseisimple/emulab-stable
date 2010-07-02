@@ -1,5 +1,11 @@
 #!/bin/sh
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Simple script to run a command with testbed admin privs turned on
 #
 

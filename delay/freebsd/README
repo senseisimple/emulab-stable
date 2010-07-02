@@ -1,0 +1,6 @@
+This directory contains changes to FreeBSD's dummynet.  Primary to
+add support for "backfill":
+
+kmods         - kernel or kernel module changes / additions
+ipfw_mods     - updates to the FreeBSD userland firewall control app
+

@@ -1,0 +1,701 @@
+#! /bin/sh
+
+imageroot="$1"
+real_root_dev="$2"
+translated_root_dev="$3"
+
+initrd=''
+
+default_lilo_entry=''
+
+is_label_or_uuid()
+{
+	local mount="$1"
+	local rc=1 #failure
+
+	# Reject labels that contain slashes, since some initramfs
+	# images don't support vol_id's FS_LABEL_ENC key-value pair.
+	case $mount in
+		LABEL=*/*|label=*/*) rc=1; ;;
+		LABEL=*|label=*) rc=0; ;;
+		UUID=*|uuid=*) rc=0; ;;
+	esac
+
+	return $rc
+}
+
+get_label()
+{
+	local dev="$1"
+	local label=''
+
+	if [ -x /lib/udev/vol_id ]; then
+		label=`/lib/udev/vol_id --label-raw $dev`
+	elif [ -x /sbin/blkid ]; then
+		label=`/sbin/blkid | \
+		       sed -n "s;^$dev"': *.*LABEL="\([^"]*\)".*;\1;p'`
+	else
+		return 1
+	fi
+
+	[ -n "$label" ] && echo LABEL=$label
+}
+
+get_uuid()
+{
+	local dev="$1"
+	local uuid=''
+
+	if [ -x /lib/udev/vol_id ]; then
+		uuid=`/lib/udev/vol_id --uuid-raw $dev`
+	elif [ -x /sbin/blkid ]; then
+		uuid=`/sbin/blkid | \
+		       sed -n "s;^$dev"': *.*UUID="\([^"]*\)".*;\1;p'`
+	else
+		return 1
+	fi
+
+	[ -n "$uuid" ] && echo UUID=$uuid
+}
+
+#extract_kernel_version()
+#{
+#	local kernel="$1"
+#
+#	echo $kernel | sed 's/[^-]*-\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/'
+#}
+
+kernel_version_compare()
+{
+        local version1="$1"
+        local version2="$2"
+	local rc=0
+
+        version1=`echo $version1 | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'`
+        local version1_major=${version1%%.*}
+        local version1_minor=${version1#*.}
+        local version1_maintenance=${version1_minor#*.}
+        version1_minor=${version1_minor%.*}
+
+        version2=`echo $version2 | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\).*$/\1/'`
+        local version2_major=${version2%%.*}
+        local version2_minor=${version2#*.}
+        local version2_maintenance=${version2_minor#*.}
+        version2_minor=${version2_minor%.*}
+
+        if [ $version1_major -lt $version2_major ]; then
+                rc=-1
+        elif [ $version1_major -gt $version2_major ]; then
+                rc=1
+        elif [ $version1_minor -lt $version2_minor ]; then
+                rc=-1
+        elif [ $version1_minor -gt $version2_minor ]; then
+                rc=1
+        elif [ $version1_maintenance -lt $version2_maintenance ]; then
+                rc=-1
+        elif [ $version1_maintenance -gt $version2_maintenance ]; then
+                rc=1
+        fi
+
+	echo $rc
+}
+
+extract_default_grub_entry()
+{
+	local imageroot="$1"
+	local grub_conf="$imageroot/$2"
+
+	local default=`sed -n 's/^default[ 	]*\([0-9]*\)$/\1/p' $grub_conf`
+	[ -z "$default" ] && default=0
+
+	local current_entry=-1
+	while read directive rest; do
+		[ -z "$directive" ] && continue
+		case $directive in
+			title)  
+				current_entry=$(( $current_entry + 1 ))
+				;;
+		esac            
+		
+		[ $current_entry -lt $default ] && continue
+		[ $current_entry -gt $default ] && break
+		
+		case $directive in
+			kernel)
+				kernel=${rest%% *}
+				commandline=${rest#* }
+				;;
+			initrd)
+				initrd="$rest"
+				;;
+		esac
+	done < $grub_conf
+}
+
+extract_default_lilo_entry()
+{
+	local imageroot=$1
+	local lilo_conf="$imageroot/etc/lilo.conf"
+
+	# Extract global settings in case the default entry doesn't
+	# have them specified.
+	local global_root=`sed -n \
+	                   's/^root[ 	]*=[ 	]*\(.*\)$/\1/p' \
+	                   $lilo_conf`
+	local global_initrd=`sed -n \
+	                     's/^initrd[ 	]*=[ 	]*\(.*\)$/\1/p' \
+	                     $lilo_conf`
+	if [ -z "$global_initrd" ]; then
+		global_initrd=`sed -n \
+		               's/^ramdisk[ 	]*=[ 	]*\(.*\)$/\1/p' \
+			       $lilo_conf`
+	fi
+	local global_append=`sed -n \
+	                     's/^append[ 	]*=[ 	]*"\(.*\)"$/\1/p' \
+	                     $lilo_conf`
+
+	local global_readonly=`sed -n 's/^read-only/ro/p' $lilo_conf`
+	if [ -z "$global_readonly" ]; then
+		global_readonly=`sed -n 's/^read-write/rw/p' $lilo_conf`
+	fi
+
+	# Get the default label.  If there isn't one, use the first
+	# defined label.
+	local default=`sed -n 's/^default[	]*=[ 	]*\(.*\)$/\1/p' \
+	               $lilo_conf`
+	if [ -z "$default" ]; then
+		default=`sed -n \
+		         's/^[ 	]*label[ 	]*=[ 	]*\(.*\)$/\1/p' \
+			 $lilo_conf | head -n1`
+	fi
+
+	default_lilo_entry="$default"
+
+	local current_image=''
+	local current_initrd=''
+	local current_append=''
+	local current_root=''
+	local current_readonly=''
+
+	local found_image=0
+	while read line; do
+		line=`echo "$line" | sed 's/[ 	]*=[ 	]*/=/'`
+		[ -z "$line" ] && continue
+		case "$line" in
+			image=*)
+				[ $found_image -eq 1 ] && break
+				current_image=${line#*=}
+				current_root=''
+				current_readonly=''
+				current_initrd=''
+				current_append=''
+				;;
+			label=*|alias=*)
+				if [ ${line#*=} = $default ]; then
+					found_image=1
+				fi
+				;;
+			append=*)
+				current_append=${line#*=}
+				current_append=${current_append#\"}
+				current_append=${current_append%\"}
+				;;
+			initrd=*|ramdisk=*)
+				current_initrd=${line#*=}
+				;;
+			root=*)
+				current_root=${line#*=}
+				;;
+			read-only)
+				current_readonly=ro
+				;;
+			read-write)
+				current_readonly=rw
+				;;
+		esac
+	done < $lilo_conf
+
+	[ -z "$current_initrd" ] && current_initrd="$global_initrd"
+	[ -z "$current_append" ] && current_append="$global_append"
+	[ -z "$current_root" ] && current_root="$global_root"
+
+	local found_root=0
+	local found_readonly=0
+	for token in $current_append; do
+		case $token in
+			root=*)
+				found_root=1
+				;;
+			ro|rw)
+				found_readonly=1
+				;;
+		esac
+	done
+	if [ $found_readonly -eq 0 ]; then
+		current_append="$current_append $current_readonly"
+	fi
+	if [ $found_root -eq 0 ]; then
+		current_append="$current_append root=$current_root"
+	fi
+
+	kernel="$current_image"
+	commandline="$current_append"
+	initrd="$current_initrd"
+}
+
+get_bootloader_name()
+{
+	local device=$1
+	
+	# Check for GRUB first because it doesn't write to the first part of the MBR.
+	# Anything that was there before will still be there, so if LILO was previously
+	# installed the string 'LILO' will be present as well as 'GRUB'.  LILO uses
+	# the whole MBR, so we don't need to do anything special to detect it properly.
+	local bootloader=unknown
+	if dd if=$real_root_dev bs=512 count=1 2> /dev/null| grep GRUB > /dev/null; then
+		bootloader=GRUB
+	elif dd if=$real_root_dev bs=512 count=1 2> /dev/null| grep LILO > /dev/null; then
+		bootloader=LILO
+	fi
+
+	echo $bootloader
+}
+
+get_swap_partitions()
+{
+	local device="$1"
+	
+	/sbin/fdisk -l "$device" | grep 'Linux swap' | cut -d' ' -f1
+}
+
+initrd_handles_label()
+{
+	local initrd="$1"
+	local decompressed_initrd="/tmp/initrd.$$"
+	local initrd_dir="/tmp/initrd.dir.$$"
+
+	[ -f "$initrd" ] || return 1
+
+	mkdir -p "$initrd_dir" 
+
+	gzip -dc < "$initrd" > "$decompressed_initrd" 2> /dev/null
+	if [ $? -ne 0 ]; then
+		cp "$initrd" "$decompressed_initrd"
+		if [ $? -ne 0 ]; then
+			exit 1
+		fi
+	fi
+
+	local mounted=0
+	mount -o ro,loop -t ext3 "$decompressed_initrd" "$initrd_dir" \
+	  2> /dev/null
+	if [ $? -ne 0 ]; then
+		mount -o ro,loop -t ext2 "$decompressed_initrd" "$initrd_dir" \
+		  2> /dev/null
+		if [ $? -eq 0 ]; then
+			mounted=1
+		fi
+	else
+		mounted=1
+	fi
+
+	if [ $mounted -eq 0 ]; then
+		(cd "$initrd_dir" && cpio -idu < "$decompressed_initrd" > \
+		  /dev/null 2>&1)
+		if [ $? -ne 0 ]; then
+			exit 1
+		fi
+	fi
+
+	cd "$initrd_dir"
+	local supports_label=0
+	if grep LABEL bin/mount > /dev/null 2>&1 && \
+	   grep UUID bin/mount > /dev/null 2>&1 || \
+	   grep libblkid.so bin/mount > /dev/null 2>&1; then
+		supports_label=1
+	elif grep LABEL bin/nash > /dev/null 2>&1 && \
+	     grep UUID bin/nash > /dev/null 2>&1 || \
+	     grep libblkid.so bin/nash > /dev/null 2>&1; then
+	  	supports_label=1
+	elif grep LABEL bin/busybox > /dev/null 2>&1 && \
+	     grep UUID bin/busybox > /dev/null 2>&1; then
+		supports_label=1
+	elif [ -x sbin/udevd ] && [ -x lib/udev/vol_id ] && \
+	     grep '[^#]*vol_id' etc/udev/rules.d/* > /dev/null; then
+		:
+		supports_label=1
+	else
+		supports_label=0
+	fi
+
+	for file in bin/mount bin/busybox bin/nash lib/udev/vol_id \
+	  etc/udev/rules.d/*; do
+		[ -f "$file" ] || continue
+		if grep "LABEL=" "$file" > /dev/null; then
+			supports_label=1
+			break
+		fi
+	done
+
+	cd /
+	[ $mounted -eq 1 ] && umount "$initrd_dir"
+
+	rm -rf "$initrd_dir" "$decompressed_initrd"
+
+	if [ $supports_label -eq 1 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+swapon_handles_label()
+{
+	local imageroot="$1"
+
+	cd "$imageroot"
+	local supports_label=0
+	if grep LABEL sbin/swapon > /dev/null 2>&1 && \
+	   grep UUID sbin/swapon > /dev/null 2>&1 || \
+	   grep libblkid.so sbin/swapon > /dev/null 2>&1; then
+		supports_label=1
+	fi
+	
+	if [ $supports_label -eq 1 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+mount_handles_label()
+{
+	local imageroot="$1"
+
+	cd "$imageroot"
+	local supports_label=0
+	if grep LABEL bin/mount > /dev/null 2>&1 && \
+	   grep UUID bin/mount > /dev/null 2>&1 || \
+	   grep libblkid.so bin/mount > /dev/null 2>&1; then
+		supports_label=1
+	elif [ -x sbin/udevd ] && [ -x lib/udev/vol_id ] && \
+	     grep '[^#]*vol_id' etc/udev/rules.d/* > /dev/null; then
+		:
+		supports_label=1
+	else
+		supports_label=0
+	fi
+
+	if [ $supports_label -eq 1 ]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+extract_root_from_commandline()
+{
+	local commandline="$@"
+
+	for token in $commandline; do
+		case $token in
+			root=*)
+				echo ${token#root=}
+				break
+				;;
+		esac
+	done
+}
+
+extract_root_from_fstab()
+{
+	local imageroot="$1"
+
+	while read device dir rest; do
+		[ -z "$device" ] && continue
+		case $device in
+			\#*)
+				continue
+				;;
+		esac
+		if [ $dir = / ]; then
+			echo $device
+			break
+		fi
+	done < $imageroot/etc/fstab
+}
+
+rewrite_fstab()
+{
+	local imageroot="$1"
+	local old_root="$2"
+	local new_root="$3"
+
+	sed -i "s;$old_root;$new_root;g" $imageroot/etc/fstab
+}
+
+rewrite_grub_config()
+{
+	local imageroot="$1"
+	local grub_config="$2"
+	local old_root="$3"
+	local new_root="$4"
+
+	sed -i "s;$old_root;$new_root;g" "$imageroot/$grub_config"
+}
+
+
+rewrite_lilo_config()
+{
+        local imageroot="$1"
+        local lilo_conf="$imageroot/etc/lilo.conf"
+        local old_root="$2"
+        local new_root="$3"
+
+        sed -i '/^[ 	]*root=/d' $lilo_conf
+        sed -i '/append=/s;[ 	]*root=[^" 	]*;;g' $lilo_conf
+        sed -i "/append=/s;\"\$; root=$new_root\";g" $lilo_conf
+
+	# Set the special flag that says we need to finish fixing LILO after
+	# boot, and dump the one-time default LILO command-line so that
+	# slicefix can find out what it is.
+	echo "$default_lilo_entry root=$new_root" > \
+	    $imageroot/var/emulab/boot/runlilo
+}
+
+echo -n "Determining installed bootloader... "
+bootloader=`get_bootloader_name $real_root_dev`
+echo "$bootloader"
+
+case $bootloader in
+	unknown)
+		exit 1
+		;;
+	LILO)
+		if ! [ -f $imageroot/etc/lilo.conf ]; then
+			echo "Can't find LILO config" 1>&2
+			exit 1
+		fi
+		extract_default_lilo_entry $imageroot
+		;;
+	GRUB)
+		grub_config=''
+		for file in /boot/grub/grub.conf /etc/grub.conf /boot/grub/menu.lst; do
+			if [ -f "$imageroot/$file" ]; then
+				grub_config="$file"
+				break
+			fi
+		done
+		if [ -z "$grub_config" ]; then
+			echo "Can't find GRUB config" 1>&2
+			exit 1
+		fi
+		extract_default_grub_entry $imageroot $grub_config
+		;;
+esac
+
+echo -n "Finding root device in /etc/fstab... "
+system_root=`extract_root_from_fstab $imageroot`
+echo "'$system_root'"
+
+echo -n "Finding root device in default $bootloader entry... "
+bootloader_root=`extract_root_from_commandline $commandline`
+echo "'$bootloader_root'"
+
+initrd_can_use_label=0
+echo -n "Checking for label/UUID support in \"$initrd\"... "
+if initrd_handles_label "$imageroot/$initrd"; then
+	initrd_can_use_label=1
+	echo yes
+else
+	echo no
+fi
+
+mount_can_use_label=0
+echo -n "Checking for label/UUID support in image... "
+if mount_handles_label $imageroot; then
+	mount_can_use_label=1
+	echo yes
+else
+	echo no
+fi
+
+swapon_can_use_label=0
+echo -n "Checking for label/UUID support for swap partitions in image... "
+if swapon_handles_label $imageroot; then
+	swapon_can_use_label=1
+	echo yes
+else
+	echo no
+fi
+
+echo -n "Checking for PATA disks... "
+# No PATA disks
+if [ "$real_root_dev" = "$translated_root_dev" ]; then
+	echo no 
+	if ! is_label_or_uuid $system_root; then
+		echo -n "Rewriting /etc/fstab to use '$real_root_dev' as root device... "
+		rewrite_fstab $imageroot $system_root $real_root_dev
+		echo done
+	fi
+
+	if ! is_label_or_uuid $bootloader_root; then
+		echo -n "Rewriting $bootloader config to use '$real_root_dev' as root device... "
+		if [ $bootloader = LILO ]; then
+			rewrite_lilo_config $imageroot $bootloader_root \
+			    $real_root_dev
+		elif [ $bootloader = GRUB ]; then
+			rewrite_grub_config $imageroot $grub_config \
+			    $bootloader_root $real_root_dev
+		fi
+		echo done
+	fi
+	exit 0
+else
+	echo yes
+fi
+
+echo -n "Checking if bootloader and /etc/fstab use labels/UUIDs for root... "
+if is_label_or_uuid "$system_root" && \
+   is_label_or_uuid "$bootloader_root"; then
+	echo yes
+	# System should boot anyway
+	# but we should rewrite for swap
+	exit 0
+else
+	echo no
+fi
+
+if is_label_or_uuid "$system_root" && \
+   [ $initrd_can_use_label -eq 1 ]; then
+	echo -n "Rewriting $bootloader config to use '$system_root' as root device... "
+	if [ $bootloader = LILO ]; then
+		rewrite_lilo_config $imageroot $bootloader_root $system_root
+	elif [ $bootloader = GRUB ]; then
+		rewrite_grub_config $imageroot $grub_config \
+		    $bootloader_root $system_root
+	fi
+	echo done
+	exit 0
+elif is_label_or_uuid "$bootloader_root" &&
+     [ $mount_can_use_label -eq 1 ]; then
+	echo -n "Rewriting /etc/fstab to use '$bootloader_root' as root device... "
+	rewrite_fstab $imageroot $system_root $bootloader_root
+	echo done
+	exit 0
+fi
+
+if [ $mount_can_use_label -eq 1 ] && \
+   [ $initrd_can_use_label -eq 1 ]; then
+	echo -n "Extracting root filesystem UUID... "
+	new_root=`get_uuid $real_root_dev`
+	if [ -z "$new_root" ]; then
+		echo "not found"
+		new_root=`get_label $real_root_dev`
+		echo -n "Extracting root filesystem label... "
+		if [ -z "$new_root" ]; then
+			echo "not found"
+			# FIXME
+			exit 1
+		else
+			echo "${new_root#LABEL=}"
+		fi
+	else
+		echo ${new_root#UUID=}
+	fi
+	echo -n "Rewriting /etc/fstab to use '$new_root' as root device... "
+	rewrite_fstab $imageroot $system_root $new_root
+	echo done
+	echo -n "Rewriting $bootloader config to use '$new_root' as root device... "
+	if [ $bootloader = LILO ]; then
+		rewrite_lilo_config $imageroot "$bootloader_root" \
+		    "$new_root"
+	elif [ $bootloader = GRUB ]; then
+		rewrite_grub_config $imageroot $grub_config "$bootloader_root" \
+		    "$new_root"
+	fi
+	echo done
+	exit 0
+fi
+
+# Old kernel, so assume we need to deal with IDE devices
+#
+# 2.6.21 is the first version of Fedora's kernel that supported PATA instead of IDE.  Obviously
+# it's possible for a kernel older than 2.6.21 to use PATA, but not very likely.  This is
+# a Quick-and-Dirty(TM) hack, but it should catch all the older images that can't use labels
+# or UUIDs and don't have PATA support.  The downside is that newer kernels with IDE support
+# or older kernels with PATA support (why?) will not be handled here, so we might use the wrong
+# root device for those.  Of course, that's why we should be using UUIDs or labels instead of
+# raw device names.
+
+extract_kernel_version $imageroot/$kernel > /tmp/kernel_info
+kernel_version=`sed -n 's/^version: //p' /tmp/kernel_info`
+kernel_has_ide=`sed -n 's/^ide-disk: //p' /tmp/kernel_info`
+
+echo -n "Checking if kernel version is < 2.6.21 or uses ide-disk driver... "
+older_kernel=`kernel_version_compare $kernel_version 2.6.21`
+if [ $older_kernel -lt 0 ] || [ "$kernel_has_ide" = yes ]; then
+	echo yes
+	if ! is_label_or_uuid $system_root; then
+		echo -n "Rewriting /etc/fstab to use '$translated_root_dev' as root device... "
+		rewrite_fstab $imageroot $system_root $translated_root_dev
+		echo done
+	fi
+
+	if ! is_label_or_uuid $bootloader_root; then
+		echo -n "Rewriting $bootloader config to use '$translated_root_dev' as root device... "
+		if [ $bootloader = LILO ]; then
+			rewrite_lilo_config $imageroot $bootloader_root \
+			    $translated_root_dev
+		elif [ $bootloader = GRUB ]; then
+			rewrite_grub_config $imageroot $grub_config \
+			    $bootloader_root $translated_root_dev
+		fi
+		echo done
+	fi
+	exit 0
+else
+	echo no
+fi
+
+# New kernel.  At this point, we have no clue whether IDE support should be used or not,
+# and it's pretty hard to tell whether the kernel will expect PATA or IDE with any degree
+# of certainty.  All we can do now is make an assumption and hope it's good enough.
+#
+# We really should be using UUIDs or labels with newer kernels anyway.
+
+if ! is_label_or_uuid $system_root; then
+	echo -n "Rewriting /etc/fstab to use '$real_root_dev' as root device... "
+	rewrite_fstab $imageroot $system_root $real_root_dev
+	echo done
+fi
+
+if ! is_label_or_uuid $bootloader_root; then
+	echo -n "Rewriting $bootloader config to use '$real_root_dev' as root device... "
+	if [ $bootloader = LILO ]; then
+		rewrite_lilo_config $imageroot $bootloader_root \
+		    $real_root_dev
+	elif [ $bootloader = GRUB ]; then
+		rewrite_grub_config $imageroot $grub_config \
+		    $bootloader_root $real_root_dev
+	fi
+	echo done
+fi
+
+if [ -x /sbin/mkswap ]; then
+	root_disk=`echo $real_root_dev | sed 's/[0-9]*$//'`
+	translated_root_disk=`echo $translated_root_dev | sed 's/[0-9]*$//'`
+	for swap in `get_swap_partitions $root_disk`; do
+		/sbin/mkswap $swap || continue
+		uuid=`get_uuid $swap`
+		if [ $swapon_can_use_label -eq 1 ]; then
+			swapdev="UUID=$uuid"
+		elif [ $older_kernel -lt 0 ]; then
+			swapdev="$translated_root_disk${swap##$root_disk}"
+		else
+			swapdev=$swap
+		fi
+		
+		echo -e "$swapdev\tswap\tswap\tdefaults\t0 0" >> /etc/fstab
+	done
+fi

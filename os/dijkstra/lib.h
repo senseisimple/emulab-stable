@@ -22,7 +22,13 @@
 #include <cassert>
 
 // A convenient converter
-std::string intToString(int num);
+inline std::string intToString(int num)
+{
+    std::ostringstream stream;
+    stream << num;
+    return stream.str();
+}
+
 
 // Sparse array of hosts. The first string is the IP address of an
 // interface on the host represented by the whole multimap. The second

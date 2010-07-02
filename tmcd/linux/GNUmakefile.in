@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,49 +32,133 @@ SYSETCDIR	?= $(DESTDIR)/etc
 ETCDIR		?= $(DESTDIR)$(CLIENT_ETCDIR)
 BINDIR		?= $(DESTDIR)$(CLIENT_BINDIR)
 VARDIR		?= $(DESTDIR)$(CLIENT_VARDIR)
+VSDIR		?= $(BINDIR)/vserver
 RCDIR		?= $(SYSETCDIR)/rc.d
 INSTALL		?= /usr/bin/install -c 
 COMMON		?= $(SRCDIR)/../common
 DEFRUNLVLDIR	?= $(RCDIR)/rc3.d
+ISMFS		= $(ETCDIR)/ismfs
 
 # without DESTDIR, used for the value of symlinks
 RRCDIR		?= /etc/rc.d
 
-install client-install:	common-install etc-install \
+destdircheck:
+	@if [ -z "$(DESTDIR)" ]; then \
+	    echo "You must define DESTDIR for this target!"; \
+	    false; \
+	fi
+	@if [ "$(DESTDIR)" = "/" ]; then \
+	    echo "DESTDIR is '/', really really bad idea!"; \
+	    false; \
+	fi
+
+subboss-install:	subboss-common-install etc-install \
 			sup-install script-install bin-install
 	@echo "Remember to install the PEM files if necessary"
+
+install client-install:	common-install etc-install \
+			sup-install script-install bin-install vserver-install
+	@echo "Remember to install the PEM files if necessary"
+
+mfs-install:	destdircheck common-install etc-install \
+			script-install bin-install
+	rm -f $(BINDIR)/rc/rc.mkelab
+	rm -f $(RCDIR)/elvind.sh
+	@if [ ! -f $(ISMFS) ]; then \
+	    echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"; \
+	fi
+
+frisbee-mfs-install:	destdircheck
+	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
+			$(SYSETCDIR)/dhclient-exit-hooks
+	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
+			$(SYSETCDIR)/dhclient-enter-hooks
+	#@if [ -r $(SRCDIR)/master.passwd ]; then \
+	#    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
+	#    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
+	#    if [ ! -e $(DESTDIR)/bin/csh ]; then \
+	#	ln $(DESTDIR)/bin/sh $(DESTDIR)/bin/csh; \
+	#    fi \
+	#fi
+	#@if [ -r $(SRCDIR)/group ]; then \
+	#    $(INSTALL) -m 644 $(SRCDIR)/group $(SYSETCDIR); \
+	#fi
+	(cd ../../tools/binoffset; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/linux_slicefix $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_info $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/extract_initrd_info $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/extract_image_info $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(SYSETCDIR)/testbed
+	$(INSTALL) -m 755 -s ../tmcc-nossl $(SYSETCDIR)/testbed/tmcc
+	$(INSTALL) -m 755 -s ../findif $(SYSETCDIR)/testbed
+	rm -f $(BINDIR)/rc/rc.mkelab
+	rm -f $(RCDIR)/elvind.sh
+
+cdboot-install:	destdircheck common-install etc-install \
+			script-install bin-install
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdboot $(BINDIR)/rc/rc.cdboot
+	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
+	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
+	#cp $(SRCDIR)/cdboot/fstab $(SYSETCDIR)/fstab
+	#cp $(SRCDIR)/cdboot/fstab.lbs $(SYSETCDIR)/fstab.lbs
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/boot
+	#cp $(SRCDIR)/cdboot/loader.conf $(DESTDIR)/boot/loader.conf
+	#cp $(SRCDIR)/cdboot/loader.rc.lbs $(DESTDIR)/boot/loader.rc.lbs
+	#cp $(SRCDIR)/cdboot/.profile $(DESTDIR)/.profile
+	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
+	(cd ../../sensors/slothd; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../pxe; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) cdboot-install)
+	(cd ../../cdrom;$(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../tools/teachswitch; $(MAKE) DESTDIR=$(DESTDIR) client-install)
+	$(INSTALL) -m 755 $(SRCDIR)/../../install/newclient $(BINDIR)/newclient
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/users
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/proj
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/groups
+	#$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/share
 
 simple-install:	common-install script-install bin-install
 
 dir-install:
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/sysconfig
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/sysconfig/network-scripts
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/init.d
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc1.d
-	$(INSTALL) -m 755 -o root -g wheel -d $(DEFRUNLVLDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)/rc6.d
-	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/db
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/sup
-	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/sysconfig
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/sysconfig/network-scripts
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)/init.d
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)/rc1.d
+	$(INSTALL) -m 755 -o root -g root -d $(DEFRUNLVLDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)/rc6.d
+	$(INSTALL) -m 755 -o root -g root -d $(ETCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(BINDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/db
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/jails
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/logs
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/sup
+	$(INSTALL) -m 755 -o root -g root -d $(VARDIR)/boot
 	-rm -rf $(DESTDIR)/etc/testbed
 	ln -s emulab $(DESTDIR)/etc/testbed
 	-rm -rf $(DESTDIR)/usr/local/etc/testbed
 	ln -s emulab $(DESTDIR)/usr/local/etc/testbed
 
 common-install:	dir-install
-	(cd ../common; $(MAKE) local-install)
+	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) local-install)
+
+subboss-common-install:	dir-install
+	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) subboss-local-install)
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile
-	$(INSTALL) -m 750 -o root -g wheel -d $(DESTDIR)/root/.cvsup
+	$(INSTALL) -m 750 -o root -g root -d $(DESTDIR)/root/.cvsup
 	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
@@ -103,7 +187,7 @@ sysetc-install:	dir-install ifcfgs
 	$(INSTALL) -m 755 $(SRCDIR)/tbprepare $(RCDIR)/init.d/tbprepare
 	-ln -sf $(RRCDIR)/init.d/tbprepare $(RCDIR)/rc1.d/K89tbprepare
 	-ln -sf $(RRCDIR)/init.d/tbprepare $(RCDIR)/rc6.d/K89tbprepare
-	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/cron.pend
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/cron.pend
 	if [ -e $(SYSETCDIR)/cron.daily/slocate.cron ]; then \
 		mv -f $(SYSETCDIR)/cron.daily/slocate.cron \
 				$(SYSETCDIR)/cron.pend; \
@@ -112,12 +196,10 @@ sysetc-install:	dir-install ifcfgs
 		mv -f $(SYSETCDIR)/cron.daily/makewhatis.cron \
 				$(SYSETCDIR)/cron.pend; \
 	fi
-	$(INSTALL) -m 755 $(SRCDIR)/elvin.sh $(RCDIR)/init.d/elvin
-	-ln -sf $(RRCDIR)/init.d/elvin $(DEFRUNLVLDIR)/S96elvin
-	-ln -sf $(RRCDIR)/init.d/elvin $(RCDIR)/rc1.d/K12elvin
-	-ln -sf $(RRCDIR)/init.d/elvin $(RCDIR)/rc6.d/K12elvin
 	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(RCDIR)/rc.local
-	-ln -sf $(RRCDIR)/rc.local $(SYSETCDIR)/rc.local
+	if [ "$(RCDIR)" != "$(SYSETCDIR)" ]; then \
+	    ln -sf $(RRCDIR)/rc.local $(SYSETCDIR)/rc.local; \
+        fi
 
 sysetc-remove:
 	-rm -f $(RCDIR)/*/S95anacron $(RCDIR)/*/K05anacron 
@@ -139,9 +221,23 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
+	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(BINDIR)/control_interface
+	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
+	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
+	$(INSTALL) -m 755 $(SRCDIR)/freebsd_to_linux_disk $(BINDIR)/freebsd_to_linux_disk
+	$(INSTALL) -m 755 $(SRCDIR)/check_disklabel $(BINDIR)/check_disklabel
+	$(INSTALL) -m 755 $(SRCDIR)/linux_slicefix $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/extract_kernel_info $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/extract_initrd_info $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/extract_image_info $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(BINDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)
+	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
+	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
 
 sfs-install:
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
+	$(INSTALL) -m 755 -o root -g root -d $(DESTDIR)/etc/sfs
 	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RCDIR)/init.d/sfs
 	-ln -sf $(RRCDIR)/init.d/nfs $(DEFRUNLVLDIR)/S20nfs
 	-ln -sf $(RRCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
@@ -156,3 +252,33 @@ sfs-install:
 # create ifcfg-eth? files
 ifcfgs:	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
 	$(SRCDIR)/mkifcfgs $(SRCDIR)/ifcfg.template
+
+vserver-install:	dir-install
+	$(INSTALL) -m 755 -o root -g root -d $(VSDIR)
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/rc.invserver $(VSDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/vserver-cnet.sh $(VSDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/vserver-init.sh $(VSDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vserver/vserver-rc.sh $(VSDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/mkvserver.pl $(BINDIR)/mkvserver.pl
+	-ln -sf $(BINDIR)/mkvserver.pl $(BINDIR)/mkjail.pl
+
+openvz-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/libvnode.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/libvnode_openvz.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/vznetinit-elab.sh $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vnodectl $(BINDIR)/
+	echo "openvz" > $(ETCDIR)/genvmtype
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/vzmount-elab.sh $(BINDIR)/
+	-ln -sf $(BINDIR)/vzmount-elab.sh /etc/vz/conf/vps.mount
+	$(INSTALL) -m 755 $(SRCDIR)/openvz/vzumount-elab.sh $(BINDIR)/
+	-ln -sf $(BINDIR)/vzumount-elab.sh /etc/vz/conf/vps.umount
+	$(INSTALL) -m 755 $(SRCDIR)/mkvnode.pl $(BINDIR)/mkvnode.pl
+
+xen-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/libvnode.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/xen/libvnode_xen.pm $(BINDIR)/
+	$(INSTALL) -m 755 $(SRCDIR)/vnodectl $(BINDIR)/
+	echo "xen" > $(ETCDIR)/genvmtype
+	$(INSTALL) -m 755 $(SRCDIR)/mkvnode.pl $(BINDIR)/mkvnode.pl
+	$(INSTALL) -m 755 $(SRCDIR)/xen/xend-config.sxp $(SYSETCDIR)/xen/
+	$(INSTALL) -m 755 xen/emulab-cnet $(SYSETCDIR)/xen/scripts/

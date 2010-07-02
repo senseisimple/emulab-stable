@@ -8,11 +8,10 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../../..
 SUBDIR		= tbsetup/plab/etc/netbed_files
-ROOTBALL	= @PLAB_ROOTBALL@
 
 include $(OBJDIR)/Makeconf
 
-SBIN_STUFF      = installcron.sh thttpd.restart thttpd
+SBIN_STUFF      = installcron.sh thttpd.restart
 FILES_DIR	= $(INSTALL_ETCDIR)/plab/netbed_files
 SBIN_DIR	= $(FILES_DIR)/sbin
 LOG_DIR		= $(FILES_DIR)/log
@@ -22,10 +21,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 mkdirs: $(LOG_DIR) $(WWW_DIR)
 
-rootball-link:
-	-ln -fs $(INSTALL_ETCDIR)/plab/$(ROOTBALL) $(WWW_DIR)/$(ROOTBALL)
-
-install: sbin-install mkdirs rootball-link
+install: sbin-install mkdirs
 
 sbin-install: $(addprefix $(SBIN_DIR)/, $(SBIN_STUFF))
 

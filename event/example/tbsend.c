@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * This is a sample event generator to send TBEXAMPLE events to all nodes
  * in an experiment. Modify as needed of course.
  */
@@ -8,6 +14,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

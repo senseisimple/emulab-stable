@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -15,6 +15,8 @@
  * Generic interface.
  */
 int		dbinit(void);
+int		dbinit_withparams(char *host,
+				  char *user, char *passwd, char *name);
 void		dbclose(void);
 
 /*
@@ -31,4 +33,6 @@ int	mydb_seteventschedulerpid(char *pid, char *eid, int processid);
  */
 MYSQL_RES      *mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
+unsigned long  mydb_escape_string(char *to, const char *from,
+				  unsigned long length);
 

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -174,7 +174,7 @@ void handle_link_modify(char * linkname, int l_index,
   info("recd. MODIFY event for link = %s\n", linkname);
 
   /*
-   * As a convience to the user, we create virt_agents entries
+   * As a convenience to the user, we create virt_agents entries
    * for each "link-vnode" so that users can talk to a specific
    * side of a duplex link, or a specific node in a lan (in which
    * case it refers to both pipes, not just one). Look at the
@@ -204,6 +204,13 @@ void handle_link_modify(char * linkname, int l_index,
     /* link is down, so just change in the link_map*/
     get_new_link_params(l_index, handle, notification, &p_which);
 }
+
+/* link field changed in 6.1 */
+#if __FreeBSD_version >= 601000
+#define DN_PIPE_NEXT(p)	((p)->next.sle_next)
+#else
+#define DN_PIPE_NEXT(p)	((p)->next)
+#endif
 
 /****************** get_link_params ***************************
 for both the pipes of the duplex link, get the pipe params
@@ -263,7 +270,7 @@ int get_link_params(int l_index)
     for ( ; num_bytes >= sizeof(*p) ; p = (struct dn_pipe *)next ) {
        
      
-       if ( p->next != (struct dn_pipe *)DN_IS_PIPE )
+       if ( DN_PIPE_NEXT(p) != (struct dn_pipe *)DN_IS_PIPE )
 	  break ;
 
        l = sizeof(*p) + p->fs.rq_elements * sizeof(*q) ;
@@ -409,13 +416,19 @@ void set_link_params(int l_index, int blackhole, int p_which)
 	    structpipe_params *p_params
 	      = &(link_map[l_index].params[p_index]);
 
-	    info("entered the loop, pindex = %d\n", p_index);
+	    if (debug)
+	      info("entered the loop, pindex=%d, pipe=%d\n",
+		   p_index, link_map[l_index].pipes[p_index]);
 	
 	    memset(&pipe, 0, sizeof pipe);
 
 	    /* set the bandwidth and delay*/
 	    pipe.bandwidth = p_params->bw;
 	    pipe.delay = p_params->delay;
+
+#ifdef DN_HAVE_BACKFILL
+	    pipe.backfill = p_params->backfill;
+#endif
 
 	    /* set the pipe number*/
 	    pipe.pipe_nr = link_map[l_index].pipes[p_index];
@@ -543,6 +556,7 @@ void set_link_params(int l_index, int blackhole, int p_which)
 	    }
 	    /*  else DROPTAIL*/
 
+		   
 	    /* now call setsockopt*/
 	    if (setsockopt(s_dummy,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, &pipe,sizeof pipe)
 		< 0)
@@ -570,6 +584,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
   int gotpipe = 0;
   int islan = link_map[l_index].islan;
   char *temp = NULL;
+  int gotqib = 0;
 
   /* Allow upper level to init the pipe */
   if (*pipe_which >= 0) {
@@ -586,7 +601,17 @@ int get_new_link_params(int l_index, event_handle_t handle,
     
     while((argvalue = strsep(&temp," \n"))){
 
-      if(strcmp(argtype,"BANDWIDTH")== 0){
+#ifdef DN_HAVE_BACKFILL
+    /* Backfill parameters. */ 
+    if(strcmp(argtype,"BACKFILL")== 0){
+      link_map[l_index].params[p_num].backfill = atoi(argvalue) * 1000;
+      if (! gotpipe) {
+	link_map[l_index].params[1].backfill =
+		link_map[l_index].params[0].backfill;
+      }
+    } else
+#endif
+    if(strcmp(argtype,"BANDWIDTH")== 0){
 	info("Bandwidth = %d\n", atoi(argvalue) * 1000);
 	link_map[l_index].params[p_num].bw = atoi(argvalue) * 1000;
 	if (! gotpipe) {
@@ -621,12 +646,13 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	    since we assume that limit is in slots/packets by default
 	 */
 	 link_map[l_index].params[p_num].q_size = atoi(argvalue);
-	 link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
+	 if (!gotqib)
+	   link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
 	 if (!gotpipe && !islan) {
 	   link_map[l_index].params[1].q_size =
 		   link_map[l_index].params[0].q_size;
-	   link_map[l_index].params[0].flags_p =
-		   link_map[l_index].params[1].flags_p;
+	   link_map[l_index].params[1].flags_p =
+		   link_map[l_index].params[0].flags_p;
 	 }
        }
 
@@ -640,6 +666,7 @@ int get_new_link_params(int l_index, event_handle_t handle,
 	   info("QSize in bytes\n");
 	   link_map[l_index].params[p_num].flags_p |= PIPE_QSIZE_IN_BYTES;
 	 }
+	 gotqib = 1;
 	 if (!gotpipe && !islan) {
 	   link_map[l_index].params[1].flags_p =
 		   link_map[l_index].params[0].flags_p;

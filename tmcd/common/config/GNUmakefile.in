@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,7 +23,17 @@ SCRIPTS		= $(addprefix $(SRCDIR)/, \
 		    rc.syncserver rc.linkagent rc.mkelab rc.localize \
 		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
 		    rc.startcmd rc.simulator rc.topomap rc.firewall \
-		    rc.tiptunnels rc.trace)
+		    rc.tiptunnels rc.trace rc.motelog rc.fakejail \
+		    rc.tpmsetup)
+
+SUBBOSS_SCRIPTS	= $(addprefix $(SRCDIR)/, \
+                    rc.config rc.misc rc.route \
+		    rc.tunnels rc.ifconfig rc.delays rc.hostnames \
+		    rc.syncserver rc.linkagent rc.mkelab rc.localize \
+		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
+		    rc.startcmd rc.simulator rc.firewall \
+		    rc.tiptunnels rc.trace rc.motelog rc.fakejail \
+		    rc.tpmsetup rc.mksubboss)
 
 include $(OBJDIR)/Makeconf
 
@@ -44,3 +54,7 @@ install:
 script-install:
 	$(INSTALL_PROGRAM) $(SRCDIR)/librc.pm $(BINDIR)/librc.pm
 	$(INSTALL_PROGRAM) $(SCRIPTS) $(BINDIR)/rc
+
+subboss-script-install:
+	$(INSTALL_PROGRAM) $(SRCDIR)/librc.pm $(BINDIR)/librc.pm
+	$(INSTALL_PROGRAM) $(SUBBOSS_SCRIPTS) $(BINDIR)/rc

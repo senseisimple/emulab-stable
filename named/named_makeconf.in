@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -41,10 +41,12 @@ my $PUBLIC_NETWORK     = "@PUBLIC_NETWORK@";
 my $PUBLIC_ROUTER      = "@PUBLIC_ROUTER@";
 my $PUBLIC_NETMASK     = "@PUBLIC_NETMASK@";
 my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
+my $VIRTNODE_NETWORK   = "@VIRTNODE_NETWORK@";
+my $VIRTNODE_NETMASK   = "@VIRTNODE_NETMASK@";
 
 # Testbed libraries.
 use lib "@prefix@/lib";
-use libdb;
+#use libdb;
 
 # Simple is good. I stole this out of a google search.
 my @NETMASKS =
@@ -77,6 +79,15 @@ for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
 	last;
     }
 }
+my $VIRTNODE_SLASH_NETMASK = "24";
+for (my $i = 0; $i < scalar(@NETMASKS); $i++) {
+    my $foo = pack("N", $NETMASKS[$i]);
+
+    if ($VIRTNODE_NETMASK eq inet_ntoa($foo)) {
+	$VIRTNODE_SLASH_NETMASK = "$i";
+	last;
+    }
+}
 
 # This is for the dotted and reverse dotted notation needed for the
 # reverse maps. This is probably all wrong ... 
@@ -84,6 +95,11 @@ my ($ia, $ib, $ic, $id) =
     ($TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
 my ($ea, $eb, $ec, $ed) =
     ($EXTERNAL_TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+
+my ($ima, $imb, $imc, $imd) =
+    ($TESTBED_NETMASK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+my ($ema, $emb, $emc, $emd) =
+    ($EXTERNAL_TESTBED_NETMASK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
 
 $infile = shift @ARGV || exit &usage;
 
@@ -94,6 +110,9 @@ while (<IF>) {
 	if (/^(.*)\%([-\w]*)\%(.*)$/) {
 	    if ($2 eq "internal_network_withmask") {
 		print $1 . "${TESTBED_NETWORK}/${TESTBED_SLASH_NETMASK}" ."$3\n";
+	    }
+	    elsif ($2 eq "virtnode_network_withmask") {
+		print $1 . "${VIRTNODE_NETWORK}/${VIRTNODE_SLASH_NETMASK}" ."$3\n";
 	    }
 	    elsif ($2 eq "internal_network_dotted") {
 		print $1 . "${ia}.${ib}.${ic}" . "$3\n";
@@ -117,6 +136,28 @@ while (<IF>) {
 			print $1 . $1 . "$forwarder;\n";
 		    }
 		    print $1 . "};\n";
+		}
+	    }
+	    elsif ($2 eq "internal_network_reverse_zones") {
+		for (my $i = $ic; $i <= $ic + (255 - $imc); $i++) {
+		    my $dotted           = "${ia}.${ib}.${i}";
+		    my $dotted_reverse   = "${i}.${ib}.${ia}";
+
+		    print $1 . "zone \"${dotted_reverse}.in-addr.arpa\" in {\n";
+		    print $1 . "\ttype master;\n";
+		    print $1 . "\tfile \"reverse/${dotted}.db\";\n";
+		    print $1 . "};\n";		    
+		}
+	    }
+	    elsif ($2 eq "external_network_reverse_zones") {
+		for (my $i = $ec; $i <= $ec + (255 - $emc); $i++) {
+		    my $dotted           = "${ea}.${eb}.${i}";
+		    my $dotted_reverse   = "${i}.${eb}.${ea}";
+
+		    print $1 . "zone \"${dotted_reverse}.in-addr.arpa\" in {\n";
+		    print $1 . "\ttype master;\n";
+		    print $1 . "\tfile \"reverse/${dotted}.db\";\n";
+		    print $1 . "};\n";		    
 		}
 	    }
 	    else {

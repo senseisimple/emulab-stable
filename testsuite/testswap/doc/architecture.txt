@@ -1,0 +1,30 @@
+testswap is a object oriented / declarative test framework for the emulab testbed.
+
+LIBRARY CODE
+./lib/TestBed/TestSuite/
+Core framework modules that the testwriter should use
+
+./lib/TestBed/XMLRPC/Client/
+The XMLRPC client interface that the core modules use to do their work
+shouldn't be directly used by the testwriter
+
+./lib/TestBed/Wrap/
+command line utility wrappers
+
+./lib/Tools/
+utility modules and functions used by the framework
+
+TESTS
+./t/topologies/*.t
+topology swap tests
+./t/xmlrpc/*.t
+xmlrpc tests
+./t/lib
+testswap framework tests
+
+
+./lib/TestBed/TestSuite.pm is a very small dsl for defining tests. It exports its symbols into namespace of modules that import it.
+
+Mouse is a lightweight version of the Moose object system for Perl.
+Moose is the best practice way of doing object orientation in Perl and is modeled after Perl6's OO system.
+Moose is used as the OO basis of testswap

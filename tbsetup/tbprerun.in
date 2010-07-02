@@ -1,9 +1,10 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -17,26 +18,29 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-f] pid eid nsfile\n";
+    print STDERR "Usage: $0 [-f] -e eid nsfile\n";
     exit(-1);
 }
-my $optlist = "fz";
+my $optlist = "fze:";
+my $pideid;
 my $force   = 0;
 my $zeemode = 0;
 my $zeeopt  = "";
-my $state;
 
 #
 # Configure variables
 #
 my $TBROOT   = "@prefix@";
 my $TESTMODE = @TESTMODE@;
-my $TBLOGS = "@TBLOGSEMAIL@";
+my $TBLOGS   = "@TBLOGSEMAIL@";
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
+my $NSVERIFY = @NSVERIFY@;
+my $vtopgen  = "$TBROOT/bin/vtopgen";
 my $wrapper  = "$TBROOT/libexec/assign_wrapper";
 my $batchexp = "$TBROOT/bin/batchexp";
 my $template = "$TBROOT/lib/ns2ir/elabinelab.ns";
 my $endexp   = "$TBROOT/bin/endexp";
-my $exptidx;
+my $dbcontrol= "$TBROOT/sbin/opsdb_control";
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -49,6 +53,9 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use User;
+use Experiment;
+use Template;
 
 #
 # Turn off line buffering on output
@@ -59,36 +66,59 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"f"})) {
     $force = 1;
 }
+if (defined($options{"e"})) {
+    $pideid = $options{"e"};
+}
 if (defined($options{"z"})) {
     $zeemode = 1;
     $zeeopt  = "-p";
 }
-if (@ARGV != 3) {
+if (!defined($pideid) || @ARGV != 1) {
     usage();
 }
-my ($pid,$eid,$nsfile) = @ARGV;
+my ($nsfile) = @ARGV;
 
 if (! -r $nsfile) {
     tbdie("NS File '$nsfile' does not exist!");
 }
 
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($pideid);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object for $pideid!");
+}
+# Need these below.
+my $pid      = $experiment->pid();
+my $eid      = $experiment->eid();
+my $state    = $experiment->state();
+my $gid      = $experiment->gid();
+my $exptidx  = $experiment->idx();
+my $instance;
+
+if ($experiment->IsInstance()) {
+    $instance = Template::Instance->LookupByExptidx($experiment->idx());
+    if (!defined($instance)) {
+	tbdie("Could not lookup instance object for $exptidx!");
+    }
+}
+
 print "Beginning pre run for $pid/$eid. " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("tbprerun started");
-
-if (! ($state = ExpState($pid, $eid))) {
-    tbdie("No such experiment $pid/$eid");
-}
-
-if (! ($gid = ExpGroup($pid,$eid))) {
-    tbdie("Unable to get group for $pid/$eid");
-}
 
 #
 # These are the valid states for running this script.
@@ -110,36 +140,37 @@ sub cleanup {
 	system("prerender -r $pid $eid");
     }
     print "Removing experiment state.\n";
-    TBExptRemoveVirtualState($pid, $eid );
+    $experiment->RemoveVirtualState();
 }
 
 #
 # Fatal error.
 #
-sub fatal($)
+sub fatal($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my ($mesg) = @_;
     
     cleanup();
-    tbdie($mesg);
+    tbdie($parms, $mesg);
 }
-
-# Need this below.
-TBExptIDX($pid, $eid, \$exptidx)
-    or fatal("Failed to get experiment index for $pid/$eid!");
 
 # Must kill any prerender process first!
 system("prerender -r $pid $eid");
 
 # Kill old virtual state.
-TBExptRemoveVirtualState($pid, $eid);
+$experiment->RemoveVirtualState() == 0 or
+    tbdie("Could not remove virtual state!");
 
 # This setups virt_nodes, virt_names including all IP address calculation
 # and tb-* handling.
 print "Running parser ... " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("parser started");
 if (system("parse-ns $zeeopt $pid $gid $eid $nsfile")) {
-    fatal("Parsing failed!");
+    fatal({type => 'secondary', severity => SEV_SECONDARY,
+	   error => ['ns_parse_failed']},
+	  "Parsing failed!");
 }
 TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
@@ -169,14 +200,19 @@ if ($events_result->num_rows) {
 }
 
 #
-# Need to know if wrapping an experiment.
+# Only admins can set the sharing mode on nodes.
 #
-my $elabinelab = 0;
-my $elabinelab_eid;
+my $query_result =
+    DBQueryFatal("select sharing_mode from virt_nodes ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 "      sharing_mode is not null");
+if ($query_result->numrows &&
+    !($this_user->IsAdmin() || $this_user->uid eq "elabman")) {
+    fatal("Only testbed admininstrators can set the sharing mode on nodes");
+}
 
-TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
-    or fatal("Failed to get ElabInElab attributes!");
-
+#
+# Need to know if wrapping an experiment.
 #
 # If we are, rerun the parser so that we can pass in the proper info
 # this time around. This is a side effect of allowing the elabinelab
@@ -187,18 +223,33 @@ TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
 # out the nodes. What if they clear the elabinelab bit too? Ick, not
 # going to worry about that.
 #
-if ($elabinelab) {
+if ($experiment->elabinelab()) {
     # Inner experiment better exist.
-    fatal("Inner experiment $elabinelab_eid does not exist!")
-	if (defined($elabinelab_eid) && !ExpState($pid, $elabinelab_eid));
+    if (defined($experiment->elabinelab_eid()) &&
+	$experiment->elabinelab_eid() ne "") {
+	my $inner_experiment =
+	    Experiment->Lookup($pid, $experiment->elabinelab_eid());
+
+	fatal("Inner experiment does not exist!")
+	    if (!defined($inner_experiment));
+
+	# Wrong place to do this?
+	my %args = ("elabinelab_exptidx" => $inner_experiment->idx());
+	
+	$experiment->Update(\%args) == 0 or
+	    fatal("Could not update elabinelab_exptidx in $experiment");
+    }
     
     # Again, kill virtual state.
-    TBExptRemoveVirtualState($pid, $eid);
+    $experiment->RemoveVirtualState() == 0 or
+	tbdie("Could not remove virtual state!");
 
     print "Re-Running parser ... " . TBTimeStamp() . "\n";
     TBDebugTimeStamp("parser started");
     if (system("parse-ns $pid $gid $eid $nsfile")) {
-	fatal("Parsing failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['ns_parse_failed']},
+	      "Parsing failed!");
     }
     TBDebugTimeStamp("parser finished");
     print "Parser done! " . TBTimeStamp() . "\n";
@@ -207,20 +258,8 @@ if ($elabinelab) {
 #
 # Put the nsfile into the DB, now that we know it parses okay.
 #
-$nsfile_string = `cat $nsfile`;
-
-if ($nsfile_string) {
-    $nsfile_string = DBQuoteSpecial($nsfile_string);
-
-    if (length($nsfile_string) >= DBLIMIT_NSFILESIZE()) {
-	fatal("NS File is way too big!");
-    }
-    if (!DBQueryWarn("delete from nsfiles where eid='$eid' and pid='$pid'") ||
-	!DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
-		     "VALUES('$pid', '$eid', $nsfile_string)")) {
-	fatal("Error storing the NS file into the database!");
-    }
-}
+$experiment->SetNSFile($nsfile) == 0 or
+    fatal("Error storing the NS file into the database!");
 
 #
 # In update mode, do not start the renderer until later. If update fails we
@@ -235,16 +274,10 @@ if ($state eq EXPTSTATE_PRERUN && !$zeemode) {
 #
 # See if using the new ipassign.
 #
-my $query_result =
-    DBQueryWarn("select use_ipassign, ipassign_args " .
-		"from experiments where pid='$pid' and eid='$eid'");
+if ($experiment->use_ipassign()) {
+    my $ipassign_args  = $experiment->ipassign_args();
 
-if (!$query_result || ($query_result->num_rows() != 1)) {
-    fatal("Error getting ipassign arguments!");
-}
-my ($use_ipassign, $ipassign_args) = $query_result->fetchrow();
-if ($use_ipassign) {
-    if (!defined $ipassign_args) {
+    if (! defined($ipassign_args)) {
 	$ipassign_args = "";
     }
     TBDebugTimeStamp("ipassign_wrapper started");
@@ -263,7 +296,9 @@ if (!$zeemode) {
     print "Setting up static routes (if requested) ... \n";
 
     if (system("staticroutes $pid $eid")) {
-	fatal("Static route calculation failed!");
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['static_routes_failed']},
+	      "Static route calculation failed!");
     }
 }
 
@@ -278,21 +313,35 @@ if (system("gentopofile $pid $eid")) {
     fatal("gentopofile failed!");
 }
 
-if (!$elabinelab) {
-    TBDebugTimeStamp("verify-ns started");
-    print "Verifying parse ...\n";
+if ($OPSDBSUPPORT) {
+    TBDebugTimeStamp("opsdb_control started");
     
-    if (system("verify-ns $pid $gid $eid $nsfile")) {
-	if (1) {
-	    SENDMAIL($TBLOGS,
-		     "NS Verify failure for $pid/$eid",
-		     "'verify-ns' failed for $pid/$eid\n".
-		     "\nIf it is not a user error nstb_compat.tcl is ".
-		     "probably out of date.\n");
+    if (system("$dbcontrol addexpdb $pid $eid")) {
+	fatal("$dbcontrol addexpdb failed!");
+    }
+}
+
+if (!$experiment->elabinelab()) {
+    TBDebugTimeStamp("verify-ns started");
+    if ($NSVERIFY) {
+	print "Verifying parse ...\n";
+    
+	if (system("verify-ns $pid $gid $eid $nsfile")) {
+	    if (1) {
+		SENDMAIL($TBLOGS,
+			 "NS Verify failure for $pid/$eid",
+			 "'verify-ns' failed for $pid/$eid\n".
+			 "\nIf it is not a user error nstb_compat.tcl is ".
+			 "probably out of date.\n");
+	    }
+	    else {
+		fatal({type => 'secondary', severity => SEV_SECONDARY,
+		       error => ['ns_verify_failed']},
+		      "verify-ns failed!");
+	    }
 	}
-	else {
-	    fatal("verify-ns failed!");
-	}
+    } else {
+	print "NSVERIFY not configured, skipping ...\n";
     }
 }
 
@@ -301,76 +350,19 @@ if (!$elabinelab) {
 # This is the only DB state that is modified during a top only run.
 #
 if (!$zeemode) {
+    my $cmd = "$wrapper -t $pid $eid";
+
+    if ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab-ops" ||
+	$this_user->stud()) {
+	$cmd = "$vtopgen -p $pid $eid";
+    }
     TBDebugTimeStamp("assign prerun started");
-    print "Doing a pre-assign ...\n";
-    if (system("$wrapper -t $pid $eid")) {
-	fatal("assign prerun failed!");
-    }
-}
+    print "Doing a pre-assign: '$cmd' ...\n";
 
-#
-# If security level indicates that the experiment needs to be run ElabInElab
-# then must generate a parallel experiment for the container. When the user
-# swaps in the original experiment, it will really be this experiment that
-# is swapped in. Its sorta bogus, but hey its a prototype.
-#
-my $security_level;
-if (! TBExptSecurityLevel($pid, $eid, \$security_level)) {
-    fatal("Could not get security_level from DB!");
-}
-
-if (0 && $security_level >= TBDB_SECLEVEL_ORANGE()) {
-    my $elabinelab_eid = $eid . "-" . "elabinelab";
-    my $tempnsfile     = "/tmp/$pid-$elabinelab_eid-$$.nsfile";
-    my $maxnodes;
-    my $elabinelab_exptidx;
-
-    if (! TBExptMinMaxNodes($pid, $eid, undef, \$maxnodes)) {
-	fatal("Could not get max nodes from DB!");
-    }
-
-    #
-    # Munge the template.
-    #
-    system("cat $template | sed -e 's/\@MAXPCS\@/$maxnodes/' ".
-	   "                    -e 's/\@SECURITY_LEVEL\@/$security_level/' ".
-	   "    >$tempnsfile");
-
-    TBDebugTimeStamp("recursive batchexp started");
-    print "Creating elabinelab container experiment.\n";
-    if (system("$batchexp -q -i -w -f -n ".
-	       "  -L 'ElabInElab Container for $eid' ".
-	       "  -E 'ElabInElab Container for $eid - DO NOT DELETE' ".
-	       "  -p $pid -e $elabinelab_eid $tempnsfile")) {
-	fatal("Could not create elabinelab container experiment!");
-    }
-    TBDebugTimeStamp("recursive batchexp finished");
-
-    #
-    # Link the two experiments together.
-    #
-    if (! (DBQueryWarn("update experiments set ".
-		       " elabinelab_eid='$eid' ".
-		       "where pid='$pid' and eid='$elabinelab_eid'") &&
-	   DBQueryWarn("update experiments set ".
-		       "  elabinelab_eid='$elabinelab_eid' ".
-		       "where pid='$pid' and eid='$eid'"))) {
-	system("$endexp -w -q $pid $elabinelab_eid");
-	fatal("Could not update DB for cross linking experiments!");
-    }
-    #
-    # This stats stuff is not done in testmode.
-    # 
-    if (! $TESTMODE) {
-	# IDX for newly created elabinelab experiment.
-	TBExptIDX($pid, $elabinelab_eid, \$elabinelab_exptidx)
-	    or fatal("Failed to get experiment index for $pid/$elabinelab_eid!");
-
-	# Cross link the other experiment (code below is for this experiment).
-	DBQueryWarn("update experiment_stats set ".
-		    "   elabinelab_exptidx=$exptidx ".
-		    "where pid='$pid' and eid='$elabinelab_eid' and ".
-		    "      exptidx='$elabinelab_exptidx'");
+    if (system($cmd)) {
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['vtopgen', undef]},
+	      "assign prerun failed!");
     }
 }
 
@@ -381,21 +373,25 @@ if (0 && $security_level >= TBDB_SECLEVEL_ORANGE()) {
 # correspond to what the wrapped experiment really wants. It is a lot easier
 # to do this here then in the parser.
 #
-if ($elabinelab && defined($elabinelab_eid)) {
+if ($experiment->elabinelab() &&
+    defined($experiment->elabinelab_eid()) &&
+    $experiment->elabinelab_eid() ne "") {
     my $outer_result;
     my $inner_result;
-    my $maxnodes;
+    my $inner_experiment =
+	Experiment->Lookup($pid, $experiment->elabinelab_eid());
+
+    fatal("Inner experiment does not exist!")
+	if (!defined($inner_experiment));
 
     if (! ($inner_result =
-	   DBQueryWarn("select type,fixed from virt_nodes ".
-		       "where pid='$pid' and eid='$elabinelab_eid'"))) {
-	fatal("Could not get virt_node info for $pid/$elabinelab_eid!");
+	   $inner_experiment->TableLookUp("virt_nodes", "type,fixed"))) {
+	fatal("Could not get virt_node info for $inner_experiment!");
     }
     if (! ($outer_result =
-	   DBQueryWarn("select vname from virt_nodes ".
-		       "where pid='$pid' and eid='$eid' and ".
-		       "      inner_elab_role='node'"))) {
-	fatal("Could not get virt_node info for $pid/$eid!");
+	   $experiment->TableLookUp("virt_nodes", "vname",
+				    "inner_elab_role='node'"))) {
+	fatal("Could not get virt_node info for $experiment!");
     }
 
     #
@@ -410,10 +406,10 @@ if ($elabinelab && defined($elabinelab_eid)) {
 	fatal("Not enough nodes in outer experiment!")
 	    if (!defined($vname));
 
-	DBQueryWarn("update virt_nodes set ".
-		    "  type='$type',fixed='$fixed' ".
-		    "where pid='$pid' and eid='$eid' and vname='$vname'")
-	    or fatal("Could not get virt_node info for $pid/$eid!");
+	$experiment->TableUpdate("virt_nodes",
+				 "type='$type',fixed='$fixed'",
+				 "vname='$vname'")
+	    or fatal("Could not update virt_node info for $experiment!");
     }
 }
 
@@ -426,24 +422,46 @@ if (! $TESTMODE) {
     # Want to move this to the stats records. Ditto for the security stuff,
     # which was handled above.
     #
-    my $elabinelab_exptidx;
+    my %sets = ();
 
-    if ($elabinelab || $security_level) {
-	DBQueryWarn("update experiment_stats set ".
-		    "   elabinelab=$elabinelab, ".
-		    "   security_level=$security_level ".
-		    "where pid='$pid' and eid='$eid' and exptidx='$exptidx'");
-    }
+    $sets{"elabinelab"} = 1
+	if ($experiment->elabinelab());
+    $sets{"security_level"} = $experiment->security_level()
+	if ($experiment->security_level());
+    $sets{"elabinelab_exptidx"} = $experiment->elabinelab_exptidx()
+	if (defined($experiment->elabinelab_exptidx()));
 
-    if ($elabinelab_eid) {
-	TBExptIDX($pid, $elabinelab_eid, \$elabinelab_exptidx)
-	    or fatal("Failed to get experiment index for $pid/$elabinelab_eid!");
-    
-	DBQueryWarn("update experiment_stats set ".
-		    "   elabinelab_exptidx=$elabinelab_exptidx ".
-		    "where pid='$pid' and eid='$eid' and exptidx='$exptidx'");
+    if (keys(%sets)) {
+	$experiment->TableUpdate("experiment_stats", \%sets) == 0 or
+	    fatal("Could not update experiment_stats info for $experiment!");
     }
 }
+
+# Setup env variables.
+if ($experiment->IsInstance()) {
+    $instance->InitializeEnvVariables() == 0
+	or fatal("Could not initialize environment strings variables");
+}
+else {
+    $experiment->InitializeEnvVariables() == 0
+	or fatal("Could not initialize environment strings variables");
+}
+
+print "Writing environment strings ...\n";
+$experiment->WriteEnvVariables() == 0
+    or fatal("Could not write environment strings for program agents");
+
+print "Setting up additional program agent support ...\n";
+$experiment->SetupProgramAgents() == 0
+    or fatal("Could not setup program agent support");
+
+print "Setting up additional network agent support ...\n";
+$experiment->SetupNetworkAgents() == 0
+    or fatal("Could not setup network agent support");
+
+print "Writing program agent info ...\n";
+$experiment->WriteProgramAgents() == 0
+    or fatal("Could not write program agent info");
 
 TBDebugTimeStamp("tbprerun finished");
 print "Pre run finished. " . TBTimeStamp() . "\n";

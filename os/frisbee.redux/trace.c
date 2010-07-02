@@ -1,12 +1,13 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002, 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <string.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -97,7 +98,7 @@ TraceStop(void)
 }
 
 void
-TraceDump(void)
+TraceDump(int serverrel, int level)
 {
 	struct event *ptr;
 	int done = 0;
@@ -111,14 +112,34 @@ TraceDump(void)
 			if (!done) {
 				done = 1;
 				fprintf(fd, "%d of %d events, "
-					"start: %ld.%03ld:\n",
+					"start=%ld.%03ld, level=%d:\n",
 					evcount > NEVENTS ? NEVENTS : evcount,
 					evcount, (long)startt.tv_sec,
-					startt.tv_usec/1000);
+					startt.tv_usec/1000, level);
+				/*
+				 * Make all event stamps relative to the
+				 * first event received.  This is specifically
+				 * for the case where the client and server
+				 * are running on the same machine and there
+				 * is only a single client.  This makes the
+				 * server timeline relative to the client's
+				 * because the server's first event is the
+				 * JOIN from the client which occurs at 0.000
+				 * in the client's timeline.
+				 *
+				 * XXX we add 1us in order to make it possible
+				 * to merge the timelines and preserve
+				 * causality.
+				 */
+				if (serverrel) {
+					struct timeval ms = { 0, 120 };
+					timersub(&ptr->tstamp, &ms, &startt);
+				}
 			}
 			timersub(&ptr->tstamp, &startt, &stamp);
-			fprintf(fd, " +%03ld.%03ld: ",
-				(long)stamp.tv_sec, stamp.tv_usec/1000);
+			fprintf(fd, " +%03ld.%06ld: ",
+				(long)stamp.tv_sec, stamp.tv_usec);
+			fprintf(fd, "%c: ", evisclient ? 'C' : 'S');
 			switch (ptr->event) {
 			case EV_JOINREQ:
 				fprintf(fd, "%s: JOIN request, ID=%lx\n",
@@ -248,11 +269,31 @@ TraceDump(void)
 				break;
 			}
 			case EV_CLINOROOM:
-				fprintf(fd, "%s: block %lu[%lu], no room, "
-					"dropped %lu blocks of previous\n",
+				fprintf(fd, "%s: block %lu[%lu], no room "
+					"(full=%lu filling=%lu)\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1],
+					ptr->args[2], ptr->args[3]);
+				break;
+			case EV_CLIFOUNDROOM:
+				fprintf(fd, "%s: block %lu[%lu], marked dubious"
+					" (missed %lu blocks)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
+				break;
+			case EV_CLIREUSE:
+				fprintf(fd, "%s: block %lu[%lu], displaces "
+					"%lu blocks of dubious chunk %lu from chunk buffer\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1],
+					ptr->args[2], ptr->args[3]);
+				break;
+			case EV_CLIDUBPROMO:
+				fprintf(fd, "%s: block %lu[%lu], no longer "
+					"dubious\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1]);
 				break;
 			case EV_CLIDUPCHUNK:
 				fprintf(fd, "%s: block %lu[%lu], dup chunk\n",
@@ -272,17 +313,17 @@ TraceDump(void)
 				break;
 			case EV_CLISCHUNK:
 				fprintf(fd, "%s: start chunk %lu, block %lu, "
-					"%lu chunks in progress\n",
+					"%lu chunks in progress (goodblks=%lu)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
-					ptr->args[2]);
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIECHUNK:
 				fprintf(fd, "%s: end chunk %lu, block %lu, "
-					"%lu chunks in progress\n",
+					"%lu chunks in progress (goodblks=%lu)\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
-					ptr->args[2]);
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLILCHUNK:
 				fprintf(fd, "%s: switched from incomplete "
@@ -318,8 +359,10 @@ TraceDump(void)
 					inet_ntoa(ptr->srcip), ptr->args[0]);
 				break;
 			case EV_CLIJOINREP:
-				fprintf(fd, "%s: got JOIN reply, blocks=%lu\n",
-					inet_ntoa(ptr->srcip), ptr->args[0]);
+				fprintf(fd, "%s: got JOIN reply, blocks=%lu, "
+					"blocksize=%lu\n",
+					inet_ntoa(ptr->srcip), ptr->args[0],
+					ptr->args[1]);
 				break;
 			case EV_CLILEAVE:
 			{
@@ -327,7 +370,7 @@ TraceDump(void)
 				bytes = (unsigned long long)ptr->args[2] << 32;
 				bytes |= ptr->args[3];
 				fprintf(fd, "%s: send LEAVE, ID=%lx, "
-					"time=%lu, bytes=%qu\n",
+					"time=%lu, bytes=%llu\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1], bytes);
 				break;
@@ -351,22 +394,53 @@ TraceDump(void)
 					ptr->args[0], ptr->args[1],
 					ptr->args[2], ptr->args[3]);
 				break;
+			case EV_CLIDCSTAT:
+			{
+				unsigned long long bytes;
+				bytes = (unsigned long long)ptr->args[0] << 32;
+				bytes |= ptr->args[1];
+				fprintf(fd, "%s: decompressed %llu bytes total\n",
+					inet_ntoa(ptr->srcip), bytes);
+				break;
+			}
 			case EV_CLIDCIDLE:
 				fprintf(fd, "%s: decompressor IDLE\n",
 					inet_ntoa(ptr->srcip));
 				break;
 			case EV_CLIWRSTATUS:
-				fprintf(fd, "%s: writer %s\n",
-					inet_ntoa(ptr->srcip),
-					ptr->args[0] ? "IDLE" : "STARTED");
+			{
+				unsigned long long bytes;
+				char *str = "??";
+
+				switch (ptr->args[0]) {
+				case 0:
+					str = "IDLE";
+					break;
+				case 1:
+					str = "STARTED";
+					break;
+				case 2:
+					str = "RUNNING";
+					break;
+				}
+				fprintf(fd, "%s: writer %s",
+					inet_ntoa(ptr->srcip), str);
+
+				bytes = (unsigned long long)ptr->args[1] << 32;
+				bytes |= ptr->args[2];
+				fprintf(fd, ", %llu bytes written\n",
+					bytes);
 				break;
+			}
 			case EV_CLIGOTPKT:
 				stamp.tv_sec = ptr->args[0];
 				stamp.tv_usec = ptr->args[1];
 				timersub(&ptr->tstamp, &stamp, &stamp);
-				fprintf(fd, "%s: got block, wait=%03ld.%03ld\n",
+				fprintf(fd, "%s: got block, wait=%03ld.%03ld"
+					", %lu good blocks recv (%lu total)\n",
 					inet_ntoa(ptr->srcip),
-					stamp.tv_sec, stamp.tv_usec/1000);
+					stamp.tv_sec, stamp.tv_usec/1000,
+					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIRTIMO:
 				stamp.tv_sec = ptr->args[0];

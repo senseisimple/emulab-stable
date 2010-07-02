@@ -1,35 +1,28 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Obstacle Information");
-
-#
 #
 # Only known and logged in users allowed.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Verify form arguments.
-# 
-if (!isset($id) ||
-    strcmp($id, "") == 0) {
-    USERERROR("You must provide an Obstacle ID!", 1);
-}
-# Sanitize.
-if (!preg_match("/^[\d]+$/", $id)) {
-    PAGEARGERROR("Invalid characters in arguments.");
-}
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("id",  PAGEARG_INTEGER);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Obstacle Information");
 
 $query_result =
     DBQueryFatal("select o.*,f.pixels_per_meter from obstacles as o ".

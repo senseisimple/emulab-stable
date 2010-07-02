@@ -1,0 +1,37 @@
+#! /bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+TRANGCMD="java -jar ${TRANG:-/usr/local/share/java/classes/trang.jar}"
+
+# Delete all xsd files which are around
+if [ -e "top.xsd" ]; then 
+  rm top.xsd 
+fi
+if [ -e "ptop.xsd" ]; then
+  rm ptop.xsd
+fi
+if [ -e "vtop.xsd" ]; then
+  rm vtop.xsd
+fi
+if [ -e "ptop-top.xsd" ]; then
+  rm ptop-top.xsd
+fi
+if [ -e "vtop-top.xsd" ]; then
+  rm vtop-top.xsd
+fi
+
+# Create the ptop file
+$TRANGCMD ptop.rnc ptop.xsd
+mv top.xsd ptop-top.xsd
+sed 's/top.xsd/ptop-top.xsd/' ptop.xsd > ptop.tmp
+mv ptop.tmp ptop.xsd
+
+# Create the vtop file
+$TRANGCMD vtop.rnc vtop.xsd
+mv top.xsd vtop-top.xsd
+sed 's/top.xsd/vtop-top.xsd/' vtop.xsd > vtop.tmp
+mv vtop.tmp vtop.xsd

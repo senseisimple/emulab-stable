@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -34,7 +34,7 @@ use libtestbed;
 # Turn off line buffering on output
 $| = 1; 
 
-my $SSH		= "$TB/bin/sshtb -n -l root ";
+my $SSH		= "$TB/bin/sshtb -n ";
 my $PROG	= "/usr/testbed/sbin/console_setup.proxy";
 my %cmdargs     = ();
 my @row;

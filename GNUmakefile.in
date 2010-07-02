@@ -1,4 +1,8 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Testbed Makefile
 #
 SRCDIR		= @srcdir@
@@ -7,7 +11,9 @@ SUBDIR		=
 TESTBED_SRCDIR  = @top_srcdir@
 DISTCLEAN_FILES = @DISTCLEAN_FILES@ 
 EVENTSYS	= @EVENTSYS@
-
+PELABSUPPORT	= @PELABSUPPORT@
+PGENISUPPORT    = @PROTOGENI_SUPPORT@
+ISMAINSITE	= @TBMAINSITE@
 SYSTEM	       := $(shell uname -s)
 
 include Makeconf
@@ -20,33 +26,72 @@ include Makeconf
 #   @optional_subdirs@ (has event)
 #   ipod os security sensors 
 # Then things that only depend on stuff we've done:
-#   pxe tbsetup tmcd utils www tip capture vis
+#   pxe tbsetup tmcd utils backend www tip capture vis
 # Then things that depend on stuff we just did:
 #
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
-		pxe tbsetup account tmcd utils tip capture ipod vis \
+		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		wiki bugdb collab
+		tools/svn wiki bugdb collab protogeni node_usage install
+ifeq ($(ISMAINSITE),1)
+SUBDIRS += tools/rmanage
+endif
+else
+SUBDIRS = db tbsetup account protogeni
+endif
 
-all:		all-subdirs 
+all:		all-subdirs just-builddirs 
 
+#
+# We used to statically link our event agents.  We no longer do this, but
+# if you want "old style" agents, use this target.
+#
+all-static:
+	@LDSTATIC=-static $(MAKE) all
+
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 install:	
 	@echo "Choose either boss-install, ops-install or fs-install"
 	@echo "Choose opsfs-install instead of ops-install for a combined ops/fs machine"
 	@echo "Choose tipserv-install for dedicated tip server machines."
+else
+install: clrhouse-install
+endif
 
 #
-# For installation on boss node (okay, paper).
+# For installation on boss node
 # 
-boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
-		install-subdirs install-mkdirs install-setbuildinfo
-	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
+boss-install:	install-checks \
+		install-subdirs install-mkdirs \
+		install-setbuildinfo
+	@echo "Boss node installed!"
 
-#
-# Same target, with the install-schemacheck dependency omitted
-# 
+# Same target, with the checks omitted
 boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
-	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
+	@echo "Boss node installed!"
+
+# Skip only the schema checks, but do the other checks.
+boss-install-noschemacheck: install-updatecheck \
+		install-sitevarscheck install-dbfillcheck \
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
+
+# Skip the update check. 
+boss-install-noupdatecheck: install-schemacheck \
+		install-sitevarscheck install-dbfillcheck \
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
+
+# Only the checks:
+install-checks: install-updatecheck \
+		install-schemacheck \
+		install-sitevarscheck \
+		install-dbfillcheck install-genischemacheck
+	@echo "Installation checks completed!"
+
+clrhouse-install:	install-subdirs install-mkdirs
+	@echo "CleaingHouse code installed!"
 
 post-install:
 	@$(MAKE) -C db post-install
@@ -65,6 +110,9 @@ endif
 	@$(MAKE) -C bugdb post-install
 	@$(MAKE) -C collab post-install
 	@$(MAKE) -C utils post-install
+ifeq ($(NODE_USAGE_SUPPORT),1)
+	@$(MAKE) -C node_usage post-install
+endif
 
 #
 # For installation on the 'ops' or 'users' node (okay, plastic)
@@ -73,7 +121,8 @@ ops-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log
 	-mkdir -p $(INSTALL_TOPDIR)/log/mysql
 	-chmod 770 $(INSTALL_TOPDIR)/log/mysql
-	-chown mysql.mysql $(INSTALL_TOPDIR)/log/mysql
+	-chown mysql $(INSTALL_TOPDIR)/log/mysql
+	-chgrp mysql $(INSTALL_TOPDIR)/log/mysql
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C security control-install
 	@$(MAKE) -C tip control-install
@@ -89,6 +138,9 @@ endif
 	@$(MAKE) -C xmlrpc control-install
 	@$(MAKE) -C tmcd control-install
 	@$(MAKE) -C account control-install
+ifeq ($(PELABSUPPORT),1)
+	@$(MAKE) -C pelab control-install
+endif
 
 fs-install:
 	@$(MAKE) -C tbsetup fs-install
@@ -98,24 +150,35 @@ opsfs-install: ops-install fs-install
 	@echo "Combined ops/fs install done."
 
 install-mkdirs:
-	-mkdir -p $(INSTALL_TOPDIR)/opsdir
 	-mkdir -p $(INSTALL_TOPDIR)/locks
 	-mkdir -p $(INSTALL_TOPDIR)/log
 	-mkdir -p $(INSTALL_TOPDIR)/log/mysql
+	-mkdir -p $(INSTALL_TOPDIR)/etc
+	-mkdir -p $(INSTALL_TOPDIR)/www
+	-mkdir -p $(INSTALL_TOPDIR)/ssl
+	-chmod 770 $(INSTALL_TOPDIR)/ssl
+ifeq ($(STANDALONE_CLEARINGHOUSE),0)
+	-mkdir -p $(INSTALL_TOPDIR)/opsdir
 	-mkdir -p $(INSTALL_TOPDIR)/log/exports
 	-mkdir -p $(INSTALL_TOPDIR)/lists
 	-mkdir -p $(INSTALL_TOPDIR)/backup
-	-mkdir -p $(INSTALL_TOPDIR)/etc
 	-mkdir -p $(INSTALL_TOPDIR)/expwork
 	-mkdir -p $(INSTALL_TOPDIR)/batch
 	-chmod 777 $(INSTALL_TOPDIR)/batch
 	-mkdir -p $(INSTALL_TOPDIR)/expinfo
 	-chmod 777 $(INSTALL_TOPDIR)/expinfo
+	-mkdir -p $(INSTALL_TOPDIR)/exparchive
+	-chmod 777 $(INSTALL_TOPDIR)/exparchive
+	-mkdir -p $(INSTALL_TOPDIR)/exparchive/Archive
+	-chmod 777 $(INSTALL_TOPDIR)/exparchive/Archive
 	-mkdir -p $(INSTALL_TOPDIR)/images
 	-chmod 775 $(INSTALL_TOPDIR)/images
 	-ln -s /usr/testbed/bin/nse $(INSTALL_TOPDIR)/bin
-	-mkdir -p $(INSTALL_TOPDIR)/ssl
-	-chmod 770 $(INSTALL_TOPDIR)/ssl
+endif
+
+just-builddirs:
+	@$(MAKE) -C rc.d all
+	@$(MAKE) -C apache all
 
 tipserv-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
@@ -126,6 +189,7 @@ tipserv-install:
 
 client-mkdirs:
 	-mkdir -p $(DESTDIR)$(CLIENT_BINDIR)
+	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)
 
 client:
 	@$(MAKE) -C lib/libtb client
@@ -154,6 +218,48 @@ endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
 
+subboss: client
+	@$(MAKE) -C os subboss
+	@$(MAKE) -C utils subboss
+
+subboss-install: subboss
+ifeq ($(EVENTSYS),1)
+	@$(MAKE) -C event client-install
+endif
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
+	@$(MAKE) -C capture client-install
+	@$(MAKE) -C tip client-install
+	@$(MAKE) -C tools client-install
+endif
+	@$(MAKE) -C sensors client-install
+	@$(MAKE) -C utils subboss-install
+	@$(MAKE) -C os subboss-install
+	@$(MAKE) -C db subboss-install
+	@$(MAKE) -C tmcd subboss-install
+	@$(MAKE) -C rc.d subboss-install
+	@$(MAKE) -C dhcpd subboss-install
+	@$(MAKE) -C tbsetup client-install
+	# Hack: this should probably be done by a subboss-install
+	# script, but there isn't a huge need for that yet
+	@rm -f $(INSTALL_RCDIR)/isc-dhcpd
+
+TARBALLDESTDIR = /var/tmp/emulab-client
+
+client-tarball:
+	@if [ `id -u` -ne 0 ]; then \
+	    echo '*** Must run as root!'; \
+	    false; \
+	fi
+	@if [ -d "$(TARBALLDESTDIR)" ]; then \
+	    echo "$(TARBALLDESTDIR) already exists."; \
+	    echo "Remove it and try again."; \
+	    false; \
+	fi
+	echo "Building and installing client-side in $(TARBALLDESTDIR)..."
+	DESTDIR=$(TARBALLDESTDIR) $(MAKE) client-install
+	echo "Creating tarball..."
+	tar czf emulab-client.tar.gz -C $(TARBALLDESTDIR) .
+
 destdircheck:
 	@if [ -z "$(DESTDIR)" ]; then \
 	    echo "You must define DESTDIR for this target!"; \
@@ -166,7 +272,7 @@ destdircheck:
 
 mfsoscheck:
 	@if [ `uname -s` != "FreeBSD" ]; then \
-	    echo "Must build MFS files on a FreeBSD system!"; \
+	    echo "Must build CDROM/MFS files on a FreeBSD system!"; \
 	    false; \
 	fi
 
@@ -175,7 +281,17 @@ mfs: mfsoscheck
 	@$(MAKE) -C sensors mfs
 	@$(MAKE) -C tmcd mfs
 
+mfs-nostatic: mfsoscheck
+	@NOSTATIC=1 $(MAKE) -C os mfs
+	@NOSTATIC=1 $(MAKE) -C sensors mfs
+	@NOSTATIC=1 $(MAKE) -C tmcd mfs
+
 mfs-install: destdircheck mfs client-mkdirs
+	@$(MAKE) -C os mfs-install
+	@$(MAKE) -C sensors mfs-install
+	@$(MAKE) -C tmcd mfs-install
+
+mfs-nostatic-install: destdircheck mfs-nostatic client-mkdirs
 	@$(MAKE) -C os mfs-install
 	@$(MAKE) -C sensors mfs-install
 	@$(MAKE) -C tmcd mfs-install
@@ -185,15 +301,76 @@ frisbee-mfs: mfsoscheck
 	@$(MAKE) -C os frisbee-mfs
 	@$(MAKE) -C tmcd frisbee-mfs
 
+frisbee-mfs-nostatic: mfsoscheck
+	@NOSTATIC=1 $(MAKE) -C cdrom/groklilo client
+	@NOSTATIC=1 $(MAKE) -C os frisbee-mfs
+	@NOSTATIC=1 $(MAKE) -C tmcd frisbee-mfs
+
 frisbee-mfs-install: destdircheck frisbee-mfs
 	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
 	@$(MAKE) -C os frisbee-mfs-install
 	@$(MAKE) -C tmcd frisbee-mfs-install
 
+frisbee-mfs-nostatic-install: destdircheck frisbee-mfs-nostatic
+	@CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C cdrom/groklilo client-install
+	@$(MAKE) -C os frisbee-mfs-install
+	@$(MAKE) -C tmcd frisbee-mfs-install
+
+cdboot: mfsoscheck client
+	@echo "CD/Dongle files built"
+
+cdboot-install: destdircheck cdboot
+	@$(MAKE) -C cdrom client-install
+	@$(MAKE) -C tmcd/freebsd6 cdboot-install
+
+flashboot: mfsoscheck client
+	@echo "Flash dongle files built"
+
+flashboot-install: destdircheck flashboot
+	@$(MAKE) -C tmcd/freebsd6 cdboot-install
+	@$(MAKE) -C os frisbee-mfs-install
+	@$(MAKE) -C flash client-install
+
 #
 # A check to see if this is a 'real' install. Kinda hacky, but as far as I can
 # tell, you can't put ifeq()'s inside of targets
 #
+ifeq ($(TBROOT),/usr/testbed)
+UPDATETESTBED= @cd $(OBJDIR)/install && perl update-testbed
+else
+UPDATETESTBED= @echo "Skipping update check, since prefix isn't /usr/testbed"
+endif
+ifeq ($(ISMAINSITE),1)
+update-testbed: update-testbed-nostop
+else
+update-testbed:	update-testbed-install
+endif
+
+update-testbed-install:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED) -i -s
+
+update-testbed-noinstall:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED)
+
+update-testbed-nostop:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED) -i
+
+update-testbed-force:
+	@echo "Updating the testbed in force mode ..."
+	$(UPDATETESTBED) -f
+
+ifeq ($(TBROOT),/usr/testbed)
+UPDATECHECK= @cd $(OBJDIR)/install && perl update-testbed -v
+else
+UPDATECHECK= @echo "Skipping update checks, since prefix isn't /usr/testbed"
+endif
+install-updatecheck:
+	@echo "Checking to see if updates need to be run"
+	$(UPDATECHECK)
+
 ifeq ($(TBROOT),/usr/testbed)
 SCHEMACHECK= cd $(OBJDIR)/db && perl schemacheck
 else
@@ -230,15 +407,35 @@ install-setbuildinfo:
 	@echo "Setting the Build and Version info"
 	$(SETBUILDINFO)
 
+install-genischemacheck:
+ifeq ($(PGENISUPPORT),1)
+	@$(MAKE) -C protogeni install-genischemacheck
+endif
+	@echo "Done"
+
+# We use separate src and obj trees in Emulab, so the traditional distclean to
+# clean "made" files from a mingled source-and-obj tree is unnecessary.
+# However, this may be useful if you mistakenly configure and make a src tree.
 clean:		clean-subdirs
 distclean:	distclean-subdirs
 	rm -f Makeconf GNUmakefile config.h config.status config.cache config.log
 	rm -f $(DISTCLEAN_FILES)
+#
+# Here's a different approch to recover from just configure problems.  It cleans
+# all files from an obj tree that have a corresponding .in file in the src tree.
+undo-configure:
+	find $SRCDIR -name '*.in' -a -not -name configure.in | \
+	    sed -e "s;$SRCDIR;$OBJDIR;" -e 's;[.]in$;;' | xargs rm -f
 
 elabinelab:
 	-mkdir -p $(INSTALL_TOPDIR)/src
 	rm -f $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
-	tar czf $(INSTALL_TOPDIR)/src/emulab-src.tar.gz -C $(SRCDIR) .
+	tar czf $(INSTALL_TOPDIR)/src/emulab-src.tar.gz -C $(SRCDIR) --exclude=.git .
+
+elabinelab-git:
+	-mkdir -p $(INSTALL_TOPDIR)/src
+	rm -f $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
+	git archive --prefix=testbed/ | gzip -c > $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
@@ -249,7 +446,10 @@ elabinelab:
 # By default, make any target by descending into subdirectories.
 %: %-subdirs ;
 
-.PHONY: post-install install-mkdirs
+.PHONY: post-install install-mkdirs clrhouse-install install \
+	boss-install-noupdatecheck boss-install-noschemacheck \
+	boss-install-force update-testbed update-testbed-install \
+	update-testbed-noinstall update-testbed-nostop
 
 # Get rid of a bunch of nasty built-in implicit rules.
 .SUFFIXES:

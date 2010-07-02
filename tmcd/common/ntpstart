@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -55,6 +55,20 @@ my @tmccresults;
 # Since this is a wrapper, we have to try to start ntp no matter what.
 #
 sub ntpstart () {
+    #
+    # No arguments means don't run ntpd, we just wanted to run ntpdate
+    #
+    return 0
+	if (!@ARGV);
+
+    #
+    # XXX FreeBSD 7 prepends "-c <configfile>" to the arguments
+    # which in our case means before the command name!
+    #
+    if ($ARGV[0] eq "-c") {
+	shift @ARGV;
+	shift @ARGV;
+    }
     if ($debug) {
 	print "@ARGV\n";
 	return 0;
@@ -142,6 +156,14 @@ open(NEW, "> $newfile")
 open(NTP, "< $ntpfile")
     or fatal("Could not open $ntpfile: $!");
 
+#
+# Some of our ntp.conf templates restrict modifications by remote hosts.
+# We need to recognize this case and explicitly allow modifications by
+# our designated servers/peers.
+#
+my $needrestrict = 0;
+my %restricts = ();
+
 while (<NTP>) {
     chomp();
     SWITCH1: {
@@ -159,6 +181,14 @@ while (<NTP>) {
 	/^driftfile[\s]*(\/.*)$/ && do {
 	    $driftfile = $1;
 	};
+	/^restrict\s+default\s+noserve$/ && do {
+	    $needrestrict = 1;
+	};
+	# Make a note if there were restrict lines
+	/^restrict\s+(\S+)$/ && do {
+	    $restricts{$1} = 1;
+	};
+
 	print NEW "$_\n";
     }
 }
@@ -172,11 +202,19 @@ foreach my $line (@ntpinfo) {
 
     SWITCH1: {
 	/^PEER=(.*)$/ && do {
-	    print NEW "peer $1\n";
+	    my $peer = $1;
+	    if ($needrestrict && !$restricts{$peer}) {
+		print NEW "restrict $peer\n";
+	    }
+	    print NEW "peer $peer\n";
 	    last SWITCH1;
 	};
 	/^SERVER=(.*)$/ && do {
-	    print NEW "server $1\n";
+	    my $server = $1;
+	    if ($needrestrict && !$restricts{$server}) {
+		print NEW "restrict $server\n";
+	    }
+	    print NEW "server $server\n";
 	    last SWITCH1;
 	};
 	/^DRIFT=(.*)$/ && do {
@@ -225,4 +263,3 @@ sub fatal($)
 	         "    $msg\n";
     exit(ntpstart());
 }
-

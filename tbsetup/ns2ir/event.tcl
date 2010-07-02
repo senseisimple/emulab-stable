@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -36,6 +36,15 @@ EventGroup instproc rename {old new} {
     $self instvar sim
 
     $sim rename_eventgroup $old $new
+}
+
+EventGroup instproc rename-agent {old new} {
+    $self instvar members
+
+    if { [info exists members($old)] } {
+	unset members($old)
+	set members($new) {}
+    }
 }
 
 #
@@ -81,7 +90,6 @@ EventGroup instproc updatedb {DB} {
     $self instvar sim
 
     if {[array size members] == 0} {
-	perror "\[updatedb] $self has no member list."
 	return
     }
 

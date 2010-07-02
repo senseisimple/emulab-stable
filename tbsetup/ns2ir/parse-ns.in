@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -45,11 +45,13 @@ my $TESTMODE = @TESTMODE@;
 my $infile   = "parse.input";
 my $outfile  = "parse.output";
 my $SAVEUID  = $UID;
-my $dbuid;
+my $this_user;
 my $pid;
 my $gid;
 my $eid;
+my $exptidx;
 my $nsfile;
+my $experiment;
 
 #
 # Turn off line buffering on output
@@ -85,6 +87,15 @@ use libdb;
 use libtestbed;
 use libtblog;
 use libtblog qw(dblog *SERR);
+use NodeType;
+use Template;
+use Experiment;
+use User;
+
+use constant false => 0;
+use constant true  => 1;
+
+sub parse_error($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -146,6 +157,13 @@ if (defined($pid)) {
     else {
 	die("Bad data in argument: $gid.");
     }
+
+    # Slowly convert to new libraries ...
+    $experiment = Experiment->Lookup($pid, $eid);
+    if (! defined($experiment)) {
+	tbdie("Cannot find the experiment object for $pid/$eid");
+    }
+    $exptidx = $experiment->idx();
 }
 
 # Remove temps cause of swapin by alternates.
@@ -157,8 +175,9 @@ if (!$TESTMODE) {
     # Get DB uid for sending over to ops. In testmode, it runs locally
     # as the user running the testsuite, obviously.
     #
-    if (! UNIX2DBUID($UID, \$dbuid)) {
-	tbdie("You do not exist in the Emulab Database!");
+    $this_user = User->ThisUser();
+    if (! defined($this_user)) {
+	tbdie("You ($UID) do not exist!");
     }
 
     # Run as the user for most of this script.
@@ -189,8 +208,8 @@ system("touch $outfile") == 0 or
 # user ID to flip to, when not in testmode.
 #
 my $cmdargs = "$TB/libexec/ns2ir/parse.proxy ";
-$cmdargs .= " -u $dbuid"
-    if (defined($dbuid));
+$cmdargs .= " -u " . $this_user->uid() . " "
+    if (defined($this_user));
 $cmdargs .= " -- ";
 $cmdargs .= " -a"
     if ($anonmode);
@@ -247,6 +266,7 @@ else {
     while (<ERR>) {
 	print SERR $_;
 	if (/^\s*\*\*\*\s*(.+)/) {
+	    parse_error($err);
 	    dblog(TBLOG_ERR, {}, $err) if $err; # flush any previous errors
 	    $_ = $1;
 	    if (/^\S+:\s*$/) { # error on next line
@@ -255,12 +275,14 @@ else {
 		s/^\s+//;
 	    } 
 	    s/\s+$//;
+	    parse_error($_);
 	    dblog(TBLOG_ERR, {}, $_) if $_;
 	    $err = '';
 	} else {
 	    $err .= $_;
 	}
     }
+    parse_error($err);
     dblog(TBLOG_ERR, {}, $err) if $err;
 
     tblog_exit();
@@ -271,7 +293,9 @@ close ERR;
 if ($?) {
     my $exit_status = $? >> 8;
     
-    tbdie({type=>'extra', cause=>'user'}, "Parsing failed (error code $exit_status)!");
+    tbdie({cause => 'user', type => 'extra', severity => SEV_ERROR,
+	   error => ['ns_parse_failed']},
+	  "Parsing failed (error code $exit_status)!");
 }
 exit(0)
     if ($impotent);
@@ -284,7 +308,9 @@ system("$TB/libexec/xmlconvert -p -x $outfile $pid $eid");
 if ($?) {
     my $exit_status = $? >> 8;
     
-    tbdie("XML converter exited with error code $exit_status!\n");
+    tbdie({type => 'primary', severity => SEV_ERROR,
+	   error => ['xml_converter_failed']},
+	  "XML converter exited with error code $exit_status!\n");
 }
 
 #
@@ -310,8 +336,8 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
 	    my $net = inet_ntoa(inet_aton($WANETMASK) & inet_aton($ip));
 		
 	    if (! defined($subnetmap{$net})) {
-		DBQueryFatal("insert into ipsubnets ".
-			     "values ('$pid','$eid', NULL)");
+		DBQueryFatal("insert into ipsubnets (exptidx,pid,eid,idx) ".
+			     "values ('$exptidx','$pid','$eid', NULL)");
 		my ($id) =
 		    DBQueryFatal("select LAST_INSERT_ID() ".
 				 "from ipsubnets")->fetchrow_array();
@@ -339,6 +365,14 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
     if ($newips ne $ips) {
 	DBQueryFatal("update virt_nodes set ips='$newips' ".
 		     "where vname='$vname' and pid='$pid' and eid='$eid'");
+	
+	foreach my $ipinfo (split(" ", $newips)) {
+	    my ($port,$ip) = split(":", $ipinfo);
+
+	    DBQueryFatal("update virt_lans set ip='$ip' ".
+			 "where vnode='$vname' and vport='$port' ".
+			 "      and pid='$pid' and eid='$eid'");
+	}
     }
 }
 #
@@ -401,52 +435,79 @@ sub GenDefsFile($)
 	print TCL "set eventtypes($type) $idx\n";
     }
     print TCL "\n";
-    
-    print TCL "# Node Types\n";
-    $query_result = DBQueryFatal(
-	"select type,class,isremotenode,isvirtnode,osname,issubnode ".
-	" from node_types as nt ".
-	"left join os_info as o on nt.osid=o.osid");
-    while (my ($type,$class,$isrem,$isvirt,$osid,$issubnode) =
-	   $query_result->fetchrow_array()) {
+
+    print TCL "# Event Trigger Types\n";
+    $query_result =
+      DBQueryFatal("select idx,type from event_triggertypes");
+    while (my ($idx,$type) = $query_result->fetchrow_array()) {
+      print TCL "set triggertypes($type) $idx\n";
+    }
+    print TCL "\n";
+ 
+    print TCL "# Node Types and Classes\n";
+    my @alltypes = NodeType->AllTypes();
+    foreach my $typeinfo (@alltypes) {
+	my $type   = $typeinfo->type();
+	my $class  = $typeinfo->class();
+	my $isrem  = $typeinfo->isremotenode();
+	my $isvirt = $typeinfo->isvirtnode();
+	my $issub  = $typeinfo->issubnode();
+	my $osid   = $typeinfo->default_osid();
+
 	print TCL "set hwtypes($type) 1\n";
 	print TCL "set hwtype_class($type) $class\n";
 	print TCL "set isremote($type) $isrem\n";
 	print TCL "set isvirt($type) $isvirt\n";
-	print TCL "set issubnode($type) $issubnode\n";
-	print TCL "set default_osids($type) \"$osid\"\n"
-	    if (defined($osid) && $osid ne "");
-    }
-    print TCL "\n";
-    
-    print TCL "# Node Classes\n";
-    $query_result =
-	DBQueryFatal("select class,isremotenode,isvirtnode,issubnode ".
-		     "from node_types");
-    while (my ($class,$isrem,$isvirt,$issubnode) =
-	   $query_result->fetchrow_array()) {
+	print TCL "set issubnode($type) $issub\n";
+
+	# Since there are multiple types per class, this is probably not
+	# the right thing to do.
 	print TCL "set hwtypes($class) 1\n";
 	print TCL "set isremote($class) $isrem\n";
 	print TCL "set isvirt($class) $isvirt\n";
-	print TCL "set issubnode($class) $issubnode\n";
+	print TCL "set issubnode($class) $issub\n";
+
+	if (defined($osid) && $osid ne "") {
+	    $query_result =
+		DBQueryFatal("select osname from os_info ".
+			     "where osid='$osid'");
+	    if ($query_result->numrows) {
+		my ($osname) = $query_result->fetchrow_array();
+
+		if ($osname) {
+		    print TCL "set default_osids($type) \"$osname\"\n"
+		}
+	    }
+	}
     }
     print TCL "\n";
-
+    
     print TCL "# Node Aux Types\n";
-    $query_result =
-	DBQueryFatal("select at.auxtype,".
-		     "       isremotenode,isvirtnode,osname,issubnode ".
-		     " from node_types_auxtypes as at ".
-		     "left join node_types as nt on nt.type=at.type ".
-		     "left join os_info as o on nt.osid=o.osid");
-    while (my ($type,$isrem,$isvirt,$osid,$issubnode) =
-	   $query_result->fetchrow_array()) {
+    my @auxtypes = NodeType->AuxTypes();
+    foreach my $typeinfo (@auxtypes) {
+	my $type   = $typeinfo->type();
+	my $isrem  = $typeinfo->isremotenode();
+	my $isvirt = $typeinfo->isvirtnode();
+	my $issub  = $typeinfo->issubnode();
+	my $osid   = $typeinfo->default_osid();
+
 	print TCL "set hwtypes($type) 1\n";
 	print TCL "set isremote($type) $isrem\n";
 	print TCL "set isvirt($type) $isvirt\n";
-	print TCL "set issubnode($type) $issubnode\n";
-	print TCL "set default_osids($type) \"$osid\"\n"
-	    if (defined($osid) && $osid ne "");
+	print TCL "set issubnode($type) $issub\n";
+
+	if (defined($osid) && $osid ne "") {
+	    $query_result =
+		DBQueryFatal("select osname from os_info ".
+			     "where osid='$osid'");
+	    if ($query_result->numrows) {
+		my ($osname) = $query_result->fetchrow_array();
+
+		if ($osname) {
+		    print TCL "set default_osids($type) \"$osname\"\n"
+		}
+	    }
+	}
     }
     print TCL "\n";
 
@@ -513,6 +574,49 @@ sub GenDefsFile($)
     }
     print TCL "\n";
 
+    print TCL "# Site variables\n";
+    my %sitevars = ();
+    $query_result = DBQueryFatal("select name,value,defaultvalue " .
+        " from sitevariables where ns_include=TRUE");
+    while (my ($name,$value,$defaultvalue) = $query_result->fetchrow_array()) {
+        # Use the default value if unset, or skip altogether if the default
+        # is just the empty string.
+        if (!defined($value)) {
+            if ($defaultvalue eq "") {
+                next;
+            } else {
+                $value = $defaultvalue;
+            }
+        }
+        # Escape special characters in the value (just braces)
+        $value =~ s/([{}])/\\$1/g;
+        # Note: braces in tcl act like single quotes in other scripting
+        # languages (eg. no interpolation occurs)
+	print TCL "set sitevariables($name) {$value}\n";
+	$sitevars{$name} = $value;
+    }
+    print TCL "\n";
+
+    #
+    # XXX Backward compat: we must ensure that certain sitevars exist in
+    # the NS defs file as NS parser assumes they do.  If they don't exist,
+    # we create them with the "traditional" values.
+    #
+    my %defvalues = (
+	"elabinelab/singlenet" => 0,
+	"elabinelab/boss_osid" => "FBSD63-STD",
+	"elabinelab/ops_osid"  => "FBSD63-STD",
+	"elabinelab/fs_osid"   => "FBSD63-STD"
+    );
+    while (my ($var, $def) = each(%defvalues)) {
+	if (!exists($sitevars{$var})) {
+	    print "*** WARNING: sitevar $var does not exist or has no value, ",
+	          "defaulting to $def\n";
+	    print TCL "set sitevariables($var) $def\n";
+	    $sitevars{$var} = $def;
+	}
+    }
+
     if (defined($pid)) {
 	print TCL "# OSIDs\n";
 	$query_result =
@@ -521,6 +625,27 @@ sub GenDefsFile($)
 		     
 	while (my ($osname) = $query_result->fetchrow_array()) {
 	    print TCL "set osids($osname) 1\n";
+	}
+	print TCL "\n";
+
+	print TCL "# subOSIDs and parent OSIDs (default parent first element)\n";
+	$query_result =
+	    DBQueryFatal("select oi.osname,oi3.osname," . 
+			 "group_concat(oi2.osname separator '\" \"')" . 
+			 " from os_submap as osm" . 
+			 " left join os_info as oi on osm.osid=oi.osid" . 
+			 " left join os_info as oi2 on osm.parent_osid=oi2.osid" . 
+			 " left join os_info as oi3 on oi.def_parentosid=oi3.osid" . 
+			 " where oi.def_parentosid is not NULL" . 
+			 " group by oi.osname");
+		     
+	while (my ($osname,$def_parentosid,$parent_osids) = 
+	       $query_result->fetchrow_array()) {
+	    my $parentlist = "\"$def_parentosid\"";
+	    if (defined($parent_osids) && $parent_osids ne '') {
+		$parentlist .= " \"$parent_osids\"";
+	    }
+	    print TCL "set subosids($osname) [list $parentlist]\n";
 	}
 	print TCL "\n";
     }
@@ -572,25 +697,148 @@ sub GenDefsFile($)
     }
 
     #
-    # ElabInElab stuff.
+    # Defaults for ElabInElab settings.
+    # System-wide defaults that come from sitevariables integrated above.
+    # However, for compatibility, we want existing experiments to retain
+    # their current settings for some of these, unless explicitly overridden
+    # via NS commands.  So here we initialize elabinelab variables based on
+    # existing values, so that the sitevar values won't get used later.
+    # These values can still be overridden by explicit settings in the NS file.
     # 
-    my $maxnodes   = 0;
-    if (defined($pid)) {
-	my $elabinelab = 0;
-	my $elabinelab_eid;
-
-	TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
-	    or tbdie("Failed to get ElabInElab attributes!");
-
-	if ($elabinelab && defined($elabinelab_eid)) {
-	    if (! TBExptMinMaxNodes($pid, $elabinelab_eid, undef, \$maxnodes)) {
-		tbdie("Could not get max nodes from DB!");
+    if (defined($experiment) && $experiment->elabinelab()) {
+	# dig out existing OSIDs for the boss/ops/fs nodes
+	$query_result =
+	    DBQueryFatal("select inner_elab_role,osname from virt_nodes ".
+			 " where inner_elab_role!='node' and ".
+			 " pid='$pid' and eid='$eid'");
+	while (my ($role,$os) = $query_result->fetchrow_array()) {
+	    if ($role =~ /^boss/) {
+		print TCL "set ::TBCOMPAT::elabinelab_nodeos('boss') $os\n";
+		next;
+	    }
+	    if ($role =~ /^ops/) {
+		print TCL "set ::TBCOMPAT::elabinelab_nodeos('ops') $os\n";
+		if ($role eq "ops+fs") {
+		    print TCL "set ::TBCOMPAT::elabinelab_nodeos('fs') $os\n";
+		}
+		next;
+	    }
+	    if ($role =~ /^fs/) {
+		print TCL "set ::TBCOMPAT::elabinelab_nodeos('fs') $os\n";
+		next;
 	    }
 	}
     }
-    # Be sure to initialize this to something ...
-    print TCL "set elabinelab_maxpcs $maxnodes\n";
+
+    #
+    # XXX elabinelab_singlenet must always have a value.
+    # This really isn't the place to do this, but I don't want to
+    # mess with the TCL code...
+    #
+    my $singlenet = $sitevars{"elabinelab/singlenet"};
+    if (defined($experiment) && $experiment->elabinelab()) {
+	$singlenet = $experiment->elabinelab_singlenet();
+    }
+    print TCL "set ::GLOBALS::elabinelab_singlenet $singlenet\n";
+
+    #
+    # Another ElabinElab setting.
+    # This looks much like the compat hack above, but is for a completely
+    # different reason.  If an inner-elab has an inner-experiment, the
+    # NS file is re-parsed to pick up additional info.
+    #
+    my $maxnodes = 0;
+    if (defined($experiment) && $experiment->elabinelab()) {
+	$maxnodes = $experiment->maximum_nodes();
+    }
+    print TCL "set elabinelab_maxpcs $maxnodes\n\n";
+
+    #
+    # For Templates.
+    #
+    print TCL "# Template goo\n";
+    # Does not matter what it is, as long as it is set.
+    print TCL "set ::DATASTORE \"" . PROJROOT() . "\"\n";
+    
+    if (defined($experiment)) {
+	my $instance =
+	    Template::Instance->LookupByID($experiment->instance_idx());
+	
+	if (defined($instance)) {
+	    my $datastore = $instance->path() . "/datastore";
+	    my %parameters;
+
+	    print TCL "set ::DATASTORE \"$datastore\"\n";
+
+	    $instance->BindingList(\%parameters) == 0
+		or tbdie("Could not get binding list for $instance");
+		
+	    foreach my $name (keys(%parameters)) {
+		my $value = $parameters{$name};
+
+		print TCL "set parameter_list_defaults($name) \"$value\"\n";
+	    }
+	    
+	    $instance->RunBindingList(\%parameters) == 0
+		or tbdie("Could not get run binding list for $instance");
+		
+	    foreach my $name (keys(%parameters)) {
+		my $value = $parameters{$name};
+
+		print TCL "set parameter_list_defaults($name) \"$value\"\n";
+	    }
+	}
+    }
+    print TCL "\n\n";
 
     print TCL "}\n";
     close(TCL);
+}
+
+sub parse_error($) {
+    my ($mesg) = @_;
+
+    return if parse_invalid_os_error($mesg);
+    return if parse_invalid_variable_error($mesg);
+
+    return;
+}
+
+sub parse_invalid_os_error($) {
+    my ($mesg) = @_;
+    my ($type, $osname);
+
+    if ($mesg =~ /^\[tb-set-(\w+)-os\] Invalid osid (\S+)\.$/) {
+	($type, $osname) = ($1, $2);
+    } else {
+	return false;
+    }
+
+    tbreport(SEV_ADDITIONAL, {script => 'parse.tcl'}, 'invalid_os',
+	     $type, $osname, undef);
+
+    return true;
+}
+
+sub parse_invalid_variable_error($) {
+    my ($mesg) = @_;
+    my ($type, $var);
+
+    if ($mesg =~ /^\[tb-set-hardware\] Invalid hardware type (\S+)\.$/) {
+	$var  = $1;
+	$type = 'hardware_type';
+    } elsif ($mesg =~ /^\[run\] Invalid lan\/link name (\S+)\./) {
+	$var  = $1;
+	$type = 'lan_link_name';
+    } elsif ($mesg =~ /^\[run\] Invalid node name (\S+)\./) {
+	$var  = $1;
+	$type = 'node_name';
+    } else {
+	return false;
+    }
+
+    tbreport(SEV_ADDITIONAL, {script => 'parse.tcl'}, 'invalid_variable',
+	     $type, $var);
+
+    return true;
 }

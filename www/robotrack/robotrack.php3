@@ -1,37 +1,36 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 include("defs.php3");
 
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-PAGEHEADER("Real Time Robot Tracking Applet");
+$optargs = OptionalPageArguments("building",    PAGEARG_STRING,
+				 "floor",       PAGEARG_STRING,
+				 "experiment",  PAGEARG_EXPERIMENT,
+				 "camheight",   PAGEARG_INTEGER,
+				 "camwidth",    PAGEARG_INTEGER,
+				 "camfps",      PAGEARG_INTEGER,
+				 "camera",      PAGEARG_INTEGER,
+				 "withwebcams", PAGEARG_BOOLEAN);
 
 #
 # Optional pid,eid. Without a building/floor, show all the nodes for the
 # experiment in all buildings/floors. Without pid,eid show all wireless
 # nodes in the specified building/floor.
 #
-if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
-    if (!TBvalid_pid($pid)) {
-	PAGEARGERROR("Invalid project ID.");
+if (isset($experiment)) {
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view this experiment!", 1);
     }
-    if (!TBvalid_eid($eid)) {
-	PAGEARGERROR("Invalid experiment ID.");
-    }
-
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view experiment $pid/$eid!",
-		  1);
-    }
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
 }
 else {
     #
@@ -103,7 +102,7 @@ if (! isset($camfps) || !TBvalid_integer($camfps)) {
 #
 $webcams = array();
 
-if ($withwebcams) {
+if (isset($withwebcams) && $withwebcams) {
     if (isset($camera) && TBvalid_integer($camera)) {
 	$query_result = DBQueryFatal("select * from webcams ".
 				     "where id='$camera'");
@@ -117,6 +116,11 @@ if ($withwebcams) {
 	$webcams[] = $camurl;
     }
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Real Time Robot Tracking Applet");
 
 #
 # Draw the legend and some explanatory text.

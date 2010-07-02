@@ -3,7 +3,10 @@
 <!--
     XML NS template based on planetlab.ns - For making PlanetLab experiments
 -->
-<nstemplate>
+<nstemplate name="PlanetLab Slice">
+    <description>
+      Creates a customized PlanetLab slice.
+    </description>
     <variable name="Count" default="10" />
     <variable name="ResUsage" default="3" />
     <variable name="HWType" default="pcplab" />
@@ -11,13 +14,15 @@
     <variable name="Tarballs" default="/somedir /proj/yourproj/tarfiles/yourtarball.tar.gz" />
     <variable name="RPMs" default="/proj/yourproj/rpms/yourrpm.rpm" />
     <variable name="Startup" default="/somepath/yourstartupcmd" />
+    <variable name="NodeVersion" default="Production" />
+    <variable name="NodeList" default="" />
     <nstext>
 	<section><![CDATA[
 # planetlab.ns - NS script to allocate PlanetLab nodes on Emulab/Netbed
 #
 # September 17, 2003
 #
-# Questions and comments to testbed-ops@emulab.net
+# Questions and comments to testbed-ops@flux.utah.edu
 
 #
 # Boilerplate
@@ -42,6 +47,14 @@ tb-set-mem-usage <ResUsage>
 set num_nodes <Count>
 
 #
+# Possibly use a fixed set of nodes (if set, overrides num_nodes setting!)
+#
+set nodelist {<NodeList>}
+if { [llength $nodelist] > 0 } {
+    set num_nodes [llength $nodelist]
+}
+
+#
 # Type of PlanetLab nodes to request.  Current choices, with counts:
 #    pcplab      Any PlanetLab node (127)
 # The following are mutually exclusive sets:
@@ -57,6 +70,9 @@ set num_nodes <Count>
 #   tb-fix-node $nodeB plab33
 #
 set hwtype "<HWType>"
+set node_version "<NodeVersion>"
+
+set inet_string ""
 
 #
 # Select the N approximately least-loaded nodes of the given type.  Fails if
@@ -66,6 +82,12 @@ for {set i 1} {$i <= $num_nodes} {incr i} {
     set node($i) [$ns node]
     tb-set-hardware $node($i) $hwtype
 
+    append inet_string "$node(${i}) "
+
+    if { [llength $nodelist] > 0 } {
+        tb-fix-node $node($i) [lindex $nodelist [expr $i - 1]]
+    }
+
 	]]></section>
     <section depends_on="FailOK" action="comment"><![CDATA[
     # Allow experiment setup to succeed even if setup of some vnodes fails.
@@ -73,6 +95,14 @@ for {set i 1} {$i <= $num_nodes} {incr i} {
     tb-set-node-failure-action $node($i) "nonfatal"
 
 	]]></section>
+	<section depends_on="NodeVersion" action="comment"><![CDATA[
+    # Select nodes with a specific software status.
+    # If you have selected the default, "Production", no desire will be set.
+    if { $node_version != "Production" } {
+        $node($i) add-desire "plabstatus-$node_version" 1.0
+    }
+
+        ]]></section>
 	<section><![CDATA[
     # Entirely optional stuff; see comments below.
 	]]></section>
@@ -99,6 +129,16 @@ for {set i 1} {$i <= $num_nodes} {incr i} {
 # 3) The "startup" command will be executed every time the vnode boots:
 #    at experiment startup, swapin, and vnode reboot.  Of course, it needs
 #    to exist on the vnode, probably from a tarball or RPM you installed.
+
+#
+# This makes "the Internet" an addressable object in your topology - it will,
+# for example, enable you to set up automatic tcpdump on it.  However, you
+# must have more than one node in your experiment!
+#
+if { $num_nodes > 1 } {
+    set internet [$ns make-lan "$inet_string" 100Mbps 0ms]
+    tb-set-lan-protocol $internet "ipv4"
+}
 
 #
 # Boilerplate

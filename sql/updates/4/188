@@ -1,0 +1,13 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("nonlocal_user_pubkeys")) {
+	DBQueryFatal("CREATE TABLE nonlocal_user_pubkeys like user_pubkeys");
+    }
+    return 0;
+}
+1;

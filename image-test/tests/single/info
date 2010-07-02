@@ -1,9 +1,13 @@
 Simple single node experment to test basic things about the node currently:
   tar
   startcmd
+  program-agent and event system
 
-Expands to 4 tests one for each pc:
+Expands to 7 tests one for each pc:
   single-pc600
   single-pc850
   single-pc2000
   single-pc3000
+  single-pc2400c2
+  single-pc3000w
+  single-pc2400w

@@ -1,0 +1,29 @@
+#
+# This file intentionally does nothing. Leave it be.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    # updating the sitevar name and description to make it
+    # more meaningful if it exists.
+    # otherwise insert updated record.
+    if (TBSiteVarExists("protogeni/max_ticket_lifetime")) {
+        DBQueryFatal("update sitevariables set name = " .
+          "'protogeni/max_sliver_lifetime', description = " .
+          "'The maximum sliver lifetime. When set limits the lifetime " .
+          "of a sliver.' where name = 'protogeni/max_ticket_lifetime'");
+    }
+    else {
+        DBQueryFatal("REPLACE INTO `sitevariables` VALUES " . 
+          "('protogeni/max_sliver_lifetime', '90', '90', " . 
+          "'The maximum sliver lifetime. When set limits the lifetime " . 
+          "of a sliver.',0)");
+
+    }
+    return 0;
+}
+1;

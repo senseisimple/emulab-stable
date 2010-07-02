@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #	cd from <builddir>/event/trafgen to testbed/event/trafgen
 
 if [ -x /usr/bin/fetch ]; then
@@ -10,20 +16,24 @@ else
     exit 1
 fi
 
+if [ -n "$2" ]; then host=$2; else host=www.emulab.net ; fi
+
 if [ ! -d $1/tg2.0/src ]; then
-    echo "Downloading tg2.0 source from www.emulab.net to $1 ..."
     cd $1
-    $fetch http://www.emulab.net/tg2.0.tar.gz
-    if [ $? -ne 0 ]; then
-         echo "Failed..."
-         echo "Downloading tg2.0 source from www.postel.org to $1 ..."
-         $fetch http://www.postel.org/tg/tg2.0.tar.gz || {
-	     echo "ERROR: tg-install: $fetch failed"
-	     exit 1
-	 }
+    if [ ! -f tg2.0.tar.gz ]; then
+      echo "Downloading tg2.0 source from $host to $1 ..."
+      $fetch http://$host/tg2.0.tar.gz
+      if [ $? -ne 0 ]; then
+           echo "Failed..."
+           echo "Downloading tg2.0 source from www.postel.org to $1 ..."
+           $fetch http://www.postel.org/tg/tg2.0.tar.gz || {
+	       echo "ERROR: tg-install: $fetch failed"
+	       exit 1
+	   }
+      fi
     fi
     echo "Unpacking/patching tg2.0 source ..."
-    tar xzf tg2.0.tar.gz || {
+    tar xzof tg2.0.tar.gz || {
         echo "ERROR: tg-install: tar failed"
 	exit 1
     }

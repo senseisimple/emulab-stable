@@ -2,10 +2,11 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
+use Getopt::Std;
 
 #
 # dbfillcheck - Make sure that the initial fill contents on the
@@ -14,11 +15,13 @@ use strict;
 # the mysql server is not running, or the database does not exist)
 # prevents us from telling if they differ or not.
 #
+my $optlist = "d";
 
 #
 # Configure variables
 #
 my $testbed_srcdir = "@top_srcdir@";
+my $DBNAME         = "@TBDBNAME@";
 
 # Locals
 my $dbfill        = "sql/database-fill.sql";
@@ -28,6 +31,16 @@ my $tempdifffile  = "/tmp/dbdiff.$$";
 my $tempnewfile   = "/tmp/dbdiff.new.$$";
 my $tempoldfile   = "/tmp/dbdiff.old.$$";
 my $exitcode      = 0;
+my $debug         = 1;
+
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    die("*** $0:\n".
+	"    Usage: dbfillcheck [-d]\n");
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
 
 #
 # Diff exits with 2 if a problem. We tell diff to ignore whitespace
@@ -36,17 +49,23 @@ my $exitcode      = 0;
 # We sort(1) the text files so that we don't pick up differences in ordering,
 # which could be pretty random.
 #
-if (system("perl $export_tables | sort > $tempoldfile")) {
+if (system("perl $export_tables | ".
+	   "grep -E -v -e '^--.*\$' -e '^\\/\\*.*\\*\\/;\$' | ".
+	   "sed -e 's/INTO `\\(.*\\)`/INTO \\1/' | ".
+	   "sort > $tempoldfile")) {
     unlink($tempoldfile);
     die("*** $0:\n".
 	"    $export_tables failed!\n");
 }
-if (system("grep -E -v '^(LOCK|UNLOCK|DELETE) ' $master_fill | sort > $tempnewfile")) {
+if (system("grep -E -v '^(LOCK|UNLOCK|DELETE) ' $master_fill | ".
+	   "grep -E -v -e '^--.*\$' -e '^\\/\\*.*\\*\\/;\$' | ".
+	   "sed -e 's/INTO `\\(.*\\)`/INTO \\1/' | ".
+	   "sort > $tempnewfile")) {
     unlink($tempoldfile);
     die("*** $0:\n".
 	"    sort $master_fill failed!\n");
 }
-if (system("diff -b -B -I '^--.*\$' $tempoldfile $tempnewfile > $tempdifffile")
+if (system("diff -b -B $tempoldfile $tempnewfile > $tempdifffile")
 	== 2) {
     unlink($tempdifffile);
     die("*** $0:\n".
@@ -67,8 +86,11 @@ if (!$?) {
 # status
 #
 print "*** Your installed database is out of date with $dbfill\n";
-print "    To bring it up to date, run: \n";
-print "    mysqldump tbdb > tbdb.backup\n";
-print "    mysql tbdb < $dbfill\n";
-unlink($tempdifffile);
+print "    Differences are listed in $tempdifffile\n"
+    if ($debug);
+print "    As a safety measure, you will not be able to install until this\n";
+print "    is resolved.\n";
+
+unlink($tempdifffile)
+    if (!$debug);
 exit(1);

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005, 2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,15 @@
 BEGIN {$FAKE_SCRIPTNAME = $ARGV[0];}
 
 use lib "@prefix@/lib";
+use OSinfo;  # To look up OS by idx.
 use libtblog qw(:DEFAULT dblog *SOUT *SERR);
+
+$ENV{'PATH'} = "/usr/bin:@prefix@/libexec";
+
+use constant false => 0;
+use constant true  => 1;
+
+sub parse_error($);
 
 tblog_set_default_cause('temp');
 
@@ -26,6 +34,23 @@ my @err;
 my $obvious_error = 0;
 
 while (<P>) {
+    #
+    # Fix up "No physical nodes have feature OS-335!" errors.  This just means
+    # that the chosen OS image doesn't run on the hardware type.
+    #
+    # Look up the osname from the number here.  Assign is run underneath, but
+    # can't do any better with this message because the OS-id is just a token
+    # in the PTOP files to it, and assign doesn't read the DB to do the Lookup.
+    # Also can't do it back in assign_wrapper, which does read the DB, because
+    # we log the error messages here and want them to be right.
+    #
+    if (/(.*)No physical nodes have feature OS-(\d+)!(.*)/) {
+	my $OS = OSinfo->Lookup($2);
+	my $os_tag =  $OS->pid() . "/" . $OS->osname();
+	$_ = "$1 OS '$os_tag' (OS-$2) does not run on this hardware type!\n$3"
+	    if (defined($OS));
+    }
+
     print SOUT $_;
     push @out, $_;
 }
@@ -43,7 +68,11 @@ if ($exitcode) {
     
     # Pull out relevent info
     print SERR "ASSIGN FAILED:\n";
-    while ((shift @out) !~ /^[\w\s]*precheck:$/) {}
+    while (($_ = shift @out) && !/^[\w\s]*precheck:$/) {}
+    if (not defined $_) {
+	tberror({cause=>'internal'}, 
+		"Invalid Assign Output (expected \"precheck:\" line).");
+    }
     while (($_ = shift @out)) {
 	/^[\w\s]*precheck:$/ && do {
 	    next;
@@ -56,7 +85,11 @@ if ($exitcode) {
 	push @err, $_;
     }
     if ($violations) {
-	while ((shift @out) !~ /^Violations:/) {}
+	while (($_ = shift @out) && !/^Violations:/) {}
+	if (not defined $_) {
+	    tberror({cause=>'internal'}, 
+		    "Invalid Assign Output (expected \"Violations:\" line).");
+	}
 	while (($_ = shift @out)) {
 	    if (/^Nodes:/) {
 		last;
@@ -80,16 +113,20 @@ if ($exitcode) {
 	    }
 	    my $sublevel = length($space) > 0 ? 1 : 0;
 	    if ($mesg =~ s/^warning:\s+//i) {
-		dblog(TBLOG_WARNING, {sublevel=>$sublevel}, $mesg);
+		dblog(TBLOG_WARNING, {sublevel=>$sublevel, type=>'primary'}, $mesg);
 	    } else {
-		dblog(TBLOG_ERR, {sublevel=>$sublevel}, $mesg);
+		parse_error($mesg);
+		dblog(TBLOG_ERR, {sublevel=>$sublevel, type=>'primary'}, $mesg);
 	    }
 	}
     }
 
     # log all relevent output as one entry unless an obvious_error was
     # already found
-    dblog(TBLOG_ERR, {}, $err) unless ($obvious_error);
+    if (!$obvious_error) {
+	parse_error($err);
+	dblog(TBLOG_ERR, {type=>'primary'}, $err);
+    }
 
     # create a log entry that assign failed
 
@@ -106,10 +143,135 @@ if ($exitcode) {
 
 exit $exitcode;
 
+sub parse_error($) {
+    my ($mesg) = @_;
 
+    return if parse_type_precheck_error($mesg);
+    return if parse_mapping_precheck_error($mesg);
+    return if parse_violation_error($mesg);
+    return if parse_fixed_node_error($mesg);
 
+    return;
+}
 
+sub parse_type_precheck_error($) {
+    my ($mesg) = @_;
+    my ($vtype, $requested, $slots, $max, $round);
 
+    if ($mesg =~ /^No (\w+) physical nodes of type (\S+) found \((\d+) requested\)$/) {
+	($round, $vtype, $requested) = ($1, $2, $3);
+	$slots = 0;
+    } elsif ($mesg =~ /^(\d+) nodes of type (\S+) requested, but only (\d+) (\w+) nodes of type \S+ found$/) {
+	($requested, $vtype, $slots, $round) = ($1, $2, $3, $4);
+    } elsif ($mesg =~ /^(\d+) nodes of type (\S+) requested, but you are only allowed to use (\d+)$/) {
+	($requested, $vtype, $max) = ($1, $2, $3);
+    } else {
+	return false;
+    }
 
+    tbreport(SEV_WARNING, 'assign_type_precheck',
+             $vtype, $requested, $slots, $max, $round);
 
+    return true;
+}
 
+sub parse_mapping_precheck_error($) {
+    my ($mesg) = @_;
+
+    if ($mesg =~ /^No possible mapping for (\S+)\n/) {
+	my $vnode = $1;
+	my (undef, @lines) = split("\n", $mesg);
+
+	foreach my $line (@lines) {
+	    my ($class, $type, $requested, $count);
+
+	    if ($line =~ /^No links of type (\S+) found! \((\d+) requested\)$/) {
+		($type, $requested) = ($1, $2);
+		$class = 'link';
+		$count = 0;
+	    } elsif ($line =~ /^Too many links of type (\S+)! \((\d+) requested, (\d+) found\)$/) {
+		($type, $requested, $count) = ($1, $2, $3);
+		$class = 'link';
+	    } elsif ($line =~ /^Too much bandwidth on emulated links!$/) {
+		$class = 'bandwidth';
+		$count = 1; # Necessary?
+	    } elsif ($line =~ /^No physical nodes have feature (\S+)!$/ ||
+		     $line =~ /OS \S+ (\S+) does not run on this hardware type!/) {
+		$type  = $1;
+		$class = 'feature';
+		$count = 0; # Necessary?
+	    } else {
+		# Unknown?
+		next;
+	    }
+
+	    tbreport(SEV_WARNING, 'assign_mapping_precheck',
+		     $vnode, $class, $type, $requested, $count);
+	}
+
+	return true;
+    }
+
+    return false;
+}
+
+sub parse_violation_error($) {
+    my ($mesg) = @_;
+
+    if ($mesg =~ /^Type precheck passed\.\n/) {
+	my ($unassigned, $pnode_load, $no_connect, $link_users, $bandwidth,
+	    $desires, $vclass, $delay, $trivial_mix, $subnodes, $max_types,
+	    $endpoints);
+
+	my (undef, @lines) = split("\n", $mesg);
+
+	foreach my $line (@lines) {
+	    if    ($line =~ /^  unassigned: +(\d+)$/)  { $unassigned  = $1 }
+	    elsif ($line =~ /^  pnode_load: +(\d+)$/)  { $pnode_load  = $1 }
+	    elsif ($line =~ /^  no_connect: +(\d+)$/)  { $no_connect  = $1 }
+	    elsif ($line =~ /^  link_users: +(\d+)$/)  { $link_users  = $1 }
+	    elsif ($line =~ /^  bandwidth: +(\d+)$/)   { $bandwidth   = $1 }
+	    elsif ($line =~ /^  desires: +(\d+)$/)     { $desires     = $1 }
+	    elsif ($line =~ /^  vclass: +(\d+)$/)      { $vclass      = $1 }
+	    elsif ($line =~ /^  delay: +(\d+)$/)       { $delay       = $1 }
+	    elsif ($line =~ /^  trivial mix: +(\d+)$/) { $trivial_mix = $1 }
+	    elsif ($line =~ /^  subnodes: +(\d+)$/)    { $subnodes    = $1 }
+	    elsif ($line =~ /^  max_types: +(\d+)$/)   { $max_types   = $1 }
+	    elsif ($line =~ /^  endpoints: +(\d+)$/)   { $endpoints   = $1 }
+	}
+
+	tbreport(SEV_WARNING, 'assign_violation',
+		 $unassigned, $pnode_load, $no_connect, $link_users, $bandwidth,
+		 $desires, $vclass, $delay, $trivial_mix, $subnodes, $max_types,
+		 $endpoints);
+
+	return true;
+    }
+
+    return false;
+}
+
+sub parse_fixed_node_error($) {
+    my ($mesg) = @_;
+    my ($class, $vnode, $pnode);
+
+    if ($mesg =~ /^Fixed node: (\S+) does not exist\.$/) {
+	$vnode = $1;
+	$class = 'exist';
+    } elsif ($mesg =~ /^Fixed node: (\S+) not available\.$/) {
+	$pnode = $1;
+	$class = 'available';
+    } elsif ($mesg =~ /^Unable to find a type for fixed, vtyped, node (\S+)$/) {
+	$vnode = $1;
+	$class = 'type';
+    } elsif ($mesg =~ /^Fixed node: Could not map (\S+) to (\S+)$/) {
+	($vnode, $pnode) = ($1, $2);
+	$class = 'map';
+    } else {
+	return false;
+    }
+
+    tbreport(SEV_WARNING, 'assign_fixed_node', $class, $vnode, $pnode);
+
+    return true;
+}

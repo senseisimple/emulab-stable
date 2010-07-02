@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -49,7 +49,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || PLAB());
+    if (MFS());
 
 # Now safe to do this since MFS does not have full perl install.
 require Socket;
@@ -141,15 +141,17 @@ sub doboot()
     # Create the /local partition to hold the logs, and mkdir the log
     # directory. This works on Linux too!
     #
-    if (! JAILED()) {
+    if (! JAILED() && ! GENVNODE()) {
 	if (! -d "/local") {
 	    system("mkdir /local") == 0
 		or fatal("Could not mkdir /local");
-	    system("$BINDIR/mkextrafs.pl -f /local");
 	}
-	if (! -d "/local/local") {
-	    fatal("Could not create the /local filesystem");
-	}
+        if (! PLAB()) {
+            system("$BINDIR/mkextrafs.pl -f /local");
+            if (! -d "/local") {
+                fatal("Could not create the /local filesystem");
+            }
+        }
     }
     if (! -d "/local/logs") {
 	system("mkdir /local/logs") == 0
@@ -201,14 +203,15 @@ sub doboot()
 	my $trace_snaplen = $trace->{"TRACE_SNAPLEN"};
 	my $log           = "$LOGDIR/trace_${linkname}-${vnode}.debug";
  	my $optargs	  = "";
-	my $eventargs     = "-e $pid/$eid -s localhost";
+	my $eventargs     = "-e $pid/$eid -s " . getlocalevserver();
 	my $expr          = "";
 
 	#
 	# For the event system, listen for events to the entire link/lan,
 	# and for this node on the link/lan.
 	#
-	$eventargs .= " -L ${linkname}-${vnode}-tracemon,${linkname}-tracemon";
+	$eventargs .= " -L ${linkname}-${vnode}-tracemon";
+	$eventargs .= " -k " . TMEVENTKEY();
 
 	#
 	# User can specify a snaplen. Otherwise, If the trace type is
@@ -231,14 +234,14 @@ sub doboot()
 	    $optargs .= " -P " . (4442 + $idx);
 	}
 
-	if (! JAILED()) {
+	if (! JAILED() && ! GENVNODE() && ! PLAB() ) {
 	    #
 	    # Need the ethernet address for the vnode so we can create an ether
 	    # rule for tcpdump. We want to make sure that we get the correct
 	    # packets. We want to capture just the packets from the source node
 	    # for the link, both before the pipe and after the pipe.  In this
 	    # way, we prevent too much duplication of packets, but we also get
-	    # to see how the dummynet pipes have affected te packets, since an
+	    # to see how the dummynet pipes have affected the packets, since a
 	    # packet will end up in the output twice; once before the pipe and
 	    # again after the pipe. At the same time, we can also support
 	    # asymmetric rules (remember, a duplex link has two queues).
@@ -273,6 +276,7 @@ sub doboot()
 	# See perl manpage topic on exec ...
 	my @cmd  = split('\s+', "$PCAPPER -I $optargs $eventargs -t");
 	my @args = ();
+	my $norecv = 0;
 
 	foreach my $dir ("recv", "xmit") {
 	    my $file = "/local/logs/trace_${vnode}-${linkname}.${dir}";
@@ -294,21 +298,57 @@ sub doboot()
 	    # run on the end node (as in a linkdelay or jail). In this case
 	    # there is no input interface to bolt the tcpdump to; we just
 	    # capture packets as they leave (after the ipfw dummynet pipe).
+            # But, if it's a PlanetLab node, we assume it has only one
+            # interface.
 	    #
-	    next
-		if (!defined($mac) || $mac eq "");
-
-	    # convert to iface.
-	    if (! ($iface = findiface($mac))) {
-		print "*** WARNING: Could not map MAC $mac to an interface!\n";
+	    if ((!defined($mac) || $mac eq "") && ! PLAB()) {
+		if ($dir eq "recv") {
+		    $norecv = 1;
+		}
 		next;
 	    }
+
+            if (PLAB()) {
+		#
+		# XXX We create only a .xmit file even though it contains
+		# both recv and xmit packets.  It would be nice to call it
+		# something more logical (.both), but those sufficies are
+		# part of loghole's genetic makeup and are not to be tampered
+		# with.
+		#
+		next
+		    if ($dir eq "recv");
+
+                # XXX - Hardcoding this works for now...
+                $iface = "eth0";
+            } else {
+                # convert to iface.
+                if (! ($iface = findiface($mac))) {
+                    print "*** WARNING: Could not map MAC $mac to an " .
+                        "interface!\n";
+                    next;
+                }
+
+		# XXX - if we're on a wifi node, we get goofed up here
+		# because we get the wifiX VAP device.  The pcapper
+		# needs to listen on the real athX device.  So, we just 
+		# fix that little thing here.  This should probably
+		# be moved up into findiface, but it wouldn't be clean
+		# there either.  Correspondingly, we don't put it in
+		# findif.c because other parts of wifi setup
+		# depend on seeing the wifiX name!  Sigh.
+
+		if ($iface =~ /wifi(\d+)/) {
+		    $iface = "ath$1";
+		}
+
+            }
 	    push(@cmd, "-f");
 	    push(@cmd, $file);
 	    push(@args, $iface);
 	    push(@args, "$expr");
 
-	    if ($dir eq "recv") {
+	    if ($dir eq "recv" || $norecv) {
 		print GK "mapif ${iface}=${vnode}-${linkname}\n";
 	    }
 	}

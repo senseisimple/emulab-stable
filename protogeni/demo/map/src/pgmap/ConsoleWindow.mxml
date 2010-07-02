@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResizeWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
+	title="Console"
+	implements="LogRoot"
+	showCloseButton="true"
+	borderAlpha=".9" borderColor="#D2E1F0"
+	height="400" width="700"
+	close="PopUpManager.removePopUp(this)"
+	resizable="true">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager; 
+
+			[Bindable]
+			public var output:String;
+			
+			public function appendText(s:String):void {
+				output += s;
+			}
+			
+			public function clear():void {
+				output = "Previous content cleared\n";
+			}
+			
+		]]>
+	</mx:Script>
+	<mx:TextArea id="txt" width="100%" height="100%"
+		text="{output}"  editable="false" wordWrap="true"/>
+	
+</ResizeWindow>

@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+set -e
+
+cd @prefix@/libexec/node_usage
+
+./gather
+./analy
+./analy2
+./mk-plots
+./mk-php-pages
+./publish

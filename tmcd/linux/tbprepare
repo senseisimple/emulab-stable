@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -11,15 +11,12 @@
 #
 # description:	Clean up node using Emulab's prepare script.
 
-# Source function library.
-. /etc/rc.d/init.d/functions
-
 # Source networking configuration.
-if [ ! -f /etc/sysconfig/network ]; then
-    exit 0
+if [ -f /etc/sysconfig/network ]; then
+    . /etc/sysconfig/network
+elif [ -f /lib/lsb/init-functions ]; then
+    . /lib/lsb/init-functions
 fi
-
-. /etc/sysconfig/network
 
 RETVAL=0
 
@@ -36,14 +33,21 @@ case "$1" in
 	# Note: /var/lock/subsys/tbprepare will be created later, as needed.
 	;;
   stop)
-  	rm /var/lock/subsys/tbprepare
-	echo "Running Testbed prepare script ..."
-	$BINDIR/prepare 2>&1 | tee /prepare.log
-	$BINDIR/logboot /prepare.log
-	rm -f /prepare.log
-	echo "Informing the testbed we're rebooting ..."
-	$BINDIR/tmcc state SHUTDOWN
-	RETVAL=$?
+        #
+        # Note the Ubuntu does not use the /var/lock/subsys files
+        # so we will get here on every shutdown, not just when the
+        # subsys file exists.
+        #
+        if [ -f /var/lock/subsys/tbprepare ]; then
+  	    rm -f /var/lock/subsys/tbprepare
+	    echo "Running Testbed prepare script ..."
+	    $BINDIR/prepare 2>&1 | tee /prepare.log
+	    $BINDIR/logboot /prepare.log
+	    rm -f /prepare.log
+	    echo "Informing the testbed we're rebooting ..."
+	    $BINDIR/tmcc state SHUTDOWN
+	    RETVAL=$?
+	fi
 	;;
   status)
 	echo "Peachy"

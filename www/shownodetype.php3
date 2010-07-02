@@ -1,76 +1,65 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-
-#
-# Standard Testbed Header
-#
-PAGEHEADER("Node Type Information");
+include("imageid_defs.php");
 
 #
 # Anyone can access this info, its a PUBLIC PAGE!
+# Get current user if there is one.
 #
+$this_user = CheckLogin($check_status);
+$reqargs   = RequiredPageArguments("node_type", PAGEARG_STRING);
 
-#
-# Verify form arguments.
-# 
-if (!isset($node_type) ||
-    strcmp($node_type, "") == 0) {
-    USERERROR("You must provide a node type.", 1);
-}
 # Sanitize.
 if (!preg_match("/^[-\w]+$/", $node_type)) {
     PAGEARGERROR("Invalid characters in arguments.");
 }
 
 #
-# Check to make sure that this is a valid nodeid
+# Standard Testbed Header
 #
-if (! TBValidNodeType($node_type)) {
-    USERERROR("$node_type is not a valid node type!", 1);
-}
+PAGEHEADER("Node Type Information");
 
 $query_result =
     DBQueryFatal("select * from node_types ".
 		 "where type='$node_type'");
 
 if (! mysql_num_rows($query_result) != 0) {
-    TBERROR("No entry for node_type $node_type!", 1);
+    USERERROR("No such node_type $node_type!", 1);
 }
-$noderow = mysql_fetch_assoc($query_result);
+$noderow = mysql_fetch_array($query_result);
 
-echo "<font size=+2>".
-     "Node Type <b>$node_type</b>".
-     "</font>\n";
+if ($this_user && ISADMIN()) {
+    SUBPAGESTART();
+    SUBMENUSTART("More Options");
+    WRITESUBMENUBUTTON("Edit this type",
+		       "editnodetype.php3?node_type=$node_type");
+    WRITESUBMENUBUTTON("Create a PC type",
+		       "editnodetype.php3?new_type=1&node_class=pc");
+    WRITESUBMENUBUTTON("Create a Switch type",
+		       "editnodetype.php3?new_type=1&node_class=switch");
+    SUBMENUEND();
+    SUBPAGEEND();
+}
 
 echo "<table border=2 cellpadding=0 cellspacing=2
              align=center>\n";
 
-$class		= $noderow["class"];
-$proc		= $noderow["proc"];
-$speed		= $noderow["speed"];
-$RAM		= $noderow["RAM"];
-$HD		= $noderow["HD"];
-$max_interfaces = $noderow["max_interfaces"];
-$osid		= $noderow["osid"];
-$imageid	= $noderow["imageid"];
-$imageable	= $noderow["imageable"];
-$delay_capacity = $noderow["delay_capacity"];
-$virtnode_capacity = $noderow["virtnode_capacity"];
-$delay_osid	= $noderow["delay_osid"];
-$jail_osid	= $noderow["jail_osid"];
-$isvirtnode	= $noderow["isvirtnode"];
-$isremotenode	= $noderow["isremotenode"];
-$bios_waittime	= $noderow["bios_waittime"];
-
-TBOSInfo($osid, $osname, $pid);
-TBOSInfo($jail_osid, $jail_osname, $pid);
-TBOSInfo($delay_osid, $delay_osname, $pid);
-TBImageInfo($imageid, $imagename, $pid);
+# Stuff from the node types table.
+$class	 = $noderow["class"];
+$options = array("isvirtnode",
+		 "isdynamic",
+		 "isjailed",
+		 "isremotenode",
+		 "issubnode",
+		 "isplabdslice",
+		 "isgeninode",
+		 "isfednode",
+		 "isswitch");
 
 echo "<tr>
       <td>Type:</td>
@@ -82,93 +71,63 @@ echo "<tr>
       <td class=left>$class</td>
           </tr>\n";
 
-if ($isremotenode) {
-    echo "<tr>
-          <td>Remote:</td>
-          <td class=left>Yes</td>
+foreach ($options as $option) {
+    $value = $noderow[$option];
+
+    if ($value) {
+	echo "<tr>
+               <td>$option:</td>
+               <td class=left>Yes</td>
               </tr>\n";
+    }
 }
 
-if ($isvirtnode) {
-    echo "<tr>
-          <td>Virtual:</td>
-          <td class=left>Yes</td>
-              </tr>\n";
+#
+# And now all of the attributes ...
+#
+# Grab the attributes for the type.
+$query_result = DBQueryFatal("select * from node_type_attributes ".
+			     "where type='$node_type' ".
+			     "order by attrkey");
+if (mysql_num_rows($query_result)) {
+    echo "<tr></tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$key      = $row["attrkey"];
+	$val      = $row["attrvalue"];
+	$attrtype = $row["attrtype"];
+	
+	if ($key == "default_osid" ||
+	    $key == "jail_osid" ||
+	    $key == "delay_osid") {
+	    if ($osinfo = OSinfo::Lookup($val)) {
+		$val = $osinfo->osname();
+	    }
+	}
+	elseif ($key == "default_imageid") {
+	    if ($image = Image::Lookup($val)) {
+		$val = $image->imagename();
+	    }
+	}
+	echo "<tr>\n";
+	echo "<td>$key:</td>\n";
+	echo "<td class=left>$val</td>\n";
+	echo "</tr>\n";
+    }
+    echo "</table>\n";
 }
-
-echo "<tr>
-      <td>Processor:</td>
-      <td class=left>$proc</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Speed:</td>
-      <td class=left>$speed MHZ</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>RAM:</td>
-      <td class=left>$RAM MB</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Disk Size:</td>
-      <td class=left>$HD GB</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Interfaces:</td>
-      <td class=left>$max_interfaces</td>
-          </tr>\n";
-
-if (isset($bios_waittime)) {
-    echo "<tr>
-              <td>Bios Waittime:</td>
-              <td class=left>$bios_waittime</td>
-          </tr>\n";
-}
-
-echo "<tr>
-      <td>Delay Capacity:</td>
-      <td class=left>$delay_capacity</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Jail Capacity:</td>
-      <td class=left>$virtnode_capacity</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Default OSID:</td>
-      <td class=left>$osname</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Jail OSID:</td>
-      <td class=left>$jail_osname</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Delay OSID:</td>
-      <td class=left>$delay_osname</td>
-          </tr>\n";
-
-echo "<tr>
-      <td>Default ImageID:</td>
-      <td class=left>$imagename</td>
-          </tr>\n";
-
-echo "</table>\n";
 
 #
 # Suck out info for all the nodes of this type. We are going to show
-# just a list of dots, in two color mode.
-# 
+# just a list of dots, in two color mode.  Note, we also check that the
+# physical node is free, see note in nodecontrol_list.php3 for why.
+#
 $query_result =
-    DBQueryFatal("select n.node_id,n.eventstate,r.pid ".
+    DBQueryFatal("select n.node_id,n.eventstate,ifnull(r.pid,rp.pid) as pid ".
 		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join reserved as r on n.node_id=r.node_id ".
+		 "left join reserved as rp on n.phys_nodeid=rp.node_id ".
 		 "where nt.type='$node_type' and ".
 		 "      (role='testnode' or role='virtnode') ".
 		 "ORDER BY priority");
@@ -177,6 +136,8 @@ $query_result =
 if (mysql_num_rows($query_result)) {
     echo "<br>
           <center>
+	  Nodes (<a href=nodecontrol_list.php3?showtype=$node_type>Show details</a>)
+	  <br>
           <table class=nogrid cellspacing=0 border=0 cellpadding=5>\n";
 
     $maxcolumns = 4;
@@ -223,7 +184,7 @@ if (mysql_num_rows($query_result)) {
     echo "</table>\n";
     echo "<br>
           <img src=\"/autostatus-icons/greenball.gif\" alt=free>&nbsp;Free
-          &nbsp &nbsp &nbsp
+          &nbsp; &nbsp; &nbsp;
           <img src=\"/autostatus-icons/redball.gif\" alt=free>&nbsp;Reserved
           </center>\n";
 }

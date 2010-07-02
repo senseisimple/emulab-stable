@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,13 +18,15 @@ use Exporter;
 	 os_account_cleanup os_accounts_start os_accounts_end os_accounts_sync
 	 os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_groupgid os_useradd os_userdel os_usermod os_mkdir
-	 os_ifconfig_veth
+	 os_ifconfig_veth os_viface_name
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_samba_mount 
+	 os_groupdel os_samba_mount os_islocaldir
 	 os_getnfsmounts os_getnfsmountpoints os_noisycmd
 	 os_fwconfig_line os_fwrouteconfig_line
        );
+
+sub VERSION()	{ return 1.0; }
 
 # Must come after package declaration!
 use English;
@@ -71,6 +73,7 @@ $BASH		= "/bin/bash";
 $NTS		= "/cygdrive/c/WINDOWS/system32";
 $NET		= "$NTS/net";
 $NETSH		= "$NTS/netsh";
+$IPCONFIG	= "$NTS/ipconfig";
 $NTE		= "$NTS/drivers/etc";
 
 $HOSTSFILE	= "$NTE/hosts";
@@ -276,10 +279,10 @@ sub get_dev_map()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$$;$$)
+sub os_ifconfig_line($$$$$$$;$$%)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases,
-	$iface_type, $settings, $rtabid) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $iface_type,
+	$settings, $rtabid, $cookie) = @_;
     my ($uplines, $downlines);
 
     # Handle interfaces missing from ipconfig.
@@ -297,6 +300,11 @@ sub os_ifconfig_line($$$$$$$;$$)
 	get_dev_map();
 	if ( ! defined( $dev_map{$iface} ) ) {
 	    system("$BINDIR/rc/rc.reboot");
+	    # Sometimes rc.reboot gets fork: Resource temporarily unavailable.
+	    print "rc.reboot returned, trying tsshutddn.";
+	    system("tsshutdn 1 /REBOOT /DELAY:1");
+	    print "tsshutdn failed, sleep forever.";
+	    sleep;
 	}
     }
 
@@ -305,9 +313,9 @@ sub os_ifconfig_line($$$$$$$;$$)
 	$uplines   .= qq{\n    #================================\n    };
 	$uplines   .= qq{echo "Enabling $iface on $inet"\n    };
 	#
-	# Re-enable device if necessary (getmac Transport is "Disconnected".)
+	# Re-enable device if necessary (getmac Transport is "Media disconnected".)
 	my $test   =  qq[getmac /v /fo csv | awk -F, '/^"$iface"/{print \$4}'];
-	$uplines   .= qq{if [ \`$test\` = '"Disconnected"' ]; then\n    };
+	$uplines   .= qq{if [ \`$test\` = '"Media disconnected"' ]; then\n    };
 	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
 	$uplines   .= qq{  sleep 5\n    };
 	$uplines   .= qq{fi\n    };
@@ -317,8 +325,15 @@ sub os_ifconfig_line($$$$$$$;$$)
 	#
 	# Check that the configuration took!
 	my $showip =  qq[$NETSH interface ip show address name="$iface"];
-	$test      =  qq[$showip | awk '/IP Address:/{print \$NF}'];
-	$uplines   .= qq{if [ \`$test\` != $inet ]; then\n    };
+	my $ipconf =  qq[$IPCONFIG /all | tr -d '\\r'];
+	my $ipawk  =  qq[/^Ethernet adapter/] .
+	    qq[{ ifc = gensub("Ethernet adapter (.*):", "\\\\\\\\1", 1); next }] .
+		qq[/IP Address/ && ifc == "$iface"{print \$NF}];
+	my $addr1  =  qq[addr1=\`$showip | awk '/IP Address:/{print \$NF}'\`];
+	my $addr2  =  qq[addr2=\`$ipconf | awk '$ipawk'\`];
+	my $iptest = '[[ "$addr1" != '.$inet.' || "$addr2" != '.$inet.' ]]';
+	$uplines   .= qq{$addr1\n    $addr2\n    };
+	$uplines   .= qq{if $iptest; then\n    };
 	#
 	# Re-do it if not.
 	$uplines   .= qq{  echo "    Config failed on $iface, retrying."\n    };
@@ -326,10 +341,11 @@ sub os_ifconfig_line($$$$$$$;$$)
 	$uplines   .= qq{  sleep 5\n    };
 	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
 	$uplines   .= qq{  sleep 5\n    };
-	$uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask) . qq{\n    };
+	$uplines   .= sprintf("  " . $IFCONFIG, $iface, $inet, $mask) . qq{\n    };
 	#
 	# Re-check.
-	$uplines   .= qq{  if [ \`$test\` != $inet ]; then\n    };
+	$uplines   .= qq{  $addr1\n    $addr2\n    };
+	$uplines   .= qq{  if $iptest; then\n    };
 	$uplines   .= qq{    echo "    Reconfig still failed on $iface."\n    };
 	$uplines   .= qq{  else echo "    Reconfig succeeded on $iface."\n    };
 	$uplines   .= qq{  fi\n    };
@@ -346,9 +362,28 @@ sub os_ifconfig_line($$$$$$$;$$)
 #
 # Specialized function for configing locally hacked veth devices.
 #
-sub os_ifconfig_veth($$$$$;$$$)
+sub os_ifconfig_veth($$$$$;$$$$$)
 {
     return "";
+}
+
+#
+# Compute the name of a virtual interface device based on the
+# information in ifconfig hash (as returned by getifconfig).
+#
+sub os_viface_name($)
+{
+    my ($ifconfig) = @_;
+    my $piface = $ifconfig->{"IFACE"};
+
+    #
+    # Physical interfaces use their own name
+    #
+    if (!$ifconfig->{"ISVIRT"}) {
+	return $piface;
+    }
+    warn("CygWin does not support virtual interface type '$itype'\n");
+    return undef;
 }
 
 #
@@ -449,6 +484,22 @@ sub os_userdel($)
 
     # Unimplemented.
     return -1;
+}
+
+#
+# Modify user password.
+# 
+sub os_modpasswd($$)
+{
+    my($login, $pswd) = @_;
+
+    my $cmd = "echo -e '$pswd\\n$pswd' | passwd $login >& /dev/null";
+    ##print "    $cmd\n";
+    if (system($cmd) != 0) {
+	warning("os_modpasswd error ($cmd)\n");
+	return -1;
+    }
+    return 0;
 }
 
 #
@@ -694,6 +745,18 @@ sub MapShell($)
        $fullpath = $DEFSHELL;
    }
    return $fullpath;
+}
+
+# Return non-zero if given directory is on a "local" filesystem
+sub os_islocaldir($)
+{
+    my ($dir) = @_;
+
+    # XXX
+    if ($dir =~ /^\/(proj|groups|users|share)/) {
+	return 0;
+    }
+    return 1;
 }
 
 sub os_samba_mount($$$)

@@ -1,46 +1,32 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Link Monitoring");
-
-#
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Check to make sure a valid experiment.
+# Verify page arguments.
 #
-if (isset($pid) && strcmp($pid, "") &&
-    isset($eid) && strcmp($eid, "")) {
-    if (! TBvalid_eid($eid)) {
-	PAGEARGERROR("$eid contains invalid characters!");
-    }
-    if (! TBvalid_pid($pid)) {
-	PAGEARGERROR("$pid contains invalid characters!");
-    }
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("$pid/$eid is not a valid experiment!", 1);
-    }
-    if (TBExptState($pid, $eid) != $TB_EXPTSTATE_ACTIVE) {
-	USERERROR("$pid/$eid is not currently swapped in!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to run linktest on $pid/$eid!",
-		  1);
-    }
-}
-else {
-    PAGEARGERROR("Must specify pid and eid!");
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("linklan",    PAGEARG_STRING,
+				 "vnode",      PAGEARG_STRING,
+				 "action",     PAGEARG_STRING);
+
+# Need these below.
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+
+if (!$experiment->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to run linktest on $pid/$eid!", 1);
 }
 
 #
@@ -48,7 +34,7 @@ else {
 # when the experiment is swapped out, but we need to generate a form based
 # on virt_lans instead of delays/linkdelays. Thats harder to do. 
 #
-if (TBExptState($pid, $eid) != $TB_EXPTSTATE_ACTIVE) {
+if ($experiment->state() != $TB_EXPTSTATE_ACTIVE) {
     USERERROR("Experiment $eid must be active to monitor its links!", 1);
 }
 
@@ -61,9 +47,12 @@ if (mysql_num_rows($query_result) == 0) {
     USERERROR("No links are being traced/monitored in $eid/$pid!", 1);
 }
 
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Link Monitoring");
+
+echo $experiment->PageHeader();
 echo "<br /><br />\n";
 
 #
@@ -101,12 +90,13 @@ print "<table align=center>\n" .
 
 function SPITMONLINK($vlan, $vnode)
 {
-    global $pid, $eid;
+    global $experiment;
 
-    $link = "<a href=linkmon_mon.php3?pid=$pid&eid=$eid&linklan=$vlan";
+    $url  = CreateURL("linkmon_mon", $experiment, "linklan", $vlan);
+    $link = "<a href='$url";
     if ($vnode)
 	$link .= "&vnode=$vnode";
-    $link .= " target=_blank>";
+    $link .= "' target=_blank>";
     $link .= "<img border=0 src='/autostatus-icons/blueball.gif' ".
 	          "alt='Monitor Link'>";
     $link .= "</a>\n";
@@ -115,11 +105,11 @@ function SPITMONLINK($vlan, $vnode)
 
 function SPITTRACELINK($vlan, $vnode, $action, $color)
 {
-    global $pid, $eid;
+    global $experiment;
 
-    $link  = "<a href=linkmon_ctl.php3?pid=$pid&eid=$eid&linklan=$vlan";
-    $link .= "&action=${action}&vnode=$vnode";
-    $link .= ">";
+    $url  = CreateURL("linkmon_ctl", $experiment, "linklan", $vlan,
+		      "action", $action, "vnode", $vnode);
+    $link = "<a href='$url'>";
     $link .= "<img border=0 src='/autostatus-icons/${color}ball.gif' ".
 	           "alt='$action'>";
     $link .= "</a>\n";
@@ -168,7 +158,7 @@ for ($i = 0; $i < $num; $i++) {
 }
 echo "</table>\n";
 echo "<center><font size=-1>".
-     "The <a href='tutorial/docwrapper.php3?docname=advanced.html#Tracing'>".
+     "The <a href='$WIKIDOCURL/AdvancedExample#Tracing'>".
      "Advanced Tutorial</a> has more info on link Tracing/Monitoring\n".
      "</font></center>\n";
 

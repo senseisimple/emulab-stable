@@ -2,7 +2,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,21 +12,53 @@ import libplab
 from libtestbed import *
 
 def usage(me):
-    print "Usage: %s [ -vd ]" % me
-    print "  Passing -o to getfree will cause it to only run once."
-    print "  Passing -i to getfree will cause if to only update using"
-    print "   existing node info (no new nodes will be added)."
+    print "Usage: %s [ -vd ] [ -n ] [ -g ] [<plc>] ... [<plc>]" % me
+    print "    (where <plc> is the name or id of a plc in the db)"
     sys.exit(1)
 
 
 def main(args):
     me = args[0]
     parser = TBParser()
-    parser.parse_args()
+
+    parser.add_option("-n", "--nodes",dest="nodes",default=False,
+                      action="store_true",help="Only synch node entries.")
+    parser.add_option("-g", "--nodegroups",dest="nodegroups",default=False,
+                      action="store_true",help="Only synch node group entries.")
+    
+    (options,cargs) = parser.parse_args()
+
+    libplab.debug = options.debug
+    libplab.verbose = options.verbose
+
+    both = True
+    if options.nodes and options.nodegroups:
+        both = True
+    elif options.nodes or options.nodegroups:
+        both = False
 
     plab = libplab.Plab()
-    plab.updateNodeEntries()
-    
+
+    plcids = []    
+    if len(cargs) > 0:
+        # Only do the args...
+        plcids = cargs
+    else:
+        # Grab all the PLCs we know about and do for all...
+        plcs = plab.getPLCs()
+        for (name,idx) in plcs:
+            plcids.append(name)
+            pass
+        pass
+
+    for plc in plcids:
+        if options.nodes or both:
+            print "Updating node entries at %s." % plc
+            plab.updateNodeEntries(plc)
+        if options.nodegroups or both:
+            print "Updating node group entries at %s." % plc
+            plab.updateNodeGroupEntries(plc)
+        pass
     return
 
 if __name__ == "__main__":

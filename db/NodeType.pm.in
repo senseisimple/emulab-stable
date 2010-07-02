@@ -1,0 +1,324 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package NodeType;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+use libdb;
+use libtestbed;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+# Cache of instances to avoid regenerating them.
+my %nodetypes	= ();
+my %nodeclasses = ();
+my $debug	= 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup a (physical) node and create a class instance to return.
+#
+sub Lookup($$)
+{
+    my ($class, $type) = @_;
+
+    # Look in cache first
+    return $nodetypes{$type}
+        if (exists($nodetypes{$type}));
+
+    my $query_result =
+	DBQueryWarn("select * from node_types where type='$type'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    # Do not use the embedded type field, cause of auxtypes.
+    $self->{"TYPE"}  = $type;
+    $self->{"DBROW"} = $query_result->fetchrow_hashref();
+    $self->{"ATTRS"} = undef;
+
+    bless($self, $class);
+
+    # Add to cache.
+    $nodetypes{$type} = $self;
+    return $self;
+}
+# accessors
+sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
+# Do not use the embedded type field, cause of auxtypes.
+sub type($)           { return $_[0]->{'TYPE'}; }
+sub class($)          { return field($_[0], 'class'); }
+sub isvirtnode($)     { return field($_[0], 'isvirtnode'); }
+sub isjailed($)       { return field($_[0], 'isjailed'); }
+sub isdynamic($)      { return field($_[0], 'isdynamic'); }
+sub isremotenode($)   { return field($_[0], 'isremotenode'); }
+sub issubnode($)      { return field($_[0], 'issubnode'); }
+sub isplabdslice($)   { return field($_[0], 'isplabdslice'); }
+sub isplabphysnode($) { return field($_[0], 'isplabphysnode'); }
+sub issimnode($)      { return field($_[0], 'issimnode'); }
+sub isgeninode($)     { return field($_[0], 'isgeninode'); }
+sub isfednode($)      { return field($_[0], 'isfednode'); }
+sub isswitch($)       { return field($_[0], 'isswitch'); }
+
+#
+# Force a reload of the data.
+#
+sub LookupSync($$)
+{
+    my ($class, $type) = @_;
+
+    # delete from cache
+    delete($nodetypes{$type})
+        if (exists($nodetypes{$type}));
+    delete($nodeclasses{$type})
+        if (exists($nodeclasses{$type}));
+
+    return Lookup($class, $type);
+}
+
+#
+# Find me a type, or a class, or by auxtype. Just find me something!
+#
+sub LookupAny($$)
+{
+    my ($class, $type) = @_;
+
+    my $obj = NodeType->Lookup($type);
+    return $obj
+	if (defined($obj));
+
+    my $query_result =
+	DBQueryWarn("select type from node_types where class='$type' limit 1");
+    return undef
+	if (!$query_result);
+    if ($query_result->numrows) {
+	my ($ntype) = $query_result->fetchrow_array();
+	return NodeType->Lookup($ntype);
+    }
+
+    $query_result =
+	DBQueryWarn("select type from node_types_auxtypes ".
+		    "where auxtype='$type' limit 1");
+    return undef
+	if (!$query_result);
+    if ($query_result->numrows) {
+	my ($ntype) = $query_result->fetchrow_array();
+	return NodeType->Lookup($ntype);
+    }
+    return undef;
+}
+
+#
+# Return a list of all types.
+#
+sub AllTypes($)
+{
+    my ($class)  = @_;
+    my @alltypes = ();
+    
+    my $query_result =
+	DBQueryWarn("select type from node_types");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    while (my ($type) = $query_result->fetchrow_array()) {
+	my $typeinfo = Lookup($class, $type);
+
+	# Something went wrong?
+	return undef
+	    if (!defined($typeinfo));
+	
+	push(@alltypes, $typeinfo);
+    }
+    return @alltypes;
+}
+
+sub AuxTypes($)
+{
+    my ($class)  = @_;
+    my @auxtypes = ();
+    
+    my $query_result =
+	DBQueryFatal("select at.auxtype,nt.type ".
+		     "  from node_types_auxtypes as at ".
+		     "left join node_types as nt on nt.type=at.type ");
+    
+    return ()
+	if (!$query_result || !$query_result->numrows);
+
+    while (my ($auxtype, $type) = $query_result->fetchrow_array()) {
+	my $typeinfo = Lookup($class, $type);
+
+	# Something went wrong?
+	return undef
+	    if (!defined($typeinfo));
+
+	#
+	# Generate a new type entry, but named by the auxtype instead.
+	# Underlying data is shared; might need to change that.
+	#
+	my $newtype         = {};
+	$newtype->{"TYPE"}  = $auxtype;
+	$newtype->{"DBROW"} = $typeinfo->{"DBROW"};
+	$newtype->{"ATTRS"} = $typeinfo->{"ATTRS"};
+	bless($newtype, $class);
+
+	# Add to cache.
+	$nodetypes{$auxtype} = $newtype;
+	
+	push(@auxtypes, $newtype);
+    }
+    return @auxtypes;
+}
+
+#
+# Load attributes if not already loaded.
+#
+sub LoadAttributes($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    return 0
+	if (defined($self->{"ATTRS"}));
+
+    #
+    # Get the attribute array.
+    #
+    my $type = $self->type();
+    
+    my $query_result =
+	DBQueryWarn("select attrkey,attrvalue,attrtype ".
+		    "  from node_type_attributes ".
+		    "where type='$type'");
+
+    $self->{"ATTRS"} = {};
+    while (my ($key,$val,$type) = $query_result->fetchrow_array()) {
+	$self->{"ATTRS"}->{$key} = { "key"   => $key,
+				     "value" => $val,
+				     "type"  => $type };
+    }
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $type  = $self->type();
+    my $class = $self->class();
+
+    return "[NodeType: $type/$class]";
+}
+
+#
+# Look for an attribute.
+#
+sub GetAttribute($$;$$)
+{
+    my ($self, $attrkey, $pattrvalue, $pattrtype) = @_;
+    
+    goto bad
+	if (!ref($self));
+
+    $self->LoadAttributes() == 0
+	or goto bad;
+
+    if (!exists($self->{"ATTRS"}->{$attrkey})) {
+	return undef
+	    if (!defined($pattrvalue));
+	$$pattrvalue = undef;
+	return 0;
+    }
+
+    my $ref = $self->{"ATTRS"}->{$attrkey};
+
+    # Return value instead if a $pattrvalue not provided. 
+    return $ref->{'value'}
+	if (!defined($pattrvalue));
+    
+    $$pattrvalue = $ref->{'value'};
+    $$pattrtype  = $ref->{'type'}
+        if (defined($pattrtype));
+
+    return 0;
+    
+  bad:
+    return undef
+	if (!defined($pattrvalue));
+    $$pattrvalue = undef;
+    return -1;
+}
+# Shortcuts for typical attributes.
+sub default_osid($;$)  {return GetAttribute($_[0], "default_osid", $_[1]); }
+sub default_imageid($;$){return GetAttribute($_[0], "default_imageid",$_[1]); }
+sub delay_osid($;$)    {return GetAttribute($_[0], "delay_osid", $_[1]); }
+sub jail_osid($;$)     {return GetAttribute($_[0], "jail_osid", $_[1]); }
+sub imageable($;$)     {return GetAttribute($_[0], "imageable", $_[1]); }
+sub memory($;$)        {return GetAttribute($_[0], "memory", $_[1]); }
+sub disksize($;$)      {return GetAttribute($_[0], "disksize", $_[1]); }
+sub disktype($;$)      {return GetAttribute($_[0], "disktype", $_[1]); }
+sub bootdisk_unit($;$) {return GetAttribute($_[0], "bootdisk_unit", $_[1]); }
+sub pxe_boot_path($;$) {return GetAttribute($_[0], "pxe_boot_path", $_[1]); }
+sub processor($;$)     {return GetAttribute($_[0], "processor", $_[1]); }
+sub frequency($;$)     {return GetAttribute($_[0], "frequency", $_[1]); }
+sub bios_waittime($;$) {return GetAttribute($_[0], "bios_waittime", $_[1]); }
+sub control_iface($;$) {return GetAttribute($_[0], "control_interface",$_[1]);}
+sub adminmfs_osid($;$) {return GetAttribute($_[0], "adminmfs_osid",$_[1]);}
+sub rebootable($;$)    {return GetAttribute($_[0], "rebootable",$_[1]);}
+sub power_delay($;$)   {return GetAttribute($_[0], "power_delay",$_[1]);}
+sub shared($;$)        {return GetAttribute($_[0], "shared",$_[1]);}
+
+sub initial_experiment($;$) {
+    return GetAttribute($_[0], "initial_experiment",$_[1]);
+}
+sub virtnode_capacity($;$) {
+    return GetAttribute($_[0], "virtnode_capacity", $_[1]);
+}
+sub simnode_capacity($;$) {
+    return GetAttribute($_[0], "simnode_capacity", $_[1]);
+}
+sub delay_capacity($;$) {
+    return GetAttribute($_[0], "delay_capacity", $_[1]);
+}
+sub trivlink_maxspeed($;$) {
+    return GetAttribute($_[0], "trivlink_maxspeed", $_[1]);
+}
+sub isdedicatedremote($;$) {
+    return GetAttribute($_[0], "dedicated_widearea", $_[1]);
+}
+sub control_interface($;$) { return control_iface($_[0], $_[1]); }
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -9,41 +9,57 @@ include("defs.php3");
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 #
-# Verify page/form arguments.
+# Verify page arguments
 #
-if (! isset($_GET['target_uid']))
-    $target_uid = $uid;
-else
-    $target_uid = $_GET['target_uid'];
-
-# Pedantic check of uid before continuing.
-if ($target_uid == "" || !TBvalid_uid($target_uid)) {
-    PAGEARGERROR("Invalid uid: '$target_uid'");
+$optargs = OptionalPageArguments("target_user", PAGEARG_USER,
+				 "p12", PAGEARG_BOOLEAN);
+if (!isset($p12)) {
+    $p12 = 0;
 }
 
-#
-# Check to make sure thats this is a valid UID.
-#
-if (! TBCurrentUser($target_uid)) {
-    USERERROR("The user $target_uid is not a valid user", 1);
+# Default to current user if not provided.
+if (!isset($target_user)) {
+     $target_user = $this_user;
 }
+
+# Need these below
+$target_uid = $target_user->uid();
+$target_idx = $target_user->uid_idx();
 
 #
 # Only admin people can create SSL certs for another user.
 #
-if (!$isadmin &&
-    strcmp($uid, $target_uid)) {
-    USERERROR("You do not have permission to download SSL cert for $user!", 1);
+if (!$isadmin && !$target_user->SameUser($this_user)) {
+    USERERROR("You do not have permission to download SSL cert ".
+	      "for $user!", 1);
 }
 
-$query_result =
-    DBQueryFatal("select cert,privkey from user_sslcerts ".
-		 "where uid='$target_uid' and encrypted=1");
+if ($p12) {
+    if ($fp = popen("$TBSUEXEC_PATH $target_uid nobody webspewcert", "r")) {
+	header("Content-Type: application/octet-stream;".
+	       "filename=\"emulab.p12\";");
+	header("Content-Disposition: inline; filename=\"emulab.p12\";");
+	header("Cache-Control: no-cache, must-revalidate");
+	header("Pragma: no-cache");
+#       header("Content-Type: application/x-x509-user-cert");
+	while (!feof($fp) && connection_status() == 0) {
+	    print(fread($fp, 1024));
+	    flush();
+	}
+	$retval = pclose($fp);
+	$fp = 0;
+    }
+    return;
+}
+
+$query_result =& $target_user->TableLookUp("user_sslcerts",
+					   "cert,privkey",
+					   "encrypted=1 and revoked is null");
 
 if (!mysql_num_rows($query_result)) {
     PAGEHEADER("Download SSL Certificate for $target_uid");
@@ -61,3 +77,4 @@ echo "-----BEGIN CERTIFICATE-----\n";
 echo $cert;
 echo "-----END CERTIFICATE-----\n";
 
+?>

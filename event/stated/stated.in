@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,6 +32,7 @@ my $rebootlog  = "$TB/log/nodereboot.log";
 my $power = "$TB/bin/power";
 my $apod = "$TB/sbin/apod";
 my $TBLOG = "@TBLOGFACIL@";
+my $LOGFILE = "$TB/log/stated.log";
 
 $| = 1;
 
@@ -44,14 +45,6 @@ use Getopt::Std;
 use English;
 use POSIX;			# for strftime, and sigprocmask and friends
 use Fcntl;			# file constants for pidfile
-use Sys::Syslog;
-# Important note about syslog: It defaults to using an inet socket,
-# but 'syslogd -s' (the default) doesn't listen for one. So either
-# run syslogd without -s, or use setlogsock('unix') before openlog.
-# (To get setlocksock: 'use Sys::Syslog qw(:DEFAULT setlogsock);' )
-
-# Do lots of db retries before we fail and die
-$libdb::DBQUERY_MAXTRIES = 100;
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
@@ -67,7 +60,6 @@ my $last_reload = time;
 # Command line opts.
 my $dbtag = "";
 my $debug = 0;
-my $nolog = 0;
 my $server = "localhost";
 my $port   = @BOSSEVENTPORT@;
 my $lockfile;
@@ -80,7 +72,6 @@ sub usage {
 Usage: $0 [-h] [-d] [-s server] [-p port] [-t dbtag]
 -h              This message
 -d              Turn on debugging output, and do not go into the background
--l              Do not use syslog; send output to stderr. Use with -d only
 -t tag          Use only those nodes with matching tag in nodes table
 -s server       Use specified server, instead of this site's bossnode
 -p port	        Use specified port
@@ -111,11 +102,6 @@ if ($opt{s}) {
 }
 if ($opt{p}) {
     $port = $opt{p};
-}
-if ($opt{l}) {
-    usage()
-	if (! $opt{d});
-    $nolog = 1;
 }
 if ($opt{t}) {
     $dbtag = $opt{t};
@@ -158,7 +144,7 @@ my $PXEKERNEL	 = "PXEKERNEL";
 sub debug(@);
 sub fatal($);
 sub notify($;$);
-sub info($;$);
+sub info($);
 sub getTimeouts();
 sub getValid();
 sub getModeTrans();
@@ -190,14 +176,10 @@ if (!$debug) {
 	    fatal("Couldn't remove $pidfile: $? $!\n");
     }
     # Background
-    # We use syslog, so redirect the output to nothing
-    if (TBBackGround("/dev/null")) {
+    if (TBBackGround($LOGFILE)) {
 	exit(0);
     }
-}
-# set up syslog
-if (! $nolog) {
-    openlog("stated","pid",$TBLOG);
+    TBdbfork();
 }
 
 if (defined($pidfile)) {
@@ -250,20 +232,20 @@ if ($debug) { qshow(); }
 my $do_reload = 0;
 my $sigrestart= 0;
 my $sigcleanup= 0;
+my $exiting   = 0;
 
 # Make the daemon reload database state on a sighup - but I'm worried
 # about what would happen if we tried to do this mid-loop. So, we'll
 # just set a flag and do it when we're done with our current pass.
 $SIG{HUP}  = sub { info("SIGHUP - Reloading DB state\n"); $do_reload = 1; };
+$SIG{USR2} = sub { info("SIGUSR2 - Reopening logfile\n"); ReOpenLog($LOGFILE); };
 
 # Set up other signals.
 $SIG{USR1} = \&restart_wrap;
-$SIG{USR2} = \&cleanup_wrap;
 $SIG{INT}  = \&cleanup_wrap;
 $SIG{QUIT} = \&cleanup_wrap;
 $SIG{ABRT} = \&cleanup_wrap;
 $SIG{TERM} = \&cleanup_wrap;
-$SIG{KILL} = \&cleanup_wrap;
 
 # Track if I handled an event or not
 my $event_count = 0;
@@ -514,7 +496,7 @@ sub getTriggers() {
 
     # Grab global triggers (including any-mode)
     my $result =
-      DBQueryFatal("SELECT op_mode, state, trigger " .
+      DBQueryFatal("SELECT op_mode, state, `trigger` " .
 		   "FROM state_triggers where node_id='$TBANYMODE' ".
 		   "order by op_mode,state");
     my %t;
@@ -526,7 +508,7 @@ sub getTriggers() {
 
     # Grab per-node triggers (including any-mode)
     $result =
-      DBQueryFatal("SELECT node_id, op_mode, state, trigger " .
+      DBQueryFatal("SELECT node_id, op_mode, state, `trigger` " .
 		   "FROM state_triggers where node_id!='$TBANYMODE' ".
 		   "order by op_mode,state");
     while (my ($n, $mode, $state, $trig) = $result->fetchrow()) {
@@ -808,6 +790,10 @@ sub stateTransition($$) {
 		checkGenISUP($node);
 		next;
 	    };
+	    /^CHECKPORTREG$/ && do {
+		CheckPortRegistration($node);
+		next;
+	    };
 	    /^$TBRESET$/ && do {
 		# We successfully booted, so clear some flags
 		$nodes{$node}{noretry}   = 0;
@@ -835,6 +821,18 @@ sub stateTransition($$) {
 	    };
 	    (/^$TBPOWERCYCLE$/) && do {
 		handleCommand($node,$TBPOWERCYCLE);
+		next;
+	    };
+	    /^RELOADOLDMFS$/ && do {
+		my $frisbee_osid = TBNodeDiskloadOSID($node);
+		my $frisbee_name = DBQuerySingleFatal("select osname from os_info where osid=$frisbee_osid");
+		my $msg = 
+		    ("Attempted to load multiple images on $node using an old Frisbee MFS.\n".
+		     "To make this work please update the $frisbee_name MFS image.\n");
+		SENDMAIL($REALTBOPS,
+			 "$frisbee_name Needs Updating",
+			 $msg,
+			 "Stated Daemon <".$TBOPS.">");
 		next;
 	    };
 	    notify("Unknown trigger '$trig' for $node in $mode/$newstate!\n");
@@ -1251,6 +1249,46 @@ sub setTimeout( $$$$ ) {
     if (0) { print "Done:\n"; qshow(); }
 }
 
+sub CheckPortRegistration($) {
+    my ($node) = @_;
+    my ($pid, $eid, $vname);
+    
+    debug("$node: Checking Port Registration for $node\n");
+
+    return
+	if (! NodeidToExp($node, \$pid, \$eid, \$vname));
+
+    my $exptidx;
+    if (!TBExptIDX($pid, $eid, \$exptidx)) {
+	print "*** WARNING: No such experiment $pid/$eid!\n";
+	return;
+    }
+
+    #
+    # The point is to see if a node has come up without filling port
+    # registrations that would affect backwards compatability with older
+    # images. 
+    #
+    my $query_result =
+	DBQueryWarn("select sync_server from experiments ".
+		    "where pid='$pid' and eid='$eid' and ".
+		    "      sync_server='$vname'");
+
+    if ($query_result && $query_result->num_rows) {
+	$query_result =
+	    DBQueryWarn("select port from port_registration ".
+			"where pid='$pid' and eid='$eid' and ".
+			"      node_id='$node' and service='emulab_syncd'");
+	
+	if ($query_result && !$query_result->num_rows) {
+	    DBQueryWarn("insert into port_registration set ".
+			"     exptidx='$exptidx', pid='$pid', eid='$eid', ".
+			"     service='emulab_syncd', ".
+			"     node_id='$node', port='16534'");
+	}
+    }
+}
+
 # Remove a timeout.
 sub remTimeout ($)
 {
@@ -1292,7 +1330,7 @@ sub AddNodeTrigger( $$$@ ) {
     }
     my $triglist = join(",",@{$triggers{"$node:$mode:$state"}});
     DBQueryFatal("replace into state_triggers ".
-		 "(node_id,op_mode,state,trigger) values ".
+		 "(node_id,op_mode,state,`trigger`) values ".
 		 "('$node','$mode','$state','$triglist')");
     return 0;
 }
@@ -1412,7 +1450,7 @@ sub os_opmode() {
 
 sub debug(@) {
     if ($debug) {
-	print @_;
+	print STDERR @_;
     }
 }
 
@@ -1506,26 +1544,12 @@ sub announce($) {
     }
 }
 
-sub info($;$) {
+sub info($) {
     my $message = shift;
-    my $notice = shift || 0;
-    # Use syslog
-    my $prio="info";
-    if ($notice) {
-	$prio = "notice";
-    }
-    if ($nolog) {
-	print $message;
-    }
-    else {
-	if ($debug) {
-	    # Print out log entries like this:
-	    # Sep 20 09:36:00 stated[238]: Reloading state from database
-	    print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
-	    $message = "DEBUG: ".$message;
-	}
-	syslog($prio,$message) || notify("syslog failed: $? $!\n");
-    }
+
+    # Print out log entries like this:
+    # Sep 20 09:36:00 [238]: Reloading state from database
+    print strftime("%b %e %H:%M:%S", localtime) . " [$$]: $message";
 }
 
 sub restart_wrap { $sigrestart=1; }
@@ -1570,13 +1594,24 @@ sub cleanup_wrap { $sigcleanup=1; }
 
 # This gets called if we catch a signal (TERM, etc.)
 sub cleanup {
-    notify("Signal received, exiting\n");
+    notify("Cleanup signal received, exiting\n");
     # now do the normal exit stuff in END {}
     exit(0);
 }
 
 # This gets called if we die of 'natural causes' (exit, die, etc.)
 END {
+    if ($ending) {
+	info("Recursive call to END block. Returning ...\n");
+	return;
+    }
+    if (!defined($handle)) {
+	#
+	# No handle, nothing interesting happening. 
+	#
+	return;
+    }
+    $ending = 1;
     debug("Ending stated...\n");
     my $stat = $?;
     $lastmail=0;
@@ -1588,17 +1623,15 @@ END {
 	# Must be a child
 	info("Stated child exiting\n");
     }
-    debug("Annouced. Cleaning up...\n");
-    # clean up Syslog
-    if (! $nolog) {
-	closelog();
-    }
+    debug("Announced. Cleaning up...\n");
     if ($handle) {
 	debug("Unregistering w/event system...\n");
 	if (event_unregister($handle) == 0) {
-	    die "Unable to unregister with event system\n";
+	    info("Unable to unregister with event system\n");
 	}
-	debug("Unregistered.\n");
+	else {
+	    debug("Unregistered.\n");
+	}
     }
     debug("Cleaned up. Bye!\n");
     # Restore $? in case one of the things I called changed it

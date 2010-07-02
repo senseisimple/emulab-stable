@@ -387,6 +387,8 @@ def tryXmlrpcCmd(cmd, args = (),
                 # a tuple - throws an exception if its operand isn't
                 if type(args) == tuple:
                     return cmd(*args)
+                elif type(args) == dict:
+                    return cmd(**args)
                 else:
                     return cmd(args)
             else:

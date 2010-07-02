@@ -1,0 +1,24 @@
+Docs
+Prefix
+
+Pain points
+=================================
+Testlayout - Suites and  Tests, buildup, teardown using Test::Class
+Testoutput - TestBuilderWrapper
+
+DOCS TODO
+  backoff example
+  more prose docs
+
+TODO
+  SSH SCP Cleanup
+  Revisit CartProd
+
+LATER
+  test groupings - use - perl modules works for now
+  Large External Tars and Resources for experiements
+  EXPAND CURRENT IMPLEMENTATION
+    event subsystem
+
+Parallel TODOS
+  clean up FF, Roles, constructors

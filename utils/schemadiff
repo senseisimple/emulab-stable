@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -33,6 +33,7 @@ sub debug(@);
 my $debug = 0;
 my $sql = 1;
 my $quiet = 0;
+my $ignore_tables = 0;
 
 #
 # Return value - number of differences between the two files
@@ -43,7 +44,7 @@ my $diff = 0;
 # Process command-line args
 #
 my %opt;
-getopts('hdsq', \%opt); 
+getopts('hdsqt', \%opt); 
 if ($opt{h}) {
     exit &usage;
 }
@@ -58,7 +59,9 @@ if ($opt{q}) {
     $sql = 0;
     $debug = 0;
 }
-
+if ($opt{t}) {
+    $ignore_tables = 1;
+}
 
 if (@ARGV != 2) {
     exit &usage
@@ -144,10 +147,16 @@ sub read_schema($) {
 	# differs depending on whether or not we're in a create definition.
 	#
 	if (!$create_table) {
-	    if (/^\s*$/ || /^\s*#/ || /^--/ || /^INSERT INTO/) {
+	    if (/^\s*$/i || /^\s*#/i || /^--/i || /^INSERT INTO/i) {
 		# An insert statement, a comment, or a blank line. Do nothing.
-	    } elsif (/^CREATE TABLE (\w+) \($/) {
-
+	    }
+	    elsif (/^\/\*.*\*\/[;]+$/i) {
+		# Also a comment
+	    }
+	    elsif (/^DROP TABLE /i) {
+		# mysql 5.0 add these now.
+	    }
+	    elsif (/^CREATE TABLE `?(\w+)`? \($/i) {
 		# Start of a new table definition
 		$create_table = 1;
 		$table_name = $1;
@@ -175,8 +184,9 @@ sub read_schema($) {
 	    # If we are in a table creation statement, we need to find out
 	    # what this line is trying to do...
 	    #
-
-	    if (/^\) TYPE\s*=\s*(\w+);/) {
+	    if (/^\) TYPE\s*=\s*(\w+);/i ||
+		/^\) ENGINE\s*=\s*(\w+)\s*DEFAULT\s*CHARSET=(\w+);/i ||
+		/^\) ENGINE\s*=\s*(\w+)\s*AUTO_INCREMENT=\d*\s*DEFAULT\s*CHARSET=(\w+);/i) {
 
 		# The end of the table definition
 		my $type = $1;
@@ -199,43 +209,52 @@ sub read_schema($) {
 	    # them someday for completeness. For now, we have check for them
 	    # so that we don't accidentally treat them as columns
 	    #
-	    elsif (/^\s*.*\s+FOREIGN KEY\s+/) {
+	    elsif (/^\s*.*\s+FOREIGN KEY\s+/i) {
 		die "Found a FOREIGN KEY line, which we don't handle yet\n";
-	    } elsif (/^\s*CHECK\s*\((.+)\),?$/) {
+	    } elsif (/^\s*CHECK\s*\((.+)\),?$/i) {
 		die "Found a CHECK line, which we don't handle yet\n";
-	    } elsif (/^\s*UNIQUE (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/) {
+	    } elsif (/^\s*UNIQUE (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/i) {
 		die "Found a UNIQUE (INDEX) line, which we don't handle yet\n";
-	    } elsif (/^\s*FULLTEXT (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/) {
+	    } elsif (/^\s*FULLTEXT (INDEX)?\s+(\w+)?\s+\((.+[^,])\),?$/i) {
 		die "Found a FULLTEXT (INDEX) line, which we don't handle yet\n";
 
-	    } elsif (/^\s*PRIMARY KEY\s*\((.+)\),?$/) {
+	    } elsif (/^\s*PRIMARY KEY\s*\((.+)\),?$/i) {
 
 		# A primary key
 		my $key = $1;
 		# Strip whitespace
 		$key =~ s/\s+//g;
+		# Strip backquotes
+		$key =~ s/\`//g;
 		debug("Putting primary key $key in table $table_name\n");
 		$tables{$table_name}{PRIMARY}{$key} = 1;
 
-	    } elsif (/^\s*(KEY|INDEX)\s+(\w+)?\s+\((.+[^,])\),?$/) {
+	    } elsif (/^\s*(UNIQUE)?\s+(KEY|INDEX)\s+`?(\w+)?`?\s+\((.+[^,])\),?$/i) {
 
 		# A key/index (synonmyms)
 		my ($name, $key) = ($2, $3);
 		# Strip whitespace
 		$key =~ s/\s+//g;
-		debug("Putting key $key in table $table_name\n");
+		# Strip backquotes
+		$key =~ s/\`//g;
+  		debug("Putting key $key in table $table_name\n");
 
-		if ($name) {
+  	 	if ($name) {
 		    $tables{$table_name}{KEYS}{$name} = $key;
 		} else { 
 		    die "Found a key without a name: $key\n";
 		}
 
-	    } elsif (/^\s*(\w+)\s+(.+[^,\s]),?\s*$/) {
+	    } elsif (/^\s*`?(\w+)`?\s+(.+[^,\s]),?\s*$/i) {
 
 		# A column definition
 		my ($name, $definition) = ($1, $2);
 		debug("Found column $name with type $definition\n");
+
+		# Change timestamp(14) to timestamp!
+		$definition =~ s/timestamp NOT NULL default.*/timestamp NOT NULL/g;
+		$definition =~ s/timestamp\(14\)/timestamp/g;
+		
 		$tables{$table_name}{COLUMNS}{$name} = $definition;
 
 		push @{ $tables{$table_name}{ORDERED_COLUMNS} },
@@ -273,7 +292,8 @@ sub compare_tables($$) {
     # Removed tables are easy to handle 
     #
     foreach my $table (@$removed) {
-	$diff++;
+	$diff++
+	    if (!$ignore_tables);
 	if (!$quiet) { print "# Table $table was removed\n"; }
 	if ($sql) { print "DROP TABLE $table;\n\n"; }
     }
@@ -282,7 +302,8 @@ sub compare_tables($$) {
     #
     #
     foreach my $table (@$added) {
-	$diff++;
+	$diff++
+	    if (!$ignore_tables);
 	if (!$quiet) { print "# Table $table was added\n"; }
 	if ($sql) {
 	    print "CREATE TABLE $table (\n";
@@ -424,7 +445,7 @@ sub compare_columns($$@) {
 		my $old_definition =
 		    $schema1->{$table}{COLUMNS}{$removed->[$j]};
 
-		if ($old_definition eq $new_definition) {
+		if (lc($old_definition) eq lc($new_definition)) {
 		    $diff++;
 
 		    #
@@ -576,6 +597,7 @@ sub usage() {
     print "-h    This message\n";
     print "-s    Summary: Don't print SQL statments to apply changes\n";
     print "-q    Quiet: Don't print anything, just return a value\n";
+    print "-t    Ignore table creates and drops\n";
     print "-d    Turn on debugging output\n";
     return 1;
 }

@@ -1,0 +1,81 @@
+Date: Wed, 16 Aug 2006 14:48:28 -0600
+From: Mike Hibler <mike@flux.utah.edu>
+To: pelab@flux.utah.edu
+Subject: monitoring your "cloud" shaping
+
+During the previous paper crunch I had written a little perl script
+
+        ~mike/parsepipe.pl
+
+to dump the IPFW tables on delay nodes so you could see how things were setup.
+I have since made the output a little more understandable.  It prints out a
+section per delay node, ala:
+
+tbdelay4:
+  elab-5 <   elab-5:  100000000,    0ms,  0.0%,     194179,  238270680
+
+  elab-5 >   elab-1:    2020000,  108ms,  0.0%,      23790,    1318245
+  elab-5 >   elab-2:    1257000,  211ms,  0.0%,      34024,   38376164
+  elab-5 >   elab-3:     100000,  179ms,  0.0%,       1768,    1773906
+  elab-5 >   elab-4:    4009000,   60ms,  0.0%,      36499,   50793730
+  elab-5 >   elab-6:    6000000,    2ms,  0.0%,      91105,  124302317
+
+  elab-6 <   elab-6:  100000000,    0ms,  0.0%,     173572,  236836570
+
+  elab-6 >   elab-1:    2340000,   90ms,  0.0%,      26841,    1487517
+  elab-6 >   elab-2:    1197000,  162ms,  0.0%,      27187,   34443151
+  elab-6 >   elab-3:     100000,  171ms,  0.0%,       3363,    4429941
+  elab-6 >   elab-4:     100000,  100ms,  0.0%,       2159,    2536567
+  elab-6 >   elab-5:   14976000,    3ms,  0.0%,      78294,   85779645
+
+*** Ignored pipes with traffic:
+  elab-5 <      any:  100000000,    0ms,  0.0%,         41,       3918
+  elab-5 >      any:  100000000,    0ms,  0.0%,          9,        414
+  elab-6 <      any:  100000000,    0ms,  0.0%,         39,       3774
+  elab-6 >      any:  100000000,    0ms,  0.0%,          9,        414
+
+where each line consists of the node we are shaping for, the direction
+("<" in from the cloud, ">" out to the cloud), the destination for the
+packets,
+the bandwidth/delay/loss and the number of packets/bytes through the pipe.
+
+The first line ("elab-5 < elab-5") is for the rule used for all traffic coming
+off of the cloud for the node we are shaping.  This one should be unshaped,
+as per our strategy of shaping only outbound traffic to the cloud/lan.
+
+The second bunch of lines is for our shaped node out to the individual other
+nodes in the cloud.
+
+Then there is a another group of lines for the other node that we are shaping
+for ("elab-6").
+
+"Ignored pipes with traffic" are those which should not be in use, but
+have traffic counts.  Rules involving "any" and small counts are ok, as they
+are the generic shaping rules that were in use before the cloud rules got set
+up.  The counts here should not increase after the cloud is "up".
+
+---------------------------------------------------------------------------
+
+The file parsepipe.pl is now checked in as "cloudinfo".
+
+---------------------------------------------------------------------------
+
+Date: Tue, 22 Aug 2006 15:25:50 -0600 (MDT)
+From: Kevin Atkinson <kevina@cs.utah.edu>
+To: pelab@flux.utah.edu
+Subject: Setting And Restoring Settings For Elab Cloud
+
+It is now possible to save and restore the elab "cloud" settings.
+I hacked Mike's cloudinfo script to dump the settings in a form that is easy
+to parse, and then wrote a script to read in those settings and make the
+appropriate tenv calls.
+
+To save them:
+
+ cloudinfo -d PID EID > dump.txt
+
+And then to restore:
+
+ ./cloudinfo-set < dump.txt
+
+No guarantee this will work on a non elab experiment.

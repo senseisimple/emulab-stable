@@ -1,0 +1,130 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use strict;
+use Getopt::Std;
+
+my $TEVC = "/usr/testbed/bin/tevc";
+my $LOGHOLE = "/usr/testbed/bin/loghole";
+
+my $optlist = "nt";
+my $nologs = 0;
+my $sanityChecks = 0;
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (!getopts($optlist, \%options)) {
+    print "error: cannot parse options\n";
+    exit(1);
+}
+#
+# Require the pid and eid
+#
+if (@ARGV != 2) {
+    die "Usage: $0 pid eid\n";
+}
+my ($pid, $eid) = @ARGV;
+
+if (defined($options{"n"})) {
+    $nologs = 1;
+}
+
+if (defined($options{"t"})) {
+    $sanityChecks = 1;
+}
+
+#
+# Stop the stubs and monitors
+#
+print "##### Stopping stubs and monitors\n";
+if (system "$TEVC -e $pid/$eid now plabstubs stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planetstubs stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now monitorgroup stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Stop link tracing
+#
+print "##### Stopping link tracing\n";
+if (system "$TEVC -e $pid/$eid now planet-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planet-tracemon stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now plabc-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now plabc-tracemon stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now elabc-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now elabc-tracemon stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Smack down host tcpdumps
+#
+print "##### Stopping host tcpdumps\n";
+if (system "$TEVC -e $pid/$eid now tdhosts stop") {
+    die "Error running tevc\n";
+}
+
+print "##### Stopping sanity check tcpdumps\n";
+if (system "$TEVC -e $pid/$eid now sanityCheckDumps stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Stop running servers
+#
+print "##### Stopping servers\n";
+if (system "$TEVC -e $pid/$eid now allservers stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Grab logfiles
+#
+if (!$nologs) {
+    print "##### Gathering logfiles\n";
+    if (system "$LOGHOLE -e $pid/$eid sync -P") {
+	die "Error running loghole\n";
+    }
+
+    # Run cross-correlation checks on the collected Tcpdump files.
+    if ($sanityChecks) {
+        print "##### Running cross-correlation sanity checks\n";
+        if (system "python SanityCheck.py -t -u /proj/$pid/exp/$eid/") {
+            die "Error running cross-correlation sanity check\n";
+        }
+    }
+
+    #
+    # Create an archive containing these logfiles
+    #
+    print "##### Creating archive\n";
+    if (system "$LOGHOLE -e $pid/$eid archive") {
+	die "Error running loghole\n";
+    }
+} else {
+    print "##### Ignoring logfiles\n";
+}
+
+
+print "##### Done\n";
+

@@ -1,8 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
+
+static const char rcsid[] = "$Id: parser.cc,v 1.9 2009-05-20 18:06:08 tarunp Exp $";
 
 #include "parser.h"
 

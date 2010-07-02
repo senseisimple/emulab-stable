@@ -14,14 +14,14 @@
     <variable name="NodeName" default="devbox" descr="Node Name" />
     <!-- This hard-codes the image name, but it seems like we have to do
          that somewhere... -->
-    <variable name="ImageName" default="PLAB-DEVBOX" descr = "Disk Image" />
+    <variable name="ImageName" default="PLAB-DEVBOX-v42" descr = "Disk Image" />
     <nstext>
         <section><![CDATA[
 # plabdevbox.ns - NS script to make a DevBox experiment on Emulab
 #
 # February 21, 2006
 #
-# Questions and comments to testbed-ops@emulab.net
+# Questions and comments to testbed-ops@flux.utah.edu
 
 #
 # Boilerplate

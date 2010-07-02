@@ -1,0 +1,128 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Generate the CRL bundle and store in the www directly. This is done on
+# the clearinghouse only, where all the bundles are kept.
+# 
+sub usage()
+{
+    print "Usage: gencrlbundle\n";
+    exit(1);
+}
+my $optlist = "";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $WWWBUNDLE	  = "$TB/www/genicrl.bundle";
+my $BUNDLE	  = "$TB/etc/genicrl.bundle";
+my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-ch";
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use libaudit;
+require GeniDB;
+import GeniDB;
+
+# For error log.
+my $errors = 0;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+# Record output in case of error.
+LogStart(0);
+
+#
+# Post our own CRL.
+#
+# XXX Hack check to make sure this is a real emulab.
+#
+if (-d "$TB/expwork/emulab-ops") {
+    system("$POSTCRL") >= 0
+	or fatal("Could not post our own CRL");
+}
+
+my $query_result =
+    DBQueryWarn("select cert,uuid, ".
+		" UNIX_TIMESTAMP(expires) < UNIX_TIMESTAMP(now()) as expired ".
+		"from geni_crls ".
+		"order by uuid");
+
+open(BUNDLE, ">/tmp/crlbundle.$$")
+    or fatal("Could not create new CRL bundle file");
+while (my ($cert,$uuid,$expired) = $query_result->fetchrow_array()) {
+    if ($expired) {
+	print STDERR "*** CRL for $uuid has expired. Skipping ...\n";
+	$errors++;
+	next;
+    }
+    print BUNDLE $cert;
+}
+close(BUNDLE);
+
+# Don't bother if no change
+system("/usr/bin/diff -q $BUNDLE /tmp/crlbundle.$$");
+if ($?) {
+    system("/bin/mv /tmp/crlbundle.$$ $BUNDLE") == 0
+	or fatal("Could not copy to $BUNDLE!");
+
+    system("/usr/local/etc/rc.d/apache.sh restart") == 0
+	or fatal("Could not restart apache!");
+    
+    system("/bin/cp $BUNDLE $WWWBUNDLE") == 0
+	or fatal("Could not copy to $WWWBUNDLE!");
+
+    system("/usr/local/etc/rc.d/apache.sh restart") == 0
+	or fatal("Could not restart apache!");
+}
+# Apache spits out stuff. No errors at this point, nothing to report.
+AuditEnd()
+    if (!$errors);
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

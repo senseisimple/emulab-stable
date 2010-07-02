@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,7 +24,7 @@ use vars qw(@ISA @EXPORT);
 	       RESPONSE_FORBIDDEN RESPONSE_BADVERSION RESPONSE_SERVERERROR
 	       RESPONSE_TOOBIG RESPONSE_REFUSED RESPONSE_TIMEDOUT
 
-	       ParseResponse CallMethod0 CallMethod Config
+	       ParseResponse CallMethod0 CallMethod CallMethodHTTP Config
 );
 
 # Must come after package declaration!
@@ -35,6 +35,9 @@ use RPC::XML;
 use RPC::XML::Parser;
 use Socket;
 use IO::Handle;     # thousands of lines just for autoflush :-(
+use LWP::UserAgent;
+use HTTP::Request::Common qw(POST);
+use HTTP::Headers;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -51,8 +54,8 @@ $ENV{'PATH'} = $ENV{'PATH'} . ":/usr/local/bin";
 my %config =
     ( "debug"		=> 0,
       "verbose",	=> 0,
-      "server"		=> undef,
-      "portnum"		=> undef,
+      "server"		=> $BOSSNODE,
+      "portnum"		=> @OUTERBOSS_XMLRPCPORT@,
       "version"		=> undef,
       "cert"		=> undef,
     );
@@ -233,13 +236,92 @@ sub CallMethod0($$$)
     return ParseResponse($xmlgoo);
 }
 
+#
+# Call to a non-Emulab xmlrpc server.  Returns a response hash from 
+# ParseResponse; if there was an HTTP error, the hash also contains the keys
+# httpcode and httpmsg.
+#
+sub CallMethodHTTP($$$) {
+    my ($httpURL,$method,$arghash) = @_;
+
+    my $request = new RPC::XML::request($method,($arghash));
+    if ($debug) {
+	print STDERR "xml request: " . $request->as_string();
+	print STDERR "\n";
+    }
+
+    #
+    # Send an http post.
+    #
+    my $reqstr = $request->as_string();
+    my $ua = LWP::UserAgent->new();
+    #my $xheader = HTTP::Headers->new();
+    #$xheader->header('Content-type' => 'text/xml');
+    #$xheader->header('Content-length' => length($reqstr));
+    my $hreq = HTTP::Request->new(POST => $httpURL);
+    $hreq->content_type('text/xml');
+    $hreq->content($reqstr);
+    my $hresp = $ua->request($hreq);
+
+    if (!$hresp->is_success()) {
+	return { 'httpcode' => $hresp->code(),
+		 'httpmsg' => $hresp->message() };
+    }
+    if ($debug) {
+	print STDERR "xml response: " . $hresp->as_string();
+	print STDERR "\n";
+    }
+    
+    #
+    # Read back the xmlgoo from the child.
+    #
+    my $xmlgoo = $hresp->content();
+
+    if ($debug) {
+	print STDERR "xmlgoo: " . $xmlgoo;
+	print STDERR "\n";
+    }
+
+    #
+    # Convert the xmlgoo to Perl and return it.
+    #
+    my $parser   = RPC::XML::Parser->new();
+    my $goo      = $parser->parse($xmlgoo);
+    my ($value,$output,$code);
+    
+    # Python servers seem to return faults in structs, not as <fault> elements.
+    # Sigh.
+    if (!ref($goo)) {
+        print STDERR "Error in XMLRPC parse: $goo\n";
+        return undef;
+    }
+    elsif ($goo->value()->is_fault() 
+	|| (ref($goo->value()) && UNIVERSAL::isa($goo->value(),"HASH") 
+	    && exists($goo->value()->{'faultCode'}))) {
+	$code   = $goo->value()->{"faultCode"}->value;
+	$value  = $code;
+	$output = $goo->value()->{"faultString"}->value;
+    }
+    else {
+	$code   = 0;
+	$value  = $goo->value;
+	if (ref($value)) {
+	    $value = $value->value;
+	}
+	$output = $value;
+    }
+    return {"code"   => $code,
+	    "value"  => $value,
+	    "output" => $output};
+}
+
 sub CallMethod($$$)
 {
     my $response = CallMethod0($_[0], $_[1], $_[2]);
 
     if (($config{"verbose"} || $response->{"code"}) &&
 	defined($response->{"output"}) && $response->{"output"} ne "") {
-	print $response->{"output"};
+	print $response->{"output"}, "\n";
     }
     if ($response->{"code"}) {
 	return undef;

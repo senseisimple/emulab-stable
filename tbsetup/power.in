@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,6 +22,7 @@ my $ELABINELAB = @ELABINELAB@;
 my $RPCSERVER  = "@OUTERBOSS_NODENAME@";
 my $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
 my $RPCCERT    = "@OUTERBOSS_SSLCERTNAME@";
+my $WOL        = "$TB/sbin/whol";
 
 use lib "@prefix@/lib";
 use libdb;
@@ -30,8 +31,13 @@ use power_rpc27;
 use power_sgmote;
 use power_mail;
 use power_whol;
+use power_ilo;
 use snmpit_apc;
 use libtestbed;
+use User;
+use Node;
+use NodeType;
+use StateWait;
 use strict;
 use English;
 use Getopt::Std;
@@ -57,10 +63,13 @@ my $ip = "";			#stores IP of a power controller
 my $outlet = 0;			#stores number of an outlet
 my %IPList = ();		#holds machine/ip pairs
 my %OutletList = ();		#holds machine/outlet pairs
+my @wolnodes = ();
 my $exitval = 0;
+my $this_user;
 
 # Protos
 sub dostatus(@);
+sub dowol(@);
 
 #
 # Process command-line arguments
@@ -69,7 +78,7 @@ my %opt = ();
 getopts("v:he",\%opt);
 
 if ($opt{h}) {
-    exit &usage;
+    exit usage();
 }
 
 # useful values are 0, 1, 2 and 3
@@ -165,13 +174,24 @@ if ($ELABINELAB) {
     if (!defined($rval)) {
 	exit(-1);
     }
+    if ($sendevent && ($op eq "off" || $op eq "cycle")) {
+	foreach my $node (@nodelist) {
+	    TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
+	}
+    }
     exit($rval);
 }
 
 #
-# Get table of users <--> machines for those nodes, to make sure
-# user is authorized to control the nodes
+# This script can be run by root.
 #
+if ($UID) {
+    $this_user = User->ThisUser();
+    if (! defined($this_user)) {
+	die("*** $0:\n".
+	    "    You ($UID) do not exist!\n");
+    }
+}
 
 my %timelimited = ();
 
@@ -181,31 +201,51 @@ my %timelimited = ();
 # is primarily to preserve the pre-libification behavior of power
 #
 my %outlets = ();
-foreach my $node (@machines) {
-    if (!(($UID == 0) || TBNodeAccessCheck($UID,TB_NODEACCESS_POWERCYCLE,$node))) {
-	warn "You are not authorized to control $node. Skipping...\n";
-	next;
+foreach my $nodeid (@machines) {
+    my $node = Node->Lookup($nodeid);
+    if (defined($node)) {
+	#
+	# We allow root/admins to power cycle a non-existent node
+	# (a new node that has not been added yet).
+	#
+	if (defined($this_user) &&
+	    !$node->AccessCheck($this_user, TB_NODEACCESS_POWERCYCLE)) {
+	    warn "You are not authorized to control $nodeid. Skipping...\n";
+	    next;
+	}
     }
 
-    my $result = DBQueryFatal("select o.power_id, o.outlet, " .
-	"(CURRENT_TIMESTAMP - power_time > last_power) " .
-	"from outlets as o left join nodes as n on " .
-	"(o.node_id = n.node_id) ".
-	# Shark hack
-	"or (n.node_id = concat(o.node_id,'-1')) " .
-	# End shark hack
-	"left join node_types as t on n.type=t.type ".
-	"where o.node_id='$node'");
+    #
+    # Query DB directly since node might not exist yet.
+    #
+    my $result =
+        DBQueryFatal("select power_id,outlet,UNIX_TIMESTAMP(last_power) ".
+		     "  from outlets ".
+		     "where node_id='$nodeid'");
     if ($result->num_rows() == 0) {
-	warn "No outlets table entry found for $node. Skipping...\n";
+	warn "No outlets table entry found for $nodeid. Skipping...\n";
 	SENDMAIL($TBOPS,
-		 "No power outlet for $node",
-		 "Unable to power '$op' $node; no outlets table entry!",
+		 "No power outlet for $nodeid",
+		 "Unable to power '$op' $nodeid; no outlets table entry!",
 		 $TBOPS);
 	next;
     }
+    my ($power_id, $outlet, $last_power) = $result->fetchrow();
 
-    my ($power_id, $outlet, $time_ok) = $result->fetchrow();
+    #
+    # Default power delay to 60 seconds if non-existent node.
+    #
+    my $power_delay = 60;
+    my $postwol     = 0;
+    if (defined($node)) {
+	$power_delay = $node->NodeTypeInfo()->power_delay();
+
+	if ($node->NodeAttribute("wakeonlan_afterpower", \$postwol) != 0) {
+	    warn "Could not get wakeonlan_afterpower attr for $nodeid.\n";
+	    $postwol = 0;
+	}
+    }
+    my $time_ok = (time() - $power_delay > $last_power ? 1 : 0);
 
     #
     # Check for rate-limiting, and update the last power cycle time
@@ -216,18 +256,18 @@ foreach my $node (@machines) {
     #
     if ( $op ne "off" ) {
 	if (! ($time_ok || ($UID == 0)) ) {
-	    warn "$node was power cycled recently. Skipping...\n";
+	    warn "$nodeid was power cycled recently. Skipping...\n";
 	    next;
 	} elsif ( $power_id ne "mail" ) {
 	    DBQueryFatal("update outlets set last_power=CURRENT_TIMESTAMP " .
-			 "where node_id = '$node'");
+			 "where node_id = '$nodeid'");
 	}
     }
 
     #
     # Associate this node with the power controller it is attached to
     #
-    push @{$outlets{$power_id}}, [$node, $outlet];
+    push @{$outlets{$power_id}}, [$nodeid, $outlet, $postwol];
 }
 
 print "machines= ",join(" ",@machines),"\n" if $verbose;
@@ -240,11 +280,12 @@ foreach my $power_id (keys %outlets) {
     #
     my @outlets = ();
     my @nodes = ();
+    my %postwol = ();
     foreach my $node (@{$outlets{$power_id}}) {
-	my ($node_id, $outlet) = @$node;
+	my ($node_id, $outlet, $wol) = @$node;
 	push @outlets, $outlet;
 	push @nodes, $node_id;
-
+	$postwol{$node_id} = $wol;
     }
     my $nodestr = join(",",@nodes);
 
@@ -252,7 +293,10 @@ foreach my $power_id (keys %outlets) {
     my $IP;
     my $class;
 
-    if ($power_id eq "mail" || $power_id =~ /^whol-/) {
+    if ($power_id eq "mail" || $power_id =~ /^whol-/ 
+	|| $power_id=~ /^rmcp-/
+	|| $power_id eq 'drac'
+	|| $power_id eq 'ilo' || $power_id eq 'ilo2') {
 	$type = $power_id;
 	$IP = "";
 	$class = "";
@@ -310,6 +354,17 @@ foreach my $power_id (keys %outlets) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
 	    $errors++;
 	}
+    } elsif ($type =~ /rmcp-(\w+)/) {
+	require power_rmcp;
+	if (power_rmcp::rmcpctrl($1,$op,@nodes)) {
+	    print "Control of $nodestr failed.\n"; ++$exitval;
+	    ++$errors;
+	}
+    } elsif ($type eq 'ilo2' || $type eq 'ilo' || $type eq 'drac') {
+	if (iloctrl($type,$op,@nodes)) {
+	    print "Control of $nodestr failed.\n"; ++$exitval;
+            ++$errors;
+        }
     } elsif ($type eq "mail") {
 	if (mailctrl($op,@nodes)) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
@@ -328,11 +383,26 @@ foreach my $power_id (keys %outlets) {
 		my $state = TBDB_NODESTATE_SHUTDOWN;
 		TBSetNodeEventState($node,$state);
 	    }
+	    push(@wolnodes, $node)
+		if ($postwol{$node});
 	}
     } else {
 	$exitval += $errors;
     }
+}
 
+#
+# Handle the postwol option. This is technically incorrect; we really
+# needed to start the wait operation before we turned the node off since
+# we could miss the transition by starting to wait afterwards. But, that
+# would require a complete reorg of this code and besides, the whole idea
+# that nodes that need wakeonlan are not going to actually come back alive
+# on their own.
+#
+if (@wolnodes) {
+    if (dowol(@wolnodes) != 0) {
+	$exitval++;
+    }
 }
 
 # Return 0 on success. Return non-zero number of nodes that failed.
@@ -433,7 +503,9 @@ sub dostatus(@) {
 		    next;
 		}
 	    }
-	    for my $outlet (1..20) {
+	    print "$ctrl Current: ", $status{current}, " Amps\n"
+		if defined($status{current});
+	    for my $outlet (1..24) {
 		my $ostr = "outlet$outlet";
 		print "$ctrl Outlet $outlet: ", $status{$ostr}, "\n"
 		    if (defined($status{$ostr}));
@@ -456,7 +528,7 @@ sub dostatus(@) {
 		}
 		printf "$ctrl Temperature: %.1f F\n", $temp;
 	    }
-	    for my $outlet (1..20) {
+	    for my $outlet (1..24) {
 		my $ostr = "outlet$outlet";
 		print "$ctrl Outlet $outlet: ", $status{$ostr}, "\n"
 		    if (defined($status{$ostr}));
@@ -469,4 +541,108 @@ sub dostatus(@) {
 	}
     }
     return $errors;
+}
+
+#
+# Do a normal wakeonlan after power cycle. This is for laptops that do
+# come back on (no bios setting to control it either).
+#
+sub dowol(@)
+{
+    my (@nodeids) = @_;
+    my %macs      = ();
+
+    # XXX Must know the outgoing interface. Using the whol flag. Ick.
+    my $query_result =
+	DBQueryFatal("select iface from interfaces ".
+		     "where node_id='boss' and whol=1");
+    if ($query_result->numrows != 1) {
+	warn "WOL: Could not get outgoing interface for boss node.\n";
+	return -1;
+    }
+    my ($iface) = $query_result->fetchrow_array();
+
+    #
+    # Grab the MACs for all of the nodes.
+    #
+    foreach my $nodeid (@nodeids) {
+	$query_result =
+	    DBQueryFatal("select mac from interfaces  ".
+			 "where node_id='$nodeid' and ".
+			 "      role='" . TBDB_IFACEROLE_CONTROL() . "'");
+
+	if ($query_result->numrows != 1) {
+	    warn "WOL: Could not get control interface MAC for $nodeid.\n";
+	    next;
+	}
+	my ($mac) = $query_result->fetchrow_array();
+	$macs{$nodeid} = $mac;
+    }
+    @nodeids = keys(%macs);
+
+    print "Doing a plain WOL to @nodeids via interface $iface\n";
+
+    #
+    # This is going to take an arbitrary length of time; we have no idea
+    # how long it takes for the node to initialize itself and get to a
+    # point where a wakeonlan packet will do something. So, we use state
+    # waiting to find out when it hits pxeboot. Keep sending wol packets
+    # until we get there.
+    #
+    my @states = (TBDB_NODESTATE_PXEBOOTING);
+    if (initStateWait(\@states, @nodeids) != 0) {
+	print "WOL: Could not initialize state waiting!\n";
+	return -1;
+    }
+
+    # We have to wait at least a few seconds for the node to transition from
+    # off to its sleep mode.
+    sleep(15);
+
+    #
+    # Loop no more then 15 times (at 10 seconds per loop).
+    #
+    my $maxloops = 15;
+
+    while (keys(%macs) && $maxloops > 0) {
+	foreach my $nodeid (keys(%macs)) {
+	    my $mac = $macs{$nodeid};
+	    
+	    # Do this a few times since the packet could get lost and
+	    # it seems to take a couple of packets to kick it.
+	    for (my $i = 0; $i < 5; $i++) {
+		system("$WOL $iface $mac");
+		select(undef, undef, undef, 0.1);
+	    }
+	}
+	my @done = ();
+	my @fail = ();
+	
+	if (waitForState(\@done, \@fail, 10) != 0) {
+	    print "WOL: waitForState returned non zero!\n";
+	    endStateWait();
+	    return -1;
+	}
+	if (@fail) {
+	    print "WOL: waitForState failed on @fail!\n";
+	    foreach my $failed (@fail) {
+		delete($macs{$failed});
+	    }
+	}
+	foreach my $nodeid (@done) {
+	    print "$nodeid is alive after wakeonlan.\n";
+	    delete($macs{$nodeid});
+	}
+
+	@nodeids = keys(%macs);
+	print "Sending more wol packets to @nodeids ...\n"
+	    if (@nodeids);
+	$maxloops--;
+    }
+    endStateWait();
+    if (@nodeids) {
+	print "WOL: @nodeids did not power on after many wakeonlan packets!\n";
+	return -1;
+    }
+    return 0;
 }

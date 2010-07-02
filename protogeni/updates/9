@@ -1,0 +1,51 @@
+#
+# Beef up the geni_resources table for use in cooked mode.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    DBQueryFatal("alter table geni_slivers change `status` ".
+		 "`status` varchar(16) NOT NULL default 'created'");
+    
+    DBQueryFatal("alter table geni_aggregates change `status` ".
+		 "`status` varchar(16) NOT NULL default 'created'");
+
+    if (!DBSlotExists("geni_aggregates", "state")) {
+	DBQueryFatal("alter table geni_aggregates add ".
+		     "`state` varchar(16) NOT NULL default 'stopped' ".
+		     "after status");
+    }
+    if (!DBSlotExists("geni_slivers", "state")) {
+	DBQueryFatal("alter table geni_slivers add ".
+		     "`state` varchar(16) NOT NULL default 'stopped' ".
+		     "after status");
+    }
+    if (!DBSlotExists("geni_slivers", "resource_id")) {
+	DBQueryFatal("alter table geni_slivers add ".
+		     "`resource_id` varchar(64) NOT NULL default '' ".
+		     "after resource_type");
+    }
+    if (!DBTableExists("client_slivers")) {
+	DBQueryFatal("CREATE TABLE `client_slivers` ( ".
+	     " `idx` mediumint(8) unsigned NOT NULL default '0', ".
+	     " `urn` varchar(256) NOT NULL default '', ".
+	     " `slice_idx` mediumint(8) unsigned NOT NULL default '0',".
+	     " `manager_urn` varchar(256) NOT NULL default '', ".
+	     " `creator_idx` mediumint(8) unsigned NOT NULL default '0',".
+	     " `created` datetime default NULL, ".
+	     " `expires` datetime default NULL, ".
+	     " `locked` datetime default NULL, ".
+	     " `manifest` text, ".
+	     " PRIMARY KEY  (`idx`), ".
+	     " INDEX `slice_uuid` (`slice_idx`) ".
+	     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    return 0;
+}
+1;

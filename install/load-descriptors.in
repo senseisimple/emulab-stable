@@ -1,0 +1,301 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use strict;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Load in descriptors for images and osids. The input to this script is
+# a file created with the dump-descriptors script in this directory,
+#
+sub usage()
+{
+    print STDOUT "Usage: load-descriptors [-f] filename\n";
+    exit(-1);
+}
+my $optlist = "df";
+my $force   = 0;
+my $debug   = 0;
+
+#
+# These are the OSIDs that are used to populate the osidtoimageid table
+# using their nextosid entries.
+#
+my @standard_osnames  = ('RHL-STD', 'FBSD-STD');
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $NEWOSID     = "$TB/bin/newosid";
+my $NEWIMAGE    = "$TB/bin/newimageid";
+my $NEWIMAGE_EZ = "$TB/bin/newimageid_ez";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+
+#$libdb::DBQUERY_DEBUG = 1;
+
+# Local
+my %osidtoimageid  = ();
+my %local_osids    = ();
+my %local_imageids = ();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub ParseIt($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+usage()
+    if (@ARGV != 1);
+my $filename = $ARGV[0];
+
+#
+#
+#
+my $protouser = User->Lookup("elabman");
+if (!defined($protouser)) {
+    fatal("Could not look up object for protouser (elabman)");
+}
+my $PROTOPROJ = TBOPSPID();
+my %mappings  = ();
+my %images    = ();
+my %osinfos   = ();
+
+#
+# Open tempfile.
+#
+open(OUTPUT, "$filename") or
+    die("Could not open $filename for reading!\n");
+
+my $which = "";
+my $tmp   = "";
+
+while (<OUTPUT>) {
+    next
+	if ($_ =~ /descriptors\>/);
+	
+    if ($_ =~ /\<mapping/) {
+	$which = "mapping";
+    }
+    elsif ($_ =~ /\<osid\>/) {
+	$which = "osid";
+    }
+    elsif ($_ =~ /\<image\>/) {
+	$which = "image";
+    }
+    if ($_ =~ /\<\/mapping\>/) {
+	my $mapping = ParseIt($tmp . $_);
+	$mappings{$mapping->{'name'}} = $mapping->{'value'};
+	$tmp = "";
+	next;
+    }
+    elsif ($_ =~ /\<\/osid\>/) {
+	my $osinfo = ParseIt($tmp . $_);
+	$osinfos{$osinfo->{'attribute'}->{"osname"}->{'value'}} =
+	    [$osinfo, $tmp . $_];
+	$tmp = "";
+	next;
+    }
+    elsif ($_ =~ /\<\/image\>/) {
+	my $image = ParseIt($tmp . $_);
+	$images{$image->{'attribute'}->{"imagename"}->{'value'}} =
+	    [$image, $tmp . $_];
+	$tmp = "";
+	next;
+    }
+    $tmp .= $_;
+}
+close(OUTPUT);
+
+#
+# Prepass to make sure the XML files verify.
+#
+foreach my $osname (keys(%osinfos)) {
+    my ($xmlparse, $string) = @{ $osinfos{$osname} };
+
+    open(NEW, "| $NEWOSID -v -")
+	or fatal("Cannot start $NEWOSID");
+    print NEW $string;
+    close(NEW)
+	or fatal("OS $osname does not verify");
+}
+foreach my $imagename (keys(%images)) {
+    my ($xmlparse, $string) = @{ $images{$imagename} };
+    my $ezid  = exists($xmlparse->{'attribute'}->{"OS"});
+    my $which = ($ezid ? $NEWIMAGE_EZ : $NEWIMAGE);
+
+    open(NEW, "| $which -v -f -")
+	or fatal("Cannot start $which");
+    print NEW $string;
+    close(NEW)
+	or fatal("Image $imagename does not verify");
+}
+
+#
+# Must create the OSids first since the images reference them.
+#
+foreach my $osname (keys(%osinfos)) {
+    my ($xmlparse, $string) = @{ $osinfos{$osname} };
+
+    my $osinfo = OSinfo->Lookup("$PROTOPROJ,$osname");
+    if (defined($osinfo) && !$force) {
+	print STDERR "OS $osname already exists. Skipping; use -f option\n";
+	next;
+    }
+    open(NEW, "| $NEWOSID -")
+	or fatal("Cannot start $NEWOSID");
+    print NEW $string;
+    if (!close(NEW)) {
+	print STDERR "$string\n";
+	fatal("$osname could not be created");
+    }
+}
+
+#
+# Two passes. First do the ezid images, then the other. This is cause
+# multiple images can reference the OSids created with an EZid.
+#
+foreach my $imagename (keys(%images)) {
+    my ($xmlparse, $string) = @{ $images{$imagename} };
+    my $ezid  = exists($xmlparse->{'attribute'}->{"OS"});
+    my $which = ($ezid ? $NEWIMAGE_EZ : $NEWIMAGE);
+
+    next
+	if (! $ezid);
+
+    my $image = Image->Lookup("$PROTOPROJ,$imagename");
+    if (defined($image) && !$force) {
+	print STDERR
+	    "Image $imagename already exists. Skipping; use -f option\n";
+	next;
+    }
+    open(NEW, "| $which -f -")
+	or fatal("Cannot start $which");
+    print NEW $string;
+    if (!close(NEW)) {
+	print STDERR "$string\n";
+	fatal("Image $imagename could not be created");
+    }
+}
+foreach my $imagename (keys(%images)) {
+    my ($xmlparse, $string) = @{ $images{$imagename} };
+    my $ezid  = exists($xmlparse->{'attribute'}->{"OS"});
+    my $which = ($ezid ? $NEWIMAGE_EZ : $NEWIMAGE);
+
+    next
+	if ($ezid);
+
+    my $image = Image->Lookup("$PROTOPROJ,$imagename");
+    if (defined($image) && !$force) {
+	print STDERR
+	    "Image $imagename already exists. Skipping; use -f option\n";
+	next;
+    }
+    open(NEW, "| $which -f -")
+	or fatal("Cannot start $which");
+    print NEW $string;
+    if (!close(NEW)) {
+	print STDERR "$string\n";
+	fatal("Image $imagename could not be created");
+    }
+}
+#
+# Now do the nextosid mappings.
+#
+foreach my $osid (keys(%mappings)) {
+    my $nextosid   = $mappings{$osid};
+    my $osinfo     = OSinfo->Lookup("$PROTOPROJ,$osid");
+    my $nextosinfo = OSinfo->Lookup("$PROTOPROJ,$nextosid");
+
+    if (!defined($osinfo)) {
+	fatal("Could not find osid $osid");
+    }
+    if (!defined($nextosinfo)) {
+	fatal("Could not find nextosid $nextosid");
+    }
+    if (defined($osinfo->nextosid()) &&
+	$osinfo->nextosid() != $nextosinfo->osid()) {
+	my $current;
+
+	if ($osinfo->nextosid()) {
+	    $current = OSinfo->Lookup($osinfo->nextosid());
+	}
+	else {
+	    # So bogus.
+	    $current = "osid_map";
+	}
+	print STDERR "nextosid for $osinfo wants to be $nextosinfo, ".
+	    "but its already set to $current. Skipping ...\n";
+	next;
+    }
+    print "Setting nextosid for $osinfo to $nextosinfo\n";
+    if ($osinfo->SetNextOS($nextosinfo)) {
+	fatal("Could not set nextosid for $osinfo to $nextosinfo");
+    }
+}
+
+exit(0);
+
+sub ParseIt($)
+{
+    my ($string) = @_;
+
+    my $xmlparse = eval { XMLin($string,
+				VarAttr => 'name',
+				ContentKey => '-content',
+				SuppressEmpty => undef); };
+    fatal($@)
+	if ($@);
+    
+    return $xmlparse;
+}
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+
+

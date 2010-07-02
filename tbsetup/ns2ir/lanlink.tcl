@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -65,6 +65,7 @@ Queue instproc init {link type node} {
     $self set trace_expr {}
     $self set trace_snaplen 0
     $self set trace_endnode 0
+    $self set trace_mysql 0
 
     #
     # These are NS variables for queues (with NS defaults).
@@ -207,11 +208,15 @@ LanLink instproc init {s nodes bw d type} {
     # assignment.
     $self set mustdelay 0
 
-    # Allow user to turn on veth devices on emulated links.
-    $self set useveth 0
+    # Allow user to specify encapsulation on emulated links.
+    $self set encap "default"
 
     # XXX Allow user to set the accesspoint.
     $self set accesspoint {}
+
+    # Optional layer and implemented-by relationship
+    $self set layer {}
+    $self set implemented_by {}
 
     # A simulated lanlink unless we find otherwise
     $self set simulated 1
@@ -255,15 +260,23 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar rbandwidth
     $self instvar ebandwidth
     $self instvar rebandwidth
+    $self instvar backfill
+    $self instvar rbackfill
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
     $self instvar rloss
     $self instvar cost
     $self instvar linkq
+    $self instvar fixed_iface
 
     $self instvar iscloud
     $self set iscloud 0
+
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    #$self instvar oflistener   # this is not needed
+    $self set ofenabled 0
 
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
@@ -272,17 +285,30 @@ LanLink instproc init {s nodes bw d type} {
 	# Note - we don't set defaults for ebandwidth and rebandwidth - lack
 	# of an entry for a nodepair indicates that they should be left NULL
 	# in the output.
+	set backfill($nodepair) 0
+	set rbackfill($nodepair) 0
 	set delay($nodepair) [expr $d / 2.0]
 	set rdelay($nodepair) [expr $d / 2.0]
 	set loss($nodepair) 0
 	set rloss($nodepair) 0
 	set cost($nodepair) 1
+	set fixed_iface($nodepair) 0
 	lappend nodelist $nodepair
 
 	set lq q[incr new_counter]
 	Queue lq$lq $self $type $node
 	set linkq($nodepair) lq$lq
     }
+}
+
+#
+# Enable Openflow on lan/link and set controller
+#
+LanLink instproc enable_openflow {ofcontrollerstr} {
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    set ofenabled 1
+    set ofcontroller $ofcontrollerstr
 }
 
 #
@@ -314,6 +340,37 @@ Link instproc trace {{ttype "header"} {texpr ""}} {
     $fromqueue trace $ttype $texpr
 }
 
+#
+# A link can be implemented in terms of a path or
+# a link at a lower level of the stack.
+#
+Link instproc implemented_by {impl} {
+    $self instvar implemented_by
+    $self instvar layer
+    
+    if {[$impl info class] == "Path"} {
+	set implemented_by $impl
+    } elseif {[$impl info class] == "Link"} {
+	if {$layer == {}} {
+	    perror "\[$self implemented_by] no layer set!"
+	    return
+	}
+	set impl_layer [$impl set layer]
+	if {$impl_layer == {}} {
+	    perror "\[$self implemented_by] no layer set in $impl!"
+	    return
+	}
+	if {$impl_layer >= $layer} {
+	    perror "\[$self implemented_by] $impl is not at a lower layer!"
+	    return
+	}
+	set implemented_by $impl
+    } else {
+        perror "\[$self implemented_by] must be a link or a path!"
+        return
+    }
+}
+
 Lan instproc trace_snaplen {len} {
     $self instvar nodelist
     $self instvar linkq
@@ -330,6 +387,35 @@ Link instproc trace_snaplen {len} {
     
     $toqueue set trace_snaplen $len
     $fromqueue set trace_snaplen $len
+}
+
+Lan instproc trace_mysql {onoff} {
+    var_import ::GLOBALS::dpdb
+    $self instvar nodelist
+    $self instvar linkq
+
+    foreach nodeport $nodelist {
+	set linkqueue $linkq($nodeport)
+	$linkqueue set trace_mysql $onoff
+    }
+
+    if {$onoff} {
+	set dpdb 1
+    }
+}
+
+Link instproc trace_mysql {onoff} {
+    var_import ::GLOBALS::dpdb
+
+    $self instvar toqueue
+    $self instvar fromqueue
+    
+    $toqueue set trace_mysql $onoff
+    $fromqueue set trace_mysql $onoff
+
+    if {$onoff} {
+	set dpdb 1
+    }
 }
 
 Lan instproc trace_endnode {onoff} {
@@ -397,10 +483,14 @@ LanLink instproc fill_ips {} {
 	}
     }
     if {$isremote && [$self info class] != "Link"} {
-	perror "Not allowed to use a remote node in lan $self!"
+        puts stderr "Warning: Remote nodes used in LAN $self - no IPs assigned"
+	#perror "Not allowed to use a remote node in lan $self!"
 	return
     }
-    set widearea $isremote
+    if {$isremote} {
+	# A boolean ... not a count.
+	set widearea 1
+    }
 
     # See parse-ns if you change this! 
     if {$isremote && ($netmask != "255.255.255.248")} {
@@ -615,6 +705,38 @@ LanLink instproc rename_queue {old new} {
     }
 }
 
+LanLink instproc set_fixed_iface {node iface} {
+    $self instvar nodelist
+    $self instvar fixed_iface
+
+    # find this node
+    set found 0
+    foreach nodeport $nodelist {
+	if {$node == [lindex $nodeport 0]} {
+	    set fixed_iface($nodeport) $iface
+	    set found 1
+	    break
+	}
+    }
+
+    if {!$found} {
+	perror "\[set_fixed_iface] $node is not the specified link/lan!"
+    }
+}
+
+# Check the IP address against its mask and ensure that the host
+# portion of the IP address is not all '0's (reserved) or all '1's
+# (broadcast).
+LanLink instproc check-ip-mask {ip mask} {
+    set ipint [inet_atohl $ip]
+    set maskint [inet_atohl $mask]
+    set maskinverse [expr (~ $maskint)]
+    set remainder [expr ($ipint & $maskinverse)]
+    if {$remainder == 0 || $remainder == $maskinverse} {
+	perror "\[check-ip-mask] IP address $ip with netmask $mask has either all '0's (reserved) or all '1's (broadcast) in the host portion of the address."
+    }
+}
+
 Link instproc updatedb {DB} {
     $self instvar toqueue
     $self instvar fromqueue
@@ -627,6 +749,8 @@ Link instproc updatedb {DB} {
     $self instvar rbandwidth
     $self instvar ebandwidth
     $self instvar rebandwidth
+    $self instvar backfill
+    $self instvar rbackfill
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -636,16 +760,16 @@ Link instproc updatedb {DB} {
     $self instvar uselinkdelay
     $self instvar emulated
     $self instvar nobwshaping
-    $self instvar useveth
+    $self instvar encap
     $self instvar sim
     $self instvar netmask
     $self instvar protocol
     $self instvar mustdelay
-
-    if {$protocol != "ethernet"} {
-	perror "Link must be an ethernet only, not a $protocol"
-	return
-    }
+    $self instvar fixed_iface
+    $self instvar layer
+    $self instvar implemented_by
+    $self instvar ofenabled
+    $self instvar ofcontroller
 
     $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
 
@@ -700,9 +824,11 @@ Link instproc updatedb {DB} {
 	set port [lindex $nodeport 1]
 	set ip [$node ip $port]
 
+	$self check-ip-mask $ip $netmask
+
 	set nodeportraw [join $nodeport ":"]
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "vnode" "vport" "ip" "mustdelay"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "backfill" "rbackfill" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "vnode" "vport" "ip" "mustdelay"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -722,9 +848,27 @@ Link instproc updatedb {DB} {
  	    lappend fields "trace_expr"
  	    lappend fields "trace_snaplen"
  	    lappend fields "trace_endnode"
+ 	    lappend fields "trace_db"
 	}
 
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $node $port $ip $mustdelay]
+	# fixing ifaces
+	if {$fixed_iface($nodeport) != 0} {
+	    lappend fields "fixed_iface"
+	}
+
+	# Set the layer
+	if { $layer != {} } {
+	    lappend fields "layer"
+	}
+	if { $implemented_by != {} } {
+	    if {[$implemented_by info class] == "Path"} {
+		lappend fields "implemented_by_path"
+	    } else {
+		lappend fields "implemented_by_link"
+	    }
+	}
+
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $backfill($nodeport) $rbackfill($nodeport)  $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)
@@ -741,6 +885,35 @@ Link instproc updatedb {DB} {
 	    lappend values [$linkqueue set trace_expr]
 	    lappend values [$linkqueue set trace_snaplen]
 	    lappend values [$linkqueue set trace_endnode]
+	    lappend values [$linkqueue set trace_mysql]
+	}
+
+	# fixing ifaces
+	if {$fixed_iface($nodeport) != 0} {
+	    lappend values $fixed_iface($nodeport)
+	}
+	# Set the layer
+	if { $layer != {} } {
+	    lappend values $layer
+	}
+	if { $implemented_by != {} } {
+	    lappend values $implemented_by
+	}
+	
+	# openflow
+	#
+	# table: virt_lans
+	# columns: ofenabled = 0/1
+	#          ofcontroller = ""/"controller connection string"
+	#
+	lappend fields "ofenabled"
+	lappend fields "ofcontroller"
+	
+	lappend values $ofenabled
+	if {$ofenabled == 1} {
+	    lappend values $ofcontroller
+	} else {
+	    lappend values ""
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values
@@ -759,6 +932,8 @@ Lan instproc updatedb {DB} {
     $self instvar rbandwidth
     $self instvar ebandwidth
     $self instvar rebandwidth
+    $self instvar backfill
+    $self instvar rbackfill
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -768,7 +943,7 @@ Lan instproc updatedb {DB} {
     $self instvar uselinkdelay
     $self instvar emulated
     $self instvar nobwshaping
-    $self instvar useveth
+    $self instvar encap
     $self instvar sim
     $self instvar netmask
     $self instvar protocol
@@ -776,6 +951,9 @@ Lan instproc updatedb {DB} {
     $self instvar settings
     $self instvar member_settings
     $self instvar mustdelay
+    $self instvar fixed_iface
+    $self instvar ofenabled
+    $self instvar ofcontroller
 
     if {$modelnet_cores > 0 || $modelnet_edges > 0} {
 	perror "Lans are not allowed when using modelnet; just duplex links."
@@ -842,6 +1020,8 @@ Lan instproc updatedb {DB} {
 	set port [lindex $nodeport 1]
 	set ip [$node ip $port]
 
+	$self check-ip-mask $ip $netmask
+
 	set nodeportraw [join $nodeport ":"]
 
 	set is_accesspoint 0
@@ -849,7 +1029,7 @@ Lan instproc updatedb {DB} {
 	    set is_accesspoint 1
 	}
 
-	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint" "vnode" "vport" "ip" "mustdelay"]
+	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "backfill" "rbackfill" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "encap_style" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint" "vnode" "vport" "ip" "mustdelay"]
 
 	# Treat estimated bandwidths differently - leave them out of the lists
 	# unless the user gave a value - this way, they get the defaults if not
@@ -869,9 +1049,15 @@ Lan instproc updatedb {DB} {
  	    lappend fields "trace_expr"
  	    lappend fields "trace_snaplen"
  	    lappend fields "trace_endnode"
+ 	    lappend fields "trace_db"
 	}
-	
-	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
+
+	# fixing ifaces
+        if {$fixed_iface($nodeport) != 0} {
+            lappend fields "fixed_iface"
+        }
+
+	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $backfill($nodeport) $rbackfill($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
 	    lappend values $ebandwidth($nodeport)
@@ -888,6 +1074,28 @@ Lan instproc updatedb {DB} {
 	    lappend values [$linkqueue set trace_expr]
 	    lappend values [$linkqueue set trace_snaplen]
 	    lappend values [$linkqueue set trace_endnode]
+	    lappend values [$linkqueue set trace_mysql]
+	}
+
+	# fixing ifaces
+        if {$fixed_iface($nodeport) != 0} {
+            lappend values $fixed_iface($nodeport)
+        }
+
+	# openflow
+	#
+	# table: virt_lans
+	# columns: ofenabled = 0/1
+	#          ofcontroller = ""/"controller connection string"
+	#
+	lappend fields "ofenabled"
+	lappend fields "ofcontroller"
+	
+	lappend values $ofenabled
+	if {$ofenabled == 1} {
+	    lappend values $ofcontroller
+	} else {
+	    lappend values ""
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values

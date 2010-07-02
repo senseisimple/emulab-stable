@@ -22,7 +22,7 @@ init: init.c pathnames.h
 install:
 
 client-install: client
-	install -s -o root -g wheel -m 500 -fschg -b -B.bak init /sbin/init
+	install -s -o root -g wheel -m 500 -fschg -b -B.bak init $(DESTDIR)/sbin/init
 
 clean:	
 	rm -f *.o core init

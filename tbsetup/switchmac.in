@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -30,7 +30,9 @@ use snmpit_lib;
 use snmpit_cisco;
 use snmpit_foundry;
 use snmpit_nortel;
+use snmpit_hp;
 use SNMP;
+use Getopt::Long;
 
 use strict;
 
@@ -57,14 +59,26 @@ if (!TBAdmin($>)) {
     die "Sorry, only admins can use this script\n";
 }
 
-if (@ARGV) {
-    die "usage: $0\n";
+my (@test_switches, @control_switches);
+my $debug = 0;
+my %opt = ("v+" => \$debug,
+	   "E=s" => \@test_switches,
+	   "C=s" => \@control_switches);
+GetOptions(%opt);
+
+sub DEBUG {
+    if ($debug) {
+	print STDERR @_;
+    }
 }
 
 #
 # ElabinElab is special; Ask outer boss for the info.
 #
 if ($ELABINELAB) {
+    if ($debug) {
+        DEBUG "ELABINELAB mode\n";
+    }
     libxmlrpc::Config({"server"  => $RPCSERVER,
 		       "verbose" => 0,
 		       "cert"    => $RPCCERT,
@@ -96,15 +110,27 @@ if ($ELABINELAB) {
 &SNMP::initMib();
 
 #
-# Yeah, it's slow, but we want to use all the test switches so that we don't
-# have to worry about missing something, and don't have to get the user to
-# guess which switch they're using
+# If explicit switches were listed, we use them as listed in the roles
+# specified with no checking.  The caller had better know what they are
+# doing!
 #
-my @test_switches = map {[$_,"experimental"]} getTestSwitches();
-
-if (!@test_switches) {
-    die "No experimental switches found - make sure they're in the nodes ".
-	"table!\n";
+if (@test_switches > 0) {
+    if ($test_switches[0] eq "none") {
+	@test_switches = ();
+    } else {
+	@test_switches = map {[$_,"experimental"]} @test_switches;
+    }
+} else {
+    #
+    # Yeah, it's slow, but we want to use all the test switches so that we don't
+    # have to worry about missing something, and don't have to get the user to
+    # guess which switch they're using
+    #
+    @test_switches = map {[$_,"experimental"]} getTestSwitches();
+    if (!@test_switches) {
+	die "Error: No experimental net switches found in database - you need\n" .
+	    "to add them before running this script\n";
+    }
 }
 
 #
@@ -112,24 +138,32 @@ if (!@test_switches) {
 #
 my %trunks = getTrunkHash();
 
-my @control_switches = map {[$_,"control"]} getControlSwitches();
-if (!@control_switches) {
-    warn "Warning - No control switches found - you probably want to add them " .
-	"to the nodes table\n";
+if (@control_switches > 0) {
+    if ($control_switches[0] eq "none") {
+	@control_switches = ();
+    } else {
+	@control_switches = map {[$_,"control"]} @control_switches;
+    }
+} else {
+    @control_switches = map {[$_,"control"]} getControlSwitches();
+    if (!@control_switches) {
+	warn "Warning - No control switches found - you probably want to add them " .
+	    "to the nodes table\n";
+    }
 }
 
 my @switches = (@test_switches, @control_switches);
 
-my $debug = 0;
-
-sub DEBUG {
-    if ($debug) {
-	print @_;
+if ($debug) {
+    DEBUG "switches in database:\n";
+    foreach my $switch (@switches) {
+        my ($name, $type) = @$switch;
+        DEBUG "  $name ($type)\n";
     }
 }
 
 #
-# Loop through each switch indvidually
+# Loop through each switch individually
 #
 SWITCHLOOP:
 foreach my $switchref (@switches) {
@@ -144,14 +178,20 @@ foreach my $switchref (@switches) {
     #
     my $type = getDeviceType($switch);
     my ($snmpversion, $useindexing, $switchtype);
+    my $cisco_29xx = 0;
 SWITCH:
     for ($type) {
-	(/^cisco/ || /^catalyst/) && do { $snmpversion = "2c"; $useindexing = 1;
-	    $switchtype = "cisco"; last;};
+	(/^cisco/ || /^catalyst/) && do {
+            $snmpversion = "2c"; $useindexing = 1; $switchtype = "cisco";
+            if ($type =~ /29\d\d/) { DEBUG "Cisco 29xx\n"; $cisco_29xx = 1; }
+            last;
+        };
 	(/^intel/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "intel"; last;};
 	(/^nortel/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "nortel"; last;};
+	(/^hp/) && do { $snmpversion = "1"; $useindexing = 0;
+	    $switchtype = "hp"; last;};
 	(/^foundry/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "foundry"; last;};
 
@@ -195,6 +235,12 @@ SWITCH:
 	@vlanList = ([0,0,[]]);
 	if ($switchtype eq "foundry") {
 	    $device = new snmpit_foundry($switch,$debug,$community);
+	}
+	if ($switchtype eq "nortel") {
+	    $device = new snmpit_nortel($switch,$debug,$community);
+	}
+	if ($switchtype eq "hp") {
+	    $device = new snmpit_hp($switch,$debug,$community);
 	}
     }
 
@@ -334,7 +380,17 @@ SWITCH:
 	    #
 	    foreach my $index (keys %bridgeports) {
 		my $bridgeport = $bridgeports{$index};
-		my $ifIndex = $ifIndexMap{$bridgeport};
+                
+                #
+                # Funny special case for cisco 29xx series - it doesn't need
+                # to go throug the map!
+                #
+		my $ifIndex;
+                if ($cisco_29xx) {
+                    $ifIndex = $bridgeport;
+                } else {
+                    $ifIndex = $ifIndexMap{$bridgeport};
+                }
 		if (!$ifIndex) {
 			DEBUG "ifIndex conversion failed for $bridgeport!\n";
 			next;
@@ -347,7 +403,7 @@ SWITCH:
 		#
 		my $modport;
 		if (($switchtype eq "cisco") || ($switchtype eq "foundry") ||
-		    ($switchtype eq "nortel")) {
+		    ($switchtype eq "hp") || ($switchtype eq "nortel")) {
 		    ($modport) = $device->convertPortFormat(2, $ifIndex);
 		} else {
 		    $modport = "1.$ifIndex";
@@ -374,20 +430,29 @@ SWITCH:
 	    # off-switch (eg. a trunk port)
 	    #
 	    DEBUG "printing for index $index\n";
-	    next unless ($status{$index} && ($status{$index} eq "learned" || 
-		$status{$index} eq "3"));
+	    if (!($status{$index} && ($status{$index} eq "learned" || 
+		$status{$index} eq "3"))) {
+                DEBUG "   Skipping MAC that wasn't learned\n";
+                next;
+            }
 	    #
 	    # As far as I can tell, this is a bug with (at least some versions
 	    # of) CatOS - we sometimes get back MACs that are not even in
 	    # this vlan, and those end up with an empty $realport
 	    #
-	    next if ((!$realports{$index}) ||
-		     ($realports{$index} =~ /ifIndex/));
+	    if ((!$realports{$index}) || ($realports{$index} =~ /ifIndex/)) {
+                DEBUG "   Skipping MAC with bad realport ($realports{$index})\n";
+                next;
+            }
+
             #
             # Skip ports that belong to known trunks - we only want to learn
             # about nodes that are directly connected to each switch
             #
-            next if ($trunks{$realports{$index}});
+            if ($trunks{$realports{$index}}) {
+                DEBUG "   Skipping MAC on a trunk\n";
+                next;
+            }
 
 	    print "$MACs{$index},$realports{$index},$vlan_number,". 
 		"$interfaces{$index},$class_str\n";

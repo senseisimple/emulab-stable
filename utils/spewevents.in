@@ -1,0 +1,180 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Fcntl;
+use IO::Handle;
+use strict;
+
+#
+# Spew event stream for an experiment.
+#
+sub usage()
+{
+    print STDOUT "Usage: spewevents <pid> <eid>\n";
+    exit(-1);
+}
+my $optlist = "w";
+my $fromweb = 0;
+  
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use event;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+# Protos
+sub callbackFunc($$$);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"w"})) {
+    $fromweb = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** Bad data in pid: $pid\n");
+}	
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** Bad data in eid: $eid\n");
+}
+
+#
+# Verify that this person is allowed to do this. 
+#
+if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_READINFO)) {
+    die("*** $0:\n".
+	"    You do not have permission to view events for $pid/$eid!\n");
+}
+
+# Obvious.
+STDOUT->autoflush(1);
+
+if (! EventRegister()) {
+    die("*** $0:\n".
+	"    Unable to register with event system\n");
+}
+my $handle = $event::EventSendHandle;
+
+my $tuple  = address_tuple_alloc();
+if (! $tuple) {
+    die("*** $0:\n".
+	"    Could not allocate an address tuple\n");
+}
+
+# All events for this experiment, sans scheduler events.
+%$tuple = (expt => "$pid/$eid");
+
+if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
+    die("*** $0:\n".
+	"    Could not subscribe to event\n");
+}
+
+#
+# Icky. Send out some stuff at the beginning to make the browser do
+# something. This terrible, but not sure what else to do.
+#
+if ($fromweb) {
+    for (my $i = 0; $i <= 1024; $i++) {
+	print " ";
+    }
+    print "\n";
+}
+
+#
+# Loop.
+#
+my $lastevent_time = time();
+
+while (1) {
+    # Quit when the experiment is no longer active.
+    last
+	if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE());
+
+    # Quit if no events for a long time.
+    if (time() - $lastevent_time > 900) {
+	syswrite(STDOUT, "No events for a long time; stopping ...\n");
+	last;
+    }
+    
+    event_poll_blocking($handle, 2000);
+}
+exit(0);
+
+sub callbackFunc($$$) {
+    my ($handle, $notification, $data) = @_;
+
+    my $time      = time();
+    my $site      = event_notification_get_site($handle, $notification);
+    my $expt      = event_notification_get_expt($handle, $notification);
+    my $group     = event_notification_get_group($handle, $notification);
+    my $host      = event_notification_get_host($handle, $notification);
+    my $objtype   = event_notification_get_objtype($handle, $notification);
+    my $objname   = event_notification_get_objname($handle, $notification);
+    my $eventtype = event_notification_get_eventtype($handle, $notification);
+    my $arguments = event_notification_get_arguments($handle, $notification);
+
+    my $string = 
+	sprintf("%-12s %-10s %-15s %-12s %-15s %-15s",
+		"$time", "$group", "$host", "$objtype",
+		"$objname", "$eventtype");
+
+    if (defined($arguments)) {
+	# Trim extra whitespace.
+	$arguments =~ s/^\s+//;
+	$arguments =~ s/\s+$//;	
+
+	$string .= "  $arguments";
+    }
+    $string .= "\n";
+
+    my $rval = syswrite(STDOUT, $string);
+
+    # If the web page stops this is only way to catch it and exit.
+    # Hence, the use of syswrite so we can get status back.
+    exit(0)
+	if (!defined($rval));
+
+    $lastevent_time = time();
+}

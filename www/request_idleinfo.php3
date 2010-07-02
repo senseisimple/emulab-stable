@@ -1,11 +1,32 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
+
+#
+# Only known and logged in users.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Only admins can do this!
+#
+if (!$isadmin) {
+    USERERROR("Only TB admins can do this!", 1);
+}
+
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("experiment", PAGEARG_EXPERIMENT);
+$optargs = OptionalPageArguments("message",    PAGEARG_ANYTHING,
+				 "canceled",   PAGEARG_STRING,
+				 "confirmed",  PAGEARG_STRING);
 
 #
 # Standard Testbed Header
@@ -13,37 +34,20 @@ include("showstuff.php3");
 PAGEHEADER("Request info about possibly Idle experiment");
 
 #
-# Only known and logged in users can end experiments.
+# Need these below
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$pid = $experiment->pid();
+$eid = $experiment->eid();
+$pcs = $experiment->PCCount();
 
-#
-# Verify page arguments.
-# 
-if (!isset($pid) ||
-    strcmp($pid, "") == 0) {
-    USERERROR("You must provide a Project ID.", 1);
-}
+echo $experiment->PageHeader();
+echo "<br>";
 
-if (!isset($eid) ||
-    strcmp($eid, "") == 0) {
-    USERERROR("You must provide an Experiment ID.", 1);
-}
-
-#
-# Only admins can do this!
-#
-if (! ISADMIN($uid)) {
-    USERERROR("Only TB admins can do this!", 1);
-}
-
-#
-# Check to make sure this is a valid PID/EID tuple.
-#
-if (! TBValidExperiment($pid, $eid)) {
-    USERERROR("The experiment $eid is not a valid experiment ".
-	      "in project $pid.", 1);
+if (!$pcs) {
+    echo "<center><h3>Idle info request canceled because there are no PCs!</h3>
+          </center>\n";
+    PAGEFOOTER();
+    return;
 }
 
 #
@@ -52,51 +56,38 @@ if (! TBValidExperiment($pid, $eid)) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
-    echo "<center><h2>Idle info request canceled!</h2>
-          <br><br>
-          <a href='showexp.php3?pid=$pid&eid=$eid'>
-             Back to experiment $pid/$eid</a>
+if (isset($canceled) && $canceled) {
+    echo "<center><h3>Idle info request canceled!</h3>
           </center>\n";
     PAGEFOOTER();
     return;
 }
 
-#
-# See how many PCs the experiment is holding.
-# 
-$query_result =
-    DBQueryFatal("select count(*) as count from reserved as r ".
-		 "left join nodes as n on r.node_id=n.node_id ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "where nt.class='pc' and pid='$pid' and eid='$eid'");
-
-if (!mysql_num_rows($query_result)) {
-    echo "<center><h2>Idle info request canceled cause there are no PCs!</h2>
-          <br><br>
-          <a href='showexp.php3?pid=$pid&eid=$eid'>
-             Back to experiment $pid/$eid</a>
-          </center>\n";
-    PAGEFOOTER();
-    return;
-}
-$row = mysql_fetch_array($query_result);
-$pcs = $row["count"];
-
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<br><center><h3>
-          Are your <b>SURE</b> you want to send an Idle Info request
+          Are you <b>SURE</b> you want to send an Idle Info request
           email message to the swapper of $pid/$eid?
-          </h3></center>\n";
+          </h3>\n";
 
     #
     # Dump experiment record.
-    # 
-    SHOWEXP($pid, $eid);
-    
-    echo "<form action='request_idleinfo.php3?pid=$pid&eid=$eid' method=post>";
-    echo "<input type=submit name=confirmed value=Confirm>\n";
-    echo "<input type=submit name=canceled value=Cancel>\n";
+    #
+    $experiment->Show();
+
+    $url = CreateURL("request_idleinfo", $experiment);
+   
+    echo "<br>\n";
+    echo "<form action='$url' method=post>\n";
+    echo "<table align=center border=1>\n";
+    echo "  <tr><td><center>Additional message to user?</center></td></tr>
+	    <tr><td><textarea rows=2 cols=50 name=message></textarea>
+	      </td></tr>
+	    <tr><td><center>\n";
+    echo "    <input type=submit name=confirmed value=Confirm>\n";
+    echo "    &nbsp; &nbsp;\n";
+    echo "    <input type=submit name=canceled value=Cancel>\n";
+    echo "    </center></td></tr>\n";
+    echo "</table>\n";
     echo "</form>\n";
     echo "</center>\n";
 
@@ -105,46 +96,38 @@ if (!$confirmed) {
 }
 
 # Info about experiment.
-$query_result =
-    DBQueryFatal("select e.gid,e.expt_swap_uid as swapper, ".
-		 "       e.expt_head_uid as creator, ".
-		 "       UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped)".
-		 "   as swapseconds, r.pnodes ".
-		 " from experiments as e ".
-		 "left join experiment_stats as s on s.exptidx=e.idx ".
-		 "left join experiment_resources as r on ".
-		 "     s.rsrcidx=r.idx ".
-		 "where e.pid='$pid' and e.eid='$eid'");
-
-$row = mysql_fetch_array($query_result);
-$gid     = $row["gid"];
-$swapper = $row["swapper"];
-$creator = $row["creator"];
-$pcs     = $row["pnodes"];
-$seconds = $row["swapseconds"];
+$seconds = $experiment->SwapSeconds();
 $hours   = intval($seconds / 3600);
 
+if (! ($creator = $experiment->GetCreator())) {
+    TBERROR("Could not lookup object for experiment creator!", 1);
+}
+if (! ($swapper = $experiment->GetSwapper())) {
+    TBERROR("Could not lookup object for experiment swapper!", 1);
+}
+if (! ($group = $experiment->Group())) {
+    TBERROR("Could not lookup object for experiment group!", 1);
+}
+
 # Lots of email addresses!
-$allleaders    = TBLeaderMailList($pid, $gid);
-$swapper_name  = "";
-$swapper_email = "";
-TBUserInfo($swapper, $swapper_name, $swapper_email);
-$creator_name  = "";
-$creator_email = "";
-if ($swapper != $creator) {
-    TBUserInfo($creator, $creator_name, $creator_email);
+$allleaders    = $group->LeaderMailList();
+$swapper_name  = $swapper->name();
+$swapper_email = $swapper->email();
+$creator_name  = $creator->name();
+$creator_email = $creator->email();
+if (! $swapper->SameUser($creator)) {
     $allleaders .= ", \"$creator_name\" <$creator_email>";
 }
 
 # And send email
 TBMAIL("$swapper_name <$swapper_email>",
-       "Please tell us about your experiment",
+       "Experiment $pid/$eid - Please tell us about it",
        "Hi. We noticed that your experiment '$pid/$eid' has been\n".
        "swapped in for $hours hours and is using $pcs nodes.\n".
        "\n".
        "Such long running experiments are unusual so we want to make sure\n".
        "this experiment is still doing useful work.\n".
-       "\n".
+       (isset($message) && $message !== "" ? "\n$message\n\n" : "\n").
        "Please respond to this message letting us know; if we do not hear\n".
        "from you within a couple of hours, we will be forced to swap your\n".
        "experiment out so that others can use the nodes.\n\n".
@@ -155,8 +138,6 @@ TBMAIL("$swapper_name <$swapper_email>",
        "Errors-To: $TBMAIL_WWW");
 
 echo "<center><h2>Message sent!</h2>
-      <br><br>
-      <a href='showexp.php3?pid=$pid&eid=$eid'>Back to experiment $pid/$eid</a>
       </center>\n";
 
 #

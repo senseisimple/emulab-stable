@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -20,6 +20,7 @@
 #include <mysql/mysql.h>
 
 /* XXX Should be configured in */
+#define NEWNODEPID      "emulab-ops"
 #define NEWNODEOSID	"NEWNODE-MFS"
 
 #ifdef USE_MYSQL_DB
@@ -46,13 +47,21 @@ open_bootinfo_db(void)
 */
 
 int
-query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
+query_bootinfo_db(struct in_addr ipaddr, char *node_id, int version, 
+		  boot_what_t *info, char* key)
 {
 	int		nrows, rval = 0;
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	char		ipstr[32];
+	int		haskey=0;
 
+	char		savedkey[HOSTKEY_LENGTH];
+	if(key != NULL)
+		{
+		strncpy(savedkey, key, HOSTKEY_LENGTH);
+		haskey=1;
+		}
 	info->cmdline[0] = 0;	/* Must zero first byte! */
 	info->flags      = 0;
 	strcpy(ipstr, inet_ntoa(ipaddr));
@@ -72,38 +81,111 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 #define NEXT_BOOT_MFS		12
 #define NEXT_BOOT_PARTITION	13
 #define PID			14
+#define PXE_BOOT_PATH		15
 #define DEFINED(x)		(row[(x)] != NULL && row[(x)][0] != '\0')
 #define TOINT(x)		(atoi(row[(x)]))
 
-	res = mydb_query("select n.def_boot_osid, n.def_boot_cmd_line, "
-			 "        odef.path, odef.mfs, pdef.partition, "
-			 "       n.temp_boot_osid, "
-			 "        otemp.path, otemp.mfs, ptemp.partition, "
-			 "       n.next_boot_osid, n.next_boot_cmd_line, "
-			 "        onext.path, onext.mfs, pnext.partition, "
-			 "       r.pid "
-			 " from interfaces as i "
-			 "left join nodes as n on i.node_id=n.node_id "
-			 "left join reserved as r on i.node_id=r.node_id "
-			 "left join partitions as pdef on "
-			 "     n.node_id=pdef.node_id and "
-			 "     n.def_boot_osid=pdef.osid "
-			 "left join os_info as odef on "
-			 "     odef.osid=n.def_boot_osid "
-			 "left join partitions as ptemp on "
-			 "     n.node_id=ptemp.node_id and "
-			 "     n.temp_boot_osid=ptemp.osid "
-			 "left join os_info as otemp on "
-			 "     otemp.osid=n.temp_boot_osid "
-			 "left join partitions as pnext on "
-			 "     n.node_id=pnext.node_id and "
-			 "     n.next_boot_osid=pnext.osid "
-			 "left join os_info as onext on "
-			 "     onext.osid=n.next_boot_osid "
-			 "where i.IP='%s'", 15, inet_ntoa(ipaddr));
-
+	if (node_id) {
+		/*
+		 * Right now, this is ONLY used for checking bootinfo for
+		 * imageable vnodes.  All bets off if you try it for something
+		 * else!
+		 */
+		res = mydb_query("select n.def_boot_osid, n.def_boot_cmd_line, "
+				 "        odef.path, odef.mfs, pdef.partition, "
+				 "       n.temp_boot_osid, "
+				 "        otemp.path, otemp.mfs, ptemp.partition, "
+				 "       n.next_boot_osid, n.next_boot_cmd_line, "
+				 "        onext.path, onext.mfs, pnext.partition, "
+				 "       r.pid,n.pxe_boot_path "
+				 " from nodes as n "
+				 "left join reserved as r on n.node_id=r.node_id "
+				 "left join partitions as pdef on "
+				 "     n.node_id=pdef.node_id and "
+				 "     n.def_boot_osid=pdef.osid "
+				 "left join os_info as odef on "
+				 "     odef.osid=n.def_boot_osid "
+				 "left join partitions as ptemp on "
+				 "     n.node_id=ptemp.node_id and "
+				 "     n.temp_boot_osid=ptemp.osid "
+				 "left join os_info as otemp on "
+				 "     otemp.osid=n.temp_boot_osid "
+				 "left join partitions as pnext on "
+				 "     n.node_id=pnext.node_id and "
+				 "     n.next_boot_osid=pnext.osid "
+				 "left join os_info as onext on "
+				 "     onext.osid=n.next_boot_osid "
+				 "left outer join "
+				 "  (select type,attrvalue from node_type_attributes "
+				 "     where attrkey='nobootinfo' and attrvalue='1' "
+				 "     group by type) as nobootinfo_types "
+				 "  on n.type=nobootinfo_types.type "
+				 "where n.node_id='%s' "
+				 "  and nobootinfo_types.attrvalue is NULL",
+				 16, node_id);
+	}
+	else if (! haskey) {
+		res = mydb_query("select n.def_boot_osid, n.def_boot_cmd_line, "
+				 "        odef.path, odef.mfs, pdef.partition, "
+				 "       n.temp_boot_osid, "
+				 "        otemp.path, otemp.mfs, ptemp.partition, "
+				 "       n.next_boot_osid, n.next_boot_cmd_line, "
+				 "        onext.path, onext.mfs, pnext.partition, "
+				 "       r.pid,n.pxe_boot_path "
+				 " from interfaces as i "
+				 "left join nodes as n on i.node_id=n.node_id "
+				 "left join reserved as r on i.node_id=r.node_id "
+				 "left join partitions as pdef on "
+				 "     n.node_id=pdef.node_id and "
+				 "     n.def_boot_osid=pdef.osid "
+				 "left join os_info as odef on "
+				 "     odef.osid=n.def_boot_osid "
+				 "left join partitions as ptemp on "
+				 "     n.node_id=ptemp.node_id and "
+				 "     n.temp_boot_osid=ptemp.osid "
+				 "left join os_info as otemp on "
+				 "     otemp.osid=n.temp_boot_osid "
+				 "left join partitions as pnext on "
+				 "     n.node_id=pnext.node_id and "
+				 "     n.next_boot_osid=pnext.osid "
+				 "left join os_info as onext on "
+				 "     onext.osid=n.next_boot_osid "
+				 "left outer join "
+				 "  (select type,attrvalue from node_type_attributes "
+				 "     where attrkey='nobootinfo' and attrvalue='1' "
+				 "     group by type) as nobootinfo_types "
+				 "  on n.type=nobootinfo_types.type "
+				 "where i.IP='%s' "
+				 "  and nobootinfo_types.attrvalue is NULL",
+				 16, inet_ntoa(ipaddr));
+	}
+	else { /* User provided a widearea hostkey, so they don't have a necessarily-unique IP address. */
+		/* This is meant to be similar to the above, but queries on the wideareanodekey instead. */
+		res = mydb_query("SELECT n.def_boot_osid, n.def_boot_cmd_line, "
+				 "odef.path, odef.mfs, pdef.partition, "
+				 "n.temp_boot_osid, "
+				 "otemp.path, otemp.mfs, ptemp.partition, "
+				 "n.next_boot_osid, n.next_boot_cmd_line, "
+				 "onext.path, onext.mfs, pnext.partition, "
+				 "r.pid,n.pxe_boot_path "
+				 "FROM nodes AS n "
+				 "LEFT JOIN reserved AS r ON n.node_id=r.node_id "
+				 "LEFT JOIN partitions AS pdef ON n.node_id=pdef.node_id AND n.def_boot_osid=pdef.osid "
+				 "LEFT JOIN os_info AS odef ON odef.osid=n.def_boot_osid "
+				 "LEFT JOIN partitions AS ptemp ON n.node_id=ptemp.node_id AND n.temp_boot_osid=ptemp.osid "
+				 "LEFT JOIN os_info AS otemp ON otemp.osid=n.temp_boot_osid "
+				 "LEFT JOIN partitions AS pnext ON n.node_id=pnext.node_id AND n.next_boot_osid=pnext.osid "
+				 "LEFT JOIN os_info AS onext ON onext.osid=n.next_boot_osid "
+				 "LEFT OUTER JOIN "
+					"(SELECT type,attrvalue FROM node_type_attributes WHERE attrkey='nobootinfo' AND attrvalue='1' GROUP BY type) "
+				 	"AS nobootinfo_types ON n.type=nobootinfo_types.type "
+				 "WHERE n.node_id IN "
+					"(SELECT node_id FROM widearea_nodeinfo WHERE privkey='%s') "
+					"AND nobootinfo_types.attrvalue IS NULL;", 16, savedkey);
+	}
+	
 	if (!res) {
-		error("Query failed for host %s\n", ipstr);
+		error("Query failed for host %s\n", node_id ? node_id : ipstr);
 		/* XXX Wrong. Should fail so client can request again later */
 		return 0;
 	}
@@ -116,7 +198,8 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 	case 1:
 		break;
 	default:
-		error("%d entries for host %s\n", nrows, ipstr);
+		error("%d entries for host %s\n",
+		      nrows, node_id ? node_id : ipstr);
 		break;
 	}
 	row = mysql_fetch_row(res);
@@ -127,6 +210,22 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 	 */
 	if (version >= 1 && row[PID] == (char *) NULL) {
 		info->type = BIBOOTWHAT_TYPE_WAIT;
+		goto done;
+	}
+
+	/*
+	 * If we received a query from a node whose PXE boot program is
+	 * not an "Emulab pxeboot", then the node may be coming out of PXEWAIT
+	 * and we need to tell it to reboot again to pick up the new PXE boot
+	 * program.  An "Emulab pxeboot" is one that speaks bootinfo.
+	 *
+	 * XXX note that an "Emulab pxeboot" is currently identified by
+	 * its not being the default pxeboot and its path containing the
+	 * string "pxeboot" anywhere.
+	 */
+	if (DEFINED(PXE_BOOT_PATH) &&
+	    strstr(row[PXE_BOOT_PATH], "pxeboot") == NULL) {
+		info->type = BIBOOTWHAT_TYPE_REBOOT;
 		goto done;
 	}
 
@@ -151,10 +250,15 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			info->what.partition = TOINT(NEXT_BOOT_PARTITION);
 		}
 		else {
-			error("Invalid NEXT_BOOT entry for host %s\n", ipstr);
+			error("Invalid NEXT_BOOT entry for host %s\n",
+			      node_id ? node_id : ipstr);
 			rval = 1;
 		}
 		if (DEFINED(NEXT_BOOT_CMDLINE)) {
+			/*
+			 * XXX note that this will override any cmdline
+			 * specified in the osid path.  Should append instead?
+			 */
 			strncpy(info->cmdline,
 				row[NEXT_BOOT_CMDLINE], MAX_BOOT_CMDLINE-1);
 		}
@@ -180,7 +284,8 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			info->what.partition = TOINT(TEMP_BOOT_PARTITION);
 		}
 		else {
-			error("Invalid TEMP_BOOT entry for host %s\n", ipstr);
+			error("Invalid TEMP_BOOT entry for host %s\n",
+			      node_id ? node_id : ipstr);
 			rval = 1;
 		}
 		goto done;
@@ -205,10 +310,15 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 			info->what.partition = TOINT(DEF_BOOT_PARTITION);
 		}
 		else {
-			error("Invalid DEF_BOOT entry for host %s\n", ipstr);
+			error("Invalid DEF_BOOT entry for host %s\n",
+			      node_id ? node_id : ipstr);
 			rval = 1;
 		}
 		if (DEFINED(DEF_BOOT_CMDLINE)) {
+			/*
+			 * XXX note that this will override any cmdline
+			 * specified in the osid path.  Should append instead?
+			 */
 			strncpy(info->cmdline,
 				row[DEF_BOOT_CMDLINE], MAX_BOOT_CMDLINE-1);
 		}
@@ -218,7 +328,7 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 	 * If we get here, there is no bootinfo to give the client.
 	 * New PXE boot clients get PXEWAIT, but older ones get an error.
 	 */
-	error("No OSIDs set for host %s\n", ipstr);
+	error("No OSIDs set for host %s\n", node_id ? node_id : ipstr);
 	if (version >= 1) {
 		info->type = BIBOOTWHAT_TYPE_WAIT;
 		goto done;
@@ -276,13 +386,13 @@ boot_newnode_mfs(struct in_addr ipaddr, int version, boot_what_t *info)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	error("%s: nonexistent IP, booting '%s'\n",
-	      inet_ntoa(ipaddr), NEWNODEOSID);
+	error("%s: nonexistent IP, booting '%s,%s'\n",
+	      inet_ntoa(ipaddr), NEWNODEPID, NEWNODEOSID);
 
 #define MFS_PATH	0
 
-	res = mydb_query("select path from os_info "
-			 "where osid='%s' and mfs=1", 1, NEWNODEOSID);
+	res = mydb_query("select path from os_info where pid='%s' and "
+			 "osname='%s' and mfs=1", 1, NEWNODEPID, NEWNODEOSID);
 
 	if (!res) {
 		error("Query failed\n");
@@ -322,7 +432,14 @@ parse_mfs_path(char *str, boot_what_t *info)
 {
 	struct hostent *he;
 	struct in_addr hip;
-	char *path;
+	char *path, *args;
+
+	/* treat anything after a space as the command line */
+	args = strchr(str, ' ');
+	if (args != NULL) {
+		*args++ = '\0';
+		strncpy(info->cmdline, args, MAX_BOOT_CMDLINE-1);
+	}
 
 	/* no hostname, just copy string as is */
 	path = strchr(str, ':');

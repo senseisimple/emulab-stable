@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,6 +22,7 @@ use English;
 use SNMP;
 use snmpit_lib;
 use Socket;
+use libtestbed;
 
 #
 # These are the commands that can be passed to the portControl function
@@ -101,6 +102,12 @@ sub new($$$;$) {
     $self->{MIN_VLAN}         = $options->{'min_vlan'};
     $self->{MAX_VLAN}         = $options->{'max_vlan'};
 
+    if (($self->{MAX_VLAN} > 1024) && ($self->{MIN_VLAN} < 1000)) {
+	warn "ERROR: Some Cisco switches forbid creation of user vlans ".
+	     "with 1000 < vlan number <= 1024\n";
+	return undef;
+    }
+
     if ($community) { # Allow this to over-ride the default
 	$self->{COMMUNITY}    = $community;
     } else {
@@ -110,8 +117,17 @@ sub new($$$;$) {
     #
     # We have to change our behavior depending on what OS the switch runs
     #
-    $options->{'type'} =~ /^(\w+)(-modhack(-?))?(-ios)?$/;
+    if (!($options->{'type'} =~ /^(\w+)(-modhack(-?))?(-ios)?$/)) {
+	warn "ERROR: Incorrectly formatted switch type name: ",
+	     $options->{'type'}, "\n";
+	return undef;
+    }
     $self->{SWITCHTYPE} = $1;
+    if (!$self->{SWITCHTYPE}) {
+	warn "ERROR: Unable to determine type of switch $self->{NAME} from " .
+             "string '$options->{type}'\n";
+	return undef;
+    }
 
     if ($2) {
         $self->{NON_MODULAR_HACK} = 1;
@@ -132,8 +148,13 @@ sub new($$$;$) {
     #
     # Find the class of switch - look for 4 digits in the switch type
     #
-    if ($self->{SWITCHTYPE} =~ /(\d{2})\d{2}/) {
-       $self->{SWITCHCLASS} = "${1}00";
+	if ($self->{SWITCHTYPE} =~ /(\d{2})(\d{2})/) {
+	   # Special case, that 2960
+	   if ($1 == "29" && $2 == "60") {
+	      $self->{SWITCHCLASS} = "2960";
+	   } else {
+		  $self->{SWITCHCLASS} = "${1}00";
+	   }
     } else {
         warn "snmpit: Unable to determine switch class for $name\n";
         $self->{SWITCHCLASS} = "6500";
@@ -158,9 +179,26 @@ sub new($$$;$) {
 	    
     if ($self->{OSTYPE} eq "CatOS") {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt";
+        # The STACK mib contains some code for copying config via TFTP
+        $self->{TFTPWRITE} = 1;
     } elsif ($self->{OSTYPE} eq "IOS") {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt",
                     "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt";
+        # Backwards compatability: for some reason, some older installations
+        # seem to have a different filename for this file. The version of
+        # the filename ending in '-MIB' is the "correct" one, but try
+        # loading the older file if they don't have the newer one. If they
+        # don't have either one, we'll not fail here, only when they try to
+        # acutally use this MIB, and most sites won't actually use it.
+        if (-e "$mibpath/CISCO-CONFIG-COPY-MIB.txt") {
+            push @mibs, "$mibpath/CISCO-CONFIG-COPY-MIB.txt";
+            $self->{TFTPWRITE} = 1;
+        } elsif (-e "$mibpath/CISCO-CONFIG-COPY.txt") {
+            push @mibs, "$mibpath/CISCO-CONFIG-COPY.txt";
+            $self->{TFTPWRITE} = 1;
+        } else {
+            $self->{TFTPWRITE} = 0;
+        }
     } else {
 	warn "ERROR: Unsupported switch OS $self->{OSTYPE}\n";
 	return undef;
@@ -382,10 +420,11 @@ sub vlanLock($) {
 
     #
     # Try max_tries times before we give up, in case some other process just
-    # has it locked.
+    # has it locked. NOTE: snmpitSetWarn is going to retry something like
+    # 10 times, so we don't need to try the look _too_ many times.
     #
     my $tries = 1;
-    my $max_tries = 40;
+    my $max_tries = 10;
     while ($tries <= $max_tries) {
     
 	#
@@ -401,12 +440,27 @@ sub vlanLock($) {
 		(defined($grabBuffer)?$grabBuffer:"undef.") . "\n");
 	if (! $grabBuffer) {
 	    #
-	    # Only print this message every five tries
+	    # Only print this message if we've tried at least twice, to
+            # cut down on error messages
 	    #
-	    if (!($tries % 5)) {
+	    if ($tries >= 2) {
 		print STDERR "$self->{NAME}: VLAN edit buffer request failed - " .
 			     "try $tries of $max_tries.\n";
+                #
+                # Try to find out who is holding the lock. Let's only try a
+                # couple times, since if it's failing due to an unresponsive
+                # switch, there's no point in sending a ton of these get
+                # requests.
+                #
+                my $owner = snmpitGetWarn($self->{SESS}, [$BufferOwner, 1], 2);
+                if ($owner) {
+                    print STDERR "$self->{NAME}: VLAN lock is held by $owner\n";
+                } else {
+                    print STDERR "$self->{NAME}: No owner of the VLAN lock\n";
+                }
+
 	    }
+
 	} else {
 	    last;
 	}
@@ -455,31 +509,49 @@ sub vlanUnlock($) {
     # Send the command to apply what's in the edit buffer
     #
     my $ApplyRetVal = snmpitSetWarn($self->{SESS},[$EditOp,1,"apply","INTEGER"]);
-    $self->debug("Apply set: '$ApplyRetVal'\n");
-
-    #
-    # Loop waiting for the switch to tell us that it's finished applying the
-    # edits
-    #
-    $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
-    $self->debug("Apply gave $ApplyRetVal\n");
-    while ($ApplyRetVal eq "inProgress") { 
-        # Rate-limit our polling
-        select(undef,undef,undef,.1);
-	$ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
-	$self->debug("Apply gave $ApplyRetVal\n");
-        print ".";
+    if (!defined($ApplyRetVal)) {
+        $self->debug("Apply set: '$ApplyRetVal'\n");
+    } else {
+        $self->debug("Apply returned undef\n");
     }
 
-    #
-    # Tell the caller what happened
-    #
-    if ($ApplyRetVal ne "succeeded") {
+    if (!defined($ApplyRetVal) || $ApplyRetVal != 1) {
         print " FAILED\n";
-	warn("**** ERROR: Failure applying VLAN changes: $ApplyRetVal\n");
-    } else { 
-        print " Succeeded\n";
-	$self->debug("Apply Succeeded.\n");
+	warn("**** ERROR: Failure attempting to apply VLAN changes ($ApplyRetVal) on $self->{NAME}\n");
+    } else {
+
+        #
+        # No point in trying to do this part if the switch rejected our request
+        # to apply the edit buffer changes.
+        #
+        # Loop waiting for the switch to tell us that it's finished applying the
+        # edits
+        #
+        $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
+        if (!defined($ApplyRetVal)) {
+            $self->debug("Apply set: '$ApplyRetVal'\n");
+        } else {
+            $self->debug("Apply returned undef\n");
+        }
+        while ($ApplyRetVal eq "inProgress") { 
+            # Rate-limit our polling
+            select(undef,undef,undef,.1);
+            $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
+            $self->debug("Apply gave $ApplyRetVal\n");
+            print ".";
+        }
+
+        #
+        # Tell the caller what happened
+        #
+        if ($ApplyRetVal ne "succeeded") {
+            print " FAILED\n";
+            warn("**** ERROR: Failure applying VLAN changes on $self->{NAME}:".
+		 " $ApplyRetVal\n");
+        } else { 
+            print " Succeeded\n";
+            $self->debug("Apply Succeeded.\n");
+        }
     }
 
     #
@@ -489,7 +561,8 @@ sub vlanUnlock($) {
     my $snmpvar = [$EditOp,1,"release",'INTEGER'];
     my $RetVal = snmpitSetWarn($self->{SESS},$snmpvar);
     if (! $RetVal ) {
-        warn("*** ERROR: Failed to unlock VLAN edit buffer\n");
+        warn("*** ERROR: ".
+	     "Failed to unlock VLAN edit buffer on $self->{NAME}\n");
         return 0;
     }
     $self->debug("Release: '$RetVal'\n");
@@ -669,7 +742,7 @@ sub createVlan($$;$$$) {
 	# Try to wait out transient failures
 	#
 	if ($tries_remaining != $max_tries) {
-	    print STDERR "VLAN creation failed, trying again " .
+	    print STDERR "VLAN $vlan_id creation failed, trying again " .
 		"($tries_remaining tries left)\n";
 	    sleep 5;
 	}
@@ -726,11 +799,14 @@ sub createVlan($$;$$$) {
 	# Perform the actual creation. Yes, this next line MUST happen all in
 	# one set command....
 	#
-	my $RetVal = snmpitSetWarn($self->{SESS},
-               [[$VlanRowStatus,"1.$vlan_number", "createAndGo","INTEGER"],
+	my ($statusRow, $typeRow, $nameRow, $saidRow) = 
+               ([$VlanRowStatus,"1.$vlan_number", "createAndGo","INTEGER"],
 		[$VlanType,"1.$vlan_number","ethernet","INTEGER"],
 		[$VlanName,"1.$vlan_number",$vlan_id,"OCTETSTR"],
-		[$VlanSAID,"1.$vlan_number",$SAID,"OCTETSTR"]]);
+		[$VlanSAID,"1.$vlan_number",$SAID,"OCTETSTR"]);
+	my @varList = ($vlan_number > 1000) ?  ($statusRow, $nameRow)
+			    : ($statusRow, $typeRow, $nameRow, $saidRow);
+	my $RetVal = snmpitSetWarn($self->{SESS}, new SNMP::VarList(@varList));
 	print "",($RetVal? "Succeeded":"Failed"), ".\n";
 
 	#
@@ -882,7 +958,8 @@ sub setPortVlan($$@) {
     my $errors = 0;
 
     if (!$self->vlanNumberExists($vlan_number)) {
-	print STDERR "ERROR: VLAN $vlan_number does not exist\n";
+	print STDERR "ERROR: VLAN $vlan_number does not exist on switch"
+	. $self->{NAME} . "\n";
 	return 1;
     }
 
@@ -920,32 +997,60 @@ sub setPortVlan($$@) {
     }
 
     #
-    # Convert ports from the format the were passed in to the correct format
-    #
-    my @portlist = $self->convertPortFormat($format,@ports);
-
-    #
     # We'll keep track of which ports suceeded, so that we don't try to
     # enable/disable, etc. ports that failed.
     #
     my @okports = ();
-    foreach my $port (@portlist) {
+    my ($index, $retval);
+    my %BumpedVlans = ();
 
-	# 
-	# Make sure the port didn't get mangled in conversion
+    foreach my $port (@ports) {
+	$self->debug("Putting port $port in VLAN $vlan_number\n");
 	#
-	if (!defined $port) {
-	    print STDERR "Port not found, skipping\n";
+	# Check to see if it's a trunk ....
+	#
+	($index) = $self->convertPortFormat($PORT_FORMAT_IFINDEX, $port);
+	$retval = snmpitGetWarn($self->{SESS},
+			["vlanTrunkPortDynamicState",$index]);
+	if (!$retval) {
 	    $errors++;
 	    next;
 	}
-	$self->debug("Putting port $port in VLAN $vlan_number\n");
+	$self->debug("Port trunk mode is $retval\n");
+	
+	if (!(($retval eq "on") || ($retval eq "onNoNegotiate"))) {
+	    #
+	    # Convert ports to the correct format
+	    #
+	    ($index) = $self->convertPortFormat($format, $port);
 
-	#
-	# Do the acutal SNMP command
-	#
-	my $snmpvar = [$PortVlanMemb,$port,$vlan_number,'INTEGER'];
-	my $retval = snmpitSetWarn($self->{SESS},$snmpvar);
+	    # 
+	    # Make sure the port didn't get mangled in conversion
+	    #
+	    if (!defined $index) {
+		print STDERR "Port not found, skipping\n";
+		$errors++;
+		next;
+	    }
+	    my $snmpvar = [$PortVlanMemb,$index,$vlan_number,'INTEGER'];
+	    #
+	    # Check to see if we are already in a VLAN
+	    #
+	    $retval = snmpitGet($self->{SESS},[$PortVlanMemb,$index]);
+	    if (($retval ne "NOSUCHINSTANCE") &&
+		("$retval" ne "$vlan_number") && ("$retval" ne "1")) {
+		$BumpedVlans{$retval} = 1;
+	    }
+	    #
+	    # Do the acutal SNMP command
+	    #
+	    $retval = snmpitSetWarn($self->{SESS},$snmpvar);
+	} else {
+	    #
+	    # We're here if it a trunk
+	    #
+	    $retval = $self->setVlansOnTrunk($port, 1, $vlan_number);
+	}
 	if (!$retval) {
 	    $errors++;
 	    next;
@@ -970,6 +1075,15 @@ sub setPortVlan($$@) {
 	    print STDERR "Port enable had $rv failures.\n";
 	    $errors += $rv;
 	}
+    }
+
+    # When removing things from the control vlan for a firewall,
+    # need to tell stack to shake things up to flush FDB on neighboring
+    # switches.
+    #
+    my @bumpedlist = keys ( %BumpedVlans );
+    if (@bumpedlist) {
+	@{$self->{DISPLACED_VLANS}} = @bumpedlist;
     }
 
     return $errors;
@@ -1029,6 +1143,70 @@ sub removePortsFromVlan($@) {
     $self->debug("About to remove ports " . join(",",@ports) . "\n");
     if (@ports) {
 	return $self->setPortVlan(1,@ports);
+    } else {
+	return 0;
+    }
+}
+
+#
+# Remove some ports from the given VLAN, which are given as Cisco-specific
+# VLAN numbers. Do not specify trunked ports here.
+#
+# usage: removeSomePortsFromVlan(self,int vlan, ports)
+#	 returns 0 on sucess.
+#	 returns the number of failed ports on failure.
+#
+sub removeSomePortsFromVlan($$@) {
+    my $self = shift;
+    my $vlan_number = shift;
+    my @ports = @_;
+
+    #
+    # Make sure the VLANs actually exist
+    #
+    if (!$self->vlanNumberExists($vlan_number)) {
+	print STDERR "ERROR: VLAN $vlan_number does not exist\n";
+	return 1;
+    }
+
+    #
+    # Make a hash of the ports for easy lookup later.
+    #
+    my %ports = ();
+    @ports{@ports} = @ports;
+
+    #
+    # Get a list of the ports in the VLAN
+    #
+    my $VlanPortVlan;
+    if ($self->{OSTYPE} eq "CatOS") {
+	$VlanPortVlan = "vlanPortVlan"; #index is ifIndex
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	$VlanPortVlan = "vmVlan"; #index is ifIndex
+    }
+    my @remports;
+
+    #
+    # Walk the tree to find VLAN membership
+    #
+    my ($rows) = snmpitBulkwalkFatal($self->{SESS},[$VlanPortVlan]);
+    foreach my $rowref (@$rows) {
+	my ($name,$modport,$port_vlan_number) = @$rowref;
+	my ($trans) = convertPortFormat($PORT_FORMAT_NODEPORT,$modport);
+	if (!defined $trans) {
+	    $trans = ""; # Guard against some uninitialized value warnings
+	}
+
+	$self->debug("Got $name $modport ($trans) $port_vlan_number\n");
+	
+	push(@remports, $modport)
+	    if ("$port_vlan_number" eq "$vlan_number" &&
+		exists($ports{$trans}));
+    }
+
+    $self->debug("About to remove ports " . join(",",@remports) . "\n");
+    if (@remports) {
+	return $self->setPortVlan(1,@remports);
     } else {
 	return 0;
     }
@@ -1121,6 +1299,19 @@ sub UpdateField($$$@) {
 	    $self->debug("Port $port was $Status\n");
 	    if ($Status ne $val) {
 		$self->debug("Setting $port to $val...");
+
+		# For 2960, we must ensure that field updates use
+                # module 1 *not* 0
+		# This transforms a request like
+		#	portAdminSpeed.0.8.s100000000
+		# to
+		#	portAdminSpeed.1.8.s100000000
+		#
+		if ($self->{SWITCHCLASS} == "2960" &&
+			$port =~ /^(\d+)\.(\d+)$/ && $1 == 0) {
+			$port = "1.$2";
+		}
+
 		# Don't use async
 		my $result = snmpitSetWarn($self->{SESS},
                     [$OID,$port,$val,"INTEGER"]);
@@ -1147,6 +1338,99 @@ sub UpdateField($$$@) {
     }
     # returns 0 on success, # of failed ports on failure
     $err;
+}
+
+#
+# Determine if a VLAN has any ports on this switch
+#
+# usage: vlanHasPorts($self, $vlan_number)
+# returns 1 if the vlan exists and has ports
+#
+sub vlanHasPorts($$) {
+    my ($self, $vlan_number)= @_;
+
+    if ($self->vlanNumberExists($vlan_number)) {
+
+	my $VlanPortVlan;
+	if ($self->{OSTYPE} eq "CatOS") {
+	    $VlanPortVlan = ["vlanPortVlan"]; #index is ifIndex
+	} elsif ($self->{OSTYPE} eq "IOS") {
+	    $VlanPortVlan = ["vmVlan"]; #index is ifIndex
+	}
+	#
+	# Walk the tree for the VLAN members
+	#
+	my ($rows) = snmpitBulkwalkFatal($self->{SESS},$VlanPortVlan);
+	$self->debug("Vlan members walk got " . scalar(@$rows) . " rows\n");
+	foreach my $rowref (@$rows) {
+	    my ($name,$modport,$number) = @$rowref;
+	    $self->debug("Got $name $modport $number\n",3);
+	    if ($number == $vlan_number) { return 1; }
+	}
+	return 0;
+    }
+}
+
+#
+# The next section is a helper function for checking which vlans
+# and which ports or trunks, setting and clearing them, etc.
+#
+
+my %vtrunkOIDS = (
+    0 => "vlanTrunkPortVlansEnabled",
+    1 => "vlanTrunkPortVlansEnabled2k",
+    2 => "vlanTrunkPortVlansEnabled3k",
+    3 => "vlanTrunkPortVlansEnabled4k"
+);
+
+# precompute 1k 0 bits as bitfield
+my $p1k = pack("x128");
+
+my ($VOP_CLEAR, $VOP_SET, $VOP_CLEARALL, $VOP_CHECK) = (0, 1, 2, 3);
+
+#
+# vlanTrunkUtil($self, $op, $ifIndex, @vlans)
+# does one of the 4 operations above on all 4 ranges of vlans
+# but tries to be a little smart about not visting ranges not needed.
+
+sub vlanTrunkUtil($$$$) {
+    my ($self, $op, $ifIndex, @vlans) = @_;
+
+    my ($bitfield, %vranges, @result);
+
+    if ($op == $VOP_CLEARALL)
+        { @result = @vlans = (1, 1025, 2049, 3073); }
+    foreach my $vlan (@vlans)
+	{ push @{$vranges{($vlan >> 10) & 3}}, $vlan; }
+
+    while (my ($bank, $banklist) = each %vranges) {
+	my ($bankbase, $bankOID) = (($bank << 10), $vtrunkOIDS{$bank});
+	$self->lock() unless ($op == $VOP_CHECK);
+	if ($op == $VOP_CLEARALL) {
+	    $bitfield = $p1k;
+	} else {
+	    $bitfield = snmpitGetFatal($self->{SESS}, [$bankOID,$ifIndex]);
+	    # the cisco 650x sometimes returns only a few bytes...
+	    my @bits = split //, unpack("B1024", $bitfield . $p1k);
+
+	    foreach my $vlan (@$banklist) {
+		 if ($op == $VOP_CHECK) {
+		     if ($bits[$vlan - $bankbase]) { push @result, $vlan; }
+		 } else {
+		     $bits[$vlan - $bankbase] = $op;
+		     push @result, $vlan;
+		 }
+	    }
+	    $bitfield = pack("B*", join('',@bits)) unless ($op == $VOP_CHECK);
+	}
+	next if ($op == $VOP_CHECK);
+
+	# don't need to check result because it dies if it doesn't work.
+	snmpitSetFatal($self->{SESS},
+	    [$bankOID,$ifIndex,$bitfield,"OCTETSTR"]);
+	$self->unlock();
+    }
+    return sort @result;
 }
 
 #
@@ -1207,6 +1491,34 @@ sub listVlans($) {
 	if (!$Names{$vlan_number}) {
 	    $self->debug("listVlans: WARNING: port $self->{NAME}.$modport in non-existant " .
 		"VLAN $vlan_number\n");
+	}
+    }
+
+    #
+    # Walk trunks for the VLAN members
+    #
+    ($rows) = snmpitBulkwalkFatal($self->{SESS},["vlanTrunkPortDynamicStatus"]);
+    $self->debug("Trunk members walk returned " . scalar(@$rows) . " rows\n");
+    foreach my $rowref (@$rows) {
+	my ($name,$ifIndex,$status) = @$rowref;
+	$self->debug("Got $name $ifIndex $status\n",3);
+	if ($status ne "trunking") { next;}
+        # XXX: This should really print out something more useful, like the
+        # other end of the trunk
+        my $node = $self->{NAME} . ".trunk$ifIndex";
+        #my ($node) = $self->convertPortFormat($PORT_FORMAT_NODEPORT,$ifIndex);
+        #if (!$node) {
+        #    my ($modport) = $self->convertPortFormat($PORT_FORMAT_MODPORT,$ifIndex);
+        #    $modport =~ s/\./\//;
+        #    $node = $self->{NAME} . ".$modport";
+        #}
+
+	# Get the allowed VLANs on this trunk
+	my @trunklans = $self->vlanTrunkUtil($VOP_CHECK, $ifIndex, keys %Names);
+
+	foreach my $vlan_number (@trunklans) {
+	    $self->debug("got vlan $vlan_number on trunk $node\n",3);
+	    push @{$Members{$vlan_number}}, $node;
 	}
     }
 
@@ -1450,36 +1762,8 @@ sub setVlansOnTrunk($$$$) {
     }
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
-
-    #
-    # Get the existing bitfield for allowed VLANs on the trunk
-    #
-    my $bitfield = snmpitGetFatal($self->{SESS},
-	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
-    my $unpacked = unpack("B*",$bitfield);
-    
-    # Put this into an array of 1s and 0s for easy manipulation
-    my @bits = split //,$unpacked;
-
-    # Just set the bit of the ones we want to change
-    foreach my $vlan_number (@vlan_numbers) {
-	$bits[$vlan_number] = $value;
-    }
-
-    # Pack it back up...
-    $unpacked = join('',@bits);
-
-    $bitfield = pack("B*",$unpacked);
-
-    # And save it back...
-    my $rv = snmpitSetFatal($self->{SESS},
-        ["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,"OCTETSTR"]);
-    if ($rv) {
-	return 1;
-    } else {
-	return 0;
-    }
-
+    @vlan_numbers = $self->vlanTrunkUtil($value, $ifIndex, @vlan_numbers);
+    return (scalar(@vlan_numbers) != 0);
 }
 
 #
@@ -1506,37 +1790,10 @@ sub clearAllVlansOnTrunk($$) {
     if (($channel =~ /^\d+$/) && ($channel != 0)) {
 	$ifIndex = $channel;
     }
-
-    #
-    # Get the exisisting bitfield for allowed VLANs on the trunk
-    #
-    my $bitfield = snmpitGetFatal($self->{SESS},
-	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
-    my $unpacked = unpack("B*",$bitfield);
-    
-    # Put this into an array of 1s and 0s for easy manipulation
-    my @bits = split //,$unpacked;
-
-    # Clear the bit for every VLAN
-    foreach my $index (0 .. $#bits) {
-	$bits[$index] = 0;
-    }
-
-    # Pack it back up...
-    $unpacked = join('',@bits);
-
-    $bitfield = pack("B*",$unpacked);
-
-    # And save it back...
-    my $rv = snmpitSetFatal($self->{SESS},
-        ["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield, "OCTETSTR"]);
-    if ($rv) {
-	return 1;
-    } else {
-	return 0;
-    }
-
+    my @vlan_numbers = $self->vlanTrunkUtil($VOP_CLEARALL, $ifIndex);
+    return (scalar(@vlan_numbers) != 0);
 }
+
 #
 # Easy flush of FDB for a (vlan, trunk port) if port is on vlan
 # by removing it and adding it back
@@ -1547,8 +1804,7 @@ sub clearAllVlansOnTrunk($$) {
 #        return value currently ignored.
 
 sub resetVlanIfOnTrunk($$$) {
-    my $self = shift;
-    my ($modport, $value, $vlan_number) = @_;
+    my ($self, $modport, $vlan_number) = @_;
 
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
@@ -1559,77 +1815,37 @@ sub resetVlanIfOnTrunk($$$) {
     # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
     # the channel ifIndex the the port is in a channel. Not sure that
     # this is _always_ beneficial, though
+    # NOTE: This 'conversion' is no longer needed, since we call
+    # getChannelIfIndex on the port before passing it into this function
     #
-    my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
-    if (!($channel =~ /^\d+$/) || ($channel == 0)) {
-	print "WARNING: setVlansOnTrunk got zero channel for $self->{NAME}.$modport\n";
-	return 0;
+    #my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
+    #if (!($channel =~ /^\d+$/) || ($channel == 0)) {
+    #	print "WARNING: resetVlanIfOnTrunk got bad channel ($channel) for $self->{NAME}.$modport\n";
+    #	return 0;
+    #}
+    #if (($channel =~ /^\d+$/) && ($channel != 0)) {
+    #	$ifIndex = $channel;
+    #}
+
+    my @vlan_numbers = $self->vlanTrunkUtil($VOP_CHECK, $ifIndex, $vlan_number);
+    if (@vlan_numbers) {
+	$self->vlanTrunkUtil($VOP_CLEAR, $ifIndex, $vlan_number);
+	$self->vlanTrunkUtil($VOP_SET, $ifIndex, $vlan_number);
     }
-    if (($channel =~ /^\d+$/) && ($channel != 0)) {
-	$ifIndex = $channel;
-    }
-
-    #
-    # Get the exisisting bitfield for allowed VLANs on the trunk
-    #
-    my $bitfield = snmpitGetFatal($self->{SESS},
-	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
-    my $unpacked = unpack("B*",$bitfield);
-    
-    # Put this into an array of 1s and 0s for easy manipulation
-    my @bits = split //,$unpacked;
-
-    # check to see if this vlan is already allowed on this trunk,
-    # if not, return.
-
-    if ($bits[$vlan_number] ne '1') {
-	return;
-    }
-
-    # Just set the bit of the vlan we want to remove...
-    $bits[$vlan_number] = 0;
-
-    # Pack it back up...
-    $unpacked = join('',@bits);
-
-    $bitfield = pack("B*",$unpacked);
-
-    # And save it back...
-    my $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
-    	    "OCTETSTR"]);
-
-    #
-    # ask for the bitfield over again to make sure that the cisco has time
-    # to deal with setting it, before we clobber it all over again.
-    #
-    $bitfield = snmpitGetFatal($self->{SESS},
-	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
-
-    # Just set the bit of the vlan we want to add back...
-    $bits[$vlan_number] = '1';
-
-    # Pack it back up...
-    $unpacked = join('',@bits);
-
-    $bitfield = pack("B*",$unpacked);
-
-    # And save it back...
-    $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
-    	    "OCTETSTR"]);
     return 0;
 }
 
 #
 # Enable trunking on a port
 #
-# usage: enablePortTrunking(self, modport, nativevlan)
+# usage: enablePortTrunking2(self, modport, nativevlan, equaltrunking)
 #        modport: module.port of the trunk to operate on
 #        nativevlan: VLAN number of the native VLAN for this trunk
 #        Returns 1 on success, 0 otherwise
 #
-sub enablePortTrunking($$$) {
-    my $self = shift;
-    my ($port,$native_vlan) = @_;
+sub enablePortTrunking2($$$$) {
+    my ($self,$port,$native_vlan,$equaltrunking) = @_;
+    my $trunking_vlan = ($equaltrunking ? 1 : $native_vlan);
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
 
@@ -1656,7 +1872,7 @@ sub enablePortTrunking($$$) {
     #
     # Set the native VLAN for this trunk
     #
-    my $nativeVlan = ["vlanTrunkPortNativeVlan",$ifIndex,$native_vlan,"INTEGER"];
+    my $nativeVlan = ["vlanTrunkPortNativeVlan",$ifIndex,$trunking_vlan,"INTEGER"];
     $rv = snmpitSetWarn($self->{SESS},$nativeVlan);
     if (!$rv) {
 	warn "ERROR: Unable to set native VLAN on trunk\n";
@@ -1666,12 +1882,14 @@ sub enablePortTrunking($$$) {
     #
     # Finally, enable trunking!
     #
-    my $trunkEnable = ["vlanTrunkPortDynamicState",$ifIndex,"on","INTEGER"];
+    my $trunkEnable = ["vlanTrunkPortDynamicState",$ifIndex,"onNoNegotiate","INTEGER"];
     $rv = snmpitSetWarn($self->{SESS},$trunkEnable);
     if (!$rv) {
 	warn "ERROR: Unable to enable trunking\n";
 	return 0;
     }
+
+    if ($equaltrunking) { return 1; }
 
     #
     # Allow the native VLAN to cross the trunk
@@ -1755,10 +1973,13 @@ sub readifIndex($) {
    
 	foreach my $rowref (@$rows) {
 	    my ($name,$iid,$descr) = @$rowref;
-	    if ($descr =~ /(\w*)(\d+)\/(\d+)$/) {
+	    if ($descr =~ /(\D*)(\d+)\/(\d+)$/) {
                 my $type = $1;
                 my $module = $2;
                 my $port = $3;
+
+		$self->debug("IFINDEX: $descr ($type,$module,$port)\n", 2);
+
                 if ($self->{NON_MODULAR_HACK}) {
                     #
                     # Hack for non-modular switches with both 100Mbps and
@@ -1780,6 +2001,8 @@ sub readifIndex($) {
 
 		$self->{IFINDEX}{$modport} = $ifindex;
 		$self->{IFINDEX}{$ifindex} = $modport;
+
+		$self->debug("IFINDEX: $modport,$ifindex\n", 2);
 	    }
 	}
     }
@@ -1858,12 +2081,11 @@ sub writeConfigTFTP($$$) {
     #
 
     #
-    # The MIB this function currently uses is only supported on CatOS. IOS
-    # actually has a better one (CISCO-CONFIG-COPY-MIB), so we'll be able to
-    # support it in the future
+    # Make sure we've loaded in the proper MIBs to do this
     #
-    if ($self->{OSTYPE} ne "CatOS") {
-	warn "writeConfigTFTP only supported on CatOS\n";
+    if (!$self->{TFTPWRITE}) {
+	warn "No support for copying config via TFTP - possible missing MIB " .
+             "file\n";
 	return 0;
     }
 
@@ -1879,42 +2101,128 @@ sub writeConfigTFTP($$$) {
     my $ipstr = join(".",unpack('C4',$ip));
 
     #
-    # Set up a few values on the switch to tell it where to stick the config
-    # file
+    # CatOS switches use the CISCO-STACK-MIB for this, IOS switches use
+    # CISCO-CONFIG-COPY-MIB (which is much more powerful)
     #
-    my $setHost = ["tftpHost",0,$ipstr,"STRING"];
-    my $setFilename = ["tftpFile",0,$filename,"STRING"];
+    if ($self->{OSTYPE} eq "CatOS") {
+        #
+        # Set up a few values on the switch to tell it where to stick the config
+        # file
+        #
+        my $setHost = ["tftpHost",0,$ipstr,"STRING"];
+        my $setFilename = ["tftpFile",0,$filename,"STRING"];
 
-    snmpitSetFatal($self->{SESS},$setHost);
-    snmpitSetFatal($self->{SESS},$setFilename);
+        snmpitSetFatal($self->{SESS},$setHost);
+        snmpitSetFatal($self->{SESS},$setFilename);
 
-    #
-    # Okay, go!
-    #
-    my $tftpGo = ["tftpAction","0","uploadConfig","INTEGER"];
-    snmpitSetFatal($self->{SESS},$tftpGo);
+        #
+        # Okay, go!
+        #
+        my $tftpGo = ["tftpAction","0","uploadConfig","INTEGER"];
+        snmpitSetFatal($self->{SESS},$tftpGo);
 
-    #
-    # Poll to see if it suceeded - wait for a while, but not forever!
-    #
-    my $tftpResult = ["tftpResult",0];
-    my $iters = 0;
-    my $rv;
-    while (($rv = snmpitGetFatal($self->{SESS},$tftpResult))
-	eq "inProgress" && ($iters < 30)) {
-	$iters++;
-	sleep(1);
-    }
-    if ($iters == 30) {
-	warn "TFTP write took longer than 30 seconds!";
-	return 0;
+        #
+        # Poll to see if it suceeded - wait for a while, but not forever!
+        #
+        my $tftpResult = ["tftpResult",0];
+        my $iters = 0;
+        my $rv;
+        while (($rv = snmpitGetFatal($self->{SESS},$tftpResult))
+            eq "inProgress" && ($iters < 30)) {
+            $iters++;
+            sleep(1);
+        }
+        if ($iters == 30) {
+            warn "TFTP write took longer than 30 seconds!";
+            return 0;
+        } else {
+            if ($rv ne "success") {
+                warn "TFTP write failed with error $rv\n";
+                return 0;
+            } else {
+                return 1;
+            }
+        }
+
     } else {
-	if ($rv ne "success") {
-	    warn "TFTP write failed with error $rv\n";
-	    return 0;
-	} else {
-	    return 1;
-	}
+        #
+        # We generate a random number that we'll use to identify this session.
+        #
+        my $sessid = int(rand(65536));
+
+        #
+        # Create an entry in the ccCopyTable. createAndWait means we'll be
+        # sending more data in subsequent packets
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyEntryRowStatus",$sessid,
+            'createAndWait','INTEGER']);
+
+        #
+        # We'll be uploading to a TFTP server
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyDestFileType",$sessid,
+            'networkFile','INTEGER']);
+        snmpitSetFatal($self->{SESS},["ccCopyServerAddress",$sessid,
+            $ipstr,'STRING']);
+        snmpitSetFatal($self->{SESS},["ccCopyFileName",$sessid,
+            $filename,'STRING']);
+        snmpitSetFatal($self->{SESS},["ccCopyProtocol",$sessid,
+            'tftp','INTEGER']);
+        
+        #
+        # We want the running-config file (ie. the current configuration)
+        #
+        snmpitSetFatal($self->{SESS},["ccCopySourceFileType",$sessid,
+            'runningConfig','INTEGER']);
+
+        #
+        # Engage!
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyEntryRowStatus",$sessid,
+            'active','INTEGER']);
+
+        #
+        # Wait for it to finish
+        #
+        my $ccCopyResult = ["ccCopyState",$sessid];
+        my $iters = 0;
+        my $rv;
+        while ($rv = snmpitGetFatal($self->{SESS},$ccCopyResult)) {
+            # We finished, one way or the other...
+            if ($rv eq "successful" || $rv eq "failed") {
+                last;
+            }
+            # Give up, it's taken too long
+            if ($iters++ == 30) {
+                last;
+            }
+
+            sleep(1);
+        }
+
+        #
+        # If it failed, find out why
+        #
+        my $cause = snmpitGetWarn($self->{SESS},["ccCopyFailCause",$sessid]);
+
+        #
+        # Remove our ccCopyTable entry
+        #
+        snmpitSetFatal($self->{SESS},["ccCopyEntryRowStatus",$sessid,
+            'destroy','INTEGER']);
+
+        if ($iters == 30) {
+            warn "TFTP write took longer than 30 seconds!";
+            return 0;
+        } else {
+            if ($rv ne "successful") {
+                warn "TFTP write failed with error $rv ($cause)\n";
+                return 0;
+            } else {
+                return 1;
+            }
+        }
+
     }
 }
 
@@ -1925,7 +2233,7 @@ sub writeConfigTFTP($$$) {
 #
 # Usage: debug($self, $message, $level)
 #
-sub debug($$:$) {
+sub debug($$;$) {
     my $self = shift;
     my $string = shift;
     my $debuglevel = shift;
@@ -1935,6 +2243,108 @@ sub debug($$:$) {
     if ($self->{DEBUG} >= $debuglevel) {
 	print STDERR $string;
     }
+}
+
+my $lock_held = 0;
+
+sub lock($) {
+    my $self = shift;
+    my $token = "snmpit_" . $self->{NAME};
+    if ($lock_held == 0) {
+	my $old_umask = umask(0);
+	die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
+	umask($old_umask);
+    }
+    $lock_held = 1
+}
+
+sub unlock($) {
+	if ($lock_held == 1) { TBScriptUnlock();}
+	$lock_held = 0;
+}
+
+#
+# Enable Openflow
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Disable Openflow
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set controller
+#
+sub setOpenflowController($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Set listener
+#
+sub setOpenflowListener($$$) {
+    my $self = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $RetVal;
+    
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    warn "ERROR: Cisco swith doesn't support Openflow now";
+    return 0;
+}
+
+#
+# Get used listener ports
+#
+sub getUsedOpenflowListenerPorts($) {
+    my $self = shift;
+    my %ports = ();
+
+    warn "ERROR: Cisco swith doesn't support Openflow now\n";
+
+    return %ports;
+}
+
+#
+# Check if Openflow is supported on this switch
+#
+sub isOpenflowSupported($) {
+    #
+    # Cisco switch doesn't support Openflow yet.
+    #
+    return 0;
 }
 
 # End with true

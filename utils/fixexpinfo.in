@@ -1,0 +1,230 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Fix up the expinfo directory.
+#
+sub usage()
+{
+    print(STDOUT "Usage: fixexpinfo\n");
+    exit(-1);
+}
+my $optlist   = "vdna";
+my $debug     = 0;
+my $verbose   = 0;
+my $impotent  = 0;
+my $archive   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $EXPINFO     = "$TB/expinfo";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output. Very important for this script!
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use Project;
+use Experiment;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+if (defined($options{"a"})) {
+    $archive = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+usage()
+    if (@ARGV);
+
+#
+# Do not run this script unless its the real version.
+#
+if (!$impotent && $UID != 0) {
+    die("*** $0:\n".
+	"     Must runs this as root\n");
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("$msg\n");
+}
+
+umask(0000);
+
+#
+# List of all projects.
+#
+my %projects = ();
+
+my $query_result =
+    DBQueryFatal("select pid from projects");
+
+while (my ($pid) = $query_result->fetchrow_array()) {
+    $projects{$pid} = $pid;
+}
+my $regexpplist = join("|", keys(%projects));
+
+#
+# Read the contents of the expinfo directory and generate new
+# directories. 
+#
+opendir(DIR, $EXPINFO) or
+    fatal("Unable to open directory $EXPINFO");
+while (my $dirent = readdir(DIR)) {
+    next
+	if ($dirent eq "." || $dirent eq "..");
+
+    my $pid;
+    my $eid;
+    my $idx;
+	    
+    if ($dirent =~ /^($regexpplist)\-(\w[-\w]*)\.(\d*)/) {
+	$pid = $1;
+	$eid = $2;
+	$idx = $3;
+    }
+    elsif ($dirent =~
+	   /^($regexpplist)\-([-\w]*\-\d\d\d\d\d\d\d\d\-\d\d\.\d\d\.\d\d)$/) {
+	$pid = $1;
+	$eid = $2;
+    }
+    elsif (exists($projects{$dirent})) {
+	# SKip
+	next;
+    }
+    else {
+	print STDERR "Bad dir name $dirent. Skipping ...\n";
+	next;
+    }
+
+    if ($archive) {
+	# Archive only; leave current experiments alone.
+	my $experiment = Experiment->Lookup($idx);
+	next
+	    if ($experiment);
+    }
+
+    if (!exists($projects{$pid})) {
+	fatal("Inconsistency in project $pid: $dirent");
+    }
+    my $piddir  = "$EXPINFO/$pid";
+    my $eiddir  = "$EXPINFO/$pid/$eid";
+    my $project = Project->Lookup($pid);
+    fatal("Could not find project record")
+	if (!defined($project));
+    
+    my $unix_uid = $project->GetLeader()->unix_uid();
+    my $unix_gid = $project->unix_gid();
+
+    if (! -e $piddir) {
+	if ($impotent) {
+	    print STDERR "Would mkdir $piddir\n"
+		if ($verbose);
+	}
+	else {
+	    print STDERR "mkdir $piddir\n"
+		if ($debug);
+	    if (! mkdir($piddir, 0777)) {
+		fatal("Could not create $piddir: $!");
+	    }
+	    if (! chown($unix_uid, $unix_gid, "$piddir")) {
+		fatal("Could not chown $piddir to $UID/$unix_gid: $!");
+	    }
+	}
+    }
+    if (! -e $eiddir) {
+	if ($impotent) {
+	    print STDERR "Would mkdir $eiddir\n"
+		if ($verbose);
+	}
+	else {
+	    print STDERR "mkdir $eiddir\n"
+		if ($debug);
+	    if (! mkdir($eiddir, 0777)) {
+		fatal("Could not create $eiddir: $!");
+	    }
+	    if (! chown($unix_uid, $unix_gid, "$eiddir")) {
+		fatal("Could not chown $eiddir to $UID/$unix_gid: $!");
+	    }
+	}
+    }
+    if (-e "$eiddir/$idx") {
+	fatal("$eiddir/$idx already exists! $dirent\n");
+    }
+    if ($impotent) {
+	print STDERR "Would mv $dirent to $eiddir/$idx\n"
+	    if ($verbose);
+    }
+    else {
+	print STDERR "Moving $dirent to $eiddir/$idx\n"
+	    if ($debug);
+	if (!rename("$EXPINFO/$dirent", "$eiddir/$idx")) {
+	    fatal("Could not rename $dirent to $eiddir/$idx\n");
+	}
+    }
+}
+closedir(DIR);
+
+#
+# Make sure all projet directories are made.
+#
+foreach my $pid (keys(%projects)) {
+    my $project = Project->Lookup($pid);
+    fatal("Could not find project record")
+	if (!defined($project));
+    
+    my $unix_uid = $project->GetLeader()->unix_uid();
+    my $unix_gid = $project->unix_gid();
+    my $piddir   = "$EXPINFO/$pid";
+
+    if (! -e $piddir) {
+	if ($impotent) {
+	    print STDERR "Would mkdir $piddir\n"
+		if ($verbose);
+	}
+	else {
+	    print STDERR "mkdir $piddir\n"
+		if ($debug);
+	    if (! mkdir($piddir, 0777)) {
+		fatal("Could not create $piddir: $!");
+	    }
+	    if (! chown($unix_uid, $unix_gid, "$piddir")) {
+		fatal("Could not chown $piddir to $UID/$unix_gid: $!");
+	    }
+	}
+    }
+}
+

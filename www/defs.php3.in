@@ -1,12 +1,21 @@
 <?php
 #
-# Standard definitions! 
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Lets emulate register_globals=off for a while.
+include("unregister_globals.php");
+
+#
+# Standard definitions.
 #
 $TBDIR          = "@prefix@/";
 $OURDOMAIN      = "@OURDOMAIN@";
 $BOSSNODE       = "@BOSSNODE@";
 $USERNODE       = "@USERNODE@";
 $CVSNODE	= "cvs.${OURDOMAIN}";
+$WIKINODE	= $USERNODE;
 $TBADMINGROUP   = "@TBADMINGROUP@";
 $WWWHOST	= "@WWWHOST@";
 $WWW		= "@WWW@";
@@ -16,24 +25,38 @@ $TBDOCBASE	= "@TBDOCBASE@";
 $TBWWW		= "@TBWWW@";
 $THISHOMEBASE	= "@THISHOMEBASE@";
 $ELABINELAB     = @ELABINELAB@;
+$PLABSUPPORT    = @PLABSUPPORT@;
+$PUBSUPPORT     = @PUBSUPPORT@;
 $WIKISUPPORT    = @WIKISUPPORT@;
+$TRACSUPPORT    = @TRACSUPPORT@;
 $BUGDBSUPPORT   = @BUGDBSUPPORT@;
 $CVSSUPPORT     = @CVSSUPPORT@;
 $MAILMANSUPPORT = @MAILMANSUPPORT@;
 $CHATSUPPORT    = @CHATSUPPORT@;
+$PROTOGENI      = @PROTOGENI_SUPPORT@;
+$EXP_VIS        = @EXP_VIS_SUPPORT@;
+$ISOLATEADMINS  = @ISOLATEADMINS@;
 $CONTROL_NETWORK= "@CONTROL_NETWORK@";
+$CONTROL_NETMASK= "@CONTROL_NETMASK@";
 $WIKIHOME       = "https://${USERNODE}/twiki";
 $WIKIURL        = "${WIKIHOME}/bin/newlogon";
 $WIKICOOKIENAME = "WikiCookie";
 $BUGDBURL       = "https://${USERNODE}/flyspray";
 $BUGDBCOOKIENAME= "FlysprayCookie";
+$TRACCOOKIENAME = "TracCookie";
 $MAILMANURL     = "http://${USERNODE}/mailman";
 $OPSCVSURL      = "http://${USERNODE}/cvsweb/cvsweb.cgi";
 $OPSJETIURL     = "http://${USERNODE}/jabber/jeti.php";
+$WIKIDOCURL     = "http://${WIKINODE}/wikidocs/wiki";
+$MIN_UNIX_UID   = @MIN_UNIX_UID@;
+$MIN_UNIX_GID   = @MIN_UNIX_GID@;
 $EXPOSELINKTEST = 1;
 $EXPOSESTATESAVE= 0;
 $EXPOSEARCHIVE  = 0;
 $EXPOSETEMPLATES= 0;
+$USERSELECTUIDS = 1;
+$REMOTEWIKIDOCS = @REMOTEWIKIDOCS@;
+$GMAP_API_KEY   = "@GMAP_API_KEY@";
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";
@@ -46,6 +69,7 @@ $TBAUTHTIMEOUT  = "@TBAUTHTIMEOUT@";
 $TBMAINSITE     = "@TBMAINSITE@";
 $TBSECURECOOKIES= "@TBSECURECOOKIES@";
 $TBCOOKIESUFFIX = "@TBCOOKIESUFFIX@";
+$FANCYBANNER    = "@FANCYBANNER@";
 
 $TBWWW_DIR	= "$TBDIR"."www/";
 $TBBIN_DIR	= "$TBDIR"."bin/";
@@ -54,6 +78,7 @@ $TBLIBEXEC_DIR	= "$TBDIR"."libexec/";
 $TBSUEXEC_PATH  = "$TBLIBEXEC_DIR/suexec";
 $TBCHKPASS_PATH = "$TBLIBEXEC_DIR/checkpass";
 $TBCSLOGINS     = "$TBETC_DIR/cslogins";
+$UUIDGEN_PATH   = "@UUIDGEN@";
 
 #
 # Hardcoded check against $WWWHOST, to prevent anyone from accidentally setting
@@ -63,15 +88,38 @@ if ($WWWHOST != "www.emulab.net") {
     $TBMAINSITE = 0;
 }
 
-$TBPROJ_DIR     = "/proj";
-$TBUSER_DIR	= "/users";
-$TBGROUP_DIR	= "/groups";
+#
+# The wiki docs either come from the local node, or in most cases
+# they are redirected back to Utah's emulab.
+#
+if ($TBMAINSITE) {
+    $WIKIDOCURL  = "https://${WIKINODE}/wikidocs/wiki";
+}
+elseif ($REMOTEWIKIDOCS) {
+    $WIKIDOCURL  = "https://wiki.emulab.net/wikidocs/wiki";
+}
+else {
+    $WIKIDOCURL  = "/wikidocs/wiki";
+}
+
+$TBPROJ_DIR     = "@PROJROOT_DIR@";
+$TBUSER_DIR	= "@USERSROOT_DIR@";
+$TBGROUP_DIR	= "@GROUPSROOT_DIR@";
+$TBSCRATCH_DIR	= "@SCRATCHROOT_DIR@";
 $TBCVSREPO_DIR  = "$TBPROJ_DIR/cvsrepos";
 $TBNSSUBDIR     = "nsdir";
 
-$TBAUTHCOOKIE   = "HashCookie" . $TBCOOKIESUFFIX;
-$TBNAMECOOKIE   = "MyUidCookie" . $TBCOOKIESUFFIX;
-$TBLOGINCOOKIE  = "LoginCookie" . $TBCOOKIESUFFIX;
+$TBVALIDDIRS	  = "$TBPROJ_DIR, $TBUSER_DIR, $TBGROUP_DIR";
+$TBVALIDDIRS_HTML = "<code>$TBPROJ_DIR</code>, <code>$TBUSER_DIR</code>, <code>$TBGROUP_DIR</code>";
+if ($TBSCRATCH_DIR) {
+    $TBVALIDDIRS .= ", $TBSCRATCH_DIR";
+    $TBVALIDDIRS_HTML .= ", <code>$TBSCRATCH_DIR</code>";
+}
+
+$TBAUTHCOOKIE   = "NewHashCookie" . $TBCOOKIESUFFIX;
+$TBNAMECOOKIE   = "NewMyUidCookie" . $TBCOOKIESUFFIX;
+$TBEMAILCOOKIE  = "MyEmailCookie" . $TBCOOKIESUFFIX;
+$TBLOGINCOOKIE  = "NewLoginCookie" . $TBCOOKIESUFFIX;
 
 $HTTPTAG        = "http://";
 
@@ -80,6 +128,7 @@ $TBMAIL_WWW		= "Testbed WWW <$TBMAILADDR_WWW>";
 $TBMAIL_APPROVAL	= "Testbed Approval <$TBMAILADDR_APPROVAL>";
 $TBMAIL_LOGS		= "Testbed Logs <$TBMAILADDR_LOGS>";
 $TBMAIL_AUDIT		= "Testbed Audit <$TBMAILADDR_AUDIT>";
+$TBMAIL_NOREPLY		= "no-reply@$OURDOMAIN";
 
 #
 # This just spits out an email address in a page, so it does not need
@@ -97,13 +146,21 @@ putenv("HTTP_SCRIPT=1");
 # to PAGEHEADER
 #
 $RSS_HEADER_NEWS = "<link rel=\"alternate\" type=\"application/rss+xml\" " .
-           "title=\"Emulab News\" href=\"$TBDOCBASE/news-rss.php3\" />";
+           "title=\"Emulab News\" href=\"$TBDOCBASE/news-rss.php3?protogeni=0\" />";
 
+$RSS_HEADER_PGENINEWS =
+   "<link rel=\"alternate\" type=\"application/rss+xml\" " .
+   "title=\"ProtoGeni News\" href=\"$TBDOCBASE/news-rss.php3?protogeni=1\"/>";
 
 #
 # Database constants and the like.
 #
 include("dbdefs.php3");
+include("url_defs.php");
+include("user_defs.php");
+include("group_defs.php");
+include("project_defs.php");
+include("experiment_defs.php");
 
 #
 # Control how error messages are returned to the user. If the session is
@@ -138,6 +195,41 @@ function TBMAIL($to, $subject, $message, $headers = 0)
 }
 
 #
+#
+# Identical to perl function of the same name
+#
+#
+function SendProjAdminMail($proj, $from, $to, $subject, $message, $headers = "")
+{
+    global $MAILMANSUPPORT, $TBMAIL_APPROVAL, $TBMAIL_AUDIT, $OURDOMAIN, $TBMAIL_WWW;
+    $projadminmail = $MAILMANSUPPORT ? "$proj-admin@$OURDOMAIN" : $TBMAIL_APPROVAL;
+    if ($headers) {
+        $headers .= "\n";
+    }
+    if ($from == 'ADMIN') {
+	$from = $projadminmail;
+	$headers .= "Bcc: $projadminmail\n";
+    } elseif ($to == 'ADMIN') {
+	$to = $projadminmail;
+	$headers .= "Reply-To: $projadminmail\n";
+    } else {
+	$headers .= "Bcc: $projadminmail\n";
+    }
+    $headers .= "From: $from\n";
+    if ($from == 'AUDIT') {
+	$from = $TBMAIL_AUDIT;
+	$headers .= "Bcc: $TBMAIL_AUDIT\n";
+    } elseif ($to == "AUDIT") {
+	$to = $TBMAIL_AUDIT;
+    } else {
+	$headers .= "Bcc: $TBMAIL_AUDIT\n";
+    }
+    $headers .= "Errors-To: $TBMAIL_WWW\n"; # FIXME: Why?
+    $headers = substr($headers, 0, -1);
+    TBMAIL($to, $subject, $message, $headers);
+}
+
+#
 # Internal errors should be reported back to the user simply. The actual 
 # error information should be emailed to the list for action. The script
 # should then terminate if required to do so.
@@ -146,6 +238,8 @@ function TBERROR ($message, $death, $xmp = 0) {
     global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR, $TBMAILADDR_OPS;
     global $session_interactive, $session_errorhandler;
     $script = urldecode($_SERVER['REQUEST_URI']);
+
+    CLEARBUSY();
 
     TBMAIL($TBMAIL_OPS,
          "WEB ERROR REPORT",
@@ -170,11 +264,18 @@ function TBERROR ($message, $death, $xmp = 0) {
 }
 
 #
-# General user errors should print something warm and fuzzy
+# General user errors should print something warm and fuzzy.  If a
+# header is not already printed and the dealth paramater is true, then
+# assume the error is a precheck error and send an appropriate HTTP
+# response to prevent robots from indexing the page.  This currently
+# defaults to a "400 Bad Request", but that may change in the future.
 #
-function USERERROR($message, $death) {
+function USERERROR($message, $death = 1, 
+	           $status_code = HTTP_400_BAD_REQUEST) {
     global $TBMAILADDR;
     global $session_interactive, $session_errorhandler;
+
+    CLEARBUSY();
 
     if (! $session_interactive) {
 	if ($session_errorhandler)
@@ -196,7 +297,7 @@ function USERERROR($message, $death) {
             </font>\n";
 
     if ($death) {
-	PAGEERROR($msg);
+	PAGEERROR($msg, $status_code);
     }
     else
         echo "$msg\n";
@@ -214,12 +315,13 @@ function FORMERROR($field) {
 # A page argument error. 
 # 
 function PAGEARGERROR($msg = 0) {
-    $default = "Invalid page arguments: " . $_SERVER['REQUEST_URI'];
+    $default = "Invalid page arguments: " .
+          	htmlspecialchars($_SERVER['REQUEST_URI']);
 
     if ($msg) {
 	$default = "$default<br><br>$msg";
     }
-    USERERROR($default, 1);
+    USERERROR($default, 1, HTTP_400_BAD_REQUEST);
 }
 
 #
@@ -227,10 +329,10 @@ function PAGEARGERROR($msg = 0) {
 #
 # Save this stuff so we can generate better error messages and such.
 # 
-$suexec_cmdandargs = "";
-$suexec_retval     = 0;
-$suexec_output     = "";
-$suexec_output_array;
+$suexec_cmdandargs   = "";
+$suexec_retval       = 0;
+$suexec_output       = "";
+$suexec_output_array = null;
 
 #
 # Actions for suexec. 
@@ -240,6 +342,8 @@ define("SUEXEC_ACTION_DIE",		1);
 define("SUEXEC_ACTION_USERERROR",	2);
 define("SUEXEC_ACTION_IGNORE",		3);
 define("SUEXEC_ACTION_DUPDIE",		4);
+# SUEXEC_ACTION_MAIL_TBLOGS to be ored with one of the above actions
+define("SUEXEC_ACTION_MAIL_TBLOGS",     64);
 
 #
 # An suexec error.
@@ -247,7 +351,7 @@ define("SUEXEC_ACTION_DUPDIE",		4);
 function SUEXECERROR($action)
 {
     global $suexec_cmdandargs, $suexec_retval;
-    global $suexec_output, $suexec_output_array;
+    global $suexec_output;
 
     $foo  = "Shell Program Error. Exit status: $suexec_retval\n";
     $foo .= "  '$suexec_cmdandargs'\n";
@@ -282,6 +386,13 @@ function SUEXEC($uid, $gid, $cmdandargs, $action) {
     global $TBSUEXEC_PATH;
     global $suexec_cmdandargs, $suexec_retval;
     global $suexec_output, $suexec_output_array;
+    global $TBMAIL_LOGS;
+
+    $mail_tblog = 0;
+    if ($action & SUEXEC_ACTION_MAIL_TBLOGS) {
+	$action &= ~SUEXEC_ACTION_MAIL_TBLOGS;
+	$mail_tblog = 1;
+    }
 
     ignore_user_abort(1);
 
@@ -304,6 +415,15 @@ function SUEXEC($uid, $gid, $cmdandargs, $action) {
 	}
     }
 
+    if ($mail_tblog) {
+	$mesg  = "$TBSUEXEC_PATH $suexec_cmdandargs\n";
+	$mesg .= "Return Value: $suexec_retval\n\n";
+	$mesg .= "--------- OUTPUT ---------\n";
+	$mesg .= $suexec_output;
+	
+	TBMAIL($TBMAIL_LOGS, "suexec: $cmdandargs", $mesg);
+    }
+
     #
     # The output is still available of course, via $suexec_output.
     # 
@@ -315,20 +435,16 @@ function SUEXEC($uid, $gid, $cmdandargs, $action) {
     return $suexec_retval;
 }
 
-function ADDPUBKEY($uid, $cmdandargs) {
+#
+# We invoke addpubkey as user nobody all the time. The implied user is passed
+# along in an HTTP_ variable (see tbauth). This avoids a bunch of confusion
+# that results from new users who do not have a context yet. 
+#
+function ADDPUBKEY($cmdandargs) {
     global $TBSUEXEC_PATH;
 
-    #
-    # Complication. User might not have an actual account if setting or
-    # changing his own pubkeys. webonly, unapproved, and unverified users
-    # can still muck with their personal info. So, just invoke as user
-    # nobody. We will get audit email in case we need to track what has
-    # happened. 
-    #
-    if (! HASREALACCOUNT($uid)) {
-	$uid = "nobody";
-    }
-    return SUEXEC($uid, "nobody", $cmdandargs, 0);
+    return SUEXEC("nobody", "nobody", "webaddpubkey $cmdandargs",
+		  SUEXEC_ACTION_CONTINUE);
 }
 
 #
@@ -349,20 +465,11 @@ function CHECKURL($url, &$error) {
 	}
 
 	$fp = @fopen($url, "r");
-	if (! $fp) {
-	    # Check to see if it was a redirect, in which case its OK
-	    for ($i = 0; $i < count($http_response_header); $i++) {
-		if (!strcmp("Location:", substr($http_response_header[$i],0,9))) {
-		    $is_redirect = 1;
-		}
-	    }
-	    if (!$is_redirect) {
-		$error = "URL is not valid; Cannot be accessed!";
-		return 0;
-	    }
-	} else {
-	    fclose($fp);
+	if (!$fp) {
+	    $error = "URL is not valid; Cannot be accessed!";
+	    return 0;
 	}
+	fclose($fp);
     }
     return 1;
 }
@@ -373,6 +480,12 @@ function CHECKURL($url, &$error) {
 function CHECKPASSWORD($uid, $password, $name, $email, &$error)
 {
     global $TBCHKPASS_PATH;
+
+    # Watch for caller errors since this calls to the shell.
+    if (empty($uid) || empty($password) || empty($name) || empty($email)) {
+	$error = "";
+	return 0;
+    }
 
     $uid      = escapeshellarg($uid);
     $password = escapeshellarg($password);
@@ -392,8 +505,46 @@ function CHECKPASSWORD($uid, $password, $name, $email, &$error)
 	    "$TBCHKPASS_PATH $password $uid '$name:$email'", 1);
 }
 
+#
+# Grab a UUID (universally unique identifier).
+#
+function NewUUID()
+{
+    global $UUIDGEN_PATH;
+
+    $uuid = shell_exec($UUIDGEN_PATH);
+    
+    if (isset($uuid) && $uuid != "") {
+	return rtrim($uuid);
+    }
+    TBERROR("$UUIDGEN_PATH Failure", 1);
+}
+
 function LASTNODELOGIN($node)
 {
+}
+
+function VALIDUSERPATH($path, $uid="", $pid="", $gid="", $eid="")
+{
+    global $TBPROJ_DIR, $TBUSER_DIR, $TBGROUP_DIR, $TBSCRATCH_DIR;
+
+    #
+    # No ids specified, just make sure it starts with an appropriate prefix.
+    #
+    if (!$uid && !$pid && !$gid && !$eid) {
+	if (preg_match("#^$TBPROJ_DIR/.*#", $path) ||
+	    preg_match("#^$TBUSER_DIR/.*#", $path) ||
+	    preg_match("#^$TBGROUP_DIR/.*#", $path)) {
+	    return 1;
+	}
+	if ($TBSCRATCH_DIR && preg_match("/^$TBSCRATCH_DIR\/.*/", $path)) {
+	    return 1;
+	}
+	return 0;
+    }
+
+    # XXX for now, see tbsetup/libtestbed.pm for what should happen
+    return 0;
 }
 
 #
@@ -413,6 +564,31 @@ function ARRAY_PRINT($arr) {
 }
 
 #
+# Return Yes or No given boolean
+#
+function YesNo($bool) {
+    return ($bool ? "Yes" : "No");
+}
+
+#
+# If the page was accessed via http redirect to https and exit
+# otherwise do nothing
+#
+function RedirectHTTPS() {
+    global $WWWHOST,$drewheader;
+    if ($drewheader) {
+	trigger_error(
+	    "PAGEHEADER called before RedirectHTTPS ".
+	    "Won't be able to redirect to HTTPS if necessary ".
+	    "in ". $_SERVER['SCRIPT_FILENAME'] . ",",
+	    E_USER_WARNING);
+    } else if (!@$_SERVER['HTTPS'] && $_SERVER['REQUEST_METHOD'] == 'GET') {
+	header("Location: https://$WWWHOST". $_SERVER['REQUEST_URI']);
+	exit;
+    }
+}
+
+#
 # Beware empty spaces (cookies)!
 # 
 require("tbauth.php3");
@@ -420,5 +596,6 @@ require("tbauth.php3");
 #
 # Okay, this is what checks the login and spits out the menu.
 #
+require("Sajax.php");
 require("menu.php3");
 ?>

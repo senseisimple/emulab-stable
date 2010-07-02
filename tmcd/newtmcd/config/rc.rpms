@@ -1,0 +1,161 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo
+my $RPMINSTALL  = "/usr/local/bin/install-rpm %s %s";
+my $RPMDBFILE   = "/var/db/testbed.rpms";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || (REMOTE() && !(JAILED() || PLAB())));
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my %rpms   = ();
+    my $errors = 0;
+    my %tmccresults;
+    
+    print STDOUT "Checking Testbed RPM configuration ... \n";
+
+    if (tmcc(TMCCCMD_RPM, undef, \%rpms) < 0) {
+	fatal("Could not get rpm list from server!");
+    }
+    return
+	if (! keys(%rpms));
+
+    #
+    # Option to install-rpm: Locally, always use the copy (-c) option
+    # to get the file via NFS, but avoid the stupid changing-exports-file
+    # server race (install-rpm knows how to deal with said race).
+    # Remote nodes get the file via the network (-t) option.
+    #
+    # Note: Windows also uses the -t option since root does not have access
+    # to NFS mounted FSes.
+    # 
+    my $installoption = ((REMOTE() || WINDOWS()) ? "-t" : "-c");
+
+    my $ptr = $tmccresults{"PACKAGE"};
+    $ptr = [ $ptr ] if (ref $ptr ne 'ARRAY');
+
+    foreach my $rpm (@$ptr) {
+        my $rpmline = sprintf($RPMINSTALL, $installoption, $rpm);
+		    
+        print STDOUT "Installing RPM $rpm\n";
+        if (system($rpmline)) {
+	    if ($? >> 8 == 255) {
+	        $errors++;
+	    }
+	}
+    }
+    exit($errors);
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do.
+    return;
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Same as booting
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to clean state, as if just allocated).
+#
+sub docleanup()
+{
+    # Remove DB file. No attempt is made to uninstall though.
+    if (-e "$RPMDBFILE") {
+	unlink "$RPMDBFILE";
+    }
+}

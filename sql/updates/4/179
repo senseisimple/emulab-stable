@@ -1,0 +1,13 @@
+#
+# This file intentionally does nothing. Leave it be.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    return 0;
+}
+1;

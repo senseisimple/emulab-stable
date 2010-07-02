@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -54,6 +54,7 @@ use libdb;
 use libtestbed;
 use libxmlrpc;
 use libtblog;
+use Image;
 
 # Locals
 my $FRISBEE     = "$TB/sbin/frisbee";
@@ -88,6 +89,11 @@ else {
     die("Tainted argument $imageid!\n");
 }
 
+my $image = Image->Lookup($imageid);
+if (!defined($image)) {
+    tbdie("No such imageid: $imageid!");
+}
+
 #
 # Grab mcastif. This is has been set up for us, and its a serious kludge.
 #
@@ -104,12 +110,9 @@ else {
 }
 
 #
-# Grab image info.
+# Grab image path.
 #
-my $query_result =
-    DBQueryFatal("select path,creator,gid from images where imageid='$imageid'");
-
-my ($filename,$creator,$gid) = $query_result->fetchrow();
+my $filename = $image->path();
 
 #
 # Ask the outer Emulab to lauch a frisbee and return the loadinfo to us.
@@ -141,8 +144,17 @@ if ($debug) {
     print "$FRISBEE -N -i $mcastif -m $loadaddr -p $loadport $filename\n";
 }
 
+$SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
 system("$FRISBEE -N -i $mcastif -m $loadaddr -p $loadport $filename");
 if ($?) {
     tbdie("Error downloading image data from outer Emulab!");
 }
 exit(0);
+
+sub cleanup {
+    tbwarn("Download interrupted, $filename removed");
+    $SIG{HUP} = $SIG{INT} = $SIG{TERM} = 'IGNORE';
+    kill('TERM', 0); 
+    unlink($filename);
+    exit(-1);
+}

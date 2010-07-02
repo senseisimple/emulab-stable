@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -22,6 +22,8 @@
 	
 #include <sys/param.h>
 
+#include <unistd.h>
+#include <string.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <strings.h>
@@ -49,6 +51,9 @@
 #include <arpa/inet.h>
 #include <setjmp.h>
 #include <netdb.h>
+#ifndef __linux__
+#include <rpc/rpc.h>
+#endif
 #ifdef WITHSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -70,6 +75,17 @@ void usage(void);
 void warning(char *format, ...);
 void die(char *format, ...);
 void dolog(int level, char *format, ...);
+
+int val2speed(int val);
+void rawmode(char *devname, int speed);
+int netmode();
+void writepid(void);
+void createkey(void);
+int handshake(void);
+#ifdef USESOCKETS
+int clientconnect(void);
+#endif
+int handleupload(void);
 
 #ifdef __linux__
 #define _POSIX_VDISABLE '\0'
@@ -114,12 +130,14 @@ int	 powermon = 0;
 #ifndef  USESOCKETS
 #define relay_snd 0
 #define relay_rcv 0
+#define remotemode 0
 #else
 char		  *Bossnode = BOSSNODE;
 struct sockaddr_in Bossaddr;
 char		  *Aclname;
 int		   serverport = SERVERPORT;
 int		   sockfd, tipactive, portnum, relay_snd, relay_rcv;
+int		   remotemode;
 int		   upportnum = -1, upfd = -1, upfilefd = -1;
 char		   uptmpnam[64];
 size_t		   upfilesize = 0;
@@ -294,7 +312,7 @@ int
 main(int argc, char **argv)
 {
 	char strbuf[MAXPATHLEN], *newstr();
-	int flags, op, i;
+	int op, i;
 	struct sigaction sa;
 	extern int optind;
 	extern char *optarg;
@@ -302,16 +320,19 @@ main(int argc, char **argv)
 	struct sockaddr_in name;
 #endif
 
-	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
+	if ((Progname = rindex(argv[0], '/')))
+		Progname++;
+	else
+		Progname = *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:P")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:Pm")) != EOF)
 		switch (op) {
 #ifdef	USESOCKETS
 #ifdef  WITHSSL
 		case 'c':
 		        certfile = optarg;
 		        break;
-#endif  WITHSSL
+#endif  /* WITHSSL */
 		case 'b':
 			Bossnode = optarg;
 			break;
@@ -322,6 +343,10 @@ main(int argc, char **argv)
 
 		case 'i':
 			standalone = 1;
+			break;
+
+		case 'm':
+			remotemode = 1;
 			break;
 #endif /* USESOCKETS */
 		case 'H':
@@ -379,17 +404,21 @@ main(int argc, char **argv)
 
 	Machine = argv[0];
 
-	(void) sprintf(strbuf, PIDNAME, LOGPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), PIDNAME, LOGPATH, argv[0]);
 	Pidname = newstr(strbuf);
-	(void) sprintf(strbuf, LOGNAME, LOGPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), LOGNAME, LOGPATH, argv[0]);
 	Logname = newstr(strbuf);
-	(void) sprintf(strbuf, RUNNAME, LOGPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), RUNNAME, LOGPATH, argv[0]);
 	Runname = newstr(strbuf);
-	(void) sprintf(strbuf, TTYNAME, TIPPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), TTYNAME, TIPPATH, argv[0]);
 	Ttyname = newstr(strbuf);
-	(void) sprintf(strbuf, PTYNAME, TIPPATH, argv[0]);
+	(void) snprintf(strbuf, sizeof(strbuf), PTYNAME, TIPPATH, argv[0]);
 	Ptyname = newstr(strbuf);
-	(void) sprintf(strbuf, DEVNAME, DEVPATH, argv[1]);
+	if (remotemode)
+		strcpy(strbuf, argv[1]);
+	else
+		(void) snprintf(strbuf, sizeof(strbuf),
+				DEVNAME, DEVPATH, argv[1]);
 	Devname = newstr(strbuf);
 
 	openlog(Progname, LOG_PID, LOG_TESTBED);
@@ -457,7 +486,7 @@ main(int argc, char **argv)
 		Bossaddr.sin_port   = htons(serverport);
 	}
 
-	(void) sprintf(strbuf, ACLNAME, ACLPATH, Machine);
+	(void) snprintf(strbuf, sizeof(strbuf), ACLNAME, ACLPATH, Machine);
 	Aclname = newstr(strbuf);
 	
 	/*
@@ -521,10 +550,11 @@ main(int argc, char **argv)
 			die("socket(): %s", geterr(errno));
 		if (connect(ptyfd, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 			die("connect(): %s", geterr(errno));
-		sprintf(key.key, "RELAY %d", portnum);
+		snprintf(key.key, sizeof(key.key), "RELAY %d", portnum);
 		key.keylen = strlen(key.key);
 		if (write(ptyfd, &key, sizeof(key)) != sizeof(key))
 			die("write(): %s", geterr(errno));
+#ifdef  WITHSSL
 		initializessl();
 		sslRelay = SSL_new(ctx);
 		if (!sslRelay)
@@ -535,6 +565,7 @@ main(int argc, char **argv)
 			die("SSL_connect()");
 		if (sslverify(sslRelay, "Capture Server"))
 			die("SSL connection did not verify");
+#endif
 		if (fcntl(ptyfd, F_SETFL, O_NONBLOCK) < 0)
 			die("fcntl(O_NONBLOCK): %s", geterr(errno));
 		tipactive = 1;
@@ -563,13 +594,17 @@ main(int argc, char **argv)
 	}
 	
 	if (!relay_rcv) {
-		rawmode(Devname, speed);
+#ifdef  USESOCKETS
+	    if (remotemode) {
+		if (netmode() != 0)
+		    die("Could not establish connection to %s\n", Devname);
+	    }
+	    else
+#endif
+		    rawmode(Devname, speed);
 	}
-	
 	writepid();
-
 	capture();
-
 	cleanup();
 	exit(0);
 }
@@ -580,7 +615,8 @@ int	pid;
 void
 capture(void)
 {
-	flags = FNDELAY;
+	int flags = FNDELAY;
+
 	(void) fcntl(ptyfd, F_SETFL, &flags);
 
 	if (pid = fork())
@@ -759,7 +795,7 @@ capture(void)
 		if (i == 0) {
 #ifdef	USESOCKETS
 			if (needshake) {
-				handshake();
+				(void) handshake();
 				continue;
 			}
 #endif
@@ -767,10 +803,10 @@ capture(void)
 		}
 #ifdef	USESOCKETS
 		if (FD_ISSET(sockfd, &fds)) {
-			clientconnect();
+			(void) clientconnect();
 		}
 		if ((upfd >=0) && FD_ISSET(upfd, &fds)) {
-			handleupload();
+			(void) handleupload();
 		}
 #endif	/* USESOCKETS */
 		if ((devfd >= 0) && FD_ISSET(devfd, &fds)) {
@@ -788,10 +824,26 @@ capture(void)
 			else
 #endif
 			  cc = read(devfd, buf, sizeof(buf));
-			if (cc < 0)
-				die("%s: read: %s", Devname, geterr(errno));
-			if (cc == 0)
-				die("%s: read: EOF", Devname);
+			if (cc <= 0) {
+#ifdef  USESOCKETS
+				if (remotemode) {
+					FD_CLR(devfd, &sfds);
+					close(devfd);
+					warning("remote socket closed;"
+						"attempting to reconnect");
+					while (netmode() != 0) {
+					    usleep(5000000);
+					}
+					FD_SET(devfd, &sfds);
+					continue;
+				}
+#endif
+				if (cc < 0)
+					die("%s: read: %s",
+					    Devname, geterr(errno));
+				if (cc == 0)
+					die("%s: read: EOF", Devname);
+			}
 			errno = 0;
 
 			sigprocmask(SIG_BLOCK, &actionsigmask, &omask);
@@ -831,6 +883,7 @@ capture(void)
 				}
 				if (i == 0) {
 #ifdef	USESOCKETS
+					sigprocmask(SIG_SETMASK, &omask, NULL);
 					goto disconnected;
 #else
 					die("%s: write: zero-length", Ptyname);
@@ -959,12 +1012,14 @@ dropped:
 			for (lcc = 0; lcc < cc; lcc += i) {
 				if (relay_rcv) {
 #ifdef USESOCKETS
+#ifdef  WITHSSL
 					if (sslRelay != NULL) {
 						i = SSL_write(sslRelay,
 							      &buf[lcc],
 							      cc - lcc);
-					}
-					else {
+					} else
+#endif
+					{
 						i = cc - lcc;
 					}
 #endif
@@ -1208,6 +1263,7 @@ newstr(char *str)
 /*
  * Open up PID file and write our pid into it.
  */
+void
 writepid(void)
 {
 	int fd;
@@ -1222,7 +1278,7 @@ writepid(void)
 	if (chmod(Pidname, 0644) < 0)
 		die("%s: chmod: %s", Pidname, geterr(errno));
 	
-	(void) sprintf(buf, "%d\n", getpid());
+	(void) snprintf(buf, sizeof(buf), "%d\n", getpid());
 	
 	if (write(fd, buf, strlen(buf)) < 0)
 		die("%s: write: %s", Pidname, geterr(errno));
@@ -1323,11 +1379,13 @@ powermonmode(void)
 	usleep(100000);
 	
 	tcflush(devfd, TCOFLUSH);
+	return 0;
 }
 
 /*
  * Put the console line into raw mode.
  */
+void
 rawmode(char *devname, int speed)
 {
 	struct termios t;
@@ -1357,6 +1415,53 @@ rawmode(char *devname, int speed)
 		die("%s: powermonmode: %s", Devname, geterr(errno));
 	
 }
+
+/*
+ * The console line is really a socket on some node:port.
+ */
+#ifdef  USESOCKETS
+int
+netmode()
+{
+	struct sockaddr_in	sin;
+	struct hostent		*he;
+	char			*bp;
+	int			port;
+	char			hostport[BUFSIZ];
+	
+	strcpy(hostport, Devname);
+	if ((bp = strchr(hostport, ':')) == NULL)
+		die("%s: bad format, expecting 'host:port'", hostport);
+	*bp++ = '\0';
+	if (sscanf(bp, "%d", &port) != 1)
+		die("%s: bad port number", bp);
+	he = gethostbyname(hostport);
+	if (he == 0) {
+		warning("gethostbyname(%s): %s", hostport, hstrerror(h_errno));
+		return -1;
+	}
+	bzero(&sin, sizeof(sin));
+	memcpy ((char *)&sin.sin_addr, he->h_addr, he->h_length);
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(port);
+
+	if ((devfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		warning("socket(): %s", geterr(errno));
+		return -1;
+	}
+	if (connect(devfd, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+		warning("connect(): %s", geterr(errno));
+		close(devfd);
+		return -1;
+	}
+	if (fcntl(devfd, F_SETFL, O_NONBLOCK) < 0) {
+		warning("%s: fcntl(O_NONBLOCK): %s", Devname, geterr(errno));
+		close(devfd);
+		return -1;
+	}
+	return 0;
+}
+#endif
 
 /*
  * From kgdbtunnel
@@ -1453,12 +1558,14 @@ clientconnect(void)
 {
 	struct sockaddr_in sin;
 	int		cc, length = sizeof(sin);
-	int             dorelay = 0, doupload = 0;
-	int             ret;
 	int		newfd;
 	secretkey_t     key;
 	capret_t	capret;
+#ifdef WITHSSL
+	int             dorelay = 0, doupload = 0;
+	int             ret;
 	SSL	       *newssl;
+#endif
 
 	newfd = accept(sockfd, (struct sockaddr *)&sin, &length);
 	if (newfd < 0) {
@@ -1718,7 +1825,13 @@ handleupload(void)
 	int		drop = 0, rc, retval = 0;
 	char		buffer[BUFSIZE];
 
-	if ((rc = SSL_read(sslUpload, buffer, sizeof(buffer))) < 0) {
+#ifdef WITHSSL
+	rc = SSL_read(sslUpload, buffer, sizeof(buffer));
+#else
+	/* XXX no clue if this is correct */
+	rc = read(upfd, buffer, sizeof(buffer));
+#endif
+	if (rc < 0) {
 		if ((errno != EINTR) && (errno != EAGAIN)) {
 			drop = 1;
 		}
@@ -1742,8 +1855,10 @@ handleupload(void)
 	}
 
 	if (drop) {
+#ifdef WITHSSL
 		SSL_free(sslUpload);
 		sslUpload = NULL;
+#endif
 		FD_CLR(upfd, &sfds);
 		close(upfd);
 		upfd = -1;
@@ -1759,7 +1874,7 @@ handleupload(void)
  * Generate our secret key and write out the file that local tip uses
  * to do a secure connect.
  */
-int
+void
 createkey(void)
 {
 	int			cc, i, fd;
@@ -1767,7 +1882,7 @@ createkey(void)
 	FILE		       *fp;
 
 	if (relay_snd)
-		return 1;
+		return;
 
 	/*
 	 * Generate the key. Should probably generate a random
@@ -1846,8 +1961,7 @@ createkey(void)
 	/*
 	 * Send the info over.
 	 */
-	handshake();
-	return 1;
+	(void) handshake();
 }
 
 /*

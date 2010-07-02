@@ -1,50 +1,79 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # This script generates the contents of an image. No headers or footers,
-# just spit back an image. The thumbs are public, so no checking is done.
-# To obfuscate, do not use pid/eid, but rather use the resource index. 
+# just spit back an image. 
 #
+
+#
+# Capture script errors and report back to user.
+#
+function SPITERROR($message = "", $death = 1)
+{
+    header("Content-type: image/gif");
+    readfile("coming-soon-thumb.gif");
+}
+$session_interactive  = 0;
+$session_errorhandler = 'SPITERROR';
 
 #
 # Verify page arguments.
-# 
-if (!isset($guid) ||
-    strcmp($guid, "") == 0) {
-    USERERROR("You must provide a Template ID.", 1);
-}
-if (!TBvalid_guid($guid)) {
-    PAGEARGERROR("Invalid characters in GUID!");
-}
-
 #
-# Get the data from the DB.
-#
-$query_result =
-    DBQueryFatal("select image from experiment_template_graphs ".
-		 "where parent_guid='$guid'");
+$reqargs = RequiredPageArguments("template", PAGEARG_TEMPLATE);
+$optargs = OptionalPageArguments("zoom",     PAGEARG_STRING);
 
-if ($query_result && mysql_num_rows($query_result)) {
-    $row  = mysql_fetch_array($query_result);
-    $data = $row['image'];
-
-    if (strlen($data)) {
-	header("Content-type: image/png");
-	echo "$data";
-	return;
+if (isset($zoom)) {
+    if ($zoom != "in" && $zoom != "out") {
+	PAGEARGERROR("Invalid characters in zoom factor!");
     }
 }
 
-# No Data. Spit back a stub image.
-header("Content-type: image/gif");
-readfile("coming-soon-thumb.gif");
+function SPITGRAPH($template)
+{
+    $data = NULL;
+
+    if ($template->GraphImage($data) != 0 || $data == NULL || $data == "") {
+	SPITERROR();
+    }
+    else {
+	header("Content-type: image/png");
+	echo "$data";
+    }
+}
+
+#
+# If the request did not specify a zoom, return whatever we have.
+#
+if (!isset($zoom)) {
+    SPITGRAPH($template);
+    return;
+}
+
+#
+# Otherwise regen the picture, zooming in or out.
+#
+$optarg = "-z " . ($zoom == "in" ? "in" : "out");
+
+$pid = $template->pid();
+$gid = $template->gid();
+$unix_gid = $template->UnixGID();
+
+$retval = SUEXEC($uid, "$pid,$unix_gid", "webtemplate_graph $optarg $guid",
+		 SUEXEC_ACTION_CONTINUE);
+
+if ($retval) {
+    SPITERROR();
+}
+else {
+    SPITGRAPH($template);
+}
 
 #
 # No Footer!

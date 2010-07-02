@@ -1,0 +1,12 @@
+--- perl-5.8.8/ext/IPC/SysV/SysV.xs.orig	2008-12-23 10:48:32.000000000 -0700
++++ perl-5.8.8/ext/IPC/SysV/SysV.xs	2008-12-23 10:48:46.000000000 -0700
+@@ -3,9 +3,6 @@
+ #include "XSUB.h"
+ 
+ #include <sys/types.h>
+-#ifdef __linux__
+-#   include <asm/page.h>
+-#endif
+ #if defined(HAS_MSG) || defined(HAS_SEM) || defined(HAS_SHM)
+ #ifndef HAS_SEM
+ #   include <sys/ipc.h>

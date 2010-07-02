@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -321,13 +321,10 @@ int main( int argc, char ** argv )
       sprintf(runString, programToLaunch, portString);
 
       if (debug) printf("Running '%s'\n", runString);
-
-      for (foo = runString; *foo; foo++);
-      foo[0] = ' ';
-      foo[1] = '&';
-      foo[2] = '\0';
-
-      system( runString );
+      
+      if (! fork()) {
+        exit(system( runString ));
+      }
     }
    
     /*

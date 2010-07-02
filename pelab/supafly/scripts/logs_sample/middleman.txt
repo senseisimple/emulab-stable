@@ -1,0 +1,44 @@
+DEBUG: read 4096 bytes (a block)
+DEBUG: connect from 127.0.0.1:52399
+DEBUG: (send client!) connect from 127.0.0.1:53017
+BLOCKTIME(de): 1 340 at 1160446283.828233
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 2 326 at 1160446283.927870
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 3 326 at 1160446283.928342
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 4 321 at 1160446283.928727
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 5 322 at 1160446283.929112
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 6 326 at 1160446283.929499
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 7 580 at 1160446283.930710
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 8 323 at 1160446283.931122
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 9 327 at 1160446283.931512
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: read 4096 bytes (a block)
+BLOCKTIME(de): 10 320 at 1160446283.931894
+DEBUG: sending to clients
+DEBUG: wrote all block_size 4096 bytes to client 0!
+DEBUG: (send client!) disconnect!
+DEBUG: disconnect from 127.0.0.1

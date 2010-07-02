@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -69,6 +69,7 @@ NSENode instproc make-simulated {args} {
 NSENode instproc updatedb {DB} {
     $self instvar nseconfig
     $self instvar simcode_present
+    var_import ::GLOBALS::sim_osname
 
     # for all the simulated nodes, we need to find out if
     # they are connected to a real node and if so, find the
@@ -102,7 +103,7 @@ NSENode instproc updatedb {DB} {
     tb-set-hardware $self pcnsenode
 
     # NSE code runs only FreeBSD as of now. 
-    $self set osid "FBSD-STD"    
+    $self set osid $sim_osname
 
     # The Node class's updatedb method updates the DB
     $self next $DB

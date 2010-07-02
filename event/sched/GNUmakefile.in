@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,12 +20,13 @@ CFLAGS   += -DSBINDIR='"$(INSTALL_SBINDIR)"'
 #CFLAGS  += -DDEBUG
 CFLAGS	 += -O -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `elvin-config --cflags vin4mt`
+CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -pthread
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += $(LDSTATIC)
 DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
-LIBS     += -levent_r -ltb -lcipher -lz
+LIBS     += -levent_r -ltb -lz
 
 ULXRINC   = -I/usr/local/include -I/usr/local/include/ulxmlrpcpp
 CXXFLAGS += -pthread -O $(ULXRINC) -I$(OBJDIR) -I$(TESTBED_SRCDIR)/lib/libtb
@@ -38,7 +39,7 @@ ULXRLIBS  = -L/usr/local/lib  -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
 #     gave up quickly. Deal with it later. 
 #
 #LIBS     += `elvin-config --libs vin4mt`
-LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
+LIBS	 += -L/usr/local/lib -lpubsub_r -lssl -lcrypto -lm
 
 OBJS	  = event-sched.o 
 
@@ -60,7 +61,7 @@ OBJS = \
 	version.o
 
 event-sched_rrpc: $(OBJS) event-sched.h ../lib/libevent.a
-	$(CXX) $(CFLAGS) -static $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
 
 DEPS = \
 	console-agent.h error-record.h event-sched.h group-agent.h listNode.h \
@@ -89,6 +90,7 @@ install: event-sched_rrpc
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/event-sched.8 \
 		$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	$(INSTALL_PROGRAM) $(SRCDIR)/elog2xplot \
 		$(INSTALL_DIR)/opsdir/bin/elog2xplot
 

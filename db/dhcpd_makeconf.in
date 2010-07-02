@@ -44,15 +44,22 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use NodeType;
 
 my $CRTLTAG	    = TBDB_IFACEROLE_CONTROL();
 my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
 my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
-my $lockfile	    = "/var/tmp/testbed_dhcpd_lockfile";
-my %bossnodes	    = ();
+my %servernodes	    = ();
+my %dhcp_subbosses  = ();
+my %tftp_subbosses  = ();
+my %bootinfo_subbosses  = ();
+my %singlectlnet    = ();
 my $template        = $DHCPD_TEMPLATE;
 my $outfile	    = "/tmp/dhcpd_makeconf.$$";
-my $OUT		    = *STDOUT; 
+my $OUT		    = *STDOUT;
+my %subboss_dhcp_servers;
+
+sub RestartSubbossDhcp($$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -96,86 +103,103 @@ if (defined($options{"t"})) {
 
 #
 # If we are going to actually install this file, must serialize to
-# avoid a trashed config file. Use a dummy file in /var/tmp, opened for
-# writing and flock'ed.
+# avoid a trashed config file.
 #
 if ($install) {
-    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
-    my $count = 0;
-    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
-	#
-	# If we don't get it the first time, we wait for:
-	# 1) The lock to become free, in which case we do our thing
-	# 2) The time on the lock to change, in which case we wait for
-	#    that process to finish
-	#
-	my $oldlocktime = (stat(LOCK))[9];
-	my $gotlock = 0;
-	while (1) {
-	    print "Another dhcpd config update in progress, ".
-		"waiting for it to finish\n";
-	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		# OK, got the lock, we can do what we're supposed to
-		$gotlock = 1;
-		last;
-	    }
-	    my $locktime = (stat(LOCK))[9];
-	    if ($locktime != $oldlocktime) {
-		$oldlocktime = $locktime;
-		last;
-	    }
-	    if ($count++ > 30)  {
-		fatal("Could not get the lock after a long time!\n");
-	    }
-	    sleep(1);
-	}
-
-	$count = 0;
-	#
-	# If we didn't get the lock, wait for the processes that did to finish
-	#
-	if (!$gotlock) {
-	    while (1) {
-		if ((stat(LOCK))[9] != $oldlocktime) {
-		    exit(0);
-		}
-		if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		    close(LOCK);
-		    exit(0);
-		}
-		if ($count++ > 30)  {
-		    fatal("Process with the lock didn't finish after a ".
-			  "long time!\n");
-		}
-		sleep(1); 
-	    }
-	}
+    if ((my $locked = TBScriptLock("dhcpd.conf", 1)) != TBSCRIPTLOCK_OKAY()) {
+	exit(0)
+	    if ($locked == TBSCRIPTLOCK_IGNORE);
+	fatal("Could not get the lock after a long time!\n");
     }
-    #
-    # Perl-style touch(1)
-    #
-    my $now = time;
-    utime $now, $now, $lockfile;
 
     #
     # Open temporary output file.
-    # 
+    #
     open(OF, ">$outfile") or
 	fatal("Could not open $outfile\n");
     $OUT = *OF;
 }
 
+#
+# Locate all the "alternate server" nodes (inner elab boss nodes or
+# inner plab PLC nodes).  We do this now rather than in the per-nodetype
+# query below because the server may not be of the same type as the nodes
+# they serve!
+#
+my $query_result =
+    DBQueryWarn("select r.node_id,i.IP,r.pid,r.eid ".
+		"from reserved as r ".
+                "left join interfaces as i on ".
+                "     r.node_id=i.node_id ".
+                "where (r.inner_elab_role='boss' or ".
+		"       r.inner_elab_role='boss+router' or ".
+		"       r.plab_role='plc') and ".
+		"      i.role='$CRTLTAG' ");
+if (! $query_result) {
+    fatal("Could not dhcpd data from DB!");
+}
+while (my %row = $query_result->fetchhash()) {
+    if (defined($row{"pid"}) && defined($row{"eid"})) {
+	my $pid = $row{"pid"};
+	my $eid = $row{"eid"};
+	my $tag = "${pid}:${eid}";
+
+	$servernodes{$tag} = $row{"IP"};
+
+	#
+	# Need to know if this is a single or dual control network model.
+	#
+	my $exp_result =
+	    DBQueryFatal("select elabinelab_singlenet from experiments ".
+			 "where pid='$pid' and eid='$eid'");
+	if ($exp_result->num_rows) {
+	    $singlectlnet{$tag} = ($exp_result->fetchrow_array())[0];
+	}
+	else {
+	    $singlectlnet{$tag} = 0;
+	}
+    }
+}
+
+# Slurp in all of the subboss data to know A) if we should serve the DHCP
+# lease to a given node, or if the next-server field should be something
+# other than the IP for boss.
+$query_result =
+    DBQueryWarn("select s.node_id, s.service, s.subboss_id, i.IP ".
+		"from subbosses as s left join interfaces as i on ".
+		"s.subboss_id=i.node_id where i.role='$CRTLTAG'");
+if (! $query_result) {
+    fatal("Could not dhcpd data from DB!");
+}
+while (my %row = $query_result->fetchhash()) {
+    my $node_id = $row{"node_id"};
+
+    if ($row{"service"} eq 'tftp') {
+	    $tftp_subbosses{$node_id} = $row{"IP"};
+    } elsif ($row{"service"} eq 'dhcp') {
+	    $dhcp_subbosses{$node_id} = $row{"IP"};
+	    $subboss_dhcp_servers{$row{"subboss_id"}} = 1;
+    } elsif ($row{"service"} eq 'bootinfo') {
+	    $bootinfo_subbosses{$node_id} = $row{"IP"};
+    }
+}
+
 open(IF,"<$template") or
     fatal("Unable to open $template for reading");
 while (<IF>) {
-	if (/^(\s*)\%\%nodetype=(\w+)/) {
+	if (/^(\s*)range\s*;/) {
+		# Comment out a null DHCPD_DYNRANGE line.
+		my $spaces = $1;
+		print $OUT "${spaces}#range ... ...;\n";
+	} elsif (/^(\s*)\%\%nodetype=(\w+)/) {
 		my $spaces = $1;
 		my $nodetype = $2;
-		my $query_result =
-		    DBQueryWarn("select n.node_id,n.pxe_boot_path, ".
-				"       i.IP,i.MAC,r.pid,r.eid, ".
-				"       r.vname,r.inner_elab_role, ".
-				"       r.inner_elab_boot ".
+
+		$query_result =
+		    DBQueryWarn("select n.node_id,n.pxe_boot_path,n.type, ".
+				"       i.IP,i.MAC,r.pid,r.eid,r.vname, ".
+				"       r.inner_elab_role,r.inner_elab_boot, ".
+				"       r.plab_role,r.plab_boot ".
 				"from nodes as n ".
 				"left join interfaces as i on ".
 				"     n.node_id=i.node_id ".
@@ -190,29 +214,15 @@ while (<IF>) {
 		    fatal("Could not dhcpd data from DB!");
 		}
 
-		#
-		# First go through and find any boss nodes. We need these
-		# to create the next-server line for elabinelab.
-		#
-		while (my %row = $query_result->fetchhash()) {
-		    if (defined($row{"pid"}) &&
-			defined($row{"inner_elab_role"}) &&
-			($row{"inner_elab_role"} eq "boss" ||
-			 $row{"inner_elab_role"} eq "boss+router")) {
-			my $tag = $row{"pid"} . ":" . $row{"eid"};
-			
-			$bossnodes{$tag} = $row{"IP"};
-		    }
-		}
-		$query_result->dataseek(0);
-		
 		while (my %row = $query_result->fetchhash()) {
 		    my $ip  = $row{"IP"};
 		    my $mac = $row{"MAC"};
 		    my $node_id;
 		    my $next_server = "";
+		    my $bootinfo_server = "";
 		    my $hostname = "";
 		    my $dns = "";
+		    my $booting = "";
 		    my $filename = "";
 
 		    if ($vnames && defined($row{"vname"})) {
@@ -222,27 +232,94 @@ while (<IF>) {
 			$node_id = $row{"node_id"};
 		    }
 
-		    if (defined($row{"pid"}) &&
-			$row{"inner_elab_boot"} == 1 &&
-			defined($row{"inner_elab_role"}) &&
-			$row{"inner_elab_role"} eq "node") {
-			my $tag = $row{"pid"} . ":" . $row{"eid"};
-			
-			$next_server = "${spaces}\tnext-server " .
-			    $bossnodes{$tag} . ";\n";
-			$dns = "${spaces}\toption domain-name-servers 1.1.1.1;\n";
+		    my $tag;
+		    if (defined($row{"pid"})) {
+			$tag = $row{"pid"} . ":" . $row{"eid"};
+		    }
+
+		    if (defined($tag) && defined($servernodes{$tag}) &&
+			(($row{"inner_elab_boot"} == 1 &&
+			  defined($row{"inner_elab_role"}) &&
+			  $row{"inner_elab_role"} eq "node") ||
+			 ($row{"plab_boot"} == 1 &&
+			  defined($row{"plab_role"}) &&
+			  $row{"plab_role"} eq "node"))) {
+
+			#
+			# XXX it is not yet completely clear what all we
+			# need to do, or not do, for plab nodes.
+			#
+			if ($row{"plab_boot"} == 1) {
+			    $hostname =
+				"${spaces}\toption host-name \"$node_id\";\n";
+			    $next_server = "${spaces}\tnext-server " .
+				$servernodes{$tag} . ";\n";
+			} else {
+			    if ($singlectlnet{$tag}) {
+				$hostname = "${spaces}\toption host-name ".
+				    "\"$node_id\";\n";
+				$booting  = "${spaces}\tignore booting;\n";
+			    }
+			    else {
+				$next_server = "${spaces}\tnext-server " .
+				    $servernodes{$tag} . ";\n";
+				$dns = "${spaces}\toption ".
+				    "domain-name-servers 1.1.1.1;\n";
+			    }
+			}
+		    }
+		    elsif (defined $dhcp_subbosses{$node_id}) {
+			$hostname =
+			    "${spaces}\toption host-name \"$node_id\";\n";
+	                $booting = "${spaces}\tignore booting;\n";
 		    }
 		    else {
 			$hostname =
 			    "${spaces}\toption host-name \"$node_id\";\n";
+
+		        if (defined $tftp_subbosses{$node_id}) {
+			    $next_server = "${spaces}\tnext-server " .
+			        $tftp_subbosses{$node_id} . ";\n";
+		        }
+
+		        if (defined $bootinfo_subbosses{$node_id}) {
+			    $bootinfo_server = "${spaces}\toption PXE.emulab-bootinfo " .
+			        $bootinfo_subbosses{$node_id} . ";\n";
+		        }
+
 		    }
-		    
-		    # Handle alternate boot program filename if it exists
+
+		    #
+		    # Handle alternate boot program filename if it exists.
+		    # Use mutable nodes.pxe_boot_path if it is defined.
+		    # Otherwise use the node_types.pxe_boot_path if it is
+		    # defined.  Otherwise don't set anything (use the global
+		    # default).
+		    #
 		    if (defined($row{"pxe_boot_path"})) {
 			my $fn = $row{"pxe_boot_path"};
 			# make sure it is pretty constrained
 			if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
 			    $filename = "${spaces}\tfilename \"$fn\";\n";
+			}
+		    }
+		    if (!$filename) {
+			# Get the type info for this type.
+			my $nodetype = NodeType->Lookup($row{"type"});
+			# Get the type specific version of pxe_boot_path
+			my $nt_pxe_boot_path;
+
+			$nodetype->pxe_boot_path(\$nt_pxe_boot_path) == 0
+                            or fatal("Could not get pxe_boot_path for ".
+				     "$node_id");
+
+			if (defined($nt_pxe_boot_path)) {
+			    my $fn = $nt_pxe_boot_path;
+
+			    # make sure it is pretty constrained
+			    if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
+				$filename = "${spaces}\tfilename \"$fn\";\n";
+			    }
 			}
 		    }
 
@@ -252,7 +329,9 @@ while (<IF>) {
 		    print $OUT "${spaces}host $ip {\n";
 		    print $OUT $filename;
 		    print $OUT $next_server;
+		    print $OUT $bootinfo_server;
 		    print $OUT $dns;
+		    print $OUT $booting;
 		    print $OUT "${spaces}\thardware ethernet $mac;\n";
 		    print $OUT $hostname;
 		    print $OUT "${spaces}\tfixed-address $ip;\n";
@@ -289,7 +368,16 @@ if ($install) {
 	if (kill('TERM', $dpid) == 0) {
 	    fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
 	}
+
+        my $old_uid = $UID;
+        $UID = $EUID;
+        for my $subboss (keys %subboss_dhcp_servers) {
+            RestartSubbossDhcp($subboss, $restart);
+        }
+        $UID = $old_uid;
     }
+
+    TBScriptUnlock();
 }
 exit(0);
 
@@ -298,6 +386,25 @@ exit(0);
 #
 sub fatal {
     my $msg = $_[0];
-    die($msg);
+
+    TBScriptUnlock()
+	if ($install);
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+sub RestartSubbossDhcp($$)
+{
+        my ($subboss, $restart) = @_;
+        
+        my $cmd = "ssh $subboss @prefix@/sbin/subboss_dhcpd_makeconf";
+
+        $cmd .= " -r" if ($restart);
+
+        print "Restarting dhcpd on subboss $subboss\n";
+        if (system($cmd)) {
+	    print STDERR "Failed to restart dhcpd on $subboss\n";
+	}
 }
 

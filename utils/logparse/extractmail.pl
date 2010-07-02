@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Extract testbed mail of interest.  Takes one or more mboxs of interest
 # and creates a new file with only the messages of interest.  Duplicates
 # are ignored.  Note that the resulting file is NOT necessarily in date order.

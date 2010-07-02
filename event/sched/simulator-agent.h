@@ -132,6 +132,14 @@ int add_report_data(simulator_agent_t sa,
  */
 int send_report(simulator_agent_t sa, char *args);
 
+
+/**
+ * Send an "error" report.  Similar to send_report but doesn't create
+ * a zip file or clear the logs directory.  Also avoids overwriting
+ * the "report.mail" file by writing to "error-report.mail" instead.
+ */
+int send_error_report(simulator_agent_t sa, char *args);
+
 #ifdef __cplusplus
 }
 #endif

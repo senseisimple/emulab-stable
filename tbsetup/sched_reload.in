@@ -1,11 +1,10 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
 use Getopt::Std;
    
@@ -43,6 +42,11 @@ my $TB     = "@prefix@";
 #
 use lib "@prefix@/lib";
 use libdb;
+use Project;
+use User;
+use Node;
+use Image;
+use Experiment;
 
 #
 # These come from the library.
@@ -60,19 +64,12 @@ my $force	= 0;
 my $pend	= 0;
 my @nodes       = ();
 my $type	= TB_DEFAULT_RELOADTYPE;
-my $usedefault  = 1;
-my $imagename;
+my $project;
+my $experiment;
+my $image;
 my $imageid;
 my $imagepid    = TB_OPSPID;
 my %imagenodes  = ();
-my @row;
-my $eidmode     = 0;
-my $typemode    = 0;
-my $classmode   = 0;
-my @types	= ();
-my $class;
-my $pid;
-my $eid;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -81,10 +78,27 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1; #Turn off line buffering on output
 
 #
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("*** $0:\n".
+	"    You ($UID) do not exist!\n");
+}
+
+#
+# Mere users cannot schedule reloads.
+#
+if ($UID && !$this_user->IsAdmin()) {
+    die("*** $0:\n".
+	"     Only root or TB administrators can schedule disk reloads.\n");
+}
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -100,78 +114,93 @@ if ($pend and $force) {
 if (defined($options{"i"}) && defined($options{"m"})) {
     usage();
 }
-if (defined($options{"i"})) {
-    $imagename  = $options{"i"};
-    $usedefault = 0;
 
-    if ($imagename =~ /^([-\w\.\+]+)$/) {
-	$imagename = $1;
-    }
-    else {
-	die("Bad data in $imagename.");
-    }
-    
+#
+# Find the image (if not the default).
+#
+if (defined($options{"i"})) {
     if (defined($options{"p"})) {
 	$imagepid = $options{"p"};
-	
-	if ($imagepid =~ /^([-\w\.\+]+)$/) {
-	    $imagepid = $1;
-	}
-	else {
-	    die("*** Bad data in $imagepid.\n");
-	}
     }
-}
-if (defined($options{"m"})) {
-    $imageid = $options{"m"};
-    $usedefault = 0;
+    $project = Project->Lookup($imagepid);
+    if (!defined($project)) {
+	die("*** $:\n".
+	    "    No such project $imagepid!\n");
+    }
+    # This is untainted.
+    $imagepid = $project->pid();
 
-    if ($imageid =~ /^([-\w\.\+]+)$/) {
-	$imageid = $1;
+    # Look up image in project.
+    $image = Image->Lookup($imagepid, $options{"i"});
+    if (!defined($image)) {
+	die("*** $:\n".
+	    "    No such image!\n");
     }
-    else {
-	die("*** Bad data in $imageid\n");
-    }
+    # This is untainted.
+    $imageid = $image->imageid();
 }
+elsif (defined($options{"m"})) {
+    $image = Image->Lookup($options{"m"});
+    if (!defined($image)) {
+	die("*** $:\n".
+	    "    No such image!\n");
+    }
+    # This is untainted.
+    $imageid = $image->imageid();
+}
+
+#
+# Figure out what nodes to reload.
+#
 if (defined($options{"e"})) {
-    if (@ARGV) {
-	usage();
+    usage()
+	if (@ARGV);
+
+    $experiment = Experiment->Lookup($options{"e"});
+    if (!defined($experiment)) {
+	die("*** $:\n".
+	    "    No such experiment!\n");
     }
-    
-    $eidmode = $options{"e"};
-    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
-	$pid = $1;
-	$eid = $2;
-    }
-    else {
-	print STDOUT "Invalid argument to -e option: $eidmode\n";
-	usage();
+    @nodes = $experiment->NodeList();
+    if (!@nodes) {
+	die("*** $0:\n".
+	    "    There are no nodes allocated to $experiment!\n");
     }
 }
 elsif (defined($options{"t"})) {
-    if (!@ARGV) {
-	usage();
-    }
+    usage()
+	if (!@ARGV);
     
-    $typemode = 1;
-
     #
     # Untaint types,
     #
-    foreach my $type ( @ARGV ) {
+    foreach my $type (@ARGV) {
 	if ($type =~ /^([-\w]+)$/) {
 	    $type = $1;
 	}
 	else {
 	    die("Bad type name: $type.");
 	}
-    
-	push(@types, $type);
+	my $query_result =
+	    DBQueryFatal("select node_id from nodes ".
+			 "where type='$type' and role='testnode'");
+
+	while (my ($nodeid) = $query_result->fetchrow_array()) {
+	    my $node = Node->Lookup($nodeid);
+	    if (!defined($node)) {
+		die("*** $0:\n".
+		    "    Could not map node $nodeid to its object!\n");
+	    }
+	    push(@nodes, $node);
+	}
+    }
+    if (!@nodes) {
+	die("*** $0:\n".
+	    "    There are no nodes of any type!\n");
     }
 }
 elsif (defined($options{"c"})) {
-    $classmode = 1;
-    $class     = $options{"c"};
+    my $class     = $options{"c"};
 
     if ($class =~ /^([-\w]+)$/) {
 	$class = $1;
@@ -179,52 +208,35 @@ elsif (defined($options{"c"})) {
     else {
 	die("*** Bad data in $class\n");
     }
-}
-else {
-    if (@ARGV < 1) {
-	usage();
-    }
-}
-
-if ($eidmode) {
-    if (! (@nodes = ExpNodes($pid, $eid))) {
-	die("*** $0:\n".
-	    "    There are no nodes allocated to experiment $pid/$eid!");
-    }
-}
-elsif ($typemode) {
-    foreach my $type ( @types ) {
-	my $query_result =
-	    DBQueryFatal("select node_id from nodes ".
-			 "where type='$type' and role='testnode'");
-
-	while (my ($node) = $query_result->fetchrow_array()) {
-	    push(@nodes, $node);
-	}
-    }
-}
-elsif ($classmode) {
     my $query_result =
 	    DBQueryFatal("select n.node_id from nodes as n ".
 			 "left join node_types as nt on n.type=nt.type ".
 			 "where nt.class='$class' and n.role='testnode'");
-
-    while (my ($node) = $query_result->fetchrow_array()) {
+    
+    while (my ($nodeid) = $query_result->fetchrow_array()) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    die("*** $0:\n".
+		"    Could not map node $nodeid to its object!\n");
+	}
 	push(@nodes, $node);
+    }
+    if (!@nodes) {
+	die("*** $0:\n".
+	    "    There are no nodes of class $class!\n");
     }
 }
 else {
-    #
-    # Untaint nodes.
-    #
-    foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\@\w]+)$/) {
-	    $node = $1;
+    # Nodes on command line
+    usage()
+	if (@ARGV < 1);
+
+    foreach my $n (@ARGV) {
+	my $node = Node->Lookup($n);
+	if (!defined($node)) {
+	    die("*** $0:\n".
+		"    Node $n does not exist!\n");
 	}
-	else {
-	    die("Bad node name: $node.");
-	}
-    
 	push(@nodes, $node);
     }
 }
@@ -233,8 +245,8 @@ else {
 # VIRTNODE HACK: Virtual nodes are special. Do not reload!
 #
 my @temp = ();
-foreach my $node ( @nodes ) {
-    if (TBIsNodeVirtual($node)) {
+foreach my $node (@nodes) {
+    if ($node->isvirtnode()) {
 	print "*** Skipping virtual node $node ...\n";
 	next;
     }
@@ -247,55 +259,28 @@ if (! @nodes) {
 }
 
 #
-# Root and admin types can do whatever they want.
-# Mere users cannot schedule reloads.
-#
-if ($UID && !TBAdmin($UID)) {
-    die("*** $0:\n".
-	"     Only root or TB administrators can schedule disk reloads.\n");
-}
-
-#
-# Confirm a valid imagename if one was specified. Otherwise we are going
-# to pull it out of the DB for each node.
-#
-if (defined($imagename)) {
-    if (! ($imageid = TBImageID($imagepid, $imagename))) {
-	die("*** $0:\n".
-	    "    No such image $imagename in project $imagepid!\n");
-    }
-}
-
-#
 # Loop through each node.
 # 
 my @load_list=();
 foreach my $node (@nodes) {
-    my $pc = $node;
-    my $allocated = 0;
-
-    $sth = DBQueryFatal("select node_id from nodes where node_id='$pc'");
-    if ($sth->num_rows() != 1) {
-      print STDERR "Node $pc does not exist. Skipping $pc.\n";
-      next;
-    }
+    my $pc = $node->node_id();
+    my $allocated  = 0;
+    my $this_image = $image;
 
     #
     # Get default imageid for this node if none specified on comand line.
     #
-    if ($usedefault) {
-	if (! DefaultImageID($node, \$imageid) || !defined($imageid)) {
+    if (!defined($this_image)) {
+	$this_image = Image->Lookup($node->default_imageid());
+	if (!defined($this_image)) {
 	    print STDERR
 		"*** Node $pc does not have a default imageid. Skipping!\n";
 	    next;
 	}
     }
-    
-    print STDERR "Checking if $pc is reserved...";
-    $sth = DBQueryFatal("select node_id from reserved where node_id='$pc'");
-   
-    if ( ($sth->num_rows()) < 1) {
-        print STDERR "Available.\nReserving and adding to list.\n";
+
+    if (!$node->IsReserved()) {
+        print STDERR "Reserving $node and adding to list.\n";
 	my $eid;
 	if ($pend) {
 	    $eid = $PENDINGEID;
@@ -315,8 +300,9 @@ foreach my $node (@nodes) {
 	    DBQueryFatal("delete from last_reservation where node_id='$pc'");
 	    $allocated = 1;
 	}
-    } else {
-        print STDERR "Reserved.\n";      
+    }
+    else {
+        print STDERR "$node is already reserved.\n";      
     }
 
     #
@@ -328,7 +314,7 @@ foreach my $node (@nodes) {
     }
 
     # Put it in the reloads table so TMCD knows to free it.
-    if (! TBSetSchedReload($pc, $imageid, $type)) {
+    if ($node->SetSchedReload($this_image, $type) != 0) {
 	die("*** $0:\n".
 	    "    Could not set scheduled reload for $pc!"); 
     }
@@ -343,11 +329,11 @@ foreach my $node (@nodes) {
     # in PERL, hence this funny looking code!
     #
     if ($allocated) {
-	if (! defined($imagenodes{$imageid})) {
-	    $imagenodes{$imageid} = [ $node ];
+	if (! defined($imagenodes{$this_image->imageid()})) {
+	    $imagenodes{$this_image->imageid()} = [ $pc ];
 	}
 	else {
-	    push(@{ $imagenodes{$imageid} }, $node);
+	    push(@{ $imagenodes{$this_image->imageid()} }, $pc);
 	}
     }
 }
@@ -362,7 +348,7 @@ if ($pend) {
 # stores a list of nodes for each imageid.
 #
 foreach my $id ( keys(%imagenodes) ) {
-    my @nodelist = @{ $imagenodes{$imageid} };
+    my @nodelist = @{ $imagenodes{$id} };
 
     my $cmd = "$osload -m $id @nodelist";
 

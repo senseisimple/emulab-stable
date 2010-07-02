@@ -2,12 +2,12 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 #
-# install-ops - Script to do the initial install of an ops node
+# ops-install - Script to do the initial install of an ops node
 #
 # The main things it does not do yet:
 # * Figure out where to put directories such as /users /proj - they must
@@ -23,7 +23,7 @@ my $PREFIX = '@prefix@';
 
 my @MAILING_LISTS = ("@TBOPSEMAIL@","@TBLOGSEMAIL@","@TBWWWEMAIL@",
     "@TBAPPROVALEMAIL@","@TBAUDITEMAIL@","@TBSTATEDEMAIL@",
-    "@TBTESTSUITEEMAIL@", "@TBERRORSEMAIL@");
+    "@TBTESTSUITEEMAIL@", "@TBERRORSEMAIL@", "@TBAUTOMAILEMAIL@");
 
 
 my $OURDOMAIN   = '@OURDOMAIN@';
@@ -42,9 +42,22 @@ my $CVSSUPPORT  = @CVSSUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
-my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
 my $LIBDIR      = "$PREFIX/lib";
+my $SCRATCHDIR =  '@FSDIR_SCRATCH@';
+my $OUTER_BOSS = '@OUTERBOSS_NODENAME@';
+if ($OUTER_BOSS eq '')
+    { $OUTER_BOSS = "www.emulab.net"; }
+
+#
+# Fixed paths for clients
+#
+my $PROJROOT    = "@PROJROOT_DIR@";
+my $GROUPROOT   = "@GROUPSROOT_DIR@";
+my $USERROOT    = "@USERSROOT_DIR@";
+my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
+my $SHAREROOT	= "@SHAREROOT_DIR@";
+my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 
 # True if we are also the FS node
 my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
@@ -55,6 +68,14 @@ my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
 
 # Should be configure variable
 my $TBADMINGID  = 101;
+
+#
+# XXX temporary for perl DBD mysql access
+my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
+# XXX temporary until fix dependencies in emulab-ops package
+my $PYM2_PKG	  = "py25-m2crypto-0.19.1";
+# XXX temporary until someone extracts their head from the dark regions
+my $EASYINSTALL	  = "/usr/local/bin/easy_install";
 
 #
 # Allow this to work if the library is left in the source directory
@@ -69,14 +90,18 @@ use Getopt::Std;
 # Handle command-line options
 #
 sub usage {
-    print "Usage: ops-install [-b] [-p packagedir] [-P portname]\n";
+    print "Usage: ops-install [-b] [-p packagedir] [-s] " .
+	"[-P ops-portname] [-F fs-portname]\n";
+    print "  Required: -p (for binary packages) or -s (for source makes.)\n";
     exit(1);
 }
 
 # Version of FreeBSD.
-my $FBSD_VERSION = 4;
-if (`uname -r` =~ /^(\d)/) {
-    $FBSD_VERSION = $1;
+my $FBSD_MAJOR = 4;
+my $FBSD_MINOR = 10;
+if (`uname -r` =~ /^(\d+)\.(\d+)/) {
+    $FBSD_MAJOR = $1;
+    $FBSD_MINOR = $2;
 }
 else {
     die("Could not determine what version of FreeBSD you are running!\n");
@@ -86,15 +111,28 @@ else {
 # The meta-ports (name and version) that drag in all the dependancies for
 # an ops/fs node. These are OS dependent as we upgrade.
 #
-my $OPS_PORT  = (($FBSD_VERSION == 4) ? "emulab-ops-1.4" : "emulab-ops-2.0");
-my $FS_PORT   = (($FBSD_VERSION == 4) ? "emulab-fs-1.4" : "emulab-fs-2.0");
+my $OPS_PORT = "emulab-ops-1.4"; 
+my $FS_PORT = "emulab-fs-1.4";
+if ($FBSD_MAJOR > 4) {
+    if ($FBSD_MAJOR > 6) {
+	$OPS_PORT = "emulab-ops-3.0";
+	$FS_PORT = "emulab-fs-3.0";
+    } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
+	$OPS_PORT = "emulab-ops-2.1";
+	$FS_PORT = "emulab-fs-2.1";
+    } else {
+	$OPS_PORT = "emulab-ops-2.0";
+	$FS_PORT = "emulab-fs-2.0";
+    }
+}
 my $PHP4_PORT = "php4-extensions-1.0";
 
 my $packagedir = "";
 my $batchmode  = 0;
+my $domakes  = 0;
 my $password;
 my %opts;
-if (! getopts("P:p:bw:F:", \%opts)) {
+if (! getopts("P:p:bsw:F:", \%opts)) {
     usage();
 }
 if (defined($opts{p})) {
@@ -102,6 +140,9 @@ if (defined($opts{p})) {
 }
 if (defined($opts{b})) {
     $batchmode = 1;
+}
+if (defined($opts{s})) {
+    $domakes = 1;
 }
 if (defined($opts{P})) {
     $OPS_PORT = $opts{P};
@@ -111,6 +152,15 @@ if (defined($opts{F})) {
 }
 if (defined($opts{w})) {
     $password = $opts{w};
+}
+# Don't just charge into making ports from source by default.
+if ($packagedir eq "" and $domakes eq 0) {
+    print "At least one of -p and -s must be given.\n";
+    usage();
+}
+if ($packagedir ne "" and $domakes eq 1) {
+    print "Only one of -p and -s can be given.\n";
+    usage();
 }
 if (@ARGV) {
     usage();
@@ -134,12 +184,11 @@ my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
 my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
-my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
+my $PKG_DEL    = "/usr/sbin/pkg_delete";
 my $PWD        = "/bin/pwd";
 my $CP         = "/bin/cp";
 my $MV         = "/bin/mv";
-my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
 my $MOUNT      = "/sbin/mount";
 my $TAR	       = "/usr/bin/tar";
@@ -168,9 +217,9 @@ my $SMBCONF_FILE    = "/usr/local/etc/smb.conf";
 my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
 my $APACHE_ETCDIR   = "/usr/local/etc/apache";
 my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
+my $WWWDIR          = "/usr/local/www/data";
 
 # For installing mysqld
-my $MYSQL           = "/usr/local/bin/mysql";
 my $MYSQLADMIN      = "/usr/local/bin/mysqladmin";
 my $MYSQLSHOW       = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP       = "/usr/local/bin/mysqldump";
@@ -183,32 +232,33 @@ my $MYSQL_LOGDIR    = "$LOGDIR/mysql";
 #
 my $LIST_DIR      = "/etc/mail/lists";
 my $TIPLOG_DIR    = "/var/log/tiplogs";
-my $PORTSDIR      = "/usr/ports";
 my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $SRCDIR        = '@srcdir@';
-my $TOP_SRCDIR    = "@top_srcdir@";
-my $RCDIR         = "/usr/local/etc/rc.d";
-my $VARRUN        = "/var/run";
 
 #
 # And some lists that we use
 #
 my @LOCAL_HOSTS        = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
 my @LOGFILES           = ("/var/log/logins","/var/log/tiplogs/capture.log",
-    "/var/log/mountd.log");
+    "/var/log/mountd.log", "$LOGDIR/pubsubd.log", "$LOGDIR/elvin_gateway.log");
+
 my @LOCAL_MAILING_LISTS = grep(/$OURDOMAIN$/,@MAILING_LISTS);
 my @MAILING_LIST_NAMES  = map { /^([\w-]+)\@/ } @LOCAL_MAILING_LISTS;
 
-my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
-    ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
+my @TESTBED_DIRS       = ([$PREFIX, "0775"], [$USERROOT, "0755"],
+			  [$PROJROOT, "0755"], [$GROUPROOT, "0755"],
+			  [$SHAREROOT, "0775"]);
 
-my @MOUNTPOINTS        = ("/users", "/proj", "/groups", "/share");
+my @MOUNTPOINTS        = ($USERROOT, $PROJROOT, $GROUPROOT, $SHAREROOT);
+
+if ($SCRATCHDIR) {
+    push(@TESTBED_DIRS, [$SCRATCHROOT, "0755"]);
+    push(@MOUNTPOINTS, $SCRATCHROOT);
+}
 
 #
 # A few files we have to deal with
 #
-my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
-my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
 my $MAILMAN_PATCH   = "$TOP_SRCDIR/patches/mailman.patch";
 my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
@@ -240,6 +290,13 @@ if ($UID != 0) {
 #
 # The phases are fairly self-explanatory
 #
+Phase "sperl", "Checking for setuid perl", sub {
+    if (ExecQuiet("$PKG_INFO -L -x perl-5 | fgrep -q -s sperl") == 0) {
+	PhaseSkip("Perl is okay");
+    }
+    PhaseFail("setuid perl is not set up properly. Read the wiki!");
+};
+
 Phase "usersgroups", "Creating users and groups", sub {
     Phase "tbadmin", "Creating tbadmin group", sub {
 	if (getgrnam("tbadmin")) {
@@ -298,7 +355,7 @@ Phase "ports", "Installing ports", sub {
 	    }
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT");
 	};
-	if ($FBSD_VERSION > 4) {
+	if ($FBSD_MAJOR > 4) {
 	    Phase "php4", "Installing php4 package", sub {
 		if (!ExecQuiet("$PKG_INFO -e $PHP4_PORT")) {
 		    PhaseSkip("Package already installed");
@@ -309,6 +366,47 @@ Phase "ports", "Installing ports", sub {
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir ".
 			       "     $PKG_ADD $PHP4_PORT");
 	    };
+	}
+	# XXX Also temporary
+	Phase "pubsub", "Installing pubsub package", sub {
+	    my $pspkg = $ELVIN_COMPAT ? "pubsub-elvincompat" : "pubsub";
+	    if (!ExecQuiet("$PKG_INFO -x $pspkg")) {
+		PhaseSkip("$pspkg already installed");
+	    }
+	    my $pname = GetPackage($pspkg, $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
+	# XXX Ditto
+	if ($FBSD_MAJOR > 6 || ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2)) {
+	    Phase "p5-DBD-mysql50", "Installing old Perl Mysql package", sub {
+		my $pname = `$PKG_INFO -E 'p5-DBD-mysql50-*' 2>/dev/null`;
+		chomp($pname);
+		if ($pname eq $P5DBD_PKG) {
+		    PhaseSkip("p5-DBD-mysql50 already up to date");
+		}
+		if (!$packagedir) {
+		    PhaseSkip("No package directory provided");
+		}
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
+		    if ($pname);
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
+	    };
+	    # XXX cannot seem to get these dependencies into emulab-boss
+	    if ($FBSD_MAJOR > 6) {
+		Phase "py-m2crypto", "Installing python m2crypto package", sub {
+		    my $pname = `$PKG_INFO -E 'py25-m2crypto-*' 2>/dev/null`;
+		    chomp($pname);
+		    if ($pname eq $PYM2_PKG) {
+			PhaseSkip("py25-m2crypto already up to date");
+		    }
+		    if (!$packagedir) {
+			PhaseSkip("No package directory provided");
+		    }
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
+			if ($pname);
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PYM2_PKG");
+		};
+	    }
 	}
     };
     Phase "fs-packages", "Installing FS packages", sub {
@@ -331,19 +429,14 @@ Phase "ports", "Installing ports", sub {
 	    if (!$packagedir) {
 		PhaseSkip("No package directory provided");
 	    }
-	    # Lets not hardwire the package name; whatever it is will do.
-	    my $pname = `ls $packagedir/mailman-*.tbz`;
-	    PhaseFail("Cannot find mailman package in $packagedir!")
-		if ($?);
-	    chomp($pname);
-	    
+	    my $pname = GetPackage("mailman", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
     if ($CVSSUPPORT) {
 	Phase "cvsd", "Installing cvsd package", sub {
 	    PhaseSkip("cvsd not supported on ops")
-		if ($FBSD_VERSION < 6);
+		if ($FBSD_MAJOR < 6);
 
 	    if (!ExecQuiet("$PKG_INFO -x -E cvsd")) {
 		PhaseSkip("cvsd package already installed");
@@ -351,19 +444,14 @@ Phase "ports", "Installing ports", sub {
 	    if (!$packagedir) {
 		PhaseSkip("No package directory provided");
 	    }
-	    # Lets not hardwire the package name; whatever it is will do.
-	    my $pname = `ls $packagedir/cvsd-*.tbz`;
-	    PhaseFail("Cannot find cvsd package in $packagedir!")
-		if ($?);
-	    chomp($pname);
-	    
+	    my $pname = GetPackage("cvsd", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
     if ($BUGDBSUPPORT) {
 	Phase "flyspray", "Installing flyspray package support", sub {
 	    PhaseSkip("flyspray not supported on ops")
-		if ($FBSD_VERSION < 6);
+		if ($FBSD_MAJOR < 6);
 
 	    if (!ExecQuiet("$PKG_INFO -x -E adodb")) {
 		PhaseSkip("adodb package already installed");
@@ -371,16 +459,11 @@ Phase "ports", "Installing ports", sub {
 	    if (!$packagedir) {
 		PhaseSkip("No package directory provided");
 	    }
-	    # Lets not hardwire the package name; whatever it is will do.
-	    my $pname = `ls $packagedir/adodb-*.tbz`;
-	    PhaseFail("Cannot find adodb package in $packagedir!")
-		if ($?);
-	    chomp($pname);
-	    
+	    my $pname = GetPackage("adodb", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
-    PhaseSkip("Package directory provided; not installing from source")
+    PhaseSkip("Package directory provided; not installing from sources")
 	if ($packagedir);
     
     Phase "pcopy", "Copying ports into place", sub {
@@ -440,11 +523,8 @@ Phase "portfixup", "Fixing up packages", sub {
 	if (!ExecQuiet("$PKG_INFO -x rsync")) {
 	    PhaseSkip("rsync already installed");
 	}
-
-	PhaseFail("Must provide -p (packagedir) argument!")
-	    if (!$packagedir);
-
-	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD rsync-2.6.3_1");
+	my $pname = GetPackage("rsync", $packagedir);
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
     if ($WINSUPPORT) {
 	Phase "samba", "Looking for Samba and installing", sub {
@@ -454,44 +534,81 @@ Phase "portfixup", "Fixing up packages", sub {
 	    if (!ExecQuiet("$PKG_INFO -x samba")) {
 		PhaseSkip("samba already installed");
 	    }
-	    
-	    PhaseFail("Must provide -p (packagedir) argument!")
-		if (!$packagedir);
-
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD samba-3.0.7,1");
+	    my $pname = GetPackage("samba", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
-	    if ($FBSD_VERSION > 4 ||
+	    if ($FBSD_MAJOR > 4 ||
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
-		PhaseSkip("GCC 3.0 already installed");
+		PhaseSkip("GCC 3.0 or greater already installed");
 	    }
-	    
-	    PhaseFail("Must provide -p (packagedir) argument!")
-		if (!$packagedir);
-
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD gcc30-3.0.4_1");
+	    my $pname = GetPackage("gcc30", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
+    }
+    if ($FBSD_MAJOR > 6) {
+	#
+	# What a crock!  First, that the FreeBSD ports system
+	# defaults to installing the zipped .egg files that have
+	# to be unzipped per-user before use.  Second, that it
+	# offers no easy way at package creation to override this.
+	# Third, that there is no easy way that I could find in
+	# the python eggs system to set a global cache directory
+	# into which to unpack all eggs; you have to set
+	# PYTHON_EGG_CACHE in the environment of every script.
+	# Fourth, that the per-user default value might be in an
+	# unwritable location.
+	#
+	# So, I am reduced to manually unpacking all .egg files
+	# into the corresponding .egg directories after the
+	# install!  Since this would totally screw any attempt
+	# to update those packages, I just do it to the one
+	# package that I know will fail otherwise.
+	#
+	Phase "m2crypto-egg", "Unpacking python m2crypto .egg", sub {
+	    my $pydir = "/usr/local/lib/python2.5/site-packages";
+	    my $egg = `ls -d $pydir/M2Crypto-0.19.1-py2.5-*.egg 2>/dev/null`;
+	    chomp($egg);
+	    if (! -x $EASYINSTALL) {
+		PhaseSkip("python easy_install missing");
+	    }
+	    if ($egg eq "") {
+		PhaseSkip("py25-m2crypto egg not found");
+	    }
+	    if (-d "$egg") {
+		PhaseSkip("py25-m2crypto egg already unpacked");
+	    }
+	    ExecQuietFatal("mv $egg /var/tmp/");
+	    $egg =~ s/$pydir//;
+	    ExecQuietFatal("$EASYINSTALL -Z /var/tmp$egg");
+	    ExecQuietFatal("mv /var/tmp$egg $pydir/$egg.bak");
 	};
     }
 };
 
 Phase "patches", "Applying patches", sub {
-    Phase "m2cryptopatch", "Patching m2crypto", sub {
-	my $patchfile = $M2CRYPTO_PATCH;
-	
-	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
-	    $patchfile = "${patchfile}-0.13";
-	}
-	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
-	    PhaseSkip("$patchfile already applied");
-	}
-	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
-    };
+    if ($FBSD_MAJOR < 7) {
+	Phase "m2cryptopatch", "Patching m2crypto", sub {
+	    my $patchfile = $M2CRYPTO_PATCH;
+
+	    if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.17'") == 0) {
+		$patchfile = "${patchfile}-0.17";
+	    }
+	    elsif (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+		$patchfile = "${patchfile}-0.13";
+	    }
+	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+		PhaseSkip("Patch already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
+	};
+    }
     if ($MAILMANSUPPORT) {
 	Phase "mailmanpatch", "Patching mailman", sub {
 	    my $patchfile = $MAILMAN_PATCH;
 	
 	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
-		PhaseSkip("$patchfile already applied");
+		PhaseSkip("Patch already applied");
 	    }
 	    ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
 	};
@@ -509,11 +626,21 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
 		      qq|mountd_flags="-r -p 900"|,
 		      (($ISFS && $WINSUPPORT) ? qq|smbd_enable="YES"| : ()),
 		      qq|apache_enable="YES"|,
-		      qq|syslogd_flags=""|);
+		      qq|syslogd_flags=""|,
+		      ($CVSSUPPORT ? qq|cvsd_enable="YES"| : ()),
+		      qq|pubsubd_flags="-T 10"|);
 };
 
 Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
     DoneIfEdited($HOSTS);
+    # XXX get rid of any existing lines with boss/ops/fs
+    if ($ELABINELAB) {
+	my $dellist = "-e '/^${BOSSNODE_IP}/d' -e '/^${USERNODE_IP}/d'";
+	if (!$ISFS) {
+	    $dellist .= " -e '/^${FSNODE_IP}/d'";
+	}
+	ExecQuietFatal("sed -i.orig $dellist $HOSTS");
+    }
     my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss" .
 	"\n${USERNODE_IP}\t@OPS_NAMES";
     if (!$ISFS) {
@@ -582,9 +709,9 @@ Phase "exports", "Setting up exports", sub {
 	# filesystems.  Note: we cannot do /share on the same exports line
 	# as the other filesystems because of the RO mount below (trust me).
 	#
-	my @dirs = ('/var','/usr/testbed');
+	my @dirs = ('/var', $PREFIX);
 	if ($ISFS) {
-	    @dirs = ('/users','/groups','/proj',@dirs);
+	    @dirs = (grep(!/^$SHAREROOT$/, @MOUNTPOINTS), @dirs);
 	}
 	@dirs = map {`realpath $_`} @dirs;
 	chomp @dirs;
@@ -611,13 +738,13 @@ Phase "exports", "Setting up exports", sub {
 	    #
 	    my ($a,$b,$c,$d) =
 		($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
-	    my $realdir = `realpath /share`;
+	    my $realdir = `realpath $SHAREROOT`;
 	    chomp($realdir);
 	    push(@exports_lines,
 		 "$realdir\t$BOSSNODE -maproot=root");
 	    push(@exports_lines,
 		 "$realdir\t-network ${a}.${b}.${c} -mask $CONTROL_NETMASK ".
-		 "-maproot=root -ro");
+		 "-maproot=root -ro -alldirs");
 	}
 
 	#
@@ -625,15 +752,15 @@ Phase "exports", "Setting up exports", sub {
 	#
 	if ($CVSSUPPORT) {
 	    my $pdir;
-	    my $dfout = `df /proj | fgrep '/dev'`;
+	    my $dfout = `df $PROJROOT | fgrep '/dev'`;
 	    if ($?) {
-		PhaseFail("'df /proj' failed!");
+		PhaseFail("'df $PROJROOT' failed!");
 	    }
 	    if ($dfout =~ /\s+([\/\w]*)$/) {
 		$pdir = $1;
 	    }
 	    else {
-		PhaseFail("Could not determine where /proj is mounted!");
+		PhaseFail("Could not determine where $PROJROOT is mounted!");
 	    }
 	    push(@exports_lines, "$pdir\tlocalhost -alldirs");
 	}
@@ -669,11 +796,19 @@ Phase "NFSmounts", "Setting up NFS mounts", sub {
     };
     Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
 	DoneIfEdited($FSTAB);
-	AppendToFileFatal($FSTAB,
-		"$FSNODE:/users\t\t/users\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/proj\t\t/proj\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/groups\t\t/groups\tnfs\trw,nodev,nosuid\t0\t0",
-		"$FSNODE:/share\t\t/share\tnfs\trw,nodev,nosuid\t0\t0");
+	my $nfsopt = "nosuid";
+	$nfsopt .= ",nodev"
+	    if ($FBSD_MAJOR < 7);
+	my @lines = ("$FSNODE:$USERROOT\t\t$USERROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$PROJROOT\t\t$PROJROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$GROUPROOT\t\t$GROUPROOT\tnfs\trw,$nfsopt\t0\t0",
+		     "$FSNODE:$SHAREROOT\t\t$SHAREROOT\tnfs\trw,$nfsopt\t0\t0");
+	if ($SCRATCHDIR) {
+	    push(@lines,
+		 "$FSNODE:$SCRATCHROOT\t\t$SCRATCHROOT\tnfs\trw,$nfsopt\t0\t0");
+	}
+
+	AppendToFileFatal($FSTAB, @lines);
     };
     Phase "mounts", "Mounting NFS filesystems", sub {
 	foreach my $dir (@MOUNTPOINTS) {
@@ -738,21 +873,25 @@ Phase "syslog", "Setting up syslog", sub {
 	    # Find the cron line, after which we place our auth.info line
 	    #
 	    if ($line =~ /^cron/) {
-		print SC "# " . MAGIC_TESTBED_START . "\n";
+		print SC "# " . MAGIC_TESTBED_START() . "\n";
 		print SC "auth.info\t\t\t\t\t/var/log/logins\n";
-		print SC "# " . MAGIC_TESTBED_END . "\n";
+		print SC "# " . MAGIC_TESTBED_END() . "\n";
 	    }
 	}
 
 	#
 	# Put a few more lines at the end
 	#
-	print SC "# " . MAGIC_TESTBED_START . "\n";
+	print SC "# " . MAGIC_TESTBED_START() . "\n";
 	print SC "!capture\n";
 	print SC "*.*\t\t\t\t\t\t/var/log/tiplogs/capture.log\n";
 	print SC "!mountd\n";
 	print SC "*.*\t\t\t\t\t\t/var/log/mountd.log\n";
-	print SC "# " . MAGIC_TESTBED_END . "\n";
+	print SC "!pubsubd\n";
+	print SC "*.*\t\t\t\t\t\t${LOGDIR}/pubsubd.log\n";
+	print SC "!elvin_gateway\n";
+	print SC "*.*\t\t\t\t\t\t${LOGDIR}/elvin_gateway.log\n";
+	print SC "# " . MAGIC_TESTBED_END() . "\n";
 	close SC;
     };
 
@@ -792,6 +931,8 @@ Phase "syslog", "Setting up syslog", sub {
 	AppendToFileFatal($NEWSYSLOG_CONF,
 	    "/var/log/logins\t\t\t\t640  7     200 *      Z",
 	    "/var/log/mountd.log\t\t\t640  5     200 *      Z",
+	    "$LOGDIR/pubsubd.log\t\t\t640  5     1000 *     Z",
+	    "$LOGDIR/elvin_gateway.log\t\t\t640  5     1000 *     Z",
 	    "/var/log/tiplogs/capture.log\t\t644  7     *    168   Z");
     };
 };
@@ -819,7 +960,9 @@ Phase "cron", "Adding cron jobs", sub {
 
 Phase "sudoers", "Editing $SUDOERS to allow wheel group", sub {
     DoneIfEdited($SUDOERS);
-    AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
+    AppendToFileFatal($SUDOERS,
+		      "%wheel    ALL=(ALL) NOPASSWD: ALL",
+		      "Defaults  logfile=/var/log/sudo.log");
 };
 
 Phase "samba", "Setting up Samba", sub {
@@ -843,8 +986,16 @@ Phase "samba", "Setting up Samba", sub {
     };
     if ($ELABINELAB) {	
 	Phase "starting", "Starting Samba", sub {
+	    my $sscript;
+	    if (-x "$RCDIR/samba.sh") {
+		$sscript = "samba.sh";
+	    } elsif (-x "$RCDIR/samba") {
+		$sscript = "samba";
+	    } else {
+		PhaseFail("No samba startup script!?");
+	    }
 	    DoneIfExists("$VARRUN/smbd.pid");
-	    ExecQuietFatal("$RCDIR/samba.sh start");
+	    ExecQuietFatal("$RCDIR/$sscript start");
 	};
     }
 };
@@ -852,7 +1003,13 @@ Phase "samba", "Setting up Samba", sub {
 Phase "ssh", "Allowing root ssh", sub {
     Phase "sshdconfig", "Permitting root login through ssh", sub {
 	DoneIfEdited($SSHD_CONFIG);
-	AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin yes");
+	# modern versions of FBSD explicitly turn off proto 1 by default
+	if ($FBSD_MAJOR > 6) {
+	    ExecQuietFatal("sed -i.orig -e 's/Protocol/#Protocol/' $SSHD_CONFIG");
+	}
+	AppendToFileFatal($SSHD_CONFIG,
+			  "PermitRootLogin yes",
+			  "Protocol 2,1");
     };
     Phase "dotssh", "Making root's .ssh directory", sub {
 	DoneIfExists("/root/.ssh");
@@ -898,13 +1055,6 @@ Phase "capture", "Setting up capture", sub {
     };
 };
 
-Phase "event", "Setting up event system", sub {
-    Phase "elvinconf", "Installing elvind config file", sub {
-	DoneIfIdentical($ELVIND_CONF,$OPS_ELVIND_CONF);
-	ExecQuietFatal("$CP $OPS_ELVIND_CONF $ELVIND_CONF");
-    };
-};
-
 Phase "rc.d", "Setting up rc.d scripts", sub {
     Phase "rsyncd", "Removing rsyncd startup script",  sub {
 	DoneIfDoesntExist("$RCDIR/rsyncd.sh");
@@ -918,27 +1068,54 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
 	}
     };
+    Phase "my-server2", "Removing $RCDIR/mysql-server", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-server");
+	if (!unlink "$RCDIR/mysql-server") {
+	    PhaseFail("Unable to remove $RCDIR/mysql-server: $!");
+	}
+    };
+    if ($ELVIN_COMPAT) {
+	Phase "elvin-gateway", "Installing elvin gateway startup file", sub {
+	    PhaseSkip("elvind not installed, elvin_gateway not enabled")
+		if (! -x "/usr/local/libexec/elvind");
+	    DoneIfExists("$RCDIR/3.elvin_gateway.sh");
+	    PhaseFail("Pubsub system or elvin_gateway is not installed")
+	};
+    }
+    
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
         Phase "elvind.sh", "Removing port version of elvind.sh", sub {
 	    DoneIfDoesntExist("$RCDIR/elvind.sh");
             ExecQuietFatal("/bin/rm -f $RCDIR/elvind.sh");
         };
-	DoneIfExists("$RCDIR/2.elvind.sh");
 	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d control-install");
     };
 };
 
 Phase "apache", "Installing apache config file", sub {
     PhaseSkip("apache not supported on ops")
-	if ($FBSD_VERSION == 4);
+	if ($FBSD_MAJOR == 4);
 
     DoneIfEdited("$HTTPD_CONF");
     ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache control-install");
 };
+Phase "wikidocs", "Installing wikidocs redirect", sub {
+    PhaseSkip("wikidocs not supported on ops")
+	if ($FBSD_MAJOR == 4);
+
+    DoneIfExists("$WWWDIR/wikidocs/.htaccess");
+
+    if (! -e "$WWWDIR/wikidocs") {
+	mkdir("$WWWDIR/wikidocs", 0755) or
+	    PhaseFail("Unable to make $WWWDIR/wikidocs: $!");
+    }
+    CreateFileFatal("$WWWDIR/wikidocs/.htaccess",
+		    "Redirect /wikidocs http://users.emulab.net/trac/emulab");
+};
 
 Phase "database", "Setting up database", sub {
     PhaseSkip("mysqld not supported on ops")
-	if ($FBSD_VERSION == 4);
+	if ($FBSD_MAJOR == 4);
     
     # Get a password for the the DB.
     Phase "password", "Asking for mysqld root password", sub {
@@ -995,6 +1172,15 @@ Phase "database", "Setting up database", sub {
 			   "where user=\"root\"; flush privileges' | ".
 			   "$MYSQL -s -u root mysql");
     };
+
+    Phase "dbpatch", "Patching up mysql DB", sub {
+	if (!ExecQuiet("$MYSQLDUMP -u root -p$password mysql emulab_dbs")) {
+	    PhaseSkip("DB already patched");
+	}
+
+	ExecQuietFatal("$MYSQL -u root -p$password mysql ".
+		       "  < $TOP_SRCDIR/sql/opsdb.sql");
+    };
 };
 
 if ($MAILMANSUPPORT) {
@@ -1006,7 +1192,7 @@ if ($MAILMANSUPPORT) {
     
     Phase "Mailman", "Setting up Mailman", sub {
 	PhaseSkip("mailman not supported on ops")
-	    if ($FBSD_VERSION == 4);
+	    if ($FBSD_MAJOR == 4);
 
 	# Patch for broken install
 	ExecQuietFatal("$CHMOD 2770 $MAILMANDIR/archives/private");
@@ -1065,8 +1251,9 @@ if ($MAILMANSUPPORT) {
 		if (ExecQuiet("fgrep AliasFile $SENDMAIL_CF | ".
 			      "fgrep -q -s mailman") == 0);
 
+	    # Insert the mailman aliases file first, to avoid a forwarding loop.
 	    ExecQuietFatal("sed -i .orig -e ".
-			   "  's,\\(AliasFile.*\\),\\1\\,$MAILMANALIAS,' ".
+			   "  '/AliasFile=/s;=;=$MAILMANALIAS,;' ".
 			   "$SENDMAIL_CF");
 	};
 	Phase "aliases", "Creating $MAILMANALIAS", sub {
@@ -1086,15 +1273,16 @@ if ($CVSSUPPORT) {
     my $CVSDHEAD  = "$LIBDIR/cvsd.conf.head";
     my $CVSDJAIL  = "/var/cvsjail";
     my $BUILDROOT = "/usr/local/sbin/cvsd-buildroot";
-    my $REPOSDIR  = "/proj/cvsrepos";
+    my $REPOSDIR  = "$PROJROOT/cvsrepos";
     
     Phase "cvsd", "Installing cvsd", sub {
 	PhaseSkip("cvsd not supported on ops")
-	    if ($FBSD_VERSION < 6);
+	    if ($FBSD_MAJOR < 6);
 
 	Phase "files", "Installing cvsd files", sub {
 	    DoneIfExists($CVSDHEAD);
-	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/collab/cvs control-install");
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/collab/cvstools ".
+			   "  control-install");
 	};
 
 	Phase "cvsd.conf", "Installing cvsd.conf", sub {
@@ -1125,6 +1313,9 @@ if ($CVSSUPPORT) {
 	};
 
 	Phase "cvsd.sh", "Installing cvsd.sh", sub {
+	    # FBSD 6.3 and beyond should install this in place
+	    DoneIfExists("$RCDIR/cvsd");
+
 	    DoneIfExists("$RCDIR/cvsd.sh");
 	    ExecQuietFatal("mv $RCDIR/cvsd.sh.sample $RCDIR/cvsd.sh");
 	    ExecQuietFatal("$CHMOD a+x $RCDIR/cvsd.sh");
@@ -1135,7 +1326,7 @@ if ($CVSSUPPORT) {
 if ($BUGDBSUPPORT) {
     my $FLYSPRAYPWD   = "$ETCDIR/flyspray.pwd";
     my $FLYSPRAYDIR   = "/usr/local/www/data/flyspray";
-    my $FLYSPRAYURL   = "http://www.emulab.net/downloads/flyspray-0.9.9.tgz";
+    my $FLYSPRAYURL   = "http://$OUTER_BOSS/downloads/flyspray-0.9.9.tgz";
     my $FLYSPRAYCONF  = "$ETCDIR/flyspray.conf.php";
     my $PHPCONFIG     = "/usr/local/etc/php.ini";
     my $localtarfile  = "/tmp/flyspray.tgz";
@@ -1143,7 +1334,7 @@ if ($BUGDBSUPPORT) {
 
     Phase "flyspray", "Installing flyspray", sub {
 	PhaseSkip("flyspray not supported on ops")
-	    if ($FBSD_VERSION < 6);
+	    if ($FBSD_MAJOR < 6);
 
 	# Get a password for the installation.
 	Phase "password", "Generating flyspray password", sub {
@@ -1266,14 +1457,14 @@ if ($BUGDBSUPPORT) {
 if ($WIKISUPPORT) {
     my $WIKIDIR       = "/usr/local/www/data/twiki";
     my $WIKICONF      = "LocalSite.cfg";
-    my $WIKIURL       = "http://www.emulab.net/downloads/twiki-4.1.tgz";
+    my $WIKIURL       = "http://$OUTER_BOSS/downloads/twiki-4.1.tgz";
     my $localtarfile  = "/tmp/twiki.tgz";
     my $CGISESSDIR    = "/var/db/cgisess";
     my $WIKI_LOGDIR   = "$LOGDIR/twiki";
     
     Phase "TWiki", "Installing TWiki", sub {
 	PhaseSkip("TWiki not supported on ops")
-	    if ($FBSD_VERSION < 6);
+	    if ($FBSD_MAJOR < 6);
 
 	Phase "fetching", "Fetching TWiki distribution", sub {
 	    DoneIfExists($localtarfile);
@@ -1293,7 +1484,7 @@ if ($WIKISUPPORT) {
 	    }
 	    ExecQuietFatal("$CHMOD 770 $WIKIDIR");
 
-	    PhaseSkip("Flyspray already unpacked")
+	    PhaseSkip("TWiki already unpacked")
 		if (-e "$WIKIDIR/data");
 	    ExecQuietFatal("$TAR zxf $localtarfile -C $WIKIDIR"); 
 	};

@@ -1,9 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -49,6 +50,7 @@ sub fatal($);
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Project;
 
 #
 # We don't want to run this script unless its the real version.
@@ -79,7 +81,7 @@ if (! $BUGDBSUPPORT) {
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -89,22 +91,11 @@ if (defined($options{"d"})) {
 if (@ARGV != 1) {
     usage();
 }
-my $pid = $ARGV[0];
-
-#
-# Untaint args.
-#
-if ($pid =~ /^([-\w]+)$/) {
-    $pid = $1;
+my $project = Project->Lookup($ARGV[0]);
+if (!defined($project)) {
+    fatal("No such project $ARGV[0]!");
 }
-else {
-    die("Bad data in pid: $pid");
-}
-
-# Valid project?
-if (! ProjLeader($pid)) {
-    fatal("No such project $pid!");
-}
+my $pid = $project->pid();
 
 #
 # This script always does the right thing, so no permission checks.

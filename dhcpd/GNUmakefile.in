@@ -12,6 +12,7 @@ SUBDIR		= dhcpd
 ETCDIR          = /usr/local/etc
 
 DHCPD_FILES	= dhcpd.conf.template
+SUBBOSS_DHCPD_FILES	= dhcpd.conf.subboss.template
 
 include $(OBJDIR)/Makeconf
 
@@ -23,11 +24,14 @@ all: $(DHCPD_FILES)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install:	$(ETCDIR)/dhcpd.conf.template
+subboss-install:	$(ETCDIR)/dhcpd.conf.subboss.template
+	-chmod 664 $(ETCDIR)/dhcpd.conf.subboss.template
+
+install:	$(ETCDIR)/dhcpd.conf.template $(ETCDIR)/dhcpd.conf.subboss.template
 	-chmod 664 $(ETCDIR)/dhcpd.conf.template
 
 clean: 
-	rm -f $(DHCPD_FILES)
+	rm -f $(DHCPD_FILES) $(SUBBOSS_DHCPD_FILES)
 
 $(ETCDIR)/%: %
 	@echo "Installing $<"

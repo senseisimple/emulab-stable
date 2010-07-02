@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Stuff for OSIDs. All this stuff should come from the DB instead!
@@ -55,19 +55,26 @@ $osid_reboot_waitlist["Other"]		= 60;
 #
 # Helper function to write out a menu.
 #
-function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
+function WRITEOSIDMENU($caption, $value, $osid_result, $previous,
+		       $delete_varname = "", $delete_varvalue = "")
 {
-    echo "<tr>
-            <td>*$caption:</td>";
+    echo "<tr>";
+    if ($delete_varname != "") {
+	echo "<td align=center>
+                  <input type=checkbox value=checked
+                         name=\"$delete_varname\" $delete_varvalue>
+                </td>\n";
+    }
+    echo "  <td>*$caption:</td>";
     echo "  <td><select name=\"$value\">
                 <option value=X>Please Select </option>\n";
 
     mysql_data_seek($osid_result, 0);
 
     while ($row = mysql_fetch_array($osid_result)) {
-	$osid   = $row[osid];
-	$osname = $row[osname];
-	$pid    = $row[pid];
+	$osid   = $row["osid"];
+	$osname = $row["osname"];
+	$pid    = $row["pid"];
 	$selected = "";
 
 	if (strcmp($previous, "$osid") == 0)
@@ -85,19 +92,26 @@ function WRITEOSIDMENU($caption, $value, $osid_result, $previous)
           </tr>\n";
 }
 
-function WRITEIMAGEIDMENU($caption, $value, $imageid_result, $previous)
+function WRITEIMAGEIDMENU($caption, $value, $imageid_result, $previous,
+			  $delete_varname = "", $delete_varvalue = "")
 {
-    echo "<tr>
-            <td>*$caption:</td>";
+    echo "<tr>";
+    if ($delete_varname != "") {
+	echo "<td align=center>
+                  <input type=checkbox value=checked
+                         name=\"$delete_varname\" $delete_varvalue>
+                </td>\n";
+    }
+    echo "<td>*$caption:</td>";
     echo "  <td><select name=\"$value\">
                 <option value=X>Please Select </option>\n";
 
     mysql_data_seek($imageid_result, 0);
 
     while ($row = mysql_fetch_array($imageid_result)) {
-	$imageid   = $row[imageid];
-	$imagename = $row[imagename];
-	$pid       = $row[pid];
+	$imageid   = $row["imageid"];
+	$imagename = $row["imagename"];
+	$pid       = $row["pid"];
 	$selected  = "";
 
 	if (strcmp($previous, "$imageid") == 0)

@@ -1,11 +1,10 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
+use strict;
 use English;
 use Getopt::Std;
 
@@ -55,12 +54,8 @@ my $TBLOGS      = "@TBLOGSEMAIL@";
 my $expsetup    = "$TB/sbin/exports_setup";
 my $batchmode   = 0;
 my @nodes       = ();
-my $user_name;
-my $user_email;
 my $logname;
 my $failed	= 0;
-my $dbuid;
-my $estate;
 
 #
 # Load the Testbed support stuff. 
@@ -68,6 +63,8 @@ my $estate;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Experiment;
+use User;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -80,7 +77,7 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -109,75 +106,62 @@ else {
     die("*** Bad data in eid: $eid\n");
 }
 
-#
-# If more args, they are node names.
-#
-if (@ARGV) {
-    # Untaint the nodes.
-    foreach my $node ( @ARGV ) {
-	if ($node =~ /^([-\w]+)$/) {
-	    $node = $1;
-	}
-	else {
-	    die("*** Bad node name: $node.");
-	}
-
-	push(@nodes, $node);
-    }
-}
-
-#
-# Verify actual user and get his DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
+my $experiment = Experiment->Lookup($pid, $eid);
+if (! defined($experiment)) {
     die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
-}
-
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-        "    Cannot determine your name and email address.\n");
-}
-
-#
-# Verify that this person is allowed to do this.
-#
-if (!TBAdmin() &&
-    ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_UPDATE)) {
-    die("*** $0:\n".
-	"    You not have permission to update nodes in $pid/$eid!\n");
+	"    No such experiment $pid/$eid in the Emulab Database.\n");
 }
 
 #
 # Check state. Only ACTIVE experiments. 
 #
-$estate = ExpState($pid, $eid);
+my $estate = $experiment->state();
 if ($estate ne EXPTSTATE_ACTIVE) {
-    print STDERR "Experiment $pid/$eid is not ACTIVE!\n";
+    print STDERR "Experiment $pid/$eid is in state $estate, not ACTIVE!\n";
     # For web page.
     exit(1);
 }
 
 #
-# Get the list of nodes that need to be "updated." We already have the
-# exerpiment locked, so if we have a problem, must unlock it.
+# Verify user and get his DB uid and other info for later.
 #
-if (! scalar(@nodes)) {
-    @nodes = ExpNodes($pid, $eid);
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+
+#
+# Verify that this person is allowed to do this.
+#
+if (!$this_user->IsAdmin() &&
+    !$experiment->AccessCheck($this_user, TB_EXPT_UPDATE)) {
+    die("*** $0:\n".
+	"    You not have permission to update nodes in $pid/$eid!\n");
+}
+
+#
+# If more args, they are node names.
+#
+if (@ARGV) {
+    my @allnodes = $experiment->NodeList(1); # Just the names.
+    
+    foreach my $nodeid ( @ARGV ) {
+	my $node = Node->Lookup($nodeid);
+	if (!defined($node)) {
+	    die("*** $0:\n".
+		"    $nodeid is not a node!\n");
+	}
+	if (! grep {$_ eq $nodeid} @allnodes) {
+	    die("*** $0:\n".
+		"    Node $nodeid is not allocated to $pid/$eid!\n");
+	}
+	push(@nodes, $node);
+    }
 }
 else {
-    #
-    # Must verify that user supplied node names are really in the
-    # experiment.
-    #
-    my @allnodes = ExpNodes($pid, $eid);
-
-    foreach my $n1 (@nodes) {
-	if (! grep {$_ eq $n1} @allnodes) {
-	    die("*** $0:\n".
-		"    Node $n1 is not allocated to $pid/$eid!\n");
-	}
-    }
+    @nodes = $experiment->NodeList();
 }
 if (! scalar(@nodes)) {
     print STDERR "There are no nodes allocated to experiment $pid/$eid\n";
@@ -221,40 +205,29 @@ sleep(2);
 # (old local images), but its harmless. 
 #
 foreach my $node ( @nodes ) {
-    if (! DBQueryWarn("update nodes set ".
-		      "update_accounts=GREATEST(update_accounts,1) ".
-		      "where node_id='$node'")) {
-	fatal("DB Error!");
-    }
+    $node->MarkForUpdate() == 0
+	or fatal("Could not mark $node for update!");
 }
 
 print STDOUT "Waiting a while for nodes to auto update ...\n";
 for (my $i = 0; $i < 10; $i++) {
     sleep(30);
 
-    my $firstnode = pop(@nodes);
-    my $querystr  = "node_id='$firstnode' ";
+    my @notdone;
+    my @done;
+    Node->CheckUpdateStatus(\@done, \@notdone, @nodes) == 0
+	or fatal("Could not check update status for nodes: @nodes");
 
-    while (@nodes) {
-	my $node = pop(@nodes);
-
-	$querystr .= "or node_id='$node' ";
-    }
+    foreach my $node (@done) {
+	my $node_id = $node->node_id();
 	
-    my $query_result =
-	DBQueryFatal("select node_id,update_accounts from nodes ".
-		     "where ($querystr)");
-
-    while (my ($node,$notdone) = $query_result->fetchrow_array) {
-	if ($notdone) {
-	    push(@nodes, $node);
-	}
-	else {
-	    print STDOUT "$node updated.\n";
-	}
+	print STDOUT "$node_id updated.\n";
     }
+    @nodes = @notdone;
+    
     last
 	if (! @nodes);
+    
     print STDOUT "Still waiting for nodes to auto update ...\n";
 }
 foreach my $node ( @nodes ) {
@@ -262,7 +235,6 @@ foreach my $node ( @nodes ) {
     $failed++;
 }
 
-TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING());
 NotifyUser("Node Update Complete", $failed);
 if (defined($logname)) {
     unlink($logname);
@@ -313,7 +285,6 @@ sub NotifyUser($$)
 sub fatal($) {
     my($mesg) = @_;
 
-    TBUnLockExp($pid, $eid, BATCHSTATE_RUNNING());
     NotifyUser($mesg, 1);
     if (defined($logname)) {
 	unlink($logname);

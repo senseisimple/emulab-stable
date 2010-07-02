@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2002, 2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -11,6 +11,7 @@
  * TODO: Needs to be daemonized.
  */
 
+#include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>

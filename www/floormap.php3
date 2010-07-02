@@ -1,28 +1,56 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Wireless Node Map");
-
-#
 # Only logged in people at the moment; might open up at some point.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page args
+#
+$optargs = OptionalPageArguments("experiment",    PAGEARG_EXPERIMENT,
+				 "building",      PAGEARG_STRING,
+				 "floor",         PAGEARG_STRING,
+				 "feature",       PAGEARG_STRING,
+				 "prefix",        PAGEARG_STRING,
+				 "scale_0_x",     PAGEARG_INTEGER,
+				 "scale_1_x",     PAGEARG_INTEGER,
+				 "scale_2_x",     PAGEARG_INTEGER,
+				 "scale_3_x",     PAGEARG_INTEGER,
+				 "scale_4_x",     PAGEARG_INTEGER,
+				 "scale_5_x",     PAGEARG_INTEGER,
+				 "map_x",         PAGEARG_INTEGER,
+				 "map_y",         PAGEARG_INTEGER,
+				 "last_scale",    PAGEARG_INTEGER,
+				 "last_x",        PAGEARG_INTEGER,
+				 "last_y",        PAGEARG_INTEGER,
+				 "last_x_off",    PAGEARG_INTEGER,
+				 "last_y_off",    PAGEARG_INTEGER,
+				 "last_notitles", PAGEARG_INTEGER, 
+				 "last_ghost",    PAGEARG_INTEGER,
+				 "ghost_on_x",    PAGEARG_INTEGER,
+				 "ghost_off_x",   PAGEARG_INTEGER);
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Wireless PC Map" .
+	   ((isset($feature) && $feature != "")?" ($feature)":" (802.11)"));
+
 
 # Careful with this local variable
 unset($prefix);
 
 #
-# Verify page arguments. First allow user to optionally specify building/floor.
+# Allow user to optionally specify building/floor.
 #
 if (isset($building) && $building != "") {
     # Sanitize for the shell.
@@ -35,33 +63,32 @@ if (isset($building) && $building != "") {
     }
 }
 else {
-    unset($building);
+    $building = "MEB";
     unset($floor);
 }
 
-#
-# Optional pid,eid. Without a building/floor, show all the nodes for the
-# experiment in all buildings/floors. Without pid,eid show all wireless
-# nodes in the specified building/floor.
-#
-if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
-    if (!TBvalid_pid($pid)) {
-	PAGEARGERROR("Invalid project ID.");
-    }
-    if (!TBvalid_eid($eid)) {
-	PAGEARGERROR("Invalid experiment ID.");
-    }
-
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view experiment $pid/$eid!", 1);
+if (isset($feature) && $feature != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[-\w]+$/", $feature)) {
+        PAGEARGERROR("Invalid feature argument.");
     }
 }
 else {
-    unset($pid);
-    unset($eid);
+    unset($feature);
+}
+
+#
+# Optional experiment. Without a building/floor, show all the nodes for the
+# experiment in all buildings/floors. Without pid,eid show all wireless
+# nodes in the specified building/floor.
+#
+if (isset($experiment)) {
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    if (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view floormaps ".
+		  "for experiment $pid/$eid!", 1);
+    }
 }
 
 # THIS is ugly...  Value= is not passed by IE on <input type=image>, so we wrap the
@@ -215,7 +242,11 @@ $query_result =
     DBQueryFatal("select loc.*,s.capval,r.pid,r.eid from location_info as loc ".
 		 "left join interface_settings as s on ".
 		 "     s.node_id=loc.node_id and s.capkey='channel' ".
-		 "left join reserved as r on r.node_id=loc.node_id");
+		 "left join reserved as r on r.node_id=loc.node_id ".
+		 (isset($feature)?" left join node_features as f on f.node_id=loc.node_id ":"") . 
+		 "where loc.building='$building' ".
+		 (isset($feature)?" and f.feature='$feature' ":"") . 
+		 (isset($floor) ? "and loc.floor='$floor'" : ""));
 
 while ($row = mysql_fetch_array($query_result)) {
     $channel   = $row["capval"];
@@ -306,12 +337,14 @@ $perl_args = "-o $prefix " .
 
 	     (isset($pid) ? "-e $pid,$eid " : "") .
 	     (isset($floor) ? "-f $floor " : "") .
+             (isset($feature) ? "-F $feature " : "") . 
 	     (isset($building) ? "$building" : "");  # Building arg must be last!
 
 if (0) {    ### Put the Perl script args into the page when debugging.
     echo "\$btfv/floormap -d $perl_args\n";
 }
-$retval = SUEXEC($uid, "nobody", "webfloormap $perl_args", SUEXEC_ACTION_IGNORE);
+$retval = SUEXEC($uid, "nobody", "webfloormap $perl_args",
+		 SUEXEC_ACTION_IGNORE);
 
 if ($retval) {
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
@@ -328,8 +361,10 @@ if (! readfile("${prefix}.map")) {
 }
 
 echo "<font size=+1>For more info on using wireless nodes, see the
-     <a href='tutorial/docwrapper.php3?docname=wireless.html'>
-     wireless tutorial.</a></font>\n";
+     <a href='$WIKIDOCURL/wireless'>
+     wireless tutorial</a> and the 
+     <a href='$WIKIDOCURL/gnuradio'>GNU software 
+     defined radio tutorial</a>.</font>\n";
 
 echo "<center>\n";
 
@@ -453,6 +488,9 @@ else {
 }
 echo "  Show nodes on other floors as hollow dots.\n";
 echo "  <br>\n";
+if (isset($feature)) {
+    echo "  <a href='floormap.php3'>Show all wireless nodes</a><br>\n";
+}
 echo "  <input name=map type=image style=\"border: 2px solid\" ";
 echo          "src=\"floormap_aux.php3?prefix=$uniqueid\" usemap=\"#floormap\">\n";
 echo "  <br>\n";
@@ -460,6 +498,12 @@ zoom_btns($curr_scale);
 
 # Hidden items are all returned as page arguments when any input control is clicked.
 echo "  <input type=\"hidden\" name=\"prefix\" value=\"$uniqueid\">\n";
+if (isset($feature)) {
+    echo "  <input type=\"hidden\" name=\"feature\" value=\"$feature\">\n";
+}
+if (isset($building)) {
+    echo "  <input type=\"hidden\" name=\"building\" value=\"$building\">\n";
+}
 
 # The last_* items come from a .state file with the map, from the Perl script.
 if (! readfile("${prefix}.state")) {

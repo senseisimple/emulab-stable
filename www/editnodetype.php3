@@ -1,10 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("imageid_defs.php");
+include_once("osinfo_defs.php");
 include("osiddefs.php3");
 
 #
@@ -14,38 +16,145 @@ include("osiddefs.php3");
 #
 # Only known and logged in users can end experiments.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#
-# Admin users only
-#
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
 if (! $isadmin) {
     USERERROR("You do not have permission to edit node types!", 1);
 }
 
-if (!$new_type && (!isset($node_type) || !strcmp($node_type,""))) {
-    USERERROR("No type given!", 1);
+$optargs = OptionalPageArguments("submit",     PAGEARG_STRING,
+				 "formfields", PAGEARG_ARRAY,
+
+				 # Send new_type=1 to create new nodetype.
+				 "new_type",   PAGEARG_STRING,
+				 # Optional if new_type, required if not.
+				 "node_type",  PAGEARG_STRING,
+				 # Optional if new_type
+				 "node_class", PAGEARG_STRING,
+
+				 # Attribute creation and deletion.
+				 "deletes",    PAGEARG_ARRAY,
+				 "attributes", PAGEARG_ARRAY,
+				 "newattribute_type",  PAGEARG_STRING,
+				 "newattribute_name",  PAGEARG_STRING,
+				 "newattribute_value", PAGEARG_ANYTHING);
+if (!isset($node_type)) { $node_type = ""; }
+if (!isset($node_class)) { $node_class = "pc"; }
+if (!isset($attributes)) { $attributes = array(); }
+if (!isset($deletes)) { $deletes = array(); }
+
+$emulab_ops = Project::LookupByPid("emulab-ops");
+$freebsd_mfs = OSinfo::LookupByName($emulab_ops,"FREEBSD-MFS");
+$rhl_std = OSinfo::LookupByName($emulab_ops, "RHL-STD");
+$fbsd_std = OSinfo::LookupByName($emulab_ops,"FBSD-STD");
+$frisbee_mfs = OSinfo::LookupByName($emulab_ops,"FRISBEE-MFS");
+
+# The default image comes from a site variable to avoid hardwiring here.
+$default_imagename = TBGetSiteVar("general/default_imagename");
+$default_image = Image::LookupByName($emulab_ops, $default_imagename);
+
+if ($freebsd_mfs == null || $default_image == null ||
+    $rhl_std == null || $fbsd_std == null || $frisbee_mfs == null) {
+    PAGEERROR("You must add images from Utah into your database" .
+              " before adding a nodetype. See installation documentation for details!",1);
 }
+
+# This belongs elsewhere!
+$initial_switch_attributes = array(
+    array("attrkey" => "imageable", "attrvalue" => "0",
+	  "attrtype" => "boolean"),
+    array("attrkey" => "rebootable", "attrvalue" => "0",
+	  "attrtype" => "boolean"),
+    );
+
+$initial_attributes = array(
+    array("attrkey" => "adminmfs_osid", "attrvalue" => $freebsd_mfs->osid(),
+	  "attrtype" => "integer"),
+    array("attrkey" => "bios_waittime", "attrvalue" => "60",
+	  "attrtype" => "integer"),
+    array("attrkey" => "bootdisk_unit", "attrvalue" => "0",
+	  "attrtype" => "integer"),
+    array("attrkey" => "control_interface", "attrvalue" => "ethX",
+	  "attrtype" => "string"),
+    array("attrkey" => "control_network", "attrvalue" => "X",
+	  "attrtype" => "integer"),
+    array("attrkey" => "default_imageid",
+	  "attrvalue" => $default_image->imageid(),
+	  "attrtype" => "string"),
+    array("attrkey" => "default_osid", "attrvalue" => $rhl_std->osid(),
+	  "attrtype" => "integer"),
+    array("attrkey" => "delay_capacity", "attrvalue" => "2",
+	  "attrtype" => "integer"),
+    array("attrkey" => "delay_osid", "attrvalue" => $fbsd_std->osid(),
+	  "attrtype" => "integer"),
+    array("attrkey" => "diskloadmfs_osid", "attrvalue" => $frisbee_mfs->osid(),
+	  "attrtype" => "integer"),
+    array("attrkey" => "disksize", "attrvalue" => "0.00",
+	  "attrtype" => "float"),
+    array("attrkey" => "disktype", "attrvalue" => "ad",
+	  "attrtype" => "string"),
+    array("attrkey" => "frequency", "attrvalue" => "XXX",
+	  "attrtype" => "integer"),
+    array("attrkey" => "imageable", "attrvalue" => "1",
+	  "attrtype" => "boolean"),
+    array("attrkey" => "jail_osid", "attrvalue" =>  $fbsd_std->osid(),
+	  "attrtype" => "integer"),
+    array("attrkey" => "max_interfaces", "attrvalue" => "X",
+	  "attrtype" => "integer"),
+    array("attrkey" => "memory", "attrvalue" => "XXX",
+	  "attrtype" => "integer"),
+    array("attrkey" => "power_delay", "attrvalue" => "60",
+	  "attrtype" => "integer"),
+    array("attrkey" => "processor", "attrvalue" => "PIII",
+	  "attrtype" => "string"),
+    array("attrkey" => "rebootable", "attrvalue" => "1",
+	  "attrtype" => "boolean"),
+    array("attrkey" => "simnode_capacity", "attrvalue" => "650",
+	  "attrtype" => "integer"),
+    array("attrkey" => "trivlink_maxspeed", "attrvalue" => "400000",
+	  "attrtype" => "integer"),
+    array("attrkey" => "virtnode_capacity", "attrvalue" => "20",
+	  "attrtype" => "integer"),
+    );
 
 #
 # Spit the form out using the array of data.
 #
-function SPITFORM($node_type, $formfields, $errors)
+function SPITFORM($node_type, $formfields, $attributes, $deletes, $errors)
 {
-    global $osid_result, $imageid_result, $new_type;
+    global $osid_result, $imageid_result, $mfsosid_result, $new_type;
+    global $newattribute_name, $newattribute_value, $newattribute_type;
+
+    #
+    # Split default_imageid
+    #
+
+    if (isset($attributes["default_imageid"])) {
+	$default_imageids = preg_split('/,/', $attributes["default_imageid"]);
+	for ($i = 0; $i != count($default_imageids); $i++) {
+	    $attributes["default_imageid_$i"] = $default_imageids[$i];
+	}
+	$last_default_imageid_label = "default_imageid_$i";
+	$attributes["default_imageid_$i"] = 0;
+	unset($attributes["default_imageid"]);
+	ksort($attributes);
+    } else {
+	$attributes["default_imageid_0"] = 0;
+	$last_default_imageid_label = "default_imageid_0";
+	ksort($attributes);
+    }
 
     #
     # Standard Testbed Header
     #
-    PAGEHEADER("Edit Node Type");
-
-    echo "<font size=+2>Node Type <b>".
-         "<a href='shownodetype.php3?node_type=$node_type'>$node_type</a></b>\n".
-         "</font>\n";
-    echo "<br><br>\n";
+    if (! isset($new_type)) {
+	PAGEHEADER("Edit Node Type");
+    }
+    else {
+	PAGEHEADER("Create Node Type");
+    }
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -71,7 +180,7 @@ function SPITFORM($node_type, $formfields, $errors)
 
 
     $formargs = "node_type=$node_type";
-    if ($new_type) {
+    if (isset($new_type)) {
 	$formargs .= "&new_type=1";
     }
 
@@ -80,8 +189,8 @@ function SPITFORM($node_type, $formfields, $errors)
 	  " name=typeform>\n";
 
     echo "<tr>
-              <td>Type:</td>\n";
-    if ($new_type) {
+              <td colspan=2>Type:</td>\n";
+    if (isset($new_type)) {
         echo "<td class=left>
                  <input type=text
                         name=\"node_type\"
@@ -94,8 +203,8 @@ function SPITFORM($node_type, $formfields, $errors)
     }
 
     echo "<tr>
-              <td>Class:</td>\n";
-    if ($new_type) {
+              <td colspan=2>Class:</td>\n";
+    if (isset($new_type)) {
         echo "<td class=left>
                  <input type=text
                         name=\"formfields[class]\"
@@ -103,282 +212,240 @@ function SPITFORM($node_type, $formfields, $errors)
 	                size=10>
              </td>\n";
     } else {
-	echo "<td class=left>$formfields[class]</td>
+	echo "<td class=left>" . $formfields["class"] . "</td>
           </tr>\n";
     }
 
     echo "<tr>
-             <td>Processor (eg. 'Pentium IV'):</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[proc]\"
-                        value=\"" . $formfields[proc] . "\"
-	                size=10>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>Speed:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[speed]\"
-                        value=\"" . $formfields[speed] . "\"
-	                size=5> MHz
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>RAM:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[RAM]\"
-                        value=\"" . $formfields[RAM] . "\"
-	                size=5> MB
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>Disk Size:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[HD]\"
-                        value=\"" . $formfields[HD] . "\"
-	                size=10> GB
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>Max Interfaces:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[max_interfaces]\"
-                        value=\"" . $formfields[max_interfaces] . "\"
-	                size=3>
-             </td>
-          </tr>\n";
-
-    #
-    # Function to set iface based on the control net
-    #
-    echo "<SCRIPT LANGUAGE=JavaScript>
-              function SetIface(theform) 
-              {
-                  var control_net = theform['formfields[control_net]'].value;
-		  theform['formfields[control_iface]'].value =
-			  'eth' + control_net;
-	      }
-	  </SCRIPT>\n";
-
-
-    echo "<tr>
-             <td>*Control Network:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[control_net]\"
-                        value=\"" . $formfields[control_net] . "\"
-	                size=3 onChange='SetIface(typeform);'>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>*Control Network Iface (eg. 'eth0'):</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[control_iface]\"
-                        value=\"" . $formfields[control_iface] . "\"
-	                size=6>
-             </td>
-          </tr>\n";
-
-
-    WRITEOSIDMENU("Default OSID", "formfields[osid]",
-		  $osid_result, $formfields[osid]);
-
-    WRITEIMAGEIDMENU("Default ImageID", "formfields[imageid]",
-		  $imageid_result, $formfields[imageid]);
-
-    WRITEOSIDMENU("Delay OSID", "formfields[delay_osid]",
-		  $osid_result, $formfields[delay_osid]);
-
-    WRITEOSIDMENU("Jailbird OSID", "formfields[jail_osid]",
-		  $osid_result, $formfields[jail_osid]);
-
-
-    echo "<tr>
-             <td>Power Cycle Time:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[power_time]\"
-                        value=\"" . $formfields[power_time] . "\"
-	                size=5> Seconds
-             </td>
-          </tr>\n";
-
-
-    echo "<tr>
-             <td>Imageable?:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[imageable]\"
-                        value=\"" . $formfields[imageable] . "\"
-	                size=2>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>Delay Capacity:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[delay_capacity]\"
-                        value=\"" . $formfields[delay_capacity] . "\"
-	                size=2>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>Disktype (ad,da,ar,amrd):</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[disktype]\"
-                        value=\"" . $formfields[disktype] . "\"
-	                size=6>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>Boot Disk Unit (0-255):</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[bootdisk_unit]\"
-                        value=\"" . $formfields[bootdisk_unit] . "\"
-	                size=6>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>Bios reboot wait time:<br>
-                 (in seconds)</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[bios_waittime]\"
-                        value=\"" . $formfields[bios_waittime] . "\"
-	                size=6>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>isvirtnode:</td>
+             <td colspan=2>isvirtnode:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[isvirtnode]\"
-                        value=\"" . $formfields[isvirtnode] . "\"
+                        value=\"" . $formfields["isvirtnode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-             <td>ismodelnet:</td>
-             <td class=left>
-                 <input type=text
-                        name=\"formfields[ismodelnet]\"
-                        value=\"" . $formfields[ismodelnet] . "\"
-	                size=2>
-             </td>
-          </tr>\n";
-
-    echo "<tr>
-             <td>isjailed:</td>
+             <td colspan=2>isjailed:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[isjailed]\"
-                        value=\"" . $formfields[isjailed] . "\"
+                        value=\"" . $formfields["isjailed"] . "\"
 	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-             <td>isdynamic:</td>
+             <td colspan=2>isdynamic:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[isdynamic]\"
-                        value=\"" . $formfields[isdynamic] . "\"
+                        value=\"" . $formfields["isdynamic"] . "\"
 	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-             <td>isremotenode:</td>
+             <td colspan=2>isremotenode:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[isremotenode]\"
-                        value=\"" . $formfields[isremotenode] . "\"
+                        value=\"" . $formfields["isremotenode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-             <td>issubnode:</td>
+             <td colspan=2>issubnode:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[issubnode]\"
-                        value=\"" . $formfields[issubnode] . "\"
+                        value=\"" . $formfields["issubnode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-             <td>isplabdslice:</td>
+             <td colspan=2>isplabdslice:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[isplabdslice]\"
-                        value=\"" . $formfields[isplabdslice] . "\"
+                        value=\"" . $formfields["isplabdslice"] . "\"
 	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-             <td>issimnode:</td>
+             <td colspan=2>issimnode:</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[issimnode]\"
-                        value=\"" . $formfields[issimnode] . "\"
+                        value=\"" . $formfields["issimnode"] . "\"
 	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-             <td>Simnode Capacity:</td>
+             <td colspan=2>isgeninode:</td>
              <td class=left>
                  <input type=text
-                        name=\"formfields[simnode_capacity]\"
-                        value=\"" . $formfields[simnode_capacity] . "\"
-	                size=3>
+                        name=\"formfields[isgeninode]\"
+                        value=\"" . $formfields["isgeninode"] . "\"
+	                size=2>
              </td>
           </tr>\n";
 
     echo "<tr>
-              <td colspan=2 align=center>
+             <td colspan=2>isfednode:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[isfednode]\"
+                        value=\"" . $formfields["isfednode"] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
+    echo "<tr>
+             <td colspan=2>isswitch:</td>
+             <td class=left>
+                 <input type=text
+                        name=\"formfields[isswitch]\"
+                        value=\"" . $formfields["isswitch"] . "\"
+	                size=2>
+             </td>
+          </tr>\n";
+
+    #
+    # Now do attributes.
+    #
+    echo "<tr></tr>
+          <tr></tr>
+           <td align=center><font size=-1>Delete?</font></td>
+           <td align=center colspan=2><b>Node Attributes</b></td></tr>\n";
+
+    while (list ($key, $val) = each ($attributes)) {
+	if (!isset($deletes[$key])) {
+	    # Somehow this doesn't get initialized in the Create Node case.
+	    $deletes[$key] = "";
+	}
+	if ($key == "default_osid" ||
+	    $key == "jail_osid" ||
+	    $key == "delay_osid") {
+	    WRITEOSIDMENU($key, "attributes[$key]", $osid_result, $val,
+			  "deletes[$key]", $deletes[$key]);
+	}
+	elseif ($key == "adminmfs_osid" ||
+		$key == "diskloadmfs_osid") {
+	    WRITEOSIDMENU($key, "attributes[$key]", $mfsosid_result, $val,
+			  "deletes[$key]", $deletes[$key]);
+	}
+	elseif ($key == $last_default_imageid_label) {
+	    WRITEIMAGEIDMENU("$key<sup><b>1</b></sup>", "attributes[$key]", $imageid_result, $val,
+			     "deletes[$key]", $deletes[$key]);
+	}
+	elseif ($key == "default_imageid" || 
+    	        substr($key, 0, strlen("default_imageid_")) == "default_imageid_") {
+	    WRITEIMAGEIDMENU("$key", "attributes[$key]", $imageid_result, $val,
+			     "deletes[$key]", $deletes[$key]);
+	}
+	else {
+	    echo "<tr>
+                      <td align=center>
+                            <input type=checkbox value=checked
+                                    name=\"deletes[$key]\" $deletes[$key]></td>
+                      <td>${key}:</td>
+                      <td class=left>
+                          <input type=text
+                                 name=\"attributes[$key]\"
+                                 value=\"" . $val . "\"></td>
+                  </tr>\n";
+	}
+    }
+
+    #
+    # Provide area for adding a new attribute.
+    # 
+    echo "<tr></tr>
+          <tr></tr>
+           <td align=center colspan=3><b>Add New Attribute</b></td></tr>\n";
+
+    echo "<tr>
+           <td colspan=2>Attribute Name:</td>
+           <td class=left>
+               <input type=text name=newattribute_name
+                      value=\"$newattribute_name\"></td>
+          </tr>\n";
+    echo "<tr>
+           <td colspan=2>Attribute Value:</td>
+           <td class=left>
+               <input type=text name=newattribute_value
+                      value=\"$newattribute_value\"></td>
+          </tr>\n";
+
+    $typenames   = array();
+    $typenames[] = "boolean";
+    $typenames[] = "integer";
+    $typenames[] = "float";
+    $typenames[] = "string";
+    
+    echo "<tr>
+           <td colspan=2>Attribute Type:</td>
+           <td class=left>\n";
+
+    foreach ($typenames as $i => $type) {
+	$checked = "";
+
+	if ($newattribute_type == $type)
+	    $checked = "checked";
+	
+	echo "<input type=radio $checked name=newattribute_type
+                     value=$type>$type\n";
+    }
+    echo "</td></tr>\n";
+
+    echo "<tr>
+              <td colspan=3 align=center>
                  <b><input type=submit name=submit value=Submit></b>
               </td>
           </tr>\n";
 
     echo "</form>
           </table>\n";
+
+    echo "<blockquote>
+	      <ol type=1 start=1>
+		 <li> To add more than one image, add the first image and 
+                      submit the form.  Then add the next, etc.</li>
+              </ol>
+              </blockquote>";
 }
 
-if ($new_type) {
+if (isset($new_type)) {
     #
-    # Starting a new node type - let's give some reasonable defaults
+    # Starting a new node type - give some reasonable defaults
     #
-    $defaults = array("class" => "pc", "power_time" => 60, "imageable" => 1,
-	"delay_capacity" => 2, "disktype" => "ad", "isvirtnode" => 0,
-	"isremotenode" => 0, "issubnode" => 0, "isplabdslice" => 0,
-        "ismodelnet" => 0, "isjailed" => 0, "isdynamic" => 0,
-        "bios_waittime" => 0,
-	"issimnode" => 0, "simnode_capacity" => 20, "bootdisk_unit" => 0);
-} else {
+    $defaults = array("class" => $node_class, "isvirtnode" => 0,
+		      "isremotenode" => 0, "issubnode" => 0,
+		      "isplabdslice" => 0, "isjailed" => 0, "isdynamic" => 0,
+		      "issimnode" => 0, "isgeninode" => 0, "isfednode" => 0,
+                      "isswitch" => ($node_class == "switch" ? 1 : 0));
+    if ($node_class == "switch") {
+        $initial_attributes = $initial_switch_attributes;
+    }
+    $default_attributes = array();
+    $attribute_types = array();
+    $attribute_deletes = array();
+    
+    foreach ($initial_attributes as $entry) {
+	$default_attributes[$entry['attrkey']] = $entry['attrvalue'];
+	$attribute_types[$entry['attrkey']] = $entry['attrtype'];
+	$attribute_deletes[$entry['attrkey']] = "";
+    }
+}
+elseif (isset($node_type)) {
     #
-    # We're editing an existing type - suck the current info out of the
+    # Editing an existing type - suck the current info out of the
     # database.
     #
     if (!preg_match("/^[-\w]+$/", $node_type)) {
@@ -390,27 +457,52 @@ if ($new_type) {
     if (($defaults = mysql_fetch_array($query_result)) == 0) {
 	USERERROR("$node_type is not a valid node type!", 1);
     }
+    
+    #
+    # And the attributes ... needed below.
+    #
+    $default_attributes = array();
+    $attribute_types = array();
+    $attribute_deletes = array();
+
+    $query_result =
+	DBQueryFatal("select * from node_type_attributes ".
+		     "where type='$node_type'");
+    while ($row = mysql_fetch_array($query_result)) {
+	$default_attributes[$row['attrkey']] = $row['attrvalue'];
+	$attribute_types[$row['attrkey']] = $row['attrtype'];
+	$attribute_deletes[$row['attrkey']] = "";
+    }
+    $attribute_types["default_imageid"] = "string";
+}
+else {
+    PAGEARGERROR("Must provide one of node_type or new_type");
+    return;
 }
 
-
-
 #
-# We need a list of osids and imageids.
+# We need lists of osids and imageids for selection.
 #
 $osid_result =
     DBQueryFatal("select osid,osname,pid from os_info ".
 		 "where (path='' or path is NULL) ".
-		 "order by pid,osid");
+		 "order by pid,osname");
+
+$mfsosid_result =
+    DBQueryFatal("select osid,osname,pid from os_info ".
+		 "where (path is not NULL and path!='') ".
+		 "order by pid,osname");
 
 $imageid_result =
     DBQueryFatal("select imageid,imagename,pid from images ".
-		 "order by pid,imageid");
+		 "order by pid,imagename");
 
 #
 # On first load, display initial values.
 #
 if (! isset($submit)) {
-    SPITFORM($node_type, $defaults, 0);
+    SPITFORM($node_type, $defaults,
+	     $default_attributes, $attribute_deletes, 0);
     PAGEFOOTER();
     return;
 }
@@ -418,358 +510,251 @@ if (! isset($submit)) {
 #
 # We do not allow these to be changed.
 #
-if (!$new_type) {
+if (!isset($new_type)) {
     $formfields["class"] = $defaults["class"];
 }
 
 #
-# Otherwise, must validate and redisplay if errors. Build up a DB insert
-# string as we go. 
+# Otherwise, must validate and redisplay if errors.
 #
 $errors  = array();
-$inserts = array();
 
-# Class (only for new types)
-if ($new_type && isset($formfields['class']) && $formfields['class'] != "") {
-    if (! TBvalid_description($formfields['class'])) {
-	$errors["Class"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["class"] = addslashes($formfields["class"]);
-    }
+#
+# Combine imageids into a comma seperated list
+#
+$default_imagesids = array();
+$default_imagesid_once_defined = 0;
+for ($i = 0; isset($attributes["default_imageid_$i"]); $i++) {
+    if (!(isset($deletes["default_imageid_$i"]) && $deletes["default_imageid_$i"] == "checked")
+        && $attributes["default_imageid_$i"] != 0)
+        array_push($default_imagesids, $attributes["default_imageid_$i"]);
+    unset($attributes["default_imageid_$i"]);
+    $default_imagesid_once_defined = 1;
+}
+if (count($default_imagesids) > 0) {
+    $attributes["default_imageid"] = join(',', $default_imagesids);
+} elseif ($default_imagesid_once_defined) {
+    $attributes["default_imageid"] = "0";
+    $deletes["default_imageid"] = "checked";
 }
 
-# Processor
-if (isset($formfields[proc]) && $formfields[proc] != "") {
-    if (! TBvalid_description($formfields[proc])) {
-	$errors["Processor"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["proc"] = addslashes($formfields[proc]);
-    }
-}
+# Check the attributes.
+while (list ($key, $val) = each ($attributes)) {
+    # Skip checks if scheduled for deletion
+    if (isset($deletes[$key]) && $deletes[$key] == "checked") 
+	continue;
 
-# Speed
-if (isset($formfields[speed]) && $formfields[speed] != "") {
-    if (! TBvalid_integer($formfields[speed])) {
-	$errors["speed"] = TBFieldErrorString();
+    if (!isset($attribute_types[$key])) {
+	$errors[$key] = "Unknown Attribute";
+	continue;
     }
-    else {
-	$inserts["speed"] = $formfields[speed];
+    
+    if ($val == "") {
+	$errors[$key] = "No value provided for $key";
+	continue;
     }
-}
 
-# RAM
-if (isset($formfields[RAM]) && $formfields[RAM] != "") {
-    if (! TBvalid_integer($formfields[RAM])) {
-	$errors["RAM"] = TBFieldErrorString();
+    # Probably redundant with the XML keyfields checking...
+    $attrtype = $attribute_types[$key];
+    if ($attrtype == "") {	# Shouldn't happen...
+	$attrtype = $attribute_types[$key] = "integer";
     }
-    else {
-	$inserts["RAM"] = $formfields[RAM];
+    if (strpos(":boolean:float:integer:string:", ":$attrtype:")===FALSE) {
+	$errors[$key] = "Invalid type information: $attrtype";
+	continue;
     }
-}
 
-# HD
-if (isset($formfields[HD]) && $formfields[HD] != "") {
-    if (! TBvalid_float($formfields[HD])) {
-	$errors["HD"] = TBFieldErrorString();
+    # New attributes require type and value.
+    if (isset($newattribute_name) && $newattribute_name != "" &&
+	!(isset($newattribute_type) && $newattribute_type != "")) {
+	$errors[$newattribute_name] = "Missing type";
     }
-    else {
-	$inserts["HD"] = $formfields[HD];
-    }
-}
-
-# max_interfaces
-if (isset($formfields[max_interfaces]) && $formfields[max_interfaces] != "") {
-    if (! TBvalid_tinyint($formfields[max_interfaces])) {
-	$errors["max_interfaces"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["max_interfaces"] = $formfields[max_interfaces];
-    }
-}
-
-# control_net
-if (isset($formfields[control_net]) && $formfields[control_net] != "") {
-    if (! TBvalid_tinyint($formfields[control_net])) {
-	$errors["control_net"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["control_net"] = $formfields[control_net];
-    }
-} else {
-    $errors["control_net"] = "Field is required";
-}
-
-# control_iface
-if (isset($formfields[control_iface]) && $formfields[control_iface] != "") {
-    if (! TBvalid_userdata($formfields[control_iface])) {
-	$errors["control_iface"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["control_iface"] = addslashes($formfields[control_iface]);
-    }
-} else {
-    $errors["control_iface"] = "Field is required";
-}
-
-# OSID
-if (isset($formfields[osid]) && $formfields[osid] != "") {
-    if ($formfields[osid] == "none") {
-	$inserts["osid"] = "";
-    }
-    elseif (! TBvalid_osid($formfields[osid])) {
-	$errors["osid"] = TBFieldErrorString();
-    }
-    elseif (! TBValidOSID($formfields[osid])) {
-	$errors["osid"] = "No such OSID";
-    }
-    else {
-	$inserts["osid"] = $formfields[osid];
-    }
-}
-
-# ImageID
-if (isset($formfields[imageid]) && $formfields[imageid] != "") {
-    if ($formfields[imageid] == "none") {
-	$inserts["imageid"] = "";
-    }
-    elseif (! TBvalid_osid($formfields[imageid])) {
-	$errors["imageid"] = TBFieldErrorString();
-    }
-    elseif (! TBValidImageID($formfields[imageid])) {
-	$errors["imageid"] = "No such ImageID";
-    }
-    else {
-	$inserts["imageid"] = $formfields[imageid];
-    }
-}
-
-# delay_osid
-if (isset($formfields[delay_osid]) && $formfields[delay_osid] != "") {
-    if ($formfields[delay_osid] == "none") {
-	$inserts["delay_osid"] = "";
-    }
-    elseif (! TBvalid_osid($formfields[delay_osid])) {
-	$errors["delay_osid"] = TBFieldErrorString();
-    }
-    elseif (! TBValidOSID($formfields[delay_osid])) {
-	$errors["delay_osid"] = "No such osid";
-    }
-    else {
-	$inserts["delay_osid"] = $formfields[delay_osid];
-    }
-}
-
-# jail_osid
-if (isset($formfields[jail_osid]) && $formfields[jail_osid] != "") {
-    if ($formfields[jail_osid] == "none") {
-	$inserts["jail_osid"] = "";
-    }
-    elseif (! TBvalid_osid($formfields[jail_osid])) {
-	$errors["jail_osid"] = TBFieldErrorString();
-    }
-    elseif (! TBValidOSID($formfields[jail_osid])) {
-	$errors["jail_osid"] = "No such osid";
-    }
-    else {
-	$inserts["jail_osid"] = $formfields[jail_osid];
-    }
-}
-
-# power_time
-if (isset($formfields[power_time]) && $formfields[power_time] != "") {
-    if (! TBvalid_tinyint($formfields[power_time])) {
-	$errors["power_time"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["power_time"] = $formfields[power_time];
-    }
-}
-
-# imageable
-if (isset($formfields[imageable]) && $formfields[imageable] != "") {
-    if (! TBvalid_boolean($formfields[imageable])) {
-	$errors["imageable"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["imageable"] = $formfields[imageable];
-    }
-}
-
-# delay_capacity
-if (isset($formfields[delay_capacity]) && $formfields[delay_capacity] != "") {
-    if (! TBvalid_tinyint($formfields[delay_capacity])) {
-	$errors["delay_capacity"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["delay_capacity"] = $formfields[delay_capacity];
-    }
-}
-
-# disktype
-if (isset($formfields[disktype]) && $formfields[disktype] != "") {
-    if ($formfields[disktype] != "ad" &&
-	$formfields[disktype] != "da" &&
-	$formfields[disktype] != "ar" &&
-	$formfields[disktype] != "amrd") {
-	$errors["disktype"] = "Must be one of ad, da, ar, amrd";
-    }
-    else {
-	$inserts["disktype"] = $formfields[disktype];
-    }
-}
-
-# bootdisk_unit
-if (isset($formfields[bootdisk_unit]) && $formfields[bootdisk_unit] != "") {
-    if (! TBvalid_tinyint($formfields[bootdisk_unit])) {
-	$errors["bootdisk_unit"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["bootdisk_unit"] = $formfields[bootdisk_unit];
-    }
-}
-
-# bios_waittime
-if (isset($formfields[bios_waittime]) && $formfields[bios_waittime] != "") {
-    if (! TBvalid_integer($formfields[bios_waittime])) {
-	$errors["bios_waittime"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["bios_waittime"] = $formfields[bios_waittime];
-    }
-}
-
-# isvirtnode
-if (isset($formfields[isvirtnode]) && $formfields[isvirtnode] != "") {
-    if (! TBvalid_boolean($formfields[isvirtnode])) {
-	$errors["isvirtnode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isvirtnode"] = $formfields[isvirtnode];
-    }
-}
-
-# ismodelnet
-if (isset($formfields[ismodelnet]) && $formfields[ismodelnet] != "") {
-    if (! TBvalid_boolean($formfields[ismodelnet])) {
-	$errors["ismodelnet"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["ismodelnet"] = $formfields[ismodelnet];
-    }
-}
-
-# isjailed
-if (isset($formfields[isjailed]) && $formfields[isjailed] != "") {
-    if (! TBvalid_boolean($formfields[isjailed])) {
-	$errors["isjailed"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isjailed"] = $formfields[isjailed];
-    }
-}
-
-# isdynamic
-if (isset($formfields[isdynamic]) && $formfields[isdynamic] != "") {
-    if (! TBvalid_boolean($formfields[isdynamic])) {
-	$errors["isdynamic"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isdynamic"] = $formfields[isdynamic];
-    }
-}
-
-# isremotenode
-if (isset($formfields[isremotenode]) && $formfields[isremotenode] != "") {
-    if (! TBvalid_boolean($formfields[isremotenode])) {
-	$errors["isremotenode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isremotenode"] = $formfields[isremotenode];
-    }
-}
-
-# issubnode
-if (isset($formfields[issubnode]) && $formfields[issubnode] != "") {
-    if (! TBvalid_boolean($formfields[issubnode])) {
-	$errors["issubnode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["issubnode"] = $formfields[issubnode];
-    }
-}
-
-# isplabdslice
-if (isset($formfields[isplabdslice]) && $formfields[isplabdslice] != "") {
-    if (! TBvalid_boolean($formfields[isplabdslice])) {
-	$errors["isplabdslice"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["isplabdslice"] = $formfields[isplabdslice];
-    }
-}
-
-# issimnode
-if (isset($formfields[issimnode]) && $formfields[issimnode] != "") {
-    if (! TBvalid_boolean($formfields[issimnode])) {
-	$errors["issimnode"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["issimnode"] = $formfields[issimnode];
-    }
-}
-
-# simnode_capacity
-if (isset($formfields[simnode_capacity]) &&
-    $formfields[simnode_capacity] != "") {
-    if (! TBvalid_tinyint($formfields[simnode_capacity])) {
-	$errors["simnode_capacity"] = TBFieldErrorString();
-    }
-    else {
-	$inserts["simnode_capacity"] = $formfields[simnode_capacity];
+    if (isset($newattribute_name) && $newattribute_name != "" &&
+	!(isset($newattribute_value) && $newattribute_value != "")) {
+	$errors[$newattribute_name] = "Missing value";
     }
 }
 
 #
-# Spit any errors now.
-#
+# If any errors, respit the form with the current values and the
+# error messages displayed. Iterate until happy.
+# 
 if (count($errors)) {
-    SPITFORM($node_type, $formfields, $errors);
+    SPITFORM($node_type, $formfields, $attributes, $deletes, $errors);
     PAGEFOOTER();
     return;
 }
 
 #
-# Otherwise, do the inserts.
+# Build up argument array to pass along.
 #
-$insert_data = array();
-foreach ($inserts as $name => $value) {
-    $insert_data[] = "$name='$value'";
+$args = array();
+
+# Class (only for new types.)
+if (isset($new_type) &&
+    isset($formfields['class']) && $formfields['class'] != "") {
+    $args["new_type"] = "1";
+    $args["class"] = $formfields["class"];
 }
 
-if ($new_type) {
-    DBQueryFatal("insert into node_types set type='$node_type', ".
-		 implode(",", $insert_data));
-    if ($formfields["class"] == "pc") {
-	$vnode_type = $node_type;
-	$vnode_type = preg_replace("/pc/","pcvm",$vnode_type);
-	if ($vnode_type == $node_type) {
-	    $vnode_type = "$vnode_type-vm";
-	}
-	DBQueryFatal("insert into node_types_auxtypes set " .
-	    "auxtype='$vnode_type', type='pcvm'");
-    }
-} else {
-    DBQueryFatal("update node_types set ".
-		 implode(",", $insert_data) . " ".
-		 "where type='$node_type'");
+# isvirtnode
+if (isset($formfields["isvirtnode"]) && $formfields["isvirtnode"] != "") {
+    $args["isvirtnode"] = $formfields["isvirtnode"];
 }
+
+# isjailed
+if (isset($formfields["isjailed"]) && $formfields["isjailed"] != "") {
+    $args["isjailed"] = $formfields["isjailed"];
+}
+
+# isdynamic
+if (isset($formfields["isdynamic"]) && $formfields["isdynamic"] != "") {
+    $args["isdynamic"] = $formfields["isdynamic"];
+}
+
+# isremotenode
+if (isset($formfields["isremotenode"]) && $formfields["isremotenode"] != "") {
+    $args["isremotenode"] = $formfields["isremotenode"];
+}
+
+# issubnode
+if (isset($formfields["issubnode"]) && $formfields["issubnode"] != "") {
+    $args["issubnode"] = $formfields["issubnode"];
+}
+
+# isplabdslice
+if (isset($formfields["isplabdslice"]) && $formfields["isplabdslice"] != "") {
+    $args["isplabdslice"] = $formfields["isplabdslice"];
+}
+
+# issimnode
+if (isset($formfields["issimnode"]) && $formfields["issimnode"] != "") {
+    $args["issimnode"] = $formfields["issimnode"];
+}
+
+# isgeninode
+if (isset($formfields["isgeninode"]) && $formfields["isgeninode"] != "") {
+    $args["isgeninode"] = $formfields["isgeninode"];
+}
+
+# isfednode
+if (isset($formfields["isfednode"]) && $formfields["isfednode"] != "") {
+    $args["isfednode"] = $formfields["isfednode"];
+}
+
+# isswitch
+if (isset($formfields["isswitch"]) && $formfields["isswitch"] != "") {
+    $args["isswitch"] = $formfields["isswitch"];
+}
+
+# Existing attributes.
+foreach ($attributes as $attr_key => $attr_val) {
+    if (isset($deletes[$attr_key]) && $deletes[$attr_key] == "checked") 
+	$args["delete_${attr_key}"] = "1";
+    $attr_type = $attribute_types[$attr_key];
+    $args["attr_${attr_type}_${attr_key}"] = $attr_val;
+}
+
+#
+# Form allows for adding a single new attribute, but someday be more fancy.
+#
+if (isset($newattribute_name) && $newattribute_name != "" &&
+    isset($newattribute_value) && $newattribute_value != "" &&
+    isset($newattribute_type) && $newattribute_type != "") {
+
+    $args["new_attr"] = $newattribute_name;
+    # The following is matched by wildcards on the other side of XML,
+    # including checking its type and value, just like existing attributes.
+    $args["attr_${newattribute_type}_$newattribute_name"] = $newattribute_value;
+}
+
+if (! ($result = SetNodeType($node_type, $args, $errors))) {
+    # Always respit the form so that the form fields are not lost.
+    # I just hate it when that happens so lets not be guilty of it ourselves.
+    SPITFORM($node_type, $formfields, $attributes, $deletes, $errors);
+    PAGEFOOTER();
+    return;
+}
+
+PAGEHEADER(isset($new_type) ? "Create" : "Edit" . " Node Type");
 
 #
 # Spit out a redirect so that the history does not include a post
 # in it. The back button skips over the post and to the form.
 #
-header("Location: editnodetype.php3?node_type=$node_type");
+PAGEREPLACE("editnodetype.php3?node_type=$node_type");
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+
+#
+# Create or edit a nodetype.  (No class for that at present.)
+#
+function SetNodeType($node_type, $args, &$errors) {
+    global $suexec_output, $suexec_output_array;
+
+    #
+    # Generate a temporary file and write in the XML goo.
+    #
+    $xmlname = tempnam("/tmp", "editnodetype");
+    if (! $xmlname) {
+	TBERROR("Could not create temporary filename", 0);
+	$errors[] = "Transient error(1); please try again later.";
+	return null;
+    }
+    if (! ($fp = fopen($xmlname, "w"))) {
+	TBERROR("Could not open temp file $xmlname", 0);
+	$errors[] = "Transient error(2); please try again later.";
+	return null;
+    }
+
+    # Add these. Maybe caller should do this?
+    $args["node_type"] = $node_type;
+    
+    fwrite($fp, "<nodetype>\n");
+    foreach ($args as $name => $value) {
+	fwrite($fp, "<attribute name=\"$name\">");
+	fwrite($fp, "  <value>" . htmlspecialchars($value) . "</value>");
+	fwrite($fp, "</attribute>\n");
+    }
+    fwrite($fp, "</nodetype>\n");
+    fclose($fp);
+    chmod($xmlname, 0666);
+
+    $retval = SUEXEC("nobody", "nobody", "webeditnodetype $xmlname",
+		     SUEXEC_ACTION_IGNORE);
+
+    if ($retval) {
+	if ($retval < 0) {
+	    $errors[] = "Transient error(3, $retval); please try again later.";
+	    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+	}
+	else {
+	    # unlink($xmlname);
+	    if (count($suexec_output_array)) {
+		for ($i = 0; $i < count($suexec_output_array); $i++) {
+		    $line = $suexec_output_array[$i];
+		    if (preg_match("/^([-\w]+):\s*(.*)$/",
+				   $line, $matches)) {
+			$errors[$matches[1]] = $matches[2];
+		    }
+		    else
+			$errors[] = $line;
+		}
+	    }
+	    else
+		$errors[] = "Transient error(4, $retval); please try again later.";
+	}
+	return null;
+    }
+    # There are no return value(s) to parse at the end of the output.
+
+    # Unlink this here, so that the file is left behind in case of error.
+    # We can then create the nodetype by hand from the xmlfile, if desired.
+    unlink($xmlname);
+    return true;
+}
 
 ?>

@@ -1,23 +1,22 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
+# Only known and logged in users can be verified.
+#
+$this_user = CheckLoginOrDie(CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
+
+#
 # Standard Testbed Header
 #
 PAGEHEADER("New User Verification");
-
-#
-# Only known and logged in users can be verified.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid,
-	      CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
 
 echo "<p>
       The purpose of this page is to verify, for security purposes, that

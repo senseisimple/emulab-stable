@@ -1,8 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
+
+static const char rcsid[] = "$Id: pclass.cc,v 1.31 2009-06-15 19:42:26 ricci Exp $";
 
 #include "port.h"
 
@@ -16,7 +18,7 @@
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#ifdef NEW_GCC
 #include <ext/hash_map>
 using namespace __gnu_cxx;
 #else
@@ -44,9 +46,6 @@ using namespace boost;
 // fill out the pclass structure.  Then two routines pclass_set, and
 // pclass_unset are used to maintaing the structure during annealing.
 
-// Used to catch cumulative floating point errors
-static double ITTY_BITTY = 0.00000001;
-
 extern pnode_pvertex_map pnode2vertex;
 
 // pclasses - A list of all pclasses.
@@ -60,7 +59,7 @@ extern pclass_types type_table;
 // returns 1 if a and b are equivalent.  They are equivalent if the
 // type and features information match and if there is a one-to-one
 // mapping between links that preserves bw, and destination.
-int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
+int pclass_equiv(tb_pgraph &pg, tb_pnode *a,tb_pnode *b)
 {
 #ifdef PCLASS_DEBUG_MORE
   cerr << "pclass_equiv: a=" << a->name << " b=" << b->name << endl;
@@ -155,27 +154,26 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
   link_list b_links;
 
   poedge_iterator eit,eendit;
-  tie(eit,eendit) = out_edges(bn,PG);
+  tie(eit,eendit) = out_edges(bn,pg);
   for (;eit != eendit;++eit) {
-    pvertex dst = target(*eit,PG);
     b_links.push_back(*eit);
   }
   
   // Go through all of a's links, trying to find matches on node b. If we find
   // a match, we remove it from the list
-  tie(eit,eendit) = out_edges(an,PG);
+  tie(eit,eendit) = out_edges(an,pg);
   for (;eit != eendit;++eit) {
     tb_plink *plink_a = get(pedge_pmap,*eit);
-    pvertex dest_pv_a = target(*eit,PG);
+    pvertex dest_pv_a = target(*eit,pg);
     if (dest_pv_a == a)
-      dest_pv_a = source(*eit,PG);
+      dest_pv_a = source(*eit,pg);
 
     link_list::iterator bit;
     for (bit = b_links.begin(); bit != b_links.end(); bit++) {
       tb_plink *plink_b = get(pedge_pmap,*bit);
-      pvertex dest_pv_b = target(*bit,PG);
+      pvertex dest_pv_b = target(*bit,pg);
       if (dest_pv_b == b)
-	dest_pv_b = source(*bit,PG);
+	dest_pv_b = source(*bit,pg);
 
       // If links are equivalent, remove this link in b from further
       // consideration, and go to the next link in a
@@ -214,7 +212,7 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
    list of all equivalence classes) and type_table (and table of
    physical type to list of classes that can satisfy that type) are
    set by this routine. */
-int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
+int generate_pclasses(tb_pgraph &pg, bool pclass_for_each_pnode,
     bool dynamic_pclasses) {
   typedef hash_map<tb_pclass*,tb_pnode*,hashptr<tb_pclass*> > pclass_pnode_map;
   typedef hash_map<fstring,pclass_list*> name_pclass_list_map;
@@ -223,7 +221,7 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
   pclass_pnode_map canonical_members;
 
   pvertex_iterator vit,vendit;
-  tie(vit,vendit) = vertices(PG);
+  tie(vit,vendit) = vertices(pg);
   for (;vit != vendit;++vit) {
     cur = *vit;
     bool found_class = 0;
@@ -237,7 +235,7 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
       for (dit=canonical_members.begin();dit!=canonical_members.end();
 	  ++dit) {
 	curclass=(*dit).first;
-	if (pclass_equiv(PG,curP,(*dit).second)) {
+	if (pclass_equiv(pg,curP,(*dit).second)) {
 	  // found the right class
 	  found_class=1;
 	  curclass->add_member(curP,false);
@@ -259,10 +257,10 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
   if (dynamic_pclasses) {
     // Make a pclass for each node, which starts out disabled. It will get
     // enabled later when something is assigned to the pnode
-    pvertex_iterator vit,vendit;
-    tie(vit,vendit) = vertices(PG);
-    for (;vit != vendit;++vit) {
-      tb_pnode *pnode = get(pvertex_pmap,*vit);
+    pvertex_iterator pvit, pvendit;
+    tie(pvit,pvendit) = vertices(pg);
+    for (;pvit != pvendit;++pvit) {
+      tb_pnode *pnode = get(pvertex_pmap,*pvit);
       // No point in doing this if the pnode is either: already in a pclass of
       // size one, or can only have a single vnode mapped to it anyway
       if (pnode->my_class->size == 1) {
@@ -271,7 +269,7 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
       bool multiplexed = false;
       tb_pnode::types_map::iterator it = pnode->types.begin();
       for (; it != pnode->types.end(); it++) {
-	  if ((*it).second->max_load > 1) {
+	  if ((*it).second->get_max_load() > 1) {
 	      multiplexed = true;
 	      break;
 	  }
@@ -284,21 +282,22 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
       n->name = pnode->name + "-own";
       n->add_member(pnode,true);
       n->disabled = true;
+      n->is_dynamic = true;
     }
   }
 
   name_pclass_list_map pre_type_table;
 
-  pclass_list::iterator it;
-  for (it=pclasses.begin();it!=pclasses.end();++it) {
-    tb_pclass *cur = *it;
+  pclass_list::iterator pit;
+  for (pit=pclasses.begin();pit!=pclasses.end();++pit) {
+    tb_pclass *pclass = *pit;
     tb_pclass::pclass_members_map::iterator dit;
-    for (dit=cur->members.begin();dit!=cur->members.end();
+    for (dit=pclass->members.begin();dit!=pclass->members.end();
 	 ++dit) {
       if (pre_type_table.find((*dit).first) == pre_type_table.end()) {
 	pre_type_table[(*dit).first]=new pclass_list;
       }
-      pre_type_table[(*dit).first]->push_back(cur);
+      pre_type_table[(*dit).first]->push_back(pclass);
     }
   }
 
@@ -322,7 +321,7 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
   return 0;
 }
 
-int tb_pclass::add_member(tb_pnode *p, bool is_own_class)
+int tb_pclass::add_member(tb_pnode *p, bool own_class)
 {
   tb_pnode::types_map::iterator it;
   for (it=p->types.begin();it!=p->types.end();++it) {
@@ -333,7 +332,7 @@ int tb_pclass::add_member(tb_pnode *p, bool is_own_class)
     members[type]->push_back(p);
   }
   size++;
-  if (is_own_class) {
+  if (own_class) {
       p->my_own_class=this;
   } else {
       p->my_class=this;
@@ -388,8 +387,8 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
   for (dit=c->members.begin();dit!=c->members.end();dit++) {
     if ((*dit).first == p->current_type) {
       // same class - only remove if node is full
-      if ((p->current_type_record->current_load ==
-	      p->current_type_record->max_load) ||
+      if ((p->current_type_record->get_current_load() ==
+	      p->current_type_record->get_max_load()) ||
 	      p->my_own_class) {
 	(*dit).second->remove(p);
 	if (p->my_own_class) {
@@ -398,7 +397,7 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
       }
     } else {
       // XXX - should be made faster
-      if (!p->types[dit->first]->is_static) {
+      if (!p->types[dit->first]->is_static()) {
 	  // If it's not in the list then this fails quietly.
 	  (*dit).second->remove(p);
       }
@@ -434,14 +433,14 @@ int pclass_unset(tb_pnode *p)
       // empty and the front if it's not.  Since unset is called before
       // remove_node empty means only one user.
       if (! (*dit).second->exists(p)) {
-	assert(p->current_type_record->current_load > 0);
+	assert(p->current_type_record->get_current_load() > 0);
 #ifdef PNODE_ALWAYS_FRONT
 	(*dit).second->push_front(p);
 #else
 #ifdef PNODE_SWITCH_LOAD
-	if (p->current_type_record->current_load == 0) {
+	if (p->current_type_record->get_current_load() == 0) {
 #else
-	if (p->current_load == 1) {
+	if (p->get_current_load() == 1) {
 #endif
 	  (*dit).second->push_back(p);
 	} else {

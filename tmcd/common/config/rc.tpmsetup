@@ -1,0 +1,196 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+my $vnodeid;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#my $RCDIR	= "$BINDIR/rc";
+
+#
+# Not all clients support this.
+#
+#exit(0)
+#    if (MFS());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^cleanup$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+	# Here we get the keyblob which is ready to be loaded into the TPM
+	# via tpm-openssl-engine.  This key is saved in $BINDIR/tpm.key.
+	# I am not sure if this is the best place to save this stuff.  I also
+	# get the tpm x509 cert (which is supposed to be signed by the CA)
+	# from tmcd.  It is also stored as $BINDIR/tpm.cert
+
+	my @tpmblob;
+	my @tpmpub;
+
+	#if (tmcc(TMCCCMD_TPMBLOB, "hex", \@tpmblob) < 0) {
+	if (tmcc(TMCCCMD_TPMBLOB, undef, \@tpmblob) < 0) {
+		#fatal("Could not get tpmblob from server");
+		print STDOUT "Could not get tpmblob from server";
+		return;
+	}
+	$str = $tpmblob[0];
+	if(!$str) {
+		#fatal("no tpmblob in database")
+		print STDOUT "no tpmblob in database";
+		return;
+	}
+
+	# Sanity check and trim BLOB= or BLOBHEX=
+	if($str =~ /^BLOBHEX=/){
+		$str = substr($str, 8);
+	}elsif($str =~ /^BLOB=/){
+		$str = substr($str, 5);
+	}else{
+		#fatal("corrupt key blob: @tpmblob");
+		print STDOUT "corrupt key blob: @tpmblob";
+		return;
+	}
+
+	# Strip off newline
+	# XXX: should check the newline probably
+	$len = length($str);
+	$str = substr($str, 0, $len-1);
+
+	open(FD, ">$BINDIR/tpm.key");
+	print FD pack("H*", $str);
+	close(FD);
+
+	if (tmcc(TMCCCMD_TPMPUB, undef, \@tpmpub) < 0) {
+		#fatal("Could not get tpmpub from server");
+		print STDOUT "Could not get tpmpub from server";
+		return;
+	}
+
+	$str = $tpmpub[0];
+	if(!$str) {
+		#fatal("no tpm x509 cert in database")
+		print STDOUT "no tpm x509 cert in database";
+		return;
+	}
+
+	# Trim TPMPUB=
+	if($str =~ /^TPMPUB=/){
+		$str = substr($str, 7);
+	}else{
+		#fatal("bogus tpmpub: @tpmpub");
+		print STDOUT "bogus tpmpub: @tpmpub";
+		return;
+	}
+
+	open(FD, ">$BINDIR/tpm.cert");
+	print FD $str;
+	$size = @tpmpub;
+	for($i = 1;$i < $size;$i++){
+		print FD $tpmpub[$i];
+	}
+	close(FD);
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+
+}

@@ -1,0 +1,98 @@
+#!/usr/local/bin/python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+import sys
+import getopt
+import xmlrpclib
+import traceback
+import string
+
+DEF_HOST = 'ops.emulab.net'
+DEF_PORT = 3993
+
+def usage(progname):
+    print "Usage: %s [-hp <arg>]" % str(progname)
+    print "  -h <name>    Connect to this server (default: %s)" % DEF_HOST
+    print "  -p <port>    Connect to this port (default: %d)" % DEF_PORT
+    sys.exit(2)
+    pass
+
+def main():
+    try:
+        opts,args = getopt.getopt(sys.argv[1:],"h:p:")
+    except getopt.GetoptError:
+        traceback.print_exc()
+        usage(sys.argv[0])
+        pass
+
+    (host,port) = (DEF_HOST,DEF_PORT)
+
+    for (o,v) in opts:
+        if o == '-h':
+            host = v
+            pass
+        elif o == '-p':
+            port = int(v)
+            pass
+        pass
+
+    if len(args) < 1:
+        usage(sys.argv[0])
+        pass
+
+    method = 'flexlab.' + args.pop(0)
+    params = dict({})
+    for param in args:
+        plist = string.split(param, "=", 1)
+        if len(plist) != 2:
+            print ("error: Parameter, '"
+                   + param
+                   + "', is not of the form: param=value!")
+            return -1
+        value = plist[1]
+
+        #
+        # Evaluate the arg no matter what (so we get int/float/str, in addition
+        # to list/dict).
+        #
+        try:
+            value = eval(value)
+        except:
+            print "Error while parsing argument into python variable:"
+            traceback.print_exc()
+            sys.exit(3)
+            pass
+        
+        params[plist[0]] = value
+        pass
+
+    #
+    # Setup the server, grab the method
+    #
+    surl = "http://%s:%d/" % (host,port)
+    server = xmlrpclib.ServerProxy(surl,allow_none=1)
+
+    meth = getattr(server,method)
+    
+    #
+    # Make the call. 
+    #
+    try:
+        response = apply(meth,[params])
+        pass
+    except xmlrpclib.Fault, e:
+        print e.faultString
+        return -1
+
+    print str(response)
+    
+    sys.exit(0)
+
+
+if __name__ == '__main__':
+    main()
+    pass

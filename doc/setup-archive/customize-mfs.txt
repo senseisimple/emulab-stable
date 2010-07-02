@@ -1,0 +1,102 @@
+1. DESCRIPTION:
+
+These are the files/directories needed for PXE booting.
+
+2. CONTENTS:
+
+README
+	This file
+
+freebsd*/
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 6.2 system.
+	We use this MFS for creating disk images and general maintenance
+	tasks on a node (e.g., when the node's disk is scrogged).
+	The MFS contains a pretty small set of utilities.
+
+frisbee*/
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 6.2 system.
+	This MFS is considerably smaller than the "freebsd" one.
+	It is used to reload node disks with frisbee.  Since it may be loaded
+	simultaneously by many nodes to reload their disks, we wanted
+	this to be as small as possible.  Not intended as an interactive
+	environment, its rc.local script invokes frisbee and then reboots.
+
+freebsd.newnode*/
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 6.2 system.
+	A specialized version of the freebsd MFS for loading on nodes
+	which are not yet part of Emulab.  Has a generic kernel and specialized
+	scripts for figuring out the network connections, etc.
+
+pxeboot*/pxeboot.emu-{sio,vga,null}
+	This is a specialized version of the FreeBSD boot loader.
+	There is a version for use with the 4.7 based system (pxeboot47)
+	and one for the FreeBSD 6.2 system (pxeboot62).  In each of these
+	directories, there are three versions of the boot loader:
+	serial-line (-sio), VGA (-vga), and null (-null) console versions
+	of our standard PXE-booted startup.  Whichever you choose should
+	be renamed as /tftpboot/pxeboot.emu (or whatever your boss dhcpd.conf
+	file says).
+
+
+3. INSTALLATION:
+
+If you are reading this file, then I guess you have succeeded in unpacking
+the tarball.  Hopefully, you have unpacked it into /tftpboot.  If not, go
+do that now, I'll wait...
+
+...ok.  First, you have to choose between using FreeBSD 4.7 or FreeBSD 6.2
+MFSes.  You almost certainly want to use the 6.2 versions since 6.2 supports
+more hardware.  In fact, the "6.2 version" actually has a 6.3-STABLE kernel
+built on 6/26/2008, so it is the lastest available for the 6.x series.
+
+If you have any problem with the 6.2 versions *and* you have older hardware,
+then try the 4.7 versions.  If the 6.2 version don't work because it appears
+that your hardware is not supported, then contact Utah for more help.
+In summary, I recommend:
+
+	pxeboot62/pxeboot.emu-{sio,vga} (pick one and rename to "pxeboot.emu",
+                                     then copy it to /tftpboot)
+	frisbee62 (rename to "frisbee")
+	freebsd62 (rename to "freebsd")
+	freebsd62.newnode (rename to "freebsd.newnode")
+
+Anyway, after choosing your MFSes, you should have three generic MFSes
+(frisbee, freebsd, freebsd.newnode).  The three MFSes unloaded are "generic"
+in the sense that they don't have any of your (or our) Emulab keys or
+passwords.  That is ok for the "newnode" MFS, but the other two will need
+to be customized for your site.  You will also need to run the 'prepare'
+script for *each* of the three MFSes. See the README file in each boot
+subdirectory for MFS-specific customization and installation instructions.
+
+If you don't have VGA or serial lines, and it appears that nodes are not
+booting, try using pxeboot.emu-null which gives you a non-interactive version
+of the boot loader.  Some sites have had problems with "phantom" serial line
+input from a non-existent serial line causing the -sio version of the boot
+loader to drop into interactive mode.  Make sure you replace the loader.conf
+file in the three subdirectories with the -null version as well.
+
+4. EMULAB INTEGRATION
+
+For Emulab to know about the MFSes you have just installed, you will need
+to add some database state.  This is done using the "load-descriptors"
+script in your Emulab build tree:
+
+       cd <your-elab-build-dir>/install
+       ./load-descriptors <your-elab-source-dir>/install/<descriptor-file>
+
+<descriptor-file> is either "descriptors.sql" or "descriptors-new.sql"
+depending on whether you are going to load FreeBSD4+Redhat9 or
+FreeBSD6+Fedora6 as your standard image on disks.  Sorry, but this is a
+bit of a forward reference, since determining which of those you want
+means skipping ahead and looking at:
+
+      http://www.emulab.net/downloads/generic-image-README.txt
+
+which is part of customizing a disk image for your nodes.  Look at part II
+of that file ("Which generic image do I need?").  If you choose FBSD62+FC6,
+then use "descriptors-new.sql", otherwise use "descriptors.sql".
+(In the next release, we will separate the DB state for the MFS images from
+that of the disk images, and get rid of this confusing step...)
+
+[ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
+[ Last updated 07/08/08 ]

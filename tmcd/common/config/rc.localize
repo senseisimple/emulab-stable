@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -40,7 +40,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (REMOTE() || JAILED() || CONTROL());
+    if (PLAB() || JAILED() || CONTROL());
 
 # Protos.
 sub doboot();
@@ -121,8 +121,9 @@ sub doboot()
     # up old authkeys to authkeys2 file, which is also used by openssh sshd. 
     #
     if (@pubkeys) {
-	my $authkeys  = "/root/.ssh/authorized_keys";
-	my $authkeys2 = "/root/.ssh/authorized_keys2";
+	my $authdir   = (WINDOWS() ? "/sshkeys/root" : "/root/.ssh");
+	my $authkeys  = $authdir . "/authorized_keys";
+	my $authkeys2 = $authkeys . "2";
 	
 	if (-e "$authkeys") {
 	    system("cp -pf $authkeys $authkeys2") == 0

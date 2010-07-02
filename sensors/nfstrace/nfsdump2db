@@ -225,7 +225,7 @@ def requery(table, *args):
             tries -= 1
             if e.args[0] == ER_NOT_KEYFILE:
                 print "  *** Issuing repair for " + table
-                cur.execute("REPAIR TABLES " + table)
+                cur.execute("REPAIR TABLES `" + table + "`")
                 pass
             raise
         except IntegrityError, e:
@@ -276,8 +276,8 @@ class Parser:
             print ("    Table: " + tab.ljust(18) + " \t"
                    + `self.row_counts[tab]` + " record(s)")
             requery(tab,
-                    "LOAD DATA INFILE %s REPLACE INTO TABLE " + tab +
-                    " FIELDS TERMINATED BY ','",
+                    "LOAD DATA INFILE %s REPLACE INTO TABLE `" + tab + "` " +
+                    "FIELDS TERMINATED BY ','",
                     (self.data_files[tab].name,))
 
 
@@ -288,7 +288,7 @@ class Parser:
                 requery("packet_stat",
                         "REPLACE INTO packet_stats (table_name, stamp, "
                         "  packet_count) "
-                        "SELECT %s,NOW(),sum(total) FROM reads "
+                        "SELECT %s,NOW(),sum(total) FROM `reads` "
                         "WHERE timestamp >= %s",
                         (tab, self.first_timestamp,))
                 pass
@@ -928,14 +928,14 @@ def update_files(files):
                 requery("file_access",
                         "REPLACE INTO file_access "
                         "(fh, node_ip, last_access) "
-                        "SELECT fh,node_ip,MAX(timestamp) FROM reads "
+                        "SELECT fh,node_ip,MAX(timestamp) FROM `reads` "
                         "WHERE timestamp >= %s "
                         "GROUP BY fh,node_ip",
                         (parser.first_timestamp,))
                 requery("file_writes",
                         "REPLACE INTO file_writes "
                         "(fh, node_ip, last_access) "
-                        "SELECT fh,node_ip,MAX(timestamp) FROM writes "
+                        "SELECT fh,node_ip,MAX(timestamp) FROM `writes` "
                         "WHERE timestamp >= %s "
                         "GROUP BY fh,node_ip",
                         (parser.first_timestamp,))
@@ -944,7 +944,8 @@ def update_files(files):
                 for tab in TABLES:
                     if tab not in EXCLUDE_TABLES:
                         requery(tab,
-                                "DELETE FROM " + tab + " WHERE timestamp<%s",
+                                "DELETE FROM `" + tab + "` " +
+                                " WHERE timestamp<%s",
                                 (float(parser.first_timestamp) - (5 * 60),))
                         pass
                     pass

@@ -1,0 +1,213 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Generate a CRL certificate.
+# 
+sub usage()
+{
+    print "Usage: gencrl [-f]\n";
+    exit(1);
+}
+my $optlist = "df";
+my $debug   = 0;
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $TBBASE        = "@TBBASE@";
+my $SSLDIR        = "$TB/lib/ssl";
+my $CACONFIG      = "$SSLDIR/ca.cnf";
+my $EMULAB_CERT   = "$TB/etc/emulab.pem";
+my $EMULAB_KEY    = "$TB/etc/emulab.key";
+my $OPENSSL       = "/usr/bin/openssl";
+my $WORKDIR       = "$TB/ssl";
+my $CRLPEM	  = "crl.pem";
+my $CRLDAYS	  = 30;
+
+# Locals
+my $crlcreated	  = 0;	# Last update in seconds. 0 effectively forces regeneration.
+my $regen         = 0;  # If anyting has changed or if crl is about to expire.
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use POSIX qw(strftime);
+use Date::Parse;
+use Time::Local;
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+#
+# CD to the workdir, and then serialize on the lock file since there is
+# some shared goop that the ssl tools muck with (serial number, index, etc.).
+# 
+chdir("$WORKDIR") or
+    fatal("Could not chdir to $WORKDIR: $!");
+
+TBScriptLock("mkusercert") == 0 or
+    fatal("Could not get the lock!");
+
+#
+# If the crl exists and not in force mode, see how old it is. If less
+# than 1/2 the distance to expiration, then do not bother to regen if
+# there no one has expired since the last time (revoked field in the
+# certs table).
+#
+if (-e $CRLPEM) {
+    my $lastupdate = `$OPENSSL crl -noout -lastupdate -in $CRLPEM`;
+    chomp($lastupdate);
+    if (! (defined($lastupdate) && ($lastupdate =~ /^lastupdate/i))) {
+	fatal("Could not parse the lastupdate field from CRL file");
+    }
+    $lastupdate =~ s/^lastupdate=//i;
+
+    $crlcreated = timegm(strptime($lastupdate));
+    if (!defined($crlcreated)) {
+	fatal("Could not convert lastupdate field from CRL file to gmtime");
+    }
+    $crlcreated = timegm(strptime($lastupdate));
+
+    #
+    # Get expiration time
+    #
+    my $expires = `$OPENSSL crl -noout -nextupdate -in $CRLPEM`;
+    chomp($expires);
+    if (! (defined($expires) && ($expires =~ /^nextupdate/i))) {
+	fatal("Could not parse the nextupdate field from CRL file");
+    }
+    $expires =~ s/^nextupdate=//i;
+    $expires = timegm(strptime($expires));
+    if (!defined($expires)) {
+	fatal("Could not convert nextupdate field from CRL file to gmtime");
+    }
+
+    my $diff = $expires - $crlcreated;
+    if (time() >= $expires ||
+	$diff <= 0 ||
+	time() >= $crlcreated + $diff / 2) {
+	$force = 1;
+    }
+
+    print "$crlcreated, $expires, $diff, $force\n"
+	if ($debug);
+}
+else {
+    $force = 1;
+}
+
+#
+# Find all revoked certificates. We want to create an index.txt file. 
+#
+my $query_result =
+    DBQueryWarn("select idx,DN,UNIX_TIMESTAMP(created), ".
+		"   UNIX_TIMESTAMP(revoked) ".
+		" from user_sslcerts ".
+		"where encrypted=1 and revoked is not null ".
+		"and expires > NOW()");
+if (!$query_result) {
+    fatal("Could not get the crl list from the DB");
+}
+
+my @list = ();
+
+while (my ($idx,$dn,$created,$revoked) = $query_result->fetchrow_array()) {
+    chomp($dn);
+    
+    my $string = "R\t";
+    $string .= POSIX::strftime("%y%m%d%H%M%SZ", gmtime($created)) . "\t";
+    $string .= POSIX::strftime("%y%m%d%H%M%SZ", gmtime($revoked)) . "\t";
+    $string .= sprintf("%08x\t", $idx);
+    $string .= "unknown\t$dn\n";
+
+    push(@list, $string);
+
+    if ($debug) {
+	print STDERR "$created, $revoked\n";
+    }
+
+    # if this was revoked since last CRL, we really do need to regen,
+    $regen++
+	if ($revoked >= $crlcreated);
+}
+if (! ($regen || $force)) {
+    print STDERR "No reason to regenerate. Exiting ...\n";
+    # exit value important; tells caller nothing changed.
+    exit(1);
+}
+
+open(CRL, ">crl.txt")
+    or fatal("Could not create new crl.txt file");
+foreach my $string (@list) {
+    print CRL $string;
+}
+close(CRL);
+
+# This file needs to exist. Not sure why. Not documented.
+if (!-e "crl.txt.attr") {
+    system("echo 'unique_subject = no' > crl.txt.attr");
+}
+
+#
+# Generate the CRL certificate.
+#
+system("$OPENSSL ca -gencrl -name CA_crl -crldays $CRLDAYS -config $CACONFIG ".
+       " -out $CRLPEM -cert $EMULAB_CERT -keyfile $EMULAB_KEY") == 0
+    or fatal("Could not sign certificate request");
+
+TBScriptUnlock();
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "Could not generate CRL", $msg);
+    TBScriptUnlock();
+    print STDERR "*** $0:\n".
+	         "    $msg\n";
+    # exit value important.
+    exit(-1);
+}

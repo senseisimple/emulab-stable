@@ -1,0 +1,23 @@
+--- inittab~	2008-02-01 13:46:14.000000000 -0700
++++ inittab	2008-02-05 16:58:42.000000000 -0700
+@@ -42,13 +42,14 @@
+ 
+ 
+ # Run gettys in standard runlevels
+-co:2345:respawn:/sbin/agetty ttyS0 115200 vt100-nav
++#co:2345:respawn:/sbin/agetty ttyS0 115200 vt100-nav
+ 1:2345:respawn:/sbin/mingetty tty1
+-2:2345:respawn:/sbin/mingetty tty2
+-3:2345:respawn:/sbin/mingetty tty3
+-4:2345:respawn:/sbin/mingetty tty4
+-5:2345:respawn:/sbin/mingetty tty5
+-6:2345:respawn:/sbin/mingetty tty6
++#2:2345:respawn:/sbin/mingetty tty2
++#3:2345:respawn:/sbin/mingetty tty3
++#4:2345:respawn:/sbin/mingetty tty4
++#5:2345:respawn:/sbin/mingetty tty5
++#6:2345:respawn:/sbin/mingetty tty6
++S0:2345:respawn:/sbin/agetty -L 115200 ttyS0 vt100
+ 
+ # Run xdm in runlevel 5
+ x:5:respawn:/etc/X11/prefdm -nodaemon

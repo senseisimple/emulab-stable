@@ -1,0 +1,55 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use Mysql;
+
+my $DB = Mysql->connect("localhost", "pelab", "flexlabdata");
+
+my $threshold = 3;
+
+if (!$DB) {
+    die "Failled to connect to DB\n";
+}
+
+my $result = $DB->query("SELECT s.site_name, d.site_name, bw " .
+                        "FROM pair_data AS p " .
+                        "LEFT JOIN site_mapping AS s " .
+                        "    ON s.site_idx = p.srcsite_idx AND " .
+                        "       s.node_idx = p.srcnode_idx " .
+                        "LEFT JOIN site_mapping AS d " .
+                        "    ON d.site_idx = p.dstsite_idx AND " .
+                        "       d.node_idx = p.dstnode_idx " .
+                        "WHERE bw IS NOT NULL AND bw > 0 " );
+
+my %bw;
+while (my @row = $result->fetchrow()) {
+    #printf("Got '$row[0]' '$row[1]' '$row[2]'\n");
+    # For now, let's just worry about one measurement for each pair
+    $bw{$row[0]}{$row[1]} = $row[2];
+}
+
+$totalPaths = 0;
+
+foreach my $src (keys %bw) {
+    foreach my $dst (keys %{$bw{$src}}) {
+        if (exists $bw{$dst}{$src}) {
+            # We have measurements in both directions
+	    $totalPaths = $totalPaths + 1;
+            my $ratio = $bw{$src}{$dst} * 1.0 / $bw{$dst}{$src};
+            if ($ratio < 1) { 
+                # We'll catch this in the other order
+                next;
+            }
+            if ($ratio > $threshold) {
+                print "$ratio $src $dst $bw{$src}{$dst} $bw{$dst}{$src}\n";
+            }
+        }
+    }
+}
+
+print "Total paths = $totalPaths\n";
+

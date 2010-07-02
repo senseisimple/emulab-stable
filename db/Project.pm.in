@@ -1,0 +1,668 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package Project;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+use libdb;
+use libtestbed;
+use User;
+use Group;
+use English;
+use Data::Dumper;
+use File::Basename;
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		= "@prefix@";
+my $BOSSNODE    = "@BOSSNODE@";
+my $CONTROL	= "@USERNODE@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAPPROVAL  = "@TBAPPROVALEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBBASE      = "@TBBASE@";
+my $TBWWW       = "@TBWWW@";
+my $WIKISUPPORT = @WIKISUPPORT@;
+my $MAILMANSUPPORT = @MAILMANSUPPORT@;
+my $ADDPROJADMINLIST = "$TB/sbin/addprojadminlist";
+
+# Cache of instances to avoid regenerating them.
+my %projects   = ();
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by idx.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+
+    # Look in cache first
+    return $projects{"$token"}
+        if (exists($projects{"$token"}));
+
+    #
+    # For backwards compatability, look to see if the token is numeric
+    # or alphanumeric. If numeric, assumes its an idx, otherwise a name.
+    #
+    if ($token =~ /^\d*$/) {
+	$query_result =
+	    DBQueryWarn("select * from projects where pid_idx='$token'");
+    }
+    elsif ($token =~ /^[-\w]*$/) {
+	$query_result =
+	    DBQueryWarn("select * from projects where pid='$token'");
+    }
+    else {
+	return undef;
+    }
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self           = {};
+    $self->{'PROJECT'} = $query_result->fetchrow_hashref();
+    $self->{'GROUP'}   = Group->Lookup($self->{'PROJECT'}->{'pid_idx'});
+
+    return undef
+	if (!defined($self->{'GROUP'}));
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $projects{$self->{'PROJECT'}->{'pid_idx'}} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'PROJECT'}->{$_[1]}); }
+sub pid($)	        { return field($_[0], "pid"); }
+sub gid($)	        { return field($_[0], "gid"); }
+sub pid_idx($)          { return field($_[0], "pid_idx"); }
+sub gid_idx($)          { return field($_[0], "pid_idx"); }
+sub head_uid($)         { return field($_[0], "head_uid"); }
+sub head_idx($)         { return field($_[0], "head_idx"); }
+sub created($)          { return field($_[0], "created"); }
+sub description($)      { return field($_[0], "name"); }
+sub why($)		{ return field($_[0], "why"); }
+sub addr($)		{ return field($_[0], "addr"); }
+sub URL($)		{ return field($_[0], "URL"); }
+sub funders($)		{ return field($_[0], "funders"); }
+sub num_members($)      { return field($_[0], "num_members"); }
+sub num_pcs($)		{ return field($_[0], "num_pcs"); }
+sub num_pcplab($)       { return field($_[0], "num_pcplab"); }
+sub num_ron($)		{ return field($_[0], "num_ron"); }
+sub public($)		{ return field($_[0], "public"); }
+sub public_whynot($)    { return field($_[0], "public_whynot"); }
+sub linked_to_us($)     { return field($_[0], "linked_to_us"); }
+sub expt_count($)       { return field($_[0], "expt_count"); }
+sub expt_last($)        { return field($_[0], "expt_last"); }
+sub approved($)         { return field($_[0], "approved"); }
+sub wikiname($)         { return field($_[0], "wikiname"); }
+sub mailman_password($) { return field($_[0], "mailman_password"); }
+sub allow_workbench($)  { return field($_[0], "allow_workbench"); }
+
+# These come from the group not the project.
+sub unix_gid($)         { return $_[0]->{'GROUP'}->unix_gid(); }
+sub unix_name($)        { return $_[0]->{'GROUP'}->unix_name(); }
+
+#
+# Lookup given pid For backwards compat.
+#
+sub LookupByPid($$)
+{
+    my ($class, $pid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select pid_idx from projects where pid='$pid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($pid_idx) = $query_result->fetchrow_array();
+
+    return Project->Lookup($pid_idx);
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $pid_idx = $self->pid_idx();
+    
+    my $query_result =
+	DBQueryWarn("select * from projects where pid_idx=$pid_idx");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'PROJECT'} = $query_result->fetchrow_hashref();
+
+    return $self->{'GROUP'}->Refresh();
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid     = $self->pid();
+    my $pid_idx = $self->pid_idx();
+
+    return "[Project: $pid, IDX: $pid_idx]";
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid_idx = $self->pid_idx();
+
+    my $query = "update projects set ".
+	join(",", map("$_='" . $argref->{$_} . "'", keys(%{$argref})));
+
+    $query .= " where pid_idx='$pid_idx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Class function to create new project and return object.
+#
+sub Create($$$$)
+{
+    my ($class, $pid, $leader, $argref) = @_;
+	
+    #
+    # The array of inserts is assumed to be safe already. Generate
+    # a list of actual insert clauses to be joined below.
+    #
+    my @insert_data = (!defined($argref) ? () :
+		       map("$_=" . DBQuoteSpecial($argref->{$_}),
+			   keys(%{$argref})));
+
+    # First create the underlying default group for the project.
+    my $newgroup = Group->Create(undef, $pid, $leader, 'Default Group', $pid);
+    return undef
+	if (!defined($newgroup));
+
+    # Every project gets a new unique index, which comes from the group.
+    my $pid_idx = $newgroup->gid_idx();
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "pid='$pid'");
+    push(@insert_data, "pid_idx='$pid_idx'");
+    push(@insert_data, "head_uid='" . $leader->uid() . "'");
+    push(@insert_data, "head_idx='" . $leader->uid_idx() . "'");
+    push(@insert_data, "created=now()");
+
+    # Insert into DB. 
+    if (! DBQueryWarn("insert into projects set " . join(",", @insert_data))) {
+	$newgroup->Delete();
+	return undef;
+    }
+
+    if (! DBQueryWarn("insert into project_stats (pid, pid_idx) ".
+		      "values ('$pid', $pid_idx)")) {
+	$newgroup->Delete();
+	DBQueryFatal("delete from projects where pid_idx='$pid_idx'");
+	return undef;
+    }
+    my $newproject = Project->Lookup($pid_idx);
+    return undef
+	if (! $newproject);
+
+    #
+    # The creator of a group is not automatically added to the group,
+    # but we do want that for a new project. 
+    #
+    if ($newgroup->AddMemberShip($leader) < 0) {
+	$newgroup->Delete();
+	DBQueryWarn("delete from project_stats where pid_idx=$pid_idx");
+	DBQueryWarn("delete from projects where pid_idx=$pid_idx");
+	return undef;
+    }
+
+    #
+    # Now create the per-project Admin List
+    #
+    if ($MAILMANSUPPORT) {
+	my $res = system("$ADDPROJADMINLIST $pid");
+	if ($res != 0) {
+	    SENDMAIL($TBOPS, "Addprojadminlist failed!", 
+		     "\"$ADDPROJADMINLIST $pid\" failed.\n".
+		     "Details most likely in testbed-logs mail with \"suexec: webnewproj\"\n".
+		     "in the subject.\n");
+	}
+    }
+
+    return $newproject;
+}
+
+#
+# Equality test for two projects. Not necessary in perl, but good form.
+#
+sub SameProject($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($other)));
+
+    return $self->pid_idx() == $other->pid_idx();
+}
+
+#
+# The basis of access permissions; what is the users trust level in the project
+#
+sub Trust($$)
+{
+    my ($self, $user) = @_;
+
+    # Must be a real reference. 
+    return PROJMEMBERTRUST_NONE
+	if (! ref($self));
+
+    my $group = $self->GetProjectGroup();
+    # Should not happen!
+    return PROJMEMBERTRUST_NONE
+	if (!defined($group));
+
+    return $group->Trust($user);
+}
+
+#
+# Check permissions.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+    my $mintrust;
+    
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $group = $self->GetProjectGroup();
+    # Should not happen!
+    return 0
+	if (!defined($group));
+
+    return $group->AccessCheck($user, $access_type);
+}
+
+#
+# Send newproject email; separate function so email can be resent.
+#
+sub SendNewProjectEmail($;$)
+{
+    my ($self, $firstproject) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $firstproject = 0
+	if (!defined($firstproject));
+
+    my $leader             = $self->GetLeader();
+    my $usr_uid            = $leader->uid();
+    my $usr_idx            = $leader->uid_idx();
+    my $usr_title	   = $leader->title();
+    my $usr_name	   = $leader->name();
+    my $usr_affil	   = $leader->affil();
+    my $usr_email	   = $leader->email();
+    my $usr_addr	   = $leader->addr();
+    my $usr_addr2	   = $leader->addr2();
+    my $usr_city	   = $leader->city();
+    my $usr_state	   = $leader->state();
+    my $usr_zip	           = $leader->zip();
+    my $usr_country        = $leader->country();
+    my $usr_phone	   = $leader->phone();
+    my $usr_URL            = $leader->URL();
+    my $wikiname           = $leader->wikiname();
+    my $returning          = $leader->status() ne $User::USERSTATUS_NEWUSER;
+    my $usr_returning      = ($returning ? "Yes" : "No");
+    my $proj_desc	   = $self->description();
+    my $proj_URL           = $self->URL();
+    my $proj_funders       = $self->funders();
+    my $proj_public        = ($self->public() ? "Yes" : "No");
+    my $proj_linked        = ($self->linked_to_us() ? "Yes" : "No");
+    my $proj_whynotpublic  = $self->public_whynot();
+    my $proj_members       = $self->num_members();
+    my $proj_pcs           = $self->num_pcs();
+    my $proj_plabpcs       = $self->num_pcplab();
+    my $proj_ronpcs        = $self->num_ron();
+    my $proj_why	   = $self->why();
+    my $unix_gid           = $self->unix_gid();
+    my $unix_name          = $self->unix_name();
+    my $pid                = $self->pid();
+    my $pid_idx            = $self->pid_idx();
+    my $gid                = $self->pid();
+
+    $usr_addr2 = ""
+	if (!defined($usr_addr2));
+    $usr_URL = ""
+	if (!defined($usr_URL));
+    $proj_whynotpublic = ""
+	if (!defined($proj_whynotpublic));
+
+    if ($returning || $firstproject) {
+	SendProjAdminMail
+	    ($pid, "$usr_name '$usr_uid' <$usr_email>", "ADMIN",
+	     "New Project '$pid' ($usr_uid)",
+	     "'$usr_name' wants to start project '$pid'.\n".
+	     "\n".
+	     "Name:            $usr_name ($usr_uid/$usr_idx)\n".
+	     "Project IDX:     $pid_idx\n".
+	     "Returning User?: $usr_returning\n".
+	     "Email:           $usr_email\n".
+	     "User URL:        $usr_URL\n".
+	     "Description:     $proj_desc\n".
+	     "Project URL:     $proj_URL\n".
+	     "Public URL:      $proj_public\n".
+	     "Why Not Public:  $proj_whynotpublic\n".
+	     "Link to Us?:     $proj_linked\n".
+	     "Funders:         $proj_funders\n".
+	     "Job Title:       $usr_title\n".
+	     "Affiliation:     $usr_affil\n".
+	     "Address 1:       $usr_addr\n".
+	     "Address 2:       $usr_addr2\n".
+	     "City:            $usr_city\n".
+	     "State:           $usr_state\n".
+	     "ZIP/Postal Code: $usr_zip\n".
+	     "Country:         $usr_country\n".
+	     "Phone:           $usr_phone\n".
+	     "Members:         $proj_members\n".
+	     "PCs:             $proj_pcs\n".
+	     "Planetlab PCs:   $proj_plabpcs\n".
+	     "RON PCs:         $proj_ronpcs\n".
+	     "Unix GID:        $unix_name ($unix_gid)\n".
+	     "Reasons:\n$proj_why\n\n".
+	     "Please review the application and when you have made a \n".
+	     "decision, go to $TBWWW and\n".
+	     "select the 'Project Approval' page.");
+    }
+    else {
+	SendProjAdminMail
+	    ($pid, "$usr_name '$usr_uid' <$usr_email>", "ADMIN",
+	     "New Project '$pid' ($usr_uid)",
+	     "'$usr_name' wants to start project '$pid'.\n".
+	     "\n".
+	     "Name:            $usr_name ($usr_uid/$usr_idx)\n".
+	     "Project IDX:     $pid_idx\n".
+	     "Email:           $usr_email\n".
+	     "Returning User?: No\n".
+	     "\n".
+	     "No action is necessary until the user has verified the ".
+	     "account.\n");
+    }
+    
+    return 0;
+}
+
+#
+# Return user object for leader.
+#
+sub GetLeader($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return User->Lookup($self->head_idx());
+}
+
+#
+# Return project group.
+#
+sub GetProjectGroup($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+
+    return $self->{'GROUP'};
+}
+
+#
+# Return membership for user in the default group
+#
+sub LookupUser($$)
+{
+    my ($self, $user) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! (ref($self) && ref($user)));
+
+    return $self->{'GROUP'}->LookupUser($user);
+}
+
+#
+# Change the leader for a project.
+#
+sub ChangeLeader($$)
+{
+    my ($self, $leader) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($leader)));
+
+    # Default group fits.
+    $self->{'GROUP'}->ChangeLeader($leader) == 0
+	or return -1;
+
+    # Then the project
+    my %args = ();
+    $args{'head_uid'} = $leader->uid();
+    $args{'head_idx'} = $leader->uid_idx();
+    return $self->Update(\%args);
+}
+
+#
+# Set the approval bit,
+#
+sub SetApproved($$)
+{
+    my ($self, $approved) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self)));
+
+    my %args = ("approved" => ($approved ? 1 : 0));
+    return $self->Update(\%args);
+}
+
+#
+# Delete a user from the project (and all subgroups of course). No checks
+# are made; that should be done higher up. Optionally return list of groups
+# from which the user was deleted.
+#
+sub DeleteUser($$;$)
+{
+    my ($self, $user, $plist) = @_;
+    my @grouplist = ();
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($user)));
+
+    my $uid_idx = $user->uid_idx();
+    my $pid_idx = $self->pid_idx();
+    my $gid_idx = $pid_idx;
+
+    # Need a list of all groups for the user in this project.
+    # Should probably use a "class" method in the Groups module.
+    my $query_result =
+	DBQueryWarn("select gid_idx from group_membership ".
+		    "where pid_idx=$pid_idx and uid_idx=$uid_idx");
+    return -1
+	if (! $query_result);
+    return 0
+	if (! $query_result->numrows);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	# Do main group last.
+	next
+	    if ($idx == $gid_idx);
+
+	my $group = Group->Lookup($idx);
+	return -1
+	    if (!defined($group));
+
+	return -1
+	    if ($group->DeleteMemberShip($user) < 0);
+
+	push(@grouplist, $group);
+    }
+
+    my $group = Group->Lookup($gid_idx);
+    return -1
+	if (!defined($group));
+
+    return -1
+	if ($group->DeleteMemberShip($user) < 0);
+
+    if (defined($plist)) {
+	@$plist = (@grouplist, $group);
+    }
+    return 0;
+}
+
+#
+# List of subgroups for a project member (not including default group).
+#
+sub GroupList($$)
+{
+    my ($self, $plist) = @_;
+    my @grouplist = ();
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self)));
+
+    my $pid_idx = $self->pid_idx();
+
+    my $query_result =
+	DBQueryWarn("select gid_idx from groups ".
+		    "where pid_idx=$pid_idx and pid_idx!=gid_idx");
+    return -1
+	if (! $query_result);
+    
+    return 0
+	if (! $query_result->numrows);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $group = Group->Lookup($idx);
+	return -1
+	    if (!defined($group));
+
+	push(@grouplist, $group);
+    }
+    @$plist = @grouplist;
+    return 0;
+}
+
+#
+# Update the aggregate stats.
+#
+sub UpdateStats($$$$$)
+{
+    my ($self, $mode, $duration, $pnodes, $vnodes) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid_idx = $self->pid_idx();
+
+    DBQueryWarn("update project_stats ".
+		"set expt${mode}_count=expt${mode}_count+1, ".
+		"    expt${mode}_last=now(), ".
+		"    allexpt_duration=allexpt_duration+${duration}, ".
+		"    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
+		"    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
+		"    allexpt_vnode_duration=".
+		"        allexpt_vnode_duration+($vnodes * ${duration}), ".
+		"    allexpt_pnode_duration=".
+		"        allexpt_pnode_duration+($pnodes * ${duration}) ".
+		"where pid_idx='$pid_idx'");
+
+    if ($mode eq TBDB_STATS_SWAPIN || $mode eq TBDB_STATS_START) {
+	DBQueryWarn("update projects set ".
+		    " expt_last=now(),expt_count=expt_count+1 ".
+		    "where pid_idx='$pid_idx'");
+    }
+
+    $self->Refresh();
+
+    return 0;
+}
+
+#
+# Bump last activity
+#
+sub BumpActivity($)
+{
+    my ($self) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid_idx = $self->pid_idx();
+    
+    DBQueryWarn("update project_stats set last_activity=now() ".
+		"where pid_idx='$pid_idx'");
+
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

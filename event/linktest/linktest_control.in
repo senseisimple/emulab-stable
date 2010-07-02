@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -24,22 +24,19 @@ sub usage()
 	  "-t   - Specify timeout in seconds.\n".
 	  "-o   - Specify output file for linktest results.\n".
 	  "-m   - Send email to swapper if linktest fails.\n".
+	  "-r   - Report results only, don't flag errors.\n".
 	  "-d   - Turn on debugging output.\n");
     exit(-1);
 }
-my $optlist  = "dkl:o:t:mf";
+my $optlist  = "dkl:o:t:mfr";
 my $debug    = 2;
 my $cancel   = 0;
 my $sendmail = 0;
-my $hosed    = 0;
 my $forcerun = 0;
+my $reportonly = 0;
 my $timeout;
 my $level;
 my $output;
-my $expstate;
-my $dbuid;
-my $user_name;
-my $user_email;
 my $child_pid;			# Child run_linktest process.
 
 #
@@ -57,6 +54,8 @@ my $SSH		= "$TB/bin/sshtb";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
+use Experiment;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -85,6 +84,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"m"})) {
     $sendmail = 1;
+}
+if (defined($options{"r"})) {
+    $reportonly = 1;
 }
 if (defined($options{"f"})) {
     $forcerun = 1;
@@ -126,91 +128,56 @@ if (defined($options{"o"})) {
 if (@ARGV != 2) {
     usage();
 }
-my $pid = $ARGV[0];
-my $eid = $ARGV[1];
-
-#
-# Untaint args.
-#
-if ($pid =~ /^([-\@\w]+)$/) {
-    $pid = $1;
+# Slowly convert to using Experiment module.
+my $experiment = Experiment->Lookup($ARGV[0], $ARGV[1]);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object!")
 }
-else {
-    die("Bad data in pid: $pid.");
-}
-if ($eid =~ /^([-\@\w]+)$/) {
-    $eid = $1;
-}
-else {
-    die("Bad data in eid: $eid.");
-}
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
 
 #
 # Check state. Only in the active state
 #
-if (! ($expstate = ExpState($pid, $eid))) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid!\n");
-}
-if ($expstate ne EXPTSTATE_ACTIVE && $expstate ne EXPTSTATE_ACTIVATING &&
-    $expstate ne EXPTSTATE_MODIFY_RESWAP) {
+if ($experiment->state() ne EXPTSTATE_ACTIVE &&
+    $experiment->state() ne EXPTSTATE_ACTIVATING &&
+    $experiment->state() ne EXPTSTATE_MODIFY_RESWAP) {
     die("*** $0:\n".
 	"    Experiment $pid/$eid must be active!\n");
 }
 
-# Need this to pass to boss.
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database!\n");
-}
-
 #
-# Get email info for user.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $dbuid      = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
 #
 # Check permission. Only people with permission to destroy the experiment
 # can do this.
 #
-if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
+if (! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
 	"    You do not have permission to start/stop linktest for ".
 	"$pid/$eid!\n");
 }
 
-# Need the unix_gid info to pass to boss.
-my $gid = ExpGroup($pid, $eid);
-my ($unix_gid, $unix_gidname);
-
-if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gidname)) {
-    die("*** $0:\n".
-	"    Could not get unix group info for $pid/$gid!\n");
-}
-
-my $errlog = TBExptUserDir($pid, $eid) . "/logs/linktest.log";
+# Need the unix_gidname info to pass to ops.
+my $unix_gidname = $experiment->GetGroup()->unix_name();
+my $errlog       = $experiment->UserDir() . "/logs/linktest.log";
 
 #
 # Lets see if there is a linktest running already.
 #
-my $query_result =
-    DBQueryFatal("select linktest_level,linktest_pid ".
-		 "from experiments where eid='$eid' and pid='$pid'");
-
-if (! $query_result->numrows) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid exists!\n");
-}
-my ($linktest_level, $linktest_pid) = $query_result->fetchrow_array();
-
+my $linktest_pid = $experiment->linktest_pid();
 if (defined($linktest_pid) && $linktest_pid) {
     if (! kill(0, $linktest_pid) && ($ERRNO == ESRCH)) {
-	DBQueryFatal("update experiments set linktest_pid=0 ".
-		     "where pid='$pid' and eid='$eid'");
-	
+	$experiment->Update({'linktest_pid' => 0});
 	if ($cancel) {
 	    print("Linktest has already exited on experiment $pid/$eid!\n");
 	    exit(0);
@@ -240,32 +207,17 @@ elsif ($cancel) {
 	"    Linktest is not running on experiment $pid/$eid!\n")
 }
 
-#
-# Okay, this is hacky. Before trying, lets make sure that all the nodes
-# in the experiment are able to run linktest. This is defined by the
-# "linktest" feature in the osfeatures list of the OSID, for each node.
-#
-$query_result =
-    DBQueryFatal("select v.vname,o.osname,FIND_IN_SET('linktest',osfeatures) ".
-		 "  from virt_nodes as v ".
-		 "left join reserved as r on r.pid=v.pid and ".
-		 "     r.eid=v.eid and r.vname=v.vname ".
-		 "left join nodes as n on n.phys_nodeid=r.node_id ".
-		 "left join os_info as o on o.osid=n.def_boot_osid ".
-		 "where v.pid='$pid' and v.eid='$eid'");
-
-
-while (my ($vname,$osname,$gotlinktest) = $query_result->fetchrow_array()) {
-    if (! defined($gotlinktest) || !$gotlinktest) {
-	print STDERR
-	    "*** Node $vname is running an OSID ($osname) that does not ".
-		"support linktest!\n";
-	$hosed++;
+my @hosed = ();
+$experiment->LinkTestCapable(\@hosed);
+if (@hosed > 0) {
+    print STDERR
+	"*** Nodes running an OSID that does not support linktest:\n";
+    print STDERR
+	"***   ", join(' ', @hosed), "\n";
+    if (!$forcerun) {
+	die("*** $0:\n".
+	    "    Aborting linktest since not all nodes support it!\n");
     }
-}
-if ($hosed && !$forcerun) {
-    die("*** $0:\n".
-	"    Aborting linktest since not all nodes support it!\n");
 }
 
 #
@@ -274,8 +226,8 @@ if ($hosed && !$forcerun) {
 #
 sub cleanup()
 {
-    DBQueryFatal("update experiments set linktest_pid=0 ".
-		 "where pid='$pid' and eid='$eid'");
+    $experiment->Update({'linktest_pid' => 0})
+	if (defined($experiment));
 }
 
 sub handler($)
@@ -295,13 +247,13 @@ sub handler($)
 
 sub notify()
 {
-    my $lev = (defined($level) ? $level : $linktest_level);
+    my $lev = (defined($level) ? $level : $experiment->linktest_level());
     my $logname = undef;
     my $isopen;
     my $filespec = "";
     my $errbody = "";
 
-    TBExptGetLogFile($pid, $eid, \$logname, \$isopen);
+    $experiment->GetLogFile(\$logname, \$isopen);
     if (defined($logname)) {
 	$filespec = "\n\nfile://$logname\n";
     }
@@ -344,8 +296,7 @@ if ($child_pid) {
     $SIG{TERM} = \&handler;
     $SIG{INT}  = \&handler;
 
-    DBQueryFatal("update experiments set linktest_pid=$$ ".
-		 "where pid='$pid' and eid='$eid'");
+    $experiment->Update({'linktest_pid' => $$});
     
     waitpid($child_pid, 0);
     my $exitval = $? >> 8;
@@ -372,11 +323,13 @@ push(@cmdargs, ("-d", "$debug"))
 push(@cmdargs, ("-t", "$timeout"))
     if (defined($timeout));
 push(@cmdargs, "-l");
-push(@cmdargs, (defined($level) ? $level : $linktest_level));
+push(@cmdargs, (defined($level) ? $level : $experiment->linktest_level()));
 push(@cmdargs, ("-g", $unix_gidname));
 push(@cmdargs, ("-u", $dbuid));
 push(@cmdargs, ("-e", "$pid/$eid"));
 push(@cmdargs, ("-o", $errlog));
+push(@cmdargs, "-r")
+    if ($reportonly);
 
 print "Running '@cmdargs'\n"
     if ($debug);

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,6 +32,7 @@ my $UNIFIED     = "@UNIFIED_BOSS_AND_OPS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $USERNODE    = "@USERNODE@";
 my $FSNODE      = "@FSNODE@";
+my $MAINSITE    = @TBMAINSITE@;
 
 # Locals
 my $debug	= 0;
@@ -45,6 +46,7 @@ my $chpid       = 0;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Node;
 
 #
 # Turn off line buffering on output
@@ -87,17 +89,21 @@ if ($UNIFIED && ($hostname eq $BOSSNODE || $hostname eq $USERNODE ||
 }
 else {
     my $user;
+    my $node = Node->Lookup($hostname);
 
-    if (TBValidNodeName($hostname)) {
-	my ($jailed, $plab, $physhost);
-	if (TBIsNodeVirtual($hostname, \$jailed, \$plab)) {
-	    if ($plab) {
+    if (defined($node)) {
+	if ($node->isvirtnode()) {
+	    if ($node->isplabdslice()) {
 		TBPlabNodeUsername($hostname, \$user);
+                # if the node didn't exist in the db, we don't want to just
+                # try logging in as root!
+                if (!defined($user) || "$user" eq "0") {
+                    exit(1);
+                }
 	    }
-	    TBPhysNodeID($hostname, \$physhost);
-	    $hostname = $physhost;
+	    $hostname = $node->phys_nodeid();
 	}
-	elsif (TBIsNodeRemote($hostname)) {
+	elsif ($node->isremotenode() && !$node->isdedicatedremote()) {
 	    $user = "emulabman";
 	}
     }

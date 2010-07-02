@@ -27,7 +27,7 @@ debug = 0
 #
 DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
 DEF_PLC_USER = "lepreau@cs.utah.edu"
-DEF_PLC_PASS = "phurds"            # XXX: hardcoded, cleartext passwds bad.
+DEF_PLC_PASS = ""            # XXX: hardcoded, cleartext passwds bad.
 
 MAX_PLC_LEASELEN = 2*30*24*60*60   # defined by PLC as two months
 MIN_LEASE_ADDTIME = 23*60*60       # less than a day used? leave it be then..

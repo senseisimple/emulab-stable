@@ -1,5 +1,9 @@
 <?php
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Stuff to support checking field data before we insert it into the DB.
 #
 define("TBDB_CHECKDBSLOT_NOFLAGS",	0x0);
@@ -42,6 +46,7 @@ function TBGrabFieldData()
 function TBFieldData($table, $column, $flag = 0)
 {
     global $DBFieldData;
+    global $DBFieldErrstr;
     
     if (! $DBFieldData) {
 	TBGrabFieldData();
@@ -71,8 +76,10 @@ function TBFieldData($table, $column, $flag = 0)
                 # Warn TBOPS
 		TBERROR("TBFieldData: No slot data for $table/$column!", 0);
 	    }
-	    if ($flag & TBDB_CHECKDBSLOT_ERROR)
-		return 0;
+	    if ($flag & TBDB_CHECKDBSLOT_ERROR) {
+		$DBFieldErrstr = "Internal Error";
+		return array(null, null);
+	    }
 	}
 	$fielddata = $DBFieldData["default:default"];
     }
@@ -128,7 +135,7 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
 
     switch ($column_type) {
         case "text":
-	    if ((!$min && !max) ||
+	    if ((!$min && !$max) ||
 		(strlen("$token") >= $min && strlen("$token") <= $max))
 		return 1;
 	    break;
@@ -136,7 +143,7 @@ function TBcheck_dbslot($token, $table, $column, $flag = 0)
         case "int":
         case "float":
 	    # If both min/max are zero, then skip check; allow anything. 
-	    if ((!$min && !max) || ($token >= $min && $token <= $max))
+	    if ((!$min && !$max) || ($token >= $min && $token <= $max))
 		return 1;
 	    break;
 	    
@@ -179,6 +186,9 @@ function TBvalid_slot($token, $table, $slot) {
 function TBvalid_uid($token) {
     return TBcheck_dbslot($token, "users", "uid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_uididx($token) {
+    return TBvalid_integer($token);
 }
 #
 # Used to allow _ (underscore), but no more.
@@ -227,6 +237,10 @@ function TBvalid_title($token) {
 }
 function TBvalid_affiliation($token) {
     return TBvalid_userdata($token);
+}
+function TBvalid_affiliation_abbreviation($token) {
+    return TBcheck_dbslot($token, "users", "usr_affil_abbrev",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
 function TBvalid_addr($token) {
     return TBvalid_userdata($token);
@@ -290,6 +304,10 @@ function TBvalid_node_id($token) {
     return TBcheck_dbslot($token, "nodes", "node_id",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_vnode_id($token) {
+    return TBcheck_dbslot($token, "virt_nodes", "vname",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
 function TBvalid_imageid($token) {
     return TBcheck_dbslot($token, "images", "imageid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
@@ -318,3 +336,4 @@ function TBvalid_archive_message($token) {
     return TBcheck_dbslot($token, "archive_tags", "description",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+?>

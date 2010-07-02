@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+
+# 
+# EMULAB-COPYRIGHT 
+# Copyright (c) 2009 University of Utah and the Flux Group. 
+# All rights reserved. 
+#
+
+#
+# Make a simple top file - a bunch of PCs all in a big gigabit LAN
+#
+
+use strict;
+
+die "Usage: $0 <nodes>\n" unless @ARGV == 1;
+
+my ($nodes) = @ARGV;
+
+print "node lannode lan\n";
+for (my $i = 0; $i < $nodes; $i++) {
+    print "node node$i pc\n";
+    print "link vlink$i node$i lannode 1000 0 0 ethernet\n";
+}

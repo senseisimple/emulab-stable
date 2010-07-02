@@ -1,22 +1,41 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 if (!isset($embedded)) {
     require("defs.php3");
+
+    # Some Knowledge Base entries are visible only to admins.
+    $this_user = CheckLogin($check_status);
+    $admin_access = ISADMIN() || ISFOREIGN_ADMIN();
+    $embedded = 0;
+
+    $optargs = OptionalPageArguments("submit",      PAGEARG_STRING,
+				     "query",       PAGEARG_STRING,
+				     "query_which", PAGEARG_STRING,
+				     "query_type",  PAGEARG_STRING);
+}
+else {
+    #
+    # Sheesh. This file is included from search.php3, hence the sillyness.
+    #
+    $embedded = 1;
+    $admin_access = 0;
 }
 
 #
 # Standard Testbed Header
 #
-if (!isset($embedded)) {
+if (!$embedded) {
     PAGEHEADER("Search Emulab Knowledge Base");
 } 
 
 function SPITFORM($query, $query_type, $query_which, $error)
 {
+    global $TBBASE;
+
     echo "<table align=center border=1>
           <form action=kb-search.php3 method=get>\n";
 
@@ -97,8 +116,12 @@ function SPITFORM($query, $query_type, $query_which, $error)
     echo "</form>
           </table><br>\n";
 
+    # Link to kb-browse through $TBBASE (https:), not $TBDOCBASE (http:).
+    # On https:, the browser sends HashCookie, so we get CHECKLOGIN_LOGGEDIN
+    # status.  Going via http:, we get CHECKLOGIN_MAYBEVALID, and can't know
+    # whether to show admin KB entries.
     echo "<center>".
-	 "You may also <a href=kb-browse.php3>
+	 "You may also <a href=$TBBASE/kb-browse.php3>
 	     browse the entire Knowledge Base</a>.".
          "</center>\n";
 }
@@ -106,7 +129,7 @@ function SPITFORM($query, $query_type, $query_which, $error)
 #
 # First page load ...
 # 
-if (!isset($submit) && !isset($embedded)) {
+if (!isset($submit) && !$embedded) {
     SPITFORM("", null, "both", null);
     PAGEFOOTER();
     return;
@@ -161,6 +184,8 @@ if ($query == "*" ||
     preg_match("/^\s+$/", $query)) {
     $search_result =
 	DBQueryFatal("select * from knowledge_base_entries ".
+		     ($admin_access ? "" :
+		      "where section != 'Testbed Operations' ").
 		     "order by section,date_created");
 }
 else {
@@ -222,13 +247,24 @@ else {
 	$clause = "where ". implode(" and ", $wordarray);
     }
     $search_result =
-	DBQueryFatal("select * from knowledge_base_entries ".
-		     "$clause ".
-		     "order by section,date_created");
+	DBQuery("select * from knowledge_base_entries ".
+		"$clause ".
+		($admin_access ? "" : 
+		 "and section != 'Testbed Operations' ").
+		"order by section,date_created");
 }
 
+if ( ! $search_result ) {
+    if (!$embedded) {
+	DBWarn("DB Query failed");
+	SPITFORM($query, $query_type, $query_which,
+                 "Bad query.  Please try again.  " . mysql_error());
+	PAGEFOOTER();
+    }
+    return;
+}
 if (! mysql_num_rows($search_result)) {
-    if (!isset($embedded)) {
+    if (!$embedded) {
 	SPITFORM($query, $query_type, $query_which,
 		 "No Matches. Please try again");
 	PAGEFOOTER();
@@ -239,11 +275,11 @@ if (! mysql_num_rows($search_result)) {
 #
 # Okay, format the list ...
 #
-if (!isset($embedded)) {
+if (!$embedded) {
     SPITFORM($query, $query_type, $query_which, null);
 }
 
-if (!isset($embedded)) {
+if (!$embedded) {
     echo "<blockquote><blockquote>\n";
 }
 echo "<font size=+2>Knowledge Base search results</font>\n";
@@ -269,19 +305,22 @@ while ($row = mysql_fetch_array($search_result)) {
     echo "<li>";
     if (isset($xref_tag) && $xref_tag != "") {
 	echo "<a NAME='$xref_tag'></a>";
+	echo "<a href=kb-show.php3?xref_tag=$xref_tag>$title</a>\n";
     }
-    echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    else {
+	echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    }
 }
 
 echo "</ul></ul>\n";
-if (!isset($embedded)) {
+if (!$embedded) {
     echo "</blockquote></blockquote>\n";
 }
 
 #
 # Standard Testbed Footer
 #
-if (!isset($embedded)) {
+if (!$embedded) {
     PAGEFOOTER();
 }
 ?>

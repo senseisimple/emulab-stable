@@ -1,0 +1,44 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package TBConfig;
+
+use SemiModern::Perl;
+use Crypt::X509;
+use Tools qw(slurp);
+use Data::Dumper;
+use MIME::Base64;
+
+our $XMLRPC_SERVER    = $ENV{'TBTS_XMLRPC_URL'} || "https://boss.emulab.net:3069/usr/testbed";
+our $OPS_SERVER       = "users.emulab.net";
+our $XMLRPC_VERSION   = "0.1";
+our $XMLRPC_SERVER_TIMEOUT = 60 * 10;  #seconds
+our $SSL_CLIENT_CERT  = glob("~/.ssl/emulab.cert");
+our $SSL_CLIENT_KEY   = glob("~/.ssl/decrypted_emulab.key");
+our $EMULAB_USER      = get_emulab_user();
+our $DEFAULT_PID      = $ENV{'TBTS_PROJECT'} || 'tbtest';
+our $DEFAULT_GID      = $ENV{'TBTS_GROUP'}   || '';
+our $DEBUG_XML_CLIENT = $ENV{'TBTS_DEBUG'}   || 0;
+our $CMDLINE_OPTIONS  = {};
+our @EXPERIMENT_OPS_PARAMS = ('noemail' => 1);
+our $concurrent_prerun_jobs = 4;
+our $concurrent_node_usage  = 20;
+our $EMULAB_SUFFIX    = "emulab.net";
+our $cmdline_defines  = {};
+our $exclude_steps    = qw();
+our $runonly;
+
+sub get_emulab_user {
+  my $cert = slurp($SSL_CLIENT_CERT);
+  $cert =~ s/^-----BEGIN CERTIFICATE-----//;
+  $cert =~ s/-----END CERTIFICATE-----//;
+  $cert = decode_base64($cert);
+  $cert = Crypt::X509->new(cert => $cert);
+  my $user = $cert->subject_ou;
+  $user =~ /.*\.(.*)/;
+  $1
+}
+
+1;

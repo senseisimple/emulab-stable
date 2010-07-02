@@ -1,0 +1,105 @@
+#! /bin/sh
+
+initrd="$1"
+
+check_initrd()
+{
+	local initrd="$1"
+	local decompressed_initrd="/tmp/initrd.$$"
+	local initrd_dir="/tmp/initrd.dir.$$"
+
+	[ -f "$initrd" ] || return 1
+
+	mkdir -p "$initrd_dir" 
+
+	gzip -dc < "$initrd" > "$decompressed_initrd" 2> /dev/null
+	if [ $? -ne 0 ]; then
+		cp "$initrd" "$decompressed_initrd"
+		if [ $? -ne 0 ]; then
+			exit 1
+		fi
+	fi
+
+	local mounted=0
+	mount -o ro,loop -t ext3 "$decompressed_initrd" "$initrd_dir" \
+	  2> /dev/null
+	if [ $? -ne 0 ]; then
+		mount -o ro,loop -t ext2 "$decompressed_initrd" "$initrd_dir" \
+		  2> /dev/null
+		if [ $? -eq 0 ]; then
+			mounted=1
+		fi
+	else
+		mounted=1
+	fi
+
+	if [ $mounted -eq 0 ]; then
+		(cd "$initrd_dir" && cpio -idu < "$decompressed_initrd" > \
+		  /dev/null 2>&1)
+		if [ $? -ne 0 ]; then
+			exit 1
+		fi
+	fi
+
+	cd "$initrd_dir"
+	if [ -x sbin/udevd ] && [ -x lib/udev/vol_id ]; then
+		if grep '[^#]*ID_FS_UUID' etc/udev/rules.d/* > /dev/null; then
+			initrd_handles_uuid=yes
+		fi
+		if grep '[^#]*ID_FS_LABEL' etc/udev/rules.d/* > /dev/null; then
+			initrd_handles_label=yes
+		fi
+	elif [ -x bin/busybox ]; then
+		if grep LABEL bin/mount > /dev/null; then
+			initrd_handles_label=yes
+		fi
+		if grep UUID bin/mount > /dev/null; then
+			initrd_handles_uuid=yes
+		fi
+	elif [ -x bin/nash ]; then
+		if grep libblkid.so bin/nash > /dev/null; then
+			initrd_handles_label=yes
+			initrd_handles_uuid=yes
+		else
+			if grep LABEL bin/nash > /dev/null; then
+				initrd_handles_label=yes
+			fi
+			# Older versions of nash support mounting by
+			# UUID, but the mkrootdev function doesn't
+			# support resolving to an actual device by UUID.
+			# Checking just for 'UUID' in these binaries
+			# will yield a false positive, so check for the
+			# nash function that doesn the work instead.
+			if grep nashDmGetUUID bin/nash > /dev/null; then
+				initrd_handles_uuid=yes
+			fi
+		fi
+	elif [ -x bin/mount ]; then
+		if grep libblkid.so bin/mount > /dev/null; then
+			initrd_handles_label=yes
+			initrd_handles_uuid=yes
+		else
+			if grep LABEL bin/mount > /dev/null; then
+				initrd_handles_label=yes
+			fi
+			if grep UUID bin/mount > /dev/null; then
+				initrd_handles_uuid=yes
+			fi
+		fi
+	fi
+
+	cd /
+	[ $mounted -eq 1 ] && umount "$initrd_dir"
+
+	rm -rf "$initrd_dir" "$decompressed_initrd"
+}
+
+initrd_handles_label=no
+initrd_handles_uuid=no
+
+check_initrd "$initrd"
+
+echo "initrd_handles_label=$initrd_handles_label"
+echo "initrd_handles_uuid=$initrd_handles_uuid"
+
+exit 0

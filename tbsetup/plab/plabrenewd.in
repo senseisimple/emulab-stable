@@ -25,6 +25,9 @@ def main(args):
 
     parser = TBParser()
     opts, args = parser.parse_args(args[1:])
+
+    libplab.debug = opts.debug
+    libplab.verbose = opts.verbose
     
     plab = libplab.Plab()
     daemon = pydaemon(pydaemon.SYSLOG)

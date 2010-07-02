@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2008 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -11,6 +11,8 @@
 #include <ctype.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <string.h>
+#include <errno.h>
 #include <time.h>
 #include <math.h>
 #include <paths.h>
@@ -18,19 +20,23 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <pthread.h>
+#include <signal.h>
 #include "config.h"
 #include "event.h"
 #include "tbdefs.h"
 #include "log.h"
 
 static int debug = 0;
+static int stop  = 0;
 static event_handle_t localhandle;
 static event_handle_t bosshandle;
 
 void
 usage(char *progname)
 {
-    fprintf(stderr, "Usage: %s [-s server] -e pid/eid\n", progname);
+    fprintf(stderr,
+	    "Usage: %s [-s server] [-i pidfile] -e pid/eid\n", progname);
     exit(-1);
 }
 
@@ -42,6 +48,12 @@ static void
 sched_callback(event_handle_t handle,
 	       event_notification_t notification, void *data);
 
+static void
+sigterm(int sig)
+{
+	stop = 1;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -50,6 +62,8 @@ main(int argc, char **argv)
 	char			*server = NULL;
 	char			*port = NULL;
 	char			*myeid = NULL;
+	char			*pidfile = NULL;
+	char			*vnodeid = NULL;
 	char			buf[BUFSIZ], ipaddr[32];
 	char			hostname[MAXHOSTNAMELEN];
 	struct hostent		*he;
@@ -59,7 +73,7 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "ds:p:e:")) != -1) {
+	while ((c = getopt(argc, argv, "ds:p:e:i:v:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
@@ -70,8 +84,14 @@ main(int argc, char **argv)
 		case 'p':
 			port = optarg;
 			break;
+		case 'i':
+			pidfile = optarg;
+			break;
 		case 'e':
 			myeid = optarg;
+			break;
+		case 'v':
+			vnodeid = optarg;
 			break;
 		default:
 			usage(progname);
@@ -115,6 +135,12 @@ main(int argc, char **argv)
 		server = EVENTSERVER;
 
 	/*
+	 * XXX Need to daemonize earlier or the threads go away.
+	 */
+	if (!debug)
+		daemon(0, 0);
+	
+	/*
 	 * Convert server/port to elvin thing.
 	 *
 	 * XXX This elvin string stuff should be moved down a layer. 
@@ -134,13 +160,13 @@ main(int argc, char **argv)
 	}
 	
 	/* Register with the event system on boss */
-	bosshandle = event_register(server, 0);
+	bosshandle = event_register(server, 1);
 	if (bosshandle == NULL) {
 		fatal("could not register with remote event system");
 	}
 
 	/* Register with the event system on the local node */
-	localhandle = event_register("elvin://localhost", 0);
+	localhandle = event_register("elvin://localhost", 1);
 	if (localhandle == NULL) {
 		fatal("could not register with local event system");
 	}
@@ -167,25 +193,28 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on remote server");
 	}
 
+	signal(SIGTERM, sigterm);
+
 	/*
 	 * Stash the pid away.
 	 */
-	sprintf(buf, "%s/evproxy.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
+	if (! pidfile) {
+		sprintf(buf, "%s/evproxy.pid", _PATH_VARRUN);
+		pidfile = buf;
+	}
+	fp = fopen(pidfile, "w");
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", getpid());
 		(void) fclose(fp);
 	}
 
-	/*
-	 * Do this now, once we have had a chance to fail on the above
-	 * event system calls.
-	 */
-	if (!debug)
-		daemon(0, 0);
-	
 	/* Begin the event loop, waiting to receive event notifications */
-	event_main(bosshandle);
+	while (! stop) {
+		struct timeval  tv = { 5, 0 };
+
+		select(0, NULL, NULL, NULL, &tv);
+	}
+	unlink(pidfile);
 
 	/* Unregister with the remote event system: */
 	if (event_unregister(bosshandle) == 0) {

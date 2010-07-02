@@ -1,0 +1,433 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Change the user profile from a XML description.
+#
+sub usage()
+{
+    print("Usage: moduserinfo [-d] [-v] <xmlfile>\n");
+    exit(-1);
+}
+my $optlist = "dv";
+my $debug   = 0;
+my $verify  = 0;	# Check data and return status only. 
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $checkpass   = "$TB/libexec/checkpass";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+# Protos
+sub fatal($);
+sub UserError(;$);
+sub CheckPassword($$$$$);
+sub escapeshellarg($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $xmlfile  = shift(@ARGV);
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and the
+# current user context is "implied" (see tbauth.php3).
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    # You don't need admin privileges to manage your own profile.
+}
+else {
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+
+    # The web interface (and in the future the xmlrpc interface) sets this.
+    $this_user = User->ImpliedUser();
+
+    if (! defined($this_user)) {
+	fatal("Cannot determine implied user!");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+#
+# XXX We should encode all of this in the DB so that we can generate the
+# forms on the fly, as well as this checking code.
+#
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("uid"		=> ["uid_idx",		$SLOT_REQUIRED],
+
+     # The rest are optional, so we can skip passing ones that are not changing.
+     "usr_name"		=> ["usr_name",		$SLOT_OPTIONAL],
+     "usr_title"	=> ["usr_title",	$SLOT_OPTIONAL],
+     "usr_affil"	=> ["usr_affil",	$SLOT_OPTIONAL],
+     "usr_affil_abbrev"	=> ["usr_affil_abbrev",	$SLOT_OPTIONAL],
+     "usr_shell"	=> ["usr_shell",	$SLOT_OPTIONAL],
+     "usr_URL"		=> ["usr_URL",		$SLOT_OPTIONAL],
+     "usr_email"	=> ["usr_email",	$SLOT_OPTIONAL],
+     "usr_addr"		=> ["usr_addr",		$SLOT_OPTIONAL],
+     "usr_addr2"	=> ["usr_addr2",	$SLOT_OPTIONAL],
+     "usr_city"		=> ["usr_city",		$SLOT_OPTIONAL],
+     "usr_state"	=> ["usr_state",	$SLOT_OPTIONAL],
+     "usr_zip"		=> ["usr_zip",		$SLOT_OPTIONAL],
+     "usr_country"	=> ["usr_country",	$SLOT_OPTIONAL],
+     "usr_phone"	=> ["usr_phone",	$SLOT_OPTIONAL],
+     "password1"	=> ["password1",	$SLOT_OPTIONAL],
+     "password2"	=> ["password2",	$SLOT_OPTIONAL],
+     "w_password1"	=> ["w_password1",	$SLOT_OPTIONAL],
+     "w_password2"	=> ["w_password2",	$SLOT_OPTIONAL],
+     "user_interface"	=> ["user_interface",	$SLOT_OPTIONAL],
+     "notes"		=> ["notes",		$SLOT_OPTIONAL]);
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+#
+# Process and dump the errors (formatted for the web interface).
+# We should probably XML format the errors instead but not sure I want
+# to go there yet.
+#
+my %errors = ();
+
+#
+# Make sure all the required arguments were provided.
+#
+my $key;
+foreach $key (keys(%xmlfields)) {
+    my (undef, $required, undef) = @{$xmlfields{$key}};
+
+    $errors{$key} = "Required value not provided"
+	if ($required & $SLOT_REQUIRED  &&
+	    ! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+UserError()
+    if (keys(%errors));
+
+#
+# We build up an array of arguments to pass to User->ModUserInfo() as we check
+# the attributes.
+#
+my %moduserinfo_args = ();
+
+#
+# Wildcard keys have one or more *'s in them like simple glob patterns.
+# This allows multiple key instances for categories of attributes, and
+# putting a "type signature" in the key for arg checking, as well.
+#
+# Wildcards are made into regex's by anchoring the ends and changing each * to
+# a "word" (group of alphahumeric.)  A tail * means "the rest", allowing
+# multiple words separated by underscores or dashes.
+#
+my $wordpat = '[a-zA-Z0-9]+';
+my $tailpat = '[-\w]+';
+my %wildcards;
+foreach $key (keys(%xmlfields)) {
+    if (index($key, "*") >= 0) {
+	my $regex = '^' . $key . '$';
+	$regex =~ s/\*\$$/$tailpat/;
+	$regex =~ s/\*/$wordpat/g;
+	$wildcards{$key} = $regex;
+    }
+}
+# Key ordering is lost in a hash.
+# Put longer matching wildcard keys before their prefix.
+my @wildkeys = reverse(sort(keys(%wildcards)));
+
+foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+    if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+    }
+
+    print STDERR "User attribute: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $field = $key;
+    my $wild;
+    if (!exists($xmlfields{$key})) {
+
+	# Not a regular key; look for a wildcard regex match.
+        foreach my $wildkey (@wildkeys) {
+	    my $regex = $wildcards{$wildkey};
+	    if ($wild = $key =~ /$regex/) {
+		$field = $wildkey;
+		print STDERR "Wildcard: '$key' matches '$wildkey'\n"
+		    if ($debug);
+		last; # foreach $wildkey
+	    }
+	}
+	if (!$wild) {
+	    $errors{$key} = "Unknown attribute";
+	    next; # foreach $key
+	}
+    }
+
+    my ($dbslot, $required, $default) = @{$xmlfields{$field}};
+
+    if ($required & $SLOT_REQUIRED) {
+	# A slot that must be provided, so do not allow a null value.
+	if (!defined($value)) {
+	    $errors{$key} = "Must provide a non-null value";
+	    next;
+	}
+    }
+    if ($required & $SLOT_OPTIONAL) {
+	# Optional slot. If value is null skip it. Might not be the correct
+	# thing to do all the time?
+	if (!defined($value)) {
+	    next
+		if (!defined($default));
+	    $value = $default;
+	}
+    }
+    if ($required & $SLOT_ADMINONLY) {
+	# Admin implies optional, but thats probably not correct approach.
+	$errors{$key} = "Administrators only"
+	    if (! $this_user->IsAdmin());
+    }
+	
+    # Now check that the value is legal.
+    if (! TBcheck_dbslot($value, "users",
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+	$errors{$key} = TBFieldErrorString();
+	next;
+    }
+
+    $moduserinfo_args{$key} = $value;
+}
+UserError()
+    if (keys(%errors));
+
+#
+# Now do special checks.
+#
+my $target_uid = $moduserinfo_args{"uid"};
+my $target_user = User->Lookup($target_uid);
+if (!defined($target_user)) {
+    UserError("uid: No such user ($target_uid)");
+}
+if (!$target_user->AccessCheck($this_user, TB_USERINFO_MODIFYINFO())) {
+    UserError("UserInfo: Not enough permission");
+}
+my $target_name = $target_user->name();
+my $target_email = $target_user->email();
+
+# Make sure the user name has at least two tokens!
+if (exists($moduserinfo_args{"usr_name"}) &&
+    $moduserinfo_args{"usr_name"} !~ /\S\s+\S/) {
+    UserError("FullName: Please provide a first and last name");
+}
+
+if (exists($moduserinfo_args{"URL"})) {
+    if ($moduserinfo_args{"URL"} !~ /^http:\/\//) {
+	UserError("URL: malformed - Must begin with http://");
+    }
+    if ($moduserinfo_args{"URL"} =~ /\s/) {
+	UserError("URL: malformed - Spaces are not allowed.");
+    }
+}
+
+if (exists($moduserinfo_args{"usr_email"})) {
+    my $temp_user = User->LookupByEmail($moduserinfo_args{"usr_email"});
+    if ($temp_user && !$target_user->SameUser($temp_user)) {
+	UserError("EmailAddress: Already in use by another user!");
+    }
+}
+
+my $is_pwd1 = exists($moduserinfo_args{"password1"});
+my $is_pwd2 = exists($moduserinfo_args{"password2"});
+if ($is_pwd1 || $is_pwd2) {
+    my $pwd1 = $moduserinfo_args{"password1"};
+    my $pwd2 = $moduserinfo_args{"password2"};
+    if (($is_pwd1 && $pwd1 ne "") xor ($is_pwd2 && $pwd2 ne "")) {
+	UserError("Password: must confirm");
+    }
+    if ($is_pwd1 && $is_pwd2) {
+	if ($pwd1 ne $pwd2) {
+	    UserError("Password: Two passwords do not match");
+	}
+	if ($pwd2) {
+	    CheckPassword("", $target_uid, $pwd2, 
+			  $target_name, $target_email);
+	}
+    }
+}
+
+# We often get the previous Windows password without a confirmation,
+# because it is shown in the form input field.
+my $is_w_pwd1 = exists($moduserinfo_args{"w_password1"});
+my $is_w_pwd2 = exists($moduserinfo_args{"w_password2"});
+if ($is_pwd1 || $is_pwd2) {
+    my $w_pwd1 = $moduserinfo_args{"w_password1"};
+    my $w_pwd2 = $moduserinfo_args{"w_password2"};
+    if ($is_w_pwd1 && $is_w_pwd2) {
+	if ($w_pwd2 ne "" && $w_pwd1 ne $w_pwd2) {
+	    UserError("WindowsPassword: Two passwords do not match");
+	}
+	if ($w_pwd2) {
+	    CheckPassword("Windows", $target_uid, $w_pwd2, 
+			  $target_name, $target_email);
+	}
+    }
+}
+
+if (exists($moduserinfo_args{"user_interface"})) {
+    my $ui = $moduserinfo_args{"user_interface"};
+    if ($ui && $ui ne TBDB_USER_INTERFACE_EMULAB &&
+	$ui ne TBDB_USER_INTERFACE_PLAB) {
+	UserError("UserInterface: Invalid");
+    }
+}
+
+exit(0)
+    if ($verify);
+
+#
+# Now safe to make the changes.
+#
+my $usrerr;
+my $mod_val = User->ModUserInfo($this_user, $target_user,
+				\%moduserinfo_args, \$usrerr);
+UserError($usrerr)
+    if (defined($usrerr));
+fatal("Could not modify user profile!")
+    if (!defined($mod_val));
+
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    # Exit with negative status so web interface treats it as system error.
+    exit(-1);
+}
+
+sub UserError(;$)
+{
+    my ($mesg) = @_;
+
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+    }
+    print "$mesg\n"
+	if (defined($mesg));
+
+    # Exit with positive status so web interface treats it as user error.
+    exit(1);
+}
+
+sub CheckPassword($$$$$)
+{
+    my ($prefix, $uid, $password, $name, $email) = @_;
+    my $checkpass_args = escapeshellarg($password)
+	. " " . $uid . " " . escapeshellarg($name . ":" . $email);
+
+    # Make taint check happy.
+    if ($checkpass_args =~ /^(.*)$/) {
+	$checkpass_args = $1;
+    }
+    my $pwokay = `$checkpass $checkpass_args`;
+    if ($?) {
+	chomp($pwokay);
+	if (! ($pwokay =~ /^ok$/)) {
+	    UserError("$prefix$pwokay");
+	}
+	fatal("Checkpass failed with $?");
+    }
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^[:alnum:]]/\\$&/g;
+    return $str;
+}

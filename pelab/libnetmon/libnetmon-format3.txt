@@ -1,0 +1,53 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+Line format 3 for libnetmon:
+
+<Command>: <Key> <Timestamp> <Value>
+
+<Command> describes the kind of connection
+<Key> is a unique key for the connection
+<Timestamp> is a decimal number representing absolute time
+<Value> is a command-dependent string
+
+Limits:
+
+<Key> can be at most 30 characters
+There can be no more that 2^16 independent destinations on a single UDP socket.
+
+Possible commands and their values:
+
+New (value is 'TCP' or 'UDP')
+RemoteIP (value is a dotted quadruplet describing destination IP address)
+RemotePort (value is a number representing the remote port of the connection)
+LocalPort (value is a number representing the local port of the connection)
+TCP_NODELAY (int)
+TCP_MAXSEG (int)
+SO_RCVBUF (int)
+SO_SNDBUF (int)
+Connected (no value) (RemoteIP and RemotePort MUST be sent before this command)
+Send (value is the size of the write or sendto)
+SendTo (value is <localPort>:<remoteIP>:<remotePort>:<size>
+Closed (no value)
+Init (value is command line, enclosed in ' ')
+Exit (no value)
+SendMsg (no value yet)
+
+On a TCP connection, there should be the following sequence:
+
+New
+(TCP_NODELAY|TCP_MAXSEG|SO_RCVBUF|SO_SNDBUF|RemoteIP|RemotePort)*
+Connected
+LocalPort
+Send*
+Closed
+
+On a UDP connection, there should be the following sequence:
+
+New
+Connected?
+(SO_RCVBUF|SO_SNDBUF)*
+SendTo*
+Closed

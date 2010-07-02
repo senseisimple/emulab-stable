@@ -1,0 +1,515 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(tmpnam);
+use Data::Dumper;
+
+#
+# Manage the pool of shared nodes.
+#
+sub usage()
+{
+    print STDOUT "Usage: pool_daemon [-d] [nsfile]\n" .
+	"Use the -d option to prevent daemonization\n";
+    exit(-1);
+}
+my $optlist = "dne1";
+my $debug    = 0;
+my $impotent = 0;
+my $killme   = 0;
+my $nofree   = 1;
+my $gotlock  = 0;
+my $mailsent = 0;
+my $oneshot  = 0;
+my $nsfile;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $BOSSNODE = "@BOSSNODE@";
+my $logfile  = "$TB/log/poollog";
+my $SWAPEXP  = "$TB/bin/swapexp";
+my $tmpfile  = "/tmp/pool-$$.nsfile";
+
+# Testbed Support library
+use lib "@prefix@/lib";
+use libdb;
+use libtblog;
+use event;
+use libtestbed;
+use NodeType;
+use Experiment;
+use User;
+use OSinfo;
+use Image;
+
+#
+# This should run as root.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
+
+# We use tblog to determine why swapexp failed.
+tblog_stop_capture();
+
+# Locals
+my $EVhandle;
+
+# Prototypes.
+sub SetupEventHandler();
+sub fatal($);
+sub cleanup();
+sub notify($);
+		      
+#
+# Turn off line buffering on output (dots ...).
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"1"})) {
+    $oneshot = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"e"})) {
+    $nofree = 1;
+}
+usage()
+    if (@ARGV > 1);
+$nsfile = $ARGV[0]
+    if (@ARGV == 1);
+$oneshot = 1
+    if (defined($nsfile));
+
+if (!$impotent && CheckDaemonRunning("pool_daemon")) {
+    fatal("Not starting another pool daemon!");
+}
+# Go to ground.
+if (! ($oneshot || $debug || $impotent)) {
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
+}
+if (!($impotent || $oneshot) && MarkDaemonRunning("pool_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    ReOpenLog($logfile);
+}
+$SIG{HUP} = \&handler
+    if (!($oneshot || $debug || $impotent));
+
+print "Pool Daemon starting... pid $$, at ".`date`;
+
+#
+# Grab the shared node experiment. This should come from a sitevar.
+# Or perhaps we want to manage multiple shared pools?
+#
+my $experiment =
+    Experiment->Lookup(TBOPSPID(), "shared-nodes") ||
+    Experiment->Lookup(TBOPSPID(), "shared-node");
+    
+if (!defined($experiment)) {
+    fatal("Could not lookup shared node experiment. Exiting ...");
+}
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
+
+#
+# If the experiment is in the new state, then set it to swapped and exit.
+# If in the swapped state, also exit since the local Emulab is not using
+# shared nodes yet.
+#
+if ($experiment->state() eq EXPTSTATE_NEW()) {
+    $experiment->SetState(EXPTSTATE_SWAPPED());
+}
+
+#
+# We need this user for running swapexp below.
+#
+my $elabman = User->Lookup("elabman");
+if (!defined($elabman)) {
+    fatal("Could not lookup elabman user. Exiting ...");
+}
+
+#
+# We need to have this image available.
+#
+my $image = Image->Lookup(TBOPSPID(), "FEDORA8-OVZ-STD");
+if (!defined($image)) {
+    print STDERR "Pool Daemon exiting since there is suitable image\n";
+    cleanup();
+    exit(0);
+}
+
+#
+# And handler for TERM since we really do not want this to be
+# interrupted. Just set a flag that will cause it to exit at
+# the next loop.
+#
+sub sigterm()
+{
+    print "Got a TERM signal; arranging to exit soon\n";
+    $killme = 1;
+}
+$SIG{TERM} = \&sigterm;
+
+while (!$killme) {
+    my $disabled;
+    
+    print "Pool Daemon running at ".`date`;
+
+    if (! TBGetSiteVar("web/nologins", \$disabled) || $disabled) {
+	print "  Skipping this loop cause of nologins\n";
+	goto loop;
+    }
+
+    #
+    # Serialize this part with the mapper.
+    #
+    if (!$impotent) {
+	my $tries = 0;
+	
+	while (1) {
+	    #
+	    # Use a countup/countdown counter, so that multiple mappers
+	    # can run, but not while the pool_daemon is running.
+	    #
+	    my $lock_result =
+		DBQueryWarn("update emulab_locks set value=-1 ".
+			    "where name='pool_daemon' and value=0");
+	    fatal("DB Error going for lock")
+		if (!defined($lock_result));
+
+	    $gotlock = $lock_result->affectedrows;
+
+	    last
+		if ($gotlock);
+
+	    if ($tries++ > 100) {
+		notify("Cannot get the lock after a really long time");
+		$tries = 0;
+	    }
+	    chat("Waiting for pool daemon lock ...\n");
+	    sleep(10);
+	}
+    }
+    
+    Node->FlushAll();
+    $experiment->Refresh() == 0
+	or fatal("Could not reload $experiment");
+
+    if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
+	print "Skipping this loop cause the experiment is swapped\n";
+	goto loop;
+    }
+    if (defined($nsfile)) {
+	print "Copying $nsfile to $tmpfile\n";
+	system("/bin/cp -f $nsfile $tmpfile") == 0
+	    or fatal("Could not copy nsfile");
+	goto skipns;
+    }
+    
+    my @nodelist = $experiment->NodeList();
+    my %inuse    = ();
+    my %tofree   = ();
+    my $loaded   = 0;
+    my $unloaded = 0;
+    my $newcount = 0;
+
+    # Sitevars to control poolsize. Reloas each loop.
+    my $maxpoolsize  = TBGetSiteVar("general/maxpoolsize");
+    my $minpoolsize  = TBGetSiteVar("general/minpoolsize");
+    my $poolnodetype = TBGetSiteVar("general/poolnodetype");
+
+    #
+    # Look to see how each of the nodes is packed. This is
+    # advisory; we will not know for sure until tables locked
+    # in nfree and we can count the number of vnodes on it.
+    #
+    foreach my $node (@nodelist) {
+	my $reservation = $node->Reservation();
+	# Node released somewhere else. 
+	next
+	    if (!defined($reservation));
+	next
+	    if (!$experiment->SameExperiment($reservation));
+
+	my $maxsharecount = $node->MaxShareCount();
+	# Transient error?
+	next
+	    if ($maxsharecount < 0);
+
+	# Look for nodes with nothing on them.
+	my $vnodecount = $node->HasVirtualNodes();
+	# Transient error?
+	next
+	    if ($vnodecount < 0);
+
+	if ($vnodecount == 0) {
+	    print "$node no longer has virtual nodes on it.\n";
+	    # Free the node unless we would go below the minpoolsize.
+	    if (!$nofree &&
+		scalar(@nodelist) - scalar(keys(%tofree)) > $minpoolsize) {
+		print "  Adding to free list.\n";
+		$tofree{$node->node_id()} = $node;
+	    }
+	    next;
+	}
+	# Count up loaded vs. unloaded nodes.
+	my $factor = $maxsharecount / $vnodecount;
+	print "$node load factor is $factor\n";
+	if ($factor < 0.5) {
+	    $unloaded++;
+	}
+	else {
+	    $loaded++;
+	}
+	$inuse{$node->vname()} = $node;
+    }
+    #
+    # Try to keep at least one unloaded machine available, but stay under max.
+    #
+    if (scalar(@nodelist) - $loaded < 1) {
+	if (keys(%tofree)) {
+	    # rescue one from the free list.
+	    my $key = (keys(%tofree))[0];
+	    delete($tofree{$key});
+	}
+ 	elsif (scalar(@nodelist) < $maxpoolsize) {
+	    $newcount++;
+	}
+    }
+    if (!$debug) {
+	if (! (keys(%tofree) || $newcount)) {
+	    exit(0)
+		if ($impotent);
+	    goto loop;
+	}
+    }
+
+    #
+    # Generate a new NS file. Be nice to not have to this, but not
+    # having an NS file could confuse things for the web interface.
+    #
+    print "Generating a new NS file in $tmpfile\n";
+    
+    if (!open(NS, ">$tmpfile")) {
+	notify("Could not create $tmpfile");
+	goto loop;
+    }
+    print NS "# Auto generated by the pool daemon\n\n";
+    print NS "source tb_compat.tcl\n";
+    print NS "set ns [new Simulator]\n";
+
+    foreach my $node (@nodelist) {
+	next
+	    if (exists($tofree{$node->node_id}));
+
+	my $vname  = $node->vname();
+	my $nodeid = $node->node_id();
+	my $osid   = $node->def_boot_osid();
+	my $osinfo = OSinfo->Lookup($osid);
+	my $osname = $osinfo->osname();
+
+	print NS "set $vname [\$ns node]\n";
+	print NS "tb-set-node-os \$$vname $osname\n";
+	print NS "tb-set-node-sharingmode \$$vname \"shared_local\"\n";
+	print NS "tb-fix-node \$$vname $nodeid\n";
+    }
+    while ($newcount) {
+	my $id    = 1;
+	my $vname = "vhost${id}";
+
+	while (exists($inuse{$vname})) {
+	    $id++;
+	    $vname = "vhost${id}";
+	}
+	print NS "set $vname [\$ns node]\n";
+	print NS "tb-set-node-os \$$vname " . $image->imagename() . "\n";
+	print NS "tb-set-node-sharingmode \$$vname \"shared_local\"\n";
+	print NS "tb-set-hardware \$$vname $poolnodetype\n"
+	    if (defined($poolnodetype) && $poolnodetype ne "");
+
+	$newcount--;
+    }
+    print NS "\$ns rtproto Static\n";
+    print NS "\$ns run\n";
+    close(NS);
+  skipns:
+    chmod(0775, $tmpfile);
+
+    last
+	if ($impotent || $killme);
+
+    # Must do this each time before fork.
+    tblog_new_session();
+
+    #
+    # Start a swapmod. 
+    #
+    my $childpid = fork();
+    if ($childpid) {
+	print "Starting a swap modify. Child is $childpid.\n";
+	
+	#
+	# Wait for the swapmod to complete.
+	#
+	waitpid($childpid, 0);
+	my $exitval = $?;
+	print "Swap modify done at " . `date`;
+	$experiment->LockDown(1);
+	if ($exitval) {
+	    my $error_data = tblog_lookup_error();
+
+	    if ($error_data->{'cause'} eq "temp") {
+		print "Temporary resource shortage; try again later\n";
+		goto loop;
+	    }
+	    fatal("swapmod failed");
+	}
+    }
+    else {
+	if ($elabman->FlipTo($experiment->unix_gid())) {
+	    fatal("Could not flipto $elabman");
+	}
+	$experiment->LockDown(0);	
+	exec("$SWAPEXP -q -w -n -s modify $pid $eid $tmpfile");
+	die("Could not exec $SWAPEXP\n");
+    }
+  loop:
+    if ($gotlock) {
+	my $lock_result =
+	    DBQueryWarn("update emulab_locks set value=0 ".
+			"where name='pool_daemon'");
+	fatal("DB Error releasing lock")
+	    if (!defined($lock_result));
+	
+	$gotlock = 0;
+    }
+    last
+	if ($oneshot);
+    
+    # Use a long period; we do not want the pool to change too fast.
+    sleep(120);
+}
+cleanup();
+exit(0);
+
+#
+# Subscribe to experiment state change events.
+#
+sub SetupEventHandler()
+{
+    my $port = @BOSSEVENTPORT@;
+    my $URL  = "elvin://localhost:$port";
+    
+    # Connect to the event system, and subscribe the the events we want
+    $EVhandle = event_register($URL, 0);
+    
+    if (!$EVhandle) {
+	fatal("Unable to register with event system");
+    }
+
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) {
+	fatal("Could not allocate an address tuple");
+    }
+
+    %$tuple = ( objtype   => libdb::TBDB_TBEVENT_CONTROL(),
+		objname   => "pool_daemon",
+		host      => $BOSSNODE,
+	      );
+    
+    if (!event_subscribe($EVhandle, \&EventHandler, $tuple)) {
+	fatal("Could not subscribe to events");
+    }
+}
+
+#
+# Callback for above.
+#
+sub EventHandler($$$) {
+    my ($handle,$notification,undef) = @_;
+    
+    my $objname   = event_notification_get_objname($handle,$notification);
+    my $eventtype = event_notification_get_eventtype($handle,$notification);
+
+    print "$objname, $eventtype\n";
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "Pool Daemon Died", $msg, $TBOPS)
+	if (!($impotent || $oneshot));
+    
+    $mailsent = 1;
+    cleanup();
+    die($msg);
+}
+
+sub notify($)
+{
+    my ($msg) = @_;
+
+    print "$msg\n";
+    SENDMAIL($TBOPS, "Pool Daemon Message", $msg, $TBOPS);
+}
+
+sub cleanup()
+{
+    if ($gotlock) {
+	DBQueryWarn("update emulab_locks set value=0 ".
+		    "where name='pool_daemon'");
+	$gotlock = 0;
+    }
+
+    MarkDaemonStopped("pool_daemon")
+	if (!($impotent || $oneshot));
+}
+
+END {
+    my $exitcode = $?;
+
+    if ($exitcode && !($mailsent || $impotent || $oneshot)) {
+	SENDMAIL($TBOPS, "Pool Daemon Died",
+		 "Please look at $logfile", $TBOPS);
+    }
+    cleanup();
+
+    $? = $exitcode;
+}

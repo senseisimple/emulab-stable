@@ -1,4 +1,10 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Firewall rule template.
 #
 # The bulk of the line is the body of an IPFW rule, a '#' denoted "comment"
@@ -273,8 +279,9 @@ allow ip from fs to any frag			# 60035: BASIC,CLOSED
 # cvsup to boss
 allow tcp from any to boss 5999 setup keep-state # 60036: BASIC,CLOSED
 
-# elvind to ops (unicast TCP and multicast UDP)
+# elvind or pubsubd to ops (unicast TCP and multicast UDP)
 allow ip from any to ops 2917 keep-state	# 60038: BASIC,CLOSED
+allow ip from any to ops 16505 keep-state	# 60039: BASIC,CLOSED
 
 # slothd to boss
 allow udp from any to boss 8509 		# 60040: BASIC,CLOSED

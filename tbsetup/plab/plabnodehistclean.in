@@ -1,0 +1,143 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use POSIX qw(strftime);
+
+#
+# This is a simple script that cleans out the plab_nodehist table to keep
+# it from getting too large.  We only need the data from the past week or
+# two directly accessible for plabmonitord anyway.
+#
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUTOMAIL  = "@TBAUTOMAILEMAIL@";
+
+my $HOUR = 60*60;
+my $DAY = 24*$HOUR;
+my $WEEK = 7*$DAY;
+my $DEF_OUTFILE = "$TB/log/plabnodehist.log";
+# Only select/write/delete this many rows at a time.
+my $MAXROWS = 1024;
+my $WAITSECS = 10;
+
+sub usage()
+{
+    print STDERR "Usage: plabnodehistclean [-d..d] [-SDf]\n";
+    print STDERR "  -d..d     Debug level.\n";
+    print STDERR "  -S        Do not dump cleaned entries to file.\n";
+    print STDERR "  -D <date> Only clean entries with stamp older than <date>\n";
+    print STDERR "            (default is two weeks prior to current time)\n";
+    print STDERR "  -f <file> Output file to append cleaned entries.\n";
+    exit(-1);
+}
+
+my $optlist = "dSD:f:";
+my $debug   = 0;
+my $savedata = 1;
+my $ddate = strftime("%Y-%m-%d %H:%M:%S",localtime(time() - 3*$DAY));
+my $of = $DEF_OUTFILE;
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/sbin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    ++$debug;
+}
+if (defined($options{'D'})) {
+    $ddate = $options{'D'};
+}
+if (defined($options{'f'})) {
+    $of = $options{'f'};
+}
+
+my $OFD = undef;
+if ($savedata) {
+    # Try opening our output file...
+    open($OFD,">>$of") or die "Could not open $of to append!";
+}
+
+my $res = DBQueryFatal("select count(idx) from plab_nodehist" . 
+		       "  where timestamp < '$ddate'");
+my @trow = $res->fetchrow_array();
+
+print STDOUT "About to clean " . $trow[0] . " rows.\n";
+print STDOUT "Starting in ";
+my $i = $WAITSECS;
+while ($i) {
+    print STDOUT "$i ";
+    sleep(1);
+    --$i;
+}
+print STDOUT "... starting!\n";
+
+# Now, select N rows from the plab_nodehist table at a time, write them to
+# OF, and then delete them.  Just want to make sure the data is written.
+my $totalrows = 0;
+while (1) {
+    $res = DBQueryFatal("select node_id,phys_node_id,timestamp," . 
+			"  component,operation,status,msg" . 
+			" from plab_nodehist" . 
+			"  where timestamp < '$ddate'" . 
+			"  order by timestamp asc" . 
+			"  limit $MAXROWS");
+    
+    while (my @row = $res->fetchrow_array()) {
+	print $OFD "" . join(',',@row) . "\n";
+    }
+    
+    # rows only is guaranteed to return num rows AFTER you fetch them all
+    # for select statements (update and delete should have valid count immed)
+    if (!$res->rows()) {
+	last;
+    }
+
+    my $numrows = $res->rows();
+
+    $res = DBQueryFatal("delete from plab_nodehist" . 
+			"  where timestamp < '$ddate'" . 
+			"  order by timestamp asc" . 
+			"  limit $MAXROWS");
+
+    if ($res->rows() != $numrows) {
+	print STDERR "WARNING: deleted ".$res->rows()." rows, not $numrows!\n";
+    }
+    elsif ($debug > 0) {
+	print STDERR "Deleted ".$res->rows()." rows.\n";
+    }
+
+    $totalrows += $res->rows();
+}
+
+close($OFD);
+
+print STDOUT "Cleaned $totalrows rows from plab_nodehist.\n";
+
+exit(0);

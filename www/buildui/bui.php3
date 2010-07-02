@@ -1,30 +1,39 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
 require("defs.php3");
-
-PAGEHEADER("NetBuild");
+chdir("buildui");
 
 #
 # Only known and logged in users can do this.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
 
-#if (!$isadmin) {
-#    USERERROR("You do not have permission to use this interface!", 1);
-#}
-
-chdir("buildui");
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("action", PAGEARG_STRING,
+				 "experiment", PAGEARG_EXPERIMENT);
 
 if (isset($action) && $action == "modify") {
+    if (!isset($experiment)) {
+	USERERROR("Must provide experiment to modify!", 1);
+    }
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
     echo "<h3>Modifying $pid/$eid:</h3>";
 }
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("NetBuild");
 
 ?>
 
@@ -78,7 +87,7 @@ We'll still be here waiting for you.
 </li>
 </ul>
 <p>
-<a href="../doc/docwrapper.php3?docname=netbuilddoc.html">Netbuild Full Reference</a>
+<a href="<? echo $WIKIDOCURL ?>/netbuilddoc">Netbuild Full Reference</a>
 </p>
 
 <?php

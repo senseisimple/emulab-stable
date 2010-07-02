@@ -279,7 +279,7 @@ def do_gc(args):
 
     if len(ips) > 0:
         for tab in GC_TABLES:
-            cur.execute("DELETE FROM " + tab + " where node_ip in "
+            cur.execute("DELETE FROM `" + tab + "` where node_ip in "
                         "(" + ",".join(("%s",) * len(ips)) + ")", ips)
             pass
         pass

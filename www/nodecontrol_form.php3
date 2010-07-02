@@ -1,70 +1,68 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
+
+#
+# Only known and logged in users can do this.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("node", PAGEARG_NODE);
+
+# Need these below.
+$node_id = $node->node_id();
+
+#
+# Admin users can control any node, but normal users can only control
+# nodes in their own experiments.
+#
+if (!$isadmin &&
+    !$node->AccessCheck($this_user, $TB_NODEACCESS_MODIFYINFO)) {
+    USERERROR("You do not have permission to modify node $node_id!", 1);
+}
 
 #
 # Standard Testbed Header
 #
 PAGEHEADER("Node Control Form");
 
-#
-# Only known and logged in users can do this.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$node_id            = $node->node_id(); 
+$type               = $node->type();
+$def_boot_osid      = $node->def_boot_osid();
+$def_boot_cmd_line  = $node->def_boot_cmd_line();
+$next_boot_osid     = $node->next_boot_osid();
+$next_boot_cmd_line = $node->next_boot_cmd_line();
+$temp_boot_osid     = $node->temp_boot_osid();
+$rpms               = $node->rpms();
+$tarballs           = $node->tarballs();
+$startupcmd         = $node->startupcmd();
+$vname              = null;
 
-#
-# Verify form arguments.
-# 
-if (!isset($node_id) ||
-    strcmp($node_id, "") == 0) {
-    USERERROR("You must provide a node ID.", 1);
+# Need the reservation info.
+if (($resrow = $node->ReservedTableEntry())) {
+    $vname = $resrow["vname"];
 }
-
-#
-# Check to make sure that this is a valid nodeid
-#
-$query_result =
-    DBQueryFatal("select n.*,r.vname from nodes as n ".
-		 "left join reserved as r on n.node_id=r.node_id ".
-		 "where n.node_id='$node_id'");
-if (mysql_num_rows($query_result) == 0) {
-  USERERROR("The node $node_id is not a valid nodeid!", 1);
-}
-$row = mysql_fetch_array($query_result);
-
-#
-# Admin users can control any node, but normal users can only control
-# nodes in their own experiments.
-#
-$isadmin = ISADMIN($uid);
-if (! $isadmin) {
-    if (! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
-        USERERROR("You do not have permission to modify node $node_id!", 1);
-    }
-}
-
-$node_id            = $row[node_id]; 
-$type               = $row[type];
-$vname		    = $row[vname];
-$def_boot_osid      = $row[def_boot_osid];
-$def_boot_cmd_line  = $row[def_boot_cmd_line];
-$next_boot_osid     = $row[next_boot_osid];
-$next_boot_cmd_line = $row[next_boot_cmd_line];
-$temp_boot_osid     = $row[temp_boot_osid];
-$rpms               = $row[rpms];
-$tarballs           = $row[tarballs];
-$startupcmd         = $row[startupcmd];
 
 #
 # Get the OSID list. These are either OSIDs that are currently loaded on
 # the node as indicated by the partitions table, or OSIDs with non-null
-# paths (which means they are OSKit kernels). The list is pruned using the
-# pid of the user when not an admin type, of course.
+# paths (which means they are OSKit kernels or BSD MFSes). The list is pruned
+# using the pid of the user when not an admin type, of course.
+#
+# Note the funky "order by", we reverse sort by node_id first to get the
+# disk-based OSes up front (node_id is '' for OSKit/MFS kernels).  After
+# that we order by pid and then by osname (rather than osid since that is
+# now an integer).
 #
 if ($isadmin) {
     $osid_result =
@@ -73,51 +71,46 @@ if ($isadmin) {
 		     "left join partitions as p on o.osid=p.osid ".
 		     "where p.node_id='$node_id' or ".
 		     "(o.path!='' and o.path is not NULL) ".
-		     "order by o.osid");
+		     "order by p.node_id desc,o.pid,o.osname");
 }
 else {
+    $uid_idx = $this_user->uid_idx();
+    
     $osid_result =
 	DBQueryFatal("select distinct o.osname, o.pid, o.osid as oosid," .
 		     "p.osid as posid from os_info as o ".
 		     "left join group_membership as m on m.pid=o.pid ".
 		     "left join partitions as p on o.osid=p.osid ".
 		     "where p.node_id='$node_id' or ".
-		     "  ((m.uid='$uid' or o.shared=1) and ".
+		     "  ((m.uid_idx='$uid_idx' or o.shared=1) and ".
 		     "   (o.path!='' and o.path is not NULL)) ".
-		     "order by o.pid,o.osid");
+		     "order by p.node_id desc,o.pid,o.osname");
 }
 
 echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
 #
-# Generate the form. Note that $refer is set by the caller so we know
-# how we got to the nodecontrol page. 
-# 
-echo "<form action=\"nodecontrol.php3?refer=$refer\"
-            method=\"post\">\n";
+# Generate the form.
+#
+$url = CreateURL("nodecontrol", $node);
 
+echo "<form action='$url' method=\"post\">\n";
 echo "<tr>
           <td>Node ID:</td>
-          <td class=\"left\"> 
-              <input readonly type=readonly name=node_id value=\"$node_id\">
-              </td>
+          <td class=\"left\">$node_id</td>
       </tr>\n";
 
 if ($vname) {
     echo "<tr>
               <td>Virtual Name:</td>
-              <td class=left> 
-                  <input readonly type=readonly name=vname value='$vname'>
-                  </td>
+              <td class=left>$vname</td>
           </tr>\n";
 }
 
 echo "<tr>
           <td>Node Type:</td>
-          <td class=\"left\"> 
-              <input readonly type=readonly name=node_type value=\"$type\">
-              </td>
+          <td class=\"left\">$type</td>
       </tr>\n";
 
 #
@@ -126,14 +119,17 @@ echo "<tr>
 echo "<tr>
           <td>*Def Boot OS:</td>";
 echo "    <td><select name=def_boot_osid>\n";
-if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid)) {
-    echo "<option selected value='$def_boot_osid'>$osname </option>\n";
+if ($def_boot_osid &&
+    ($osinfo = OSinfo::Lookup($def_boot_osid))) {
+    $osname = $osinfo->osname();
+    $pid = $osinfo->pid();
+    echo "<option selected value='$def_boot_osid'>$pid - $osname </option>\n";
 }
                while ($row = mysql_fetch_array($osid_result)) {
-                  $osname = $row[osname];
-                  $oosid = $row[oosid];
-		  $posid = $row[posid];
-		  $pid  = $row[pid];
+                  $osname = $row["osname"];
+                  $oosid  = $row["oosid"];
+		  $posid  = $row["posid"];
+		  $pid    = $row["pid"];
 
 		  # Use the osid that came from the partitions table, if there
 		  # was one - otherwise, go with the os_info table
@@ -171,9 +167,10 @@ if ($isadmin) {
     echo "                <option value=\"\">No OS</option>\n";
     
     while ($row = mysql_fetch_array($osid_result)) {
-	$osname = $row[osname];
-	$oosid = $row[oosid];
-	$posid = $row[posid];
+	$osname = $row["osname"];
+	$oosid = $row["oosid"];
+	$posid = $row["posid"];
+	$pid   = $row["pid"];
 
         # Use the osid that came from the partitions table, if there
 	# was one - otherwise, go with the os_info table
@@ -209,9 +206,10 @@ if ($isadmin) {
     echo "                <option value=\"\">No OS</option>\n";
     
     while ($row = mysql_fetch_array($osid_result)) {
-	$osname = $row[osname];
-	$oosid = $row[oosid];
-	$posid = $row[posid];
+	$osname = $row["osname"];
+	$oosid = $row["oosid"];
+	$posid = $row["posid"];
+	$pid   = $row["pid"];
 
         # Use the osid that came from the partitions table, if there
 	# was one - otherwise, go with the os_info table

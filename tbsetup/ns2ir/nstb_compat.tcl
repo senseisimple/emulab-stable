@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,6 +10,9 @@
 
 namespace eval GLOBALS {
     variable security_level 0
+    variable pid {}
+    variable gid {}
+    variable eid {}
 }
 
 proc tb-set-ip {node ip} {}
@@ -18,7 +21,7 @@ proc tb-set-ip-link {src link ip} {}
 proc tb-set-ip-lan {src lan ip} {}
 proc tb-set-netmask {lanlink netmask} {}
 proc tb-set-hardware {node type args} {}
-proc tb-set-node-os {node os} {}
+proc tb-set-node-os {node os {parentos 0}} {}
 proc tb-set-link-loss {src args} {}
 proc tb-set-lan-loss {lan rate} {}
 proc tb-set-node-rpms {node args} {}
@@ -46,20 +49,26 @@ proc tb-set-multiplexed {link onoff} {}
 proc tb-set-endnodeshaping {link onoff} {}
 proc tb-set-noshaping {link onoff} {}
 proc tb-set-useveth {link onoff} {}
+proc tb-set-link-encap {link style} {}
 proc tb-set-allowcolocate {lanlink onoff} {}
 proc tb-set-colocate-factor {factor} {}
 proc tb-set-sync-server {node} {}
+proc tb-set-node-usesharednode {node} {}
 proc tb-set-mem-usage {usage} {}
 proc tb-set-cpu-usage {usage} {}
 proc tb-bind-parent {sub phys} {}
 proc tb-fix-current-resources {onoff} {}
 proc tb-set-encapsulate {onoff} {}
+proc tb-set-vlink-emulation {style} {}
+proc tb-set-sim-os {os} {}
 proc tb-set-jail-os {os} {}
+proc tb-set-link-layer {link layer} {}
 proc tb-set-delay-os {os} {}
 proc tb-set-delay-capacity {cap} {}
 proc tb-use-ipassign {onoff} {}
 proc tb-set-ipassign-args {args} {}
 proc tb-set-lan-protocol {lanlink protocol} {}
+proc tb-set-link-protocol {lanlink protocol} {}
 proc tb-set-lan-accesspoint {lanlink node} {}
 proc tb-set-lan-setting {lanlink capkey capval} {}
 proc tb-set-node-lan-setting {lanlink node capkey capval} {}
@@ -71,11 +80,27 @@ proc tb-elab-in-elab {onoff} {}
 proc tb-elab-in-elab-topology {topo} {}
 proc tb-set-inner-elab-eid {eid} {}
 proc tb-set-elabinelab-cvstag {cvstag} {}
+proc tb-elabinelab-singlenet {{onoff 1}} {}
+proc tb-set-elabinelab-attribute {key val {order 0}} {}
+proc tb-unset-elabinelab-attribute {key} {}
+proc tb-set-elabinelab-role-attribute {role key val {order 0}} {}
+proc tb-unset-elabinelab-role-attribute {role key} {}
 proc tb-set-node-inner-elab-role {node role} {}
 proc tb-set-node-id {vnode myid} {}
 proc tb-set-link-est-bandwidth {srclink args} {}
 proc tb-set-lan-est-bandwidth {lan bw} {}
 proc tb-set-node-lan-est-bandwidth {node lan bw} {}
+proc tb-set-link-backfill {srclink args} {}
+proc tb-set-link-simplex-backfill {link src bw} {}
+proc tb-set-lan-backfill {lan bw} {}
+proc tb-set-node-lan-backfill {node lan bw} {}
+proc tb-set-lan-simplex-backfill {lan node tobw frombw} {}
+proc tb-set-node-plab-role {node role} {}
+proc tb-set-node-plab-plcnet {node lanlink} {}
+proc tb-set-dpdb {onoff} {}
+proc tb-fix-interface {vnode lanlink iface} {}
+proc tb-set-node-usesharednode {node weight} {}
+proc tb-set-node-sharingmode {node sharemode} {}
 
 proc tb-set-security-level {level} {
 
@@ -232,8 +257,11 @@ Simulator instproc event-group {args} {
     return [new EventGroup]
 }
 
-Simulator instproc make-cloud {nodes args} {
-    return [$self make-lan $nodes 100Mbps 0ms]
+Simulator instproc make-cloud {nodes bw delay args} {
+    return [$self make-lan $nodes $bw $delay]
+}
+
+Simulator instproc make-path {linklist} {
 }
 
 Node instproc program-agent {args} {
@@ -253,12 +281,18 @@ Simulator instproc connect {src dst} {
 }
 
 Simulator instproc define-template-parameter {name args} {
+    # install the name/value in the outer environment.
+    set value [lindex $args 0]    
+    uplevel 1 set \{$name\} \{$value\}
 }
 
 LanNode instproc trace {args} {
 }
 
 LanNode instproc trace_endnode {args} {
+}
+
+LanNode instproc implemented_by {args} {
 }
 
 LanNode instproc unknown {m args} {

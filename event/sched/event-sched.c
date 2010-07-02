@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,6 +19,7 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -56,6 +57,8 @@ static void enqueue(event_handle_t handle,
 		    void *data);
 static void dequeue(event_handle_t handle);
 static int  handle_completeevent(event_handle_t handle, sched_event_t *eventp);
+static void RecordEvent(sched_event_t *eventp, char *eventtype,
+			char *parent, char *arguments);
 
 static char	*progname;
 char	pideid[BUFSIZ];
@@ -63,6 +66,12 @@ char	*pid, *eid;
 static int	get_static_events(event_handle_t handle);
 int	debug;
 const char *XMLRPC_ROOT = TBROOT;
+
+/* Dynamic event recording */
+static int	recordevents;
+static char	*recordevents_filename;
+static void	RecordEventsInit(void);
+
 
 expt_state_t expt_state;
 
@@ -80,16 +89,18 @@ static pid_t emcd_pid = -1;
 static pid_t vmcd_pid = -1;
 static pid_t rmcd_pid = -1;
 
-static struct agent ns_sequence_agent;
+static struct agent ns_sequence_agent; /* Used for list of things to do right after swapin */
 static timeline_agent_t ns_sequence;
-static struct agent ns_teardown_agent;
+static struct agent ns_teardown_agent; /* Used during experiment teardown */
 static timeline_agent_t ns_teardown;
-static struct agent ns_timeline_agent;
+static struct agent ns_swapout_agent; /* Used during experiment swapout */
+static timeline_agent_t ns_swapout;
+static struct agent ns_timeline_agent; /* Used for timeline in the experiment */
 static timeline_agent_t ns_timeline;
 
 static void sigpass(int sig)
 {
-	info("event-sched: received signal %d, exiting\n", sig);
+	info("event-sched[%d]: received signal %d, exiting\n", getpid(), sig);
 	
 	if (emcd_pid != -1)
 		kill(emcd_pid, sig);
@@ -103,7 +114,7 @@ static void sigpass(int sig)
 
 static void sigpanic(int sig)
 {
-	info("event-sched: sigpanic %d\n", sig);
+	info("event-sched[%d]: sigpanic %d\n", getpid(), sig);
 
 	abort();
 }
@@ -189,6 +200,7 @@ usage(void)
 		"  -h          Print this message\n"
 		"  -V          Print version information\n"
 		"  -d          Turn on debugging\n"
+		"  -t filename Record dynamic events to file as they arrive\n"
 		"  -s server   Specify location of elvind server. "
 		"(Default: localhost)\n"
 		"  -r          Use the standard RPC path. (Current: %s)\n"
@@ -233,7 +245,7 @@ main(int argc, char *argv[])
 	if ((primary_simulator_agent = create_simulator_agent()) == NULL)
 		fatal("cannot allocate simulator agent");
 
-	while ((c = getopt(argc, argv, "hVrs:p:dl:k:")) != -1) {
+	while ((c = getopt(argc, argv, "hVrs:p:dl:k:t:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage();
@@ -259,6 +271,10 @@ main(int argc, char *argv[])
 			break;
 		case 'k':
 			keyfile = optarg;
+			break;
+		case 't':
+			recordevents = 1;
+			recordevents_filename = optarg;
 			break;
 		default:
 			usage();
@@ -294,6 +310,10 @@ main(int argc, char *argv[])
 
 	if (RPC_metadata(pid, eid)) {
 		fatal("could not get experiment metadata");
+	}
+
+	if (recordevents) {
+		RecordEventsInit();
 	}
 
 	/*
@@ -345,6 +365,7 @@ main(int argc, char *argv[])
 		fatal("could not register with event system");
 	}
 
+	/* Make a (not yet populated) list of things to do after initial swapin */
 	ns_sequence = create_timeline_agent(TA_SEQUENCE);
 	ns_sequence->ta_local_agent.la_link.ln_Name = ns_sequence_agent.name;
 	ns_sequence->ta_local_agent.la_handle = handle;
@@ -358,7 +379,8 @@ main(int argc, char *argv[])
 	ns_sequence_agent.handler = &ns_sequence->ta_local_agent;
 	lnAddTail(&sequences, &ns_sequence->ta_local_agent.la_link);
 	lnAddTail(&agents, &ns_sequence_agent.link);
-	
+
+	/* Make a (not yet populated) list of things to do during teardown */
 	ns_teardown = create_timeline_agent(TA_SEQUENCE);
 	ns_teardown->ta_local_agent.la_link.ln_Name = ns_teardown_agent.name;
 	ns_teardown->ta_local_agent.la_handle = handle;
@@ -372,7 +394,23 @@ main(int argc, char *argv[])
 	ns_teardown_agent.handler = &ns_teardown->ta_local_agent;
 	lnAddTail(&sequences, &ns_teardown->ta_local_agent.la_link);
 	lnAddTail(&agents, &ns_teardown_agent.link);
-	
+
+	/* Make a (not yet populated) list of things to do during swapout, "at swapout" events go into here */
+	ns_swapout = create_timeline_agent(TA_SEQUENCE);
+	ns_swapout->ta_local_agent.la_link.ln_Name = ns_swapout_agent.name;
+	ns_swapout->ta_local_agent.la_handle = handle;
+	ns_swapout->ta_local_agent.la_agent = &ns_swapout_agent;
+	ns_swapout_agent.link.ln_Name = ns_swapout_agent.name;
+	strcpy(ns_swapout_agent.name, "__ns_swapout");
+	strcpy(ns_swapout_agent.nodeid, "*");
+	strcpy(ns_swapout_agent.vnode, "*");
+	strcpy(ns_swapout_agent.objtype, TBDB_OBJECTTYPE_SEQUENCE);
+	strcpy(ns_swapout_agent.ipaddr, "*");
+	ns_swapout_agent.handler = &ns_swapout->ta_local_agent;
+	lnAddTail(&sequences, &ns_swapout->ta_local_agent.la_link);
+	lnAddTail(&agents, &ns_swapout_agent.link);
+
+	/* Make a (not yet populated) timeline for the experiment. "at" events go into here */	
 	ns_timeline = create_timeline_agent(TA_TIMELINE);
 	ns_timeline->ta_local_agent.la_link.ln_Name = ns_timeline_agent.name;
 	ns_timeline->ta_local_agent.la_handle = handle;
@@ -535,6 +573,8 @@ int sends_complete(struct agent *agent, const char *evtype)
 {
 	static char *run_completes[] = {
 		TBDB_EVENTTYPE_RUN,
+		TBDB_EVENTTYPE_HALT,
+		TBDB_EVENTTYPE_RELOAD,
 		NULL
 	};
 
@@ -544,8 +584,21 @@ int sends_complete(struct agent *agent, const char *evtype)
 	};
 
 	static char *simulator_completes[] = {
+		TBDB_EVENTTYPE_RESET,
 		TBDB_EVENTTYPE_REPORT,
 		TBDB_EVENTTYPE_MODIFY,
+		TBDB_EVENTTYPE_SNAPSHOT,
+		TBDB_EVENTTYPE_LOG,
+		NULL
+	};
+
+	static char *linktrace_completes[] = {
+		TBDB_EVENTTYPE_SNAPSHOT,
+		NULL
+	};
+
+	static char *link_completes[] = {
+		TBDB_EVENTTYPE_RESET,
 		NULL
 	};
 
@@ -565,7 +618,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		char *objtype;
 		char **evtypes;
 	} objtype2complete[] = {
-		{ TBDB_OBJECTTYPE_LINK, NULL },
+		{ TBDB_OBJECTTYPE_LINK, link_completes },
 		{ TBDB_OBJECTTYPE_TRAFGEN, NULL },
 		{ TBDB_OBJECTTYPE_TIME, NULL },
 		{ TBDB_OBJECTTYPE_PROGRAM, run_completes },
@@ -579,7 +632,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_SEQUENCE, run_completes },
 		{ TBDB_OBJECTTYPE_CONSOLE, NULL },
 		{ TBDB_OBJECTTYPE_TOPOGRAPHY, NULL },
-		{ TBDB_OBJECTTYPE_LINKTRACE, NULL },
+		{ TBDB_OBJECTTYPE_LINKTRACE, linktrace_completes },
 		{ TBDB_OBJECTTYPE_EVPROXY, NULL },
 		{ TBDB_OBJECTTYPE_BGMON, NULL },
 		{ NULL, NULL }
@@ -677,6 +730,7 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 	char			eventtype[TBDB_FLEN_EVEVENTTYPE];
 	struct agent	       *agentp;
 	timeline_agent_t	ta = NULL;
+	int			token;
 	
 	if (! event_notification_get_timeline(handle, notification,
 						   timeline,
@@ -743,9 +797,9 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 						event.notification,
 						"SCHEDULER") ||
 		    ! event_notification_put_int32(handle,
-						   event.notification,
-						   "SCHEDULER",
-						   0)) {
+						    event.notification,
+						    "SCHEDULER",
+						    0)) {
 			error("could not clear scheduler attribute of "
 			      "notification %p\n", event.notification);
 			return;
@@ -765,15 +819,19 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 		}
 		
 		if (debug) {
+		        char time_buf_1[24], time_buf_2[24];
 			struct timeval now;
 		    
 			gettimeofday(&now, NULL);
+
+			make_timestamp(time_buf_1, &event.time);
+			make_timestamp(time_buf_2, &now);
 			
 			info("Sched: "
-			     "note:%p at:%ld:%d now:%ld:%d agent:%s %s\n",
+			     "note:%p at:%s now:%s agent:%s %s\n",
 			     event.notification,
-			     event.time.tv_sec, event.time.tv_usec,
-			     now.tv_sec, now.tv_usec, agentp->name,
+			     time_buf_1, time_buf_2,
+			     agentp->name,
 			     eventtype);
 		}
 		
@@ -790,12 +848,31 @@ enqueue(event_handle_t handle, event_notification_t notification, void *data)
 		event_notification_set_host(handle,
 					    event.notification,
 					    agentp->ipaddr);
-		event_notification_put_int32(handle,
-					     event.notification,
-					     "TOKEN",
-					     next_token);
-		next_token += 1;
-		
+
+		/*
+		 * Do not override token.
+		 */
+		if (! event_notification_get_int32(handle,
+						   event.notification,
+						   "TOKEN",
+						   (int32_t *)&token)) {
+			event_notification_put_int32(handle,
+						     event.notification,
+						     "TOKEN",
+						     next_token);
+			next_token += 1;
+		}
+
+		if (recordevents) {
+			char	argsbuf[BUFSIZ] = "";
+			event_notification_get_arguments(handle,
+							 event.notification,
+							 argsbuf,
+							 sizeof(argsbuf));
+			
+			RecordEvent(&event, eventtype, timeline, argsbuf);
+		}
+
 		/*
 		 * Enqueue the event notification for resending at the
 		 * indicated time:
@@ -845,21 +922,27 @@ dequeue(event_handle_t handle)
 {
 	sched_event_t next_event;
 	struct timeval now;
-	
+	char time_buf_1[24], time_buf_2[24];
+
+// XXX
+//	info("event-sched.c: in dequeue(), about to enter event loop\n");
+// XXX
 	while (1) {
+//		info("event-sched.c: Event loop loops\n");
 		if (sched_event_dequeue(&next_event, 1) < 0)
 			break;
+//		info("event-sched.c: Dequeued another event\n");
 		
 		/* Fire event. */
 		if (debug)
 			gettimeofday(&now, NULL);
 
 		if (debug) {
-			info("Fire:  note:%p at:%ld:%d now:%ld:%d agent:%s\n",
+			make_timestamp(time_buf_1, &next_event.time);
+			make_timestamp(time_buf_2, &now);
+			info("Fire:  note:%p at:%s now:%s agent:%s\n",
 			     next_event.notification,
-			     next_event.time.tv_sec, next_event.time.tv_usec,
-			     now.tv_sec,
-			     now.tv_usec,
+			     time_buf_1, time_buf_2,
 			     next_event.agent.s ?
 			     (next_event.length == 1 ?
 			      next_event.agent.s->name :
@@ -893,6 +976,9 @@ dequeue(event_handle_t handle)
 
 		sched_event_free(handle, &next_event);
 	}
+// XXX
+//	info("event-sched.c: in dequeue(), just left event loop\n");
+// XXX
 }
 
 int
@@ -959,7 +1045,8 @@ AddAgent(event_handle_t handle,
 	 char *vname, char *vnode, char *nodeid, char *ipaddr, char *type)
 {
 	struct agent *agentp;
-		
+
+	info("D:\t\tAddAgent asked to add agent %s\n", vname);		
 	if ((agentp = calloc(sizeof(struct agent), 1)) == NULL) {
 		error("AddAgent: Out of memory\n");
 		return -1;
@@ -1152,7 +1239,7 @@ AddGroup(event_handle_t handle, char *groupname, char *agentname)
 int
 AddEvent(event_handle_t handle, address_tuple_t tuple,
 	 char *exidx, char *ftime, char *objname, char *exargs,
-	 char *objtype, char *evttype, char *parent)
+	 char *objtype, char *evttype, char *parent, char *triggertype)
 {
 	timeline_agent_t     ta = NULL;
 	sched_event_t	     event;
@@ -1160,6 +1247,7 @@ AddEvent(event_handle_t handle, address_tuple_t tuple,
 	struct agent	    *agentp = NULL;
 	struct timeval	     time;
 
+	info("D: AddEvent asked to add event %s\n", objname);
 	if (strcmp(objtype, TBDB_OBJECTTYPE_TIME) == 0) {
 		return 0;
 	}
@@ -1168,8 +1256,16 @@ AddEvent(event_handle_t handle, address_tuple_t tuple,
 		error("AddEvent: Could not map event index %s\n", exidx);
 		return -1;
 	}
-
-	if (parent && strlen(parent) > 0) {
+info("AddEvent called with event of triggertype %s\n", triggertype);
+	if (strcmp(triggertype, "SWAPOUT")==0) { /* If it is of triggertype SWAPOUT,
+						Divert to the ns_swapout sequence
+						XXX I am not certain anything else in this function
+						apart from timeline_agent_append() is needed, but
+						let's assume it is.
+						*/
+	ta = ns_swapout;
+	}
+	else if (parent && strlen(parent) > 0) { /* If the event has a parent, we inherit its timeline-agent */
 		if (((ta = (timeline_agent_t)lnFindName(&timelines,
 							parent)) == NULL) &&
 		    ((ta = (timeline_agent_t)lnFindName(&sequences,
@@ -1179,7 +1275,7 @@ AddEvent(event_handle_t handle, address_tuple_t tuple,
 		}
 	}
 	else {
-		ta = ns_timeline;
+		ta = ns_timeline; /* It's on the main timeline? */
 	}
 	
 	tuple->host      = agentp->ipaddr;
@@ -1205,6 +1301,7 @@ AddEvent(event_handle_t handle, address_tuple_t tuple,
 
 	event_notification_insert_hmac(handle, event.notification);
 
+	/* convert the event into a timeval */
 	time.tv_sec  = (int)firetime;
 	time.tv_usec = (int)((firetime - (floor(firetime))) * 1000000);
 	if (time.tv_usec >= 1000000) {
@@ -1322,6 +1419,9 @@ get_static_events(event_handle_t handle)
 	}
 
 	event.agent.s = primary_simulator_agent->sa_local_agent.la_agent;
+// XXX
+info("Automatically scheduling the beginning and end of time\n");
+// XXX
 	if (event.agent.s != NULL) {
 		// XXX emulab-ops experiments might not have a simulator agent
 
@@ -1368,6 +1468,28 @@ get_static_events(event_handle_t handle)
 	
 		sched_event_prepare(handle, &event);
 		timeline_agent_append(ns_teardown, &event);
+
+		/* Log when swapout events have officially started. */
+		event.notification = event_notification_create(
+			handle,
+			EA_Experiment, pideid,
+			EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
+			EA_Event, TBDB_EVENTTYPE_LOG,
+			EA_Name, event.agent.s->name,
+			EA_Arguments, "Swapout started",
+			EA_TAG_DONE);
+		event.time.tv_sec = 0;
+		event.time.tv_usec = 0;
+		event.length = 1;
+		event.flags = SEF_SINGLE_HANDLER;
+		event_notification_put_int32(handle,
+					     event.notification,
+					     "TOKEN",
+					     next_token);
+		next_token += 1;
+
+		sched_event_prepare(handle, &event);
+		timeline_agent_append(ns_swapout, &event);
 	}
 	
 	/*
@@ -1427,7 +1549,9 @@ get_static_events(event_handle_t handle)
 			 EA_Name, ns_sequence_agent.name,
 			 EA_TAG_DONE);
 	}
-	
+// XXX
+// info("Returning from get_static_events()\n");	
+// XXX
 	return 0;
 }
 
@@ -1506,6 +1630,17 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 		warning("completion event is missing CTOKEN argument\n");
 	}
 
+	if (debug) {
+		char time_buf_1[24];
+		struct timeval now;
+
+		gettimeofday(&now, NULL);
+		make_timestamp(time_buf_1, &now);
+			
+		info("Done:  now:%s CTOKEN=%d ERROR=%d\n",
+		     time_buf_1, ctoken, agerror);
+	}
+
 	if (agerror != 0 && agerror != ~0) {
 		error_record_t er;
 		
@@ -1546,8 +1681,46 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 	    ((strcmp(objtype, TBDB_OBJECTTYPE_SEQUENCE) == 0) ||
 	     (strcmp(objtype, TBDB_OBJECTTYPE_GROUP) == 0)) &&
 	    !handled) {
-		send_report(primary_simulator_agent, "");
+		send_error_report(primary_simulator_agent, "");
 	}
 	
 	return 1;
+}
+
+/*
+ * Record events to DB
+ */
+static FILE	*recordevents_fp;
+
+static void
+RecordEventsInit(void)
+{
+	/*
+	 * Open up file and write a header that describes the format.
+	 */
+	if ((recordevents_fp = fopen(recordevents_filename, "w")) == NULL) {
+		fatal("Could not open recordevents_filename for writing");
+	}
+
+	fprintf(recordevents_fp,
+		"arrivaltime,firetime,vnode,objname,objecttype,eventtype,"
+		"parent,arguments\n");
+	fflush(recordevents_fp);
+}
+
+static void
+RecordEvent(sched_event_t *eventp, char *eventtype, char *parent, char *args)
+{
+	struct timeval now;
+	struct agent *agentp = eventp->agent.s;
+
+	gettimeofday(&now, NULL);
+
+	fprintf(recordevents_fp,
+		"%ld:%ld,%ld:%ld,%s,%s,%s,%s,%s,%s\n",
+		now.tv_sec, now.tv_usec,
+		eventp->time.tv_sec, eventp->time.tv_usec,
+		agentp->vnode, agentp->name, agentp->objtype, eventtype,
+		parent, args);
+	fflush(recordevents_fp);
 }

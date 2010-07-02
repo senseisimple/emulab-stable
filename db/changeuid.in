@@ -1,7 +1,7 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2006, 2007, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -31,9 +31,10 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
+# Protos.
+sub fatal($);
 
 #
 # Turn off line buffering on output
@@ -47,14 +48,6 @@ $ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# We don't want to run this script unless its the real version.
-#
-#if ($EUID != 0) {
-#    die("*** $0:\n".
-#	"    Must be setuid! Maybe its a development version?\n");
-#}
-
-#
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
 #
@@ -64,7 +57,7 @@ if ($UID == 0) {
 }
 
 # Only admin types!
-if (!TBAdmin($UID)) {
+if (!TBAdmin()) {
     die("*** $0:\n".
 	"    Only TB administrators can run this script!\n");
 }
@@ -108,40 +101,35 @@ if (AuditStart(0)) {
     exit(0);
 }
 
-#
-# Get the user status. Only users in the new or unapproved state can
-# have their uid changed. Once the account is created, it is much more
-# difficult to deal with.
-#
-$query_result =
-    DBQueryFatal("select status from users where uid='$olduid'");
-
-if ($query_result->numrows == 0) {
-    die("*** $0:\n".
-	"    No such user '$olduid' in the DB!\n");
+# Map target user to object.
+my $target_user = User->Lookup($olduid);
+if (! defined($target_user)) {
+    fatal("$olduid does not exist!");
 }
-my ($status) = $query_result->fetchrow_array();
+
+# Map invoking user to object.
+my $this_user = User->LookupByUnixId($UID);
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+$target_dbid  = $target_user->dbid();
 
 #
 # Only operate on unapproved users (must be verified). Any other state
 # is hard to deal with cause of exported homedirs, existing experiments,
 # files that need to be changed on disk, etc. Maybe add this support later.
 # 
-if ($status ne USERSTATUS_UNAPPROVED()) {
-    die("*** $0:\n".
-	"    User '$olduid' must be an unapproved (verified) user!\n");
+if ($target_user->status() ne USERSTATUS_UNAPPROVED()) {
+    fatal("User '$olduid' must be an unapproved (verified) user!");
 }
 
 #
 # Obviously the new user must not exist in the users table. This is the
 # last table we change below ...
 #
-$query_result =
-    DBQueryFatal("select status from users where uid='$newuid'");
-
-if ($query_result->numrows) {
-    die("*** $0:\n".
-	"    User '$newuid' is already in the DB!\n");
+my $new_user = User->Lookup($newuid);
+if (defined($new_user)) {
+    fatal("User '$newuid' is already in the DB!");
 }
 
 #
@@ -149,23 +137,27 @@ if ($query_result->numrows) {
 #
 print "Updating group_membership table ...\n";
 DBQueryFatal("update group_membership set uid='$newuid' ".
-	     "where uid='$olduid'");
+	     "where uid_idx='$target_dbid'");
 
 print "Updating projects table ...\n";
 DBQueryFatal("update projects set head_uid='$newuid' ".
-	     "where head_uid='$olduid'");
+	     "where head_idx='$target_dbid'");
 
 print "Updating user_pubkeys table ...\n";
 DBQueryFatal("update user_pubkeys set uid='$newuid' ".
-	     "where uid='$olduid'");
+	     "where uid_idx='$target_dbid'");
 
 print "Updating user_sfskeys table ...\n";
 DBQueryFatal("update user_sfskeys set uid='$newuid' ".
-	     "where uid='$olduid'");
+	     "where uid_idx='$target_dbid'");
 
 print "Updating user_stats table ...\n";
 DBQueryFatal("update user_stats set uid='$newuid' ".
-	     "where uid='$olduid'");
+	     "where uid_idx='$target_dbid'");
+
+print "Updating user_sslcerts table ...\n";
+DBQueryFatal("update user_sslcerts set uid='$newuid' ".
+	     "where uid_idx='$target_dbid'");
 
 print "Updating widearea_accounts table ...\n";
 DBQueryFatal("update widearea_accounts set uid='$newuid' ".
@@ -173,11 +165,11 @@ DBQueryFatal("update widearea_accounts set uid='$newuid' ".
 
 print "Updating groups table ...\n";
 DBQueryFatal("update groups set leader='$newuid' ".
-	     "where leader='$olduid'");
+	     "where leader_idx='$target_dbid'");
 
 # Auto logout old user. 
 print "Clearing logins table ...\n";
-DBQueryFatal("delete from login where uid='$olduid'");
+DBQueryFatal("delete from login where uid_idx='$target_dbid'");
 
 #
 # Lastly change users table; if anything breaks above we can still run
@@ -186,4 +178,13 @@ DBQueryFatal("delete from login where uid='$olduid'");
 # as new one, but that is not likely to happen!
 #
 print "Updating users table ...\n";
-DBQueryFatal("update users set uid='$newuid' where uid='$olduid'");
+DBQueryFatal("update users set uid='$newuid' where uid_idx='$target_dbid'");
+
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

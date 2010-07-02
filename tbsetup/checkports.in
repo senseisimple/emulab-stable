@@ -1,10 +1,12 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use English;
+use Getopt::Std;
+use strict;
 
 #
 # checkports - Check to make sure that all ports for an experiment are
@@ -13,67 +15,78 @@
 # TODO: Add duplex checking
 # TODO: Add the ability to check all ports at once
 #
-
+sub usage()
+{
+    print "Usage: $0 [-h] <eid>\n";
+    print "  Checks all ports in pid/eid to make sure that the operational\n";
+    print "  status (whether or not the port has carrier) matches the\n";
+    print "  administrative status (whether or not the port is enabled.)\n";
+    exit(-1);
+}
+my $optlist = "h";
 
 #
 # Configure variables
 #
 use lib '@prefix@/lib';
 
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
 use libdb;
+use libtestbed;
+use Experiment;
 use snmpit_lib;
 
-use English;
-use Getopt::Long;
-use strict;
-
-sub usage {
-    print << "END";
-Usage: $0 [-h] <pid> <eid>
--h    This message
-
-Checks all ports in pid/eid to make sure that the operational status (whether
-or not the port has carrier) matches the administrative status (whether or not
-the port is enabled.)
-END
-
-    return 1;
-}
+# The set of OIDs we care about
+my @oids = ('ifAdminStatus','ifOperStatus');
 
 #
 # Process command-line arguments
 #
-my %opt = ();
-GetOptions(\%opt,'h');
-
-if ($opt{h}) {
-    exit &usage;
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"h"})) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
 }
 
-my @oids = ('ifAdminStatus','ifOperStatus'); # The set of OIDs we care about
-
-if (@ARGV != 2) {
-    exit &usage;
+# Lookup user.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
 
-snmpit_lib::init(0);
-
-my($pid,$eid) = (shift,shift);
-
-#
-# First, make sure the experiment exists
-#
-if (!ExpState($pid,$eid)) {
-    die "There is no experiment $eid in project $pid\n";
+# Lookup experiment.
+my $experiment = Experiment->Lookup($ARGV[0]);
+if (!defined($experiment)) {
+    tbdie("Could not lookup experiment object for $ARGV[0]!")
 }
+my $pid       = $experiment->pid();
+my $eid       = $experiment->eid();
 
 #
 # Make sure they have access to it
 #
-if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+if (!$experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
     die "You do not have permission to view experiment $pid/$eid\n";
 }
 
+snmpit_lib::init(0);
 
 #
 # Get a list of all ports in the experiment

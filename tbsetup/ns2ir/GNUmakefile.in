@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,9 +19,14 @@ LIB_STUFF    = lanlink.tcl node.tcl sim.tcl tb_compat.tcl null.tcl \
 		  nsenode.tcl nstb_compat.tcl event.tcl firewall.tcl \
 		  elabinelab.ns elabinelab-withfsnode.ns \
 		  fw.ns timeline.tcl sequence.tcl \
-		  topography.tcl console.tcl
+		  topography.tcl console.tcl path.tcl
 BOSSLIBEXEC  = parse-ns
 USERLIBEXEC  = parse.proxy
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = 
+SETUID_LIBX_SCRIPTS  = parse-ns
 
 #
 # Force dependencies on the scripts so that they will be rerun through

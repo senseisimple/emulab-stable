@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,9 +10,9 @@ OBJDIR		= ../..
 SUBDIR		= event/proxy
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= evproxy proxytest evproxyplab elvindtest
+PROGRAMS	= evproxy proxytest eventping evproxyplab
 ifneq ($(SYSTEM),Linux)
-PROGRAMS       += evproxyclient evproxyserver
+PROGRAMS       += 
 endif
 
 include $(OBJDIR)/Makeconf
@@ -23,6 +23,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 LIBTBDIR    = $(OBJDIR)/lib/libtb
 LIBEVENTDIR = ../lib
+CPPC        = g++
 
 # Rules to make sure that some libraries we need from other directories get
 # built first
@@ -35,68 +36,66 @@ $(LIBEVENTDIR)/%.a:
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O2 -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 
 PFLAGS    = -pthread
 PFLAGS   += -DDEBUG
 PFLAGS	 += -O2 -g -Wall
 PFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-PFLAGS   += `$(ELVIN_CONFIG) --cflags vin4mt`
+PFLAGS   += -L/usr/local/lib -lpubsub_r -lm
+
+PLDFLAGS += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
+PLIBS     = -levent_r -ltb -lcrypto
+PLIBS    += -L/usr/local/lib -lpubsub_r -lm
+PLDFLAGS += $(LDSTATIC)
 
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
-LIBS     += -levent -ltb -lcrypto
-LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
-CPPC     = g++
+LIBS      = -levent -ltb -lcrypto
+LIBS     += -L/usr/local/lib -lpubsub -lm
+LDFLAGS  += $(LDSTATIC)
 
-ifeq ($(host_cpu),arm)
-else
-LDFLAGS  += -static
-PLDFLAGS  += -static
+# Deal with the presence/absence of kerberos in the linux ssl library
 ifeq ($(SYSTEM),Linux)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
-ifeq ($(NEEDKERB),0)
- CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
- LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NOKERB := 1
 endif
-LIBS     += -ldl
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+PLIBS    += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
+PLIBS    += -lkrb5support
+endif
 endif
 endif
 
-PLDFLAGS  = -pthread
-PLDFLAGS += -L../lib -L${OBJDIR}/lib/libtb
-PLIBS     = -levent_r -ltb
-PLIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lcrypto -lm
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl -lz
+PLIBS    += -ldl -lz
+endif
 
 evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ evproxy.o $(LIBS)
+	$(CC) $(PLDFLAGS) -o $@ -pthread evproxy.o $(PLIBS)
 
-evproxyclient-debug:	proxyclient.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ proxyclient.o $(LIBS)
-
-evproxyserver-debug:	proxyserver.o $(LIBTBDIR)/log.o
-	$(CC) $(PLDFLAGS) -o $@ proxyserver.o $(PLIBS)
-
-proxyserver.o:  proxyserver.c
-	$(CC) $(PFLAGS) -c $<
-
-proxytest-debug:	proxytest.o $(LIBTBDIR)/log.o
-	$(CC) $(LDFLAGS) -o $@ proxytest.o $(LIBS)
-
+# Dave swears we use this on plab nodes. Hand installed into the rootball.
 evproxyplab.o: evproxyplab.cc
 	$(CPPC) $(CFLAGS)  -c $<
 
-evproxyplab:    evproxyplab.o ../lib/libevent.a ../lib/event.h
+evproxyplab-debug:    evproxyplab.o ../lib/libevent.a ../lib/event.h
 	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
 
-elvindtest:     elvindtest.o
-	$(CC) $(LDFLAGS) -o $@ elvindtest.o $(LIBS)
-
+eventping-debug: eventping.o
+	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-client: evproxy
+client: evproxy$(EXE) evproxyplab$(EXE)
 client-install: client
 	$(INSTALL_PROGRAM) evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
+	$(INSTALL_PROGRAM) evproxyplab$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy_shared$(EXE)
 
 clean:
-	/bin/rm -f *.o $(PROGRAMS)
+	/bin/rm -f *.o $(PROGRAMS) *-debug

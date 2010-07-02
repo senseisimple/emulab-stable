@@ -1,0 +1,429 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniEmulab;
+
+#
+# Stuff to interface between Emulab core and Geni nodes.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniDB;
+use Genixmlrpc;
+use GeniResponse;
+use GeniTicket;
+use GeniCredential;
+use GeniCertificate;
+use GeniComponent;
+use GeniAuthority;
+use GeniRegistry;
+use GeniSlice;
+use GeniSliver;
+use GeniUser;
+use GeniHRN;
+use GeniXML;
+use libtestbed;
+use User;
+use Node;
+use Interface;
+use Lan;
+use English;
+use XML::Simple;
+use Data::Dumper;
+use Experiment;
+use libdb qw(TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT);
+use POSIX qw(strftime);
+use Carp;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $SACERT         = "$TB/etc/genisa.pem";
+
+#
+# Initialize for using geni resources.
+#
+sub RegisterExperiment($$)
+{
+    my ($experiment, $user) = @_;
+
+    my $slice = GeniSlice->LookupByExperiment($experiment);
+    return 0
+	if (defined($slice));
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "Could not load certificate from $SACERT\n";
+	return -1;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "Could not create context to talk to clearinghouse\n";
+    }
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    #
+    # Create a Geni user from the supplied Emulab user.
+    #
+    my $geniuser = GeniUser->CreateFromLocal($user);
+    if (!defined($geniuser)) {
+	print STDERR "Could not create a geni user from current user $user\n";
+	return -1;
+    }
+    # Register user at the ClearingHouse.
+    print STDERR "Registering $geniuser at the ClearingHouse.\n";
+    if ($geniuser->Register() != 0) {
+	print STDERR "Could not register $geniuser at the ClearingHouse.\n";
+	return -1;
+    }
+
+    #
+    # Create and register the slice. Slice is returned locked
+    #
+    print STDERR "Creating new slice for $experiment\n";
+    $slice = GeniSlice->CreateFromLocal($experiment, $geniuser);
+    if (!defined($slice)) {
+	print STDERR "Could not create local slice from $experiment\n";
+	return -1;
+    }
+    #
+    # We want this slice to have a long expiration and let Emulab
+    # deal with aging it out.
+    #
+    my $expires = time() + (3600 * 24 * 90);
+    if ($slice->SetExpiration($expires)) {
+	print STDERR "Could not set expiration for $slice\n";
+
+	if ($slice->UnRegister() != 0) {
+	    print STDERR "Could not unregister $slice for $experiment\n";
+	    return -1;
+	}
+	$slice->Delete();
+	return -1;
+    }
+    print STDERR "Registering $slice at the ClearingHouse.\n";
+    if ($slice->Register() != 0) {
+	$slice->Delete();
+	print STDERR "Could not register slice $slice\n";
+	return -1;
+    }
+    $slice->UnLock();
+    return 0;
+}
+
+#
+# Delete the slice record from the ClearingHouse and then locally.
+#
+sub UnRegisterExperiment($)
+{
+    my ($experiment) = @_;
+
+    my $slice = GeniSlice->LookupByExperiment($experiment);
+    return 0
+	if (!defined($slice));
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "Could not load certificate from $SACERT\n";
+	return -1;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "Could not create context to talk to clearinghouse\n";
+	return -1;
+    }
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    #
+    # Its possible the sa_daemon has the slice locked.
+    #
+    if ($slice->Lock() != 0) {
+	print STDERR "Could not lock slice\n";
+	return -1;
+    }
+    print STDERR "Unregistering $slice at the ClearingHouse.\n";
+    if ($slice->UnRegister() != 0) {
+	print STDERR "Could not unregister $slice for $experiment\n";
+	return -1;
+    }
+    # Needs to move.
+    GeniRegistry::ClientSliver->SliceDelete($slice);
+    
+    if ($slice->Delete()) {
+	print STDERR "Could not delete $slice for $experiment\n";
+	return -1;
+    }
+    return 0;
+}
+
+#
+# Create a physical node on the fly. 
+#
+sub CreatePhysNode($)
+{
+    my ($node_urn) = @_;
+    my @ifaces;
+    my $ctrliface;
+
+    if (!defined($node_urn) || ! GeniHRN::IsValid($node_urn)) {
+	carp("Not a proper node urn: $node_urn\n");
+	return -1;
+    }
+    print STDERR "$node_urn\n";
+
+    my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
+    my $manager_urn = GeniHRN::Generate($auth, "authority", "cm");
+
+    #
+    # Load the SA cert to act as caller context.
+    #
+    my $certificate = GeniCertificate->LoadFromFile($SACERT);
+    if (!defined($certificate)) {
+	print STDERR "Could not load certificate from $SACERT\n";
+	return undef;
+    }
+    my $context = Genixmlrpc->Context($certificate);
+    if (!defined($context)) {
+	print STDERR "Could not create context to talk to clearinghouse\n";
+	return undef;
+    }
+    #
+    # Set the default RPC context. 
+    #
+    Genixmlrpc->SetContext($context);
+
+    my $authority = GeniAuthority->CreateFromRegistry("CM", $manager_urn);
+    if (!defined($authority)) {
+	print STDERR "Could not lookup $manager_urn at ClearingHouse\n";
+	return undef;
+    }
+    my $manager_version = $authority->Version();
+    return undef
+	if (!defined($manager_version));
+
+    my $component = GeniComponent->CreateFromRegistry($node_urn);
+    if (!defined($component)) {
+	print STDERR "Could not lookup $node_urn at ClearingHouse\n";
+	return undef;
+    }
+    my $node = Node->LookupWideArea($node_urn);
+    return $node
+	if (defined($node));
+
+    print STDERR "Creating local node for $node_urn\n";
+
+    my $blob     = $component->Resolve();
+    return undef
+	if (!defined($blob));
+
+    my $hrn      = $blob->{'hrn'};
+    my $IP       = $blob->{'physctrl'};
+    my $hostname = $blob->{'hostname'};
+    my $uuid     = $blob->{'uuid'};
+    if (! (defined($hrn) && defined($IP) && defined($hostname) &&
+	   defined($uuid))) {
+	print STDERR "Missing stuff in blob from CM for $node_urn\n";
+	goto bad;
+    }
+    if (! ($hrn =~ /^[-\w\.]*$/)) {
+	print STDERR "Invalid hrn '$hrn' in blob from CM for $node_urn\n";
+	goto bad;
+    }
+    if (! ($uuid =~ /^[-\w\.]*$/)) {
+	print STDERR "Invalid uuid '$uuid' in blob from CM for $node_urn\n";
+	goto bad;
+    }
+    if (! ($hostname =~ /^[-\w\.]*$/)) {
+	print STDERR
+	    "Invalid hostname '$hostname' in blob from CM for $node_urn\n";
+	goto bad;
+    }
+    $node_id = $hrn;
+    $node_id =~ s/\./\-/g;
+    
+    if (length($node_id) > 32) {
+	print STDERR "Nodeid '$node_id' too long for $node_urn\n";
+	goto bad;
+    }
+
+    #
+    # Find control network.
+    #
+    if (exists($blob->{'interfaces'})) {
+	foreach my $ref (@{ $blob->{'interfaces'} }) {
+	    my $role = $ref->{'role'};
+	    
+	    if ($role eq "ctrl" || $role eq "control") {
+		$IP = $ref->{'IP'};
+
+		#
+		# This turns out to be a problem; if the node is actually
+		# on the local cluster (we treat all protogeni nodes same),
+		# we end up with two nodes in the interfaces table with the
+		# same IP; not allowed since stuff breaks (bootinfo, tmcd).
+		#
+		next;
+	    }
+	    if ($role eq TBDB_IFACEROLE_CONTROL() ||
+		$role eq TBDB_IFACEROLE_EXPERIMENT()) {
+		my $MAC = $ref->{'MAC'};
+		if (!defined($MAC) || !($MAC =~ /^[:\w]*$/)) {
+		    print STDERR "Bad mac in blob for $node_urn:\n";
+		    goto bad;
+		}
+		my $IIP = $ref->{'IP'};
+		if (!defined($IIP) || !($IIP =~ /^[-\w\.]*$/)) {
+		    print STDERR "Bad IP in blob for $node_urn:\n";
+		    goto bad;
+		}
+		my ($card) = ($ref->{'iface'} =~ /^\D*(\d*)$/);
+		if (!defined($card)) {
+		    print STDERR "Bad iface in blob for $node_urn:\n";
+		    goto bad;
+		}
+		
+		my $ifaceargs = {
+		    "card"      => $card,
+		    "role"      => $ref->{'role'},
+		    "MAC"       => $MAC,
+		    "IP"        => $IIP,
+		    "type"      => "fxp",
+		};
+		push(@ifaces, $ifaceargs);
+
+		$ctrliface = $ifaceargs
+		    if ($ref->{'role'} eq TBDB_IFACEROLE_CONTROL());
+	    }
+	}
+    }
+    elsif (exists($blob->{'rspec'})) {
+	my $rspec = GeniXML::Parse($blob->{'rspec'});
+	if (!defined($rspec)) {
+	    goto bad;
+	}
+	foreach my $noderef (GeniXML::FindNodes("n:node",
+						$rspec)->get_nodelist()) {
+	    next
+		if (GeniXML::GetNodeId($noderef) ne $node_urn);
+	    next
+		if (! defined(GeniXML::FindFirst("n:interface", $noderef)));
+
+	    my $count = 0;
+	    
+	    foreach my $ref (GeniXML::FindNodes("n:interface",
+						$noderef)->get_nodelist()) {
+		my $component_id = GeniXML::GetText("component_id", $ref);
+		my $role = GeniXML::GetText("role", $ref);
+		if (!defined($role) ||
+		    $role eq "experimental" || $role eq "expt") {
+		    $role = TBDB_IFACEROLE_EXPERIMENT();
+		}
+		elsif ($role eq "ctrl" || $role eq "control") {
+		    $role = TBDB_IFACEROLE_CONTROL();
+
+		    my $ipv4 = GeniXML::GetText("public_ipv4", $ref);
+		    $IP = $ipv4;
+
+		    #
+		    # This turns out to be a problem; if the node is actually
+		    # on the local cluster (we treat all protogeni nodes same),
+		    # we end up with two nodes in the interfaces table with the
+		    # same IP; not allowed since stuff breaks (bootinfo, tmcd).
+		    #
+		    next;
+		}
+		else {
+		    print STDERR "Unknown role $role for $node_urn!\n";
+		    goto bad;
+		}
+		my $MAC  = "00000000000" . $count;
+
+		my ($auth,$id,$iface) = GeniHRN::ParseInterface($component_id);
+
+		my $ifaceargs = {
+		    "card"      => $count,
+		    "iface"     => $iface,
+		    "role"      => $role,
+		    "MAC"       => $MAC,
+		    "IP"        => '',
+		    "type"      => "fxp",
+		};
+		push(@ifaces, $ifaceargs);
+
+		if ($role eq TBDB_IFACEROLE_CONTROL()) {
+		    my $ipv4 = GeniXML::GetText("public_ipv4", $ref);
+		    $ctrliface = $ifaceargs;
+		    $ifaceargs->{'IP'}   = $ipv4;
+		}
+		$count++;
+		#print Dumper($ifaceargs);
+	    }
+	}
+    }
+    if (! @ifaces) {
+	print STDERR "No interfaces in blob for $node_urn!\n";
+	goto bad;
+    }
+    if (!defined($IP)) {
+	print STDERR "No control interface in blob for $node_urn!\n";
+	goto bad;
+    }		   
+    if (! ($IP =~ /^[-\w\.]*$/)) {
+	print STDERR "Invalid IP '$IP' in blob from CM for $node_urn\n";
+	goto bad;
+    }
+    my $newnode = Node->Create($node_id, undef,
+			       {"role"      => "testnode",
+				"type"      => "pcfedphys",
+				"hostname"  => $hostname,
+				"external_node_id" => $node_urn,
+				"IP"        => $IP});
+    if (!defined($newnode)) {
+	print STDERR "Could not create new node from blob for $node_urn\n";
+	goto bad;
+    }
+    foreach my $ifaceargs (@ifaces) {
+	my $interface = Interface->Create($newnode, $ifaceargs);
+	if (!defined($interface)) {
+	    $newnode->Delete();
+	    print STDERR
+		"Could not create interface from blob for $node_urn\n";
+	    print STDERR Dumper($ifaceargs);
+	    goto bad;
+	}
+    }
+    return $newnode;
+  bad:
+    print STDERR Dumper($blob);
+    return undef;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

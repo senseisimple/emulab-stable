@@ -14,4 +14,6 @@ HAS_CONFIGURE=	yes
 USE_GMAKE=	yes
 INSTALLS_SHLIB=	yes
 
+BUILD_DEPENDS= ${LOCALBASE}/include/expat.h:${PORTSDIR}/textproc/expat2
+
 .include <bsd.port.mk>

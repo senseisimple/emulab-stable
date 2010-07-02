@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -45,71 +45,91 @@ my $NAMED_FORWARDERS   = "@NAMED_FORWARDERS@";
 
 # Testbed libraries.
 use lib "@prefix@/lib";
-use libdb;
+#use libdb;
 
 #
 # This is for the dotted and reverse dotted notation needed for the
-# reverse maps. This is probably all wrong ... 
-# XXX only right for a /24?
+# reverse maps. This is probably all wrong ...
+#
+# XXX I assume that the netmask falls between /16 and /24 ... 
 #
 my ($ia, $ib, $ic, $id) =
     ($TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
 my ($ea, $eb, $ec, $ed) =
     ($EXTERNAL_TESTBED_NETWORK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
 
+my ($ima, $imb, $imc, $imd) =
+    ($TESTBED_NETMASK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+
+my ($ema, $emb, $emc, $emd) =
+    ($EXTERNAL_TESTBED_NETMASK =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/);
+
 $infile = shift @ARGV || exit &usage;
 
-my $internal_revfile = "${ia}.${ib}.${ic}.db.head";
-my $external_revfile = "${ea}.${eb}.${ec}.db.head";
-
 #
-# Create internal version.
+# Generate a set of maps for all indicies in the 3rd octet.
 #
-print "Generating internal reverse lookup file ...\n";
-system("cp -f reverse.head $internal_revfile") == 0 or
-    die("Unable to copy $infile to $internal_revfile\n");
+for (my $i = $ic; $i <= $ic + (255 - $imc); $i++) {
+    my $internal_revfile = "${ia}.${ib}.${i}.db.head";
 
-open(REV, ">>$internal_revfile")
-    or die("Unable to open $internal_revfile for appending!\n");
+    #
+    # Create internal version.
+    #
+    print "Generating internal reverse lookup file ...\n";
+    system("cp -f reverse.head $internal_revfile") == 0 or
+	die("Unable to copy $infile to $internal_revfile\n");
 
-# XXX assumes /24
-my $BOSSNODE_ADDR = $1 if ($BOSSNODE_IP =~ /\d+\.\d+\.\d+\.(\d+)/);
-my $USERNODE_ADDR = $1 if ($USERNODE_IP =~ /\d+\.\d+\.\d+\.(\d+)/);
-my $FSNODE_ADDR = $1 if ($FSNODE_IP =~ /\d+\.\d+\.\d+\.(\d+)/);
+    open(REV, ">>$internal_revfile")
+	or die("Unable to open $internal_revfile for appending!\n");
+    print REV "\n";
 
-print REV "\n";
-print REV "${BOSSNODE_ADDR}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
-print REV "${USERNODE_ADDR}\tIN\tPTR\tops.${OURDOMAIN}.\n";
-if ($FSNODE_IP ne $USERNODE_IP) {
-    print REV "${FSNODE_ADDR}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
+    # Need to put boss/ops into the proper zone file.
+    if ($BOSSNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
+	print REV "${1}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
+    }
+    if ($USERNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
+	print REV "${1}\tIN\tPTR\tops.${OURDOMAIN}.\n";
+    }
+    if ($FSNODE_IP ne $USERNODE_IP &&
+	$FSNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
+	print REV "${1}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
+    }
+    close(REV);
 }
-close(REV);
 
 # No need is just one big IP space.
 exit(0)
     if ($TESTBED_NETWORK eq $EXTERNAL_TESTBED_NETWORK);
 
 #
-# Create external version.
+# Generate a set of maps for all indicies in the 3rd octet.
 #
-print "Generating external reverse lookup file ...\n";
-system("cp -f reverse.head $external_revfile") == 0 or
-    die("Unable to copy $infile to $external_revfile\n");
+for (my $i = $ec; $i <= $ec + (255 - $emc); $i++) {
+    my $external_revfile = "${ea}.${eb}.${i}.db.head";
+    
+    #
+    # Create external version.
+    #
+    print "Generating external reverse lookup file ...\n";
+    system("cp -f reverse.head $external_revfile") == 0 or
+	die("Unable to copy $infile to $external_revfile\n");
 
-open(REV, ">>$external_revfile")
-    or die("Unable to open $external_revfile for appending!\n");
-
-# XXX assumes /24
-$BOSSNODE_ADDR = $1 if ($EXTERNAL_BOSSNODE_IP =~ /\d+\.\d+\.\d+\.(\d+)/);
-$USERNODE_ADDR = $1 if ($EXTERNAL_USERNODE_IP =~ /\d+\.\d+\.\d+\.(\d+)/);
-$FSNODE_ADDR = $1 if ($EXTERNAL_FSNODE_IP =~ /\d+\.\d+\.\d+\.(\d+)/);
-
-print REV "\n";
-print REV "${BOSSNODE_ADDR}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
-print REV "${USERNODE_ADDR}\tIN\tPTR\tops.${OURDOMAIN}.\n";
-if ($EXTERNAL_FSNODE_IP ne $EXTERNAL_USERNODE_IP) {
-    print REV "${FSNODE_ADDR}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
+    open(REV, ">>$external_revfile")
+	or die("Unable to open $external_revfile for appending!\n");
+    print REV "\n";
+    
+    # Need to put boss/ops into the proper zone file.
+    if ($EXTERNAL_BOSSNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
+	print REV "${1}\tIN\tPTR\tboss.${OURDOMAIN}.\n";
+    }
+    if ($EXTERNAL_USERNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
+	print REV "${1}\tIN\tPTR\tops.${OURDOMAIN}.\n";
+    }
+    if ($EXTERNAL_FSNODE_IP ne $EXTERNAL_USERNODE_IP &&
+	$EXTERNAL_FSNODE_IP =~ /\d+\.\d+\.$i\.(\d+)/) {
+	print REV "${1}\tIN\tPTR\tfs.${OURDOMAIN}.\n";
+    }
+    close(REV);
 }
-close(REV);
     
 exit(0);

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -15,34 +15,42 @@ include $(OBJDIR)/Makeconf
 
 all:		boss-all tipserv-all
 boss-all:	capserver
-tipserv-all:	capture capture-tty capquery
-client: capture capquery
+tipserv-all:	capture capture-tty capquery caplogserver caplog caplog.bin
+client: capture capquery caplog caplog.bin
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DBFLAGS	+= -I/usr/local/include
+DBFLAGS	+= -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb
 
 #
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
 # due to the output device/pty being full.
 #
-CFLAGS += -g -O2 -DLOG_DROPS -I${OBJDIR} -DLOG_TESTBED=$(LOG_TESTBED)
+CFLAGS += -Wall -g -O2 -DLOG_DROPS -I${OBJDIR} -DLOG_TESTBED=$(LOG_TESTBED)
+LDFLAGS  += $(LDSTATIC)
 
 ifeq ($(SYSTEM),Linux)
-ifeq ($(host_cpu),arm)
-else
-CFLAGS += -I/usr/kerberos/include
-LDFLAGS += -L/usr/kerberos/lib -lkrb5 -lk5crypto -lcom_err
+ifneq ($(wildcard /usr/kerberos/bin/krb5-config),)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
 endif
-else
-LDFLAGS += -static
+endif
+LIBS	 += -ldl -lz
 endif
 
 capture: capture.c capdecls.h
-	$(CC) $(CFLAGS) -DUSESOCKETS -DWITHSSL -DPREFIX=\"$(TBROOT)\" -o capture $< -lssl -lcrypto $(LDFLAGS)
+	$(CC) $(CFLAGS) -DUSESOCKETS -DWITHSSL -DPREFIX=\"$(TBROOT)\" -o capture $< $(LDFLAGS) -lssl -lcrypto $(LIBS)
 
 capquery: capquery.c capdecls.h
-	$(CC) $(CFLAGS) -DPREFIX=\"$(TBROOT)\" -o $@ $<
+	$(CC) $(CFLAGS) -DPREFIX=\"$(TBROOT)\" -o $@ $< $(LDFLAGS) $(LIBS)
+
+caplog.bin: caplog.c capdecls.h
+	$(CC) $(CFLAGS) -DPREFIX=\"$(TBROOT)\" -o $@ $< $(LDFLAGS) $(LIBS)
+
+caplogserver: caplogserver.c capdecls.h
+	$(CC) $(CFLAGS) -DPREFIX=\"$(TBROOT)\" -o $@ $< $(LDFLAGS) $(LIBS)
 
 capture-nossl: capture.c capdecls.h
 	$(CC) $(CFLAGS) -DUSESOCKETS -DPREFIX=\"$(TBROOT)\" -o capture-nossl $<
@@ -52,6 +60,7 @@ capture-tty: capture.c capdecls.h
 
 capserver:	capserver.c capdecls.h
 	$(CC) $(CFLAGS) $(DBFLAGS) -o capserver $< \
+		${OBJDIR}/lib/libtb/libtb.a \
 		-L/usr/local/lib/mysql -lmysqlclient
 
 #
@@ -66,7 +75,10 @@ client-install: client
 
 real-install:	all $(INSTALL_SBINDIR)/capserver $(INSTALL_SBINDIR)/capture
 
-tipserv-install:	tipserv-all $(INSTALL_SBINDIR)/capture
+tipserv-install:	tipserv-all $(INSTALL_SBINDIR)/capture \
+			$(INSTALL_SBINDIR)/caplogserver
 
 clean:
-	rm -f *.o capture capture-tty capserver core errs Errs
+	rm -f *.o capture capture-tty capserver capquery core errs Errs
+	rm -f caplog caplog.bin caplogserver
+

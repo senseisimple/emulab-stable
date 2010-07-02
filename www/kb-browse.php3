@@ -1,13 +1,19 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 
-# Page arguments.
-$printable = $_GET['printable'];
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+$optargs   = OptionalPageArguments("printable", PAGEARG_BOOLEAN);
+
+# Some Knowledge Base entries are visible only to admins.
+$admin_access = $isadmin || ISFOREIGN_ADMIN();
+
 if (!isset($printable))
     $printable = 0;
 
@@ -34,10 +40,12 @@ else {
 }
 
 #
-# Get all entries.
+# Get all entries.  Only admins see section='Testbed Operations'.
 # 
 $search_result =
     DBQueryFatal("select * from knowledge_base_entries ".
+		 ($admin_access ? "" : 
+		  "where section != 'Testbed Operations' ").
 		 "order by section,date_created");
 
 if (! mysql_num_rows($search_result)) {
@@ -57,6 +65,7 @@ while ($row = mysql_fetch_array($search_result)) {
     $section  = $row['section'];
     $title    = $row['title'];
     $idx      = $row['idx'];
+    $xref_tag = $row['xref_tag'];
 
     if ($lastsection != $section) {
 	if ($lastsection != "") {
@@ -68,7 +77,12 @@ while ($row = mysql_fetch_array($search_result)) {
 	echo "<ul>\n";
     }
     echo "<li>";
-    echo "<a href=#${idx}>$title</a>\n";
+    if (isset($xref_tag) && $xref_tag != "") {
+	echo "<a href=#${xref_tag}>$title</a>\n";
+    }
+    else {
+	echo "<a href=#${idx}>$title</a>\n";
+    }
 }
 mysql_data_seek($search_result, 0);
 
@@ -97,9 +111,12 @@ while ($row = mysql_fetch_array($search_result)) {
     echo "<li>";
     if (isset($xref_tag) && $xref_tag != "") {
 	echo "<a NAME='$xref_tag'></a>";
+	echo "<a href=kb-show.php3?xref_tag=$xref_tag>$title</a>\n";
     }
-    echo "<a NAME='$idx'></a>";
-    echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    else {
+	echo "<a NAME='$idx'></a>";
+	echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    }
 
     echo "<blockquote>\n";
     echo $body;

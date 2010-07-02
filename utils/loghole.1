@@ -1,6 +1,6 @@
 .\"
 .\" EMULAB-COPYRIGHT
-.\" Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+.\" Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
 .\" All rights reserved.
 .\"
 .TH LOGHOLE 1 "June 16, 2005" "Emulab" "Emulab Commands Manual"
@@ -262,6 +262,9 @@ Send a SNAPSHOT event to the link trace agents before syncing the logfiles.
 This is mostly a convenience so you do not have to remember to send the event
 before gathering the files.
 .TP
+\fB-R\fR, \fB--root
+Use sudo on the nodes to read files as root.
+.TP
 .I node1 ...
 Specify a subset of virtual or physical nodes that should be synchronized,
 otherwise all of the nodes will be synchronized.
@@ -393,6 +396,9 @@ Only remove log files on the nodes.
 .TP
 \fB-e\fR, \fB--experiment
 Only remove log directories in the experiment's log directory.
+.TP
+\fB-R\fR, \fB--root
+Use sudo to run the clean as root on the nodes
 .SH GC
 The
 .B gc

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,13 +17,15 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR "Usage: grantnodetype [-h] -p <pid> <type>\n";
+    print STDERR "Usage: grantnodetype [-h] [-r] -p <pid> <type>\n";
     print STDERR "	-h   This message\n";
+    print STDERR "	-r   Revoke access instead of grant\n";
     exit(-1);
 }
-my $optlist  = "hp:dn";
+my $optlist  = "hp:dnr";
 my $impotent = 0;
 my $debug    = 0;
+my $revoke   = 0;
 my %newtypes = ();
 my $pid;
 
@@ -47,6 +49,8 @@ my $update_perms = "$TB/sbin/update_permissions";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Project;
+use Group;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -74,6 +78,9 @@ if (defined($options{h})) {
 }
 if (defined($options{n})) {
     $impotent = 1;
+}
+if (defined($options{r})) {
+    $revoke = 1;
 }
 if (defined($options{d})) {
     $debug = 1;
@@ -108,6 +115,14 @@ if (!TBAdmin($UID)) {
     die("*** $0:\n".
 	"    You are not allowed to grant permission to use node types!\n");
 }
+
+my $project = Project->Lookup($pid);
+if (!defined($project)) {
+    die("*** $0:\n".
+	"    Cannot map project $pid to its object\n");
+}
+# Need this below.
+my $pid_idx = $project->pid_idx();
 
 #
 # Check to make sure a valid type in the node_types table.
@@ -153,7 +168,9 @@ while (my ($nodetype,$nodeclass) = $query_result->fetchrow_array()) {
 # Run the queries.
 # 
 foreach my $newtype (keys(%newtypes)) {
-    print STDERR "Granting permission to use type $newtype\n"
+    print STDERR
+	($revoke ? "Revoking" : "Granting") . " " .
+	"permission to use type $newtype\n"
 	if ($debug);
 
     #
@@ -176,10 +193,13 @@ foreach my $newtype (keys(%newtypes)) {
     #
     # Add generic rules that say the project is allowed to use "infinite"
     # number of nodes of each type. 
-    # 
+    #
+    my $count = ($revoke ? 0 : 999999);
+    
     DBQueryFatal("replace into group_policies ".
-		 "(pid, gid, policy, auxdata, count) ".
-		 "values ('$pid', '$pid', 'type', '$newtype', 999999)")
+		 "(pid_idx, gid_idx, pid, gid, policy, auxdata, count) ".
+		 "values ($pid_idx, $pid_idx, '$pid', '$pid', ".
+		 "        'type', '$newtype', $count)")
 	if (!$impotent);
 }
 

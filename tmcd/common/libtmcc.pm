@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,8 +9,8 @@
 # TMCC library. Provides an interface to the TMCD via a config file
 # or directly to it via TCP
 #
-# TODO: Proxy path in a jail. 
-# 
+# TODO: Proxy path in a jail.
+#
 package libtmcc;
 use Exporter;
 @ISA    = "Exporter";
@@ -31,11 +31,15 @@ use Exporter;
 	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO TMCCCMD_LOCALIZATION
 	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY TMCCCMD_USERENV
 	     TMCCCMD_TIPTUNNELS TMCCCMD_TRACEINFO TMCCCMD_ELVINDPORT
-             TMCCCMD_PLABEVENTKEYS
+             TMCCCMD_PLABEVENTKEYS TMCCCMD_PORTREGISTER
+	     TMCCCMD_MOTELOG TMCCCMD_BOOTWHAT TMCCCMD_ROOTPSWD
+	     TMCCCMD_LTMAP TMCCCMD_LTPMAP TMCCCMD_TOPOMAP TMCCCMD_LOADINFO
+	     TMCCCMD_TPMBLOB TMCCCMD_TPMPUB TMCCCMD_DHCPDCONF
 	     );
 
 # Must come after package declaration!
 use English;
+use Data::Dumper;
 
 #
 # Turn off line buffering on output
@@ -62,13 +66,14 @@ my $beproxy     = 0;
 
 #
 # Configuration. The importer of this library should set these values
-# accordingly. 
+# accordingly.
 #
 %config =
     ( "debug"		=> 0,
       "useudp"		=> 0,
       "beproxy"		=> 0,	# A unix domain path when true.
       "dounix"		=> 0,	# A unix domain path when true.
+      "beinetproxy"	=> 0,   # A string of the form "ipaddr:port"
       "server"		=> undef,
       "portnum"		=> undef,
       "version"		=> undef,
@@ -81,6 +86,9 @@ my $beproxy     = 0;
       "clrcache"        => 0,
       "noproxy"         => 0,
       "nossl"           => 0,
+      "cachedir"        => undef,
+      "urn"             => undef,
+      "usetpm"          => 0,
     );
 
 # The cache directory is named by the vnodeid. This avoids some confusion.
@@ -173,6 +181,17 @@ my %commandset =
       "traceinfo"       => {TAG => "traceinfo"},
       "elvindport"      => {TAG => "elvindport"},
       "plabeventkeys"   => {TAG => "plabeventkeys"},
+      "motelog"         => {TAG => "motelog"},
+      "portregister"    => {TAG => "portregister"},
+      "bootwhat"        => {TAG => "bootwhat"},
+      "rootpswd"        => {TAG => "rootpswd"},
+      "topomap"	        => {TAG => "topomap"},
+      "ltmap"	        => {TAG => "ltmap"},
+      "ltpmap"	        => {TAG => "ltpmap"},
+      "tpmblob"      	=> {TAG => "tpmblob"},
+      "tpmpubkey"       => {TAG => "tpmpubkey"},
+      "loadinfo"        => {TAG => "loadinfo"},
+      "dhcpdconf"       => {TAG => "dhcpdconf"},
     );
 
 #
@@ -229,10 +248,21 @@ sub TMCCCMD_TIPTUNNELS  (){ $commandset{"tiptunnels"}->{TAG}; }
 sub TMCCCMD_TRACEINFO   (){ $commandset{"traceinfo"}->{TAG}; }
 sub TMCCCMD_ELVINDPORT  (){ $commandset{"elvindport"}->{TAG}; }
 sub TMCCCMD_PLABEVENTKEYS(){ $commandset{"plabeventkeys"}->{TAG}; }
+sub TMCCCMD_MOTELOG()   { $commandset{"motelog"}->{TAG}; }
+sub TMCCCMD_PORTREGISTER(){ $commandset{"portregister"}->{TAG}; }
+sub TMCCCMD_BOOTWHAT()  { $commandset{"bootwhat"}->{TAG}; }
+sub TMCCCMD_ROOTPSWD()  { $commandset{"rootpswd"}->{TAG}; }
+sub TMCCCMD_TOPOMAP(){ $commandset{"topomap"}->{TAG}; }
+sub TMCCCMD_LTMAP()  { $commandset{"ltmap"}->{TAG}; }
+sub TMCCCMD_LTPMAP()  { $commandset{"ltpmap"}->{TAG}; }
+sub TMCCCMD_TPMBLOB()  { $commandset{"tpmblob"}->{TAG}; }
+sub TMCCCMD_TPMPUB()  { $commandset{"tpmpubkey"}->{TAG}; }
+sub TMCCCMD_LOADINFO()  { $commandset{"loadinfo"}->{TAG}; }
+sub TMCCCMD_DHCPDCONF()  { $commandset{"dhcpdconf"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
-# 
+#
 sub configtmcc($$)
 {
     my ($opt, $val) = @_;
@@ -241,6 +271,12 @@ sub configtmcc($$)
 	print STDERR "*** $0:\n".
 	             "    Invalid libtmcc option: $opt/$val\n";
 	return -1;
+    }
+    if ($opt eq "cachedir") {
+	$CACHEDIR = $val;
+    }
+    elsif ($opt eq "server") {
+	$ENV{'BOSSNAME'} = $val;
     }
     $config{$opt} = $val;
 }
@@ -265,12 +301,19 @@ sub optionstring($%)
     if ($opthash{"nossl"}) {
 	$options .= " -i";
     }
+    if ($opthash{"usetpm"}) {
+	$options .= " -T";
+    }
     if ($opthash{"beproxy"}) {
 	$options .= " -x " . $opthash{"beproxy"};
 	$beproxy  = 1;
     }
     if ($opthash{"dounix"}) {
 	$options .= " -l " . $opthash{"dounix"};
+    }
+    if ($opthash{"beinetproxy"}) {
+	$options .= " -X " . $opthash{"beinetproxy"};
+	$beproxy  = 1;
     }
     if (defined($opthash{"server"})) {
 	$options .= " -s " . $opthash{"server"};
@@ -309,7 +352,7 @@ sub optionstring($%)
 # If a "results" argument (pass by reference) has been provided, then
 # take the results of tmcc, and store a list of strings into it.
 # If an options hash is passed, use that to extend the global config options.
-# 
+#
 sub runtmcc ($;$$%)
 {
     my ($cmd, $args, $results, %optconfig) = @_;
@@ -320,6 +363,11 @@ sub runtmcc ($;$$%)
     $options = optionstring($options, %optconfig)
 	if (%optconfig);
 
+    # Must be last option, before command
+    if (defined($config{"urn"})) {
+	$options .= " URN=" . $config{"urn"};
+    }
+
     if (!defined($args)) {
 	$args = "";
     }
@@ -329,7 +377,7 @@ sub runtmcc ($;$$%)
     }
 
     #
-    # Special case. If the proxy option is given, exec and forget.
+    # Special case. If a proxy option is given, exec and forget.
     #
     if ($beproxy) {
 	exec($string);
@@ -388,7 +436,7 @@ sub tmcc ($;$$%)
     }
 
     #
-    # See if this is a cmd we can get from the local config stash. 
+    # See if this is a cmd we can get from the local config stash.
     #
     if (!$nocache && (!defined($args) || $args eq "")) {
 	foreach my $key (keys(%commandset)) {
@@ -407,7 +455,7 @@ sub tmcc ($;$$%)
 		    #
 		    print STDERR "Fetching locally from $filename\n"
 			if ($debug);
-		
+
 		    while (<TD>) {
 			next
 			    if ($_ =~ /^\*\*\* $tag$/);
@@ -429,8 +477,8 @@ sub tmcc ($;$$%)
     #
     if (!$config{"dounix"} && !$noproxy && -e $PROXYDEF) {
 	#
-	# Suck out the path and untaint. 
-	# 
+	# Suck out the path and untaint.
+	#
 	open(PP, "$BOOTDIR/proxypath");
 	my $ppath = <PP>;
 	close(PP);
@@ -452,13 +500,19 @@ sub tmcc ($;$$%)
 sub tmccbossname()
 {
     my @tmccresults;
+    my $bossname;
 
-    if (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
+    if (exists($ENV{'BOSSNAME'})) {
+	$bossname = $ENV{'BOSSNAME'};
+    }
+    elsif (runtmcc(TMCCCMD_BOSSINFO, undef, \@tmccresults) < 0 ||
 	!scalar(@tmccresults)) {
 	warn("*** WARNING: Could not get bossinfo from tmcc!\n");
 	return undef;
     }
-    my ($bossname) = split(" ", $tmccresults[0]);
+    else {
+	($bossname) = split(" ", $tmccresults[0]);
+    }
 
     #
     # Taint check. Nice to do for the caller. Also strips any newline.
@@ -513,7 +567,7 @@ sub tmccbossinfo()
 sub tmccclrconfig()
 {
     my $dir = CacheDir();
-	
+
     if (-d $dir) {
 	system("rm -rf $dir");
     }
@@ -528,13 +582,15 @@ sub tmccgetconfig()
     my @tmccresults;
     my $cdir = CacheDir();
 
+    my $noproxy = $config{"noproxy"};
+
     #
-    # Check for proxypath file, but do not override config option. 
+    # Check for proxypath file, but do not override config option.
     #
-    if (!$config{"dounix"} && -e $PROXYDEF) {
+    if (!$config{"dounix"} && !$noproxy && -e $PROXYDEF) {
 	#
-	# Suck out the path and untaint. 
-	# 
+	# Suck out the path and untaint.
+	#
 	open(PP, "$BOOTDIR/proxypath");
 	my $ppath = <PP>;
 	close(PP);
@@ -552,7 +608,7 @@ sub tmccgetconfig()
 	warn("*** WARNING: Could not mkdir $cdir: $!\n");
 	return -1;
     }
-   
+
     # XXX  Can't "use libsetup" in libtmcc to reference the WINDOWS() function.
     my $arg = (-e "$ETCDIR/iscygwin") ? "windows" : undef;
     if (runtmcc("fullconfig", $arg, \@tmccresults) < 0 ||
@@ -565,7 +621,7 @@ sub tmccgetconfig()
     while ($str = shift(@tmccresults)) {
 	if ($str =~ /^\*\*\* ([-\w]*)$/) {
 	    my $param = $1;
-	    
+
 	    if (open(TD, "> $cdir/$param")) {
 		#
 		# Set the permission on the file first if necessary
@@ -583,7 +639,7 @@ sub tmccgetconfig()
 		}
 		while (@tmccresults) {
 		    $str = shift(@tmccresults);
-		    
+
 		    last
 			if ($str =~ /^\*\*\* $param$/);
 		    print TD $str;

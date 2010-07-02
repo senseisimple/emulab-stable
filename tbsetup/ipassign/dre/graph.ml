@@ -1,4 +1,10 @@
 (*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
+(*
  * graph.ml - simple graph module
  * Note: tests are commented out, since this module gets included by other
  * files
@@ -87,6 +93,41 @@ add_edge g n1 n2 0;; *)
 (* Should be: Something that can't be printed, because of how it is
  * recursively defined *)
 
+(*
+ * Combine nodes 1 and 2 - node1 inherits all of node2's edges, and
+ * node2 is destroyed
+ *)
+let combine_nodes (graph : ('a, 'b) t) (node1 : ('a, 'b) node) (node2 : ('a, 'b)
+        node) : unit =
+
+    (*
+     * Iterate over all edges for node2
+     *)
+    let rec combine_helper (l : ('a, 'b) edge list) : unit =
+        match l with 
+          edge :: xs -> (
+              let otherend =
+                  (if edge.src == node2 then edge.dst else edge.dst ) in
+              (* Remove this edge from the other end's edge list, and add
+               * the new edge in *)
+              otherend.node_edges <-
+                  (List.filter (fun x -> x != edge) otherend.node_edges);
+              (* Add the new edge to the graph *)
+              (* XXX Make sure it's not already in there! *)
+              let _ = add_edge graph node1 otherend edge.contents in
+              combine_helper xs)
+        | [] -> ()
+    in
+    combine_helper node2.node_edges;
+    (* Clear out all edges for node2 *)
+    node2.node_edges <- [];
+
+    (*
+     * XXX Actually delete node2 and its edges from the nodes and edges lists
+     *)
+    ()
+;;
+
 (* Some simple helper functions - even though they're simple, they hide
  * the list and edge representation so that we could change them later
  * if we want *)
@@ -147,7 +188,7 @@ let read_graph_file (filename : string) : ('a,'b) t =
                 let dst =
                     if not (is_member g second) then add_node g second
                     else find_node g second in
-                let edge = add_edge g src dst 1 in
+                let _ = add_edge g src dst 1 in
                 g)
     in
     make_graph_from_edges edges

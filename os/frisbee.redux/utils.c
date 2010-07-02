@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -63,7 +63,7 @@ sleeptime(unsigned int usecs, char *str, int doround)
 	if (clockres_us == 0) {
 #ifndef linux
 		struct clockinfo ci;
-		int cisize = sizeof(ci);
+		size_t cisize = sizeof(ci);
 
 		ci.hz = 0;
 		if (sysctlbyname("kern.clockrate", &ci, &cisize, 0, 0) == 0 &&
@@ -179,11 +179,17 @@ BlockMapAdd(BlockMap_t *blockmap, int block, int count)
 
 	i = block / CHAR_BIT;
 	off = block % CHAR_BIT;
-	while (count--) {
-		blockmap->map[i] |= (1 << off);
-		if (++off == CHAR_BIT) {
-			i++;
-			off = 0;
+	while (count > 0) {
+		if (off == 0 && count >= CHAR_BIT) {
+			blockmap->map[i++] = ~0;
+			count -= CHAR_BIT;
+		} else {
+			blockmap->map[i] |= (1 << off);
+			if (++off == CHAR_BIT) {
+				i++;
+				off = 0;
+			}
+			count--;
 		}
 	}
 }
@@ -300,13 +306,17 @@ BlockMapInvert(BlockMap_t *oldmap, BlockMap_t *newmap)
 		newmap->map[i] = ~(oldmap->map[i]);
 }
 
+/*
+ * Merge any blocks from request frommap into tomap.
+ */
 int
 BlockMapMerge(BlockMap_t *frommap, BlockMap_t *tomap)
 {
 	int i, bit, mask, did = 0;
 
 	for (i = 0; i < sizeof(frommap->map); i++) {
-		if (tomap->map[i] == ~0 || frommap->map[i] == tomap->map[i])
+		if (frommap->map[i] == 0 || tomap->map[i] == ~0 ||
+		    frommap->map[i] == tomap->map[i])
 			continue;
 		for (bit = 0; bit < CHAR_BIT; bit++) {
 			mask = 1 << bit;
@@ -321,31 +331,46 @@ BlockMapMerge(BlockMap_t *frommap, BlockMap_t *tomap)
 	return did;
 }
 
-static void
-bmfirstfunc(int chunk, int block, int count, void *arg)
-{
-	int *firstp = arg;
-
-	if (*firstp == -1)
-		*firstp = block;
-}
-
+/*
+ * Return the block number of the first block allocated in the map.
+ * Returns CHUNKSIZE if no block is set.
+ */
 int
 BlockMapFirst(BlockMap_t *blockmap)
 {
-	int first = -1;
+	int block, i;
 
-	(void) BlockMapApply(blockmap, 0, bmfirstfunc, &first);
-	return first;
+	assert(sizeof(blockmap->map) * CHAR_BIT == CHUNKSIZE);
+
+	/*
+	 * Skip empty space at the front quickly
+	 */
+	for (i = 0; i < sizeof(blockmap->map); i++)
+		if (blockmap->map[i] != 0)
+			break;
+
+	block = i * CHAR_BIT;
+	if (i < sizeof(blockmap->map)) {
+		int bit, mask;
+		for (bit = 0; bit < CHAR_BIT; bit++) {
+			mask = 1 << bit;
+			if ((blockmap->map[i] & mask) != 0)
+				return (block + bit);
+		}
+	}
+	return block;
 }
 
 /*
  * Repeatedly apply the given function to each contiguous allocated range.
+ * If the function returns non-zero, we stop processing at that point and
+ * return.  This allows a "short-circuit" ability.
+ *
  * Returns number of allocated blocks processed.
  */
 int
 BlockMapApply(BlockMap_t *blockmap, int chunk,
-	      void (*func)(int, int, int, void *), void *arg)
+	      int (*func)(int, int, int, void *), void *arg)
 {
 	int block, count, mask;
 	int i, bit, val;
@@ -363,8 +388,9 @@ BlockMapApply(BlockMap_t *blockmap, int chunk,
 				count++;
 			} else {
 				if (count > 0) {
-					if (func)
-						func(chunk, block, count, arg);
+					if (func &&
+					    func(chunk, block, count, arg))
+						return(did+count);
 					did += count;
 					count = 0;
 				}
@@ -374,8 +400,8 @@ BlockMapApply(BlockMap_t *blockmap, int chunk,
 		}
 	}
 	if (count > 0) {
-		if (func)
-			func(chunk, block, count, arg);
+		if (func && func(chunk, block, count, arg))
+			return (did+count);
 		did += count;
 	}
 
@@ -405,12 +431,12 @@ ClientStatsDump(unsigned int id, ClientStats_t *stats)
 		seconds = stats->u.v1.runsec;
 		if (seconds == 0)
 			seconds = 1;
-		log("  real data written:      %qu (%ld Bps)",
+		log("  real data written:      %qu (%qu Bps)",
 		    stats->u.v1.rbyteswritten,
-		    (long)(stats->u.v1.rbyteswritten/seconds));
-		log("  effective data written: %qu (%ld Bps)",
+		    stats->u.v1.rbyteswritten/seconds);
+		log("  effective data written: %qu (%qu Bps)",
 		    stats->u.v1.ebyteswritten,
-		    (long)(stats->u.v1.ebyteswritten/seconds));
+		    stats->u.v1.ebyteswritten/seconds);
 		log("Client %u Params:", id);
 		log("  chunk/block size:     %d/%d",
 		    CHUNKSIZE, BLOCKSIZE);

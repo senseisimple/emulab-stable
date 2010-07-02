@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Removes common XML entities from stdin and replaces them with their
+# characters in stdout. Useful for making xml quoted inside of xml
+# more legible.
+
+sed 's/&quot;/"/g' | sed 's/&lt;/</g' | sed 's/&gt;/>/g'

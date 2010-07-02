@@ -1,22 +1,29 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Robot Map");
-
-#
 # Only logged in people at the moment; might open up at some point.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page args
+#
+$optargs = OptionalPageArguments("experiment",    PAGEARG_EXPERIMENT,
+				 "building",      PAGEARG_STRING,
+				 "floor",         PAGEARG_STRING,
+				 "prefix",        PAGEARG_STRING,
+				 "map_x",         PAGEARG_INTEGER,
+				 "map_y",         PAGEARG_INTEGER,
+				 "show_cameras",  PAGEARG_STRING,
+				 "show_exclusion",PAGEARG_STRING);
 
 # Careful with this local variable
 unset($prefix);
@@ -44,24 +51,13 @@ else {
 # experiment in all buildings/floors. Without pid,eid show all wireless
 # nodes in the specified building/floor.
 #
-if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
-    if (!TBvalid_pid($pid)) {
-	PAGEARGERROR("Invalid project ID.");
+if (isset($experiment)) {
+    $pid = $experiment->pid();
+    $eid = $experiment->eid();
+    if (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view robotmaps ".
+		  "for experiment $pid/$eid!", 1);
     }
-    if (!TBvalid_eid($eid)) {
-	PAGEARGERROR("Invalid experiment ID.");
-    }
-
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view experiment $pid/$eid!", 1);
-    }
-}
-else {
-    unset($pid);
-    unset($eid);
 }
 
 #
@@ -87,28 +83,9 @@ else {
 }
 
 #
-# max_x and max_y are the bounds of the image from the state file.
+# Standard Testbed Header
 #
-if (0) {
-if (isset($max_x) && $max_x != "") {
-    # Sanitize for the shell.
-    if (!preg_match("/^[0-9]+$/", $max_x)) {
-	PAGEARGERROR("Invalid max_x argument.");
-    }
-}
-else {
-    PAGEARGERROR("Must supply max_x for image");
-}
-if (isset($max_y) && $max_y != "") {
-    # Sanitize for the shell.
-    if (!preg_match("/^[0-9]+$/", $max_y)) {
-	PAGEARGERROR("Invalid max_y argument.");
-    }
-}
-else {
-    PAGEARGERROR("Must supply max_y for image");
-}
-} 
+PAGEHEADER("Robot Map");
 
 #
 # Assume a single image for the robot map. When user clicks, pixel
@@ -140,9 +117,10 @@ while ($row = mysql_fetch_array($query_result)) {
     $loc_z     = $row["loc_z"];
     $orient    = $row["orientation"];
 
-    if ((isset($pid) && $pid == $row["pid"]) &&
-	(isset($eid) && $eid == $row["eid"]) &&
-	isset($row["vname"])) {
+    if ((isset($experiment) &&
+	 $pid == $row["pid"] &&
+	 $eid == $row["eid"]) &&
+	 isset($row["vname"])) {
 	$vnames[$node_id] = $row["vname"];
     }
 
@@ -164,7 +142,7 @@ while ($row = mysql_fetch_array($query_result)) {
 }
 
 $event_time_start = array();
-if (isset($pid) && isset($eid)) {
+if (isset($experiment)) {
     $query_result =
 	DBQueryFatal("SELECT parent,arguments FROM eventlist WHERE " .
 		     "pid='$pid' and eid='$eid' and objecttype=3 and ".
@@ -219,13 +197,14 @@ $perl_args = ("-o $prefix -t -z -n " .
 		strcmp($show_exclusion, "Yep") == 0) ? "-x " : "") .
 	      (isset($map_x) ? "-c $map_x,$map_y " : "") .
 	      (isset($floor) ? "-f $floor " : "") .
-	      (isset($pid) ? "-e $pid,$eid " : "") .
+	      (isset($experiment) ? "-e $pid,$eid " : "") .
 	      (isset($building) ? "$building" : ""));  # Building arg must be last!
 
 if (0) {    ### Put the Perl script args into the page when debugging.
     echo "\$btfv/floormap -d $perl_args\n";
 }
-$retval = SUEXEC($uid, "nobody", "webfloormap $perl_args", SUEXEC_ACTION_IGNORE);
+$retval = SUEXEC($uid, "nobody", "webfloormap $perl_args",
+		 SUEXEC_ACTION_IGNORE);
 
 if ($retval) {
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
@@ -241,7 +220,7 @@ if (! readfile("${prefix}.map")) {
     TBERROR("Could not read ${prefix}.map", 1);
 }
 
-if (isset($pid)) {
+if (isset($experiment)) {
     echo "<font size=+2>Robots in experiment <b>".
          "<a href='showproject.php3?pid=$pid'>$pid</a>/".
          "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b> </font>\n";
@@ -257,7 +236,7 @@ echo "<form method=post action='robotmap.php3" .
 
 echo "Click on the image to get its X,Y coordinates<br>\n";
 # The image may be clicked to get node info or set a new center-point.
-if ($isadmin || TBWebCamAllowed($uid)) {
+if ($isadmin || $this_user->WebCamAllowed()) {
     echo "  <a href=webcam.php3>Webcam View</a> (Updated in real time)";
     echo "  <br>\n";
 }
@@ -268,8 +247,6 @@ echo "  <a href=robotrack/robotrack.php3?building=${building}&floor=${floor}&wit
 echo "  <br>\n";
 
 if (isset($map_x) && isset($map_y)) {
-#    $map_y = $max_y - $map_y;
-	
     if (isset($pixels_per_meter) && $pixels_per_meter) {
 	$meters_x = sprintf("%.3f", $map_x / $pixels_per_meter);
 	$meters_y = sprintf("%.3f", $map_y / $pixels_per_meter);
@@ -282,7 +259,7 @@ if (isset($map_x) && isset($map_y)) {
     echo "<br>\n";
 }
 
-if (isset($pid) && isset($eid)) {
+if (isset($experiment)) {
     $current_time = time();
     foreach ($event_time_start as $key => $value) {
 	$event_time_elapsed = $current_time - $value;
@@ -385,7 +362,7 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
                      name=show_cameras
                      value=Yep
                      $cam_checked>Show <a
- href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Tracking
+ href=\"$WIKIDOCURL/wireless#VISION\">Tracking
  Camera</a> Bounds</input></td>
       </tr>
       <tr>
@@ -393,7 +370,7 @@ echo "<td align=\"left\" valign=\"top\" class=\"stealth\">
                      name=show_exclusion
                      value=Yep
                      $excl_checked>Show <a
- href=\"doc/docwrapper.php3?docname=mobilewireless.html#VISION\">Exclusion
+ href=\"$WIKIDOCURL/wireless#VISION\">Exclusion
  Zones</a></input></td>
       </tr>
       <tr><td colspan=2 align=center><input type=submit value=Update></td></tr>

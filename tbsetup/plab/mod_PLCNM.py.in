@@ -14,8 +14,11 @@ import fcntl
 import time
 import calendar
 import cPickle
+import os
 
 from libtestbed import *
+from aspects import wrap_around
+from timer_advisories import timeAdvice
 
 #
 # output control vars
@@ -26,9 +29,12 @@ debug = 0
 #
 # PLC constants
 #
-DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
-DEF_PLC_USER = "lepreau@cs.utah.edu"
-DEF_PLC_PASS = "phurds"            # XXX: hardcoded, cleartext passwds bad.
+#DEF_PLC_URI = "https://www.planet-lab.org/PLCAPI/"
+DEF_PLC_URI = "https://delta.cs.princeton.edu/PLCAPI/"
+# these are now sucked in from a file
+DEF_PLC_USER = ""
+DEF_PLC_PASS = ""
+DEF_PLC_PASS_FILE = "@prefix@/etc/plab/plc.pw"
 
 DEF_NM_PORT = "814"
 
@@ -61,7 +67,6 @@ MIN_REV    = 10
 # subsequent request.
 #
 class __PLCagent:
-    
     class __PLCMutexMethod:
         def __init__(self, funcname, obj):
             self.__lockfile = open(PLC_LOCKFILE, "w")
@@ -95,10 +100,12 @@ class __PLCagent:
 
 
 class NMagent:
-    def __init__(self, IP, nmport = DEF_NM_PORT):
+    def __init__(self, IP, nodeid, nmport = DEF_NM_PORT):
         self.__server = xmlrpclib.ServerProxy("http://" + IP + ":" +
                                               nmport + "/")
         self.__vers = [0,0,0]
+        self.IP = IP
+        self.nodeid = nodeid
         pass
 
     def create_sliver(self, ticket):
@@ -119,9 +126,27 @@ class NMagent:
             pass
         return self.__vers
 
-    pass
+    def ping(self):
+        try:
+            res = self.__server.version()
+            if type(res) == list and len(res) == 2 and res[0] == 0:
+                return True
+            pass
+        except:
+            if debug:
+                traceback.print_exc()
+                pass
+            pass
+        return False
     
-        
+    def getAgentClass(self):
+        return self.__class__
+
+    pass
+#wrap_around(NMagent.create_sliver, timeAdvice)
+#wrap_around(NMagent.delete_sliver, timeAdvice)
+
+
 #
 # The real PLC agent.  Wraps up standard arguments to the
 # PLC XMLRPC interface.
@@ -132,8 +157,16 @@ class NMagent:
 class PLCagent:
     def __init__(self, slicename,
                  uri = DEF_PLC_URI,
-                 username = DEF_PLC_USER,
-                 password = DEF_PLC_PASS):
+                 username = "",
+                 password = ""):
+
+        if username == "":
+            username = mod_PLCNM.username
+            pass
+        if password == "":
+            password = mod_PLCNM.password
+            pass
+        
         if not slicename:
             raise RuntimeError, "Must provide a slicename!"
         self.__slice = {}
@@ -216,11 +249,26 @@ class PLCagent:
 
 
 class mod_PLCNM:
+    username = ""
+    password = ""
+    
     def __init__(self):
         self.modname = "mod_PLCNM"
         self.__PLCagent = None
         self.__sliceexpdict = {}
         self.__sliceexptime = 0
+
+        # try to grab the master account info from the file:
+        try:
+            file = open(DEF_PLC_PASS_FILE,'r')
+            lines = file.readlines()
+            mod_PLCNM.username = lines[0].strip('\n')
+            mod_PLCNM.password = lines[1].strip('\n')
+            pass
+        except:
+            print "Failed to retrive master passwd from %s" % DEF_PLC_PASS_FILE
+            raise
+        
         return
 
     def createSlice(self, slice):
@@ -392,9 +440,7 @@ class mod_PLCNM:
     def createNode(self, node):
 
         ticketdata = cPickle.loads(node.slice.slicemeta)
-        agent  = NMagent(node.IP)
-
-        TIMESTAMP("createnode started on %s" % (node.nodeid))
+        agent  = NMagent(node.IP, node.nodeid)
                   
         #res = tryXmlrpcCmd(agent.SliceNodesAdd, node.IP,
         #                   OKstrs = ["already assigned"])
@@ -417,9 +463,7 @@ class mod_PLCNM:
         pass
 
         try:
-            TIMESTAMP("create_sliver() starting on %s." % node.nodeid)
             res = tryXmlrpcCmd(agent.create_sliver, ticketdata)
-            TIMESTAMP("create_sliver() complete on %s." % node.nodeid)
             if debug:
                 print res
                 pass
@@ -442,7 +486,7 @@ class mod_PLCNM:
 
     def freeNode(self, node):
         rcap = cPickle.loads(node.nodemeta)
-        agent = NMagent(node.IP)
+        agent = NMagent(node.IP, node.nodeid)
         res = None
 
         try:
@@ -458,7 +502,6 @@ class mod_PLCNM:
                   (node.nodeid, node.slice.slicename)
             raise
         
-        TIMESTAMP("freenode %s finished." % node.nodeid)
         return res
 
     def renewNode(self, node, length = 0):

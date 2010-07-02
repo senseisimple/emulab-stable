@@ -1,0 +1,177 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Fcntl ':flock';
+use Errno qw(EEXIST);
+
+#
+# Add a user to the wiki on ops. Also allow update of password.
+#
+sub usage()
+{
+    print STDOUT "Usage: tracuser [-d] [-u | -r] <uid>\n";
+    exit(-1);
+}
+my $optlist = "udr";
+my $update  = 0;
+my $remove  = 0;
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $TRACSUPPORT = @TRACSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $TRACPROXY   = "$TB/sbin/tracproxy";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+
+# Protos
+sub fatal($);
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no trac support, just exit. 
+#
+if (! $TRACSUPPORT) {
+    print "Trac support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"u"})) {
+    $update = 1;
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"r"})) {
+    $remove = 1;
+}
+usage()
+    if (@ARGV != 1 || ($remove && $update));
+
+my $user = $ARGV[0];
+
+#
+# Untaint args.
+#
+if ($user =~ /^([-\w]+)$/) {
+    $user = $1;
+}
+else {
+    die("Bad data in user: $user.");
+}
+
+# Map target user to object.
+my $target_user = User->Lookup($user);
+if (! defined($target_user)) {
+    fatal("$user does not exist!");
+}
+
+# Must serialize all this trac stuff. Be sure to use the same token!
+TBScriptLock("trac") == 0 or
+    fatal("Could not get the lock!");
+
+#
+# This script always does the right thing, so no permission checks.
+# In fact, all it does it call over to ops to run a script over there.
+# Note that adduser will just update the password if the user already
+# exists.
+#
+# For ssh.
+#
+$UID = $EUID;
+
+my $optarg = ($debug ? "-d" : "");
+
+if ($remove) {
+    print "Removing user $user from trac on $CONTROL.\n";
+
+    system("$SSH -host $CONTROL $TRACPROXY $optarg deluser $user");
+}
+else {
+    if ($update) {
+	print "Updating trac info for $user on $CONTROL.\n";
+    }
+    else {
+	print "Adding user $user to trac on $CONTROL.\n";
+    }
+    my $usr_pswd  = $target_user->pswd();
+    my $isadmin   = $target_user->admin();
+
+    # shell escape.
+    #$usr_pswd  =~ s/\$/\\\$/g;
+
+    system("echo '$usr_pswd' | ".
+	   "$SSH -host $CONTROL $TRACPROXY $optarg adduser $user $isadmin");
+}
+my $status = $?;
+TBScriptUnlock();
+$? = $status;
+
+if ($?) {
+    if ($? >> 8 == EEXIST()) {
+	# Not an error.
+	exit(0);
+    }
+    fatal("$TRACPROXY failed on $CONTROL!");
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

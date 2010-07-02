@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2006, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -79,6 +79,9 @@ foreach my $i (keys %sitevars) {
 	if ($sitevars1{$i}{"desc"} ne $sitevars2{$i}{"desc"}) {	
 	    push @setClause, "description=" . $sitevars2{$i}{"desc"};
 	}
+	if ($sitevars1{$i}{"ns_include"} ne $sitevars2{$i}{"ns_include"}) {
+	    push @setClause, "ns_include=" . $sitevars2{$i}{"ns_include"};
+	}
 	if (@setClause) {
 	    $diff++;
 	    if (!$quiet) { print "# sitevar $i was changed.\n"; }
@@ -103,7 +106,8 @@ foreach my $i (keys %sitevars) {
 	          "$i,".
 	          "NULL" . ",".
 	          $sitevars2{$i}{"dval"} . ",".
-	          $sitevars2{$i}{"desc"} .
+	          $sitevars2{$i}{"desc"} . ",".
+		  $sitevars2{$i}{"ns_include"} .
 	          ");\n\n";
 	}
     }
@@ -130,9 +134,9 @@ sub read_sitevars($$) {
     open(FH,"<$filename") or die "Unable to open $filename: $!\n";
 
     while(<FH>) {
-	my ($name, $val, $dval, $desc);
+	my ($name, $val, $dval, $desc, $ns_include);
 
-	if (/^INSERT INTO sitevariables/) {
+	if (/^INSERT( IGNORE)? INTO `?sitevariables`?/) {
 	    #
 	    # Either match NULL, or
 	    #   a quote followed by some number of:
@@ -141,19 +145,29 @@ sub read_sitevars($$) {
 	    #   followed by a closed quote.
 	    #
 	    my $match = "^(('([^\\']|(\\\\.))*')|(NULL))";
-	    s/^INSERT INTO sitevariables VALUES \(//;
+
+	    #
+	    # Either match NULL, or
+	    #   a nonempty sequence of digits
+            #
+	    my $matchint = "^(([0-9]+)|(NULL))";
+
+	    s/^INSERT( IGNORE)? INTO `?sitevariables`? VALUES \(//;
 	    ($name) = /${match},/;
-	    s/${match},// or die "bad parse $_";
+	    s/${match},// or die "bad name parse $_";
 	    ($val) = /${match},/;
-	    s/${match},// or die "bad parse $_";
+	    s/${match},// or die "bad val parse $_";
 	    ($dval) = /${match},/;
-	    s/${match},// or die "bad parse $_";
-	    ($desc) = /${match}\);/;
-	    s/${match}\);// or die "bad parse $_";
+	    s/${match},// or die "bad dval parse $_";
+	    ($desc) = /${match},/;
+	    s/${match},// or die "bad desc parse $_";
+	    ($ns_include) = /${matchint}\);/;
+	    s/${matchint}\);// or die "bad ns_include parse $_";
 
             debug("Adding variable $name...\n");
             ${$hashref}{$name}{"dval"} = $dval;
             ${$hashref}{$name}{"desc"} = $desc;
+	    ${$hashref}{$name}{"ns_include"} = $ns_include;
         }
     }
 

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,6 +11,7 @@ global CLIENTBINDIR
 set CLIENTVARDIR @CLIENT_VARDIR@
 set CLIENTBINDIR @CLIENT_BINDIR@
 set EVENTSERVER  @EVENTSERVER@
+set PROJDIR	 @PROJROOT_DIR@
 
 # consults tmcc hostnames database to translate hostname to IP
 # returns ip address of name
@@ -190,6 +191,7 @@ proc readtrafgens {} {
     set tmcctrafgens [open $CLIENTVARDIR/boot/tmcc.trafgens r]
     set tmcctraf [read $tmcctrafgens]
     close $tmcctrafgens
+
     set trafgenlist [split $tmcctraf "\n"]
     set formatstr {TRAFGEN=%s MYNAME=%s MYPORT=%u PEERNAME=%s PEERPORT=%u PROTO=%s ROLE=%s GENERATOR=%s}
     foreach trafgen $trafgenlist {
@@ -434,19 +436,15 @@ if { $simcode_present == 1 } {
 
 # get some params to configure the event system interface
 
-set tmccbossinfo [open $CLIENTVARDIR/boot/tmcc.bossinfo r]
-set tmccboss [read $tmccbossinfo]
-close $tmccbossinfo
-set boss [lindex [split $tmccboss " \n"] 0]
 set pideidlist [split [exec hostname] "."]
 set vnode [lindex $pideidlist 0]
 set eid [lindex $pideidlist 1]
 set pid [lindex $pideidlist 2]
-set logpath "/proj/$pid/exp/$eid/logs/nse-$vnode.log"
+set logpath "$PROJDIR/$pid/exp/$eid/logs/nse-$vnode.log"
 set simobjname [$ns set tbname]
-set nseswap_cmdline "$CLIENTBINDIR/tevc	< -s $EVENTSERVER -e $pid/$eid now $simobjname NSESWAP SIMHOST=$vnode"
+set nseswap_cmdline "$CLIENTBINDIR/tevc -s $EVENTSERVER -e $pid/$eid now $simobjname NSESWAP SIMHOST=$vnode"
 
-set pktrate_logpath "/proj/$pid/exp/$eid/logs/nse-vnodepktrate-$vnode.log"
+set pktrate_logpath "$PROJDIR/$pid/exp/$eid/logs/nse-vnodepktrate-$vnode.log"
 
 # Configuring the Scheduler to monitor the event system
 set evsink [new TbEventSink]

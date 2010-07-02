@@ -1,0 +1,329 @@
+--- iproute-2.6.27-d/Makefile.orig	2009-06-16 15:00:24.000000000 -0600
++++ iproute-2.6.27-d/Makefile	2009-06-16 15:04:48.000000000 -0600
+@@ -1,10 +1,10 @@
+-DESTDIR=/usr/
++DESTDIR?=/usr/
+ LIBDIR=/usr/lib/
+ SBINDIR=/sbin
+ CONFDIR=/etc/iproute2
+ DOCDIR=/share/doc/iproute2
+ MANDIR=/share/man
+-KERNEL_INCLUDE=/usr/include
++KERNEL_INCLUDE?=/usr/include
+ 
+ # Path to db_185.h include
+ DBM_INCLUDE:=/usr/include
+--- iproute-2.6.27-d/include/linux/pkt_sched.h.orig	2008-10-27 11:27:27.000000000 -0600
++++ iproute-2.6.27-d/include/linux/pkt_sched.h	2009-06-16 15:48:16.000000000 -0600
+@@ -112,6 +112,35 @@
+ 	__u32	limit;	/* Queue length: bytes for bfifo, packets for pfifo */
+ };
+ 
++/* PLR section */
++
++struct tc_plr_qopt
++{
++	__u32 plr; /* % drop rate (0-100) */
++};
++
++enum {
++	TCA_PLR_UNSPEC,
++	TCA_PLR_PARMS,
++	TCA_PLR_INIT,
++	__TCA_PLR_MAX,
++};
++
++/* DELAY section */
++
++struct tc_delay_qopt
++{
++	__u32 delay_usec; /* # of usecs to delay */
++	__u8  reset_time;       /* flag: reset time on dequeue, or not */
++};
++
++enum {
++	TCA_DELAY_UNSPEC,
++	TCA_DELAY_PARMS,
++	TCA_DELAY_INIT,
++	__TCA_DELAY_MAX,
++};
++
+ /* PRIO section */
+ 
+ #define TCQ_PRIO_BANDS	16
+--- iproute-2.6.27-d/tc/Makefile.orig	2008-10-27 11:27:27.000000000 -0600
++++ iproute-2.6.27-d/tc/Makefile	2009-06-16 15:11:13.000000000 -0600
+@@ -5,6 +5,8 @@
+ include ../Config
+ 
+ TCMODULES :=
++TCMODULES += q_delay.o
++TCMODULES += q_plr.o
+ TCMODULES += q_fifo.o
+ TCMODULES += q_sfq.o
+ TCMODULES += q_red.o
+--- iproute-2.6.27-d/tc/q_delay.c.orig	2009-06-16 15:21:37.000000000 -0600
++++ iproute-2.6.27-d/tc/q_delay.c	2009-06-16 15:49:48.000000000 -0600
+@@ -0,0 +1,132 @@
++/*
++ * q_delay.c		Delay.
++ *
++ *		This program is free software; you can redistribute it and/or
++ *		modify it under the terms of the GNU General Public License
++ *		as published by the Free Software Foundation; either version
++ *		2 of the License, or (at your option) any later version.
++ *
++ * Authors:	David T. McWherter, <dtm@vramp.net>
++ *			Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <syslog.h>
++#include <fcntl.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <string.h>
++
++#include "utils.h"
++#include "tc_util.h"
++
++static void explain(void)
++{
++	fprintf(stderr, "Usage: ... delay <microseconds> [reset_time (0|1)]\n");
++}
++
++static void explain1(char *arg)
++{
++	fprintf(stderr, "Illegal \"%s\"\n", arg);
++}
++
++
++#define usage() return(-1)
++
++static int 
++delay_parse_opt
++	(struct qdisc_util *qu, int argc, char **argv, struct nlmsghdr *n)
++{
++	struct tc_delay_qopt opt;
++        char *end;
++
++	memset(&opt, 0, sizeof(opt));
++
++	if ( argc > 4 ) { 
++          fprintf(stderr, "Too many arguments (seen: %d, expected: 2 or 4)\n",
++                  argc);
++          return -1;
++	} else if ( argc < 2 ) { 
++          fprintf(stderr, "Too few arguments (seen: %d, expected: 2 or 4)\n",
++                  argc);
++          return -1;
++	} else {
++
++          while ( argc > 0 ) { 
++            if (!strcmp(*argv, "usecs")) {
++              NEXT_ARG();
++              opt.delay_usec = strtoul(*argv,&end,0);
++              if (*end) {
++                explain1("microseconds");
++                return -1;
++              }
++              fprintf( stdout, "Usecs: %u\n", opt.delay_usec );
++            }
++            else if (!strcmp(*argv, "reset_time")) {
++              NEXT_ARG();
++              opt.reset_time = strtoul(*argv,&end,0);
++              if (*end) {
++                explain1("reset_time");
++                return -1;
++              }
++              fprintf( stdout, "reset_time: %u\n", opt.reset_time );
++            }
++            argc--;
++            argv++;
++          }
++        }
++
++	addattr_l(n, 1024, TCA_OPTIONS, &opt, sizeof(opt));
++
++	return 0;
++}
++
++static int 
++delay_print_opt
++	(struct qdisc_util *qu, FILE *f, struct rtattr *opt)
++{
++	struct rtattr *tb[TCA_DELAY_PARMS + 1];
++	struct tc_delay_qopt *qopt;
++
++	if (opt == NULL)
++		return 0;
++
++	if (parse_rtattr_nested_compat(tb, TCA_DELAY_PARMS, opt, qopt,
++				       sizeof(*qopt)))
++                return -1;
++
++	fprintf( f, "delay { %u } reset_time { %u }", 
++                 qopt->delay_usec,
++                 qopt->reset_time
++		);
++
++	return 0;
++}
++
++
++static int delay_print_xstats(struct qdisc_util *qu, FILE *f, struct rtattr *xstats)
++{
++	return 0;
++}
++
++
++static int 
++delay_parse_class_opt(struct qdisc_util *qu, int argc, char **argv,
++   struct nlmsghdr *n)
++{
++  return 0;
++}
++
++
++struct qdisc_util delay_qdisc_util = {
++    .id = "delay",
++    .parse_qopt = delay_parse_opt,
++    .print_qopt = delay_print_opt,
++    .print_xstats = delay_print_xstats,
++
++    .parse_copt = delay_parse_class_opt,
++    .print_copt = delay_print_opt,
++};
+--- iproute-2.6.27-d/tc/q_plr.c.orig	2009-06-16 15:21:37.000000000 -0600
++++ iproute-2.6.27-d/tc/q_plr.c	2009-06-16 15:49:59.000000000 -0600
+@@ -0,0 +1,116 @@
++/*
++ * q_plr.c      packet loss qdisc
++ *
++ *		This program is free software; you can redistribute it and/or
++ *		modify it under the terms of the GNU General Public License
++ *		as published by the Free Software Foundation; either version
++ *		2 of the License, or (at your option) any later version.
++ *
++ * Authors:	Kirk Webb, <kwebb@cs.utah.edu>
++ *			Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <syslog.h>
++#include <fcntl.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
++#include <string.h>
++
++#include "utils.h"
++#include "tc_util.h"
++
++static void explain(void)
++{
++	fprintf(stderr, "Usage: ... plr <rate (%% loss: 0-100)>\n");
++}
++
++static void explain1(char *arg)
++{
++	fprintf(stderr, "Illegal \"%s\"\n", arg);
++}
++
++
++#define usage() return(-1)
++
++static int 
++plr_parse_opt
++	(struct qdisc_util *qu, int argc, char **argv, struct nlmsghdr *n)
++{
++	struct tc_plr_qopt opt;
++	double plr_rate = 0;
++	char *p;
++
++	memset(&opt, 0, sizeof(opt));
++
++	if ( argc > 1 ) { 
++		fprintf(stderr, "Too many arguments (seen: %d, expected: %d)\n",
++			argc, 1);
++		return -1;
++	} else if ( argc < 1 ) { 
++		fprintf(stderr, "Too few arguments (seen: %d, expected: %d)\n",
++			argc, 1);
++		return -1;
++	} else if ( argc == 1 ) {
++	  plr_rate = strtod(*argv, &p);
++            if (p == *argv || plr_rate < 0 || plr_rate > 1) {
++	      explain1("fraction (range 0-1)");
++	      return -1;
++	    }
++	}
++
++	opt.plr = (unsigned int)(plr_rate*0xffffffffUL);
++	fprintf( stdout, "PLR: %u\n", opt.plr );
++
++	addattr_l(n, 1024, TCA_OPTIONS, &opt, sizeof(opt));
++
++	return 0;
++}
++
++static int 
++plr_print_opt
++	(struct qdisc_util *qu, FILE *f, struct rtattr *opt)
++{
++	struct rtattr *tb[TCA_PLR_PARMS + 1];
++	struct tc_plr_qopt *qopt;
++
++	if (opt == NULL)
++		return 0;
++
++	if (parse_rtattr_nested_compat(tb, TCA_PLR_PARMS, opt, qopt,
++				       sizeof(*qopt)))
++                return -1;
++
++	fprintf( f, "PLR: %f", 
++		 qopt->plr / (double) 0xffffffff
++		);
++
++	return 0;
++}
++
++static int plr_print_xstats(struct qdisc_util *qu, FILE *f, struct rtattr *xstats)
++{
++	return 0;
++}
++
++static int 
++plr_parse_class_opt(struct qdisc_util *qu, int argc, char **argv,
++   struct nlmsghdr *n)
++{
++  return 0;
++}
++
++
++
++struct qdisc_util plr_qdisc_util = {
++    .id = "plr",
++    .parse_qopt = plr_parse_opt,
++    .print_qopt = plr_print_opt,
++    .print_xstats = plr_print_xstats,
++
++    .parse_copt = plr_parse_class_opt,
++    .print_copt = plr_print_opt,
++};
+--- iproute-2.6.27-d/tc/tc_qdisc.c.orig	2008-10-27 11:27:27.000000000 -0600
++++ iproute-2.6.27-d/tc/tc_qdisc.c	2009-06-16 15:12:29.000000000 -0600
+@@ -38,7 +38,7 @@
+ 	fprintf(stderr, "\n");
+ 	fprintf(stderr, "       tc qdisc show [ dev STRING ] [ingress]\n");
+ 	fprintf(stderr, "Where:\n");
+-	fprintf(stderr, "QDISC_KIND := { [p|b]fifo | tbf | prio | cbq | red | etc. }\n");
++	fprintf(stderr, "QDISC_KIND := { [p|b]fifo | delay | plr | tbf | prio | cbq | red | etc. }\n");
+ 	fprintf(stderr, "OPTIONS := ... try tc qdisc add <desired QDISC_KIND> help\n");
+ 	fprintf(stderr, "STAB_OPTIONS := ... try tc qdisc add stab help\n");
+ 	return -1;

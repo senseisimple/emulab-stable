@@ -61,7 +61,8 @@ public:
     // as named temporaries to try to make this conceptually simple.
 
 public:
-    virtual ~Assigner();
+    Assigner() {}
+    virtual ~Assigner() {}
 
     // Create a copy of the current object polymorphically.
     virtual std::auto_ptr<Assigner> clone(void) const=0;
@@ -87,19 +88,6 @@ public:
 
     virtual NodeLookup & getHosts(void)=0;
 
-/* TODO: Remove this when the changes are debugged
-
-    // Populate the argument vectors with our state so that routes can
-    // be calculated.  For the explanation of these arguments, see
-    // Router.h
-    virtual void graph(std::vector<NodeLookup> & nodeToLevel,
-                       std::vector<MaskTable> & levelMaskSize,
-                       std::vector<PrefixTable> & levelPrefix,
-                       std::vector<LevelLookup> & levelMakeup,
-                       std::vector<int> & lanWeights) const=0;
-
-*/
-
 public:
     struct Lan
     {
@@ -124,5 +112,3 @@ private:
 };
 
 #endif
-
-

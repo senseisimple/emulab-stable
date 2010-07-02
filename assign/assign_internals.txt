@@ -1,9 +1,10 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
+PLEASE NOTE: This file is somewhat out of date.
 
 This document attempts to describe some of the internals of assign.
 Much of the simulated annealing code of assign is not documented here

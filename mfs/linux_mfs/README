@@ -1,0 +1,26 @@
+This is the build tree for the Linux-based Frisbee/admin/newnode MFS.
+
+This can probably only be compiled on a Linux machine.
+
+COMPILING
+---------
+- Install the fakeroot package (fakeroot.alioth.debian.org)
+- Edit the top-level Makefile and set the MFS_ARCH variable to i386 for
+  a 32-bit build or x86_64 for a 64-bit build.
+- Set TESTBED_PATH and TESTBEDOBJ_PATH in source/testbed/Makefile to
+  the location of your Emulab source tree and your build tree
+  respectively.
+- Download the source tarballs from ops via scp into a 'tarballs'
+  directory: 'scp ops:/share/linux/mfs/source tarballs'
+- Run 'make' (or 'make toolchain' for the compiler and 'make initramfs'
+  for the kernel and initramfs).
+
+BUGS
+----
+- There are no docs (except this, and it sucks).
+- The build system needs some work:
+  - There are occasional problems building the toolchain.  These are due
+    to weird bugs in the gcc build process that I haven't figured out a
+    good fix for.
+  - There are some minor dependency issues in building some of the
+    targets that cause other targets to be rebuilt unnecessarily.

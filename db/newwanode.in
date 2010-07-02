@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -40,6 +40,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use NodeType;
 
 #
 # This is run from the web page, but tbadmins can run it from the command
@@ -126,14 +127,21 @@ if (defined($nickname)) {
 #
 # Must be a valid type.
 #
-my $query_result =
-    DBQueryFatal("select osid,control_iface from node_types ".
-		 "where type='$nodetype'");
-if (! $query_result->numrows) {
+my $typeinfo = NodeType->Lookup($nodetype);
+if (!defined($typeinfo)) {
     fatal("*** $0:\n".
 	  "    No such nodetype $nodetype is defined in the DB!\n");
 }
-my ($defosid,$control_iface) = $query_result->fetchrow_array();
+my ($defosid,$control_iface);
+
+if ($typeinfo->default_osid(\$defosid) || !$defosid) {
+    fatal("*** $0:\n".
+	  "    No default OSID for $nodetype is defined in the DB!\n");
+}
+if ($typeinfo->control_interface(\$control_iface) || !$control_iface) {
+    fatal("*** $0:\n".
+	  "    No control interface for $nodetype is defined in the DB!\n");
+}
 
 #
 # For now, just pcwa/pcron is allowed until we have more DB state that says
@@ -167,6 +175,12 @@ if ($nodetype eq "pcwa") {
 else {
     $pid = "ron";
     $eid = "all";
+}
+
+my $exptidx;
+if (!TBExptIDX($pid, $eid, \$exptidx)) {
+    fatal("*** $0:\n".
+	  "    No such experiment $pid/$eid!\n");
 }
 
 #
@@ -260,9 +274,14 @@ else {
 		 "values ('$nodename', 0, 1, '$nodeip', ".
 		 "        'fxp', '$control_iface', '$ifacerole')");
 
+    DBQueryFatal("insert into interface_state ".
+		 "(node_id, card, port, iface) ".
+		 "values ('$nodename', 0, 1, 'fxp')");
+
     DBQueryFatal("insert into reserved ".
-		 "(node_id, pid, eid, rsrv_time, vname) ".
-		 "values ('$nodename', '$pid', '$eid', now(), '$nickname')");
+		 "(node_id, exptidx, pid, eid, rsrv_time, vname) ".
+		 "values ('$nodename', $exptidx, ".
+		 "        '$pid', '$eid', now(), '$nickname')");
 }
 
 #
@@ -272,9 +291,6 @@ for ($i = 1; $i < 9; $i++) {
     my $priority  = ($nextpri * 100) + $i;
     $nodevname = "v${nodename}-${i}";
 
-    if (TBValidNodeName($nodevname)) {
-	next;
-    }
     print "Creating widearea virtual node $nodevname ...\n";
     DBQueryFatal("insert into nodes ".
 		 "(node_id, type, phys_nodeid, role, priority, ".

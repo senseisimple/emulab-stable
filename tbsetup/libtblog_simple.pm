@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,10 +23,11 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT = qw (tblog tberror tberr tbwarn tbwarning tbnotice tbinfo tbdebug 
-	      tbdie
-	      tblog_session
+	      tbdie tblog_session 
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
-	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
+	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG
+	      SEV_DEBUG SEV_NOTICE SEV_WARNING SEV_SECONDARY
+	      SEV_ERROR SEV_ADDITIONAL SEV_IMMEDIATE);
 
 # After package decl.
 # DO NOT USE "use English" in this module
@@ -39,7 +40,8 @@ use strict;
 
 use vars qw($SCRIPTNAME 
 	    $EMERG $ALRET $CRIT $ERR $WARNING $NOTICE $INFO $DEBUG
-	    %PRIORITY_MAP_TO_STR %PRIORITY_MAP_TO_NUM);
+	    %PRIORITY_MAP_TO_STR %PRIORITY_MAP_TO_NUM
+	    *SOUT *SERR);
 
 #
 # Duplicate STDOUT and STDERR to SOUT and SERR respectfully, since
@@ -87,6 +89,18 @@ while (my ($n,$v) = each %PRIORITY_MAP_TO_STR) {
 }
 
 #
+# tbreport related constants
+#
+
+use constant SEV_DEBUG      =>   0;
+use constant SEV_NOTICE     => 100;
+use constant SEV_WARNING    => 300;
+use constant SEV_SECONDARY  => 400;
+use constant SEV_ERROR      => 500; # Threshold
+use constant SEV_ADDITIONAL => 600;
+use constant SEV_IMMEDIATE  => 900;
+
+#
 # Utility functions
 #
 
@@ -114,6 +128,7 @@ sub tblog_session() {
     return $ENV{TBLOG_SESSION};
 }
 
+
 #
 # Dummy dblog, does nothing in this module
 # Once the real "libtblog.pm" is used than this will be replaced
@@ -123,6 +138,7 @@ sub dblog_dummy( $$@ ) {
   return 1;
 }
 *dblog = \&dblog_dummy;
+
 
 #
 # tblog(priority, mesg, ...)
@@ -179,9 +195,21 @@ sub tbdie( @ ) {
     $parms = shift if ref $_[0] eq 'HASH';
     my $mesg = join('',@_);
 
-    dblog($ERR, $parms, $mesg);
-    tblog_stop_capture() if exists $INC{'libtblog.pm'};
-    die format_message(scriptname(), $ERR, $mesg);
+    if ($^S) {
+	# Handle case when we are in an eval block special:
+	#   1) downgrade error to warning as it may not be fatal
+	#   2) Call tblog (not just dblog) to print the error since 
+        #      the message may never actually appear. 
+	#   3) Don't stop capturing as we are not trully dying
+	#   4) Don't format message as it may be modified latter
+	tblog($WARNING, $parms, $mesg);
+	$mesg .= "\n" unless $mesg =~ /\n$/;
+	die $mesg;
+    } else {
+	dblog($ERR, $parms, $mesg);
+	tblog_stop_capture() if exists $INC{'libtblog.pm'};
+	die format_message(scriptname(), $ERR, $mesg);
+    }
 }
 
 #

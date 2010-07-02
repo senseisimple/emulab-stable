@@ -1,0 +1,11 @@
+\ Loader.rc
+\ $FreeBSD: src/sys/boot/i386/loader/loader.rc,v 1.1 2003/05/31 05:25:18 scottl Exp $
+\
+\ Includes additional commands
+include /boot/loader.4th
+
+\ Reads and processes loader.rc
+start
+
+\ Emulab boot
+testbed_boot

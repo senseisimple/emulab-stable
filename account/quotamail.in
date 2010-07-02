@@ -1,5 +1,9 @@
 #!/bin/sh
-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 # Found on the internet, and customized for Emulab
 
 #
@@ -16,7 +20,17 @@
 # installation script/directions should take care of this now.
 #
 
-for i in `/usr/sbin/repquota -v @FS_WITH_QUOTAS@ | awk '$2 ~ /+/ {print $1}'`
+PROJSTR="Project directory:    @FSDIR_PROJ@"
+GROUPSSTR="Group directory:      @FSDIR_GROUPS@"
+USERSSTR="User/Home directory:  @FSDIR_USERS@"
+if [ -n "@FSDIR_SCRATCH@" ]; then
+    SCRATCHSTR="Project scratch directory: @FSDIR_SCRATCH@"
+else
+    SCRATCHSTR=""
+fi
+
+
+for i in `/usr/sbin/repquota -v @FS_WITH_QUOTAS@ | awk '$2 ~ /\+/ {print $1}'`
 do
 (
 # feel free to change this message!!!
@@ -39,10 +53,16 @@ You can check your usage with the 'quota' command on @USERNODE@:
 
 (Note: This will not work from nodes in an experiment.)
 
-The directory trees where you most likely have files are:
-Project directory:    @FSDIR_PROJ@
-Group directory:      @FSDIR_GROUPS@
-User/Home directory:  @FSDIR_USERS@   
+The directory trees (on @USERNODE@) where you most likely have files are:
+
+$PROJSTR
+$GROUPSSTR
+$USERSSTR
+$SCRATCHSTR
+
+PLEASE NOTE: just login to @USERNODE@ directly to do the cleanup!
+You will not be able to swapin an experiment to access these directories
+while over quota.
 
 Thanks,
 @THISHOMEBASE@ Testbed Operations

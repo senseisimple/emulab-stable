@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -10,11 +10,12 @@ use Getopt::Std;
 sub usage()
 {
     print "Usage: " .
-	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+	scriptname() . " [-j vnodeid] [-n] boot|shutdown|reconfig|reset\n";
     exit(1);
 }
-my $optlist = "j:";
+my $optlist = "j:n";
 my $action  = "boot";
+my $doit = 1;
 
 # Turn off line buffering on output
 $| = 1;
@@ -44,12 +45,6 @@ use liblocsetup;
 use libtmcc;
 use librc;
 
-#
-# Not all clients support this.
-#
-exit(0)
-    if (REMOTE() && !(PLAB() || JAILED()));
-
 # Protos.
 sub doboot();
 sub doshutdown();
@@ -64,7 +59,9 @@ if (defined($options{'j'})) {
     my $vnodeid = $options{'j'};
     libsetup_setvnodeid($vnodeid);
 }
-# Allow default above.
+if (defined($options{'n'})) {
+    $doit = 0;
+}
 if (@ARGV) {
     $action = $ARGV[0];
 }
@@ -102,8 +99,7 @@ sub doboot()
     my @tmccresults;
     my %newaccounts = ();
     my %newgroups   = ();
-    my %pubkeys1    = ();
-    my %pubkeys2    = ();
+    my %pubkeys     = ();
     my @sfskeys     = ();
     my %deletes     = ();
     my %lastmod     = ();
@@ -139,7 +135,8 @@ sub doboot()
 	    $gname = lc($gname)
 		if (PLAB());
 	    
-	    if (REMOTE() && !JAILED() && !PLAB()) {
+	    if (REMOTE() && !REMOTEDED() && !JAILED() && !GENVNODE() 
+		&& !PLAB()) {
 		$gname = "emu-${gname}";
 	    }
 	    $newgroups{"$gname"} = $2
@@ -159,20 +156,13 @@ sub doboot()
 	    my $key   = $2;
 
 	    #
-	    # P1 or P2 key. Must be treated differently below.
+	    # All pubkeys go into one file nowadays
 	    #
-	    if ($key =~ /^\d+\s+.*$/) {
-		if (! defined($pubkeys1{$login})) {
-		    $pubkeys1{$login} = [];
-		}
-		push(@{$pubkeys1{$login}}, $key);
+	    if (! defined($pubkeys{$login})) {
+		$pubkeys{$login} = [];
 	    }
-	    else {
-		if (! defined($pubkeys2{$login})) {
-		    $pubkeys2{$login} = [];
-		}
-		push(@{$pubkeys2{$login}}, $key);
-	    }
+	    push(@{$pubkeys{$login}}, $key);
+
 	    next;
 	}
 	elsif ($str =~ /^SFSKEY KEY="(.*)"/) {
@@ -226,7 +216,7 @@ sub doboot()
 
 	print "Adding group: $group/$gid\n";
 	    
-	if (os_groupadd($group, $gid)) {
+	if ($doit && os_groupadd($group, $gid)) {
 	    warning("Error adding new group $group/$gid");
 	    next;
 	}
@@ -247,7 +237,7 @@ sub doboot()
 
 	print "Removing group: $group/$gid\n";
 	
-	if (os_groupdel($group)) {
+	if ($doit && os_groupdel($group)) {
 	    warning("Error removing group $group/$gid");
 	    next;
 	}
@@ -272,7 +262,7 @@ sub doboot()
     # XXX: hack, hack, hack - Jay requested that user "games" be removed from
     # plab nodes since conflicts with his UID.
     os_userdel("games")
-	if (PLAB());
+	if ($doit && PLAB());
 
     while (($login, $info) = each %PWDDB) {
 	my $uid = $info;
@@ -316,7 +306,7 @@ sub doboot()
 	
 	print "Removing user: $login\n";
 	
-	if (os_userdel($login) != 0) {
+	if ($doit && os_userdel($login) != 0) {
 	    warning("Error removing user $login");
 	    next;
 	}
@@ -328,7 +318,7 @@ sub doboot()
 	#
 	if (defined($homedir) &&
 	    index($homedir, "/${login}")) {
-	    if (os_homedirdel($login, $homedir) != 0) {
+	    if ($doit && os_homedirdel($login, $homedir) != 0) {
 	        warning("Could not remove homedir $homedir.");
 	    }
 	}
@@ -387,7 +377,8 @@ sub doboot()
 		    print "Updating: ".
 			"$login/$uid/$gid/$root/$name/$hdir/$glist\n";
 		    
-		    os_usermod($login, $gid, "$glist", $pswd, $root, $shell);
+		    os_usermod($login, $gid, "$glist", $pswd, $root, $shell)
+			if ($doit);
 
 		    #
 		    # Note that we changed the info for next time.
@@ -398,53 +389,75 @@ sub doboot()
 	    else {
 		print "Adding: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
 		push(@addedUsers, $login);
-		if (os_useradd($login, $uid, $gid, $pswd, 
+
+		if ($doit &&
+		    os_useradd($login, $uid, $gid, $pswd, 
 			       "$glist", $hdir, $name, $root, $shell)) {
 		    warning("Error adding new user $login");
 		    next;
 		}
-
+		
 		if (PLAB() && ! -e $hdir) {
-		    if (! os_mkdir($hdir, "0755")) {
+		    if ($doit && !os_mkdir($hdir, "0755")) {
 			warning("Error creating user homedir");
 			next;
 		    }
-		    chown($uid, $gid, $hdir);
+		    chown($uid, $gid, $hdir)
+			if ($doit);
 		}
+
+		#
+		# Might be a local node that does not mount /user from ops.
+		# Or a remote node.
+		#
+		$doupdate = 1
+		    if (! -e "$hdir/.ssh" || ! -d "$hdir/.ssh");
 		
 		# Add to DB only if successful. 
 		$PWDDB{$login} = "$uid:$serial";
 	    }
 
 	    #
-	    # Remote nodes and local control nodes get this. 
+	    # Anytime the home dir is on a local FS ...
 	    # 
-	    if ((REMOTE() || CONTROL()) && $doupdate) {
+	    if ($doit && $doupdate) {
 		#
 		# Must ask for the current home dir since we rely on pw.conf.
 		#
 		my (undef,undef,undef,undef,
 		    undef,undef,undef,$homedir) = getpwuid($uid);
-		my $sshdir  = "$homedir/.ssh";
-		my $forward = "$homedir/.forward";
 
-		#
-		# Create .ssh dir and populate it with an authkeys file.
-		#
-		TBNewsshKeyfile($sshdir, $uid, $gid, 1, @{$pubkeys1{$login}});
-		TBNewsshKeyfile($sshdir, $uid, $gid, 2, @{$pubkeys2{$login}});
+		if (CONTROL() || os_islocaldir($homedir)) {
+		    my $sshdir  = "$homedir/.ssh";
+		    my $forward = "$homedir/.forward";
 
-		#
-		# Give user a .forward back to emulab.
-		#
-		if (! -e $forward) {
-		    system("echo '$email' > $forward");
+		    # Sanity; this does not always happen correctly.
+		    my $cmd = "$CHMOD 755 $homedir";
+		    if (system($cmd) != 0) {
+			warning("Failed $cmd: $!");
+		    }
+
+		    #
+		    # Create .ssh dir and populate it with an authkeys file.
+		    # XXX as a sanity check, do nothing if tmcd gaves us
+		    # no keys for any user. Means that something went wrong.
+		    #
+		    TBNewsshKeyfile($sshdir, $uid, $gid, 0,
+				    @{$pubkeys{$login}})
+			if (keys(%pubkeys));
+
+		    #
+		    # Give user a .forward back to emulab.
+		    #
+		    if (! -e $forward) {
+			system("echo '$email' > $forward");
 		
-		    chown($uid, $gid, $forward) 
-			or warning("Could not chown $forward: $!");
+			chown($uid, $gid, $forward) 
+			    or warning("Could not chown $forward: $!");
 		
-		    chmod(0644, $forward) 
-			or warning("Could not chmod $forward: $!");
+			chmod(0644, $forward) 
+			    or warning("Could not chmod $forward: $!");
+		    }
 		}
 	    }
 	}
@@ -459,7 +472,8 @@ sub doboot()
 
     if (WINDOWS()) {
 	# Make the /etc/group and passwd files.
-	os_accounts_end();
+	os_accounts_end()
+	    if ($doit);
 
 	# We couldn't do chown'ing before new users were in the /etc/passwd file.
 	if (scalar(@addedUsers) == 0) {
@@ -494,31 +508,33 @@ sub doboot()
 		# Open up an existing key dir to the root user.  Even though root
 		# is in the Administrators group, it's locked out by permissions.
 		$cmd = "$CHMOD 777 $sshdir";
-		if (-e $sshdir && system($cmd) != 0) {
+		if ($doit && -e $sshdir && system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
 		}
 		$cmd = "$CHOWN -R root $sshdir";
-		if (-e $sshdir && system($cmd) != 0) {
+		if ($doit && -e $sshdir && system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
 		}
 
 		# Create .ssh dir and populate it with an authkeys file.
-		TBNewsshKeyfile($sshdir, $uid, $gid, 1, @{$pubkeys1{$login}});
-		TBNewsshKeyfile($sshdir, $uid, $gid, 2, @{$pubkeys2{$login}});
+		if ($doit) {
+		    TBNewsshKeyfile($sshdir, $uid, $gid, 0,
+				    @{$pubkeys{$login}});
+		}
 
 		# Set the ownership of the home directory / mount point / keys.
 		# Use the system chown by name, not UID.  Can't use chown -R, it goes
 		# top-down, chowning the directory away and then trying to read it.
 		my $cmd = "$CHOWN $login $sshdir/*";
-		if (system($cmd) != 0) {
+		if ($doit && system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
 		}
 		$cmd = "$CHOWN $login $sshdir";
-		if (system($cmd) != 0) {
+		if ($doit && system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
 		}
 		$cmd = "$CHMOD 700 $sshdir";
-		if (system($cmd) != 0) {
+		if ($doit && system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
 		}
 	    }
@@ -528,7 +544,7 @@ sub doboot()
     #
     # Create sfs_users file and populate it with public SFS keys
     #
-    if (USESFS()) {
+    if ($doit && USESFS()) {
 	my $sfsusers = "/etc/sfs/sfs_users";
 	
 	if (!open(SFSKEYS, "> ${sfsusers}.new")) {
@@ -614,7 +630,7 @@ sub doshutdown()
 
     # Make the CygWin /etc/passwd and /etc/group files match Windows.
     os_accounts_sync()
-	if (WINDOWS());
+	if ($doit && WINDOWS());
 }
 
 #
@@ -631,6 +647,13 @@ sub doreconfig()
 #
 sub docleanup()
 {
+    my $retval = 0;
+
+    # Hand this off to liblocsetup to restore default passwd/group files.
+    if ($doit) {
+	$retval = os_account_cleanup();
+    }
+
     my $pdb = $PASSDB . ".db";
     my $gdb = $GROUPDB . ".db";
 
@@ -644,9 +667,8 @@ sub docleanup()
 	if (-e $pdb);
     unlink $gdb
 	if (-e $gdb);
-    
-    # Hand this off to liblocsetup to restore default passwd/group files.
-    os_account_cleanup();
+
+    return $retval;
 }
 
 #

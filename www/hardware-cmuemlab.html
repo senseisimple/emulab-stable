@@ -1,0 +1,154 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2008 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h1>
+    Hardware Overview CMUlab
+</h1>
+</center>
+
+CMUlab manages three different testbeds.  This page is under construction.
+
+<h3>Cluster Nodes</h3>
+<ul>
+<a name="tbpcs"></a>
+
+<a name="tbpc850"></a>
+<li>8 <a href=shownodetype.php3?node_type=pc850>pc850</a>
+             PC nodes (<b>pc001-pc008</b>), consisting of:
+<ul>
+<li> 850MHz Intel Pentium III processors.
+<li> Based on the
+<a
+href="http://www.intel.com/support/motherboards/server/isp1100/">
+Intel ISP1100 </a> 1U server platform (old reliable BX chipset).
+<li> 512MB PC133 ECC SDRAM.
+<li> 5
+<a
+href="http://support.intel.com/support/network/adapter/pro100/index.htm">
+Intel EtherExpress Pro</a> 10/100Mbps Ethernet ports:
+<ul>
+	<li>2 builtin on the motherboard
+		(<code>eth2/eth3</code> in Linux, <code>fxp0/fxp1</code> in FreeBSD)</i>
+	<li>2 on an
+	    <a href = "http://www.intel.com/network/connectivity/resources/doc_library/tech_specs/pro100dport.htm">
+	    Intel EtherExpress Pro 100+ Dual-Port Server Adapter</a>
+		(<code>eth0/eth1</code> in Linux, <code>fxp2/fxp3</code> in FreeBSD)
+	<li>1 on a single-port Intel EtherExpress Pro/100B Adapter
+		(<code>eth4</code> in Linux, <code>fxp4</code> in FreeBSD)
+</ul>
+<li> 
+40GB IBM 60GXP 7200RPM ATA/100 IDE hard drive.
+<li> Floppy drive.
+</ul>
+<p>
+
+</ul>
+
+<h3>Wireless network Emulator - public</h3>
+<ul>
+<a name="tbpc2000"></a>
+<li>10 <a href=shownodetype.php3?node_type=pc2000>pc2000</a>
+	Dell D610 laptops (<b>pcemu001-pcemu010</b>) consisting of:
+<ul>
+<li> 1.83 GHz Intel Core Duo (?)
+<li> 1 GB RAM (?)
+<li> 80Gb Hard Drive Size, 5400 RPM Hard Drive Speed (?)
+<li> 10/100/1000 Ethernet for control network  (?)
+<li> Atheros wireless card (?)
+</ul>
+
+<a name="tbpc2000"></a>
+<li>FPGA-based signal propagation emulation hardware supporting:
+<ul>
+<li> 2.4 GHz ISM band
+<li> Up to 15 nodes
+<li> Full n x n signal level communication and interference
+</ul>
+
+<li>1 <a href=shownodetype.php3?node_type=pc2000>pc2000</a>
+	emulation control PC (<b>emucontrol-1</b>) consisting of:
+<ul>
+<li> 1.83 GHz Intel Core Duo (?)
+<li> 1 GB RAM (?)
+<li> 80Gb Hard Drive Size, 5400 RPM Hard Drive Speed (?)
+<li> 10/100/1000 Ethernet for control network  (?)
+<li> Atheros wireless card (?)
+</ul>
+<li> Two emulator nodes are equipped with USRP software radios.  More USRP devices can be added depending on demand.
+<li> The channels between nodes emu001, emu002, and emu003 have multi-path capabilities.  They suppor up to three paths.
+</ul>
+
+<h3>Wireless network Emulator - private</h3>
+<ul>
+<a name="tbpc2000"></a>
+<li>4 <a href=shownodetype.php3?node_type=pc2000>pc2000</a>
+	Dell D620 laptops (<b>emu???-emu???</b>) consisting of:
+<ul>
+<li> 1.83 GHz Intel Core Duo 
+<li> 1 GB RAM
+<li> 80Gb Hard Drive Size, 5400 RPM Hard Drive Speed
+<li> 10/100/1000 Ethernet for control network 
+<li> Atheros wireless card
+</ul>
+<p>
+
+
+<a name="tbpc2000"></a>
+<li>FPGA-based signal propagation emulation hardware supporting:
+<ul>
+<li> 2.4 GHz ISM band
+<li> Up to 15 nodes
+<li> Full n x n signal level communication and interference
+</ul>
+
+<li>1 <a href=shownodetype.php3?node_type=pc2000>pc2000</a>
+	PowerEdge 1850 (<b>pc009</b>) emulation control PC consisting of:
+<ul>
+<li> single core 64-bit Xeon processor
+<li> 1 GB RAM
+<li> 146G Hard Drive Size
+</ul>
+<p>
+
+</ul>
+
+<h3>Homenet</h3>
+<ul>
+<a name="tbpcs"></a>
+
+<a name="tbpc850"></a>
+<li>x <a href=shownodetype.php3?node_type=pc850>pc850</a>
+             PC nodes (<b>pc41-pc168</b>), consisting of:
+<ul>
+<li> 850MHz Intel Pentium III processors.
+<li> Based on the
+<a
+href="http://www.intel.com/support/motherboards/server/isp1100/">
+Intel ISP1100 </a> 1U server platform (old reliable BX chipset).
+<li> 512MB PC133 ECC SDRAM.
+<li> 5
+<a
+href="http://support.intel.com/support/network/adapter/pro100/index.htm">
+Intel EtherExpress Pro</a> 10/100Mbps Ethernet ports:
+<ul>
+	<li>2 builtin on the motherboard
+		(<code>eth2/eth3</code> in Linux, <code>fxp0/fxp1</code> in FreeBSD)</i>
+	<li>2 on an
+	    <a href = "http://www.intel.com/network/connectivity/resources/doc_library/tech_specs/pro100dport.htm">
+	    Intel EtherExpress Pro 100+ Dual-Port Server Adapter</a>
+		(<code>eth0/eth1</code> in Linux, <code>fxp2/fxp3</code> in FreeBSD)
+	<li>1 on a single-port Intel EtherExpress Pro/100B Adapter
+		(<code>eth4</code> in Linux, <code>fxp4</code> in FreeBSD)
+</ul>
+<li> 
+40GB IBM 60GXP 7200RPM ATA/100 IDE hard drive.
+<li> Floppy drive.
+</ul>
+<p>
+
+
+
+

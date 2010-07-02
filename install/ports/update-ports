@@ -1,0 +1,188 @@
+#!/bin/sh
+#
+# Fiecely bogus script to attempt to upgrade ports on an existing Emulab server
+#
+#DO=echo
+DO=
+
+if [ -z "$1" ]; then
+    echo '*** Usage: update-ports [boss|ops]'
+    exit 1
+fi
+SERVER=$1
+
+if [ -z "$PKG_PATH" ] || [ ! -d "$PKG_PATH" ]; then
+    echo '*** Must set PKG_PATH to directory where packages are installed'
+    exit 1
+fi
+
+if [ -z "$ELVIN_COMPAT" ]; then
+    echo '*** Must set ELVIN_COMPAT to 0 or 1'
+    exit 1
+fi
+
+if [ -z "$UTMPDIR" ]; then
+    echo '*** Must set UTMPDIR to the directory where you untarred patches'
+    exit 1
+fi
+
+ecompat=
+if [ $ELVIN_COMPAT -eq 1 ]; then
+    echo "NOTICE: Building with Elvin Compatibility enabled ..."
+    if [ ! -e $PKG_PATH/libelvin-4.0.3_2.tbz -o ! -e $PKG_PATH/elvind-4.0.3.tbz ]; then
+        echo '*** No Elvin packages; you may have downloaded the wrong package tarball'
+	exit 1
+    fi
+    ecompat="-elvincompat"
+else
+    #
+    # XXX sweet, if ELVIN_COMPAT is defined, it means "1" to the port Makefiles;
+    # we key off of ecompat instead below.
+    #
+    unset ELVIN_COMPAT
+fi
+
+#
+# XXX this is downright unholy, but I found no other way to install binary
+# packages recursively with the proper dependencies
+#
+$DO export MAKEFLAGS='PHP_VER=4 APACHE_PORT=www/apache13-modssl -DSKIP_DNS_CHECK ENABLE_SUIDPERL=yes SWIG_LANGUAGES= WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes -DWITHOUT_WINBIND -DWITHOUT_LDAP -DWITHOUT_POPT -DWITHOUT_CUPS'
+
+echo "update-ports: Installing/updating portupgrade ..."
+$DO pkg_delete -f -x pkgconfig pkg_install portupgrade ruby
+$DO pkg_add $PKG_PATH/portupgrade-2.3.1,2.tbz || {
+    echo '*** pkg_add failed'
+    exit 2
+}
+
+echo "update-ports: Rebuilding portupgrade DB ..."
+$DO rm /var/db/pkg/pkgdb.db
+$DO pkgdb -fu || {
+    echo '*** pkgdb failed'
+    exit 2
+}
+
+echo "update-ports: Updating perl ..."
+$DO rm -rf /usr/bin/*perl* /usr/lib/*perl* /usr/libdata/perl /usr/share/perl
+$DO portupgrade -N -PP lang/perl5.8 || {
+    echo '*** portupgrade failed'
+    exit 2
+}
+$DO ln -s /usr/local/bin/perl5.8.8 /usr/bin/perl
+
+echo "update-ports: Cleaning out old python ..."
+$DO pkg_delete -f -x python-2 py23 py24
+
+echo "update-ports: Cleaning out other old cruft ..."
+$DO pkg_delete -f -x XFree86 tcl-8.3 tk-8.3 libtool-1.3 gcc30
+
+echo "update-ports: Updating packages with funky dependencies ..."
+$DO pkg_delete -f -x expat-1
+$DO portupgrade -N -PP textproc/expat2 || {
+    echo '*** portupgrade of expat2 failed'
+    exit 2
+}
+
+# XFree dependencies
+$DO pkg_delete -f -x otcl vcg graphviz
+
+# mysql stuff
+$DO pkg_delete -f -x '^mysql-' p5-Mysql-modules p5-DBD-mysql p5-DBI mod_auth_mysql p5-XML-Parser py-MySQLdb
+$DO portupgrade -N -PP misc/p5-DBD-mysql50-old || {
+    echo '*** portupgrade of p5-DBD-mysql failed'
+    exit 2
+}
+
+#
+# XXX must add the Elvin packages manually via pkg_add due to checks in
+# port Makefiles that will stop portupgrade
+#
+$DO pkg_delete -f -x elvin
+if [ -n "$ecompat" ]; then
+    echo "update-ports: Installing Elvin packages ..."
+    $DO pkg_add $PKG_PATH/libelvin-4.0.3_2.tbz || {
+        echo '*** pkg_add of libelvin failed'
+        exit 2
+    }
+    $DO pkg_add $PKG_PATH/elvind-4.0.3.tbz || {
+        echo '*** pkg_add of elvind failed'
+        exit 2
+    }
+fi
+
+echo "update-ports: Installing correct version of pubsub ..."
+$DO pkg_delete -f -x pubsub
+$DO portupgrade -N -PP misc/emulab-pubsub${ecompat} || {
+    echo '*** portupgrade of pubsub failed'
+    exit 2
+}
+
+ports="misc/emulab-$SERVER"
+if [ "$SERVER" = "ops" ]; then
+    $DO pkg_delete -f -x emulab-fs
+    ports="misc/emulab-fs $ports"
+fi
+echo "update-ports: Installing $ports port(s) ..."
+$DO pkg_delete -f -x emulab-$SERVER
+$DO portupgrade -N -PP -f -R $ports || {
+    echo '*** portupgrade failed'
+    exit 2
+}
+
+echo "update-ports: Install necessary PHP4 extensions ..."
+oMAKEFLAGS=$MAKEFLAGS
+MAKEFLAGS="$MAKEFLAGS WITH_MHASH=yes WITH_XMLRPC=yes WITH_CURL=yes WITH_OPENSSL=yes WITH_BZ2=yes WITH_GD=yes WITH_MCRYPT=yes WITH_MYSQL=yes WITH_XML=yes WITH_APACHE=yes"
+$DO pkg_delete -f -x '^php4-' t1lib
+$DO portupgrade -N -PP -R lang/php4-extensions || {
+    echo '*** portupgrade failed'
+    exit 2
+}
+MAKEFLAGS=$oMAKEFLAGS
+
+echo "update-ports: Reinstall legacy p5-DBD package ..."
+$DO pkg_delete -f -x p5-DBD-mysql
+$DO portupgrade -N -PP misc/p5-DBD-mysql50-old || {
+    echo '*** portupgrade of p5-DBD-mysql failed'
+    exit 2
+}
+
+echo "update-ports: Apply important Emulab port patches ..."
+patchdir=$UTMPDIR
+perldir=/usr/local/lib/perl5/site_perl/5.8.8/mach
+if [ -f $patchdir/Mysql.pm.patch -a -f $perldir/Mysql.pm ]; then
+    patch -d $perldir -p0 < $patchdir/Mysql.pm.patch
+fi
+pythondir=/usr/local/lib/python2.5/site-packages
+if [ -f $patchdir/m2crypto.patch-0.17 -a -d $pythondir/M2Crypto ]; then
+    patch -p0 < $patchdir/m2crypto.patch-0.17
+fi
+
+echo "update-ports: Cleanup startup scripts ..."
+startdir=/usr/local/etc/rc.d
+if [ -f $startdir/1.mysql-client.sh -a -f $startdir/mysql-client ]; then
+    rm -f $startdir/mysql-client
+fi
+if [ -f $startdir/1.mysql-server.sh -o -f $startdir/2.mysql-server.sh ] &&
+   [ -f $startdir/mysql-server ]; then
+    rm -f $startdir/mysql-server
+fi
+if [ -f $startdir/apache.sh.sample ]; then
+    cp -p $startdir/apache.sh.sample $startdir/apache.sh
+fi
+if [ -f $startdir/2.dhcpd.sh -a -f $startdir/isc-dhcpd ]; then
+    rm -f $startdir/isc-dhcpd
+fi
+
+echo "update-ports: Clean out old binaries ..."
+# XXX remnants of named port
+if [ "$SERVER" = "boss" -a -x /usr/local/sbin/rndc ]; then
+    rm -f $startdir/1.named.sh /usr/local/sbin/rndc*
+fi
+
+echo "update-ports: Installing old FreeBSD compatibility packages ..."
+$DO portupgrade -N -PP misc/compat4x misc/compat5x || {
+    echo '*** portupgrade failed'
+    exit 2
+}
+
+exit 0

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX Need to deal with locking at some point ...
@@ -19,7 +19,11 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
+use Project;
 use English;
+use Experiment;
+use Archive;
+use Template;
 use File::stat;
 use File::Basename;
 use POSIX qw(strftime);
@@ -28,1201 +32,16 @@ use Time::HiRes qw(gettimeofday);
 # Configure variables
 my $TB		= "@prefix@";
 my $MAINSITE    = @TBMAINSITE@;
-my $ALLOWEDPID  = "testbed";
-# XXX
-my $ARCHIVEDIR  = "/usr/testbed/exparchive";
-my $TESTMODE    = @TESTMODE@;
-my $TBOPS       = "@TBOPSEMAIL@";
-my $ELABINELAB  = @ELABINELAB@;
-my $MD5		= "/sbin/md5";
-my $MKDIR       = "/bin/mkdir";
-my $CHMOD       = "/bin/chmod";
-my $CHGRP       = "/usr/bin/chgrp";
+my $ARCHSUPPORT = @ARCHIVESUPPORT@;
+my $USEARCHIVE  = $ARCHSUPPORT;
+my $ZIPINFO     = "/usr/local/bin/zipinfo";
 my $TAR		= "/usr/bin/tar";
-my $RSYNC	= "/usr/local/bin/rsync";
-my $RM		= "/bin/rm";
-my $REALPATH	= "/bin/realpath";
-my $SVN         = "/usr/local/bin/svn";
-my $SVNADMIN    = "/usr/local/bin/svnadmin";
-my $IMPORTER    = "$TB/sbin/svn_load_dirs.pl";
-my $inittag     = 'root';
-my $defaultview = 'head';
-my $debug       = 0;
-my $svnopt      = ($debug ? "" : "-q");
-my %ROOTS       = ("proj"   => "proj",
-		   "users"  => "users",
-		   "share"  => "share",
-		   "groups" => "groups");
 
-my $TAGTYPE_USER      = "user";
-my $TAGTYPE_COMMIT    = "commit";
-my $TAGTYPE_SAVEPOINT = "savepoint";
-my $TAGTYPE_INTERNAL  = "internal";
-
-#
-# Set umask so that other people in the project can mess with the archive.
-#
-umask(0002);
-
-# Little helper and debug function.
-sub mysystem($)
-{
-    my ($command) = @_;
-
-    print STDERR "Running '$command'\n"
-	if ($debug);
-    system($command);
-}
-
-# Another little helper for scripts that include this library.
 sub setdebug($)
 {
     my ($toggle) = @_;
 
-    if ($toggle) {
-	$debug  = $toggle;
-	$svnopt = "";
-    }
-    else {
-	$debug  = 0;
-	$svnopt = "-q";
-    }
-}
-
-#
-# Create a new archive. Returns -1 if any error. Otherwise return
-# the new record index.
-# 
-sub ArchiveCreate(;$$$)
-{
-    my ($tag, $view, $unix_gid) = @_;
-    
-    my $idx;
-    my $dir;
-
-    $tag = $inittag
-	if (!defined($tag));
-    $view = $defaultview
-	if (!defined($view));
-
-    # Tags cannot must start with a letter.
-    if ($tag =~ /^\d+/) {
-	$tag = "T" . $tag;
-    }
-
-    #
-    # Need to create the directory for it, once we have the index.
-    # 
-    my $query_result =
-	DBQueryWarn("insert into archives set ".
-		    "  idx=NULL, ".
-		    "  date_created=UNIX_TIMESTAMP(now())");
-
-    return -1
-	if (!$query_result);
-
-    $idx = $query_result->insertid;
-    $dir = "$ARCHIVEDIR/$idx";
-
-    #
-    # Create the directory and store the absolute path into the new record.
-    # This should probably be a privledged operation at some point.
-    # 
-    mysystem("$MKDIR $dir") == 0 or goto bad;
-    mysystem("$CHMOD 775 $dir") == 0 or goto bad;
-    if (defined($unix_gid)) {
-	mysystem("$CHGRP $unix_gid $dir") == 0 or goto bad;
-    }
-
-    DBQueryWarn("update archives set directory='$dir' where idx='$idx'")
-	or goto bad;
-
-    #
-    # Make subdirs. One to hold the control tree, and the other
-    # to hold currently checked out versions of the tree. Lastly, we
-    # need a place to copyin files before they are added to the repo.
-    #
-    my $repodir   = "$dir/repo";
-    my $checkouts = "$dir/checkouts";
-    my $checkins  = "$dir/checkins";
-
-    if (! mkdir("$repodir", 0777)) {
-	print STDERR "ArchiveCreate: Could not mkdir $repodir: $!\n";
-	goto bad;
-    }
-    if (! chmod(0777, "$repodir")) {
-	print STDERR "ArchiveCreate: Could not chmod $repodir: $!\n";
-	goto bad;
-    }
-    if (! mkdir("$checkouts", 0777)) {
-	print STDERR "ArchiveCreate: Could not mkdir $checkouts: $!\n";
-	goto bad;
-    }
-    if (! chmod(0777, "$checkouts")) {
-	print STDERR "ArchiveCreate: Could not chmod $checkouts: $!\n";
-	goto bad;
-    }
-    if (! mkdir("$checkins", 0777)) {
-	print STDERR "ArchiveCreate: Could not mkdir $checkins: $!\n";
-	goto bad;
-    }
-    if (! chmod(0777, "$checkins")) {
-	print STDERR "ArchiveCreate: Could not chmod $checkins: $!\n";
-	goto bad;
-    }
-    if (! mkdir("$checkins/$view", 0777)) {
-	print STDERR "ArchiveCreate: Could not mkdir $checkins/$view: $!\n";
-	goto bad;
-    }
-    if (! chmod(0777, "$checkins/$view")) {
-	print STDERR "ArchiveCreate: Could not chmod $checkins/$view: $!\n";
-	goto bad;
-    }
-    # Initialize the repo.
-    mysystem("$SVNADMIN create $repodir") == 0
-	or goto bad;
-    
-    # Create an stub directory tree and import it as "root"
-    mysystem("cd $dir; mkdir ignore; cd ignore; mkdir $view; ".
-             "         mkdir $view/trunk $view/savepoint $view/tags; ".
-	     "         mkdir $view/history; ".
-	     "$SVN import $svnopt -m 'ArchiveCreate' ".
-	     "     $view file://$repodir/$view")
-	== 0 or goto bad;
-
-    # Create a branch tag in the tags directory to base differences against.
-    mysystem("$SVN copy $svnopt -m 'ArchiveCreate Branch' ".
-	     "          file://$repodir/$view/trunk ".
-	     "          file://$repodir/$view/tags/${tag}-branch")
-	== 0 or goto bad;
-    
-    # Now check it out. This creates the $checkouts/$view directory.
-    mysystem("cd $checkouts; ".
-	     "$SVN checkout $svnopt file://$repodir/$view")
-	== 0 or goto bad;
-
-    # Now enter the default view (okay, branch) of this archive.
-    DBQueryWarn("insert into archive_views set ".
-		"  current_tag='$tag', archive_idx='$idx', view='$view', ".
-		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
-    
-    # Now enter an initial tag for the tree. Nothing actually gets tagged.
-    DBQueryWarn("insert into archive_tags set idx=NULL, ".
-		"  tag='$tag', archive_idx='$idx', view='$view', ".
-		"  tagtype='$TAGTYPE_INTERNAL', ".
-		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
-    
-    return $idx;
-
-  bad:
-#    mysystem("$RM -rf $dir")
-#        if (defined($dir));
-    DBQueryFatal("delete from archive_views ".
-		 "where view='$view' and archive_idx='$idx'")
-	if (defined($idx));
-    DBQueryFatal("delete from archives where idx='$idx'")
-	if (defined($idx));
-    return -1;
-}
-
-#
-# Helper function for below; Checks that a path is safe and legal.
-#
-sub ValidatePath($)
-{
-    my ($ppath)  = @_;
-    # We get a pointer so we can return the new path.
-    my $pathname = $$ppath;
-    my $rootdir;
-
-    # Taint check path before handing off to shell below.
-    if ($pathname =~ /^([-\w\/\.\+\@,~]+)$/) {
-	$pathname = $1;
-    }
-    else {
-	print STDERR "*** ValidatePath: illegal characters in '$pathname'\n";
-	return 1;
-    }
-
-    if (! -e $pathname || ! -r $pathname) {
-	print STDERR "*** ValidatePath: $pathname cannot be read!\n";
-	return 1;
-    }
-
-    #
-    # Use realpath to check that the path does not contain links to
-    # files outside the directory space the user is allowed to access.
-    # We must taint check the result to keep everyone happy.
-    #
-    my $realpath = `$REALPATH $pathname`;
-    if ($realpath =~ /^([-\w\/\.\+\@,~]+)$/) {
-	$realpath = $1;
-    }
-    else {
-	print STDERR "*** ValidatePath: ".
-	    "Bad data returned by realpath: $realpath\n";
-	return -1;
-    }
-
-    #
-    # Strip leading /dir from the pathname. We want a relative path to
-    # the rootdir so we can copy it in.
-    #
-    if ($realpath =~ /^[\/]+(\w+)\/(.+)$/) {
-	$rootdir  = $1;
-	$pathname = $2;
-    }
-    else {
-	print STDERR "*** ValidatePath: ".
-	    "Illegal characters in pathname: $realpath\n";
-	return -1;
-    }
-
-    #
-    # The file must reside in one of the Emulab "root" filesystems.
-    #
-    if (! exists($ROOTS{$rootdir})) {
-	print STDERR "*** ValidatePath: ".
-	    "$realpath does not resolve to an allowed directory!\n";
-	return -1;
-    }
-
-    $$ppath = $realpath;
-    return 0;
-}
-    
-#
-# Add a file to an archive. Returns -1 if any error. Otherwise return 0.
-# All this does is copy the file (and its directory structure) into the
-# temporary store. Later, after all the files are in the tree, must
-# commit it to the repo. 
-#
-sub ArchiveAdd($$;$$)
-{
-    my ($archive_idx, $pathname, $view, $exact) = @_;
-    my $rootdir;
-
-    $view = $defaultview
-	if (!defined($view));
-
-    $exact = 0
-	if (!defined($exact));
-
-    # This returns a taint checked value in $pathname.
-    if (ValidatePath(\$pathname) != 0) {
-	print STDERR "ArchiveAdd: Could not validate pathname $pathname\n";
-	return -1;
-    }
-
-    #
-    # Strip leading /dir from the pathname, we need it below.
-    #
-    if ($pathname =~ /^[\/]+(\w+)\/([-\w\/\.\+\@,~]+)$/) {
-	$rootdir  = $1;
-	$pathname = $2;
-    }
-    else {
-	print STDERR "ArchiveAdd: Illegal characters in pathname $pathname\n";
-	return -1;
-    }
-
-    #
-    # See if the archive exists and if it does, get the pathname to it.
-    #
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveAdd: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveAdd: $directory cannot be written!\n";
-	return -1;
-    }
-    my $repodir   = "$directory/repo";
-    my $checkout  = "$directory/checkouts/$view";
-    my $checkin   = "$directory/checkins/$view";
-    
-    #
-    # Copy the file in. We use tar on individual files (to retain the
-    # directory structure and mode bits, etc). On a directory, use either
-    # tar or rsync, depending on whether we want an exact copy (removing
-    # files in the target that are not present in the source). 
-    #
-    if (! -e "$checkin/$rootdir") {
-	mysystem("$MKDIR $checkin/$rootdir") == 0 or return -1;
-    }
-    
-    if (-f "/${rootdir}/${pathname}" || !$exact) {
-	mysystem("$TAR cf - -C /$rootdir $pathname | ".
-		 "$TAR xf - -U -C $checkin/$rootdir");
-	mysystem("$CHMOD 775 $checkin/$rootdir/$pathname");
-    }
-    else {
-	mysystem("cd /$rootdir; ".
-		 "$RSYNC -R -rtgoDlz --delete ${pathname} $checkin/$rootdir");
-    }
-    if ($?) {
-	print STDERR "ArchiveAdd: Could not copy in /$rootdir/$pathname\n";
-	return -1;
-    }
-    return 0;
-}
-
-#
-# Bring the current contents of the temporary store into the archive as a
-# checkpoint (or a savepoint I guess). Implementationlly, its really a
-# branch off the current import revision, since it does not become a new
-# head revision until the entire branch (all the savepoints) is committed
-# later, say when the experiment is swapped out.
-#
-sub ArchiveSavePoint($;$$$)
-{
-    my ($archive_idx, $savetag, $view, $altdir) = @_;
-    my $cwd;
-
-    $view = $defaultview
-	if (!defined($view));
-
-    return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
-	    TBSCRIPTLOCK_OKAY());
-
-    #
-    # See if the archive exists and if it does, get the pathname to it.
-    #
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveSavePoint: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	goto bad;
-    }
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveSavePoint: $directory cannot be written!\n";
-	goto bad;
-    }
-    my $repodir   = "$directory/repo";
-    my $checkin   = (defined($altdir) ? $altdir : "$directory/checkins/$view");
-
-    # Need to remember where we came from!
-    chomp($cwd = `pwd`);
-    # Must do the taint check too.
-    if ($cwd =~ /^([-\w\.\/]+)$/) {
-	$cwd = $1;
-    }
-    else {
-	print STDERR "ArchiveSavePoint: Bad data in $cwd!\n";
-	goto bad;
-    }
-
-    # Get the current tag for the archive.
-    my ($archive_tag);
-    if (GetArchiveCurrentTags($archive_idx, $view, \$archive_tag) < 0) {
-	print STDERR "ArchiveSavePoint: ".
-	    "Archive '$archive_idx' does not have a current tag!\n";
-	goto bad;
-    }
-
-    # Make up a savetag if one not provided.
-    if (!defined($savetag)) {
-	my ($seconds, $microseconds) = gettimeofday();
-	
-	$savetag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-	$savetag .= $microseconds;
-	$savetag .= "_savepoint";
-    }
-
-    # Tags must start with a letter.
-    if ($savetag =~ /^\d+/) {
-	$savetag = "T" . $savetag;
-    }
-    
-    #
-    # Use svn import command. This is nice cause it handles all the
-    # subdirs and stuff in one shot, instead of trying to deal with
-    # each file and directory individually.
-    #
-    if (! chdir("$checkin")) {
-	print STDERR "ArchiveSavePoint: Cannot chdir to $checkin!\n";
-	goto bad;
-    }
-    mysystem("$IMPORTER -no_user_input file://$repodir ".
-	     "          $view/savepoint . " .
-	     ($debug < 2 ? "> /dev/null" : ""))
-	== 0 or goto bad;
-
-    #
-    # Create the tag for this savepoint. 
-    # 
-    mysystem("$SVN copy $svnopt -m 'ArchiveCreate Branch' ".
-	     "          file://$repodir/$view/savepoint ".
-	     "          file://$repodir/$view/tags/${savetag}")
-	== 0 or goto bad;
-    
-
-    #
-    # And record the new tag. 
-    # 
-    DBQueryWarn("insert into archive_tags set idx=NULL, ".
-		"  tag='$savetag', view='$view', ".
-		"  archive_idx='$archive_idx', ".
-		"  tagtype='$TAGTYPE_SAVEPOINT', ".
-		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
-
-  okay:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return 0;
-
-  bad:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return -1;
-}
-
-#
-# Commit the current contents of the temporary store to the archive.
-# Returns -1 if any error. Otherwise return 0.
-#
-sub ArchiveCommit($;$$$$)
-{
-    my ($archive_idx, $newtag, $mfile, $view, $altdir) = @_;
-    my $noactivity = 0;
-    my $cwd;
-
-    $view = $defaultview
-	if (!defined($view));
-
-    return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
-	    TBSCRIPTLOCK_OKAY());
-
-    #
-    # See if the archive exists and if it does, get the pathname to it.
-    #
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveCommit: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	goto bad;
-    }
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveCommit: $directory cannot be written!\n";
-	goto bad;
-    }
-    my $repodir   = "$directory/repo";
-    my $checkout  = "$directory/checkouts/$view";
-    my $checkin   = (defined($altdir) ? $altdir : "$directory/checkins/$view");
-
-    # Need to remember where we came from!
-    chomp($cwd = `pwd`);
-    # Must do the taint check too.
-    if ($cwd =~ /^([-\w\.\/]+)$/) {
-	$cwd = $1;
-    }
-    else {
-	print STDERR "ArchiveCommit: Bad data in $cwd!\n";
-	goto bad;
-    }
-
-    if (! chdir("$directory")) {
-	print STDERR "ArchiveCommit: Cannot chdir to $directory!\n";
-	goto bad;
-    }
-
-    # Get the current tags for the archive.
-    my ($archive_tag, $previous_tag);
-    if (GetArchiveCurrentTags($archive_idx, $view, \$archive_tag,
-			      \$previous_tag) < 0) {
-	print STDERR "ArchiveCommit: ".
-	    "Archive '$archive_idx' does not have a current tag!\n";
-	goto bad;
-    }
-
-    #
-    # Form new tag.
-    # 
-    my ($seconds, $microseconds) = gettimeofday();
-    my $import_tag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-    $import_tag    .= $microseconds;
-
-    if (!defined($newtag)) {
-	$newtag = $import_tag . "_commit";
-    }
-
-    # Tags cannot must start with a letter.
-    if ($newtag =~ /^\d+/) {
-	$newtag = "T" . $newtag;
-    }
-
-    #
-    # Lets see if there has been any action since the last commit.
-    # Check for new tags, and if nothing has happened, just drop a
-    # new set of tags in and return.
-    #
-    my $query_result =
-	DBQueryWarn("select tag from archive_tags ".
-		    "where archive_idx='$archive_idx' and view='$view' ".
-		    "order by idx desc limit 1");
-    goto bad
-	if (!$query_result || !$query_result->numrows);
-    
-    my ($tmptag) = $query_result->fetchrow_array();
-    if ($tmptag eq $archive_tag) {
-	print "ArchiveCommit: Archive is clean; no need to commit.\n";
-	$noactivity = 1;
-    }
-
-    #
-    # Message can come from a file. 
-    #
-    my $message_arg = "-m 'Commit merge of ${archive_tag} to trunk'";
-
-    if (defined($mfile)) {
-	if (! -r $mfile) {
-	    print STDERR "*** ArchiveCommit: $mfile cannot be read!\n";
-	    goto bad;
-	}
-	$message_arg = "-F $mfile";
-    }
-    
-    #
-    # Okay, do the commit to the trunk for this view.
-    # 
-    if (! $noactivity) {
-	#
-	# Create a temporary spot to work in.
-	# 
-	if (! mkdir("merge.$$", 0777)) {
-	    print STDERR "ArchiveCommit: Could not mkdir merge.$$: $!\n";
-	    goto bad;
-	}
-	chdir("merge.$$");
-	
-	#
-	# Check out the current trunk.
-	#
-	mysystem("$SVN checkout $svnopt file://$repodir/$view/trunk")
-	    == 0 or goto bad;
-
-	#
-	# Do a merge from the branch off the previous commit tag, with
-	# the savepoint. This is merged into the working directory we
-	# just checked out above. This will do the work of scheduling
-	# additions and deletions.
-	#
-	mysystem("$SVN merge $svnopt ".
-		 "     file://$repodir/$view/tags/${archive_tag}-branch ".
-		 "     file://$repodir/$view/savepoint ".
-		 "     trunk")
-	    == 0 or goto bad;
-
-	mysystem("$SVN commit $svnopt $message_arg trunk")
-	    == 0 or goto bad;
-
-	# Clean the temp dir,
-	chdir("$directory");
-	mysystem("/bin/rm -rf merge.$$");
-	if ($?) {
-	    print STDERR "ArchiveCommit: Could not remove merge.$$\n";
-	}
-    }
-
-    # Create a tag in the tags directory for the commit.
-    mysystem("$SVN copy $svnopt $message_arg ".
-	     "          file://$repodir/$view/trunk ".
-	     "          file://$repodir/$view/tags/${newtag}")
-	== 0 or goto bad;
-    
-    # Create a tag in the history directory for the commit. The
-    # history directory has just the commit tags, so its easy to go
-    # back in time.
-    mysystem("$SVN copy $svnopt $message_arg ".
-	     "          file://$repodir/$view/trunk ".
-	     "          file://$repodir/$view/history/${newtag}")
-	== 0 or goto bad;
-    
-    # Create a branch tag in the tags directory to base differences against.
-    mysystem("$SVN copy $svnopt -m 'ArchiveCommit Branch' ".
-	     "          file://$repodir/$view/trunk ".
-	     "          file://$repodir/$view/tags/${newtag}-branch")
-	== 0 or goto bad;
-
-    # For putting message into DB.
-    my $dclause = (defined($mfile) ? 
-		   ", description=" . DBQuoteSpecial(`cat $mfile`) : "");
-    
-    DBQueryWarn("insert into archive_tags set idx=NULL, ".
-		"  tag='$newtag', view='$view', ".
-		"  archive_idx='$archive_idx', ".
-		"  tagtype='$TAGTYPE_COMMIT', ".
-		"  date_created=UNIX_TIMESTAMP(now()) $dclause")
-	or goto bad;
-
-    DBQueryWarn("update archive_views set ".
-		"  current_tag='$newtag', ".
-		"  previous_tag='$archive_tag' ".
-		"where archive_idx='$archive_idx' and view='$view'")
-	or goto bad;
-
-    # And now into the checkout dir to checkout a current copy.
-    if (! chdir("$checkout")) {
-	print STDERR "ArchiveCommit: Cannot chdir to $checkout!\n";
-	goto bad;
-    }
-    mysystem("$SVN $svnopt update trunk");
-    if ($?) {
-	print STDERR "ArchiveCommit: Could not update head revision!\n";
-	goto bad;
-    }
-  okay:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return 0;
-
-  bad:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return -1;
-}
-
-#
-# Fork an archive (okay, branch) for use in separate development. Note that
-# once forked, there is no join, as that would be impossibly hard to deal
-# with cause of conflicts.
-#
-sub ArchiveFork($$;$$$)
-{
-    my ($archive_idx, $newview, $branchtag, $newtag, $view) = @_;
-    my $sourcepoint;
-    my $cwd;
-
-    $view = $defaultview
-	if (!defined($view));
-
-    return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
-	    TBSCRIPTLOCK_OKAY());
-
-    #
-    # See if the archive exists and if it does, get the pathname to it.
-    #
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveFork: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	goto bad;
-    }
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveFork: $directory cannot be written!\n";
-	goto bad;
-    }
-    my $repodir     = "$directory/repo";
-    my $checkouts   = "$directory/checkouts";
-    my $checkout    = "$directory/checkouts/$view";
-    my $checkin     = "$directory/checkins/$view";
-    my $newcheckout = "$directory/checkouts/$newview";
-    my $newcheckin  = "$directory/checkins/$newview";
-
-    # Need to remember where we came from!
-    chomp($cwd = `pwd`);
-    # Must do the taint check too.
-    if ($cwd =~ /^([-\w\.\/]+)$/) {
-	$cwd = $1;
-    }
-    else {
-	print STDERR "ArchiveFork: Bad data in $cwd!\n";
-	goto bad;
-    }
-
-    # Get the current tags for the archive.
-    my ($archive_tag, $previous_tag);
-    if (GetArchiveCurrentTags($archive_idx, $view, \$archive_tag,
-			      \$previous_tag) < 0) {
-	print STDERR "ArchiveFork: ".
-	    "Archive '$archive_idx' does not have a current tag!\n";
-	goto bad;
-    }
-
-    #
-    # Form new tag.
-    # 
-    my ($seconds, $microseconds) = gettimeofday();
-    my $import_tag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-    $import_tag    .= $microseconds;
-
-    if (!defined($newtag)) {
-	$newtag = $import_tag . "_fork";
-    }
-
-    # Tags cannot must start with a letter.
-    if ($newtag =~ /^\d+/) {
-	$newtag = "T" . $newtag;
-    }
-
-    # Create new view directories and checkout.
-    if (! mkdir("$newcheckin", 0777)) {
-	print STDERR "ArchiveFork: Could not mkdir $newcheckin: $!\n";
-	goto bad;
-    }
-    if (! chmod(0777, "$newcheckin")) {
-	print STDERR "ArchiveFork: Could not chmod $newcheckin: $!\n";
-	goto bad;
-    }
-
-    # Create newview directory in the repo.
-    mysystem("$SVN mkdir $svnopt -m 'ArchiveFork' ".
-	     "          file://$repodir/$newview")
-	== 0 or goto bad;
-
-    #
-    # If no branchtag supplied, we want to branch at the trunk. But we still
-    # need to mark it with a tag or else we have no idea later what actually
-    # happened.
-    #
-    if (!defined($branchtag)) {
-	$branchtag = $import_tag . "_fork";
-
-	mysystem("$SVN copy $svnopt -m 'ArchiveFork' ".
-		 "          file://$repodir/$view/trunk ".
-		 "          file://$repodir/$view/tags/$branchtag")
-	    == 0 or goto bad;
-    }
-    $sourcepoint = "tags/$branchtag";
-
-    # Copy the trunk of the old view.
-    mysystem("$SVN copy $svnopt -m 'ArchiveFork' ".
-	     "          file://$repodir/$view/$sourcepoint ".
-	     "          file://$repodir/$newview/trunk")
-	== 0 or goto bad;
-
-    # Ditto for the savepoints directory. 
-    mysystem("$SVN copy $svnopt -m 'ArchiveFork' ".
-	     "          file://$repodir/$view/savepoint ".
-	     "          file://$repodir/$newview/savepoint")
-	== 0 or goto bad;
-
-    # Do not want to copy the tags/history directories. Add new ones.
-    mysystem("$SVN mkdir $svnopt -m 'ArchiveFork' ".
-	     "          file://$repodir/$newview/history ".
-	     "          file://$repodir/$newview/tags")
-	== 0 or goto bad;
-
-    # Create a branch tag in the tags directory to base differences against.
-    mysystem("$SVN copy $svnopt -m 'ArchiveFork Branch' ".
-	     "          file://$repodir/$newview/trunk ".
-	     "          file://$repodir/$newview/tags/${newtag}-branch")
-	== 0 or goto bad;
-    
-    # Now check it out. This creates the checkouts/$newview directory.
-    mysystem("cd $checkouts; ".
-	     "$SVN checkout $svnopt file://$repodir/$newview")
-	== 0 or goto bad;
-
-    # Now enter the newview (okay, branch) of this archive.
-    DBQueryWarn("insert into archive_views set ".
-		"  current_tag='$newtag', archive_idx='$archive_idx', ".
-		"  view='$newview', ".
-		"  parent_view='$view', branch_tag='$branchtag', ".
-		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
-    
-    # Now enter an initial tag for the new view. Nothing actually gets tagged.
-    DBQueryWarn("insert into archive_tags set idx=NULL, ".
-		"  tag='$newtag', archive_idx='$archive_idx', ".
-		"  tagtype='$TAGTYPE_INTERNAL', ".
-		"  view='$newview', ".
-		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
-
-  okay:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return 0;
-
-  bad:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return -1;
-}
-
-#
-# Checkout a copy of the archive, optionally at a particular view/branch.
-#
-sub ArchiveCheckout($$;$$$)
-{
-    my ($archive_idx, $target, $view, $tag, $subdir) = @_;
-    my $sourcepoint;
-    my $cwd;
-
-    $view = $defaultview
-	if (!defined($view));
-
-    return -1
-	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
-	    TBSCRIPTLOCK_OKAY());
-
-    #
-    # See if the archive exists and if it does, get the pathname to it.
-    #
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveCheckout: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	goto bad;
-    }
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveCheckout: $directory cannot be written!\n";
-	goto bad;
-    }
-    my $repodir     = "$directory/repo";
-
-    #
-    # We allow target to exist or not exist.
-    #
-    if (! -e $target) {
-	if (! mkdir("$target", 0777)) {
-	    print STDERR "ArchiveCheckout: Could not mkdir $target: $!\n";
-	    return -1;
-	}
-	if (! chmod(0777, "$target")) {
-	    print STDERR "ArchiveCheckout: ".
-		"Could not chmod directory $target: $!\n";
-	    return -1;
-	}
-    }
-
-    # Need to remember where we came from!
-    chomp($cwd = `pwd`);
-    # Must do the taint check too.
-    if ($cwd =~ /^([-\w\.\/]+)$/) {
-	$cwd = $1;
-    }
-    else {
-	print STDERR "ArchiveCheckout: Bad data in $cwd!\n";
-	goto bad;
-    }
-
-    # Where to find what we want.
-    if (defined($tag)) {
-	$sourcepoint = "tags/$tag";
-    }
-    else {
-	$sourcepoint = "trunk"
-    }
-    # Allowed to check out a particular subdir (but not a file).
-    $sourcepoint = $sourcepoint . "/$subdir"
-	if (defined($subdir));
-
-    # Now check it out. This creates the $checkouts/$view directory.
-    mysystem("cd $target; ".
-	     "$SVN checkout $svnopt file://$repodir/$view/$sourcepoint .")
-	== 0 or goto bad;
-  okay:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return 0;
-
-  bad:
-    TBScriptUnlock();
-    chdir($cwd)
-	if (defined($cwd));
-    return -1;
-}
-
-#
-# Archive the Archive, moving it into the expinfo directory.
-# I intend this to be run only when an experiment is terminated.
-# No need to have two copies.
-#
-sub ArchiveArchive($$)
-{
-    my ($archive_idx, $dirpath) = @_;
-    my $target = "$dirpath/Archive";
-
-    #
-    # See if the archive exists and if it does, get the pathname to it.
-    #
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveArchive: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
-
-    #
-    # Need additional check to make sure that it has not already been
-    # archived.
-    #
-    my ($archived, $date_archived);
-    
-    if (IsArchiveArchived($archive_idx, \$archived, \$date_archived) < 0) {
-	return -1;
-    }
-    if ($archived) {
-	print STDERR "ArchiveArchive: ".
-	    "Archive '$archive_idx' already archived on $date_archived!\n";
-	return 0;
-    }
-
-    # Is it shared? If so, certainly do not archive it!
-    my $shared;
-    if (IsArchiveShared($archive_idx, \$shared) < 0) {
-	return -1;
-    }
-    if ($shared) {
-	print STDERR "ArchiveArchive: ".
-	    "Archive '$archive_idx' is shared; not archiving!\n";
-	return 0;
-    }
-    
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveArchive: $directory cannot be written!\n";
-	return -1;
-    }
-
-    if (! -e $target) {
-	if (! mkdir("$target", 0777)) {
-	    print STDERR "ArchiveArchive: Could not mkdir $target: $!\n";
-	    return -1;
-	}
-	if (! chmod(0777, "$target")) {
-	    print STDERR "ArchiveArchive: ".
-		"Could not chmod directory $target: $!\n";
-	    return -1;
-	}
-    }    
-
-    #
-    # Tar up the whole thing and move it across.
-    #
-    mysystem("$TAR cf - -C $directory repo | tar xf - -C $target");
-    if ($?) {
-	print STDERR "ArchiveArchive: Could not copy in $directory\n";
-	return -1;
-    }
-
-    #
-    # Update its location in the DB, and remove the old directory.
-    # 
-    DBQueryWarn("update archives set ".
-		"   directory='$target', ".
-		"   archived=1, ".
-		"   date_archived=UNIX_TIMESTAMP(now()) ".
-		"where idx='$archive_idx'")
-	or return -1;
-    
-    mysystem("/bin/rm -rf $directory");
-    if ($?) {
-	print STDERR "ArchiveArchive: ".
-	    "Could not remove contents of $directory!\n";
-	return -1;
-    }
-    return 0;
-}
-
-#
-# Destroy an archive. The DB state is retained unless optional flag says
-# to clean it.
-#
-sub ArchiveDestroy($$;$)
-{
-    my ($archive_idx, $clean, $view) = @_;
-
-    $view = $defaultview
-	if (!defined($view));
-
-    #
-    # See if the archive exists and if it does, get the pathname to it.
-    #
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveDestroy: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
-
-    #
-    # Need additional check to make sure that it has not already been
-    # archived. Do not want to do anything, unless clean is specified.
-    #
-    my ($archived, $date_archived);
-    
-    if (IsArchiveArchived($archive_idx, \$archived, \$date_archived) < 0) {
-	return -1;
-    }
-    if ($archived && !$clean) {
-	print STDERR "ArchiveDestroy: ".
-	    "Archive '$archive_idx' archived on $date_archived!\n";
-	return 0;
-    }
-    
-    if (! -d $directory || ! -w $directory) {
-	return 0;
-    }
-
-    # Is it shared? If so, certainly do not delete it!
-    my $shared;
-    if (IsArchiveShared($archive_idx, \$shared) < 0) {
-	return -1;
-    }
-
-    if (! $shared) {
-	mysystem("/bin/rm -rf $directory");
-	if ($?) {
-	    print STDERR "ArchiveDestroy: ".
-		"Could not remove contents of $directory!\n";
-	    return -1;
-	}
-    }
-    elsif ($clean) {
-	my $checkout  = "$directory/checkouts/$view";
-	my $checkin   = "$directory/checkins/$view";
-
-	mysystem("/bin/rm -rf $checkout $checkin");
-	if ($?) {
-	    print STDERR "ArchiveDestroy: ".
-		"Could not remove contents of $directory!\n";
-	    return -1;
-	}
-    }
-    
-    if ($clean) {
-	(DBQueryWarn("delete from archive_tags ".
-		     "where archive_idx='$archive_idx' and view='$view'") &&
-	 DBQueryWarn("delete from archive_views ".
-		     "where archive_idx='$archive_idx' and view='$view'"))
-	    || return -1;
-	
-	if (! $shared) {
-	    DBQueryWarn("delete from archives ".
-			"where idx='$archive_idx'") || return -1;
-	}
-    }
-    return 0;
-}
-
-#
-# Get the directory for an archive, given its index. Returns -1 on error,
-# zero otherwise. 
-#
-sub GetArchiveDirectory($$)
-{
-    my ($idx, $rvalp) = @_;
-    
-    my $query_result =
-	DBQueryWarn("select directory from archives where idx='$idx'");
-
-    return -1
-	if (!$query_result || !$query_result->numrows);
-    my ($dir) = $query_result->fetchrow_array();
-
-    $$rvalp = $dir
-	if (defined($rvalp));
-    return 0;
-}
-
-#
-# See if the archive has already been archived away, and when.
-#
-sub IsArchiveArchived($$$)
-{
-    my ($idx, $parch, $pdate) = @_;
-    
-    my $query_result =
-	DBQueryWarn("select archived,FROM_UNIXTIME(date_archived) ".
-		    "  from archives where idx='$idx'");
-
-    return -1
-	if (!$query_result || !$query_result->numrows);
-    
-    my ($archived,$date_archived) = $query_result->fetchrow_array();
-
-    $$parch = $archived
-	if (defined($parch));
-    $$pdate = $date_archived
-	if (defined($pdate));
-    
-    return 0;
-}
-
-#
-# See if the archive is shared amongst more then one experiment. This
-# only looks at current experiments. Once an archive is archived, not
-# sure what we will do if the user want to branch from it. 
-#
-sub IsArchiveShared($$)
-{
-    my ($idx, $prval) = @_;
-    
-    my $query_result =
-	DBQueryWarn("select e.pid,e.eid,s.archive_idx from experiments as e ".
-		    "left join experiment_stats as s on s.exptidx=e.idx ".
-		    "where s.archive_idx='$idx'");
-
-    return -1
-	if (!$query_result || !$query_result->numrows);
-    
-    $$prval = (($query_result->numrows > 1) ? 1 : 0)
-	if (defined($prval));
-    
-    return 0;
-}
-
-#
-# See if a tag is unique to the archive.
-#
-sub IsArchiveTaqUnique($$$;$)
-{
-    my ($idx, $tag, $prval, $view) = @_;
-    
-    $view = $defaultview
-	if (!defined($view));
-
-    my $query_result =
-	DBQueryWarn("select * from archive_tags ".
-		    "where archive_idx='$idx' and ".
-		    "      view='$view' and tag='$tag'");
-    return -1
-	if (!$query_result);
-
-    $$prval = (($query_result->numrows > 0) ? 0 : 1)
-	if (defined($prval));
-    
-    return 0;
-}
-
-#
-# Get the current tag for an archive, given its index. Returns -1 on error,
-# zero otherwise. Place tag in the return pointer.
-#
-sub GetArchiveCurrentTags($$$;$)
-{
-    my ($archive_idx, $view, $tagp, $prevp) = @_;
-    
-    my $query_result =
-	DBQueryWarn("select v.current_tag,v.previous_tag ".
-		    "    from archive_views as v ".
-		    "left join archive_tags as t on ".
-		    "     t.archive_idx=v.archive_idx and ".
-		    "     t.tag=v.current_tag and t.view=v.view ".
-		    "where v.archive_idx='$archive_idx' and ".
-		    "      v.view='$view'");
-
-    return -1
-	if (!$query_result);
-    my ($tag,$previous) = $query_result->fetchrow_array();
-    
-    $$tagp = $tag
-	if (defined($tagp));
-    $$prevp = $previous
-	if (defined($prevp));
-    return 0;
+    Archive::setdebug($toggle);
 }
 
 #
@@ -1230,9 +49,9 @@ sub GetArchiveCurrentTags($$$;$)
 # experiment_stats table, not the current experiments table. That is cause
 # we keep the archive and its DB info around forever with the stats.
 #
-sub TBExperimentArchiveInfo($$$$)
+sub TBExperimentArchive($$$$)
 {
-    my ($pid, $eid, $idxp, $viewp) = @_;
+    my ($pid, $eid, $archivep, $viewp) = @_;
 
     my $query_result =
 	DBQueryWarn("select s.archive_idx,e.idx from experiments as e ".
@@ -1248,11 +67,41 @@ sub TBExperimentArchiveInfo($$$$)
     return 1
 	if (!defined($archive_idx) || $archive_idx == 0);
 
-    $$idxp = $archive_idx
-	if (defined($idxp));
+    my $archive = Archive->Lookup($archive_idx);
+    return -1
+	if (!defined($archive));
+
+    $$archivep = $archive
+	if (defined($archivep));
     $$viewp = "$exptidx"
 	if (defined($viewp));
     
+    return 0;
+}
+
+#
+# Grab the current tag for an experiment.
+#
+sub TBExperimentArchiveTag($$$)
+{
+    my ($pid, $eid, $tagp) = @_;
+
+    my $query_result =
+	DBQueryWarn("select r.archive_tag from experiments as e ".
+		    "left join experiment_stats as s on s.exptidx=e.idx ".
+		    "left join experiment_resources as r on r.idx=s.rsrcidx ".
+		    "where e.pid='$pid' and e.eid='$eid'");
+
+    return -1
+	if (!$query_result || $query_result->numrows == 0);
+
+    my ($archive_tag) = $query_result->fetchrow_array();
+
+    # Need to deal with no archive yet!
+    return 1
+	if (!defined($archive_tag));
+
+    $$tagp = $archive_tag;
     return 0;
 }
 
@@ -1268,54 +117,32 @@ sub TBCreateExperimentArchive($$)
     my ($pid, $eid) = @_;
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+	if (!Archive::doarchiving($pid, $eid));
 
-    # Grab experiment indicies we need,
-    my $query_result =
-	DBQueryWarn("select e.idx,s.rsrcidx from experiments as e ".
-		    "left join experiment_stats as s on e.idx=s.exptidx ".
-		    "where e.pid='$pid' and e.eid='$eid'");
-    if (!$query_result || !$query_result->numrows) {
-	return -1;
-    }
-
-    my ($exptidx,$rsrcidx) = $query_result->fetchrow_array();
-    my $archive_tag = "T${rsrcidx}";
-
-    #
-    # The point of this is to set the group of the new directory.
-    #
-    my $gid = ExpGroup($pid, $eid);
-    if (! $gid) {
-	return -1;
-    }
-    my ($unix_gid, $unix_name);
-    if (!TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
-	return -1;
-    }
-    my $view = "$exptidx";
-
-    #
-    # Create the new archive and get back the new index. 
-    #
-    my $archive_idx = ArchiveCreate($archive_tag, $view, $unix_name);
+    my $experiment = Experiment->Lookup($pid, $eid);
     return -1
-	if ($archive_idx < 0);
+	if (!defined($experiment));
+    
+    my $exptidx   = $experiment->idx();
+    my $rsrcidx   = $experiment->rsrcidx();
+    my $group     = $experiment->GetGroup();
+    my $unix_name = $group->unix_name();
+    my $view      = "$exptidx";
 
-    if (! (DBQueryWarn("update experiment_stats set ".
-		       "      archive_idx='$archive_idx' ".
-		       "where pid='$pid' and eid='$eid' and ".
-		       "      exptidx='$exptidx'") &&
-	   DBQueryWarn("update experiment_resources set ".
-		       "      archive_tag='$archive_tag' ".
-		       "where idx='$rsrcidx'"))) {
-	ArchiveDestroy($archive_idx, 1, $view);
-	return -1;
-    }
+    my $archive = Archive->Create($view, $unix_name);
+    return -1
+	if (!defined($archive));
+
+    my $archive_idx = $archive->idx();
+
+    $experiment->TableUpdate("experiment_stats",
+			     "archive_idx='$archive_idx'") == 0
+	or goto bad;
+    
     return 0;
 
   bad:
-    ArchiveDestroy($archive_idx, 1, $view);
+    $archive->Destroy(1, $view);
     return -1;
 }
 
@@ -1325,18 +152,18 @@ sub TBCreateExperimentArchive($$)
 sub TBExperimentArchiveAddFile($$$;$)
 {
     my ($pid, $eid, $pathname, $exact) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    return ArchiveAdd($archive_idx, $pathname, $view, $exact);
+    return $archive->Add($pathname, $view, $exact);
 }
 
 #
@@ -1344,72 +171,86 @@ sub TBExperimentArchiveAddFile($$$;$)
 #
 sub TBExperimentArchiveAddTracedFiles($$)
 {
-    my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
-
-    return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    return 0;
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
-    return 0
-	if ($rval > 0);
-    return -1
-	if ($rval < 0);
-
-    my $query_result =
-	DBQueryFatal("SELECT e.idx,s.rsrcidx FROM experiments as e ".
-		     "left join experiment_stats as s on e.idx=s.exptidx ".
-		     "where e.pid='$pid' and e.eid='$eid'");
-    
-    if ($query_result->num_rows() != 1) {
-	die("*** $0:\n".
-	    "    Experiment $pid/$eid has no stats!\n");
-    }
-    my ($exptidx, $rsrcidx) = $query_result->fetchrow_array();
-
-    $query_result = 
-	DBQueryFatal("SELECT af.fn FROM fs_resources as fr ".
-		     "LEFT JOIN accessed_files as af on af.idx=fr.fileidx ".
-		     "WHERE fr.rsrcidx=$rsrcidx and fr.type!='l'");
-    while (my ($fn) = $query_result->fetchrow_array()) {
-	if ($fn =~ /^\/share/ ||
-	    $fn =~ /^<u:/) {
-	    next;
-	}
-
-	$rval = ArchiveAdd($archive_idx, $fn, $view);
-
-	return $rval
-	    if ($rval != 0);
-    }
-
     return 0;
 }
 
 #
-# Add files the user explicitly wants archived
+# Add all files from the experiment directory to the archive.
 #
 sub TBExperimentArchiveAddUserFiles($$)
 {
     my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+	if (!Archive::doarchiving($pid, $eid));
 
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return -1
+	if (!defined($experiment));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    my $userdir  = TBExptUserDir($pid, $eid);
-    my $userarch = "$userdir/archive";
+    my $userdir;
 
-    if (-e $userarch) {
-	$rval = ArchiveAdd($archive_idx, $userarch, $view, 1);
+    if ($experiment->IsTemplate()) {
+	# XXX Fix this
+	my $template = Template->LookupByPidEid($pid, $eid);
+
+	$userdir = $template->path();
+    }
+    else {
+	$userdir = $experiment->UserDir();
+    }
+
+    if (-e $userdir) {
+	$rval = $archive->Add("$userdir/.", $view, 1, 1);
+
+	return $rval
+	    if ($rval != 0);
+    }
+    return 0;
+}
+
+#
+# Check for differences in the user files to see if we need a commit.
+#
+sub TBExperimentArchiveDiffUserFiles($$)
+{
+    my ($pid, $eid) = @_;
+    my ($archive, $view);
+
+    return 0
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return -1
+	if (!defined($experiment));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    my $userdir;
+
+    if ($experiment->IsTemplate()) {
+	# XXX Fix this
+	my $template = Template->LookupByPidEid($pid, $eid);
+
+	$userdir = $template->path();
+    }
+    else {
+	$userdir = $experiment->UserDir();
+    }
+
+    if (-e $userdir) {
+	$rval = $archive->Diff("$userdir/.", $view);
 
 	return $rval
 	    if ($rval != 0);
@@ -1422,30 +263,7 @@ sub TBExperimentArchiveAddUserFiles($$)
 #
 sub TBExperimentArchiveSavePoint($$;$)
 {
-    my ($pid, $eid, $tagext) = @_;
-    my ($archive_idx, $view);
-
-    $tagext = "savepoint"
-	if (!defined($tagext));
-
-    return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
-    return 0
-	if ($rval > 0);
-    return -1
-	if ($rval < 0);
-
-    #
-    # Derive a tag that contains some useful info?
-    #
-    my ($seconds, $microseconds) = gettimeofday();
-    my $newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-    $newtag .= int($microseconds / 1000);
-    $newtag .= "_${tagext}";
-
-    return ArchiveSavePoint($archive_idx, $newtag, $view);
+    return 0;
 }
 
 #
@@ -1454,23 +272,18 @@ sub TBExperimentArchiveSavePoint($$;$)
 sub TBExperimentArchivePreSwapMod($$)
 {
     my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchivePreSwapMod: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
+    my $directory = $archive->directory();
     if (! -d $directory || ! -w $directory) {
 	print STDERR "ArchivePreSwapMod: $directory cannot be written!\n";
 	return -1;
@@ -1525,23 +338,18 @@ sub TBExperimentArchivePreSwapMod($$)
 sub TBExperimentArchiveSwapModSwapOut($$)
 {
     my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveSwapmodswapout: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
+    my $directory = $archive->directory();
     if (! -d $directory || ! -w $directory) {
 	print STDERR "ArchiveSwapmodswapout: $directory cannot be written!\n";
 	return -1;
@@ -1615,23 +423,18 @@ sub TBExperimentArchiveSwapModSwapOut($$)
 sub TBExperimentArchiveRollBack($$)
 {
     my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveRollBack: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
+    my $directory = $archive->directory();
     if (! -d $directory || ! -w $directory) {
 	print STDERR "ArchiveRollBack: $directory cannot be written!\n";
 	return -1;
@@ -1679,23 +482,18 @@ sub TBExperimentArchiveRollBack($$)
 sub TBExperimentArchiveSwapModCommit($$$)
 {
     my ($pid, $eid, $swapped) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveSwapModCommit: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
+    my $directory = $archive->directory();
     if (! -d $directory || ! -w $directory) {
 	print STDERR "ArchiveSwapModCommit: $directory cannot be written!\n";
 	return -1;
@@ -1730,14 +528,9 @@ sub TBExperimentArchiveSwapModCommit($$$)
     $newtag .= int($microseconds / 1000);
     $newtag .= "_preswapmod";
 
-    print "Doing a savepoint on the experiment archive ...\n";
-    return -1 
-	if (ArchiveSavePoint($archive_idx, undef, $view, $location) != 0);
-
     print "Doing a commit on the experiment archive ...\n";
     return -1
-	if (ArchiveCommit($archive_idx,
-			  $newtag, undef, $view, $location) != 0);
+	if ($archive->Commit($newtag, undef, undef, $view, $location) != 0);
 
     if (!DBQueryWarn("update experiment_resources set ".
 		     "      archive_tag='$newtag' ".
@@ -1753,9 +546,7 @@ sub TBExperimentArchiveSwapModCommit($$$)
     if ($?) {
 	print STDERR "*** ArchiveSwapModCommit: Could not rm $preswapdir\n";
     }
-    #
     # Ditto.
-    # 
     system("/bin/rm -rf $swapmodswapout");
     if ($?) {
 	print STDERR
@@ -1768,31 +559,26 @@ sub TBExperimentArchiveSwapModCommit($$$)
 #
 # Commit an experiment archive. 
 #
-sub TBCommitExperimentArchive($$$;$$)
+sub TBCommitExperimentArchive($$$;$$$)
 {
-    my ($pid, $eid, $tagext, $usertagged, $mfile) = @_;
-    my ($archive_idx, $view);
+    my ($pid, $eid, $tagext, $usertagged, $mfile, $comment) = @_;
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    #
-    # Need this below.
-    #
-    my $query_result =
-	DBQueryWarn("select s.rsrcidx from experiments as e ".
-		    "left join experiment_stats as s on e.idx=s.exptidx ".
-		    "where e.pid='$pid' and e.eid='$eid'");
-    if (!$query_result || !$query_result->numrows) {
-	return -1;
-    }
-    my ($rsrcidx) = $query_result->fetchrow_array();
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return -1
+	if (!defined($experiment));
+
+    my $rsrcidx     = $experiment->rsrcidx();
+    my $archive_idx = $archive->idx();
 
     #
     # Derive a tag, unless its a user specified tag. In that case it
@@ -1808,10 +594,9 @@ sub TBCommitExperimentArchive($$$;$$)
     else {
 	$newtag = $tagext;
 
-	my $unique;
+	my $unique = $archive->IsTagUnique($newtag, $view);
 	return -1
-	    if (IsArchiveTaqUnique($archive_idx,
-				   $newtag, \$unique, $view) < 0);
+	    if (!defined($unique));
 
 	if (! $unique) {
 	    print STDERR "*** ArchiveCommit: Duplicate user tag: $newtag\n";
@@ -1820,18 +605,17 @@ sub TBCommitExperimentArchive($$$;$$)
     }
 
     return -1
-	if (ArchiveCommit($archive_idx, $newtag, $mfile, $view) != 0);
+	if ($archive->Commit($newtag, $comment, $mfile, $view) != 0);
 
-    if (!DBQueryWarn("update experiment_resources set ".
-		     "      archive_tag='$newtag' ".
-		     "where idx='$rsrcidx'")) {
-	return -1;
-    }
+    $experiment->TableUpdate("experiment_resources",
+			     "archive_tag='$newtag'", "idx='$rsrcidx'") == 0
+	or goto bad;
+
     # A user specified tag is updated.
     if ($usertagged) {
 	my $query_result =
 	    DBQueryWarn("update archive_tags set ".
-			"  tagtype='$TAGTYPE_USER' ".
+			"  tagtype='$Archive::TAGTYPE_USER' ".
 			"where archive_idx='$archive_idx' and ".
 			"      view='$view' and tag='$newtag'");
 	return -1
@@ -1845,23 +629,31 @@ sub TBCommitExperimentArchive($$$;$$)
 }
 
 #
+# Tag an experiment archive. 
+#
+sub TBTagExperimentArchive($$$;$$)
+{
+    return 0;
+}
+
+#
 # Checkout a copy of an experiment archive, optionally at a branch.
 # 
 sub TBCheckoutExperimentArchive($$$;$$)
 {
     my ($pid, $eid, $path, $tag, $subdir) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    return ArchiveCheckout($archive_idx, $path, $view, $tag, $subdir);
+    return $archive->Checkout($path, $view, $tag, $subdir);
 }
 
 #
@@ -1872,25 +664,24 @@ sub TBCheckoutExperimentArchivebyExptIDX($$;$$)
     my ($exptidx, $path, $tag, $subdir) = @_;
 
     return 0
-	if (!$MAINSITE);
+	if (!$USEARCHIVE);
 
     my $query_result =
-	DBQueryWarn("select s.archive_idx,s.pid from experiment_stats as s ".
-		    "where s.exptidx='$exptidx'");
-
+	DBQueryWarn("select archive_idx from experiment_stats ".
+		    "where exptidx='$exptidx'");
     return -1
-	if (!$query_result || $query_result->numrows == 0);
-
-    my ($archive_idx,$pid) = $query_result->fetchrow_array();
-
+	if (!$query_result || !$query_result->numrows);
+    
+    my ($archive_idx) = $query_result->fetchrow_array();
+    
     return 0
-	if ($pid ne $ALLOWEDPID);
+	if (!$archive_idx);
 
-    # Need to deal with no archive yet!
-    return 1
-	if (!defined($archive_idx) || $archive_idx == 0);
+    my $archive = Archive->Lookup($archive_idx);
+    return -1
+	if (!defined($archive));
 
-    return ArchiveCheckout($archive_idx, $path, $exptidx, $tag, $subdir);
+    return $archive->Checkout($path, $exptidx, $tag, $subdir);
 }
 
 #
@@ -1899,18 +690,18 @@ sub TBCheckoutExperimentArchivebyExptIDX($$;$$)
 sub TBArchiveExperimentArchive($$)
 {
     my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    return ArchiveArchive($archive_idx, TBExptLogDir($pid, $eid));
+    return $archive->Archive($view);
 }
 
 #
@@ -1920,18 +711,18 @@ sub TBArchiveExperimentArchive($$)
 sub TBDeleteExperimentArchive($$)
 {
     my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    return ArchiveDestroy($archive_idx, 0, $view);
+    return $archive->Destroy(0, $view);
 }
 
 #
@@ -1940,18 +731,18 @@ sub TBDeleteExperimentArchive($$)
 sub TBDestroyExperimentArchive($$)
 {
     my ($pid, $eid) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    return ArchiveDestroy($archive_idx, 1, $view);
+    return $archive->Destroy(1, $view);
 }
 
 #
@@ -1961,46 +752,46 @@ sub TBDestroyExperimentArchive($$)
 sub TBForkExperimentArchive($$$$$)
 {
     my ($pid, $eid, $copypid, $copyeid, $copytag) = @_;
-    my ($archive_idx, $copyview);
+    my ($archive, $copyview);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($copypid, $copyeid,
-				       \$archive_idx, \$copyview);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($copypid, $copyeid,
+				   \$archive, \$copyview);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    # Grab experiment indicies we need,
-    my $query_result =
-	DBQueryWarn("select e.idx,s.rsrcidx from experiments as e ".
-		    "left join experiment_stats as s on e.idx=s.exptidx ".
-		    "where e.pid='$pid' and e.eid='$eid'");
-    if (!$query_result || !$query_result->numrows) {
-	return -1;
-    }
-    my ($exptidx,$rsrcidx) = $query_result->fetchrow_array();
-    my $archive_tag = "T${rsrcidx}";
-    my $newview     = "$exptidx";
+    my $experiment = Experiment->Lookup($pid, $eid);
+    return -1
+	if (!defined($experiment));
+
+    my $archive_idx = $archive->idx();
+    my $rsrcidx     = $experiment->rsrcidx();
+    my $archive_tag = "F${rsrcidx}";
+    my $newview     = $experiment->idx();
 
     return -1
-	if (ArchiveFork($archive_idx, $newview,
-			$copytag, $archive_tag, $copyview) < 0);
+	if ($archive->Fork($newview, $archive_tag, $copyview) < 0);
 
-    if (! (DBQueryWarn("update experiment_stats set ".
-		       "      archive_idx='$archive_idx' ".
-		       "where pid='$pid' and eid='$eid' and ".
-		       "      exptidx='$exptidx'") &&
-	   DBQueryWarn("update experiment_resources set ".
-		       "      archive_tag='$archive_tag' ".
-		       "where idx='$rsrcidx'"))) {
-	# Its a shared resource, but ArchiveDestroy() checks.
-	ArchiveDestroy($archive_idx, 1, $newview);
-	return -1;
-    }
+    $experiment->TableUpdate("experiment_resources",
+			     "archive_tag='$archive_tag'",
+			     "idx='$rsrcidx'") == 0
+	or goto bad;
+
+    $experiment->TableUpdate("experiment_stats",
+			     "archive_idx='$archive_idx'") == 0
+	or goto bad;
+
     return 0;
+
+  bad:
+    # Its a shared resource, but ArchiveDestroy() checks.
+    $archive->Destroy(1, $newview)
+	if (defined($archive));
+    return -1;
 }
 
 #
@@ -2009,73 +800,67 @@ sub TBForkExperimentArchive($$$$$)
 sub TBIsTaqUnique($$$$)
 {
     my ($pid, $eid, $tag, $prval) = @_;
-    my ($archive_idx, $view);
+    my ($archive, $view);
     
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    return IsArchiveTaqUnique($archive_idx, $tag, $prval, $view);
+    my $unique = $archive->IsTagUnique($tag, $view);
+    return -1
+	if (!defined($unique));
+    $$prval = $unique;
+    return 0;
 }
 
 #
 # Return a list of files in a particular spot in the archive. This avoids
 # having to check it out.
 #
-sub TBListExperimentArchive($$$;$$)
+sub TBListExperimentArchive($$$;$$$)
 {
-    my ($pid, $eid, $prval, $tag, $subdir) = @_;
-    my ($archive_idx, $view);
-    my @filelist = ();
+    my ($pid, $eid, $prval, $long, $tag, $root, $subdir) = @_;
+    my ($archive, $view);
 
-    @$prval = @filelist;
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
-    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
     return 0
 	if ($rval > 0);
     return -1
 	if ($rval < 0);
 
-    my $sourcepoint = (defined($tag) ? "tags/$tag" : "trunk");
-    $sourcepoint = "$sourcepoint/$subdir"
-	if (defined($subdir));
+    return $archive->List($prval, $view, $long, $tag, $subdir);
+}
 
-    my $directory;
-    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ListExperimentArchive: ".
-	    "Archive '$archive_idx' does not exist in the DB!\n";
-	return -1;
-    }
-    if (! -d $directory || ! -w $directory) {
-	print STDERR "ListExperimentArchive: $directory cannot be written!\n";
-	return -1;
-    }
-    my $repo = "$directory/repo/$view";
-	
-    #
-    # Start a subprocess that does the listing, and then read it back.
-    #
-    if (!open(LIST, "$SVN list -R file://$repo/$sourcepoint |")) {
-	print STDERR "ListExperimentArchive: Could not start svn!\n";
-	return -1;
-    }
-    while (<LIST>) {
-	chomp($_);
-	push(@filelist, $_);
-    }
+#
+# Return a list of files in a particular spot in the archive. This avoids
+# having to check it out.
+#
+sub TBDUExperimentArchive($$$)
+{
+    my ($pid, $eid, $prval) = @_;
+    my ($archive, $view);
+
+    $$prval = 0;
+    return 0
+	if (!Archive::doarchiving($pid, $eid));
+    
+    my $rval = TBExperimentArchive($pid, $eid, \$archive, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (! close(LIST));
+	if ($rval < 0);
 
-    @$prval = @filelist;
-    return 0;
+    return $archive->DU($prval);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
+

@@ -1,0 +1,189 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# It's very, very hard to tell which interfaces mii-tool will work on, and
+# which to use ethtool on. In fact, in some cases, one tool may report success
+# at chaning settings but not, in fact, do anything at all. This script is a
+# hack to get around this behavior - it tries both tools, and verifies that
+# they did the right thing.
+#
+
+use strict;
+
+if (@ARGV < 3 || @ARGV == 4 || @ARGV > 5) {
+    die "Usage: ifforce <iface> <speed> <duplex> [inetaddr mask]\n";
+}
+
+my ($iface, $speed, $duplex, $inet, $mask) = @ARGV;
+
+#
+# Strings used by mii-tool to identify media type
+#
+my $IFC_1000MBS  = "1000baseTx";
+my $IFC_100MBS  = "100baseTx";
+my $IFC_10MBS   = "10baseT";
+my $IFC_FDUPLEX = "FD";
+my $IFC_HDUPLEX = "HD";
+
+my $IFCONFIGBIN = "/sbin/ifconfig";
+my $IFCONFIG    = "$IFCONFIGBIN %s inet %s netmask %s";
+
+my $media;
+my $uplines;
+
+#
+# Need to check units on the speed. Just in case.
+#
+if ($speed =~ /(\d*)([A-Za-z]*)/) {
+    if ($2 eq "Mbps") {
+        $speed = $1;
+    }
+    elsif ($2 eq "Kbps") {
+        $speed = $1 / 1000;
+    }
+    else {
+        warn("*** Bad speed units $2 in ifconfig, default to 100Mbps\n");
+        $speed = 100;
+    }
+    if ($speed == 1000) {
+        $media = $IFC_1000MBS;
+    }
+    elsif ($speed == 100) {
+        $media = $IFC_100MBS;
+    }
+    elsif ($speed == 10) {
+        $media = $IFC_10MBS;
+    }
+    else {
+        warn("*** Bad Speed $speed in ifconfig, default to 100Mbps\n");
+        $speed = 100;
+        $media = $IFC_100MBS;
+    }
+}
+if ($duplex eq "full") {
+    $media = "$media-$IFC_FDUPLEX";
+}
+elsif ($duplex eq "half") {
+    $media = "$media-$IFC_HDUPLEX";
+}
+else {
+    warn("*** Bad duplex $duplex in ifconfig, default to full\n");
+    $duplex = "full";
+    $media = "$media-$IFC_FDUPLEX";
+}
+#
+# Linux is apparently changing from mii-tool to ethtool but some drivers
+# don't support the new interface (3c59x), some don't support the old
+# interface (e1000), and some (eepro100) support the new interface just
+# enough that they can report success but not actually do anything. Sweet!
+#
+my $ethtool;
+if (-e "/sbin/ethtool") {
+    $ethtool = "/sbin/ethtool";
+} elsif (-e "/usr/sbin/ethtool") {
+    $ethtool = "/usr/sbin/ethtool";
+}
+
+my $success = 0;
+if (defined($ethtool)) {
+    print "Trying ethtool\n";
+    # First, see if ethtool appears to work at all for the interface - this
+    # seems to proerly return an error on eepro100
+    my $rv = system("$ethtool $iface >/dev/null 2>&1");
+    if (!$rv) {
+        #
+        # Okay, passed that test, let's see if it actually works to set
+        # anything!
+        #
+        $rv =
+          system("$ethtool -s $iface autoneg off speed $speed duplex $duplex");
+        if (!$rv) {
+            #
+            # Yes, it SAYS it worked, but often that doesn't mean that it
+            # really did!
+            #
+            my @settings = `$ethtool $iface`;
+            my ($autoneg, $opspeed, $opduplex) = (undef,undef,undef);
+            foreach my $line (@settings) {
+                if ($line =~ /Advertised auto-negotiation: (\w+)/) {
+                    if ($1 =~ /no/i) {
+                        $autoneg = 0;
+                     } else {
+                         $autoneg = 1;
+                     }
+                } elsif ($line =~ /^Speed: (\d+)([\w\/]+)/) {
+                    # XXX What does this look like on a gigabit link?
+                    if ($2 eq "MB/s") {
+                        $opspeed = $1;
+                    } else {
+                        warn "Error parsing speed string! ($2)\n";
+                    }
+                } elsif ($line =~ /^Duplex: (\w+)/) {
+                    if ($1 =~ /full/i) {
+                        $opduplex = "full";
+                    } else {
+                        $opduplex = "half";
+                    }
+                }
+            }
+            if (!defined($autoneg) || $autoneg != 0) {
+                print "ethtool failed to turn off auto-negotation\n";
+            } elsif (!defined($opspeed) || $opspeed != $speed ) {
+                print "ethtool failed to set operational speed\n";
+            } elsif (!defined($opduplex) || $opduplex ne $duplex) {
+                print "ethtool failed to set operational duplex\n";
+            } else {
+                #
+                # Hey, what a surprise! It actually worked!
+                #
+                $success = 1;
+            }
+        } else {
+            #
+            # Okay, it told us it isn't working
+            #
+            print "ethtool failed to set interface params for $iface\n";
+        }
+    } else {
+        print "ethtool cannot get interface information for $iface\n";
+    }
+}
+
+#
+# Okay, no luck with ethtool, let's fallt back to mii-tool
+#
+if (!$success) {
+    print "Trying mii-tool\n";
+    my $rv = system("/sbin/mii-tool --force=$media $iface");
+    if ($rv) {
+        warn "mii-tool failed ($rv)\n";
+        $success = 0;
+    } else {
+        $success = 1;
+    }
+    # XXX What if mii-tool fails subtly. Well, we haven't seen that YET.
+}
+
+
+if (defined($inet) && $inet ne "") {
+     my $ifconfigstr = sprintf($IFCONFIG, $iface, $inet, $mask);
+     my $rv = system($ifconfigstr);
+     if ($rv) {
+         warn "ifconfig failed\n";
+         $success = 0;
+     }
+}
+
+if (!$success) {
+    print "failed\n";
+    exit 1;
+} else {
+    print "succeeded\n";
+    exit 0;
+}
+

@@ -1,11 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
 # No PAGEHEADER since we spit out a Location header later. See below.
@@ -14,19 +14,51 @@ include("template_defs.php");
 #
 # Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments
+#
+$reqargs = RequiredPageArguments("action",        PAGEARG_STRING);
+$optargs = OptionalPageArguments("template",      PAGEARG_TEMPLATE,
+				 "submit",        PAGEARG_STRING,
+				 "metadata",      PAGEARG_METADATA,
+				 "metadata_type", PAGEARG_STRING,
+				 "referrer",      PAGEARG_STRING,
+				 "formfields",    PAGEARG_ARRAY);
+
+# Need these below.
+$guid = $template->guid();
+$vers = $template->vers();
+$pid  = $template->pid();
+$unix_gid = $template->UnixGID();
 
 #
 # Spit the form out using the array of data.
 #
 function SPITFORM($action, $formfields, $errors)
 {
-    global $template_guid, $template_vers;
-    global $metadata_guid, $metadata_vers;
+    global $template, $metadata, $referrer;
+    global $metadata_type;
+
+    $template_guid = $template->guid();
+    $template_vers = $template->vers();
     
     PAGEHEADER("Manage Template Metadata");
+
+    if ($action == "add") {
+	echo "<center>";
+	echo "<font size=+1>
+                  Attach metadata[<b>1</b>] to your template.</font>";
+	echo "</center><br>\n";
+    }
+    elseif ($action == "delete") {
+	echo "<center>";
+	echo "<h3>Are you sure you want to delete this item?</h3>";
+	echo "</center><br>\n";
+    }
 
     if ($errors) {
 	echo "<table class=nogrid
@@ -50,8 +82,22 @@ function SPITFORM($action, $formfields, $errors)
 	echo "</table><br>\n";
     }
 
-    echo "<form action=template_metadata.php?action=$action method=post>\n";
+    if ($action == "modify" || $action == "delete") {
+	$url = CreateURL("template_metadata", $template, $metadata);
+    }
+    else {
+	$url = CreateURL("template_metadata", $template);
+    }
+    if (isset($metadata_type) && $metadata_type != "") {
+	$url .= "&metadata_type=$metadata_type";
+    }
+    
+    echo "<form action='${url}&action=$action' method=post>\n";
     echo "<table align=center border=1>\n";
+
+    if (isset($referrer) && $referrer != "") {
+	echo "<input type=hidden name=referrer value='$referrer'>";
+    }
 
     #
     # Template GUID and Version. These are read-only fields.
@@ -61,21 +107,20 @@ function SPITFORM($action, $formfields, $errors)
               <td class='pad4' class=left>
                   $template_guid/$template_vers</td>\n";
     echo "</tr>\n";
-    echo "<input type=hidden name=template_guid value=$template_guid>\n";
-    echo "<input type=hidden name=template_vers value=$template_vers>\n";
 
-    if ($action == "modify") {
+    if ($action == "modify" || $action == "delete") {
+	$metadata_guid = $metadata->guid();
+	$metadata_vers = $metadata->vers();
+	
 	echo "<tr>
                   <td class='pad4'>Metadata GUID:</td>
                   <td class='pad4' class=left>
                       $metadata_guid/$metadata_vers</td>\n";
 	echo "</tr>\n";
-	echo "<input type=hidden name=metadata_guid value=$metadata_guid>\n";
-	echo "<input type=hidden name=metadata_vers
-                                 value=$metadata_vers>\n";
     }
 
-    $readonly = ($action == "modify" ? "readonly" : "");
+    $readonly_name  = ($action == "add"    ? "" : "readonly");
+    $readonly_value = ($action == "delete" ? "readonly" : "");
 
     #
     # Name of the item
@@ -84,9 +129,9 @@ function SPITFORM($action, $formfields, $errors)
               <td>*Name:<br>
                   (something short and pithy)</td>
               <td class=pad4 class=left>
-	          <input type=text $readonly
+	          <input type=text $readonly_name
                          name=\"formfields[name]\"
-                         value=\"" . $formfields[name] . "\"
+                         value=\"" . $formfields["name"] . "\"
 	                 size=64>
              </td>
           </tr>\n";
@@ -98,15 +143,18 @@ function SPITFORM($action, $formfields, $errors)
           </tr>
           <tr>
               <td colspan=2 align=center class=left>
-                  <textarea name=\"formfields[value]\"
+                  <textarea $readonly_value name=\"formfields[value]\"
                     rows=10 cols=80>" .
-	            ereg_replace("\r", "", $formfields[value]) .
+	            ereg_replace("\r", "", $formfields["value"]) .
 	           "</textarea>
               </td>
           </tr>\n";
 
     if ($action == "modify") {
 	$tag = "Modify Metadata";
+    }
+    elseif ($action == "delete") {
+	$tag = "Delete Metadata";
     }
     else {
 	$tag = "Add Metadata";
@@ -119,29 +167,16 @@ function SPITFORM($action, $formfields, $errors)
          </tr>
         </form>
         </table>\n";
-}
 
-#
-# In "show" mode, spit a single entry out with a menu.
-#
-function SPITMETADATA($guid, $version)
-{
-    global $template_guid, $template_vers;
-
-    SUBPAGESTART();
-    SUBMENUSTART("Options");
-
-    WRITESUBMENUBUTTON("Modify Metadata Item",
-		       "template_metadata.php?action=modify&".
-		       "guid=$guid&version=$version");
-
-    WRITESUBMENUBUTTON("Add New Metadata",
-		       "template_metadata.php?action=add&".
-		       "guid=$template_guid&version=$template_vers");
-
-    SUBMENUEND();
-    SHOWMETADATAITEM($guid, $version);
-    SUBPAGEEND();
+    echo "<blockquote><blockquote>
+          <ol>
+            <li> Metadata can be any arbitrary name/value pair that you want
+                 to associate with your template. The name can include
+                 any printable ascii character including spaces, but
+                 not newlines. The value can include any printable ascii
+                 character and my be multiline.
+          </ol>
+          </blockquote></blockquote>\n";
 }
 
 #
@@ -149,74 +184,82 @@ function SPITMETADATA($guid, $version)
 #
 if (!isset($submit)) {
     #
-    # Verify page arguments.
-    # 
-    if (!isset($guid) ||
-	strcmp($guid, "") == 0) {
-	USERERROR("You must provide a Template ID.", 1);
-    }
-    if (!isset($version) ||
-	strcmp($version, "") == 0) {
-	USERERROR("You must provide a Template version", 1);
-    }
-    if (!TBvalid_guid($guid)) {
-	PAGEARGERROR("Invalid characters in GUID!");
-    }
-    if (!TBvalid_integer($version)) {
-	PAGEARGERROR("Invalid characters in version!");
-    }
-
-    if ($action == "modify" || $action == "show") {
-	$metadata_guid = $guid;
-	$metadata_vers = $version;
-
-	#
-	# Find template associated with this metadata item.
-	#
-	if (! TBMetadata2Template($guid, $version,
-				  $template_guid, $template_vers)) {
-	    USERERROR("Invalid metadata guid/version", 1);
-	}
-    }
-    else {
-	$template_guid = $guid;
-	$template_vers = $version;
-
-        #
-        # Check to make sure this is a valid template.
-        #
-	if (! TBValidExperimentTemplate($guid, $version)) {
-	    USERERROR("The experiment template $guid/$version is not a valid ".
-		      "experiment template!", 1);
-	}
-    }
-    
-    #
-    # Verify Permission.
-    #
-    if (! TBExptTemplateAccessCheck($uid, $template_guid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to modify experiment template ".
-		  "$template_guid/$template_vers!", 1);
-    }
-
-    #
-    # For plain show ...
+    # In show mode, we can show any metadata entry, but it cannot be modified
+    # unless its in the context of a template. That might change later?
     #
     if ($action == "show") {
-	PAGEHEADER("Manage Template Metadata");
-	SPITMETADATA($metadata_guid, $metadata_vers);
+	if (!isset($metadata)) {
+	    PAGEARGERROR("Must provide a metadata guid");
+	}
+	$metadata_guid = $metadata->guid();
+	$metadata_vers = $metadata->vers();
+
+        #
+        # Verify Permission. Need permission for the template, any version.
+        #
+	if (! isset($template)) {
+	    $template = Template::Lookup($metadata->template_guid(), 1);
+	}
+
+	if (!$template ||
+	    !$template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	    USERERROR("You do not have permission to view metadata in ".
+		      " template $template_guid!", 1);
+	}
+
+	PAGEHEADER("Show Metadata");
+	$metadata->Show();
 	PAGEFOOTER();
 	return;
     }
-
-    if ($action == "modify") {
-	if (! TBMetadataData($metadata_guid, $metadata_vers, $defaults)) {
-	    USERERROR("Could not retrieve metadata data", 1);
+    elseif ($action == "modify" || $action == "delete") {
+	if (!isset($template)) {
+	    PAGEARGERROR("Must provide a template guid");
 	}
+	$template_guid = $template->guid();
+	$template_vers = $template->vers();
+
+	if (!isset($metadata)) {
+	    PAGEARGERROR("Must provide a metadata guid");
+	}
+	$metadata_guid = $metadata->guid();
+	$metadata_vers = $metadata->vers();
+	$metadata_type = $metadata->type();
     }
     else {
-	$defaults = array();
+	if (!isset($template)) {
+	    PAGEARGERROR("Must provide a template guid");
+	}
+	$template_guid = $template->guid();
+	$template_vers = $template->vers();
+
+	if (isset($metadata_type) && $metadata_type != "") {
+	    if (!TBvalid_template_metadata_type($metadata_type)) {
+		PAGEARGERROR("Invalid characters in metadata type!");
+	    }
+	}
+	else {
+	    unset($metadata_type);
+	}
     }
+
+    # Perm check for add/modify to the template.
+    if (!$template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+	USERERROR("You do not have permission to $action metadata in ".
+		  " template $template_guid!", 1);
+    }
+
+    # Defaults for the form come from the DB.
+    $defaults = array();
+    if ($action == "modify" || $action == "delete") {
+	$defaults["name"]  = $metadata->name();
+	$defaults["value"] = $metadata->value();
+    }
+    else {
+	$defaults["name"]  = "";
+	$defaults["value"] = "";
+    }
+    $referrer = $_SERVER['HTTP_REFERER'];
     
     #
     # Allow formfields that are already set to override defaults
@@ -238,97 +281,127 @@ elseif (! isset($formfields)) {
 #
 # Verify page arguments, which depend on action.
 #
-if ($action == "modify") {
-    if (!isset($metadata_guid) || $metadata_guid == "") {
-	USERERROR("You must provide a Metadata GUID.", 1);
+if ($action == "modify" || $action == "delete") {
+    if (!isset($template)) {
+	PAGEARGERROR("Must provide a template guid");
     }
-    if (!isset($metadata_vers) || $metadata_vers == "") {
-	USERERROR("You must provide a Metadata version", 1);
-    }
-    if (!TBvalid_guid($metadata_guid)) {
-	PAGEARGERROR("Invalid characters in GUID!");
-    }
-    if (!TBvalid_integer($metadata_vers)) {
-	PAGEARGERROR("Invalid characters in version!");
-    }
+    $template_guid = $template->guid();
+    $template_vers = $template->vers();
 
-    #
-    # Find template associated with this metadata item.
-    #
-    if (! TBMetadata2Template($metadata_guid, $metadata_vers,
-			      $template_guid, $template_vers)) {
-	USERERROR("Invalid metadata guid/version", 1);
+    if (!isset($metadata)) {
+	PAGEARGERROR("Must provide a metadata guid");
     }
-
-    # Need this below.
-    if (! TBMetadataData($metadata_guid, $metadata_vers, $metadata_data)) {
-	USERERROR("Could not retrieve metadata data", 1);
-    }
+    $metadata_guid = $metadata->guid();
+    $metadata_vers = $metadata->vers();
+    $metadata_type = $metadata->type();
 }
 else {
-    if (!isset($template_guid) || $template_guid == "") {
-	USERERROR("You must provide a Template GUID.", 1);
+    if (!isset($template)) {
+	PAGEARGERROR("Must provide a template guid");
     }
-    if (!isset($template_vers) || $template_vers == "") {
-	USERERROR("You must provide a Template version", 1);
-    }
-    if (!TBvalid_guid($template_guid)) {
-	PAGEARGERROR("Invalid characters in GUID!");
-    }
-    if (!TBvalid_integer($template_vers)) {
-	PAGEARGERROR("Invalid characters in version!");
-    }
+    $template_guid = $template->guid();
+    $template_vers = $template->vers();
 
-    #
-    # Check to make sure this is a valid template.
-    #
-    if (! TBValidExperimentTemplate($template_guid, $template_vers)) {
-	USERERROR("The experiment template $template_guid/$template_vers ".
-		  "is not a valid experiment template!", 1);
+    if (isset($metadata_type) && $metadata_type != "") {
+	if (!TBvalid_template_metadata_type($metadata_type)) {
+	    PAGEARGERROR("Invalid characters in metadata type!");
+	}
+    }
+    else {
+	unset($metadata_type);
     }
 }
 
-#
-# Verify Permission.
-#
-if (! TBExptTemplateAccessCheck($uid, $template_guid, $TB_EXPT_MODIFY)) {
-    USERERROR("You do not have permission to modify experiment template ".
-	      "$template_guid/$template_vers!", 1);
+# Perm check for add/modify to the template.
+if (!$template->AccessCheck($this_user, $TB_EXPT_MODIFY)) {
+    USERERROR("You do not have permission to $action metadata in ".
+	      " template $template_guid!", 1);
 }
 
 #
 # Okay, validate form arguments.
 #
 $errors = array();
+$command_opts = "";
 
 #
 # Name
 #
+if (!isset($formfields["name"]) || $formfields["name"] == "") {
+    $errors["Metadata Name"] = "Missing Field";
+}
+elseif (!TBvalid_template_metadata_name($formfields["name"])) {
+    $errors["Metadata Name"] = TBFieldErrorString();
+}
+
 if ($action == "add") {
-    if (!isset($formfields[name]) || $formfields[name] == "") {
-	$errors["Metadata Name"] = "Missing Field";
+    if ($template->LookupMetadataByName($formfields["name"])) {
+	$errors["Metadata Name"] = "Name already in use";
     }
-    elseif (!TBvalid_template_metadata_name($formfields[name])) {
-	$errors["Metadata Name"] = TBFieldErrorString();
+    if (isset($metadata_type)) {
+	$command_opts .= "-t " . escapeshellarg($metadata_type) . " ";
     }
-    elseif (TBTemplateMetadataLookup($template_guid, $template_vers,
-				     $formfields[name], $metadata_value)) {
-	$errors["Metadata Name"] = "Name already in use"; 
-    }
+    $command_opts .= "-a add " . escapeshellarg($formfields["name"]);
+}
+elseif ($action == "delete") {
+    $command_opts .= "-a delete " . escapeshellarg($formfields["name"]);
+}
+else {
+    # Had to already exist above. 
+    $command_opts .= "-a modify " . escapeshellarg($formfields["name"]);
 }
 
 #
 # Value:
-# 
-if (!isset($formfields[value]) || $formfields[value] == "") {
-    $errors["Metadata Value"] = "Missing Field";
+#
+if ($action != "delete" && $action != "add") {
+    if (!isset($formfields["value"]) || $formfields["value"] == "") {
+	$errors["Metadata Value"] = "Missing Field";
+    }
+    elseif (!TBvalid_template_metadata_value($formfields["value"])) {
+	$errors["Metadata Value"] = TBFieldErrorString();
+    }
+    if ($action == "modify" &&
+	$formfields["value"] == $metadata->value()) {
+	$errors["Metadata Value"] = "New value identical to old value";
+    }
 }
-elseif (!TBvalid_template_metadata_value($formfields[value])) {
-    $errors["Metadata Value"] = TBFieldErrorString();
-}
-if ($action == "modify" &&
-    $formfields[value] == $metadata_data[value]) {
-    $errors["Metadata Value"] = "New value identical to old value";
+
+#
+# XXX Some metadata is special ...
+#
+if (isset($metadata_type)) {
+    if ($metadata_type == "tid") {
+	if ($action == "delete") {
+	    $errors["TID"] = "Not allowed to delete this";
+	}
+	elseif (!TBvalid_eid($formfields["value"])) {
+	    $errors["TID"] = TBFieldErrorString();
+	}
+    }
+    elseif ($metadata_type == "template_description") {
+	if ($action == "delete") {
+	    $errors["Description"] = "Not allowed to delete this";
+	}
+	elseif (!TBvalid_template_description($formfields["value"])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
+    elseif ($metadata_type == "parameter_description") {
+	if (!TBvalid_template_parameter_description($formfields["value"])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
+    elseif ($metadata_type == "instance_description") {
+	if (!TBvalid_template_instance_description($formfields["value"])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
+    elseif ($metadata_type == "run_description") {
+	if (!TBvalid_experiment_run_description($formfields["value"])) {
+	    $errors["Description"] = TBFieldErrorString();
+	}
+    }
 }
 
 if (count($errors)) {
@@ -338,37 +411,60 @@ if (count($errors)) {
 }
 
 #
-# Insert the new record.
+# Generate a temporary file and write in the data.
 #
-$name  = addslashes($formfields[name]);
-$value = addslashes($formfields[value]);
+if ($action != "delete") {
+    list($usec, $sec) = explode(' ', microtime());
+    srand((float) $sec + ((float) $usec * 100000));
+    $foo = rand();
 
-if ($action == "modify") {
-    $query_result =
-	DBQueryFatal("select MAX(vers) from experiment_template_metadata ".
-		     "   as maxvers ".
-		     "where guid='$metadata_guid'");
+    $datafile = "/tmp/$uid-$foo.txt";
 
-    $row  = mysql_fetch_array($query_result);
-    $maxvers = $row[0];
-    $extrastuff = "parent_guid='$metadata_guid',parent_vers='$metadata_vers',";
-    $metadata_vers = $maxvers + 1;
+    if (! ($fp = fopen($datafile, "w"))) {
+	TBERROR("Could not create temporary file $datafile", 1);
+    }
+
+    fwrite($fp, $formfields["value"]);
+    fclose($fp);
+    chmod($datafile, 0666);
+
+    $command_opts = " -f $datafile $command_opts";
+}
+
+#
+# The backend does the actual work.
+#
+$pid = $template->pid();
+$gid = $template->gid();
+
+$retval = SUEXEC($uid, "$pid,$unix_gid",
+		 "webtemplate_metadata ".
+		 "$command_opts $template_guid/$template_vers",
+		 SUEXEC_ACTION_IGNORE);
+
+if ($action != "delete") {
+    unlink($datafile);
+}
+
+#
+# Fatal Error. Report to the user, even though there is not much he can
+# do with the error. Also reports to tbops.
+# 
+if ($retval < 0) {
+    SUEXECERROR(SUEXEC_ACTION_CONTINUE);
+}
+
+# User error. Tell user and exit.
+if ($retval) {
+    SUEXECERROR(SUEXEC_ACTION_USERERROR);
+    return;
+}
+
+if (isset($referrer)) {
+    header("Location: $referrer");
 }
 else {
-    TBNewGUID($metadata_guid);
-    $metadata_vers = 1;
-    $extrastuff = "";
+    header("Location: ". CreateURL("template_show", $template));
 }
-DBQueryFatal("insert into experiment_template_metadata set ".
-	     "     guid='$metadata_guid',vers='$metadata_vers', ".
-	     "     template_guid='$template_guid', ".
-	     "     template_vers='$template_vers', ".
-	     $extrastuff .
-	     "     name='$name', value='$value', created=now()");
 
-#
-# Zap back to this page, but with show option.
-#
-header("Location: ".
-       "template_metadata.php?action=show&guid=$metadata_guid".
-       "&version=$metadata_vers");
+?>

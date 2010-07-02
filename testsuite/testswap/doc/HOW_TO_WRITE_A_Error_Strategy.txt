@@ -1,0 +1,21 @@
+Error strategies allow for catching the following experiment errors
+  TestBed::ParallelRunner::Executor::PrerunError
+  TestBed::ParallelRunner::Executor::SwapinError
+  TestBed::ParallelRunner::Executor::RunError
+  TestBed::ParallelRunner::Executor::SwapoutError
+  TestBed::ParallelRunner::Executor::KillError
+
+Extend TestBed::ParallelRunner::ErrorStrategy
+
+TestBed::ParallelRunner::BackoffStrategy is an example of how to do this.
+
+BackoffStrategy->build takes a string of four arguments concatenated with ':'
+  "waittime:maxretires:exponent:maxtime"
+
+  waittime   is the time in seconds to wait between retries
+  maxretries is the maximum number of retries to attempt before failing
+  exponent   is the exponent to raise the waittime to i.e. (waittime * (2 ** exponent))
+  maxtime    is the maximum total time to be spent attempting to retry
+
+if maxtime elapses or maxretries attempts is reached the experiment is terminated.
+

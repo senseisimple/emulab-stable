@@ -1,0 +1,513 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# drag in nf2 libs
+use lib "/usr/local/NF2/lib/Perl5";
+
+use English;
+use Getopt::Std;
+use Socket;
+use IO::Handle;
+use POSIX qw(strftime);
+
+my $NF2DIR = "/usr/local/NF2";
+my $CPCITOOL = "/usr/local/sbin/cpci_reprogram.pl";
+my $BITPROG = "/usr/local/bin/nf2_download";
+my $SCONE = "$NF2DIR/bin/scone";
+my $RR_BITFILE = "$NF2DIR/bitfiles/reference_router.bit";
+
+# mac ports in the router
+my @MPORT = (0x01,0x04,0x10,0x40);
+# cpu (i.e., exception path) ports in the router
+my @CPORT = (0x02,0x08,0x20,0x80);
+
+require "reg_defines.ph";
+use NF21RouterLib;
+# need this to pull in NF2::PDU on behalf of NF21RouterLib
+use NF2::PacketLib;
+use NF2::RegAccess;
+
+sub ddijkstra($);
+sub umac_to_pmac($$);
+sub doboot();
+sub dosetup();
+sub doshutdown();
+
+#
+# "Boot" a NetFPGA.
+#
+sub usage()
+{
+    print "Usage: netfpgactl [-d] <netfpga> [boot|shutdown|reboot]\n";
+    exit(1);
+}
+my $optlist	= "d";
+my $debug       = 0;
+my $nid;
+my $success     = 0;
+my $cmd         = "boot";
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Need this below
+my ($pid, $eid) = check_nickname();
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (!@ARGV) {
+    usage();
+}
+$nid = $ARGV[0];
+
+if ($nid =~ /^([-\w\d]+)$/) {
+    $nid = $1;
+}
+else {
+    die("Bad data in node id: $nid.");
+}
+
+if (scalar(@ARGV) > 1) {
+    $cmd = $ARGV[1];
+
+    if ($cmd =~ /^(start|boot)$/i) {
+	$cmd = "boot";
+    }
+    elsif ($cmd =~ /^(stop|shutdown)$/i) {
+	$cmd = "shutdown";
+    }
+    elsif ($cmd =~ /^(reboot)$/i) {
+	$cmd = "reboot";
+    }
+    else {
+	print "improper command\n";
+	usage();
+    }
+}
+else {
+    usage();
+}
+
+my %config	= ();
+my $logname     = "$LOGDIR/subnode-${nid}.log";
+my $RCDIR	= "$BINDIR/rc";
+my $bootscript	= "/var/emulab/boot/subnode-${nid}";
+my @tmccresults;
+
+#
+# Okay, lets background so we can redirect all the output. We wait for the
+# child to exit though so we can return status to caller. 
+#
+if (!$debug && (my $childpid = TBBackGround($logname))) {
+    #
+    # Wait for child and return status.
+    #
+    waitpid($childpid, 0);
+    exit($? >> 8);
+}
+print "Starting NetFPGA bootup for $nid at " .
+  POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime()) . "\n";
+
+# Tell the library what vnode we are messing with.
+libsetup_setvnodeid($nid);
+# Tell tmcc library too, although thats already been done with previous call.
+configtmcc("subnode", $nid);
+
+# Do not bother if somehow got released.
+if (! libsetup::check_status()) {
+    print "Node is free!\n";
+    exit(0);
+}
+
+#
+# Tell the testbed the node is booting.
+#
+tmcc(TMCCCMD_STATE, "BOOTING");
+
+#
+# Create the config directory. 
+# 
+if (! -e CONFDIR()) {
+    mkdir(CONFDIR(), 0755) or
+	die("*** $0:\n".
+	    "    Could not mkdir ".CONFDIR().": $!\n");
+}
+
+# The primary interface (i.e., 'nf2c0') for this card
+my $mgmt_iface;
+my $min_iface_num = 2**32;
+
+#
+# Store info from tmcd and others that we need to configure the ref router.
+#
+my %ifcset = ();
+my @routes = ();
+my @arps = ();
+
+my $RUNDIR = "/var/emulab/run/$nid";
+
+#
+# Now deal with the interface config.
+#
+my @ifacelist = ();
+
+if (getifconfig(\@ifacelist) != 0) {
+    die("Could not get ifconfig from libsetup!\n");
+}
+
+foreach my $iface (@ifacelist) {
+    my $inet  = $iface->{"IPADDR"};
+    my $mask  = $iface->{"IPMASK"};
+    my $mac   = $iface->{"MAC"};
+    my $origmac = $mac;
+    my $name  = findiface($mac);
+    my $num;
+    if (!defined($name)) {
+	print "ERROR: could not find interface for $mac!\n";
+	next;
+    }
+    if ($name =~ /^[\w\d]+(\d+)$/) {
+	$num = $1 + 0;
+	if ($num < $min_iface_num) {
+	    $min_iface_num = $num;
+	    $mgmt_iface = $name;
+	}
+    }
+    else {
+	print "WARNING: could not determine interface number" . 
+	    " for $name!\n";
+    }
+    
+    if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	$mac = "$1:$2:$3:$4:$5:$6";
+    }
+    else {
+	print "ERROR: invalid mac addr $mac!\n";
+	next;
+    }
+    
+    my $pmac  = umac_to_pmac($nid,$mac);
+    if (!defined($pmac)) {
+	print "WARNING: could not convert $mac to a physical mac!\n";
+    }
+
+    $ifcset{$mac}{'name'} = $name;
+    $ifcset{$mac}{'num'} = $num;
+    $ifcset{$mac}{'ipaddr'} = $inet;
+    $ifcset{$mac}{'netmask'} = $mask;
+    $ifcset{$mac}{'subnet'} = inet_ntoa(inet_aton($inet) & inet_aton($mask));
+    $ifcset{$mac}{'pmac'} = $pmac;
+
+    print "interface $name $inet $mask ".$ifcset{$mac}{'subnet'}." $mac $pmac\n";
+}
+
+#
+# Grab the standard routes from libsetup, if any.
+#
+my @routelist = ();
+my $routetype      = "";
+
+if (getrouterconfig(\@routelist, \$routetype)) {
+    die("Could not get router configuration from libsetup!\n");
+}
+if ($routetype eq "gated" || $routetype eq "ospf") {
+    die("Cannot do session routing on NetFPGAs!\n");
+}
+
+if (@routelist) {
+    foreach my $route (@routelist) {
+	my $inet  = $route->{"IPADDR"};
+	my $mask  = $route->{"IPMASK"};
+	my $gate  = $route->{"GATEWAY"};
+	my $type  = $route->{"TYPE"};
+
+	#
+	# Need to find the port by matching gw against the interface list.
+	#
+	my ($tip,$tmask,$tmac);
+	my $found = 0;
+	foreach my $mac (keys(%ifcset)) {
+	    $tip = $ifcset{$mac}{'ipaddr'};
+	    $tmask = $ifcset{$mac}{'netmask'};
+	    $tmac = $mac;
+	    
+	    if (inet_ntoa((inet_aton($tmask) & inet_aton($tip))) eq
+		inet_ntoa((inet_aton($tmask) & inet_aton($gate)))) {
+		$found = 1;
+		last;
+	    }
+	}
+
+	if (!$found) {
+	    print "WARNING: did not find iface for route\n" . 
+		"  ip $inet mask $mask nexthop $gate type $type\n";
+	    next;
+	}
+
+	if ($type eq "host") {
+	    $mask = "255.255.255.255";
+	}
+
+	push(@routes,[$inet,$mask,$gate,$tmac]);
+
+	print "route $inet $mask $gate $type $tmac\n";
+    }
+}
+else {
+    print "No routes\n";
+}
+
+#
+# Execute, now that we have info.
+#
+if ($cmd eq 'boot') {
+    doboot();
+}
+elsif ($cmd eq 'reboot') {
+    doshutdown();
+    doboot();
+}
+elsif ($cmd eq 'shutdown') {
+    doshutdown();
+}
+
+#
+# Tell the testbed the node booted okay
+#
+tmcc(TMCCCMD_STATE, "ISUP");
+
+print "NetFPGA $nid booted okay\n";
+exit(0);
+
+#
+# Configure a netfpga.
+#
+sub dosetup() {
+    # make sure we have the config/run dir for this netfpga
+    system("mkdir -p $RUNDIR");
+
+    open(AFD,">$RUNDIR/cpuhw") 
+	or die "ERROR: could not construct userspace arp file!";
+    open(RFD,">$RUNDIR/rtable") 
+	or die "ERROR: could not construct userspace routing table file!";
+    
+    if ($debug) { print "Getting registers for $mgmt_iface\n"; }
+
+    # grab the register function set for the primary iface for this 
+    # netfpga card
+    my @regf = nf_get_hw_reg_access($mgmt_iface);
+
+    # invalidate the forwarding and arp tables
+    my $i;
+    print "Invalidating routing table entries...\n";
+    for ($i = 0; $i < ROUTER_RT_SIZE(); ++$i) {
+	invalidate_LPM_table_entry_generic($i,@regf);
+    }
+    print "Invalidating arp table entries...\n";
+    for ($i = 0; $i < ROUTER_ARP_SIZE(); ++$i) {
+	invalidate_ARP_table_entry_generic($i,@regf);
+    }
+
+    # setup IP and MAC addrs for the necessary ports, and default routes
+    $i = 0;
+    foreach my $k (keys(%ifcset)) {
+	add_dst_ip_filter_entry_generic($i,$ifcset{$k}{'ipaddr'},@regf);
+	#				$ifcset{$k}{'name'});
+	set_router_MAC_generic(($ifcset{$k}{'num'} % 4) + 1,
+			       $ifcset{$k}{'pmac'},@regf);
+	add_LPM_table_entry_generic($i,$ifcset{$k}{'subnet'},
+				    $ifcset{$k}{'netmask'},'0.0.0.0',
+				    $MPORT[$ifcset{$k}{'num'} % 4],@regf);
+	++$i;
+
+	# write the physical mac/ip addr map to the file
+	print AFD "eth" . ($ifcset{$k}{'num'} % 4) . 
+	    " " . $ifcset{$k}{'ipaddr'} . " " . $ifcset{$k}{'netmask'} . 
+	    " " . $ifcset{$k}{'pmac'} . "\n";
+
+	# write the default route to file
+	print RFD "" . $ifcset{$k}{'subnet'} . " " . '0.0.0.0' . " " . 
+	    $ifcset{$k}{'netmask'} . 
+	    " eth" . ($ifcset{$k}{'num'} % 4) . "\n";
+    }
+
+    # setup routes (default routes have already been done) in forwarding table
+    # we have already set up $i - 1 default routes
+    $i = scalar(keys(%ifcset));
+    foreach my $r (@routes) {
+	my @ra = @$r;
+
+	if (!($i < ROUTER_RT_SIZE())) {
+	    print "INFO: could not store route (" . join(" ",@ra) . 
+		") in forwarding table!\n";
+	    next;
+	}
+
+	add_LPM_table_entry_generic($i,$ra[0],$ra[1],$ra[2],
+				    $MPORT[$ifcset{$ra[3]}{'num'} % 4],@regf);
+	++$i;
+
+	# write the userspace routing table entry
+	print RFD "" . $ra[0] . " " . $ra[2] . " " . $ra[1] . 
+	    " eth" . ($ifcset{$ra[3]}{'num'} % 4) . "\n";
+    }
+
+    close(AFD);
+    close(RFD);
+
+}
+
+sub doboot() {
+    my $retval;
+
+    # program the cpci stuff
+    print "Setting up reprogramming...\n";
+    $retval = system("$CPCITOOL");
+    if ($retval) {
+	die "could not run cpci programmer!";
+    }
+
+    # upload the bitfile
+    print "Reprogramming with reference router bitfile...\n";
+    $retval = system("$BITPROG $RR_BITFILE");
+    if ($retval) {
+	die "could not run upload reference router bitfile!";
+    }
+    
+    # "ifconfig" the netfpga, and write some files for scone
+    print "Configuring reference router...\n";
+    dosetup();
+
+    if ($routetype =~ /^static$/i) {
+	# start up neutered scone
+	my $pid = fork();
+	if (!defined($pid)) {
+	    die "fork";
+	}
+	elsif ($pid) {
+	    open(PIDFILE,">$RUNDIR/scone.pid") 
+		or die "ERROR: could not open $RUNDIR/scone.pid!";
+	    print PIDFILE "$pid\n";
+	    close(PIDFILE);
+	}
+	else {
+	    close(STDIN);
+	    close(STDOUT);
+	    close(STDERR);
+	    
+	    chdir("$RUNDIR");
+	    exec("$SCONE -r rtable -l scone.log") 
+		or die "exec";
+	}
+    }
+}
+
+sub doshutdown() {
+
+    if ($routetype =~ /^static$/i) {
+	# kill scone
+	if ( -f "$RUNDIR/scone.pid") {
+	    open(FD,"$RUNDIR/scone.pid");
+	    my $pid = <FD>;
+	    chomp($pid);
+	    close(FD);
+	    if ($pid =~ /^\d+$/ && kill(0,$pid)) {
+		print "Killing scone pid $pid...\n";
+		kill(9,$pid);
+	    }
+	    else {
+		print "Couldn't find running scone to kill.\n";
+	    }
+	}
+    }
+
+    # invalidate the routing and arp tables
+    if ($debug) { print "Getting registers for $mgmt_iface\n"; }
+
+    # grab the register function set for the primary iface for this 
+    # netfpga card
+    my @regf = nf_get_hw_reg_access($mgmt_iface);
+
+    # invalidate the forwarding and arp tables
+    my $i;
+    print "Invalidating routing table entries...\n";
+    for ($i = 0; $i < ROUTER_RT_SIZE(); ++$i) {
+	invalidate_LPM_table_entry_generic($i,@regf);
+    }
+    print "Invalidating arp table entries...\n";
+    for ($i = 0; $i < ROUTER_ARP_SIZE(); ++$i) {
+	invalidate_ARP_table_entry_generic($i,@regf);
+    }
+}
+
+
+#
+# helper stuff
+#
+
+#
+# All the netfpgas have the same MAC addrs for the user-visible nf2 ifaces.  
+# So we generate "unique" ones (in the locally-assigned MAC space) for the 
+# actual hardware ifaces based on the default nf2 base MAC (00:4e:46:32:43:00).
+#
+sub umac_to_pmac($$) {
+    my ($nid,$umac) = @_;
+
+    if (!defined($nid) || !defined($umac)) {
+	return undef;
+    }
+
+    my $nodenum;
+    if ($nid =~ /^[\w\d\-]+(\d+)$/) {
+	$nodenum = $1;
+    }
+    else {
+	return undef;
+    }
+
+    my @sumac = ();
+    if ($umac =~ /:/) {
+	@sumac = split(/:/,$umac);
+    }
+    elsif ($umac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	@sumac = ($1,$2,$3,$4,$5,$6);
+    }
+    else {
+	return undef;
+    }
+
+    # get in the locally-assigned MAC space
+    $sumac[0] = "02";
+    # set the 4th byte to the numeric part of the node_id... ugh!
+    if ($nodenum < 10) {
+	$sumac[3] = sprintf("0%x",$nodenum);
+    }
+    else {
+	$sumac[3] = sprintf("0%x",$nodenum);
+    }
+
+    return join(':',@sumac);
+}

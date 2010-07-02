@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2009 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -62,5 +62,5 @@ void	BlockMapInvert(BlockMap_t *oldmap, BlockMap_t *newmap);
 int	BlockMapMerge(BlockMap_t *frommap, BlockMap_t *tomap);
 int	BlockMapFirst(BlockMap_t *blockmap);
 int	BlockMapApply(BlockMap_t *blockmap, int chunk,
-		      void (*func)(int, int, int, void *), void *farg);
+		      int (*func)(int, int, int, void *), void *farg);
 void	ClientStatsDump(unsigned int id, ClientStats_t *stats);

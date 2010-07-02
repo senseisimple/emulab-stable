@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -42,14 +42,6 @@ if [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
 fi
 
 #
-# If this is a newnode boot, boss (inner or outer) will have returned with
-# no hostname.  We don't need to record anything in this case, so skip it.
-#
-if [ x"$new_host_name" = x ]; then
-    exit 0
-fi
-
-#
 # Remember our server IP, real hostname, router IP, etc.
 #
 echo $new_dhcp_server_identifier > $BOOTDIR/bossip
@@ -62,6 +54,33 @@ if [ -n "$interface" ]; then
 fi
 
 #
+# For Xen-based vnodes we record the vnode name where the scripts expect it.
+# XXX this works because only Xen-based vnodes DHCP.
+#
+case "$new_host_name" in
+    pcvm*)
+	echo $new_host_name > $BOOTDIR/vmname
+	;;
+esac   
+
+#
+# If this is a newnode boot, boss (inner or outer) will have returned with
+# no hostname.  We don't need to record anything in this case, so skip it.
+#
+if [ x"$new_host_name" = x ]; then
+    exit 0
+fi
+
+#
+# XXX compenstate for a stupid long time bug in the dhclient-script
+#
+curhname=`hostname`
+if [ $reason = BOUND -a -z "$curhname" -a -n "$new_host_name" ]; then
+    echo "`date`: hostname is $new_host_name" >>$LOGDIR/dhclient-exit.log 2>&1
+    hostname $new_host_name
+fi
+
+#
 # We have observed problems where changing the speed/duplex of a link
 # leaves DNS a little wonky.  So we whack on it til it responds so that
 # the sethostname script won't fail.
@@ -71,7 +90,7 @@ if [ "$new_network_number" = "10.200.1.0" ]; then
         if `$BINDIR/tmcc bossinfo >/dev/null 2>&1`; then
 	    break
 	fi
-        echo "${interface}: waiting for DNS.." >>$LOGDIR/dhclient-exit.log 2>&1
+        echo "`date`: ${interface}: waiting for DNS.." >>$LOGDIR/dhclient-exit.log 2>&1
         sleep $i
     done
 fi

@@ -1,0 +1,390 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use strict;
+use Getopt::Std;
+
+my $TEVC = "/usr/testbed/bin/tevc";
+my $LOGHOLE = "/usr/testbed/bin/loghole";
+my $PYTHON = "/usr/local/bin/python";
+my $PERL = "/usr/bin/perl";
+my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
+my $NODELIST = "/usr/testbed/bin/node_list";
+my $EXPINFO = "/usr/testbed/bin/expinfo";
+my $INITCOND = "init-elabnodes.pl";
+
+my $realplab = 0;
+my $initelab = 0;
+my $sanityChecks = 0;
+
+my $UNKNOWN = "<unknown>";
+my $stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
+my $stub_cmdargs = $UNKNOWN;
+my $mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
+my $mon_cmdargs = $UNKNOWN;
+
+sub get_cmdargs($$);
+
+sub usage()
+{
+    print "Usage: $0 [-C] [ -S command-line ] [ -s command-args ] pid eid\n".
+	  "  -p              monitor real planetlab nodes\n".
+	  "  -i              initialize elab nodes with historic plab data\n". 
+	  "  -N s|m          use new stub (s) or monitor (m)\n".
+	  "  -O s|m          use old stub (s) or monitor (m)\n".
+	  "  -S command-line replace the current stub command arguments\n".
+	  "  -s command-args append args to stub command line\n".
+	  "  -M command-line replace the current monitor command arguments\n".
+	  "  -m command-args append args to monitor command line\n".
+      "  -t              start tcpdumps for cross-correlation checks\n".
+	  "  -C              show current command line(s)\n";
+    exit(1);
+}
+my $optlist = "CS:s:M:m:piN:O:t";
+
+my $pelabdir;
+if ($0 =~ /(.*)\/[^\/]+$/) {
+    $pelabdir = $1;
+} else {
+    $pelabdir = ".";
+}
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (!getopts($optlist, \%options)) {
+    print "error: cannot parse options\n";
+    usage();
+}
+#
+# Require the pid and eid
+#
+if (@ARGV != 2) {
+    usage();
+}
+my ($pid, $eid) = @ARGV;
+
+#
+# Make sure the experiment is swapped in!
+#
+my @expinfo = `$EXPINFO $pid $eid`;
+if (grep /No such experiment/, @expinfo) {
+    die "*** ERROR: Experiment does not exist!\n";
+} elsif (! grep(/State: active/,@expinfo)) {
+    die "*** ERROR: Experiment is not swapped in!\n";
+}
+
+#$stub_cmdargs = get_cmdargs("plab", $stub_cmd);
+#$mon_cmdargs = get_cmdargs("elab", $mon_cmd);
+#if (defined($options{"S"})) {
+#    $stub_cmdargs = $options{"S"};
+#}
+#if (defined($options{"s"})) {
+#    if ($stub_cmdargs eq $UNKNOWN) {
+#	$stub_cmdargs = $options{"s"};
+#    } else {
+#	$stub_cmdargs .= " " . $options{"s"};
+#    }
+#}
+#if (defined($options{"M"})) {
+#    $mon_cmdargs = $options{"M"};
+#}
+#if (defined($options{"m"})) {
+#    if ($mon_cmdargs eq $UNKNOWN) {
+#	$mon_cmdargs = $options{"m"};
+#    } else {
+#	$mon_cmdargs .= " " . $options{"m"};
+#    }
+#}
+#if (defined($options{"C"})) {
+#    my $cmdline = $stub_cmd;
+#    if ($stub_cmdargs ne $UNKNOWN) {
+#	$cmdline .= " $stub_cmdargs";
+#    }
+#    print "Current stub command line: '$cmdline'\n";
+#
+#    $cmdline = $mon_cmd;
+#    if ($mon_cmdargs ne $UNKNOWN) {
+#	$cmdline .= " $mon_cmdargs";
+#    }
+#    print "Current monitor command line: '$cmdline'\n";
+#}
+if (defined($options{"p"})) {
+    $realplab = 1;
+    if ($mon_cmdargs eq $UNKNOWN) {
+	$mon_cmdargs = "-p";
+    } else {
+	$mon_cmdargs .= " " . "-p";
+    }
+}
+if (defined($options{"i"})) {
+    $initelab = 1;
+    print "WARNING: -i only makes sense with -p\n"
+	if (!$realplab);
+}
+#if (defined($options{"N"})) {
+#    if ($options{"N"} eq "s") {
+#	$stub_cmd = "/bin/sh /local/pelab/magent/auto-magent.sh";
+#	$stub_cmdargs = ""
+#	    if ($stub_cmdargs eq $UNKNOWN);
+#    } elsif ($options{"N"} eq "m") {
+#	$mon_cmd = "/bin/sh /local/pelab/dbmonitor/auto-dbmonitor.sh";
+#	$mon_cmdargs = ""
+#	    if ($mon_cmdargs eq $UNKNOWN);
+#    } else {
+#	die "Unknown -N type '", $options{"N"}, "'\n";
+#    }
+#}
+#if (defined($options{"O"})) {
+#    if ($options{"O"} eq "s") {
+#	$stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
+#	$stub_cmdargs = ""
+#	    if ($stub_cmdargs eq $UNKNOWN);
+#    } elsif ($options{"O"} eq "m") {
+#	$mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
+#	$mon_cmdargs = ""
+#	    if ($mon_cmdargs eq $UNKNOWN);
+#    } else {
+#	die "Unknown -O type '", $options{"O"}, "'\n";
+#    }
+#}
+if (defined($options{"t"})) {
+    $sanityChecks = 1;
+}
+
+my $use_magent = ($stub_cmd =~ /magent/) ? 1 : 0;
+my $use_simplemodel = ($mon_cmd =~ /dbmonitor/) ? 1 : 0;
+
+#
+# Let's help some poor bozos (Rob) get the right command line args
+#
+print "##### Stashing node list for experiment\n";
+my @vnodes = split /\s+/,`$NODELIST -v -e $pid,$eid`;
+my $hasfakeplab = grep /plab-\d+/, @vnodes;
+my $hasrealplab = grep /planet-\d+/, @vnodes;
+print "HFPL = $hasfakeplab HRPL = $hasrealplab RPL = $realplab\n";
+if (!$hasfakeplab && $hasrealplab && !$realplab) {
+    die "*** ERROR: Forgot to specify -p!\n";
+} elsif ($hasfakeplab && !$hasrealplab && $realplab) {
+    die "*** ERROR: Should not use -p!\n";
+}
+
+#
+# Make sure any old stubs/monitors are dead
+#
+print "##### Stopping old stubs and monitors\n";
+if ($realplab) {
+    if (system "$TEVC -e $pid/$eid now planetstubs stop") {
+	die "Error running tevc\n";
+    }
+} else {
+    if (system "$TEVC -e $pid/$eid now plabstubs stop") {
+	die "Error running tevc\n";
+    }
+}
+if (system "$TEVC -e $pid/$eid now monitorgroup stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Make sure link logs get cleaned up
+#
+print "##### Rolling link tracing files \n";
+if (system "$TEVC -e $pid/$eid now planet-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planet-tracemon stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Smack down host tcpdumps
+#
+print "##### Stopping host tcpdumps\n";
+if (system "$TEVC -e $pid/$eid now tdhosts stop") {
+    die "Error running tevc\n";
+}
+
+
+#
+# Restart the server program
+
+#
+# Clean out the logs so that we can start fresh
+#
+print "##### Cleaning old logfiles (ignore 'No match' errors)\n";
+if (system "$LOGHOLE -e $pid/$eid clean -f -r") {
+    die "Error running loghole\n";
+}
+
+#
+# Reset the links so that we remove any delay changes we might have previously
+# made
+#
+print "##### Resetting all links in the experiment..";
+print "clear..";
+if (system "$TEVC -e $pid/$eid now elabc clear") {
+    die "Error running tevc elabc clear\n";
+}
+print "reset\n";
+if (system "$TEVC -w -e $pid/$eid now elabc reset") {
+    die "Error running tevc elabc reset\n";
+}
+
+#
+# XXX stash node list for experiment since nodes don't have node_list
+# right now.  This is needed by the dbmonitor if it is in use.
+#
+print "##### Stashing node list for experiment\n";
+if (system "$NODELIST -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list") {
+    warn "Could not create node list for dbmonitor; it will fail if used\n";
+}
+
+#
+# Restart the event system so the 'create' event, necessary for pelab to work,
+# gets fired again
+#
+print "##### Restarting the event system\n";
+if (system "$EVENTSYS -e $pid,$eid replay") {
+    die "Error controlling the event system\n";
+}
+
+print "##### Waiting for event system to start\n";
+sleep(10);
+
+#
+# Fetch and store the initial conditions for plab nodes if desired.
+# We both stash them in a file and set them directly.  The former is
+# read by the monitor at start up to inform the stubs.  The latter is
+# for backward compat with the old monitor/stubs that did not do it for
+# themselves.
+#
+if ($realplab && $initelab && !$use_simplemodel) {
+    print "##### Stashing initial path conditions for plab nodes\n";
+    if (system "$pelabdir/$INITCOND -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid") {
+	warn "Could not acquire initial path conditions\n";
+    }
+#    print "##### Initializing Emulab link characteristics\n";
+#    if (system "$pelabdir/$INITCOND -C $pid $eid") {
+#	warn "Error initializing Emulab links with initial path conditions\n";
+#    }
+} else {
+    # avoid old stale conditions
+    unlink("/proj/$pid/exp/$eid/tmp/initial-conditions.txt");
+}
+
+print "##### Restarting servers\n";
+if (system "$TEVC -e $pid/$eid now allservers stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now allservers start") {
+    die "Error running tevc\n";
+}
+
+#
+# Start link tracing
+#
+print "##### Starting link tracing\n";
+if (system "$TEVC -e $pid/$eid now planet-tracemon start") {
+    die "Error running tevc\n";
+}
+
+#
+# Start host tcpdumps
+#
+print "##### Starting host tcpdumps\n";
+if (system "$TEVC -e $pid/$eid now tdhosts start") {
+    die "Error running tevc\n";
+}
+
+#
+# Start up the stubs and monitors
+#
+#my $startarg = "";
+print "##### Starting stubs";
+#if ($initelab && $use_magent) {
+#    $stub_cmdargs += " /proj/$pid/exp/$eid/tmp/initial-conditions.txt ";
+#}
+#if ($stub_cmdargs ne $UNKNOWN) {
+#    print " with: '$stub_cmd $stub_cmdargs'";
+#    $startarg = "'COMMAND=$stub_cmd $stub_cmdargs'";
+#}
+print "\n";
+if ($realplab) {
+    if (system "$TEVC -e $pid/$eid now planetstubs start") {
+	die "Error running tevc\n";
+    }
+} else {
+    if (system "$TEVC -e $pid/$eid now plabstubs start") {
+	die "Error running tevc\n";
+    }
+}
+
+#$startarg = "";
+print "##### Starting monitors";
+#if ($mon_cmdargs ne $UNKNOWN) {
+#    print " with: '$mon_cmd $mon_cmdargs'";
+#    $startarg = "'COMMAND=$mon_cmd $mon_cmdargs'";
+#}
+print "\n";
+if (system "$TEVC -e $pid/$eid now monitorgroup start") {
+    die "Error running tevc\n";
+}
+
+#print "##### Starting tcpdumps\n";
+#if (system "$TEVC -e $pid/$eid now plabtcpdump start") {
+#    die "Error running tevc\n";
+#}
+
+print "##### Starting tcpdumps for cross-correlation sanity checks\n";
+if (system "$TEVC -e $pid/$eid now sanityCheckDumps start") {
+    die "Error running tevc\n";
+}
+
+print "##### Done\n";
+
+exit(0);
+
+#
+# Dig the command line out of the logs from the previous run
+# (if there was one)
+#
+sub get_cmdargs($$)
+{
+    my ($ntype,$cmd) = @_;
+    my $cmdargs = $UNKNOWN;
+    my $lfile = ($ntype eq "plab") ? "plabstub" : "monitor";
+
+    my @list = `/bin/ls /proj/$pid/exp/$eid/logs/$eid.*.zip`;
+    return $cmdargs
+	if ($?);
+    chomp(@list);
+
+    my $file = $list[$#list];
+    return $cmdargs
+	if (! -r $file);
+    my @info = `unzip -p $file "${ntype}-1/local/logs/${lfile}-1.status"`;
+    foreach (@info) {
+	if (/^COMMAND=(.*)/) {
+	    if ($1 ne $cmd) {
+		$cmdargs = $1;
+
+		# XXX filter out broken cmdlines (old bug in program_agent)
+		$cmdargs =~ s/\s*}\s*$//;
+
+		$cmdargs =~ s/^$cmd//;
+		if ($cmdargs eq "") {
+		    $cmdargs = $UNKNOWN;
+		}
+	    }
+	    last;
+	}
+    }
+
+    return $cmdargs;
+}

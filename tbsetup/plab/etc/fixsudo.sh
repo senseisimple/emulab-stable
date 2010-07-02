@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 TMPSUDOERS=/tmp/sudoers
 ME=`whoami`
@@ -27,6 +32,6 @@ $ME     ALL=(ALL) NOPASSWD: ALL
 %root   ALL=(ALL) NOPASSWD: ALL
 EOF
 
-su -c "install -c -m 440 $TMPSUDOERS /etc/sudoers"
+sudo install -c -m 440 $TMPSUDOERS /etc/sudoers
 
 exit $?

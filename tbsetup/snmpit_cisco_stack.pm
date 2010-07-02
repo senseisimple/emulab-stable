@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,7 +32,7 @@ use libdb;
 # usage: new(string name, string stack_id, int debuglevel, list of devicenames)
 # returns a new object blessed into the snmpit_cisco_stack class
 #
-sub new($$$$@) {
+sub new($$$$$@) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -56,7 +56,6 @@ sub new($$$$@) {
     } else {
 	$self->{DEBUG} = 0;
     }
-
     #
     # The ID of this stack
     # 
@@ -117,7 +116,7 @@ sub new($$$$@) {
 	# we weren't given devicenames for devices that aren't ciscos
 	#
 	SWITCH: for ($type) {
-	    (/65\d\d/ || /40\d\d/ || /45\d\d/ || /29\d\d/ || /55\d\d/)
+	    (/65\d\d/ || /40\d\d/ || /45\d\d/ || /29\d\d/ || /55\d\d/ || /35\d\d/)
 		    && do {
 		use snmpit_cisco;
 		$device = new snmpit_cisco($devicename,$self->{DEBUG});
@@ -253,6 +252,8 @@ sub setPortVlan($$@) {
     # Split up the ports among the devices involved
     #
     my %map = mapPortsToDevices(@ports);
+    my %trunks;
+    my @trunks;
 
     if ($self->{PRUNE_VLANS}) {
         #
@@ -278,8 +279,8 @@ sub setPortVlan($$@) {
         # Find out every switch which might have to transit this VLAN through
         # its trunks
         #
-        my %trunks = getTrunks();
-        my @trunks = getTrunksFromSwitches(\%trunks, keys %switches);
+        %trunks = getTrunks();
+        @trunks = getTrunksFromSwitches(\%trunks, keys %switches);
         foreach my $trunk (@trunks) {
             my ($src,$dst) = @$trunk;
             $switches{$src} = $switches{$dst} = 1;
@@ -327,6 +328,7 @@ sub setPortVlan($$@) {
         }
     }
 
+    my %BumpedVlans = ();
     #
     # Perform the operation on each switch
     #
@@ -343,10 +345,48 @@ sub setPortVlan($$@) {
 	# Simply make the appropriate call on the device
 	#
 	$errors += $device->setPortVlan($vlan_number,@{$map{$devicename}});
+
+	#
+	# When making firewalls, may have to flush FDB entries from trunks
+	#
+	if (defined($device->{DISPLACED_VLANS})) {
+	    foreach my $vlan (@{$device->{DISPLACED_VLANS}}) {
+		$BumpedVlans{$vlan} = 1;
+	    }
+	    $device->{DISPLACED_VLANS} = undef;
+	}
     }
 
     if ($vlan_id ne 'default') {
-	$errors += (!$self->setVlanOnTrunks($vlan_number,1,@ports));
+	# if PRUNE were not in effect, then %trunks and @trunks
+	# aren't valid.  If VTP weren't enforced however,
+	# merely calling setVlanOnTrunks() with just the specified
+	# ports would miss transit-only switches.
+	# maybe the phrase at the top should be if (PRUNE || !VTP ..)
+	# expecially if running VTP automatically creates the interswitch
+	# trunks.
+	# I'll let Rob R. decide what to do about that -- sklower.
+	$errors += (!$self->setVlanOnTrunks2($vlan_number,1,\%trunks,@trunks));
+    }
+
+    #
+    # When making firewalls, may have to flush FDB entries from trunks
+    #
+    foreach my $vlan (keys %BumpedVlans) {
+	foreach my $devicename ($self->switchesWithPortsInVlan($vlan)) {
+	    my $dev = $self->{DEVICES}{$devicename};
+	    foreach my $neighbor (keys %{$trunks{$devicename}}) {
+		my $trunkIndex = $dev->getChannelIfIndex(
+				    @{$trunks{$devicename}{$neighbor}});
+		if (!defined($trunkIndex)) {
+		    warn "unable to find channel information on $devicename ".
+			 "for $devicename-$neighbor EtherChannel\n";
+		    $errors += 1;
+		} else {
+		    $dev->resetVlanIfOnTrunk($trunkIndex,$vlan);
+		}
+	    }
+	}
     }
 
     return $errors;
@@ -376,29 +416,32 @@ sub createVlan($$$;$$$) {
     # What we do here depends on whether this stack uses VTP to synchronize
     # VLANs or not
     #
-    my $okay = 1;
+    my $vlan_number;
+
+    # XXX temp, see doMakeVlans in snmpit.in
+    if ($::next_vlan_tag)
+	{ $vlan_number = $::next_vlan_tag; $::next_vlan_tag = 0; }
+
     if ($self->{VTP} || $self->{PRUNE_VLANS}) {
 	#
 	# We just need to create the VLAN on the stack leader
 	#
 	#
-	my $vlan_number = $self->{LEADER}->createVlan($vlan_id,undef,@otherargs);
-	$okay = ($vlan_number != 0);
+	$vlan_number = $self->{LEADER}->createVlan($vlan_id,$vlan_number,@otherargs);
     } else {
 	#
 	# We need to create the VLAN on all devices
 	# XXX - should we do the leader first?
 	#
-	my $vlan_number = undef;
-	foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
-	    print "Creating VLAN on switch $devicename ... \n" if $self->{DEBUG};
+	foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}){
+	    print "Creating VLAN on switch $devicename ... \n"
+		if $self->{DEBUG};
 	    my $device = $self->{DEVICES}{$devicename};
 	    my $res = $device->createVlan($vlan_id,$vlan_number,@otherargs);
 	    if (!$res) {
 		#
 		# Ooops, failed. Don't try any more
 		#
-		$okay = 0;
 		last;
 	    } else {
 		#
@@ -413,13 +456,12 @@ sub createVlan($$$;$$$) {
     # We need to add the ports to VLANs at the stack level, since they are
     # not necessarily on the leader
     #
-    if ($okay && @ports) {
+    if ($vlan_number && @ports) {
 	if ($self->setPortVlan($vlan_id,@ports)) {
-	    $okay = 0;
+	    print STDERR "*** Failed to add ports to vlan\n";
 	}
     }
-
-    return $okay;
+    return return $vlan_number;
 }
 
 #
@@ -636,6 +678,67 @@ sub removeVlan($@) {
 }
 
 #
+# Remove some ports from a single vlan,
+#
+# usage: removeSomePortsFromVlan(self, vlan identifier, port list)
+#
+# returns: 1 on success
+# returns: 0 on failure
+#
+sub removeSomePortsFromVlan($$@) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my @ports = @_;
+    my $errors = 0;
+
+    my %vlan_numbers = $self->{LEADER}->findVlans($vlan_id);
+    
+    #
+    # First, make sure that the VLAN really does exist
+    #
+    my $vlan_number = $vlan_numbers{$vlan_id};
+    if (!$vlan_number) {
+	warn "ERROR: VLAN $vlan_id not found on switch!";
+	return 0;
+    }
+
+    #
+    # Prevent the VLAN from being sent across trunks.
+    #
+    if (!$self->setVlanOnTrunks($vlan_number,0)) {
+	warn "ERROR: Unable to remove VLAN $vlan_number from trunks!\n";
+	#
+	# We can keep going, 'cause we can still remove the VLAN
+	#
+    }
+
+    #
+    # Now, we go through each device and remove all ports from the VLAN
+    # on that device. Note the reverse sort order! This way, we do not
+    # interfere with another snmpit processes, since createVlan tries
+    # in 'forward' order (we will remove the VLAN from the 'last' switch
+    # first, so the other snmpit will not see it free until it's been
+    # removed from all switches)
+    #
+    foreach my $devicename (sort {tbsort($b,$a)} keys %{$self->{DEVICES}}) {
+	my $device = $self->{DEVICES}{$devicename};
+	my %vlan_numbers = $device->findVlans($vlan_id);
+
+	#
+	# Only remove ports from the VLAN if it exists on this device.
+	#
+	next
+	    if (!defined($vlan_numbers{$vlan_id}));
+	    
+	print "Removing ports on $devicename from VLAN $vlan_id\n"
+	    if $self->{DEBUG};
+
+	$errors += $device->removeSomePortsFromVlan($vlan_id, @ports);
+    }
+    return ($errors == 0);
+}
+
+#
 # Set a variable associated with a port. 
 # TODO: Need a list of variables here
 #
@@ -679,33 +782,19 @@ sub getStats($) {
 #
 # Turns on trunking on a given port, allowing only the given VLANs on it
 #
-# usage: enableTrunking(self, port, vlan identifier list)
+# usage: enableTrunking2(self, port, equaltrunking, vlan identifier list)
+#
+# formerly was enableTrunking() without the predicate to decline to put
+# the port in dual mode.
 #
 # returns: 1 on success
 # returns: 0 on failure
 #
-sub enableTrunking($$@) {
+sub enableTrunking2($$$@) {
     my $self = shift;
     my $port = shift;
+    my $equaltrunking = shift;
     my @vlan_ids = @_;
-
-    #
-    # On a Cisco, the first VLAN given becomes the native VLAN for the trunk
-    #
-    my $native_vlan_id = shift @vlan_ids;
-    if (!$native_vlan_id) {
-	print STDERR "ERROR: No native VLAN passed to enableTrunking()!\n";
-	return 0;
-    }
-
-    #
-    # Grab the VLAN number for the native VLAN
-    #
-    my $vlan_number = $self->{LEADER}->findVlan($native_vlan_id);
-    if (!$vlan_number) {
-	print STDERR "ERROR: Native VLAN $native_vlan_id does not exist!\n";
-	return 0;
-    }
 
     #
     # Split up the ports among the devices involved
@@ -717,37 +806,60 @@ sub enableTrunking($$@) {
 	warn "ERROR: Unable to find device entry for $devicename\n";
 	return 0;
     }
+    #
+    # If !equaltrunking, the first VLAN given becomes the PVID for the trunk
+    #
+    my ($native_vlan_id, $vlan_number);
+    if ($equaltrunking) {
+	$native_vlan_id = "default";
+	$vlan_number = 1;
+    } else {
+	$native_vlan_id = shift @vlan_ids;
+	if (!$native_vlan_id) {
+	    warn "ERROR: No VLAN passed to enableTrunking()!\n";
+	    return 0;
+	}
+	#
+	# Grab the VLAN number for the native VLAN
+	#
+	$vlan_number = $device->findVlan($native_vlan_id);
+	if (!$vlan_number) {
+	    warn "Native VLAN $native_vlan_id was not on $devicename";
+	    # This is painful
+	    my $error = $self->setPortVlan($native_vlan_id,$port);
+	    if ($error) {
+		    warn ", and couldn't add it\n"; return 0;
+	    } else { warn "\n"; } 
+	}
+    }
 
     #
     # Simply make the appropriate call on the device
     #
     print "Enable trunking: Port is $port, native VLAN is $native_vlan_id\n"
 	if ($self->{DEBUG});
-    my $rv = $device->enablePortTrunking($port, $vlan_number);
+    my $rv = $device->enablePortTrunking2($port, $vlan_number, $equaltrunking);
 
     #
     # If other VLANs were given, add them to the port too
     #
     if (@vlan_ids) {
-	my %vlan_numbers = $self->{LEADER}->findVlans(@vlan_ids);
 	my @vlan_numbers;
 	foreach my $vlan_id (@vlan_ids) {
 	    #
-	    # First, make sure that the VLAN really does exist
+	    # setPortVlan makes sure that the VLAN really does exist
+	    # and will set up intervening trunks as well as adding the
+	    # trunked port to that VLAN
 	    #
-	    my $vlan_number = $vlan_numbers{$vlan_id};
-	    if (!$vlan_number) {
-		warn "ERROR: VLAN $vlan_id not found on switch!";
+	    my $error = $self->setPortVlan($vlan_id,$port);
+	    if ($error) {
+		warn "ERROR: could not add VLAN $vlan_id to trunk $port\n";
 		next;
 	    }
 	    push @vlan_numbers, $vlan_number;
 	}
 	print "  add VLANs " . join(",",@vlan_numbers) . " to trunk\n"
 	    if ($self->{DEBUG});
-	if (!$device->setVlansOnTrunk($port,1,@vlan_numbers)) {
-	    warn "ERROR: could not add VLANs " .
-		join(",",@vlan_numbers) . " to trunk";
-	}
     }
 
     return $rv;
@@ -833,6 +945,18 @@ sub setVlanOnTrunks($$$;@) {
     # switches
     #
     my @trunks = getTrunksFromSwitches(\%trunks,@switches);
+    return $self->setVlanOnTrunks2($vlan_number,$value,\%trunks,@trunks);
+}
+#
+# Enables or disables (depending on $value) a VLAN on all the supplied
+# trunks. Returns 1 on sucess, 0 on failure.
+#
+sub setVlanOnTrunks2($$$$@) {
+    my $self = shift;
+    my $vlan_number = shift;
+    my $value = shift;
+    my $trunkref = shift;
+    my @trunks = @_;
 
     #
     # Now, we go through the list of trunks that need to be modifed, and
@@ -859,7 +983,7 @@ sub setVlanOnTrunks($$$;@) {
 	    # Trunks might be EtherChannels, find the ifIndex
 	    #
             my $trunkIndex = $self->{DEVICES}{$src}->
-                             getChannelIfIndex(@{ $trunks{$src}{$dst} });
+                             getChannelIfIndex(@{ $$trunkref{$src}{$dst} });
             if (!defined($trunkIndex)) {
                 warn "ERROR - unable to find channel information on $src ".
 		     "for $src-$dst EtherChannel\n";
@@ -880,7 +1004,7 @@ sub setVlanOnTrunks($$$;@) {
 	    # Trunks might be EtherChannels, find the ifIndex
 	    #
             my $trunkIndex = $self->{DEVICES}{$dst}->
-                             getChannelIfIndex(@{ $trunks{$dst}{$src} });
+                             getChannelIfIndex(@{ $$trunkref{$dst}{$src} });
             if (!defined($trunkIndex)) {
                 warn "ERROR - unable to find channel information on $dst ".
 		     "for $src-$dst EtherChannel\n";
@@ -913,14 +1037,223 @@ sub switchesWithPortsInVlan($$) {
     my @switches = ();
     foreach my $devicename (keys %{$self->{DEVICES}}) {
         my $device = $self->{DEVICES}{$devicename};
-        foreach my $line ($device->listVlans()) {
-            my ($vlan_id, $vlan, $memberRef) = @$line;
-            if (($vlan == $vlan_number) && (@$memberRef > 0)) {
-                push @switches, $devicename;
-            }
+	if ($device->vlanHasPorts($vlan_number)) {
+	    push @switches, $devicename;
         }
     }
     return @switches;
+}
+
+#
+# Openflow enable function for Cisco stack
+# Till now it just report an error.
+#
+# enableOpenflow(self, vlan_id)
+# return # of errors
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Enabling Openflow on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->enableOpenflow($vlan_number);
+		if (!$ok) { $errors++; }
+		else {print "Done! \n" if $self->{DEBUG};}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}
+    }
+        
+    return $errors;
+}
+
+#
+# Disable Openflow
+#
+# disableOpenflow(self, vlan_id);
+# return # of errors
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Disabling Openflow on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->disableOpenflow($vlan_number);
+		if (!$ok) { $errors++; }
+		else {print "Done! \n" if $self->{DEBUG};}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}
+    }
+        
+    return $errors;
+}
+
+#
+# Set Openflow controller on VLAN
+#
+# setController(self, vlan_id, controller);
+# return # of errors
+#
+sub setOpenflowController($$$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my $controller = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Setting Openflow controller on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->setOpenflowController($vlan_number, $controller);
+		if (!$ok) { $errors++; }
+		else {print "Done! \n" if $self->{DEBUG};}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}
+    }
+        
+    return $errors;
+}
+
+#
+# Set Openflow listener on VLAN
+#
+# setListener(self, vlan_id, listener);
+# return # of errors
+#
+# This function might be replaced by a enableListener(vlan_id)
+# that sets the listener on switches automatically and returns
+# the listener connection string.
+#
+sub setOpenflowListener($$$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my $listener = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Setting Openflow listener on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->setOpenflowListener($vlan_number, $listener);
+		if (!$ok) { $errors++; }
+		else {print "Done! \n" if $self->{DEBUG};}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}	
+    }
+        
+    return $errors;
+}
+
+
+#
+# Get used Openflow listener ports
+#
+# getUsedOpenflowListenerPorts(self, vlan_id)
+#
+sub getUsedOpenflowListenerPorts($$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my %ports = ();
+
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {		
+		my %tmports = $device->getUsedOpenflowListenerPorts();
+		@ports{ keys %tmports } = values %tmports;		
+	    } else {
+		#
+		# YES this be an error because the VLAN is on it.
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+	    }
+	}	
+    }
+
+    return %ports;
 }
 
 # End with true

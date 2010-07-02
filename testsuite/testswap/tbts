@@ -1,0 +1,171 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+BEGIN {
+  #add localcpan path to library search path
+  if (-f glob("~/lib/perl5/Test/Harness.pm")) {
+    my $localcpan_path = glob('~/lib/perl5');
+    my $p5l = $ENV{PERL5LIB};
+    unless ( (defined $p5l) && ($p5l =~ /$localcpan_path/)) {
+      my $sep = (defined $p5l) ? ":" : "";
+      $ENV { PERL5LIB} .= "$sep" . " $localcpan_path";
+      push @INC, $localcpan_path;
+    }
+    push @INC, $localcpan_path;
+  }
+  $ENV{PERL5LIB} .= ":tests";
+}
+
+use lib qw(lib tests);
+use SemiModern::Perl;
+
+use Data::Dumper;
+use TBConfig;
+use TestBed::Daemonize;
+
+my $emailme;
+my $daemonize;
+{
+  use Getopt::Long;
+  my $debug;
+  my $project;
+  my $group;
+  my $xmlrpcurl;
+
+  my $cmdline_defines;
+  my $concurrent_prerun_jobs;
+  my $concurrent_node_usage;
+  my $exclude_steps;
+  my $runonly;
+  my $dontkill;
+  my $alreadyalive;
+  my $daemonize;
+  my $prefix;
+  my $result = GetOptions (
+      "d|debug"        => \$debug,
+      "define=s%"      => \$cmdline_defines,
+      "project=s"      => \$project,
+      "xmlrpcurl=s"    => \$xmlrpcurl,
+      "group=s"        => \$group,
+      "cprj=i"         => \$concurrent_prerun_jobs,
+      "cnu=i"          => \$concurrent_node_usage,
+      "excludesteps=s" => \$exclude_steps,
+      "runonly=s"      => \$runonly,
+      "dontkill"       => \$dontkill,
+      "alreadyalive"   => \$alreadyalive,
+      "daemonize"      => \$daemonize,
+      "emailme=s"      => \$emailme,
+      "prefix=s"       => \$prefix,
+    );
+
+  if ($debug)     { $ENV { 'TBTS_DEBUG'      } = 1          ; $TBConfig::DEBUG_XML_CLIENT = 1       ; }
+  if ($group)     { $ENV { 'TBTS_GROUP'      } = $group     ; $TBConfig::DEFAULT_GID = $group       ; }
+  if ($project)   { $ENV { 'TBTS_PROJECT'    } = $project   ; $TBConfig::DEFAULT_PID = $project     ; }
+  if ($xmlrpcurl) { $ENV { 'TBTS_XMLRPC_URL' } = $xmlrpcurl ; $TBConfig::XMLRPC_SERVER = $xmlrpcurl ; }
+  if ($concurrent_prerun_jobs) { $TBConfig::concurrent_prerun_jobs = $concurrent_prerun_jobs; }
+  if ($concurrent_node_usage)  { $TBConfig::concurrent_node_usage = $concurrent_node_usage; }
+  if ($cmdline_defines)        { $TBConfig::cmdline_defines = $cmdline_defines; }
+  if ($exclude_steps)          { $TBConfig::exclude_steps = [split(/ /, $exclude_steps)]; }
+  if ($runonly)                { $TBConfig::runonly = [split(/ /, $runonly)]; }
+  if ($dontkill)               { $TBConfig::exclude_steps = [qw/swapout end/]}
+  if ($alreadyalive)           { $TBConfig::exclude_steps = [qw/create swapin swapout end/]}
+  if ($prefix)                 { $TBConfig::prefix = $prefix; }
+  if ($daemonize or $emailme)  { TestBed::Daemonize::daemonize; }
+}
+
+sub find_rx_in_dir {
+  my ($rx, $dir) = @_;
+  my @results;
+  my $scandir = sub { if (-f && m/$rx/)  { push @results,   $File::Find::name; } };
+  use File::Find;
+  find($scandir, $dir);
+  @results;
+}
+
+sub all_ts { find_rx_in_dir(qr{\.t$}, 't'); }
+sub all_tpms { find_rx_in_dir(qr{\.pm$}, 'tests'); }
+
+sub usage {
+  my $ts_text;
+  my $tpms_text;
+  for (all_ts) { $ts_text     .= "        " . $_ . "\n"; }
+  for (all_tpms) { $tpms_text .= "        " . $_ . "\n"; }
+  print <<"USAGE";
+TestBed TestSwap
+./tbts OPTIONS TESTSUITE|TESTFILE
+        -d --debug
+        -g --group=GROUPNAME
+        -p --project=PROJECTNAME
+        -x --xmlrpcurl=XMLRPCURL
+        --define OS=FBSD410-UPDATE
+        --cprj=4  => \$concurrent_prerun_jobs,
+        --cnu=20  => \$concurrent_node_usage,
+        --dontkill => --excludesteps "swapout end"
+        --alreadyalive => --excludesteps "create swapin swapout end"
+        --excludesteps "swapout end"
+        --excludesteps "create swapin swapout end"
+        --runonly "testname1 testname2 testname3"
+        --daemonize
+        --emailme user\@emulab.net
+	--prefix=PREFIX #prefixes all eids with PREFIX
+        
+
+    TESTSUITES:
+        massive  - all experiment tests
+        all      - all framework tests
+        sanity   - all framework utility and xmlrpc client modules test
+        lib      - all framework utility tests
+        xmlrpc   - all xmlrpc client modules tests
+        critic   - runs perl critic on framework code
+
+    TESTFILES:
+USAGE
+  print $ts_text;
+  print $tpms_text;
+}
+
+sub array_single_difference {
+  my ($src, $minus) = @_;
+  grep { my $s = $_; !(grep { $s eq $_ } @$minus) } @$src;
+}
+
+use TestBed::Harness;
+if (@ARGV) {
+  my @xmlrpc = qw(t/xmlrpc/*.t);
+  my @lib = qw(t/lib/*.t t/lib/*/*.t t/tbts/cmdlineargs.t);
+  my @sanity = (@lib, @xmlrpc);
+  my @all = sort(array_single_difference([all_ts], [qw(t/coding/pod_coverage.t t/noautorun/tbts_cmdlineargs.t t/eine/elab_in_elab.t)]));
+  my @massive = array_single_difference([all_tpms], [qw(tests/xen/xen.pm)]);
+
+  my $cmd = $ARGV[0];
+  $_   = $cmd;
+  chomp $_;
+  if (/.*\.t$/ || /.*\.pm$/) { runharness(@ARGV); }
+  elsif ($_ eq 'podc')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep contain; done; '; }
+  elsif ($_ eq 'pode')      { system 'for x in `find lib -iname "*.pm"`; do podchecker $x 2>&1 |grep ERROR; done;'; }
+  elsif (/critic/)          { exec 'perlcritic lib t'; }
+  elsif (/massive/)         { runharness( @massive ); }
+  elsif (/all/)             { runharness( @all ); }
+  elsif (/sanity/)          { runharness( @sanity ); }
+  elsif (/lib/)             { runharness( @lib ); }
+  elsif (/xmlrpc/)          { runharness( @xmlrpc ); }
+  elsif (/podcov/)          { 
+    eval "use Test::Pod::Coverage";
+    if ($@) { say "Test::Pod::Coverage not found you need to install it first"; }
+    else { 
+      use IPC::Run3;
+      use Tools;
+      my $out = `./tbts t/coding/pod_coverage.t 2>&1`;
+      #Tools::splat("podcov.data", $out);
+      run3('perl devtools/podfailure.pl', \$out); 
+    }
+  }
+}
+else {
+  usage();
+}
+
+TestBed::Daemonize::email_daemonize_logs($emailme) if $emailme;

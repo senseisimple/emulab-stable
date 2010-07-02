@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -65,6 +65,16 @@ Node instproc init {s} {
     # table).
     $self set osid ""
 
+    # We have this for a bad, bad reason.  We can't expose $vhost variables
+    # in ns files because assign can't yet handle fixing vnodes to vhosts (or
+    # any other mapping constraints, since that would imply multiple levels 
+    # of mapping)... so when you set the parent_osid for vnodes, you are 
+    # setting the os for the vhost itself; the osid is the os for the vnode.
+    #
+    # If the osid gets set to a subosid, we set parent_osid to the default
+    # parent_osid for that osid in updatedb.
+    $self set parent_osid ""
+
     # Start with an empty set of desires
     $self instvar desirelist
     array set desirelist {}
@@ -76,8 +86,11 @@ Node instproc init {s} {
     $self set tarfiles ""
     $self set failureaction "fatal"
     $self set inner_elab_role ""
+    $self set plab_role "none"
+    $self set plab_plcnet "none"
     $self set fixed ""
     $self set nseconfig ""
+    $self set sharing_mode ""
 
     $self set topo ""
 
@@ -136,6 +149,7 @@ Node instproc updatedb {DB} {
     $self instvar portlist
     $self instvar type
     $self instvar osid
+    $self instvar parent_osid
     $self instvar cmdline
     $self instvar rpms
     $self instvar startup
@@ -143,6 +157,8 @@ Node instproc updatedb {DB} {
     $self instvar tarfiles
     $self instvar failureaction
     $self instvar inner_elab_role
+    $self instvar plab_role
+    $self instvar plab_plcnet
     $self instvar routertype
     $self instvar fixed
     $self instvar agentlist
@@ -154,12 +170,14 @@ Node instproc updatedb {DB} {
     $self instvar desirelist
     $self instvar nseconfig
     $self instvar simulated
+    $self instvar sharing_mode
     $self instvar topo
     $self instvar X_
     $self instvar Y_
     $self instvar orientation_
     $self instvar numeric_id
     var_import ::TBCOMPAT::default_osids
+    var_import ::TBCOMPAT::subosids
     var_import ::GLOBALS::use_physnaming
     var_import ::TBCOMPAT::physnodes
     var_import ::TBCOMPAT::objtypes
@@ -168,6 +186,15 @@ Node instproc updatedb {DB} {
     var_import ::GLOBALS::default_ip_routing_type
     var_import ::GLOBALS::enforce_user_restrictions
     var_import ::TBCOMPAT::hwtype_class
+
+    #
+    # Reserved name; conflicts with kludgy manner in which a program
+    # agent can used on ops.
+    #
+    if {"$self" == "ops"} {
+	perror "You may not use the name for 'ops' for a node!"
+	return
+    }
     
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
@@ -179,15 +206,35 @@ Node instproc updatedb {DB} {
 	}
     } else {
 	# Do not allow user to set os for virt nodes at this time.
-	if {$enforce_user_restrictions && $isvirt} {
-	    perror "You may not specify an OS for virtual nodes ($self)!"
-	    return
-	}
+	#if {$enforce_user_restrictions && $isvirt} {
+	#    perror "You may not specify an OS for virtual nodes ($self)!"
+	#    return
+	#}
 	# Do not allow user to set os for host running virt nodes.
 	if {$enforce_user_restrictions && $virthost} {
 	    perror "You may not specify an OS for hosting virtnodes ($self)!"
 	    return
 	}
+    }
+
+    #
+    # If the osid is a subosid and there is no parent, choose the default
+    # one now.
+    # XXX don't do this for now -- an OS can be both a subOS and a regular OS
+    # (i.e., windows), and we don't want to imply to Emulab that there should
+    # be a subOS if the user doesn't force it.
+    #
+    #if {[info exists $subosids($osid)] && $parent_osid == ""} {
+    #    set parent_osid [lindex $subosids($osid) 0]
+    #}
+
+    #
+    # If the osid won't run on the specified parent, die.
+    #
+    if {$parent_osid != "" && $osid != "" 
+	&& [lsearch -exact $subosids($osid) $parent_osid] == -1} {
+	perror "subOSID $osid does not run on parent OSID $parent_osid!"
+	return
     }
 
     #
@@ -263,9 +310,29 @@ Node instproc updatedb {DB} {
 	lappend values $inner_elab_role
     }
 
+    if { $plab_role != "none" } {
+	lappend fields "plab_role"
+	lappend values $plab_role
+    }
+
+    if { $plab_plcnet != "" } {
+	lappend fields "plab_plcnet"
+	lappend values $plab_plcnet
+    }
+
+    if { $sharing_mode != "" } {
+	lappend fields "sharing_mode"
+	lappend values $sharing_mode
+    }
+
     if { $numeric_id != {} } {
 	lappend fields "numeric_id"
 	lappend values $numeric_id
+    }
+
+    if { $parent_osid != {} && $parent_osid != 0} {
+	lappend fields "parent_osname"
+	lappend values $parent_osid
     }
 
     $sim spitxml_data "virt_nodes" $fields $values
@@ -413,6 +480,7 @@ Node instproc set_fixed {pnode} {
     $self instvar topo
     $self instvar fixed
     $self instvar issubnode
+    $self instvar isvirt
 
     if { [Node info instances $pnode] != {} } {
         # $pnode is an object instance of class Node
@@ -426,7 +494,7 @@ Node instproc set_fixed {pnode} {
     }
     set fixed $pnode
 
-    if {[info exists physnodes($pnode)]} {
+    if {$isvirt == 0 && [info exists physnodes($pnode)]} {
 	set type $physnodes($pnode)
 	
 	if {$topo != ""} {
@@ -552,7 +620,7 @@ Node instproc program-agent {args} {
     set curprog [new Program [$self set sim]]
     $curprog set node $self
     $curprog set command $(-command)
-    $curprog set dir $(-dir)
+    $curprog set dir "{$(-dir)}"
     $curprog set expected-exit-code $(-expected-exit-code)
     if {$(-timeout) != {}} {
 	set to [::GLOBALS::reltime-to-secs $(-timeout)]

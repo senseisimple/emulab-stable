@@ -1,6 +1,18 @@
 #!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 rm bgmon.tar.gz
 #tar -czf bgmon.tar.gz bgmon.pl runbgmon event.pm
-tar -czf bgmon.tar.gz bgmon.pl runbgmon
-cp bgmon.tar.gz /proj/tbres/gebhardt/
+tar -czf bgmon.tar.gz bgmon.pl libwanetmon.pm Cmdqueue.pm runbgmon iperfwrapper.pl
+cp bgmon.tar.gz /proj/tbres/gebhardt/wanetmonstuff/
+#rm /proj/tbres/gebhardt/wanetmonstuff/iperfd.tar.gz
+#rm /proj/tbres/gebhardt/wanetmonstuff/fping.tar.gz
+#cp /proj/tbres/bin/iperfd .
+#cp /proj/tbres/bin/fping .
+#tar -zcf /proj/tbres/gebhardt/wanetmonstuff/iperfd.tar.gz iperfd
+#tar -zcf /proj/tbres/gebhardt/wanetmonstuff/fping.tar.gz fping
+

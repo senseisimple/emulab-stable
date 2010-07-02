@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -25,6 +25,7 @@ import pwd
 sys.path.append("@prefix@/lib")
 import getopt
 import os
+import re
 
 import xmlrpclib
 from emulabclient import *
@@ -91,12 +92,15 @@ API = {
                                      "in an experiment" },
     "node_avail"        : { "func" : "node_avail",
                             "help" : "Print free node counts" },
+    "node_avail_list"   : { "func" : "node_avail_list",
+                            "help" : "Print physical node_ids for matching" +
+                                     "free nodes" },
     "delay_config"      : { "func" : "delay_config",
                             "help" : "Change the link shaping characteristics " +
                                      "for a link or lan" },
-    "link_config"       : { "func" : "link_config",
-                            "help" : "Change interface parameters " +
-                                     "for a wireless link" },
+    "wilink_config"     : { "func" : "wilink_config",
+                            "help" : "Change INTERFACE parameters " +
+                                     "for a WIRELESS link" },
     "savelogs"          : { "func" : "savelogs",
                             "help" : "Save console tip logs to experiment " +
                                      "directory" },
@@ -127,6 +131,24 @@ API = {
                             "help" : "Wait for experiment to reach a state" },
     "tipacl"            : { "func" : "tipacl",
                             "help" : "Get console acl" },
+    "template_commit"   : { "func" : "template_commit",
+                            "help" : "Commit changes to template (modify)" },
+    "template_export"   : { "func" : "template_export",
+                            "help" : "Export template record" },
+    "template_checkout" : { "func" : "template_checkout",
+                            "help" : "Checkout a template" },
+    "template_instantiate": { "func" : "template_instantiate",
+                            "help" : "Instantiate a template" },
+    "template_swapin":    { "func" : "template_swapin",
+                            "help" : "Swapin a preloaded template instance" },
+    "template_swapout"  : { "func" : "template_swapout",
+                            "help" : "Terminate template instance" },
+    "template_startrun" : { "func" : "template_startrun",
+                            "help" : "Start new experiment run" },
+    "template_modrun"   : { "func" : "template_modrun",
+                            "help" : "Modify resources for run" },
+    "template_stoprun"  : { "func" : "template_stoprun",
+                            "help" : "Stop current experiment run" },
 };
 
 #
@@ -490,7 +512,7 @@ class node_list:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "pvhe:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "pPvhHme:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -509,11 +531,20 @@ class node_list:
             elif opt == "-p":
                 which = "phys";
                 pass
+            elif opt == "-P":
+                which = "phystype";
+                pass
             elif opt == "-v":
                 which = "virt";
                 pass
             elif opt == "-h":
                 which = "pphys";
+                pass
+            elif opt == "-H":
+                which = "pphysauxtype";
+                pass
+            elif opt == "-m":
+                which = "mapping";
                 pass
             elif opt == "-e":
                 pid,eid = string.split(val, ",")
@@ -540,8 +571,17 @@ class node_list:
             elif which == "phys":
                 print val["node"], " ",
                 pass
+            elif which == "phystype":
+                print ("%s=%s") % (val["node"],val["type"]), " ",
+                pass
             elif which == "pphys":
                 print val["pnode"], " ",
+                pass
+            elif which == "pphysauxtype":
+                print "%s=%s"  % (val["pnode"],val["auxtype"]), " ",
+                pass
+            elif which == "mapping":
+                print "%s=%s" % (node, val["pnode"]),
                 pass
             pass
         print "";
@@ -552,8 +592,10 @@ class node_list:
 	print "node_list [options] -e pid,eid";
 	print "where:";
 	print "     -p   - Print physical (Emulab database) names (default)";
+	print "     -P   - Like -p, but include node type";
 	print "     -v   - Print virtual (experiment assigned) names";
 	print "     -h   - Print physical name of host for virtual nodes";
+	print "     -H   - Like -h, but include node auxtypes";
  	print "     -e   - Project and Experiment ID to list";
         wrapperoptions();
         return
@@ -609,6 +651,65 @@ class node_avail:
         print
         print "example:"
         print "  $ node_avail -t pc850"
+        wrapperoptions()
+        return
+
+    pass
+
+
+#
+# node_avail_list
+#
+class node_avail_list:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        params = {}
+        
+        try:
+            opts, req_args = getopt.getopt(self.argv, "hp:t:c:n:", [
+                "help", "project=", "node-type=", "node-class=", "nodes=" ])
+
+            for opt, val in opts:
+                if opt in ("-h", "--help"):
+                    self.usage();
+                    return 0
+                elif opt in ("-p", "--project"):
+                    params["proj"] = val
+                    pass
+                elif opt in ("-c", "--node-class"):
+                    params["class"] = val
+                    pass
+                elif opt in ("-t", "--node-type"):
+                    params["type"] = val
+                    pass
+                elif opt in ("-n", "--nodes"):
+                    params["nodes"] = val
+                    pass
+                pass
+            pass
+        except  getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        rval,response = do_method("node", "getlist", params)
+        return rval
+
+    def usage(self):
+        print "node_avail_list [-p project] [-c class] [-t type] [-n nodes]"
+        print "Print physical node_ids of available nodes."
+        print "where:"
+        print "     -p project         - Specify project credentials for node"
+        print "                          types that are restricted"
+        print "     -c class           - The node class (Default: pc)"
+        print "     -t type            - The node type"
+        print "     -n pcX,pcY,...,pcZ - A list of physical node_ids"
+        print
+        print "example:"
+        print "  $ node_avail_list -t pc850"
         wrapperoptions()
         return
 
@@ -714,9 +815,9 @@ class delay_config:
         return
 
 #
-# link_config
+# wilink_config
 #
-class link_config:
+class wilink_config:
     def __init__(self, argv=None):
         self.argv = argv;
         return
@@ -789,8 +890,8 @@ class link_config:
         return rval;
 
     def usage(self):
-	print "link_config [options] -e pid,eid link PARAM=value ...";
-	print "link_config [options] pid eid link PARAM=value ...";
+	print "wilink_config [options] -e pid,eid link PARAM=value ...";
+	print "wilink_config [options] pid eid link PARAM=value ...";
 	print "where:";
 	print "     -m   - Modify virtual experiment as well as current state";
 	print "     -s   - Select the source of the link to change";
@@ -799,6 +900,12 @@ class link_config:
         print "";
         print "Special Param";
         print " ENABLE=yes/no   - Bring the link up or down (or ENABLE=up/down)";
+        print ""
+        print "*********************** WARNING *******************************"
+        print "   wilink_config is used to configure WIRELESS INTERFACES!"
+        print "   Use delay_config to change the traffic shaping parameters"
+        print "   on normal links and lans."
+        print "***************************************************************"
         wrapperoptions();
         return
 
@@ -1160,7 +1267,7 @@ class startexp:
     def apply(self):
         try:
             opts, req_args = getopt.getopt(self.argv,
-                                           "iwfqS:L:a:l:E:g:p:e:",
+                                           "iwfqS:L:a:l:E:g:p:e:N",
                                            [ "help" ]);
             pass
         except getopt.error, e:
@@ -1208,6 +1315,9 @@ class startexp:
             elif opt == "-w":
                 params["wait"] = "yes"
                 pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
+                pass
             pass
 
         # Do this after so --help is seen.
@@ -1227,7 +1337,7 @@ class startexp:
         return rval;
 
     def usage(self):
-        print "startexp [-q] [-i [-w]] [-f] [-E description] [-g gid]";
+        print "startexp [-q] [-i [-w]] [-f] [-N] [-E description] [-g gid]";
         print "         [-S reason] [-L reason] [-a <time>] [-l <time>]";
         print "         -p <pid> -e <eid> <nsfile>";
 	print "where:";
@@ -1243,6 +1353,7 @@ class startexp:
         print "   -g   - The subgroup in which to create the experiment";
         print "   -p   - The project in which to create the experiment";
         print "   -e   - The experiment name (unique, alphanumeric, no blanks)";
+	print "   -N   - Suppress most email to the user and testbed-ops";
         print "nsfile  - NS file to parse for experiment";
         wrapperoptions();
         return
@@ -1258,7 +1369,7 @@ class swapexp:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:s:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "wNe:s:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1272,6 +1383,9 @@ class swapexp:
                 return 0
             elif opt == "-w":
                 params["wait"] = "yes"
+                pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
                 pass
             elif opt == "-s":
                 params["direction"] = val
@@ -1313,6 +1427,7 @@ class swapexp:
 	print "where:";
 	print "     -w   - Wait for experiment to finish swapping";
  	print "     -e   - Project and Experiment ID";
+	print "     -N   - Suppress most email to the user and testbed-ops";
         print "     in   - Swap experiment in  (must currently be swapped out)";
         print "    out   - Swap experiment out (must currently be swapped in)";
         print ""
@@ -1333,7 +1448,7 @@ class modexp:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "rswe:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "rswNe:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1353,6 +1468,9 @@ class modexp:
                 pass
             elif opt == "-s":
                 params["restart_eventsys"] = "yes"
+                pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
                 pass
             elif opt == "-e":
                 pid,eid = string.split(val, ",")
@@ -1393,13 +1511,14 @@ class modexp:
         return rval;
 
     def usage(self):
-	print "modexp [-r] [-s] [-w] -e pid,eid nsfile";
-	print "modexp [-r] [-s] [-w] pid eid nsfile";
+	print "modexp [-r] [-s] [-w] [-N] -e pid,eid nsfile";
+	print "modexp [-r] [-s] [-w] [-N] pid eid nsfile";
 	print "where:";
 	print "     -w   - Wait for experiment to finish swapping";
  	print "     -e   - Project and Experiment ID";
         print "     -r   - Reboot nodes (when experiment is active)";
         print "     -s   - Restart event scheduler (when experiment is active)";
+	print "     -N   - Suppress most email to the user and testbed-ops";
         print ""
         print "By default, modexp runs in the background, sending you email ";
         print "when the transition has completed. Use the -w option to wait";
@@ -1424,7 +1543,7 @@ class endexp:
 
     def apply(self):
         try:
-            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            opts, req_args = getopt.getopt(self.argv, "wNe:", [ "help" ]);
             pass
         except getopt.error, e:
             print e.args[0]
@@ -1438,6 +1557,9 @@ class endexp:
                 return 0
             elif opt == "-w":
                 params["wait"] = "yes"
+                pass
+            elif opt == "-N":
+                params["noemail"] = "yes"
                 pass
             elif opt == "-e":
                 pid,eid = string.split(val, ",")
@@ -1466,11 +1588,12 @@ class endexp:
         return rval;
 
     def usage(self):
-	print "endexp [-w] -e pid,eid";
-	print "endexp [-w] pid eid";
+	print "endexp [-w] [-N] -e pid,eid";
+	print "endexp [-w] [-N] pid eid";
 	print "where:";
 	print "     -w   - Wait for experiment to finish terminating";
  	print "     -e   - Project and Experiment ID";
+	print "     -N   - Suppress most email to the user and testbed-ops";
         print ""
         print "By default, endexp runs in the background, sending you email ";
         print "when the transition has completed. Use the -w option to wait";
@@ -1742,6 +1865,815 @@ class tipacl:
         wrapperoptions();
         return
     pass
+
+#
+# template_commit
+#
+class template_commit:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv,
+                                           "we:p:E:t:r:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        guid   = None
+        params = {}
+        eid    = None
+        pid    = None
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-e":
+                params["exp"] = val
+                eid = val
+                pass
+            elif opt == "-p":
+                params["proj"] = val
+                pid = val;
+                pass
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-t":
+                params["tid"] = val;
+                pass
+            elif opt == "-r":
+                params["tag"] = val;
+                pass
+            pass
+        
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 1:
+            params["guid"] = req_args[0]
+            pass
+        elif pid == None and eid == None:
+            (guid, subdir) = infer_template()
+            if subdir:
+                params["path"] = os.getcwd()
+                pass
+            else:
+                self.usage();
+                return -1
+            pass
+        else:
+            self.usage();
+            return -1
+        
+        print "Committing template; please be (very) patient!"
+        
+        rval,response = do_method("template", "template_commit", params);
+        return rval;
+    
+    def usage(self):
+	print "template_commit [-w]"
+	print "template_commit [-w] [-e eid | -r tag] <guid/vers>"
+        print "template_commit [-w] -p pid -e eid"
+	print "where:";
+	print "     -w     - Wait for template to finish commit";
+        print "     -e     - Commit from specific template instance (eid)"
+        print "     -E     - A pithy sentence describing your experiment"
+        print "     -t     - The template name (alphanumeric, no blanks)"
+        print "     -p     - Project for -e option (pid)"
+        print "    guid    - Template GUID"
+        print ""
+        print "By default, commit runs in the background, sending you email ";
+        print "when the operation has completed. Use the -w option to wait";
+        print "in the foreground, returning exit status. Email is still sent.";
+        print ""
+        print "Environment:"
+        print "  cwd   The template will be inferred from the current"
+        print "        working directory if it is inside a template checkout."
+        wrapperoptions();
+        return
+    pass
+
+class template_export:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "i:r:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        instance = None
+        params   = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-i":
+                params["instance"] = val
+                instance = val
+                pass
+            elif opt == "-r":
+                params["run"] = val
+                pass
+            pass
+        
+        # Try to infer the template guid/vers from the current path.
+        if instance == None:
+            self.usage();
+            return -1
+        
+        rval,response = do_method("template", "export", params);
+        return rval;
+    
+    def usage(self):
+	print "template_export [-r runidx] -i instance_id";
+	print "where:";
+        print "     -i   - Export specific template instance (idx)";
+        print "     -r   - Optional run index to export";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+class template_checkout:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "d", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        if (len(req_args) == 0):
+            self.usage()
+            return -1
+
+        params         = {}
+        params["guid"] = req_args[0]
+        params["path"] = os.getcwd()
+        
+        rval,response = do_method("template", "checkout", params);
+        return rval;
+    
+    def usage(self):
+	print "template_checkout guid/vers";
+        print ""
+        print "Environment:"
+        print "  cwd   The template checkout is placed in the current dir"
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_instantiate
+#
+class template_instantiate:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv,
+                                           "bwqS:L:a:l:E:e:x:",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        guid        = None
+        xmlfilename = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-b":
+                params["batch"] = "yes";
+                pass
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-e":
+                params["exp"] = val;
+                pass
+            elif opt == "-x":
+                xmlfilename = val;
+                pass
+            elif opt == "-S":
+                params["swappable"]     = "no";
+                params["noswap_reason"] = val;
+                pass
+            elif opt == "-L":
+                params["idleswap"]          = 0;
+                params["noidleswap_reason"] = val;
+                pass
+            elif opt == "-l":
+                params["idleswap"] = val;
+                pass
+            elif opt == "-a":
+                params["max_duration"] = val;
+                pass
+            elif opt == "-f":
+                params["noswapin"] = "yes"
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-p":
+                params["preload"] = "yes"
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                (guid, subdir) = infer_template()
+                if guid == None:
+                    self.usage()
+                    return -1
+                pass
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+            pass
+        else:
+            self.usage();
+            return -1
+        
+        params["guid"] = guid
+
+        if xmlfilename:
+            try:
+                params["xmlfilestr"] = open(xmlfilename).read();
+                pass
+            except:
+                print "Could not open file: " + req_args[0];
+                return -1;
+            pass
+        
+        rval,response = do_method("template", "instantiate", params);
+        return rval;
+
+    def usage(self):
+        print "template_instantiate [-q] [-E description] [-p xmlfilename] ";
+        print "     [-b] [-p] [-S reason] [-L reason] [-a <time>] [-l <time>]";
+        print "     -e <eid> <guid>";
+	print "where:";
+        print "   -b   - queue for the batch system";
+        print "   -p   - preload only; do not swapin";
+        print "   -w   - wait for non-batchmode experiment to instantiate";
+        print "   -q   - be less chatty";
+        print "   -S   - Instance cannot be swapped; must provide reason";
+        print "   -L   - Instance cannot be IDLE swapped; must provide reason";
+        print "   -a   - Auto swapout NN minutes after instance is swapped in";
+        print "   -l   - Auto swapout NN minutes after instance goes idle";
+        print "   -E   - A pithy sentence describing your experiment";
+        print "   -x   - XML file of parameter bindings";
+        print "   -e   - The instance name (unique, alphanumeric, no blanks)";
+        print "   guid - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory if it is inside a template checkout."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_swapin
+#
+class template_swapin:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "wqe:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        guid   = None
+        params = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-q":
+                params["quiet"] = "yes"
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+        else:
+            self.usage();
+            return -1
+            
+        params["guid"] = guid
+
+        rval,response = do_method("template", "swapin", params);
+        return rval;
+
+    def usage(self):
+	print "template_swapin -e id [<guid/vers>]";
+	print "where:";
+        print "     -e   - Instance ID (aka eid)";
+        print "     -q   - be less chatty";
+	print "     -w   - Wait for instance to finish swapping in";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_swapout
+#
+class template_swapout:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        guid   = None
+        params = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if len(req_args) == 0:
+            guid = infer_guid(os.getcwd())
+            if guid == None:
+                self.usage();
+                return -1
+            pass
+        elif len(req_args) == 1:
+            guid = req_args[0]
+        else:
+            self.usage();
+            return -1
+            
+        params["guid"] = guid
+
+        rval,response = do_method("template", "swapout", params);
+        return rval;
+
+    def usage(self):
+	print "template_swapout -e id [<guid/vers>]";
+	print "where:";
+        print "     -e   - Instance ID (aka eid)";
+	print "     -w   - Wait for instance to finish terminating";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_startrun and template_modrun
+#
+class template_startrun:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:my:",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        pid         = None
+        guid        = None
+        xmlfilename = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-m":
+                params["modify"] = "yes"
+                pass
+            elif opt == "-c":
+                params["clear"] = "yes"
+                pass
+            elif opt == "-r":
+                params["runid"] = val
+                pass
+            elif opt == "-y":
+                params["params"] = val
+                pass
+            elif opt == "-p":
+                pid = val
+                pass
+            elif opt == "-x":
+                xmlfilename = val;
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if pid == None:
+            if len(req_args) == 0:
+                guid = infer_guid(os.getcwd())
+                if guid == None:
+                    self.usage();
+                    return -1
+                pass
+            elif len(req_args) == 1:
+                guid = req_args[0]
+                pass
+            else:
+                self.usage();
+                return -1
+            
+            params["guid"] = guid
+            pass
+        else:
+            params["pid"] = pid
+            pass
+        
+        if xmlfilename:
+            try:
+                params["xmlfilestr"] = open(xmlfilename).read();
+                pass
+            except:
+                print "Could not open file: " + req_args[0];
+                return -1;
+            pass
+        
+        rval,response = do_method("template", "startrun", params);
+        return rval;
+
+    def usage(self):
+	print "template_startrun [-r <id>] [-E <descr>] -e id [-p <pid> | <guid/vers>]";
+	print "where:";
+        print "     -E   - A pithy sentence describing your run";
+        print "     -x   - XML file of parameter bindings";
+        print "     -y   - Default params, one of template,instance,lastrun";
+        print "     -r   - A token (id) for the run";
+        print "     -e   - Instance ID (aka eid)";
+	print "     -w   - Wait until run has started";
+	print "     -m   - Reparse ns file (effectively a swap modify)";
+        print "     -c   - run loghole clean before starting run";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+class template_modrun:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:E:r:p:cx:my:",
+                                           [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        pid         = None
+        guid        = None
+        xmlfilename = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-E":
+                params["description"] = val;
+                pass
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-m":
+                params["modify"] = "yes"
+                pass
+            elif opt == "-c":
+                params["clear"] = "yes"
+                pass
+            elif opt == "-r":
+                params["runid"] = val
+                pass
+            elif opt == "-y":
+                params["params"] = val
+                pass
+            elif opt == "-p":
+                pid = val
+                pass
+            elif opt == "-x":
+                xmlfilename = val;
+                pass
+            elif opt == "-e":
+                params["exp"]  = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if pid == None:
+            if len(req_args) == 0:
+                guid = infer_guid(os.getcwd())
+                if guid == None:
+                    self.usage();
+                    return -1
+                pass
+            elif len(req_args) == 1:
+                guid = req_args[0]
+                pass
+            else:
+                self.usage();
+                return -1
+            
+            params["guid"] = guid
+            pass
+        else:
+            params["pid"] = pid
+            pass
+        
+        if xmlfilename:
+            try:
+                params["xmlfilestr"] = open(xmlfilename).read();
+                pass
+            except:
+                print "Could not open file: " + req_args[0];
+                return -1;
+            pass
+        
+        rval,response = do_method("template", "modrun", params);
+        return rval;
+
+    def usage(self):
+	print "template_modrun [-r <id>] [-E <descr>] -e id [-p <pid> | <guid/vers>]";
+	print "where:";
+        print "     -E   - A pithy sentence describing your run";
+        print "     -x   - XML file of parameter bindings";
+        print "     -y   - Default params, one of template,instance,lastrun";
+        print "     -r   - A token (id) for the run";
+        print "     -e   - Instance ID (aka eid)";
+	print "     -w   - Wait until run has started";
+	print "     -m   - Reparse ns file (effectively a swap modify)";
+        print "     -c   - run loghole clean before starting run";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# template_stoprun
+#
+class template_stoprun:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "we:qp:t:i", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        pid         = None
+        guid        = None
+        params      = {}
+        
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+            elif opt == "-w":
+                params["wait"] = "yes"
+                pass
+            elif opt == "-q":
+                params["quiet"] = "yes"
+                pass
+            elif opt == "-p":
+                pid = val
+                pass
+            elif opt == "-t":
+                params["token"] = val;
+                pass
+            elif opt == "-i":
+                params["ignoreerrors"] = "yes";
+                pass
+            elif opt == "-e":
+                params["exp"] = val;
+                pass
+            pass
+
+        # Try to infer the template guid/vers from the current path.
+        if pid == None:
+            if len(req_args) == 0:
+                guid = infer_guid(os.getcwd())
+                if guid == None:
+                    self.usage();
+                    return -1
+                pass
+            elif len(req_args) == 1:
+                guid = req_args[0]
+                pass
+            else:
+                self.usage();
+                return -1
+            params["guid"] = guid
+            pass
+        else:
+            params["pid"] = pid
+            pass
+
+        rval,response = do_method("template", "stoprun", params);
+        return rval;
+
+    def usage(self):
+	print "template_stoprun [-w] -e id [-p <pid> | <guid/vers>]";
+	print "where:";
+        print "     -e   - Instance ID (aka eid)";
+        print "     -i   - Ignore errors and force Run to stop";
+	print "     -w   - Wait for Run to finish stopping";
+        print "    guid  - Template GUID";
+        print ""
+        print "Environment:"
+        print "  cwd   The template GUID will be inferred from the current"
+        print "        working directory, if it is inside the templates's"
+        print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# Infer template guid from path
+#
+def infer_guid(path):
+    guid = None
+    vers = None
+    dirs = path.split(os.path.sep)
+    if ((len(dirs) < 6) or
+        (not (("proj" in dirs) and ("templates" in dirs))) or
+        (len(dirs) < (dirs.index("templates") + 2))):
+        return None
+    else:
+        guid = dirs[dirs.index("templates") + 1]
+        vers = dirs[dirs.index("templates") + 2]
+        pass
+    return guid + "/" + vers
+
+#
+# Different version, that crawls up tree looking for .template file.
+# Open up file and get the guid/vers, but also return path of final directory.
+#
+def infer_template():
+    rootino = os.stat("/").st_ino
+    cwd     = os.getcwd()
+    guid    = None
+    vers    = None
+    subdir  = None
+
+    try:
+        while True:
+            if os.access(".template", os.R_OK):
+                fp = open(".template")
+                line = fp.readline()
+                while line:
+                    m = re.search('^GUID:\s*([\w]*)\/([\d]*)$', line)
+                    if m:
+                        guid    = m.group(1)
+                        vers    = m.group(2)
+                        subdir  = os.getcwd()
+                        fp.close();
+                        return (guid + "/" + vers, subdir)
+                    line = fp.readline()
+                    pass
+                fp.close();
+                break
+            if os.stat(".").st_ino == rootino:
+                break
+            os.chdir("..")
+            pass
+        pass
+    except:
+        pass
+        
+    os.chdir(cwd)
+    return (guid, subdir)    
+    pass
+
+#
+# Infer pid and eid
+#
+def infer_pideid(path):
+    pid = None
+    eid = None
+    dirs = path.split(os.path.sep)
+    if ((len(dirs) < 6) or
+        (not (("proj" in dirs) and ("exp" in dirs))) or
+        (len(dirs) < (dirs.index("exp") + 1))):
+        return (None, None)
+    else:
+        pid = dirs[dirs.index("proj") + 1]
+        eid = dirs[dirs.index("proj") + 3]
+        pass
+    return (pid, eid)
 
 #
 # Process program arguments. There are two ways we could be invoked.

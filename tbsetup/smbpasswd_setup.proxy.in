@@ -1,0 +1,91 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+
+#
+# smbpasswd_setup.proxy - This is run remotely on Fs as root, with stdin piped
+# from smbpasswd_setup on Boss.
+#
+# It sets the Samba password on Fs for each active user to specified (Emulab
+# Windows) password.
+#
+# usage: smbpasswd_setup.proxy [debug_level]
+#
+
+my $dbg = 0;
+if ($#ARGV+1 > 0) {
+    $dbg = $ARGV[0];
+}
+if ($dbg =~ /^([-\w]+)$/i) {
+    $dbg = $1;
+}
+else {
+    die("Tainted argument: $dbg\n");
+}
+
+#
+# Configure variables.
+#
+my $WINSUPPORT  = @WINSUPPORT@;
+
+my $SMBPASSWD	= "/usr/local/bin/smbpasswd";
+
+#
+# We don't want to run this script unless its the real version (or debugging.)
+#
+if ($EUID != 0 and !$dbg) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+die("*** $0:\n".
+    "    Nothing to do if no Windows support in this copy of Emulab.\n")
+    if (!$WINSUPPORT);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+my $log = "/tmp/smbpasswd_setup_proxy.log";
+open(LOG, "> $log")
+    || fatal("Couldn't open $log.\n");
+{
+    local $SIG{PIPE} = sub { die "$SMBPASSWD pipe broke" };
+
+    # Each line on stdin is "uid w_pswd".
+    my ($uid, $w_pwd);
+    while (<STDIN>) {
+	if (! (($uid, $w_pswd) = m/^(\S+) (.+)/)) {
+	    print LOG "BAD LINE: $_\n";
+	}
+	else {
+	    print LOG "$uid, '$w_pswd'\n";
+	}
+
+	if (! $dbg) {
+	    # Tell smbpasswd the password, and again to confirm.
+	    # -s == Silent: no prompts, read from stdin.
+	    # -a == Add the uid if necessary.
+	    my $cmd = "| $SMBPASSWD -s -a $uid";
+	    open(PWD, $cmd );
+	    print PWD "$w_pswd\n$w_pswd\n";
+	    my $stat = close PWD;
+	    if (0 && $stat) { # XXX it's succeeding, but returning 1.
+		print LOG "FAILED, closing: '$cmd', $stat\n";
+		exit($stat);
+	    }
+	}
+    }
+}
+close(LOG);
+
+exit(0);
+
+
+

@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<top pid="testbed" eid="xmltop" xmlns="http://emulab.net/resources/vtop/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemalocation="http://emulab.net/resources/vtop/1.0 file:/home/ricci/testbed/assign/top.xsd">
-    <node name="nodeA"><ass/>
-        <node_type>
-            <type_name>pc</type_name>
-        </node_type>
-        <desire>
-            <desire_name>fast</desire_name>
-            <desire_weight>0.2</desire_weight>
-        </desire>
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005-2006 University of Utah and the Flux Group.
+   All rights reserved.
+-->
+<vtop pid="testbed" eid="xmltop" xmlns="http://emulab.net/resources/vtop/0.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <node name="nodeA">
+        <node_type type_name="pc" type_slots="1" />
     </node>
-</top>
+</vtop>

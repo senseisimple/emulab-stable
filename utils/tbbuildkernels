@@ -1,5 +1,11 @@
 #!/usr/bin/perl -w
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # tbbuildkernels - a little script for building and installing the
 #
 

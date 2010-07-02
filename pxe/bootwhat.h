@@ -1,12 +1,13 @@
 /*
- * Copyright (c) 2000, 2001, 2003, 2004 University of Utah and the Flux Group.
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  *
- * boot/bootwhat.h from the OSKit.
+ * Derived from boot/bootwhat.h in the OSKit.
  */
 
-#ifndef _OSKIT_BOOT_BOOTWHAT_H_
-#define _OSKIT_BOOT_BOOTWHAT_H_
+#ifndef _EMULAB_BOOTWHAT_H_
+#define _EMULAB_BOOTWHAT_H_
 
 #define BOOTWHAT_DSTPORT		6969
 #define BOOTWHAT_SRCPORT		9696
@@ -25,7 +26,9 @@
 #define  MAX_BOOT_PATH		256
 #define  MAX_BOOT_CMDLINE	((MAX_BOOT_DATA - MAX_BOOT_PATH) - 32)
 
-typedef struct {
+#define	 HOSTKEY_LENGTH 	129
+
+typedef struct boot_info {
 	short   version;
 	short	opcode;
 	int	status;
@@ -38,9 +41,10 @@ typedef struct {
 #define BIOPCODE_BOOTWHAT_ACK		3	/* Ack to Reply */
 #define BIOPCODE_BOOTWHAT_ORDER		4	/* Unsolicited command */
 #define BIOPCODE_BOOTWHAT_INFO		5	/* Request for bootinfo */
+#define BIOPCODE_BOOTWHAT_KEYED_REQUEST 6	/* Request for bootinfo, with key data stuffed into the data portion */
 
 /* Version */
-#define BIVERSION_CURRENT		1	/* Old version is zero */
+#define BIVERSION_CURRENT		1	/* First version is zero */
 
 /* Status */
 #define BISTAT_SUCCESS			0
@@ -97,8 +101,9 @@ typedef struct boot_what {
 #define BIBOOTWHAT_TYPE_REBOOT	5	/* Reboot */
 #define BIBOOTWHAT_TYPE_AUTO	6	/* Do a bootinfo query */
 #define BIBOOTWHAT_TYPE_MFS	7	/* Boot an MFS from server:/path */
+#define BIBOOTWHAT_TYPE_RESTART	8	/* Restart ourselves without reset */
 
 /* Flags */
-#define BIBOOTWHAT FLAGS_CMDLINE	0x01	/* Kernel to boot */ 
+#define BIBOOTWHAT_FLAGS_CMDLINE	0x01	/* Kernel to boot */ 
 
-#endif /* _OSKIT_BOOT_BOOTWHAT_H_ */
+#endif /* _EMULAB_BOOTWHAT_H_ */

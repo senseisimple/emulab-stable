@@ -1,10 +1,11 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include_once("node_defs.php");
 
 #
 # This page is used for both admin node control, and for mere user
@@ -13,48 +14,62 @@ include("defs.php3");
 # 
 
 #
+# Only known and logged in users can do this.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("target_user",	PAGEARG_USER,
+				 "showtype",    PAGEARG_STRING,
+				 "typefilter",  PAGEARG_STRING,
+				 "bypid",       PAGEARG_STRING);
+
+if (isset($target_user)) {
+    if (! $target_user->AccessCheck($this_user, $TB_USERINFO_READINFO)) {
+	USERERROR("You do not have permission to do this!", 1);
+    }
+    $target_uid  = $target_user->uid();
+    $target_idx  = $target_user->uid_idx();
+}
+else {
+    $target_uid  = $uid;
+    $target_idx  = $this_user->uid_idx();
+    $target_user = $this_user;
+}
+
+#
 # Standard Testbed Header
 #
 PAGEHEADER("Node Control Center");
 
-#
-# Only known and logged in users can do this.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-
-#
-# Verify page arguments.
-# 
-if (isset($target_uid)) {
-    if ($target_uid == "") {
-	$target_uid = $uid;
-    }
-    elseif (! TBvalid_uid($target_uid)) {
-	PAGEARGERROR("Invalid characters in '$target_uid'");
-    }
-    elseif (! TBUserInfoAccessCheck($uid, $target_uid, $TB_USERINFO_READINFO)) {
-	USERERROR("You do not have permission to view this user's ".
-		  "information!", 1);
-    }
-}
-else {
-    $target_uid = $uid;
-}
-
-echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
+echo "<b>Tabular views: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
-               <a href='floormap.php3'>wireless maps</a>,
                <a href='nodecontrol_list.php3?showtype=wireless'>
-                                                        wireless list</a>,
-               <a href='robotmap.php3'>robot maps</a>,
-               <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
+                                                        wireless</a>,";
+if ($TBMAINSITE) {
+    echo "     <a href='nodecontrol_list.php3?showtype=widearea&typefilter=pcpg,pcpg-i2'>protogeni</a>,";
+}
+echo "         <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
 
 if ($isadmin) {
-    echo    ", <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
+    echo    ", <a href='nodeutilization.php'>utilization</a>,
+               <a href='nodecontrol_list.php3?showtype=virtnodes'>virtual</a>,
                <a href='nodecontrol_list.php3?showtype=physical'>physical</a>,
                <a href='nodecontrol_list.php3?showtype=all'>all</a>";
+}
+echo ".</b><br>\n";
+
+echo "<b>Map views: <a href='floormap.php3'>wireless</a>";
+if ($TBMAINSITE) {
+    echo ", <a href='floormap.php3?feature=usrp'>
+              GNU USRP</a>,
+            <a href='floormap.php3?feature=usrp2'>
+              USRP2</a> (software defined radio),
+            <a href='robotmap.php3'>robot</a>";
 }
 echo ".</b><br>\n";
 
@@ -107,7 +122,10 @@ elseif (! strcmp($showtype, "widearea")) {
 		 	   "'USA, ','')".
 			   "AS location, ".
 	 		   "wani.connect_type, ".
-			   "wani.hostname";
+			   "wani.hostname, " .
+                           "wani.site, ".
+	 		   "wani.latitude, ".
+			   "wani.longitude";
     $additionalLeftJoin = "LEFT JOIN widearea_nodeinfo AS wani ".
 			  "ON n.node_id=wani.node_id";
 
@@ -122,11 +140,33 @@ elseif (! strcmp($showtype, "wireless")) {
 
     $view   = "Wireless";
 }
+elseif (preg_match("/^[-\w]+$/", $showtype)) {
+    $role   = "(role='testnode')";
+    $clause = "and (nt.type='$showtype')";
+    $view   = "only <a href=shownodetype.php3?node_type=$showtype>$showtype</a>";
+}
 else {
     $role   = "(role='testnode')";
     $clause = "and (nt.class='pc')";
     $view   = "PCs";
 }
+
+# If adding an additional type filter list, do that...
+if (isset($typefilter)) {
+    $types = explode(",",$typefilter);
+    $typeclause = "and nt.type in (";
+    foreach ($types as $t) {
+	# Sanitize.
+	if (!preg_match("/^[-\w]+$/", $t)) {
+	    PAGEARGERROR("Invalid characters in typefilter argument '$t'.");
+	}
+	$typeclause .= "'$t',";
+    }
+    $typeclause = rtrim($typeclause,",");
+    $typeclause .= ")";
+    $clause .= " $typeclause";
+}
+
 # If admin or widearea, show the vname too. 
 $showvnames = 0;
 if ($isadmin || !strcmp($showtype, "widearea")) {
@@ -154,11 +194,11 @@ if (! strcmp($showtype, "summary")) {
 	    if ($bypid == "" || !TBvalid_pid($bypid)) {
 		PAGEARGERROR("Invalid characters in 'bypid' argument!");
 	    }
-	    if (! TBValidProject($bypid)) {
+	    if (! ($target_project = Project::Lookup($bypid))) {
 		PAGEARGERROR("No such project '$bypid'!");
 	    }
-	    if (! TBProjAccessCheck($target_uid,
-				    $bypid, $bypid, $TB_PROJECT_READINFO)){
+	    if (!$target_project->AccessCheck($this_user,
+					      $TB_PROJECT_READINFO)){
 		USERERROR("You are not a member of project '$bypid!", 1);
 	    }
 	    $pidclause = "and g.pid='$bypid'";
@@ -174,7 +214,7 @@ if (! strcmp($showtype, "summary")) {
 		DBQueryFatal("select distinct type from group_membership as g ".
 			     "left join nodetypeXpid_permissions as p ".
 			     "     on g.pid=p.pid ".
-			     "where uid='$target_uid' $pidclause");
+			     "where uid_idx='$target_idx' $pidclause");
 	}
 	
 	while ($row = mysql_fetch_array($query_result)) {
@@ -207,15 +247,19 @@ if (! strcmp($showtype, "summary")) {
 	$unknowncounts[$type] = 0;
     }
 
-    # Get free totals by type.
+    # Get free totals by type.  Note we also check that the physical node
+    # is free, see note on non-summary query for why.
     $query_result =
 	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
+		     "left join nodes as np on np.node_id=n.phys_nodeid ".
 		     "left join node_types as nt on n.type=nt.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
-		     "where (role='testnode') and ".
+		     "left join reserved as rp on rp.node_id=n.phys_nodeid ".
+		     "where (n.role='testnode') and ".
 		     "      (nt.class!='shark' and nt.class!='pcRemote' ".
 		     "      and nt.class!='pcplabphys') ".
-		     "      and r.pid is null and n.reserved_pid is null ".
+		     "      and r.pid is null and rp.pid is null ".
+		     "      and n.reserved_pid is null and np.reserved_pid is null ".
 		     "group BY n.eventstate,n.type");
 
     while ($row = mysql_fetch_array($query_result)) {
@@ -233,7 +277,7 @@ if (! strcmp($showtype, "summary")) {
 	}
     }
 
-    $projlist = TBProjList($target_uid, $TB_PROJECT_CREATEEXPT);
+    $projlist = $target_user->ProjectAccessList($TB_PROJECT_CREATEEXPT);
     if (count($projlist) > 1) {
 	echo "<b>By Project Permission: ";
 	while (list($project) = each($projlist)) {
@@ -290,15 +334,10 @@ if (! strcmp($showtype, "summary")) {
               <td align=center>$allfree</td>
               <td align=center>$alltotal</td>
               </tr>\n";
-
-    if ($isadmin) {
-	# Give admins the option to create a new type
-	echo "<tr></tr>\n";
-	echo "<th colspan=3 align=center>
-                <a href=editnodetype.php3?new_type=1>Create a new type</a>
-              </th>\n";
-    }
     echo "</table>\n";
+
+    echo "<center><a href=shownodetype_list.php>Node Type List</a></center>";
+
     if ($allunknown > 0) {
 	    echo "<br><font size=-1><b>*</b> - Some nodes ($allunknown) are ".
 		    "free, but currently in an unallocatable state.</font>";
@@ -309,15 +348,26 @@ if (! strcmp($showtype, "summary")) {
 
 #
 # Suck out info for all the nodes.
+#
+# If a node is free we check to make sure that that the physical node
+# is also.  This is based on the assumption that if a physical node is
+# not available, neither is the node, such as the case with netpga2.
+# This may not be true for virtual nodes, such as PlanetLab slices,
+# but virtual nodes are allocated on demand, and thus are never free.
 # 
 $query_result =
     DBQueryFatal("select distinct n.node_id,n.phys_nodeid,n.type,ns.status, ".
-		 "   n.def_boot_osid,r.pid,r.eid,nt.class,r.vname ".
+		 "   n.def_boot_osid, ".
+		 "   if(r.pid is not null,r.pid,rp.pid) as pid, ".
+	         "   if(r.pid is not null,r.eid,rp.eid) as eid, ".
+		 "   nt.class, ".
+	 	 "   if(r.pid is not null,r.vname,rp.vname) as vname ".
 		 "$additionalVariables ".
 		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join node_status as ns on n.node_id=ns.node_id ".
 		 "left join reserved as r on n.node_id=r.node_id ".
+		 "left join reserved as rp on n.phys_nodeid=rp.node_id ".
 		 "$additionalLeftJoin ".
 		 "where $role $clause ".
 		 "ORDER BY priority");
@@ -339,9 +389,9 @@ $num_unk  = 0;
 $freetypes= array();
 
 while ($row = mysql_fetch_array($query_result)) {
-    $pid                = $row[pid];
-    $status             = $row[status];
-    $type               = $row[type];
+    $pid                = $row["pid"];
+    $status             = $row["status"];
+    $type               = $row["type"];
 
     if (! isset($freetypes[$type])) {
 	$freetypes[$type] = 0;
@@ -371,7 +421,7 @@ $num_total = ($num_free + $num_up + $num_down + $num_pd + $num_unk);
 mysql_data_seek($query_result, 0);
 
 if (! strcmp($showtype, "widearea")) {
-    echo "<a href=tutorial/docwrapper.php3?docname=widearea.html>
+    echo "<a href='$WIKIDOCURL/widearea'>
              Widearea Usage Notes</a>\n";
 }
 
@@ -430,8 +480,9 @@ foreach($freetypes as $key => $value) {
 echo "</table>\n";
 SUBMENUEND_2B();
 
-echo "<table border=2 cellpadding=2 cellspacing=2>\n";
+echo "<table border=2 cellpadding=2 cellspacing=2 id='nodelist'>\n";
 
+echo "<thead class='sort'>";
 echo "<tr>
           <th align=center>ID</th>\n";
 
@@ -440,7 +491,7 @@ if ($showvnames) {
 }
 
 echo "    <th align=center>Type (Class)</th>
-          <th align=center>Up?</th>\n";
+          <th align=center class='sorttable_nosort'>Up?</th>\n";
 
 if ($isadmin) {
     echo "<th align=center>PID</th>
@@ -453,30 +504,34 @@ elseif (strcmp($showtype, "widearea")) {
 }
 
 if (!strcmp($showtype, "widearea")) {
-    echo "<th align=center>Processor</th>
+    echo "<th align=center>Site</th>
 	  <th align=center>Connection</th>
-	  <th align=center>Location</th>\n";
+	  <th align=center>Location</th>
+	  <th align=center>Latitude</th>
+	  <th align=center>Longitude</th>";
 }
     
-echo "</tr>\n";
+echo "</tr></thead>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
-    $node_id            = $row[node_id]; 
-    $phys_nodeid        = $row[phys_nodeid]; 
-    $type               = $row[type];
+    $node_id            = $row["node_id"]; 
+    $phys_nodeid        = $row["phys_nodeid"]; 
+    $type               = $row["type"];
     $class              = $row["class"];
-    $def_boot_osid      = $row[def_boot_osid];
-    $pid                = $row[pid];
-    $eid                = $row[eid];
-    $vname              = $row[vname];
-    $hostname           = $row[hostname];
-    $status             = $row[status];
+    $def_boot_osid      = $row["def_boot_osid"];
+    $pid                = $row["pid"];
+    $eid                = $row["eid"];
+    $vname              = $row["vname"];
+    $status             = $row["status"];
 
     if (!strcmp($showtype, "widearea")) {	
-	$machine_type = $row[machine_type];
-	$location = $row[location];
-	$connect_type = $row[connect_type];
-	$vname        = $row[hostname];
+	$site         = $row["site"];
+	$machine_type = $row["machine_type"];
+	$location     = $row["location"];
+	$connect_type = $row["connect_type"];
+	$vname        = $row["hostname"];
+	$latitude     = $row["latitude"];
+	$longitude    = $row["longitude"];
     } 
 
     echo "<tr>";
@@ -530,8 +585,11 @@ while ($row = mysql_fetch_array($query_result)) {
 	    echo "<td>--</td>
    	          <td>--</td>\n";
 	}
-	if ($def_boot_osid && TBOSInfo($def_boot_osid, $osname, $ospid))
+	if ($def_boot_osid &&
+	    ($osinfo = OSinfo::Lookup($def_boot_osid))) {
+	    $osname = $osinfo->osname();
 	    echo "<td>$osname</td>\n";
+	}
 	else
 	    echo "<td>&nbsp</td>\n";
     }
@@ -543,15 +601,20 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     if (!strcmp($showtype, "widearea")) {	
-	echo "<td>$machine_type</td>
+	echo "<td>$site</td>
 	      <td>$connect_type</td>
-	      <td><font size='-1'>$location</font></td>\n";
+	      <td><font size='-1'>$location</font></td>
+	      <td><font size='-1'>$latitude</font></td>
+	      <td><font size='-1'>$longitude</font></td>\n";
     }
     
     echo "</tr>\n";
 }
 
 echo "</table>\n";
+echo "<script type='text/javascript' language='javascript'>
+         sorttable.makeSortable(getObjbyName('nodelist'));
+      </script>\n";
 SUBPAGEEND();
 
 #

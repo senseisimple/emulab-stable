@@ -1,0 +1,766 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+source tb_compat.tcl
+
+set ns [new Simulator]
+$ns rtproto Static
+
+##########
+# Beginning of user-settable options
+
+#
+# If set to 1, doesn't allocate any real Plab nodes (or fake ones either).
+# Attributes for the elab-* machines are taken from DB data for nodes in
+# the plabnodes list. This can be used to implement the Simple-Static and
+# Simple-Dynamic modes
+#
+# This option requires that you have nodes listed in plabnodes and forces
+# use of the dbmonitor.
+#
+set no_plab 0
+
+#
+# This control how many _pairs_ of PCs there are. ie. 2 gets you 2 monitors in
+# Emulab, plus matching agents in PlanetLab
+#
+set num_pcs 2
+
+#
+# If set to 1, we grab real PlanetLab nodes. Both this and fake_plab can be
+# set at the same time
+#
+set real_plab 1
+
+#
+# If set to 1, we create a fake PlanetLab inside Emulab, so that we can run
+# the agent in an environment we have full control over
+#
+set fake_plab 0
+
+#
+# If set to 1, we do automatic tcpdumps on all nodes
+#
+set trace 1
+
+#
+# If you want to get specific real planetlab nodes, ask for them here by site
+# or by emulab node ID. 
+# NOTES:
+#   An empty list for either selection method turns it off
+#   Do not use both site and node selection at the same time!
+#   The list must be at least as long as num_pcs above, It can be longer, but
+#     extra elements will be ignored
+#   I recommend using the sites option, rather than the nodes option, since that
+#     may get you less-loaded nodes and is more robust to crashed nodes
+#   You can get a list of node IDs and sites at:
+#     https://www.emulab.net/nodecontrol_list.php3?showtype=widearea
+#   You can get a list of PlanetLab nodes that are known to be fairly reliable
+#     and to have data from flexmon by running the 'goodnodes.pl' script in the
+#     root directory of your Flexlab source
+#   Site names are case-sensitive!
+#
+
+# Empty list
+set plabsites {}
+# Example site list
+#set plabsites {UCB Stanford Cornell Jerusalem Taiwan}
+
+# Empty list
+set plabnodes {}
+# Example node list
+#set plabnodes {plab518 plab541 plab628 plab736 plab360}
+set plabnodes {plab540 plab18}
+
+#
+# This provides you with an easy way to skip certain hosts in the above lists
+# by index number
+#
+# Empty List
+set skiplist {}
+# Example list
+#set skiplist {2 7}
+
+#
+# Where to grab your tarball of flexlab software from. See the README for
+# instructions. Then put the path to your tarball in this variable.
+#
+set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+
+#
+# Hardare type to use for PCs inside of emulab - you can set to some other
+# value, like "pc3000", to get specific types of PCs
+#
+set hwtype "pc"
+set do_bsd 0
+
+#
+# Server and client to use for automated testing. If set, will automatically
+# be started on all elab nodes by the 'start-experiment' script
+#
+if {$do_bsd} {
+    set sstr "/usr/local/etc/emulab/emulab-iperf -s "
+    # NOTE: No client support for now, you'll have to run the client yourself
+    set cstr "/usr/local/etc/emulab/emulab-iperf -t 60 -c "
+} else {
+    set sstr "/usr/bin/iperf -s "
+    # NOTE: No client support for now, you'll have to run the client yourself
+    set cstr "/usr/bin/iperf -t 60 -c "
+}
+set serverprog $sstr
+set clientprog $cstr
+
+#
+# Application to run automatically on all nodes (planet, plab or elab)
+#
+set allnodesprog "/bin/true"
+
+#
+# Run FreeBSD 6.1 on elab_ nodes.  Forces use of dbmonitor.
+#
+
+#
+# If non-zero, uses the DB-based "monitor" to control the cloud shaping. This
+# implements the Simple-Static and Simple-Dynamic network models (If this is
+# not set, you get the regular monitor and agent, which implement ACIM)
+#
+set use_dbmonitor 0
+if {$do_bsd} {
+    set use_dbmonitor 1
+}
+
+#
+# Use this to set a unique port so that you don't collide with others on the
+# same node. Only supported when use_magent is set
+#
+set stub_port 3149
+set udp_stub_peer_port 3492
+
+        
+######
+# Options for the dbmonitor (simple models)
+######
+
+#
+# If dbmonitor is set, these are the intervals at which the latency and BW
+# data are sampled by bgmon on the plab nodes (zero means use the default).
+# The smaller (shorter interval) of the two, is used as the interval at which
+# dbmonitor polls the DB to get data recorded by bgmon.
+#
+set dbmonitor_latinterval 10
+set dbmonitor_bwinterval 0
+
+# Get these into the environment for dbmonitor to read
+set opt(DBMONITOR_LATINTERVAL) $dbmonitor_latinterval
+set opt(DBMONITOR_BWINTERVAL) $dbmonitor_bwinterval
+
+######
+# Options for Fake PlanetLab
+######
+
+#
+# When using a fake plab, these are the parameters for the fake Internet
+# 'cloud' connecting the plab nodes. For now, all nodes have the same
+# parameters - hopefully this will change in a later version
+#
+set cloud_delay "30ms"
+set cloud_bw "1.5Mbps"
+
+#
+# When using a fake plab, these are the parameters for the 'control'
+# delay (ie. the latency for the elab nodes to reach the plab nodes
+#
+set control_delay "0ms"
+set control_bw "100Mbps"
+
+######
+# Deprecated / Unsupported / Internal Options
+######
+
+#
+# If set to 1, we trace on all end nodes instead of (or in addition to)
+# all delay nodes above.
+#
+# XXX this option won't do anything right now.  If there are delay nodes
+# involved for local LAN/clouds it is ignored, and as long as tracing is
+# enabled, plab nodes will get end_node tracing anyway.
+#
+set trace_end_nodes 0
+
+#
+# These are the initial conditions for the 'elabc' cloud, the Emulab side of
+# a pelab experiment
+#
+set ecloud_delay "0ms"
+set ecloud_bw "100Mbps"
+
+#
+# If non-zero, limits the number of slots in the queues for the fake PlanetLab
+#
+set limit_fake_queue_slots 0
+
+# XXX for internal use only
+set no_stub 0
+
+#
+# If non-zero, uses the new stub (magent) instead of the old one
+# If set to 1, uses the new stub as a receiver
+# If set to 2, uses a separate iperfd to receive traffic
+#
+set use_magent 1
+
+# End of user-settable options
+##########
+
+set pid ${GLOBALS::pid}
+set eid ${GLOBALS::eid}
+
+set delay_os FBSD54-DNODE
+
+if {$do_bsd} {
+    set node_os FBSD61-STD
+} else {
+    # XXX -UPDATE for now.  Contains bug fixes (progagent command lines).
+    #set node_os PLAB-DEVBOX-UPDATE
+    set node_os PLAB-DEVBOX
+}
+
+tb-set-delay-os $delay_os
+
+#
+# Enforce no_plab requirements
+#
+if {$no_plab} {
+    set fake_plab 0
+    set real_plab 0
+# XXX don't force use of dbmonitor; may want to just use init_elabnodes.
+#    set use_dbmonitor 1
+    set use_magent 0
+    set no_stub 1
+}
+
+#
+# Enforce USE_DBMONITOR requirements
+#
+if {$use_dbmonitor} {
+    set use_magent 0
+    set no_stub 1
+}
+
+#
+# Set up skiplist
+#
+for {set i 0} {$i < [llength $skiplist]} {incr i} {
+    set skip([lindex $skiplist $i]) 1
+}
+
+set stub_peer_port $stub_port
+set stub_command_port 3150
+
+#
+# Tarballs and RPMs we install on all nodes
+#
+set tarfiles "/local $pelab_tar"
+set plab_rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm"
+if {$do_bsd} {
+    set elab_rpms ""
+} else {
+    set elab_rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm"
+}
+
+if {$do_bsd} {
+    set elabshell "/bin/sh -T"
+} else {
+    set elabshell "/bin/sh"
+}
+
+if {$use_magent} {
+    set stubcommand "/bin/sh /local/pelab/magent/auto-magent.sh --peerserverport=$stub_peer_port --monitorserverport=$stub_command_port"
+    # XXX woeful, and hopefully temporary, hack
+    if {$use_magent == 2} {
+	set opt(MAGENT_NORECV) 1
+    }
+} else {
+    set stubcommand "/bin/sh /local/pelab/stub/auto-stub.sh"
+}
+
+# we don't run dbmonitor on the nodes anymore
+if {0 && $use_dbmonitor} {
+    set moncommand "$elabshell /local/pelab/dbmonitor/auto-dbmonitor.sh"
+} else {
+    set moncommand "$elabshell /local/pelab/monitor/auto-monitor.sh --stub-port=$stub_command_port"
+}
+
+#
+# So far, nothing I tried can get the auto-* scripts to return 0
+# when interrupted
+#
+set ecode 15
+
+set elan_string ""
+set plan_string ""
+set inet_string ""
+
+set stublist {}
+set planetstublist {}
+set plabstublist {}
+set monitorlist {}
+set planetservers {}
+set serverlist {}
+set clientlist {}
+set tflist {}
+set anlist {}
+
+set sanitychecklist {}
+
+#
+# Create all of the nodes
+#
+set tfix 1
+set anix 1
+for {set i 1} {$i <= $num_pcs} {incr i} {
+
+    if {$real_plab && ![info exists skip($i)]} {
+        set planet($i) [$ns node]
+        tb-set-hardware $planet($i) pcplab
+        append inet_string "$planet(${i}) "
+        set planetstub($i) [$planet($i) program-agent -expected-exit-code $ecode -command $stubcommand]
+        lappend stublist $planetstub($i)
+        lappend planetstublist $planetstub($i)
+
+        set plabsanitycheck($i) [$planet($i) program-agent -command "/local/pelab/run-sanity.sh vnet $planet($i) $stub_peer_port $udp_stub_peer_port"]
+
+        lappend sanitychecklist $plabsanitycheck($i)
+
+        tb-set-node-tarfiles $planet($i) $tarfiles
+        tb-set-node-rpms $planet($i) $plab_rpms
+
+        set tfupdate($tfix) [$planet($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
+	lappend tflist $tfupdate($tfix)
+	incr tfix
+	set allnodes($anix) [$planet($i) program-agent -command $allnodesprog]
+	lappend anlist $allnodes($anix)
+	incr anix
+
+        if {[llength $plabsites] > 0} {
+            set why_doesnt_tcl_have_concat "*&"
+            append why_doesnt_tcl_have_concat [lindex $plabsites [expr $i - 1]]
+            $planet($i) add-desire $why_doesnt_tcl_have_concat 1.0
+        } elseif {[llength $plabnodes] > 0} {
+            tb-fix-node $planet($i) [lindex $plabnodes [expr $i - 1]]
+        }
+    }
+
+    if {$fake_plab} {
+        set plab($i) [$ns node]
+        tb-set-node-os $plab($i) $node_os
+        tb-set-hardware $plab($i) $hwtype
+        append plan_string "$plab(${i}) "
+        set plabstub($i) [$plab($i) program-agent -expected-exit-code $ecode -command $stubcommand]
+        lappend stublist $plabstub($i)
+        lappend plabstublist $plabstub($i)
+
+        tb-set-node-tarfiles $plab($i) $tarfiles
+        tb-set-node-rpms $plab($i) $plab_rpms
+        set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
+	lappend tflist $tfupdate($tfix)
+	incr tfix
+	set allnodes($anix) [$plab($i) program-agent -command $allnodesprog]
+	lappend anlist $allnodes($anix)
+	incr anix
+    }
+
+    set elab($i) [$ns node]
+    tb-set-node-os $elab($i) $node_os
+    tb-set-hardware $elab($i) $hwtype
+    append elan_string "$elab(${i}) "
+    set monitor($i) [$elab($i) program-agent -expected-exit-code $ecode -command $moncommand]
+    lappend monitorlist $monitor($i)
+
+    set server($i) [$elab($i) program-agent -expected-exit-code $ecode -command $serverprog]
+    set client($i) [$elab($i) program-agent -expected-exit-code $ecode -command $clientprog]
+    lappend serverlist $server($i)
+    lappend clientlist $client($i)
+
+    set elabsanitycheck($i) [$elab($i) program-agent -command "/local/pelab/run-sanity.sh any $elab($i) "]
+
+    lappend sanitychecklist $elabsanitycheck($i)
+
+    tb-set-node-tarfiles $elab($i) $tarfiles
+    if {$elab_rpms != ""} {
+        tb-set-node-rpms $elab($i) $elab_rpms
+    }
+    set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -it"]
+    lappend tflist $tfupdate($tfix)
+    incr tfix
+    set allnodes($anix) [$elab($i) program-agent -command $allnodesprog]
+    lappend anlist $allnodes($anix)
+    incr anix
+
+    #
+    # If the user has given a plabnodes list, we set up $opt variables so that
+    # even if they are not actually using PlanetLab nodes, the simple model can
+    # still see the mapping between elab and plab nodes
+    #
+    if {[llength $plabnodes] > 0 && ![info exists skip($i)]} {
+        set opt(pelab-elab-$i-mapping) [lindex $plabnodes [expr $i - 1]]
+    }
+}
+
+#
+# Run the DB monitor on ops
+# Intervals are passed via the environment.
+#
+if {$use_dbmonitor} {
+    set dbmonitor [new Program $ns]
+    $dbmonitor set node "ops"
+    $dbmonitor set command "/usr/testbed/sbin/dbmonitor.pl $pid $eid"
+    $dbmonitor set expected-exit-code $ecode
+    set monitorlist $dbmonitor
+}
+
+#
+# Set up groups to make it easy for us to start/stop program agents
+#
+if {$stublist != {}} {
+    set stubgroup [$ns event-group $stublist]
+    if {$real_plab} {
+        set planetstubs [$ns event-group $planetstublist]
+    }
+    if {$fake_plab} {
+        set plabstubs [$ns event-group $plabstublist]
+    }
+}
+set monitorgroup [$ns event-group $monitorlist]
+
+set allservers [$ns event-group $serverlist]
+set allclients [$ns event-group $clientlist]
+
+set tfhosts [$ns event-group $tflist]
+set anhosts [$ns event-group $anlist]
+
+set sanityCheckDumps [$ns event-group $sanitychecklist]
+
+set tracelist {}
+
+#
+# Real Internet cloud for real plab nodes
+#
+if {$real_plab} {
+    set realinternet [$ns make-lan "$inet_string" 100Mbps 0ms]
+    tb-set-lan-protocol $realinternet ipv4
+    if {$trace} {
+	$realinternet trace header "tcp and port $stub_peer_port"
+	if {$trace_end_nodes} {
+	    $realinternet trace_endnode 1
+	}
+	lappend tracelist $realinternet
+    }
+}
+
+#
+# Fake 'Internet' cloud for fake plab nodes
+#
+if {$fake_plab} {
+    set plabc [$ns make-cloud "$plan_string" $cloud_bw $cloud_delay]
+    tb-set-ip-lan $plab(1) $plabc 10.1.0.1
+    if {$trace} {
+	$plabc trace
+	if {$trace_end_nodes} {
+	    $plabc trace_endnode 1
+	}
+	lappend tracelist $plabc
+    }
+    if {$limit_fake_queue_slots} {
+        for {set i 1} {$i <= $num_pcs} {incr i} {
+            set fakequeues($i) [[$ns lanlink $plabc $plab($i)] queue]
+            $fakequeues($i) set limit_ $limit_fake_queue_slots
+        }
+    }
+}
+
+#
+# Lan which will be controlled by the monitor
+#
+set elabc [$ns make-cloud "$elan_string" $ecloud_bw $ecloud_delay]
+tb-set-ip-lan $elab(1) $elabc 10.0.0.1
+if {$trace} {
+    $elabc trace
+    if {$trace_end_nodes} {
+	$elabc trace_endnode 1
+    }
+    lappend tracelist $elabc
+}
+
+#
+# We don't want the sync server to end up out there on some plab node
+#
+tb-set-sync-server $elab(1)
+
+#
+# Set up a fake Internet link between the PlanetLab and Emulab sides
+# when using fake plab nodes
+#
+if {$fake_plab} {
+    set erouter [$ns node]
+    set prouter [$ns node]
+
+    set elabcontrol [$ns make-lan "$elan_string $erouter" 100Mbps 0ms]
+    set plabcontrol [$ns make-lan "$plan_string $prouter" 100Mbps 0ms]
+
+    set internet [$ns duplex-link $erouter $prouter $control_bw $control_delay DropTail]
+    if {$trace} {
+	$internet trace
+	if {$trace_end_nodes} {
+	    $internet trace_endnode 1
+	}
+	lappend tracelist $internet
+    }
+
+    tb-set-ip-lan $elab(1) $elabcontrol 192.168.0.1
+    tb-set-ip-lan $plab(1) $plabcontrol 192.168.1.1
+
+    tb-set-ip-link $erouter $internet 192.168.254.1
+    tb-set-ip-link $prouter $internet 192.168.254.2
+}
+
+# for one-off ops commands
+set opsagent [new Program $ns]
+$opsagent set node "ops"
+$opsagent set command "/bin/true"
+
+#
+# The set of traced links
+# XXX still cannot use an event-group of link tracing events in a sequence
+#
+#set tracegroup [$ns event-group $tracelist]
+
+#
+# Build up the event sequences to start and stop an actual run.
+#
+if {$no_plab || $real_plab} {
+  set start [$ns event-sequence]
+    $start append "$ns log \"Starting REAL plab experiment\""
+
+    # stop stubs and monitors
+    $start append "$ns log \"##### Stopping stubs and monitors...\""
+    if {!$no_stub && $real_plab} {
+	$start append "$planetstubs stop"
+    }
+    $start append "$monitorgroup stop"
+
+    # stop servers
+    if {$serverprog != ""} {
+	$start append "$ns log \"##### Stopping servers...\""
+	$start append "$allservers stop"
+    }
+
+    # stop link logging
+    $start append "$ns log \"##### Roll link trace logs...\""
+    foreach link $tracelist {
+        $start append "$link trace snapshot"
+        $start append "$link trace stop"
+    }
+
+    $start append "$sanityCheckDumps stop"
+
+    # clean out log files
+    # XXX original script passed --root, cleanlogs does not--may be a problem.
+    $start append "$ns log \"##### Cleaning logs...\""
+    $start append "$ns cleanlogs"
+
+    # reset shaping characteristics for all nodes
+    $start append "$ns log \"##### Resetting links...\""
+    $start append "$elabc clear"
+    $start append "$elabc reset"
+
+    if {$real_plab} {
+	# distinguish between real/fake runs
+	# XXX I'm thinkin...we can do better than this!
+	$start append "$opsagent run -command \"cp /dev/null /proj/$pid/exp/$eid/tmp/real_plab\""
+
+	# save off node list
+	$start append "$ns log \"##### Creating node list...\""
+	$start append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
+
+	# initialize path characteristics
+	$start append "$ns log \"##### Initialize emulation node path characteristics...\""
+	$start append "$elabc create"
+	$start append "$opsagent run -command \"/usr/testbed/bin/init-elabnodes.pl  -o /proj/$pid/exp/$eid/tmp/initial-conditions.txt $pid $eid\""
+    } else {
+	$start append "$elabc create"
+    }
+
+    # restart link tracing
+    # XXX cleanlogs has unlinked the current trace log, so we have to
+    # snapshot to bring it back into existence
+    $start append "$ns log \"##### Starting link tracing...\""
+    foreach link $tracelist {
+        $start append "$link trace snapshot"
+        $start append "$link trace start"
+    }
+
+    # restart servers
+    if {$serverprog != ""} {
+	$start append "$ns log \"##### Starting server...\""
+	$start append "$allservers start"
+    }
+
+    # restart stubs and monitors
+    $start append "$ns log \"##### Starting stubs and monitors...\""
+    if {!$no_stub && $real_plab} {
+	$start append "$planetstubs start"
+    }
+    $start append "$monitorgroup start"
+
+    # gather up the data and inform the user
+    $start append "$ns log \"##### Experiment run started!\""
+    # XXX cannot do a report here as that will cause the logs to be
+    #     deleted before the next loghole sync
+
+  set stop [$ns event-sequence]
+    $stop append "$ns log \"Stopping REAL plab experiment\""
+
+    # stop stubs and monitors
+    $stop append "$ns log \"##### Stopping stubs and monitors...\""
+    if {!$no_stub && $real_plab} {
+	$stop append "$planetstubs stop"
+    }
+    $stop append "$monitorgroup stop"
+
+    # stop servers
+    if {$serverprog != ""} {
+	$stop append "$ns log \"##### Stopping servers...\""
+	$stop append "$allservers stop"
+    }
+
+    $stop append "$sanityCheckDumps stop"
+
+    # stop link logging and save logs
+    $stop append "$ns log \"##### Stop link tracing...\""
+    foreach link $tracelist {
+        $stop append "$link trace snapshot"
+        $stop append "$link trace stop"
+    }
+
+    # reset shaping characteristics for all nodes
+    $stop append "$ns log \"##### Resetting links...\""
+    $stop append "$elabc clear"
+    $stop append "$elabc reset"
+
+    # gather up the data and inform the user
+    $stop append "$ns log \"##### Experiment run stopped!\""
+    $stop append "$ns report"
+}
+
+#
+# Build up the event sequences to start and stop an actual run on FAKE
+# plab nodes.  The only difference here (besides the names) is that these
+# sequences use plabstubs rather than planetstubs.
+#
+if {$fake_plab} {
+  set start_fake [$ns event-sequence]
+    $start_fake append "$ns log \"Starting FAKE plab experiment\""
+
+    # stop stubs and monitors
+    $start_fake append "$ns log \"##### Stopping stubs and monitors...\""
+    if {!$no_stub} {
+	$start_fake append "$plabstubs stop"
+    }
+    $start_fake append "$monitorgroup stop"
+
+    # stop servers
+    if {$serverprog != ""} {
+	$start_fake append "$ns log \"##### Stopping servers...\""
+	$start_fake append "$allservers stop"
+    }
+
+    # stop link logging
+    $start_fake append "$ns log \"##### Roll link trace logs...\""
+    foreach link $tracelist {
+        $start_fake append "$link trace snapshot"
+        $start_fake append "$link trace stop"
+    }
+
+    # clean out log files
+    # XXX original script passed --root, cleanlogs does not--may be a problem.
+    $start_fake append "$ns log \"##### Cleaning logs...\""
+    $start_fake append "$ns cleanlogs"
+
+    # reset shaping characteristics for all nodes
+    $start_fake append "$ns log \"##### Resetting links...\""
+    $start_fake append "$elabc clear"
+    $start_fake append "$elabc reset"
+
+    # distinguish between real/fake runs
+    # XXX I'm thinkin...we can do better than this!
+    $start_fake append "$opsagent run -command \"rm -f /proj/$pid/exp/$eid/tmp/real_plab\""
+
+    # save off node list
+    $start_fake append "$ns log \"##### Creating node list...\""
+    $start_fake append "$opsagent run -command \"/usr/testbed/bin/node_list -m -e $pid,$eid > /proj/$pid/exp/$eid/tmp/node_list\""
+
+    # restart link tracing
+    # XXX cleanlogs has unlinked the current trace log, so we have to
+    # snapshot to bring it back into existence
+    $start_fake append "$ns log \"##### Starting link tracing...\""
+    foreach link $tracelist {
+        $start_fake append "$link trace snapshot"
+        $start_fake append "$link trace start"
+    }
+
+    # restart servers
+    if {$serverprog != ""} {
+	$start_fake append "$ns log \"##### Starting server...\""
+	$start_fake append "$allservers start"
+    }
+
+    # restart stubs and monitors
+    $start_fake append "$ns log \"##### Starting stubs and monitors...\""
+    if {!$no_stub} {
+	$start_fake append "$plabstubs start"
+    }
+    $start_fake append "$monitorgroup start"
+
+    # gather up the data and inform the user
+    $start_fake append "$ns log \"##### Experiment run started!\""
+    # XXX cannot do a report here as that will cause the logs to be
+    #     deleted before the next loghole sync
+
+  set stop_fake [$ns event-sequence]
+    $stop_fake append "$ns log \"Stopping FAKE plab experiment\""
+
+    # stop stubs and monitors
+    $stop_fake append "$ns log \"##### Stopping stubs and monitors...\""
+    if {!$no_stub} {
+	$stop_fake append "$plabstubs stop"
+    }
+    $stop_fake append "$monitorgroup stop"
+
+    # stop servers
+    if {$serverprog != ""} {
+	$stop_fake append "$ns log \"##### Stopping servers...\""
+	$stop_fake append "$allservers stop"
+    }
+
+    # stop link logging and save logs
+    $stop_fake append "$ns log \"##### Stop link tracing...\""
+    foreach link $tracelist {
+        $stop_fake append "$link trace snapshot"
+        $stop_fake append "$link trace stop"
+    }
+
+    # reset shaping characteristics for all nodes
+    $stop_fake append "$ns log \"##### Resetting links...\""
+    $stop_fake append "$elabc clear"
+    $stop_fake append "$elabc reset"
+
+    # gather up the data and inform the user
+    $stop_fake append "$ns log \"##### Experiment run stopped!\""
+    $stop_fake append "$ns report"
+}
+
+$ns run

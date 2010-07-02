@@ -1,0 +1,51 @@
+#!/usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# cloudinfo-set <pid> <eid>: Set the cloud info based on an input file of the form:
+#
+#####################   <pid> <eid>
+#   <src> <dst> <bw> <delay> <loss>
+#
+# Where <src> and <dst> or of the form "elab-*" for now.
+
+use strict;
+
+my $TEVC = "/usr/testbed/bin/tevc";
+
+#local $_ = <>;
+#chop;
+#my ($pid,$eid) = /^(\S+)\s+(\S+)$/ or die
+#  "First line must be of the form \"<pid> <eid>\"\n";
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+
+my $failures = 0;
+
+while (<STDIN>) {
+    my ($src, $dst, $bw, $del, $plr) = split /\s+/;
+    my $dstip = $dst;
+    if ($dstip !~ /^\d+\.\d+\.\d+\.\d+$/) {
+	$dst =~ (/^elab-(\d+)$/) or die "Host names must be of the form elab-NUM\n";
+	$dstip = "10.0.0.$1";
+    }
+    my $srcip = $src;
+    if ($srcip =~ /^\d+\.\d+\.\d+\.(\d+)$/)
+    {
+	$src = "elab-$1";
+    }
+    my $cmd = "$TEVC -e $pid/$eid now elabc-$src MODIFY ".
+      "DEST=$dstip BANDWIDTH=$bw DELAY=$del PLR=$plr";
+    print STDERR "$cmd\n";
+    system("$cmd");
+    if ($? != 0) {
+	print STDERR "*** Failed to set paramters for $src -> $dst\n";
+	$failures++;
+    }
+}
+
+exit $failures;

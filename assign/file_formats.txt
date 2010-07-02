@@ -1,0 +1,202 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#####
+##### File formats used by assign
+#####
+
+This file definition of the file formats used by assign, and notes about how
+they have changed over time. Rules are expressed in my own  bastardization of
+BNF and regexp syntax. This document assumes you have read the 2003 CCR paper
+by Ricci, Alfeld, and Lepreau about assign.
+
+##### ptop (physical topology) file
+
+ptop file: <line>*
+<line> ::= <node_line> | <link_line> | <type_limit_line> | <policy_line>
+
+<node_line> ::= node <node_name> <node_type>+ [- <feature>* [- <flag>*  ]]
+<node_type> ::= "*"?<type_name>:<type_count>
+<type_count> ::= "*" | <int>
+<feature> ::= <feature_type><feature_name>:<float>
+<feature_type> ::= | "?+" | "*&" | "*!"
+<flag> ::= trivial_bw:<int> | subnode_of:<node_name> | unique
+
+<link_line> ::= link <link_name> <interface> <interface> <int> <float> <float> [ <int> ] <link_type>*
+<interface> := <node_name>:<mac>/<iface>
+
+<type_limit_line> ::= set-type-limit <node_type> <int>
+
+<policy_line> ::= policy <desire_policy>
+<desire_policy> ::= desire <feature_name> ( disallow | limit <float> )
+
+Interpretation:
+
+<node_line> - though a node can have several types that it can satisfy, it is
+    only allowed to "be" one type at a time. See exception for 'static' types
+    below.
+<node_type> - the optional '*' flag at the beginning of a type name indicates
+    that a type is 'static' - that is, that it can *always* satisfy vnodes of
+    this type, regardless of what its current 'dynamic' (non-*ed) type is. This
+    is primarily used for switches
+<type_count> - the number of virtual nodes of the given type a physical node
+    can satisfy at once. Commonly 1, but may be >1 for virtual-machine like
+    technologies. '*' simply means 'infinite'
+<feature> - see the 2003 assign paper in CCR for an explanation of features and
+    desires (in the top file). One of the important types of features added
+    by Emulab are of the form 'OS-<FOO>:0', indicating that the node can run
+    operating system FOO (though older ptop files do not have these features)
+<feature_type> - not documented in the paper. '?+' means 'additive' feature -
+    values of matching desires for the assigned vnodes will be added up, and if
+    they are greater than the value for the feature, a violation will be
+    flagged. Used primarily to express CPU and memory constraints. '&*' means
+    'one is okay' - the first user (globally) of this feature is not assessed
+    the penalty, but subsequent users are. '*!' means 'more than one is okay' -
+    the first user (globally) of this feature is assessed the penalty, but
+    subsequent users are not.
+<flag> - trivial_bw indicates how much bandwidth this node can handle through
+    its loopback interface. subnode_of indicates this node is a subnode of
+    another node - for example, it may be a PCI card hosted in another node. If
+    the subnode_of flag is used on a virtual node, a valid mapping must make
+    sure that the subnode relationship of the virtual node is mirrored by the
+    physical nodes. Note: the host must appear somewhere in the ptop file, but
+    it need not appear before the subnode. The unique flag indicates that there
+    is something not visible in the ptop file that makes this node different
+    from all other physical nodes - it prevents assign from putting it in a
+    physical equivalence class, as described in the paper.
+<link_line> - The two interfaces are the source and destination of this link,
+    respectively. The next three numbers are, respectively, bandwidth, delay,
+    and packet loss. Units are not specified, but must match the units in the
+    top file. See notes at the end of this file for more information. The final
+    (optional) integer records the number of virtual links that can be mapped
+    to this physical link. In practice, we do not use this field, using the
+    bandwidth number for multiplexing instead, and it has been removed from
+    the latest version of the file format.
+<link_type> - In practice, usually 'ethernet', '80211a', '80211b', or '80211g'.
+    Older ptop files do not have this field.
+<interface> - the first part of this field is the only really important one:
+    the physical node it references must have already appeared in the ptop
+    file. The other two portions are mostly ignored.
+<type_limit_line> - used to enforce Emulab policies: ie. this experiment is
+    not allowed to use more than 10 pc3000 nodes
+<policy_line> - used to indicate policies for mapping the experiment. The only
+    policies currently supported are 'desire' policies, which can be used to
+    disallow the top file from requesting a particular desire, or limit the
+    total weight that can be given to a desire
+
+##### top (virtual topology) file
+
+top file: <line>*
+
+<line> ::= <node_line> | <link_line> | <vclass_line> | <fix_line> | <hint_line>
+
+<node_line> ::= node <node_name> <node_type_name>[:<int>] <desire_or_flag>*
+<desire_or_flag> ::= disallow_trivial_mix | subnode_of:<node_name> | <desire>
+<desire> ::= <desire_type><desire_name>:<float>
+<desire_type> ::= | "?+" | "&*" | "*!"
+
+<link_line1> ::= link <link_name> <interface> <interface> <int|'*'> <float>
+                 <float> <link_flag>*
+<link_line2> ::= link <link_name> <interface> <interface> <int> <float> <float> 
+                 <link_type> <link_flag*>
+<link_flag> ::= nodelay | emulated | trivial_ok | fixsrciface:<string> |
+                fixdstiface:<string>
+<interface> := <node_name>:<mac>/<iface>
+
+<vclass_line> ::= make-vclass <vlass_name> <float> <node_type>+
+
+<fix_line> ::= fix-node <node_name> <node_name>
+
+<hint_line> ::= node-hint <node_name> <node_name>
+
+Interpretation:
+
+<node_line> - note that, unlike a physical node, a virtual node can only have
+    one type. The ':SLOTS' portion of the type is option in the ptop file, 
+    and its absence indicates that the node takes up a single slot
+<desire_or_flag> - for the meaning of 'subnode_of', see the explanation of
+    flags in the ptop file. disallow_trivial_mix means that either all of
+    this virtual node's links must be satisfied by trivial (loopback) physical
+    links, or real links, or vice versa - not a mixture of the two
+<desire> - see <feature> in the ptop file
+<desire_type> - see <feature_type> in the ptop file
+<link_line1> and <link_line2> - see notes below for the difference between the
+    two line types. See <link_line> in the ptop file. The integer gives the
+    bandwidth for the link, but if the special value '*' is given, assign
+    simply uses the native bandwidth of the interfaces selected.
+<link_type> - when present, a valid mapping must put this virtual link on a
+    physical link of the same type. For multi-hop link mappings (ie. those
+    that traverse multiple switches), *all* links used must be of this type. I
+    am considering the ability to express more complicated policies (ie. 'at
+    least one link in a multihop path must this type')
+<link_flag> - 'nodelay' is currently not used: it indicates that assign is not
+    allowed to insert a traffic shaping ('delay') node when mapping this link.
+    'emulated' means that is is acceptable to multiplex this virtual link
+    (along with other emulated links) onto a physical link, subject to
+    bandwidth limits. Without this flag, only one-to-one link mappings are
+    allowed. 'trivial_ok' allows trivial (loopback) mapping of this link, which
+    is disallowed by default. 'fixsrciface' and 'fixdstiface' require that the
+    '<iface>' portion of the interface specification on the physical link
+    (which typically looks like 'eth0') match the supplied string.
+<vclass_line> - see the assign paper for an explanation of virtual classes.
+<fix_line> - requires the specified virtual node to be mapped to the specified
+    physical node
+<hint_line> - similar to <fix_line>, but is a 'suggestion' rather than a
+    requirement
+
+##### Other notes
+
+The 'normalized' files we have released have the following properties:
+    Nodes are all listed before links
+    In top files, vclasses are listed before nodes, to avoid forward references
+    All link lines in top and ptop files have associated types - this means
+        that for the top file format, link lines are all in the <link_line2>
+        format.
+    All link lines in the physical topology files have the optional 'slots'
+        field
+    All node lines in the ptop files have the optional dashes to separate the
+        'feature' and 'flags' portions of the line, though the actual feature
+        and flag lists may be empty
+
+There is, unfortunately, a change I made in the top file format that you must
+take special care to detect. Later versions of the top file add a mandatory
+type field to link lines, before the flags. Thus, when looking at a file, you
+need to be careful to tell if what you are looking at is a link type or a
+flag - essentially, if the eighth token on the line is not a valid flag, it
+is most likely a type (and we have only ever used types "ethernet" and "80211*")
+
+'switch' is a special type to assign (the only one). Basically, assign assumes
+that any node with a type of 'switch' is willing to forward packets, and it can
+thus make multi-hop link assignment through several switches. I am in the
+process of generalizing this to allow multi-hop link assignments at different
+layers of the network stack.
+
+The ptop and top files produced by Emulab have dummy values for latency and
+packet loss numbers. Bandwidth numbers are generally rounded 'up' to the
+nearest Ethernet speed (ie. 100Mbps or 1Gbps). This is due to the fact that
+traffic shaping is done at a different layer in Emulab - 'delay' nodes are
+inserted into the topology to do this traffic shaping before the top file is
+created, and allow runtime changes to shaping parameters, and thus must assume
+they might be raised to full interface speed.
+
+Bandwidth units in emulab-generated top/ptop files are in kbps.
+
+Emulab-generated top and ptop files contain nodes first, and then links. This
+guarantees that when a link refers to a node, that node has already been
+defined.
+
+assign handles LANs by having a 'LAN node' in the virtual topology that
+represents the LAN, and each member of the LAN has a link to that LAN. The LAN
+virtual node (type *lan) typically gets placed on a switch, though with virtual
+node experiments, it can get place on a node instead.
+
+We handle 802.11 by treating it similar to a LAN (we do not at this point try to
+do assignment based on signal strength, etc.) There is a fake 'airswitch' node
+created in the ptop file, and nodes with wireless interfaces have
+appropriately-typed links to it.
+
+I am in the process of replacing the top and ptop formats with XML ones based
+on the planned GENI rspec.

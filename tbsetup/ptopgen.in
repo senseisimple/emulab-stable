@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,24 +10,49 @@ use English;
 use Getopt::Std;
 use Math::BigInt;
 
+use lib "@prefix@/lib";
+use libdb qw(TBGetSiteVar);
+
+use libptop;
+
+my $top = libptop->Create();
+
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
+
+$NO_GENI = "0";
+$V_0_1 = "0.1";
+$V_0_2 = "0.2";
+$V_2 = "2";
+
+if ($PGENISUPPORT) {
+  require GeniHRN;
+}
+
+use GeniHRN;
+
 sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
-	  "[-n c/e]\n".
+	  "[-n c/e] [-x] [-g (0.1 | 2)] [-c component-name]\n".
 	  "       -p include nodes the project has permission to use\n".
 	  "       -e include given experiments resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
 	  "       -v Include stuff for topologies with virtual nodes\n".
 	  "       -r Include stuff for topologies with widearea nodes\n".
-	  "       -s Include stuff for topologies with simulated nodes\n".
+#	  "       -s Include stuff for topologies with simulated nodes\n".
+	  "       -h Include stuff for topologies with shared nodes\n".
 	  "       -a Include even reserved nodes\n".
 	  "       -m Override multiplex_factor\n".
 	  "       -u Prune unused interfaces of allocated nodes (-e)\n".
 	  "       -c Delay capacity override\n".
-	  "       -n Add in modelnet core and edge node features\n");
-    exit(-1);
+	  "       -n Add in modelnet core and edge node features\n".
+	  "       -x Output into the new xml ptop format.\n".
+	  "       -g version With -x, geni version. Must be '0', '0.1' or '2'\n".
+          "       -1 Print an rspec containing only the node component-name");
+        exit(-1);
 }
-my $optlist = "s:e:m:vp:rSan:c:u";
+
+my $optlist = "s:e:m:vp:rSan:c:uxg:h1:";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -36,6 +61,26 @@ my $allnodes  = 0;
 my $mnetcores = 0;
 my $mnetedges = 0;
 my $prune     = 0;
+my $do_xml    = 0;
+my $genimode  = $NO_GENI;
+my $useshared = 0;
+my $component_name = undef;
+
+my $OURDOMAIN = "@OURDOMAIN@";
+my $MAINSITE  = @TBMAINSITE@;
+my $cmuuid = TBGetSiteVar('protogeni/cm_uuid');
+my $cmurn = "";
+if ($PGENISUPPORT) {
+    $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+}
+
+my $default_long = undef;
+TBGetSiteVar('general/default_longitude', \$default_long);
+my $default_lat = undef;
+TBGetSiteVar('general/default_latitude', \$default_lat);
+my $default_country = undef;
+TBGetSiteVar('general/default_country', \$default_country);
+
 my $delaycap_override;
 
 #
@@ -67,17 +112,24 @@ use lib '@prefix@/lib';
 require exitonwarn;
 use libdb;
 use libtblog;
+use Experiment;
+use Node;
+use NodeType;
+use Lan;
 
 tblog_stop_capture('stdout');
 
 my $TRACK_INTERSWITCH_BANDWIDTH = "@TRACK_INTERSWITCH_BANDWIDTH@";
 
 my %switches	  = ();
-my %used_switches = ();
 my %permissions   = ();
 my %typemap       = ();
 my %auxtypemap    = ();
 my %areamap       = ();
+my %globalcounts  = ();
+my %interfacestate= ();
+my %vinterfaces   = ();
+my %rusagedata    = ();
 
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
@@ -85,6 +137,9 @@ my $DEADEID = NODEDEAD_EID();
 my $pid;
 my $exempt_eid;
 my $switchtouse;
+my $experiment;
+
+sub fatal($);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -102,6 +157,9 @@ if (defined($options{"s"})) {
 }
 if (defined($options{"m"})) {
     $mfactor = $options{"m"};
+}
+if (defined($options{"h"})) {
+    $useshared = 1;
 }
 if (defined($options{"v"})) {
     $virtstuff = 1;
@@ -137,33 +195,132 @@ if (defined($options{"e"})) {
     $exempt_eid = $options{"e"};
     usage()
 	if (!defined($pid));
+    $experiment = Experiment->Lookup($pid, $exempt_eid);
+    die("Could not look up experiment $pid,$exempt_eid\n")
+	if (!defined($experiment));
 }
+if (defined($options{"x"})) {
+    if (defined($options{"g"}) && $PGENISUPPORT) {
+	$useshared = 1;
+	$virtstuff = 1;
+	$genimode = $options{"g"};
+    }
+    $do_xml = 1;
+}
+if (defined($options{"1"})) {
+    $component_name = $options{"1"};
+}
+
 usage()
-    if ($prune && !defined($exempt_eid));
+    if ($prune && !defined($exempt_eid)
+	|| ($genimode ne $NO_GENI
+	    && $genimode ne $V_0_1
+	    && $genimode ne $V_0_2
+	    && $genimode ne $V_2));
+
+$fake_inet_switch = "internet";
+$fake_inet_iface = "(null)";
+$fake_air_switch = "airswitch";
+$fake_air_iface = "(null)";
+if ($genimode ne $NO_GENI) {
+    $fake_inet_iface = "border";
+    $fake_air_iface = "air";
+}
+
+print_header();
+
+my %nodetointerface;
+my %interfaceroles = ();
+my %interfacetypes = ();
+my %interfaceips = ();
+
+# Read interfaces
+my $result =
+    DBQueryFatal("SELECT node_id,card,port,iface,interface_type,role,IP" .
+		 " from interfaces " .
+		 ($genimode ne $NO_GENI ? "where role!='gw'" : ""));
+		 
+while (($node,$card,$port,$iface,$type,$role,$ip) = $result->fetchrow_array) {
+    push @{ $nodetointerface{"$node"} }, $iface;
+    $interfacemap{"$node:$card:$port"} = $iface;
+    if ((defined $type) && ($type ne "")) {
+	$interfacetypes{"$node:$card:$port"} = $type;
+    }
+    if ((defined $role) && ($role ne "")) {
+	$interfaceroles{"$node:$iface"} = $role;
+    }
+    if ((defined $ip) && ($ip ne "")) {
+	$interfaceips{"$node:$iface"} = $ip;
+    }
+}
+
+my %nodetouuid;
+my %nodetoavailable;
+
+$result = DBQueryFatal("SELECT n.node_id, n.eventstate, n.role, n.uuid, " .
+		       "nt.isremotenode, " .
+		       "dedicated_wa_types.attrvalue, b.erole, " .
+		       "n.reserved_pid, b.eid " .
+		       "from nodes as n " .
+		       "left join reserved as b on n.node_id=b.node_id " .
+		       "left join node_types as nt on nt.type=n.type " .
+		       "left outer join " .
+		       "  (select type, attrvalue " .
+		       "   from node_type_attributes " .
+		       "   where attrkey='dedicated_widearea' " .
+		       "   group by type) as dedicated_wa_types " .
+		       "  on nt.type=dedicated_wa_types.type " .
+		       "where nt.isvirtnode = 0 or nt.isvirtnode is null;");
+while (($node,$eventstate, $role, $uuid, $isremotenode,
+	$wa_attrvalue, $erole,
+	$reserved_pid, $reserved_eid) = $result->fetchrow_array) {
+    if (defined($uuid) && $uuid ne "")
+    {
+	$nodetouuid{$node} = $uuid;
+    }
+    my $islocal = $role eq 'testnode'
+	&& ((! defined($isremotenode) || $isremotenode == 0)
+	    || (defined($wa_attrvalue) && $wa_attrvalue == 1));
+    my $isup = defined($eventstate)
+	&& ($eventstate eq TBDB_NODESTATE_ISUP
+	    || $eventstate eq TBDB_NODESTATE_PXEWAIT
+	    || $eventstate eq TBDB_NODESTATE_POWEROFF
+	    || $eventstate eq TBDB_NODESTATE_ALWAYSUP);
+    my $isshared = (defined($erole)
+		    && $erole eq "sharedhost"
+		    && $useshared
+		    && $isup);
+    my $isreserved = (defined($reserved_eid)
+		      || (defined($reserved_pid)
+			  && (! defined($pid) || $pid ne $reserved_pid)));
+    my $isfree = (!$islocal
+		  || (! $isreserved && $isup)
+		  || $isshared);
+    $nodetoavailable{$node} = $isfree;
+}
 
 # Read class/type maps
-my $result =
-    DBQueryFatal("select class,type,delay_capacity,".
-		 "   virtnode_capacity,isvirtnode,simnode_capacity, " .
-		 "   speed, RAM, trivlink_maxspeed, imageable, osid ".
-		 "from node_types");
-while (($class,$type,$delaycapacity,
-	$virtcapacity,$isvirt,$simcapacity, $speed, $ram, $trivspeed,
-	$imageable, $osid)
-	    = $result->fetchrow_array) {
+$result =
+    DBQueryFatal("select class,type,isvirtnode from node_types");
+
+while (my ($class,$type,$isvirt) = $result->fetchrow_array) {
     $map = {};
     $map->{'CLASS'}    = $class;
-    $map->{'DELAYCAP'} = $delaycapacity;
-    $map->{'VIRTCAP'}  = $virtcapacity;
-    $map->{'SIMCAP'}   = $simcapacity;
     $map->{'ISVIRT'}   = $isvirt;
-    $map->{'SPEED'}    = $speed;
-    $map->{'RAM'}      = $ram;
-    $map->{'OSID'}     = $osid;
-    $map->{'IMAGEABLE'}= $imageable;
-    $map->{'TRIVSPEED'}= $trivspeed;
+    my $typeinfo       = NodeType->Lookup($type);
+    $map->{'DELAYCAP'} = $typeinfo->delay_capacity();
+    $map->{'VIRTCAP'}  = $typeinfo->virtnode_capacity();
+    $map->{'SIMCAP'}   = $typeinfo->simnode_capacity();
+    $map->{'SPEED'}    = $typeinfo->frequency();
+    $map->{'RAM'}      = $typeinfo->memory();
+    $map->{'OSID'}     = $typeinfo->default_osid();
+    $map->{'IMAGEABLE'}= $typeinfo->imageable();
+    $map->{'TRIVSPEED'}= $typeinfo->trivlink_maxspeed();
+    $map->{'SHARED'}   = $typeinfo->shared();
+    $map->{'TYPEINFO'} = $typeinfo;
     $map->{'FEATURES'} = [];
     $map->{'AUXTYPES'} = {};
+    $map->{'OSLIST'} = [];
     $typemap{$type} = $map;
 
     # Default is permission to use all types,classes. 
@@ -174,6 +331,10 @@ while (($class,$type,$delaycapacity,
 # Read node_startloc
 $result = DBQueryFatal("select node_id,building from node_startloc");
 while (($node,$building) = $result->fetchrow_array) {
+    # TODO: This screws up the meaning of the @features list. Now it
+    # is not just a list of feature strings, but a list of strings
+    # which might themselves be space-delimited lists of feature
+    # strings. Fix this.
     $areamap{$node} .= " area-$building:0";
 }
 
@@ -246,7 +407,7 @@ if (defined($pid)) {
 # 1) To avoid an explosion in the number of features for nodes
 # 2) To avoid information leaks, allowing projects to see each other's images
 # 
-my $osidquery = "select distinct o.osid, oi.type from os_info as o " .
+my $osidquery = "select distinct o.osid, oi.type, o.osname, o.pid, o.OS, o.version, o.description,o.protogeni_export from os_info as o " .
 	"left join osidtoimageid as oi on o.osid = oi.osid " .
 	"left join images as i on oi.imageid = i.imageid ".
 	"where i.global = 1";
@@ -254,23 +415,89 @@ if ($pid) {
     $osidquery .= " or i.pid='$pid'";
 }
 
-my %node_type_osids;
-my %osid_node_types;
+my $defaultosidquery = 'select distinct o.osid, t.type, o.osname, o.pid, o.OS, o.version, o.description, o.protogeni_export '.
+    'from os_info as o left join node_type_attributes as t '.
+    'on (o.osid=t.attrvalue) where t.attrkey="default_osid"';
+
+#
+# For subOS support (i.e., vnode OSes running atop vhost OSes), we have to
+# check both the subosid and all the parent_osid it can run on.
+#
+my $subosidquery = "select o.osid,o.parent_osid from os_submap as o " .
+	"left join osidtoimageid as oi1 on o.osid = oi1.osid " .
+	"left join osidtoimageid as oi2 on o.parent_osid = oi2.osid " .
+	"left join images as i1 on oi1.imageid = i1.imageid ".
+	"left join images as i2 on oi2.imageid = i2.imageid ".
+	"where (i1.global = 1";
+if ($pid) {
+    $subosidquery .= " or i1.pid='$pid'";
+}
+$subosidquery .= ") and (i2.global = 1";
+if ($pid) {
+    $subosidquery .= " or i2.pid='$pid'";
+}
+$subosidquery .= ")";
+
+our %node_type_osids;
+our %osid_node_types;
+our %osid_subosids;
+our %osid_name;
+our %osid_pid;
+our %osid_os;
+our %osid_version;
+our %osid_description;
+our %node_countries;
+our %node_latitudes;
+our %node_longitudes;
+
 $result = DBQueryFatal($osidquery);
-while (my ($osid,$type) = $result->fetchrow()) {
-    if ($node_type_osids{$type}) {
-	push @{$node_type_osids{$type}}, $osid;
-    } else {
-	$node_type_osids{$type} = [$osid];
+processOs($result);
+
+$result = DBQueryFatal($defaultosidquery);
+processOs($result);
+
+sub processOs
+{
+    my $result = shift(@_);
+    while (my ($osid,$type,$osname,$ospid,$osos,
+	       $osversion,$osdescription,$geni) = $result->fetchrow()) {
+	if ($typemap{$type}) {
+	    my $default = $typemap{$type}->{'OSID'};
+	    if ($geni eq 1 ||
+		(defined($default) && $default eq $osid)) {
+		push(@{ $typemap{$type}->{'OSLIST'} }, $osid);
+		$osid_name{$osid} = $osname;
+		$osid_pid{$osid} = $ospid;
+		$osid_os{$osid} = $osos;
+		$osid_version{$osid} = $osversion;
+		$osid_description{$osid} = $osdescription;
+	    }
+	}
+	if ($node_type_osids{$type}) {
+	    push @{$node_type_osids{$type}}, $osid;
+	} else {
+	    $node_type_osids{$type} = [$osid];
+	}
+	#
+	# We have to maintain a data structure telling us which types an OSID could
+	# be on for use below with generic OSIDs
+	#
+	if ($osid_node_types{$osid}) {
+	    push @{$osid_node_types{$osid}}, $type;
+	} else {
+	    $osid_node_types{$osid} = [$type];
+	}
     }
-    #
-    # We have to maintain a data structure telling us which types an OSID could
-    # be on for use below with generic OSIDs
-    #
-    if ($osid_node_types{$osid}) {
-	push @{$osid_node_types{$osid}}, $type;
+}
+#
+# XXX Note below that for now, subosids cannot redirect to other subosids.
+#
+$result = DBQueryFatal($subosidquery);
+while (my ($subosid,$osid) = $result->fetchrow()) {
+    if ($osid_subosids{$osid}) {
+	push @{$osid_subosids{$osid}}, $subosid;
     } else {
-	$osid_node_types{$osid} = [$type];
+	$osid_subosids{$osid} = [$subosid];
     }
 }
 
@@ -293,18 +520,38 @@ while (my ($osid) = $result->fetchrow()) {
 }
 
 # Print switches
-if (defined($switchtouse)) {
-    print "node $switchtouse switch:1 *lan:*\n";
+if (defined($switchtouse) && ! defined($component_name)) {
+    # Should probably get the last four args out of the database, but I don't
+    # think we ever actually use this case...
+    print_switch($switchtouse,undef,undef,undef,undef);
     $switches{$switchtouse} = 1;
 }
-else {
+elsif (! defined($component_name)) {
     $result =
-	DBQueryFatal("select node_id from nodes where role = \"testswitch\"");
+	DBQueryFatal("select n.node_id, n.uuid, country, latitude, longitude " .
+                     "from nodes as n left join widearea_nodeinfo as wn ".
+                     "  on n.node_id=wn.node_id " .
+		     "where role='testswitch' or role='widearea_switch'");
 
-    while (($switch) = $result->fetchrow_array) {
-	print "node $switch switch:1 *lan:*\n";
+    while (($switch, $uuid, $country, $latitude, $longitude) =
+            $result->fetchrow_array) {
+	print_switch($switch, $uuid, $country, $latitude, $longitude);
 	$switches{$switch} = 1;
     }
+}
+
+#
+# Get the global counts.
+#
+$result =
+    DBQueryFatal("select phys_nodeid,count(phys_nodeid) from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id ".
+		 "where n.node_id!=n.phys_nodeid ".
+		 (defined($exempt_eid) ?
+		  "and not (pid='$pid' and eid='$exempt_eid') " : " ") .
+		 "group by phys_nodeid");
+while (my ($node_id,$count) = $result->fetchrow_array) {
+    $globalcounts{$node_id} = $count;
 }
 
 # Find available nodes.
@@ -332,24 +579,75 @@ if (defined($exempt_eid)) {
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
 }
 
+# In shared mode, allow allocated nodes whose sharing_mode is set.
+if ($useshared) {
+    $free_condition = "($free_condition or ".
+	"(b.node_id is not null && b.erole='sharedhost' && ".
+	" np.eventstate='" . TBDB_NODESTATE_ISUP . "'))";
+}
+
 # If the user wants all nodes, we consider everything to be free (this
 # overrides the other possible free conditions
 if ($allnodes) {
     $free_condition = "1";
 }
 
+# By default, include no wide area nodes when setting up the data structures.
+#$free_condition = "($free_condition and ".
+#    "(t.isremotenode=0 or ".
+#    "dedicated_wa_types.attrvalue=1))";
+
+# But if they have asked for widearea, we want this prepass to include
+# these nodes.
+#if ($widearea) {
+#    $free_condition = "($free_condition or ".
+#	"(t.isremotenode=1 and ".
+#	"t.isvirtnode=0 and t.type!='pcfedphys' and ".
+#	"dedicated_wa_types.attrvalue is NULL))";
+#}
+
+
+# In genimode exclude nodes with exclusion attribute.
+if ($genimode ne $NO_GENI) {
+    $free_condition = "($free_condition and ".
+	"(nat1.attrvalue is null or nat1.attrvalue=0))";
+}
+
+if (defined($component_name)) {
+    $free_condition = "(a.node_id = \"$component_name\")";
+}
+
 $result =
     DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode," .
-		 "a.def_boot_osid, (b.pid is not null and b.eid is not null), " .
+		 "a.def_boot_osid,(b.pid is not null and b.eid is not null), ".
 		 "  np.reserved_pid is not null,np.eventstate, ".
-		 "  np.battery_percentage ".
+		 "  np.battery_percentage,np.uuid,b.sharing_mode, ".
+		 "  ru.load_1min, ru.load_5min, ru.status_timestamp, ".
+		 "  a.def_boot_osid, nat2.attrvalue, wn.country, " .
+                 "  wn.latitude, wn.longitude, t.isremotenode ".
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join nodes as np on a.phys_nodeid=np.node_id ".
 		 "left join node_types as t on t.type=a.type ".
+		 "left join node_attributes as nat1 on ".
+		 "     nat1.node_id=a.node_id and ".
+		 "     nat1.attrkey='protogeni_exclude' ".
+		 "left join node_attributes as nat2 on ".
+		 "     nat2.node_id=a.node_id and ".
+		 "     nat2.attrkey='shared_weight' ".
+		 "left join node_rusage as ru on ru.node_id=a.node_id ".
+		 "left outer join ". 
+		 "  (select type,attrvalue ".
+		 "   from node_type_attributes ".
+		 "   where attrkey='dedicated_widearea' ".
+		 "   group by type) as dedicated_wa_types ".
+		 "  on t.type=dedicated_wa_types.type ".
+                 "left join widearea_nodeinfo as wn on a.node_id=wn.node_id ".
 		 "where $free_condition and ".
-		 "      (a.role='testnode' and t.isremotenode=0)");
+#		 "      a.role='testnode'"
+		 "   (a.role='testnode' and (t.isremotenode=0 or ".
+		 "                           dedicated_wa_types.attrvalue=1))");
 
 #
 # Scan the results, checking permissions and adding to the list
@@ -358,13 +656,19 @@ $result =
 # the type/class of node.
 #
 while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
-	$prereserved,$eventstate,$battery_perc) = $result->fetchrow_array) {
+	$prereserved,$eventstate,$battery_perc,$uuid,$sharing_mode,
+	$load_1min,$load_5min,$load_tstamp,$osid,$weight,$country,$latitude,
+        $longitude,$isremote) = $result->fetchrow_array) {
+    my $current = $top->CreateNode($node);
+    $current->SetSubnode($physnode, $issubnode);
+    $current->SetRemote($isremote);
+
+#    next
+#	if ($isremote);
+
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
-    if ($issubnode) {
-	$subnode_of{$node} = $physnode;
-    }
     $node_def_boot_osid{$node} = $def_boot_osid;
 
     if ($reserved) {
@@ -372,11 +676,25 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
     } else {
 	$is_reserved{$node} = 0;
     }
+    if ($useshared && $sharing_mode) {
+	$sharing_mode{$node} = { "load_1min"   => $load_1min,
+				 "load_5min"   => $load_5min,
+				 "load_tstamp" => $load_tstamp,
+				 "osid"        => $osid,
+				 "weight"      => $weight};
+    }
+    else {
+	$sharing_mode{$node} = 0;
+    }
 
     $is_prereserved{$node} = $prereserved;
 
     $curr_state{$node} = $eventstate;
     $curr_batt{$node} = $battery_perc;
+
+    $node_countries{$node} = $country;
+    $node_latitudes{$node} = $latitude;
+    $node_longitudes{$node} = $longitude;
 }
 
 #
@@ -405,6 +723,12 @@ while (my ($node_id1, $node_id2) = $result->fetchrow()) {
 # Loop through and print out all nodes
 #
 foreach $node (keys(%nodes)) {
+    my $current = $top->nodes()->{$node};
+
+    # Wide area nodes are handled below
+#    next
+#	if ($current->is_remote());
+
     my $type  = $nodes{$node};
     my $class = $typemap{$type}->{'CLASS'};
     my $delay_capacity = $typemap{$type}->{'DELAYCAP'};
@@ -412,19 +736,22 @@ foreach $node (keys(%nodes)) {
     my $cpu_speed = $typemap{$type}->{'SPEED'};
     my $ram = $typemap{$type}->{'RAM'};
     my $trivspeed = $typemap{$type}->{'TRIVSPEED'};
+    my $uuid = $nodetouuid{$node};
     
     my @types = ("$type:1");
     my @features;
     my @flags;
     my $needvirtgoo = 0;
 
+    my ($latitude, $longitude, $country);
+
     # XXX temporary hack until node reboot avoidance 
     # is available. Nodes running the FBSD-NSE image
     # will have a feature def-osid-fbsd-nse 0.0
     # This is used by assign to prefer these pnodes
     # first before using others.
-    if( $node_def_boot_osid{$node} eq 
-	TBOSID(TB_OPSPID, "FBSD-NSE") ) { 
+    if($node_def_boot_osid{$node} && ($node_def_boot_osid{$node} eq 
+	TBOSID(TB_OPSPID, "FBSD-NSE"))) { 
 	push(@features, "FBSD-NSE:0.0");
     }
 
@@ -433,7 +760,7 @@ foreach $node (keys(%nodes)) {
 	push(@types, "$class:1");
     }
 
-    if ($delay_capacity > 0) {
+    if (defined($delay_capacity) && $delay_capacity > 0) {
 	# Comes from the NS file;
 	$delay_capacity = $delaycap_override
 	    if (defined($delaycap_override) &&
@@ -442,6 +769,63 @@ foreach $node (keys(%nodes)) {
 	
 	push @types, "delay:$delay_capacity";
 	push @types, "delay-${type}:$delay_capacity";
+    }
+
+    #
+    # Prototype shared mode.
+    #
+    if ($sharing_mode{$node}) {
+	#
+	# Add a feature that says this node should not be picked
+	# unless the cooresponding desire is in the vtop. This
+	# allows the node to be picked, subject to other type constraints.
+	#
+	push(@features, "pcshared:1.0");
+
+	#
+	# The pool daemon may override the share weight.
+	#
+	if (defined($sharing_mode{$node}->{"weight"})) {
+	    my $weight = $sharing_mode{$node}->{"weight"};
+	    
+	    push(@features, "shareweight:$weight");
+	}
+	else {
+	    #
+	    # The point of this feature is to have assign favor shared nodes
+	    # that already have nodes on them, so that they are well packed.
+	    # Shared nodes with just a few vnodes on them are avoided so that
+	    # they will free up eventually. 
+	    #
+	    my $maxvnodes = 10;
+	    my $weight    = 0.5;
+	    my $gcount    = $globalcounts{$node} || 0.0;
+
+	    foreach my $auxinfo (@{$auxtypes{$node}}) {
+		my ($auxtype,$count) = split(":", $auxinfo);
+		
+		if ($auxtype eq "pcvm") {
+		    $maxvnodes = $count;
+		    last;
+		}
+	    }
+	    #
+	    # No point in the feature if no room left. 
+	    #
+	    if ($maxvnodes > $gcount) {
+		my $factor = ($gcount / $maxvnodes);
+		if ($factor < 0.25) {
+		    $weight = 0.8;
+		}
+		elsif ($factor > 0.75) {
+		    $weight = 0.1;
+		}
+		else {
+		    $weight = 0.3;
+		}
+		#push(@features, "shareweight:$weight");
+	    }
+	}
     }
 
     #
@@ -462,14 +846,30 @@ foreach $node (keys(%nodes)) {
 	if ($typemap{$realtype}->{'ISVIRT'} && $count > 0) {
 	    next
 		if (! $virtstuff);
-		
+
+	    #
+	    # If the node is shared, must subtract the current global count
+	    # from the max first, to see if there is any room left.
+	    #
+	    if ($sharing_mode{$node} && exists($globalcounts{$node})) {
+		$count -= $globalcounts{$node};
+	    }
 	    if (defined($mfactor) && $mfactor <= $count) {
-		$auxinfo = "$auxtype:$mfactor";
+		$count = $mfactor;
 	    }
-	    else {
-		$auxinfo = "$auxtype:$count";
-	    }
+	    $auxinfo = "$auxtype:$count";
 	    $needvirtgoo = 1;
+
+	    #
+	    # Add in machine specific auxtypes that use the same count.
+	    #
+	    push(@types, "${type}-vm:$count");
+
+	    # And a legacy type.
+	    my $legacy_type = $type;
+	    if (($legacy_type =~ s/pc/pcvm/)) {
+		push(@types, "${legacy_type}:$count");
+	    }
 	}
 	push(@types, $auxinfo);
     }
@@ -499,7 +899,7 @@ foreach $node (keys(%nodes)) {
         }
     }
 
-    if ($simstuff && $simnode_capacity > 0) {
+    if ($simstuff && defined($simnode_capacity) && $simnode_capacity > 0) {
 	#
 	# Use user specified multiplex factor
 	#
@@ -530,11 +930,32 @@ foreach $node (keys(%nodes)) {
     }
 
     #
-    # Add in features for all of the OSes that this node (as evidenced by its
-    # type) can support
+    # Add in OS features.
     #
-    if ($node_type_osids{$type}) {
-	push @features, map "OS-$_:0", @{$node_type_osids{$type}};
+    if ($sharing_mode{$node}) {
+	#
+	# A shared node is running just one OS, and we put that in
+	# so that the user can specify which of the current VM types
+	# is wanted.
+	#
+	my $osid = $sharing_mode{$node}->{'osid'};
+	push(@features, "OS-$osid:0.5");
+	# Add any subOSes the shared node osid can support
+	if (defined($osid_subosids{$osid})) {
+	    push (@features, map "OS-$osid-$_:0", @{$osid_subosids{$osid}});
+	}
+    }
+    elsif ($node_type_osids{$type}) {
+	#
+	# Add in features for all of the OSes that this node (as
+	# evidenced by its type) can support
+	#
+	foreach my $o1 (@{$node_type_osids{$type}}) {
+	    push @features, "OS-$o1:0";
+	    foreach my $o2 (@{$osid_subosids{$o1}}) {
+		push @features, "OS-$o1-$o2:0";
+	    }
+	}
     }
     elsif (! $typemap{$type}->{'IMAGEABLE'} &&
 	   defined($typemap{$type}->{'OSID'})) {
@@ -586,24 +1007,44 @@ foreach $node (keys(%nodes)) {
     #
     # Handle subnodes
     #
-    if ($subnode_of{$node}) {
+    if ($current->is_subnode()) {
 	# We don't want to include subnodes unless their parent node is going
 	# to be in the ptop file too
-	if (!$nodes{$subnode_of{$node}}) {
+	if (!$nodes{$current->subnode_of()} ||
+	    $sharing_mode{$current->subnode_of()}) {
 	    # In fact, nuke it from %nodes so that we don't include its links,
 	    # either
 	    delete $nodes{$node};
 	    next;
 	}
 	# Push the subnode's information into its flags
-	push @flags, "subnode_of:$subnode_of{$node}";
+	push @flags, "subnode_of:" . $current->subnode_of();
     }
 
-    my $text = "node $node " . join(" ",@types) . " - " . join(" ",@features) .
-	" - " . join(" ",@flags);
+    #
+    # Handle node locations
+    #
+    $country = $node_countries{$node};
+    $latitude = $node_latitudes{$node};
+    $longitude = $node_longitudes{$node};
 
+    my @parse_features = split(" ", join(" ", @features));
+    print_node($node, \@types, \@parse_features, \@flags, $uuid,
+	       $nodetointerface{$node}, $country, $latitude, $longitude,
+	       $type);
+}
 
-    print "$text\n";
+my @inet_protos = ("ipv4");
+if (($widearea && ! defined($component_name)) || $genimode ne $NO_GENI) {
+    #
+    # Set up 'the Internet' as a fake switch that all widearea nodes can
+    # talk to.
+    # Some day, it may make sense to connect control net ports to this
+    # switch.
+    #
+    my @types = map("*$_:*", @inet_protos);
+    print_node($fake_inet_switch, \@types, [], [], undef, [], undef, undef,
+        undef, undef);
 }
 
 #
@@ -621,24 +1062,58 @@ foreach $node (keys(%nodes)) {
 # since that is where we define what vtypes are hosted on a particular
 # physnode. 
 #
-if ($widearea) {
+if ($widearea && ! defined($component_name)) {
+    #
+    # Note - there is currently an assumption in this query that widearea nodes
+    # have only one control interface.
+    #
     $result =
-	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site ".
+	DBQueryFatal("select n.node_id,nt.type,ns.status,r.pid,r.eid,wn.site,".
+                     "wn.country,wn.latitude,wn.longitude, ".
+                     "i.iface,wn.bwlimit,n.uuid ".
 		     "from nodes as n ".
 		     "left join node_types as nt on nt.type=n.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
 		     "left join node_status as ns on ns.node_id=n.node_id ".
 		     "left join widearea_nodeinfo as wn on ".
 		     "     wn.node_id=n.node_id ".
+		     "left join interfaces as i on ".
+		     "     n.node_id=i.node_id and ".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
+		     "left outer join ". 
+		     "  (select type,attrvalue ".
+		     "   from node_type_attributes ".
+		     "   where attrkey='dedicated_widearea' ".
+		     "   group by type) as dedicated_wa_types ".
+		     "  on nt.type=dedicated_wa_types.type ".
 		     "where  (n.role='testnode' and nt.isremotenode=1 and ".
-		     "        nt.isvirtnode=0)");
+		     "        nt.isvirtnode=0 and nt.type!='pcfedphys' and ".
+		     "        dedicated_wa_types.attrvalue is NULL)");
     
-    while (($physnode,$ptype,$status,$mpid,$meid,$site)
+    while (($physnode,$ptype,$status,$mpid,$meid,$site,$country,$latitude,
+            $longitude,$iface,$bwlimit,$uuid)
 	   = $result->fetchrow_array) {
+	my $current = $top->nodes()->{$physnode};
+
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
 	my @features;
 	my @flags;
+	my $maxvnodes;
+
+	#
+	# Grab the global allocation count of vnodes on this pnode (if there
+	# is one). This modifies the counts below.  If the count has already
+	# been reached, then do not put this node into the ptop file.
+	#
+	$maxvnodes =
+	    $typemap{$ptype}->{'TYPEINFO'}->GetAttribute("global_capacity");
+	
+	if (defined($maxvnodes) && exists($globalcounts{$physnode})) {
+	    $maxvnodes -= $globalcounts{$physnode};
+	    next
+		if ($maxvnodes <= 0);
+	}
 
 	#
 	# Mark any nodes that are not up with a feature, so that they won't
@@ -647,6 +1122,10 @@ if ($widearea) {
 	#
 	if (($status && ($status ne 'up')) ||
 	    ($mpid eq $DEADPID && $meid eq $DEADEID)) {
+	    # But not in genimode.
+	    next
+		if ($genimode ne $NO_GENI);
+	    
 	    push @features, "down:1";
 	}
 
@@ -662,6 +1141,9 @@ if ($widearea) {
 	#
 	foreach my $auxinfo (@{$auxtypes{$physnode}}) {
 	    my ($auxtype,$count) = split(":", $auxinfo);
+
+	    $count = $maxvnodes
+		if (defined($maxvnodes) && $maxvnodes < $count);
 
 	    if (defined($mfactor) && $mfactor <= $count) {
 		$auxinfo = "$auxtype:$mfactor";
@@ -692,21 +1174,49 @@ if ($widearea) {
 	    push @features, map "OS-$_:0", @{$node_type_osids{$ptype}};
 	}
 
-	my $text = "node $physnode " .
-	           join(" ",@types) . " - " . join(" ",@features) .
-		   " - " . join(" ",@flags);
+        #
+        # Put in a feature indicating whether or not this node has a bandwidth
+        # cap
+        #
+        if (!defined($bwlimit) || $bwlimit eq "-1") {
+	    push @features, "nobwlimit:0";
+        } else {
+	    push @features, "bwlimit:0";
+        }
 
-	print "$text\n";
+	print_node($physnode, \@types, \@features, \@flags, $uuid,
+		   $nodetointerface{$physnode},$country,$latitude,$longitude,
+		   undef);
+
+        #
+        # Print out a link to the 'internet'.
+        # Note - we make up a fake bandwidth. In the future, maybe we
+        # could put something real in there.
+        #
+        if ($iface && $genimode eq $NO_GENI) {
+	    print_simple_link($physnode, $iface,
+			      $fake_inet_switch, $fake_inet_iface,
+			      100000, 0, 0, @inet_protos);
+        }
+
+	# Insert into nodes array in case there are wires entries.
+	$nodes{$physnode} = $ptype;
     }
 }
 
-# Read interfaces
-$result = DBQueryFatal("SELECT node_id,card,port,iface,interface_type" .
-		     " from interfaces");
-while (($node,$card,$port,$iface,$type) = $result->fetchrow_array) {
-    $interfacemap{"$node:$card:$port"} = $iface;
-    if ((defined $type) && ($type ne "")) {
-	$interfacetypes{"$node:$card:$port"} = $type;
+if ($genimode ne $NO_GENI) {
+    foreach $key (keys %interfaceroles) {
+	if (is_public_interface($key)) {
+	    if ($key =~ /^([^:]+):([^:]+)$/) {
+		my $node = $1;
+		my $iface = $2;
+		if (defined($nodes{$node})) {
+		    print_simple_link($node, $iface,
+				      $fake_inet_switch, $fake_inet_iface,
+				      100000, 0, 0, @inet_protos);
+		}
+	    }
+	}
     }
 }
 
@@ -730,6 +1240,7 @@ while (($type,$capkey,$capval) = $result->fetchrow_array) {
 # Read interface switches
 $result = DBQueryFatal("SELECT node_id1, iface, node_id2 FROM wires AS w " .
 	"LEFT JOIN interfaces as i ON w.node_id1=i.node_id AND w.card1=i.card");
+
 while (($node,$iface,$switch) = $result->fetchrow_array) {
     if ($node && $iface) {
 	$interfaceswitches{"$node:$iface"} = $switch;
@@ -742,9 +1253,57 @@ $result = DBQueryFatal("SELECT node_id, iface, card, port, IP ".
 
 while (($node,$iface,$card,$port,$IP) = $result->fetchrow_array) {
     next
-	if ($prune && $is_reserved{$node} && (!defined($IP) || $IP eq ""));
+	if ($prune && $is_reserved{$node} && !$sharing_mode{$node} && 
+	    (!defined($IP) || $IP eq ""));
 
     $interfacecardports{"$node:$iface"} = [$card,$port];
+}
+
+# Read interface_state
+$result = DBQueryFatal("select * from interface_state");
+
+while (my $ref = $result->fetchrow_hashref()) {
+    my $node  = $ref->{'node_id'};
+    my $iface = $ref->{'iface'};
+    
+    $interfacestate{"$node:$iface"} = $ref;
+}
+
+#
+# Add back in the used shared bandwidth.
+#
+if (defined($experiment)) {
+    # Read the vinterfaces table to get any bandwidth in use by
+    # this experiment.
+    my $exptidx   = $experiment->idx();
+    my $pstateDir = $experiment->WorkDir() . "/pstate";
+
+    DBQueryFatal("create temporary table if not exists ".
+		 "vinterfaces_${exptidx} like vinterfaces");
+
+    DBQueryFatal("delete from vinterfaces_${exptidx}");
+    
+    DBQueryFatal("load data infile '$pstateDir/vinterfaces' ".
+		 "into table vinterfaces_${exptidx}")
+	    if (-e "$pstateDir/vinterfaces");
+    
+    $result = DBQueryFatal("select * from vinterfaces_$exptidx ".
+			   "where exptidx=$exptidx");
+
+    while (my $row = $result->fetchrow_hashref()) {
+	my $node      = $row->{'node_id'};
+	my $iface     = $row->{'iface'};
+	my $bandwidth = $row->{'bandwidth'};
+
+	next
+	    if (!defined($iface) || $bandwidth <= 0);
+	next
+	    if (!exists($interfacestate{"$node:$iface"}));
+
+	my $ref = $interfacestate{"$node:$iface"};
+	$ref->{'remaining_bandwidth'} =
+	    $ref->{'remaining_bandwidth'} + $bandwidth;
+    }
 }
 
 $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
@@ -752,20 +1311,62 @@ $result = DBQueryFatal("SELECT node_id1,card1,port1,node_id2,card2,port2" .
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $result->fetchrow_array) {
     if ((defined($nodes{$node1}) || defined($switches{$node1})) && 
-	(defined($nodes{$node2}) || defined($switches{$node2}))) {
+	(defined($nodes{$node2}) || defined($switches{$node2})) &&
+	! defined($component_name)) {
+
+	#
+	# When it is a node,switch link, the switch always used to be
+	# node2, but now switches are explicitly tagged. But we also
+	# have a node,node links and switch,switch links (trunks).
+	#
+	my $node1obj = Node->Lookup($node1);
+	if (!defined($node1obj)) {
+	    fatal("Could not lookup $node1");
+	}
+	my $node2obj = Node->Lookup($node2);
+	if (!defined($node2obj)) {
+	    fatal("Could not lookup $node2");
+	}
+	my $switchobj = ($node2obj->isswitch() ? $node2obj :
+			 ($node1obj->isswitch() ? $node1obj : undef));
+
+	# This comes from the switch info, unless its a direct link
+	# between two nodes; use ethernet in this case.
+	my $basetype;
+
+	if (!defined($switchobj)) {
+	    $basetype = "ethernet";
+	}
+	elsif ($switchobj->NodeTypeAttribute("forwarding_protocols",
+					     \$basetype) ||
+	       !defined($basetype) || $basetype eq "") {
+	    fatal("No forwarding_protocols set for $switchobj (type)");
+	}
 	$iface1 = get_iface($node1,$card1,$port1);
 	$iface2 = get_iface($node2,$card2,$port2);
-	$iface1bw = get_ifacebw($node1,$card1,$port1,"ethernet");
-	$iface2bw = get_ifacebw($node2,$card2,$port2,"ethernet");
+	$iface1bw = get_ifacebw($node1,$card1,$port1,$basetype);
+	$iface2bw = get_ifacebw($node2,$card2,$port2,$basetype);
 
-	next
-	    if (! exists($interfacecardports{"$node1:$iface1"}));
-	
-	# XXX - This is a bad, bad hack - we  use our knowledge that in the
-	# wires table links to the switch always come as node2. We also assume
-	# that node interfaces are plugged into switch ports of the same speed.
-	# Chris has something better on the way (storing the speed on the
-	# switch side), so this is just a temp. hack.
+        my @types = ($basetype);
+
+	#
+	# The pc side of any link must have an interfaces table,
+	# or else we just skip it. Typically, the switch side does
+	# not have entry, unless its a trunk like and we want it to
+	# go into the ptop file. 
+	#
+	if (!$node1obj->isswitch()) {
+	    next
+		if (! exists($interfacecardports{"$node1:$iface1"}));
+	}
+	if (!$node2obj->isswitch()) {
+	    next
+		if (! exists($interfacecardports{"$node2:$iface2"}));
+	}
+
+	#
+	# Determine the (maximum) supported bandwidth for the link.
+	#
 	if (!defined($switches{$node1}) && defined($switches{$node2})) {
 	    $bw = $iface1bw;
 	} else {
@@ -775,13 +1376,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 		$bw = $iface2bw;
 	    }
 	}
-	if (defined($switches{$node2})) {
-	    $used_switches{$node2} = 1;
-	}
-	if (defined($switches{$node1})) {
-	    $used_switches{$node1} = 1;
-	}
-	if (defined($switches{$node1}) && defined($switches{$node2})) {
+	if ($node1obj->isswitch() && $node2obj->isswitch()) {
 	    # interswitch link
 	    if (defined($interconnects{"$node1:$node2"})) {
 		$interconnects{"$node1:$node2"} += $bw;
@@ -789,10 +1384,36 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 		$interconnects{"$node1:$node2"} = new Math::BigInt $bw;
 	    }
 	} else {
-	    # !!! - Here we use our knowledge that in the wires table links
-	    # to the switch always come as node2.
-	    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
-		" $node2:$iface2 $bw 0 0 1 ethernet\n";
+	    #
+            # Node-to-switch link
+	    #
+	    # We used to hardwire in the knowledge that the switch is
+	    # always node2 in the wires table. Now, we actually mark
+	    # switches as being switches.
+	    #
+            # Come up with some other types for this link. The idea is
+            # that it allows people to ask for links to specific
+            # switches, specific interface types, etc.
+	    #
+	    push(@types, $basetype . "-" . $switchobj->node_id())
+		if (defined($switchobj));
+
+            if ($interfacetypes{"$node1:$card1:$port1"}) {
+                push @types, "$basetype-" .
+                    $interfacetypes{"$node1:$card1:$port1"};
+            }
+            push @types, "$basetype-$bw";
+
+	    if ($sharing_mode{$node1}) {
+		$bw =
+		    $interfacestate{"$node1:$iface1"}->{'remaining_bandwidth'};
+		next
+		    if ($bw == 0);
+	    }
+
+	    print_simple_link($node1, $iface1,
+			      $node2, $iface2,
+			      $bw, 0, 0, @types);
 	}
     } 
 }
@@ -805,18 +1426,32 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
     #
     # Get a list of all VLANs
     #
-    my $result = DBQueryFatal("SELECT virtual, members FROM vlans");
-    while (my ($virtual, $members) = $result->fetchrow()) {
-	#
-	# Split apart the space-separated list of members
-	#
-	my @members = split /\s+/, $members;
+    my @vlans;
+    if (VLan->AllVLans(\@vlans) != 0) {
+	die("*** $0:\n".
+	    "    Unable to load VLANs for all experiments\n");
+    }
+    foreach my $vlan (@vlans) {
+	my @members;
+
+	if ($vlan->MemberList(\@members) != 0) {
+	    die("*** $0:\n".
+		"    Unable to load members for $vlan\n");
+	}
 	my %switches = ();
 	foreach my $member (@members) {
-	    my ($node,$iface) = split /:/, $member;
-	    my $switch = get_ifaceswitch($node,$iface);
-	    my ($card, $port) = get_ifacecardport($node,$iface);
-	    my $bw = get_ifacebw($node,$card,$port,"ethernet");
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		die("*** $0:\n".
+		    "    Missing attributes for $member in $vlan\n");
+	    }
+	    my $nodeid = $node->node_id();
+	    
+	    my $switch = get_ifaceswitch($nodeid,$iface);
+	    my ($card, $port) = get_ifacecardport($nodeid,$iface);
+	    my $bw = get_ifacebw($nodeid,$card,$port,"ethernet");
 	    $switches{$switch} += $bw;
 	}
 
@@ -846,63 +1481,81 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
     }
 }
 
-foreach $interconnect (keys(%interconnects)) {
-    ($src,$dst) = split(":",$interconnect);
-    my $speed = $interconnects{$interconnect};
-    # This is really dumb - BigInts like to print out with a leading '+',
-    # which we don't want. Stript it off.
-    $speed =~ s/^\+|-//;
-    print "link link-$interconnect $src $dst $speed 0 0 1 ethernet\n";
+if (! defined($component_name)) {
+  # TODO: Figure out how to actually add interconnect interfaces rather than
+  #       just having them be (null).
+  foreach $interconnect (keys(%interconnects)) {
+      ($src,$dst) = split(":",$interconnect);
+      my $speed = $interconnects{$interconnect};
+      # This is really dumb - BigInts like to print out with a leading '+',
+      # which we don't want. Stript it off.
+      $speed =~ s/^\+|-//;
+      print_named_link("link-$interconnect",
+  		     $src, "(null)",
+		     $dst, "(null)",
+		     $speed, 0, 0, "ethernet");
+  }
 }
 
 #
 # Fake switch. Hardwired for now. 
 #
-my @wireless_protos = ("80211", "80211a", "80211b", "80211g");
-my $fake_switch = "airswitch";
-print "node $fake_switch ", join(" ",map("*$_:*",@wireless_protos)), "\n";
+my @wireless_protos = ("80211", "80211a", "80211b", "80211g", "flex900",
+		       "xcvr2450");
 
-foreach my $interface (keys(%interfacetypes)) {
-    my ($node,$card,$port) = split(":", $interface);
+my @fake_switch_types = map("*$_:*", @wireless_protos);
+if (! defined($component_name)) {
+  print_node($fake_air_switch, \@fake_switch_types, [], [], undef,
+	     [], undef, undef, undef, undef);
 
-    next
-    if (!defined($nodes{$node}));
-	
-    my $type    = $interfacetypes{$interface};
-    my @protos  = @{ $interfaceprotocols{$type} };
-    my $iface   = get_iface($node,$card,$port);
+  foreach my $interface (keys(%interfacetypes)) {
+      my ($node,$card,$port) = split(":", $interface);
+      
+      next
+	  if (!defined($nodes{$node}));;
+      
+      my $type    = $interfacetypes{$interface};
+      
+      next
+	  if (!defined($interfaceprotocols{$type}));
+      
+      my @protos  = @{ $interfaceprotocols{$type} };
+      my $iface   = get_iface($node,$card,$port);
 
-    #
-    # Get the intersection of the protocols supported by this interface, and
-    # the wireless protocols we know about
-    #
-    my (%union, %intersection);
-    foreach $proto (@protos, @wireless_protos) {
-	$union{$proto}++ && $intersection{$proto}++;
-    }
+      #
+      # Get the intersection of the protocols supported by this interface, and
+      # the wireless protocols we know about
+      #
+      my (%union, %intersection);
+      foreach $proto (@protos, @wireless_protos) {
+	  $union{$proto}++ && $intersection{$proto}++;
+      }
+      
+      my @intersection = keys %intersection;
 
-    my @intersection = keys %intersection;
-
-    #
-    # Skip this interface if it speaks no wireless protocols
-    #
-    next unless @intersection;
-
-    #
-    # Find the max bandwidth supported by any of the wireless protocols
-    # supported by this interface
-    #
-    my $max_bw = 0;
-    foreach my $proto (@intersection) {
-	my $ifacebw = get_ifacebw($node,$card,$port,$proto);
-	if ($ifacebw > $max_bw) {
-	    $max_bw = $ifacebw;
-	}
-    }
-    print "link link-$node:$iface-$fake_switch:(null) ".
-	"$node:$node/$iface $fake_switch:(null) $max_bw 0 0 1 ".
-	join(" ",@intersection). "\n";
+      #
+      # Skip this interface if it speaks no wireless protocols
+      #
+      next unless @intersection;
+      
+      #
+      # Find the max bandwidth supported by any of the wireless protocols
+      # supported by this interface
+      #
+      my $max_bw = 0;
+      foreach my $proto (@intersection) {
+	  my $ifacebw = get_ifacebw($node,$card,$port,$proto);
+	  if ($ifacebw > $max_bw) {
+	      $max_bw = $ifacebw;
+	  }
+      }
+      print_simple_link($node, $iface,
+			$fake_air_switch, $fake_air_iface,
+			$max_bw, 0, 0, @intersection);
+  }
 }
+
+print_footer();
 
 exit(0);
 
@@ -931,11 +1584,10 @@ sub get_iface {
 sub get_ifacebw {
     ($node,$card,$port,$protocol) = @_;
     if (defined($interfacetypes{"$node:$card:$port"})) {
-	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}}{$protocol};
+	my $bw = $interfacespeeds{$interfacetypes{"$node:$card:$port"}}{$protocol};
+	return $bw if defined( $bw );
     }
-    else {
-	return $default_switchport_speed;
-    }
+    return $default_switchport_speed;
 }
 
 sub get_ifaceswitch {
@@ -954,4 +1606,519 @@ sub get_ifacecardport {
     } else {
 	return ();
     }
+}
+
+######################################################################
+# Functions for printing XML
+######################################################################
+
+sub print_header {
+    if ($do_xml) {
+	if ($genimode eq $NO_GENI) {
+	    print "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	    print "<ptop testbed=\"@THISHOMEBASE@\" "
+		. "xmlns=\"http://emulab.net/resources/ptop/0.1\">\n";
+	} else {
+	    print "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	    print "<rspec ";
+	    print "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ";
+	    my $ns = "";
+	    my $url = "";
+	    if ($genimode eq $V_0_1) {
+		$ns = "http://www.protogeni.net/resources/rspec/0.1";
+		$url = "http://www.protogeni.net/resources/rspec/0.1/ad.xsd";
+	    } elsif ($genimode eq $V_0_2) {
+		$ns = "http://www.protogeni.net/resources/rspec/0.2";
+		$url = "http://www.protogeni.net/resources/rspec/0.2/ad.xsd";
+	    } elsif ($genimode eq $V_2) {
+		$ns = "http://www.protogeni.net/resources/rspec/2";
+		$url = "http://www.protogeni.net/resources/rspec/2/ad.xsd";
+	    }
+	    print "xmlns=\"$ns\" ";
+	    print "xsi:schemaLocation=\"$ns $url\" ";
+	    print "type=\"advertisement\" ";
+	    my @times = gmtime(time());
+	    printf("generated=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
+		   $times[5] + 1900, $times[4] + 1, $times[3],
+		   $times[2], $times[1], $times[0]);
+	    printf("valid_until=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
+		   $times[5] + 1900, $times[4] + 1, $times[3],
+		   $times[2], $times[1], $times[0]);
+	    print ">\n";
+	}
+    }
+}
+
+sub print_footer {
+    if ($do_xml && $genimode eq $NO_GENI) {
+	print "</ptop>\n";
+    } elsif ($do_xml && $genimode ne $NO_GENI) {
+	print "</rspec>\n";
+    }
+}
+
+# Special print function for switches.
+sub print_switch
+{
+    my $name = shift(@_);
+    my $uuid = shift(@_);
+    my $country = shift(@_);
+    my $latitude = shift(@_);
+    my $longitude = shift(@_);
+    my $interfaces = [];
+    if ($do_xml && $genimode ne $NO_GENI)
+    {
+	push @$interfaces, "(null)";
+    }
+    # XXX - local hack for Utah - don't allow our 'hub' switch to be host for
+    # LAN nodes, which encourages the placement of all LAN members on the same
+    # switch
+    my $types = ["switch:1"];
+    if (!(defined($MAINSITE) && $MAINSITE && $name eq "procurve1")) {
+	push(@$types, "*lan:*");
+    }
+    print_node($name, $types, [], [], $uuid, $interfaces,
+        $country, $latitude, $longitude, undef);
+}
+
+sub print_node
+{
+    my $name = shift(@_);
+    my $types = shift(@_);
+    my $features = shift(@_);
+    my $flags = shift(@_);
+    my $uuid = shift(@_);
+    my $interfaces = shift(@_);
+    my $country = shift(@_);
+    my $lat = shift(@_);
+    my $long = shift(@_);
+    my $mainType = shift(@_);
+    if (! defined($lat) || ! defined($long)) {
+	$lat = $default_lat;
+	$long = $default_long;
+    }
+    if (! defined($country)) {
+	$country = $default_country;
+    }
+    if (!$do_xml) {
+	my $text = "node $name " .
+	    join(" ", @$types) . " - " . join(" ", @$features) .
+		" - " . join(" ", @$flags);
+	print "$text\n";
+    } elsif ($genimode ne $NO_GENI) {
+	# rspec format
+	my $exclusive = "true";
+	if ($sharing_mode{$name}) {
+	    $exclusive = "false";
+	}
+	print "<node ";
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print "component_manager_uuid=\"$cmurn\" ";
+	} elsif ($genimode eq $V_2) {
+	    print "component_manager_id=\"$cmurn\" ";
+	}
+	print "component_name=\"$name\" ";
+	my $urn = GeniHRN::Generate($OURDOMAIN, "node", $name);
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print " component_uuid=\"$urn\" ";
+	} elsif ($genimode eq $V_2) {
+	    print " component_id=\"$urn\" ";
+	}
+	if ($genimode eq $V_2) {
+	    print " exclusive=\"$exclusive\" ";
+	}
+	print ">\n";
+	if (defined($mainType) && $genimode eq $V_0_2) {
+	    print_osids($mainType);
+	}
+	print_node_types(@$types);
+	my $avail = "false";
+	if ($nodetoavailable{$name}
+	    || $name eq $fake_inet_switch
+	    || $name eq $fake_air_switch) {
+	    $avail = "true";
+	}
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2)
+	{
+	    print "  <available>$avail</available>\n";
+	} elsif ($genimode eq $V_2)
+	{
+	    print "  <available now=\"$avail\" />\n";
+	}
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print "  <exclusive>$exclusive</exclusive>\n";
+	}
+	if ($name eq $fake_inet_switch)
+	{
+	    print "  <cloud />\n";
+	    print_node_interfaces($name, $fake_inet_iface);
+	} elsif ($name eq $fake_air_switch) {
+	    print "  <cloud />\n";
+	    print_node_interfaces($name, $fake_air_iface);
+	}
+        if (defined($lat) && defined($long)) {
+            # TODO: May not be a good default for country
+            if (!defined($country) || $country eq "") {
+                $country = "US";
+            }
+            print "  <location country=\"$country\" longitude=\"$long\" " .
+                  "latitude=\"$lat\" />\n";
+        }
+	print_node_flags(@$flags);
+	print_node_interfaces($name, @$interfaces);
+	print "</node>\n";
+    } else {
+	# ptop format
+	print "<node name=\"$name\"";
+	print ">\n";
+	print_node_types(@$types);
+	print_node_flags(@$flags);
+	print_node_features(@$features);
+	print "</node>\n";
+    }
+}
+
+# Print osids
+sub print_osids
+{
+    my ($type) = @_;
+    my @osids = @{ $typemap{$type}->{'OSLIST'} };
+    my $default = $typemap{$type}->{'OSID'};
+    foreach $os (@osids) {
+	my $urn = GeniHRN::Generate($OURDOMAIN, "image",
+				    $osid_pid{$os} . "//" . $osid_name{$os});
+	print "<disk_image ";
+	print "name=\"" . $urn . "\" ";
+	print "os=\"" . $osid_os{$os} . "\" ";
+	print "version=\"" . $osid_version{$os} . "\" ";
+	print "description=\"" . $osid_description{$os} . "\" ";
+	if ($os eq $default) {
+	    print "default=\"true\" ";
+	}
+	print "/>\n";
+    }
+}
+
+# The order print_node_types(), print_node_features(),
+# print_node_flags() must always be observed lest we break the schema.
+sub print_node_types
+{
+    my $i = 0;
+    for (; $i < scalar(@_); ++$i) {
+	my ($name, $count) = split(/:/, $_[$i], 2);
+	my $is_static = 0;
+	if ($name =~ /^\*/) {
+	    $name = substr($name, 1);
+	    $is_static = 1;
+	}
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print "  <node_type \n";
+	    print "    type_name=\"$name\"\n";
+	    if ($count eq "*") {
+		print "    type_slots=\"unlimited\"\n";
+	    } else {
+		print "    type_slots=\"$count\"\n";
+	    }
+	    if ($is_static) {
+		print "    static=\"true\"\n";
+	    }
+	    print "  />\n";
+	} elsif ($genimode eq $V_2) {
+	    if ($name eq "pc") {
+		print "  <sliver_type name=\"raw-pc\" />\n";
+	    }
+	    if ($name eq "pcvm") {
+		print "  <sliver_type name=\"openvz\" />\n";
+	    }
+	    print "  <hardware_type name=\"$name\" />\n";
+	}
+    }
+}
+
+sub print_node_features
+{
+    my $i = 0;
+    for (; $i < scalar(@_); ++$i) {
+	my ($name, $value) = split(/:/, $_[$i], 2);
+	my $flags = "    ";
+	if ($value >= 1.0) {
+	    $flags .= " violatable=\"true\" ";
+	}
+	if ($name =~ /^\?\+/) {
+	    $flags .= " local_operator=\"+\" ";
+	    $name = substr($name, 2);
+	}
+	elsif ($name =~ /^\*&/) {
+	    $flags .= " global_operator=\"FirstFree\" ";
+	    $name = substr($name, 2);
+	}
+	elsif ($name =~ /^\*!/) {
+	    $flags .= " global_operator=\"OnceOnly\" ";
+	    $name = substr($name, 2);
+	}
+	print "  <fd \n";
+	print "     fd_name=\"$name\" \n";
+	print "     fd_weight=\"$value\" \n";
+	if ($flags ne "    ") {
+	    print $flags."\n";
+	}
+	print "  />\n";
+    }
+}
+
+sub print_node_flags
+{
+    my $i = 0;
+    for (; $i < scalar(@_); ++$i) {
+	my ($name, $value) = split(/:/, $_[$i], 2);
+	if ($name eq "trivial_bw" && $genimode eq $NO_GENI) {
+	    print "  <trivial_bandwidth>$value</trivial_bandwidth>\n";
+	}
+	elsif ($name eq "subnode_of") {
+	    if ($genimode ne $NO_GENI) {
+		$value = GeniHRN::Generate($OURDOMAIN, "node", $value);
+	    }
+	    if ($genimode eq $V_2) {
+		print "  <relation type=\"subnode_of\" ";
+		print "component_id=\"$value\" />\n";
+	    } else {
+		print "  <subnode_of>$value</subnode_of>\n";
+	    }
+	}
+	elsif ($name eq "unique" && $genimode eq $NO_GENI) {
+	    print "  <unique/>\n";
+	}
+	elsif ($name eq "disallow_trivial_mix" && $genimode eq $NO_GENI) {
+	    print "  <disallow_trivial_mix/>\n";
+	}
+    }
+}
+
+sub make_ip
+{
+    my $in = shift(@_);
+    my @octets = split(/\./, $in);
+    my $result = 0;
+    my $i = 0;
+    for (; $i < scalar(@octets); ++$i) {
+	$result = (($result << 8) | $octets[$i]);
+    }
+    return $result;
+}
+
+sub is_routable
+{
+    my @privateIps   = (make_ip("10.0.0.0"), make_ip("172.16.0.0"),
+			make_ip("192.168.0.0"));
+    my @privateMasks = (8, 12, 16);
+
+    my $in = shift(@_);
+    my $result = 0;
+    if (defined($in) && $in =~ /\d+\.\d+\.\d+\.\d+/) {
+	$result = 1;
+	my $ip = make_ip($in);
+	my $i = 0;
+	for ($i = 0; $i < scalar(@privateIps); ++$i) {
+	    my $mask = (0xffffffff << (32 - $privateMasks[$i]));
+	    if (($ip & $mask) == ($privateIps[$i] & $mask)) {
+		$result = 0;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub is_public_interface
+{
+    my $key = shift(@_);
+    my $result = 0;
+    if (exists($interfaceroles{$key})
+	&& exists($interfaceips{$key})) {
+	if ($interfaceroles{$key} eq "ctrl"
+	    && is_routable($interfaceips{$key})) {
+	    $result = 1;
+	}
+    }
+    return $result;
+}
+
+sub print_node_interfaces
+{
+    my $nodeName = shift(@_);
+    my @interfaces = @_;
+    my $i = 0;
+    for (; $i < scalar(@interfaces); ++$i) {
+	my $name = $interfaces[$i];
+	my $urn = GeniHRN::GenerateInterface($OURDOMAIN, $nodeName, $name);
+	print "  <interface component_id=\"$urn\" ";
+	if (exists($interfaceroles{"$nodeName:$name"})) {
+	    my $roleString = $interfaceroles{"$nodeName:$name"};
+	    if ($roleString eq "ctrl") {
+		print "role=\"control\" ";
+	    } elsif ($roleString eq "expt") {
+		print "role=\"experimental\" ";
+	    }
+	}
+	if (is_public_interface("$nodeName:$name")) {
+	    my $ip = $interfaceips{"$nodeName:$name"};
+	    print "public_ipv4=\"$ip\" ";
+	}
+	print "/>\n";
+    }
+}
+
+sub print_named_link_ptop
+{
+    my $name = shift(@_);
+    my $source = shift(@_);
+    my $source_if = shift(@_);
+    my $dest = shift(@_);
+    my $dest_if = shift(@_);
+    my $bw = shift(@_);
+    my $delay = shift(@_);
+    my $loss = shift(@_);
+    my $proto_count = scalar(@_);
+
+    my $source_full = "$source:$source/$source_if";
+    # Not sure about (null) stuff ... 
+    my $dest_full = "$dest:" .
+	(($dest_if eq "(null)") ? "$dest_if" : "$dest/$dest_if");
+    if ($source =~ /cisco/ && $dest =~ /cisco/)
+    {
+	$source_full = $source;
+	$dest_full = $dest;
+    }
+    print "link $name $source_full "
+	. "$dest_full $bw $delay $loss 1 " . join(" ", @_) . "\n";
+}
+
+sub print_named_link_xml
+{
+    my $name = shift(@_);
+    my $source = shift(@_);
+    my $source_if = shift(@_);
+    my $dest = shift(@_);
+    my $dest_if = shift(@_);
+    my $bw = shift(@_);
+    my $delay = shift(@_);
+    my $loss = shift(@_);
+    my $proto_count = scalar(@_);
+    if ($genimode ne $NO_GENI) {
+	print "<link ";
+	my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "sa");
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print "component_manager_uuid=\"$cmurn\" ";
+	} elsif ($genimode eq $V_2) {
+	    print "component_manager_id=\"$cmurn\" ";
+	}
+	print "component_name=\"$name\" ";
+	my $urn = GeniHRN::Generate($OURDOMAIN, "link", $name);
+	if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print "component_uuid=\"$urn\" ";
+	} elsif ($genimode eq $V_2) {
+	    print "component_id=\"$urn\" ";
+	}
+	print ">\n";
+	print_interface($source, $source_if);
+	print_interface($dest, $dest_if);
+    } else {
+	print "<link name=\"$name\">\n";
+	print "  <source_interface><interface>\n";
+	print_interface_contents($source, $source_if);
+	print "  </interface></source_interface>\n";
+	print "  <destination_interface><interface>\n";
+	print_interface_contents($dest, $dest_if);
+	print "  </interface></destination_interface>\n";
+    }
+    if ($genimode eq $NO_GENI || $genimode eq $V_0_1 || $genimode eq $V_0_2)
+    {
+	print "  <bandwidth>$bw</bandwidth>\n";
+	print "  <latency>$delay</latency>\n";
+	print "  <packet_loss>$loss</packet_loss>\n";
+    } elsif ($genimode eq $V_2) {
+	print_property($source, $source_if, $dest, $dest_if,
+		       $bw, $delay, $loss);
+	print_property($dest, $dest_if, $source, $source_if,
+		       $bw, $delay, $loss);
+    }
+    my $i = 0;
+    for (; $i < $proto_count; ++$i) {
+	if ($genimode eq $NO_GENI) {
+	    print "  <link_type><type_name>" . $_[$i]
+		. "</type_name></link_type>\n";
+	} elsif ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	    print "  <link_type type_name=\"" . $_[$i] . "\" />\n";
+	} elsif ($genimode eq $V_2) {
+	    print "  <link_type name=\"" . $_[$i] . "\" />\n";
+	}
+    }
+    print "</link>\n\n";
+}
+
+sub print_interface
+{
+    my $node = shift(@_);
+    my $interface = shift(@_);
+    print "  <interface_ref ";
+    my $nodeUrn = GeniHRN::Generate($OURDOMAIN, "node", $node);
+    my $interfaceUrn = GeniHRN::GenerateInterface($OURDOMAIN, $node,
+						  $interface);
+    if ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
+	print "component_node_uuid=\"$nodeUrn\" ";
+	print "component_interface_id=\"" . $interfaceUrn . "\"";
+    } elsif ($genimode eq $V_2) {
+	print "component_id=\"$interfaceUrn\"";
+    }
+    print "/>\n";
+}
+
+sub print_property
+{
+    my ($source, $source_if, $dest, $dest_if, $bw, $delay, $loss) = @_;
+    my $source_urn = GeniHRN::GenerateInterface($OURDOMAIN, $source,
+						$source_if);
+    my $dest_urn = GeniHRN::GenerateInterface($OURDOMAIN, $dest, $dest_if);
+    print "<property source_id=\"$source_urn\" dest_id=\"$dest_urn\" ";
+    print " capacity=\"$bw\" latency=\"$delay\" packet_loss=\"$loss\" />\n";
+}
+
+sub print_interface_contents
+{
+    my $node = shift(@_);
+    my $interface = shift(@_);
+    print "    <node_name>$node</node_name>\n";
+    print "    <interface_name>$interface</interface_name>\n";
+}
+
+# Print a link with a unique name not necessarily related to source,
+# dest, source_if, and dest_if.
+sub print_named_link
+{
+    if (!$do_xml) {
+	print_named_link_ptop(@_);
+    } elsif ($do_xml) {
+	print_named_link_xml(@_);
+    }
+}
+
+# Print a link where the name is just a recapitulation of the source
+# and destination node and interface names.
+sub print_simple_link
+{
+    print_named_link("link-".$_[0].":".$_[1]."-".$_[2].":".$_[3], @_);
+}
+
+sub print_type_relation
+{
+    my $type = shift(@_);
+    my $osids = @_;
+}
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
 }

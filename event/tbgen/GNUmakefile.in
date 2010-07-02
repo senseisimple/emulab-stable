@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,23 +32,31 @@ $(LIBEVENTDIR)/%.a:
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS   += -I/usr/local/include
 
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent -lcrypto
-LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+LIBS     += -lm -L/usr/local/lib -lpubsub 
+LDFLAGS  += $(LDSTATIC)
 
-ifeq ($(host_cpu),arm)
-else
-LDFLAGS  += -static
+# Deal with the presence/absence of kerberos in the linux ssl library
 ifeq ($(SYSTEM),Linux)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
-ifeq ($(NEEDKERB),0)
- CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
- LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NOKERB := 1
 endif
-LIBS     += -ldl
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
 endif
+endif
+endif
+
+ifeq ($(SYSTEM),Linux)
+LIBS     += -ldl -lz
 endif
 
 # Link against some of the object files from libtb, instead of the
@@ -60,14 +68,14 @@ tevc-debug:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o ../lib/libevent.a ../l
 install:	$(INSTALL_BINDIR)/tevc \
 		$(INSTALL_DIR)/opsdir/bin/tevc
 
-control-install:	$(INSTALL_BINDIR)/tevc
+control-install:	all $(INSTALL_BINDIR)/tevc
 
 client: tevc
 client-install: client
 	$(INSTALL_PROGRAM) tevc$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/tevc$(EXE)
 
 clean:
-	rm -f *.o $(PROGRAMS)
+	rm -f *.o $(PROGRAMS) *-debug
 
 $(INSTALL_DIR)/opsdir/bin/%: %
 	@echo "Installing $<"

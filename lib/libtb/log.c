@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -21,9 +21,12 @@
 
 static int	usesyslog = 0;
 static char    *filename;
+#define LOG_IDENT   "Testbed"
 
 /*
- * Init.
+ * Initialize.  If slog is non-zero use syslog with name (if provided)
+ * as the identifier.  If slog is zero, then name (if set) is the name of
+ * a logfile to which stdout and stderr are redirected.
  */
 int
 loginit(int slog, char *name)
@@ -31,7 +34,7 @@ loginit(int slog, char *name)
 	if (slog) {
 		usesyslog = 1;
 		if (! name)
-			name = "Testbed";
+			name = LOG_IDENT;
 		openlog(name, LOG_PID, LOG_TESTBED);
 		return 0;
 	}
@@ -41,7 +44,7 @@ loginit(int slog, char *name)
 	if (name) {
 		int	fd;
 
-		if ((fd = open(name, O_RDWR|O_CREAT|O_APPEND, 0640)) != -1) {
+		if ((fd = open(name, O_RDWR|O_CREAT|O_APPEND, 0644)) != -1) {
 			(void)dup2(fd, STDOUT_FILENO);
 			(void)dup2(fd, STDERR_FILENO);
 			if (fd > 2)
@@ -59,6 +62,16 @@ void
 logsyslog(void)
 {
 	usesyslog = 1;
+}
+
+/*
+ * Flush any buffered log output
+ */
+void
+logflush(void)
+{
+	if (!usesyslog)
+		fflush(stderr);
 }
 
 void

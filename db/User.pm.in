@@ -1,0 +1,1826 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package User;
+
+use strict;
+use Exporter;
+use vars qw(@ISA);
+@ISA    = "Exporter";
+
+use libdb;
+use libtestbed;
+use English;
+use Data::Dumper;
+use File::Basename;
+use overload ('""' => 'Stringify');
+use Project;
+use vars qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
+	    $NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
+	    $NEWUSER_FLAGS_NOUUID
+	    $USERSTATUS_ACTIVE $USERSTATUS_FROZEN
+	    $USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
+	    $USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED
+	    @EXPORT_OK);
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $TBBASE         = "@TBBASE@";
+my $TBWWW          = "@TBWWW@";
+my $WIKISUPPORT    = @WIKISUPPORT@;
+my $BOSSNODE       = "@BOSSNODE@";
+my $CONTROL	   = "@USERNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $MIN_UNIX_UID   = @MIN_UNIX_UID@;
+my $MIN_UNIX_GID   = @MIN_UNIX_GID@;
+my $tbacct	   = "$TB/sbin/tbacct";
+
+# Create() flags.
+$NEWUSER_FLAGS_PROJLEADER	= 0x01;
+$NEWUSER_FLAGS_WIKIONLY		= 0x02;
+$NEWUSER_FLAGS_WEBONLY		= 0x04;
+$NEWUSER_FLAGS_ARCHIVED		= 0x08;
+$NEWUSER_FLAGS_NOUUID		= 0x80;
+
+# Status values.
+$USERSTATUS_ACTIVE		= "active";
+$USERSTATUS_FROZEN		= "frozen";
+$USERSTATUS_UNAPPROVED		= "unapproved";
+$USERSTATUS_UNVERIFIED		= "unverified";
+$USERSTATUS_NEWUSER	        = "newuser";
+$USERSTATUS_ARCHIVED	        = "archived";
+
+# Why, why, why?
+@EXPORT_OK = qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
+		$NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
+		$NEWUSER_FLAGS_NOUUID
+		$USERSTATUS_ACTIVE $USERSTATUS_FROZEN
+		$USERSTATUS_UNAPPROVED $USERSTATUS_UNVERIFIED
+		$USERSTATUS_NEWUSER $USERSTATUS_ARCHIVED);
+
+# Protos
+sub SetUserInterface($$);
+sub escapeshellarg($);
+
+# Cache of instances to avoid regenerating them.
+my %users      = ();
+my $debug      = 0;
+
+# Little helper and debug function.
+sub mysystem($)
+{
+    my ($command) = @_;
+
+    print STDERR "Running '$command'\n"
+	if ($debug);
+    return system($command);
+}
+
+#
+# Lookup by idx.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $status_archived = $USERSTATUS_ARCHIVED;
+    my $query_result;
+
+    # Look in cache first
+    return $users{"$token"}
+        if (exists($users{"$token"}));
+
+    #
+    # For backwards compatability, look to see if the token is numeric
+    # or alphanumeric. If numeric, assumes its an idx, otherwise a name.
+    #
+    if ($token =~ /^\d+$/) {
+	$query_result =
+	    DBQueryWarn("select * from users where uid_idx='$token'");
+    }
+    elsif ($token =~ /^\w+$/) {
+	# When looking up by uid, only look for non-archived users;
+	# Must use an idx if you really want an archived user. This
+	# will prevent problems with code that has not yet been
+	# changed to use the idx field.
+	$query_result =
+	    DBQueryWarn("select * from users ".
+			"where uid='$token' and status!='$status_archived'");
+    }
+    else {
+	return undef;
+    }
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self         = {};
+    $self->{'USER'}  = $query_result->fetchrow_hashref();
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $users{$self->{'USER'}->{'uid_idx'}} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
+sub uid_idx($)		{ return field($_[0], "uid_idx"); }
+sub dbid($)		{ return field($_[0], "uid_idx"); }
+sub uid($)		{ return field($_[0], "uid"); }
+sub uuid($)		{ return field($_[0], "uid_uuid"); }
+sub created($)		{ return field($_[0], "usr_created"); }
+sub expires($)		{ return field($_[0], "usr_expires"); }
+sub modified($)		{ return field($_[0], "usr_modified"); }
+sub name($)		{ return field($_[0], "usr_name"); }
+sub title($)		{ return field($_[0], "usr_title"); }
+sub affil($)		{ return field($_[0], "usr_affil"); }
+sub affil_abbrev($)	{ return field($_[0], "usr_affil_abbrev"); }
+sub email($)		{ return field($_[0], "usr_email"); }
+sub URL($)		{ return field($_[0], "usr_URL"); }
+sub addr($)		{ return field($_[0], "usr_addr"); }
+sub addr2($)		{ return field($_[0], "usr_addr2"); }
+sub city($)		{ return field($_[0], "usr_city"); }
+sub state($)		{ return field($_[0], "usr_state"); }
+sub zip($)		{ return field($_[0], "usr_zip"); }
+sub country($)		{ return field($_[0], "usr_country"); }
+sub phone($)		{ return field($_[0], "usr_phone"); }
+sub shell($)		{ return field($_[0], "usr_shell"); }
+sub pswd($)		{ return field($_[0], "usr_pswd"); }
+sub w_pswd($)		{ return field($_[0], "usr_w_pswd"); }
+sub unix_uid($)		{ return field($_[0], "unix_uid"); }
+sub status($)		{ return field($_[0], "status"); }
+sub admin($)		{ return field($_[0], "admin"); }
+sub foreign_admin($)	{ return field($_[0], "foreign_admin"); }
+sub dbedit($)		{ return field($_[0], "dbedit"); }
+sub stud($)		{ return field($_[0], "stud"); }
+sub webonly($)		{ return field($_[0], "webonly"); }
+sub pswd_expires($)	{ return field($_[0], "pswd_expires"); }
+sub cvsweb($)		{ return field($_[0], "cvsweb"); }
+sub emulab_pubkey($)	{ return field($_[0], "emulab_pubkey"); }
+sub home_pubkey($)	{ return field($_[0], "home_pubkey"); }
+sub adminoff($)		{ return field($_[0], "adminoff"); }
+sub verify_key($)	{ return field($_[0], "verify_key"); }
+sub widearearoot($)	{ return field($_[0], "widearearoot"); }
+sub wideareajailroot($) { return field($_[0], "wideareajailroot"); }
+sub notes($)		{ return field($_[0], "notes"); }
+sub weblogin_frozen($)  { return field($_[0], "weblogin_frozen"); }
+sub weblogin_failcount($){return field($_[0], "weblogin_failcount");}
+sub weblogin_failstamp($){return field($_[0], "weblogin_failstamp");}
+sub plab_user($)	{ return field($_[0], "plab_user"); }
+sub user_interface($)	{ return field($_[0], "user_interface"); }
+sub chpasswd_key($)	{ return field($_[0], "chpasswd_key"); }
+sub chpasswd_expires($) { return field($_[0], "chpasswd_expires"); }
+sub wikiname($)		{ return field($_[0], "wikiname"); }
+sub wikionly($)		{ return field($_[0], "wikionly"); }
+sub mailman_password($) { return field($_[0], "mailman_password"); }
+
+# Temporary data storage ... useful.
+sub GetTempData($$) { return field($_[0], "tempdata"); } 
+sub SetTempData($$) {
+
+    my ($self, $value) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $self->{'USER'}->{"tempdata"} = $value;
+
+    return 0;
+}
+
+#
+# Lookup user given a plain uid. For backwards compat.
+#
+sub LookupByUid($$)
+{
+    my ($class, $uid) = @_;
+
+    return User->Lookup($uid);
+}
+
+# Include archived users, as for checking a newuser account.
+sub LookupByUidAll($$)
+{
+    my ($class, $uid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users where uid='$uid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given the unix uid ($UID typically).
+#
+sub LookupByUnixId($$)
+{
+    my ($class, $unix_uid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select uid,uid_idx from users ".
+		     "where unix_uid='$unix_uid'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid, $uid_idx) = $query_result->fetchrow_array();
+
+    # Sanity check against password file before returning.
+    my ($pwname) = getpwuid($unix_uid) or
+	die("*** $unix_uid is not in the password file!");
+
+    if ($uid ne $pwname) {
+	warn("*** WARNING: LookupByUnixId: $pwname does not match $uid\n");
+	return undef
+    }
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given a wikiname. This is just to make sure the wikiname
+# the user picked is unique.
+#
+sub LookupByWikiName($$)
+{
+    my ($class, $wikiname) = @_;
+    my $status_archived = $USERSTATUS_ARCHIVED;
+    
+    my $query_result =
+	DBQueryFatal("select uid_idx from users ".
+		     "where wikiname='$wikiname' and ".
+		     "      status!='$status_archived'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given an e-mail address.  This is just to make sure the
+# e-mail address the user picked is unique.
+#
+sub LookupByEmail($$)
+{
+    my ($class, $email) = @_;
+    my $status_archived = $USERSTATUS_ARCHIVED;
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users ".
+		     "where LCASE(usr_email)=LCASE('$email') and ".
+		     "      status!='$status_archived'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Lookup user given a UUID.  
+#
+sub LookupByUUID($$)
+{
+    my ($class, $uuid) = @_;
+    my $status_archived = $USERSTATUS_ARCHIVED;
+    my $safe_uuid = DBQuoteSpecial($uuid);
+
+    my $query_result =
+	DBQueryFatal("select uid_idx from users ".
+		     "where uid_uuid=$safe_uuid and ".
+		     "      status!='$status_archived'");
+
+    return undef
+	if (! $query_result || !$query_result->numrows);
+
+    my ($uid_idx) = $query_result->fetchrow_array();
+
+    return User->Lookup($uid_idx);
+}
+
+#
+# Class function to create new user and return object.
+#
+sub Create($$$$)
+{
+    my ($class, $uid, $flags, $argref) = @_;
+    my $uuid;
+
+    my $isleader = ($flags & $NEWUSER_FLAGS_PROJLEADER ? 1 : 0);
+    my $wikionly = ($flags & $NEWUSER_FLAGS_WIKIONLY   ? 1 : 0);
+    my $webonly  = ($flags & $NEWUSER_FLAGS_WEBONLY    ? 1 : 0);
+    my $archived = ($flags & $NEWUSER_FLAGS_ARCHIVED   ? 1 : 0);
+    my $nouuid   = ($flags & $NEWUSER_FLAGS_NOUUID     ? 1 : 0);
+
+    #
+    # If no uid, we need to generate a unique one for the user.
+    #
+    if (! $uid) {
+	#
+	# Take the first 5 letters of the email to form a root. That gives
+	# us 3 digits to make it unique, since unix uids are limited to 8
+	# chars, sheesh!
+	#
+	my $email = $argref->{'usr_email'};
+	my $token;
+
+	if ($email =~ /^([-\w\+\.]+)\@([-\w\.]+)$/) {
+	    $token = $1;
+	}
+	else {
+	    return undef;
+	}
+	# Squeeze out any dots or dashes.
+	$token =~ s/\.//g;
+	$token =~ s/\-//g;
+
+	# Trim off any trailing numbers or +foo tokens.
+	if ($token =~ /^([a-zA-Z]+)/) {
+	    $token = $1;
+	}
+	else {
+	    return undef;
+	}
+
+	# First 5 chars, at most.
+	$token = substr($token, 0, 5);
+
+	# Grab all root matches from the DB.
+	my $query_result =
+	    DBQueryWarn("select uid from users where uid like '${token}%'");
+
+	return undef
+	    if (!$query_result);
+
+	# Easy; no matches at all!
+	if (!$query_result->numrows) {
+	    $uid = "$token" . "001";
+	}
+	else {
+	    my $max = 0;
+		
+	    #
+	    # Find unused slot. Must be a better way to do this!
+	    #
+	    while (my ($foo) = $query_result->fetchrow_array()) {
+		my $name;
+		my $number;
+		
+		# Split name from number
+		if ($foo =~ /^([a-zA-Z]+)(\d*)$/) {
+		    $name   = $1;
+		    $number = $2;
+		}
+		else {
+		    return undef;
+		}
+		# Must be exact root
+		next
+		    if ($name ne $token);
+
+		# Backwards compatability; might not have appended number.
+		if (isset($number) && intval($number) > $max) {
+		    $max = intval($number);
+		}
+	    }
+	    $max++;
+	    $uid = $token . sprintf("%03d", $max);
+	}
+    }
+	
+    #
+    # The array of inserts is assumed to be safe already. Generate
+    # a list of actual insert clauses to be joined below.
+    #
+    my @insert_data = (!defined($argref) ? () :
+		       map("$_=" . DBQuoteSpecial($argref->{$_}),
+			   keys(%{$argref})));
+
+    # Every user gets a new unique index.
+    my $uid_idx = User->NextIDX();
+
+    #
+    # Get me an unused unix id. 
+    #
+    my $unix_uid;
+
+    #
+    # Start here, and keep going if the one picked from the DB just
+    # happens to be in use (in the passwd file). Actually happens!
+    #
+    my $min_uid = $MIN_UNIX_UID;
+    
+    while (! defined($unix_uid)) {
+	#
+	# Nice query, eh? Basically, find unused numbers by looking at
+	# existing numbers plus one, and check to see if that number
+	# is taken.
+	#
+	my $query_result =
+	    DBQueryWarn("select u.unix_uid + 1 as start from users as u ".
+			"left outer join users as r on ".
+			"  u.unix_uid + 1 = r.unix_uid ".
+			"where u.unix_uid>=$min_uid and ".
+			"      u.unix_uid<60000 and ".
+			"      r.unix_uid is null limit 1");
+	return undef
+	    if (! $query_result);
+
+	if (! $query_result->numrows) {
+	    print "*** WARNING: Could not find an unused unix_uid!\n";
+	    return undef;
+	}
+
+	my ($unused) = $query_result->fetchrow_array();
+
+	if (getpwuid($unused)) {
+	    # Keep going.
+	    $min_uid++;
+	}
+	else {
+	    # Break out of loop.
+	    $unix_uid = $unused;
+	}
+    }
+
+    # Initial mailman_password.
+    my $mailman_password = substr(TBGenSecretKey(), 0, 10);
+
+    # And a verification key.
+    my $verify_key = TBGenSecretKey();
+
+    if (! $nouuid) {
+	# And a UUID (universally unique identifier).
+	$uuid = NewUUID();
+	if (!defined($uuid)) {
+	    print "*** WARNING: Could not generate a UUID!\n";
+	    return undef;
+	}
+	push(@insert_data, "uid_uuid='$uuid'");
+    }
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "wikionly='1'")
+	if ($wikionly);
+    push(@insert_data, "webonly='1'")
+	if ($webonly);
+
+    push(@insert_data, "usr_created=now()");
+    push(@insert_data, "usr_modified=now()");
+    push(@insert_data, "unix_uid=$unix_uid");
+    push(@insert_data, "mailman_password='$mailman_password'");
+    push(@insert_data, "verify_key='$verify_key'");
+    push(@insert_data, "uid_idx='$uid_idx'");
+    push(@insert_data, "uid='$uid'");
+
+    if ($archived) {
+	#
+	# Creating an archived user; this only happens when restoring a
+        # deleted user (which is to say, not often).
+	#
+	push(@insert_data, "status='$USERSTATUS_ARCHIVED'");
+	push(@insert_data, "usr_name='$uid'");
+	push(@insert_data, "pswd_expires=now()");
+	push(@insert_data, "usr_pswd='*'");
+	push(@insert_data, "usr_email='bouncer\@${OURDOMAIN}'");
+    }
+    else {
+	push(@insert_data, "status='$USERSTATUS_NEWUSER'");
+	push(@insert_data, "pswd_expires=date_add(now(), interval 1 year)");
+    }
+
+    # Insert into DB.
+    DBQueryWarn("insert into users set " . join(",", @insert_data))
+	or return undef;
+
+    # And the stats record.
+    @insert_data = ();
+    push(@insert_data, "uid_idx='$uid_idx'");
+    push(@insert_data, "uid='$uid'");
+    push(@insert_data, "uid_uuid='$uuid'")
+	if (!$nouuid);
+
+    if (! DBQueryWarn("insert into user_stats set ".join(",", @insert_data))) {
+	DBQueryFatal("delete from users where uid_idx='$uid_idx'");
+	return undef;
+    }
+    return User->Lookup($uid_idx);
+}
+
+#
+# Delete the user from the users and user_stats tables.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    DBQueryWarn("delete from user_stats where uid_idx='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from users where uid_idx='$uid_idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Utility (class) function to get a new uid for a user.
+#
+sub NextIDX($)
+{
+    my ($class) = @_;
+
+    my $idx = TBGetUniqueIndex('next_uid', 1);
+    return $idx;
+}
+
+#
+# Purge user from various tables, but not the user table.
+#
+sub Purge($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $uid     = $self->uid();
+    my $uid_idx = $self->uid_idx();
+
+    DBQueryWarn("delete from group_membership where uid_idx='$uid_idx'")
+	or return -1;
+
+    #
+    # Then the pubkey tables.
+    # 
+    DBQueryWarn("delete from user_pubkeys  where uid_idx='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from user_sfskeys  where uid_idx='$uid_idx'")
+	or return -1;
+
+    #
+    # Do not delete certs; we need them around so we can generte the CRLS.
+    # Just set the revoked flag for them. At some point we need to prune
+    # the table.
+    #
+    DBQueryWarn("update user_sslcerts set revoked=now() ".
+		"where uid_idx='$uid_idx' and revoked is null")
+	or return -1;
+
+    #
+    # Must do widearea_accounts too.
+    #
+    DBQueryWarn("delete from widearea_accounts where uid_idx='$uid_idx'")
+	or return -1;
+
+    #
+    # Then some other pidly tables.
+    # 
+    DBQueryWarn("delete from login where uid_idx='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from nodeuidlastlogin where uid='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from uidnodelastlogin where uid='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from unixgroup_membership where uid='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from userslastlogin where uid='$uid_idx'")
+	or return -1;
+    DBQueryWarn("delete from user_policies where uid='$uid_idx'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Wrap above function so I do not forget to use it for the current user.
+#
+sub ThisUser($)
+{
+    return User->LookupByUnixId($UID);
+}
+
+#
+# The "implied" user is the user the web interface says we are running as.
+#
+sub ImpliedUser($)
+{
+    return undef
+	if (! exists($ENV{'HTTP_INVOKING_USER'}));
+    
+    # The lookup routine checks it argument, so no need to taint check.
+    return User->Lookup($ENV{'HTTP_INVOKING_USER'});
+}
+
+#
+# See if user is member of emulab-ops project. Must be the current user.
+#
+sub IsOpsGuy($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    if (!$self->SameUser($self->ThisUser())) {
+	print STDERR "*** IsOpsGuy: Must be invoked on current user!\n";
+	return 0;
+    }
+    return TBMinTrust(TBProjTrust($self->uid_idx(), TBOPSPID()),
+		      PROJMEMBERTRUST_USER());
+}
+
+#
+# See if user is an admin. Must be the current user.
+#
+sub IsAdmin($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    if (!$self->SameUser($self->ThisUser())) {
+	print STDERR "*** IsAdmin: Must be invoked on current user!\n";
+	return 0;
+    }
+    #
+    # No one is considered an admin unless they have the magic environment
+    # variable set (so that you have to be a bit more explict about wanting
+    # admin privs.) Use the withadminprivs script to get this variable set.
+    # Also check with HTTP_ at the front of the name, since this is required
+    # to get it through suexec from the web scripts.
+    #
+    if (!($ENV{WITH_TB_ADMIN_PRIVS} || $ENV{HTTP_WITH_TB_ADMIN_PRIVS})) {
+	return 0;
+    }
+    return $self->admin();
+}
+
+#
+# Worker class method to change the user profile.
+# Assumes most argument checking was done elsewhere.
+#
+sub ModUserInfo($$$$)
+{
+    my ($class, $this_user, $target_user, $argref, $usrerr_ref) = @_;
+
+    my $this_uid = $this_user->uid();
+    my $isadmin = $this_user->IsAdmin();
+
+    my $target_uid = $target_user->uid();
+    my $target_uid_idx = $target_user->uid_idx();
+    my $target_name = $target_user->name();
+    my $target_email = $target_user->email();
+    my $wikionly = $target_user->wikionly();
+
+    my %mods;
+    my $noreport;
+
+    #
+    # Only admin types can change the email address. If its different, the
+    # user circumvented the form, and so its okay to blast it.
+    #
+    my $usr_email = $argref->{"usr_email"};
+    if ($usr_email && $target_email ne $usr_email) {
+	if (!$isadmin) {
+	    $$usrerr_ref = "Email: ".
+		"You are not allowed to change your email address";
+	    return undef;
+	}
+
+	#
+	# Invoke the backend to deal with this.
+	#
+	my $cmd = "$tbacct email $target_uid " .
+		   escapeshellarg($usr_email);
+	##print $cmd;
+	my $cmd_out = `$cmd`;
+	if ($?) {
+	    chomp($cmd_out);
+	    $$usrerr_ref = "Error: " . $cmd_out;
+	    return undef;
+	}
+	$mods{"usr_email"} = $usr_email;
+    }
+
+    #
+    # Now see if the user is requesting to change the password.
+    #
+    if (($argref->{"password1"} && $argref->{"password1"} ne "") &&
+	($argref->{"password2"} && $argref->{"password2"} ne "")) {
+
+	my $old_encoding = $target_user->pswd();
+	my $new_encoding = crypt($argref->{"password1"}, $old_encoding);
+
+	#
+	# Compare. Must change it!
+	# 
+	if ($old_encoding eq $new_encoding) {
+	    $$usrerr_ref = "Error: " .
+		"New password same as old password";
+	    return undef;
+	}
+
+	#
+	# Do it again. This ensures we use the current algorithm, not whatever
+	# it was encoded with last time.
+	# XXX Perl crypt doesn't have this option!
+	# XXX $new_encoding  = crypt($argref->{"password1"});
+
+	my $safe_encoding = escapeshellarg($new_encoding);
+
+	#
+	# Invoke the backend to deal with this.
+	#
+	my $cmd = "tbacct passwd $target_uid $safe_encoding";
+	##print $cmd;
+	my $cmd_out = `$cmd`;
+	if ($?) {
+	    chomp($cmd_out);
+	    $$usrerr_ref = "Error: " . $cmd_out;
+	    return undef;
+	}
+	$noreport = 1;
+    }
+
+    #
+    # See if the user is requesting to change the Windows password.
+    #
+    if (($argref->{"w_password1"} && $argref->{"w_password1"} ne "") &&
+	($argref->{"w_password2"} && $argref->{"w_password2"} ne "")) {
+
+	my $old_wpswd = $target_user->w_pswd();
+	my $new_wpswd = $argref->{"w_password1"};
+
+	#
+	# Compare. Must change it!
+	# 
+	if ($old_wpswd eq $new_wpswd) {
+	    $$usrerr_ref = "Error: " .
+		"New Windows password same as old Windows password";
+	    return undef;
+	}
+
+	#
+	# Invoke the backend to deal with this.
+	#
+	my $cmd = "tbacct wpasswd $target_uid " . escapeshellarg($new_wpswd);
+	##print $cmd;
+	my $cmd_out = `$cmd`;
+	if ($?) {
+	    chomp($cmd_out);
+	    $$usrerr_ref = "Error: " . $cmd_out;
+	    return undef;
+	}
+	$noreport = 1;
+    }
+
+    #
+    # Only admins can change the notes field. We do not bother to generate
+    # any email or external updates for this.
+    #
+    my $notes = $argref->{"notes"};
+    if (defined($notes) && $isadmin && $target_user->notes() ne $notes) {
+	$target_user->SetNotes($notes);
+	$noreport = 1;
+    }
+
+    #
+    # Set the plab bit separately since no need to call out to the backend.
+    #
+    my $ui = $argref->{"user_interface"};
+    if (defined($ui) && $target_user->user_interface() ne $ui) {
+	$target_user->SetUserInterface($ui);
+	$noreport = 1;
+    }
+
+    #
+    # Now update the rest of the information in the DB.
+    # (Others above already did their own updates.)
+    #
+    my %updates;
+    foreach my $col ("usr_name", "usr_title", "usr_affil", "usr_affil_abbrev", 
+		     "usr_URL",
+		     "usr_addr", "usr_addr2", "usr_city", "usr_state",
+		     "usr_zip", "usr_country", "usr_phone", "usr_shell") {
+	# Copy args we want so that others can't get through.
+	if (exists($argref->{$col})) {
+	    $updates{$col} = $mods{$col} = $argref->{$col};
+	}
+    }
+    if (keys %updates) {
+	if ($target_user->Update(\%updates)) {
+	    return undef;
+	}
+    }
+
+    if (!keys %mods) {
+	if (!$noreport) {
+	    # Warn the user that the submit button was pressed with no effect.
+	    $$usrerr_ref = "Submit: Nothing changed";
+	    return undef;
+	}
+    }
+    else {
+	# Send an audit e-mail reporting what is being changed.
+	my @report = ("Name:usr_name", "Email:usr_email",
+		      "Job Title:usr_title", "Affiliation:usr_affil",
+		      "Affiliation Abbreviation:usr_affil_abbrev",
+		      "URL:usr_URL", "Address1:usr_addr",
+		      "Address2:usr_addr2", "City:usr_city",
+		      "State:usr_state", "ZIP/Postal Code:usr_zip",
+		      "Country:usr_country", "Phone:usr_phone",
+		      "Shell:usr_shell");
+	my $msg = "\n".
+	    "User information for '$target_uid' changed by '$this_uid'.\n".
+	     "(IDX: $target_uid_idx, $target_name, $target_email".
+		 ($wikionly ? ", *WikiOnly*" : "") . ")\n\n";
+	foreach my $line (@report) {
+	    my ($label, $field) = split /:/, $line;
+	    if (exists($mods{$field})) {
+		$msg .= sprintf "%-20s%s\n", $label .":", $mods{$field};
+	    }
+	}
+	SENDMAIL("$target_name <$target_email>",
+		 "User Information for '$target_uid' Modified",
+		 $msg, TBMAIL_OPS(), sprintf("Bcc: %s\nErrors-To:%s", 
+					     TBMAIL_AUDIT(), TBMAIL_WWW()));
+
+	#
+	# "tbacct mod" updates the user gecos field (usr_name) and shell.
+	#
+	if ($mods{"usr_name"} || $mods{"usr_shell"}) {
+	    my $cmd = "$tbacct mod $target_uid";
+	    ##print $cmd;
+	    my $cmd_out = `$cmd`;
+	    if ($?) {
+		chomp($cmd_out);
+		$$usrerr_ref = "Error: " . $cmd_out;
+		return undef;
+	    }
+	}
+    }
+    return 1;
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+    
+    my $query_result =
+	DBQueryWarn("select * from users where uid_idx=$uid_idx");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'USER'} = $query_result->fetchrow_hashref();
+
+    return 0;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uid     = $self->uid();
+    my $uid_idx = $self->uid_idx();
+
+    return "[User: $uid, IDX: $uid_idx]";
+}
+
+#
+# Perform some updates ...
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query = "update users set usr_modified=now(), ".
+	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}), keys(%{$argref})));
+
+    $query .= " where uid_idx='$uid_idx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Equality test for two users. Not strictly necessary in perl, but good form.
+#
+sub SameUser($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($other)));
+
+    return $self->uid_idx() == $other->uid_idx();
+}
+
+#
+# First approved project.
+#
+sub FirstApprovedProject($$)
+{
+    my ($self, $pptr) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select pid_idx from group_membership ".
+		    "where uid_idx='$uid_idx' and pid_idx=gid_idx and ".
+		    "      trust!='none' ".
+		    "order by date_approved asc limit 1");
+
+    if (! $query_result || !$query_result->numrows) {
+	$$pptr = undef;
+	return 0;
+    }
+
+    my ($pid_idx) = $query_result->fetchrow_array();
+    my $project   = Project->Lookup($pid_idx);
+    
+    if (! defined($project)) {
+	warn("*** User::FirstApprovedProject: ".
+	     "Could not load project $pid_idx!");
+	return -1;
+    }
+    $$pptr = $project;
+    return 0;
+}
+
+#
+# Change the status of a user in the DB.
+#
+sub SetStatus($$)
+{
+    my ($self, $status) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my %args = ("status" => $status);
+
+    return $self->Update(\%args);
+}
+
+#
+# Get user ssl certificate (pubkey). 
+#
+sub SSLCert($$$)
+{
+    my ($self, $encrypted, $pref) = @_;
+    $encrypted = ($encrypted ? 1 : 0);
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select cert from user_sslcerts ".
+		    "where uid_idx='$uid_idx' and encrypted=$encrypted and ".
+		    "      revoked is null");
+		    
+    return -1
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($cert) = $query_result->fetchrow_array();
+    $$pref = $cert;
+    return 0;
+}
+
+#
+# Get user ssh keys. This is bogus; I am making sure not to return the
+# emulab key which is not encrypted. The keys table needs work.
+#
+sub GetSSHKeys($$)
+{
+    my ($self, $pref) = @_;
+    my @result = ();
+    
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select pubkey from user_pubkeys ".
+		    "where uid_idx='$uid_idx' and ".
+		    "      comment not like '%${OURDOMAIN}'");
+
+    return -1
+	if (!defined($query_result));
+
+    while (my ($key) = $query_result->fetchrow_array()) { 
+	push(@result, $key);
+    }    
+    @$pref = @result;
+    return 0;
+}
+
+#
+# Get the passphrase for the encrypted key.
+#
+sub SSLPassPhrase($$$)
+{
+    my ($self, $encrypted, $pref) = @_;
+    $encrypted = ($encrypted ? 1 : 0);
+    
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $query_result =
+	DBQueryWarn("select password from user_sslcerts ".
+		    "where uid_idx='$uid_idx' and encrypted=$encrypted and ".
+		    "      revoked is null");
+    return -1
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($password) = $query_result->fetchrow_array();
+    $$pref = $password;
+    return 0;
+}
+
+#
+# Set password for user.
+#
+sub SetPassword($$$)
+{
+    my ($self, $encoding, $expires) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    # Clear the chpasswd stuff anytime passwd is set.
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  usr_pswd='$encoding', pswd_expires=$expires, ".
+			  "  chpasswd_key=NULL,chpasswd_expires=0 ".
+			  "where uid_idx='$uid_idx'"));
+
+    return Refresh($self);
+}
+
+#
+# Set Windows password for user.
+#
+sub SetWindowsPassword($$)
+{
+    my ($self, $wpswd) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  usr_w_pswd='$wpswd' ".
+			  "where uid_idx='$uid_idx'"));
+
+    return Refresh($self);
+}
+
+#
+# Set notes field for user.
+#
+sub SetNotes($$)
+{
+    my ($self, $notes) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    $notes = escapeshellarg($notes);
+    my $uid_idx = $self->uid_idx();
+
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  notes='$notes' ".
+			  "where uid_idx='$uid_idx'"));
+
+    return Refresh($self);
+}
+
+#
+# Set user interface mode for user.
+#
+sub SetUserInterface($$)
+{
+    my ($self, $interface) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    return -1
+	if (! DBQueryWarn("update users set ".
+			  "  user_interface='$interface' ".
+			  "where uid_idx='$uid_idx'"));
+
+    return Refresh($self);
+}
+
+#
+# User verified; find users groups and send email.
+#
+sub SendVerifiedEmail($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid     = $self->uid();
+    my $uid_idx = $self->uid_idx();
+
+    my $newuser     = $USERSTATUS_NEWUSER;
+    my $unapproved  = $USERSTATUS_UNAPPROVED;
+    my $none        = $Group::MemberShip::TRUSTSTRING_NONE;
+
+    # Audit email.
+    SENDMAIL($TBAUDIT,
+	     "User '$uid' has been verified",
+	     "\n".
+	     "User '$uid' has been verified.\n".	
+	     "Status has been changed from '$newuser' to '$unapproved'\n",
+	     "$TBAPPROVAL");
+
+    #
+    # Get the list of all project/groups this users has tried to join
+    # but whose membership messages where delayed until the user verified
+    # himself.
+    #
+    my $query_result =
+	DBQueryFatal("select gid_idx from group_membership ".
+		     "where uid_idx='$uid_idx' and trust='$none'");
+
+    while (my ($gid_idx) = $query_result->fetchrow_array()) {
+	my $group = Group->Lookup($gid_idx);
+
+	if (!defined($group)) {
+	    print("*** User::SendApprovalEmail: ".
+		  "Could not load group $gid_idx!");
+	    return -1;
+	}
+	#
+	# If a project leader is verifying himself, then we do the project
+	# version of the email (sends to tbapproval).
+	#
+	if ($group->IsProjectGroup() && $group->IsLeader($self)) {
+	    my $project = $group->GetProject();
+
+	    $project->SendNewProjectEmail() == 0 or
+		return -1;
+	}
+	else {
+	    $group->SendJoinEmail($self) == 0 or
+		return -1;
+	}
+    }
+    return 0;
+}
+
+#
+# Return group membership for a user.  
+#
+sub GroupMembershipList($$;$)
+{
+    my ($self, $prval, $desired_trust) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx     = $self->uid_idx();
+    my $none        = $Group::MemberShip::TRUSTSTRING_NONE;
+    my @result      = ();
+    my $trust_clause;
+
+    if (!defined($desired_trust)) {
+	$trust_clause = "and trust!='$none'"
+    }
+    elsif ($desired_trust eq "") {
+	$trust_clause = "";
+    }
+    else {
+	$trust_clause = "and trust='$desired_trust'"
+    }
+
+    my $query_result =
+	DBQueryWarn("select distinct gid_idx from group_membership ".
+		    "where uid_idx='$uid_idx' $trust_clause");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($gid_idx) = $query_result->fetchrow_array()) {
+	my $group = Group->Lookup($gid_idx);
+
+	if (!defined($group)) {
+	    print("*** User::GroupMembershipList: ".
+		  "Could not load group $gid_idx!");
+	    return -1;
+	}
+	push(@result, $group);
+    }
+    @$prval = @result;
+    return 0;
+}
+
+#
+# Return project membership for a user.  
+#
+sub ProjectMembershipList($$;$)
+{
+    my ($self, $prval, $desired_trust) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx     = $self->uid_idx();
+    my $none        = $Group::MemberShip::TRUSTSTRING_NONE;
+    my @result      = ();
+    my $trust_clause;
+
+    if (!defined($desired_trust)) {
+	$trust_clause = "and trust!='$none'"
+    }
+    elsif ($desired_trust eq "") {
+	$trust_clause = "";
+    }
+    else {
+	$trust_clause = "and trust='$desired_trust'"
+    }
+
+    my $query_result =
+	DBQueryWarn("select distinct pid_idx from group_membership ".
+		    "where uid_idx='$uid_idx' and pid_idx=gid_idx ".
+		    "      $trust_clause");
+
+    return -1
+	if (!$query_result);
+
+    while (my ($pid_idx) = $query_result->fetchrow_array()) {
+	my $project = Project->Lookup($pid_idx);
+
+	if (!defined($project)) {
+	    print("*** User::ProjectMembershipList: ".
+		  "Could not load project $pid_idx!");
+	    return -1;
+	}
+	push(@result, $project);
+    }
+    @$prval = @result;
+    return 0;
+}
+
+#
+# Return project leadership for a user.  
+#
+sub ProjectLeaderList($$;$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx     = $self->uid_idx();
+    my @result      = ();
+
+    my $query_result =
+	DBQueryFatal("select pid_idx from projects where head_idx='$uid_idx'");
+    
+    return -1
+	if (!$query_result);
+
+    while (my ($pid_idx) = $query_result->fetchrow_array()) {
+	my $project = Project->Lookup($pid_idx);
+
+	if (!defined($project)) {
+	    print("*** User::ProjectLeaderList: ".
+		  "Could not load project $pid_idx!");
+	    return -1;
+	}
+	push(@result, $project);
+    }
+    @$prval = @result;
+    return 0;
+}
+
+#
+# Return a glist for setting user groups. The argument is the default
+# group, since the list has to be reordered for perl to do the right thing. 
+#
+sub GList($$)
+{
+    my ($self, $default) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $user_uid = $self->uid();
+
+    # Should we get this info from the DB instead of using "id?"
+    my $glist = `id -G $user_uid`;
+    if ($glist =~ /^([\d ]*)$/) {
+	$glist = $1;
+    }
+    else {
+	print STDERR "*** Unexpected results from 'id -G $user_uid': $glist\n";
+	return undef;
+    }
+
+    #
+    # Remove current group from glist, then add gid twice at the front
+    # of the list Order matters here, or we won't pick up all the groups
+    # we need.
+    #
+    $glist =~ s/ ?\b$default\b ?//;
+    $glist = $default . " " . $default . " " . $glist;
+
+    return $glist;
+}
+
+#
+# Return a list of the additional Unix groups a user is in. These are
+# returned as plain integers.
+#
+sub UnixGroupList($$)
+{
+    my ($self, $prval) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx  = $self->uid_idx();
+    my @glist    = ();
+    @$prval      = ();
+
+    my $query_result =
+	DBQueryWarn("select gid from unixgroup_membership ".
+		    "where uid_idx='$uid_idx'");
+    return -1
+	if (!defined($query_result));
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($gid) = $query_result->fetchrow_array()) {
+	push(@glist, $gid)
+    }
+    @$prval = @glist;
+    return 0;
+}
+
+#
+# Flip to user, with the provided group as the default.
+#
+sub FlipTo($$)
+{
+    my ($self, $default_gid) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $glist = $self->GList($default_gid);
+    return -1
+	if (!defined($glist));
+
+    $GID            = $default_gid;
+    $EGID           = $glist;
+    $EUID = $UID    = $self->unix_uid();
+    $ENV{'USER'}    = $self->uid();
+    $ENV{'LOGNAME'} = $self->uid();
+
+    return 0;
+}
+
+#
+# Update aggregate stats.
+#
+sub UpdateStats($$$$$)
+{
+    my ($self, $mode, $duration, $pnodes, $vnodes) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+
+    DBQueryWarn("update user_stats ".
+		"set expt${mode}_count=expt${mode}_count+1, ".
+		"    expt${mode}_last=now(), ".
+		"    allexpt_duration=allexpt_duration+${duration}, ".
+		"    allexpt_vnodes=allexpt_vnodes+${vnodes}, ".
+		"    allexpt_pnodes=allexpt_pnodes+${pnodes}, ".
+		"    allexpt_vnode_duration=".
+		"        allexpt_vnode_duration+($vnodes * ${duration}), ".
+		"    allexpt_pnode_duration=".
+		"        allexpt_pnode_duration+($pnodes * ${duration}) ".
+		"where uid_idx='$uid_idx'");
+
+    $self->Refresh();
+
+    return 0;
+}
+
+#
+# Bump last activity
+#
+sub BumpActivity($)
+{
+    my ($self) = @_;
+	
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uid_idx = $self->uid_idx();
+    
+    DBQueryWarn("update user_stats set last_activity=now() ".
+		"where uid_idx='$uid_idx'");
+
+    return 0;
+}
+
+#
+# Check permissions.
+#
+sub AccessCheck($$$)
+{
+    my ($self, $user, $access_type) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! ref($self));
+
+    my $mintrust;
+
+    if ($access_type < TB_USERINFO_MIN || $access_type > TB_USERINFO_MAX) {
+	print "*** Invalid access type $access_type!\n";
+	return 0;
+    }
+    # Admins do whatever they want!
+    return 1
+	if ($user->IsAdmin());
+
+    # User can muck with his own stuff.
+    return 1
+	if SameUser($self, $user);
+
+    my $auth_idx = $user->uid_idx();
+    my $this_idx = $self->uid_idx();
+
+    #
+    # Only project leader in same project as user.
+    #
+    if ($access_type == TB_USERINFO_MODIFYINFO) {
+        #
+        # This join will allow the operation if the current user is in the 
+        # same project (any project) as the target user, but with root permissions.
+        # 
+	my $query_result =
+	    DBQueryFatal("select g.trust from group_membership as g ".
+			 "left join group_membership as authed on ".
+			 "     g.pid_idx=authed.pid_idx and ".
+			 "     g.gid_idx=authed.gid_idx and ".
+			 "     g.uid_idx='$this_idx' ".
+			 "where authed.uid_idx='$auth_idx' and ".
+			 "      (authed.trust='project_root')");
+
+	return $query_result->numrows;
+    }
+    return 0;
+}
+
+#
+# Home dir for user.
+#
+sub HomeDir($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return undef
+	if (! ref($self));
+    
+    return USERROOT() . "/" . $self->uid();
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^[:alnum:]]/\\$&/g;
+    $str =~ /^(.+)$/; # untaint the result
+    return $1;
+}
+
+#############################################################################
+# Non-local users, as for federation/geni.
+#
+package User::NonLocal;
+use User;
+use libdb;
+use libtestbed;
+use English;
+use overload ('""' => 'Stringify');
+
+# Cache of instances to avoid regenerating them.
+my %nonlocal_users      = ();
+
+#
+# Lookup by idx.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $idx;
+    my $query_result;
+
+    if ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select uid_idx from nonlocal_users ".
+			"where uid_uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    
+    # Look in cache first
+    return $nonlocal_users{"$idx"}
+        if (exists($nonlocal_users{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from nonlocal_users where uid_idx='$idx'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self          = {};
+    $self->{'USER'}   = $query_result->fetchrow_hashref();
+    # Want to know if this is a shadow of a local user.
+    $self->{'SHADOW'} = User->Lookup($idx);
+
+    bless($self, $class);
+    
+    # Add to cache. 
+    $nonlocal_users{$self->{'USER'}->{'uid_idx'}} = $self;
+    
+    return $self;
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'USER'}->{$_[1]}); }
+sub uid_idx($)		{ return field($_[0], "uid_idx"); }
+sub idx($)		{ return field($_[0], "uid_idx"); }
+sub uid($)		{ return field($_[0], "uid"); }
+sub uid_uuid($)		{ return field($_[0], "uid_uuid"); }
+sub created($)		{ return field($_[0], "created"); }
+sub name($)		{ return field($_[0], "name"); }
+sub email($)		{ return field($_[0], "email"); }
+sub shadow($)		{ return $_[0]->{'SHADOW'}; }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $uid = $self->uid();
+    my $idx = $self->idx();
+
+    return "[NonLocalUser: $uid, IDX: $idx]";
+}
+
+#
+# Class function to create a new nonlocal user and return object.
+#
+sub Create($$$$$$;$)
+{
+    my ($class, $idx, $uid, $uuid, $name, $email, $sshkeys) = @_;
+    my @insert_data = ();
+    my $islocal = 0;
+
+    # Every user gets a new unique index.
+    if (!defined($idx) || $idx == 0) {
+	$idx = User->NextIDX();
+    }
+    else {
+	# Sanity check.
+	my $existing = User->Lookup($idx);
+	if (defined($existing)) {
+	    if ($uuid eq $existing->uuid()) {
+		#
+		# Shadow a local user, strictly for tmcd.
+		#
+		$islocal = 1;
+	    }
+	    else {
+		print STDERR "NonLocal user with $idx exists: $existing\n";
+		return undef;
+	    }
+	}
+    }
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "uid_idx='$idx'");
+
+    my $safe_uid   = DBQuoteSpecial($uid);
+    my $safe_name  = DBQuoteSpecial($name);
+    my $safe_email = DBQuoteSpecial($email);
+    my $safe_uuid  = DBQuoteSpecial($uuid);
+    push(@insert_data, "uid=$safe_uid");
+    push(@insert_data, "name=$safe_name");
+    push(@insert_data, "email=$safe_email");
+    push(@insert_data, "uid_uuid=$safe_uuid");
+
+    if (defined($sshkeys)) {
+	foreach my $sshkey (@{ $sshkeys }) {
+	    my $safe_sshkey = DBQuoteSpecial($sshkey);
+
+	    DBQueryWarn("insert into nonlocal_user_pubkeys set ".
+			"  uid=$safe_uid, uid_idx='$idx', ".
+			"  idx=NULL, stamp=now(), pubkey=$safe_sshkey")
+		or return undef;
+	}
+    }
+
+    # Insert into DB.
+    if (!DBQueryWarn("insert into nonlocal_users set " .
+		     join(",", @insert_data))) {
+	DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
+	    if (!$islocal);
+	return undef;
+    }
+    return User::NonLocal->Lookup($idx);
+}
+
+#
+# Modify the keys.
+#
+sub ModifyKeys($$)
+{
+    my ($self, $sshkeys) = @_;
+
+    my $idx = $self->uid_idx();
+    my $uid = $self->uid();
+    
+    DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
+	or return -1;
+    
+    if (defined($sshkeys)) {
+	foreach my $sshkey (@{ $sshkeys }) {
+	    my $safe_sshkey = DBQuoteSpecial($sshkey);
+
+	    DBQueryWarn("insert into nonlocal_user_pubkeys set ".
+			"  uid='$uid', uid_idx='$idx', ".
+			"  idx=NULL, stamp=now(), pubkey=$safe_sshkey")
+		or return -1;
+	}
+    }
+    return 0;
+}
+
+#
+# Delete the user, as for registration errors.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $idx = $self->idx();
+
+    DBQueryWarn("delete from nonlocal_user_pubkeys where uid_idx='$idx'")
+	or return -1;
+    DBQueryWarn("delete from nonlocal_user_bindings where uid_idx='$idx'")
+	or return -1;
+    DBQueryWarn("delete from nonlocal_users where uid_idx='$idx'")
+	or return -1;
+    
+    return 0;
+}
+
+#
+# Bind nonlocal user to experiment (slice, in Geni).
+#
+sub BindToExperiment($$)
+{
+    my ($self, $experiment) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $uid     = $self->uid();
+    my $idx     = $self->idx();
+    my $exptidx = $experiment->idx();
+    
+    # Insert into DB.
+    DBQueryWarn("replace into nonlocal_user_bindings set " .
+		"  uid='$uid', uid_idx='$idx', exptidx='$exptidx'")
+	or return -1;
+
+    return 0;
+}
+
+sub UnBindFromExperiment($$)
+{
+    my ($self, $experiment) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $uid     = $self->uid();
+    my $idx     = $self->idx();
+    my $exptidx = $experiment->idx();
+    
+    # Insert into DB.
+    DBQueryWarn("delete from nonlocal_user_bindings " .
+		"where uid_idx='$idx' and exptidx='$exptidx'")
+	or return -1;
+
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

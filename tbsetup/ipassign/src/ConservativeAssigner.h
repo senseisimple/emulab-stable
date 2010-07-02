@@ -51,22 +51,6 @@ private:
     void populatePartitionTree(size_t partition,
                                ptree::Branch * tree,
                                std::vector<ptree::LeafLan> & outLan);
-/*
-    // populate arguments with the METIS graph format
-    void convert(std::vector<int> & indexes, std::vector<int> & neighbors,
-                 std::vector<int> & weights) const;
-    // Given a lan, add the appropriate adjacency and weight information
-    // to arrays.
-    void convertAddLan(Lan const & lanToAdd, std::vector<int> & neighbors,
-                       std::vector<int> & weights) const;
-
-    // Given the number of a node, calculate the adjacencies and weights
-    // and put them into arrays.
-    void convertAddNode(Lan const & info, int currentNode,
-                        std::vector<int> & neighbors,
-                        std::vector<int> & weights) const;
-
-*/
 
     // Given a number, how many bits are required to represent up to and
     // including that number?
@@ -119,5 +103,3 @@ private:
 };
 
 #endif
-
-

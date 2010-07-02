@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,24 +21,32 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c`
+CFLAGS	 += -I/usr/local/include
+#CFLAGS   += `$(ELVIN_CONFIG) --cflags vin4c` -DHAVE_ELVIN
+CFLAGS	 += -DHAVE_PUBSUB
 CFLAGS   += -DCLIENT_BINDIR='"$(CLIENT_BINDIR)"'
 
 LDFLAGS  += -g -L../lib -L${OBJDIR}/lib/libtb
 LIBS     += -levent -ltb -lcrypto
-LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+#LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+LIBS	 += -L/usr/local/lib -lpubsub
+LDFLAGS  += $(LDSTATIC)
 
-ifeq ($(host_cpu),arm)
-else
-LDFLAGS  += -static
+# Deal with the presence/absence of kerberos in the linux ssl library
 ifeq ($(SYSTEM),Linux)
-NEEDKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
-ifeq ($(NEEDKERB),0)
- CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
- LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(LDSTATIC),)
+NOKERB := $(shell nm /usr/lib/libssl.a | grep -q krb; echo $$?)
+else
+NOKERB := 1
 endif
-LIBS     += -ldl
+ifeq ($(NOKERB),0)
+CFLAGS   += `/usr/kerberos/bin/krb5-config --cflags`
+LIBS     += `/usr/kerberos/bin/krb5-config --libs krb5`
+ifneq ($(wildcard /usr/lib/libkrb5support.a),)
+LIBS     += -lkrb5support
 endif
+endif
+LIBS	 += -ldl
 endif
 
 version.c: program-agent.c
@@ -49,16 +57,24 @@ program-agent-debug: program-agent.o version.o
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-install:
+install:	$(INSTALL_DIR)/opsdir/sbin/program-agent
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/program-agent.8 \
 		$(INSTALL_DIR)/opsdir/man/man8/program-agent.8
+
+control-install:	$(INSTALL_SBINDIR)/program-agent
 
 client: $(PROGRAMS)
 client-install: client
 	$(INSTALL_PROGRAM) program-agent$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/program-agent$(EXE)
 	chmod u+s-w $(DESTDIR)$(CLIENT_BINDIR)/program-agent
+	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man8
 	$(INSTALL) -m 644 $(SRCDIR)/program-agent.8 $(DESTDIR)$(CLIENT_MANDIR)/man8/program-agent.8
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS)
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@

@@ -1,0 +1,119 @@
+[ This README describes how to customize a FreeBSD 6 image for use on a
+flash dongle.  Mostly this is the same as the cdboot stuff, but based on
+a newer FreeBSD.  These instructions are for Utah folks as there are a
+lot of mysterious pieces with a shady past... ]
+
+
+*** Start with an initial FreeBSD filesystem.
+
+Ours has just sorta been handed down from generation to generation,
+being manually updated along the way.  So I could not even begin to
+tell you where it came from.  The basic theory is: start with a clean
+release and remove everything that doesn't matter.  Its that last part
+that is tricky! :-)  Just contact testbed-ops@emulab.net instead.
+
+
+*** Basic Emulab mods
+
+One you have a base filesystem tree (we'll say it is in /FOO), you
+should do some preliminary tweaking that is not part of the Emulab
+install.
+
+Set the root password. You can do that by using the -d option to vipw:
+
+	vipw -d /FOO/etc
+
+Remove any existing ssh keys in /FOO/etc/ssh.  If you want all dongles
+to have the same key, either generate one:
+
+	/usr/bin/ssh-keygen -N "" -f /FOO/etc/ssh/ssh_host_key
+	/usr/bin/ssh-keygen -d -N "" -f /FOO/etc/ssh/ssh_host_dsa_key
+
+of copy in pre-existing ones.  Otherwise the system will create keys
+when it first boots.
+
+Edit /FOO/etc/ssh/sshd_config to allow root login:
+
+	PermitRootLogin yes
+
+Edit /FOO/etc/ttys and turn on the serial console if you want to use
+the serial console. 
+
+	console "/usr/libexec/getty std.115200" unknown on secure
+
+Copy a couple of magic programs into /FOO/usr/local/bin:
+
+	-rwxr-xr-x  1 root  wheel  205084 Jun 26 06:15 hier*
+	-r-xr-xr-x  1 root  wheel  124532 Jun 26 10:48 wget*
+
+Hier is a Utah-local thing.  You could probably modify cdroot in this
+directory (installed as /FOO/etc/rc.d/cdroot) to use "cp -rp" instead.
+
+Create /FOO/usr/local/lib and copy in libintl.so.2, which is needed
+by wget, unless you go and reconfig it to statically link.
+
+In addition to wget, there are a few other ports that need to be installed.
+perl5, sudo and the dhcpd-client port (the last is used in place of the
+pre-installed BSD version of dhclient).
+
+We use a special, modified version of the FreeBSD second-level boot loader
+(loader) which supports a local 'testbed_boot' command.  This can be
+found in users.emulab.net:/share/freebsd/6.2/src/sys/boot/i386/emuboot-cd.
+The resulting binary will need to be copied into /FOO/boot.
+	
+
+*** Install/update the filesystem tree with the current testbed software
+
+Assuming you have a build tree /OBJ and the source is in /SRC, then do:
+
+	cd /OBJ
+	/SRC/configure --with-TBDEFS=/SRC/defsfile
+	setenv DESTDIR /FOO
+	gmake flashboot
+	sudo gmake flashboot-install
+
+
+*** Create a bootable flash device
+
+We just want one big filesystem.  So stick your dongle in the machine and:
+
+	set unit=<unit>
+	sudo fdisk -I $unit
+	sudo boot0cfg -B $unit
+	sudo disklabel -w -B ${unit}s1
+	sudo newfs /dev/${unit}s1a
+
+(where <unit> is that assigned to the flash drive when plugged in; e.g. "da0")
+Make really, really sure you got it right, lest you wipe out your main disk.
+
+Mount it up and copy over the filesystem tree you have:
+
+	sudo mkdir /dongle
+	sudo mount /dev/${unit}s1a /dongle
+	sudo hier cp /FOO /dongle
+
+Unmount and you are done!
+
+	sudo umount /dongle
+	sudo fsck /dev/${unit}s1a	# for good luck
+
+To create future dongles of the same size, I would suggest that you take
+a dd image (or a frisbee image if the drive is large) of the unit you just
+make and then just lay down that image using a large block size.  Flash
+drives can be wicked slow, and often the bigger the writes, the faster they
+are.  In fact, you might want to experiment with making the filesystem
+blocksize larger in the "newfs" above to see if you get better performance
+with 32K or 64K.  You may want to play around with lowering the number of
+inodes (-i) in newfs as well; there are only about 8000 files in our
+current FS.
+
+[ WARNING: on at least one PQI flash drive, when I tried to create the dd
+  image with blocksize of 16k or 8k, it read bogus data (bytes of -1 which
+  should have been 0s).  When read with a block size of 4k or smaller it
+  worked.  This is distressing since the filesystem will read 16k blocks. ]
+
+*** Test the dongle
+
+Now you can stick it in the machine you want to boot.  Of course, you will
+have to modify the BIOS on that machine to boot from dongle first (you DID
+check to make sure your machine will boot from a flash drive, right?)

@@ -21,6 +21,7 @@ sub usage {
     print STDERR "[-s <scale>] | [-c <map_x>,<_y>] ";
     print STDERR "[-S <last_scale> -C <last_x>,<_y>] -O <last_x_off>,<_y>] ";
     print STDERR "[-e <pid,eid>] [<building>]\n";
+    print STDERR "[-F <feature>]\n";
     print STDERR "\nor\n";
     print STDERR "Usage: floormap [-k] [-o <prefix>] ";
     exit(-1);
@@ -35,7 +36,7 @@ sub dprint($) {
 	if ($debug);
 }
 
-my $optlist  = "df:o:s:c:S:C:O:e:tTakgzvnxy";
+my $optlist  = "df:o:s:c:S:C:O:e:F:tTakgzvnxy";
 my $notitles = 0;       # This suppresses titles surrounding the output map.
 my $showany  = 0;	# When showing specific floor, showany is turned on.
 my $mereuser = 1;
@@ -50,8 +51,11 @@ my $show_exclusion = 0;
 my $show_nodes     = 1;
 
 my $building;
+my $pc600wifi_bldg = "MEB-MRC600";
 my $floor;
 my $image;
+
+my $feature_filter;
 
 # These result from clicking on zoom/pan controls outside.
 my $scale      = 1;	# From clicking on one of the scale buttons.
@@ -77,9 +81,13 @@ my $last_notitles = 0;  # This says there were no titles around the previous ima
 # The image produced for each floor will be this size, except when
 # using thumbnails.
 #
-# XXX What is this! 
+# Try to make a standard-sized output image.
+# (XXX Should fit the browser window size instead.)
 my $out_width  = 792;
 my $out_height = 492;
+# We may have a smaller thumbnail image, and/or add header/trailer.
+my $real_out_width;
+my $real_out_height;
 
 # Max x,y of image to go into state file.
 my $max_x = 0;
@@ -295,6 +303,9 @@ if (defined($options{"x"})) {
     $show_exclusion = 1;
 }
 
+if (defined($options{"F"})) {
+    $feature_filter = $options{"F"};
+}
 if (defined($options{"e"})) {
     if ($options{"e"} =~ /([-\w]*),([-\w]*)/) {
 	$pid = $1;
@@ -438,7 +449,7 @@ else {
 	adjustmap($areamap, 0, $running_y);
 	push(@areamaps, $areamap);
 	
-	$running_y += $floorimage->Get('height');
+	$running_y += $real_out_height;  ## $floorimage->Get('height');
     }
     dprint "images ".($img_n+1)."\n";
     ## Append and Coalesce get this error - 
@@ -452,13 +463,23 @@ writefiles($images->[0], @areamaps);
 ## Append the component images in the shell, until the Perl function is fixed.
 dprint "Last image is $img_n.\n";
 if ($img_n > 0) {
-    my @args = ("convert", "${prefix}.jpg.*", "-append", "${prefix}.jpg");
+    ## Do the cropping here too.
+    for ( my $i = 0; $i <= $img_n; $i++ ) {
+	my @args = ("convert",
+		    "-crop", "$real_out_width"."x$real_out_height+0+0",
+		    "${prefix}-$i.jpg", "${prefix}-c$i.jpg");
+	dprint "@args\n";
+	system(@args) == 0
+	    or die "system @args failed: $?";
+    }
+
+    my @args = ("convert","-append", "${prefix}-c*.jpg", "${prefix}.jpg");
     dprint "@args\n";
     system(@args) == 0
 	or die "system @args failed: $?";
 
     ## Clean up the component image files.
-    @args = ("/bin/sh", "-c", "rm ${prefix}.jpg.*");
+    @args = ("/bin/sh", "-c", "rm ${prefix}-*.jpg");
     dprint "@args\n";
     system(@args) == 0
 	or die "system @args failed: $?";
@@ -477,16 +498,19 @@ sub dofloor($$)
     # Grab the nodes on this floor in this building. We want to know
     # their allocation status so we know what colors to use.
     #
-    my $query = "select loc.*,r.pid,r.eid,r.vname, ".
+    my $query = "select loc.*,r.pid,r.eid,r.vname,f.feature, ".
                 "  n.battery_voltage,n.battery_percentage, ".
 		"  n.destination_x,n.destination_y,n.destination_orientation ".
 		"  from location_info as loc ".
 		"left join reserved as r on r.node_id=loc.node_id ".
 		"left join nodes as n on n.node_id=loc.node_id ".
+		"left join node_features as f on f.node_id=loc.node_id " .
 		"where loc.building='$building' " .
+                (defined($feature_filter)?" and f.feature='$feature_filter' ":"") . 
 		(defined($pid) ? " and r.pid='$pid' and r.eid='$eid'" : "");
-    my $query_result = DBQueryFatal($query . " and loc.floor='$floor'");
-
+    # Overlap dots left-to right, top-to-bottom where they are close-packed.
+    my $order = " order by loc.loc_x, loc.loc_y";
+    my $query_result = DBQueryFatal($query . " and loc.floor='$floor'" . $order );
     
     my $newnodes_query = "select * from new_nodes ".
 		         "where building='$building'";
@@ -495,7 +519,7 @@ sub dofloor($$)
     # When ghosting is turned on, get nodes from all floors to be overlaid.
     my ($ghost_result, $ghost_newnodes_result);
     if ($ghost) {
-	$ghost_result = DBQueryFatal($query);
+	$ghost_result = DBQueryFatal($query . $order);
 	$ghost_newnodes_result = DBQueryFatal($newnodes_query);
     }
 
@@ -540,6 +564,7 @@ sub dofloor($$)
     }
     $img_n++;
     my $baseimage = $images->[$img_n];
+    my $ppm = $baseimages{$building}->{"ppm"};
 
     # Figure out where the user clicked.  (Use the upper-left corner if no click yet.)
     # We won't have both scale and click coords, because they are separate controls.
@@ -678,12 +703,10 @@ sub dofloor($$)
 					 " and floor='$floor'");
 	
 	while (my %crow = $camera_result->fetchhash()) {
-	    my $xmin    = $crow{"loc_x"} * $baseimages{$building}->{"ppm"};
-	    my $ymin    = $crow{"loc_y"} * $baseimages{$building}->{"ppm"};
-	    my $xmax    = ($crow{"loc_x"} + $crow{"width"}) * 
-		$baseimages{$building}->{"ppm"};
-	    my $ymax    = ($crow{"loc_y"} + $crow{"height"}) *
-		$baseimages{$building}->{"ppm"};
+	    my $xmin    = $crow{"loc_x"} * $ppm;
+	    my $ymin    = $crow{"loc_y"} * $ppm;
+	    my $xmax    = ($crow{"loc_x"} + $crow{"width"}) * $ppm;
+	    my $ymax    = ($crow{"loc_y"} + $crow{"height"}) * $ppm;
 	    
 	    $err = $baseimage->Draw(stroke=>'orange',
 				    strokewidth=>'1',
@@ -772,6 +795,14 @@ sub dofloor($$)
 		    }
 		}
 	    }
+
+	    # Link to a special page for the pc600 Wifi Cluster nodes, 
+	    # except on their own map.
+	    my $ispc600wifi = defined($rowref->{"feature"}) &&
+		$rowref->{"feature"} eq "pc600wifi" && 
+		    $building ne $pc600wifi_bldg;
+	    $props->{'ISPC600WIFI'} = $ispc600wifi;
+
             my $x2 = $x + $DOT_RAD;
 	    if ($ghost && $rowref->{"floor"} != $floor) { 
 		$err = $baseimage->Draw(stroke=>$color, strokewidth=>'1.5',
@@ -850,9 +881,12 @@ sub dofloor($$)
 		if (defined($o) && (($o < 0.0 && $o > -180.0) || 
 				    ($o > 180.0 && $o < 360.0)));
 	    
-            $err = $baseimage->Annotate(fill=>'black', x=>$lx, y=>$ly, 
-					text=>"$label");
-            warn "$err" if "$err";            
+	    # No labels on the pc600 wifi cluster nodes, except on their own map.
+	    if (!$ispc600wifi) {
+		$err = $baseimage->Annotate(fill=>'black', x=>$lx, y=>$ly, 
+					    text=>"$label");
+		warn "$err" if "$err";
+	    }
 
 	    $props->{"X1"} = $x - $DOT_RAD;
 	    $props->{"Y1"} = $y - $DOT_RAD;
@@ -900,13 +934,22 @@ sub dofloor($$)
 	#
 	# Stick in a very primitive scale bar.
 	#
-	# Scale_arg 0 means to use the 40% size thumbnail images.
-	my $fac = ($scale <= 2.0 ? ($scale_arg == 0 ? 3 : 2) : 1);
-	my $fac2 = ($scale_arg == 0 ? 2 : 5) * $fac;
-	my $lab = sprintf("%d Meters", 5 * $fac);
-	dprint "scale bar fac $fac fac2 $fac2 lab $lab\n";
+	# Zoom factor: scale_arg 0 means to use the 40% size thumbnail images.
+	$fac = ($scale <= 2.0 ? ($scale_arg == 0 ? 3 : 2) : 1);
+	my ($lab, $fac2);
+	if ( $ppm < 100.0 ) {
+	    # Show a 15 meter scale bar for thumbnails, 10 normal, zoomed 5.
+	    $lab = sprintf("%d Meters", 5 * $fac);
+	    $fac2 = ($scale_arg == 0 ? 2 : 5) * $fac;
+	}
+	else {
+            # Use a 50 cm scale for the pc600 wifi cluster map.
+            $lab = "50 cm";
+            $fac2 = ($scale_arg == 0 ? 0.2 : 0.5);
+	}
+        dprint "scale bar: ppm $ppm, fac $fac, fac2 $fac2, lab $lab\n";
 
-	my $dis = int($baseimages{$building}->{"ppm"} * $fac2);
+	my $dis = int($ppm * $fac2);
 	my $sx1 = $this_width - ($dis + 10);
 	my $sx2 = $this_width - 10;
 	my $lx  = $sx1 + (($dis / 2) - ((length($lab) * 8) / 2));
@@ -938,8 +981,13 @@ sub dofloor($$)
         # Border adds to both the top and the bottom.  Crop some of it away.
         my $y1 = $head_height + $this_height;
         my $y2 = $y1 + $tail_height;
-        $err = $baseimage->Crop(width=>$this_width, height=>$y2);
-        warn "$err" if "$err";
+        ## This Crop stopped working inside Perl, so do it in the shell instead.
+        ## (It started making smaller images at higher zoom factors.)
+        $real_out_width = $this_width;
+        $real_out_height = $y2;
+        ##$err = $baseimage->Crop(width=>$this_width, height=>$y2);
+        ##warn "$err" if "$err";
+
         # Fill in a black rectangle at the bottom for a separator.
         $err = $baseimage->Draw(fill=>'black', primitive=>'rectangle',
                                 points=>"0,$y1, $this_width,$y2");
@@ -1027,6 +1075,7 @@ sub calc_offsets($$$$$) {
 sub adjustmap($$$)
 {
     my ($mapref, $x, $y) = @_;
+    dprint "adjustmap x $x y $y\n";
 
     foreach my $nodeid (keys(%{ $mapref })) {
 	$mapref->{$nodeid}->{"X1"} += $x;
@@ -1071,12 +1120,17 @@ sub writefiles($@)
 	    my $isobs = $map{$nodeid}->{"ISOBS"};
 	    my $descr = $map{$nodeid}->{"DESCR"};
 	    my $isnew = $map{$nodeid}->{"ISNEW"};
+	    my $ispc600wifi = $map{$nodeid}->{"ISPC600WIFI"};
 	    my $link  = ($isobs ?
 			 "showobstacle.php3?id=${nodeid}" :
 			 ($isnew ?
 			  "newnode_edit.php3?id=${isnew}" :
-			  "shownode.php3?node_id=${nodeid}"));
-	    my $title = ($isobs ? $descr : $nodeid);
+			  ($ispc600wifi ?
+			   "floormap.php3?building=${pc600wifi_bldg}" :
+			   "shownode.php3?node_id=${nodeid}")));
+	    my $title = ($isobs ? $descr :
+			 ($ispc600wifi ? "pc600 WiFi Cluster ($nodeid)" :
+			  $nodeid));
 
 	    $title .= " (vname=" . $map{$nodeid}->{'VNAME'} . ")"
 		if (exists($map{$nodeid}->{'VNAME'}));

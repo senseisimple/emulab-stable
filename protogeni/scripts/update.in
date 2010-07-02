@@ -1,0 +1,134 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Update Protogeni stuff.
+# 
+sub usage()
+{
+    print "Usage: update\n";
+    exit(1);
+}
+my $optlist = "";
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $DBUPDATE	  = "$TB/sbin/dbupdate";
+my $WAP           = "$TB/sbin/withadminprivs";
+my $SACERT	  = "$TB/etc/genisa.pem";
+my $CMCERT	  = "$TB/etc/genicm.pem";
+my $geniuserid    = "geniuser";
+my $geniprojid    = "GeniSlices";
+my $SUDO	  = "/usr/local/bin/sudo";
+my $BATCHEXP      = "$TB/bin/batchexp";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub OneShot();
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libtestbed;
+use libdb qw(TBSetSiteVar TBSiteVarExists TBGetSiteVar);
+use Experiment;
+use GeniDB;
+use GeniCertificate;	  
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV);
+
+OneShot();
+
+#
+# Apply the dbupdates using the Emulab utility, to all three DBs.
+#
+system("$DBUPDATE " . GENISA_DBNAME()) == 0
+    or fatal("Could not apply updates to SA DB");
+system("$DBUPDATE " . GENICM_DBNAME()) == 0
+    or fatal("Could not apply updates to CM DB");
+system("$DBUPDATE " . GENICH_DBNAME()) == 0
+    or fatal("Could not apply updates to CH DB");
+
+exit(0);
+
+#
+# A one of a kind update.
+#
+sub OneShot()
+{
+    if (!TBSiteVarExists("protogeni/sa_uuid") ||
+	!TBSiteVarExists("protogeni/cm_uuid")) {
+	fatal("Please update your Emulab sitevars.");
+    }
+    if (TBGetSiteVar("protogeni/sa_uuid") eq "") {
+        #
+	# Load the SA cert
+        #
+	my $certificate = GeniCertificate->LoadFromFile($SACERT);
+	if (!defined($certificate)) {
+	    fatal("Could not load certificate from $SACERT\n");
+	}
+	TBSetSiteVar('protogeni/sa_uuid', $certificate->uuid());
+    }
+    if (TBGetSiteVar("protogeni/cm_uuid") eq "") {
+        #
+	# Load the CM cert 
+        #
+	my $certificate = GeniCertificate->LoadFromFile($CMCERT);
+	if (!defined($certificate)) {
+	    fatal("Could not load certificate from $CMCERT\n");
+	}
+	TBSetSiteVar('protogeni/cm_uuid', $certificate->uuid());
+    }
+    my $experiment = Experiment->Lookup($geniprojid, "reservations");
+    if (!defined($experiment)) {
+	system("$SUDO -u $geniuserid $WAP $BATCHEXP ".
+	       "  -q -i -k -w -f -n -S 'System Experiment' ".
+	       "  -L 'System Experiment' ".
+	       "  -E 'Holding Pattern for Reservations - DO NOT DELETE' ".
+	       "  -p $geniprojid -e reservations -h " . NewUUID());
+	fatal("Could not create create reservations holding experiment")
+	    if ($?);
+    }
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

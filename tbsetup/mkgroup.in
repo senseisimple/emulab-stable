@@ -1,12 +1,12 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+use strict;
 
 #
 # Create a group on the control/ops nodes and any tipservers. This does
@@ -14,17 +14,17 @@ use Getopt::Std;
 # entries and the group directory. Runs in the foreground all the time;
 # Its quick enough that the user can wait for it.
 #
-# XXX - /proj wired in
-#       control node wired in.
+# XXX - control node wired in.
 #
 sub usage()
 {
-    print STDOUT "Usage: mkgroup <pid> <gid>\n";
+    print STDOUT "Usage: mkgroup [-s] <gid>\n";
     exit(-1);
 }
-sub fatal($);
+my $optlist = "s";
+my $silent  = 0;
 
-my  $optlist = "";
+sub fatal($);
 
 #
 # Configure variables
@@ -36,23 +36,18 @@ my $CONTROL     = "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $ELABINELAB  = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
-my $PROJROOT    = "/proj";
-my $GRPROOT     = "/groups";
+my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $OPSDBSUPPORT= @OPSDBSUPPORT@;
+my $TBBASE      = "@TBBASE@";
+my $TBWWW       = "@TBWWW@";
 my $SSH         = "$TB/bin/sshtb";
 my $ADDMMLIST   = "$TB/sbin/addmmlist";
+my $OPSDBCONTROL= "$TB/sbin/opsdb_control";
 my $GROUPADD    = "/usr/sbin/pw groupadd";
 my @DIRLIST     = ("exp", "images", "logs", "tarfiles", "rpms", "tiplogs");
 my $SAVEUID     = $UID;
 
-my $dbuid;
-my @db_row;
-my $query_result;
-my $leader;
-my $logname;
-my $user_name;
-my $user_email;
-my $unix_gid;
-my $unix_name;
+# Locals
 my @tipservers;
 
 #
@@ -78,6 +73,12 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
+use Group;
+
+# Defined in libtestbed.
+my $PROJROOT    = PROJROOT();
+my $GRPROOT     = GROUPROOT();
 
 #
 # We don't want to run this script unless its the real version.
@@ -100,47 +101,36 @@ if ($UID == 0) {
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 2) {
+if (defined($options{"s"})) {
+    $silent = 1;
+}
+if (@ARGV != 1) {
     usage();
 }
-my $pid = shift(@ARGV);
-my $gid = shift(@ARGV);
 
-#
-# Untaint args.
-#
-if ($pid =~ /^([-\@\w]+)$/) {
-    $pid = $1;
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
-else {
-    die("Bad data in pid: $pid.");
-}
-if ($gid =~ /^([-\@\w]+)$/) {
-    $gid = $1;
-}
-else {
-    die("Bad data in gid: $gid.");
-}
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+my $user_uid   = $this_user->uid();
 
-#
-# Get user DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-        "    You do not exist in the Emulab Database!\n");
+# Map the group to its object.
+my $group = Group->Lookup($ARGV[0]);
+if (!defined($group)) {
+    fatal("Could not lookup group object for $ARGV[0]");
 }
-
-#
-# Get email info for mail.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-        "    Cannot determine email info for you!\n");
-}
+my $unix_gid   = $group->unix_gid();
+my $unix_name  = $group->unix_name();
+my $pid        = $group->pid();
+my $gid        = $group->gid();
+my $gid_idx    = $group->gid_idx();
 
 #
 # This script is always audited. Mail is sent automatically upon exit.
@@ -154,24 +144,18 @@ if (AuditStart(0)) {
 
 #
 # Need Proj leader for ownership.
-# 
-if (! ($leader = GroupLeader($pid, $gid))) {
-    die("*** $0:\n".
-	"    Could not determine group leader for $pid/$gid!\n");
+#
+my $leader = $group->GetLeader();
+if (!defined($leader)) {
+    fatal("Could not determine group leader for $group");
 }
+my $unix_uid = $leader->unix_uid();
 
 #
 # The group directory lives here.
 # 
 my $groupdir  = "$GRPROOT/$pid/$gid";
 my $grouplink = "$PROJROOT/$pid/groups/$gid";
-
-#
-# Unix info for the group
-#
-if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
-    fatal("No info for project/group $pid/$gid!");
-}
 
 # 
 # Create group locally if it does not exist. egrep returns 1 when
@@ -237,10 +221,8 @@ if ($pid ne $gid) {
 	fatal("Could not chmod directory $groupdir: $!");
     }
 
-    $unix_uid = getpwnam($leader);
-
     if (! chown($unix_uid, $unix_gid, "$groupdir")) {
-	fatal("Could not chown $groupdir to $leader/$gid: $!");
+	fatal("Could not chown $groupdir to $unix_uid/$unix_gid: $!");
     }
 
     if (! -e $grouplink) {
@@ -265,20 +247,49 @@ if ($pid ne $gid) {
 	}
     }
 
-    if ($MAILMANSUPPORT && !$ELABINELAB) {
+    if (($MAILMANSUPPORT || $OPSDBSUPPORT) && !$ELABINELAB) {
 	$UID  = $SAVEUID;
 	$EUID = $UID;
-	system("$ADDMMLIST -a ${pid}-${gid}-users") == 0 or
-	    fatal("$ADDMMLIST -a ${pid}-${gid}-users failed!");
+
+	if ($MAILMANSUPPORT) {
+	    system("$ADDMMLIST -a ${pid}-${gid}-users") == 0 or
+		fatal("$ADDMMLIST -a ${pid}-${gid}-users failed!");
+	}
+
+	if ($OPSDBSUPPORT) {
+	    system("$OPSDBCONTROL addgroup $pid $gid") == 0 or
+		fatal("$OPSDBCONTROL addgroup $pid $gid failed!");
+	}
 	$EUID = 0;
     }
 }
-    
+
+# No email when the project group being created.
+if (!$silent && !$group->IsProjectGroup()) {
+    #
+    # Send an email message with a join link.
+    #
+    my $group_leader_name  = $leader->name();
+    my $group_leader_email = $leader->email();
+    my $group_leader_uid   = $leader->uid();
+
+    SENDMAIL("$group_leader_name '$group_leader_uid' <$group_leader_email>",
+     "New Group '$pid/$gid ($gid_idx)' Created",
+     "This message is to notify you that group '$gid' in project '$pid'\n".
+     "has been created. Please save this link so that you can send it to\n".
+     "people you wish to have join this group:\n".
+     "\n".
+     "    ${TBBASE}/joinproject.php3?target_pid=$pid&target_gid=$gid\n".
+     "\n",
+     "$user_name '$user_uid' <$user_email>",
+     "CC: $user_name '$user_uid' <$user_email>");
+}
 print "Group Creation Completed!\n";
 exit(0);
 
 sub fatal($)
 {
+    
     my($mesg) = $_[0];
 
     die("*** $0:\n".

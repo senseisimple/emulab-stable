@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -50,6 +50,7 @@ sub fatal($);
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use User;
 
 #
 # We don't want to run this script unless its the real version.
@@ -105,15 +106,14 @@ else {
     die("Bad data in uid: $uid");
 }
 
-# Need the password hash ...
-$query_result =
-    DBQueryFatal("select u.usr_pswd from users as u ".
-		 "where u.uid='$uid'");
-
-if ($query_result->numrows == 0) {
-    fatal("No such user $uid!");
+# Map target user to object.
+my $target_user = User->Lookup($uid);
+if (! defined($target_user)) {
+    fatal("$uid does not exist!");
 }
-my ($passhash) = $query_result->fetchrow_array();
+
+# Need the password hash ...
+my $passhash = $target_user->pswd();
 
 # shell escape.
 $passhash =~ s/\$/\\\$/g;

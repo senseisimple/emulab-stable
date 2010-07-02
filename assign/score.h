@@ -1,26 +1,14 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 #ifndef _SCORE_H
 #define _SCORE_H
 
-/*
- * 'optimal' score - computes a lower bound on the optimal score for this
- * mapping, so that if we find this score, we know we're done and can exit
- * early.
- */
-#ifdef USE_OPTIMAL
-#define OPTIMAL_SCORE(edges,nodes) (nodes*SCORE_PNODE + \
-                                    nodes/opt_nodes_per_sw*SCORE_SWITCH + \
-                                    edges*((SCORE_INTRASWITCH_LINK+ \
-                                    SCORE_DIRECT_LINK*2)*4+\
-                                    SCORE_INTERSWITCH_LINK)/opt_nodes_per_sw)
-#else
-#define OPTIMAL_SCORE(edges,nodes) 0
-#endif
+#include "physical.h"
+#include "virtual.h"
 
 /*
  * Details about which violations are present
@@ -73,7 +61,6 @@ class violated_info {
 	int max_types;
 };
 
-extern double score;
 extern int violated;
 extern violated_info vinfo;
 extern bool allow_trivial_links;
@@ -110,4 +97,53 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
 void resolve_links(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
     bool deterministic);
 void mark_vlink_unassigned(tb_vlink *vlink);
+
+/*
+ * Declaration of many of the variables used for scoring. Default values
+ * are provided in score.cc, but these declarations are here so that other
+ * parts of the code can see or modify their values.
+ */
+extern float SCORE_DIRECT_LINK; /* Cost of a direct link */
+extern float SCORE_INTRASWITCH_LINK; /* Cost of an intraswitch link*/
+extern float SCORE_INTERSWITCH_LINK; /* Cost of an interswitch link*/
+
+extern float SCORE_DIRECT_LINK_PENALTY; /* Cost of overused direct link*/
+extern float SCORE_NO_CONNECTION; /* Cost of not filling a virt. link*/
+extern float SCORE_PNODE; /* Cost of using a pnode*/
+extern float SCORE_PNODE_PENALTY; /* Cost of overusing a pnode*/
+extern float SCORE_SWITCH; /* Cost of using a switch.*/
+extern float SCORE_UNASSIGNED; /* Cost of an unassigned node*/
+extern float SCORE_MISSING_LOCAL_FEATURE;
+extern float SCORE_OVERUSED_LOCAL_FEATURE;
+extern float SCORE_PCLASS; /* Cost of each pclass */
+
+extern float SCORE_VCLASS; /* vclass score multiplier */
+extern float SCORE_EMULATED_LINK; /* cost of an emualted link */
+extern float SCORE_OUTSIDE_DELAY; /* penalty for going out of delay
+requirements */
+#ifdef PENALIZE_UNUSED_INTERFACES
+extern float SCORE_UNUSED_INTERFACE;
+#endif
+extern float SCORE_TRIVIAL_PENALTY; /* Cost of over-using a trivial link */
+
+extern float SCORE_TRIVIAL_MIX; /* Cost of mixing trivial and non-trivial
+links */
+
+extern float SCORE_SUBNODE; /* Cost of not properly assigning subnodes */
+extern float SCORE_MAX_TYPES; /* Cost of going over type limits - low 
+* enough that assign ususally picks this
+* over leaving a node unassigned */
+
+// The following are used to weight possible link resolutions.  Higher
+// numbers mean a more likely resolution.
+extern float LINK_RESOLVE_TRIVIAL;
+extern float LINK_RESOLVE_DIRECT;
+extern float LINK_RESOLVE_INTRASWITCH;
+extern float LINK_RESOLVE_INTERSWITCH;
+
+// The amount that each violation contributes to the total score
+extern float VIOLATION_SCORE;
+
+extern float opt_nodes_per_sw;
+
 #endif

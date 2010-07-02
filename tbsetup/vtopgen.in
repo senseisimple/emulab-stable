@@ -1,0 +1,154 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage ()
+{
+    print STDERR "Usage: $0 [-v] [-u [-f]] [-x] [-o filename] pid eid\n";
+    print STDERR " -p   - pre-assign mode, as from tbprerun\n";
+    print STDERR " -v   - Enables verbose output\n";
+    print STDERR " -u   - Enables update mode\n";
+    print STDERR " -x   - XML output\n";
+    print STDERR " -o   - Send output to file instead of stdout\n";
+    print STDERR " -f   - Fix current resources during update mode\n";
+    exit(1);
+}
+my $optlist  = "vufxo:pr";
+my $verbose  = 0;
+my $fixmode  = 0;
+my $updating = 0;
+my $warnings = 0;
+my $preassign= 0;
+my $xml      = 0;
+my $rspec    = 0;
+my $output   = *STDOUT;
+my $retval   = 0;
+my $filename;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use libtblog;
+use libvtop;
+
+# Protos
+sub fatal($);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV < 2) {
+    usage();
+}
+if (defined($options{"v"})) {
+    $verbose++;
+}
+if (defined($options{"u"})) {
+    $updating = 1;
+}
+if (defined($options{"f"})) {
+    $fixmode = 1;
+}
+if (defined($options{"x"})) {
+    $xml = 1;
+}
+if (defined($options{"r"})) {
+    $rspec = 1;
+}
+if (defined($options{"p"})) {
+    $preassign = 1;
+}
+if (defined($options{"o"})) {
+    $filename = $options{"o"};
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal("Could not lookup experiment object $pid,$eid!")
+}
+
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+
+my $flags = 0;
+$flags |= $libvtop::VTOP_FLAGS_VERBOSE
+    if ($verbose);
+$flags |= $libvtop::VTOP_FLAGS_UPDATE
+    if ($updating);
+$flags |= $libvtop::VTOP_FLAGS_FIXNODES
+    if ($fixmode);
+
+# Open up output file now.
+if (defined($filename)) {
+    open(OUT, ">$filename")
+	or fatal("Could not open output file: $!");
+    $output = *OUT;
+}
+
+my $vtop = libvtop->Create($experiment, $this_user, $flags);
+if (!defined($vtop)) {
+    fatal("Could not create vtop structure for $experiment");
+}
+$vtop->CreateVtop() == 0
+    or fatal("Could not create vtop for $experiment");
+
+if ($preassign) {
+    if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
+			     "minimum_nodes" => $vtop->minimum_nodes(),
+			     "virtnode_count"=> $vtop->virtnodecount() })) {
+	fatal("Could not update min/max nodes for $experiment");
+	return -1;
+    }
+    exit(0);
+}
+
+if ($rspec && defined($vtop->rspec())) {
+    $retval = $vtop->PrintRspec($output);
+}
+elsif ($xml) {
+    $retval = $vtop->PrintXML($output);
+}
+else {
+    $retval = $vtop->PrintTop($output);
+}
+close($output)
+    if (defined($filename));
+exit($retval);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

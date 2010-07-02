@@ -1,0 +1,340 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Handle iLO or iLO 2 remote power control.
+# Also handle DRAC since its so similar.
+# Node must have an interface such that role='other' and
+# interface_type='ilo2' or 'ilo'.
+#
+# Supports either pubkey or passwd auth, depending on what's in db.
+#
+
+package power_ilo;
+
+use Exporter;
+@ISA = ("Exporter");
+@EXPORT = qw( iloctrl );
+
+use lib "@prefix@/lib";
+use libdb;
+use emutil;
+
+use IO::Pty;
+use POSIX qw(setsid);
+use POSIX ":sys_wait_h";
+
+my $debug = 0;
+# Always parallelize for now cause we are vulnerable to timeouts with 
+# unreachable nodes or weird iLO crap.
+my $parallelize = 1;
+
+# Turn off line buffering on output
+$| = 1;
+
+my %portinfo = ();
+
+#
+# usage: iloctrl(type, cmd, nodes)
+# type = { "ilo" | "ilo2" }
+# cmd = { "cycle" | "on" | "off" }
+# nodes = list of one or more physical node names
+#
+# Returns 0 on success. Non-zero on failure.
+# 
+sub iloctrl($$@) {
+    my ($type,$cmd,@nodes) = @_;
+    my $exitval = 0;
+
+    if ($debug) {
+	print "iloctrl called with $type,$cmd,(" . join(',',@nodes) . ")\n";
+    }
+
+    if ($cmd ne "cycle" && $cmd ne "on" && $cmd ne "off") {
+	warn "invalid power command '$cmd'; \n" . 
+	    "  valid commands are 'cycle, 'off', and 'on'.\n";
+	return scalar(@nodes);
+    }
+
+    my %ilo_nodeinfo = ();
+
+    # grab ilo IP and auth info
+    foreach my $n (@nodes) {
+	my $res = DBQueryFatal("select IP from interfaces" . 
+			       " where node_id='$n' and role='other'" . 
+			       "   and interface_type='$type'");
+	if (!defined($res) || !$res || $res->num_rows() == 0) {
+	    warn "No $type interface for $n; cannot find $type IP!\n";
+	    ++$exitval;
+	    next;
+	}
+	my ($IP) = $res->fetchrow();
+
+	$res = DBQueryFatal("select key_role,key_uid,mykey" . 
+			    " from outlets_remoteauth" . 
+			    " where node_id='$n' and key_type='$type'");
+	if (!defined($res) || !$res || $res->num_rows() == 0) {
+	    warn "No $type remote auth info for $n!\n";
+	    ++$exitval;
+	    next;
+	}
+	my ($krole,$kuid,$kkey) = $res->fetchrow();
+
+	$ilo_nodeinfo{$n} = [ $n,$IP,$krole,$kuid,$kkey ];
+    }
+
+    my $timeout = 30;
+    if ($parallelize) {
+	my $coderef = sub {
+	    my ($n,$IP,$krole,$kuid,$kkey) = @{ $_[0] };
+	    
+	    my $tret;
+	    eval {
+		$tret = iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey,$timeout);
+	    };
+	    if ($@) {
+		print "$@";
+		return -1;
+	    }
+	    return 0;
+	};
+	my @results = ();
+	my @ilos    = values(%ilo_nodeinfo);
+	
+	if (ParRun(undef, \@results, $coderef, @ilos)) {
+	    print STDERR "*** power_ilo: Internal error in ParRun()!\n";
+	    return -1;
+	}
+	#
+	# Check the exit codes. 
+	#
+	foreach my $result (@results) {
+	    ++$exitval
+		if ($result != 0);
+	}
+    }
+    else {
+	for my $key (keys(%ilo_nodeinfo)) {
+	    my ($n,$IP,$krole,$kuid,$kkey) = @{$ilo_nodeinfo{$key}};
+
+	    if (iloexec($n,$type,$cmd,$IP,$krole,$kuid,$kkey,$timeout)) {
+		++$exitval;
+	    }
+	}
+    }
+    return $exitval;
+}
+
+#
+# Arguments: $node_id,$type,$cmd,$IP,$key_role,$key_uid,$key[,$timeout]
+#
+sub iloexec($$$$$$$;$) {
+    my ($node_id,$type,$cmd,$IP,$key_role,$key_uid,$key,$timeout) = @_;
+
+    if ($debug) {
+	print "iloexec called with (" . join(',',@_) . ")\n";
+    }
+
+    if (!defined($type) || !defined($cmd) || !defined($IP) 
+	|| !defined($key_role) || !defined($key_uid) || !defined($key)) {
+	warn "Incomplete argument list, skipping node" . 
+	    (defined($node_id)?" $node_id":"");
+
+	return -1;
+    }
+
+    my $power_cmd;
+    if ($cmd eq 'cycle') {
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction powercycle' : 'power reset');
+    }
+    elsif ($cmd eq 'reset') {
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction hardreset' : 'power warm');
+    }
+    elsif ($cmd eq 'on') {
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction powerup' : 'power on');
+    }
+    elsif ($cmd eq 'off') {
+	$power_cmd = ($type eq "drac" ?
+		      'racadm serveraction powerdown' : 'power off');
+    }
+    else {
+	warn "Bad iLO power command $cmd";
+	return -11;
+    }
+
+    if ($type ne 'ilo' && $type ne 'ilo2' && $type ne "drac") {
+	warn "Unsupported iLO/DRAC type $type!";
+	return -7;
+    }
+
+    my @expect_seq;
+    my $ssh_cmd = "ssh -o StrictHostKeyChecking=no -l '$key_uid'";
+
+    if ($key_role eq 'ssh-key') {
+	if ($key ne '') {
+	    $ssh_cmd .= " -i '$key'";
+	}
+	if ($type eq "drac") {
+	    @expect_seq = (['\$ ',  $power_cmd],
+			   ['\$ ',  'exit']);
+	}
+	else {
+	    @expect_seq = (['hpiLO-> ',$power_cmd],['hpiLO-> ','exit']);
+	}
+    }
+    elsif ($key_role eq 'ssh-passwd') {
+	$ssh_cmd .= " -o PubkeyAuthentication=no";
+	$ssh_cmd .= " -o PasswordAuthentication=yes";
+	if ($key eq '') {
+	    warn "iLO key_role ssh-passwd specified, but no passwd!";
+	    return -13;
+	}
+	if ($type eq "drac") {
+	    @expect_seq = (['password: ', $key],
+			   ['\$ ',        $power_cmd],
+			   ['\$ ',        'exit']);
+	}
+	else {
+	    @expect_seq = (['password: ',$key],['hpiLO-> ',$power_cmd],
+			   ['hpiLO-> ','exit']);
+	}
+    }
+    else {
+	warn "Unsupported key_role $key_role!";
+	return -14;
+    }
+
+    $ssh_cmd .= " $IP";
+
+    my $pid;
+    my $sentall = 0;
+    # Setup some signal handlers so we can avoid leaving ssh zombies.
+    $SIG{'CHLD'} = sub { die "iloexec($node_id) child ssh died unexpectedly!"; };
+    $SIG{'PIPE'} = sub { die "iloexec($node_id) ssh died unexpectedly!"; };
+    if (defined($timeout)) {
+	$SIG{'ALRM'} = sub {
+	    $SIG{'PIPE'} = 'IGNORE';
+	    $SIG{'CHLD'} = 'IGNORE';
+	    kill(INT,$pid);
+	    select(undef,undef,undef,0.1);
+	    kill(TERM,$pid);
+	    select(undef,undef,undef,0.1);
+	    kill(KILL,$pid);
+	    die "iloexec($node_id) timed out in ssh!";
+	};
+
+	alarm($timeout);
+    }
+
+    my $pty = IO::Pty->new() || die "can't make pty: $!";
+    defined ($pid = fork()) || die "fork: $!";
+    if (!$pid) {
+	# Flip to UID 0 to ensure we can read whatever private key we need
+	$EUID = 0;
+	
+	if ($debug) {
+	    print "Flipped to root: $EUID\n";
+	}
+
+	# Connect our kid to the tty so the parent can chat through the pty
+        POSIX::setsid();
+
+	$pty->make_slave_controlling_terminal();
+
+	my $tty = $pty->slave();
+	my $tty_fd = $tty->fileno();
+	close($pty);
+
+	open(STDIN,"<&$tty_fd");
+	open(STDOUT,">&$tty_fd");
+	open(STDERR,">&STDOUT");
+	close($tty);
+
+	# Don't want ssh to prompt us via ssh-askpass!
+	delete $ENV{DISPLAY};
+
+	if ($debug) {
+	    print "ssh_cmd($node_id): $ssh_cmd\n";
+	}
+	
+	exec("$ssh_cmd") || die "exec: $!";
+    }
+
+    #
+    # Talk to ssh over the pty: wait for expected output and send responses
+    #
+    my @lines = ();
+    foreach $es (@expect_seq) {
+	my ($rval,$sval) = @$es;
+
+	my $found = 0;
+	my $line = '';
+	while (1) {
+	    my $char;
+	    if (read($pty,$char,1) != 1) {
+		warn "Error in read in iLO pseudo expect loop!\n";
+		print "Had read the following lines:\n";
+		foreach my $ln (@lines) {
+		    print "  $ln\n";
+		}
+		last;
+	    }
+	    if ($char eq "\r" || $char eq "\n") {
+		push @lines,$line;
+		if ($debug) {
+		    print "read '$line' while looking for '$rval'\n";
+		}
+		$line = '';
+	    }
+	    else {
+		$line .= $char;
+	    }
+
+	    if ($line =~ /$rval$/) {
+		print $pty "$sval\r\n";
+		if ($debug) {
+		    print "sent '$sval'\n";
+		}
+		$found = 1;
+		last;
+	    }
+	}
+
+	if (!$found) {
+	    # some sort of error; try to kill off ssh
+	    kill(15,$pid);
+	    return -16;
+	}
+    }
+    # this is a race, but there's nothing better, because we want the remote 
+    # side to see an appropriate exit so it frees its resources, so there is
+    # a very miniscule chance that the connection could break and ssh could 
+    # exit before we get here... but it seems unlikely.
+    $SIG{'CHLD'} = 'IGNORE';
+
+    # make sure the local ssh dies:
+    my $i = 5;
+    my $dead = 0;
+    while (--$i) {
+	my $ret = waitpid($pid,WNOHANG);
+	if ($ret == -1 || $ret == $pid) {
+	    $dead = 1;
+	    last;
+	}
+	sleep(1);
+    }
+    kill(KILL,$pid) if (!$dead);
+
+    # if we get here, things probably went ok...
+    return 0;
+}
+
+1;

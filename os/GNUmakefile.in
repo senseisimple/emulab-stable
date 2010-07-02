@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,12 +26,15 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
 	@$(MAKE) -C frisbee.redux install
+	$(INSTALL_PROGRAM) $(SRCDIR)/template_record \
+		$(INSTALL_DIR)/opsdir/bin/template_record
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man1
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 \
 		$(INSTALL_DIR)/opsdir/man/man1/install-tarfile.1
 
 control-install: 
 	@$(MAKE) -C imagezip install
+	$(INSTALL_PROGRAM) $(SRCDIR)/template_record $(LBINDIR)/template_record
 
 client:
 ifeq ($(SYSTEM),FreeBSD)
@@ -42,11 +45,12 @@ endif
 	$(MAKE) -C genhostsfile client
 
 client-install: client
-	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
+	-mkdir -p $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	-mkdir -p $(DESTDIR)$(CLIENT_MANDIR)/man1
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
+	$(INSTALL_PROGRAM) $(SRCDIR)/template_record $(LBINDIR)/template_record
 ifeq ($(SYSTEM),FreeBSD)
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-swapimage $(LBINDIR)/
@@ -55,6 +59,16 @@ endif
 	$(MAKE) -C syncd client-install
 	$(MAKE) -C dijkstra client-install
 	$(MAKE) -C genhostsfile client-install
+
+subboss: client
+	$(MAKE) -C frisbee.redux all
+
+subboss-install: subboss client-install
+ifeq ($(SYSTEM),FreeBSD)
+	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux install
+else
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C frisbee.redux install
+endif
 
 mfs:
 	$(MAKE) -C imagezip client
@@ -71,11 +85,20 @@ frisbee-mfs:
 	$(MAKE) -C growdisk client
 
 frisbee-mfs-install: frisbee-mfs
+ifeq ($(SYSTEM),FreeBSD)
 	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux client-install
 	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C growdisk client-install
+else
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C frisbee.redux client-install
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C growdisk client-install
+endif
+
+cdboot-install: mfs-install frisbee-mfs
+	$(MAKE) -e -C frisbee.redux client-install
+	$(MAKE) -e -C growdisk client-install
 
 remote-install: 
-	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
+	-mkdir -p $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 

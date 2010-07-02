@@ -1,7 +1,7 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2006 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: ntpinfo table.
@@ -14,6 +14,10 @@ use Getopt::Std;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
+use Experiment;
+use User;
+use Lan;
 
 #
 # Do things necessary for setting up inner elab experiment. 
@@ -26,13 +30,25 @@ sub usage()
  
     exit(-1);
 }
-my $optlist  = "dgkfur";
+my $optlist  = "dgkfurP";
 my $debug    = 1;
+my $verbose  = 0;
 my $killmode = 0;
 my $fwboot   = 0;
 my $dbgooonly= 0;
 my $update   = 0;
 my $remove   = 0;
+
+#
+# XXX experimental speed hacks.
+#     $inparallel    reboots all server in parallel (rather than serially)
+#		     after setup
+#     $restartnodes  uses a new bootinfo RESTART command to quickly move
+#		     inner nodes from control of outer boss to inner boss
+#		     avoiding all node reboots
+#
+my $inparallel = 1;
+my $restartnodes = 1;
 
 sub DumpDBGoo();
 
@@ -42,19 +58,20 @@ sub DumpDBGoo();
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CONTROL	= "@USERNODE@";
+my $DBNAME      = "@TBDBNAME@";
 my $TBOPSPID    = TBOPSPID();
 my $SSH		= "$TB/bin/sshtb";
+my $SCP		= "/usr/bin/scp";
 my $nodereboot  = "$TB/bin/node_reboot";
+my $noderestart	= "$TB/sbin/bootinfosend -R";
 my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $nodewait    = "$TB/sbin/node_statewait";
 my $snmpit      = "$TB/bin/snmpit";
 
-# Locals
-my $elabinelab;
-my $elabinelab_eid;
-
 # Protos
 sub TearDownEmulab();
+sub RemoveNodes();
+sub UpdateEmulab();
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -73,24 +90,19 @@ if ($EUID != 0) {
 	"    Must be root! Maybe its a development version?\n");
 }
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
-
 # Locals
-my $PROJROOT	= PROJROOT();
 my $SAVEUID     = $UID;
 my $workdir;
+my $expdir;
 my %noderoles	= ();
 my $opsnode;
 my $bossnode;
 my $fsnode;
 my $routernode;
 my @expnodes    = ();
-my $dbuid;
-my $user_name;
-my $user_email;
 my $query_result;
-my $exptinfo;
+my $inner_experiment;
+my $inner_nsfile;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -118,6 +130,9 @@ if (defined($options{"u"})) {
 if (defined($options{"r"})) {
     $remove = 1;
 }
+if (defined($options{"P"})) {
+    $inparallel = 1;
+}
 if (! @ARGV) {
     usage();
 }
@@ -138,33 +153,41 @@ if ($eid =~ /^([-\w]+)$/) {
 else {
     die("Tainted argument $eid!\n");
 }
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    die("*** $0:\n".
+	"    Could not map $pid/$eid to its object!\n");
+}
 $workdir = TBExptWorkDir($pid, $eid);
+$expdir = PROJROOT() . "/$pid/exp/$eid";
+
+# Build Logfile names
+my $opslogfile  = "$workdir/opsnode.log";
+my $fslogfile   = "$workdir/fsnode.log";
+my $bosslogfile = "$workdir/bossnode.log";
 
 #
 # Verify user and get his DB uid.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
-}
 TBDebugTimeStampsOn();
 
 #
 # Get elabinelab status to make sure, and to see if we need to fire off
 # an experiment inside once its setup.
 #
-if (! TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)) {
-    die("*** $0:\n".
-	"    Could not get elabinelab status for experiment $pid/$eid\n");
-}
+my $elabinelab           = $experiment->elabinelab();
+my $elabinelab_eid       = $experiment->elabinelab_eid();
+my $elabinelab_nosetup   = $experiment->elabinelab_nosetup();
+my $elabinelab_singlenet = $experiment->elabinelab_singlenet();
+
 exit(0)
     if (!$elabinelab);
 
@@ -173,14 +196,6 @@ exit(0)
 #
 my $firewall;
 my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
-
-#
-# XXX NOSETUP option needs more work ...
-#
-$query_result =
-    DBQueryFatal("select elabinelab_nosetup from experiments ".
-		 "where pid='$pid' and eid='$eid'");
-my ($nosetup) = $query_result->fetchrow_array();
 
 #
 # Presetup; turn off firewall.
@@ -204,30 +219,18 @@ if ($fwboot) {
 # from the DB and save it. 
 #
 if (defined($elabinelab_eid)) {
-    $query_result =
-	DBQueryFatal("select nsfile from nsfiles ".
-		     "where pid='$pid' and eid='$elabinelab_eid'");
-
+    $inner_experiment = Experiment->Lookup($pid, $elabinelab_eid);
     die("*** $0:\n".
 	"    No such experiment in DB for $pid/$elabinelab_eid\n")
-	if (!$query_result->numrows);
+	if (!defined($inner_experiment));
 
-    my ($nsfile) = $query_result->fetchrow_array();
+    $inner_experiment->GetNSFile(\$inner_nsfile) == 0 or
+	die("*** $0:\n".
+	    "    Could not get NS file for $inner_experiment\n");
     
     die("*** $0:\n".
-	"    No nsfile in DB for $pid/$elabinelab_eid\n")
-	if (!defined($nsfile) || $nsfile eq "");
-
-    $query_result =
-	DBQueryFatal("select * from experiments ".
-		     "where pid='$pid' and eid='$elabinelab_eid'");
-
-    die("*** $0:\n".
-	"    No such experiment in DB for $pid/$elabinelab_eid\n")
-	if (!$query_result->numrows);
-
-    $exptinfo = $query_result->fetchrow_hashref();
-    $exptinfo->{"nsfile"} = $nsfile;
+	"    No nsfile in DB for $inner_experiment")
+	if (!defined($inner_nsfile) || $inner_nsfile eq "");
 }
 
 #
@@ -290,24 +293,30 @@ $UID = 0;
 # This is temporary. I think I will switch this over to grabbing the latest
 # version from the web server.
 #
+# XXX ugh, copy over a newer mkextrafs.pl as well (one that supports -2).
+# XXX ughII, we only copy over a FreeBSD version, this will break a Linux boss.
+#
 my $mkelab = "$TB/etc/rc.mkelab";
-
-if (-e "/proj/$pid/exp/$eid/rc.mkelab") {
-    $mkelab = "/proj/$pid/exp/$eid/rc.mkelab";
+if (-e "$expdir/rc.mkelab") {
+    $mkelab = "$expdir/rc.mkelab";
 }
-print "Copying $mkelab to ${bossnode}/${opsnode}";
+my $mkextrafs = "";
+if (-e "$TB/etc/mkextrafs.pl") {
+    $mkextrafs = "$TB/etc/mkextrafs.pl";
+}
+print "Copying $mkelab $mkextrafs to ${bossnode}/${opsnode}";
 print "/${fsnode}"
     if (defined($fsnode));
 print "\n";
-system("scp $mkelab ${bossnode}:/tmp");
-system("scp $mkelab ${opsnode}:/tmp");
-system("scp $mkelab ${fsnode}:/tmp")
+system("scp $mkelab $mkextrafs ${bossnode}:/tmp");
+system("scp $mkelab $mkextrafs ${opsnode}:/tmp");
+system("scp $mkelab $mkextrafs ${fsnode}:/tmp")
     if (defined($fsnode));
 
 if (defined($fsnode)) {
     TBDebugTimeStamp("Setting up fsnode");
     print "Setting up fsnode on $fsnode\n";
-    system("$SSH -host $fsnode /tmp/rc.mkelab -s -d > /tmp/fsnode.$$ 2>&1");
+    system("$SSH -host $fsnode /tmp/rc.mkelab -s -d > $fslogfile 2>&1");
     if ($?) {
 	$UID = $SAVEUID;
 	SENDMAIL("$user_name <$user_email>",
@@ -315,8 +324,7 @@ if (defined($fsnode)) {
 		 "Error building the fs node ($fsnode)",
 		 $TBOPS,
 		 "Cc: $TBOPS",
-		 ("/tmp/fsnode.$$"));
-	system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
+		 ($fslogfile));
 	print STDERR "*** $0:\n".
 	    "    Error building the fsnode ($fsnode)!\n";
 	exit(($debug ? 0 : -1));
@@ -324,7 +332,7 @@ if (defined($fsnode)) {
 }
 TBDebugTimeStamp("Setting up opsnode");
 print "Setting up opsnode on $opsnode\n";
-system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > /tmp/opsnode.$$ 2>&1");
+system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > $opslogfile 2>&1");
 if ($?) {
     $UID = $SAVEUID;
     SENDMAIL("$user_name <$user_email>",
@@ -332,15 +340,14 @@ if ($?) {
 	     "Error building the ops node ($opsnode)",
 	     $TBOPS,
 	     "Cc: $TBOPS",
-	     ("/tmp/opsnode.$$"));
-    system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
+	     ($opslogfile));
     print STDERR "*** $0:\n".
 	         "    Error building the opsnode ($opsnode)!\n";
     exit(($debug ? 0 : -1));
 }
 TBDebugTimeStamp("Setting up bossnode");
 print "Setting up bossnode on $bossnode\n";
-system("$SSH -host $bossnode /tmp/rc.mkelab -s -d > /tmp/bossnode.$$ 2>&1");
+system("$SSH -host $bossnode /tmp/rc.mkelab -s -d > $bosslogfile 2>&1");
 if ($?) {
     $UID = $SAVEUID;
     SENDMAIL("$user_name <$user_email>",
@@ -348,37 +355,38 @@ if ($?) {
 	     "Error building the boss node ($bossnode)",
 	     $TBOPS,
 	     "Cc: $TBOPS",
-	     ("/tmp/bossnode.$$"));
-    system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
+	     ($bosslogfile));
     print STDERR "*** $0:\n".
 	         "    Error building the bossnode ($bossnode)!\n";
     exit(($debug ? 0 : -1));
 }
 
-# Send these log files off now so that we can look at them.
-if (defined($fsnode)) {
-    SENDMAIL("$user_name <$user_email>",
-	     "ElabInElab Setup Log: $pid/$eid",
-	     "Logs for building fs/ops/boss ($fsnode/$opsnode/$bossnode)",
-	     $TBOPS,
-	     "Cc: $TBOPS",
-	     ("/tmp/fsnode.$$", "/tmp/opsnode.$$", "/tmp/bossnode.$$"));
-} else {
-    SENDMAIL("$user_name <$user_email>",
-	     "ElabInElab Setup Log: $pid/$eid",
-	     "Logs for building ops/boss ($opsnode/$bossnode)",
-	     $TBOPS,
-	     "Cc: $TBOPS",
-	     ("/tmp/opsnode.$$", "/tmp/bossnode.$$"));
+if ($verbose) {
+    # Send these log files off now so that we can look at them.
+    if (defined($fsnode)) {
+	SENDMAIL("$user_name <$user_email>",
+		 "ElabInElab Setup Log: $pid/$eid",
+		 "Logs for building fs/ops/boss ($fsnode/$opsnode/$bossnode)",
+		 $TBOPS,
+		 "Cc: $TBOPS",
+		 ($fslogfile, $opslogfile, $bosslogfile));
+    }
+    else {
+	SENDMAIL("$user_name <$user_email>",
+		 "ElabInElab Setup Log: $pid/$eid",
+		 "Logs for building ops/boss ($opsnode/$bossnode)",
+		 $TBOPS,
+		 "Cc: $TBOPS",
+		 ($opslogfile, $bosslogfile));
+    }
 }
-system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
 $UID  = $SAVEUID;
 
 # Run as real user for the next few scripts, which are setuid.
 $EUID = $UID;
 
 goto skipsetup
-    if ($nosetup);
+    if ($elabinelab_nosetup);
 
 #
 # Restart DHCPD, but first mark the nodes as being ready to boot inside
@@ -395,37 +403,94 @@ if ($?) {
 	"    Failed to reconfig/restart DHCPD.\n");
 }
 
-if (defined($fsnode)) {
-    # Reboot fs and wait for it to come back.
-    print "Rebooting fsnode ($fsnode).\n";
-    TBDebugTimeStamp("Rebooting fsnode");
-    system("$nodereboot -w $fsnode");
+if ($inparallel) {
+    my $nodes = "$bossnode $opsnode";
+    $nodes .= " $fsnode"
+	if (defined($fsnode));
+    print "Rebooting servers ($nodes).\n";
+    TBDebugTimeStamp("Rebooting servers");
+    system("$nodereboot -w $nodes");
     if ($?) {
 	die("*** $0:\n".
-	    "    Error rebooting the fsnode ($fsnode)!\n");
+	    "    Error rebooting the servers ($nodes)!\n");
     }
-}
-# Reboot ops and wait for it to come back.
-print "Rebooting opsnode ($opsnode).\n";
-TBDebugTimeStamp("Rebooting opsnode");
-system("$nodereboot -w $opsnode");
-if ($?) {
-    die("*** $0:\n".
-	"    Error rebooting the opsnode ($opsnode)!\n");
-}
-# Reboot boss and wait for it to come back.
-print "Rebooting bossnode ($bossnode).\n";
-TBDebugTimeStamp("Rebooting bossnode");
-system("$nodereboot -w $bossnode");
-if ($?) {
-    die("*** $0:\n".
-	"    Error rebooting the bossnode ($bossnode)!\n");
+} else {
+    if (defined($fsnode)) {
+	# Reboot fs and wait for it to come back.
+	print "Rebooting fsnode ($fsnode).\n";
+	TBDebugTimeStamp("Rebooting fsnode");
+	system("$nodereboot -w $fsnode");
+	if ($?) {
+	    die("*** $0:\n".
+		"    Error rebooting the fsnode ($fsnode)!\n");
+	}
+    }
+    # Reboot ops and wait for it to come back.
+    print "Rebooting opsnode ($opsnode).\n";
+    TBDebugTimeStamp("Rebooting opsnode");
+    system("$nodereboot -w $opsnode");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error rebooting the opsnode ($opsnode)!\n");
+    }
+    # Reboot boss and wait for it to come back.
+    print "Rebooting bossnode ($bossnode).\n";
+    TBDebugTimeStamp("Rebooting bossnode");
+    system("$nodereboot -w $bossnode");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error rebooting the bossnode ($bossnode)!\n");
+    }
 }
 $EUID = 0;
 
 # Reboot the experimental nodes. They will come up inside the inner elab.
 # DO NOT WAIT! They are not going to report ISUP from this point on. 
 if (@expnodes) {
+    #
+    # First we try the magic pxeboot restart.
+    # The nodes should still be in PXEWAIT, so we send them a restart
+    # to make them re-DHCP.  This should get them quickly reparented to
+    # the inner boss.
+    #
+    # If this doesn't work, we fall back on rebooting the nodes.
+    #
+    if ($restartnodes) {
+	TBDebugTimeStamp("Redirecting experimental nodes to inner boss");
+	my $stat = 0;
+	# Run as real user again.
+	$EUID = $UID;
+	foreach my $node (@expnodes) {
+	    $stat = system("$noderestart $node");
+	    last if ($stat);
+	}
+	$EUID = 0;
+	if ($stat) {
+	    tbwarn("Node restart failed ($stat), falling back to reboot.");
+	    goto rebootnodes;
+	}
+
+	#
+	# Ssh into inner boss and use a utility script to determine
+	# when the nodes have reported in and are in PXEWAIT (part of the
+	# inner elab). Note the short timeout, since this operation should
+	# be virtually instantaneous.
+	#
+	print "Waiting for nodes to restart and join the inner emulab.\n";
+	TBDebugTimeStamp("Waiting for inner nodes to restart");
+	$UID  = 0;
+	$stat = system("$SSH -host $bossnode ".
+		       "/usr/testbed/sbin/node_statewait -t 15 -a");
+	$UID  = $SAVEUID;
+	if ($stat) {
+	    tbwarn("Error ($stat) waiting for nodes to restart, falling back to reboot.");
+	    goto rebootnodes;
+	}
+
+	goto restartworked;
+    }
+
+rebootnodes:
     print "Rebooting inner experimental nodes.\n";
     TBDebugTimeStamp("Rebooting experimental nodes");
     # Run as real user again.
@@ -454,6 +519,7 @@ if (@expnodes) {
     }
     $UID  = $SAVEUID;
 
+restartworked:
     #
     # To avoid confusion later (with swapmod, which wants them to be ISUP),
     # and so the web interface does not show the nodes as down, set the 
@@ -477,7 +543,7 @@ if (defined($elabinelab_eid)) {
     open(NS, "> /tmp/$$.ns")
 	or die("*** $0:\n".
 	       "    Could not write ns code to tmp file!\n");
-    print NS $exptinfo->{"nsfile"};
+    print NS $inner_nsfile;
     print NS "\n";
     close(NS);
 
@@ -500,7 +566,8 @@ if (defined($elabinelab_eid)) {
 	
     print "Starting experiment $pid/$elabinelab_eid on inner emulab.\n";
     TBDebugTimeStamp("Starting inner experiment");
-    system("$SSH -host $bossnode 'sudo -u $dbuid /usr/testbed/bin/batchexp ".
+    system("$SSH -host $bossnode ".
+	   " 'sudo -u $user_uid /usr/testbed/bin/batchexp ".
 	   "  -q -i $optarg -S \"ElabInElab Experiment\" ".
 	   "  -L \"ElabInElab ElabInElab\" -E \"ElabInElab Experiment\" ".
 	   "  -p $pid -e $elabinelab_eid $nsfilename'");
@@ -561,7 +628,7 @@ sub DumpDBGoo()
     #
     # These tables are dumped completely.
     #
-    my @FULLTABLES = ("node_types", "interface_types",
+    my @FULLTABLES = ("node_types", "node_type_attributes", "interface_types",
 		      "interface_capabilities",
 		      "switch_paths", "switch_stack_types", "switch_stacks",
 		      "node_type_features", "node_types_auxtypes", "osid_map",
@@ -572,18 +639,19 @@ sub DumpDBGoo()
     # as is, unless its the fs or ops node. For those we want to change the
     # node_id to "fs" or "ops" and their type to ops.
     #
-    my @NODETABLES = ("node_auxtypes", "node_status", "nodes",
-		      "node_rusage", "node_hostkeys", "node_idlestats");
+    my @NODETABLES = ("node_auxtypes", "node_status", "nodes", 
+		      "node_rusage", "node_hostkeys", "node_activity",
+		      "interface_state");
 
     #
     # These tables are dumped by project ID.
     #
-    my @PROJTABLES = ("project_stats", "projects", "group_stats", "groups");
+    my @PROJTABLES = ("projects", "groups");
 
     #
-    # These tables are dumped by user ID (for the project).
+    # These tables are dumped by user ID (for the project members).
     #
-    my @USERTABLES = ("users", "user_pubkeys", "user_stats");
+    my @USERTABLES = ("users", "user_pubkeys");
 
     foreach my $table (@FULLTABLES) {
 	unlink("$statedir/$table");
@@ -592,10 +660,22 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not dump table $table\n");
 
-	if ($table eq "node_types") {
-	    DBQueryFatal("update temp_${table} set ".
-			 "delay_capacity=delay_capacity-1 ".
-			 "where delay_capacity>0");
+	if ($table eq "node_type_attributes") {
+	    my $attributes_result =
+		DBQueryFatal("select type,attrvalue from temp_${table} ".
+			     "where attrkey='delay_capacity'");
+
+	    while (my ($ntype,$value) = $attributes_result->fetchrow_array()) {
+		my $newvalue = $value - 1;
+
+		next
+		    if ($newvalue < 0);
+		
+		DBQueryFatal("update temp_${table} set ".
+			     "   attrvalue='$newvalue' ".
+			     "where type='$ntype' and ".
+			     "      attrkey='delay_capacity'");
+	    }
 	}
 
 	DBQueryWarn("select * from temp_$table ".
@@ -643,6 +723,20 @@ sub DumpDBGoo()
 			 "left join nodes as n on w.node_id1=n.node_id or ".
 			 "     w.node_id2=n.node_id ".
 			 "where w.type='Trunk'");
+
+	    # Clear any node reservations on the inside
+	    DBQueryFatal("update temp_${table} set ".
+			 " reserved_pid=null where reserved_pid is not null");
+
+	    # Put the inner nodes into "limbo" so they DTRT when restarted
+	    if ($restartnodes) {
+		DBQueryFatal("update temp_${table} set".
+			     "  op_mode='PXEKERNEL',next_op_mode='',".
+			     "  eventstate='". TBDB_NODESTATE_PXELIMBO . "',".
+			     "  temp_boot_osid=NULL,next_boot_osid=NULL,".
+			     "  osid=NULL".
+			     " where role='testnode'");
+	    }
 	}
     
 	DBQueryWarn("select * from temp_$table ".
@@ -659,6 +753,28 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not dump table $table\n");
     }
+    #
+    # Cleared versions of the project/group stats tables.
+    #
+    unlink("$statedir/project_stats");
+    DBQueryFatal("create temporary table temp_project_stats ".
+		 "like project_stats");
+    DBQueryFatal("insert into temp_project_stats (pid,pid_idx) ".
+		 "select pid,pid_idx from project_stats ".
+		 "where pid='$pid'");
+    DBQueryFatal("select * from temp_project_stats ".
+		 "into outfile '$statedir/project_stats'");
+
+    unlink("$statedir/group_stats");
+    DBQueryFatal("create temporary table temp_group_stats ".
+		 "like group_stats");
+    DBQueryFatal("insert into temp_group_stats ".
+		 "  (pid,pid_idx,gid,gid_idx,gid_uuid) ".
+		 "select pid,pid_idx,gid,gid_idx,gid_uuid ".
+		 "   from group_stats ".
+		 "where pid='$pid'");
+    DBQueryFatal("select * from temp_group_stats ".
+		 "into outfile '$statedir/group_stats'");
 
     #
     # Special case the group and user policy tables. Not sure what to
@@ -676,21 +792,36 @@ sub DumpDBGoo()
 	unlink("$statedir/$table");
 
 	DBQueryWarn("create temporary table temp_$table ".
-		    "select t.* from group_membership as gm ".
-		    "left join users as u on u.uid=gm.uid ".
-		    "left join $table as t on t.uid=u.uid ".
-		    "where gm.pid='$pid' and gm.gid=gm.pid ".
-		    " and t.uid is not NULL and ".
+		    "select distinct t.* from group_membership as gm ".
+		    "left join users as u on u.uid_idx=gm.uid_idx ".
+		    "left join $table as t on t.uid_idx=u.uid_idx ".
+		    "where (gm.pid='$pid' or ".
+		    "       gm.pid='" . TBOPSPID() . "') and gm.gid=gm.pid ".
+		    " and t.uid_idx is not NULL and ".
 		    " u.status='" . USERSTATUS_ACTIVE() . "'")
 	    or die("*** $0:\n".
 		   "    Could not create table temp_$table\n");
 
+	# Clean up ... these are created in the inner elab.
+	DBQueryFatal("delete from temp_${table} ".
+		     "where uid='elabman' or uid='elabckup' or ".
+		     "      uid='operator'");
+
 	if ($table eq "users") {
-	    $creator = ExpLeader($pid, $eid);
+	    my $creator_uid = $experiment->creator();
 	    
 	    DBQueryFatal("update temp_${table} set ".
 			 " admin=1 ".
-			 "where uid='$creator'");
+			 "where uid='$creator_uid'");
+
+	    #
+	    # Save time; force all other users to start out
+	    # frozen since most users in the project do not ever
+	    # actually log in. 
+	    #
+	    DBQueryFatal("update temp_${table} set ".
+			 " status='" . USERSTATUS_FROZEN() . "' ".
+			 "where uid!='$creator_uid'");
 	}
 
 	DBQueryWarn("select * from temp_$table ".
@@ -698,19 +829,33 @@ sub DumpDBGoo()
 	    or die("*** $0:\n".
 		   "    Could not dump table temp_$table\n");
     }
+    #
+    # We want a cleared stats table, so do it here.
+    #
+    DBQueryFatal("create temporary table temp_user_stats ".
+		 "like user_stats");
+    DBQueryFatal("insert into temp_user_stats ".
+		 "  (uid,uid_idx,uid_uuid) ".
+		 "select uid,uid_idx,uid_uuid from temp_users");
+    DBQueryWarn("select * from temp_user_stats ".
+		"into outfile '$statedir/user_stats'")
+	or die("*** $0:\n".
+	       "    Could not dump table temp_user_stats\n");
 
     # The group_membership is also special.
     DBQueryWarn("select gm.* from group_membership as gm ".
-		"left join users as u on u.uid=gm.uid ".
+		"left join users as u on u.uid_idx=gm.uid_idx ".
 		"where (gm.pid='$pid' or ".
-		"       gm.pid='" . TBOPSPID() . "') and ".
-		" u.status='" . USERSTATUS_ACTIVE() . "' ".
+		"       (gm.pid='" . TBOPSPID() . "' and gm.pid=gm.gid)) and ".
+		" u.status='" . USERSTATUS_ACTIVE() . "' and ".
+		" gm.uid!='elabman' and gm.uid!='elabckup' and ".
+		" gm.uid!='operator' ".
 		"into outfile '$statedir/group_membership'")
 	or die("*** $0:\n".
 	       "    Could not dump table group_membership\n");
 
     #
-    # Initial images; not that these images are not going to exist inside!
+    # Initial images; note that these images are not going to exist inside!
     # 
     DBQueryWarn("select * from images ".
 		"where pid='$pid' or (pid='$TBOPSPID' and global=1) ".
@@ -749,6 +894,15 @@ sub DumpDBGoo()
 		"into outfile '$statedir/osidtoimageid'")
 	or die("*** $0:\n".
 	       "    Could not dump table osidtoimageid\n");
+	    
+    # Subosids.  Only take the mapping to parents for those children that
+    # are in the e-in-e pid or are in emulab-ops and are shared.
+    DBQueryWarn("select osm.* from os_submap as osm ".
+		"left join os_info as osi on osm.osid=osi.osid ".
+		"where osi.pid='$pid' or (osi.pid='$TBOPSPID' and osi.shared=1) ".
+		"into outfile '$statedir/os_submap'")
+	or die("*** $0:\n".
+	       "    Could not dump table os_submap\n");
 
     #
     # interfaces table. Need to tag the interfaces being used as the control
@@ -765,19 +919,21 @@ sub DumpDBGoo()
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_interfaces\n");
 
-    # First, mark the real control network as "other" to avoid it being
-    # thought of as the control network!.
-    DBQueryWarn("update temp_interfaces ".
-		"set role='" . TBDB_IFACEROLE_OUTER_CONTROL() . "' " .
-		"where role='" . TBDB_IFACEROLE_CONTROL() . "'")
-	or die("*** $0:\n".
-	       "    Could not delete control ifaces from temp_interfaces\n");
+    if (! $elabinelab_singlenet) {
+	# First, mark the real control network as "other" to avoid it being
+	# thought of as the control network!.
+	DBQueryWarn("update temp_interfaces ".
+		    "set role='" . TBDB_IFACEROLE_OUTER_CONTROL() . "' " .
+		    "where role='" . TBDB_IFACEROLE_CONTROL() . "'")
+	    or die("*** $0:\n".
+		   "    Could not delete control ifaces from temp_interfaces\n");
 
-    DBQueryWarn("update temp_interfaces set ".
-		" role='" . TBDB_IFACEROLE_CONTROL() . "' " .
-		"where IP!='' and role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
-	or die("*** $0:\n".
-	       "    Could not update roles in temp_interfaces\n");
+	DBQueryWarn("update temp_interfaces set ".
+		    " role='" . TBDB_IFACEROLE_CONTROL() . "' " .
+		    "where IP!='' and role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
+	    or die("*** $0:\n".
+		   "    Could not update roles in temp_interfaces\n");
+    }
 
     # And rename the fs/ops nodes as above.
     if (defined($fsnode)) {
@@ -808,8 +964,8 @@ sub DumpDBGoo()
 		"select t.* from reserved as r ".
 		"left join virt_nodes as v on v.vname=r.vname and ".
 		"     v.pid=r.pid and v.eid=r.eid ".
-		"left join wires as t on t.node_id1=r.node_id and ".
-		"     t.type='Node' ".
+		"left join wires as t on t.node_id1=r.node_id ".
+		($elabinelab_singlenet == 0 ? " and t.type='Node' " : " ") .
 		"where r.pid='$pid' and r.eid='$eid' and ".
 		"      v.inner_elab_role in ('node','ops','fs','ops+fs') ")
 	or die("*** $0:\n".
@@ -827,16 +983,18 @@ sub DumpDBGoo()
 	or die("*** $0:\n".
 	       "    Could not ops node_id in temp_wires\n");
 
-    # But we need to take out the wires that are being used as the
-    # inner control network, or at least mark them as Control.
-    $query_result =
-	DBQueryWarn("select node_id,card,port from temp_interfaces ".
-		    "where role='" . TBDB_IFACEROLE_CONTROL() . "' ");
+    if (! $elabinelab_singlenet) {
+	# But we need to take out the wires that are being used as the
+	# inner control network, or at least mark them as Control.
+	$query_result =
+	    DBQueryWarn("select node_id,card,port from temp_interfaces ".
+			"where role='" . TBDB_IFACEROLE_CONTROL() . "' ");
 
-    while (my ($node_id,$card,$port) = $query_result->fetchrow_array()) {
-	DBQueryWarn("update temp_wires set type='Control' ".
-		    "where node_id1='$node_id' and card1=$card and ".
-		    "      port1=$port");
+	while (my ($node_id,$card,$port) = $query_result->fetchrow_array()) {
+	    DBQueryWarn("update temp_wires set type='Control' ".
+			"where node_id1='$node_id' and card1=$card and ".
+			"      port1=$port");
+	}
     }
     # Okay, now add the "trunk" wires in without any alteration.
     DBQueryWarn("insert into temp_wires ".
@@ -865,7 +1023,8 @@ sub DumpDBGoo()
 	DBQueryWarn("update temp_reserved set ".
 		    "   node_id='fs', ".
 		    "   pid='$TBOPSPID', ".
-		    "   eid='opsnodes' ".
+		    "   eid='opsnodes', ".
+		    "   exptidx=1 ".
 		    "where node_id='$fsnode'")
 	    or die("*** $0:\n".
 		   "    Could not update temporary table temp_reserved\n");
@@ -873,7 +1032,8 @@ sub DumpDBGoo()
     DBQueryWarn("update temp_reserved set ".
 		"   node_id='ops', ".
 		"   pid='$TBOPSPID', ".
-		"   eid='opsnodes' ".
+		"   eid='opsnodes', ".
+		"   exptidx=1 ".
 		"where node_id='$opsnode'")
 	or die("*** $0:\n".
 	       "    Could not update temporary table temp_reserved\n");
@@ -895,12 +1055,30 @@ sub DumpDBGoo()
 	       "    Could not dump table tiplines\n");
 
     #
+    # Dump the DB schema too, so we can check in the inner Elab that this data
+    # is compatible with the sql/database-create.sql schema file there, *before*
+    # loading it into the db.  Added/removed columns would misalign row data.
+    #
+    my $schemafile = "$expdir/outer_db_schema";
+    system("rm -f $schemafile")
+	if (-f $schemafile);
+    my $isvers5     = system("mysql -V | egrep -q -s 'Distrib 5.'") == 0;
+    my $extraopts   = ($isvers5 ? "--skip-quote-names" : "");
+    #
+    # XXX: Requires that mysqldump be in caller's $PATH - probably an OK
+    # assumption, but maybe not always
+    #
+    my $mysqldump   = "mysqldump -d $extraopts $DBNAME " .
+	"@FULLTABLES @NODETABLES @PROJTABLES @USERTABLES";
+    system("$mysqldump 2> /dev/null > $schemafile");
+
+    #
     # Tar up the directory and send it over to (real) ops.
     #
     $UID = 0;
     system("tar cf - -C $statedir . | ".
 	   "   gzip | $SSH -F /dev/null -host $CONTROL ".
-	   "   '(cat > /$PROJROOT/$pid/exp/$eid/dbstate.tar.gz)'");
+	   "   '(cat > $expdir/dbstate.tar.gz)'");
     if ($?) {
 	die("*** $0:\n".
 	    "    Could not create dbstate.tar.gz\n");
@@ -980,7 +1158,8 @@ sub TearDownEmulab()
     # why that is.
     #
     DBQueryFatal("update nodes set ".
-		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
+		 "  def_boot_osid=NULL,next_boot_osid=NULL,".
+		 "  temp_boot_osid=NULL ".
 		 "where " .
 		    join(" or ", map("node_id='$_'",
 				     ($bossnode, $opsnode,
@@ -1056,6 +1235,7 @@ sub RemoveNodes()
     my $wap        = "$tbdir/sbin/withadminprivs";
     my $nodereboot = "$tbdir/bin/node_reboot";
     my $deletenode = "$tbdir/sbin/deletenode";
+    my $creator    = $experiment->creator();
     my @nodes	   = ();
     my $paniced    = 0;
 
@@ -1100,39 +1280,47 @@ sub RemoveNodes()
     # Grab the vlans table. We need to find any ports used by the nodes
     # getting deleted, and move them back to the default vlan. 
     #
-    my %newvlans = ();
-    my @todelete = ();
+    my @delmembers = ();
+    my @todelete   = ();
     
     my $query_result =
-	DBQueryWarn("select v.*,e.inner_id from vlans as v ".
-		    "left join elabinelab_vlans as e on ".
-		    "   e.outer_id=v.id ".
-		    "where v.pid='$pid' and v.eid='$eid'");
+	DBQueryWarn("select inner_id,outer_id from elabinelab_vlans ".
+		    "where pid='$pid' and eid='$eid'");
     return -1
 	if (!$query_result);
 
-    while (my (%row) = $query_result->fetchhash()) {
-	my $members  = $row{"members"};
-	my $id       = $row{"id"};
-	my $inner_id = $row{"inner_id"};
-	my @newports = ();
-	my $changed  = 0;
+    while (my ($inner_id,$outer_id) = $query_result->fetchrow_array()) {
+	my $vlan = VLan->Lookup($outer_id);
+	if (!defined($vlan)) {
+	    print STDERR "*** No such vlan $outer_id ($inner_id)\n";
+	    return -1;
+	}
+	my @members;
 
-	foreach my $port (split(/\s+/, $members)) {
-	    my ($node,$eth) = split(":", $port);
+	if ($vlan->MemberList(\@members) != 0) {
+	    print STDERR "*** Unable to load members for $vlan\n";
+	    return -1;
+	}
+	my $id         = $outer_id;
+	my $changed    = 0;
 
-	    # If this node is not in the list of nodes to be deleted,
-	    # the node:port stays in the port list.
-	    if (! grep {$_ eq $node} @nodes) {
-		push(@newports, $port);
+	foreach my $member (@members) {
+	    my $node;
+	    my $iface;
+
+	    if ($member->GetNodeIface(\$node, \$iface) != 0) {
+		print STDERR "Missing attributes for $member in $vlan\n";
+		return -1;
 	    }
-	    else {
-		push(@todelete, $port);
+	    my $nodeid = $node->node_id();
+	    
+	    # See if this node is in the list of nodes to be deleted,
+	    if (grep {$_ eq $nodeid} @nodes) {
+		push(@todelete, "$nodeid:$iface");
+		push(@delmembers, $member);
 		$changed = 1;
 	    }
 	}
-	$newvlans{$id} = [ @newports ]
-	    if ($changed);
     }
 
     # Remove ports from the vlans.
@@ -1143,13 +1331,9 @@ sub RemoveNodes()
 	    return -1;
 	}
     }
-
     # Only if the above succeeds, do we update the vlans table.
-    foreach $id (keys(%newvlans)) {
-	my $members = join(" ", @{ $newvlans{$id} });
-
-	DBQueryWarn("update vlans set members='$members' ".
-		    "where id=$id")
+    foreach my $member (@delmembers) {
+	$member->Delete() == 0
 	    or return -1;
     }
     
@@ -1190,7 +1374,8 @@ sub RemoveNodes()
     # why that is.
     #
     DBQueryFatal("update nodes set ".
-		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
+		 "  def_boot_osid=NULL,next_boot_osid=NULL,".
+		 "  temp_boot_osid=NULL ".
 		 "where " .
 		   join(" or ", map("node_id='$_'", @nodes)));
     
@@ -1222,7 +1407,7 @@ sub RemoveNodes()
 			 "    Outer boss will use power cycle.\n";
 	}
 	print "Asking inner boss ($bossnode) to delete $node\n";
-	system("$SSH -host $bossnode sudo -u elabman ".
+	system("$SSH -host $bossnode sudo -u $creator ".
 	       "     $wap $deletenode -b -q -f $node");
 	if ($?) {
 	    #
@@ -1259,9 +1444,11 @@ sub RemoveNodes()
 sub UpdateEmulab()
 {
     my $tbdir      = "/usr/testbed";
+    my $statedir   = "$workdir/elabinelab";
     my $wap        = "$tbdir/sbin/withadminprivs";
     my $nodereboot = "$tbdir/bin/node_reboot";
     my $nodewait   = "$tbdir/sbin/node_statewait";
+    my $creator    = $experiment->creator();
     my @nodes      = ();
     my $paniced    = 0;
 
@@ -1286,17 +1473,107 @@ sub UpdateEmulab()
     # Grab the list of nodes that have been added to the inner elab.
     #
     my $query_result =
-	DBQueryFatal("select node_id from reserved ".
-		     "where pid='$pid' and eid='$eid' and ".
-		     "      inner_elab_boot=0 and inner_elab_role='node'");
-    
-    while (my ($node) = $query_result->fetchrow_array()) {
-	push(@nodes, $node);	
-    }
+	DBQueryFatal("select r.node_id,n.type,i.IP from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join interfaces as i on i.node_id=r.node_id and ".
+		     "     i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      r.inner_elab_boot=0 and r.inner_elab_role='node'");
     return 0
-	if (!@nodes);
+	if (!$query_result->numrows);
+
+    DBQueryFatal("create temporary table temp_new_nodes like new_nodes");
+    DBQueryFatal("create temporary table temp_new_interfaces ".
+		 " like new_interfaces");
+
+    my %idmap = ();
+    while (my ($node,$type,$ip) = $query_result->fetchrow_array()) {
+	my $result =
+	    DBQueryFatal("insert into temp_new_nodes set ".
+			 " new_node_id=NULL, node_id='$node', ".
+			 " type='$type', IP='$ip'");
+	
+	$idmap{$node} = $result->insertid;
+    }
+    @nodes = keys(%idmap);
+
+    $query_result =
+	DBQueryFatal("select r.node_id,i.ip,i.role,i.card,i.mac, ".
+		     "  i.interface_type,w.node_id2,w.card2,w.port2 ".
+		     " from reserved as r ".
+		     "left join interfaces as i on i.node_id=r.node_id ".
+		     "left join wires as w on w.node_id1=i.node_id and ".
+		     "     w.card1=i.card and w.port1=i.port ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      r.inner_elab_boot=0 and r.inner_elab_role='node'");
+
+    while (my ($node,$ip,$role,$card,$mac,$type,$switch,
+	       $switch_card,$switch_port) = $query_result->fetchrow_array()) {
+	my $nid = $idmap{$node};
+
+	if (! $elabinelab_singlenet) {
+	    #
+	    # Mark the real control network as "other" to avoid it being
+	    # thought of as the control network.
+	    #
+	    if ($role eq TBDB_IFACEROLE_CONTROL()) {
+		$role = TBDB_IFACEROLE_OUTER_CONTROL();
+	    }
+	    # And mark the inner control network.
+	    if ($role eq TBDB_IFACEROLE_EXPERIMENT() &&
+		defined($ip) && $ip ne "") {
+		$role = TBDB_IFACEROLE_CONTROL();
+	    }
+	}
+	DBQueryFatal("insert into temp_new_interfaces set ".
+		     " new_node_id='$nid', role='$role', card='$card', ".
+		     " mac='$mac', interface_type='$type', ".
+		     " switch_id='$switch',switch_card='$switch_card', ".
+		     " switch_port='$switch_port'");
+    }
+    unlink("$statedir/new_nodes");
+    DBQueryFatal("select * from temp_new_nodes ".
+		 "into outfile '$statedir/new_nodes'");
+    unlink("$statedir/new_interfaces");
+    DBQueryFatal("select * from temp_new_interfaces ".
+		 "into outfile '$statedir/new_interfaces'");
+
+    return 0
+	if ($dbgooonly);
+    
+    # For SSH and SCP below
+    $UID = 0;
+
+    #
+    # Send the new_nodes and new_interfaces tables over to the
+    # inner elab.
+    #
+    print "Sending new DB tables to inner boss ($bossnode)\n";
+    system("$SCP $statedir/new_nodes $statedir/new_interfaces ".
+	   "    ${bossnode}:/tmp");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not scp tables to inner boss\n";
+	return -1;
+    }
+    system("$SSH -host $bossnode mysqlimport -r tbdb ".
+	   "     /tmp/new_nodes /tmp/new_interfaces");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not load tables on inner boss\n";
+	return -1;
+    }
+    print "Telling inner boss ($bossnode) to incorporate new nodes: @nodes\n";
+    system("$SSH -host $bossnode sudo -u $creator /usr/testbed/sbin/wap ".
+	   "     /usr/testbed/sbin/newnode -q -n @nodes");
+    if ($?) {
+	print STDERR "*** $0:\n".
+	             "    Could not incorporate new nodes on inner boss\n";
+	return -1;
+    }
 
     # Run as real user for the next few scripts, which are setuid.
+    $UID  = $SAVEUID;
     $EUID = $UID;
 
     #

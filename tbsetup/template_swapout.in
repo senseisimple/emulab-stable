@@ -1,10 +1,11 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
@@ -33,14 +34,13 @@ sub usage()
 	  "<guid/vers> - GUID and version to swapin\n");
     exit(-1);
 }
-my $optlist	 = "qwaie:";
+my $optlist	 = "qwaie:bf";
 my %options      = ();
 my $quiet        = 0;
+my $force        = 0;
 my $waitmode     = 0;
-my $foreground   = 0;
-my $pid;
+my $batchmode    = 0;	# Called from the batch daemon.
 my $eid;
-my $tid;
 my $guid;
 my $version;
 
@@ -53,21 +53,24 @@ my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
+my $STAMPS      = @STAMPS@;
 
 # Locals
-my $user_name;
-my $user_email;
-my $dbuid;
+my $pid;
 my $logname;
+my $logfile;
 my $exptidx;
-my $runidx;
+my $template;
+my $instance;
+my $neveractive = 0;
 # For the END block below.
 my $cleaning    = 0;
-my $exptcreated = 0;
 my $justexit    = 1;
 
 # Programs we need
 my $endexp      = "$TB/bin/endexp";
+my $swapexp     = "$TB/bin/swapexp";
+my $endrun      = "$TB/bin/template_exprun";
 
 # Protos
 sub ParseArgs();
@@ -81,7 +84,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
-use libTemplates;
+use Template;
+use Experiment;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -106,18 +110,13 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
+my $user_uid   = $this_user->uid();
 
 # Now parse arguments.
 ParseArgs();
@@ -132,33 +131,63 @@ if ($waitmode) {
 }
 
 #
-# Grab template info.
+# Grab template info and do access check.
 #
-if (libTemplates::TemplateInfo($guid, $version, \$pid, \$tid, \$gid) < 0) {
-    tbdie("Could not get info for template $guid/$version!");
-}
+$template = Template->Lookup($guid, $version);
 
-if (! TBExptIDX($pid, $eid, \$exptidx)) {
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! $template->AccessCheck($this_user, TB_EXPT_DESTROY)) {
+    tberror("You do not have permission to terminate template instance ".
+	    "$eid in template $guid/$version");
+    exit(1);
+}
+$pid = $template->pid();
+
+#
+# Now we need to find the experiment index so we can find the instance.
+# This is wrong, but necessary cause of how templates are layered over
+# the existing experiment structure.
+#
+if (! TBExptIDX($template->pid(), $eid, \$exptidx)) {
     fatal(-1, "Could not get experiment index for $pid,$eid!");
 }
 
-if (! libtemplates::TemplateInstanceInfo($exptidx, \$runidx)) {
-    fatal(-1, "Could not get experiment run index for $exptidx!");
+$instance = Template::Instance->LookupByExptidx($exptidx);
+if (!defined($instance)) {
+    fatal(-1, "Could not get instance record for experiment $exptidx!");
 }
 
-#
-# Make sure UID is allowed to create experiments in this project.
-#
-if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
-    tberror("You do not have permission to instantiate template ".
-	    "$guid/$version");
-    exit(1);
+# Grab the experiment record for below.
+my $experiment = Experiment->Lookup($pid, $eid);
+if (!defined($experiment)) {
+    fatal(-1, "Experiment $pid/$eid object could not be found!");
 }
+
+# Check for cancel and dequeue.
+if (! $batchmode) {
+    if ($experiment->state() eq EXPTSTATE_ACTIVATING) {
+	system("$swapexp -x -s out $pid $eid");
+	exit($? >> 8);
+    }
+    elsif ($experiment->batchmode() &&
+	   $experiment->state() eq EXPTSTATE_QUEUED) {
+	# User wants to dequeue a batch experiment that is waiting to go.
+	system("$swapexp -x -s pause $pid $eid");
+	exit($? >> 8);
+    }
+}
+
 #
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
 #
 $justexit = 0;
+
+if ($STAMPS) {
+    $instance->Stamp("template_swapout", "starting");
+}
 
 #
 # Catch this so we can clean up.
@@ -168,10 +197,20 @@ $SIG{TERM} = \&sighandler;
 #
 # If not in batch mode, go into the background. Parent exits.
 #
-if (! $foreground) {
-    $logname = TBExptCreateLogFile($pid, $eid, "swapout");
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+if (! $batchmode) {
+    # Cleanup
+    $experiment->CleanLogFiles() == 0
+	or fatal(-1, "Could not clean up logfiles!");
+    
+    $logfile = $experiment->CreateLogFile("swapout");
+    if (!defined($logfile)) {
+	fatal(-1, "Could not create logfile!");
+    }
+    $logname = $logfile->filename();
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
 
     if (my $childpid = TBBackGround($logname)) {
 	#
@@ -189,7 +228,7 @@ if (! $foreground) {
 	print("Waiting for template instance to terminate.\n")
 	    if (! $quiet);
 	    
-	if (isatty(STDIN) && !$quiet) {
+	if (-f STDIN && !$quiet) {
 	    print("You may type ^C at anytime; you will be notified via email.".
 		  "\n".
 		  "You will not actually interrupt the experiment itself.\n");
@@ -217,6 +256,9 @@ if (! $foreground) {
     }
     TBdbfork();
 }
+# Give the web page a chance to start looking at the log file before
+# the entire experiment is gone.
+sleep(1);
 
 #
 # When in waitmode, must put ourselves in another process group so that
@@ -227,19 +269,61 @@ if ($waitmode) {
 }
 
 #
-# Now do the swapout.
+# Stop the current run, but only if the instance was actually instantiated.
+#
+if (defined($instance->start_time())) {
+    my $opt = ($force ? "-i" : "");
+
+    if ($STAMPS) {
+	$instance->Stamp("template_swapout", "stoprun starting");
+    }
+
+    system("$endrun $opt -a stop -f -e $eid $guid/$version") == 0
+	or fatal(-1, "Could not stop the current run!");
+
+    if ($STAMPS) {
+	$instance->Stamp("template_swapout", "stoprun done");
+    }
+
+    # This sets the stop time.
+    $instance->Stop() == 0
+	or fatal(-1, "Could not stop experiment instance!");
+}
+
+if ($STAMPS) {
+    $instance->Stamp("template_swapout", "endexp starting");
+}
+
+#
+# Now do the swapout (or just the termination).
 #
 # Note special -x option.
 #
-my @arguments = ($endexp, "-x", "-q", $pid, $eid);
+my @arguments = ($endexp, "-x", "-q");
+push(@arguments, "-b")
+    if ($batchmode);
+push(@arguments, ($exptidx));
 
 # Now invoke.
 system(@arguments);
 fatal($? >> 8, "Could not terminate template instance")
     if ($?);
 
-libTemplates::FinalizeTemplateInstanceRecord($guid, $version, $exptidx) == 0 
-    or fatal(-1, "Could not finalize experiment instance record!");
+if ($STAMPS) {
+    $instance->Stamp("template_swapout", "endexp done");
+}
+
+if (defined($instance->start_time())) {
+    # Reminder; instance records are not deleted.
+    $instance->Finalize() == 0
+	or fatal(-1, "Could not finalize experiment instance!");
+}
+else {
+    # Okay, we *do* delete if the instance was never instantiated.
+    print("Deleting instance since it was never swapped in!\n");
+    $instance->Delete() == 0
+	or fatal(-1, "Could not delete instance!");
+}
 
 exit(0);
 
@@ -294,6 +378,12 @@ sub ParseArgs()
     if (defined($options{"w"})) {
 	$waitmode = 1;
     }
+    if (defined($options{"b"})) {
+	$batchmode = 1;
+    }
+    if (defined($options{"f"})) {
+	$force = 1;
+    }
 }
 
 #
@@ -338,8 +428,8 @@ END {
 	# We are screwed; a recursive error. Someone will have to clean
 	# up by hand. 
 	#
-	SENDMAIL(TBOPS, 
-		 "Instance Termination Failure: $pid/$tid",
+	SENDMAIL($TBOPS, 
+		 "Instance Termination Failure: $pid/$eid",
 		 "Recursive error in cleanup! This is very bad.");
 	$? = $saved_exitcode;
 	return;

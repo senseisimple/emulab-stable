@@ -1,0 +1,5 @@
+Simple publish subscribe system for Emulab.
+
+This version retains compatiblity with Elvin via a "gateway"
+service that listens on the Elvin port, converting messages to/from
+pubsub format for the pubsubd.

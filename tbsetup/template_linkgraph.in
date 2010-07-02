@@ -1,0 +1,387 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use Date::Parse;
+use Errno qw(EDQUOT);
+use Data::Dumper;
+
+#
+# Simple graphing functions for link data.
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_linkgraph [-q] [-s vnode] [-t vnode] ".
+	  "-i <exptidx> -r <runid> <guid/vers> <graphtype>\n".
+	  "switches and arguments:\n".
+	  "-q           - be less chatty\n".
+	  "-r <rund>    - Experiment run to work on\n".
+	  "-i <exptidx> - Experiment index to work on\n".
+	  "<guid/vers>  - GUID and version\n");
+    exit(-1);
+}
+my $optlist	 = "qi:dr:s:t:";
+my %options      = ();
+my $quiet        = 0;
+my $debug        = 0;
+my $eid;
+my $exptidx;
+my $runidx;
+my $guid;
+my $version;
+my $graphtype;
+my $srclan;
+my $dstlan;
+my $srcvnode;
+my $dstvnode;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL     = "@USERNODE@";
+my $checkquota  = "$TB/sbin/checkquota";
+my $dbcontrol   = "$TB/sbin/opsdb_control";
+my $tempanalyze = "$TB/bin/template_analyze";
+
+# Locals
+my $template;
+my $instance;
+my $archive_tag;
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub cleanup();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Template;
+use Experiment;
+use User;
+
+# In libdb
+my $projroot = PROJROOT();
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid and other info for later.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
+}
+my $user_uid   = $this_user->uid();
+
+# Now parse arguments.
+ParseArgs();
+
+# Temporary
+libArchive::setdebug($debug);
+
+#
+# Grab template info and do access check.
+#
+$template = Template->Lookup($guid, $version);
+
+if (!defined($template)) {
+    tbdie("Experiment template $guid/$version does not exist!");
+}
+if (! $template->AccessCheck($this_user, TB_EXPT_READINFO)) {
+    tberror("You do not have permission to access template $guid/$version");
+    exit(1);
+}
+my $pid = $template->pid();
+my $gid = $template->gid();
+
+$instance = Template::Instance->LookupByExptidx($exptidx);
+if (!defined($instance)) {
+    fatal(-1, "Could not get instance record for experiment $exptidx!");
+}
+
+if ($instance->ArchiveTag(\$archive_tag) < 0) {
+    fatal(-1, "Could not get current archive tag for instance $exptidx!");
+}
+
+if (system("$checkquota $user_uid") != 0) {
+    tberror("You are over your disk quota on $CONTROL; ".
+	    "please login there and cleanup!");
+    exit(1);
+}
+
+# Get the the runs.
+my %runlist;
+$instance->RunList(\%runlist) == 0
+    or fatal(-1, "Could not get runlist for $instance");
+
+#
+# It is an error to analyze an instance with no runs; it sorta implies
+# the the initial run is still active.
+#
+if (! keys(%runlist)) {
+    tberror("There are no experiment runs in instance $instance!");
+    exit(1);
+}
+
+my $dbname;
+my $optargs = "";
+
+if ($instance->Instantiated()) {
+    my $experiment = Experiment->Lookup($instance->pid(), $instance->eid());
+    
+    fatal(-1, "Could not get experiment object from $instance!")
+	if (!defined($experiment));
+
+    fatal(-1, "No experiment database in use!")
+	if (! $experiment->dpdb() || !$experiment->dpdbname());
+
+    $dbname = $experiment->dpdbname();
+    $eid    = $instance->eid();
+}
+else {
+    #
+    # We need to use a database from the archive. We do not want to check
+    # this out multiple times, so look to see if a temp DB already exists.
+    #
+    # Note that we just want the last run since that will include the
+    # accumulated data.
+    #
+    my $lastrun = $instance->LastRun();
+    fatal(-1, "Could not get last run for instance $instance!")
+	if (! defined($lastrun));
+
+    my $idx = $lastrun->idx();
+    $dbname = "${guid},${version}," . $instance->idx() . ",$idx";
+    
+    my $query_result =
+	DBQueryFatal("select * from datapository_databases ".
+		     "where dbname='$dbname'");
+    if (! $query_result->numrows) {
+	system("$tempanalyze -i $exptidx -r $idx $guid/$version") == 0 or
+	    fatal(-1, "Could not check out database for run $idx!");
+    }
+
+    #
+    # Since there is no current instance experiment, use the eid from the
+    # template for the lookups below. This is not quite correct though, since
+    # an instance might actually have a different topology or number of nodes, 
+    # or be different in some other manner. Needs more thought.
+    #
+    $eid    = $template->eid();
+}
+
+#
+# For a specific run, figure out the start and end times of the run
+# and pass those along as options to the graphing code.
+#
+if (defined($runidx)) {
+    my $rowref = $runlist{$runidx};
+    my $start  = $rowref->{"start_time"};
+    my $stop   = $rowref->{"stop_time"};
+
+    if (defined($stop)) {
+	$optargs = "-r " . str2time($start) . ":" . str2time($stop);
+    }
+    else {
+	$optargs = "-r " . str2time($start) . ":0";
+    }
+}
+
+# Specific source link/node
+if (defined($srcvnode)) {
+    my $query_result =
+	DBQueryFatal("select ip from virt_lans ".
+		     "where vname='$srclan' and vnode='$srcvnode' and ".
+		     "      pid='$pid' and eid='$eid'");
+    if ($query_result->numrows) {
+	my ($ip) = $query_result->fetchrow_array();
+	
+	$optargs .= " -s $ip";
+    }
+}
+    
+# Specific destination link/node
+if (defined($dstvnode)) {
+    my $query_result =
+	DBQueryFatal("select ip from virt_lans ".
+		     "where vname='$dstlan' and vnode='$dstvnode' and ".
+		     "      pid='$pid' and eid='$eid'");
+    if ($query_result->numrows) {
+	my ($ip) = $query_result->fetchrow_array();
+	
+	$optargs .= " -t $ip";
+    }
+}
+#SENDMAIL($TBOPS, "foo", "$dbname $graphtype $optargs");
+    
+system("$dbcontrol graphdb $dbname $graphtype $optargs") == 0 or
+    fatal(-1, "Failed to generate requested graph!");
+
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 2) {
+	usage();
+    }
+    
+    #
+    # Pick up guid/version first and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    #
+    # Pick up graph type.
+    #
+    $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)$/) {
+	$graphtype = $1;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"i"})) {
+	$exptidx = $options{"i"};
+    
+	if (! TBcheck_dbslot($exptidx, "default", "int",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment index!");
+	}
+	# real check.
+	if ($exptidx =~ /^([\w]*)$/) {
+	    $exptidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $exptidx");
+	}
+    }
+    else {
+	tbdie("You must supply the -i option!");
+    }
+
+    if (defined($options{"r"})) {
+	$runidx = $options{"r"};
+    
+	if (! TBcheck_dbslot($runidx, "default", "int",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper run index!");
+	}
+	# real check.
+	if ($runidx =~ /^([\w]*)$/) {
+	    $runidx = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $runidx");
+	}
+    }
+
+    # These are really linkname/vnode ... so we can find exact IP addr.
+    if (defined($options{"s"})) {
+	my $tmp = $options{"s"};
+
+	if ($tmp =~ /^([-\w]+)\/([-\w]+)$/) {
+	    $srclan   = $1;
+	    $srcvnode = $2;
+	}
+	else {
+	    tbdie("Bad srcvnode name: $srcvnode!");
+	}
+    }
+    if (defined($options{"t"})) {
+	my $tmp = $options{"t"};
+
+	if ($tmp =~ /^([-\w]+)\/([-\w]+)$/) {
+	    $dstlan   = $1;
+	    $dstvnode = $2;
+	}
+	else {
+	    tbdie("Bad dstvnode name: $dstvnode!");
+	}
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"d"})) {
+	$debug = 2;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+
+    exit($errorstat);
+}
+

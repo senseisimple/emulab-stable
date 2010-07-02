@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,9 +49,7 @@ my $FLOOR = 4;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 30;
+use NodeType;
 
 #
 # These come from the library.
@@ -66,7 +64,6 @@ my $NODEDEAD_EID= NODEDEAD_EID;
 
 sub fatal($);
 sub notify($);
-sub daemonize();
 sub freefromreloading($);
 		      
 my $os_load	= "$TB/bin/os_load -s";
@@ -77,6 +74,8 @@ my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
 my $retry_time  = 20;              # in minutes
 my $warn_time   = $retry_time * 2; # in minutes
+my $widearea_multiplier = 2;       # widearea nodes get (mult+1)x longer, but
+                                   #  possibly not quite true cause of mustwipe)
 my %retried     = ();
 my %warned	= ();
 my %failed	= ();
@@ -112,10 +111,31 @@ if (defined($options{"d"})) {
     $debug = $options{"d"};
 }
 
+#
+# Only one please.
+#
+if (CheckDaemonRunning("reload_daemon")) {
+    fatal("Not starting another reload daemon!");
+}
+
 # Go to ground.
 if (! $debug) {
-    daemonize();
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
 }
+if (MarkDaemonRunning("reload_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    ReOpenLog($logfile);
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
 
 print "Reload Daemon starting... pid $$, at ".`date`;
 
@@ -147,9 +167,11 @@ while (1) {
     # yields waits of 20, 40 and 60 minutes.
     #
     $query_result =
-	DBQueryWarn("select node_id,mustwipe from reserved " .
-		    "where pid='$RELOADPID' and eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time * (mustwipe + 1) MINUTE)".
+	DBQueryWarn("select r.node_id,r.mustwipe from reserved as r" . 
+		    " left join nodes as n on r.node_id=n.node_id" . 
+		    " left join node_types as nt on n.type=nt.type " . 
+		    "where r.pid='$RELOADPID' and r.eid='$RELOADEID' and " .
+		    "(CURRENT_TIMESTAMP - INTERVAL ($retry_time * (r.mustwipe + 1) + (nt.isremotenode * $retry_time * $widearea_multiplier)) MINUTE)".
 		    "  > rsrv_time");
 
     if (! $query_result) {
@@ -205,9 +227,11 @@ while (1) {
     # XXX again, we scale by the value of mustwipe.
     #
     $query_result =
-	DBQueryWarn("select node_id,mustwipe from reserved " .
-		    "where pid='$RELOADPID' and eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL $warn_time * (mustwipe + 1) MINUTE)".
+	DBQueryWarn("select r.node_id,r.mustwipe from reserved as r" . 
+		    " left join nodes as n on r.node_id=n.node_id" . 
+		    " left join node_types as nt on n.type=nt.type " . 
+		    "where r.pid='$RELOADPID' and r.eid='$RELOADEID' and " .
+		    "(CURRENT_TIMESTAMP - INTERVAL ($warn_time * (mustwipe + 1) + (nt.isremotenode * $warn_time * $widearea_multiplier)) MINUTE)".
 		    "  > rsrv_time");
     
     if (! $query_result) {
@@ -245,7 +269,7 @@ while (1) {
     my $CLASSCLAUSE = "(n.class='pc' or n.class='pct')";
     
     $query_result =
-	DBQueryWarn("select a.node_id,b.pid,b.eid,b.mustwipe,n.imageable ".
+	DBQueryWarn("select a.node_id,b.pid,b.eid,b.mustwipe,a.type ".
 		    "from reserved as b ".
 		    "left join nodes as a on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
@@ -273,10 +297,11 @@ while (1) {
 	$pid  = $hrow{'pid'};
 	$eid  = $hrow{'eid'};
 	$mustwipe = $hrow{'mustwipe'};
-	$imageable = $hrow{'imageable'};
+	$type = $hrow{'type'};
+	$imageable = NodeType->LookupSync($type)->imageable();
 
 	# XXX Garcia Hack
-	if (!$imageable && TBNodeType($node) eq "garcia") {
+	if (!$imageable && $type eq "garcia") {
 	    $imageable = 1;
 	}
 	# XXX End Garcia Hack
@@ -551,6 +576,7 @@ sub fatal($)
     local($msg) = $_[0];
 
     SENDMAIL($TBOPS, "Reload Daemon Died", $msg, $TBOPS);
+    MarkDaemonStopped("reload_daemon");
     die($msg);
 }
 
@@ -560,31 +586,4 @@ sub notify($)
 
     print "$mesg\n";
     SENDMAIL($TBOPS, "Reload Daemon Message", $mesg, $TBOPS);
-}
-
-#
-# Become a daemon.
-# 
-sub daemonize()
-{
-    my $mypid = fork();
-    if ($mypid) {
-	exit(0);
-    }
-
-    #
-    # We have to disconnect from the caller by redirecting both STDIN and
-    # STDOUT away from the pipe. Otherwise the caller will continue to wait
-    # even though the parent has exited. 
-    #
-    open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
-
-    #
-    # Open the batch log and start writing to it. 
-    #
-    open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
-    open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
-
-    return 0;
 }

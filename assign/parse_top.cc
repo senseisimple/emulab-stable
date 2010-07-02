@@ -1,8 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
+
+static const char rcsid[] = "$Id: parse_top.cc,v 1.42 2009-05-20 18:06:08 tarunp Exp $";
 
 #include "port.h"
 
@@ -41,12 +43,12 @@ extern vvertex_vector virtual_nodes;
 // dependant on their ordering in the top file, which can be annoying to get
 // right.
 // Returns the number of errors found
-int bind_top_subnodes() {
+int bind_top_subnodes(tb_vgraph &vg) {
     int errors = 0;
 
     // Iterate through all vnodes looking for ones that are subnodes
     vvertex_iterator vit,vendit;
-    tie(vit,vendit) = vertices(VG);
+    tie(vit,vendit) = vertices(vg);
     for (;vit != vendit;++vit) {
 	tb_vnode *vnode = get(vvertex_pmap, *vit);
 	if (!vnode->subnode_of_name.empty()) {
@@ -67,16 +69,16 @@ int bind_top_subnodes() {
 
 extern name_vclass_map vclass_map;
 
-int parse_top(tb_vgraph &VG, istream& i)
+int parse_top(tb_vgraph &vg, istream& input)
 {
   string_vector parsed_line;
   int errors=0,line=0;
   int num_nodes = 0;
   char inbuf[1024];
   
-  while (!i.eof()) {
+  while (!input.eof()) {
     line++;
-    i.getline(inbuf,1024);
+    input.getline(inbuf,1024);
     parsed_line = split_line(inbuf,' ');
     if (parsed_line.size() == 0) {continue;}
 
@@ -101,32 +103,27 @@ int parse_top(tb_vgraph &VG, istream& i)
 	}
 
 	num_nodes++;
-	tb_vnode *v = new tb_vnode();
-	vvertex vv = add_vertex(VG);
+        tb_vclass *vclass;
+	
+	name_vclass_map::iterator dit = vclass_map.find(type);
+	if (dit != vclass_map.end()) {
+	  type = "";
+	  vclass = (*dit).second;
+	} else {
+	  vclass = NULL;
+	  if (vtypes.find(type) == vtypes.end()) {
+	      vtypes[type] = typecount;
+	  } else {
+	      vtypes[type] += typecount;
+	  }
+	}
+
+	tb_vnode *v = new tb_vnode(name,type,typecount);
+	v->vclass = vclass;
+	vvertex vv = add_vertex(vg);
 	vname2vertex[name] = vv;
 	virtual_nodes.push_back(vv);
 	put(vvertex_pmap,vv,v);
-	v->name = name;
-	name_vclass_map::iterator dit = vclass_map.find(type);
-	if (dit != vclass_map.end()) {
-	  v->type="";
-	  v->vclass = (*dit).second;
-	} else {
-	  v->type=type;
-	  v->vclass=NULL;
-	  if (vtypes.find(v->type) == vtypes.end()) {
-	      vtypes[v->type] = typecount;
-	  } else {
-	      vtypes[v->type] += typecount;
-	  }
-	}
-	v->typecount = typecount;
-#ifdef PER_VNODE_TT
-	v->num_links = 0;
-	v->total_bandwidth = 0;
-#endif
-	v->disallow_trivial_mix = false;
-	v->nontrivial_links = v->trivial_links = 0;
 	
 	for (unsigned int i = 3;i < parsed_line.size();++i) {
 	  string desirename,desireweight;
@@ -152,8 +149,9 @@ int parse_top(tb_vgraph &VG, istream& i)
 		      top_error("Bad desire, bad weight.");
 		      gweight = 0;
 		  }
-		  v->desires.push_front(
-			  tb_node_featuredesire(desirename,gweight));
+		  tb_node_featuredesire node_fd(desirename, gweight);
+		  node_fd.add_desire_user(gweight);
+		  v->desires.push_front(node_fd);
 	      }
 	  }
 	}
@@ -237,15 +235,25 @@ int parse_top(tb_vgraph &VG, istream& i)
 
 	vvertex node1 = vname2vertex[src];
 	vvertex node2 = vname2vertex[dst];
-	e = add_edge(node1,node2,VG).first;
+	e = add_edge(node1,node2,vg).first;
 	tb_vlink *l = new tb_vlink();
 	l->src = node1;
 	l->dst = node2;
 	l->type = link_type;
 	put(vedge_pmap,e,l);
 
-	if ((sscanf(bw.c_str(),"%d",&(l->delay_info.bandwidth)) != 1) ||
-	    (sscanf(bwunder.c_str(),"%d",&(l->delay_info.bw_under)) != 1) ||
+        // Special flag: treat a bandwidth of '*' specially
+        if (!strcmp(bw.c_str(),"*")) {
+            l->delay_info.bandwidth = -2; // Special flag
+            l->delay_info.adjust_to_native_bandwidth = true;
+        } else {
+            if (sscanf(bw.c_str(),"%d",&(l->delay_info.bandwidth)) != 1) {
+                top_error("Bad line line, bad bandwidth characteristics.");
+            }
+        }
+
+        // Scan in the rest of the delay_info structure
+	if ((sscanf(bwunder.c_str(),"%d",&(l->delay_info.bw_under)) != 1) ||
 	    (sscanf(bwover.c_str(),"%d",&(l->delay_info.bw_over)) != 1) ||
 	    (sscanf(bwweight.c_str(),"%lg",&(l->delay_info.bw_weight)) != 1) ||
 	    (sscanf(delay.c_str(),"%d",&(l->delay_info.delay)) != 1) ||
@@ -290,10 +298,10 @@ int parse_top(tb_vgraph &VG, istream& i)
 		      parsed_line[i] << ".");
 	  }
 	}
-	
-#ifdef PER_VNODE_TT
+
 	tb_vnode *vnode1 = get(vvertex_pmap,node1);
 	tb_vnode *vnode2 = get(vvertex_pmap,node2);
+#ifdef PER_VNODE_TT
 	if (l->emulated) {
 	    if (!l->allow_trivial) {
 		vnode1->total_bandwidth += l->delay_info.bandwidth;
@@ -306,6 +314,14 @@ int parse_top(tb_vgraph &VG, istream& i)
 	    vnode2->link_counts[link_type]++;
 	}
 #endif
+        
+        // Some sanity checks: this combination is illegal for now
+        if (l->delay_info.adjust_to_native_bandwidth && (l->allow_trivial ||
+                    l->emulated)) {
+            top_error("Auto-assigning bandwidth on trivial or emulated links"
+                      " not allowed!");
+        }
+	
       }
     } else if (command == string("make-vclass")) {
       if (parsed_line.size() < 4) {
@@ -347,7 +363,7 @@ int parse_top(tb_vgraph &VG, istream& i)
     }
   }
 
-  errors += bind_top_subnodes();
+  errors += bind_top_subnodes(vg);
 
   if (errors > 0) {exit(EXIT_FATAL);}
   

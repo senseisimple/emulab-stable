@@ -1,0 +1,69 @@
+./myboss.vulnelab.testbed.emulab.net/joinproject.php3
+<form name=myform enctype=multipart/form-data action="joinproject.php3" method="post">
+<input type="text" name="formfields[joining_uid]" value="" size=8 maxlength=8>
+<input type="text" name="formfields[usr_name]" value="" size=30>
+<input type="text" name="formfields[wikiname]" value="" size=30>
+<input type="text" name="formfields[usr_title]" value="" size=30>
+<input type="text" name="formfields[usr_affil]" value="" size=40>
+<input type="text" name="formfields[usr_URL]" value="http://" size=45>
+<input type="text" name="formfields[usr_email]" value="" size=30>
+<input type="text" name="formfields[usr_addr]" value="" size=45>
+<input type="text" name="formfields[usr_addr2]" value="" size=45>
+<input type="text" name="formfields[usr_city]" value="" size=25>
+<input type="text" name="formfields[usr_state]" value="" size=2>
+<input type="text" name="formfields[usr_zip]" value="" size=10>
+<input type="text" name="formfields[usr_country]" value="USA" size=15>
+<input type="text" name="formfields[usr_phone]" value="" size=15>
+<input type="hidden" name="MAX_FILE_SIZE" value="1024" >
+<input type="file" name="usr_keyfile" size=50 >
+<input type="password" name="formfields[password1]" value="" size=8>
+<input type="password" name="formfields[password2]" value="" size=8>
+<input type="text" name="formfields[pid]" value="" size=12 maxlength=12>
+<input type="text" name="formfields[gid]" value="" size=12 maxlength=12>
+<input type="submit" name="submit" value="Submit" >
+
+./myboss.vulnelab.testbed.emulab.net/kb-search.php3
+<form action="kb-search.php3" method="get">
+<input type="text" name="query" value="" size=50 maxlength=100>
+<input type="radio" name="query_type" value="and" checked >
+<input type="radio" name="query_type" value="or" >
+<input type="radio" name="query_type" value="exact" >
+<input type="radio" name="query_which" value="title" >
+<input type="radio" name="query_which" value="body" >
+<input type="radio" name="query_which" value="both" checked >
+<input type="submit" name="submit" value='Submit Query' >
+
+./myboss.vulnelab.testbed.emulab.net/newproject.php3
+<form enctype=multipart/form-data name=myform action="newproject.php3" method="post">
+<input type="text" name="formfields[proj_head_uid]" value="" size=8 maxlength=8>
+<input type="text" name="formfields[usr_name]" value="" size=30>
+<input type="text" name="formfields[wikiname]" value="" size=30>
+<input type="text" name="formfields[usr_title]" value="" size=30>
+<input type="text" name="formfields[usr_affil]" value="" size=40>
+<input type="text" name="formfields[usr_URL]" value="http://" size=45>
+<input type="text" name="formfields[usr_email]" value="" size=30>
+<input type="text" name="formfields[usr_addr]" value="" size=45>
+<input type="text" name="formfields[usr_addr2]" value="" size=45>
+<input type="text" name="formfields[usr_city]" value="" size=25>
+<input type="text" name="formfields[usr_state]" value="" size=2>
+<input type="text" name="formfields[usr_zip]" value="" size=10>
+<input type="text" name="formfields[usr_country]" value="USA" size=15>
+<input type="text" name="formfields[usr_phone]" value="" size=15>
+<input type="hidden" name="MAX_FILE_SIZE" value="1024" >
+<input type="file" name="usr_keyfile" value="" size=50>
+<input type="password" name="formfields[password1]" value="" size=8>
+<input type="password" name="formfields[password2]" value="" size=8>
+<input type="text" name="formfields[pid]" value="" size=12 maxlength=12>
+<input type="text" name="formfields[proj_name]" value="" size=40>
+<input type="text" name="formfields[proj_URL]" value="http://" size=45>
+<input type="checkbox" name="formfields[proj_public]" value="checked" checked>
+<input type="text" name="formfields[proj_whynotpublic]" value="" size=45>
+<input type="checkbox" name="formfields[proj_linked]" value="checked" checked>
+<input type="text" name="formfields[proj_funders]" value="" size=45>
+<input type="text" name="formfields[proj_members]" value="" size=4>
+<input type="text" name="formfields[proj_pcs]" value="" size=4>
+<input type="checkbox" name="formfields[proj_plabpcs]" value="checked" >
+<input type="checkbox" name="formfields[proj_ronpcs]" value="checked" >
+<input type="textarea" name="formfields[proj_why]" rows=10 cols=60>
+<input type="submit" name="submit" value="Submit" >
+

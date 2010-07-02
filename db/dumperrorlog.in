@@ -4,6 +4,7 @@
 # Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
+use strict;
 use English;
 use Getopt::Std;
 
@@ -14,20 +15,26 @@ sub usage() {
     print STDOUT "Usage: dumperrorlog [-d]\n";
     exit(-1);
 }
-my $optlist  = "d";
+my $optlist  = "df";
 my $debug    = 0;
+my $force    = 0;
 my $tempfile = "/var/tmp/testbed_dumperrorlog_tempfile";
+
+my $keep_important = 7 * 24 * 60 * 60;
+my $keep_any       = 4 * 24 * 60 * 60;
+my $max_rows       = 300000;
 
 #
 # Configure variables
 #
-my $TB		= "@prefix@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $ISMAINSITE  = @TBMAINSITE@;
-my $USERNODE	= "@USERNODE@";
-my $PROXY       = "$TB/sbin/dumperrorlog.proxy";
-my $SCP         = "/usr/bin/scp";
-my $SSHTB	= "$TB/bin/sshtb";
+my $TB		 = "@prefix@";
+my $TBOPS        = "@TBOPSEMAIL@";
+my $ISUTAHEMULAB = "@OURDOMAIN@" eq 'emulab.net';
+my $USERNODE	 = "@USERNODE@";
+my $PROXY        = "$TB/sbin/dumperrorlog.proxy";
+my $SCP          = "/usr/bin/scp";
+my $SSHTB	 = "$TB/bin/sshtb";
+my $ERRORLOGDB   = "@TBERRORLOGDBNAME@";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -55,6 +62,14 @@ if ($UID != 0) {
 }
 
 #
+# Only one script can run at a time, for now just
+# abort instead of waiting
+#
+my $lock_res = TBScriptLock("dumperrorlog", 1, 0);
+#exit( 0) if $lock_res == TBSCRIPTLOCK_IGNORE();
+exit(-1) if $lock_res != TBSCRIPTLOCK_OKAY();
+
+#
 # Form a temp name.
 #
 my $logname = TBMakeLogname("dumperrorlog");
@@ -63,7 +78,7 @@ my $logname = TBMakeLogname("dumperrorlog");
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
@@ -72,6 +87,9 @@ if (@ARGV) {
 }
 if (defined($options{"d"})) {
     $debug++;
+}
+if (defined($options{"f"})) {
+    $force++;
 }
 
 #
@@ -84,16 +102,36 @@ if (! $debug) {
 }
 
 #
-# Get the last index we archived out.
+# Get the last log index we archived out.
 #
 my $query_result =
     DBQueryFatal("select idx from emulab_indicies ".
 		 "where name='lastlog_seqnum'");
-my ($lastseq) = $query_result->fetchrow_array();
-if (!defined($lastseq)) {
+my ($minseq) = $query_result->fetchrow_array();
+if (!defined($minseq)) {
     DBQueryFatal("insert into emulab_indicies (name, idx) ".
 		 "values ('lastlog_seqnum', 0)");
-    $lastseq = 0;
+    $minseq = 0;
+}
+
+#
+# And the last experiment index we sent over.
+#
+$query_result =
+    DBQueryFatal("select idx from emulab_indicies ".
+		 "where name='lastlog_exptidx'");
+my ($exptidx_min) = $query_result->fetchrow_array();
+if (!defined($exptidx_min)) {
+    DBQueryFatal("insert into emulab_indicies (name, idx) ".
+		 "values ('lastlog_exptidx', 0)");
+    $exptidx_min = 0;
+}
+# And the current largest one.
+$query_result =
+    DBQueryFatal("select MAX(exptidx) from experiment_stats");
+my ($exptidx_max) = $query_result->fetchrow_array();
+if (!defined($exptidx_max)) {
+    fatal("Could not get largest experiment index!");
 }
 
 #
@@ -108,50 +146,46 @@ if (!defined($NOTICE)) {
 }
 
 #
-# Only the main site does this archiving stuff.
+# Now get the largest log index to copy
+# 
+$query_result =
+    DBQueryFatal("select MAX(seq) from log ".
+		 "where seq > $minseq " .
+		 "  and seq <= $minseq + $max_rows ");
+my $maxseq = $query_result->fetchrow_array();
+$maxseq = $minseq unless defined $maxseq;
+
+print "Copying log entries ($minseq,$maxseq]\n";
+print "Exptidx ($exptidx_min, $exptidx_max]\n";
+
 #
-if ($ISMAINSITE) {
+# Might not be any new entries ...
+# 
+if ($minseq != $maxseq) {
     #
-    # Must lock the table of course
+    # Backup old outfile
     #
-    DBQueryFatal("lock tables log write");
+    if (-e "${tempfile}.log") {
+	unlink("${tempfile}.log.save")
+	    if (-e "${tempfile}.log.save");
+
+	system("/bin/mv -f ${tempfile}.log ${tempfile}.log.save");
+    }
 
     #
     # Grab all of the new entries and store to the file
     #
     DBQueryFatal("select * from log ".
-		 "where seq > $lastseq " .
+		 "where seq > $minseq " .
+		 "and seq <= $maxseq " .
 		 "into outfile '${tempfile}.log' ");
 
-    #
-    # Now we need to find out what the last index really was. 
-    # 
-    my $firstseq = $lastseq;
-    
-    $query_result =
-	DBQueryFatal("select seq from log ".
-		     "where seq > $lastseq " .
-		     "order by seq desc limit 1");
-    # Save for later.
-    $lastseq = $query_result->fetchrow_array();
+    system("echo \"load data infile '${tempfile}.log' replace into table log\" ".
+	   "     | mysql $ERRORLOGDB");
+    fatal("Could not load into archive DB!")
+	if ($?);
 
-    DBQueryFatal("unlock tables");
-
-    #
-    # Might not be any new entries ...
-    # 
-    if (defined($lastseq)) {
-	system("echo \"load data infile '${tempfile}.log' into table log\" ".
-	       "     | mysql errorlog");
-	fatal("Could not load into archive DB!")
-	    if ($?);
-
-	# Okay, now that we have really archived them away, update the
-	# seq number.
-	DBQueryFatal("update emulab_indicies set idx='$lastseq' ".
-		     "where name='lastlog_seqnum'");
-
-	#
+    if ($ISUTAHEMULAB) {
 	# XXX This awful hack will go away when Kevin is happy with
 	# the error logging code.
 	#
@@ -160,61 +194,102 @@ if ($ISMAINSITE) {
 	# Copy the file over to ops and load it into the DB over there.
 	#
 	system("$SCP -p ${tempfile}.log ".
-	       "     ${USERNODE}:/var/db/mysql/errorlog") == 0
-	    or fatal("Could not copy $tempfile to $USERNODE!");
+	       "     ${USERNODE}:/var/db/mysql/$ERRORLOGDB") == 0
+		   or fatal("Could not copy $tempfile to $USERNODE!");
 
 	system("$SSHTB -host $USERNODE $PROXY log") == 0
 	    or fatal("Could not load log entries into ops DB!");
     }
-    unlink("${tempfile}.log");
+}
 
-    #
-    # Now the other tables Kevin needs
-    #
-    foreach my $tablename ("scripts", "priorities", "causes", "errors") {
-	if ($tablename eq "errors") {
-	    DBQueryFatal("select * from $tablename where session>=$firstseq ".
-			 "into outfile '${tempfile}.${tablename}' ");
-	}
-	else {
-	    DBQueryFatal("select * from $tablename ".
-			 "into outfile '${tempfile}.${tablename}' ");
-	}
+#
+# Now the other tables Kevin needs
+#
+foreach my $tablename ("scripts", "priorities", "causes", "session_info",
+		       "errors", "users", "experiments",
+		       "report_error", "report_context",
+		       "report_assign_violation") {
 
-	system("echo \"load data infile '${tempfile}.${tablename}' ".
-	       "     replace into table $tablename\" | mysql errorlog");
-	fatal("Could not load $tablename into archive DB!")
-	    if ($?);
+    unlink("${tempfile}.${tablename}") if -e "${tempfile}.${tablename}";
 
+    if (($tablename eq "errors" ||
+	 $tablename eq "session_info") && !$force) {
+	DBQueryFatal("select * from $tablename where session>=$minseq and session<=$maxseq ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    elsif ($tablename eq "report_error" ||
+	   $tablename eq "report_context" ||
+	   $tablename eq "report_assign_violation") {
+	DBQueryFatal("select * from $tablename where seq>=$minseq and seq<=$maxseq ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    elsif ($tablename eq "users") {
+	DBQueryFatal("select uid,unix_uid from $tablename ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    elsif ($tablename eq "experiments") {
+	next if
+	    ($exptidx_max == $exptidx_min);
+
+	DBQueryFatal("select exptidx,pid,eid from experiment_stats ".
+		     "where exptidx >  $exptidx_min and ".
+		     "      exptidx <= $exptidx_max ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+    else {
+	DBQueryFatal("select * from $tablename ".
+		     "into outfile '${tempfile}.${tablename}' ");
+    }
+
+    system("echo \"load data infile '${tempfile}.${tablename}' ".
+	   "     replace into table $tablename\" | mysql $ERRORLOGDB");
+    fatal("Could not load $tablename into archive DB!")
+	if ($?);
+
+    if ($ISUTAHEMULAB) {
 	#
 	# Copy the file over to ops and load it into the DB over there.
 	#
 	system("$SCP -p ${tempfile}.${tablename} ".
-	       "     ${USERNODE}:/var/db/mysql/errorlog") == 0
-	    or fatal("Could not copy ${tempfile}.${tablename} to $USERNODE!");
+	       "     ${USERNODE}:/var/db/mysql/$ERRORLOGDB") == 0
+		   or fatal("Could not copy ${tempfile}.${tablename} to $USERNODE!");
 
 	system("$SSHTB -host $USERNODE $PROXY $tablename") == 0
 	    or fatal("Could not load $tablename entries into ops DB!");
-	
+
 	unlink("${tempfile}.${tablename}");
     }
 }
 
-#
-# And then age out entries older then 14 days.
-#
-DBQueryFatal("delete from log ".
-	     "where stamp < (UNIX_TIMESTAMP(now()) - (14 * 24 * 60 * 60))");
+
+# Okay, now that we have really archived them away, update the
+# seq number.
+DBQueryFatal("update emulab_indicies set idx='$maxseq' ".
+	     "where name='lastlog_seqnum'");
+
+# Okay, now that we have really sent over the experiment_stats stuff.
+DBQueryFatal("update emulab_indicies set idx='$exptidx_max' ".
+		     "where name='lastlog_exptidx'");
 
 #
-# And age out non critical data older then 7 days.
+# And then age out entries.
+#
+DBQueryFatal("delete from log ".
+	     "where stamp < (UNIX_TIMESTAMP(now()) - $keep_important)".
+	     "  and seq <= $maxseq");
+
+#
+# And age out non critical data.
 #
 DBQueryFatal("delete from log ".
 	     "where priority > $NOTICE and ".
-	     "      stamp < (UNIX_TIMESTAMP(now()) - (7 * 24 * 60 * 60))");
+	     "      stamp < (UNIX_TIMESTAMP(now()) - $keep_any)".
+	     "        and seq <= $maxseq");
 
 unlink("$logname")
     if (-e $logname);
+
+TBScriptUnlock();
 
 exit(0);
 
@@ -230,3 +305,4 @@ sub fatal($)
     die("*** $0:\n".
 	"    $msg\n");
 }
+

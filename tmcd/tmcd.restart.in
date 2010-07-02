@@ -1,13 +1,18 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2001-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 DIR=@prefix@/sbin
 
 if [ -f /var/run/tmcd.pid ]
 then
-	kill `cat /var/run/tmcd.pid`
+	kill `cat /var/run/tmcd.pid` >/dev/null 2>&1
 	rm -f /var/run/tmcd.pid
 fi
 
 sleep 1
-${DIR}/tmcd
-
+${DIR}/tmcd -i @BOSSNODE_IP@
+exit 0

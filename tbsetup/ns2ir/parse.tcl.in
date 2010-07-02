@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -239,12 +239,15 @@ namespace eval GLOBALS {
     # Flag to disable doing a fix-node
     variable fix_current_resources 1
 
-    # Control veth encapsulation
-    variable veth_encapsulate 1
+    # Control virtual link encapsulation
+    # XXX "default" is for backward compat so we can distinguish
+    # specified vs. unspecified in assign_wrapper
+    variable vlink_encapsulate "default"
 
-    # Allow override of jail and delay osids.
+    # Allow override of jail, delay, simnode osids.
     variable jail_osname {}
     variable delay_osname {}
+    variable sim_osname "FBSD-STD"
 
     # Allow override of delay capacity.
     variable delay_capacity {}
@@ -262,6 +265,10 @@ namespace eval GLOBALS {
     variable elabinelab_topo ""
     variable elabinelab_eid {}
     variable elabinelab_cvstag {}
+    variable elabinelab_singlenet 0
+
+    # Does user want a per-experiment DB?
+    variable dpdb 0
 
     # Security level. Defaults to 0 ("green")
     # If explicit_firewall is set, then you cannot also give a security level.
@@ -273,6 +280,10 @@ namespace eval GLOBALS {
 
     # List of source files.
     variable sourcefile_list {}
+
+    variable optarray_order
+    array set optarray_order {}
+    variable optarray_count 0
 
     #
     # Named argument helper function.
@@ -353,6 +364,7 @@ namespace eval GLOBALS {
 source ${GLOBALS::libdir}/nsobject.tcl
 source ${GLOBALS::libdir}/sim.tcl
 source ${GLOBALS::libdir}/lanlink.tcl
+source ${GLOBALS::libdir}/path.tcl
 source ${GLOBALS::libdir}/node.tcl
 source ${GLOBALS::libdir}/null.tcl
 source ${GLOBALS::libdir}/traffic.tcl
@@ -389,12 +401,25 @@ source ${GLOBALS::libdir}/topography.tcl
 rename set real_set
 proc set {args} {
     var_import GLOBALS::last_class
+    var_import GLOBALS::optarray_order
+    var_import GLOBALS::optarray_count
 
     # There are a bunch of cases where we just pass through to real set.
     if {[llength $args] == 1} {
 	return [uplevel real_set \{[lindex $args 0]\}]
     } elseif {($last_class == {})} {
-	return [uplevel real_set \{[lindex $args 0]\} \{[lindex $args 1]\}]
+	real_set var [lindex $args 0]
+	real_set val [lindex $args 1]
+
+	#
+	# This is the special OPT array, which we need to keep ordered
+	# when inserting into the DB.
+	#
+	if {[regexp {^opt\(([-_0-9a-zA-Z]+)\)} $var d optname]} {
+	    real_set optarray_order($optarray_count) $optname
+	    incr optarray_count
+	}
+	return [uplevel real_set \{$var\} \{$val\}]
     }
 
     real_set var [lindex $args 0]
@@ -513,6 +538,13 @@ proc new {class args} {
 # unit is given then bytes (b) is assumed.  It returns the bandwidth
 # in Kbps.
 proc parse_bw {bspec {islink 1}} {
+    #
+    # Special case; "*" means let assign pick the bandwidth. Make it zero.
+    #
+    if {"$bspec" == "*"} {
+	return 0
+    }
+
     # Default to bytes
     if {[scan $bspec "%f%s" bw unit] == 1} {
 	set unit b
@@ -545,6 +577,10 @@ proc parse_bw {bspec {islink 1}} {
 	return 0
     }
     return $val
+}
+
+proc parse_backfill {bspec} {
+    return [parse_bw $bspec 0]
 }
 
 # parse_delay dspec

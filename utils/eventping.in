@@ -13,6 +13,8 @@ my $TB = "@prefix@";
 my $BOSSNODE = "@BOSSNODE@";
 my $TBOPS = "@TBOPSEMAIL@";
 
+sub fatal ( $ );
+
 $| = 1;
 
 use event;

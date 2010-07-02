@@ -1,0 +1,113 @@
+On occasion, you may need to update the Emulab software in the disk loader
+("frisbee") and admin ("freebsd") MFSes.  Here is how you do that.
+
+1. Allocate a FreeBSD X node from which to do the build/install.
+   'X' depends on the version of the MFS you are using, and will be either
+   4.7, or 5.3 (actually 5.4).  If you don't have the appropriate disk
+   image, contact Utah.  Allocate a test node with the appropriate image,
+   we'll call it pc1 in the following.
+
+2. Copy over the MFSes from boss:
+
+	scp /tftpboot/freebsd/boot/mfsroot pc1:/tmp/mfsroot.freebsd
+	scp /tftpboot/frisbee/boot/mfsroot pc1:/tmp/mfsroot.frisbee
+
+3. Ensure you have a testbed source tree visible to the machine
+   (i.e., in /proj/<yourproj> or /users/<you>), say in /proj/testbed,
+   and configure a build tree:
+
+	mkdir /proj/testbed/tbobj
+	cd /proj/testbed/tbobj
+	/proj/testbed/tbsrc/configure
+
+4. Now login to pc1 and update the freebsd (admin) MFS as follows:
+
+   FreeBSD 4.x:
+	sudo vnconfig vn0 /tmp/mfsroot.freebsd
+	sudo mount /dev/vn0c /mnt
+	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
+	sudo make mfs-install
+
+   FreeBSD 5.x:
+        sudo mdconfig -a -t vnode -f /tmp/mfsroot.freebsd -u 1
+	sudo mount /dev/md1 /mnt
+	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
+	sudo make mfs-install
+
+   this should update the scripts and binaries in the tree rooted at
+   /mnt.  Unmount and unconfig it:
+
+   FreeBSD 4.x:
+	sudo umount /dev/vn0c
+	sudo vnconfig -u vn0
+
+   FreeBSD 5.x:
+        sudo umount /dev/md1
+	sudo mdconfig -d -u 1
+	
+   and scp /tmp/mfsroot.freebsd back into place on boss
+   (/tftpboot/freebsd/boot/mfsroot).  Be sure to save the old mfsroot
+   off to mfsroot.bak or something first, in case anything goes wrong.
+   Also, remember to run the prepare script in /tftpboot/freebsd/boot
+   afterward!
+
+5. Do the same for the frisbee (diskloader) MFS:
+
+   FreeBSD 4.x:
+	sudo vnconfig vn0 /tmp/mfsroot.frisbee
+	sudo mount /dev/vn0c /mnt
+	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
+	sudo make frisbee-mfs-install
+
+   FreeBSD 5.x:
+        sudo mdconfig -a -t vnode -f /tmp/mfsroot.frisbee -u 1
+	sudo mount /dev/md1 /mnt
+	setenv DESTDIR /mnt		# or export DESTDIR=/mnt
+	sudo make frisbee-mfs-install
+
+   Note the make target is different!  This install is different than
+   that for the other MFS for historical reasons.  Unmount and unconfig it:
+
+   FreeBSD 4.x:
+	sudo umount /dev/vn0c
+	sudo vnconfig -u vn0
+
+   FreeBSD 5.x:
+        sudo umount /dev/md1
+	sudo mdconfig -d -u 1
+
+   and scp it back into place on boss.  Again, remember to save the
+   old MFS and run the prepare script in /tftpboot/frisbee/boot.
+
+6. Make sure the new versions work.  You can just use the node you
+   allocated for updating to test it.  For frisbee do this from boss:
+
+	os_load pc1
+
+   This will of course clobber the disk on pc1, so don't do it if you
+   were using the node for something else!  Make sure the disk load
+   runs correctly by watching the console.  To test the freebsd MFS do:
+
+	node_admin on pc1
+
+   which will force it to reboot into the admin MFS.  Make sure the
+   node comes up.  You should be able to ssh into it (or login on the
+   console).
+
+7. All done!  If there are any problems, copy back the saved mfsroot
+   file (and rerun prepare) and contact testbed-ops@flux.utah.edu for
+   help.
+
+
+Note about FreeBSD 4.10 and the MFSes:
+
+   Early versions of the MFS tarball we distributed included a FreeBSD
+   4.10 version of the MFSes.  However, we encountered occasional data
+   corruption on machines with older IDE chipsets (specifically, the
+   venerable Intel BX chipset).  The problem would manifest itself as
+   machines that wouldn't boot or that had filesystem problems, shortly
+   after loading their disks with a FreeBSD 4.10 frisbee MFS.  Machines
+   with newer chipsets had no such problems.  So use the 5.x MFSes if
+   you have them, otherwise stick with 4.7.
+
+

@@ -1,12 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
-require("Sajax.php");
+require_once("Sajax.php");
 sajax_init();
-sajax_export("GetPNodes");
+sajax_export("GetPNodes", "GetExpState");
 
 # If this call is to client request function, then turn off interactive mode.
 # All errors will go to above function and get reported back through the
@@ -15,9 +15,12 @@ if (sajax_client_request()) {
     $session_interactive = 0;
 }
 
+#
+# This will return the experiment object to the caller.
+#
 function CHECKPAGEARGS($pid, $eid) {
-    global $uid, $TB_EXPT_READINFO;
-    
+    global $this_user, $TB_EXPT_READINFO;
+
     #
     # Verify page arguments.
     # 
@@ -37,22 +40,32 @@ function CHECKPAGEARGS($pid, $eid) {
     }
 
     #
+    # If $this_user is not set, someone got confused. 
+    #
+    if (!isset($this_user)) {
+	TBERROR("Current user is not defined in CHECKPAGEARGS()", 1);
+    }
+
+    #
     # Check to make sure this is a valid PID/EID tuple.
     #
-    if (! TBValidExperiment($pid, $eid)) {
+    $experiment = Experiment::LookupByPidEid($pid, $eid);
+    if (! $experiment) {
 	USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
     }
+    
     #
     # Verify permission.
     #
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+    if (! $experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view the log for $pid/$eid!", 1);
     }
+    return $experiment;
 }
 
 function GetPNodes($pid, $eid) {
     CHECKPAGEARGS($pid, $eid);
-    
+
     $retval = array();
 
     $query_result = DBQueryFatal(
@@ -66,72 +79,68 @@ function GetPNodes($pid, $eid) {
     return $retval;
 }
 
-function STARTLOG($pid, $eid)
+function GetExpState($pid, $eid)
 {
-    global $BASEPATH;
+    $experiment = CHECKPAGEARGS($pid, $eid);
+    $expstate   = $experiment->state();
+
+    return $expstate;
+}
+
+function STARTWATCHER($experiment)
+{
+    echo "<script type='text/javascript' language='javascript'
+                  src='showexp.js'></script>\n";
+
+    $pid   = $experiment->pid();
+    $eid   = $experiment->eid();
+    $state = $experiment->state();
     
     echo "<script type='text/javascript' language='javascript'>\n";
-    echo "function SetupOutputArea() {
-              var Iframe = document.getElementById('outputframe');
-              var winheight = 0;
-              var yoff = 0;
+    sajax_show_javascript();
+    echo "StartStateChangeWatch('$pid', '$eid', '$state');\n";
+    echo "</script>\n";
+}
 
-	      // This tells us the total height of the browser window.
-              if (window.innerHeight) // all except Explorer
-                  winheight = window.innerHeight;
-              else if (document.documentElement &&
-                       document.documentElement.clientHeight)
-                  // Explorer 6 Strict Mode
-	          winheight = document.documentElement.clientHeight;
-              else if (document.body)
-                  // other Explorers
-                 winheight = document.body.clientHeight;
+function STARTLOG($object)
+{
+    if (is_a($object, 'Experiment')) {
+	STARTWATCHER($object);
+    }
+    if (!is_a($object, 'Logfile')) {
+	$object = $object->GetLogfile();
+    }
+    $url = CreateURL("spewlogfile", $object);
 
-              // Now get the Y offset of the outputframe.
-              yoff = Iframe.offsetTop;
-
-	      Iframe.contentWindow.document.open();
-	      Iframe.contentWindow.document.write('<html><head><base href=$BASEPATH/></head><body><pre id=outputarea></pre></body></html>');
- 	      Iframe.contentWindow.document.close();
-
-              if (winheight != 0)
-                  // Now calculate how much room is left and make the iframe
-                  // big enough to use most of the rest of the window.
-                  if (yoff != 0)
-                      winheight = winheight - (yoff + 175);
-                  else
-                      winheight = winheight * 0.7;
-
-	          Iframe.height = winheight;
-          }
-          </script>\n";
-
-    echo "<br>\n";
-    echo "<img id='busy' src='busy.gif'><span id='loading'> Loading...</span>";
+    echo "<center>\n";
+    echo "<img id='load_busy' src='busy.gif'>
+                   <span id='load_loading'> Working ...</span>";
+    echo "</center>\n";
     echo "<br>\n";
     
-    echo "<div><iframe id='outputframe' src='busy.gif' ".
-	"width=100% height=600 scrolling=auto border=4></iframe></div>\n";
-    
+    echo "<div align=center><iframe class='outputframe' ".
+	"id='outputframe' name='outputframe'></iframe></div>\n";
+
     echo "<script type='text/javascript' language='javascript' src='json.js'>
           </script>".
 	 "<script type='text/javascript' language='javascript'
                   src='mungelog.js'>
           </script>\n";
     echo "<script type='text/javascript' language='javascript'>\n";
-
-    echo "SetupOutputArea();\n"; 
-
-    sajax_show_javascript();
-
-    echo "exp_pid = \"$pid\";\n";
-    echo "exp_eid = \"$eid\";\n";
-    echo "</script>
-         <iframe id='downloader' name='downloader' width=0 height=0
-                 src='spewlogfile.php3?pid=$pid&eid=$eid'
-                 onload='ml_handleReadyState(LOG_STATE_LOADED);'
-                 border=0 style='width:0px; height:0px; border: 0px'>
-         </iframe>\n";
+    echo "if (is_chrome == false && is_safari == false) {
+              SetupOutputArea('outputframe', true);
+          }\n";
+    echo "</script><div>
+         <iframe id='downloader' name='downloader'
+                 class='downloader' src='$url'
+                 onload='ml_handleReadyState(LOG_STATE_LOADED);'>
+         </iframe></div>\n";
+    echo "<script type='text/javascript' language='javascript'>\n";
+    echo "if (is_chrome || is_safari) {
+	    HideFrame('outputframe');
+	    ShowDownLoader('downloader');
+         }\n";
+    echo "</script>";
 }
 
 # See if this request is to one of the above functions. Does not return
@@ -141,3 +150,4 @@ sajax_handle_client_request();
 #
 # We return to the including script ...
 #
+

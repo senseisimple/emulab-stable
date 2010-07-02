@@ -1,0 +1,44 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/template_cvsroot
+
+include $(OBJDIR)/Makeconf
+
+#LIB_STUFF    = commit_prep commit_logmsg commit_finish
+#OTHER_STUFF  = commitinfo loginfo verifymsg
+
+LIB_STUFF    = logtag
+OTHER_STUFF  = taginfo
+CTRLSBIN_STUFF= rtag_commit
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all: $(LIB_STUFF) $(CTRLSBIN_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: \
+	$(addprefix $(INSTALL_LIBDIR)/cvsroot/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_LIBDIR)/cvsroot/, $(OTHER_STUFF)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLSBIN_STUFF)) 
+
+$(INSTALL_LIBDIR)/cvsroot/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/cvsroot
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+
+clean:

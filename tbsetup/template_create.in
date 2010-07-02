@@ -1,10 +1,11 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006 University of Utah and the Flux Group.
+# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
+use strict;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
@@ -25,59 +26,71 @@ use Errno qw(EDQUOT);
 sub usage()
 {
     print(STDERR
-	  "Usage: create_expt_template [-q] [-w] [-E description]\n".
-	  "                [-g gid] <pid> <tid> <input file>\n".
+	  "Usage: template_create [-q] [-w] [-E description]\n".
+	  "          [-m guid/vers] [-g gid] <pid> <tid> <input file>\n".
 	  "switches and arguments:\n".
-	  "-w       - wait for template to be created.\n".
-	  "-q       - be less chatty\n".
-	  "-E <str> - A pithy sentence describing the template\n".
-	  "-g <gid> - The group in which to create the experiment\n".
-	  "<pid>    - The project in which to create the experiment\n".
-	  "<tid>    - The template name (unique, alphanumeric, no blanks)\n".
-	  "<input>  - Input file for experiment.\n");
+	  "-w        - wait for template to be created.\n".
+	  "-m <guid> - Modify existing template.\n".
+	  "-q        - be less chatty\n".
+	  "-E <str>  - A pithy sentence describing the template\n".
+	  "-g <gid>  - The group in which to create the experiment\n".
+	  "<pid>     - The project in which to create the experiment\n".
+	  "<tid>     - The template name (alphanumeric, no blanks)\n".
+	  "<input>   - Input file for experiment.\n");
     exit(-1);
 }
-my $optlist	 = "qwE:g:m:";
+my $optlist	 = "qwE:g:m:f:r:";
 my $quiet        = 0;
 my $waitmode     = 0;
-my $description  = "";
 my $modify       = 0;
+my $repotag;
+my $repobase;
+my $needrepoinit = 0;
+my $frompath;
+my $description;
 my $pid;
 my $tid;
-my $eid;
 my $gid;
 my $inputfile;
+my $logfile;
+my $logname;
 # For modify.
 my $parent_guid;
 my $parent_vers;
+my $parent_template;
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $PROJROOT	= "/proj";
 my $EVENTSYS	= @EVENTSYS@;
 my $TBOPS	= "@TBOPSEMAIL@";
 my $TBLOGS	= "@TBLOGSEMAIL@";
 my $TBDOCBASE	= "@TBDOCBASE@";
 my $TBBASE	= "@TBBASE@";
 my $CONTROL	= "@USERNODE@";
+my $STAMPS      = @STAMPS@;
 
 # Locals
-my $user_name;
-my $user_email;
-my $dbuid;
+my $template;
 my $guid;
-my $version = 1;
+my $vers;
+my $eid;
+my $cvsdir;
+my $tmpdir;
+my $archive;
 # For the END block below.
-my $cleaning   = 0;
+my $cleaning    = 0;
 my $exptcreated = 0;
+my $justexit    = 1;
 
 # Programs we need
 my $checkquota  = "$TB/sbin/checkquota";
 my $batchexp    = "$TB/bin/batchexp";
 my $endexp      = "$TB/bin/endexp";
 my $makegraph   = "$TB/bin/template_graph";
+my $CVSBIN      = "/usr/bin/cvs";
+my $RLOG        = "/usr/bin/rlog";
 
 # Protos
 sub ParseArgs();
@@ -90,10 +103,17 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
-use libTemplates;
+use libArchive;
+use Template;
+use libaudit;
+use Project;
+use User;
 
-# Be careful not to exit on transient error
-$libdb::DBQUERY_MAXTRIES = 120;
+# In libdb
+my $projroot = PROJROOT();
+
+# Temporary
+$libtestbed::SYSTEM_DEBUG = 1;
 
 #
 # Turn off line buffering on output
@@ -115,30 +135,63 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Verify user and get his DB uid.
+# Verify user and get his DB uid and other info for later.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    tbdie("You do not exist in the Emulab Database!");
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    tbdie("You ($UID) do not exist!");
 }
-
-#
-# Get email info for user.
-#
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    tbdie("Cannot determine your name and email address.");
-}
+my $user_dbid  = $this_user->dbid();
+my $user_uid   = $this_user->uid();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
 
 #
 # Before doing anything else, check for overquota ... lets not waste
 # our time. Make sure user sees the error by exiting with 1.
 #
-if (system("$checkquota $dbuid") != 0) {
-    tberror("You are over your disk quota on $CONTROL; please cleanup!");
+if (system("$checkquota $user_uid") != 0) {
+    tberror("You are over your disk quota on $CONTROL; ".
+	    "please login there and cleanup!");
     exit(1);
 }
 
 # Now parse arguments.
 ParseArgs();
+
+#
+# Make sure UID is allowed to create experiments in this project.
+#
+my $project = Project->Lookup($pid, $eid);
+if (!defined($project)) {
+    tbdie("Could not map project $pid/$eid to its object!");
+}
+if (! $project->AccessCheck($this_user, TB_PROJECT_CREATEEXPT)) {
+    tbdie("You do not have permission to create templates in $pid/$gid");
+}
+
+#
+# On modify, must check access to the parent template.
+#
+if ($modify) {
+    $parent_template = Template->Lookup($parent_guid, $parent_vers);
+
+    if (!defined($parent_template)) {
+	tbdie("Experiment template $parent_guid/$parent_vers does not exist!");
+    }
+
+    if (!$parent_template->AccessCheck($user_uid, TB_EXPT_READINFO)) {
+	tbdie("You do not have permission to modify experiment template ".
+	      "$parent_guid/$parent_vers");
+    }
+
+    $description = $parent_template->description()
+	if (!defined($description));
+}
+else {
+    $description = "Created by $user_uid"
+	if (! defined($description));
+}
 
 #
 # In wait mode, block SIGINT until we spin off the background process.
@@ -150,88 +203,7 @@ if ($waitmode) {
 }
 
 #
-# Make sure UID is allowed to create experiments in this project.
-#
-if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
-    tbdie("You do not have permission to create experiments in $pid/$gid");
-}
-
-#
-# On modify, must check access to the parent template.
-#
-if ($modify) {
-    if (!libTemplates::TBValidExperimentTemplate($parent_guid, $parent_vers)) {
-	tbdie("Experiment template $parent_guid/$parent_vers does not exist!");
-    }
-    if (!libTemplates::TBExptTemplateAccessCheck($dbuid,
-						 $parent_guid,
-						 TB_EXPT_READINFO)) {
-	tbdie("You do not have permission to modify experiment template ".
-	      "$parent_guid/$parent_vers");
-    }
-
-    # Hmm, this is redundant in the table. 
-    $guid = $parent_guid;
-}
-else {
-    #
-    # Otherwise, grab new guid before tables are locked.
-    #
-    if (libTemplates::NewGUID(\$guid) < 0) {
-	tbdie("Could not get a new GUID!");
-    }
-}
-
-#
-# Create a template record; the tid has to be unique within the project,
-# across both the experiments and template tables, since there will be
-# two paths to experiment creation for the near term. See corresponding
-# code in batchexp.
-#
-DBQueryFatal("lock tables experiments write, ".
-	     "            experiment_templates write");
-
-my $query_result =
-    DBQueryFatal("select pid,tid from experiment_templates ".
-		 "where tid='$tid' and pid='$pid'");
-
-if ($query_result->numrows) {
-    DBQueryWarn("unlock tables");
-    tbdie("Template ID $tid in project $pid is already in use!");
-}
-
-#
-# Find unused version number now that tables are locked. 
-#
-if ($modify) {
-    $query_result =
-	DBQueryFatal("select MAX(vers) from experiment_templates ".
-		     "where guid='$guid'");
-
-    $version = ($query_result->fetchrow_array())[0];
-    $version++;
-}
-
-# Currently, we make up an eid using the guid and version. This will
-# change later.
-$eid = "T${guid}-${version}";
-
-#
-# Sanity check; make sure this eid is not in use. Tables are still locked.
-#
-$query_result =
-    DBQueryFatal("select pid,eid from experiments ".
-		 "where eid='$eid' and pid='$pid'");
-
-if ($query_result->numrows) {
-    DBQueryWarn("unlock tables");
-    tbdie("Experiment ID $eid in project $pid is already in use!");
-}
-
-#
-# Create a template record to "reserve" the tid. We pass the rest of
-# it off to the normal experiment path right now (too much stuff to
-# duplicate with a deadline looming right around the corner).
+# Create a template record now, so we know what it is.
 #
 my %args = ();
 
@@ -239,29 +211,308 @@ if ($modify) {
     $args{'parent_guid'} = $parent_guid;
     $args{'parent_vers'} = $parent_vers;
 }
-$args{'guid'}        = $guid;
-$args{'vers'}        = $version;
 $args{'pid'}         = $pid;
 $args{'gid'}         = $gid;
 $args{'tid'}         = $tid;
-$args{'eid'}         = $eid;
-$args{'uid'}         = $dbuid;
+$args{'uid'}         = $user_uid;
+$args{'uid_idx'}     = $user_dbid;
 $args{'description'} = DBQuoteSpecial($description);
 $args{'description'} =~ s/^\'(.*)\'$/$1/;
 
-if (libTemplates::NewTemplateRecord(\%args) < 0) {
+if (! ($template = Template->Create(\%args))) {
     tbdie("Could not create a new template record!");
 }
-# Now safe to unlock; the tid/eid is reserved;
-DBQueryFatal("unlock tables");
 
-# Input files are kept in the DB, with the template.
-exit(-1)
-    if (libTemplates::AddTemplateInputFile($guid, $version, $inputfile) < 0);
+if ($STAMPS) {
+    if ($modify) {
+	$parent_template->Stamp("template_create", "modified");
+	
+	$template->Stamp("template_create", "creating",
+			 "parent_version", $parent_vers);
+    }
+    else {
+	$template->Stamp("template_create", "creating", "", 0);
+    }
+}
+
+#
+# The template gets its own directory structure. 
+#
+if (my $rval = $template->CreateDirectory()) {
+    $template->Delete();
+    tbdie("Failed to create directories for template");
+}
+my $template_dir = $template->path();
+
+#
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
+
+# Grab stuff we need out of the template.
+$guid   = $template->guid();
+$vers   = $template->vers();
+$eid    = $template->eid();
+$cvsdir = "$projroot/$pid/templates/$guid/cvsrepo";
+$tmpdir = "$projroot/$pid/templates/$guid/cvstmp.$$";
+
+#
+# Use the logonly option to audit so that we get a record mailed.
+#
+$logfile = $template->CreateLogFile("template_create");
+if (!defined($logfile)) {
+    fatal(-1, "Could not create a logfile");
+}
+$logname = $logfile->filename();
+# We want it to spew to the web.
+$template->SetLogFile($logfile) == 0 or
+    fatal(-1, "Could not set the logfile");
+$template->OpenLogFile() == 0 or
+    fatal(-1, "Could not open the logfile");
+
+if (my $childpid =
+    AuditStart(LIBAUDIT_DAEMON, $logname,
+	       LIBAUDIT_LOGONLY|LIBAUDIT_FANCY|LIBAUDIT_NODELETE)) {
+    #
+    # Parent exits normally, unless in waitmode. We have to set
+    # justexit to make sure the END block below does not run.
+    #
+    $justexit = 1;
+    
+    if (!$waitmode) {
+	print("Template $guid/$vers is being created. Watch your email.\n")
+	    if (! $quiet);
+	exit(0);
+    }
+    print("Waiting for template $guid/$vers to be created. ".
+	  "Please be patient!\n")
+	if (! $quiet);
+
+    # Give child a chance to run.
+    select(undef, undef, undef, 0.25);
+	
+    #
+    # Reset signal handlers. User can now kill this process, without
+    # stopping the child.
+    #
+    $SIG{TERM} = 'DEFAULT';
+    $SIG{QUIT} = 'DEFAULT';
+    $SIG{INT}  = 'DEFAULT';
+
+    #
+    # Wait until child exits or until user gets bored and types ^C.
+    #
+    waitpid($childpid, 0);
+    my $exit_code = $? >> 8;
+
+    print("Done. Exited with status: $?\n")
+	if (! $quiet);
+
+    if ($exit_code == 0) {
+        # Web interface depends on this line. Bad; need another way to send
+        # back the newly generated guid/version.
+	print "Template $guid/$vers has been created\n";
+    }
+    else {
+	my $d = tblog_lookup_error();
+	print tblog_format_error($d);
+    }
+    
+    exit $exit_code;
+}
+
+# Add audit info.  Right now this will only work when called in
+# the child of the script being audited.  Eventually these can be
+# set anywhere.
+AddAuditInfo("which", "$pid/$tid");
+AddAuditInfo("failure_frag", "Template Creation Failure");
+AddAuditInfo("success_frag", "New Template Created");
+
+#
+# We need to catch TERM so we can kill the children and do a cleanup.
+#
+sub handler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    fatal(-1, "Caught SIG${signame}! Killing template setup ...");
+}
+$SIG{TERM} = \&handler;
+$SIG{QUIT} = 'DEFAULT';
+
+#
+# Set up CVS repo on ops to use as alternate interface.
+#
+if (!$modify || ! -e $cvsdir) {
+    $needrepoinit = 1
+	if (! -e $cvsdir);
+	
+    if (! mkdir("$cvsdir", 0777)) {
+	fatal(-1, "Could not mkdir $cvsdir: $!");
+    }
+    if (! chmod(0777, "$cvsdir")) {
+	fatal(-1, "Could not chmod $cvsdir: $!");
+    }
+    # Init the CVS control files.
+    System("$CVSBIN -d $cvsdir init") == 0
+	or fatal(-1, "Could not initialize $cvsdir");
+
+    open(GUID, ">$cvsdir/CVSROOT/GUID") or
+	fatal(-1, "Could not create cookie file in CVSROOT directory");
+    print GUID "$guid\n";
+    close(GUID);
+
+    System("cd $cvsdir/CVSROOT; co -l config taginfo") == 0
+	or fatal(-1, "Could not lock $cvsdir/CVSROOT/config");
+
+    System("cp -fp $TB/lib/cvsroot/* $cvsdir/CVSROOT") == 0
+	or fatal(-1, "Could not copy cvsroot files to $cvsdir/CVSROOT!");
+
+    open(CONFIG, ">> $cvsdir/CVSROOT/config") 
+	or fatal(-1, "Could not open $cvsdir/CVSROOT/config for writing");
+    print CONFIG "\n";
+    print CONFIG "# Added for Emulab Testbed; DO NOT DELETE!\n";
+    print CONFIG "TemplateCommit=$TB/sbin/rtag_commit\n";
+    close(CONFIG);
+}
+
+#
+# We stick in a little cookie file so we know what template this is,
+# from within the CVS repo (well, sandbox).
+#
+open(COOKIE, "> $template_dir/.template") or
+    fatal(-1, "Could not create cookie file in stub import directory");
+print COOKIE "# DO NOT REMOVE THIS FILE OR MODIFY THIS FILE, EVER!\n";
+print COOKIE "GUID: $guid/$vers\n";
+print COOKIE "TIME: " . time() . "\n";
+close(COOKIE);
+
+if (defined($repotag)) {
+    #
+    # We need to get a checkout from the repo for both the nsfile and
+    # the datastore directory.
+    #
+    mkdir("$tmpdir", 0777) or
+	fatal(-1, "Could not mkdir $tmpdir: $!");
+
+    #
+    # Need the numeric revision corresponding to the tag. From that we can
+    # determine the branch tag.
+    #
+    my $revision;
+    
+    open(TAGLOG, "$cvsdir/CVSROOT/tags") or
+	fatal(-1, "Could not open $cvsdir/CVSROOT/tags for reading");
+    while (<TAGLOG>) {
+	if ($_ =~ /^$repotag,\s*([\w]+),\s*([\d\.]+)$/) {
+	    print "$repotag $1 at revision $2\n";
+	    if ($1 eq "add" || $1 eq "mov") {
+		$revision = $2;
+	    }
+	    else {
+		$revision = undef;
+	    }
+	}
+    }
+    close(TAGLOG);
+    if (!defined($revision)) {
+	fatal(-1, "Could not find base revision for $repotag");
+    }
+    #
+    # And now the branch tag that this tag is on. Split the revision
+    # up so we can find the second to last token. Basically, if
+    # 1.2.2.1 is the revision, then the branch tag has a revision
+    # number that looks like 1.2.0.2 (magic). The HEAD is special of
+    # course.
+    #
+    my @tokens = split(/\./, $revision);
+    if (scalar(@tokens) > 2) {
+	my $branchtag;
+	
+	$tokens[scalar(@tokens)-1] = $tokens[scalar(@tokens)-2];
+	$tokens[scalar(@tokens)-2] = 0;
+	my $branchrev = join(".", @tokens);
+    
+	open(RLOG, "$RLOG -h $cvsdir/setup/.template,v |")
+	    or fatal(-1,
+		     "Could not run rlog on $cvsdir/setup/.template,v!");
+	my $intags = 0;
+	while (<RLOG>) {
+	    if ($intags) {
+		# Look for end of tag section. Consume rest of input file.
+		if ($_ =~ /^[\w]+/) {
+		    while (<RLOG>) {
+			;
+		    }
+		    last;
+		}
+		# Otherwise process tags ...
+		if ($_ =~ /^\s+([-\w]+):\s+([\d\.]+)$/) {
+		    #print "tag $1 at revision $2\n";
+		    if ($branchrev eq $2) {
+			$branchtag = $1;
+		    }
+		}
+		next;
+	    }
+	    # Look for the start of the tag section.
+	    if ($_ =~ /^symbolic names:/) {
+		$intags = 1;
+	    }
+	}
+	close(RLOG);
+	if (!defined($branchtag)) {
+	    fatal(-1, "Could not find branch tag for revision $revision!");
+	}
+	$repobase = $branchtag;
+
+	# Checkout ...
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
+	       "  -r $repotag setup")
+	    == 0 or fatal(-1, "Could not checkout '$repotag' from $cvsdir");
+    }
+    else {
+	# Checkout along trunk, no -r option cause then commit fails
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout -r HEAD setup")
+	    == 0 or fatal(-1, "Could not checkout trunk from $cvsdir");
+
+	#
+	# Clear the default branch so that checkout gives us the trunk.
+	#
+	System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
+	    == 0 or fatal(-1, "Could not clear default branch in $cvsdir");
+
+	# And clear the sticky tag so later commit works.
+	System("cd $tmpdir/setup; $CVSBIN -d $cvsdir update -A")
+	    == 0 or fatal(-1, "Could not update to head trunk from $cvsdir");
+    }
+
+    $inputfile = "$tmpdir/setup/tbdata/nsfile.ns";
+    fatal(-1, "NS file missing from repo checkout!")
+	if (!-e $inputfile);
+}
+
+#
+# The description is versioned metadata the user can modify.
+#
+$template->NewMetadata("description", $description,
+		       $this_user, "template_description") == 0
+    or fatal(-1, "Failed to insert metadata record for description");
+
+#
+# The TID is versioned metadata the user can modify.
+#
+$template->NewMetadata("TID", $tid, $this_user, "tid") == 0
+    or fatal(-1, "Failed to insert metadata record for description");
 
 # Now invoke batchexp to preload the experiment. Note special -x option.
-system("$batchexp -x -q -i -f ".
-       "-E 'Experiment Template Preload $guid/$version' ".
+system("$batchexp ". 
+       "-x $guid/$vers" . ($modify ? ",$parent_guid/$parent_vers" : "") . " " .
+       "-q -i -f -E 'Experiment Template Preload $guid/$vers' ".
        "-p $pid -e $eid $inputfile");
 fatal($? >> 8, "Oops")
     if ($?);
@@ -269,12 +520,364 @@ fatal($? >> 8, "Oops")
 # Need to kill the experiment if we fail after this point.
 $exptcreated = 1;
 
+if ($STAMPS) {
+    $template->Stamp("template_create", "batchexp");
+}
+
+# Input files are kept in the DB, with the template.
+fatal(-1, "Could not add NS file to template store")
+    if ($template->AddInputFile($inputfile) < 0);
+
+#
+# Grab archive index for new templates. 
+#
+libArchive::TBExperimentArchive($pid, $eid, \$archive, undef)
+    >= 0 or fatal(-1, "Could not get archive for $template!");
+
+# And update the record.
+%args = ();
+$args{'archive_idx'} = $archive->idx();
+
+$template->Update(\%args) == 0
+    or fatal(-1, "Could not update template record!");
+
+#
+# When creating a template, the archive is created (or forked) in batchexp
+# but it is not committed. We need to do that now cause this experiment
+# is never actually swapped in. Instead each instance is a new fork, and if
+# the archive were not committed, it would not look correct.
+# Before we do that though, we want to copy the datastore directory to the
+# child since we *do* want that stuff shared.
+#
+if ($modify) {
+    print "Committing archive before copying data store\n";
+    libArchive::TBCommitExperimentArchive($pid, $eid, "template_modify")
+	>= 0 or fatal(-1, "Failed to commit experiment archive!");
+
+    if (defined($repotag)) {
+	$template->ImportDataStore("$tmpdir/setup/datastore") == 0
+	    or fatal(-1, "Failed to import data store");
+    }
+    elsif (defined($frompath)) {
+	$template->ImportDataStore("$frompath/datastore") == 0
+	    or fatal(-1, "Failed to import data store");
+    }
+    else {
+	$template->CopyDataStore($parent_template, $user_uid) == 0
+	    or fatal(-1, "Failed to copy data store");
+    }
+
+    # and tell the archive library about the above files.
+    libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) == 0
+	or fatal(-1, "Failed to add datastore files to the archive!");
+}
+
+# Make a copy of the inputfile in the template_dir so that it finds its
+# way into the user accessible CVS repo. This is also where the datastore
+# gets copied to for import.
+system("cp -p $inputfile $template_dir/tbdata/nsfile.ns") == 0
+    or fatal(-1, "Could not copy $inputfile to $template_dir/tbdata");
+
+# Need this so the datastore directory looks populated in the CVS repo.
+if (! -e "$template_dir/datastore/.ignore") {
+    System("cd $template_dir/datastore; touch .ignore")
+	== 0 or fatal(-1,
+		      "Could not touch .ignore in $template_dir/datastore");
+}
+
+#
+# When the template is first created, import an initial vendor branch
+# into the CVS repo so that there is something there. 
+#
+if (!$modify || $needrepoinit) {
+    System("cd $template_dir; ".
+	   "$CVSBIN -d $cvsdir import ".
+	   "  -m 'Initialize new cvs repo for template $guid' setup ".
+	   "  T${guid}-${vers}_import_branch T${guid}-${vers}_import")
+	== 0 or fatal(-1, "Could not import new template into $cvsdir");
+
+    # Create the records module with a simple mkdir. Harmless.
+    mkdir("$cvsdir/records", 0777) or
+	fatal(-1, "Could not mkdir $cvsdir/records: $!");
+
+    #
+    # Must advance the head past 1.1 since that is where the imports are done
+    # and it will confuse everything later.
+    #
+    mkdir("$tmpdir", 0777) or
+	fatal(-1, "Could not mkdir $tmpdir: $!");
+
+    # Checkout ...
+    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout setup")
+	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+
+    # Commit ...
+    System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
+	     "  -m 'Commit initial import back to head'")
+	== 0 or fatal(-1, "Could not commit to $cvsdir");
+
+    # No keyword subst.
+    System("cd $tmpdir/setup; $CVSBIN -Q -d $cvsdir admin -kb")
+	== 0 or fatal(-1, "Could not set -kb in $cvsdir");
+
+    #
+    # Now tag the CVS repo with the current guid/vers so we can find it easily.
+    #
+    System("$CVSBIN -d $cvsdir rtag -n T${guid}-${vers} setup")
+	== 0 or fatal(-1, "Could not rtag initial version in $cvsdir");
+
+    # Setup the records directory.
+    System("cd $tmpdir; $CVSBIN -d $cvsdir checkout records")
+	== 0 or fatal(-1, "Could not checkout from $cvsdir");
+
+    System("cd $tmpdir/records; touch .ignore") == 0 or
+	fatal(-1, "Could not create $tmpdir/records/.ignore");
+ 
+    System("cd $tmpdir/records; $CVSBIN -d $cvsdir add .ignore")
+	== 0 or fatal(-1, "Could not cvs add $tmpdir/records/.ignore!");
+    
+    System("cd $tmpdir/records; $CVSBIN -d $cvsdir commit -f -R ".
+	     "  -m 'Commit initial records directory'")
+	== 0 or fatal(-1, "Could not commit records to $cvsdir");
+}
+elsif ($frompath) {
+    #
+    # When modifying a template from an instance we need to import the
+    # new files into the CVS repo and then merge/commit back to the
+    # current head (of the branch).
+    #
+    # Not going to deal with this now.
+}
+elsif (defined($repotag)) {
+    #
+    # Need to commit the new version of .template on the new branch so
+    # that when the user does a checkout of the branch, it says what
+    # template it is (and what to template to modify on the next branch).
+    #
+    System("cp -p $template_dir/.template $tmpdir/setup") == 0
+	or fatal(-1, "Could not cp $template_dir/.template to $tmpdir");
+
+    # Check the file in.
+    System("cd $tmpdir/setup; ".
+	   "$CVSBIN commit " . (defined($repobase) ? "-r $repobase " : " ") .
+	   "  -m 'Update guid after modify' .template")
+	== 0 or fatal(-1, "Could not commit final version in $cvsdir");
+    
+    #
+    # Tag the CVS repo with the current guid/vers so we can find it easily.
+    #
+    System("$CVSBIN -d $cvsdir rtag -n " .
+	   (defined($repobase) ? "-r $repobase " : " ") .
+	   "   T${guid}-${vers} setup")
+	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
+
+    #
+    # Clear the default branch so that "update -A" takes user to trunk.
+    #
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b")
+	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
+}
+else {
+    mkdir("$tmpdir", 0777) or
+	fatal(-1, "Could not mkdir $tmpdir: $!");
+
+    my $athead = 0;
+
+    #
+    # To support older templates, see if the parent is in the CVS repo.
+    # If not, skip all this. 
+    #
+    my $ptag = "T${parent_guid}-${parent_vers}";
+    my $revision = `$RLOG -h $cvsdir/setup/.template,v | grep '${ptag}:'`;
+    goto noparent
+	if ($?);
+
+    # Split out the revision number.
+    if ($revision =~ /^.*:\s+([\d.]+)$/) {
+	$revision = $1;
+    }
+    else {
+	fatal(-1, "Could not parse '$revision'");
+    }
+
+    #
+    # We want to know if the parent is on the trunk and at the head.  If it
+    # is, then continue along the trunk, otherwise need to create a branch
+    # off the parent. This makes it nice for the common case that most
+    # people work along the the trunk.
+    #
+    # XXX Potential problem here; even though the .template file is at the
+    # head revision on the trunk, there is no way to know where all the
+    # other files are. If the user has been good to his CVS tree, then
+    # things will probably work most of the time, but ...
+    #
+    chomp($revision);
+    my @tokens = split(/\./, $revision);
+    if (scalar(@tokens) == 2) {
+	my $header = `$RLOG -h $cvsdir/setup/.template,v | egrep '^head:'`;
+	if ($?) {
+	    fatal(-1, "Could not determine head revision for ".
+		  "$cvsdir/setup/.template,v");
+	}
+	if ($header =~ /^head:\s+([\d.]+)$/) {
+	    if ("$1" eq "$revision") {
+		$athead = 1;
+	    }
+	}
+	else {
+	    fatal(-1, "Could not parse ($header) head revision for ".
+		  "$cvsdir/setup/.template,v");
+	}
+    }
+
+    if (!$athead) {
+        #
+        # Create a branch off the parent template for this new template
+        #
+	System("$CVSBIN -d $cvsdir rtag -n -r T${parent_guid}-${parent_vers} ".
+	       " -b T${parent_guid}-${vers}_branch setup ") 
+	    == 0 or fatal(-1, "Could not rtag parent version in $cvsdir");
+    }
+    
+    #
+    # Import onto new branch in the vendor branch.
+    # Then commit to a new (branch) head.
+    #
+    System("cd $template_dir; ".
+	   "$CVSBIN -d $cvsdir import -b 1.1.${vers} ".
+	   "  -m 'Modify cvs repo for template $guid/$vers' setup ".
+	   "  T${guid}-${vers}_import_branch T${guid}-${vers}_import")
+	== 0 or fatal(-1, "Could not import modified template into $cvsdir");
+
+    if ($athead) {
+	# Checkout and merge
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
+	       "  -j HEAD -j T${guid}-${vers}_import_branch setup")
+	    == 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
+
+        # Commit ...
+	System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
+	       "  -m 'Commit merge with head'")
+	    == 0 or fatal(-1, "Could not commit on $cvsdir");
+    }
+    else {
+	# Checkout and merge
+	System("cd $tmpdir; $CVSBIN -d $cvsdir checkout ".
+	       "  -r T${parent_guid}-${vers}_branch ".
+	       "  -j T${parent_guid}-${vers}_branch ".
+	       "  -j T${guid}-${vers}_import_branch setup")
+	    == 0 or fatal(-1, "Could not checkout/merge from $cvsdir");
+
+	# Need to clear the -b (default branch) or else the merge
+	# commit fails for some reason that makes no sense to me.
+	System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b setup") == 0
+	    or fatal(-1, "Could not clear default branch (-b) on $cvsdir");
+    
+        # Commit ...
+	System("cd $tmpdir/setup; $CVSBIN -d $cvsdir commit -f -R ".
+	       "  -r T${parent_guid}-${vers}_branch  ".
+	       "  -m 'Commit merge with head'")
+	    == 0 or fatal(-1, "Could not commit on $cvsdir");
+    }
+    
+    #
+    # Clear the default branch so that "update -A" takes user to trunk.
+    #
+    System("cd $tmpdir; $CVSBIN -d $cvsdir admin -b setup")
+	== 0 or fatal(-1, "Could not clear default branch in $cvsdir");
+
+    # No keyword subst.
+    System("cd $tmpdir; $CVSBIN -Q -d $cvsdir admin -kb setup")
+	== 0 or fatal(-1, "Could not set -kb in $cvsdir");
+    
+    #
+    # Now tag the CVS repo with the current guid/vers so we can
+    # find it easily.
+    #
+    System("$CVSBIN -d $cvsdir rtag -n ".	
+	   "  -r " . ($athead ? "HEAD" : "T${parent_guid}-${vers}_branch") .
+	   "  T${guid}-${vers} setup")
+	== 0 or fatal(-1, "Could not rtag final version in $cvsdir");
+noparent:
+}
+System("/bin/rm -rf $tmpdir")
+    if (-e $tmpdir);
+
+# Do a savepoint prior to the commit below. As noted above, this is
+# not done in batchexp.
+#print "Doing a savepoint\n";
+#libArchive::TBExperimentArchiveSavePoint($pid, $eid, "CopyDataStore") >= 0
+#    or fatal(-1, "Failed to do a savepoint on the experiment archive!");
+
+print "Doing final commit\n";
+libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
+    >= 0 or fatal(-1, "Failed to commit experiment archive!");
+
+#
+# Copy the virt_parameters table to the formal parameters table.
+# I am not sure about the need for this table yet, but the only way
+# to get the parameters is via the parser, but we want to save this
+# info forever (after the underlying experiment is terminated).
+#
+my $query_result =
+    DBQueryWarn("select name,value,description from virt_parameters ".
+              "where pid='$pid' and eid='$eid'");
+
+fatal(-1, "Could not get virt_parameters for $pid/$eid")
+    if (! $query_result);
+
+while (my ($name, $value, $description) = $query_result->fetchrow_array()) {
+    $template->NewFormalParameter($name, $value, $description, $this_user) == 0
+	or fatal(-1, "Could not set formal parameter for $pid/$eid")
+}
+
+#
+# Copy the rest of the metadata from parent to child.
+# XXX This has to be done after the previous step (virt_parameters)
+#
+if ($modify) {
+    $template->CopyMetadata($parent_template, $this_user) == 0
+	or fatal(-1, "Failed to copy metadata records");
+}
+   
 #
 # Generate the graph for the template.
 #
-system("$makegraph $guid");
+print "Generating graph\n";
+system("$makegraph -s $guid");
 fatal(-1, "Error generating template graph.")
     if ($?);
+
+#
+# Make the new template active (and the parent template inactive) if the
+# parent was already active.
+#
+if ($modify && $parent_template->IsActive()) {
+    $parent_template->InActivate();
+    $template->Activate();
+}
+
+#
+# Update parent to point to most recent child.
+#
+if ($modify) {
+    %args = ();
+
+    $args{'child_guid'} = $template->guid();
+    $args{'child_vers'} = $template->vers();
+
+    $parent_template->Update(\%args) == 0
+	or fatal(-1, "Could not update parent template record!");
+}
+if ($STAMPS) {
+    $template->Stamp("template_create", "created");
+}
+
+#
+# Clear the log file so the web page stops spewing. 
+#
+$template->CloseLogFile()
+    if (defined($logfile));
 
 exit(0);
 
@@ -345,20 +948,27 @@ sub ParseArgs()
 	}
 
 	#
-	# The file must reside in /proj, /groups, or /users. Since this script
-	# runs as the caller, regular file permission checks ensure its a file
-	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
-	# since this script is invoked directly from web interface.
+	# The file must reside in an acceptible location. Since this script
+	# runs as the caller, regular file permission checks ensure it is a
+	# file the user is allowed to use.  So we don't have to be too tight
+	# with the RE matching /tmp and /var/tmp files.  Note that
+	# /tmp/$guid-$nsref.nsfile is also allowed since this script is
+	# invoked directly from web interface which generates a name that
+	# should not be guessable.
 	#
 	if (! ($inputfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
 	    ! ($inputfile =~ /^\/tmp\/\d+\.ns/) &&
 	    ! ($inputfile =~ /^\/var\/tmp\/php\w+/) &&
-	    ! ($inputfile =~ /^\/proj/) &&
-	    ! ($inputfile =~ /^\/groups/) &&
-	    ! ($inputfile =~ /^\/users/)) {
+	    ! TBValidUserDir($inputfile, 0)) {
 	    tberror("$inputfile does not resolve to an allowed directory!");
 	    # Note positive status; so error goes to user not tbops.
 	    exit(1);
+	}
+	# Copy to a temporary file.
+	my $tempnsfile = $inputfile;
+	$inputfile = "/tmp/$$.ns";
+	if (system("/bin/cp", "$tempnsfile", "$inputfile")) {
+	    tberror("Could not copy $tempnsfile to $inputfile");
 	}
     }
     #
@@ -378,6 +988,15 @@ sub ParseArgs()
 	$gid = $pid;
     }
 
+    if (defined($options{"f"})) {
+	$frompath = $options{"f"};
+
+	# The Archive library has a nice routine to validate this path.
+	if (Archive::ValidatePath(\$frompath) != 0) {
+	    tbdie("Invalid path $frompath");
+	}
+    }
+
     #
     # Parent pointer, for modify. We always create a new template point
     # it to the parent. 
@@ -393,6 +1012,17 @@ sub ParseArgs()
 	}
     }
 
+    if (defined($options{"r"})) {
+	$repotag = $options{"r"};
+
+	if ($repotag =~ /^([-\w]+)$/) {
+	    $repotag  = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $repotag");
+	}
+    }
+
     if (defined($options{"E"})) {
 	if (! TBcheck_dbslot($options{"E"},
 			     "experiment_templates", "description",
@@ -400,9 +1030,6 @@ sub ParseArgs()
 	    tbdie("Improper template description!");
 	}
 	$description = $options{"E"};
-    }
-    else {
-	$description = "Created by $dbuid";
     }
 
     if (defined($options{"q"})) {
@@ -424,14 +1051,21 @@ sub cleanup()
 	exit(-1)
 	    if (!TBExptIDX($pid, $eid, \$exptidx));
 		
-	system("$endexp -x -q -w $pid $eid");
+	system("$endexp -x -q -w $exptidx");
 	exit(-1)
 	    if ($?);
 
 	# And delete all the other stuff?
     }
-    libTemplates::DeleteTemplateRecord($guid, $version)
-	if (defined($guid));
+    # Delete repo but only if this is the initial template creation.
+    system("/bin/rm -f $inputfile")
+	if (defined($inputfile) && -e $inputfile);
+    system("/bin/rm -rf $cvsdir")
+	if (!$modify && defined($cvsdir) && -e $cvsdir);
+    System("/bin/rm -rf $tmpdir")
+	if (defined($tmpdir) && -e $tmpdir);
+    $template->Delete()
+	if (defined($template));
 }
 
 sub fatal($$)
@@ -449,7 +1083,7 @@ sub fatal($$)
 
 END {
     # Normal exit, nothing to do.
-    if (!$?) {
+    if (!$? || $justexit) {
 	return;
     }
     my $saved_exitcode = $?;
@@ -459,7 +1093,7 @@ END {
 	# We are screwed; a recursive error. Someone will have to clean
 	# up by hand. 
 	#
-	SENDMAIL(TBOPS, 
+	SENDMAIL($TBOPS, 
 		 "Template Creation Failure: $pid/$tid",
 		 "Recursive error in cleanup! This is very bad.");
 	$? = $saved_exitcode;

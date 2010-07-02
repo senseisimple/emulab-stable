@@ -1,7 +1,7 @@
 #!/bin/sh
 
-MAIL_WARNINGS_TO=testbed-ops@emulab.net
-BASE=/home/utah_elab_svc/netbed_files
+SLICE=`basename $HOME`
+BASE=$HOME/netbed_files
 LOGDIR=$BASE/log
 LOGFILE=$LOGDIR/thttpd.log
 PIDFILE=$LOGDIR/thttpd.pid
@@ -32,8 +32,9 @@ $HTTPD_COMMAND
 #
 # Make sure it started
 #
-if $WGET_COMMAND; then
+$WGET_COMMAND
+if [ "$?" != "0"; then
         ERRSTR="thttpd on `hostname` failed to start"
         echo $ERRSTR
-	echo "$ERRSTR" | mail -s "$ERRSTR" $MAIL_WARNINGS_TO
+#	echo "$ERRSTR" | mail -s "$ERRSTR" $MAIL_WARNINGS_TO
 fi;

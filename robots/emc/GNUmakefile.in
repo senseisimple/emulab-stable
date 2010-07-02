@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,6 +13,11 @@ include $(OBJDIR)/Makeconf
 
 PROGS = locpiper emcd
 TESTS = test_emcd.sh
+
+# These scripts installed setuid, with sudo. 
+SETUID_BIN_SCRIPTS   = 
+SETUID_SBIN_SCRIPTS  = locpiper
+SETUID_LIBX_SCRIPTS  =
 
 all: $(PROGS)
 client client-install:
@@ -34,10 +39,9 @@ test_emcd.sh: emcd
 emcd: $(OBJS) ../mtp/libmtp.a emcd.h ../mtp/mtp_xdr.h ../mtp/mtp.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-install: all
+install: all $(INSTALL_SBINDIR)/locpiper
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) emcd $(INSTALL_DIR)/opsdir/sbin/emcd
-	$(INSTALL_PROGRAM) locpiper $(INSTALL_SBINDIR)/locpiper
 	@echo "Don't forget to do a post-install as root"
 
 post-install: 

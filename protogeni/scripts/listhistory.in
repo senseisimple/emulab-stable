@@ -1,0 +1,154 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Data::Dumper;
+
+#
+# Ask all components managers for a list of tickets issued.
+# 
+sub usage()
+{
+    print "Usage: listusage [cm ...]\n";
+    exit(1);
+}
+my $optlist    = "";
+my $errors     = 0;
+my @managers;
+sub fatal($);
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-ch";
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use libtestbed;
+require GeniDB;
+require Genixmlrpc;
+use GeniResponse;
+require GeniCertificate;
+require GeniCredential; 
+require GeniAuthority;
+require GeniSlice;
+
+if (@ARGV) {
+    while (@ARGV) {
+	my $manager = shift(@ARGV);
+	my $query_result =
+	    GeniDB::DBQueryFatal("select uuid from geni_authorities ".
+				 "where hrn='${manager}.cm'");
+	fatal("No such manager $manager")
+	    if (!$query_result->numrows);
+	my ($uuid) = $query_result->fetchrow_array();
+	push(@managers, $uuid);
+    }
+}
+
+#
+# The RPC context for this script is as the CH
+#
+my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
+my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $EMULAB_PEMFILE");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+Genixmlrpc->SetTimeout(15);
+
+#
+# The credential will be issued to the ClearingHouse.
+#
+my $authority = GeniAuthority->Lookup($certificate->uuid());
+if (!defined($authority)) {
+    fatal("Could not find local authority object");
+}
+
+#
+# List of all CMs.
+#
+my $query_result =
+    GeniDB::DBQueryWarn("select uuid from geni_authorities ".
+			"where type='cm' ".
+			(!@managers ? "" :
+			 "and (" . join(" or ",
+					map("uuid='$_'", @managers)) . ")"));
+fatal("Could not lookup CM list")
+    if (!defined($query_result));
+fatal("No managers listed in the DB; is this a ClearingHouse?")
+    if (!$query_result->numrows);
+
+while (my ($manager_uuid) = $query_result->fetchrow_array()) {
+    my $manager = GeniAuthority->Lookup($manager_uuid);
+    print STDERR "Could not lookup up CM $manager_uuid\n"
+	if (!defined($manager));
+
+    my $manager_credential = GeniCredential->Create($manager, $authority);
+    if (!defined($manager_credential)) {
+	fatal("Could not create new credential for $manager");
+    }
+    if ($manager_credential->Sign($certificate) != 0) {
+	fatal("Could not sign credential for $manager");
+    }
+
+    print "$manager\n";
+	
+    my $response =
+	Genixmlrpc::CallMethod($manager->url(), undef,
+			       "ListHistory",
+			       { "credential" =>
+				     $manager_credential->asString() });
+    if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR
+	    "Could not ListHistory on $manager: ". $response->output();
+	    $errors++;
+    }
+    foreach my $ref (@{$response->value()}) {
+	my $owner_hrn = $ref->{'owner_hrn'};
+	my $slice_hrn = $ref->{'slice_hrn'};
+	my $created   = $ref->{'created'};
+	my $redeemed  = $ref->{'redeemed'};
+	my $expired   = $ref->{'expired'};
+	my $released  = $ref->{'released'};
+	my $rspec     = $ref->{'rspec'};
+
+	print "$owner_hrn,$slice_hrn,$created,$redeemed,$expired,$released\n";
+	print "$rspec\n";
+    }
+    $manager_credential->Delete();
+}
+exit($errors);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    exit(1);
+}

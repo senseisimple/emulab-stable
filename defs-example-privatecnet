@@ -1,0 +1,276 @@
+#
+# This is an example definitions file for configure.
+#
+# This version has a non-routable control network; i.e., nodes must be
+# accessed via the multi-homed, publically routable "users" node.
+# The control network looks like:
+#
+# Complete:            192.168.0/22
+# "public" segment:      192.168.3/24
+# "private" segment:     192.168.2/24
+# "node control segment: 192.168.0/23 (aka: 192.168.0/24, 192.168.1/24)
+#
+# This configuration requires a router/firewall between the segments
+# (addreses 192.168.{0,2,3}.1).
+#
+# Use the --with-TBDEFS=filename to specify your own file.
+# If you add a variable, be sure to go and update configure.in.
+#
+
+# The name of this installation
+THISHOMEBASE=Example.Emulab.Net
+
+#
+# Various domain and host names
+#
+
+# Host name of our web server (or host:port)
+WWWHOST=www.example.emulab.net
+
+# Fully-quailified hostname of the boss node
+BOSSNODE=boss.example.emulab.net
+
+# Fully-quailified hostname of the ops (also called users) node
+USERNODE=ops.example.emulab.net
+
+# Fully-quailified hostname of the fileserver (will probably be the same
+# as the ops node)
+FSNODE=fs.example.emulab.net
+
+#
+# Minimum Unix uid and gid values for Emulab users.
+# Emulab will create the initial user with these values and all additional
+# users will have values greater than these.  It would be unwise to make
+# these less than 1000 to avoid conflicts with "standard" BSD and Linux
+# users.  These can also be tweaked to avoid pre-existing accounts on the
+# fileserver machine.
+#
+MIN_UNIX_UID=10000
+MIN_UNIX_GID=6000
+
+# 
+# Addresses to which email will be sent - These are expected to go to mailing
+# lists. You can either host the lists on your ops node, send them off to
+# some external server. If you chose to run them from the ops node, the
+# ops-install script sets up empty lists for you.
+#
+
+# Main address for the 'operations staff' - Copies of error messages, etc. will
+# get sent to this address, and in some cases users are directed to this
+# address if they have questions and/or problems.
+TBOPSEMAIL=testbed-ops@example.emulab.net
+
+# Notification of new projects requests get sent to this address for approval.
+# Should have a few admin-types on it.
+TBAPPROVALEMAIL=testbed-approval@example.emulab.net
+
+# Logs, such as experiment creation/deletion go to this address. Probably no
+# more than one person needs to be on this one.
+TBLOGSEMAIL=testbed-logs@example.emulab.net
+
+# Various auditing message about account maintenance go here. Again, probably
+# only needs one member.
+TBAUDITEMAIL=testbed-audit@example.emulab.net
+
+# Some web reports get sent to this one.
+TBWWWEMAIL=testbed-www@example.emulab.net
+
+# Our node state management daemon sends mail to this address. Someone should
+# be on this list, and reporting persistent error messages to Utah would be a
+# good idea.
+TBSTATEDEMAIL=testbed-stated@example.emulab.net
+
+# We have a test suite to test the front end. This email is for the results
+# of the testsuite, but is not used yet.
+TBTESTSUITEEMAIL=testbed-testsuite@example.emulab.net
+
+# We dynamically create two email addresses for notifications to users - one
+# for all testbed users, and one for all users whose projects have active
+# experiments. These addresses are included in the above lists, with the
+# intent that they can be used to archive all mail sent to them.
+TBUSERSARCHIVE=testbed-users-archive@example.emulab.net
+TBACTIVEARCHIVE=testbed-active-users-archive@example.emulab.net
+
+#
+# Real paths (no symlinks) to the directories that get exported from ops
+#
+# FSDIR_SCRATCH is optional.  The intent is that it provides per-project
+# space that is not "guaranteed" (for the Utah Emulab that means we do
+# not back it up to tape).  If defined, you would either set no quotas,
+# or higher quotas than for FSDIR_PROJ, on this filesystem.  If you are
+# not providing guarantees and are not doing quotas, you might as well
+# just put all your space in /proj and leave FSDIR_SCRATCH= blank.
+#
+FSDIR_GROUPS=/q/groups
+FSDIR_PROJ=/q/proj
+FSDIR_USERS=/users
+FSDIR_SHARE=/share
+FSDIR_SCRATCH=
+
+#
+# Filesystems on which quotas should be enforced.
+# Note that if multiple of the FSDIR_* vars above are on the same filesystem
+# (e.g., /q/proj and /q/groups) then you should only specify the base of the
+# common filesystem on which they all reside here (e.g., /q).
+# Set to the empty string to turn off quota checking.
+#
+FS_WITH_QUOTAS="/q /users"
+
+#
+# SSL Certificate stuff. Used to customize config files in ssl directory.
+# Note that OrganizationalUnit is set in the cnf file.
+# CommonName is typically set to BOSSNODE and emailAddress to TBOPSEMAIL
+#
+SSLCERT_COUNTRY="US"
+SSLCERT_STATE="Utah"
+SSLCERT_LOCALITY="Salt Lake City"
+SSLCERT_ORGNAME="Utah Network Testbed"
+
+#
+# Control network configuration stuff.
+# Used primarily to generate initial named and dhcpd config files.
+# See doc/setup-network.txt for definitions of the private, public and
+# control segments.
+#
+
+#
+# Boss and users node IP addresses on the control network.
+# For boss this is an address on the private segment of the control net.
+# For users this is an address on the public segment of the control net.
+#
+BOSSNODE_IP=192.168.2.70
+USERNODE_IP=192.168.3.74
+FSNODE_IP=$USERNODE_IP
+
+#
+# If your boss/ops nodes are multihomed (and typically, one of the
+# networks is a public routable network, and the other is an internal
+# unroutable network), then define the the external addresses here (and
+# the internal addresses above).
+#
+EXTERNAL_BOSSNODE_IP=155.98.32.70
+EXTERNAL_USERNODE_IP=155.98.33.74
+EXTERNAL_FSNODE_IP=$EXTERNAL_USERNODE_IP
+
+#
+# Network definitions - see doc/setup-network.txt for a description of how
+# we recommend laying out your network
+#
+
+#
+# The overall control network range - this subnet should cover the
+# CONTROL, PRIVATE, and PUBLIC networks below.
+#
+TESTBED_NETWORK=192.168.0.0
+TESTBED_NETMASK=255.255.252.0
+
+#
+# As above, if you have internal and external networks, define the
+# external network here, and the internal network above.
+# 
+EXTERNAL_TESTBED_NETWORK=155.98.32.0
+EXTERNAL_TESTBED_NETMASK=255.255.240.0
+
+#
+# The node control network segment.
+#
+CONTROL_ROUTER_IP=192.168.0.1
+CONTROL_NETWORK=192.168.0.0
+CONTROL_NETMASK=255.255.254.0
+
+#
+# The private network segment.
+#
+PRIVATE_NETWORK=192.168.2.0
+PRIVATE_ROUTER=192.168.2.1
+PRIVATE_NETMASK=255.255.255.0
+
+#
+# The public network segment.
+#
+PUBLIC_NETWORK=192.168.3.0
+PUBLIC_ROUTER=192.168.3.1
+PUBLIC_NETMASK=255.255.255.0
+
+#
+# A range of addresses within the node control network segment
+# to use for new nodes being added to the testbed.
+# You need at least one.
+#
+DHCPD_DYNRANGE="192.168.1.240 192.168.1.250"
+
+#
+# If you have forwarders for your named, specify them here for named.conf
+# generation in the named directory.
+#
+NAMED_FORWARDERS="1.1.1.1 1.1.2.1"
+
+#
+# Windows support. Turn this on if you think you might want to use windows
+# XP images on your experimental nodes. Note though, that Utah cannot
+# provide those images to you (because of obvious licensing issues), so it
+# will be up to you to generate an XP image yourself and install the
+# Emulab client side that enables XP to work inside your testbed. Turning
+# Windows support will install and enable Samba on your ops node, so there 
+# are firewall issues to be aware of (you want to block the appropriate ports
+# so that your ops samba server can be accessed from *only* your control
+# subnet!).
+#
+WINSUPPORT=0
+
+#
+# Enable an NS verification path using a clean version of NS.
+# There is no reason to disable this unless NS won't build on your ops node.
+#
+NSVERIFY=1
+
+#
+# Virtual node network configuration (if you don't want virtual nodes,
+# just leave this as is)
+#
+# Needs at least a /16 network.  For a /16 the layout of an IP is:
+#	X.Y.<pnode>.<vnode>
+# where <pnode> is the physical host node and <vnode> is the virtual
+# node on that host.  Both are between 1 and 254.  If you have more than
+# 254 physical nodes then the assignment code will increment Y, meaning
+# that you had better have larger than a /16 network.  If you are using
+# the default 172.16/12, then you can have up to 16 * 254 physical hosts.
+# If you want more than 254 vnodes per pnode, you are screwed.
+#
+VIRTNODE_NETWORK=172.16.0.0
+VIRTNODE_NETMASK=255.240.0.0
+# XXX compat
+JAILIPBASE=$VIRTNODE_NETWORK
+JAILIPMASK=$VIRTNODE_NETMASK
+
+#
+# Only supported on the Mother Ship (emulab.net) right now.
+#
+WIKISUPPORT=0
+BUGDBSUPPORT=0
+MAILMANSUPPORT=0
+CVSSUPPORT=0
+CHATSUPPORT=0
+NFSTRACESUPPORT=0
+ARCHIVESUPPORT=0
+OPSDBSUPPORT=0
+SFSSUPPORT=0
+PELABSUPPORT=0
+PLABSUPPORT=0
+PLAB_ROOTBALL="plabroot-18.tar.bz2"
+
+#
+# You shouldn't have to change anything below this point
+#
+
+TBADMINGROUP=tbadmin
+TBDBNAME=tbdb
+IPBASE=10
+DELAYCAPACITY=2
+DISABLE_NSE=1
+FRISEBEEMCASTADDR="234.5.6"
+FRISEBEEMCASTPORT=3564
+
+# Sometimes the main page is down in a directory on WWWHOST
+# No trailing '/'!
+#WWW=www.example.emulab.net/emulab-www

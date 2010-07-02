@@ -1,0 +1,82 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Description of a physical topology
+#
+
+default namespace = "http://emulab.net/resources/ptop/0.1"
+
+include "top.rnc"
+
+## "Legacy" assign node flags - will be replaced with properties, and in some
+## cases, explicit links
+NodeFlagSpec =
+    ## Gives the amount of bandwidth this node can forward through its loopback
+    ## interface. In the future, we will make the loopback interface/link
+    ## explicit in the topology
+    ## Valid only for physical nodes
+    (element trivial_bandwidth { xsd:integer })?,
+    ## Specify that this node is a subnode of another node. We MIGHT
+    ## try to do this with properties in the future
+    ## Valid for both virtual and physical nodes
+    element subnode_of { text }?,
+    ## Indicates that this node should never be considered identical to any
+    ## other node. Could be done with a property
+    ## Valid only for physical nodes
+    element unique { empty }?,
+    ## Indicates that virtual links must either all be trivial (loopback), or
+    ## none of them must be. Possibly expressible with properties?
+    element disallow_trivial_mix { empty }?
+
+## A node in the topology
+NodeSpec = element node { NodeContents }
+  
+NodeContents =
+    ## Name of the node - each node name must be unique within the 
+    ## top element
+        attribute name { text },
+    ## Type specification - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+        NodeTypeSpec+,
+    ## Legacy flags
+        NodeFlagSpec,
+    ## Legacy features and desires
+        FeatureDesireSpec*,
+    ## Types of virtual nodes that this physical node can satisfy
+    ## Desires of this node, which should (or must) be matched by the
+    ## physical node we are assigned to
+        PropertySpec*
+
+## Links in the topology - zero or more
+LinkSpec = element link { LinkContents }
+
+LinkContents =
+    ## Name of the link - must be unique in the top
+        attribute name { text },
+    ## The two interfaces which form the endpoints of this link.
+        LinkEndPoints,
+    ## The characteristics (bandwidth, latency, loss) which affect traffic.
+        LinkCharacteristics,
+    ## Type of this link - we use a named pattern here (defined below), so
+    ## that it can be overriden in the virtual topology schema, where you are
+    ## only allowed to have one
+        LinkTypeSpec+,
+    ## Properties of this link
+        PropertySpec*
+
+## A link can (by default) have zero or more types
+## LinkSpec.LinkType = LinkTypeSpec*
+
+start = element ptop {
+    ## The testbed that this physical topology came from - will be used for
+    ## federation
+    attribute testbed { text },
+    ## Nodes in the topology - zero or more
+    ## Links in the topology - zero or more
+    (NodeSpec | LinkSpec)*
+}

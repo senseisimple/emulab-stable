@@ -1,147 +1,92 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-include("template_defs.php");
+include_once("template_defs.php");
 
 #
-# Only known and logged in users can begin experiments.
+# Only known and logged in users.
 #
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$optargs = OptionalPageArguments("experiment",   PAGEARG_EXPERIMENT,
+				 "template",     PAGEARG_TEMPLATE,
+				 "copyid",       PAGEARG_INTEGER,
+				 "record",       PAGEARG_INTEGER,
+				 "nsref",        PAGEARG_INTEGER,
+				 "guid",         PAGEARG_INTEGER,
+				 "nsdata",       PAGEARG_ANYTHING);
 
 #
 # This comes from the begin_experiment page, when cloning an experiment
 # from another experiment.
 #
 if (isset($copyid) && $copyid != "") {
-    unset($exptidx);
-    unset($copypid);
-    unset($copyeid);
-    unset($copytag);
-    
-    #
-    # See what kind of copyid.
-    #
-    if (preg_match("/^(\d+)(?::([-\w]*))?$/", $copyid, $matches)) {
-	$exptidx = $matches[1];
-	$copytag = $matches[2];
-	    
-	if (TBvalid_integer($exptidx)) {
-            #
-	    # See if its a current experiment.
-	    #
-	    $query_result =
-		DBQueryFatal("select pid,eid from experiments ".
-			     "where idx='$exptidx'");
-		
-	    if (mysql_num_rows($query_result)) {
-		$row = mysql_fetch_row($query_result);
-
-		$copypid = $row[0];
-		$copyeid = $row[1];
-	    }
+    if (TBvalid_integer($copyid)) {
+	#
+	# See if its a current experiment.
+	#
+	$experiment = Experiment::Lookup($copyid);
+	if (!$experiment) {
+	    $record = $copyid;
 	}
-    }
-    elseif (preg_match("/^([-\w]+),([-\w]+)(?::([-\w]*))?$/",
-		       $copyid, $matches)) {
-	$copypid = $matches[1];
-	$copyeid = $matches[2];
-	$copytag = $matches[3];
     }
     else {
-	PAGEARGERROR("Invalid ID");
-    }
-
-    if (isset($copypid) && isset($copyeid) &&
-	(!isset($copytag) || $copytag == "")) {
-	$pid = $copypid;
-	$eid = $copyeid;
-	# Fall through to below.
-    }
-    elseif (isset($exptidx)) {
-	#
-	# By convention, this means to always go to the archive. There
-	# must be a tag.
-	#
-	if (! isset($copytag) || $copytag == "") {
-	    PAGEARGERROR("Must supply a tag");
-	}
-	if (! isset($copypid)) {
-	    #
-	    # Ick, map to pid,eid so we can generate a proper path into
-	    # the archive. This is bad. 
-	    #
-	    $query_result =
-		DBQueryFatal("select pid,eid from experiments_stats ".
-			     "where exptidx='$exptidx'");
-		
-	    if (!mysql_num_rows($query_result)) {
-		PAGEARGERROR("Invalid experiment index!", 1);
-	    }
-	    $row = mysql_fetch_row($query_result);
-	    $copypid = $row[0];
-	    $copyeid = $row[1];
-	}
-	header("Location: cvsweb/cvsweb.php3/$exptidx/tags/$copytag/".
-	       "proj/$copypid/exp/$copyeid/${copyeid}.ns?".
-	       "exptidx=$exptidx&view=markup");
-    }
-    else {
-	PAGEARGERROR("");
+	PAGEARGERROR("Invalid copyID!");
     }
 }
 
 #
 # Spit back an NS file to the user. 
 #
+if (isset($record) && $record != "" && TBvalid_integer($record)) {
+    $experiment_resources = ExperimentResources::Lookup($record);
+    if (! $experiment_resources) {
+	USERERROR("No such experiment resources record $record!", 1);
+    }
+    if (!$experiment_resources->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view the NS file for ".
+		  "experiment resource record $record!", 1);
+    }
+    
+    #
+    # Grab the NS file.
+    #
+    if (($nsfile = $experiment_resources->NSFile())) {
+	header("Content-Type: text/plain");
+	echo "$nsfile\n";
+    }
+    else {
+	USERERROR("There is no NS file recorded for ".
+		  "experiment resource record $record!", 1);
+    }
+    return;
+}
 
 #
 # A template.
 #
-if (isset($guid) && isset($version)) {
-    if (!TBvalid_guid($guid)) {
-	PAGEARGERROR("Invalid GUID.");
-    }
-    if (!TBvalid_tinyint($version)) {
-	PAGEARGERROR("Invalid GUID version");
-    }
-    #
-    # Check to make sure this is a valid template.
-    #
-    if (! TBValidExperimentTemplate($guid, $version)) {
-	USERERROR("The experiment template $guid/$version is not a valid ".
-		  "experiment template!", 1);
-    }
-
-    #
-    # Verify Permission.
-    #
-    if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
-	USERERROR("You do not have permission to view experiment template ".
-		  "$guid/$version!", 1);
+if (isset($template)) {
+    if (! $template->AccessCheck($this_user, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view template!", 1);
     }
     header("Content-Type: text/plain");
 
     #
     # Grab all of the input files. Display each one. 
     #
-    $query_result =
-	DBQueryFatal("select * from experiment_template_inputs ".
-		     "where parent_guid='$guid' and parent_vers='$version'");
+    $input_list = $template->InputFiles();
 
-    while ($row = mysql_fetch_array($query_result)) {
-	$input_idx = $row['input_idx'];
-
-	$input_query =
-	    DBQueryFatal("select input from experiment_template_input_data ".
-			 "where idx='$input_idx'");
-
-	$input_row = mysql_fetch_array($input_query);
-	echo $input_row['input'];
+    for ($i = 0; $i < count($input_list); $i++) {
+	echo $input_list[$i];
 	echo "\n\n";
     }
     return;
@@ -150,19 +95,11 @@ if (isset($guid) && isset($version)) {
 #
 # if requesting a specific pid,eid must have permission.
 #
-if (isset($pid) && isset($eid)) {
-    #
-    # Check to make sure this is a valid PID/EID tuple.
-    #
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("Experiment $eid is not a valid experiment ".
-		  "in project $pid.", 1);
-    }
-
+if (isset($experiment)) {
     #
     # Verify Permission.
     #
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+    if (!$experiment->AccessCheck($this_user, $TB_EXPT_READINFO)) {
 	USERERROR("You do not have permission to view the NS file for ".
 		  "experiment $eid in project $pid!", 1);
     }
@@ -170,18 +107,16 @@ if (isset($pid) && isset($eid)) {
     #
     # Grab the NS file from the DB.
     #
-    $query_result =
-	DBQueryFatal("select nsfile from nsfiles ".
-		     "where pid='$pid' and eid='$eid'");
-    if (mysql_num_rows($query_result) == 0) {
+    if (($nsfile = $experiment->NSFile())) {
+	header("Content-Type: text/plain");
+	echo "$nsfile\n";
+    }
+    else {
+	$pid = $experiment->pid();
+	$eid = $experiment->eid();
 	USERERROR("There is no NS file recorded for ".
 		  "experiment $eid in project $pid!", 1);
     }
-    $row    = mysql_fetch_array($query_result);
-    $nsfile = $row["nsfile"];
-    
-    header("Content-Type: text/plain");
-    echo "$nsfile\n";
     return;
 }
 
@@ -199,8 +134,8 @@ if (isset($nsdata) && strcmp($nsdata, "") != 0) {
     header("Content-Type: text/plain");
     echo "$nsdata";
 } elseif (isset($nsref) && strcmp($nsref,"") != 0 && 
-          ereg("^[0-9]+$", $nsref)) {
-    if (isset($guid) && ereg("^[0-9]+$", $guid)) {
+          preg_match('/^[0-9]+$/', $nsref)) {
+    if (isset($guid) && preg_match('/^[0-9]+$/', $guid)) {
 	$nsfile = "/tmp/$guid-$nsref.nsfile";    
         $id = $guid;
     } else {

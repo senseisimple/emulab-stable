@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -12,51 +12,52 @@ if (!$MAILMANSUPPORT) {
 }
 
 # No Pageheader since we spit out a redirection below.
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
-$isadmin = ISADMIN($uid);
+$this_user = CheckLoginOrDie(CHECKLOGIN_USERSTATUS|
+			     CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments
+#
+$optargs = OptionalPageArguments("target_project", PAGEARG_PROJECT,
+				 "target_group",   PAGEARG_GROUP,
+				 "listname",       PAGEARG_STRING,
+				 "asadmin",        PAGEARG_BOOLEAN,
+				 "wantadmin",      PAGEARG_BOOLEAN,
+				 "wantconfig",     PAGEARG_BOOLEAN);
 
 #
 # We will either show a specific list.
 #
-if (isset($pid) && $pid != "") {
-    # XXX Yuck!
+if (isset($target_project) || isset($target_group)) {
+    if (! isset($target_group)) {
+	$target_group = $target_project->DefaultGroup();
+    }
+    $pid = $target_group->pid();
+    $gid = $target_group->gid();
 
-    if (!isset($gid) || $gid == "") {
-	$gid = $pid;
-    }
-
-    if (! TBvalid_pid($pid)) {
-	PAGEARGERROR("Invalid characters in $pid!");
-    }
-    if (! TBvalid_gid($gid)) {
-	PAGEARGERROR("Invalid characters in $gid!");
-    }
-    if (! TBValidGroup($pid, $gid)) {
-	USERERROR("No such project/group $pid/$gid!", 1);
-    }
-
+    if ($target_group->IsProjectGroup())
+	$listname = "$pid" . "-users";
+    else
+	$listname = "$pid-$gid" . "-users";
+    
     #
     # Make sure the user is allowed! We must do a permission check since
     # we are asking mailman to generate a cookie without a password.
     #
     if (!$isadmin &&
-	!TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
+	!$target_group->AccessCheck($this_user, $TB_PROJECT_READINFO)) {
 	USERERROR("You are not a member of $pid/$gid.", 1);
     }
-
-    if (strcmp($pid, $gid))
-	$listname = "$pid-$gid" . "-users";
-    else
-	$listname = "$pid" . "-users";
 
     #
     # By default, we want the user interface to the archives. However, an
     # admin can request access to the list admin interface, and we need
     # a different cookie for that.
     #
-    TBUserInfo($uid, $user_name, $user_email);
+    $user_name  = $this_user->name();
+    $user_email = $this_user->email();
     $user_email = rawurlencode($user_email);
     
     $cookietype = "user";
@@ -118,7 +119,8 @@ elseif (isset($listname) && $listname != "") {
     if (! TBvalid_mailman_listname($listname)) {
 	PAGEARGERROR("Invalid characters in $listname!");
     }
-    TBUserInfo($uid, $user_name, $user_email);
+    $user_name  = $this_user->name();
+    $user_email = $this_user->email();
     $user_email = rawurlencode($user_email);
 	
     $optargs = "";
@@ -126,7 +128,7 @@ elseif (isset($listname) && $listname != "") {
     # Make sure the user is allowed! We must do a permission check since
     # we are asking mailman to generate a cookie without a password.
     #
-    if (isset($wantadmin)) {
+    if (isset($wantadmin) || isset($asadmin)) {
 	if (!$isadmin) {
 	    $mm_result = DBQueryFatal("select * from mailman_listnames ".
 				      "where listname='$listname'");
@@ -145,7 +147,11 @@ elseif (isset($listname) && $listname != "") {
 	    }
 	}
 	$cookietype = "admin";
-	$listiface  = "admin";
+	if (isset($wantadmin)) {
+	    $listiface  = "admin";
+	} else {
+	    $listiface  = "private";
+        }
     }
     elseif (isset($wantconfig)) {
 	$cookietype = "user";

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -30,9 +30,6 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TEVC        = "$TB/bin/tevc";
 my $nodeid;
-my $pid;
-my $eid;
-my $vname;
 
 #
 # Testbed Support libraries
@@ -40,6 +37,7 @@ my $vname;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Node;
 
 #
 # Turn off line buffering on output
@@ -105,19 +103,31 @@ else {
 #
 # Check args and permission
 #
-if (!TBValidNodeName($nodeid)) {
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    die("*** $0:\n".
+	"    You ($UID) do not exist!\n");
+}
+
+my $node = Node->Lookup($nodeid);
+if (!defined($node)) {
     die("*** $0:\n".
 	"    Node does not exist: $nodeid\n");
 }
-if (!TBNodeAccessCheck($UID, TB_NODEACCESS_MODIFYINFO(), $nodeid)) {
+if (!$node->AccessCheck($this_user, TB_NODEACCESS_MODIFYINFO())) {
     die("*** $0:\n".
 	"    Not enough permission: $nodeid\n");
 
 }
-if (!NodeidToExp($nodeid, \$pid, \$eid, \$vname)) {
+my $experiment = $node->Reservation();
+if (!defined($experiment)) {
     die("*** $0:\n".
 	"    Could not map nodeid to experiment: $nodeid\n");
 }
+my $pid = $experiment->pid();
+my $eid = $experiment->eid();
+my $vname = $node->vname();
 
 #
 # Inject an event. 

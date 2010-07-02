@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005, 2007 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -12,6 +12,7 @@
 
 #include <ctype.h>
 #include <syslog.h>
+#include <string.h>
 
 #include "auxfuncs.h"
 

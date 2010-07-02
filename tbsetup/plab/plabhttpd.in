@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -9,9 +9,6 @@
 # Simple little script to start up thttpd on planetlab nodes - it actually
 # restarts the server gracefully, so that any downloads already going on will
 # get to complete
-#
-# NOTE: This script currently requires YOUR keys, because it logs in as utah1
-# on the planetlab nodes
 #
 
 use lib '@prefix@/lib';
@@ -28,21 +25,78 @@ my $PLAB_USER = "utah_svc_slice";
 my $THTTPD_START = "netbed_files/sbin/thttpd.restart";
 
 #
+# max parallelization
+#
+my $MAX_CHILDREN = 10;
+
+#
 # SSH command
 #
 my $SSH = "ssh -q -oBatchMode=yes -oStrictHostKeyChecking=no -l $PLAB_USER";
 
-#
-# Get a list of planetlab nodes that are up
-#
-my $query_result = DBQueryFatal("SELECT n.node_id FROM nodes as n " .
-            "LEFT JOIN node_status AS s ON n.node_id=s.node_id " .
-	    "LEFT JOIN reserved AS r ON n.node_id = r.node_id " .
-	    "WHERE n.type=\"pcplabphys\" AND s.status=\"up\" AND " .
-		"!(r.pid=\"" . NODEDEAD_PID .
-		    "\" AND r.eid=\"" . NODEDEAD_EID .  "\")");
+my @nodes = ();
 
-while (my ($node) = $query_result->fetchrow()) {
-    print "Starting up webserver on $node ...\n";
-    system "$SSH $node $THTTPD_START";
+if (@ARGV) {
+    @nodes = @ARGV;
 }
+
+if (!scalar(@nodes)) {
+    #
+    # Get a list of planetlab nodes that are up
+    #
+    my $query_result = 
+	DBQueryFatal("SELECT n.node_id FROM nodes as n " .
+		     "LEFT JOIN node_status AS s ON n.node_id=s.node_id " .
+		     "LEFT JOIN reserved AS r ON n.node_id = r.node_id " .
+		     "WHERE n.type=\"pcplabphys\" AND s.status=\"up\" AND " .
+		     "!(r.pid=\"" . NODEDEAD_PID .
+		     "\" AND r.eid=\"" . NODEDEAD_EID .  "\") " . 
+		     "order by n.node_id");
+
+    while (my ($node) = $query_result->fetchrow()) {
+	push @nodes, $node;
+    }
+}
+
+#
+# Run up to $max_children rsyncs at a time
+#
+my $current_children = 0;
+my @failed = ();
+my %children = ();
+while (@nodes || $current_children) {
+    if (($current_children < $MAX_CHILDREN) && @nodes) {
+	#
+	# If we have room for another child, start one up
+	#
+        my $node = pop @nodes;
+        if (my $pid = fork()) {
+            $current_children++;
+            $children{$pid} = $node;
+        } else {
+            print "Starting up webserver on $node\n\n";
+            exec "$SSH $node $THTTPD_START";
+        }
+    } else {
+	#
+	# Wait for a child to die, and see if it failed
+	#
+        my $childpid = wait();
+        if ($childpid < 0) {
+            die "Bad return value from wait(): $childpid\n";
+        }
+        if ($children{$childpid}) {
+            $current_children--;
+            if ($?) {
+                push @failed, $children{$childpid};
+            }
+        }
+    }
+}
+
+if (@failed) {
+    print "Some nodes failed: \n";
+    print map {"$_\n"} @failed;
+}
+
+exit scalar @failed;

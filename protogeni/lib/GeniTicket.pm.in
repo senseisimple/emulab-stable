@@ -1,0 +1,979 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniTicket;
+
+#
+# Some simple ticket stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw (TICKET_PURGED TICKET_EXPIRED TICKET_REDEEMED
+	      TICKET_RELEASED TICKET_DELETED TICKET_NOSTATS);
+
+use GeniDB;
+use GeniCredential;
+use GeniCertificate;
+use emutil qw(TBGetUniqueIndex);
+use GeniUtil;
+use GeniHRN;
+use GeniXML;
+use English;
+use XML::Simple;
+use XML::LibXML;
+use Data::Dumper;
+use Date::Parse;
+use POSIX qw(strftime);
+use Time::Local;
+use File::Temp qw(tempfile);
+use overload ('""' => 'Stringify');
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
+my $NFREE	   = "$TB/bin/nfree";
+my $CMCERT	   = "$TB/etc/genicm.pem";
+
+# Ticket release flags
+sub TICKET_PURGED()	{ return 1; }
+sub TICKET_REDEEMED()	{ return 2; }
+sub TICKET_EXPIRED()	{ return 3; }
+sub TICKET_RELEASED()	{ return 4; }
+sub TICKET_DELETED()	{ return 5; }
+sub TICKET_NOSTATS()	{ return 0x1; }
+
+# Cache of tickets.
+my %tickets = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%tickets); }
+
+# Do not load this for the Clearinghouse XML server.
+BEGIN { 
+    if (! defined($main::GENI_ISCLRHOUSE)) {
+	require Experiment;
+	require Node;
+    }
+}
+
+#
+# Lookup by local idx.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $idx;
+    my $query_result;
+
+    if (GeniHRN::IsValid($token)) {
+	# We don't attempt to handle tickets for foreign authorities.
+	return undef if !GeniHRN::Authoritative($token, "@OURDOMAIN@");
+
+	my ($authority, $type, $id) = GeniHRN::Parse($token);
+	return undef if $type ne "ticket";
+	$idx = $id;
+    }
+    elsif ($token =~ /^\d+$/) {
+	$idx = $token;
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$query_result =
+	    DBQueryWarn("select idx from geni_tickets ".
+			"where ticket_uuid='$token'");
+	    return undef
+		if (! $query_result || !$query_result->numrows);
+
+	    ($idx) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    return $tickets{"$idx"}
+        if (exists($tickets{"$idx"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_tickets where idx='$idx'");
+
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my $row = $query_result->fetchrow_hashref();
+
+    # Map the component
+    my $component;
+    if ($row->{'component_uuid'}) {
+	$component = GeniComponent->Lookup($row->{'component_uuid'});
+	return undef
+	    if (!defined($component));
+    }
+    my $ticket = GeniTicket->CreateFromSignedTicket($row->{'ticket_string'},
+						    $component, 1);
+    return undef
+	if (!defined($ticket));
+
+    # We ignore this in the ticket. In fact, we need to change how we bring
+    # tickets back into the system.
+    $ticket->{'redeem_before'} = $row->{'redeem_before'};
+
+    # Mark as coming from the DB.
+    $ticket->{'idx'}    = $idx;
+    $ticket->{'stored'} = 1;
+    $ticket->{'LOCKED'}   = 0;
+
+    # Cache.
+    $tickets{"$idx"} = $ticket;
+    return $ticket;
+}
+
+#
+# Create an unsigned ticket object, to be populated and signed and returned.
+#
+sub Create($$$$)
+{
+    # $rspec is an XML string.
+    my ($class, $target, $owner, $rspec) = @_;
+
+    my $parser = XML::LibXML->new;
+    my $doc;
+    eval {
+	$doc = $parser->parse_string($rspec);
+    };
+    if ($@) {
+	print STDERR "Failed to parse ticket string: $@\n";
+	return undef;
+    }
+
+    # Every Ticket gets a new unique index (sequence number).
+    my $seqno = TBGetUniqueIndex('next_ticket', 1);
+
+    my $self = {};
+    $self->{'rspec'}         = $doc->documentElement();
+    $self->{'ticket_uuid'}   = undef;
+    $self->{'owner_uuid'}    = $owner->uuid();
+    $self->{'owner_hrn'}     = $owner->hrn();
+    $self->{'owner_urn'}     = $owner->urn();
+    $self->{'owner_cert'}    = $owner->GetCertificate();
+    $self->{'target_uuid'}   = $target->uuid();
+    $self->{'target_hrn'}    = $target->hrn();
+    $self->{'target_urn'}    = $target->urn();
+    $self->{'target_cert'}   = $target->GetCertificate();
+    $self->{'seqno'}         = $seqno;
+    $self->{'ticket_string'} = undef;
+    $self->{'component'}     = undef;
+    $self->{'slice'}         = undef;
+    $self->{'stored'}        = 0;	# Stored to the DB.
+    $self->{'LOCKED'}        = 0;
+
+    #
+    # For now, all tickets expire very quickly ...
+    #
+    $self->{'redeem_before'} =
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (5*60)));
+
+    #
+    # Locally generated tickets need a local DB index, which can be the
+    # same as the sequence number. A ticket from a remote component will
+    # have it own seqno, and so we will generate a locally valid idx for
+    # those when when(if) we store them in the DB.
+    #
+    $self->{'idx'}           = $seqno;
+    
+    bless($self, $class);
+
+    return $self;
+}
+# accessors
+sub field($$)           { return ($_[0]->{$_[1]}); }
+sub idx($)		{ return field($_[0], "idx"); }
+sub seqno($)		{ return field($_[0], "seqno"); }
+sub rspec($)		{ return field($_[0], "rspec"); }
+sub target_uuid($)	{ return field($_[0], "target_uuid"); }
+sub owner_uuid($)	{ return field($_[0], "owner_uuid"); }
+sub target_hrn($)	{ return field($_[0], "target_hrn"); }
+sub owner_hrn($)	{ return field($_[0], "owner_hrn"); }
+sub target_urn($)	{ return field($_[0], "target_urn"); }
+sub owner_urn($)	{ return field($_[0], "owner_urn"); }
+sub target_cert($)	{ return field($_[0], "target_cert"); }
+sub owner_cert($)	{ return field($_[0], "owner_cert"); }
+sub uuid($)		{ return field($_[0], "ticket_uuid"); }
+sub ticket_uuid($)	{ return field($_[0], "ticket_uuid"); }
+sub ticket($)		{ return field($_[0], "ticket"); }
+sub asString($)		{ return field($_[0], "ticket_string"); }
+sub ticket_string($)	{ return field($_[0], "ticket_string"); }
+sub redeem_before($)	{ return field($_[0], "redeem_before"); }
+sub expires($)	        { return field($_[0], "expires"); }
+sub redeemed($   )	{ return field($_[0], "redeemed"); }
+sub component_uuid($)	{ return field($_[0], "component_uuid"); }
+sub component($)	{ return field($_[0], "component"); }
+sub stored($)		{ return field($_[0], "stored"); }
+sub slice($)            { return $_[0]->{'slice'}; }
+sub slice_uuid($)	{ return $_[0]->slice()->uuid(); }
+sub slice_hrn($)	{ return $_[0]->slice()->hrn(); }
+sub slice_urn($)	{ return $_[0]->slice()->urn(); }
+sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
+
+
+# Return the URN.
+sub urn($)
+{
+    my ($self) = @_;
+
+    return GeniHRN::Generate("@OURDOMAIN@", "ticket", $self->idx());
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $idx = $self->idx();
+    if (!defined($idx)) {
+	my $seqno = $self->seqno();
+	$idx = "S$seqno";
+    }
+    my $owner_hrn   = $self->owner_hrn();
+    my $target_uuid = $self->target_uuid();
+    
+    return "[GeniTicket: $idx, owner:$owner_hrn, target_uuid:$target_uuid]";
+}
+
+#
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($tickets{$self->idx()});
+}
+
+#
+# Create a ticket object from a signed ticket string.
+#
+sub CreateFromSignedTicket($$;$$)
+{
+    my ($class, $ticket_string, $component, $nosig) = @_;
+
+    #
+    # This flag is used to avoid verifying the signature since I do not
+    # really care if the component gives me a bad ticket; I am not using
+    # it locally, just passing it back to the component at some point.
+    #
+    $nosig = 0
+	if (!defined($nosig));
+
+    if (! $nosig) {
+	my ($fh, $filename) = tempfile(UNLINK => 0);
+	return undef
+	    if (!defined($fh));
+	print $fh $ticket_string;
+	close($fh);
+	system("$VERIFYCRED $filename");
+	if ($?) {
+	    print STDERR "Ticket in $filename did not verify\n";
+	    return undef;
+	}
+	unlink($filename);
+    }
+
+    # Use XML::Simple to convert to something we can mess with.
+    my $parser = XML::LibXML->new;
+    my $doc;
+    eval {
+	$doc = $parser->parse_string($ticket_string);
+    };
+    if ($@) {
+	print STDERR "Failed to parse ticket string: $@\n";
+	return undef;
+    }
+
+    # Dig out the rspec.
+    my $rspec = GeniXML::FindFirst("//*[local-name()='rspec']",
+				   $doc->documentElement());
+    if (!defined($rspec)) {
+	print STDERR "Ticket is missing rspec node\n";
+	return undef;
+    }
+    
+    # Dig out the ticket uuid.
+    my ($uuid_node) = $doc->getElementsByTagName("uuid");
+    if (!defined($uuid_node)) {
+	print STDERR "Ticket is missing uuid node\n";
+	return undef;
+    }
+    my $ticket_uuid = $uuid_node->to_literal();
+
+    if (! ($ticket_uuid =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid uuid in ticket\n";
+	return undef;
+    }
+
+    # Dig out the target certificate.
+    my ($cert_node) = $doc->getElementsByTagName("target_gid");
+    if (!defined($cert_node)) {
+	print STDERR "Ticket is missing target gid node\n";
+	return undef;
+    }
+    my $target_certificate =
+	GeniCertificate->LoadFromString($cert_node->to_literal());
+    if (!defined($target_certificate)) {
+	print STDERR "Could not get target certificate from string\n";
+	return undef;
+    }
+
+    if (!($target_certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid target_uuid in credential\n";
+	return undef;
+    }
+    if (!($target_certificate->hrn() =~ /^[-\w\.]+$/)) {
+	my $hrn = $target_certificate->hrn();
+	print STDERR "Invalid hrn $hrn in target of ticket\n";
+	return undef;
+    }
+
+    # Dig out the owner certificate.
+    ($cert_node) = $doc->getElementsByTagName("owner_gid");
+    if (!defined($cert_node)) {
+	print STDERR "Ticket is missing owner gid node\n";
+	return undef;
+    }
+    my $owner_certificate =
+	GeniCertificate->LoadFromString($cert_node->to_literal());
+    if (!defined($target_certificate)) {
+	print STDERR "Could not get owner certificate from string\n";
+	return undef;
+    }
+    if (!($owner_certificate->uuid() =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/)) {
+	print STDERR "Invalid target_uuid in credential\n";
+	return undef;
+    }
+    if (!($owner_certificate->hrn() =~ /^[-\w\.]+$/)) {
+	my $hrn = $owner_certificate->hrn();
+	print STDERR "Invalid hrn $hrn in owner of ticket\n";
+	return undef;
+    }
+
+    # Sequence number
+    my ($seqno_node) = $doc->getElementsByTagName("serial");
+    if (!defined($seqno_node)) {
+	print STDERR "Ticket is missing seqno node\n";
+	return undef;
+    }
+    my $seqno = $seqno_node->to_literal();
+
+    if (! ($seqno =~ /^\w+$/)) {
+	print STDERR "Invalid sequence number in ticket\n";
+	return undef;
+    }
+
+    # Expiration
+    my ($expires_node) = $doc->getElementsByTagName("expires");
+    if (!defined($expires_node)) {
+	print STDERR "Ticket is missing expires node\n";
+	return undef;
+    }
+    my $expires = $expires_node->to_literal();
+
+    if (! ($expires =~ /^[-\w:.\/]+/)) {
+	print STDERR "Invalid expires date in ticket\n";
+	return undef;
+    }
+    # Convert to a localtime.
+    my $when = timegm(strptime($expires));
+    if (!defined($when)) {
+	print STDERR "Could not parse expires: '$expires'\n";
+	return undef;
+    }
+    
+    my $self = {};
+    $self->{'idx'}           = undef;
+    $self->{'rspec'}         = $rspec;
+    $self->{'ticket_uuid'}   = $ticket_uuid;
+    $self->{'target_uuid'}   = $target_certificate->uuid();
+    $self->{'owner_uuid'}    = $owner_certificate->uuid();
+    $self->{'target_hrn'}    = $target_certificate->hrn();
+    $self->{'owner_hrn'}     = $owner_certificate->hrn();
+    $self->{'target_urn'}    = $target_certificate->urn();
+    $self->{'owner_urn'}     = $owner_certificate->urn();
+    $self->{'target_cert'}   = $target_certificate;
+    $self->{'owner_cert'}    = $owner_certificate;
+    $self->{'ticket_string'} = $ticket_string;
+    $self->{'xmlref'}        = $doc;
+    $self->{'component'}     = $component;
+    $self->{'seqno'}         = $seqno;
+    $self->{'expires'}       = $expires;
+    $self->{'stored'}        = 0;
+    $self->{'slice'}         = undef;
+    $self->{'LOCKED'}        = 0;
+    
+    #
+    # We save copies of the tickets we hand out, but delete them
+    # when redeemed. If we still have it, mark it.
+    #
+    my $query_result =
+	DBQueryWarn("select * from geni_tickets where idx='$seqno'");
+
+    if ($query_result && $query_result->numrows) {
+	my $row = $query_result->fetchrow_hashref();
+	$self->{'redeem_before'} = $row->{'redeem_before'};
+	$self->{'idx'}    = $seqno;
+	$self->{'stored'} = 1;
+	#
+	# Older tickets might not have the slice set. The CM will
+	# set it later though.
+	#
+	if (defined($row->{'slice_uuid'})) {
+	    my $slice_uuid = $row->{'slice_uuid'};
+	    my $slice = GeniSlice->Lookup($slice_uuid);
+	    if (!defined($slice)) {
+		print STDERR
+		    "Could not locate slice for ticket from $slice_uuid\n";
+		return undef;
+	    }
+	    $self->{'slice'} = $slice;
+	}
+    }
+    bless($self, $class);
+    return $self;
+}
+
+#
+# Might have to delete this from the DB, as with an error handing out
+# a ticket.
+#
+sub Delete($$)
+{
+    my ($self, $flag) = @_;
+
+    return -1
+	if (! ref($self));
+
+    if ($self->stored()) {
+	my $idx  = $self->idx();
+	my $uuid = $self->ticket_uuid();
+	
+	DBQueryWarn("delete from geni_tickets where idx='$idx'")
+	    or return -1;
+
+	if ($flag == TICKET_PURGED) {
+	    GeniUsage->DeleteTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		    "GeniUsage->DeleteTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_RELEASED) {
+	    GeniUsage->ReleaseTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		    "GeniUsage->ReleaseTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_EXPIRED) {
+	    GeniUsage->ExpireTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		    "GeniUsage->ExpireTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_REDEEMED) {
+	    GeniUsage->RedeemTicket($self) == 0 
+		or print STDERR "GeniTicket::Delete: ".
+		"GeniUsage->RedeemTicket($self) failed\n";
+	}
+	elsif ($flag == TICKET_DELETED) {
+	    # Do nothing for this. Just removing from the tickets table,
+	    # but want to leave it in the history.
+	}
+	delete($tickets{"$idx"});
+    }
+    return 0;
+}
+
+#
+# We lock at a very coarse grain, mostly in the CM. 
+#
+sub Lock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    # We already have it locked.
+    return 0
+	if ($self->LOCKED());
+
+    # Not in the DB, so does not matter.
+    return 0
+	if (!$self->stored());
+
+    DBQueryWarn("lock tables geni_tickets write")
+	or return -1;
+
+    my $query_result =
+	DBQueryWarn("select locked from geni_tickets ".
+		    "where idx='$idx' and locked is null");
+    if (!$query_result || !$query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	return 1;
+    }
+    $query_result =
+	DBQueryWarn("update geni_tickets set locked=now() where idx='$idx'");
+    DBQueryWarn("unlock tables");
+
+    return 1
+	if (!$query_result);
+    $self->{'LOCKED'} = $$;
+    return 0;
+}
+sub UnLock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    return 1
+	if (!$self->LOCKED());
+
+    DBQueryWarn("update geni_tickets set locked=NULL where idx='$idx'")
+	or return -1;
+    
+    $self->{'LOCKED'} = 0;
+    return 0;
+}
+
+sub SetSlice($$)
+{
+    my ($self, $slice) = @_;
+    
+    $self->{'slice'} = $slice;
+    return 0;
+}
+
+#
+# Return the outstanding ticket for a slice.
+#
+sub SliceTicket($$)
+{
+    my ($class, $slice) = @_;
+
+    my $slice_uuid = $slice->uuid();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_tickets ".
+		    "where slice_uuid='$slice_uuid'");
+    return undef
+	if (!$query_result);
+    return undef
+	if ($query_result->numrows != 1);
+
+    my ($idx) = $query_result->fetchrow_array();
+    return GeniTicket->Lookup($idx);
+}
+
+#
+# Return the rspec in XML for the ticket.
+#
+sub rspecXML($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (! ref($self));
+    return undef
+	if (!defined($self->rspec()));
+
+    return GeniXML::Serialize($self->rspec());
+}
+
+#
+# Populate the ticket with some stuff, which right now is just the
+# number of node we are willing to grant.
+#
+sub Grant($$)
+{
+    my ($self, $count) = @_;
+
+    return -1
+	if (! ref($self));
+
+    $self->{'count'} = $count;
+    return 0;
+}
+
+#
+# Store the given ticket in the DB. We only do this for signed tickets,
+# so we have a record of them. We store them on the server and the client
+# side.
+#
+sub Store($;$)
+{
+    my ($self, $flags) = @_;
+    my @insert_data  = ();
+
+    $flags = 0
+	if (!defined($flags));
+
+    my $idx         = $self->idx();
+    my $seqno       = $self->seqno();
+    my $target_uuid = $self->target_uuid();
+    my $owner_uuid  = $self->owner_uuid();
+    my $ticket_uuid = $self->ticket_uuid();
+    my $expires     = $self->redeem_before() || $self->expires();
+    my $slice_uuid  = $self->slice_uuid();
+
+    #
+    # For a locally created/signed ticket, seqno=idx. For a ticket from
+    # another component, we have to generate a locally unique idx for
+    # the DB insertion.
+    #
+    if (!defined($idx)) {
+	$idx = TBGetUniqueIndex('next_ticket', 1);
+	$self->{'idx'} = $idx;
+    }
+    # A locally generated ticket will not have a component. Might change that.
+    push(@insert_data, "component_uuid='" . $self->component()->uuid() . "'")
+	if (defined($self->component()));
+
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "idx='$idx'");
+    push(@insert_data, "seqno='$seqno'");
+    push(@insert_data, "ticket_uuid='$ticket_uuid'");
+    push(@insert_data, "target_uuid='$target_uuid'");
+    push(@insert_data, "owner_uuid='$owner_uuid'");
+    push(@insert_data, "slice_uuid='$slice_uuid'");
+    push(@insert_data, "redeem_before='$expires'");
+    
+    my $safe_ticket = DBQuoteSpecial($self->ticket_string());
+    push(@insert_data, "ticket_string=$safe_ticket");
+
+    # Insert into DB.
+    DBQueryWarn("insert into geni_tickets set " . join(",", @insert_data))
+	or return -1;
+
+    if (! ($flags & TICKET_NOSTATS)) {
+	if (GeniUsage->NewTicket($self)) {
+	    print STDERR
+		"GeniTicket::Store: GeniUsage->NewTicket($self) failed\n";
+	}
+    }
+
+    $tickets{"$idx"}  = $self;
+    $self->{'stored'} = 1;
+    return 0;
+}
+
+#
+# When we redeem a ticket, we update the history file and delete it.
+#
+sub Redeem($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    return $self->Delete(TICKET_REDEEMED);
+}
+
+#
+# Sign the ticket before returning it.
+#
+sub Sign($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    #
+    # Every ticket/credential gets its own uuid.
+    #
+    my $ticket_uuid = NewUUID();
+    $self->{'ticket_uuid'} = GeniUtil::NewUUID();
+
+    $self->RunSigner() == 0
+	or return -1;
+
+    return 0;
+}
+
+#
+# Sign the ticket before returning it. We capture the output, which is
+# in XML. 
+#
+sub RunSigner($$)
+{
+    my ($self) = @_;
+
+    return -1
+	if (!ref($self));
+
+    my $idx         = $self->seqno();
+    my $expires     = $self->redeem_before();
+    my $target_cert = $self->target_cert()->cert();
+    my $owner_cert  = $self->owner_cert()->cert();
+    my $ticket_uuid = $self->{'ticket_uuid'};
+    my $rspec_xml   = GeniXML::Serialize($self->rspec());
+
+    # Convert to GMT.
+    $expires = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+			       gmtime(str2time($expires)));
+
+    #
+    # Create a template xml file to sign.
+    #
+    my $template =
+	"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n".
+	"<credential xml:id=\"ref1\">\n".
+	" <type>ticket</type>\n".
+	" <serial>$idx</serial>\n".
+	" <owner_gid>$owner_cert</owner_gid>\n".
+	" <target_gid>$target_cert</target_gid>\n".
+	" <uuid>$ticket_uuid</uuid>\n".
+	" <expires>$expires</expires>\n".
+	" <ticket>\n".
+	"  <can_delegate>1</can_delegate>\n".
+	"  <redeem_before>$expires</redeem_before>\n".
+	"  $rspec_xml\n".
+	" </ticket>\n".	
+        "</credential>\n";
+
+    my ($fh, $filename) = tempfile(UNLINK => 0);
+    return -1
+	if (!defined($fh));
+
+    print $fh $template;
+    close($fh);
+
+    #
+    # Fire up the signer and capture the output. This is the signed ticket
+    # that is returned. 
+    #
+    if (! open(SIGNER, "$SIGNCRED -c $CMCERT $filename |")) {
+	print STDERR "Could not sign $filename\n";
+	return -1;
+    }
+    my $ticket = "";
+    while (<SIGNER>) {
+	$ticket .= $_;
+    }
+    if (!close(SIGNER)) {
+	print STDERR "Could not sign $filename\n";
+	return -1;
+    }
+    $self->{'ticket_string'} = $ticket;
+    return 0;
+}
+
+#
+# Release a ticket. Need to release the nodes ...
+# Used by the CM.
+#
+sub Release($$)
+{
+    my ($self, $flag) = @_;
+
+    return -1
+	if (! ref($self));
+
+    $self->ReleaseHolding($flag) == 0
+	or return -1;
+
+    # Older tickets do not have this, but handled in ReleaseHolding.
+    return 0
+	if (!defined($self->slice_uuid()) || $self->slice_uuid() eq "");
+
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	$self->Delete($flag);
+	return 0;
+    }
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->eid();
+    my @nodeids = ();
+    my @nodes   = ();
+
+    foreach my $ref (GeniXML::FindNodes("n:node",
+					$self->rspec())->get_nodelist()) {
+	# Skip lan nodes; they are fake.
+	next
+	    if (GeniXML::IsLanNode($ref));
+	
+	# Skip remote nodes.
+	next
+	    if (!GeniXML::IsLocalNode($ref));
+	
+	my $resource_uuid = GeniXML::GetNodeId($ref);
+	if (!defined($resource_uuid)) {
+	    print STDERR "No resource id for node in ticket\n";
+	    print GeniXML::Serialize($ref);
+	    return -1;
+	}
+
+	# Virtual nodes not created until ticket redeemed.
+	my $node = GeniUtil::LookupNode($resource_uuid);
+	next
+	    if (!defined($node));
+
+	my $reservation = $node->Reservation();
+	next
+	    if (!defined($reservation));
+
+	# Watch for duplicates, as in multiple vnodes on a pnode.
+	next
+	    if (grep {$_ eq $node->node_id()} @nodeids);
+
+	#
+	# If the node is still in the experiment and not incorporated,
+	# release it. genisliver_idx is not defined until ticket redeemed.
+	#
+	if ($reservation->SameExperiment($experiment)) {
+	    my $restable = $node->ReservedTableEntry();
+	    if (defined($restable) &&
+		(!defined($restable->{'genisliver_idx'}) ||
+		 $restable->{'genisliver_idx'} == 0)) {
+		push(@nodeids, $node->node_id());
+		push(@nodes, $node);
+	    }
+	}
+    }
+    if (@nodeids) {
+	system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+    }
+    foreach my $node (@nodes) {
+	$node->Refresh();
+    }
+    $self->Delete($flag);
+    return 0;
+}
+
+#
+# Retained for backwards compatability.
+#
+sub ReleaseHolding($$)
+{
+    my ($self, $flag) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $experiment = Experiment->Lookup("GeniSlices", "reservations");
+    if (!defined($experiment)) {
+	return 0;
+    }
+    my $pid     = $experiment->pid();
+    my $eid     = $experiment->eid();
+    my @nodeids = ();
+    my @nodes   = ();
+
+    foreach my $ref (GeniXML::FindNodes("n:node",
+					$self->rspec())->get_nodelist()) {
+	# Skip lan nodes; they are fake.
+	next
+	    if (GeniXML::IsLanNode($ref));
+	
+	# Skip remote nodes.
+	next
+	    if (!GeniXML::IsLocalNode($ref));
+	
+	my $resource_uuid = GeniXML::GetNodeId($ref);
+	if (!defined($resource_uuid)) {
+	    print STDERR "No resource id for node in ticket\n";
+	    print GeniXML::Serialize($ref);
+	    return -1;
+	}
+
+	my $node = Node->Lookup($resource_uuid);
+	next
+	    if (!defined($node));
+
+	my $reservation = $node->Reservation();
+	next
+	    if (!defined($reservation));
+
+	# Watch for duplicates, as in multiple vnodes on a pnode.
+	next
+	    if (grep {$_ eq $node->node_id()} @nodeids);
+
+	#
+	# If the node is still in the reservations experiment, it
+	# is by definition, not in use by a slice. 
+	#
+	if ($reservation->SameExperiment($experiment)) {
+	    push(@nodeids, $node->node_id());
+	    push(@nodes, $node);
+	}
+    }
+    if (@nodeids) {
+	system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+    }
+    foreach my $node (@nodes) {
+	$node->Refresh();
+    }
+    return 0;
+}
+
+#
+# Equality test for two tickets.
+#
+sub SameTicket($$)
+{
+    my ($self, $other) = @_;
+
+    # Must be a real reference. 
+    return 0
+	if (! (ref($self) && ref($other)));
+
+    return $self->idx() == $other->idx();
+}
+
+#
+# Check if ticket has expired. Use the DB directly.
+#
+sub Expired($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select idx from geni_tickets ".
+		    "where idx='$idx' and ".
+		    "      (UNIX_TIMESTAMP(now()) > ".
+		    "       UNIX_TIMESTAMP(redeem_before))");
+    
+    return $query_result->numrows;
+}
+
+#
+# List all tickets for a user.
+#
+sub ListUserTickets($$$)
+{
+    my ($class, $user, $pref) = @_;
+    my @result = ();
+
+    my $user_uuid = $user->uuid();
+    my $query_result = DBQueryWarn("select idx from geni_tickets ".
+				   "where owner_uuid='$user_uuid'");
+    return -1
+	if (!$query_result);
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $ticket = GeniTicket->Lookup($idx);
+	return -1
+	    if (!defined($ticket));
+	push(@result, $ticket);
+    }
+
+    @$pref = @result;
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

@@ -1,14 +1,13 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
+use strict;
 
 #
 # This gets invoked from the Web interface. Terminate an experiment.
@@ -24,22 +23,24 @@ use POSIX qw(isatty setsid);
 sub usage()
 {
     print(STDERR
-	  "Usage: endexp [-q] [-b | -w] <pid> <eid>\n".
+	  "Usage: endexp [-q] [-p] [-b | -w] [-N] <eid>\n".
 	  "switches and arguments:\n".
 	  "-w       - wait for non-batchmode experiment terminate\n".
 	  "-q       - be less chatty\n".
-	  "<pid>    - The project the experiment belongs to\n".
-	  "<eid>    - The experiment name (id)\n");
+	  "-N       - Suppress most email to the user and testbed-ops\n".
+	  "<eid>    - The experiment id\n");
     exit(-1);
 }
 
-sub fatal($);
+sub fatal($;$);
 
-my $optlist  = "bwqx";
+my $optlist  = "bwqxpN";
 my $waitmode = 0;
 my $batch    = 0;
 my $quiet    = 0;
+my $purge    = 0;
 my $template_mode = 0;
+my $noemail  = 0;
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -79,21 +80,18 @@ my $TBLOGS = "@TBLOGSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 use libArchive;
+use User;
+use Template;
+use Experiment;
 
-# Be careful not to exit on transient error; 0 means infinite retry.
-$libdb::DBQUERY_MAXTRIES = 0;
-
-my $tbdir    = "$TB/bin/";
-my $projroot = "/proj";
-my $tbdata   = "tbdata";
+my $tbdir       = "$TB/bin/";
+my $tbdata      = "tbdata";
+my $archcontrol = "$TB/bin/archive_control";
 my $nextstate;
 my $logname;
-my $dbuid;
-my $user_name;
-my $user_email;
-my @row;
-my $isadmin;
+my $logfile;
     
 #
 # Untaint the path
@@ -110,17 +108,18 @@ $| = 1;
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 #
-%options = ();
+my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 2) {
+if (@ARGV != 1) {
     usage();
 }
-my $pid   = $ARGV[0];
-my $eid   = $ARGV[1];
 if (defined($options{"b"})) {
     $batch = 1;
+}
+if (defined($options{"p"})) {
+   $purge = 1;
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
@@ -131,50 +130,74 @@ if (defined($options{"q"})) {
 if (defined($options{"x"})) {
     $template_mode = 1;
 }
+if (defined($options{"N"})) {
+    $noemail = 1;
+}
 usage()
     if ($waitmode && $batch);
 
-#
-# Untaint the arguments.
-#
-if ($pid =~ /^([-\w\.]+)$/) {
-    $pid = $1;
+# Map invoking user to object.
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
 }
-else {
-    die("Tainted argument $pid!\n");
-}
-if ($eid =~ /^([-\w\.]+)$/) {
-    $eid = $1;
-}
-else {
-    die("Tainted argument $eid!\n");
-}
-my $workdir = TBExptWorkDir($pid, $eid);
-my $userdir = TBExptUserDir($pid, $eid);
+my $isadmin    = TBAdmin();
+my $user_name  = $this_user->name();
+my $user_email = $this_user->email();
+my $user_uid   = $this_user->uid();
 
 #
-# Verify user and get his DB uid.
+# Grab the experiment.
 #
-if (! UNIX2DBUID($UID, \$dbuid)) {
+my $experiment = Experiment->Lookup($ARGV[0]);
+if (! $experiment) {
     die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
+	"    No such experiment in the Emulab Database.\n");
 }
-$isadmin = TBAdmin($UID);
+my $pid     = $experiment->pid();
+my $eid     = $experiment->eid();
+my $swapper = $experiment->GetSwapper();
+
+my $workdir = $experiment->WorkDir();
+my $userdir = $experiment->UserDir();
+my $infodir = $experiment->InfoDir();
+
+# Sanity check.
+if (! (-e $workdir && -e $userdir)) {
+    die("*** $0:\n".
+	"    Missing a critical directory!\n");
+}
+if (! -e $infodir) {
+    if (! -e "$TB/expinfo/$pid") {
+	die("*** $0:\n".
+	    "    $TB/expinfo/$pid has not been created yet!\n".
+	    "    Did you run 'fixexpinfo' like you were supposed to?\n");
+    }
+    #
+    # This is not going to happen unless a devel tree has been
+    # mixed with the main tree (or another devel tree). Try to
+    # recover, bail of not possible.
+    #
+    if (system("/bin/mkdir -m 777 -p $infodir")) {
+	die("*** $0:\n".
+	    "    $infodir was missing and cannot be created!\n");
+    }
+}
 
 #
-# Get email info for user.
+# See if this is a template instance; error if the -x option not provided,
+# since that means user is trying to self-terminate; not in the program.
 #
-if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+if ($experiment->IsInstance() && !$template_mode) {
     die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
+	"    $pid/$eid is a template instance; use another command!\n");
 }
 
 #
 # Verify that this person is allowed to end the experiment.
-# Note that any script down the line has to do an admin check also. 
 #
 if ($UID && !$isadmin &&
-    !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
+    ! $experiment->AccessCheck($this_user, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
 	"    You do not have permission to end this experiment!\n");
 }
@@ -195,25 +218,19 @@ if ($waitmode) {
 # terminating consists of a couple of different experiment states down inside
 # the tb scripts. 
 #
-DBQueryFatal("lock tables experiments write");
+$experiment->LockTables() == 0
+    or die("*** $0:\n".
+	   "    Could not lock experiment tables for $pid/$eid!\n");
 
-$query_result =
-    DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
-
-if (! $query_result->numrows) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid exists!\n");
-}
-my %hashrow = $query_result->fetchhash();
-my $expt_head_login = $hashrow{'expt_head_uid'};
-my $estate          = $hashrow{'state'};
-my $batchstate      = $hashrow{'batchstate'};
-my $expt_path       = $hashrow{'path'};
-my $isbatchexpt     = $hashrow{'batchmode'};
-my $cancelflag      = $hashrow{'canceled'};
-my $expt_locked     = $hashrow{'expt_locked'};
-my $elabinelab      = $hashrow{'elab_in_elab'};
-my $lockdown        = $hashrow{'lockdown'};
+my $expt_head_login = $experiment->creator();
+my $estate          = $experiment->state();
+my $batchstate      = $experiment->batchstate();
+my $expt_path       = $experiment->path();
+my $isbatchexpt     = $experiment->batchmode();
+my $cancelflag      = $experiment->canceled();
+my $expt_locked     = $experiment->locked();
+my $elabinelab      = $experiment->elabinelab();
+my $lockdown        = $experiment->lockdown();
 
 #
 # Batch experiments get a different protocol to avoid races with the
@@ -270,7 +287,7 @@ else {
 	# already be running, but we deal with that by looking at the
 	# state below.
 	#
-	TBSetCancelFlag($pid, $eid, EXPTCANCEL_TERM);
+	$experiment->SetCancelFlag(EXPTCANCEL_TERM);
 
 	#
 	# If the state is QUEUED or SWAPPED, we can do it right away.
@@ -354,8 +371,8 @@ else {
     die("*** $0:\n".
 	"    Experiment $pid/$eid appears to be in the wrong state: $estate\n");
 }
-TBLockExp($pid, $eid, $nextstate);
-DBQueryFatal("unlock tables");
+# Unlock tables at same time.
+$experiment->Lock($nextstate, 1);
 
 #
 # XXX - At this point a failure is going to leave things in an
@@ -370,24 +387,27 @@ DBQueryFatal("unlock tables");
 # the person who is actually terminating the experiment, since its polite
 # to let the original creator know whats going on. 
 #
-my $expt_head_name;
-my $expt_head_email;
-
-if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
-    print "*** WARNING: ".
-	  "Could not determine name/email for $expt_head_login.\n";
-    $expt_head_name  = "TBOPS";
-    $expt_head_email = $TBOPS;
-}
+my $expt_head_name  = $swapper->name();
+my $expt_head_email = $swapper->email();
 
 #
 # If not in batch mode, go into the background. Parent exits.
 #
 if (!$batch && !$template_mode) {
-    $logname = TBExptCreateLogFile($pid, $eid, "endexp");
-    TBExptSetLogFile($pid, $eid, $logname);
-    TBExptOpenLogFile($pid, $eid);
+    # Cleanup
+    $experiment->CleanLogFiles() == 0
+	or fatal("Could not clean up logfiles!");
 
+    $logfile = $experiment->CreateLogFile("endexp");
+    if (!defined($logfile)) {
+	fatal("Could not create logfile!");
+    }
+    $logname = $logfile->filename();
+    # We want it to spew to the web.
+    $experiment->SetLogFile($logfile);
+    # Mark it open since we are going to start using it right away.
+    $logfile->Open();
+    
     if (my $childpid = TBBackGround($logname)) {
 	#
 	# Parent exits normally, except if in waitmode. 
@@ -402,7 +422,7 @@ if (!$batch && !$template_mode) {
 	print("Waiting for experiment $eid to finish terminating.\n")
 		if (! $quiet);
 	
-	if (isatty(STDIN) && !$quiet) {
+	if (-t && !$quiet) {
 	    print("You may type ^C at anytime; you will be notified via email.".
 		  "\n".
 		  "You will not actually interrupt the experiment itself.\n");
@@ -430,6 +450,9 @@ if (!$batch && !$template_mode) {
     }
     TBdbfork();
 }
+# Give the web page a chance to start looking at the log file before
+# the entire experiment is gone.
+sleep(1);
 
 #
 # When in waitmode, must put ourselves in another process group so that
@@ -443,53 +466,50 @@ if ($waitmode) {
 # Sanity check states in case someone changes something.
 #
 if ($estate eq EXPTSTATE_ACTIVE) { 
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0,
-		    TBDB_STATS_FLAGS_START);
+    $experiment->PreSwap($this_user, TBDB_STATS_SWAPOUT, $estate) == 0 or
+	fatal("Preswap failed!");
 
-    print STDOUT "Running 'tbswap out $pid $eid'\n";
-    if (system("$tbdir/tbswap out $pid $eid") != 0) {
-	fatal("tbswap out failed!\n");
+    if ($experiment->Swap($Experiment::EXPT_SWAPOUT) != 0) {
+	fatal({type => 'secondary', severity => SEV_SECONDARY,
+	       error => ['tbswap_out_failed']},
+	      "tbswap out failed!");
     }
-    SetExpState($pid, $eid, EXPTSTATE_TERMINATING);
+    $experiment->PostSwap($this_user, TBDB_STATS_SWAPOUT) == 0 or
+	fatal("PostSwap failed!");
+
+    $experiment->SetState(EXPTSTATE_TERMINATING) == 0
+	or fatal("Failed to set experiment state to " .
+		 EXPTSTATE_TERMINATING());
+
     $estate = EXPTSTATE_SWAPPED;
 
-    #
-    # Gather statistics for the swapout.
-    #
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0);
-
-    # Do a SavePoint on the experiment files.
-    print "Doing a savepoint to the experiment archive ...\n";
-    if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "swapout") < 0) {
-	fatal("Failed to do a savepoint on the experiment archive!");
-    }
+    # Commit the archive after swapout. Easier to use the script. 
+    system("$archcontrol -t endexp commit $pid $eid");
 }
-
-# Commit the archive after swapout.
-print "Doing a final commit on the experiment archive ...\n";
-libArchive::TBCommitExperimentArchive($pid, $eid, "endexp") == 0 or
-    fatal("Could not commit experiment archive!");
 
 if ($estate eq EXPTSTATE_SWAPPED ||
     $estate eq EXPTSTATE_QUEUED) {
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0,
-		    TBDB_STATS_FLAGS_START);
-    
-    print STDOUT "Running 'tbend $pid $eid'\n";
-    if (system("$tbdir/tbend $pid $eid") != 0) {
+    $experiment->GatherSwapStats($this_user, TBDB_STATS_TERMINATE, 0,
+				 TBDB_STATS_FLAGS_START)
+	== 0 or fatal("GatherSwapStats failed");
+
+    if ($experiment->End() != 0) {  
 	fatal("tbend failed!\n");
     }
-    SetExpState($pid, $eid, EXPTSTATE_TERMINATED);
+    $experiment->SetState(EXPTSTATE_TERMINATED) == 0
+	or fatal("Failed to set experiment state to " .EXPTSTATE_TERMINATED());
+    
     $estate = EXPTSTATE_TERMINATED;
 
     #
     # Gather statistics for the swapout.
     #
-    GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_TERMINATE, 0);
+    $experiment->GatherSwapStats($this_user, TBDB_STATS_TERMINATE)
+	== 0 or fatal("GatherSwapStats failed");
 }
 
 # We better be here ...
-$estate = ExpState($pid, $eid);
+$estate = $experiment->state();
 if ($estate ne EXPTSTATE_TERMINATED) {
     fatal("Experiment is in the wrong state: $estate\n");
 }
@@ -497,7 +517,7 @@ if ($estate ne EXPTSTATE_TERMINATED) {
 #
 # Try to copy off the files for testbed information gathering.
 #
-TBSaveExpLogFiles($pid, $eid);
+$experiment->SaveLogFiles();
 
 # Copy out the archive and then delete it.
 print "Archiving and clearing the experiment archive ...\n";
@@ -509,13 +529,14 @@ libArchive::TBArchiveExperimentArchive($pid, $eid) == 0 or
 #
 if (!$template_mode) {
     print "Experiment $pid/$eid has been successfully terminated!\n";
-    TBExptClearLogFile($pid, $eid);
+    $experiment->ClearLogFile();
 }
 
 #
-# Cleanup DB state and remove directory.
-# 
-TBExptDestroy($pid, $eid);
+# Cleanup DB state and remove directory. Purge flag is optional and generally
+# used by admins for cleaning up bad DB state caused by script errors.
+#
+$experiment->Delete($purge);
 
 #
 # In batch mode, exit now. 
@@ -531,28 +552,29 @@ my $message =
     "Experiment `$eid' in project `$pid' has been terminated.\n" .
     "You may now reuse `$eid' as an experiment name.\n";
 
-SENDMAIL("$user_name <$user_email>",
+SENDMAIL(($noemail ? $TBLOGS : "$user_name <$user_email>"),
 	 "Experiment $pid/$eid Terminated",
 	 $message,
 	 "$user_name <$user_email>",
-	 "Cc:  $expt_head_name <$expt_head_email>\n".
-	 "Bcc: $TBLOGS", ($logname));
+	 ($noemail ? "" 
+	  : "Cc:  $expt_head_name <$expt_head_email>\n".
+	    "Bcc: $TBLOGS"), 
+         ($logname));
 
 exit 0;
 
-sub fatal($)
+sub fatal($;$)
 {
+    my $parms = {};
+    $parms = shift if ref $_[0] eq 'HASH';
     my($mesg) = $_[0];
     
-    print STDOUT $mesg;
+    tberror($parms, $mesg);
 
-    #
-    # Kill this for convenience later.
-    #
-    TBUnLockExp($pid, $eid);
+    $experiment->Unlock();
 
     # Copy over the log files so the user can see them.
-    system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
+    $experiment->CopyLogFiles();    
 
     #
     # In batch mode, exit without sending the email. 
@@ -565,7 +587,7 @@ sub fatal($)
     # Clear the log file so the web page stops spewing. 
     #
     if (defined($logname)) {
-	TBExptClearLogFile($pid, $eid);
+	$experiment->CloseLogFile();
     }
 
     #

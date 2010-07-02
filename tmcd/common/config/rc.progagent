@@ -1,11 +1,13 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+use POSIX ":sys_wait_h";
+use POSIX qw(setsid);
 
 sub usage()
 {
@@ -21,13 +23,6 @@ $| = 1;
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
-
-# Script specific goo
-my $LOGFILE = "$LOGDIR/progagent.debug";
-my $PIDFILE = "/var/run/progagent.pid";
-my $CONFIG  = "$BOOTDIR/progagents";
-my $PAGENT  = "$BINDIR/program-agent";
-my $PAWRAPPER = "$BINDIR/pa-wrapper";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -50,7 +45,16 @@ if ($EUID != 0) {
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || REMOTE() && !PLAB());
+    if (MFS() || (REMOTE() && !(REMOTEDED() || PLAB() || FAKEJAILED() 
+				|| JAILED())));
+
+# Script specific goo. 
+my $LOGFILE = LOGDIR() . "/progagent.debug";
+my $WRAPLOG = LOGDIR() . "/progwrap.debug";
+my $PIDFILE = (FAKEJAILED() ? CONFDIR() : "/var/run") . "/progagent.pid";
+my $CONFIG  = CONFDIR() . "/progagents";
+my $PAGENT  = "$BINDIR/program-agent";
+my $TOKEN   = "/var/tmp/progagent-token";
 
 # Protos.
 sub doboot();
@@ -101,49 +105,146 @@ sub doboot()
     my @agents = ();
     my @userenv = ();
 
-    if (tmcc(TMCCCMD_PROGRAMS, undef, \@agents) < 0) {
-	fatal("Could not get progagent config from server!");
-    }
-    if (tmcc(TMCCCMD_USERENV, undef, \@userenv) < 0) {
-	fatal("Could not get user environment from server!");
-    }
-    unlink $CONFIG;
-    return
-	if (! @agents);
-
-    #
-    # Write the data to the file. The rc script will interpret it.
-    # Note that one of the lines (the first) indicates what user to
-    # run the agent as. 
-    # 
-    if (!open(RUN, ">$CONFIG")) {
-	fatal("Could not open $CONFIG: $!");
-    }
-    foreach my $line (@agents) {
-	print RUN "$line";
-    }
-    foreach my $line (@userenv) {
-	print RUN "ENV $line";
-    }
-    close(RUN);
-
     #
     # Need the pid/eid. 
     # 
     my ($pid, $eid, $vname) = check_nickname();
 
-    print "Starting Program Agent ...\n";
+    #
+    # Daemonize and let the boot continue. We have to disconnect and
+    # change our session id so that we do not killed off (nor the
+    # trafgen children) when boot script terminates. The downside is
+    # that we cannot report errors to the caller. 
+    #
+    if (my $childpid = TBBackGround($WRAPLOG)) {
+	sleep(2);
 
-    if (PLAB()) {
-        system("$PAWRAPPER $PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
-           "-i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
-    } else {
-        system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
-               "-i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG &");
+	# This catches most startup problems.
+	my $foo = waitpid($childpid, &WNOHANG);
+	if ($foo) {
+	    my $status = $?;
+	    unlink($PIDFILE);
+
+	    system("cat $WRAPLOG")
+		if (-s $WRAPLOG);
+	
+	    fatal("Failed to program agent: $foo $status!");
+	}
+	exit(0);
     }
+    # Fully disconnect from bootup. 
+    setsid();
 
-    if ($?) {
-        fatal("Could not start program agent!");
+    $TOKEN .= ".$$";
+
+    while (1) {
+	if (tmcc(TMCCCMD_PROGRAMS, undef, \@agents) < 0) {
+	    fatal("Could not get progagent config from server!");
+	}
+	if (tmcc(TMCCCMD_USERENV, undef, \@userenv) < 0) {
+	    fatal("Could not get user environment from server!");
+	}
+	unlink $CONFIG;
+
+	#
+	# We want to run program-agent even if there are currently no
+	# registered agents.  But to do that, we need a UID which we
+	# get from the TMCC creator command.  Note that if we do not
+	# get a UID, we just exit normally without starting the agent.
+	# This is backward compatible and enables us to boot up unallocated
+	# nodes (though I am not sure they would ever reach this script).
+	#
+	if (@agents == 0) {
+	    my @tmccresults;
+	    if (tmcc(TMCCCMD_CREATOR, undef, \@tmccresults) < 0) {
+		fatal("Could not get UID for progagent from server!");
+	    }
+	    if ($tmccresults[0] =~ / SWAPPER=([-\w]*)/) {
+		push(@agents, "UID=$1\n");
+	    } elsif ($tmccresults[0] =~ /^CREATOR=([-\w]*)/) {
+		push(@agents, "UID=$1\n");
+	    } else {
+		warning("Cannot determine UID for program agent, not running");
+		exit(0);
+	    }
+	}
+
+	#
+	# Write the data to the file. The rc script will interpret it.
+	# Note that one of the lines (the first) indicates what user to
+	# run the agent as. 
+	# 
+	if (!open(RUN, ">$CONFIG")) {
+	    fatal("Could not open $CONFIG: $!");
+	}
+	foreach my $line (@agents) {
+	    print RUN "$line";
+	}
+	foreach my $line (@userenv) {
+	    print RUN "ENV $line";
+	}
+	close(RUN);
+
+	print "Starting Program Agent ...\n";
+
+	my $server = getlocalevserver();
+
+	if (SHADOW()) {
+	    my $boss = $ENV{'BOSSNAME'};
+	    if (!defined($boss)) {
+		fatal("BOSSNAME is not set in the environment");
+	    }
+	    my ($domain) = ($boss =~ /^[^\.]+\.(.*)$/);
+	    $server = "event-server.${domain}";
+	}
+
+	#
+	# PlanetLab nodes don't have a fixed elvind port, so we need to
+	# look that up and pass it in.  Also for plab, we always restart
+	# a dead program-agent, regardless of the cause.
+	#
+	if (PLAB()) {
+	    my $elvind_port;
+
+	    if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
+		# this failure does happen...
+		warning("Could not get plabconfig from server, ".
+			"waiting awhile and trying again...");
+		sleep(5);
+		next;
+	    }
+	    if ($tmccresults[0] =~ /ELVIND_PORT=(\d+)/) {
+		$elvind_port = $1;
+	    }
+	    else {
+		# this failure should not happen
+		fatal("invalid format for plabconfig info");
+	    }
+	    system("$PAGENT -P -e $pid/$eid -s $server -l $LOGFILE ".
+		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG ".
+		   "-v $vname -r -p $elvind_port -t $TOKEN");
+	}
+	else {
+	    system("$PAGENT -e $pid/$eid -s $server -l $LOGFILE ".
+		   "-v $vname -t $TOKEN ".
+		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
+	    exit(0)
+		if (! $?);
+
+	    # Like the magic exit code? This means the agent was told by boss
+	    # to exit so that we can regen the config file and then restart.
+	    # There is most certainly a better way to do this.
+	    if ($? >> 8 != 45) {
+		fatal("program agent exited with non-zero status: $?");
+	    }
+	}
+	
+	print "Program Agent died ($?), restarting...\n";
+
+	#
+	# We want to restart, go around the loop again. Turn the cache off.
+	#
+	libtmcc::configtmcc("nocache", 1);
     }
     return;
 }

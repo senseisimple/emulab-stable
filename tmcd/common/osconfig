@@ -1,0 +1,663 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+#use Data::Dumper;
+
+#
+# This script is intended to be invoked only from the MFS at this point.  The
+# goal is to update a read-only MFS before (or "just in time") it executes the
+# bulk of the client side, or to update a freshly loaded slice in some way
+# defined by boss.
+#
+sub setupEnv();
+sub checkAndMount();
+sub detectLinux($\%);
+sub detectBSD($\%);
+sub detectMFS($\%);
+sub doUpdate($$$);
+
+#
+# Anytime you update testbed/www/osconfig_dump.php, you should update this list
+# and the script.
+#
+my @osconfig_vars = ('os','os_version','distro','distro_version','arch');
+
+sub usage() {
+    print "Usage: " . scriptname() . " [-ncd] [-DfmMsa <arg>] premfs|postload";
+    print "\n";
+    print "NOTE: you must supply at least -m or both -M and -D for postload!!\n";
+    print "\n";
+    print "  -d             (debug mode)\n";
+    print "  -n             (do not attempt to discover values for some\n";
+    print "                  unsupplied osconfig variables)\n";
+    print "  -c             (only check if there are updates to perform;\n";
+    print "                  don't actually do anything)\n";
+    print "  -m <mnt point> (mount point of device to config)\n";
+    print "  -M <mnt args>  (args needed to mount device to config)\n";
+    print "  -f <fstype>    (fs type of device)\n";
+    print "  -s <ostype>    (os type (i.e., linux or freebsd))\n";
+    print "  -D <device>    (device to config)\n";
+    print "  -a <k=v,...>   (osconfig variables and their values; accepts:\n";
+    print "                  " . join(',',@osconfig_vars) . ";\n";
+    print "                  this script tries to guess values for unsupplied\n";
+    print "                  variables)\n";
+
+    exit(1);
+}
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+use libsetup;
+use libtmcc;
+use librc;
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+my $WGET    = "/usr/bin/wget";
+if (! -x $WGET) {
+	$WGET = "/usr/local/bin/wget";
+}
+
+my $debug = 0;
+my $optlist = "m:M:f:s:D:a:ndc";
+# defaults
+my ($env,$autodetect,$check,$mnt,$mntargs,$fstype,$slicetype,$dev,$args) = 
+    (undef,1,0,undef,undef,undef,undef,undef,undef);
+my %osconfig_args = ();
+
+my %opts = ();
+if (! getopts($optlist, \%opts)) {
+    usage();
+}
+
+if (defined($opts{"d"})) {
+    $debug = 1;
+}
+if (defined($opts{"n"})) {
+    $autodetect = 0;
+}
+if (defined($opts{"c"})) {
+    $check = 1;
+}
+if (defined($opts{"m"})) {
+    $mnt = $opts{"m"};
+}
+if (defined($opts{"M"})) {
+    $mntargs = $opts{"M"};
+}
+if (defined($opts{"f"})) {
+    $fstype = $opts{"f"};
+}
+if (defined($opts{"s"})) {
+    $slicetype = $opts{"s"};
+}
+if (defined($opts{"D"})) {
+    $dev = $opts{"D"};
+}
+if (defined($opts{"a"})) {
+    $args = $opts{"a"};
+    foreach my $kvp (split(/,/,$args)) {
+	my @kvs = split(/=/,$kvp);
+	if (scalar(@kvs) != 2) {
+	    print STDERR "Warning: key-value osconfig variable '$kvp'" . 
+		" improperly formatted!\n";
+	}
+	else {
+	    my $found = 0;
+	    foreach my $known (@osconfig_vars) {
+		if ($known eq $kvs[0]) {
+		    $found = 1;
+		    last;
+		}
+	    }
+
+	    if ($found) {
+		$osconfig_args{$kvs[0]} = $kvs[1];
+	    }
+	}
+    }
+}
+if (@ARGV != 1) {
+    usage();
+}
+else {
+    $env = $ARGV[0];
+    if (!($env eq 'premfs' || $env eq 'postload')) {
+	usage();
+    }
+}
+if ($env eq 'postload' && !defined($slicetype)) {
+    print STDERR "Error: you must supply the ostype for postload\n";
+    usage();
+}
+if ($env eq 'postload' 
+    && (!defined($mnt) || (!defined($dev) && !defined($mntargs)))) {
+    print STDERR "Error: you must supply at least -m or both -M and -D" . 
+	" for postload!\n";
+    usage();
+}
+elsif ($env eq 'premfs' && !defined($mnt)) {
+    $mnt = "/";
+}
+
+print "Running osconfig...\n";
+
+# Get the boss info for below.
+my ($bossname, $bossip) = tmccbossinfo();
+if (!defined($bossname)) {
+    fatal("Could not determine the name of the boss server!");
+}
+
+if ($env eq 'postload') {
+    if (!($slicetype =~ /linux/i || $slicetype =~ /freebsd/i)) {
+	print STDERR "Error: bad slice type $slicetype!\n";
+	usage();
+    }
+    else {
+	if (!checkAndMount()) {
+	    exit(1);
+	}
+	if ($autodetect) {
+	    if ($slicetype =~ /linux/i) {
+		detectLinux($mnt,%osconfig_args);
+	    }
+	    elsif ($slicetype =~ /freebsd/i) {
+		detectBSD($mnt,%osconfig_args);
+	    }
+	}
+	setupEnv();
+	if (!doUpdate($env,$check,\%osconfig_args)) {
+	    exit(2);
+	}
+    }
+}
+elsif ($env eq 'premfs') {
+    if ($autodetect) {
+	detectMFS($mnt,%osconfig_args);
+    }
+    setupEnv();
+    if (!doUpdate($env,$check,\%osconfig_args)) {
+	exit(2);
+    }
+}
+
+exit(0);
+
+
+sub setupEnv() {
+    if (defined($dev)) {
+	$ENV{"ELAB_UPD_DEV"} = "$dev";
+    }
+    if (defined($mnt)) {
+	$ENV{"ELAB_UPD_MNT"} = "$mnt";
+    }
+    if (defined($mntargs)) {
+	$ENV{"ELAB_UPD_MNTARGS"} = "$mntargs";
+    }
+    if (defined($env)) {
+	$ENV{"ELAB_UPD_ENV"} = "$env";
+    }
+    if (defined($slicetype)) {
+	$ENV{"ELAB_UPD_OSTYPE"} = "$slicetype";
+    }
+    if (defined($fstype)) {
+	$ENV{"ELAB_UPD_FSTYPE"} = "$fstype";
+    }
+}
+
+sub checkAndMount() {
+    if (defined($mnt)) {
+	my $retval = system("mount | grep 'on $mnt'");
+	if (!$retval) {
+	    return 1;
+	}
+	elsif (defined($dev) && defined($mntargs)) {
+	    $retval = system("mount $mntargs $dev $mnt");
+	    if ($retval) {
+		print STDERR "mount of $dev at $mnt failed!\n";
+		return 0;
+	    }
+	    return 1;
+	}
+	else {
+	    print STDERR "not enough info to mount $mnt!\n";
+	    return 0;
+	}
+    }
+    elsif (defined($dev) && defined($mntargs)) {
+	$mnt = "/mnt";
+	my $retval = system("mount $mntargs $dev $mnt");
+	if ($retval) {
+	    print STDERR "mount of $dev at $mnt failed!\n";
+	    return 0;
+	}
+	return 1;
+    }
+    print STDERR "total failure to mount a slice to work on!\n";
+    return 0;
+}
+
+#
+# Little subroutine to URL encode data we're sending through the web interface
+#
+sub urlencode {
+    my ($string) = @_;
+    my @chars = split //, $string;
+    my $encoded = "";
+    foreach my $char (@chars) {
+	if ($char =~ /[0-9a-zA-Z]/) {
+	    $encoded .= $char;
+	} else {
+	    $encoded .= sprintf "%%%02X", ord($char);
+	}
+    }
+
+    return $encoded;
+}
+
+sub doUpdate($$$) {
+    my ($env,$check,$aref) = @_;
+    my %urlargs = ();
+    if (defined($aref)) {
+	%urlargs = %$aref;
+    }
+
+    if ($check) {
+	print "Checking for dynamic client-side updates...\n";
+    }
+    else {
+	print "Downloading dynamic client-side updates...\n";
+    }
+
+    my $ip = `cat $BOOTDIR/myip`;
+    chomp($ip);
+
+    if (! -d "/var/emulab/update.tmp" && !mkdir("/var/emulab/update.tmp")) {
+	print STDERR "could not mkdir /var/emulab/update.tmp!\n";
+	return 0;
+    }
+
+    my $uurl = "https://$bossname/osconfig_dump.php?ip=$ip";
+
+    $urlargs{"env"} = "$env";
+    # note that we always take this from the / root, not the slice /
+    if (REMOTE() && !defined($urlargs{"privkey"})) {
+	$urlargs{"privkey"} = `cat /etc/emulab/emulab-privkey`;
+	chomp($urlargs{"privkey"});
+    }
+    if ($check) {
+	$urlargs{"check"} = 1;
+    }
+
+    foreach my $k (keys(%urlargs)) {
+	$uurl .= "&${k}=" . urlencode($urlargs{$k});
+    }
+
+    my $doit = 0;
+    my $cmdstr = $WGET;
+    # For MFS environments we don't currently install any CA certificates, so
+    # force wget to skip the cert check.
+    $cmdstr .= " --no-check-certificate" if (-f "$ETCDIR/ismfs");
+    $cmdstr .= " -o /tmp/update.wget.log -O /tmp/update.file '$uurl'";
+    print STDERR "update URL: '$cmdstr'\n";
+    my $retval = system($cmdstr);
+    if ($retval) {
+	print "update failed in wget: wget log is:\n\n";
+	system("cat /tmp/update.wget.log");
+	print "\n";
+    }
+    else {
+	my (undef,undef,undef,undef,undef,undef,undef,$size,
+	    undef,undef,undef,undef,undef) = stat("/tmp/update.file");
+
+	if (!$size) {
+	    print "No updates found.\n";
+	    return 0;
+	}
+
+	my $topline = `head -1 /tmp/update.file`;
+	chomp($topline);
+	my $mimetype = `file -b -i /tmp/update.file`;
+	chomp($mimetype);
+
+	if ($check && $topline =~ /^TBMSG: update=yes/) {
+	    print "Check found updates!\n";
+	    return 1;
+	}
+	elsif ($check) {
+	    print "Check did not find updates.\n";
+	    return 0;
+	}
+
+	if ($mimetype =~ "^application/x-gzip") {
+	    $retval = system("tar -xzf /tmp/update.file -C /var/emulab/update.tmp");
+	    if ($retval) {
+		print "Error: tar failed!\n";
+	    }
+	    else {
+		$doit = 1;
+	    }
+	}
+	elsif ($topline =~ /^TBERROR: (.+)$/) {
+	    print "Error: server returned error: '$1'\n";
+	}
+	elsif ($topline =~ /^TBMSG: (.+)$/) {
+	    print "Error: server returned info msg: '$1'\n";
+	}
+	else {
+	    print "Error: server response could not be handled!\n";
+	}
+    }
+
+    if ($doit) {
+	my @cmds = ();
+
+	# check the directory for the manifest
+	chdir("/var/emulab/update.tmp");
+	if (!open(MFD,"MANIFEST")) {
+	    print "Error updating: no MANIFEST, aborting!\n";
+	    return 0;
+	}
+
+	while (my $line = <MFD>) {
+	    chomp($line);
+	    my ($f,$type,$dest) = split(/\t/,$line);
+
+	    if ($type eq "script") {
+		print "Running update script ($f):\n";
+		system("./$f");
+	    }
+	    elsif ($type eq "archive") {
+		print "Extracting $f to $dest.\n";
+		system("tar -xzf $f -C $mnt/$dest");
+	    }
+	    elsif ($type eq "file") {
+		print "Copying $f to $dest.\n";
+		system("cp $f $mnt/$dest");
+	    }
+	    else {
+		print "Don't know file type $type for $f, skipping!\n";
+	    }
+	}
+
+	print "Finished running updates!\n";
+    }
+
+    return 1;
+}
+
+sub detectArch($) {
+    my $testfile = shift;
+    if (!defined($testfile)) {
+	return "";
+    }
+
+    my $output = `file -b $testfile`;
+    chomp($output);
+    my @fields = split(/,/,$output);
+
+    my ($bits,$arch) = ("","");
+    foreach my $f (@fields) {
+	if ($f =~ /(\d+)\-bit/) {
+	    $bits = $1;
+	}
+	elsif ($f =~ /x86(\-|_)64/) {
+	    $arch = "x86_64";
+	}
+	elsif ($f =~ /80(\d86)/) {
+	    $arch = "i${1}";
+	}
+    }
+    if (!defined($arch) && defined($bits)) {
+	$arch = "${bits}-bit";
+    }
+    elsif (!defined($arch) && !defined($bits)) {
+	$arch = $fields[1];
+    }
+
+    return $arch;
+}
+
+sub detectLinuxKernel($) {
+    my $mnt = shift;
+    my $retval = '';
+
+    my ($grubfile,$lilofile) = (undef,undef);
+    # first try grub, then lilo
+    # XXX really should look at boot sector to figure this out...
+    if (-x "$mnt/sbin/grub") {
+	if (! -z "$mnt/boot/grub/grub.conf") {
+	    $grubfile = "$mnt/boot/grub/grub.conf";
+	}
+	elsif (! -z "$mnt/boot/grub/menu.lst") {
+	    $grubfile = "$mnt/boot/grub/menu.lst";
+	}
+    }
+    elsif (-x "$mnt/sbin/lilo") {
+	if (! -z "$mnt/etc/lilo.conf") {
+	    $lilofile = "$mnt/etc/lilo.conf";
+	}
+    }
+
+    if (defined($grubfile)) {
+	my ($def,$kernel) = (undef,undef);
+	my $i = 0;
+
+	# yes, we do assume there's a line like "default( |=)N" before 
+	# the titles...
+	open(BFD,$grubfile);
+	while (my $line = <BFD>) {
+	    if ($line =~ /^#/) {
+	    }
+	    elsif ($line =~ /default\s*=*\s*(\d+)/) {
+		$def = $1 + 0;
+	    }
+	    elsif ($line =~ /kernel\s+([^\s\n]+)\s*/) {
+		if ($i == $def) {
+		    $retval = `basename $1`;
+		    chomp($retval);
+		    last;
+		}
+		else {
+		    ++$i;
+		}
+	    }
+	}
+	close(BFD);
+    }
+    elsif (defined($lilofile)) {
+	my ($def,$kernel,$label) = (undef,undef,undef);
+
+	# yes, we do assume there's a line like "default( |=)N" before 
+	# the titles...
+	open(BFD,$lilofile);
+	while (my $line = <BFD>) {
+	    if ($line =~ /^#/) {
+	    }
+	    elsif ($line =~ /default\s*=*\s*([^\s]+)/) {
+		$def = $1;
+	    }
+	    elsif ($line =~ /image\s*=\s*([^\s\n]+)/) {
+		$kernel = $1;
+	    }
+	    elsif ($line =~ /label\s*=\s*([^\s\n]+)/) {
+		if ($def eq $1) {
+		    $retval = `basename $kernel`;
+		    chomp($retval);
+		    last;
+		}
+	    }
+	}
+	close(BFD);
+    }
+
+    return $retval;
+}
+
+sub detectLinuxDistro($) {
+    my $mnt = shift;
+    my @retval = (undef,undef);
+
+    if (-e "$mnt/etc/redhat-release") {
+	# redhat/fedora
+	my $d = `cat $mnt/etc/redhat-release | grep -i release`;
+	chomp($d);
+	if ($d =~ /(Red Hat Linux)\s+release\s+([\d\.]+)/i) {
+	    $retval[0] = $1;
+	    $retval[1] = $2;
+	}
+	elsif ($d =~ /(Fedora Core)\s+release\s+([\d\.]+)/i) {
+	    $retval[0] = $1;
+	    $retval[1] = $2;
+	}
+	elsif ($d =~ /(Fedora)\s+release\s+([\d\.]+)/i) {
+	    $retval[0] = $1;
+	    $retval[1] = $2;
+	}
+    }
+    elsif (-e "$mnt/etc/lsb-release") {
+	my $d = `cat $mnt/etc/lsb-release | grep DISTRIB_ID`;
+	chomp($d);
+	if ($d =~ /DISTRIB_ID=([\w\d]+)/i) {
+	    $retval[0] = $1;
+	}
+	my $v = `cat $mnt/etc/lsb-release | grep DISTRIB_RELEASE`;
+	chomp($v);
+	if ($v =~ /DISTRIB_RELEASE=([\w\d\-\.]+)/i) {
+	    $retval[1] = $1;
+	}
+    }
+
+    return @retval;
+}
+
+sub detectLinux($\%) {
+    my ($mnt,$aref) = @_;
+
+    # If they don't tell us anything, fill stuff in...
+    if (!defined(${$aref}{"os"})) {
+	${$aref}{"os"} = 'Linux';
+    }
+    if (!defined(${$aref}{"os_version"})) {
+	${$aref}{"os_version"} = detectLinuxKernel($mnt);
+    }
+    my ($d,$v) = detectLinuxDistro($mnt);
+    if (!defined(${$aref}{"distro"}) && defined($d)) {
+	${$aref}{"distro"} = $d;
+    }
+    if (!defined(${$aref}{"distro_version"}) && defined($v)) {
+	${$aref}{"distro_version"} = $v;
+    }
+    if (!defined(${$aref}{"arch"})) {
+	${$aref}{"arch"} = detectArch("$mnt/bin/ls");
+    }
+
+    return 1;
+}
+
+sub detectBSD($\%) {
+    my ($mnt,$aref) = @_;
+
+    # If they don't tell us anything, fill stuff in... we look for 
+    # (free|open|net)bsd... if anybody uses another bsd on an Emulab somewhere,
+    # I will be very surprised.
+
+    # This is ugly as sin... we grab strings out of the kernel and call it good
+    # (yes, a linux-oriented person did this)
+    my $KSTRS = undef;
+    if (-f "$mnt/boot/kernel/kernel") {
+	open($KSTRS,"strings $mnt/boot/kernel/kernel |");
+    }
+    elsif (-f "$mnt/boot/kernel") {
+	open($KSTRS,"strings $mnt/boot/kernel |");
+    }
+    elsif (-f "$mnt/kernel") {
+	open($KSTRS,"strings $mnt/kernel |");
+    }
+    elsif (-f "$mnt/bsd") {
+	open($KSTRS,"strings $mnt/bsd |");
+    }
+    elsif (-f "$mnt/netbsd") {
+	open($KSTRS,"strings $mnt/netbsd |");
+    }
+
+    my ($d,$v) = ('BSD',undef);
+    if (defined($KSTRS)) {
+	while (my $line = <$KSTRS>) {
+	    if ($line =~ /^(\w+BSD)\s+([\d\.]+\s+\([\w\d\-]+\)\s+#\d+)/i) {
+		$d = $1;
+		$v = $2;
+		last;
+	    }
+	    elsif ($line =~ /^(\w+BSD)\s+([\d\.]+[\w\d\-]*\s+#\d+)/i) {
+		$d = $1;
+		$v = $2;
+		last;
+	    }
+	    elsif ($line =~ /^(\w+BSD)\s+([\d\.]+[\w\d\-]*)/i) {
+		$d = $1;
+		$v = $2;
+		last;
+	    }
+	}
+	close($KSTRS);
+    }
+
+    if (!defined(${$aref}{"os"}) && defined($d)) {
+	${$aref}{"os"} = $d;
+    }
+    if (!defined(${$aref}{"os_version"}) && defined($v)) {
+	${$aref}{"os_version"} = $v;
+    }
+    if (!defined(${$aref}{"distro"})) {
+	${$aref}{"distro"} = ${$aref}{"os"};
+    }
+    if (!defined(${$aref}{"distro_version"})) {
+	${$aref}{"distro_version"} = ${$aref}{"os_version"};
+    }
+    if (!defined(${$aref}{"arch"})) {
+	${$aref}{"arch"} = detectArch("$mnt/bin/ls");
+    }
+
+    return 1;
+}
+
+sub detectMFS($\%) {
+    my ($mnt,$aref) = @_;
+
+    # If they don't tell us anything
+    if (!defined(${$aref}{"os"})) {
+	${$aref}{"os"} = `uname -s`;
+	chomp(${$aref}{"os"});
+    }
+    if (!defined(${$aref}{"os_version"})) {
+	${$aref}{"os_version"} = `uname -r`;
+	chomp(${$aref}{"os_version"});
+    }
+    if (!defined(${$aref}{"distro"})) {
+	${$aref}{"distro"} = ${$aref}{"os"};
+    }
+    if (!defined(${$aref}{"distro_version"})) {
+	${$aref}{"distro_version"} = ${$aref}{"os_version"};
+    }
+    if (!defined(${$aref}{"arch"})) {
+	${$aref}{"arch"} = `uname -m`;
+	chomp(${$aref}{"arch"});
+    }
+
+    return 1;
+}

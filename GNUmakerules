@@ -1,6 +1,7 @@
 #
-# Insert Copyright Here.
-#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# All rights reserved.
 
 # Get rid of a bunch of nasty built-in implicit rules,
 # to avoid bogus circular dependencies and make things go faster.
@@ -34,6 +35,22 @@ $(INSTALL_ETCDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_ETCDIR)
 	$(INSTALL_DATA) $< $@
+
+$(addprefix $(INSTALL_SBINDIR)/, $(SETUID_SBIN_SCRIPTS)): $(INSTALL_SBINDIR)/%: %
+	echo "Installing (setuid) $<"
+	-mkdir -p $(INSTALL_SBINDIR)
+	$(SUDO) $(INSTALL) -o root -m 4755 $< $@
+
+$(addprefix $(INSTALL_BINDIR)/, $(SETUID_BIN_SCRIPTS)): $(INSTALL_BINDIR)/%: %
+	echo "Installing (setuid) $<"
+	-mkdir -p $(INSTALL_BINDIR)
+	$(SUDO) $(INSTALL) -o root -m 4755 $< $@
+
+$(addprefix $(INSTALL_LIBEXECDIR)/, $(SETUID_LIBX_SCRIPTS)): $(INSTALL_LIBEXECDIR)/%: %
+	echo "Installing (setuid) $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)
+	$(SUDO) $(INSTALL) -o root -m 4755 $< $@
+
 
 CFLAGS += $(LOCALCFLAGS)
 
@@ -80,7 +97,7 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 #
 # Rules to regen configure written files.
 #
-%: %.in
+%: %.in $(OBJDIR)/config.status
 	@echo "Regenerating $@"
 	cd $(OBJDIR) && CONFIG_FILES=$(SUBDIR)/$@ ./config.status
 

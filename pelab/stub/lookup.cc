@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 // lookup.cc
 
 // Provide lookups of the sender and receiver indices based on a
@@ -59,7 +65,7 @@ void init_connection(connection * conn)
     conn->source_port = 0;
     conn->dest_port = 0;
     conn->last_usetime = time(NULL);
-    conn->pending = 0;
+    conn->pending.is_pending = 0;
   }
 }
 
@@ -100,11 +106,11 @@ int replace_sender_by_stub_port(unsigned long ip, unsigned short stub_port,
     // There is already a connection. Get rid of the old connection.
     int index = pos->second;
     snddb[index].last_usetime = now;
-    snddb[index].pending = 0;
+    snddb[index].pending.is_pending = 0;
     if (snddb[index].sockfd != -1)
     {
-	FD_CLR(snddb[index].sockfd, read_fds);
-	close(snddb[index].sockfd);
+        FD_CLR(snddb[index].sockfd, read_fds);
+        close(snddb[index].sockfd);
     }
     if (sockfd > maxfd)
     {
@@ -134,7 +140,7 @@ int replace_sender_by_stub_port(unsigned long ip, unsigned short stub_port,
     }
     snddb[index].sockfd = sockfd;
     snddb[index].last_usetime = now;
-    snddb[index].pending = 0;
+    snddb[index].pending.is_pending = 0;
     result = index;
   }
   return result;
@@ -255,6 +261,10 @@ int insert_fake(unsigned long ip, unsigned short port)
     sniff_rcvdb[index].start = 0;
     sniff_rcvdb[index].end = 0;
     throughput[index].isValid = 0;
+    last_through[index] = 0;
+    buffer_full[index] = 0;
+    max_delay[index] = 0;
+    last_max_delay[index] = 0;
     loss_records[index].loss_counter=0;
     loss_records[index].total_counter=0;
     last_loss_rates[index]=0;
@@ -291,11 +301,11 @@ void reconnect_receiver(int index)
     perror("connect");
     clean_exit(1);
   }
-  int send_buf_size = 0;
-  int int_size = sizeof(send_buf_size);
-  getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &send_buf_size,
-	     (socklen_t*)&int_size);
-  fprintf(stderr, "Socket buffer size: %d\n", send_buf_size);
+//  int send_buf_size = 0;
+//  int int_size = sizeof(send_buf_size);
+//  getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &send_buf_size,
+//           (socklen_t*)&int_size);
+//  fprintf(stderr, "Socket buffer size: %d\n", send_buf_size);
 
   struct sockaddr_in source_addr;
   socklen_t len = sizeof(source_addr);
@@ -333,11 +343,16 @@ void reconnect_receiver(int index)
   sniff_rcvdb[index].start = 0;
   sniff_rcvdb[index].end = 0;
   throughput[index].isValid = 0;
+  last_through[index] = 0;
+  buffer_full[index] = 0;
+  max_delay[index] = 0;
+  last_max_delay[index] = 0;
   loss_records[index].loss_counter=0;
   loss_records[index].total_counter=0;
   last_loss_rates[index]=0;
   delays[index]=0;
   last_delays[index]=0;
+  delay_count[index]=0;
   max_throughput[index] = 0;
   base_rtt[index] = LONG_MAX;
 //  remove_delay_samples(index);
@@ -382,7 +397,6 @@ void clear_pending(int index, fd_set * write_fds)
   {
     pending_receivers.erase(index);
     FD_CLR(rcvdb[index].sockfd, write_fds);
-    rcvdb[index].pending = 0;
   }
 }
 
@@ -403,6 +417,7 @@ void remove_index(int index, fd_set * write_fds)
       close(rcvdb[index].sockfd);
       rcvdb[index].sockfd = -1;
     }
+    rcvdb[index].pending.is_pending = 0;
   }
 }
 

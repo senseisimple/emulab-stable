@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,9 @@
 import sys
 import os, os.path
 import pwd
+import string
+import types
+import traceback
 
 TBPATH = os.path.join("@prefix@", "lib")
 if TBPATH not in sys.path:
@@ -50,50 +53,202 @@ TB_NODEHISTORY_OP_MOVE  = "move"
 __dbName = "@TBDBNAME@"
 __dbQueryMaxtries = 1
 __dbConnMaxtries = 5
+__dbMailOnFail = True
+__dbFailMailAddr = TBOPS
 
-__dbConnection = None
+# Multiple connections via slots.
+__DB = dict({})
+# Keep connection info around for reconnects.  Except we don't save passwords!
+# If a connection required a password, we throw a ManualReconnectRequiredError.
+__DBConnectArgs = dict({})
 
-def TBDBConnect():
-    global __dbConnection
-    
-    if __dbConnection:
-        return
+class ManualReconnectRequiredError(StandardError):
+    pass
 
-    # Create a DB username for accounting purposes
-    uid = os.getuid()
-    try:
-        name = pwd.getpwuid(uid)[0]
-    except KeyError:
-        name = "uid%d" % uid
-    dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
+def TBDBUnusedHandle():
+    maxhandle = -1
+    for k,v in __DB.iteritems():
+        if (type(k) == types.IntType) and k > maxhandle:
+            maxhandle = k
+            pass
+        pass
+    return maxhandle+1
+
+#
+# By default, connect to the Emulab db.  Also supports connections to other
+# dbs.  If you specify a dbnum of None, we pick the first unused one and
+# return it.
+#
+def TBDBConnect(dbnum=0,db=None,user=None,host=None,passwd=None):
+    global __DB
+    global __DBConnectArgs
+
+    if dbnum == None:
+        dbnum = TBDBUnusedHandle()
+
+    if __DB.has_key(dbnum) and __DB[dbnum] != None:
+        return dbnum
+
+    cargs = {}
+    dbname = db
+    if db == None:
+        dbname = __dbName
+    cargs['db'] = dbname
+    dbuser = user
+    if user == None:
+        # Create a DB username for accounting purposes
+        uid = os.getuid()
+        try:
+            name = pwd.getpwuid(uid)[0]
+        except KeyError:
+            name = "uid%d" % uid
+        dbuser = "%s:%s:%d" % (sys.argv[0], name, os.getpid())
+        
+        if debug:
+            print "Connecting to db %s (%d) as %s" % (dbname,dbnum,dbuser)
+    cargs['user'] = dbuser
+    if host != None:
+        cargs['host'] = host
+    if passwd != None:
+        cargs['passwd'] = passwd
 
     if debug:
-        print "Connecting to db %s as %s" % (__dbName, dbuser)
-
+        print "About to try connect with args=%s" % str(cargs)
+    
     # Connect, with retries
     for tries in range(__dbConnMaxtries):
         try:
-            __dbConnection = MySQLdb.connect(db = __dbName, user = dbuser)
+            __DB[dbnum] = MySQLdb.connect(**cargs)
+            # Delete the password if it exists, but make a record of it
+            # so that we throw a "must manually reconnect" exception if
+            # a reconnect happens.  Not ideal, but necessary.
+            if cargs.has_key('passwd'):
+                cargs['passwd'] = None
+                pass
+            __DBConnectArgs[dbnum] = cargs
         except:
-            time.sleep(1)
+            if debug:
+                traceback.print_exc()
+            time.sleep(5)
         else:
             break
     else:
-        raise RuntimeError, "Cannot connect to DB after several attempts!"
+        raise RuntimeError, "Cannot connect to DB %d after several " + \
+              "attempts!" % dbnum
 
-def DBQuery(queryPat, querySub = (), asDict = False):
-    TBDBConnect()
+    return dbnum
+
+def TBDBReconnect(retry = False,dbnum = 0,passwd=None):
+    global __dbConnMaxtries, __DB
     
-    if asDict:
-        cursor = __dbConnection.cursor(MySQLdb.cursors.DictCursor)
-    else:
-        cursor = __dbConnection.cursor()
+    if retry:
+        tmpConnMaxtries = __dbConnMaxtries
+        # "forever"
+        __dbConnMaxtries = 10000
+        pass
+
+    # Force closed if not closed yet.
+    try:
+        __DB[dbnum].close()
+    except:
+        pass
+    __DB[dbnum] = None
+
+    tconnargs = __DBConnectArgs[dbnum].copy()
+    if tconnargs.has_key('passwd') and tconnargs['passwd'] == None \
+           and passwd == None:
+        raise ManualReconnectRequiredError("This connection requires a passwd!")
+    if passwd != None:
+        tconnargs = __DBConnectArgs[dbnum].copy()
+        tconnargs["passwd"] = passwd
+        pass
+    
+    try:
+        TBDBConnect(dbnum=dbnum,**tconnargs)
+    except RuntimeError:
+        # restore old value, even though the program will probably choose
+        # to die if it can't reconnect...
+        if retry:
+            __dbConnMaxtries = tmpConnMaxtries
+            pass
+        raise RuntimeError, "Cannot reconnect to DB %d after %d attempts!" \
+              % (dbnum,__dbConnMaxtries)
+
+    if retry:
+        __dbConnMaxtries = tmpConnMaxtries
+        pass
+
+    return
+
+#
+# XXX: Ugh.
+# The reason for this hack is the limited functionality across fork supported
+# by MySQLdb.  The desire is that child processes, on their first query
+# post-fork, should notice if they inherited the parent's connection, stop
+# using that connection, and let its resources be garbage-collected, BUT NOT
+# send a disconnect to the server.  Unfortunately, since MySQLdb takes all its
+# functionality from a C wrapper around the MySQL libs, there is no way to both
+# garbage-collect the resources and not officially disconnect.  If you set the
+# connection obj to None, you call the destructor and this disconnects from the
+# server.  No way to both dealloc the C resources and not disconnect.  There's
+# a simple one-line fix to allow for this in the C wrapper (and better multi-
+# line fixes), but I don't want to hack this in right now.
+#
+
+#
+# Thus, processes that os.fork off children should call TBDBPreFork() just
+# before the actual fork syscall.  Note that this method does not perform the
+# fork; it merely forces a disconnect from the server.  Both the parent and the
+# child will reconnect transparently upon the first query.  At this point, this
+# is the best transparent sol'n, even though it's terrible!
+# Of course, if you're not planning to 1) touch the connection, or 2) close
+# all open filehandles in the child, you don't need to call this.
+# WARNING: do not call this function if you have any connection state (i.e.,
+# are in the middle of a transaction)!
+#
+def TBDBPreFork():
+    unclosed = []
+    for dbno in __DB.keys():
+        if not TBDBDisconnect(dbnum=dbno):
+            unclosed.append(dbno)
+            pass
+        pass
+    if len(unclosed) > 0:
+        # don't just null out object; this could perhaps fail if there's an
+        # uncommitted transaction or something...
+        raise RuntimeError, "Could not close db connection(s) (%s) " + \
+              "in prefork!" % (",".join(unclosed))
+    
+    return
+
+def TBDBDisconnect(dbnum=0):
+    global __DB
+
+    if __DB[dbnum]:
+        try:
+            __DB[dbnum].close()
+            __DB[dbnum] = None
+        except:
+            print "Could not close db connection!"
+            return False
+        pass
+    
+    return True
+
+def DBQuery(queryPat, querySub = (), asDict = False, dbnum = 0):
+    TBDBConnect(dbnum=dbnum)
 
     if debug:
         print "Executing DB query %s" % queryPat
 
     tries = __dbQueryMaxtries
     while tries:
+        if asDict:
+            cursor = __DB[dbnum].cursor(MySQLdb.cursors.DictCursor)
+        else:
+            cursor = __DB[dbnum].cursor()
+            pass
+
         try:
             cursor.execute(queryPat, querySub)
             ret = cursor.fetchall()
@@ -107,34 +262,45 @@ def DBQuery(queryPat, querySub = (), asDict = False):
                 return ()
             return ret
         except MySQLdb.MySQLError, e:
+            try:
+                __DB[dbnum].ping()
+            except MySQLdb.MySQLError:
+                # Connection is dead; need a reconnect
+                try:
+                    TBDBReconnect(True,dbnum=dbnum)
+                    continue
+                except RuntimeError:
+                    print "Error: could not reconnect to mysqld!"
+                    time.sleep(1)
+                    pass
+                pass
+
             tries -= 1
             if tries == 0:
                 break
-            else:
-                time.sleep(1)
-                try:
-                    __dbConnection.ping()
-                except MySQLdb.MySQLError:
-                    pass
-                
+            pass
+        pass
+
     tbmsg  = queryPat % cursor.connection.literal(querySub)
     tbmsg += "\n\n"
     tbmsg += "".join(traceback.format_exception(*sys.exc_info()))
-    SENDMAIL(TBOPS, "DB query failed", "DB query failed:\n\n%s" % tbmsg, TBOPS)
+    if __dbMailOnFail:
+        SENDMAIL(__dbFailMailAddr,"DB query failed", "DB query failed:\n\n%s" \
+                 % tbmsg, __dbFailMailAddr)
     return None
 
-def DBQueryFatal(*args):
-    ret = DBQuery(*args)
+def DBQueryFatal(*args,**kwargs):
+    ret = DBQuery(*args,**kwargs)
     if ret == None:
         raise RuntimeError, "DBQueryFatal failed"
     return ret
 
-def DBQueryWarn(*args):
-    return DBQuery(*args)
+def DBQueryWarn(*args,**kwargs):
+    return DBQuery(*args,**kwargs)
 
-def DBQuoteSpecial(str):
-    TBDBConnect()
-    return __dbConnection.escape_string(str)
+def DBQuoteSpecial(str,dbnum=0):
+    TBDBConnect(dbnum=dbnum)
+    return __DB[dbnum].escape_string(str)
 
 
 #
@@ -202,13 +368,18 @@ def TBExptIDX(pid,eid):
 #        Returns 1 if okay.
 #        Returns 0 if failed.
 #
-def TBSetNodeLogEntry(node, dbuid, type, message):
-    if not TBValidNodeName(node) or not TBValidNodeLogType(type):
+def TBSetNodeLogEntry(node, dbuid, etype, message):
+    if not TBValidNodeName(node) or not TBValidNodeLogType(etype):
 	return 0
+    idx = TBMapUIDtoIDX(dbuid)
+
+    if type(idx) == tuple:
+        idx = idx[0]
+        pass
     return DBQueryWarn("insert into nodelog "
 		       "values "
-                       "(%s, NULL, %s, %s, %s, now())",
-                       (node, type, dbuid, message))
+                       "(%s, NULL, %s, %s, %s, %s, now())",
+                       (node, etype, dbuid, idx, message))
 
 #
 # Validate a node name.
@@ -246,12 +417,19 @@ def TBValidNodeLogType(type):
 def MarkPhysNodeDown(pnode):
     pid = NODEDEAD_PID;
     eid = NODEDEAD_EID;
-    
+    exptidx = 0
+
+    try:
+        exptidx = TBExptIDX(pid, eid)
+    except:
+        print "*** WARNING: No such experiment %s/%s!" % (pid,eid)
+	return
+
     DBQueryFatal("lock tables reserved write")
     DBQueryFatal("update reserved set "
-		 "  pid=%s,eid=%s,rsrv_time=now() "
+		 "  exptidx=%s,pid=%s,eid=%s,rsrv_time=now() "
 		 "where node_id=%s",
-                 (pid, eid, pnode))
+                 (exptidx,pid, eid, pnode))
     DBQueryFatal("unlock tables")
     TBSetNodeHistory(pnode, TB_NODEHISTORY_OP_MOVE, os.getuid(), pid, eid)
     return
@@ -273,12 +451,14 @@ def TBSetNodeHistory(nodeid, op, uid, pid, eid):
         pass
     except ValueError:
         pass
+
+    idx = TBMapUIDtoIDX(uid)
     
     return DBQueryWarn("insert into node_history set "
 		       "  history_id=0, node_id=%s, op=%s, "
-		       "  uid=%s, stamp=UNIX_TIMESTAMP(now()), "
+		       "  uid=%s, uid_idx=%s, stamp=UNIX_TIMESTAMP(now()), "
 		       "  exptidx=%s",
-                       (nodeid,op,uid,exptidx))
+                       (nodeid,op,uid,idx,exptidx))
 
 
 def TBSiteVarExists(name):
@@ -310,3 +490,15 @@ def TBGetSiteVar(name):
     
     raise RuntimeException, \
           "*** attempted to fetch unknown site variable name!"
+
+def TBMapUIDtoIDX(uid):
+    uid = DBQuoteSpecial(uid)
+    
+    qres = DBQueryFatal("select uid_idx from users "
+                        "where uid=%s and status!='archived'", (uid,))
+
+    if len(qres) == 0:
+        return 0
+
+    return qres[0]
+

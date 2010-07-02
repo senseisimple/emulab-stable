@@ -1,0 +1,12 @@
+--- blacklist~	2008-03-12 15:55:00.000000000 -0600
++++ blacklist	2008-02-20 19:00:10.000000000 -0700
+@@ -34,3 +34,9 @@
+ # ISDN - see bugs 154799, 159068
+ blacklist hisax
+ blacklist hisax_fcpcipnp
++
++# Emulab -- must prevent wireless drivers from loading on boot
++# so that dhclient doesn't try to bring up the control net on a wireless
++# device.
++blacklist ath5k
++blacklist ath_pci

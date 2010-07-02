@@ -1,0 +1,13 @@
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("reserved", "tmcd_redirect")) {
+	DBQueryFatal("alter table reserved add `tmcd_redirect` tinytext");
+    }
+    return 0;
+}
+1;

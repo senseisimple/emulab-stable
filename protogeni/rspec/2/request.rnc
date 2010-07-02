@@ -1,0 +1,96 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Prototype of a request RSpec, to be used by ProtoGENI
+# Version 2
+#
+
+default namespace = "http://www.protogeni.net/resources/rspec/2"
+
+include "common.rnc"
+
+# The ComponentName will only be available after an assignment
+NodeContents &=
+  # Client-specified identifier
+  attribute client_id { text } &
+  # Component used to create the sliver
+  attribute component_id { text }? &
+  attribute component_manager_id { text }? &
+  attribute component_name { text }? &
+
+  # Indicates whether the user is requesting this node exclusively
+  attribute exclusive { xsd:boolean }? &
+
+  # Indicates an equivalence class to determine which other slivers
+  # should be created on the same physical node.
+  attribute colocate { text }? &
+
+  # The type of node this sliver should be bound to. At most one kind
+  # of hardware type may be specified and the sliver type must be
+  # specified.
+  HardwareType? &
+  element sliver_type {
+    SliverTypeContents &
+    element disk_image { DiskImageContents }
+  }
+
+ServiceContents &=
+  AnyExtension &
+  element install { InstallServiceContents }* &
+  element execute { ExecuteServiceContents }*
+
+InstallServiceContents &=
+  AnyExtension &
+  attribute url { text } &
+  attribute install_path { text }
+
+ExecuteServiceContents &=
+  AnyExtension &
+  attribute shell { text } &
+  attribute command { text }
+
+# The LinkMapping will only be available after an assignment
+LinkContents &=
+  attribute client_id { text } &
+  element component_manager { attribute name { text } }* &
+  element component_hop { ComponentHopContents }*
+
+# The ComponentInterfaceDeclName will only be available after an assignment
+InterfaceContents &=
+  attribute component_id { text }? &
+  attribute client_id { text }
+
+# The ComponentInterfaceRefName will only be available after an assignment
+InterfaceRefContents &=
+  attribute client_id { text }
+
+RSpecContents &=
+  attribute type { "request" }
+
+# A request link is mapped to an arbitrary topology which represents
+# the virtual LAN/link which embodies it. Note that nodes do not
+# provide any additional information and can be derived from the
+# interface mapping.
+ComponentHopContents &=
+  AnyExtension &
+  # Component ID of the link
+  attribute component_id { text } &
+  attribute component_manager_id { text } &
+  InterfaceMapping*
+
+# Each interface represents a particular physical interface. If that
+# interface is one of the link end points, it is also mapped to that
+# virtual interface name.
+InterfaceMapping = element interface_ref {
+  AnyExtension &
+  # Component ID of the interface
+  attribute component_id { text } &
+  attribute component_manager_id { text } &
+  attribute client_id { text }?
+}
+
+start = RSpec

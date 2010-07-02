@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 timeit=/usr/bin/time
 
 if [ ! -x ../extractmail.pl -o ! -x ../parsemail.pl -o ! -x ../checkrecords.pl -o ! -r tbmail.pm ]; then

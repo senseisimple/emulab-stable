@@ -1,10 +1,37 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
+include("imageid_defs.php");
+
+#
+# Only known and logged in users can end experiments.
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+#
+# Verify page arguments.
+#
+$reqargs = RequiredPageArguments("image", PAGEARG_IMAGE);
+$optargs = OptionalPageArguments("canceled", PAGEARG_BOOLEAN,
+				 "confirmed", PAGEARG_BOOLEAN);
+
+# Need these below
+$imageid = $image->imageid();
+$imagename = $image->imagename();
+$pid = $image->pid();
+
+#
+# Verify permission.
+#
+if (! $image->AccessCheck($this_user, $TB_IMAGEID_DESTROY)) {
+    USERERROR("You do not have permission to destroy ImageID $imageid!", 1);
+}
 
 #
 # Standard Testbed Header
@@ -12,64 +39,11 @@ include("defs.php3");
 PAGEHEADER("Delete an Image Descriptor");
 
 #
-# Only known and logged in users can end experiments.
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-#
-# Must provide the ImageID.
-# 
-if (!isset($imageid) ||
-    strcmp($imageid, "") == 0) {
-    USERERROR("The ImageID was not provided!", 1);
-}
-
-if (! TBValidImageID($imageid)) {
-    USERERROR("ImageID '$imageid' is not a valid ImageID!", 1);
-}
-
-#
-# Verify permission.
-#
-if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_DESTROY)) {
-    USERERROR("You do not have permission to destroy ImageID $imageid!", 1);
-}
-
-#
-# Get user level info.
-#
-if (!TBImageInfo($imageid, $imagename, $pid)) {
-    USERERROR("ImageID '$imageid' is no longer a valid ImageID!", 1);
-}
-
-#
 # Check to see if the imageid is being used in various places
 #
-$query_result1 =
-    DBQueryFatal("select * from current_reloads where image_id='$imageid'");
-$query_result2 =
-    DBQueryFatal("select * from scheduled_reloads where image_id='$imageid'");
-$query_result3 =
-    DBQueryFatal("select * from node_types where imageid='$imageid'");
-
-if (mysql_num_rows($query_result1)) {
-    echo "$imageid is referenced in the current_reloads table!<br>";
-    $conflicts++;
-}
-if (mysql_num_rows($query_result2)) {
-    echo "$imageid is referenced in the scheduled_reloads table!<br>";
-    $conflicts++;
-}
-if (mysql_num_rows($query_result3)) {
-    echo "$imageid is referenced in the node_types table!<br>";
-    $conflicts++;
-}
-if ($conflicts) {
-    echo "<br>
-          You must resolve these issues before the imageid can be deleted!";
-    PAGEFOOTER();
-    return;
+if ($image->InUse()) {
+    USERERROR("Image $imageid is still in use or busy!<br>".
+	      "You must resolve these issues before is can be deleted!", 1);
 }
 
 #
@@ -78,7 +52,7 @@ if ($conflicts) {
 # set. Or, the user can hit the cancel button, in which case we should
 # probably redirect the browser back up a level.
 #
-if ($canceled) {
+if (isset($canceled) && $canceled) {
     echo "<center><h2><br>
           Image Descriptor removal canceled!
           </h2></center>\n";
@@ -87,14 +61,15 @@ if ($canceled) {
     return;
 }
 
-if (!$confirmed) {
+if (!isset($confirmed)) {
     echo "<center><h2><br>
           Are you <b>REALLY</b>
           sure you want to delete Image '$imagename' in project $pid?
           </h2>\n";
+
+    $url = CreateURL("deleteimageid", $image);
     
-    echo "<form action='deleteimageid.php3' method=post>";
-    echo "<input type=hidden name=imageid value='$imageid'>\n";
+    echo "<form action='$url' method=post>";
     echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
     echo "<b><input type=submit name=canceled value=Cancel></b>\n";
     echo "</form>\n";
@@ -117,6 +92,8 @@ if (!$confirmed) {
 # Need to make sure that there is no frisbee process running before
 # we kill it.
 #
+STARTBUSY("Removing imageid");
+
 $retval = SUEXEC($uid, $pid, "webfrisbeekiller $imageid", SUEXEC_ACTION_DIE);
 
 DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
@@ -124,28 +101,23 @@ DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 #
 # If this is an EZ imageid, then delete the corresponding OSID too.
 #
-$query_result =
-    DBQueryFatal("select ezid,path from images where imageid='$imageid'");
-$row = mysql_fetch_row($query_result);
-$ezid = $row[0];
-$path = $row[1];
-
-#
 # Delete the record(s).
 #
 DBQueryFatal("DELETE FROM images WHERE imageid='$imageid'");
 DBQueryFatal("DELETE FROM osidtoimageid where imageid='$imageid'");
-if ($ezid) {
+if ($image->ezid()) {
     DBQueryFatal("DELETE FROM os_info WHERE osid='$imageid'");
 }
-
 DBQueryFatal("unlock tables");
+
+STOPBUSY();
 
 echo "<br>
       <h3>
       Image '$imageid' in project $pid has been deleted!\n";
 
-if ($path) {
+if ($image->path() && $image->path() != "") {
+    $path = $image->path();
     echo "<br>
           <br>
           <font color=red>Please remember to delete $path!</font>\n";

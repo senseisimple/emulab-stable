@@ -1,0 +1,651 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use strict;
+use Getopt::Std;
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Back-end script to create new Image descriptors (EZ Form.)
+#
+sub usage()
+{
+    print("Usage: newimageid [-v] <xmlfile>\n");
+    exit(-1);
+}
+my $optlist = "dvf";
+my $debug   = 0;
+my $force   = 0;
+my $verify  = 0;	# Check data and return status only. 
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBGROUP_DIR	= "@GROUPSROOT_DIR@";
+my $TBPROJ_DIR	= "@PROJROOT_DIR@";
+
+#
+# Untaint the path
+#
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use User;
+use Project;
+use Image;
+
+# Protos
+sub fatal($);
+sub UserError(;$);
+sub escapeshellarg($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"v"})) {
+    $verify = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $xmlfile  = shift(@ARGV);
+
+#
+# Map invoking user to object. 
+# If invoked as "nobody" we are coming from the web interface and the
+# current user context is "implied" (see tbauth.php3).
+#
+my $this_user;
+
+if (getpwuid($UID) ne "nobody") {
+    $this_user = User->ThisUser();
+
+    if (! defined($this_user)) {
+	fatal("You ($UID) do not exist!");
+    }
+    # You don't need admin privileges to create new Image descriptors.
+}
+else {
+    #
+    # Check the filename when invoked from the web interface; must be a
+    # file in /tmp.
+    #
+    if ($xmlfile =~ /^([-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in pathname: $xmlfile");
+    }
+
+    # Use realpath to resolve any symlinks.
+    my $translated = `realpath $xmlfile`;
+    if ($translated =~ /^(\/tmp\/[-\w\.\/]+)$/) {
+	$xmlfile = $1;
+    }
+    else {
+	fatal("Bad data in translated pathname: $xmlfile");
+    }
+
+    # The web interface (and in the future the xmlrpc interface) sets this.
+    $this_user = User->ImpliedUser();
+
+    if (! defined($this_user)) {
+	fatal("Cannot determine implied user!");
+    }
+}
+
+#
+# These are the fields that we allow to come in from the XMLfile.
+#
+my $SLOT_OPTIONAL	= 0x1;	# The field is not required.
+my $SLOT_REQUIRED	= 0x2;  # The field is required and must be non-null.
+my $SLOT_ADMINONLY	= 0x4;  # Only admins can set this field.
+#
+# XXX We should encode all of this in the DB so that we can generate the
+# forms on the fly, as well as this checking code.
+#
+my %xmlfields =
+    # XML Field Name        DB slot name         Flags             Default
+    ("imagename"	=> ["imagename",	$SLOT_REQUIRED],
+     "nodetype"		=> ["nodetype",		$SLOT_OPTIONAL],
+     "nodeclass"	=> ["nodeclass",	$SLOT_OPTIONAL],
+     "pid"		=> ["pid",		$SLOT_REQUIRED],
+     "gid"		=> ["gid",		$SLOT_OPTIONAL],
+     "description"	=> ["description",	$SLOT_REQUIRED],
+     "loadpart"		=> ["loadpart",		$SLOT_REQUIRED],
+     "OS"		=> ["OS",		$SLOT_REQUIRED],
+     "version"		=> ["version",		$SLOT_OPTIONAL,	   ""],
+     "path"		=> ["path",		$SLOT_OPTIONAL,    ""],
+     "node_id"		=> ["node_id",		$SLOT_OPTIONAL,    ""],
+     "osfeatures",	=> ["osfeatures",	$SLOT_OPTIONAL,	   ""],
+     "op_mode",		=> ["op_mode",		$SLOT_REQUIRED],
+     "mtype_*"		=> ["mtype",		$SLOT_OPTIONAL],
+     "wholedisk",	=> ["wholedisk",	$SLOT_OPTIONAL,    0],
+     "max_concurrent",	=> ["max_concurrent",	$SLOT_OPTIONAL,    0],
+     "shared",		=> ["shared",		$SLOT_OPTIONAL,    0],
+     "global",		=> ["global",		$SLOT_ADMINONLY,   0],
+     "mbr_version",	=> ["mbr_version",	$SLOT_OPTIONAL],
+     "reboot_waittime",	=> ["reboot_waittime",	$SLOT_ADMINONLY],
+);
+
+#
+# Must wrap the parser in eval since it exits on error.
+#
+my $xmlparse = eval { XMLin($xmlfile,
+			    VarAttr => 'name',
+			    ContentKey => '-content',
+			    SuppressEmpty => undef); };
+fatal($@)
+    if ($@);
+
+#
+# Process and dump the errors (formatted for the web interface).
+# We should probably XML format the errors instead but not sure I want
+# to go there yet.
+#
+my %errors = ();
+
+#
+# Make sure all the required arguments were provided.
+#
+my $key;
+foreach $key (keys(%xmlfields)) {
+    my (undef, $required, undef) = @{$xmlfields{$key}};
+
+    $errors{$key} = "Required value not provided"
+	if ($required & $SLOT_REQUIRED  &&
+	    ! exists($xmlparse->{'attribute'}->{"$key"}));
+}
+UserError()
+    if (keys(%errors));
+
+#
+# We build up an array of arguments to pass to Image->Create() as we check
+# the attributes.
+#
+my %newimageid_args = ();
+
+#
+# Wildcard keys have one or more *'s in them like simple glob patterns.
+# This allows multiple key instances for categories of attributes, and
+# putting a "type signature" in the key for arg checking, as well.
+#
+# Wildcards are made into regex's by anchoring the ends and changing each * to
+# a "word" (group of alphahumeric.)  A tail * means "the rest", allowing
+# multiple words separated by underscores or dashes.
+#
+my $wordpat = '[a-zA-Z0-9]+';
+my $tailpat = '[-\w]+';
+my %wildcards;
+foreach $key (keys(%xmlfields)) {
+    if (index($key, "*") >= 0) {
+	my $regex = '^' . $key . '$';
+	$regex =~ s/\*\$$/$tailpat/;
+	$regex =~ s/\*/$wordpat/g;
+	$wildcards{$key} = $regex;
+    }
+}
+# Key ordering is lost in a hash.
+# Put longer matching wildcard keys before their prefix.
+my @wildkeys = reverse(sort(keys(%wildcards)));
+
+foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
+    my $value = $xmlparse->{'attribute'}->{"$key"}->{'value'};
+    if (!defined($value)) {	# Empty string comes from XML as an undef value.
+	$xmlparse->{'attribute'}->{"$key"}->{'value'} = $value = "";
+    }
+
+    print STDERR "User attribute: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $field = $key;
+    my $wild;
+    if (!exists($xmlfields{$key})) {
+
+	# Not a regular key; look for a wildcard regex match.
+        foreach my $wildkey (@wildkeys) {
+	    my $regex = $wildcards{$wildkey};
+	    if ($wild = $key =~ /$regex/) {
+		$field = $wildkey;
+		print STDERR "Wildcard: '$key' matches '$wildkey'\n"
+		    if ($debug);
+		last; # foreach $wildkey
+	    }
+	}
+	if (!$wild) {
+	    $errors{$key} = "Unknown attribute";
+	    next; # foreach $key
+	}
+    }
+
+    my ($dbslot, $required, $default) = @{$xmlfields{$field}};
+
+    if ($required & $SLOT_REQUIRED) {
+	# A slot that must be provided, so do not allow a null value.
+	if (!defined($value)) {
+	    $errors{$key} = "Must provide a non-null value";
+	    next;
+	}
+    }
+    if ($required & $SLOT_OPTIONAL) {
+	# Optional slot. If value is null skip it. Might not be the correct
+	# thing to do all the time?
+	if (!defined($value)) {
+	    next
+		if (!defined($default));
+	    $value = $default;
+	}
+    }
+    if ($required & $SLOT_ADMINONLY) {
+	# Admin implies optional, but thats probably not correct approach.
+	$errors{$key} = "Administrators only"
+	    if (! $this_user->IsAdmin());
+    }
+	
+    # Now check that the value is legal.
+    if (! TBcheck_dbslot($value, "images",
+			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+	$errors{$key} = TBFieldErrorString();
+	next;
+    }
+
+    $newimageid_args{$key} = $value;
+}
+UserError()
+    if (keys(%errors));
+
+#
+# Options for using this page with different types of nodes.
+# nodetype controls the view and trumps nodeclass.
+# nodeclass determines what node types are visible from the DB.
+#
+my $nodeclass;
+if (exists($newimageid_args{"nodetype"}) && 
+    $newimageid_args{"nodetype"} == "mote") {
+    $nodeclass = "mote";
+} else {
+    # Defaults to PC view.
+    if (!exists($newimageid_args{nodeclass})) {
+	$nodeclass = "pc";
+    } else {
+	$nodeclass = escapeshellarg($nodeclass);
+    }
+}
+
+#
+# Need a list of node types. We join this over the nodes table so that
+# we get a list of just the nodes that are currently in the testbed, not
+# just in the node_types table.  Limit by class if given.
+#
+my $types_querystring = "select distinct n.type from nodes as n ".
+    "left join node_types as nt on n.type=nt.type ".
+    "left join node_type_attributes as a on a.type=n.type ".
+    "where a.attrkey='imageable' and ".
+    "      a.attrvalue!='0' and n.role='testnode'";
+if ($nodeclass) {
+    $types_querystring .= " and nt.class='$nodeclass' ";
+}
+my $types_result = DBQueryFatal($types_querystring);
+
+# Save the valid types in a new array for later.
+my @mtypes_array;
+while (my ($type) = $types_result->fetchrow_array()) {
+    push(@mtypes_array, $type);
+    $xmlfields{"mtype_$type"} = ["mtype", $SLOT_OPTIONAL];
+}
+## printf "%s mtypes\n", $#mtypes_array + 1;
+## foreach my $x (@mtypes_array) { printf "%s\n", $x; }
+## print "\n";
+
+#
+# Now do special checks.
+#
+
+my $isadmin = $this_user->IsAdmin();
+my $imagename = $newimageid_args{"imagename"};
+my $OS = $newimageid_args{"OS"};
+
+# In this form, we make the images:imagename and the os_info:osname the same!
+# Currently, TB_OSID_OSNAMELEN is shorter than TB_IMAGEID_IMAGENAMELEN
+# and that causes problems since we use the same id for both tables. For
+# now, test for the shorter of the two.
+if ( length($imagename) > TB_OSID_OSNAMELEN()) {
+    UserError("Descriptor Name: Too long! ".
+    "Must be less than or equal to " . TB_OSID_OSNAMELEN());
+}
+
+my $project = Project->Lookup($newimageid_args{"pid"});
+if (!defined($project)) {
+    UserError("Project: No such project");
+}
+
+my $group;
+if (exists($newimageid_args{"gid"})) {
+    my $gid = $newimageid_args{"gid"};
+    $group = Group->LookupByPidGid($project->pid(), $gid);
+    if (!defined($group)) {
+	UserError("Group: No such group $gid");
+    }
+}
+else {
+    $group = $project->GetProjectGroup();    
+}
+
+# Permission check if we managed to get a proper group above.
+if ($group &&
+    ! $group->AccessCheck($this_user, TB_PROJECT_MAKEIMAGEID())) {
+    UserError("Project: Not enough permission");
+}
+
+#
+# Only admin types can set the global bit for an image. Ignore silently.
+#
+my $global = 0;
+if ($isadmin &&
+    exists($newimageid_args{"global"}) &&
+    $newimageid_args{"global"} eq "1") {
+    $global = 1;
+} else {
+    delete $newimageid_args{"global"};
+}
+
+my $shared = 0;
+if (exists($newimageid_args{"shared"}) &&
+    $newimageid_args{"shared"} eq "1") {
+    $shared = 1;
+}
+# Does not make sense to do this. 
+if ($global && $shared) {
+    UserError("Global: Image declared both shared and global");
+}
+
+#
+# The path must not contain illegal chars and it must be more than
+# the original /proj/$pid we gave the user. We allow admins to specify
+# a path outside of /proj though.
+# 
+if (!exists($newimageid_args{"path"}) ||
+    $newimageid_args{"path"} eq "") {
+    UserError("Path: Missing Field");
+}
+elsif (! $isadmin) {
+    my $pdef = "";
+    
+    if (!$shared &&
+	exists($newimageid_args{"gid"}) &&
+	$newimageid_args{"gid"} ne "" &&
+	$newimageid_args{"gid"} ne $newimageid_args{"pid"}) {
+	$pdef = "$TBGROUP_DIR/" .
+	    $newimageid_args{"pid"} . "/" . $newimageid_args{"gid"} . "/";
+    }
+    else {
+	$pdef = "$TBPROJ_DIR/" . $newimageid_args{"pid"} . "/images/";
+    }
+
+    if (index($newimageid_args{"path"}, $pdef) < 0) {
+	UserError("Path: Invalid Path");
+    }
+}
+
+# We allow loadpart=0 for whole-disk images in the Long Form, and it uses the
+# same table_regex checking patterns.  Here "wholedisk" is a separate checkbox.
+my $loadpart = $newimageid_args{"loadpart"};
+if ($loadpart < 1 || $loadpart > 4) {
+    UserError("DOS Partion: Out of range.");
+} 
+
+#
+# Check sanity of node name and that user can create an image from it.
+#
+my ($node, $node_id);
+if (exists($newimageid_args{"node_id"}) &&
+    $newimageid_args{"node_id"} ne "") {
+
+    if (!($node = Node->Lookup($newimageid_args{"node_id"}))) {
+	UserError("Node: Invalid node name");
+    }
+    elsif (!$node->AccessCheck($this_user, TB_NODEACCESS_LOADIMAGE())) {
+	UserError("Node: Not enough permission");
+    }
+    else {
+	$node_id = $node->node_id();
+    }
+}
+
+#
+# If no MBR version was specified, and a snapshot node was given,
+# try to deduce the default MBR version based on what is currently
+# on the node we are snapshotting.
+#
+if (!exists($newimageid_args{"mbr_version"}) && defined($node_id)) {
+    my $mbrvers = 1;
+
+    #
+    # If there is only one MBR version for all images on the disk,
+    # use that.  Otherwise, if there is no or ambiguous info, default
+    # to version 1.
+    #
+    my $query_result =
+	DBQueryFatal("select mbr_version from partitions as p, images as i ".
+		     " where p.imageid=i.imageid and p.node_id='$node_id' ".
+		     " group by mbr_version");
+    if ($query_result && $query_result->numrows == 1) {
+	($mbrvers) = $query_result->fetchrow_array();	
+    }
+    $newimageid_args{"mbr_version"} = $mbrvers;
+}
+
+#
+# See what node types this image will work on. Must be at least one!
+#
+UserError("Node Types: Must have at least one node type")
+    if ($#mtypes_array < 0);
+my $typeclause = join(" or ", map("type='$_'", @mtypes_array));
+
+# Check validity of mtype_* args, since the keys are dynamically generated.
+my $node_types_selected = 0;
+my @mtype_keys = grep(/^mtype_/, keys(%newimageid_args));
+foreach $key (@mtype_keys) {
+    my $value = $newimageid_args{$key};
+    print STDERR "mtype: '$key' -> '$value'\n"
+	if ($debug);
+
+    my $type = $key;
+    $type =~ s/^mtype_//;
+    my $match = grep(/^${type}$/, @mtypes_array);
+    if ($match == 0) {
+	$errors{$key} = "Illegal node type."
+    }
+    elsif ($value eq "1") {
+	$node_types_selected++;
+    }
+}
+UserError("Node Types: Must select at least one node type")
+    if ($node_types_selected == 0 && !$force);
+
+#
+# We perform a further check for non-admins.  When a node to snapshot
+# has been specified, we check the OSID of the appropriate partition
+# and see which node types it is appropriate for, and further restrict
+# the list as necessary.  This prevents creation of custom images based on
+# old OSes from being checked as runnable on newer HW where they do not
+# stand a chance.
+#
+if (!$isadmin && defined($node_id)) {
+    my $query_result =
+	DBQueryFatal("select oi.type from osidtoimageid as oi ".
+		     "left join partitions as p on oi.osid=p.osid ".
+		     "where p.node_id='$node_id' and p.partition=$loadpart");
+    my %otypes;
+    while (my ($ntype) = $query_result->fetchrow_array()) {
+	$otypes{$ntype} = 1;
+    }
+    my @invalid_node_types;
+    foreach my $ntype (@mtype_keys) {
+        $ntype =~ s/^mtype_//;
+	if (!exists($otypes{$ntype})) {
+	    push @invalid_node_types, $ntype;
+	}
+    }
+    if (@invalid_node_types) {
+	UserError("Node Types: Current image on $node_id".
+		  " cannot run on the following node types: ". 
+		  join(' ', @invalid_node_types));
+		  
+    }
+}
+
+# XXX  Allowable OS types, OS features, and OpModes need to be
+# XXX  converted from constants in osiddefs.php and put into the DB.
+# XXX  Validity checks go here and in the similar place in newosid.in .
+my %osid_reboot_waitlist = ("Linux", 120, "Fedora", 120, "FreeBSD", 120,
+			    "NetBSD", 120, "Windows", 240, "TinyOS", 60,
+			    "Oskit", 60, "Other", 60);
+
+#
+# Reboot waittime. Only admin users can set this. Grab default
+# if not set.  If no default, complain (unless they failed to specify an OS
+# in which case we will complain about that instead).
+#
+my $reboot_waittime;
+if (!exists($osid_reboot_waitlist{$OS})) {
+    UserError("OS: Invalid OS");
+} elsif (exists($newimageid_args{"reboot_waittime"})) {
+    $reboot_waittime = $newimageid_args{"reboot_waittime"}
+} else {
+    $reboot_waittime = $osid_reboot_waitlist{$OS};
+}
+
+exit(0)
+    if ($verify);
+
+#
+# Now safe to create new OS and image descriptors.
+#
+# We pass the imagename along as an argument to Create(), so remove it from
+# the argument array.  (Same name is used for both Creates.)
+#
+delete($newimageid_args{"imagename"});
+
+#
+# XXX note that osid "path" is not the same as imageid "path".  The former
+# is for multiboot (aka OSKit) kernels.  So we remove the path arg temporary.
+#
+my $ipath = $newimageid_args{"path"};
+delete($newimageid_args{"path"});
+
+# Cross-connect: Make the os descriptor first with the imagename, then take
+# the osid index and use it as the imageid index as well.
+$newimageid_args{"ezid"} = 1;
+# OSInfo->Create args not quite the same as Image->Create ones so copy 
+# newimageid_args into a new hash and fix up values.
+my %newosid_args = %newimageid_args;
+$newosid_args{"shared"} = $newimageid_args{"global"} 
+    if exists $newimageid_args{"global"};
+my $usrerr;
+my $new_osinfo = OSinfo->Create($project, $this_user, $imagename,
+				\%newosid_args, \$usrerr);
+UserError($usrerr)
+    if (defined($usrerr));
+fatal("Could not create new OSID!")
+    if (!defined($new_osinfo));
+
+$newimageid_args{"path"} = $ipath;
+
+my $osid = $new_osinfo->osid();
+
+#
+# Special option. Whole disk image, but only one partition that actually
+# matters. 
+#
+my $loadlen  = 1;
+$newimageid_args{"part${loadpart}_osid"} = $osid;
+if ($newimageid_args{"wholedisk"}) {
+    $loadlen  = 4;
+    $loadpart = 0;
+}
+$newimageid_args{"loadpart"} = $loadpart;
+$newimageid_args{"loadlength"} = $loadlen;
+$newimageid_args{"default_osid"} = $osid;
+
+# Create the osidtoimageid mapping too.
+$newimageid_args{"makedefault"} = 1;
+
+my $new_image = Image->Create($project, $group, $this_user, $imagename, $osid,
+			      \%newimageid_args, \$usrerr);
+UserError($usrerr)
+    if (defined($usrerr));
+fatal("Could not create new Image!")
+    if (!defined($new_image));
+
+my $imageid = $new_image->imageid();
+
+# The web interface requires this line to be printed.
+print "IMAGE $imagename/$imageid has been created\n";
+
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    # Exit with negative status so web interface treats it as system error.
+    exit(-1);
+}
+
+sub UserError(;$)
+{
+    my ($mesg) = @_;
+
+    if (keys(%errors)) {
+	foreach my $key (keys(%errors)) {
+	    my $val = $errors{$key};
+	    print "${key}: $val\n";
+	}
+    }
+    print "$mesg\n"
+	if (defined($mesg));
+
+    # Exit with positive status so web interface treats it as user error.
+    exit(1);
+}
+
+sub escapeshellarg($)
+{
+    my ($str) = @_;
+
+    $str =~ s/[^[:alnum:]]/\\$&/g;
+    return $str;
+}

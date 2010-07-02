@@ -2,30 +2,41 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
+# system imports
 import sys, os
-sys.path.append("@prefix@/lib")
 import getopt
-from libtestbed import *
-import libplab
 import time
+import traceback
 import __builtin__
 
+# Emulab imports
+sys.path.append("@prefix@/lib")
+from libtestbed import *
+import libplab
 
-TRIES = 3
-SLEEPINT = 5
 
 def usage(me):
-    print "Usage: %s [ -vdf ] { alloc | free } pid eid nodeid" % me
+    print "Usage: %s \\\n" \
+          "  [-vdfE] {alloc|renew|free|stop|start|restart|nmping} \\\n" \
+          "          pid eid nodeid\n" \
+          "  (or without Emulab DB):\n" \
+          "          slicename nodeid" \
+          % (me)
     sys.exit(1)
+
+def processException(command, nodeid, e):
+    print "plabnode: %s, %s, fail, %s" % (nodeid, command, str(e))
+    if parser.values.debug:
+        traceback.print_exc()
+        pass
+    pass
 
 def main(args):
     me = args[0]
-    alloctries = TRIES
-    setuptries = TRIES
     Force = False
 
     #
@@ -40,62 +51,146 @@ def main(args):
     parser.add_option("--noIS", dest="noIS", action="store_true",
                       default=False,
                       help="Don't run InstantiateSliver() in mod_PLC")
+    parser.add_option("-E","--no-emulabify",dest="no_emulabify",default=False,
+                      action="store_true",help="Do not install/config Emulab" \
+                      " software on the node")
 
     # parse command line options
     opts, args = parser.parse_args(args[1:])
 
+    if not libplab.debug:
+        libplab.debug = opts.debug
+    if not libplab.verbose:
+        libplab.verbose = opts.verbose
+
+    slicename = None
     # make sure we were told what to do on the command line.
-    if not len(args) == 4:
+    if len(args) == 3:
+        command, slicename, nodeid = args
+        pass
+    elif len(args) == 4:
+        command, pid, eid, nodeid = args
+        pass
+    else:
         usage(me)
         pass
-
-    command, pid, eid, nodeid = args
+    
     plab = libplab.Plab()
-    slice = plab.loadSlice(pid, eid)
+    if slicename != None:
+        slice = plab.loadSliceDirect(slicename)
+        pass
+    else:
+        slice = plab.loadSliceByNode(pid, eid, nodeid)
+        pass
 
     if command == "alloc":
-        node = slice.createNode(nodeid, force=parser.values.force)
-        
-        while 1:
-            try:
+        try:
+            node = slice.createNode(nodeid, force=parser.values.force)
+            # With the v4 NM, we have to sleep a couple seconds to give
+            # the slice the a chance to get keys/acct stuff straightened out
+            # so we can actually slogin and copy fixsudo.sh to the node.
+            if not opts.no_emulabify:
+                time.sleep(2)
                 node.emulabify()
-                # Note that vnode_setup boots the node
-            except:
-                print "Node setup failed on %s" % nodeid
-            else:
-                break
-
-            setuptries = setuptries - 1
-            if setuptries > 0:
-                print "Sleeping for %s seconds and then retrying " \
-                      "setup on %s" % (SLEEPINT, nodeid)
-                time.sleep(SLEEPINT)
-            else:
-                print "Giving up after %s setup attempts on %s" % \
-                      (TRIES, nodeid)
-                node.free()
-                raise
+                pass
+            # Note that vnode_setup boots the node
+            pass
+        except Exception, e:
+            traceback.print_exc()
+            print "Node setup failed on %s" % nodeid
+            processException(command, nodeid, e)
+            try: node.free()
+            except: pass
+            sys.exit(1)
+            pass
+        pass
 
     elif command == "renew":
         try:
             node = slice.loadNode(nodeid)
-        except:
-            print "renew: Node %s isn't allocated" % nodeid
+            node.renew()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
             sys.exit(1)
-        node.renew()
+            pass
 
     elif command == "free":
         try:
             node = slice.loadNode(nodeid)
-        except:
-            print "free: Node %s doesn't appear to be allocated to %s/%s" % \
-                  (nodeid, pid, eid)
+            node.free()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
             sys.exit(1)
+            pass
+        pass
 
-        node.free()
+    elif command == "stop":
+        try:
+            node = slice.loadNode(nodeid)
+            node.stop()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "start":
+        try:
+            node = slice.loadNode(nodeid)
+            node.start()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "stop":
+        try:
+            node = slice.loadNode(nodeid)
+            node.stop()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "restart":
+        try:
+            node = slice.loadNode(nodeid)
+            node.restart()
+            pass
+        except Exception, e:
+            processException(command, nodeid, e)
+            sys.exit(1)
+            pass
+        pass
+
+    elif command == "nmping":
+        exitval = 1
+        try:
+            node = slice.loadNode(nodeid)
+            res = node.pingNM()
+            if res:
+                exitval = 0
+                pass
+            pass
+        except:
+            if parser.values.debug:
+                traceback.print_exc()
+                pass
+            pass
+        sys.exit(exitval)
 
     else:
         usage(me)
+        pass
+
+    pass
 
 if __name__ == "__main__":
     main(sys.argv)

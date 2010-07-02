@@ -192,7 +192,7 @@ if (! $noredef) {
     print "\nRedefining EmulabShutdown.\n";
     # Have to remove a service before you can redefine it.
     system("cygrunsrv -R EmulabShutdown");
-    system("cygrunsrv -I EmulabShutdown -u root -w \"$rootpwd\"" .
+    system("cygrunsrv -I EmulabShutdown -u root -w '$rootpwd'" .
 	   " -p /cygdrive/c/cygwin/bin/bash" .
 	   " --shutdown --type manual" .
 	   " -a \"--norc --noprofile -c '/usr/local/etc/emulab/tbshutdown'\"");
@@ -204,7 +204,7 @@ if (! $noredef) {
     my $progrun = "cygrunsrv -S ProgAgent";
     my $bootlog = "/var/log/bootsetup.log";
     system("cygrunsrv -R EmulabStartup");
-    system("cygrunsrv -I EmulabStartup -u root -w \"$rootpwd\"" .
+    system("cygrunsrv -I EmulabStartup -u root -w '$rootpwd'" .
 	   " --dep DHCP --dep elvinsvc.exe --dep W32Time" .
 	   " -p /cygdrive/c/cygwin/bin/bash" .
 	   " -a \"--norc --noprofile -c " .
@@ -228,6 +228,7 @@ if ($sysprep) {
 	$deploy_src = "$sysprep_src/xpsp1_support_tools_deploy";
     }
     else {
+	# No CSDVersion regkey setting on SP0.
 	$deploy_src = "$sysprep_src/xp_support_tools_deploy";
     }
     print "$sp sysprep from $deploy_src\n";
@@ -257,9 +258,9 @@ if ($sysprep) {
 
     my $clt = "Cmdlines.txt";
     my $clt_src = "$sysprep_src/$clt";
-    my $clt_dir = $sysprep_dst . '/$oem$';
+    my $clt_dir = $sysprep_dst . q{/'$oem$'};
     my $clt_dst = "$clt_dir/$clt";
-    print "Copying $spi to $spi_dst\n";    
+    print "Copying $clt to $clt_dst\n";    
     do_cmd "mkdir $clt_dir";
     do_cmd "cp -p $clt_src $clt_dst";
 }
@@ -486,4 +487,5 @@ if ($sysprep) {
     print "DevicePath = "; system("regtool get $drvkey");
 }
 
-print "\nDone!  Now capture the XP disk image.\n";
+print "\nDone!  Now capture the XP disk image for:\n";
+system("head -1 /etc/motd");

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2008 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # In rc.conf, we have told it to just to configure lo0.  Then when the
@@ -14,5 +14,13 @@
 #
 network_interfaces=`ifconfig -l | sed -e 's/lo0//'`
 for _if in $network_interfaces; do
-	eval ifconfig_${_if}="DHCP"
+	case $_if in
+	lo*|gif*|faith*|tun*|plip*)
+		;;
+	ath*)
+		;;
+	*)
+		eval ifconfig_${_if}="DHCP"
+		;;
+	esac
 done

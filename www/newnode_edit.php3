@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2006, 2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -12,29 +12,31 @@ require("defs.php3");
 #
 
 #
+# Only admins can see this page
+#
+$this_user = CheckLoginOrDie();
+$uid       = $this_user->uid();
+$isadmin   = ISADMIN();
+
+if (! $isadmin) {
+    USERERROR("You do not have admin privileges!", 1);
+}
+
+$reqargs = RequiredPageArguments("id",         PAGEARG_STRING);
+$optargs = OptionalPageArguments("node_id",    PAGEARG_STRING,
+				 "type",       PAGEARG_STRING,
+				 "IP",         PAGEARG_STRING,
+				 "identifier", PAGEARG_STRING);
+
+#
 # Standard Testbed Header
 #
 PAGEHEADER("New Testbed Node");
 
 #
-# Only admins can see this page
-#
-$uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-$isadmin = ISADMIN($uid);
-if (! $isadmin) {
-    USERERROR("You do not have admin privileges!", 1);
-}
-
-
-if (!$id) {
-    USERERROR("Must specify a node ID!",1);
-}
-
-#
 # If we had any update information passed to us, do the update now
 #
-if ($node_id) {
+if (isset($node_id)) {
     DBQueryFatal("UPDATE new_nodes SET node_id='$node_id', type='$type', " .
     	"IP='$IP', identifier='$identifier' WHERE new_node_id='$id'");
 }

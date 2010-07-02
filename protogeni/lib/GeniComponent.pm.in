@@ -1,0 +1,471 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniComponent;
+
+#
+# Some simple ticket stuff.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+use GeniDB;
+use Genixmlrpc;
+use GeniResponse;
+use GeniRegistry;
+use GeniTicket;
+use GeniCredential;
+use GeniAuthority;
+use GeniHRN;
+use emutil qw(TBGetUniqueIndex);
+use English;
+use overload ('""' => 'Stringify');
+use XML::Simple;
+use Date::Parse;
+
+# Configure variables
+my $TB		   = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAPPROVAL     = "@TBAPPROVALEMAIL@";
+my $TBAUDIT   	   = "@TBAUDITEMAIL@";
+my $BOSSNODE       = "@BOSSNODE@";
+my $OURDOMAIN      = "@OURDOMAIN@";
+my $SIGNCRED	   = "$TB/sbin/signgenicred";
+my $VERIFYCRED	   = "$TB/sbin/verifygenicred";
+
+# Do not allocated nodes.
+my $impotent       = 0;
+
+# Cache of instances to avoid regenerating them.
+my %components     = ();
+BEGIN { use GeniUtil; GeniUtil::AddCache(\%components); }
+
+#
+# Lookup by uuid.
+#
+sub Lookup($$)
+{
+    my ($class, $token) = @_;
+    my $query_result;
+    my $uuid;
+
+    if (GeniHRN::IsValid($token)) {
+	$query_result =
+	    DBQueryWarn("select uuid from geni_certificates ".
+			"where urn='$token'");
+	return undef
+	    if (!$query_result || !$query_result->numrows);
+    
+	($uuid) = $query_result->fetchrow_array();
+    }
+    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+	$uuid = $token;
+    }
+    elsif ($token =~ /^[-\w\.]*$/) {
+	$query_result =
+	    DBQueryWarn("select uuid from geni_components ".
+			"where hrn='$token'");
+
+	return undef
+	    if (!$query_result || !$query_result->numrows);
+
+	($uuid) = $query_result->fetchrow_array();
+    }
+    else {
+	return undef;
+    }
+    # Look in cache first
+    return $components{"$uuid"}
+        if (exists($components{"$uuid"}));
+
+    $query_result =
+	DBQueryWarn("select * from geni_components where uuid='$uuid'");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my $self              = {};
+    $self->{'COMPONENT'}  = $query_result->fetchrow_hashref();
+    bless($self, $class);
+
+    #
+    # Grab the certificate, since we will probably want it.
+    #
+    my $certificate = GeniCertificate->Lookup($uuid);
+    if (!defined($certificate)) {
+	print STDERR "Could not find certificate for component $uuid\n";
+	return undef;
+    }
+    $self->{'CERT'} = $certificate;
+    
+    #
+    # And grab the manager if we know it. 
+    #
+    my $manager_uuid = $self->{'COMPONENT'}->{'manager_uuid'};
+    if (defined($manager_uuid)) {
+	my $manager = GeniAuthority->Lookup($manager_uuid);
+	if (!defined($manager)) {
+	    print STDERR "Could not find manager for component $uuid\n";
+	    return undef;
+	}
+	$self->{'MANAGER'} = $manager;
+    }
+    
+    # Add to cache. 
+    $components{$self->{'COMPONENT'}->{'uuid'}} = $self;
+    
+    return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $urn = $self->urn();
+
+    return "[GeniComponent: $urn]";
+}
+
+#
+# Create a Geni component in the DB.
+#
+sub Create($$;$)
+{
+    my ($class, $certificate, $manager) = @_;
+
+    my @insert_data = ();
+
+    my $safe_hrn  = DBQuoteSpecial($certificate->hrn());
+    my $safe_uuid = DBQuoteSpecial($certificate->uuid());
+    my $safe_url  = DBQuoteSpecial($certificate->URL());
+    
+    # Now tack on other stuff we need.
+    push(@insert_data, "created=now()");
+    push(@insert_data, "hrn=$safe_hrn");
+    push(@insert_data, "uuid=$safe_uuid");
+    push(@insert_data, "url=$safe_url");
+    push(@insert_data, "manager_uuid='" . $manager->uuid() . "'")
+	if (defined($manager));
+
+    if ($certificate->Store() != 0) {
+	print STDERR "Could not store certificate for new component.\n";
+	return undef;
+    }
+
+    # Insert into DB.
+    DBQueryWarn("replace into geni_components set " . join(",", @insert_data))
+	or return undef;
+
+    return GeniComponent->Lookup($certificate->uuid());
+}
+# accessors
+sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'COMPONENT'}->{$_[1]}); }
+sub uuid($)		{ return field($_[0], "uuid"); }
+sub expires($)		{ return field($_[0], "expires"); }
+sub manager_uuid($)	{ return field($_[0], "manager_uuid"); }
+sub hrn($)		{ return field($_[0], "hrn"); }
+sub url($)		{ return field($_[0], "url"); }
+sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
+sub GetCertificate($)   { return $_[0]->{'CERT'}; }
+sub GetManager($)       { return $_[0]->{'MANAGER'}; }
+
+#
+# Expired?
+#
+sub IsExpired($)
+{
+    my ($self)  = @_;
+    my $expires = $self->expires();
+
+    return 1
+	if (!defined($expires) || $expires eq "");
+    
+    my $when = strptime($expires);
+
+    return ($when < time());
+}
+
+#
+# Return the URN. This is complicated by the fact that the DB does not
+# store the urn, but is in the certificate. Further, it might be a
+# Component from a CM not doing URNs yet, in which case set it to the
+# uuid and hope for the best.
+#
+sub urn($)
+{
+    my ($self) = @_;
+
+    return $self->GetCertificate()->urn();
+}
+
+#
+# Delete a component from the DB.
+#
+sub Delete($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    if ($self->GetCertificate()->Delete() != 0) {
+	print STDERR "Could not delete certificate for $self\n";
+	return -1;
+    }
+    my $uuid = $self->uuid();
+    DBQueryWarn("delete from geni_components ".
+		"where uuid='$uuid'")
+	or return -1;
+
+    # Delete from the cache. 
+    delete($components{$uuid});
+
+    return 0;
+}
+
+#
+# Compare two component refs.
+#
+sub SameComponent($$)
+{
+    my ($self, $other) = @_;
+
+    return 0
+	if (! (ref($self) && ref($other)));
+
+    return $self->uuid() eq $other->uuid();
+}
+
+#
+# Refresh a class instance by reloading from the DB.
+#
+sub Refresh($)
+{
+    my ($self) = @_;
+
+    return -1
+	if (! ref($self));
+
+    my $uuid = $self->uuid();
+
+    my $query_result =
+	DBQueryWarn("select * from geni_components where uuid='$uuid'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    $self->{'COMPONENT'} = $query_result->fetchrow_hashref();
+    return 0;
+}
+
+#
+# Update Fields.
+#
+sub Update($$)
+{
+    my ($self, $argref) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $uuid = $self->uuid();
+
+    my $query = "update geni_components set ".
+	join(",", map("$_=" . DBQuoteSpecial($argref->{$_}),
+		      keys(%{$argref})));
+
+    $query .= " where uuid='$uuid'";
+
+    return -1
+	if (! DBQueryWarn($query));
+
+    return Refresh($self);
+}
+
+#
+# Create component from the ClearingHouse, by looking up the info.
+#
+sub CreateFromRegistry($$)
+{
+    my ($class, $token) = @_;
+
+    my $component = GeniComponent->Lookup($token);
+    # We want to reload if urn/uuid not set properly
+    return $component
+	if (defined($component) &&
+	    $component->urn() && $component->manager_uuid());
+
+    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    return undef
+	if (!defined($clearinghouse));
+
+    my $blob;
+    return undef
+	if ($clearinghouse->Resolve($token, "Component", \$blob) != 0);
+
+    my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
+    return undef
+	if (!defined($certificate));
+
+    my $manager_certificate =
+	GeniCertificate->LoadFromString($blob->{'manager_gid'});
+    if (!defined($certificate)) {
+	goto bad;
+    }
+
+    #
+    # At this point, we do not support non-urn sites. They must re-register.
+    #
+    my $urn = $certificate->urn();
+    if (!defined($urn)) {
+	print STDERR "GeniComponent::CreateFromRegistry: ".
+	    "$certificate does not have a urn.\n";
+	goto bad;
+    }
+
+    #
+    # Create the manager authority as well.
+    #
+    my $manager_urn = $manager_certificate->urn();
+    if (!defined($manager_urn)) {
+	print STDERR "GeniComponent::CreateFromRegistry: ".
+	    "$manager_certificate does not have a urn.\n";
+	goto bad;
+    }
+    my $manager = GeniAuthority->CreateFromRegistry("CM", $manager_urn);
+    if (!defined($manager)) {
+	print STDERR "GeniComponent::CreateFromRegistry: ".
+	    "could not create authority $manager_urn\n";
+    }
+    
+    $component = GeniComponent->Create($certificate, $manager);
+    if (!defined($component)) {
+	print STDERR "GeniComponent::CreateFromRegistry: ".
+	    "could not create component from $certificate\n";
+	goto bad;
+    }
+    return $component;
+
+  bad:
+    $certificate->Delete()
+	if (defined($certificate));
+    $manager_certificate->Delete()
+	if (defined($manager_certificate));
+    return undef;
+}
+
+#
+# Create component from a certificate.
+#
+sub CreateFromCertificate($$;$)
+{
+    my ($class, $certificate, $manager) = @_;
+
+    my $component = GeniComponent->Create($certificate, $manager);
+    $certificate->Delete()
+	if (!defined($component));
+
+    return $component;
+}
+
+#
+# Resolve a component (at its CM).
+#
+sub Resolve($)
+{
+    my ($self) = @_;
+
+    my $authority = GeniAuthority->Lookup($self->manager_uuid());
+    if (!defined($authority)) {
+	$authority =
+	    GeniAuthority->CreateFromRegistry("CM", $self->manager_uuid());
+	if (!defined($authority)) {
+	    print STDERR "Could not create registry credential for $self\n";
+	    return undef;
+	}
+    }
+    my $manager_version = $authority->Version();
+    return undef
+	if (!defined($manager_version));
+
+    my $credential = GeniRegistry::Client->CreateCredential($self);
+    if (!defined($credential)) {
+	print STDERR "Could not create registry credential for $self\n";
+	return undef;
+    }
+
+    my $method_args;
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $credential->asString();
+	$method_args->{'uuid'}       = $self->uuid();
+	$method_args->{'type'}       = "node";
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$credential->asString()];
+	$method_args->{'urn'}         = $self->urn();
+    }
+    else {
+	print STDERR "GeniComponent::Resolve: Unknown version at $authority\n";
+	return undef;
+    }
+    my $response =
+	Genixmlrpc::CallMethod($authority->url(),
+			       undef, "Resolve", $method_args);
+    if (!defined($response)) {
+	print STDERR "*** Internal error Resolving $self at $authority\n";
+	return undef;
+    }
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not resolve $self at $authority Error:";
+	print STDERR " " . $response->output() . "\n";
+	return undef;
+    }
+    return $response->value();
+}
+
+#
+# Delete all components for a CM.
+#
+sub DeleteAll($$)
+{
+    my ($class, $authority) = @_;
+
+    my $uuid = $authority->uuid();
+    my $query_result =
+	DBQueryWarn("select uuid from geni_components ".
+		    "where manager_uuid='$uuid'");
+
+    return -1
+	if (! $query_result);
+    return 0
+	if (!$query_result->numrows);
+
+    while (my ($uuid) = $query_result->fetchrow_array()) {
+	my $component = GeniComponent->Lookup($uuid);
+	if (!defined($component)) {
+	    print STDERR "Could not lookup component $uuid\n";
+	    return -1;
+	}
+	if ($component->Delete() != 0) {
+	    print STDERR "Could not delete $component\n";
+	    return -1;
+	}
+    }
+
+    return 0;
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+

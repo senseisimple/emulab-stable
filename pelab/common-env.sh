@@ -1,5 +1,11 @@
 #!/bin/sh
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # Simple shell script to get some environment variables useful for pelab
 # shell scripts
 #
@@ -16,11 +22,22 @@ COMMON_ENV_LOADED="yes"
 UNAME=`uname -s`
 
 #
+# Yow.  The BSD shell requires setting trapsasync (-T) to allow us to
+# receive signals when in a wait.
+#
+if [ "$UNAME" = "FreeBSD" ]; then
+    set -o trapsasync
+    SH="/bin/sh -T"
+else
+    SH=/bin/sh
+fi
+
+#
 # Different binary directories for FreeBSD/Linux
 #
-if [ "$UNAME" == "Linux" ]; then
+if [ "$UNAME" = "Linux" ]; then
     BIN_PATH="/usr/bin"
-elif [ "$UNAME" == "FreeBSD" ]; then
+elif [ "$UNAME" = "FreeBSD" ]; then
     BIN_PATH="/usr/local/bin"
 else
     echo "Unable to determine operating system"
@@ -36,17 +53,20 @@ NICKFILE="$EMUBOOT/nickname"
 RCPLAB="$EMUBOOT/rc.plab"
 HOSTSFILE="/etc/hosts"
 IFCONFIG="/sbin/ifconfig"
-PERL="${BIN_PATH}/perl"
+PERL="/usr/bin/perl"
 PYTHON="${BIN_PATH}/python"
-SH=/bin/sh
 SUDO="${BIN_PATH}/sudo"
 MKDIR="/bin/mkdir"
 CHMOD="/bin/chmod"
+SU="/bin/su"
+
 SYNC="/usr/local/etc/emulab/emulab-sync"
-if [ "$UNAME" == "Linux" ]; then
+SYNCTIMO=120
+
+if [ "$UNAME" = "Linux" ]; then
     GREP="/bin/grep"
-elif [ "$UNAME" == "FreeBSD" ]; then
-    BIN_PATH="/usr/bin/grep"
+elif [ "$UNAME" = "FreeBSD" ]; then
+    GREP="/usr/bin/grep"
 else
     echo "Unable to determine operating system"
     exit -1
@@ -56,7 +76,7 @@ fi
 # Some 'constants' by convention. 
 #
 export PELAB_LAN=elabc
-export EPLAB_LAN=planetc
+export EPLAB_LAN=plabc
 
 #
 # Name of the barrier for indicating all stubs are ready
@@ -78,23 +98,32 @@ export PROJECT=`echo $NICKNAME | cut -d. -f3`;
 SCRIPT_LOCATION=`dirname $0`
 export BASE="${SCRIPT_LOCATION}/../";
 export STUB_DIR="${BASE}/stub/";
+export MAGENT_DIR="${BASE}/magent/";
 export NETMON_DIR="${BASE}/libnetmon/";
 export MONITOR_DIR="${BASE}/monitor/";
+export DBMONITOR_DIR="${BASE}/dbmonitor/";
+export IPERFD_DIR="${BASE}/iperfd/";
 export TMPDIR="/var/tmp/";
 export LOGDIR="/local/logs/"
 
 #
-# Temproary files we use
+# Temproary files we use.
+# We put them in /local/logs so they become part of the fossil record.
 #
-export IPMAP="/var/tmp/ip-mapping.txt"
+export IPMAP="/local/logs/ip-mapping.txt"
+export INITCOND="/local/logs/initial-conditions.txt"
 
 #
-# Important scrips/libraries
+# Important scripts/libraries
 #
 export NETMOND="netmond"
 export STUBD="stubd"
+export MAGENT="magent"
 export MONITOR="monitor.py"
+export DBMONITOR="dbmonitor.pl"
+export IPERFD="iperfd"
 export GENIPMAP="gen-ip-mapping.pl"
+export GENINITCOND="init-elabnodes.pl"
 export NETMON_LIB="libnetmon.so"
 
 #
@@ -111,6 +140,26 @@ else
 fi
 
 #
+# Find out if we're in a vserver - can we see the init process?
+#
+ps --pid 1 > /dev/null
+if [ $? == 1 ]; then
+    export IN_VSERVER="yes"
+else
+    export IN_VSERVER=""
+fi
+
+#
+# Are we the "master" (sync server) node?
+#
+
+if `$SYNC -m`; then
+    export ON_MASTER="yes"
+else
+    export ON_MASTER=""
+fi
+
+#
 # Make a handy variable for running as root (ie. invoke sudo if necessary)
 #
 if [ "$EUID" != "0" ]; then
@@ -120,9 +169,12 @@ else
 fi
 
 #
-# How big is this experiment? Counts the number of planetlab nodes
+# How big is this experiment? Counts the number of planetlab nodes. IF there
+# are real planetlab nodes in this experiment, count them instead of the number
+# of fake planetlab nodes - this allows us to remove planetlab nodes that fail
+# from the experiment, and *maybe* everything else will just work.
 #
-export PEER_PAIRS=`$GREP -E -c 'planet-.*-planetcontrol' /etc/hosts`
+export PEER_PAIRS=`$GREP -q planet /etc/hosts && $GREP -E -c 'planet-.*-realinternet ' /etc/hosts || $GREP -E -c 'plab-.*-plabc ' /etc/hosts`
 export PEERS=`expr $PEER_PAIRS \* 2`
 
 #
@@ -160,13 +212,20 @@ get_iface_addr() {
 #
 # $HOST_ROLE should be set by the calling script
 #
-if [ "$HOST_ROLE" == "monitor" ]; then
+if [ "$HOST_ROLE" = "monitor" ]; then
     export PELAB_IP=`lookup_ip_host $HOSTNAME $PELAB_LAN`
     export PELAB_IFACE=`ifacename $PELAB_IP`
-elif [ "$HOST_ROLE" == "stub" ]; then
-    if [ "$ON_ELAB" == "yes" ]; then
+elif [ "$HOST_ROLE" = "stub" ]; then
+    if [ "$ON_ELAB" = "yes" ]; then
         export PLAB_IP=`lookup_ip_host $HOSTNAME $EPLAB_LAN`
-        export PLAB_IFACE=`ifacename $PLAB_IP`
+        #
+        # We could still be in a vserver
+        #
+        if [ "$IN_VSERVER" = "yes" ]; then
+            export PLAB_IFACE="vnet"
+        else
+            export PLAB_IFACE=`ifacename $PLAB_IP`
+        fi
     else
         # On real planetlab
         export PLAB_IFACE="vnet"
@@ -182,19 +241,29 @@ fi
 barrier_wait()
 {
     BARRIER=$1
-    #
-    # Are we the master?
-    #
-    $SYNC -m
-    MASTER=$?
-    if [ "$MASTER" == "1" ]; then
-        # I know, this looks backwards. But it's right
-        $SYNC -n $BARRIER 
-    else
+
+    if [ $ON_MASTER ]; then
         WAITERS=`expr $PEERS - 1`
-        echo "Waiting for $WAITERS clients"
-        $SYNC -n $BARRIER -i $WAITERS
+        echo "Waiting up to $SYNCTIMO seconds for $WAITERS clients"
+        sync_timeout $SYNCTIMO $SYNC -n $BARRIER -i $WAITERS
+	_rval=$?
+    else
+	#
+	# XXX on planetlab, lookup of the syncserver name can
+	# fail transiently.  Try a couple more times, waiting in between.
+	#
+	for i in 1 2 3; do
+	    $SYNC -n $BARRIER 
+	    _rval=$?
+	    if [ $_rval -ne 68 ]; then
+	        break
+	    fi
+	    echo "sync on $BARRIER failed, trying again..."
+	    sleep 10
+	done
     fi
+
+    return $_rval
 }
 
 #
@@ -208,5 +277,56 @@ log_output_background()
     $CMD 1> ${LOGDIR}/${PROGNAME}.stdout 2> ${LOGDIR}/${PROGNAME}.stderr &
     echo $!
 }
+
+sync_watchdog()
+{
+    TIMO=$1
+    SYNCDPID=$2
+
+    sleep $TIMO
+    echo '*** HUPing syncd'
+    $AS_ROOT kill -HUP $SYNCDPID
+}
+
+#
+# If $SYNC command doesn't return within the indicated timeout period,
+# HUP the syncserver to force everyone out of a barrier.
+#
+sync_timeout()
+{
+    TIMO=$1
+    shift
+    CMDSTR=$*
+
+    if [ -r /var/run/syncd.pid ]; then
+        SYNCDPID=`cat /var/run/syncd.pid`
+    else
+        SYNCDPID=""
+    fi
+
+    # fire off the command
+    $CMDSTR & CMDPID=$!
+
+    # and a watchdog
+    if [ -n "$SYNCDPID" ]; then
+        sync_watchdog $TIMO $SYNCDPID & DOGPID=$!
+    fi
+
+    # wait for the command to finish or be terminated
+    wait $CMDPID
+    RVAL=$?
+
+    # nuke the watchdog
+    if [ -n "$SYNCDPID" ]; then
+        kill -9 $DOGPID >/dev/null 2>&1
+    fi
+
+    # and return the result
+    return $RVAL
+}
+
+#
+# Become the 'vuser'
+#
 
 fi # End of header guard

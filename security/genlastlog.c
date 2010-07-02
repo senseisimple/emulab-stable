@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2006, 2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -60,6 +60,7 @@
 #include <sys/socket.h>
 #include <mysql/mysql.h>
 #include <zlib.h>
+#include "tbdb.h"
 
 /*
  * This is the NFS mountpoint where users:/var is mounted.
@@ -77,7 +78,6 @@
 
 static char		*progname;
 static int		debug = 0;
-static int		mydb_update(char *query, ...);
 static int		doit(gzFile *infp);
 static char		opshostname[MAXHOSTNAMELEN];
 static jmp_buf		deadline;
@@ -128,6 +128,11 @@ main(int argc, char **argv)
 	openlog("genlastlog", LOG_PID, LOG_TESTBED);
 	syslog(LOG_NOTICE, "genlastlog starting");
 
+	if (!dbinit()) {
+		syslog(LOG_ERR, "Could not connect to DB!");
+		exit(1);
+	}
+
 	/*
 	 * We need the canonical hostname for the usersnode so that we can
 	 * put those logins in another table.
@@ -137,7 +142,8 @@ main(int argc, char **argv)
 		       USERNODE, hstrerror(h_errno));
 		exit(-1);
 	}
-	strncpy(opshostname, he->h_name, strlen(opshostname));
+	strncpy(opshostname, he->h_name, sizeof(opshostname));
+
 	if (bp = strchr(opshostname, '.')) 
 		*bp = 0;
 
@@ -189,10 +195,12 @@ doit(gzFile *infp)
 {
 	int		i, skip = 0;
 	time_t		curtime, ll_time;
-	char		*user, node[64], prog[128];
-	char		buf[BUFSIZ], *bp;
+	char		*user, node[TBDB_FLEN_NODEID * 2], prog[128];
+	char		buf[BUFSIZ], *bp, uid_idx[128], tmp[BUFSIZ];
 	struct tm	tm;
-
+	MYSQL_RES	*dbres;
+	MYSQL_ROW	dbrow;
+	
 	while (1) {
 		if (gzgets(infp, buf, BUFSIZ) == NULL)
 			break;
@@ -310,74 +318,58 @@ doit(gzFile *infp)
 		if (strcasecmp(user, "ROOT") == 0)
 			continue;
 
+		dbres = mydb_query("select uid_idx from users where uid='%s' ",
+				   1, user);
+
+		if (!dbres) {
+			syslog(LOG_ERR, "DB error getting user %s", user);
+			continue;
+		}
+
+		if (!mysql_num_rows(dbres)) {
+			syslog(LOG_INFO, "No DB record for user %s", user);
+			mysql_free_result(dbres);
+			continue;
+		}
+		dbrow = mysql_fetch_row(dbres);
+		strncpy(uid_idx, dbrow[0], sizeof(uid_idx));
+		mysql_free_result(dbres);
+
+		/*
+		 * Safety first. 
+		 */
+		mydb_escape_string(tmp, uid_idx, strlen(uid_idx));
+		strcpy(uid_idx, tmp);
+		mydb_escape_string(tmp, node, strlen(node));
+		strcpy(node, tmp);
+
 		if (mydb_update("replace into uidnodelastlogin "
-				"(uid, node_id, date, time) "
-				"values ('%s', '%s', "
+				"(uid, uid_idx, node_id, date, time) "
+				"values ('%s', '%s', '%s', "
 				"        FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
 				"        FROM_UNIXTIME(%ld, '%%T')) ",
-				user, node, ll_time, ll_time) < 0)
+				user, uid_idx, node, ll_time, ll_time) == 0)
 			break;
 
 		if (strncmp(node, opshostname, strlen(node)) == 0 ||
 		    strncmp(node, "ops", strlen(node)) == 0) {
 			if (mydb_update("replace into userslastlogin "
-					"(uid, date, time) "
-					"values ('%s', "
+					"(uid, uid_idx, date, time) "
+					"values ('%s', '%s', "
 					"  FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
 					"  FROM_UNIXTIME(%ld, '%%T')) ",
-					user, ll_time, ll_time) < 0)
+					user, uid_idx, ll_time, ll_time) == 0)
 				break;
 		}
 		else {
 			if (mydb_update("replace into nodeuidlastlogin "
-					"(node_id, uid, date, time) "
-					"values ('%s', '%s', "
+					"(node_id, uid_idx, uid, date, time) "
+					"values ('%s', '%s', '%s', "
 					"  FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
 					"  FROM_UNIXTIME(%ld, '%%T')) ",
-					node, user, ll_time, ll_time) < 0)
+					node, uid_idx, user, ll_time, ll_time) == 0)
 				break;
 		}
 	}
 	return 0;
 }
-
-static int
-mydb_update(char *query, ...)
-{
-	static MYSQL	db;
-	static int	inited;
-	char		querybuf[BUFSIZ];
-	va_list		ap;
-	int		n;
-
-	va_start(ap, query);
-	n = vsnprintf(querybuf, sizeof(querybuf), query, ap);
-	if (n > sizeof(querybuf)) {
-		syslog(LOG_ERR, "query too long for buffer");
-		return 1;
-	}
-
-	if (debug) {
-		printf("%s\n", querybuf);
-		return 0;
-	}
-
-	if (! inited) {
-	    mysql_init(&db);
-	    if (mysql_real_connect(&db, 0, "genlastlog",
-				   0, TBDBNAME, 0, 0, 0) == 0) {
-		    syslog(LOG_ERR, "%s: connect failed: %s",
-			   TBDBNAME, mysql_error(&db));
-		    return -1;
-	    }
-	    inited = 1;
-	}
-
-	if (mysql_real_query(&db, querybuf, n) != 0) {
-		syslog(LOG_ERR, "%s: query failed: %s",
-			TBDBNAME, mysql_error(&db));
-		return -1;
-	}
-	return 0;
-}
-

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,7 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif
 ifeq ($(SYSTEM),FreeBSD)
-SUBDIRS	       += sched delay-agent nsetrafgen stated
+SUBDIRS	       += sched delay-agent stated
 endif
 
 all:	etc-subdir trafgen-fetch all-subdirs
@@ -29,7 +29,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 # makefile work if it unpacks the tarball itself
 #
 trafgen-fetch:
-	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
+	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen "@OUTERBOSS_NODENAME@"
 
 etc-subdir:
 	@$(MAKE) -C etc all
@@ -40,6 +40,7 @@ install:
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
+	@$(MAKE) -C program-agent install
 
 client:		trafgen-fetch client-subdirs
 client-install: client client-install-subdirs
@@ -49,6 +50,7 @@ control-install:
 	@$(MAKE) -C tbgen control-install
 	@$(MAKE) -C sched control-install
 	@$(MAKE) -C linktest control-install
+	@$(MAKE) -C program-agent control-install
 
 post-install: 
 	@$(MAKE) -C linktest post-install

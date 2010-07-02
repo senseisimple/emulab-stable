@@ -1,0 +1,34 @@
+./README                                              - initial getting started doc
+
+./TBConfig.pm                                         - global configuration values
+./tbts                                                - testbed testsuite driver
+./sc                                                  - shortcut driver for interactive user
+
+./lib/SemiModern/Perl.pm                              - provides perl5.10 say to older perls
+./lib/TestBed/TestSuite.pm                            - provides e() ep() dpe() macros
+./lib/TestBed/TestSuite/Node.pm                       - represents a emulab node
+./lib/TestBed/TestSuite/Project.pm                    - represents a emulab project
+./lib/TestBed/TestSuite/Experiment.pm                 - represents a emulab experiment 
+./lib/TestBed/TestSuite/Experiment/Macros.pm          - holds some obselete macros
+./lib/TestBed/XMLRPC/Client.pm                        - XMLRPC utility classes
+./lib/TestBed/XMLRPC/Client/NodeInfo.pm
+./lib/TestBed/XMLRPC/Client/Experiment.pm
+./lib/TestBed/XMLRPC/Client/Pretty.pm                 - XMLRPC pretty printers
+./lib/TestBed/XMLRPC/Client/Emulab.pm
+./lib/TestBed/Wrap/tevc.pm                            - tevc wrapper
+./lib/TestBed/Wrap/linktest.pm                        - linktest wrapper
+./lib/Tools.pm                                        - utility functions
+./lib/Tools/TBSSH.pm                                  - testbed ssh functions
+./lib/Tools/Network.pm                                - network utility functions (ping traceroute)
+
+./doc/architecture.txt
+./doc/cheatsheet.txt
+./doc/dirmap.txt
+
+./Makefile.PL                                         - Module::Install makefile
+
+./t/emulab.t                                          - emulab XMLRPC tests
+./t/experiment.t                                      - experiment XMLRPC tests
+./t/lib                                               - testswap framework tests
+./t/lib/tools.t                                       - testswap framework tools tests
+./t/lib/tools/network.t                               - testswap framework network tests
