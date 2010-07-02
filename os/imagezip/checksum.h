@@ -3,8 +3,11 @@
 #ifndef CHECKSUM_H_IMAGEZIP_0
 #define CHECKSUM_H_IMAGEZIP_0
 
-void
-init_checksum(void);
+char *
+checksum_keyfile(char *imagename);
+
+int
+init_checksum(char *keyfile);
 
 void
 cleanup_checksum(void);
@@ -14,8 +17,13 @@ cleanup_checksum(void);
 int
 verify_checksum(blockhdr_t *blockhdr, const char *bodybufp);
 
+int
+encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen);
+
 void
-mem_to_hex(unsigned char * dest, const unsigned char * source,
-           int memsize);
+mem_to_hexstr(unsigned char *dest, const unsigned char *source, int memsize);
+
+int
+hexstr_to_mem(unsigned char *dest, const unsigned char *source, int memsize);
 
 #endif

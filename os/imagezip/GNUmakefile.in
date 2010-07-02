@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,8 +10,8 @@ OBJDIR		= ../..
 SUBDIR		= os/imagezip
 DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
-		  imageunzip.c crc.c disksize.c imageunzip.8 \
-		  extfs/*.[hc] fat/*.[hc] ffs/*.[hc] ntfs/*.[hc] shd/*.[hc] \
+		  imageunzip.c crc.c checksum.c disksize.c imageunzip.8 \
+		  extfs/*.[hc] ext4fs/*.[hc] fat/*.[hc] ffs/*.[hc] ntfs/*.[hc] shd/*.[hc] \
 		  hashmap/*.[hc]
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
@@ -30,11 +30,16 @@ export HAVE_GCC3 = 1
 export HAVE_LOCALE = 1
 endif
 
-# XXX 5.3 and linuxthreads don't see to get along
-ifeq ($(FBSDREL),5.3)
 WITH_LTHREADS	= 0
-else
+
+# XXX 5.3 and linuxthreads don't see to get along
+# 7.0 and beyond should not need it
+ifneq ($(FBSDREL),5.3)
+ifneq ($(FBSDMAJ),7)
+ifneq ($(FBSDMAJ),8)
 WITH_LTHREADS	= 1
+endif
+endif
 endif
 
 # XXX special checkpoint/shadow device support
@@ -57,6 +62,9 @@ WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
 WITH_FAT	= @WINSUPPORT@
 WITH_HASH	= 1
+WITH_EXT4FS	= 0
+
+WITH_CRYPTO	= 1
 
 include $(OBJDIR)/Makeconf
 
@@ -68,7 +76,7 @@ ifeq ($(WITH_LTHREADS),1)
 PTHREADCFLAGS	= -D_THREAD_SAFE -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
 else
-PTHREADCFLAGS	= -DCONDVARS_WORK
+PTHREADCFLAGS	= -D_THREAD_SAFE -DCONDVARS_WORK
 PTHREADLIBS	= -lpthread
 endif
 SUBDIRCFLAGS	+= 
@@ -79,7 +87,7 @@ endif
 # Necessary sometimes.
 #PTHREADCFLAGS	+= -DCONDVARS_WORK
 
-CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) -static -DWITH_CRYPTO
+CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) $(LDSTATIC) -DWITH_CRYPTO
 LIBS 		= -lz
 ZIPCFLAGS	= $(CFLAGS) -Wall
 ZIPLIBS		= 
@@ -102,11 +110,28 @@ SUBDIRS		+= extfs
 ZIPLIBS		+= extfs/libextfs.a
 endif
 
+# EXT4
+ifeq ($(WITH_EXT4FS),1)
+CFLAGS		+= -DWITH_EXT4FS
+SUBDIRS		+= ext4fs
+ZIPLIBS		+= ext4fs/libext4fs.a
+endif
+
 # with NTFS
 ifeq ($(WITH_NTFS),1)
 ifndef HAVE_GCC3
 CC		= gcc30
 endif
+
+#
+# Default to the old libntfs for now.
+# Once proven, switch to 2.0.0.
+#
+ifndef NTFSVER
+NTFSVER		= 1.7.1
+endif
+export		NTFSVER
+
 CFLAGS		+= -DWITH_NTFS
 SUBDIRS		+= ntfs
 ZIPLIBS		+= ntfs/libntfs.a
@@ -139,7 +164,12 @@ ZIPLIBS		+= hashmap/libhashmap.a
 LIBS		+= -lcrypto $(PTHREADLIBS)
 endif
 
-all:	$(SUBDIRS) imagezip imageunzip imagedump imagehash
+# with CRYPTO
+ifeq ($(WITH_HASH),1)
+CFLAGS		+= -DWITH_CRYPTO -DSIGN_CHECKSUM
+endif
+
+all:	imagezip imageunzip imagedump imagehash
 
 whoami:
 	@echo "SYSTEM is $(SYSTEM)"
@@ -150,20 +180,20 @@ endif
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-imagezip: imagezip.o disksize.o version.o $(ZIPLIBS)
-	$(CC) $(CFLAGS) imagezip.o disksize.o version.o $(ZIPLIBS) $(LIBS) -o imagezip
+imagezip: $(SUBDIRS) imagezip.o disksize.o checksum.o version.o $(ZIPLIBS)
+	$(CC) $(CFLAGS) imagezip.o disksize.o checksum.o version.o $(ZIPLIBS) $(LIBS) -o imagezip
 
 imagezip.o:	imagezip.c
 	$(CC) -c $(ZIPCFLAGS) -o imagezip.o $<
 
-imageunzip: imageunzip.o crc.o version.o 
-	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
+imageunzip: imageunzip.o disksize.o checksum.o crc.o version.o 
+	$(CC) $(CFLAGS) imageunzip.o disksize.o checksum.o crc.o version.o $(UNZIPLIBS) -o imageunzip
 
 imageunzip.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
 
-imagedump: imagedump.o version.o $(SHDLIBS)
-	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) $(SHDLIBS) -o imagedump
+imagedump: imagedump.o checksum.o version.o $(SHDLIBS)
+	$(CC) $(CFLAGS) imagedump.o checksum.o version.o $(LIBS) $(SHDLIBS) -o imagedump
 
 imagehash: imagehash.o version.o
 	$(CC) $(CFLAGS) imagehash.o version.o $(HASHLIBS) -o imagehash
@@ -171,7 +201,7 @@ imagehash: imagehash.o version.o
 imagehash.o:	imagehash.c
 	$(CC) -c $(HASHCFLAGS) -o imagehash.o $<
 
-ffs extfs ntfs fat shd hashmap:
+ffs extfs ext4fs ntfs fat shd hashmap:
 	@$(MAKE) SUBDIRCFLAGS="$(SUBDIRCFLAGS)" -C $@ all
 
 imagezip.o: sliceinfo.h imagehdr.h global.h
@@ -185,7 +215,7 @@ install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip $(INSTALL_BINDI
 
 client: all
 client-install: client
-	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/bin
+	$(INSTALL) -m 755 -o root -d $(DESTDIR)/usr/local/bin
 	$(INSTALL_PROGRAM) -s imagezip$(EXE) $(DESTDIR)/usr/local/bin/imagezip$(EXE)
 	$(INSTALL_PROGRAM) -s imageunzip$(EXE) $(DESTDIR)/usr/local/bin/imageunzip$(EXE)
 	$(INSTALL_PROGRAM) -s imagedump$(EXE) $(DESTDIR)/usr/local/bin/imagedump$(EXE)

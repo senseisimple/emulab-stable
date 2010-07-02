@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -69,6 +69,7 @@ static int	GotBlock(Packet_t *p);
 static void	RequestChunk(int timedout);
 static int	RequestStamp(int chunk, int block, int count, void *arg);
 static int	RequestRedoTime(int chunk, unsigned long long curtime);
+extern int	ImageUnzipInitKeys(char *sig_keyfile, char *enc_keyfile);
 extern int	ImageUnzipInit(char *filename, int slice, int debug, int zero,
 			       int nothreads, int dostype, int dodots,
 			       unsigned long writebufmem);
@@ -189,8 +190,9 @@ main(int argc, char **argv)
 	char   *filename;
 	int	dostype = -1;
 	int	slice = 0;
+	char	*sig_keyfile = 0, *enc_keyfile = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ON")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONc:e:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -303,6 +305,14 @@ main(int argc, char **argv)
 
 		case 'N':
 			nodecompress = 1;
+			break;
+
+		case 'c':
+			sig_keyfile = optarg;
+			break;
+
+		case 'e':
+			enc_keyfile = optarg;
 			break;
 
 		case 'h':
@@ -445,7 +455,11 @@ main(int argc, char **argv)
 
 	/*
 	 * Prepare the unzipper.
-	 * This call fires off the disk writer thread as required.
+	 */
+	ImageUnzipInitKeys(sig_keyfile, enc_keyfile);
+
+	/*
+	 * Pass in assorted parameters and fire off the disk writer thread.
 	 * The writer thread synchronizes only with us (the decompresser).
 	 */
 	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype, 3,

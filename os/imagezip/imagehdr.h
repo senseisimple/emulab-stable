@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -13,34 +13,38 @@
  * None of this wimpy start at version 1 stuff either, our first version
  * is 1,768,515,945!
  *
- *      V2 introduced the first and last sector fields as well
- *      as basic relocations.
+ *	V2 introduced the first and last sector fields as well
+ *	as basic relocations.
  *
- *      V3 introduced LILO relocations for Linux partition images.
- *      Since an older imageunzip would still work, but potentially
- *      lay down an incorrect images, I bumped the version number.
+ *	V3 introduced LILO relocations for Linux partition images.
+ *	Since an older imageunzip would still work, but potentially
+ *	lay down an incorrect images, I bumped the version number.
+ *	Note that there is no change to the header structure however.
+ *
+ *	V4 of the block descriptor adds support for integrety protection
+ *	and encryption.
  */
-#define COMPRESSED_MAGIC_BASE           0x69696969
-#define COMPRESSED_V1                   (COMPRESSED_MAGIC_BASE+0)
-#define COMPRESSED_V2                   (COMPRESSED_MAGIC_BASE+1)
-#define COMPRESSED_V3                   (COMPRESSED_MAGIC_BASE+2)
-#define COMPRESSED_V4                   (COMPRESSED_MAGIC_BASE+3)
+#define COMPRESSED_MAGIC_BASE		0x69696969
+#define COMPRESSED_V1			(COMPRESSED_MAGIC_BASE+0)
+#define COMPRESSED_V2			(COMPRESSED_MAGIC_BASE+1)
+#define COMPRESSED_V3			(COMPRESSED_MAGIC_BASE+2)
+#define COMPRESSED_V4			(COMPRESSED_MAGIC_BASE+3)
 
-#define COMPRESSED_MAGIC_CURRENT        COMPRESSED_V4
+#define COMPRESSED_MAGIC_CURRENT	COMPRESSED_V4
 
 /*
  * Each compressed block of the file has this little header on it.
- * Since each subblock is independently compressed, we need to know
+ * Since each block is independently compressed, we need to know
  * its internal size (it will probably be shorter than 1MB) since we
  * have to know exactly how much to give the inflator.
  */
 struct blockhdr_V1 {
-        uint32_t        magic;
-        uint32_t        size;           /* Size of compressed part */
-        int32_t         blockindex;
-        int32_t         blocktotal;
-        int32_t         regionsize;
-        int32_t         regioncount;
+	uint32_t	magic;		/* magic/version */
+	uint32_t	size;		/* Size of compressed part */
+	int32_t		blockindex;	/* netdisk: which block we are */
+	int32_t		blocktotal;	/* netdisk: total number of blocks */
+	int32_t		regionsize;	/* sizeof header + regions */
+	int32_t		regioncount;	/* number of regions */
 };
 
 /*
@@ -52,73 +56,88 @@ struct blockhdr_V1 {
  * this was not the case in frisbee.
  */
 struct blockhdr_V2 {
-        uint32_t        magic;          /* magic/version */
-        uint32_t        size;           /* Size of compressed part */
-        int32_t         blockindex;     /* netdisk: which block we are */
-        int32_t         blocktotal;     /* netdisk: total number of blocks */
-        int32_t         regionsize;     /* sizeof header + regions */
-        int32_t         regioncount;    /* number of regions */
-        /* V2 follows */
-        uint32_t        firstsect;      /* first sector described by block */
-        uint32_t        lastsect;       /* last sector described by block */
-        int32_t         reloccount;     /* number of reloc entries */
+	uint32_t	magic;		/* magic/version */
+	uint32_t	size;		/* Size of compressed part */
+	int32_t		blockindex;	/* netdisk: which block we are */
+	int32_t		blocktotal;	/* netdisk: total number of blocks */
+	int32_t		regionsize;	/* sizeof header + regions */
+	int32_t		regioncount;	/* number of regions */
+	/* V2 follows */
+	uint32_t	firstsect;	/* first sector described by block */
+	uint32_t	lastsect;	/* last sector described by block */
+	int32_t		reloccount;	/* number of reloc entries */
 };
 
-#define CHECKSUM_LEN_MAX 64
-/* SIGNATURE_KEY_LENGTH must be greater than CHECKSUM_LEN_MAX + 41 */
-#define SIGNATURE_KEY_LENGTH 256
-#define UUID_LENGTH 16
-/*#define AUTHENTICATION_SIGNATURE_LENGTH 256;*/
+#define UUID_LENGTH		16
 
 /*
- * Version 3 of the block descriptor adds support for integrety protection
- * and encryption.
- * A checksum is now mandatory - otherwise, an attacker could modify
- * the header to just turn it off, and since we wouldn't check the checksum,
- * we'd never check! So, you MUST fill in the checksum. All implementations
- * are required to support SHA1, support for others are optional.
+ * Authentication/integrity/encryption constants for V4.
+ */
+#define ENC_MAX_KEYLEN		32	/* XXX same as EVP_MAX_KEY_LENGTH */
+#define CSUM_MAX_LEN		64
+#define SIG_MAX_KEYLEN		256	/* must be > CSUM_MAX_LEN+41 */
+#define AUTH_MAX_SIGLEN		256
+
+/*
+ * Version 4 of the block descriptor adds support for authentication,
+ * integrety protection and encryption.
+ *
+ * An encrypted hash (aka, signature) of each header+chunk is stored in
+ * the header (checksum).  The hash algorithm used is likewise stored in
+ * the header (checksumtype).  The signature key used to encrypt the hash
+ * is transfered out-of-band.
+ *
+ * To ensure that all valid signed chunks are part of the same image, a
+ * unique identifier is stored in the header (imageid) of each chunk
+ * associated with the same image.
+ *
+ * Optionally, the contents of each chunk (but not the header) is encrypted
+ * using the indicated cipher (enc_cipher) and initialization vector (enc_iv).
  */
 struct blockhdr_V4 {
-        uint32_t        magic;          /* magic/version */
-        uint32_t        size;           /* Size of compressed part */
-        int32_t         blockindex;     /* netdisk: which block we are */
-        int32_t         blocktotal;     /* netdisk: total number of blocks */
-        int32_t         regionsize;     /* sizeof header + regions */
-        int32_t         regioncount;    /* number of regions */
-        /* V2 follows */
-        uint32_t        firstsect;      /* first sector described by block */
-        uint32_t        lastsect;       /* last sector described by block */
-        int32_t         reloccount;     /* number of reloc entries */
-        /* V4 follows */
-        uint32_t        enc_cipher;     /* Which cipher was used to encrypt */
-        //uint32_t        enc_iv    ;     /* Initialization vector */
-        int8_t          enc_iv[EVP_MAX_KEY_LENGTH];      /* Initialization vector */
-        uint32_t        checksumtype;   /* Which checksum was used */
-        unsigned char   checksum[SIGNATURE_KEY_LENGTH]; /* Checksum, leave room for 512 bits */
-/*        uint32_t        authtype;*/ /* Which authentication algorithm was used */
-/*        unsigned char   authsig[AUTHENTICATION_SIGNATURE_LENGTH];*/ /* Auth Signature */
-        unsigned char   imageid[UUID_LENGTH]; /* Unique imageid for the whole image */
+	uint32_t	magic;		/* magic/version */
+	uint32_t	size;		/* Size of compressed part */
+	int32_t		blockindex;	/* netdisk: which block we are */
+	int32_t		blocktotal;	/* netdisk: total number of blocks */
+	int32_t		regionsize;	/* sizeof header + regions */
+	int32_t		regioncount;	/* number of regions */
+	/* V2 follows */
+	uint32_t	firstsect;	/* first sector described by block */
+	uint32_t	lastsect;	/* last sector described by block */
+	int32_t		reloccount;	/* number of reloc entries */
+	/* V4 follows */
+	uint32_t	enc_cipher;	/* Which cipher was used to encrypt */
+	int8_t		enc_iv[ENC_MAX_KEYLEN];
+					/* Initialization vector */
+	uint32_t	checksumtype;	/* Which checksum was used */
+	unsigned char	checksum[SIG_MAX_KEYLEN];
+					/* Checksum, leave room for 512 bits */
+#if 0
+	uint32_t	authtype;	/* Which auth algorithm was used */
+	unsigned char	authsig[AUTH_MAX_SIGLEN];
+					/* Auth Signature */
+#endif
+	unsigned char	imageid[UUID_LENGTH];
+					/* Unique ID for the whole image */
 };
 
 /*
- * Checksums supported
+ * Checksum types supported
  */
-/* Required to be supported by all versions */
-#define CHECKSUM_SHA1   0
-
-/*
- * Length of the checksum field (in bytes) for various checksum types
- */
-#define CHECKSUM_LEN_SHA1 20
+#define CSUM_NONE		0  /* must be zero */
+#define CSUM_SHA1		1  /* SHA1: default */
+#define CSUM_SHA1_LEN		20
 
 /*
  * Ciphers supported
  */
-#define ENCRYPTION_NULL 0
-#define ENCRYPTION_BLOWFISH_CBC 1
+#define ENC_NONE		0  /* must be zero */
+#define ENC_BLOWFISH_CBC	1
 
-/* Authentication ciphers supported */
-#define AUTHENTICATION_RSA 0
+/*
+ * Authentication ciphers supported
+ */
+#define AUTH_RSA		0
 
 /*
  * Relocation descriptor.
@@ -126,25 +145,26 @@ struct blockhdr_V4 {
  * absolute block numbers.  This descriptor tells the unzipper what the
  * data structure is and where it is located in the block.
  *
- * Relocation descriptors follow the region descriptors in the header block.
+ * Relocation descriptors follow the region descriptors in the header area.
  */
 struct blockreloc {
-        uint32_t        type;           /* relocation type (below) */
-        uint32_t        sector;         /* sector it applies to */
-        uint32_t        sectoff;        /* offset within the sector */
-        uint32_t        size;           /* size of data affected */
+	uint32_t	type;		/* relocation type (below) */
+	uint32_t	sector;		/* sector it applies to */
+	uint32_t	sectoff;	/* offset within the sector */
+	uint32_t	size;		/* size of data affected */
 };
-#define RELOC_NONE              0
-#define RELOC_FBSDDISKLABEL     1       /* FreeBSD disklabel */
-#define RELOC_OBSDDISKLABEL     2       /* OpenBSD disklabel */
-#define RELOC_LILOSADDR         3       /* LILO sector address */
-#define RELOC_LILOMAPSECT       4       /* LILO map sector */
-#define RELOC_LILOCKSUM         5       /* LILO descriptor block cksum */
+#define RELOC_NONE		0
+#define RELOC_FBSDDISKLABEL	1	/* FreeBSD disklabel */
+#define RELOC_OBSDDISKLABEL	2	/* OpenBSD disklabel */
+#define RELOC_LILOSADDR		3	/* LILO sector address */
+#define RELOC_LILOMAPSECT	4	/* LILO map sector */
+#define RELOC_LILOCKSUM		5	/* LILO descriptor block cksum */
+#define RELOC_SHORTSECTOR	6	/* indicated sector < sectsize */
 
 /* XXX potential future alternatives to hard-wiring BSD disklabel knowledge */
-#define RELOC_ADDPARTOFFSET     100     /* add partition offset to location */
-#define RELOC_XOR16CKSUM        101     /* 16-bit XOR checksum */
-#define RELOC_CKSUMRANGE        102     /* range of previous checksum */
+#define RELOC_ADDPARTOFFSET	100	/* add partition offset to location */
+#define RELOC_XOR16CKSUM	101	/* 16-bit XOR checksum */
+#define RELOC_CKSUMRANGE	102	/* range of previous checksum */
 
 typedef struct blockhdr_V4 blockhdr_t;
 
@@ -156,29 +176,40 @@ typedef struct blockhdr_V4 blockhdr_t;
  * (swap, free FS blocks).
  */
 struct region {
-        uint32_t        start;
-        uint32_t        size;
+	uint32_t	start;
+	uint32_t	size;
 };
 
 /*
- * In the new model, each sub region has its own region header info.
- * But there is no easy way to tell how many regions before compressing.
- * Just leave a page, and hope that 512 regions is enough!
+ * Each block has its own region header info.
  *
- * This number must be a multiple of the NFS read size in netdisk.
+ * Since there is no easy way to tell how many regions will fit before
+ * we have compressed the region data, we just have to pick a size here.
+ * If this area is too small, it is possible that a highly fragmented image
+ * will fill this header before filling the data area of a block.  If the
+ * region header area is too large, we will almost always fill up the data
+ * area before filling the region header.  Since the latter is more likely
+ * to be common, we tend to the small-ish side.
+ *
+ * At 4K with 8 byte region descriptors, we can fix 512 regions into a
+ * single chunk.
  */
-#define DEFAULTREGIONSIZE       (1024 * 4)
+#define DEFAULTREGIONSIZE	4096
 
 /*
  * Ah, the frisbee protocol. The new world order is to break up the
- * file into fixed 1MB chunks, with the region info prepended to each
+ * file into fixed chunks, with the region info prepended to each
  * chunk so that it can be layed down on disk independently of all the
- * chunks in the file.
+ * chunks in the file. 
  */
-#define SUBBLOCKSIZE            (1024 * 1024)
-#define SUBBLOCKMAX             (SUBBLOCKSIZE - DEFAULTREGIONSIZE)
+#define F_BLOCKSIZE		1024
+#define F_BLOCKSPERCHUNK	1024
+
+#define CHUNKSIZE		(F_BLOCKSIZE * F_BLOCKSPERCHUNK)
+#define CHUNKMAX		(CHUNKSIZE - DEFAULTREGIONSIZE)
+
 
 /*
  * Assumed sector (block) size
  */
-#define SECSIZE                 512
+#define SECSIZE			512

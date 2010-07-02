@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -57,7 +57,7 @@ endif
 
 CLIENTFLAGS	= $(CFLAGS)
 CLIENTLIBS	= -lz $(PTHREADLIBS)
-CLIENTOBJS	= client.o frisbee.o disksize.o $(SHAREDOBJS)
+CLIENTOBJS	= client.o frisbee.o checksum.o disksize.o $(SHAREDOBJS)
 
 SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
@@ -65,6 +65,9 @@ SERVEROBJS	= server.o $(SHAREDOBJS)
 
 CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= $(LDSTATIC)
+
+IUZFLAGS	= -DFRISBEE -DWITH_CRYPTO -DSIGN_CHECKSUM
+IUZLIBS		= -lcrypto
 
 #
 # Define this to break chunks into 8192 byte rather than 1024 byte blocks
@@ -101,7 +104,7 @@ endif
 #EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` -I$(TESTBED_SRCDIR)
 
 frisbee: $(CLIENTOBJS)
-	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o frisbee
+	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) $(IUZLIBS) -o frisbee
 	cp frisbee frisbee.debug
 	strip frisbee
 
@@ -117,13 +120,17 @@ log.o:		$(SRCDIR)/log.c decls.h log.h
 event.o:	$(SRCDIR)/event.c decls.h log.h event.h
 	$(CC) $(EVENTFLAGS) -c $(SRCDIR)/event.c
 
-$(FRISBEEDIR)/imageunzip.c: $(FRISBEEDIR)/imagehdr.h $(FRISBEEDIR)/queue.h
+$(FRISBEEDIR)/imageunzip.c: $(FRISBEEDIR)/imagehdr.h $(FRISBEEDIR)/queue.h $(FRISBEEDIR)/checksum.h
+$(FRISBEEDIR)/checksum.c: $(FRISBEEDIR)/imagehdr.h $(FRISBEEDIR)/checksum.h
 
 disksize.o:	$(FRISBEEDIR)/disksize.c
-	$(CC) -c $(CFLAGS) -I$(FRISBEEDIR) -o disksize.o $<
+	$(CC) -c $(CFLAGS) $(IUZFLAGS) -I$(FRISBEEDIR) -o disksize.o $<
+
+checksum.o:	$(FRISBEEDIR)/checksum.c
+	$(CC) -c $(CFLAGS) $(IUZFLAGS) -I$(FRISBEEDIR) -o checksum.o $<
 
 frisbee.o:	$(FRISBEEDIR)/imageunzip.c
-	$(CC) -c $(CFLAGS) -DFRISBEE -I$(FRISBEEDIR) -o frisbee.o $<
+	$(CC) -c $(CFLAGS) $(IUZFLAGS) -I$(FRISBEEDIR) -o frisbee.o $<
 
 client.o:	decls.h log.h utils.h trace.h
 server.o:	decls.h log.h utils.h trace.h
