@@ -1,0 +1,18 @@
+use strict;
+use libdb;
+
+#
+# Changes for protogeni.
+#
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("os_info", "protogeni_export")) {
+	DBQueryFatal("alter table os_info add ".
+		     " `protogeni_export` tinyint(1) NOT NULL default '0'");
+    }
+    return 0;
+}
+1;
+

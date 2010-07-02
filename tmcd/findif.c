@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2001-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2001-2010 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * BSD code derived from:
@@ -133,7 +133,8 @@ find_iface(char *macaddr)
 	struct	if_msghdr	*ifm;
 	struct	ifa_msghdr	*ifam;
 	struct	sockaddr_dl	*sdl;
-	char			*buf, *lim, *next, *cp, *name;
+	char			*buf, *lim, *next, *cp;
+	char			name[IFNAMSIZ];
 	size_t			needed;
 	int			n, addrs, mib[6];
 
@@ -181,7 +182,11 @@ find_iface(char *macaddr)
 		cp = (char *)LLADDR(sdl);
 		if ((n = sdl->sdl_alen) <= 0 || sdl->sdl_type != IFT_ETHER)
 			continue;
-		name = sdl->sdl_data;
+		memcpy(name, sdl->sdl_data,
+		    sizeof(name) < sdl->sdl_nlen ?
+		    sizeof(name)-1 : sdl->sdl_nlen);
+		name[sizeof(name) < sdl->sdl_nlen ?
+		    sizeof(name)-1 : sdl->sdl_nlen] = '\0';
 
 		if (addrtype == ADDR_MAC) {
 			char enet[BUFSIZ], *bp = enet;

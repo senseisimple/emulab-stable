@@ -21,14 +21,13 @@
 #
 my $PREFIX     = '@prefix@';
 my $SRCDIR     = '@srcdir@';
-my $TOP_SRCDIR = '@top_srcdir@';
-my $DBNAME     = "@TBDBNAME@";
 my $ERRORLOG_DBNAME = "@TBERRORLOGDBNAME@";
 my $ELABINELAB = @ELABINELAB@;
 my $WINSUPPORT = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $BUGDBSUPPORT = @BUGDBSUPPORT@;
 my $ARCHSUPPORT = @ARCHIVESUPPORT@;
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $OURDOMAIN  = '@OURDOMAIN@';
 my $EXPOSETEMPLATES = $ELABINELAB;
 
@@ -65,7 +64,6 @@ my $PWD        = "/bin/pwd";
 my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
 my $SSH_KEYGEN = "/usr/bin/ssh-keygen";
-my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PKG_ADD    = "/usr/sbin/pkg_add";
 my $PKG_DEL    = "/usr/sbin/pkg_delete";
 my $TOUCH      = "/usr/bin/touch";
@@ -79,14 +77,11 @@ my $MOUNT      = "/sbin/mount";
 my $SUDO       = "/usr/local/bin/sudo";
 my $SUIDPERL   = "/usr/bin/suidperl";
 
-my $MYSQL      = "/usr/local/bin/mysql";
 my $MYSQLADMIN = "/usr/local/bin/mysqladmin";
 my $MYSQLSHOW  = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
 my $MYSQLINSTALL = "/usr/local/bin/mysql_install_db";
 my $MYSQLDBDIR = "/var/db/mysql";
-
-my $GMAKE      = "/usr/local/bin/gmake";
 
 #
 # Some files we edit/create
@@ -159,8 +154,9 @@ my $TFTPD_PKG	  = "emulab-tftp-hpa-0.48";
 # XXX temporary for perl DBD mysql access
 my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
 # XXX temporary until fix dependencies in emulab-boss package
-my $P5GD_PKG	  = "p5-GD-2.07";
 my $PYM2_PKG	  = "py25-m2crypto-0.19.1";
+# XXX temporary until someone extracts their head from the dark regions
+my $EASYINSTALL	  = "/usr/local/bin/easy_install";
 
 #
 # Named pid file.
@@ -170,17 +166,13 @@ my $NAMED_PIDFILE = "/var/run/named.pid";
 #
 # Some directories we care about
 #
-my $LOGDIR        = "$PREFIX/log";
 my $MYSQL_LOGDIR  = "$LOGDIR/mysql";
-my $RCDIR         = "/usr/local/etc/rc.d";
 my $USERSVAR_DIR  = "$PREFIX/usersvar";
 my $OPSDIR_DIR    = "$PREFIX/opsdir";
-my $PORTSDIR      = "/usr/ports";
 my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $MIBPATH       = "/usr/local/share/snmp/mibs";
 my $TFTP_DIR      = "$PREFIX/tftpboot";
 my $TFTP_PROJ_DIR = "$TFTP_DIR/proj";
-my $VARRUN        = "/var/run";
 my $ETCSSH	  = "/etc/ssh";
 
 #
@@ -503,20 +495,6 @@ Phase "ports", "Installing ports", sub {
 			if ($pname);
 		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
 		};
-		# XXX cannot seem to get these dependencies into emulab-boss
-		Phase "p5-GD", "Installing GD graphics package", sub {
-		    my $pname = `$PKG_INFO -E 'p5-GD-*' 2>/dev/null`;
-		    chomp($pname);
-		    if ($pname eq $P5GD_PKG) {
-			PhaseSkip("p5-GD already up to date");
-		    }
-		    if (!$packagedir) {
-			PhaseSkip("No package directory provided");
-		    }
-		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_DEL -f $pname")
-			if ($pname);
-		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5GD_PKG");
-		};
 		if ($FBSD_MAJOR > 6) {
 		    Phase "py-m2crypto", "Installing python m2crypto package", sub {
 			my $pname = `$PKG_INFO -E 'py25-m2crypto-*' 2>/dev/null`;
@@ -545,6 +523,19 @@ Phase "ports", "Installing ports", sub {
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	    }
 	}
+	if ($PGENISUPPORT) {
+	    Phase "protogeni", "Installing protogeni packages", sub {
+		if ($FBSD_MAJOR > 6 || ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2)) {
+		    if (!ExecQuiet("$PKG_INFO -x emulab-protogeni")) {
+			PhaseSkip("Protogeni package already installed");
+		    }
+		    my $pname = GetPackage("emulab-protogeni", $packagedir);
+		    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+		} else {
+		    PhaseSkip("OS install too old for Protogeni");
+		}
+	    };
+	}
     };
     PhaseSkip("Package directory provided; not installing from sources")
 	if ($packagedir);
@@ -567,6 +558,8 @@ Phase "ports", "Installing ports", sub {
 	      "interactive. Run: \n" .
 	      "    cd $PORTSMISCDIR/emulab-boss && make install\n" .
 	      "    cd $PORTSMISCDIR/emulab-php4 && make install\n" .
+	      ($PGENISUPPORT ?
+	      "    cd $PORTSMISCDIR/emulab-protogeni && make install\n" : "") .
 	      "then re-run this script.");
 };
 
@@ -610,6 +603,44 @@ Phase "portfixup", "Fixing up packages", sub {
 	    }
 	    my $pname = GetPackage("gcc30", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
+    }
+    if ($FBSD_MAJOR > 6) {
+	#
+	# What a crock!  First, that the FreeBSD ports system
+	# defaults to installing the zipped .egg files that have
+	# to be unzipped per-user before use.  Second, that it
+	# offers no easy way at package creation to override this.
+	# Third, that there is no easy way that I could find in
+	# the python eggs system to set a global cache directory
+	# into which to unpack all eggs; you have to set
+	# PYTHON_EGG_CACHE in the environment of every script.
+	# Fourth, that the per-user default value might be in an
+	# unwritable location.
+	#
+	# So, I am reduced to manually unpacking all .egg files
+	# into the corresponding .egg directories after the
+	# install!  Since this would totally screw any attempt
+	# to update those packages, I just do it to the one
+	# package that I know will fail otherwise.
+	#
+	Phase "m2crypto-egg", "Unpacking python m2crypto .egg", sub {
+	    my $pydir = "/usr/local/lib/python2.5/site-packages";
+	    my $egg = `ls -d $pydir/M2Crypto-0.19.1-py2.5-*.egg 2>/dev/null`;
+	    chomp($egg);
+	    if (! -x $EASYINSTALL) {
+		PhaseSkip("python easy_install missing");
+	    }
+	    if ($egg eq "") {
+		PhaseSkip("py25-m2crypto egg not found");
+	    }
+	    if (-d "$egg") {
+		PhaseSkip("py25-m2crypto egg already unpacked");
+	    }
+	    ExecQuietFatal("mv $egg /var/tmp/");
+	    $egg =~ s/$pydir//;
+	    ExecQuietFatal("$EASYINSTALL -Z /var/tmp$egg");
+	    ExecQuietFatal("mv /var/tmp$egg $pydir/$egg.bak");
 	};
     }
 };
@@ -769,7 +800,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!tftpd",     "*.*\t\t\t\t\t\t$LOGDIR/tftpd.log",
 	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
 	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
-	    "!pubsubd",    "*.*\t\t\t\t\t\t$LOGDIR/pubsubd.log",
+	    "!pubsubd",   "*.*\t\t\t\t\t\t$LOGDIR/pubsubd.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log",
 	    "!genlastlog","*.*\t\t\t\t\t\t$LOGDIR/genlastlog.log",
 	    "!sdcollectd","*.*\t\t\t\t\t\t$LOGDIR/sdcollectd.log",
@@ -813,7 +844,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/stated.log             640  9     1000 *     Z ".
 	        "/var/run/stated.pid 31",
 	    "$LOGDIR/checknodes.log         640  14    300  *     Z ".
-	        "/var/run/checknodes.pid",
+	        "/var/run/checknodes_daemon.pid",
 	    "$LOGDIR/osselect.log           640  9     300  *     Z",
 	    "$LOGDIR/power.log              640  7     300  *     Z",
 	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
@@ -830,7 +861,17 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/plablinkdata.log       640  7     1000 *     Z",
 	    "$LOGDIR/xmlrpcbag.log          640  7     300  *     Z",
 	    "$LOGDIR/sshxmlrpc.log          640  7     300  *     Z",
-	    "$LOGDIR/sslxmlrpc.log          640  7     300  *     Z");
+	    "$LOGDIR/sslxmlrpc.log          640  7     300  *     Z",
+	    "$LOGDIR/reloadlog              640  9     1000 *     Z ".
+		"/var/run/reload_daemon.pid",
+	    "$LOGDIR/checkuplog             640  9     1000 *     Z ".
+		"/var/run/checkup_daemon.pid",
+	    "$LOGDIR/poollog                640  9     1000 *     Z ".
+		"/var/run/pool_daemon.pid",
+	    "$LOGDIR/expire_daemon.log      640  9     1000 *     Z ".
+		"/var/run/expire_daemon.pid",
+	    "$LOGDIR/sa_daemon.log          640  9     1000 *     Z ".
+		"/var/run/sa_daemon.pid");
     };
 };
 
@@ -846,6 +887,8 @@ Phase "database", "Setting up database", sub {
 	if (!ExecQuiet("$MYSQLADMIN ping")) {
 	    PhaseSkip("mysqld already running");
 	}
+	# XXX make sure client startup was done (setting ldpath)
+	ExecQuietFatal("$RCDIR/1.mysql-client.sh start");
 	ExecQuietFatal("$RCDIR/2.mysql-server.sh start");
 	# Give mysqld some time to start, then make sure it did
 	sleep 5;
@@ -940,6 +983,46 @@ Phase "database", "Setting up database", sub {
 	}
 	ExecQuietFatal("$MYSQL $ERRORLOG_DBNAME < $TOP_SRCDIR/sql/database-create-errorlog.sql");
     };
+    Phase "version_info", "Initializing version_info table", sub {
+	my $SQLUPDATES =
+	    "$TOP_SRCDIR/sql/updates/$SQL_UPDATE_MAJOR_REVISION";
+	my $INUPDATES  =
+	    "$TOP_SRCDIR/install/updates/$INSTALL_UPDATE_MAJOR_REVISION";
+	
+	my ($exitval, @results) =
+	    ExecQuiet("echo 'select * from version_info' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar(@results)) {
+	    PhaseSkip("Already done");
+	}
+	($exitval, @results) =
+	    ExecQuiet("cd $SQLUPDATES ; ls | sort -n -r | head -1");
+	if ($exitval) {
+	    PhaseFail("Error getting sql update list");
+	}
+	my $sqlfile = $results[0];
+	chomp($sqlfile);
+
+	($exitval, @results) =
+	    ExecQuiet("cd $INUPDATES ; ls | sort -n -r | head -1");
+	if ($exitval) {
+	    PhaseFail("Error getting install update list");
+	}
+	my $updatefile = $results[0];
+	chomp($updatefile);
+
+	my $sqlval = $SQL_UPDATE_MAJOR_REVISION . "." . $sqlfile;
+	my $upval  = $INSTALL_UPDATE_MAJOR_REVISION . "." . $updatefile;
+
+	ExecQuietFatal("echo 'insert into version_info set ".
+		       "  name=\"dbrev\", value=\"$sqlval\"' ".
+		       "| $MYSQL -s $DBNAME");
+	ExecQuietFatal("echo 'insert into version_info set ".
+		       "  name=\"install\", value=\"$upval\"' ".
+		       "| $MYSQL -s $DBNAME");
+    };
 };
 
 Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
@@ -954,7 +1037,8 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
 		   qq|xntpd_enable="YES"|,
 		   qq|syslogd_flags=""|,
 		   qq|tftpd_flags="-lvvvv -C 40 -s /tftpboot"|,
-		   qq|apache_enable="YES"|);
+		   qq|apache_enable="YES"|,
+		   qq|pubsubd_flags="-T 10"|);
 
     # Starting at FreeBSD 6 we use the default version of bind, not the port.
     if ($FBSD_MAJOR < 6) {

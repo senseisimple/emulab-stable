@@ -11,7 +11,9 @@ UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= nalloc nfree nodeip readycount 
+SUBBOSS_SBIN_SCRIPTS	= subboss_dhcpd_makeconf
+
+BIN_SCRIPTS	= nalloc nfree nodeip readycount
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
@@ -56,6 +58,8 @@ endif
 # 
 all:	$(TARGETS)
 
+$(SUBBOSS_SBIN_SCRIPTS):
+
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
@@ -63,6 +67,10 @@ install: boss-install
 else
 install: clrhouse-install
 endif
+
+subboss-install: $(addprefix $(INSTALL_SBINDIR)/, $(SUBBOSS_SBIN_SCRIPTS))
+	ln -sf $(INSTALL_SBINDIR)/subboss_dhcpd_makeconf \
+		$(CLIENT_BINDIR)/subboss_dhcpd_makeconf
 
 boss-install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \

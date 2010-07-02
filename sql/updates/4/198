@@ -1,0 +1,21 @@
+use strict;
+use libdb;
+
+#
+# MLE stuff
+#
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("virt_lans", "layer")) {
+	DBQueryFatal("alter table virt_lans add ".
+		     " `layer` tinyint(4) NOT NULL default '2'");
+    }
+    DBQueryFatal("replace into table_regex values ".
+		 "  ('virt_lans','layer','int','redirect', ".
+		 "   'default:tinyint',1,2,NULL)");
+    return 0;
+}
+1;
+

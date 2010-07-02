@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Utility routines for Emulab.
@@ -13,7 +13,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
 @EXPORT = qw (TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
 	      TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
-	      TBGetUniqueIndex ParRun);
+	      TBGetUniqueIndex ParRun NoLogins);
 
 use emdb;
 use English;
@@ -462,6 +462,26 @@ sub ParRun($$$@)
     return -1
 	if ($signaled);
     return 0;
+}
+
+#
+# Check for nologins; web interface disabled means other interfaces
+# should be disabled. Not using libdb:GetSiteVar cause do not want to
+# drag all that stuff in. Predicate; retun 1 if no logins is set.
+#
+sub NoLogins()
+{
+    my $query_result =
+	DBQueryWarn("select value from sitevariables ".
+		    "where name='web/nologins'");
+
+    return 1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+    my ($value) = $query_result->fetchrow_array();
+
+    return ($value ? 1 : 0);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

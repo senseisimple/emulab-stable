@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # node reboot library. Basically the backend to the node_reboot script, but
@@ -538,6 +538,7 @@ sub RebootNode {
 	return -2;
     }
     if ($nodestate eq TBDB_NODESTATE_PXEWAIT() ||
+	$nodestate eq TBDB_NODESTATE_PXELIMBO() ||
 	$nodestate eq TBDB_NODESTATE_PXEWAKEUP()) {
 	#
 	# In killmode, we do not want to bother with sending a wakeup event.
@@ -842,12 +843,13 @@ sub RebootVNode($$) {
 	exit(GeniEmulab->StartSlivers($experiment, [ $nodeobj ]));
     }
 
-    my $addargs = "";
+    my $addargs = "-t ";	# Turn on timestamps.
     if ($plab) {
 	$addargs .= "-p ";
     }
     elsif ($jailed) {
-	$addargs .= "-j ";
+	# Use virtual control net routes. 
+	$addargs .= "-jV ";
     }
     else {
 	$addargs .= "-i ";

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -38,7 +38,6 @@ my $NEWUSER	  = "$TB/sbin/newuser";
 my $NEWPROJ	  = "$TB/sbin/newproj";
 my $MKPROJ	  = "$TB/sbin/mkproj";
 my $TBACCT	  = "$TB/sbin/tbacct";
-my $MKCERTS	  = "$TB/sbin/protogeni/createcerts";
 my $ADDAUTHORITY  = "$TB/sbin/protogeni/addauthority";
 my $GETCACERTS    = "$TB/sbin/protogeni/getcacerts";
 my $POSTCRL       = "$TB/sbin/protogeni/postcrl";
@@ -78,6 +77,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libtestbed;
 use libdb qw(TBSetSiteVar TBOPSPID DBQueryFatal);
+use emutil qw(TBGetUniqueIndex);
 use User;
 use Project;
 use Experiment;
@@ -133,13 +133,16 @@ if( $? == -1 ) {
 	die( "refusing to overwrite $originalfile" );
     rename( "$TB/etc/emulab.pem", "$originalfile" ) or
 	die( "could not rename root certificate" );
+
+    my $serial = TBGetUniqueIndex( "user_sslcerts" );
     # Save the new certificate to a temporary file: OpenSSL will reuse the
     # plain text from the old certificate instead of the current version,
     # so we regenerate the whole thing once we've finished to avoid
     # horrible confusion.
     system( "$OPENSSL x509 -days 2000 -text -extfile $extfile " .
-	    "-signkey $TB/etc/emulab.key < $originalfile " .
-	    "> $TB/etc/emulab.tmp" );
+	    "-set_serial $serial -signkey $TB/etc/emulab.key " .
+	    "< $originalfile > $TB/etc/emulab.tmp" );
+
     # For some reason, OpenSSL can return non-zero even when the certificate
     # generation succeeded.  Check the output file instead.
     if( !( -s "$TB/etc/emulab.tmp" ) ) {
@@ -192,12 +195,16 @@ if (!$asch && ! -e "$TB/etc/.federated") {
 #
 # Packages.
 #
-my %packlist = ("libxml2>=2.6.26"       => "/usr/ports/textproc/libxml2",
-		"p5-Frontier-RPC"       => "/usr/ports/net/p5-Frontier-RPC",
-		"p5-XML-LibXML>=1.70"   => "/usr/ports/textproc/p5-XML-LibXML",
-		"xmlsec1"               => "/usr/ports/security/xmlsec1",
-		"p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay"
-		);
+my %packlist =
+    ("libxml2>=2.6.26"       => "/usr/ports/textproc/libxml2",
+     "p5-Frontier-RPC"       => "/usr/ports/net/p5-Frontier-RPC",
+     "p5-XML-LibXML>=1.70"   => "/usr/ports/textproc/p5-XML-LibXML",
+     "xmlsec1"               => "/usr/ports/security/xmlsec1",
+     "p5-Crypt-SSLeay>=0.57" => "/usr/ports/security/p5-Crypt-SSLeay",
+     "p5-Crypt-OpenSSL-X509" => "/usr/ports/security/p5-Crypt-OpenSSL-X509",
+     "p5-Crypt-X509"         => "/usr/ports/security/p5-Crypt-X509",
+     "xerces-c2>=2.7.0"      => "/usr/ports/textproc/xerces-c2"
+     );
 my $needpkgs = 0;
 
 foreach my $pkgname (sort(keys(%packlist))) {
@@ -243,8 +250,7 @@ if (! -e "$TB/www/protogeni") {
 $crosstext = <<'CROSSEND';
 <?xml version="1.0"?>
 <cross-domain-policy>
-    <allow-access-from domain="boss.emulab.net" />
-    <allow-access-from domain="users.emulab.net" />
+    <allow-access-from domain="*.emulab.net" />
     <allow-access-from domain="*.protogeni.net" />
 </cross-domain-policy>
 CROSSEND

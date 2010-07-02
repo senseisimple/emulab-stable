@@ -189,14 +189,14 @@ void print_solution(const solution &s) {
 	    tb_vnode *vnode = get(vvertex_pmap,vv);
 	    pvertex pv = vnode->assignment;
 	    tb_pnode *pnode = get(pvertex_pmap,pv);
-/*#ifdef WITH_XML
+#ifdef WITH_XML
 		if (both_inputs_rspec == true)
 		{
-			rspec_annotater->annotate_trivial_link((vlink->name).c_str(), (pnode->name).c_str());
+			rspec_annotater->annotate_element((vlink->name).c_str());
 			if (is_generated)
 				continue;
 		}
-#endif*/
+#endif
 	    cout << " trivial " <<  pnode->name << ":loopback" <<
 		" (" << pnode->name << "/null,(null)) " <<
 		pnode->name << ":loopback" << " (" << pnode->name <<

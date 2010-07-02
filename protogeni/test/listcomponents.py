@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -47,7 +47,7 @@ if debug: print str(response["value"])
 # Ask each manager for its list.
 #
 for manager in response["value"]:
-    print manager["hrn"] + "[" + manager[ "urn" ] + "]: " + manager["url"]
+    print manager[ "urn" ] + ": " + manager["url"]
 
     # Skip the discover resources. Too much.
     continue

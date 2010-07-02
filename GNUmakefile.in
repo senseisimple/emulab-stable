@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Testbed Makefile
@@ -33,7 +33,7 @@ ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		tools/svn wiki bugdb collab protogeni node_usage
+		tools/svn wiki bugdb collab protogeni node_usage install
 ifeq ($(ISMAINSITE),1)
 SUBDIRS += tools/rmanage
 endif
@@ -41,7 +41,7 @@ else
 SUBDIRS = db tbsetup account protogeni
 endif
 
-all:		all-subdirs 
+all:		all-subdirs just-builddirs 
 
 #
 # We used to statically link our event agents.  We no longer do this, but
@@ -62,16 +62,33 @@ endif
 #
 # For installation on boss node
 # 
-boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
-		install-genischemacheck install-subdirs install-mkdirs \
+boss-install:	install-checks \
+		install-subdirs install-mkdirs \
 		install-setbuildinfo
 	@echo "Boss node installed!"
 
-#
-# Same target, with the install-schemacheck dependency omitted
-# 
+# Same target, with the checks omitted
 boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
 	@echo "Boss node installed!"
+
+# Skip only the schema checks, but do the other checks.
+boss-install-noschemacheck: install-updatecheck \
+		install-sitevarscheck install-dbfillcheck \
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
+
+# Skip the update check. 
+boss-install-noupdatecheck: install-schemacheck \
+		install-sitevarscheck install-dbfillcheck \
+		install-genischemacheck install-subdirs install-mkdirs \
+		install-setbuildinfo
+
+# Only the checks:
+install-checks: install-updatecheck \
+		install-schemacheck \
+		install-sitevarscheck \
+		install-dbfillcheck install-genischemacheck
+	@echo "Installation checks completed!"
 
 clrhouse-install:	install-subdirs install-mkdirs
 	@echo "CleaingHouse code installed!"
@@ -159,6 +176,10 @@ ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 	-ln -s /usr/testbed/bin/nse $(INSTALL_TOPDIR)/bin
 endif
 
+just-builddirs:
+	@$(MAKE) -C rc.d all
+	@$(MAKE) -C apache all
+
 tipserv-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
 	-mkdir -p $(INSTALL_TOPDIR)/etc
@@ -196,6 +217,31 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
+
+subboss: client
+	@$(MAKE) -C os subboss
+	@$(MAKE) -C utils subboss
+
+subboss-install: subboss
+ifeq ($(EVENTSYS),1)
+	@$(MAKE) -C event client-install
+endif
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
+	@$(MAKE) -C capture client-install
+	@$(MAKE) -C tip client-install
+	@$(MAKE) -C tools client-install
+endif
+	@$(MAKE) -C sensors client-install
+	@$(MAKE) -C utils subboss-install
+	@$(MAKE) -C os subboss-install
+	@$(MAKE) -C db subboss-install
+	@$(MAKE) -C tmcd subboss-install
+	@$(MAKE) -C rc.d subboss-install
+	@$(MAKE) -C dhcpd subboss-install
+	@$(MAKE) -C tbsetup client-install
+	# Hack: this should probably be done by a subboss-install
+	# script, but there isn't a huge need for that yet
+	@rm -f $(INSTALL_RCDIR)/isc-dhcpd
 
 TARBALLDESTDIR = /var/tmp/emulab-client
 
@@ -290,6 +336,42 @@ flashboot-install: destdircheck flashboot
 # tell, you can't put ifeq()'s inside of targets
 #
 ifeq ($(TBROOT),/usr/testbed)
+UPDATETESTBED= @cd $(OBJDIR)/install && perl update-testbed
+else
+UPDATETESTBED= @echo "Skipping update check, since prefix isn't /usr/testbed"
+endif
+ifeq ($(ISMAINSITE),1)
+update-testbed: update-testbed-nostop
+else
+update-testbed:	update-testbed-install
+endif
+
+update-testbed-install:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED) -i -s
+
+update-testbed-noinstall:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED)
+
+update-testbed-nostop:
+	@echo "Updating the testbed ..."
+	$(UPDATETESTBED) -i
+
+update-testbed-force:
+	@echo "Updating the testbed in force mode ..."
+	$(UPDATETESTBED) -f
+
+ifeq ($(TBROOT),/usr/testbed)
+UPDATECHECK= @cd $(OBJDIR)/install && perl update-testbed -v
+else
+UPDATECHECK= @echo "Skipping update checks, since prefix isn't /usr/testbed"
+endif
+install-updatecheck:
+	@echo "Checking to see if updates need to be run"
+	$(UPDATECHECK)
+
+ifeq ($(TBROOT),/usr/testbed)
 SCHEMACHECK= cd $(OBJDIR)/db && perl schemacheck
 else
 SCHEMACHECK= @echo "Skipping schema check, since prefix isn't /usr/testbed"
@@ -350,6 +432,11 @@ elabinelab:
 	rm -f $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
 	tar czf $(INSTALL_TOPDIR)/src/emulab-src.tar.gz -C $(SRCDIR) --exclude=.git .
 
+elabinelab-git:
+	-mkdir -p $(INSTALL_TOPDIR)/src
+	rm -f $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
+	git archive --prefix=testbed/ | gzip -c > $(INSTALL_TOPDIR)/src/emulab-src.tar.gz
+
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
 %.MAKE:
@@ -359,7 +446,10 @@ elabinelab:
 # By default, make any target by descending into subdirectories.
 %: %-subdirs ;
 
-.PHONY: post-install install-mkdirs clrhouse-install install
+.PHONY: post-install install-mkdirs clrhouse-install install \
+	boss-install-noupdatecheck boss-install-noschemacheck \
+	boss-install-force update-testbed update-testbed-install \
+	update-testbed-noinstall update-testbed-nostop
 
 # Get rid of a bunch of nasty built-in implicit rules.
 .SUFFIXES:

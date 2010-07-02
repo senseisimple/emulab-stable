@@ -47,6 +47,9 @@ destdircheck:
 	    false; \
 	fi
 
+subboss-install:	basefbsd-subboss-install etc-install \
+			sup-install script-install bin-install
+
 install client-install:	basefbsd-install etc-install \
 			sup-install script-install bin-install # jail-install
 
@@ -101,6 +104,10 @@ dir-install:
 
 basefbsd-install: dir-install
 	(cd ../freebsd; $(MAKE) all install)
+	rm -f $(SYSETCDIR)/start_if.* $(SYSETCDIR)/rc.early $(BINDIR)/dhclient
+
+basefbsd-subboss-install: dir-install
+	(cd ../freebsd; $(MAKE) all subboss-install)
 	rm -f $(SYSETCDIR)/start_if.* $(SYSETCDIR)/rc.early $(BINDIR)/dhclient
 
 basefbsdmfs-install: dir-install

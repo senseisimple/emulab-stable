@@ -1,4 +1,9 @@
 #! /usr/bin/perl
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2008 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 use XML::Parser;
 use Data::Dumper;

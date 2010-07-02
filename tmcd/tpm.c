@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2009-2010 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef STANDALONE
 #include "log.h"
 #include "config.h"
@@ -21,6 +27,7 @@
 
 EVP_PKEY *tpmk;
 
+#ifdef TPM
 static ENGINE *tpme;
 /*
  * hash is the SHA1 hash of our TPM storage root passsword (not the owner
@@ -28,6 +35,7 @@ static ENGINE *tpme;
  */
 static char *tpmhash = "\x71\x10\xed\xa4\xd0\x9e\x06\x2a\xa5\xe4\xa3\x90\xb0"
 			"\xa5\x72\xac\x0d\x2c\x02\x20";
+#endif
 
 int
 tmcd_tpm_loadengine(void)

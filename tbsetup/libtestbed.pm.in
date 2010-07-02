@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,7 +20,8 @@ use Exporter;
 	 TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED
 	 PROJROOT GROUPROOT USERROOT SCRATCHROOT SHAREROOT
 	 TBValidUserDir TBValidUserDirList TBMakeTempFile NewUUID System
-	 SendProjAdminMail ReOpenLog);
+	 SendProjAdminMail ReOpenLog
+	 CheckDaemonRunning MarkDaemonRunning MarkDaemonStopped);
 @EXPORT_OK =
     qw ( TBMAIL_PROJADMIN);
 
@@ -802,6 +803,55 @@ sub System($)
     TBDebugTimeStamp("Done");
 
     return $retval;
+}
+
+#
+# Check for the existence of a pid file and see if that file is
+# running. Mostly cause of devel tree versions.
+#
+sub CheckDaemonRunning($)
+{
+    my ($name) = @_;
+    my $pidfile = "/var/run/${name}.pid";
+
+    if (-e $pidfile) {
+	my $opid = `cat $pidfile`;
+	if ($opid =~ /^(\d*)$/) {
+	    $opid = $1;
+	}
+	else {
+	    print STDERR "$pidfile exists, but $opid is malformed\n";
+	    return 1;
+	}
+	if (kill(0, $opid)) {
+	    print STDERR "$pidfile exists, and process $opid is running\n";
+	    return 1;
+	}
+	unlink($pidfile);
+    }
+    return 0;
+}
+#
+# Mark a daemon as running.
+#
+sub MarkDaemonRunning($)
+{
+    my ($name) = @_;
+    my $pidfile = "/var/run/${name}.pid";
+
+    if (system("echo '$PID' > $pidfile")) {
+	print STDERR "Could not create $pidfile\n";
+	return -1;
+    }
+    return 0;
+}
+sub MarkDaemonStopped($)
+{
+    my ($name) = @_;
+    my $pidfile = "/var/run/${name}.pid";
+
+    unlink($pidfile);
+    return 0;
 }
 
 1;

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Database Constants
@@ -578,7 +578,7 @@ function TBGetVersionInfo(&$major, &$minor, &$build)
 	DBQuery("select value from version_info where name='dbrev'");
     if ($query_result && mysql_num_rows($query_result)) {
 	$row = mysql_fetch_row($query_result);
-	list($a,$b) = split('\.', $row[0]);
+	list($a,$b) = preg_split('/\./', $row[0]);
 	$a = (isset($a) && $a != "" ? $a : "x");
 	$b = (isset($b) && $b != "" ? $b : "y");
 	$major = $a;
@@ -589,6 +589,22 @@ function TBGetVersionInfo(&$major, &$minor, &$build)
 	$minor = "Y";
     }
     return 1;
+}
+
+#
+# Get the commit hash.
+#
+function TBGetCommitHash()
+{
+    $query_result = 
+	DBQueryFatal("select value from version_info ".
+		     "where name='commithash'");
+
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_row($query_result);
+	return $row[0];
+    }
+    return null;
 }
 
 #

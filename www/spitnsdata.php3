@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -134,8 +134,8 @@ if (isset($nsdata) && strcmp($nsdata, "") != 0) {
     header("Content-Type: text/plain");
     echo "$nsdata";
 } elseif (isset($nsref) && strcmp($nsref,"") != 0 && 
-          ereg("^[0-9]+$", $nsref)) {
-    if (isset($guid) && ereg("^[0-9]+$", $guid)) {
+          preg_match('/^[0-9]+$/', $nsref)) {
+    if (isset($guid) && preg_match('/^[0-9]+$/', $guid)) {
 	$nsfile = "/tmp/$guid-$nsref.nsfile";    
         $id = $guid;
     } else {

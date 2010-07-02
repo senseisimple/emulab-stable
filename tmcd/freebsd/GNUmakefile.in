@@ -50,6 +50,10 @@ destdircheck:
 	    false; \
 	fi
 
+subboss-install:	subboss-common-install etc-install init-install \
+			sup-install script-install bin-install jail-install 
+	@echo "Remember to install the PEM files if necessary"
+
 install client-install:	common-install etc-install init-install \
 			sup-install script-install bin-install jail-install 
 	@echo "Remember to install the PEM files if necessary"
@@ -158,6 +162,9 @@ dir-install:
 
 common-install:	dir-install
 	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) local-install)
+
+subboss-common-install:	dir-install
+	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) subboss-local-install)
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile

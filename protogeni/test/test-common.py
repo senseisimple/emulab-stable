@@ -15,6 +15,7 @@
 from urlparse import urlsplit, urlunsplit
 from urllib import splitport
 import xmlrpclib
+import M2Crypto
 from M2Crypto import X509
 import socket
 
@@ -140,14 +141,42 @@ def Fatal(message):
     sys.exit(1)
 
 def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
-    passphrase = open(PASSPHRASEFILE).readline()
-    passphrase = passphrase.strip()
-    return passphrase
+    """Acquire the encrypted certificate passphrase by reading a file
+    or prompting the user.
+
+    This is an M2Crypto callback. If the passphrase file exists and is
+    readable, use it. If the passphrase file does not exist or is not
+    readable, delegate to the standard M2Crypto passphrase
+    callback. Return the passphrase.
+    """
+    if os.path.exists(PASSPHRASEFILE):
+        try:
+            passphrase = open(PASSPHRASEFILE).readline()
+            passphrase = passphrase.strip()
+            return passphrase
+        except IOError, e:
+            print 'Error reading passphrase file %s: %s' % (PASSPHRASEFILE,
+                                                            e.strerror)
+    else:
+        if debug:
+            print 'passphrase file %s does not exist' % (PASSPHRASEFILE)
+    # Prompt user if PASSPHRASEFILE does not exist or could not be read.
+    from M2Crypto.util import passphrase_callback
+    return passphrase_callback(v, prompt1, prompt2)
+
+def geni_am_response_handler(method, method_args):
+    """Handles the GENI AM responses, which are different from the
+    ProtoGENI responses. ProtoGENI always returns a dict with three
+    keys (code, value, and output. GENI AM operations return the
+    value, or an XML RPC Fault if there was a problem.
+    """
+    return apply(method, method_args)
 
 #
 # Call the rpc server.
 #
-def do_method(module, method, params, URI=None, quiet=False, version=None):
+def do_method(module, method, params, URI=None, quiet=False, version=None,
+              response_handler=None):
     if not os.path.exists(CERTIFICATE):
         return Fatal("error: missing emulab certificate: %s\n" % CERTIFICATE)
     
@@ -209,6 +238,11 @@ def do_method(module, method, params, URI=None, quiet=False, version=None):
     meth      = getattr(server, method)
     meth_args = [ params ]
 
+    if response_handler:
+        # If a response handler was passed, use it and return the result.
+        # This is the case when running the GENI AM.
+        return response_handler(meth, params)
+
     #
     # Make the call. 
     #
@@ -220,6 +254,14 @@ def do_method(module, method, params, URI=None, quiet=False, version=None):
         return (-1, None)
     except xmlrpclib.ProtocolError, e:
         if not quiet: print >> sys.stderr, e.errmsg
+        return (-1, None)
+    except M2Crypto.SSL.Checker.WrongHost, e:
+        if not quiet:
+            print >> sys.stderr, "Warning: certificate host name mismatch."
+            print >> sys.stderr, "Please consult:"
+            print >> sys.stderr, "    http://www.protogeni.net/trac/protogeni/wiki/HostNameMismatch"            
+            print >> sys.stderr, "for recommended solutions."
+            print >> sys.stderr, e
         return (-1, None)
 
     #
@@ -282,7 +324,7 @@ def get_slice_credential( slice, selfcredential ):
     if "urn" in slice:
         params["urn"]       = slice["urn"]
     else:
-        params["uuid"]       = slice["uuid"]
+        params["uuid"]      = slice["uuid"]
     rval,response = do_method("sa", "GetCredential", params)
     if rval:
         Fatal("Could not get Slice credential")

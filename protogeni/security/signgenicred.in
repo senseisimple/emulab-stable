@@ -40,7 +40,7 @@ my $BOSSNODE	= "@BOSSNODE@";
 use lib "@prefix@/lib";
 use libaudit;
 use libtestbed;
-
+use GeniUtil();
 #
 # Turn off line buffering on output
 #
@@ -220,6 +220,13 @@ if ($root->nodeName eq "credential") {
     # </signed-credential>
     #
     my $newroot       = XML::LibXML::Element->new('signed-credential');
+    $newroot->setNamespace($GeniUtil::XSI_NS, "xsi", 0);
+    $newroot->setAttributeNS($GeniUtil::XSI_NS, "noNamespaceSchemaLocation"
+                           , $GeniUtil::CREDENTIAL_SCHEMA_LOCATION);
+    $newroot->setAttributeNS($GeniUtil::XSI_NS, "schemaLocation"
+                           , $GeniUtil::EXTENSIONS_NS . " " 
+                           . $GeniUtil::EXTENSIONS_SCHEMA_LOCATION);
+
     $signatures_node  = XML::LibXML::Element->new('signatures');
     $credentials_node = $root;
     $newroot->addChild($root);

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # For installation.
@@ -19,6 +19,7 @@ include $(OBJDIR)/Makeconf
 
 RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh \
 		  2.dhcpd.sh 1.mysql-client.sh
+SUBBOSS_SCRIPTS	= 2.dhcpd.sh
 OPS_SCRIPTS     = 3.and.sh 1.mysql-client.sh 1.mysql-server.sh
 ifeq ($(ELVINCOMPAT),1)
 OPS_SCRIPTS    += 2.elvind.sh 3.elvin_gateway.sh
@@ -63,11 +64,24 @@ $(INSTALL_RCDIR)/capture: capture.sh
 	-mkdir -p $(INSTALL_RCDIR)
 	$(INSTALL_PROGRAM) capture.sh $@
 
+#
+# Well, this is awkward.  Make sure we don't try to install anything from
+# a dev tree both because it doesn't make any sense and because it would
+# clobber the "real" version.
+#
+ifeq ($(TBROOT),/usr/testbed)
+
 install: $(addprefix $(INSTALL_RCDIR)/, $(RC_SCRIPTS))
 
 control-install:	$(addprefix $(INSTALL_RCDIR)/, $(OPS_SCRIPTS))
+
+subboss-install:	$(addprefix $(INSTALL_RCDIR)/, $(SUBBOSS_SCRIPTS))
 
 clrhouse-install:	$(INSTALL_RCDIR)/2.mysql-server.sh \
 			$(INSTALL_RCDIR)/1.mysql-client.sh
 
 tipserv-install:	$(addprefix $(INSTALL_RCDIR)/, $(TIP_SCRIPTS))
+else
+install control-install subboss-install clrhouse-install tipserv-install:
+	@echo "Cannot install startup scripts in dev tree"
+endif

@@ -80,7 +80,13 @@ EventTimeline instproc updatedb {DB} {
     $self instvar event_list
     
     foreach event $event_list {
-	$sim spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "parent"] [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] $self ]
+        if {[string equal [lindex $event 0] "swapout"]} {
+                set event [lreplace $event 0 0 0]
+                set triggertype "SWAPOUT"
+        } else {
+                set triggertype "TIMER"
+        }
+       $sim spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "triggertype" "arguments" "atstring" "parent"] [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) $triggertypes($triggertype) [lindex $event 5] [lindex $event 6] $self ]
     }
 
     $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] \

@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2008-2009 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #include <arpa/inet.h>
 
 #include "httpd.h"

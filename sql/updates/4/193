@@ -1,0 +1,41 @@
+#
+# Add the elabinelab_attributes table.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("elabinelab_attributes")) {
+	DBQueryFatal("CREATE TABLE `elabinelab_attributes` ( ".
+	             " `pid` varchar(12) NOT NULL default '', ".
+	             " `eid` varchar(32) NOT NULL default '', ".
+	             " `exptidx` int(11) NOT NULL default '0', ".
+		     " `role` enum('boss','router','ops','fs','node') NOT NULL default 'node', ".
+	             " `attrkey` varchar(32) NOT NULL default '', ".
+	             " `attrvalue` tinytext NOT NULL, ".
+	             " `ordering` smallint(5) unsigned NOT NULL default '0', ".
+	             "  PRIMARY KEY  (`exptidx`,`role`,`attrkey`,`ordering`) ".
+	             ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    
+    # Fill in check fields
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','role','text','regex',".
+		 " '^(boss|router|ops|fs|node)\$',0,0,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','attrkey','text','regex',".
+		 " '^[-\\\\w\\\\.]+\$',1,32,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','attrvalue','text','regex',".
+		 " '^[-\\\\w\\\\.\\\\+,\\\\s\\\\/]+\$',0,255,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES".
+		 " ('elabinelab_attributes','ordering','int','redirect',".
+		 " 'default:tinyint',0,0,NULL)");
+
+    # Initialize new table.
+    return 0;
+}
+1;

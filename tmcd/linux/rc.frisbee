@@ -133,6 +133,7 @@ write_image()
 	local slice=$3
 	local zfill=$4
 	local ptype=$5
+	local server=$6
 	local port=""
 	local imagefile=""
 	local frisbee_opts="$FRISBEE_OPTS"
@@ -207,7 +208,9 @@ write_image()
 	$BINDIR/tmcc state RELOADING
 
 	if [ $protocol = frisbee ]; then
-		$BINDIR/frisbee -m $address -p $port $frisbee_opts $disk
+		[ -n "$server" ] || server=$BOSSIP
+		echo "$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk"
+		$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk
 		rc=$?
 
 		if [ $rc -ne 0 ]; then
@@ -233,6 +236,7 @@ handle_loadinfo()
 {
 	local LOADINFO="$@"
 	local ADDRESS=`get_value "$LOADINFO" ADDR`
+	local SERVER=`get_value "$LOADINFO" SERVER`
 	local PARTOS=`get_value "$LOADINFO" PARTOS`
 	local PARTITION=`get_value "$LOADINFO" PART`
 	PARTITION=${PARTITION:-'0'}
@@ -305,7 +309,7 @@ handle_loadinfo()
 		zapsuperblocks /dev/$DISK
 	fi
 
-	write_image $ADDRESS /dev/$DISK $PARTITION $ZFILL $PTYPE
+	write_image $ADDRESS /dev/$DISK $PARTITION $ZFILL $PTYPE $SERVER
 	rc=$?
 	if [ $rc -ne 0 ]; then
 		echo "Failed to write image to disk, status $rc"
@@ -393,12 +397,35 @@ fi
 # which disk is which.
 $BINDIR/get_edd_map > $BOOTDIR/edd_map 2>/dev/null
 
+
 FRISBEE_OPTS="-S $BOSSIP"
 
 if [ -e $BOOTDIR/myip ]; then
-	FRISBEE_OPTS="$FRISBEE_OPTS -i `cat $BOOTDIR/myip`"
+	FRISBEE_OPTS="-i `cat $BOOTDIR/myip`"
 fi
 IMAGEUNZIP_OPTS="-o -O -W 32"
+
+RESIDMEM=32
+RESIDMEM=`expr \( $RESIDMEM + 2 \) \* 1024`
+FREEMEM=`free | sed -n 's/^-\/+ buffers.* \([0-9]*\)$/\1/p'`
+if [ -z "$FREEMEM" ]; then
+	# BusyBox's 'free' command has slightly different output
+	FREEMEM=`free | sed -n 's/^  *Mem: *[0-9]* *[0-9]* *\([0-9]*\) *.*$/\1/p'`
+fi
+if [ $FREEMEM -gt $RESIDMEM ]; then
+	BUFFERMEM=`expr $FREEMEM - $RESIDMEM`
+	DATASEGSIZE=`ulimit -d`
+	if ! [ $DATASEGSIZE = unlimited ] &&
+	     [ $BUFFERMEM -gt $DATASEGSIZE ]; then
+		BUFFERMEM=$DATASEGSIZE
+		echo "WARNING: kernel limits buffering to $BUFFERMEM KB"
+	else
+		BUFFERMEM=`expr $BUFFERMEM / 1024`
+	fi
+
+	FRISBEE_OPTS="$FRISBEE_OPTS -M $BUFFERMEM"
+fi
+
 
 # Wipe the MBR and partition boot blocks on all disks if reloading
 case $STATUS in

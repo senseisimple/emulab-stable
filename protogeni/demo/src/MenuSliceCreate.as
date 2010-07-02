@@ -115,7 +115,6 @@ package
       opName = "Acquiring credential";
       clip.loadText.text = opName;
       op.reset(Geni.getCredential);
-//      op.addField("uuid", "0b2eb97e-ed30-11db-96cb-001143e453fe");
       op.call(completeCredential, failure);
       addSend();
     }
@@ -150,7 +149,8 @@ package
       if (code == 0)
       {
         credential.ssh = response.value;
-        startSliceDelete();
+		startSliceResolve();
+        //
 //        startUserLookup();
       }
       else
@@ -158,8 +158,39 @@ package
         codeFailure();
       }
     }
+	
+	// GET EXISTING SLICE
+	
+	function startSliceResolve() : void
+    {
+      opName = "Resolve";
+      clip.loadText.text = "Resolving slice";
+	  
+	  op.reset(Geni.resolve);
+	  op.addField("credential", credential.base);
+	  op.addField("hrn", sliceName);
+	  op.addField("type", "Slice");
+	 // op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
+	  op.call(completeSliceResolve, failure);
+	  addSend();
+    }
+	
+	function completeSliceResolve(code : Number, response : Object) : void
+    {
+      addResponse();
+      if (code == 0)
+      {
+		  sliceId = response.value.uuid;
+		  startSliceCredential();
+      }
+      else
+      {
+		  startSliceDelete();
+        //codeFailure();
+      }
+    }
 
-
+/*
     function startUserLookup() : void
     {
       opName = "Lookup User";
@@ -211,8 +242,49 @@ package
         startSliceCreate();
       }
     }
-
-    function startSliceDelete() : void
+*/
+	
+	function startSliceCredential() : void
+    {
+      opName = "Slice Credential";
+      clip.loadText.text = "Getting the credential for the existing slice";
+	  
+	  op.reset(Geni.getCredential);
+	  op.addField("credential", credential.base);
+	  op.addField("uuid", sliceId);
+	  op.addField("type", "Slice");
+	  //op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
+	  op.call(completeSliceCredential, failure);
+    }
+	
+	function completeSliceCredential(code : Number, response : Object) : void
+    {
+      addResponse();
+      if (code == 0)
+      {
+		  credential.slice = String(response.value);
+		  credential.existing = true;
+		  var newDetailMenu = new MenuSliceDetail(sliceName, sliceId, credential,
+                                          Util.makeUrn(Geni.defaultAuthority,
+                                                       "slice", sliceName));
+        Main.setText(clip.xmlText.text);
+        Main.changeState(newDetailMenu);
+      }
+	  else if (code == 3)
+	  {
+		  var newSelectMenu = new MenuSliceSelect();
+        newSelectMenu.setSliceName("Access to '" + sliceName + "' is forbidden");
+        Main.changeState(newSelectMenu);
+	  }
+      else
+      {
+        codeFailure();
+      }
+    }
+	
+	// CREATE NEW SLICE
+	
+	function startSliceDelete() : void
     {
       opName = "Delete";
       clip.loadText.text = "Deleting existing slice";
@@ -232,12 +304,10 @@ package
       {
         startSliceCreate();
       }
-          else if(code == 7)
-          {
-                  var newMenu = new MenuSliceSelect();
-                  Main.changeState(newMenu);
-                  newMenu.setSliceName(sliceName + " hasn't expired");
-          }
+	  else if(code == 7)
+	  {
+		  startSliceResolve();
+	  }
       else
       {
         codeFailure();
@@ -264,6 +334,7 @@ package
       if (code == 0)
       {
         credential.slice = String(response.value);
+		  credential.existing = false;
 //        startResourceLookup();
         var newMenu = new MenuSliceDetail(sliceName, sliceId, credential,
                                           Util.makeUrn(Geni.defaultAuthority,
@@ -308,6 +379,7 @@ package
     }
 
     var clip : WaitingClip;
+	var components : Array;
     var sliceName : String;
     var sliceId : String;
     var op : Operation;

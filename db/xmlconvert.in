@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -110,12 +110,18 @@ my %virtual_tables =
      "firewall_rules"		=> { rows  => undef, 
 				     tag   => "firewall_rules",
 				     row   => "firewall_rule"},
+     "elabinelab_attributes"	=> { rows  => undef, 
+				     tag   => "elabinelab_attributes",
+				     row   => "attribute"},
      "virt_tiptunnels"		=> { rows  => undef, 
 				     tag   => "tiptunnels",
 				     row   => "tiptunnel"},
-     "virt_parameters"           => { rows  => undef, 
-				      tag   => "parameters",
-				      row   => "parameter"},
+     "virt_parameters"          => { rows  => undef, 
+				     tag   => "parameters",
+				     row   => "parameter"},
+     "virt_paths"               => { rows  => undef,
+				     tag   => "path_members",
+				     row   => "path_member"},
      # This is a fake table. See below. If we add more, lets generalize.
      "external_sourcefiles"	=> { rows  => undef, 
 				     tag   => "nsfiles",

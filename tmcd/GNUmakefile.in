@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 , 2008University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -167,15 +167,26 @@ install:	all
 
 install:	$(INSTALL_SBINDIR)/tmcd \
 		$(INSTALL_SBINDIR)/tmcd.restart \
-		$(INSTALL_SBINDIR)/findif
-	$(INSTALL_PROGRAM) $(SRCDIR)/common/config/rc.mkelab \
-			   $(INSTALL_ETCDIR)/rc.mkelab
+		$(INSTALL_SBINDIR)/findif \
+		elabinelabfiles
 
 control-install: tmcc
 	@$(MAKE) -C freebsd control-install
 
+subboss-install: client
+	@$(MAKE) -C $(MDSUBDIR) subboss-install
+
 client-install: client
 	@$(MAKE) -C $(MDSUBDIR) install
+
+#
+# XXX argh!  assumes FreeBSD inner boss
+#
+elabinelabfiles:
+	$(INSTALL_PROGRAM) $(SRCDIR)/common/config/rc.mkelab \
+			   $(INSTALL_ETCDIR)/rc.mkelab
+	$(INSTALL_PROGRAM) $(SRCDIR)/freebsd/mkextrafs.pl \
+			   $(INSTALL_ETCDIR)/mkextrafs.pl
 
 mfs: client
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -68,6 +68,7 @@ my $quiet      = 0;
 my $clear      = 0;
 my $warnings   = 0;
 my $maxrun     = 3;		# Maximum number of times we run assign.
+my $gotlock    = 0;
 my $vtop;
 
 #
@@ -298,12 +299,41 @@ sub AssignLoop()
 	}
 
 	#
+	# Serialize with the pool daemon if using shared nodes.
+	#
+	if ((!($impotent || $regression)) && $vtop->sharednodecount()) {
+	    while (1) {
+		#
+		# Use a countup/countdown counter, so that multiple mappers
+		# can run, but not while the pool_daemon is running.
+		#
+		my $lock_result =
+		    DBQueryFatal("update emulab_locks set value=value+1 ".
+				 "where name='pool_daemon' and value>=0");
+
+		$gotlock = $lock_result->affectedrows;
+
+		last
+		    if ($gotlock);
+		
+		chat("Waiting for pool daemon lock ...\n");
+		sleep(10);
+	    }
+	}
+
+	#
 	# RunAssign returns  0 if successful.
 	#           returns -1 if failure, but assign says to stop trying.
 	#           returns  1 if failure, but assign says to try again.
 	#           returns  2 if we made some forward progress.
 	#
 	my $retval = RunAssign($precheck, $prefix);
+
+	if ($gotlock) {
+	    DBQueryFatal("update emulab_locks set value=value-1 ".
+			 "where name='pool_daemon'");
+	    $gotlock = 0;
+	}
 
 	# Success!
 	last
@@ -712,6 +742,15 @@ sub PrintSolution()
 END {
     # Watch for getting here cause of a die()/exit() statement someplace.
     my $exitcode = $?;
+
+    #
+    # Do not want to leave this around, it will lock the pool daemon out.
+    #
+    if ($gotlock) {
+	DBQueryFatal("update emulab_locks set value=value-1 ".
+		     "where name='pool_daemon'");
+	$gotlock = 0;
+    }
 
     if ($exitcode && $exitcode != $WRAPPER_FAILED) {
 	$exitcode = $WRAPPER_FAILED|$WRAPPER_FAILED_FATALLY;

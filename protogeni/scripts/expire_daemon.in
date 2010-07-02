@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -33,7 +33,7 @@ my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
-my $LOGFILE       = "$TB/log/geniexpire.cm";
+my $LOGFILE       = "$TB/log/expire_daemon.log";
 my $IDLETIMES	  = "$TB/sbin/idletimes";
 my $EMULAB_PEMFILE = "$TB/etc/genicm.pem";
 my $REGISTER      = "$TB/sbin/protogeni/register_sliver";
@@ -90,6 +90,7 @@ require GeniCertificate;
 use Experiment;
 use Node;
 use libtestbed;
+use emutil;
 use POSIX qw(strftime);
 
 #
@@ -104,12 +105,32 @@ Genixmlrpc->SetTimeout(10);
 $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+cm";
 
+if (CheckDaemonRunning("expire_daemon")) {
+    fatal("Not starting another expire daemon!");
+}
 # Go to ground.
 if (! $debug) {
     if (TBBackGround($LOGFILE)) {
 	exit(0);
     }
 }
+if (MarkDaemonRunning("expire_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
+    ReOpenLog($LOGFILE);
+    $EUID = $SAVEEUID;
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
 GeniUtil::FlipToGeniUser();
 
 #
@@ -288,17 +309,10 @@ sub RegisterSlices()
     }
 }
 
-#
-# Setup a signal handler for newsyslog.
-#
-sub handler()
-{
-    ReOpenLog($LOGFILE);
-}
-$SIG{HUP} = \&handler
-    if (!$debug);
-
 while (1) {
+    next
+	if (NoLogins());
+    
     print "Running at ".
 	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
     
@@ -327,7 +341,7 @@ sub fatal($)
 	     "ProtoGENI expire daemon died",
 	     $msg,
 	     $TBOPS);
-
+    MarkDaemonStopped("expire_daemon");
     die("*** $0:\n".
 	"    $msg\n");
 }

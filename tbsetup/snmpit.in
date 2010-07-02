@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -50,12 +50,19 @@ sub doTrunkDisable($$);
 sub doRestorePortStatus($@);
 sub doSynchLeader($);
 sub CreateOneVlan($$@);
+sub doOpenflowEnable($$);
+sub doOpenflowDisable($$);
+sub doSetOpenflowController($$$);
+sub doSetOpenflowListener($$$);
+sub doEnableOpenflowListener($$);
 
 #
 # Defaults
 #
 my $debug = 0;
 my $quiet = 0;
+my $minOpenflowListenerPort = 5000;
+my $maxOpenflowListenerPort = 65535;
 
 ######################################################################
 # Step 1 - Process command-line arguments
@@ -78,6 +85,10 @@ Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
+          [--of-disable name pid eid]
+          [--of-enable name pid eid]
+          [--of-controller name pid eid tcp:ip:port]
+          [--of-listener name pid eid]
 General:
   -h          Display this help message
   -v <level>  Verbose mode
@@ -116,6 +127,21 @@ VLAN Control:
                         WITH EXTREME CAUTION **
   -F                Create all vlans in the given stack on the leader for
 		    use in leader->{ALLVLANSONLEADER} (Internal use only)
+  --of-enable <name> <pid> <eid> 
+                    Enable Openflow on VLAN with the name <name> that is 
+		        associated with the given experiment 
+  --of-disable <name> <pid> <eid>
+                    Disable Openflow on VLAN with the name <name> that is 
+		        associated with the given experiment
+  --of-controller <name> <pid> <eid> tcp:ip:port
+                    Set controller for Openflow-enabled VLAN with the 
+		        name <name> that is associated with the given 
+			experiment
+  --of-listener <name> <pid> <eid> 
+                    Enable listener for Openflow-enabled VLAN with the 
+		        name <name> that is associated with the given 
+			experiment, snmpit will print out the listener 
+			connection string
 
 Port Control:
   -s                     List all ports, and show configuration information
@@ -142,13 +168,13 @@ END
     return 1;
 }
 
-
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i');
+    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -163,14 +189,16 @@ if ($opt{v}) {
 if ($opt{q}) {
     $quiet = 1;
     if ($opt{m} || $opt{o} || $opt{t} || $opt{r} || $opt{X} || $opt{T} ||
-	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e}) {
+	  $opt{E} || $opt{U} || $opt{u} || $opt{d} || $opt{p} || $opt{e} ||
+	  $opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-controller'} || 
+	  $opt{'of-listener'}) {
 	my $nulldev;
         open($nulldev, ">>/dev/null");
 	select $nulldev; # supresses print foo(); without explicit fileglob
     }
 }
 
-#
+#if ($opt{F}) { push @commands, ["synchleader"]; }
 # Values that may have been passed on the command line
 #
 my $pid;
@@ -180,6 +208,7 @@ my @ports;
 my @optvlanids = ();
 my $equaltrunking = 0;
 my $this_user;
+my $ofconnstr; # Openflow connection string, for controller 
 our $next_vlan_tag; # XXX see doMakeVlan for explanation
 
 #
@@ -245,6 +274,32 @@ if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
     # Set the @ports array so that we'll do proper permission checking on it
     #
     @ports = ($opt{T});
+} elsif ($opt{'of-controller'}) {
+    #
+    # Options that take the pid eid and connection string
+    #
+    if (@ARGV < 2) {
+	tberror "pid/eid reqired!";
+	exit &usage;
+    } else {
+	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }
+    if (@ARGV < 0) {
+	tberror "Controller connection string reqired!";
+	exit &usage;
+    } else {
+	$ofconnstr = shift @ARGV;
+    }
+} elsif ($opt{'of-enable'} || $opt{'of-disable'} || $opt{'of-listener'}) {
+    #
+    # Options that need pid eid
+    #
+    if (@ARGV < 1) {
+	tberror "pid/eid reqired!";
+	exit &usage;
+    } else {
+	($pid, $eid) = (shift @ARGV, shift @ARGV);
+    }    
 } else {
     #
     # Everything else
@@ -288,6 +343,10 @@ if ($opt{a}) { push @commands, ["portcontrol","auto"]; }
 if ($opt{D}) { push @commands, ["expcnetcontrol", "disable"]; }
 if ($opt{R}) { push @commands, ["expcnetcontrol", "enable"]; }
 if ($opt{T}) { push @commands, ["trunkenable", $opt{T}]; }
+if ($opt{'of-enable'}) { push @commands, ["ofenable", $opt{'of-enable'}]; }
+if ($opt{'of-disable'}) { push @commands, ["ofdisable", $opt{'of-disable'}]; }
+if ($opt{'of-controller'}) { push @commands, ["ofcontroller", $opt{'of-controller'}]; }
+if ($opt{'of-listener'}) { push @commands, ["oflistener", $opt{'of-listener'}]; }
 
 #
 # Commands that can occur more than once
@@ -584,7 +643,8 @@ COMMAND: foreach my $command (@commands) {
             # devices that don't explicitly have a port in the VLAN.)
             @vlans = getExperimentVlans($pid,$eid,@optvlanids);
             if (!@vlans) {
-                print "snmpit: $pid/$eid has no VLANs to create, skipping\n";
+                print "snmpit: $pid/$eid has no VLANs to create, skipping\n"
+		    if (!$quiet);
                 next COMMAND;
             }
             if ($supplied_switches) {
@@ -609,7 +669,8 @@ COMMAND: foreach my $command (@commands) {
 	    #
 	    @vlans = getExperimentVlans($pid,$eid,@optvlanids);
             if (!@vlans) {
-                print "snmpit: $pid/$eid has no VLANs, skipping\n";
+                print "snmpit: $pid/$eid has no VLANs, skipping\n"
+		    if (!$quiet);
                 next COMMAND;
             }
             @vlans = filterPlannedVlans(@vlans);
@@ -717,6 +778,25 @@ COMMAND: foreach my $command (@commands) {
             @args = %args;
             last;
         };
+	(/ofenable/ || /ofdisable/ || /ofcontroller/ || /oflistener/) && do {
+	    @vlans = @args;
+
+	    # Same to 'remove', we find stacks by VLAN 
+	    my ($vlanobj, $stack);
+            if ($supplied_switches) {
+                debug("Openflow operations: using supplied switches\n");
+                @devicenames = @supplied_switches;
+            } elsif (defined($experiment) &&
+                     defined($vlanobj = VLan->Lookup($experiment,$vlans[0])) &&
+                     defined($stack = $vlanobj->GetStack())) {
+                debug("Openflow operations: found stack $stack in database\n");
+                @devicenames = getSwitchesInStack($stack);
+            } else {
+                debug("Openflow operations: using test switches\n");
+                @devicenames = getTestSwitches();
+            }
+	    last;
+	};
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
@@ -765,7 +845,8 @@ COMMAND: foreach my $command (@commands) {
 	SWITCH: for ($stack_type) {
 	    (/cisco/ || /catalyst/) && do {
 		require snmpit_cisco_stack;
-		$stack = new snmpit_cisco_stack($stack_id,$debug,$single_domain, 						@{$stacks{$stack_id}});
+		$stack = new snmpit_cisco_stack($stack_id,$debug,$single_domain,
+ 						@{$stacks{$stack_id}});
 		last;
 	    }; # /cisco/
 	    /intel/ && do {
@@ -913,6 +994,22 @@ COMMAND: foreach my $command (@commands) {
 	    $exitval += doRestorePortStatus(\@stacks,@args);
 	    last;
 	}; # /portstatus/ && do
+	(/ofenable/) && do {
+	    $exitval += doOpenflowEnable(\@stacks,$vlans[0]);
+	    last;
+	}; # /ofenable/ && do
+	(/ofdisable/) && do {
+	    $exitval += doOpenflowDisable(\@stacks,$vlans[0]);
+	    last;
+	}; # /ofdisable/ && do
+	(/ofcontroller/) && do {
+	    $exitval += doSetOpenflowController(\@stacks,$vlans[0],$ofconnstr);
+	    last;
+	}; # /ofcontroller/ && do
+	(/oflistener/) && do {
+	    $exitval += doEnableOpenflowListener(\@stacks,$vlans[0]);
+	    last;
+	}; # /oflistener/ && do
     }
 }
 
@@ -1450,6 +1547,36 @@ sub doVlansFromTables($$@) {
 		}
 		delete($trunkedPorts{$port});
 	    }
+	    
+	    #
+	    # Set openflow
+	    #
+	    # A much more right place for the openflow settings is CreateOneVlan,
+	    # however, it is called by sync vlan function and others, which don't destroy
+	    # the existing vlan_arrtibutes rows.
+	    #
+	    # TODO: Move this part to CreateOneVlan and Make sure the existed 
+	    #       vlan_attributes rows are deleted
+	    #
+	    my $ofenabled;
+	    $vlan->GetAttribute("ofenabled", \$ofenabled);
+	    if (defined($ofenabled) && $ofenabled == 1) {
+	        $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	        my $ofcontroller;
+	        $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	        if (defined($ofcontroller) && $ofcontroller ne "") {
+	            $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	        }
+	    
+	        $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	        # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	        # should refresh itself. But here vlan will not be used any more, so
+	        # maybe we can comment this refresh.
+	        $vlan->Refresh();	    
+	    }
+	    
 	    # Delete this vlan from the list that will be created below.
 	    delete($vlans{"$vlanid"});
 	}
@@ -1489,6 +1616,35 @@ sub doVlansFromTables($$@) {
 	my @ports  = getVlanPorts($vlanid);
 
 	$errors += CreateOneVlan($stack, $vlanid, @ports);
+	
+	#
+	# Set openflow
+	# 
+	# A much more right place for the openflow settings is CreateOneVlan,
+	# however, it is called by sync vlan function and others, which don't destroy
+	# the existing vlan_arrtibutes rows.
+	#
+	# TODO: Move this part to CreateOneVlan and Make sure the existed 
+	#       vlan_attributes rows are deleted
+	#
+	my $ofenabled;
+	$vlan->GetAttribute("ofenabled", \$ofenabled);
+	if (defined($ofenabled) && $ofenabled == 1) {
+	    $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	    my $ofcontroller;
+	    $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	    if (defined($ofcontroller) && $ofcontroller ne "") {
+	        $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	    }
+	    
+	    $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	    # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	    # should refresh itself. But here vlan will not be used any more, so
+	    # maybe we can comment this refresh.
+	    $vlan->Refresh();	    
+	}
     }
     return $errors;
 }
@@ -2410,5 +2566,194 @@ sub doTrunkDisable($$) {
   finish:
     setPortTagged($port, 0)
 	if (!$errors);
+    return $errors;
+}
+
+
+#
+# Openflow lock and functions
+# 
+use libtestbed;
+
+my $of_lock_held = 0;
+
+sub oflock() {
+    my $token = "of_snmpit";
+    my $old_umask = umask(0);
+    die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
+    umask($old_umask);
+    $of_lock_held = 1;
+}
+
+sub ofunlock() {
+	if ($of_lock_held) { TBScriptUnlock(); $of_lock_held = 0;}
+}
+
+#
+# doOpenflowEnable(stacks, vlan)
+# Enable Openflow on a VLAN
+#
+sub doOpenflowEnable($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $errors = 0;
+
+    #
+    # Enabling Openflow on each stack
+    #
+    print "Enabling Openflow on VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	$errors += $stack->enableOpenflow($vlan);	
+    }
+
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+    
+    return $errors;
+}
+
+#
+# doOpenflowDisable(stack, vlan)
+# Disable Openflow on a VLAN
+#
+sub doOpenflowDisable($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $errors = 0;
+
+    #
+    # Disabling Openflow on each stack
+    #
+    print "Disabling Openflow on VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	$errors += $stack->disableOpenflow($vlan);	
+    }
+             
+    #
+    # TODO:clear controllers/listeners here. Now in HP stack code.
+    #
+
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+    
+    return $errors;
+}
+
+#
+# doSetOpenflowController(stack, vlan, controller)
+# Set controller for an Openflow-enabled VLAN
+#
+sub doSetOpenflowController($$$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $controller = shift;
+    my $errors = 0;
+
+    #
+    # Set controller on each stack
+    #
+    print "Set controller for VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+        $errors += $stack->setOpenflowController($vlan, $controller);	
+    }
+    
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+
+    return $errors;
+}
+
+#
+# doSetOpenflowListener(stack, vlan, listener)
+# Set listener for an Openflow-enabled VLAN
+#
+sub doSetOpenflowListener($$$) {
+    my $stacks = shift;
+    my $vlan = shift;
+    my $listener = shift;
+    my $errors = 0;
+
+    #
+    # Set controller on each stack
+    #
+    print "Set listener for VLAN $vlan ...\n"
+	if (!$quiet);
+    foreach my $stack (@$stacks) {
+	$errors += $stack->setOpenflowListener($vlan, $listener);	
+    }
+
+    if (!$errors) {
+	print "Done! \n" if (!$quiet);
+    }
+
+    return $errors;
+}
+
+#
+# doEnableOpenflowListener(stacks, vlan)
+# enable openflow listener on the given VLAN
+# this function prints out the connection string of the listener
+#
+sub doEnableOpenflowListener($$) {
+    my $stacks = shift;
+    my $vlan = shift;
+
+    my %usedports = ();
+    my $port = $minOpenflowListenerPort;
+    my $errors = 0;
+    my $set_ok = 0;
+    my $listenerConnStr;
+
+    #
+    # get used ports
+    #
+    # Here a big lock is better than many small locks, it avoids dead locks
+    # because multiple small locks have to be held one by one, which
+    # brings the risk of dead lock.
+    #
+    oflock();
+    foreach my $stack (@$stacks) {
+        my %tmports = $stack->getUsedOpenflowListenerPorts($vlan);
+	@usedports{ keys %tmports } = values %tmports;
+    }
+
+    # get the available port
+    while (defined($usedports{$port}) && $port <= $maxOpenflowListenerPort) {
+	$port++;
+    }
+    
+    if ($port > $maxOpenflowListenerPort) {
+	print "ERROR: No port available for Openflow listener on VLAN $vlan. \n";
+	$errors++;
+    } else {
+	#
+	# set listener
+	#
+	$listenerConnStr = "ptcp:".$port;
+        my $err = doSetOpenflowListener($stacks, $vlan, $listenerConnStr);
+        if ($err == 0 && $set_ok == 0) {
+            $set_ok = 1;
+        }
+    }
+
+    if ($set_ok) {
+        print "Openflow listener connection string for VLAN $vlan is $listenerConnStr \n";
+    }
+
+    ofunlock();
+    
+    #
+    # update the vlan object with the new listener string
+    # other openflow functions may also need this, especially doOpenflowEnable/doOpenflowDisable
+    #
+    my $vlaninst = VLan->Lookup($vlan);
+    $vlaninst->SetAttribute('oflistener', $listenerConnStr, 'string');
+
     return $errors;
 }

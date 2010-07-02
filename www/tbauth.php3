@@ -952,6 +952,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     global $WIKISUPPORT, $WIKICOOKIENAME;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT, $TRACCOOKIENAME;
+    global $TBLIBEXEC_DIR, $EXP_VIS;
     
     # Caller makes these checks too.
     if (!TBvalid_uid($uid)) {
@@ -970,10 +971,11 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     $timeout = $now + $TBAUTHTIMEOUT;
     $hashkey = GENHASH();
     $crc     = bin2hex(mhash(MHASH_CRC32, $hashkey));
+    $opskey  = GENHASH();
 
     DBQueryFatal("replace into login ".
-		 "  (uid,uid_idx,hashkey,hashhash,timeout,adminon) values ".
-		 "  ('$uid', $uid_idx, '$hashkey', '$crc', '$timeout', $adminon)");
+		 "  (uid,uid_idx,hashkey,hashhash,timeout,adminon,opskey) values ".
+		 "  ('$uid', $uid_idx, '$hashkey', '$crc', '$timeout', $adminon, '$opskey')");
 
     #
     # Issue the cookie requests so that subsequent pages come back
@@ -1062,6 +1064,12 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
 		 "       weblogin_failcount=0,weblogin_failstamp=0 ".
 		 "where uid_idx='$uid_idx'");
 
+    # Proj-vis cookies
+    if ($EXP_VIS) {
+	setcookie("exp_vis_session", $opskey, 0, "/", $TBAUTHDOMAIN, 0);
+	exec("$TBLIBEXEC_DIR/write-vis-auth > /dev/null 2>&1 &");
+    }
+
     return 0;
 }
 
@@ -1095,6 +1103,7 @@ function DOLOGOUT($user) {
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN, $WWWHOST;
     global $WIKISUPPORT, $WIKICOOKIENAME, $HTTP_COOKIE_VARS;
     global $BUGDBSUPPORT, $BUGDBCOOKIENAME, $TRACSUPPORT, $TRACCOOKIENAME;
+    global $TBLIBEXEC_DIR, $EXP_VIS;
 
     if (! $CHECKLOGIN_USER)
 	return 1;
@@ -1168,6 +1177,12 @@ function DOLOGOUT($user) {
     }
     if ($BUGDBSUPPORT) {
 	setcookie($BUGDBCOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    }
+
+    #
+    if ($EXP_VIS) {
+	setcookie("exp_vis_session", "", $timeout, "/", $TBAUTHDOMAIN, 0);
+	exec("$TBLIBEXEC_DIR/write-vis-auth > /dev/null 2>&1 &");
     }
 
     return 0;

@@ -81,11 +81,11 @@ package com.mattism.http.xmlrpc
 //    this._response.removeEventListener(ProgressEvent.PROGRESS, progress);
       this._response.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
                                          securityError);
-		if(observeTimer != null)
-		{
-			observeTimer.stop();
-			observeTimer = null;
-		}
+                if(observeTimer != null)
+                {
+                        observeTimer.stop();
+                        observeTimer = null;
+                }
     }
 
     public function call(method : String) : void
@@ -116,7 +116,7 @@ package com.mattism.http.xmlrpc
         observeTimeout(60);
       }
     }
-    
+
     public var observeTimer:Timer;
     private function observeTimeout(sec:Number):void
     {
@@ -127,16 +127,16 @@ package com.mattism.http.xmlrpc
     }
     private function timeoutError(e:TimerEvent):void
         {
-        	_fault = null;
-        	this._response.close();
-        	dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "Operation timed out after " + observeTimer.delay/1000 + " seconds"));
-        	//dispatchEvent(new IOErrorEvent(IOErrorEvent.IO_ERROR, false, false, 'request timeout'));
-        	observeTimer = null;
+                _fault = null;
+                this._response.close();
+                dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "Operation timed out after " + observeTimer.delay/1000 + " seconds"));
+                //dispatchEvent(new IOErrorEvent(IOErrorEvent.IO_ERROR, false, false, 'request timeout'));
+                observeTimer = null;
         }
 
     private function _onLoad( evt:Event ):void
     {
-    	if (observeTimer) {
+        if (observeTimer) {
                 observeTimer.removeEventListener(TimerEvent.TIMER, timeoutError);
             }
       var responseXML:XML = new XML(this._response.data);
@@ -173,8 +173,7 @@ package com.mattism.http.xmlrpc
     protected function securityError(event : SecurityErrorEvent) : void
     {
       _fault = null;
-      dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false,
-                                   event.toString()));
+      dispatchEvent(event);
     }
 
     private function parseResponse(xml:XML):Object

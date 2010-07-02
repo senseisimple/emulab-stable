@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Lets emulate register_globals=off for a while.
@@ -34,6 +34,7 @@ $CVSSUPPORT     = @CVSSUPPORT@;
 $MAILMANSUPPORT = @MAILMANSUPPORT@;
 $CHATSUPPORT    = @CHATSUPPORT@;
 $PROTOGENI      = @PROTOGENI_SUPPORT@;
+$EXP_VIS        = @EXP_VIS_SUPPORT@;
 $ISOLATEADMINS  = @ISOLATEADMINS@;
 $CONTROL_NETWORK= "@CONTROL_NETWORK@";
 $CONTROL_NETMASK= "@CONTROL_NETMASK@";
@@ -531,12 +532,12 @@ function VALIDUSERPATH($path, $uid="", $pid="", $gid="", $eid="")
     # No ids specified, just make sure it starts with an appropriate prefix.
     #
     if (!$uid && !$pid && !$gid && !$eid) {
-	if (ereg("^$TBPROJ_DIR/.*", $path) ||
-	    ereg("^$TBUSER_DIR/.*", $path) ||
-	    ereg("^$TBGROUP_DIR/.*", $path)) {
+	if (preg_match("#^$TBPROJ_DIR/.*#", $path) ||
+	    preg_match("#^$TBUSER_DIR/.*#", $path) ||
+	    preg_match("#^$TBGROUP_DIR/.*#", $path)) {
 	    return 1;
 	}
-	if ($TBSCRATCH_DIR && ereg("^$TBSCRATCH_DIR/.*", $path)) {
+	if ($TBSCRATCH_DIR && preg_match("/^$TBSCRATCH_DIR\/.*/", $path)) {
 	    return 1;
 	}
 	return 0;

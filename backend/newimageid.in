@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -18,8 +18,9 @@ sub usage()
     print("Usage: newimageid [-v] <xmlfile>\n");
     exit(-1);
 }
-my $optlist = "dv";
+my $optlist = "dvf";
 my $debug   = 0;
+my $force   = 0;
 my $verify  = 0;	# Check data and return status only. 
 
 #
@@ -67,6 +68,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
 }
 if (defined($options{"v"})) {
     $verify = 1;
@@ -266,11 +270,32 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
 	    if (! $this_user->IsAdmin());
     }
 	
-    # Now check that the value is legal.
-    if (! TBcheck_dbslot($value, "images",
-			 $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
-	$errors{$key} = TBFieldErrorString();
-	next;
+    #
+    # Special case osids so they can be in pid,osname format. 
+    #
+    if (($dbslot eq "default_osid" || $dbslot =~ /^part\d/) &&
+	$value =~ /^.+,.+$/) {
+	my ($pid,$osname) = ($value =~ /^(.*),(.*)$/);
+	
+	# Now check that the value is legal.
+	if (! TBcheck_dbslot($pid, "projects",
+			     "pid", TBDB_CHECKDBSLOT_ERROR)) {
+	    $errors{$key} = TBFieldErrorString();
+	    next;
+	}
+	if (! TBcheck_dbslot($osname, "os_info",
+			     "osname", TBDB_CHECKDBSLOT_ERROR)) {
+	    $errors{$key} = TBFieldErrorString();
+	    next;
+	}
+    }
+    else {
+	# Now check that the value is legal.
+	if (! TBcheck_dbslot($value, "images",
+			     $dbslot, TBDB_CHECKDBSLOT_ERROR)) {
+	    $errors{$key} = TBFieldErrorString();
+	    next;
+	}
     }
 
     $newimageid_args{$key} = $value;
@@ -439,12 +464,11 @@ elsif (! $isadmin) {
 #
 UserError("Node Types: Must have at least one node type")
     if ($#mtypes_array < 0);
-my $typeclause = join(" or ", map("type='$_'", @mtypes_array));
 
 # Check validity of mtype_* args, since the keys are dynamically generated.
 my $node_types_selected = 0;
-my @mtype_keys = grep(/^mtype_/, keys(%newimageid_args));
-foreach $key (@mtype_keys) {
+my @mtype_keys = ();
+foreach $key (grep(/^mtype_/, keys(%newimageid_args))) {
     my $value = $newimageid_args{$key};
     print STDERR "mtype: '$key' -> '$value'\n"
 	if ($debug);
@@ -457,10 +481,13 @@ foreach $key (@mtype_keys) {
     }
     elsif ($value eq "1") {
 	$node_types_selected++;
+	push(@mtype_keys, $key);
     }
 }
 UserError("Node Types: Must select at least one node type")
-    if ($node_types_selected == 0);
+    if ($node_types_selected == 0 && !$force);
+
+my $typeclause = join(" or ", map("type='$_'", @mtype_keys));
 
 #
 # Check sanity of node name and that user can create an image from it.

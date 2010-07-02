@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -102,7 +102,7 @@ use vars qw(@ISA @EXPORT);
 	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_RELOADDONE_V2
 	 TBDB_NODESTATE_UNKNOWN
 	 TBDB_NODESTATE_PXEWAIT TBDB_NODESTATE_PXEWAKEUP
-	 TBDB_NODESTATE_PXEFAILED
+	 TBDB_NODESTATE_PXEFAILED TBDB_NODESTATE_PXELIMBO
 	 TBDB_NODESTATE_PXEBOOTING TBDB_NODESTATE_ALWAYSUP
 	 TBDB_NODESTATE_MFSSETUP TBDB_NODESTATE_TBFAILED
 	 TBDB_NODESTATE_POWEROFF
@@ -172,7 +172,7 @@ use vars qw(@ISA @EXPORT);
 	 TBOSLoadMaxOkay TBImageLoadMaxOkay TBImageID 
 	 TBdbfork VnameToNodeid 
 	 TBIsNodeRemote 
-	 TBIsNodeImageable TBIsNodeVirtual TBControlNetIP TBPhysNodeID
+	 TBIsNodeVirtual TBControlNetIP TBPhysNodeID
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBNodeUpdateAccountsByUID
 	 TBExptWorkDir TBExptUserDir
@@ -485,6 +485,7 @@ sub TBDB_NODESTATE_RELOADDONE()	{ "RELOADDONE"; }
 sub TBDB_NODESTATE_RELOADDONE_V2(){ "RELOADDONEV2"; }
 sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
 sub TBDB_NODESTATE_PXEWAIT()	{ "PXEWAIT"; }
+sub TBDB_NODESTATE_PXELIMBO()	{ "PXELIMBO"; }
 sub TBDB_NODESTATE_PXEWAKEUP()	{ "PXEWAKEUP"; }
 sub TBDB_NODESTATE_PXEFAILED()	{ "PXEFAILED"; }
 sub TBDB_NODESTATE_PXEBOOTING()	{ "PXEBOOTING"; }
@@ -655,6 +656,7 @@ sub TBDB_PHYSICAL_NODE_TABLES() {
 	'nodeuidlastlogin'	=> [ 'node_id' ],
 	'ntpinfo'		=> [ 'node_id' ],
 	'outlets'		=> [ 'node_id' ],
+	'outlets_remoteauth'	=> [ 'node_id' ],
 	'partitions'		=> [ 'node_id' ],
 	'plab_slice_nodes'	=> [ 'node_id' ],
 	'port_counters'		=> [ 'node_id' ],
@@ -1306,26 +1308,6 @@ sub TBOSMaxConcurrent ($)
 }
 
 #
-# Returns the reboot waittime.
-#
-# usage: TBOSIDRebootWaittime(char *osid)
-#        returns >= 1 if there is a waittime
-#        returns undef if there is no waittime
-#        returns 0 if not valid.
-#
-sub TBOSIDRebootWaittime ($)
-{
-    my ($osid) = @_;
-
-    require OSinfo;
-
-    my $osinfo = OSinfo->Lookup($osid);
-    return 0
-	if (!defined($osinfo));
-    return $osinfo->reboot_waittime();
-}
-
-#
 # Returns the number of nodes that are supposedly booting an OS. A list of
 # nodes that should be excluded from this count can be given.
 #
@@ -1710,33 +1692,6 @@ sub TBGetNodeAllocState($$)
 	$$state = TBDB_ALLOCSTATE_UNKNOWN;
     }
     return 1;
-}
-
-#
-# Is a node imageable?
-#
-# usage TBIsNodeImageable(char *node)
-#        Returns 1 if yes.
-#        Returns 0 if no.
-#
-sub TBIsNodeImageable($)
-{
-    my ($nodeid) = @_;
-
-    my $node = Node->Lookup($nodeid);
-
-    return 0
-	if (!defined($node));
-
-    my $imageable;
-    
-    return 0
-	if ($node->NodeTypeAttribute("imageable", \$imageable) != 0);
-
-    $imageable = 0
-	if (!defined($imageable));
-
-    return $imageable;
 }
 
 #
@@ -2747,13 +2702,15 @@ sub TBNodeStateWait ($$$$@) {
 	$waittime = time - $waitstart;
 	if ($waittime > $maxwait) {
 	    $minutes = int($waittime / 60);
-	    print "*** Giving up on $pc - it's been $minutes minute(s).\n";
+	    print "*** Giving up on $pc ($state) - ",
+	          "it's been $minutes minute(s).\n";
 	    TBNodeConsoleTail($pc, *STDOUT);
 	    return 1;
 	}
 	if (int($waittime / 60) > $minutes) {
 	    $minutes = int($waittime / 60);
-	    print "Still waiting for $pc - it's been $minutes minute(s).\n";
+	    print "Still waiting for $pc ($state) - ",
+	          "it's been $minutes minute(s).\n";
 	}
 	sleep(1);
     }

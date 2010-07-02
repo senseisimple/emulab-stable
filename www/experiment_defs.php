@@ -307,6 +307,7 @@ class Experiment
     function locked()       { return $this->field('expt_locked'); }
     function elabinelab()   { return $this->field('elab_in_elab');}
     function lockdown()     { return $this->field('lockdown'); }
+    function skipvlans()    { return $this->field('skipvlans'); }
     function created()      { return $this->field('expt_created'); }
     function swapper()      { return $this->field('expt_swap_uid');}
     function swappable()    { return $this->field('swappable');}
@@ -434,6 +435,20 @@ class Experiment
 
 	$query_result =
 	    DBQueryFatal("update experiments set lockdown='$mode' ".
+			 "where idx='$idx'");
+
+	return 0;
+    }
+
+    #
+    # Flip lockdown bit.
+    #
+    function SetSkipVlans($mode) {
+	$idx      = $this->idx();
+	$mode     = ($mode ? 1 : 0);
+
+	$query_result =
+	    DBQueryFatal("update experiments set skipvlans='$mode' ".
 			 "where idx='$idx'");
 
 	return 0;
@@ -707,6 +722,7 @@ class Experiment
 	$mnet_cores  = $exprow["modelnet_cores"];
 	$mnet_edges  = $exprow["modelnet_edges"];
 	$lockdown    = $exprow["lockdown"];
+	$skipvlans   = $exprow["skipvlans"];
 	$exptidx     = $exprow["idx"];
 	$archive_idx = $exprow["archive_idx"];
 	$dpdb        = $exprow["dpdb"];
@@ -1005,6 +1021,17 @@ class Experiment
 		"&type=lockdown&value=$lockflip>Toggle</a>)
                    </td>
               </tr>\n";
+
+	    if (ISADMIN()) {
+		$thisflip = ($skipvlans ? 0 : 1);
+		$flipval  = ($skipvlans ? "Yes" : "No");
+		echo "<tr>
+                       <td>Skip Vlans:</td>
+                       <td>$flipval (<a href=toggle.php?pid=$pid&eid=$eid".
+		           "&type=skipvlans&value=$thisflip>Toggle</a>)
+                       </td>
+                      </tr>\n";
+	    }
 	}
 
 	if ($batchmode) {
@@ -1084,6 +1111,7 @@ class Experiment
 
 		if ($slice) {
 		    $slice_hrn = $slice->hrn();
+		    $slice_urn = $slice->urn();
 		    if (ISADMIN()) {
 			$url = CreateURL("showslice", "slice_idx",
 					 $slice->idx(), "showtype", "cm");
@@ -1091,13 +1119,13 @@ class Experiment
 			echo "<tr>
                                 <td>Geni Slice (CM): </td>
                                 <td class=\"left\">
-                                     <a href='$url'>$slice_hrn</a></td>
+                                     <a href='$url'>$slice_urn</a></td>
                               </tr>\n";
 		    }
 		    else {
 			echo "<tr>
                                 <td>Geni Slice (CM): </td>
-                                <td class=\"left\">$slice_hrn</td>
+                                <td class=\"left\">$slice_urn</td>
                               </tr>\n";
 		    }
 		}
@@ -1106,6 +1134,7 @@ class Experiment
 		$slice = GeniSlice::LookupByExperiment("geni-sa", $this);
 		if ($slice) {
 		    $slice_hrn = $slice->hrn();
+		    $slice_urn = $slice->urn();
 		    if (ISADMIN()) {
 			$url = CreateURL("showslice", "slice_idx",
 					 $slice->idx(), "showtype", "sa");
@@ -1113,13 +1142,13 @@ class Experiment
 			echo "<tr>
                                  <td>Geni Slice (SA): </td>
                                  <td class=\"left\">
-                                      <a href='$url'>$slice_hrn</a></td>
+                                      <a href='$url'>$slice_urn</a></td>
                              </tr>\n";
 		    }
 		    else {
 			echo "<tr>
                                 <td>Geni Slice (SA): </td>
-                                <td class=\"left\">$slice_hrn</td>
+                                <td class=\"left\">$slice_urn</td>
                               </tr>\n";
 		    }
 		    $slice = GeniSlice::Lookup("geni-cm", $slice_hrn);
@@ -1131,13 +1160,13 @@ class Experiment
 			    echo "<tr>
                                      <td>Geni Slice (CM): </td>
                                      <td class=\"left\">
-                                           <a href='$url'>$slice_hrn</a></td>
+                                           <a href='$url'>$slice_urn</a></td>
                                   </tr>\n";
 			}
 			else {
 			    echo "<tr>
                                     <td>Geni Slice (SA): </td>
-                                    <td class=\"left\">$slice_hrn</td>
+                                    <td class=\"left\">$slice_urn</td>
                                   </tr>\n";
 			}
 		    }
@@ -1551,5 +1580,4 @@ function ShowExperimentList_internal($templates_only,
     }
     return $html;
 }
-
-    
+?>

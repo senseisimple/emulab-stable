@@ -197,8 +197,9 @@ my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not lookup experiment object!")
 }
-my $special = ($pid eq "testbed" || $pid eq "tbres" ||
-	       $pid eq "emulab-ops" || $pid eq "utahstud");
+my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "geni" ||
+	       $pid eq "emulab-ops" || $pid eq "utahstud" || $pid eq "ResiliNets");
+my $newsetup = $special;
 
 #
 # Print starting message.
@@ -1285,8 +1286,10 @@ sub doSwapin($) {
     #
     print "Resetting OS and rebooting.\n";
     TBDebugTimeStamp("launching os_setup");
-    if (!($os_setup_pid = fork())) { 
-	exec("os_setup $pid $eid") or return 1;
+    if (!($os_setup_pid = fork())) {
+	my $oscmd = ($newsetup ? "os_setup_new" : "os_setup");
+	
+	exec("$oscmd $pid $eid") or return 1;
     } elsif ($os_setup_pid == -1) {
 	tberror "Fork failed.";
 	return 1;
@@ -1299,7 +1302,8 @@ sub doSwapin($) {
     # the step has completed and 2) It's OK for the command to run in
     # parallel with os_setup (no DB dependencies, etc.)
     #
-    if ($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special)) {
+    if (!$experiment->skipvlans() &&
+	($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
 	if (system("snmpit -t $pid $eid")) {
@@ -1422,12 +1426,17 @@ sub doSwapin($) {
     #
     # Do linktest if user requested it at swapin.
     #
+    # We don't run linktest on elabinelabs since there may be no network
+    # (i.e., in the "single control network" case) and inner nodes are
+    # going to be sitting in PXEWAIT.
+    #
     my $query_result =
 	DBQueryFatal("select linktest_level,linktest_pid from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     my ($linktest_level,$linktest_pid) = $query_result->fetchrow_array();
 
-    if ($linktest_level && ($type == REAL || $type == MODIFY)) {
+    if (!$elabinelab && $linktest_level &&
+	($type == REAL || $type == MODIFY)) {
 	if ($linktest_pid) {
 	    tbwarn "Linktest is already running! $linktest_pid";
 	}

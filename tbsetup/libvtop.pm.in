@@ -1054,6 +1054,7 @@ sub LoadVirtLans($)
 	my $encap          = $vlanmember->encap_style();
 	my $mask           = $vlanmember->mask();
 	my $ip             = $vlanmember->ip();
+	my $layer          = $vlanmember->layer();
 	my $fixed_iface    = $vlanmember->fixed_iface();
 	my ($vname,$vport) = split(":", $vlanmember->member());
 
@@ -1090,6 +1091,7 @@ sub LoadVirtLans($)
 	# Whether all member nodes are simulated
 	$virtlan->_allsim(0);
 	$virtlan->_protocol($protocol);
+	$virtlan->_layer($layer);
 	$virtlan->_accesspoint($vlanmember)
 	    if ($vlanmember->is_accesspoint());
 	$virtlan->_sharednodes(0);
@@ -1237,6 +1239,8 @@ sub GenVirtNodes($)
 		if ($vnode->_sharedokay()) {
 		    $ref->{'exclusive'} = 0;
 		}
+		$ref->{'node_type'} = {"type_name"  => "pcvm",
+				       "type_slots" => 1};
 	    }
 	    else {
 		$ref->{'virtualization_type'} = 'raw';
@@ -1261,13 +1265,12 @@ sub GenVirtNodes($)
 		$self->{'RSPEC'} = {
 		    'generated_by' => 'libvtop',
 		    'type'  => 'request',
-		    'xmlns' => 'http://www.protogeni.net/resources/rspec/0.1',
+		    'xmlns' => 'http://www.protogeni.net/resources/rspec/0.2',
 		    'node'  => [] };
 	    }
 	    push(@{ $self->rspec()->{'node'} }, $ref);
 	    next;
 	}
-
 	my $subnodestr = "";
 	if ($vnode->_issubnode()) {
 	    my $parent  = $vnode->_parent();
@@ -1565,6 +1568,7 @@ sub GenVirtLans($)
 	my $nobwshaping  = $vlan->_nobwshaping();
 	my $protocol     = $vlan->_protocol();
 	my $encap        = $vlan->_encapstyle();
+	my $layer        = $vlan->_layer();
 
 	#
 	# Count the types of nodes (simulated, virtual, real, etc.) in this
@@ -1690,6 +1694,17 @@ sub GenVirtLans($)
 		if ($osdoesvlan{$osid});
 	    $nodesdo{"ldelay"}++
 		if ($osdoeslinkdelays{$osid});
+	}
+
+	#
+	# Layer 1 links cannot be any of these things right now.
+	# Just a wire.
+	#
+	if ($layer == 1 &&
+	    ($trivial_ok || $emulated || $uselinkdelay ||
+	     $mustdelay || $nobwshaping || $sharednodes || $simnodes)) {
+	    tberror("$vname is a layer 1 link, no optons please.\n");
+	    return -1;
 	}
 
 	$self->printdb("$vname: members = ".
@@ -2065,7 +2080,9 @@ sub GenVirtLans($)
 		 # Link must be shaped for other reasons (q_red).
 		 $mustdelay ||
 		 # Global force, or per-link force. 
-		 $self->option('forcelinkdelays') || $uselinkdelay)) {
+		 $self->option('forcelinkdelays') || $uselinkdelay) &&
+		# Only layer 2 is shaped.
+		$layer == 2) {
 		# Need a delay node and its really a shaped link.
 		$shaped = 1;
 		# Mark the links as shaped for later.
@@ -2228,6 +2245,9 @@ sub GenVirtLans($)
 		else {
 		    # Let assign choose bw if top_bw is zero.
 		    $spec .= ($top_bw == 0 ? "*" : $top_bw);
+		}
+		if ($layer == 1) {
+		    $protocol = "wire";
 		}
 		$spec .= " 0 0 $protocol";
 		$spec .= " emulated" if ($emulated);
@@ -3062,9 +3082,9 @@ sub AddNodeToSolution($$$)
     return 0;
 }
 
-sub AddLinkToSolution($$$$$$$)
+sub AddLinkToSolution($$$$$$$$)
 {
-    my ($self, $vlink, $trivial, $nodeA, $portA, $nodeB, $portB) = @_;
+    my ($self, $vlink, $trivial, $direct, $nodeA, $portA, $nodeB, $portB) = @_;
 	
     #
     # Map the solution back to our objects and store the results.
@@ -3114,8 +3134,10 @@ sub AddLinkToSolution($$$$$$$)
 	    $member0->_pnode($nodeA);
 	    $member0->_pport($portA);
 	    # For a special case, see below.
-	    $member0->_lannode($nodeB);
-	    $member0->_lanport($portB);
+	    if (defined($nodeB)) {
+		$member0->_lannode($nodeB);
+		$member0->_lanport($portB);
+	    }
 	}
     }
     elsif (($lan,$virtA) =
@@ -3148,9 +3170,12 @@ sub AddLinkToSolution($$$$$$$)
     }
 	
     $self->solution_plinks()->{$vlink} =
-	[$linktag,$virtlan,$trivial,$member0,$member1];
+	[$linktag,$virtlan,$trivial,$direct,$member0,$member1];
     if (!$trivial) {
-	$self->printdb("  $vlink $nodeA$portA,$nodeB$portB\n");
+	$self->printdb("  $vlink ".
+		       (defined($nodeA) ? "A:$nodeA:$portA " : "") .
+		       (defined($nodeB) ? "B:$nodeB:$portB " : "") .
+		       ($direct ? " (direct)" : "") . "\n");
     }
     else {
 	$self->printdb("  $vlink trivial\n");
@@ -3214,6 +3239,7 @@ sub ReadTextSolution($$)
     EDGEWHILE: while (<$input>) {
 	my ($vlink,$rawA,$rawB) = undef;
 	my $trivial = 0;
+	my $direct  = 0;
 
 	/^End Edges$/ && last EDGEWHILE;
         my @info = split;
@@ -3230,6 +3256,7 @@ sub ReadTextSolution($$)
 	    };
 	    /^direct$/ && do {
 		($vlink,$rawA,$rawB) = @info[0,3,5];
+		$direct = 1;
 		last SWITCH1;
 	    };
 	    /^trivial$/ && do {
@@ -3243,18 +3270,35 @@ sub ReadTextSolution($$)
 	}
 
 	my ($nodeportA,$nodeportB) = undef;
+	my ($switchportA,$switchportB) = undef;
 	my ($nodeA,$portA,$nodeB,$portB) = undef;
 	
 	if (!$trivial) {
-	    $nodeportA = getnodeport($rawA);
-	    $nodeportB = getnodeport($rawB);
-	    # Convert them back to node:iface format.
-	    $nodeportA =~ s/\//:/;
-	    $nodeportB =~ s/\//:/;
-	    ($nodeA,$portA) = split(":", $nodeportA);
-	    ($nodeB,$portB) = split(":", $nodeportB);
+	    ($nodeportA,$switchportA) = getnodeport($rawA);
+	    if (defined($nodeportA)) {
+		# Convert back to node:iface format.
+		$nodeportA =~ s/\//:/;
+		($nodeA,$portA) = split(":", $nodeportA);
+	    }
+
+	    #
+	    # A direct link between two nodes; $rawA holds both sides
+	    # of the link (switchportA is really $nodeportB). 
+	    #
+	    if ($direct && defined($switchportA)) {
+		$nodeportB   = $switchportA;
+		$switchportB = undef;
+	    }
+	    else {
+		($nodeportB,$switchportB) = getnodeport($rawB);
+	    }
+	    if (defined($nodeportB)) {
+		# Convert back to node:iface format.
+		$nodeportB =~ s/\//:/;
+		($nodeB,$portB) = split(":", $nodeportB);
+	    }
 	}
-	$self->AddLinkToSolution($vlink, $trivial,
+	$self->AddLinkToSolution($vlink, $trivial, $direct,
 				 $nodeA, $portA, $nodeB, $portB);
     }
     return 0;
@@ -3269,7 +3313,7 @@ sub ReadRspecSolution($$)
     $self->printdb("Nodes:\n");
 
     foreach my $ref (@{ $self->rspec()->{'node'} }) {
-	my $node_urn = $ref->{'component_urn'};
+	my $node_urn = $ref->{'component_urn'} || $ref->{'component_uuid'};
 	my $virtual  = $ref->{'virtual_id'};
 
 	# Skip LAN/Fake nodes.
@@ -3324,6 +3368,7 @@ sub ReadRspecSolution($$)
 
 	if (scalar(@ifacerefs) == 2) {
 	    my ($ifaceA,$ifaceB) = @ifacerefs;
+	    my $trivial = 0;
 
 	    my $virtA  = $ifaceA->{'virtual_interface_id'};
 	    my $virtB  = $ifaceB->{'virtual_interface_id'};
@@ -3333,10 +3378,15 @@ sub ReadRspecSolution($$)
 	    my $nodeB  = $self->solution()->{'V2P'}->{$vnodeB};
 	    my $portA  = $ifacemap{$vnodeA}->{$virtA};
 	    my $portB  = $ifacemap{$vnodeB}->{$virtB};
+	    my $vlink  = "linksimple/$virtual_id/$virtA,$virtB";
+
+	    if ($portA eq "loopback" || $portB eq "loopback") {
+		$nodeA = $nodeB = $portA = $portB = undef;
+		$trivial = 1;
+		$virtlan->_trivial_ok(1);
+	    }
 	    
-	    my $vlink = "linksimple/$virtual_id/$virtA,$virtB";
-	    
-	    $self->AddLinkToSolution($vlink, 0,
+	    $self->AddLinkToSolution($vlink, $trivial, 0,
 				     $nodeA, $portA, $nodeB, $portB);
 	}
 	else {
@@ -3348,7 +3398,7 @@ sub ReadRspecSolution($$)
 	    
 		my $vlink = "linklan/$virtual_id/$virtA";
 	    
-		$self->AddLinkToSolution($vlink, 0, $nodeA, $portA);
+		$self->AddLinkToSolution($vlink, 0, 0, $nodeA, $portA);
 	    }
 	}
     }
@@ -3728,7 +3778,7 @@ sub AllocNodes($)
     if (defined($self->rspec()) && !$self->impotent()) {
 	$self->printdb("Requesting geni tickets ...\n");
 	
-	if (libGeni::GetTickets($self->experiment(), $self->impotent(),
+	if (libGeni::GetTickets($self->experiment(), $self->verbose(),
 				$self->user(), $self->rspec())) {
 	    tberror("Could not allocate Geni Tickets\n");
 	    return -1;
@@ -3841,7 +3891,8 @@ sub AllocNodes($)
 	my $vpnodename = $self->solution_v2v()->{$vnodename};
 	my $vpnode     = $self->pnodes()->{$vpnodename};
 	
-	if ($vpnode->isjailed() || $vpnode->isremotenode()) {
+	if ($vpnode->isjailed() ||
+	    $vpnode->isremotenode() || $vpnode->_onsharednode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
 	    my $sshdport  = nextipportnum($pnode);
@@ -4165,7 +4216,8 @@ sub InterpLinks($)
     my %plinks = %{ $self->solution_plinks() };
 
     foreach my $plink (sort(keys(%plinks))) {
-	my ($linktag,$virtlan,$trivial,$member0,$member1) = @{$plinks{$plink}};
+	my ($linktag,$virtlan,$trivial,$direct,$member0,$member1) =
+	    @{$plinks{$plink}};
 	my $lan = $virtlan->vname();
 
 	#
@@ -4331,6 +4383,7 @@ sub InterpLinks($)
 	    # trivial links do not have physical links, but could be using
 	    # virtual interfaces on the same node. 
 	    #
+	    #
 	    if (! $trivial) {
 		$nodeB  = $member1->_pnode();
 		$portB  = $member1->_pport();
@@ -4338,7 +4391,19 @@ sub InterpLinks($)
 		$self->printdb("LINK simple: $virtA,$virtB - ".
 			       "$nodeA:$portA,$nodeB:$portB\n");
 
-		if ($virtlan->usevirtiface()) {
+		if ($virtlan->_layer() == 1 || $direct) {
+		    #
+		    # Just a wire. At layer two, its a wire between
+		    # two nodes.
+		    #
+		    $protolink = ProtoLan->Create($experiment, $lan,
+						  $self->impotent());
+		    $protolink->SetType("wire");
+		    $protolink->SetRole("link");
+		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
+		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
+		}
+		elsif ($virtlan->usevirtiface()) {
 		    my $protovlan;
 		    
 		    #
@@ -5766,7 +5831,7 @@ sub UploadVlans($)
     # "veth" implemented vlans, we have to merge the overlapping vlans
     # into "supervlans". Must be done iteratively of course.
     #
-    $self->printdb("Dumping vlans before merging.\n");
+    $self->printdb("Dumping protolans before merging.\n");
     ProtoLan->DumpAll()
 	if ($self->verbose());
     
@@ -5817,7 +5882,7 @@ sub UploadVlans($)
     }
     
     if (!$self->impotent()) {
-	$self->printdb("Uploading vlans table.\n");
+	$self->printdb("Uploading protolans table.\n");
 	ProtoLan->DumpAll()
 	    if ($self->verbose());
 	if (ProtoLan->InstantiateAll($self->regression()) != 0) {
@@ -5862,7 +5927,7 @@ sub UploadVlans($)
 	}
     }
     else {
-	$self->printdb("Dumping final vlans table.\n");
+	$self->printdb("Dumping final protolans table.\n");
 	ProtoLan->DumpAll()
 	    if ($self->verbose());
     }
@@ -6331,14 +6396,18 @@ sub UpLoadInterfaceSettings($)
 }
 
 # getnodeport(s)
-# Takes a ports result from assign (mac0,mac1) and returns the
-# first non-null one.
+# Takes a ports result from assign (mac0,mac1) and converts null strings to undef.
 sub getnodeport($)
 {
     my $macstring=$_[0];
     my ($A,$B) = ($macstring =~ /^\(([^,]+),([^,]+)\)$/);
 
-    return (($A ne "(null)") ? $A : (($B ne "(null)") ? $B : "null/null"));
+    $A = undef
+	if ($A eq "(null)");
+    $B = undef
+	if ($B eq "(null)");
+
+    return ($A, $B);
 }
 
 # Get the type for an interface.

@@ -30,6 +30,9 @@ BOSSNODE = "@BOSSNODE@"
 BOSSEVENTPORT = "@BOSSEVENTPORT@"
 OURDOMAIN = "@OURDOMAIN@"
 USERNODE = "@USERNODE@"
+BASEADDR = "@FRISEBEEMCASTADDR@"
+BASEPORT = "@FRISEBEEMCASTPORT@"
+SUBBOSS_UID = "elabman"
 
 TBPATH = os.path.join(TBDIR, "lib")
 if TBPATH not in sys.path:
@@ -327,6 +330,7 @@ class EmulabServer:
         self.instances["osid"]       = osid(self);
         self.instances["node"]       = node(self);
         self.instances["elabinelab"] = elabinelab(self);
+        self.instances["subboss"] = subboss(self);
         return
 
     def __getattr__(self, name):
@@ -3117,20 +3121,22 @@ class experiment:
         #
         result = []
 
-	res = DBQuery("select ex.idx,ex.time,ex.vname,"
-                      " ot.type,et.type,ex.arguments,ex.parent "
-                      "from eventlist as ex "
-                      "left join event_eventtypes as et on "
+	res = DBQuery("SELECT ex.idx,ex.time,ex.vname,"
+                      "ot.type,et.type,ex.arguments,ex.parent,etr.type "
+                      "FROM eventlist AS ex "
+                      "LEFT JOIN event_triggertypes AS etr ON "
+                      "ex.triggertype=etr.idx "
+                      "LEFT JOIN event_eventtypes AS et ON "
                       " ex.eventtype=et.idx "
-                      "left join event_objecttypes as ot on "
+                      "LEFT JOIN event_objecttypes AS ot ON "
                       " ex.objecttype=ot.idx "
-                      "where ex.pid=%s and ex.eid=%s and ot.type!='TIME' "
-                      "order by ex.time,ex.idx ASC",
+                      "WHERE ex.pid=%s AND ex.eid=%s AND ot.type!='TIME' "
+                      "ORDER BY ex.time,ex.idx ASC",
                       (argdict["proj"], argdict["exp"]))
 
         for event in res:
             result.append((str(event[0]), str(event[1]), event[2],
-                           event[3], event[4], event[5], event[6]));
+                           event[3], event[4], event[5], event[6], event[7]));
             pass
         
         res = DBQuery("select n.phys_nodeid,i.IP from reserved as r "
@@ -3193,7 +3199,7 @@ class experiment:
                            "",
                            "__ns_teardown"))
             pass
-        
+
         return EmulabResponse(RESPONSE_SUCCESS, value=result)
 
     def event_time_start(self, version, argdict):
@@ -4237,6 +4243,400 @@ class node:
     
     pass
 
+#
+# Hack class to get subbosses working... Note that nothing we do
+# in this class can damage anything or mess up anything outside the expt.
+#
+class subboss:
+    ##
+    # Initialize the object.  Currently only sets the objects 'VERSION' value.
+    #
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
+        self.VERSION  = VERSION
+        self.clientip = server.clientip;
+        self.pid      = None;
+        self.eid      = None;
+        return
+
+    #
+    # Anything we do from this class has to be called by a node,
+    # that node must be reserved, a subboss, and assigned to an
+    # active experiment.  
+    #
+    def verifystuff(self):
+        if self.clientip == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="SSL connections only")
+
+        res = DBQueryFatal("select i.node_id,r.erole "
+                           "  from interfaces as i "
+                           "left join reserved as r on r.node_id=i.node_id "
+                           "where i.IP=%s and i.role='ctrl'",
+                           (self.clientip))
+        
+        # IP must map to a node.
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such node for IP: " +
+                                  self.clientip)
+        
+        # Node must be reserved.
+        if res[0][1] == None:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Node is not reserved: " + res[0][0])
+        
+        # Must be a subboss.
+        if res[0][1] != "subboss":
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                                  output="Not a subboss");
+        
+        if self.uid != SUBBOSS_UID:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                                  output="Invalid UID")
+        
+        return None;
+    #
+    # Return info for a particular image on a given subboss
+    # 
+    def get_load_address(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+		           "imageid=%s and subboss_id=%s", (str(argdict["imageid"]), argdict["subboss_id"]))
+
+        if len(res) == 0:
+ 	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+
+        unlock_tables()
+        result = {}
+        result["address"] = res[0][0]
+        result["frisbee_pid"] = res[0][1]
+
+        return EmulabResponse(RESPONSE_SUCCESS, value=result, output=str(result))
+
+
+    #
+    # Return a multicast_address for subboss_frisbeed
+    # 
+    def allocate_load_address(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        status, msg = next_mcast_address()
+        if not status:
+	       return EmulabResponse(RESPONSE_ERROR, output=msg)
+        else:
+ 	       mcast_address = msg
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+ 		           "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			   str(argdict["imageid"])))
+        if len(res) == 0:
+	       # This pair doesn't exist in the table yet.  Better insert it
+	       res = DBQueryFatal("insert into subboss_images values (%s,%s,'',0,1,0)",
+				  (argdict["subboss_id"], argdict["imageid"]))
+        elif res[0][0] != "":
+	       # Subboss is already running a frisbeed for this image, so just update the
+	       # busy flag
+	       subboss_image_set_busy(argdict["subboss_id"], argdict["imageid"])
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="Frisbee server already running")
+        elif res[0][1] != 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="Bad DB state: frisbeed PID without load_address")
+
+
+	res = DBQueryFatal("update subboss_images set load_address = %s, load_busy = 1 where "
+			   "subboss_id=%s and imageid=%s", (mcast_address,
+			   argdict["subboss_id"], argdict["imageid"]))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS, value=mcast_address, output=mcast_address)
+
+    #
+    # Reset a subboss image entry; called when frisbeed is no longer needed
+    # 
+    def clear_load_address(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+
+ 	res = DBQueryFatal("update subboss_images set load_address = '', frisbee_pid = 0, load_busy = 0 "
+	                   "where subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			   str(argdict["imageid"])))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS)
+
+    #
+    # Set process ID for subboss frisbeed
+    # 
+    def set_frisbee_pid(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid", "frisbee_pid"))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select load_address,frisbee_pid from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+        elif res[0][0] == "":
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No address for image")
+
+	res = DBQueryFatal("update subboss_images set frisbee_pid=%s where subboss_id=%s and "
+			   "imageid=%s", (argdict["frisbee_pid"], argdict["subboss_id"],
+			   str(argdict["imageid"])))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS)
+
+    #
+    # Set sync flag for an image
+    # 
+    def set_sync_flag(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid", "sync"))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+
+        res = DBQueryFatal("select sync from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       # This pair doesn't exist in the table yet.  Better insert it
+	       res = DBQueryFatal("insert into subboss_images values (%s,%s,'',0,0,%d)",
+				  (argdict["subboss_id"], str(argdict["imageid"]), argdict["sync"]))
+        else:
+		res = DBQueryFatal("update subboss_images set sync=%s where subboss_id=%s and "
+			   "imageid=%s", (argdict["sync"], argdict["subboss_id"],
+			   str(argdict["imageid"])))
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS)
+
+    #
+    # See if subboss image 'busy' flag is set; indicates frisbeed should run again
+    # 
+    def image_requested(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("subboss_id", "imageid"))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        lock_subboss_image_table()
+        busy = 0
+
+        res = DBQueryFatal("select load_address,frisbee_pid,load_busy from subboss_images where "
+		          "subboss_id=%s and imageid=%s", (argdict["subboss_id"],
+			  str(argdict["imageid"])))
+        if len(res) == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No such image")
+        elif res[0][0] == "":
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="No address for image")
+        elif res[0][1] == 0:
+	       unlock_tables()
+	       return EmulabResponse(RESPONSE_ERROR, output="PID not set for image")
+
+        if res[0][2] > 0:
+	       busy = 1
+	       res = DBQueryFatal("update subboss_images set load_busy = 0 where subboss_id=%s and "
+				   "imageid=%s", (argdict["subboss_id"], str(argdict["imageid"])))
+
+	unlock_tables()
+
+	return EmulabResponse(RESPONSE_SUCCESS, value=busy, output=str(busy))
+
+    #
+    # Fire up a frisbeed for an image,
+    # This is essentially the same as the frisbeelauncher method for
+    # elabinelab
+    # 
+    def frisbeelauncher(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("imageid",))
+        if (argerror):
+            return argerror
+        
+        if not re.match("^[-\@\w\+\.]*$", str(argdict["imageid"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed imageid value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+        
+        argstr = escapeshellarg(str(argdict["imageid"]))
+        
+        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        #
+        # Success. Must get the loadinfo out of the DB so we can pass it back.
+        #
+        res = DBQueryFatal("select load_address from images where imageid=%s",
+                           (str(argdict["imageid"]),))
+        
+        # Hmm, something went wrong?
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Imageid is gone: " +
+                                  argdict["imageid"])
+        
+        if (res[0][0] == None or res[0][0] == ""):
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No load_address in DB: " +
+                                  argdict["imageid"])
+        
+        return EmulabResponse(RESPONSE_SUCCESS, str(res[0][0]), output=output)
+    
 
 #
 # Hack class to get ElabInElab limping along ... Note that nothing we do
@@ -4550,14 +4950,29 @@ class elabinelab:
         if not xmlfilename:
             return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
 
-        argstr = "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+        #
+        # Create a temporary file for the output.
+        #
+        (outfp, outfilename) = writensfile("");
+        if not outfilename:
+            return EmulabResponse(RESPONSE_SERVERERROR, output="Server Error")
 
-        (exitval, output) = runcommand(TBDIR + "/sbin/snmpit.proxyv2 " + argstr)
+        argstr  = "-o " + outfilename + " ";
+        argstr += "-p " + self.pid + " -e " + self.eid + " " + xmlfilename;
+
+        (exitval,output) = runcommand(TBDIR + "/sbin/snmpit.proxyv2 " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+
+        #
+        # Results are in the outfile.
+        #
+        stuff = ""
+        for l in outfp:
+            stuff += l
+            pass
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
-    
     #
     # Fire up a frisbeed for an image,
     # 
@@ -5566,3 +5981,54 @@ def scrubdict(retval, prunelist=[], defaultvals={}):
         pass
     
     return retval
+
+def subboss_image_set_busy(subboss, imageid):
+	res = DBQueryFatal("update subboss_images set load_busy=1 where "
+			   "imageid=%s and subboss_id=%s", (imageid, subboss))
+	# XXX make sure update worked
+
+#
+# Get the next mcast address to use for frisbeed
+# tables must be unlocked for this to work
+#
+def next_mcast_address():
+	res = DBQueryFatal("update emulab_indicies set idx=LAST_INSERT_ID(idx+1) "
+		           "where name='frisbee_index'")
+
+	# XXX what if index doesn't exist yet?  should in practice though
+
+	res = DBQueryFatal("select LAST_INSERT_ID()")
+	idx = res[0][0] # XXX what is the right way to do this?
+
+	dotted = map(int, BASEADDR.split("."))
+	if len(dotted) < 4:
+		dotted.extend([1, 1, 1])
+		dotted = dotted[0:4]
+
+	dotted[3] += idx
+	if dotted[3] > 254:
+		dotted[2] += dotted[3] / 254
+		dotted[3] = dotted[3] % 254 + 1
+
+	if dotted[2] > 254:
+		dotted[1] += dotted[2] / 254
+		dotted[2] = dotted[2] % 254 + 1
+
+	if dotted[1] > 254:
+		return (False, "No more multicast addresses")
+
+	port = int(BASEPORT) + (((dotted[2] << 8) | dotted[3]) & 0x7FFF)
+
+	return (True, "%d.%d.%d.%d:%d" % (dotted[0], dotted[1], dotted[2], dotted[3], port))
+
+#
+# Locks the subboss_images table
+#
+def lock_subboss_image_table():
+	return DBQueryFatal("lock tables subboss_images write")
+
+#
+# Unlocks any tables we've locked
+#
+def unlock_tables():
+	return DBQueryFatal("unlock tables")

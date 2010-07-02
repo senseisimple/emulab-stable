@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 #
@@ -797,7 +797,7 @@ sub removeSomePortsFromTrunk($$@) {
 
 	foreach my $port (@ports) {
 	    return 0
-		if (! $device->setVlanOnTrunks($port, 0, $vlan_number));
+		if (! $device->setVlansOnTrunk($port, 0, $vlan_number));
 	}
     }
 
@@ -1147,6 +1147,215 @@ sub reapCall($$) {
     my ($self,$proc) = @_;
     $self->debug("snmpit_stack::reapCall($proc)\n");
     return snmpit_jitdev::reapCall($proc);
+}
+
+#
+# Enable Openflow
+#
+# enableOpenflow(self, vlan_id);
+# return # of errors
+#
+sub enableOpenflow($$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Enabling Openflow on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->enableOpenflow($vlan_number);
+		if (!$ok) { $errors++; }
+		else {print "Done! \n" if $self->{DEBUG};}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}
+    }
+        
+    return $errors;
+}
+
+#
+# Disable Openflow
+# 
+# disableOpenflow(self, vlan_id);
+# return # of errors
+#
+sub disableOpenflow($$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Disabling Openflow on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->disableOpenflow($vlan_number);
+		if (!$ok) { $errors++; }
+		else {print "Done! \n" if $self->{DEBUG};}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}
+    }
+        
+    return $errors;
+}
+
+#
+# Set Openflow controller on VLAN
+# 
+# setController(self, vlan_id, controller);
+# return # of errors
+#
+sub setOpenflowController($$$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my $controller = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Setting Openflow controller on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->setOpenflowController($vlan_number, $controller);
+		if (!$ok) { $errors++; }
+		else {print "Done! \n" if $self->{DEBUG};}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}
+    }
+        
+    return $errors;
+}
+
+#
+# Set Openflow listener on VLAN
+#
+# setListener(self, vlan_id, listener);
+# return # of errors
+#
+sub setOpenflowListener($$$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my $listener = shift;
+    
+    my $errors = 0;
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {
+		print "Setting Openflow listener on $devicename for VLAN $vlan_id".
+		    "..." if $self->{DEBUG};
+
+		my $ok = $device->setOpenflowListener($vlan_number, $listener);
+		if (!$ok) { $errors++; }
+		else {
+		    print "Done! \n" if $self->{DEBUG};
+		    print "  Openflow listener on $devicename for VLAN $vlan_id is $listener \n";
+		}
+	    } else {
+		#
+		# TODO: Should this be an error?
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+		$errors++;
+	    }
+	}	
+    }
+        
+    return $errors;
+}
+
+#
+# Get used Openflow listener ports
+#
+# getUsedOpenflowListenerPorts(self, vlan_id)
+#
+sub getUsedOpenflowListenerPorts($$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my %ports = ();
+
+    foreach my $devicename (keys %{$self->{DEVICES}})
+    {
+	my $device = $self->{DEVICES}{$devicename};
+	my $vlan_number = $device->findVlan($vlan_id, 2);
+	if (!$vlan_number) {
+	    #
+	    # Not sure if this is an error or not.
+	    # It might be possible that not all devices in a stack have the given VLAN.
+	    #
+	    print "$device has no VLAN $vlan_id, ignore it. \n" if $self->{DEBUG};
+	} else {
+	    if ($device->isOpenflowSupported()) {		
+		my %tmports = $device->getUsedOpenflowListenerPorts();
+		@ports{ keys %tmports } = values %tmports;		
+	    } else {
+		#
+		# YES this be an error because the VLAN is on it.
+		#
+		warn "ERROR: Openflow is not supported on $devicename \n";
+	    }
+	}	
+    }
+
+    return %ports;
 }
 
 

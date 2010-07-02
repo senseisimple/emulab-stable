@@ -61,11 +61,12 @@ CVSSUPPORT=1
 STAMPS=1
 CHATSUPPORT=1
 NFSTRACESUPPORT=1
-ARCHIVESUPPORT=1
+ARCHIVESUPPORT=0
 OPSDBSUPPORT=1
 PELABSUPPORT=1
 PLABSUPPORT=1
 PLAB_ROOTBALL="plabroot-21.tar.bz2"
+EXP_VIS_SUPPORT=1
 # Do not turn this on unless you talk to Utah first!
 PROTOGENI_SUPPORT=1
 # If you are not the main Emulab site in Utah, change this!

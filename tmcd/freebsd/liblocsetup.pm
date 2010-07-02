@@ -12,8 +12,8 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD $HOSTSFILE
-	 $LOOPBACKMOUNT 
+    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
+	 $HOSTSFILE $LOOPBACKMOUNT $CHMOD
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth os_viface_name os_modpasswd
@@ -21,7 +21,7 @@ use Exporter;
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel os_getnfsmounts os_islocaldir
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre os_nfsmount
-	 os_find_freedisk
+	 os_find_freedisk os_gendhcpdconf os_get_ctrlnet_ip
        );
 
 sub VERSION()	{ return 1.0; }
@@ -54,7 +54,7 @@ sub INXENVM()   { return libsetup::INXENVM(); }
 
 #
 # Various programs and things specific to FreeBSD and that we want to export.
-# 
+#
 $CP		= "/bin/cp";
 $DF		= "/bin/df";
 $EGREP		= "/usr/bin/egrep -s -q";
@@ -68,6 +68,7 @@ $SFSCD		= "/usr/local/sbin/sfscd";
 $RPMCMD		= "/usr/local/bin/rpm";
 $HOSTSFILE	= "/etc/hosts";
 $WGET		= "/usr/local/bin/wget";
+$CHMOD		= "/bin/chmod";
 
 #
 # These are not exported
@@ -96,8 +97,8 @@ my $DEFSHELL	= "/bin/tcsh";
 
 #
 # OS dependent part of account cleanup. On a remote node, this will
-# only be called from inside a JAIL, or from the prepare script. 
-# 
+# only be called from inside a JAIL, or from the prepare script.
+#
 sub os_account_cleanup()
 {
     printf STDOUT "Resetting passwd and group files\n";
@@ -105,12 +106,12 @@ sub os_account_cleanup()
 	print STDERR "Could not copy default group file into place: $!\n";
 	return -1;
     }
-    
+
     if (system("$CP -f $TMPASSWD /etc/master.passwd_testbed") != 0) {
 	print STDERR "Could not copy default passwd file into place: $!\n";
 	return -1;
     }
-    
+
     if (system("$MKDB /etc/master.passwd_testbed") != 0) {
 	print STDERR "Failure running $MKDB on default password file: $!\n";
 	return -1;
@@ -175,7 +176,7 @@ sub os_ifconfig_line($$$$$$$$;$$%)
     }
 
     $uplines = "";
-    
+
     if ($inet eq "") {
 	$uplines .= "$IFCONFIGBIN $iface up $media $mediaopt";
     }
@@ -235,7 +236,7 @@ sub os_ifconfig_veth($$$$$;$$$$$)
 	      "sysctl net.link.ether.inet.useloopback=0 >/dev/null 2>&1\n    ";
 	    $cookie->{"alias"} = 1;
 	}
-	
+
 	$uplines   .= sprintf($IFALIAS, $iface, $inet, $mask);
 	$downlines .= "$IFCONFIGBIN $iface -alias $inet";
 
@@ -342,13 +343,13 @@ sub os_viface_name($)
 sub os_etchosts_line($$$)
 {
     my ($name, $ip, $aliases) = @_;
-    
+
     return sprintf("%s\t%s %s", $ip, $name, $aliases);
 }
 
 #
 # Add a new group
-# 
+#
 sub os_groupadd($$)
 {
     my($group, $gid) = @_;
@@ -358,7 +359,7 @@ sub os_groupadd($$)
 
 #
 # Delete an old group
-# 
+#
 sub os_groupdel($)
 {
     my($group) = @_;
@@ -368,7 +369,7 @@ sub os_groupdel($)
 
 #
 # Remove a user account.
-# 
+#
 sub os_userdel($)
 {
     my($login) = @_;
@@ -378,7 +379,7 @@ sub os_userdel($)
 
 #
 # Modify user group membership.
-# 
+#
 sub os_usermod($$$$$$)
 {
     my($login, $gid, $glist, $pswd, $root, $shell) = @_;
@@ -401,7 +402,7 @@ sub os_usermod($$$$$$)
 
 #
 # Add a user.
-# 
+#
 sub os_useradd($$$$$$$$$)
 {
     my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root, $shell) = @_;
@@ -446,7 +447,7 @@ sub os_useradd($$$$$$$$$)
 
 #
 # Modify user password
-# 
+#
 sub os_modpasswd($$)
 {
     my($login, $pswd) = @_;
@@ -485,8 +486,8 @@ sub os_mkdir($$)
 }
 
 #
-# OS Dependent configuration. 
-# 
+# OS Dependent configuration.
+#
 sub os_setup()
 {
     # This should never happen!
@@ -494,6 +495,15 @@ sub os_setup()
 	print "Ignoring os setup on remote/MFS node!\n";
 	return 0;
     }
+}
+
+#
+# Generate ISC dhcpd config file for subbosses
+#
+sub os_gendhcpdconf()
+{
+	return libsetup::gendhcpdconf("/usr/local/etc/dhcpd.conf",
+		"/usr/local/etc/dhcpd.conf.subboss.template");
 }
 
 #
@@ -510,7 +520,7 @@ sub os_routing_enable_forward()
     elsif (JAILED()) {
 	$cmd = "# IP forwarding is enabled outside the jail";
     } else {
-	# No Fast Forwarding when operating with linkdelays. 
+	# No Fast Forwarding when operating with linkdelays.
 	$cmd  = "sysctl net.inet.ip.forwarding=1\n" .
 	        "    if [ ! -e $fname ]; then\n" .
 	        "        sysctl net.inet.ip.fastforwarding=1\n" .
@@ -583,7 +593,7 @@ sub MapShell($)
    }
 
    my $fullpath = `grep '/${shell}\$' $SHELLS`;
-   
+
    if ($?) {
        return $DEFSHELL;
    }
@@ -602,7 +612,7 @@ sub MapShell($)
 sub os_islocaldir($)
 {
     my ($dir) = @_;
-    my $rv = 0; 
+    my $rv = 0;
 
     #
     # XXX 'df -l' doesn't do the right thing on older FreeBSD
@@ -623,15 +633,15 @@ sub os_islocaldir($)
 }
 
 #
-# Find out what NFS mounts exist already! 
-# 
+# Find out what NFS mounts exist already!
+#
 sub os_getnfsmounts($)
 {
     my ($rptr) = @_;
     my %mounted = ();
 
     #
-    # Grab the output of the mount command and parse. 
+    # Grab the output of the mount command and parse.
     #
     if (! open(MOUNT, "$MOUNT|")) {
 	print "os_getnfsmounts: Cannot run mount command\n";
@@ -876,7 +886,7 @@ sub os_fwrouteconfig_line($$$)
 sub os_config_gre($$$$$$$)
 {
     my ($name, $unit, $inetip, $peerip, $mask, $srchost, $dsthost) = @_;
-    
+
     my $gre = `ifconfig gre create`;
     if ($?) {
 	warn("*** Could not create a new gre device.\n");
@@ -916,6 +926,39 @@ sub os_get_disks
     }
 
     return @disks;
+}
+
+sub os_get_ctrlnet_ip
+{
+	my $iface;
+	my $address;
+
+	if (!open CONTROLIF, "$BOOTDIR/controlif") {
+		return undef;
+	}
+
+	$iface = <CONTROLIF>;
+	chomp $iface;
+
+	$iface =~ /(.*)/;
+	$iface = $1;
+
+	close CONTROLIF;
+
+	if (!open IFCFG, "$IFCONFIGBIN $iface|") {
+		return undef;
+	}
+
+	while (<IFCFG>) {
+		if (/inet ([0-9.]*) /) {
+			$address = $1;
+			last;
+		}
+	}
+
+	close IFCFG;
+
+	return $address;
 }
 
 sub os_get_disk_size($)
@@ -1065,7 +1108,7 @@ sub os_find_freedisk($$)
     print STDERR "found mounts: ", join('/', sort keys %mounts), "\n" if ($debug);
 
     #
-    # For each disk, find any unused space 
+    # For each disk, find any unused space
     #
     foreach my $disk (sort @disks) {
 	#

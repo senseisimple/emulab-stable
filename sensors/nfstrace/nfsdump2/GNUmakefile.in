@@ -1,0 +1,36 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= sensors/nfstrace/nfsdump2
+ND2SRCDIR	= nfsdump2
+PROGRAMS	= nfsdump2/nfsdump2
+
+TARBALL		= nfsdump-v1.01-031204.tgz
+
+include $(OBJDIR)/Makeconf
+
+all:	$(SRCDIR)/GNUmakefile.in $(PROGRAMS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+$(ND2SRCDIR)/Makefile:
+	$(SRCDIR)/nfsdump2-install $(SRCDIR) $(TARBALL)
+	cd $(ND2SRCDIR) && ./configure
+
+nfsdump2/nfsdump2: $(ND2SRCDIR)/Makefile
+	cd $(ND2SRCDIR) && ./config.status
+	cd $(ND2SRCDIR) && $(MAKE)
+
+clean:
+	-@if [ -d "$(ND2SRCDIR)" ]; then \
+	    cd $(ND2SRCDIR) && $(MAKE) clean; \
+        fi
+
+reallyclean:
+	/bin/rm -rf $(ND2SRCDIR) $(TARBALL)

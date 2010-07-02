@@ -50,10 +50,16 @@ my $CRTLTAG	    = TBDB_IFACEROLE_CONTROL();
 my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
 my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
 my %servernodes	    = ();
+my %dhcp_subbosses  = ();
+my %tftp_subbosses  = ();
+my %bootinfo_subbosses  = ();
 my %singlectlnet    = ();
 my $template        = $DHCPD_TEMPLATE;
 my $outfile	    = "/tmp/dhcpd_makeconf.$$";
 my $OUT		    = *STDOUT;
+my %subboss_dhcp_servers;
+
+sub RestartSubbossDhcp($$);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -155,6 +161,29 @@ while (my %row = $query_result->fetchhash()) {
     }
 }
 
+# Slurp in all of the subboss data to know A) if we should serve the DHCP
+# lease to a given node, or if the next-server field should be something
+# other than the IP for boss.
+$query_result =
+    DBQueryWarn("select s.node_id, s.service, s.subboss_id, i.IP ".
+		"from subbosses as s left join interfaces as i on ".
+		"s.subboss_id=i.node_id where i.role='$CRTLTAG'");
+if (! $query_result) {
+    fatal("Could not dhcpd data from DB!");
+}
+while (my %row = $query_result->fetchhash()) {
+    my $node_id = $row{"node_id"};
+
+    if ($row{"service"} eq 'tftp') {
+	    $tftp_subbosses{$node_id} = $row{"IP"};
+    } elsif ($row{"service"} eq 'dhcp') {
+	    $dhcp_subbosses{$node_id} = $row{"IP"};
+	    $subboss_dhcp_servers{$row{"subboss_id"}} = 1;
+    } elsif ($row{"service"} eq 'bootinfo') {
+	    $bootinfo_subbosses{$node_id} = $row{"IP"};
+    }
+}
+
 open(IF,"<$template") or
     fatal("Unable to open $template for reading");
 while (<IF>) {
@@ -239,47 +268,25 @@ while (<IF>) {
 			    }
 			}
 		    }
+		    elsif (defined $dhcp_subbosses{$node_id}) {
+			$hostname =
+			    "${spaces}\toption host-name \"$node_id\";\n";
+	                $booting = "${spaces}\tignore booting;\n";
+		    }
 		    else {
 			$hostname =
 			    "${spaces}\toption host-name \"$node_id\";\n";
 
-			my $query_result =
-			    DBQueryWarn( "(select attrvalue from " .
-				   "node_attributes where node_id = '$node_id' " .
-			           " and attrkey = 'tftp_server' ) union " .
-			           "(select attrvalue from " .
-			           "node_type_attributes where type = " .
-			           "'$nodetype' " .
-				   " and attrkey = 'tftp_server') limit 1" );
+		        if (defined $tftp_subbosses{$node_id}) {
+			    $next_server = "${spaces}\tnext-server " .
+			        $tftp_subbosses{$node_id} . ";\n";
+		        }
 
-			if (! $query_result) {
-			    fatal("Could not get tftp_server data from DB!");
-			}
+		        if (defined $bootinfo_subbosses{$node_id}) {
+			    $bootinfo_server = "${spaces}\toption PXE.emulab-bootinfo " .
+			        $bootinfo_subbosses{$node_id} . ";\n";
+		        }
 
-			if (my %row = $query_result->fetchhash()) {
-				my $tftp_server = $row{'attrvalue'};
-				$next_server = "${spaces}\tnext-server " .
-					$tftp_server . ";\n";
-			}
-
-			$query_result =
-			    DBQueryWarn( "(select attrvalue from " .
-				   "node_attributes where node_id = '$node_id' " .
-			           " and attrkey = 'bootinfo_server' ) union " .
-			           "(select attrvalue from " .
-			           "node_type_attributes where type = " .
-			           "'$nodetype' " .
-				   " and attrkey = 'bootinfo_server') limit 1" );
-
-			if (! $query_result) {
-			    fatal("Could not get bootinfo_server data from DB!");
-			}
-
-			if (my %row = $query_result->fetchhash()) {
-				$bootinfo_server = "${spaces}\toption " .
-				"PXE.emulab-bootinfo " .
-				$row{'attrvalue'} . ";\n";
-			}
 		    }
 
 		    #
@@ -361,7 +368,15 @@ if ($install) {
 	if (kill('TERM', $dpid) == 0) {
 	    fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
 	}
+
+        my $old_uid = $UID;
+        $UID = $EUID;
+        for my $subboss (keys %subboss_dhcp_servers) {
+            RestartSubbossDhcp($subboss, $restart);
+        }
+        $UID = $old_uid;
     }
+
     TBScriptUnlock();
 }
 exit(0);
@@ -377,5 +392,19 @@ sub fatal {
 
     die("*** $0:\n".
 	"    $msg\n");
+}
+
+sub RestartSubbossDhcp($$)
+{
+        my ($subboss, $restart) = @_;
+        
+        my $cmd = "ssh $subboss @prefix@/sbin/subboss_dhcpd_makeconf";
+
+        $cmd .= " -r" if ($restart);
+
+        print "Restarting dhcpd on subboss $subboss\n";
+        if (system($cmd)) {
+	    print STDERR "Failed to restart dhcpd on $subboss\n";
+	}
 }
 

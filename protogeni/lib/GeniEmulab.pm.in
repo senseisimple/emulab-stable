@@ -101,7 +101,7 @@ sub RegisterExperiment($$)
     # Create and register the slice. Slice is returned locked
     #
     print STDERR "Creating new slice for $experiment\n";
-    $slice = GeniSlice->CreateFromLocal($experiment, $user);
+    $slice = GeniSlice->CreateFromLocal($experiment, $geniuser);
     if (!defined($slice)) {
 	print STDERR "Could not create local slice from $experiment\n";
 	return -1;

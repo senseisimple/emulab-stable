@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -15,15 +15,17 @@ use strict;
 #
 sub usage()
 {
-    print STDERR "Usage: dump-descriptors [-v vers] filename\n";
+    print STDERR "Usage: dump-descriptors [-v vers] [-m] filename\n";
+    print STDERR "  -m      dump just the MFS descriptors.\n";
     print STDERR "  -v 1    first generation STD images (FBSD410, RHL90)\n";
     print STDERR "  -v 2    second generation STD images (FBSD62, FC6)\n";
     print STDERR "Default version is 1.\n";
     exit(-1);
 }
 
-my $optlist = "v:";
+my $optlist = "v:m";
 my $version = 1;
+my $mfsonly = 0;
 
 #
 # These are the images/osids we dump out. We of course get the embedded osids.
@@ -66,7 +68,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $BOSSNODE	= "@BOSSNODE@";
-my $TFTPDIR     = "/tftpboot";
+my $DUMPDESC    = "$TB/sbin/dumpdescriptor";
 
 #
 # Testbed Support libraries
@@ -74,11 +76,14 @@ my $TFTPDIR     = "/tftpboot";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use Image;
+use OSinfo;
 
 # Locals
 my %tempkeys  = ();
 my $protouser = "elabman";
 my $protoproj = TBOPSPID();
+sub fatal($);
 
 #
 # Turn off line buffering on output
@@ -106,162 +111,114 @@ if (defined($options{"v"})) {
     }
     $version = $vers;
 }
-
+if (defined($options{"m"})) {
+    $mfsonly    = 1;
+    %mappings   = ();
+    %imagenames = ();
+}
 usage()
     if (@ARGV != 1);
 my $filename = $ARGV[0];
 
+my %images  = ();
+my %osinfos = ();
+
+#
+# Gather up the images and any osinfos they reference.
+#
+foreach my $imagename (@{$imagenames{$version}}) {
+    my $image = Image->Lookup("$protoproj,$imagename");
+    if (!defined($image)) {
+	fatal("Cannot find image descriptor for $imagename");
+    }
+    $images{$image->imageid()} = $image;
+
+    #
+    # Get the osids it references.
+    #
+    foreach my $key (('part1_osid', 'part2_osid',
+		      'part3_osid', 'part4_osid', 'default_osid')) {
+	my $osid = $image->$key();
+	next
+	    if (!defined($osid));
+
+	my $osinfo = OSinfo->Lookup($osid);
+	if (!defined($osinfo)) {
+	    fatal("Cannot find OS descriptor for $osid");
+	}
+	$osinfos{$osinfo->osid()} = $osinfo;
+    }
+}
+#
+# And the OSs
+#
+foreach my $osname (@osnames) {
+    my $osinfo = OSinfo->Lookup("$protoproj,$osname");
+    if (!defined($osinfo)) {
+	fatal("Cannot find os descriptor for $osname");
+    }
+    $osinfos{$osinfo->osid()} = $osinfo;
+}
+foreach my $osname (keys(%{$mappings{$version}})) {
+    my $nextosname = $mappings{$version}{$osname};
+
+    my $osinfo = OSinfo->Lookup("$protoproj,$nextosname");
+    if (!defined($osinfo)) {
+	fatal("Cannot find os descriptor for $nextosname");
+    }
+    $osinfos{$osinfo->osid()} = $osinfo;
+}
 #
 # Open tempfile.
 #
 open(OUTPUT, ">$filename") or
     die("Could not open $filename for writing!\n");
-
-#
-# Create some temporary tables to mirror the existing tables. We
-# populate these tables then spit them out. On the other side, when we
-# load this table, we will move the rows out and into the local table,
-# after adjustment.
-#
-
-#
-# The images table.
-#
-DBQueryFatal("create temporary table temp_images like images");
-DBQueryFatal("insert into temp_images ".
-	     "select * from images where pid='$protoproj' and (".
-	     join(" or ", map("imagename='$_'", @{$imagenames{$version}})) . ")");
-
-my $query_result  = DBQueryFatal("show create table temp_images");
-my $create_string = ($query_result->fetchrow_array())[1];
-
-#
-# Kill the idx slots; they may not be valid on the remote testbeds, and
-# it simplifies backwards compatability.
-#
-DBQueryFatal("alter table temp_images ".
-	     "drop pid_idx, drop gid_idx, drop creator_idx, drop uuid");
-
-#
-# Before we dump the table contents, reset a few things.
-#
-DBQueryFatal("update temp_images set ".
-	     "creator='$protouser', ".
-	     "pid='$protoproj', gid='$protoproj', ".
-	     "load_address='', frisbee_pid=0, load_busy=0, ".
-	     "created=now(), updated=NULL");
-
-$query_result =
-    DBQueryFatal("select * from temp_images");
-
-while (my $rowref = $query_result->fetchrow_hashref()) {
-    my $query_string = "insert into temp_images set ";
-    my @query_sets   = ();
-
-    #
-    # Pick up the osids that are used in this image, and add them to the
-    # list of osids to dump out.
-    #
-    foreach my $key (('part1_osid', 'part2_osid',
-		      'part3_osid', 'part4_osid', 'default_osid')) {
-
-	$tempkeys{$rowref->{$key}} = 1
-	    if (defined($rowref->{$key}));
-    }
-    
-    foreach my $key (keys(%{$rowref})) {
-	if (defined($rowref->{$key})) {
-	    push(@query_sets, "${key}='" . $rowref->{$key} . "'");
-	}
-	else {
-	    push(@query_sets, "${key}=NULL");
-	}
-    }
-    $query_string .= join(",", @query_sets);
-    
-    print OUTPUT "$query_string;\n";
-}
-
-#
-# Add the osids we found above to the list.
-#
-foreach my $key (keys(%tempkeys)) {
-    push(@osids, $key);
-}
-
-#
-# Now do the osinfo table
-#
-DBQueryFatal("create temporary table temp_os_info like os_info");
-DBQueryFatal("insert into temp_os_info ".
-	     "select * from os_info where pid='$protoproj' and ((".
-	     join(" or ", map("osname='$_'", @osnames)) . ") or (".
-	     join(" or ", map("osid='$_'", @osids)) . "))".
-	     " order by osname");
-
-$query_result  = DBQueryFatal("show create table temp_os_info");
-$create_string = ($query_result->fetchrow_array())[1];
-
-#
-# Kill the idx slots; they may not be valid on the remote testbeds, and
-# it simplifies backwards compatability.
-#
-DBQueryFatal("alter table temp_os_info ".
-	     "drop pid_idx, drop creator_idx, drop uuid");
-
-#
-# Before we dump the table contents, reset a few things.
-#
-DBQueryFatal("update temp_os_info set ".
-	     "creator='$protouser', ".
-	     "pid='$protoproj', created=now()");
-
-#
-# We reset the nextosid slots in the -STD osids, rather then worrying
-# about the osid_map table. 
-#
+print OUTPUT "<descriptors>\n";
 foreach my $osname (keys(%{$mappings{$version}})) {
     my $nextosname = $mappings{$version}{$osname};
 
-    $query_result =
-	DBQueryFatal("select osid from temp_os_info ".
-		     "where pid='$protoproj' and osname='$nextosname'");
-    if (! $query_result->numrows) {
-	print "Could not map $protoproj,$osname to its osid!\n";
-	exit(-1);
-    }
-    my ($nextosid) = $query_result->fetchrow_array();
-
-    DBQueryFatal("update temp_os_info set nextosid='$nextosid' ".
-		 "where pid='$protoproj' and osname='$osname'");
-}
-
-$query_result =
-    DBQueryFatal("select * from temp_os_info");
-
-while (my $rowref = $query_result->fetchrow_hashref()) {
-    my $query_string = "insert into temp_os_info set ";
-    my @query_sets   = ();
-
-    #
-    # Replace any host:path spec with just the path; pxeboot knows what to
-    # do and does not need the hostname in it. 
-    #
-    if (defined($rowref->{'path'}) && $rowref->{'path'} ne "" &
-	$rowref->{'path'} =~ /^(.*):(.*)$/) {
-	$rowref->{'path'} = $2;
-    }
-    foreach my $key (keys(%{$rowref})) {
-	if (defined($rowref->{$key})) {
-	    push(@query_sets, "${key}='" . $rowref->{$key} . "'");
-	}
-	else {
-	    push(@query_sets, "${key}=NULL");
-	}
-    }
-    $query_string .= join(",", @query_sets);
-    
-    print OUTPUT "$query_string;\n";
+    print OUTPUT "<mapping name=\"$osname\">\n";
+    print OUTPUT "    <value>$nextosname</value>\n";
+    print OUTPUT "</mapping>\n";
 }
 close(OUTPUT);
+
+#
+# Hmm, this is interesting. We reuse OSids that were created via the EZ
+# path, typically in the combo images. We need to delete those from the
+# osinfos list since they get created when processing the EZ images in
+# the load-descriptors script. Ordering is going to be important when
+# loading them in.
+#
+foreach my $osid (keys(%osinfos)) {
+    my $osinfo = $osinfos{$osid};
+
+    next
+	if ($osinfo->ezid());
+    next
+	if ($mfsonly && !$osinfo->mfs());
+
+    system("$DUMPDESC -o $osid >> $filename") == 0
+	or fatal("Could not dump $osinfo");
+}
+foreach my $imageid (keys(%images)) {
+    my $image = $images{$imageid};
+    
+    system("$DUMPDESC -i $imageid >> $filename") == 0
+	or fatal("Could not dump $image");
+}
+open(OUTPUT, ">>$filename") or
+    die("Could not open $filename for writing!\n");
+print OUTPUT "</descriptors>\n";
+close(OUTPUT);
 exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = @_;
+
+    print STDERR "*** $0:\n".
+	         "    $mesg\n";
+    exit(-1);
+}
+
