@@ -824,13 +824,12 @@ sub StartSlivers($$$$)
     if (@failed) {
 	foreach my $resource (@failed) {
 	    my $manager_urn = $resource->manager_urn();
-	    my $ticketstr   = $resource->Ticket();
-	    my $ticket      = GeniXML::Parse($ticketstr);
+	    my $manifest    = $resource->Manifest();
 	    return -1
-		if (!defined($ticket));
+		if (!defined($manifest));
 
 	    foreach my $ref (GeniXML::FindNodes("n:node",
-						$ticket)->get_nodelist()) {
+						$manifest)->get_nodelist()) {
 		my $vname            = GeniXML::GetVirtualId($ref);
 		my $this_manager_urn = GeniXML::GetManagerId($ref);
 
