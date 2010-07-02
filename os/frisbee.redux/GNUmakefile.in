@@ -13,6 +13,9 @@ DISTFILES	= TODO client.c decls.h event.c event.h log.c log.h \
 		  network.c queue.h server.c trace.c trace.h utils.c utils.h
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
+# Set to 1 for "secure frisbee" support.  Requires openssl libraries.
+WITH_CRYPTO	= 1
+
 SYSTEM	:= $(shell uname -s)
 
 # FreeBSD specific goop
@@ -66,8 +69,13 @@ SERVEROBJS	= server.o $(SHAREDOBJS)
 CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS
 LDFLAGS		= $(LDSTATIC)
 
-IUZFLAGS	= -DFRISBEE -DWITH_CRYPTO -DSIGN_CHECKSUM
-IUZLIBS		= -lcrypto
+IUZFLAGS	= -DFRISBEE
+IUZLIBS		= 
+
+ifeq ($(WITH_CRYPTO),1)
+IUZFLAGS	+= -DWITH_CRYPTO -DSIGN_CHECKSUM
+IUZLIBS		+= -lcrypto
+endif
 
 #
 # Define this to break chunks into 8192 byte rather than 1024 byte blocks

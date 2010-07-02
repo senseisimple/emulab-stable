@@ -901,6 +901,11 @@ ImageUnzipInitKeys(char *sig_keyfile, char *enc_keyfile)
 			exit(1);
 		do_decrypt = 1;
 	}
+#else
+	if (sig_keyfile != NULL || enc_keyfile != NULL) {
+		fprintf(stderr, "Authentication/encryption not supported\n");
+		exit(1);
+	}
 #endif
 
 	return 0;

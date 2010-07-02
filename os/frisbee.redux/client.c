@@ -454,7 +454,7 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * Prepare the unzipper.
+	 * Initialize keys for authentication/encryption.
 	 */
 	ImageUnzipInitKeys(sig_keyfile, enc_keyfile);
 
