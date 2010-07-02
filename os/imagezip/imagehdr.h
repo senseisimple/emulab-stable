@@ -76,7 +76,6 @@ struct blockhdr_V2 {
 #define ENC_MAX_KEYLEN		32	/* XXX same as EVP_MAX_KEY_LENGTH */
 #define CSUM_MAX_LEN		64
 #define SIG_MAX_KEYLEN		256	/* must be > CSUM_MAX_LEN+41 */
-#define AUTH_MAX_SIGLEN		256
 
 /*
  * Version 4 of the block descriptor adds support for authentication,
@@ -112,11 +111,6 @@ struct blockhdr_V4 {
 	uint32_t	checksumtype;	/* Which checksum was used */
 	unsigned char	checksum[SIG_MAX_KEYLEN];
 					/* Checksum, leave room for 512 bits */
-#if 0
-	uint32_t	authtype;	/* Which auth algorithm was used */
-	unsigned char	authsig[AUTH_MAX_SIGLEN];
-					/* Auth Signature */
-#endif
 	unsigned char	imageid[UUID_LENGTH];
 					/* Unique ID for the whole image */
 };

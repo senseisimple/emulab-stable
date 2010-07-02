@@ -16,6 +16,9 @@ DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
+# Set to 1 for "secure frisbee" support.  Requires openssl libraries.
+WITH_CRYPTO	= 1
+
 SYSTEM	:= $(shell uname -s)
 
 # FreeBSD specific goop
@@ -61,10 +64,8 @@ WITH_FFS	= 1
 WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
 WITH_FAT	= @WINSUPPORT@
-WITH_HASH	= 1
+WITH_HASH	= 0
 WITH_EXT4FS	= 0
-
-WITH_CRYPTO	= 1
 
 include $(OBJDIR)/Makeconf
 
@@ -87,7 +88,7 @@ endif
 # Necessary sometimes.
 #PTHREADCFLAGS	+= -DCONDVARS_WORK
 
-CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) $(LDSTATIC) -DWITH_CRYPTO
+CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) $(LDSTATIC)
 LIBS 		= -lz
 ZIPCFLAGS	= $(CFLAGS) -Wall
 ZIPLIBS		= 
@@ -95,6 +96,12 @@ UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
 UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
 HASHCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
 HASHLIBS	= $(LIBS) -lcrypto $(PTHREADLIBS)
+
+# Secure images
+ifeq ($(WITH_CRYPTO),1)
+CFLAGS		+= -DWITH_CRYPTO -DSIGN_CHECKSUM
+LIBS		+= -lcrypto
+endif
 
 # UFS/UFS2
 ifeq ($(WITH_FFS),1)
@@ -162,11 +169,6 @@ SUBDIRCFLAGS	+= -DHASHSTATS
 SUBDIRS		+= hashmap
 ZIPLIBS		+= hashmap/libhashmap.a
 LIBS		+= -lcrypto $(PTHREADLIBS)
-endif
-
-# with CRYPTO
-ifeq ($(WITH_HASH),1)
-CFLAGS		+= -DWITH_CRYPTO -DSIGN_CHECKSUM
 endif
 
 all:	imagezip imageunzip imagedump imagehash

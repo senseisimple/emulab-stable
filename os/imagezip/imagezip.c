@@ -542,9 +542,8 @@ main(int argc, char *argv[])
 			break;
 		case 'u':
 			/* UUID for image id. */
-			if (!hexstr_to_mem(imageid, optarg, UUID_LENGTH)) {
+			if (!hexstr_to_mem(imageid, optarg, UUID_LENGTH))
 				usage();
-			}
 			break;
 		case 'h':
 		case '?':
@@ -1763,9 +1762,6 @@ static void	encrypt_start(blockhdr_t *hdr);
 static void	encrypt_chunk(uint8_t *buf, off_t size);
 static void	encrypt_finish(blockhdr_t *hdr,
 			       uint8_t *outbuf, uint32_t *out_size);
-#if 0
-static void	authenticate(blockhdr_t *hdr);
-#endif
 #endif
 
 /*
@@ -2547,30 +2543,6 @@ checksum_finish(blockhdr_t *hdr)
 	SHA1_Final(hdr->checksum, &sha_ctx);
 #endif
 }
-
-#if 0
-void
-authenticate(blockhdr_t *hdr)
-{
-	int bytecount = 0;
-	if (EVP_PKEY_size(authkey) > AUTH_MAX_SIGLEN) {
-		fprintf(stderr,
-			"Authorization signature size is too large: %d",
-			EVP_PKEY_size(authkey));
-		exit(1);
-	}
-	EVP_MD_CTX * context = EVP_MD_CTX_create();
-	EVP_MD_CTX_init(context);
-
-	EVP_SignInit(context, EVP_sha1);
-	EVP_SignUpdate(context, hdr, sizeof(hdr));
-	EVP_SignFinal(context, hdr->authsig, &bytecount, authkey);
-
-	EVP_MD_CTX_cleanup(context);
-	EVP_MD_CTX_destroy(context);
-	hdr->authtype = AUTH_RSA;
-}
-#endif
 
 /*
  * Encryption functions

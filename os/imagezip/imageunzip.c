@@ -1224,7 +1224,9 @@ inflate_subblock(const char *chunkbufp)
 	off_t		offset, size;
 	char		resid[SECSIZE];
 	writebuf_t	*wbuf;
+#ifdef WITH_CRYPTO
 	char		plaintext[CHUNKMAX];
+#endif
 
 	d_stream.zalloc   = (alloc_func)0;
 	d_stream.zfree    = (free_func)0;
@@ -1248,11 +1250,13 @@ inflate_subblock(const char *chunkbufp)
 	{
 		static int didwarn;
 
+#ifdef WITH_CRYPTO
 		if (do_checksum) {
 			fprintf(stderr,
 				"-c specified but image is unsigned\n");
 			exit(1);
 		}
+#endif
 		curregion = (struct region *)
 			((struct blockhdr_V1 *)blockhdr + 1);
 		if (dofill && !didwarn) {
@@ -1266,11 +1270,13 @@ inflate_subblock(const char *chunkbufp)
 
 	case COMPRESSED_V2:
 	case COMPRESSED_V3:
+#ifdef WITH_CRYPTO
 		if (do_checksum) {
 			fprintf(stderr,
 				"-c specified but image is unsigned\n");
 			exit(1);
 		}
+#endif
 		imageversion = 2;
 		curregion = (struct region *)
 			((struct blockhdr_V2 *)blockhdr + 1);

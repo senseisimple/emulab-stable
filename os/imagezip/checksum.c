@@ -1,10 +1,19 @@
-// This is shared code between imagedump and imageunzip. It is used to
-// verify that the checksum is correct.
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2009-2010 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
+/*
+ * This is shared code between imagedump and imageunzip. It is used to
+ * verify that the checksum is correct.
+ */
 #include <ctype.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
+#ifdef WITH_CRYPTO
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 
@@ -163,6 +172,7 @@ encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen)
 
 	return 1;
 }
+#endif
 
 /*
  * Conversion functions

@@ -123,6 +123,7 @@ main(int argc, char **argv)
 		} else
 			infd = fileno(stdin);
 
+#ifdef WITH_CRYPTO
 		if (checksums > 0) {
 			char *keyfile = checksum_keyfile(argv[0]);
 
@@ -133,11 +134,14 @@ main(int argc, char **argv)
 				continue;
 			}
 		}
+#endif
 
 		errors = dumpfile(isstdin ? "<stdin>" : argv[0], infd);
 
+#ifdef WITH_CRYPTO
 		if (checksums > 0)
 			cleanup_checksum();
+#endif
 
 		if (!isstdin)
 			close(infd);
@@ -728,6 +732,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 		}
 	}
 
+#ifdef WITH_CRYPTO
 	/*
 	 * Checksum this image.  Assumes SHA1, because we check for this above.
 	 */
@@ -737,6 +742,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 			return 1;
 		}
 	}
+#endif
 
 	return 0;
 }
