@@ -16,6 +16,7 @@ package
 {
   import flash.events.ErrorEvent;
   import flash.events.Event;
+  import flash.events.SecurityErrorEvent;
   import flash.utils.Dictionary;
   import flash.system.Security;
   import com.mattism.http.xmlrpc.ConnectionImpl;
@@ -105,6 +106,7 @@ package
         server = new ConnectionImpl(url);
         server.addEventListener(Event.COMPLETE, callSuccess);
         server.addEventListener(ErrorEvent.ERROR, callFailure);
+        server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
         server.addParam(param, "struct");
         server.call(method);
       }
@@ -147,6 +149,8 @@ package
       {
         server.removeEventListener(Event.COMPLETE, callSuccess);
         server.removeEventListener(ErrorEvent.ERROR, callFailure);
+        server.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
+                                   callFailure);
         server.cleanup();
         server = null;
       }

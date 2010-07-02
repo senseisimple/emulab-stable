@@ -23,10 +23,10 @@ package
 
     private static var cmv2 : String = "cmv2";
 
-//    public static var defaultAuthority : String = "jonlab.testbed.emulab.net";
+//    public static var defaultAuthority : String = "myelab.testbed.emulab.net";
     public static var defaultAuthority : String = "emulab.net";
 
-//    public static var defaultHost : String = "myboss.jonlab.testbed.emulab.net";
+//    public static var defaultHost : String = "myboss.myelab.testbed.emulab.net:446";
     public static var defaultHost : String = "boss.emulab.net";
 
     public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
@@ -44,7 +44,7 @@ package
     public static var updateTicket : Array = new Array(cm, "UpdateTicket");
     public static var redeemTicket : Array = new Array(cm, "RedeemTicket");
     public static var releaseTicket : Array = new Array(cm, "ReleaseTicket");
-    public static var deleteSliver : Array = new Array(cm, "DeleteSliver");
+    public static var deleteSlice : Array = new Array(cm, "DeleteSlice");
     public static var startSliver : Array = new Array(cm, "StartSliver");
     public static var updateSliver : Array = new Array(cm, "UpdateSliver");
     public static var resolveResource : Array = new Array(cm, "Resolve");
