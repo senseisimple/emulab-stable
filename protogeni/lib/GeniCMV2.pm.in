@@ -560,7 +560,7 @@ sub StartSliver($)
 {
     my ($argref) = @_;
     my $slice_urn    = $argref->{'slice_urn'};
-    my $sliver_urns  = $argref->{'component_urns'};
+    my $sliver_urns  = $argref->{'sliver_urns'} || $argref->{'component_urns'};
     my $credentials  = $argref->{'credentials'};
     my $manifest     = $argref->{'manifest'};
     
@@ -572,7 +572,7 @@ sub StopSliver($)
 {
     my ($argref) = @_;
     my $slice_urn    = $argref->{'slice_urn'};
-    my $sliver_urns  = $argref->{'component_urns'};
+    my $sliver_urns  = $argref->{'sliver_urns'} || $argref->{'component_urns'};
     my $credentials  = $argref->{'credentials'};
 
     return SliverAction("stop",
@@ -583,7 +583,7 @@ sub RestartSliver($)
 {
     my ($argref) = @_;
     my $slice_urn    = $argref->{'slice_urn'};
-    my $sliver_urns  = $argref->{'sliver_urns'};
+    my $sliver_urns  = $argref->{'sliver_urns'} || $argref->{'component_urns'};
     my $credentials  = $argref->{'credentials'};
     my $manifest     = $argref->{'manifest'};
 
