@@ -331,6 +331,8 @@ sub CreateSliver($)
 	    GeniCM::CleanupDeadSlice($slice, 1);
 	}
     }
+    my ($sliver_credential, $sliver_manifest) = @{ $response->{'value'} };
+    
     #
     # Leave the slice intact on error, so we can go look at it. 
     #
@@ -359,8 +361,17 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start sliver");
     }
+    GeniCM::UpdateManifest($slice);
+    $sliver_manifest = $aggregate->GetManifest(1);
+    if (!defined($sliver_manifest)) {
+	print STDERR "CreateSliver: Could not get manifest for $aggregate\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				    "Internal Error");
+    }
+    
     $slice->UnLock();
-    return $response;
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				[$sliver_credential, $sliver_manifest]);
 }
 
 #
