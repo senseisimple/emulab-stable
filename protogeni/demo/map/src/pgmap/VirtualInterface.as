@@ -29,8 +29,15 @@
 		
 		[Bindable]
 		public var id:String;
+		public var role:int;
 
 		[Bindable]
 		public var virtualLinks:ArrayCollection = new ArrayCollection();
+		
+		public var physicalNodeInterface:PhysicalNodeInterface;
+		public var isVirtual:Boolean;
+		public var name : String;
+		public var bandwidth:int = 0;
+		
 	}
 }

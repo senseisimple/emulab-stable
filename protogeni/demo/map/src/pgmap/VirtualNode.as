@@ -31,11 +31,87 @@
 		public var virtualizationType:String;
 		public var sliverUrn:String;
 		
+		// Component
+		[Bindable]
+		public var name:String;
+		public var manager:ComponentManager;
+		public var urn:String;
+		public var isVirtual:Boolean;
+		public var isShared:Boolean;
+		public var isBgpMux:Boolean;
+		public var upstreamAs:String;
+		public var superNode:PhysicalNode;
+		
 		[Bindable]
 		public var interfaces:ArrayCollection = new ArrayCollection();
+		public var links:ArrayCollection = new ArrayCollection();
+		
 		public var rspec:XML;
 		public var sliver:Sliver;
 		public var hostname:String;
+		
+		public function setToPhysicalNode(node:PhysicalNode):void
+		{
+			physicalNode = node;
+			name = node.name;
+			manager = node.manager;
+			urn = node.urn;
+			superNode = node.subNodeOf;
+			isVirtual = false;
+			isShared = !node.exclusive;
+			// deal with rest
+		}
+		
+		public function setToVirtualNode(virtualName:String,
+										 virtualManager:ComponentManager,
+										 virtualUrn:String,
+										 newIsShared:Boolean):void
+		{
+			name = virtualName;
+			manager = virtualManager;
+			urn = virtualUrn;
+			superNode = null;
+			isVirtual = true;
+			isShared = newIsShared;
+			// deal with rest
+		}
+		
+		public function allocateInterface():VirtualInterface
+		{
+			if(isVirtual)
+			{
+				var newVirtualInterface:VirtualInterface = new VirtualInterface(this);
+				newVirtualInterface.id = "virt-" + String(interfaces.length);
+				newVirtualInterface.role = PhysicalNodeInterface.EXPERIMENTAL;
+				newVirtualInterface.isVirtual = true;
+				newVirtualInterface.bandwidth = 100000;
+				return newVirtualInterface;
+			} else {
+				for each (var candidate:PhysicalNodeInterface in physicalNode.interfaces)
+				{
+					if (candidate.role == PhysicalNodeInterface.EXPERIMENTAL)
+					{
+						var success:Boolean = true;
+						for each (var check:VirtualInterface in interfaces)
+						{
+							if(!check.isVirtual && check.physicalNodeInterface == candidate)
+								success = false;
+								break;
+						}
+						if(success)
+						{
+							var newPhysicalInterface:VirtualInterface = new VirtualInterface(this);
+							newPhysicalInterface.isVirtual = false;
+							newPhysicalInterface.id = candidate.id;
+							newPhysicalInterface.role = candidate.role;
+							newPhysicalInterface.physicalNodeInterface = candidate;
+							return newPhysicalInterface;
+						}
+					}
+				}
+			}
+			return null;
+		}
 		
 		// Gets all connected physical nodes
 		public function GetNodes():ArrayCollection {

@@ -68,6 +68,32 @@
 			return false;
 		}
 		
+		public function getOrCreateSliverFor(cm:ComponentManager):Sliver
+		{
+			for each(var s:Sliver in slivers)
+			{
+				if(s.componentManager == cm)
+					return s;
+			}
+			var newSliver:Sliver = new Sliver(this);
+			return newSliver;
+		}
+		
+		public function clone(addOutsideReferences:Boolean = true):Slice
+		{
+			var newSlice:Slice = new Slice();
+			newSlice.uuid = this.uuid;
+			newSlice.hrn = this.hrn;
+			newSlice.urn = this.urn;
+			newSlice.creator = this.creator;
+			newSlice.credential = this.credential;
+			for each(var sliver:Sliver in this.slivers)
+			{
+				newSlice.slivers.addItem(sliver.clone(addOutsideReferences));
+			}
+			return newSlice;
+		}
+		
 		public function ReadyIcon():Class {
 			switch(Status()) {
 				case READY : return Common.flagGreenIcon;

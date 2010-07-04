@@ -226,6 +226,21 @@
 	        		if(ix.localName() == "interface") {
 	        			var i:PhysicalNodeInterface = new PhysicalNodeInterface(n);
 	        			i.id = ix.@component_id;
+						var tempString:String = ix.@role;
+						switch(tempString)
+						{
+							case "control": i.role = 0;
+								break;
+							case "experimental": i.role = 1;
+								break;
+							case "unused": i.role = 2;
+								break;
+							case "unused_control": i.role = 3;
+								break;
+							case "unused_experimental": i.role = 4;
+								break;
+						}
+
 	        			n.interfaces.Add(i);
 	        			interfaceDictionary[i.id] = i;
 	        		} else if(ix.localName() == "node_type") {

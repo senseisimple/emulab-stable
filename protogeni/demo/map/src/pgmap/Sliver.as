@@ -76,7 +76,6 @@
       			nodes.addItem(virtualNode);
       			nodesById[virtualNode.virtualId] = virtualNode;
       			virtualNode.physicalNode.virtualNodes.addItem(virtualNode);
-      			var i:int = 0;
       		}
       		
       		for each(var linkXml:XML in linksXml)
@@ -108,6 +107,68 @@
       			virtualLink.rspec = linkXml.copy();
       			links.addItem(virtualLink);
       		}
+		}
+		
+		public function removeOutsideReferences():void
+		{
+			for each(var node:VirtualNode in this.nodes)
+			{
+				if(node.physicalNode.virtualNodes.getItemIndex(node) > -1)
+					node.physicalNode.virtualNodes.removeItemAt(node.physicalNode.virtualNodes.getItemIndex(node));
+			}
+		}
+		
+		public function clone(addOutsideReferences:Boolean = true):Sliver
+		{
+			var newSliver:Sliver = new Sliver(slice);
+			newSliver.credential = this.credential;
+			newSliver.componentManager = this.componentManager;
+			newSliver.rspec = this.rspec;
+			newSliver.urn = this.urn;
+			newSliver.state = this.state;
+			newSliver.status = this.status;
+			
+			var allNewInterfaces:Dictionary = new Dictionary();
+			for each(var node:VirtualNode in this.nodes)
+			{
+				var newNode:VirtualNode = new VirtualNode(newSliver);
+				newNode.virtualId = node.virtualId;
+				newNode.sliverUrn = node.sliverUrn;
+				newNode.virtualizationType = node.virtualizationType;
+				newNode.physicalNode = node.physicalNode;
+				for each(var vi:VirtualInterface in node.interfaces)
+				{
+					var virtualInterface:VirtualInterface = new VirtualInterface(newNode);
+					virtualInterface.id = vi.id;
+					newNode.interfaces.addItem(virtualInterface);
+					allNewInterfaces[virtualInterface.id] = virtualInterface;
+				}
+				
+				newNode.rspec = node.rspec;
+				if(addOutsideReferences)
+					newNode.physicalNode.virtualNodes.addItem(newNode);
+				newSliver.nodes.addItem(newNode);
+			}
+
+			
+			for each(var link:VirtualLink in this.links)
+			{
+				var newLink:VirtualLink = new VirtualLink(newSliver);
+				newLink.virtualId = link.virtualId;
+				newLink.sliverUrn = link.sliverUrn;
+				newLink.type = link.type;
+				newLink.bandwidth = link.bandwidth;
+				newLink.rspec = link.rspec;
+				
+				for each(var lvi:VirtualInterface in link.interfaces) {
+					newLink.interfaces.addItem(allNewInterfaces[lvi.id]);
+					allNewInterfaces[lvi.id].virtualLinks.addItem(newLink);
+				}
+				
+				newSliver.links.addItem(newLink);
+			}
+			
+			return newSliver;
 		}
 	}
 }

@@ -19,6 +19,12 @@
 	// Interface on a physical node
 	public class PhysicalNodeInterface
 	{
+		public static var CONTROL:int = 0;
+		public static var EXPERIMENTAL:int = 1;
+		public static var UNUSED:int = 2;
+		public static var UNUSED_CONTROL:int = 3;
+		public static var UNUSED_EXPERIMENTAL:int = 4;
+		
 		public function PhysicalNodeInterface(own:PhysicalNode)
 		{
 			owner = own;
@@ -29,8 +35,12 @@
 		
 		[Bindable]
 		public var id:String;
+		
+		public var role : int = -1;
 
 		[Bindable]
 		public var links:ArrayCollection = new ArrayCollection();
+		
+		
 	}
 }
