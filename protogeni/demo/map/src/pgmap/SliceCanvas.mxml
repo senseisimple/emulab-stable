@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas xmlns:mx="http://www.adobe.com/2006/mxml"
+		   width="100%" height="100%" borderStyle="solid" backgroundColor="#F6F6F6"
+		   dragEnter="dragEnterHandler(event)"  dragDrop="dragDropHandler(event)"
+		   mouseMove="mouseMoveHandler(event)" mouseUp="mouseUpHandler(event)" borderColor="#CDC2C2">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.List;
+			import mx.events.DragEvent;
+			import mx.managers.DragManager;
+			import mx.managers.PopUpManager; 
+			
+			public var slice:Slice;
+			public var startNode:SliceNode = null;
+			public var currentNode:SliceNode = null;
+			public var tempLink:SliceLink;
+			public var hostWindow:SliceWindow;
+			
+			public var allNodes:SliceNodeCollection = new SliceNodeCollection();
+			public var allLinks:SliceLinkCollection = new SliceLinkCollection();
+			public var addedRawChildren:ArrayCollection = new ArrayCollection();
+			
+			public function load(newSlice:Slice):void
+			{
+				slice = newSlice.clone(false);
+				
+				for each(var s:Sliver in slice.slivers)
+				{
+					// load!
+				}
+			}
+			
+			private  function dragEnterHandler(event:DragEvent):void {
+				if (event.dragSource.hasFormat("canvas") ||
+						(event.dragInitiator is List &&
+						List(event.dragInitiator).selectedItem is PhysicalNode &&
+						PhysicalNode(List(event.dragInitiator).selectedItem).available &&
+						!allNodes.containsPhysicalNode(PhysicalNode(List(event.dragInitiator).selectedItem))))
+				{
+					DragManager.acceptDragDrop(Canvas(event.currentTarget));
+				}
+			}
+			
+			private function dragDropHandler(event:DragEvent):void {
+				// Handle dragging new node
+				if(event.dragInitiator is List && List(event.dragInitiator).selectedItem is PhysicalNode)
+				{
+					var pn:PhysicalNode = List(event.dragInitiator).selectedItem as PhysicalNode;
+					var sn:SliceNode = new SliceNode();
+					var newVirtualNode:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(pn.manager));
+					newVirtualNode.setToPhysicalNode(pn);
+					sn.setNode(newVirtualNode);
+					sn.canvas = this;
+					this.addChild(sn);
+					sn.x = Canvas(event.currentTarget).mouseX - (sn.width/2);
+					sn.y = Canvas(event.currentTarget).mouseY - (sn.height/2);
+					allNodes.addItem(sn);
+					hostWindow.loadNodes();
+					newVirtualNode.sliver.nodes.addItem(newVirtualNode);
+				}
+				// Handle dragging old one
+				else if(this.contains(event.dragInitiator as DisplayObject))
+				{
+					SliceNode(event.dragInitiator).x = Canvas(event.currentTarget).mouseX - SliceNode(event.dragInitiator).startX;
+					SliceNode(event.dragInitiator).y = Canvas(event.currentTarget).mouseY - SliceNode(event.dragInitiator).startY;
+					redrawAllLinks();
+				}
+			}
+			
+			public function startLinkingFrom(node:SliceNode):void
+			{
+				startNode = node;
+				tempLink = new SliceLink(this);
+			}
+
+			protected function mouseMoveHandler(event:MouseEvent):void
+			{
+				if(startNode != null)
+				{
+					// See if a node is under
+					currentNode = null;
+					for each(var sn:SliceNode in allNodes)
+					{
+						if(sn != startNode && sn.getRect(this).contains(mouseX, mouseY) && !allLinks.hasLinkFor(startNode, sn)) {
+							currentNode = sn;
+							break;
+						}
+					}
+
+					// Add sprite to Canvas display list
+					tempLink.drawEstablishing(startNode.x + startNode.width/2,
+											startNode.y + startNode.height/2,
+											mouseX,
+											mouseY, currentNode != null);
+					addRawChild( tempLink );
+
+				} else if(tempLink != null && rawChildren.contains(tempLink))
+					removeRawChild(tempLink);
+			}
+
+
+			protected function mouseUpHandler(event:MouseEvent):void
+			{
+				// Add link if needed
+				if(startNode != null && currentNode != null) {
+					if(tempLink.establish(startNode, currentNode)) {
+						tempLink.drawEstablished();
+					}
+					validateNow();
+				} else if(tempLink != null && rawChildren.contains(tempLink))
+					removeRawChild(tempLink);
+				
+				// Reset
+				startNode = null;
+				currentNode = null;
+				tempLink = null;
+				redrawAllLinks();
+			}
+			
+			// RAW CHILDREN FUNCTIONS
+			public function redrawAllLinks():void
+			{
+				for each(var sl:SliceLink in allLinks)
+				{
+					sl.drawEstablished();
+					sendRawChildToBack(sl);
+				}
+			}
+			
+			public function sendRawChildToBack(child:*):void
+			{
+				rawChildren.setChildIndex(child, 1);
+			}
+			
+			public function addRawChild(child:*, sendToBack:Boolean = false):void
+			{
+				if(sendToBack)
+					rawChildren.addChildAt(child, 1);
+				else
+					rawChildren.addChild(child);
+				
+				addedRawChildren.addItem(child);
+			}
+			
+			public function removeRawChild(child:*):void
+			{
+				rawChildren.removeChild(child);
+				addedRawChildren.removeItemAt(addedRawChildren.getItemIndex(child));
+			}
+			
+			public function removeAllRawChildren():void
+			{
+				for each(var child:* in addedRawChildren)
+				{
+					rawChildren.removeChild(child);
+				}
+				addedRawChildren.removeAll();
+			}
+
+		]]>
+	</mx:Script>
+
+</mx:Canvas>
