@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<maps:Map xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:maps="com.google.maps.*"
+		  height="100%" width="100%"
+		  preinitialize="mappreinit()"
+		  mapevent_mappreinitialize="onMapPreinitialize(event)"
+		  mapevent_mapready="onMapReady(event)"
+		  key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg">
+	<mx:Script>
+		<![CDATA[
+			import com.google.maps.LatLng;
+			import com.google.maps.MapMoveEvent;
+			import com.google.maps.MapOptions;
+			import com.google.maps.MapType;
+			import com.google.maps.MapZoomEvent;
+			import com.google.maps.controls.MapTypeControl;
+			import com.google.maps.controls.PositionControl;
+			import com.google.maps.controls.ZoomControl;
+			
+			private function onMapPreinitialize(event:Event):void {
+				var myMapOptions:MapOptions = new MapOptions();
+				myMapOptions.zoom = 4;
+				myMapOptions.center = new LatLng(38,-97);
+				myMapOptions.mapType = MapType.PHYSICAL_MAP_TYPE;
+				setInitOptions(myMapOptions);
+			}
+			
+			private function mappreinit():void {
+				// Set correct key
+				var url : String = mx.core.Application.application.url;
+				if(url.indexOf("https://users.emulab.net") > -1)
+					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
+				else if(url.indexOf("http://users.emulab.net") > -1)
+					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRQhQD93Qa0bULV_1nZL9DPKN6w4xSZvcNEsTI1o7vjS_yayjPwrn1FOw";
+				else if(url.indexOf("http://boss.emulab.net") > -1)
+					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hT-JTA_kdlWCi1B9UqMb6PoH1IjshRNCq_RwaKn0XBDiQgigKEreNFnfw";
+				else if(url.indexOf("https://boss.emulab.net") > -1)
+					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTJAI3wyjNM51iUcfoH5qR3p3QFHBQ_Ukk2jOVwrIST7TsKH0dxYswnyg";
+				else if(url.indexOf("http://www.protogeni.net") > -1)
+					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTfdIoaYgi7tOvtC9dvhWwYlnAj4hTW5IpetuD9FvaEH3LDmTpL2Vs__w";
+				else if(url.indexOf("https://www.protogeni.net") > -1)
+					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRNcqKgyvlELbhgjE5kl-gFNsMkyxTLoim3vJsPX9zTdq5dy1yGCfLGqw";
+			}
+			
+			private function onMapReady(event:Event):void {
+				addControl(new ZoomControl());
+				//map.addControl(new PositionControl());
+				addControl(new MapTypeControl());
+				
+				enableScrollWheelZoom();
+				enableContinuousZoom();
+				
+				addEventListener(MapZoomEvent.ZOOM_CHANGED, afterMove);
+				Main.protogeniHandler.rpcHandler.startInitiationSequence();
+			}
+			
+			private function afterMove(evt:MapZoomEvent):void
+			{
+				Main.protogeniHandler.mapHandler.drawMap();
+			}
+			
+			public function resetZoom():void {
+				setZoom(4);
+				panTo(new LatLng(38,-97));
+			}
+		]]>
+	</mx:Script>
+</maps:Map>

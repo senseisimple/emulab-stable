@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<cross-domain-policy>
+    <allow-access-from domain="boss.emulab.net" />
+	<allow-access-from domain="users.emulab.net"/>
+</cross-domain-policy>
+

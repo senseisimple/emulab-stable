@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Canvas
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="124" height="22" borderStyle="solid" backgroundColor="#EAEAEA" borderThickness="2"
+	mouseDown="mouseMoveHandler(event)"
+	xmlns:protogeniflash="protogeniflash.*" verticalScrollPolicy="off" horizontalScrollPolicy="off" xmlns:display="protogeni.display.*">
+	
+	<mx:Style>
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+	</mx:Style>
+	
+	<mx:Script>
+		<![CDATA[
+			import protogeni.resources.VirtualNode;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.core.DragSource;
+			import mx.graphics.ImageSnapshot;
+			import mx.managers.DragManager;
+			
+			[Bindable]
+			public var node:VirtualNode;
+			public var links:ArrayCollection;
+			
+			public var startX:int;
+			public var startY:int;
+			public var canvas:SliceCanvas;
+			
+			public function setNode(n:VirtualNode):void
+			{
+				node = n;
+				toolTip += "Name: " + n.name + "\nURN: " + n.urn;
+				links = new ArrayCollection();
+			}
+			
+			public function removeLink(l:SliceLink):void
+			{
+				links.removeItemAt(links.getItemIndex(l));
+			}
+			
+			private  function mouseMoveHandler(event:MouseEvent):void{
+				var d:Array = getObjectsUnderPoint(new Point(event.localX, event.localY));
+				var dragInitiator:Canvas = Canvas(event.currentTarget);
+				var ds:DragSource = new DragSource();
+				ds.addData(dragInitiator, "canvas"); 
+				
+				startX = event.localX;
+				startY = event.localY;
+				DragManager.doDrag(dragInitiator, ds, event);
+			}
+			
+			private  function mouseDownHandler(event:MouseEvent):void{
+				event.stopImmediatePropagation();
+				canvas.startLinkingFrom(this);
+			}
+			
+			public function getMiddleX():int
+			{
+				return x + width/2;
+			}
+			
+			public function getMiddleY():int
+			{
+				return y + height/2;
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:Label x="8" y="0" text="{node.name}" width="91.66667" height="18"/>
+	<mx:Label x="-1" text="E" width="10" fontSize="8" height="17" y="2" textAlign="center"/>
+	<display:ImageButton id="addLink" x="100" y="-2" width="22" height="22" source="@Embed('../images/bullet_add.png')" mouseDown="mouseDownHandler(event)"/>
+	<mx:VRule x="8" y="0" width="2" height="18"/>
+	
+</mx:Canvas>
