@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:ResizeWindow xmlns="protogeniflash.*" xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="500" height="158" showCloseButton="true" layout="vertical"
+	borderAlpha=".9" borderColor="#D2E1F0"
+	resizable="true"
+	title="Component Manager Information"
+	close="PopUpManager.removePopUp(this)" xmlns:display="protogeni.display.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import protogeni.resources.ComponentManager;
+			import mx.controls.Spacer;
+			import mx.containers.HBox;
+			import mx.controls.Button;
+			import com.google.maps.View;
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Label;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			public var main:protogeniflash;
+			
+			public function loadCm(cm:ComponentManager):void {
+				cmInfo.load(cm);
+			}
+		]]>
+	</mx:Script>
+	<display:ComponentManagerAdvancedInformation height="100%" width="100%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="cmInfo" />
+</display:ResizeWindow>

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
+	title="Console"
+	implements="LogRoot" initialize="init()" layout="horizontal" xmlns:protogeniflash="protogeniflash.*" xmlns:display="protogeni.display.*">
+	
+	<mx:Style source="protogeni/display/styles.css"/>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Button;
+			import mx.controls.HRule;
+			import mx.controls.Spacer;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			
+			import protogeni.ProtogeniHandler;
+			import protogeni.communication.CommunicationUtil;
+			import protogeni.communication.Request;
+			import protogeni.communication.RequestQueueNode;
+			
+			public var selectedIndex:int;
+			private var logList:Array;
+			public var groups:Array;
+			
+			[Bindable]
+			public var groupNames:Array;
+			
+			public function init():void
+			{
+				clear();
+				Main.protogeniHandler.addEventListener(ProtogeniHandler.QUEUE_CHANGED, resetQueueView);
+			}
+			
+			public function setStatus(s:String, isWaiting:Boolean, isError:Boolean):void
+			{
+				Main.Pgmap().waitingIcon.visible = isWaiting;
+				Main.Pgmap().progressLabel.text = s;
+				if(isWaiting)
+					Main.Pgmap().progressLabel.styleName = "inprogressStyle";
+				else if(isError)
+					Main.Pgmap().progressLabel.styleName = "failedStyle";
+				else
+					Main.Pgmap().progressLabel.styleName = "validStyle";
+			}
+			
+			public function appendText(s:String):void {
+				// For now, just add
+				var newMsg:LogMessage = new LogMessage("", "", s);
+				logList.push(newMsg);
+				if(groupComboBox.selectedIndex == 0)
+					addMessage(newMsg);
+			}
+			
+			public function appendMessage(msg:LogMessage):void {
+				logList.push(msg);
+				if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
+				{
+					addMessage(msg);
+				}
+			}
+			
+			private function doScroll(event:FlexEvent): void
+			{
+				verticalScrollPosition=maxVerticalScrollPosition
+				validateNow();
+				removeEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
+			}
+
+			
+			private function addMessage(msg:LogMessage):void
+			{
+				addEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
+				if(msg.type == LogMessage.TYPE_START)
+				{
+					var split:Spacer = new Spacer();
+					logs.addChild(split);
+				}
+				if(msg.groupId == "")
+				{
+					var generalLabel:Label = new Label();
+					generalLabel.text = msg.details;
+					logs.addChild(generalLabel);
+				} else {
+					logs.addChild(DisplayUtil.getLogMessageButton(msg));
+				}
+			}
+			
+			public function clear():void {
+				selectedIndex = 0;
+				logList = new Array();
+				groups = new Array("", CommunicationUtil.sesUrl, CommunicationUtil.chUrl);
+				groupNames = new Array("All", "Slice Embedding Service", "Clearing House");
+				if(logs != null)
+					logs.removeAllChildren();
+			}
+			
+			public function clearScreen():void
+			{
+				logs.removeAllChildren();
+			}
+			
+			public function open():void
+			{
+				PopUpManager.addPopUp(this, Main.Pgmap(), false);
+				PopUpManager.centerPopUp(this);
+				groupComboBox.selectedIndex = selectedIndex;
+			}
+			
+			public function openGroup(id:String):void
+			{
+				groupComboBox.selectedIndex = groups.indexOf(id);
+				refreshView();
+			}
+			
+			public function refreshView():void
+			{
+				clearScreen();
+				if(groupComboBox.selectedIndex == 0)
+				{
+					for each(var allMsg:LogMessage in logList)
+					{
+						addMessage(allMsg);
+					}
+				} else {
+					for each(var msg:LogMessage in logList)
+					{
+						if(msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1)
+							addMessage(msg);
+					}
+				}
+				selectedIndex = groupComboBox.selectedIndex;
+			}
+			
+			public function resetQueueView(junk:*):void
+			{
+				queue.removeAllChildren();
+				var currentNode:RequestQueueNode = Main.protogeniHandler.rpcHandler.queue.head;
+				if(currentNode == null)
+				{
+					var noneLabel:Label = new Label();
+					noneLabel.text = "None";
+					queue.addChild(noneLabel);
+				}
+				else
+				{
+					if(Main.protogeniHandler.rpcHandler.working)
+					{
+						var currentLabel:Label = new Label();
+						currentLabel.text = "Currently running";
+						queue.addChild(currentLabel);
+						queue.addChild(DisplayUtil.getRequestButton(currentNode.item));
+						currentNode = currentNode.next;
+					}
+					if(currentNode == null)
+					{
+						var noneWaitingLabel:Label = new Label();
+						noneWaitingLabel.text = "None waiting";
+						queue.addChild(noneWaitingLabel);
+					} else {
+						var waitingLabel:Label = new Label();
+						waitingLabel.text = "Waiting";
+						queue.addChild(waitingLabel);
+						while(currentNode != null)
+						{
+							queue.addChild(DisplayUtil.getRequestButton(currentNode.item));
+							currentNode = currentNode.next;
+						}
+					}
+				}
+			}
+			
+		]]>
+	</mx:Script>
+	
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:VBox height="100%" width="50%" horizontalAlign="center">
+			<mx:Label text="Logs for"  fontSize="12" fontWeight="bold"/>
+			<mx:ComboBox id="groupComboBox" dataProvider="{groupNames}" change="refreshView()"></mx:ComboBox>
+			<mx:VBox height="100%" width="100%" id="logs">
+			</mx:VBox>
+		</mx:VBox>
+		
+		<mx:VBox height="100%" width="50%" horizontalAlign="center">
+			<mx:Label text="Queued Requests"  fontWeight="bold" fontSize="12"/>
+			<mx:VBox height="100%" width="100%" id="queue">
+			</mx:VBox>
+		</mx:VBox>
+	</mx:HDividedBox>
+	
+</display:DefaultWindow>
