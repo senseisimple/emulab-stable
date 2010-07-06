@@ -794,7 +794,7 @@ sub Start($$$)
 	    # Look to see if local physical node was stopped (powered off).
 	    #
 	    if (!$node->isremotenode() &&
-		$sliver->state() eq "stopped") {
+		($sliver->state() eq "stopped" || $sliver->state() eq "new")) {
 		$poweron{$node->node_id} = $node;
 	    }
 	    else {
@@ -1018,7 +1018,8 @@ sub Stop($$)
 	    # in the stopped state. Skip those.
 	    #
 	    next
-		if ($sliver->state() eq "stopped");
+		if ($sliver->state() eq "stopped"
+		    || $sliver->state() eq "new");
 	    
 	    if ($node->isvirtnode()) {
 		$vnodes{$node->node_id} = $node;
