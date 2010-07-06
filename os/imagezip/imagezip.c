@@ -15,6 +15,7 @@
 #ifdef WITH_CRYPTO
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <openssl/rsa.h>
 #include <openssl/rand.h>
 #ifdef SIGN_CHECKSUM
 #include <openssl/err.h>

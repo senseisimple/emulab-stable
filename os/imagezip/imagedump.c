@@ -303,7 +303,7 @@ dumpfile(char *name, int fd)
 					memcpy(imageid, hdr->imageid,
 					       UUID_LENGTH);
 					if (detail > 0) {
-						uint8_t idbuf[UUID_LENGTH*2+1];
+						char idbuf[UUID_LENGTH*2+1];
 						mem_to_hexstr(idbuf,
 							      hdr->imageid,
 							      UUID_LENGTH);
@@ -737,7 +737,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 	 * Checksum this image.  Assumes SHA1, because we check for this above.
 	 */
 	if (checksums && hdr->checksumtype != CSUM_NONE) {
-		if (!verify_checksum(hdr, buf)) {
+		if (!verify_checksum(hdr, (unsigned char *)buf)) {
 			printf("ERROR: chunk %d fails checksum!\n", chunkno);
 			return 1;
 		}

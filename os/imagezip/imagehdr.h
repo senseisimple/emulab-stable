@@ -106,7 +106,7 @@ struct blockhdr_V4 {
 	int32_t		reloccount;	/* number of reloc entries */
 	/* V4 follows */
 	uint32_t	enc_cipher;	/* Which cipher was used to encrypt */
-	int8_t		enc_iv[ENC_MAX_KEYLEN];
+	uint8_t		enc_iv[ENC_MAX_KEYLEN];
 					/* Initialization vector */
 	uint32_t	checksumtype;	/* Which checksum was used */
 	unsigned char	checksum[SIG_MAX_KEYLEN];

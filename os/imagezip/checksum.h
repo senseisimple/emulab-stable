@@ -15,15 +15,15 @@ cleanup_checksum(void);
 // Returns 1 if checksums matched, 0 if they failed to match.
 // If the checksums fail to match, an error message is also printed.
 int
-verify_checksum(blockhdr_t *blockhdr, const char *bodybufp);
+verify_checksum(blockhdr_t *blockhdr, const unsigned char *bodybufp);
 
 int
 encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen);
 
 void
-mem_to_hexstr(unsigned char *dest, const unsigned char *source, int memsize);
+mem_to_hexstr(char *dest, const unsigned char *source, int memsize);
 
 int
-hexstr_to_mem(unsigned char *dest, const unsigned char *source, int memsize);
+hexstr_to_mem(unsigned char *dest, const char *source, int memsize);
 
 #endif

@@ -1184,7 +1184,7 @@ write_subblock(int chunkno, const char *chunkbufp)
 #ifdef WITH_CRYPTO
 /* returns the number of characters decrypted */
 static int
-decrypt_buffer(char * dest, const char * source, const blockhdr_t * header)
+decrypt_buffer(unsigned char *dest, const unsigned char *source, const blockhdr_t *header)
 {
 	/* init */
 	int update_count = 0;
@@ -1329,7 +1329,8 @@ inflate_subblock(const char *chunkbufp)
 		 */
 		if (do_decrypt) {
 			((blockhdr_t *)blockhdr)->size
-				= decrypt_buffer(plaintext, chunkbufp,
+				= decrypt_buffer((unsigned char *)plaintext,
+						 (unsigned char *)chunkbufp,
 						 blockhdr);
 			chunkbufp = plaintext;
 		}

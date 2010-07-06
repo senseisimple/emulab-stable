@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -523,7 +523,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	struct hashregion *reg;
 	int chunkno;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	char *hashstr;
 	readbuf_t *rbuf;
@@ -863,7 +863,7 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	z_stream z;
 	int err, nreg;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	readbuf_t *rbuf;
 	int errors = 0;
@@ -1101,7 +1101,7 @@ hashfilechunk(int chunkno, char *chunkbufp, int chunksize,
 	int resid;
 	uint32_t cursect = 0, nbytes;
 	unsigned char hash[HASH_MAXSIZE];
-	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+	unsigned char *(*hashfunc)(const unsigned char *, size_t,
 				   unsigned char *);
 	unsigned char *bufp = (unsigned char *)chunkbufp;
 	int errors = 0;

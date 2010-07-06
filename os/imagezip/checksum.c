@@ -16,6 +16,7 @@
 #ifdef WITH_CRYPTO
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <openssl/rsa.h>
 
 #include "imagehdr.h"
 #include "checksum.h"
@@ -50,15 +51,15 @@ input_public_key(char *keyfile, RSA *key)
 
 	file = fopen(keyfile, "r");
 	fscanf(file, "%1024s", str);
-	BN_hex2bn(& key->n, str);
+	BN_hex2bn(&key->n, str);
 	fscanf(file, "%1024s", str);
-	BN_hex2bn(& key->e, str);
+	BN_hex2bn(&key->e, str);
 	fscanf(file, "%1024s", str);
-	BN_hex2bn(& key->dmp1, str);
+	BN_hex2bn(&key->dmp1, str);
 	fscanf(file, "%1024s", str);
-	BN_hex2bn(& key->dmq1, str);
+	BN_hex2bn(&key->dmq1, str);
 	fscanf(file, "%1024s", str);
-	BN_hex2bn(& key->iqmp, str);
+	BN_hex2bn(&key->iqmp, str);
 	fclose(file);
 }
 
@@ -97,7 +98,7 @@ decrypt_checksum(unsigned char *alleged_sum)
 }
 
 int
-verify_checksum(blockhdr_t *blockhdr, const char *bodybufp)
+verify_checksum(blockhdr_t *blockhdr, const unsigned char *bodybufp)
 {
 	SHA_CTX sum_context;
 	int sum_length;
@@ -183,7 +184,7 @@ encrypt_readkey(char *keyfile, unsigned char *keybuf, int buflen)
  * into source. source must have 2*memsize + 1 bytes available.
  */
 void
-mem_to_hexstr(unsigned char *dest, const unsigned char *source, int memsize)
+mem_to_hexstr(char *dest, const unsigned char *source, int memsize)
 {
 	int i;
 
@@ -212,7 +213,7 @@ hex_to_char(char in)
  * less than 2*memsize characters in the source null-terminated string.
  */
 int
-hexstr_to_mem(unsigned char * dest, const unsigned char * source, int memsize)
+hexstr_to_mem(unsigned char * dest, const char * source, int memsize)
 {
 	int result = 1;
 	int i = 0;
