@@ -36,7 +36,7 @@ package
       return null;
     }
 	
-	public function getComponent(urn:String, cm:String):String
+	public function getComponent(urn:String, cm:String, force:Boolean = false):String
 	{
 		return "The flash client is not ready to process messages.  Please make sure the slice is created.";
 	}

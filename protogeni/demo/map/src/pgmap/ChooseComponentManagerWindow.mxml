@@ -2,10 +2,10 @@
 <mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
 	title="Component Managers"
 	showCloseButton="true"
-	borderAlpha=".9" borderColor="#D2E1F0" width="222"
+	borderAlpha=".9" borderColor="#D2E1F0" width="250"
 	defaultButton="{okButton}"
 	close="close()"
-	creationComplete="okButton.setFocus()" xmlns:ns1="pgmap.*" height="288" verticalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2">
+	creationComplete="okButton.setFocus()" xmlns:ns1="pgmap.*" height="310" verticalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2">
 	
 	<mx:Style>
 		.failedStyle {
@@ -47,7 +47,7 @@
 			import mx.controls.Alert;
 			import mx.events.CloseEvent;	
        		import mx.managers.PopUpManager;
-       		
+       		import flash.net.navigateToURL;
 			[Bindable]
 			public var main:pgmap;
 			
@@ -166,11 +166,25 @@
 			{
 				var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
 				var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
+				var cmGoto:ImageButton;
+				if(cmHbox.numChildren == 3)
+					cmGoto = cmHbox.getChildAt(2) as ImageButton;
 				
 				if(cm.Status == ComponentManager.FAILED) {
 					cmCheckbox.styleName = "failedStyle";
 					cmInfo.source = Common.flagRedIcon;
-					cmInfo.toolTip = cm.Message;
+					cmInfo.toolTip = cm.errorDescription;
+					if(cmGoto == null && cm.mightNeedSecurityException())
+					{
+						cmGoto = new ImageButton();
+						cmGoto.source = Common.exclamationIcon;
+						cmGoto.toolTip = "Click to open CM URL, it appears that you might need to add a security exception";
+						cmGoto.addEventListener(MouseEvent.CLICK,
+							function openCm():void {
+								navigateToURL(new URLRequest(cm.VisitUrl()), "_blank");
+							});
+						cmHbox.addChild(cmGoto);
+					}
 				}
 				else if(cm.Status == ComponentManager.UNKOWN) {
 					cmCheckbox.styleName = "unknownStyle";
@@ -238,7 +252,7 @@
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 	<mx:SWFLoader id="waitingIcon" source="@Embed('../../images/waiting.swf')" visible="false"/> 
 	</mx:HBox>
-	<mx:VBox width="100%" height="196" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2">
+	<mx:VBox width="100%" height="218" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2">
 	</mx:VBox>
 	<mx:HBox width="100%" horizontalAlign="right">
 	<mx:Spacer width="100%"/>
