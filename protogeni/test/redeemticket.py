@@ -101,12 +101,25 @@ if rval:
 ticket = response["value"]
 print "Got the ticket"
 
+redeemcred = slicecred;
+#
+# Get the sliver credential.
+#
+print "Asking for sliver credential"
+params = {}
+params["slice_urn"] = SLICEURN
+params["credentials"] = (slicecred,)
+rval,response = do_method("cm", "GetSliver", params, version="2.0")
+if not rval:
+  redeemcred = response["value"]
+  print "Got the sliver credential"
+
 #
 # And redeem the ticket.
 #
 print "Redeeming the ticket"
 params = {}
-params["credentials"] = (slicecred,)
+params["credentials"] = (redeemcred,)
 params["ticket"]      = ticket
 params["slice_urn"]   = SLICEURN
 params["keys"]        = mykeys
@@ -114,6 +127,6 @@ rval,response = do_method("cm", "RedeemTicket", params, version="2.0")
 if rval:
     Fatal("Could not redeem the ticket")
     pass
-sliver,manifest = response["value"]
+(sliver, manifest) = response["value"]
 print "Created the sliver"
 print str(manifest)

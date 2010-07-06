@@ -107,6 +107,7 @@ print str(myslice)
 #
 print "Asking for sliver credential"
 params = {}
+params["slice_urn"] = SLICEURN
 params["credentials"] = (slicecred,)
 rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if rval:
@@ -122,10 +123,10 @@ valid_until = time.strftime("%Y%m%dT%H:%M:%S",time.gmtime(time.time() + 6000));
 
 print "Renewing the Sliver until " + valid_until
 params = {}
-params["credentials"]  = (slivercred,)
+params["credentials"]  = (slicecred,)
 params["slice_urn"]    = SLICEURN
-params["valid_until"]  = valid_until
-rval,response = do_method("cm", "RenewSliver", params, version="2.0")
+params["expiration"]  = valid_until
+rval,response = do_method("cm", "RenewSlice", params, version="2.0")
 if rval:
     Fatal("Could not renew sliver")
     pass
