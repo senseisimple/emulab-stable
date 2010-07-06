@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -37,7 +37,7 @@ package
       parent.addChild(clip);
 
       clip.sliceName.text = sliceName;
-          clip.sliceUrn.text = sliceUrn;
+      clip.sliceUrn.text = sliceUrn;
       nodes = new ActiveNodes(parent, clip.nodeList, clip.description);
       managers = new ComponentView(clip.cmSelect, clip.nodeList, nodes);
       console = new Console(parent, nodes, managers, clip,
@@ -47,12 +47,14 @@ package
       abstract = new AbstractNodes(clip, nodes, managers);
     }
         
-        public override function getComponent(urn:String, cm:String):String
+        public override function getComponent(urn:String, cm:String, force:Boolean = false):String
         {
+				Main.getConsole().appendText("\nGETTING Component...\n");
                 var compm : ComponentManager = null;
                 var cms : Array = managers.getManagers();
                 
                 // Get CM
+				Main.getConsole().appendText("GETTING CM\n");
                 var length:int = cms.length;
                 for(var i:int = 0; i < length; i++)
                 {
@@ -64,6 +66,7 @@ package
                 }
                 
                 // Get component
+				Main.getConsole().appendText("GETTING Comp\n");
                 if(compm != null)
                 {
                         var index:int;
@@ -74,7 +77,8 @@ package
                         {
                                 return "Node not found, most likely because it isn't available.";
                         }
-                        if(compm.isUsed(index))
+						Main.getConsole().appendText("Comp is index " + index + "\n");
+                        if(compm.isUsed(index) && !force)
                                 return "Component is being used already";
                         var component = compm.getComponent(index);
                         var superNode = null;
@@ -121,7 +125,7 @@ package
 
     var sliceName : String;
     var sliceId : String;
-        var sliceUrn : String;
+    public var sliceUrn : String;
     var credential : Credential;
     var parent : DisplayObjectContainer;
     var clip : SliceDetailClip;

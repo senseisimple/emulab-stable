@@ -56,6 +56,15 @@
 			}
 		}
 		
+		public function getCm(urn:String):ComponentManager {
+			for each(var cm : ComponentManager in this.ComponentManagers)
+			{
+				 if(cm.Urn == urn)
+				 	return cm;
+			}
+			return null;
+		}
+		
 		public function getCredential(afterCompletion : Function):void {
 			rpc.AfterCall = afterCompletion;
 			rpc.startCredential();

@@ -129,7 +129,10 @@ if os.path.exists( LOCALCONF ):
 if EXTRACONF and os.path.exists( EXTRACONF ):
     execfile( EXTRACONF )
 
-HOSTNAME = XMLRPC_SERVER[ "default" ]
+if "sa" in XMLRPC_SERVER:
+    HOSTNAME = XMLRPC_SERVER[ "sa" ]
+else:
+    HOSTNAME = XMLRPC_SERVER[ "default" ]
 DOMAIN   = HOSTNAME[HOSTNAME.find('.')+1:]
 SLICEURN = "urn:publicid:IDN+" + DOMAIN + "+slice+" + SLICENAME
 
