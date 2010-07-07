@@ -60,7 +60,7 @@ if ($UID != 0) {
 #
 # Exit if not a protogeni site.
 #
-if (! $PGENISUPPORT) {
+if (! ($PGENISUPPORT && $PGENICLRHOUSE)) {
     exit(0);
 }
 
