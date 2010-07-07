@@ -794,7 +794,7 @@ sub Start($$$)
 	    # Look to see if local physical node was stopped (powered off).
 	    #
 	    if (!$node->isremotenode() &&
-		($sliver->state() eq "stopped" || $sliver->state() eq "new")) {
+		($sliver->state() eq "stopped")) {
 		$poweron{$node->node_id} = $node;
 	    }
 	    else {
