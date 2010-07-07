@@ -196,6 +196,7 @@ $(TESTBED_BUILD_PATH)/tmcc.bin:
 
 $(TESTBED_BUILD_PATH)/frisbee: $(SYSROOT_ZLIB_SHARED)
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	C_INCLUDE_PATH=$(STAGING_DIR)/usr/include/openssl \
 	$(MAKE) -C $(FRISBEE_PATH) -f Makefile-linux.sa \
 		CC=$(CROSS_COMPILER_PREFIX)gcc \
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) frisbee
@@ -206,6 +207,7 @@ $(TESTBED_BUILD_PATH)/frisbee: $(SYSROOT_ZLIB_SHARED)
 
 $(TESTBED_BUILD_PATH)/imageunzip: $(SYSROOT_ZLIB_SHARED)
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	C_INCLUDE_PATH=$(STAGING_DIR)/usr/include/openssl \
 	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa \
 		CC=$(CROSS_COMPILER_PREFIX)gcc \
 		imageunzip
@@ -216,6 +218,7 @@ $(TESTBED_BUILD_PATH)/imageunzip: $(SYSROOT_ZLIB_SHARED)
 
 $(TESTBED_BUILD_PATH)/imagezip: $(SYSROOT_ZLIB_SHARED)
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
+	C_INCLUDE_PATH=$(STAGING_DIR)/usr/include/openssl \
 	$(MAKE) -C $(IMAGEZIP_PATH) -f Makefile-linux.sa \
 		CC=$(CROSS_COMPILER_PREFIX)gcc \
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) imagezip
