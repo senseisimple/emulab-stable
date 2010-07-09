@@ -1024,7 +1024,7 @@ sub SetupReloadFrisbee($)
 	if (defined $subboss) {
 		my $image = Image->Lookup($imageid);
 		my $filename = $image->path();
-		my @image_stats = stat $filename;
+		my $stats = stat $filename;
 
 		my $query_result = DBQueryWarn("select sync from subboss_images where " .
 			    "subboss_id = '$subboss' and imageid = '$imageid' and sync = 1");
@@ -1032,7 +1032,7 @@ sub SetupReloadFrisbee($)
 		if (!$query_result || !$query_result->numrows) {
 			system("$SUBBOSS_FRISBEELAUNCHER " .  ($debug ? "-d ": "") .
 				"$subboss " . "$imageid " . "\"$filename\" " .
-				stat[7] . ' ' . stat[9]);
+				$stats->size() . ' ' . $stats->mtime());
 			if ($?) {
 			    tberror "Subboss Frisbee Launcher ($imageid on $subboss) failed!";
 			    return -1;
