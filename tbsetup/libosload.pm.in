@@ -1023,7 +1023,7 @@ sub SetupReloadFrisbee($)
     foreach my $imageid (@$imageids) {
 	if (defined $subboss) {
 		my $image = Image->Lookup($imageid);
-		my $filename = $image->filename();
+		my $filename = $image->path();
 		my @image_stats = stat $filename;
 
 		my $query_result = DBQueryWarn("select sync from subboss_images where " .
