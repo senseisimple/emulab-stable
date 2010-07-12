@@ -14,70 +14,37 @@
 
 package protogeni.communication
 {
-  import flash.events.ErrorEvent;
+	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 
   public class RequestSliverResolve extends Request
   {
-    public function RequestSliverResolve(newCm : ComponentManager,
-                                                                         newSliceUrn : String,
-                                             newNext : Request) : void
+    public function RequestSliverResolve(s:Sliver) : void
     {
-      super(newCm.getName());
-      cm = newCm;
-          sliceUrn = newSliceUrn;
-      next = newNext;
+		super("SliverResolve", "Resolving sliver on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.resolveResource, true);
+		sliver = s;
+		op.addField("urn", sliver.urn);
+		op.addField("credentials", new Array(sliver.credential));
+		op.setExactUrl(sliver.componentManager.Url);
     }
 
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
-
-    override public function start(credential : Credential) : Operation
-    {
-                opName = "Resolving sliver";
-                op.reset(Geni.resolveResource);
-              op.addField("urn", cm.getSliverUrn());
-              op.addField("credentials", new Array(cm.getSliver()));
-              op.setExactUrl(cm.getUrl());
-                  return op;
-    }
-
-        override public function fail(event : ErrorEvent) : Request
-        {
-           return next;
-        }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      var result : Request = next;
-      if (code == 0)
-      {
-                var rspec = new XML(response.value.manifest);
-                var links : Array = new Array();
-                for each(var component:XML in rspec.children())
-                {
-                        if(component.localName() == "node")
-                        {
-                                Main.getConsole().appendText("\nAdding node ... " + Main.menu.getComponent(component.@component_urn, cm.getName(), true) + "\n");
-                        }
-                        else if(component.localName() == "link")
-                        {
-                                links.push(component);
-                        }
-                }
-                // TODO: Process links after nodes to make sure the nodes exist
-      }
-      else
-      {
-        // No sliver
-      }
-      return result;
-    }
-
-    private var cm : ComponentManager;
-        private var sliceUrn : String;
-    private var next : Request;
+	override public function complete(code : Number, response : Object) : *
+	{
+		var newCall:Request = new Request();
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			sliver.rspec = new XML(response.value.manifest);
+			sliver.parseRspec();
+			Main.protogeniHandler.dispatchSliceChanged();
+		}
+		else
+		{
+			// do nothing
+		}
+		
+		return newCall;
+	}
+	
+	private var sliver:Sliver;
   }
 }

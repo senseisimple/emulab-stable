@@ -196,10 +196,6 @@
 	       			rspecView.loadXml(virtualNode.rspec);
 				}
 			}
-			
-			public function tryAdd():void {
-				main.connectionHandler.RequestNode(node.urn, node.manager.Hrn);
-			}
 		]]>
 	</mx:Script>
 
@@ -230,11 +226,6 @@
 						<mx:VRule height="16"/>
 						<mx:Label text="Availability" fontWeight="bold"/>
 						<mx:Image id="imgAvailable"/>
-						<!--<mx:Button label="Add" click="tryAdd();" enabled="{node.available}"/>-->
-						<display:ImageButton id="addButton" enabled="{node.available}"
-							source="@Embed('../images/bullet_add.png')"
-							click="tryAdd()"
-							toolTip="Add this node on the flash client" />
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%">

@@ -14,61 +14,42 @@
 
 package protogeni.communication
 {
-  import flash.events.ErrorEvent;
+	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 
   public class RequestSliverGet extends Request
   {
-    public function RequestSliverGet(newCm : ComponentManager,
-                                                                         newSliceUrn : String,
-                                             newNext : Request) : void
+    public function RequestSliverGet(s:Sliver) : void
     {
-      super(newCm.getName());
-      cm = newCm;
-          sliceUrn = newSliceUrn;
-      next = newNext;
+		super("SliverGet", "Getting the sliver on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.getSliver, true);
+		sliver = s;
+		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("credentials", new Array(sliver.slice.credential));
+		op.setExactUrl(sliver.componentManager.Url);
     }
 
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
+	override public function complete(code : Number, response : Object) : *
+	{
+		var newCall:Request = new Request();
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			sliver.credential = String(response.value);
+			var cred:XML = new XML(response.value);
+			sliver.urn = cred.credential.target_urn;
+			newCall = new RequestSliverStatus(sliver);
+		}
+		else if(code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)
+		{
+			// NO SLICE FOUND HERE
+		}
+		else
+		{
+			// do nothing
+		}
+		
+		return newCall;
+	}
 
-    override public function start(credential : Credential) : Operation
-    {
-          opName = "Getting sliver";
-          op.reset(Geni.getSliver);
-          op.addField("slice_urn", sliceUrn);
-          op.addField("credentials", new Array(credential.slice));
-          op.setExactUrl(cm.getUrl());
-          return op;
-    }
-
-        override public function fail(event : ErrorEvent) : Request
-        {
-           return next;
-        }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      var result : Request = next;
-      if (code == 0)
-      {
-                // Sliver exists
-        cm.setSliver(String(response.value));
-            var cred:XML = new XML(response.value);
-            cm.setSliverUrn(cred.credential.target_urn);
-                result = new RequestSliverResolve(cm, sliceUrn, null);
-      }
-      else
-      {
-        // No sliver
-      }
-      return result;
-    }
-
-    private var cm : ComponentManager;
-        private var sliceUrn : String;
-    private var next : Request;
+    private var sliver:Sliver;
   }
 }

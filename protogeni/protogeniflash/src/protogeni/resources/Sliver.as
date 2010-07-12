@@ -43,6 +43,27 @@
 			slice = owner;
 		}
 		
+		public function createRspec():void
+		{
+			/*
+			var rspec = XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
+				+ "<rspec "
+				+ "xmlns=\"http://www.protogeni.net/resources/rspec/0.2\" "
+				+ "type=\"request\" />");
+			var i : int = 0;
+			
+			for each(var vn:VirtualNode in nodes)
+			{
+				result.appendChild(vn.getXml());
+			}
+			
+			for each(var vl:VirtualLink in links)
+			{
+				result.appendChild(vl.getXml());
+			}
+			*/
+		}
+		
 		public function parseRspec():void
 		{
 			var nodesById:Dictionary = new Dictionary();

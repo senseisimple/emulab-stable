@@ -42,6 +42,8 @@
 		public var upstreamAs:String;
 		public var superNode:PhysicalNode;
 		
+		public static var virtType:String = "emulab-vnode";
+		
 		[Bindable]
 		public var interfaces:ArrayCollection = new ArrayCollection();
 		public var links:ArrayCollection = new ArrayCollection();
@@ -142,6 +144,86 @@
 				}
 			}
 			return ac;
+		}
+		
+		public function GetXml():XML
+		{
+			var result : XML = null;
+			/*
+			var str : String = "<node ";
+			if (! isVirtual)
+			{
+				str += "component_uuid=\"" + id + "\" ";
+			}
+			str += "component_manager_uuid=\"" + manager.Urn + "\" ";
+			str += "virtual_id=\"" + name + "\" "
+				+ "virtualization_type=\"" + virtType + "\" ";
+			if (manager.Urn != null)
+			{
+				str += "sliver_uuid=\"" + sliver.urn + "\" ";
+			}
+			if (isShared)
+			{
+				str += "virtualization_subtype=\"emulab-openvz\" ";
+				str += "exclusive=\"0\"";
+			}
+			else
+			{
+				str += "exclusive=\"1\"";
+			}
+			str += ">";
+			if (isBgpMux)
+			{
+				str += '<node_type type_name="bgpmux" type_slots="1"> ';
+				str += '  <field key="upstream_as" value="' + component.upstreamAs
+					+ '" /> ';
+				str += '  <field key="prefix" value="' + manager.getBgpAddress()
+					+ '" /> ';
+				str += '  <field key="netmask" value="' + manager.getBgpNetmask()
+					+ '" /> ';
+				str += '</node_type> ';
+			}
+			else
+			{
+				var nodeType = "pc";
+				if (isShared)
+				{
+					nodeType = "pcvm";
+				}
+				else
+				{
+					nodeType = "pc";
+					//          if (manager.getName() == "Emulab")
+					//          {
+					//            nodeType = "pc600";
+					//          }
+				}
+				str += "<node_type type_name=\"" + nodeType
+					+ "\" type_slots=\"1\" /> ";
+			}
+			if (superNode != null)
+			{
+				str += "<subnode_of>" + superNode + "</subnode_of> ";
+			}
+			for each (var current in interfaces)
+			{
+				if (current.used)
+				{
+					str += "<interface virtual_id=\"" + current.virtualId + "\" ";
+					
+					if (current.name != null)
+					{
+						str += "component_id=\"" + current.name + "\" ";
+					}
+					
+					str += " />";
+				}
+			}
+			str += "<interface virtual_id=\"control\" />";
+			str += " </node>";
+			result = XML(str);
+			*/
+			return result;
 		}
 	}
 }

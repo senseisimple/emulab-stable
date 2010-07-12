@@ -20,16 +20,17 @@ package protogeni.communication
   {
     public function RequestGetCredential() : void
     {
-      super("GetCredential", CommunicationUtil.getCredential);
+      super("GetCredential", "Getting the basic user credential", CommunicationUtil.getCredential);
     }
 
-    override public function complete(code : Number, response : Object) : Request
+    override public function complete(code : Number, response : Object) : *
     {
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			Main.protogeniHandler.CurrentUser.credential = String(response.value);
 			var cred:XML = new XML(response.value);
 			Main.protogeniHandler.CurrentUser.urn = cred.credential.owner_urn;
+			Main.protogeniHandler.dispatchUserChanged();
 		}
 		else
 		{

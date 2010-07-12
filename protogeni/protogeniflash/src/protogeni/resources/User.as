@@ -14,10 +14,6 @@
  
  package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	import mx.collections.Sort;
-	import mx.collections.SortField;
-	import mx.utils.ObjectUtil;
 	
 	// ProtoGENI user information
 	public class User
@@ -33,32 +29,11 @@
 		public var keys : String;
 		public var urn : String;
 		
-		public var slices:ArrayCollection;
+		public var slices:SliceCollection;
 		
 		public function User()
 		{
-			slices = new ArrayCollection();
-		}
-		
-		private function compareSlices(slicea:Slice, sliceb:Slice):int {
-			return ObjectUtil.compare(slicea.CompareValue(), sliceb.CompareValue());
-        }
-		
-		public function displaySlices():ArrayCollection {
-			var ac : ArrayCollection = new ArrayCollection();
-			ac.addItem(new Slice());
-			for each(var s:Slice in slices) {
-				ac.addItem(s);
-			}
-			
-			var dataSortField:SortField = new SortField();
-            dataSortField.compareFunction = compareSlices;
-            
-            var sort:Sort = new Sort();
-            sort.fields = [dataSortField];
-			ac.sort = sort;
-	    	ac.refresh();
-			return ac;
+			slices = new SliceCollection();
 		}
 	}
 }

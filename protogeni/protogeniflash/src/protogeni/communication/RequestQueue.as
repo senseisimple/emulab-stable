@@ -29,17 +29,29 @@ package protogeni.communication
 
     public function push(newItem:*) : void
     {
-      var newNode:RequestQueueNode = new RequestQueueNode(newItem);
-      if (tail != null)
-      {
-        tail.next = newNode;
-      }
-      else
-      {
-        head = newNode;
-      }
-      tail = newNode;
-	  Main.protogeniHandler.dispatchQueueChanged();
+		var newNode:RequestQueueNode = null;
+		var newTail:RequestQueueNode = null;
+		
+		if(newItem is RequestQueueNode)
+		{
+			newNode = newItem;
+			newTail = newNode;
+			while(newTail.next != null)
+				newTail = newTail.next;
+		}
+		else
+		{
+			newNode = new RequestQueueNode(newItem);
+			newTail = newNode;
+		}
+		
+		if (tail != null)
+			tail.next = newNode;
+		else
+			head = newNode;
+		
+		tail = newTail;
+		Main.protogeniHandler.dispatchQueueChanged();
     }
 
     public function front() : *
@@ -66,18 +78,6 @@ package protogeni.communication
         tail = null;
       }
     }
-	
-	public function mergeToFront(newFront:RequestQueue):void
-	{
-		if(head != null)
-		{
-			newFront.tail.next = head;
-			head = newFront.head;
-		}
-		else
-			head = newFront.head;
-		Main.protogeniHandler.dispatchQueueChanged();
-	}
 
     public var head : RequestQueueNode;
     public var tail : RequestQueueNode;

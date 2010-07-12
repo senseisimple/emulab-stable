@@ -14,66 +14,69 @@
 
 package protogeni.communication
 {
+  import com.mattism.http.xmlrpc.MethodFault;
+  
   import flash.events.ErrorEvent;
   import flash.events.SecurityErrorEvent;
+  import flash.utils.ByteArray;
+  
+  import mx.utils.Base64Decoder;
+  
+  import protogeni.resources.ComponentManager;
 
   public class RequestDiscoverResources extends Request
   {
-    public function RequestDiscoverResources(newCm : ComponentManager,
-                                             newNext : Request) : void
+	  
+    public function RequestDiscoverResources(newCm:ComponentManager) : void
     {
-      super(newCm.getName());
-      cm = newCm;
-      next = newNext;
+		super("DiscoverResources (" + newCm.Hrn + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true);
+		cm = newCm;
+		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
+		op.addField("compress", true);
+		op.setExactUrl(newCm.DiscoverResourcesUrl());
     }
+	
+	override public function complete(code : Number, response : Object) : *
+	{
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			var decodor:Base64Decoder = new Base64Decoder();
+			decodor.decode(response.value);
+			var bytes:ByteArray = decodor.toByteArray();
+			bytes.uncompress();
+			var decodedRspec:String = bytes.toString();
+			cm.Rspec = new XML(decodedRspec);
+			cm.processRspec(Main.protogeniHandler.rpcHandler.start);
+		}
+		else
+		{
+			cm.errorMessage = response.output;
+			cm.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + cm.errorMessage;
+			cm.Status = ComponentManager.FAILED;
+			waitOnComplete = false;
+			Main.protogeniHandler.dispatchComponentManagerChanged();
+		}
+		
+		return null;
+	}
 
-    override public function cleanup() : void
+    override public function fail(event : ErrorEvent, fault : MethodFault) : *
     {
-      super.cleanup();
-    }
+		cm.errorMessage = event.toString();
+		cm.errorDescription = "";
+		if(cm.errorMessage.search("#2048") > -1)
+			cm.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + cm.DiscoverResourcesUrl();
+		else if(cm.errorMessage.search("#2032") > -1)
+			cm.errorDescription = "IO error, possibly due to the server being down";
+		else if(cm.errorMessage.search("timed"))
+			cm.errorDescription = event.text;
+		
+		cm.Status = ComponentManager.FAILED;
+		Main.protogeniHandler.dispatchComponentManagerChanged();
 
-    override public function start(credential : Credential) : Operation
-    {
-      opName = "Discovering Resources";
-      var opType = Geni.discoverResources;
-      if (cm.getName() == "Wisconsin" || cm.getName() == "Kentucky"
-        || cm.getName() == "CMU")
-      {
-        opType = Geni.discoverResourcesv2;
-      }
-      op.reset(opType);
-      op.addField("credentials", new Array(credential.slice));
-      op.setUrl(cm.getUrl());
-      return op;
-    }
-
-    override public function fail(event : ErrorEvent) : Request
-    {
-      var state = ComponentManager.IO_FAILURE;
-      if (event is SecurityErrorEvent)
-      {
-        state = ComponentManager.SECURITY_FAILURE;
-      }
-      cm.resourceFailure(state);
-      return next;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      var result : Request = next;
-      if (code == 0)
-      {
-        cm.resourceSuccess(response.value);
-      }
-      else
-      {
-        cm.resourceFailure(ComponentManager.INTERNAL_FAILURE);
-      }
-      return result;
+      return null;
     }
 
     private var cm : ComponentManager;
-    public var next : Request;
   }
 }

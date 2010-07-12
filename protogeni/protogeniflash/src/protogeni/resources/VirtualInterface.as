@@ -39,5 +39,22 @@
 		public var name : String;
 		public var bandwidth:int = 0;
 		
+		public function getXml():XML
+		{
+			var result : XML = <interface_ref />;
+			/*
+			result.@virtual_node_id = virtualNode.name;
+			if (isTunnel())
+			{
+				result.@tunnel_ip = ipToString(tunnelIp + ipOffset);
+				result.@virtual_interface_id = "control";
+			}
+			else
+			{
+				result.@virtual_interface_id = interfaceName;
+			}
+			*/
+			return result;
+		}
 	}
 }

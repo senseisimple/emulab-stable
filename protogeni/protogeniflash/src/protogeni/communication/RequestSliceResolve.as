@@ -14,78 +14,67 @@
 
 package protogeni.communication
 {
-	import flash.events.ErrorEvent;
+	import mx.controls.Alert;
+	
+	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
 
   public class RequestSliceResolve extends Request
   {
-    public function RequestSliceResolve() : void
+    public function RequestSliceResolve(s:Slice, willBeCreating:Boolean = false) : void
     {
-      super("Clearinghouse");
-	  name = "GetCredential";
-	  op.reset(CommunicationUtil.getCredential);
+		super("SliceResolve", "Resolving slice named " + s.hrn, CommunicationUtil.resolve);
+		slice = s;
+		isCreating = willBeCreating;
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		op.addField("hrn", slice.hrn);
+		op.addField("type", "Slice");
+		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-		var result : Request = null;
-
+	
+	override public function complete(code : Number, response : Object) : *
+	{
+		var newRequest:Request = null;
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			Main.protogeniHandler.CurrentUser.credential = String(response.value);
-			var cred:XML = new XML(response.value);
-			Main.protogeniHandler.CurrentUser.urn = cred.credential.owner_urn;
-			startSshLookup();
+			if(isCreating)
+			{
+				Alert.show("Slice '" + slice.hrn + "' already exists");
+				Main.log.setStatus("Slice exists", false, true);
+			}
+			else
+			{
+				slice.uuid = response.value.uuid;
+				slice.creator = Main.protogeniHandler.CurrentUser;
+				slice.hrn = response.value.hrn;
+				slice.urn = response.value.urn;
+				for each(var sliverCm:String in response.value.component_managers) {
+					var newSliver:Sliver = new Sliver(slice);
+					newSliver.componentManager = Main.protogeniHandler.ComponentManagers.getByUrn(sliverCm);
+					slice.slivers.addItem(newSliver);
+				}
+				Main.protogeniHandler.dispatchSliceChanged();
+				newRequest = new RequestSliceCredential(slice);
+			}
 		}
 		else
 		{
-			codeFailure();
+			if(isCreating)
+			{
+				newRequest = new RequestSliceRemove(slice);
+			}
+			else
+			{
+				Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+				Main.protogeniHandler.mapHandler.drawAll();
+			}
+			
 		}
 		
-      if (code == 0)
-      {
-        var headDiscovery : RequestDiscoverResources = null;
-		var tailDiscovery : RequestDiscoverResources = null;
-        var headSliver : RequestSliverGet = null;
-		var cm:ComponentManager;
-		
-		// Create the CMs
-		for each (var input in response.value)
-        {
-          var current : ComponentManager
-            = new ComponentManager(input.urn, input.hrn, "REMOVEME",
-                                   input.url, null, 2);
-          view.addManager(current);
-		  headDiscovery = new RequestDiscoverResources(current, headDiscovery);
-		  if(tailDiscovery == null)
-		  	tailDiscovery = headDiscovery;
-		  if(credential.existing)
-		  	headSliver = new RequestSliverGet(current, (Main.menu as MenuSliceDetail).sliceUrn, headSliver);
-        }
-		tailDiscovery.next = headSliver;
-        result = headDiscovery;
-      }
-      else
-      {
-        Main.getConsole().appendText("ListComponents Failed\n");
-      }
-      return result;
-    }
-	
-	override public function fail(event:ErrorEvent):void
-	{
-		main.openConsole();
-		main.setProgress("Operation failed!", Common.failColor);
-		main.stopWaiting();
-		outputFailure(event, fault);
-		
-		var msg:String = event.toString();
-		if(msg.search("#2048") > -1)
-			Alert.show("Check to make sure you have added a security exception for: " + op.getUrl(), "Security Exception");
-		else if(msg.search("#2032") > -1)
-			Alert.show("Check to make sure your SSL certificate has been added to your browser.","SSL Certificate");
+		return newRequest;
 	}
 
-    private var view : ComponentView;
+    private var slice : Slice;
+	private var isCreating:Boolean;
   }
 }

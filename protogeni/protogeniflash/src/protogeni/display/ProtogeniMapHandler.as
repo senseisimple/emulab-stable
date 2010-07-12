@@ -328,7 +328,7 @@ package protogeni.display
 	    }
 	    
 	    public function drawMap(junk:* = null):void {
-			Main.log.setStatus("Drawing map", true, false);
+			//Main.log.setStatus("Drawing map", true, false);
 	    	
 	    	map.closeInfoWindow();
 	    	map.clearOverlays();
@@ -408,7 +408,7 @@ package protogeni.display
 		        }
 	        }
 			
-			Main.log.setStatus("Completed drawing map", false, false);
+			//Main.log.setStatus("Completed drawing map", false, false);
 	    }
 	    
 	    public function getOverlapping(o:Object, added:ArrayCollection):void {

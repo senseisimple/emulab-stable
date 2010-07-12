@@ -16,64 +16,55 @@ package protogeni.communication
 {
   import flash.events.ErrorEvent;
   import flash.events.SecurityErrorEvent;
+  import protogeni.resources.Slice;
 
   public class RequestUserResolve extends Request
   {
-    public function RequestUserResolve(newCm : ComponentManager,
-                                             newNext : Request) : void
+    public function RequestUserResolve() : void
     {
-      super(newCm.getName());
-      cm = newCm;
-      next = newNext;
+		super("UserResolve", "Resolve user", CommunicationUtil.resolve);
+		op.addField("type", "User");
+		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
-
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
-
-    override public function start(credential : Credential) : Operation
-    {
-      opName = "Discovering Resources";
-      var opType = Geni.discoverResources;
-      if (cm.getName() == "Wisconsin" || cm.getName() == "Kentucky"
-        || cm.getName() == "CMU")
-      {
-        opType = Geni.discoverResourcesv2;
-      }
-      op.reset(opType);
-      op.addField("credentials", new Array(credential.slice));
-      op.setUrl(cm.getUrl());
-      return op;
-    }
-
-    override public function fail(event : ErrorEvent) : Request
-    {
-      var state = ComponentManager.IO_FAILURE;
-      if (event is SecurityErrorEvent)
-      {
-        state = ComponentManager.SECURITY_FAILURE;
-      }
-      cm.resourceFailure(state);
-      return next;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      var result : Request = next;
-      if (code == 0)
-      {
-        cm.resourceSuccess(response.value);
-      }
-      else
-      {
-        cm.resourceFailure(ComponentManager.INTERNAL_FAILURE);
-      }
-      return result;
-    }
-
-    private var cm : ComponentManager;
-    public var next : Request;
+	
+	override public function start():Operation
+	{
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		op.addField("hrn", Main.protogeniHandler.CurrentUser.urn);
+		return op;
+	}
+	
+	override public function complete(code : Number, response : Object) : *
+	{
+		var newCalls:RequestQueue = new RequestQueue();
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			Main.protogeniHandler.CurrentUser.uid = response.value.uid;
+			Main.protogeniHandler.CurrentUser.hrn = response.value.hrn;
+			Main.protogeniHandler.CurrentUser.uuid = response.value.uuid;
+			Main.protogeniHandler.CurrentUser.email = response.value.email;
+			Main.protogeniHandler.CurrentUser.name = response.value.name;
+			Main.protogeniHandler.dispatchUserChanged();
+			
+			var sliceHrns:Array = response.value.slices;
+			if(sliceHrns != null && sliceHrns.length > 0) {
+				for each(var sliceHrn:String in sliceHrns)
+				{
+					var userSlice:Slice = new Slice();
+					userSlice.hrn = sliceHrn;
+					Main.protogeniHandler.CurrentUser.slices.add(userSlice);
+					newCalls.push(new RequestSliceResolve(userSlice));
+				}
+			}
+			else
+				Main.protogeniHandler.mapHandler.drawAll();
+		}
+		else
+		{
+			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+		}
+		
+		return newCalls.head;
+	}
   }
 }

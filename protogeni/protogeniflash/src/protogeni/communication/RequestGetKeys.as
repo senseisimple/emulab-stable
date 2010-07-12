@@ -20,7 +20,7 @@ package protogeni.communication
 	{
 		public function RequestGetKeys() : void
 		{
-			super("GetKeys", CommunicationUtil.getKeys);
+			super("GetKeys", "Getting the ssh credential", CommunicationUtil.getKeys);
 		}
 		
 		override public function start():Operation
@@ -29,7 +29,7 @@ package protogeni.communication
 			return op;
 		}
 		
-		override public function complete(code : Number, response : Object) : Request
+		override public function complete(code : Number, response : Object) : *
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{

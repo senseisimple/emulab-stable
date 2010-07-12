@@ -153,5 +153,60 @@
 			}
 			return false;
 		}
+		
+		public function getXml():XML
+		{
+			var result : XML = null;
+			/*
+			if (!isTunnel() || useTunnels)
+			{
+				result = <link />;
+				result.@virtual_id = "link" + String(number);
+				if (! isTunnel())
+				{
+					var bandwidth = Math.floor(Math.min(leftInterface.bandwidth,
+						rightInterface.bandwidth));
+					if (left.getName().slice(0, 2) == "pg"
+						|| right.getName().slice(0, 2) == "pg")
+					{
+						bandwidth = 1000000;
+					}
+					return XML("<bandwidth>" + bandwidth + "</bandwidth>");
+				}
+				
+				if (version >= 3)
+				{
+					var link_type = <link_type />;
+					link_type.@name = "GRE";
+					var key = <field />;
+					key.@key = "key";
+					key.@value = "0";
+					var ttl = <field />;
+					ttl.@key = "ttl";
+					ttl.@value = "0";
+					link_type.appendChild(key);
+					link_type.appendChild(ttl);
+					result.appendChild(link_type);
+				}
+				else
+				{
+					if (isTunnel())
+					{
+						result.@link_type = "tunnel";
+					}
+					else if (version >= 1)
+					{
+						result.@link_type = "ethernet";
+					}
+				}
+				
+				result.appendChild(getInterfaceXml(left, leftInterfaceName, 0,
+					version));
+				result.appendChild(getInterfaceXml(right, rightInterfaceName, 1,
+					version));
+			}
+			*/
+			return result;
+		}
 	}
 }

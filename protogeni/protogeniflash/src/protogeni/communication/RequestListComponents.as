@@ -14,63 +14,55 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.ComponentManager;
+
   public class RequestListComponents extends Request
   {
-    public function RequestListComponents(newView : ComponentView) : void
+    public function RequestListComponents(shouldDiscoverResources:Boolean, shouldStartSlices:Boolean) : void
     {
-      super("Clearinghouse");
-      view = newView;
+      super("ListComponents", "Getting the information for the component managers", CommunicationUtil.listComponents);
+	  startDiscoverResources = shouldDiscoverResources;
+	  startSlices = shouldStartSlices;
     }
+	
+	override public function start():Operation
+	{
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		return op;
+	}
 
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
-
-    override public function start(credential : Credential) : Operation
-    {
-      opName = "Listing ComponentManagers";
-      var opType = Geni.listComponents;
-      op.reset(opType);
-      op.addField("credential", credential.slice);
-      op.setUrl(Geni.chUrl);
-      return op;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      var result : Request = null;
-      if (code == 0)
-      {
-        var headDiscovery : RequestDiscoverResources = null;
-		var tailDiscovery : RequestDiscoverResources = null;
-        var headSliver : RequestSliverGet = null;
-		var cm:ComponentManager;
+	// Should return Request or RequestQueueNode
+	override public function complete(code : Number, response : Object) : *
+	{
+		var newCalls:RequestQueue = new RequestQueue();
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			for each(var obj:Object in response.value)
+			{
+				var newCm:ComponentManager = new ComponentManager();
+				newCm.Hrn = obj.hrn;
+				newCm.Url = obj.url;
+				newCm.Urn = obj.urn;
+				Main.protogeniHandler.ComponentManagers.add(newCm);
+				Main.protogeniHandler.dispatchComponentManagerChanged();
+				if(startDiscoverResources)
+				{
+					newCm.Status = ComponentManager.INPROGRESS;
+					newCalls.push(new RequestDiscoverResources(newCm));
+				}
+			}
+			if(startSlices)
+				newCalls.push(new RequestUserResolve());
+		}
+		else
+		{
+			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+		}
 		
-		// Create the CMs
-		for each (var input in response.value)
-        {
-          var current : ComponentManager
-            = new ComponentManager(input.urn, input.hrn, "REMOVEME",
-                                   input.url, null, 2);
-          view.addManager(current);
-		  headDiscovery = new RequestDiscoverResources(current, headDiscovery);
-		  if(tailDiscovery == null)
-		  	tailDiscovery = headDiscovery;
-		  if(credential.existing)
-		  	headSliver = new RequestSliverGet(current, (Main.menu as MenuSliceDetail).sliceUrn, headSliver);
-        }
-		tailDiscovery.next = headSliver;
-        result = headDiscovery;
-      }
-      else
-      {
-        Main.getConsole().appendText("ListComponents Failed\n");
-      }
-      return result;
-    }
-
-    private var view : ComponentView;
+		return newCalls.head;
+	}
+	
+	private var startDiscoverResources:Boolean;
+	private var startSlices:Boolean;
   }
 }
