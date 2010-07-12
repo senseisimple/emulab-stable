@@ -24,12 +24,11 @@
 		import mx.managers.PopUpManager;
 		
 		import protogeni.ProtogeniHandler;
+		import protogeni.display.ChooseComponentManagerWindow;
 		import protogeni.display.ConsoleWindow;
 		import protogeni.display.DisplayUtil;
 		import protogeni.display.SlicesWindow;
 		import protogeni.resources.Slice;
-		
-		import protogeniflash.*;
 	    
 	    //------------------------------------------
 	    // Embedded resources
@@ -40,9 +39,8 @@
         private var arrowIn:Class;
         
         public var console:ConsoleWindow;
+		public var cms:ChooseComponentManagerWindow;
         public var about:AboutWindow = new AboutWindow();
-		
-		public var connectionHandler:ConnectionHandler;
 		
 		[Bindable]
 		public var slicesMenu : ArrayCollection;
@@ -57,13 +55,16 @@
 			
 			Main.protogeniHandler = new ProtogeniHandler();
 			Main.protogeniHandler.mapHandler.map = map;
+			Main.protogeniHandler.addEventListener(ProtogeniHandler.SLICES_CHANGED, fillCombobox);
 			
 	    	console = new ConsoleWindow();
 			PopUpManager.addPopUp(console, this, false);
+			PopUpManager.centerPopUp(console);
 			//PopUpManager.removePopUp(console);
 	    	Main.log = console;
 			
-			connectionHandler = new ConnectionHandler();
+			cms = new ChooseComponentManagerWindow();
+			cms.openFirst();
 	    	
 	    	Security.allowDomain("localhost");	
 	    }
@@ -93,8 +94,8 @@
 	    }
 	    
 	    // ComboBox
-	    public function fillCombobox():void {
-	    	slicesMenu = Main.protogeniHandler.CurrentUser.displaySlices();
+	    public function fillCombobox(junk:* = null):void {
+	    	slicesMenu = Main.protogeniHandler.CurrentUser.slices.displaySlices();
 	    }
 	    
 	    public function getSliceLabel(s:Slice):String {
@@ -116,11 +117,11 @@
 		<mx:VRule height="14"/>
 		<display:ImageButton id="refreshButton"
 			source="@Embed('../images/arrow_refresh.png')"
-			click="Main.protogeniHandler.clearComponents(); Main.protogeniHandler.rpcHandler.loadComponentManagers();"
+			click="Main.protogeniHandler.ComponentManagers.clear(); Main.protogeniHandler.rpcHandler.loadComponentManagers();"
 			toolTip="Reload data" />
 		<display:ImageButton id="changeCMButton"
 			source="@Embed('../images/server_edit.png')"
-			click="DisplayUtil.viewComponentManagers()"
+			click="cms.show()"
 			toolTip="Change component manager"/>
 		<display:ImageButton id="consoleButton"
 			source="@Embed('../images/application_xp_terminal.png')"

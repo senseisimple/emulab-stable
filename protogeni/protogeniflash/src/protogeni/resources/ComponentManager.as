@@ -41,7 +41,7 @@
 		public var Urn : String = "";
 		
 		[Bindable]
-		public var Show : Boolean = false;
+		public var Show : Boolean = true;
 		
 		public var errorMessage : String = "";
 		public var errorDescription : String = "";
@@ -145,7 +145,7 @@
 			}
 			else if (myState == DONE)
 			{
-				Main.log.setStatus("Done",false,false);
+				Main.log.setStatus("Parsing " + Hrn + " RSPEC Done",false,false);
 	    		interfaceDictionary = null;
 	    		nodeNameDictionary = null;
 	    		subnodeList = null;

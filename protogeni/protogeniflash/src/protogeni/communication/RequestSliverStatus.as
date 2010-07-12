@@ -14,51 +14,37 @@
 
 package protogeni.communication
 {
-  class RequestSliverStatus extends Request
+	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
+	
+  public class RequestSliverStatus extends Request
   {
-    public function RequestSliverStatus(newManager : ComponentManager,
-                                       newNodes : ActiveNodes,
-									   newSliceUrn) : void
+    public function RequestSliverStatus(s:Sliver) : void
     {
-      super(newManager.getName());
-      manager = newManager;
-      nodes = newNodes;
-	  sliceUrn = newSliceUrn;
+		super("SliverStatus", "Getting the sliver status on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.sliverStatus, true);
+		sliver = s;
+		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("credentials", new Array(sliver.slice.credential));
+		op.setExactUrl(sliver.componentManager.Url);
     }
 
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
-
-    override public function start(credential : Credential) : Operation
-    {
-      nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.BOOTED);
-      opName = "Booting Sliver";
-      op.reset(Geni.startSliver);
-      op.addField("slice_urn", sliceUrn);
-      op.addField("credentials", new Array(manager.getSliver()));
-      //? op.addField("impotent", Request.IMPOTENT);
-      op.setUrl(manager.getUrl());
-      return op;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      if (code == 0)
-      {
-        nodes.commitState(manager);
-      }
-      else
-      {
-        nodes.revertState(manager);
-      }
-      return null;
-    }
-
-    var manager : ComponentManager;
-    var nodes : ActiveNodes;
-	var sliceUrn : String;
+	override public function complete(code : Number, response : Object) : *
+	{
+		var newCall:Request = new Request();
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			sliver.status = response.value.status;
+			sliver.state = response.value.state;
+			newCall = new RequestSliverResolve(sliver);
+		}
+		else
+		{
+			// do nothing
+		}
+		
+		return newCall;
+	}
+	
+	private var sliver:Sliver;
   }
 }

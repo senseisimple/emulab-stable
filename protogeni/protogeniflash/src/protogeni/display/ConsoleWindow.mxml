@@ -19,6 +19,7 @@
 			import protogeni.communication.CommunicationUtil;
 			import protogeni.communication.Request;
 			import protogeni.communication.RequestQueueNode;
+			import protogeni.resources.ComponentManager;
 			
 			public var selectedIndex:int;
 			private var logList:Array;
@@ -31,6 +32,7 @@
 			{
 				clear();
 				Main.protogeniHandler.addEventListener(ProtogeniHandler.QUEUE_CHANGED, resetQueueView);
+				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGERS_CHANGED, loadComponentManagers);
 			}
 			
 			public function setStatus(s:String, isWaiting:Boolean, isError:Boolean):void
@@ -94,6 +96,18 @@
 				groupNames = new Array("All", "Slice Embedding Service", "Clearing House");
 				if(logs != null)
 					logs.removeAllChildren();
+			}
+			
+			public function loadComponentManagers(junk:* = null):void
+			{
+				groups = new Array("", CommunicationUtil.sesUrl, CommunicationUtil.chUrl);
+				groupNames = new Array("All", "Slice Embedding Service", "Clearing House");
+				
+				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+				{
+					groups.push(cm.Url);
+					groupNames.push(cm.Hrn);
+				}
 			}
 			
 			public function clearScreen():void
@@ -184,6 +198,8 @@
 		
 		<mx:VBox height="100%" width="50%" horizontalAlign="center">
 			<mx:Label text="Queued Requests"  fontWeight="bold" fontSize="12"/>
+			<mx:Button label="Pause" click="Main.protogeniHandler.rpcHandler.pause();"/>
+			<mx:Button label="Start" click="Main.protogeniHandler.rpcHandler.start();"/>
 			<mx:VBox height="100%" width="100%" id="queue">
 			</mx:VBox>
 		</mx:VBox>

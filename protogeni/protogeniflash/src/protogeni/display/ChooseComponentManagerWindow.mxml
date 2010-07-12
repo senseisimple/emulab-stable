@@ -3,7 +3,9 @@
 	title="Component Managers"
 	width="250" height="310"
 	defaultButton="{okButton}"
-	creationComplete="okButton.setFocus()" xmlns:protogeniflash="protogeniflash.*" verticalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" xmlns:display="protogeni.display.*">
+	creationComplete="okButton.setFocus()"
+	verticalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2"
+	xmlns:display="protogeni.display.*">
 	
 	<mx:Style source="styles.css"/>
 	
@@ -26,11 +28,18 @@
 				Main.protogeniHandler.mapHandler.drawMap();
 			}
 			
-			public function open():void {
-				PopUpManager.addPopUp(this, Main.Pgmap(), false);
-       			PopUpManager.centerPopUp(this);
+			public function openFirst():void {
+				show();
        			okButton.enabled = Main.protogeniHandler.ComponentManagers.length > 0;
-				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGER_CHANGED, refreshList);
+				refreshList();
+				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGER_CHANGED, ResetAll);
+				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGERS_CHANGED, refreshList);
+			}
+			
+			public function show():void
+			{
+				PopUpManager.addPopUp(this, Main.Pgmap(), false);
+				PopUpManager.centerPopUp(this);
 			}
 			
 			public function refreshList(junk:* = null):void {
@@ -70,7 +79,7 @@
 				}
 			}
 			
-			public function ResetAll():void
+			public function ResetAll(junk:* = null):void
 			{
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
@@ -122,7 +131,7 @@
 				if(cm.Status == ComponentManager.FAILED) {
 					cmCheckbox.styleName = "failedStyle";
 					cmInfo.source = DisplayUtil.flagRedIcon;
-					cmInfo.toolTip = cm.errorDescription;
+					cmHbox.toolTip = cm.errorDescription;
 					if(cmGoto == null && cm.mightNeedSecurityException())
 					{
 						cmGoto = new ImageButton();
@@ -138,18 +147,18 @@
 				else if(cm.Status == ComponentManager.UNKOWN) {
 					cmCheckbox.styleName = "unknownStyle";
 					cmInfo.source = DisplayUtil.flagOrangeIcon;
-					cmInfo.toolTip = "Unknown status";
+					cmHbox.toolTip = "Unknown status";
 				}
 				else if(cm.Status == ComponentManager.INPROGRESS) {
 					cmCheckbox.styleName = "inprogressStyle";
 					cmInfo.source = DisplayUtil.flagOrangeIcon;
-					cmInfo.toolTip = "In progress...";
+					cmHbox.toolTip = "In progress...";
 				}
 				else if(cm.Status == ComponentManager.VALID)
 				{
 					cmCheckbox.styleName = "validStyle";
 					cmInfo.source = DisplayUtil.flagGreenIcon;
-					cmInfo.toolTip = "Valid";
+					cmHbox.toolTip = "Valid";
 				}
 			}
 			

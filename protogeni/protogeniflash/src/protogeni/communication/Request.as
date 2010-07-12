@@ -20,10 +20,12 @@ package protogeni.communication
 
   public class Request
   {
-    public function Request(newName:String = "", qualifiedMethod : Array = null) : void
+    public function Request(newName:String = "", newDetails:String = "", qualifiedMethod : Array = null, shouldContinueOnErrors:Boolean = false, shouldWaitOnComplete:Boolean = false) : void
     {
       op = new Operation(qualifiedMethod);
       name = newName;
+	  continueOnError = shouldContinueOnErrors;
+	  waitOnComplete = shouldWaitOnComplete;
     }
 
     public function cleanup() : void
@@ -51,17 +53,20 @@ package protogeni.communication
       return op;
     }
 
-    public function complete(code : Number, response : Object) : Request
+    public function complete(code : Number, response : Object) : *
     {
       return null;
     }
 
-    public function fail(event : ErrorEvent, fault : MethodFault) : Request
+    public function fail(event : ErrorEvent, fault : MethodFault) : *
     {
 		return null;
     }
 
 	public var op:Operation;
 	public var name:String;
+	public var details:String;
+	public var waitOnComplete:Boolean;
+	public var continueOnError:Boolean;
   }
 }

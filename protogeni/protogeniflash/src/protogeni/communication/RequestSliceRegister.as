@@ -14,37 +14,36 @@
 
 package protogeni.communication
 {
+	import protogeni.display.DisplayUtil;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
-  public class RequestSliceCredential extends Request
+  public class RequestSliceRegister extends Request
   {
-    public function RequestSliceCredential(s:Slice) : void
+    public function RequestSliceRegister(s:Slice) : void
     {
-		super("SliceCredential", "Getting the slice credential for " + s.hrn, CommunicationUtil.getCredential, true);
+		super("SliceRegister", "Register slice named " + s.hrn, CommunicationUtil.register);
 		slice = s;
 		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
-		op.addField("uuid", slice.uuid);
+		op.addField("hrn", slice.urn);
 		op.addField("type", "Slice");
-		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
-
+	
 	override public function complete(code : Number, response : Object) : *
 	{
-		var newCalls:RequestQueue = new RequestQueue();
+		var newRequest:Request = null;
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			slice.credential = String(response.value);
-			Main.protogeniHandler.dispatchSliceChanged();
-			for each(var s:Sliver in slice.slivers)
-				newCalls.push(new RequestSliverGet(s));
+			Main.protogeniHandler.CurrentUser.slices.add(slice);
+			DisplayUtil.viewSlice(slice);
 		}
 		else
 		{
-			// skip errors
+			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 		
-		return newCalls.head;
+		return newRequest;
 	}
 
     private var slice : Slice;

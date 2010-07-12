@@ -147,6 +147,7 @@
 		public static function getRequestButton(r:Request):Button {
 			var requestButton:Button = new Button();
 			requestButton.label = r.name;
+			requestButton.toolTip = r.details;
 			return requestButton;
 		}
 		
@@ -261,11 +262,6 @@
 	    	PopUpManager.addPopUp(cmWindow, Main.Pgmap(), false);
        		PopUpManager.centerPopUp(cmWindow);
        		cmWindow.loadCm(cm);
-		}
-		
-		public static function viewComponentManagers():void{
-			var cms:ChooseComponentManagerWindow = new ChooseComponentManagerWindow();
-			cms.open();
 		}
 		
 		// Opens a physical node in a window
