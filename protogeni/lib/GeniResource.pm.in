@@ -506,6 +506,15 @@ sub ConvertRspec($)
 		    if (exists($ifaceref->{$key}));
 	    }
 	}
+	if (exists($ref->{'disk_image'})) {
+	    my $osref = $ref->{'disk_image'};
+	    my $os    = GeniXML::AddElement("disk_image", $node);
+
+	    foreach my $key ('name') {
+		GeniXML::SetText($key, $os, $osref->{$key})
+		    if (exists($osref->{$key}));
+	    }
+	}
     }
     if (exists($rspec->{'link'})) {
 	foreach my $linkref (@{ $rspec->{'link'} }) {
