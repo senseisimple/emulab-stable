@@ -48,7 +48,7 @@ endif
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
 # 
-all: $(RC_SCRIPTS) $(OPS_SCRIPTS) capture.sh
+all: $(RC_SCRIPTS) $(OPS_SCRIPTS) capture.sh 3.v0_gateway.sh
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -79,6 +79,9 @@ subboss-install:	$(addprefix $(INSTALL_RCDIR)/, $(SUBBOSS_SCRIPTS))
 
 clrhouse-install:	$(INSTALL_RCDIR)/2.mysql-server.sh \
 			$(INSTALL_RCDIR)/1.mysql-client.sh
+
+gateway-install:	$(INSTALL_RCDIR)/3.v0_gateway.sh
+
 
 tipserv-install:	$(addprefix $(INSTALL_RCDIR)/, $(TIP_SCRIPTS))
 else
