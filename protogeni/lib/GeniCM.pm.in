@@ -820,6 +820,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$pctype = undef;
 			goto raw;
 		    }
+		    else {
+			$response
+			    = GeniResponse->Create(GENIRESPONSE_BADARGS,
+						   undef,
+				       "Malformed rspec: ".
+				       "Unknown virtualization_subtype");
+			goto bad;
+		    }
 		}
 		else {
 		    goto raw;
@@ -2089,14 +2097,37 @@ sub SliverWorkAux($$$$$$$)
 		if (!exists($managers{$ENV{'MYURN'}}));
 	}
 
-	# Do not worry about modifying a link that is setup. Later.
-	next
-	    if (grep {$_ eq $linkname} keys(%linkmap));
+	my $link_type = GeniXML::GetText("link_type", $linkref);
+
+	# Do not worry about modifying a link that is setup, unless a tunnel.
+	# Need to deal with this later.
+	if (grep {$_ eq $linkname} keys(%linkmap)) {
+	    next
+		if (! (defined($link_type) && $link_type eq "tunnel"));
+
+	    #
+	    # Gack, we have to recreate all the tunnel physical state, but
+	    # that was lost when we did the RemovePhysicalState() above.
+	    # The aggregate needs to get rebuilt, so delete the existing
+	    # one. Needs a lot more thought.
+	    #
+	    my $sliver_urn = GeniXML::GetText("sliver_urn", $linkref);
+	    if (!defined($sliver_urn)) {
+		print STDERR
+		    "Could not find sliver_urn in existing link $linkname\n";
+		next;
+	    }
+	    my $tunnel_aggregate = GeniAggregate->Lookup($sliver_urn);
+	    if (!defined($tunnel_aggregate)) {
+		print STDERR "No aggregate for existing tunnel $sliver_urn\n";
+		next;
+	    }
+	    $tunnel_aggregate->Delete(GENI_PURGEFLAG);
+	}
 
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	my $link_type = GeniXML::GetText("link_type", $linkref);
 	if (defined($link_type) && $link_type eq "tunnel") {
 
 	    my $iface1ref   = $interfaces[0];
