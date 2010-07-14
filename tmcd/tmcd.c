@@ -4275,6 +4275,7 @@ COMMAND_PROTOTYPE(donseconfigs)
 COMMAND_PROTOTYPE(dostate)
 {
 	char 		newstate[128];	/* More then we will ever need */
+	int		i;
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
@@ -4291,6 +4292,17 @@ COMMAND_PROTOTYPE(dostate)
 		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
+	/*
+	 * Sanity check. No special or weird chars.
+	 */
+	for (i = 0; i < strlen(newstate); i++) {
+		if (! (isalnum(newstate[i]) ||
+		       newstate[i] == '_' || newstate[i] == '-')) {
+			error("DOSTATE: %s: Bad state name\n", reqp->nodeid);
+			return 1;
+		}
+	}
+	
 #ifdef EVENTSYS
 	/*
 	 * Send the state out via an event
