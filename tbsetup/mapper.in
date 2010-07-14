@@ -386,6 +386,8 @@ sub AssignLoop()
 	sleep(5);
 	$currentrun++;
     }
+    GatherAssignStats($pid, $eid, %{ $vtop->exptstats() })
+	if (!$impotent);
     TBDebugTimeStamp("mapper loop finished");
     return 0;
 }

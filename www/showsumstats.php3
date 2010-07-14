@@ -452,8 +452,9 @@ function showrange ($showby, $range) {
     $query_result =
 	DBQueryFatal("select s.exptidx,s.pid,r.pnodes,r.vnodes, ".
 		     "   swapin_time,swapout_time,swapmod_time,byswapmod, ".
-		     "   e.eid_uuid,r.idx,r.lastidx,byswapin,u.status, ".
-		     "   s.creator as uid,s.creator_idx as uid_idx ".
+		     "   e.state,r.idx,r.lastidx,byswapin,u.status, ".
+		     "   s.creator as uid,s.creator_idx as uid_idx, ".
+		     "   UNIX_TIMESTAMP(s.swapout_last) as swapout_last ".
 		     " from experiment_resources as r ".
 		     "left join experiment_stats as s on ".
 		     "     r.exptidx=s.exptidx ".
@@ -479,9 +480,10 @@ function showrange ($showby, $range) {
 	$swapmod_time = $row["swapmod_time"];
 	$byswapmod    = $row["byswapmod"];
 	$byswapin     = $row["byswapin"];
-	$uuid	      = $row["eid_uuid"];
+	$estate	      = $row["state"];
 	$rsrcidx      = $row["idx"];
 	$lastidx      = $row["lastidx"];
+	$swapout_last = $row["swapout_last"];
 	$swapseconds  = 0;
 
 	if ($debug2) 
@@ -561,12 +563,23 @@ function showrange ($showby, $range) {
 		echo "No swapin time: $exptidx, $rsrcidx<br>\n";
 	    continue;
 	}
-	if ($swapout_time == 0 && $swapmod_time == 0) {
-	    if (!isset($uuid)) {	    
-		if (1)
-		    echo "No swapout/swapmod time: $exptidx, $rsrcidx<br>\n";
+	if ($swapout_time == 0 && $swapmod_time == 0 &&
+	    (!isset($estate) || $estate != $TB_EXPTSTATE_ACTIVE)) {
+	    #
+	    # This is a fixup for missing swapout times.
+	    #
+	    echo "No swapout/swapmod time: $exptidx, $rsrcidx";
+	    if (isset($swapout_last) && $swapout_last > $swapin_time) {
+		echo " ... ";
+		echo "Using swapout_last instead: $swapout_last<br>\n";
+		$swapout_time = $swapout_last;
+	    }
+	    else {
+		echo "<br>\n";
 		continue;
 	    }
+	}
+	if ($swapout_time == 0 && $swapmod_time == 0) {
 	    if ($spanend < $swapin_time)
 		continue;
 
