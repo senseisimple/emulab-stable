@@ -963,6 +963,28 @@ class Node
                   </tr>\n";
 	    }
 
+	    #
+	    # Get subboss info.
+	    #
+	    echo "<tr>
+              <td align=center colspan=2>Subboss Info</td>
+            </tr>\n";
+	    echo "<tr><th>Service</th><th>Subboss Node ID</th>\n";
+
+	    $query_result =
+	        DBQueryFatal("select service,subboss_id from subbosses ".
+			     "where node_id ='$node_id'");
+
+	    while ($row = mysql_fetch_array($query_result)) {
+	        $service = $row["service"];
+	        $subboss = $row["subboss_id"];
+
+	        echo "<tr>
+                  <td>$service</td>
+                  <td class=left>$subboss</td>
+                 </tr>\n";
+	    }
+
             #
             # Switch info. Very useful for debugging.
             #
