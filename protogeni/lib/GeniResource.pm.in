@@ -1626,12 +1626,13 @@ sub Discover($$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
+    my $manager_version = $self->ManagerVersion();
+
     my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
 
     #
     # Create a Geni user from current user doing the operation.
