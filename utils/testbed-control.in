@@ -135,7 +135,7 @@ while (1) {
 
     print "-> Experiments still in transition:\n";
     while (my ($pid,$eid,$idx,$state,$expt_locked) =
-	   $query_result->query_result()) {
+	   $query_result->fetchrow_array()) {
 
 	print "  $pid,$eid,$idx -- $state, $expt_locked\n";
     }
