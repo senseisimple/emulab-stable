@@ -1249,7 +1249,19 @@ sub GenVirtNodes($)
 		if (defined($vnode->_osinfo())) {
 		    my $osname = $vnode->_osinfo()->osname();
 
-		    $ref->{'disk_image'} = {"name" => $osname};
+		    #
+		    # If this is the default image, then do not put
+		    # this in; let the other side do what it wants.
+		    #
+		    my $default_osinfo =
+			OSinfo->Lookup($vnode->_typeinfo()->default_osid());
+		    if (!defined($default_osinfo)) {
+			tberror("Could not find default osinfo for $vnode\n");
+			return -1;
+		    }
+		    if ($osname ne $default_osinfo->osname()) {
+			$ref->{'disk_image'} = {"name" => $osname};
+		    }
 		}
 	    }
 
