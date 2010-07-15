@@ -721,7 +721,7 @@ sub commit_mail($\@$@) {
     #
     # Send all the changes together in one message
     #
-    if (!$separate_mail) {
+    if (!$separate_mail && @fullbody) {
         send_mail($subject,
             $actionstring . join("\n" . "-"x72 . "\n\n",
                                  map { join "",@$_} @fullbody),
