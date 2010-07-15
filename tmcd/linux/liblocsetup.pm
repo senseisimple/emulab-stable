@@ -120,8 +120,14 @@ my $debug = 0;
 #
 # OS dependent part of cleanup node state.
 #
-sub os_account_cleanup()
+sub os_account_cleanup($)
 {
+    # XXX this stuff should be lifted up into rc.accounts, sigh
+    my ($updatemasterpasswdfiles) = @_;
+    if (!defined($updatemasterpasswdfiles)) {
+	$updatemasterpasswdfiles = 0;
+    }
+
     #
     # Don't just splat the master passwd/group files into place from $ETCDIR.
     # Instead, grab the current Emulab uids/gids, grab the current group/passwd
@@ -130,6 +136,14 @@ sub os_account_cleanup()
     # into the master files in $ETCDIR.  Also, we remove accounts from the
     # master files if they no longer appear in the current files.  Finally, we
     # strip deleted uids from any groups they might appear in (!).
+    #
+    # And now we only do the merge if told to do so.  This is the default 
+    # coming from prepare, now.  If not merging, we just overwrite the real 
+    # files with the master files -- we do not update the master files.
+    #
+    # We *do* output the diff to say what *would* have changed, so that
+    # an operator can know that they need to manually add a user to the 
+    # master files.
     #
     my %PDB;
     my %GDB;
@@ -313,16 +327,34 @@ sub os_account_cleanup()
 	    print STDERR "Running 'diff -u $file ${file}.new'\n";
 	    $retval = system("diff -u $file ${file}.new");
 	    if ($retval) {
-		print STDERR "Files ${file}.new and $file differ; updating $file.\n";
-		system("mv ${file}.new $file");
+		if ($updatemasterpasswdfiles) {
+		    print STDERR "Files ${file}.new and $file differ; updating $file.\n";
+		    system("mv ${file}.new $file");
+		}
+		else {
+		    print STDERR "Files ${file}.new and $file differ, but I was told not to update the master files!.\n";
+		    system("rm -f ${file}.new");
+		}
+	    }
+	    else {
+		system("rm -f ${file}.new");
 	    }
 	}
 	else {
 	    print STDERR "Running 'diff -q -u $file ${file}.new'\n";
 	    $retval = system("diff -q -u $file ${file}.new");
 	    if ($retval) {
-		print STDERR "Files ${file}.new and $file differ, but we can't show the changes!  Updating $file anyway!\n";
-		system("mv ${file}.new $file");
+		if ($updatemasterpasswdfiles) {
+		    print STDERR "Files ${file}.new and $file differ, but we can't show the changes!  Updating $file anyway!\n";
+		    system("mv ${file}.new $file");
+		}
+		else {
+		    print STDERR "Files ${file}.new and $file differ, but we can't show the changes, and I was told not to update the master files!\n";
+		    system("rm -f ${file}.new");
+		}
+	    }
+	    else {
+		system("rm -f ${file}.new");
 	    }
 	}
     }
