@@ -1245,6 +1245,12 @@ sub GenVirtNodes($)
 	    else {
 		$ref->{'virtualization_type'} = 'raw';
 		$ref->{'exclusive'} = 1;
+
+		if (defined($vnode->_osinfo())) {
+		    my $osname = $vnode->_osinfo()->osname();
+
+		    $ref->{'disk_image'} = {"name" => $osname};
+		}
 	    }
 
 	    if (@ifaces) {
@@ -5197,17 +5203,20 @@ sub InitializePhysNode($$$)
     if ($self->regression()) {
 	$rsrvsets{"rsrv_time"} = 0;
     }
-    my $setstr = join(",", map("$_='" . $nodesets{$_} . "'", keys(%nodesets)));
-    $self->printdb("  $setstr\n");
-
-    DBQueryWarn("update nodes set $setstr where node_id='$pnodename'")
+    if ($self->verbose()) {
+	my $setstr = join(",",
+			  map("$_='" . $nodesets{$_} . "'", keys(%nodesets)));
+	$self->printdb("  $setstr\n");
+    }
+    $pnode->Update(\%nodesets) == 0
 	or return -1 if (!$self->impotent());
 
-    $setstr = join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
-    
-    $self->printdb("  $setstr\n");
-
-    DBQueryWarn("update reserved set $setstr where node_id='$pnodename'")
+    if ($self->verbose()) {
+	my $setstr =
+	    join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
+	$self->printdb("  $setstr\n");
+    }
+    $pnode->ModifyReservation(\%rsrvsets) == 0
 	or return -1 if (!$self->impotent());
     
     #

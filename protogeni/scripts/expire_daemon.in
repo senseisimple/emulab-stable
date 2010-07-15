@@ -309,6 +309,46 @@ sub RegisterSlices()
     }
 }
 
+sub ReportLockedSlices()
+{
+    my $msg = "";
+    
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx,locked from geni_slices ".
+			    "where locked is not null and ".
+			    "      DATE_SUB(NOW(),INTERVAL 1 DAY) >= locked");
+    if (!$query_result) {
+	Fatal("ReportLockedSlices: Error getting info from the DB.");
+    }
+    return
+	if (!$query_result->numrows);
+
+    while (my ($idx, $locked) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	my $urn = $slice->urn();
+	
+	$msg .= "$urn : $locked\n";
+
+	print STDERR "$urn : locked since $locked\n";
+    }
+    return
+	if ($msg eq "");
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "ProtoGENI expire daemon: Locked Slices",
+	     "The following CM slices have been locked for a long time\n\n".
+	     $msg,
+	     $TBOPS);
+}
+
 while (1) {
     next
 	if (NoLogins());
@@ -320,6 +360,7 @@ while (1) {
     ExpireSlices();
     ShutdownSlices();
     RegisterSlices();
+    ReportLockedSlices();
 
     # Be certain stale info is gone.
     Experiment->FlushAll();

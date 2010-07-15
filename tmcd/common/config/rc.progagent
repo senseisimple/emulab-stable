@@ -188,6 +188,7 @@ sub doboot()
 	print "Starting Program Agent ...\n";
 
 	my $server = getlocalevserver();
+	my $port   = "";
 
 	if (SHADOW()) {
 	    my $boss = $ENV{'BOSSNAME'};
@@ -196,6 +197,14 @@ sub doboot()
 	    }
 	    my ($domain) = ($boss =~ /^[^\.]+\.(.*)$/);
 	    $server = "event-server.${domain}";
+
+	    #
+	    # See if we need to connect to the compatability gateway.
+	    # Version 0, no elvin compat.
+	    #
+	    if (exists($ENV{'V0_COMPAT'})) {
+		$port = "-p " . $ENV{'V0_COMPAT'};
+	    }
 	}
 
 	#
@@ -225,7 +234,7 @@ sub doboot()
 		   "-v $vname -r -p $elvind_port -t $TOKEN");
 	}
 	else {
-	    system("$PAGENT -e $pid/$eid -s $server -l $LOGFILE ".
+	    system("$PAGENT -e $pid/$eid -s $server $port -l $LOGFILE ".
 		   "-v $vname -t $TOKEN ".
 		   "-d -i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
 	    exit(0)
