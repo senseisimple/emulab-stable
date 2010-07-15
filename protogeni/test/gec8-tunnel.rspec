@@ -1,0 +1,9 @@
+  <link virtual_id="tun0"
+        link_type="tunnel">
+    <interface_ref virtual_node_id="utah1"
+                   virtual_interface_id="control"
+                   tunnel_ip="192.168.0.1" />
+    <interface_ref virtual_node_id="kentucky1" 
+                   virtual_interface_id="control"
+                   tunnel_ip="192.168.0.2" />
+  </link>
