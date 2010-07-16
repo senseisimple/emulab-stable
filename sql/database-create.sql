@@ -470,7 +470,7 @@ CREATE TABLE `emulab_indicies` (
 DROP TABLE IF EXISTS `emulab_locks`;
 CREATE TABLE `emulab_locks` (
   `name` varchar(64) NOT NULL default '',
-  `value` int(10) unsigned NOT NULL default '0',
+  `value` int(10) NOT NULL default '0',
   PRIMARY KEY  (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

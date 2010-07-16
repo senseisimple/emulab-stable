@@ -434,6 +434,7 @@ function WRITESIDEBAR() {
     }
 
     NavMenuButton("Documentation", "$WIKIDOCURL");
+    NavMenuButtonNew("Forums", "http://groups.google.com/group/emulab-users");
 
     if ($rootEmulab) {
 	# Leave New here about 2 weeks

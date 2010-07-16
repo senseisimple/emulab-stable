@@ -160,7 +160,7 @@ sub dokeyhash()
     }
     umask($oldumask);
     return 0;
-+}
+}
 
 #
 # Get the event key

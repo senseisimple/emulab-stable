@@ -99,8 +99,14 @@ my $DEFSHELL	= "/bin/tcsh";
 # OS dependent part of account cleanup. On a remote node, this will
 # only be called from inside a JAIL, or from the prepare script.
 #
-sub os_account_cleanup()
+sub os_account_cleanup($)
 {
+    # XXX this stuff should be lifted up into rc.accounts, sigh
+    my ($updatemasterpasswdfiles) = @_;
+    if (!defined($updatemasterpasswdfiles)) {
+	$updatemasterpasswdfiles = 0;
+    }
+
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP /etc/group") != 0) {
 	print STDERR "Could not copy default group file into place: $!\n";
