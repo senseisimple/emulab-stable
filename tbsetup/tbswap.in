@@ -315,8 +315,8 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
 	else {
 	    print STDERR "Cleaning up after errors.\n";
 	    doSwapout(CLEANUP);
+	    $updatehosed = 1;
 	}
-	$updatehosed = 1;
     }
     else {
 	#
