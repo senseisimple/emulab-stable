@@ -37,6 +37,7 @@ my $LOGFILE       = "$TB/log/expire_daemon.log";
 my $IDLETIMES	  = "$TB/sbin/idletimes";
 my $EMULAB_PEMFILE = "$TB/etc/genicm.pem";
 my $REGISTER      = "$TB/sbin/protogeni/register_sliver";
+my $SLEEP_INTERVAL= 60;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -349,6 +350,8 @@ sub ReportLockedSlices()
 	     $TBOPS);
 }
 
+my $counter = 0;
+
 while (1) {
     if (NoLogins()) {
 	sleep(5);
@@ -362,14 +365,19 @@ while (1) {
     ExpireSlices();
     ShutdownSlices();
     RegisterSlices();
-    ReportLockedSlices();
+
+    $counter += $SLEEP_INTERVAL;
+    if ($counter >= (24 * 60 * 60)) {
+	ReportLockedSlices();
+	$counter = 0;
+    }
 
     # Be certain stale info is gone.
     Experiment->FlushAll();
     Node->FlushAll();
     GeniUtil::FlushCaches();
 
-    sleep(60);
+    sleep($SLEEP_INTERVAL);
 }
 exit(0);
 
