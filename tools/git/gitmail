@@ -48,6 +48,12 @@ my $debug = get_config("debug",undef);
 my $testmode = undef;
 
 #
+# If set, try to hide trivial merges (i.e., ones with standard subject
+# line and no body text). Ugly hack.
+#
+my $hide_trivial_merges = get_config("hidetrivialmerges",undef);
+
+#
 # Command-line options - have to do this before setting other options, since
 # we want to be able to turn on debugging early
 #
@@ -681,6 +687,28 @@ sub commit_mail($\@$@) {
         $showcommand .= "'$rev'";
         debug("running '$showcommand'");
         my @body = `$showcommand`;
+        
+        if ($hide_trivial_merges) {
+	        my $is_merge = 0;
+	        my $body_lines = 0;
+	        my $subject;
+	        for (@body) {
+		        $is_merge = 1 if (/^Merge:/);
+			if (/^ /) {
+				if (not defined $subject) {
+					$subject = $_;
+				} else {
+					$body_lines++;
+				}
+			}
+		}
+		
+		if ($is_merge && $body_lines == 0 &&
+		    $subject =~ /^ +Merge (?:remote )?branch '[^']+'(?: of .*)?$/){
+			next;
+		}
+			
+	}
 
         if ($separate_mail) {
             # Send this message by itself
@@ -693,7 +721,7 @@ sub commit_mail($\@$@) {
     #
     # Send all the changes together in one message
     #
-    if (!$separate_mail) {
+    if (!$separate_mail && @fullbody) {
         send_mail($subject,
             $actionstring . join("\n" . "-"x72 . "\n\n",
                                  map { join "",@$_} @fullbody),
