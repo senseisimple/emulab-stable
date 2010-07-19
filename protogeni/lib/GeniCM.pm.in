@@ -1201,7 +1201,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -n -d -v -u -o $tmpfile $pid $eid");
+    system("$MAPPER -a -d -v -u -o $tmpfile $pid $eid");
     if ($?) {
 	my $logstuff = undef;
 	
@@ -1632,6 +1632,10 @@ sub SliverWorkAux($$$$$$$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	$response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$owner->Modify(undef, undef, $keys);
     }
 
@@ -3023,6 +3027,10 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	my $response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$user->Modify(undef, undef, $keys);
     }
     if ($slice->Lock() != 0) {
@@ -4133,6 +4141,29 @@ sub CheckTicket($)
     }
     
     return $ticket;
+}
+
+sub CheckKeys($)
+{
+    my ($keys) = @_;
+
+    goto bad
+	if (!ref($keys));
+    
+    foreach my $keyref (@{ $keys }) {
+	goto bad
+	    if (!ref($keyref));
+	
+	my $key  = $keyref->{'key'};
+	my $type = $keyref->{'type'};
+
+	goto bad
+	    if (! (defined($key) && defined($type) &&
+		   $key ne "" && $type ne ""));
+    }		
+    return 0;
+  bad:
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys")
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
