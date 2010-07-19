@@ -1236,15 +1236,34 @@ sub isdedicatedremote($) { return NodeTypeInfo($_[0])->isdedicatedremote(); }
 sub isswitch($)       { return NodeTypeInfo($_[0])->isswitch(); }
 
 #
+# Later has arrived...
+# Look for node_attributes settings first and if none, fall back on
+# node_type_attributes info.
+#
+sub default_osid($;$) {
+    my ($self,$stuff) = @_;
+    my $val = undef;
+
+    if (NodeAttribute($self, "default_osid", \$val) == 0) {
+	return $val;
+    }
+    return NodeTypeInfo($self)->default_osid($stuff);
+}
+
+sub default_imageid($;$) {
+    my ($self,$stuff) = @_;
+    my $val = undef;
+
+    if (NodeAttribute($self, "default_imageid", \$val) == 0) {
+	return $val;
+    }
+    return NodeTypeInfo($self)->default_imageid($stuff);
+}
+
+#
 # And these are the less common attributes, but still common enough to
 # warrant shortcuts.
 #
-sub default_osid($;$) {
-    return NodeTypeInfo($_[0])->default_osid($_[1]);
-}
-sub default_imageid($;$) {
-    return NodeTypeInfo($_[0])->default_imageid($_[1]);
-}
 sub delay_osid($;$) {
     return NodeTypeInfo($_[0])->delay_osid($_[1]);
 }
