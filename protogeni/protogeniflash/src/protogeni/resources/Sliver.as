@@ -24,6 +24,8 @@
 		public static var READY : String = "ready";
 	    public static var NOTREADY : String = "notready";
 	    public static var FAILED : String = "failed";
+		
+		public var created:Boolean = false;
 	    
 		public var credential : Object = null;
 		public var componentManager : ComponentManager = null;
@@ -38,30 +40,26 @@
 		
 		public var slice : Slice;
 		
-		public function Sliver(owner : Slice)
+		public function Sliver(owner : Slice, manager:ComponentManager = null)
 		{
 			slice = owner;
+			componentManager = manager;
 		}
 		
-		public function createRspec():void
+		public function getRequestRspec():XML
 		{
-			/*
-			var rspec = XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
+			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
 				+ "<rspec "
 				+ "xmlns=\"http://www.protogeni.net/resources/rspec/0.2\" "
 				+ "type=\"request\" />");
-			var i : int = 0;
 			
 			for each(var vn:VirtualNode in nodes)
-			{
-				result.appendChild(vn.getXml());
-			}
+				requestRspec.appendChild(vn.getXml());
 			
 			for each(var vl:VirtualLink in links)
-			{
-				result.appendChild(vl.getXml());
-			}
-			*/
+				requestRspec.appendChild(vl.getXml());
+			
+			return requestRspec;
 		}
 		
 		public function parseRspec():void
@@ -81,29 +79,31 @@
       		for each(var nodeXml:XML in nodesXml)
       		{
       			var virtualNode:VirtualNode = new VirtualNode(this);
-      			virtualNode.virtualId = nodeXml.@virtual_id;
-      			virtualNode.sliverUrn = nodeXml.@sliver_urn;
+      			virtualNode.id = nodeXml.@virtual_id;
+      			//virtualNode.sliverUrn = nodeXml.@sliver_urn;
       			virtualNode.virtualizationType = nodeXml.@virtualization_type;
+				if(nodeXml.@virtualization_subtype != null)
+					virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;
       			virtualNode.physicalNode = componentManager.Nodes.GetByUrn(nodeXml.@component_urn);
       			for each(var ix:XML in nodeXml.children()) {
 	        		if(ix.localName() == "interface") {
 	        			var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
 	      				virtualInterface.id = ix.@virtual_id;
-	      				virtualNode.interfaces.addItem(virtualInterface);
+	      				virtualNode.interfaces.Add(virtualInterface);
       				}
 	        	}
       			
       			virtualNode.rspec = nodeXml.copy();
       			nodes.addItem(virtualNode);
-      			nodesById[virtualNode.virtualId] = virtualNode;
+      			nodesById[virtualNode.id] = virtualNode;
       			virtualNode.physicalNode.virtualNodes.addItem(virtualNode);
       		}
       		
       		for each(var linkXml:XML in linksXml)
       		{
       			var virtualLink:VirtualLink = new VirtualLink(this);
-      			virtualLink.virtualId = linkXml.@virtual_id;
-      			virtualLink.sliverUrn = linkXml.@sliver_urn;
+      			virtualLink.id = linkXml.@virtual_id;
+      			//virtualLink.sliverUrn = linkXml.@sliver_urn;
       			virtualLink.type = linkXml.@link_type;
       			
       			for each(var viXml:XML in linkXml.children()) {
@@ -148,42 +148,67 @@
 			newSliver.urn = this.urn;
 			newSliver.state = this.state;
 			newSliver.status = this.status;
+			newSliver.created = this.created;
 			
-			var allNewInterfaces:Dictionary = new Dictionary();
+			var oldNodeToCloneNode:Dictionary = new Dictionary();
+			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
 			for each(var node:VirtualNode in this.nodes)
 			{
 				var newNode:VirtualNode = new VirtualNode(newSliver);
-				newNode.virtualId = node.virtualId;
-				newNode.sliverUrn = node.sliverUrn;
+				newNode.id = node.id;
 				newNode.virtualizationType = node.virtualizationType;
+				newNode.virtualizationSubtype = node.virtualizationSubtype;
 				newNode.physicalNode = node.physicalNode;
+				newNode.manager = node.manager;
+				newNode.urn = node.urn;
+				newNode.isShared = node.isShared;
+				newNode.isVirtual = node.isVirtual;
+				newNode.superNode = node.superNode;
+				newNode.diskImage = node.diskImage;
+				newNode.tarfiles = node.tarfiles;
+				newNode.startupCommand = node.startupCommand;
+				newNode.hostname = node.startupCommand;
+				newNode.rspec = node.rspec;
 				for each(var vi:VirtualInterface in node.interfaces)
 				{
 					var virtualInterface:VirtualInterface = new VirtualInterface(newNode);
 					virtualInterface.id = vi.id;
-					newNode.interfaces.addItem(virtualInterface);
-					allNewInterfaces[virtualInterface.id] = virtualInterface;
+					virtualInterface.role = vi.role;
+					virtualInterface.isVirtual = vi.isVirtual;
+					virtualInterface.physicalNodeInterface = vi.physicalNodeInterface;
+					virtualInterface.bandwidth = vi.bandwidth;
+					virtualInterface.ip = vi.ip;
+					newNode.interfaces.Add(virtualInterface);
+					oldInterfaceToCloneInterface[vi] = virtualInterface;
+					// links? add later ...
 				}
 				
-				newNode.rspec = node.rspec;
 				if(addOutsideReferences)
 					newNode.physicalNode.virtualNodes.addItem(newNode);
 				newSliver.nodes.addItem(newNode);
+				
+				oldNodeToCloneNode[node] = newNode;
 			}
 
 			
 			for each(var link:VirtualLink in this.links)
 			{
 				var newLink:VirtualLink = new VirtualLink(newSliver);
-				newLink.virtualId = link.virtualId;
-				newLink.sliverUrn = link.sliverUrn;
+				newLink.id = link.id;
 				newLink.type = link.type;
 				newLink.bandwidth = link.bandwidth;
 				newLink.rspec = link.rspec;
+				newLink._isTunnel = link._isTunnel;
 				
-				for each(var lvi:VirtualInterface in link.interfaces) {
-					newLink.interfaces.addItem(allNewInterfaces[lvi.id]);
-					allNewInterfaces[lvi.id].virtualLinks.addItem(newLink);
+				newLink.firstNode = oldNodeToCloneNode[link.firstNode];
+				newLink.secondNode = oldNodeToCloneNode[link.secondNode];
+				
+				for each(var i:VirtualInterface in link.interfaces)
+				{
+					var newInterface:VirtualInterface = oldInterfaceToCloneInterface[i];
+					newLink.interfaces.addItem(newInterface);
+					newInterface.virtualLinks.addItem(newLink);
+					newInterface.virtualNode.links.addItem(newLink);
 				}
 				
 				newSliver.links.addItem(newLink);

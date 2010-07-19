@@ -21,44 +21,51 @@
 	{
 		public function VirtualNode(owner:Sliver)
 		{
-			sliver = owner;
+			slivers = new Array(owner);
+			interfaces = new VirtualInterfaceCollection();
+			var controlInterface:VirtualInterface = new VirtualInterface(this);
+			controlInterface.id = "control";
+			controlInterface.role = PhysicalNodeInterface.CONTROL;
+			controlInterface.isVirtual = true;
+			interfaces.Add(controlInterface);
 		}
 		
 		[Bindable]
 		public var physicalNode:PhysicalNode;
 		
-		public var virtualId:String;
-		public var virtualizationType:String;
-		public var sliverUrn:String;
+		[Bindable]
+		public var id:String;
+		public var virtualizationType:String = "emulab-vnode";
+		public var virtualizationSubtype:String = "emulab-openvz";
 		
 		// Component
-		[Bindable]
-		public var name:String;
 		public var manager:ComponentManager;
+		
+		[Bindable]
 		public var urn:String;
 		public var isVirtual:Boolean;
 		public var isShared:Boolean;
-		public var isBgpMux:Boolean;
-		public var upstreamAs:String;
-		public var superNode:PhysicalNode;
+		public var superNode:VirtualNode;
+		public var subNodes:Array = new Array();
 		
-		public static var virtType:String = "emulab-vnode";
+		public var diskImage:String = "";
+		public var tarfiles:String = "";
+		public var startupCommand:String = "";
 		
 		[Bindable]
-		public var interfaces:ArrayCollection = new ArrayCollection();
+		public var interfaces:VirtualInterfaceCollection;
 		public var links:ArrayCollection = new ArrayCollection();
 		
 		public var rspec:XML;
-		public var sliver:Sliver;
+		public var slivers:Array;
 		public var hostname:String;
 		
 		public function setToPhysicalNode(node:PhysicalNode):void
 		{
 			physicalNode = node;
-			name = node.name;
+			id = node.name;
 			manager = node.manager;
 			urn = node.urn;
-			superNode = node.subNodeOf;
 			isVirtual = false;
 			isShared = !node.exclusive;
 			// deal with rest
@@ -69,7 +76,7 @@
 										 virtualUrn:String,
 										 newIsShared:Boolean):void
 		{
-			name = virtualName;
+			id = virtualName;
 			manager = virtualManager;
 			urn = virtualUrn;
 			superNode = null;
@@ -83,13 +90,13 @@
 			if(isVirtual)
 			{
 				var newVirtualInterface:VirtualInterface = new VirtualInterface(this);
-				newVirtualInterface.id = "virt-" + String(interfaces.length);
+				newVirtualInterface.id = "virt-int-" + this.interfaces.collection.length;
 				newVirtualInterface.role = PhysicalNodeInterface.EXPERIMENTAL;
-				newVirtualInterface.isVirtual = true;
 				newVirtualInterface.bandwidth = 100000;
+				newVirtualInterface.isVirtual = true;
 				return newVirtualInterface;
 			} else {
-				for each (var candidate:PhysicalNodeInterface in physicalNode.interfaces)
+				for each (var candidate:PhysicalNodeInterface in physicalNode.interfaces.collection)
 				{
 					if (candidate.role == PhysicalNodeInterface.EXPERIMENTAL)
 					{
@@ -104,7 +111,7 @@
 						{
 							var newPhysicalInterface:VirtualInterface = new VirtualInterface(this);
 							newPhysicalInterface.isVirtual = false;
-							newPhysicalInterface.id = candidate.id;
+							newPhysicalInterface.id = "phy-int-" + this.interfaces.collection.length;
 							newPhysicalInterface.role = candidate.role;
 							newPhysicalInterface.physicalNodeInterface = candidate;
 							return newPhysicalInterface;
@@ -118,7 +125,7 @@
 		// Gets all connected physical nodes
 		public function GetNodes():ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
-			for each(var nodeInterface:VirtualInterface in interfaces) {
+			for each(var nodeInterface:VirtualInterface in interfaces.collection) {
 				for each(var nodeLink:VirtualLink in nodeInterface.virtualLinks) {
 					for each(var nodeLinkInterface:VirtualInterface in nodeLink.interfaces)
 					{
@@ -146,83 +153,53 @@
 			return ac;
 		}
 		
-		public function GetXml():XML
+		public function getXml():XML
 		{
-			var result : XML = null;
-			/*
-			var str : String = "<node ";
-			if (! isVirtual)
-			{
-				str += "component_uuid=\"" + id + "\" ";
-			}
-			str += "component_manager_uuid=\"" + manager.Urn + "\" ";
-			str += "virtual_id=\"" + name + "\" "
-				+ "virtualization_type=\"" + virtType + "\" ";
-			if (manager.Urn != null)
-			{
-				str += "sliver_uuid=\"" + sliver.urn + "\" ";
-			}
+			var result : XML = <node />;
+			if (!isVirtual)
+				result.@component_uuid = physicalNode.urn;
+			result.@component_manager_uuid = manager.Urn;
+			result.@virtual_id = id;
+			result.@virtualization_type = virtualizationType;
 			if (isShared)
 			{
-				str += "virtualization_subtype=\"emulab-openvz\" ";
-				str += "exclusive=\"0\"";
+				result.@virtualization_subtype = virtualizationSubtype;
+				result.@exclusive = 0;
 			}
 			else
+				result.@exclusive = 1;
+
+			// Currently only pcs
+			var nodeType:String = "pc";
+			if (isShared)
+				nodeType = "pcvm";
+			var nodeTypeXml:XML = <node_type />;
+			nodeTypeXml.@type_name = nodeType;
+			nodeTypeXml.@type_slots = 1;
+			
+			if(startupCommand.length > 0)
+				nodeTypeXml.@startup_command = startupCommand;
+			
+			if(tarfiles.length > 0)
+				nodeTypeXml.@tarfiles = tarfiles;
+			
+			if(diskImage.length > 0)
 			{
-				str += "exclusive=\"1\"";
+				var diskImageXml:XML = <disk_image />;
+				diskImageXml.@name = diskImage;
+				result.appendChild(diskImageXml);
 			}
-			str += ">";
-			if (isBgpMux)
-			{
-				str += '<node_type type_name="bgpmux" type_slots="1"> ';
-				str += '  <field key="upstream_as" value="' + component.upstreamAs
-					+ '" /> ';
-				str += '  <field key="prefix" value="' + manager.getBgpAddress()
-					+ '" /> ';
-				str += '  <field key="netmask" value="' + manager.getBgpNetmask()
-					+ '" /> ';
-				str += '</node_type> ';
-			}
-			else
-			{
-				var nodeType = "pc";
-				if (isShared)
-				{
-					nodeType = "pcvm";
-				}
-				else
-				{
-					nodeType = "pc";
-					//          if (manager.getName() == "Emulab")
-					//          {
-					//            nodeType = "pc600";
-					//          }
-				}
-				str += "<node_type type_name=\"" + nodeType
-					+ "\" type_slots=\"1\" /> ";
-			}
+			
 			if (superNode != null)
+				result.appendChild(XML("<subnode_of>" + superNode.urn + "</subnode_of>"));
+			
+			for each (var current:VirtualInterface in interfaces.collection)
 			{
-				str += "<subnode_of>" + superNode + "</subnode_of> ";
+				var interfaceXml:XML = <interface />;
+				interfaceXml.@virtual_id = current.id;
+				result.appendChild(interfaceXml);
 			}
-			for each (var current in interfaces)
-			{
-				if (current.used)
-				{
-					str += "<interface virtual_id=\"" + current.virtualId + "\" ";
-					
-					if (current.name != null)
-					{
-						str += "component_id=\"" + current.name + "\" ";
-					}
-					
-					str += " />";
-				}
-			}
-			str += "<interface virtual_id=\"control\" />";
-			str += " </node>";
-			result = XML(str);
-			*/
+
 			return result;
 		}
 	}

@@ -34,6 +34,7 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			sliver.rspec = new XML(response.value.manifest);
+			sliver.created = true;
 			sliver.parseRspec();
 			Main.protogeniHandler.dispatchSliceChanged();
 		}

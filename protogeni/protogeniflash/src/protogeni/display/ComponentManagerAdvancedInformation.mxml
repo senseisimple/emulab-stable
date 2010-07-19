@@ -118,7 +118,8 @@
 						<mx:Label text="URL" fontWeight="bold"/>
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-						<mx:Label text="{cm.Url}"/>
+						<mx:Button label="{cm.Url}" toolTip="Click to visit URL"
+								   click="navigateToURL(new URLRequest(cm.VisitUrl()), '_blank');"/>
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%">

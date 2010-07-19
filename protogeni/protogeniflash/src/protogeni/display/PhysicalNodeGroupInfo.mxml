@@ -76,6 +76,6 @@
 			</mx:GridItem>
 		</mx:GridRow>
 	</mx:Grid>
-	<mx:Button label="More Info" click="if(group.collection.length > 1) DisplayUtil.viewNodeGroup(group); else DisplayUtil.viewNode(group.collection[0]);"/>
+	<mx:Button label="More Info" click="if(group.collection.length > 1) DisplayUtil.viewNodeGroup(group); else DisplayUtil.viewPhysicalNode(group.collection[0]);"/>
 	
 </mx:VBox>

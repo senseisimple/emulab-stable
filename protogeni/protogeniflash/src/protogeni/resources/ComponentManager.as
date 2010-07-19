@@ -19,7 +19,6 @@
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
 	
-	
 	import protogeni.Util;
 	import protogeni.display.DisplayUtil;
 	
@@ -39,6 +38,8 @@
 		
 		[Bindable]
 		public var Urn : String = "";
+		
+		public var Version:int;
 		
 		[Bindable]
 		public var Show : Boolean = true;
@@ -117,6 +118,8 @@
 	    public function processRspec(afterCompletion : Function):void {
 			Main.log.setStatus("Parsing " + Hrn + " RSPEC", true, false);
 
+			var ns:String = (Rspec.namespace() as Namespace).uri;
+			Version = parseInt(ns.substring(ns.lastIndexOf('.')));
 			var nodeName : QName = new QName(Rspec.namespace(), "node");
 			nodes = Rspec.elements(nodeName);
 			nodeName = new QName(Rspec.namespace(), "link");
@@ -135,12 +138,10 @@
 	    {
 			if (myState == NODE_PARSE)	    	
 			{
-	    		//main.setProgress("Parsing " + (locations.length() - myIndex) + " more nodes", Common.waitColor);
 				parseNextNode();
 			}
 			else if (myState == LINK_PARSE)
 			{
-	    		//main.setProgress("Parsing " + (links.length() - myIndex) + " more links", Common.waitColor);
 				parseNextLink();
 			}
 			else if (myState == DONE)
@@ -170,7 +171,6 @@
 	        var idx:int;
 	        for(idx = 0; idx < MAX_WORK; idx++) {
 	        	var fullIdx:int = myIndex + idx;
-	        	//main.console.appendText("idx:" + idx.toString() + " full:" + fullIdx.toString());
 	        	if(fullIdx == nodes.length()) {
 	        		
 	        		// Assign subnodes
@@ -183,11 +183,8 @@
 	        		
 	        		myState = LINK_PARSE;
 	        		myIndex = 0;
-	        		//main.console.appendText("...finished nodes\n");
 	        		return;
 	        	}
-	        	//main.console.appendText("parsing...");
-	        	//main.console.appendText(fullIdx.toString());
 
 				var p:XML = nodes[fullIdx];
 				
@@ -207,12 +204,12 @@
 				}
 
 				var ng:PhysicalNodeGroup = Nodes.GetByLocation(lat,lng);
-				
+				var tempString:String;
 				if(ng == null) {
-					var cnt:String = "";
+					tempString = "";
 					if(temp != null)
-						cnt = temp.@country;
-					ng = new PhysicalNodeGroup(lat, lng, cnt, Nodes);
+						tempString = temp.@country;
+					ng = new PhysicalNodeGroup(lat, lng, tempString, Nodes);
 					Nodes.Add(ng);
 				}
 
@@ -226,21 +223,8 @@
 	        		if(ix.localName() == "interface") {
 	        			var i:PhysicalNodeInterface = new PhysicalNodeInterface(n);
 	        			i.id = ix.@component_id;
-						var tempString:String = ix.@role;
-						switch(tempString)
-						{
-							case "control": i.role = 0;
-								break;
-							case "experimental": i.role = 1;
-								break;
-							case "unused": i.role = 2;
-								break;
-							case "unused_control": i.role = 3;
-								break;
-							case "unused_experimental": i.role = 4;
-								break;
-						}
-
+						tempString = ix.@role;
+						i.role = PhysicalNodeInterface.RoleIntFromString(tempString);
 	        			n.interfaces.Add(i);
 	        			interfaceDictionary[i.id] = i;
 	        		} else if(ix.localName() == "node_type") {
@@ -259,6 +243,13 @@
 						var parentName:String = ix.toString();
 						if(parentName.length > 0)
 							subnodeList.addItem({subNode:n, parentName:parentName});
+					} else if(ix.localName() == "disk_image") {
+						var newDiskImage:DiskImage = new DiskImage();
+						newDiskImage.name = ix.@name;
+						newDiskImage.os = ix.@os;
+						newDiskImage.description = ix.@description;
+						newDiskImage.version = ix.@version;
+						n.diskImages.addItem(newDiskImage);
 					}
 	        	}
 				
@@ -267,8 +258,6 @@
 	        	nodeNameDictionary[n.urn] = n;
 	        	nodeNameDictionary[n.name] = n;
 	        	AllNodes.addItem(n);
-	        	
-	        	//main.console.appendText("done\n");
 	        }
 	        myIndex += idx;
 	    }

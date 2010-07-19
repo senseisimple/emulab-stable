@@ -21,11 +21,11 @@
 {
 	import flash.display.DisplayObject;
 	import flash.events.MouseEvent;
+	import flash.text.StyleSheet;
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
 	import mx.managers.PopUpManager;
-	
 	
 	import protogeni.communication.Request;
 	import protogeni.resources.ComponentManager;
@@ -36,6 +36,7 @@
 	import protogeni.resources.PhysicalNodeInterface;
 	import protogeni.resources.Slice;
 	import protogeni.resources.VirtualLink;
+	import protogeni.resources.VirtualNode;
 	
 	public class DisplayUtil
 	{
@@ -94,6 +95,34 @@
         [Bindable]
         [Embed(source="../../../images/exclamation.png")]
         public static var exclamationIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/lightbulb.png")]
+		public static var onIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/lightbulb_off.png")]
+		public static var offIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/add.png")]
+		public static var addIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/add.png")]
+		public static var acceptIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/cancel.png")]
+		public static var cancelIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/control_stop_blue.png")]
+		public static var stopIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/control_play_blue.png")]
+		public static var playIcon:Class;
         
         // Gets an icon for a boolean value
         public static function assignIcon(val:Boolean):Class {
@@ -148,6 +177,11 @@
 			var requestButton:Button = new Button();
 			requestButton.label = r.name;
 			requestButton.toolTip = r.details;
+			requestButton.addEventListener(MouseEvent.CLICK,
+				function openRequest(event:MouseEvent):void {
+					viewRequest(r);
+				}
+			);
 			return requestButton;
 		}
 		
@@ -183,7 +217,7 @@
 			nodeButton.setStyle("icon", DisplayUtil.assignAvailabilityIcon(n));
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
-					viewNode(n);
+					viewPhysicalNode(n);
 				}
 			);
 			return nodeButton;
@@ -205,7 +239,7 @@
 		// Gets a button for the virtual link
 		public static function getVirtualLinkButton(pl:VirtualLink):Button {
 			var linkButton:Button = new Button();
-			linkButton.label = pl.virtualId;
+			linkButton.label = pl.id;
 			linkButton.setStyle("icon", DisplayUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
@@ -265,12 +299,19 @@
 		}
 		
 		// Opens a physical node in a window
-		public static function viewNode(n:PhysicalNode):void {
+		public static function viewPhysicalNode(n:PhysicalNode):void {
 			var ngWindow:PhysicalNodeAdvancedWindow = new PhysicalNodeAdvancedWindow();
 	    	ngWindow.main = Main.Pgmap();
 	    	PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
        		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadNode(n);
+		}
+		
+		public static function viewVirtualNode(n:VirtualNode):void {
+			var ngWindow:VirtualNodeAdvancedWindow = new VirtualNodeAdvancedWindow();
+			PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+			PopUpManager.centerPopUp(ngWindow);
+			ngWindow.loadNode(n);
 		}
 		
 		// Opens a group of physical nodes in a window
@@ -285,7 +326,7 @@
 		// Opens a group of physical nodes in a window
 		public static function viewNodeCollection(nc:ArrayCollection):void {
 			if(nc.length == 1)
-				viewNode(nc[0]);
+				viewPhysicalNode(nc[0]);
 			else {
 				var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
 		    	ngWindow.main = Main.Pgmap();
@@ -295,19 +336,19 @@
 			}
 		}
 		
-		public static function viewSlices():void {
-			var sWindow:SlicesWindow = new SlicesWindow();
-			PopUpManager.addPopUp(sWindow, Main.Pgmap(), false);
-			PopUpManager.centerPopUp(sWindow);
-			sWindow.refreshView();
-		}
-		
 		// Opens a component manager in a window
 		public static function viewSlice(s:Slice):void {
 			var sWindow:SliceWindow = new SliceWindow();
 			PopUpManager.addPopUp(sWindow, Main.Pgmap(), false);
 			PopUpManager.centerPopUp(sWindow);
 			sWindow.loadSlice(s);
+		}
+		
+		public static function viewRequest(r:Request):void {
+			var rWindow:RequestWindow = new RequestWindow();
+			PopUpManager.addPopUp(rWindow, Main.Pgmap(), false);
+			PopUpManager.centerPopUp(rWindow);
+			rWindow.load(r);
 		}
 	}
 }

@@ -19,15 +19,20 @@
 	public class User
 	{
 		[Bindable]
-		public var uid : String;
+		public var uid:String;
 		
-		public var uuid : String;
-		public var hrn : String;
-		public var email : String;
-		public var name : String;
-		public var credential : String;
-		public var keys : String;
-		public var urn : String;
+		[Bindable]
+		public var uuid:String;
+		[Bindable]
+		public var hrn:String;
+		[Bindable]
+		public var email:String;
+		[Bindable]
+		public var name:String;
+		public var credential:String;
+		public var keys:Array;
+		[Bindable]
+		public var urn:String;
 		
 		public var slices:SliceCollection;
 		

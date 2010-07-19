@@ -25,6 +25,32 @@
 		public static var UNUSED_CONTROL:int = 3;
 		public static var UNUSED_EXPERIMENTAL:int = 4;
 		
+		public static function RoleStringFromInt(i:int):String
+		{
+			switch(i)
+			{
+				case CONTROL: return "control";
+				case EXPERIMENTAL: return "experimental";
+				case UNUSED: return "unused";
+				case UNUSED_CONTROL: return "unused_control";
+				case UNUSED_EXPERIMENTAL: return "unused_experimental";
+				default: return "";
+			}
+		}
+		
+		public static function RoleIntFromString(s:String):int
+		{
+			switch(s)
+			{
+				case "control": return CONTROL;
+				case "experimental": return EXPERIMENTAL;
+				case "unused": return UNUSED;
+				case "unused_control": return UNUSED_CONTROL;
+				case "unused_experimental": return UNUSED_EXPERIMENTAL;
+				default: return -1;
+			}
+		}
+		
 		public function PhysicalNodeInterface(own:PhysicalNode)
 		{
 			owner = own;

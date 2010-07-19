@@ -121,7 +121,18 @@ package protogeni.communication
 
     public function getSendXml() : String
     {
-      return server._method.getXml().toString();
+		try
+		{
+			var x:XML = server._method.getXml();
+		} catch(e:Error)
+		{
+			return "";
+		}
+		
+		if(x == null)
+			return "";
+		else
+      		return x.toString();
     }
 
     public function getResponseXml() : String

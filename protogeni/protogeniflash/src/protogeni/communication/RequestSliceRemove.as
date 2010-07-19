@@ -33,7 +33,7 @@ package protogeni.communication
 	override public function complete(code : Number, response : Object) : *
 	{
 		var newRequest:Request = null;
-		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS || code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)
 		{
 			newRequest = new RequestSliceRegister(slice);
 		}

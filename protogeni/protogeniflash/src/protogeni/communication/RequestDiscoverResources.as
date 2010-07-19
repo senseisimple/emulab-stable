@@ -22,6 +22,7 @@ package protogeni.communication
   
   import mx.utils.Base64Decoder;
   
+  import protogeni.Util;
   import protogeni.resources.ComponentManager;
 
   public class RequestDiscoverResources extends Request
@@ -29,7 +30,7 @@ package protogeni.communication
 	  
     public function RequestDiscoverResources(newCm:ComponentManager) : void
     {
-		super("DiscoverResources (" + newCm.Hrn + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true);
+		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true);
 		cm = newCm;
 		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
 		op.addField("compress", true);
@@ -76,6 +77,14 @@ package protogeni.communication
 
       return null;
     }
+	
+	override public function cancel():void
+	{
+		cm.Status = ComponentManager.UNKOWN;
+		waitOnComplete = false;
+		Main.protogeniHandler.dispatchComponentManagerChanged();
+		op.cleanup();
+	}
 
     private var cm : ComponentManager;
   }

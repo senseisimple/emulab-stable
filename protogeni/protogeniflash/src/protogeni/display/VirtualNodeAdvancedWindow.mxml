@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns="protogeniflash.*" xmlns:mx="http://www.adobe.com/2006/mxml"
+	width="675" height="500"
+	title="Node Information"
+	xmlns:display="protogeni.display.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import com.google.maps.View;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.Label;
+			import mx.controls.Spacer;
+			
+			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.VirtualNode;
+			
+			public var main:protogeniflash;
+			
+			public function loadNode(n:VirtualNode):void {
+				nodeInfo.load(n);
+			}
+		]]>
+	</mx:Script>
+	<display:VirtualNodeAdvancedInformation height="100%" width="100%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="nodeInfo" />
+</display:DefaultWindow>

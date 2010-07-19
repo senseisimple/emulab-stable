@@ -37,7 +37,7 @@
 						if(ng.collection.length > 1)
 							DisplayUtil.viewNodeGroup(ng);
 						else
-							DisplayUtil.viewNode(ng.collection[0]);
+							DisplayUtil.viewPhysicalNode(ng.collection[0]);
 					});
 				
 				if(ng.city.length == 0)
@@ -91,7 +91,7 @@
 			}
 		]]>
 	</mx:Script>
-	<mx:Label text="Label" id="clusterLabel"/>
+	<mx:Label text="Label" id="clusterLabel" maxWidth="{this.width}"/>
 	<mx:VBox width="170" height="114" id="nodeGroupButtonsVbox" verticalGap="2" horizontalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" borderStyle="solid">
 	</mx:VBox>
 	<mx:Button label="Zoom" id="zoomButton" icon="@Embed('../../../images/zoom_in.png')"/>

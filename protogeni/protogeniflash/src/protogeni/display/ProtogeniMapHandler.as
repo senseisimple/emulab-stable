@@ -63,7 +63,7 @@ package protogeni.display
 	    		for each(var n:PhysicalNode in g.collection) {
 	    			for each(var vn:VirtualNode in n.virtualNodes)
 	    			{
-	    				if(vn.sliver.slice == selectedSlice)
+	    				if(vn.slivers[0].slice == selectedSlice)
 	    				{
 	    					drawGroup.Add(n);
 	    					break;

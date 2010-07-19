@@ -1,13 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow xmlns="pgmap.*" xmlns:mx="http://www.adobe.com/2006/mxml"
 	title="Console"
-	implements="LogRoot" initialize="init()" layout="horizontal" xmlns:protogeniflash="protogeniflash.*" xmlns:display="protogeni.display.*">
+	implements="LogRoot" initialize="init()" layout="horizontal" xmlns:protogeniflash="protogeniflash.*" xmlns:display="protogeni.display.*" width="700" height="400">
 	
-	<mx:Style source="protogeni/display/styles.css"/>
+	<mx:Style>
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+	</mx:Style>
 	
 	<mx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
 			import mx.controls.Button;
 			import mx.controls.HRule;
 			import mx.controls.Spacer;
@@ -18,6 +48,7 @@
 			import protogeni.ProtogeniHandler;
 			import protogeni.communication.CommunicationUtil;
 			import protogeni.communication.Request;
+			import protogeni.communication.RequestQueue;
 			import protogeni.communication.RequestQueueNode;
 			import protogeni.resources.ComponentManager;
 			
@@ -96,6 +127,8 @@
 				groupNames = new Array("All", "Slice Embedding Service", "Clearing House");
 				if(logs != null)
 					logs.removeAllChildren();
+				if(queue != null)
+					queue.removeAllChildren();
 			}
 			
 			public function loadComponentManagers(junk:* = null):void
@@ -108,11 +141,13 @@
 					groups.push(cm.Url);
 					groupNames.push(cm.Hrn);
 				}
+				this.validateNow();
 			}
 			
 			public function clearScreen():void
 			{
 				logs.removeAllChildren();
+				queue.removeAllChildren();
 			}
 			
 			public function open():void
@@ -130,7 +165,39 @@
 			
 			public function refreshView():void
 			{
-				clearScreen();
+				this.resetLogView();
+				this.resetQueueView();
+				
+				selectedIndex = groupComboBox.selectedIndex;
+			}
+			
+			public function addRequest(rqn:RequestQueueNode):void
+			{
+				var reqHbox:HBox = new HBox();
+				var removeButton:ImageButton = new ImageButton();
+				removeButton.data = rqn;
+				removeButton.source = DisplayUtil.cancelIcon;
+				removeButton.toolTip = "Cancel this operation";
+				removeButton.addEventListener(MouseEvent.CLICK,
+					function remove(e:MouseEvent):void
+					{
+						Main.protogeniHandler.rpcHandler.remove(e.currentTarget.data);
+						/*
+						Alert.show("Really remove '" + e.currentTarget.data.item.name + "' from the queue?", "Remove?", Alert.YES|Alert.NO, Main.Pgmap(),
+							function removeRequest(e:CloseEvent):void
+							{
+								if(e.detail == Alert.YES)
+									
+							});*/
+					});
+				reqHbox.addChild(removeButton);
+				reqHbox.addChild(DisplayUtil.getRequestButton(rqn.item));
+				queue.addChild(reqHbox);
+			}
+			
+			public function resetLogView(junk:* = null):void
+			{
+				logs.removeAllChildren();
 				if(groupComboBox.selectedIndex == 0)
 				{
 					for each(var allMsg:LogMessage in logList)
@@ -144,13 +211,27 @@
 							addMessage(msg);
 					}
 				}
-				selectedIndex = groupComboBox.selectedIndex;
 			}
 			
-			public function resetQueueView(junk:*):void
+			public function resetQueueView(junk:* = null):void
 			{
 				queue.removeAllChildren();
-				var currentNode:RequestQueueNode = Main.protogeniHandler.rpcHandler.queue.head;
+				
+				var selectedQueue:RequestQueue = new RequestQueue();
+				if(groupComboBox.selectedIndex == 0)
+				{
+					selectedQueue = Main.protogeniHandler.rpcHandler.queue;
+				} else {
+					var currentTestNode:RequestQueueNode = Main.protogeniHandler.rpcHandler.queue.head;
+					while(currentTestNode != null)
+					{
+						if((currentTestNode.item as Request).op.getUrl().indexOf(groups[groupComboBox.selectedIndex]) > -1)
+							selectedQueue.push(currentTestNode.item);
+						currentTestNode = currentTestNode.next;
+					}
+				}
+				
+				var currentNode:RequestQueueNode = selectedQueue.head;
 				if(currentNode == null)
 				{
 					var noneLabel:Label = new Label();
@@ -159,12 +240,12 @@
 				}
 				else
 				{
-					if(Main.protogeniHandler.rpcHandler.working)
+					if(Main.protogeniHandler.rpcHandler.working && Main.protogeniHandler.rpcHandler.queue.head.item == currentNode.item)
 					{
 						var currentLabel:Label = new Label();
 						currentLabel.text = "Currently running";
 						queue.addChild(currentLabel);
-						queue.addChild(DisplayUtil.getRequestButton(currentNode.item));
+						addRequest(currentNode);
 						currentNode = currentNode.next;
 					}
 					if(currentNode == null)
@@ -178,7 +259,7 @@
 						queue.addChild(waitingLabel);
 						while(currentNode != null)
 						{
-							queue.addChild(DisplayUtil.getRequestButton(currentNode.item));
+							addRequest(currentNode);
 							currentNode = currentNode.next;
 						}
 					}
@@ -189,20 +270,27 @@
 	</mx:Script>
 	
 	<mx:HDividedBox width="100%" height="100%">
-		<mx:VBox height="100%" width="50%" horizontalAlign="center">
-			<mx:Label text="Logs for"  fontSize="12" fontWeight="bold"/>
-			<mx:ComboBox id="groupComboBox" dataProvider="{groupNames}" change="refreshView()"></mx:ComboBox>
+		<mx:VBox height="100%" width="50%" horizontalAlign="center" horizontalScrollPolicy="off">
+			<mx:Label text="Logs"  fontSize="12" fontWeight="bold"/>
 			<mx:VBox height="100%" width="100%" id="logs">
 			</mx:VBox>
 		</mx:VBox>
 		
-		<mx:VBox height="100%" width="50%" horizontalAlign="center">
+		<mx:VBox height="100%" width="50%" horizontalAlign="center" horizontalScrollPolicy="off">
 			<mx:Label text="Queued Requests"  fontWeight="bold" fontSize="12"/>
-			<mx:Button label="Pause" click="Main.protogeniHandler.rpcHandler.pause();"/>
-			<mx:Button label="Start" click="Main.protogeniHandler.rpcHandler.start();"/>
+			<mx:HBox width="100%" horizontalAlign="center">
+				<display:ImageButton id="startButton"
+									 source="@Embed('../images/control_play_blue.png')"
+									 click="Main.protogeniHandler.rpcHandler.start();"
+									 toolTip="Force start the queue" />
+			</mx:HBox>
 			<mx:VBox height="100%" width="100%" id="queue">
 			</mx:VBox>
 		</mx:VBox>
 	</mx:HDividedBox>
+	<mx:ControlBar>
+		<mx:Label text="View"  fontSize="12" fontWeight="bold"/>
+		<mx:ComboBox id="groupComboBox" dataProvider="{groupNames}" change="refreshView()"></mx:ComboBox>
+	</mx:ControlBar>
 	
 </display:DefaultWindow>

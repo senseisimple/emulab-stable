@@ -6,19 +6,20 @@
 	
 	<mx:Script>
 		<![CDATA[
-			import protogeni.resources.ComponentManager;
-			import protogeni.resources.Slice;
-			import protogeni.resources.PhysicalNode;
 			import mx.collections.ArrayCollection;
 			import mx.collections.Sort;
 			import mx.collections.SortField;
+			import mx.containers.TabNavigator;
+			import mx.controls.TextArea;
 			import mx.controls.scrollClasses.ScrollThumb;
 			import mx.core.DragSource;
 			import mx.core.UIComponent;
 			import mx.events.FlexEvent;
 			
-			[Bindable]
-			private var slice:Slice;
+			import protogeni.resources.ComponentManager;
+			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.Slice;
+			import protogeni.resources.Sliver;
 			
 			[Bindable]
 			private var cms:Array;
@@ -33,8 +34,10 @@
 					nodes = cm.getAvailableNodes();
 					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
 					{
-						if(sn.node.manager == cm && nodes.getItemIndex(sn.node) > -1)
-							nodes.removeItemAt(nodes.getItemIndex(sn.node));
+						if(!sn.node.isVirtual &&
+								sn.node.manager == cm &&
+								nodes.getItemIndex(sn.node.physicalNode) > -1)
+							nodes.removeItemAt(nodes.getItemIndex(sn.node.physicalNode));
 					}
 				}
 				else
@@ -74,18 +77,46 @@
 				}
 				return DisplayUtil.assignAvailabilityIcon(item as PhysicalNode);
 			}
+			
+			public function previewRspec():void
+			{
+				var previewRspec:DefaultWindow = new DefaultWindow();
+				previewRspec.title = "Preview Request RSPEC for: " + sliceCanvas.slice.hrn;
+				var tabs:TabNavigator = new TabNavigator();
+				tabs.percentHeight = 100;
+				tabs.percentWidth = 100;
+				previewRspec.addChild(tabs);
+				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				{
+					var tab:VBox = new VBox();
+					tab.percentHeight = 100;
+					tab.percentWidth = 100;
+					tab.label = s.componentManager.Hrn;
+					var previewRspecText:TextArea = new TextArea();
+					previewRspecText.percentHeight = 100;
+					previewRspecText.percentWidth = 100;
+					previewRspecText.text = s.getRequestRspec().toString();
+					tab.addChild(previewRspecText);
+					tabs.addChild(tab);
+				}
+				previewRspec.show();
+			}
 
 		]]>
 	</mx:Script>
 	<mx:HBox width="100%">
-		<mx:Label text="{slice.hrn}" fontSize="17" fontWeight="bold"/>
+		<mx:Label text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold"/>
 		<mx:Spacer width="100%"/>
-		<mx:Label text="{slice.urn}"/>
+		<mx:Label text="{sliceCanvas.slice.urn}"/>
+		<display:ImageButton id="previewRspecButton"
+							 source="@Embed('../images/page_code.png')"
+							 click="previewRspec()"
+							 toolTip="Preview the Request RSPEC" />
 	</mx:HBox>
 	<mx:HBox width="100%">
 		<mx:Button label="Embed"/>
 		<mx:Label text="Slivers"/>
-		<mx:Button label="Create"/>
+		<mx:Button label="Create" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
 		<mx:Button label="Boot"/>
 		<mx:Button label="Delete"/>
 	</mx:HBox>

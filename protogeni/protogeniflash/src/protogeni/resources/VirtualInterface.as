@@ -30,31 +30,14 @@
 		[Bindable]
 		public var id:String;
 		public var role:int;
+		public var isVirtual:Boolean;
 
+		public var ip:String = "";
+		
 		[Bindable]
 		public var virtualLinks:ArrayCollection = new ArrayCollection();
 		
 		public var physicalNodeInterface:PhysicalNodeInterface;
-		public var isVirtual:Boolean;
-		public var name : String;
 		public var bandwidth:int = 0;
-		
-		public function getXml():XML
-		{
-			var result : XML = <interface_ref />;
-			/*
-			result.@virtual_node_id = virtualNode.name;
-			if (isTunnel())
-			{
-				result.@tunnel_ip = ipToString(tunnelIp + ipOffset);
-				result.@virtual_interface_id = "control";
-			}
-			else
-			{
-				result.@virtual_interface_id = interfaceName;
-			}
-			*/
-			return result;
-		}
 	}
 }

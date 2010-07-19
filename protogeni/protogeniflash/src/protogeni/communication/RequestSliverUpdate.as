@@ -14,44 +14,22 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.Sliver;
+
   class RequestSliverUpdate extends Request
   {
-    public function RequestSliverUpdate(newManager : ComponentManager,
-                                        newNodes : ActiveNodes,
-                                        newRspec : String,
-                                        newBeginTunnel : Boolean,
-										newSliceUrn : String) : void
+    public function RequestSliverUpdate(s:Sliver) : void
     {
-      super(newManager.getName());
-      manager = newManager;
-      nodes = newNodes;
-      rspec = newRspec;
-      beginTunnel = newBeginTunnel;
-      ticket = null;
-	  sliceUrn = newSliceUrn;
+		super("SliverUpdate", "Updating sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.updateSliver);
+		sliver = s;
+		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("credentials", new Array(sliver.slice.credential));
+		op.addField("ticket", ticket);
+		op.setExactUrl(sliver.componentManager.Url);
     }
-
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
-
+	
     override public function start(credential : Credential) : Operation
     {
-      if (manager.getVersion() == 0)
-      {
-        if (! beginTunnel)
-        {
-          nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.CREATED);
-        }
-        opName = "Updating Sliver";
-        op.reset(Geni.updateSliver);
-        op.addField("slice_urn", sliceUrn);
-        op.addField("credentials", new Array(manager.getSliver()));
-        op.addField("rspec", rspec);
-        op.addField("keys", credential.ssh);
-        //? op.addField("impotent", Request.IMPOTENT);
-      }
       else if (ticket == null)
       {
         if (! beginTunnel)
@@ -124,11 +102,6 @@ package protogeni.communication
       ticket = newTicket;
     }
 
-    var manager : ComponentManager;
-    var nodes : ActiveNodes;
-    var rspec : String;
-    var beginTunnel : Boolean;
-    var ticket : String;
-	var sliceUrn : String;
+    var sliver : Sliver;
   }
 }

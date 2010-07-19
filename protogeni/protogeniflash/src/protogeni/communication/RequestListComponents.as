@@ -44,12 +44,12 @@ package protogeni.communication
 				newCm.Url = obj.url;
 				newCm.Urn = obj.urn;
 				Main.protogeniHandler.ComponentManagers.add(newCm);
-				Main.protogeniHandler.dispatchComponentManagerChanged();
 				if(startDiscoverResources)
 				{
 					newCm.Status = ComponentManager.INPROGRESS;
 					newCalls.push(new RequestDiscoverResources(newCm));
 				}
+				Main.protogeniHandler.dispatchComponentManagerChanged();
 			}
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());
