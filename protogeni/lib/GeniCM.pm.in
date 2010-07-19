@@ -766,19 +766,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		#
-		# For now, the project has to be emulab-ops. 
+		# For now, the project has to be emulab-ops or the
+		# the current project.
 		#
-		if ($ospid ne TBOPSPID()) {
+		if (! ($ospid eq TBOPSPID() ||
+		       $ospid eq $slice_experiment->pid())) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				 "Illegal project name in URN: $dname");
 		    goto bad;
 		}
-		my $osinfo = OSinfo->LookupByName($os);
+		my $osinfo = OSinfo->Lookup($ospid, $os);
 		if (!defined($osinfo)) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					     "Bad osname in URN: $dname");
+					     "Unknown image URN: $dname");
 		    goto bad;
 		}
 		#
