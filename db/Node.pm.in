@@ -1244,7 +1244,7 @@ sub default_osid($;$) {
     my ($self,$stuff) = @_;
     my $val = undef;
 
-    if (NodeAttribute($self, "default_osid", \$val) == 0) {
+    if (NodeAttribute($self, "default_osid", \$val) == 0 && defined($val)) {
 	return $val;
     }
     return NodeTypeInfo($self)->default_osid($stuff);
@@ -1254,7 +1254,7 @@ sub default_imageid($;$) {
     my ($self,$stuff) = @_;
     my $val = undef;
 
-    if (NodeAttribute($self, "default_imageid", \$val) == 0) {
+    if (NodeAttribute($self, "default_imageid", \$val) == 0 && defined($val)) {
 	return $val;
     }
     return NodeTypeInfo($self)->default_imageid($stuff);
