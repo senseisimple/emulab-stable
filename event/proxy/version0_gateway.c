@@ -128,18 +128,9 @@ main(int argc, char **argv)
 	if (!debug) {
 		loginit(1, "v0_gateway");
 		/* See below for daemonization */
-		pubsub_debug = (PUBSUB_DEBUG_CONNECT|
-				PUBSUB_DEBUG_RECONNECT|
-				PUBSUB_DEBUG_CALLBACK|
-				PUBSUB_DEBUG_DISPATCHER); /* XXX for now */
+		pubsub_debug = 1; /* XXX for now */
 	} else {
-		/* XXX backward compat */
-		pubsub_debug = (PUBSUB_DEBUG_CONNECT|
-				PUBSUB_DEBUG_RECONNECT|
-				PUBSUB_DEBUG_CALLBACK|
-				PUBSUB_DEBUG_DISPATCHER);
-		if (debug > 1)
-			pubsub_debug |= PUBSUB_DEBUG_DETAIL;
+		pubsub_debug = debug;
 	}
 
 	info("version0<->version1 gateway daemon starting\n");
