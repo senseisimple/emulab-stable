@@ -1,25 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:ResizeWindow
+<display:DefaultWindow
 	xmlns:mx="http://www.adobe.com/2006/mxml"
-	xmlns:protogeniflash="protogeniflash.*"
-	borderAlpha=".9" borderColor="#D2E1F0"
-	showCloseButton="true"
-	title="Slices"
-	close="PopUpManager.removePopUp(this)"
-	layout="vertical" width="272" height="226" xmlns:display="protogeni.display.*">
+	title="Slices" show="refreshView()"
+	width="272" height="226"
+	xmlns:display="protogeni.display.*">
 	
 	<mx:Script>
 		<![CDATA[
-			import protogeni.resources.Slice;
+			import mx.controls.Alert;
 			import mx.events.CloseEvent;
-			import mx.managers.PopUpManager; 
+			import mx.managers.PopUpManager;
+			
+			import protogeni.ProtogeniHandler;
+			import protogeni.resources.Slice; 
+			
+			public function openFirst():void {
+				show();
+				Main.protogeniHandler.addEventListener(ProtogeniHandler.SLICES_CHANGED, refreshView);
+				Main.protogeniHandler.addEventListener(ProtogeniHandler.SLICE_CHANGED, refreshView);
+				
+				focusManager.setFocus(sliceName);
+			}
 			
 			public function createSlice():void
 			{
-				//Main.protogeniHandler.rpcHandler.startSlice(sliceName.text);
+				if(Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0)
+				{
+					Alert.show("User credential needed before trying to create slice.");
+					return;
+				}
+					
+				if(Main.protogeniHandler.CurrentUser.keys == null || Main.protogeniHandler.CurrentUser.keys.length == 0)
+				{
+					Alert.show("User keys needed before trying to create slice.");
+					return;
+				}
+
+				if(sliceName.text.length == 0)
+				{
+					Alert.show("Please input a name for the slice");
+					focusManager.setFocus(sliceName);
+					return;
+				}
+
+				Main.protogeniHandler.rpcHandler.startSlice(sliceName.text);
 			}
 			
-			public function refreshView():void
+			public function refreshView(junk:* = null):void
 			{
 				this.removeAllChildren();
 				for each(var s:Slice in Main.protogeniHandler.CurrentUser.slices)
@@ -29,13 +56,13 @@
 					this.addChild(b);
 				}
 			}
-			
+
 		]]>
 	</mx:Script>
 	
 	<mx:ControlBar>
-		<mx:TextInput id="sliceName" width="100%"/>
-		<mx:Button label="Create" click="createSlice();"/>
+		<mx:TextInput id="sliceName" width="100%" enter="createSlice();"/>
+		<mx:Button id="createButton" label="Create" click="createSlice();"/>
 	</mx:ControlBar>
 	
-</display:ResizeWindow>
+</display:DefaultWindow>

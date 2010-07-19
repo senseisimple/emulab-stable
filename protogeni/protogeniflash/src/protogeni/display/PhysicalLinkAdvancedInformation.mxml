@@ -82,7 +82,7 @@
 					</mx:GridItem>
 					<mx:GridItem width="100%">
 						<mx:VBox width="100%">
-							<mx:Button id="interface1Button" label="{link.interface1.owner.name}" click="DisplayUtil.viewNode(link.interface1.owner);"/>
+							<mx:Button id="interface1Button" label="{link.interface1.owner.name}" click="DisplayUtil.viewPhysicalNode(link.interface1.owner);"/>
 							<mx:Label text="on {link.interface1.id}"/>
 						</mx:VBox>
 					</mx:GridItem>
@@ -95,7 +95,7 @@
 					</mx:GridItem>
 					<mx:GridItem width="100%">
 						<mx:VBox width="100%">
-							<mx:Button id="interface2Button" label="{link.interface2.owner.name}" click="DisplayUtil.viewNode(link.interface2.owner);"/>
+							<mx:Button id="interface2Button" label="{link.interface2.owner.name}" click="DisplayUtil.viewPhysicalNode(link.interface2.owner);"/>
 							<mx:Label text="on {link.interface2.id}"/>
 						</mx:VBox>
 					</mx:GridItem>

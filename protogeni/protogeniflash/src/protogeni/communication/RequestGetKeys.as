@@ -34,6 +34,7 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				Main.protogeniHandler.CurrentUser.keys = response.value;
+				Main.protogeniHandler.dispatchUserChanged();
 			}
 			else
 			{

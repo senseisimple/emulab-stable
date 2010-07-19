@@ -6,17 +6,20 @@
 	
 	<mx:Script>
 		<![CDATA[
-			import protogeni.resources.Slice;
-			import protogeni.resources.Sliver;
-			import protogeni.resources.VirtualNode;
-			import protogeni.resources.PhysicalNode;
 			import mx.collections.ArrayCollection;
 			import mx.controls.List;
 			import mx.events.DragEvent;
 			import mx.managers.DragManager;
-			import mx.managers.PopUpManager; 
+			import mx.managers.PopUpManager;
 			
+			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.Slice;
+			import protogeni.resources.Sliver;
+			import protogeni.resources.VirtualNode; 
+			
+			[Bindable]
 			public var slice:Slice;
+			
 			public var startNode:SliceNode = null;
 			public var currentNode:SliceNode = null;
 			public var tempLink:SliceLink;
@@ -51,18 +54,10 @@
 				// Handle dragging new node
 				if(event.dragInitiator is List && List(event.dragInitiator).selectedItem is PhysicalNode)
 				{
-					var pn:PhysicalNode = List(event.dragInitiator).selectedItem as PhysicalNode;
-					var sn:SliceNode = new SliceNode();
-					var newVirtualNode:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(pn.manager));
-					newVirtualNode.setToPhysicalNode(pn);
-					sn.setNode(newVirtualNode);
-					sn.canvas = this;
-					this.addChild(sn);
-					sn.x = Canvas(event.currentTarget).mouseX - (sn.width/2);
-					sn.y = Canvas(event.currentTarget).mouseY - (sn.height/2);
-					allNodes.addItem(sn);
-					hostWindow.loadNodes();
-					newVirtualNode.sliver.nodes.addItem(newVirtualNode);
+					addPhysicalNode(List(event.dragInitiator).selectedItem as PhysicalNode,
+						Canvas(event.currentTarget).mouseX,
+						Canvas(event.currentTarget).mouseY);
+					
 				}
 				// Handle dragging old one
 				else if(this.contains(event.dragInitiator as DisplayObject))
@@ -71,6 +66,72 @@
 					SliceNode(event.dragInitiator).y = Canvas(event.currentTarget).mouseY - SliceNode(event.dragInitiator).startY;
 					redrawAllLinks();
 				}
+			}
+			
+			public function removeVirtualNode(vn:VirtualNode):void
+			{
+				for each(var sn:SliceNode in this.allNodes)
+				{
+					if(sn.node == vn)
+						removeSliceNode(sn);
+				}
+			}
+			
+			public function removeSliceNode(sn:SliceNode):void
+			{
+				// Remove subnodes
+				for each(var sub:VirtualNode in sn.node.subNodes)
+					removeVirtualNode(sub);
+				
+				// Remove links
+				while(sn.links.length > 0)
+					sn.links[0].removeLink()
+				
+				// Remove nodes and slivers
+				for each(var s:Sliver in sn.node.slivers)
+				{
+					s.nodes.removeItemAt(s.nodes.getItemIndex(sn.node));
+					if(s.nodes.length == 0)
+						slice.slivers.removeItemAt(slice.slivers.getItemIndex(s));
+				}
+
+				this.removeChild(sn);
+				allNodes.removeItemAt(allNodes.getItemIndex(sn));
+				hostWindow.loadNodes();
+			}
+			
+			public function addPhysicalNode(pn:PhysicalNode, x:int = -1, y:int = -1):SliceNode
+			{
+				// Don't duplicate
+				if(allNodes.containsPhysicalNode(pn))
+					return allNodes.getForPhysicalNode(pn);
+				
+				var sn:SliceNode = new SliceNode();
+				var newVirtualNode:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(pn.manager));
+				newVirtualNode.setToPhysicalNode(pn);
+				sn.setNode(newVirtualNode);
+				sn.canvas = this;
+				this.addChild(sn);
+				this.validateNow();
+				sn.width = sn.width + (sn.nameLabel.textWidth - sn.nameLabel.width)
+				sn.x = x - (sn.width/2);
+				sn.y = y - (sn.height/2);
+				allNodes.addItem(sn);
+				hostWindow.loadNodes();
+				newVirtualNode.slivers[0].nodes.addItem(newVirtualNode);
+				
+				// See if we need to connected to a parent node
+				if(pn.subNodeOf != null)
+				{
+					if(!allNodes.containsPhysicalNode(pn.subNodeOf))
+						sn.node.superNode = addPhysicalNode(pn.subNodeOf, x + 40, y + 40).node;
+					else
+						sn.node.superNode = allNodes.getForPhysicalNode(pn.subNodeOf).node;
+					sn.node.superNode.subNodes.push(sn.node);
+					
+				}
+				
+				return sn;
 			}
 			
 			public function startLinkingFrom(node:SliceNode):void
@@ -87,7 +148,9 @@
 					currentNode = null;
 					for each(var sn:SliceNode in allNodes)
 					{
-						if(sn != startNode && sn.getRect(this).contains(mouseX, mouseY) && !allLinks.hasLinkFor(startNode, sn)) {
+						if(sn != startNode
+								&& sn.getRect(this).contains(mouseX, mouseY)
+								&& !allLinks.hasLinkFor(startNode, sn)) {
 							currentNode = sn;
 							break;
 						}
@@ -111,10 +174,11 @@
 				if(startNode != null && currentNode != null) {
 					if(tempLink.establish(startNode, currentNode)) {
 						tempLink.drawEstablished();
-					}
-					validateNow();
+					} else
+						removeRawChild(tempLink);
 				} else if(tempLink != null && rawChildren.contains(tempLink))
 					removeRawChild(tempLink);
+				validateNow();
 				
 				// Reset
 				startNode = null;

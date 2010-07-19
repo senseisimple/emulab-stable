@@ -1,13 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
 	title="Component Managers"
-	width="250" height="310"
+	width="270" height="400"
 	defaultButton="{okButton}"
+	resize="cmVbox.height = this.height - 92"
 	creationComplete="okButton.setFocus()"
-	verticalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2"
+	verticalGap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" horizontalScrollPolicy="off" verticalScrollPolicy="off"
 	xmlns:display="protogeni.display.*">
 	
-	<mx:Style source="styles.css"/>
+	<mx:Style>
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+	</mx:Style>
 	
 	<mx:Script>
 		<![CDATA[
@@ -34,12 +63,6 @@
 				refreshList();
 				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGER_CHANGED, ResetAll);
 				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGERS_CHANGED, refreshList);
-			}
-			
-			public function show():void
-			{
-				PopUpManager.addPopUp(this, Main.Pgmap(), false);
-				PopUpManager.centerPopUp(this);
 			}
 			
 			public function refreshList(junk:* = null):void {
@@ -79,6 +102,19 @@
 				}
 			}
 			
+			public function updateWidth():void
+			{
+				this.validateNow();
+				var max:int = this.width;
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					if((cmHbox.minWidth+50) > max)
+						max = (cmHbox.minWidth+50);
+				}
+				this.width = max;
+				this.validateNow();
+			}
+			
 			public function ResetAll(junk:* = null):void
 			{
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
@@ -105,20 +141,6 @@
 					cmInfo.source = DisplayUtil.flagOrangeIcon;
 				}
 			}
-			
-			/*
-			public function ResetStatus(cm:ComponentManager):void
-			{
-				for each(var cmHbox:HBox in cmVbox.getChildren() )
-				{
-					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-					if(cm.Hrn == cmCheckbox.label)
-					{
-						updateCmHbox(cmHbox, cm);
-						return;
-					}
-				}
-			}*/
 			
 			public function updateCmHbox(cmHbox:HBox, cm:ComponentManager):void
 			{
@@ -160,6 +182,7 @@
 					cmInfo.source = DisplayUtil.flagGreenIcon;
 					cmHbox.toolTip = "Valid";
 				}
+				updateWidth();
 			}
 			
 			public function selectAll():void
@@ -201,6 +224,7 @@
 						DisplayUtil.viewComponentManager(cm);
 					});
 				cmVbox.addChild(cmHbox);
+				updateWidth();
 			}
 			
 			public function selectAllChange():void
@@ -220,7 +244,7 @@
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 	<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 
 	</mx:HBox>
-	<mx:VBox width="100%" height="218" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2">
+	<mx:VBox width="100%" height="308" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2" horizontalScrollPolicy="off">
 	</mx:VBox>
 	<mx:HBox width="100%" horizontalAlign="right">
 	<mx:Spacer width="100%"/>

@@ -50,7 +50,7 @@
 				{
 					for each(var vn:VirtualNode in node.virtualNodes)
 					{
-						if(vn.sliver.slice == Main.protogeniHandler.mapHandler.selectedSlice)
+						if(vn.slivers[0].slice == Main.protogeniHandler.mapHandler.selectedSlice)
 						{
 							virtualNode = vn;
 							break;
@@ -119,9 +119,9 @@
 					sliceLinksVbox.label = "Slice (" + connectedNodes.length + " Nodes)"
 					var connectedLabel:Label = new Label();
 					if(connectedNodes.length > 0)
-						connectedLabel.text = "Connected on " + virtualNode.sliver.slice.hrn + " to";
+						connectedLabel.text = "Connected on " + virtualNode.slivers[0].slice.hrn + " to";
 					else
-						connectedLabel.text = "No linked nodes on " + virtualNode.sliver.slice.hrn;
+						connectedLabel.text = "No linked nodes on " + virtualNode.slivers[0].slice.hrn;
 					sliceLinksVbox.addChild(connectedLabel);
 					
 					for each(var connectedNode:PhysicalNode in connectedNodes)

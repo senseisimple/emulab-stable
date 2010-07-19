@@ -37,7 +37,7 @@
 		{
 		}
 		
-		public var queue:RequestQueue = new RequestQueue();
+		public var queue:RequestQueue = new RequestQueue(true);
 		public var working:Boolean = false;
 		public var forceStop:Boolean = false;
 		public var isPaused:Boolean = false;
@@ -77,6 +77,18 @@
 			pushRequest(new RequestSliceResolve(newSlice, true));
 		}
 		
+		public function submitSlice(slice:Slice):void
+		{
+			for each(var sliver:Sliver in slice.slivers)
+			{
+				//if(sliver.created)
+					//pushRequest(new RequestSliverUpdate(sliver, true));
+				//else
+					pushRequest(new RequestSliverCreate(sliver));
+			}
+			// do something after to save the new slice?
+		}
+		
 		public function pushRequest(newRequest : Request, forceStart:Boolean = true) : void
 		{
 			if (newRequest != null)
@@ -100,7 +112,7 @@
 				var op:Operation = front.start();
 				op.call(complete, failure);
 				Main.log.setStatus(front.name, true, false);
-				Main.log.appendMessage(new LogMessage(op.getUrl(), "Send (" + front.name + ")", op.getSendXml(), false, LogMessage.TYPE_START));
+				Main.log.appendMessage(new LogMessage(op.getUrl(), "Send: " + front.name, op.getSendXml(), false, LogMessage.TYPE_START));
 				working = true;
 			}
 			else
@@ -113,6 +125,24 @@
 		public function pause():void
 		{
 			isPaused = true;
+		}
+		
+		public function remove(rqn:RequestQueueNode):void
+		{
+			if(working && queue.head == rqn)
+			{
+				working = false;
+				Main.log.setStatus(rqn.item.name + " canceled!", false, false);
+			}
+			if(queue.contains(rqn))
+			{
+				rqn.item.cancel();
+				var url:String = (rqn.item as Request).op.getUrl();
+				var name:String = rqn.item.name;
+				queue.remove(rqn);
+				Main.protogeniHandler.dispatchQueueChanged();
+				Main.log.appendMessage(new LogMessage(url, name + "Canceled", "User canceled", false, LogMessage.TYPE_END));
+			}
 		}
 		
 		private function failure(event : ErrorEvent, fault : MethodFault) : void
@@ -165,7 +195,7 @@
 					Main.log.appendMessage(new LogMessage(queue.front().op.getUrl(), CommunicationUtil.GeniresponseToString(code), queue.front().op.getResponseXml(), true, LogMessage.TYPE_END));
 				} else {
 					Main.log.setStatus(queue.front().name + " done", false, false);
-					Main.log.appendMessage(new LogMessage(queue.front().op.getUrl(), "Response (" + queue.front().name + ")", queue.front().op.getResponseXml(), false, LogMessage.TYPE_END));
+					Main.log.appendMessage(new LogMessage(queue.front().op.getUrl(), "Response: " + queue.front().name, queue.front().op.getResponseXml(), false, LogMessage.TYPE_END));
 				}
 
 				// Find out what to do next

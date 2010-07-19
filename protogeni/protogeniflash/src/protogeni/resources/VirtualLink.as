@@ -21,14 +21,11 @@
 	{
 		public function VirtualLink(owner:Sliver)
 		{
-			sliver = owner;
+			slivers = new Array(owner);
 		}
 		
 		[Bindable]
-		public var virtualId:String;
-		
-		[Bindable]
-		public var sliverUrn:String;
+		public var id:String;
 		
 		public var type:String;
 		
@@ -38,12 +35,11 @@
 		[Bindable]
 		public var bandwidth:Number;
 		
-		public var tunnelIp:int = 0;
+		public var firstTunnelIp:int = 0;
+		public var secondTunnelIp:int = 0;
 		public var _isTunnel:Boolean = false;
-		public var tunnelLeft:VirtualNode;
-		public var tunnelRight:VirtualNode;
 		
-		public var sliver:Sliver;
+		public var slivers:Array;
 
 		public var rspec:XML;
 		
@@ -52,35 +48,61 @@
 		
 		public static var tunnelNext:int = 1;
 		
-		public static function getNextTunnel() : int
+		public static function getNextTunnel():String
 		{
-			var result:int = tunnelNext;
-			tunnelNext += 2;
-			return result;
+			var first : int = ((tunnelNext >> 8) & 0xff);
+			var second : int = (tunnelNext & 0xff);
+			tunnelNext++;
+			return "192.168." + String(first) + "." + String(second);
 		}
 		
 		public function establish(first:VirtualNode, second:VirtualNode):Boolean
 		{
+			var firstInterface:VirtualInterface;
+			var secondInterface:VirtualInterface;
 			if(first.manager != second.manager)
 			{
+				firstInterface = first.interfaces.GetByID("control");
+				secondInterface = second.interfaces.GetByID("control");
 				_isTunnel = true;
-				tunnelLeft = first;
-				tunnelRight = second;
-				tunnelIp = getNextTunnel();
+				if(firstInterface.ip.length == 0)
+					firstInterface.ip = getNextTunnel();
+				if(secondInterface.ip.length == 0)
+					secondInterface.ip = getNextTunnel();
+				
+				// Make sure nodes are in both
+				if(!(second.slivers[0] as Sliver).nodes.contains(first))
+					(second.slivers[0] as Sliver).nodes.addItem(first);
+				if(!(first.slivers[0] as Sliver).nodes.contains(second))
+					(first.slivers[0] as Sliver).nodes.addItem(second);
+				
+				// Add relative slivers
+				if(slivers[0].componentManager != first.slivers[0].componentManager)
+					slivers.push(first.slivers[0]);
+				else if(slivers[0].componentManager != second.slivers[0].componentManager)
+					slivers.push(second.slivers[0]);
 			} else {
-				var firstInterface:VirtualInterface = first.allocateInterface();
-				var secondInterface:VirtualInterface = second.allocateInterface();
+				firstInterface = first.allocateInterface();
+				secondInterface = second.allocateInterface();
 				if(secondInterface == null || secondInterface == null)
 					return false;
-				first.interfaces.addItem(firstInterface);
-				second.interfaces.addItem(secondInterface);
-				this.interfaces.addItem(firstInterface);
-				this.interfaces.addItem(secondInterface);
+				first.interfaces.Add(firstInterface);
+				second.interfaces.Add(secondInterface);
 			}
+			this.interfaces.addItem(firstInterface);
+			this.interfaces.addItem(secondInterface);
 			firstNode = first;
 			secondNode = second;
 			first.links.addItem(this);
 			second.links.addItem(this);
+			id = slivers[0].slice.getUniqueVirtualLinkId(this);
+			for each(var s:Sliver in slivers)
+				s.links.addItem(this);
+			if(first.manager == second.manager)
+			{
+				firstInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
+				secondInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
+			}
 			return true;
 		}
 		
@@ -88,11 +110,15 @@
 		{
 			for each(var vi:VirtualInterface in this.interfaces)
 			{
-				vi.virtualNode.interfaces.removeItemAt(vi.virtualNode.interfaces.getItemIndex(vi));
+				if(vi.id != "control")
+					vi.virtualNode.interfaces.collection.removeItemAt(vi.virtualNode.interfaces.collection.getItemIndex(vi));
 			}
 			interfaces.removeAll();
 			firstNode.links.removeItemAt(firstNode.links.getItemIndex(this));
 			secondNode.links.removeItemAt(secondNode.links.getItemIndex(this));
+			for each(var s:Sliver in slivers)
+				s.links.removeItemAt(s.links.getItemIndex(this));
+			// Remove nodes without links??
 		}
 		
 		public function isTunnel():Boolean
@@ -109,17 +135,10 @@
 			return _isTunnel;
 		}
 		
-		public function ipToString(ip : int) : String
-		{
-			var first : int = ((ip >> 8) & 0xff);
-			var second : int = (ip & 0xff);
-			return "192.168." + String(first) + "." + String(second);
-		}
-		
 		public function hasTunnelTo(target : ComponentManager) : Boolean
 		{
-			return isTunnel() && (this.tunnelLeft.manager == target
-				|| tunnelRight.manager == target);
+			return isTunnel() && (this.firstNode.manager == target
+				|| secondNode.manager == target);
 		}
 		
 		public function isConnectedTo(target : ComponentManager) : Boolean
@@ -141,7 +160,8 @@
 				if(i.virtualNode == node)
 					return true;
 			}
-			return false;
+
+			return (firstNode == node || secondNode == node);
 		}
 		
 		public function hasPhysicalNode(node:PhysicalNode):Boolean
@@ -156,56 +176,52 @@
 		
 		public function getXml():XML
 		{
-			var result : XML = null;
-			/*
-			if (!isTunnel() || useTunnels)
+			var result : XML = <link />;
+			result.@virtual_id = id;
+			
+			if (!isTunnel())
+				result.appendChild(XML("<bandwidth>" + bandwidth + "</bandwidth>"));
+			
+			if (slivers[0].componentManager.Version >= 3)
 			{
-				result = <link />;
-				result.@virtual_id = "link" + String(number);
-				if (! isTunnel())
+				var link_type:XML = <link_type />;
+				link_type.@name = "GRE";
+				var key:XML = <field />;
+				key.@key = "key";
+				key.@value = "0";
+				var ttl:XML = <field />;
+				ttl.@key = "ttl";
+				ttl.@value = "0";
+				link_type.appendChild(key);
+				link_type.appendChild(ttl);
+				result.appendChild(link_type);
+			}
+			else
+			{
+				if (isTunnel())
 				{
-					var bandwidth = Math.floor(Math.min(leftInterface.bandwidth,
-						rightInterface.bandwidth));
-					if (left.getName().slice(0, 2) == "pg"
-						|| right.getName().slice(0, 2) == "pg")
-					{
-						bandwidth = 1000000;
-					}
-					return XML("<bandwidth>" + bandwidth + "</bandwidth>");
+					result.@link_type = "tunnel";
 				}
-				
-				if (version >= 3)
+				else
+					result.@link_type = "ethernet";
+			}
+			
+			for each (var current:VirtualInterface in interfaces)
+			{
+				var interfaceRefXml:XML = <interface_ref />;
+				interfaceRefXml.@virtual_node_id = current.virtualNode.id;
+				if (isTunnel())
 				{
-					var link_type = <link_type />;
-					link_type.@name = "GRE";
-					var key = <field />;
-					key.@key = "key";
-					key.@value = "0";
-					var ttl = <field />;
-					ttl.@key = "ttl";
-					ttl.@value = "0";
-					link_type.appendChild(key);
-					link_type.appendChild(ttl);
-					result.appendChild(link_type);
+					interfaceRefXml.@tunnel_ip = current.ip;
+					interfaceRefXml.@virtual_interface_id = "control";
 				}
 				else
 				{
-					if (isTunnel())
-					{
-						result.@link_type = "tunnel";
-					}
-					else if (version >= 1)
-					{
-						result.@link_type = "ethernet";
-					}
+					interfaceRefXml.@virtual_interface_id = current.id;
 				}
-				
-				result.appendChild(getInterfaceXml(left, leftInterfaceName, 0,
-					version));
-				result.appendChild(getInterfaceXml(right, rightInterfaceName, 1,
-					version));
+				result.appendChild(interfaceRefXml);
 			}
-			*/
+
 			return result;
 		}
 	}

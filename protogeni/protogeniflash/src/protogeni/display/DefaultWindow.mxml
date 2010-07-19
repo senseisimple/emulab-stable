@@ -10,6 +10,12 @@
 	<mx:Script>
 		<![CDATA[
 			import mx.managers.PopUpManager; 
+			
+			public function show():void
+			{
+				PopUpManager.addPopUp(this, Main.Pgmap(), false);
+				PopUpManager.centerPopUp(this);
+			}
 		]]>
 	</mx:Script>
 	

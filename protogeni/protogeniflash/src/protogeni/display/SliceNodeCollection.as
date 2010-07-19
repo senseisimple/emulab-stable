@@ -1,6 +1,7 @@
 package protogeni.display
 {
 	import mx.collections.ArrayCollection;
+	
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.VirtualNode;
 	
@@ -15,7 +16,7 @@ package protogeni.display
 		{
 			for each (var sn:SliceNode in this)
 			{
-				if(!sn.node.isVirtual && sn.node.physicalNode == node)
+				if(sn.node.physicalNode == node)
 					return true;
 			}
 			return false;
@@ -29,6 +30,16 @@ package protogeni.display
 					return true;
 			}
 			return false;
+		}
+		
+		public function getForPhysicalNode(node:PhysicalNode):SliceNode
+		{
+			for each (var sn:SliceNode in this)
+			{
+				if(sn.node.physicalNode == node)
+					return sn;
+			}
+			return null;
 		}
 		
 		public function seperateNodesByComponentManager():Array

@@ -44,7 +44,6 @@ package protogeni.communication
 			Main.protogeniHandler.CurrentUser.uuid = response.value.uuid;
 			Main.protogeniHandler.CurrentUser.email = response.value.email;
 			Main.protogeniHandler.CurrentUser.name = response.value.name;
-			Main.protogeniHandler.dispatchUserChanged();
 			
 			var sliceHrns:Array = response.value.slices;
 			if(sliceHrns != null && sliceHrns.length > 0) {
@@ -56,8 +55,9 @@ package protogeni.communication
 					newCalls.push(new RequestSliceResolve(userSlice));
 				}
 			}
-			else
-				Main.protogeniHandler.mapHandler.drawAll();
+			
+			Main.protogeniHandler.dispatchUserChanged();
+			Main.protogeniHandler.mapHandler.drawAll();
 		}
 		else
 		{

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:Canvas
 	xmlns:mx="http://www.adobe.com/2006/mxml"
-	width="124" height="22" borderStyle="solid" backgroundColor="#EAEAEA" borderThickness="2"
+	width="164" height="21" borderStyle="solid" backgroundColor="#EAEAEA" borderThickness="2"
 	mouseDown="mouseMoveHandler(event)"
 	xmlns:protogeniflash="protogeniflash.*" verticalScrollPolicy="off" horizontalScrollPolicy="off" xmlns:display="protogeni.display.*">
 	
@@ -37,12 +37,14 @@
 	
 	<mx:Script>
 		<![CDATA[
-			import protogeni.resources.VirtualNode;
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
 			import mx.core.DragSource;
+			import mx.core.mx_internal;
 			import mx.graphics.ImageSnapshot;
 			import mx.managers.DragManager;
+			
+			import protogeni.resources.VirtualNode;
 			
 			[Bindable]
 			public var node:VirtualNode;
@@ -55,13 +57,25 @@
 			public function setNode(n:VirtualNode):void
 			{
 				node = n;
-				toolTip += "Name: " + n.name + "\nURN: " + n.urn;
+				toolTip += "Name: " + n.id + "\nURN: " + n.urn;
 				links = new ArrayCollection();
 			}
 			
 			public function removeLink(l:SliceLink):void
 			{
 				links.removeItemAt(links.getItemIndex(l));
+			}
+			
+			public function showInfo(event:MouseEvent):void
+			{
+				event.stopImmediatePropagation();
+				DisplayUtil.viewVirtualNode(node);
+			}
+			
+			public function remove(event:MouseEvent):void
+			{
+				event.stopImmediatePropagation();
+				canvas.removeSliceNode(this)
 			}
 			
 			private  function mouseMoveHandler(event:MouseEvent):void{
@@ -93,9 +107,9 @@
 		]]>
 	</mx:Script>
 	
-	<mx:Label x="8" y="0" text="{node.name}" width="91.66667" height="18"/>
-	<mx:Label x="-1" text="E" width="10" fontSize="8" height="17" y="2" textAlign="center"/>
-	<display:ImageButton id="addLink" x="100" y="-2" width="22" height="22" source="@Embed('../images/bullet_add.png')" mouseDown="mouseDownHandler(event)"/>
-	<mx:VRule x="8" y="0" width="2" height="18"/>
+	<mx:Label id="nameLabel" text="{node.id}" height="18" verticalCenter="0" right="18" left="34" fontSize="9" />
+	<display:ImageButton id="addLink" width="16" height="16" source="@Embed('../images/add.png')" mouseDown="mouseDownHandler(event)" right="0" verticalCenter="-1"/>
+	<display:ImageButton id="infoButton" width="16" height="16" source="@Embed('../images/information.png')" mouseDown="showInfo(event)" verticalCenter="-1" x="17"/>
+	<display:ImageButton id="removeButton" height="16" source="@Embed('../images/cross.png')" mouseDown="remove(event)" verticalCenter="-1" left="0" width="16"/>
 	
 </mx:Canvas>

@@ -6,6 +6,7 @@ package protogeni.display
 	import flash.events.MouseEvent;
 	
 	import mx.core.UIComponent;
+	
 	import protogeni.resources.VirtualLink;
 	
 	public class SliceLink extends Sprite
@@ -41,6 +42,7 @@ package protogeni.display
 		
 		public function establish(start:SliceNode, end:SliceNode):Boolean
 		{
+			virtualLink = new VirtualLink(start.node.slivers[0]);
 			if(virtualLink.establish(start.node, end.node))
 			{
 				removeButton = new ImageButton();
@@ -48,18 +50,19 @@ package protogeni.display
 				removeButton.addEventListener(MouseEvent.CLICK, removeLink);
 				canvas.addChild(removeButton);
 				canvas.allLinks.addItem(this);
+				startNode = start;
+				endNode = end;
 				startNode.links.addItem(this);
 				endNode.links.addItem(this);
 				established = true;
-				startNode = start;
-				endNode = end;
 				return true;
 			} else {
+				virtualLink = null;
 				return false;
 			}
 		}
 		
-		public function removeLink(event:MouseEvent):void
+		public function removeLink(event:MouseEvent = null):void
 		{
 			virtualLink.remove();
 			startNode.removeLink(this);

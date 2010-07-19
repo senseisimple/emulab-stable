@@ -15,6 +15,7 @@
  package protogeni.resources
 {
 	import mx.collections.ArrayCollection;
+	
 	import protogeni.display.DisplayUtil;
 	
 	// Slice that a user created in ProtoGENI
@@ -76,7 +77,8 @@
 				if(s.componentManager == cm)
 					return s;
 			}
-			var newSliver:Sliver = new Sliver(this);
+			var newSliver:Sliver = new Sliver(this, cm);
+			slivers.addItem(newSliver);
 			return newSliver;
 		}
 		
@@ -130,6 +132,98 @@
 				return 0;
 			else
 				return 1;
+		}
+		
+		public function getUniqueVirtualLinkId(l:VirtualLink = null):String
+		{
+			var highest:int = 0;
+			for each(var s:Sliver in slivers)
+			{
+				for each(var l:VirtualLink in s.links)
+				{
+					try
+					{
+						if(l.id.substr(0,5) == "link-")
+						{
+							var testHighest:int = parseInt(l.id.substring(5));
+							if(testHighest >= highest)
+								highest = testHighest+1;
+						}
+					} catch(e:Error)
+					{
+						
+					}
+				}
+			}
+			return "link-" + highest;
+			/*
+			if(l == null)
+				return "link-" + highest;
+			else
+			{
+				if(l.isTunnel())
+					return "tunnel-" + highest;
+				else
+					return "link-" + highest;
+			}
+			*/
+		}
+		
+		public function getUniqueVirtualNodeId(n:VirtualNode = null):String
+		{
+			var highest:int = 0;
+			for each(var s:Sliver in slivers)
+			{
+				for each(var n:VirtualNode in s.nodes)
+				{
+					try
+					{
+						var testHighest:int = parseInt(n.id.substring(n.id.lastIndexOf("-")));
+						if(testHighest > highest)
+							highest = testHighest+1;
+					} catch(e:Error)
+					{
+						
+					}
+				}
+			}
+			if(n == null)
+				return "node-" + highest;
+			else
+			{
+				if(n.isShared)
+					return "shared-" + highest;
+				else
+					return "exclusive-" + highest;
+			}
+		}
+		
+		public function getUniqueVirtualInterfaceId():String
+		{
+			var highest:int = 0;
+			for each(var s:Sliver in slivers)
+			{
+				for each(var l:VirtualLink in s.links)
+				{
+					for each(var i:VirtualInterface in l.interfaces)
+					{
+						try
+						{
+							if(i.id.substr(0,10) == "interface-")
+							{
+								var testHighest:int = parseInt(i.id.substring(10));
+								if(testHighest >= highest)
+									highest = testHighest+1;
+							}
+						} catch(e:Error)
+						{
+							
+						}
+					}
+					
+				}
+			}
+			return "interface-" + highest;
 		}
 	}
 }

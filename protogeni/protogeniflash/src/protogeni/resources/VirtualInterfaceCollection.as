@@ -35,13 +35,18 @@
 		}
 		
 		public function Add(ni:VirtualInterface):void {
+			for each(var t:VirtualInterface in collection)
+			{
+				if(t.id == ni.id)
+					return;
+			}
 			collection.addItem(ni);
 		}
 		
 		public function Links():ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			for each(var ni:VirtualInterface in collection) {
-				for each(var l:VirtualLink in ni.links) {
+				for each(var l:VirtualLink in ni.virtualLinks) {
 					ac.addItem(l);
 				}
 			}

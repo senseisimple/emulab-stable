@@ -15,156 +15,42 @@
 package protogeni.communication
 {
   import flash.events.ErrorEvent;
+  
+  import protogeni.resources.Sliver;
 
-  class RequestSliverCreate extends Request
+  public class RequestSliverCreate extends Request
   {
-    public function RequestSliverCreate(newManager : ComponentManager,
-                                        newNodes : ActiveNodes,
-                                        newRspec : String,
-                                        newSliceUrn : String) : void
+    public function RequestSliverCreate(s:Sliver) : void
 
     {
-      super(newManager.getName());
-      manager = newManager;
-      nodes = newNodes;
-      rspec = newRspec;
-      sliceUrn = newSliceUrn;
+		super("SliverCreate", "Creating sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
+		sliver = s;
+		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("rspec", sliver.getRequestRspec().toXMLString());
+		op.addField("keys", sliver.slice.creator.keys);
+		op.addField("credentials", new Array(sliver.slice.credential));
+		op.setExactUrl(sliver.componentManager.Url);
     }
+	
+	override public function complete(code : Number, response : Object) : *
+	{
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			sliver.credential = response.sliver;
+			sliver.created = true;
 
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
+			var newSliver:String = response.manifest;
+			
+			Main.protogeniHandler.dispatchSliceChanged();
+		}
+		else
+		{
+			// do nothing
+		}
+		
+		return null;
+	}
 
-    override public function start(credential : Credential) : Operation
-    {
-/*
-      if (manager.getTicket() == null)
-      {
-        nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.CREATED);
-        opName = "Getting Ticket";
-        op.reset(Geni.getTicket);
-        op.addField("slice_urn", sliceUrn);
-        op.addField("credentials", new Array(credential.slice));
-        op.addField("rspec", rspec);
-        //? op.addField("impotent", Request.IMPOTENT);
-        op.setUrl(manager.getUrl());
-      }
-      else
-      {
-        opName = "Redeeming Ticket";
-        op.reset(Geni.redeemTicket);
-        op.addField("slice_urn", sliceUrn);
-        op.addField("credentials", new Array(credential.slice));
-        op.addField("ticket", manager.getTicket());
-        //? op.addField("impotent", Request.IMPOTENT);
-        op.addField("keys", credential.ssh);
-        op.setUrl(manager.getUrl());
-      }
-*/
-      nodes.changeState(manager, ActiveNodes.PLANNED, ActiveNodes.BOOTED);
-      opName = "Creating Sliver";
-      op.reset(Geni.createSliver);
-      op.addField("slice_urn", sliceUrn);
-      op.addField("rspec", rspec);
-      op.addField("keys", credential.ssh);
-      op.addField("credentials", new Array(credential.slice));
-      op.setUrl(manager.getUrl());
-      return op;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      var result : Request = null;
-/*
-      if (code == 0)
-      {
-        if (manager.getTicket() == null)
-        {
-          var ticket : String = response.value;
-          manager.setTicket(ticket);
-//          setSliverIds(ticket);
-          result = new RequestSliverCreate(manager, nodes, rspec, sliceUrn);
-        }
-        else
-        {
-          if (manager.getVersion() == 0)
-          {
-            manager.setSliver(response.value);
-            setSliverIds(response.value);
-          }
-          else
-          {
-            manager.setSliver(response.value[0]);
-            manager.setManifest(response.value[1]);
-          }
-
-          if (! nodes.hasTunnels(manager))
-          {
-            nodes.commitState(manager);
-          }
-          else
-          {
-            var newRspec = nodes.getXml(true, manager);
-            result = new RequestSliverUpdate(manager, nodes, newRspec,
-                                             true, sliceUrn);
-          }
-        }
-      }
-      else
-      {
-        result = releaseTicket();
-        nodes.revertState(manager);
-      }
-*/
-      if (code == 0)
-      {
-        manager.setSliver(response.value[0]);
-        manager.setManifest(response.value[1]);
-        nodes.commitState(manager);
-      }
-      else
-      {
-        nodes.revertState(manager);
-      }
-      return result;
-    }
-
-    override public function fail(event : ErrorEvent) : Request
-    {
-      var result : Request = releaseTicket();
-      nodes.revertState(manager);
-      return result;
-    }
-
-    function releaseTicket() : Request
-    {
-      var result : Request = null;
-      if (manager.getTicket() != null)
-      {
-        result = new RequestReleaseTicket(manager, sliceUrn);
-      }
-      return result;
-    }
-
-    function setSliverIds(signedCredStr : String) : void
-    {
-      var signedCred : XML = XML(signedCredStr);
-      for each (var node in signedCred.descendants("node"))
-      {
-        var name : String = node.elements("nickname");
-        var sliverId : String = node.elements("sliver_uuid");
-        if (name != "" && sliverId != "")
-        {
-          nodes.setSliverId(manager, name, sliverId);
-        }
-      }
-    }
-
-    var manager : ComponentManager;
-    var nodes : ActiveNodes;
-    var rspec : String;
-    var sliceUrn : String;
+    public var sliver:Sliver;
   }
 }

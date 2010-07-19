@@ -24,6 +24,7 @@ package protogeni.communication
     {
       op = new Operation(qualifiedMethod);
       name = newName;
+	  details = newDetails;
 	  continueOnError = shouldContinueOnErrors;
 	  waitOnComplete = shouldWaitOnComplete;
     }
@@ -32,6 +33,11 @@ package protogeni.communication
     {
       op.cleanup();
     }
+	
+	public function cancel():void
+	{
+		cleanup();
+	}
 
     public function getSendXml() : String
     {
@@ -64,7 +70,9 @@ package protogeni.communication
     }
 
 	public var op:Operation;
+	[Bindable]
 	public var name:String;
+	[Bindable]
 	public var details:String;
 	public var waitOnComplete:Boolean;
 	public var continueOnError:Boolean;

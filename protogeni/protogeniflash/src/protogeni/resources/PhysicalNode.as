@@ -49,6 +49,8 @@
 		public var subNodes : ArrayCollection = new ArrayCollection();
 		public var virtualNodes : ArrayCollection = new ArrayCollection();
 		
+		public var diskImages:ArrayCollection = new ArrayCollection();
+		
 		[Bindable]
 		public var types:ArrayCollection = new ArrayCollection();
 		

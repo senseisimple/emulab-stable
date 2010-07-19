@@ -81,6 +81,8 @@ package com.mattism.http.xmlrpc
 //    this._response.removeEventListener(ProgressEvent.PROGRESS, progress);
       this._response.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
                                          securityError);
+	  this._response.removeEventListener(IOErrorEvent.NETWORK_ERROR, networkError);
+	  
                 if(observeTimer != null)
                 {
                         observeTimer.stop();
@@ -112,7 +114,20 @@ package com.mattism.http.xmlrpc
         request.method = URLRequestMethod.POST;
         request.url = this.getUrl();
 
-        this._response.load(request);
+		try {
+			this._response.load(request);
+		}
+		catch (error:ArgumentError)
+		{
+			dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "Argument error on load"));
+			trace("An ArgumentError has occurred.");
+		}
+		catch (error:SecurityError)
+		{
+			dispatchEvent(new SecurityErrorEvent(SecurityErrorEvent.SECURITY_ERROR, false, false, "Security error on load"));
+			trace("A SecurityError has occurred.");
+		}
+
         observeTimeout(60);
       }
     }
@@ -146,7 +161,7 @@ package com.mattism.http.xmlrpc
 		  if (this._response.bytesLoaded == 0)
 		  {
 			  trace("XMLRPC Fault: No data");
-			  dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
+			  dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "No data"));
 		  }
 		  else if (responseXML.fault.length() > 0)
 	      {
@@ -188,6 +203,12 @@ package com.mattism.http.xmlrpc
       _fault = null;
       dispatchEvent(event);
     }
+	
+	protected function networkError(event:IOErrorEvent) : void
+	{
+		_fault = null;
+		dispatchEvent(event);
+	}
 
     private function parseResponse(xml:XML):Object
     {
