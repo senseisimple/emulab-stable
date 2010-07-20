@@ -8,6 +8,7 @@
  * This is shared code between imagedump and imageunzip. It is used to
  * verify that the checksum is correct.
  */
+#include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
