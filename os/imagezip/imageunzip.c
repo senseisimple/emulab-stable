@@ -563,7 +563,7 @@ main(int argc, char *argv[])
 #ifdef NOTHREADS
 	nothreads = 1;
 #endif
-	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:Nck:")) != -1)
+	while ((ch = getopt(argc, argv, "vdhs:zp:oOnFD:W:Cr:Nck:u:")) != -1)
 		switch(ch) {
 #ifdef FAKEFRISBEE
 		case 'F':
@@ -640,6 +640,12 @@ main(int argc, char *argv[])
 			}
 			break;
 #endif
+		case 'u':
+			/* UUID for image id. */
+			if (!hexstr_to_mem(imageid, optarg, UUID_LENGTH))
+				usage();
+			has_id = 1;
+			break;
 
 		case 'h':
 		case '?':
@@ -887,9 +893,13 @@ main(int argc, char *argv[])
  * When compiled for frisbee, act as a library.
  */
 int
-ImageUnzipInitKeys(char *sig_keyfile, char *enc_keyfile)
+ImageUnzipInitKeys(char *uuid, char *sig_keyfile, char *enc_keyfile)
 {
 #ifdef WITH_CRYPTO
+	if (uuid) {
+		memcpy(imageid, uuid, UUID_LENGTH);
+		has_id = 1;
+	}
 	if (sig_keyfile) {
 		if (!init_checksum(sig_keyfile))
 			exit(1);
@@ -1258,7 +1268,12 @@ inflate_subblock(const char *chunkbufp)
 #ifdef WITH_CRYPTO
 		if (do_checksum) {
 			fprintf(stderr,
-				"-c specified but image is unsigned\n");
+				"signature checking requested but image is wrong format\n");
+			exit(1);
+		}
+		if (do_decrypt) {
+			fprintf(stderr,
+				"decryption requested but image is wrong format\n");
 			exit(1);
 		}
 #endif
@@ -1278,7 +1293,12 @@ inflate_subblock(const char *chunkbufp)
 #ifdef WITH_CRYPTO
 		if (do_checksum) {
 			fprintf(stderr,
-				"-c specified but image is unsigned\n");
+				"signature checking requested but image is wrong format\n");
+			exit(1);
+		}
+		if (do_decrypt) {
+			fprintf(stderr,
+				"decryption requested but image is wrong format\n");
 			exit(1);
 		}
 #endif
@@ -1305,8 +1325,10 @@ inflate_subblock(const char *chunkbufp)
 		/*
 		 * Track the current image UUID.
 		 *
-		 * If this is the first chunk received, remember its UUID.
-		 * All other chunks must match this UUID.
+		 * If a UUID was specified on the command line, use that as
+		 * the expected UUID.  Otherwise, if this is the first chunk
+		 * received, remember its UUID.  All other chunks must match
+		 * this UUID.
 		 */
 		if (has_id == 0) {
 			has_id = 1;

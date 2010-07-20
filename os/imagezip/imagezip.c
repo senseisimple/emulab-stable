@@ -77,6 +77,7 @@ int	do_signature = 0;
 char	*sighasharg = NULL;
 off_t	datawritten;
 partmap_t ignore, forceraw;
+static	int got_imageid;
 static unsigned char imageid[UUID_LENGTH];
 
 #ifdef WITH_SHD
@@ -545,6 +546,7 @@ main(int argc, char *argv[])
 			/* UUID for image id. */
 			if (!hexstr_to_mem(imageid, optarg, UUID_LENGTH))
 				usage();
+			got_imageid++;
 			break;
 		case 'h':
 		case '?':
@@ -604,14 +606,25 @@ main(int argc, char *argv[])
 	}
 
 #ifdef WITH_CRYPTO
+#if 0
+	if (!RAND_load_file("/dev/urandom", 1024))
+		fprintf(stderr, "Error getting random seed\n");
+#endif
+	if (!got_imageid) {
+		char uuidstr[UUID_LENGTH*2+1];
+
+		if (!RAND_bytes(imageid, sizeof(imageid))) {
+			fprintf(stderr,"Unable to generate random imageid\n");
+			exit(1);
+		}
+		mem_to_hexstr(uuidstr, imageid, UUID_LENGTH);
+		fprintf(stderr, "UUID: %s\n", uuidstr);
+		got_imageid++;
+	}
 	if (do_signature) {
 		sig_key = RSA_generate_key(CSUM_MAX_LEN*8, 17, NULL, NULL);
 		if (!info)
 			output_public_key(outfilename, sig_key);
-#if 0
-		if (!RAND_load_file("/dev/urandom", 1024))
-			fprintf(stderr, "Error getting random seed\n");
-#endif
 	}
 #endif
 
@@ -2492,6 +2505,10 @@ output_public_key(char *imagename, RSA *key)
 	}
 
 	file = fopen(fname, "w");
+	if (file == NULL) {
+		fprintf(stderr, "Cannot create keyfile %s\n", fname);
+		exit(1);
+	}
 	BN_print_fp(file, key->n);
 	fprintf(file, "\n");
 	BN_print_fp(file, key->e);
