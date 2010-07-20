@@ -662,7 +662,7 @@ sub TBScriptLock($;$$)
     my ($token, $global, $waittime) = @_;
     local *LOCK;
 
-    $waittime = 30
+    $waittime = 120
 	if (!defined($waittime));
     $global = 0
 	if (!defined($global));
