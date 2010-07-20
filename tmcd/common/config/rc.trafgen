@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -46,7 +46,7 @@ use librc;
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || (REMOTE() && !REMOTEDED()));
+    if (MFS() || (REMOTE() && !(REMOTEDED() || FAKEJAILED() || JAILED())));
 
 # Now safe to do this since MFS does not have full perl install.
 require Socket;
@@ -161,8 +161,27 @@ sub doboot()
     $SIG{INT}  = \&Pcleanup;
     $SIG{HUP}  = \&Pcleanup;
     
+    my $evserver = getlocalevserver();
+    my $evport   = "";
+
+    if (SHADOW()) {
+	my $boss = $ENV{'BOSSNAME'};
+	if (!defined($boss)) {
+	    fatal("BOSSNAME is not set in the environment");
+	}
+	my ($domain) = ($boss =~ /^[^\.]+\.(.*)$/);
+	$evserver = "event-server.${domain}";
+
+	#
+	# See if we need to connect to the compatability gateway.
+	# Version 0, no elvin compat.
+	#
+	if (exists($ENV{'V0_COMPAT'})) {
+	    $evport = "-p " . $ENV{'V0_COMPAT'};
+	}
+    }
     # We connect to the local elvind and talk to the master via the proxy.
-    my $cmdline = "$BINDIR/trafgen -s " . getlocalevserver();
+    my $cmdline = "$BINDIR/trafgen -s $evserver $evport";
     if ($pid) {
 	$cmdline .= " -E $pid/$eid -k " . TMEVENTKEY();
     }

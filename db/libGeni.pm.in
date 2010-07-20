@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $TBDOCBASE   = "@TBDOCBASE@";
+my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 
 my $ASSIGN	= "$TB/libexec/assign";
 
@@ -235,17 +236,27 @@ sub MapResources($$$$)
 
 	foreach my $ref (@{ $solution->{'node'} }) {
 	    my $virtual_id = $ref->{'virtual_id'};
-	    my $node_uuid  = $ref->{'component_uuid'};
+	    my $node_urn   = $ref->{'component_uuid'};
 	    my $cm_urn     = $ref->{'component_manager_uuid'};
 	    my $noderef    = $nodemap{$virtual_id};
 
 	    #
 	    # This writes the solution back into the original rspec. 
 	    #
-	    $noderef->{'component_uuid'} = $node_uuid;
-	    $noderef->{'component_urn'}  = $node_uuid;
+	    $noderef->{'component_uuid'} = $node_urn;
+	    $noderef->{'component_urn'}  = $node_urn;
 	    $noderef->{'component_manager_uuid'} = $cm_urn;
 
+	    if (exists($noderef->{'disk_image'})) {
+		my $osid = $noderef->{'disk_image'}->{'name'};
+		my ($auth,$type,$id) = GeniHRN::Parse($node_urn);
+
+		my $urn = GeniHRN::Generate($auth, "image", "emulab-ops");
+		$urn .= "//" . $osid;
+		
+		$noderef->{'disk_image'}->{'name'} = $urn;
+	    }
+	    
 	    if (exists($ref->{'interface'})) {
 		my $interfaces = $ref->{'interface'};
 
@@ -557,6 +568,8 @@ sub MapNodes($$)
 		"-s $BOSSNODE -k $eventkey,$keyhash -u '$sliver_urn'";
 	    $cmd .= " -j " . $node->node_id()
 		if ($node->isvirtnode());
+	    $cmd .= " -e 16509"
+		if ($ELVIN_COMPAT);
 
 	    GeniXML::SetText("startup_command", $ref, "$cmd boot");
 

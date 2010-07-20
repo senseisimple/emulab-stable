@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,7 +12,7 @@ SUBDIR		= event/proxy
 SYSTEM	       := $(shell uname -s)
 PROGRAMS	= evproxy proxytest eventping evproxyplab
 ifneq ($(SYSTEM),Linux)
-PROGRAMS       += 
+PROGRAMS       += version0_gateway
 endif
 
 include $(OBJDIR)/Makeconf
@@ -87,10 +87,18 @@ evproxyplab.o: evproxyplab.cc
 evproxyplab-debug:    evproxyplab.o ../lib/libevent.a ../lib/event.h
 	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
 
+version0_gateway:    version0_gateway.c
+	$(CC) $(CFLAGS) $(PLDFLAGS) -pthread -o $@ $< -L/usr/local/lib \
+		-lpubsub_r -lm
+
 eventping-debug: eventping.o
 	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
+
+control-install:	$(INSTALL_SBINDIR)/version0_gateway
+
+install:		$(INSTALL_DIR)/opsdir/sbin/version0_gateway
 
 client: evproxy$(EXE) evproxyplab$(EXE)
 client-install: client
@@ -99,3 +107,8 @@ client-install: client
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS) *-debug
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@

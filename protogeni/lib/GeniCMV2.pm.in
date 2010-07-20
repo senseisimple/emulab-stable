@@ -677,7 +677,8 @@ sub SliverAction($$$$$)
 	my ($object, $action) = @_;
 
 	if ($action eq "start") {
-	    if ($object->state() ne "stopped" && $object->state() ne "mixed") {
+	    if ($object->state() ne "stopped" && $object->state() ne "new"
+		&& $object->state() ne "mixed") {
 		return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 					    "Sliver is not stopped (yet)");
 	    }

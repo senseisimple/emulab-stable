@@ -506,6 +506,15 @@ sub ConvertRspec($)
 		    if (exists($ifaceref->{$key}));
 	    }
 	}
+	if (exists($ref->{'disk_image'})) {
+	    my $osref = $ref->{'disk_image'};
+	    my $os    = GeniXML::AddElement("disk_image", $node);
+
+	    foreach my $key ('name') {
+		GeniXML::SetText($key, $os, $osref->{$key})
+		    if (exists($osref->{$key}));
+	    }
+	}
     }
     if (exists($rspec->{'link'})) {
 	foreach my $linkref (@{ $rspec->{'link'} }) {
@@ -1617,12 +1626,13 @@ sub Discover($$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
+    my $manager_version = $self->ManagerVersion();
+
     my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
 
     #
     # Create a Geni user from current user doing the operation.

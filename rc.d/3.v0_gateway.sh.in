@@ -1,0 +1,29 @@
+#! /bin/sh
+#
+# PROVIDE: version0_gateway
+# REQUIRE: pubsub
+#
+port="16509"
+pubsubd_pidfile="/var/run/pubsubd_v0.pid"
+pubsubd_logfile="@prefix@/log/pubsubd_v0.log"
+pubsubd_flags="-T 10 -p $port -e $pubsubd_pidfile -l $pubsubd_logfile"
+
+case $1 in
+    start|faststart)
+	if [ -x /usr/local/libexec/pubsubd ]; then
+	    /usr/local/libexec/pubsubd $pubsubd_flags
+	fi
+        if [ -x @prefix@/sbin/version0_gateway  ]; then
+	    echo -n " v0_gateway"
+	    @prefix@/sbin/version0_gateway -p $port
+	fi
+	;;
+    stop)
+        if [ -r /var/run/version0_gateway.pid ]; then
+	    kill `cat /var/run/version0_gateway.pid`
+	fi
+        if [ -r $pubsubd_pidfile ]; then
+	    kill `cat $pubsubd_pidfile`
+	fi
+	;;
+esac

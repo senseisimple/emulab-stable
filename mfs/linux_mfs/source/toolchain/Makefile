@@ -30,6 +30,7 @@ $(BUILDROOT_PATH)/.patch-stamp: $(BUILDROOT_PATH)/.extract-stamp
 	$(SCRIPTS_PATH)/patch-kernel.sh $(BUILDROOT_PATH) $(SOURCE_PATH)/buildroot '*.patch'
 	cp $(SOURCE_PATH)/toolchain/linux*.patch $(BUILDROOT_PATH)/toolchain/kernel-headers
 	cp $(SOURCE_PATH)/toolchain/uClibc*.patch $(BUILDROOT_PATH)/toolchain/uClibc
+	cp $(SOURCE_PATH)/toolchain/uClibc*.config $(BUILDROOT_PATH)/toolchain/uClibc
 	touch $@
 
 $(BUILDROOT_PATH)/.config-stamp: $(BUILDROOT_PATH)/.patch-stamp

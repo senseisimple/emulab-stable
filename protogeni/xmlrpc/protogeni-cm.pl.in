@@ -44,6 +44,7 @@ use GeniCMV2;
 use Genixmlrpc;
 use GeniResponse;
 use libaudit;
+use emutil;
 
 # Geniuser.
 my $user  = "geniuser";
@@ -92,6 +93,13 @@ sub XMLError($$)
     print "Content-Type: text/xml \n\n";
     print $decoder->encode_fault($code, $string);
     exit(0);
+}
+
+#
+# Check for NoLogins; return XMLRPC
+#
+if (NoLogins()) {
+    XMLError(503, "CM temporarily offline; please try again later");
 }
 
 #
