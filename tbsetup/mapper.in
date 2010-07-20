@@ -50,7 +50,7 @@ sub usage ()
 		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:";
+my $optlist    = "dvunfprqczxm:ko:a";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
@@ -58,6 +58,7 @@ my $updating   = 0;
 my $impotent   = 0;
 my $precheck   = 0;
 my $prepass    = 0;
+my $alloconly  = 0;
 my $outfile;
 my $mfactor;
 my $regression = 0;
@@ -134,6 +135,9 @@ if (@ARGV < 2) {
 if (defined($options{"v"})) {
     TBDebugTimeStampsOn();
     $verbose++;
+}
+if (defined($options{"a"})) {
+    $alloconly++;
 }
 if (defined($options{"d"})) {
     $debug++;
@@ -215,6 +219,8 @@ $vtopflags |= $libvtop::VTOP_FLAGS_FIXNODES
     if ($fixmode || $usecurrent);
 $vtopflags |= $libvtop::VTOP_FLAGS_IMPOTENT
     if ($impotent);
+$vtopflags |= $libvtop::VTOP_FLAGS_ALLOCONLY
+    if ($alloconly);
 $vtopflags |= $libvtop::VTOP_FLAGS_REGRESSION
     if ($regression);
 
@@ -387,7 +393,7 @@ sub AssignLoop()
 	$currentrun++;
     }
     GatherAssignStats($pid, $eid, %{ $vtop->exptstats() })
-	if (!$impotent);
+	if (! ($impotent || $alloconly));
     TBDebugTimeStamp("mapper loop finished");
     return 0;
 }
@@ -487,7 +493,7 @@ sub RunAssign($$)
     }
     close(VTOPFILE);
 
-    if (! ($impotent || $regression)) {
+    if (! ($impotent || $regression || $alloconly)) {
 	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
 				 "minimum_nodes" => $vtop->minimum_nodes(),
 				 "virtnode_count"=> $vtop->virtnodecount() })){
@@ -653,7 +659,7 @@ sub RunAssign($$)
 	return -1;
     }
     TBDebugTimeStamp("InitializePhysNodes ended");
-    if (! ($impotent || $regression)) {
+    if (! ($impotent || $regression || $alloconly)) {
 	TBDebugTimeStamp("ReserveSharedBandwidth started");
 	if ($experiment->ReserveSharedBandwidth($updating) != 0) {
 	    print("Could not reserve shared bandwidth\n");

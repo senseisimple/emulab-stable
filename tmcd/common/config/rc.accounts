@@ -13,9 +13,10 @@ sub usage()
 	scriptname() . " [-j vnodeid] [-n] boot|shutdown|reconfig|reset\n";
     exit(1);
 }
-my $optlist = "j:n";
+my $optlist = "j:nM";
 my $action  = "boot";
 my $doit = 1;
+my $updatemasterpasswdfiles = 0;
 
 # Turn off line buffering on output
 $| = 1;
@@ -61,6 +62,9 @@ if (defined($options{'j'})) {
 }
 if (defined($options{'n'})) {
     $doit = 0;
+}
+if (defined($options{'M'})) {
+    $updatemasterpasswdfiles = 1;
 }
 if (@ARGV) {
     $action = $ARGV[0];
@@ -651,7 +655,7 @@ sub docleanup()
 
     # Hand this off to liblocsetup to restore default passwd/group files.
     if ($doit) {
-	$retval = os_account_cleanup();
+	$retval = os_account_cleanup($updatemasterpasswdfiles);
     }
 
     my $pdb = $PASSDB . ".db";

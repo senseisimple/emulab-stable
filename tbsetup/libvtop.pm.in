@@ -10,7 +10,7 @@ use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT @EXPORT_OK
 	    $VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_QUIET
-	    $VTOP_FLAGS_FIXNODES $VTOP_FLAGS_IMPOTENT
+	    $VTOP_FLAGS_FIXNODES $VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_ALLOCONLY
 	    $VTOP_FLAGS_REGRESSION);
 
 @ISA    = "Exporter";
@@ -55,9 +55,11 @@ $VTOP_FLAGS_FIXNODES	= 0x04;
 $VTOP_FLAGS_IMPOTENT	= 0x08;
 $VTOP_FLAGS_REGRESSION  = 0x10;
 $VTOP_FLAGS_QUIET       = 0x20;
+$VTOP_FLAGS_ALLOCONLY	= 0x40;
 
 @EXPORT_OK = qw($VTOP_FLAGS_UPDATE $VTOP_FLAGS_VERBOSE $VTOP_FLAGS_FIXNODES
-		$VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_REGRESSION $VTOP_FLAGS_QUIET);
+		$VTOP_FLAGS_IMPOTENT $VTOP_FLAGS_REGRESSION $VTOP_FLAGS_QUIET
+		$VTOP_FLAGS_ALLOCONLY);
 
 #
 # Create an object representing the stuff we need to create the vtop file.
@@ -172,6 +174,7 @@ sub quiet($)		{ return $_[0]->flags() & $VTOP_FLAGS_QUIET; }
 sub updating($)		{ return $_[0]->flags() & $VTOP_FLAGS_UPDATE; }
 sub fixcurrent($)	{ return $_[0]->flags() & $VTOP_FLAGS_FIXNODES; }
 sub impotent($)		{ return $_[0]->flags() & $VTOP_FLAGS_IMPOTENT; }
+sub alloconly($)	{ return $_[0]->flags() & $VTOP_FLAGS_ALLOCONLY; }
 sub regression($)	{ return $_[0]->flags() & $VTOP_FLAGS_REGRESSION; }
 sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); }
 
@@ -1245,6 +1248,24 @@ sub GenVirtNodes($)
 	    else {
 		$ref->{'virtualization_type'} = 'raw';
 		$ref->{'exclusive'} = 1;
+
+		if (defined($vnode->_osinfo())) {
+		    my $osname = $vnode->_osinfo()->osname();
+
+		    #
+		    # If this is the default image, then do not put
+		    # this in; let the other side do what it wants.
+		    #
+		    my $default_osinfo =
+			OSinfo->Lookup($vnode->_typeinfo()->default_osid());
+		    if (!defined($default_osinfo)) {
+			tberror("Could not find default osinfo for $vnode\n");
+			return -1;
+		    }
+		    if ($osname ne $default_osinfo->osname()) {
+			$ref->{'disk_image'} = {"name" => $osname};
+		    }
+		}
 	    }
 
 	    if (@ifaces) {
@@ -3648,7 +3669,7 @@ sub AllocNodes($)
 	if (exists($self->solution()->{'TORESERVE'}->{$nodeid})) {
 	    $self->newreserved()->{$nodeid} = $nodeid;
 	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY())
-		if (!$self->impotent());
+		if (!($self->impotent() || $self->alloconly()));
 
 	    #
 	    # Fix all of the nodes assigned to the pnode.
@@ -3759,7 +3780,7 @@ sub AllocNodes($)
 	    # Mark it for teardown by the caller (tbswap currently).
 	    #
 	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_TEARDOWN())
-		if (!$self->impotent());
+		if (!($self->impotent() || $self->alloconly()));
 	}
 	elsif ($pnode->_reuse() eq "reboot") {
 	    #
@@ -3767,7 +3788,7 @@ sub AllocNodes($)
 	    # it should be rebooted.
 	    #
 	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY())
-		if (!$self->impotent());
+		if (!($self->impotent() || $self->alloconly()));
 	}
     }
   skip:
@@ -3775,7 +3796,8 @@ sub AllocNodes($)
     # Allocate Geni nodes (get tickets). Eventually we want to retry
     # the assignment and replace tickets that we could not get. 
     #
-    if (defined($self->rspec()) && !$self->impotent()) {
+    if (defined($self->rspec()) &&
+	!($self->impotent() || $self->alloconly())) {
 	$self->printdb("Requesting geni tickets ...\n");
 	
 	if (libGeni::GetTickets($self->experiment(), $self->verbose(),
@@ -3790,7 +3812,7 @@ sub AllocNodes($)
 	tberror("Could not allocate virtual nodes\n");
 	return -1;
     }
-    if (!$self->impotent()) {
+    if (! ($self->impotent() || $self->alloconly())) {
 	#
 	# Redeem the tickets. If this fails, we are going to be
 	# really hosed.
@@ -3905,7 +3927,7 @@ sub AllocNodes($)
 
 	    DBQueryWarn("update nodes set sshdport=$sshdport ".
 			"where node_id='$vpnodename'")
-		or return -1 if (!$self->impotent());
+		or return -1 if (! ($self->impotent() || $self->alloconly()));
 	}
     }
 
@@ -3924,7 +3946,7 @@ sub AllocNodes($)
 
 	$self->printdb("Setting $virt_trafgen port to $ipport\n");
 
-	if (!$self->impotent()) {
+	if (! ($self->impotent() || $self->alloconly())) {
 	    DBQueryWarn("update virt_trafgens set port=$ipport ".
 			"where exptidx='$idx' and ".
 			"      vnode='$vnodename' and vname='$trafname'")
@@ -3956,7 +3978,7 @@ sub AllocNodes($)
 	DBQueryWarn("insert into v2pmap set ".
 		    "  pid='$pid', eid='$eid', exptidx='$idx', ".
 		    "  vname='$vnodename', node_id='$pnodename'")
-	    or return -1 if (!$self->impotent());
+	    or return -1 if (!($self->impotent() || $self->alloconly()));
     }
     
     return 0;
@@ -4077,7 +4099,8 @@ sub AllocVirtNodes($)
 					"nodeid"   => $physical,
 					"debug"    => 0,
 					"verbose"  => $self->verbose(),
-					"impotent" => $self->impotent(),
+					"impotent" => $self->impotent() ||
+					    $self->alloconly(),
 					"sharedokay" => $sharedokay,
 					"regression" => $self->regression()})
 		    < 0) {
@@ -4126,7 +4149,7 @@ sub AllocVirtNodes($)
 		# for. Okay for now since it is never the case that it
 		# should fail!
 		#
-		if ($self->impotent()) {
+		if ($self->impotent() || $self->alloconly()) {
 		    tbinfo("Selected for $physical: @plist\n");
 		    tbinfo("Skipping physical reservation, as directed.\n");
 		}
@@ -4167,7 +4190,7 @@ sub AllocVirtNodes($)
 	    # state they were in so that os_setup/vnode_setup know they
 	    # need to reboot them.
 	    #
-	    if (!$self->impotent()) {
+	    if (!($self->impotent() || $self->alloconly())) {
 		if (!exists($self->current_v2v()->{$virtual})) {
 		    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_CLEAN());
 		}
@@ -4188,7 +4211,7 @@ sub AllocVirtNodes($)
 		my $pnode = $self->pnodes()->{$pname};
 
 		$pnode->SetAllocState(TBDB_ALLOCSTATE_RES_TEARDOWN())
-		    if (!$self->impotent());
+		    if (!($self->impotent() || $self->alloconly()));
 	    }		
 	}
     }
@@ -4267,14 +4290,17 @@ sub InterpLinks($)
 			   "$nodeD:$portD,$nodeC:$portC\n");
 
 	    my $protolan    = ProtoLan->Create($experiment, "$lan",
-					       $self->impotent());
+					       $self->impotent() ||
+					       $self->alloconly());
 	    my $protolansrc = ProtoLan->Create($experiment,
 					       "$lan" . "-delaysrc",
-					       $self->impotent(),
+					       $self->impotent() ||
+					       $self->alloconly(),
 					       $protolan);
 	    my $protolandst = ProtoLan->Create($experiment,
 					       "$lan" . "-delaydst",
-					       $self->impotent(),
+					       $self->impotent() ||
+					       $self->alloconly(),
 					       $protolan);
 	    $protolansrc->SetType("vlan");
 	    $protolandst->SetType("vlan");
@@ -4329,7 +4355,8 @@ sub InterpLinks($)
 	    my $protolan = ProtoLan->Lookup($experiment, $lan);
 	    if (!defined($protolan)) {
 		$protolan = ProtoLan->Create($experiment, "$lan",
-					     $self->impotent());
+					     $self->impotent() ||
+					     $self->alloconly());
 		$protolan->SetRole("link/lan");
 	    }
 	    $protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -4339,7 +4366,8 @@ sub InterpLinks($)
 	    if (!defined($protolanlan)) {
 		$protolanlan = ProtoLan->Create($experiment,
 						$lan . "-delaylan",
-						$self->impotent(),
+						$self->impotent() ||
+						$self->alloconly(),
 						$protolan);
 		$protolanlan->SetType("vlan");
 		$protolanlan->SetRole("delay");
@@ -4397,7 +4425,8 @@ sub InterpLinks($)
 		    # two nodes.
 		    #
 		    $protolink = ProtoLan->Create($experiment, $lan,
-						  $self->impotent());
+						  $self->impotent() ||
+						  $self->alloconly());
 		    $protolink->SetType("wire");
 		    $protolink->SetRole("link");
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -4426,7 +4455,8 @@ sub InterpLinks($)
 			my $lanid = "v" . "$lan" . $vlanid++;
 
 			$protovlan = ProtoLan->Create($experiment, $lanid,
-						      $self->impotent());
+						      $self->impotent() ||
+						      $self->alloconly());
 			$protovlan->SetRole("encapsulation");
 			$protovlan->SetType("vlan");
 			$protovlan->SetEncapStyle($virtlan->_encapstyle());
@@ -4468,14 +4498,14 @@ sub InterpLinks($)
 			}
 
 			if ($virtnodeA->_onsharednode() &&
-			    !$self->impotent() && 
+			    !($self->impotent() || $self->alloconly()) && 
 			    $virtifaceA->ReserveSharedBandwidth($bandwidth)) {
 			    tbinfo("Could not reserve shared bandwidth: ".
 				   "$member0,$bandwidth,$virtifaceA\n");
 			    return -1;
 			}
 			if ($virtnodeB->_onsharednode() &&
-			    !$self->impotent() && 
+			    !($self->impotent() || $self->alloconly()) && 
 			    $virtifaceB->ReserveSharedBandwidth($rbandwidth)) {
 			    tbinfo("Could not reserve shared bandwidth: ".
 				   "$member1,$rbandwidth,$virtifaceB\n");
@@ -4486,7 +4516,8 @@ sub InterpLinks($)
 		    $portB = $virtifaceB->viface();
 
 		    $protolink = ProtoLan->Create($experiment, $lan,
-						  $self->impotent(),
+						  $self->impotent() ||
+						  $self->alloconly(),
 						  $protovlan);
 		    $protolink->SetType((defined($protovlan) ?
 					"emulated" : "emulated-shared"));
@@ -4496,7 +4527,8 @@ sub InterpLinks($)
 		}
 		else {
 		    $protolink = ProtoLan->Create($experiment, $lan,
-						  $self->impotent());
+						  $self->impotent() ||
+						  $self->alloconly());
 		    $protolink->SetType("vlan");
 		    $protolink->SetRole("link/lan");
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -4529,7 +4561,8 @@ sub InterpLinks($)
 				   "$nodeA:$portA,$nodeB:$portB\n");
 		    
 		    $protolink = ProtoLan->Create($experiment, $lan,
-						  $self->impotent());
+						  $self->impotent(),
+						  $self->alloconly());
 		    $protolink->SetType("trivial");
 		    $protolink->SetRole("link/lan");
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -4595,7 +4628,8 @@ sub InterpLinks($)
 			else {
 			    my $lanid = "v" . "$lan" . $vlanid++;
 			    $protovlan = ProtoLan->Create($experiment, $lanid,
-							  $self->impotent());
+							  $self->impotent() ||
+							  $self->alloconly());
 			    $protovlan->SetRole("encapsulation");
 			    $protovlan->SetType("vlan");
 			    $protovlan->SetEncapStyle($virtlan->_encapstyle());
@@ -4630,7 +4664,7 @@ sub InterpLinks($)
 			}
 			my $maxbw = max($bandwidth, $rbandwidth);
 			if ($virtnodeA->_onsharednode() &&
-			    !$self->impotent() && 
+			    !($self->impotent() || $self->alloconly) && 
 			    $virtiface->ReserveSharedBandwidth($maxbw)) {
 			    tbinfo("Could not reserve shared bandwidth: ".
 				   "$member0,$maxbw,$virtiface\n");
@@ -4654,7 +4688,8 @@ sub InterpLinks($)
 		    }
 		    else {
 			$protolan = ProtoLan->Create($experiment, $lan,
-						     $self->impotent(),
+						     $self->impotent() ||
+						     $self->alloconly(),
 						     $protovlan);
 		    }
 		    $protolan->SetType((defined($protovlan) ?
@@ -4692,13 +4727,15 @@ sub InterpLinks($)
 			# protolans earlier.
 			#
 			$protolan = ProtoLan->Create($experiment, $lan,
-						     $self->impotent());
+						     $self->impotent() ||
+						     $self->alloconly());
 		    
 			if ($virtlan->_delayed()) {
 			    my $protolanlan =
 				ProtoLan->Create($experiment,
 						 $lan . "-delaylan",
-						 $self->impotent(),
+						 $self->impotent() ||
+						 $self->alloconly(),
 						 $protolan);
 			    $protolanlan->SetType("vlan");
 			    $protolanlan->SetRole("delay");
@@ -4737,7 +4774,8 @@ sub InterpLinks($)
 		    $protolan = ProtoLan->Lookup($experiment, $lan);
 		    if (!defined($protolan)) {
 			$protolan = ProtoLan->Create($experiment, $lan,
-						     $self->impotent());
+						     $self->impotent() ||
+						     $self->alloconly());
 			$protolan->SetType("trivial");
 			$protolan->SetRole("link/lan");
 		    }
@@ -4777,7 +4815,8 @@ sub InterpLinks($)
 	    $self->printdb("FakeLan - $virtA - $nodeA:$portA\n");
 	    
 	    my $protolan = ProtoLan->Lookup($experiment, $lan);
-	    $protolan = ProtoLan->Create($experiment, $lan, $self->impotent())
+	    $protolan = ProtoLan->Create($experiment, $lan,
+				 $self->impotent() || $self->alloconly())
 		if (!defined($protolan));
 	    $protolan->SetType("fakelan");
 	    $protolan->SetRole("link/lan");
@@ -4826,7 +4865,9 @@ sub InterpLinks($)
     }
     if (@sharedpnodes > 1) {
 	my $protovlan = ProtoLan->Create($experiment, "sharedlan",
-					 $self->impotent());
+					 $self->impotent() ||
+					 $self->alloconly());
+					 
 	$protovlan->SetRole("encapsulation");
 	$protovlan->SetType("vlan");
 	$protovlan->SetEncapStyle("default");
@@ -4855,7 +4896,8 @@ sub InterpLinks($)
 		DBQueryWarn("update interfaces set " .
 			    "   current_speed='$speed',trunk=1 " .
 			    "where node_id='$pnodename' and iface='$iface'")
-		    or return -1 if (!$self->impotent());
+		    or return -1 if (!($self->impotent() ||
+				       $self->alloconly()));
 
 		#
 		# Do not do this for nodes already in the shared experiment.
@@ -4869,7 +4911,8 @@ sub InterpLinks($)
 				"   remaining_bandwidth='$speed' " .
 				"where node_id='$pnodename' and ".
 				"      iface='$iface'")
-			or return -1 if (!$self->impotent());
+			or return -1 if (!($self->impotent() ||
+					   $self->alloconly()));
 		}
 	    }
 	}
@@ -4962,7 +5005,7 @@ sub InitializePhysNodes($)
     #
     # XXX This is here cause vnames were not set until now. Need to move.
     #
-    if (defined($self->rspec()) && !$self->impotent()) {
+    if (defined($self->rspec()) && !($self->impotent() || $self->alloconly())){
 	if (libGeni::MapNodes($self->experiment(), $self->verbose())) {
 	    tberror("Could not map geni nodes to local nodes.\n");
 	    return -1;
@@ -5118,7 +5161,7 @@ sub InitializePhysNode($$$)
 	%rsrvsets = ("vname"             => $vname,
 		     "erole"             => $role);
 
-	if (!$self->impotent() &&
+	if (!$self->impotent() && !$self->alloconly() &&
 	    $self->experiment()->AddInternalProgramAgent($vname)) {
 	    tberror("Error determining boot command line for $pnode\n");
 	    return -1;
@@ -5197,24 +5240,27 @@ sub InitializePhysNode($$$)
     if ($self->regression()) {
 	$rsrvsets{"rsrv_time"} = 0;
     }
-    my $setstr = join(",", map("$_='" . $nodesets{$_} . "'", keys(%nodesets)));
-    $self->printdb("  $setstr\n");
+    if ($self->verbose()) {
+	my $setstr = join(",",
+			  map("$_='" . $nodesets{$_} . "'", keys(%nodesets)));
+	$self->printdb("  $setstr\n");
+    }
+    $pnode->Update(\%nodesets) == 0
+	or return -1 if (! ($self->impotent() || $self->alloconly()));
 
-    DBQueryWarn("update nodes set $setstr where node_id='$pnodename'")
-	or return -1 if (!$self->impotent());
-
-    $setstr = join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
-    
-    $self->printdb("  $setstr\n");
-
-    DBQueryWarn("update reserved set $setstr where node_id='$pnodename'")
-	or return -1 if (!$self->impotent());
+    if ($self->verbose()) {
+	my $setstr =
+	    join(",", map("$_='" . $rsrvsets{$_} . "'", keys(%rsrvsets)));
+	$self->printdb("  $setstr\n");
+    }
+    $pnode->ModifyReservation(\%rsrvsets) == 0
+	or return -1 if (! ($self->impotent() || $self->alloconly()));
     
     #
     # Now call os_select.
     #
     if (defined($osid) && !$pnode->isremotenode()) {
-	if ($self->impotent()) {
+	if ($self->impotent() || $self->alloconly()) {
 	    $self->printdb("  pretending to os_select $osid\n");
 	}
 	else {
@@ -5319,7 +5365,8 @@ sub getrtabid($$$)
 
     if ($numvnodesonpnode > 1 || $pnode->_sharedhost()) {
 	if (! exists($self->solution_rtabmap()->{$vnodename})) {
-	    if ($pnode->_sharedhost() && !$self->impotent()) {
+	    if ($pnode->_sharedhost() &&
+		!($self->impotent() || $self->alloconly())) {
 		$rtabid = $pnode->Nextrtabid();
 	    }
 	    else {
@@ -5419,7 +5466,7 @@ sub NewVirtIface($$$$;$)
     $argref{"vnode_id"} = $vvnode
 	if (defined($vvnode));
 
-    my $virtiface = ($self->impotent() ?
+    my $virtiface = ($self->impotent() || $self->alloconly() ?
 		     Interface::VInterface->MakeFake($pnodename, \%argref) :
 		     Interface::VInterface->Create($pnodename, \%argref));
     if (!defined($virtiface)) {
@@ -5451,7 +5498,7 @@ sub NewVirtIface($$$$;$)
 	DBQueryWarn("update interfaces set " .
 		     "   current_speed='$speed',trunk=$trunk " .
 		     "where node_id='$pnodename' and iface='$pport'")
-	    or return -1 if (!$self->impotent());
+	    or return -1 if (!($self->impotent() || $self->alloconly()));
     }
 
     #
@@ -5567,7 +5614,7 @@ sub AddDelay($$$$$$$$$)
   	     ",$q1_limit,$q1_maxthresh,$q1_minthresh,$q1_weight,$q1_linterm".
 	     ",$q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit".
 	     ",$q1_droptail,$q1_red,$q1_gentle)")
-	    or return -1 if (!$self->impotent());
+	    or return -1 if (! ($self->impotent() || $self->alloconly()));
     }
     else {
 	my ($q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,
@@ -5600,7 +5647,7 @@ sub AddDelay($$$$$$$$$)
 	     "  $q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,".
 	     "  $q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,".
 	     "  $q0_droptail,$q0_red,$q0_gentle,2,0)")
-	    or return -1 if (!$self->impotent());
+	    or return -1 if (! ($self->impotent() || $self->alloconly()));
     }
 
     #
@@ -5628,13 +5675,13 @@ sub AddDelay($$$$$$$$$)
 		"current_speed='$speed0' " .
 		"where node_id='$pnodename' and ".
 		"iface='$iface0'")
-	or return -1 if (!$self->impotent());
+	or return -1 if (!($self->impotent() || $self->alloconly()));
 
     DBQueryWarn("update interfaces set " .
 		"current_speed='$speed1' " .
 		"where node_id='$pnodename' and ".
 		"iface='$iface1'")
-	or return -1 if (!$self->impotent());
+	or return -1 if (!($self->impotent() || $self->alloconly()));
 
     return 0;
 }
@@ -5704,7 +5751,7 @@ sub AddLinkDelay($$$$$$)
 		   "\]\n");
 
     return 0
-	if ($self->impotent());
+	if ($self->impotent() || $self->alloconly());
 
     DBQueryWarn("insert into linkdelays " .
 		" (node_id,iface,type,ip,netmask,exptidx,pid,eid,vlan, ".
@@ -5769,7 +5816,7 @@ sub SetUpTracing($$$$$)
 		   "$endnode, $pnodename, $iface0, $iface1\n");
 
     return 0
-	if ($self->impotent());
+	if ($self->impotent() || $self->alloconly());
 
     my $experiment = $self->experiment();
     my $pid = $experiment->pid();
@@ -5881,7 +5928,7 @@ sub UploadVlans($)
 	}
     }
     
-    if (!$self->impotent()) {
+    if (!($self->impotent() || $self->alloconly())) {
 	$self->printdb("Uploading protolans table.\n");
 	ProtoLan->DumpAll()
 	    if ($self->verbose());
@@ -5964,7 +6011,7 @@ sub UploadVlans($)
 	    
 	    DBQueryWarn("update interfaces set current_speed='$speed' ".
 			"where node_id='$pnodename' and iface='$iface'")
-		or return -1 if (!$self->impotent());
+		or return -1 if (!($self->impotent() || $self->alloconly()));
 	}
     }
 
@@ -5994,7 +6041,7 @@ sub UploadVlans($)
 		$self->printdb("Virt Patch: ".
 			       "$vname $pname $vid $pport $speed\n");
 	
-		if (!$self->impotent()) {
+		if (!($self->impotent() || $self->alloconly())) {
 		    DBQueryWarn("update vinterfaces set iface='$pport' ".
 				"where node_id='$pname' and unit='$vid'")
 			or return -1;
@@ -6098,7 +6145,8 @@ sub UpLoadIPAddresses($)
 				    "   vnode_id=$vnode_id,rtabid='$rtabid' ".
 				    "where node_id='$pnodename' and ".
 				    "      iface='$iface'")
-			    or return -1 if (!$self->impotent());
+			    or return -1 if (!($self->impotent() ||
+					       $self->alloconly()));
 			    
 			$IPs{"$pnodename:$iface"} = 1;
 		    }
@@ -6221,7 +6269,7 @@ sub UpLoadTunnels($)
 		       "$ip0 <-> $ip1, $peerip0 <-> $peerip1\n");
 
 	next
-	    if ($self->impotent());
+	    if ($self->impotent() || $self->alloconly());
 
 	my $tunnel = Tunnel->Create($self->experiment(),
 				    $virtlan->vname(), $secretkey,
@@ -6337,7 +6385,8 @@ sub UpLoadInterfaceSettings($)
 			    "       (node_id, iface, capkey, capval) ".
 			    "values ('$pnodename', '$iface', ".
 			    "        $capkey, $capval)")
-		    or return -1 if (!$self->impotent());
+		    or return -1 if (!($self->impotent() ||
+				       $self->alloconly()));
 	    }
 
 	    #
@@ -6357,7 +6406,8 @@ sub UpLoadInterfaceSettings($)
 			    "       (node_id, iface, capkey, capval) ".
 			    "values ('$pnodename', '$iface', ".
 			    "        $capkey, $capval)")
-		    or return -1 if (!$self->impotent());
+		    or return -1 if (! ($self->impotent() ||
+					$self->alloconly()));
 	    }
 
 	    #
@@ -6367,7 +6417,8 @@ sub UpLoadInterfaceSettings($)
 			 "       (node_id, iface, capkey, capval) ".
 			 "values ('$pnodename', '$iface', ".
 			 "        'protocol', '$protocol')")
-		or return -1 if (!$self->impotent());
+		or return -1 if (! ($self->impotent() ||
+				    $self->alloconly()));
 		
 	    $self->printdb("interface_setting: ".
 			   "$pnodename $iface protocol $protocol\n");
@@ -6375,7 +6426,8 @@ sub UpLoadInterfaceSettings($)
 	    DBQueryWarn("replace into interface_settings ".
 			"       (node_id, iface, capkey, capval) ".
 			"values ('$pnodename', '$iface', 'ssid', '$ssid')")
-		or return -1 if (!$self->impotent());
+		or return -1 if (! ($self->impotent() ||
+				    $self->alloconly()));
 	
 	    $self->printdb("interface_setting: ".
 			   "$pnodename $iface ssid $ssid\n");
@@ -6385,7 +6437,8 @@ sub UpLoadInterfaceSettings($)
 			    "       (node_id, iface, capkey, capval) ".
 			    "values ('$pnodename', '$iface', ".
 			    "        'accesspoint', '$apmac')")
-		    or return -1 if (!$self->impotent());
+		    or return -1 if (! ($self->impotent() ||
+					$self->alloconly()));
 		    
 		$self->printdb("interface_setting: ".
 			       "$pnodename $iface accesspoint $apmac\n");
@@ -6508,7 +6561,8 @@ sub SetPortRange($)
     # Otherwise find a free slot in the table.
     #
     my ($newlow,$newhigh) =
-	$self->experiment()->SetPortRange($self->impotent());
+	$self->experiment()->SetPortRange($self->impotent() ||
+					  $self->alloconly());
 
     $self->printdb("SetPortRange: $newlow,$newhigh\n");
 
@@ -6534,7 +6588,7 @@ sub SetPortRange($)
 	DBQueryWarn("update nodes set ipport_low=$newlow, ".
 		    " ipport_next=ipport_low+1, ipport_high=$newhigh ".
 		    "where node_id='$vpnodename'")
-	    or return -1 if (!$self->impotent());
+	    or return -1 if (!($self->impotent() || $self->alloconly()));
     }
     return 0;
 }

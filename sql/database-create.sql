@@ -470,7 +470,7 @@ CREATE TABLE `emulab_indicies` (
 DROP TABLE IF EXISTS `emulab_locks`;
 CREATE TABLE `emulab_locks` (
   `name` varchar(64) NOT NULL default '',
-  `value` int(10) unsigned NOT NULL default '0',
+  `value` int(10) NOT NULL default '0',
   PRIMARY KEY  (`name`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2408,7 +2408,7 @@ CREATE TABLE `nonlocal_user_bindings` (
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `exptidx` int(11) NOT NULL default '0',
-   PRIMARY KEY  (`uid_idx`),
+   PRIMARY KEY  (`uid_idx`,`exptidx`),
    KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
