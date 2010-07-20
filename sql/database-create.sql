@@ -2408,7 +2408,7 @@ CREATE TABLE `nonlocal_user_bindings` (
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `exptidx` int(11) NOT NULL default '0',
-   PRIMARY KEY  (`uid_idx`),
+   PRIMARY KEY  (`uid_idx`,`exptidx`),
    KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
