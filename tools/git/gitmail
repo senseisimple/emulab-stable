@@ -48,8 +48,9 @@ my $debug = get_config("debug",undef);
 my $testmode = undef;
 
 #
-# If set, try to hide trivial merges (i.e., ones with standard subject
-# line and no body text). Ugly hack.
+# If set, hide trivial merges (those where no diff hunks needed to be modified
+# as part of the merge).  Trivial merges that have a non-empty commit message
+# are still shown in case the committer decided to document the merge.
 #
 my $hide_trivial_merges = get_config("hidetrivialmerges",undef);
 
@@ -692,6 +693,12 @@ sub commit_mail($\@$@) {
 	        my $is_merge = 0;
 	        my $body_lines = 0;
 	        my $subject;
+	        my @diff_lines;
+
+		# This is a bit of a hack.  It assumes that the output
+		# of git-show will not change.  We could use --pretty
+		# to produce exactly the format we want, but since we've
+		# already called git-show we'll just use that.
 	        for (@body) {
 		        $is_merge = 1 if (/^Merge:/);
 			if (/^ /) {
@@ -702,12 +709,17 @@ sub commit_mail($\@$@) {
 				}
 			}
 		}
+
+		if ($is_merge) {
+			@diff_lines = `$GIT diff-tree --no-commit-id --cc $rev`;
+		}
 		
-		if ($is_merge && $body_lines == 0 &&
-		    $subject =~ /^ +Merge (?:remote )?branch '[^']+'(?: of .*)?$/){
+		if ($is_merge && !@diff_lines && !$body_lines) {
+			# We have a trivial merge, i.e. no hunks were modified as
+			# part of the merge.  We still want to show the commit if
+			# the commit message is non-standard.
 			next;
 		}
-			
 	}
 
         if ($separate_mail) {
