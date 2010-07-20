@@ -1,0 +1,23 @@
+#
+# Change primary key on nonlocal_user_bindings
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    my $query_result =
+	DBQueryFatal("show index from nonlocal_user_bindings ".
+		     "where Key_name='PRIMARY'");
+
+    if ($query_result->numrows == 1) {
+	DBQueryFatal("alter table nonlocal_user_bindings drop primary key");
+	DBQueryFatal("alter table nonlocal_user_bindings add primary key ".
+		     "(`uid_idx`,`exptidx`)");
+    }
+
+    return 0;
+}
+1;
