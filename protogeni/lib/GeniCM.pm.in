@@ -1234,8 +1234,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff,
 				 "Could not map to resources");
+	# So we can find things later.
+	$slice_experiment->SaveLogFiles();
 	goto bad;
     }
+    # So we can find things later.
+    $slice_experiment->SaveLogFiles();
+
     my $solution = GeniXML::ParseFile($tmpfile);
     if ($@) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1974,6 +1979,9 @@ sub SliverWorkAux($$$$$$$)
 	}
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
+
+	# So we can find things later.
+	$experiment->SaveLogFiles();
 	goto bad;
     }
   
