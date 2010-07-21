@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -271,7 +271,6 @@ system("$OPENSSL ca -batch -policy policy_sslxmlrpc ".
        " -infiles syscert_req.pem $outline") == 0
     or fatal("Could not sign certificate request");
 $UID = $SAVEUID;
-TBScriptUnlock();
 
 #
 # Combine the key and the certificate into one file
@@ -288,6 +287,7 @@ else {
     system("cat syscert_key.pem syscert_cert.pem") == 0
 	or fatal("Could not combine cert and key");
 }
+TBScriptUnlock();
 exit(0);
 
 sub fatal($) {
