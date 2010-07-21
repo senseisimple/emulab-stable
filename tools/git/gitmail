@@ -48,6 +48,13 @@ my $debug = get_config("debug",undef);
 my $testmode = undef;
 
 #
+# If set, hide trivial merges (those where no diff hunks needed to be modified
+# as part of the merge).  Trivial merges that have a non-empty commit message
+# are still shown in case the committer decided to document the merge.
+#
+my $hide_trivial_merges = get_config("hidetrivialmerges",undef);
+
+#
 # Command-line options - have to do this before setting other options, since
 # we want to be able to turn on debugging early
 #
@@ -681,6 +688,39 @@ sub commit_mail($\@$@) {
         $showcommand .= "'$rev'";
         debug("running '$showcommand'");
         my @body = `$showcommand`;
+        
+        if ($hide_trivial_merges) {
+	        my $is_merge = 0;
+	        my $body_lines = 0;
+	        my $subject;
+	        my @diff_lines;
+
+		# This is a bit of a hack.  It assumes that the output
+		# of git-show will not change.  We could use --pretty
+		# to produce exactly the format we want, but since we've
+		# already called git-show we'll just use that.
+	        for (@body) {
+		        $is_merge = 1 if (/^Merge:/);
+			if (/^ /) {
+				if (not defined $subject) {
+					$subject = $_;
+				} else {
+					$body_lines++;
+				}
+			}
+		}
+
+		if ($is_merge) {
+			@diff_lines = `$GIT diff-tree --no-commit-id --cc $rev`;
+		}
+		
+		if ($is_merge && !@diff_lines && !$body_lines) {
+			# We have a trivial merge, i.e. no hunks were modified as
+			# part of the merge.  We still want to show the commit if
+			# the commit message is non-standard.
+			next;
+		}
+	}
 
         if ($separate_mail) {
             # Send this message by itself
@@ -693,7 +733,7 @@ sub commit_mail($\@$@) {
     #
     # Send all the changes together in one message
     #
-    if (!$separate_mail) {
+    if (!$separate_mail && @fullbody) {
         send_mail($subject,
             $actionstring . join("\n" . "-"x72 . "\n\n",
                                  map { join "",@$_} @fullbody),

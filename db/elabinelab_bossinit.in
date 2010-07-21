@@ -91,9 +91,28 @@ else {
     die("Tainted argument $pid!\n");
 }
 
-# Temporary ... See utils/firstuser ... 
-DBQueryFatal("update group_membership set pid_idx=1,gid_idx=1 ".
-	     "where pid='$TBOPSPID' and pid=gid");
+#
+# XXX Fixup the pid/gid indicies for emulab-ops in various tables.
+# At this point they have the values of the outer Emulab so they need
+# to be reset to reflect the newly minted version here.
+#
+my @PIDGIDTABLES = ("group_membership", "images");
+my @PIDONLYTABLES = ("os_info");
+
+my $q = DBQueryFatal("select pid_idx from projects ".
+		     "where pid='$TBOPSPID'");
+my ($npid) = $q->fetchrow_array();
+my $q = DBQueryFatal("select gid_idx from groups ".
+		     "where pid='$TBOPSPID' and gid=pid");
+my ($ngid) = $q->fetchrow_array();
+
+foreach my $table (@PIDGIDTABLES) {
+    DBQueryFatal("update $table set pid_idx=$npid,gid_idx=$ngid ".
+		 "where pid='$TBOPSPID' and pid=gid");
+}
+foreach my $table (@PIDONLYTABLES) {
+    DBQueryFatal("update $table set pid_idx=$npid where pid='$TBOPSPID'");
+}
 
 # Do not want to share the UUIDs with outer Emulab.
 DBQueryFatal("update users set uid_uuid=UUID()");

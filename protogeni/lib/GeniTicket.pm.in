@@ -844,7 +844,11 @@ sub Release($$)
 	}
     }
     if (@nodeids) {
-	system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+	#
+	# XXX Need to determine when a node needs to be reloaded.
+	#
+	#system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+	system("$NFREE -x -q $pid $eid @nodeids");
     }
     foreach my $node (@nodes) {
 	$node->Refresh();
@@ -911,7 +915,11 @@ sub ReleaseHolding($$)
 	}
     }
     if (@nodeids) {
-	system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+	#
+	# XXX Need to determine when a node needs to be reloaded.
+	#
+	#system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
+	system("$NFREE -x -q $pid $eid @nodeids");
     }
     foreach my $node (@nodes) {
 	$node->Refresh();

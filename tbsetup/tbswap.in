@@ -197,9 +197,10 @@ my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not lookup experiment object!")
 }
-my $special = ($pid eq "testbed" || $pid eq "tbres" ||
-	       $pid eq "emulab-ops" || $pid eq "utahstud");
-my $newsetup = ($pid eq "testbed" || $pid eq "geni");
+my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "geni" ||
+	       $pid eq "emulab-ops" || $pid eq "utahstud" ||
+               $pid eq "ResiliNets" || $pid eq "gec8tutorial");
+my $newsetup = $special;
 
 #
 # Print starting message.
@@ -315,8 +316,8 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
 	else {
 	    print STDERR "Cleaning up after errors.\n";
 	    doSwapout(CLEANUP);
+	    $updatehosed = 1;
 	}
-	$updatehosed = 1;
     }
     else {
 	#

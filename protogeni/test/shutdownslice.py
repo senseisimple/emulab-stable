@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -27,6 +27,13 @@ from M2Crypto import X509
 ACCEPTSLICENAME=1
 
 execfile( "test-common.py" )
+
+if len(REQARGS) != 1 or REQARGS[0] != "verified":
+    print "Are you sure you want to use this script? It freezes the slice."
+    print "You probably want to use deleteslice.py instead."
+    print "If you really want to use this script, add 'verified'"
+    sys.exit(1)
+    pass
 
 #
 # Get a credential for myself, that allows me to do things at the SA.

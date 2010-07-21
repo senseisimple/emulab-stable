@@ -337,6 +337,11 @@ sub Create($$$$;$)
 	foreach my $keyref (@{ $keys }) {
 	    my $key  = $keyref->{'key'};
 	    my $type = $keyref->{'type'};
+
+	    next
+		if (! (defined($key) && defined($type) &&
+		       $key ne "" && $type ne ""));
+		
 	    chomp($key);
 	    chomp($type);
 	    
@@ -387,6 +392,11 @@ sub Modify($$$$)
 	foreach my $keyref (@{ $keys }) {
 	    my $key  = $keyref->{'key'};
 	    my $type = $keyref->{'type'};
+
+	    next
+		if (! (defined($key) && defined($type) &&
+		       $key ne "" && $type ne ""));
+		
 	    chomp($key);
 	    chomp($type);
 	    

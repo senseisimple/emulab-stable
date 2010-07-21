@@ -129,7 +129,10 @@ if os.path.exists( LOCALCONF ):
 if EXTRACONF and os.path.exists( EXTRACONF ):
     execfile( EXTRACONF )
 
-HOSTNAME = XMLRPC_SERVER[ "default" ]
+if "sa" in XMLRPC_SERVER:
+    HOSTNAME = XMLRPC_SERVER[ "sa" ]
+else:
+    HOSTNAME = XMLRPC_SERVER[ "default" ]
 DOMAIN   = HOSTNAME[HOSTNAME.find('.')+1:]
 SLICEURN = "urn:publicid:IDN+" + DOMAIN + "+slice+" + SLICENAME
 
@@ -300,7 +303,10 @@ def resolve_slice( name, selfcredential ):
     params = {}
     params["credential"] = mycredential
     params["type"]       = "Slice"
-    params["hrn"]        = name
+    if name.startswith("urn:"):
+        params["urn"]       = name
+    else:
+        params["hrn"]       = name
     rval,response = do_method("sa", "Resolve", params)
     if rval:
         Fatal("Slice does not exist");

@@ -64,9 +64,12 @@ use libsetup;
 #
 my $noumount = 0;
 my %options = ();
-if (getopts("N", \%options)) {
+if (getopts("NM", \%options)) {
     if (defined($options{"N"})) {
 	$noumount = 1;
+    }
+    if (defined($options{"M"})) {
+	$updatemasterpasswdfiles = 1;
     }
 }
 my $isvm = ((-e "$ETCDIR/genvmtype") ? 1 : 0);
@@ -77,7 +80,11 @@ my $isvm = ((-e "$ETCDIR/genvmtype") ? 1 : 0);
 cleanup_node(1);
 
 print "Running $BINDIR/rc/rc.config to clean up ...\n";
-system("$BINDIR/rc/rc.config reset");
+my $rcconfig_args = "";
+if ($updatemasterpasswdfiles) {
+    $rcconfig_args = "-M";
+}
+system("$BINDIR/rc/rc.config $rcconfig_args reset");
 
 print "Removing old DB files ...\n";
 foreach my $dbfile (@DBFILES) {

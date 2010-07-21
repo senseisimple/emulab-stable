@@ -41,7 +41,7 @@ CREATE TABLE `geni_authorities` (
   `url` tinytext,
   `urn` tinytext,
   PRIMARY KEY  (`uuid`),
-  UNIQUE KEY `urn` (`urn`(256))
+  UNIQUE KEY `urn` (`urn`(255))
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `geni_slices`;

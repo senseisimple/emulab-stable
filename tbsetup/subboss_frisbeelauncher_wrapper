@@ -63,9 +63,10 @@ usage()
 my ($subboss, $imageid, $path, $size, $mtime) = map { /(.*)/; $1 } @ARGV;
 my @command = ('ssh', $subboss);
 
+push @command, '/usr/testbed/sbin/subboss_frisbeelauncher';
 push @command, '-d' if ($debug);
 push @command, '-k' if ($killmode);
-push @command, ('/usr/testbed/sbin/subboss_frisbeelauncher', $imageid, $path, $size, $mtime);
+push @command, ($imageid, $path, $size, $mtime);
 
 system(@command);
 if ($?) {

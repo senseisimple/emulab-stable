@@ -895,7 +895,8 @@ sub AddNode($$)
 }
 
 #
-# Stub function to light up a set of nodes; does nothing.
+# Stub function to light up a set of nodes; calls the big version in the
+# parent.
 #
 sub LightUpNodes($@)
 {

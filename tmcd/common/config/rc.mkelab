@@ -854,7 +854,18 @@ sub SetupFsNode()
     if ($FBSD_VERSION >= 5) {
 	mysystem("/etc/rc.d/rpcbind start");
 	mysystem("/etc/rc.d/nfsd start");
-	mysystem("/etc/rc.d/mountd start");
+	#
+	# XXX lovely: we normally start mountd bound to port 900, but
+	# quite often during an elabinelab setup, that port is already
+	# in use causing mountd to silently fail and we don't notice til
+	# boss-install when it tries to mount the filesystems.
+	#
+	# So we don't bind to a specific port here (by directly starting
+	# mounted rather than using the rc.d startup script) to avoid this
+	# issue.  Note that when elabinelab setup finishes, boss and ops
+	# will be rebooted and we will again be bound to port 900.
+	#
+	mysystem("mountd -r");
     } else {
 	# XXX FBSD4 is such a pain...
 	mysystem("nfsd -u -t -n 8");
@@ -1271,7 +1282,18 @@ sub SetupOpsNode($)
     if ($FBSD_VERSION >= 5) {
 	mysystem("/etc/rc.d/rpcbind start");
 	mysystem("/etc/rc.d/nfsd start");
-	mysystem("/etc/rc.d/mountd start");
+	#
+	# XXX lovely: we normally start mountd bound to port 900, but
+	# quite often during an elabinelab setup, that port is already
+	# in use causing mountd to silently fail and we don't notice til
+	# boss-install when it tries to mount the filesystems.
+	#
+	# So we don't bind to a specific port here (by directly starting
+	# mounted rather than using the rc.d startup script) to avoid this
+	# issue.  Note that when elabinelab setup finishes, boss and ops
+	# will be rebooted and we will again be bound to port 900.
+	#
+	mysystem("mountd -r");
 	mysystem("/etc/rc.d/sendmail start");
     } else {
 	# XXX FBSD4 is such a pain...

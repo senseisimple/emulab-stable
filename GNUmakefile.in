@@ -30,7 +30,7 @@ include Makeconf
 # Then things that depend on stuff we just did:
 #
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
-SUBDIRS = lib apache db assign www @optional_subdirs@ ipod security sensors \
+SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils backend tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
 		tools/svn wiki bugdb collab protogeni node_usage install

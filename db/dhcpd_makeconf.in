@@ -369,9 +369,12 @@ if ($install) {
 	    fatal("Could not kill(TERM) process $dpid (dhcpd): $!");
 	}
 
+        my $old_uid = $UID;
+        $UID = $EUID;
         for my $subboss (keys %subboss_dhcp_servers) {
             RestartSubbossDhcp($subboss, $restart);
         }
+        $UID = $old_uid;
     }
 
     TBScriptUnlock();
@@ -394,7 +397,7 @@ sub fatal {
 sub RestartSubbossDhcp($$)
 {
         my ($subboss, $restart) = @_;
-
+        
         my $cmd = "ssh $subboss @prefix@/sbin/subboss_dhcpd_makeconf";
 
         $cmd .= " -r" if ($restart);

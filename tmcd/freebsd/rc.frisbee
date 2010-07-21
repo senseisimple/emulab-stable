@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Optional flag argument says "do not reboot"
@@ -84,15 +84,14 @@ tweakmbr() {
 }
 
 find_disks() {
-	local disks
+    _DISKS=""
+    for d in `sed -n 's/^\([a-z]*[0-9][0-9]*\): [0-9][0-9]*MB/\1/p' /var/run/dmesg.boot`; do
+	case $d in
+	    ad*|da*|ar*|aacd*) _DISKS="$_DISKS $d"
+	esac
+    done
 
-	for d in `sed -n 's/^\([a-z]*[0-9][0-9]*\): [0-9][0-9]*MB/\1/p' /var/run/dmesg.boot`; do
-		case $d in
-			ad*|da*|ar*|aacd*) disks="$disks $d"
-		esac
-	done
-
-	echo $disks
+    echo $_DISKS
 }
 
 #
@@ -106,22 +105,22 @@ find_disks() {
 # via fdisk.
 #
 zapsuperblocks() {
-    DSK=$1
+    _DSK=$1
 
     #
     # Note we are not overly concerned about the consequences of misparsing
     # the fdisk output.  If we whack random blocks, it doesn't hurt anything.
     #
-    offs=`fdisk -s $DSK 2>/dev/null | sed -n -e 's/^[ 0-9]*: *\([0-9]*\).*$/\1/p'`
+    offs=`fdisk -s $_DSK 2>/dev/null | sed -n -e 's/^[ 0-9]*: *\([0-9]*\).*$/\1/p'`
 
     if [ x"$offs" = x ]; then
         return
     fi
 
-    echo -n "Invalidating old potential superblocks on $DSK: "
+    echo -n "Invalidating old potential superblocks on $_DSK: "
     for off in $offs; do
         echo -n "$off "
-	dd if=/dev/zero of=/dev/${DSK} oseek=$off count=16 >/dev/null 2>&1 || {
+	dd if=/dev/zero of=/dev/${_DSK} oseek=$off count=16 >/dev/null 2>&1 || {
 	    echo "WARNING: failed to invalidate $off"
 	}
     done
@@ -134,32 +133,49 @@ zapsuperblocks() {
 # Function to load a single image on a disk
 #
 loadone() {
-    LOADINFO=$1
-    NUM=$2
+    _LOADINFO=$1
+    _NUM=$2
 
-    echo "Loading image #$NUM"
+    echo "Loading image #$_NUM"
 
-    ADDRESS=`echo $LOADINFO | sed -e 's/.*ADDR=\([^[:space:]]*\).*/\1/'`
-    SERVER=`echo $LOADINFO | sed -e 's/.*SERVER=\([^[:space:]]*\).*/\1/'`
+    # Parse dem args
+    for parm in $_LOADINFO; do
+        case $parm in
+	ADDR=*|\
+	SERVER=*|\
+	PART=*|\
+	PARTOS=*|\
+	DISK=*|\
+	ZFILL=*|\
+	ACPI=*|\
+	ASF=*|\
+	MBRVERS=*|\
+	PREPARE=*)
+	    # XXX need to parse better, eval is dangerous!
+	    eval $parm
+	    ;;
+        *)
+	    echo "WARNING: bad loadinfo parameter \"$parm\" ignored"
+	    ;;
+	esac
+    done
+
+    #
+    # Assign defaults where needed.
+    # Assumed to be set: ADDR
+    #
     SERVER=${SERVER:-$BOSSIP}
-    PARTITION=`echo $LOADINFO | sed -e 's/.*PART=\([^[:space:]]*\).*/\1/'`
-    PARTITION=${PARTITION:-'0'}
-    PARTOS=`echo $LOADINFO | sed -e 's/.*PARTOS=\([^[:space:]]*\).*/\1/'`
-    DISK=`echo $LOADINFO | sed -e 's/.*DISK=\([^[:space:]]*\).*/\1/'`
+    PART=${PART:-'0'}
+    PARTOS=${PARTOS:-'unknown'}
     DISK=${DISK:-'ad0'}
-    ZFILL=`echo $LOADINFO | sed -e 's/.*ZFILL=\([^[:space:]]*\).*/\1/'`
     ZFILL=${ZFILL:-'0'}
-    ACPI=`echo $LOADINFO | sed -e 's/.*ACPI=\([^[:space:]]*\).*/\1/'`
     ACPI=${ACPI:-'unknown'}
-    ASF=`echo $LOADINFO | sed -e 's/.*ASF=\([^[:space:]]*\).*/\1/'`
     ASF=${ASF:-'unknown'}
-    MBR=`echo $LOADINFO | sed -e 's/.*MBRVERS=\([^[:space:]]*\).*/\1/'`
-    MBR=${MBR:-'1'}
-    PREPARE=`echo $LOADINFO | sed -e 's/.*PREPARE=\([^[:space:]]*\).*/\1/'`
+    MBRVERS=${MBRVERS:-'1'}
     PREPARE=${PREPARE:-'0'}
 
-    if [ "$PARTITION" != "0" ]; then
-	SLICE="-s $PARTITION"
+    if [ "$PART" != "0" ]; then
+	SLICE="-s $PART"
 	case $PARTOS in
 	FreeBSD)
 		SLICE="$SLICE -D 165"
@@ -215,12 +231,12 @@ loadone() {
 	(cd /dev; ./MAKEDEV $DISK ${DISK}s2a ${DISK}s3a ${DISK}s4a)
     fi
 
-    if [ x"$ADDRESS" != x ]; then
-	isurl=`echo $ADDRESS | grep http -`
-	ispath=`echo $ADDRESS | grep '^/' -`
+    if [ x"$ADDR" != x ]; then
+	isurl=`echo $ADDR | grep http -`
+	ispath=`echo $ADDR | grep '^/' -`
 
 	if [ x"$isurl" != x ]; then
-	    echo "Need to download $ADDRESS"
+	    echo "Need to download $ADDR"
 
 	    isurl=1
 	    if [ ! -d /images ]; then
@@ -231,19 +247,19 @@ loadone() {
 	    #
 	    # This needs a lot more work ...
 	    #
-	    imagefile=`echo $ADDRESS | sed -e 's,^http[s]*://[^/]*/,,'`
+	    imagefile=`echo $ADDR | sed -e 's,^http[s]*://[^/]*/,,'`
 	    imagefile="/images/$imagefile"
 	elif [ x"$ispath" != x ]; then
 	    ispath=1
 
-	    if [ ! -e $ADDRESS ]; then
-		echo "$ADDRESS does not exist!"
+	    if [ ! -e $ADDR ]; then
+		echo "$ADDR does not exist!"
 		return 1
 	    fi
-	    imagefile="$ADDRESS"
+	    imagefile="$ADDR"
         else
-	    PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`
-	    MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`
+	    PORT=`echo $ADDR | awk -F: '{ printf $2 }'`
+	    MCAST=`echo $ADDR | awk -F: '{ printf $1 }'`
 	    if [ -e $BOOTDIR/myip ]; then
 		MCASTIF="-i `cat $BOOTDIR/myip`"
 	    else
@@ -283,14 +299,14 @@ loadone() {
 	# For slice images, ensure that the MBR is the correct version
 	# and replace if not.
 	#
-        if [ $NUM -eq 0 ]; then
-	    if [ "$PARTITION" != "0" ]; then
-		tweakmbr $DISK $MBR
+        if [ $_NUM -eq 0 ]; then
+	    if [ "$PART" != "0" ]; then
+		tweakmbr $DISK $MBRVERS
 	    fi
-            FIRSTMBR=$MBR
+            FIRSTMBR=$MBRVERS
         else
-            if [ "$FIRSTMBR" != "$MBR" ]; then
-		echo "MBR Mismatch: First MBR is \"$FIRSTMBR\" while image #$NUM is \"$MBR\""
+            if [ "$FIRSTMBR" != "$MBRVERS" ]; then
+		echo "MBR Mismatch: First MBR is \"$FIRSTMBR\" while image #$_NUM is \"$MBRVERS\""
 	    fi
         fi
 
@@ -299,14 +315,14 @@ loadone() {
 	# to put it. Done after the MBR tweak of course. Then download the URL.
 	#
 	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
-	    echo "Downloading image \'$ADDRESS\' to /images directory ..."
+	    echo "Downloading image \'$ADDR\' to /images directory ..."
 	    $BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
 		$BINDIR/mkextrafs.pl -n -f -s 4 -r $DISK /images || {
 		    echo "Could not create /images partition"
 		    return 1
 		}
 	    }
-	    wget -nv -N -P /images "$ADDRESS"
+	    wget -nv -N -P /images "$ADDR"
 	    wstat=$?
 	    case $wstat in
 	    0)
@@ -332,14 +348,14 @@ loadone() {
 	# environment and at least won't hurt anything if not true.
 	#
 	if [ $PREPARE -eq 1 -o \
-             \( $isrem -eq 0 -a x"$ZFILL" = x -a "$PARTITION" = "0" \) ]
+             \( $isrem -eq 0 -a x"$ZFILL" = x -a "$PART" = "0" \) ]
         then
 	    zapsuperblocks $DISK
 	fi
 
 	if [ x"$imagefile" != x ]; then
-	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}"
-	    /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PARTITION}
+	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PART}"
+	    /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PART}
 	else
 	    echo "Running $BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
 	    $BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
@@ -372,8 +388,8 @@ loadone() {
 	    echo "Adjusting slice-related files"
 	    export SLICEFIX_ACPI=$ACPI
 	    export SLICEFIX_ASF=$ASF
-	    $BINDIR/slicefix $PARTITION $DISK
-	    echo "Image #$NUM load complete at `date`"
+	    $BINDIR/slicefix $PART $DISK
+	    echo "Image #$_NUM load complete at `date`"
 	    return 0
 	    ;;
 	*)
@@ -391,10 +407,6 @@ $BINDIR/tmcc state RELOADSETUP
 BOSSINFO=`$BINDIR/tmcc bossinfo`
 STATUS=`$BINDIR/tmcc status`
 
-# For testing purposes.
-#BOSSINFO='boss.emulab.net 155.101.128.70'
-#LOADINFO='ADDR=234.5.6.69:4444'
-
 BOSSIP=`echo $BOSSINFO | awk '{ print $2 }'`
 
 if [ -x /usr/sbin/ntpdate ]; then
@@ -407,14 +419,15 @@ if [ -r $BINDIR/rc.ipod ]; then
 fi
 
 #
-# Break the load info into lines by setting IFS to a newline.
+# Assign each line (one image) to one of the positional parameters.
+# This is done by setting IFS to a newline and using set.
 # XXX there must be a better way to do this!
 #
-OIFS=$IFS
+OIFS="$IFS"
 IFS='
 '
 set -- `$BINDIR/tmcc loadinfo`
-IFS=$OIFS
+IFS="$OIFS"
 if [ "$1"x = x ]; then
     echo "No load information for node"
     exit 1
@@ -495,7 +508,3 @@ fi
 echo "Frisbee finished"
 
 exit 0
-
-
-
-

@@ -159,7 +159,7 @@ function SPITFORM($formfields, $errors)
     global $EXPOSELINKTEST, $EXPOSEARCHIVE;
     global $EXPOSESTATESAVE;
     global $TBVALIDDIRS_HTML;
-    global $WIKIDOCURL;
+    global $WIKIDOCURL, $WIKINODE;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -214,7 +214,11 @@ function SPITFORM($formfields, $errors)
           <li><b>If you have an NS file:</b><br> You may want to
               <b><a href='nscheck_form.php3'>syntax check it first</a></b>
           <li><b>If you do not have an NS file:</b><br>
-              <b><a href='clientui.php3'>New GUI editor</a></b> - An enhanced Java applet for editing topologies.<br>
+              <b><a href='clientui.php3'>New GUI editor</a></b> -
+                An enhanced Java applet for editing topologies.
+              (<b><a href='clientui-alt.php3'>ProtoGeni Version</a></b> -
+                <a href='http://$WIKINODE/trac/protogeni/wiki'>
+                  What's ProtoGeni?</a>)<br>
               The older <b><a href='buildui/bui.php3'>NetBuild GUI</a></b>
               can be used to graphically create topologies.<font size=-2>
               (<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 

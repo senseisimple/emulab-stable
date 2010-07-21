@@ -434,10 +434,11 @@ function WRITESIDEBAR() {
     }
 
     NavMenuButton("Documentation", "$WIKIDOCURL");
+    NavMenuButtonNew("Forums", "http://groups.google.com/group/emulab-users");
 
     if ($rootEmulab) {
 	# Leave New here about 2 weeks
-        NavMenuButton("Papers and Talks (Apr 4)", "$TBDOCBASE/pubs.php3");
+        NavMenuButtonNew("Papers and Talks (Jul 18)", "$TBDOCBASE/pubs.php3");
 	NavMenuButton("Emulab Software (Sep 1)", "$TBDOCBASE/software.php3");
 
 	NavMenuButton("List People",

@@ -1674,7 +1674,7 @@ sub print_switch
     # LAN nodes, which encourages the placement of all LAN members on the same
     # switch
     my $types = ["switch:1"];
-    if (defined($MAINSITE) && $MAINSITE && $name ne "procurve1") {
+    if (!(defined($MAINSITE) && $MAINSITE && $name eq "procurve1")) {
 	push(@$types, "*lan:*");
     }
     print_node($name, $types, [], [], $uuid, $interfaces,

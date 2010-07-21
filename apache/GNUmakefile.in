@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2007, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2002-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -55,6 +55,12 @@ install-dirs:
 	-mkdir -p $(INSTALL_TOPDIR)/www
 
 #
+# Well, this is awkward.  Make sure we don't try to install anything from
+# a dev tree both because it doesn't make any sense and because it would
+# clobber the "real" version.
+#
+ifeq ($(TBROOT),/usr/testbed)
+#
 # XXX another woeful hack.  There appears to be a well-documented problem
 # with Apache and PHP4, where loading PHP with certain extensions will cause
 # Apache to crash immediately.  However, if you start it without PHP and then
@@ -78,5 +84,9 @@ install: install-dirs install-scripts httpd.conf.fixed
 
 control-install: install-dirs install-scripts httpd.conf-ops
 	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
+else
+install-scripts install control-install:
+	@echo "Cannot install Apache config in dev tree"
+endif
 
 clean:
