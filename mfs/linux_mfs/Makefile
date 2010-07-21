@@ -39,11 +39,14 @@ clean:
 	rm -rf $(TARGET_BUILD_PATH)
 	rm -rf $(BOOT_PATH)
 
-toolchain:
-	$(MAKE) -C $(SOURCE_PATH)/$@ all
+toolchain: $(BUILDROOT_PATH)/toolchain-built
+
+$(BUILDROOT_PATH)/toolchain-built:
+	$(MAKE) -C $(SOURCE_PATH)/toolchain all
 	$(MAKE) -C $(SOURCE_PATH)/zlib install-sysroot
 	$(MAKE) -C $(SOURCE_PATH)/openssl install
 	$(MAKE) -C $(SOURCE_PATH)/ncurses install
+	touch $(BUILDROOT_PATH)/toolchain-built
 
 $(MODULES): toolchain
 	$(MAKE) -C $(SOURCE_PATH)/$@ all
