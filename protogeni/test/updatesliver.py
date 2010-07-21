@@ -27,6 +27,7 @@ ACCEPTSLICENAME=1
 
 debug    = 0
 impotent = 1
+rspec    = None
 
 execfile( "test-common.py" )
 
@@ -41,13 +42,7 @@ elif len(REQARGS) == 1:
     except IOError, e:
         print >> sys.stderr, args[ 0 ] + ": " + e.strerror
         sys.exit( 1 )
-else:
-    rspec = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-            " <node virtual_id=\"geni1\" "+\
-            "       virtualization_type=\"emulab-vnode\" " +\
-            "       startup_command=\"/bin/ls > /tmp/foo\"> " +\
-            " </node>" +\
-            "</rspec>"    
+    pass
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
@@ -107,6 +102,7 @@ print str(myslice)
 #
 print "Asking for sliver credential"
 params = {}
+params["slice_urn"] = SLICEURN
 params["credentials"] = (slicecred,)
 rval,response = do_method("cm", "GetSliver", params, version="2.0")
 if rval:
@@ -115,21 +111,21 @@ if rval:
 slivercred = response["value"]
 print "Got the sliver credential"
 
-#
-# Renew the sliver, for kicks
-#
-valid_until = time.strftime("%Y%m%dT%H:%M:%S",time.gmtime(time.time() + 6000));
-
-print "Renewing the Sliver until " + valid_until
-params = {}
-params["credentials"]  = (slivercred,)
-params["slice_urn"]    = SLICEURN
-params["valid_until"]  = valid_until
-rval,response = do_method("cm", "RenewSliver", params, version="2.0")
-if rval:
-    Fatal("Could not renew sliver")
+if rspec == None:
+    #
+    # Do a resolve to get the manifest urn.
+    #
+    print "Resolving the sliver at the CM to get the manifest"
+    params = {}
+    params["credentials"] = (slicecred,)
+    params["urn"]         = myslice["sliver_urn"]
+    rval,response = do_method("cm", "Resolve", params, version="2.0")
+    if rval:
+        Fatal("Could not get resolve slice")
+        pass
+    mysliver = response["value"]
+    rspec = mysliver["manifest"];
     pass
-print "Sliver has been renewed"
 
 #
 # Update the sliver, getting a ticket back

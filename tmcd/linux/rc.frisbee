@@ -209,6 +209,7 @@ write_image()
 
 	if [ $protocol = frisbee ]; then
 		[ -n "$server" ] || server=$BOSSIP
+		echo "$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk"
 		$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk
 		rc=$?
 

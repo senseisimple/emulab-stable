@@ -67,14 +67,45 @@ sub ListResources()
 # Create a sliver by allocating and starting resources.
 sub CreateSliver()
 {
-    my ($slice_urn, $credentials, $rspec) = @_;
+    my ($slice_urn, $credentials, $rspec, $users) = @_;
+
+    print STDERR "CreateSliver\n";
+
+    # circulate through the users and bind them to the slice
+    my $caller_urn = $ENV{'GENIURN'};
+    my $caller_keys = undef;
+    foreach my $user (@$users) {
+        my $user_urn = $user->{'urn'};
+        # Skip if it is not the caller
+        next if ($user_urn ne $caller_urn);
+        $caller_keys = $user->{keys};
+    }
+
+    # Package the caller_keys in a list of hashes the way the CM wants
+    # it. Each hash has two keys ('type' and 'key'). 'type' is always
+    # 'ssh' for us, and 'key' is the key.
+
+    my $sliver_keys = undef;
+    if (defined($caller_keys)) {
+        $sliver_keys = [];
+        foreach my $key (@$caller_keys) {
+            # The CMV2 does not like newlines at the end of the keys.
+            chomp($key);
+            push(@$sliver_keys, {'type' => 'ssh', 'key' => $key});
+        }
+    }
+
+    # This only gets us part of the way there. For users that are not
+    # *this* user, we need to somehow add their keys, which also
+    # requires adding them as a user *without* their certificate. Not
+    # sure we'll be able to do that.
 
     # Invoke CreateSliver
     my $create_args = {
         'slice_urn' => $slice_urn,
         'rspec' => $rspec,
-        'credentials' => $credentials
-        # Omit keys, we expect them to be in the rspec
+        'credentials' => $credentials,
+        'keys' => $sliver_keys
     };
 
     my $response = GeniCMV2::CreateSliver($create_args);
@@ -145,9 +176,9 @@ sub SliverStatus()
     $status->{'geni_urn'} = 'Unknown';
 
     # Determine geni_status. XXX how to determine 'configuring'?
-    if ($pgstatus->{'status'} == 'ready') {
+    if ($pgstatus->{'status'} eq 'ready') {
         $status->{'geni_status'} = 'ready';
-    } elsif ($pgstatus->{'status'} == 'failed') {
+    } elsif ($pgstatus->{'status'} eq 'failed') {
         $status->{'geni_status'} = 'failed';
     } else {
         $status->{'geni_status'} = 'unknown';

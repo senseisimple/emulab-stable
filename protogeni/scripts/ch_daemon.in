@@ -60,7 +60,7 @@ if ($UID != 0) {
 #
 # Exit if not a protogeni site.
 #
-if (! $PGENISUPPORT) {
+if (! ($PGENISUPPORT && $PGENICLRHOUSE)) {
     exit(0);
 }
 
@@ -178,8 +178,10 @@ sub ProbeCMs()
 }
 
 while (1) {
-    next
-	if (NoLogins());
+    if (NoLogins()) {
+	sleep(5);
+	next;
+    }
 
     print "Running at ".
 	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";

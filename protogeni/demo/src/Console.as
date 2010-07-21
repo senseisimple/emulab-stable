@@ -60,6 +60,7 @@ package
                                              arena.embedButton,
                                              arena.rspecButton,
                                              arena.fullScreenButton,
+                                             arena.discoverButton,
                                              clip.backButton,
                                              clip.copyButton),
                                    new Array(clickConsole,
@@ -70,6 +71,7 @@ package
                                              clickEmbed,
                                              clickRspec,
                                              clickFullScreen,
+                                             clickDiscover,
                                              clickBack,
                                              clickCopy));
 
@@ -86,15 +88,15 @@ package
     public function discoverResources() : void
     {
       pushRequest(new RequestListComponents(managers));
-      forEachComponent(discoverSliver);
-    }
+      forEachComponent(discoverComponents);
+        }
 
     public function getConsole() : TextField
     {
       return clip.text;
     }
 
-    function discoverSliver(cm : ComponentManager) : Request
+    function discoverComponents(cm : ComponentManager) : Request
     {
       if (cm != managers.getManagers()[0])
       {
@@ -253,6 +255,12 @@ package
       }
     }
 
+    function clickDiscover(event : MouseEvent) : void
+    {
+      pushRequest(new RequestResourceDiscovery(managers.getCurrentManager(),
+                                               null));
+    }
+
     function clickBack(event : MouseEvent) : void
     {
       clip.visible = false;
@@ -331,13 +339,13 @@ package
       arena.embedButton.gotoAndStop(newState);
     }
 
-    function failure(event : ErrorEvent, fault : MethodFault) : void
+        function failure(event : ErrorEvent, fault : MethodFault) : void
     {
-      clip.text.appendText(Util.getFailure(queue.front().getOpName(),
+           clip.text.appendText(Util.getFailure(queue.front().getOpName(),
                                            queue.front().getUrl(),
                                            event, fault));
       clip.text.scrollV = clip.text.maxScrollV;
-      var next : Request = queue.front().fail();
+      var next : Request = queue.front().fail(event);
       queue.front().cleanup();
       queue.pop();
       if (next != null)
@@ -356,12 +364,12 @@ package
                                               queue.front().getResponseXml()));
         clip.text.scrollV = clip.text.maxScrollV;
         var next : Request = queue.front().complete(code, response, credential);
-        queue.front().cleanup();
-        queue.pop();
         if (next != null)
         {
           queue.push(next);
         }
+                queue.front().cleanup();
+        queue.pop();
         start();
       }
       catch (e : Error)

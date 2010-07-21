@@ -766,19 +766,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		#
-		# For now, the project has to be emulab-ops. 
+		# For now, the project has to be emulab-ops or the
+		# the current project.
 		#
-		if ($ospid ne TBOPSPID()) {
+		if (! ($ospid eq TBOPSPID() ||
+		       $ospid eq $slice_experiment->pid())) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				 "Illegal project name in URN: $dname");
 		    goto bad;
 		}
-		my $osinfo = OSinfo->LookupByName($os);
+		my $osinfo = OSinfo->Lookup($ospid, $os);
 		if (!defined($osinfo)) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					     "Bad osname in URN: $dname");
+					     "Unknown image URN: $dname");
 		    goto bad;
 		}
 		#
@@ -819,6 +821,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    elsif ($virtualization_subtype eq "raw") {
 			$pctype = undef;
 			goto raw;
+		    }
+		    else {
+			$response
+			    = GeniResponse->Create(GENIRESPONSE_BADARGS,
+						   undef,
+				       "Malformed rspec: ".
+				       "Unknown virtualization_subtype");
+			goto bad;
 		    }
 		}
 		else {
@@ -1193,7 +1203,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -n -d -v -u -o $tmpfile $pid $eid");
+    system("$MAPPER -a -d -v -u -o $tmpfile $pid $eid");
     if ($?) {
 	my $logstuff = undef;
 	
@@ -1224,8 +1234,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff,
 				 "Could not map to resources");
+	# So we can find things later.
+	$slice_experiment->SaveLogFiles();
 	goto bad;
     }
+    # So we can find things later.
+    $slice_experiment->SaveLogFiles();
+
     my $solution = GeniXML::ParseFile($tmpfile);
     if ($@) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1624,6 +1639,10 @@ sub SliverWorkAux($$$$$$$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	$response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$owner->Modify(undef, undef, $keys);
     }
 
@@ -1960,6 +1979,9 @@ sub SliverWorkAux($$$$$$$)
 	}
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
+
+	# So we can find things later.
+	$experiment->SaveLogFiles();
 	goto bad;
     }
   
@@ -2089,14 +2111,37 @@ sub SliverWorkAux($$$$$$$)
 		if (!exists($managers{$ENV{'MYURN'}}));
 	}
 
-	# Do not worry about modifying a link that is setup. Later.
-	next
-	    if (grep {$_ eq $linkname} keys(%linkmap));
+	my $link_type = GeniXML::GetText("link_type", $linkref);
+
+	# Do not worry about modifying a link that is setup, unless a tunnel.
+	# Need to deal with this later.
+	if (grep {$_ eq $linkname} keys(%linkmap)) {
+	    next
+		if (! (defined($link_type) && $link_type eq "tunnel"));
+
+	    #
+	    # Gack, we have to recreate all the tunnel physical state, but
+	    # that was lost when we did the RemovePhysicalState() above.
+	    # The aggregate needs to get rebuilt, so delete the existing
+	    # one. Needs a lot more thought.
+	    #
+	    my $sliver_urn = GeniXML::GetText("sliver_urn", $linkref);
+	    if (!defined($sliver_urn)) {
+		print STDERR
+		    "Could not find sliver_urn in existing link $linkname\n";
+		next;
+	    }
+	    my $tunnel_aggregate = GeniAggregate->Lookup($sliver_urn);
+	    if (!defined($tunnel_aggregate)) {
+		print STDERR "No aggregate for existing tunnel $sliver_urn\n";
+		next;
+	    }
+	    $tunnel_aggregate->Delete(GENI_PURGEFLAG);
+	}
 
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	my $link_type = GeniXML::GetText("link_type", $linkref);
 	if (defined($link_type) && $link_type eq "tunnel") {
 
 	    my $iface1ref   = $interfaces[0];
@@ -2992,6 +3037,10 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	my $response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$user->Modify(undef, undef, $keys);
     }
     if ($slice->Lock() != 0) {
@@ -4102,6 +4151,29 @@ sub CheckTicket($)
     }
     
     return $ticket;
+}
+
+sub CheckKeys($)
+{
+    my ($keys) = @_;
+
+    goto bad
+	if (!ref($keys));
+    
+    foreach my $keyref (@{ $keys }) {
+	goto bad
+	    if (!ref($keyref));
+	
+	my $key  = $keyref->{'key'};
+	my $type = $keyref->{'type'};
+
+	goto bad
+	    if (! (defined($key) && defined($type) &&
+		   $key ne "" && $type ne ""));
+    }		
+    return 0;
+  bad:
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys")
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

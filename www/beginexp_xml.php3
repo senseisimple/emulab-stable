@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -112,7 +112,8 @@ else {
 	}
 	elseif (! ($group = Group::LookupByPidGid($formfields["exp_pid"],
 						  $formfields["exp_gid"]))) {
-	    $errors["Group"] = "Group '$exp_gid' is not in project '$exp_pid'";
+	    $errors["Group"] = "Group '" . $formfields["exp_gid"] .
+		"' is not in project '" . $formfields["exp_pid"]. "'";
 	}
     }
     else {

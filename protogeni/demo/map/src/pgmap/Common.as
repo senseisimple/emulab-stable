@@ -25,6 +25,7 @@
 	import mx.controls.Button;
 	import mx.core.Application;
 	import mx.managers.PopUpManager;
+	import flash.external.ExternalInterface;
 	
 	public class Common
 	{
@@ -76,6 +77,10 @@
         [Bindable]
         [Embed(source="../../images/error.png")]
         public static var errorIcon:Class;
+        
+        [Bindable]
+        [Embed(source="../../images/exclamation.png")]
+        public static var exclamationIcon:Class;
         
         // Gets an icon for a boolean value
         public static function assignIcon(val:Boolean):Class {
@@ -278,5 +283,26 @@
 	       		ngWindow.loadCollection(nc);
 			}
 		}
+		
+		public static  function getBrowserName():String
+        {
+            var browser:String;
+            var browserAgent:String = ExternalInterface.call("function getBrowser(){return navigator.userAgent;}");
+ 
+ 			if(browserAgent == null)
+ 				return "Undefined";
+            else if(browserAgent.indexOf("Firefox") >= 0)
+                browser = "Firefox";
+            else if(browserAgent.indexOf("Safari") >= 0)
+                browser = "Safari";
+            else if(browserAgent.indexOf("MSIE") >= 0)
+                browser = "IE";
+            else if(browserAgent.indexOf("Opera") >= 0)
+                browser = "Opera";
+            else
+                browser = "Undefined";
+            
+            return (browser);
+        }
 	}
 }

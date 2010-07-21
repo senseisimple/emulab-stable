@@ -156,7 +156,7 @@ control-script-install:	dir-install bossnode
 	$(INSTALL) bossnode $(ETCDIR)/bossnode
 
 PGENIFILES = rc.ifconfig rc.topomap rc.progagent rc.pgeni \
-		rc.tarfiles rc.rpms
+		rc.tarfiles rc.rpms rc.trafgen
 
 pgeni-tarball:
 	-rm -f $(TBROOT)/www/downloads/geniclient.tar

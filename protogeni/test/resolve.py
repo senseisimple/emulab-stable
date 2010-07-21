@@ -40,6 +40,18 @@ else:
 mycredential = get_self_credential()
 print "Got my SA credential"
 
+type = URN.split('+')[2]  
+if type == 'slice':
+    SLICENAME = URN
+    pass
+    
+if type == 'slice' or type == 'sliver':
+    myslice = resolve_slice( SLICENAME, mycredential )
+    print "Found the slice, asking for a credential ..."
+    
+    mycredential = get_slice_credential( myslice, mycredential )
+    print "Got the slice credential"
+    pass
 
 print "Resolving at the local CM"
 params = {}

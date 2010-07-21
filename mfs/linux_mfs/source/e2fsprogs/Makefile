@@ -23,7 +23,7 @@ clean:
 
 LIBS	:= $(addprefix $(TARGET_PATH)/lib/, libext2fs.so libe2p.so libcom_err.so libblkid.so libuuid.so)
 
-install: $(TARGET_PATH)/sbin/mke2fs $(TARGET_PATH)/sbin/tune2fs $(TARGET_PATH)/sbin/e2fsck $(TARGET_PATH)/usr/bin/uuidgen $(LIBS)
+install: $(TARGET_PATH)/sbin/mke2fs $(TARGET_PATH)/sbin/tune2fs $(TARGET_PATH)/sbin/e2fsck $(TARGET_PATH)/usr/bin/uuidgen $(TARGET_PATH)/usr/sbin/resize2fs $(LIBS)
 
 $(E2FSPROGS_PATH)/.extract-stamp:
 	mkdir -p $(TARGET_BUILD_PATH)
@@ -60,7 +60,7 @@ $(E2FSPROGS_PATH)/.config-stamp: $(E2FSPROGS_PATH)/.patch-stamp
 		--infodir=/usr/share/info \
 		--disable-debugfs --disable-imager \
 		--disable-tls \
-		--disable-resizer --enable-fsck \
+		--enable-fsck \
 		--disable-e2initrd-helper \
 		--enable-elf-shlibs \
 		--without-catgets \
@@ -91,6 +91,11 @@ $(E2FSPROGS_PATH)/misc/uuidgen: $(E2FSPROGS_PATH)/.config-stamp
 		$(TARGET_CONFIGURE_OPTS) LD=$(MFS_ARCH)-linux-uclibc-gcc
 	touch $@
 
+$(E2FSPROGS_PATH)/resize/resize2fs: $(E2FSPROGS_PATH)/.config-stamp
+	LDFLAGS="-rpath ../lib" PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(E2FSPROGS_PATH) \
+		$(TARGET_CONFIGURE_OPTS) LD=$(MFS_ARCH)-linux-uclibc-gcc
+	touch $@
+
 $(E2FSPROGS_PATH)/lib/%.so: $(E2FSPROGS_PATH)/.config-stamp
 	LDFLAGS="-rpath ../lib" PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) -C $(E2FSPROGS_PATH) \
 		$(TARGET_CONFIGURE_OPTS) LD=$(MFS_ARCH)-linux-uclibc-gcc
@@ -117,6 +122,13 @@ $(TARGET_PATH)/sbin/e2fsck: $(E2FSPROGS_PATH)/e2fsck/e2fsck
 	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/sbin/e2fsck
 	ln -sf $(notdir $@) $(dir $@)/fsck.ext2
 	ln -sf $(notdir $@) $(dir $@)/fsck.ext3
+	touch -c $@
+
+$(TARGET_PATH)/usr/sbin/resize2fs: $(E2FSPROGS_PATH)/resize/resize2fs
+	install -d -m 755 $(TARGET_PATH)/sbin
+	install -m 755 $< \
+		$(TARGET_PATH)/usr/sbin/resize2fs
+	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/usr/sbin/resize2fs
 	touch -c $@
 
 $(TARGET_PATH)/sbin/tune2fs: $(E2FSPROGS_PATH)/misc/tune2fs
