@@ -14,7 +14,7 @@ INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
 FAKEROOT_BIN	=	fakeroot
 
 MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo \
-       	e2fsprogs openssl wget perl portmap file ethtool ncurses jove
+       	e2fsprogs openssl wget perl portmap file ethtool ncurses jove tcsh
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
@@ -72,18 +72,6 @@ uclibc-install: $(TARGET_PATH)/lib/libc.so.0
 $(FAKEROOT_ENVIRONMENT):
 	touch $@
 
-devices: $(FAKEROOT_ENVIRONMENT)
-	rm -rf $(TARGET_PATH)/dev
-	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
-		-i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/makedevs.sh \
-		$(SCRIPTS_PATH)/devices $(TARGET_PATH)
-
-permissions: $(FAKEROOT_ENVIRONMENT) devices install
-	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
-		-i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/fixperms.sh $(TARGET_PATH)
-
 initramfs: install
 	rm -rf $(INITRAMFS_PATH)
 	cp -dpR $(TARGET_PATH) $(INITRAMFS_PATH)
@@ -96,6 +84,9 @@ initramfs: install
 	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/fixperms.sh $(INITRAMFS_PATH)
+	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
+		-i $(FAKEROOT_ENVIRONMENT) \
+		$(SCRIPTS_PATH)/misc_fixup.sh $(TARGET_PATH)
 	$(FAKEROOT_BIN) -i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/gen_initramfs.sh $(INITRAMFS_PATH) $(INITRAMFS)
 	rm -f $(FAKEROOT_ENVIRONMENT)
