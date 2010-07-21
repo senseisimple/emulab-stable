@@ -2988,7 +2988,7 @@ sub PrintRspec($;$)
     $root->setAttribute("xmlns", "http://www.protgeni.net/resources/rspec/2");
     $root->setAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
     $root->setAttribute("xsi:schemaLocation",
-			"http://www.protogeni.net/resources/rspec/2");
+			"http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd");
     $root->setAttribute("type", "request");
     $root->setAttribute("generated", 
 			POSIX::strftime("20%y-%m-%dT%H:%M:%S", gmtime($creation)));
