@@ -13,7 +13,8 @@ INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file ethtool
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo \
+       	e2fsprogs openssl wget perl portmap file ethtool ncurses
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
@@ -42,6 +43,7 @@ toolchain:
 	$(MAKE) -C $(SOURCE_PATH)/$@ all
 	$(MAKE) -C $(SOURCE_PATH)/zlib install-sysroot
 	$(MAKE) -C $(SOURCE_PATH)/openssl install
+	$(MAKE) -C $(SOURCE_PATH)/ncurses install
 
 $(MODULES): toolchain
 	$(MAKE) -C $(SOURCE_PATH)/$@ all
