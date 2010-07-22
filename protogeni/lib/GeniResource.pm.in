@@ -358,6 +358,13 @@ sub Ticket($)
     $self->{'NEWTICKET'} = $ticket;
     return $ticket;
 }
+# Got a ticket?
+sub HaveTicket($)
+{
+    my ($self) = @_;
+
+    return $self->newticket_idx();
+}
 
 sub Manifest($)
 {
@@ -696,7 +703,7 @@ sub GetTicket($$$$)
 	    print STDERR "Could not update ticket $ticket. Error: ";
 	}
 	else {
-	    print STDERR "Could not get new ticket. Error: ";
+	    print STDERR "Could not get new ticket from $self. Error: ";
 	}
 	print STDERR "  " . $response->output() . "\n";
 	return -1;
