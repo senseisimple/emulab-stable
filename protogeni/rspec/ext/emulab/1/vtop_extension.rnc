@@ -7,7 +7,7 @@
 #
 # Description of Emulab-specific extensions for a virtual topology
 #
-default namespace = "http://www.emulab.net/resources/rspec/ext/vtop/1"
+namespace emulab = "http://www.protogeni.net/resources/rspec/ext/emulab/1"
 
 #
 # We include the common topology extension specification schema, 
@@ -15,9 +15,9 @@ default namespace = "http://www.emulab.net/resources/rspec/ext/vtop/1"
 include "top_extension.rnc"
 
 # For a fixed node - th
-AssignedToSpec = element node_assigned_to { text }?
+AssignedToSpec = element emulab:assigned_to { text }?
 
-HintToSpec = element node_hint_to { text }?
+HintToSpec = element emulab:hint_to { text }?
 
 ## "Legacy" assign node flags - will be replaced with properties, and in some
 ## cases, explicit links
@@ -25,38 +25,38 @@ NodeFlagSpec =
     ## Specify that this node is a subnode of another node. We MIGHT
     ## try to do this with properties in the future
     ## Valid for both virtual and physical nodes
-    element node_subnode_of { text }?,
+    element emulab:subnode_of { text }?,
     ## Indicates that this node should never be considered identical to any
     ## other node. Could be done with a property
     ## Valid only for physical nodes
-    element node_unique { empty }?,
+    element emulab:unique { empty }?,
     ## Indicates that virtual links must either all be trivial (loopback), or
     ## none of them must be. Possibly expressible with properties?
-    element node_disallow_trivial_mix { empty }?
+    element emulab:disallow_trivial_mix { empty }?
 
 ## "Legacy" link flags used by assign. Will be replaced by properties
 LinkFlagSpec = 
     ## Indicates that it is not okay to use a delay node to artificially
     ## shape/delay traffic for this link. Replace by using type system.
-    element link_nodelay { empty }?,
+    element emulab:nodelay { empty }?,
     ## Indicates whether it is okay to multiplex this link with other virtual
     ## links onto the same physical link (old name: emulated) Probably replace
     ## by using the type system (ie. have an 'Ethernet' type that can only
     ## hold one slot,  and an 'Ethernet-tagged' type that can hold more).
-    element link_multiplex_ok { empty }?,
+    element emulab:multiplex_ok { empty }?,
     ## Indicates whether it is okay to satisfy this link with a trivial
     ## (loopback) link. Replace using type system.
-    element link_trivial_ok { empty }?,
+    element emulab:trivial_ok { empty }?,
     ## Gives the name of the interface that must be used to satisfy the source
     ## of this link - note that the interface name is given, not the node name
-    element link_fixsrciface { string }?,
+    element emulab:fixsrciface { string }?,
     ## Same as fixsrciface, for destination of the link
-    element link_fixdstiface { string }?
+    element emulab:fixdstiface { string }?
 
 ## Specify a virtual class - assign allows you to define classes for virtual
 ## nodes, and specify that all nodes using that class should, or must, be
 ## assigned to physical nodes of the same type
-VclassSpec = element vtop_vclass {
+VclassSpec = element emulab:vclass {
     ## Name of the virtual class
     attribute name { text },
     ## Specify whether the vclass is hard (ie. all nodes *must* be of the same
@@ -71,7 +71,7 @@ VclassSpec = element vtop_vclass {
 ## For the moment only 2 interface mappings are specified because
 ## every link only has 2 interfaces for the moment.
 LinkMapping =
-  element link_component_hop { 
+  element emulab:component_hop { 
 		attribute assigned_to { text }, 
 		InterfaceMapping, 
 		InterfaceMapping 

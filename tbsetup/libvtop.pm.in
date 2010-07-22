@@ -2985,10 +2985,13 @@ sub PrintRspec($;$)
     my $expiration = $creation + 3600;
     
     my $root = $doc->createElement("rspec");
-    $root->setAttribute("xmlns", "http://www.protgeni.net/resources/rspec/2");
+    $root->setAttribute("xmlns", "http://www.protogeni.net/resources/rspec/2");
     $root->setAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
+    $root->setAttribute("xmlns:emulab", "http://www.protogeni.net/resources/rspec/ext/emulab/1");
+
+### XXX: Change the URL
     $root->setAttribute("xsi:schemaLocation",
-			"http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd");
+			"http://www.protogeni.net/resources/rspec/2  http://www.protogeni.net/resources/rspec/2/request.xsd http://www.protogeni.net/resources/rspec/ext/emulab/1 http://www.cs.utah.edu/~tarunp/code/vtop_extension.xsd");
     $root->setAttribute("type", "request");
     $root->setAttribute("generated", 
 			POSIX::strftime("20%y-%m-%dT%H:%M:%S", gmtime($creation)));
@@ -7103,7 +7106,7 @@ sub processNodeRspec ($$$$)
     my $typecount = addNodeRspec($doc, $hardwarenode, 'emulab:node_type');
     $typecount->setAttribute('type_slots', $nodetypeslots);
     if ($isnodestatic == 1) {
-	addNodeRspec($doc, $hardwarenode, 'emulab:static');
+	$typecount->setAttribute('static', 'true');
     }
 
     # Create sliver type
@@ -7111,25 +7114,15 @@ sub processNodeRspec ($$$$)
     $slivernode->setAttribute('name', $slivertype);
     my $diskimagenode = addNodeRspec($doc, $slivernode, 'disk_image');
 
-#XXX: This is NOT correct at all. The disk image name should be a URN
+# XXX: This is NOT correct at all. The disk image name should be a URN
 # composed of the project name, and the name of the disk image obtained from
 # the osinfo structure. It should NOT be the osid. This has been done merely 
 # as a placeholder to ensure that the vtop still validates.
-#
-    # There should be only one "OS-*" desire for any given node. 
-    # If there is more than one, only the first one will be used.
-    # This is a temporary measure anyway, so it should be fixed sooner
-    # rather than later.
-    while ( my ($desire, $desireval) = each (%{$node->{'desires'}})) {
-	if (index($desire, "OS-") == 0) {
-	    $diskimagenode->setAttribute('name', $desire);
-	    last;
-	}
-    }
+    $diskimagenode->setAttribute('name', 'diskimageurn');
 
     # Deal with the disallow_trivial_mix flag
     if (exists($node->{'disallow_trivial_mix'})) {
-	addNodeRspec($doc, $rspecnode, 'emulab:ext_disallow_trivial_mix');
+	addNodeRspec($doc, $rspecnode, 'emulab:disallow_trivial_mix');
     }
 
     # Deal with the subnode_of flag
@@ -7148,7 +7141,7 @@ sub processNodeRspec ($$$$)
 
     # Add all the desires as extensions
     while ( my ($desire, $desireval) = each (%{$node->{'desires'}})) {
-	my $desirenode = addNodeRspec($doc, $rspecnode, 'emulab:desire');
+	my $desirenode = addNodeRspec($doc, $rspecnode, 'emulab:fd');
 	my $operator = $desireval->[0];
 	$desirenode->setAttribute('name', $desire);
 	$desirenode->setAttribute('weight', $desireval->[1]);
@@ -7281,7 +7274,10 @@ sub processLinkRspec ($$$$)
 	
     my $rspeclink = addNodeRspec($doc, $root, 'link');
     $rspeclink->setAttribute('client_id', $link->{'name'});
-    $rspeclink->setAttribute('component_manager_id', $link->{'cm'});
+    
+    my $cmnode = addNodeRspec($doc, $rspeclink, 'component_manager');
+    $cmnode->setAttribute('name', $link->{'cm'});
+
     my $linktype = addNodeRspec($doc, $rspeclink, 'link_type');
     $linktype->setAttribute('name', $link->{'link_type'});
 
@@ -7305,8 +7301,8 @@ sub processLinkRspec ($$$$)
 
     # The forward link
     my $property = addNodeRspec($doc, $rspeclink, 'property');
-    $property->setAttribute('src', $link->{'interface_ref'}->[0]);
-    $property->setAttribute('dst', $link->{'interface_ref'}->[1]);
+    $property->setAttribute('source_id', $link->{'interface_ref'}->[0]);
+    $property->setAttribute('dest_id', $link->{'interface_ref'}->[1]);
     $property->setAttribute('capacity', $link->{'capacity'});
     $property->setAttribute('latency', $link->{'latency'});
     $property->setAttribute('packet_loss', $link->{'packet_loss'});
@@ -7314,8 +7310,8 @@ sub processLinkRspec ($$$$)
     # And now the backward. Assign doesn't know how to deal with
     # links with unbalanced properties anyway
     $property = addNodeRspec($doc, $rspeclink, 'property');
-    $property->setAttribute('src', $link->{'interface_ref'}->[1]);
-    $property->setAttribute('dst', $link->{'interface_ref'}->[0]);
+    $property->setAttribute('source_id', $link->{'interface_ref'}->[1]);
+    $property->setAttribute('dest_id', $link->{'interface_ref'}->[0]);
     $property->setAttribute('capacity', $link->{'capacity'});
     $property->setAttribute('latency', $link->{'latency'});
     $property->setAttribute('packet_loss', $link->{'packet_loss'});

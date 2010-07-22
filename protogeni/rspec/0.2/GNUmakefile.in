@@ -7,7 +7,7 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../..
-SUBDIR		= protogeni/rspec/0.1
+SUBDIR		= protogeni/rspec/0.2
 
 include $(OBJDIR)/Makeconf
 
@@ -19,15 +19,15 @@ all:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_LIBDIR)/assign/0.1/, $(SCHEMATA))
+install: $(addprefix $(INSTALL_LIBDIR)/assign/0.2/, $(SCHEMATA))
 
 control-install:
 
 clean:
 	rm -f *.o core
 
-$(INSTALL_LIBDIR)/assign/0.1/%: %
+$(INSTALL_LIBDIR)/assign/0.2/%: %
 	@echo "Installing $<"
-	-mkdir -p $(INSTALL_LIBDIR)/assign/0.1
+	-mkdir -p $(INSTALL_LIBDIR)/assign/0.2
 	$(INSTALL) $< $@
 

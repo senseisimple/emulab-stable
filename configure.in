@@ -1011,6 +1011,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
         protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
         protogeni/test/GNUmakefile protogeni/rspec/GNUmakefile \
         protogeni/rspec/0.1/GNUmakefile \
+	protogeni/rspec/0.2/GNUmakefile \
+	protogeni/rspec/2/GNUmakefile \
         collab/GNUmakefile \
         collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \
