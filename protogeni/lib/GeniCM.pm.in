@@ -766,19 +766,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		#
-		# For now, the project has to be emulab-ops. 
+		# For now, the project has to be emulab-ops or the
+		# the current project.
 		#
-		if ($ospid ne TBOPSPID()) {
+		if (! ($ospid eq TBOPSPID() ||
+		       $ospid eq $slice_experiment->pid())) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				 "Illegal project name in URN: $dname");
 		    goto bad;
 		}
-		my $osinfo = OSinfo->LookupByName($os);
+		my $osinfo = OSinfo->Lookup($ospid, $os);
 		if (!defined($osinfo)) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					     "Bad osname in URN: $dname");
+					     "Unknown image URN: $dname");
 		    goto bad;
 		}
 		#
@@ -1232,8 +1234,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff,
 				 "Could not map to resources");
+	# So we can find things later.
+	$slice_experiment->SaveLogFiles();
 	goto bad;
     }
+    # So we can find things later.
+    $slice_experiment->SaveLogFiles();
+
     my $solution = GeniXML::ParseFile($tmpfile);
     if ($@) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1972,6 +1979,9 @@ sub SliverWorkAux($$$$$$$)
 	}
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
+
+	# So we can find things later.
+	$experiment->SaveLogFiles();
 	goto bad;
     }
   
