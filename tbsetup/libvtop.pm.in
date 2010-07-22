@@ -1234,7 +1234,7 @@ sub GenVirtNodes($)
 		return -1;
 	    }
 	    my $ref = { 'virtual_id'    => $vname,
-			'component_urn' => $vnode->fixed(),
+			'request_urn'   => $vnode->fixed()   
 		      };
 	    if ($vnode->_isvirtnode()) {
 		$ref->{'virtualization_type'} = 'emulab-vnode';
@@ -1410,7 +1410,7 @@ sub GenFixNodes($)
 	    tbwarn("GenFixNodes: No fixed node for $vname\n");
 	}
 
-	# Normal nodes have a vnodem but delay nodes do not.
+	# Normal nodes have a vnode but delay nodes do not.
 	if (!defined($vnode) && !$self->isadelaynode($vname)) {
 	    tbwarn("GenFixNodes: No vnode for $vname\n");
 	}
@@ -2340,7 +2340,7 @@ sub GenVirtLans($)
 		    if (defined($fixed) && $fixed ne "") {
 			my ($authority,$type,$nodeid) = GeniHRN::Parse($fixed);
 			
-			$noderef->{'component_urn'} =
+			$noderef->{'request_urn'} =
 			    GeniHRN::Generate($authority, "node", "*");
 		    }
 		    my $ref = {
@@ -3678,14 +3678,15 @@ sub AllocNodes($)
 		$self->fixednodes()->{$vname} = $nodeid;
 
 		# And add to the results for the next vtop print.
-		$self->addfixed("$vname $nodeid");
+		$self->addfixed("$vname $nodeid")
+		    if (!$pnode->isfednode());
 	    }
 	}
     }
     
     if ($exitval > 0) {
 	#
-	# We got some but no all the nodes.
+	# We got some but not all the nodes.
 	#
 	my $rcount    = scalar(@reserved);
 	my $tcount    = scalar(@nodeids);
@@ -3726,7 +3727,8 @@ sub AllocNodes($)
 		    $self->fixednodes()->{$vname} = $nodeid;
 
 		    # And add to the results for the next vtop print.
-		    $self->addfixed("$vname $nodeid");
+		    $self->addfixed("$vname $nodeid")
+			if (!$pnode->isfednode());
 		}
 	    }
 	}
@@ -3799,11 +3801,45 @@ sub AllocNodes($)
     if (defined($self->rspec()) &&
 	!($self->impotent() || $self->alloconly())) {
 	$self->printdb("Requesting geni tickets ...\n");
-	
-	if (libGeni::GetTickets($self->experiment(), $self->verbose(),
-				$self->user(), $self->rspec())) {
-	    tberror("Could not allocate Geni Tickets\n");
-	    return -1;
+
+	my $progress = libGeni::GetTickets($self->experiment(),
+					   $self->verbose(),
+					   $self->user(), $self->rspec());
+	if ($progress) {
+	    tberror("Error allocating (some) Geni Tickets\n");
+	    #
+	    # Need to find out what geni nodes we could not get tickets for.
+	    # The local proxy nodes for them need to be released, and if we
+	    # made forward progress, we try again in another loop through.
+	    # The rest of the solution state will get cleared before
+	    # the next loop, but calling nfree is easiest here. 
+	    #
+	    my @tofree = ();
+	    
+	    foreach my $pnode (@reserved) {
+		my $nodeid = $pnode->node_id();
+
+		#
+		# XXX See libGeni; it sets external_resource_index if the
+		# if we get a ticket. Need a state variable instead. 
+		#
+		if (exists($self->solution()->{'TORESERVE'}->{$nodeid}) &&
+		    !defined($pnode->external_resource_index())) {
+		    push(@tofree, $nodeid);
+		}
+	    }
+	    if (@tofree) {
+		tbinfo("Releasing unticketed nodes: @tofree\n");
+		system("$NFREE $pid $eid @tofree");
+		if ($?) {
+		    tberror("Could not free unticketed nodes\n");
+		    return -1;
+		}
+		foreach my $nodeid (@tofree) {
+		    delete($self->newreserved()->{$nodeid});
+		}
+	    }
+	    return $progress;
 	}
 	tbinfo("Successfully got all geni tickets we needed.\n");
     }
