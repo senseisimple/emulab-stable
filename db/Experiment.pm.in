@@ -2076,6 +2076,8 @@ sub PreSwap($$$$)
     $swapper->BumpActivity();
     $self->GetProject()->BumpActivity();
     $self->GetGroup()->BumpActivity();
+    $self->Refresh() == 0
+	or goto failed;
     return 0;
 
   failed:
@@ -2157,16 +2159,7 @@ sub SwapFail($$$$;$)
 		"where idx='$rsrcidx'")
 	or return -1;
 
-    if ($which eq $EXPT_SWAPMOD &&
-	$self->state() eq libdb::EXPTSTATE_ACTIVE()) {
-	DBQueryWarn("update experiment_resources set ".
-		    ($flags & libdb::TBDB_STATS_FLAGS_MODHOSED() ?
-		     "swapout_time=swapmod_time, " : " ") .
-		    "swapmod_time=0 ".
-		    "where idx='$lastrsrc'")
-	    or return -1;
-    }
-
+    # Delete it.
     DBQueryWarn("delete from experiment_resources ".
 		"where idx=$rsrcidx")
 	or return -1;
@@ -2225,6 +2218,21 @@ sub PostSwap($$$$)
     my $prev_swapper = $swapper;
     my $query_result;
 
+    #
+    # Need to update the previous record with the swapmod_time.
+    #
+    if ($which eq $EXPT_SWAPMOD) {
+	my $when = "UNIX_TIMESTAMP(now())";
+	# unless its active, in which case pick up swapin time.
+	$when = $self->swapin_time()
+	    if ($self->state() eq libdb::EXPTSTATE_ACTIVE());
+	
+	DBQueryWarn("update experiment_resources set ".
+		    "  swapmod_time=$when ".
+		    "where idx='$lastrsrc'")
+	    or return -1;
+    }
+
     if ($which eq $EXPT_SWAPOUT ||
 	($which eq $EXPT_SWAPMOD &&
 	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
@@ -2246,7 +2254,7 @@ sub PostSwap($$$$)
 		DBQueryWarn("select r.pnodes,r.vnodes,r.uid_idx, ".
 			    "  r.swapmod_time - r.swapin_time ".
 			    " from experiment_resources as r ".
-			    "where r.idx='$rsrcidx'");
+			    "where r.idx='$lastrsrc'");
 	}
 	return -1
 	    if (!$query_result);
@@ -2262,18 +2270,6 @@ sub PostSwap($$$$)
 	    $prev_swapper = $swapper
 		if (!defined($prev_swapper));
 	}
-    }
-
-    if ($which eq $EXPT_SWAPMOD) {
-	my $when = "UNIX_TIMESTAMP(now())";
-	# unless its active, in which case pick up swapin time.
-	$when = $self->swapin_time()
-	    if ($self->state() eq libdb::EXPTSTATE_ACTIVE());
-	
-	DBQueryWarn("update experiment_resources set ".
-		    "  swapmod_time=$when ".
-		    "where idx='$lastrsrc'")
-	    or return -1;
     }
 
     # Special case for initial record. Needs to be fixed.
