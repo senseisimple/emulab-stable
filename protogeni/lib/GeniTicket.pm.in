@@ -244,9 +244,9 @@ sub Stringify($)
 	$idx = "S$seqno";
     }
     my $owner_hrn   = $self->owner_hrn();
-    my $target_uuid = $self->target_uuid();
+    my $target_urn  = $self->target_urn();
     
-    return "[GeniTicket: $idx, owner:$owner_hrn, target_uuid:$target_uuid]";
+    return "[GeniTicket: $idx, owner:$owner_hrn, target:$target_urn]";
 }
 
 #
