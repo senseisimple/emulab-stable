@@ -76,22 +76,49 @@ sub MapResources($$$$)
 	or return -1;
 
     foreach my $ref (@{ $rspec->{'node'} }) {
+	my $resource;
 	my %copy = %{ $ref };
 	my $copy = \%copy;
 	
-	my $node_urn = $copy->{'component_urn'};
+	my $node_urn = $copy->{'request_urn'};
 	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
-
 	$copy->{'component_manager_uuid'} = $cm;
-	if ($node_id eq "*") {
-	    # assign will use this, but its format is bogus. Kill it.
-	    delete($copy->{'component_urn'});
+
+	#
+	# Get the resource object.
+	#
+	if (!exists($cm_urns{$cm})) {
+	    $resource = GeniResource->Lookup($experiment->idx(), $cm);
+	    if (!defined($resource)) {
+		$resource = GeniResource->Create($experiment, $cm);
+		if (!defined($resource)) {
+		    print STDERR "Could not create GeniResource for $cm\n";
+		    return -1;
+		}
+	    }
+	    $cm_urns{$cm} = $resource;
 	}
-	else {
-	    $copy->{'component_uuid'} = $node_urn;
+	$resource = $cm_urns{$cm};
+
+	#
+	# request_urn means nothing to assign; kill that from the copy.
+	#
+	delete($copy->{'request_urn'});
+	# Ditto
+	delete($copy->{'tarfiles'});
+
+	#
+	# If already have the ticket, then leave the urn alone.
+	# We do not run assign again, but we need the rspec to be
+	# complete for loops below.
+	#
+	if (!$resource->HaveTicket()) {
+	    if ($node_id ne "*")  {
+		$copy->{'component_uuid'} = $node_urn;
+		$copy->{'component_urn'}  = $node_urn;
+	    }
 	}
-	$cm_urns{$cm} = $cm;
 
 	#
 	# The point of this is to split the rspec apart, since at present
@@ -125,6 +152,9 @@ sub MapResources($$$$)
 	foreach my $ref (@{ $rspec->{'link'} }) {
 	    my $linkname   = $ref->{'virtual_id'};
 
+	    # means nothing to assign; added again below.
+	    delete($ref->{'component_manager'});
+
 	    # Skip tunnels until rspec stitching in place.
 	    next
 		if (exists($ref->{'link_type'}) &&
@@ -157,27 +187,20 @@ sub MapResources($$$$)
     }
 
     #
-    # Get the resource objects.
-    #
-    foreach my $cm (keys(%cm_urns)) {
-	my $resource = GeniResource->Lookup($experiment->idx(), $cm);
-	if (!defined($resource)) {
-	    $resource = GeniResource->Create($experiment, $cm);
-	    if (!defined($resource)) {
-		print STDERR "Could not create GeniResource for $cm\n";
-		return -1;
-	    }
-	}
-	$cm_urns{$cm} = $resource;
-    }
-
-    #
     # Discover resources at the component and run assign.
     #
     foreach my $cm (keys(%cm_urns)) {
 	my $resource = $cm_urns{$cm};
 	my $fragment = $fragments{$cm};
 	my $advertisement;
+
+	#
+	# We got the ticket on a previous loop.
+	#
+	if ($resource->HaveTicket()) {
+	    print STDERR "Already have a ticket for $resource; skipping ...\n";
+	    next;
+	}
 
 	print STDERR "Asking for resource list from $resource\n";
 	if ($resource->Discover($user, \$advertisement)) {
@@ -316,6 +339,7 @@ sub GetTickets($$$$)
 {
     my ($experiment, $verbose, $user, $rspec) = @_;
     my %cm_urns   = ();
+    my %nodemap   = ();
 
     Register($experiment, $user) == 0
 	or return -1;
@@ -331,33 +355,39 @@ sub GetTickets($$$$)
 	    $ref->{'node_type'}->{'type_name'} eq "lan") {
 	    next;
 	}
+	my $virtual_id = $ref->{'virtual_id'};
 	my $node_urn = $ref->{'component_urn'};
 	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
 
-	$cm_urns{$cm} = $cm;
-
+	#
+	# Get the resource objects for below.
+	#
+	if (!exists($cm_urns{$cm})) {
+	    my $resource = GeniResource->Lookup($experiment->idx(), $cm);
+	    if (!defined($resource)) {
+		print STDERR "Could not get GeniResource for $cm\n";
+		return -1;
+	    }
+	    $nodemap{$virtual_id} = $resource;
+	    
+	    #
+	    # We got the ticket on a previous loop.
+	    #
+	    next
+		if ($resource->HaveTicket());
+	    
+	    $cm_urns{$cm} = $resource;
+	}
 	#
 	# This is how we get the client side to do cooked mode properly.
 	#
 	$ref->{'tarfiles'} = "/usr/local/etc/emulab ".
 	    "$TBDOCBASE/downloads/geniclient.tar";
     }
-
-    #
-    # Get the resource objects.
-    #
-    foreach my $cm (keys(%cm_urns)) {
-	my $resource = GeniResource->Lookup($experiment->idx(), $cm);
-	if (!defined($resource)) {
-	    $resource = GeniResource->Create($experiment, $cm);
-	    if (!defined($resource)) {
-		print STDERR "Could not create GeniResource for $cm\n";
-		return -1;
-	    }
-	}
-	$cm_urns{$cm} = $resource;
-    }
+    # No tickets needed, return now.
+    return 0
+	if (! scalar(keys(%cm_urns)));
 
     #
     # XXX Convert to a proper XML looking thing. This is just a temporay
@@ -390,6 +420,9 @@ sub GetTickets($$$$)
 		$resource->last_rpc_value()) {
 		print STDERR $resource->last_rpc_value() . "\n";
 	    }
+	    # Return indicator of possible forward progress.
+	    return 1
+		if ($resource->last_rpc_output() =~ /Could not map to/i);
 	    return -1;
 	}
 	return 0;
@@ -409,8 +442,9 @@ sub GetTickets($$$$)
     #
     # Check the exit codes. Eventually return specific error info.
     #
-    my $errors = 0;
-    my $count  = 0;
+    my $errors   = 0;
+    my $count    = 0;
+    my $progress = 0;
     foreach my $result (@results) {
 	my $resource = $resources[$count];
 
@@ -425,11 +459,41 @@ sub GetTickets($$$$)
 	elsif ($result != 0) {
 	    print STDERR "*** Error getting ticket for $resource\n";
 	    $errors++;
+
+	    # Watch for forward progress. Not being able to map actually
+	    # means forward progress since we want to try again with
+	    # different resources. The mapper will try a few times before
+	    $progress++
+		if ($result > 1);
+	}
+	else {
+	    $progress++;
+
+	    #
+	    # Got a ticket; mark the proxy nodes so that libvtop knows.
+	    # Failure to get a ticket means we need to release the node
+	    # up in libvtop. Probably need a state variable instead.
+	    #
+	    foreach my $virtual_id (keys(%nodemap)) {
+		next
+		    if (!$resource->SameResource($nodemap{$virtual_id}));
+
+		my $node = $experiment->VnameToNode($virtual_id);
+		if (defined($node)) {
+		    $node->ModifyReservation({"external_resource_index" =>
+						  $resource->idx()})
+			== 0 or return -1;
+		}
+	    }
 	}
 	$count++;
     }
+    return 0
+	if (!$errors);
+    
     print STDERR Dumper($rspec) if ($errors);
-    return $errors;
+    # Return indication of forward progress so caller knows to to stop.
+    return ($progress ? 1 : -1);
 }
 
 #
