@@ -21,4 +21,11 @@ NodeFlagSpec =
     ## none of them must be. Possibly expressible with properties?
     element emulab:disallow_trivial_mix { empty }?
 
-start = NodeFlagSpec | FeatureDesireSpec
+TypeLimitSpec =
+	element emulab:set_type_limit { TypeLimitContents }
+
+TypeLimitContents = 
+	attribute typeclass { text } &
+	attribute count { xsd:integer }	
+
+start = NodeFlagSpec | FeatureDesireSpec | TypeLimitSpec

@@ -10,8 +10,8 @@
 
 #ifdef WITH_XML
 
-#ifndef __ANNOTATE_RSPEC_H
-#define __ANNOTATE_RSPEC_H
+#ifndef __ANNOTATE_RSPEC_V2_H
+#define __ANNOTATE_RSPEC_V2_H
 
 #include "annotate.h"
 
@@ -23,7 +23,7 @@
 
 #include <xercesc/dom/DOM.hpp>
 
-class annotate_rspec : public annotate
+class annotate_rspec_v2 : public annotate
 {
  private:
   // Enumeration of which interface in a hop 
@@ -32,8 +32,8 @@ class annotate_rspec : public annotate
   std::map< std::string, std::set<std::string> > lan_links_map;
   
  public:
-  annotate_rspec ();
-  ~annotate_rspec () { ; }
+  annotate_rspec_v2 ();
+  ~annotate_rspec_v2 () { ; }
   
   // Annotates nodes and direct links in the rspec
   void annotate_element(const char* v_name, const char* p_name);

@@ -34,7 +34,9 @@ static const char rcsid[] = "$Id: parse_advertisement_rspec.cc,v 1.7 2009-10-21 
 #else
 	#define SCHEMA_LOCATION "ad.xsd"
 #endif
-				 
+
+using namespace rspec_emulab_extension;
+ 
 /*
  * XXX: Do I have to release lists when done with them?
  */
@@ -77,306 +79,291 @@ static bool populate_nodes(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			  set<string> &unavailable);
 static bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			  set<string> &unavailable);
+static bool populate_type_limits(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg);
+
 
 int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
-    /* 
-     * Fire up the XML parser
-     */
-    XMLPlatformUtils::Initialize();
-    
-    XercesDOMParser *domParser = new XercesDOMParser;
-    
+  /* 
+   * Fire up the XML parser
+   */
+  XMLPlatformUtils::Initialize();
+  
+  XercesDOMParser *domParser = new XercesDOMParser;
+  
+  /*
+   * Enable some of the features we'll be using: validation, namespaces, etc.
+   */
+  domParser->setValidationScheme(XercesDOMParser::Val_Always);
+  domParser->setDoNamespaces(true);
+  domParser->setDoSchema(true);
+  domParser->setValidationSchemaFullChecking(true);
+  
+  /*
+   * Just use a custom error handler - must admin it's not clear to me why
+   * we are supposed to use a SAX error handler for this, but this is what
+   * the docs say....
+   */    
+  ParseErrorHandler* errHandler = new ParseErrorHandler();
+  domParser->setErrorHandler(errHandler);
+  
+  /*
+   * Do the actual parse
+   */
+  domParser->parse(filename);
+  //XMLDEBUG("XML parse completed" << endl);
+  
+  /* 
+   * If there are any errors, do not go any further
+   */
+  if (errHandler->sawError()) {
+    cerr << "There were " << domParser -> getErrorCount () 
+	 << " errors in your file. " << endl;
+    exit(EXIT_FATAL);
+  }
+  else {
     /*
-     * Enable some of the features we'll be using: validation, namespaces, etc.
-     */
-    domParser->setValidationScheme(XercesDOMParser::Val_Always);
-    domParser->setDoNamespaces(true);
-    domParser->setDoSchema(true);
-    domParser->setValidationSchemaFullChecking(true);
-
-    /*
-     * Just use a custom error handler - must admin it's not clear to me why
-     * we are supposed to use a SAX error handler for this, but this is what
-     * the docs say....
-     */    
-    ParseErrorHandler* errHandler = new ParseErrorHandler();
-    domParser->setErrorHandler(errHandler);
-    
-    /*
-     * Do the actual parse
-     */
-    domParser->parse(filename);
-    //XMLDEBUG("XML parse completed" << endl);
-	    
-    /* 
-     * If there are any errors, do not go any further
-     */
-    if (errHandler->sawError()) {
-        cerr << "There were " << domParser -> getErrorCount () 
-			 				<< " errors in your file. " << endl;
-        exit(EXIT_FATAL);
-    }
-    else {
-        /*
-        * Get the root of the document - we're going to be using the same root
+     * Get the root of the document - we're going to be using the same root
         * for all subsequent calls
         */
-        DOMDocument* doc = domParser->getDocument();
-        advt_root = doc->getDocumentElement();
-        set<string> unavailable; // this should really be an unordered_set,
-	    // but that's not very portable yet
-
-		int rspecVersion = rspec_parser_helper::getRspecVersion(advt_root);
-		switch (rspecVersion)
-		{
-			case 1:
-				rspecParser = new rspec_parser_v1(RSPEC_TYPE_ADVT);
-				break;
-			case 2:
-				rspecParser = new rspec_parser_v2(RSPEC_TYPE_ADVT);
-				break;
-			default:
-				cerr << "ERROR: Unsupported rspec ver. " << rspecVersion
-						<< " ... Aborting " << endl;
-				exit(EXIT_FATAL);
-		}
-		XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
-		
-        bool is_physical;
-        XStr type (advt_root->getAttribute(XStr("type").x()));
-        if (strcmp(type.c(), "advertisement") == 0)
-        	is_physical = true;
-		else if (strcmp(type.c(), "request") == 0)
-			is_physical = false;
-        
-        // XXX: Not sure about datetimes, so they are strings for now
-        XStr generated (advt_root->getAttribute(XStr("generated").x()));
-        XStr valid_until (advt_root->getAttribute(XStr("valid_until").x()));
-        
-        /*
-        * These three calls do the real work of populating the assign data
-        * structures
-        */
-        XMLDEBUG("starting node population" << endl);
-        if (!populate_nodes(advt_root,pg,sg,unavailable)) {
-        	cerr << "Error reading nodes from physical topology "
-							 << filename << endl;
-        	exit(EXIT_FATAL);
-        }
-        XMLDEBUG("finishing node population" << endl);
-		XMLDEBUG("starting link population" << endl);
-        if (!populate_links(advt_root,pg,sg,unavailable)) {
-        	cerr << "Error reading links from physical topology "
-							 << filename << endl;
-        	exit(EXIT_FATAL);
-        }
-        XMLDEBUG("finishing link population" << endl);
-        
-        cerr << "RSpec parsing finished" << endl; 
+    DOMDocument* doc = domParser->getDocument();
+    advt_root = doc->getDocumentElement();
+    set<string> unavailable; // this should really be an unordered_set,
+    // but that's not very portable yet
+    
+    int rspecVersion = rspec_parser_helper::getRspecVersion(advt_root);
+    switch (rspecVersion) {
+    case 1:
+      rspecParser = new rspec_parser_v1(RSPEC_TYPE_ADVT);
+      break;
+    case 2:
+      rspecParser = new rspec_parser_v2(RSPEC_TYPE_ADVT);
+      break;
+    default:
+      cerr << "ERROR: Unsupported rspec ver. " << rspecVersion
+	   << " ... Aborting " << endl;
+      exit(EXIT_FATAL);
     }
+    XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
+    
+    bool is_physical;
+    XStr type (advt_root->getAttribute(XStr("type").x()));
+    if (strcmp(type.c(), "advertisement") == 0)
+      is_physical = true;
+    else if (strcmp(type.c(), "request") == 0)
+      is_physical = false;
+    
+    // XXX: Not sure about datetimes, so they are strings for now
+    XStr generated (advt_root->getAttribute(XStr("generated").x()));
+    XStr valid_until (advt_root->getAttribute(XStr("valid_until").x()));
     
     /*
-    * All done, clean up memory
-    */
-//     XMLPlatformUtils::Terminate();
-	free(rspecParser);
-    return 0;
+     * These three calls do the real work of populating the assign data
+     * structures
+     */
+    XMLDEBUG("starting node population" << endl);
+    if (!populate_nodes(advt_root,pg,sg,unavailable)) {
+      cerr << "Error reading nodes from physical topology "
+	   << filename << endl;
+      exit(EXIT_FATAL);
+    }
+    XMLDEBUG("finishing node population" << endl);
+    XMLDEBUG("starting link population" << endl);
+    if (!populate_links(advt_root,pg,sg,unavailable)) {
+      cerr << "Error reading links from physical topology "
+	   << filename << endl;
+      exit(EXIT_FATAL);
+    }
+    XMLDEBUG("finishing link population" << endl);
+    XMLDEBUG("setting type limits" << endl);
+    if (!populate_type_limits(advt_root, pg, sg)) {
+      cerr << "Error setting type limits " << filename << endl;
+      exit(EXIT_FATAL);
+    }
+    XMLDEBUG("finishing setting type limits" << endl);
+
+    cerr << "RSpec parsing finished" << endl; 
+  }
+  
+  /*
+   * All done, clean up memory
+   */
+  //     XMLPlatformUtils::Terminate();
+  free(rspecParser);
+  return 0;
 }
 
 /*
  * Pull nodes from the document, and populate assign's own data structures
  */
-bool populate_nodes(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
-			  set<string> &unavailable) {
-	bool is_ok = true;
-	pair<map<string, DOMElement*>::iterator, bool> insert_ret;
-    /*
-     * Get a list of all nodes in this document
-     */
-	DOMNodeList *nodes = root->getElementsByTagName(XStr("node").x());
-	int nodeCount = nodes->getLength();
-	XMLDEBUG("Found " << nodeCount << " nodes in rspec" << endl);
-	clock_t times [nodeCount];
-
-	int availableCount = 0;
-	int counter = 0;
-	for (size_t i = 0; i < nodeCount; i++) 
-	{
-		DOMNode *node = nodes->item(i);
-		// This should not be able to fail, because all elements in
-		// this list came from the getElementsByTagName() call
-		DOMElement *elt = dynamic_cast<DOMElement*>(node);
-				
-		bool hasComponentId;
-		bool hasCMId;
-		string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
-		string componentManagerId = rspecParser->readComponentManagerId(elt,hasCMId);
-		
-		if (!hasComponentId || !hasCMId)
-		{
-			is_ok = false;
-			continue;
-		}
-				
-		bool hasAvailable;
-		string available = rspecParser->readAvailable(elt, hasAvailable);
-// 		XStr available (getChildValue(elt, "available"));
-// 		if (strcmp(available, "false") == 0)
-// 		{
-// 		    unavailable.insert(componentId);
-// 		    continue;
-// 		}
-		if (available == "false")
-		{
-			unavailable.insert(componentId);
-			continue;
-		}
-		++availableCount;
-		
-		// Maintain a list of componentId's seen so far to ensure no duplicates
-		insert_ret = advertisement_elements->insert(
-								pair<string, DOMElement*>(componentId, elt));
-		if (insert_ret.second == false)
-		{
-			cerr << componentId << " already exists" << endl;
-			is_ok = false;
-		}
-
-		// XXX: This should not have to be called manually
-		bool allUnique;
-		rspecParser->readInterfacesOnNode(elt, allUnique);
-
-		/* Deal with the location tag */
-		int locationDataCount;
-		vector<string> locationData 
-				= rspecParser->readLocation(elt, locationDataCount);
-		
-		string country = locationData[0];
-		string latitude = "";
-		string longitude  = "";
-		if (locationDataCount == 3)
-		{
-			latitude = locationData[1];
-			longitude = locationData[2];
-		}
-		
-		pvertex pv;
-
-		tb_pnode *p;
-		/*
-		* TODO: These three steps shouldn't be 'manual'
-		*/
-		pv = add_vertex(pg);
-		// XXX: This is wrong!
-		p = new tb_pnode(componentId);
-		// XXX: Global
-		put(pvertex_pmap,pv,p);
-		/*
-		* XXX: This shouldn't be "manual"
-		*/
-		pname2vertex[componentId.c_str()] = pv;
-		
-		int typeCount;
-		vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
-		for (int i = 0; i < typeCount; i++)
-		{
-			node_type type = types[i];
-			const char* typeName = type.typeName.c_str();
-			int typeSlots = type.typeSlots;
-			bool isStatic = type.isStatic;
-			
-			// Add the type into assign's data structures
-			if (ptypes.find(typeName) == ptypes.end()) {
-				ptypes[typeName] = new tb_ptype(typeName);
-			}
-			ptypes[typeName]->add_slots(typeSlots);
-			tb_ptype *ptype = ptypes[typeName];
-			
-			/*
-			* For the moment, we treat switches specially - when we get the
-			* "forwarding" code working correctly, this special treatment
-			* will go away.
-			* TODO: This should not be in the parser, it should be somewhere
-			* else!
-			*/
-			if (strcmp(typeName, "switch") == 0) {
-				p->is_switch = true;
-				p->types["switch"] = new tb_pnode::type_record(1,false,ptype);
-				svertex sv = add_vertex(sg);
-				tb_switch *s = new tb_switch();
-				put(svertex_pmap,sv,s);
-				s->mate = pv;
-				p->sgraph_switch = sv;
-				p->switches.insert(pv);
-			} 
-			else {
-				p->types[typeName]
-						= new tb_pnode::type_record(typeSlots,isStatic,ptype);
-			}
-			p->type_list.push_back(p->types[typeName]);
-		}
-		
-		bool hasExclusive;
-		string exclusive = rspecParser->readExclusive(elt, hasExclusive);
-// 		if( hasChildTag( elt, "exclusive" ) ) {
-// 		    XStr exclusive( getChildValue( elt, "exclusive" ) );
-// 		    fstring feature( "shared" );
-// 
-// 		    if( !strcmp( exclusive, "false" ) )
-// 					p->features.push_front( 
-// 							tb_node_featuredesire( feature, 
-// 								1.0, true, featuredesire::FD_TYPE_NORMAL) );
-// 		}
-		
-		if (hasExclusive) {
-			fstring feature ("shared");
-			if (exclusive != "false") {
-				p->features.push_front(tb_node_featuredesire(feature, 1.0, true,
-																							featuredesire::FD_TYPE_NORMAL));
-			}
-		}
-
-		// Add the component_manager_uuid as a feature.
-		// We need to do this to handle external references
-		(p->features).push_front(
-		                  tb_node_featuredesire(
-								XStr(componentManagerId.c_str()).f(), 
-								1.0, false, featuredesire::FD_TYPE_NORMAL));
-		
-		bool isSubnode;
-		string subnodeOf = rspecParser->readSubnodeOf (elt, isSubnode);
-		if (isSubnode)
-		{
-			if (!p->subnode_of_name.empty()) 
-			{
-		    	is_ok = false;
-		    	continue;
-			} 
-			else 
-			{
-				// Just store the name for now, we'll do late binding to
-				// an actual pnode later
-		    	p->subnode_of_name = XStr(subnodeOf.c_str()).f();
-				}
-		}
-	
-		/*
-		* XXX: Is this really necessary?
-		*/
-		p->features.sort();
-
+bool populate_nodes(DOMElement *root, 
+		    tb_pgraph &pg, tb_sgraph &sg, set<string> &unavailable) {
+  bool is_ok = true;
+  pair<map<string, DOMElement*>::iterator, bool> insert_ret;
+  /*
+   * Get a list of all nodes in this document
+   */
+  DOMNodeList *nodes = root->getElementsByTagName(XStr("node").x());
+  int nodeCount = nodes->getLength();
+  XMLDEBUG("Found " << nodeCount << " nodes in rspec" << endl);
+  clock_t times [nodeCount];
+  
+  int availableCount = 0;
+  int counter = 0;
+  for (size_t i = 0; i < nodeCount; i++) {
+    DOMNode *node = nodes->item(i);
+    // This should not be able to fail, because all elements in
+    // this list came from the getElementsByTagName() call
+    DOMElement *elt = dynamic_cast<DOMElement*>(node);
+    
+    bool hasComponentId;
+    bool hasCMId;
+    string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
+    string componentManagerId = rspecParser->readComponentManagerId(elt,hasCMId);
+    
+    if (!hasComponentId || !hasCMId) {
+      is_ok = false;
+      continue;
     }
-   		 
+    
+    bool isAvailable;
+    string available = rspecParser->readAvailable(elt, isAvailable);
+    if (available == "false") {
+	unavailable.insert(componentId);
+	continue;
+      }
+    ++availableCount;
+    
+    // Maintain a list of componentId's seen so far to ensure no duplicates
+    insert_ret = advertisement_elements->insert
+      (pair<string, DOMElement*>(componentId, elt));
+    if (insert_ret.second == false)
+      {
+	cerr << componentId << " already exists" << endl;
+	is_ok = false;
+      }
+    
+    // XXX: This should not have to be called manually
+    bool allUnique;
+    rspecParser->readInterfacesOnNode(elt, allUnique);
+    
+    /* Deal with the location tag */
+    int locationDataCount;
+    vector<string> locationData 
+      = rspecParser->readLocation(elt, locationDataCount);
+    
+    string country = locationData[0];
+    string latitude = "";
+    string longitude  = "";
+    if (locationDataCount == 3) {
+      latitude = locationData[1];
+      longitude = locationData[2];
+    }
+    
+    pvertex pv;
+    
+    tb_pnode *p;
     /*
-     * This post-pass binds subnodes to their parents
+     * TODO: These three steps shouldn't be 'manual'
      */
-    bind_ptop_subnodes(pg);
-    XMLDEBUG ("Found " << availableCount << " available nodes" << endl);
+    pv = add_vertex(pg);
+    // XXX: This is wrong!
+    p = new tb_pnode(componentId);
+    // XXX: Global
+    put(pvertex_pmap,pv,p);
     /*
-     * Indicate no errors
+     * XXX: This shouldn't be "manual"
      */
-     
-    return is_ok;
+    pname2vertex[componentId.c_str()] = pv;
+    
+    int typeCount;
+    vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
+    for (int i = 0; i < typeCount; i++) {
+      node_type type = types[i];
+      const char* typeName = type.typeName.c_str();
+      int typeSlots = type.typeSlots;
+      bool isStatic = type.isStatic;
+      
+      cout << typeName << " " << typeSlots << " " << isStatic << endl;
+
+      // Add the type into assign's data structures
+      if (ptypes.find(typeName) == ptypes.end()) {
+	ptypes[typeName] = new tb_ptype(typeName);
+      }
+      ptypes[typeName]->add_slots(typeSlots);
+      tb_ptype *ptype = ptypes[typeName];
+      
+      /*
+       * For the moment, we treat switches specially - when we get the
+       * "forwarding" code working correctly, this special treatment
+       * will go away.
+       * TODO: This should not be in the parser, it should be somewhere
+       * else!
+       */
+      if (strcmp(typeName, "switch") == 0) {
+	p->is_switch = true;
+	p->types["switch"] = new tb_pnode::type_record(1,false,ptype);
+	svertex sv = add_vertex(sg);
+	tb_switch *s = new tb_switch();
+	put(svertex_pmap,sv,s);
+	s->mate = pv;
+	p->sgraph_switch = sv;
+	p->switches.insert(pv);
+      } 
+      else {
+	p->types[typeName]
+	  = new tb_pnode::type_record(typeSlots,isStatic,ptype);
+      }
+      p->type_list.push_back(p->types[typeName]);
+    }
+    
+    bool hasExclusive;
+    string exclusive = rspecParser->readExclusive(elt, hasExclusive);
+    
+    if (hasExclusive) {
+      fstring feature ("shared");
+      if (exclusive != "false") {
+	p->features.push_front
+	  (tb_node_featuredesire(feature, 1.0, true,
+				 featuredesire::FD_TYPE_NORMAL));
+      }
+    }
+    
+    // Add the component_manager_uuid as a feature.
+    // We need to do this to handle external references
+    (p->features).push_front
+      (tb_node_featuredesire(XStr(componentManagerId.c_str()).f(), 
+			     1.0, false, featuredesire::FD_TYPE_NORMAL));
+
+    bool isSubnode;
+    string subnodeOf = rspecParser->readSubnodeOf (elt, isSubnode);
+    if (isSubnode) {
+      if (!p->subnode_of_name.empty()){
+	is_ok = false;
+	continue;
+      } 
+      else { 
+	// Just store the name for now, we'll do late binding to
+	// an actual pnode later
+	p->subnode_of_name = XStr(subnodeOf.c_str()).f();
+      }
+    }
+    
+    /*
+     * XXX: Is this really necessary?
+     */
+    p->features.sort();
+  }
+  
+  /*
+   * This post-pass binds subnodes to their parents
+   */
+  bind_ptop_subnodes(pg);
+  XMLDEBUG ("Found " << availableCount << " available nodes" << endl);
+  /*
+   * Indicate no errors
+   */
+  
+  return is_ok;
 }
 
 /*
@@ -385,211 +372,220 @@ bool populate_nodes(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 			  set<string> &unavailable) {
     
-    bool is_ok = true;
-    pair<map<string, DOMElement*>::iterator, bool> insert_ret;
-	
-    /*
-     * TODO: Support the "PENALIZE_BANDWIDTH" option?
-     * TODO: Support the "FIX_PLINK_ENDPOINTS" and "FIX_PLINKS_DEFAULT"?
-     */
-    DOMNodeList *links = root->getElementsByTagName(XStr("link").x());
-    int linkCount = links->getLength();
-    XMLDEBUG("Found " << links->getLength()  << " links in rspec" << endl);
-		
-    for (size_t i = 0; i < linkCount; i++) {
-        
-			DOMNode *link = links->item(i);
-			DOMElement *elt = dynamic_cast<DOMElement*>(link);
-        
-			bool hasComponentId;
-			bool hasCMId;
-			string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
-			string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
-			
-			if (!hasComponentId || !hasCMId) {
-				cerr << "All elements must have a component_uuid/component_urn "
-						 << "and a component_manager_uuid/component_manager_urn" << endl;
-				is_ok = false;
-			}
-			else
-			{
-				insert_ret = advertisement_elements->insert(
-									pair<string, DOMElement*>(componentId, elt));
-				if (insert_ret.second == false)
-				{
-					cerr << componentId << " already exists" << endl;
-					is_ok = false;
-				}
-			}
-		
-			/*
-			* Get source and destination interfaces - we use knowledge of the
-			* schema that there is awlays exactly one source and one destination
-			*/
-			int ifaceCount = 0;
-			vector<struct link_interface> interfaces 
-					= rspecParser->readLinkInterface(elt, ifaceCount);
-			
-			// Error handling
-			switch (ifaceCount)
-			{
-				case RSPEC_ERROR_BAD_IFACE_COUNT:
-					cerr << "Incorrect number of interfaces found on link " 
-							<< componentId << ". Expected 2 (found " 
-							<< ifaceCount << ")" << endl;
-					is_ok = false;
-					continue;
-				
-				case RSPEC_ERROR_UNSEEN_NODEIFACE_SRC:
-					cerr << "Unseen node-interface pair on the source interface ref"
-							<< endl;
-					is_ok = false;
-					continue;
-						
-				case RSPEC_ERROR_UNSEEN_NODEIFACE_DST:
-					cerr << "Unseen node-interface pair on the destination interface ref"
-							<< endl;
-					is_ok = false;
-					continue;
-			}
-			
-			/* NOTE: In a request, we assume that each link has only two interfaces
-			 * Although the order is immaterial, assign expects a source first 
-			 * and a destination second and we assume the same
-			 */	
-			string src_node = interfaces[0].physicalNodeId;
-			string src_iface = interfaces[0].physicalIfaceId;
-			string dst_node = interfaces[1].physicalNodeId;
-			string dst_iface = interfaces[1].physicalIfaceId;
-
-			if (src_node == "" || src_iface == "")
-			{
-				cerr << "Physical link " << componentId 
-						<< " must have a component id and component interface id "
-						<< " specified for the source node" << endl;
-				is_ok = false;
-				continue;
-			}
-			if (dst_node == "" || dst_iface == "")
-			{
-				cerr << "Physical link " << componentId 
-						<< " must have a component id and component interface id"
-						<< " specified for the destination node" << endl;
-				is_ok = false;
-				continue;
-			}
-	
-			if( unavailable.count( src_node ) || 
-					unavailable.count( dst_node ) )
-					//one or both of the endpoints are unavailable; silently
-					//ignore the link
-					continue;
-	
-			/*
-			* Get standard link characteristics
-			*/
-			int count;
-			link_characteristics characteristics
-					= rspecParser->readLinkCharacteristics (elt, count);
-			
-			int bandwidth = characteristics.bandwidth;
-			int latency = characteristics.latency;
-			double packetLoss = characteristics.packetLoss;
-			
-			/*
-			* Find the nodes in the existing data structures
-			*/
-			pvertex src_vertex = pname2vertex[src_node.c_str()];
-			pvertex dst_vertex = pname2vertex[dst_node.c_str()];
-			tb_pnode *src_pnode = get(pvertex_pmap,src_vertex);
-			tb_pnode *dst_pnode = get(pvertex_pmap,dst_vertex);
-			
-			/*
-			* Start getting link types - we know there is at least one, and we
-			* need it for the constructor
-			*/
-			int typeCount;
-			vector<link_type> types = rspecParser->readLinkTypes(elt, typeCount);
-			const char* str_first_type = types[0].typeName.c_str();
-							
-			/*
-			* Create the actual link object
-			*/
-			pedge phys_edge = (add_edge(src_vertex,dst_vertex,pg)).first;
-			// XXX: Link type!?
-			// XXX: Don't want to use (null) src and dest macs, but would break
-			// other stuff if I remove them... bummer!
-			tb_plink *phys_link =
-				new tb_plink(componentId.c_str(), 
-							tb_plink::PLINK_NORMAL, str_first_type,
-									"(null)", "(null)", 
-										src_iface.c_str(), dst_iface.c_str());
-			
-			phys_link->delay_info.bandwidth = bandwidth;
-			phys_link->delay_info.delay = latency;
-			phys_link->delay_info.loss = packetLoss;
-		
-			// XXX: Should not be manual
-			put(pedge_pmap, phys_edge, phys_link);
-	
-		
-			// ******************************************
-			// XXX: This is weird. It has to be clarified
-			// ******************************************
-			#ifdef PENALIZE_BANDWIDTH
-				float penalty = 1.0
-				phys_link -> penalty = penalty;
-			#endif
-		
-			// XXX: Likewise, should happen automatically, but the current tb_plink
-			// strucutre doesn't actually have pointers to the physnode endpoints
-			src_pnode->total_interfaces++;
-			dst_pnode->total_interfaces++;
-			src_pnode->link_counts[str_first_type]++;
-			dst_pnode->link_counts[str_first_type]++;
-			
-			/*
-			* Add in the rest of the link types we found
-			*/
-			for (int i = 1; i < typeCount; i++) 
-			{
-				const char *str_type_name = types[i].typeName.c_str();
-				////XMLDEBUG("  Link has type " << type_name << endl);
-				// XXX: Should not be manual
-				phys_link->types.insert(str_type_name);
-				src_pnode->link_counts[str_type_name]++;
-				dst_pnode->link_counts[str_type_name]++;
-			}
-		
-			if (ISSWITCH(src_pnode) && ISSWITCH(dst_pnode)) 
-			{
-				svertex src_switch = get(pvertex_pmap,src_vertex)->sgraph_switch;
-				svertex dst_switch = get(pvertex_pmap,dst_vertex)->sgraph_switch;
-				sedge swedge = add_edge(src_switch,dst_switch,sg).first;
-				tb_slink *sl = new tb_slink();
-				put(sedge_pmap,swedge,sl);
-				sl->mate = phys_edge;
-				phys_link->is_type = tb_plink::PLINK_INTERSWITCH;
-			}
-				
-			else if (ISSWITCH(src_pnode) && ! ISSWITCH(dst_pnode)) 
-			{
-				dst_pnode->switches.insert(src_vertex);
-#ifdef PER_VNODE_TT
-				dst_pnode->total_bandwidth += bandwidth;
-#endif
-			}
-				
-			else if (ISSWITCH(dst_pnode) && ! ISSWITCH(src_pnode)) 
-			{
-				src_pnode->switches.insert(dst_vertex);
-#ifdef PER_VNODE_TT
-				src_pnode->total_bandwidth += bandwidth;
-#endif
-			}
-
+  bool is_ok = true;
+  pair<map<string, DOMElement*>::iterator, bool> insert_ret;
+  
+  /*
+   * TODO: Support the "PENALIZE_BANDWIDTH" option?
+   * TODO: Support the "FIX_PLINK_ENDPOINTS" and "FIX_PLINKS_DEFAULT"?
+   */
+  DOMNodeList *links = root->getElementsByTagName(XStr("link").x());
+  int linkCount = links->getLength();
+  XMLDEBUG("Found " << links->getLength()  << " links in rspec" << endl);
+  
+  for (size_t i = 0; i < linkCount; i++) {
+    
+    DOMNode *link = links->item(i);
+    DOMElement *elt = dynamic_cast<DOMElement*>(link);
+    
+    bool hasComponentId;
+    bool hasCMId;
+    string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
+    string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
+    
+    if (!hasComponentId || !hasCMId) {
+      cerr << "All elements must have a component_uuid/component_urn "
+	   << "and a component_manager_uuid/component_manager_urn" << endl;
+      is_ok = false;
     }
-    return is_ok;
+    else {
+      insert_ret = 
+	advertisement_elements->insert(pair<string, DOMElement*>
+				       (componentId, elt));
+      if (insert_ret.second == false) {
+	cerr << componentId << " already exists" << endl;
+	is_ok = false;
+      }
+    }
+    
+    /*
+     * Get source and destination interfaces - we use knowledge of the
+     * schema that there is awlays exactly one source and one destination
+     */
+    int ifaceCount = 0;
+    vector<struct link_interface> interfaces 
+      = rspecParser->readLinkInterface(elt, ifaceCount);
+    
+    // Error handling
+    switch (ifaceCount) {
+    case RSPEC_ERROR_BAD_IFACE_COUNT:
+      cerr << "Incorrect number of interfaces found on link " 
+	   << componentId << ". Expected 2 (found " 
+	   << ifaceCount << ")" << endl;
+      is_ok = false;
+      continue;
+      
+    case RSPEC_ERROR_UNSEEN_NODEIFACE_SRC:
+      cerr << "Unseen node-interface pair on the source interface ref"
+	   << endl;
+      is_ok = false;
+      continue;
+      
+    case RSPEC_ERROR_UNSEEN_NODEIFACE_DST:
+      cerr << "Unseen node-interface pair on the destination interface ref"
+	   << endl;
+      is_ok = false;
+      continue;
+    }
+    
+    /* NOTE: In a request, we assume that each link has only two interfaces
+     * Although the order is immaterial, assign expects a source first 
+     * and a destination second and we assume the same
+     */	
+    string src_node = interfaces[0].physicalNodeId;
+    string src_iface = interfaces[0].physicalIfaceId;
+    string dst_node = interfaces[1].physicalNodeId;
+    string dst_iface = interfaces[1].physicalIfaceId;
+    
+    if (src_node == "" || src_iface == "") {
+      cerr << "Physical link " << componentId 
+	   << " must have a component id and component interface id "
+	   << " specified for the source node" << endl;
+      is_ok = false;
+      continue;
+    }
+    if (dst_node == "" || dst_iface == "") {
+      cerr << "Physical link " << componentId 
+	   << " must have a component id and component interface id"
+	   << " specified for the destination node" << endl;
+      is_ok = false;
+      continue;
+    }
+    
+    if( unavailable.count( src_node ) || 
+	unavailable.count( dst_node ) )
+      //one or both of the endpoints are unavailable; silently
+      //ignore the link
+      continue;
+    
+    /*
+     * Get standard link characteristics
+     */
+    int count;
+    link_characteristics characteristics
+      = rspecParser->readLinkCharacteristics (elt, count);
+    
+    int bandwidth = characteristics.bandwidth;
+    int latency = characteristics.latency;
+    double packetLoss = characteristics.packetLoss;
+    
+    /*
+     * Find the nodes in the existing data structures
+     */
+    pvertex src_vertex = pname2vertex[src_node.c_str()];
+    pvertex dst_vertex = pname2vertex[dst_node.c_str()];
+    tb_pnode *src_pnode = get(pvertex_pmap,src_vertex);
+    tb_pnode *dst_pnode = get(pvertex_pmap,dst_vertex);
+    
+    /*
+     * Start getting link types - we know there is at least one, and we
+     * need it for the constructor
+     */
+    int typeCount;
+    vector<link_type> types = rspecParser->readLinkTypes(elt, typeCount);
+    const char* str_first_type = types[0].typeName.c_str();
+    
+    /*
+     * Create the actual link object
+     */
+    pedge phys_edge = (add_edge(src_vertex,dst_vertex,pg)).first;
+    // XXX: Link type!?
+    // XXX: Don't want to use (null) src and dest macs, but would break
+    // other stuff if I remove them... bummer!
+    tb_plink *phys_link =
+      new tb_plink(componentId.c_str(), 
+		   tb_plink::PLINK_NORMAL, str_first_type,
+		   "(null)", "(null)", 
+		   src_iface.c_str(), dst_iface.c_str());
+    
+    phys_link->delay_info.bandwidth = bandwidth;
+    phys_link->delay_info.delay = latency;
+    phys_link->delay_info.loss = packetLoss;
+		
+    // XXX: Should not be manual
+    put(pedge_pmap, phys_edge, phys_link);
+    
+    
+    // ******************************************
+    // XXX: This is weird. It has to be clarified
+    // ******************************************
+#ifdef PENALIZE_BANDWIDTH
+    float penalty = 1.0
+      phys_link -> penalty = penalty;
+#endif
+    
+    // XXX: Likewise, should happen automatically, but the current tb_plink
+    // strucutre doesn't actually have pointers to the physnode endpoints
+    src_pnode->total_interfaces++;
+    dst_pnode->total_interfaces++;
+    src_pnode->link_counts[str_first_type]++;
+    dst_pnode->link_counts[str_first_type]++;
+    
+    /*
+     * Add in the rest of the link types we found
+     */
+    for (int i = 1; i < typeCount; i++) {
+      const char *str_type_name = types[i].typeName.c_str();
+      ////XMLDEBUG("  Link has type " << type_name << endl);
+      // XXX: Should not be manual
+      phys_link->types.insert(str_type_name);
+      src_pnode->link_counts[str_type_name]++;
+      dst_pnode->link_counts[str_type_name]++;
+    }
+    
+    if (ISSWITCH(src_pnode) && ISSWITCH(dst_pnode)) {
+      svertex src_switch = get(pvertex_pmap,src_vertex)->sgraph_switch;
+      svertex dst_switch = get(pvertex_pmap,dst_vertex)->sgraph_switch;
+      sedge swedge = add_edge(src_switch,dst_switch,sg).first;
+      tb_slink *sl = new tb_slink();
+      put(sedge_pmap,swedge,sl);
+      sl->mate = phys_edge;
+      phys_link->is_type = tb_plink::PLINK_INTERSWITCH;
+    }
+    
+    else if (ISSWITCH(src_pnode) && ! ISSWITCH(dst_pnode)) {
+      dst_pnode->switches.insert(src_vertex);
+#ifdef PER_VNODE_TT
+      dst_pnode->total_bandwidth += bandwidth;
+#endif
+    }
+    
+    else if (ISSWITCH(dst_pnode) && ! ISSWITCH(src_pnode)) {
+	src_pnode->switches.insert(dst_vertex);
+#ifdef PER_VNODE_TT
+	src_pnode->total_bandwidth += bandwidth;
+#endif
+    }
+    
+  }
+  return is_ok;
+}
+
+bool populate_type_limits(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg)
+{
+  int count;
+  vector<struct type_limit> rv = rspecParser->readTypeLimits(root, count);
+  XMLDEBUG ("Found " << count << " type limits" << endl);
+  for (int i = 0; i < count; i++) {
+    fstring type = XStr(rv[i].typeClass.c_str()).f();
+    int max = rv[i].typeCount;
+
+    if (ptypes.find(type) == ptypes.end()) {
+      ptypes[type] = new tb_ptype(type);
+    }
+    ptypes[type]->set_max_users(max);
+  }  
+  return true;
 }
 
 #endif

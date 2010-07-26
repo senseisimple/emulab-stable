@@ -71,18 +71,18 @@ void print_solution(const solution &s) {
 			cout << "unassigned: " << vn->name << endl;
 		} else {
 	#ifdef WITH_XML
-			const char* node_name = XStr(vn -> name).c();
-			const char* assigned_to = XStr (get(pvertex_pmap,s.get_assignment(*vit))->name).c() ;
-			if (both_inputs_rspec == true)
-			{
-				rspec_annotater->annotate_element(node_name, assigned_to);
-				if (rspec_annotater->is_generated_element("node", "virtual_id", node_name))
-					continue;
-			}
-			else if (both_inputs_xml == true)
-			{
-				vtop_annotater->annotate_element(node_name, assigned_to);
-			}
+// 			const char* node_name = XStr(vn -> name).c();
+// 			const char* assigned_to = XStr (get(pvertex_pmap,s.get_assignment(*vit))->name).c() ;
+// 			if (both_inputs_rspec == true)
+// 			{
+// 				rspec_annotater->annotate_element(node_name, assigned_to);
+// 				if (rspec_annotater->is_generated_element("node", "virtual_id", node_name))
+// 					continue;
+// 			}
+// 			else if (both_inputs_xml == true)
+// 			{
+// 				vtop_annotater->annotate_element(node_name, assigned_to);
+// 			}
 	#endif
 			cout << vn->name << " " << get(pvertex_pmap,s.get_assignment(*vit))->name << endl;
 		}
@@ -221,20 +221,18 @@ void print_solution(const solution &s) {
 /* Print out the current solution and annotate the rspec */
 void print_solution (const solution &s, const char* output_filename)
 {
-	print_solution(s);
+  print_solution(s);
 #ifdef WITH_XML
-	// This will work because print_solution is called already
-	// and the objects have been created there
-	if (both_inputs_rspec == true)
-	{
-		cout << "Writing annotated rspec to " << output_filename << endl;
-		rspec_annotater->write_annotated_file (output_filename);
-	}
-	else if (both_inputs_xml == true)
-	{
-		cout << "Writing annotated xml to " << output_filename << endl;
-		vtop_annotater->write_annotated_file (output_filename);
-	}
+  // This will work because print_solution is called already
+  // and the objects have been created there
+  if (both_inputs_rspec == true) {
+      cout << "Writing annotated rspec to " << output_filename << endl;
+      rspec_annotater->write_annotated_file (output_filename);
+  }
+  else if (both_inputs_xml == true) {
+      cout << "Writing annotated xml to " << output_filename << endl;
+      vtop_annotater->write_annotated_file (output_filename);
+  }
 #endif
 }
 

@@ -437,6 +437,8 @@ sub RunAssign($$)
     # allocated to experiment in the PTOP results.
     #
     my $ptopargs = "-p $pid ";
+# XXX: This should be removed after testing.
+    $ptopargs .= "-e $eid ";
     $ptopargs   .= "-e $eid "
 	if ($updating);
     $ptopargs   .= "-u "
@@ -455,6 +457,7 @@ sub RunAssign($$)
     	if ($precheck);
     $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
     	if (defined($experiment->delay_capacity()));
+    $ptopargs .= "-x -g 2";
 
     chat("ptopargs: '$ptopargs'\n");
     TBDebugTimeStamp("ptopgen started");
@@ -475,7 +478,7 @@ sub RunAssign($$)
 	foreach my $typeclass (keys(%admission_control)) {
 	    my $count = $admission_control{$typeclass};
 
-	    print PTOP "set-type-limit $typeclass $count\n";
+#	    print PTOP "set-type-limit $typeclass $count\n";
 	}
 	close(PTOP);
     }
@@ -505,7 +508,7 @@ sub RunAssign($$)
 
     # Run assign
     my $cmd  = "assign";
-    my $args = "$ptopfile $vtopfile";
+    my $args = "-f rspec $ptopfile $vtopfile";
     $args = "-P $args"
 	if (!$vtop->sharednodecount());
     $args = "-uod -c .75 $args"

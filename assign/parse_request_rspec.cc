@@ -66,593 +66,574 @@ static rspec_parser* rspecParser;
  * These are not meant to be used outside of this file,so they are only
  * declared in here
  */
-static bool populate_nodes(DOMElement *root, tb_vgraph &vg, 
-		                  	map< pair<string, string>,
-		                      	 pair<string, string> >* fixed_interfaces);
-static bool populate_links(DOMElement *root, tb_vgraph &vg, 
-							map< pair<string, string>, 
-								 pair<string, string> >* fixed_interfaces);
-							   					
+static bool populate_nodes(DOMElement *root, 
+			   tb_vgraph &vg, 
+			   map< pair<string, string>,
+			   pair<string, string> >* fixed_interfaces);
+static bool populate_links(DOMElement *root, 
+			   tb_vgraph &vg, 
+			   map< pair<string, string>, 
+			   pair<string, string> >* fixed_interfaces);
+
 DOMElement* appendChildTagWithData (DOMElement* parent, 
-									const char* tag_name, 
-									const char* child_value);
+				    const char* tag_name, 
+				    const char* child_value);
 string generate_virtualNodeId (string virtual_id);
 string generate_virtualIfaceId(string node_name, int interface_number);
 
 int parse_request(tb_vgraph &vg, char *filename) {
-    /* 
-     * Fire up the XML domParser
-     */
-    XMLPlatformUtils::Initialize();
-    
-    XercesDOMParser *domParser = new XercesDOMParser;
-    
+  /* 
+   * Fire up the XML domParser
+   */
+  XMLPlatformUtils::Initialize();
+  
+  XercesDOMParser *domParser = new XercesDOMParser;
+  
+  /*
+   * Enable some of the features we'll be using: validation, namespaces, etc.
+   */
+  domParser->setValidationScheme(XercesDOMParser::Val_Always);
+  domParser->setDoNamespaces(true);
+  domParser->setDoSchema(true);
+  domParser->setValidationSchemaFullChecking(true);
+  //domParser->setExternalSchemaLocation("http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd");
+  
+  /*
+   * Just use a custom error handler - must admin it's not clear to me why
+   * we are supposed to use a SAX error handler for this, but this is what
+   * the docs say....
+   */    
+  ParseErrorHandler* errHandler = new ParseErrorHandler();
+  domParser->setErrorHandler(errHandler);
+  
+  /*
+   * Do the actual parse
+   */
+  domParser->parse(filename);
+  XMLDEBUG("XML parse completed" << endl);
+  
+  /* 
+   * If there are any errors, do not go any further
+   */
+  if (errHandler->sawError()) {
+    cerr << "There were " << domParser -> getErrorCount () 
+	 << " errors in your file. " << endl;
+    exit(EXIT_FATAL);
+  }
+  else {
     /*
-     * Enable some of the features we'll be using: validation, namespaces, etc.
+     * Get the root of the document - we're going to be using the same root
+     * for all subsequent calls
      */
-    domParser->setValidationScheme(XercesDOMParser::Val_Always);
-    domParser->setDoNamespaces(true);
-    domParser->setDoSchema(true);
-    domParser->setValidationSchemaFullChecking(true);
-	//domParser->setExternalSchemaLocation("http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd");
-        
-    /*
-     * Just use a custom error handler - must admin it's not clear to me why
-     * we are supposed to use a SAX error handler for this, but this is what
-     * the docs say....
-     */    
-    ParseErrorHandler* errHandler = new ParseErrorHandler();
-    domParser->setErrorHandler(errHandler);
+    doc = domParser->getDocument();
+    request_root = doc->getDocumentElement();
     
-    /*
-     * Do the actual parse
-     */
-    domParser->parse(filename);
-    XMLDEBUG("XML parse completed" << endl);
-	    
-	/* 
-     * If there are any errors, do not go any further
-     */
-    if (errHandler->sawError()) {
-        cerr << "There were " << domParser -> getErrorCount () 
-			 << " errors in your file. " << endl;
-        exit(EXIT_FATAL);
+    bool is_physical;
+    XStr type (request_root->getAttribute(XStr("type").x()));
+    if (strcmp(type.c(), "request") != 0) {
+      cerr << "Error: RSpec type must be \"request\"" << endl;
+      exit (EXIT_FATAL);
+    } 
+    
+    // NOTE: Not sure about datetimes. They are strings for now
+    XStr generated (request_root->getAttribute(XStr("generated").x()));
+    XStr valid_until(request_root->getAttribute(XStr("valid_until").x()));
+    
+    // Initialize the rspec parser with the correct object depending
+    // on the version of the rspec.
+    int rspecVersion = rspec_parser_helper::getRspecVersion(request_root);
+    switch (rspecVersion) {
+    case 1:
+      rspecParser = new rspec_parser_v1(RSPEC_TYPE_REQ);
+      break;
+    case 2:
+      rspecParser = new rspec_parser_v2(RSPEC_TYPE_REQ);
+      break;
+    default:
+      cerr << "ERROR: Unsupported rspec ver. " << rspecVersion
+	   << " ... Aborting " << endl;
+      exit(EXIT_FATAL);
     }
-    else {
-        /*
-        * Get the root of the document - we're going to be using the same root
-        * for all subsequent calls
-        */
-        doc = domParser->getDocument();
-        request_root = doc->getDocumentElement();
-        
-        bool is_physical;
-        XStr type (request_root->getAttribute(XStr("type").x()));
-		if (strcmp(type.c(), "request") != 0)
-		{
-			cerr << "Error: RSpec type must be \"request\"" << endl;
-			exit (EXIT_FATAL);
-		} 
-        
-        // NOTE: Not sure about datetimes. They are strings for now
-        XStr generated (request_root->getAttribute(XStr("generated").x()));
-        XStr valid_until(request_root->getAttribute(XStr("valid_until").x()));
-		
-		// Initialize the rspec parser with the correct object depending
-		// on the version of the rspec.
-		int rspecVersion = rspec_parser_helper::getRspecVersion(request_root);
-		switch (rspecVersion)
-		{
-			case 1:
-				rspecParser = new rspec_parser_v1(RSPEC_TYPE_REQ);
-				break;
-			case 2:
-				rspecParser = new rspec_parser_v2(RSPEC_TYPE_REQ);
-				break;
-			default:
-				cerr << "ERROR: Unsupported rspec ver. " << rspecVersion
-						<< " ... Aborting " << endl;
-				exit(EXIT_FATAL);
-		}
-		XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
-        
-		map< pair<string, string>, pair<string, string> > fixed_interfaces;
-        
-		/*
-        * These three calls do the real work of populating the assign data
-        * structures
-        */
-        XMLDEBUG("starting node population" << endl);
-        if (!populate_nodes(request_root,vg, &fixed_interfaces)) {
-			cerr << "Error reading nodes from virtual topology " 
-				 << filename << endl;
-			exit(EXIT_FATAL);
-        }
-        XMLDEBUG("finishing node population" << endl);
-        
-        XMLDEBUG("starting link population" << endl);
-        if (!populate_links(request_root,vg, &fixed_interfaces)) {
-			cerr << "Error reading links from virtual topology " 
-				 << filename << endl;
-			exit(EXIT_FATAL);
-        }
-        XMLDEBUG("finishing link population" << endl);
-		
-        /* TODO: We need to do something about policies at some point. */
-		//populate_policies(root);
-        
-        cerr << "RSpec parsing finished" << endl; 
-    }
+    XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
+    
+    map< pair<string, string>, pair<string, string> > fixed_interfaces;
     
     /*
-    * All done, clean up memory
-    */
+     * These three calls do the real work of populating the assign data
+     * structures
+     */
+    XMLDEBUG("starting node population" << endl);
+    if (!populate_nodes(request_root,vg, &fixed_interfaces)) {
+      cerr << "Error reading nodes from virtual topology " 
+	   << filename << endl;
+      exit(EXIT_FATAL);
+    }
+    XMLDEBUG("finishing node population" << endl);
+    
+    XMLDEBUG("starting link population" << endl);
+    if (!populate_links(request_root,vg, &fixed_interfaces)) {
+      cerr << "Error reading links from virtual topology " 
+	   << filename << endl;
+      exit(EXIT_FATAL);
+    }
+    XMLDEBUG("finishing link population" << endl);
+    
+    /* TODO: We need to do something about policies at some point. */
+    //populate_policies(root);
+    
+    cerr << "RSpec parsing finished" << endl; 
+  }
+  
+  /*
+   * All done, clean up memory
+   */
 //     XMLPlatformUtils::Terminate();
-	free(rspecParser);
-    return 0;
+  free(rspecParser);
+  return 0;
 }
 
 bool populate_node(DOMElement* elt, 
-					tb_vgraph &vg, map< pair<string,string>, 
-					pair<string,string> >* fixed_interfaces) 
+		   tb_vgraph &vg, map< pair<string,string>, 
+		   pair<string,string> >* fixed_interfaces) 
 {	
-	bool hasVirtualId;
-	string virtualId = rspecParser->readVirtualId(elt, hasVirtualId);
-	
-	bool available;
-	string availableString = rspecParser->readAvailable(elt, available);
-	
-	bool hasComponentId;
-	bool hasCMId;
-	string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
-	string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
-	
-	// If a node has a component_uuid, it is a fixed node
-	if (hasComponentId) {
-		if(hasCMId)
-			fixed_nodes [virtualId] = componentId;	
-		else
-			cerr << "WARNING: Virtual node " << virtualId 
-					 << " has a componentId specified "
-					 << "but no component manager " << endl
-					 << "The componentId will be ignored." << endl;
-	}
-		
-	if (!hasVirtualId)
-	{
-		cerr << "ERROR: Every node must have a virtual_id" << endl;
-		return false;
-	}
-
-	bool allUnique;
-	map< pair<string, string>, pair<string, string> > fixedIfacesOnNode;
-	fixedIfacesOnNode = rspecParser->readInterfacesOnNode(elt, allUnique);
-	// XXX: This should not have to be called manually
-	if (!allUnique) {
-		cerr << "The node-interface pairs in " << virtualId 
-				<< " were not unique."	<< endl;
-		return false;
-	}
-	fixed_interfaces->insert(fixedIfacesOnNode.begin(),fixedIfacesOnNode.end());
-	
-	/* Deal with the location tag */
-	cerr << "WARNING: Country information will be ignored" << endl;
-		
-	/*
-	 * Add on types
-	 */
-	tb_vclass *vclass = NULL;
-
-	int typeCount;
-	vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
-	cerr << " Here " << endl;
-	bool no_type = (typeCount == 0);
-	if (typeCount > 1) {
-		cerr << "ERROR: Too many node types (" << typeCount << ") on " 
-				 << virtualId << " (allowed 1) ... Aborting " << endl;
-		exit(EXIT_FAILURE);
-	}
-	
-	string typeName = types[0].typeName;
-	int typeSlots = types[0].typeSlots;
-	bool isStatic = types[0].isStatic;
-		
-	bool isUnlimited = (typeSlots == 1000);
-		
-	cerr << "Done parsing node types " << endl;
-	
-	/*
-	 * Make a tb_ptype structure for this guy - or just add this node to
-	 * it if it already exists
-	 * XXX: This should not be "manual"!
-	 */
-	const char* typeName_c = typeName.c_str();
-	if (ptypes.find(typeName_c) == ptypes.end()) {
-		ptypes[typeName_c] = new tb_ptype(typeName_c);
-	}
-	ptypes[typeName_c]->add_slots(typeSlots);
-	tb_ptype *ptype = ptypes[typeName_c];
-		
-	name_vclass_map::iterator dit = vclass_map.find(fstring(typeName.c_str()));
-	if (dit != vclass_map.end()) {
-		no_type = true;
-		vclass = (*dit).second;
-	} 
-	else {
-		vclass = NULL;
-		if (vtypes.find(typeName_c) == vtypes.end()) {
-			vtypes[typeName_c] = typeSlots;
-		} 
-		else {
-			vtypes[typeName_c] += typeSlots;
-		}
-	}
-
-		bool isSubnode;
-		string subnodeOf = rspecParser->readSubnodeOf(elt, isSubnode);
-	
-	// A bunch of defaults for stuff that assign wants and Protogeni doesn't
-	// The code to read the values from the request is still there 
-	bool is_unique = false;
-	bool is_disallow_trivial_mix = false;
-	//-------------------------------------------------------------------------
-		
-	tb_vnode *v = NULL;
-	if (no_type)
-		// If they gave no type, just assume it's a PC for
-		// now. This is not really a good assumption.
-		v = new tb_vnode(virtualId.c_str(), "pc", typeSlots);
-	else
-		v = new tb_vnode(virtualId.c_str(), 
-						 typeName.c_str(), typeSlots);
-		
-		// Construct the vertex
-	v -> disallow_trivial_mix = is_disallow_trivial_mix;
-	if (isSubnode)
-		v -> subnode_of_name = subnodeOf.c_str();
-		
-	bool hasExclusive;
-	string exclusive = rspecParser->readExclusive(elt, hasExclusive);
-	
-	if (hasExclusive) {
-		fstring desirename("shared");
-		
-		if (exclusive == "false" || exclusive == "0") {
-			tb_node_featuredesire node_fd( desirename, 1.0,
-											true,featuredesire::FD_TYPE_NORMAL);
-			node_fd.add_desire_user( 1.0 );
-			v->desires.push_front( node_fd );
-		} else if(exclusive != "true" && exclusive != "1"){
-			static int syntax_error;
-
-			if( !syntax_error ) {
-				syntax_error = 1;
-				cout << "Warning: unrecognised exclusive "
-						"attribute \"" << exclusive << "\"; will "
-						"assume exclusive=\"true\"\n";
-			}
-		}
-	}
-			
-	v->vclass = vclass;
-	vvertex vv = add_vertex(vg);
-	vname2vertex[virtualId.c_str()] = vv;
-	virtual_nodes.push_back(vv);
-	put(vvertex_pmap,vv,v);
-		
-	// If a component manager has been specified, then the node must be 
-	// managed by that CM. We implement this as a desire.
-	if (hasCMId) 
-	{
-		tb_node_featuredesire node_fd (
-								XStr(cmId.c_str()).f(), 
-								1.0, true, featuredesire::FD_TYPE_NORMAL);
-		node_fd.add_desire_user(0);
-		(v->desires).push_front(node_fd);
-	}
-	
- 	v -> desires.sort();
-	return true;
+  bool hasVirtualId;
+  string virtualId = rspecParser->readVirtualId(elt, hasVirtualId);
+  
+  bool hasComponentId;
+  bool hasCMId;
+  string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
+  string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
+  
+  // If a node has a component_uuid, it is a fixed node
+  if (hasComponentId) {
+    if(hasCMId)
+      fixed_nodes [virtualId] = componentId;	
+    else
+      cerr << "WARNING: Virtual node " << virtualId 
+	   << " has a componentId specified "
+	   << "but no component manager " << endl
+	   << "The componentId will be ignored." << endl;
+  }
+  
+  if (!hasVirtualId) {
+    cerr << "ERROR: Every node must have a virtual_id" << endl;
+    return false;
+  }
+  
+  bool allUnique;
+  map< pair<string, string>, pair<string, string> > fixedIfacesOnNode;
+  fixedIfacesOnNode = rspecParser->readInterfacesOnNode(elt, allUnique);
+  // XXX: This should not have to be called manually
+  if (!allUnique) {
+    cerr << "The node-interface pairs in " << virtualId 
+	 << " were not unique."	<< endl;
+    return false;
+  }
+  fixed_interfaces->insert(fixedIfacesOnNode.begin(),fixedIfacesOnNode.end());
+  
+  /* Deal with the location tag */
+  cerr << "WARNING: Country information will be ignored" << endl;
+  
+  /*
+   * Add on types
+   */
+  tb_vclass *vclass = NULL;
+  
+  int typeCount;
+  vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
+  bool no_type = (typeCount == 0);
+  if (typeCount > 1) {
+    cerr << "ERROR: Too many node types (" << typeCount << ") on " 
+	 << virtualId << " (allowed 1) ... Aborting " << endl;
+    exit(EXIT_FAILURE);
+  }
+  
+  string typeName = types[0].typeName;
+  int typeSlots = types[0].typeSlots;
+  bool isStatic = types[0].isStatic;
+  
+  bool isUnlimited = (typeSlots == 1000);
+  
+  /*
+   * Make a tb_ptype structure for this guy - or just add this node to
+   * it if it already exists
+   * XXX: This should not be "manual"!
+   */
+  const char* typeName_c = typeName.c_str();
+  if (ptypes.find(typeName_c) == ptypes.end()) {
+    ptypes[typeName_c] = new tb_ptype(typeName_c);
+  }
+  ptypes[typeName_c]->add_slots(typeSlots);
+  tb_ptype *ptype = ptypes[typeName_c];
+  
+  name_vclass_map::iterator dit = vclass_map.find(fstring(typeName.c_str()));
+  if (dit != vclass_map.end()) {
+    no_type = true;
+    vclass = (*dit).second;
+  } 
+  else {
+    vclass = NULL;
+    if (vtypes.find(typeName_c) == vtypes.end()) {
+      vtypes[typeName_c] = typeSlots;
+    } 
+    else {
+      vtypes[typeName_c] += typeSlots;
+    }
+  }
+  
+  bool isSubnode;
+  string subnodeOf = rspecParser->readSubnodeOf(elt, isSubnode);
+  
+  // A bunch of defaults for stuff that assign wants and Protogeni doesn't
+  // The code to read the values from the request is still there 
+  bool is_unique = false;
+  bool is_disallow_trivial_mix = false;
+  //-------------------------------------------------------------------------
+  
+  tb_vnode *v = NULL;
+  if (no_type)
+    // If they gave no type, just assume it's a PC for
+    // now. This is not really a good assumption.
+    v = new tb_vnode(virtualId.c_str(), "pc", typeSlots);
+  else
+    v = new tb_vnode(virtualId.c_str(), 
+		     typeName.c_str(), typeSlots);
+  
+  // Construct the vertex
+  v -> disallow_trivial_mix = is_disallow_trivial_mix;
+  if (isSubnode)
+    v -> subnode_of_name = subnodeOf.c_str();
+  
+  bool hasExclusive;
+  string exclusive = rspecParser->readExclusive(elt, hasExclusive);
+  
+  if (hasExclusive) {
+    fstring desirename("shared");
+    
+    if (exclusive == "false" || exclusive == "0") {
+      tb_node_featuredesire node_fd( desirename, 1.0,
+				     true,featuredesire::FD_TYPE_NORMAL);
+      node_fd.add_desire_user( 1.0 );
+      v->desires.push_front( node_fd );
+    } 
+    else if(exclusive != "true" && exclusive != "1"){
+      static int syntax_error;
+      
+      if( !syntax_error ) {
+	syntax_error = 1;
+	cout << "Warning: unrecognised exclusive "
+	  "attribute \"" << exclusive << "\"; will "
+	  "assume exclusive=\"true\"\n";
+      }
+    }
+  }
+  
+  v->vclass = vclass;
+  vvertex vv = add_vertex(vg);
+  vname2vertex[virtualId.c_str()] = vv;
+  virtual_nodes.push_back(vv);
+  put(vvertex_pmap,vv,v);
+  
+  // If a component manager has been specified, then the node must be 
+  // managed by that CM. We implement this as a desire.
+  if (hasCMId) {
+    tb_node_featuredesire node_fd (XStr(cmId.c_str()).f(), 
+				   1.0, true, featuredesire::FD_TYPE_NORMAL);
+    node_fd.add_desire_user(0);
+    (v->desires).push_front(node_fd);
+  }
+  
+  v -> desires.sort();
+  return true;
 }
 
 /*
  * Pull nodes from the document, and populate assign's own data structures
  */
-bool populate_nodes(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
-	bool is_ok = true;
-    /*
-     * Get a list of all nodes in this document
-     */
-	DOMNodeList *nodes = root->getElementsByTagName(XStr("node").x());
+bool populate_nodes(DOMElement *root, 
+		    tb_vgraph &vg, map< pair<string, string>, 
+		    pair<string, string> >* fixed_interfaces) {
+  bool is_ok = true;
+  /*
+   * Get a list of all nodes in this document
+   */
+  DOMNodeList *nodes = root->getElementsByTagName(XStr("node").x());
   int nodeCount = nodes->getLength();
   XMLDEBUG("Found " << nodeCount << " nodes in rspec" << endl);
-	clock_t times [nodeCount];
-
-  for (size_t i = 0; i < nodeCount; i++) 
-	{
-		DOMNode *node = nodes->item(i);
-		// This should not be able to fail, because all elements in
-		// this list came from the getElementsByTagName() call
-		DOMElement *elt = dynamic_cast<DOMElement*>(node);
-		is_ok &= populate_node(elt, vg, fixed_interfaces);
-	}
-   		 
-    /*
-     * This post-pass binds subnodes to their parents
-     */
+  clock_t times [nodeCount];
+  
+  for (size_t i = 0; i < nodeCount; i++)  {
+    DOMNode *node = nodes->item(i);
+    // This should not be able to fail, because all elements in
+    // this list came from the getElementsByTagName() call
+    DOMElement *elt = dynamic_cast<DOMElement*>(node);
+    is_ok &= populate_node(elt, vg, fixed_interfaces);
+  }
+  
+  /*
+   * This post-pass binds subnodes to their parents
+   */
   bind_vtop_subnodes(vg);
-    
-    /*
-     * Indicate errors, if any
-     */
+  
+  /*
+   * Indicate errors, if any
+   */
   return is_ok;
 }
 
-bool populate_link (DOMElement* elt, tb_vgraph &vg, map< pair<string,string>, pair<string,string> >* fixed_interfaces) 
+bool populate_link (DOMElement* elt, 
+		    tb_vgraph &vg, map< pair<string,string>, 
+		    pair<string,string> >* fixed_interfaces) 
 {
-	bool hasVirtualId;
-	string virtualId = rspecParser->readVirtualId(elt, hasVirtualId);
-	
-	bool hasVirtualizationType;
-	string virtualizationType 
-						= rspecParser->readVirtualizationType(elt, hasVirtualizationType);
-	
-	/*
-	* Get the link type - we know there is at least one, and we
-	* need it for the constructor
-	* Note: Changed from element to attribute
-	*/
-	int count;
-	vector<struct link_type> linkTypes = rspecParser->readLinkTypes(elt, count);
-	if (count > 1) {
-		cerr << "ERROR: Too many link types specified (" << count 
-				 << ") on " << virtualId << ". Allowed 1 ... Aborting" << endl;
-		exit(EXIT_FAILURE);
-	}
-	string linkType = linkTypes[0].typeName;
-	if (linkType == "")
-		linkType = "ethernet";	
+  bool hasVirtualId;
+  string virtualId = rspecParser->readVirtualId(elt, hasVirtualId);
+  
+  bool hasVirtualizationType;
+  string virtualizationType 
+    = rspecParser->readVirtualizationType(elt, hasVirtualizationType);
+  
+  /*
+   * Get the link type - we know there is at least one, and we
+   * need it for the constructor
+   * Note: Changed from element to attribute
+   */
+  int count;
+  vector<struct link_type> linkTypes = rspecParser->readLinkTypes(elt, count);
+  if (count > 1) {
+    cerr << "ERROR: Too many link types specified (" << count 
+	 << ") on " << virtualId << ". Allowed 1 ... Aborting" << endl;
+    exit(EXIT_FAILURE);
+  }
+  string linkType = linkTypes[0].typeName;
+  if (linkType == "")
+    linkType = "ethernet";	
+  
+  /*
+   * Get standard link characteristics
+   */
+  struct link_characteristics characteristics
+    = rspecParser->readLinkCharacteristics(elt, count);
+  int bandwidth = characteristics.bandwidth;
+  int latency = characteristics.latency;
+  double packetLoss = characteristics.packetLoss;
+  
+  struct link_interface src;
+  struct link_interface dst;
+  
+  int ifaceCount = 0;
+  vector<struct link_interface> interfaces
+    = rspecParser->readLinkInterface(elt, ifaceCount);
+  
+  /* NOTE: In a request, we assume that each link has only two interfaces.
+   * Although the order is immaterial, assign expects a source first 
+   * and then destination and we assume the same ordering.
+   * If more than two interfaces are provided, the link must be a lan 
+   */
+  if (ifaceCount > 2) {
+    string str_lan_id = generate_virtualNodeId(virtualId);
+    
+    // NOTE: This is an attribute which is not in the rspec
+    // it has been added to easily identify lan_links during annotation
+    elt->setAttribute(XStr("is_lan").x(), XStr("true").x());
+    
+    // Create the lan node
+    DOMElement* lan_node = doc->createElement(XStr("node").x());
+    request_root->appendChild(lan_node);
+    lan_node->setAttribute(XStr("virtualization_type").x(),
+			   XStr("raw").x());
+    lan_node->setAttribute(XStr("exclusive").x(), XStr("1").x());
+    lan_node->setAttribute(XStr("virtual_id").x(),
+			   XStr(str_lan_id.c_str()).x());
+    
+    // Create node type for the lan
+    DOMElement* lan_node_type = doc->createElement(XStr("node_type").x());
+    lan_node_type->setAttribute(XStr("type_name").x(), XStr("lan").x());
+    lan_node_type->setAttribute(XStr("type_slots").x(), XStr("1").x());
+    lan_node->appendChild(lan_node_type);
+    
+    // NOTE: This is an attribute which is not in the rspec
+    // but which has been added to distinguish the element
+    // from those explicitly specified by the user during annotation
+    lan_node->setAttribute(XStr("generated_by_assign").x(),
+			   XStr("true").x());
+    
+    // We need to store the dynamically created links in a list
+    // and add them to the virtual graph later because the sanity checks
+    // will fail if they are added before the lan node is added.
+    list<DOMElement*> links;
+    list<DOMElement*>::iterator it = links.begin();
+    for (int i = 0; i < ifaceCount; ++i) {
+      link_interface interface = interfaces[i];
+      const XMLCh* virtualIfaceId = XStr(interface.virtualIfaceId.c_str()).x();
+      const XMLCh* virtualNodeId = XStr(interface.virtualNodeId.c_str()).x();
+      
+      string str_lan_interface_id = generate_virtualIfaceId(str_lan_id, i);
+      DOMElement* lan_interface = doc->createElement(XStr("interface").x());
 
-		/*
-		 * Get standard link characteristics
-		*/
-	struct link_characteristics characteristics
-			= rspecParser->readLinkCharacteristics(elt, count);
-	int bandwidth = characteristics.bandwidth;
-	int latency = characteristics.latency;
-	double packetLoss = characteristics.packetLoss;
-	
-	struct link_interface src;
-	struct link_interface dst;
-		
-	int ifaceCount = 0;
-	vector<struct link_interface> interfaces
-							= rspecParser->readLinkInterface(elt, ifaceCount);
-	
-	/* NOTE: In a request, we assume that each link has only two interfaces.
-	 * Although the order is immaterial, assign expects a source first 
-	 * and then destination and we assume the same ordering.
-	 * If more than two interfaces are provided, the link must be a lan 
-	 */
-	if (ifaceCount > 2)
-	{
-		string str_lan_id = generate_virtualNodeId(virtualId);
-		
-		// NOTE: This is an attribute which is not in the rspec
-		// it has been added to easily identify lan_links during annotation
-		elt->setAttribute(XStr("is_lan").x(), XStr("true").x());
-			
-		// Create the lan node
-		DOMElement* lan_node = doc->createElement(XStr("node").x());
-		request_root->appendChild(lan_node);
-		lan_node->setAttribute(XStr("virtualization_type").x(),
-													 XStr("raw").x());
-		lan_node->setAttribute(XStr("exclusive").x(), XStr("1").x());
-		lan_node->setAttribute(XStr("virtual_id").x(),
-							 	XStr(str_lan_id.c_str()).x());
-			
-		// Create node type for the lan
-		DOMElement* lan_node_type = doc->createElement(XStr("node_type").x());
-		lan_node_type->setAttribute(XStr("type_name").x(), XStr("lan").x());
-		lan_node_type->setAttribute(XStr("type_slots").x(), XStr("1").x());
-		lan_node->appendChild(lan_node_type);
-		
-		// NOTE: This is an attribute which is not in the rspec
-		// but which has been added to distinguish the element
-		// from those explicitly specified by the user during annotation
-		lan_node->setAttribute(XStr("generated_by_assign").x(),
-													 XStr("true").x());
-			
-		// We need to store the dynamically created links in a list
-		// and add them to the virtual graph later because the sanity checks
-		// will fail if they are added before the lan node is added.
-		list<DOMElement*> links;
-		list<DOMElement*>::iterator it = links.begin();
-		for (int i = 0; i < ifaceCount; ++i)
-		{
-			link_interface interface = interfaces[i];
-			const XMLCh* virtualIfaceId 
-								= XStr(interface.virtualIfaceId.c_str()).x();
-			const XMLCh* virtualNodeId 
-								= XStr(interface.virtualNodeId.c_str()).x();
-				
-			string str_lan_interface_id = 
-					generate_virtualIfaceId(str_lan_id, i);
-			DOMElement* lan_interface = 
-					doc->createElement(XStr("interface").x());
-			lan_node->appendChild(lan_interface);
-			lan_interface->setAttribute(XStr("virtual_id").x(),
-							XStr(str_lan_interface_id.c_str()).x());
-				
-			DOMElement* link = doc->createElement(XStr("link").x());
-			request_root->appendChild(link);
-			link->setAttribute(XStr("virtual_id").x(), 
-								XStr(interface.virtualNodeId 
-										+ string(":") + str_lan_id).x());
-			appendChildTagWithData(link, "bandwidth",
-								rspecParser->numToString(bandwidth).c_str());
-			appendChildTagWithData(link, "latency",
-								rspecParser->numToString(latency).c_str());
-			appendChildTagWithData(link, "packet_loss",
-								rspecParser->numToString(packetLoss).c_str());
-				
-			DOMElement* src_interface_ref 
-							= doc->createElement(XStr("interface_ref").x());
-			src_interface_ref->setAttribute(XStr("virtualIfaceId").x(),
-											virtualIfaceId);
-			src_interface_ref->setAttribute(XStr("virtualNodeId").x(),
-											virtualNodeId);
-			link->appendChild(src_interface_ref);
-				
-			DOMElement* dst_interface_ref 
-								= doc->createElement(XStr("interface_ref").x());
-			dst_interface_ref->setAttribute(XStr("virtualIfaceId").x(),
-										XStr(str_lan_interface_id.c_str()).x());
-			dst_interface_ref->setAttribute(XStr("virtualNodeId").x(),
-											XStr(str_lan_id.c_str()).x());
-			link->appendChild(dst_interface_ref);
-			
-			// Adding attributes to ensure that the element is handled
-			// correctly during annotation.
-			link->setAttribute(XStr("generated_by_assign").x(),
-								XStr("true").x());
-			link->setAttribute(XStr("lan_link").x(),
-								XStr(virtualId.c_str()).x());
-			
-			links.insert(it, link);
-		}
-			
-		populate_node(lan_node, vg, fixed_interfaces);
-		for (it = links.begin(); it != links.end(); ++it)
-			populate_link(*it, vg, fixed_interfaces);
-		return true;
-	}
-	else if (ifaceCount == 2)
-	{
-		src = interfaces[0];
-		dst = interfaces[1];
-	}
-	else
-	{
-		cerr << "ERROR: Too few interfaces found (" << ifaceCount << ")" 
-				<< " on " << virtualId << " at least 2 required ... Aborting" 
-				<< endl;
-		exit(EXIT_FAILURE);
-	}
-	
-	string srcNode = src.virtualNodeId;
-	string srcIface = src.virtualIfaceId;
-	string dstNode = dst.virtualNodeId;
-	string dstIface = dst.virtualIfaceId;
-	if (srcNode == "" || srcIface == "")
-	{
-		cerr << "No source node found on interface for link " 
-				<< virtualId << endl;
-		return false;
-	}
-	if (dstNode == "" || dstIface == "")
-	{
-		cerr << "No destination node found on interface for link " 
-				<< virtualId << endl;
-		return false;
-	}
-        
-	if (vname2vertex.find(srcNode.c_str()) == vname2vertex.end()) {
-		cerr << "Bad link " << virtualId 
-				<< ", non-existent source node " << srcNode << endl;
-		return false;
-	}
-	if (vname2vertex.find(dstNode.c_str()) == vname2vertex.end()) {
-		cerr << "Bad link " << virtualId 
-				<< ", non-existent destination node " << dstNode << endl;
-		return false;
-	}
-		
-	vvertex v_src_vertex = vname2vertex[srcNode.c_str()];
-	vvertex v_dst_vertex = vname2vertex[dstNode.c_str()];
-	tb_vnode *src_vnode = get(vvertex_pmap,v_src_vertex);
-	tb_vnode *dst_vnode = get(vvertex_pmap,v_dst_vertex);
-
-	bool emulated = false;
-	if (virtualizationType == "raw" || virtualizationType == "")
-		emulated = true;
-		
-	// This section has a whole bunch of defaults for tags that 
-	// were used in the old text format but are not in Protogeni. 
-	// We will eventually decide whether or not we want them.
-	bool allow_delayed = true;
-	bool allow_trivial = true;
-		
-	map< pair<string,string>, pair<string,string> >::iterator it;
-		
-	bool fix_srcIface = false;
-	fstring fixed_srcIface = "";
-	it = fixed_interfaces->find(pair<string,string>(srcNode, srcIface));
-	if (it != fixed_interfaces->end())
-	{
-		cerr << "Found fixed source interface (" << (it->second).first << ","
-				<< (it->second).second << ") on (" << (it->first).first << ","
-				<< (it->first).second << ")" << endl;
-		fix_srcIface = true;
-		fixed_srcIface = (it->second).second;
-	}
-			
-		
-	bool fix_dstIface = false;
-	fstring fixed_dstIface = "";
-	it = fixed_interfaces->find(make_pair(dstNode, dstIface));
-	if (it != fixed_interfaces->end())
-	{
-		cerr << "Found fixed destination interface (" << (it->second).first 
-				<< "," << (it->second).second << ") on (" << (it->first).first
-				<< "," << (it->first).second << ")" << endl;
-		fix_dstIface = true;
-		fixed_dstIface = (it->second).second;
-	}
-
-	if (emulated) 
-	{
-		if (!allow_trivial) 
-		{
-			src_vnode->total_bandwidth += bandwidth;
-			dst_vnode->total_bandwidth += bandwidth;
-		}
-	} 
-	else 
-	{
-		src_vnode->num_links++;
-		dst_vnode->num_links++;
-		src_vnode->link_counts[linkType.c_str()]++;
-		dst_vnode->link_counts[linkType.c_str()]++;
-	}
-	
-	vedge virt_edge = (add_edge(v_src_vertex,v_dst_vertex,vg)).first;
-		
-	tb_vlink *virt_link = new tb_vlink();
-		
-	virt_link-> name = virtualId;
-	virt_link-> type = fstring(linkType.c_str());
-
-	virt_link-> fix_src_iface = fix_srcIface;
-	virt_link-> src_iface = (fixed_srcIface);//.f();
-
-	virt_link-> fix_dst_iface = fix_dstIface;
-	virt_link-> dst_iface = (fixed_dstIface);//.f();
-
-	virt_link-> emulated = emulated;
-	virt_link-> allow_delayed = allow_delayed;
-	virt_link-> allow_trivial = allow_trivial;
-	virt_link-> no_connection = true;
-	virt_link->delay_info.bandwidth = bandwidth;
-	virt_link->delay_info.delay = latency;
-	virt_link->delay_info.loss = packetLoss;
-	virt_link->src = v_src_vertex;
-	virt_link->dst = v_dst_vertex;
-	
-		// XXX: Should not be manual
-	put(vedge_pmap, virt_edge, virt_link);
-	
-	return true;
+      lan_node->appendChild(lan_interface);
+      lan_interface->setAttribute(XStr("virtual_id").x(),
+				  XStr(str_lan_interface_id.c_str()).x());
+      
+      DOMElement* link = doc->createElement(XStr("link").x());
+      request_root->appendChild(link);
+      link->setAttribute(XStr("virtual_id").x(), 
+			 XStr(interface.virtualNodeId 
+			      + string(":") + str_lan_id).x());
+      appendChildTagWithData(link, "bandwidth",
+			     rspecParser->numToString(bandwidth).c_str());
+      appendChildTagWithData(link, "latency",
+			     rspecParser->numToString(latency).c_str());
+      appendChildTagWithData(link, "packet_loss",
+			     rspecParser->numToString(packetLoss).c_str());
+      
+      DOMElement* src_interface_ref 
+	= doc->createElement(XStr("interface_ref").x());
+      src_interface_ref->setAttribute(XStr("virtualIfaceId").x(),
+				      virtualIfaceId);
+      src_interface_ref->setAttribute(XStr("virtualNodeId").x(),
+				      virtualNodeId);
+      link->appendChild(src_interface_ref);
+      
+      DOMElement* dst_interface_ref 
+	= doc->createElement(XStr("interface_ref").x());
+      dst_interface_ref->setAttribute(XStr("virtualIfaceId").x(),
+				      XStr(str_lan_interface_id.c_str()).x());
+      dst_interface_ref->setAttribute(XStr("virtualNodeId").x(),
+				      XStr(str_lan_id.c_str()).x());
+      link->appendChild(dst_interface_ref);
+      
+      // Adding attributes to ensure that the element is handled
+      // correctly during annotation.
+      link->setAttribute(XStr("generated_by_assign").x(),
+			 XStr("true").x());
+      link->setAttribute(XStr("lan_link").x(),
+			 XStr(virtualId.c_str()).x());
+      
+      links.insert(it, link);
+    }
+    
+    populate_node(lan_node, vg, fixed_interfaces);
+    for (it = links.begin(); it != links.end(); ++it)
+      populate_link(*it, vg, fixed_interfaces);
+    return true;
+  }
+  else if (ifaceCount == 2) {
+    src = interfaces[0];
+    dst = interfaces[1];
+  }
+  else {
+    cerr << "ERROR: Too few interfaces found (" << ifaceCount << ")" 
+	 << " on " << virtualId << " at least 2 required ... Aborting" 
+	 << endl;
+    exit(EXIT_FAILURE);
+  }
+  
+  string srcNode = src.virtualNodeId;
+  string srcIface = src.virtualIfaceId;
+  string dstNode = dst.virtualNodeId;
+  string dstIface = dst.virtualIfaceId;
+  if (srcNode == "" || srcIface == "") {
+    cerr << "No source node found on interface for link " 
+	 << virtualId << endl;
+    return false;
+  }
+  if (dstNode == "" || dstIface == "") {
+    cerr << "No destination node found on interface for link " 
+	 << virtualId << endl;
+    return false;
+  }
+  
+  if (vname2vertex.find(srcNode.c_str()) == vname2vertex.end()) {
+    cerr << "Bad link " << virtualId 
+	 << ", non-existent source node " << srcNode << endl;
+    return false;
+  }
+  if (vname2vertex.find(dstNode.c_str()) == vname2vertex.end()) {
+    cerr << "Bad link " << virtualId 
+	 << ", non-existent destination node " << dstNode << endl;
+    return false;
+  }
+  
+  vvertex v_src_vertex = vname2vertex[srcNode.c_str()];
+  vvertex v_dst_vertex = vname2vertex[dstNode.c_str()];
+  tb_vnode *src_vnode = get(vvertex_pmap,v_src_vertex);
+  tb_vnode *dst_vnode = get(vvertex_pmap,v_dst_vertex);
+  
+  bool emulated = false;
+  if (virtualizationType == "raw" || virtualizationType == "")
+    emulated = true;
+  
+  // This section has a whole bunch of defaults for tags that 
+  // were used in the old text format but are not in Protogeni. 
+  // We will eventually decide whether or not we want them.
+  bool allow_delayed = true;
+  bool allow_trivial = true;
+  
+  map< pair<string,string>, pair<string,string> >::iterator it;
+  
+  bool fix_srcIface = false;
+  fstring fixed_srcIface = "";
+  it = fixed_interfaces->find(pair<string,string>(srcNode, srcIface));
+  if (it != fixed_interfaces->end()) {
+    cerr << "Found fixed source interface (" << (it->second).first << ","
+	 << (it->second).second << ") on (" << (it->first).first << ","
+	 << (it->first).second << ")" << endl;
+    fix_srcIface = true;
+    fixed_srcIface = (it->second).second;
+  }
+  
+  
+  bool fix_dstIface = false;
+  fstring fixed_dstIface = "";
+  it = fixed_interfaces->find(make_pair(dstNode, dstIface));
+  if (it != fixed_interfaces->end()) {
+    cerr << "Found fixed destination interface (" << (it->second).first 
+	 << "," << (it->second).second << ") on (" << (it->first).first
+	 << "," << (it->first).second << ")" << endl;
+    fix_dstIface = true;
+    fixed_dstIface = (it->second).second;
+  }
+  
+  if (emulated) {
+    if (!allow_trivial) {
+      src_vnode->total_bandwidth += bandwidth;
+      dst_vnode->total_bandwidth += bandwidth;
+    }
+  } 
+  else {
+    src_vnode->num_links++;
+    dst_vnode->num_links++;
+    src_vnode->link_counts[linkType.c_str()]++;
+    dst_vnode->link_counts[linkType.c_str()]++;
+  }
+  
+  vedge virt_edge = (add_edge(v_src_vertex,v_dst_vertex,vg)).first;
+  
+  tb_vlink *virt_link = new tb_vlink();
+  
+  virt_link-> name = virtualId;
+  virt_link-> type = fstring(linkType.c_str());
+  
+  virt_link-> fix_src_iface = fix_srcIface;
+  virt_link-> src_iface = (fixed_srcIface);//.f();
+  
+  virt_link-> fix_dst_iface = fix_dstIface;
+  virt_link-> dst_iface = (fixed_dstIface);//.f();
+  
+  virt_link-> emulated = emulated;
+  virt_link-> allow_delayed = allow_delayed;
+  virt_link-> allow_trivial = allow_trivial;
+  virt_link-> no_connection = true;
+  virt_link->delay_info.bandwidth = bandwidth;
+  virt_link->delay_info.delay = latency;
+  virt_link->delay_info.loss = packetLoss;
+  virt_link->src = v_src_vertex;
+  virt_link->dst = v_dst_vertex;
+  
+  // XXX: Should not be manual
+  put(vedge_pmap, virt_edge, virt_link);
+  
+  return true;
 }
 
 /*
@@ -679,30 +660,30 @@ bool populate_links(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, 
 }
 
 DOMElement* appendChildTagWithData (DOMElement* parent, 
-									const char* tag_name, 
-									const char* child_value)
+				    const char* tag_name, 
+				    const char* child_value)
 {
-	DOMElement* child = doc->createElement(XStr(tag_name).x());
-	child->appendChild(doc->createTextNode(XStr(child_value).x()));
-	parent->appendChild(child);
-	return child;
+  DOMElement* child = doc->createElement(XStr(tag_name).x());
+  child->appendChild(doc->createTextNode(XStr(child_value).x()));
+  parent->appendChild(child);
+  return child;
 }
 
 string generate_virtualNodeId (string virtual_id) 
 {
-	std:ostringstream oss;
-	struct timeval tv;
-	struct timezone tz;
-	gettimeofday(&tv, &tz);
-	oss << virtual_id << tv.tv_sec << tv.tv_usec;
-	return oss.str();
+ std:ostringstream oss;
+  struct timeval tv;
+  struct timezone tz;
+  gettimeofday(&tv, &tz);
+  oss << virtual_id << tv.tv_sec << tv.tv_usec;
+  return oss.str();
 }
 
 string generate_virtualIfaceId (string lan_name, int interface_number)
-{
-	std:ostringstream oss;
-	oss << lan_name << ":" << interface_number;
-	return oss.str();
+{ 
+ std:ostringstream oss;
+  oss << lan_name << ":" << interface_number;
+  return oss.str();
 }
 
 #endif
