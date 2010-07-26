@@ -51,6 +51,9 @@ class rspec_parser_v2 : public rspec_parser
 
   std::vector<struct rspec_emulab_extension::type_limit>
     readTypeLimits(const xercesc::DOMElement* tag, int& count);
+
+  std::vector<struct rspec_emulab_extension::fd>
+    readFeaturesDesires(const xercesc::DOMElement* tag, int& count);
 };
 
 

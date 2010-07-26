@@ -14,6 +14,7 @@
 #define __ANNOTATE_RSPEC_V2_H
 
 #include "annotate.h"
+#include "annotate_rspec.h"
 
 #include <list>
 #include <map>
@@ -23,7 +24,7 @@
 
 #include <xercesc/dom/DOM.hpp>
 
-class annotate_rspec_v2 : public annotate
+class annotate_rspec_v2 : public annotate_rspec
 {
  private:
   // Enumeration of which interface in a hop 

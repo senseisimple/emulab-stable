@@ -225,15 +225,7 @@ bool populate_nodes(DOMElement *root,
       continue;
     }
     
-    bool isAvailable;
-    string available = rspecParser->readAvailable(elt, isAvailable);
-    if (available == "false") {
-	unavailable.insert(componentId);
-	continue;
-      }
-    ++availableCount;
-    
-    // Maintain a list of componentId's seen so far to ensure no duplicates
+   // Maintain a list of componentId's seen so far to ensure no duplicates
     insert_ret = advertisement_elements->insert
       (pair<string, DOMElement*>(componentId, elt));
     if (insert_ret.second == false)
@@ -283,8 +275,6 @@ bool populate_nodes(DOMElement *root,
       int typeSlots = type.typeSlots;
       bool isStatic = type.isStatic;
       
-      cout << typeName << " " << typeSlots << " " << isStatic << endl;
-
       // Add the type into assign's data structures
       if (ptypes.find(typeName) == ptypes.end()) {
 	ptypes[typeName] = new tb_ptype(typeName);
@@ -346,6 +336,45 @@ bool populate_nodes(DOMElement *root,
 	// an actual pnode later
 	p->subnode_of_name = XStr(subnodeOf.c_str()).f();
       }
+    }
+
+    // This has to be at the end becuase if we don't populate
+    // at least the interfaces, we get all kinds of crappy errors
+    bool isAvailable;
+    string available = rspecParser->readAvailable(elt, isAvailable);
+    if (available == "false") {
+	unavailable.insert(componentId);
+	continue;
+      }
+    ++availableCount;
+
+    // Deal with features
+    int fdsCount;
+    vector<struct fd> fds = rspecParser->readFeaturesDesires(elt, fdsCount);
+    for (int i = 0; i < fdsCount; i++) {
+      struct fd feature = fds[i];
+      featuredesire::fd_type fd_type;
+      switch(feature.op.type) {
+      case LOCAL_OPERATOR:
+	fd_type = featuredesire::FD_TYPE_LOCAL_ADDITIVE;
+	break;
+      case GLOBAL_OPERATOR:
+	if (feature.op.op == "OnceOnly") {
+	  fd_type = featuredesire::FD_TYPE_GLOBAL_ONE_IS_OKAY;
+	}
+	else {
+	  fd_type = featuredesire::FD_TYPE_GLOBAL_MORE_THAN_ONE;
+	}
+	break;
+      default:
+	fd_type = featuredesire::FD_TYPE_NORMAL;
+	break;
+      }
+      tb_node_featuredesire node_fd (XStr(feature.fd_name.c_str()).f(),
+				     feature.fd_weight,
+				     feature.violatable,
+				     fd_type);
+      (p->features).push_front(node_fd);
     }
     
     /*

@@ -80,28 +80,28 @@ namespace rspec_emulab_extension {
   class emulab_extensions_parser : public rspec_parser_helper {
   private:
     int type;
-    struct emulab_operator readOperator(xercesc::DOMElement* tag);
-    struct hardness readHardness (xercesc::DOMElement* tag);
+    struct emulab_operator readOperator(const xercesc::DOMElement* tag);
+    struct hardness readHardness (const xercesc::DOMElement* tag);
     
   public:
     // Constructor
     emulab_extensions_parser(int type) { this->type = type; }
     
     // Functions
-    std::vector<struct fd> readAllFeaturesDesires 
-      (xercesc::DOMElement* ele);
-    struct fd readFeatureDesire (xercesc::DOMElement* tag);
-    struct node_flags readNodeFlag (xercesc::DOMElement* tag);
-    struct link_flags readLinkFlag (xercesc::DOMElement* tag);
-    std::vector<struct property> readAllProperties
-      (xercesc::DOMElement* elem);
-    struct property readProperty (xercesc::DOMElement* tag);
-    std::vector<struct vclass> readAllVClasses (xercesc::DOMElement*);
-    struct vclass readVClass (xercesc::DOMElement* tag);
-    std::string readAssignedTo (xercesc::DOMElement* tag);
-    std::string readHintTo (xercesc::DOMElement* tag);
-    std::string readTypeSlots (xercesc::DOMElement* tag);
-    bool readStaticType (xercesc::DOMElement* tag);
+    std::vector<struct fd> readFeaturesDesires (const xercesc::DOMElement*, 
+						int&);
+    struct fd readFeatureDesire (const xercesc::DOMElement* tag);
+    struct node_flags readNodeFlag (const xercesc::DOMElement* tag);
+    struct link_flags readLinkFlag (const xercesc::DOMElement* tag);
+    std::vector<struct property> readProperties
+      (const xercesc::DOMElement* elem);
+    struct property readProperty (const xercesc::DOMElement* tag);
+    std::vector<struct vclass> readAllVClasses (const xercesc::DOMElement*);
+    struct vclass readVClass (const xercesc::DOMElement* tag);
+    std::string readAssignedTo (const xercesc::DOMElement* tag);
+    std::string readHintTo (const xercesc::DOMElement* tag);
+    std::string readTypeSlots (const xercesc::DOMElement* tag);
+    bool readStaticType (const xercesc::DOMElement* tag);
     std::vector<struct type_limit> readTypeLimits(const xercesc::DOMElement* tag,
 						  int& count);
   };

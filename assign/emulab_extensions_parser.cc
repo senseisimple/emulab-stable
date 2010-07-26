@@ -17,7 +17,7 @@ XERCES_CPP_NAMESPACE_USE
 using namespace std;
 using namespace rspec_emulab_extension;
 
-emulab_operator emulab_extensions_parser::readOperator(DOMElement* tag)
+emulab_operator emulab_extensions_parser::readOperator(const DOMElement* tag)
 {
   struct emulab_operator op = { "", NORMAL_OPERATOR };
   if (this->hasAttribute(tag, "global_operator")) {
@@ -32,10 +32,11 @@ emulab_operator emulab_extensions_parser::readOperator(DOMElement* tag)
 }
 
 vector<struct fd> 
-emulab_extensions_parser::readAllFeaturesDesires (DOMElement* elem)
+emulab_extensions_parser::readFeaturesDesires (const DOMElement* ele, int& count)
 {
-  DOMNodeList* fdNodes = elem->getElementsByTagName(XStr("emulab:fd").x());
   vector<struct fd> fds;
+  DOMNodeList* fdNodes = ele->getElementsByTagName(XStr("emulab:fd").x());
+  count = fdNodes->getLength();
   for (int i = 0; i < fdNodes->getLength(); i++) 	{
     fds.push_back(this->readFeatureDesire
 		  (dynamic_cast<DOMElement*>(fdNodes->item(i))));
@@ -43,7 +44,7 @@ emulab_extensions_parser::readAllFeaturesDesires (DOMElement* elem)
   return fds;
 }
 
-struct fd emulab_extensions_parser::readFeatureDesire (DOMElement* tag)
+struct fd emulab_extensions_parser::readFeatureDesire (const DOMElement* tag)
 {
   struct fd fdObject = {
     this->getAttribute(tag, "name"),
@@ -55,8 +56,8 @@ struct fd emulab_extensions_parser::readFeatureDesire (DOMElement* tag)
   return fdObject;
 }
 
-vector<struct property> emulab_extensions_parser::readAllProperties
-(DOMElement* elem)
+vector<struct property> emulab_extensions_parser::readProperties
+(const DOMElement* elem)
 {
   DOMNodeList* propNodes = elem->getElementsByTagName(XStr("property").x());
   vector<struct property> properties;
@@ -67,7 +68,7 @@ vector<struct property> emulab_extensions_parser::readAllProperties
   return properties;
 }
 
-struct property emulab_extensions_parser::readProperty (DOMElement* tag)
+struct property emulab_extensions_parser::readProperty (const DOMElement* tag)
 {
   struct property propertyObject = {
     this->getAttribute(tag, "property_name"),
@@ -80,7 +81,7 @@ struct property emulab_extensions_parser::readProperty (DOMElement* tag)
   return propertyObject;
 }
 
-struct hardness emulab_extensions_parser::readHardness (DOMElement* tag)
+struct hardness emulab_extensions_parser::readHardness (const DOMElement* tag)
 {
   struct hardness hardnessObject;
   if (this->hasChild(tag, "hard")) {
@@ -97,7 +98,7 @@ struct hardness emulab_extensions_parser::readHardness (DOMElement* tag)
 }
 
 vector<struct vclass> 
-emulab_extensions_parser::readAllVClasses (DOMElement* elem)
+emulab_extensions_parser::readAllVClasses (const DOMElement* elem)
 {
   DOMNodeList* vclassNodes 
     = elem->getElementsByTagName(XStr("emulab:vclass").x());
@@ -110,7 +111,7 @@ emulab_extensions_parser::readAllVClasses (DOMElement* elem)
   return vclasses;
 }
 
-struct vclass emulab_extensions_parser::readVClass (DOMElement* tag)
+struct vclass emulab_extensions_parser::readVClass (const DOMElement* tag)
 {
   struct vclass vclassObject = {
     this->getAttribute(tag, "name"),
@@ -120,7 +121,7 @@ struct vclass emulab_extensions_parser::readVClass (DOMElement* tag)
   return vclassObject;
 }
 
-string emulab_extensions_parser::readTypeSlots (DOMElement* tag)
+string emulab_extensions_parser::readTypeSlots (const DOMElement* tag)
 {
   DOMNodeList* typeSlotsNodes 
     = tag->getElementsByTagName(XStr("emulab:node_type").x());
@@ -131,7 +132,7 @@ string emulab_extensions_parser::readTypeSlots (DOMElement* tag)
   return (this->getAttribute(typeSlotsNode, "type_slots"));
 }
 
-bool emulab_extensions_parser::readStaticType (DOMElement* tag)
+bool emulab_extensions_parser::readStaticType (const DOMElement* tag)
 {
   DOMNodeList* typeSlotsNodes
     = tag->getElementsByTagName(XStr("emulab:node_type").x());

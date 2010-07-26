@@ -405,6 +405,7 @@ sub RunAssign($$)
 {
     my ($precheck, $prefix) = @_;
 
+    my $typelimitfile = $prefix .".limits";
     my $ptopfile = $prefix . ".ptop";
     my $vtopfile = $prefix . ".vtop";
     my $assignexitcode = 0;
@@ -431,14 +432,28 @@ sub RunAssign($$)
     }
 
     #
+    # Append this admission control results to ptopgen.
+    #
+    if (scalar(keys(%admission_control))) {
+	open(TYPELIMIT, ">$typelimitfile") or
+	    return -1;
+
+	foreach my $typeclass (keys(%admission_control)) {
+	    my $count = $admission_control{$typeclass};
+
+	    print TYPELIMIT "$typeclass $count\n";
+	}
+	close(TYPELIMIT);
+    }
+
+
+    #
     # Snapshot physical resources.
     #
     # if updating (-u), include any resources that may already be
     # allocated to experiment in the PTOP results.
     #
     my $ptopargs = "-p $pid ";
-# XXX: This should be removed after testing.
-    $ptopargs .= "-e $eid ";
     $ptopargs   .= "-e $eid "
 	if ($updating);
     $ptopargs   .= "-u "
@@ -457,7 +472,8 @@ sub RunAssign($$)
     	if ($precheck);
     $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
     	if (defined($experiment->delay_capacity()));
-    $ptopargs .= "-x -g 2";
+    $ptopargs .= "-x -g 2 ";
+    $ptopargs .= "-l $typelimitfile";
 
     chat("ptopargs: '$ptopargs'\n");
     TBDebugTimeStamp("ptopgen started");
@@ -467,21 +483,6 @@ sub RunAssign($$)
 	return -1;
     }
     TBDebugTimeStamp("ptopgen finished");
-
-    #
-    # Append this admission control results to ptopgen.
-    #
-    if (scalar(keys(%admission_control))) {
-	open(PTOP, ">> $ptopfile") or
-	    return -1;
-
-	foreach my $typeclass (keys(%admission_control)) {
-	    my $count = $admission_control{$typeclass};
-
-#	    print PTOP "set-type-limit $typeclass $count\n";
-	}
-	close(PTOP);
-    }
 
     #
     # Now generate a vtop file and dump it to a file.

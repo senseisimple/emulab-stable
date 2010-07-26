@@ -48,6 +48,7 @@ rspec_parser_v2::readLinkInterface (const DOMElement* link, int& ifaceCount)
       return vector<struct link_interface>();
     }
     if ((this->ifacesSeen).find(destId) == (this->ifacesSeen).end()) {
+      cerr << "Could not find " << destId << endl;
       ifaceCount = RSPEC_ERROR_UNSEEN_NODEIFACE_DST;
       return vector<struct link_interface>();
     }
@@ -242,6 +243,12 @@ vector<struct type_limit>
 rspec_parser_v2::readTypeLimits (const DOMElement* tag, int& count)
 {
   return ((this->emulabExtensions)->readTypeLimits(tag, count));
+}
+
+vector<struct fd>
+rspec_parser_v2::readFeaturesDesires (const DOMElement* tag, int& count)
+{
+  return ((this->emulabExtensions)->readFeaturesDesires(tag, count));
 }
 
 #endif // #ifdef WITH_XML

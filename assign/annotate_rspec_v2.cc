@@ -30,7 +30,6 @@ extern DOMElement* request_root;
 extern map<string, DOMElement*>* advertisement_elements;
 				 
 XERCES_CPP_NAMESPACE_USE
-
 using namespace std;
 
 annotate_rspec_v2 :: annotate_rspec_v2 ()
@@ -86,7 +85,10 @@ void annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name
   if (vnode != NULL) {
     if (!vnode->hasAttribute(XStr("generated_by_assign").x())) {
       DOMElement* pnode = (this->physical_elements->find(p_name))->second;
-      copy_component_spec(pnode, vnode);
+      vnode->setAttribute(XStr("component_id").x(),
+			  pnode->getAttribute(XStr("component_id").x()));
+      vnode->setAttribute(XStr("component_manager_id").x(),
+			  pnode->getAttribute(XStr("component_manager_id").x()));
     }
   }
   else {

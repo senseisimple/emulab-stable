@@ -274,4 +274,11 @@ rspec_parser::readTypeLimits (const DOMElement* tag, int& count)
   return vector<struct type_limit>();
 }
 
+vector<struct fd> 
+rspec_parser::readFeaturesDesires (const DOMElement* tag, int& count) 
+{
+  count = 0;
+  return vector<struct fd>();
+}
+
 #endif
