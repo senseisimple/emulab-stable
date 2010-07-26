@@ -25,11 +25,11 @@ NodeFlagSpec =
     ## Specify that this node is a subnode of another node. We MIGHT
     ## try to do this with properties in the future
     ## Valid for both virtual and physical nodes
-    element emulab:subnode_of { text }?,
+    element emulab:subnode_of { text }? &
     ## Indicates that this node should never be considered identical to any
     ## other node. Could be done with a property
     ## Valid only for physical nodes
-    element emulab:unique { empty }?,
+    element emulab:unique { empty }? &
     ## Indicates that virtual links must either all be trivial (loopback), or
     ## none of them must be. Possibly expressible with properties?
     element emulab:disallow_trivial_mix { empty }?
@@ -38,18 +38,18 @@ NodeFlagSpec =
 LinkFlagSpec = 
     ## Indicates that it is not okay to use a delay node to artificially
     ## shape/delay traffic for this link. Replace by using type system.
-    element emulab:nodelay { empty }?,
+    element emulab:nodelay { empty }? &
     ## Indicates whether it is okay to multiplex this link with other virtual
     ## links onto the same physical link (old name: emulated) Probably replace
     ## by using the type system (ie. have an 'Ethernet' type that can only
     ## hold one slot,  and an 'Ethernet-tagged' type that can hold more).
-    element emulab:multiplex_ok { empty }?,
+    element emulab:multiplex_ok { empty }? &
     ## Indicates whether it is okay to satisfy this link with a trivial
     ## (loopback) link. Replace using type system.
-    element emulab:trivial_ok { empty }?,
+    element emulab:trivial_ok { empty }? &
     ## Gives the name of the interface that must be used to satisfy the source
     ## of this link - note that the interface name is given, not the node name
-    element emulab:fixsrciface { string }?,
+    element emulab:fixsrciface { string }? &
     ## Same as fixsrciface, for destination of the link
     element emulab:fixdstiface { string }?
 
@@ -58,14 +58,13 @@ LinkFlagSpec =
 ## assigned to physical nodes of the same type
 VclassSpec = element emulab:vclass {
     ## Name of the virtual class
-    attribute name { text },
+    attribute name { text } &
     ## Specify whether the vclass is hard (ie. all nodes *must* be of the same
     ## type) or soft (ie. violating it is allowed, but penalize)
     (element hard { empty } |
      (element soft { empty },
-      element weight { xsd:float { minInclusive = "0.0" } } )),
+      element weight { xsd:float { minInclusive = "0.0" } } )) &
 	element physical_type { text }+
 }
 
 start = AssignedToSpec | HintToSpec | NodeFlagSpec | LinkFlagSpec | VclassSpec
-                        | LinkMapping
