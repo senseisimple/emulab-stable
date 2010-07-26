@@ -37,11 +37,13 @@ CXXFLAGS += -I/sw/include
 ifeq ($(HAVE_XERCES),yes)
 CXXFLAGS += -DWITH_XML
 LIBS += -L/usr/local/lib -lxerces-c
-OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec.o annotate_vtop.o annotate.o rspec_parser_helper.o rspec_parser.o rspec_parser_v1.o rspec_parser_v2.o emulab_extensions_parser.o
+OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec_v2.o annotate_rspec.o annotate_vtop.o annotate.o rspec_parser_helper.o rspec_parser.o rspec_parser_v1.o rspec_parser_v2.o emulab_extensions_parser.o
 endif
 
 # Pick either this
 CXXFLAGS += -O3 
+# XXX: Get rid of this once done testing
+# CXXFLAGS += -g
 # or this
 #CXXFLAGS += -O0 -g -Wall -DVERBOSE
 # and then zero or more of these
@@ -114,6 +116,7 @@ anneal.o: anneal.cc anneal.h port.h delay.h physical.h common.h fstring.h \
   solution.h vclass.h neighborhood.h
 annotate.o: annotate.cc
 annotate_rspec.o: annotate_rspec.cc
+annotate_rspec_v2.o: annotate_rspec_v2.cc
 annotate_vtop.o: annotate_vtop.cc
 assign.o: assign.cc port.h common.h fstring.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h vclass.h pclass.h score.h \

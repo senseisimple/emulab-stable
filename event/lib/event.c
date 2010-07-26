@@ -1608,7 +1608,7 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
-	if (1) {
+	if (0) {
 		unsigned char   *up;
 		
 		INFO("event_notification_insert_hmac: ");
@@ -1737,7 +1737,7 @@ event_notification_check_hmac(event_handle_t handle,
 	assert(srclen <= EVP_MAX_MD_SIZE);
 	memcpy(srcmac, pmac, srclen);
 
-	if (1) {
+	if (0) {
 		unsigned char   *up;
 		
 		INFO("event_notification_check_hmac __hmac__: ");
@@ -1813,7 +1813,7 @@ event_notification_check_hmac(event_handle_t handle,
 		HMAC_Final(&ctx, mac, &len);
 		HMAC_cleanup(&ctx);
 
-		if (1) {
+		if (0) {
 		    unsigned char   *up;
 		
 		    INFO("event_notification_check_hmac (elvin): ");
@@ -1847,7 +1847,7 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
-	if (1) {
+	if (0) {
 		unsigned char   *up;
 		
 		INFO("event_notification_check_hmac plain: ");

@@ -333,8 +333,11 @@ sub Create($$$$;$)
     }
 
     # Insert the sshkey if we got one.
-    if (defined($keys)) {
+    if (defined($keys) && ref($keys)) {
 	foreach my $keyref (@{ $keys }) {
+	    next
+		if (!ref($keyref));
+	    
 	    my $key  = $keyref->{'key'};
 	    my $type = $keyref->{'type'};
 
@@ -385,11 +388,14 @@ sub Modify($$$$)
 			     "where idx='$idx'"));
     }
 
-    if (defined($keys)) {
+    if (defined($keys) && ref($keys)) {
 	return -1
 	    if (!DBQueryWarn("delete from geni_userkeys where uuid='$uuid'"));
 	
 	foreach my $keyref (@{ $keys }) {
+	    next
+		if (!ref($keyref));
+
 	    my $key  = $keyref->{'key'};
 	    my $type = $keyref->{'type'};
 

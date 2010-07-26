@@ -1,5 +1,5 @@
 # The default namespace for the ptop extension
-default namespace = "http://www.emulab.net/resources/rspec/ext/ptop/1"
+namespace emulab = "http://www.protogeni.net/resources/rspec/ext/emulab/1"
 
 include "top_extension.rnc"
 
@@ -8,17 +8,20 @@ NodeFlagSpec =
     ## interface. In the future, we will make the loopback interface/link
     ## explicit in the topology
     ## Valid only for physical nodes
-    (element trivial_bandwidth { xsd:integer })?,
-    ## Specify that this node is a subnode of another node. We MIGHT
-    ## try to do this with properties in the future
-    ## Valid for both virtual and physical nodes
-    element subnode_of { text }?,
+    element emulab:trivial_bandwidth { attribute value { xsd:integer } }? &
     ## Indicates that this node should never be considered identical to any
     ## other node. Could be done with a property
     ## Valid only for physical nodes
-    element unique { empty }?,
+    element emulab:unique { empty }? &
     ## Indicates that virtual links must either all be trivial (loopback), or
     ## none of them must be. Possibly expressible with properties?
-    element disallow_trivial_mix { empty }?
+    element emulab:disallow_trivial_mix { empty }?
 
-start = NodeFlagSpec | FeatureDesireSpec
+TypeLimitSpec =
+	element emulab:set_type_limit { TypeLimitContents }
+
+TypeLimitContents = 
+	attribute typeclass { text } &
+	attribute count { xsd:integer }	
+
+start = NodeFlagSpec | FeatureDesireSpec | TypeLimitSpec

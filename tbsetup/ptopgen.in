@@ -12,7 +12,7 @@ use Math::BigInt;
 
 use lib "@prefix@/lib";
 use libdb qw(TBGetSiteVar);
-
+use libadminctrl;
 use libptop;
 
 my $top = libptop->Create();
@@ -33,7 +33,8 @@ use GeniHRN;
 sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
-	  "[-n c/e] [-x] [-g (0.1 | 2)] [-c component-name]\n".
+	  "[-n c/e] [-x] [-g (0.1 | 2)] [-c component-name]".
+	  "[-l type-limit-file]\n" .
 	  "       -p include nodes the project has permission to use\n".
 	  "       -e include given experiments resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
@@ -46,13 +47,14 @@ sub usage()
 	  "       -u Prune unused interfaces of allocated nodes (-e)\n".
 	  "       -c Delay capacity override\n".
 	  "       -n Add in modelnet core and edge node features\n".
-	  "       -x Output into the new xml ptop format.\n".
+	  "       -x Output into the new xml ptop format\n".
 	  "       -g version With -x, geni version. Must be '0', '0.1' or '2'\n".
+	  "       -l specifies the location of the type limit file\n" .
           "       -1 Print an rspec containing only the node component-name");
         exit(-1);
 }
 
-my $optlist = "s:e:m:vp:rSan:c:uxg:h1:";
+my $optlist = "s:e:m:vp:rSan:c:uxg:h1:l:";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -139,6 +141,8 @@ my $exempt_eid;
 my $switchtouse;
 my $experiment;
 
+my $typelimitfile = "";
+
 sub fatal($);
 
 #
@@ -206,6 +210,9 @@ if (defined($options{"x"})) {
 	$genimode = $options{"g"};
     }
     $do_xml = 1;
+}
+if (defined($options{"l"})) {
+    $typelimitfile = $options{"l"};
 }
 if (defined($options{"1"})) {
     $component_name = $options{"1"};
@@ -1624,6 +1631,8 @@ sub print_header {
 	    print "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ";
 	    my $ns = "";
 	    my $url = "";
+	    my $emulabns = "";
+	    my $emulaburl = "";
 	    if ($genimode eq $V_0_1) {
 		$ns = "http://www.protogeni.net/resources/rspec/0.1";
 		$url = "http://www.protogeni.net/resources/rspec/0.1/ad.xsd";
@@ -1633,9 +1642,18 @@ sub print_header {
 	    } elsif ($genimode eq $V_2) {
 		$ns = "http://www.protogeni.net/resources/rspec/2";
 		$url = "http://www.protogeni.net/resources/rspec/2/ad.xsd";
+		$emulabns = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
+# XXX: This needs to be changed
+		$emulaburl = "http://www.cs.utah.edu/~tarunp/code/ptop_extension.xsd";
 	    }
 	    print "xmlns=\"$ns\" ";
-	    print "xsi:schemaLocation=\"$ns $url\" ";
+	    if ($genimode eq $V_2) {
+		print "xmlns:emulab=\"$emulabns\" ";
+		print "xsi:schemaLocation=\"$ns $url $emulabns $emulaburl\" ";
+	    }
+	    else {
+		print "xsi:schemaLocation=\"$ns $url\" ";
+	    }
 	    print "type=\"advertisement\" ";
 	    my @times = gmtime(time());
 	    printf("generated=\"%04d-%02d-%02dT%02d:%02d:%02dZ\" ",
@@ -1653,6 +1671,9 @@ sub print_footer {
     if ($do_xml && $genimode eq $NO_GENI) {
 	print "</ptop>\n";
     } elsif ($do_xml && $genimode ne $NO_GENI) {
+	if ($genimode eq $V_2) {
+	    print_type_limits();
+	}
 	print "</rspec>\n";
     }
 }
@@ -1766,6 +1787,7 @@ sub print_node
         }
 	print_node_flags(@$flags);
 	print_node_interfaces($name, @$interfaces);
+	print_node_features(@$features);
 	print "</node>\n";
     } else {
 	# ptop format
@@ -1799,6 +1821,26 @@ sub print_osids
     }
 }
 
+sub print_type_limits 
+{
+    if ($typelimitfile ne "") {
+	open(TYPELIMIT, "<$typelimitfile") or 
+	    die("Count not open type limit file $typelimitfile\n");
+	my @typelimits = <TYPELIMIT>;
+	close(TYPELIMIT);
+
+	foreach $line (@typelimits) { 
+	    chomp($line);
+	    my ($typeclass, $count) = split(" ", $line);
+
+	    print "<emulab:set_type_limit ";
+	    print "typeclass=\"$typeclass\" ";
+	    print "count=\"$count\"";
+	    print "/>\n";
+	}
+    }
+}
+
 # The order print_node_types(), print_node_features(),
 # print_node_flags() must always be observed lest we break the schema.
 sub print_node_types
@@ -1820,7 +1862,7 @@ sub print_node_types
 		print "    type_slots=\"$count\"\n";
 	    }
 	    if ($is_static) {
-		print "    static=\"true\"\n";
+		print "static=\"true\"\n";
 	    }
 	    print "  />\n";
 	} elsif ($genimode eq $V_2) {
@@ -1830,7 +1872,17 @@ sub print_node_types
 	    if ($name eq "pcvm") {
 		print "  <sliver_type name=\"openvz\" />\n";
 	    }
-	    print "  <hardware_type name=\"$name\" />\n";
+	    print "  <hardware_type name=\"$name\">\n";
+	    if ($count eq "*") {
+		print "    <emulab:node_type type_slots=\"unlimited\" ";
+	    } else {
+		print "    <emulab:node_type type_slots=\"$count\" ";
+	    }
+	    if ($is_static) {
+		print "static=\"true\"";
+	    }
+	    print "/>\n";
+	    print "  </hardware_type>\n";
 	}
     }
 }
@@ -1840,7 +1892,7 @@ sub print_node_features
     my $i = 0;
     for (; $i < scalar(@_); ++$i) {
 	my ($name, $value) = split(/:/, $_[$i], 2);
-	my $flags = "    ";
+	my $flags = "";
 	if ($value >= 1.0) {
 	    $flags .= " violatable=\"true\" ";
 	}
@@ -1856,13 +1908,22 @@ sub print_node_features
 	    $flags .= " global_operator=\"OnceOnly\" ";
 	    $name = substr($name, 2);
 	}
-	print "  <fd \n";
-	print "     fd_name=\"$name\" \n";
-	print "     fd_weight=\"$value\" \n";
-	if ($flags ne "    ") {
-	    print $flags."\n";
+	if ($genimode eq $V_2) {
+	    print "  <emulab:fd name=\"$name\" weight=\"$value\" ";
+	    if ($flags ne "") {
+		print $flags;
+	    }
+	    print "/>\n";
 	}
-	print "  />\n";
+	else {
+	    print "  <fd \n";
+	    print "     fd_name=\"$name\" \n";
+	    print "     fd_weight=\"$value\" \n";
+	    if ($flags ne "") {
+		print $flags."\n";
+	    }
+	    print "  />\n";
+	}
     }
 }
 
