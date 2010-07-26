@@ -67,25 +67,5 @@ VclassSpec = element emulab:vclass {
 	element physical_type { text }+
 }
 
-## The path to which a link has been mapped
-## For the moment only 2 interface mappings are specified because
-## every link only has 2 interfaces for the moment.
-LinkMapping =
-  element emulab:component_hop { 
-		attribute assigned_to { text }, 
-		InterfaceMapping, 
-		InterfaceMapping 
-  }+
-
-# Each interface represents a particular physical interface. If that
-# interface is one of the link end points, it is also mapped to that
-# virtual node and its interface name.
-InterfaceMapping = element interface {
-  attribute physical_node_name { text }, 
-  attribute physical_interface_name { text },
-  attribute virtual_node_name { text }?,
-  attribute virtual_interface_name { text }?
-}
-
 start = AssignedToSpec | HintToSpec | NodeFlagSpec | LinkFlagSpec | VclassSpec
                         | LinkMapping

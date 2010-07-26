@@ -8,15 +8,11 @@ NodeFlagSpec =
     ## interface. In the future, we will make the loopback interface/link
     ## explicit in the topology
     ## Valid only for physical nodes
-    (element emulab:trivial_bandwidth { xsd:integer })?,
-    ## Specify that this node is a subnode of another node. We MIGHT
-    ## try to do this with properties in the future
-    ## Valid for both virtual and physical nodes
-    element emulab:subnode_of { text }?,
+    element emulab:trivial_bandwidth { attribute value { xsd:integer } }? &
     ## Indicates that this node should never be considered identical to any
     ## other node. Could be done with a property
     ## Valid only for physical nodes
-    element emulab:unique { empty }?,
+    element emulab:unique { empty }? &
     ## Indicates that virtual links must either all be trivial (loopback), or
     ## none of them must be. Possibly expressible with properties?
     element emulab:disallow_trivial_mix { empty }?
