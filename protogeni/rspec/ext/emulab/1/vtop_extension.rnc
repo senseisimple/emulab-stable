@@ -14,10 +14,7 @@ namespace emulab = "http://www.protogeni.net/resources/rspec/ext/emulab/1"
 #
 include "top_extension.rnc"
 
-# For a fixed node - th
-AssignedToSpec = element emulab:assigned_to { text }?
-
-HintToSpec = element emulab:hint_to { text }?
+HintToSpec = element emulab:hint_to { attribute value { text } }?
 
 ## "Legacy" assign node flags - will be replaced with properties, and in some
 ## cases, explicit links
@@ -26,10 +23,6 @@ NodeFlagSpec =
     ## try to do this with properties in the future
     ## Valid for both virtual and physical nodes
     element emulab:subnode_of { text }? &
-    ## Indicates that this node should never be considered identical to any
-    ## other node. Could be done with a property
-    ## Valid only for physical nodes
-    element emulab:unique { empty }? &
     ## Indicates that virtual links must either all be trivial (loopback), or
     ## none of them must be. Possibly expressible with properties?
     element emulab:disallow_trivial_mix { empty }?
@@ -67,4 +60,11 @@ VclassSpec = element emulab:vclass {
 	element physical_type { text }+
 }
 
-start = AssignedToSpec | HintToSpec | NodeFlagSpec | LinkFlagSpec | VclassSpec
+start = HintToSpec | NodeFlagSpec | LinkFlagSpec | VclassSpec
+
+
+
+
+
+
+
