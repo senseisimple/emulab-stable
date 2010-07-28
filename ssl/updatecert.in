@@ -1,0 +1,139 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Initialize an emulab to act as a protogeni emulab. Add optional -c
+# option if this is a clearinghouse.
+# 
+sub usage()
+{
+    print "Usage: updatecert [-d] <certfile.pem>\n";
+    exit(1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $OPENSSL       = "/usr/bin/openssl";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub UpdateCert($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libtestbed;
+use emutil qw(TBGetUniqueIndex);
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+usage()
+    if (!@ARGV);
+my $certfile = $ARGV[0];
+
+fatal("No such file: $certfile")
+    if (! -e $certfile);
+
+exit(UpdateCert($certfile));
+
+#
+# Update a certificate using the installed CA.
+#
+sub UpdateCert($)
+{
+    my ($file) = @_;
+
+    # Update by changing serial.
+    my $serial = TBGetUniqueIndex( "user_sslcerts" );
+
+    #
+    # Make sure we can get find the private key in the file, and
+    # save it for later.
+    #
+    my $privkey;
+    my $string;
+    
+    open(CERT, $file)
+	or fatal("Could not open $file");
+    while (<CERT>) {
+	my $line = $_;
+	if ($line =~ /^-----BEGIN RSA/) {
+	    $string = $line;
+	    next;
+	}
+	if ($line =~ /^-----END RSA/) {
+	    $string  = $string .= $line;
+	    $privkey = $string;
+	    next;
+	}
+	$string .= $line
+	    if (defined($string));
+    }
+    close(CERT);
+    if (!defined($privkey)) {
+	fatal("Could not find private key in $file");
+    }
+    
+    #
+    # Save the new certificate to a temporary file: OpenSSL will reuse the
+    # plain text from the old certificate instead of the current version,
+    # so we regenerate the whole thing to avoid confusion.
+    #
+    my $newcert = "/tmp/$$";
+
+    # Put the private key back into the new file.
+    open(CERT, ">$newcert")
+	or fatal("Could not open $newcert for writing");
+    print CERT $privkey;
+    close(CERT);
+
+    system("$OPENSSL x509 -days 2000 -text " .
+	   "-set_serial $serial -signkey $TB/etc/emulab.key " .
+	   "< $file | $OPENSSL x509 -text >> $newcert");
+    if ($?) {
+	fatal("Could not create new certificate");
+    }
+    print "New certificate written to $newcert\n";
+
+    return 0;
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
