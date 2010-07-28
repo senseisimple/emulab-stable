@@ -26,6 +26,11 @@ my $debug   = 0;
 my $TB		  = "@prefix@";
 my $TBOPS         = "@TBOPSEMAIL@";
 my $OPENSSL       = "/usr/bin/openssl";
+my $SSLDIR        = "$TB/lib/ssl";
+my $CACONFIG      = "$SSLDIR/ca.cnf";
+my $EMULAB_CERT   = "$TB/etc/emulab.pem";
+my $EMULAB_KEY    = "$TB/etc/emulab.key";
+my $WORKDIR       = "$TB/ssl";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -105,27 +110,62 @@ sub UpdateCert($)
     if (!defined($privkey)) {
 	fatal("Could not find private key in $file");
     }
+    $file = `realpath $file`;
+    chomp($file);
+
+    #
+    # CD to the workdir, and then serialize on the lock file since
+    # there is some shared goop that the ssl tools muck with (serial
+    # number, index, etc.).
+    # 
+    chdir("$WORKDIR") or
+	fatal("Could not chdir to $WORKDIR: $!");
+
+    TBScriptLock("mkusercert") == 0 or
+	fatal("Could not get the lock!");
+
+    #
+    # Need an index file, which is the openssl version of the DB.
+    #
+    if (! -e "index.txt") {
+	open(IND, ">index.txt")
+	    or fatal("Could not create index.txt");
+	close(IND);
+    }
     
     #
     # Save the new certificate to a temporary file: OpenSSL will reuse the
     # plain text from the old certificate instead of the current version,
     # so we regenerate the whole thing to avoid confusion.
     #
-    my $newcert = "/tmp/$$";
+    my $newcert = "/tmp/$$.pem";
+    my $newreq  = "/tmp/$$.req";
 
-    # Put the private key back into the new file.
-    open(CERT, ">$newcert")
-	or fatal("Could not open $newcert for writing");
-    print CERT $privkey;
-    close(CERT);
+    # Need a serial number file.
+    open(SER, ">serial")
+	or fatal("Could not open serial for writing");
+    printf SER "%08x\n", $serial;
+    close(SER);
 
-    system("$OPENSSL x509 -days 2000 -text " .
-	   "-set_serial $serial -signkey $TB/etc/emulab.key " .
-	   "< $file | $OPENSSL x509 -text >> $newcert");
+    system("$OPENSSL x509 -x509toreq -in $file -signkey $file >$newreq");
+    if ($?) {
+	fatal("Could not create new certificate request");
+    }
+    system("$OPENSSL ca -batch -policy policy_match -days 2000 ".
+	   " -name CA_syscerts -config $CACONFIG -in $newreq ".
+	   " -extensions typical_extensions ".
+	   " -cert $EMULAB_CERT -keyfile $EMULAB_KEY -out $newcert");
     if ($?) {
 	fatal("Could not create new certificate");
     }
+
+    # Put the private key back into the new file.
+    open(CERT, ">>$newcert")
+	or fatal("Could not open $newcert for writing");
+    print CERT $privkey;
+    close(CERT);
     print "New certificate written to $newcert\n";
+    TBScriptUnlock();
 
     return 0;
 }
