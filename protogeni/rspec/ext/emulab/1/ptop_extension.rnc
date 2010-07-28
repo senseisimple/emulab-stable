@@ -12,7 +12,7 @@ NodeFlagSpec =
     ## Indicates that this node should never be considered identical to any
     ## other node. Could be done with a property
     ## Valid only for physical nodes
-    element emulab:unique { empty }? &
+    element emulab:unique { empty }?
 
 TypeLimitSpec =
 	element emulab:set_type_limit { TypeLimitContents }
