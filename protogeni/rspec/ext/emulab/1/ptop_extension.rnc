@@ -13,9 +13,6 @@ NodeFlagSpec =
     ## other node. Could be done with a property
     ## Valid only for physical nodes
     element emulab:unique { empty }? &
-    ## Indicates that virtual links must either all be trivial (loopback), or
-    ## none of them must be. Possibly expressible with properties?
-    element emulab:disallow_trivial_mix { empty }?
 
 TypeLimitSpec =
 	element emulab:set_type_limit { TypeLimitContents }
