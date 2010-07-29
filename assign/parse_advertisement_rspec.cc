@@ -139,7 +139,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
       rspecParser = new rspec_parser_v2(RSPEC_TYPE_ADVT);
       break;
     default:
-      cerr << "ERROR: Unsupported rspec ver. " << rspecVersion
+      cerr << "*** Unsupported rspec ver. " << rspecVersion
 	   << " ... Aborting " << endl;
       exit(EXIT_FATAL);
     }
@@ -162,21 +162,21 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
      */
     XMLDEBUG("starting node population" << endl);
     if (!populate_nodes(advt_root,pg,sg,unavailable)) {
-      cerr << "Error reading nodes from physical topology "
+      cerr << "*** Error reading nodes from physical topology "
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
     XMLDEBUG("finishing node population" << endl);
     XMLDEBUG("starting link population" << endl);
     if (!populate_links(advt_root,pg,sg,unavailable)) {
-      cerr << "Error reading links from physical topology "
+      cerr << "*** Error reading links from physical topology "
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
     XMLDEBUG("finishing link population" << endl);
     XMLDEBUG("setting type limits" << endl);
     if (!populate_type_limits(advt_root, pg, sg)) {
-      cerr << "Error setting type limits " << filename << endl;
+      cerr << "*** Error setting type limits " << filename << endl;
       exit(EXIT_FATAL);
     }
     XMLDEBUG("finishing setting type limits" << endl);
@@ -219,7 +219,7 @@ bool populate_nodes(DOMElement *root,
     bool hasCMId;
     string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
     string componentManagerId = rspecParser->readComponentManagerId(elt,hasCMId);
-    
+
     if (!hasComponentId || !hasCMId) {
       is_ok = false;
       continue;
@@ -228,28 +228,29 @@ bool populate_nodes(DOMElement *root,
    // Maintain a list of componentId's seen so far to ensure no duplicates
     insert_ret = advertisement_elements->insert
       (pair<string, DOMElement*>(componentId, elt));
-    if (insert_ret.second == false)
-      {
-	cerr << componentId << " already exists" << endl;
-	is_ok = false;
-      }
+    if (insert_ret.second == false) {
+      cerr << "*** " << componentId << " already exists" << endl;
+      is_ok = false;
+    }
     
     // XXX: This should not have to be called manually
     bool allUnique;
     rspecParser->readInterfacesOnNode(elt, allUnique);
+
+    // XXX: We don't ever do anything with this, so I am commenting it out
     
-    /* Deal with the location tag */
-    int locationDataCount;
-    vector<string> locationData 
-      = rspecParser->readLocation(elt, locationDataCount);
+//     /* Deal with the location tag */
+//     int locationDataCount;
+//     vector<string> locationData 
+//       = rspecParser->readLocation(elt, locationDataCount);
     
-    string country = locationData[0];
-    string latitude = "";
-    string longitude  = "";
-    if (locationDataCount == 3) {
-      latitude = locationData[1];
-      longitude = locationData[2];
-    }
+//     string country = locationData[0];
+//     string latitude = "";
+//     string longitude  = "";
+//     if (locationDataCount == 3) {
+//       latitude = locationData[1];
+//       longitude = locationData[2];
+//     }
     
     pvertex pv;
     
@@ -268,13 +269,14 @@ bool populate_nodes(DOMElement *root,
     pname2vertex[componentId.c_str()] = pv;
     
     int typeCount;
-    vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
+    vector<struct node_type>types = rspecParser->readNodeTypes(elt, typeCount);
+    bool switchAdded = false;
     for (int i = 0; i < typeCount; i++) {
       node_type type = types[i];
       const char* typeName = type.typeName.c_str();
       int typeSlots = type.typeSlots;
       bool isStatic = type.isStatic;
-      
+
       // Add the type into assign's data structures
       if (ptypes.find(typeName) == ptypes.end()) {
 	ptypes[typeName] = new tb_ptype(typeName);
@@ -290,6 +292,7 @@ bool populate_nodes(DOMElement *root,
        * else!
        */
       if (strcmp(typeName, "switch") == 0) {
+      //      if (rspecParser->checkIsSwitch(componentId) && !switchAdded) {
 	p->is_switch = true;
 	p->types["switch"] = new tb_pnode::type_record(1,false,ptype);
 	svertex sv = add_vertex(sg);
@@ -324,29 +327,32 @@ bool populate_nodes(DOMElement *root,
       (tb_node_featuredesire(XStr(componentManagerId.c_str()).f(), 
 			     1.0, false, featuredesire::FD_TYPE_NORMAL));
 
-    bool isSubnode;
-    string subnodeOf = rspecParser->readSubnodeOf (elt, isSubnode);
+    // This has to be at the end becuase if we don't populate
+    // at least the interfaces, we get all kinds of crappy errors
+    bool isAvailable;
+    string available = rspecParser->readAvailable(elt, isAvailable);
+    if (available == "false") {
+      unavailable.insert(componentId);
+      continue;
+    }
+    ++availableCount;
+
+    bool isSubnode = false;
+    int subnodeCnt;
+    string subnodeOf = rspecParser->readSubnodeOf (elt, isSubnode, subnodeCnt);
     if (isSubnode) {
-      if (!p->subnode_of_name.empty()){
+      if (subnodeCnt > 1) {
+	cerr << "*** Too many \"subnode\" relations found in "
+	     << componentId << "Allowed 1 ... " << endl;
 	is_ok = false;
 	continue;
-      } 
+      }
       else { 
 	// Just store the name for now, we'll do late binding to
 	// an actual pnode later
 	p->subnode_of_name = XStr(subnodeOf.c_str()).f();
       }
     }
-
-    // This has to be at the end becuase if we don't populate
-    // at least the interfaces, we get all kinds of crappy errors
-    bool isAvailable;
-    string available = rspecParser->readAvailable(elt, isAvailable);
-    if (available == "false") {
-	unavailable.insert(componentId);
-	continue;
-      }
-    ++availableCount;
 
     // Deal with features
     int fdsCount;
@@ -377,6 +383,17 @@ bool populate_nodes(DOMElement *root,
       (p->features).push_front(node_fd);
     }
     
+    // Read extensions for emulab-specific flags
+    bool hasTrivialBw;
+    int trivialBw = rspecParser->readTrivialBandwidth(elt, hasTrivialBw);
+    if (hasTrivialBw) {
+      p->trivial_bw = trivialBw;
+    }
+
+    if (rspecParser->readUnique(elt)) {
+      p->unique = true;
+    }
+
     /*
      * XXX: Is this really necessary?
      */
@@ -423,8 +440,7 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
     
     if (!hasComponentId || !hasCMId) {
-      cerr << "All elements must have a component_uuid/component_urn "
-	   << "and a component_manager_uuid/component_manager_urn" << endl;
+      cerr << "*** Require component ID and component manager ID" << endl;
       is_ok = false;
     }
     else {
@@ -432,11 +448,11 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 	advertisement_elements->insert(pair<string, DOMElement*>
 				       (componentId, elt));
       if (insert_ret.second == false) {
-	cerr << componentId << " already exists" << endl;
+	cerr << "*** " << componentId << " already exists" << endl;
 	is_ok = false;
       }
     }
-    
+
     /*
      * Get source and destination interfaces - we use knowledge of the
      * schema that there is awlays exactly one source and one destination
@@ -447,26 +463,27 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     
     // Error handling
     switch (ifaceCount) {
-    case RSPEC_ERROR_BAD_IFACE_COUNT:
-      cerr << "Incorrect number of interfaces found on link " 
-	   << componentId << ". Expected 2 (found " 
-	   << ifaceCount << ")" << endl;
-      is_ok = false;
-      continue;
-      
     case RSPEC_ERROR_UNSEEN_NODEIFACE_SRC:
-      cerr << "Unseen node-interface pair on the source interface ref"
+      cerr << "*** Unseen node-interface pair on the source interface ref"
 	   << endl;
       is_ok = false;
       continue;
       
     case RSPEC_ERROR_UNSEEN_NODEIFACE_DST:
-      cerr << "Unseen node-interface pair on the destination interface ref"
+      cerr << "*** Unseen node-interface pair on the destination interface ref"
 	   << endl;
       is_ok = false;
       continue;
     }
     
+    if (ifaceCount != 2) {
+      cerr << "*** Incorrect number of interfaces found on link " 
+	   << componentId << ". Expected 2 (found " 
+	   << ifaceCount << ")" << endl;
+      is_ok = false;
+      continue;
+    }
+
     /* NOTE: In a request, we assume that each link has only two interfaces
      * Although the order is immaterial, assign expects a source first 
      * and a destination second and we assume the same
@@ -477,26 +494,26 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     string dst_iface = interfaces[1].physicalIfaceId;
     
     if (src_node == "" || src_iface == "") {
-      cerr << "Physical link " << componentId 
+      cerr << "*** Physical link " << componentId 
 	   << " must have a component id and component interface id "
 	   << " specified for the source node" << endl;
       is_ok = false;
       continue;
     }
     if (dst_node == "" || dst_iface == "") {
-      cerr << "Physical link " << componentId 
+      cerr << "*** Physical link " << componentId 
 	   << " must have a component id and component interface id"
 	   << " specified for the destination node" << endl;
       is_ok = false;
       continue;
     }
-    
+
     if( unavailable.count( src_node ) || 
 	unavailable.count( dst_node ) )
       //one or both of the endpoints are unavailable; silently
       //ignore the link
       continue;
-    
+
     /*
      * Get standard link characteristics
      */

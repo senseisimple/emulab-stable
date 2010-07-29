@@ -74,6 +74,8 @@ class rspec_parser : public rspec_parser_helper
   
   int rspecType; 
   std::set< std::pair<std::string, std::string> >ifacesSeen;
+  std::set< std::string > switches; 
+  virtual void addSwitch (const xercesc::DOMElement*);
   struct link_interface getIface (const xercesc::DOMElement*);
   
  public:
@@ -95,9 +97,6 @@ class rspec_parser : public rspec_parser_helper
   virtual std::vector<struct node_type> 
     readNodeTypes (const xercesc::DOMElement*,
 		   int&, int unlimitedSlots=1000);
-  
-  // Reads subnode tag, if present
-  virtual std::string readSubnodeOf (const xercesc::DOMElement*, bool&);
   
   // Reads the exclusive tag if present
   virtual std::string readExclusive (const xercesc::DOMElement*, bool&);
@@ -133,6 +132,20 @@ class rspec_parser : public rspec_parser_helper
 
   virtual std::vector<struct rspec_emulab_extension::fd>
     readFeaturesDesires(const xercesc::DOMElement*, int&);
+
+  virtual bool checkIsSwitch (std::string nodeId);
+
+  virtual std::vector<struct rspec_emulab_extension::vclass> 
+    readVClasses (const xercesc::DOMElement* tag);
+  virtual std::string readSubnodeOf (const xercesc::DOMElement* tag, 
+				     bool& isSubnode,
+				     int& count);
+  virtual bool readDisallowTrivialMix (const xercesc::DOMElement* tag);
+  virtual bool readUnique (const xercesc::DOMElement* tag);
+  virtual int readTrivialBandwidth (const xercesc::DOMElement* tag, bool&);
+  virtual std::string readHintTo (const xercesc::DOMElement* tag, bool&);
+  virtual bool readNoDelay (const xercesc::DOMElement* tag);
+  virtual bool readTrivialOk (const xercesc::DOMElement* tag);
 };
 
 

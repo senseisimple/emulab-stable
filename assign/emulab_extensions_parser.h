@@ -61,7 +61,7 @@ namespace rspec_emulab_extension {
   struct vclass {
     std::string name;
     struct hardness type;
-    std::string physicalType;
+    std::vector<std::string> physicalTypes;
   };
   
   struct property {
@@ -96,14 +96,21 @@ namespace rspec_emulab_extension {
     std::vector<struct property> readProperties
       (const xercesc::DOMElement* elem);
     struct property readProperty (const xercesc::DOMElement* tag);
-    std::vector<struct vclass> readAllVClasses (const xercesc::DOMElement*);
+    std::vector<struct vclass> readVClasses (const xercesc::DOMElement*);
     struct vclass readVClass (const xercesc::DOMElement* tag);
     std::string readAssignedTo (const xercesc::DOMElement* tag);
     std::string readHintTo (const xercesc::DOMElement* tag);
     std::string readTypeSlots (const xercesc::DOMElement* tag);
     bool readStaticType (const xercesc::DOMElement* tag);
-    std::vector<struct type_limit> readTypeLimits(const xercesc::DOMElement* tag,
+    std::vector<struct type_limit> readTypeLimits(const xercesc::DOMElement*,
 						  int& count);
+    std::string readSubnodeOf (const xercesc::DOMElement* tag, bool&);
+    virtual bool readDisallowTrivialMix (const xercesc::DOMElement* tag);
+    virtual bool readUnique (const xercesc::DOMElement* tag);
+    virtual int readTrivialBandwidth (const xercesc::DOMElement* tag, bool&);
+    virtual std::string readHintTo (const xercesc::DOMElement* tag, bool&);
+    virtual bool readNoDelay (const xercesc::DOMElement* tag);
+    virtual bool readTrivialOk (const xercesc::DOMElement* tag);
   };
   
 } // namespace rspec_emulab_extension

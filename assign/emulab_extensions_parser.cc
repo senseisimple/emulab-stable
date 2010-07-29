@@ -84,21 +84,20 @@ struct property emulab_extensions_parser::readProperty (const DOMElement* tag)
 struct hardness emulab_extensions_parser::readHardness (const DOMElement* tag)
 {
   struct hardness hardnessObject;
-  if (this->hasChild(tag, "hard")) {
-    // XXX: This is a temporary fix. We will need to deal with hard
-    // vclasses correctly at some point
+  string strWeight = this->getAttribute(tag, "weight");
+
+  if (strWeight == "hard") {
     hardnessObject.type = HARD_VCLASS;
   }
-  else /* (this->hasChildTag(tag, "soft"))  */ {
-    hardnessObject.weight
-      = rspec_parser_helper::stringToNum (this->readChild(tag, "weight"));
+  else {
     hardnessObject.type = SOFT_VCLASS;
+    hardnessObject.weight = rspec_parser_helper::stringToNum(strWeight);
   }
   return hardnessObject;
 }
 
 vector<struct vclass> 
-emulab_extensions_parser::readAllVClasses (const DOMElement* elem)
+emulab_extensions_parser::readVClasses (const DOMElement* elem)
 {
   DOMNodeList* vclassNodes 
     = elem->getElementsByTagName(XStr("emulab:vclass").x());
@@ -113,10 +112,31 @@ emulab_extensions_parser::readAllVClasses (const DOMElement* elem)
 
 struct vclass emulab_extensions_parser::readVClass (const DOMElement* tag)
 {
+  vector<string> physTypes;
+  DOMNodeList* physNodes
+    = tag->getElementsByTagName(XStr("emulab:physical_type").x());
+  for (int i = 0; i < physNodes->getLength(); i++) {
+    DOMElement* physNode = dynamic_cast<DOMElement*>(physNodes->item(i));
+    // XXX: This is nasty because the type name that we give assign
+    // has to be the concatation of the hardware type and sliver type
+    // It's not clear which is the best place to do this
+    // i.e. whether to generate this concatenated type here in the parser
+    // (in which case any time the formula to convert the single type to 
+    // a hardware type and sliver type changes, it will have to be updated
+    // both here and in libvtop) or to do it just once in libvtop in which
+    // case the reverse holds true i.e. when we change the way we concatenate
+    // the types and present it to assign, we will have to change the code 
+    // in libvtop
+    string physNodeName  = this->getAttribute(physNode, "name");
+    cerr << "Converted vclass name to " 
+	 << rspec_parser_helper::convertType(physNodeName) << endl;
+    physTypes.push_back(rspec_parser_helper::convertType(physNodeName));
+  }
+    
   struct vclass vclassObject = {
-    this->getAttribute(tag, "name"),
+    rspec_parser_helper::convertType(this->getAttribute(tag, "name")),
     this->readHardness(tag),
-    this->readChild(tag, "physical_type")
+    physTypes
   };
   return vclassObject;
 }
@@ -161,6 +181,74 @@ emulab_extensions_parser::readTypeLimits (const DOMElement* tag, int& count)
     rv.push_back(limit);
   }
   return rv;
+}
+
+string emulab_extensions_parser::readSubnodeOf (const DOMElement* tag, 
+						bool& isSubnode)
+{
+  string rv = "";
+  DOMNodeList* subnodes
+    = tag->getElementsByTagName(XStr("emulab:subnode_of").x());
+  isSubnode = (subnodes->getLength() > 0);
+  if (isSubnode) {
+    DOMElement* subnode = dynamic_cast<DOMElement*>(subnodes->item(0));
+    rv = this->getAttribute(subnode, "parent");
+  }
+  return rv;
+}
+
+bool emulab_extensions_parser::readDisallowTrivialMix (const DOMElement* tag) 
+{
+  DOMNodeList* trivialMix 
+    = tag->getElementsByTagName(XStr("emulab:disallow_trivial_mix").x());
+  return (trivialMix->getLength() > 0);
+}
+
+bool emulab_extensions_parser::readUnique (const DOMElement* tag) 
+{
+  DOMNodeList* uniques = tag->getElementsByTagName(XStr("emulab:unique").x());
+  return (uniques->getLength() > 0);
+}
+
+int emulab_extensions_parser::readTrivialBandwidth(const DOMElement* tag,
+						   bool& hasTrivialBw) 
+{
+  int trivialBw = 0;
+  DOMNodeList* bws 
+    = tag->getElementsByTagName(XStr("emulab:trivial_bandwidth").x());
+  hasTrivialBw = (bws->getLength() > 0);
+  if (hasTrivialBw) {
+    trivialBw =(int)this->stringToNum(this->getAttribute
+				      (dynamic_cast<DOMElement*>(bws->item(0)),
+				       "value"));
+  }
+  return trivialBw;
+}
+
+string emulab_extensions_parser::readHintTo (const DOMElement* tag, 
+					     bool& hasHint)
+{
+  string hint = "";
+  DOMNodeList* hints = tag->getElementsByTagName(XStr("emulab:hint_to").x());
+  hasHint = (hints->getLength() > 0);
+  if (hasHint) {
+    hint = this->getAttribute(dynamic_cast<DOMElement*>(hints->item(0)), 
+			      "value");
+  }
+  return hint;
+}
+
+bool emulab_extensions_parser::readNoDelay (const DOMElement* tag)
+{
+  DOMNodeList* nodelays= tag->getElementsByTagName(XStr("emulab:nodelay").x());
+  return (nodelays->getLength() > 0);
+}
+
+bool emulab_extensions_parser::readTrivialOk (const DOMElement* tag)
+{
+  DOMNodeList* trivial_oks
+    = tag->getElementsByTagName(XStr("emulab:trivial_ok").x());
+  return (trivial_oks->getLength() > 0);
 }
 
 #endif // WITH_XML

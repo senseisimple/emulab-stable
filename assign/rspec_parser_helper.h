@@ -38,6 +38,15 @@ class rspec_parser_helper
   
   // To determine the rspec version from the root element
   static int getRspecVersion (xercesc::DOMElement* root);
+
+  // Converts the (hardwareType/sliverType) pair of rspec v2 to a single type
+  // for assign's consumption
+  static std::string convertType (std::string hwType, std::string slType);
+
+  // Converts a single type name of the old format into a 
+  // (hardwareType/sliverType) pair and then converts it into a single type
+  // for assign's consumption
+  static std::string convertType (std::string type);
 };
 
 #endif // __RSPEC_PARSER_HELPER_H__

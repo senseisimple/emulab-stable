@@ -17,6 +17,7 @@ static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.16 2009-10-21 20:49
 #include "parse_error_handler.h"
 #include "rspec_parser_v1.h"
 #include "rspec_parser_v2.h"
+#include "emulab_extensions_parser.h"
 
 #include <fstream>
 #include <sstream>
@@ -33,6 +34,9 @@ static const char rcsid[] = "$Id: parse_request_rspec.cc,v 1.16 2009-10-21 20:49
 #else	
 	#define SCHEMA_LOCATION "request.xsd"
 #endif
+
+using namespace rspec_emulab_extension;
+
 /*
  * XXX: Do I have to release lists when done with them?
  */
@@ -74,6 +78,7 @@ static bool populate_links(DOMElement *root,
 			   tb_vgraph &vg, 
 			   map< pair<string, string>, 
 			   pair<string, string> >* fixed_interfaces);
+static bool populate_vclasses (DOMElement* root, tb_vgraph& vg);
 
 DOMElement* appendChildTagWithData (DOMElement* parent, 
 				    const char* tag_name, 
@@ -116,7 +121,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
    * If there are any errors, do not go any further
    */
   if (errHandler->sawError()) {
-    cerr << "There were " << domParser -> getErrorCount () 
+    cerr << "*** There were " << domParser -> getErrorCount () 
 	 << " errors in your file. " << endl;
     exit(EXIT_FATAL);
   }
@@ -131,7 +136,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
     bool is_physical;
     XStr type (request_root->getAttribute(XStr("type").x()));
     if (strcmp(type.c(), "request") != 0) {
-      cerr << "Error: RSpec type must be \"request\"" << endl;
+      cerr << "*** RSpec type must be \"request\"" << endl;
       exit (EXIT_FATAL);
     } 
     
@@ -150,7 +155,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
       rspecParser = new rspec_parser_v2(RSPEC_TYPE_REQ);
       break;
     default:
-      cerr << "ERROR: Unsupported rspec ver. " << rspecVersion
+      cerr << "*** Unsupported rspec ver. " << rspecVersion
 	   << " ... Aborting " << endl;
       exit(EXIT_FATAL);
     }
@@ -162,9 +167,16 @@ int parse_request(tb_vgraph &vg, char *filename) {
      * These three calls do the real work of populating the assign data
      * structures
      */
+    XMLDEBUG("starting vclass population" << endl);
+    if (!populate_vclasses (request_root, vg)) {
+      cerr << "*** Error reading vclasses from virtual topology "
+	   << filename << endl;
+      exit(EXIT_FATAL);
+    }
+    XMLDEBUG("finishing vclass population" << endl);
     XMLDEBUG("starting node population" << endl);
     if (!populate_nodes(request_root,vg, &fixed_interfaces)) {
-      cerr << "Error reading nodes from virtual topology " 
+      cerr << "*** Error reading nodes from virtual topology " 
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
@@ -172,7 +184,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
     
     XMLDEBUG("starting link population" << endl);
     if (!populate_links(request_root,vg, &fixed_interfaces)) {
-      cerr << "Error reading links from virtual topology " 
+      cerr << "*** Error reading links from virtual topology " 
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
@@ -216,16 +228,16 @@ bool populate_node(DOMElement* elt,
   }
   
   if (!hasVirtualId) {
-    cerr << "ERROR: Every node must have a virtual_id" << endl;
+    cerr << "*** Every node must have a virtual_id" << endl;
     return false;
   }
   
   bool allUnique;
   map< pair<string, string>, pair<string, string> > fixedIfacesOnNode;
-  fixedIfacesOnNode = rspecParser->readInterfacesOnNode(elt, allUnique);
   // XXX: This should not have to be called manually
+  fixedIfacesOnNode = rspecParser->readInterfacesOnNode(elt, allUnique);
   if (!allUnique) {
-    cerr << "The node-interface pairs in " << virtualId 
+    cerr << "*** The node-interface pairs in " << virtualId 
 	 << " were not unique."	<< endl;
     return false;
   }
@@ -243,9 +255,9 @@ bool populate_node(DOMElement* elt,
   vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
   bool no_type = (typeCount == 0);
   if (typeCount > 1) {
-    cerr << "ERROR: Too many node types (" << typeCount << ") on " 
+    cerr << "*** Too many node types (" << typeCount << ") on " 
 	 << virtualId << " (allowed 1) ... Aborting " << endl;
-    exit(EXIT_FAILURE);
+    return false;
   }
   
   string typeName = types[0].typeName;
@@ -254,6 +266,8 @@ bool populate_node(DOMElement* elt,
   
   bool isUnlimited = (typeSlots == 1000);
   
+  cerr << "Found req type " << typeName << endl;
+
   /*
    * Make a tb_ptype structure for this guy - or just add this node to
    * it if it already exists
@@ -280,15 +294,24 @@ bool populate_node(DOMElement* elt,
       vtypes[typeName_c] += typeSlots;
     }
   }
+
+  // Read emulab extensions
   
   bool isSubnode;
-  string subnodeOf = rspecParser->readSubnodeOf(elt, isSubnode);
+  int subnodeCnt;
+  string subnodeOf = rspecParser->readSubnodeOf(elt, isSubnode, subnodeCnt);
+  if (isSubnode) {
+    if (subnodeCnt > 1) {
+      cerr << "*** To many \"subnode\" relations found in " 
+	   << virtualId << ". Allowed 1 ... " << endl;
+      return false;
+    }
+  }
   
-  // A bunch of defaults for stuff that assign wants and Protogeni doesn't
-  // The code to read the values from the request is still there 
-  bool is_unique = false;
-  bool is_disallow_trivial_mix = false;
-  //-------------------------------------------------------------------------
+  bool disallow_trivial_mix = rspecParser->readDisallowTrivialMix(elt);
+ 
+  bool hasNodeHint = false;
+  string nodeHint = rspecParser->readHintTo(elt, hasNodeHint);
   
   tb_vnode *v = NULL;
   if (no_type)
@@ -300,13 +323,19 @@ bool populate_node(DOMElement* elt,
 		     typeName.c_str(), typeSlots);
   
   // Construct the vertex
-  v -> disallow_trivial_mix = is_disallow_trivial_mix;
-  if (isSubnode)
+  if (disallow_trivial_mix) {
+    v -> disallow_trivial_mix = true;
+  }
+  if (isSubnode) {
     v -> subnode_of_name = subnodeOf.c_str();
+  }
+  if (hasNodeHint) {
+    node_hints[virtualId] = nodeHint;
+  }
   
   bool hasExclusive;
   string exclusive = rspecParser->readExclusive(elt, hasExclusive);
-  
+
   if (hasExclusive) {
     fstring desirename("shared");
     
@@ -326,6 +355,35 @@ bool populate_node(DOMElement* elt,
 	  "assume exclusive=\"true\"\n";
       }
     }
+  }
+
+  int fdsCount;
+  vector<struct fd> fds = rspecParser->readFeaturesDesires(elt, fdsCount);
+  for (int i = 0; i < fdsCount; i++) {
+    struct fd desire = fds[i];
+    featuredesire::fd_type fd_type;
+    switch(desire.op.type) {
+    case LOCAL_OPERATOR:
+      fd_type = featuredesire::FD_TYPE_LOCAL_ADDITIVE;
+      break;
+    case GLOBAL_OPERATOR:
+      if (desire.op.op == "OnceOnly") {
+	fd_type = featuredesire::FD_TYPE_GLOBAL_ONE_IS_OKAY;
+      }
+      else {
+	fd_type = featuredesire::FD_TYPE_GLOBAL_MORE_THAN_ONE;
+      }
+      break;
+    default:
+      fd_type = featuredesire::FD_TYPE_NORMAL;
+      break;
+    }
+    tb_node_featuredesire node_fd (XStr(desire.fd_name.c_str()).f(),
+				   desire.fd_weight,
+				   desire.violatable,
+				   fd_type);
+    node_fd.add_desire_user(desire.fd_weight);
+    (v->desires).push_front(node_fd);
   }
   
   v->vclass = vclass;
@@ -399,24 +457,30 @@ bool populate_link (DOMElement* elt,
    */
   int count;
   vector<struct link_type> linkTypes = rspecParser->readLinkTypes(elt, count);
+  string linkType = "ethernet";
   if (count > 1) {
-    cerr << "ERROR: Too many link types specified (" << count 
+    cerr << "*** Too many link types specified (" << count 
 	 << ") on " << virtualId << ". Allowed 1 ... Aborting" << endl;
-    exit(EXIT_FAILURE);
+    return false;
   }
-  string linkType = linkTypes[0].typeName;
-  if (linkType == "")
-    linkType = "ethernet";	
+  else if (count == 1){
+    linkType = linkTypes[0].typeName;
+  }
   
   /*
    * Get standard link characteristics
    */
   struct link_characteristics characteristics
     = rspecParser->readLinkCharacteristics(elt, count);
+  if (count != 1) {
+    cerr << "*** Incorrect number of link properties specified ("
+	 << count << " on " << virtualId <<". Allowed 1 " << endl;
+    return false;
+  }
   int bandwidth = characteristics.bandwidth;
   int latency = characteristics.latency;
   double packetLoss = characteristics.packetLoss;
-  
+
   struct link_interface src;
   struct link_interface dst;
   
@@ -488,18 +552,14 @@ bool populate_link (DOMElement* elt,
       
       DOMElement* src_interface_ref 
 	= doc->createElement(XStr("interface_ref").x());
-      src_interface_ref->setAttribute(XStr("virtualIfaceId").x(),
+      src_interface_ref->setAttribute(XStr("clientId").x(),
 				      virtualIfaceId);
-      src_interface_ref->setAttribute(XStr("virtualNodeId").x(),
-				      virtualNodeId);
       link->appendChild(src_interface_ref);
       
       DOMElement* dst_interface_ref 
 	= doc->createElement(XStr("interface_ref").x());
-      dst_interface_ref->setAttribute(XStr("virtualIfaceId").x(),
+      dst_interface_ref->setAttribute(XStr("clientId").x(),
 				      XStr(str_lan_interface_id.c_str()).x());
-      dst_interface_ref->setAttribute(XStr("virtualNodeId").x(),
-				      XStr(str_lan_id.c_str()).x());
       link->appendChild(dst_interface_ref);
       
       // Adding attributes to ensure that the element is handled
@@ -522,34 +582,35 @@ bool populate_link (DOMElement* elt,
     dst = interfaces[1];
   }
   else {
-    cerr << "ERROR: Too few interfaces found (" << ifaceCount << ")" 
+    cerr << "*** Too few interfaces found (" << ifaceCount << ")" 
 	 << " on " << virtualId << " at least 2 required ... Aborting" 
 	 << endl;
-    exit(EXIT_FAILURE);
+    return false;
   }
   
   string srcNode = src.virtualNodeId;
   string srcIface = src.virtualIfaceId;
   string dstNode = dst.virtualNodeId;
   string dstIface = dst.virtualIfaceId;
+
   if (srcNode == "" || srcIface == "") {
-    cerr << "No source node found on interface for link " 
+    cerr << "*** No source node found on interface for link " 
 	 << virtualId << endl;
     return false;
   }
   if (dstNode == "" || dstIface == "") {
-    cerr << "No destination node found on interface for link " 
+    cerr << "*** No destination node found on interface for link " 
 	 << virtualId << endl;
     return false;
   }
   
   if (vname2vertex.find(srcNode.c_str()) == vname2vertex.end()) {
-    cerr << "Bad link " << virtualId 
+    cerr << "*** Bad link " << virtualId 
 	 << ", non-existent source node " << srcNode << endl;
     return false;
   }
   if (vname2vertex.find(dstNode.c_str()) == vname2vertex.end()) {
-    cerr << "Bad link " << virtualId 
+    cerr << "*** Bad link " << virtualId 
 	 << ", non-existent destination node " << dstNode << endl;
     return false;
   }
@@ -559,15 +620,14 @@ bool populate_link (DOMElement* elt,
   tb_vnode *src_vnode = get(vvertex_pmap,v_src_vertex);
   tb_vnode *dst_vnode = get(vvertex_pmap,v_dst_vertex);
   
+  // XXX: This is obsolete. We need to fix it ASAP
   bool emulated = false;
   if (virtualizationType == "raw" || virtualizationType == "")
     emulated = true;
   
-  // This section has a whole bunch of defaults for tags that 
-  // were used in the old text format but are not in Protogeni. 
-  // We will eventually decide whether or not we want them.
-  bool allow_delayed = true;
-  bool allow_trivial = true;
+  // Emulab extensions
+  bool allow_delayed = !(rspecParser->readNoDelay(elt));
+  bool allow_trivial = rspecParser->readTrivialOk(elt);
   
   map< pair<string,string>, pair<string,string> >::iterator it;
   
@@ -613,17 +673,21 @@ bool populate_link (DOMElement* elt,
   
   virt_link-> name = virtualId;
   virt_link-> type = fstring(linkType.c_str());
-  
+
   virt_link-> fix_src_iface = fix_srcIface;
-  virt_link-> src_iface = (fixed_srcIface);//.f();
+  if (fix_srcIface) {
+    virt_link-> src_iface = (fixed_srcIface);//.f();
+  }
   
   virt_link-> fix_dst_iface = fix_dstIface;
-  virt_link-> dst_iface = (fixed_dstIface);//.f();
+  if (fix_dstIface) {
+    virt_link-> dst_iface = (fixed_dstIface);//.f();
+  }
   
   virt_link-> emulated = emulated;
   virt_link-> allow_delayed = allow_delayed;
   virt_link-> allow_trivial = allow_trivial;
-  virt_link-> no_connection = true;
+  virt_link-> no_connection = false;
   virt_link->delay_info.bandwidth = bandwidth;
   virt_link->delay_info.delay = latency;
   virt_link->delay_info.loss = packetLoss;
@@ -637,7 +701,7 @@ bool populate_link (DOMElement* elt,
 }
 
 /*
- * Pull the links from the ptop file, and populate assign's own data sturctures
+ * Pull the links from the vtop file, and populate assign's own data sturctures
  */
 bool populate_links(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
     
@@ -653,11 +717,50 @@ bool populate_links(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, 
     for (size_t i = 0; i < linkCount; i++) {
         DOMNode *link = links->item(i);
         DOMElement *elt = dynamic_cast<DOMElement*>(link);
-        
-		is_ok &= populate_link(elt, vg, fixed_interfaces);	
+	is_ok &= populate_link(elt, vg, fixed_interfaces);	
     }
     return is_ok;
 }
+
+bool populate_vclass (struct vclass vclass, tb_vgraph& vg)
+{
+  tb_vclass *v = NULL;
+  const char* name = vclass.name.c_str();
+  // We don't have support for hard vclasses yet
+  if (vclass.type.type == SOFT_VCLASS) {
+    cerr << "Soft vclass " << name << " with weight " 
+	 << vclass.type.weight << endl;
+    v = new tb_vclass (XStr(name).f(), vclass.type.weight);
+    if (v == NULL) {
+      cerr << "*** Could not create vclass " << vclass.name << endl;
+      return false;
+    }
+    vclass_map[name] = v;
+  }
+  
+  for (int i = 0; i < vclass.physicalTypes.size(); i++) {
+    fstring physType = XStr(vclass.physicalTypes[i].c_str()).f();
+    cerr << "vclass physType: " << physType << endl;
+    v->add_type(physType);
+    vclasses[name].push_back(physType);
+  }
+  return true;
+}
+
+/*
+ * Populate the vclasses
+ */
+bool populate_vclasses (DOMElement* root, tb_vgraph& vg)
+{
+  bool isOk = true;
+  vector<struct vclass> vclasses = rspecParser->readVClasses(root);
+  cerr << "Found " << vclasses.size() << " vclasses." << endl;
+  for (int i = 0; i < vclasses.size(); i++) {
+    isOk &= populate_vclass(vclasses[i], vg);
+  }
+  return isOk;
+}
+    
 
 DOMElement* appendChildTagWithData (DOMElement* parent, 
 				    const char* tag_name, 

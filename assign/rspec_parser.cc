@@ -99,25 +99,31 @@ vector<struct node_type> rspec_parser::readNodeTypes (const DOMElement* node,
 						      int& typeCount,
 						      int unlimitedSlots)
 {
+  bool isSwitch = false;
   DOMNodeList* nodeTypes = node->getElementsByTagName(XStr("node_type").x());
   vector<struct node_type> types;
-  for (int i = 0; i < nodeTypes->getLength(); i++) 
-    {
-      DOMElement *tag = dynamic_cast<DOMElement*>(nodeTypes->item(i));
-      
-      string typeName = XStr(tag->getAttribute(XStr("type_name").x())).c();
-      
-      int typeSlots;
-      string slot = XStr(tag->getAttribute(XStr("type_slots").x())).c();
-      if (slot == "unlimited")
-	typeSlots = unlimitedSlots;
-      else 
-	typeSlots = (int)stringToNum(slot);
-      
-      bool isStatic = tag->hasAttribute(XStr("static").x());
-      struct node_type type = {typeName, typeSlots, isStatic};
-      types.push_back(type);
+  for (int i = 0; i < nodeTypes->getLength(); i++) {
+    DOMElement *tag = dynamic_cast<DOMElement*>(nodeTypes->item(i));
+    
+    string typeName = XStr(tag->getAttribute(XStr("type_name").x())).c();
+    if (typeName == "switch") {
+      isSwitch = true;
     }
+    int typeSlots;
+    string slot = XStr(tag->getAttribute(XStr("type_slots").x())).c();
+    if (slot == "unlimited")
+      typeSlots = unlimitedSlots;
+    else 
+      typeSlots = (int)stringToNum(slot);
+    
+    bool isStatic = tag->hasAttribute(XStr("static").x());
+    struct node_type type = {typeName, typeSlots, isStatic};
+    types.push_back(type);
+  }
+
+  if (isSwitch) {
+    this->addSwitch(node);
+  }
   typeCount = nodeTypes->getLength();
   return types;
 }
@@ -161,6 +167,7 @@ rspec_parser::readInterfacesOnNode  (const DOMElement* node,
 }
 
 // Returns a link_characteristics element
+// count should be 1 on success.
 struct link_characteristics 
 rspec_parser :: readLinkCharacteristics (const DOMElement* link,
 					 int& count,
@@ -184,6 +191,7 @@ rspec_parser :: readLinkCharacteristics (const DOMElement* link,
   latency = hasLatency ? atoi(strLat.c_str()) : 0 ;
   packetLoss = hasPacketLoss ? atof(strLoss.c_str()) : 0.0;
   
+  count = 1;
   struct link_characteristics rv = {bandwidth, latency, packetLoss};
   return rv;
 }
@@ -233,7 +241,6 @@ rspec_parser :: readLinkInterface (const DOMElement* link, int& ifaceCount)
   return rv;
 }
 
-
 vector<struct link_type> rspec_parser::readLinkTypes (const DOMElement* link,
 						      int& typeCount)
 {
@@ -252,8 +259,32 @@ vector<struct link_type> rspec_parser::readLinkTypes (const DOMElement* link,
   return types;
 }
 
-string rspec_parser :: readSubnodeOf (const DOMElement* tag, bool& isSubnode)
+bool rspec_parser::checkIsSwitch (string nodeId) 
 {
+  return (((this->switches).find(nodeId)) != (this->switches).end());
+}
+
+void rspec_parser::addSwitch (const DOMElement* node) 
+{
+  bool dummy;
+  string nodeId = this->readPhysicalId(node, dummy);
+  if (this->rspecType == RSPEC_TYPE_REQ) {
+    nodeId = this->readVirtualId(node, dummy);
+  }
+  (this->switches).insert(nodeId);
+}
+
+vector<struct vclass>
+rspec_parser :: readVClasses (const DOMElement* tag)
+{
+  return vector<struct vclass>();
+}
+
+string rspec_parser :: readSubnodeOf (const DOMElement* tag, 
+				      bool& isSubnode,
+				      int& count)
+{
+  count = (tag->getElementsByTagName(XStr("subnode_of").x()))->getLength();
   return (this->readChild(tag, "subnode_of", isSubnode));
 }
 
@@ -280,5 +311,39 @@ rspec_parser::readFeaturesDesires (const DOMElement* tag, int& count)
   count = 0;
   return vector<struct fd>();
 }
+
+bool rspec_parser::readDisallowTrivialMix (const DOMElement* tag)
+{
+  return false;
+}
+
+bool rspec_parser::readUnique (const DOMElement* tag)
+{
+  return false;
+}
+
+int rspec_parser::readTrivialBandwidth (const DOMElement* tag,
+					 bool& hasTrivialBw)
+{
+  hasTrivialBw = false;
+  return 0;
+}
+
+string rspec_parser::readHintTo (const DOMElement* tag, bool& hasHintTo)
+{
+  hasHintTo = false;
+  return "";
+}
+
+bool rspec_parser::readNoDelay (const DOMElement* tag)
+{
+  return false;
+}
+
+bool rspec_parser::readTrivialOk (const DOMElement* tag)
+{
+  return false;
+}
+
 
 #endif

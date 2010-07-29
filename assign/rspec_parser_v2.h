@@ -54,6 +54,16 @@ class rspec_parser_v2 : public rspec_parser
 
   std::vector<struct rspec_emulab_extension::fd>
     readFeaturesDesires(const xercesc::DOMElement* tag, int& count);
+
+  std::vector<struct rspec_emulab_extension::vclass>
+    readVClasses (const xercesc::DOMElement* tag);
+  std::string readSubnodeOf (const xercesc::DOMElement* tag, bool&, int&);
+  bool readDisallowTrivialMix (const xercesc::DOMElement* tag);
+  bool readUnique (const xercesc::DOMElement* tag);
+  int readTrivialBandwidth (const xercesc::DOMElement* tag, bool&);
+  std::string readHintTo (const xercesc::DOMElement* tag, bool&);
+  bool readNoDelay (const xercesc::DOMElement* tag);
+  bool readTrivialOk (const xercesc::DOMElement* tag);
 };
 
 

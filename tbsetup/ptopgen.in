@@ -1644,7 +1644,7 @@ sub print_header {
 		$url = "http://www.protogeni.net/resources/rspec/2/ad.xsd";
 		$emulabns = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
 # XXX: This needs to be changed
-		$emulaburl = "http://www.cs.utah.edu/~tarunp/code/ptop_extension.xsd";
+		$emulaburl = "http://www.protogeni.net/resources/rspec/ext/emulab/1/ptop_extension.xsd";
 	    }
 	    print "xmlns=\"$ns\" ";
 	    if ($genimode eq $V_2) {
@@ -1932,25 +1932,39 @@ sub print_node_flags
     my $i = 0;
     for (; $i < scalar(@_); ++$i) {
 	my ($name, $value) = split(/:/, $_[$i], 2);
-	if ($name eq "trivial_bw" && $genimode eq $NO_GENI) {
-	    print "  <trivial_bandwidth>$value</trivial_bandwidth>\n";
+	if ($name eq "trivial_bw"){
+	    if ($genimode eq $NO_GENI) {
+		print "  <trivial_bandwidth>$value</trivial_bandwidth>\n";
+	    }
+	    elsif ($genimode eq $V_2) {
+		print "  <emulab:trivial_bandwidth value=\"$value\" />\n";
+	    }
 	}
 	elsif ($name eq "subnode_of") {
-	    if ($genimode ne $NO_GENI) {
-		$value = GeniHRN::Generate($OURDOMAIN, "node", $value);
-	    }
-	    if ($genimode eq $V_2) {
-		print "  <relation type=\"subnode_of\" ";
-		print "component_id=\"$value\" />\n";
-	    } else {
+	    if ($genimode eq $NO_GENI) {
 		print "  <subnode_of>$value</subnode_of>\n";
 	    }
+	    elsif ($genimode eq $V_2) {
+		$value = GeniHRN::Generate($OURDOMAIN, "node", $value);
+		print "  <relation type=\"subnode_of\" ";
+		print "component_id=\"$value\" />\n";
+	    } 
 	}
-	elsif ($name eq "unique" && $genimode eq $NO_GENI) {
-	    print "  <unique/>\n";
+	elsif ($name eq "unique") {
+	    if ($genimode eq $NO_GENI) {
+		print "  <unique/>\n";
+	    }
+	    elsif ($genimode eq $V_2) {
+		print "  <emulab:unique />\n";
+	    }
 	}
-	elsif ($name eq "disallow_trivial_mix" && $genimode eq $NO_GENI) {
-	    print "  <disallow_trivial_mix/>\n";
+	elsif ($name eq "disallow_trivial_mix") {
+	    if ($genimode eq $NO_GENI) {
+		print "  <disallow_trivial_mix/>\n";
+	    }
+	    elsif ($genimode eq $V_2) {
+		print "  <emulab:disallow_trivial_mix /> \n";
+	    }
 	}
     }
 }

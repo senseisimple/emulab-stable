@@ -2982,15 +2982,20 @@ sub PrintRspec($;$)
     # Construct the current time string 
     my $creation = time();
     my $expiration = $creation + 3600;
+
+    my $rspecns = "http://www.protogeni.net/resources/rspec/2";
+    my $rspecurl = "http://www.protogeni.net/resources/rspec/2/request.xsd";
+    my $extns = "http://www.protogeni.net/resources/rspec/ext/emulab/1";
+    my $exturl = "http://www.protogeni.net/resources/rspec/ext/emulab/1/vtop_extension.xsd";
     
     my $root = $doc->createElement("rspec");
-    $root->setAttribute("xmlns", "http://www.protogeni.net/resources/rspec/2");
+    $root->setAttribute("xmlns", "$rspecns");
     $root->setAttribute("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
-    $root->setAttribute("xmlns:emulab", "http://www.protogeni.net/resources/rspec/ext/emulab/1");
+    $root->setAttribute("xmlns:emulab", "$extns");
 
 ### XXX: Change the URL
     $root->setAttribute("xsi:schemaLocation",
-			"http://www.protogeni.net/resources/rspec/2  http://www.protogeni.net/resources/rspec/2/request.xsd http://www.protogeni.net/resources/rspec/ext/emulab/1 http://www.cs.utah.edu/~tarunp/code/vtop_extension.xsd");
+			"$rspecns $rspecurl $extns $exturl"); 
     $root->setAttribute("type", "request");
     $root->setAttribute("generated", 
 			POSIX::strftime("20%y-%m-%dT%H:%M:%S", gmtime($creation)));
@@ -3014,6 +3019,9 @@ sub PrintRspec($;$)
     }
     foreach my $ref (@{$self->rspec()->{'link'}}) {
 	$self->processLinkRspec($doc, $root, $ref);
+    }
+    foreach my $ref (@{$self->rspec()->{'vclass'}}) {
+	$self->processVClassRspec($doc, $root, $ref);
     }
     
     print $output $doc->toString(1) . "\n";
@@ -7334,19 +7342,17 @@ sub processLinkRspec ($$$$)
 #	$output .= 'fixdstiface:' . $link->{'fixdstiface'} . ' ';
 #    }
 
+    # Add the interface refs
+    my $interface_ref = addNodeRspec($doc, $rspeclink, 'interface_ref');
+    $interface_ref->setAttribute('client_id', $link->{'interface_ref'}->[0]);
+
+    $interface_ref = addNodeRspec($doc, $rspeclink, 'interface_ref');
+    $interface_ref->setAttribute('client_id', $link->{'interface_ref'}->[1]);
+
     # The forward link
     my $property = addNodeRspec($doc, $rspeclink, 'property');
     $property->setAttribute('source_id', $link->{'interface_ref'}->[0]);
     $property->setAttribute('dest_id', $link->{'interface_ref'}->[1]);
-    $property->setAttribute('capacity', $link->{'capacity'});
-    $property->setAttribute('latency', $link->{'latency'});
-    $property->setAttribute('packet_loss', $link->{'packet_loss'});
-
-    # And now the backward. Assign doesn't know how to deal with
-    # links with unbalanced properties anyway
-    $property = addNodeRspec($doc, $rspeclink, 'property');
-    $property->setAttribute('source_id', $link->{'interface_ref'}->[1]);
-    $property->setAttribute('dest_id', $link->{'interface_ref'}->[0]);
     $property->setAttribute('capacity', $link->{'capacity'});
     $property->setAttribute('latency', $link->{'latency'});
     $property->setAttribute('packet_loss', $link->{'packet_loss'});
@@ -7412,6 +7418,24 @@ sub processLink($$$$)
 	elsif ($token ne "") {
 	    addNode($xmlDocument, $newLinkNode, $token);
 	}
+    }
+}
+
+sub processVClassRspec($$$$)
+{
+    my ($self, $doc, $root, $vclass) = @_;
+    my $vclassNode = addNodeRspec($doc, $root, 'emulab:vclass');
+
+    my $name = $vclass->{'name'};
+    my $weight = $vclass->{'weight'};
+
+    # XXX: We don't have hard vclass support yet     
+    $vclassNode->setAttribute('name', $name);
+    $vclassNode->setAttribute('weight', $weight);
+
+    foreach my $physType (@{$vclass->{'members'}}) {
+	my $physNode = addNodeRspec($doc, $vclassNode, 'emulab:physical_type');
+	$physNode->setAttribute('name', $physType);
     }
 }
 
