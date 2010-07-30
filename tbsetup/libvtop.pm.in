@@ -4994,6 +4994,8 @@ sub InterpLinks($)
     # Write the vlans to the DB.
     $self->UploadVlans() == 0
 	or return -1;
+    $self->UpLoadIPAddresses() == 0
+	or return -1;
     $self->UpLoadTunnels() == 0
 	or return -1;
     $self->UpLoadInterfaceSettings() == 0
@@ -6082,8 +6084,6 @@ sub UploadVlans($)
 	    }
 	}
     }
-    $self->UpLoadIPAddresses() == 0
-	or return -1;
     return 0;
 }
 
