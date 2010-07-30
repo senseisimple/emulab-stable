@@ -14,15 +14,13 @@ namespace emulab = "http://www.protogeni.net/resources/rspec/ext/emulab/1"
 #
 include "top_extension.rnc"
 
+## Provides hints to assign regarding the physical node to which this
+## virtual node should be mapped
 HintToSpec = element emulab:hint_to { attribute value { text } }?
 
 ## "Legacy" assign node flags - will be replaced with properties, and in some
 ## cases, explicit links
 NodeFlagSpec =
-    ## Specify that this node is a subnode of another node. We MIGHT
-    ## try to do this with properties in the future
-    ## Valid for both virtual and physical nodes
-    element emulab:subnode_of { text }? &
     ## Indicates that virtual links must either all be trivial (loopback), or
     ## none of them must be. Possibly expressible with properties?
     element emulab:disallow_trivial_mix { empty }?
@@ -32,19 +30,21 @@ LinkFlagSpec =
     ## Indicates that it is not okay to use a delay node to artificially
     ## shape/delay traffic for this link. Replace by using type system.
     element emulab:nodelay { empty }? &
+
     ## Indicates whether it is okay to multiplex this link with other virtual
     ## links onto the same physical link (old name: emulated) Probably replace
     ## by using the type system (ie. have an 'Ethernet' type that can only
     ## hold one slot,  and an 'Ethernet-tagged' type that can hold more).
     element emulab:multiplex_ok { empty }? &
+
     ## Indicates whether it is okay to satisfy this link with a trivial
     ## (loopback) link. Replace using type system.
     element emulab:trivial_ok { empty }? &
-    ## Gives the name of the interface that must be used to satisfy the source
-    ## of this link - note that the interface name is given, not the node name
-    element emulab:fixsrciface { string }? &
-    ## Same as fixsrciface, for destination of the link
-    element emulab:fixdstiface { string }?
+
+## Gives the name of the interface that must be used to satisfy the source
+## of this link - note that the interface name is given, not the node name
+FixedInterfaceSpec = 
+	element emulab:fixedinterface { attribute name { text } } 
 
 ## Specify a virtual class - assign allows you to define classes for virtual
 ## nodes, and specify that all nodes using that class should, or must, be
@@ -59,5 +59,6 @@ VclassSpec = element emulab:vclass {
     element emulab:physical_type { attribute name { text } }+
 }
 
-start = HintToSpec | NodeFlagSpec | LinkFlagSpec | VclassSpec
+start = HintToSpec | NodeFlagSpec | LinkFlagSpec | VclassSpec 
+      		   | FixedInterfaceSpec
 
