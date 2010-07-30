@@ -126,3 +126,8 @@ RANDFILE	= $dir/.rand		# private random number file
 default_crl_days= 30			# how long before next CRL
 preserve	= no			# keep passed DN ordering
 unique_subject  = no
+
+[ typical_extensions ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints = CA:false

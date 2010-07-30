@@ -193,7 +193,6 @@ sub TBDBDisconnect()
     for (my $i = 0; $i < @DB; $i++) {
 	undef($DB[$i]);
     }
-    select(undef, undef, undef, 0.2);
 }
 
 # Create a new DB handle and return the handle number
