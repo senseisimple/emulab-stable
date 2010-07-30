@@ -39,7 +39,7 @@ LinkFlagSpec =
 
     ## Indicates whether it is okay to satisfy this link with a trivial
     ## (loopback) link. Replace using type system.
-    element emulab:trivial_ok { empty }? &
+    element emulab:trivial_ok { empty }?
 
 ## Gives the name of the interface that must be used to satisfy the source
 ## of this link - note that the interface name is given, not the node name
