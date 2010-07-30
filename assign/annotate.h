@@ -24,7 +24,8 @@
 class annotate
 {
  protected: 
-  //xercesc::DOMDocument* doc;
+  xercesc::DOMDocument* document;
+  xercesc::DOMElement* physical_root;
   xercesc::DOMElement* virtual_root;
   std::map<std::string, xercesc::DOMElement*> *physical_elements;
   

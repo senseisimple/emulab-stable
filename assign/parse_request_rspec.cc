@@ -59,6 +59,8 @@ extern name_vclass_map vclass_map;
 DOMElement* request_root = NULL;
 DOMDocument* doc = NULL;
 
+map<string, string>* vIfacesMap = new map<string, string>();
+
 int rspec_version = -1;
 
 int bind_ptop_subnodes(tb_pgraph &pg);
@@ -122,7 +124,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
    */
   if (errHandler->sawError()) {
     cerr << "*** There were " << domParser -> getErrorCount () 
-	 << " errors in your file. " << endl;
+	 << " errors in " << filename << endl;
     exit(EXIT_FATAL);
   }
   else {
@@ -136,7 +138,8 @@ int parse_request(tb_vgraph &vg, char *filename) {
     bool is_physical;
     XStr type (request_root->getAttribute(XStr("type").x()));
     if (strcmp(type.c(), "request") != 0) {
-      cerr << "*** RSpec type must be \"request\"" << endl;
+      cerr << "*** RSpec type must be \"request\" in " << filename
+	   << " (found " << type.c() << ")" << endl;
       exit (EXIT_FATAL);
     } 
     
@@ -161,8 +164,10 @@ int parse_request(tb_vgraph &vg, char *filename) {
     }
     XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
     
+    // Set global variable for annotating
+    rspec_version = rspecVersion;
     map< pair<string, string>, pair<string, string> > fixed_interfaces;
-    
+
     /*
      * These three calls do the real work of populating the assign data
      * structures
@@ -266,8 +271,6 @@ bool populate_node(DOMElement* elt,
   
   bool isUnlimited = (typeSlots == 1000);
   
-  cerr << "Found req type " << typeName << endl;
-
   /*
    * Make a tb_ptype structure for this guy - or just add this node to
    * it if it already exists
@@ -614,6 +617,9 @@ bool populate_link (DOMElement* elt,
 	 << ", non-existent destination node " << dstNode << endl;
     return false;
   }
+
+  vIfacesMap->insert(pair<string, string>(srcIface, srcNode));
+  vIfacesMap->insert(pair<string, string>(dstIface, dstNode));
   
   vvertex v_src_vertex = vname2vertex[srcNode.c_str()];
   vvertex v_dst_vertex = vname2vertex[dstNode.c_str()];
@@ -728,8 +734,6 @@ bool populate_vclass (struct vclass vclass, tb_vgraph& vg)
   const char* name = vclass.name.c_str();
   // We don't have support for hard vclasses yet
   if (vclass.type.type == SOFT_VCLASS) {
-    cerr << "Soft vclass " << name << " with weight " 
-	 << vclass.type.weight << endl;
     v = new tb_vclass (XStr(name).f(), vclass.type.weight);
     if (v == NULL) {
       cerr << "*** Could not create vclass " << vclass.name << endl;
@@ -740,7 +744,6 @@ bool populate_vclass (struct vclass vclass, tb_vgraph& vg)
   
   for (int i = 0; i < vclass.physicalTypes.size(); i++) {
     fstring physType = XStr(vclass.physicalTypes[i].c_str()).f();
-    cerr << "vclass physType: " << physType << endl;
     v->add_type(physType);
     vclasses[name].push_back(physType);
   }

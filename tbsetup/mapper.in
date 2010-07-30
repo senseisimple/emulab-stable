@@ -48,9 +48,10 @@ sub usage ()
     print STDERR " -m   - Set the multiplex factor; overrides experiment.\n";
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
+    print STDERR " -l   - Use rspec v2 instead of the text file format\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:a";
+my $optlist    = "dvunfprqczxm:ko:al";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
@@ -70,6 +71,7 @@ my $clear      = 0;
 my $warnings   = 0;
 my $maxrun     = 3;		# Maximum number of times we run assign.
 my $gotlock    = 0;
+my $userspec   = 0;
 my $vtop;
 
 #
@@ -181,6 +183,9 @@ if (defined($options{"q"})) {
 }
 if (defined($options{"c"})) {
     $clear = 1;
+}
+if (defined($options{"l"})) {
+    $userspec = 1;
 }
 
 my $pid = $ARGV[0];
@@ -408,6 +413,10 @@ sub RunAssign($$)
     my $typelimitfile = $prefix .".limits";
     my $ptopfile = $prefix . ".ptop";
     my $vtopfile = $prefix . ".vtop";
+    if ($userspec) {
+	$ptopfile .= ".xml";
+	$vtopfile .= ".xml";
+    }
     my $assignexitcode = 0;
 
     # Debugging hack for regression mode. Avoid really long assign runs.
@@ -472,7 +481,9 @@ sub RunAssign($$)
     	if ($precheck);
     $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
     	if (defined($experiment->delay_capacity()));
-    $ptopargs .= "-x -g 2 ";
+    if ($userspec == 1) {
+	$ptopargs .= "-x -g 2 ";
+    }
     $ptopargs .= "-l $typelimitfile";
 
     chat("ptopargs: '$ptopargs'\n");
@@ -491,8 +502,14 @@ sub RunAssign($$)
 	tberror("Could not open $vtopfile: $!\n");
 	return -1;
     }
-#    if ($vtop->PrintTop(*VTOPFILE) != 0) {
-    if ($vtop->PrintRspec(*VTOPFILE) != 0) {
+    my $reslibvtop;
+    if ($userspec == 1) {
+	$reslibvtop = $vtop->PrintRspec(*VTOPFILE);
+    }
+    else {
+	$reslibvtop = $vtop->PrintTop(*VTOPFILE);
+    }
+    if ($reslibvtop != 0) {
 	tberror("Could not print vtop file for $experiment\n");
 	return -1;
     }
@@ -509,7 +526,12 @@ sub RunAssign($$)
 
     # Run assign
     my $cmd  = "assign";
-    my $args = "-f rspec $ptopfile $vtopfile";
+    my $args = "";
+    $args .= "-f rspec " 
+	if ($userspec == 1);
+    $args .= "-f text "
+	if ($userspec == 0);
+    $args .= "$ptopfile $vtopfile";
     $args = "-P $args"
 	if (!$vtop->sharednodecount());
     $args = "-uod -c .75 $args"

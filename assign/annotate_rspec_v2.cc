@@ -27,14 +27,21 @@ static const char rcsid[] = "$Id: annotate_rspec_v2.cc,v 1.9 2009-10-21 20:49:26
 				 
 extern DOMDocument* doc;
 extern DOMElement* request_root;
+extern DOMElement* advt_root;
+
 extern map<string, DOMElement*>* advertisement_elements;
+
+extern map<string,string>* pIfacesMap;
+extern map<string,string>* vIfacesMap;
 				 
 XERCES_CPP_NAMESPACE_USE
 using namespace std;
 
 annotate_rspec_v2 :: annotate_rspec_v2 ()
 {
+  this->document = doc;
   this->virtual_root = request_root;
+  this->physical_root = advt_root;
   this->physical_elements = advertisement_elements;
   
   vector<DOMElement*> lan_links 
@@ -58,6 +65,21 @@ annotate_rspec_v2 :: annotate_rspec_v2 ()
     this->lan_links_map.insert
       (pair< string, set<string> >(lan_link_id, virtual_interface_ids));
   }
+
+  // Go through the entire virtual topology and create a map
+  // of interfaces and their parent nodes
+  // XXX: This is actually present in the rspecParser, but I can't think of 
+  // a clean way of getting it in here without introducing version dependent
+  // code in the parse_request_rspec.cc 
+  //  this->vIfacesMap = this->populateIfaceMap(this->virtual_root, "client_id");
+  this->vInterfaceMap = vIfacesMap;
+  
+  // Do the same for the physical topology
+  // XXX: This is very inefficient. Need to find some way of using this data
+  // since it's already present in the rspecParser. It's ok for the virtual 
+  // topology since it's small, but the physical topology is big 
+  //  this->pIfacesMap =this->populateIfaceMap(this->physical_root,"component_id");
+  this->pInterfaceMap = pIfacesMap;
 }
 
 // Annotate a trivial link
@@ -68,11 +90,13 @@ void annotate_rspec_v2::annotate_element (const char* v_name)
 				 "link", "client_id", v_name);
   annotate_interface (vlink, 0);
   annotate_interface (vlink, 1);	
-  create_component_hop(vlink);
+  DOMElement* hop = create_component_hop(vlink);
+  vlink->appendChild(hop);
 }
 
 // This will get called when a node or a direct link needs to be annotated
-void annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
+void 
+annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
 {
   DOMElement* vnode 
     = getElementByAttributeValue(this->virtual_root, 
@@ -85,6 +109,10 @@ void annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name
   if (vnode != NULL) {
     if (!vnode->hasAttribute(XStr("generated_by_assign").x())) {
       DOMElement* pnode = (this->physical_elements->find(p_name))->second;
+      if (pnode->hasAttribute(XStr("component_name").x())) {
+	vnode->setAttribute(XStr("component_name").x(),
+			    pnode->getAttribute(XStr("component_name").x()));
+      }
       vnode->setAttribute(XStr("component_id").x(),
 			  pnode->getAttribute(XStr("component_id").x()));
       vnode->setAttribute(XStr("component_manager_id").x(),
@@ -98,13 +126,15 @@ void annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name
     DOMElement* plink = (this->physical_elements->find(p_name))->second;
     
     // If plink is NULL, then it must be a trivial link
+    // XXX: Add trivial link support?
     if (plink == NULL) {
 			
     }
     annotate_interface (plink, vlink, 0);
     annotate_interface (plink, vlink, 1);
     
-    create_component_hop(plink, vlink, BOTH, NULL);
+    DOMElement* hop = create_component_hop(plink, vlink, BOTH, NULL);
+    vlink->appendChild(hop);
     
     if (vlink->hasAttribute(XStr("generated_by_assign").x())) {
       string str_lan_link 
@@ -148,9 +178,12 @@ void annotate_rspec_v2::annotate_element (const char* v_name,
   annotate_interface(p_src_switch_link, vlink, 0);
   annotate_interface(p_switch_dst_link, vlink, 1);
   
+  vector<DOMElement*> componentHops;
   DOMElement* prev_component_hop 
     = create_component_hop (p_src_switch_link, vlink, SOURCE, NULL);
+  componentHops.push_back(prev_component_hop);
 #if 0
+  {
   for (DOMElement *prev_link_in_path = p_src_switch_link; !links->empty(); ) {
     DOMElement* p_switch_switch_link 
       = find_next_link_in_path (prev_link_in_path, links);
@@ -158,6 +191,7 @@ void annotate_rspec_v2::annotate_element (const char* v_name,
       = create_component_hop (p_switch_switch_link, 
 			      vlink, NEITHER, prev_component_hop);
     prev_link_in_path = p_switch_switch_link;
+    componentHops.push_back(prev_component_hop);
   }
 #else
   {
@@ -171,147 +205,143 @@ void annotate_rspec_v2::annotate_element (const char* v_name,
   }
 #endif
   {
-    create_component_hop (p_switch_dst_link, 
-			  vlink, DESTINATION, prev_component_hop);
+    DOMElement* hop 
+      = create_component_hop (p_switch_dst_link, vlink, DESTINATION, 
+			      prev_component_hop);
+    componentHops.push_back(hop);
+    for (int i = 0; i < componentHops.size(); i++) {
+      vlink->appendChild(componentHops[i]);
+    }
   }
 }
 
 // Creates a component_hop for a trivial link
-// Adds the hop to the vlink and returns the hop element that was created
 DOMElement* annotate_rspec_v2::create_component_hop (DOMElement* vlink)
 {
-  DOMNodeList* interfaces 
-    = vlink->getElementsByTagName(XStr("interface_ref").x());
-  DOMElement* src_iface = dynamic_cast<DOMElement*>(interfaces->item(0));
-  DOMElement* dst_iface = dynamic_cast<DOMElement*>(interfaces->item(1));
-  
-  const char* src_id 
-    = XStr(src_iface->getAttribute(XStr("virtual_node_id").x())).c();
-  const char* dst_id 
-    = XStr(dst_iface->getAttribute(XStr("virtual_node_id").x())).c();
-  
-  DOMElement* src_vnode 
+  DOMNodeList* ifaces = vlink->getElementsByTagName(XStr("interface_ref").x());
+  DOMElement* srcIface = dynamic_cast<DOMElement*>(ifaces->item(0));
+  DOMElement* dstIface = dynamic_cast<DOMElement*>(ifaces->item(1));
+
+  string srcIfaceId = XStr(srcIface->getAttribute(XStr("client_id").x())).c();
+  string dstIfaceId = XStr(dstIface->getAttribute(XStr("client_id").x())).c();
+
+  bool fnd;
+  string srcIfaceNodeId 
+    = this->lookupIface(this->vInterfaceMap, srcIfaceId, fnd);
+  string dstIfaceNodeId 
+    = this->lookupIface(this->vInterfaceMap, dstIfaceId, fnd);
+
+  DOMElement* srcVnode 
     = getElementByAttributeValue(this->virtual_root,
-				 "node", "client_id", src_id);
-  DOMElement* dst_vnode 
+				 "node", "client_id", srcIfaceNodeId.c_str());
+  DOMElement* dstVnode 
     = getElementByAttributeValue(this->virtual_root,
-				 "node", "client_id", dst_id);
+				 "node", "client_id", dstIfaceNodeId.c_str());
   
-  XStr src_component_id (find_urn(src_vnode, "component"));
-  XStr dst_component_id (find_urn(dst_vnode, "component"));
-  
-  DOMElement* component_hop = doc->createElement(XStr("component_hop").x());
-  
-  DOMElement* src_iface_clone 
-    = dynamic_cast<DOMElement*>
-    (doc->importNode(dynamic_cast<DOMNode*>(src_iface),true));
-  src_iface_clone->setAttribute(XStr("component_node_id").x(),
-				src_component_id.x());
-  src_iface_clone->setAttribute(XStr("component_interface_id").x(),
-				XStr("loopback").x()); 
-  
-  cerr << src_component_id.c() << " AND " << dst_component_id.c() << endl;
-  
-  DOMElement* dst_iface_clone 
+  DOMElement* srcIfaceClone 
     = dynamic_cast<DOMElement*>(doc->importNode
-				(dynamic_cast<DOMNode*>(dst_iface),true));
-  dst_iface_clone->setAttribute(XStr("component_node_id").x(),
-				dst_component_id.x());
-  dst_iface_clone->setAttribute(XStr("component_interface_id").x(),
-				XStr("loopback").x());
+				(dynamic_cast<DOMNode*>(srcIface),true));
+  srcIfaceClone->setAttribute(XStr("component_id").x(), XStr("loopback").x()); 
   
-  component_hop->appendChild(src_iface_clone);
-  component_hop->appendChild(dst_iface_clone);
-  vlink->appendChild(component_hop);
-  return component_hop;
+  DOMElement* dstIfaceClone
+    = dynamic_cast<DOMElement*>(doc->importNode
+				(dynamic_cast<DOMNode*>(dstIface),true));
+  dstIfaceClone->setAttribute(XStr("component_id").x(), XStr("loopback").x());
+
+  DOMElement* hop = doc->createElement(XStr("component_hop").x());  
+  hop->appendChild(srcIfaceClone);
+  hop->appendChild(dstIfaceClone);
+
+  return hop;
 }
 
 // Creates a hop from a switch till the next end point. 
-// Adds the hop to the vlink and returns the hop element that was created
 DOMElement* 
 annotate_rspec_v2::create_component_hop (const DOMElement* plink, 
-				      DOMElement* vlink, 
-				      int endpoint_interface, 
-				      const DOMElement* prev_component_hop)
+					 DOMElement* vlink, 
+					 int endpointIface, 
+					 const DOMElement* prevHop)
 {
-  // Create a single_hop_link element
-  DOMElement* component_hop = doc->createElement(XStr("component_hop").x());
-  copy_component_spec(plink, component_hop);
-  
-  DOMElement* component_hop_interface 
-    = doc->createElement(XStr("interface").x());
-  
   // We assume the first interface is the source and the second the dest
-  DOMNodeList* pinterfaces 
-    = plink->getElementsByTagName(XStr("interface_ref").x());
-  DOMElement* plink_src_iface =dynamic_cast<DOMElement*>(pinterfaces->item(0));
-  DOMElement* plink_dst_iface =dynamic_cast<DOMElement*>(pinterfaces->item(1));
+  DOMNodeList* pIfaces =plink->getElementsByTagName(XStr("interface_ref").x());
+  DOMElement* plinkSrcIface = dynamic_cast<DOMElement*>(pIfaces->item(0));
+  DOMElement* plinkDstIface = dynamic_cast<DOMElement*>(pIfaces->item(1));
   
-  DOMNodeList* vinterfaces 
-    = vlink->getElementsByTagName(XStr("interface_ref").x());
-  DOMElement* vlink_src_iface =dynamic_cast<DOMElement*>(vinterfaces->item(0));
-  DOMElement* vlink_dst_iface =dynamic_cast<DOMElement*>(vinterfaces->item(1));
+  DOMNodeList* vIfaces =vlink->getElementsByTagName(XStr("interface_ref").x());
+  DOMElement* vlinkSrcIface = dynamic_cast<DOMElement*>(vIfaces->item(0));
+  DOMElement* vlinkDstIface = dynamic_cast<DOMElement*>(vIfaces->item(1));
+
+  string vlinkSrcIfaceId 
+    = XStr(vlinkSrcIface->getAttribute(XStr("client_id").x())).c();
+
+  string vlinkDstIfaceId 
+    = XStr(vlinkDstIface->getAttribute(XStr("client_id").x())).c();
   
   // If the previous component hop is not specified (NULL),
   // then the link is either direct 
   // or the direction is guaranteed to be from the node to the switch
-  DOMElement* plink_src_iface_clone 
+  DOMElement* plinkSrcIfaceClone 
     = dynamic_cast<DOMElement*>(doc->importNode
-				(dynamic_cast<DOMNode*>(plink_src_iface),true));
-  DOMElement* plink_dst_iface_clone 
+				(dynamic_cast<DOMNode*>(plinkSrcIface),true));
+  DOMElement* plinkDstIfaceClone
     = dynamic_cast<DOMElement*>(doc->importNode
-				(dynamic_cast<DOMNode*>(plink_dst_iface),true));
+				(dynamic_cast<DOMNode*>(plinkDstIface),true));
+
   // If the previous component is specified,
   // the link specification could be the opposite of what we need
-  if (prev_component_hop != NULL)  {
+  if (prevHop != NULL)  {
     // Find the destination of the previous component hop
-    DOMElement* prev_hop_dst_iface 
-      = dynamic_cast<DOMElement*>((prev_component_hop->getElementsByTagName
+    DOMElement* prevHopDstIface
+      = dynamic_cast<DOMElement*>((prevHop->getElementsByTagName
 				   (XStr("interface_ref").x()))->item(1));
-    XStr prev_hop_dst_uuid (find_urn(prev_hop_dst_iface, "component_node"));
-    
+
+    bool found = false;
+    string prevHopDstIfaceId 
+      = XStr(prevHopDstIface->getAttribute(XStr("component_id").x())).c();
+    string prevHopDstNodeId = this->lookupIface(this->pInterfaceMap, 
+						prevHopDstIfaceId, found);
+
     // We need to do this because in advertisements, 
     // all links are from nodes to switches
     // and we need to reverse this for the last hop of a multi-hop path
     // This is slightly more expensive, 
     // but definitely more robust than checking based on 
     // whether a destination interface was specified
-    if (strcmp(prev_hop_dst_uuid.c(),
-	       XStr(find_urn(plink_dst_iface,
-			     "component_node")).c()) == 0) {
-      plink_src_iface_clone 
-	= dynamic_cast<DOMElement*>
-	(doc->importNode(dynamic_cast<DOMNode*>
-			 (plink_dst_iface), true));
-      plink_dst_iface_clone 
-	= dynamic_cast<DOMElement*>
-	(doc->importNode(dynamic_cast<DOMNode*>
-			 (plink_src_iface), true));
+    string plinkDstIfaceId 
+      = XStr(plinkDstIface->getAttribute(XStr("component_id").x())).c();
+    string plinkDstNodeId = this->lookupIface(this->pInterfaceMap, 
+					      plinkDstIfaceId, found);
+    if (prevHopDstNodeId == plinkDstNodeId) {
+      plinkSrcIfaceClone = dynamic_cast<DOMElement*>(doc->importNode
+						     (dynamic_cast<DOMNode*>
+						      (plinkDstIface), true));
+      plinkDstIfaceClone = dynamic_cast<DOMElement*>(doc->importNode
+						     (dynamic_cast<DOMNode*>
+						      (plinkSrcIface), true));
     }
   }
   
   // If the source interface is an end point
-  if (endpoint_interface == SOURCE || endpoint_interface == BOTH) {
-    set_interface_as_link_endpoint
-      (plink_src_iface_clone, 
-       XStr(vlink_src_iface->getAttribute(XStr("virtual_node_id").x())).c(), 
-       XStr(vlink_src_iface->getAttribute(XStr("virtual_interface_id").x())).c());
+  if (endpointIface == SOURCE || endpointIface == BOTH) {
+    plinkSrcIfaceClone->setAttribute(XStr("client_id").x(),
+				     XStr(vlinkSrcIfaceId.c_str()).x());
   }
   
   // If the destination interface is an end point
-  if (endpoint_interface == DESTINATION || endpoint_interface == BOTH) {
-    set_interface_as_link_endpoint
-      (plink_dst_iface_clone, 
-       XStr(vlink_dst_iface->getAttribute(XStr("virtual_node_id").x())).c(),
-       XStr(vlink_dst_iface->getAttribute(XStr("virtual_interface_id").x())).c());
+  if (endpointIface == DESTINATION || endpointIface == BOTH) {
+    plinkDstIfaceClone->setAttribute(XStr("client_id").x(),
+				     XStr(vlinkDstIfaceId.c_str()).x());
   }
+
+  // Create a single_hop_link element
+  DOMElement* hop = doc->createElement(XStr("component_hop").x());
+  copy_component_spec(plink, hop);
   
   // Add interface specifications to the link in the single hop element
-  component_hop->appendChild(plink_src_iface_clone);
-  component_hop->appendChild(plink_dst_iface_clone);
+  hop->appendChild(plinkSrcIfaceClone);
+  hop->appendChild(plinkDstIfaceClone);
   
-  vlink->appendChild(component_hop);
-  return (component_hop);
+  return hop;
 }
 
 // Copies the component_hop from the generated_link to the requsted_link
@@ -389,75 +419,54 @@ void annotate_rspec_v2::annotate_interface (const DOMElement* plink,
 //    with the interface_id obtained in 4)
 void annotate_rspec_v2::annotate_interface (const DOMElement* plink, 
 					    const DOMElement* vlink, 
-					    int interface_number,
-					    bool is_trivial_link)
+					    int ifaceNumber,
+					    bool isTrivialLink)
 {
-  DOMNodeList* vinterfaces 
-    = vlink->getElementsByTagName(XStr("interface_ref").x());
-  DOMElement* vlink_iface 
-    = dynamic_cast<DOMElement*>(vinterfaces->item(interface_number));
-  XStr vlink_iface_virtual_interface_id 
-    (vlink_iface->getAttribute(XStr("client_id").x()));
+  DOMNodeList* refs = vlink->getElementsByTagName(XStr("interface_ref").x());
+  DOMElement* ref = dynamic_cast<DOMElement*>(refs->item(ifaceNumber));
+  string ifaceId = XStr(ref->getAttribute(XStr("client_id").x())).c();
   
   // Get the client_id of the node to which the interface belongs
-  XStr vlink_iface_virtual_node_id 
-    (vlink_iface->getAttribute(XStr("virtual_node_id").x()));
-  DOMElement* vnode 
-    = getElementByAttributeValue(this->virtual_root, 
-				 "node", 
-				 "client_id", 
-				 vlink_iface_virtual_node_id.c());
-  DOMElement* vnode_iface_decl 
-    = getElementByAttributeValue(vnode, "interface", "client_id", 
-				 vlink_iface_virtual_interface_id.c());
-  XStr component_node_uuid (find_urn(vnode, "component"));
-  
-  if (!is_trivial_link) {
-    DOMElement* p_iface 
-      = getElementByAttributeValue(plink, "interface_ref", 
-				   "component_node_uuid", 
-				   component_node_uuid.c());
-    if (p_iface == NULL) {
-      p_iface = getElementByAttributeValue(plink, "interface_ref", 
-					   "component_node_urn", 
-					   component_node_uuid.c());
+  bool found = false;
+  string nodeId = this->lookupIface(this->vInterfaceMap, ifaceId, found);
+  DOMElement* vnode = getElementByAttributeValue(this->virtual_root, "node", 
+						 "client_id", nodeId.c_str());
+  DOMElement* decl = getElementByAttributeValue(vnode, "interface", 
+						"client_id", ifaceId.c_str());
+
+  string physNodeId = XStr(vnode->getAttribute(XStr("component_id").x())).c();
+
+  if (!isTrivialLink) {
+    // Find the interface on the physical link which is situated
+    // on the physical node to which the vnode has been mapped
+    const DOMElement* pIface = this->getIfaceOnNode(plink, physNodeId);
+    if (pIface == NULL) {
+      cerr << "*** No interface on " 
+	   << XStr(plink->getAttribute(XStr("component_id").x())).c()
+	   << " is declared on node " << physNodeId << endl;
+      exit(EXIT_FATAL);
     }
-    
-    XStr component_interface_id 
-      (p_iface->getAttribute(XStr("component_interface_id").x()));
-    vnode_iface_decl->setAttribute 
-      (XStr("component_id").x(), component_interface_id.x());
+    decl->setAttribute (XStr("component_id").x(), 
+			pIface->getAttribute(XStr("component_id").x()));
   }
   else {
-    vnode_iface_decl->setAttribute(XStr("component_id").x(), 
-				   XStr("loopback").x());
+    decl->setAttribute(XStr("component_id").x(), XStr("loopback").x());
   }
 }
 
 // Copies the component spec from the source to the destination
-void annotate_rspec_v2::copy_component_spec(const DOMElement* src, DOMElement* dst)
+void 
+annotate_rspec_v2::copy_component_spec(const DOMElement* src, DOMElement* dst)
 {
   if (src->hasAttribute (XStr("component_name").x()))
-    dst->setAttribute (XStr("component_name").x(), 
-		       XStr(src->getAttribute
-			    (XStr("component_name").x())).x());
-  dst->setAttribute (XStr("component_uuid").x(), 
-		     XStr(src->getAttribute(XStr("component_uuid").x())).x());
-  dst->setAttribute (XStr("component_manager_uuid").x(), 
-		     XStr(src->getAttribute
-			  (XStr("component_manager_uuid").x())).x());
-}
+    dst->setAttribute(XStr("component_name").x(), 
+		      XStr(src->getAttribute(XStr("component_name").x())).x());
 
-// If the interface belongs to an end point of the link, 
-// and additional client_id attribute has to be added to it
-void annotate_rspec_v2::set_interface_as_link_endpoint (DOMElement* interface, 
-						     const char* virtual_node_id, 
-						     const char* virtual_interface_id)
-{
-  interface->setAttribute(XStr("virtual_node_id").x(), 
-			  XStr(virtual_node_id).x());
-  interface->setAttribute(XStr("virtual_interface_id").x(), 
-			  XStr(virtual_interface_id).x());
+  dst->setAttribute(XStr("component_id").x(), 
+		    XStr(src->getAttribute(XStr("component_id").x())).x());
+  dst->setAttribute(XStr("component_manager_id").x(), 
+		    XStr(src->getAttribute
+			 (XStr("component_manager_id").x())).x());
 }
 
 // Finds the next link in the path returned by assign
@@ -529,6 +538,38 @@ bool annotate_rspec_v2::is_generated_element(const char* tag,
   if (element == NULL)
     return false;
   return (element->hasAttribute(XStr("generated_by_assign").x()));
+}
+
+string annotate_rspec_v2::lookupIface (map<string,string>* ifacesMap, 
+				       string ifaceId,
+				       bool& found) 
+{
+  string nodeId = "";
+  found = false;
+  map<string, string>::iterator it = ifacesMap->find(ifaceId);
+  if (it != ifacesMap->end()) {
+    nodeId = it->second;
+    found = true;
+  }
+  return nodeId;
+}
+
+// Returns that interface on the physical link which is declared in 
+// the physical node nodeId
+const DOMElement* 
+annotate_rspec_v2::getIfaceOnNode(const DOMElement* plink, string nodeId)
+{
+  DOMNodeList* refs = plink->getElementsByTagName(XStr("interface_ref").x());
+  for (int i = 0; i < refs->getLength(); i++) {
+    bool found = false;
+    DOMElement* ref = dynamic_cast<DOMElement*>(refs->item(i));
+    string ifaceId = XStr(ref->getAttribute(XStr("component_id").x())).c();
+    string declNodeId = this->lookupIface(this->pInterfaceMap, ifaceId, found);
+    if (found && (declNodeId == nodeId)) {
+      return ref;
+    }
+  }
+  return NULL;
 }
 
 #endif

@@ -86,9 +86,11 @@ void print_solution(const solution &s) {
 	const char* assigned_to 
 	  = XStr (get(pvertex_pmap,s.get_assignment(*vit))->name).c() ;
 	if (both_inputs_rspec) {
-	  //	  rspec_annotater->annotate_element(node_name, assigned_to);
-	  //	  if (rspec_annotater->is_generated_element("node","virtual_id",node_name))
-	  //	    continue;
+	  rspec_annotater->annotate_element(node_name, assigned_to);
+	  if (rspec_annotater->is_generated_element("node",
+						    "virtual_id",
+						    node_name))
+	    continue;
 	}
 	else if (both_inputs_xml) {
 	  vtop_annotater->annotate_element(node_name, assigned_to);
@@ -111,8 +113,8 @@ void print_solution(const solution &s) {
 
 #ifdef WITH_XML
 	if (both_inputs_rspec) {
-	  //	  is_generated = rspec_annotater->is_generated_element 
-	  //	    ("link", "virtual_id", (vlink->name).c_str());
+	  is_generated = rspec_annotater->is_generated_element 
+	    ("link", "virtual_id", (vlink->name).c_str());
 	  if (!is_generated)
 	    cout << vlink->name;
 	}
@@ -128,17 +130,18 @@ void print_solution(const solution &s) {
 	    // Direct link - just need the source and destination
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());
 	    tb_plink *p2 = get(pedge_pmap,vlink->link_info.plinks.back());
-		// XXX: This is not correct because it contradicts the comment earlier
-		// It seems that it will work because the front and back of the list will have the same node
-		// But it needs to be checked anyway.
+	    // XXX: This is not correct because it contradicts the comment earlier
+	    // It seems that it will work because the front and back of the list will have the same node
+	    // But it needs to be checked anyway.
 #ifdef WITH_XML
 	    if (both_inputs_rspec) {
-	      //	      rspec_annotater->annotate_element((vlink->name).c_str(), (p->name).c_str());
+	      rspec_annotater->annotate_element((vlink->name).c_str(), 
+						(p->name).c_str());
 	      if (is_generated)
 		continue;
 	    }
 	    else if (both_inputs_xml == true) {
-	      // 			annotate_vtop((vlink->name).c_str(), (p->name).c_str());
+	      //	      annotate_vtop((vlink->name).c_str(), (p->name).c_str());
 	    }
 #endif
 	    cout << " direct " << p->name << " (" <<
@@ -153,7 +156,7 @@ void print_solution(const solution &s) {
 	    links.push_back((p->name).c_str());
 	    links.push_back((p2->name).c_str());
 	    if (both_inputs_rspec) {
-	      //	      rspec_annotater->annotate_element((vlink->name).c_str(), &links);
+	      rspec_annotater->annotate_element((vlink->name).c_str(), &links);
 	      if (is_generated)
 		continue;
 	    }
@@ -184,7 +187,7 @@ void print_solution(const solution &s) {
 	  }
 #ifdef WITH_XML
 	    if (both_inputs_rspec) {
-	      //	      rspec_annotater->annotate_element((vlink->name).c_str(), &links);
+	      rspec_annotater->annotate_element((vlink->name).c_str(), &links);
 	    }
 	    else if (both_inputs_xml) {
 	      vtop_annotater->annotate_element((vlink->name).c_str(), &links);
@@ -200,7 +203,7 @@ void print_solution(const solution &s) {
 	  tb_pnode *pnode = get(pvertex_pmap,pv);
 #ifdef WITH_XML
 	  if (both_inputs_rspec) {
-	    //	    rspec_annotater->annotate_element((vlink->name).c_str());
+	    rspec_annotater->annotate_element((vlink->name).c_str());
 	    if (is_generated)
 	      continue;
 	  }
@@ -234,7 +237,7 @@ void print_solution (const solution &s, const char* output_filename)
   // and the objects have been created there
   if (both_inputs_rspec == true) {
       cout << "Writing annotated rspec to " << output_filename << endl;
-      //      rspec_annotater->write_annotated_file (output_filename);
+      rspec_annotater->write_annotated_file (output_filename);
   }
   else if (both_inputs_xml == true) {
       cout << "Writing annotated xml to " << output_filename << endl;

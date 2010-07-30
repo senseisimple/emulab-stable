@@ -35,295 +35,287 @@ using namespace std;
 
 annotate_rspec :: annotate_rspec ()
 {
-	this->virtual_root = request_root;
-	this->physical_elements = advertisement_elements;
-	
-	vector<DOMElement*> lan_links 
-			= getElementsHavingAttribute(this->virtual_root, "link", "is_lan");
-	vector<DOMElement*>::iterator it;
-	for (it = lan_links.begin(); it < lan_links.end(); it++)
+  this->document = doc;
+  this->virtual_root = request_root;
+  this->physical_elements = advertisement_elements;
+  
+  vector<DOMElement*> lan_links 
+    = getElementsHavingAttribute(this->virtual_root, "link", "is_lan");
+  vector<DOMElement*>::iterator it;
+  for (it = lan_links.begin(); it < lan_links.end(); it++)
+    {
+      DOMElement* lan_link = *it;
+      // Removing annotations inserted earlier
+      lan_link->removeAttribute(XStr("is_lan").x());
+      string lan_link_id 
+	= string(XStr(lan_link->getAttribute(XStr("virtual_id").x())).c());
+      set<string> virtual_interface_ids;
+      DOMNodeList* interfaces 
+	= lan_link->getElementsByTagName(XStr("interface_ref").x());
+      for (int j = 0; j < interfaces->getLength(); j++)
 	{
-		DOMElement* lan_link = *it;
-		// Removing annotations inserted earlier
-		lan_link->removeAttribute(XStr("is_lan").x());
-		string lan_link_id 
-			= string(XStr(lan_link->getAttribute(XStr("virtual_id").x())).c());
-		set<string> virtual_interface_ids;
-		DOMNodeList* interfaces 
-					= lan_link->getElementsByTagName(XStr("interface_ref").x());
-		for (int j = 0; j < interfaces->getLength(); j++)
-		{
-			DOMElement* interface 
-					= dynamic_cast<DOMElement*>(interfaces->item(j));
-			virtual_interface_ids.insert
-					(string(XStr(interface->getAttribute
-									(XStr("virtual_interface_id").x())).c()));
-		}
-		this->lan_links_map.insert
-			(pair< string, set<string> >(lan_link_id, virtual_interface_ids));
+	  DOMElement* interface 
+	    = dynamic_cast<DOMElement*>(interfaces->item(j));
+	  virtual_interface_ids.insert
+	    (string(XStr(interface->getAttribute
+			 (XStr("virtual_interface_id").x())).c()));
 	}
+      this->lan_links_map.insert
+	(pair< string, set<string> >(lan_link_id, virtual_interface_ids));
+    }
 }
 
 // Annotate a trivial link
 void annotate_rspec::annotate_element (const char* v_name)
 {
-	DOMElement* vlink 
-			= getElementByAttributeValue(this->virtual_root, 
-										 "link", "virtual_id", v_name);
-	annotate_interface (vlink, 0);
-	annotate_interface (vlink, 1);	
-	create_component_hop(vlink);
+  DOMElement* vlink 
+    = getElementByAttributeValue(this->virtual_root, 
+				 "link", "virtual_id", v_name);
+  annotate_interface (vlink, 0);
+  annotate_interface (vlink, 1);	
+  create_component_hop(vlink);
 }
 
 // This will get called when a node or a direct link needs to be annotated
 void annotate_rspec::annotate_element (const char* v_name, const char* p_name)
 {
-	DOMElement* vnode 
-			= getElementByAttributeValue(this->virtual_root, 
-										 "node", "virtual_id", v_name);
-	// If a vnode by that name was found, then go ahead. 
-	// If not, that element should be a link
-	// We are not terribly concerned about 
-	// having to scan the entire physical topology twice
-	// because direct links are never really going to happen
-	if (vnode != NULL)
-	{
-		if (!vnode->hasAttribute(XStr("generated_by_assign").x()))
-		{
-			DOMElement* pnode = (this->physical_elements->find(p_name))->second;
-			copy_component_spec(pnode, vnode);
-		}
-	}
-	else
-	{
-		DOMElement* vlink 
-				= getElementByAttributeValue(this->virtual_root, 
-											 "link", "virtual_id", v_name);
-		DOMElement* plink = (this->physical_elements->find(p_name))->second;
-		
-		// If plink is NULL, then it must be a trivial link
-		if (plink == NULL)
-		{
-			
-		}
-		annotate_interface (plink, vlink, 0);
-		annotate_interface (plink, vlink, 1);
-		
-		create_component_hop(plink, vlink, BOTH, NULL);
-		
-		if (vlink->hasAttribute(XStr("generated_by_assign").x()))
-		{
-			string str_lan_link 
-				= string(XStr(vlink->getAttribute(XStr("lan_link").x())).c());
-			DOMElement* lan_link 
-					= getElementByAttributeValue(this->virtual_root, "link", 
-												"virtual_id", 
-												str_lan_link.c_str());
-			DOMNodeList* component_hops 
-					= vlink->getElementsByTagName(XStr("component_hop").x());
-			for (int i = 0; i < component_hops->getLength(); i++)
-			{
-				DOMElement* component_hop 
-						= dynamic_cast<DOMElement*>(component_hops->item(i));
-				copy_component_hop(lan_link, component_hop);
-			}
-		}
-	}
+  DOMElement* vnode 
+    = getElementByAttributeValue(this->virtual_root, 
+				 "node", "virtual_id", v_name);
+  // If a vnode by that name was found, then go ahead. 
+  // If not, that element should be a link
+  // We are not terribly concerned about 
+  // having to scan the entire physical topology twice
+  // because direct links are never really going to happen
+  if (vnode != NULL) {
+    if (!vnode->hasAttribute(XStr("generated_by_assign").x())) {
+      DOMElement* pnode = (this->physical_elements->find(p_name))->second;
+      copy_component_spec(pnode, vnode);
+    }
+  }
+  else {
+    DOMElement* vlink 
+      = getElementByAttributeValue(this->virtual_root, 
+				   "link", "virtual_id", v_name);
+    DOMElement* plink = (this->physical_elements->find(p_name))->second;
+    
+    // If plink is NULL, then it must be a trivial link
+    if (plink == NULL) {
+      
+    }
+    annotate_interface (plink, vlink, 0);
+    annotate_interface (plink, vlink, 1);
+    
+    create_component_hop(plink, vlink, BOTH, NULL);
+    
+    if (vlink->hasAttribute(XStr("generated_by_assign").x())) {
+      string str_lan_link 
+	= string(XStr(vlink->getAttribute(XStr("lan_link").x())).c());
+      DOMElement* lan_link 
+	= getElementByAttributeValue(this->virtual_root, "link", 
+				     "virtual_id", 
+				     str_lan_link.c_str());
+      DOMNodeList* component_hops 
+	= vlink->getElementsByTagName(XStr("component_hop").x());
+      for (int i = 0; i < component_hops->getLength(); i++) {
+	DOMElement* component_hop 
+	  = dynamic_cast<DOMElement*>(component_hops->item(i));
+	copy_component_hop(lan_link, component_hop);
+      }
+    }
+  }
 }
 
 // This is called when an intraswitch or interswitch link has to be annotated
 void annotate_rspec::annotate_element (const char* v_name, 
-									   list<const char*>* links)
+				       list<const char*>* links)
 {
-	// These are the paths from the source to the first switch
-	// and from the last switch to the destination
-	const char* psrc_name = links->front();	
-	const char* pdst_name = links->back();	
-	DOMElement* p_src_switch_link 
-						= (this->physical_elements->find(psrc_name))->second;
-	DOMElement* p_switch_dst_link 
-						= (this->physical_elements->find(pdst_name))->second;
-	
-	// Remove these links from the list
-	// If it is an intra-switch link, the list should now be empty.
-	links->pop_front();
-	links->pop_back();
-		
-	DOMElement* vlink 
-			= getElementByAttributeValue (this->virtual_root, "link", 
-										  "virtual_id", v_name);
-	annotate_interface(p_src_switch_link, vlink, 0);
-	annotate_interface(p_switch_dst_link, vlink, 1);
-	
-	DOMElement* prev_component_hop 
-			= create_component_hop (p_src_switch_link, vlink, SOURCE, NULL);
+  // These are the paths from the source to the first switch
+  // and from the last switch to the destination
+  const char* psrc_name = links->front();	
+  const char* pdst_name = links->back();	
+  DOMElement* p_src_switch_link 
+    = (this->physical_elements->find(psrc_name))->second;
+  DOMElement* p_switch_dst_link 
+    = (this->physical_elements->find(pdst_name))->second;
+  
+  // Remove these links from the list
+  // If it is an intra-switch link, the list should now be empty.
+  links->pop_front();
+  links->pop_back();
+  
+  DOMElement* vlink = getElementByAttributeValue (this->virtual_root, "link", 
+						  "virtual_id", v_name);
+  annotate_interface(p_src_switch_link, vlink, 0);
+  annotate_interface(p_switch_dst_link, vlink, 1);
+  
+  DOMElement* prev_component_hop 
+    = create_component_hop (p_src_switch_link, vlink, SOURCE, NULL);
 #if 0
-	for (DOMElement *prev_link_in_path = p_src_switch_link; !links->empty(); )
-	{
-		DOMElement* p_switch_switch_link = find_next_link_in_path (prev_link_in_path, links);
-		prev_component_hop = create_component_hop (p_switch_switch_link, vlink, NEITHER, prev_component_hop);
-		prev_link_in_path = p_switch_switch_link;
-	}
+  for (DOMElement *prev_link_in_path = p_src_switch_link; !links->empty(); )
+    {
+      DOMElement* p_switch_switch_link = find_next_link_in_path (prev_link_in_path, links);
+      prev_component_hop = create_component_hop (p_switch_switch_link, vlink, NEITHER, prev_component_hop);
+      prev_link_in_path = p_switch_switch_link;
+    }
 #else
-	{
-	    static int gave_apology;
-
-	    if( !links->empty() && !gave_apology ) {
-		gave_apology = 1;
-		cerr << "Warning: unable to locate interfaces on "
-		    "switch/switch links; omitting those\n";
+  {
+    static int gave_apology;
+    
+    if( !links->empty() && !gave_apology ) {
+      gave_apology = 1;
+      cerr << "Warning: unable to locate interfaces on "
+	"switch/switch links; omitting those\n";
 	    }
-	}
+  }
 #endif
-	create_component_hop 
-			(p_switch_dst_link, vlink, DESTINATION, prev_component_hop);
+  create_component_hop 
+    (p_switch_dst_link, vlink, DESTINATION, prev_component_hop);
 }
 
 // Creates a component_hop for a trivial link
 // Adds the hop to the vlink and returns the hop element that was created
 DOMElement* annotate_rspec::create_component_hop (DOMElement* vlink)
 {
-	DOMNodeList* interfaces 
+  DOMNodeList* interfaces 
 			= vlink->getElementsByTagName(XStr("interface_ref").x());
-	DOMElement* src_iface = dynamic_cast<DOMElement*>(interfaces->item(0));
-	DOMElement* dst_iface = dynamic_cast<DOMElement*>(interfaces->item(1));
-	
-	const char* src_id 
-			= XStr(src_iface->getAttribute(XStr("virtual_node_id").x())).c();
-	const char* dst_id 
-			= XStr(dst_iface->getAttribute(XStr("virtual_node_id").x())).c();
-	
-	DOMElement* src_vnode 
-			= getElementByAttributeValue(this->virtual_root,
-										 "node", "virtual_id", src_id);
-	DOMElement* dst_vnode 
-			= getElementByAttributeValue(this->virtual_root,
-										 "node", "virtual_id", dst_id);
-	
-	XStr src_component_id (find_urn(src_vnode, "component"));
-	XStr dst_component_id (find_urn(dst_vnode, "component"));
-	
-	DOMElement* component_hop = doc->createElement(XStr("component_hop").x());
-
-	DOMElement* src_iface_clone 
-			= dynamic_cast<DOMElement*>
-			(doc->importNode(dynamic_cast<DOMNode*>(src_iface),true));
-	src_iface_clone->setAttribute(XStr("component_node_id").x(),
-								  src_component_id.x());
-	src_iface_clone->setAttribute(XStr("component_interface_id").x(),
-								  XStr("loopback").x()); 
-	
-	cerr << src_component_id.c() << " AND " << dst_component_id.c() << endl;
-	
-	DOMElement* dst_iface_clone 
-			= dynamic_cast<DOMElement*>
-			(doc->importNode(dynamic_cast<DOMNode*>(dst_iface),true));
-	dst_iface_clone->setAttribute(XStr("component_node_id").x(),
-								  dst_component_id.x());
-	dst_iface_clone->setAttribute(XStr("component_interface_id").x(),
-								  XStr("loopback").x());
-	
-	component_hop->appendChild(src_iface_clone);
-	component_hop->appendChild(dst_iface_clone);
-	vlink->appendChild(component_hop);
-	return component_hop;
+  DOMElement* src_iface = dynamic_cast<DOMElement*>(interfaces->item(0));
+  DOMElement* dst_iface = dynamic_cast<DOMElement*>(interfaces->item(1));
+  
+  const char* src_id 
+    = XStr(src_iface->getAttribute(XStr("virtual_node_id").x())).c();
+  const char* dst_id 
+    = XStr(dst_iface->getAttribute(XStr("virtual_node_id").x())).c();
+  
+  DOMElement* src_vnode 
+    = getElementByAttributeValue(this->virtual_root,
+				 "node", "virtual_id", src_id);
+  DOMElement* dst_vnode 
+    = getElementByAttributeValue(this->virtual_root,
+				 "node", "virtual_id", dst_id);
+  
+  XStr src_component_id (find_urn(src_vnode, "component"));
+  XStr dst_component_id (find_urn(dst_vnode, "component"));
+  
+  DOMElement* component_hop = doc->createElement(XStr("component_hop").x());
+  
+  DOMElement* src_iface_clone 
+    = dynamic_cast<DOMElement*>
+    (doc->importNode(dynamic_cast<DOMNode*>(src_iface),true));
+  src_iface_clone->setAttribute(XStr("component_node_id").x(),
+				src_component_id.x());
+  src_iface_clone->setAttribute(XStr("component_interface_id").x(),
+				XStr("loopback").x()); 
+  
+  cerr << src_component_id.c() << " AND " << dst_component_id.c() << endl;
+  
+  DOMElement* dst_iface_clone 
+    = dynamic_cast<DOMElement*>
+    (doc->importNode(dynamic_cast<DOMNode*>(dst_iface),true));
+  dst_iface_clone->setAttribute(XStr("component_node_id").x(),
+				dst_component_id.x());
+  dst_iface_clone->setAttribute(XStr("component_interface_id").x(),
+				XStr("loopback").x());
+  
+  component_hop->appendChild(src_iface_clone);
+  component_hop->appendChild(dst_iface_clone);
+  vlink->appendChild(component_hop);
+  return component_hop;
 }
 
 // Creates a hop from a switch till the next end point. 
 // Adds the hop to the vlink and returns the hop element that was created
-DOMElement* annotate_rspec::create_component_hop 
-								(const DOMElement* plink, DOMElement* vlink, 
-									int endpoint_interface, 
-		 							const DOMElement* prev_component_hop)
+DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink, 
+						  DOMElement* vlink, 
+						  int endpoint_interface, 
+						  const DOMElement* prev_component_hop)
 {
-	// Create a single_hop_link element
-	DOMElement* component_hop = doc->createElement(XStr("component_hop").x());
-	copy_component_spec(plink, component_hop);
-
-	DOMElement* component_hop_interface 
-									= doc->createElement(XStr("interface").x());
-		
-	// We assume the first interface is the source and the second the dest
-	DOMNodeList* pinterfaces 
-					= plink->getElementsByTagName(XStr("interface_ref").x());
-	DOMElement* plink_src_iface 
-							= dynamic_cast<DOMElement*>(pinterfaces->item(0));
-	DOMElement* plink_dst_iface 
-							= dynamic_cast<DOMElement*>(pinterfaces->item(1));
-				
-	DOMNodeList* vinterfaces 
-					= vlink->getElementsByTagName(XStr("interface_ref").x());
-	DOMElement* vlink_src_iface 
-							= dynamic_cast<DOMElement*>(vinterfaces->item(0));
-	DOMElement* vlink_dst_iface 
-							= dynamic_cast<DOMElement*>(vinterfaces->item(1));
-		
-	// If the previous component hop is not specified (NULL),
-	// then the link is either direct 
-	// or the direction is guaranteed to be from the node to the switch
-	DOMElement* plink_src_iface_clone 
-			= dynamic_cast<DOMElement*>
-				(doc->importNode(dynamic_cast<DOMNode*>(plink_src_iface),true));
-	DOMElement* plink_dst_iface_clone 
-			= dynamic_cast<DOMElement*>
+  // Create a single_hop_link element
+  DOMElement* component_hop = doc->createElement(XStr("component_hop").x());
+  copy_component_spec(plink, component_hop);
+  
+  DOMElement* component_hop_interface 
+    = doc->createElement(XStr("interface").x());
+  
+  // We assume the first interface is the source and the second the dest
+  DOMNodeList* pinterfaces 
+    = plink->getElementsByTagName(XStr("interface_ref").x());
+  DOMElement* plink_src_iface 
+    = dynamic_cast<DOMElement*>(pinterfaces->item(0));
+  DOMElement* plink_dst_iface 
+    = dynamic_cast<DOMElement*>(pinterfaces->item(1));
+  
+  DOMNodeList* vinterfaces 
+    = vlink->getElementsByTagName(XStr("interface_ref").x());
+  DOMElement* vlink_src_iface 
+    = dynamic_cast<DOMElement*>(vinterfaces->item(0));
+  DOMElement* vlink_dst_iface 
+    = dynamic_cast<DOMElement*>(vinterfaces->item(1));
+  
+  // If the previous component hop is not specified (NULL),
+  // then the link is either direct 
+  // or the direction is guaranteed to be from the node to the switch
+  DOMElement* plink_src_iface_clone 
+    = dynamic_cast<DOMElement*>
+    (doc->importNode(dynamic_cast<DOMNode*>(plink_src_iface),true));
+  DOMElement* plink_dst_iface_clone 
+    = dynamic_cast<DOMElement*>
 				(doc->importNode(dynamic_cast<DOMNode*>(plink_dst_iface),true));
-	// If the previous component is specified,
-	// the link specification could be the opposite of what we need
-	if (prev_component_hop != NULL)
-	{
-		// Find the destination of the previous component hop
-		DOMElement* prev_hop_dst_iface 
-				= dynamic_cast<DOMElement*>
-					((prev_component_hop->getElementsByTagName
-										(XStr("interface_ref").x()))->item(1));
-		XStr prev_hop_dst_uuid (find_urn(prev_hop_dst_iface,
-                                                 "component_node"));
-		
-		// We need to do this because in advertisements, 
-		// all links are from nodes to switches
-		// and we need to reverse this for the last hop of a multi-hop path
-		// This is slightly more expensive, 
-		// but definitely more robust than checking based on 
-		// whether a destination interface was specified
-		if (strcmp(prev_hop_dst_uuid.c(),
-                           XStr(find_urn(plink_dst_iface,
-                                         "component_node")).c()) == 0)
-		{
-			plink_src_iface_clone 
-					= dynamic_cast<DOMElement*>
-						(doc->importNode(dynamic_cast<DOMNode*>
-											(plink_dst_iface), true));
-			plink_dst_iface_clone 
-					= dynamic_cast<DOMElement*>
-						(doc->importNode(dynamic_cast<DOMNode*>
-											(plink_src_iface), true));
-		}
-	}
-	
-	// If the source interface is an end point
-	if (endpoint_interface == SOURCE || endpoint_interface == BOTH)
-		set_interface_as_link_endpoint
-				(plink_src_iface_clone, 
-					XStr(vlink_src_iface->getAttribute
-									(XStr("virtual_node_id").x())).c(), 
-					XStr(vlink_src_iface->getAttribute
-									(XStr("virtual_interface_id").x())).c());
-	
-	// If the destination interface is an end point
-	if (endpoint_interface == DESTINATION || endpoint_interface == BOTH)
-		set_interface_as_link_endpoint
-				(plink_dst_iface_clone, 
-					XStr(vlink_dst_iface->getAttribute
-									(XStr("virtual_node_id").x())).c(),
-					XStr(vlink_dst_iface->getAttribute
-									(XStr("virtual_interface_id").x())).c());
-		
-	// Add interface specifications to the link in the single hop element
-	component_hop->appendChild(plink_src_iface_clone);
-	component_hop->appendChild(plink_dst_iface_clone);
-		
-	vlink->appendChild(component_hop);
-	return (component_hop);
+  // If the previous component is specified,
+  // the link specification could be the opposite of what we need
+  if (prev_component_hop != NULL) {
+      // Find the destination of the previous component hop
+    DOMElement* prev_hop_dst_iface 
+      = dynamic_cast<DOMElement*>
+      ((prev_component_hop->getElementsByTagName
+	(XStr("interface_ref").x()))->item(1));
+    XStr prev_hop_dst_uuid (find_urn(prev_hop_dst_iface,
+				     "component_node"));
+    
+    // We need to do this because in advertisements, 
+    // all links are from nodes to switches
+    // and we need to reverse this for the last hop of a multi-hop path
+    // This is slightly more expensive, 
+    // but definitely more robust than checking based on 
+    // whether a destination interface was specified
+    if (strcmp(prev_hop_dst_uuid.c(),
+	       XStr(find_urn(plink_dst_iface,
+			     "component_node")).c()) == 0) {
+      plink_src_iface_clone 
+	= dynamic_cast<DOMElement*>
+	(doc->importNode(dynamic_cast<DOMNode*>
+			 (plink_dst_iface), true));
+      plink_dst_iface_clone 
+	= dynamic_cast<DOMElement*>
+	(doc->importNode(dynamic_cast<DOMNode*>
+			 (plink_src_iface), true));
+    }
+  }
+  
+  // If the source interface is an end point
+  if (endpoint_interface == SOURCE || endpoint_interface == BOTH)
+    set_interface_as_link_endpoint
+      (plink_src_iface_clone, 
+       XStr(vlink_src_iface->getAttribute
+	    (XStr("virtual_node_id").x())).c(), 
+       XStr(vlink_src_iface->getAttribute
+	    (XStr("virtual_interface_id").x())).c());
+  
+  // If the destination interface is an end point
+  if (endpoint_interface == DESTINATION || endpoint_interface == BOTH)
+    set_interface_as_link_endpoint
+      (plink_dst_iface_clone, 
+       XStr(vlink_dst_iface->getAttribute
+	    (XStr("virtual_node_id").x())).c(),
+       XStr(vlink_dst_iface->getAttribute
+	    (XStr("virtual_interface_id").x())).c());
+  
+  // Add interface specifications to the link in the single hop element
+  component_hop->appendChild(plink_src_iface_clone);
+  component_hop->appendChild(plink_dst_iface_clone);
+  
+  vlink->appendChild(component_hop);
+  return (component_hop);
 }
 
 // Copies the component_hop from the generated_link to the requsted_link

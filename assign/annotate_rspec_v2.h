@@ -31,6 +31,9 @@ class annotate_rspec_v2 : public annotate_rspec
   // is an interface to a link end point
   enum endpoint_interface_enum { NEITHER, SOURCE, DESTINATION, BOTH };
   std::map< std::string, std::set<std::string> > lan_links_map;
+
+  std::map< std::string, std::string >* vInterfaceMap;
+  std::map< std::string, std::string >* pInterfaceMap;
   
  public:
   annotate_rspec_v2 ();
@@ -75,12 +78,6 @@ class annotate_rspec_v2 : public annotate_rspec
   // Returns the hop element that was created
   xercesc::DOMElement* create_component_hop (xercesc::DOMElement* vlink);
   
-  // If the interface is the end point of a link/path, 
-  // add two additional attributes to it
-  void set_interface_as_link_endpoint (xercesc::DOMElement* interface, 
-				       const char* virtual_node_id, 
-				       const char* virtual_interface_id);
-  
   // Finds the next link in the path returned by assign
   xercesc::DOMElement* find_next_link_in_path 
     (xercesc::DOMElement *prev, 
@@ -107,6 +104,15 @@ class annotate_rspec_v2 : public annotate_rspec
   bool is_generated_element (const char* tag, 
 			     const char* attr_name, 
 			     const char* attr_value);
+
+  // Given an interface Id, returns the node on which the interface is present
+  std::string lookupIface (std::map<std::string, std::string>* map,
+			   std::string ifaceId, bool&);
+
+  // Returns the interface on the physical link
+  // which is declared on the physical node with component_id, physNodeId
+  const xercesc::DOMElement* 
+    getIfaceOnNode(const xercesc::DOMElement* plink, std::string physNodeId);
 };
 
 #endif //for __ANNOTATE_RSPEC_H

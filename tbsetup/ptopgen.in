@@ -1668,6 +1668,9 @@ sub print_header {
 }
 
 sub print_footer {
+    if (!$do_xml) {
+	print_type_limits();
+    }
     if ($do_xml && $genimode eq $NO_GENI) {
 	print "</ptop>\n";
     } elsif ($do_xml && $genimode ne $NO_GENI) {
@@ -1832,11 +1835,18 @@ sub print_type_limits
 	foreach $line (@typelimits) { 
 	    chomp($line);
 	    my ($typeclass, $count) = split(" ", $line);
-
-	    print "<emulab:set_type_limit ";
-	    print "typeclass=\"$typeclass\" ";
-	    print "count=\"$count\"";
-	    print "/>\n";
+	    
+	    if ($genimode eq $NO_GENI) {
+		print "set-type-limit $typeclass $count\n";
+	    }
+	    else {
+		if ($genimode eq $V_2) {
+		    print "<emulab:set_type_limit ";
+		    print "typeclass=\"$typeclass\" ";
+		    print "count=\"$count\"";
+		    print "/>\n";
+		}
+	    }
 	}
     }
 }

@@ -2357,12 +2357,17 @@ sub GenVirtLans($)
 		#
 		if ($self->virtlan_use_linkdelay($vlan, $shaped)) {
 		    my $plink = "linksimple/$vname/$member0,$member1";
-		    
+		    my $others = {};
+		    if ($emulated) {
+			$others->{'emulated'} = 1;
+		    }
+		    if ($trivial_ok) {
+			$others->{'trivial_ok'} = 1;
+		    }
 		    $self->createLink($plink, $cmid, $vname0, $vname1, 
 				      ($top_bw == 0 ? "*" : 
 				       max($top_bw, $top_rbw)), $protocol,
-				      { 'emulated'   => "1",
-					'trivial_ok' => "1" });
+				      $others);
 	
 # 		    	$self->addlink("$plink $vname0 $vname1 ".
 # 				   ($top_bw == 0 ? "*" :

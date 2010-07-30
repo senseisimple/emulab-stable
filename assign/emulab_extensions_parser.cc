@@ -128,8 +128,6 @@ struct vclass emulab_extensions_parser::readVClass (const DOMElement* tag)
     // the types and present it to assign, we will have to change the code 
     // in libvtop
     string physNodeName  = this->getAttribute(physNode, "name");
-    cerr << "Converted vclass name to " 
-	 << rspec_parser_helper::convertType(physNodeName) << endl;
     physTypes.push_back(rspec_parser_helper::convertType(physNodeName));
   }
     

@@ -58,8 +58,10 @@ extern name_vclass_map vclass_map;
 
 // This is a hash map of the entire physical topology 
 // because it takes far too long for it to search the XML DOM tree.
-map<string, DOMElement*>* advertisement_elements 
-										= new map<string, DOMElement*>();
+map<string,DOMElement*>* advertisement_elements= new map<string,DOMElement*>();
+
+map<string, string>* pIfacesMap = new map<string, string>();
+
 DOMElement* advt_root = NULL;
 
 /*
@@ -117,7 +119,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
    */
   if (errHandler->sawError()) {
     cerr << "There were " << domParser -> getErrorCount () 
-	 << " errors in your file. " << endl;
+	 << " errors in " << filename << endl;
     exit(EXIT_FATAL);
   }
   else {
@@ -147,10 +149,10 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     
     bool is_physical;
     XStr type (advt_root->getAttribute(XStr("type").x()));
-    if (strcmp(type.c(), "advertisement") == 0)
-      is_physical = true;
-    else if (strcmp(type.c(), "request") == 0)
-      is_physical = false;
+    if (strcmp(type.c(), "advertisement") != 0) {
+      cerr << "*** Rspec type must be \"advertisement\" in " << filename
+	   << " (found " << type.c() << ")" << endl;
+    }
     
     // XXX: Not sure about datetimes, so they are strings for now
     XStr generated (advt_root->getAttribute(XStr("generated").x()));
@@ -205,7 +207,6 @@ bool populate_nodes(DOMElement *root,
   DOMNodeList *nodes = root->getElementsByTagName(XStr("node").x());
   int nodeCount = nodes->getLength();
   XMLDEBUG("Found " << nodeCount << " nodes in rspec" << endl);
-  clock_t times [nodeCount];
   
   int availableCount = 0;
   int counter = 0;
@@ -484,10 +485,6 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
       continue;
     }
 
-    /* NOTE: In a request, we assume that each link has only two interfaces
-     * Although the order is immaterial, assign expects a source first 
-     * and a destination second and we assume the same
-     */	
     string src_node = interfaces[0].physicalNodeId;
     string src_iface = interfaces[0].physicalIfaceId;
     string dst_node = interfaces[1].physicalNodeId;
@@ -507,6 +504,9 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
       is_ok = false;
       continue;
     }
+
+    pIfacesMap->insert(pair<string, string>(src_iface, src_node));
+    pIfacesMap->insert(pair<string, string>(dst_iface, dst_node));
 
     if( unavailable.count( src_node ) || 
 	unavailable.count( dst_node ) )
