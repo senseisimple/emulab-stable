@@ -13,6 +13,7 @@
 use strict;
 use English;
 use Frontier::Responder;
+use Frontier::RPC2;
 use Data::Dumper;
 use POSIX;
 use Crypt::X509;
@@ -22,32 +23,44 @@ use Crypt::OpenSSL::X509;
 # we are left with a giant mess.
 BEGIN {
     no warnings;
-    for (my $i = 3; $i < 2048; $i++) {
+    for (my $i = 3; $i < 1024; $i++) {
       POSIX:close($i);
     }
 }
 
-# Do this early so that we talk to the right DB.
-use vars qw($GENI_DBNAME $GENI_ISCLRHOUSE $GENI_CHPEMFILE);
-BEGIN { $GENI_DBNAME = "geni-ch"; $GENI_ISCLRHOUSE = 1; }
-
 # Configure variables
-my $ETCDIR         = "@prefix@/etc";
-my $EMULAB_PEMFILE = ((-s "$ETCDIR/genich-local.pem") ?
-		      "$ETCDIR/genich-local.pem" : "$ETCDIR/genich.pem");
-# See GeniCredential; a helpful debugging aid.
-$GENI_CHPEMFILE = $EMULAB_PEMFILE;
+my $MAINSITE 	   = @TBMAINSITE@;
+my $TBOPS          = "@TBOPSEMAIL@";
+my $MODULE;
+my $GENIURN;
+
+# These are the modules we load for each service.
+my %GENI_MODULES = ( "cm"  => "@prefix@/lib/protogeni-cm.pm",
+		     "am"  => "@prefix@/lib/geni-am.pm",
+		     "sa"  => "@prefix@/lib/protogeni-sa.pm",
+		     "ch"  => "@prefix@/lib/protogeni-ch.pm",
+		     "ses" => "@prefix@/lib/protogeni-ses.pm" );
+
+# These variables are shared with the loaded module.
+use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION);
 
 # Testbed libraries.
 use lib '@prefix@/lib';
-use GeniCH;
-use GeniCertificate;
+use Genixmlrpc;
 use GeniResponse;
 use libaudit;
+use emutil;
+use libtestbed;
 
 # Geniuser.
 my $user  = "geniuser";
 my $group = "GeniSlices";
+
+# Need a command line option.
+my $debug = 1;
+
+# Determined by version.
+my $responder;
 
 #
 # Turn off line buffering on output
@@ -61,21 +74,6 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# So we know who/what we are acting as.
-#
-my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
-if (!defined($certificate)) {
-    die("*** $0:\n".
-	"    Could not get uuid from $EMULAB_PEMFILE\n");
-}
-$ENV{'MYUUID'} = $certificate->uuid();
-# The URN could also come from the certificate, and that might be preferable
-# in some ways (if anybody is doing something silly like authenticating
-# with somebody else's certificate).  But that would require everybody to
-# upgrade to URNs in their certificates, so we can't assume it yet.
-$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+ch";
-
-#
 # Helper function to return a properly formated XML error.
 #
 sub XMLError($$)
@@ -86,6 +84,13 @@ sub XMLError($$)
     print "Content-Type: text/xml \n\n";
     print $decoder->encode_fault($code, $string);
     exit(0);
+}
+
+#
+# Check for NoLogins; return XMLRPC
+#
+if (NoLogins()) {
+    XMLError(503, "CM temporarily offline; please try again later");
 }
 
 #
@@ -159,7 +164,7 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
     foreach my $tmp (@{ $decoded->SubjectAltName }) {
 	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/ ||
 	    $tmp =~ /^(urn:.*)$/) {
-	    $ENV{'GENIURN'} = $1;
+	    $GENIURN = $ENV{'GENIURN'} = $1;
 	}
     }
 }
@@ -175,40 +180,144 @@ if (!defined($request)) {
     exit(0);
 }
 
+if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
+    my $pathinfo = $ENV{'PATH_INFO'};
+    $pathinfo =~ s/^\///;
+    my @parts = split(/\//, $pathinfo);
+    if (@parts) {
+	my $m = shift(@parts);
+	if ($m =~ /^[-\w]+$/) {
+	    $MODULE = $m;
+	    if (@parts) {
+		my $v = shift(@parts);
+		if ($v =~ /^[\d\.]+$/) {
+		    $GENI_VERSION = "$v";
+		}
+	    }
+	}
+    }
+}
+
+if (!defined($MODULE) || !exists($GENI_MODULES{$MODULE})) {
+    XMLError(-1, "Invalid module specification")
+}
+my $file = $GENI_MODULES{$MODULE};
+
+# This just loads the file.
+my $return = do $file;
+if (!defined($return)) {
+    SENDMAIL($TBOPS, "Error loading module",
+	     ($@ ? $@ : ($! ? $! : Dumper(%ENV))));
+    XMLError(-1, "Internal error loading module");
+}
+if (!(defined($GENI_METHODS) && defined($EMULAB_PEMFILE))) {
+    SENDMAIL($TBOPS, "Error loading module $MODULE",
+	     "No definition for GENI_METHODS or EMULAB_PEMFILE");
+    XMLError(-1, "Internal error loading module; missing definitions");
+}
+
+#
+# So we know who/what we are acting as.
+#
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    die("*** $0:\n".
+	"    Could not get uuid from $EMULAB_PEMFILE\n");
+}
+$ENV{'MYUUID'} = $certificate->uuid();
+# The URN could also come from the certificate, and that might be preferable
+# in some ways (if anybody is doing something silly like authenticating
+# with somebody else's certificate).  But that would require everybody to
+# upgrade to URNs in their certificates, so we can't assume it yet.
+$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+$MODULE";
+
+#
+# Create and set our RPC context for any calls we end up making.
+#
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
 #
 # Use libaudit to capture any output from libraries and programs.
 # Send that to tbops so they can be fixed.
 #
-LogStart(0, undef, LIBAUDIT_LOGTBOPS());
+if ($MAINSITE) {
+    LogStart(0);
+    AddAuditInfo("to", "protogeni-errors\@flux.utah.edu")
+}
+else {
+    LogStart(0, undef, LIBAUDIT_LOGTBOPS());
+}
 
-my $responder = Frontier::Responder->new( "methods" => {
-    "GetVersion"            => \&GeniCH::GetVersion,
-    "GetCredential"         => \&GeniCH::GetCredential,
-    "Resolve"               => \&GeniCH::Resolve,
-    "Register"              => \&GeniCH::Register,
-    "Remove"                => \&GeniCH::Remove,
-    "ListComponents"        => \&GeniCH::ListComponents,
-    "PostCRL"               => \&GeniCH::PostCRL,
-    "Shutdown"              => \&GeniCH::Shutdown,
-    "List"                  => \&GeniCH::List,
-   },
-);
-
-my $response = $responder->{'_decode'}->serve($request,
-					      $responder->{'methods'});
-
-# Add stuff for log message if sent.
-AddAuditInfo("message", $response . "\n\n" . $request);
 # CC errors to Utah for now.
 AddAuditInfo("cc", "protogeni-errors\@flux.utah.edu");
+
+#
+# This is lifted from the Frontier code. I want the actual response
+# object, not the XML. 
+#
+my $decoder   = Frontier::RPC2->new();
+my $call;
+my $response;
+
+$request =~ s/(<\?XML\s+VERSION)/\L$1\E/;
+eval { $call = $decoder->decode($request) };
+if ($@) {
+    XMLError(1, "error decoding RPC:\n" . $@);
+}
+if ($call->{'type'} ne 'call') {
+    XMLError(1, "expected RPC methodCall, got $call->{'type'}");
+}
+my $method = $call->{'method_name'};
+if (!defined($GENI_METHODS->{$method})) {
+    XMLError(3, "no such method $method\n");
+}
+my $result;
+my $message =
+    "URN:    $GENIURN\n".
+    "Module: $MODULE\n".
+    "Method: $method\n";
+    
+eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
+if ($@) {
+    #
+    # These errors should get mailed to tbops.
+    #
+    print STDERR "Error executing RPC method $method:\n" . $@ . "\n";
+    AddAuditInfo("to", $TBOPS);
+    $response = $decoder->encode_fault(4, "Internal Error executing $method");
+
+    AddAuditInfo("message", $message .
+		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
+}
+else {
+    $response = $decoder->encode_response($result);
+
+    if (GeniResponse::IsError($result)) {
+	$message .= "Error:  " . $result->{'code'} . "\n";
+    }
+    else {
+	$message .= "Code:   " . $result->{'code'} . "\n";
+    }
+    $message .= "Output: " . $result->{'output'} . "\n"
+	if (defined($result->{'output'}));
+
+    $message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
+    $message .= "Request:\n" . $request . "\n";
+    
+    AddAuditInfo("message", $message);
+}
+
+if ($debug) {
+    print STDERR "Debugging is on.\n";
+}
 
 #
 # Terminate the log capture so that we can print the response to STDOUT
 # for the web server.
 #
-LogEnd();
+LogEnd(0);
 
-print "Content-Type: text/xml\n\n" . $response;
+print "Content-Type: text/xml \n\n" . $response;
 exit(0);
 
 #
@@ -228,3 +337,4 @@ END {
 	$? = 0;
     }
 }
+
