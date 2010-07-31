@@ -18,7 +18,7 @@ $EMULAB_PEMFILE    = "$ETCDIR/genicm.pem";
 # Testbed libraries.
 use lib '@prefix@/lib';
 use GeniCM;
-
+use GeniCMV2;
 
 if (!defined($GENI_VERSION) || $GENI_VERSION eq "1.0") {
     $GENI_METHODS = {
