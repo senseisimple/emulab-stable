@@ -273,9 +273,12 @@ if (!defined($GENI_METHODS->{$method})) {
 }
 my $result;
 my $message =
-    "URN:    $GENIURN\n".
-    "Module: $MODULE\n".
-    "Method: $method\n";
+    "URN:     $GENIURN\n".
+    "Module:  $MODULE\n".
+    "Method:  $method\n";
+$message .=
+    "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
+
     
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {
@@ -293,12 +296,12 @@ else {
     $response = $decoder->encode_response($result);
 
     if (GeniResponse::IsError($result)) {
-	$message .= "Error:  " . $result->{'code'} . "\n";
+	$message .= "Error:   " . $result->{'code'} . "\n";
     }
     else {
-	$message .= "Code:   " . $result->{'code'} . "\n";
+	$message .= "Code:    " . $result->{'code'} . "\n";
     }
-    $message .= "Output: " . $result->{'output'} . "\n"
+    $message .= "Output:  " . $result->{'output'} . "\n"
 	if (defined($result->{'output'}));
 
     $message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
