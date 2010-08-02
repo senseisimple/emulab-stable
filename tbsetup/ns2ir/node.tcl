@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -487,6 +487,8 @@ Node instproc set_fixed {pnode} {
 	if {$issubnode} {
 	    $pnode set subnodehost 1
 	    $pnode set subnodechild $self
+	} elseif ($isvirt) {
+	    # Need to check anything?
 	} else {
 	    perror "\[set-fixed] Improper fix-node $self to $pnode!"
 	    return
