@@ -1508,14 +1508,14 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 
       // XXX: Not 100% sure it's better to do this inside find_best_link rather
       // than in the caller
-      if (flipped) {
-          // If the endpoints are flipped, then we need to flip our notion of
-          // which ones need to be compared.
-          bool tmp = check_src_iface;
-          check_src_iface = check_dst_iface;
-          check_dst_iface = tmp;
-          SDEBUG(cerr << "         find_best_link: flipping interface comparisons" << endl;)
-      }
+//       if (flipped) {
+//           // If the endpoints are flipped, then we need to flip our notion of
+//           // which ones need to be compared.
+//           bool tmp = check_src_iface;
+//           check_src_iface = check_dst_iface;
+//           check_dst_iface = tmp;
+//           SDEBUG(cerr << "         find_best_link: flipping interface comparisons" << endl;)
+//       }
 
       SDEBUG(cerr << "         find_best_link: fix_src_iface = " <<
               vlink->fix_src_iface << " check_src_iface = " << check_src_iface
@@ -1529,7 +1529,8 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
           // Whether we check the 'source' or 'destination' on the vlink against
           // the phyisical link's source interface depends on whether we're
           // traversing the link if forward or reverse (flipped) order
-          fstring compare_iface = vlink->src_iface;
+//          fstring compare_iface = vlink->src_iface;
+	fstring compare_iface = (flipped? vlink->dst_iface : vlink->src_iface);
           if (plink->srciface != compare_iface) {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
                       "): Fix source: " << plink->srciface << " != " <<
@@ -1547,7 +1548,8 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       // XXX: This only works because we always have the node as the 'source'
       // of a plink! Shouldn't depend on this!
       if (vlink->fix_dst_iface && check_dst_iface) {
-          fstring compare_iface = vlink->dst_iface;
+//           fstring compare_iface = vlink->dst_iface;
+	fstring compare_iface = (flipped? vlink->src_iface : vlink->dst_iface);
           if (plink->srciface != compare_iface) {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
                       "): Fix dst: " << plink->srciface << " != " <<

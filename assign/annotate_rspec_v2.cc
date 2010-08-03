@@ -37,12 +37,20 @@ extern map<string,string>* vIfacesMap;
 XERCES_CPP_NAMESPACE_USE
 using namespace std;
 
+// TODO: Link mapping has been disabled. Re-enable this when all bugs 
+// related to interfaces on switches have been fixed.
+
 annotate_rspec_v2 :: annotate_rspec_v2 ()
 {
   this->document = doc;
   this->virtual_root = request_root;
   this->physical_root = advt_root;
   this->physical_elements = advertisement_elements;
+
+#ifdef DISABLE_LINK_ANNOTATION
+    cerr << "WARNING: Annotation code will execute, "
+	 << "but links will not be annotated" << endl;
+#endif
   
   vector<DOMElement*> lan_links 
     = getElementsHavingAttribute(this->virtual_root, "link", "is_lan");
@@ -66,19 +74,7 @@ annotate_rspec_v2 :: annotate_rspec_v2 ()
       (pair< string, set<string> >(lan_link_id, virtual_interface_ids));
   }
 
-  // Go through the entire virtual topology and create a map
-  // of interfaces and their parent nodes
-  // XXX: This is actually present in the rspecParser, but I can't think of 
-  // a clean way of getting it in here without introducing version dependent
-  // code in the parse_request_rspec.cc 
-  //  this->vIfacesMap = this->populateIfaceMap(this->virtual_root, "client_id");
   this->vInterfaceMap = vIfacesMap;
-  
-  // Do the same for the physical topology
-  // XXX: This is very inefficient. Need to find some way of using this data
-  // since it's already present in the rspecParser. It's ok for the virtual 
-  // topology since it's small, but the physical topology is big 
-  //  this->pIfacesMap =this->populateIfaceMap(this->physical_root,"component_id");
   this->pInterfaceMap = pIfacesMap;
 }
 
@@ -91,7 +87,9 @@ void annotate_rspec_v2::annotate_element (const char* v_name)
   annotate_interface (vlink, 0);
   annotate_interface (vlink, 1);	
   DOMElement* hop = create_component_hop(vlink);
-  vlink->appendChild(hop);
+#ifndef DISABLE_LINK_ANNOTATION
+    vlink->appendChild(hop);
+#endif
 }
 
 // This will get called when a node or a direct link needs to be annotated
@@ -134,7 +132,9 @@ annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
     annotate_interface (plink, vlink, 1);
     
     DOMElement* hop = create_component_hop(plink, vlink, BOTH, NULL);
-    vlink->appendChild(hop);
+#ifndef DISABLE_LINK_ANNOTATION
+      vlink->appendChild(hop);
+#endif    
     
     if (vlink->hasAttribute(XStr("generated_by_assign").x())) {
       string str_lan_link 
@@ -158,6 +158,10 @@ annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
 void annotate_rspec_v2::annotate_element (const char* v_name, 
 					  list<const char*>* links)
 {
+  // We can't locate interfaces on the switches, so we don't add those 
+  // to the annotation. The warning is only given the one time
+  static bool gave_apology = false;
+
   // These are the paths from the source to the first switch
   // and from the last switch to the destination
   const char* psrc_name = links->front();	
@@ -179,40 +183,34 @@ void annotate_rspec_v2::annotate_element (const char* v_name,
   annotate_interface(p_switch_dst_link, vlink, 1);
   
   vector<DOMElement*> componentHops;
-  DOMElement* prev_component_hop 
+  DOMElement* prevComponentHop 
     = create_component_hop (p_src_switch_link, vlink, SOURCE, NULL);
-  componentHops.push_back(prev_component_hop);
-#if 0
-  {
-  for (DOMElement *prev_link_in_path = p_src_switch_link; !links->empty(); ) {
-    DOMElement* p_switch_switch_link 
-      = find_next_link_in_path (prev_link_in_path, links);
-    prev_component_hop 
-      = create_component_hop (p_switch_switch_link, 
-			      vlink, NEITHER, prev_component_hop);
-    prev_link_in_path = p_switch_switch_link;
-    componentHops.push_back(prev_component_hop);
-  }
-#else
-  {
-    static int gave_apology;
-
-    if( !links->empty() && !gave_apology ) {
-      gave_apology = 1;
-      cerr << "Warning: unable to locate interfaces on "
-	"switch/switch links; omitting those\n";
+  componentHops.push_back(prevComponentHop);
+    
+  for (DOMElement *prevLinkInPath = p_src_switch_link; !links->empty(); ) {
+#ifndef DISABLE_LINK_ANNOTATION
+    if (!gave_apology) { 
+      gave_apology = true;
+      cerr << endl << "\nWARNING: Unable to locate interfaces on "
+	"switch/switch links; omitting those from the annotation" << endl;
     }
+#endif
+    DOMElement* pSwitchSwitchLink 
+      = find_next_link_in_path (prevLinkInPath, links);
+    prevComponentHop = create_component_hop (pSwitchSwitchLink, vlink, 
+					     NEITHER, prevComponentHop);
+    prevLinkInPath = pSwitchSwitchLink;
+    //    componentHops.push_back(prevComponentHop);
+  }
+
+  DOMElement* hop = create_component_hop (p_switch_dst_link, vlink, 
+					  DESTINATION, prevComponentHop);
+  componentHops.push_back(hop);
+#ifndef DISABLE_LINK_ANNOTATION
+  for (int i = 0; i < componentHops.size(); i++) {
+    vlink->appendChild(componentHops[i]);
   }
 #endif
-  {
-    DOMElement* hop 
-      = create_component_hop (p_switch_dst_link, vlink, DESTINATION, 
-			      prev_component_hop);
-    componentHops.push_back(hop);
-    for (int i = 0; i < componentHops.size(); i++) {
-      vlink->appendChild(componentHops[i]);
-    }
-  }
 }
 
 // Creates a component_hop for a trivial link
@@ -226,10 +224,8 @@ DOMElement* annotate_rspec_v2::create_component_hop (DOMElement* vlink)
   string dstIfaceId = XStr(dstIface->getAttribute(XStr("client_id").x())).c();
 
   bool fnd;
-  string srcIfaceNodeId 
-    = this->lookupIface(this->vInterfaceMap, srcIfaceId, fnd);
-  string dstIfaceNodeId 
-    = this->lookupIface(this->vInterfaceMap, dstIfaceId, fnd);
+  string srcIfaceNodeId =this->lookupIface(this->vInterfaceMap,srcIfaceId,fnd);
+  string dstIfaceNodeId =this->lookupIface(this->vInterfaceMap,dstIfaceId,fnd);
 
   DOMElement* srcVnode 
     = getElementByAttributeValue(this->virtual_root,
@@ -276,7 +272,7 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
 
   string vlinkDstIfaceId 
     = XStr(vlinkDstIface->getAttribute(XStr("client_id").x())).c();
-  
+
   // If the previous component hop is not specified (NULL),
   // then the link is either direct 
   // or the direction is guaranteed to be from the node to the switch
@@ -286,6 +282,17 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
   DOMElement* plinkDstIfaceClone
     = dynamic_cast<DOMElement*>(doc->importNode
 				(dynamic_cast<DOMNode*>(plinkDstIface),true));
+  
+  string plinkSrcIfaceId 
+    = XStr(plinkSrcIface->getAttribute(XStr("component_id").x())).c();
+  string plinkDstIfaceId 
+    = XStr(plinkDstIface->getAttribute(XStr("component_id").x())).c();
+  
+  bool found = false;
+  string plinkSrcNodeId = this->lookupIface(this->pInterfaceMap,
+					    plinkSrcIfaceId, found);
+  string plinkDstNodeId = this->lookupIface(this->pInterfaceMap, 
+					    plinkDstIfaceId, found);
 
   // If the previous component is specified,
   // the link specification could be the opposite of what we need
@@ -295,7 +302,6 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
       = dynamic_cast<DOMElement*>((prevHop->getElementsByTagName
 				   (XStr("interface_ref").x()))->item(1));
 
-    bool found = false;
     string prevHopDstIfaceId 
       = XStr(prevHopDstIface->getAttribute(XStr("component_id").x())).c();
     string prevHopDstNodeId = this->lookupIface(this->pInterfaceMap, 
@@ -307,31 +313,44 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
     // This is slightly more expensive, 
     // but definitely more robust than checking based on 
     // whether a destination interface was specified
-    string plinkDstIfaceId 
-      = XStr(plinkDstIface->getAttribute(XStr("component_id").x())).c();
-    string plinkDstNodeId = this->lookupIface(this->pInterfaceMap, 
-					      plinkDstIfaceId, found);
     if (prevHopDstNodeId == plinkDstNodeId) {
-      plinkSrcIfaceClone = dynamic_cast<DOMElement*>(doc->importNode
-						     (dynamic_cast<DOMNode*>
-						      (plinkDstIface), true));
-      plinkDstIfaceClone = dynamic_cast<DOMElement*>(doc->importNode
-						     (dynamic_cast<DOMNode*>
-						      (plinkSrcIface), true));
+      plinkSrcIfaceClone 
+	= dynamic_cast<DOMElement*>(doc->importNode
+				    (dynamic_cast<DOMNode*>(plinkDstIface), 
+				     true));
+      plinkDstIfaceClone 
+	= dynamic_cast<DOMElement*>(doc->importNode
+				    (dynamic_cast<DOMNode*>(plinkSrcIface), 
+				     true));
     }
   }
   
-  // If the source interface is an end point
-  if (endpointIface == SOURCE || endpointIface == BOTH) {
-    plinkSrcIfaceClone->setAttribute(XStr("client_id").x(),
-				     XStr(vlinkSrcIfaceId.c_str()).x());
+  //Annotate the link endpoint 
+  if (endpointIface != NEITHER) {
+    bool annotated;
+    annotated = this->annotate_endpoint(plinkSrcIfaceClone, vlinkSrcIfaceId);
+    if (!annotated) {
+      this->annotate_endpoint(plinkDstIfaceClone, vlinkSrcIfaceId);
+    }
+    annotated = this->annotate_endpoint(plinkDstIfaceClone, vlinkDstIfaceId);
+    if (!annotated) {
+      this->annotate_endpoint(plinkSrcIfaceClone, vlinkDstIfaceId);
+    }
   }
-  
-  // If the destination interface is an end point
-  if (endpointIface == DESTINATION || endpointIface == BOTH) {
-    plinkDstIfaceClone->setAttribute(XStr("client_id").x(),
-				     XStr(vlinkDstIfaceId.c_str()).x());
-  }
+
+  // Find the physical nodes for the source and destination interfaces
+  // We need these to determine the component manager IDs.
+  DOMElement* plinkSrcNode 
+    = ((this->physical_elements)->find(plinkSrcNodeId))->second;
+  DOMElement* plinkDstNode
+    = ((this->physical_elements)->find(plinkDstNodeId))->second;
+
+  plinkSrcIfaceClone->setAttribute
+    (XStr("component_manager_id").x(),
+     plinkSrcNode->getAttribute(XStr("component_manager_id").x()));
+  plinkDstIfaceClone->setAttribute
+    (XStr("component_manager_id").x(),
+     plinkDstNode->getAttribute(XStr("component_manager_id").x()));
 
   // Create a single_hop_link element
   DOMElement* hop = doc->createElement(XStr("component_hop").x());
@@ -354,7 +373,7 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
 // but it sounds like a dirty way of doing it and is not exactly robust,
 // so we shall use the slower, but more robust method
 void annotate_rspec_v2::copy_component_hop(DOMElement* lan_link, 
-					DOMElement* component_hop)
+					   DOMElement* component_hop)
 {
   string lan_link_id 
     = string(XStr(lan_link->getAttribute(XStr("client_id").x())).c());
@@ -436,32 +455,53 @@ void annotate_rspec_v2::annotate_interface (const DOMElement* plink,
 
   string physNodeId = XStr(vnode->getAttribute(XStr("component_id").x())).c();
 
+  // When the link is a trivial link, the interface name is loopback
+  string interface = "loopback";
+  string shortName = "";
+
+  // This entire block is ifdef'ed because we have trouble annotating 
+  // interfaces when a requested lan node is mapped to a switch
+  // Once we have support for interfaces on switches, this problem will go away
+  // XXX: While link mapping is disabled, node annotations will be 
+  // inconsistent when any one node is mapped onto a switch
+#ifndef DISABLE_LINK_ANNOTATION
   if (!isTrivialLink) {
     // Find the interface on the physical link which is situated
     // on the physical node to which the vnode has been mapped
     const DOMElement* pIface = this->getIfaceOnNode(plink, physNodeId);
     if (pIface == NULL) {
-      cerr << "*** No interface on " 
+      cerr << "\n\n*** No interface on " 
 	   << XStr(plink->getAttribute(XStr("component_id").x())).c()
-	   << " is declared on node " << physNodeId << endl;
+	   << " is declared on node " << physNodeId << endl << endl;
+      cerr << "*** Additional information: " << endl;
+      cerr << "Virtual link ID: "
+	   << XStr(vlink->getAttribute(XStr("client_id").x())).c() << endl;
+      cerr << "Interface ID on vlink: " << ifaceId << endl;
+      cerr << "Interface declared on vnode: " << nodeId << endl;
+      cerr << "Virtual node mapped to: " << physNodeId << endl;
+      cerr << "Physical link ID: " 
+	   << XStr(plink->getAttribute(XStr("component_id").x())).c() << endl;
       exit(EXIT_FATAL);
     }
-    decl->setAttribute (XStr("component_id").x(), 
-			pIface->getAttribute(XStr("component_id").x()));
+    interface = XStr(pIface->getAttribute(XStr("component_id").x())).c();
+    shortName = this->getShortInterfaceName(interface);
   }
-  else {
-    decl->setAttribute(XStr("component_id").x(), XStr("loopback").x());
-  }
+
+  // We also need to add the fixedinterface element to this
+  // since we need to ensure that when a partially mapped request is fed
+  // back into assign, the link isn't mapped to a different set of interfaces
+  
+  // XXX: This is not robust at all since it assumes that assign's output 
+  // will always have the interface name at the end with the form: *:<iface>
+  decl->setAttribute(XStr("component_id").x(), XStr(interface).x());
+  this->addFixedInterface(decl, shortName);
+#endif
 }
 
 // Copies the component spec from the source to the destination
 void 
 annotate_rspec_v2::copy_component_spec(const DOMElement* src, DOMElement* dst)
 {
-  if (src->hasAttribute (XStr("component_name").x()))
-    dst->setAttribute(XStr("component_name").x(), 
-		      XStr(src->getAttribute(XStr("component_name").x())).x());
-
   dst->setAttribute(XStr("component_id").x(), 
 		    XStr(src->getAttribute(XStr("component_id").x())).x());
   dst->setAttribute(XStr("component_manager_id").x(), 
@@ -480,14 +520,15 @@ DOMElement* annotate_rspec_v2::find_next_link_in_path (DOMElement *prev,
   DOMElement* link = NULL;
   for (it = links->begin(); it != links->end(); ++it) {
     link = (this->physical_elements->find(*it))->second;
-    XStr link_src(find_urn(getNthInterface(link,0),
-			   "component_node"));
-    XStr link_dst(find_urn(getNthInterface(link,1),
-			   "component_node"));
-    XStr prev_dst(find_urn(getNthInterface(prev,1),
-			   "component_node"));
-    if (strcmp(link_src.c(), prev_dst.c()) == 0 
-	|| strcmp(link_dst.c(), prev_dst.c()) == 0) {
+
+    // We assume as we have done throughout that the first interface 
+    // represents the source of the link and the second interface
+    // is the destination.
+    string linkSrc = this->getNodeForNthInterface(link, 0);
+    string linkDst = this->getNodeForNthInterface(link, 1);
+    string prevDst = this->getNodeForNthInterface(prev, 1);
+
+    if (linkSrc == prevDst || linkDst == prevDst) {
       links->remove(*it);
       break;
     }
@@ -570,6 +611,64 @@ annotate_rspec_v2::getIfaceOnNode(const DOMElement* plink, string nodeId)
     }
   }
   return NULL;
+}
+
+// Returns the node id for the nth interface on a link
+string annotate_rspec_v2::getNodeForNthInterface (const DOMElement* link, 
+						  int number)
+{
+  bool found  = false;
+  DOMNodeList* ifaces = link->getElementsByTagName(XStr("interface_ref").x());
+  if (ifaces->getLength() < number) {
+    cerr << "*** Link " 
+	 << XStr(link->getAttribute(XStr("component_id").x())).c()
+	 << " has only " << ifaces->getLength() << " interfaces. "
+	 << "Interface number " << number << " requested." << endl;
+    exit(EXIT_FATAL);
+  }
+  DOMElement* iface = dynamic_cast<DOMElement*>(ifaces->item(number));
+  string ifaceId = XStr(link->getAttribute(XStr("component_id").x())).c();
+  return (this->lookupIface(this->pInterfaceMap, ifaceId, found));
+}
+
+// Annotates the end point interface if found
+bool annotate_rspec_v2::annotate_endpoint(DOMElement* iface, string virtId) 
+{
+  bool found = false;
+  bool annotated = false;
+  string ifaceId = XStr(iface->getAttribute(XStr("component_id").x())).c();
+  string physNodeId = this->lookupIface(this->pInterfaceMap, ifaceId, found);
+  string virtNodeId = this->lookupIface(this->vInterfaceMap, virtId, found);
+  DOMElement* virtNode
+    = getElementByAttributeValue(this->virtual_root, "node", "client_id", 
+				 virtNodeId.c_str());
+  string mappedTo = XStr(virtNode->getAttribute(XStr("component_id").x())).c();
+  if (mappedTo == physNodeId) {
+    annotated = true;
+    iface->setAttribute(XStr("client_id").x(), XStr(virtId).x());
+  }
+  return annotated;
+}
+
+// Adds a fixed interface element to an interface
+void annotate_rspec_v2::addFixedInterface (DOMElement* iface, string shortName)
+{
+  DOMNodeList* fixedIfaces 
+    = iface->getElementsByTagName(XStr("emulab:fixedinterface").x());
+  // If a fixed interface is not present, we add one.
+  if (fixedIfaces->getLength() == 0) {
+    DOMElement* fixedIfaceNode 
+      = doc->createElement(XStr("emulab:fixedinterface").x());
+    fixedIfaceNode->setAttribute(XStr("name").x(), XStr(shortName).x());
+    iface->appendChild(fixedIfaceNode);
+  }
+}
+
+// Extracts the short interface name from the interface URN
+string annotate_rspec_v2::getShortInterfaceName (string interface)
+{
+  int loc = interface.find_last_of(":");
+  return interface.substr(loc+1);
 }
 
 #endif

@@ -181,6 +181,35 @@ emulab_extensions_parser::readTypeLimits (const DOMElement* tag, int& count)
   return rv;
 }
 
+string 
+emulab_extensions_parser::readFixedInterface(const DOMElement* tag,bool& fixed)
+{
+  string rv = "";
+  DOMNodeList* fixIfaces 
+    = tag->getElementsByTagName(XStr("emulab:fixedinterface").x());
+  fixed = (fixIfaces->getLength() == 1);
+  if (fixed) {
+    DOMElement* fixedIface = dynamic_cast<DOMElement*>(fixIfaces->item(0));
+    rv = this->getAttribute(fixedIface, "name");
+  }
+  return rv;
+}
+
+string
+emulab_extensions_parser::readShortInterfaceName (const DOMElement* tag,
+						  bool& hasShortName)
+{
+  string rv = "";
+  DOMNodeList* interfaces 
+    = tag->getElementsByTagName(XStr("emulab:interface").x());
+  hasShortName = (interfaces->getLength() == 1);
+  if (hasShortName) {
+    DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(0));
+    rv = this->getAttribute(interface, "name");
+  }
+  return rv;
+}
+
 string emulab_extensions_parser::readSubnodeOf (const DOMElement* tag, 
 						bool& isSubnode)
 {
@@ -247,6 +276,36 @@ bool emulab_extensions_parser::readTrivialOk (const DOMElement* tag)
   DOMNodeList* trivial_oks
     = tag->getElementsByTagName(XStr("emulab:trivial_ok").x());
   return (trivial_oks->getLength() > 0);
+}
+
+bool emulab_extensions_parser::readMultiplexOk (const DOMElement* tag)
+{
+  DOMNodeList* multiplexOks
+    = tag->getElementsByTagName(XStr("emulab:multiplex_ok").x());
+  return (multiplexOks->getLength() > 0);
+}
+
+struct policy emulab_extensions_parser::readPolicy(const DOMElement* tag) 
+{
+  struct policy policy = {
+    this->getAttribute(tag, "type"),
+    this->getAttribute(tag, "name"),
+    this->getAttribute(tag, "limit")
+  };
+  return policy;
+}
+
+vector<struct policy> 
+emulab_extensions_parser::readPolicies (const DOMElement* tag, int& count)
+{
+  vector<struct policy> rv;
+  DOMNodeList* policies = tag->getElementsByTagName(XStr("emulab:policy").x());
+  count = policies->getLength();
+  for (int i = 0; i < count; i++) {
+    rv.push_back
+      (this->readPolicy(dynamic_cast<DOMElement*>(policies->item(0))));
+  }
+  return rv;
 }
 
 #endif // WITH_XML

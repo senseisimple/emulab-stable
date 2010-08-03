@@ -113,6 +113,19 @@ class annotate_rspec_v2 : public annotate_rspec
   // which is declared on the physical node with component_id, physNodeId
   const xercesc::DOMElement* 
     getIfaceOnNode(const xercesc::DOMElement* plink, std::string physNodeId);
+
+  // Retuns the id of the physical source node
+  // for the nth interface of a link
+  std::string getNodeForNthInterface (const xercesc::DOMElement* link, int n);
+
+  // Annotates the end point of a link
+  bool annotate_endpoint(xercesc::DOMElement* iface, std::string virtId);
+
+  // Extracts the short interface name from the interface URN
+  std::string getShortInterfaceName (std::string interfaceURN);
+
+  // Adds a fixed interface element to an interface
+  void addFixedInterface(xercesc::DOMElement* interface,std::string shortname);
 };
 
 #endif //for __ANNOTATE_RSPEC_H

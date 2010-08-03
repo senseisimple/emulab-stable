@@ -78,11 +78,11 @@ static rspec_parser* rspecParser;
  * declared in here
  */
 static bool populate_nodes(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
-			  set<string> &unavailable);
+			   set<string> &unavailable);
 static bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
-			  set<string> &unavailable);
-static bool populate_type_limits(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg);
-
+			   set<string> &unavailable);
+static bool populate_type_limits(DOMElement *root,tb_pgraph &pg,tb_sgraph &sg);
+static bool populate_policies (DOMElement*root, tb_pgraph &pg, tb_sgraph &sg);
 
 int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
   /* 
@@ -141,7 +141,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
       rspecParser = new rspec_parser_v2(RSPEC_TYPE_ADVT);
       break;
     default:
-      cerr << "*** Unsupported rspec ver. " << rspecVersion
+      cout << "*** Unsupported rspec ver. " << rspecVersion
 	   << " ... Aborting " << endl;
       exit(EXIT_FATAL);
     }
@@ -150,7 +150,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     bool is_physical;
     XStr type (advt_root->getAttribute(XStr("type").x()));
     if (strcmp(type.c(), "advertisement") != 0) {
-      cerr << "*** Rspec type must be \"advertisement\" in " << filename
+      cout << "*** Rspec type must be \"advertisement\" in " << filename
 	   << " (found " << type.c() << ")" << endl;
     }
     
@@ -162,27 +162,33 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
      * These three calls do the real work of populating the assign data
      * structures
      */
-    XMLDEBUG("starting node population" << endl);
+    XMLDEBUG("Starting node population" << endl);
     if (!populate_nodes(advt_root,pg,sg,unavailable)) {
-      cerr << "*** Error reading nodes from physical topology "
+      cout << "*** Error reading nodes from physical topology "
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
-    XMLDEBUG("finishing node population" << endl);
-    XMLDEBUG("starting link population" << endl);
+    XMLDEBUG("Finishing node population" << endl);
+    XMLDEBUG("Starting link population" << endl);
     if (!populate_links(advt_root,pg,sg,unavailable)) {
-      cerr << "*** Error reading links from physical topology "
+      cout << "*** Error reading links from physical topology "
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
-    XMLDEBUG("finishing link population" << endl);
-    XMLDEBUG("setting type limits" << endl);
+    XMLDEBUG("Finishing link population" << endl);
+    XMLDEBUG("Setting type limits" << endl);
     if (!populate_type_limits(advt_root, pg, sg)) {
-      cerr << "*** Error setting type limits " << filename << endl;
+      cout << "*** Error setting type limits " << filename << endl;
       exit(EXIT_FATAL);
     }
-    XMLDEBUG("finishing setting type limits" << endl);
-
+    XMLDEBUG("Finishing setting type limits" << endl);
+    XMLDEBUG("Starting policy population" << endl);
+    if (!populate_policies(advt_root, pg, sg)) {
+      cout << "*** Error setting policies " << filename << endl;
+      exit(EXIT_FATAL);
+    }
+    XMLDEBUG("Finishing setting policies" << endl);
+    
     cerr << "RSpec parsing finished" << endl; 
   }
   
@@ -199,6 +205,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
  */
 bool populate_nodes(DOMElement *root, 
 		    tb_pgraph &pg, tb_sgraph &sg, set<string> &unavailable) {
+  static bool displayedWarning = false;
   bool is_ok = true;
   pair<map<string, DOMElement*>::iterator, bool> insert_ret;
   /*
@@ -230,7 +237,7 @@ bool populate_nodes(DOMElement *root,
     insert_ret = advertisement_elements->insert
       (pair<string, DOMElement*>(componentId, elt));
     if (insert_ret.second == false) {
-      cerr << "*** " << componentId << " already exists" << endl;
+      cout << "*** " << componentId << " already exists" << endl;
       is_ok = false;
     }
     
@@ -239,19 +246,10 @@ bool populate_nodes(DOMElement *root,
     rspecParser->readInterfacesOnNode(elt, allUnique);
 
     // XXX: We don't ever do anything with this, so I am commenting it out
-    
-//     /* Deal with the location tag */
-//     int locationDataCount;
-//     vector<string> locationData 
-//       = rspecParser->readLocation(elt, locationDataCount);
-    
-//     string country = locationData[0];
-//     string latitude = "";
-//     string longitude  = "";
-//     if (locationDataCount == 3) {
-//       latitude = locationData[1];
-//       longitude = locationData[2];
-//     }
+    if (!displayedWarning) {
+      cout << "WARNING: Country information will be ignored" << endl;
+      displayedWarning = true;
+    }
     
     pvertex pv;
     
@@ -343,7 +341,7 @@ bool populate_nodes(DOMElement *root,
     string subnodeOf = rspecParser->readSubnodeOf (elt, isSubnode, subnodeCnt);
     if (isSubnode) {
       if (subnodeCnt > 1) {
-	cerr << "*** Too many \"subnode\" relations found in "
+	cout << "*** Too many \"subnode\" relations found in "
 	     << componentId << "Allowed 1 ... " << endl;
 	is_ok = false;
 	continue;
@@ -421,6 +419,10 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     
   bool is_ok = true;
   pair<map<string, DOMElement*>::iterator, bool> insert_ret;
+
+  // It should be safe to read it now because all the short interface names
+  // have been populated once all the nodes have been read.
+  map<string, string> shortNames = rspecParser->getShortNames();
   
   /*
    * TODO: Support the "PENALIZE_BANDWIDTH" option?
@@ -441,7 +443,7 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
     
     if (!hasComponentId || !hasCMId) {
-      cerr << "*** Require component ID and component manager ID" << endl;
+      cout << "*** Require component ID and component manager ID" << endl;
       is_ok = false;
     }
     else {
@@ -449,7 +451,7 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 	advertisement_elements->insert(pair<string, DOMElement*>
 				       (componentId, elt));
       if (insert_ret.second == false) {
-	cerr << "*** " << componentId << " already exists" << endl;
+	cout << "*** " << componentId << " already exists" << endl;
 	is_ok = false;
       }
     }
@@ -465,20 +467,20 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     // Error handling
     switch (ifaceCount) {
     case RSPEC_ERROR_UNSEEN_NODEIFACE_SRC:
-      cerr << "*** Unseen node-interface pair on the source interface ref"
+      cout << "*** Unseen node-interface pair on the source interface ref"
 	   << endl;
       is_ok = false;
       continue;
       
     case RSPEC_ERROR_UNSEEN_NODEIFACE_DST:
-      cerr << "*** Unseen node-interface pair on the destination interface ref"
+      cout << "*** Unseen node-interface pair on the destination interface ref"
 	   << endl;
       is_ok = false;
       continue;
     }
     
     if (ifaceCount != 2) {
-      cerr << "*** Incorrect number of interfaces found on link " 
+      cout << "*** Incorrect number of interfaces found on link " 
 	   << componentId << ". Expected 2 (found " 
 	   << ifaceCount << ")" << endl;
       is_ok = false;
@@ -491,14 +493,14 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     string dst_iface = interfaces[1].physicalIfaceId;
     
     if (src_node == "" || src_iface == "") {
-      cerr << "*** Physical link " << componentId 
+      cout << "*** Physical link " << componentId 
 	   << " must have a component id and component interface id "
 	   << " specified for the source node" << endl;
       is_ok = false;
       continue;
     }
     if (dst_node == "" || dst_iface == "") {
-      cerr << "*** Physical link " << componentId 
+      cout << "*** Physical link " << componentId 
 	   << " must have a component id and component interface id"
 	   << " specified for the destination node" << endl;
       is_ok = false;
@@ -552,7 +554,9 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
       new tb_plink(componentId.c_str(), 
 		   tb_plink::PLINK_NORMAL, str_first_type,
 		   "(null)", "(null)", 
-		   src_iface.c_str(), dst_iface.c_str());
+		   shortNames[src_iface].c_str(),
+		   shortNames[dst_iface].c_str());
+    //		   src_iface.c_str(), dst_iface.c_str());
     
     phys_link->delay_info.bandwidth = bandwidth;
     phys_link->delay_info.delay = latency;
@@ -633,5 +637,33 @@ bool populate_type_limits(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg)
   }  
   return true;
 }
+
+bool populate_policies (DOMElement* root, tb_pgraph &pg, tb_sgraph &sg)
+{
+  int count;
+  bool is_ok = true;
+  vector<struct policy> policies = rspecParser->readPolicies(root, count);
+  XMLDEBUG ("Found " << count << " policies" << endl);
+  for (int i = 0; i < count; i++) {
+    struct policy policy = policies[i];
+    string name = policy.name;
+    string limit = policy.limit;
+    tb_featuredesire *fd 
+      = tb_featuredesire::get_featuredesire_by_name(((fstring)XStr(name).c()));
+    if (fd == NULL) {
+      cerr << "*** Desire " << name << " not found" << endl;
+      is_ok &= false;
+    }
+    else {
+      if (limit == "disallow") {
+	fd->disallow_desire();
+      }
+      else {
+	fd->limit_desire(rspec_parser_helper::stringToNum(limit));
+      }
+    }
+  }
+  return is_ok;
+}   
 
 #endif

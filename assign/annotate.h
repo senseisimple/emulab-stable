@@ -52,6 +52,9 @@ class annotate
   
   // Writes the annotated xml to disk
   void write_annotated_file(const char* filename);
+
+  // Writes an XML element to a string
+  std::string printXML (const xercesc::DOMElement* tag);
 };
 
 #endif // for __ANNOTATE_H

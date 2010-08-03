@@ -42,8 +42,6 @@ endif
 
 # Pick either this
 CXXFLAGS += -O3 
-# XXX: Get rid of this once done testing
-# CXXFLAGS += -g
 # or this
 #CXXFLAGS += -O0 -g -Wall -DVERBOSE
 # and then zero or more of these
@@ -55,6 +53,10 @@ CXXFLAGS += -O3
 
 # And then, regardless, you can also have this
 #CXXFLAGS += -DSTATS
+
+# This is added to disable link mapping while we figure out how to get assign
+# to deal with interfaces on switches
+CXXFLAGS += -DDISABLE_LINK_ANNOTATION
 
 # assign now supports a dizzing array of defines, which are as-yet undocumented
 # Here are the ones used for a typical build:

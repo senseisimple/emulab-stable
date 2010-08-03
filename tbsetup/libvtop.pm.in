@@ -225,7 +225,7 @@ sub createLink($$$$$$$$)
     my $ref = {
 	'name'           => $name,
 	'cm'             => $cm,
-	'link_type'      => "$type",
+	'link_type'      => $type,
 	'interface_ref'  => [$src, $dst],
 	'capacity'       => $bw,
 	'packet_loss'    => "0",
@@ -330,7 +330,15 @@ sub updateInterfaceRefAndNode ($$$)
 	if ($node->{'name'} eq $nodename) {
 	    my $ifacenumber = $node->{'interface_count'};
 	    my $iface = $nodename . ":" . "$ifacenumber";
-	    push(@{$node->{'interfaces'}}, $iface);
+	    my $fixed = '';
+	    if (exists($link->{'fixiface'})) {
+		foreach my $fixediface (@{$link->{'fixiface'}}) {
+		    if ($fixediface->[0] eq $node->{'name'}) {
+			$fixed = $fixediface->[1];
+		    }
+		}
+	    }
+	    push(@{$node->{'interfaces'}}, [$iface, $fixed]);
 	    $link->{'interface_ref'}->[$idx] = $iface;
 	    $node->{'interface_count'} = $node->{'interface_count'} + 1;
 	    last;
@@ -1686,9 +1694,8 @@ sub GenVirtLans($)
 # 	    };
 
 			$self->createLink($vname, $cmid, 
-								$member0, $member1, 
-								$bw, "tunnel", undef)
-
+					  $member0, $member1, 
+					  $bw, "tunnel", undef)
 		}
     }
 
@@ -2313,8 +2320,8 @@ sub GenVirtLans($)
 	    my $fixi0 = $member0->fixed_iface();
 	    my $fixi1 = $member1->fixed_iface();
 # 	    my ($fixsrc0,$fixdst0,$fixsrc1,$fixdst1,$fixall)=('','','','','');
-		my ($fixsrc0,$fixdst0,$fixsrc1,$fixdst1)=('','','','');
-		my ($fixsrc, $fixdst) = ('','');
+	    my ($fixsrc0,$fixdst0,$fixsrc1,$fixdst1)=('','','','');
+	    my ($fixsrc, $fixdst) = ('','');
 
 	    if (defined($fixi0) && $fixi0 ne '') {
 # 			$fixsrc0 = "fixsrciface:$fixi0";
@@ -2364,6 +2371,18 @@ sub GenVirtLans($)
 		    if ($trivial_ok) {
 			$others->{'trivial_ok'} = 1;
 		    }
+		    if ($fixsrc ne '') {
+			if (!exists($others->{'fixiface'})) {
+			    $others->{'fixiface'} = [];
+			}
+			push(@{$others->{'fixiface'}}, [$vname0, $fixsrc]);
+		    }
+		    if ($fixdst ne '') {
+			if (!exists($others->{'fixiface'})) {
+			    $others->{'fixiface'} = [];
+			}
+			push(@{$others->{'fixiface'}}, [$vname1, $fixdst]);
+		    }
 		    $self->createLink($plink, $cmid, $vname0, $vname1, 
 				      ($top_bw == 0 ? "*" : 
 				       max($top_bw, $top_rbw)), $protocol,
@@ -2409,7 +2428,10 @@ sub GenVirtLans($)
 		    
 		    my $others = {};
 		    if ($fixsrc0 ne '') {
-			$others->{'fixsrciface'} = $fixsrc0;
+			if (!exists($others->{'fixiface'})) {
+			    $others->{'fixiface'} = [];
+			}
+			push(@{$others->{'fixiface'}}, [$vname0, $fixsrc0]);
 		    }
 		    
 		    $self->createLink("linksdelaysrc/$vname/$member0,$member1",
@@ -2421,9 +2443,16 @@ sub GenVirtLans($)
 # 					"$vname0 $delayname ".
 # 					($top_bw == 0 ? "*" : $top_bw) .
 # 					" 0 0 $protocol $fixsrc0");
-		    
+
+# XXX: I am not too sure about this. Looking at the old code seems to suggest
+# that I should be doing $others->{'fixiface'} = [$delayname, $fixdst0];
+# but fixing an interface on a delay node doesn't seem to make a great deal of
+# sense. If something goes wrong, this would be a place to look.
 		    if ($fixdst0 ne '') {
-			$others->{'fixdstiface'} = $fixdst0;
+			if (!exists($others->{'fixiface'})) {
+			    $others->{'fixiface'} = [];
+			}
+			push(@{$others->{'fixiface'}}, [$vname1, $fixdst0]);
 		    }
 		    $self->createLink("linksdelaydst/$vname/$member1,$member0",
 				      $cmid, $vname1, $delayname,
@@ -2497,10 +2526,16 @@ sub GenVirtLans($)
 # 				$spec .= " $fixall";
 # 			}
 		if ($fixsrc ne '') {
-				$others->{'fixsrciface'} = $fixsrc;
+		    if (!exists($others->{'fixiface'})) { 
+			$others->{'fixiface'} = [];
+		    }
+		    push(@{$others->{'fixiface'}},[$vname0, $fixsrc]);
 		}
 		if ($fixdst ne '') {
-		    $others->{'fixdstiface'} = $fixdst;
+		    if (!exists($others->{'fixiface'})) {
+			$others->{'fixiface'} = [];
+		    }
+		    push(@{$others->{'fixiface'}}, [$vname1, $fixdst]);
 		}
 		$self->createLink($plink, $cmid, $vname0, $vname1, $bw, 
 				  $protocol, $others);
@@ -2698,7 +2733,7 @@ sub GenVirtLans($)
 		my ($fixsrc0) = ('');
 
 		if (defined($fixi0) && $fixi0 ne '') {
-		    $fixsrc0 = "fixsrciface:$fixi0";
+		    $fixsrc0 = "$fixi0";
 		}
 
 		my ($top_bw, $top_rbw) = $self->virtlantopbw($vlan, $member);
@@ -2732,7 +2767,11 @@ sub GenVirtLans($)
 			    $others->{'trivial_ok'} = 1;
 			}
 			if ($fixsrc0) {
-			    $others->{'fixsrciface'} = $fixi0;
+			    if(!exists($others->{'fixiface'})) {
+				$others->{'fixiface'} = [];
+			    }
+			    push(@{$others->{'fixiface'}}, 
+				 [$vnodevname, $fixi0]);
 			}
 			$self->createLink($plink, $cmid, $vnodevname, 
 					  "lan/$vname",
@@ -2776,7 +2815,11 @@ sub GenVirtLans($)
 			
 			my $others = {};
 			if ($fixsrc0) {
-			    $others->{'fixsrciface'} = $fixi0;
+			    if (!exists($others->{'fixiface'})) {
+				$others->{'fixiface'} = [];
+			    }
+			    push(@{$others->{'fixiface'}}, 
+				 [$vnodevname,$fixi0]);
 			}
 			$self->createLink("linkdelaysrc/$vname/$member", $cmid,
 					  $vnodevname, $delayname,
@@ -2791,7 +2834,7 @@ sub GenVirtLans($)
 			$self->createLink("linkdelaydst/$vname/$member", $cmid,
 					  "lan/$vname", $delayname,
 					  $top_bw == 0 ? "*" : $top_bw,
-					  $protocol, $others);
+					  $protocol, {});
 			
 # 				$self->addlink("linkdelaydst/$vname/$member " .
 # 						"lan/$vname $delayname ".
@@ -2829,7 +2872,10 @@ sub GenVirtLans($)
 			$others->{'trivial_ok'} = 1;
 		    }
 		    if ($fixsrc0) {
-			$others->{'fixsrciface'} = $fixsrc0;
+			if (!exists($others->{'fixiface'})) {
+			    $others->{'fixiface'} = [];
+			}
+			push(@{$others->{'fixiface'}},[$vnodevname, $fixsrc0]);
 		    }
 		    
 		    # Let assign choose bw if top_bw is zero.
@@ -2877,8 +2923,6 @@ sub GenVirtLans($)
 sub PrintTop($;$)
 {
     my ($self, $outfile) = @_;
-    $outfile = *STDOUT
-	if (!defined($outfile));
 
 #    print Dumper($self);
     my $output = "";
@@ -2928,11 +2972,15 @@ sub PrintTop($;$)
 	if (exists($link->{'trivial_ok'})) {
 	    $output .= 'trivial_ok' . ' ';
 	}
-	if (exists($link->{'fixsrciface'})) {
-	    $output .= 'fixsrciface:' . $link->{'fixsrciface'} . ' ';
-	}
-	if (exists($link->{'fixdstiface'})) {
-	    $output .= 'fixdstiface:' . $link->{'fixdstiface'} . ' ';
+	if (exists($link->{'fixiface'})) {
+	    foreach my $fixediface (@{$link->{'fixiface'}}) {
+		if ($fixediface->[0] eq $link->{'interface_ref'}->[0]) {
+		    $output .= 'fixsrciface:' . $fixediface->[1] . ' ';
+		}
+		if ($fixediface->[0] eq $link->{'interface_ref'}->[1]) {
+		    $output .= 'fixdstiface:' . $fixediface->[1] . ' ';
+		}
+	    }
 	}
 	$output .= "\n";
     }
@@ -2943,27 +2991,9 @@ sub PrintTop($;$)
 	$output .= $fixednode->{'pnode'};
 	$output .= "\n";
     }
-	
-#     foreach my $ref (@{$self->rspec()->{'link'}}) {
-# 	$self->processLinkRspec($doc, $root, $ref);
-#     }
 
-
-#     foreach my $vclass (@{$self->results->{'class'}}) {
-# 	print $output "make-vclass $vclass\n";
-#     }
-#     foreach my $ref (@{$self->results->{'nodeslinks'}}) {
-# 	my ($which, $what) = @{ $ref };
-# 	if ($which eq "node") {
-# 	    print $output "node $what\n";
-# 	}
-# 	else {
-# 	    print $output "link $what\n";
-# 	}
-#     }
-#     foreach my $fixed (@{$self->results->{'fixed'}}) {
-# 	print $output "fix-node $fixed\n";
-#     }
+    $outfile = *STDOUT
+	if (!defined($outfile));
     print $outfile $output;
     return 0;
 }
@@ -7112,103 +7142,6 @@ sub addNodeWithText($$$$)
 }
 
 #
-# Process a node and emits RSPEC v2
-#
-sub processNodeRspec ($$$$)
-{
-    my ($self, $doc, $root, $node) = @_;
-    
-    # Check if the node has been fixed
-    my $fixedto = '';
-    foreach my $fixednode (@{$self->rspec()->{'fixed'}}) {
-	if ($fixednode->{'vnode'} eq $node->{'name'}) {
-	    $fixedto = $fixednode->{'pnode'};
-	    last;
-	}
-    }
-
-    my $rspecnode = addNodeRspec ($doc, $root, 'node');
-    $rspecnode->setAttribute('client_id', $node->{'name'});
-    $rspecnode->setAttribute('component_manager_id', $node->{'cm'});
-    if ($fixedto ne '') {
-	$rspecnode->setAttribute('component_id', $fixedto);
-    }
-
-    my $isnodestatic = $node->{'node_static'};
-    my $nodetypename = $node->{'node_type'};
-    my $nodetypeslots = $node->{'type_slots'};
-    
-    # Determine hardware type and sliver type from nodetype
-    my $slivertype = "raw-pc";
-    my $hardwaretype = $nodetypename;
-    my $vmloc = index($nodetypename, "vm");
-    if ($vmloc != -1) {
-	$slivertype = "openvz";
-	$hardwaretype = substr($nodetypename, 0, $vmloc) 
-	                 . substr($nodetypename, $vmloc+2); 
-    }
-
-    # Create hardware node with Emulab extensions
-    my $hardwarenode = addNodeRspec($doc, $rspecnode, 'hardware_type');
-    $hardwarenode->setAttribute('name', $hardwaretype);
-    my $typecount = addNodeRspec($doc, $hardwarenode, 'emulab:node_type');
-    $typecount->setAttribute('type_slots', $nodetypeslots);
-    if ($isnodestatic == 1) {
-	$typecount->setAttribute('static', 'true');
-    }
-
-    # Create sliver type
-    my $slivernode = addNodeRspec($doc, $rspecnode, 'sliver_type');
-    $slivernode->setAttribute('name', $slivertype);
-    my $diskimagenode = addNodeRspec($doc, $slivernode, 'disk_image');
-
-# XXX: This is NOT correct at all. The disk image name should be a URN
-# composed of the project name, and the name of the disk image obtained from
-# the osinfo structure. It should NOT be the osid. This has been done merely 
-# as a placeholder to ensure that the vtop still validates.
-    $diskimagenode->setAttribute('name', 'diskimageurn');
-
-    # Deal with the disallow_trivial_mix flag
-    if (exists($node->{'disallow_trivial_mix'})) {
-	addNodeRspec($doc, $rspecnode, 'emulab:disallow_trivial_mix');
-    }
-
-    # Deal with the subnode_of flag
-    if (exists($node->{'subnode'})) {
-	my $relation = addNodeRspec($doc, $rspecnode, 'relation');
-	$relation->setAttribute('type', 'subnode');
-	my $subnode = addNodeRspec($doc, $relation, 'emulab:subnode_of');
-	$subnode->SetAttribute('parent', $node->{'subnode'});
-    }
-
-    # Add interfaces to the node
-    foreach my $interface (@{$node->{'interfaces'}}) {
-	my $interfacedecl = addNodeRspec($doc, $rspecnode, 'interface');
-	$interfacedecl->setAttribute('client_id', $interface);
-    }
-
-    # Add all the desires as extensions
-    while ( my ($desire, $desireval) = each (%{$node->{'desires'}})) {
-	my $desirenode = addNodeRspec($doc, $rspecnode, 'emulab:fd');
-	my $operator = $desireval->[0];
-	$desirenode->setAttribute('name', $desire);
-	$desirenode->setAttribute('weight', $desireval->[1]);
-	if ($desireval->[1] >= 1.000000) {
-	    $desirenode->setAttribute('violatable', 'true');
-	}
-	if ($operator eq "?+") {
-	    $desirenode->setAttribute('local_operator', '+');
-	}
-	elsif ($operator eq "*&") {
-	    $desirenode->setAttribute('global_operator', 'FirstFree');
-	}
-	elsif ($operator eq '*!') {
-	    $desirenode->setAttribute('global_operator', 'OnceOnly');
-	}
-    }
-}
-
-#
 # Processes a node
 #
 sub processNode($$$$)
@@ -7315,54 +7248,6 @@ sub processNode($$$$)
     return 0;
 }
 
-sub processLinkRspec ($$$$)
-{
-# TODO: Deal with fixed interfaces correctly
-    my ($self, $doc, $root, $link) = @_;
-	
-    my $rspeclink = addNodeRspec($doc, $root, 'link');
-    $rspeclink->setAttribute('client_id', $link->{'name'});
-    
-    my $cmnode = addNodeRspec($doc, $rspeclink, 'component_manager');
-    $cmnode->setAttribute('name', $link->{'cm'});
-
-    my $linktype = addNodeRspec($doc, $rspeclink, 'link_type');
-    $linktype->setAttribute('name', $link->{'link_type'});
-
-    if (exists ($link->{'nodelay'})) {
-	addNodeRspec($doc, $rspeclink, 'emulab:nodelay');
-    }
-    if (exists($link->{'emulated'})) {
-	addNodeRspec($doc, $rspeclink, 'emulab:multiplex_ok');
-    }
-    if (exists($link->{'trivial_ok'})) {
-	addNodeRspec($doc, $rspeclink, 'trivial_ok');
-    }
-
-    # XXX: I'm not sure how to deal with fixed interfaces
-#    if (exists($link->{'fixsrciface'})) {
-#	$output .= 'fixsrciface:' . $link->{'fixsrciface'} . ' ';
-#    }
-#    if (exists($link->{'fixdstiface'})) {
-#	$output .= 'fixdstiface:' . $link->{'fixdstiface'} . ' ';
-#    }
-
-    # Add the interface refs
-    my $interface_ref = addNodeRspec($doc, $rspeclink, 'interface_ref');
-    $interface_ref->setAttribute('client_id', $link->{'interface_ref'}->[0]);
-
-    $interface_ref = addNodeRspec($doc, $rspeclink, 'interface_ref');
-    $interface_ref->setAttribute('client_id', $link->{'interface_ref'}->[1]);
-
-    # The forward link
-    my $property = addNodeRspec($doc, $rspeclink, 'property');
-    $property->setAttribute('source_id', $link->{'interface_ref'}->[0]);
-    $property->setAttribute('dest_id', $link->{'interface_ref'}->[1]);
-    $property->setAttribute('capacity', $link->{'capacity'});
-    $property->setAttribute('latency', $link->{'latency'});
-    $property->setAttribute('packet_loss', $link->{'packet_loss'});
-}
-
 #
 # Processes a link
 #
@@ -7426,24 +7311,6 @@ sub processLink($$$$)
     }
 }
 
-sub processVClassRspec($$$$)
-{
-    my ($self, $doc, $root, $vclass) = @_;
-    my $vclassNode = addNodeRspec($doc, $root, 'emulab:vclass');
-
-    my $name = $vclass->{'name'};
-    my $weight = $vclass->{'weight'};
-
-    # XXX: We don't have hard vclass support yet     
-    $vclassNode->setAttribute('name', $name);
-    $vclassNode->setAttribute('weight', $weight);
-
-    foreach my $physType (@{$vclass->{'members'}}) {
-	my $physNode = addNodeRspec($doc, $vclassNode, 'emulab:physical_type');
-	$physNode->setAttribute('name', $physType);
-    }
-}
-
 #
 # Process a v-class.
 #
@@ -7466,6 +7333,172 @@ sub processVClass($$$$)
 			"physical_type", $token);
     }
     return 0;
+}
+
+#
+# Process a node and emits RSPEC v2
+#
+sub processNodeRspec ($$$$)
+{
+    my ($self, $doc, $root, $node) = @_;
+    
+    # Check if the node has been fixed
+    my $fixedto = '';
+    foreach my $fixednode (@{$self->rspec()->{'fixed'}}) {
+	if ($fixednode->{'vnode'} eq $node->{'name'}) {
+	    $fixedto = $fixednode->{'pnode'};
+	    last;
+	}
+    }
+
+    my $rspecnode = addNodeRspec ($doc, $root, 'node');
+    $rspecnode->setAttribute('client_id', $node->{'name'});
+    $rspecnode->setAttribute('component_manager_id', $node->{'cm'});
+    if ($fixedto ne '') {
+	$rspecnode->setAttribute('component_id', $fixedto);
+    }
+
+    my $isnodestatic = $node->{'node_static'};
+    my $nodetypename = $node->{'node_type'};
+    my $nodetypeslots = $node->{'type_slots'};
+    
+    # Determine hardware type and sliver type from nodetype
+    # The formula for this is to check for the substring "vm" in the type name
+    # If the substring is found, the rest of the string becomes the hardware 
+    # type and the sliver type is "openvz". If the substring "vm" is not found,
+    # the sliver type is "raw-pc" and the type name is the hardware type
+    # eg: typename = pcvm600 =>{ hardwaretype = "pc600", slivertype = "openvz"}
+    # eg: typename = pc600 => { hardwaretype = "pc600", slivertype = "raw-pc"}
+    my $slivertype = "raw-pc";
+    my $hardwaretype = $nodetypename;
+    my $vmloc = index($nodetypename, "vm");
+    if ($vmloc != -1) {
+	$slivertype = "openvz";
+	$hardwaretype = substr($nodetypename, 0, $vmloc) 
+	                 . substr($nodetypename, $vmloc+2); 
+    }
+
+    # Create hardware node with Emulab extensions
+    my $hardwarenode = addNodeRspec($doc, $rspecnode, 'hardware_type');
+    $hardwarenode->setAttribute('name', $hardwaretype);
+    my $typecount = addNodeRspec($doc, $hardwarenode, 'emulab:node_type');
+    $typecount->setAttribute('type_slots', $nodetypeslots);
+    if ($isnodestatic == 1) {
+	$typecount->setAttribute('static', 'true');
+    }
+
+    # Create sliver type
+    my $slivernode = addNodeRspec($doc, $rspecnode, 'sliver_type');
+    $slivernode->setAttribute('name', $slivertype);
+    my $diskimagenode = addNodeRspec($doc, $slivernode, 'disk_image');
+
+# XXX: This is NOT correct at all. The disk image name should be a URN
+# composed of the project name, and the name of the disk image obtained from
+# the osinfo structure. It should NOT be the osid. This has been done merely 
+# as a placeholder to ensure that the vtop still validates.
+    $diskimagenode->setAttribute('name', 'diskimageurn');
+
+    # Deal with the disallow_trivial_mix flag
+    if (exists($node->{'disallow_trivial_mix'})) {
+	addNodeRspec($doc, $rspecnode, 'emulab:disallow_trivial_mix');
+    }
+
+    # Deal with the subnode_of flag
+    if (exists($node->{'subnode'})) {
+	my $relation = addNodeRspec($doc, $rspecnode, 'relation');
+	$relation->setAttribute('type', 'subnode');
+	my $subnode = addNodeRspec($doc, $relation, 'emulab:subnode_of');
+	$subnode->SetAttribute('parent', $node->{'subnode'});
+    }
+
+    # Add interfaces to the node
+    foreach my $interface (@{$node->{'interfaces'}}) {
+	my $interfacedecl = addNodeRspec($doc, $rspecnode, 'interface');
+	$interfacedecl->setAttribute('client_id', $interface->[0]);
+	if ($interface->[1] ne '') {
+	    my $fixediface = addNodeRspec($doc, $interfacedecl, 
+					  'emulab:fixedinterface');
+	    $fixediface->setAttribute('name', $interface->[1]);
+	}
+    }
+
+    # Add all the desires as extensions
+    while ( my ($desire, $desireval) = each (%{$node->{'desires'}})) {
+	my $desirenode = addNodeRspec($doc, $rspecnode, 'emulab:fd');
+	my $operator = $desireval->[0];
+	$desirenode->setAttribute('name', $desire);
+	$desirenode->setAttribute('weight', $desireval->[1]);
+	if ($desireval->[1] >= 1.000000) {
+	    $desirenode->setAttribute('violatable', 'true');
+	}
+	if ($operator eq "?+") {
+	    $desirenode->setAttribute('local_operator', '+');
+	}
+	elsif ($operator eq "*&") {
+	    $desirenode->setAttribute('global_operator', 'FirstFree');
+	}
+	elsif ($operator eq '*!') {
+	    $desirenode->setAttribute('global_operator', 'OnceOnly');
+	}
+    }
+}
+
+sub processLinkRspec ($$$$)
+{
+# TODO: Deal with fixed interfaces correctly
+    my ($self, $doc, $root, $link) = @_;
+	
+    my $rspeclink = addNodeRspec($doc, $root, 'link');
+    $rspeclink->setAttribute('client_id', $link->{'name'});
+    
+    my $cmnode = addNodeRspec($doc, $rspeclink, 'component_manager');
+    $cmnode->setAttribute('name', $link->{'cm'});
+
+    my $linktype = addNodeRspec($doc, $rspeclink, 'link_type');
+    $linktype->setAttribute('name', $link->{'link_type'});
+
+    if (exists ($link->{'nodelay'})) {
+	addNodeRspec($doc, $rspeclink, 'emulab:nodelay');
+    }
+    if (exists($link->{'emulated'})) {
+	addNodeRspec($doc, $rspeclink, 'emulab:multiplex_ok');
+    }
+    if (exists($link->{'trivial_ok'})) {
+	addNodeRspec($doc, $rspeclink, 'emulab:trivial_ok');
+    }
+
+    # Add the interface refs
+    my $interface_ref = addNodeRspec($doc, $rspeclink, 'interface_ref');
+    $interface_ref->setAttribute('client_id', $link->{'interface_ref'}->[0]);
+
+    $interface_ref = addNodeRspec($doc, $rspeclink, 'interface_ref');
+    $interface_ref->setAttribute('client_id', $link->{'interface_ref'}->[1]);
+
+    # The forward link
+    my $property = addNodeRspec($doc, $rspeclink, 'property');
+    $property->setAttribute('source_id', $link->{'interface_ref'}->[0]);
+    $property->setAttribute('dest_id', $link->{'interface_ref'}->[1]);
+    $property->setAttribute('capacity', $link->{'capacity'});
+    $property->setAttribute('latency', $link->{'latency'});
+    $property->setAttribute('packet_loss', $link->{'packet_loss'});
+}
+
+sub processVClassRspec($$$$)
+{
+    my ($self, $doc, $root, $vclass) = @_;
+    my $vclassNode = addNodeRspec($doc, $root, 'emulab:vclass');
+
+    my $name = $vclass->{'name'};
+    my $weight = $vclass->{'weight'};
+
+    # XXX: We don't have hard vclass support yet     
+    $vclassNode->setAttribute('name', $name);
+    $vclassNode->setAttribute('weight', $weight);
+
+    foreach my $physType (@{$vclass->{'members'}}) {
+	my $physNode = addNodeRspec($doc, $vclassNode, 'emulab:physical_type');
+	$physNode->setAttribute('name', $physType);
+    }
 }
 
 ################################################################################
