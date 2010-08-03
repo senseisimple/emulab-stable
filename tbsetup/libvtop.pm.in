@@ -3805,8 +3805,14 @@ sub InterpNodes($)
 	}
 
 	if (!defined($virtnode)) {
-	    # Internally created node. We need to deal with internally
-	    # created nodes in a different way.
+	    #
+	    # Internally created node. At the moment, these should be
+	    # delay nodes.
+	    #
+	    if (exists($self->delaynodes()->{$virtual})) {
+		tbwarn("Unknown node $virtual on $physical\n");
+		return -1;
+	    }
 	}
 	elsif ($virtnode->_isvirtnode()) {
 	    #
