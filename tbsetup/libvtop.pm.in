@@ -49,7 +49,7 @@ my $cmid          = '';
 if ($PGENISUPPORT) {
     require libGeni;
     require GeniHRN;
-	$cmid = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+    $cmid = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 }
 
 # Flags.
@@ -311,7 +311,7 @@ sub createFixedNode ($$$)
 {
     my ($self, $vnode, $pnode) = @_;
     my $ref = { 'vnode' => $vnode,
-		'pnode' => $pnode
+		'pnode' => GeniHRN::Generate($OURDOMAIN, "node", $pnode)
     };
     if (!exists($self->rspec()->{'fixed'})) {
 	$self->rspec()->{'fixed'} = [];
