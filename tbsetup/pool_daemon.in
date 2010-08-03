@@ -222,7 +222,7 @@ while (!$killme) {
 		notify("Cannot get the lock after a really long time");
 		$tries = 0;
 	    }
-	    chat("Waiting for pool daemon lock ...\n");
+	    print "Waiting for pool daemon lock ...\n";
 	    sleep(10);
 	}
     }

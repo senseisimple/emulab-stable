@@ -248,8 +248,7 @@ sub Resolve($)
 	}
 
 	my @slices = GeniSlice->LookupByCreator( $geniuser );
-	my @sliceURNs = map( GeniHRN::Generate( $OURDOMAIN, "slice",
-						$_->slicename() ), @slices );
+	my @sliceURNs = map( $_->urn(), @slices );
 
 	# Return a blob.
 	my $blob = { "uid"      => $geniuser->uid(),
@@ -285,9 +284,7 @@ sub Resolve($)
 		     "creator_uuid" => $slice->creator_uuid(),
 		     "creator_urn"  => $slice->creator_urn(),
 		     "gid"          => $slice->cert(),
-		     "urn"          => GeniHRN::Generate($OURDOMAIN,
-							 "slice",
-							 $slice->slicename()),
+		     "urn"          => $slice->urn(),
 		     "component_managers" => \@managers
 		 };
 	$slice->UnLock();

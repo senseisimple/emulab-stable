@@ -1344,13 +1344,8 @@ SSLVerifyDepth  10
 SSLRequire ( %{SSL_CLIENT_S_DN_OU} ne "sslxmlrpc" )
 </Location>
 
-ScriptAlias /protogeni/xmlrpc/ch @prefix@/protogeni/xmlrpc/protogeni-ch.pl
-ScriptAlias /protogeni/xmlrpc/cm @prefix@/protogeni/xmlrpc/protogeni-cm.pl
-ScriptAlias /protogeni/xmlrpc/sa @prefix@/protogeni/xmlrpc/protogeni-sa.pl
-ScriptAlias /protogeni/xmlrpc/ses @prefix@/protogeni/xmlrpc/protogeni-ses.pl
-<IfDefine GENI_AM>
-ScriptAlias /protogeni/xmlrpc/am @prefix@/protogeni/xmlrpc/geni-am.pl
-</IfDefine>
+ScriptAlias /protogeni/xmlrpc @prefix@/protogeni/xmlrpc/protogeni-wrapper.pl
+
 <Directory "@prefix@/www/protogeni">
 	SSLRequireSSL
 	Order deny,allow
