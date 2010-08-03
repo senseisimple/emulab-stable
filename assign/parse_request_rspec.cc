@@ -221,16 +221,20 @@ bool populate_node(DOMElement* elt,
   bool hasCMId;
   string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
   string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
+
+  cerr << "Got here with " << virtualId << " and " << cmId << endl;
   
   // If a node has a component_uuid, it is a fixed node
   if (hasComponentId) {
-    if(hasCMId)
+    if(hasCMId) {
       fixed_nodes [virtualId] = componentId;	
-    else
-      cout << "WARNING: Virtual node " << virtualId 
+    }
+    else {
+      cout << "WARNING: Fixed virtual node " << virtualId 
 	   << " has a componentId specified "
 	   << "but no component manager " << endl
 	   << "The componentId will be ignored." << endl;
+    }
   }
   
   if (!hasVirtualId) {
@@ -263,17 +267,22 @@ bool populate_node(DOMElement* elt,
   int typeCount;
   vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
   bool no_type = (typeCount == 0);
+  string typeName = "";
+  int typeSlots = 0;
+  bool isStatic = false;
+  bool isUnlimited = false;
   if (typeCount > 1) {
     cerr << "*** Too many node types (" << typeCount << ") on " 
 	 << virtualId << " (allowed 1) ... Aborting " << endl;
     return false;
   }
-  
-  string typeName = types[0].typeName;
-  int typeSlots = types[0].typeSlots;
-  bool isStatic = types[0].isStatic;
-  
-  bool isUnlimited = (typeSlots == 1000);
+  else if (typeCount == 1) {
+    typeName = types[0].typeName;
+    typeSlots = types[0].typeSlots;
+    isStatic = types[0].isStatic;
+    
+    isUnlimited = (typeSlots == 1000);
+  }
   
   /*
    * Make a tb_ptype structure for this guy - or just add this node to
