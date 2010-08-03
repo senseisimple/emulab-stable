@@ -646,7 +646,7 @@ sub RunAssign($$)
     close(ASSIGNFP);
     TBDebugTimeStamp("ReadSolution ended");
     
-    if (defined($vtop->rspec())) {
+    if (defined($vtop->genirspec())) {
 	TBDebugTimeStamp("Map Geni Resources Started");
 	if ($vtop->MapResources() != 0) {
 	    print("Could not map external resources! $!\n");
