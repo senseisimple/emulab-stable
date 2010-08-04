@@ -2028,18 +2028,42 @@ sub GenVirtLans($)
 	    $trivial_ok = $vlan->_trivial_ok();
 
 	    if ($sharednodes) {
-		#
-		# All nodes must support vlan encapsulation since that is how we
-		# create the links. Even if only one node in the link or
-		# lan is on a shared node, they must all do vlan encap.
-		# If none of the nodes land on a shared node, then use the
-		# requested vlan encap. Right, this decision is actually made
-		# later after assign maps the resources.
-		#
-		if ($nodesdo{"vlan"} != $allnodes) {
-		    tberror("Shared nodes requested for $vname, ".
-			    "but vlan encapsulation\n".
-			    "not supported on all nodes.\n");
+		my $newencap;
+		
+		if ($sharednodes != $allnodes || $vlan->_needvlan()) {
+		    #
+		    # Change the encap type to vlan since that is supported.
+		    #
+		    if ($nodesdo{"vlan"} == $allnodes) {
+			$newencap = "vlan";
+		    }
+		    # Force this on.
+		    $emulated   = 1;
+		}
+		else {
+		    if ($nodesdo{"veth-en"} == $allnodes) {
+			# Veth means encapsulated.
+			$newencap = "veth";
+		    }
+		    elsif ($nodesdo{"veth-ne"} == $allnodes) {
+			$newencap = "veth-ne";
+		    }
+		    elsif ($nodesdo{"vlan"} == $allnodes) {
+			$newencap = "vlan";
+		    }
+		    # Force this on.
+		    $emulated   = 1;
+		}
+		if (defined($newencap)) {
+		    $encapval = $newencap;
+		    $vlan->_emulated($emulated);
+		    $vlan->_encapstyle($newencap);
+		    
+				$self->printdb("Converting encapstyle to ".
+					       "$encapval on $vname\n");
+		}
+		else {
+		    tberror("Cannot find a common encapstyle for $vname\n");
 		    $errors++;
 		}
 	    }
