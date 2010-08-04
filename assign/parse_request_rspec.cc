@@ -136,16 +136,12 @@ int parse_request(tb_vgraph &vg, char *filename) {
     request_root = doc->getDocumentElement();
     
     bool is_physical;
-    XStr type (request_root->getAttribute(XStr("type").x()));
-    if (strcmp(type.c(), "request") != 0) {
+    string type = XStr (request_root->getAttribute(XStr("type").x())).c();
+    if (type != "request") {
       cout << "*** RSpec type must be \"request\" in " << filename
-	   << " (found " << type.c() << ")" << endl;
+	   << " (found " << type << ")" << endl;
       exit (EXIT_FATAL);
     } 
-    
-    // NOTE: Not sure about datetimes. They are strings for now
-    XStr generated (request_root->getAttribute(XStr("generated").x()));
-    XStr valid_until(request_root->getAttribute(XStr("valid_until").x()));
     
     // Initialize the rspec parser with the correct object depending
     // on the version of the rspec.

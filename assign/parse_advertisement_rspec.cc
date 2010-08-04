@@ -61,6 +61,7 @@ extern name_vclass_map vclass_map;
 map<string,DOMElement*>* advertisement_elements= new map<string,DOMElement*>();
 
 map<string, string>* pIfacesMap = new map<string, string>();
+map<string, string> shortNodeNames;
 
 DOMElement* advt_root = NULL;
 
@@ -149,15 +150,12 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
     
     bool is_physical;
-    XStr type (advt_root->getAttribute(XStr("type").x()));
-    if (strcmp(type.c(), "advertisement") != 0) {
+    string type = XStr(advt_root->getAttribute(XStr("type").x())).c();
+    if (type != "advertisement") {
       cout << "*** Rspec type must be \"advertisement\" in " << filename
-	   << " (found " << type.c() << ")" << endl;
+	   << " (found " << type << ")" << endl;
+      exit(EXIT_FATAL);
     }
-    
-    // XXX: Not sure about datetimes, so they are strings for now
-    XStr generated (advt_root->getAttribute(XStr("generated").x()));
-    XStr valid_until (advt_root->getAttribute(XStr("valid_until").x()));
     
     /*
      * These three calls do the real work of populating the assign data
@@ -228,6 +226,11 @@ bool populate_nodes(DOMElement *root,
     bool hasCMId;
     string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
     string componentManagerId = rspecParser->readComponentManagerId(elt,hasCMId);
+
+    bool hasComponentName;
+    string componentName 
+      = rspecParser->readComponentName (elt, hasComponentName);
+    shortNodeNames.insert(pair<string,string>(componentId, componentName));
 
     if (!hasComponentId || !hasCMId) {
       is_ok = false;
@@ -499,7 +502,7 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     string src_iface = interfaces[0].physicalIfaceId;
     string dst_node = interfaces[1].physicalNodeId;
     string dst_iface = interfaces[1].physicalIfaceId;
-    
+
     if (src_node == "" || src_iface == "") {
       cout << "*** Physical link " << componentId 
 	   << " must have a component id and component interface id "
@@ -550,7 +553,19 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     int typeCount;
     vector<link_type> types = rspecParser->readLinkTypes(elt, typeCount);
     string str_first_type = types[0].typeName;
-    
+
+    /* Create srcmac and dstmacs which are needed by the code which 
+     * parsers assign's output
+     */
+
+    string srcMac = "(null)", dstMac = "(null)";
+    if (shortNames[src_iface] != "(null)") {
+      srcMac = shortNodeNames[src_node] + "/" + shortNames[src_iface];
+    }
+    if (shortNames[dst_iface] != "(null)") {
+      dstMac = shortNodeNames[dst_node] + "/" + shortNames[dst_iface];
+    }
+      
     /*
      * Create the actual link object
      */
@@ -561,10 +576,8 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     tb_plink *phys_link =
       new tb_plink(componentId.c_str(), 
 		   tb_plink::PLINK_NORMAL, str_first_type.c_str(),
-		   "(null)", "(null)", 
-		   shortNames[src_iface].c_str(),
-		   shortNames[dst_iface].c_str());
-    //		   src_iface.c_str(), dst_iface.c_str());
+		   srcMac.c_str(), dstMac.c_str(), 
+		   shortNames[src_iface], shortNames[dst_iface]);
     
     phys_link->delay_info.bandwidth = bandwidth;
     phys_link->delay_info.delay = latency;

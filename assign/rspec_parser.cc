@@ -51,6 +51,13 @@ string rspec_parser :: readPhysicalId (const DOMElement* tag,
   return (this->getAttribute(tag, "component_id", hasComponentId));
 }
 
+// Returns the component name
+string rspec_parser::readComponentName (const DOMElement* tag, 
+					bool& hasComponentName) 
+{
+  return (this->getAttribute(tag, "component_name", hasComponentName));
+}
+
 // Returns the client_id Sets an out parameter to true if an ID is present
 string rspec_parser :: readVirtualId (const DOMElement* tag, bool& hasClientId)
 {
