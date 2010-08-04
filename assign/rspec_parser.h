@@ -89,6 +89,7 @@ class rspec_parser : public rspec_parser_helper
   virtual std::string readVirtualId (const xercesc::DOMElement*, bool&);
   virtual std::string readComponentManagerId (const xercesc::DOMElement*,
 					      bool&);
+  virtual std::string readComponentName (const xercesc::DOMElement*, bool&);
   virtual std::string readVirtualizationType (const xercesc::DOMElement*,
 					      bool&);
   
