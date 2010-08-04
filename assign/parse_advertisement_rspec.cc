@@ -111,8 +111,9 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
   /*
    * Do the actual parse
    */
+  XMLDEBUG("Begin XML parse" << endl);
   domParser->parse(filename);
-  //XMLDEBUG("XML parse completed" << endl);
+  XMLDEBUG("XML parse completed" << endl);
   
   /* 
    * If there are any errors, do not go any further

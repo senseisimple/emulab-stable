@@ -13,6 +13,7 @@ static const char rcsid[] = "$Id: annotate.cc,v 1.2 2009-05-20 18:06:07 tarunp E
 #ifdef WITH_XML
 
 #include "annotate.h"
+#include "common.h"
 #include "xstr.h"
 #include <string>
 
@@ -28,9 +29,17 @@ void annotate::write_annotated_file (const char* filename)
 {
   // Get the current implementation
   DOMImplementation *impl = DOMImplementationRegistry::getDOMImplementation(NULL);
-  
+  if (!impl) { 
+    cout << "*** Could not create DOMImplementationRegistry" << endl;
+    exit(EXIT_FATAL);
+  }
+
   // Construct the DOMWriter
   DOMWriter* writer = ((DOMImplementationLS*)impl)->createDOMWriter();
+  if (!writer) {
+    cout << "*** Could not create DOMWriter" << endl;
+    exit(EXIT_FATAL);
+  }
   
   // Make the output look pretty
   if (writer->canSetFeature(XMLUni::fgDOMWRTFormatPrettyPrint, true))
@@ -46,6 +55,10 @@ void annotate::write_annotated_file (const char* filename)
 
   // Construct the LocalFileFormatTarget
   XMLFormatTarget *outputFile = new xercesc::LocalFileFormatTarget(filename);
+  if (!outputFile) {
+    cout << "*** Could not create output file " << filename << endl;
+    exit(EXIT_FATAL);
+  }
   
   // Serialize a DOMNode to the local file "<some-file-name>.xml"
   writer->writeNode(outputFile, *dynamic_cast<DOMNode*>(this->document));

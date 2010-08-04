@@ -10,6 +10,7 @@
 
 #ifdef WITH_XML
 
+#include "common.h"
 #include "rspec_parser_v2.h"
 #include "rspec_parser.h"
 
@@ -45,7 +46,7 @@ rspec_parser_v2::readLinkInterface (const DOMElement* link, int& ifaceCount)
     }
     if ((this->ifacesSeen).find(sourceId) == (this->ifacesSeen).end()) {
       cerr << "*** Could not find source interface " << sourceId << endl;
-      exit(-1);
+      exit(EXIT_FATAL);
     }
 
     string destId = "";
@@ -57,7 +58,7 @@ rspec_parser_v2::readLinkInterface (const DOMElement* link, int& ifaceCount)
       }
       if ((this->ifacesSeen).find(destId) == (this->ifacesSeen).end()) {
 	cerr << "*** Could not find destination interface " << destId << endl;
-	exit(-1);
+	exit(EXIT_FATAL);
       }
     }
 
