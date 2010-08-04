@@ -273,7 +273,7 @@ bool populate_nodes(DOMElement *root,
     bool switchAdded = false;
     for (int i = 0; i < typeCount; i++) {
       node_type type = types[i];
-      const char* typeName = type.typeName.c_str();
+      string typeName = type.typeName;
       int typeSlots = type.typeSlots;
       bool isStatic = type.isStatic;
 
@@ -291,8 +291,7 @@ bool populate_nodes(DOMElement *root,
        * TODO: This should not be in the parser, it should be somewhere
        * else!
        */
-      if (strcmp(typeName, "switch") == 0) {
-      //      if (rspecParser->checkIsSwitch(componentId) && !switchAdded) {
+      if (typeName == "switch") {
 	p->is_switch = true;
 	p->types["switch"] = new tb_pnode::type_record(1,false,ptype);
 	svertex sv = add_vertex(sg);
@@ -303,10 +302,10 @@ bool populate_nodes(DOMElement *root,
 	p->switches.insert(pv);
       } 
       else {
-	p->types[typeName]
+	p->types[typeName.c_str()]
 	  = new tb_pnode::type_record(typeSlots,isStatic,ptype);
       }
-      p->type_list.push_back(p->types[typeName]);
+      p->type_list.push_back(p->types[typeName.c_str()]);
     }
     
     bool hasExclusive;
@@ -550,7 +549,7 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
      */
     int typeCount;
     vector<link_type> types = rspecParser->readLinkTypes(elt, typeCount);
-    const char* str_first_type = types[0].typeName.c_str();
+    string str_first_type = types[0].typeName;
     
     /*
      * Create the actual link object
@@ -561,7 +560,7 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     // other stuff if I remove them... bummer!
     tb_plink *phys_link =
       new tb_plink(componentId.c_str(), 
-		   tb_plink::PLINK_NORMAL, str_first_type,
+		   tb_plink::PLINK_NORMAL, str_first_type.c_str(),
 		   "(null)", "(null)", 
 		   shortNames[src_iface].c_str(),
 		   shortNames[dst_iface].c_str());
@@ -587,8 +586,8 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     // strucutre doesn't actually have pointers to the physnode endpoints
     src_pnode->total_interfaces++;
     dst_pnode->total_interfaces++;
-    src_pnode->link_counts[str_first_type]++;
-    dst_pnode->link_counts[str_first_type]++;
+    src_pnode->link_counts[str_first_type.c_str()]++;
+    dst_pnode->link_counts[str_first_type.c_str()]++;
     
     /*
      * Add in the rest of the link types we found

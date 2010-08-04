@@ -432,7 +432,6 @@ bool populate_nodes(DOMElement *root,
   DOMNodeList *nodes = root->getElementsByTagName(XStr("node").x());
   int nodeCount = nodes->getLength();
   XMLDEBUG("Found " << nodeCount << " nodes in rspec" << endl);
-  clock_t times [nodeCount];
   
   for (size_t i = 0; i < nodeCount; i++)  {
     DOMNode *node = nodes->item(i);
