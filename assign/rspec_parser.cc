@@ -259,6 +259,11 @@ vector<struct link_type> rspec_parser::readLinkTypes (const DOMElement* link,
   return types;
 }
 
+map<string, string> rspec_parser::getShortNames(void)
+{
+  return (this->shortNames);
+}
+
 bool rspec_parser::checkIsSwitch (string nodeId) 
 {
   return (((this->switches).find(nodeId)) != (this->switches).end());
@@ -312,6 +317,13 @@ rspec_parser::readFeaturesDesires (const DOMElement* tag, int& count)
   return vector<struct fd>();
 }
 
+vector<struct policy>
+rspec_parser::readPolicies (const DOMElement* tag, int& count)
+{
+  count = 0;
+  return vector<struct policy>();
+}
+
 bool rspec_parser::readDisallowTrivialMix (const DOMElement* tag)
 {
   return false;
@@ -345,5 +357,8 @@ bool rspec_parser::readTrivialOk (const DOMElement* tag)
   return false;
 }
 
-
+bool rspec_parser::readMultiplexOk (const DOMElement* tag)
+{
+  return false;
+}
 #endif

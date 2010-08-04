@@ -17,6 +17,7 @@
 
 #include <sstream>
 #include <string>
+#include <vector>
 #include <xercesc/dom/DOM.hpp>
 
 class rspec_parser_helper
@@ -30,6 +31,8 @@ class rspec_parser_helper
   std::string readChild (const xercesc::DOMElement*, const char*, bool&);
   std::string readChild (const xercesc::DOMElement*, const char*);
   bool hasChild (const xercesc::DOMElement*, const char*);
+  std::vector<xercesc::DOMElement*> 
+    getChildrenByName(const xercesc::DOMElement* parent, const char* name);
   
   // Methods to convert between strings and other data types
   static std::string numToString (int num);

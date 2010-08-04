@@ -13,6 +13,7 @@
 #include "rspec_parser_v2.h"
 #include "rspec_parser.h"
 
+#include <cstdlib>
 #include <string>
 #include <vector>
 #include <xercesc/dom/DOM.hpp>
@@ -28,35 +29,35 @@ vector<struct link_interface>
 rspec_parser_v2::readLinkInterface (const DOMElement* link, int& ifaceCount)
 {
   vector<struct link_interface> rv;
-  //  DOMNodeList* properties = link->getElementsByTagName(XStr("property").x());
-  DOMNodeList* interfaceRefs 
-    = link->getElementsByTagName(XStr("interface_ref").x());
-  ifaceCount = interfaceRefs->getLength();
+  // We can't use getElementsByTagName here because
+  // that returns all interface_refs in all descendants of link
+  // which would include any component hops
+  // as would be present in a partially-mapped rspec.
+  vector<DOMElement*> interfaceRefs 
+    = this->getChildrenByName(link, "interface_ref");
+  ifaceCount = interfaceRefs.size();
   
   for (int i = 0; i < ifaceCount; i += 2) {
-    DOMElement* ref = dynamic_cast<DOMElement*>(interfaceRefs->item(i));
+    DOMElement* ref = interfaceRefs[i];
     string sourceId = this->getAttribute(ref, "component_id");
     if (this->rspecType == RSPEC_TYPE_REQ) {
       sourceId = this->getAttribute(ref, "client_id");
     }
     if ((this->ifacesSeen).find(sourceId) == (this->ifacesSeen).end()) {
-      cerr << "Could not find " << sourceId << endl;
-      ifaceCount = RSPEC_ERROR_UNSEEN_NODEIFACE_SRC;
-      return vector<struct link_interface>();
+      cerr << "*** Could not find source interface " << sourceId << endl;
+      exit(-1);
     }
 
     string destId = "";
     if ((i+1) < ifaceCount) {
-      DOMElement* nextRef 
-	= dynamic_cast<DOMElement*>(interfaceRefs->item(i+1));
+      DOMElement* nextRef = interfaceRefs[i+1];
       destId = this->getAttribute(nextRef, "component_id");
       if (this->rspecType == RSPEC_TYPE_REQ) {
 	destId = this->getAttribute(nextRef, "client_id");
       }
       if ((this->ifacesSeen).find(destId) == (this->ifacesSeen).end()) {
-	cerr << "Could not find " << destId << endl;
-	ifaceCount = RSPEC_ERROR_UNSEEN_NODEIFACE_DST;
-	return vector<struct link_interface>();
+	cerr << "*** Could not find destination interface " << destId << endl;
+	exit(-1);
       }
     }
 
@@ -219,17 +220,23 @@ rspec_parser_v2::readInterfacesOnNode  (const DOMElement* node,
     if (this->rspecType == RSPEC_TYPE_ADVT) {
       nodeId = this->readPhysicalId (node, hasAttr);
       ifaceId = XStr(iface->getAttribute(XStr("component_id").x())).c();
+      bool hasShortName = false;
+      string shortName 
+	= (this->emulabExtensions)->readShortInterfaceName(iface,hasShortName);
+      if (hasShortName) {
+	(this->shortNames).insert(pair<string,string>(ifaceId, shortName));
+      }
     }
     else { //(this->rspecType == RSPEC_TYPE_REQ)
       nodeId = this->readVirtualId (node, hasAttr);
       ifaceId = XStr(iface->getAttribute(XStr("client_id").x())).c();
-      if (iface->hasAttribute(XStr("component_id").x())) {
-	bool hasComponentId;
-	string componentNodeId = this->readPhysicalId (node, hasComponentId);
-	string componentIfaceId = this->getAttribute(iface, "component_id");
+      bool isFixed = false;
+      string fixedTo
+	= (this->emulabExtensions)->readFixedInterface(iface, isFixed);
+      if (isFixed) {
 	fixedInterfaces.insert (make_pair 
 				(make_pair(nodeId,ifaceId),
-				 make_pair(componentNodeId,componentIfaceId)));
+				 make_pair("", fixedTo)));
       }
     }
     allUnique &= ((this->ifacesSeen).insert	
@@ -339,6 +346,17 @@ bool rspec_parser_v2::readNoDelay (const DOMElement* tag)
 bool rspec_parser_v2::readTrivialOk (const DOMElement* tag)
 {
   return ((this->emulabExtensions)->readTrivialOk(tag));
+}
+
+bool rspec_parser_v2::readMultiplexOk (const DOMElement* tag)
+{
+  return ((this->emulabExtensions)->readMultiplexOk(tag));
+}
+
+vector<struct policy> 
+rspec_parser_v2::readPolicies (const DOMElement* tag, int& count) 
+{
+  return ((this->emulabExtensions)->readPolicies(tag, count));
 }
 
 #endif // #ifdef WITH_XML

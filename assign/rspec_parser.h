@@ -73,6 +73,7 @@ class rspec_parser : public rspec_parser_helper
   rspec_emulab_extension::emulab_extensions_parser* emulabExtensions;
   
   int rspecType; 
+  std::map< std::string, std::string > shortNames;
   std::set< std::pair<std::string, std::string> >ifacesSeen;
   std::set< std::string > switches; 
   virtual void addSwitch (const xercesc::DOMElement*);
@@ -127,6 +128,10 @@ class rspec_parser : public rspec_parser_helper
     std::pair<std::string, std::string> >
     readInterfacesOnNode (const xercesc::DOMElement*, bool&);
 
+  // Gets a map of the interface URNS to the short names
+  // that assign needs for fixed interfaces
+  std::map<std::string, std::string> getShortNames (void);
+
   virtual std::vector<struct rspec_emulab_extension::type_limit> 
     readTypeLimits (const xercesc::DOMElement*, int&);
 
@@ -143,9 +148,12 @@ class rspec_parser : public rspec_parser_helper
   virtual bool readDisallowTrivialMix (const xercesc::DOMElement* tag);
   virtual bool readUnique (const xercesc::DOMElement* tag);
   virtual int readTrivialBandwidth (const xercesc::DOMElement* tag, bool&);
+  virtual bool readMultiplexOk (const xercesc::DOMElement* tag);
   virtual std::string readHintTo (const xercesc::DOMElement* tag, bool&);
   virtual bool readNoDelay (const xercesc::DOMElement* tag);
   virtual bool readTrivialOk (const xercesc::DOMElement* tag);
+  virtual std::vector<struct rspec_emulab_extension::policy>
+    readPolicies (const xercesc::DOMElement* tag, int& count);
 };
 
 

@@ -22,6 +22,12 @@ namespace rspec_emulab_extension {
   
 #define HARD_VCLASS 0
 #define SOFT_VCLASS 1
+
+  struct policy {
+    std::string type;
+    std::string name;
+    std::string limit;
+  };
   
   struct emulab_operator {
     std::string op;
@@ -111,6 +117,12 @@ namespace rspec_emulab_extension {
     virtual std::string readHintTo (const xercesc::DOMElement* tag, bool&);
     virtual bool readNoDelay (const xercesc::DOMElement* tag);
     virtual bool readTrivialOk (const xercesc::DOMElement* tag);
+    virtual bool readMultiplexOk (const xercesc::DOMElement* tag);
+    virtual string readFixedInterface (const xercesc::DOMElement*, bool&);
+    virtual string readShortInterfaceName (const xercesc::DOMElement*, bool&);
+    virtual struct policy readPolicy (const xercesc::DOMElement*);
+    virtual std::vector<struct policy>
+      readPolicies (const xercesc::DOMElement*, int& count);
   };
   
 } // namespace rspec_emulab_extension

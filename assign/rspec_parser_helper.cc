@@ -124,4 +124,19 @@ string rspec_parser_helper :: convertType (string type)
   return (rspec_parser_helper::convertType(hwType, slType));
 }
 
+vector<DOMElement*> 
+rspec_parser_helper::getChildrenByName (const DOMElement* tag,
+					const char* name)
+{
+  vector<DOMElement*> rv;
+  DOMNodeList* children = tag->getElementsByTagName(XStr(name).x());
+  for (int i = 0; i < children->getLength(); i++) {
+    DOMNode* child = children->item(i);
+    if (dynamic_cast<DOMElement*>(child->getParentNode()) == tag) {
+      rv.push_back(dynamic_cast<DOMElement*>(child));
+    }
+  }
+  return rv;
+}
+
 #endif //WITH_XML

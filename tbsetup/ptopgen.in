@@ -2048,7 +2048,9 @@ sub print_node_interfaces
 	    my $ip = $interfaceips{"$nodeName:$name"};
 	    print "public_ipv4=\"$ip\" ";
 	}
-	print "/>\n";
+	print ">\n";
+	print "    <emulab:interface name=\"$name\"/>\n";
+	print "  </interface>\n";
     }
 }
 

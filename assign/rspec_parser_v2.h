@@ -29,16 +29,14 @@ class rspec_parser_v2 : public rspec_parser
   std::vector< struct link_interface >
     readLinkInterface (const xercesc::DOMElement*, int&);
   
-  struct link_characteristics readLinkCharacteristics 
-    (const xercesc::DOMElement*, 
-     int&,
-     int defaultBandwidth = -1, 
-     int unlimitedBandwidth = -1);
+  struct link_characteristics 
+    readLinkCharacteristics (const xercesc::DOMElement*, int&,
+			     int defaultBandwidth = -1, 
+			     int unlimitedBandwidth = -1);
   
-  std::vector<struct node_type> readNodeTypes
-    (const xercesc::DOMElement*,
-     int& typeCount,
-     int unlimitedSlots);
+  std::vector<struct node_type> 
+    readNodeTypes (const xercesc::DOMElement*, int& typeCount, 
+		   int unlimitedSlots);
   
   map< pair<string, string>, pair<string, string> >
     readInterfacesOnNode (const xercesc::DOMElement* node, 
@@ -64,6 +62,9 @@ class rspec_parser_v2 : public rspec_parser
   std::string readHintTo (const xercesc::DOMElement* tag, bool&);
   bool readNoDelay (const xercesc::DOMElement* tag);
   bool readTrivialOk (const xercesc::DOMElement* tag);
+  bool readMultiplexOk (const xercesc::DOMElement* tag);
+  std::vector<struct rspec_emulab_extension::policy>
+    readPolicies (const xercesc::DOMElement* tag, int& count);
 };
 
 

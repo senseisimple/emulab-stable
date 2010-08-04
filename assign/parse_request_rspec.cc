@@ -123,7 +123,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
    * If there are any errors, do not go any further
    */
   if (errHandler->sawError()) {
-    cerr << "*** There were " << domParser -> getErrorCount () 
+    cout << "*** There were " << domParser -> getErrorCount () 
 	 << " errors in " << filename << endl;
     exit(EXIT_FATAL);
   }
@@ -138,7 +138,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
     bool is_physical;
     XStr type (request_root->getAttribute(XStr("type").x()));
     if (strcmp(type.c(), "request") != 0) {
-      cerr << "*** RSpec type must be \"request\" in " << filename
+      cout << "*** RSpec type must be \"request\" in " << filename
 	   << " (found " << type.c() << ")" << endl;
       exit (EXIT_FATAL);
     } 
@@ -174,14 +174,14 @@ int parse_request(tb_vgraph &vg, char *filename) {
      */
     XMLDEBUG("starting vclass population" << endl);
     if (!populate_vclasses (request_root, vg)) {
-      cerr << "*** Error reading vclasses from virtual topology "
+      cout << "*** Error reading vclasses from virtual topology "
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
     XMLDEBUG("finishing vclass population" << endl);
     XMLDEBUG("starting node population" << endl);
     if (!populate_nodes(request_root,vg, &fixed_interfaces)) {
-      cerr << "*** Error reading nodes from virtual topology " 
+      cout << "*** Error reading nodes from virtual topology " 
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
@@ -189,7 +189,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
     
     XMLDEBUG("starting link population" << endl);
     if (!populate_links(request_root,vg, &fixed_interfaces)) {
-      cerr << "*** Error reading links from virtual topology " 
+      cout << "*** Error reading links from virtual topology " 
 	   << filename << endl;
       exit(EXIT_FATAL);
     }
@@ -213,6 +213,7 @@ bool populate_node(DOMElement* elt,
 		   tb_vgraph &vg, map< pair<string,string>, 
 		   pair<string,string> >* fixed_interfaces) 
 {	
+  static bool displayedWarning = false;
   bool hasVirtualId;
   string virtualId = rspecParser->readVirtualId(elt, hasVirtualId);
   
@@ -220,20 +221,24 @@ bool populate_node(DOMElement* elt,
   bool hasCMId;
   string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
   string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
+
+  cerr << "Got here with " << virtualId << " and " << cmId << endl;
   
   // If a node has a component_uuid, it is a fixed node
   if (hasComponentId) {
-    if(hasCMId)
+    if(hasCMId) {
       fixed_nodes [virtualId] = componentId;	
-    else
-      cerr << "WARNING: Virtual node " << virtualId 
+    }
+    else {
+      cout << "WARNING: Fixed virtual node " << virtualId 
 	   << " has a componentId specified "
 	   << "but no component manager " << endl
 	   << "The componentId will be ignored." << endl;
+    }
   }
   
   if (!hasVirtualId) {
-    cerr << "*** Every node must have a virtual_id" << endl;
+    cout << "*** Every node must have a virtual_id" << endl;
     return false;
   }
   
@@ -242,14 +247,17 @@ bool populate_node(DOMElement* elt,
   // XXX: This should not have to be called manually
   fixedIfacesOnNode = rspecParser->readInterfacesOnNode(elt, allUnique);
   if (!allUnique) {
-    cerr << "*** The node-interface pairs in " << virtualId 
+    cout << "*** The node-interface pairs in " << virtualId 
 	 << " were not unique."	<< endl;
     return false;
   }
   fixed_interfaces->insert(fixedIfacesOnNode.begin(),fixedIfacesOnNode.end());
   
   /* Deal with the location tag */
-  cerr << "WARNING: Country information will be ignored" << endl;
+  if (!displayedWarning) {
+    cout << "WARNING: Country information will be ignored" << endl;
+    displayedWarning = true;
+  }
   
   /*
    * Add on types
@@ -259,17 +267,22 @@ bool populate_node(DOMElement* elt,
   int typeCount;
   vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
   bool no_type = (typeCount == 0);
+  string typeName = "";
+  int typeSlots = 0;
+  bool isStatic = false;
+  bool isUnlimited = false;
   if (typeCount > 1) {
     cerr << "*** Too many node types (" << typeCount << ") on " 
 	 << virtualId << " (allowed 1) ... Aborting " << endl;
     return false;
   }
-  
-  string typeName = types[0].typeName;
-  int typeSlots = types[0].typeSlots;
-  bool isStatic = types[0].isStatic;
-  
-  bool isUnlimited = (typeSlots == 1000);
+  else if (typeCount == 1) {
+    typeName = types[0].typeName;
+    typeSlots = types[0].typeSlots;
+    isStatic = types[0].isStatic;
+    
+    isUnlimited = (typeSlots == 1000);
+  }
   
   /*
    * Make a tb_ptype structure for this guy - or just add this node to
@@ -305,7 +318,7 @@ bool populate_node(DOMElement* elt,
   string subnodeOf = rspecParser->readSubnodeOf(elt, isSubnode, subnodeCnt);
   if (isSubnode) {
     if (subnodeCnt > 1) {
-      cerr << "*** To many \"subnode\" relations found in " 
+      cout << "*** To many \"subnode\" relations found in " 
 	   << virtualId << ". Allowed 1 ... " << endl;
       return false;
     }
@@ -462,7 +475,7 @@ bool populate_link (DOMElement* elt,
   vector<struct link_type> linkTypes = rspecParser->readLinkTypes(elt, count);
   string linkType = "ethernet";
   if (count > 1) {
-    cerr << "*** Too many link types specified (" << count 
+    cout << "*** Too many link types specified (" << count 
 	 << ") on " << virtualId << ". Allowed 1 ... Aborting" << endl;
     return false;
   }
@@ -476,7 +489,7 @@ bool populate_link (DOMElement* elt,
   struct link_characteristics characteristics
     = rspecParser->readLinkCharacteristics(elt, count);
   if (count != 1) {
-    cerr << "*** Incorrect number of link properties specified ("
+    cout << "*** Incorrect number of link properties specified ("
 	 << count << " on " << virtualId <<". Allowed 1 " << endl;
     return false;
   }
@@ -585,7 +598,7 @@ bool populate_link (DOMElement* elt,
     dst = interfaces[1];
   }
   else {
-    cerr << "*** Too few interfaces found (" << ifaceCount << ")" 
+    cout << "*** Too few interfaces found (" << ifaceCount << ")" 
 	 << " on " << virtualId << " at least 2 required ... Aborting" 
 	 << endl;
     return false;
@@ -597,23 +610,23 @@ bool populate_link (DOMElement* elt,
   string dstIface = dst.virtualIfaceId;
 
   if (srcNode == "" || srcIface == "") {
-    cerr << "*** No source node found on interface for link " 
+    cout << "*** No source node found on interface for link " 
 	 << virtualId << endl;
     return false;
   }
   if (dstNode == "" || dstIface == "") {
-    cerr << "*** No destination node found on interface for link " 
+    cout << "*** No destination node found on interface for link " 
 	 << virtualId << endl;
     return false;
   }
   
   if (vname2vertex.find(srcNode.c_str()) == vname2vertex.end()) {
-    cerr << "*** Bad link " << virtualId 
+    cout << "*** Bad link " << virtualId 
 	 << ", non-existent source node " << srcNode << endl;
     return false;
   }
   if (vname2vertex.find(dstNode.c_str()) == vname2vertex.end()) {
-    cerr << "*** Bad link " << virtualId 
+    cout << "*** Bad link " << virtualId 
 	 << ", non-existent destination node " << dstNode << endl;
     return false;
   }
@@ -628,8 +641,9 @@ bool populate_link (DOMElement* elt,
   
   // XXX: This is obsolete. We need to fix it ASAP
   bool emulated = false;
-  if (virtualizationType == "raw" || virtualizationType == "")
-    emulated = true;
+  emulated = rspecParser->readMultiplexOk(elt);
+//   if (virtualizationType == "raw" || virtualizationType == "")
+//     emulated = true;
   
   // Emulab extensions
   bool allow_delayed = !(rspecParser->readNoDelay(elt));
@@ -641,9 +655,6 @@ bool populate_link (DOMElement* elt,
   fstring fixed_srcIface = "";
   it = fixed_interfaces->find(pair<string,string>(srcNode, srcIface));
   if (it != fixed_interfaces->end()) {
-    cerr << "Found fixed source interface (" << (it->second).first << ","
-	 << (it->second).second << ") on (" << (it->first).first << ","
-	 << (it->first).second << ")" << endl;
     fix_srcIface = true;
     fixed_srcIface = (it->second).second;
   }
@@ -653,9 +664,6 @@ bool populate_link (DOMElement* elt,
   fstring fixed_dstIface = "";
   it = fixed_interfaces->find(make_pair(dstNode, dstIface));
   if (it != fixed_interfaces->end()) {
-    cerr << "Found fixed destination interface (" << (it->second).first 
-	 << "," << (it->second).second << ") on (" << (it->first).first
-	 << "," << (it->first).second << ")" << endl;
     fix_dstIface = true;
     fixed_dstIface = (it->second).second;
   }
@@ -677,23 +685,23 @@ bool populate_link (DOMElement* elt,
   
   tb_vlink *virt_link = new tb_vlink();
   
-  virt_link-> name = virtualId;
-  virt_link-> type = fstring(linkType.c_str());
+  virt_link->name = virtualId;
+  virt_link->type = fstring(linkType.c_str());
 
-  virt_link-> fix_src_iface = fix_srcIface;
+  virt_link->fix_src_iface = fix_srcIface;
   if (fix_srcIface) {
-    virt_link-> src_iface = (fixed_srcIface);//.f();
+    virt_link->src_iface = (fixed_srcIface);//.f();
   }
   
-  virt_link-> fix_dst_iface = fix_dstIface;
+  virt_link->fix_dst_iface = fix_dstIface;
   if (fix_dstIface) {
-    virt_link-> dst_iface = (fixed_dstIface);//.f();
+    virt_link->dst_iface = (fixed_dstIface);//.f();
   }
   
-  virt_link-> emulated = emulated;
-  virt_link-> allow_delayed = allow_delayed;
-  virt_link-> allow_trivial = allow_trivial;
-  virt_link-> no_connection = false;
+  virt_link->emulated = emulated;
+  virt_link->allow_delayed = allow_delayed;
+  virt_link->allow_trivial = allow_trivial;
+  virt_link->no_connection = false;
   virt_link->delay_info.bandwidth = bandwidth;
   virt_link->delay_info.delay = latency;
   virt_link->delay_info.loss = packetLoss;
@@ -712,7 +720,6 @@ bool populate_link (DOMElement* elt,
 bool populate_links(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
     
     bool is_ok = true;
-    
     /*
      * TODO: Support the "PENALIZE_BANDWIDTH" option?
      * TODO: Support the "FIX_PLINK_ENDPOINTS" and "FIX_PLINKS_DEFAULT"?
