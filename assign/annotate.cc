@@ -60,8 +60,13 @@ void annotate::write_annotated_file (const char* filename)
     exit(EXIT_FATAL);
   }
   
+  if (!(this->document)) {
+    cout << "*** INTERNAL ERROR: this->document was NULL" << endl;
+    exit(EXIT_FATAL);
+  }
+
   // Serialize a DOMNode to the local file "<some-file-name>.xml"
-  writer->writeNode(outputFile, *dynamic_cast<DOMNode*>(this->document));
+  writer->writeNode(outputFile, *(this->document));
   
   // Flush the buffer to ensure all contents are written
   outputFile->flush();
