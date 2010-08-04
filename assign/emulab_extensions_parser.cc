@@ -110,7 +110,8 @@ emulab_extensions_parser::readVClasses (const DOMElement* elem)
   return vclasses;
 }
 
-struct vclass emulab_extensions_parser::readVClass (const DOMElement* tag)
+struct vclass 
+emulab_extensions_parser::readVClass (const DOMElement* tag)
 {
   vector<string> physTypes;
   DOMNodeList* physNodes

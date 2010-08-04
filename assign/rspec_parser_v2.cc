@@ -146,7 +146,7 @@ rspec_parser_v2::readNodeTypes (const DOMElement* node,
     for (int j = 0; j < sliverTypes->getLength(); j++) {
       DOMElement* slNode = dynamic_cast<DOMElement*>(sliverTypes->item(j));
       string slTypeName = this->getAttribute(slNode, "name");
-      string typeName = rspec_parser_helper::convertType(defHw, slTypeName);
+      string typeName = this->convertType(defHw, slTypeName);
       struct node_type type = {typeName, 1, false};
       types.push_back(type);
     }
@@ -181,7 +181,7 @@ rspec_parser_v2::readNodeTypes (const DOMElement* node,
     }
     
     if (sliverTypes->getLength() == 0) {
-      string typeName = rspec_parser_helper::convertType(hwTypeName, defSl);
+      string typeName = this->convertType(hwTypeName, defSl);
       struct node_type type = {typeName, typeSlots, isStatic};
       types.push_back(type);
     }
@@ -189,8 +189,7 @@ rspec_parser_v2::readNodeTypes (const DOMElement* node,
     for (int j = 0; j < sliverTypes->getLength(); j++) {
       DOMElement* slNode = dynamic_cast<DOMElement*>(sliverTypes->item(j));
       string slTypeName = this->getAttribute(slNode, "name");
-      string typeName = rspec_parser_helper::convertType(hwTypeName, 
-							 slTypeName);
+      string typeName = this->convertType(hwTypeName, slTypeName);
       
       struct node_type type = {typeName, typeSlots, isStatic};
       types.push_back(type);
@@ -358,5 +357,16 @@ rspec_parser_v2::readPolicies (const DOMElement* tag, int& count)
 {
   return ((this->emulabExtensions)->readPolicies(tag, count));
 }
+
+string rspec_parser_v2::convertType (const string hwType, const string slType) 
+{
+  return rspec_parser_helper::convertType(hwType, slType);
+}
+
+string rspec_parser_v2::convertType (const string type)
+{
+  return rspec_parser_helper::convertType(type);
+}
+
 
 #endif // #ifdef WITH_XML

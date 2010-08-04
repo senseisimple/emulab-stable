@@ -313,18 +313,26 @@ bool populate_nodes(DOMElement *root,
     
     if (hasExclusive) {
       fstring feature ("shared");
-      if (exclusive != "false") {
+      if (exclusive == "false" || exclusive == "0") {
 	p->features.push_front
 	  (tb_node_featuredesire(feature, 1.0, true,
 				 featuredesire::FD_TYPE_NORMAL));
+      }
+      else if (exclusive != "true" && exclusive != "1") {
+	static int syntax_error;
+	if ( !syntax_error ) { 
+	  syntax_error = 1;
+	  cout << "WARNING: unrecognized exclusive attribute \""
+	       << exclusive << "\"; Asuming exclusive = \"true\"" << endl;
+	}
       }
     }
     
     // Add the component_manager_uuid as a feature.
     // We need to do this to handle external references
-    (p->features).push_front
-      (tb_node_featuredesire(XStr(componentManagerId.c_str()).f(), 
-			     1.0, false, featuredesire::FD_TYPE_NORMAL));
+    tb_node_featuredesire node_fd (XStr(componentManagerId.c_str()).f(), 
+				   0.9);//, false, featuredesire::FD_TYPE_NORMAL);
+    (p->features).push_front(node_fd);
 
     // This has to be at the end becuase if we don't populate
     // at least the interfaces, we get all kinds of crappy errors

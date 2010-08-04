@@ -130,8 +130,9 @@ class rspec_parser : public rspec_parser_helper
 
   // Gets a map of the interface URNS to the short names
   // that assign needs for fixed interfaces
-  std::map<std::string, std::string> getShortNames (void);
+  virtual std::map<std::string, std::string> getShortNames (void);
 
+  // These are functions needed to deal with extensions
   virtual std::vector<struct rspec_emulab_extension::type_limit> 
     readTypeLimits (const xercesc::DOMElement*, int&);
 
@@ -154,6 +155,12 @@ class rspec_parser : public rspec_parser_helper
   virtual bool readTrivialOk (const xercesc::DOMElement* tag);
   virtual std::vector<struct rspec_emulab_extension::policy>
     readPolicies (const xercesc::DOMElement* tag, int& count);
+
+  // XXX: This is really, really bad. We shouldn't have a function which 
+  // converts a single type name into the composite name that version 2
+  // expects but we need it when dealing with default types
+  virtual std::string convertType (const std::string, const std::string);
+  virtual std::string convertType (const std::string hwType);
 };
 
 

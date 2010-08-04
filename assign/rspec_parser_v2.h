@@ -65,6 +65,8 @@ class rspec_parser_v2 : public rspec_parser
   bool readMultiplexOk (const xercesc::DOMElement* tag);
   std::vector<struct rspec_emulab_extension::policy>
     readPolicies (const xercesc::DOMElement* tag, int& count);
+  std::string convertType (const std::string);
+  std::string convertType (const std::string, const std::string);
 };
 
 

@@ -295,7 +295,10 @@ string rspec_parser :: readSubnodeOf (const DOMElement* tag,
 
 string rspec_parser :: readExclusive (const DOMElement* tag, bool& isExclusive)
 {
-  return (this->readChild(tag, "exclusive", isExclusive));
+  if (this->hasChild(tag, "exclusive")) {
+    return (this->readChild(tag, "exclusive", isExclusive));
+  }
+  return (this->getAttribute(tag, "exclusive", isExclusive));
 }
 
 string rspec_parser :: readAvailable (const DOMElement* tag, bool& isAvailable)
@@ -361,4 +364,18 @@ bool rspec_parser::readMultiplexOk (const DOMElement* tag)
 {
   return false;
 }
+
+// In the default case, just return the type as it is. 
+// Only in version 2 will we need to do something intelligent(?) with it
+string rspec_parser::convertType (const string hwType) {
+  return hwType;
+}
+
+// Since assign doesn't really know what multiple types mean,
+// we will only return the first. Hopefully, this will never ever
+// really get used outside of v2.
+string rspec_parser::convertType (const string hwType, const string slType) {
+  return hwType;
+}
+
 #endif

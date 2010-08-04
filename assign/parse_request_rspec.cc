@@ -222,8 +222,6 @@ bool populate_node(DOMElement* elt,
   string componentId = rspecParser->readPhysicalId(elt, hasComponentId);
   string cmId = rspecParser->readComponentManagerId(elt, hasCMId);
 
-  cerr << "Got here with " << virtualId << " and " << cmId << endl;
-  
   // If a node has a component_uuid, it is a fixed node
   if (hasComponentId) {
     if(hasCMId) {
@@ -267,8 +265,8 @@ bool populate_node(DOMElement* elt,
   int typeCount;
   vector<struct node_type> types = rspecParser->readNodeTypes(elt, typeCount);
   bool no_type = (typeCount == 0);
-  string typeName = "";
-  int typeSlots = 0;
+  string typeName = rspecParser->convertType("pc");
+  int typeSlots = 1;
   bool isStatic = false;
   bool isUnlimited = false;
   if (typeCount > 1) {
@@ -330,13 +328,17 @@ bool populate_node(DOMElement* elt,
   string nodeHint = rspecParser->readHintTo(elt, hasNodeHint);
   
   tb_vnode *v = NULL;
-  if (no_type)
+  if (no_type) {
     // If they gave no type, just assume it's a PC for
     // now. This is not really a good assumption.
-    v = new tb_vnode(virtualId.c_str(), "pc", typeSlots);
-  else
+    cerr << "no type defaults to: " << typeName.c_str() << endl;
+    v = new tb_vnode(virtualId.c_str(), typeName.c_str(), 
+		     typeSlots);
+  }
+  else {
     v = new tb_vnode(virtualId.c_str(), 
 		     typeName.c_str(), typeSlots);
+  }
   
   // Construct the vertex
   if (disallow_trivial_mix) {
@@ -351,6 +353,7 @@ bool populate_node(DOMElement* elt,
   
   bool hasExclusive;
   string exclusive = rspecParser->readExclusive(elt, hasExclusive);
+  cerr << hasExclusive << " " << exclusive << endl;
 
   if (hasExclusive) {
     fstring desirename("shared");
@@ -366,9 +369,9 @@ bool populate_node(DOMElement* elt,
       
       if( !syntax_error ) {
 	syntax_error = 1;
-	cout << "Warning: unrecognised exclusive "
-	  "attribute \"" << exclusive << "\"; will "
-	  "assume exclusive=\"true\"\n";
+	cout << "WARNING: unrecognised exclusive "
+	  "attribute \"" << exclusive << "\"; " <<
+	  "Assuming exclusive=\"true\"\n";
       }
     }
   }
@@ -411,9 +414,10 @@ bool populate_node(DOMElement* elt,
   // If a component manager has been specified, then the node must be 
   // managed by that CM. We implement this as a desire.
   if (hasCMId) {
+    cerr << "Adding desire " << XStr(cmId.c_str()).f() << endl;
     tb_node_featuredesire node_fd (XStr(cmId.c_str()).f(), 
-				   1.0, true, featuredesire::FD_TYPE_NORMAL);
-    node_fd.add_desire_user(0);
+				   0.9);//, false, featuredesire::FD_TYPE_NORMAL);
+    node_fd.add_desire_user(0.9);
     (v->desires).push_front(node_fd);
   }
   
