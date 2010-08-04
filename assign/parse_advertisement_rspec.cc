@@ -118,7 +118,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
    * If there are any errors, do not go any further
    */
   if (errHandler->sawError()) {
-    cerr << "There were " << domParser -> getErrorCount () 
+    cout << "*** There were " << domParser -> getErrorCount () 
 	 << " errors in " << filename << endl;
     exit(EXIT_FATAL);
   }
@@ -189,7 +189,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     }
     XMLDEBUG("Finishing setting policies" << endl);
     
-    cerr << "RSpec parsing finished" << endl; 
+    XMLDEBUG("RSpec parsing finished" << endl); 
   }
   
   /*

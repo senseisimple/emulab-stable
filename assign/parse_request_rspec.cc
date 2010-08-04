@@ -198,7 +198,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
     /* TODO: We need to do something about policies at some point. */
     //populate_policies(root);
     
-    cerr << "RSpec parsing finished" << endl; 
+    XMLDEBUG("RSpec parsing finished" << endl); 
   }
   
   /*
@@ -331,14 +331,10 @@ bool populate_node(DOMElement* elt,
   if (no_type) {
     // If they gave no type, just assume it's a PC for
     // now. This is not really a good assumption.
-    cerr << "no type defaults to: " << typeName.c_str() << endl;
-    v = new tb_vnode(virtualId.c_str(), typeName.c_str(), 
-		     typeSlots);
+    cerr << "WARNING: No type information found on node. " 
+	 << "Defaulting to " << typeName.c_str() << endl;
   }
-  else {
-    v = new tb_vnode(virtualId.c_str(), 
-		     typeName.c_str(), typeSlots);
-  }
+  v = new tb_vnode(virtualId.c_str(), typeName.c_str(), typeSlots);
   
   // Construct the vertex
   if (disallow_trivial_mix) {
@@ -353,7 +349,6 @@ bool populate_node(DOMElement* elt,
   
   bool hasExclusive;
   string exclusive = rspecParser->readExclusive(elt, hasExclusive);
-  cerr << hasExclusive << " " << exclusive << endl;
 
   if (hasExclusive) {
     fstring desirename("shared");
@@ -414,7 +409,6 @@ bool populate_node(DOMElement* elt,
   // If a component manager has been specified, then the node must be 
   // managed by that CM. We implement this as a desire.
   if (hasCMId) {
-    cerr << "Adding desire " << XStr(cmId.c_str()).f() << endl;
     tb_node_featuredesire node_fd (XStr(cmId.c_str()).f(), 
 				   0.9);//, false, featuredesire::FD_TYPE_NORMAL);
     node_fd.add_desire_user(0.9);

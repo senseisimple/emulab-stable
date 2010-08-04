@@ -617,7 +617,6 @@ int mapping_precheck() {
             if (type_table.find(this_type) == type_table.end()) {
                 // Yes, I know, goto is evil. But I'm not gonna indent the next
                 // 100 lines of code for this error case
-	      cerr << "Can't be a goto now, can it? " << endl;
                 goto nosuchtype;
             }
 
@@ -635,7 +634,6 @@ int mapping_precheck() {
 		if (pnode->total_bandwidth >= v->total_bandwidth) {
 		    matched_bw++;
 		} else {
-		  cerr << "Not enough bandwidth? on " << pnode->name << endl;
 			potential_match = false;
 		}
 
@@ -648,7 +646,6 @@ int mapping_precheck() {
 		} else {
 		    if (v->typecount > type_iterator->second->get_max_load()) {
 			// Nope, this vnode is too demanding
-		      cerr << "Max load? on " << pnode->name << endl;
 			potential_match = false;
 		    }
 		}
@@ -669,7 +666,6 @@ int mapping_precheck() {
 		    if (fdit.either_violateable()) {
 			if (fdit.membership() !=
 				tb_featuredesire_set_iterator::BOTH) {
-			  cerr << "not a fat chance " << fdit.membership() << " "<< fdit->name() << endl;
 			    potential_match = false;
 			}
 
@@ -716,11 +712,9 @@ int mapping_precheck() {
                         // Great, there are enough, too
                         matched_link_counts[type]++;
                       } else {
-			cerr << "link_counts? " << endl;
                         potential_match = false;
                       }
                     } else {
-		      cerr << "Surely not! " << endl;
                       potential_match = false;
                     }
                   }
