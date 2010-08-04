@@ -42,7 +42,8 @@ my %GENI_MODULES = ( "cm"  => "@prefix@/lib/protogeni-cm.pm",
 		     "ses" => "@prefix@/lib/protogeni-ses.pm" );
 
 # These variables are shared with the loaded module.
-use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION);
+use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION
+	    $GENI_RESPONSE_CONVERTER);
 
 # Testbed libraries.
 use lib '@prefix@/lib';
@@ -293,8 +294,6 @@ if ($@) {
 		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
 }
 else {
-    $response = $decoder->encode_response($result);
-
     if (GeniResponse::IsError($result)) {
 	$message .= "Error:   " . $result->{'code'} . "\n";
     }
@@ -308,6 +307,16 @@ else {
     $message .= "Request:\n" . $request . "\n";
     
     AddAuditInfo("message", $message);
+
+    #
+    # Added this for geni-am ...
+    #
+    if (defined($GENI_RESPONSE_CONVERTER)) {
+	$response = &$GENI_RESPONSE_CONVERTER($result);
+    }
+    else {
+	$response = $decoder->encode_response($result);
+    }
 }
 
 if ($debug) {
