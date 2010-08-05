@@ -3685,7 +3685,7 @@ sub ReadRspecSolution($$)
     $self->printdb("Processing rspec\n");
     $self->printdb("Nodes:\n");
 
-    foreach my $ref (@{ $self->rspec()->{'node'} }) {
+    foreach my $ref (@{ $rspec->{'node'} }) {
 	my $node_urn = $ref->{'component_urn'} || $ref->{'component_uuid'};
 	my $virtual  = $ref->{'virtual_id'};
 
@@ -3714,7 +3714,7 @@ sub ReadRspecSolution($$)
 	}
     }
     $self->printdb("Links:\n");
-    foreach my $ref (@{ $self->rspec()->{'link'} }) {
+    foreach my $ref (@{ $rspec->{'link'} }) {
 	my $virtual_id = $ref->{"virtual_id"};
 	my $virtlan    = $self->vlans()->{$virtual_id};
 	
