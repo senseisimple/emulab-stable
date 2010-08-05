@@ -195,7 +195,7 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
    * All done, clean up memory
    */
   //     XMLPlatformUtils::Terminate();
-  free(rspecParser);
+  delete rspecParser;
   return 0;
 }
 
