@@ -8,6 +8,7 @@
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.controls.List;
+			import mx.core.UIComponent;
 			import mx.events.DragEvent;
 			import mx.managers.DragManager;
 			import mx.managers.PopUpManager;
@@ -29,7 +30,7 @@
 			
 			public var allNodes:SliceNodeCollection = new SliceNodeCollection();
 			public var allLinks:SliceLinkCollection = new SliceLinkCollection();
-			public var addedRawChildren:ArrayCollection = new ArrayCollection();
+			//public var addedRawChildren:ArrayCollection = new ArrayCollection();
 			
 			public function load(newSlice:Slice):void
 			{
@@ -171,10 +172,10 @@
 											startNode.y + startNode.height/2,
 											mouseX,
 											mouseY, currentNode != null);
-					addRawChild( tempLink );
+					addChild(tempLink);
 
-				} else if(tempLink != null && rawChildren.contains(tempLink))
-					removeRawChild(tempLink);
+				} else if(tempLink != null && this.getChildren().contains(tempLink))
+					removeChild(tempLink);
 			}
 
 
@@ -185,9 +186,9 @@
 					if(tempLink.establish(startNode, currentNode)) {
 						tempLink.drawEstablished();
 					} else
-						removeRawChild(tempLink);
-				} else if(tempLink != null && rawChildren.contains(tempLink))
-					removeRawChild(tempLink);
+						removeChild(tempLink);
+				} else if(tempLink != null && getChildren().contains(tempLink))
+					removeChild(tempLink);
 				validateNow();
 				
 				// Reset
@@ -201,40 +202,8 @@
 			public function redrawAllLinks():void
 			{
 				for each(var sl:SliceLink in allLinks)
-				{
 					sl.drawEstablished();
-					sendRawChildToBack(sl);
-				}
-			}
-			
-			public function sendRawChildToBack(child:*):void
-			{
-				rawChildren.setChildIndex(child, 1);
-			}
-			
-			public function addRawChild(child:*, sendToBack:Boolean = false):void
-			{
-				if(sendToBack)
-					rawChildren.addChildAt(child, 1);
-				else
-					rawChildren.addChild(child);
-				
-				addedRawChildren.addItem(child);
-			}
-			
-			public function removeRawChild(child:*):void
-			{
-				rawChildren.removeChild(child);
-				addedRawChildren.removeItemAt(addedRawChildren.getItemIndex(child));
-			}
-			
-			public function removeAllRawChildren():void
-			{
-				for each(var child:* in addedRawChildren)
-				{
-					rawChildren.removeChild(child);
-				}
-				addedRawChildren.removeAll();
+					this.setChildIndex(sl, 0);
 			}
 
 		]]>
