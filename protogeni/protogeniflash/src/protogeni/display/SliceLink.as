@@ -9,7 +9,7 @@ package protogeni.display
 	
 	import protogeni.resources.VirtualLink;
 	
-	public class SliceLink extends Sprite
+	public class SliceLink extends UIComponent
 	{
 		public static var ESTABLISHED_COLOR:uint = 0x0000ff;
 		public static var TUNNEL_COLOR:uint = 0x00ffff;
@@ -23,10 +23,15 @@ package protogeni.display
 		public var removeButton:ImageButton;
 		public var canvas:SliceCanvas;
 		
+		private var rawSprite:Sprite;
+		
 		public function SliceLink(newCanvas:SliceCanvas)
 		{
 			super();
 			canvas = newCanvas;
+			
+			rawSprite = new Sprite();
+			addChild(rawSprite);
 		}
 		
 		public function isForNodes(first:SliceNode, second:SliceNode):Boolean
@@ -68,7 +73,7 @@ package protogeni.display
 			startNode.removeLink(this);
 			endNode.removeLink(this);
 			canvas.removeChild(removeButton);
-			canvas.removeRawChild(this);
+			canvas.removeChild(this);
 			canvas.allLinks.removeItemAt(canvas.allLinks.getItemIndex(this));
 		}
 		
@@ -88,18 +93,18 @@ package protogeni.display
 		
 		public function drawLink(startX:int, startY:int, endX:int, endY:int, color:uint):void
 		{
-			graphics.clear();
-			graphics.lineStyle(4, color, 1.0, true,
+			rawSprite.graphics.clear();
+			rawSprite.graphics.lineStyle(4, color, 1.0, true,
 				LineScaleMode.NORMAL, CapsStyle.ROUND);
-			graphics.moveTo(startX, startY);
-			graphics.lineTo(endX, endY);
+			rawSprite.graphics.moveTo(startX, startY);
+			rawSprite.graphics.lineTo(endX, endY);
 			
 			if(established)
 			{
-				graphics.moveTo(((startNode.getMiddleX() + endNode.getMiddleX()) / 2), ((startNode.getMiddleY() + endNode.getMiddleY()) / 2));
-				graphics.lineStyle(2, color, 1.0);
-				graphics.beginFill(color, 0.8);
-				graphics.drawCircle(((startNode.getMiddleX() + endNode.getMiddleX()) / 2),
+				rawSprite.graphics.moveTo(((startNode.getMiddleX() + endNode.getMiddleX()) / 2), ((startNode.getMiddleY() + endNode.getMiddleY()) / 2));
+				rawSprite.graphics.lineStyle(2, color, 1.0);
+				rawSprite.graphics.beginFill(color, 0.8);
+				rawSprite.graphics.drawCircle(((startNode.getMiddleX() + endNode.getMiddleX()) / 2),
 					((startNode.getMiddleY() + endNode.getMiddleY()) / 2),
 					9);
 			}
