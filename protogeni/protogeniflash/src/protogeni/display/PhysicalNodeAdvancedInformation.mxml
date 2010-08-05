@@ -86,7 +86,7 @@
 				if(node.subNodeOf != null)
 				{
 					parentNodeLabel.text = "Subnode of";
-					parentNodeHbox.addChild(DisplayUtil.getNodeButton(node.subNodeOf));
+					parentNodeHbox.addChild(DisplayUtil.getPhysicalNodeButton(node.subNodeOf));
 				}
 				else
 				{
@@ -101,7 +101,7 @@
 					subNodesLabel.text = "Subnodes:";
 					for each(var subNode:PhysicalNode in node.subNodes)
 					{
-						hierarchyVbox.addChild(DisplayUtil.getNodeButton(subNode));
+						hierarchyVbox.addChild(DisplayUtil.getPhysicalNodeButton(subNode));
 					}
 				}
 				else
@@ -126,7 +126,7 @@
 					
 					for each(var connectedNode:PhysicalNode in connectedNodes)
 					{
-						sliceLinksVbox.addChild(DisplayUtil.getNodeButton(connectedNode));
+						sliceLinksVbox.addChild(DisplayUtil.getPhysicalNodeButton(connectedNode));
 						
 						var connectedLinks:ArrayCollection = virtualNode.GetLinks(connectedNode);
 						for each(var connectedLink:VirtualLink in connectedLinks)
@@ -155,7 +155,7 @@
 				physicalLinksVbox.addChild(connectedLabel);
 				
 				for each(var n:PhysicalNode in nodes) {
-					physicalLinksVbox.addChild(DisplayUtil.getNodeButton(n));
+					physicalLinksVbox.addChild(DisplayUtil.getPhysicalNodeButton(n));
 					
 					var nodeLinks:ArrayCollection = n.GetNodeLinks(node);
 					for each(var l:PhysicalLink in nodeLinks) {
@@ -169,7 +169,7 @@
 						var space:Spacer = new Spacer();
 						space.width = 16;
 						linkHbox.addChild(space);
-						var endInterfaceButton:Button = DisplayUtil.getLinkButton(endInterface, l);
+						var endInterfaceButton:Button = DisplayUtil.getPhysicalLinkWithInterfaceButton(endInterface, l);
 						endInterfaceButton.label = endInterface.id;
 						linkHbox.addChild(endInterfaceButton);
 						physicalLinksVbox.addChild(linkHbox);
@@ -205,7 +205,11 @@
 						
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-						<mx:Label text="{node.name}" fontSize="17" fontWeight="bold" width="100%"/>
+						<mx:Label text="{node.name}" fontSize="17" fontWeight="bold" width="100%" selectable="true"/>
+						<display:ImageButton id="locateButton"
+											 source="{DisplayUtil.mapIcon}"
+											 click="Main.protogeniHandler.mapHandler.zoomToPhysicalNode(node)"
+											 toolTip="View Advertisement RSPEC" />
 						<display:ImageButton id="componentButton"
 							source="@Embed('../images/page_white_code.png')"
 							click="viewComponentRspec()"
@@ -233,7 +237,7 @@
 						<mx:Label text="URN" fontWeight="bold"/>
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-						<mx:Label text="{node.urn}"/>
+						<mx:Label text="{node.urn}" selectable="true"/>
 					</mx:GridItem>
 				</mx:GridRow>
 				<mx:GridRow width="100%" height="86">

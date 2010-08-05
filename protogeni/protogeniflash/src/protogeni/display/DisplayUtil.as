@@ -25,6 +25,7 @@
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
+	import mx.controls.Label;
 	import mx.managers.PopUpManager;
 	
 	import protogeni.communication.Request;
@@ -123,7 +124,30 @@
 		[Bindable]
 		[Embed(source="../../../images/control_play_blue.png")]
 		public static var playIcon:Class;
-        
+		
+		[Bindable]
+		[Embed(source="../../../images/delete.png")]
+		public static var deleteIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/arrow_refresh.png")]
+		public static var refreshIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/find.png")]
+		public static var searchIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/map.png")]
+		public static var mapIcon:Class;
+		
+		public static function getLabel(text:String):Label
+		{
+			var l:Label = new Label();
+			l.text = text;
+			return l;
+		}
+
         // Gets an icon for a boolean value
         public static function assignIcon(val:Boolean):Class {
 			if (val)
@@ -188,7 +212,10 @@
 		// Gets a button for the slice
 		public static function getSliceButton(s:Slice):Button {
 			var sButton:Button = new Button();
-			sButton.label = s.hrn;
+			if(s.hrn != null && s.hrn.length > 0)
+				sButton.label = s.hrn;
+			else
+				sButton.label = s.urn;
 			sButton.addEventListener(MouseEvent.CLICK,
 				function openSlice(event:MouseEvent):void {
 					viewSlice(s);
@@ -201,6 +228,7 @@
 		public static function getComponentManagerButton(cm:ComponentManager):Button {
 			var cmButton:Button = new Button();
 			cmButton.label = cm.Hrn;
+			cmButton.toolTip = cm.Hrn + " at " + cm.Url;
 			cmButton.setStyle("icon", DisplayUtil.assignIconForComponentManager(cm));
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openComponentManager(event:MouseEvent):void {
@@ -211,9 +239,10 @@
 		}
 		
 		// Gets a button for the physical node
-		public static function getNodeButton(n:PhysicalNode):Button {
+		public static function getPhysicalNodeButton(n:PhysicalNode):Button {
 			var nodeButton:Button = new Button();
 			nodeButton.label = n.name;
+			nodeButton.toolTip = n.name + " on " + n.manager.Hrn;
 			nodeButton.setStyle("icon", DisplayUtil.assignAvailabilityIcon(n));
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
@@ -224,7 +253,7 @@
 		}
 		
 		// Gets a button for a physical link
-		public static function getLinkButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
+		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
 			var linkButton:Button = new Button();
 			linkButton.label = ni.id;
 			linkButton.setStyle("icon", DisplayUtil.linkIcon);
@@ -295,7 +324,7 @@
 	    	cmWindow.main = Main.Pgmap();
 	    	PopUpManager.addPopUp(cmWindow, Main.Pgmap(), false);
        		PopUpManager.centerPopUp(cmWindow);
-       		cmWindow.loadCm(cm);
+       		cmWindow.load(cm);
 		}
 		
 		// Opens a physical node in a window

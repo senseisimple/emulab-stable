@@ -89,6 +89,12 @@
 				first.interfaces.Add(firstInterface);
 				second.interfaces.Add(secondInterface);
 			}
+			
+			// Bandwidth
+			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
+			if (first.id.slice(0, 2) == "pg" || second.id.slice(0, 2) == "pg")
+				bandwidth = 1000000;
+			
 			this.interfaces.addItem(firstInterface);
 			this.interfaces.addItem(secondInterface);
 			firstNode = first;

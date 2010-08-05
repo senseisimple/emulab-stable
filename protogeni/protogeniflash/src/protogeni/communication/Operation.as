@@ -105,6 +105,7 @@ package protogeni.communication
         success = newSuccess;
         failure = newFailure;
         server = new ConnectionImpl(url);
+		server.timeout = timeout;
         server.addEventListener(Event.COMPLETE, callSuccess);
         server.addEventListener(ErrorEvent.ERROR, callFailure);
         server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
@@ -176,6 +177,8 @@ package protogeni.communication
     private var server : ConnectionImpl;
     private var success : Function;
     private var failure : Function;
+	
+	public var timeout:int = 60;
 
     private static var SERVER_PATH : String = "/protogeni/xmlrpc/";
 

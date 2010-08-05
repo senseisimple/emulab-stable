@@ -51,6 +51,37 @@ package protogeni
 		return replaceString(replaceString(name, ".", ""), "-", "");
 	}
 	
+	public static function findInAny(text:Array, candidates:Array, matchAll:Boolean = false, caseSensitive:Boolean = false):Boolean
+	{
+		if(!caseSensitive)
+		{
+			for each(var textTemp:String in text)
+			textTemp = textTemp.toLowerCase();
+		}
+			
+		for each(var candidate:String in candidates)
+		{
+			if(!caseSensitive)
+				candidate = candidate.toLowerCase();
+			for each(var s:String in text)
+			{
+				
+				if(matchAll)
+				{
+					if(candidate == s)
+						return true;
+				}
+				else
+				{
+					if(candidate.indexOf(s) > -1)
+						return true;
+				}
+			}
+			
+		}
+		return false;
+	}
+	
 	// Shortens the given string to a length, taking out from the middle
 	public static function shortenString(phrase : String, size : int) : String {
 		if(phrase.length < size)

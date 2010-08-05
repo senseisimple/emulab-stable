@@ -40,7 +40,7 @@
 						
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-						<mx:Label text="{node.id}" fontSize="17" fontWeight="bold" width="100%"/>
+						<mx:Label text="{node.id}" fontSize="17" fontWeight="bold" width="100%" selectable="true"/>
 						<display:ImageButton id="physicalButton"
 							source="@Embed('../images/drive_network.png')"
 							click="DisplayUtil.viewPhysicalNode(node.physicalNode)"
@@ -61,7 +61,7 @@
 						<mx:Label text="URN" fontWeight="bold"/>
 					</mx:GridItem>
 					<mx:GridItem width="100%">
-						<mx:Label text="{node.urn}"/>
+						<mx:Label text="{node.urn}" selectable="true"/>
 					</mx:GridItem>
 				</mx:GridRow>
 			</mx:Grid>

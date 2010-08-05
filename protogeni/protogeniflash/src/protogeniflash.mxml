@@ -2,7 +2,7 @@
 <mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
 	xmlns:maps="com.google.maps.*"
 	xmlns:protogeniflash="protogeniflash.*"
-	layout="vertical" paddingRight="0" paddingLeft="0" paddingTop="0" paddingBottom="0"
+	layout="vertical" paddingRight="0" paddingLeft="0" paddingTop="0" paddingBottom="0" horizontalAlign="left"
 	backgroundColor="#D2E1F0"
     preinitialize="preinit();"
 	creationComplete="init();" xmlns:display="protogeni.display.*">
@@ -17,16 +17,20 @@
 		import mx.controls.Alert;
 		import mx.controls.Image;
 		import mx.controls.Label;
+		import mx.core.mx_internal;
 		import mx.events.CloseEvent;
 		import mx.events.CollectionEvent;
 		import mx.events.ListEvent;
 		import mx.events.ResizeEvent;
 		import mx.managers.PopUpManager;
 		
+		import protogeni.ProtogeniEvent;
 		import protogeni.ProtogeniHandler;
+		import protogeni.Util;
 		import protogeni.display.ChooseComponentManagerWindow;
 		import protogeni.display.ConsoleWindow;
 		import protogeni.display.DisplayUtil;
+		import protogeni.display.SearchWindow;
 		import protogeni.display.SlicesWindow;
 		import protogeni.display.UserWindow;
 		import protogeni.resources.Slice;
@@ -44,6 +48,7 @@
         public var about:AboutWindow = new AboutWindow();
 		public var slices:SlicesWindow;
 		public var user:UserWindow;
+		public var search:SearchWindow;
 		
 		[Bindable]
 		public var slicesMenu : ArrayCollection;
@@ -58,7 +63,7 @@
 			
 			Main.protogeniHandler = new ProtogeniHandler();
 			Main.protogeniHandler.mapHandler.map = map;
-			Main.protogeniHandler.addEventListener(ProtogeniHandler.SLICES_CHANGED, fillCombobox);
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
 			
 	    	console = new ConsoleWindow();
 			PopUpManager.addPopUp(console, this, false);
@@ -68,6 +73,10 @@
 			
 			cms = new ChooseComponentManagerWindow();
 			cms.openFirst();
+			
+			search = new SearchWindow();
+			search.show();
+			search.close();
 			
 			slices = new SlicesWindow();
 			slices.openFirst();
@@ -108,6 +117,7 @@
 	    // ComboBox
 	    public function fillCombobox(junk:* = null):void {
 	    	slicesMenu = Main.protogeniHandler.CurrentUser.slices.displaySlices();
+			
 	    }
 	    
 	    public function getSliceLabel(s:Slice):String {
@@ -145,7 +155,7 @@
 						   click="slices.show()"
 						   toolTip="Work with slices"/>
 		<mx:VRule height="14"/>
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)" width="100%" minWidth="0"></mx:ComboBox>
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
 		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.protogeniHandler.mapHandler.drawMap()"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
@@ -156,6 +166,10 @@
 							 source="@Embed(source='../images/user.png')"
 							 click="user.show()"
 							 toolTip="View user information" />
+		<display:ImageButton id="searchButton"
+							 source="{DisplayUtil.searchIcon}"
+							 click="search.show()"
+							 toolTip="Toggle fullscreen" />
 		<display:ImageButton id="resetZoomButton"
 			source="@Embed('../images/zoom.png')"
 			click="map.resetZoom();"

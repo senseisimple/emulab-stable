@@ -14,36 +14,27 @@
 
 package protogeni.communication
 {
-	import protogeni.resources.PhysicalNode;
-	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
-	import protogeni.resources.VirtualNode;
-	
-  public class RequestSliverStatus extends Request
+
+  public class RequestTicketGet extends Request
   {
-    public function RequestSliverStatus(s:Sliver) : void
+    public function RequestTicketGet(s:Sliver) : void
     {
-		super("SliverStatus", "Getting the sliver status on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.sliverStatus, true);
+		super("TicketGet", "Getting ticket for sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.updateTicket);
 		sliver = s;
 		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("ticket", ticket);
+		op.addField("rspec", s.getRequestRspec());
 		op.addField("credentials", new Array(sliver.slice.credential));
 		op.setExactUrl(sliver.componentManager.Url);
     }
-
+	
 	override public function complete(code : Number, response : Object) : *
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			sliver.status = response.value.status;
-			sliver.state = response.value.state;
-			for each(var nodeObject:Object in response.value.details)
-			{
-				var vn:VirtualNode = sliver.getVirtualNodeFor(sliver.componentManager.Nodes.GetByUrn(nodeObject.component_urn));
-				vn.status = nodeObject.status;
-				vn.state = nodeObject.state;
-				vn.error = nodeObject.error;
-			}
-			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
+			sliver.ticket = new XML(response.value);
+			return new RequestTicketRedeem(sliver, sliver.ticket);
 		}
 		else
 		{
@@ -53,6 +44,7 @@ package protogeni.communication
 		return null;
 	}
 	
-	private var sliver:Sliver;
+	public var sliver:Sliver;
+	public var ticket:XML;
   }
 }

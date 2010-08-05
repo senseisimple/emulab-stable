@@ -50,6 +50,7 @@
 		public var Nodes:PhysicalNodeGroupCollection = new PhysicalNodeGroupCollection();
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();
 		public var AllNodes:ArrayCollection = new ArrayCollection();
+		public var AllLinks:ArrayCollection = new ArrayCollection();
 		
 		[Bindable]
 		public var Status : int = UNKOWN;
@@ -109,6 +110,7 @@
 	    	Nodes = new PhysicalNodeGroupCollection();
 			Links = new PhysicalLinkGroupCollection();
 			AllNodes = new ArrayCollection();
+			AllLinks = new ArrayCollection();
 			Rspec = null;
 			Status = ComponentManager.UNKOWN;
 			errorMessage = "";
@@ -151,7 +153,7 @@
 	    		nodeNameDictionary = null;
 	    		subnodeList = null;
 	      		Status = ComponentManager.VALID;
-				Main.protogeniHandler.dispatchComponentManagerChanged();
+				Main.protogeniHandler.dispatchComponentManagerChanged(this);
 				main.stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				myAfter();
 			}
@@ -324,7 +326,7 @@
 		        	}
 	        	}
 	        	
-	        	//main.console.appendText("done\n");
+				AllLinks.addItem(l);
 	        }
 	        myIndex += idx;
 	    }

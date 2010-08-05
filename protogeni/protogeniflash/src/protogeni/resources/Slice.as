@@ -42,6 +42,8 @@
 		public var creator : User = null;
 		public var credential : String = "";
 		public var slivers : ArrayCollection = new ArrayCollection();
+		
+		public var validUntil:Date;
 
 		public function Slice()
 		{
@@ -58,6 +60,36 @@
 				}
 			}
 			return status;
+		}
+		
+		public function GetAllNodes():ArrayCollection
+		{
+			var nodes:ArrayCollection = new ArrayCollection();
+			for each(var s:Sliver in slivers)
+			{
+				for each(var n:VirtualNode in s.nodes)
+				{
+					if(!nodes.contains(n))
+						nodes.addItem(n);
+				}
+					
+			}
+			return nodes;
+		}
+		
+		public function GetPhysicalNodes():ArrayCollection
+		{
+			var nodes:ArrayCollection = new ArrayCollection();
+			for each(var s:Sliver in slivers)
+			{
+				for each(var n:VirtualNode in s.nodes)
+				{
+					if(!nodes.contains(n) && n.physicalNode != null)
+						nodes.addItem(n.physicalNode);
+				}
+				
+			}
+			return nodes;
 		}
 		
 		public function hasSliverFor(cm:ComponentManager):Boolean

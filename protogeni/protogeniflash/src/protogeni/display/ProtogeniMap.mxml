@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <maps:Map xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:maps="com.google.maps.*"
-		  height="100%" width="100%"
+		  height="100%" width="100%" maxWidth="{mx.core.Application.application.width}"
 		  preinitialize="mappreinit()"
 		  mapevent_mappreinitialize="onMapPreinitialize(event)"
 		  mapevent_mapready="onMapReady(event)"
@@ -15,6 +15,8 @@
 			import com.google.maps.controls.MapTypeControl;
 			import com.google.maps.controls.PositionControl;
 			import com.google.maps.controls.ZoomControl;
+			
+			import mx.core.Application;
 			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
@@ -44,7 +46,7 @@
 			private function onMapReady(event:Event):void {
 				addControl(new ZoomControl());
 				//map.addControl(new PositionControl());
-				addControl(new MapTypeControl());
+				//addControl(new MapTypeControl());
 				
 				enableScrollWheelZoom();
 				enableContinuousZoom();

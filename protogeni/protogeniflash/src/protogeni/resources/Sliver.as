@@ -18,12 +18,22 @@
 	
 	import mx.collections.ArrayCollection;
 	
+	import protogeni.Util;
+	import protogeni.communication.CommunicationUtil;
+	
 	// Sliver from a slice containing all resources from the CM
 	public class Sliver
 	{
-		public static var READY : String = "ready";
-	    public static var NOTREADY : String = "notready";
-	    public static var FAILED : String = "failed";
+		public static var STATE_READY : String = "ready";
+	    public static var STATE_NOTREADY : String = "notready";
+	    public static var STATE_FAILED : String = "failed";
+		
+		public static var STATUS_CHANGING:String = "changing";
+		public static var STATUS_READY:String = "ready";
+		public static var STATUS_NOTREADY:String = "notready";
+		public static var STATUS_FAILED:String = "changing";
+		public static var STATUS_UNKOWN:String = "ready";
+		public static var STATUS_MIXED:String = "notready";
 		
 		public var created:Boolean = false;
 	    
@@ -31,6 +41,8 @@
 		public var componentManager : ComponentManager = null;
 		public var rspec : XML = null;
 		public var urn : String = null;
+		
+		public var ticket:XML;
 		
 		public var state : String;
 		public var status : String;
@@ -40,17 +52,30 @@
 		
 		public var slice : Slice;
 		
+		public var validUntil:Date;
+		
 		public function Sliver(owner : Slice, manager:ComponentManager = null)
 		{
 			slice = owner;
 			componentManager = manager;
 		}
 		
+		public function getVirtualNodeFor(pn:PhysicalNode):VirtualNode
+		{
+			for each(var vn:VirtualNode in this.nodes)
+			{
+				if(vn.physicalNode == pn)
+					return vn;
+			}
+			
+			return null;
+		}
+		
 		public function getRequestRspec():XML
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
 				+ "<rspec "
-				+ "xmlns=\"http://www.protogeni.net/resources/rspec/0.2\" "
+				+ "xmlns=\""+CommunicationUtil.rspec2Namespace+"\" "
 				+ "type=\"request\" />");
 			
 			for each(var vn:VirtualNode in nodes)
@@ -64,6 +89,9 @@
 		
 		public function parseRspec():void
 		{
+			nodes = new ArrayCollection();
+			links = new ArrayCollection();
+			
 			var nodesById:Dictionary = new Dictionary();
 			
 			var linksXml : ArrayCollection = new ArrayCollection();
@@ -80,7 +108,15 @@
       		{
       			var virtualNode:VirtualNode = new VirtualNode(this);
       			virtualNode.id = nodeXml.@virtual_id;
-      			//virtualNode.sliverUrn = nodeXml.@sliver_urn;
+				virtualNode.manager = Main.protogeniHandler.ComponentManagers.getByUrn(nodeXml.@component_manager_urn);
+				if(nodeXml.@sliver_urn != null)
+					virtualNode.urn = nodeXml.@sliver_urn;
+				if(nodeXml.@sliver_uuid != null)
+					virtualNode.uuid = nodeXml.@sliver_uuid;
+				if(nodeXml.@sshdport != null)
+					virtualNode.sshdport = nodeXml.@sshdport;
+				if(nodeXml.@hostname != null)
+					virtualNode.hostname = nodeXml.@hostname;
       			virtualNode.virtualizationType = nodeXml.@virtualization_type;
 				if(nodeXml.@virtualization_subtype != null)
 					virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;

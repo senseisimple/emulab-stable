@@ -14,56 +14,34 @@
 
 package protogeni.communication
 {
-  class RequestSliverDelete extends Request
-  {
-    public function RequestSliverDelete(newManager : ComponentManager,
-                                         newNodes : ActiveNodes,
-                                                                                 newSliceUrn : String) : void
-    {
-      super(newManager.getName());
-      manager = newManager;
-      nodes = newNodes;
-          sliceUrn = newSliceUrn;
-    }
+	import protogeni.resources.Sliver;
 
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
-
-    override public function start(credential : Credential) : Operation
-    {
-      // TODO: Check to make sure that manager.getSliver()
-      // exists and perform a no-op if it doesn't.
-      nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.PLANNED);
-      nodes.changeState(manager, ActiveNodes.BOOTED, ActiveNodes.PLANNED);
-      opName = "Deleting Slice ";
-      op.reset(Geni.deleteSlice);
-      op.addField("slice_urn", sliceUrn);
-      op.addField("credentials", new Array(manager.getSliver()));
-      //? op.addField("impotent", Request.IMPOTENT);
-      op.setUrl(manager.getUrl());
-      return op;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      if (code == 0)
-      {
-        nodes.commitState(manager);
-      }
-      else
-      {
-        nodes.revertState(manager);
-      }
-      manager.setSliver(null);
-      manager.setTicket(null);
-      return null;
-    }
-
-    var manager : ComponentManager;
-    var nodes : ActiveNodes;
-        var sliceUrn : String;
-  }
+	public class RequestSliverDelete extends Request
+	{
+		public function RequestSliverDelete(s:Sliver) : void
+		{
+			super("SliverDelete", "Deleting sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.deleteSlice);
+			sliver = s;
+			op.addField("slice_urn", sliver.slice.urn);
+			op.addField("credentials", new Array(sliver.slice.credential));
+			op.setExactUrl(sliver.componentManager.Url);
+		}
+		
+		override public function complete(code : Number, response : Object) : *
+		{
+			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+			{
+				sliver.slice.slivers.removeItemAt(sliver.slice.slivers.getItemIndex(sliver));
+				Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
+			}
+			else
+			{
+				// problem removing??
+			}
+			
+			return null;
+		}
+		
+		public var sliver:Sliver;
+	}
 }

@@ -11,6 +11,7 @@
 			textRollOverColor: red;
 			textSelectedColor: red;
 			themeColor: red;
+			borderColor:red;
 		}
 		
 		.validStyle {
@@ -18,6 +19,7 @@
 			textRollOverColor: green;
 			textSelectedColor: green;
 			themeColor: green;
+			borderColor:green;
 		}
 		
 		.unknownStyle {
@@ -25,6 +27,7 @@
 			textRollOverColor: grey;
 			textSelectedColor: grey;
 			themeColor: grey;
+			borderColor:#B6B6B6;
 		}
 		
 		.inprogressStyle {
@@ -53,6 +56,26 @@
 			public var startX:int;
 			public var startY:int;
 			public var canvas:SliceCanvas;
+			
+			public function resetToStatus():void
+			{
+				this.toolTip = "";
+				if(node.status == VirtualNode.STATUS_READY)
+				{
+					this.styleName = "validStyle";
+					this.toolTip = node.state;
+				} else if(node.status == VirtualNode.STATUS_FAILED)
+				{
+					this.styleName = "failedStyle";
+					this.toolTip = "Error: " + node.error;
+				} else {
+					this.toolTip = "State: " + node.state + " Status: " + node.status;
+					if(node.status == VirtualNode.STATUS_CHANGING)
+						this.styleName = "inprogressStyle";
+					else
+						this.styleName = "unknownStyle";
+				}
+			}
 			
 			public function setNode(n:VirtualNode):void
 			{

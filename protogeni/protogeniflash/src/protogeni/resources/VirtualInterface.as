@@ -38,6 +38,6 @@
 		public var virtualLinks:ArrayCollection = new ArrayCollection();
 		
 		public var physicalNodeInterface:PhysicalNodeInterface;
-		public var bandwidth:int = 0;
+		public var bandwidth:int = 100000;
 	}
 }

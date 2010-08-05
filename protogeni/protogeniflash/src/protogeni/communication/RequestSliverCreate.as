@@ -21,7 +21,6 @@ package protogeni.communication
   public class RequestSliverCreate extends Request
   {
     public function RequestSliverCreate(s:Sliver) : void
-
     {
 		super("SliverCreate", "Creating sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
 		sliver = s;
@@ -36,12 +35,16 @@ package protogeni.communication
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			sliver.credential = response.sliver;
+			sliver.credential = response.value[0];
 			sliver.created = true;
 
-			var newSliver:String = response.manifest;
+			sliver.rspec = new XML(response.value[1]);
+			//sliver.parseRspec();
+			// update existing?
 			
-			Main.protogeniHandler.dispatchSliceChanged();
+			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
+
+			return new RequestSliverStatus(sliver);
 		}
 		else
 		{

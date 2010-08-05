@@ -27,6 +27,8 @@ package protogeni.communication
 		sliver = s;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("credentials", new Array(sliver.slice.credential));
+		op.addField("status", Sliver.STATUS_READY);
+		op.addField("timeout", 60000);
 		op.setExactUrl(sliver.componentManager.Url);
     }
 
@@ -43,7 +45,7 @@ package protogeni.communication
 				vn.state = nodeObject.state;
 				vn.error = nodeObject.error;
 			}
-			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
+			Main.protogeniHandler.dispatchSliceChanged();
 		}
 		else
 		{

@@ -14,38 +14,34 @@
 
 package protogeni.communication
 {
+	import mx.controls.Alert;
+	
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
-  public class RequestSliverResolve extends Request
+  public class RequestSliceDelete extends Request
   {
-    public function RequestSliverResolve(s:Sliver) : void
+    public function RequestSliceDelete(s:Slice) : void
     {
-		super("SliverResolve", "Resolving sliver on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.resolveResource, true);
-		sliver = s;
-		op.addField("urn", sliver.urn);
-		op.addField("credentials", new Array(sliver.credential));
-		op.setExactUrl(sliver.componentManager.Url);
+		super("SliceDelete", "Deleting slice named " + s.hrn, CommunicationUtil.deleteSlice);
+		slice = s;
+		op.addField("slice_urn", slice.urn);
+		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		// What CM???
     }
-
+	
 	override public function complete(code : Number, response : Object) : *
 	{
-		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS || code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)
 		{
-			sliver.rspec = new XML(response.value.manifest);
-			sliver.created = true;
-			sliver.parseRspec();
-			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
-			return new RequestSliverStatus(sliver);
+			//??
 		}
 		else
 		{
-			// do nothing
+			//??
 		}
-		
-		return null;
 	}
-	
-	private var sliver:Sliver;
+
+    private var slice : Slice;
   }
 }
