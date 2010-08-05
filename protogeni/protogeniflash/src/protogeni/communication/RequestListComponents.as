@@ -49,7 +49,7 @@ package protogeni.communication
 					newCm.Status = ComponentManager.INPROGRESS;
 					newCalls.push(new RequestDiscoverResources(newCm));
 				}
-				Main.protogeniHandler.dispatchComponentManagerChanged();
+				Main.protogeniHandler.dispatchComponentManagerChanged(newCm);
 			}
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());

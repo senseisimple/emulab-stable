@@ -45,6 +45,7 @@
 			import mx.events.FlexEvent;
 			import mx.managers.PopUpManager;
 			
+			import protogeni.ProtogeniEvent;
 			import protogeni.ProtogeniHandler;
 			import protogeni.communication.CommunicationUtil;
 			import protogeni.communication.Request;
@@ -62,8 +63,8 @@
 			public function init():void
 			{
 				clear();
-				Main.protogeniHandler.addEventListener(ProtogeniHandler.QUEUE_CHANGED, resetQueueView);
-				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGERS_CHANGED, loadComponentManagers);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.QUEUE_CHANGED, resetQueueView);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, loadComponentManagers);
 			}
 			
 			public function setStatus(s:String, isWaiting:Boolean, isError:Boolean):void

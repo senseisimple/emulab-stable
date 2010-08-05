@@ -26,7 +26,8 @@ package protogeni.resources
 			var ac : ArrayCollection = new ArrayCollection();
 			ac.addItem(new Slice());
 			for each(var s:Slice in this) {
-				ac.addItem(s);
+				if(s.slivers.length > 0)
+					ac.addItem(s);
 			}
 			
 			var dataSortField:SortField = new SortField();

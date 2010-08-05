@@ -23,7 +23,6 @@ package protogeni.display
 	import mx.collections.ArrayCollection;
 	import mx.events.FlexEvent;
 	
-	
 	import protogeni.Util;
 	import protogeni.resources.ComponentManager;
 	import protogeni.resources.PhysicalLink;
@@ -54,6 +53,11 @@ package protogeni.display
 		
 		public var userResourcesOnly:Boolean = false;
 		public var selectedSlice:Slice = null;
+		
+		public function zoomToPhysicalNode(n:PhysicalNode):void
+		{
+			map.panTo(new LatLng(n.GetLatitude(), n.GetLongitude()));
+		}
 		
 		private function addNodeGroupMarker(g:PhysicalNodeGroup):void
 	    {
@@ -134,7 +138,7 @@ package protogeni.display
 		        });
 	
 		  		map.addOverlay(m);
-		  		markers.addItem({marker:m, nodeGroup:drawGroup});
+		  		markers.addItem({marker:m, nodeGroup:drawGroup, info:groupInfo});
 	    	} else {
 	    		// Draw an empty marker
 	    		var nonodes:Marker = new Marker(

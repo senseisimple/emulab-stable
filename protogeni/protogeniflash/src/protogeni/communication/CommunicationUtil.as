@@ -19,6 +19,10 @@ package protogeni.communication
 	
   public class CommunicationUtil
   {
+	  // Namespaces
+	  public static var rspec1Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
+	  public static var rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
+	  
 	  // Error codes
 	  public static var GENIRESPONSE_SUCCESS : int = 0;
 	  public static var GENIRESPONSE_BADARGS : int  = 1;

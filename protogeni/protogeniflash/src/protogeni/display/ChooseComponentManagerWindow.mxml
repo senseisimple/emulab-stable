@@ -49,6 +49,7 @@
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
 			
+			import protogeni.ProtogeniEvent;
 			import protogeni.ProtogeniHandler;
 			import protogeni.resources.ComponentManager;
 
@@ -61,8 +62,8 @@
 				show();
        			okButton.enabled = Main.protogeniHandler.ComponentManagers.length > 0;
 				refreshList();
-				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGER_CHANGED, ResetAll);
-				Main.protogeniHandler.addEventListener(ProtogeniHandler.COMPONENTMANAGERS_CHANGED, refreshList);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, ResetAll);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, refreshList);
 			}
 			
 			public function refreshList(junk:* = null):void {

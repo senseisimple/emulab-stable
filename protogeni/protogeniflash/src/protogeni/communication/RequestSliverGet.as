@@ -36,7 +36,7 @@ package protogeni.communication
 			sliver.credential = String(response.value);
 			var cred:XML = new XML(response.value);
 			sliver.urn = cred.credential.target_urn;
-			newCall = new RequestSliverStatus(sliver);
+			newCall = new RequestSliverResolve(sliver);
 		}
 		else if(code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)
 		{

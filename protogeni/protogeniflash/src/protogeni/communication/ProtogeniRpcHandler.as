@@ -81,12 +81,36 @@
 		{
 			for each(var sliver:Sliver in slice.slivers)
 			{
-				//if(sliver.created)
-					//pushRequest(new RequestSliverUpdate(sliver, true));
-				//else
+				if(sliver.created)
+					pushRequest(new RequestSliverUpdate(sliver));
+				else
 					pushRequest(new RequestSliverCreate(sliver));
 			}
-			// do something after to save the new slice?
+		}
+		
+		public function refreshSlice(slice:Slice):void
+		{
+			for each(var sliver:Sliver in slice.slivers)
+				pushRequest(new RequestSliverStatus(sliver));
+		}
+		
+		public function deleteSlice(slice:Slice):void
+		{
+			for each(var sliver:Sliver in slice.slivers)
+			{
+				//if(sliver.created)
+				//pushRequest(new RequestSliverUpdate(sliver, true));
+				//else
+				pushRequest(new RequestSliverDelete(sliver));
+			}
+		}
+		
+		public function bootSlice(slice:Slice):void
+		{
+			for each(var sliver:Sliver in slice.slivers)
+			{
+				pushRequest(new RequestSliverStart(sliver));
+			}
 		}
 		
 		public function pushRequest(newRequest : Request, forceStart:Boolean = true) : void

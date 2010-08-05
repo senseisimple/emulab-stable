@@ -45,12 +45,12 @@ package protogeni.communication
 			Main.protogeniHandler.CurrentUser.email = response.value.email;
 			Main.protogeniHandler.CurrentUser.name = response.value.name;
 			
-			var sliceHrns:Array = response.value.slices;
-			if(sliceHrns != null && sliceHrns.length > 0) {
-				for each(var sliceHrn:String in sliceHrns)
+			var slices:Array = response.value.slices;
+			if(slices != null && slices.length > 0) {
+				for each(var sliceUrn:String in slices)
 				{
 					var userSlice:Slice = new Slice();
-					userSlice.hrn = sliceHrn;
+					userSlice.urn = sliceUrn;
 					Main.protogeniHandler.CurrentUser.slices.add(userSlice);
 					newCalls.push(new RequestSliceResolve(userSlice));
 				}

@@ -27,7 +27,7 @@ package protogeni.communication
 		slice = s;
 		isCreating = willBeCreating;
 		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
-		op.addField("hrn", slice.hrn);
+		op.addField("hrn", slice.urn);
 		op.addField("type", "Slice");
 		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
@@ -39,7 +39,7 @@ package protogeni.communication
 		{
 			if(isCreating)
 			{
-				Alert.show("Slice '" + slice.hrn + "' already exists");
+				Alert.show("Slice '" + slice.urn + "' already exists");
 				Main.log.setStatus("Slice exists", false, true);
 			}
 			else
@@ -53,7 +53,7 @@ package protogeni.communication
 					newSliver.componentManager = Main.protogeniHandler.ComponentManagers.getByUrn(sliverCm);
 					slice.slivers.addItem(newSliver);
 				}
-				Main.protogeniHandler.dispatchSliceChanged();
+				Main.protogeniHandler.dispatchSliceChanged(slice);
 				newRequest = new RequestSliceCredential(slice);
 			}
 		}

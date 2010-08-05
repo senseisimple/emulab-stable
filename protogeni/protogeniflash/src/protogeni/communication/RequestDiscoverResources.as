@@ -55,7 +55,7 @@ package protogeni.communication
 			cm.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + cm.errorMessage;
 			cm.Status = ComponentManager.FAILED;
 			waitOnComplete = false;
-			Main.protogeniHandler.dispatchComponentManagerChanged();
+			Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		}
 		
 		return null;
@@ -73,7 +73,7 @@ package protogeni.communication
 			cm.errorDescription = event.text;
 		
 		cm.Status = ComponentManager.FAILED;
-		Main.protogeniHandler.dispatchComponentManagerChanged();
+		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 
       return null;
     }
@@ -82,7 +82,7 @@ package protogeni.communication
 	{
 		cm.Status = ComponentManager.UNKOWN;
 		waitOnComplete = false;
-		Main.protogeniHandler.dispatchComponentManagerChanged();
+		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		op.cleanup();
 	}
 

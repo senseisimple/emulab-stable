@@ -12,6 +12,8 @@
 			import mx.managers.DragManager;
 			import mx.managers.PopUpManager;
 			
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
@@ -37,6 +39,14 @@
 				{
 					// load!
 				}
+				
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refreshSlice);
+			}
+			
+			public function refreshSlice(junk:*):void
+			{
+				for each(var sn:SliceNode in this.allNodes)
+					sn.resetToStatus();
 			}
 			
 			private  function dragEnterHandler(event:DragEvent):void {

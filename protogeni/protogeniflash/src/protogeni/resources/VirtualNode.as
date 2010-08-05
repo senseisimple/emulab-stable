@@ -43,6 +43,7 @@
 		
 		[Bindable]
 		public var urn:String;
+		public var uuid:String;
 		public var isVirtual:Boolean;
 		public var isShared:Boolean;
 		public var superNode:VirtualNode;
@@ -59,6 +60,17 @@
 		public var rspec:XML;
 		public var slivers:Array;
 		public var hostname:String;
+		public var sshdport:String;
+		
+		public var error:String;
+		public var state:String;
+		public var status:String;
+		
+		public static var STATUS_CHANGING:String = "changing";
+		public static var STATUS_READY:String = "ready";
+		public static var STATUS_NOTREADY:String = "notready";
+		public static var STATUS_FAILED:String = "failed";
+		public static var STATUS_UNKOWN:String = "unknown";
 		
 		public function setToPhysicalNode(node:PhysicalNode):void
 		{

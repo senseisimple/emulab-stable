@@ -35,7 +35,7 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			slice.credential = String(response.value);
-			Main.protogeniHandler.dispatchSliceChanged();
+			Main.protogeniHandler.dispatchSliceChanged(slice);
 			for each(var s:Sliver in slice.slivers)
 				newCalls.push(new RequestSliverGet(s));
 		}

@@ -1,28 +1,144 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow xmlns="protogeniflash.*" xmlns:mx="http://www.adobe.com/2006/mxml"
-	width="500" height="158"
+	width="570" height="150"
 	title="Component Manager Information"
 	close="PopUpManager.removePopUp(this)" xmlns:display="protogeni.display.*">
 	
 	<mx:Script>
 		<![CDATA[
-			import protogeni.resources.ComponentManager;
-			import mx.controls.Spacer;
-			import mx.containers.HBox;
-			import mx.controls.Button;
 			import com.google.maps.View;
+			
 			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.containers.TabNavigator;
+			import mx.containers.VBox;
 			import mx.controls.Alert;
+			import mx.controls.Button;
 			import mx.controls.Label;
+			import mx.controls.Spacer;
+			import mx.controls.TextArea;
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
 			
-			public var main:protogeniflash;
+			import protogeni.resources.ComponentManager;
 			
-			public function loadCm(cm:ComponentManager):void {
-				cmInfo.load(cm);
+			public var main:protogeniflash;
+
+			[Bindable]
+			private var cm:ComponentManager = null;
+			
+			public function load(n:ComponentManager):void {
+				cm = n;
+				messageButton.visible = cm.errorDescription.length > 0;
+				messageButton.includeInLayout = cm.errorDescription.length > 0;
+				rpsecButton.visible = cm.Rspec != null;
+				rpsecButton.includeInLayout = cm.Rspec != null;
+				dotButton.visible = cm.Rspec != null;
+				dotButton.includeInLayout = cm.Rspec != null;
+				nodesButton.label = cm.AllNodes.length.toString();
+			}
+			
+			public function viewRspec():void {
+				var rspecWindow:XmlWindow = new XmlWindow;
+				PopUpManager.addPopUp(rspecWindow, Main.Pgmap(), false);
+				PopUpManager.centerPopUp(rspecWindow);
+				rspecWindow.title = "Advertisement RSPEC from " + cm.Hrn;
+				rspecWindow.loadXml(cm.Rspec);
+			}
+			
+			public function viewMessage():void {
+				Alert.show(cm.errorDescription);
+			}
+			
+			public function openGraph():void
+			{
+				var cw:DefaultWindow = new DefaultWindow();
+				PopUpManager.addPopUp(cw, main, false);
+				PopUpManager.centerPopUp(cw);
+				cw.title = "Graph information for " + cm.Hrn;
+				var tabContainer:TabNavigator = new TabNavigator();
+				tabContainer.percentHeight = 100;
+				tabContainer.percentWidth = 100;
+				
+				// DOT graph
+				var dotTab:VBox = new VBox();
+				dotTab.label = "DOT graph";
+				var textd:TextArea = new TextArea();
+				textd.percentHeight = 100;
+				textd.percentWidth = 100;
+				textd.text = cm.getDotGraph();
+				dotTab.addChild(textd);
+				tabContainer.addChild(dotTab);
+				
+				// GraphML
+				var graphmlTab:VBox = new VBox();
+				graphmlTab.label = "GraphML";
+				var textg:TextArea = new TextArea();
+				textg.percentHeight = 100;
+				textg.percentWidth = 100;
+				textg.text = cm.getGraphML();
+				graphmlTab.addChild(textg);
+				tabContainer.addChild(graphmlTab);
+				
+				cw.addChild(tabContainer);
+			}
+			
+			public function viewConsole():void
+			{
+				Main.log.open();
+				Main.log.openGroup(cm.Url);
 			}
 		]]>
 	</mx:Script>
-	<display:ComponentManagerAdvancedInformation height="100%" width="100%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="cmInfo" />
+	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" id="cmInfo">
+		<mx:GridRow width="100%">
+			<mx:GridItem width="30">
+				
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{cm.Hrn}" fontSize="17" fontWeight="bold" width="100%" selectable="true"/>
+				<display:ImageButton id="consoleButton"
+									 source="@Embed('../images/application_xp_terminal.png')"
+									 click="viewConsole()"
+									 toolTip="View log messages in the console" />
+				<display:ImageButton id="rpsecButton"
+									 source="@Embed('../images/page_white_code.png')"
+									 click="viewRspec()"
+									 toolTip="View Advertisement RSPEC" />
+				<display:ImageButton id="dotButton"
+									 source="@Embed('../images/chart_organisation.png')"
+									 click="openGraph()"
+									 toolTip="View the graph information" />
+				<display:ImageButton id="messageButton"
+									 source="@Embed('../images/flag_red.png')"
+									 click="viewMessage()"
+									 toolTip="View Message" />
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="URL" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Button label="{cm.Url}" toolTip="Click to visit URL"
+						   click="navigateToURL(new URLRequest(cm.VisitUrl()), '_blank');"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="URN" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Label text="{cm.Urn}" selectable="true"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<mx:Label text="Nodes" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<mx:Button id="nodesButton" click="DisplayUtil.viewNodeCollection(cm.AllNodes);"/>
+			</mx:GridItem>
+		</mx:GridRow>
+	</mx:Grid>
 </display:DefaultWindow>

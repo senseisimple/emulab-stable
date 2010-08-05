@@ -23,6 +23,7 @@ package protogeni.communication
     public function Request(newName:String = "", newDetails:String = "", qualifiedMethod : Array = null, shouldContinueOnErrors:Boolean = false, shouldWaitOnComplete:Boolean = false) : void
     {
       op = new Operation(qualifiedMethod);
+	  op.timeout = 180;
       name = newName;
 	  details = newDetails;
 	  continueOnError = shouldContinueOnErrors;

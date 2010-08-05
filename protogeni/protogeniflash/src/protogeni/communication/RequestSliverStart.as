@@ -14,51 +14,35 @@
 
 package protogeni.communication
 {
-  class RequestSliverStart extends Request
+	import protogeni.resources.Sliver;
+
+  public class RequestSliverStart extends Request
   {
-    public function RequestSliverStart(newManager : ComponentManager,
-                                       newNodes : ActiveNodes,
-									   newSliceUrn) : void
+    public function RequestSliverStart(s:Sliver) : void
     {
-      super(newManager.getName());
-      manager = newManager;
-      nodes = newNodes;
-	  sliceUrn = newSliceUrn;
+		super("SliverStart", "Starting sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.startSliver);
+		sliver = s;
+		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("credentials", new Array(sliver.slice.credential));
+		op.setExactUrl(sliver.componentManager.Url);
     }
-
-    override public function cleanup() : void
-    {
-      super.cleanup();
-    }
-
-    override public function start(credential : Credential) : Operation
-    {
-      nodes.changeState(manager, ActiveNodes.CREATED, ActiveNodes.BOOTED);
-      opName = "Booting Sliver";
-      op.reset(Geni.startSliver);
-      op.addField("slice_urn", sliceUrn);
-      op.addField("credentials", new Array(manager.getSliver()));
-      //? op.addField("impotent", Request.IMPOTENT);
-      op.setUrl(manager.getUrl());
-      return op;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      if (code == 0)
-      {
-        nodes.commitState(manager);
-      }
-      else
-      {
-        nodes.revertState(manager);
-      }
-      return null;
-    }
-
-    var manager : ComponentManager;
-    var nodes : ActiveNodes;
-	var sliceUrn : String;
+	
+	override public function complete(code : Number, response : Object) : *
+	{
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			// booted, get anything needed
+			
+			
+		}
+		else
+		{
+			// ??
+		}
+		
+		return null;
+	}
+	
+	public var sliver:Sliver;
   }
 }

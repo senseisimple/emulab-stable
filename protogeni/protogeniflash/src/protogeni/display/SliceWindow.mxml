@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow
 	xmlns:mx="http://www.adobe.com/2006/mxml"
-	xmlns:protogeniflash="protogeniflash.*"
+	xmlns:protogeniflash="protogeniflash.*" initialize="init()"
 	title="Slice" xmlns:display="protogeni.display.*">
 	
 	<mx:Script>
@@ -16,10 +16,13 @@
 			import mx.core.UIComponent;
 			import mx.events.FlexEvent;
 			
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
 			import protogeni.resources.ComponentManager;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
+			import protogeni.resources.VirtualNode;
 			
 			[Bindable]
 			private var cms:Array;
@@ -27,16 +30,23 @@
 			[Bindable]
 			public var nodes:ArrayCollection;
 			
+			private var cm:ComponentManager;
+			
+			public function init():void
+			{
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, loadNodes);
+			}
+			
 			public function loadNodes():void {
-				var cm:ComponentManager = Main.protogeniHandler.ComponentManagers[selectCm.selectedIndex] as ComponentManager;
+				cm = Main.protogeniHandler.ComponentManagers[selectCm.selectedIndex] as ComponentManager;
 				if(this.hideUnavailableCheckBox.selected)
 				{
 					nodes = cm.getAvailableNodes();
 					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
 					{
 						if(!sn.node.isVirtual &&
-								sn.node.manager == cm &&
-								nodes.getItemIndex(sn.node.physicalNode) > -1)
+							sn.node.manager == cm &&
+							nodes.getItemIndex(sn.node.physicalNode) > -1)
 							nodes.removeItemAt(nodes.getItemIndex(sn.node.physicalNode));
 					}
 				}
@@ -105,20 +115,13 @@
 		]]>
 	</mx:Script>
 	<mx:HBox width="100%">
-		<mx:Label text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold"/>
+		<mx:Label text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" selectable="true"/>
 		<mx:Spacer width="100%"/>
-		<mx:Label text="{sliceCanvas.slice.urn}"/>
+		<mx:Label text="{sliceCanvas.slice.urn}" selectable="true"/>
 		<display:ImageButton id="previewRspecButton"
 							 source="@Embed('../images/page_code.png')"
 							 click="previewRspec()"
 							 toolTip="Preview the Request RSPEC" />
-	</mx:HBox>
-	<mx:HBox width="100%">
-		<mx:Button label="Embed"/>
-		<mx:Label text="Slivers"/>
-		<mx:Button label="Create" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
-		<mx:Button label="Boot"/>
-		<mx:Button label="Delete"/>
 	</mx:HBox>
 	<mx:HDividedBox width="100%" height="100%">
 		<mx:VBox height="100%">
@@ -137,5 +140,12 @@
 			<display:SliceCanvas id="sliceCanvas" hostWindow="{this}">
 			</display:SliceCanvas>
 	</mx:HDividedBox>
+	<mx:ControlBar>
+		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
+		<display:ImageButton id="createButton" toolTip="Create slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);" source="{DisplayUtil.acceptIcon}"/>
+		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
+		<display:ImageButton id="bootButton" toolTip="Boot slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.bootSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
+		<mx:Button label="Embed"/>
+	</mx:ControlBar>
 	
 </display:DefaultWindow>
