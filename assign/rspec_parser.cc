@@ -28,7 +28,7 @@ rspec_parser :: rspec_parser (int type)
 
 rspec_parser :: ~rspec_parser ()
 {
-  free(this->emulabExtensions);
+  delete this->emulabExtensions;
 }
 
 struct link_interface rspec_parser :: getIface (const DOMElement* tag)

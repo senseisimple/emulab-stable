@@ -201,7 +201,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
    * All done, clean up memory
    */
 //     XMLPlatformUtils::Terminate();
-  free(rspecParser);
+  delete rspecParser;
   return 0;
 }
 
