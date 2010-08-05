@@ -36,7 +36,7 @@ using namespace std;
 annotate_rspec :: annotate_rspec ()
 {
   this->document = doc;
-  this->virtual_root = request_root;
+  this->virtual_root = dynamic_cast<DOMElement*>(dynamic_cast<DOMNode*>(request_root)->cloneNode(true));
   this->physical_elements = advertisement_elements;
   
   vector<DOMElement*> lan_links 
@@ -52,7 +52,7 @@ annotate_rspec :: annotate_rspec ()
       set<string> virtual_interface_ids;
       DOMNodeList* interfaces 
 	= lan_link->getElementsByTagName(XStr("interface_ref").x());
-      for (int j = 0; j < interfaces->getLength(); j++)
+      for (unsigned int j = 0; j < interfaces->getLength(); j++)
 	{
 	  DOMElement* interface 
 	    = dynamic_cast<DOMElement*>(interfaces->item(j));
@@ -117,7 +117,7 @@ void annotate_rspec::annotate_element (const char* v_name, const char* p_name)
 				     str_lan_link.c_str());
       DOMNodeList* component_hops 
 	= vlink->getElementsByTagName(XStr("component_hop").x());
-      for (int i = 0; i < component_hops->getLength(); i++) {
+      for (unsigned int i = 0; i < component_hops->getLength(); i++) {
 	DOMElement* component_hop 
 	  = dynamic_cast<DOMElement*>(component_hops->item(i));
 	copy_component_hop(lan_link, component_hop);
@@ -234,9 +234,6 @@ DOMElement* annotate_rspec::create_component_hop (const DOMElement* plink,
   DOMElement* component_hop = doc->createElement(XStr("component_hop").x());
   copy_component_spec(plink, component_hop);
   
-  DOMElement* component_hop_interface 
-    = doc->createElement(XStr("interface").x());
-  
   // We assume the first interface is the source and the second the dest
   DOMNodeList* pinterfaces 
     = plink->getElementsByTagName(XStr("interface_ref").x());
@@ -334,7 +331,7 @@ void annotate_rspec::copy_component_hop(DOMElement* lan_link,
 			= string(XStr(lan_link->getAttribute(XStr("virtual_id").x())).c());
 	DOMNodeList* interfaces 
 			= component_hop->getElementsByTagName(XStr("interface_ref").x());
-	for (int i = 0; i < interfaces->getLength(); i++)
+	for (unsigned int i = 0; i < interfaces->getLength(); i++)
 	{
 		DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(i));
 		if (interface->hasAttribute(XStr("virtual_interface_id").x()))
