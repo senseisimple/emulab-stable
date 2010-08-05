@@ -99,12 +99,11 @@ rspec_parser_v2 :: readLinkCharacteristics (const DOMElement* link,
   bool hasBandwidth, hasLatency, hasPacketLoss;
   count = properties->getLength();
 
-  //  if (count == 1) {
-    DOMElement* property = dynamic_cast<DOMElement*>(properties->item(0));
-    strBw = this->getAttribute(property, "capacity", hasBandwidth);
-    strLat = this->getAttribute(property, "latency", hasLatency);
-    strLoss = this->getAttribute(property, "packet_loss", hasPacketLoss);
-    //  }
+  // Read only from the first property and ignore the rest
+  DOMElement* property = dynamic_cast<DOMElement*>(properties->item(0));
+  strBw = this->getAttribute(property, "capacity", hasBandwidth);
+  strLat = this->getAttribute(property, "latency", hasLatency);
+  strLoss = this->getAttribute(property, "packet_loss", hasPacketLoss);
 
   int bandwidth = 0, latency = 0;
   float packetLoss = 0.0;

@@ -710,7 +710,10 @@ bool populate_link (DOMElement* elt,
 /*
  * Pull the links from the vtop file, and populate assign's own data sturctures
  */
-bool populate_links(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, pair<string, string> >* fixed_interfaces) {
+bool 
+populate_links(DOMElement *root, 
+	       tb_vgraph &vg, 
+	       map< pair<string, string>, pair<string, string> >*fixed_interfaces) {
     
     bool is_ok = true;
     /*
@@ -720,7 +723,7 @@ bool populate_links(DOMElement *root, tb_vgraph &vg, map< pair<string, string>, 
     DOMNodeList *links = root->getElementsByTagName(XStr("link").x());
     int linkCount = links->getLength();
     XMLDEBUG("Found " << links->getLength()  << " links in rspec" << endl);
-    for (size_t i = 0; i < linkCount; i++) {
+    for (int i = 0; i < linkCount; i++) {
         DOMNode *link = links->item(i);
         DOMElement *elt = dynamic_cast<DOMElement*>(link);
 	is_ok &= populate_link(elt, vg, fixed_interfaces);	
@@ -742,7 +745,7 @@ bool populate_vclass (struct vclass vclass, tb_vgraph& vg)
     vclass_map[name] = v;
   }
   
-  for (int i = 0; i < vclass.physicalTypes.size(); i++) {
+  for (unsigned int i = 0; i < vclass.physicalTypes.size(); i++) {
     fstring physType = XStr(vclass.physicalTypes[i].c_str()).f();
     v->add_type(physType);
     vclasses[name].push_back(physType);
@@ -758,7 +761,7 @@ bool populate_vclasses (DOMElement* root, tb_vgraph& vg)
   bool isOk = true;
   vector<struct vclass> vclasses = rspecParser->readVClasses(root);
   cerr << "Found " << vclasses.size() << " vclasses." << endl;
-  for (int i = 0; i < vclasses.size(); i++) {
+  for (unsigned int i = 0; i < vclasses.size(); i++) {
     isOk &= populate_vclass(vclasses[i], vg);
   }
   return isOk;
@@ -777,7 +780,7 @@ DOMElement* appendChildTagWithData (DOMElement* parent,
 
 string generate_virtualNodeId (string virtual_id) 
 {
- std:ostringstream oss;
+  std::ostringstream oss;
   struct timeval tv;
   struct timezone tz;
   gettimeofday(&tv, &tz);
@@ -787,7 +790,7 @@ string generate_virtualNodeId (string virtual_id)
 
 string generate_virtualIfaceId (string lan_name, int interface_number)
 { 
- std:ostringstream oss;
+  std::ostringstream oss;
   oss << lan_name << ":" << interface_number;
   return oss.str();
 }
