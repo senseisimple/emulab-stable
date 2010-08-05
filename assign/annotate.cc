@@ -66,7 +66,7 @@ void annotate::write_annotated_file (const char* filename)
   }
 
   // Serialize a DOMNode to the local file "<some-file-name>.xml"
-  writer->writeNode(outputFile, *(this->document));
+  writer->writeNode(outputFile, *(this->virtual_root));
   
   // Flush the buffer to ensure all contents are written
   outputFile->flush();
