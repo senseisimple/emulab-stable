@@ -44,7 +44,7 @@
 					return;
 				}
 
-				Main.protogeniHandler.rpcHandler.startSlice(sliceName.text);
+				Main.protogeniHandler.rpcHandler.createSlice(sliceName.text);
 			}
 			
 			public function refreshView(junk:* = null):void

@@ -29,6 +29,7 @@ package protogeni.communication
 		op.addField("keys", sliver.slice.creator.keys);
 		op.addField("credentials", new Array(sliver.slice.credential));
 		op.setExactUrl(sliver.componentManager.Url);
+		op.timeout = 360;
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -48,7 +49,16 @@ package protogeni.communication
 		}
 		else
 		{
-			// do nothing
+			// Cancel remaining calls
+			var tryDeleteNode:RequestQueueNode = this.node.next;
+			while(tryDeleteNode != null && tryDeleteNode is RequestSliverCreate && (tryDeleteNode as RequestSliverCreate).sliver.slice == sliver.slice)
+			{
+				Main.protogeniHandler.rpcHandler.remove(tryDeleteNode);
+				tryDeleteNode = tryDeleteNode.next;
+			}
+			
+			// Show the error
+			Main.log.open();
 		}
 		
 		return null;

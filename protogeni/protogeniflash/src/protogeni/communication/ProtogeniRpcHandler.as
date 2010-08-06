@@ -68,7 +68,7 @@
 			}
 		}
 		
-		public function startSlice(name:String) : void
+		public function createSlice(name:String) : void
 		{
 			var newSlice:Slice = new Slice();
 			newSlice.hrn = name;
@@ -79,6 +79,7 @@
 		
 		public function submitSlice(slice:Slice):void
 		{
+			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
 				if(sliver.created)
@@ -90,12 +91,14 @@
 		
 		public function refreshSlice(slice:Slice):void
 		{
+			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 				pushRequest(new RequestSliverStatus(sliver));
 		}
 		
 		public function deleteSlice(slice:Slice):void
 		{
+			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
 				//if(sliver.created)
@@ -105,11 +108,30 @@
 			}
 		}
 		
-		public function bootSlice(slice:Slice):void
+		public function startSlice(slice:Slice):void
 		{
+			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
 				pushRequest(new RequestSliverStart(sliver));
+			}
+		}
+		
+		public function stopSlice(slice:Slice):void
+		{
+			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+			for each(var sliver:Sliver in slice.slivers)
+			{
+				pushRequest(new RequestSliverStop(sliver));
+			}
+		}
+		
+		public function restartSlice(slice:Slice):void
+		{
+			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+			for each(var sliver:Sliver in slice.slivers)
+			{
+				pushRequest(new RequestSliverRestart(sliver));
 			}
 		}
 		
@@ -226,9 +248,7 @@
 				var next : * = queue.front().complete(code, response);
 				var shouldImmediatelyExit:Boolean = queue.head != null && queue.front().waitOnComplete;
 				if (next != null)
-				{
 					queue.push(next);
-				}
 				queue.front().cleanup();
 				queue.pop();
 				

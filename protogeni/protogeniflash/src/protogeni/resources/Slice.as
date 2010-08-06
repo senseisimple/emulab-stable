@@ -41,7 +41,7 @@
 		public var urn : String = null;
 		public var creator : User = null;
 		public var credential : String = "";
-		public var slivers : ArrayCollection = new ArrayCollection();
+		public var slivers:SliverCollection = new SliverCollection();
 		
 		public var validUntil:Date;
 
@@ -122,9 +122,22 @@
 			newSlice.urn = this.urn;
 			newSlice.creator = this.creator;
 			newSlice.credential = this.credential;
+			newSlice.validUntil = this.validUntil;
 			for each(var sliver:Sliver in this.slivers)
-			{
 				newSlice.slivers.addItem(sliver.clone(addOutsideReferences));
+			// Deal with the pointers to slivers since they're all created
+			for each(sliver in this.slivers)
+			{
+				for each(var node:VirtualNode in sliver.nodes)
+				{
+					for each(var nodeSliver:Sliver in node.slivers)
+						newSlice.slivers.getByUrn(sliver.urn).nodes.getById(node.id).slivers.push(newSlice.slivers.getByUrn(nodeSliver.urn));
+				}
+				for each(var link:VirtualLink in sliver.links)
+				{
+					for each(var linkSliver:Sliver in link.slivers)
+						newSlice.slivers.getByUrn(sliver.urn).links.getById(link.id).slivers.push(newSlice.slivers.getByUrn(linkSliver.urn));
+				}
 			}
 			return newSlice;
 		}

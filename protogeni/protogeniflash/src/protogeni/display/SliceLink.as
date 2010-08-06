@@ -6,7 +6,9 @@ package protogeni.display
 	import flash.events.MouseEvent;
 	
 	import mx.core.UIComponent;
+	import mx.effects.easing.Linear;
 	
+	import protogeni.resources.VirtualInterface;
 	import protogeni.resources.VirtualLink;
 	
 	public class SliceLink extends UIComponent
@@ -45,21 +47,33 @@ package protogeni.display
 			return startNode == node || endNode == node;
 		}
 		
+		public function establishFromExisting(vl:VirtualLink):void
+		{
+			
+			this.virtualLink = vl;
+			
+			removeButton = new ImageButton();
+			removeButton.source = DisplayUtil.notAvailableIcon;
+			removeButton.addEventListener(MouseEvent.CLICK, removeLink);
+			canvas.addChild(removeButton);
+			canvas.allLinks.addItem(this);
+
+			// For now just assume there's two ...
+			startNode = this.canvas.allNodes.getForVirtualNode(virtualLink.firstNode);
+			startNode.links.addItem(this);
+			
+			endNode = this.canvas.allNodes.getForVirtualNode(virtualLink.secondNode);
+			endNode.links.addItem(this);
+
+			established = true;
+		}
+		
 		public function establish(start:SliceNode, end:SliceNode):Boolean
 		{
 			virtualLink = new VirtualLink(start.node.slivers[0]);
 			if(virtualLink.establish(start.node, end.node))
 			{
-				removeButton = new ImageButton();
-				removeButton.source = DisplayUtil.notAvailableIcon;
-				removeButton.addEventListener(MouseEvent.CLICK, removeLink);
-				canvas.addChild(removeButton);
-				canvas.allLinks.addItem(this);
-				startNode = start;
-				endNode = end;
-				startNode.links.addItem(this);
-				endNode.links.addItem(this);
-				established = true;
+				establishFromExisting(virtualLink);
 				return true;
 			} else {
 				virtualLink = null;

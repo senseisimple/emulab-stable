@@ -31,9 +31,7 @@ package protogeni.communication
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			// booted, get anything needed
-			
-			
+			return new RequestSliverStatus(sliver);
 		}
 		else
 		{

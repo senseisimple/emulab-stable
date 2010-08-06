@@ -16,14 +16,13 @@ package protogeni.communication
 {
 	import protogeni.resources.Sliver;
 
-  public class RequestSliverUpdate extends Request
+  public class RequestSliverRestart extends Request
   {
-    public function RequestSliverUpdate(s:Sliver) : void
+    public function RequestSliverRestart(s:Sliver) : void
     {
-		super("SliverUpdate", "Updating sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.updateSliver);
+		super("SliverRestart", "Restarting sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.restartSliver);
 		sliver = s;
-		op.addField("sliver_urn", sliver.urn);
-		op.addField("rspec", sliver);
+		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("credentials", new Array(sliver.slice.credential));
 		op.setExactUrl(sliver.componentManager.Url);
     }
@@ -32,7 +31,7 @@ package protogeni.communication
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			return new RequestTicketUpdate(sliver, new XML(response.value));
+			return new RequestSliverStatus(sliver);
 		}
 		else
 		{

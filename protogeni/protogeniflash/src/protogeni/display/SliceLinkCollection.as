@@ -1,6 +1,8 @@
 package protogeni.display
 {
 	import mx.collections.ArrayCollection;
+	
+	import protogeni.resources.VirtualLink;
 
 	public class SliceLinkCollection extends ArrayCollection
 	{
@@ -26,6 +28,26 @@ package protogeni.display
 					newSliceCollection.addItem(sl);
 			}
 			return newSliceCollection;
+		}
+		
+		public function containsVirtualLink(vl:VirtualLink):Boolean
+		{
+			for each(var sl:SliceLink in this)
+			{
+				if(sl.virtualLink == vl)
+					return true;
+			}
+			return false;
+		}
+		
+		public function getVirtualLinkFor(vl:VirtualLink):SliceLink
+		{
+			for each(var sl:SliceLink in this)
+			{
+				if(sl.virtualLink == vl)
+					return sl;
+			}
+			return null;
 		}
 	}
 }
