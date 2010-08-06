@@ -88,19 +88,24 @@ package protogeni.communication
     public static var register : Array = new Array(sa, "Register");
 
     public static var discoverResources : Array = new Array(cm, "DiscoverResources");
+	public static var resolveResource : Array = new Array(cm, "Resolve");
+	// Ticket
     public static var getTicket : Array = new Array(cm, "GetTicket");
     public static var updateTicket : Array = new Array(cm, "UpdateTicket");
     public static var redeemTicket : Array = new Array(cm, "RedeemTicket");
     public static var releaseTicket : Array = new Array(cm, "ReleaseTicket");
-    public static var deleteSlice : Array = new Array(cm, "DeleteSlice");
-    public static var startSliver : Array = new Array(cm, "StartSliver");
-    public static var updateSliver : Array = new Array(cm, "UpdateSliver");
-    public static var resolveResource : Array = new Array(cm, "Resolve");
+	// Slice
     public static var sliceStatus : Array = new Array(cm, "SliceStatus");
+	public static var deleteSlice : Array = new Array(cm, "DeleteSlice");
+	// Sliver
     public static var getSliver : Array = new Array(cm, "GetSliver");
     public static var sliverStatus : Array = new Array(cm, "SliverStatus");
     public static var sliverTicket : Array = new Array(cm, "SliverTicket");
     public static var createSliver : Array = new Array(cm, "CreateSliver");
+	public static var startSliver : Array = new Array(cm, "StartSliver");
+	public static var stopSliver : Array = new Array(cm, "StopSliver");
+	public static var restartSliver : Array = new Array(cm, "RestartSliver");
+	public static var updateSliver : Array = new Array(cm, "UpdateSliver");
 
     public static var map : Array = new Array(ses, "Map");
 

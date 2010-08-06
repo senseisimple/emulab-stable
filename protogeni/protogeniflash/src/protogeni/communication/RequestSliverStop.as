@@ -16,15 +16,14 @@ package protogeni.communication
 {
 	import protogeni.resources.Sliver;
 
-  public class RequestSliverStart extends Request
+  public class RequestSliverStop extends Request
   {
-    public function RequestSliverStart(s:Sliver) : void
+    public function RequestSliverStop(s:Sliver) : void
     {
-		super("SliverUpdate", "Booting sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.startSliver);
+		super("SliverStop", "Stopping sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.stopSliver);
 		sliver = s;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.addField("ticket", ticket);
 		op.setExactUrl(sliver.componentManager.Url);
     }
 	
@@ -32,7 +31,7 @@ package protogeni.communication
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			// booted
+			return new RequestSliverStatus(sliver);
 		}
 		else
 		{

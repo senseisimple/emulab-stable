@@ -19,6 +19,7 @@ package protogeni.communication
     public function RequestQueueNode(newItem : *) : void
     {
       item = newItem;
+	  item.node = this;
       next = null;
     }
 

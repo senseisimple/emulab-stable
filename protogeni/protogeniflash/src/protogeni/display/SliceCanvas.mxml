@@ -18,6 +18,7 @@
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
+			import protogeni.resources.VirtualLink;
 			import protogeni.resources.VirtualNode; 
 			
 			[Bindable]
@@ -34,17 +35,25 @@
 			
 			public function load(newSlice:Slice):void
 			{
+				// Clone it so we can make changes w/o affecting original
 				slice = newSlice.clone(false);
 				
+				// Nodes
 				for each(var s:Sliver in slice.slivers)
 				{
-					// load!
+					for each(var n:VirtualNode in s.nodes)
+						this.addVirtualNodeToCanvas(n);
 				}
 				
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refreshSlice);
+				// Links
+				for each(s in slice.slivers)
+				{
+					for each(var l:VirtualLink in s.links)
+						this.addVirtualLinkToCanvas(l);
+				}
 			}
-			
-			public function refreshSlice(junk:*):void
+
+			public function refreshSlice():void
 			{
 				for each(var sn:SliceNode in this.allNodes)
 					sn.resetToStatus();
@@ -111,9 +120,63 @@
 				hostWindow.loadNodes();
 			}
 			
-			public function addPhysicalNode(pn:PhysicalNode, x:int = -1, y:int = -1):SliceNode
+			public function addVirtualLinkToCanvas(vl:VirtualLink):SliceLink
+			{
+				if(this.allLinks.containsVirtualLink(vl))
+					return this.allLinks.getVirtualLinkFor(vl);
+				
+				var sl:SliceLink = new SliceLink(this);
+				sl.establishFromExisting(vl);
+				sl.drawEstablished();
+				this.addChild(sl);
+				validateNow();
+				redrawAllLinks();
+				return sl;
+			}
+			
+			public function addVirtualNodeToCanvas(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode
+			{
+				if(allNodes.containsVirtualNode(vn))
+					return allNodes.getForVirtualNode(vn);
+				
+				var sn:SliceNode = new SliceNode();
+				sn.setNode(vn);
+				addSliceNode(sn, x, y);
+				return sn;
+			}
+			
+			public function addVirtualNode(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode
 			{
 				// Don't duplicate
+				if(allNodes.containsVirtualNode(vn))
+					return allNodes.getForVirtualNode(vn);
+				
+				var sn:SliceNode = addVirtualNodeToCanvas(vn, x, y);
+				if(!(vn.slivers[0] as Sliver).nodes.contains(vn))
+					(vn.slivers[0] as Sliver).nodes.addItem(vn);
+				
+				// See if we need to connect to a parent node
+				if(vn.superNode != null)
+				{
+					if(!allNodes.containsVirtualNode(vn.superNode))
+						sn.node.superNode = addVirtualNode(vn.superNode, x + 40, y + 40).node;
+					else
+						sn.node.superNode = allNodes.getForVirtualNode(vn.superNode).node;
+					sn.node.superNode.subNodes.push(sn.node);
+				} else if(vn.physicalNode != null && vn.physicalNode.subNodeOf != null)
+				{
+					if(!allNodes.containsPhysicalNode(vn.physicalNode.subNodeOf))
+						sn.node.superNode = addPhysicalNode(vn.physicalNode.subNodeOf, x + 40, y + 40).node;
+					else
+						sn.node.superNode = allNodes.getForPhysicalNode(vn.physicalNode.subNodeOf).node;
+					sn.node.superNode.subNodes.push(sn.node);
+				}
+				
+				return sn;
+			}
+			
+			public function addPhysicalNodeToCanvas(pn:PhysicalNode, x:int = -1, y:int = -1):SliceNode
+			{
 				if(allNodes.containsPhysicalNode(pn))
 					return allNodes.getForPhysicalNode(pn);
 				
@@ -121,17 +184,21 @@
 				var newVirtualNode:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(pn.manager));
 				newVirtualNode.setToPhysicalNode(pn);
 				sn.setNode(newVirtualNode);
-				sn.canvas = this;
-				this.addChild(sn);
-				this.validateNow();
-				sn.width = sn.width + (sn.nameLabel.textWidth - sn.nameLabel.width)
-				sn.x = x - (sn.width/2);
-				sn.y = y - (sn.height/2);
-				allNodes.addItem(sn);
-				hostWindow.loadNodes();
-				newVirtualNode.slivers[0].nodes.addItem(newVirtualNode);
+				addSliceNode(sn, x, y);
+				return sn;
+			}
+			
+			public function addPhysicalNode(pn:PhysicalNode, x:int = -1, y:int = -1):SliceNode
+			{
+				// Don't duplicate
+				if(allNodes.containsPhysicalNode(pn))
+					return allNodes.getForPhysicalNode(pn);
 				
-				// See if we need to connected to a parent node
+				var sn:SliceNode = addPhysicalNodeToCanvas(pn, x, y);
+				if(!(sn.node.slivers[0] as Sliver).nodes.contains(sn.node))
+					(sn.node.slivers[0] as Sliver).nodes.addItem(sn.node);
+				
+				// See if we need to connect to a parent node
 				if(pn.subNodeOf != null)
 				{
 					if(!allNodes.containsPhysicalNode(pn.subNodeOf))
@@ -143,6 +210,21 @@
 				}
 				
 				return sn;
+			}
+			
+			public function addSliceNode(sn:SliceNode, x:int = -1, y:int = -1):void
+			{
+				if(allNodes.contains(sn))
+					return;
+				sn.canvas = this;
+				this.addChild(sn);
+				this.validateNow();
+				sn.width = sn.width + (sn.nameLabel.textWidth - sn.nameLabel.width);
+				sn.setLocation(x, y);
+				allNodes.addItem(sn);
+				
+				if(sn.node.physicalNode != null && hostWindow.nodes != null && hostWindow.nodes.getItemIndex(sn.node.physicalNode) > -1)
+					hostWindow.nodes.removeItemAt(hostWindow.nodes.getItemIndex(sn.node.physicalNode));
 			}
 			
 			public function startLinkingFrom(node:SliceNode):void
@@ -202,8 +284,11 @@
 			public function redrawAllLinks():void
 			{
 				for each(var sl:SliceLink in allLinks)
+				{
 					sl.drawEstablished();
 					this.setChildIndex(sl, 0);
+				}
+					
 			}
 
 		]]>

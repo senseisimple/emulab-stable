@@ -97,15 +97,15 @@
 			
 			private function doScroll(event:FlexEvent): void
 			{
-				verticalScrollPosition=maxVerticalScrollPosition
-				validateNow();
-				removeEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
+				logs.verticalScrollPosition = logs.maxVerticalScrollPosition
+				logs.validateNow();
+				logs.removeEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
 			}
 
 			
 			private function addMessage(msg:LogMessage):void
 			{
-				addEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
+				logs.addEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
 				if(msg.type == LogMessage.TYPE_START)
 				{
 					var split:Spacer = new Spacer();

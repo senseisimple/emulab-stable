@@ -18,6 +18,19 @@ package protogeni.resources
 			Main.protogeniHandler.dispatchSlicesChanged();
 		}
 		
+		public function addOrReplace(s:Slice):void
+		{
+			for each(var existing:Slice in this)
+			{
+				if(existing.urn == s.urn)
+				{
+					existing = s;
+					return;
+				}
+			}
+			add(s);
+		}
+		
 		private function compare(slicea:Slice, sliceb:Slice):int {
 			return ObjectUtil.compare(slicea.CompareValue(), sliceb.CompareValue());
 		}

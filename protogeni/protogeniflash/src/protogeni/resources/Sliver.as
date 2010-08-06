@@ -43,12 +43,13 @@
 		public var urn : String = null;
 		
 		public var ticket:XML;
+		public var manifest:XML;
 		
 		public var state : String;
 		public var status : String;
 		
-		public var nodes:ArrayCollection = new ArrayCollection();
-		public var links:ArrayCollection = new ArrayCollection();
+		public var nodes:VirtualNodeCollection = new VirtualNodeCollection();
+		public var links:VirtualLinkCollection = new VirtualLinkCollection();
 		
 		public var slice : Slice;
 		
@@ -89,8 +90,8 @@
 		
 		public function parseRspec():void
 		{
-			nodes = new ArrayCollection();
-			links = new ArrayCollection();
+			nodes = new VirtualNodeCollection();
+			links = new VirtualLinkCollection();
 			
 			var nodesById:Dictionary = new Dictionary();
 			
@@ -120,7 +121,7 @@
       			virtualNode.virtualizationType = nodeXml.@virtualization_type;
 				if(nodeXml.@virtualization_subtype != null)
 					virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;
-      			virtualNode.physicalNode = componentManager.Nodes.GetByUrn(nodeXml.@component_urn);
+				virtualNode.setToPhysicalNode(componentManager.Nodes.GetByUrn(nodeXml.@component_urn));
       			for each(var ix:XML in nodeXml.children()) {
 	        		if(ix.localName() == "interface") {
 	        			var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
@@ -134,6 +135,15 @@
       			nodesById[virtualNode.id] = virtualNode;
       			virtualNode.physicalNode.virtualNodes.addItem(virtualNode);
       		}
+			
+			for each(var vn:VirtualNode in nodes)
+			{
+				if(vn.physicalNode.subNodeOf != null)
+				{
+					vn.superNode = nodes.getById(vn.physicalNode.subNodeOf.name);
+					nodes.getById(vn.physicalNode.subNodeOf.name).subNodes.push(vn);
+				}
+			}
       		
       		for each(var linkXml:XML in linksXml)
       		{
@@ -147,21 +157,23 @@
       					virtualLink.bandwidth = viXml.toString();
 	        		if(viXml.localName() == "interface_ref") {
 	        			var vid:String = viXml.@virtual_interface_id;
-      				var nid:String = viXml.@virtual_node_id;
-      				var interfacedNode:VirtualNode = nodesById[nid];
-      				for each(var vi:VirtualInterface in interfacedNode.interfaces)
-      				{
-      					if(vi.id == vid)
-      					{
-      						virtualLink.interfaces.addItem(vi);
-      						vi.virtualLinks.addItem(virtualLink);
-      						break;
-      					}
-      				}
+	      				var nid:String = viXml.@virtual_node_id;
+	      				var interfacedNode:VirtualNode = nodesById[nid];
+	      				for each(var vi:VirtualInterface in interfacedNode.interfaces.collection)
+	      				{
+	      					if(vi.id == vid)
+	      					{
+	      						virtualLink.interfaces.addItem(vi);
+	      						vi.virtualLinks.addItem(virtualLink);
+	      						break;
+	      					}
+	      				}
       				}
 	        	}
       			
       			virtualLink.rspec = linkXml.copy();
+				virtualLink.firstNode = (virtualLink.interfaces[0] as VirtualInterface).virtualNode;
+				virtualLink.secondNode = (virtualLink.interfaces[1] as VirtualInterface).virtualNode;
       			links.addItem(virtualLink);
       		}
 		}
@@ -178,16 +190,21 @@
 		public function clone(addOutsideReferences:Boolean = true):Sliver
 		{
 			var newSliver:Sliver = new Sliver(slice);
+			newSliver.created = this.created;
 			newSliver.credential = this.credential;
 			newSliver.componentManager = this.componentManager;
 			newSliver.rspec = this.rspec;
 			newSliver.urn = this.urn;
+			newSliver.ticket = this.ticket;
+			newSliver.manifest = this.manifest;
 			newSliver.state = this.state;
 			newSliver.status = this.status;
-			newSliver.created = this.created;
+			newSliver.validUntil = this.validUntil;
 			
+			// Nodes
 			var oldNodeToCloneNode:Dictionary = new Dictionary();
 			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
+			var retrace:Array = new Array();
 			for each(var node:VirtualNode in this.nodes)
 			{
 				var newNode:VirtualNode = new VirtualNode(newSliver);
@@ -197,15 +214,23 @@
 				newNode.physicalNode = node.physicalNode;
 				newNode.manager = node.manager;
 				newNode.urn = node.urn;
+				newNode.uuid = node.uuid;
 				newNode.isShared = node.isShared;
 				newNode.isVirtual = node.isVirtual;
-				newNode.superNode = node.superNode;
+				// supernode? add later ...
+				// subnodes? add later ...
+				retrace.push({clone:newNode, old:node});
 				newNode.diskImage = node.diskImage;
 				newNode.tarfiles = node.tarfiles;
 				newNode.startupCommand = node.startupCommand;
 				newNode.hostname = node.startupCommand;
 				newNode.rspec = node.rspec;
-				for each(var vi:VirtualInterface in node.interfaces)
+				newNode.sshdport = node.sshdport;
+				newNode.error = node.error;
+				newNode.state = node.state;
+				newNode.status = node.status;
+				// slivers? add later ...
+				for each(var vi:VirtualInterface in node.interfaces.collection)
 				{
 					var virtualInterface:VirtualInterface = new VirtualInterface(newNode);
 					virtualInterface.id = vi.id;
@@ -226,15 +251,32 @@
 				oldNodeToCloneNode[node] = newNode;
 			}
 
+			// supernode and subnodes need to be added after to ensure they were created
+			for each(var check:Object in retrace)
+			{
+				var cloneNode:VirtualNode = check.clone;
+				var oldNode:VirtualNode = check.old;
+				if(oldNode.superNode != null)
+					cloneNode.superNode = newSliver.nodes.getById(oldNode.id);
+				if(oldNode.subNodes != null && oldNode.subNodes.length > 0)
+				{
+					for each(var subNode:VirtualNode in oldNode.subNodes)
+						cloneNode.subNodes.push(newSliver.nodes.getById(subNode.id));
+				}
+			}
 			
+			// Links
 			for each(var link:VirtualLink in this.links)
 			{
 				var newLink:VirtualLink = new VirtualLink(newSliver);
 				newLink.id = link.id;
 				newLink.type = link.type;
 				newLink.bandwidth = link.bandwidth;
-				newLink.rspec = link.rspec;
+				newLink.firstTunnelIp = link.firstTunnelIp;
+				newLink.secondTunnelIp = link.secondTunnelIp;
 				newLink._isTunnel = link._isTunnel;
+				newLink.rspec = link.rspec;
+				// Slivers?  add later ...
 				
 				newLink.firstNode = oldNodeToCloneNode[link.firstNode];
 				newLink.secondNode = oldNodeToCloneNode[link.secondNode];

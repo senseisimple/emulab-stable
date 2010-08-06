@@ -77,5 +77,7 @@ package protogeni.communication
 	public var details:String;
 	public var waitOnComplete:Boolean;
 	public var continueOnError:Boolean;
+	
+	public var node:RequestQueueNode;
   }
 }

@@ -42,6 +42,16 @@ package protogeni.display
 			return null;
 		}
 		
+		public function getForVirtualNode(node:VirtualNode):SliceNode
+		{
+			for each (var sn:SliceNode in this)
+			{
+				if(sn.node == node)
+					return sn;
+			}
+			return null;
+		}
+		
 		public function seperateNodesByComponentManager():Array
 		{
 			var completedCms:ArrayCollection = new ArrayCollection();
