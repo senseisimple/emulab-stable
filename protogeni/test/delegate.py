@@ -16,6 +16,7 @@
 import datetime
 import getopt
 import os
+import random
 import re
 import sys
 import tempfile
@@ -200,10 +201,13 @@ old = Lookup( doc.documentElement, "credential" )
 
 c = doc.createElement( "credential" )
 
-id = 1
-while filter( lambda x: x.getAttribute( "xml:id" ) == "ref" + str( id ),
-              doc.getElementsByTagName( "credential" ) ):    
-    id = id + 1
+# I really want do loops in Python...
+while True:
+    id = "ref" + '%016X' % random.getrandbits( 64 )
+    if not filter( lambda x: x.getAttribute( "xml:id" ) == "ref" + str( id ),
+                   doc.getElementsByTagName( "credential" ) ):
+        break
+
 c.setAttribute( "xml:id", "ref" + str( id ) )
 c.appendChild( Lookup( old, "type" ).cloneNode( True ) )
 
