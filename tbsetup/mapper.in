@@ -484,7 +484,8 @@ sub RunAssign($$)
     if ($userspec == 1) {
 	$ptopargs .= "-x -g 2 ";
     }
-    $ptopargs .= "-l $typelimitfile";
+    $ptopargs .= "-l $typelimitfile"
+	if (scalar(keys(%admission_control)));
 
     chat("ptopargs: '$ptopargs'\n");
     TBDebugTimeStamp("ptopgen started");
