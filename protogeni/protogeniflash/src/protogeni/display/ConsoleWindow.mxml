@@ -90,9 +90,7 @@
 			public function appendMessage(msg:LogMessage):void {
 				logList.push(msg);
 				if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
-				{
 					addMessage(msg);
-				}
 			}
 			
 			private function doScroll(event:FlexEvent): void

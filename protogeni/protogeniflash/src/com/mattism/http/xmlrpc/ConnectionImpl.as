@@ -44,6 +44,8 @@ package com.mattism.http.xmlrpc
     private var _parsed_response : Object;
 
     private var _fault : MethodFault;
+	
+	public var timeout:int = 60;
 
     public function ConnectionImpl(url : String)
     {
@@ -128,7 +130,7 @@ package com.mattism.http.xmlrpc
 			trace("A SecurityError has occurred.");
 		}
 
-        observeTimeout(60);
+        observeTimeout(timeout);
       }
     }
 
