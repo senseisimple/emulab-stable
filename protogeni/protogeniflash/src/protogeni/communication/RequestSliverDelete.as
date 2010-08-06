@@ -31,7 +31,8 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				sliver.slice.slivers.removeItemAt(sliver.slice.slivers.getItemIndex(sliver));
+				if(sliver.slice.slivers.getItemIndex(sliver) > -1)
+					sliver.slice.slivers.removeItemAt(sliver.slice.slivers.getItemIndex(sliver));
 				Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 			}
 			else

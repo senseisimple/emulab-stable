@@ -69,7 +69,11 @@
 					this.styleName = "failedStyle";
 					this.toolTip = "Error: " + node.error;
 				} else {
-					this.toolTip = "State: " + node.state + " Status: " + node.status;
+					if(node.state == null || node.status == null ||
+						(node.state.length == 0 && node.status.length == 0))
+						toolTip = "Name: " + node.id + "\nURN: " + node.urn;
+					else
+						toolTip = "State: " + node.state + " Status: " + node.status;
 					if(node.status == VirtualNode.STATUS_CHANGING)
 						this.styleName = "inprogressStyle";
 					else
@@ -80,7 +84,7 @@
 			public function setNode(n:VirtualNode):void
 			{
 				node = n;
-				toolTip = "Name: " + n.id + "\nURN: " + n.urn;
+				resetToStatus();
 				links = new ArrayCollection();
 			}
 			
@@ -123,8 +127,11 @@
 				var finalY:int = y;
 				if(x == -1)
 				{
-					finalX = Math.round(Math.random() * parent.height);
-					finalY = Math.round(Math.random() * parent.width);
+					while(Math.abs(finalX - finalY) < 20)
+					{
+						finalX = Math.round(Math.random() * parent.width);
+						finalY = Math.round(Math.random() * parent.height);
+					}
 				}
 				this.x = finalX - (this.width/2);
 				this.y = finalY - (this.height/2);

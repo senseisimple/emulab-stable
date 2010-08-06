@@ -90,6 +90,8 @@
 		
 		public function parseRspec():void
 		{
+			this.validUntil = Util.parseProtogeniDate(rspec.@valid_until);
+			
 			nodes = new VirtualNodeCollection();
 			links = new VirtualLinkCollection();
 			

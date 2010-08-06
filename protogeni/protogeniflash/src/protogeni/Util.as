@@ -51,6 +51,16 @@ package protogeni
 		return replaceString(replaceString(name, ".", ""), "-", "");
 	}
 	
+	public static function parseProtogeniDate(value:String):Date
+	{
+		var dateString:String = value;
+		dateString = dateString.replace(/(\d{4,4})\-(\d{2,2})\-(\d{2,2})/g, "$1/$2/$3");
+		dateString = dateString.replace("T", " ");
+		dateString = dateString.replace(/(\+|\-)(\d+):(\d+)/g, " GMT$1$2$3");
+		dateString = dateString.replace("Z", " GMT-0000");
+		return new Date(Date.parse(dateString));
+	}
+	
 	public static function findInAny(text:Array, candidates:Array, matchAll:Boolean = false, caseSensitive:Boolean = false):Boolean
 	{
 		if(!caseSensitive)
