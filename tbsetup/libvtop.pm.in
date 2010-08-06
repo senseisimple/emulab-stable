@@ -247,9 +247,11 @@ sub Create($$$)
     my $self = {};
     bless($self, $class);
 
-    $self->{'VIRTNODE'} = $virt_node;
-    $self->{'VTOP'}     = $vtop;
-    $self->{'HASH'}     = {};
+    $self->{'VIRTNODE'}   = $virt_node;
+    $self->{'VTOP'}       = $vtop;
+    $self->{'HASH'}       = {};
+    # The virtlans this virtnode is a member of. 
+    $self->{'MEMBERSHIP'} = {};
     
     return $self;
 }
@@ -257,6 +259,8 @@ sub Create($$$)
 sub virt_node($)	{ return $_[0]->{'VIRTNODE'}; }
 sub vtop($)		{ return $_[0]->{'VTOP'}; }
 sub hash($)		{ return $_[0]->{'HASH'}; }
+sub membership($)       { return $_[0]->{'MEMBERSHIP'}; }
+sub memberlist($)       { return values(%{ $_[0]->{'MEMBERSHIP'} }); }
 
 # Break circular reference someplace to avoid exit errors.
 sub DESTROY {
@@ -265,6 +269,7 @@ sub DESTROY {
     $self->{'VIRTNODE'}   = undef;
     $self->{'VTOP'}       = undef;
     $self->{'HASH'}       = undef;
+    $self->{'MEMBERSHIP'} = undef;
 }
 
 sub Stringify($)
@@ -1036,6 +1041,9 @@ sub LoadVirtLans($)
 	# Global map from vnode:port back to the lan object
 	$self->memberof()->{$vlanmember->member()} = $virtlan;
 
+	# Each virt_node has a list of all virt_lans it belongs to.
+	$vlanmember->virt_node()->membership()->{"$virtlan"} = $virtlan;
+
 	# Other fields we need below
 	my $delay          = $vlanmember->delay();
 	my $bandwidth      = $vlanmember->bandwidth();
@@ -1234,7 +1242,7 @@ sub GenVirtNodes($)
 		return -1;
 	    }
 	    my $ref = { 'virtual_id'    => $vname,
-			'component_urn' => $vnode->fixed(),
+			'request_urn'   => $vnode->fixed()   
 		      };
 	    if ($vnode->_isvirtnode()) {
 		$ref->{'virtualization_type'} = 'emulab-vnode';
@@ -1410,7 +1418,7 @@ sub GenFixNodes($)
 	    tbwarn("GenFixNodes: No fixed node for $vname\n");
 	}
 
-	# Normal nodes have a vnodem but delay nodes do not.
+	# Normal nodes have a vnode but delay nodes do not.
 	if (!defined($vnode) && !$self->isadelaynode($vname)) {
 	    tbwarn("GenFixNodes: No vnode for $vname\n");
 	}
@@ -1894,46 +1902,25 @@ sub GenVirtLans($)
 	    $trivial_ok = $vlan->_trivial_ok();
 
 	    if ($sharednodes) {
-		my $newencap;
-
-		if ($sharednodes != $allnodes || $vlan->_needvlan()) {
-		    #
-		    # Change the encap type to vlan since that is supported.
-		    #
-		    if ($nodesdo{"vlan"} == $allnodes) {
-			$newencap = "vlan";
-		    }
-		    # Force this on.
-		    $emulated   = 1;
-		}
-		else {
-		    if ($nodesdo{"veth-en"} == $allnodes) {
-			# Veth means encapsulated.
-			$newencap = "veth";
-		    }
-		    elsif ($nodesdo{"veth-ne"} == $allnodes) {
-			$newencap = "veth-ne";
-		    }
-		    elsif ($nodesdo{"vlan"} == $allnodes) {
-			$newencap = "vlan";
-		    }
-		    # Force this on.
-		    $emulated   = 1;
-		}
-		if (defined($newencap)) {
-		    $encapval = $newencap;
-		    $vlan->_emulated($emulated);
-		    $vlan->_encapstyle($newencap);
-
-		    $self->printdb("Converting encapstyle to ".
-				   "$encapval on $vname\n");
-		}
-		else {
-		    tberror("Cannot find a common encapstyle for $vname\n");
+		#
+		# All nodes must support vlan encapsulation since that is how we
+		# create the links. Even if only one node in the link or
+		# lan is on a shared node, they must all do vlan encap.
+		# If none of the nodes land on a shared node, then use the
+		# requested vlan encap. Right, this decision is actually made
+		# later after assign maps the resources.
+		#
+		if ($nodesdo{"vlan"} != $allnodes) {
+		    tberror("Shared nodes requested for $vname, but vlan encapsulation\n".
+			    "not supported on all nodes.\n");
 		    $errors++;
 		}
 	    }
-	    elsif ($nodesdo{$encapval} == $allnodes) {
+	    #
+	    # Regardless of shared nodes, there must be a common encapsulation style
+	    # in case no shared nodes are used (and vlan encap is not needed).
+	    #
+	    if ($nodesdo{$encapval} == $allnodes) {
 		#
 		# All members support the encapsulation style, use it.
 		#
@@ -2340,7 +2327,7 @@ sub GenVirtLans($)
 		    if (defined($fixed) && $fixed ne "") {
 			my ($authority,$type,$nodeid) = GeniHRN::Parse($fixed);
 			
-			$noderef->{'component_urn'} =
+			$noderef->{'request_urn'} =
 			    GeniHRN::Generate($authority, "node", "*");
 		    }
 		    my $ref = {
@@ -3189,7 +3176,7 @@ sub AddLinkToSolution($$$$$$$$)
 	tberror("Bad vlink in solution: $vlink\n");
 	return -1;
     }
-	
+
     $self->solution_plinks()->{$vlink} =
 	[$linktag,$virtlan,$trivial,$direct,$member0,$member1];
     if (!$trivial) {
@@ -3678,14 +3665,15 @@ sub AllocNodes($)
 		$self->fixednodes()->{$vname} = $nodeid;
 
 		# And add to the results for the next vtop print.
-		$self->addfixed("$vname $nodeid");
+		$self->addfixed("$vname $nodeid")
+		    if (!$pnode->isfednode());
 	    }
 	}
     }
     
     if ($exitval > 0) {
 	#
-	# We got some but no all the nodes.
+	# We got some but not all the nodes.
 	#
 	my $rcount    = scalar(@reserved);
 	my $tcount    = scalar(@nodeids);
@@ -3726,7 +3714,8 @@ sub AllocNodes($)
 		    $self->fixednodes()->{$vname} = $nodeid;
 
 		    # And add to the results for the next vtop print.
-		    $self->addfixed("$vname $nodeid");
+		    $self->addfixed("$vname $nodeid")
+			if (!$pnode->isfednode());
 		}
 	    }
 	}
@@ -3799,11 +3788,45 @@ sub AllocNodes($)
     if (defined($self->rspec()) &&
 	!($self->impotent() || $self->alloconly())) {
 	$self->printdb("Requesting geni tickets ...\n");
-	
-	if (libGeni::GetTickets($self->experiment(), $self->verbose(),
-				$self->user(), $self->rspec())) {
-	    tberror("Could not allocate Geni Tickets\n");
-	    return -1;
+
+	my $progress = libGeni::GetTickets($self->experiment(),
+					   $self->verbose(),
+					   $self->user(), $self->rspec());
+	if ($progress) {
+	    tberror("Error allocating (some) Geni Tickets\n");
+	    #
+	    # Need to find out what geni nodes we could not get tickets for.
+	    # The local proxy nodes for them need to be released, and if we
+	    # made forward progress, we try again in another loop through.
+	    # The rest of the solution state will get cleared before
+	    # the next loop, but calling nfree is easiest here. 
+	    #
+	    my @tofree = ();
+	    
+	    foreach my $pnode (@reserved) {
+		my $nodeid = $pnode->node_id();
+
+		#
+		# XXX See libGeni; it sets external_resource_index if the
+		# if we get a ticket. Need a state variable instead. 
+		#
+		if (exists($self->solution()->{'TORESERVE'}->{$nodeid}) &&
+		    !defined($pnode->external_resource_index())) {
+		    push(@tofree, $nodeid);
+		}
+	    }
+	    if (@tofree) {
+		tbinfo("Releasing unticketed nodes: @tofree\n");
+		system("$NFREE $pid $eid @tofree");
+		if ($?) {
+		    tberror("Could not free unticketed nodes\n");
+		    return -1;
+		}
+		foreach my $nodeid (@tofree) {
+		    delete($self->newreserved()->{$nodeid});
+		}
+	    }
+	    return $progress;
 	}
 	tbinfo("Successfully got all geni tickets we needed.\n");
     }
@@ -3891,6 +3914,18 @@ sub AllocNodes($)
 		$self->pnodes()->{$vpnode->node_id()} = $vpnode;
 		$virtnode->_onsharednode($pnode->_sharedhost());
 		$virtnode->_pnode($vpnode);
+
+		#
+		# Minor post processing; Whenever a shared node is
+		# selected by assign, must reset the encap style of
+		# the lans it is a memberof, to vlan encap.
+		#
+		if ($virtnode->_onsharednode()) {
+		    foreach my $virtlan ($virtnode->memberlist()) {
+			$virtlan->_needvlan(1);
+			$virtlan->_encapstyle("vlan");
+		    }
+		}
 	    }
 	    else {
 		# Default this for physnodes.
@@ -4444,14 +4479,9 @@ sub InterpLinks($)
 		    # there is a postpass to merge the vlans into a single
 		    # supervlan since a nodeport can be in just a single vlan.
 		    #
-		    # If both nodes shared, do not need the vlan.
-		    # If only one of the nodes is shared, must still create
-		    # an underlying vlan. 
-		    # 
 		    #
-		    if ((!($virtnodeA->_onsharednode() &&
-			   $virtnodeB->_onsharednode())) ||
-			$virtlan->_needvlan()) {
+		    if ($virtnodeA->_onsharednode() ||
+			$virtnodeB->_onsharednode() || $virtlan->_needvlan()) {
 			my $lanid = "v" . "$lan" . $vlanid++;
 
 			$protovlan = ProtoLan->Create($experiment, $lanid,
@@ -4561,7 +4591,7 @@ sub InterpLinks($)
 				   "$nodeA:$portA,$nodeB:$portB\n");
 		    
 		    $protolink = ProtoLan->Create($experiment, $lan,
-						  $self->impotent(),
+						  $self->impotent() ||
 						  $self->alloconly());
 		    $protolink->SetType("trivial");
 		    $protolink->SetRole("link/lan");
@@ -4619,9 +4649,7 @@ sub InterpLinks($)
 		    #
 		    my $protovlan;
 		    
-		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() != $virtlan->memberlist() ||
-			$virtlan->_needvlan()) {
+		    if (!$virtlan->_sharednodes() || $virtlan->_needvlan()) {
 			if (exists($protovlans{$lan})) {
 			    $protovlan = $protovlans{$lan};
 			}
@@ -4965,6 +4993,8 @@ sub InterpLinks($)
 
     # Write the vlans to the DB.
     $self->UploadVlans() == 0
+	or return -1;
+    $self->UpLoadIPAddresses() == 0
 	or return -1;
     $self->UpLoadTunnels() == 0
 	or return -1;
@@ -5396,7 +5426,7 @@ sub NewVirtIface($$$$;$)
     my $ip        = $member->ip();
     my $mask      = $member->mask();
     my $encap     = $virtlan->_encapstyle();
-    my $isveth    = ($encap eq "veth" || $encap eq "veth-ne");
+    my $isveth    = (($encap eq "veth" || $encap eq "veth-ne") ? 1 : 0);
     my $vllidx    = $virtlan->idx();
     my $rtabid    = $self->getrtabid($pnode, $member);
     my $exptidx   = $self->experiment()->idx();
@@ -6054,8 +6084,6 @@ sub UploadVlans($)
 	    }
 	}
     }
-    $self->UpLoadIPAddresses() == 0
-	or return -1;
     return 0;
 }
 

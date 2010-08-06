@@ -1156,6 +1156,19 @@ sub Retry($$)
 }
 
 #####################################################################
+package libossetup_pcRemote;
+use base qw(libossetup_pc);
+
+use libdb;
+use libtestbed;
+use libossetup;
+use libtblog;
+use Node;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
+
+#####################################################################
 #
 # This is a wrapper for virtnodes; hopefully most virtnodes can share
 # stuff.

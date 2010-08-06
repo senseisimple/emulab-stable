@@ -338,8 +338,11 @@ sub Create($$$$)
     #
     # Lock the tables to prevent concurrent creation
     #
-    DBQueryWarn("lock tables nodes write, widearea_nodeinfo write")
-	or return -1;
+    DBQueryWarn("lock tables nodes write, widearea_nodeinfo write, ".
+		"node_hostkeys write, node_status write, ".
+		"node_utilization write, ".
+		"node_activity write, reserved write, node_auxtypes write")
+	or return undef;
 
     #
     # Make up a priority (just used for sorting)
@@ -349,6 +352,17 @@ sub Create($$$$)
     }
     else {
 	$priority = 1;
+    }
+
+    #
+    # See if we have a record; if we do, we can stop now and get the
+    # existing record.
+    #
+    my $query_result =
+	DBQueryWarn("select node_id from nodes where node_id='$node_id'");
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	return Node->Lookup($node_id);
     }
 
     if (!DBQueryWarn("insert into nodes set ".
@@ -378,7 +392,6 @@ sub Create($$$$)
 	    return undef;
 	}
     }
-    DBQueryWarn("unlock tables");
 
     if ($role eq "testnode") {
 	DBQueryWarn("insert into node_hostkeys (node_id) ".
@@ -435,12 +448,14 @@ sub Create($$$$)
 		    "type='$vtype', count=$virtnode_capacity")
 	    or goto bad;
     }
+    DBQueryWarn("unlock tables");
     return Node->Lookup($node_id);
     
   bad:
     foreach my $table (@cleantables) {
 	DBQueryWarn("delete from $table where node_id='$node_id'");
     }
+    DBQueryWarn("unlock tables");
     return undef;
 }
 

@@ -1,0 +1,40 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME $GENI_ISCLRHOUSE $GENI_METHODS
+	    $GENI_CHPEMFILE $EMULAB_PEMFILE);
+BEGIN { $GENI_DBNAME = "geni-ch"; $GENI_ISCLRHOUSE = 1; }
+
+# Configure variables
+my $ETCDIR         = "@prefix@/etc";
+
+$EMULAB_PEMFILE = ((-s "$ETCDIR/genich-local.pem") ?
+		   "$ETCDIR/genich-local.pem" : "$ETCDIR/genich.pem");
+# See GeniCredential; a helpful debugging aid.
+$GENI_CHPEMFILE = $EMULAB_PEMFILE;
+
+# Testbed libraries.
+use lib '@prefix@/lib';
+use GeniCH;
+
+$GENI_METHODS = {
+    "GetVersion"            => \&GeniCH::GetVersion,
+    "GetCredential"         => \&GeniCH::GetCredential,
+    "Resolve"               => \&GeniCH::Resolve,
+    "Register"              => \&GeniCH::Register,
+    "Remove"                => \&GeniCH::Remove,
+    "ListComponents"        => \&GeniCH::ListComponents,
+    "PostCRL"               => \&GeniCH::PostCRL,
+    "Shutdown"              => \&GeniCH::Shutdown,
+    "List"                  => \&GeniCH::List,
+};
+
+1;
+

@@ -13,7 +13,8 @@ INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file ethtool
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo \
+       	e2fsprogs openssl wget perl portmap file ethtool ncurses jove tcsh
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
@@ -38,10 +39,14 @@ clean:
 	rm -rf $(TARGET_BUILD_PATH)
 	rm -rf $(BOOT_PATH)
 
-toolchain:
-	$(MAKE) -C $(SOURCE_PATH)/$@ all
+toolchain: $(BUILDROOT_PATH)/toolchain-built
+
+$(BUILDROOT_PATH)/toolchain-built:
+	$(MAKE) -C $(SOURCE_PATH)/toolchain all
 	$(MAKE) -C $(SOURCE_PATH)/zlib install-sysroot
 	$(MAKE) -C $(SOURCE_PATH)/openssl install
+	$(MAKE) -C $(SOURCE_PATH)/ncurses install
+	touch $(BUILDROOT_PATH)/toolchain-built
 
 $(MODULES): toolchain
 	$(MAKE) -C $(SOURCE_PATH)/$@ all
@@ -70,18 +75,6 @@ uclibc-install: $(TARGET_PATH)/lib/libc.so.0
 $(FAKEROOT_ENVIRONMENT):
 	touch $@
 
-devices: $(FAKEROOT_ENVIRONMENT)
-	rm -rf $(TARGET_PATH)/dev
-	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
-		-i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/makedevs.sh \
-		$(SCRIPTS_PATH)/devices $(TARGET_PATH)
-
-permissions: $(FAKEROOT_ENVIRONMENT) devices install
-	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
-		-i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/fixperms.sh $(TARGET_PATH)
-
 initramfs: install
 	rm -rf $(INITRAMFS_PATH)
 	cp -dpR $(TARGET_PATH) $(INITRAMFS_PATH)
@@ -94,6 +87,9 @@ initramfs: install
 	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/fixperms.sh $(INITRAMFS_PATH)
+	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
+		-i $(FAKEROOT_ENVIRONMENT) \
+		$(SCRIPTS_PATH)/misc_fixup.sh $(TARGET_PATH)
 	$(FAKEROOT_BIN) -i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/gen_initramfs.sh $(INITRAMFS_PATH) $(INITRAMFS)
 	rm -f $(FAKEROOT_ENVIRONMENT)
