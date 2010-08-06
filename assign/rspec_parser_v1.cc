@@ -136,41 +136,40 @@ map< pair<string, string>, pair<string, string> >
 rspec_parser_v1::readInterfacesOnNode (const DOMElement* node, 
 				       bool& allUnique)
 {
-  bool exists;
   DOMNodeList* ifaces = node->getElementsByTagName(XStr("interface").x());
   map< pair<string, string>, pair<string, string> > fixedInterfaces;
   allUnique = true;
-  for (int i = 0; i < ifaces->getLength(); i++) {
+  for (unsigned int i = 0; i < ifaces->getLength(); i++) {
       DOMElement* iface = dynamic_cast<DOMElement*>(ifaces->item(i));
       bool hasAttr;
       string nodeId = "";
       string ifaceId = "";
       if (this->rspecType == RSPEC_TYPE_ADVT) {
-	nodeId = this->readPhysicalId (node, hasAttr);
-	ifaceId = XStr(iface->getAttribute(XStr("component_id").x())).c();
+        nodeId = this->readPhysicalId (node, hasAttr);
+        ifaceId = XStr(iface->getAttribute(XStr("component_id").x())).c();
       }
       else { //(this->rspecType == RSPEC_TYPE_REQ)
-	nodeId = this->readVirtualId (node, hasAttr);
-	ifaceId = XStr(iface->getAttribute(XStr("virtual_id").x())).c();
-	if (iface->hasAttribute(XStr("component_id").x())) {
-	  bool hasComponentId;
-	  string componentNodeId = this->readPhysicalId (node, hasComponentId);
-	  string componentIfaceId = this->getAttribute(iface, "component_id");
-	  fixedInterfaces.insert (make_pair 
-				  (make_pair(nodeId,ifaceId),
-				   make_pair(componentNodeId,
-					     componentIfaceId)));
-	}
+        nodeId = this->readVirtualId (node, hasAttr);
+        ifaceId = XStr(iface->getAttribute(XStr("virtual_id").x())).c();
+        if (iface->hasAttribute(XStr("component_id").x())) {
+          bool hasComponentId;
+          string componentNodeId = this->readPhysicalId (node, hasComponentId);
+          string componentIfaceId = this->getAttribute(iface, "component_id");
+          fixedInterfaces.insert (make_pair 
+                                  (make_pair(nodeId,ifaceId),
+                                   make_pair(componentNodeId,
+                                             componentIfaceId)));
+        }
       }
       //cout << "(" << nodeId << "," << ifaceId << ")" << endl;
       allUnique &= ((this->ifacesSeen).insert
-		    (pair<string, string>(nodeId, ifaceId))).second;
+                    (pair<string, string>(nodeId, ifaceId))).second;
   }
   return fixedInterfaces;
 }
 
 string rspec_parser_v1 :: readSubnodeOf (const DOMElement* tag,
-                                      bool& isSubnode,
+                                         bool& isSubnode,
                                       int& count)
 {
   count = (tag->getElementsByTagName(XStr("subnode_of").x()))->getLength();

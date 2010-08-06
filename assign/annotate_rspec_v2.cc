@@ -44,6 +44,7 @@ annotate_rspec_v2 :: annotate_rspec_v2 ()
 {
   this->document = doc;
   this->virtual_root = request_root;
+  //  this->virtual_root = dynamic_cast<DOMElement*>(dynamic_cast<DOMNode*>(request_root)->cloneNode(true));
   this->physical_root = advt_root;
   this->physical_elements = advertisement_elements;
 
@@ -64,7 +65,7 @@ annotate_rspec_v2 :: annotate_rspec_v2 ()
     set<string> virtual_interface_ids;
     DOMNodeList* interfaces 
       = lan_link->getElementsByTagName(XStr("interface_ref").x());
-    for (int j = 0; j < interfaces->getLength(); j++) {
+    for (unsigned int j = 0; j < interfaces->getLength(); j++) {
       DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(j));
       virtual_interface_ids.insert
 	(string(XStr(interface->getAttribute
@@ -86,8 +87,8 @@ void annotate_rspec_v2::annotate_element (const char* v_name)
 				 "link", "client_id", v_name);
   annotate_interface (vlink, 0);
   annotate_interface (vlink, 1);	
-  DOMElement* hop = create_component_hop(vlink);
 #ifndef DISABLE_LINK_ANNOTATION
+  DOMElement* hop = create_component_hop(vlink);
     vlink->appendChild(hop);
 #endif
 }
@@ -156,7 +157,7 @@ annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
 
 // This is called when an intraswitch or interswitch link has to be annotated
 void annotate_rspec_v2::annotate_element (const char* v_name, 
-					  list<const char*>* links)
+                                          list<const char*>* links)
 {
   // We can't locate interfaces on the switches, so we don't add those 
   // to the annotation. The warning is only given the one time
@@ -227,13 +228,6 @@ DOMElement* annotate_rspec_v2::create_component_hop (DOMElement* vlink)
   string srcIfaceNodeId =this->lookupIface(this->vInterfaceMap,srcIfaceId,fnd);
   string dstIfaceNodeId =this->lookupIface(this->vInterfaceMap,dstIfaceId,fnd);
 
-  DOMElement* srcVnode 
-    = getElementByAttributeValue(this->virtual_root,
-				 "node", "client_id", srcIfaceNodeId.c_str());
-  DOMElement* dstVnode 
-    = getElementByAttributeValue(this->virtual_root,
-				 "node", "client_id", dstIfaceNodeId.c_str());
-  
   DOMElement* srcIfaceClone 
     = dynamic_cast<DOMElement*>(doc->importNode
 				(dynamic_cast<DOMNode*>(srcIface),true));
@@ -379,7 +373,7 @@ void annotate_rspec_v2::copy_component_hop(DOMElement* lan_link,
     = string(XStr(lan_link->getAttribute(XStr("client_id").x())).c());
   DOMNodeList* interfaces 
     = component_hop->getElementsByTagName(XStr("interface_ref").x());
-  for (int i = 0; i < interfaces->getLength(); i++) {
+  for (unsigned int i = 0; i < interfaces->getLength(); i++) {
     DOMElement* interface = dynamic_cast<DOMElement*>(interfaces->item(i));
     if (interface->hasAttribute(XStr("virtual_interface_id").x())) {
       string str_virtual_interface_id 
@@ -621,12 +615,11 @@ string annotate_rspec_v2::getNodeForNthInterface (const DOMElement* link,
   DOMNodeList* ifaces = link->getElementsByTagName(XStr("interface_ref").x());
   if (ifaces->getLength() < number) {
     cerr << "*** Link " 
-	 << XStr(link->getAttribute(XStr("component_id").x())).c()
-	 << " has only " << ifaces->getLength() << " interfaces. "
-	 << "Interface number " << number << " requested." << endl;
+         << XStr(link->getAttribute(XStr("component_id").x())).c()
+         << " has only " << ifaces->getLength() << " interfaces. "
+         << "Interface number " << number << " requested." << endl;
     exit(EXIT_FATAL);
   }
-  DOMElement* iface = dynamic_cast<DOMElement*>(ifaces->item(number));
   string ifaceId = XStr(link->getAttribute(XStr("component_id").x())).c();
   return (this->lookupIface(this->pInterfaceMap, ifaceId, found));
 }

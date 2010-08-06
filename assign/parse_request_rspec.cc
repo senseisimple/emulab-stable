@@ -288,7 +288,6 @@ bool populate_node(DOMElement* elt,
     ptypes[typeName_c] = new tb_ptype(typeName_c);
   }
   ptypes[typeName_c]->add_slots(typeSlots);
-  tb_ptype *ptype = ptypes[typeName_c];
   
   name_vclass_map::iterator dit = vclass_map.find(fstring(typeName.c_str()));
   if (dit != vclass_map.end()) {
@@ -537,8 +536,8 @@ bool populate_link (DOMElement* elt,
     list<DOMElement*>::iterator it = links.begin();
     for (int i = 0; i < ifaceCount; ++i) {
       link_interface interface = interfaces[i];
-      const XMLCh* virtualIfaceId = XStr(interface.virtualIfaceId.c_str()).x();
-      const XMLCh* virtualNodeId = XStr(interface.virtualNodeId.c_str()).x();
+      string virtualIfaceId = XStr(interface.virtualIfaceId.c_str()).c();
+      string virtualNodeId = XStr(interface.virtualNodeId.c_str()).c();
       
       string str_lan_interface_id = generate_virtualIfaceId(str_lan_id, i);
       DOMElement* lan_interface = doc->createElement(XStr("interface").x());
@@ -550,8 +549,8 @@ bool populate_link (DOMElement* elt,
       DOMElement* link = doc->createElement(XStr("link").x());
       request_root->appendChild(link);
       link->setAttribute(XStr("virtual_id").x(), 
-			 XStr(interface.virtualNodeId 
-			      + string(":") + str_lan_id).x());
+                         XStr(interface.virtualNodeId 
+                              + string(":") + str_lan_id).x());
       appendChildTagWithData(link, "bandwidth",
 			     rspecParser->numToString(bandwidth).c_str());
       appendChildTagWithData(link, "latency",
@@ -560,23 +559,23 @@ bool populate_link (DOMElement* elt,
 			     rspecParser->numToString(packetLoss).c_str());
       
       DOMElement* src_interface_ref 
-	= doc->createElement(XStr("interface_ref").x());
+        = doc->createElement(XStr("interface_ref").x());
       src_interface_ref->setAttribute(XStr("clientId").x(),
-				      virtualIfaceId);
+                                      XStr(virtualIfaceId.c_str()).x());
       link->appendChild(src_interface_ref);
       
       DOMElement* dst_interface_ref 
-	= doc->createElement(XStr("interface_ref").x());
+        = doc->createElement(XStr("interface_ref").x());
       dst_interface_ref->setAttribute(XStr("clientId").x(),
-				      XStr(str_lan_interface_id.c_str()).x());
+                                      XStr(str_lan_interface_id.c_str()).x());
       link->appendChild(dst_interface_ref);
       
       // Adding attributes to ensure that the element is handled
       // correctly during annotation.
       link->setAttribute(XStr("generated_by_assign").x(),
-			 XStr("true").x());
+                         XStr("true").x());
       link->setAttribute(XStr("lan_link").x(),
-			 XStr(virtualId.c_str()).x());
+                         XStr(virtualId.c_str()).x());
       
       links.insert(it, link);
     }
@@ -780,7 +779,7 @@ DOMElement* appendChildTagWithData (DOMElement* parent,
 
 string generate_virtualNodeId (string virtual_id) 
 {
-  std::ostringstream oss;
+  ostringstream oss;
   struct timeval tv;
   struct timezone tz;
   gettimeofday(&tv, &tz);
@@ -790,7 +789,7 @@ string generate_virtualNodeId (string virtual_id)
 
 string generate_virtualIfaceId (string lan_name, int interface_number)
 { 
-  std::ostringstream oss;
+  ostringstream oss;
   oss << lan_name << ":" << interface_number;
   return oss.str();
 }

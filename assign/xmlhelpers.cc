@@ -36,7 +36,7 @@ void setChildValue(const DOMElement* parent, const char* tag, const char* value)
 DOMElement* getNodeByName (const DOMElement *root, const char* name)
 {
 	DOMNodeList *list = root -> getElementsByTagName(XStr("node").x());
-	for (int i = 0; i < list -> getLength() ; ++i)
+	for (unsigned int i = 0; i < list -> getLength() ; ++i)
 	{	
 		DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 		if (strcmp(XStr(ele->getAttribute(XStr("name").x())).c(),name) == 0)
@@ -48,7 +48,7 @@ DOMElement* getNodeByName (const DOMElement *root, const char* name)
 DOMElement* getElementByAttributeValue (const DOMElement* root, const char* tag, const char* attribute_name, const char* attribute_value)
 {
 	DOMNodeList *list = root -> getElementsByTagName(XStr(tag).x());
-	for (int i = 0; i < list -> getLength() ; ++i)
+	for (unsigned int i = 0; i < list -> getLength() ; ++i)
 	{	
 		DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 		if (strcmp(XStr(ele->getAttribute(XStr(attribute_name).x())).c(),attribute_value) == 0)
@@ -62,7 +62,7 @@ DOMElement* getElementByAttributeValue (vector<const DOMElement*> roots, const c
 	for (vector<const DOMElement*>::iterator it = roots.begin(); it != roots.end(); ++it)
 	{	
 		DOMNodeList *list = (*it)->getElementsByTagName(XStr(tag).x());
-		for (int i = 0; i < list -> getLength() ; ++i)
+		for (unsigned int i = 0; i < list -> getLength() ; ++i)
 		{
 			DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 			if (strcmp(XStr(ele->getAttribute(XStr(attribute_name).x())).c(),attribute_value) == 0)
@@ -76,7 +76,7 @@ vector<const DOMElement*> getElementsByAttributeValue (const DOMElement* root, c
 {
 	DOMNodeList *list = root -> getElementsByTagName(XStr(tag).x());
 	vector<const DOMElement*> elements;
-	for (int i = 0; i < list -> getLength() ; ++i)
+	for (unsigned int i = 0; i < list -> getLength() ; ++i)
 	{	
 		DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 		if (strcmp(XStr(ele->getAttribute(XStr(attribute_name).x())).c(),attribute_value) == 0)
@@ -89,7 +89,7 @@ vector<DOMElement*> getElementsHavingAttribute(const DOMElement* root, const cha
 {
 	DOMNodeList* list = root->getElementsByTagName(XStr(tag).x());
 	vector<DOMElement*> elements;
-	for (int i = 0; i < list->getLength(); ++i)
+	for (unsigned int i = 0; i < list->getLength(); ++i)
 	{
 		DOMElement* ele = dynamic_cast<DOMElement*>(list->item(i));
 		if (ele->hasAttribute(XStr(attribute_name).x()))

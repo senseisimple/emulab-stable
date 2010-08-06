@@ -149,7 +149,6 @@ int parse_advertisement(tb_pgraph &pg, tb_sgraph &sg, char *filename) {
     }
     XMLDEBUG("Found rspec ver. " << rspecVersion << endl);
     
-    bool is_physical;
     string type = XStr(advt_root->getAttribute(XStr("type").x())).c();
     if (type != "advertisement") {
       cout << "*** Rspec type must be \"advertisement\" in " << filename
@@ -215,7 +214,6 @@ bool populate_nodes(DOMElement *root,
   XMLDEBUG("Found " << nodeCount << " nodes in rspec" << endl);
   
   int availableCount = 0;
-  int counter = 0;
   for (size_t i = 0; i < nodeCount; i++) {
     DOMNode *node = nodes->item(i);
     // This should not be able to fail, because all elements in
@@ -273,7 +271,6 @@ bool populate_nodes(DOMElement *root,
     
     int typeCount;
     vector<struct node_type>types = rspecParser->readNodeTypes(elt, typeCount);
-    bool switchAdded = false;
     for (int i = 0; i < typeCount; i++) {
       node_type type = types[i];
       string typeName = type.typeName;
