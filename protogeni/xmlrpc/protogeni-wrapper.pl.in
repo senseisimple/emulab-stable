@@ -58,7 +58,8 @@ my $user  = "geniuser";
 my $group = "GeniSlices";
 
 # Need a command line option.
-my $debug = 1;
+my $debug      = 0;
+my $mailerrors = 1;
 
 # Determined by version.
 my $responder;
@@ -296,6 +297,9 @@ if ($@) {
 else {
     if (GeniResponse::IsError($result)) {
 	$message .= "Error:   " . $result->{'code'} . "\n";
+	if ($mailerrors) {
+	    print STDERR "Mail Errors is on.\n";
+	}
     }
     else {
 	$message .= "Code:    " . $result->{'code'} . "\n";
