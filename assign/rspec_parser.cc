@@ -33,7 +33,6 @@ rspec_parser :: ~rspec_parser ()
 
 struct link_interface rspec_parser :: getIface (const DOMElement* tag)
 {
-  bool exists;
   struct link_interface rv = 
     {
       string(XStr(tag->getAttribute(XStr("virtual_node_id").x())).c()),
@@ -109,7 +108,7 @@ vector<struct node_type> rspec_parser::readNodeTypes (const DOMElement* node,
   bool isSwitch = false;
   DOMNodeList* nodeTypes = node->getElementsByTagName(XStr("node_type").x());
   vector<struct node_type> types;
-  for (int i = 0; i < nodeTypes->getLength(); i++) {
+  for (unsigned int i = 0; i < nodeTypes->getLength(); i++) {
     DOMElement *tag = dynamic_cast<DOMElement*>(nodeTypes->item(i));
     
     string typeName = XStr(tag->getAttribute(XStr("type_name").x())).c();
@@ -143,32 +142,32 @@ rspec_parser::readInterfacesOnNode  (const DOMElement* node,
   DOMNodeList* ifaces = node->getElementsByTagName(XStr("interface").x());
   map< pair<string, string>, pair<string, string> > fixedInterfaces;
   allUnique = true;
-  for (int i = 0; i < ifaces->getLength(); i++)
+  for (unsigned int i = 0; i < ifaces->getLength(); i++)
     {
       DOMElement* iface = dynamic_cast<DOMElement*>(ifaces->item(i));
       bool hasAttr;
       string nodeId = "";
       string ifaceId = "";
       if (this->rspecType == RSPEC_TYPE_ADVT) {
-	nodeId = this->readPhysicalId (node, hasAttr);
-	ifaceId = XStr(iface->getAttribute(XStr("component_id").x())).c();
+        nodeId = this->readPhysicalId (node, hasAttr);
+        ifaceId = XStr(iface->getAttribute(XStr("component_id").x())).c();
       }
       else { //(this->rspecType == RSPEC_TYPE_REQ)
-	nodeId = this->readVirtualId (node, hasAttr);
-	ifaceId = XStr(iface->getAttribute(XStr("client_id").x())).c();
-	if (iface->hasAttribute(XStr("component_id").x())) {
-	  bool hasComponentId;
-	  string componentNodeId = 
-	    this->readPhysicalId (node, hasComponentId);
-	  string componentIfaceId = 
-	    this->getAttribute(iface, "component_id");
-	  fixedInterfaces.insert (make_pair 
-				  (make_pair(nodeId,ifaceId),
-				   make_pair(componentNodeId,componentIfaceId)));
-	}
+        nodeId = this->readVirtualId (node, hasAttr);
+        ifaceId = XStr(iface->getAttribute(XStr("client_id").x())).c();
+        if (iface->hasAttribute(XStr("component_id").x())) {
+          bool hasComponentId;
+          string componentNodeId = 
+            this->readPhysicalId (node, hasComponentId);
+          string componentIfaceId = 
+            this->getAttribute(iface, "component_id");
+          fixedInterfaces.insert (make_pair 
+                                  (make_pair(nodeId,ifaceId),
+                                   make_pair(componentNodeId,componentIfaceId)));
+        }
       }
       allUnique &= ((this->ifacesSeen).insert
-		    (pair<string, string>(nodeId, ifaceId))).second;
+                    (pair<string, string>(nodeId, ifaceId))).second;
     }
   return (fixedInterfaces);
 }
@@ -177,9 +176,9 @@ rspec_parser::readInterfacesOnNode  (const DOMElement* node,
 // count should be 1 on success.
 struct link_characteristics 
 rspec_parser :: readLinkCharacteristics (const DOMElement* link,
-					 int& count,
-					 int defaultBandwidth,
-					 int unlimitedBandwidth)
+                                         int& count,
+                                         int defaultBandwidth,
+                                         int unlimitedBandwidth)
 {
   bool hasBandwidth, hasLatency, hasPacketLoss;
   string strBw = this->readChild(link, "bandwidth", hasBandwidth);
@@ -253,7 +252,7 @@ vector<struct link_type> rspec_parser::readLinkTypes (const DOMElement* link,
 {
   DOMNodeList* linkTypes = link->getElementsByTagName(XStr("link_type").x());
   vector<struct link_type> types;
-  for (int i = 0; i < linkTypes->getLength(); i++)  {
+  for (unsigned int i = 0; i < linkTypes->getLength(); i++)  {
     DOMElement *tag = dynamic_cast<DOMElement*>(linkTypes->item(i));
     
     string name = XStr(tag->getAttribute(XStr("name").x())).c();

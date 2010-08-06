@@ -82,18 +82,17 @@ void print_solution(const solution &s) {
 	cout << "unassigned: " << vn->name << endl;
       } else {
 #ifdef WITH_XML
-	const char* node_name = XStr(vn -> name).c();
-	const char* assigned_to 
-	  = XStr (get(pvertex_pmap,s.get_assignment(*vit))->name).c() ;
+	string node_name = XStr(vn -> name).c();
+	string assigned_to =XStr(get(pvertex_pmap,s.get_assignment(*vit))->name).c();
 	if (both_inputs_rspec) {
-	  rspec_annotater->annotate_element(node_name, assigned_to);
-	  if (rspec_annotater->is_generated_element("node",
-						    "virtual_id",
-						    node_name))
+	  rspec_annotater->annotate_element(node_name.c_str(), assigned_to.c_str());
+	  if (rspec_annotater->is_generated_element("node", "virtual_id",
+                                              node_name.c_str())) {
 	    continue;
+    }
 	}
 	else if (both_inputs_xml) {
-	  vtop_annotater->annotate_element(node_name, assigned_to);
+	  vtop_annotater->annotate_element(node_name.c_str(), assigned_to.c_str());
 	}
 #endif
 	cout << vn->name << " " 

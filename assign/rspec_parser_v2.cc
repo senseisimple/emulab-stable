@@ -143,7 +143,7 @@ rspec_parser_v2::readNodeTypes (const DOMElement* node,
       return vector<struct node_type>();
     }
 
-    for (int j = 0; j < sliverTypes->getLength(); j++) {
+    for (unsigned int j = 0; j < sliverTypes->getLength(); j++) {
       DOMElement* slNode = dynamic_cast<DOMElement*>(sliverTypes->item(j));
       string slTypeName = this->getAttribute(slNode, "name");
       string typeName = this->convertType(defHw, slTypeName);
@@ -152,7 +152,7 @@ rspec_parser_v2::readNodeTypes (const DOMElement* node,
     }
   }
   
-  for (int i = 0; i < hardwareTypes->getLength(); i++) {
+  for (unsigned int i = 0; i < hardwareTypes->getLength(); i++) {
     DOMElement* hardwareNode 
       = dynamic_cast<DOMElement*>(hardwareTypes->item(i));
     
@@ -186,7 +186,7 @@ rspec_parser_v2::readNodeTypes (const DOMElement* node,
       types.push_back(type);
     }
 
-    for (int j = 0; j < sliverTypes->getLength(); j++) {
+    for (unsigned int j = 0; j < sliverTypes->getLength(); j++) {
       DOMElement* slNode = dynamic_cast<DOMElement*>(sliverTypes->item(j));
       string slTypeName = this->getAttribute(slNode, "name");
       string typeName = this->convertType(hwTypeName, slTypeName);
@@ -211,7 +211,7 @@ rspec_parser_v2::readInterfacesOnNode  (const DOMElement* node,
   DOMNodeList* ifaces = node->getElementsByTagName(XStr("interface").x());
   map< pair<string, string>, pair<string, string> > fixedInterfaces;
   allUnique = true;
-  for (int i = 0; i < ifaces->getLength(); i++) {
+  for (unsigned int i = 0; i < ifaces->getLength(); i++) {
     DOMElement* iface = dynamic_cast<DOMElement*>(ifaces->item(i));
     bool hasAttr;
     string nodeId = "";
@@ -261,7 +261,7 @@ rspec_parser_v2::readLinkTypes (const DOMElement* link, int& typeCount)
 {
   DOMNodeList* linkTypes = link->getElementsByTagName(XStr("link_type").x());
   vector<struct link_type> types;
-  for (int i = 0; i < linkTypes->getLength(); i++) {
+  for (unsigned int i = 0; i < linkTypes->getLength(); i++) {
     DOMElement* tag = dynamic_cast<DOMElement*>(linkTypes->item(i));
     string name = this->getAttribute(tag, "name");
 
@@ -279,7 +279,7 @@ string rspec_parser_v2::readSubnodeOf (const DOMElement* node,
   int cnt = 0;
   string parent = "";
   DOMNodeList* relations = node->getElementsByTagName(XStr("relations").x());
-  for (int i = 0, cnt = 0; i < relations->getLength(); i++) {
+  for (unsigned int i = 0, cnt = 0; i < relations->getLength(); i++) {
     DOMElement* relation = dynamic_cast<DOMElement*>(relations->item(0));
     string type = this->getAttribute(node, "type");
     if (type == "parent") {

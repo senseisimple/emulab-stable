@@ -37,7 +37,7 @@ emulab_extensions_parser::readFeaturesDesires (const DOMElement* ele, int& count
   vector<struct fd> fds;
   DOMNodeList* fdNodes = ele->getElementsByTagName(XStr("emulab:fd").x());
   count = fdNodes->getLength();
-  for (int i = 0; i < fdNodes->getLength(); i++) 	{
+  for (unsigned int i = 0; i < fdNodes->getLength(); i++) 	{
     fds.push_back(this->readFeatureDesire
 		  (dynamic_cast<DOMElement*>(fdNodes->item(i))));
   }
@@ -61,7 +61,7 @@ vector<struct property> emulab_extensions_parser::readProperties
 {
   DOMNodeList* propNodes = elem->getElementsByTagName(XStr("property").x());
   vector<struct property> properties;
-  for (int i = 0; i < propNodes->getLength(); i++) {
+  for (unsigned int i = 0; i < propNodes->getLength(); i++) {
     properties.push_back(this->readProperty
 			 (dynamic_cast<DOMElement*>(propNodes->item(i))));
   }
@@ -102,7 +102,7 @@ emulab_extensions_parser::readVClasses (const DOMElement* elem)
   DOMNodeList* vclassNodes 
     = elem->getElementsByTagName(XStr("emulab:vclass").x());
   vector<struct vclass> vclasses;
-  for (int i = 0; i < vclassNodes->getLength(); i++) {
+  for (unsigned int i = 0; i < vclassNodes->getLength(); i++) {
     vclasses.push_back(this->readVClass
 		       (dynamic_cast<DOMElement*>
 			(vclassNodes->item(i))));
@@ -116,7 +116,7 @@ emulab_extensions_parser::readVClass (const DOMElement* tag)
   vector<string> physTypes;
   DOMNodeList* physNodes
     = tag->getElementsByTagName(XStr("emulab:physical_type").x());
-  for (int i = 0; i < physNodes->getLength(); i++) {
+  for (unsigned int i = 0; i < physNodes->getLength(); i++) {
     DOMElement* physNode = dynamic_cast<DOMElement*>(physNodes->item(i));
     // XXX: This is nasty because the type name that we give assign
     // has to be the concatation of the hardware type and sliver type
