@@ -250,13 +250,22 @@ sub MapperWrapper()
 {
     chat("Starting the new and improved mapper wrapper.\n");
 
+    # Need to do this cause libvtop will add them again.
+    # Must be done before nodes are released.
+    $experiment->DeleteInternalProgramAgents()
+	if ($regression);
+
     TBDebugTimeStamp("Create libvtop started");
     $vtop = libvtop->Create($experiment, $this_user, $vtopflags);
     if (!defined($vtop)) {
 	fatal("Could not create vtop structure for $experiment");
     }
     TBDebugTimeStamp("Create libvtop ended");
-
+    TBDebugTimeStamp("vtopgen started");
+    $vtop->CreateVtop() == 0
+	or fatal("Could not create vtop for $experiment");
+    TBDebugTimeStamp("vtopgen finished");
+    
     if (!$impotent && ($updating || $clear)) {
 	if ($clear) {
 	    chat("Freeing reserved nodes ...\n");
@@ -268,10 +277,6 @@ sub MapperWrapper()
 	exit(0)
 	    if ($clear && !$regression);
     }
-    TBDebugTimeStamp("vtopgen started");
-    $vtop->CreateVtop() == 0
-	or fatal("Could not create vtop for $experiment");
-    TBDebugTimeStamp("vtopgen finished");
     AssignLoop();
     return 0;
 }
@@ -732,6 +737,9 @@ sub FinalizeRegression($)
 	}
 	close(VTOPFILE);
     }
+    # Must be done before nodes are released.
+    $experiment->DeleteInternalProgramAgents();
+    
     return 0
 	if ($noregfree);
     
