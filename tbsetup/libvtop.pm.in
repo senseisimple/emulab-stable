@@ -303,7 +303,8 @@ sub createFixedNode ($$$)
 {
     my ($self, $vnode, $pnode) = @_;
     my $ref = { 'vnode' => $vnode,
-		'pnode' => GeniHRN::Generate($OURDOMAIN, "node", $pnode)
+		# XXX Going to need a URN in rspec output ...
+		'pnode' => $pnode,
     };
     if (!exists($self->rspec()->{'fixed'})) {
 	$self->rspec()->{'fixed'} = [];
@@ -785,11 +786,10 @@ sub LoadCurrentResources($)
 	    my $node_id = $pnode->node_id();
 
 	    if ($pnode->isvirtnode()) {
-		$self->fixednodes()->{$vname} = $pnode->phys_nodeid();
+		$node_id = $pnode->phys_nodeid();
 	    }
-	    else {
-		$self->fixednodes()->{$vname} = $node_id;
-	    }
+	    $self->fixednodes()->{$vname} = $node_id;
+	    $self->printdb("  fixing $vname -> $node_id\n");
 	}
 	return 0;
     }
@@ -3510,6 +3510,10 @@ sub AddLinkToSolution($$$$$$$$)
 	    if (defined($nodeB)) {
 		$member0->_lannode($nodeB);
 		$member0->_lanport($portB);
+	    }
+	    else {
+		$member0->_lannode("null");
+		$member0->_lanport("null");
 	    }
 	}
     }
@@ -7252,7 +7256,9 @@ sub processNodeRspec ($$$$)
     $rspecnode->setAttribute('client_id', $node->{'name'});
     $rspecnode->setAttribute('component_manager_id', $node->{'cm'});
     if ($fixedto ne '') {
-	$rspecnode->setAttribute('component_id', $fixedto);
+	my ($authority,undef,undef) = GeniHRN::Parse($node->{'cm'});
+	$rspecnode->setAttribute('component_id',
+			 GeniHRN::Generate($authority, "node", $fixedto));
     }
 
     my $isnodestatic = $node->{'node_static'};
