@@ -135,7 +135,6 @@ int parse_request(tb_vgraph &vg, char *filename) {
     doc = domParser->getDocument();
     request_root = doc->getDocumentElement();
     
-    bool is_physical;
     string type = XStr (request_root->getAttribute(XStr("type").x())).c();
     if (type != "request") {
       cout << "*** RSpec type must be \"request\" in " << filename
@@ -154,7 +153,7 @@ int parse_request(tb_vgraph &vg, char *filename) {
       rspecParser = new rspec_parser_v2(RSPEC_TYPE_REQ);
       break;
     default:
-      cerr << "*** Unsupported rspec ver. " << rspecVersion
+      cout << "*** Unsupported rspec ver. " << rspecVersion
 	   << " ... Aborting " << endl;
       exit(EXIT_FATAL);
     }
@@ -266,7 +265,7 @@ bool populate_node(DOMElement* elt,
   bool isStatic = false;
   bool isUnlimited = false;
   if (typeCount > 1) {
-    cerr << "*** Too many node types (" << typeCount << ") on " 
+    cout << "*** Too many node types (" << typeCount << ") on " 
 	 << virtualId << " (allowed 1) ... Aborting " << endl;
     return false;
   }
@@ -326,8 +325,8 @@ bool populate_node(DOMElement* elt,
   if (no_type) {
     // If they gave no type, just assume it's a PC for
     // now. This is not really a good assumption.
-    cerr << "WARNING: No type information found on node. " 
-	 << "Defaulting to " << typeName.c_str() << endl;
+    XMLDEBUG("WARNING: No type information found on node. " 
+             << "Defaulting to " << typeName.c_str() << endl);
   }
   v = new tb_vnode(virtualId.c_str(), typeName.c_str(), typeSlots);
   
@@ -418,8 +417,8 @@ bool populate_node(DOMElement* elt,
  * Pull nodes from the document, and populate assign's own data structures
  */
 bool populate_nodes(DOMElement *root, 
-		    tb_vgraph &vg, map< pair<string, string>, 
-		    pair<string, string> >* fixed_interfaces) {
+                    tb_vgraph &vg, map< pair<string, string>, 
+                    pair<string, string> >* fixed_interfaces) {
   bool is_ok = true;
   /*
    * Get a list of all nodes in this document
@@ -428,7 +427,7 @@ bool populate_nodes(DOMElement *root,
   int nodeCount = nodes->getLength();
   XMLDEBUG("Found " << nodeCount << " nodes in rspec" << endl);
   
-  for (size_t i = 0; i < nodeCount; i++)  {
+  for (unsigned i = 0; i < nodeCount; i++)  {
     DOMNode *node = nodes->item(i);
     // This should not be able to fail, because all elements in
     // this list came from the getElementsByTagName() call
@@ -608,18 +607,18 @@ bool populate_link (DOMElement* elt,
   }
   if (dstNode == "" || dstIface == "") {
     cout << "*** No destination node found on interface for link " 
-	 << virtualId << endl;
+         << virtualId << endl;
     return false;
   }
   
   if (vname2vertex.find(srcNode.c_str()) == vname2vertex.end()) {
     cout << "*** Bad link " << virtualId 
-	 << ", non-existent source node " << srcNode << endl;
+         << ", non-existent source node " << srcNode << endl;
     return false;
   }
   if (vname2vertex.find(dstNode.c_str()) == vname2vertex.end()) {
     cout << "*** Bad link " << virtualId 
-	 << ", non-existent destination node " << dstNode << endl;
+         << ", non-existent destination node " << dstNode << endl;
     return false;
   }
 
@@ -658,6 +657,7 @@ bool populate_link (DOMElement* elt,
   if (it != fixed_interfaces->end()) {
     fix_dstIface = true;
     fixed_dstIface = (it->second).second;
+
   }
   
   if (emulated) {
@@ -738,7 +738,7 @@ bool populate_vclass (struct vclass vclass, tb_vgraph& vg)
   if (vclass.type.type == SOFT_VCLASS) {
     v = new tb_vclass (XStr(name).f(), vclass.type.weight);
     if (v == NULL) {
-      cerr << "*** Could not create vclass " << vclass.name << endl;
+      cout << "*** Could not create vclass " << vclass.name << endl;
       return false;
     }
     vclass_map[name] = v;
@@ -759,7 +759,7 @@ bool populate_vclasses (DOMElement* root, tb_vgraph& vg)
 {
   bool isOk = true;
   vector<struct vclass> vclasses = rspecParser->readVClasses(root);
-  cerr << "Found " << vclasses.size() << " vclasses." << endl;
+  XMLDEBUG("Found " << vclasses.size() << " vclasses." << endl);
   for (unsigned int i = 0; i < vclasses.size(); i++) {
     isOk &= populate_vclass(vclasses[i], vg);
   }

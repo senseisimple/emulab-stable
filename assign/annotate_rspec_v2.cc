@@ -99,7 +99,7 @@ annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
 {
   DOMElement* vnode 
     = getElementByAttributeValue(this->virtual_root, 
-				 "node", "client_id", v_name);
+                                 "node", "client_id", v_name);
   // If a vnode by that name was found, then go ahead. 
   // If not, that element should be a link
   // We are not terribly concerned about 
@@ -108,48 +108,44 @@ annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
   if (vnode != NULL) {
     if (!vnode->hasAttribute(XStr("generated_by_assign").x())) {
       DOMElement* pnode = (this->physical_elements->find(p_name))->second;
-      if (pnode->hasAttribute(XStr("component_name").x())) {
-	vnode->setAttribute(XStr("component_name").x(),
-			    pnode->getAttribute(XStr("component_name").x()));
-      }
       vnode->setAttribute(XStr("component_id").x(),
-			  pnode->getAttribute(XStr("component_id").x()));
+                          pnode->getAttribute(XStr("component_id").x()));
       vnode->setAttribute(XStr("component_manager_id").x(),
-			  pnode->getAttribute(XStr("component_manager_id").x()));
+                          pnode->getAttribute(XStr("component_manager_id").x()));
     }
   }
   else {
     DOMElement* vlink 
       = getElementByAttributeValue(this->virtual_root, 
-				   "link", "client_id", v_name);
+                                   "link", "client_id", v_name);
     DOMElement* plink = (this->physical_elements->find(p_name))->second;
     
     // If plink is NULL, then it must be a trivial link
     // XXX: Add trivial link support?
     if (plink == NULL) {
-			
+      
     }
     annotate_interface (plink, vlink, 0);
     annotate_interface (plink, vlink, 1);
     
     DOMElement* hop = create_component_hop(plink, vlink, BOTH, NULL);
 #ifndef DISABLE_LINK_ANNOTATION
-      vlink->appendChild(hop);
+    vlink->appendChild(hop);
 #endif    
     
     if (vlink->hasAttribute(XStr("generated_by_assign").x())) {
       string str_lan_link 
-	= string(XStr(vlink->getAttribute(XStr("lan_link").x())).c());
+        = string(XStr(vlink->getAttribute(XStr("lan_link").x())).c());
       DOMElement* lan_link 
-	= getElementByAttributeValue(this->virtual_root, "link", 
-				     "client_id", 
-				     str_lan_link.c_str());
+        = getElementByAttributeValue(this->virtual_root, "link", 
+                                     "client_id", 
+                                     str_lan_link.c_str());
       DOMNodeList* component_hops 
-	= vlink->getElementsByTagName(XStr("component_hop").x());
-      for (int i = 0; i < component_hops->getLength(); i++) {
-	DOMElement* component_hop 
-	  = dynamic_cast<DOMElement*>(component_hops->item(i));
-	copy_component_hop(lan_link, component_hop);
+        = vlink->getElementsByTagName(XStr("component_hop").x());
+      for (unsigned int i = 0; i < component_hops->getLength(); i++) {
+        DOMElement* component_hop 
+          = dynamic_cast<DOMElement*>(component_hops->item(i));
+        copy_component_hop(lan_link, component_hop);
       }
     }
   }
@@ -157,11 +153,14 @@ annotate_rspec_v2::annotate_element (const char* v_name, const char* p_name)
 
 // This is called when an intraswitch or interswitch link has to be annotated
 void annotate_rspec_v2::annotate_element (const char* v_name, 
-                                          list<const char*>* links)
+                                          list<const char*>* unordered)
 {
   // We can't locate interfaces on the switches, so we don't add those 
   // to the annotation. The warning is only given the one time
   static bool gave_apology = false;
+
+  // Re-order links to ensure that they are all head-to-tail.
+  list<const char*>* links = this->reorderLinks(unordered);
 
   // These are the paths from the source to the first switch
   // and from the last switch to the destination
@@ -176,10 +175,10 @@ void annotate_rspec_v2::annotate_element (const char* v_name,
   // If it is an intra-switch link, the list should now be empty.
   links->pop_front();
   links->pop_back();
-  
+
   DOMElement* vlink 
     = getElementByAttributeValue (this->virtual_root, "link", 
-				  "client_id", v_name);
+                                  "client_id", v_name);
   annotate_interface(p_src_switch_link, vlink, 0);
   annotate_interface(p_switch_dst_link, vlink, 1);
   
@@ -187,7 +186,7 @@ void annotate_rspec_v2::annotate_element (const char* v_name,
   DOMElement* prevComponentHop 
     = create_component_hop (p_src_switch_link, vlink, SOURCE, NULL);
   componentHops.push_back(prevComponentHop);
-    
+
   for (DOMElement *prevLinkInPath = p_src_switch_link; !links->empty(); ) {
 #ifndef DISABLE_LINK_ANNOTATION
     if (!gave_apology) { 
@@ -197,18 +196,19 @@ void annotate_rspec_v2::annotate_element (const char* v_name,
     }
 #endif
     DOMElement* pSwitchSwitchLink 
+      //      = ((this->physical_elements)->find(*it))->second;
       = find_next_link_in_path (prevLinkInPath, links);
     prevComponentHop = create_component_hop (pSwitchSwitchLink, vlink, 
-					     NEITHER, prevComponentHop);
+                                             NEITHER, prevComponentHop);
     prevLinkInPath = pSwitchSwitchLink;
     //    componentHops.push_back(prevComponentHop);
   }
-
+  
   DOMElement* hop = create_component_hop (p_switch_dst_link, vlink, 
-					  DESTINATION, prevComponentHop);
+                                          DESTINATION, prevComponentHop);
   componentHops.push_back(hop);
 #ifndef DISABLE_LINK_ANNOTATION
-  for (int i = 0; i < componentHops.size(); i++) {
+  for (unsigned int i = 0; i < componentHops.size(); i++) {
     vlink->appendChild(componentHops[i]);
   }
 #endif
@@ -220,7 +220,6 @@ DOMElement* annotate_rspec_v2::create_component_hop (DOMElement* vlink)
   DOMNodeList* ifaces = vlink->getElementsByTagName(XStr("interface_ref").x());
   DOMElement* srcIface = dynamic_cast<DOMElement*>(ifaces->item(0));
   DOMElement* dstIface = dynamic_cast<DOMElement*>(ifaces->item(1));
-
   string srcIfaceId = XStr(srcIface->getAttribute(XStr("client_id").x())).c();
   string dstIfaceId = XStr(dstIface->getAttribute(XStr("client_id").x())).c();
 
@@ -248,9 +247,9 @@ DOMElement* annotate_rspec_v2::create_component_hop (DOMElement* vlink)
 // Creates a hop from a switch till the next end point. 
 DOMElement* 
 annotate_rspec_v2::create_component_hop (const DOMElement* plink, 
-					 DOMElement* vlink, 
-					 int endpointIface, 
-					 const DOMElement* prevHop)
+                                         DOMElement* vlink, 
+                                         int endpointIface, 
+                                         const DOMElement* prevHop)
 {
   // We assume the first interface is the source and the second the dest
   DOMNodeList* pIfaces =plink->getElementsByTagName(XStr("interface_ref").x());
@@ -272,10 +271,10 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
   // or the direction is guaranteed to be from the node to the switch
   DOMElement* plinkSrcIfaceClone 
     = dynamic_cast<DOMElement*>(doc->importNode
-				(dynamic_cast<DOMNode*>(plinkSrcIface),true));
+                                (dynamic_cast<DOMNode*>(plinkSrcIface),true));
   DOMElement* plinkDstIfaceClone
     = dynamic_cast<DOMElement*>(doc->importNode
-				(dynamic_cast<DOMNode*>(plinkDstIface),true));
+                                (dynamic_cast<DOMNode*>(plinkDstIface),true));
   
   string plinkSrcIfaceId 
     = XStr(plinkSrcIface->getAttribute(XStr("component_id").x())).c();
@@ -294,7 +293,7 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
     // Find the destination of the previous component hop
     DOMElement* prevHopDstIface
       = dynamic_cast<DOMElement*>((prevHop->getElementsByTagName
-				   (XStr("interface_ref").x()))->item(1));
+                                   (XStr("interface_ref").x()))->item(1));
 
     string prevHopDstIfaceId 
       = XStr(prevHopDstIface->getAttribute(XStr("component_id").x())).c();
@@ -309,13 +308,13 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
     // whether a destination interface was specified
     if (prevHopDstNodeId == plinkDstNodeId) {
       plinkSrcIfaceClone 
-	= dynamic_cast<DOMElement*>(doc->importNode
-				    (dynamic_cast<DOMNode*>(plinkDstIface), 
-				     true));
+        = dynamic_cast<DOMElement*>(doc->importNode
+                                    (dynamic_cast<DOMNode*>(plinkDstIface), 
+                                     true));
       plinkDstIfaceClone 
-	= dynamic_cast<DOMElement*>(doc->importNode
-				    (dynamic_cast<DOMNode*>(plinkSrcIface), 
-				     true));
+        = dynamic_cast<DOMElement*>(doc->importNode
+                                    (dynamic_cast<DOMNode*>(plinkSrcIface), 
+                                     true));
     }
   }
   
@@ -367,7 +366,7 @@ annotate_rspec_v2::create_component_hop (const DOMElement* plink,
 // but it sounds like a dirty way of doing it and is not exactly robust,
 // so we shall use the slower, but more robust method
 void annotate_rspec_v2::copy_component_hop(DOMElement* lan_link, 
-					   DOMElement* component_hop)
+                                           DOMElement* component_hop)
 {
   string lan_link_id 
     = string(XStr(lan_link->getAttribute(XStr("client_id").x())).c());
@@ -406,15 +405,15 @@ bool annotate_rspec_v2::has_interface_with_id (string link_client_id, string id)
 
 // Annotates the interfaces on a node making up the end points of a trivial link
 void annotate_rspec_v2::annotate_interface (const DOMElement* vlink, 
-					 int interface_number)
+                                            int interface_number)
 {
   this->annotate_interface (NULL, vlink, interface_number, true);
 }
 
 // Annotates the interfaces on a non-trivial link
 void annotate_rspec_v2::annotate_interface (const DOMElement* plink,
-					 const DOMElement* vlink,
-					 int interface_number)
+                                            const DOMElement* vlink,
+                                            int interface_number)
 {
   this->annotate_interface (plink, vlink, interface_number, false);
 }
@@ -431,21 +430,22 @@ void annotate_rspec_v2::annotate_interface (const DOMElement* plink,
 // 5) Annotate the interface on the virtual node obtained in 2) 
 //    with the interface_id obtained in 4)
 void annotate_rspec_v2::annotate_interface (const DOMElement* plink, 
-					    const DOMElement* vlink, 
-					    int ifaceNumber,
-					    bool isTrivialLink)
+                                            const DOMElement* vlink, 
+                                            int ifaceNumber,
+                                            bool isTrivialLink)
 {
   DOMNodeList* refs = vlink->getElementsByTagName(XStr("interface_ref").x());
   DOMElement* ref = dynamic_cast<DOMElement*>(refs->item(ifaceNumber));
   string ifaceId = XStr(ref->getAttribute(XStr("client_id").x())).c();
+  //  cerr << endl << "Interface: " << ifaceId << endl;
   
   // Get the client_id of the node to which the interface belongs
   bool found = false;
   string nodeId = this->lookupIface(this->vInterfaceMap, ifaceId, found);
   DOMElement* vnode = getElementByAttributeValue(this->virtual_root, "node", 
-						 "client_id", nodeId.c_str());
+                                                 "client_id", nodeId.c_str());
   DOMElement* decl = getElementByAttributeValue(vnode, "interface", 
-						"client_id", ifaceId.c_str());
+                                                "client_id", ifaceId.c_str());
 
   string physNodeId = XStr(vnode->getAttribute(XStr("component_id").x())).c();
 
@@ -507,22 +507,29 @@ annotate_rspec_v2::copy_component_spec(const DOMElement* src, DOMElement* dst)
 // Assign sometimes reverses the links on the path 
 // from the source to destination, 
 // so you need to look at the entire path to find the next link
-DOMElement* annotate_rspec_v2::find_next_link_in_path (DOMElement *prev, 
-						    list<const char*>* links)
+// WARNING: This removes the link in the path from the list of link
+DOMElement* 
+annotate_rspec_v2::find_next_link_in_path (DOMElement *prev, 
+                                           list<const char*>* links)
 {
   list<const char*>::iterator it;
   DOMElement* link = NULL;
+
   for (it = links->begin(); it != links->end(); ++it) {
     link = (this->physical_elements->find(*it))->second;
 
     // We assume as we have done throughout that the first interface 
     // represents the source of the link and the second interface
     // is the destination.
-    string linkSrc = this->getNodeForNthInterface(link, 0);
-    string linkDst = this->getNodeForNthInterface(link, 1);
-    string prevDst = this->getNodeForNthInterface(prev, 1);
+    string linkSrc = this->getNthInterface(link, 0);
+    string linkDst = this->getNthInterface(link, 1);
+    string prevSrc = this->getNthInterface(prev, 0);
+    string prevDst = this->getNthInterface(prev, 1);
 
-    if (linkSrc == prevDst || linkDst == prevDst) {
+    if ((linkSrc == prevDst && linkDst != prevSrc)
+        || (linkSrc == prevSrc && linkDst != prevDst)
+        || (linkDst == prevSrc && linkSrc != prevDst)
+        || (linkDst == prevDst && linkSrc != prevSrc)) {
       links->remove(*it);
       break;
     }
@@ -537,7 +544,7 @@ void annotate_rspec_v2::cleanup()
   // Remove generated links
   vector<DOMElement*> generated_links 
     = getElementsHavingAttribute(this->virtual_root, "link", 
-				 "generated_by_assign");
+                                 "generated_by_assign");
   for (it = generated_links.begin(); it < generated_links.end(); it++) {
     DOMNode* generated_link = dynamic_cast<DOMNode*>(*it);
     dynamic_cast<DOMNode*>(this->virtual_root)->removeChild(generated_link);
@@ -546,7 +553,7 @@ void annotate_rspec_v2::cleanup()
   // Remove generated nodes
   vector<DOMElement*> generated_nodes 
     = getElementsHavingAttribute(this->virtual_root, "node", 
-				 "generated_by_assign");
+                                 "generated_by_assign");
   for (it = generated_nodes.begin(); it < generated_nodes.end(); it++) {
     DOMNode* generated_link = dynamic_cast<DOMNode*>(*it);
     dynamic_cast<DOMNode*>(this->virtual_root)->removeChild(generated_link);
@@ -595,7 +602,7 @@ const DOMElement*
 annotate_rspec_v2::getIfaceOnNode(const DOMElement* plink, string nodeId)
 {
   DOMNodeList* refs = plink->getElementsByTagName(XStr("interface_ref").x());
-  for (int i = 0; i < refs->getLength(); i++) {
+  for (unsigned int i = 0; i < refs->getLength(); i++) {
     bool found = false;
     DOMElement* ref = dynamic_cast<DOMElement*>(refs->item(i));
     string ifaceId = XStr(ref->getAttribute(XStr("component_id").x())).c();
@@ -607,21 +614,19 @@ annotate_rspec_v2::getIfaceOnNode(const DOMElement* plink, string nodeId)
   return NULL;
 }
 
-// Returns the node id for the nth interface on a link
-string annotate_rspec_v2::getNodeForNthInterface (const DOMElement* link, 
-						  int number)
+// Returns the component id for the nth interface on a link
+string annotate_rspec_v2::getNthInterface (const DOMElement* link, int number)
 {
-  bool found  = false;
   DOMNodeList* ifaces = link->getElementsByTagName(XStr("interface_ref").x());
-  if (ifaces->getLength() < number) {
+  if ((int)ifaces->getLength() < number) {
     cerr << "*** Link " 
          << XStr(link->getAttribute(XStr("component_id").x())).c()
          << " has only " << ifaces->getLength() << " interfaces. "
          << "Interface number " << number << " requested." << endl;
     exit(EXIT_FATAL);
   }
-  string ifaceId = XStr(link->getAttribute(XStr("component_id").x())).c();
-  return (this->lookupIface(this->pInterfaceMap, ifaceId, found));
+  DOMElement* iface = dynamic_cast<DOMElement*>(ifaces->item(number));
+  return string(XStr(iface->getAttribute(XStr("component_id").x())).c());
 }
 
 // Annotates the end point interface if found
@@ -662,6 +667,31 @@ string annotate_rspec_v2::getShortInterfaceName (string interface)
 {
   int loc = interface.find_last_of(":");
   return interface.substr(loc+1);
+}
+
+// Re-orders the links so that all the links on an interswitch link
+// are in the correct order
+// WARNING: This will distroy the input list
+// NOTE: The pointer to the list returned by this should be freed
+list<const char*>* 
+annotate_rspec_v2::reorderLinks (list<const char*>* links)
+{
+  list<const char*> *ordered = new list<const char*>();
+  //  list<const char*>::iterator it;
+  
+  string link = links->front();
+  links->pop_front();
+  DOMElement* prev = ((this->physical_elements)->find(link.c_str()))->second;
+  ordered->push_back(link.c_str());
+  while(!links->empty()) {
+    prev = this->find_next_link_in_path(prev, links);
+    string* link 
+      = new string(XStr(prev->getAttribute(XStr("component_id").x())).c());
+    links->remove(link->c_str());
+    ordered->push_back(link->c_str());
+  }
+  
+  return ordered;
 }
 
 #endif
