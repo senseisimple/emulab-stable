@@ -38,7 +38,7 @@ namespace featuredesire {
 class tb_featuredesire_policy {
 public:
     tb_featuredesire_policy(): allowable(true), limited_use(false),
-    min_use(0.0f), max_use(0.0f) { ; };
+    max_use(0.0f), min_use(0.0f)  { ; };
     /*
      * Functions for maintaining FD policy state. Inline, since they're
      * so simple.

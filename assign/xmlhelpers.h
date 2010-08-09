@@ -115,7 +115,7 @@ node_interface_pair parse_interface_xml(const xercesc::DOMElement* tag);
 /* 
  * Bundle the componentspec attributes together
  */
-typedef struct component_spec 
+struct component_spec 
 {
 	string component_manager_uuid;
 	string component_name;
@@ -130,7 +130,7 @@ component_spec parse_component_spec (const xercesc::DOMElement* element);
 /* 
  * Bundle the InterfaceSpec attributes together
  */
-typedef struct interface_spec 
+struct interface_spec 
 {
 	string virtual_node_id;
 	string virtual_interface_id;

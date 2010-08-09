@@ -79,7 +79,7 @@ void print_solution(const solution &s) {
     for (;vit != veit;++vit) {
       vn = get(vvertex_pmap,*vit);
       if (! s.is_assigned(*vit)) {
-	cout << "unassigned: " << vn->name << endl;
+        cout << "unassigned: " << vn->name << endl;
       } else {
 #ifdef WITH_XML
 	string node_name = XStr(vn -> name).c();
@@ -108,7 +108,7 @@ void print_solution(const solution &s) {
     vedge_iterator eit,eendit;
     tie(eit,eendit) = edges(VG);
     for (;eit!=eendit;++eit) {
-	tb_vlink *vlink = get(vedge_pmap,*eit);
+      tb_vlink *vlink = get(vedge_pmap,*eit);
 
 #ifdef WITH_XML
 	if (both_inputs_rspec) {
@@ -135,7 +135,7 @@ void print_solution(const solution &s) {
 #ifdef WITH_XML
 	    if (both_inputs_rspec) {
 	      rspec_annotater->annotate_element((vlink->name).c_str(), 
-						(p->name).c_str());
+                                          (p->name).c_str());
 	      if (is_generated)
 		continue;
 	    }
