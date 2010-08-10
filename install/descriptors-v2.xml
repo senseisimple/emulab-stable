@@ -410,6 +410,50 @@
     <value>1</value>
   </attribute>
   <attribute name="version">
+    <value>4.10</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh,ipod,isup,veths,veth-ne,veth-en,mlinks,linktest,vlans</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/FBSD410-IPFW2.ndz</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>150</value>
+  </attribute>
+  <attribute name="mbr_version">
+    <value>1</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
+  </attribute>
+  <attribute name="description">
+    <value>FreeBSD 4.10 with built-in IPFW2 support</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>FBSD410-IPFW2</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="OS">
+    <value>FreeBSD</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+</image>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="version">
     <value>6.2</value>
   </attribute>
   <attribute name="osfeatures">
@@ -444,53 +488,6 @@
   </attribute>
   <attribute name="OS">
     <value>FreeBSD</value>
-  </attribute>
-  <attribute name="gid">
-    <value>emulab-ops</value>
-  </attribute>
-</image>
-<image>
-  <attribute name="global">
-    <value>1</value>
-  </attribute>
-  <attribute name="part1_osid">
-    <value>emulab-ops,FBSD410-IPFW2</value>
-  </attribute>
-  <attribute name="default_osid">
-    <value>emulab-ops,FBSD410-IPFW2</value>
-  </attribute>
-  <attribute name="part4_osid">
-    <value>none</value>
-  </attribute>
-  <attribute name="path">
-    <value>/usr/testbed/images/FBSD410-IPFW2.ndz</value>
-  </attribute>
-  <attribute name="mbr_version">
-    <value>1</value>
-  </attribute>
-  <attribute name="loadpart">
-    <value>1</value>
-  </attribute>
-  <attribute name="description">
-    <value>FreeBSD 4.10 with built-in IPFW2 support</value>
-  </attribute>
-  <attribute name="part3_osid">
-    <value>none</value>
-  </attribute>
-  <attribute name="shared">
-    <value>0</value>
-  </attribute>
-  <attribute name="imagename">
-    <value>FBSD410-IPFW2</value>
-  </attribute>
-  <attribute name="pid">
-    <value>emulab-ops</value>
-  </attribute>
-  <attribute name="loadlength">
-    <value>1</value>
-  </attribute>
-  <attribute name="part2_osid">
-    <value>none</value>
   </attribute>
   <attribute name="gid">
     <value>emulab-ops</value>
