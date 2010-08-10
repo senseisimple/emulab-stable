@@ -148,34 +148,17 @@ while (<OUTPUT>) {
 close(OUTPUT);
 
 #
-# Prepass to make sure the XML files verify.
+# Must create the OSids first since the images reference them. But must
+# do this in two passes since there are nextosid references. But, the EZ
+# imageIDs also create OSids that can be referenced by nextosid, so must
+# do those after the first OSid pass but before the second one.
 #
 foreach my $osname (keys(%osinfos)) {
     my ($xmlparse, $string) = @{ $osinfos{$osname} };
+    my $nextosid  = exists($xmlparse->{'attribute'}->{"nextosid"});
 
-    open(NEW, "| $NEWOSID -v -")
-	or fatal("Cannot start $NEWOSID");
-    print NEW $string;
-    close(NEW)
-	or fatal("OS $osname does not verify");
-}
-foreach my $imagename (keys(%images)) {
-    my ($xmlparse, $string) = @{ $images{$imagename} };
-    my $ezid  = exists($xmlparse->{'attribute'}->{"OS"});
-    my $which = ($ezid ? $NEWIMAGE_EZ : $NEWIMAGE);
-
-    open(NEW, "| $which -v -f -")
-	or fatal("Cannot start $which");
-    print NEW $string;
-    close(NEW)
-	or fatal("Image $imagename does not verify");
-}
-
-#
-# Must create the OSids first since the images reference them.
-#
-foreach my $osname (keys(%osinfos)) {
-    my ($xmlparse, $string) = @{ $osinfos{$osname} };
+    next
+	if ($nextosid);
 
     my $osinfo = OSinfo->Lookup("$PROTOPROJ,$osname");
     if (defined($osinfo) && !$force) {
@@ -190,10 +173,8 @@ foreach my $osname (keys(%osinfos)) {
 	fatal("$osname could not be created");
     }
 }
-
 #
-# Two passes. First do the ezid images, then the other. This is cause
-# multiple images can reference the OSids created with an EZid.
+# Do the EZ images
 #
 foreach my $imagename (keys(%images)) {
     my ($xmlparse, $string) = @{ $images{$imagename} };
@@ -217,6 +198,32 @@ foreach my $imagename (keys(%images)) {
 	fatal("Image $imagename could not be created");
     }
 }
+#
+# Now the rest of the OSids.
+#
+foreach my $osname (keys(%osinfos)) {
+    my ($xmlparse, $string) = @{ $osinfos{$osname} };
+    my $nextosid  = exists($xmlparse->{'attribute'}->{"nextosid"});
+
+    next
+	if (!$nextosid);
+
+    my $osinfo = OSinfo->Lookup("$PROTOPROJ,$osname");
+    if (defined($osinfo) && !$force) {
+	print STDERR "OS $osname already exists. Skipping; use -f option\n";
+	next;
+    }
+    open(NEW, "| $NEWOSID -")
+	or fatal("Cannot start $NEWOSID");
+    print NEW $string;
+    if (!close(NEW)) {
+	print STDERR "$string\n";
+	fatal("$osname could not be created");
+    }
+}
+#
+# And the rest of the images.
+#
 foreach my $imagename (keys(%images)) {
     my ($xmlparse, $string) = @{ $images{$imagename} };
     my $ezid  = exists($xmlparse->{'attribute'}->{"OS"});
