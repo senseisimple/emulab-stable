@@ -16,6 +16,7 @@
 import datetime
 import getopt
 import os
+import random
 import re
 import sys
 import tempfile
@@ -200,11 +201,14 @@ old = Lookup( doc.documentElement, "credential" )
 
 c = doc.createElement( "credential" )
 
-id = 1
-while filter( lambda x: x.getAttribute( "xml:id" ) == "ref" + str( id ),
-              doc.getElementsByTagName( "credential" ) ):    
-    id = id + 1
-c.setAttribute( "xml:id", "ref" + str( id ) )
+# I really want do loops in Python...
+while True:
+    id = "ref" + '%016X' % random.getrandbits( 64 )
+    if not filter( lambda x: x.getAttribute( "xml:id" ) == "ref" + str( id ),
+                   doc.getElementsByTagName( "credential" ) ):
+        break
+
+c.setAttribute( "xml:id", str( id ) )
 c.appendChild( Lookup( old, "type" ).cloneNode( True ) )
 
 c.appendChild( SimpleNode( doc, "serial", "1" ) )
@@ -258,7 +262,7 @@ p.appendChild( old )
 c.appendChild( p )
 
 signature = doc.createElement( "Signature" );
-signature.setAttribute( "xml:id", "Sig_ref" + str( id ) )
+signature.setAttribute( "xml:id", "Sig_" + str( id ) )
 signature.setAttribute( "xmlns", "http://www.w3.org/2000/09/xmldsig#" )
 Lookup( doc.documentElement, "signatures" ).appendChild( signature )
 signedinfo = doc.createElement( "SignedInfo" )
@@ -272,7 +276,7 @@ sigmeth.setAttribute( "Algorithm",
                       "http://www.w3.org/2000/09/xmldsig#rsa-sha1" )
 signedinfo.appendChild( sigmeth )
 reference = doc.createElement( "Reference" );
-reference.setAttribute( "URI", "#ref" + str( id ) )
+reference.setAttribute( "URI", "#" + str( id ) )
 signedinfo.appendChild( reference )
 transforms = doc.createElement( "Transforms" )
 reference.appendChild( transforms )
@@ -309,7 +313,7 @@ doc.writexml( tmpfile )
 tmpfile.flush()
 
 ret = os.spawnlp( os.P_WAIT, XMLSEC1, XMLSEC1, "--sign", "--node-id",
-                  "Sig_ref" + str( id ), "--privkey-pem",
+                  "Sig_" + str( id ), "--privkey-pem",
                   CERTIFICATE + "," + CERTIFICATE, tmpfile.name )
 if ret == 127:
     print >> sys.stderr, XMLSEC1 + ": invocation error\n"
