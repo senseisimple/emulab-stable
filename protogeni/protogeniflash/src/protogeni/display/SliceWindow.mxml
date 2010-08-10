@@ -123,13 +123,21 @@
 					Alert.show("There is no valid RSPEC for the slice yet", "No RSPEC");
 					return;
 				}
+				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				{
+					if(s.rspec == null)
+					{
+						Alert.show("There is no valid RSPEC for the slice yet", "No RSPEC");
+						return;
+					}
+				}
 				var viewRspec:DefaultWindow = new DefaultWindow();
 				viewRspec.title = "Last Valid Request RSPEC(s) for: " + sliceCanvas.slice.hrn;
 				var tabs:TabNavigator = new TabNavigator();
 				tabs.percentHeight = 100;
 				tabs.percentWidth = 100;
 				viewRspec.addChild(tabs);
-				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				for each(s in sliceCanvas.slice.slivers)
 				{
 					var tab:VBox = new VBox();
 					tab.percentHeight = 100;

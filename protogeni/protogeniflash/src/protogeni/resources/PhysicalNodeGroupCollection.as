@@ -65,5 +65,15 @@
 		public function Add(g:PhysicalNodeGroup):void {
 			collection.addItem(g);
 		}
+		
+		public function GetAll():Array
+		{
+			var d:Array = [];
+			for each(var ng:PhysicalNodeGroup in collection) {
+				for each(var n:PhysicalNode in ng.collection)
+					d.push(n);
+			}
+			return d;
+		}
 	}
 }

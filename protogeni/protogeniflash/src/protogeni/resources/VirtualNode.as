@@ -28,6 +28,7 @@
 			controlInterface.role = PhysicalNodeInterface.CONTROL;
 			controlInterface.isVirtual = true;
 			interfaces.Add(controlInterface);
+			manager = owner.componentManager;
 		}
 		
 		[Bindable]
