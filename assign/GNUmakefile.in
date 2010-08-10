@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -56,7 +56,7 @@ CXXFLAGS += -O3
 
 # This is added to disable link mapping while we figure out how to get assign
 # to deal with interfaces on switches
-CXXFLAGS += -DDISABLE_LINK_ANNOTATION
+#CXXFLAGS += -DDISABLE_LINK_ANNOTATION
 
 # assign now supports a dizzing array of defines, which are as-yet undocumented
 # Here are the ones used for a typical build:
