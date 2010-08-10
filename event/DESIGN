@@ -64,7 +64,7 @@ notifications. The system defined fields include:
     typedef struct {
 	char		*site;		/* Which Emulab site. */
 	char		*expt;		/* Project and experiment IDs */
-	char		*group;		/* User defined group of nodes */
+	char		*group;		/* Deprecated */
 	char		*host;		/* A specific host (ipaddr) */
 	char		*objtype;	/* LINK, TRAFGEN, etc ... */
         char		*objname;	/* link0, cbr0, cbr1, etc ... */
@@ -72,6 +72,12 @@ notifications. The system defined fields include:
 	int		scheduler;	/* A dynamic event to schedule */
     } address_tuple;
     
+Important Note: Event groups are *not* implemented by the group field
+in the tuple. Rather, they are implemented by adding names to the
+objname field treating it as a comma-delimited field. Since names are
+not unique, the event is sent to every agent registered under the
+group name.
+
 The last field, scheduler, is used internally to route notifications to the
 scheduler for an experiment. This is described in more detail below.
 

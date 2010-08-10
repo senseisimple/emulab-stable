@@ -1196,7 +1196,7 @@ if ($widearea && ! defined($component_name)) {
         if ($iface && $genimode eq $NO_GENI) {
 	    print_simple_link($physnode, $iface,
 			      $fake_inet_switch, $fake_inet_iface,
-			      100000, 0, 0, @inet_protos);
+			      100000, 0, 0, \@inet_protos);
         }
 
 	# Insert into nodes array in case there are wires entries.
@@ -1213,7 +1213,7 @@ if ($genimode ne $NO_GENI) {
 		if (defined($nodes{$node})) {
 		    print_simple_link($node, $iface,
 				      $fake_inet_switch, $fake_inet_iface,
-				      100000, 0, 0, @inet_protos);
+				      100000, 0, 0, \@inet_protos);
 		}
 	    }
 	}
@@ -1413,7 +1413,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 
 	    print_simple_link($node1, $iface1,
 			      $node2, $iface2,
-			      $bw, 0, 0, @types);
+			      $bw, 0, 0, \@types);
 	}
     } 
 }
@@ -1490,10 +1490,10 @@ if (! defined($component_name)) {
       # This is really dumb - BigInts like to print out with a leading '+',
       # which we don't want. Stript it off.
       $speed =~ s/^\+|-//;
-      print_named_link("link-$interconnect",
+      print_named_interconnect("link-$interconnect",
   		     $src, "(null)",
 		     $dst, "(null)",
-		     $speed, 0, 0, "ethernet");
+		     $speed, 0, 0, ["ethernet"]);
   }
 }
 
@@ -1551,7 +1551,7 @@ if (! defined($component_name)) {
       }
       print_simple_link($node, $iface,
 			$fake_air_switch, $fake_air_iface,
-			$max_bw, 0, 0, @intersection);
+			$max_bw, 0, 0, \@intersection);
   }
 }
 
@@ -1977,19 +1977,20 @@ sub print_named_link_ptop
     my $bw = shift(@_);
     my $delay = shift(@_);
     my $loss = shift(@_);
-    my $proto_count = scalar(@_);
+    my @proto = @{ shift(@_) };
+    my $is_interconnect = shift(@_);
 
     my $source_full = "$source:$source/$source_if";
     # Not sure about (null) stuff ... 
     my $dest_full = "$dest:" .
 	(($dest_if eq "(null)") ? "$dest_if" : "$dest/$dest_if");
-    if ($source =~ /cisco/ && $dest =~ /cisco/)
+    if ($is_interconnect)
     {
 	$source_full = $source;
 	$dest_full = $dest;
     }
     print "link $name $source_full "
-	. "$dest_full $bw $delay $loss 1 " . join(" ", @_) . "\n";
+	. "$dest_full $bw $delay $loss 1 " . join(" ", @proto) . "\n";
 }
 
 sub print_named_link_xml
@@ -2002,7 +2003,9 @@ sub print_named_link_xml
     my $bw = shift(@_);
     my $delay = shift(@_);
     my $loss = shift(@_);
-    my $proto_count = scalar(@_);
+    my @proto = @{ shift(@_) };
+    my $is_interconnect = shift(@_);
+    my $proto_count = scalar(@proto);
     if ($genimode ne $NO_GENI) {
 	print "<link ";
 	my $cmurn = GeniHRN::Generate($OURDOMAIN, "authority", "sa");
@@ -2044,12 +2047,12 @@ sub print_named_link_xml
     my $i = 0;
     for (; $i < $proto_count; ++$i) {
 	if ($genimode eq $NO_GENI) {
-	    print "  <link_type><type_name>" . $_[$i]
+	    print "  <link_type><type_name>" . $proto[$i]
 		. "</type_name></link_type>\n";
 	} elsif ($genimode eq $V_0_1 || $genimode eq $V_0_2) {
-	    print "  <link_type type_name=\"" . $_[$i] . "\" />\n";
+	    print "  <link_type type_name=\"" . $proto[$i] . "\" />\n";
 	} elsif ($genimode eq $V_2) {
-	    print "  <link_type name=\"" . $_[$i] . "\" />\n";
+	    print "  <link_type name=\"" . $proto[$i] . "\" />\n";
 	}
     }
     print "</link>\n\n";
@@ -2095,9 +2098,18 @@ sub print_interface_contents
 sub print_named_link
 {
     if (!$do_xml) {
-	print_named_link_ptop(@_);
+	print_named_link_ptop(@_, 0);
     } elsif ($do_xml) {
-	print_named_link_xml(@_);
+	print_named_link_xml(@_, 0);
+    }
+}
+
+sub print_named_interconnect
+{
+    if (!$do_xml) {
+	print_named_link_ptop(@_, 1);
+    } elsif ($do_xml) {
+	print_named_link_xml(@_, 1);
     }
 }
 
