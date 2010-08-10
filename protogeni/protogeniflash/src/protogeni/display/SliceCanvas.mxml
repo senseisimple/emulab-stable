@@ -61,6 +61,7 @@
 			
 			private  function dragEnterHandler(event:DragEvent):void {
 				if (event.dragSource.hasFormat("canvas") ||
+					event.dragSource.hasFormat("marker") ||
 						(event.dragInitiator is List &&
 						List(event.dragInitiator).selectedItem is PhysicalNode &&
 						PhysicalNode(List(event.dragInitiator).selectedItem).available &&
@@ -78,6 +79,17 @@
 						Canvas(event.currentTarget).mouseX,
 						Canvas(event.currentTarget).mouseY);
 					
+				}
+				// Handle markers
+				else if(event.dragSource.hasFormat("marker"))
+				{
+					var dragSource:ProtogeniMapMarker = event.dragSource.dataForFormat( 'marker' ) as ProtogeniMapMarker;
+					var vn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(dragSource.nodeGroups.collection[0].collection[0].manager));
+					vn.isVirtual = true;
+					vn.id = slice.getUniqueVirtualNodeId(vn);
+					this.addVirtualNode(vn,
+						Canvas(event.currentTarget).mouseX,
+						Canvas(event.currentTarget).mouseY);
 				}
 				// Handle dragging old one
 				else if(this.contains(event.dragInitiator as DisplayObject))

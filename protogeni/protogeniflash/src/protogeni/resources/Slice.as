@@ -223,8 +223,8 @@
 				{
 					try
 					{
-						var testHighest:int = parseInt(n.id.substring(n.id.lastIndexOf("-")));
-						if(testHighest > highest)
+						var testHighest:int = parseInt(n.id.substring(n.id.lastIndexOf("-")+1));
+						if(testHighest >= highest)
 							highest = testHighest+1;
 					} catch(e:Error)
 					{

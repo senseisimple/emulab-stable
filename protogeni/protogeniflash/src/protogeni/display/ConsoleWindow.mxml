@@ -79,14 +79,6 @@
 					Main.Pgmap().progressLabel.styleName = "validStyle";
 			}
 			
-			public function appendText(s:String):void {
-				// For now, just add
-				var newMsg:LogMessage = new LogMessage("", "", s);
-				logList.push(newMsg);
-				if(groupComboBox.selectedIndex == 0)
-					addMessage(newMsg);
-			}
-			
 			public function appendMessage(msg:LogMessage):void {
 				logList.push(msg);
 				if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
@@ -109,14 +101,7 @@
 					var split:Spacer = new Spacer();
 					logs.addChild(split);
 				}
-				if(msg.groupId == "")
-				{
-					var generalLabel:Label = new Label();
-					generalLabel.text = msg.details;
-					logs.addChild(generalLabel);
-				} else {
-					logs.addChild(DisplayUtil.getLogMessageButton(msg));
-				}
+				logs.addChild(DisplayUtil.getLogMessageButton(msg));
 			}
 			
 			public function clear():void {

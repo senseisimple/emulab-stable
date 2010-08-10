@@ -24,5 +24,11 @@
 			<mx:click>navigateToURL(new URLRequest("http://sf.net/projects/xmlrpcflash"), "_blank");</mx:click>
 		</mx:LinkButton>
 	</mx:HBox>
+	<mx:HBox width="100%" horizontalAlign="center">
+		<mx:Label text="Icons Land"/>
+		<mx:LinkButton label="Website">
+			<mx:click>navigateToURL(new URLRequest("http://www.icons-land.com/"), "_blank");</mx:click>
+		</mx:LinkButton>
+	</mx:HBox>
 	
 </mx:TitleWindow>

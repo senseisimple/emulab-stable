@@ -71,7 +71,13 @@
 				} else {
 					if(node.state == null || node.status == null ||
 						(node.state.length == 0 && node.status.length == 0))
-						toolTip = "Name: " + node.id + "\nURN: " + node.urn;
+					{
+						toolTip = "Name: " + node.id;
+						if(node.urn != null && node.urn.length > 0)
+							toolTip += "\nURN: " + node.urn;
+						if(node.manager != null)
+							toolTip += "\nManager: " + node.manager.Hrn;
+					}
 					else
 						toolTip = "State: " + node.state + " Status: " + node.status;
 					if(node.status == VirtualNode.STATUS_CHANGING)
