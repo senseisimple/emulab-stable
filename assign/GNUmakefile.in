@@ -41,7 +41,7 @@ OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler
 endif
 
 # Pick either this
-CXXFLAGS += -O3 
+CXXFLAGS += -O3
 # or this
 #CXXFLAGS += -O0 -g -Wall -DVERBOSE
 # and then zero or more of these
