@@ -107,7 +107,9 @@ ticket = response["value"]
 #print str(ticket)
 
 #
-# Update the ticket.
+# Update the ticket. Send back the original rspec, but technically wrong.
+# Proper to dig out the rspec from the ticket and use that, modified if
+# desired. 
 #
 print "Got the ticket, doing a update on it. "
 params = {}

@@ -5,6 +5,8 @@
 -- these is not idempotent, since a site may have changed them for some reason.
 --
 
+INSERT IGNORE INTO `node_types` VALUES ('pc','pc',NULL,NULL,0,0,0,0,0,0,0,0,0,0,0,0);
+INSERT IGNORE INTO`node_type_attributes` VALUES ('pc','imageable','1','boolean');
 INSERT IGNORE INTO `node_types` VALUES ('pcvm','pcvm',NULL,NULL,1,0,1,1,0,0,0,0,0,0,0,0);
 INSERT IGNORE INTO `node_types` VALUES ('pcvwa','pcvwa',NULL,NULL,1,0,0,1,1,0,0,0,0,0,0,0);
 INSERT IGNORE INTO `node_type_attributes` VALUES ('pcvwa','default_osid','0','integer');

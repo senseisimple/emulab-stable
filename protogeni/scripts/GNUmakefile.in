@@ -18,7 +18,8 @@ PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  gencrlbundle shutdownslice remauthority listusage \
 		  update reregister cleanupticket listhistory \
 		  register_sliver sa_daemon genadmincredential \
-          genclrcredentials genallow_extcred
+		  genclrcredentials genallow_extcred advt-merge.py 
+
 
 ifeq ($(ISMAINSITE),1)
 PSBIN_STUFF     += ch_daemon

@@ -42,7 +42,8 @@ my %GENI_MODULES = ( "cm"  => "@prefix@/lib/protogeni-cm.pm",
 		     "ses" => "@prefix@/lib/protogeni-ses.pm" );
 
 # These variables are shared with the loaded module.
-use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION);
+use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION
+	    $GENI_RESPONSE_CONVERTER);
 
 # Testbed libraries.
 use lib '@prefix@/lib';
@@ -57,7 +58,8 @@ my $user  = "geniuser";
 my $group = "GeniSlices";
 
 # Need a command line option.
-my $debug = 1;
+my $debug      = 0;
+my $mailerrors = 1;
 
 # Determined by version.
 my $responder;
@@ -273,9 +275,12 @@ if (!defined($GENI_METHODS->{$method})) {
 }
 my $result;
 my $message =
-    "URN:    $GENIURN\n".
-    "Module: $MODULE\n".
-    "Method: $method\n";
+    "URN:     $GENIURN\n".
+    "Module:  $MODULE\n".
+    "Method:  $method\n";
+$message .=
+    "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
+
     
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {
@@ -290,21 +295,32 @@ if ($@) {
 		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
 }
 else {
-    $response = $decoder->encode_response($result);
-
     if (GeniResponse::IsError($result)) {
-	$message .= "Error:  " . $result->{'code'} . "\n";
+	$message .= "Error:   " . $result->{'code'} . "\n";
+	if ($mailerrors) {
+	    print STDERR "Mail Errors is on.\n";
+	}
     }
     else {
-	$message .= "Code:   " . $result->{'code'} . "\n";
+	$message .= "Code:    " . $result->{'code'} . "\n";
     }
-    $message .= "Output: " . $result->{'output'} . "\n"
+    $message .= "Output:  " . $result->{'output'} . "\n"
 	if (defined($result->{'output'}));
 
     $message .= "Result:\n"  . Dumper($result->{'value'}) . "\n\n";
     $message .= "Request:\n" . $request . "\n";
     
     AddAuditInfo("message", $message);
+
+    #
+    # Added this for geni-am ...
+    #
+    if (defined($GENI_RESPONSE_CONVERTER)) {
+	$response = &$GENI_RESPONSE_CONVERTER($result);
+    }
+    else {
+	$response = $decoder->encode_response($result);
+    }
 }
 
 if ($debug) {

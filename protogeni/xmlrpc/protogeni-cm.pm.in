@@ -20,7 +20,12 @@ use lib '@prefix@/lib';
 use GeniCM;
 use GeniCMV2;
 
-if (!defined($GENI_VERSION) || $GENI_VERSION eq "1.0") {
+# Default
+if (!defined($GENI_VERSION)) {
+    $GENI_VERSION = "2.0";
+}
+
+if ($GENI_VERSION eq "1.0") {
     $GENI_METHODS = {
 	"GetVersion"        => \&GeniCM::GetVersion,
 	"Resolve"	    => \&GeniCM::Resolve,

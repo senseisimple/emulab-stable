@@ -1672,12 +1672,16 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the virtual interfaces.
 	 */
 	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue "
+			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue, "
+			 "       l.lanid "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "left join virt_lan_lans as vll on "
 			 "  vll.idx=v.virtlanidx and vll.exptidx=v.exptidx "
+			 "left join lans as l on "
+			 "  l.exptidx=vll.exptidx and l.vname=vll.vname and "
+			 "  l.link is null "
 			 "left join lan_attributes as la on "
 			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
 			 "left join lan_attributes as la2 on "
@@ -1686,7 +1690,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "      (la2.attrvalue='Experimental' or "
 			 "       la2.attrvalue is null) "
 			 "      and %s",
-			 10, reqp->exptidx, reqp->pnodeid, buf);
+			 11, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {
 		error("%s: IFCONFIG: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -1703,20 +1707,32 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 	while (nrows) {
 		char *bufp   = buf;
+		char *ifacetype;
 		int isveth, doencap;
 
 		row = mysql_fetch_row(res);
 		nrows--;
 
-		if (strcmp(row[6], "veth") == 0) {
+		if (strcmp(row[6], "vlan") == 0 && !row[3]) {
+			/*
+			 * Convert to a loopback lan, however the client
+			 * is able to do it.
+			 */
+			isveth    = 0;
+			doencap   = 0;
+			ifacetype = "loop";
+		} else if (strcmp(row[6], "veth") == 0) {
 			isveth = 1;
 			doencap = 1;
+			ifacetype = "veth";
 		} else if (strcmp(row[6], "veth-ne") == 0) {
 			isveth = 1;
 			doencap = 0;
+			ifacetype = "veth";
 		} else {
 			isveth = 0;
 			doencap = 0;
+			ifacetype = row[6];
 		}
 
 		/*
@@ -1739,7 +1755,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "IFACETYPE=%s "
 			       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s",
-			       isveth ? "veth" : row[6],
+			       ifacetype,
 			       row[1], CHECKMASK(row[4]), row[0], row[2],
 			       row[3] ? row[3] : "none");
 
@@ -1765,7 +1781,9 @@ COMMAND_PROTOTYPE(doifconfig)
 			char *tag = "0";
 			if (isveth)
 				tag = row[8];
-			else if (strcmp(row[6], "vlan") == 0)
+			else if (strcmp(ifacetype, "loop") == 0)
+				tag = row[10];
+			else if (strcmp(ifacetype, "vlan") == 0)
 				tag = row[9] ? row[9] : "0";
 
 			/* sanity check the tag */
@@ -1776,7 +1794,6 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			bufp += OUTPUT(bufp, ebufp - bufp, " VTAG=%s", tag);
 		}
-
 		OUTPUT(bufp, ebufp - bufp, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)

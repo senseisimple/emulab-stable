@@ -16,6 +16,7 @@
 #ifdef NEW_GCC
 #include <ext/hash_map>
 #include <ext/hash_fun.h>
+
 using namespace __gnu_cxx;
 #define RANDOM() random()
 #else
