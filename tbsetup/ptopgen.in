@@ -2049,7 +2049,10 @@ sub print_node_interfaces
 	    print "public_ipv4=\"$ip\" ";
 	}
 	print ">\n";
-	print "    <emulab:interface name=\"$name\"/>\n";
+	if ($genimode eq $V_2)
+	{
+	    print "    <emulab:interface name=\"$name\"/>\n";
+	}
 	print "  </interface>\n";
     }
 }
