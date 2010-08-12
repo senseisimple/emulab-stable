@@ -4140,7 +4140,7 @@ sub InterpNodes($)
 	    # Internally created node. At the moment, these should be
 	    # delay nodes.
 	    #
-	    if (exists($self->delaynodes()->{$virtual})) {
+	    if (! exists($self->delaynodes()->{$virtual})) {
 		tbwarn("Unknown node $virtual on $physical\n");
 		return -1;
 	    }
