@@ -1925,7 +1925,7 @@ sub print_node_features
 	    }
 	    print "/>\n";
 	}
-	else {
+	elsif ($genimode eq $NO_GENI) {
 	    print "  <fd \n";
 	    print "     fd_name=\"$name\" \n";
 	    print "     fd_weight=\"$value\" \n";
