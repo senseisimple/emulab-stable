@@ -46,7 +46,19 @@ package protogeni.communication
 			var bytes:ByteArray = decodor.toByteArray();
 			bytes.uncompress();
 			var decodedRspec:String = bytes.toString();
+			
 			cm.Rspec = new XML(decodedRspec);
+			/*try
+			{
+				cm.Rspec = new XML(decodedRspec);
+			} catch(e:Error)
+			{
+				// Remove prefixes and try again
+				var prefixPattern:RegExp = /(<[\/]*)([\w]*:)/gi;
+				decodedRspec = decodedRspec.replace(prefixPattern, "$1");
+				cm.Rspec = new XML(decodedRspec);
+			}*/
+			
 			cm.processRspec(Main.protogeniHandler.rpcHandler.start);
 		}
 		else
@@ -81,6 +93,15 @@ package protogeni.communication
 	override public function cancel():void
 	{
 		cm.Status = ComponentManager.UNKOWN;
+		waitOnComplete = false;
+		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
+		op.cleanup();
+	}
+	
+	override public function cleanup():void
+	{
+		if(cm.Status == ComponentManager.INPROGRESS)
+			cm.Status = ComponentManager.FAILED;
 		waitOnComplete = false;
 		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		op.cleanup();

@@ -40,8 +40,7 @@ package protogeni.communication
 			sliver.created = true;
 
 			sliver.rspec = new XML(response.value[1]);
-			//sliver.parseRspec();
-			// update existing?
+			sliver.parseRspec();
 			
 			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 

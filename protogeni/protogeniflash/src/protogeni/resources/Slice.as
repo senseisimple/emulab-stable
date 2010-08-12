@@ -92,6 +92,28 @@
 			return nodes;
 		}
 		
+		public function getVirtualNodeWithId(id:String):VirtualNode
+		{
+			for each(var s:Sliver in slivers)
+			{
+				var vn:VirtualNode = s.nodes.getById(id);
+				if(vn != null)
+					return vn;
+			}
+			return null;
+		}
+		
+		public function getVirtualLinkWithId(id:String):VirtualLink
+		{
+			for each(var s:Sliver in slivers)
+			{
+				var vl:VirtualLink = s.links.getById(id);
+				if(vl != null)
+					return vl;
+			}
+			return null;
+		}
+		
 		public function hasSliverFor(cm:ComponentManager):Boolean
 		{
 			for each(var s:Sliver in slivers)

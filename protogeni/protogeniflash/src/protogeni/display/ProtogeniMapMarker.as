@@ -71,8 +71,8 @@ package protogeni.display
 					
 					geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
 						function(event:GeocodingEvent):void {
-							Main.log.appendMessage(
-								new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
+							//Main.log.appendMessage(
+							//	new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
 						});
 					
 					geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
