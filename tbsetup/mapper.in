@@ -274,7 +274,7 @@ sub MapperWrapper()
 	or fatal("Could not create vtop for $experiment");
     TBDebugTimeStamp("vtopgen finished");
     
-    if (!$impotent && !$toponly && ($updating || $clear)) {
+    if (!$impotent && !$alloconly && !$toponly && ($updating || $clear)) {
 	if ($clear) {
 	    chat("Freeing reserved nodes ...\n");
 	    system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
