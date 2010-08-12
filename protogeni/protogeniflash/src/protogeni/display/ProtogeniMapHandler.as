@@ -221,7 +221,7 @@ package protogeni.display
 	    	linkLabelOverlays = new ArrayCollection();
 	    	linkLineOverlays = new ArrayCollection();
 	        markers = [];
-	    	
+			
 	    	// Draw physical components
 	    	for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
 	    	{

@@ -27,6 +27,8 @@ package protogeni.display
 		
 		private var rawSprite:Sprite;
 		
+		public var lastId:String = "";
+		
 		public function SliceLink(newCanvas:SliceCanvas)
 		{
 			super();
@@ -49,8 +51,7 @@ package protogeni.display
 		
 		public function establishFromExisting(vl:VirtualLink):void
 		{
-			
-			this.virtualLink = vl;
+			setLink(vl);
 			
 			removeButton = new ImageButton();
 			removeButton.source = DisplayUtil.notAvailableIcon;
@@ -70,7 +71,7 @@ package protogeni.display
 		
 		public function establish(start:SliceNode, end:SliceNode):Boolean
 		{
-			virtualLink = new VirtualLink(start.node.slivers[0]);
+			setLink(new VirtualLink(start.node.slivers[0]));
 			if(virtualLink.establish(start.node, end.node))
 			{
 				establishFromExisting(virtualLink);
@@ -79,6 +80,12 @@ package protogeni.display
 				virtualLink = null;
 				return false;
 			}
+		}
+		
+		public function setLink(vl:VirtualLink):void
+		{
+			virtualLink = vl;
+			lastId = vl.id;
 		}
 		
 		public function removeLink(event:MouseEvent = null):void

@@ -40,7 +40,7 @@ package protogeni.display
 			return false;
 		}
 		
-		public function getVirtualLinkFor(vl:VirtualLink):SliceLink
+		public function getForVirtualLink(vl:VirtualLink):SliceLink
 		{
 			for each(var sl:SliceLink in this)
 			{

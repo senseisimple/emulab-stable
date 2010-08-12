@@ -55,8 +55,63 @@
 
 			public function refreshSlice():void
 			{
-				for each(var sn:SliceNode in this.allNodes)
-					sn.resetToStatus();
+				// Remove/replace old nodes
+				for(var i:int = 0; i < this.allNodes.length; i++)
+				{
+					var sn:SliceNode = allNodes[i];
+					var vn:VirtualNode = slice.getVirtualNodeWithId(sn.lastId);
+					if(vn == null)
+					{
+						this.removeChild(sn);
+						allNodes.removeItemAt(i);
+						i--;
+					}
+					else
+					{
+						sn.setNode(slice.getVirtualNodeWithId(sn.lastId));
+						sn.resetToStatus();
+					}
+				}
+
+				// Add new nodes
+				for each(var s:Sliver in slice.slivers)
+				{
+					for each(var n:VirtualNode in s.nodes)
+					{
+						if(this.allNodes.getForVirtualNode(n) == null)
+							this.addVirtualNodeToCanvas(n);
+					}
+						
+				}
+				
+				// Remove/replace old links
+				for(i = 0; i < this.allLinks.length; i++)
+				{
+					var sl:SliceLink = allLinks[i];
+					var vl:VirtualLink = slice.getVirtualLinkWithId(sl.lastId);
+					if(vl == null)
+					{
+						removeChild(sl.removeButton);
+						removeChild(sl);
+						allLinks.removeItemAt(i);
+						i--;
+					}
+					else
+						sl.setLink(slice.getVirtualLinkWithId(sl.lastId));
+					
+				}
+				// Add new
+				for each(s in slice.slivers)
+				{
+					for each(var l:VirtualLink in s.links)
+					{
+						if(this.allLinks.getForVirtualLink(l) == null)
+							this.addVirtualLinkToCanvas(l);
+					}
+				}
+				
+				
+				hostWindow.loadNodes();
 			}
 			
 			private  function dragEnterHandler(event:DragEvent):void {
@@ -122,8 +177,9 @@
 				// Remove nodes and slivers
 				for each(var s:Sliver in sn.node.slivers)
 				{
-					s.nodes.removeItemAt(s.nodes.getItemIndex(sn.node));
-					if(s.nodes.length == 0)
+					if(s.nodes.getItemIndex(sn.node) > -1)
+						s.nodes.removeItemAt(s.nodes.getItemIndex(sn.node));
+					if(s.nodes.length == 0 && slice.slivers.getItemIndex(s) > -1)
 						slice.slivers.removeItemAt(slice.slivers.getItemIndex(s));
 				}
 
@@ -135,7 +191,7 @@
 			public function addVirtualLinkToCanvas(vl:VirtualLink):SliceLink
 			{
 				if(this.allLinks.containsVirtualLink(vl))
-					return this.allLinks.getVirtualLinkFor(vl);
+					return this.allLinks.getForVirtualLink(vl);
 				
 				var sl:SliceLink = new SliceLink(this);
 				sl.establishFromExisting(vl);
@@ -218,7 +274,6 @@
 					else
 						sn.node.superNode = allNodes.getForPhysicalNode(pn.subNodeOf).node;
 					sn.node.superNode.subNodes.push(sn.node);
-					
 				}
 				
 				return sn;
@@ -231,8 +286,8 @@
 				sn.canvas = this;
 				this.addChild(sn);
 				this.validateNow();
-				sn.width = sn.width + (sn.nameLabel.textWidth - sn.nameLabel.width);
 				sn.setLocation(x, y);
+				sn.adjustWidth();
 				allNodes.addItem(sn);
 				
 				if(sn.node.physicalNode != null && hostWindow.nodes != null && hostWindow.nodes.getItemIndex(sn.node.physicalNode) > -1)

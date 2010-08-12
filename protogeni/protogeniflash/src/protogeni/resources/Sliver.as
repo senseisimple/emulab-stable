@@ -110,6 +110,7 @@
       		for each(var nodeXml:XML in nodesXml)
       		{
       			var virtualNode:VirtualNode = new VirtualNode(this);
+				virtualNode.setToPhysicalNode(componentManager.Nodes.GetByUrn(nodeXml.@component_urn));
       			virtualNode.id = nodeXml.@virtual_id;
 				virtualNode.manager = Main.protogeniHandler.ComponentManagers.getByUrn(nodeXml.@component_manager_urn);
 				if(nodeXml.@sliver_urn != null)
@@ -123,7 +124,6 @@
       			virtualNode.virtualizationType = nodeXml.@virtualization_type;
 				if(nodeXml.@virtualization_subtype != null)
 					virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;
-				virtualNode.setToPhysicalNode(componentManager.Nodes.GetByUrn(nodeXml.@component_urn));
       			for each(var ix:XML in nodeXml.children()) {
 	        		if(ix.localName() == "interface") {
 	        			var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);

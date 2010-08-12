@@ -23,7 +23,7 @@ package protogeni.communication
   {
     public function RequestSliceResolve(s:Slice, willBeCreating:Boolean = false) : void
     {
-		super("SliceResolve", "Resolving slice named " + s.hrn, CommunicationUtil.resolve);
+		super("SliceResolve (" + s.hrn + ")", "Resolving slice named " + s.hrn, CommunicationUtil.resolve);
 		slice = s;
 		isCreating = willBeCreating;
 		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);

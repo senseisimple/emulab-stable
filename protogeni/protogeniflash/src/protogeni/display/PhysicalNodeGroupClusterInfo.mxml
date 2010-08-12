@@ -5,16 +5,18 @@
 	
 	<mx:Script>
 		<![CDATA[
-			import protogeni.resources.PhysicalNodeGroup;
-			import mx.controls.Alert;
-			import com.google.maps.Map;
-			import com.google.maps.LatLngBounds;
 			import com.google.maps.LatLng;
-			import com.google.maps.services.Placemark;
+			import com.google.maps.LatLngBounds;
+			import com.google.maps.Map;
 			import com.google.maps.services.ClientGeocoder;
 			import com.google.maps.services.GeocodingEvent;
+			import com.google.maps.services.Placemark;
+			
 			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
 			import mx.controls.Button;
+			
+			import protogeni.resources.PhysicalNodeGroup;
 
 			public function Load(cluster:ArrayCollection):void 
 			{
@@ -81,8 +83,8 @@
 			public function setZoomButton(bounds:LatLngBounds):void {
 				zoomButton.addEventListener(MouseEvent.CLICK,
 					function zoomin(evt:MouseEvent):void {
-						var map : Map = Main.Pgmap().map;
-						var bzl : Number  = map.getBoundsZoomLevel(bounds);
+						var map:ProtogeniMap = Main.Pgmap().map;
+						var bzl:Number  = map.getBoundsZoomLevel(bounds);
 				        if(map.getZoom() != bzl-1)
 				          map.setZoom(bzl-1);
 			        	map.panTo( bounds.getCenter() );

@@ -243,22 +243,25 @@
 					Main.log.setStatus(queue.front().name + " done", false, false);
 					Main.log.appendMessage(new LogMessage(queue.front().op.getUrl(), "Response: " + queue.front().name, queue.front().op.getResponseXml(), false, LogMessage.TYPE_END));
 				}
-
-				// Find out what to do next
 				var next : * = queue.front().complete(code, response);
-				var shouldImmediatelyExit:Boolean = queue.head != null && queue.front().waitOnComplete;
-				if (next != null)
-					queue.push(next);
-				queue.front().cleanup();
-				queue.pop();
-				
-				if(shouldImmediatelyExit)
-					return;
 			}
 			catch (e : Error)
 			{
-				codeFailure(queue.front().name, "Error caught in RPC-Handler Complete", e);
+				codeFailure(queue.front().name, "Error caught in RPC-Handler Complete", e, !queue.front().continueOnError);
+				if(!queue.front().continueOnError)
+					return;
+				shouldImmediatelyExit = false;
 			}
+			
+			// Find out what to do next
+			if (next != null)
+				queue.push(next);
+			queue.front().cleanup();
+			var shouldImmediatelyExit:Boolean = queue.head != null && queue.front().waitOnComplete;
+			queue.pop();
+			
+			if(shouldImmediatelyExit)
+				return;
 			
 			tryNext();
 		}
@@ -271,14 +274,19 @@
 				forceStop = false;
 		}
 		
-		public function codeFailure(name:String, detail:String = "", e:Error = null) : void
+		public function codeFailure(name:String, detail:String = "", e:Error = null, stop:Boolean = true) : void
 		{
-			Main.log.open();
+			if(stop)
+			{
+				Main.log.open();
+				forceStop = true;
+			}
+				
 			if(e != null)
 				Main.log.appendMessage(new LogMessage("", "Code Failure: " + name,detail + "\n\n" + e.toString() + "\n\n" + e.getStackTrace(),true,LogMessage.TYPE_END));
 			else
 				Main.log.appendMessage(new LogMessage("", "Code Failure: " + name,detail,true,LogMessage.TYPE_END));
-			forceStop = true;
+			
 		}
 	}
 }
