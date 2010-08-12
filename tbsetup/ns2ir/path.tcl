@@ -38,10 +38,12 @@ Path instproc updatedb {DB} {
     $self instvar sim
     
     set idx 0
+    set layer 0
 
     foreach link $mylinklist {
-	set fields [list "pathname" "segmentname" "segmentindex"]
-	set values [list $self $link $idx]
+	set layer  [$link set layer]
+	set fields [list "pathname" "segmentname" "segmentindex" "layer"]
+	set values [list $self $link $idx $layer]
 
 	$sim spitxml_data "virt_paths" $fields $values	
 
