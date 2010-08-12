@@ -319,10 +319,18 @@ my $types_result = DBQueryFatal($types_querystring);
 
 # Save the valid types in a new array for later.
 my @mtypes_array;
-while (my ($type) = $types_result->fetchrow_array()) {
-    push(@mtypes_array, $type);
-    $xmlfields{"mtype_$type"} = ["mtype", $SLOT_OPTIONAL];
+
+if ($types_result->numrows) {
+    while (my ($type) = $types_result->fetchrow_array()) {
+	push(@mtypes_array, $type);
+	$xmlfields{"mtype_$type"} = ["mtype", $SLOT_OPTIONAL];
+    }
 }
+else {
+    @mtypes_array = ("pc");
+    $xmlfields{"mtype_pc"} = ["mtype", $SLOT_OPTIONAL];
+}
+
 ## printf "%s mtypes\n", $#mtypes_array + 1;
 ## foreach my $x (@mtypes_array) { printf "%s\n", $x; }
 ## print "\n";
@@ -599,7 +607,8 @@ $newimageid_args{"loadlength"} = $loadlen;
 $newimageid_args{"default_osid"} = $osid;
 
 # Create the osidtoimageid mapping too.
-$newimageid_args{"makedefault"} = 1;
+$newimageid_args{"makedefault"} = 1
+    if ($node_types_selected);
 
 my $new_image = Image->Create($project, $group, $this_user, $imagename, $osid,
 			      \%newimageid_args, \$usrerr);

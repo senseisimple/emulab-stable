@@ -3511,6 +3511,10 @@ sub AddLinkToSolution($$$$$$$$)
 		$member0->_lannode($nodeB);
 		$member0->_lanport($portB);
 	    }
+	    else {
+		$member0->_lannode("null");
+		$member0->_lanport("null");
+	    }
 	}
     }
     elsif (($lan,$virtA) =
@@ -4010,7 +4014,7 @@ sub AllocNodes($)
 	if (exists($self->solution()->{'TORESERVE'}->{$nodeid})) {
 	    $self->newreserved()->{$nodeid} = $nodeid;
 	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY())
-		if (!($self->impotent() || $self->alloconly()));
+		if ($self->impotent());
 
 	    #
 	    # Fix all of the nodes assigned to the pnode.
@@ -4123,7 +4127,7 @@ sub AllocNodes($)
 	    # Mark it for teardown by the caller (tbswap currently).
 	    #
 	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_TEARDOWN())
-		if (!($self->impotent() || $self->alloconly()));
+		if (! $self->impotent());
 	}
 	elsif ($pnode->_reuse() eq "reboot") {
 	    #
@@ -4131,7 +4135,7 @@ sub AllocNodes($)
 	    # it should be rebooted.
 	    #
 	    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY())
-		if (!($self->impotent() || $self->alloconly()));
+		if (! $self->impotent());
 	}
     }
   skip:
@@ -4488,8 +4492,7 @@ sub AllocVirtNodes($)
 					"nodeid"   => $physical,
 					"debug"    => 0,
 					"verbose"  => $self->verbose(),
-					"impotent" => $self->impotent() ||
-					    $self->alloconly(),
+					"impotent" => $self->impotent(),
 					"sharedokay" => $sharedokay,
 					"regression" => $self->regression()})
 		    < 0) {
@@ -4579,7 +4582,7 @@ sub AllocVirtNodes($)
 	    # state they were in so that os_setup/vnode_setup know they
 	    # need to reboot them.
 	    #
-	    if (!($self->impotent() || $self->alloconly())) {
+	    if (! $self->impotent()) {
 		if (!exists($self->current_v2v()->{$virtual})) {
 		    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_CLEAN());
 		}
@@ -4588,6 +4591,12 @@ sub AllocVirtNodes($)
 		    $pnode->SetAllocState(TBDB_ALLOCSTATE_RES_INIT_DIRTY());
 		}
 	    }
+	    #
+	    # When doing alloconly, we have to set the vname for the
+	    # physical nodes so that update works.
+	    #
+	    $pnode->ModifyReservation({"vname" => $virtual}) == 0
+		or return -1 if (!$self->impotent() && $self->alloconly());
 	}
 
 	# Since we have some extra physical vnodes reserved on this pnode,
@@ -4600,7 +4609,9 @@ sub AllocVirtNodes($)
 		my $pnode = $self->pnodes()->{$pname};
 
 		$pnode->SetAllocState(TBDB_ALLOCSTATE_RES_TEARDOWN())
-		    if (!($self->impotent() || $self->alloconly()));
+		    if (!$self->impotent() &&
+			$pnode->allocstate() ne
+			TBDB_ALLOCSTATE_RES_INIT_CLEAN());
 	    }		
 	}
     }
