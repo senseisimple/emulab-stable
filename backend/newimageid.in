@@ -315,6 +315,18 @@ my $types_result =
 		 "      a.attrvalue!='0'");
 # Save the valid types in a new array for later.
 my @mtypes_array;
+
+if ($types_result->numrows) {
+    while (my ($type) = $types_result->fetchrow_array()) {
+	push(@mtypes_array, $type);
+	$xmlfields{"mtype_$type"} = ["mtype", $SLOT_OPTIONAL];
+    }
+}
+else {
+    @mtypes_array = ("pc");
+    $xmlfields{"mtype_pc"} = ["mtype", $SLOT_OPTIONAL];
+}
+
 while (my ($type) = $types_result->fetchrow_array()) {
     push(@mtypes_array, $type);
     $xmlfields{"mtype_$type"} = ["mtype", $SLOT_OPTIONAL];
@@ -487,7 +499,8 @@ foreach $key (grep(/^mtype_/, keys(%newimageid_args))) {
 UserError("Node Types: Must select at least one node type")
     if ($node_types_selected == 0 && !$force);
 
-my $typeclause = join(" or ", map("type='$_'", @mtype_keys));
+my $typeclause =
+    ($node_types_selected ? join(" or ", map("type='$_'", @mtype_keys)) : "0");
 
 #
 # Check sanity of node name and that user can create an image from it.

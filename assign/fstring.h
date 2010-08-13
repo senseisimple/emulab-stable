@@ -25,10 +25,12 @@
 
 #include <iostream>
 #include <map>
+#include <cstring>
 using namespace std;
 
 #ifdef NEW_GCC
 #include <ext/hash_fun.h>
+//#include <hash_fun.h>
 using namespace __gnu_cxx;
 #else
 #include <stl_hash_fun.h>

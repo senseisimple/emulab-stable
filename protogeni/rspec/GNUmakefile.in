@@ -11,7 +11,7 @@ SUBDIR		= protogeni/rspec
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= 0.1
+SUBDIRS	= 0.1 0.2 2
 
 # xsdgen must be run manually if necessary.
 all: all-subdirs
@@ -20,6 +20,8 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: 
 	@$(MAKE) -C 0.1 install
+	@$(MAKE) -C 0.2 install
+	@$(MAKE) -C 2 install
 
 control-install:
 

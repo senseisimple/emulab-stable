@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -37,11 +37,11 @@ CXXFLAGS += -I/sw/include
 ifeq ($(HAVE_XERCES),yes)
 CXXFLAGS += -DWITH_XML
 LIBS += -L/usr/local/lib -lxerces-c
-OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec.o annotate_vtop.o annotate.o
+OBJS += parse_ptop_xml.o parse_vtop_xml.o parse_policy_xml.o parse_error_handler.o xmlhelpers.o parse_advertisement_rspec.o parse_request_rspec.o annotate_rspec_v2.o annotate_rspec.o annotate_vtop.o annotate.o rspec_parser_helper.o rspec_parser.o rspec_parser_v1.o rspec_parser_v2.o emulab_extensions_parser.o
 endif
 
 # Pick either this
-CXXFLAGS += -O3 
+CXXFLAGS += -O3
 # or this
 #CXXFLAGS += -O0 -g -Wall -DVERBOSE
 # and then zero or more of these
@@ -53,6 +53,10 @@ CXXFLAGS += -O3
 
 # And then, regardless, you can also have this
 #CXXFLAGS += -DSTATS
+
+# This is added to disable link mapping while we figure out how to get assign
+# to deal with interfaces on switches
+#CXXFLAGS += -DDISABLE_LINK_ANNOTATION
 
 # assign now supports a dizzing array of defines, which are as-yet undocumented
 # Here are the ones used for a typical build:
@@ -114,12 +118,14 @@ anneal.o: anneal.cc anneal.h port.h delay.h physical.h common.h fstring.h \
   solution.h vclass.h neighborhood.h
 annotate.o: annotate.cc
 annotate_rspec.o: annotate_rspec.cc
+annotate_rspec_v2.o: annotate_rspec_v2.cc
 annotate_vtop.o: annotate_vtop.cc
 assign.o: assign.cc port.h common.h fstring.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h vclass.h pclass.h score.h \
   solution.h maps.h anneal.h config.h
 config.o: config.cc config.h common.h port.h fstring.h score.h physical.h \
   delay.h featuredesire.h forwarding.h virtual.h anneal.h pclass.h
+emulab_extensions_parser.o: emulab_extensions_parser.cc
 featuredesire.o: featuredesire.cc featuredesire.h common.h port.h \
   fstring.h score.h physical.h delay.h forwarding.h virtual.h
 forwarding.o: forwarding.cc forwarding.h port.h fstring.h physical.h \
@@ -143,6 +149,10 @@ parse_vtop_xml.o: parse_vtop_xml.cc
 parser.o: parser.cc parser.h port.h
 pclass.o: pclass.cc port.h common.h fstring.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h pclass.h
+rspec_parser.o: rspec_parser.cc
+rspec_parser_helper.o: rspec_parser_helper.cc
+rspec_parser_v1.o: rspec_parser_v1.cc
+rspec_parser_v2.o: rspec_parser_v2.cc
 score.o: score.cc port.h common.h fstring.h vclass.h delay.h physical.h \
   featuredesire.h forwarding.h virtual.h pclass.h score.h
 solution.o: solution.cc solution.h port.h delay.h physical.h common.h \

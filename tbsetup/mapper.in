@@ -48,15 +48,17 @@ sub usage ()
     print STDERR " -m   - Set the multiplex factor; overrides experiment.\n";
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
+    print STDERR " -l   - Use rspec v2 instead of the text file format\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:a";
+my $optlist    = "dvunfprqczxm:ko:alt";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
 my $updating   = 0;
 my $impotent   = 0;
 my $precheck   = 0;
+my $toponly    = 0;
 my $prepass    = 0;
 my $alloconly  = 0;
 my $outfile;
@@ -70,6 +72,7 @@ my $clear      = 0;
 my $warnings   = 0;
 my $maxrun     = 3;		# Maximum number of times we run assign.
 my $gotlock    = 0;
+my $userspec   = 0;
 my $vtop;
 
 #
@@ -145,6 +148,10 @@ if (defined($options{"d"})) {
 if (defined($options{"u"})) {
     $updating = 1;
 }
+if (defined($options{"t"})) {
+    $toponly = 1;
+    $quiet   = 1;
+}
 if (defined($options{"n"})) {
     $impotent = 1;
 }
@@ -168,7 +175,8 @@ if (defined($options{"r"})) {
 	fatal("Cannot use regression mode on main DB");
     }
     $regression = 1;
-    $clear      = 1;
+    $clear      = 1
+	if (!defined($options{"t"}));
     $fixmode    = 1;
     TBDebugTimeStampsOn();
     $usecurrent = 1
@@ -181,6 +189,9 @@ if (defined($options{"q"})) {
 }
 if (defined($options{"c"})) {
     $clear = 1;
+}
+if (defined($options{"l"})) {
+    $userspec = 1;
 }
 
 my $pid = $ARGV[0];
@@ -243,7 +254,13 @@ exit(0);
 
 sub MapperWrapper()
 {
-    chat("Starting the new and improved mapper wrapper.\n");
+    chat("Starting the new and improved mapper wrapper.\n")
+	if (!$toponly);
+
+    # Need to do this cause libvtop will add them again.
+    # Must be done before nodes are released.
+    $experiment->DeleteInternalProgramAgents()
+	if ($regression);
 
     TBDebugTimeStamp("Create libvtop started");
     $vtop = libvtop->Create($experiment, $this_user, $vtopflags);
@@ -252,7 +269,12 @@ sub MapperWrapper()
     }
     TBDebugTimeStamp("Create libvtop ended");
 
-    if (!$impotent && ($updating || $clear)) {
+    TBDebugTimeStamp("vtopgen started");
+    $vtop->CreateVtop() == 0
+	or fatal("Could not create vtop for $experiment");
+    TBDebugTimeStamp("vtopgen finished");
+    
+    if (!$impotent && !$alloconly && !$toponly && ($updating || $clear)) {
 	if ($clear) {
 	    chat("Freeing reserved nodes ...\n");
 	    system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
@@ -263,10 +285,6 @@ sub MapperWrapper()
 	exit(0)
 	    if ($clear && !$regression);
     }
-    TBDebugTimeStamp("vtopgen started");
-    $vtop->CreateVtop() == 0
-	or fatal("Could not create vtop for $experiment");
-    TBDebugTimeStamp("vtopgen finished");
     AssignLoop();
     return 0;
 }
@@ -393,7 +411,7 @@ sub AssignLoop()
 	$currentrun++;
     }
     GatherAssignStats($pid, $eid, %{ $vtop->exptstats() })
-	if (! ($impotent || $alloconly));
+	if (! ($impotent || $alloconly || $regression || $toponly));
     TBDebugTimeStamp("mapper loop finished");
     return 0;
 }
@@ -405,9 +423,36 @@ sub RunAssign($$)
 {
     my ($precheck, $prefix) = @_;
 
+    my $typelimitfile = $prefix .".limits";
     my $ptopfile = $prefix . ".ptop";
     my $vtopfile = $prefix . ".vtop";
+    if ($userspec) {
+	$ptopfile .= ".xml";
+	$vtopfile .= ".xml";
+    }
     my $assignexitcode = 0;
+
+    #
+    # Now generate a vtop file and dump it to a file.
+    #
+    if (! open(VTOPFILE, "> $vtopfile")) {
+	tberror("Could not open $vtopfile: $!\n");
+	return -1;
+    }
+    my $reslibvtop;
+    if ($userspec == 1) {
+	$reslibvtop = $vtop->PrintRspec(*VTOPFILE);
+    }
+    else {
+	$reslibvtop = $vtop->PrintTop(*VTOPFILE);
+    }
+    if ($reslibvtop != 0) {
+	tberror("Could not print vtop file for $experiment\n");
+	return -1;
+    }
+    close(VTOPFILE);
+    return 0
+	if ($toponly);
 
     # Debugging hack for regression mode. Avoid really long assign runs.
     if ($regression && $noassign) {
@@ -429,6 +474,22 @@ sub RunAssign($$)
 	    return -1;
 	}
     }
+
+    #
+    # Append this admission control results to ptopgen.
+    #
+    if (scalar(keys(%admission_control))) {
+	open(TYPELIMIT, ">$typelimitfile") or
+	    return -1;
+
+	foreach my $typeclass (keys(%admission_control)) {
+	    my $count = $admission_control{$typeclass};
+
+	    print TYPELIMIT "$typeclass $count\n";
+	}
+	close(TYPELIMIT);
+    }
+
 
     #
     # Snapshot physical resources.
@@ -455,6 +516,11 @@ sub RunAssign($$)
     	if ($precheck);
     $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
     	if (defined($experiment->delay_capacity()));
+    if ($userspec == 1) {
+	$ptopargs .= "-x -g 2 ";
+    }
+    $ptopargs .= "-l $typelimitfile"
+	if (scalar(keys(%admission_control)));
 
     chat("ptopargs: '$ptopargs'\n");
     TBDebugTimeStamp("ptopgen started");
@@ -464,34 +530,6 @@ sub RunAssign($$)
 	return -1;
     }
     TBDebugTimeStamp("ptopgen finished");
-
-    #
-    # Append this admission control results to ptopgen.
-    #
-    if (scalar(keys(%admission_control))) {
-	open(PTOP, ">> $ptopfile") or
-	    return -1;
-
-	foreach my $typeclass (keys(%admission_control)) {
-	    my $count = $admission_control{$typeclass};
-
-	    print PTOP "set-type-limit $typeclass $count\n";
-	}
-	close(PTOP);
-    }
-
-    #
-    # Now generate a vtop file and dump it to a file.
-    #
-    if (! open(VTOPFILE, "> $vtopfile")) {
-	tberror("Could not open $vtopfile: $!\n");
-	return -1;
-    }
-    if ($vtop->PrintTop(*VTOPFILE) != 0) {
-	tberror("Could not print vtop file for $experiment\n");
-	return -1;
-    }
-    close(VTOPFILE);
 
     if (! ($impotent || $regression || $alloconly)) {
 	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
@@ -504,7 +542,12 @@ sub RunAssign($$)
 
     # Run assign
     my $cmd  = "assign";
-    my $args = "$ptopfile $vtopfile";
+    my $args = "";
+    $args .= "-f rspec " 
+	if ($userspec == 1);
+    $args .= "-f text "
+	if ($userspec == 0);
+    $args .= "$ptopfile $vtopfile";
     $args = "-P $args"
 	if (!$vtop->sharednodecount());
     $args = "-uod -c .75 $args"
@@ -619,7 +662,7 @@ sub RunAssign($$)
     close(ASSIGNFP);
     TBDebugTimeStamp("ReadSolution ended");
     
-    if (defined($vtop->rspec())) {
+    if (defined($vtop->genirspec())) {
 	TBDebugTimeStamp("Map Geni Resources Started");
 	if ($vtop->MapResources() != 0) {
 	    print("Could not map external resources! $!\n");
@@ -704,6 +747,9 @@ sub FinalizeRegression($)
 	}
 	close(VTOPFILE);
     }
+    # Must be done before nodes are released.
+    $experiment->DeleteInternalProgramAgents();
+    
     return 0
 	if ($noregfree);
     

@@ -27,37 +27,61 @@
  */
 const XMLCh* getChildValue(const xercesc::DOMElement* tag, const char *name);
 
-/* This will only work if there is only one element with that tag within the parent
- * It is the callers responsibility to ensure that this is the case before calling this function
+/* This will only work if there is only one element with that tag in the parent
+ * It is the callers responsibility to ensure this before calling this function
  */ 
-void setChildValue(const xercesc::DOMElement* parent, const char* tag, const char* value);
+void setChildValue(const xercesc::DOMElement* parent, 
+					const char* tag, 
+					const char* value);
 
 /*
 */
 xercesc::DOMElement* getNodeByName (const xercesc::DOMElement* root, const char* name);
 
-/* Returns an element which is a child of root with name tag which has an attribute attribute_name with value attribute_value
+/* Returns an element which is a child of root with name tag 
+ * which has an attribute attribute_name with value attribute_value
 */
-xercesc::DOMElement* getElementByAttributeValue (const xercesc::DOMElement* root, const char* tag, const char* attribute_name, const char* attribute_value);
+xercesc::DOMElement* getElementByAttributeValue 
+								(const xercesc::DOMElement* root, 
+									const char* tag, 
+									const char* attribute_name, 
+		 							const char* attribute_value);
 
-/* Returns an element from roots with name tag which has an attribute attribute_name with value attribute_value
+/* Returns an element from roots with name tag 
+ * which has an attribute attribute_name with value attribute_value
+ */
+xercesc::DOMElement* getElementByAttributeValue 
+							(std::vector<const xercesc::DOMElement*> roots,
+								const char* tag, 
+								const char* attribute_name, 
+								const char* attribute_value);
+
+/* Returns a std::vector of elements which are children of root with name tag
+ * and which have an attribute, attribute_name whose value is attribute_value
 */
-xercesc::DOMElement* getElementByAttributeValue (std::vector<const xercesc::DOMElement*> roots, const char* tag, const char* attribute_name, const char* attribute_value);
+std::vector<const xercesc::DOMElement*> getElementsByAttributeValue 
+											(const xercesc::DOMElement* root, 
+												const char* tag, 
+												const char* attribute_name, 
+												const char* attribute_value);
 
-/* Returns a std::vector of elements which are children of root with name tag and which have an attribute, attribute_name whose value is attribute_value
+/* Returns a std::vector of elements which are children of root 
+ * with name tag and which have an attribute, attribute_name 
 */
-std::vector<const xercesc::DOMElement*> getElementsByAttributeValue (const xercesc::DOMElement* root, const char* tag, const char* attribute_name, const char* attribute_value);
+std::vector<xercesc::DOMElement*> getElementsHavingAttribute
+										(const xercesc::DOMElement* root, 
+											const char* tag, 
+											const char* attribute_name);
 
-/* Returns a std::vector of elements which are children of root with name tag and which have an attribute, attribute_name 
-*/
-std::vector<xercesc::DOMElement*> getElementsHavingAttribute(const xercesc::DOMElement* root, const char* tag, const char* attribute_name);
-
-/* This will only work if there is only one element with that tag within the root
- * It is the callers responsibility to ensure that this is the case before calling this function
+/* This will only work if there is only one element with that tag in the root
+ * It is the callers responsibility to ensure this before calling this function
  */ 
-xercesc::DOMElement* getElementByTagName (const xercesc::DOMElement* root, const char* tag);
+xercesc::DOMElement* getElementByTagName (const xercesc::DOMElement* root, 
+										  const char* tag);
 
-/* Returns the nth interface in a link (it can be used in a node only if n is set to 0 */
+/* Returns the nth interface in a link 
+  (it can be used in a node only if n is set to 0 
+*/
 xercesc::DOMElement* getNthInterface (const xercesc::DOMElement* root, int n);
 
 /*
@@ -91,7 +115,7 @@ node_interface_pair parse_interface_xml(const xercesc::DOMElement* tag);
 /* 
  * Bundle the componentspec attributes together
  */
-typedef struct component_spec 
+struct component_spec 
 {
 	string component_manager_uuid;
 	string component_name;
@@ -106,7 +130,7 @@ component_spec parse_component_spec (const xercesc::DOMElement* element);
 /* 
  * Bundle the InterfaceSpec attributes together
  */
-typedef struct interface_spec 
+struct interface_spec 
 {
 	string virtual_node_id;
 	string virtual_interface_id;
@@ -126,7 +150,8 @@ XMLCh const * find_urn(xercesc::DOMElement const * element,
                        std::string const & prefix);
 
 /*
- * Check if the component spec is present. We check if the aggregate UUID and the component UUID are both present
+ * Check if the component spec is present. 
+ * We check if the aggregate UUID and the component UUID are both present
  */
 bool hasComponentSpec (xercesc::DOMElement* elt);
 
