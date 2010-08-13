@@ -51,6 +51,16 @@ for path in ext/gre-tunnel/1; do
   done
 done
 
+# Compile extensions
+for path in ext/emulab/1/; do
+    for schema in top_extension ptop_extension vtop_extension; do 
+	if [ -e ${path}/${schema}.rnc ]; then
+	    $TRANGCMD ${path}/${schema}.rnc ${path}/${schema}.xsd 
+	    sudo scp ${path}/${schema}.xsd ${path}/${schema}.rnc ops.emulab.net:/usr/local/www.geni/data/trac/resources/rspec/${path}/
+	fi
+    done
+done
+
 cd ../security
 
 for path in ext/policy/1; do
@@ -59,3 +69,5 @@ for path in ext/policy/1; do
     sudo scp ${path}/policy.xsd ${path}/policy.rnc ops.emulab.net:/usr/local/www.geni/data/trac/resources/credential/${path}/
   fi
 done
+
+sudo scp credential.xsd protogeni-rspec-common.xsd top.xsd sig.xsd xml.xsd ops.emulab.net:/usr/local/www.geni/data/trac/resources/credential/
