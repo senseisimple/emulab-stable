@@ -632,7 +632,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     my %nodemap  = ();
     my @nodeids  = ();
     my %lannodes = ();
-    my @dealloc;
 
     #
     # If this is a ticket update, we want to seed the namemap with
@@ -1318,18 +1317,10 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    $virtnode->fixed($node->node_id());
 	}
 
-	#
-	# Shared and virt nodes do not need to be allocated.
-	#
-	# XXX This is going to cause breakage since the reservations
-	# are not recorded anyplace until the ticket is redeemed.
-	#
-	if (! ($node->sharing_mode() || $node->isplabphysnode() ||
-	       ($node->isremotenode() && !$exclusive))) {
-	    # Need to allocate this node unless already mapped.
-	    push(@nodeids, $node->node_id())
-		if (!exists($namemap{$virtual_id}));
-	}
+	# New node unless already mapped.
+	push(@nodeids, $node->node_id())
+	    if (!exists($namemap{$virtual_id}));
+
 	$namemap{$virtual_id} = $node;
 	$colomap{$colocate} = $node
 	    if (defined($colocate));
@@ -1376,25 +1367,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
 
     print GeniXML::Serialize($rspec);
-
-    # Nalloc might fail if the node gets picked up by someone else.
-    if (@nodeids && !$impotent) {
-	system("$NALLOC $pid $eid @nodeids");
-	if (($? >> 8) < 0) {
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				     "Allocation failure");
-	    goto bad;
-	}
-	elsif (($? >> 8) > 0) {
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
-				     "Could not allocate some nodes");
-	    goto bad;
-	}
-	# In case the code below fails, before ticket is created.
-	@dealloc = @nodeids;
-    }
 
     #
     # For the version 2 minimal API, just return the annotated rspec.
@@ -1451,9 +1423,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    # Delete, not Release (which frees nodes).
 	    $newticket->Delete(TICKET_PURGED);
 	}
-	if (@dealloc) {
+	if (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @nodeids");
 	}
 	if (defined($slice_experiment) && $restorevirt) {
 	    $slice_experiment->RemoveVirtualState();
@@ -1465,9 +1437,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (defined($newticket)) {
 	    $newticket->Release(TICKET_PURGED);
 	}
-	elsif (@dealloc) {
+	elsif (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @nodeids");
 	}
 	#
 	# Lets leave the experiment lying around; it will get cleaned
