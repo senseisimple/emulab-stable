@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.protogeni.net/resources/rspec/2" >
   <xs:group name="AnyExtension">
-    <xs:sequence> <!-- minOccurs="0" maxOccurs="unbounded" -->
-      <xs:any namespace="##other" processContents="strict"/>
+    <xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:any namespace="##other" processContents="strict"/>
+      </xs:choice>
     </xs:sequence>
   </xs:group>
   <xs:attributeGroup name="AnyExtension">
