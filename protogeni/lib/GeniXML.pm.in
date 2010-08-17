@@ -21,7 +21,10 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-# Configure variables
+use vars qw($RSPEC_0_1 $RSPEC_2);
+$RSPEC_0_1 = "0.1";
+$RSPEC_2 = "2"l
+
 # Configure variables
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
@@ -58,6 +61,25 @@ sub ParseFile($)
     } else {
 	return $doc->documentElement();
     }
+}
+
+# Determines the rspec version of a node by examining is namespace URI
+sub GetVersion($)
+{
+    my ($node) = @_;
+    my $result = $RSPEC_0_1;
+    my $ns = $node->namespaceURI();
+    if (defined($ns)) {
+	if ($ns eq "http://protogeni.net/resources/rspec/0.1") {
+	    $result = $RSPEC_0_1;
+	} elsif ($ns eq "http://protogeni.net/resources/rspec/2") {
+	    $result = $RSPEC_2;
+	} else {
+	    carp("Unknown rspec namespace: " . $ns);
+	    $result = $RSPEC_0_1;
+	}
+    }
+    return $result;
 }
 
 # Returns a NodeList for a given XPath using a given node as
@@ -158,8 +180,10 @@ sub IsLanNode($)
     my ($node) = @_;
     my $result = 0;
     if (defined($node) && $node->localname() eq "node") {
-	foreach my $lan (FindNodes("n:node_type", $node)->get_nodelist()) {
-	    my $typeName = GetText("type_name", $lan);
+	foreach my $lan (FindNodes("n:node_type | n:hardware_type",
+				   $node)->get_nodelist()) {
+	    my $typeName = GetText("type_name", $lan) ||
+		GetText("name", $lan);
 	    if (defined($typeName) && $typeName eq "lan") {
 		$result = 1;
 		last;
@@ -194,14 +218,16 @@ sub GetNodeId($)
     my ($node) = @_;
     return GetText("component_uuid", $node) ||
 	GetText("component_urn", $node) ||
-	GetText("uuid", $node);
+	GetText("uuid", $node) ||
+	GetText("component_id", $node);
 }
 
 sub GetVirtualId($)
 {
     my ($node) = @_;
     return GetText("virtual_id", $node) ||
-	GetText("nickname", $node);
+	GetText("nickname", $node) ||
+	GetText("client_id", $node);
 }
 
 sub GetSliverId($)
@@ -214,7 +240,8 @@ sub GetManagerId($)
 {
     my ($node) = @_;
     return GetText("component_manager_uuid", $node) ||
-	GetText("component_manager_urn", $node);
+	GetText("component_manager_urn", $node) ||
+	GetText("component_manager_id", $node);
 }
 
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets
