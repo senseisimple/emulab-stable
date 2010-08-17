@@ -21,6 +21,7 @@ import pwd
 import getopt
 import os
 import re
+import zlib
 
 execfile( "test-common.py" )
 
@@ -44,9 +45,11 @@ try:
     response = do_method("am", "ListResources", params,
                          response_handler=geni_am_response_handler)
     if compress_key in options and options[compress_key]:
-        # decompress the result
-        import zlib
-        print zlib.decompress(response.data)
+        # decode and decompress the result
+        #
+        # response is a string whose content is a base64 encoded
+        # representation of a zlib compressed rspec
+        print zlib.decompress(response.decode('base64'))
     else:
         print response
 except xmlrpclib.Fault, e:
