@@ -56,6 +56,11 @@ my $PORT_FORMAT_IFINDEX  = 1;
 my $PORT_FORMAT_MODPORT  = 2;
 my $PORT_FORMAT_NODEPORT = 3;
 
+# 
+# used by vlanTrunkUtil()
+# 
+my ($VOP_CLEAR, $VOP_SET, $VOP_CLEARALL, $VOP_CHECK) = (0, 1, 2, 3);
+
 #
 # Creates a new object.
 #
@@ -943,15 +948,16 @@ sub createVlan($$;$$$) {
 }
 
 #
-# Put the given ports in the given VLAN. The VLAN is given as a cisco-specific
-# VLAN number
+# Either add or remove the given ports from the given VLAN. The VLAN is given
+# as a cisco-specific VLAN number
 #
-# usage: setPortVlan($self, $vlan_number, @ports)
+# usage: opPortVlan($self, $remove, $vlan_number, @ports)
 #	 returns 0 on sucess.
 #	 returns the number of failed ports on failure.
 #
-sub setPortVlan($$@) {
+sub opPortVlan($$$@) {
     my $self = shift;
+    my $remove = shift;
     my $vlan_number = shift;
     my @ports = @_;
 
@@ -1032,11 +1038,16 @@ sub setPortVlan($$@) {
 		$errors++;
 		next;
 	    }
-	    my $snmpvar = [$PortVlanMemb,$index,$vlan_number,'INTEGER'];
+	    my $snmpvar = [$PortVlanMemb,$index, ($remove? 1 :$vlan_number),
+				'INTEGER'];
 	    #
 	    # Check to see if we are already in a VLAN
 	    #
 	    $retval = snmpitGet($self->{SESS},[$PortVlanMemb,$index]);
+	    if ($remove && ($retval ne $vlan_number)) {
+		$errors++;
+		next;
+	    }
 	    if (($retval ne "NOSUCHINSTANCE") &&
 		("$retval" ne "$vlan_number") && ("$retval" ne "1")) {
 		$BumpedVlans{$retval} = 1;
@@ -1049,7 +1060,8 @@ sub setPortVlan($$@) {
 	    #
 	    # We're here if it a trunk
 	    #
-	    $retval = $self->setVlansOnTrunk($port, 1, $vlan_number);
+	    $retval = $self->setVlansOnTrunk($port,!$remove, $vlan_number);
+	    next if ($retval);  # should not enable or disable existing trunks
 	}
 	if (!$retval) {
 	    $errors++;
@@ -1063,7 +1075,7 @@ sub setPortVlan($$@) {
     # Ports going into VLAN 1 are being taken out of circulation, so we
     # disable them. Otherwise, we need to make sure they get enabled.
     #
-    if ($vlan_number == 1) {
+    if (($vlan_number == 1) || $remove) {
 	$self->debug("Disabling " . join(',',@okports) . "...");
 	if ( my $rv = $self->portControl("disable",@okports) ) {
 	    print STDERR "Port disable had $rv failures.\n";
@@ -1090,6 +1102,19 @@ sub setPortVlan($$@) {
 }
 
 #
+# Put the given ports in the given VLAN. The VLAN is given as a cisco-specific
+# VLAN number
+#
+# usage: setPortVlan($self, $vlan_number, @ports)
+#	 returns 0 on sucess.
+#	 returns the number of failed ports on failure.
+#
+sub setPortVlan($$@) {
+    my ($self, $vlan_number, @ports) = @_;
+    return opPortVlan($self, 0, $vlan_number, @ports);
+}
+
+#
 # Remove all ports from the given VLANs, which are given as Cisco-specific
 # VLAN numbers
 #
@@ -1100,6 +1125,7 @@ sub setPortVlan($$@) {
 sub removePortsFromVlan($@) {
     my $self = shift;
     my @vlan_numbers = @_;
+    my $errors = 0;
 
     #
     # Make sure the VLANs actually exist
@@ -1107,7 +1133,8 @@ sub removePortsFromVlan($@) {
     foreach my $vlan_number (@vlan_numbers) {
 	if (!$self->vlanNumberExists($vlan_number)) {
 	    print STDERR "ERROR: VLAN $vlan_number does not exist\n";
-	    return 1;
+	    $errors++;
+	    next;
 	}
     }
 
@@ -1126,23 +1153,49 @@ sub removePortsFromVlan($@) {
     } elsif ($self->{OSTYPE} eq "IOS") {
 	$VlanPortVlan = "vmVlan"; #index is ifIndex
     }
-    my @ports;
+    my %ports;
 
     #
     # Walk the tree to find VLAN membership
     #
     my ($rows) = snmpitBulkwalkFatal($self->{SESS},[$VlanPortVlan]);
     foreach my $rowref (@$rows) {
-	my ($name,$modport,$port_vlan_number) = @$rowref;
-	$self->debug("Got $name $modport $port_vlan_number\n");
+	my ($name,$ifIndex,$port_vlan_number) = @$rowref;
+	$self->debug("Got $name $ifIndex $port_vlan_number\n");
 	if ($vlan_numbers{$port_vlan_number}) {
-	    push @ports, $modport;
+	    push @{$ports{$port_vlan_number}}, $ifIndex;
 	}
     }
 
-    $self->debug("About to remove ports " . join(",",@ports) . "\n");
-    if (@ports) {
-	return $self->setPortVlan(1,@ports);
+    my %trunks;
+    #
+    # Walk trunks for the VLAN members
+    #
+    ($rows) = snmpitBulkwalkFatal($self->{SESS},["vlanTrunkPortDynamicStatus"]);
+    foreach my $rowref (@$rows) {
+	my ($name,$ifIndex,$status) = @$rowref;
+	$self->debug("Got $name $ifIndex $status\n",3);
+	if ($status ne "trunking") { next;}
+
+	# Get the allowed VLANs on this trunk
+	my @trunklans = $self->vlanTrunkUtil
+				($VOP_CHECK, $ifIndex, @vlan_numbers);
+
+	foreach my $vlan_number (@trunklans) {
+	    $self->debug("got vlan $vlan_number on trunk $ifIndex\n",3);
+	    push @{$trunks{$vlan_number}}, $ifIndex;
+	}
+    }
+    while (my ($number, $plist) = each %trunks) {
+	foreach my $ifIndex (@$plist)
+	    { $errors += !$self->setVlansOnTrunk($ifIndex, 0, $number); }
+    }
+
+    $self->debug("About to remove ports " . join(",",(%ports)) . "\n");
+    if (%ports) {
+	while (my ($port_vlan_number, $plist) = each %ports)
+	    { $errors += $self->opPortVlan(1,$port_vlan_number,@$plist); }
+	return $errors;
     } else {
 	return 0;
     }
@@ -1150,7 +1203,7 @@ sub removePortsFromVlan($@) {
 
 #
 # Remove some ports from the given VLAN, which are given as Cisco-specific
-# VLAN numbers. Do not specify trunked ports here.
+# VLAN numbers.
 #
 # usage: removeSomePortsFromVlan(self,int vlan, ports)
 #	 returns 0 on sucess.
@@ -1161,55 +1214,7 @@ sub removeSomePortsFromVlan($$@) {
     my $vlan_number = shift;
     my @ports = @_;
 
-    #
-    # Make sure the VLANs actually exist
-    #
-    if (!$self->vlanNumberExists($vlan_number)) {
-	print STDERR "ERROR: VLAN $vlan_number does not exist\n";
-	return 1;
-    }
-
-    #
-    # Make a hash of the ports for easy lookup later.
-    #
-    my %ports = ();
-    @ports{@ports} = @ports;
-
-    #
-    # Get a list of the ports in the VLAN
-    #
-    my $VlanPortVlan;
-    if ($self->{OSTYPE} eq "CatOS") {
-	$VlanPortVlan = "vlanPortVlan"; #index is ifIndex
-    } elsif ($self->{OSTYPE} eq "IOS") {
-	$VlanPortVlan = "vmVlan"; #index is ifIndex
-    }
-    my @remports;
-
-    #
-    # Walk the tree to find VLAN membership
-    #
-    my ($rows) = snmpitBulkwalkFatal($self->{SESS},[$VlanPortVlan]);
-    foreach my $rowref (@$rows) {
-	my ($name,$modport,$port_vlan_number) = @$rowref;
-	my ($trans) = convertPortFormat($PORT_FORMAT_NODEPORT,$modport);
-	if (!defined $trans) {
-	    $trans = ""; # Guard against some uninitialized value warnings
-	}
-
-	$self->debug("Got $name $modport ($trans) $port_vlan_number\n");
-	
-	push(@remports, $modport)
-	    if ("$port_vlan_number" eq "$vlan_number" &&
-		exists($ports{$trans}));
-    }
-
-    $self->debug("About to remove ports " . join(",",@remports) . "\n");
-    if (@remports) {
-	return $self->setPortVlan(1,@remports);
-    } else {
-	return 0;
-    }
+    return opPortVlan($self, 1, $vlan_number, @ports);
 }
 
 #
@@ -1228,6 +1233,7 @@ sub removeVlan($@) {
 
     my $errors = 0;
 
+    removePortsFromVlan($self, @vlan_numbers);
     foreach my $vlan_number (@vlan_numbers) {
         #
         # Need to lock the VLAN edit buffer
@@ -1386,7 +1392,6 @@ my %vtrunkOIDS = (
 # precompute 1k 0 bits as bitfield
 my $p1k = pack("x128");
 
-my ($VOP_CLEAR, $VOP_SET, $VOP_CLEARALL, $VOP_CHECK) = (0, 1, 2, 3);
 
 #
 # vlanTrunkUtil($self, $op, $ifIndex, @vlans)
@@ -1730,11 +1735,8 @@ sub getChannelIfIndex($@) {
     # single port channel.
     #
     if (!$ifindex) {
-        if (@ifIndexes == 1) {
             $ifindex = $ifIndexes[0];
-        }
     }
-
     return $ifindex;
 }
 
@@ -1762,6 +1764,7 @@ sub setVlansOnTrunk($$$$) {
     }
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
+    $ifIndex = $self->getChannelIfIndex($ifIndex);
     @vlan_numbers = $self->vlanTrunkUtil($value, $ifIndex, @vlan_numbers);
     return (scalar(@vlan_numbers) != 0);
 }
@@ -1778,18 +1781,7 @@ sub clearAllVlansOnTrunk($$) {
     my ($modport) = @_;
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
-
-    #
-    # If this is part of an EtherChannel, we have to find the ifIndex for the
-    # channel.
-    # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
-    # the channel ifIndex the the port is in a channel. Not sure that
-    # this is _always_ beneficial, though
-    #
-    my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
-    if (($channel =~ /^\d+$/) && ($channel != 0)) {
-	$ifIndex = $channel;
-    }
+    $ifIndex = $self->getChannelIfIndex($ifIndex);
     my @vlan_numbers = $self->vlanTrunkUtil($VOP_CLEARALL, $ifIndex);
     return (scalar(@vlan_numbers) != 0);
 }
@@ -1806,26 +1798,8 @@ sub clearAllVlansOnTrunk($$) {
 sub resetVlanIfOnTrunk($$$) {
     my ($self, $modport, $vlan_number) = @_;
 
-
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
-
-    #
-    # If this is part of an EtherChannel, we have to find the ifIndex for the
-    # channel.
-    # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
-    # the channel ifIndex the the port is in a channel. Not sure that
-    # this is _always_ beneficial, though
-    # NOTE: This 'conversion' is no longer needed, since we call
-    # getChannelIfIndex on the port before passing it into this function
-    #
-    #my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
-    #if (!($channel =~ /^\d+$/) || ($channel == 0)) {
-    #	print "WARNING: resetVlanIfOnTrunk got bad channel ($channel) for $self->{NAME}.$modport\n";
-    #	return 0;
-    #}
-    #if (($channel =~ /^\d+$/) && ($channel != 0)) {
-    #	$ifIndex = $channel;
-    #}
+    $ifIndex = $self->getChannelIfIndex($ifIndex);
 
     my @vlan_numbers = $self->vlanTrunkUtil($VOP_CHECK, $ifIndex, $vlan_number);
     if (@vlan_numbers) {
@@ -1933,7 +1907,7 @@ sub disablePortTrunking($$) {
     my $trunkDisable = ["vlanTrunkPortDynamicState",$ifIndex,"off","INTEGER"];
     $rv = snmpitSetWarn($self->{SESS},$trunkDisable);
     if (!$rv) {
-	warn "ERROR: Unable to enable trunking\n";
+	warn "ERROR: Unable to disable trunking\n";
 	return 0;
     }
 
@@ -2274,7 +2248,7 @@ sub enableOpenflow($$) {
     #
     # Cisco switch doesn't support Openflow yet.
     #
-    warn "ERROR: Cisco swith doesn't support Openflow now";
+    warn "ERROR: Cisco switch doesn't support Openflow now";
     return 0;
 }
 
@@ -2289,7 +2263,7 @@ sub disableOpenflow($$) {
     #
     # Cisco switch doesn't support Openflow yet.
     #
-    warn "ERROR: Cisco swith doesn't support Openflow now";
+    warn "ERROR: Cisco switch doesn't support Openflow now";
     return 0;
 }
 
@@ -2305,7 +2279,7 @@ sub setOpenflowController($$$) {
     #
     # Cisco switch doesn't support Openflow yet.
     #
-    warn "ERROR: Cisco swith doesn't support Openflow now";
+    warn "ERROR: Cisco switch doesn't support Openflow now";
     return 0;
 }
 
@@ -2321,7 +2295,7 @@ sub setOpenflowListener($$$) {
     #
     # Cisco switch doesn't support Openflow yet.
     #
-    warn "ERROR: Cisco swith doesn't support Openflow now";
+    warn "ERROR: Cisco switch doesn't support Openflow now";
     return 0;
 }
 
@@ -2332,7 +2306,7 @@ sub getUsedOpenflowListenerPorts($) {
     my $self = shift;
     my %ports = ();
 
-    warn "ERROR: Cisco swith doesn't support Openflow now\n";
+    warn "ERROR: Cisco switch doesn't support Openflow now\n";
 
     return %ports;
 }

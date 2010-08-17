@@ -512,7 +512,7 @@ DocumentRoot "@prefix@/www"
 # directory index.  Separate multiple entries with spaces.
 #
 <IfModule mod_dir.c>
-    DirectoryIndex index.php3 index.html
+    DirectoryIndex index.php3 index.php index.html
 </IfModule>
 
 #

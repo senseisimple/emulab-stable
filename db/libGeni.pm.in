@@ -233,8 +233,12 @@ sub MapResources($$$$)
 	$vtopfh->close();
 	$ptopfh->close();
 
-	system("nice $ASSIGN -uod -c .75 ".
-	       "-f rspec/rspec -W $soln $ptop $vtop > $log 2>&1");
+	my $cmd = "nice $ASSIGN -uod -c .75 ".
+	    "-f rspec/rspec -W $soln $ptop $vtop > $log 2>&1";
+	if ($verbose) {
+	    print STDERR "$cmd\n";
+	}
+	system($cmd);
 	
 	if ($?) {
 	    print STDERR "Could not map to physical resources on $resource\n";

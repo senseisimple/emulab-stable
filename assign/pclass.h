@@ -68,7 +68,7 @@ public:
 
 class tb_pclass {
 public:
-  tb_pclass() : name(), size(0), used_members(0), refcount(0), disabled(false),
+  tb_pclass() : name(), size(0), used_members(0), disabled(false), refcount(0),
     is_dynamic(false) {;}
 
   typedef map<fstring,tb_pnodelist*> pclass_members_map;

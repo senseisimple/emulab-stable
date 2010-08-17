@@ -1,0 +1,63 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Definition of common extensions in topologies -
+# shared between vtop (virtual topology) and ptop (physical topology)
+# extensions.
+#
+
+namespace emulab = "http://www.protogeni.net/resources/rspec/ext/emulab/1"
+
+TypeSlotsSpec = element emulab:node_type { 
+    attribute type_slots { text },
+    attribute static { "true" }?
+}
+
+## "Legacy" assign features and desires - will be phased out in favor of
+## properties
+FeatureDesireSpec = element emulab:fd {
+    ## Name of this feature or desire
+    ## element fd_name { text },
+    attribute name { text },
+    ## Weight assocated with the feature or desire
+    ## element fd_weight { xsd:float },
+    attribute weight { text },
+    ## A flag indicating whether or not a failure to match the desire with a
+    ## a feature is a constraint violation
+	##element violatable { empty }?,
+	attribute violatable { "true" }?,
+    ## Type information expressed in features and desires
+    (GlobalSpec | LocalSpec)?
+}
+
+## GlobalSpec = element global {
+##	element operator { "OnceOnly" | "FirstFree" }
+##}
+GlobalSpec = attribute global_operator { "OnceOnly" | "FirstFree" }
+
+## LocalSpec = element local {
+##	element operator { "+" }
+##	attribute local_operator { "+" }
+##}
+LocalSpec = attribute local_operator { "+" }
+
+## Properties - new: replacements for features and desires. Not yet implemented
+## in assign, and not yet fully fleshed out in this schema.
+PropertySpec = element emulab:property {
+    ## Name of this property
+    attribute name { text },
+    ## Value associated with this property
+    ## TODO: Add ranges and other types from rspec
+    attribute value { text | xsd:float },
+    ## The penalty associated with this property
+    attribute penalty { xsd:float { minInclusive = "0.0" } },
+    ## If this flag is present, not having the property is considered a violation
+    attribute violatable { "true" }?,
+    ## TODO: Add more operators - equality, range test, etc
+    ## Flags for special types of operators
+    (GlobalSpec | LocalSpec)?
+}

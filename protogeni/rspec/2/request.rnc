@@ -39,7 +39,6 @@ NodeContents &=
   }
 
 ServiceContents &=
-  AnyExtension &
   element install { InstallServiceContents }* &
   element execute { ExecuteServiceContents }*
 
@@ -94,3 +93,7 @@ InterfaceMapping = element interface_ref {
 }
 
 start = RSpec
+
+
+
+

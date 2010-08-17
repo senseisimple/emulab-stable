@@ -24,9 +24,8 @@
 #include <xercesc/dom/DOM.hpp>
 #include <xercesc/parsers/XercesDOMParser.hpp>
 #include <xercesc/sax/HandlerBase.hpp>
-XERCES_CPP_NAMESPACE_USE
 
-int parse_vtop_rspec(tb_vgraph &VG, char *filename);
+int parse_request(tb_vgraph &VG, char *filename);
 
 #endif // for __PARSE_REQUEST_RSPEC_H
 
