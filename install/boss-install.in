@@ -626,7 +626,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	#
 	Phase "m2crypto-egg", "Unpacking python m2crypto .egg", sub {
 	    my $pydir = "/usr/local/lib/python2.5/site-packages";
-	    my $egg = `ls -d $pydir/M2Crypto-0.19.1-py2.5-*.egg 2>/dev/null`;
+	    my $egg = `ls -d $pydir/M2Crypto-0.19.1-py2.5-*.egg 2>/dev/null | tail -1`;
 	    chomp($egg);
 	    if (! -x $EASYINSTALL) {
 		PhaseSkip("python easy_install missing");
@@ -637,6 +637,12 @@ Phase "portfixup", "Fixing up packages", sub {
 	    if (-d "$egg") {
 		PhaseSkip("py25-m2crypto egg already unpacked");
 	    }
+	    # XXX swig must be installed for easyinstall to exit correctly
+	    Phase "swig", "Installing swig", sub {
+		DoneIfPackageInstalled("swig");
+		my $pname = GetPackage("swig", $packagedir);
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	    };
 	    ExecQuietFatal("mv $egg /var/tmp/");
 	    $egg =~ s/$pydir//;
 	    ExecQuietFatal("$EASYINSTALL -Z /var/tmp$egg");
@@ -1443,7 +1449,12 @@ Phase "named", "Setting up initial named configuration", sub {
 	if (ExecQuiet("killall -s named")) {
 	    PhaseSkip("named not running");
 	}
-	ExecQuietFatal("$named_control stop");
+	if (ExecQuiet("$named_control stop")) {
+	    # XXX we have seen cases where the pid file is gone
+	    if (ExecQuiet("killall named")) {
+		PhaseSkip("named not running!?");
+	    }
+	}
     };
     Phase "starting", "Starting named", sub {
 	#

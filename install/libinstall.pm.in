@@ -379,7 +379,7 @@ sub DoneIfIdentical($$) {
 #
 sub DoneIfPackageInstalled($) {
     my ($pname) = @_;
-    my $foo = `$PKG_INFO -x $pname`;
+    my $foo = `$PKG_INFO -x $pname 2>&1`;
     if (! $?) {
 	PhaseSkip("already installed");
     }
