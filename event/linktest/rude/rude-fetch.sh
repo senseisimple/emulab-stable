@@ -32,7 +32,7 @@ if [ ! -d $dir/rude-$version/src ]; then
 	   }
       fi
     fi
-    echo "Unpacking/patching $rude-version source ..."
+    echo "Unpacking/patching rude-$version source ..."
     tar xzof $tarball || {
         echo "ERROR: rude-fetch.sh: tar failed"
 	exit 1
