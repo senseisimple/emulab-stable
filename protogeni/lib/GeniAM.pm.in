@@ -48,7 +48,7 @@ sub ListResources()
 
     my ($credentials, $options) = @_;
     my $available = $options->{'geni_available'} || 0;
-    my $compress = $options->{'geni_compress'} || 0;
+    my $compress = $options->{'geni_compressed'} || 0;
     my $slice_urn = $options->{'geni_slice_urn'};
 
     # If $slice_urn is defined, this turns into a Resolve call.  We

@@ -26,7 +26,7 @@ import zlib
 execfile( "test-common.py" )
 
 available_key = "geni_available"
-compress_key = "geni_compress"
+compress_key = "geni_compressed"
 
 #
 # Get a credential for myself, that allows me to do things at the SA.
