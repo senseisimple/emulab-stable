@@ -65,12 +65,12 @@ sub parse_connections($)
     foreach my $line ( @lines ) {
 	if ( $line =~ /^([A-I][0-9]{2}):\s+([A-I][0-9]{2})\W*$/ ) {
 	    if ( $2 ne $CLI_NOCONNECTION ) {
-		$src{$2} = $1;
-		if ( ! (exists $dst{$1}) ) {
-		    $dst{$1} = {};
+		$src{$1} = $2;
+		if ( ! (exists $dst{$2}) ) {
+		    $dst{$2} = {};
 		}
 
-		$dst{$1}{$2} = 1;
+		$dst{$2}{$1} = 1;
 	    }
 	}
     }
