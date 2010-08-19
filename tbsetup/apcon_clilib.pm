@@ -412,12 +412,75 @@ sub add_vlan_ports($$@)
     return 0;
 }
 
+
+#
+# Unname ports, the name of those ports will be $CLI_UNNAMED_NAME
+#
+sub unname_ports($@)
+{
+    my ($exp, @ports) = @_;
+
+    my $emsg = "";
+    foreach my $p (@ports) {
+	my ($rt, $msg) = _do_cli_cmd($exp,
+				     "configure port name $p $CLI_UNNAMED_NAME\r");
+	if ( $rt ) {
+	    $emsg = $emsg.$msg."\n";
+	}
+    }
+
+    if ( $emsg eq "" ) {
+	return 0;
+    }
+
+    return $emsg;
+}
+
+
+#
+# Disconnect ports
+# $sconns: the dst => src hashtable.
+#
+sub disconnect_ports($$) 
+{
+    my ($exp, $sconns) = @_;
+
+    my $emsg = "";
+    foreach my $src (keys %$sconns) {
+	my ($rt, $msg) = _do_cli_cmd($exp,
+				     "disconnect $src".$sconns->{$src}."\r");
+	if ( $rt ) {
+	    $emsg = $emsg.$msg."\n";
+	}
+    }
+
+    if ( $emsg eq "" ) {
+	return 0;
+    }
+
+    return $emsg;
+}
+
+
 #
 # Remove a vlan, unname the ports and disconnect them
 #
 sub remove_vlan($$)
 {
-    # TODO: not implemented yet.
+    my ($exp, $vlan) =  @_;
+
+    # Disconnect ports:
+    my ($src, $dst) = get_vlan_connections($exp, $vlan);
+    my $disrt = disconnect_ports($exp, $src);
+
+    # Unname ports:
+    my $ports = get_vlan_ports($exp, $vlan);
+    my $unrt = unnamed_ports($exp, @$ports);
+    if ( $unrt || $disrt) {
+	return $disrt.$unrt;
+    }
+
+    return 0;
 }
 
 #
