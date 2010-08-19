@@ -35,7 +35,8 @@ use Exporter;
               add_vlan_ports
               unname_ports
               disconnect_ports
-              remove_vlan);
+              remove_vlan
+              port_control);
 
 use strict;
 
@@ -59,6 +60,28 @@ my $CLI_TIMEOUT = 10000;
 # commands to show something
 my $CLI_SHOW_CONNECTIONS = "show connections raw\r";
 my $CLI_SHOW_PORT_NAMES  = "show port names *\r";
+
+# mappings from port control command to CLI command
+my %portCMDs =
+(
+    "enable" => "00",
+    "disable"=> "00",
+    "1000mbit"=> "9f",
+    "100mbit"=> "9b",
+    "10mbit" => "99",
+    "auto"   => "00",
+    "full"   => "94",
+    "half"   => "8c",
+    "auto1000mbit" => "9c",
+    "full1000mbit" => "94",
+    "half1000mbit" => "8c",
+    "auto100mbit"  => "9a",
+    "full100mbit"  => "92",
+    "half100mbit"  => "8a",
+    "auto10mbit"   => "99",
+    "full10mbit"   => "91",
+    "half10mbit"   => "89",
+);
 
 
 #
@@ -539,4 +562,26 @@ sub make_vlan_name(@)
     my @ports = shift;
 
     return "vlan".join("", sort @ports);
+}
+
+
+#
+# Do port control, set port rate.
+# Rates are defined in %portCMDs.
+#
+sub port_control($$$)
+{
+    my ($exp, $port, $rate) = @_;
+
+    if ( !exists($portCMDs{$rate}) ) {
+	return "ERROR: port rate unsupported!\n";
+    }
+
+    my $cmd = "configure rate $port $portCMDs{$rate}\r";
+    my ($rt, $msg) = _do_cli_cmd($exp, $cmd);
+    if ( $rt ) {
+	return $msg;
+    }
+
+    return 0;
 }
