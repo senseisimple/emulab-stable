@@ -13,12 +13,14 @@ package apcon_clilib;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( parse_connections
+@EXPORT = qw( create_expect_object
+              parse_connections
               parse_names
               parse_classes
               parse_zones
               parse_class_ports
               parse_zone_ports
+              get_raw_output
               get_all_vlans
               get_port_vlan
               get_vlan_ports
@@ -31,6 +33,8 @@ use Exporter;
               connect_simplex
               create_vlan
               add_vlan_ports
+              unname_ports
+              disconnect_ports
               remove_vlan);
 
 use strict;
@@ -38,16 +42,52 @@ use strict;
 $| = 1;
 
 use English;
+use Expect;
 
 # some constants
+my $APCON_SSH_CONN_STR = "ssh -l admin apcon1";
+
+# This seems to be a bad practice... It will be better if we cancel 
+# the password on the switch.
+my $APCON1_PASSWD = "daApcon!";
 my $CLI_PROMPT = "apcon1>> ";
 my $CLI_UNNAMED_PATTERN = "[Uu]nnamed";
 my $CLI_UNNAMED_NAME = "unnamed";
 my $CLI_NOCONNECTION = "A00";
+my $CLI_TIMEOUT = 10000;
 
 # commands to show something
 my $CLI_SHOW_CONNECTIONS = "show connections raw\r";
 my $CLI_SHOW_PORT_NAMES  = "show port names *\r";
+
+
+#
+# Create an Expect object that spawns the ssh process 
+# to switch.
+#
+sub create_expect_object()
+{
+    # default connection string:
+    my $spawn_cmd = $APCON_SSH_CONN_STR;
+    if ( @_ ) {
+	$spawn_cmd = shift @_;
+    }
+
+    # Create Expect object and initialize it:
+    my $exp = new Expect();
+    $exp->raw_pty(0);
+    $exp->log_stdout(0);
+    $exp->spawn($spawn_cmd)
+	or die "Cannot spawn $spawn_cmd: $!\n";
+    $exp->expect($CLI_TIMEOUT,
+		 ["admin\@apcon1's password:" => sub { my $e = shift;
+						       $e->send($APCON1_PASSWD."\n");
+						       exp_continue;}],
+		 ["Permission denied (password)." => sub { die "Password incorrect!\n";} ],
+		 [ timeout => sub { die "Timeout when connect to switch!\n";} ],
+		 $CLI_PROMPT );
+    return $exp;
+}
 
 
 #
@@ -179,7 +219,7 @@ sub _do_cli_cmd($$)
 
     $exp->clear_accum(); # Clean the accumulated output, as a rule.
     $exp->send($cmd);
-    $exp->expect(10000,
+    $exp->expect($CLI_TIMEOUT,
 		 [$CLI_PROMPT => sub {
 		     my $e = shift;
 		     $output = $e->before();
