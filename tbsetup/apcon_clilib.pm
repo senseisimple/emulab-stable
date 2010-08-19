@@ -41,7 +41,8 @@ use English;
 
 # some constants
 my $CLI_PROMPT = "apcon1>> ";
-my $CLI_UNNAMED_NAME = "Unnamed";
+my $CLI_UNNAMED_PATTERN = "[Uu]nnamed";
+my $CLI_UNNAMED_NAME = "unnamed";
 my $CLI_NOCONNECTION = "A00";
 
 # commands to show something
@@ -90,7 +91,7 @@ sub parse_names($)
 
     foreach ( split ( /\n/, $raw ) ) {
 	if ( /^([A-I][0-9]{2}):\s+(\w+)\W*/ ) {
-	    if ( $2 ne $CLI_UNNAMED_NAME ) {
+	    if ( $2 !~ /$CLI_UNNAMED_PATTERN/ ) {
 		$names{$1} = $2;
 	    }
 	}
@@ -184,6 +185,7 @@ sub _do_cli_cmd($$)
 		     $output = $e->before();
 		  }]);
 
+    $cmd = quotemeta($cmd);
     if ( $output =~ /^($cmd)\n(ERROR:.+)\r\n[.\n]*$/ ) {
 	return (1, $2);
     } else {
@@ -199,10 +201,11 @@ sub get_raw_output($$)
 {
     my ($exp, $cmd) = @_;
     my ($rt, $output) = _do_cli_cmd($exp, $cmd);
-    if ( !$rt ) {
-	if ( $output =~ /^($cmd)\n([.\n]*)$/ ) {
-	    return $2;
-	}
+    if ( !$rt ) {    	
+    	my $qcmd = quotemeta($cmd);
+	if ( $output =~ /^($qcmd)/ ) {
+	    return substr($output, length($cmd)+1);
+	}		
     }
 
     return undef;
@@ -218,15 +221,15 @@ sub get_all_vlans($)
     my $exp = shift;
 
     my $raw = get_raw_output($exp, $CLI_SHOW_PORT_NAMES);
-    my $names = parse_names($raw);
+    my $names = parse_names($raw); 
 
     my %vlans = ();
-    foreach my ($k, $v) (%$names) {
-	if ( !(exists $vlans{$v}) ) {
-	    $vlans{$v} = ();
+    foreach my $k (keys %{$names}) {
+	if ( !(exists $vlans{$names->{$k}}) ) {
+	    $vlans{$names->{$k}} = ();
 	}
 
-	push @($vlans{$v}), $k;
+	push @{$vlans{$names->{$k}}}, $k;
     }
 
     return \%vlans;
@@ -242,7 +245,7 @@ sub get_port_vlan($$)
 
     my $raw = get_raw_output($exp, "show port info $port\r");
     if ( $raw =~ /$port Name:\s+(\w+)\W*\n/ ) {
-	if ( $1 ne $CLI_UNNAMED_NAME ) {
+	if (  $1 !~ /$CLI_UNNAMED_PATTERN/ ) {
 	    return $1;
 	}
     }
@@ -392,13 +395,13 @@ sub add_vlan_ports($$@)
 {
     my ($exp, $vlan, @ports) = @_;
 
-    for( my $i = 0; $i < @ports; $i++ ) {
+    for( my $i = 0; $i < @ports; $i++ ) {    	
 	my ($rt, $msg) = _do_cli_cmd($exp, 
 				     "configure port name $ports[$i] $vlan\r");
 
 	# undo set name
 	if ( $rt ) {
-	    for ($i--; $i >= 0; $i-- ) {
+	    for ($i--; $i >= 0; $i-- ) {	    	
 		_do_cli_cmd($exp, 
 			    "configure port name $ports[$i] $CLI_UNNAMED_NAME\r");
 	    }
