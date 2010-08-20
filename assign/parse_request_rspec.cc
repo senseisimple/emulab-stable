@@ -479,11 +479,17 @@ bool populate_link (DOMElement* elt,
    */
   struct link_characteristics characteristics
     = rspecParser->readLinkCharacteristics(elt, count);
-  if (count != 1) {
-    cout << "*** Incorrect number of link properties specified ("
-	 << count << " on " << virtualId <<". Allowed 1 " << endl;
+  if (count == RSPEC_ASYMMETRIC_LINK) {
+    cout << "*** Disallowed asymmetric link specified on " << virtualId 
+         <<". Links must be symmetric" << endl;
     return false;
   }
+  else if (count > 2) { 
+    cout << "Too many link properties found on " << virtualId
+         << ". Max. allowed: 2" << endl;
+    return false;
+  }
+
   int bandwidth = characteristics.bandwidth;
   int latency = characteristics.latency;
   double packetLoss = characteristics.packetLoss;

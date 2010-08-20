@@ -96,27 +96,66 @@ rspec_parser_v2 :: readLinkCharacteristics (const DOMElement* link,
   DOMNodeList* properties = link->getElementsByTagName(XStr("property").x());
   
   string strBw = "", strLat = "", strLoss = "";
+  int bandwidth = 0, latency = 0;
+  float packetLoss = 0.0;
+
+  bool isOk = false;
   bool hasBandwidth, hasLatency, hasPacketLoss;
   count = properties->getLength();
 
-  // Read only from the first property and ignore the rest
-  DOMElement* property = dynamic_cast<DOMElement*>(properties->item(0));
-  strBw = this->getAttribute(property, "capacity", hasBandwidth);
-  strLat = this->getAttribute(property, "latency", hasLatency);
-  strLoss = this->getAttribute(property, "packet_loss", hasPacketLoss);
+  if (count > 0) {
+    // Read only from the first property and ignore the rest
+    DOMElement* property = dynamic_cast<DOMElement*>(properties->item(0));
+    strBw = this->getAttribute(property, "capacity", hasBandwidth);
+    strLat = this->getAttribute(property, "latency", hasLatency);
+    strLoss = this->getAttribute(property, "packet_loss", hasPacketLoss);
+    
+    if (!hasBandwidth) {
+      bandwidth = defaultBandwidth;
+    }
+    else if(strBw == "unlimited") {
+      bandwidth = unlimitedBandwidth;
+    }
+    else {
+      bandwidth = atoi(strBw.c_str());
+    }
+    
+    latency = hasLatency ? atoi(strLat.c_str()) : 0 ;
+    packetLoss = hasPacketLoss ? atof(strLoss.c_str()) : 0.0;
 
-  int bandwidth = 0, latency = 0;
-  float packetLoss = 0.0;
-  if (!hasBandwidth)
-    bandwidth = defaultBandwidth;
-  else if(strBw == "unlimited")
-    bandwidth = unlimitedBandwidth;
-  else
-    bandwidth = atoi(strBw.c_str());
-  
-  latency = hasLatency ? atoi(strLat.c_str()) : 0 ;
-  packetLoss = hasPacketLoss ? atof(strLoss.c_str()) : 0.0;
-  
+    if (count > 1) {
+      int revBandwidth = 0, revLatency = 0;
+      float revPacketLoss = 0.0;
+      
+      DOMElement* property = dynamic_cast<DOMElement*>(properties->item(1));
+      strBw = this->getAttribute(property, "capacity", hasBandwidth);
+      strLat = this->getAttribute(property, "latency", hasLatency);
+      strLoss = this->getAttribute(property, "packet_loss", hasPacketLoss);
+      
+      if (!hasBandwidth) {
+        revBandwidth = defaultBandwidth;
+      }
+      else if(strBw == "unlimited") {
+        revBandwidth = unlimitedBandwidth;
+      }
+      else {
+        revBandwidth = atoi(strBw.c_str());
+      }
+      
+      revLatency = hasLatency ? atoi(strLat.c_str()) : 0 ;
+      revPacketLoss = hasPacketLoss ? atof(strLoss.c_str()) : 0.0;
+      
+      if (bandwidth == revBandwidth 
+          && latency == revLatency 
+          && packetLoss == revPacketLoss) {
+        isOk = true;
+      }
+    }
+  }
+    
+  if (!isOk) {
+    count = RSPEC_ASYMMETRIC_LINK;
+  }
   struct link_characteristics rv = {bandwidth, latency, packetLoss};
   return rv;
 }
