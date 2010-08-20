@@ -530,11 +530,22 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     int count;
     link_characteristics characteristics
       = rspecParser->readLinkCharacteristics (elt, count);
-    
+
+    if (count == RSPEC_ASYMMETRIC_LINK) {
+      cout << "*** Disallowed asymmetric link found on " << componentId
+           << ". Links must be symmetric" << endl;
+      is_ok = false;
+    }
+    else if (count > 2) {
+      cout << "*** Too many link properties found on " << componentId
+           << ". Max. allowed: 2" << endl;
+      is_ok = false;
+    }
+
     int bandwidth = characteristics.bandwidth;
     int latency = characteristics.latency;
-    double packetLoss = characteristics.packetLoss;
-    
+    int packetLoss = characteristics.packetLoss;
+      
     /*
      * Find the nodes in the existing data structures
      */

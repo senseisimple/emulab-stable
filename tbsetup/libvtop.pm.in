@@ -7722,6 +7722,14 @@ sub processLinkRspec ($$$$)
     $property->setAttribute('capacity', $link->{'capacity'});
     $property->setAttribute('latency', $link->{'latency'});
     $property->setAttribute('packet_loss', $link->{'packet_loss'});
+
+    # The reverse link
+    $property = addNodeRspec($doc, $rspeclink, 'property');
+    $property->setAttribute('source_id', $link->{'interface_ref'}->[1]);
+    $property->setAttribute('dest_id', $link->{'interface_ref'}->[0]);
+    $property->setAttribute('capacity', $link->{'capacity'});
+    $property->setAttribute('latency', $link->{'latency'});
+    $property->setAttribute('packet_loss', $link->{'packet_loss'});
 }
 
 sub processVClassRspec($$$$)
