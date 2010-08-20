@@ -1423,7 +1423,8 @@ notify_callback(pubsub_handle_t *server,
 	    
 	    gettimeofday(&now, NULL);
 
-	    INFO("note arrived at %ld:%ld\n", now.tv_sec, now.tv_usec);
+	    INFO("note arrived at %ld:%ld\n",
+		 (long)now.tv_sec, (long)now.tv_usec);
     }
 	
     callback = arg->callback;
@@ -1588,7 +1589,7 @@ event_notification_insert_hmac(event_handle_t handle,
 {
 	HMAC_CTX	ctx;
 	unsigned char	mac[EVP_MAX_MD_SIZE];
-	int		len = EVP_MAX_MD_SIZE;
+	unsigned int	len = EVP_MAX_MD_SIZE;
 
 	if (0)
 		INFO("event_notification_insert_hmac (key): %s\n",
@@ -1630,7 +1631,8 @@ event_notification_insert_hmac(event_handle_t handle,
 	 * Okay, now insert the MAC into the notification as an opaque field.
 	 */
 	if (pubsub_notification_add_opaque(notification->pubsub_notification,
-				"__hmac__", mac, len, &handle->status) != 0) {
+					   "__hmac__", (char *)mac, (int)len,
+					   &handle->status) != 0) {
 		ERROR("pubsub_notification_add_opaque failed: ");
 		pubsub_error_fprintf(stderr, &handle->status);
 		return 1;
@@ -1720,7 +1722,7 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_CTX	ctx;
 	unsigned char	srcmac[EVP_MAX_MD_SIZE], mac[EVP_MAX_MD_SIZE];
 	char		*pmac;
-	int		srclen, len = EVP_MAX_MD_SIZE;
+	unsigned int	srclen, len = EVP_MAX_MD_SIZE;
 	int		tmp, elvin, elvincompat, elvin_ordered;
 	pubsub_notification_t *pubsub_notification;
 #ifdef ELVIN_COMPAT
@@ -1736,7 +1738,8 @@ event_notification_check_hmac(event_handle_t handle,
 	 * Pull out the MAC from the notification so we can compare it.
 	 */
 	if (pubsub_notification_get_opaque(pubsub_notification,
-			"__hmac__", &pmac, &srclen, &handle->status) != 0) {
+					   "__hmac__", &pmac, (int *)&srclen,
+					   &handle->status) != 0) {
 		ERROR("MAC not present!\n");
 		notification->has_hmac = 0;
 		return -1;
@@ -1848,7 +1851,9 @@ event_notification_check_hmac(event_handle_t handle,
 	if (0) {
 		hmac_dump("event_notification_check_hmac (plain)", mac, len);
 	}
+#ifdef ELVIN_COMPAT
  docmp:
+#endif
 	if (srclen == len && memcmp(srcmac, mac, len) == 0) {
 	    notification->has_hmac = 1;
 	    return 0;
