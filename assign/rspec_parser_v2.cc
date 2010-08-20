@@ -96,7 +96,7 @@ rspec_parser_v2 :: readLinkCharacteristics (const DOMElement* link,
   DOMNodeList* properties = link->getElementsByTagName(XStr("property").x());
   
   string strBw = "", strLat = "", strLoss = "";
-  int bandwidth = 0, latency = 0;
+  int bandwidth = defaultBandwidth, latency = 0;
   float packetLoss = 0.0;
 
   bool isOk = false;

@@ -485,7 +485,7 @@ bool populate_link (DOMElement* elt,
     return false;
   }
   else if (count > 2) { 
-    cout << "Too many link properties found on " << virtualId
+    cout << "*** Too many link properties found on " << virtualId
          << ". Max. allowed: 2" << endl;
     return false;
   }
