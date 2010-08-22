@@ -4491,9 +4491,10 @@ COMMAND_PROTOTYPE(dosecurestate)
 	res = mydb_query("select q.pcr,q.value from nodes as n "
 			"left join tpm_quote_values as q "
                         "on (n.op_mode = q.op_mode or q.op_mode='*') "
-			"where n.node_id='%s' and q.state ='%s' "
+			"where (q.node_id='%s' and n.node_id='%s' "
+			"and q.state ='%s') "
                         "order by q.pcr",
-			2, reqp->nodeid,newstate);
+			2, reqp->nodeid, reqp->nodeid, newstate);
 	if (!res){
 		error("SECURESTATE: %s: DB error getting pcr list\n",
 			reqp->nodeid);
@@ -4543,7 +4544,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 			1, reqp->nodeid);
 
 	if (!res){
-		error("quoteprep: %s: DB error getting tpmidentity\n",
+		error("securestate: %s: DB error getting tpmidentity\n",
 			reqp->nodeid);
                 free(pcrs);
 		return 1;
@@ -4680,9 +4681,10 @@ COMMAND_PROTOTYPE(doquoteprep)
 	res = mydb_query("select q.pcr from nodes as n "
 			"left join tpm_quote_values as q "
                         "on (n.op_mode = q.op_mode or q.op_mode='*') "
-			"where n.node_id='%s' and q.state ='%s' "
+			"where (q.node_id='%s' and n.node_id='%s' "
+			"and q.state ='%s') "
                         "order by q.pcr",
-			1, reqp->nodeid,newstate);
+			1, reqp->nodeid, reqp->nodeid, newstate);
 	if (!res){
 		error("quoteprep: %s: DB error getting pcr list\n",
 			reqp->nodeid);
