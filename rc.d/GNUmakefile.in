@@ -29,7 +29,7 @@ TIP_SCRIPTS	=
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 
-ifeq ($(FBSDVERSION),FreeBSD6)
+ifneq ($(FBSDVERSION),FreeBSD4)
 ifeq ($(WINSUPPORT),1)
 OPS_SCRIPTS += silly.sh
 endif
