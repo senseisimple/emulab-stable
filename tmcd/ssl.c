@@ -716,8 +716,16 @@ convpubkey(struct pubkeydata *k)
 	rsa = RSA_new();
 	mod = BN_new();
 	exp = BN_new();
-	if (rsa == NULL || mod == NULL || exp == NULL)
+	if (rsa == NULL || mod == NULL || exp == NULL) {
+		if (rsa)
+			RSA_free(rsa);
+		if (mod)
+			BN_free(mod);
+		if (exp)
+			BN_free(exp);
+
 		return NULL;
+	}
 	/* convert the raw public key values to BIGNUMS */
 	BN_bin2bn(k->modulus, k->keylength, mod);
 	BN_bin2bn(k->exponent, k->expsize, exp);
