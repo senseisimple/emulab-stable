@@ -151,7 +151,9 @@ event_register_withkeydata_withretry(char *name, int threaded,
 			   unsigned char *keydata, int keylen,
 			   int retrycount)
 {
+#ifndef __CYGWIN__
     extern int pubsub_is_threaded[] __attribute__ ((weak));
+#endif
     
     event_handle_t	handle;
     pubsub_handle_t    *server;
@@ -218,11 +220,15 @@ event_register_withkeydata_withretry(char *name, int threaded,
     handle->disconnect = pubsub_disconnect;
 #ifdef THREADED
     assert(threaded == 1);
+#ifndef __CYGWIN__
     assert(pubsub_is_threaded != NULL);
+#endif
     handle->mainloop = NULL; /* no mainloop for mt programs */
 #else
     assert(threaded == 0);
+#ifndef __CYGWIN__
     assert(pubsub_is_threaded == NULL);
+#endif
     handle->mainloop = pubsub_mainloop;
 #endif
     handle->notify = pubsub_notify;
