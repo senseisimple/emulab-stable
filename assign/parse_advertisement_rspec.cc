@@ -544,7 +544,7 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
 
     int bandwidth = characteristics.bandwidth;
     int latency = characteristics.latency;
-    int packetLoss = characteristics.packetLoss;
+    double packetLoss = characteristics.packetLoss;
       
     /*
      * Find the nodes in the existing data structures

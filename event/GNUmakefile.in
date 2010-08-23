@@ -18,7 +18,14 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif
 ifeq ($(SYSTEM),FreeBSD)
-SUBDIRS	       += sched delay-agent stated
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+FBSDMAJ := $(basename $(FBSDREL))
+SUBDIRS	       += sched stated
+ifneq ($(FBSDMAJ),8)
+# doesn't build right now due to API changes
+SUBDIRS	       += delay-agent
+endif
+
 endif
 
 all:	etc-subdir trafgen-fetch all-subdirs

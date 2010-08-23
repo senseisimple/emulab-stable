@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -117,8 +117,8 @@ control-install:	binaries $(SCRIPT_RUN) $(SCRIPT_PROXY)
 	$(INSTALL_PROGRAM) $(SCRIPT_PROXY) $(INSTALL_BINDIR)
 
 client: all
-	$(MAKE) -C iperf client
-	$(MAKE) -C rude client
+	cd iperf && $(MAKE) client
+	cd rude && $(MAKE) client
 
 client-install: client
 	@if test ! -x '$(CLIENT_BINDIR)/emulab-rude$(EXE)' -o \

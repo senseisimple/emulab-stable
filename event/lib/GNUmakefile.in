@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -23,7 +23,7 @@ endif
 SYSTEM	       := $(shell uname -s)
 LIBS		= libevent.a
 SWIGLIBS        =
-# Re-entrant, multi-threaded version on FreeBSD, not on Linux or Windows clients.
+# Re-entrant, multi-threaded version on FreeBSD and Linux, not on Windows.
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 LIBS           += libevent_r.a
 SWIGLIBS       += event.so _tbevent.so
