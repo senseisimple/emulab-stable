@@ -948,10 +948,10 @@ sub createVlan($$;$$$) {
 }
 
 #
-# Either add or remove the given ports from the given VLAN. The VLAN is given
-# as a cisco-specific VLAN number
+# Put the given ports in the given VLAN. The VLAN is given as a cisco-specific
+# VLAN number
 #
-# usage: opPortVlan($self, $remove, $vlan_number, @ports)
+# usage: setPortVlan($self, $vlan_number, @ports)
 #	 returns 0 on sucess.
 #	 returns the number of failed ports on failure.
 #
@@ -1101,14 +1101,6 @@ sub opPortVlan($$$@) {
     return $errors;
 }
 
-#
-# Put the given ports in the given VLAN. The VLAN is given as a cisco-specific
-# VLAN number
-#
-# usage: setPortVlan($self, $vlan_number, @ports)
-#	 returns 0 on sucess.
-#	 returns the number of failed ports on failure.
-#
 sub setPortVlan($$@) {
     my ($self, $vlan_number, @ports) = @_;
     return opPortVlan($self, 0, $vlan_number, @ports);
