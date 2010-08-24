@@ -12,11 +12,11 @@ use Frontier::RPC2;
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME $GENI_METHODS $EMULAB_PEMFILE
 	    $GENI_RESPONSE_CONVERTER);
-BEGIN { $GENI_DBNAME = "geni"; }
+BEGIN { $GENI_DBNAME = "geni-cm"; }
 
 # Configure variables
 my $ETCDIR         = "@prefix@/etc";
-$EMULAB_PEMFILE    = "$ETCDIR/genisa.pem";
+$EMULAB_PEMFILE    = "$ETCDIR/genicm.pem";
 
 # Testbed libraries.
 use lib '@prefix@/lib';
