@@ -1764,7 +1764,7 @@ sub GenVirtNodes($)
 		}
 		else {
 		    $desires->{"OS-" . $posinfo->osid()} = ['', 1.000000];
-		    $desires->{"OS-" . $posinfo->osid()-$osinfo->osid()} =
+		    $desires->{"OS-" . $posinfo->osid() . "-" . $osinfo->osid()} =
 			['', 1.000000];
 		}
 	    }
@@ -1774,7 +1774,7 @@ sub GenVirtNodes($)
 		}
 		else {
 		    $desires->{"OS-" . $posinfo->osid()} = ['', 1.000000];
-		    $desires->{"OS-" . $posinfo->osid()-$osinfo->osid()} =
+		    $desires->{"OS-" . $posinfo->osid() . "-" . $osinfo->osid()} =
 			['', 1.000000];
 		}
 	    }
