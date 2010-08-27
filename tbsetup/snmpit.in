@@ -1142,8 +1142,9 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
         my $vlan = VLan->Lookup($vlan_id);
         if (!defined($vlan)) {
 	    &debug("No such VLAN $vlan_id in lans table\n");
-	    next
-		if ($opt{l} == 1);
+            # Only print unknown VLANs if -l was given twice, or the 
+            # -O option was given
+	    next unless ($opt{l} > 1 || $opt{O});
 	    $vname = $vlan_id;
 	    $experiment = undef;
         }
