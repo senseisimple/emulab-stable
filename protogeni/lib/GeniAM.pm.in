@@ -160,9 +160,12 @@ sub DeleteSliver()
     # XXX Open question: Call "DeleteSlice" or "DeleteSliver"?
     $response = GeniCMV2::DeleteSlice($delete_args);
     if (GeniResponse::IsError($response)) {
-        return $response
+        return $response;
+    } else {
+        # Return an XML-RPC boolean
+        my $coder = Frontier::RPC2->new();
+        return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 # Get the status of the sliver associated with the given slice. This
@@ -226,8 +229,7 @@ sub RenewSliver()
         return $response
     }
 
-    # Well this is ugly. We want to return True, so we must encode it
-    # as an XMLRPC Boolean via an encoder.
+    # Return an XML-RPC boolean
     my $coder = Frontier::RPC2->new();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
 }
