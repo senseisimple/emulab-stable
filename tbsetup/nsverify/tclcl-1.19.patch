@@ -1,0 +1,26 @@
+diff -ur ./conf/configure.in.tcl ../../ns-allinone-2.34-patched/tclcl-1.19/conf/configure.in.tcl
+--- ./conf/configure.in.tcl	2009-06-14 10:35:03.000000000 -0700
++++ ../../ns-allinone-2.34-patched/tclcl-1.19/conf/configure.in.tcl	2009-12-21 18:10:39.000000000 -0800
+@@ -99,6 +99,9 @@
+ 		$d/include/tcl$TCL_HI_VERS \
+ 		$d/include/tcl$TCL_VERS \
+ 		$d/include/tcl$TCL_ALT_VERS \
++                $d/include/tcl$TCL_HI_VERS/generic \
++                $d/include/tcl$TCL_VERS/generic \
++                $d/include/tcl$TCL_ALT_VERS/generic \
+ 		$d/include \
+ 		/usr/local/include \ 
+ 		"
+diff -ur ./configure ../../ns-allinone-2.34-patched/tclcl-1.19/configure
+--- ./configure	2009-06-14 10:35:03.000000000 -0700
++++ ../../ns-allinone-2.34-patched/tclcl-1.19/configure	2009-12-21 18:15:38.000000000 -0800
+@@ -6014,6 +6014,9 @@
+ 		$d/include/tcl$TCL_HI_VERS \
+ 		$d/include/tcl$TCL_VERS \
+ 		$d/include/tcl$TCL_ALT_VERS \
++		$d/include/tcl$TCL_HI_VERS/generic \
++		$d/include/tcl$TCL_VERS/generic \
++		$d/include/tcl$TCL_ALT_VERS/generic \
+ 		$d/include \
+ 		/usr/local/include \
+ 		"
