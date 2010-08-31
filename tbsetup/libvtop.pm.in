@@ -2798,6 +2798,9 @@ sub GenVirtLans($)
 		if ($emulated) {
 		    $others->{'emulated'} = 1;
 		}
+		if ($layer == 1) {
+		    $protocol = "wire";
+		}
 		
 		if ($trivial_ok) {
 		    $others->{'trivial_ok'} = 1;
