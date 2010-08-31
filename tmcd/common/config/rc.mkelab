@@ -430,7 +430,8 @@ sub doboot()
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.1";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.1";
     }
-    elsif ($FBSD_VERSION == 7.2) {
+    elsif ($FBSD_VERSION == 7.2 ||
+	   $FBSD_VERSION == 7.3) {
 	$emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.2/packages";
 	$emulabconfig{FS_PKG_DIR} .= ".elvincompat"
 	    if ($emulabconfig{"CONFIG_ELVIN"});
@@ -1079,8 +1080,22 @@ sub SetupOpsNode($)
 	    SetupFatal("Could not get package info from Emulab!");
 	}
 	print "Removing conflicting packages.\n";
-	mysystem("pkg_delete -r -x mysql-client")
+	system("pkg_delete -r -x mysql-client")
 	    if (-e "/usr/local/bin/mysql");
+	if ($FBSD_VERSION == 7.3) {
+	    #
+	    # XXX ick, perl 5.10.1 is installed by default.
+	    # This causes lots of problems, so remove it.
+	    #
+	    system("pkg_delete -f -x perl-5.10.1")
+		if (-d "/usr/local/lib/perl5/5.10.1");
+
+	    # XXX and some packages that are in the wrong place
+	    system("pkg_delete -f -x p5-");
+
+	    # XXX perl install doesn't do this?
+	    mysystem("ln -sf /usr/local/bin/perl /usr/bin/perl");
+	}
     
 	print "Installing the ops metaport.\n";
 	RecreateDir("/usr/ports", 1);
@@ -1509,10 +1524,24 @@ sub SetupBossNode()
 	    SetupFatal("Could not get package info from Emulab!");
 	}
 	print "Removing conflicting packages.\n";
-	mysystem("pkg_delete -r -x mysql-client")
+	system("pkg_delete -r -x mysql-client")
 	    if (-e "/usr/local/bin/mysql");
-	mysystem("pkg_delete -x net-snmp")
+	system("pkg_delete -x net-snmp")
 	    if (-e "/usr/local/include/net-snmp");
+	if ($FBSD_VERSION == 7.3) {
+	    #
+	    # XXX ick, perl 5.10.1 is installed by default.
+	    # This causes lots of problems, so remove it.
+	    #
+	    system("pkg_delete -f -x perl-5.10.1")
+		if (-d "/usr/local/lib/perl5/5.10.1");
+
+	    # XXX and some packages that are in the wrong place
+	    system("pkg_delete -f -x p5-");
+
+	    # XXX perl install doesn't do this?
+	    mysystem("ln -sf /usr/local/bin/perl /usr/bin/perl");
+	}
     
 	print "Installing the boss metaport.\n";
 	RecreateDir("/usr/ports", 1);
@@ -1701,7 +1730,7 @@ sub SetupBossNode()
     #
     if ($FBSD_VERSION >= 6) {
 	print "Removing conflicting bind package.\n";
-	mysystem("pkg_delete -r -x bind9")
+	system("pkg_delete -r -x bind9")
 	    if (-e "/usr/local/sbin/rndc");
     }
 
@@ -2051,7 +2080,15 @@ sub CreateDefsFile($)
 		    }
 		    last SWITCH;
 		};
-
+		/^PROTOGENI_SUPPORT$/ && do {
+		    if ($emulabconfig{"LOAD_PROTOGENI"} && $FBSD_VERSION >= 6.2) {
+			print OUTDEFS "PROTOGENI_SUPPORT=1\n";
+		    }
+		    else {
+			print OUTDEFS "PROTOGENI_SUPPORT=0\n";
+		    }
+		    last SWITCH;
+		};
 		/^FSDIR_SCRATCH$/ && do {
 		    if ($emulabconfig{"CONFIG_SCRATCHFS"}) {
 			print OUTDEFS "FSDIR_SCRATCH=$FSMOUNTDIR/scratch\n";
@@ -2066,12 +2103,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^NSVERIFY$/ && do {
-		    # XXX cannot build full ns on FBSD7 yet
-		    if ($FBSD_VERSION > 6) {
-			print OUTDEFS "NSVERIFY=0\n";
-		    } else {
-			print OUTDEFS "NSVERIFY=1\n";
-		    }
+		    print OUTDEFS "NSVERIFY=1\n";
 		    last SWITCH;
 		};
 		
