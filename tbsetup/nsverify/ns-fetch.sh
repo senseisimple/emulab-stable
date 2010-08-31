@@ -17,7 +17,9 @@ fi
 if [ -n "$1" ]; then srcdir=$1; else srcdir=$PWD ; fi
 if [ -n "$2" ]; then tarball=$2; fi
 if [ -n "$3" ]; then host=$3; else host=www.emulab.net ; fi
-dir=$PWD
+
+# XXX do not use $PWD as it can be set wrong due to an old (<3.82) gmake bug
+dir=`pwd`
 
 if [ ! -d $dir/ns-allinone-$version ]; then
     if [ ! -f "$tarball" ]; then
