@@ -141,8 +141,8 @@ sub portControl ($$@) {
 		#
                 # Command not supported
 		#
-		$self->debug("");
-		return -1;
+		$self->debug("Unsupported port control command '$cmd' ignored.\n");
+		return 0;
 	    }
 
 	    $errors++;
@@ -154,12 +154,13 @@ sub portControl ($$@) {
 
 
 #
-# Original purpose: Given VLAN indentifiers from the database, finds the 802.1Q VLAN
+# Original purpose: 
+# Given VLAN indentifiers from the database, finds the 802.1Q VLAN
 # number for them. If not VLAN id is given, returns mappings for the entire
 # switch.
 #
 # On Apcon switch, no VLAN exists. So we use port name as VLAN name. This 
-# funtion here actually either list all VLAN names or do the existance checking,
+# funtion actually either list all VLAN names or do the existance checking,
 # which will set the mapping value to undef for nonexisted VLANs. 
 # 
 # usage: findVlans($self, @vlan_ids)
@@ -352,7 +353,7 @@ sub delPortVlan($$@) {
     $self->lock();
 
     #
-    # disconnect connects
+    # Find connections of @ports
     #
     my ($src, $dst) = getNamedConnections($self->{SESS}, $vlan_number);
     my %sconns = ();
@@ -371,6 +372,7 @@ sub delPortVlan($$@) {
 	}
     }
     
+    # Disconnect conections of @ports
     my $errmsg = disconnectPorts($self->{SESS}, \%sconns);
     if ($errmsg) {
 	warn "$errmsg";
@@ -378,6 +380,7 @@ sub delPortVlan($$@) {
 	return 1;
     }
     
+    # Unname the ports, looks like 'remove'
     $errmsg = unnamePorts($self->{SESS}, @ports);
     if ($errmsg) {
 	warn "$errmsg";
