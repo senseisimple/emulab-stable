@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -345,19 +345,8 @@ sub LinkDelaySetup()
 		# 
                 # XXX: Why do we do this, and does Linux need to?
                 #
-            }
-
-            #print STDOUT "  $iface pipe $pipeno config delay ";
-	    #print STDOUT "${delay}ms bw ${bandw}Kbit/s plr $plr ";
-	    #print STDOUT "$queue $redparams\n";
-	    #if ($type eq "duplex") {
-	    #	print STDOUT "  $iface pipe $rpipeno config delay ".
-	    #	    "${rdelay}ms bw ${rbandw}Kbit/s plr $rplr queue 4\n";
-	    #}
-
-	    if ($type eq "duplex") {
-		print MAP "$linkname duplex $vnode $vnode $iface imq${imqnum} ".
-		    "$pipeno $rpipeno\n";
+		print MAP "$linkname duplex $vnode $vnode $iface ".
+		    "imq${imqnum} $pipeno $rpipeno\n";
 	    }
 	    else {
 		print MAP "$linkname simplex $vnode $iface $pipeno\n";
