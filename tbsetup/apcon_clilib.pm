@@ -13,48 +13,117 @@ package apcon_clilib;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( parse_connections
-              parse_names
-              parse_classes
-              parse_zones
-              parse_class_ports
-              parse_zone_ports
-              get_all_vlans
-              get_port_vlan
-              get_vlan_ports
-              get_vlan_connections
-              add_cls
-              add_zone
-              add_class_ports
-              connect_multicast
-              connect_duplex
-              connect_simplex
-              create_vlan
-              add_vlan_ports
-              remove_vlan);
+@EXPORT = qw( createExpectObject
+              parseConnections
+              parseNames
+              parseClasses
+              parseZones
+              parseClassPorts
+              parseZonePorts
+              doCLICmd
+              getRawOutput
+              getAllNamedPorts 
+              getPortName
+              getNamedPorts
+              getNamedConnections
+              addCls
+              addZone
+              addClassPorts
+              connectMulticast
+              connectDuplex
+              connectSimplex
+              namePorts
+              unnamePorts
+              disconnectPorts 
+              removePortName
+              setPortRate
+              getPortInfo
+);
 
 use strict;
 
 $| = 1;
 
 use English;
+use Expect;
 
 # some constants
+my $APCON_SSH_CONN_STR = "ssh -l admin apcon1";
+
+# This seems to be a bad practice... It will be better if we cancel 
+# the password on the switch.
+my $APCON1_PASSWD = "daApcon!";
 my $CLI_PROMPT = "apcon1>> ";
 my $CLI_UNNAMED_PATTERN = "[Uu]nnamed";
 my $CLI_UNNAMED_NAME = "unnamed";
 my $CLI_NOCONNECTION = "A00";
+my $CLI_TIMEOUT = 10000;
 
 # commands to show something
 my $CLI_SHOW_CONNECTIONS = "show connections raw\r";
 my $CLI_SHOW_PORT_NAMES  = "show port names *\r";
+
+# mappings from port control command to CLI command
+my %portCMDs =
+(
+    "enable" => "00",
+    "disable"=> "00",
+    "1000mbit"=> "9f",
+    "100mbit"=> "9b",
+    "10mbit" => "99",
+    "auto"   => "00",
+    "full"   => "94",
+    "half"   => "8c",
+    "auto1000mbit" => "9c",
+    "full1000mbit" => "94",
+    "half1000mbit" => "8c",
+    "auto100mbit"  => "9a",
+    "full100mbit"  => "92",
+    "half100mbit"  => "8a",
+    "auto10mbit"   => "99",
+    "full10mbit"   => "91",
+    "half10mbit"   => "89",
+);
+
+
+#
+# Create an Expect object that spawns the ssh process 
+# to switch.
+#
+sub createExpectObject()
+{
+    # default connection string:
+    my $spawn_cmd = $APCON_SSH_CONN_STR;
+    if ( @_ ) {
+	$spawn_cmd = shift @_;
+    }
+
+    # Create Expect object and initialize it:
+    my $exp = new Expect();
+    if (!$exp) {
+	# upper layer will check this
+	return undef;
+    }
+    $exp->raw_pty(0);
+    $exp->log_stdout(0);
+    $exp->spawn($spawn_cmd)
+	or die "Cannot spawn $spawn_cmd: $!\n";
+    $exp->expect($CLI_TIMEOUT,
+		 ["admin\@apcon1's password:" => sub { my $e = shift;
+						       $e->send($APCON1_PASSWD."\n");
+						       exp_continue;}],
+		 ["Permission denied (password)." => sub { die "Password incorrect!\n";} ],
+		 [ timeout => sub { die "Timeout when connect to switch!\n";} ],
+		 $CLI_PROMPT );
+    return $exp;
+}
 
 
 #
 # parse the connection output
 # return two hashes for query from either direction
 #
-sub parse_connections($) 
+sub parseConnections($) 
 {
     my $raw = shift;
 
@@ -65,12 +134,12 @@ sub parse_connections($)
     foreach my $line ( @lines ) {
 	if ( $line =~ /^([A-I][0-9]{2}):\s+([A-I][0-9]{2})\W*$/ ) {
 	    if ( $2 ne $CLI_NOCONNECTION ) {
-		$src{$2} = $1;
-		if ( ! (exists $dst{$1}) ) {
-		    $dst{$1} = {};
+		$src{$1} = $2;
+		if ( ! (exists $dst{$2}) ) {
+		    $dst{$2} = {};
 		}
 
-		$dst{$1}{$2} = 1;
+		$dst{$2}{$1} = 1;
 	    }
 	}
     }
@@ -83,7 +152,7 @@ sub parse_connections($)
 # parse the port names output
 # return the port => name hashtable
 #
-sub parse_names($)
+sub parseNames($)
 {
     my $raw = shift;
 
@@ -105,7 +174,7 @@ sub parse_names($)
 # parse the show classes output
 # return the classname => 1 hashtable, not a list.
 #
-sub parse_classes($)
+sub parseClasses($)
 {
     my $raw = shift;
     
@@ -124,7 +193,7 @@ sub parse_classes($)
 # parse the show zones output
 # return the zonename => 1 hashtable, not a list
 #
-sub parse_zones($)
+sub parseZones($)
 {
     my $raw = shift;
 
@@ -144,7 +213,7 @@ sub parse_zones($)
 # parse the show class ports output
 # return the ports list
 #
-sub parse_class_ports($)
+sub parseClassPorts($)
 {
     my $raw = shift;
     my @ports = ();
@@ -163,23 +232,23 @@ sub parse_class_ports($)
 # parse the show zone ports output
 # same to parse_class_ports
 #
-sub parse_zone_ports($)
+sub parseZonePorts($)
 {
-    return parse_class_ports(@_[0]);
+    return parseClassPorts(@_[0]);
 }
 
 
 #
 # helper to do CLI command and check the error msg
 #
-sub _do_cli_cmd($$)
+sub doCLICmd($$)
 {
     my ($exp, $cmd) = @_;
     my $output = "";
 
     $exp->clear_accum(); # Clean the accumulated output, as a rule.
     $exp->send($cmd);
-    $exp->expect(10000,
+    $exp->expect($CLI_TIMEOUT,
 		 [$CLI_PROMPT => sub {
 		     my $e = shift;
 		     $output = $e->before();
@@ -197,10 +266,10 @@ sub _do_cli_cmd($$)
 #
 # get the raw CLI output of a command
 #
-sub get_raw_output($$)
+sub getRawOutput($$)
 {
     my ($exp, $cmd) = @_;
-    my ($rt, $output) = _do_cli_cmd($exp, $cmd);
+    my ($rt, $output) = doCLICmd($exp, $cmd);
     if ( !$rt ) {    	
     	my $qcmd = quotemeta($cmd);
 	if ( $output =~ /^($qcmd)/ ) {
@@ -213,37 +282,37 @@ sub get_raw_output($$)
 
 
 #
-# get all vlans and their ports
-# return the vlanname => port list hashtable
+# get all name => prorts hash
+# return the name => port list hashtable
 #
-sub get_all_vlans($)
+sub getAllNamedPorts($)
 {
     my $exp = shift;
 
-    my $raw = get_raw_output($exp, $CLI_SHOW_PORT_NAMES);
+    my $raw = getRawOutput($exp, $CLI_SHOW_PORT_NAMES);
     my $names = parse_names($raw); 
 
-    my %vlans = ();
+    my %nps = ();
     foreach my $k (keys %{$names}) {
-	if ( !(exists $vlans{$names->{$k}}) ) {
-	    $vlans{$names->{$k}} = ();
+	if ( !(exists $nps{$names->{$k}}) ) {
+	    $nps{$names->{$k}} = ();
 	}
 
-	push @{$vlans{$names->{$k}}}, $k;
+	push @{$nps{$names->{$k}}}, $k;
     }
 
-    return \%vlans;
+    return \%nps;
 }
 
 
 #
-# get the vlanname of a port
+# get the name of a port
 #
-sub get_port_vlan($$)
+sub getPortName($$)
 {
     my ($exp, $port) = @_;
 
-    my $raw = get_raw_output($exp, "show port info $port\r");
+    my $raw = getRawOutput($exp, "show port info $port\r");
     if ( $raw =~ /$port Name:\s+(\w+)\W*\n/ ) {
 	if (  $1 !~ /$CLI_UNNAMED_PATTERN/ ) {
 	    return $1;
@@ -254,16 +323,16 @@ sub get_port_vlan($$)
 }
 
 #
-# get the ports list of a vlan
+# get the ports list by their name.
 #
-sub get_vlan_ports($$)
+sub getNamedPorts($$)
 {
-    my ($exp, $vlan) = @_;
+    my ($exp, $pname) = @_;
     my @ports = ();
 
-    my $raw = get_raw_output($exp, $CLI_SHOW_PORT_NAMES);
+    my $raw = getRawOutput($exp, $CLI_SHOW_PORT_NAMES);
     foreach ( split /\n/, $raw ) {
-	if ( /^([A-I][0-9]{2}):\s+($vlan)\W*/ ) {
+	if ( /^([A-I][0-9]{2}):\s+($pname)\W*/ ) {
 	    push @ports, $1;
 	}
     }
@@ -272,28 +341,28 @@ sub get_vlan_ports($$)
 }
 
 #
-# get connections within a vlan
-# return two hashtabls whose format is same to parse_connections
+# get connections of ports with the given name
+# return two hashtabls whose format is same to parseConnections
 #
-sub get_vlan_connections($$)
+sub getNamedConnections($$)
 {
-    my ($exp, $vlan) = @_;
+    my ($exp, $name) = @_;
 
-    my $raw_conns = get_raw_output($exp, $CLI_SHOW_CONNECTIONS);
-    my ($allsrc, $alldst) = parse_connections($raw_conns);
-    my $ports = get_vlan_ports($exp, $vlan);
+    my $raw_conns = getRawOutput($exp, $CLI_SHOW_CONNECTIONS);
+    my ($allsrc, $alldst) = parseConnections($raw_conns);
+    my $ports = getNamedPorts($exp, $name);
 
     my %src = ();
     my %dst = ();
 
     #
-    # There may be something special: a vlan port may connect to
-    # a port that doesn't belong to the vlan. Then this connection
-    # should not belong to the vlan. Till now the following codes
+    # There may be something special: a named port may connect to
+    # a port whose name is not the same. Then this connection
+    # should not belong to the 'vlan'. Till now the following codes
     # have not dealt with it yet.
     #
     # TODO: remove those connections containning ports don't belong
-    #       to the vlan.
+    #       to the 'vlan'.
     #
     foreach my $p (@$ports) {
 	if ( exists($allsrc->{$p}) ) {
@@ -311,34 +380,34 @@ sub get_vlan_connections($$)
 #
 # Add a new class
 #
-sub add_cls($$)
+sub addCls($$)
 {
     my ($exp, $clsname) = @_;
     my $cmd = "add class I $clsname\r";
 
-    return _do_cli_cmd($exp, $cmd);
+    return doCLICmd($exp, $cmd);
 }
 
 #
 # Add a new zone
 #
-sub add_zone($$)
+sub addZone($$)
 {
     my ($exp, $zonename) = @_;
     my $cmd = "add zone $zonename\r";
 
-    return _do_cli_cmd($exp, $cmd);
+    return doCLICmd($exp, $cmd);
 }
 
 #
 # Add some ports to a class
 #
-sub add_class_ports($$@)
+sub addClassPorts($$@)
 {
     my ($exp, $clsname, @ports) = @_;
     my $cmd = "add class ports $clsname ".join("", @ports)."\r";
 
-    return _do_cli_cmd($exp, $cmd);
+    return doCLICmd($exp, $cmd);
 }
 
 # 
@@ -348,61 +417,53 @@ sub add_class_ports($$@)
 #
 # Make a multicast connection $src --> @dsts
 #
-sub connect_multicast($$@)
+sub connectMulticast($$@)
 {
     my ($exp, $src, @dsts) = @_;
     my $cmd = "connect multicast $src".join("", @dsts)."\r";
 
-    return _do_cli_cmd($exp, $cmd);
+    return doCLICmd($exp, $cmd);
 }
 
 #
 # Make a duplex connection $src <> $dst
 #
-sub connect_duplex($$$)
+sub connectDuplex($$$)
 {
     my ($exp, $src, $dst) = @_;
     my $cmd = "connect duplex $src"."$dst"."\r";
 
-    return _do_cli_cmd($exp, $cmd);
+    return doCLICmd($exp, $cmd);
 }
 
 #
 # Make a simplex connection $src -> $dst
 #
-sub connect_simplex($$$)
+sub connectSimplex($$$)
 {
     my ($exp, $src, $dst) = @_;
     my $cmd = "connect simplex $src"."$dst"."\r";
 
-    return _do_cli_cmd($exp, $cmd);
+    return doCLICmd($exp, $cmd);
 }
 
-#
-# Create a new vlan, it actually does nothing.
-# Maybe I should find a way to reserve the name.
-#
-sub create_vlan($$)
-{
-    # do nothing, but it is perfect if we can reserve the name here.
-}
 
 #
 # Add some ports to a vlan, 
 # it actually names those ports to the vlanname. 
 #
-sub add_vlan_ports($$@)
+sub namePorts($$@)
 {
-    my ($exp, $vlan, @ports) = @_;
+    my ($exp, $name, @ports) = @_;
 
     for( my $i = 0; $i < @ports; $i++ ) {    	
-	my ($rt, $msg) = _do_cli_cmd($exp, 
-				     "configure port name $ports[$i] $vlan\r");
+	my ($rt, $msg) = doCLICmd($exp, 
+				     "configure port name $ports[$i] $name\r");
 
 	# undo set name
 	if ( $rt ) {
 	    for ($i--; $i >= 0; $i-- ) {	    	
-		_do_cli_cmd($exp, 
+		doCLICmd($exp, 
 			    "configure port name $ports[$i] $CLI_UNNAMED_NAME\r");
 	    }
 	    return $msg;
@@ -412,28 +473,106 @@ sub add_vlan_ports($$@)
     return 0;
 }
 
+
 #
-# Remove a vlan, unname the ports and disconnect them
+# Unname ports, the name of those ports will be $CLI_UNNAMED_NAME
 #
-sub remove_vlan($$)
+sub unnamePorts($@)
 {
-    # TODO: not implemented yet.
+    my ($exp, @ports) = @_;
+
+    my $emsg = "";
+    foreach my $p (@ports) {
+	my ($rt, $msg) = doCLICmd($exp,
+				     "configure port name $p $CLI_UNNAMED_NAME\r");
+	if ( $rt ) {
+	    $emsg = $emsg.$msg."\n";
+	}
+    }
+
+    if ( $emsg eq "" ) {
+	return 0;
+    }
+
+    return $emsg;
+}
+
+
+#
+# Disconnect ports
+# $sconns: the dst => src hashtable.
+#
+sub disconnectPorts($$) 
+{
+    my ($exp, $sconns) = @_;
+
+    my $emsg = "";
+    foreach my $dst (keys %$sconns) {
+	my ($rt, $msg) = doCLICmd($exp,
+				     "disconnect $dst".$sconns->{$dst}."\r");
+	if ( $rt ) {
+	    $emsg = $emsg.$msg."\n";
+	}
+    }
+
+    if ( $emsg eq "" ) {
+	return 0;
+    }
+
+    return $emsg;
+}
+
+
+#
+# Remove a 'vlan', unname the ports and disconnect them
+#
+sub removePortName($$)
+{
+    my ($exp, $name) =  @_;
+
+    # Disconnect ports:
+    my ($src, $dst) = getNamedConnections($exp, $name);
+    my $disrt = disconnectPorts($exp, $src);
+
+    # Unname ports:
+    my $ports = getNamedPorts($exp, $name);
+    my $unrt = unnamePorts($exp, @$ports);
+    if ( $unrt || $disrt) {
+	return $disrt.$unrt;
+    }
+
+    return 0;
+}
+
+
+#
+# Set port rate, for port control.
+# Rates are defined in %portCMDs.
+#
+sub setPortRate($$$)
+{
+    my ($exp, $port, $rate) = @_;
+
+    if ( !exists($portCMDs{$rate}) ) {
+	return "ERROR: port rate unsupported!\n";
+    }
+
+    my $cmd = "configure rate $port $portCMDs{$rate}\r";
+    my ($rt, $msg) = doCLICmd($exp, $cmd);
+    if ( $rt ) {
+	return $msg;
+    }
+
+    return 0;
 }
 
 #
-# Obsoleted:
-# I found a better way to name the 'vlan'.
-# Ports can share the same name, so we can name
-# the ports in a vlan the same name, which is the vlan name.
-# However, extra work is required to parse the port names.
+# Get port info
 #
-# Make a name from the ports of a VLAN
-# The naming rule is "vlan"+(sorted ports), e.g.:
-# A vlan has A01, A03, B02, its name is 'vlanA01A03B02'.
-#
-sub make_vlan_name(@)
+sub getPortInfo($$)
 {
-    my @ports = shift;
+    my ($exp, $port) = @_;
 
-    return "vlan".join("", sort @ports);
+    # TODO: parse the output of show port xxxxx
+    return [$port,0];
 }
