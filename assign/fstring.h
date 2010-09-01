@@ -29,8 +29,11 @@
 using namespace std;
 
 #ifdef NEW_GCC
-#include <ext/hash_fun.h>
-//#include <hash_fun.h>
+#ifdef NEWER_GCC
+  #include <backward/hash_fun.h>
+#else
+  #include <ext/hash_fun.h>
+#endif
 using namespace __gnu_cxx;
 #else
 #include <stl_hash_fun.h>

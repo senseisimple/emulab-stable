@@ -640,6 +640,7 @@ sub commit_mail($\@$@) {
     #
     my $subject = "git commit: ";
     my $ref_type;
+    my $short_rev;
     if (defined($reponame)) {
         $subject .= "[$reponame] ";
     }
@@ -664,6 +665,10 @@ sub commit_mail($\@$@) {
     $subject .= ' ' . $what_happened;
     my $actionstring = ucfirst($ref_type) . ' ' . short_refname($refname) .
                        " has been $what_happened";
+
+    $short_rev = `git rev-parse --short $refname $STDERRNULL`;
+    chomp $short_rev;
+    $subject .= " ($short_rev)" if ($short_rev);
 
     if ($ct eq $CT_REBASE) {
         $actionstring .= ".  The following commits are new or have been modified:";

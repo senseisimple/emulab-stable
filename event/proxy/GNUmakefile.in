@@ -100,7 +100,7 @@ control-install:	$(INSTALL_SBINDIR)/version0_gateway
 
 install:		$(INSTALL_DIR)/opsdir/sbin/version0_gateway
 
-client: evproxy$(EXE) evproxyplab$(EXE)
+client: evproxy evproxyplab
 client-install: client
 	$(INSTALL_PROGRAM) evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
 	$(INSTALL_PROGRAM) evproxyplab$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy_shared$(EXE)

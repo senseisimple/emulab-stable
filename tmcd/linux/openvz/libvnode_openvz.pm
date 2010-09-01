@@ -327,7 +327,18 @@ sub vz_rootPreConfigNetwork {
 	foreach my $ifc (@{$node_ifs->{$node}}) {
 	    next if (!$ifc->{ISVIRT});
 
-	    if ($ifc->{ITYPE} eq "vlan") {
+	    if ($ifc->{ITYPE} eq "loop") {
+		my $vtag  = $ifc->{VTAG};
+
+		#
+		# No physical device. Its a loopback (trivial) link/lan
+		# All we need is a common bridge to put the veth ifaces into.
+		#
+		my $brname = "br$vtag";
+		$brs{$brname}{ENCAP} = 0;
+		$brs{$brname}{SHORT} = 0;
+	    }
+	    elsif ($ifc->{ITYPE} eq "vlan") {
 		my $iface = $ifc->{IFACE};
 		my $vtag  = $ifc->{VTAG};
 		my $vdev  = "vlan${vtag}";
@@ -1130,6 +1141,7 @@ sub vz_vnodePreConfigControlNetwork {
     #
     open(FD,">$privroot/etc/resolv.conf") 
 	or die "vz_vnodePreConfigControlNetwork: could not open resolv.conf for $vnode_id: $!";
+
     print FD "nameserver $bossip\n";
     print FD "search $shortdomain\n";
     close(FD);
@@ -1178,7 +1190,7 @@ sub vz_vnodePreConfigExpNetwork {
 	    my $vdev  = "vlan${vtag}";
 	    $br = "pbr$vdev";
 	}
-	elsif ($ifc->{PMAC} eq "none") {
+	elsif ($ifc->{PMAC} eq "none" || $ifc->{ITYPE} eq "loop") {
 	    $br = "br" . $ifc->{VTAG};
 	}
 	else {

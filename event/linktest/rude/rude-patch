@@ -223,6 +223,31 @@ diff -c -r1.1.1.1 -r1.2
   #include <netinet/in.h>  /* for struct sockaddr_in */
   #include <sys/time.h>    /* for struct timeval     */
   
+***************
+*** 107,117 ****
+   * Wrapper structure that helps filling the "header" to the buffer
+   */
+  struct udp_data{
+!   unsigned long sequence_number;
+!   unsigned long tx_time_seconds; 
+!   unsigned long tx_time_useconds; 
+!   unsigned long flow_id;
+!   unsigned long dest_addr;
+  }__attribute__ ((packed));
+  
+  
+--- 108,118 ----
+   * Wrapper structure that helps filling the "header" to the buffer
+   */
+  struct udp_data{
+!   uint32_t sequence_number;
+!   uint32_t tx_time_seconds; 
+!   uint32_t tx_time_useconds; 
+!   uint32_t flow_id;
+!   uint32_t dest_addr;
+  }__attribute__ ((packed));
+  
+  
 Index: rude/flow_txmit.c
 ===================================================================
 RCS file: /flux/CVS/emulab-rude/rude/flow_txmit.c,v
