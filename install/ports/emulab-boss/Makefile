@@ -86,6 +86,10 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
 
+.if ${OSMAJOR} >= 6
+LIB_DEPENDS+= xerces-c.27:${PORTSDIR}/textproc/xerces-c2
+.endif
+
 #
 # Until/unless the pubsub Makefile is changed, we must include libelvin.
 # This is because the pubsub libraries have to be built with ELVIN_COMPAT
@@ -197,3 +201,4 @@ vars:
 	@echo "BUILD_DEPENDS=$(BUILD_DEPENDS)"
 	@echo "LIB_DEPENDS=$(LIB_DEPENDS)"
 	@echo "RUN_DEPENDS=$(RUN_DEPENDS)"
+	@echo "PERL_VER/ARCH=${PERL_VER}/${PERL_ARCH}"

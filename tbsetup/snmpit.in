@@ -1061,28 +1061,28 @@ sub doListVlans ($) {
     # We need to 'coallate' the results from each stack by putting together
     # the results from each stack, based on the VLAN identifier
     #
-if ($ELABINELAB) {
-    #
-    # Sklower deliberately uglified this.  The intent is that eventually
-    # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
-    # it will just work.  For now, we dup the code.
-    #
-    @vlanList = RemoteDoList();
-    foreach my $vlan (@vlanList) {
-	my ($id,$ddep,$memberref) = @$vlan;
-	${$vlans{$id}}[0] = $ddep;
-	push @{${$vlans{$id}}[1]}, @$memberref;
+    if ($ELABINELAB) {
+        #
+        # Sklower deliberately uglified this.  The intent is that eventually
+        # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
+        # it will just work.  For now, we dup the code.
+        #
+        @vlanList = RemoteDoList();
+        foreach my $vlan (@vlanList) {
+            my ($id,$ddep,$memberref) = @$vlan;
+            ${$vlans{$id}}[0] = $ddep;
+            push @{${$vlans{$id}}[1]}, @$memberref;
+        }
+    } else {
+        foreach my $stack (@$stacks) {
+            @vlanList = $stack->listVlans();
+            foreach my $vlan (@vlanList) {
+                my ($id,$ddep,$memberref) = @$vlan;
+                ${$vlans{$id}}[0] = $ddep;
+                push @{${$vlans{$id}}[1]}, @$memberref;
+            }
+        }
     }
-} else {
-    foreach my $stack (@$stacks) {
-	@vlanList = $stack->listVlans();
-	foreach my $vlan (@vlanList) {
-	    my ($id,$ddep,$memberref) = @$vlan;
-	    ${$vlans{$id}}[0] = $ddep;
-	    push @{${$vlans{$id}}[1]}, @$memberref;
-	}
-    }
-}
 
     #
     # less code to do this for snmpit.proxy than for it to popen snmpit
@@ -1142,8 +1142,9 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
         my $vlan = VLan->Lookup($vlan_id);
         if (!defined($vlan)) {
 	    &debug("No such VLAN $vlan_id in lans table\n");
-	    next
-		if ($opt{l} == 1);
+            # Only print unknown VLANs if -l was given twice, or the 
+            # -O option was given
+	    next unless ($opt{l} > 1 || $opt{O});
 	    $vname = $vlan_id;
 	    $experiment = undef;
         }
