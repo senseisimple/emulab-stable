@@ -22,6 +22,10 @@ use lib '@prefix@/lib';
 use GeniCMV2;
 use GeniResponse;
 
+# Disable UUID checks in GeniCredential.
+use GeniCredential;
+$GeniCredential::CHECK_UUID = 0;
+
 my $API_VERSION = 1;
 
 #
