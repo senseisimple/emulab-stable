@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -493,8 +493,6 @@ sub listVlans($) {
     foreach my $vlan_id (keys %$vlans) {
 	push @list, [$vlan_id, $vlan_id, $vlans->{$vlan_id}];
     }
-
-    return @list;
 
     #$self->debug($self->{NAME} .":". join("\n",(map {join ",", @$_} @list))."\n");
     return @list;

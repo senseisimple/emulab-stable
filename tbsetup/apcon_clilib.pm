@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -53,6 +53,7 @@ my $APCON_SSH_CONN_STR = "ssh -l admin apcon1";
 # This seems to be a bad practice... It will be better if we cancel 
 # the password on the switch.
 my $APCON1_PASSWD = "daApcon!";
+my $APCON_DEVICE = "apcon1";
 my $CLI_PROMPT = "apcon1>> ";
 my $CLI_UNNAMED_PATTERN = "[Uu]nnamed";
 my $CLI_UNNAMED_NAME = "unnamed";
@@ -92,10 +93,15 @@ my %portCMDs =
 #
 sub createExpectObject()
 {
-    # default connection string:
-    my $spawn_cmd = $APCON_SSH_CONN_STR;
-    if ( @_ ) {
-	$spawn_cmd = shift @_;
+    my ($spawn_cmd, $devname, $passwd) = @_;
+    if (!(defined $spawn_cmd)) {
+	$spawn_cmd = $APCON_SSH_CONN_STR;
+    }
+    if (!(defined $devname)) {
+	$devname = $APCON_DEVICE;
+    }
+    if (!(defined $passwd)) {
+	$passwd = $APCON1_PASSWD;
     }
 
     # Create Expect object and initialize it:
@@ -109,8 +115,8 @@ sub createExpectObject()
     $exp->spawn($spawn_cmd)
 	or die "Cannot spawn $spawn_cmd: $!\n";
     $exp->expect($CLI_TIMEOUT,
-		 ["admin\@apcon1's password:" => sub { my $e = shift;
-						       $e->send($APCON1_PASSWD."\n");
+		 ["admin\@$devname's password:" => sub { my $e = shift;
+						       $e->send($passwd."\n");
 						       exp_continue;}],
 		 ["Permission denied (password)." => sub { die "Password incorrect!\n";} ],
 		 [ timeout => sub { die "Timeout when connect to switch!\n";} ],
