@@ -363,12 +363,14 @@ sub delPortVlan($$@) {
 	    
 	    # As destination:
 	    $sconns{$p} = $src->{$p};
-	} else if (exists($dst->{$p})) {
+	} else {
+	    if (exists($dst->{$p})) {
 	    
-	    # As source:
-	    foreach my $pdst (keys %{$dst->{$p}}) {
-		$sconns{$pdst} = $p;
-	    }
+	        # As source:
+	        foreach my $pdst (keys %{$dst->{$p}}) {
+		    $sconns{$pdst} = $p;
+	        }
+	    }    
 	}
     }
     
