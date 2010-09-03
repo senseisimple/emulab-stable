@@ -291,8 +291,12 @@ sub Create($$$$)
 	    print STDERR "*** No virtnode_capacity for $type! Using zero.\n";
 	    $virtnode_capacity = 0;
 	}
-	if ($isremote) {
-	    $osid   = 0;
+	if ($typeinfo->isswitch()) {
+	    $osid   = "NULL";
+	    $opmode = "ALWAYSUP";
+	}
+	elsif ($isremote) {
+	    $osid   = "NULL";
 	    $opmode = "";
 
 	    if (defined($typeinfo->default_osid())) {
@@ -330,7 +334,7 @@ sub Create($$$$)
 	}
     }
     else {
-	$osid   = 0;
+	$osid   = "NULL";
 	$opmode = "";
     }
     $state  = $STATE_INITIAL;
@@ -370,7 +374,7 @@ sub Create($$$$)
 		     "  phys_nodeid='$node_id', role='$role', ".
 		     "  priority=$priority, " .
 		     "  eventstate='$state', op_mode='$opmode', " .
-		     "  def_boot_osid='$osid', " .
+		     "  def_boot_osid=$osid, " .
 		     "  inception=now(), uuid=$uuid, ".
 		     "  state_timestamp=unix_timestamp(NOW()), " .
 		     "  op_mode_timestamp=unix_timestamp(NOW())")) {
