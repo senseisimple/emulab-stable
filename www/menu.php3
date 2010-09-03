@@ -731,6 +731,9 @@ function WRITESIDEBAR() {
 	NavMenuButton("Edit Site Variables",
 		      "$TBBASE/editsitevars.php3");
 
+	NavMenuButton("Show Shared Node Pool",
+		      "$TBBASE/showpool.php");
+
 	NavMenuButton("Edit Knowledge Base",
 		      "$TBBASE/kb-manage.php3");
 		    
