@@ -4619,7 +4619,7 @@ class subboss:
 	# has permission to load the image in libosload so we don't need to
 	# check again in frisbeelauncher.  Only a subboss can make this request
 	# anyway.
-        (exitval, output) = runcommand(TBDIR + "/sbin/subboss_wrapper frisbee_launcher " + argstr)
+        (exitval, output) = runcommand(TBDIR + "/sbin/subboss_wrapper frisbeelauncher " + argstr)
 
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
@@ -4634,12 +4634,12 @@ class subboss:
         if len(res) == 0:
             return EmulabResponse(RESPONSE_ERROR,
                                   output="Imageid is gone: " +
-                                  argdict["imageid"])
+                                  str(argdict["imageid"]))
         
         if (res[0][0] == None or res[0][0] == ""):
             return EmulabResponse(RESPONSE_ERROR,
                                   output="No load_address in DB: " +
-                                  argdict["imageid"])
+                                  str(argdict["imageid"]))
         
         return EmulabResponse(RESPONSE_SUCCESS, str(res[0][0]), output=output)
     

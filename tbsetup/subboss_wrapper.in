@@ -1,0 +1,74 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use strict;
+use English;
+
+sub usage()
+{
+    print "Usage: subboss_wrapper <command> [args]\n";
+    print "\n";
+    print "Valid commands:\n";
+    print "  frisbee_launcher [args]    Run frisbee_launcher with specified arugments\n";
+    print "\n";
+    exit(1);
+}
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+
+my $TB          = "@prefix@";
+my $ELABMAN     = "elabman";
+
+my $FRISBEE_LAUNCHER = "$TB/sbin/frisbeelauncher";
+
+use lib "@prefix@/lib";
+use User;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# We do not want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# We need this user for running below.
+#
+my $elabman = User->Lookup($ELABMAN);
+if (!defined($elabman)) {
+    fatal("Could not lookup $ELABMAN user. Exiting ...");
+}
+
+if ($UID != $elabman->unix_uid()) {
+    die("Must be elabman to run this script\n");
+}
+
+# Switch to root
+
+$UID = $EUID = 0;
+
+usage() if (@ARGV == 0);
+
+my $command = shift @ARGV;
+if ($command eq 'frisbeelauncher') {
+	# Pass the argument list through as-is
+	my @args = map { /(.*)/; $1 } @ARGV;
+	exec $FRISBEE_LAUNCHER, @args;
+} else {
+    fatal("Invalid command \"$command\"");
+}
+
