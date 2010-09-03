@@ -13,7 +13,7 @@ sub usage()
     print "Usage: subboss_wrapper <command> [args]\n";
     print "\n";
     print "Valid commands:\n";
-    print "  frisbee_launcher [args]    Run frisbee_launcher with specified arugments\n";
+    print "  frisbeelauncher [args]    Run frisbee_launcher with specified arugments\n";
     print "\n";
     exit(1);
 }
