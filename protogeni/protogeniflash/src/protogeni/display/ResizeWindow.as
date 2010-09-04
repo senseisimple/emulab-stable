@@ -14,14 +14,15 @@ package protogeni.display
     import mx.controls.Button;
     import mx.core.Application;
     import mx.core.DragSource;
+    import mx.core.FlexGlobals;
     import mx.core.IUIComponent;
     import mx.core.UIComponent;
+    import mx.core.mx_internal;
     import mx.events.CloseEvent;
     import mx.events.DragEvent;
     import mx.managers.DragManager;
     import mx.skins.halo.TitleBackground;
 
-    import mx.core.mx_internal;
     use namespace mx_internal;
     
     /**
@@ -55,11 +56,11 @@ package protogeni.display
             super();
             _resizable = false;
             _movable = false;
-            
+
             // constrain to the application's bounds
-            if (Application.application != null) {
-                maxWidth = Application.application.width;
-                maxHeight = Application.application.height;
+            if (FlexGlobals.topLevelApplication != null) {
+                maxWidth = FlexGlobals.topLevelApplication.width;
+                maxHeight = FlexGlobals.topLevelApplication.height;
             }
             
             addEventListener(KeyboardEvent.KEY_DOWN, keyHandler);

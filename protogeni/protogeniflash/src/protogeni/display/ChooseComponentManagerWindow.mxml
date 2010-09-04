@@ -9,18 +9,19 @@
 	xmlns:display="protogeni.display.*">
 	
 	<mx:Style>
-		.failedStyle {
-			color: red;
-			textRollOverColor: red;
-			textSelectedColor: red;
-			themeColor: red;
-		}
 		
 		.validStyle {
 			color: green;
 			textRollOverColor: green;
 			textSelectedColor: green;
 			themeColor: green;
+		}
+		
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
 		}
 		
 		.unknownStyle {
@@ -62,7 +63,7 @@
 				show();
        			okButton.enabled = Main.protogeniHandler.ComponentManagers.length > 0;
 				refreshList();
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, ResetAll);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, Reset);
 				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, refreshList);
 			}
 			
@@ -114,6 +115,20 @@
 				}
 				this.width = max;
 				this.validateNow();
+			}
+			
+			public function Reset(e:ProtogeniEvent):void
+			{
+				var cm:ComponentManager = e.changedObject as ComponentManager;
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					if(cm.Hrn == cmCheckbox.label)
+					{
+						updateCmHbox(cmHbox, cm);
+						break;
+					}
+				}
 			}
 			
 			public function ResetAll(junk:* = null):void

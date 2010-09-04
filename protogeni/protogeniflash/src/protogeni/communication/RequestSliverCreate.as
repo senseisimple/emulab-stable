@@ -52,7 +52,7 @@ package protogeni.communication
 			var tryDeleteNode:RequestQueueNode = this.node.next;
 			while(tryDeleteNode != null && tryDeleteNode is RequestSliverCreate && (tryDeleteNode as RequestSliverCreate).sliver.slice == sliver.slice)
 			{
-				Main.protogeniHandler.rpcHandler.remove(tryDeleteNode);
+				Main.protogeniHandler.rpcHandler.remove(tryDeleteNode.item);
 				tryDeleteNode = tryDeleteNode.next;
 			}
 			

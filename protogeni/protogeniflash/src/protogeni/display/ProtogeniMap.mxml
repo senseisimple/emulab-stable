@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <maps:Map xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:maps="com.google.maps.*"
-		  height="100%" width="100%" maxWidth="{mx.core.Application.application.width}"
+		  height="100%" width="100%" maxWidth="{(mx.core.FlexGlobals.topLevelApplication as Application).width}"
 		  preinitialize="mappreinit()"
 		  mapevent_mappreinitialize="onMapPreinitialize(event)"
 		  mapevent_mapready="onMapReady(event)"
@@ -17,6 +17,7 @@
 			import com.google.maps.controls.ZoomControl;
 			
 			import mx.core.Application;
+			import mx.core.FlexGlobals;
 			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
@@ -28,7 +29,7 @@
 			
 			private function mappreinit():void {
 				// Set correct key
-				var url : String = mx.core.Application.application.url;
+				var url : String = mx.core.FlexGlobals.topLevelApplication.url;
 				if(url.indexOf("https://users.emulab.net") > -1)
 					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
 				else if(url.indexOf("http://users.emulab.net") > -1)

@@ -20,14 +20,15 @@ package protogeni.communication
 
   public class Request
   {
-    public function Request(newName:String = "", newDetails:String = "", qualifiedMethod : Array = null, shouldContinueOnErrors:Boolean = false, shouldWaitOnComplete:Boolean = false) : void
+    public function Request(newName:String = "", newDetails:String = "", qualifiedMethod : Array = null, shouldContinueOnErrors:Boolean = false, shouldStartImmediately:Boolean = false, shouldRemoveImmediately:Boolean = true) : void
     {
-      op = new Operation(qualifiedMethod);
+      op = new Operation(qualifiedMethod, this);
 	  op.timeout = 180;
       name = newName;
 	  details = newDetails;
 	  continueOnError = shouldContinueOnErrors;
-	  waitOnComplete = shouldWaitOnComplete;
+	  startImmediately = shouldStartImmediately;
+	  removeImmediately = shouldRemoveImmediately;
     }
 
     public function cleanup() : void
@@ -75,8 +76,10 @@ package protogeni.communication
 	public var name:String;
 	[Bindable]
 	public var details:String;
-	public var waitOnComplete:Boolean;
+	public var startImmediately:Boolean;
+	public var removeImmediately:Boolean;
 	public var continueOnError:Boolean;
+	public var running:Boolean = false;
 	
 	public var node:RequestQueueNode;
   }

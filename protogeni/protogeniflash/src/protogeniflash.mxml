@@ -160,6 +160,7 @@
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
+		<mx:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label  text="{Main.protogeniHandler.CurrentUser.uid}"/>
 		<display:ImageButton id="userButton"
