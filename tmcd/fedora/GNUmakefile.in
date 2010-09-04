@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005, 2007, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -48,6 +48,10 @@ frisbee-mfs-install: baselinux-frisbee-mfs-install
 
 simple-install:	common-install script-install bin-install
 
+openvz-install:	baselinux-common-install common-install \
+                baselinux-script-install script-install \
+		baselinux-openvz-install etc-install
+
 dir-install:
 	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/init.d
 
@@ -88,6 +92,7 @@ sysetc-onceonly-install:
 	@$(MYINSTALL) $(SRCDIR)/syslog.conf $(SYSETCDIR)/syslog.conf
 
 script-install:	dir-install $(SCRIPTS)
+	$(INSTALL) -m 755 $(SRCDIR)/delaysetup $(BINDIR)/delaysetup
 
 sfs-install:
 	@echo "no fedora-specific sfs files"

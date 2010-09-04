@@ -313,7 +313,9 @@ sub LinkDelaySetup()
             $iface =~ /\D+(\d+)/;
             my $imqnum = $1;
 	    if ($type eq "duplex") {
-		
+		if (! -e "/sys/class/net/imq${imqnum}") {
+		    die("No such IMQ device: imq${imqnum}");
+		}
                 print DEL "$TC qdisc add dev imq${imqnum} handle $pipeno ";
                 print DEL "root plr $rplr\n";
 
