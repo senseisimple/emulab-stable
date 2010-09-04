@@ -30,7 +30,7 @@ package protogeni.communication
 	  
     public function RequestDiscoverResources(newCm:ComponentManager) : void
     {
-		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true);
+		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true, false);
 		cm = newCm;
 		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
 		op.addField("compress", true);
@@ -59,14 +59,14 @@ package protogeni.communication
 				cm.Rspec = new XML(decodedRspec);
 			}*/
 			
-			cm.processRspec(Main.protogeniHandler.rpcHandler.start);
+			cm.processRspec(cleanup);
 		}
 		else
 		{
 			cm.errorMessage = response.output;
 			cm.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + cm.errorMessage;
 			cm.Status = ComponentManager.FAILED;
-			waitOnComplete = false;
+			this.removeImmediately = true;
 			Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		}
 		
@@ -93,7 +93,6 @@ package protogeni.communication
 	override public function cancel():void
 	{
 		cm.Status = ComponentManager.UNKOWN;
-		waitOnComplete = false;
 		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		op.cleanup();
 	}
@@ -102,9 +101,11 @@ package protogeni.communication
 	{
 		if(cm.Status == ComponentManager.INPROGRESS)
 			cm.Status = ComponentManager.FAILED;
-		waitOnComplete = false;
+		running = false;
+		Main.protogeniHandler.rpcHandler.remove(this, false);
 		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
 		op.cleanup();
+		Main.protogeniHandler.rpcHandler.start();
 	}
 
     private var cm : ComponentManager;

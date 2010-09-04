@@ -38,7 +38,6 @@
 		}
 		
 		public var queue:RequestQueue = new RequestQueue(true);
-		public var working:Boolean = false;
 		public var forceStop:Boolean = false;
 		public var isPaused:Boolean = false;
 		
@@ -101,9 +100,6 @@
 			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
-				//if(sliver.created)
-				//pushRequest(new RequestSliverUpdate(sliver, true));
-				//else
 				pushRequest(new RequestSliverDelete(sliver));
 			}
 		}
@@ -140,7 +136,7 @@
 			if (newRequest != null)
 			{
 				queue.push(newRequest);
-				if (!working && forceStart)
+				if (queue.readyToStart() && forceStart)
 				{
 					start();
 				}
@@ -150,22 +146,19 @@
 		public function start() : void
 		{
 			isPaused = false;
-			if(working)
+			if(!queue.readyToStart())
 				return;
-			if (!queue.isEmpty())
-			{
-				var front:Request = queue.front();
-				var op:Operation = front.start();
-				op.call(complete, failure);
-				Main.log.setStatus(front.name, true, false);
-				Main.log.appendMessage(new LogMessage(op.getUrl(), "Send: " + front.name, op.getSendXml(), false, LogMessage.TYPE_START));
-				working = true;
-			}
-			else
-			{
-				working = false;
-			}
+			
+			var start:Request = queue.nextAndProgress();
+			start.running = true;
+			var op:Operation = start.start();
+			op.call(complete, failure);
+			Main.log.setStatus(start.name, false);
+			Main.log.appendMessage(new LogMessage(op.getUrl(), "Send: " + start.name, op.getSendXml(), false, LogMessage.TYPE_START));
+				
 			Main.protogeniHandler.dispatchQueueChanged();
+			
+			this.start();
 		}
 		
 		public function pause():void
@@ -173,55 +166,55 @@
 			isPaused = true;
 		}
 		
-		public function remove(rqn:RequestQueueNode):void
+		public function remove(r:Request, showAction:Boolean = true):void
 		{
-			if(working && queue.head == rqn)
+			if(r.running)
 			{
-				working = false;
-				Main.log.setStatus(rqn.item.name + " canceled!", false, false);
+				Main.log.setStatus(r.name + " canceled!", false);
+				r.cancel();
 			}
-			if(queue.contains(rqn))
+			queue.remove(queue.getRequestQueueNodeFor(r));
+			if(showAction)
 			{
-				rqn.item.cancel();
-				var url:String = (rqn.item as Request).op.getUrl();
-				var name:String = rqn.item.name;
-				queue.remove(rqn);
-				Main.protogeniHandler.dispatchQueueChanged();
-				Main.log.appendMessage(new LogMessage(url, name + "Canceled", "User canceled", false, LogMessage.TYPE_END));
+				var url:String = r.op.getUrl();
+				var name:String = r.name;
+				Main.log.appendMessage(new LogMessage(url, name + "Removed", "Request removed", false, LogMessage.TYPE_END));
 			}
+			Main.protogeniHandler.dispatchQueueChanged();
 		}
 		
-		private function failure(event : ErrorEvent, fault : MethodFault) : void
+		private function failure(node:Request, event : ErrorEvent, fault : MethodFault) : void
 		{
-			working = false;
+			node.running = false;
+			remove(node, false);
+
 			// Get and give general info for the failure
 			var failMessage:String = "";
 			var msg : String = "";
 			if (fault != null)
 			{
 				msg = fault.getFaultString();
-				failMessage += "\nFAILURE fault: " + queue.front().name + ": " + msg;
+				failMessage += "\nFAILURE fault: " + node.name + ": " + msg;
 			}
 			else
 			{
 				msg = event.toString();
-				failMessage += "\nFAILURE event: " + queue.front().name + ": " + msg;
+				failMessage += "\nFAILURE event: " + node.name + ": " + msg;
 				if(msg.search("#2048") > -1)
 					failMessage += "\nStream error, possibly due to server error";
 				else if(msg.search("#2032") > -1)
 					failMessage += "\nIO Error, possibly due to server problems or you have no SSL certificate";
 			}
-			failMessage += "\nURL: " + queue.front().op.getUrl();
-			Main.log.appendMessage(new LogMessage(queue.front().op.getUrl(), "Failure", failMessage, true, LogMessage.TYPE_END));
-			Main.log.setStatus(queue.front().name + " failed!", false, true);
-			if(!queue.front().continueOnError)
+			failMessage += "\nURL: " + node.op.getUrl();
+			Main.log.appendMessage(new LogMessage(node.op.getUrl(), "Failure", failMessage, true, LogMessage.TYPE_END));
+			Main.log.setStatus(node.name + " failed!", true);
+			if(!node.continueOnError)
 			{
 				Main.log.open();
 			} else {
 				// Find out what to do next
-				var next : * = queue.front().fail(event, fault);
-				queue.front().cleanup();
-				queue.pop();
+				var next : * = node.fail(event, fault);
+				node.cleanup();
 				if (next != null)
 					queue.push(next);
 				
@@ -229,39 +222,48 @@
 			}
 		}
 		
-		private function complete(code : Number, response : Object) : void
+		private function complete(node:Request, code : Number, response : Object) : void
 		{
-			working = false;
+			if(node.removeImmediately)
+			{
+				node.running = false;
+				remove(node, false);
+			}
+			
+			var next;
 			try
 			{
 				// Output completed
 				if(code != CommunicationUtil.GENIRESPONSE_SUCCESS)
 				{
-					Main.log.setStatus(queue.front().name + " done", false, true);
-					Main.log.appendMessage(new LogMessage(queue.front().op.getUrl(), CommunicationUtil.GeniresponseToString(code), queue.front().op.getResponseXml(), true, LogMessage.TYPE_END));
+					Main.log.setStatus(node.name + " done", true);
+					Main.log.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponseXml(), true, LogMessage.TYPE_END));
 				} else {
-					Main.log.setStatus(queue.front().name + " done", false, false);
-					Main.log.appendMessage(new LogMessage(queue.front().op.getUrl(), "Response: " + queue.front().name, queue.front().op.getResponseXml(), false, LogMessage.TYPE_END));
+					Main.log.setStatus(node.name + " done", false);
+					Main.log.appendMessage(new LogMessage(node.op.getUrl(), "Response: " + node.name, node.op.getResponseXml(), false, LogMessage.TYPE_END));
 				}
-				var next : * = queue.front().complete(code, response);
+				next = node.complete(code, response);
 			}
 			catch (e : Error)
 			{
-				codeFailure(queue.front().name, "Error caught in RPC-Handler Complete", e, !queue.front().continueOnError);
-				if(!queue.front().continueOnError)
+				codeFailure(node.name, "Error caught in RPC-Handler Complete", e, !queue.front().continueOnError);
+				node.removeImmediately = true;
+				if(node.running)
+				{
+					node.running = false;
+					remove(node, false);
+				}
+				if(!node.continueOnError)
 					return;
-				shouldImmediatelyExit = false;
 			}
 			
 			// Find out what to do next
-			if (next != null)
-				queue.push(next);
-			queue.front().cleanup();
-			var shouldImmediatelyExit:Boolean = queue.head != null && queue.front().waitOnComplete;
-			queue.pop();
-			
-			if(shouldImmediatelyExit)
-				return;
+			if(node.removeImmediately)
+			{
+				if (next != null)
+					queue.push(next);
+				node.cleanup();
+			}
 			
 			tryNext();
 		}

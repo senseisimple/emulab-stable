@@ -40,7 +40,7 @@ package protogeni.communication
 			if(isCreating)
 			{
 				Alert.show("Slice '" + slice.urn + "' already exists");
-				Main.log.setStatus("Slice exists", false, true);
+				Main.log.setStatus("Slice exists", true);
 			}
 			else
 			{

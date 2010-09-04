@@ -118,7 +118,7 @@
 	    }
 	    
 	    public function processRspec(afterCompletion : Function):void {
-			Main.log.setStatus("Parsing " + Hrn + " RSPEC", true, false);
+			Main.log.setStatus("Parsing " + Hrn + " RSPEC", false);
 
 			var ns:String = (Rspec.namespace() as Namespace).uri;
 			Version = parseInt(ns.substring(ns.lastIndexOf('.')));
@@ -148,7 +148,7 @@
 			}
 			else if (myState == DONE)
 			{
-				Main.log.setStatus("Parsing " + Hrn + " RSPEC Done",false,false);
+				Main.log.setStatus("Parsing " + Hrn + " RSPEC Done",false);
 	    		interfaceDictionary = null;
 	    		nodeNameDictionary = null;
 	    		subnodeList = null;
@@ -159,7 +159,7 @@
 			}
 			else
 			{
-				Main.log.setStatus("Fail",false,true);
+				Main.log.setStatus("Fail",true);
 	    		interfaceDictionary = null;
 	    		nodeNameDictionary = null;
 	    		subnodeList = null;

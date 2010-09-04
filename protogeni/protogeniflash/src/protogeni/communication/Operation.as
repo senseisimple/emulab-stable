@@ -24,9 +24,10 @@ package protogeni.communication
 
   public class Operation
   {
-    public function Operation(qualifiedMethod : Array = null) : void
+    public function Operation(qualifiedMethod : Array = null, newNode:Request = null) : void
     {
       server = null;
+	  node = newNode;
       reset(qualifiedMethod);
     }
 
@@ -145,7 +146,7 @@ package protogeni.communication
     {
 //      cleanup();
 
-      success(Number(server.getResponse().code),
+      success(node, Number(server.getResponse().code),
 //              server.getResponse().value.toString(),
 //              String(server.getResponse().output),
               server.getResponse());
@@ -154,7 +155,7 @@ package protogeni.communication
     private function callFailure(event : ErrorEvent) : void
     {
 //      cleanup();
-      failure(event, server.getFault());
+      failure(node, event, server.getFault());
     }
 
     public function cleanup() : void
@@ -177,6 +178,7 @@ package protogeni.communication
     private var server : ConnectionImpl;
     private var success : Function;
     private var failure : Function;
+	private var node:Request;
 	
 	public var timeout:int = 60;
 

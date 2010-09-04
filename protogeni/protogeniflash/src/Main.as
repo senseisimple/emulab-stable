@@ -18,6 +18,7 @@
 {
 	import mx.controls.Alert;
 	import mx.core.Application;
+	import mx.core.FlexGlobals;
 	
 	import protogeni.ProtogeniHandler;
 	
@@ -25,7 +26,7 @@
   {
 	// Returns the main class
 	public static function Pgmap():protogeniflash {
-		return mx.core.Application.application as protogeniflash;
+		return mx.core.FlexGlobals.topLevelApplication as protogeniflash;
 	}
 
 	[Bindable]

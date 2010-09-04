@@ -67,11 +67,16 @@
 				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, loadComponentManagers);
 			}
 			
-			public function setStatus(s:String, isWaiting:Boolean, isError:Boolean):void
+			public function setStatus(s:String, isError:Boolean):void
 			{
-				Main.Pgmap().waitingIcon.visible = isWaiting;
+				var isWorking:Boolean = Main.protogeniHandler.rpcHandler.queue.working();
+				Main.Pgmap().waitingIcon.visible = isWorking;
 				Main.Pgmap().progressLabel.text = s;
-				if(isWaiting)
+				if(isWorking && Main.protogeniHandler.rpcHandler.queue.workingCount() > 1)
+					Main.Pgmap().waitingCountLabel.text = Main.protogeniHandler.rpcHandler.queue.workingCount() + " reqs running";
+				else
+					Main.Pgmap().waitingCountLabel.text = "";
+				if(isWorking)
 					Main.Pgmap().progressLabel.styleName = "inprogressStyle";
 				else if(isError)
 					Main.Pgmap().progressLabel.styleName = "failedStyle";
@@ -224,13 +229,16 @@
 				}
 				else
 				{
-					if(Main.protogeniHandler.rpcHandler.working && Main.protogeniHandler.rpcHandler.queue.head.item == currentNode.item)
+					if(currentNode.item.running)
 					{
 						var currentLabel:Label = new Label();
 						currentLabel.text = "Currently running";
 						queue.addChild(currentLabel);
-						addRequest(currentNode);
-						currentNode = currentNode.next;
+						while(currentNode != null && currentNode.item.running)
+						{
+							addRequest(currentNode);
+							currentNode = currentNode.next;
+						}
 					}
 					if(currentNode == null)
 					{

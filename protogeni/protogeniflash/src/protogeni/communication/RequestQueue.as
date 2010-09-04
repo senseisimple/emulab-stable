@@ -14,11 +14,14 @@
 
 package protogeni.communication
 {
+	import flash.utils.Dictionary;
+
   public class RequestQueue
   {
     public function RequestQueue(shouldPushEvents:Boolean = false) : void
     {
       head = null;
+	  nextRequest = null;
       tail = null;
 	  pushEvents = shouldPushEvents;
     }
@@ -69,14 +72,45 @@ package protogeni.communication
 		}
 		
 		if (tail != null)
+		{
 			tail.next = newNode;
+			if(nextRequest == null)
+				nextRequest = newNode;
+		}
 		else
+		{
 			head = newNode;
+			nextRequest = newNode;
+		}
 		
 		tail = newTail;
 		if(pushEvents)
 			Main.protogeniHandler.dispatchQueueChanged();
     }
+	
+	public function working():Boolean
+	{
+		return head != null && nextRequest != head;
+	}
+	
+	public function workingCount():int
+	{
+		var count:int = 0;
+		var n:RequestQueueNode = head;
+		
+		while(n != null && n != nextRequest)
+		{
+			count++;
+			n = n.next;
+		}
+
+		return count;
+	}
+	
+	public function readyToStart():Boolean
+	{
+		return head != null && nextRequest != null && (nextRequest == head || nextRequest.item.startImmediately == true);
+	}
 
     public function front() : *
     {
@@ -89,11 +123,34 @@ package protogeni.communication
         return null;
       }
     }
+	
+	public function nextAndProgress() : *
+	{
+		var val:Object = next();
+		if(val != null)
+			nextRequest = nextRequest.next;
+		return val;
+	}
+	
+	public function next() : *
+	{
+		if (nextRequest != null)
+		{
+			return nextRequest.item;
+		}
+		else
+		{
+			return null;
+		}
+	}
 
+	/*
     public function pop() : void
     {
       if (head != null)
       {
+		if(nextRequest == head)
+			nextRequest = head.next;
         head = head.next;
 		if(pushEvents)
 			Main.protogeniHandler.dispatchQueueChanged();
@@ -101,14 +158,32 @@ package protogeni.communication
       if (head == null)
       {
         tail = null;
+		nextRequest = null;
       }
     }
+	*/
+	
+	public function getRequestQueueNodeFor(item:Request):RequestQueueNode
+	{
+		var parseNode:RequestQueueNode = head;
+		while(parseNode != null)
+		{
+			if(parseNode.item == item)
+				return parseNode;
+			parseNode = parseNode.next;
+		}
+		return null;
+	}
 	
 	public function remove(removeNode:RequestQueueNode):void
 	{
 		if(head == removeNode)
 		{
+			if(nextRequest == head)
+				nextRequest = head.next;
 			head = head.next;
+			if(head == null)
+				tail = null;
 		} else {
 			var previousNode:RequestQueueNode = head;
 			var currentNode:RequestQueueNode = head.next;
@@ -116,6 +191,8 @@ package protogeni.communication
 			{
 				if(currentNode == removeNode)
 				{
+					if(nextRequest == currentNode)
+						nextRequest = currentNode.next;
 					previousNode.next = currentNode.next;
 					return;
 				}
@@ -129,6 +206,7 @@ package protogeni.communication
 
     public var head:RequestQueueNode;
     public var tail:RequestQueueNode;
+	public var nextRequest:RequestQueueNode;
 	private var pushEvents:Boolean;
   }
 }
