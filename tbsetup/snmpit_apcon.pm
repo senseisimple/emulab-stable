@@ -20,7 +20,6 @@ use SNMP;
 use snmpit_lib;
 
 use libtestbed;
-use apcon_clilib;
 use Expect;
 
 
@@ -56,6 +55,7 @@ my %portCMDs =
     "half10mbit"   => "89",
 );
 
+my %emptyVlans = ();
 
 #
 # All functions are based on snmpit_hp class.
@@ -786,21 +786,15 @@ sub createVlan($$$) {
 	warn "$id: recreating vlan id $vlan_id \n";
 	return 0;
     }
-
-    #
-    # We do nothing here now.
-    # We can be sure that the vlan_id won't be used in future for
-    # another VLAN creation, but it is better if we can reserve
-    # the vlan_id on switch.
-    #   
-    #
-    # TODO: find a method to reserve the vlan_id as port name on 
-    # switch. Maybe creating an empty class or zone, but then we
-    # can only reserve as many as 48(or 46) names at most.
-    #
     
     print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
 	    "$self->{NAME} ...\n";
+
+    #
+    # We record this vlan because it is still empty.
+    # Apcon switch doesn't support empty VLAN.
+    #
+    $emptyVlans{$vlan_id} = 1;
 
     return $vlan_number;
 }
@@ -872,6 +866,14 @@ sub setPortVlan($$@) {
 
     $self->unlock();
 
+    #
+    # Check if this vlan was empty before and delete
+    # it from the empty vlan records if YES.
+    #
+    if (exists($emptyVlans{$vlan_number})) {
+	delete $emptyVlans{$vlan_number};
+    }
+
     return 0;
 }
 
@@ -893,6 +895,9 @@ sub delPortVlan($$@) {
     $self->debug("ports: " . join(",",@ports) . "\n");
     
     $self->lock();
+
+    # Remember all ports for empty check after remove
+    my $allports = $self->getNamedPorts($vlan_number);
 
     #
     # Find connections of @ports
@@ -932,6 +937,13 @@ sub delPortVlan($$@) {
 	return 1;
     }    
 
+    #
+    # Remember the empty VLAN for warning msg when unloading module
+    #
+    if (scalar (@ports) == scalar (@$allports)) {
+	$emptyVlans{$vlan_number} = 0;
+    }
+
     $self->unlock();
 
     return 0;
@@ -957,6 +969,8 @@ sub removePortsFromVlan($@) {
     foreach my $vlan_number (@vlan_numbers) {
 	if ($self->removePortName($vlan_number)) {
 	    $errors++;
+	} else {
+	    $emptyVlans{$vlan_number} = 0;
 	}
     }
     return $errors;
@@ -998,6 +1012,15 @@ sub removeVlan($@) {
 	if ($self->removePortName($vlan_number)) {
 	    $errors++;
 	} else {
+	    
+	    #
+	    # Check if this vlan was empty before and delete
+	    # it from the empty vlan records if YES.
+	    #
+	    if (exists($emptyVlans{$vlan_number})) {
+		delete $emptyVlans{$vlan_number};
+	    }
+
 	    print "Removed VLAN $vlan_number on switch $name.\n";	
 	}	
     }
@@ -1018,6 +1041,11 @@ sub vlanHasPorts($$) {
     if (@$portset) {
 	return 1;
     }
+
+    if (!exists($emptyVlans{$vlan_number})) {
+	$emptyVlans{$vlan_number} = -1;
+    }
+
     return 0;
 }
 
@@ -1211,6 +1239,31 @@ sub getUsedOpenflowListenerPorts($) {
 #
 sub isOpenflowSupported($) {
     return 0;
+}
+
+
+#
+# Print warning messages for empty VLANs that will be deleted 
+# after unloading the package.
+#
+END 
+{
+
+    foreach my $vlanid (keys %emptyVlans) {
+	if ($emptyVlans{$vlanid} == 1) {
+	    warn "WARNING: VLAN $vlanid is deleted \
+because no ports added after creating! Apcon switch doesnot support empty VLAN.\n";
+	}
+	if ($emptyVlans{$vlanid} == 0) {
+	    warn "WARNING: VLAN $vlanid is deleted \
+because no ports left after removing ports! Apcon switch doesnot support empty VLAN.\n";
+	}
+	if ($emptyVlans{$vlanid} == -1) {
+	    warn "WARNING: VLAN $vlanid is deleted. \
+It is empty! Apcon switch doesnot support empty VLAN.\n";
+	}
+    }
+
 }
 
 # End with true
