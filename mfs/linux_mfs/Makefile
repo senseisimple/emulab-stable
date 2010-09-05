@@ -1,4 +1,4 @@
-MFS_ARCH	=	i386
+MFS_ARCH	=	x86_64
 SOURCE_PATH	=	$(PWD)/source
 TARGET_PATH	=	$(PWD)/target
 TARGET_BUILD_PATH	=	$(PWD)/build
