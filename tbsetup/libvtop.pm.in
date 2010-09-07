@@ -1856,7 +1856,8 @@ sub GenFixNodes($)
 	# nodes is okay for the machine).
 	#
 	next
-	    if ($vnode->_isvirtnode() && defined($vnode->_fixedvm()));
+	    if (defined($vnode) && 
+		$vnode->_isvirtnode() && defined($vnode->_fixedvm()));
 
 	if ($self->isatoponode($vname) || $self->isadelaynode($vname)) {
 	    $self->createFixedNode($vname, $fixed);
