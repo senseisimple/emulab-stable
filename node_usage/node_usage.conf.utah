@@ -23,8 +23,11 @@ $NODE_USAGE_DB = 'node_usage';
 #   ...
 #
 @to_plot = (
-  ["pc600 pc850 pc2000 pc3000s", [qw(pc600 pc850 pc2000 pc3000)]],
-  ["pc3000s", [qw(pc3000)]]
+  ["pc600 pc850 pc2000 pc3000s d710s", [qw(pc600 pc850 pc2000 pc3000 d710)]],
+  ["pc3000s", [qw(pc3000)]],
+#  ["d710s", [qw(d710)], 1282575600] # latter start data: 
+#                                    #   when nodes where announced
+  ["d710s", [qw(d710)], 1269466000]
 );
 
 #
@@ -34,18 +37,19 @@ $avail_header = <<'---';
 <p>
 
 These graphs show the average number of free nodes over various time
-periods. Nodes are broken down into two classes: The first class are the 
-<a href="http://users.emulab.net/trac/emulab/wiki/pc3000">pc3000</a>s,
-which are the most numerous, and are fairly modern. They are
-most experimenters' nodes of choice. For many experimenters, the number of
-free pc3000s limits the size of the experiments they can run.
-The second class includes other, older PCs (along with the pc3000s) to give
-a sense for how many nodes are available if one is willing to use some
-slower nodes.
+periods. Nodes are broken down into three classes: The first class includes
+all "pc" node types, from the slowest to the fastest.  The other two classes
+show the most numerous and desirable node types, the
+<a href="http://users.emulab.net/trac/emulab/wiki/pc3000">pc3000</a>s
+and the
+<a href="http://users.emulab.net/trac/emulab/wiki/d710">d710</a>s
+which both have Gb Ethernet interfaces.
+For many experimenters, the number of
+free pc3000s and d710s limit the size of the experiments they can run.
 </p>
 
 <p>
-Emulab currently includes around 350 PC nodes. As you can see, most of those
+Emulab currently includes around 500 PC nodes. As you can see, most of those
 are in use even during our periods of &quot;light&quot; usage.
 </p>
 
