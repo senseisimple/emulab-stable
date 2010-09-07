@@ -26,6 +26,15 @@ my $start = ceil($START / $interval) * $interval;
 
 my @idxs = (0 .. $#to_plot);
 
+my @start;
+foreach (@idxs) {
+    if (defined $to_plot[$_][2]) {
+	$start[$_] = ceil($to_plot[$_][2] / $interval) * $interval;
+    } else {
+	$start[$_] = $start;
+    }
+}
+
 my $prev_time = 0;
 my @prev_data = map {0} @idxs;
 my @total_so_far = map {0} @idxs;
@@ -50,6 +59,11 @@ sub sum_usage_stats ($) {
 	push @res, $r;
     }
     return @res;
+}
+
+sub filter_w_start ($@) {
+    my $time = shift @_;
+    return map {$time >= $start[$_] ? $_[$_] : 'NaN'} @idxs;
 }
 
 while (<F>) {
@@ -99,6 +113,8 @@ while (<F>) {
 	}
 	my @alloc = map {$num[$_] - $free[$_]} @idxs;
 	my $dtime = $next_cutoff - $interval;
+	@free = filter_w_start $dtime, @free;
+	@alloc = filter_w_start $dtime, @alloc;
 	print O join(' ', $dtime, map {sprintf("%.1f", $_)} (@free, @alloc)),"\n" 
 	    if $dtime >= $start;
 	$error_frac = 0;
