@@ -1225,12 +1225,12 @@ function PAGEFOOTER($view = NULL) {
     echo "       <tr>\n";
     
     if ($login_user) {
-	echo "    <td class=reportbug>";
-	echo "      <a href='$TBBASE/gototrac.php3?do=newticket&login=1'>";
-	echo "        Report Bug, Gripe, Request Feature</a>";
+	echo "    <td class=reportbug>Questions? Join the ";
+	echo "      <a href='http://groups.google.com/group/emulab-users'>";
+	echo "        Help Forum</a>";
 	echo "    </td>";
     }
-    echo "        <td class=contact>Questions? Contact $TBMAILADDR</td>";
+    echo "        <td class=contact>Bug? Contact $TBMAILADDR</td>";
     echo "       </tr>\n";
     echo "      </table>\n";
     echo "      <!-- end copyright -->\n";
