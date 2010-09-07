@@ -122,6 +122,12 @@ sub vz_init {
     makeIfaceMaps();
     makeBridgeMaps();
 
+    #
+    # Turn off LVM if already using a /vz mount.
+    #
+    if (-e "/vz/.nolvm") {
+	$DOLVM = 0;
+    }
     return 0;
 }
 
@@ -149,7 +155,7 @@ sub vz_rootPreConfig {
         TBScriptUnlock();
         return 0;
     }
-    
+
     # make sure filesystem is setup 
     if ($DOLVM) {
 	# be ready to snapshot later on...
@@ -217,6 +223,7 @@ sub vz_rootPreConfig {
 	    mysystem("mkdir /vz");
 	    mysystem("$MKEXTRAFS -f /vz");
 	    mysystem("cp -pR /vz.save/* /vz/");
+	    mysystem("touch /vz/.nolvm");
 	}
 	if (system('mount | grep -q \'on /vz\'')) {
 	    mysystem("mount /vz");
@@ -247,7 +254,6 @@ sub vz_rootPreConfig {
 
     # For VLANs
     mysystem("$MODPROBE 8021q");
-    system("$VLANCONFIG set_name_type VLAN_PLUS_VID_NO_PAD");
 
     # we need this stuff for traffic shaping -- only root context can
     # modprobe, for now.
@@ -341,9 +347,11 @@ sub vz_rootPreConfigNetwork {
 	    elsif ($ifc->{ITYPE} eq "vlan") {
 		my $iface = $ifc->{IFACE};
 		my $vtag  = $ifc->{VTAG};
-		my $vdev  = "vlan${vtag}";
-		
+		my $vdev  = "${iface}.${vtag}";
+
+		system("$VLANCONFIG set_name_type DEV_PLUS_VID_NO_PAD");
 		system("$VLANCONFIG add $iface $vtag");
+		system("$VLANCONFIG set_name_type VLAN_PLUS_VID_NO_PAD");
 		system("$IFCONFIG $vdev up");
 
 		my $brname = "pbr$vdev";
@@ -1186,8 +1194,9 @@ sub vz_vnodePreConfigExpNetwork {
 	my $br;
 	
 	if ($ifc->{ITYPE} eq "vlan") {
+	    my $iface = $ifc->{IFACE};
 	    my $vtag  = $ifc->{VTAG};
-	    my $vdev  = "vlan${vtag}";
+	    my $vdev  = "${iface}.${vtag}";
 	    $br = "pbr$vdev";
 	}
 	elsif ($ifc->{PMAC} eq "none" || $ifc->{ITYPE} eq "loop") {
