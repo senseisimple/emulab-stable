@@ -61,6 +61,7 @@ $(TCSH_PATH)/.config-stamp: $(TCSH_PATH)/.patch-stamp
 $(TCSH_PATH)/tcsh: $(TCSH_PATH)/.config-stamp
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
 	        CC=$(TARGET_CC) \
+		STAGING_DIR=$(STAGING_DIR) \
 	        $(MAKE) -C $(TCSH_PATH) \
 		$(TARGET_CONFIGURE_OPTS) LD=$(MFS_ARCH)-linux-uclibc-gcc
 	touch $@
