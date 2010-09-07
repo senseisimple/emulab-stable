@@ -1,6 +1,6 @@
 --- linux-2.6.25/net/ipv4/Kconfig	2008-08-29 09:50:50.000000000 -0600
 +++ linux-2.6.25-emulab/net/ipv4/Kconfig	2008-08-29 09:53:39.000000000 -0600
-@@ -632,5 +632,11 @@
+@@ -627,3 +627,9 @@
  
  	  If unsure, say N.
  
@@ -10,8 +10,6 @@
 +config ICMP_PINGOFDEATH
 +        bool "ICMP: ICMP Ping-of-Death (Emulab)"
 +
- source "net/ipv4/ipvs/Kconfig"
- 
 --- linux-2.6.25/net/ipv4/icmp.c	2008-08-29 09:51:02.000000000 -0600
 +++ linux-2.6.25-emulab/net/ipv4/icmp.c	2008-08-29 09:57:02.000000000 -0600
 @@ -973,6 +973,67 @@
@@ -71,7 +69,7 @@
 +	        sysctl_ipod_enabled = 0;
 +		printk(KERN_CRIT "IPOD: reboot forced by %u.%u.%u.%u...\n",
 +		       NIPQUAD(iph->saddr));
-+		machine_restart(NULL);
++		emergency_restart();
 +	} else {
 +	        printk(KERN_WARNING "IPOD: from %u.%u.%u.%u rejected\n",
 +		       NIPQUAD(iph->saddr));
