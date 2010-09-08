@@ -1,8 +1,9 @@
-MFS_ARCH		=	i386
+MFS_ARCH		=	x86_64
 TOPDIR			=	$(PWD)
 SOURCE_PATH		=	$(TOPDIR)/source
 SCRIPTS_PATH		=	$(TOPDIR)/scripts
-BUILDROOT_PATH		=	$(TOPDIR)/buildroot
+BUILDROOT_VERSION	=	2010.02
+BUILDROOT_PATH		=	$(TOPDIR)/buildroot-$(BUILDROOT_VERSION)
 TARBALL_PATH		=	$(TOPDIR)/tarballs
 
 TARGET_BUILD_PATH	=	$(TOPDIR)/build
@@ -19,8 +20,7 @@ TARGET_CFLAGS		=	-Os
 endif
 TARGET_MODULES		=	uclibc-install-target zlib-install-target busybox-install dropbear-install linux-modules-install openssl-install-target kexec-install tmcc-install imagezip-install frisbee-install e2fsprogs-install
 
-BUILDROOT_PATH		=	$(TOPDIR)/buildroot
-STAGING_DIR		=	$(BUILDROOT_PATH)/build_$(MFS_ARCH)/staging_dir/
+STAGING_DIR		=	$(BUILDROOT_PATH)/output/build/staging_dir/
 
 #HOSTMAKE=make
 #HOSTAR=ar

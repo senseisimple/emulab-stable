@@ -45,8 +45,8 @@ $(OPENSSL_PATH)/.config-stamp: $(OPENSSL_PATH)/.patch-stamp
 	(cd $(OPENSSL_PATH); \
 		CFLAGS="-DOPENSSL_NO_KRB5 -DOPENSSL_NO_IDEA -DOPENSSL_NO_MDC2 -DOPENSSL_NO_RC5 $(TARGET_CFLAGS)" \
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
-		MACHINE=i386 \
-		./config 386 --prefix=/usr \
+		MACHINE=$(MFS_ARCH) \
+		./config --prefix=/usr \
 			--openssldir=/usr/lib/ssl -L$(STAGING_DIR)/lib -ldl \
 			-I$(STAGING_DIR)/usr/include $(OPENSSL_OPTS) threads \
 			shared no-idea no-mdc2 no-rc5)
@@ -63,7 +63,7 @@ $(OPENSSL_PATH)/apps/openssl: $(OPENSSL_PATH)/.config-stamp
 
 $(STAGING_DIR)/usr/lib/libcrypto.a: $(OPENSSL_PATH)/apps/openssl
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) \
-		CC=$(TARGET_CC) INSTALL_PREFIX=$(STAGING_DIR)/usr \
+		CC=$(TARGET_CC) INSTALL_PREFIX=$(STAGING_DIR) \
 		-C $(OPENSSL_PATH) install
 	cp -fa $(OPENSSL_PATH)/libcrypto.so* $(STAGING_DIR)/usr/lib/
 	chmod a-x $(STAGING_DIR)/usr/lib/libcrypto.so.0.9.8

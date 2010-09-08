@@ -43,7 +43,8 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
 		  rmproj snmpit.proxynew snmpit.proxyv2 pool_daemon \
-		  checknodes_daemon subboss_frisbeelauncher_wrapper
+		  checknodes_daemon subboss_frisbeelauncher_wrapper \
+		  subboss_wrapper
 ifeq ($(ISMAINSITE),1)
 SBIN_STUFF     += repos_daemon
 endif
@@ -95,7 +96,8 @@ SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
 SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeelauncher frisbeeimage \
 			rmuser idleswap named_setup exports_setup \
 			sfskey_update setgroups newnode_reboot vnode_setup \
-			elabinelab nfstrace rmproj subboss_frisbeelauncher_wrapper
+			elabinelab nfstrace rmproj subboss_frisbeelauncher_wrapper \
+			subboss_wrapper
 SETUID_LIBX_SCRIPTS  = console_setup spewlogfile
 
 ifeq ($(SYSTEM),FreeBSD)
@@ -233,6 +235,8 @@ endif
 	chmod u+s $(INSTALL_SBINDIR)/frisbeelauncher
 	chown root $(INSTALL_SBINDIR)/subboss_frisbeelauncher_wrapper
 	chmod u+s $(INSTALL_SBINDIR)/subboss_frisbeelauncher_wrapper
+	chown root $(INSTALL_SBINDIR)/subboss_wrapper
+	chmod u+s $(INSTALL_SBINDIR)/subboss_wrapper
 	chown root $(INSTALL_SBINDIR)/frisbeeimage
 	chmod u+s $(INSTALL_SBINDIR)/frisbeeimage
 	chown root $(INSTALL_SBINDIR)/rmuser
