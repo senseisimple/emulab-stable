@@ -5443,7 +5443,7 @@ sub InterpLinksAux($)
 		    #
 		    #
 		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() != $virtlan->memberlist() ||
+			$virtlan->_sharednodes() ||
 			$virtlan->_needvlan()) {
 			my $lanid = "v" . "$lan" . $vlanid++;
 
@@ -5613,7 +5613,7 @@ sub InterpLinksAux($)
 		    my $protovlan;
 		    
 		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() != $virtlan->memberlist() ||
+			$virtlan->_sharednodes() ||
 			$virtlan->_needvlan()) {
 			if (exists($protovlans{$lan})) {
 			    $protovlan = $protovlans{$lan};
