@@ -1,0 +1,14 @@
+#
+# This is the definitions file for Weibin on Emulab.Net.
+#
+. defs-default
+
+TBOPSEMAIL=wbsun@flux.utah.edu
+TBLOGSEMAIL=wbsun@flux.utah.edu
+TBWWWEMAIL=wbsun@flux.utah.edu
+TBAPPROVALEMAIL=wbsun@flux.utah.edu
+TBAUDITEMAIL=wbsun@flux.utah.edu
+TBSTATEDEMAIL=wbsun@cs.utah.edu
+TBTESTSUITEEMAIL=wbsun@cs.utah.edu
+WWW=www.emulab.net/dev/wbsun
+THISHOMEBASE=Wbsun.Emulab.Net
