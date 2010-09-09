@@ -884,30 +884,6 @@ sub createVlan($$$) {
     return $vlan_number;
 }
 
-
-#
-# TODO: A+ TODO for Apcon switch. The result seems to be 'unsupported'.
-# 
-# gets the forbidden, untagged, and egress lists for a vlan
-# sends back as a 3 element array of lists.  
-#
-sub getVlanLists($$) {
-    my ($self, $vlan) = @_;
-    my $ret = [0, 0, 0];
-    return $ret;
-}
-
-#
-# sets the forbidden, untagged, and egress lists for a vlan
-# sends back as a 3 element array of lists.
-# (Thats the order we saw in a tcpdump of vlan creation.)
-# (or in some cases 6 elements for 2 vlans).
-#
-sub setVlanLists($@) {
-    my ($self, @args) = @_;
-    return 0;
-}
-
 #
 # Put the given ports in the given VLAN. The VLAN is given as an 802.1Q 
 # tag number.
