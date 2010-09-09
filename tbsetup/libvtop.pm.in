@@ -1277,6 +1277,9 @@ sub LoadVirtNodes($)
 	my $osid;
 
 	next
+	    if ($vnode->_isgeninode());
+
+	next
 	    if (! ($vnode->_isvirtnode() && $vnode->_fixedvm()));
 	
 	my $fixnode = $self->vnodes()->{$vnode->_fixedvm()};
