@@ -32,6 +32,7 @@ my $CLI_TIMEOUT = 10000;
 # commands to show something
 my $CLI_SHOW_CONNECTIONS = "show connections raw\r";
 my $CLI_SHOW_PORT_NAMES  = "show port names *\r";
+my $CLI_SHOW_PORT_RATES  = "show port rate raw *\r";
 
 # mappings from port control command to CLI command
 my %portCMDs =
@@ -53,6 +54,36 @@ my %portCMDs =
     "auto10mbit"   => "99",
     "full10mbit"   => "91",
     "half10mbit"   => "89",
+);
+
+#
+# port rate values on Apcon, for raw port info translation 
+#
+my %portRates =
+(
+    "00" => ["Auto Negotiate", "auto", "auto"],
+    "9f" => ["10/100/1000 Mbps Full/Half Duplex", "auto", "auto"],
+    "9c" => ["1000 Mbps Full/Half Duplex", "auto", "1000Mbits"],
+    "94" => ["1000 Mbps Full Duplex", "full", "1000Mbits"],
+    "8c" => ["1000 Mbps Half Duplex", "half", "1000Mbits"],
+    "9b" => ["10/100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "9a" => ["100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "92" => ["100 Mbps Full Duplex", "full", "100Mbits"],
+    "8a" => ["100 Mbps Half Duplex", "half", "100Mbits"],
+    "99" => ["10 Mbps Full/Half Duplex", "auto", "10Mbits"],
+    "91" => ["10 Mbps Full Duplex", "full", "10Mbits"],
+    "89" => ["10 Mbps Half Duplex", "half", "10Mbits"],
+    "ff" => ["Analyzer Tap Auto", "auto", "auto"],
+    "fc" => ["Analyzer Tap 1000 Mbps Full/Half Duplex", "auto", "1000Mbits"],
+    "f4" => ["Analyzer Tap 1000 Mbps Full Duplex", "full", "1000Mbits"],
+    "ec" => ["Analyzer Tap 1000 Mbps Half Duplex", "half", "1000Mbits"],
+    "fb" => ["Analyzer Tap 10/100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "fa" => ["Analyzer Tap 100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "f2" => ["Analyzer Tap 100 Mbps Full Duplex", "full", "100Mbits"],
+    "ea" => ["Analyzer Tap 100 Mbps Half Duplex", "half", "100Mbits"],
+    "f9" => ["Analyzer Tap 10 Mbps Full/Half Duplex", "auto", "10Mbits"],
+    "f1" => ["Analyzer Tap 10 Mbps Full Duplex", "full", "10Mbits"],
+    "e9" => ["Analyzer Tap 10 Mbps Half Duplex", "half", "10Mbits"],
 );
 
 my %emptyVlans = ();
@@ -97,9 +128,9 @@ sub new($$$;$) {
     # Set the defaults for this object
     # 
     if (defined($debugLevel)) {
-	$self->{DEBUG} = $debugLevel;
+        $self->{DEBUG} = $debugLevel;
     } else {
-	$self->{DEBUG} = 0;
+        $self->{DEBUG} = 0;
     }
     $self->{BLOCK} = 1;
     $self->{CONFIRM} = 1;
@@ -110,8 +141,8 @@ sub new($$$;$) {
     #
     my $options = getDeviceOptions($self->{NAME});
     if (!$options) {
-	warn "ERROR: Getting switch options for $self->{NAME}\n";
-	return undef;
+        warn "ERROR: Getting switch options for $self->{NAME}\n";
+        return undef;
     }
 
     $self->{MIN_VLAN}         = $options->{'min_vlan'};
@@ -122,9 +153,9 @@ sub new($$$;$) {
     # 'snmp_community' column.
     #
     if ($community) { # Allow this to over-ride the default
-	$self->{COMMUNITY}    = $community;
+        $self->{COMMUNITY}    = $community;
     } else {
-	$self->{COMMUNITY}    = $options->{'snmp_community'};
+        $self->{COMMUNITY}    = $options->{'snmp_community'};
     }
     $self->{PASSWORD} = $self->{COMMUNITY};
 
@@ -134,8 +165,8 @@ sub new($$$;$) {
     $self->{SKIPIGMP} = 1;
 
     if ($self->{DEBUG}) {
-	print "snmpit_apcon initializing $self->{NAME}, " .
-	    "debug level $self->{DEBUG}\n" ;   
+        print "snmpit_apcon initializing $self->{NAME}, " .
+            "debug level $self->{DEBUG}\n" ;   
     }
 
     $self->{SESS} = undef;
@@ -151,8 +182,8 @@ sub new($$$;$) {
     # to keep the connection alive.
     $self->{SESS} = $self->createExpectObject();
     if (!$self->{SESS}) {
-	warn "WARNNING: Unable to connect via SSH to $self->{NAME}\n";
-	return undef;
+        warn "WARNNING: Unable to connect via SSH to $self->{NAME}\n";
+        return undef;
     }
 
     # TODO: may need this:
@@ -174,20 +205,21 @@ sub createExpectObject($)
     # Create Expect object and initialize it:
     my $exp = new Expect();
     if (!$exp) {
-	# upper layer will check this
-	return undef;
+        # upper layer will check this
+        return undef;
     }
     $exp->raw_pty(0);
     $exp->log_stdout(0);
     $exp->spawn($spawn_cmd)
-	or die "Cannot spawn $spawn_cmd: $!\n";
+    or die "Cannot spawn $spawn_cmd: $!\n";
     $exp->expect($CLI_TIMEOUT,
-		 ["admin\@$self->{NAME}'s password:" => sub { my $e = shift;
-						       $e->send($self->{PASSWORD}."\n");
-						       exp_continue;}],
-		 ["Permission denied (password)." => sub { die "Password incorrect!\n";} ],
-		 [ timeout => sub { die "Timeout when connect to switch!\n";} ],
-		 $self->{CLI_PROMPT} );
+         ["admin\@$self->{NAME}'s password:" => sub { my $e = shift;
+                               $e->send($self->{PASSWORD}."\n");
+                               exp_continue;}],
+         ["Permission denied (password)." => sub { 
+                               die "Password incorrect!\n";} ],
+         [ timeout => sub { die "Timeout when connect to switch!\n";} ],
+         $self->{CLI_PROMPT} );
     return $exp;
 }
 
@@ -206,16 +238,16 @@ sub parseConnections($$)
     my %src = ();
 
     foreach my $line ( @lines ) {
-	if ( $line =~ /^([A-I][0-9]{2}):\s+([A-I][0-9]{2})\W*$/ ) {
-	    if ( $2 ne $CLI_NOCONNECTION ) {
-		$src{$1} = $2;
-		if ( ! (exists $dst{$2}) ) {
-		    $dst{$2} = {};
-		}
+        if ( $line =~ /^([A-I][0-9]{2}):\s+([A-I][0-9]{2})\W*$/ ) {
+            if ( $2 ne $CLI_NOCONNECTION ) {
+                $src{$1} = $2;
+                if ( ! (exists $dst{$2}) ) {
+                    $dst{$2} = {};
+                }
 
-		$dst{$2}{$1} = 1;
-	    }
-	}
+                $dst{$2}{$1} = 1;
+            }
+        }
     }
 
     return (\%src, \%dst);
@@ -234,11 +266,11 @@ sub parseNames($$)
     my %names = ();
 
     foreach ( split ( /\n/, $raw ) ) {
-	if ( /^([A-I][0-9]{2}):\s+(\w+)\W*/ ) {
-	    if ( $2 !~ /$CLI_UNNAMED_PATTERN/ ) {
-		$names{$1} = $2;
-	    }
-	}
+        if ( /^([A-I][0-9]{2}):\s+(\w+)\W*/ ) {
+            if ( $2 !~ /$CLI_UNNAMED_PATTERN/ ) {
+            $names{$1} = $2;
+            }
+        }
     }
 
     return \%names;
@@ -257,9 +289,9 @@ sub parseClasses($$)
     my %clses = ();
 
     foreach ( split ( /\n/, $raw ) ) {
-	if ( /^Class\s\d{1,2}:\s+(\w+)\s+(\w+)\W*$/ ) {
-	    $clses{$2} = 1;
-	}
+        if ( /^Class\s\d{1,2}:\s+(\w+)\s+(\w+)\W*$/ ) {
+            $clses{$2} = 1;
+        }
     }
 
     return \%clses;
@@ -277,9 +309,9 @@ sub parseZones($$)
     my %zones = ();
 
     foreach ( split ( /\n/, $raw) ) {
-	if ( /^\d{1,2}:\s+(\w+)\W*$/ ) {
-	    $zones{$1} = 1;
-	}
+        if ( /^\d{1,2}:\s+(\w+)\W*$/ ) {
+            $zones{$1} = 1;
+        }
     }
 
     return \%zones;
@@ -297,9 +329,9 @@ sub parseClassPorts($$)
     my @ports = ();
 
     foreach ( split ( /\n/, $raw) ) {
-	if ( /^Port\s+\d+:\s+([A-I][0-9]{2})\W*$/ ) {
-	    push @ports, $1;
-	}
+        if ( /^Port\s+\d+:\s+([A-I][0-9]{2})\W*$/ ) {
+            push @ports, $1;
+        }
     }
 
     return \@ports;
@@ -329,16 +361,16 @@ sub doCLICmd($$)
     $exp->clear_accum(); # Clean the accumulated output, as a rule.
     $exp->send($cmd);
     $exp->expect($CLI_TIMEOUT,
-		 [$self->{CLI_PROMPT} => sub {
-		     my $e = shift;
-		     $output = $e->before();
-		  }]);
+         [$self->{CLI_PROMPT} => sub {
+             my $e = shift;
+             $output = $e->before();
+          }]);
 
     $cmd = quotemeta($cmd);
     if ( $output =~ /^($cmd)\n(ERROR:.+)\r\n[.\n]*$/ ) {
-	return (1, $2);
+        return (1, $2);
     } else {
-	return (0, $output);
+        return (0, $output);
     }
 }
 
@@ -350,11 +382,11 @@ sub getRawOutput($$)
 {
     my ($self, $cmd) = @_;
     my ($rt, $output) = $self->doCLICmd($cmd);
-    if ( !$rt ) {    	
-    	my $qcmd = quotemeta($cmd);
-	if ( $output =~ /^($qcmd)/ ) {
-	    return substr($output, length($cmd)+1);
-	}		
+    if ( !$rt ) {        
+        my $qcmd = quotemeta($cmd);
+        if ( $output =~ /^($qcmd)/ ) {
+            return substr($output, length($cmd)+1);
+        }        
     }
 
     return undef;
@@ -374,11 +406,11 @@ sub getAllNamedPorts($)
 
     my %nps = ();
     foreach my $k (keys %{$names}) {
-	if ( !(exists $nps{$names->{$k}}) ) {
-	    $nps{$names->{$k}} = ();
-	}
+        if ( !(exists $nps{$names->{$k}}) ) {
+            $nps{$names->{$k}} = ();
+        }
 
-	push @{$nps{$names->{$k}}}, $k;
+        push @{$nps{$names->{$k}}}, $k;
     }
 
     return \%nps;
@@ -394,9 +426,9 @@ sub getPortName($$)
 
     my $raw = $self->getRawOutput("show port info $port\r");
     if ( $raw =~ /$port Name:\s+(\w+)\W*\n/ ) {
-	if (  $1 !~ /$CLI_UNNAMED_PATTERN/ ) {
-	    return $1;
-	}
+        if (  $1 !~ /$CLI_UNNAMED_PATTERN/ ) {
+            return $1;
+        }
     }
 
     return undef;
@@ -412,9 +444,9 @@ sub getNamedPorts($$)
 
     my $raw = $self->getRawOutput($CLI_SHOW_PORT_NAMES);
     foreach ( split /\n/, $raw ) {
-	if ( /^([A-I][0-9]{2}):\s+($pname)\W*/ ) {
-	    push @ports, $1;
-	}
+        if ( /^([A-I][0-9]{2}):\s+($pname)\W*/ ) {
+            push @ports, $1;
+        }
     }
 
     return \@ports;
@@ -441,20 +473,84 @@ sub getNamedConnections($$)
     # should not belong to the 'vlan'. Till now the following codes
     # have not dealt with it yet.
     #
-    # TODO: remove those connections containning ports don't belong
+    # MAYBE-TODO: remove those connections containning ports don't belong
     #       to the 'vlan'.
     #
     foreach my $p (@$ports) {
-	if ( exists($allsrc->{$p}) ) {
-	    $src{$p} = $allsrc->{$p};
-	} 
+        if ( exists($allsrc->{$p}) ) {
+            $src{$p} = $allsrc->{$p};
+        } 
 
-	if ( exists($alldst->{$p}) ) {
-	    $dst{$p} = $alldst->{$p};
-	}
+        if ( exists($alldst->{$p}) ) {
+            $dst{$p} = $alldst->{$p};
+        }
     }
 
     return (\%src, \%dst);
+}
+
+#
+# parse the show port rate raw * output
+# return the hashtable ref: port name => [desired rate, actual rate]
+#
+sub parsePortRates($$)
+{
+    my $self = shift;
+    my $raw = shift;
+    
+    my %rates = ();
+    my @lines = split( /\n/, $raw );
+ 
+    foreach my $line ( @lines ) {
+        if ( $line =~ /^([A-I][0-9]{2}):\s+Desired Rate:\s+0x([0-9A-F]{2})/ ) {
+            $rates{$1} = [$2,$2];
+        } else {
+            if ( $line =~ /^([A-I][0-9]{2}):\s+Actual Link:\s+0x([0-9A-F]{2})/ ) {
+                ${$rates{$1}}[1] = $2;
+            }
+        }
+    }
+
+    return \%rates;
+}
+
+#
+# Get a single port rate
+#   return undef on any errors
+#   return the array ref: [desired rate, actual rate]
+#
+sub getPortRate($$)
+{
+    my ($self, $port) = @_;
+    my $cmd = "show port rate raw $port\r";
+
+    my $raw = $self->getRawOutput($cmd);
+    if ( defined($raw) ) {
+        my $rate = $self->parsePortRates($raw);
+        if ( exists($rate->{$port}) ) {
+            return \@{$rate->{$port}};
+        }   
+    }    
+    
+    return undef;
+}
+
+#
+# Get all ports rates
+#   return undef on any errors
+#   return the hashtable ref: portnumber => [desired rate, actual rate]
+#
+sub getAllPortsRates($)
+{
+    my $self = shift;
+    
+    my $raw = $self->getRawOutput($CLI_SHOW_PORT_RATES);
+    if ( defined($raw) ) {
+        my $rates = $self->parsePortRates($raw);
+        return $rates; 
+    }    
+    
+    return undef;
 }
 
 #
@@ -536,18 +632,18 @@ sub namePorts($$@)
 {
     my ($self, $name, @ports) = @_;
 
-    for( my $i = 0; $i < @ports; $i++ ) {    	
-	my ($rt, $msg) = $self->doCLICmd(
-				     "configure port name $ports[$i] $name\r");
+    for( my $i = 0; $i < @ports; $i++ ) {        
+        my ($rt, $msg) = $self->doCLICmd(
+                     "configure port name $ports[$i] $name\r");
 
-	# undo set name
-	if ( $rt ) {
-	    for ($i--; $i >= 0; $i-- ) {	    	
-		$self->doCLICmd(
-			    "configure port name $ports[$i] $CLI_UNNAMED_NAME\r");
-	    }
-	    return $msg;
-	}
+        # undo set name
+        if ( $rt ) {
+            for ($i--; $i >= 0; $i-- ) {            
+                $self->doCLICmd(
+                    "configure port name $ports[$i] $CLI_UNNAMED_NAME\r");
+            }
+            return $msg;
+        }
     }
 
     return 0;
@@ -563,15 +659,15 @@ sub unnamePorts($@)
 
     my $emsg = "";
     foreach my $p (@ports) {
-	my ($rt, $msg) = $self->doCLICmd(
-				     "configure port name $p $CLI_UNNAMED_NAME\r");
-	if ( $rt ) {
-	    $emsg = $emsg.$msg."\n";
-	}
+        my ($rt, $msg) = $self->doCLICmd(
+                     "configure port name $p $CLI_UNNAMED_NAME\r");
+        if ( $rt ) {
+            $emsg = $emsg.$msg."\n";
+        }
     }
 
     if ( $emsg eq "" ) {
-	return 0;
+        return 0;
     }
 
     return $emsg;
@@ -588,15 +684,15 @@ sub disconnectPorts($$)
 
     my $emsg = "";
     foreach my $dst (keys %$sconns) {
-	my ($rt, $msg) = $self->doCLICmd(
-				     "disconnect $dst".$sconns->{$dst}."\r");
-	if ( $rt ) {
-	    $emsg = $emsg.$msg."\n";
-	}
+        my ($rt, $msg) = $self->doCLICmd(
+                     "disconnect $dst".$sconns->{$dst}."\r");
+        if ( $rt ) {
+            $emsg = $emsg.$msg."\n";
+        }
     }
 
     if ( $emsg eq "" ) {
-	return 0;
+        return 0;
     }
 
     return $emsg;
@@ -618,7 +714,7 @@ sub removePortName($$)
     my $ports = $self->getNamedPorts($name);
     my $unrt = $self->unnamePorts(@$ports);
     if ( $unrt || $disrt) {
-	return $disrt.$unrt;
+        return $disrt.$unrt;
     }
 
     return 0;
@@ -634,27 +730,16 @@ sub setPortRate($$$)
     my ($self, $port, $rate) = @_;
 
     if ( !exists($portCMDs{$rate}) ) {
-	return "ERROR: port rate unsupported!\n";
+        return "ERROR: port rate unsupported!\n";
     }
 
     my $cmd = "configure rate $port $portCMDs{$rate}\r";
     my ($rt, $msg) = $self->doCLICmd($cmd);
     if ( $rt ) {
-	return $msg;
+        return $msg;
     }
 
     return 0;
-}
-
-#
-# Get port info
-#
-sub getPortInfo($$)
-{
-    my ($self, $port) = @_;
-
-    # TODO: parse the output of show port xxxxx
-    return [$port,0];
 }
 
 
@@ -663,9 +748,9 @@ sub getPortInfo($$)
 # in the apcon_clilib::portCMDs hash
 #
 # usage: portControl($self, $command, @ports)
-#	 returns 0 on success.
-#	 returns number of failed ports on failure.
-#	 returns -1 if the operation is unsupported
+#     returns 0 on success.
+#     returns number of failed ports on failure.
+#     returns -1 if the operation is unsupported
 #
 sub portControl ($$@) {
     my $self = shift;
@@ -677,18 +762,18 @@ sub portControl ($$@) {
 
     my $errors = 0;
     foreach my $port (@ports) { 
-	my $rt = $self->setPortRate($port, $cmd);
-	if ($rt) {
-	    if ($rt =~ /^ERROR: port rate unsupported/) {
-		#
+        my $rt = $self->setPortRate($port, $cmd);
+        if ($rt) {
+            if ($rt =~ /^ERROR: port rate unsupported/) {
+                #
                 # Command not supported
-		#
-		$self->debug("Unsupported port control command '$cmd' ignored.\n");
-		return 0;
-	    }
+                #
+                $self->debug("Unsupported port control command '$cmd' ignored.\n");
+                return 0;
+            }
 
-	    $errors++;
-	}
+            $errors++;
+        }
     }
 
     return $errors;
@@ -724,9 +809,9 @@ sub findVlans($@) {
     #
     my $vlans = $self->getAllNamedPorts();
     foreach $vlan_name (keys %{$vlans}) {
-	if (!@vlan_ids || exists $mapping{$vlan_name}) {
-	    $mapping{$vlan_name} = $vlan_name;
-	}
+        if (!@vlan_ids || exists $mapping{$vlan_name}) {
+            $mapping{$vlan_name} = $vlan_name;
+        }
     }
 
     return %mapping;
@@ -754,7 +839,7 @@ sub findVlan($$;$) {
     
     my $ports = $self->getNamedPorts($vlan_id);
     if (@$ports) {
-	return $vlan_id;
+        return $vlan_id;
     }
 
     return undef;
@@ -778,17 +863,17 @@ sub createVlan($$$) {
     # To acts similar to other device modules
     #
     if (!defined($vlan_number)) {
-	warn "$id called without supplying vlan_number";
-	return 0;
+        warn "$id called without supplying vlan_number";
+        return 0;
     }
     my $check_number = $self->findVlan($vlan_id,1);
     if (defined($check_number)) {
-	warn "$id: recreating vlan id $vlan_id \n";
-	return 0;
+        warn "$id: recreating vlan id $vlan_id \n";
+        return 0;
     }
     
     print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-	    "$self->{NAME} ...\n";
+        "$self->{NAME} ...\n";
 
     #
     # We record this vlan because it is still empty.
@@ -813,8 +898,6 @@ sub getVlanLists($$) {
 }
 
 #
-# TODO: A+ TODO for Apcon switch. The result seems to be 'unsupported'.
-#
 # sets the forbidden, untagged, and egress lists for a vlan
 # sends back as a 3 element array of lists.
 # (Thats the order we saw in a tcpdump of vlan creation.)
@@ -830,8 +913,8 @@ sub setVlanLists($@) {
 # tag number.
 #
 # usage: setPortVlan($self, $vlan_number, @ports)
-#	 returns 0 on sucess.
-#	 returns the number of failed ports on failure.
+#     returns 0 on sucess.
+#     returns the number of failed ports on failure.
 #
 sub setPortVlan($$@) {
     my $self = shift;
@@ -846,11 +929,11 @@ sub setPortVlan($$@) {
 
     # Check if ports are free
     foreach my $port (@ports) {
-	if ($self->getPortName($port)) {
-	    warn "ERROR: Port $port already in use.\n";
-	    $self->unlock();
-	    return 1;
-	}
+        if ($self->getPortName($port)) {
+            warn "ERROR: Port $port already in use.\n";
+            $self->unlock();
+            return 1;
+        }
     }
 
     #
@@ -859,9 +942,9 @@ sub setPortVlan($$@) {
     
     my $errmsg = $self->namePorts($vlan_number, @ports);
     if ($errmsg) {
-	warn "$errmsg";
-	$self->unlock();
-	return 1;
+        warn "$errmsg";
+        $self->unlock();
+        return 1;
     }
 
     $self->unlock();
@@ -871,7 +954,7 @@ sub setPortVlan($$@) {
     # it from the empty vlan records if YES.
     #
     if (exists($emptyVlans{$vlan_number})) {
-	delete $emptyVlans{$vlan_number};
+        delete $emptyVlans{$vlan_number};
     }
 
     return 0;
@@ -883,8 +966,8 @@ sub setPortVlan($$@) {
 # tag number.
 #
 # usage: delPortVlan($self, $vlan_number, @ports)
-#	 returns 0 on sucess.
-#	 returns the number of failed ports on failure.
+#     returns 0 on sucess.
+#     returns the number of failed ports on failure.
 #
 sub delPortVlan($$@) {
     my $self = shift;
@@ -906,42 +989,42 @@ sub delPortVlan($$@) {
     my %sconns = ();
     foreach my $p (@ports) {
 
-	if (exists($src->{$p})) {
-	    
-	    # As destination:
-	    $sconns{$p} = $src->{$p};
-	} else {
-	    if (exists($dst->{$p})) {
-	    
-	        # As source:
-	        foreach my $pdst (keys %{$dst->{$p}}) {
-		    $sconns{$pdst} = $p;
-	        }
-	    }    
-	}
+        if (exists($src->{$p})) {
+        
+            # As destination:
+            $sconns{$p} = $src->{$p};
+        } else {
+            if (exists($dst->{$p})) {
+        
+                # As source:
+                foreach my $pdst (keys %{$dst->{$p}}) {
+                    $sconns{$pdst} = $p;
+                }
+            }    
+        }
     }
     
     # Disconnect conections of @ports
     my $errmsg = $self->disconnectPorts(\%sconns);
     if ($errmsg) {
-	warn "$errmsg";
-	$self->unlock();
-	return 1;
+        warn "$errmsg";
+        $self->unlock();
+        return 1;
     }
     
     # Unname the ports, looks like 'remove'
     $errmsg = $self->unnamePorts(@ports);
     if ($errmsg) {
-	warn "$errmsg";
-	$self->unlock();
-	return 1;
+        warn "$errmsg";
+        $self->unlock();
+        return 1;
     }    
 
     #
     # Remember the empty VLAN for warning msg when unloading module
     #
     if (scalar (@ports) == scalar (@$allports)) {
-	$emptyVlans{$vlan_number} = 0;
+        $emptyVlans{$vlan_number} = 0;
     }
 
     $self->unlock();
@@ -957,8 +1040,8 @@ sub delPortVlan($$@) {
 # the vlan name any more. Same to removeVlan().
 #
 # usage: removePortsFromVlan(self,@vlan)
-#	 returns 0 on sucess.
-#	 returns the number of failed ports on failure.
+#     returns 0 on sucess.
+#     returns the number of failed ports on failure.
 #
 sub removePortsFromVlan($@) {
     my $self = shift;
@@ -967,11 +1050,11 @@ sub removePortsFromVlan($@) {
     my $id = $self->{NAME} . "::removePortsFromVlan";
 
     foreach my $vlan_number (@vlan_numbers) {
-	if ($self->removePortName($vlan_number)) {
-	    $errors++;
-	} else {
-	    $emptyVlans{$vlan_number} = 0;
-	}
+        if ($self->removePortName($vlan_number)) {
+            $errors++;
+        } else {
+            $emptyVlans{$vlan_number} = 0;
+        }
     }
     return $errors;
 }
@@ -985,8 +1068,8 @@ sub removePortsFromVlan($@) {
 # at the same time.
 #
 # usage: removeSomePortsFromVlan(self,vlan,@ports)
-#	 returns 0 on sucess.
-#	 returns the number of failed ports on failure.
+#     returns 0 on sucess.
+#     returns the number of failed ports on failure.
 #
 sub removeSomePortsFromVlan($$@) {
     my ($self, $vlan_number, @ports) = @_;
@@ -998,8 +1081,8 @@ sub removeSomePortsFromVlan($$@) {
 # The VLAN is given as a VLAN identifier from the database.
 #
 # usage: removeVlan(self,int vlan)
-#	 returns 1 on success
-#	 returns 0 on failure
+#     returns 1 on success
+#     returns 0 on failure
 #
 #
 sub removeVlan($@) {
@@ -1009,20 +1092,20 @@ sub removeVlan($@) {
     my $errors = 0;
 
     foreach my $vlan_number (@vlan_numbers) {
-	if ($self->removePortName($vlan_number)) {
-	    $errors++;
-	} else {
-	    
-	    #
-	    # Check if this vlan was empty before and delete
-	    # it from the empty vlan records if YES.
-	    #
-	    if (exists($emptyVlans{$vlan_number})) {
-		delete $emptyVlans{$vlan_number};
-	    }
+        if ($self->removePortName($vlan_number)) {
+            $errors++;
+        } else {
+        
+            #
+            # Check if this vlan was empty before and delete
+            # it from the empty vlan records if YES.
+            #
+            if (exists($emptyVlans{$vlan_number})) {
+            delete $emptyVlans{$vlan_number};
+            }
 
-	    print "Removed VLAN $vlan_number on switch $name.\n";	
-	}	
+            print "Removed VLAN $vlan_number on switch $name.\n";    
+        }    
     }
 
     return ($errors == 0) ? 1:0;
@@ -1039,11 +1122,11 @@ sub vlanHasPorts($$) {
 
     my $portset = $self->getNamedPorts($vlan_number);
     if (@$portset) {
-	return 1;
+        return 1;
     }
 
     if (!exists($emptyVlans{$vlan_number})) {
-	$emptyVlans{$vlan_number} = -1;
+        $emptyVlans{$vlan_number} = -1;
     }
 
     return 0;
@@ -1061,7 +1144,7 @@ sub listVlans($) {
     my @list = ();
     my $vlans = $self->getAllNamedPorts();
     foreach my $vlan_id (keys %$vlans) {
-	push @list, [$vlan_id, $vlan_id, $vlans->{$vlan_id}];
+        push @list, [$vlan_id, $vlan_id, $vlans->{$vlan_id}];
     }
 
     #$self->debug($self->{NAME} .":". join("\n",(map {join ",", @$_} @list))."\n");
@@ -1078,7 +1161,26 @@ sub listPorts($) {
     my $self = shift;
     my @ports = ();
 
-    # TODO: call getPortInfo one by one for each port
+    my $rates = $self->getAllPortsRates();
+    foreach my $port (keys %$rates) {
+        my ($drate, $arate) = @{$rates->{$port}};    
+        
+        my @strdrate = @{$portRates{$drate}};
+        my @strarate = @{$portRates{$arate}};
+        
+        #
+        # if port is actived, use actual rate, otherwise use desired rate
+        #
+        if ( $arate eq "00" ) {        
+            push @ports, [$port, "no", $strdrate[0], $strdrate[2], $strdrate[1]];
+        } else {
+            #
+            # Not sure if it is OK to just ignore the desired rate
+            #
+            push @ports, [$port, "yes", $strarate[0], $strarate[2], $strarate[1]];
+        }
+    }
+    
     return @ports;
 }
 
@@ -1118,7 +1220,7 @@ sub getChannelIfIndex($@) {
 # usage: setVlansOnTrunk(self, modport, value, vlan_numbers)
 #        modport: module.port of the trunk to operate on
 #        value: 0 to disallow the VLAN on the trunk, 1 to allow it
-#	 vlan_numbers: An array of 802.1Q VLAN numbers to operate on
+#     vlan_numbers: An array of 802.1Q VLAN numbers to operate on
 #        Returns 1 on success, 0 otherwise
 #
 sub setVlansOnTrunk($$$$) {
@@ -1132,7 +1234,7 @@ sub setVlansOnTrunk($$$$) {
 # usage: enablePortTrunking2(self, modport, nativevlan, equaltrunking)
 #        modport: module.port of the trunk to operate on
 #        nativevlan: VLAN number of the native VLAN for this trunk
-#	 equaltrunk: don't do dual mode; tag PVID also.
+#     equaltrunk: don't do dual mode; tag PVID also.
 #        Returns 1 on success, 0 otherwise
 #
 sub enablePortTrunking2($$$$) {
@@ -1165,10 +1267,10 @@ sub debug($$;$) {
     my $string = shift;
     my $debuglevel = shift;
     if (!(defined $debuglevel)) {
-	$debuglevel = 1;
+        $debuglevel = 1;
     }
     if ($self->{DEBUG} >= $debuglevel) {
-	print STDERR $string;
+        print STDERR $string;
     }
 }
 
@@ -1178,16 +1280,16 @@ sub lock($) {
     my $self = shift;
     my $token = "snmpit_" . $self->{NAME};
     if ($lock_held == 0) {
-	my $old_umask = umask(0);
-	die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
-	umask($old_umask);
+        my $old_umask = umask(0);
+        die if (TBScriptLock($token,0,1800) != TBSCRIPTLOCK_OKAY());
+        umask($old_umask);
     }
     $lock_held = 1;
 }
 
 sub unlock($) {
-	if ($lock_held == 1) { TBScriptUnlock();}
-	$lock_held = 0;
+    if ($lock_held == 1) { TBScriptUnlock();}
+    $lock_held = 0;
 }
 
 
@@ -1250,18 +1352,18 @@ END
 {
 
     foreach my $vlanid (keys %emptyVlans) {
-	if ($emptyVlans{$vlanid} == 1) {
-	    warn "WARNING: VLAN $vlanid is deleted \
+        if ($emptyVlans{$vlanid} == 1) {
+            warn "WARNING: VLAN $vlanid is deleted \
 because no ports added after creating! Apcon switch doesnot support empty VLAN.\n";
-	}
-	if ($emptyVlans{$vlanid} == 0) {
-	    warn "WARNING: VLAN $vlanid is deleted \
+        }
+        if ($emptyVlans{$vlanid} == 0) {
+            warn "WARNING: VLAN $vlanid is deleted \
 because no ports left after removing ports! Apcon switch doesnot support empty VLAN.\n";
-	}
-	if ($emptyVlans{$vlanid} == -1) {
-	    warn "WARNING: VLAN $vlanid is deleted. \
+        }
+        if ($emptyVlans{$vlanid} == -1) {
+            warn "WARNING: VLAN $vlanid is deleted. \
 It is empty! Apcon switch doesnot support empty VLAN.\n";
-	}
+        }
     }
 
 }
