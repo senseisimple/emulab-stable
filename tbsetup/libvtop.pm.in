@@ -4176,8 +4176,10 @@ sub InterpNodes($)
 	my $vnode = $self->vnodes()->{$vname};
 	my $fixed = $self->fixednodes()->{$vname};
 
+	# Delay and internal nodes do not have an entry in vnodes().
 	next
-	    if (! ($vnode->_isvirtnode() && $vnode->_fixedvm()));
+	    if (! (defined($vnode) &&
+		   $vnode->_isvirtnode() && $vnode->_fixedvm()));
 
 	$self->AddNodeToSolution($vname, $self->solution()->{'V2P'}->{$fixed})
 	    if (!exists($self->solution()->{'V2P'}->{$vname}));
