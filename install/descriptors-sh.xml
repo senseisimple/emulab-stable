@@ -1,0 +1,81 @@
+<descriptors>
+<osid>
+  <attribute name="magic">
+    <value></value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,isup,linktest</value>
+  </attribute>
+  <attribute name="version">
+    <value>8</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>120</value>
+  </attribute>
+  <attribute name="description">
+    <value>Generic osid for openvz virtual nodes.</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>0</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>PCVM</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>OPENVZ-STD</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Fedora</value>
+  </attribute>
+  <attribute name="nextosid">
+    <value>emulab-ops,FEDORA8-OVZ-STD</value>
+  </attribute>
+</osid>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="version">
+    <value>8</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh,ipod,isup,veths,veth-ne,mlinks,linktest,linkdelays,vlans,suboses</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/FEDORA8-OVZ-STD.ndz</value>
+  </attribute>
+  <attribute name="mbr_version">
+    <value>1</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>2</value>
+  </attribute>
+  <attribute name="description">
+    <value>Standard Fedora8 image with support for OpenVZ vnodes.</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>FEDORA8-OVZ-STD</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Fedora</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+</image>
+</descriptors>

@@ -30,6 +30,8 @@
 #define RSPEC_ERROR_UNSEEN_NODEIFACE_SRC -2
 #define RSPEC_ERROR_UNSEEN_NODEIFACE_DST -3
 
+#define RSPEC_ASYMMETRIC_LINK -1
+
 struct node_type 
 {
   std::string typeName;

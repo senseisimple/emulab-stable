@@ -22,6 +22,10 @@ use lib '@prefix@/lib';
 use GeniCMV2;
 use GeniResponse;
 
+# Disable UUID checks in GeniCredential.
+use GeniCredential;
+$GeniCredential::CHECK_UUID = 0;
+
 my $API_VERSION = 1;
 
 #
@@ -48,7 +52,7 @@ sub ListResources()
 
     my ($credentials, $options) = @_;
     my $available = $options->{'geni_available'} || 0;
-    my $compress = $options->{'geni_compress'} || 0;
+    my $compress = $options->{'geni_compressed'} || 0;
     my $slice_urn = $options->{'geni_slice_urn'};
 
     # If $slice_urn is defined, this turns into a Resolve call.  We
@@ -61,7 +65,19 @@ sub ListResources()
         'available' => $available,
         'compress' => $compress
     };
-    return GeniCMV2::DiscoverResources($discover_args);
+    my $response = GeniCMV2::DiscoverResources($discover_args);
+    if (GeniResponse::IsError($response)) {
+        return $response;
+    } else {
+        # DiscoverResources returns a base64 object, but ListResources
+        # needs to return a String representation of that base64
+        # object. The logic is that ListResources should *always*
+        # return a String instead of returning different types based
+        # on the args.
+        my $base64 = GeniResponse::value($response);
+        my $response_value = $base64->value();
+        return GeniResponse->Create( GENIRESPONSE_SUCCESS, $response_value );
+    }
 }
 
 # Create a sliver by allocating and starting resources.
@@ -148,9 +164,12 @@ sub DeleteSliver()
     # XXX Open question: Call "DeleteSlice" or "DeleteSliver"?
     $response = GeniCMV2::DeleteSlice($delete_args);
     if (GeniResponse::IsError($response)) {
-        return $response
+        return $response;
+    } else {
+        # Return an XML-RPC boolean
+        my $coder = Frontier::RPC2->new();
+        return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
     }
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 # Get the status of the sliver associated with the given slice. This
@@ -214,8 +233,7 @@ sub RenewSliver()
         return $response
     }
 
-    # Well this is ugly. We want to return True, so we must encode it
-    # as an XMLRPC Boolean via an encoder.
+    # Return an XML-RPC boolean
     my $coder = Frontier::RPC2->new();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
 }

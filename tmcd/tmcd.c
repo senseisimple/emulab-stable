@@ -2739,8 +2739,8 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		 " i.node_id=d.node_id and i.iface=d.iface "
 		 "left join vinterfaces as v on "
 		 " v.node_id=d.node_id and v.IP=d.ip "
-		 "where d.node_id='%s' %s",
-		 28, reqp->pnodeid, buf);
+		 "where d.node_id='%s' and d.exptidx='%d' %s",
+		 28, reqp->pnodeid, reqp->exptidx, buf);
 	if (!res) {
 		error("LINKDELAY: %s: DB Error getting link delays!\n",
 		      reqp->nodeid);

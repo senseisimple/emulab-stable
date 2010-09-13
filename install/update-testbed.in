@@ -37,8 +37,11 @@ my $TBOPS        = "@TBOPSEMAIL@";
 my $DBNAME       = "@TBDBNAME@";
 my $SRCDIR       = "@top_srcdir@";
 my $SQLUPDATEDIR = "$SRCDIR/sql/updates";
+my $PGENIUPDATEDIR = "$SRCDIR/protogeni/updates";
 my $UPDATEDIR    = "$SRCDIR/install/updates";
 my $DBUPDATE     = "$TB/sbin/dbupdate";
+my $PGENIUPDATE  = "$TB/sbin/protogeni/update";
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $INSTALLUPDATE= "$TB/sbin/update-install";
 my $SETSITEVAR   = "$TB/sbin/setsitevar";
 my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
@@ -172,6 +175,14 @@ if ($verify) {
     $exitval++
 	if ($?);
 
+    if ($PGENISUPPORT) {
+	print "Checking for ProtoGENI DB updates ...\n";
+	system("perl @INCDIRS ../protogeni/scripts/update ".
+	       "       -q -v -p $PGENIUPDATEDIR");
+	$exitval++
+	    if ($?);
+    }
+
     exit(0)
 	if (!$exitval);
 
@@ -296,6 +307,14 @@ print "Running pre-install updates ...\n";
 system("perl @INCDIRS ./update-install $forceopt -q -a pre -p $UPDATEDIR");
 exit(1)
     if ($?);
+
+if ($PGENISUPPORT) {
+    print "Running ProtoGENI DB updates ...\n";
+    system("perl @INCDIRS ../protogeni/scripts/update ".
+	   "       -q -p $PGENIUPDATEDIR");
+    exit(1)
+	if ($?);
+}
 
 if ($install) {
     print "Installing testbed software ... this will take a while!\n";

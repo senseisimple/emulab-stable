@@ -4614,7 +4614,13 @@ class subboss:
         
         argstr = escapeshellarg(str(argdict["imageid"]))
         
-        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
+	# We need admin privileges for non-global images since elabman won't
+	# belong to any projects.  We've already checked to make sure the user
+	# has permission to load the image in libosload so we don't need to
+	# check again in frisbeelauncher.  Only a subboss can make this request
+	# anyway.
+        (exitval, output) = runcommand(TBDIR + "/sbin/subboss_wrapper frisbeelauncher " + argstr)
+
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         

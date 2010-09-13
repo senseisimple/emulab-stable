@@ -1,14 +1,16 @@
-MFS_ARCH	=	i386
+MFS_ARCH	=	x86_64
 SOURCE_PATH	=	$(PWD)/source
 TARGET_PATH	=	$(PWD)/target
 TARGET_BUILD_PATH	=	$(PWD)/build
 SCRIPTS_PATH	=	$(PWD)/scripts
 INITRAMFS_PATH	=	$(PWD)/initramfs.tmp
-BUILDROOT_PATH	=	$(PWD)/buildroot
+BUILDROOT_VERSION	=	2010.02
+BUILDROOT_PATH		=	$(PWD)/buildroot-$(BUILDROOT_VERSION)
 FAKEROOT_ENVIRONMENT	=	$(PWD)/fs_fakeroot.env
 STAGING_DIR	=	$(PWD)/buildroot/build_$(MFS_ARCH)/staging_dir
 BOOT_PATH	=	$(PWD)/boot
-INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
+INITRAMFS_COMPRESSION	=	lzma
+INITRAMFS	=	$(BOOT_PATH)/initramfs
 
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
@@ -68,7 +70,7 @@ $(INSTALL_MODULES):
 
 $(TARGET_PATH)/lib/libc.so.0:
 	mkdir -p $(TARGET_PATH)/lib
-	cp -dpR $(BUILDROOT_PATH)/project_build_$(MFS_ARCH)/uclibc/root/lib/* $(TARGET_PATH)/lib
+	cp -dpR $(BUILDROOT_PATH)/output/target/lib/* $(TARGET_PATH)/lib
 
 uclibc-install: $(TARGET_PATH)/lib/libc.so.0
 
@@ -91,6 +93,6 @@ initramfs: install
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/misc_fixup.sh $(TARGET_PATH)
 	$(FAKEROOT_BIN) -i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/gen_initramfs.sh $(INITRAMFS_PATH) $(INITRAMFS)
+		$(SCRIPTS_PATH)/gen_initramfs.sh -c $(INITRAMFS_COMPRESSION) $(INITRAMFS_PATH) $(INITRAMFS)
 	rm -f $(FAKEROOT_ENVIRONMENT)
 	rm -rf $(INITRAMFS_PATH)

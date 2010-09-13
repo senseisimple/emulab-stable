@@ -583,6 +583,10 @@ int mapping_precheck() {
 	pclass_vector *vec = new pclass_vector();
 	vnode_type_table[v->name] = tt_entry(0,vec);
 
+	// Remember if there are no nodes of the requested type in the physical
+	// topology. Without this diagnostic, our "guess what's wrong with
+	// the vnode" code concludes that there was not enough bandwidth.
+	bool matched_node_type = true;
 	// This constitutes a list of the number of ptypes that matched the
 	// criteria. We use to guess what's wrong with the vnode.
 	int matched_bw = 0;
@@ -615,6 +619,7 @@ int mapping_precheck() {
             // Check to make sure there are actually nodes of this type in the
             // physical topology
             if (type_table.find(this_type) == type_table.end()) {
+                matched_node_type = false;
                 // Yes, I know, goto is evil. But I'm not gonna indent the next
                 // 100 lines of code for this error case
                 goto nosuchtype;
@@ -763,7 +768,10 @@ nosuchtype:
 	      }
 	    }
 
-	    if (!matched_bw) {
+	    if (!matched_node_type) {
+		cout << "      No physical nodes of requested type '"
+		     << v->type << "'!\n";
+	    } else if (!matched_bw) {
 		cout << "      Too much bandwidth on emulated links!" << endl;
 	    }
 
