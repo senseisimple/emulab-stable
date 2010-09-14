@@ -40,7 +40,7 @@ if [ ! -d $dir/rude-$version/src ]; then
     if [ -d rude -a ! -d rude-$version ]; then
         mv rude rude-$version
     fi
-    cd rude-$version && patch -p0 < $srcdir/rude-patch || {
+    cd rude-$version && patch -p0 < ../$srcdir/rude-patch || {
         echo "ERROR: rude-fetch.sh: patch failed"
 	exit 1
     }
