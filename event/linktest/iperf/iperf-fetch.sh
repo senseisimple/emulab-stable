@@ -37,7 +37,7 @@ if [ ! -d $dir/iperf-$version/src ]; then
         echo "ERROR: iperf-fetch.sh: tar failed"
 	exit 1
     }
-    cd iperf-$version && patch -p0 < $srcdir/iperf-patch || {
+    cd iperf-$version && patch -p0 < ../$srcdir/iperf-patch || {
         echo "ERROR: iperf-fetch.sh: patch failed"
 	exit 1
     }
