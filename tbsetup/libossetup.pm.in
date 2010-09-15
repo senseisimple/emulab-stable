@@ -449,6 +449,10 @@ sub LightUpNodes($@)
 	my $op      = $node->_setupoperation();
 	my $action;
 
+	# Nothing to do.
+	next
+	    if ($op == $NOSTATE);
+
 	if ($op == $RELOAD) {
 	    my $image = $node->_loadimage();
 		

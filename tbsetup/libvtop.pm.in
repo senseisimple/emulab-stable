@@ -1277,6 +1277,9 @@ sub LoadVirtNodes($)
 	my $osid;
 
 	next
+	    if ($vnode->_isgeninode());
+
+	next
 	    if (! ($vnode->_isvirtnode() && $vnode->_fixedvm()));
 	
 	my $fixnode = $self->vnodes()->{$vnode->_fixedvm()};
@@ -4173,8 +4176,10 @@ sub InterpNodes($)
 	my $vnode = $self->vnodes()->{$vname};
 	my $fixed = $self->fixednodes()->{$vname};
 
+	# Delay and internal nodes do not have an entry in vnodes().
 	next
-	    if (! ($vnode->_isvirtnode() && $vnode->_fixedvm()));
+	    if (! (defined($vnode) &&
+		   $vnode->_isvirtnode() && $vnode->_fixedvm()));
 
 	$self->AddNodeToSolution($vname, $self->solution()->{'V2P'}->{$fixed})
 	    if (!exists($self->solution()->{'V2P'}->{$vname}));
@@ -5443,7 +5448,7 @@ sub InterpLinksAux($)
 		    #
 		    #
 		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() != $virtlan->memberlist() ||
+			$virtlan->_sharednodes() ||
 			$virtlan->_needvlan()) {
 			my $lanid = "v" . "$lan" . $vlanid++;
 
@@ -5613,7 +5618,7 @@ sub InterpLinksAux($)
 		    my $protovlan;
 		    
 		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() != $virtlan->memberlist() ||
+			$virtlan->_sharednodes() ||
 			$virtlan->_needvlan()) {
 			if (exists($protovlans{$lan})) {
 			    $protovlan = $protovlans{$lan};

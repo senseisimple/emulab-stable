@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -181,7 +181,7 @@ elsif (defined($options{"e"})) {
 	die("*** $0:\n".
 	    "    You not have permission to reboot nodes in $experiment!\n");
     }
-    my @nodelist = $experiment->NodeList();
+    my @nodelist = $experiment->NodeList(0, 1);
     if (! @nodelist) {
 	die("*** $0:\n".
             "    There are no nodes reserved in $experiment\n");
