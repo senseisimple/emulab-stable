@@ -1274,8 +1274,7 @@ $port,    $enabled,$up,$speed,$duplex
 	$port =~ /^(.+):/;
 	my $node = $1;
 
-        # $node may be undef here:
-	#&debug("node is $node\n");
+	&debug("node is $node\n");
 	if (!$node) {
 	    if (!TBAdmin($UID)) {
 		next;
