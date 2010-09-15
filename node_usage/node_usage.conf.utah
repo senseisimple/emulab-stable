@@ -46,11 +46,7 @@ and the
 which both have Gb Ethernet interfaces.
 For many experimenters, the number of
 free pc3000s and d710s limit the size of the experiments they can run.
-</p>
-
-<p>
-Emulab currently includes around 500 PC nodes. As you can see, most of those
-are in use even during our periods of &quot;light&quot; usage.
+Emulab currently includes around 500 PC nodes. 
 </p>
 
 <p>
@@ -62,6 +58,11 @@ years), it may not reflect recent
 trends.
 </p>
 ---
+# Note removed:
+#   As you can see, most of those are in use even during our
+#   periods of "light" usage.
+# After "Emulab currently includes around 500 PC nodes" 
+# from above for now since it probably not true.
 
 $avail_footer = <<'---';
 <p align=center>
