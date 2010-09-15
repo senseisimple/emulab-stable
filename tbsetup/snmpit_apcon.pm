@@ -39,18 +39,18 @@ my %portCMDs =
 (
     "enable" => "00",
     "disable"=> "00",
-    "1000mbit"=> "9f",
-    "100mbit"=> "9b",
+    "1000mbit"=> "9F",
+    "100mbit"=> "9B",
     "10mbit" => "99",
     "auto"   => "00",
     "full"   => "94",
-    "half"   => "8c",
-    "auto1000mbit" => "9c",
+    "half"   => "8C",
+    "auto1000mbit" => "9C",
     "full1000mbit" => "94",
-    "half1000mbit" => "8c",
-    "auto100mbit"  => "9a",
+    "half1000mbit" => "8C",
+    "auto100mbit"  => "9A",
     "full100mbit"  => "92",
-    "half100mbit"  => "8a",
+    "half100mbit"  => "8A",
     "auto10mbit"   => "99",
     "full10mbit"   => "91",
     "half10mbit"   => "89",
@@ -62,28 +62,28 @@ my %portCMDs =
 my %portRates =
 (
     "00" => ["Auto Negotiate", "auto", "auto"],
-    "9f" => ["10/100/1000 Mbps Full/Half Duplex", "auto", "auto"],
-    "9c" => ["1000 Mbps Full/Half Duplex", "auto", "1000Mbits"],
+    "9F" => ["10/100/1000 Mbps Full/Half Duplex", "auto", "auto"],
+    "9C" => ["1000 Mbps Full/Half Duplex", "auto", "1000Mbits"],
     "94" => ["1000 Mbps Full Duplex", "full", "1000Mbits"],
-    "8c" => ["1000 Mbps Half Duplex", "half", "1000Mbits"],
-    "9b" => ["10/100 Mbps Full/Half Duplex", "auto", "100Mbits"],
-    "9a" => ["100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "8C" => ["1000 Mbps Half Duplex", "half", "1000Mbits"],
+    "9B" => ["10/100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "9A" => ["100 Mbps Full/Half Duplex", "auto", "100Mbits"],
     "92" => ["100 Mbps Full Duplex", "full", "100Mbits"],
-    "8a" => ["100 Mbps Half Duplex", "half", "100Mbits"],
+    "8A" => ["100 Mbps Half Duplex", "half", "100Mbits"],
     "99" => ["10 Mbps Full/Half Duplex", "auto", "10Mbits"],
     "91" => ["10 Mbps Full Duplex", "full", "10Mbits"],
     "89" => ["10 Mbps Half Duplex", "half", "10Mbits"],
-    "ff" => ["Analyzer Tap Auto", "auto", "auto"],
-    "fc" => ["Analyzer Tap 1000 Mbps Full/Half Duplex", "auto", "1000Mbits"],
-    "f4" => ["Analyzer Tap 1000 Mbps Full Duplex", "full", "1000Mbits"],
-    "ec" => ["Analyzer Tap 1000 Mbps Half Duplex", "half", "1000Mbits"],
-    "fb" => ["Analyzer Tap 10/100 Mbps Full/Half Duplex", "auto", "100Mbits"],
-    "fa" => ["Analyzer Tap 100 Mbps Full/Half Duplex", "auto", "100Mbits"],
-    "f2" => ["Analyzer Tap 100 Mbps Full Duplex", "full", "100Mbits"],
-    "ea" => ["Analyzer Tap 100 Mbps Half Duplex", "half", "100Mbits"],
-    "f9" => ["Analyzer Tap 10 Mbps Full/Half Duplex", "auto", "10Mbits"],
-    "f1" => ["Analyzer Tap 10 Mbps Full Duplex", "full", "10Mbits"],
-    "e9" => ["Analyzer Tap 10 Mbps Half Duplex", "half", "10Mbits"],
+    "FF" => ["Analyzer Tap Auto", "auto", "auto"],
+    "FC" => ["Analyzer Tap 1000 Mbps Full/Half Duplex", "auto", "1000Mbits"],
+    "F4" => ["Analyzer Tap 1000 Mbps Full Duplex", "full", "1000Mbits"],
+    "EC" => ["Analyzer Tap 1000 Mbps Half Duplex", "half", "1000Mbits"],
+    "FB" => ["Analyzer Tap 10/100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "FA" => ["Analyzer Tap 100 Mbps Full/Half Duplex", "auto", "100Mbits"],
+    "F2" => ["Analyzer Tap 100 Mbps Full Duplex", "full", "100Mbits"],
+    "EA" => ["Analyzer Tap 100 Mbps Half Duplex", "half", "100Mbits"],
+    "F9" => ["Analyzer Tap 10 Mbps Full/Half Duplex", "auto", "10Mbits"],
+    "F1" => ["Analyzer Tap 10 Mbps Full Duplex", "full", "10Mbits"],
+    "E9" => ["Analyzer Tap 10 Mbps Half Duplex", "half", "10Mbits"],
 );
 
 my %emptyVlans = ();
@@ -219,7 +219,7 @@ sub createExpectObject($)
          ["Are you sure you want to continue connecting (yes/no)?" => sub { 
                                # Only occurs for the first time connection...
                                my $e = shift;
-                               $e->send("yes\n");                               
+                               $e->send("yes\n");
                                exp_continue;}],
          ["Permission denied (password)." => sub { 
                                die "Password incorrect!\n";} ],
@@ -507,11 +507,16 @@ sub parsePortRates($$)
     my @lines = split( /\n/, $raw );
  
     foreach my $line ( @lines ) {
-        if ( $line =~ /^([A-I][0-9]{2}):\s+Desired Rate:\s+0x([0-9A-F]{2})/ ) {
-            $rates{$1} = [$2,$2];
+        if ( $line =~ /^([A-I][0-9]{2})\s+Desired Rate:\s+0x([A-F0-9]{2})\s+/ ) {
+            @{$rates{$1}} = ($2,[]);            
         } else {
-            if ( $line =~ /^([A-I][0-9]{2}):\s+Actual Link:\s+0x([0-9A-F]{2})/ ) {
-                ${$rates{$1}}[1] = $2;
+            if ( $line =~ /^([A-I][0-9]{2})\s+Actual Link:\s+0x([A-F0-9]{2})\s+(.+)\r$/ ) {
+                my ($port, $arate, $desc) = ($1, $2, $3);
+                if ($desc =~ /^(10{1,3}Mb)\s+(\w+)\s*/) {
+                        @{$rates{$port}[1]} = ($arate, $desc, $2,$1);
+                } else {
+                        @{$rates{$port}[1]} = ("00",);
+                }                                
             }
         }
     }
@@ -552,7 +557,7 @@ sub getAllPortsRates($)
     my $raw = $self->getRawOutput($CLI_SHOW_PORT_RATES);
     if ( defined($raw) ) {
         my $rates = $self->parsePortRates($raw);
-        return $rates; 
+        return \%$rates; 
     }    
     
     return undef;
@@ -1144,21 +1149,20 @@ sub listPorts($) {
 
     my $rates = $self->getAllPortsRates();
     foreach my $port (keys %$rates) {
-        my ($drate, $arate) = @{$rates->{$port}};    
-        
-        my @strdrate = @{$portRates{$drate}};
-        my @strarate = @{$portRates{$arate}};
-        
+        my ($drate, $arateref) = @{$rates->{$port}};
+        my @arate = @$arateref;         
+        my @strdrate = @{$portRates{$drate}};        
+
         #
         # if port is actived, use actual rate, otherwise use desired rate
         #
-        if ( $arate eq "00" ) {        
-            push @ports, [$port, "no", $strdrate[0], $strdrate[2], $strdrate[1]];
+        if ( $arate[0] eq "00" ) {        
+            push @ports, [$port, "no", "down", $strdrate[2], $strdrate[1]];
         } else {
             #
             # Not sure if it is OK to just ignore the desired rate
             #
-            push @ports, [$port, "yes", $strarate[0], $strarate[2], $strarate[1]];
+            push @ports, [$port, "yes", "up", $arate[3], $arate[2]];
         }
     }
     
