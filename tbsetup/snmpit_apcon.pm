@@ -18,6 +18,7 @@ $| = 1; # Turn off line buffering on output
 use English;
 use SNMP; 
 use snmpit_lib;
+use libdb;
 
 use libtestbed;
 use Expect;
@@ -188,6 +189,7 @@ sub new($$$;$) {
 
     # TODO: may need this:
     #$self->readifIndex();
+    $self->readTranslationTable();
 
     return $self;
 }
@@ -227,6 +229,95 @@ sub createExpectObject($)
          $self->{CLI_PROMPT} );
     return $exp;
 }
+
+#
+# Convert port format between switch format and db format
+# the original format is auto-detected.
+# simply, a switch port starts with A-Z, or A-I on Apcon 2000 series
+# while a db port is totally number: card.port.
+#
+sub convertPortFormat($$)
+{
+    my ($self, $srcport) = @_;
+    my $card = "";
+    my $port = "";
+    
+    if ($srcport =~ /([A-Z])([0-9]{2})/) {
+        # froms switch to db
+        $card = ord($1) - ord('A') + 1;
+        $port = int($2);
+        
+        return "$card.$port";
+    } elsif ($srcport =~ /(\d+)\.(\d+)/) {
+        # from db to switch
+        $card = chr(ord('A') + $1 - 1);
+        $port = sprintf("%02d", $2);
+        
+        return "$card"."$port";
+    } else {
+        # unknown format, return itself
+        return $srcport;
+    }
+}
+
+
+##############################################################################
+
+my %Interfaces=();
+# Interfaces maps pcX:Y<==>MAC
+
+my %PortIface=();
+# Maps pcX:Y<==>pcX:iface
+
+my %Ports=();
+# Ports maps pcX:Y<==>switch:port
+
+#
+# This function fills in %Interfaces and %Ports
+# They hold pcX:Y<==>MAC and pcX:Y<==>switch:port respectively
+#
+# XXX: Temp workround for portnum
+#
+sub readTranslationTable($) {
+    my $self = shift;
+    my $name="";
+    my $mac="";
+    my $iface="";
+    my $switchport="";
+
+    print "FILLING %Interfaces\n" if $self->{DEBUG};
+    my $result =
+	DBQueryFatal("select node_id,card,port,mac,iface from interfaces");
+    while ( @_ = $result->fetchrow_array()) {
+	$name = "$_[0]:$_[1]";
+	$iface = "$_[0]:$_[4]";
+	if ($_[2] != 1) {$name .=$_[2]; }
+	$mac = "$_[3]";
+	$Interfaces{$name} = $mac;
+	$Interfaces{$mac} = $name;
+	$PortIface{$name} = $iface;
+	$PortIface{$iface} = $name;
+	print "Interfaces: $mac <==> $name\n" if $self->{DEBUG} > 1;
+    }
+
+    print "FILLING %Ports\n" if $self->{DEBUG};
+    $result = DBQueryFatal("select node_id1,card1,port1,node_id2,card2,port2 ".
+	    "from wires;");
+    while ( my @row = $result->fetchrow_array()) {
+        my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
+	$name = "$node_id1:$card1:$port1";
+	print "Name='$name'\t" if $self->{DEBUG} > 2;
+	print "Dev='$node_id2'\t" if $self->{DEBUG} > 2;
+	$switchport = "$node_id2:$card2.$port2";
+	print "switchport='$switchport'\n" if $self->{DEBUG} > 2;
+	$Ports{$name} = $switchport;
+	$Ports{$switchport} = $name;
+	print "Ports: '$name' <==> '$switchport'\n" if $self->{DEBUG} > 1;
+    }
+
+}
+
+##############################################################################
 
 
 #
@@ -1153,16 +1244,24 @@ sub listPorts($) {
         my @arate = @$arateref;         
         my @strdrate = @{$portRates{$drate}};        
 
+        my $pnum = $self->{NAME}.":".$self->convertPortFormat($port);
+        
+        if (!exists $Ports{$pnum}) {
+            next;
+        }
+        
+        my $finalport = $Ports{$pnum};      
+
         #
         # if port is actived, use actual rate, otherwise use desired rate
         #
         if ( $arate[0] eq "00" ) {        
-            push @ports, [$port, "no", "down", $strdrate[2], $strdrate[1]];
+            push @ports, [$finalport, "no", "down", $strdrate[2], $strdrate[1]];
         } else {
             #
             # Not sure if it is OK to just ignore the desired rate
             #
-            push @ports, [$port, "yes", "up", $arate[3], $arate[2]];
+            push @ports, [$finalport, "yes", "up", $arate[3], $arate[2]];
         }
     }
     
