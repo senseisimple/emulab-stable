@@ -216,6 +216,11 @@ sub createExpectObject($)
          ["admin\@$self->{NAME}'s password:" => sub { my $e = shift;
                                $e->send($self->{PASSWORD}."\n");
                                exp_continue;}],
+         ["Are you sure you want to continue connecting (yes/no)?" => sub { 
+                               # Only occurs for the first time connection...
+                               my $e = shift;
+                               $e->send("yes\n");                               
+                               exp_continue;}],
          ["Permission denied (password)." => sub { 
                                die "Password incorrect!\n";} ],
          [ timeout => sub { die "Timeout when connect to switch!\n";} ],
