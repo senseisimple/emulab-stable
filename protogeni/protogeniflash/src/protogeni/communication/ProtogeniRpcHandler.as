@@ -20,6 +20,7 @@
 	import flash.events.SecurityErrorEvent;
 	import flash.utils.ByteArray;
 	
+	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
 	import mx.utils.Base64Decoder;
 	
@@ -78,12 +79,17 @@
 		
 		public function submitSlice(slice:Slice):void
 		{
-			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers)
+			var old:Slice = Main.protogeniHandler.CurrentUser.slices.getByUrn(slice.urn);
+			if(old != null && old.hasAllocatedResources())
 			{
-				if(sliver.created)
+				// Update
+				Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(var sliver:Sliver in slice.slivers)
 					pushRequest(new RequestSliverUpdate(sliver));
-				else
+			} else {
+				// Create
+				Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(sliver in slice.slivers)
 					pushRequest(new RequestSliverCreate(sliver));
 			}
 		}

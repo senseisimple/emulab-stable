@@ -2,7 +2,7 @@
 <display:DefaultWindow
 	xmlns:mx="http://www.adobe.com/2006/mxml"
 	xmlns:protogeniflash="protogeniflash.*" initialize="init()"
-	title="Slice" xmlns:display="protogeni.display.*">
+	title="Slice" xmlns:display="protogeni.display.*" xmlns:resources="protogeni.resources.*">
 	
 	<mx:Script>
 		<![CDATA[
@@ -31,6 +31,9 @@
 			
 			[Bindable]
 			public var nodes:ArrayCollection;
+			
+			[Bindable]
+			public var nodesPredefined:ArrayCollection;
 			
 			private var cm:ComponentManager;
 			
@@ -77,6 +80,24 @@
 				
 				nodes.sort = nameSort;
 				nodes.refresh();
+				
+				//
+				nodesPredefined = new ArrayCollection();
+				
+				var exclusive:VirtualNode = new VirtualNode(null);
+				exclusive.id = "Exclusive";
+				exclusive.isShared = false;
+				exclusive.isVirtual = true;
+				exclusive.manager = cm;
+				
+				var shared:VirtualNode = new VirtualNode(null);
+				shared.id = "Shared";
+				shared.isShared = true;
+				shared.isVirtual = true;
+				shared.manager = cm;
+				
+				nodesPredefined.addItem(exclusive);
+				nodesPredefined.addItem(shared);
 			}
 			
 			public function refreshSlice():void
@@ -103,7 +124,7 @@
 				loadNodes();
 			}
 			
-			private function assignAvailableIcon(item:Object):Class {
+			private function assignAvailableIconPhysical(item:Object):Class {
 				var node:PhysicalNode = item as PhysicalNode;
 				if(!this.hideUnavailableCheckBox.selected)
 				{
@@ -114,6 +135,10 @@
 					}
 				}
 				return DisplayUtil.assignAvailabilityIcon(item as PhysicalNode);
+			}
+			
+			private function assignAvailableIcon(item:Object):Class {
+				return DisplayUtil.availableIcon;
 			}
 			
 			public function viewRspecs():void
@@ -193,18 +218,19 @@
 							 toolTip="Preview the Request RSPEC" />
 	</mx:HBox>
 	<mx:HDividedBox width="100%" height="100%">
-		<mx:VBox height="100%">
+		<mx:VBox height="100%" verticalGap="2">
 			<mx:ComboBox id="selectCm" width="100%" dataProvider="{cms}" change="loadNodes()"></mx:ComboBox>
 			<mx:CheckBox label="Hide unavailable" selected="true" id="hideUnavailableCheckBox" click="loadNodes()"/>
 			<mx:List width="100%" height="100%" id="listNodes"
 					 dataProvider="{nodes}"
 					 labelField="name" dragEnabled="true"
+					 iconFunction="assignAvailableIconPhysical">
+			</mx:List>
+			<mx:List width="100%" height="46" id="listNodesPredefined"
+					 dataProvider="{nodesPredefined}"
+					 labelField="id" dragEnabled="true"
 					 iconFunction="assignAvailableIcon">
 			</mx:List>
-			<mx:HBox width="100%">
-				<mx:Button label="Exclusive"/>
-				<mx:Button label="Shared"/>
-			</mx:HBox>
 		</mx:VBox>
 			<display:SliceCanvas id="sliceCanvas" hostWindow="{this}">
 			</display:SliceCanvas>

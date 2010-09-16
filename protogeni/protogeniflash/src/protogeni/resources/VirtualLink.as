@@ -19,6 +19,9 @@
 	// Link as part of a sliver/slice connecting virtual nodes
 	public class VirtualLink
 	{
+		// Status values
+		public static var TUNNEL : String = "tunnel";
+		
 		public function VirtualLink(owner:Sliver)
 		{
 			slivers = new Array(owner);

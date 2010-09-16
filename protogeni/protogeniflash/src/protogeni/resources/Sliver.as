@@ -109,33 +109,38 @@
       		
       		for each(var nodeXml:XML in nodesXml)
       		{
-      			var virtualNode:VirtualNode = new VirtualNode(this);
-				virtualNode.setToPhysicalNode(componentManager.Nodes.GetByUrn(nodeXml.@component_urn));
-      			virtualNode.id = nodeXml.@virtual_id;
-				virtualNode.manager = Main.protogeniHandler.ComponentManagers.getByUrn(nodeXml.@component_manager_urn);
-				if(nodeXml.@sliver_urn != null)
-					virtualNode.urn = nodeXml.@sliver_urn;
-				if(nodeXml.@sliver_uuid != null)
-					virtualNode.uuid = nodeXml.@sliver_uuid;
-				if(nodeXml.@sshdport != null)
-					virtualNode.sshdport = nodeXml.@sshdport;
-				if(nodeXml.@hostname != null)
-					virtualNode.hostname = nodeXml.@hostname;
-      			virtualNode.virtualizationType = nodeXml.@virtualization_type;
-				if(nodeXml.@virtualization_subtype != null)
-					virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;
-      			for each(var ix:XML in nodeXml.children()) {
-	        		if(ix.localName() == "interface") {
-	        			var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
-	      				virtualInterface.id = ix.@virtual_id;
-	      				virtualNode.interfaces.Add(virtualInterface);
-      				}
-	        	}
-      			
-      			virtualNode.rspec = nodeXml.copy();
-      			nodes.addItem(virtualNode);
-      			nodesById[virtualNode.id] = virtualNode;
-      			virtualNode.physicalNode.virtualNodes.addItem(virtualNode);
+				var cmNode:PhysicalNode = componentManager.Nodes.GetByUrn(nodeXml.@component_urn);
+				if(cmNode != null)
+				{
+					var virtualNode:VirtualNode = new VirtualNode(this);
+					virtualNode.setToPhysicalNode(componentManager.Nodes.GetByUrn(nodeXml.@component_urn));
+					virtualNode.id = nodeXml.@virtual_id;
+					virtualNode.manager = Main.protogeniHandler.ComponentManagers.getByUrn(nodeXml.@component_manager_urn);
+					if(nodeXml.@sliver_urn != null)
+						virtualNode.urn = nodeXml.@sliver_urn;
+					if(nodeXml.@sliver_uuid != null)
+						virtualNode.uuid = nodeXml.@sliver_uuid;
+					if(nodeXml.@sshdport != null)
+						virtualNode.sshdport = nodeXml.@sshdport;
+					if(nodeXml.@hostname != null)
+						virtualNode.hostname = nodeXml.@hostname;
+					virtualNode.virtualizationType = nodeXml.@virtualization_type;
+					if(nodeXml.@virtualization_subtype != null)
+						virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;
+					for each(var ix:XML in nodeXml.children()) {
+						if(ix.localName() == "interface") {
+							var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
+							virtualInterface.id = ix.@virtual_id;
+							virtualNode.interfaces.Add(virtualInterface);
+						}
+					}
+					
+					virtualNode.rspec = nodeXml.copy();
+					nodes.addItem(virtualNode);
+					nodesById[virtualNode.id] = virtualNode;
+					virtualNode.physicalNode.virtualNodes.addItem(virtualNode);
+				}
+      			// Don't add outside nodes ... do that if found when parsing links ...
       		}
 			
 			for each(var vn:VirtualNode in nodes)
@@ -161,6 +166,17 @@
 	        			var vid:String = viXml.@virtual_interface_id;
 	      				var nid:String = viXml.@virtual_node_id;
 	      				var interfacedNode:VirtualNode = nodesById[nid];
+						// Deal with outside node
+						if(interfacedNode == null)
+						{
+							// Get outside node, don't add if not parsed in the other cm yet
+							interfacedNode = slice.getVirtualNodeWithId(nid);
+							if(interfacedNode == null)
+							{
+								virtualLink = null;
+								continue;
+							}
+						}
 	      				for each(var vi:VirtualInterface in interfacedNode.interfaces.collection)
 	      				{
 	      					if(vi.id == vid)
@@ -173,10 +189,27 @@
       				}
 	        	}
       			
+				if(virtualLink == null)
+					continue;
+				
       			virtualLink.rspec = linkXml.copy();
 				virtualLink.firstNode = (virtualLink.interfaces[0] as VirtualInterface).virtualNode;
 				virtualLink.secondNode = (virtualLink.interfaces[1] as VirtualInterface).virtualNode;
-      			links.addItem(virtualLink);
+				
+				// Deal with tunnel
+				if(virtualLink.firstNode.slivers[0] != this)
+				{
+					Util.addIfNonexistingToArray(virtualLink.firstNode.slivers, this);
+					Util.addIfNonexistingToArray(virtualLink.secondNode.slivers, virtualLink.firstNode.slivers[0]);
+					virtualLink.firstNode.slivers[0].links.addItem(virtualLink);
+				} else if(virtualLink.secondNode.slivers[0] != this)
+				{
+					Util.addIfNonexistingToArray(virtualLink.secondNode.slivers, this);
+					Util.addIfNonexistingToArray(virtualLink.firstNode.slivers, virtualLink.secondNode.slivers[0]);
+					virtualLink.secondNode.slivers[0].links.addItem(virtualLink);
+				}
+				
+				links.addItem(virtualLink);
       		}
 		}
 		
@@ -187,114 +220,6 @@
 				if(node.physicalNode.virtualNodes.getItemIndex(node) > -1)
 					node.physicalNode.virtualNodes.removeItemAt(node.physicalNode.virtualNodes.getItemIndex(node));
 			}
-		}
-		
-		public function clone(addOutsideReferences:Boolean = true):Sliver
-		{
-			var newSliver:Sliver = new Sliver(slice);
-			newSliver.created = this.created;
-			newSliver.credential = this.credential;
-			newSliver.componentManager = this.componentManager;
-			newSliver.rspec = this.rspec;
-			newSliver.urn = this.urn;
-			newSliver.ticket = this.ticket;
-			newSliver.manifest = this.manifest;
-			newSliver.state = this.state;
-			newSliver.status = this.status;
-			newSliver.validUntil = this.validUntil;
-			
-			// Nodes
-			var oldNodeToCloneNode:Dictionary = new Dictionary();
-			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
-			var retrace:Array = new Array();
-			for each(var node:VirtualNode in this.nodes)
-			{
-				var newNode:VirtualNode = new VirtualNode(newSliver);
-				newNode.id = node.id;
-				newNode.virtualizationType = node.virtualizationType;
-				newNode.virtualizationSubtype = node.virtualizationSubtype;
-				newNode.physicalNode = node.physicalNode;
-				newNode.manager = node.manager;
-				newNode.urn = node.urn;
-				newNode.uuid = node.uuid;
-				newNode.isShared = node.isShared;
-				newNode.isVirtual = node.isVirtual;
-				// supernode? add later ...
-				// subnodes? add later ...
-				retrace.push({clone:newNode, old:node});
-				newNode.diskImage = node.diskImage;
-				newNode.tarfiles = node.tarfiles;
-				newNode.startupCommand = node.startupCommand;
-				newNode.hostname = node.startupCommand;
-				newNode.rspec = node.rspec;
-				newNode.sshdport = node.sshdport;
-				newNode.error = node.error;
-				newNode.state = node.state;
-				newNode.status = node.status;
-				// slivers? add later ...
-				for each(var vi:VirtualInterface in node.interfaces.collection)
-				{
-					var virtualInterface:VirtualInterface = new VirtualInterface(newNode);
-					virtualInterface.id = vi.id;
-					virtualInterface.role = vi.role;
-					virtualInterface.isVirtual = vi.isVirtual;
-					virtualInterface.physicalNodeInterface = vi.physicalNodeInterface;
-					virtualInterface.bandwidth = vi.bandwidth;
-					virtualInterface.ip = vi.ip;
-					newNode.interfaces.Add(virtualInterface);
-					oldInterfaceToCloneInterface[vi] = virtualInterface;
-					// links? add later ...
-				}
-				
-				if(addOutsideReferences)
-					newNode.physicalNode.virtualNodes.addItem(newNode);
-				newSliver.nodes.addItem(newNode);
-				
-				oldNodeToCloneNode[node] = newNode;
-			}
-
-			// supernode and subnodes need to be added after to ensure they were created
-			for each(var check:Object in retrace)
-			{
-				var cloneNode:VirtualNode = check.clone;
-				var oldNode:VirtualNode = check.old;
-				if(oldNode.superNode != null)
-					cloneNode.superNode = newSliver.nodes.getById(oldNode.id);
-				if(oldNode.subNodes != null && oldNode.subNodes.length > 0)
-				{
-					for each(var subNode:VirtualNode in oldNode.subNodes)
-						cloneNode.subNodes.push(newSliver.nodes.getById(subNode.id));
-				}
-			}
-			
-			// Links
-			for each(var link:VirtualLink in this.links)
-			{
-				var newLink:VirtualLink = new VirtualLink(newSliver);
-				newLink.id = link.id;
-				newLink.type = link.type;
-				newLink.bandwidth = link.bandwidth;
-				newLink.firstTunnelIp = link.firstTunnelIp;
-				newLink.secondTunnelIp = link.secondTunnelIp;
-				newLink._isTunnel = link._isTunnel;
-				newLink.rspec = link.rspec;
-				// Slivers?  add later ...
-				
-				newLink.firstNode = oldNodeToCloneNode[link.firstNode];
-				newLink.secondNode = oldNodeToCloneNode[link.secondNode];
-				
-				for each(var i:VirtualInterface in link.interfaces)
-				{
-					var newInterface:VirtualInterface = oldInterfaceToCloneInterface[i];
-					newLink.interfaces.addItem(newInterface);
-					newInterface.virtualLinks.addItem(newLink);
-					newInterface.virtualNode.links.addItem(newLink);
-				}
-				
-				newSliver.links.addItem(newLink);
-			}
-			
-			return newSliver;
 		}
 	}
 }

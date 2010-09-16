@@ -114,7 +114,7 @@
 				sliceLinksVbox.removeAllChildren();
 				if(virtualNode != null) {
 					linkTabs.addChild(sliceLinksVbox);
-					var connectedNodes:ArrayCollection = virtualNode.GetNodes();
+					var connectedNodes:ArrayCollection = virtualNode.GetPhysicalNodes();
 					
 					sliceLinksVbox.label = "Slice (" + connectedNodes.length + " Nodes)"
 					var connectedLabel:Label = new Label();
@@ -128,7 +128,7 @@
 					{
 						sliceLinksVbox.addChild(DisplayUtil.getPhysicalNodeButton(connectedNode));
 						
-						var connectedLinks:ArrayCollection = virtualNode.GetLinks(connectedNode);
+						var connectedLinks:ArrayCollection = virtualNode.GetLinksForPhysical(connectedNode);
 						for each(var connectedLink:VirtualLink in connectedLinks)
 						{
 							var pointLinkHbox:HBox = new HBox();

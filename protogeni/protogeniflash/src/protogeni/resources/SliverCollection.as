@@ -18,5 +18,15 @@ package protogeni.resources
 			}
 			return null;
 		}
+		
+		public function getByCm(cm:ComponentManager):Sliver
+		{
+			for each(var sliver:Sliver in this)
+			{
+				if(sliver.componentManager == cm)
+					return sliver;
+			}
+			return null;
+		}
 	}
 }
