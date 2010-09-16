@@ -15,6 +15,8 @@
 package protogeni
 {
   import flash.external.ExternalInterface;
+  
+  import mx.collections.ArrayCollection;
 
   public class Util
   {
@@ -59,6 +61,18 @@ package protogeni
 		dateString = dateString.replace(/(\+|\-)(\d+):(\d+)/g, " GMT$1$2$3");
 		dateString = dateString.replace("Z", " GMT-0000");
 		return new Date(Date.parse(dateString));
+	}
+	
+	public static function addIfNonexistingToArray(source:Array, o:*):void
+	{
+		if(source.indexOf(o) == -1)
+			source.push(o);
+	}
+	
+	public static function addIfNonexistingToArrayCollection(source:ArrayCollection, o:*):void
+	{
+		if(source.getItemIndex(o) == -1)
+			source.addItem(o);
 	}
 	
 	public static function findInAny(text:Array, candidates:Array, matchAll:Boolean = false, caseSensitive:Boolean = false):Boolean

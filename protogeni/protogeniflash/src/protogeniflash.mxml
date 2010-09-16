@@ -117,7 +117,6 @@
 	    // ComboBox
 	    public function fillCombobox(junk:* = null):void {
 	    	slicesMenu = Main.protogeniHandler.CurrentUser.slices.displaySlices();
-			
 	    }
 	    
 	    public function getSliceLabel(s:Slice):String {
@@ -170,7 +169,7 @@
 		<display:ImageButton id="searchButton"
 							 source="{DisplayUtil.searchIcon}"
 							 click="search.show()"
-							 toolTip="Toggle fullscreen" />
+							 toolTip="Search" />
 		<display:ImageButton id="resetZoomButton"
 			source="@Embed('../images/zoom.png')"
 			click="map.resetZoom();"

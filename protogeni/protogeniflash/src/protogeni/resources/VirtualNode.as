@@ -28,7 +28,8 @@
 			controlInterface.role = PhysicalNodeInterface.CONTROL;
 			controlInterface.isVirtual = true;
 			interfaces.Add(controlInterface);
-			manager = owner.componentManager;
+			if(owner != null)
+				manager = owner.componentManager;
 		}
 		
 		[Bindable]
@@ -136,7 +137,7 @@
 		}
 		
 		// Gets all connected physical nodes
-		public function GetNodes():ArrayCollection {
+		public function GetPhysicalNodes():ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			for each(var nodeInterface:VirtualInterface in interfaces.collection) {
 				for each(var nodeLink:VirtualLink in nodeInterface.virtualLinks) {
@@ -150,14 +151,40 @@
 			return ac;
 		}
 		
+		public function GetAllNodes():ArrayCollection {
+			var ac:ArrayCollection = new ArrayCollection();
+			for each(var virtualLink:VirtualLink in links) {
+				if(virtualLink.firstNode != this && !ac.contains(virtualLink.firstNode))
+					ac.addItem(virtualLink.firstNode);
+				if(virtualLink.secondNode != this && !ac.contains(virtualLink.secondNode))
+					ac.addItem(virtualLink.secondNode);
+			}
+			return ac;
+		}
+		
 		// Gets all virtual links connected to this node
-		public function GetLinks(n:PhysicalNode):ArrayCollection {
+		public function GetLinksForPhysical(n:PhysicalNode):ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			
 			for each(var i:VirtualInterface in interfaces) {
 				for each(var l:VirtualLink in i.virtualLinks) {
 					for each(var nl:VirtualInterface in l.interfaces) {
 						if(nl != i && nl.virtualNode.physicalNode == n && !ac.contains(l)) {
+							ac.addItem(l);
+						}
+					}
+				}
+			}
+			return ac;
+		}
+		
+		public function GetLinks(n:VirtualNode):ArrayCollection {
+			var ac:ArrayCollection = new ArrayCollection();
+
+			for each(var i:VirtualInterface in interfaces) {
+				for each(var l:VirtualLink in i.virtualLinks) {
+					for each(var nl:VirtualInterface in l.interfaces) {
+						if(nl != i && nl.virtualNode == n && !ac.contains(l)) {
 							ac.addItem(l);
 						}
 					}

@@ -31,6 +31,7 @@ package protogeni.communication
     public function RequestDiscoverResources(newCm:ComponentManager) : void
     {
 		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true, false);
+		op.timeout = 60;
 		cm = newCm;
 		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
 		op.addField("compress", true);

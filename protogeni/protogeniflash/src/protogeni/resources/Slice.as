@@ -14,6 +14,8 @@
  
  package protogeni.resources
 {
+	import flash.utils.Dictionary;
+	
 	import mx.collections.ArrayCollection;
 	
 	import protogeni.display.DisplayUtil;
@@ -42,7 +44,7 @@
 		public var creator : User = null;
 		public var credential : String = "";
 		public var slivers:SliverCollection = new SliverCollection();
-		
+
 		public var validUntil:Date;
 
 		public function Slice()
@@ -62,6 +64,19 @@
 			return status;
 		}
 		
+		public function hasAllocatedResources():Boolean
+		{
+			if(slivers == null)
+				return false;
+			
+			for each(var existing:Sliver in this.slivers)
+			{
+				if(existing.created)
+					return true;
+			}
+			return false;
+		}
+		
 		public function GetAllNodes():ArrayCollection
 		{
 			var nodes:ArrayCollection = new ArrayCollection();
@@ -69,12 +84,27 @@
 			{
 				for each(var n:VirtualNode in s.nodes)
 				{
-					if(!nodes.contains(n))
+					if(n.manager == s.componentManager)
 						nodes.addItem(n);
 				}
 					
 			}
 			return nodes;
+		}
+		
+		public function GetAllLinks():ArrayCollection
+		{
+			var links:ArrayCollection = new ArrayCollection();
+			for each(var s:Sliver in slivers)
+			{
+				for each(var l:VirtualLink in s.links)
+				{
+					if(!links.contains(l))
+						links.addItem(l);
+				}
+				
+			}
+			return links;
 		}
 		
 		public function GetPhysicalNodes():ArrayCollection
@@ -145,22 +175,142 @@
 			newSlice.creator = this.creator;
 			newSlice.credential = this.credential;
 			newSlice.validUntil = this.validUntil;
+			
+			// Build up the basic slivers
+			// Build up the slivers with nodes
 			for each(var sliver:Sliver in this.slivers)
-				newSlice.slivers.addItem(sliver.clone(addOutsideReferences));
-			// Deal with the pointers to slivers since they're all created
-			for each(sliver in this.slivers)
 			{
+				var newSliver:Sliver = new Sliver(newSlice);
+				newSliver.created = sliver.created;
+				newSliver.credential = sliver.credential;
+				newSliver.componentManager = sliver.componentManager;
+				newSliver.rspec = sliver.rspec;
+				newSliver.urn = sliver.urn;
+				newSliver.ticket = sliver.ticket;
+				newSliver.manifest = sliver.manifest;
+				newSliver.state = sliver.state;
+				newSliver.status = sliver.status;
+				newSliver.validUntil = sliver.validUntil;
+				
+				newSlice.slivers.addItem(newSliver);
+			}
+			
+			var oldNodeToCloneNode:Dictionary = new Dictionary();
+			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
+
+			// Build up the slivers with nodes
+			for each(var sliver:Sliver in this.slivers)
+			{
+				var newSliver:Sliver = newSlice.slivers.getByCm(sliver.componentManager);
+				
+				// Build up nodes
+				var retrace:Array = new Array();
 				for each(var node:VirtualNode in sliver.nodes)
 				{
+					if(node.manager != sliver.componentManager)
+						continue;
+					var newNode:VirtualNode = new VirtualNode(newSliver);
+					newNode.id = node.id;
+					newNode.virtualizationType = node.virtualizationType;
+					newNode.virtualizationSubtype = node.virtualizationSubtype;
+					newNode.physicalNode = node.physicalNode;
+					newNode.manager = node.manager;
+					newNode.urn = node.urn;
+					newNode.uuid = node.uuid;
+					newNode.isShared = node.isShared;
+					newNode.isVirtual = node.isVirtual;
+					// supernode? add later ...
+					// subnodes? add later ...
+					retrace.push({clone:newNode, old:node});
+					newNode.diskImage = node.diskImage;
+					newNode.tarfiles = node.tarfiles;
+					newNode.startupCommand = node.startupCommand;
+					newNode.hostname = node.startupCommand;
+					newNode.rspec = node.rspec;
+					newNode.sshdport = node.sshdport;
+					newNode.error = node.error;
+					newNode.state = node.state;
+					newNode.status = node.status;
 					for each(var nodeSliver:Sliver in node.slivers)
-						newSlice.slivers.getByUrn(sliver.urn).nodes.getById(node.id).slivers.push(newSlice.slivers.getByUrn(nodeSliver.urn));
+					{
+						newNode.slivers.push(newSlice.slivers.getByUrn(nodeSliver.urn));
+						if(nodeSliver != sliver)
+							newSlice.slivers.getByUrn(nodeSliver.urn).nodes.addItem(newNode);
+					}
+					
+					for each(var vi:VirtualInterface in node.interfaces.collection)
+					{
+						var newVirtualInterface:VirtualInterface = new VirtualInterface(newNode);
+						newVirtualInterface.id = vi.id;
+						newVirtualInterface.role = vi.role;
+						newVirtualInterface.isVirtual = vi.isVirtual;
+						newVirtualInterface.physicalNodeInterface = vi.physicalNodeInterface;
+						newVirtualInterface.bandwidth = vi.bandwidth;
+						newVirtualInterface.ip = vi.ip;
+						newNode.interfaces.Add(newVirtualInterface);
+						oldInterfaceToCloneInterface[vi] = newVirtualInterface;
+						// links? add later ...
+					}
+
+					newSliver.nodes.addItem(newNode);
+					
+					oldNodeToCloneNode[node] = newNode;
 				}
-				for each(var link:VirtualLink in sliver.links)
+				
+				// supernode and subnodes need to be added after to ensure they were created
+				for each(var check:Object in retrace)
 				{
-					for each(var linkSliver:Sliver in link.slivers)
-						newSlice.slivers.getByUrn(sliver.urn).links.getById(link.id).slivers.push(newSlice.slivers.getByUrn(linkSliver.urn));
+					var cloneNode:VirtualNode = check.clone;
+					var oldNode:VirtualNode = check.old;
+					if(oldNode.superNode != null)
+						cloneNode.superNode = newSliver.nodes.getById(oldNode.id);
+					if(oldNode.subNodes != null && oldNode.subNodes.length > 0)
+					{
+						for each(var subNode:VirtualNode in oldNode.subNodes)
+						cloneNode.subNodes.push(newSliver.nodes.getById(subNode.id));
+					}
 				}
 			}
+			
+			// Build up the links
+			for each(sliver in this.slivers)
+			{
+				newSliver = newSlice.slivers.getByCm(sliver.componentManager);
+				
+				for each(var link:VirtualLink in sliver.links)
+				{
+					var newLink:VirtualLink = new VirtualLink(newSliver);
+					newLink.id = link.id;
+					newLink.type = link.type;
+					newLink.bandwidth = link.bandwidth;
+					newLink.firstTunnelIp = link.firstTunnelIp;
+					newLink.secondTunnelIp = link.secondTunnelIp;
+					newLink._isTunnel = link._isTunnel;
+					newLink.rspec = link.rspec;
+					for each(var linkSliver:Sliver in link.slivers)
+						newLink.slivers.push(newSlice.slivers.getByUrn(linkSliver.urn));
+					
+					newLink.firstNode = oldNodeToCloneNode[link.firstNode];
+					newLink.secondNode = oldNodeToCloneNode[link.secondNode];
+					
+					// Make sure it wasn't added by another sliver
+					if((newLink.firstNode.slivers[0] as Sliver).links.getById(newLink.id) != null)
+						continue;
+					
+					for each(var i:VirtualInterface in link.interfaces)
+					{
+						var newInterface:VirtualInterface = oldInterfaceToCloneInterface[i];
+						newLink.interfaces.addItem(newInterface);
+						newInterface.virtualLinks.addItem(newLink);
+						newInterface.virtualNode.links.addItem(newLink);
+					}
+					
+					newLink.firstNode.slivers[0].links.addItem(newLink);
+					if(newLink.secondNode.slivers[0] != newLink.firstNode.slivers[0])
+						newLink.secondNode.slivers[0].links.addItem(newLink);
+				}
+			}
+
 			return newSlice;
 		}
 		

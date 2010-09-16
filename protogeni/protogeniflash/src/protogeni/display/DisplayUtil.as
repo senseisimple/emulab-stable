@@ -252,6 +252,19 @@
 			return nodeButton;
 		}
 		
+		// Gets a button for the physical node
+		public static function getVirtualNodeButton(n:VirtualNode):Button {
+			var nodeButton:Button = new Button();
+			nodeButton.label = n.id;
+			nodeButton.toolTip = n.id + " on " + n.manager.Hrn;
+			nodeButton.addEventListener(MouseEvent.CLICK,
+				function openNode(event:MouseEvent):void {
+					viewVirtualNode(n);
+				}
+			);
+			return nodeButton;
+		}
+		
 		// Gets a button for a physical link
 		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
 			var linkButton:Button = new Button();

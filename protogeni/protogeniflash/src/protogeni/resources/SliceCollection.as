@@ -18,6 +18,16 @@ package protogeni.resources
 			Main.protogeniHandler.dispatchSlicesChanged();
 		}
 		
+		public function getByUrn(urn:String):Slice
+		{
+			for each(var existing:Slice in this)
+			{
+				if(existing.urn == urn)
+					return existing;
+			}
+			return null;
+		}
+		
 		public function addOrReplace(s:Slice):void
 		{
 			for each(var existing:Slice in this)
