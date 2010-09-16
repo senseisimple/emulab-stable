@@ -843,6 +843,21 @@ sub setPortRate($$$)
     return 0;
 }
 
+#
+# Internal
+# convert port format from pcxx:card to [A-I][0-9]{2}
+#
+sub convertPortFromNode2Dev($$) {
+    my $self = shift;
+    my $pcport = shift;
+    
+    my $modport = $Ports{"$pcport:1"};
+    if (defined($modport)) {
+        return $self->convertPortFormat($modport);
+    }
+    
+    return $pcport;
+}
 
 #
 # Set a variable associated with a port. The commands to execute are given
@@ -863,6 +878,7 @@ sub portControl ($$@) {
 
     my $errors = 0;
     foreach my $port (@ports) { 
+        $port = $self->convertPortFromNode2Dev($port);
         my $rt = $self->setPortRate($port, $cmd);
         if ($rt) {
             if ($rt =~ /^ERROR: port rate unsupported/) {
@@ -880,6 +896,21 @@ sub portControl ($$@) {
     return $errors;
 }
 
+# 
+# Check to see if the given 802.1Q VLAN tag exists on the switch
+#
+# usage: vlanNumberExists($self, $vlan_number)
+#        returns 1 if the VLAN exists, 0 otherwise
+#
+sub vlanNumberExists($$) {
+    my ($self, $vlan_number) = @_;
+
+    if ($self->findVlan($vlan_number)) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
 
 #
 # Original purpose: 
@@ -915,6 +946,12 @@ sub findVlans($@) {
         }
     }
 
+    foreach $vlan_name (keys %emptyVlans) {
+        if ( exists $mapping{$vlan_name} ) {
+            $mapping{$vlan_name} = $vlan_name;
+        }
+    }
+    
     return %mapping;
 }
 
@@ -941,6 +978,8 @@ sub findVlan($$;$) {
     my $ports = $self->getNamedPorts($vlan_id);
     if (@$ports) {
         return $vlan_id;
+    } elsif (exists($emptyVlans{$vlan_id})) {
+        return $vlan_id; #return $emptyVlans{$vlan_id};
     }
 
     return undef;
@@ -980,9 +1019,9 @@ sub createVlan($$$) {
     # We record this vlan because it is still empty.
     # Apcon switch doesn't support empty VLAN.
     #
-    $emptyVlans{$vlan_id} = 1;
+    $emptyVlans{$vlan_id} = $vlan_number;
 
-    return $vlan_number;
+    return $vlan_id;
 }
 
 #
@@ -995,17 +1034,18 @@ sub createVlan($$$) {
 #
 sub setPortVlan($$@) {
     my $self = shift;
-    my $vlan_number = shift;
-    my @ports = @_;
+    my $vlan_id = shift;
+    my @pcports = @_;
 
     my $id = $self->{NAME} . "::setPortVlan";
-    $self->debug("$id: $vlan_number ");
-    $self->debug("ports: " . join(",",@ports) . "\n");
+    $self->debug("$id: $vlan_id ");
+    $self->debug("ports: " . join(",",@pcports) . "\n");
+    my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
     
     $self->lock();
 
     # Check if ports are free
-    foreach my $port (@ports) {
+    foreach my $port (@ports) {        
         if ($self->getPortName($port)) {
             warn "ERROR: Port $port already in use.\n";
             $self->unlock();
@@ -1017,7 +1057,7 @@ sub setPortVlan($$@) {
     # TODO: Shall we check whether Vlan exists or not?
     #
     
-    my $errmsg = $self->namePorts($vlan_number, @ports);
+    my $errmsg = $self->namePorts($vlan_id, @ports);
     if ($errmsg) {
         warn "$errmsg";
         $self->unlock();
@@ -1030,8 +1070,8 @@ sub setPortVlan($$@) {
     # Check if this vlan was empty before and delete
     # it from the empty vlan records if YES.
     #
-    if (exists($emptyVlans{$vlan_number})) {
-        delete $emptyVlans{$vlan_number};
+    if (exists($emptyVlans{$vlan_id})) {
+        delete $emptyVlans{$vlan_id};
     }
 
     return 0;
@@ -1048,21 +1088,22 @@ sub setPortVlan($$@) {
 #
 sub delPortVlan($$@) {
     my $self = shift;
-    my $vlan_number = shift;
-    my @ports = @_;
+    my $vlan_id = shift;
+    my @pcports = @_;
 
-    $self->debug($self->{NAME} . "::delPortVlan $vlan_number ");
-    $self->debug("ports: " . join(",",@ports) . "\n");
+    $self->debug($self->{NAME} . "::delPortVlan $vlan_id ");
+    $self->debug("ports: " . join(",",@pcports) . "\n");
+    my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
     
     $self->lock();
 
     # Remember all ports for empty check after remove
-    my $allports = $self->getNamedPorts($vlan_number);
+    my $allports = $self->getNamedPorts($vlan_id);
 
     #
     # Find connections of @ports
     #
-    my ($src, $dst) = $self->getNamedConnections($vlan_number);
+    my ($src, $dst) = $self->getNamedConnections($vlan_id);
     my %sconns = ();
     foreach my $p (@ports) {
 
@@ -1101,7 +1142,7 @@ sub delPortVlan($$@) {
     # Remember the empty VLAN for warning msg when unloading module
     #
     if (scalar (@ports) == scalar (@$allports)) {
-        $emptyVlans{$vlan_number} = 0;
+        $emptyVlans{$vlan_id} = 1;
     }
 
     $self->unlock();
@@ -1130,7 +1171,7 @@ sub removePortsFromVlan($@) {
         if ($self->removePortName($vlan_number)) {
             $errors++;
         } else {
-            $emptyVlans{$vlan_number} = 0;
+            $emptyVlans{$vlan_number} = 1;
         }
     }
     return $errors;
@@ -1178,7 +1219,7 @@ sub removeVlan($@) {
             # it from the empty vlan records if YES.
             #
             if (exists($emptyVlans{$vlan_number})) {
-            delete $emptyVlans{$vlan_number};
+                delete $emptyVlans{$vlan_number};
             }
 
             print "Removed VLAN $vlan_number on switch $name.\n";    
@@ -1435,19 +1476,8 @@ sub isOpenflowSupported($) {
 END 
 {
 
-    foreach my $vlanid (keys %emptyVlans) {
-        if ($emptyVlans{$vlanid} == 1) {
-            warn "WARNING: VLAN $vlanid is deleted \
-because no ports added after creating! Apcon switch doesnot support empty VLAN.\n";
-        }
-        if ($emptyVlans{$vlanid} == 0) {
-            warn "WARNING: VLAN $vlanid is deleted \
-because no ports left after removing ports! Apcon switch doesnot support empty VLAN.\n";
-        }
-        if ($emptyVlans{$vlanid} == -1) {
-            warn "WARNING: VLAN $vlanid is deleted. \
-It is empty! Apcon switch doesnot support empty VLAN.\n";
-        }
+    foreach my $vlanid (keys %emptyVlans) {        
+        warn "WARNING: the unsupported empty VLAN $vlanid is deleted.\n";
     }
 
 }
