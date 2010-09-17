@@ -222,11 +222,12 @@ function SPITFORM($formfields, $errors)
               The older <b><a href='buildui/bui.php3'>NetBuild GUI</a></b>
               can be used to graphically create topologies.<font size=-2>
               (<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
-              information</a>)</font>.<br>
-              Or, you can download the Emulab
-              <a href='netlab/client.php3'><b>client</b></a> and graphically
-              create one from your desktop.
-          </ul></p><br>";
+              information</a>)</font>.";
+          #echo "<br>
+          #    Or, you can download the Emulab
+          #    <a href='netlab/client.php3'><b>client</b></a> and graphically
+          #    create one from your desktop.
+          echo "</ul></p><br>";
 	} else {
 	    if (isset($view['plab_ns_message'])) {
 		echo "<center>
