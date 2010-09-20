@@ -61,6 +61,14 @@
 			componentManager = manager;
 		}
 		
+		public function reset():void
+		{
+			nodes = new VirtualNodeCollection();
+			links = new VirtualLinkCollection();
+			state = "";
+			status = "";
+		}
+		
 		public function getVirtualNodeFor(pn:PhysicalNode):VirtualNode
 		{
 			for each(var vn:VirtualNode in this.nodes)
@@ -174,7 +182,7 @@
 							if(interfacedNode == null)
 							{
 								virtualLink = null;
-								continue;
+								break;
 							}
 						}
 	      				for each(var vi:VirtualInterface in interfacedNode.interfaces.collection)

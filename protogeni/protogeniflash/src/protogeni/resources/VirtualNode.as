@@ -37,7 +37,11 @@
 		
 		[Bindable]
 		public var id:String;
+		
+		[Bindable]
 		public var virtualizationType:String = "emulab-vnode";
+		
+		[Bindable]
 		public var virtualizationSubtype:String = "emulab-openvz";
 		
 		// Component
@@ -60,6 +64,8 @@
 		public var links:ArrayCollection = new ArrayCollection();
 		
 		public var rspec:XML;
+		
+		[Bindable]
 		public var slivers:Array;
 		public var hostname:String;
 		public var sshdport:String;
