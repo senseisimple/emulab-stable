@@ -17,6 +17,8 @@ package protogeni.communication
   import flash.events.ErrorEvent;
   
   import protogeni.resources.Sliver;
+  import protogeni.resources.VirtualLinkCollection;
+  import protogeni.resources.VirtualNodeCollection;
 
   public class RequestSliverCreate extends Request
   {
@@ -24,6 +26,7 @@ package protogeni.communication
     {
 		super("SliverCreate", "Creating sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
 		sliver = s;
+		s.created = false;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("rspec", sliver.getRequestRspec().toXMLString());
 		op.addField("keys", sliver.slice.creator.keys);

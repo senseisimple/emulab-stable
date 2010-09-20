@@ -55,6 +55,9 @@
 
 			public function refreshSlice():void
 			{
+				if(!slice.hasAllAllocatedResources())
+					return;
+				
 				var unadded:ArrayCollection = slice.GetAllNodes();
 				
 				// Remove/replace old nodes
@@ -70,7 +73,15 @@
 					}
 					else
 					{
-						unadded.removeItemAt(unadded.getItemIndex(vn));
+						for(var j:int = 0; j < unadded.length; j++)
+						{
+							if((unadded[j] as VirtualNode).id == sn.lastId)
+							{
+								unadded.removeItemAt(j);
+								break;
+							}
+						}
+						//unadded.removeItemAt(unadded.getItemIndex(vn));
 						sn.setNode(slice.getVirtualNodeWithId(sn.lastId));
 						sn.resetToStatus();
 					}
@@ -96,7 +107,15 @@
 					}
 					else
 					{
-						unadded.removeItemAt(unadded.getItemIndex(vl));
+						for(j = 0; j < unadded.length; j++)
+						{
+							if((unadded[j] as VirtualLink).id == sl.lastId)
+							{
+								unadded.removeItemAt(j);
+								break;
+							}
+						}
+						//unadded.removeItemAt(unadded.getItemIndex(vl));
 						sl.setLink(slice.getVirtualLinkWithId(sl.lastId));
 					}
 				}

@@ -77,6 +77,19 @@
 			return false;
 		}
 		
+		public function hasAllAllocatedResources():Boolean
+		{
+			if(slivers == null)
+				return false;
+			
+			for each(var existing:Sliver in this.slivers)
+			{
+				if(!existing.created)
+					return false;
+			}
+			return true;
+		}
+		
 		public function GetAllNodes():ArrayCollection
 		{
 			var nodes:ArrayCollection = new ArrayCollection();
@@ -199,9 +212,9 @@
 			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
 
 			// Build up the slivers with nodes
-			for each(var sliver:Sliver in this.slivers)
+			for each(sliver in this.slivers)
 			{
-				var newSliver:Sliver = newSlice.slivers.getByCm(sliver.componentManager);
+				newSliver = newSlice.slivers.getByCm(sliver.componentManager);
 				
 				// Build up nodes
 				var retrace:Array = new Array();

@@ -39,9 +39,12 @@ package protogeni.communication
 			for each(var nodeObject:Object in response.value.details)
 			{
 				var vn:VirtualNode = sliver.getVirtualNodeFor(sliver.componentManager.Nodes.GetByUrn(nodeObject.component_urn));
-				vn.status = nodeObject.status;
-				vn.state = nodeObject.state;
-				vn.error = nodeObject.error;
+				if(vn != null)
+				{
+					vn.status = nodeObject.status;
+					vn.state = nodeObject.state;
+					vn.error = nodeObject.error;
+				}
 			}
 			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 		}
