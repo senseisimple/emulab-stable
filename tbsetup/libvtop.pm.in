@@ -7439,7 +7439,6 @@ sub array_diff($$)
 sub SetPortRange($)
 {
     my ($self) = @_;
-    my ($newhigh, $newlow);
     
     #
     # See if any virtual nodes. If not, no need to do anything since
@@ -7451,13 +7450,12 @@ sub SetPortRange($)
     #
     # Use existing port range when updating, or else find a free slot.
     #
-    if ($self->updating()) {
-	($newlow,$newhigh) = $self->experiment()->GetPortRange();
-    }
-    else {
-	($newlow,$newhigh) =
-	    $self->experiment()->SetPortRange($self->impotent() ||
-					      $self->alloconly());
+    my ($newlow,$newhigh) = $self->experiment()->GetPortRange();
+    if (!defined($newlow)) {
+	#
+	# It is okay to do this in impotent mode; it is harmless.
+	#
+	($newlow,$newhigh) = $self->experiment()->SetPortRange(0);
     }
     if (!defined($newlow)) {
 	tberror("Could not set the portrange!\n");
