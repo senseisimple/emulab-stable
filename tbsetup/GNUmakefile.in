@@ -88,7 +88,8 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
-		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm
+		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm \
+		  power_ipmi.pm
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
