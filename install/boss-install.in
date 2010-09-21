@@ -46,7 +46,6 @@ my $FRISADDR   = '@FRISEBEEMCASTADDR@';
 #
 # Fixed paths for clients
 #
-my $PROJROOT    = "@PROJROOT_DIR@";
 my $GROUPROOT   = "@GROUPSROOT_DIR@";
 my $USERROOT    = "@USERSROOT_DIR@";
 my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
@@ -94,7 +93,6 @@ my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $INETD_CONF      = "/etc/inetd.conf";
 
-my $PROTOUSER       = "elabman";
 my $PROTOUSER_KEY   = "$TOP_SRCDIR/install/elabman_dsa.pub";
 my $ROOT_PRIVKEY    = "/root/.ssh/id_rsa";
 my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
@@ -111,7 +109,6 @@ my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
 my $DHCPD_LEASES    = "/var/db/dhcpd.leases";
 my $DHCPD_MAKECONF  = "$PREFIX/sbin/dhcpd_makeconf";
 my $BATCHEXP        = "$PREFIX/bin/batchexp";
-my $WAP             = "$PREFIX/sbin/withadminprivs";
 my $NAMED_SETUP     = "$PREFIX/sbin/named_setup";
 my $ADDPUBKEY       = "$PREFIX/sbin/addpubkey";
 my $TBACCT          = "$PREFIX/sbin/tbacct";

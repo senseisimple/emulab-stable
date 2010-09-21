@@ -52,7 +52,6 @@ if ($OUTER_BOSS eq '')
 #
 # Fixed paths for clients
 #
-my $PROJROOT    = "@PROJROOT_DIR@";
 my $GROUPROOT   = "@GROUPSROOT_DIR@";
 my $USERROOT    = "@USERSROOT_DIR@";
 my $SCRATCHROOT	= "@SCRATCHROOT_DIR@";
