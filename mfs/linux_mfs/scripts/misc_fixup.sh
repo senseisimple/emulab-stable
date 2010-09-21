@@ -11,3 +11,5 @@ if ! [ -f "$target_dir/bin/tcsh" ]; then
 	ln -sf /bin/tcsh.fake "$target_dir/bin/tcsh"
 	ln -sf /bin/tcsh.fake "$target_dir/bin/csh"
 fi
+
+touch "$target_dir/etc/mtab"

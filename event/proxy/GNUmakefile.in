@@ -42,16 +42,16 @@ PFLAGS    = -pthread
 PFLAGS   += -DDEBUG
 PFLAGS	 += -O2 -g -Wall
 PFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-PFLAGS   += -L/usr/local/lib -lpubsub_r -lm
+PFLAGS   += -L/usr/local/lib -lpubsub_r -ltb -lm
 
 PLDFLAGS += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 PLIBS     = -levent_r -ltb -lcrypto
-PLIBS    += -L/usr/local/lib -lpubsub_r -lm
+PLIBS    += -L/usr/local/lib -lpubsub_r -ltb -lm
 PLDFLAGS += $(LDSTATIC)
 
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS      = -levent -ltb -lcrypto
-LIBS     += -L/usr/local/lib -lpubsub -lm
+LIBS     += -L/usr/local/lib -lpubsub -ltb -lm
 LDFLAGS  += $(LDSTATIC)
 
 # Deal with the presence/absence of kerberos in the linux ssl library
@@ -89,7 +89,7 @@ evproxyplab-debug:    evproxyplab.o ../lib/libevent.a ../lib/event.h
 
 version0_gateway:    version0_gateway.c
 	$(CC) $(CFLAGS) $(PLDFLAGS) -pthread -o $@ $< -L/usr/local/lib \
-		-lpubsub_r -lm
+		-lpubsub_r -ltb -lm
 
 eventping-debug: eventping.o
 	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)

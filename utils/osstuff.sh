@@ -71,7 +71,7 @@ esac
 
 if [ -z "$tag" ]; then
     p1=`echo $dist | tr '[A-Z]' '[a-z]'`
-    p2=`echo $rel | sed -e 's/^\(.\).*/\1/'`
+    p2=`echo $rel | sed -e 's/^\([0-9]*\).*/\1/'`
     tag="${p1}${p2}"
 fi
 

@@ -207,6 +207,7 @@ main(int argc, char **argv)
 
 static char	notify_debug_string[2*BUFSIZ];
 
+#if 0
 static int
 pubsub_notify_traverse_debug(void *arg, char *name,
 			     pubsub_type_t type, pubsub_value_t value,
@@ -258,6 +259,7 @@ pubsub_notify_traverse_debug(void *arg, char *name,
 	
 	return 1;
 }
+#endif
 
 static void
 pubsub_callback(pubsub_handle_t *handle,

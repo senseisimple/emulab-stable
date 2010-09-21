@@ -10,6 +10,8 @@ use POSIX qw(strftime floor ceil);
 use Data::Dumper;
 use Carp;
 
+my $LIMIT = 3000000;
+
 $Data::Dumper::Indent = 1;
 
 use strict;
@@ -54,6 +56,8 @@ our $prev;
 our $prev_line;
 our $last_history_id = -1;
 
+my $again = 0;
+
 if ($prep) {
 
     if ($fresh) {
@@ -81,7 +85,11 @@ if ($prep) {
 	do "gather.state.1";
     }
     
-    $qr = DBQueryFatal("select history_id,node_id,op,stamp from $NODE_USAGE_DB.node_history_copy where history_id > $last_history_id order by history_id");
+    $qr = DBQueryFatal("select history_id,node_id,op,stamp from $NODE_USAGE_DB.node_history_copy where history_id > $last_history_id order by history_id limit $LIMIT");
+
+    if ($qr->num_rows() == $LIMIT) {
+	$again = 1;
+    }
 
     my $prev_history_id = $last_history_id;
 
@@ -162,13 +170,7 @@ if ($results) {
     close F;
 }
 
-
-
-
-
-
-
-
-
-
-
+if ($again) {
+    printf STDERR "Too many rows to handle at once, running again...\n";
+    exec "@prefix@/libexec/node_usage/gather";
+}
