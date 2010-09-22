@@ -9,7 +9,6 @@ import socket
 import os
 import os.path
 import stat
-import popen2
 import tempfile
 import time
 import re
