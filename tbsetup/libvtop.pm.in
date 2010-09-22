@@ -4728,19 +4728,24 @@ sub AllocNodes($)
 	    $vpnode->isremotenode() || $vpnode->_onsharednode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
-	    my $default   = 0;
+	    my $sshdport;
 
-	    if (exists($self->current_v2v()->{$vnodename})) {
-		$default = $vpnode->sshdport();
-		$self->printdb("Reusing port $default on $vpnode for sshd\n");
+	    #
+	    # XXX What an absurd DB default for this! Should be null.
+	    #
+	    if (exists($self->current_v2v()->{$vnodename}) &&
+		$vpnode->sshdport() != 11000) {
+		
+		$sshdport = $vpnode->sshdport();
+		$self->printdb("sshdport: Reusing $sshdport on $vpnode\n");
 	    }
-	    my $sshdport = nextipportnum($pnode, $default);
+	    else {
+		$sshdport = nextipportnum($pnode);
+		return -1
+		    if ($sshdport < 0);
 
-	    return -1
-		if ($sshdport < 0);
-
-	    $self->printdb("sshdport: ".
-			   "$vnodename $vpnodename $pnodename $sshdport\n");
+		$self->printdb("sshdport: Using $sshdport on $vpnode\n");
+	    }
 
 	    DBQueryWarn("update nodes set sshdport=$sshdport ".
 			"where node_id='$vpnodename'")
@@ -7476,12 +7481,38 @@ sub SetPortRange($)
 	my $pnodename  = $self->solution_v2p()->{$vnodename};
 	my $pnode      = $self->pnodes()->{$pnodename};
 
-	$vpnode->_portarray(undef);
 	$vpnode->_portlow($newlow);
 	$vpnode->_porthigh($newhigh);
-	$pnode->_portarray(undef);
 	$pnode->_portlow($newlow);
 	$pnode->_porthigh($newhigh);
+
+	my $portarray1 = [];
+	my $portarray2 = [];
+
+	#
+	# XXX This attempts to keep the sshd port the same across
+	# swapmod. We need a better (more general) way to do this.
+	#
+	my $sshdport;
+	if (exists($self->current_v2v()->{$vnodename}) &&
+		$vpnode->sshdport() != 11000) {
+
+	    $sshdport = $vpnode->sshdport();
+	    #$self->printdb("reserving sshdport $sshdport on $vpnode\n");
+	}
+	
+	for (my $i = 0, my $port = $pnode->_portlow();
+	     $i < $pnode->_porthigh() - $pnode->_portlow(); $i++,$port++) {
+	    
+	    $portarray1->[$i] = ($i < 10 ? $port : 0 - $port);
+	    $portarray2->[$i] = ($i < 10 ? $port : 0 - $port);
+
+	    if (defined($sshdport) && $port == $sshdport) {
+		$portarray1->[$i] = $sshdport;
+	    }
+	}
+	$pnode->_portarray($portarray1);
+	$vpnode->_portarray($portarray2);
 
 	# We only set the vpnodes. tmcd sends that to the client.
 	DBQueryWarn("update nodes set ipport_low=$newlow, ".
@@ -7496,42 +7527,17 @@ sub SetPortRange($)
 # Bump and return the IP port number for a node. This is
 # required for multiplexing virtual nodes on a physical node. 
 # 
-sub nextipportnum($;$)
+sub nextipportnum($)
 {
     my ($pnode, $default)  = @_;
     my $portarray = $pnode->_portarray();
     my $port = 0;
 
-    if (!defined($portarray)) {
-	$portarray = [];
-	
-	for (my $i = 0, my $port = $pnode->_portlow();
-	     $i < $pnode->_porthigh() - $pnode->_portlow(); $i++,$port++) {
-	    $portarray->[$i] = ($i < 10 ? $port : 0 - $port)
-	}
-	$pnode->_portarray($portarray);
-    }
-    if ($default) {
-	if ($default < $pnode->_portlow() || $default > $pnode->_porthigh()) {
-	    tberror("Dynamic port $default out of range on $pnode!\n");
-	    return -1;
-	}
-	my $idx = $default - $pnode->_portlow();
-	if ($portarray->[$idx] < 0) {
-	    $port = $portarray->[$idx] = $default;
-	}
-	else {
-	    tberror("Dynamic port $default already in use on $pnode!\n");
-	    return -1;
-	}
-    }
-    else {
-	for (my $i = 0; $i < $pnode->_porthigh() - $pnode->_portlow(); $i++) {
-	    if ($portarray->[$i] < 0) {
-		$port = 0 - $portarray->[$i];
-		$portarray->[$i] = $port;
-		last;
-	    }
+    for (my $i = 0; $i < $pnode->_porthigh() - $pnode->_portlow(); $i++) {
+	if ($portarray->[$i] < 0) {
+	    $port = 0 - $portarray->[$i];
+	    $portarray->[$i] = $port;
+	    last;
 	}
     }
     if (!$port) {
