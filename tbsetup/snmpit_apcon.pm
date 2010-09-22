@@ -289,15 +289,15 @@ sub readTranslationTable($) {
     my $result =
 	DBQueryFatal("select node_id,card,port,mac,iface from interfaces");
     while ( @_ = $result->fetchrow_array()) {
-	$name = "$_[0]:$_[1]";
-	$iface = "$_[0]:$_[4]";
-	if ($_[2] != 1) {$name .=$_[2]; }
-	$mac = "$_[3]";
-	$Interfaces{$name} = $mac;
-	$Interfaces{$mac} = $name;
-	$PortIface{$name} = $iface;
-	$PortIface{$iface} = $name;
-	print "Interfaces: $mac <==> $name\n" if $self->{DEBUG} > 1;
+        $name = "$_[0]:$_[1]";
+        $iface = "$_[0]:$_[4]";
+        if ($_[2] != 1) {$name .=$_[2]; }
+        $mac = "$_[3]";
+        $Interfaces{$name} = $mac;
+        $Interfaces{$mac} = $name;
+        $PortIface{$name} = $iface;
+        $PortIface{$iface} = $name;
+        print "Interfaces: $mac <==> $name\n" if $self->{DEBUG} > 1;
     }
 
     print "FILLING %Ports\n" if $self->{DEBUG};
@@ -305,14 +305,14 @@ sub readTranslationTable($) {
 	    "from wires;");
     while ( my @row = $result->fetchrow_array()) {
         my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
-	$name = "$node_id1:$card1:$port1";
-	print "Name='$name'\t" if $self->{DEBUG} > 2;
-	print "Dev='$node_id2'\t" if $self->{DEBUG} > 2;
-	$switchport = "$node_id2:$card2.$port2";
-	print "switchport='$switchport'\n" if $self->{DEBUG} > 2;
-	$Ports{$name} = $switchport;
-	$Ports{$switchport} = $name;
-	print "Ports: '$name' <==> '$switchport'\n" if $self->{DEBUG} > 1;
+        $name = "$node_id1:$card1:$port1";
+        print "Name='$name'\t" if $self->{DEBUG} > 2;
+        print "Dev='$node_id2'\t" if $self->{DEBUG} > 2;
+        $switchport = "$node_id2:$card2.$port2";
+        print "switchport='$switchport'\n" if $self->{DEBUG} > 2;
+        $Ports{$name} = $switchport;
+        $Ports{$switchport} = $name;
+        print "Ports: '$name' <==> '$switchport'\n" if $self->{DEBUG} > 1;
     }
 
 }
