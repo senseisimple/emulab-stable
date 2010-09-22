@@ -44,11 +44,24 @@ $(INSTALL_APACHE_CONFIG)/%: %
 # This could (should?) be done with configure, but apache port might
 # not be installed when we configure our software.
 #
+# XXX ugh, do the same thing to detect php5...
+#
 httpd.conf.fixed: httpd.conf
 	-@cp httpd.conf httpd.conf.fixed
 	@if [ -x /usr/local/libexec/apache/mod_auth_mysql.so ]; then \
             sed -i "" -e '/^LoadModule auth_mysql/s/libauth/mod_auth/' httpd.conf.fixed; \
-	    echo "Updated httpd.conf"; \
+	    echo "Updated httpd.conf for auth_mysql"; \
+	fi
+	@if [ -x /usr/local/libexec/apache/libphp5.so ]; then \
+            sed -i "" -e 's/php4/php5/g' httpd.conf.fixed; \
+	    echo "Updated httpd.conf for php5"; \
+	fi
+
+httpd.conf-ops.fixed: httpd.conf-ops
+	-@cp httpd.conf-ops httpd.conf-ops.fixed
+	@if [ true -o -x /usr/local/libexec/apache/libphp5.so ]; then \
+            sed -i "" -e 's/php4/php5/g' httpd.conf-ops.fixed; \
+	    echo "Updated httpd.conf-ops for php5"; \
 	fi
 
 install-dirs:
@@ -82,8 +95,8 @@ endif
 install: install-dirs install-scripts httpd.conf.fixed
 	$(INSTALL_DATA) httpd.conf.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
 
-control-install: install-dirs install-scripts httpd.conf-ops
-	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
+control-install: install-dirs install-scripts httpd.conf-ops.fixed
+	$(INSTALL_DATA) httpd.conf-ops.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
 else
 install-scripts install control-install:
 	@echo "Cannot install Apache config in dev tree"
