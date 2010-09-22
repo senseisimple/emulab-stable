@@ -2584,7 +2584,8 @@ sub ExperimentVLans($$$)
 	DBQueryWarn("select l.lanid from lans as l ".
 		    "left join lan_attributes as la on ".
 		    "  la.lanid=l.lanid and la.attrkey='class' ".
-		    "where l.type='vlan' and l.exptidx='$exptidx' and ".
+		    "where (l.type='vlan' or l.type='wire') ".
+                    " and l.exptidx='$exptidx' and ".
 		    "      (la.attrvalue='Experimental' or ".
 		    "       la.attrvalue is null)");
     return -1

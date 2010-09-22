@@ -598,10 +598,13 @@ sub parsePortRates($$)
     my @lines = split( /\n/, $raw );
  
     foreach my $line ( @lines ) {
-        if ( $line =~ /^([A-I][0-9]{2})\s+Desired Rate:\s+0x([A-F0-9]{2})\s+/ ) {
+        if ( $line =~ 
+	    /^([A-I][0-9]{2})\s+Desired Rate:\s+0x([A-F0-9]{2})\s+/ ) {
             @{$rates{$1}} = ($2,[]);            
         } else {
-            if ( $line =~ /^([A-I][0-9]{2})\s+Actual Link:\s+0x([A-F0-9]{2})\s+(.+)\r$/ ) {
+            if ( $line =~ 
+		/^([A-I][0-9]{2})\s+Actual Link:\s+0x([A-F0-9]{2})\s+(.+)\r$/
+	       ) {
                 my ($port, $arate, $desc) = ($1, $2, $3);
                 if ($desc =~ /^(10{1,3}Mb)\s+(\w+)\s*/) {
                         @{$rates{$port}[1]} = ($arate, $desc, $2,$1);
@@ -885,7 +888,7 @@ sub portControl ($$@) {
                 #
                 # Command not supported
                 #
-                $self->debug("Unsupported port control command '$cmd' ignored.\n");
+                $self->debug("Unsupported port command '$cmd' ignored.\n");
                 return 0;
             }
 
@@ -1040,6 +1043,12 @@ sub setPortVlan($$@) {
     my $id = $self->{NAME} . "::setPortVlan";
     $self->debug("$id: $vlan_id ");
     $self->debug("ports: " . join(",",@pcports) . "\n");
+
+    if (@pcports != 2) {
+	warn "$id: supports only two ports in one VLAN.\n";
+	return 1;
+    }
+
     my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
     
     $self->lock();
@@ -1052,16 +1061,26 @@ sub setPortVlan($$@) {
             return 1;
         }
     }
-
-    #
-    # TODO: Shall we check whether Vlan exists or not?
-    #
     
     my $errmsg = $self->namePorts($vlan_id, @ports);
     if ($errmsg) {
         warn "$errmsg";
         $self->unlock();
         return 1;
+    }
+
+    my ($rt, $msg) = $self->connectDuplex($ports[0], $ports[1]);
+    if ($rt) {
+	$self->unnamePorts(@ports);
+	warn "$id: ports connection failed. $msg\n";
+
+	# We unnamed the ports so vlan doesn't exist now.
+	if (exists($emptyVlans{$vlan_id})) {
+	    delete $emptyVlans{$vlan_id};
+	}
+
+	$self->unlock();
+	return 1;
     }
 
     $self->unlock();
@@ -1206,7 +1225,6 @@ sub removeSomePortsFromVlan($$@) {
 sub removeVlan($@) {
     my $self = shift;
     my @vlan_numbers = @_;
-    my $name = $self->{NAME};
     my $errors = 0;
 
     foreach my $vlan_number (@vlan_numbers) {
@@ -1222,7 +1240,7 @@ sub removeVlan($@) {
                 delete $emptyVlans{$vlan_number};
             }
 
-            print "Removed VLAN $vlan_number on switch $name.\n";    
+            print "Removed VLAN $vlan_number on switch $self->{NAME}.\n";    
         }    
     }
 
@@ -1264,8 +1282,7 @@ sub listVlans($) {
     foreach my $vlan_id (keys %$vlans) {
         push @list, [$vlan_id, $vlan_id, $vlans->{$vlan_id}];
     }
-
-    #$self->debug($self->{NAME} .":". join("\n",(map {join ",", @$_} @list))."\n");
+    
     return @list;
 }
 
