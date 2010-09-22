@@ -614,7 +614,8 @@ sub ExecQuiet(@) {
 #
 sub ExecQuietFatal(@) {
     if (ExecQuiet(@_)) {
-	PhaseFail("Unable to execute: ");
+	my $msg = join(' ', @_);
+	PhaseFail("Unable to execute: '$msg'");
     }
 }
 

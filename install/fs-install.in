@@ -82,7 +82,12 @@ else {
 #
 my $FS_PORT = "emulab-fs-1.4";
 if ($FBSD_MAJOR > 4) {
-    if ($FBSD_MAJOR > 6) {
+    if ($FBSD_MAJOR > 7) {
+	# XXX someday...
+	$FS_PORT = "emulab-fs-4.0";
+    } elsif ($FBSD_MAJOR == 7 && $FBSD_MINOR > 2) {
+	$FS_PORT = "emulab-fs-3.1";
+    } elsif ($FBSD_MAJOR == 7) {
 	$FS_PORT = "emulab-fs-3.0";
     } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
 	$FS_PORT = "emulab-fs-2.1";

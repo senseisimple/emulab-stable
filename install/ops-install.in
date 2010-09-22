@@ -68,13 +68,8 @@ my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
 # Should be configure variable
 my $TBADMINGID  = 101;
 
-#
 # XXX temporary for perl DBD mysql access
 my $P5DBD_PKG	  = "p5-DBD-mysql50-3.0002";
-# XXX temporary until fix dependencies in emulab-ops package
-my $PYM2_PKG	  = "py25-m2crypto-0.19.1";
-# XXX temporary until someone extracts their head from the dark regions
-my $EASYINSTALL	  = "/usr/local/bin/easy_install";
 
 #
 # Allow this to work if the library is left in the source directory
@@ -113,7 +108,14 @@ else {
 my $OPS_PORT = "emulab-ops-1.4"; 
 my $FS_PORT = "emulab-fs-1.4";
 if ($FBSD_MAJOR > 4) {
-    if ($FBSD_MAJOR > 6) {
+    if ($FBSD_MAJOR > 7) {
+	# XXX someday...
+	$OPS_PORT = "emulab-ops-4.0";
+	$FS_PORT = "emulab-fs-4.0";
+    } elsif ($FBSD_MAJOR == 7 && $FBSD_MINOR > 2) {
+	$OPS_PORT = "emulab-ops-3.1";
+	$FS_PORT = "emulab-fs-3.1";
+    } elsif ($FBSD_MAJOR == 7) {
 	$OPS_PORT = "emulab-ops-3.0";
 	$FS_PORT = "emulab-fs-3.0";
     } elsif ($FBSD_MAJOR == 6 && $FBSD_MINOR > 2) {
@@ -124,7 +126,26 @@ if ($FBSD_MAJOR > 4) {
 	$FS_PORT = "emulab-fs-2.0";
     }
 }
-my $PHP4_PORT = "php4-extensions-1.0";
+
+# PHP5 is the only alternative at the moment and only for newer OSes
+my $PHP_VERSION = 4;
+my $PHP_PORT = "php4-extensions-1.0";
+if ($FBSD_MAJOR > 7 || ($FBSD_MAJOR == 7 && $FBSD_MINOR > 2)) {
+    $PHP_VERSION = 5;
+    $PHP_PORT = "php5-extensions-1.3";
+}
+
+#
+# Version dependent python-fu 
+#
+my $PYM2_PKG = "py25-m2crypto-0.19.1";
+my $PY_VER = "python2.5";
+if ($FBSD_MAJOR > 7 || ($FBSD_MAJOR == 7 && $FBSD_MINOR > 2)) {
+    $PYM2_PKG = "py26-m2crypto-0.20";
+    $PY_VER = "python2.6";
+}
+# XXX temporary until someone extracts their head from the dark regions
+my $EASYINSTALL	  = "/usr/local/bin/easy_install";
 
 my $packagedir = "";
 my $batchmode  = 0;
@@ -355,15 +376,19 @@ Phase "ports", "Installing ports", sub {
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT");
 	};
 	if ($FBSD_MAJOR > 4) {
-	    Phase "php4", "Installing php4 package", sub {
-		if (!ExecQuiet("$PKG_INFO -e $PHP4_PORT")) {
+	    Phase "php", "Installing php${PHP_VERSION} package", sub {
+		if (!ExecQuiet("$PKG_INFO -e $PHP_PORT")) {
 		    PhaseSkip("Package already installed");
 		}
 		if (!$packagedir) {
 		    PhaseSkip("No package directory provided");
 		}
+		# XXX ugh, make sure an older version is not installed
+		if ($PHP_VERSION > 4) {
+		    ExecQuiet("$PKG_DEL -f -x php4-");
+		}
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir ".
-			       "     $PKG_ADD $PHP4_PORT");
+			       "     $PKG_ADD $PHP_PORT");
 	    };
 	}
 	# XXX Also temporary
@@ -390,13 +415,13 @@ Phase "ports", "Installing ports", sub {
 		    if ($pname);
 		ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $P5DBD_PKG");
 	    };
-	    # XXX cannot seem to get these dependencies into emulab-boss
+	    # XXX cannot seem to get these dependencies into emulab-ops
 	    if ($FBSD_MAJOR > 6) {
 		Phase "py-m2crypto", "Installing python m2crypto package", sub {
-		    my $pname = `$PKG_INFO -E 'py25-m2crypto-*' 2>/dev/null`;
+		    my $pname = `$PKG_INFO -E 'py*-m2crypto-*' 2>/dev/null`;
 		    chomp($pname);
 		    if ($pname eq $PYM2_PKG) {
-			PhaseSkip("py25-m2crypto already up to date");
+			PhaseSkip("py-m2crypto already up to date");
 		    }
 		    if (!$packagedir) {
 			PhaseSkip("No package directory provided");
@@ -494,12 +519,16 @@ Phase "ports", "Installing ports", sub {
 	    PhaseFail "Unable to change to $PORTSMISCDIR/emulab-fs: $!";
 	ExecQuietFatal("make -DBATCH install");
     };
-    Phase "php4-pinstall", "Installing PHP4 ports (may take a while)", sub {
-	if (!ExecQuiet("$PKG_INFO -e $PHP4_PORT")) {
+    Phase "php-pinstall", "Installing PHP${PHP_VERSION} ports (may take a while)", sub {
+	if (!ExecQuiet("$PKG_INFO -e $PHP_PORT")) {
 	    PhaseSkip("Ports already installed");
 	}
-	chdir "$PORTSMISCDIR/emulab-php4" or
-	    PhaseFail "Unable to change to $PORTSMISCDIR/emulab-php4: $!";
+	# XXX ugh, make sure an older version is not installed
+	if ($PHP_VERSION > 4) {
+	    ExecQuiet("$PKG_DEL -f -x php4-");
+	}
+	chdir "$PORTSMISCDIR/emulab-php${PHP_VERSION}" or
+	    PhaseFail "Unable to change to $PORTSMISCDIR/emulab-php${PHP_VERSION}: $!";
 	ExecQuietFatal("make -DBATCH install");
     };
     if ($MAILMANSUPPORT) {
@@ -565,17 +594,17 @@ Phase "portfixup", "Fixing up packages", sub {
 	# package that I know will fail otherwise.
 	#
 	Phase "m2crypto-egg", "Unpacking python m2crypto .egg", sub {
-	    my $pydir = "/usr/local/lib/python2.5/site-packages";
-	    my $egg = `ls -d $pydir/M2Crypto-0.19.1-py2.5-*.egg 2>/dev/null | tail -1`;
+	    my $pydir = "/usr/local/lib/$PY_VER/site-packages";
+	    my $egg = `ls -d $pydir/M2Crypto-*-py*-*.egg 2>/dev/null | tail -1`;
 	    chomp($egg);
 	    if (! -x $EASYINSTALL) {
 		PhaseSkip("python easy_install missing");
 	    }
 	    if ($egg eq "") {
-		PhaseSkip("py25-m2crypto egg not found");
+		PhaseSkip("egg not found");
 	    }
 	    if (-d "$egg") {
-		PhaseSkip("py25-m2crypto egg already unpacked");
+		PhaseSkip("egg already unpacked");
 	    }
 	    # XXX swig must be installed for easyinstall to exit correctly
 	    Phase "swig", "Installing swig", sub {
@@ -585,7 +614,7 @@ Phase "portfixup", "Fixing up packages", sub {
 	    };
 	    ExecQuietFatal("mv $egg /var/tmp/");
 	    $egg =~ s/$pydir//;
-	    ExecQuietFatal("$EASYINSTALL -Z /var/tmp$egg");
+	    ExecQuietFatal("$EASYINSTALL -N -H None -Z /var/tmp$egg");
 	    ExecQuietFatal("mv /var/tmp$egg $pydir/$egg.bak");
 	};
     }
@@ -1158,8 +1187,11 @@ Phase "database", "Setting up database", sub {
 
 	ExecQuietFatal("$RCDIR/1.mysql-server.sh start");
 	# Give mysqld some time to start, then make sure it did
-	sleep 5;
-	ExecQuietFatal("$MYSQLADMIN -u mysql ping");
+	sleep 2;
+	if (ExecQuiet("$MYSQLADMIN -u mysql ping")) {
+	    sleep 5;
+	    ExecQuietFatal("$MYSQLADMIN -u mysql ping");
+	}
     };
 
     # Once the password is inserted and privs flushed, will need a password
