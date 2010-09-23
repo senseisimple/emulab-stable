@@ -40,7 +40,7 @@ MAINTAINER=	testbed-ops@flux.utah.edu
 .if ${PORTVERSION} == "3.1"
 PHP_VER=	5
 PERL_VER=	5.10.1
-BOOST_PORT=	devel/boost-libs
+BOOST_PORT=	devel/boost-all
 P5SNMP_PORT=	misc/p5-SNMP
 .else
 PHP_VER=	4
