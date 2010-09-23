@@ -385,7 +385,7 @@ sub osload ($$) {
 			    my ($pmbr) = $dbresult->fetchrow_array();
 			    if ($pmbr != $rowref->{'mbr_version'}) {
 				# XXX: Is this right in the context of multiple images
-				tbwarn("$node: Existing partition $i inconsistent".
+				tbinfo("$node: Existing partition $i inconsistent".
 				       " with new image partitioning,".
 				       " invalidating existing partition");
 				$whackit = 1;

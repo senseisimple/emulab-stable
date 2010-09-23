@@ -2276,9 +2276,15 @@ sub SliverWorkAux($$$$$$$)
 		if (defined($interface));
 	    GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
 		if (defined($vinterface));
-	    GeniXML::SetText("IP", $ifaceref, $interface->IP())
-		if (defined($interface) &&
-		    defined($interface->IP()) && $interface->IP() ne "");
+	    if (defined($vinterface)) {
+		GeniXML::SetText("IP", $ifaceref, $vinterface->IP())
+		    if (defined($vinterface->IP()) && $vinterface->IP() ne "");
+	    }
+	    else {
+		GeniXML::SetText("IP", $ifaceref, $interface->IP())
+		    if (defined($interface) &&
+			defined($interface->IP()) && $interface->IP() ne "");
+	    }
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {
 		$message = "Could not add link sliver $sliver to $aggregate";

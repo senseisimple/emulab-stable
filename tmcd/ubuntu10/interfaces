@@ -1,0 +1,27 @@
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+#
+# XXX abuse of mapping function follows.
+# The findcnet script DHCPs on all interfaces the first time it is invoked
+# and uses the results of that for every other invocation.  The script
+# returns "cnet" for the interface that is the control net, and the physical
+# interface name for all others.
+#
+mapping eth*
+    script /usr/local/etc/emulab/findcnet
+
+#
+# The control network has been identified and configured indirectly
+# via the mapping above.  Here we just make sure that if shutdown, we
+# remove the indicator file so that we will re-DHCP next time.
+#
+auto eth0 eth1 eth2 eth3 eth4 eth5 eth6 eth7 eth8 eth9
+iface cnet inet manual
+    up echo "Emulab control net is $IFACE"
+    down rm -f /var/run/cnet
+    down ifconfig $IFACE down

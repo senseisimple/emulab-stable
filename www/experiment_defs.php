@@ -1022,7 +1022,7 @@ class Experiment
                    </td>
               </tr>\n";
 
-	    if (ISADMIN()) {
+	    if (ISADMIN() || STUDLY() || OPSGUY()) {
 		$thisflip = ($skipvlans ? 0 : 1);
 		$flipval  = ($skipvlans ? "Yes" : "No");
 		echo "<tr>

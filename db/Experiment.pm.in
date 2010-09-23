@@ -4230,6 +4230,20 @@ sub SetPortRange($$)
     DBQueryWarn("unlock tables");
     return ($newlow, $newhigh);
 }
+sub GetPortRange($)
+{
+    my ($self) = @_;
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select low,high from ipport_ranges where exptidx=$idx");
+    
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($low,$high) = $query_result->fetchrow_array();
+    return ($low, $high);
+}
 
 #
 # Reserve all of the shared BW we need. The vinterfaces table has

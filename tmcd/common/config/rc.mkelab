@@ -119,7 +119,6 @@ my @SYSDAEMONS = ("cron", "mountd", "ntpd", "sendmail",
 		  "syslogd", "nfsd", "rpcbind");
 
 # "Standard" packages
-my $PHP4_PKG = "php4-extensions-1.0";
 my $PGENI_PKG = "emulab-protogeni-1.0";
 
 # or this...
@@ -430,8 +429,7 @@ sub doboot()
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.1";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.1";
     }
-    elsif ($FBSD_VERSION == 7.2 ||
-	   $FBSD_VERSION == 7.3) {
+    elsif ($FBSD_VERSION == 7.2) {
 	$emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.2/packages";
 	$emulabconfig{FS_PKG_DIR} .= ".elvincompat"
 	    if ($emulabconfig{"CONFIG_ELVIN"});
@@ -440,6 +438,16 @@ sub doboot()
 	$emulabconfig{FS_PKG}       = "emulab-fs-3.0";
 	$emulabconfig{OPS_PKG}      = "emulab-ops-3.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-3.0";
+    }
+    elsif ($FBSD_VERSION == 7.3) {
+	$emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.3/packages";
+	$emulabconfig{FS_PKG_DIR} .= ".elvincompat"
+	    if ($emulabconfig{"CONFIG_ELVIN"});
+	$emulabconfig{OPS_PKG_DIR}  = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{BOSS_PKG_DIR} = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{FS_PKG}       = "emulab-fs-3.1";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-3.1";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-3.1";
     }
 
     #
@@ -1082,21 +1090,13 @@ sub SetupOpsNode($)
 	print "Removing conflicting packages.\n";
 	system("pkg_delete -r -x mysql-client")
 	    if (-e "/usr/local/bin/mysql");
-	if ($FBSD_VERSION == 7.3) {
-	    #
-	    # XXX ick, perl 5.10.1 is installed by default.
-	    # This causes lots of problems, so remove it.
-	    #
-	    system("pkg_delete -f -x perl-5.10.1")
-		if (-d "/usr/local/lib/perl5/5.10.1");
-
-	    # XXX and some packages that are in the wrong place
-	    system("pkg_delete -f -x p5-");
-
-	    # XXX perl install doesn't do this?
-	    mysystem("ln -sf /usr/local/bin/perl /usr/bin/perl");
-	}
     
+	# XXX 7.3 image is out of sync right now
+	if ($FBSD_VERSION == 7.3) {
+	    system("pkg_delete -f -x python25 -x py25");
+	    system("pkg_delete -f -x sudo -x png -x tiff");
+	}
+
 	print "Installing the ops metaport.\n";
 	RecreateDir("/usr/ports", 1);
 	$ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
@@ -1528,21 +1528,13 @@ sub SetupBossNode()
 	    if (-e "/usr/local/bin/mysql");
 	system("pkg_delete -x net-snmp")
 	    if (-e "/usr/local/include/net-snmp");
-	if ($FBSD_VERSION == 7.3) {
-	    #
-	    # XXX ick, perl 5.10.1 is installed by default.
-	    # This causes lots of problems, so remove it.
-	    #
-	    system("pkg_delete -f -x perl-5.10.1")
-		if (-d "/usr/local/lib/perl5/5.10.1");
-
-	    # XXX and some packages that are in the wrong place
-	    system("pkg_delete -f -x p5-");
-
-	    # XXX perl install doesn't do this?
-	    mysystem("ln -sf /usr/local/bin/perl /usr/bin/perl");
-	}
     
+	# XXX 7.3 image is out of sync right now
+	if ($FBSD_VERSION == 7.3) {
+	    system("pkg_delete -f -x python25 -x py25");
+	    system("pkg_delete -f -x sudo -x png -x tiff");
+	}
+
 	print "Installing the boss metaport.\n";
 	RecreateDir("/usr/ports", 1);
 	$ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
