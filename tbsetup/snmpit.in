@@ -2260,9 +2260,6 @@ sub doDeleteVlan($@) {
 	    $vlan_ids{$vlan_name} = $vlan->id();
 	}
     }
-    elsif ($ELABINELAB) {
-	die("Must provide an experiment for this operation\n");
-    }
     else {
 	foreach my $vlan_name (@vlan_names) {
 	    $vlan_ids{$vlan_name} = $vlan_name;
@@ -2271,17 +2268,28 @@ sub doDeleteVlan($@) {
 
     #
     # Hand over to outer boss.
+    # If experiment was not specified then list is vlan IDs (tbswap).
+    # If experiment was specified, list is vlan names (manual invocation).
     # 
     if ($ELABINELAB) {
-	foreach my $vlan (values(%vlans)) {
-	    if (RemoteDeleteVlan($vlan) == 0) {
-		if ($vlan->Destroy() != 0) {
-		    print STDERR "*** Could not destroy $vlan\n";
+	if (defined($experiment)) {
+	    foreach my $vlan (values(%vlans)) {
+		if (RemoteDeleteVlan($vlan) == 0) {
+		    if ($vlan->Destroy() != 0) {
+			print STDERR "*** Could not destroy $vlan\n";
+		    }
+		}
+		else {
+		    $errors++;
 		}
 	    }
-	    else {
-		$errors++;
+	}
+	else {
+	    my @vidlist = ();
+	    foreach my $vid (values(%vlan_ids)) {
+		push(@vidlist, $vid);
 	    }
+	    $errors = RemoteDoReset(undef, 0, @vidlist);
 	}
 	return $errors;
     }
