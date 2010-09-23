@@ -278,14 +278,30 @@ my $method = $call->{'method_name'};
 if (!defined($GENI_METHODS->{$method})) {
     XMLError(3, "no such method $method\n");
 }
+# Strictly for debugging the CM.
+my $target;
+if (defined($call->{'value'})) {
+    my ($argref) = @{ $call->{'value'} };
+    if (ref($argref) eq "HASH") {
+	if (exists($argref->{'slice_urn'})) {
+	    $target = $argref->{'slice_urn'};
+	}
+	elsif (exists($argref->{'sliver_urn'})) {
+	    $target = $argref->{'sliver_urn'};
+	}
+    }
+}
+
 my $result;
 my $message =
-    "URN:     $GENIURN\n".
+    "URN:     $GENIURN\n";
+$message .=
+    "Target:  $target\n" if (defined($target));
+$message .=
     "Module:  $MODULE\n".
     "Method:  $method\n";
 $message .=
     "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
-
     
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {
