@@ -617,6 +617,11 @@ sub getTestSwitches () {
     while (my @row = $result->fetchrow()) {
 	push @switches, $row[0];
     }
+    
+    #
+    # XXX: temporary only
+    #
+    push @switches, "apcon1";
 
     return @switches;
 }

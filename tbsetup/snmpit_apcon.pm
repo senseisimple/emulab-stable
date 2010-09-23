@@ -1045,8 +1045,8 @@ sub setPortVlan($$@) {
     $self->debug("ports: " . join(",",@pcports) . "\n");
 
     if (@pcports != 2) {
-	warn "$id: supports only two ports in one VLAN.\n";
-	return 1;
+        warn "$id: supports only two ports in one VLAN.\n";
+        return 1;
     }
 
     my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
@@ -1268,6 +1268,23 @@ sub vlanHasPorts($$) {
     return 0;
 }
 
+
+#
+# Internal
+# Convert from switch device port to pc node port
+#
+sub convertPortFromDev2Node($$) {
+    my ($self, $devport) = @_;
+    
+    my $pnum = $self->{NAME}."".$self->convertPortFormat($devport);
+    if (!exists $Ports{$pnum}) {
+        return undef;
+    }
+    
+    return $Ports{$pnum};
+}
+
+
 #
 # List all VLANs on the device
 #
@@ -1280,7 +1297,18 @@ sub listVlans($) {
     my @list = ();
     my $vlans = $self->getAllNamedPorts();
     foreach my $vlan_id (keys %$vlans) {
-        push @list, [$vlan_id, $vlan_id, $vlans->{$vlan_id}];
+        my @swports = @{$vlans->{$vlan_id}};
+        
+        my $cnvtsub = sub($) {
+            my $devport = shift;
+            my $pcport = $self->convertPortFromDev2Node($devport);
+            
+            return defined($pcport)?$pcport:$devport;            
+        }
+        
+        my @pcports = map {$cnvtsub->($_)} @swports;
+        
+        push @list, [$vlan_id, $vlan_id, @pcports];
     }
     
     return @list;
