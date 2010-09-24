@@ -1298,16 +1298,17 @@ sub listVlans($) {
     my $vlans = $self->getAllNamedPorts();
     foreach my $vlan_id (keys %$vlans) {
         my @swports = @{$vlans->{$vlan_id}};
-        
-        my $cnvtsub = sub($) {
-            my $devport = shift;
-            my $pcport = $self->convertPortFromDev2Node($devport);
-            
-            return defined($pcport)?$pcport:$devport;            
+        my @pcports = ();
+
+        foreach my $p (@swports) {
+            my $pcp = $self->convertPortFromDev2Node($p);
+            if ($pcp) {
+                push @pcports, $pcp;
+            } else {
+                push @pcports, $p;
+            }
         }
-        
-        my @pcports = map {$cnvtsub->($_)} @swports;
-        
+
         push @list, [$vlan_id, $vlan_id, @pcports];
     }
     
