@@ -16,6 +16,7 @@ package protogeni.communication
 {
   import flash.events.ErrorEvent;
   
+  import protogeni.resources.Slice;
   import protogeni.resources.Sliver;
   import protogeni.resources.VirtualLinkCollection;
   import protogeni.resources.VirtualNodeCollection;
@@ -44,6 +45,14 @@ package protogeni.communication
 
 			sliver.rspec = new XML(response.value[1]);
 			sliver.parseRspec();
+			
+			var old:Slice = Main.protogeniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
+			if(old != null)
+			{
+				if(old.slivers.getByUrn(sliver.urn) != null)
+					old.slivers.removeItemAt(old.slivers.getItemIndex(old.slivers.getByUrn(sliver.urn)));
+				old.slivers.addItem(sliver);
+			}
 			
 			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
 
