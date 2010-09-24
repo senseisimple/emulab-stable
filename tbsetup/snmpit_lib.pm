@@ -618,11 +618,6 @@ sub getTestSwitches () {
 	push @switches, $row[0];
     }
     
-    #
-    # XXX: temporary only
-    #
-    push @switches, "apcon1";
-
     return @switches;
 }
 
