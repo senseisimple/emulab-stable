@@ -14,6 +14,8 @@
 
 package
 {
+  import flash.events.ErrorEvent;
+
   class RequestSliceEmbedding extends Request
   {
     public function RequestSliceEmbedding(newManager : ComponentManager,
@@ -54,7 +56,7 @@ package
       return null;
     }
 
-    override public function fail() : Request
+    override public function fail(event : ErrorEvent) : Request
     {
       return null;
     }

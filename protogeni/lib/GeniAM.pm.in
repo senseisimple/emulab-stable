@@ -1,0 +1,249 @@
+#!/usr/bin/perl -wT
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package GeniAM;
+
+#
+# The server side of the CM interface on remote sites. Also communicates
+# with the GMC interface at Geni Central as a client.
+#
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use GeniCMV2;
+use GeniResponse;
+
+# Disable UUID checks in GeniCredential.
+use GeniCredential;
+$GeniCredential::CHECK_UUID = 0;
+
+my $API_VERSION = 1;
+
+#
+# Tell the client what API revision we support.  The correspondence
+# between revision numbers and API features is to be specified elsewhere.
+# No credentials are required.
+#
+sub GetVersion()
+{
+    my $blob = {
+	"geni_api" => $API_VERSION
+    };
+
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
+}
+
+# List this aggregates resources. Invokes DiscoverResources.
+# XXX Still need to handle the slice urn code path.
+sub ListResources()
+{
+    # my ($argref) = @_;
+    # my $credentials = $argref->{'credentials'};
+    # my $options = $argref->{'options'};
+
+    my ($credentials, $options) = @_;
+    my $available = $options->{'geni_available'} || 0;
+    my $compress = $options->{'geni_compressed'} || 0;
+    my $slice_urn = $options->{'geni_slice_urn'};
+
+    # If $slice_urn is defined, this turns into a Resolve call.  We
+    # need to resolve twice: once to get the sliver urn from the
+    # slice, then to get the resources associated with the sliver (a
+    # manifest rspec).
+
+    my $discover_args = {
+        'credentials' => $credentials,
+        'available' => $available,
+        'compress' => $compress
+    };
+    my $response = GeniCMV2::DiscoverResources($discover_args);
+    if (GeniResponse::IsError($response)) {
+        return $response;
+    } else {
+        # DiscoverResources returns a base64 object, but ListResources
+        # needs to return a String representation of that base64
+        # object. The logic is that ListResources should *always*
+        # return a String instead of returning different types based
+        # on the args.
+        my $base64 = GeniResponse::value($response);
+        my $response_value = $base64->value();
+        return GeniResponse->Create( GENIRESPONSE_SUCCESS, $response_value );
+    }
+}
+
+# Create a sliver by allocating and starting resources.
+sub CreateSliver()
+{
+    my ($slice_urn, $credentials, $rspec, $users) = @_;
+
+    print STDERR "CreateSliver\n";
+
+    # circulate through the users and bind them to the slice
+    my $caller_urn = $ENV{'GENIURN'};
+    my $caller_keys = undef;
+    foreach my $user (@$users) {
+        my $user_urn = $user->{'urn'};
+        # Skip if it is not the caller
+        next if ($user_urn ne $caller_urn);
+        $caller_keys = $user->{keys};
+    }
+
+    # Package the caller_keys in a list of hashes the way the CM wants
+    # it. Each hash has two keys ('type' and 'key'). 'type' is always
+    # 'ssh' for us, and 'key' is the key.
+
+    my $sliver_keys = undef;
+    if (defined($caller_keys)) {
+        $sliver_keys = [];
+        foreach my $key (@$caller_keys) {
+            # The CMV2 does not like newlines at the end of the keys.
+            chomp($key);
+            push(@$sliver_keys, {'type' => 'ssh', 'key' => $key});
+        }
+    }
+
+    # This only gets us part of the way there. For users that are not
+    # *this* user, we need to somehow add their keys, which also
+    # requires adding them as a user *without* their certificate. Not
+    # sure we'll be able to do that.
+
+    # Invoke CreateSliver
+    my $create_args = {
+        'slice_urn' => $slice_urn,
+        'rspec' => $rspec,
+        'credentials' => $credentials,
+        'keys' => $sliver_keys
+    };
+
+    my $response = GeniCMV2::CreateSliver($create_args);
+    if (GeniResponse::IsError($response)) {
+        # The create failed, so return the response.
+        return $response
+    }
+
+    # The create succeeded so gather the response info
+    my $listref = GeniResponse::value($response);
+    my ($sliver_credential, $manifest_rspec) = @{$listref};
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $manifest_rspec );
+}
+
+sub DeleteSliver()
+{
+    my ($slice_urn, $credentials) = @_;
+
+    # Invoke StopSliver
+    my $stop_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials
+    };
+
+    my $response = GeniCMV2::StopSliver($stop_args);
+    # Ignore refused error, it means the sliver was not started yet.
+    # A better way to go might be to check the sliver state and only
+    # invoke stop sliver if the sliver is started.
+    if (GeniResponse::IsError($response)
+        && GeniResponse::code($response) != GENIRESPONSE_REFUSED()) {
+        # The stop failed, so return the response.
+        return $response
+    }
+
+    # The sliver is stopped, now delete it.
+    my $delete_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials
+    };
+    # XXX Open question: Call "DeleteSlice" or "DeleteSliver"?
+    $response = GeniCMV2::DeleteSlice($delete_args);
+    if (GeniResponse::IsError($response)) {
+        return $response;
+    } else {
+        # Return an XML-RPC boolean
+        my $coder = Frontier::RPC2->new();
+        return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
+    }
+}
+
+# Get the status of the sliver associated with the given slice. This
+# just passes on to the CM SliverStatus operation.
+sub SliverStatus()
+{
+    my ($slice_urn, $credentials) = @_;
+
+    my $status_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials,
+    };
+    my $response = GeniCMV2::SliverStatus($status_args);
+    if (GeniResponse::IsError($response)) {
+        return $response
+    }
+    # $status is a hash ref
+    my $pgstatus = GeniResponse::value($response);
+    my $status = {};
+
+    # How do we determine the sliver URN? Is there one for the whole
+    # sliver, or just for each individual sliver?
+    $status->{'geni_urn'} = 'Unknown';
+
+    # Determine geni_status. XXX how to determine 'configuring'?
+    if ($pgstatus->{'status'} eq 'ready') {
+        $status->{'geni_status'} = 'ready';
+    } elsif ($pgstatus->{'status'} eq 'failed') {
+        $status->{'geni_status'} = 'failed';
+    } else {
+        $status->{'geni_status'} = 'unknown';
+    }
+
+    my $details = $pgstatus->{'details'};
+    my @children = ();
+    while ( my ($pgurn, $pgrstat) = each(%$details) ) {
+        my $child = {
+            'geni_urn' => $pgurn,
+            # XXX Need to massage status to one of the AM status values
+            'geni_status' => $pgrstat->{'status'},
+            'geni_error' => $pgrstat->{'error'},
+        };
+        push @children, $child;
+    }
+    $status->{'geni_resources'} = \@children;
+
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $status);
+}
+
+sub RenewSliver()
+{
+    my ($slice_urn, $credentials, $expiration_time) = @_;
+
+    my $renew_args = {
+        'slice_urn' => $slice_urn,
+        'expiration' => $expiration_time,
+        'credentials' => $credentials
+    };
+    my $response = GeniCMV2::RenewSlice($renew_args);
+    if (GeniResponse::IsError($response)) {
+        return $response
+    }
+
+    # Return an XML-RPC boolean
+    my $coder = Frontier::RPC2->new();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
+}
+
+sub Shutdown()
+{
+    my ($slice_urn, $credentials) = @_;
+
+    return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED );
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;

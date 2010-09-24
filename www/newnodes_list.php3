@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -27,7 +27,6 @@ if (! $isadmin) {
 # Verify page arguments.
 #
 $optargs = OptionalPageArguments("selected",     PAGEARG_ARRAY,
-				 "remap",        PAGEARG_ARRAY,
 				 "delete",       PAGEARG_STRING,
 				 "calc",         PAGEARG_STRING,
 				 "create",       PAGEARG_STRING,
@@ -36,8 +35,7 @@ $optargs = OptionalPageArguments("selected",     PAGEARG_ARRAY,
 				 "swap",         PAGEARG_STRING,
 				 "newtype",      PAGEARG_STRING,
 				 "newprefix",    PAGEARG_STRING,
-				 "addnumber",    PAGEARG_STRING,
-				 "renumber",     PAGEARG_STRING);
+				 "addnumber",    PAGEARG_STRING);
 
 #
 # Standard Testbed Header
@@ -83,7 +81,7 @@ if (count($selected_nodes)) {
 } else {
     if (isset($delete) || isset($calc) || isset($create) ||
 	isset($research) || isset($swap) || isset($newtype) ||
-	isset($newprefix) || isset($addnumber) || isset($renumber)) {
+	isset($newprefix) || isset($addnumber)) {
 	USERERROR("At least one node must be selected!",1);
     }
 }
@@ -316,32 +314,6 @@ if (isset($newprefix) || isset($addnumber)) {
 }
 
 #
-# Re-number interfaces
-#
-if (isset($renumber)) {
-    #
-    # Move them out of the way
-    #
-    foreach ($remap as $index => $value) {
-        if ($value != "") {
-	    DBQueryFatal("UPDATE new_interfaces SET card = card + 100 WHERE " .
-	        "card = $index AND ($whereclause)");
-	}
-    }
-
-    #
-    # Move them back to the correct location
-    #
-    foreach ($remap as $index => $value) {
-        if ($value != "") {
-	    DBQueryFatal("UPDATE new_interfaces SET card = $value WHERE " .
-	        "card = " . ($index + 100) . " AND ($whereclause)");
-	}
-    }
-
-}
-
-#
 # Okay, now get the node information and display the form
 #
 $nodes_result =
@@ -500,53 +472,6 @@ while ($row = mysql_fetch_array($nodes_result)) {
 <tr>
     <td colspan=2 align="center">
     <input type="submit" value="Update selected nodes" name="submit">
-    </td>
-</tr>
-</table>
-
-<br><br>
-
-<table>
-<tr>
-    <th>FreeBSD interface number</th>
-    <th>Linux interface number</th>
-</tr>
-<tr>
-    <td>0</td>
-    <td><input type="text" size=2 name="remap[0]"></td>
-</tr>
-<tr>
-    <td>1</td>
-    <td><input type="text" size=2 name="remap[1]"></td>
-</tr>
-<tr>
-    <td>2</td>
-    <td><input type="text" size=2 name="remap[2]"></td>
-</tr>
-<tr>
-    <td>3</td>
-    <td><input type="text" size=2 name="remap[3]"></td>
-</tr>
-<tr>
-    <td>4</td>
-    <td><input type="text" size=2 name="remap[4]"></td>
-</tr>
-<tr>
-    <td>5</td>
-    <td><input type="text" size=2 name="remap[5]"></td>
-</tr>
-<tr>
-    <td>6</td>
-    <td><input type="text" size=2 name="remap[6]"></td>
-</tr>
-<tr>
-    <td>7</td>
-    <td><input type="text" size=2 name="remap[6]"></td>
-</tr>
-<tr>
-    <td colspan=2 align="center">
-    <input type="submit" value="Re-number interfaces of selected nodes"
-	name="renumber">
     </td>
 </tr>
 </table>

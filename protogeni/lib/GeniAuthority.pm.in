@@ -27,6 +27,7 @@ use English;
 use overload ('""' => 'Stringify');
 use XML::Simple;
 use Date::Parse;
+use Data::Dumper;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -327,8 +328,13 @@ sub Version($)
 	print STDERR "  " . $response->output() . "\n";
 	return undef;
     }
-    $self->{'version'} = $response->value();
-    return $response->value();
+    if (ref($response->value())) {
+	$self->{'version'} = $response->value()->{'api'};
+    }
+    else {
+	$self->{'version'} = $response->value();
+    }
+    return $self->{'version'};
 }
 
 #

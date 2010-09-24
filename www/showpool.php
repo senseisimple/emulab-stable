@@ -1,14 +1,10 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
-require("Sajax.php");
-include_once("node_defs.php");
-#sajax_init();
-#sajax_export("GetExpState", "Show", "ModifyAnno", "FreeNodeHtml");
 
 #
 # Only known and logged in users can look at experiments.
@@ -16,8 +12,6 @@ include_once("node_defs.php");
 $this_user = CheckLoginOrDie();
 $uid       = $this_user->uid();
 $isadmin   = ISADMIN();
-
-PAGEHEADER("Shared Pool");
 
 #
 # Verify page arguments.
@@ -27,6 +21,8 @@ $optargs = OptionalPageArguments("sortby",     PAGEARG_STRING);
 if (!isset($sortby)) {
     $sortby = "";
 }
+
+PAGEHEADER("Shared Pool");
 
 $experiment = Experiment::LookupByPidEid("emulab-ops", "shared-nodes");
 if (!$experiment) {
@@ -69,7 +65,9 @@ $query_result =
 		 "where r.eid='$eid' and r.pid='$pid' ".
 		 "order BY rsrvtime");
 
-echo "These are the nodes in the shared pool. ";
+$url = CreateURL("showexp", $experiment);
+
+echo "These are the nodes in the <a href='$url'>shared pool</a>. ";
 echo "Please see the <a href='$WIKIDOCURL/SharedNodes'>documentation</a> ";
 echo "on how to use shared nodes in your experiment.<br>";
 

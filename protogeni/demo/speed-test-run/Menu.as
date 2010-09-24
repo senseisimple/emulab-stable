@@ -294,6 +294,15 @@ package
         if (newHost != null && newHost.length() > 0)
         {
           hosts.push(String(newHost));
+          var newName = element.attribute("virtual_id");
+          if (newName != null && newName.length() > 0)
+          {
+            names.push(String(newName));
+          }
+          else
+          {
+            names.push(String(newHost));
+          }
         }
       }
     }
@@ -305,7 +314,7 @@ package
       {
 //        progress.visible = false;
         var url = "http://boss.emulab.net/all-speed-test.php?";
-        url += "names=" + hosts.join(",") + "&";
+        url += "names=" + names.join(",") + "&";
         url += "cms=" + hosts.join(",") + "&";
         url += "hostnames=" + hosts.join(",");
         navigateToURL(new URLRequest(url), "_blank");
@@ -328,6 +337,7 @@ package
       managers = new Array();
       managerUrns = new Array();
       hosts = new Array();
+      names = new Array();
     }
 
     private var choice : MenuClip;
@@ -348,5 +358,6 @@ package
     private var managerUrns : Array;
 
     private var hosts : Array;
+    private var names : Array;
   }
 }

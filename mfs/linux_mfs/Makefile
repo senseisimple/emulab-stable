@@ -1,19 +1,22 @@
-MFS_ARCH	=	i386
+MFS_ARCH	=	x86_64
 SOURCE_PATH	=	$(PWD)/source
 TARGET_PATH	=	$(PWD)/target
 TARGET_BUILD_PATH	=	$(PWD)/build
 SCRIPTS_PATH	=	$(PWD)/scripts
 INITRAMFS_PATH	=	$(PWD)/initramfs.tmp
-BUILDROOT_PATH	=	$(PWD)/buildroot
+BUILDROOT_VERSION	=	2010.02
+BUILDROOT_PATH		=	$(PWD)/buildroot-$(BUILDROOT_VERSION)
 FAKEROOT_ENVIRONMENT	=	$(PWD)/fs_fakeroot.env
 STAGING_DIR	=	$(PWD)/buildroot/build_$(MFS_ARCH)/staging_dir
 BOOT_PATH	=	$(PWD)/boot
-INITRAMFS	=	$(BOOT_PATH)/initramfs.gz
+INITRAMFS_COMPRESSION	=	lzma
+INITRAMFS	=	$(BOOT_PATH)/initramfs
 
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
 
-MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget perl portmap file ethtool
+MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo \
+       	e2fsprogs openssl wget perl portmap file ethtool ncurses jove tcsh
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
@@ -38,10 +41,14 @@ clean:
 	rm -rf $(TARGET_BUILD_PATH)
 	rm -rf $(BOOT_PATH)
 
-toolchain:
-	$(MAKE) -C $(SOURCE_PATH)/$@ all
+toolchain: $(BUILDROOT_PATH)/toolchain-built
+
+$(BUILDROOT_PATH)/toolchain-built:
+	$(MAKE) -C $(SOURCE_PATH)/toolchain all
 	$(MAKE) -C $(SOURCE_PATH)/zlib install-sysroot
 	$(MAKE) -C $(SOURCE_PATH)/openssl install
+	$(MAKE) -C $(SOURCE_PATH)/ncurses install
+	touch $(BUILDROOT_PATH)/toolchain-built
 
 $(MODULES): toolchain
 	$(MAKE) -C $(SOURCE_PATH)/$@ all
@@ -63,24 +70,12 @@ $(INSTALL_MODULES):
 
 $(TARGET_PATH)/lib/libc.so.0:
 	mkdir -p $(TARGET_PATH)/lib
-	cp -dpR $(BUILDROOT_PATH)/project_build_$(MFS_ARCH)/uclibc/root/lib/* $(TARGET_PATH)/lib
+	cp -dpR $(BUILDROOT_PATH)/output/target/lib/* $(TARGET_PATH)/lib
 
 uclibc-install: $(TARGET_PATH)/lib/libc.so.0
 
 $(FAKEROOT_ENVIRONMENT):
 	touch $@
-
-devices: $(FAKEROOT_ENVIRONMENT)
-	rm -rf $(TARGET_PATH)/dev
-	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
-		-i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/makedevs.sh \
-		$(SCRIPTS_PATH)/devices $(TARGET_PATH)
-
-permissions: $(FAKEROOT_ENVIRONMENT) devices install
-	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
-		-i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/fixperms.sh $(TARGET_PATH)
 
 initramfs: install
 	rm -rf $(INITRAMFS_PATH)
@@ -94,7 +89,10 @@ initramfs: install
 	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/fixperms.sh $(INITRAMFS_PATH)
+	$(FAKEROOT_BIN) -s $(FAKEROOT_ENVIRONMENT) \
+		-i $(FAKEROOT_ENVIRONMENT) \
+		$(SCRIPTS_PATH)/misc_fixup.sh $(TARGET_PATH)
 	$(FAKEROOT_BIN) -i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/gen_initramfs.sh $(INITRAMFS_PATH) $(INITRAMFS)
+		$(SCRIPTS_PATH)/gen_initramfs.sh -c $(INITRAMFS_COMPRESSION) $(INITRAMFS_PATH) $(INITRAMFS)
 	rm -f $(FAKEROOT_ENVIRONMENT)
 	rm -rf $(INITRAMFS_PATH)

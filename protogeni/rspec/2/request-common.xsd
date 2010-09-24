@@ -77,7 +77,6 @@
         <xs:element ref="rspec:login"/>
       </xs:choice>
       <xs:choice>
-        <xs:group ref="rspec:AnyExtension"/>
         <xs:element ref="rspec:install"/>
         <xs:element ref="rspec:execute"/>
       </xs:choice>

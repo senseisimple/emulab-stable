@@ -22,14 +22,13 @@ package
   {
     public static function init(newParent : DisplayObjectContainer)
     {
-	  //Security.allowDomain("localhost");
-	  
+          //Security.allowDomain("localhost");
       parent = newParent;
 
       menu = new MenuSliceSelect();
       menu.init(parent);
-	  
-	  com = new ConnectionHandler();	
+
+          com = new ConnectionHandler();
     }
 
     public static function changeState(newMenu : MenuState)
@@ -56,7 +55,7 @@ package
 
     static var parent : DisplayObjectContainer;
     static var menu : MenuState;
-	static var com : ConnectionHandler;
+        static var com : ConnectionHandler;
 
     static var text : String;
   }

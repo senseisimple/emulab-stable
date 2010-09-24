@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -8,6 +8,8 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../../..
 SUBDIR		= event/linktest/iperf
+
+TARBALL		= iperf-2.0.2.tar.gz
 
 include $(OBJDIR)/Makeconf
 
@@ -50,16 +52,20 @@ iperf-install: build-iperf
 
 client-install: $(ITARGETS)
 
-# Note: GNU make wants to pass options in MAKEFLAGS (w) that are compatible
+# Note: GNU make wants to pass options in MAKEFLAGS (w) that are incompatible
 # with BSD make.  So we just force configure to assume/use gmake for BSD.
 config.status:
-	MAKE=$(MAKE) $(SRCDIR)/iperf-2.0.2/configure $(CONFIG_ARGS)
+	MAKE=$(MAKE) iperf-2.0.2/configure $(CONFIG_ARGS)
 
 iperf-2.0.2:
-	$(SRCDIR)/iperf-fetch.sh $(SRCDIR)
+	$(SRCDIR)/iperf-fetch.sh $(SRCDIR) $(TARBALL)
 
-clean: Makefile
-	$(MAKE) -f Makefile clean
+clean:
+	if [ -r Makefile ]; then $(MAKE) -f Makefile clean; fi
+	rm -f config.h config.log stamp-h1
+
+reallyclean:
+	rm -rf config.status iperf-2.0.2 $(TARBALL)
 
 Makefile: config.status
 

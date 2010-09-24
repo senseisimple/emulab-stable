@@ -21,6 +21,9 @@ package
   import fl.controls.List;
   import fl.events.ListEvent;
   import flash.events.Event;
+  import flash.events.MouseEvent;
+  import flash.net.navigateToURL;
+  import flash.net.URLRequest;
 
   class ComponentView
   {
@@ -68,9 +71,15 @@ package
       list.setStyle("cellRenderer", CustomCellRenderer);
 
       listStatus = new ListStatusClip();
+      listStatus.text.wordWrap = true;
+      listStatus.fixIt.visible = false;
+      listStatus.fixItText.visible = false;
+      listStatus.fixItText.mouseEnabled = false;
       list.addChild(listStatus);
-      listStatus.alpha = 0.3;
+//      listStatus.alpha = 0.3;
       nodes = newNodes;
+
+      buttons = new ButtonList([listStatus.fixIt], [clickFixIt]);
 
 /*
     managers = new Array(
@@ -155,6 +164,7 @@ package
 
     public function cleanup() : void
     {
+      buttons.cleanup();
       list.removeEventListener(ListEvent.ITEM_CLICK, clickItem);
       list.removeEventListener(Event.CHANGE, changeItem);
       select.removeEventListener(Event.CHANGE, changeComponent);
@@ -217,6 +227,7 @@ package
     function updateList() : void
     {
       var cm = managers[select.selectedIndex];
+      var state = cm.getState();
       list.removeAll();
       list.clearSelection();
       var i : int = 0;
@@ -225,22 +236,52 @@ package
         list.addItem(new ListItem(cm.getComponent(i).name, "NodeNone"));
       }
       list.selectedIndices = cm.getUsed();
-      if (cm.getState() == ComponentManager.NORMAL)
+      if (state == ComponentManager.NORMAL)
       {
         listStatus.visible = false;
       }
-      else if (cm.getState() == ComponentManager.LOADING)
+      else if (state == ComponentManager.LOADING)
       {
         listStatus.visible = true;
         listStatus.text.text = "Loading";
-        listStatus.text.backgroundColor = 0x00ff00;
+        listStatus.text.backgroundColor = 0x55ff55;
       }
       else
       {
         listStatus.visible = true;
-        listStatus.text.text = "Failed";
-        listStatus.text.backgroundColor = 0xff0000;
+        var errorText = "IO Failure";
+        if (state == ComponentManager.SECURITY_FAILURE)
+        {
+          errorText = "Security Failure\n\n"
+            + "Click fix it below, add a security exception, then reload "
+            + "client.";
+        }
+        else if (state == ComponentManager.INTERNAL_FAILURE)
+        {
+          errorText = "Internal Failure";
+        }
+        listStatus.text.text = errorText;
+        listStatus.text.backgroundColor = 0xff5555;
+        if (state == ComponentManager.SECURITY_FAILURE)
+        {
+          listStatus.fixIt.visible = true;
+          listStatus.fixItText.visible = true;
+        }
+        else
+        {
+          listStatus.fixIt.visible = false;
+          listStatus.fixItText.visible = false;
+        }
       }
+    }
+
+    function clickFixIt(event : MouseEvent) : void
+    {
+      Main.getConsole().appendText("Clicked\n\n\n");
+      var cm = managers[select.selectedIndex];
+      var urlText = cm.getUrl();
+      var url = new URLRequest(urlText);
+      navigateToURL(url, "_blank");
     }
 
     var select : ComboBox;
@@ -249,5 +290,6 @@ package
     var nodes : ActiveNodes;
     // The ComponentManagers
     var managers : Array;
+    var buttons : ButtonList;
   }
 }

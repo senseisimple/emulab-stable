@@ -1,0 +1,14 @@
+#
+# Fix emulab_locks table.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    DBQueryFatal("alter table emulab_locks change `value` `value` ".
+		 "  int(10) NOT NULL default '0'");
+
+    return 0;
+}
+1;

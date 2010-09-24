@@ -37,8 +37,11 @@ my $TBOPS        = "@TBOPSEMAIL@";
 my $DBNAME       = "@TBDBNAME@";
 my $SRCDIR       = "@top_srcdir@";
 my $SQLUPDATEDIR = "$SRCDIR/sql/updates";
+my $PGENIUPDATEDIR = "$SRCDIR/protogeni/updates";
 my $UPDATEDIR    = "$SRCDIR/install/updates";
 my $DBUPDATE     = "$TB/sbin/dbupdate";
+my $PGENIUPDATE  = "$TB/sbin/protogeni/update";
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $INSTALLUPDATE= "$TB/sbin/update-install";
 my $SETSITEVAR   = "$TB/sbin/setsitevar";
 my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
@@ -64,12 +67,18 @@ $| = 1;
 BEGIN
 {
     if (-e "../Makeconf") {
+	my $srcdir = "@top_srcdir@";
 	my $objdir = `/bin/pwd`;
 	chomp($objdir);
 	# Prior to first install or running from object dir.
 	unshift(@INC, "$objdir/../db");
-	unshift(@INC, "$objdir/@top_srcdir@/install");
-	unshift(@INC, "$objdir/@top_srcdir@/tbsetup");
+	if ($srcdir =~ /^\//) {
+	    unshift(@INC, "$srcdir/install");
+	    unshift(@INC, "$srcdir/tbsetup");
+	} else {
+	    unshift(@INC, "$objdir/$srcdir/install");
+	    unshift(@INC, "$objdir/$srcdir/tbsetup");
+	}
 	unshift(@INC, "$objdir/../tbsetup");
     }
 }
@@ -117,10 +126,17 @@ if (! (-e "../db/dbupdate" && -e "./update-install")) {
 my $objdir = `/bin/pwd`;
 chomp($objdir);
 
+my $abssrcdir;
+if ($SRCDIR =~ /^\//) {
+    $abssrcdir = "$SRCDIR";
+} else {
+    $abssrcdir = "$objdir/$SRCDIR";
+}
+
 my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
 	       "-I${objdir}/../db", 
-	       "-I${objdir}/${SRCDIR}/tbsetup",
-	       "-I${objdir}/${SRCDIR}/install",
+	       "-I${abssrcdir}/tbsetup",
+	       "-I${abssrcdir}/install",
 	       # To catch a few extra things that do not normally change.
 	       "-I@prefix@/lib"
 	       );
@@ -159,6 +175,14 @@ if ($verify) {
     $exitval++
 	if ($?);
 
+    if ($PGENISUPPORT) {
+	print "Checking for ProtoGENI DB updates ...\n";
+	system("perl @INCDIRS ../protogeni/scripts/update ".
+	       "       -q -v -p $PGENIUPDATEDIR");
+	$exitval++
+	    if ($?);
+    }
+
     exit(0)
 	if (!$exitval);
 
@@ -167,6 +191,8 @@ if ($verify) {
     print "    this is resolved. Typically, you can resolve this by:\n\n";
     print "        boss> cd /your/object/dir\n";
     print "        boss> gmake update-testbed\n\n";
+    print "    More information is available at:\n";
+    print "       https://users.emulab.net/trac/emulab/wiki/install/update-testbed-v2\n\n";
     exit($exitval);
 }
 
@@ -250,7 +276,7 @@ if ($stopbed) {
 
 	print "-> Experiments still in transition:\n";
 	while (my ($pid,$eid,$idx,$state,$expt_locked) =
-	       $query_result->query_result()) {
+	       $query_result->fetchrow_array()) {
 
 	    print "  $pid,$eid,$idx -- $state, $expt_locked\n";
 	}
@@ -281,6 +307,14 @@ print "Running pre-install updates ...\n";
 system("perl @INCDIRS ./update-install $forceopt -q -a pre -p $UPDATEDIR");
 exit(1)
     if ($?);
+
+if ($PGENISUPPORT) {
+    print "Running ProtoGENI DB updates ...\n";
+    system("perl @INCDIRS ../protogeni/scripts/update ".
+	   "       -q -p $PGENIUPDATEDIR");
+    exit(1)
+	if ($?);
+}
 
 if ($install) {
     print "Installing testbed software ... this will take a while!\n";

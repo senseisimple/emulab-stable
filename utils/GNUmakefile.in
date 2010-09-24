@@ -25,7 +25,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  spewconlog opsdb_control newnode suchown archive_list \
                   wanodecheckin wanodecreate spewimage \
                   anonsendmail epmodeset fixexpinfo node_traffic \
-		  dumpdescriptor subboss_tftpboot_sync
+		  dumpdescriptor subboss_tftpboot_sync testbed-control
 
 WEB_SBIN_SCRIPTS= webnewnode webdeletenode webspewconlog webarchive_list \
                   webwanodecheckin webspewimage

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 #
@@ -797,7 +797,7 @@ sub removeSomePortsFromTrunk($$@) {
 
 	foreach my $port (@ports) {
 	    return 0
-		if (! $device->setVlanOnTrunks($port, 0, $vlan_number));
+		if (! $device->setVlansOnTrunk($port, 0, $vlan_number));
 	}
     }
 
@@ -1373,6 +1373,11 @@ sub create($$$$) {
     my $self = { NAME => $name, TYPE => $type,
 		PARENT => $parent, DEBUG => $parent->{DEBUG}};
     if ($parent->{DEBUG} && !$jitdev_dumper) { $jitdev_dumper = new Dumpvalue; }
+    # The device options get recorded in the fork,
+    # so we have to do them here too (so we can fish out # min and max vlan)
+    my $options = snmpit_lib::getDeviceOptions($name);
+    $self->{MIN_VLAN} = $options->{'min_vlan'} if ($options);
+    $self->{MAX_VLAN} = $options->{'max_vlan'} if ($options);
     bless ($self, $class);
     $devices{$name} = $self;
     $self->spawn() if ($snmpit_stack::parallelized);

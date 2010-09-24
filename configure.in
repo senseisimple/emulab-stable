@@ -101,7 +101,7 @@ AC_SUBST(optional_subdirs)
 # These get defined in the definitions file (--with-TBDEFS).
 # NB: See AC_DEFINE_UNQUOTED() calls below, if you want a variable
 # to appear in config.h.
-# 
+#
 AC_SUBST(TBDBNAME)
 AC_SUBST(TBERRORLOGDBNAME)
 AC_SUBST(TBADMINGROUP)
@@ -156,6 +156,7 @@ AC_SUBST(ELABINELAB)
 AC_SUBST(OUTERBOSS_NODENAME)
 AC_SUBST(OUTERBOSS_XMLRPCPORT)
 AC_SUBST(OUTERBOSS_SSLCERTNAME)
+AC_SUBST(SUBBOSS_SSLCERTNAME)
 AC_SUBST(PLABSUPPORT)
 AC_SUBST(PUBSUPPORT)
 AC_SUBST(WIKISUPPORT)
@@ -250,7 +251,7 @@ AC_SUBST(TBERRORSEMAIL_NOSLASH)
 
 #
 # Defaults for for above variables.
-# 
+#
 TBERRORLOGDBNAME="errorlog"
 TBADMINGROUP="flux"
 CLIENT_ETCDIR="/etc/emulab"
@@ -270,6 +271,7 @@ ELABINELAB=0
 OUTERBOSS_NODENAME=""
 OUTERBOSS_XMLRPCPORT=3069
 OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
+SUBBOSS_SSLCERTNAME="/etc/subboss.pem"
 PLABSUPPORT=0
 PUBSUPPORT=0
 WIKISUPPORT=0
@@ -431,7 +433,7 @@ AC_SUBST(LOG_TESTBED)
 # If the private network is different then the control network, we need
 # an extra subnet decl for it in dhcpd.conf.template. This is enormously
 # crude and simplistic, but works for the local case!
-# 
+#
 if test "$PRIVATE_NETWORK" != "$CONTROL_NETWORK"; then
     DHCPD_CONTROLNET_DECL="subnet $PRIVATE_NETWORK netmask $PRIVATE_NETMASK {}"
 fi
@@ -660,7 +662,7 @@ AC_SUBST(OPT_CFLAGS)
 
 #
 # Disable event system. Relies on Elvin. On by default.
-# 
+#
 AC_ARG_ENABLE(events,
 [  --disable-events      Disable events (requires Elvin libraries)])
 
@@ -715,7 +717,7 @@ fi
 # Enable Windows support.
 # Right now this means NTFS support in imagezip, maybe more things later.
 # Relies on Linux NTFS library.
-# 
+#
 AC_ARG_ENABLE(windows,
 [  --enable-windows      Enable Windows XP support (default)])
 
@@ -868,6 +870,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
 	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
 	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
+	tbsetup/subboss_frisbeelauncher tbsetup/subboss_frisbeeimage \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
@@ -932,6 +935,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
         tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
+	tmcd/ubuntu10/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
 	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \
@@ -984,6 +988,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/load-descriptors install/dump-descriptors \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
         install/clrhouse-install \
+	install/libinstall.pm install/update-install install/update-testbed \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
 	mote/sgtools/GNUmakefile \
 	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
@@ -1007,6 +1012,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
         protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
         protogeni/test/GNUmakefile protogeni/rspec/GNUmakefile \
         protogeni/rspec/0.1/GNUmakefile \
+	protogeni/rspec/0.2/GNUmakefile \
+	protogeni/rspec/2/GNUmakefile \
         collab/GNUmakefile \
         collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \

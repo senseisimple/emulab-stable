@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <pubsub/pubsub.h>
+
+#define EVENT_LIBRARY_VERSION	"1.0"
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
@@ -135,6 +137,14 @@ int		address_tuple_free(address_tuple_t);
         event_notification_put_string(handle, note, "___SENDER___", buf)
 #define event_notification_clr_sender(handle, note) \
         event_notification_remove(handle, note, "___SENDER___")
+
+#define event_notification_get_version(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "___VERSION___", buf, len)
+#define event_notification_set_version(handle, note, buf) \
+        event_notification_put_string(handle, note, "___VERSION___", buf)
+#define event_notification_clr_version(handle, note) \
+        event_notification_remove(handle, note, "___VERSION___")
+
 #endif /* ifndef NO_EVENT_MACROS */
 #endif /* ifndef SWIG */
 

@@ -1,0 +1,37 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME $GENI_METHODS $EMULAB_PEMFILE);
+BEGIN { $GENI_DBNAME = "geni"; }
+
+# Configure variables
+my $ETCDIR         = "@prefix@/etc";
+$EMULAB_PEMFILE    = "$ETCDIR/genisa.pem";
+
+# Testbed libraries.
+use lib '@prefix@/lib';
+use GeniSA;
+
+$GENI_METHODS = {
+    "GetVersion"        => \&GeniSA::GetVersion,
+    "GetCredential"     => \&GeniSA::GetCredential,
+    "Resolve"           => \&GeniSA::Resolve,
+    "Register"          => \&GeniSA::Register,
+    "Remove"            => \&GeniSA::Remove,
+    "GetKeys"	        => \&GeniSA::GetKeys,
+    "BindToSlice"	=> \&GeniSA::BindToSlice,
+    "Shutdown"          => \&GeniSA::Shutdown,
+    "RenewSlice"        => \&GeniSA::RenewSlice,
+    "RegisterSliver"    => \&GeniSA::RegisterSliver,
+    "UnRegisterSliver"  => \&GeniSA::UnRegisterSliver,
+};
+
+1;
+

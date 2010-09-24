@@ -1077,50 +1077,52 @@ sub gendhcpdconf($$)
 			    my $singlenet = $$row{"SINGLENET"};
 			    my $inner_elab_boot = $$row{"INNER_ELAB_BOOT"};
 			    my $plab_boot = $$row{"PLAB_BOOT"};
+			    my $booting;
+			    my $dns;
 
-			if (defined $hostname) {
-				$hostname =
+			    if (defined $hostname) {
+			    	$hostname =
 				    "${spaces}\toption host-name \"$hostname\";\n";
-			}
+			    }
 
-			if (defined $filename) {
+    			    if (defined $filename) {
 				$filename =~ s/^"(.*)"$/$1/;
 				$filename =
 				    "${spaces}\tfilename \"$filename\";\n";
-			}
+			    }
 
 
-			if (defined $next_server) {
+			    if (defined $next_server) {
 				$next_server = "${spaces}\tnext-server " .
 					$next_server . ";\n";
-			}
+			    }
 
-			if (defined $bootinfo_server) {
+			    if (defined $bootinfo_server) {
 				$bootinfo_server = "${spaces}\toption " .
 				"PXE.emulab-bootinfo " . $bootinfo_server . ";\n";
-			}
+			    }
 
-			if ($inner_elab_boot) {
+			    if ($inner_elab_boot) {
 				if ($singlenet) {
 					$booting  = "${spaces}\tignore booting;\n";
 				} else {
 					$dns = "${spaces}\toption ".
 					    "domain-name-servers 1.1.1.1;\n";
 				}
-			}
-
-			#
-			# Handle alternate boot program filename if it exists.
-			# Use mutable nodes.pxe_boot_path if it is defined.
-			# Otherwise use the node_types.pxe_boot_path if it is
-			# defined.  Otherwise don't set anything (use the global
-			# default).
-			#
-			if (defined $filename) {
-			    # make sure it is pretty constrained
-			    if ($filename =~ /^\/tftpboot\// && $fn !~ /\.\./) {
-			        $filename = "${spaces}\tfilename \"$filename\";\n";
 			    }
+
+			    #
+			    # Handle alternate boot program filename if it exists.
+			    # Use mutable nodes.pxe_boot_path if it is defined.
+			    # Otherwise use the node_types.pxe_boot_path if it is
+			    # defined.  Otherwise don't set anything (use the global
+			    # default).
+			    #
+			    if (defined $filename) {
+			        # make sure it is pretty constrained
+			        if ($filename =~ /^\/tftpboot\// && $fn !~ /\.\./) {
+			            $filename = "${spaces}\tfilename \"$filename\";\n";
+			        }
 			}
 
 			# Need to make MAC look right..

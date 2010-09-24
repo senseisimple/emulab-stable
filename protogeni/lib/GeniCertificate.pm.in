@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCertificate;
@@ -133,7 +133,16 @@ sub hrn($)
 	return $1
 	    if ($1 ne "");
     }
+    # GENI AM compatibility with PlanetLab
+    # Use the URN from the Subject Alt Name to create the HRN
+    my ($authority, $type, $name) = GeniHRN::Parse($self->urn());
+    # Match authority up to the first colon, then add "." and name.
+    if ($authority =~ /^([^:]+):/) {
+        my $hrn = $1 . "." . $name;
+        return $hrn;
+    }
     print STDERR "Cannot find hrn inside DN: '" . $self->DN() . "'\n";
+    print STDERR "Cannot find hrn inside urn: '" . $self->urn() . "'\n";
     return "unknown";
 }
 sub email($)
@@ -266,9 +275,16 @@ sub LoadFromString($$)
 	print STDERR "Could not create tempfile for cert string\n";
 	return undef;
     }
-    print $tempfile "-----BEGIN CERTIFICATE-----\n";
-    print $tempfile $string;
-    print $tempfile "-----END CERTIFICATE-----\n";
+
+    # The certificate might already have the header and footer
+    # so only add them if needed.
+    if ($string =~ /^-----BEGIN CERTIFICATE-----/) {
+        print $tempfile $string;
+    } else {
+        print $tempfile "-----BEGIN CERTIFICATE-----\n";
+        print $tempfile $string;
+        print $tempfile "-----END CERTIFICATE-----\n";
+    }
 
     my $certificate = GeniCertificate->LoadFromFile($filename);
     unlink($filename);
@@ -325,7 +341,7 @@ sub LoadFromFile($$)
 	} elsif( $line =~ /^\s+Authority Information Access:\s*$/ ) {
 	    $accessinfo = 1;
 	} elsif( $altname ) {
-	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturi = $1
+	    m'^\s*URI:(urn:publicid:[-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $alturi = $1
 		foreach split( /, /, $line );
 	    $altname = 0;
 	} elsif( $accessinfo ) {
@@ -365,6 +381,12 @@ sub LoadFromFile($$)
 	return undef;
     }
     
+    # GENI AM: CN might not be a UUID, so check it.
+    # If it is not a UUID, make one up.
+    if ($uuid !~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
+        $uuid = GeniUtil::NewUUID();
+    }
+
     my $self          = {};
     $self->{'CERT'}   = {};
     $self->{'stored'} = 0;
@@ -584,6 +606,21 @@ sub StoreCRL($$$)
 		"  cert=$safe_cert, DN=$safe_issuer")
 	or return -1;
     unlink($filename);
+    return 0;
+}
+
+#
+# Remove a CRL.
+#
+sub DeleteCRL($$)
+{
+    my ($class, $authority) = @_;
+
+    my $uuid = $authority->uuid();
+    
+    DBQueryWarn("delete from geni_crls where uuid='$uuid'")
+	or return -1;
+
     return 0;
 }
 

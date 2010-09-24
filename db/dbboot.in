@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -68,6 +68,11 @@ DBQueryFatal("update experiments set event_sched_pid=0");
 # Clear old logins. 
 #
 DBQueryFatal("delete from login");
+
+#
+# Clear the pool daemon lock.
+#
+DBQueryFatal("replace into emulab_locks set name='pool_daemon',value='0'");
 
 #
 # Check for experiments stuck in transition.

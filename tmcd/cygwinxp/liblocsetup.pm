@@ -116,8 +116,14 @@ sub mysystem($)
 #
 # OS dependent part of cleanup node state.
 # 
-sub os_account_cleanup()
+sub os_account_cleanup($)
 {
+    # XXX this stuff should be lifted up into rc.accounts, sigh
+    my ($updatemasterpasswdfiles) = @_;
+    if (!defined($updatemasterpasswdfiles)) {
+	$updatemasterpasswdfiles = 0;
+    }
+
     # Undo what rc.mounts and rc.accounts did.  
 
     # Get the users list from NT, dumped into /etc/passwd and preened by the

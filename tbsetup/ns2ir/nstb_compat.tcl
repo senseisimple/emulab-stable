@@ -261,6 +261,9 @@ Simulator instproc make-cloud {nodes bw delay args} {
     return [$self make-lan $nodes $bw $delay]
 }
 
+Simulator instproc make-path {linklist} {
+}
+
 Node instproc program-agent {args} {
 }
 
@@ -287,6 +290,9 @@ LanNode instproc trace {args} {
 }
 
 LanNode instproc trace_endnode {args} {
+}
+
+LanNode instproc implemented_by {args} {
 }
 
 LanNode instproc unknown {m args} {

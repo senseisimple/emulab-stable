@@ -45,6 +45,7 @@ my $PROJROOT    = "@PROJROOT_DIR@";
 my $MAXRETRIES  = 1;
 
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
+my $SUBBOSS_FRISBEELAUNCHER = "$TB/sbin/subboss_frisbeelauncher_wrapper";
 my $osselect	    = "$TB/bin/os_select";
 my $TBUISP	    = "$TB/bin/tbuisp";
 
@@ -384,7 +385,7 @@ sub osload ($$) {
 			    my ($pmbr) = $dbresult->fetchrow_array();
 			    if ($pmbr != $rowref->{'mbr_version'}) {
 				# XXX: Is this right in the context of multiple images
-				tbwarn("$node: Existing partition $i inconsistent".
+				tbinfo("$node: Existing partition $i inconsistent".
 				       " with new image partitioning,".
 				       " invalidating existing partition");
 				$whackit = 1;
@@ -452,6 +453,7 @@ sub osload ($$) {
 	my $class = $nodeobject->class();
 	my $isremote = $nodeobject->isremotenode();
 	my $isvirtnode = $nodeobject->isvirtnode();
+	my $subboss;
 	my $reload_mode;
 	my $reload_func;
 	my $reboot_required;
@@ -465,6 +467,7 @@ sub osload ($$) {
 	    $reload_mode = "Frisbee";
 	    $reload_func = \&SetupReloadFrisbee;
 	    $reboot_required = !$noreboot; # Reboot unless $noreboot flag set
+	    $nodeobject->GetSubboss('frisbee', \$subboss);
 
 	    if (defined($nodeflags{$node}) 
 		&& defined($nodeflags{$node}{'noreboot'})) {
@@ -506,6 +509,7 @@ sub osload ($$) {
 	    'zerofree' => $zerofree,
 	    'prepare'  => $prepare,
 	    'maxwait'  => $maxwait,
+	    'subboss' => $subboss,
 	    'isremote' => $isremote,
 	    'isvirtnode' => $isvirtnode
 	};
@@ -981,6 +985,7 @@ sub SetupReloadFrisbee($)
     my $zerofree      = $reload_info->{'zerofree'};
     my $prepare       = $reload_info->{'prepare'};
     my $isvirtnode    = $reload_info->{'isvirtnode'};
+    my $subboss       = $reload_info->{'subboss'};
     my $osid          = TBNodeDiskloadOSID($node);
 
     #
@@ -1016,6 +1021,25 @@ sub SetupReloadFrisbee($)
     }
 
     foreach my $imageid (@$imageids) {
+	if (defined $subboss) {
+		my $image = Image->Lookup($imageid);
+		my $filename = $image->path();
+		my $stats = stat $filename;
+
+		my $query_result = DBQueryWarn("select sync from subboss_images where " .
+			    "subboss_id = '$subboss' and imageid = '$imageid' and sync = 1");
+
+		if (!$query_result || !$query_result->numrows) {
+			system("$SUBBOSS_FRISBEELAUNCHER " .  ($debug ? "-d ": "") .
+				"$subboss " . "$imageid " . "\"$filename\" " .
+				$stats->size() . ' ' . $stats->mtime());
+			if ($?) {
+			    tberror "Subboss Frisbee Launcher ($imageid on $subboss) failed!";
+			    return -1;
+			}
+			return 0;
+		}
+	}
 	system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
 	if ($?) {
 	    tberror "Frisbee Launcher ($imageid) failed!";

@@ -197,8 +197,11 @@ my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not lookup experiment object!")
 }
-my $special = ($pid eq "testbed" || $pid eq "tbres" ||
-	       $pid eq "emulab-ops" || $pid eq "utahstud");
+my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "geni" ||
+	       $pid eq "emulab-ops" || $pid eq "utahstud" ||
+               $pid eq "ResiliNets" || $pid eq "gec8tutorial");
+my $newsetup = $special;
+my $syncvlans = ($pid eq "emulab-ops" || ($MAINSITE && $special));
 
 #
 # Print starting message.
@@ -314,8 +317,8 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
 	else {
 	    print STDERR "Cleaning up after errors.\n";
 	    doSwapout(CLEANUP);
+	    $updatehosed = 1;
 	}
-	$updatehosed = 1;
     }
     else {
 	#
@@ -960,7 +963,7 @@ sub doSwapin($) {
 	my @same = ();
 	my $ret;
 
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    $ret = Lan->CompareVlansWithSwitches($experiment, \@diff, \@same);
 	}
 	else {
@@ -972,7 +975,7 @@ sub doSwapin($) {
 		    "Failed to compare old vlans");
 	    return 1;
 	}
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    if (@diff) {
 		print "Removing obsolete vlans @diff\n";
 		system("snmpit -f ". join(" ", map("-o $_", @diff)));
@@ -1285,8 +1288,10 @@ sub doSwapin($) {
     #
     print "Resetting OS and rebooting.\n";
     TBDebugTimeStamp("launching os_setup");
-    if (!($os_setup_pid = fork())) { 
-	exec("os_setup $pid $eid") or return 1;
+    if (!($os_setup_pid = fork())) {
+	my $oscmd = ($newsetup ? "os_setup_new" : "os_setup");
+	
+	exec("$oscmd $pid $eid") or return 1;
     } elsif ($os_setup_pid == -1) {
 	tberror "Fork failed.";
 	return 1;
@@ -1300,7 +1305,7 @@ sub doSwapin($) {
     # parallel with os_setup (no DB dependencies, etc.)
     #
     if (!$experiment->skipvlans() &&
-	($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special))) {
+	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
 	if (system("snmpit -t $pid $eid")) {

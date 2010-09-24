@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,11 +14,11 @@ include $(OBJDIR)/Makeconf
 
 all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 	capture.pem capture.fingerprint capture.sha1fingerprint \
-	keys mksig jabber.pem
+	keys mksig jabber.pem updatecert
 
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
 	localnode.pem capture.sha1fingerprint apache.pem apache-ops.pem \
-	ctrlnode.pem jabber.pem
+	ctrlnode.pem jabber.pem updatecert
 
 clearinghouse:	emulab.pem apache.pem
 
@@ -254,6 +254,7 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/emulab_privkey.pem \
 		$(INSTALL_ETCDIR)/emulab_pubkey.pem \
+		$(INSTALL_SBINDIR)/updatecert \
 		install-conf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
@@ -282,6 +283,7 @@ remote-site-boss-install:	install-dirs \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
 		$(INSTALL_ETCDIR)/ctrlnode.pem \
 		$(INSTALL_ETCDIR)/server.pem \
+		$(INSTALL_SBINDIR)/updatecert \
 		install-conf
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem

@@ -1,0 +1,226 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Look for things that need to be expired and resources released. This is
+# incredibly primitive at the moment.
+#
+sub usage()
+{
+    print "Usage: ch_daemon [-d] [-n]\n";
+    exit(1);
+}
+my $optlist   = "dn";
+my $debug     = 0;
+my $impotent  = 0;
+
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
+my $LOGFILE       = "$TB/log/ch_daemon.log";
+my $EMULAB_PEMFILE = "$TB/etc/genich.pem";
+my $SLEEP_INTERVAL = 60;
+my $PROBE_INTERVAL = (60 * 60 * 24);
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub notify($);
+
+#
+# Probe interval countdown. Set to zero so it runs right away.
+#
+my $probe_countdown = 0;
+	  
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+if ($UID != 0) {
+    fatal("Must be root to run this script\n");
+}
+
+#
+# Exit if not a protogeni site.
+#
+if (! ($PGENISUPPORT && $PGENICLRHOUSE)) {
+    exit(0);
+}
+
+#
+# Check args early so we get the right DB.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-ch";
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+require GeniDB;
+require GeniUtil;
+require GeniCertificate;
+require GeniAuthority;
+require libGeni;
+use libtestbed;
+use emutil;
+use POSIX qw(strftime ceil);
+
+#
+# So we know who/what we are acting as.
+#
+my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+if (!defined($certificate)) {
+    fatal("Could not get uuid/urn from $EMULAB_PEMFILE\n");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+Genixmlrpc->SetTimeout(10);
+$ENV{'MYUUID'} = $certificate->uuid();
+$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+ch";
+
+if (CheckDaemonRunning("ch_daemon")) {
+    fatal("Not starting another ch daemon!");
+}
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($LOGFILE)) {
+	exit(0);
+    }
+}
+if (MarkDaemonRunning("ch_daemon")) {
+    fatal("Could not mark daemon as running!");
+}
+#
+# Setup a signal handler for newsyslog.
+#
+sub handler()
+{
+    my $SAVEEUID = $EUID;
+    
+    $EUID = 0;
+    ReOpenLog($LOGFILE);
+    $EUID = $SAVEEUID;
+}
+$SIG{HUP} = \&handler
+    if (!$debug);
+
+GeniUtil::FlipToGeniUser();
+
+# Do not wait long.
+Genixmlrpc->SetTimeout(10);
+
+#
+# Probe CMs
+#
+sub ProbeCMs()
+{
+    my @authorities = ();
+    my $up	    = "Up:\n";
+    my $down        = "Down:\n";
+    my $disabled    = "Disabled:\n";
+    
+    if (GeniAuthority->ListAll(\@authorities)) {
+	fatal("Could not get authorities list from the DB");
+    }
+    foreach my $authority (@authorities) {
+	my $urn = $authority->urn();
+	
+	next
+	    if ($authority->type() ne "cm");
+
+	if ($authority->disabled()) {
+	    $disabled .= "$urn\n";
+	    next;
+	}
+
+	print "Contacting $urn\n";
+	my $version = $authority->Version();
+	if (!defined($version)) {
+	    print "Error getting version from $urn\n";
+	    $down .= "$urn\n";
+	}
+	else {
+	    print "  Running version $version\n";
+	    $up .= "$urn, version $version\n";
+	}
+    }
+    SENDMAIL("geni-dev-utah\@flux.utah.edu",
+	     "ClearingHouse Daemon Message",
+	     "This is an automated message from the ClearingHouse Daemon\n\n".
+	     $up . "\n" . $down . "\n" . $disabled . "\n", $TBOPS);
+}
+
+while (1) {
+    if (NoLogins()) {
+	sleep(5);
+	next;
+    }
+
+    print "Running at ".
+	POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime()) . "\n";
+
+    $probe_countdown -= $SLEEP_INTERVAL;
+    if ($probe_countdown <= 0) {
+	ProbeCMs();
+	$probe_countdown = $PROBE_INTERVAL;
+    }
+
+    # Be certain stale info is gone.
+    GeniUtil::FlushCaches();
+
+    sleep($SLEEP_INTERVAL);
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "ProtoGENI CH daemon died",
+	     $msg,
+	     $TBOPS);
+
+    MarkDaemonStopped("ch_daemon");
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+sub notify($)
+{
+    my ($msg) = @_;
+
+    print "$msg\n";
+    SENDMAIL($TBOPS, "ClearingHouse Daemon Message", $msg, $TBOPS);
+}
+

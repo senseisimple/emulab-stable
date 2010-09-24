@@ -15,7 +15,7 @@ L                      = @SSLCERT_LOCALITY@
 O                      = @SSLCERT_ORGNAME@
 OU                     = Server
 # tmcc uses CN for verification.
-CN                     = @WWWHOST@
+CN                     = @BOSSNODE@
 emailAddress           = @TBOPSEMAIL@
 
 [ req_attributes ]

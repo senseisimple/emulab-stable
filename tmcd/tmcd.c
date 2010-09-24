@@ -370,7 +370,7 @@ struct command {
         { "programs",     FULLCONFIG_ALL,  F_ALLOCATED, doprogagents},
         { "syncserver",   FULLCONFIG_ALL,  F_ALLOCATED, dosyncserver},
         { "keyhash",      FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED, doeventkey},
+        { "eventkey",     FULLCONFIG_ALL,  F_ALLOCATED|F_REMREQSSL, doeventkey},
         { "fullconfig",   FULLCONFIG_NONE, F_ALLOCATED, dofullconfig},
         { "routelist",	  FULLCONFIG_PHYS, F_ALLOCATED, doroutelist},
         { "role",	  FULLCONFIG_PHYS, F_ALLOCATED, dorole},
@@ -1686,12 +1686,16 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the virtual interfaces.
 	 */
 	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue "
+			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue, "
+			 "       l.lanid "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
 			 "  i.node_id=v.node_id and i.iface=v.iface "
 			 "left join virt_lan_lans as vll on "
 			 "  vll.idx=v.virtlanidx and vll.exptidx=v.exptidx "
+			 "left join lans as l on "
+			 "  l.exptidx=vll.exptidx and l.vname=vll.vname and "
+			 "  l.link is null "
 			 "left join lan_attributes as la on "
 			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
 			 "left join lan_attributes as la2 on "
@@ -1700,7 +1704,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "      (la2.attrvalue='Experimental' or "
 			 "       la2.attrvalue is null) "
 			 "      and %s",
-			 10, reqp->exptidx, reqp->pnodeid, buf);
+			 11, reqp->exptidx, reqp->pnodeid, buf);
 	if (!res) {
 		error("%s: IFCONFIG: DB Error getting veth interfaces!\n",
 		      reqp->nodeid);
@@ -1717,20 +1721,32 @@ COMMAND_PROTOTYPE(doifconfig)
 	}
 	while (nrows) {
 		char *bufp   = buf;
+		char *ifacetype;
 		int isveth, doencap;
 
 		row = mysql_fetch_row(res);
 		nrows--;
 
-		if (strcmp(row[6], "veth") == 0) {
+		if (strcmp(row[6], "vlan") == 0 && !row[3]) {
+			/*
+			 * Convert to a loopback lan, however the client
+			 * is able to do it.
+			 */
+			isveth    = 0;
+			doencap   = 0;
+			ifacetype = "loop";
+		} else if (strcmp(row[6], "veth") == 0) {
 			isveth = 1;
 			doencap = 1;
+			ifacetype = "veth";
 		} else if (strcmp(row[6], "veth-ne") == 0) {
 			isveth = 1;
 			doencap = 0;
+			ifacetype = "veth";
 		} else {
 			isveth = 0;
 			doencap = 0;
+			ifacetype = row[6];
 		}
 
 		/*
@@ -1753,7 +1769,7 @@ COMMAND_PROTOTYPE(doifconfig)
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "IFACETYPE=%s "
 			       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s",
-			       isveth ? "veth" : row[6],
+			       ifacetype,
 			       row[1], CHECKMASK(row[4]), row[0], row[2],
 			       row[3] ? row[3] : "none");
 
@@ -1779,7 +1795,9 @@ COMMAND_PROTOTYPE(doifconfig)
 			char *tag = "0";
 			if (isveth)
 				tag = row[8];
-			else if (strcmp(row[6], "vlan") == 0)
+			else if (strcmp(ifacetype, "loop") == 0)
+				tag = row[10];
+			else if (strcmp(ifacetype, "vlan") == 0)
 				tag = row[9] ? row[9] : "0";
 
 			/* sanity check the tag */
@@ -1790,7 +1808,6 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			bufp += OUTPUT(bufp, ebufp - bufp, " VTAG=%s", tag);
 		}
-
 		OUTPUT(bufp, ebufp - bufp, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
@@ -2736,8 +2753,8 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		 " i.node_id=d.node_id and i.iface=d.iface "
 		 "left join vinterfaces as v on "
 		 " v.node_id=d.node_id and v.IP=d.ip "
-		 "where d.node_id='%s' %s",
-		 28, reqp->pnodeid, buf);
+		 "where d.node_id='%s' and d.exptidx='%d' %s",
+		 28, reqp->pnodeid, reqp->exptidx, buf);
 	if (!res) {
 		error("LINKDELAY: %s: DB Error getting link delays!\n",
 		      reqp->nodeid);
@@ -3855,9 +3872,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	char		*disktype, *useacpi, *useasf, address[MYBUFSIZE];
+	char            server_address[MYBUFSIZE];
 	char		mbrvers[51];
 	char            *loadpart, *OS, *prepare;
 	int		disknum, nrows, zfill;
+	int             frisbee_pid;
 
 	/*
 	 * Get the address the node should contact to load its image
@@ -3925,6 +3944,46 @@ COMMAND_PROTOTYPE(doloadinfo)
 		OS = row[2];
 		prepare = row[8];
 
+		res2 = mydb_query("select load_address,frisbee_pid,IP from subboss_images as i "
+				 "left join subbosses as s on s.subboss_id = i.subboss_id "
+				 "left join interfaces as n on n.node_id =  s.subboss_id "
+				 "where s.node_id = '%s' and s.service = 'frisbee' and "
+				 "i.imageid = '%s' and i.load_address != '' and "
+				 "n.role='ctrl' and i.sync != 1", 3, reqp->nodeid, row[7]);
+
+		if (!res2) {
+			error("doloadinfo: %s: DB Error getting subboss info!\n",
+			       reqp->nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
+
+		frisbee_pid = 0;
+		address[0] = '\0';
+		server_address[0] = '\0';
+
+		if (mysql_num_rows(res2)) {
+			row2 = mysql_fetch_row(res2);
+
+			if (row2[0] && row2[0][0])
+				strcpy(address, row2[0]);
+
+			if (row2[1] && row2[1][0])
+				frisbee_pid = atoi(row2[1]);
+			
+			strcpy(server_address, row2[2]);
+		} else {
+			if (row[0] && row[0][0])
+				strcpy(address, row[0]);
+
+			if (row[3] && row[3][0])
+				frisbee_pid = atoi(row[3]);
+			
+			strcpy(server_address, BOSSNODE_IP);
+		}
+
+		mysql_free_result(res2);
+
 		/*
 		 * Remote nodes get a URL for the address.
 		 */
@@ -3939,24 +3998,25 @@ COMMAND_PROTOTYPE(doloadinfo)
 			OUTPUT(address, sizeof(address),
 			       "%s/spewimage.php?imageid=%s&access_key=%s",
 			       TBBASE, row[7], row[6]);
+			
+			server_address[0] = 0;
 		}
 		else {
 			/*
 			 * Simple text string.
 			 */
-			if (! row[0] || !row[0][0]) {
+			if (!address[0]) {
 				mysql_free_result(res);
 				return 0;
 			}
-			strcpy(address, row[0]);
 
 			/*
 			 * Sanity check
 			 */
-			if (!row[3] || !row[3][0]) {
+			if (!frisbee_pid) {
 				error("doloadinfo: %s: "
 				      "No pid associated with address %s\n",
-				      reqp->nodeid, row[0]);
+				      reqp->nodeid, address);
 				mysql_free_result(res);
 				return 1;
 			}
@@ -3964,6 +4024,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=%s PART=%s PARTOS=%s", address, loadpart, OS);
+		
+		if (server_address[0] && (vers >= 31)) {
+			bufp += OUTPUT(bufp, ebufp - bufp,
+			               " SERVER=%s", server_address);
+		}
 
 		/*
 		 * Remember zero-fill free space, mbr version fields, and access_key
@@ -4243,6 +4308,7 @@ COMMAND_PROTOTYPE(dostate)
 	char 		newstate[128];	/* More then we will ever need */
 	MYSQL_RES	*res;
 	int		nrows;
+	int		i;
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
@@ -4259,7 +4325,6 @@ COMMAND_PROTOTYPE(dostate)
 		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
-
 
         /*
          * Check to make sure that this is not a state that must be reported
@@ -4290,6 +4355,17 @@ COMMAND_PROTOTYPE(dostate)
             // mail, but this needs more thought before making it the
             // default action.
         }
+
+	/*
+	 * Sanity check. No special or weird chars.
+	 */
+	for (i = 0; i < strlen(newstate); i++) {
+		if (! (isalnum(newstate[i]) ||
+		       newstate[i] == '_' || newstate[i] == '-')) {
+			error("DOSTATE: %s: Bad state name\n", reqp->nodeid);
+			return 1;
+		}
+	}
 
 #ifdef EVENTSYS
 	/*
@@ -6557,6 +6633,12 @@ COMMAND_PROTOTYPE(dofullconfig)
 				 */
 				continue;
 			}
+			/*
+			 * Silently drop all TPM-required commands right now.
+			 */
+			if ((command_array[i].flags & F_REQTPM)) {
+				continue;
+			}
 			OUTPUT(buf, sizeof(buf),
 			       "*** %s\n", command_array[i].cmdname);
 			client_writeback(sock, buf, strlen(buf), tcp);
@@ -8548,7 +8630,7 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 			 "left join interfaces as i on n.node_id = i.node_id "
 			 "left join reserved as r on n.node_id = r.node_id "
 			 "where s.subboss_id = '%s' and "
-	                 "s.service='dhcp' and i.role='ctrl'", 11,
+	                 "s.service='dhcp' and i.role='ctrl' order by n.priority", 11,
 			 reqp->nodeid);
 
 	if (!res) {
@@ -8598,7 +8680,7 @@ COMMAND_PROTOTYPE(dodhcpdconf)
 		}
 
 		if (inner_elab_boot) {
-			res2 = mydb_query("select elabinelab_singlenet from experiments "
+			res2 = mydb_query("select elabinelab_singlenet from experiments where "
 					  "eid = '%s' and pid = '%s'", 1, row[5], row[6]);
 
 			if (!res2) {

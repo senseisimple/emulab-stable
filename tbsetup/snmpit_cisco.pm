@@ -108,6 +108,17 @@ sub new($$$;$) {
 	return undef;
     }
 
+    #
+    # Cisco considers anything over 1k an 'extended' VLAN. There are some
+    # issues with supporing these on certain devices, so we want to know if
+    # we'll ever be called on to make VLANs in the extended range.
+    #
+    if ($self->{MAX_VLAN} > 1000) {
+        $self->{EXTENDED_VLANS} = 1;
+    } else {
+        $self->{EXTENDED_VLANS} = 0;
+    }
+
     if ($community) { # Allow this to over-ride the default
 	$self->{COMMUNITY}    = $community;
     } else {
@@ -1398,8 +1409,17 @@ sub vlanTrunkUtil($$$$) {
 
     my ($bitfield, %vranges, @result);
 
-    if ($op == $VOP_CLEARALL)
-        { @result = @vlans = (1, 1025, 2049, 3073); }
+    if ($op == $VOP_CLEARALL) {
+        #
+        # Clear the 'extended range' VLANs iff they might be used on this
+        # switch
+        #
+        if ($self->{EXTENDED_VLANS}) {
+            @result = @vlans = (1, 1025, 2049, 3073);
+        } else {
+            @result = @vlans = (1);
+        }
+    }
     foreach my $vlan (@vlans)
 	{ push @{$vranges{($vlan >> 10) & 3}}, $vlan; }
 

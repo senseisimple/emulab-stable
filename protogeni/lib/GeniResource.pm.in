@@ -26,6 +26,7 @@ use GeniAuthority;
 use GeniComponent;
 use GeniUser;
 use GeniHRN;
+use GeniXML;
 use emutil qw(TBGetUniqueIndex);
 use User;
 use Project;
@@ -218,6 +219,7 @@ sub manager_version($)  { return $_[0]->{'manager_version'}; }
 sub last_rpc_error($)   { return $_[0]->{'last_rpc_error'}; }
 sub last_rpc_output($)  { return $_[0]->{'last_rpc_output'}; }
 sub last_rpc_value($)   { return $_[0]->{'last_rpc_value'}; }
+sub manifest_string($)  { return $_[0]->{'MANIFESTSTR'}; }
 
 #
 # Delete a resource record from the DB.
@@ -356,6 +358,13 @@ sub Ticket($)
     $self->{'NEWTICKET'} = $ticket;
     return $ticket;
 }
+# Got a ticket?
+sub HaveTicket($)
+{
+    my ($self) = @_;
+
+    return $self->newticket_idx();
+}
 
 sub Manifest($)
 {
@@ -378,11 +387,11 @@ sub Manifest($)
 	return undef;
     }
     my ($manifest_string) = $query_result->fetchrow_array();
-    my $manifest = XMLin($manifest_string, KeyAttr => [],
-			 ForceArray => ["node", "link", "interface",
-					"interface_ref", "linkendpoints",
-					"component_manager"]);
-
+    my $manifest = GeniXML::Parse($manifest_string);
+    if (!defined($manifest)) {
+	print STDERR "Could not getmanifest for $self\n";
+	return undef;
+    }
     $self->{'MANIFEST'}    = $manifest;
     $self->{'MANIFESTSTR'} = $manifest_string;
     return $manifest;
@@ -397,14 +406,7 @@ sub UpdateManifest($$)
 	return -1;
     }
     my $manifest_idx = $self->manifest_idx();
-
-    my $manifest_string =
-	eval { XMLout($manifest, "NoAttr" => 1, RootName => "manifest") };
-    if ($@) {
-	print STDERR "UpdateManifest: XMLout error: $@\n";
-	print STDERR Dumper($manifest);
-	return -1;
-    }
+    my $manifest_string = GeniXML::Serialize($manifest);
 
     my $query_result =
 	DBQueryWarn("update geni_manifests set ".
@@ -462,12 +464,110 @@ sub ManagerVersion($)
 }
 
 #
+# Convert an rspec structure (as from libvtop) into proper format.
+# This is horrible.
+#
+sub ConvertRspec($)
+{
+    my ($rspec) = @_;
+    my $template;
+
+    if (1) {
+	$template =
+	    "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.2\" ".
+	    "       type=\"request\" generated_by=\"libvtop\">".
+	    "</rspec>";
+    }
+    else {
+	$template =
+	    "<rspec xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ".
+	    "       xsi:schemaLocation=".
+	    "\"http://www.protogeni.net/resources/rspec/0.2 ".
+	    "  http://www.protogeni.net/resources/rspec/0.2/request.xsd\" ".
+	    "       type=\"request\" generated_by=\"libvtop\"> ".
+	    "</rspec>";
+    }
+
+    my $new = GeniXML::Parse($template);
+    if (!defined($new)) {
+	print STDERR "ConvertRspec: Could not create new document\n";
+	return undef;
+    }
+    # ???
+    my $root = $new;
+
+    foreach my $ref (@{ $rspec->{'node'} }) {
+	my $node = GeniXML::AddElement("node", $root);
+	
+	foreach my $key ('virtual_id', 'component_urn', 'exclusive',
+			 'component_manager_urn', 'component_manager_uuid',
+			 'virtualization_type', 'virtualization_subtype',
+			 'startup_command', 'tarfiles') {
+	    GeniXML::SetText($key, $node, $ref->{$key})
+		if (exists($ref->{$key}));
+	}
+	foreach my $ifaceref (@{ $ref->{'interface'} }) {
+	    my $iface = GeniXML::AddElement("interface", $node);
+	    foreach my $key ('virtual_id', 'component_id') {
+		GeniXML::SetText($key, $iface, $ifaceref->{$key})
+		    if (exists($ifaceref->{$key}));
+	    }
+	}
+	if (exists($ref->{'disk_image'})) {
+	    my $osref = $ref->{'disk_image'};
+	    my $os    = GeniXML::AddElement("disk_image", $node);
+
+	    foreach my $key ('name') {
+		GeniXML::SetText($key, $os, $osref->{$key})
+		    if (exists($osref->{$key}));
+	    }
+	}
+    }
+    if (exists($rspec->{'link'})) {
+	foreach my $linkref (@{ $rspec->{'link'} }) {
+	    my $link = GeniXML::AddElement("link", $root);
+	    foreach my $key ('virtual_id', 'link_type',
+			     'virtualization_type') {
+		GeniXML::SetText($key, $link, $linkref->{$key})
+		    if (exists($linkref->{$key}));
+	    }
+	    # These are special; see libvtop.
+	    foreach my $key ('bandwidth', 'latency', 'packet_loss') {
+		if (exists($linkref->{$key})) {
+		    my ($val) = @{ $linkref->{$key} };
+
+		    GeniXML::SetText($key, $link, $val);
+		}
+	    }
+	    foreach my $ifaceref (@{ $linkref->{'interface_ref'} }) {
+		my $iface = GeniXML::AddElement("interface_ref", $link);
+		
+		foreach my $key ('virtual_node_id', 'virtual_interface_id',
+				 'tunnel_ip') {
+		    GeniXML::SetText($key, $iface, $ifaceref->{$key})
+			if (exists($ifaceref->{$key}));
+		}
+	    }
+	    foreach my $cmref (@{ $linkref->{'component_manager'} }) {
+		my $cm = GeniXML::AddElement("component_manager", $link);
+		
+		foreach my $key ('id') {
+		    GeniXML::SetText($key, $cm, $cmref->{$key})
+			if (exists($cmref->{$key}));
+		}
+	    }
+	}
+    }
+    return $new;
+}
+
+#
 # Add Resources. We get an rspec to replace the current rspec.
 # Ask for a ticket, and then redeem it.
 #
 sub GetTicket($$$$)
 {
-    my ($self, $user, $rspec, $impotent) = @_;
+    my ($self, $user, $rspec_string, $impotent) = @_;
     my $ticket;
     my $response;
 
@@ -482,15 +582,6 @@ sub GetTicket($$$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
-
-    my $rspec_string = eval { XMLout($rspec, "NoAttr" => 1) };
-    if ($@) {
-	print STDERR "GetTicket: XMLout error: $@\n";
-	print STDERR Dumper($rspec);
-	return -1;
-    }
-
-    $rspec_string =~ s/opt\>/rspec\>/g;
 
     #
     # Load the SA cert to act as caller context.
@@ -612,7 +703,7 @@ sub GetTicket($$$$)
 	    print STDERR "Could not update ticket $ticket. Error: ";
 	}
 	else {
-	    print STDERR "Could not get new ticket. Error: ";
+	    print STDERR "Could not get new ticket from $self. Error: ";
 	}
 	print STDERR "  " . $response->output() . "\n";
 	return -1;
@@ -1051,55 +1142,6 @@ sub Clear($$)
 	}
     }
 
-    if (defined($sliver_credential)) {
-	my $method_name = "DeleteSlice";
-	my $method_args = undef;
-
-	if ($manager_version == 1.0) {
-	    $method_args->{'credential'} = $slice_credential->asString();
-	}
-	elsif ($manager_version == 2.0) {
-	    $method_args->{'credentials'} = [$slice_credential->asString()];
-	    $method_args->{'slice_urn'}   = $slice->urn();
-	}
-	else {
-	    print STDERR
-		"GeniResource::Clear Unknown version at $authority\n";
-	    return -1;
-	}
-	print STDERR "Deleting sliver on $authority\n";
-	$response =
-	    Genixmlrpc::CallMethod($authority->url(), $usercontext,
-				   $method_name, $method_args);
-	if (!defined($response)) {
-	    $self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
-	    print STDERR "*** Internal error deleting sliver for $self\n";
-	    return -1;
-	}
-	$self->{'last_rpc_error'} = $response->code();
-	$self->{'last_rpc_output'} = $response->output();
-	$self->{'last_rpc_value'}  = $response->value();
-	if ($response->code() != GENIRESPONSE_SUCCESS &&
-	    $response->code() != GENIRESPONSE_SEARCHFAILED) {
-	    print STDERR "Could not delete sliver for $self. Error: ";
-	    print STDERR "  " . $response->output() . "\n";
-	    return -1;
-	}
-	$sliver_credential->Delete();
-	$self->Update({"credential_idx" => 0});
-
-	#
-	# Delete this now; no point in waiting for the CM to tell us.
-	#
-	# Needs to move elsewhere I think.
-	#
-	my $clientsliver =
-	    GeniRegistry::ClientSliver->LookupByAuthority($slice,
-							  $manager_urn);
-	$clientsliver->Delete()
-	    if (defined($clientsliver));
-    }
-
     if (defined($newticket)) {
 	my $method_name = "ReleaseTicket";
 	my $method_args = { "ticket" => $newticket->asString() };
@@ -1140,6 +1182,54 @@ sub Clear($$)
     if (defined($oldticket)) {
 	$oldticket->Delete(TICKET_DELETED);
 	$self->Update({"ticket_idx" => 0});
+    }
+
+    my $method_name = "DeleteSlice";
+    my $method_args = undef;
+
+    if ($manager_version == 1.0) {
+	$method_args->{'credential'} = $slice_credential->asString();
+    }
+    elsif ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$slice_credential->asString()];
+	$method_args->{'slice_urn'}   = $slice->urn();
+    }
+    else {
+	print STDERR "GeniResource::Clear Unknown version at $authority\n";
+	return -1;
+    }
+    print STDERR "Deleting sliver on $authority\n";
+    $response =
+	Genixmlrpc::CallMethod($authority->url(), $usercontext,
+			       $method_name, $method_args);
+    if (!defined($response)) {
+	$self->{'last_rpc_error'} = GENIRESPONSE_RPCERROR();
+	print STDERR "*** Internal error deleting sliver for $self\n";
+	return -1;
+    }
+    $self->{'last_rpc_error'} = $response->code();
+    $self->{'last_rpc_output'} = $response->output();
+    $self->{'last_rpc_value'}  = $response->value();
+    if ($response->code() != GENIRESPONSE_SUCCESS &&
+	$response->code() != GENIRESPONSE_SEARCHFAILED) {
+	print STDERR "Could not delete sliver for $self. Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	return -1;
+    }
+    #
+    # Delete this now; no point in waiting for the CM to tell us.
+    #
+    # Needs to move elsewhere I think.
+    #
+    my $clientsliver =
+	GeniRegistry::ClientSliver->LookupByAuthority($slice,
+						      $manager_urn);
+    $clientsliver->Delete()
+	if (defined($clientsliver));
+    
+    if (defined($sliver_credential)) {
+	$sliver_credential->Delete();
+	$self->Update({"credential_idx" => 0});
     }
 
     #
@@ -1543,12 +1633,13 @@ sub Discover($$$)
 	return -1;
     }
     my $manager_urn = $self->manager_urn();
+    my $manager_version = $self->ManagerVersion();
+
     my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
 
     #
     # Create a Geni user from current user doing the operation.

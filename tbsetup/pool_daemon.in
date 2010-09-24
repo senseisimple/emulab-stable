@@ -15,22 +15,21 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDOUT "Usage: pool_daemon [-d]\n" .
+    print STDOUT "Usage: pool_daemon [-d] [nsfile]\n" .
 	"Use the -d option to prevent daemonization\n";
     exit(-1);
 }
-my $optlist = "dn";
+my $optlist = "dne1fs";
 my $debug    = 0;
 my $impotent = 0;
-my $startup  = 0;
-
-#
-# This should run as root.
-#
-if ($UID != 0) {
-    die("*** $0:\n".
-	"    Only root can run this script!\n");
-}
+my $killme   = 0;
+my $nofree   = 1;
+my $gotlock  = 0;
+my $mailsent = 0;
+my $oneshot  = 0;
+my $swapin   = 0;
+my $force    = 0;
+my $nsfile;
 
 #
 # Configure variables
@@ -40,6 +39,7 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $BOSSNODE = "@BOSSNODE@";
 my $logfile  = "$TB/log/poollog";
 my $SWAPEXP  = "$TB/bin/swapexp";
+my $tmpfile  = "/tmp/pool-$$.nsfile";
 
 # Testbed Support library
 use lib "@prefix@/lib";
@@ -52,6 +52,14 @@ use Experiment;
 use User;
 use OSinfo;
 use Image;
+
+#
+# This should run as root.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
 
 # We use tblog to determine why swapexp failed.
 tblog_stop_capture();
@@ -84,26 +92,46 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 0) {
-    usage();
-}
 if (defined($options{"d"})) {
-    $debug = $options{"d"};
+    $debug = 1;
+}
+if (defined($options{"1"})) {
+    $oneshot = 1;
 }
 if (defined($options{"n"})) {
-    $impotent = $options{"n"};
+    $impotent = 1;
 }
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"e"})) {
+    $nofree = 1;
+}
+if (defined($options{"s"})) {
+    $swapin = 1;
+}
+# Temporary disable until I feel more confident.
+if (!$force) {
+    print "Pool daemon is currently disabled. Exiting.\n";
+    exit(0);
+}
+usage()
+    if (@ARGV > 1);
+$nsfile = $ARGV[0]
+    if (@ARGV == 1);
+$oneshot = 1
+    if (defined($nsfile));
 
 if (!$impotent && CheckDaemonRunning("pool_daemon")) {
     fatal("Not starting another pool daemon!");
 }
 # Go to ground.
-if (! ($debug || $impotent)) {
+if (! ($oneshot || $debug || $impotent)) {
     if (TBBackGround($logfile)) {
 	exit(0);
     }
 }
-if (!$impotent && MarkDaemonRunning("pool_daemon")) {
+if (!($impotent || $oneshot) && MarkDaemonRunning("pool_daemon")) {
     fatal("Could not mark daemon as running!");
 }
 #
@@ -114,7 +142,7 @@ sub handler()
     ReOpenLog($logfile);
 }
 $SIG{HUP} = \&handler
-    if (!($debug || $impotent));
+    if (!($oneshot || $debug || $impotent));
 
 print "Pool Daemon starting... pid $$, at ".`date`;
 
@@ -140,11 +168,6 @@ my $eid = $experiment->eid();
 if ($experiment->state() eq EXPTSTATE_NEW()) {
     $experiment->SetState(EXPTSTATE_SWAPPED());
 }
-if ($experiment->state() eq EXPTSTATE_SWAPPED()) {
-    print STDERR "Pool Daemon exiting since the experiment is swapped\n";
-    cleanup();
-    exit(0);
-}
 
 #
 # We need this user for running swapexp below.
@@ -164,26 +187,75 @@ if (!defined($image)) {
     exit(0);
 }
 
-while (1) {
+#
+# And handler for TERM since we really do not want this to be
+# interrupted. Just set a flag that will cause it to exit at
+# the next loop.
+#
+sub sigterm()
+{
+    print "Got a TERM signal; arranging to exit soon\n";
+    $killme = 1;
+}
+$SIG{TERM} = \&sigterm;
+
+while (!$killme) {
     my $disabled;
+    my $didsomething = 0;
     
-    # Use a long period; we do not want the pool to change too fast.
-    if (!$startup) {
-	$startup++;
-    }
-    else {
-	sleep(120);
-    }
     print "Pool Daemon running at ".`date`;
 
     if (! TBGetSiteVar("web/nologins", \$disabled) || $disabled) {
 	print "  Skipping this loop cause of nologins\n";
-	next;
+	goto loop;
     }
 
+    #
+    # Serialize this part with the mapper.
+    #
+    if (!$impotent) {
+	my $tries = 0;
+	
+	while (1) {
+	    #
+	    # Use a countup/countdown counter, so that multiple mappers
+	    # can run, but not while the pool_daemon is running.
+	    #
+	    my $lock_result =
+		DBQueryWarn("update emulab_locks set value=-1 ".
+			    "where name='pool_daemon' and value=0");
+	    fatal("DB Error going for lock")
+		if (!defined($lock_result));
+
+	    $gotlock = $lock_result->affectedrows;
+
+	    last
+		if ($gotlock);
+
+	    if ($tries++ > 100) {
+		notify("Cannot get the lock after a really long time");
+		$tries = 0;
+	    }
+	    print "Waiting for pool daemon lock ...\n";
+	    sleep(10);
+	}
+    }
+    
     Node->FlushAll();
     $experiment->Refresh() == 0
 	or fatal("Could not reload $experiment");
+
+    if ($experiment->state() eq EXPTSTATE_SWAPPED() && !$swapin) {
+	print "Skipping this loop cause the experiment is swapped\n";
+	goto loop;
+    }
+    if (defined($nsfile)) {
+	print "Copying $nsfile to $tmpfile\n";
+	system("/bin/cp -f $nsfile $tmpfile") == 0
+	    or fatal("Could not copy nsfile");
+	goto skipns;
+    }
+    
     my @nodelist = $experiment->NodeList();
     my %inuse    = ();
     my %tofree   = ();
@@ -195,6 +267,15 @@ while (1) {
     my $maxpoolsize  = TBGetSiteVar("general/maxpoolsize");
     my $minpoolsize  = TBGetSiteVar("general/minpoolsize");
     my $poolnodetype = TBGetSiteVar("general/poolnodetype");
+
+    #
+    # Sanity check the nodetype to make sure it has been set.
+    #
+    my $typeinfo = NodeType->Lookup("pc", $poolnodetype);
+    if (!defined($typeinfo)) {
+	fatal("$poolnodetype is not a valid pc type. Please set the ".
+	      "'general/poolnodetype' site variable");
+    }
 
     #
     # Look to see how each of the nodes is packed. This is
@@ -223,7 +304,8 @@ while (1) {
 	if ($vnodecount == 0) {
 	    print "$node no longer has virtual nodes on it.\n";
 	    # Free the node unless we would go below the minpoolsize.
-	    if (scalar(@nodelist) - scalar(keys(%tofree)) > $minpoolsize) {
+	    if (!$nofree &&
+		scalar(@nodelist) - scalar(keys(%tofree)) > $minpoolsize) {
 		print "  Adding to free list.\n";
 		$tofree{$node->node_id()} = $node;
 	    }
@@ -231,6 +313,7 @@ while (1) {
 	}
 	# Count up loaded vs. unloaded nodes.
 	my $factor = $maxsharecount / $vnodecount;
+	print "$node load factor is $factor\n";
 	if ($factor < 0.5) {
 	    $unloaded++;
 	}
@@ -248,27 +331,29 @@ while (1) {
 	    my $key = (keys(%tofree))[0];
 	    delete($tofree{$key});
 	}
-	elsif (scalar(@nodelist) < $maxpoolsize) {
+ 	elsif (scalar(@nodelist) < $maxpoolsize) {
 	    $newcount++;
 	}
     }
-    if (! (keys(%tofree) || $newcount)) {
-	exit(0)
-	    if ($impotent);
-	next;
+    if (!$debug) {
+	if (! (keys(%tofree) || $newcount)) {
+	    exit(0)
+		if ($impotent);
+	    goto loop;
+	    # This counts as doing something.
+	    $didsomething = 1;
+	}
     }
 
     #
     # Generate a new NS file. Be nice to not have to this, but not
     # having an NS file could confuse things for the web interface.
     #
-    my $tmpfile = "/tmp/pool-$$.nsfile";
-
     print "Generating a new NS file in $tmpfile\n";
     
     if (!open(NS, ">$tmpfile")) {
 	notify("Could not create $tmpfile");
-	next;
+	goto loop;
     }
     print NS "# Auto generated by the pool daemon\n\n";
     print NS "source tb_compat.tcl\n";
@@ -308,10 +393,11 @@ while (1) {
     print NS "\$ns rtproto Static\n";
     print NS "\$ns run\n";
     close(NS);
+  skipns:
     chmod(0775, $tmpfile);
 
-    exit(0)
-	if ($impotent);
+    last
+	if ($impotent || $killme);
 
     # Must do this each time before fork.
     tblog_new_session();
@@ -330,12 +416,13 @@ while (1) {
 	my $exitval = $?;
 	print "Swap modify done at " . `date`;
 	$experiment->LockDown(1);
+	$didsomething = 1;
 	if ($exitval) {
 	    my $error_data = tblog_lookup_error();
 
 	    if ($error_data->{'cause'} eq "temp") {
 		print "Temporary resource shortage; try again later\n";
-		next;
+		goto loop;
 	    }
 	    fatal("swapmod failed");
 	}
@@ -348,7 +435,24 @@ while (1) {
 	exec("$SWAPEXP -q -w -n -s modify $pid $eid $tmpfile");
 	die("Could not exec $SWAPEXP\n");
     }
+  loop:
+    if ($gotlock) {
+	my $lock_result =
+	    DBQueryWarn("update emulab_locks set value=0 ".
+			"where name='pool_daemon'");
+	fatal("DB Error releasing lock")
+	    if (!defined($lock_result));
+	
+	$gotlock = 0;
+    }
+    last
+	if ($oneshot && $didsomething);
+    
+    # Use a long period; we do not want the pool to change too fast.
+    sleep(120);
 }
+cleanup();
+exit(0);
 
 #
 # Subscribe to experiment state change events.
@@ -396,7 +500,10 @@ sub fatal($)
 {
     my ($msg) = @_;
 
-    SENDMAIL($TBOPS, "Pool Daemon Died", $msg, $TBOPS);
+    SENDMAIL($TBOPS, "Pool Daemon Died", $msg, $TBOPS)
+	if (!($impotent || $oneshot));
+    
+    $mailsent = 1;
     cleanup();
     die($msg);
 }
@@ -411,6 +518,24 @@ sub notify($)
 
 sub cleanup()
 {
+    if ($gotlock) {
+	DBQueryWarn("update emulab_locks set value=0 ".
+		    "where name='pool_daemon'");
+	$gotlock = 0;
+    }
+
     MarkDaemonStopped("pool_daemon")
-	if (!$impotent);
+	if (!($impotent || $oneshot));
+}
+
+END {
+    my $exitcode = $?;
+
+    if ($exitcode && !($mailsent || $impotent || $oneshot)) {
+	SENDMAIL($TBOPS, "Pool Daemon Died",
+		 "Please look at $logfile", $TBOPS);
+    }
+    cleanup();
+
+    $? = $exitcode;
 }

@@ -158,7 +158,7 @@ sub Resolve($)
 					undef, "Nothing here by that name");
 	}
 
-	my $rspec = GetAdvertisement(0, $node->node_id());
+	my $rspec = GetAdvertisement(0, $node->node_id(), "0.1");
 	if (! defined($rspec)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not start avail");
@@ -248,7 +248,7 @@ sub DiscoverResourcesAux($$$)
     #
     # Acquire the advertisement from ptopgen and compress it if requested.
     #
-    my $xml = GetAdvertisement($available, undef);
+    my $xml = GetAdvertisement($available, undef, "0.2");
     if (! defined($xml)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
@@ -266,12 +266,12 @@ sub DiscoverResourcesAux($$$)
 #
 # Use ptopgen in xml mode to spit back an xml file. 
 #
-sub GetAdvertisement($$)
+sub GetAdvertisement($$$)
 {
-    my ($available, $pc) = @_;
+    my ($available, $pc, $version) = @_;
     my $xml = undef;
 
-    my $invocation = "$PTOPGEN -x -g 0.2 -r -p GeniSlices";
+    my $invocation = "$PTOPGEN -x -g $version -r -p GeniSlices";
     $invocation .= " -a" unless $available;
     if (defined($pc)) {
 	$invocation .= " -1 $pc";
@@ -632,7 +632,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     my %nodemap  = ();
     my @nodeids  = ();
     my %lannodes = ();
-    my @dealloc;
 
     #
     # If this is a ticket update, we want to seed the namemap with
@@ -766,19 +765,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		#
-		# For now, the project has to be emulab-ops. 
+		# For now, the project has to be emulab-ops or the
+		# the current project.
 		#
-		if ($ospid ne TBOPSPID()) {
+		if (! ($ospid eq TBOPSPID() ||
+		       $ospid eq $slice_experiment->pid())) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				 "Illegal project name in URN: $dname");
 		    goto bad;
 		}
-		my $osinfo = OSinfo->LookupByName($os);
+		my $osinfo = OSinfo->Lookup($ospid, $os);
 		if (!defined($osinfo)) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					     "Bad osname in URN: $dname");
+					     "Unknown image URN: $dname");
 		    goto bad;
 		}
 		#
@@ -819,6 +820,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    elsif ($virtualization_subtype eq "raw") {
 			$pctype = undef;
 			goto raw;
+		    }
+		    else {
+			$response
+			    = GeniResponse->Create(GENIRESPONSE_BADARGS,
+						   undef,
+				       "Malformed rspec: ".
+				       "Unknown virtualization_subtype");
+			goto bad;
 		    }
 		}
 		else {
@@ -982,7 +991,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 							"vport" => $vport};
 
 	    # This is used after the mapper runs since it uses vname:vport.
-	    $vportmap{"$node_nickname:$vport"} = $linkref;
+	    $vportmap{"$node_nickname:$vport"} = {"rspec" => $linkref};
 	}
     }
 
@@ -1121,6 +1130,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    GeniHRN::ParseInterface( $iface_name );
 		$iface_name = $urn_iface;
 	    }
+	    #
+	    # Hack to catch a loopback (trivial link).
+	    #
+	    if ($iface_name eq "loopback") {
+		$iface_name = "";
+		$trivial_ok = 1;
+	    }
 	    my $iface_vport = $ifacemap{$node_nickname}->{$iface_id}->{"vport"};
 
 	    # XXX
@@ -1134,8 +1150,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    if (defined($user_bandwidth)) {
 		$bandwidth = $user_bandwidth;
 	    }
-	    
-	    $virtexperiment->NewTableRow("virt_lans",
+
+	    my $virtlan =
+		$virtexperiment->NewTableRow("virt_lans",
 					 {"vname"       => $lanname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
@@ -1150,6 +1167,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					  "rbandwidth"  => $bandwidth, # kbps
 					  "rlossrate"   => 0.0,
 					  "fixed_iface" => $iface_name});
+	    $vportmap{$member}->{"virtlan"} = $virtlan;
 	    $ifacenum++;
 	}
 	$linknum++;
@@ -1186,7 +1204,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -n -d -v -u -o $tmpfile $pid $eid");
+    system("$MAPPER -a -d -v -u -o $tmpfile $pid $eid");
     if ($?) {
 	my $logstuff = undef;
 	
@@ -1217,8 +1235,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff,
 				 "Could not map to resources");
+	# So we can find things later.
+	$slice_experiment->SaveLogFiles();
 	goto bad;
     }
+    # So we can find things later.
+    $slice_experiment->SaveLogFiles();
+
     my $solution = GeniXML::ParseFile($tmpfile);
     if ($@) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1294,18 +1317,10 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    $virtnode->fixed($node->node_id());
 	}
 
-	#
-	# Shared and virt nodes do not need to be allocated.
-	#
-	# XXX This is going to cause breakage since the reservations
-	# are not recorded anyplace until the ticket is redeemed.
-	#
-	if (! ($node->sharing_mode() || $node->isplabphysnode() ||
-	       ($node->isremotenode() && !$exclusive))) {
-	    # Need to allocate this node unless already mapped.
-	    push(@nodeids, $node->node_id())
-		if (!exists($namemap{$virtual_id}));
-	}
+	# New node unless already mapped.
+	push(@nodeids, $node->node_id())
+	    if (!exists($namemap{$virtual_id}));
+
 	$namemap{$virtual_id} = $node;
 	$colomap{$colocate} = $node
 	    if (defined($colocate));
@@ -1330,12 +1345,16 @@ sub GetTicketAuxAux($$$$$$$$$)
 						 "Virtual node ID or virtual interface ID missing on interface");
 		goto bad;
 	    }
-	    my $linkref     = $vportmap{"$virtual_node_id:$virtual_port_id"};
+	    my $vportp      = $vportmap{"$virtual_node_id:$virtual_port_id"};
+	    my $linkref     = $vportp->{'rspec'};
+	    my $virtlan     = $vportp->{'virtlan'};
+	    $virtlan->fixed_iface($component_id)
+		if (defined($component_id));
 	    $component_id = "lo0"
 		if (!defined($component_id));
 	    if (! GeniXML::SetText("component_id", $linkref, $component_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-						 "Bad XML: Failed to add component_id");
+				 "Bad XML: Failed to add component_id");
 		goto bad;
 	    }
 	}
@@ -1348,25 +1367,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
 
     print GeniXML::Serialize($rspec);
-
-    # Nalloc might fail if the node gets picked up by someone else.
-    if (@nodeids && !$impotent) {
-	system("$NALLOC $pid $eid @nodeids");
-	if (($? >> 8) < 0) {
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				     "Allocation failure");
-	    goto bad;
-	}
-	elsif (($? >> 8) > 0) {
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
-				     "Could not allocate some nodes");
-	    goto bad;
-	}
-	# In case the code below fails, before ticket is created.
-	@dealloc = @nodeids;
-    }
 
     #
     # For the version 2 minimal API, just return the annotated rspec.
@@ -1423,9 +1423,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    # Delete, not Release (which frees nodes).
 	    $newticket->Delete(TICKET_PURGED);
 	}
-	if (@dealloc) {
+	if (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @nodeids");
 	}
 	if (defined($slice_experiment) && $restorevirt) {
 	    $slice_experiment->RemoveVirtualState();
@@ -1437,9 +1437,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (defined($newticket)) {
 	    $newticket->Release(TICKET_PURGED);
 	}
-	elsif (@dealloc) {
+	elsif (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @nodeids");
 	}
 	#
 	# Lets leave the experiment lying around; it will get cleaned
@@ -1617,6 +1617,10 @@ sub SliverWorkAux($$$$$$$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	$response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$owner->Modify(undef, undef, $keys);
     }
 
@@ -1953,6 +1957,9 @@ sub SliverWorkAux($$$$$$$)
 	}
 	$response =
 	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
+
+	# So we can find things later.
+	$experiment->SaveLogFiles();
 	goto bad;
     }
   
@@ -2082,14 +2089,37 @@ sub SliverWorkAux($$$$$$$)
 		if (!exists($managers{$ENV{'MYURN'}}));
 	}
 
-	# Do not worry about modifying a link that is setup. Later.
-	next
-	    if (grep {$_ eq $linkname} keys(%linkmap));
+	my $link_type = GeniXML::GetText("link_type", $linkref);
+
+	# Do not worry about modifying a link that is setup, unless a tunnel.
+	# Need to deal with this later.
+	if (grep {$_ eq $linkname} keys(%linkmap)) {
+	    next
+		if (! (defined($link_type) && $link_type eq "tunnel"));
+
+	    #
+	    # Gack, we have to recreate all the tunnel physical state, but
+	    # that was lost when we did the RemovePhysicalState() above.
+	    # The aggregate needs to get rebuilt, so delete the existing
+	    # one. Needs a lot more thought.
+	    #
+	    my $sliver_urn = GeniXML::GetText("sliver_urn", $linkref);
+	    if (!defined($sliver_urn)) {
+		print STDERR
+		    "Could not find sliver_urn in existing link $linkname\n";
+		next;
+	    }
+	    my $tunnel_aggregate = GeniAggregate->Lookup($sliver_urn);
+	    if (!defined($tunnel_aggregate)) {
+		print STDERR "No aggregate for existing tunnel $sliver_urn\n";
+		next;
+	    }
+	    $tunnel_aggregate->Delete(GENI_PURGEFLAG);
+	}
 
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	my $link_type = GeniXML::GetText("link_type", $linkref);
 	if (defined($link_type) && $link_type eq "tunnel") {
 
 	    my $iface1ref   = $interfaces[0];
@@ -2246,9 +2276,15 @@ sub SliverWorkAux($$$$$$$)
 		if (defined($interface));
 	    GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
 		if (defined($vinterface));
-	    GeniXML::SetText("IP", $ifaceref, $interface->IP())
-		if (defined($interface) &&
-		    defined($interface->IP()) && $interface->IP() ne "");
+	    if (defined($vinterface)) {
+		GeniXML::SetText("IP", $ifaceref, $vinterface->IP())
+		    if (defined($vinterface->IP()) && $vinterface->IP() ne "");
+	    }
+	    else {
+		GeniXML::SetText("IP", $ifaceref, $interface->IP())
+		    if (defined($interface) &&
+			defined($interface->IP()) && $interface->IP() ne "");
+	    }
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {
 		$message = "Could not add link sliver $sliver to $aggregate";
@@ -2985,6 +3021,10 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	my $response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$user->Modify(undef, undef, $keys);
     }
     if ($slice->Lock() != 0) {
@@ -4063,7 +4103,7 @@ sub CheckCredential($)
 
 sub CheckTicket($)
 {
-    my $ticket = GeniCredential->CreateFromSignedTicket($_[0]);
+    my $ticket = GeniTicket->CreateFromSignedTicket($_[0]);
     if (!defined($ticket)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create ticket object");
@@ -4095,6 +4135,29 @@ sub CheckTicket($)
     }
     
     return $ticket;
+}
+
+sub CheckKeys($)
+{
+    my ($keys) = @_;
+
+    goto bad
+	if (!ref($keys));
+    
+    foreach my $keyref (@{ $keys }) {
+	goto bad
+	    if (!ref($keyref));
+	
+	my $key  = $keyref->{'key'};
+	my $type = $keyref->{'type'};
+
+	goto bad
+	    if (! (defined($key) && defined($type) &&
+		   $key ne "" && $type ne ""));
+    }		
+    return 0;
+  bad:
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys")
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

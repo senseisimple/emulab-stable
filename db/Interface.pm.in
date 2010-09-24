@@ -322,14 +322,38 @@ sub Create($$$)
 	print STDERR Dumper($argref);
 	return undef;
     }
-    DBQueryWarn("insert into interfaces set ".
+    
+    #
+    # Lock the tables to prevent concurrent creation
+    #
+    DBQueryWarn("lock tables interfaces write, ".
+		"            interface_state write, ".
+		"            wires write")
+	or return undef;
+
+    #
+    # See if we have a record; if we do, we can stop now. This is
+    # not actually correct, since creating a node is not atomic.
+    #
+    my $query_result =
+	DBQueryWarn("select node_id from interfaces ".
+		    "where node_id='$node_id' and ".
+		    "      card='$card' and port='$port'");
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	return Interface->Lookup($node_id, $card, $port);
+    }
+    
+    if (!DBQueryWarn("insert into interfaces set ".
 		"  node_id='$node_id', " .
 		"  card=$card, port=$port, role='$ifrole', ".
 		"  mac='$MAC', IP='$IP', mask='$mask', " .
 		"  interface_type='$iftype', iface='$iface', " .
 		"  current_speed='$max_speed', duplex='$duplex', ".
-		"  uuid='$uuid'")
-	or return undef;
+		"  uuid='$uuid'")) {
+	DBQueryWarn("unlock tables");
+	return undef;
+    }
 
     if (!DBQueryWarn("insert into interface_state set ".
 		     "  node_id='$node_id', " .
@@ -337,6 +361,7 @@ sub Create($$$)
 	DBQueryWarn("delete from interfaces ".
 		    "where node_id='$node_id' and card='$card' ".
 		    "      and port='$port'");
+	DBQueryWarn("unlock tables");
 	return undef;
     }
 
@@ -359,9 +384,11 @@ sub Create($$$)
 	    DBQueryWarn("delete from interfaces ".
 			"where node_id='$node_id' and card='$card' ".
 			"      and port='$port'");
+	    DBQueryWarn("unlock tables");
 	    return undef;
 	}
     }
+    DBQueryWarn("unlock tables");
     return Interface->Lookup($node_id, $card, $port);
 }
 

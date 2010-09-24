@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,7 +12,7 @@ SUBDIR		= event/proxy
 SYSTEM	       := $(shell uname -s)
 PROGRAMS	= evproxy proxytest eventping evproxyplab
 ifneq ($(SYSTEM),Linux)
-PROGRAMS       += 
+PROGRAMS       += version0_gateway
 endif
 
 include $(OBJDIR)/Makeconf
@@ -42,16 +42,16 @@ PFLAGS    = -pthread
 PFLAGS   += -DDEBUG
 PFLAGS	 += -O2 -g -Wall
 PFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
-PFLAGS   += -L/usr/local/lib -lpubsub_r -lm
+PFLAGS   += -L/usr/local/lib -lpubsub_r -ltb -lm
 
 PLDFLAGS += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 PLIBS     = -levent_r -ltb -lcrypto
-PLIBS    += -L/usr/local/lib -lpubsub_r -lm
+PLIBS    += -L/usr/local/lib -lpubsub_r -ltb -lm
 PLDFLAGS += $(LDSTATIC)
 
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS      = -levent -ltb -lcrypto
-LIBS     += -L/usr/local/lib -lpubsub -lm
+LIBS     += -L/usr/local/lib -lpubsub -ltb -lm
 LDFLAGS  += $(LDSTATIC)
 
 # Deal with the presence/absence of kerberos in the linux ssl library
@@ -87,15 +87,28 @@ evproxyplab.o: evproxyplab.cc
 evproxyplab-debug:    evproxyplab.o ../lib/libevent.a ../lib/event.h
 	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
 
+version0_gateway:    version0_gateway.c
+	$(CC) $(CFLAGS) $(PLDFLAGS) -pthread -o $@ $< -L/usr/local/lib \
+		-lpubsub_r -ltb -lm
+
 eventping-debug: eventping.o
 	$(CC) $(LDFLAGS) -o $@ eventping.o -pthread $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-client: evproxy$(EXE) evproxyplab$(EXE)
+control-install:	$(INSTALL_SBINDIR)/version0_gateway
+
+install:		$(INSTALL_DIR)/opsdir/sbin/version0_gateway
+
+client: evproxy evproxyplab
 client-install: client
 	$(INSTALL_PROGRAM) evproxy$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy$(EXE)
 	$(INSTALL_PROGRAM) evproxyplab$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/evproxy_shared$(EXE)
 
 clean:
 	/bin/rm -f *.o $(PROGRAMS) *-debug
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@

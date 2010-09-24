@@ -88,8 +88,18 @@ void score_link_endpoints(pedge pe);
 #define SDEBADD(amount) cerr << "SADD: " << #amount << "=" << amount << " from " << score;score+=amount;cerr << " to " << score << endl
 #define SDEBSUB(amount)  cerr << "SSUB: " << #amount << "=" << amount << " from " << score;score-=amount;cerr << " to " << score << endl
 
+#ifdef SCORE_DEBUG_MAX
+// Handy way to print only the first N debugging messages, since that's usually
+// enough to get the idea
+static unsigned long scoredebugcount = 0;
+#endif
+
 #ifdef SCORE_DEBUG
+#ifdef SCORE_DEBUG_MAX
+#define SDEBUG(a) if (scoredebugcount++ < SCORE_DEBUG_MAX) { a; }
+#else
 #define SDEBUG(a) a
+#endif
 #else
 #define SDEBUG(a) 
 #endif
@@ -207,7 +217,7 @@ void init_score()
 float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
     pvertex dest_pv, tb_vlink *vlink, tb_pnode *pnode, tb_pnode *dest_pnode,
     bool flipped) {
-  SDEBUG(cerr << "   finding link resolutions" << endl);
+  SDEBUG(cerr << "   finding link resolutions from " << pnode->name << " to " << dest_pnode->name << endl);
   /* We need to calculate all possible link resolutions, stick
    * them in a nice datastructure along with their weights, and
    * then select one randomly.
@@ -245,7 +255,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
     info.plinks.push_back(pe);
     resolutions.push_back(info);
     total_weight += LINK_RESOLVE_DIRECT;
-    SDEBUG(cerr << "    direct_link " << pe << endl);
+    SDEBUG(cerr << "    added a direct_link " << pe << endl);
   }
   // Intraswitch link
   pedge first,second;
@@ -253,6 +263,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       switch_it != pnode->switches.end();++switch_it) {
     if (dest_pnode->switches.find(*switch_it) !=
         dest_pnode->switches.end()) {
+      SDEBUG(cerr << "    intraswitch: both are connected to " << *switch_it << endl);
       bool first_link, second_link;
       /*
        * Check to see if either, or both, pnodes are actually
@@ -348,13 +359,17 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       if ((pv == *source_switch_it) || (pv ==
             *dest_switch_it)) {
         first_link = false;
+        SDEBUG(cerr << "    interswitch: not first link in a path" << endl);
       } else {
+        SDEBUG(cerr << "    interswitch: *is* first link in a path" << endl);
         first_link = true;
       }
       if ((dest_pv == *source_switch_it) ||
           (dest_pv == *dest_switch_it)) {
         second_link = false;
+        SDEBUG(cerr << "    interswitch: not second link in a path" << endl);
       } else {
+        SDEBUG(cerr << "    interswitch: *is* second link in a path" << endl);
         second_link = true;
       }
 
@@ -517,6 +532,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
   if (vlink->src != vv) {
     SDEBUG(cerr << "  vlink is flipped" << endl);
     flipped = true;
+    assert(vlink->dst == vv);
   }
 
   /*
@@ -1490,13 +1506,31 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	  continue;
       }
 
+      // XXX: Not 100% sure it's better to do this inside find_best_link rather
+      // than in the caller
+//       if (flipped) {
+//           // If the endpoints are flipped, then we need to flip our notion of
+//           // which ones need to be compared.
+//           bool tmp = check_src_iface;
+//           check_src_iface = check_dst_iface;
+//           check_dst_iface = tmp;
+//           SDEBUG(cerr << "         find_best_link: flipping interface comparisons" << endl;)
+//       }
+
+      SDEBUG(cerr << "         find_best_link: fix_src_iface = " <<
+              vlink->fix_src_iface << " check_src_iface = " << check_src_iface
+              << " fix_dst_iface = " << vlink->fix_dst_iface
+              << " check_dst_iface = " << check_dst_iface
+              << " flipped = " << flipped << endl);
+
       // If the vlink has a fixed source interface, and it doesn't match
       // this plink, skip it
       if (vlink->fix_src_iface && check_src_iface) {
           // Whether we check the 'source' or 'destination' on the vlink against
           // the phyisical link's source interface depends on whether we're
           // traversing the link if forward or reverse (flipped) order
-          fstring compare_iface = (flipped?vlink->dst_iface:vlink->src_iface);
+//          fstring compare_iface = vlink->src_iface;
+	fstring compare_iface = (flipped? vlink->dst_iface : vlink->src_iface);
           if (plink->srciface != compare_iface) {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
                       "): Fix source: " << plink->srciface << " != " <<
@@ -1514,7 +1548,8 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       // XXX: This only works because we always have the node as the 'source'
       // of a plink! Shouldn't depend on this!
       if (vlink->fix_dst_iface && check_dst_iface) {
-          fstring compare_iface = (flipped?vlink->src_iface:vlink->dst_iface);
+//           fstring compare_iface = vlink->dst_iface;
+	fstring compare_iface = (flipped? vlink->src_iface : vlink->dst_iface);
           if (plink->srciface != compare_iface) {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
                       "): Fix dst: " << plink->srciface << " != " <<

@@ -119,7 +119,6 @@ my @SYSDAEMONS = ("cron", "mountd", "ntpd", "sendmail",
 		  "syslogd", "nfsd", "rpcbind");
 
 # "Standard" packages
-my $PHP4_PKG = "php4-extensions-1.0";
 my $PGENI_PKG = "emulab-protogeni-1.0";
 
 # or this...
@@ -439,6 +438,16 @@ sub doboot()
 	$emulabconfig{FS_PKG}       = "emulab-fs-3.0";
 	$emulabconfig{OPS_PKG}      = "emulab-ops-3.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-3.0";
+    }
+    elsif ($FBSD_VERSION == 7.3) {
+	$emulabconfig{FS_PKG_DIR} = "/share/freebsd/7.3/packages";
+	$emulabconfig{FS_PKG_DIR} .= ".elvincompat"
+	    if ($emulabconfig{"CONFIG_ELVIN"});
+	$emulabconfig{OPS_PKG_DIR}  = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{BOSS_PKG_DIR} = $emulabconfig{FS_PKG_DIR};
+	$emulabconfig{FS_PKG}       = "emulab-fs-3.1";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-3.1";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-3.1";
     }
 
     #
@@ -854,7 +863,18 @@ sub SetupFsNode()
     if ($FBSD_VERSION >= 5) {
 	mysystem("/etc/rc.d/rpcbind start");
 	mysystem("/etc/rc.d/nfsd start");
-	mysystem("/etc/rc.d/mountd start");
+	#
+	# XXX lovely: we normally start mountd bound to port 900, but
+	# quite often during an elabinelab setup, that port is already
+	# in use causing mountd to silently fail and we don't notice til
+	# boss-install when it tries to mount the filesystems.
+	#
+	# So we don't bind to a specific port here (by directly starting
+	# mounted rather than using the rc.d startup script) to avoid this
+	# issue.  Note that when elabinelab setup finishes, boss and ops
+	# will be rebooted and we will again be bound to port 900.
+	#
+	mysystem("mountd -r");
     } else {
 	# XXX FBSD4 is such a pain...
 	mysystem("nfsd -u -t -n 8");
@@ -1068,9 +1088,15 @@ sub SetupOpsNode($)
 	    SetupFatal("Could not get package info from Emulab!");
 	}
 	print "Removing conflicting packages.\n";
-	mysystem("pkg_delete -r -x mysql-client")
+	system("pkg_delete -r -x mysql-client")
 	    if (-e "/usr/local/bin/mysql");
     
+	# XXX 7.3 image is out of sync right now
+	if ($FBSD_VERSION == 7.3) {
+	    system("pkg_delete -f -x python25 -x py25");
+	    system("pkg_delete -f -x sudo -x png -x tiff");
+	}
+
 	print "Installing the ops metaport.\n";
 	RecreateDir("/usr/ports", 1);
 	$ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
@@ -1271,7 +1297,18 @@ sub SetupOpsNode($)
     if ($FBSD_VERSION >= 5) {
 	mysystem("/etc/rc.d/rpcbind start");
 	mysystem("/etc/rc.d/nfsd start");
-	mysystem("/etc/rc.d/mountd start");
+	#
+	# XXX lovely: we normally start mountd bound to port 900, but
+	# quite often during an elabinelab setup, that port is already
+	# in use causing mountd to silently fail and we don't notice til
+	# boss-install when it tries to mount the filesystems.
+	#
+	# So we don't bind to a specific port here (by directly starting
+	# mounted rather than using the rc.d startup script) to avoid this
+	# issue.  Note that when elabinelab setup finishes, boss and ops
+	# will be rebooted and we will again be bound to port 900.
+	#
+	mysystem("mountd -r");
 	mysystem("/etc/rc.d/sendmail start");
     } else {
 	# XXX FBSD4 is such a pain...
@@ -1487,11 +1524,17 @@ sub SetupBossNode()
 	    SetupFatal("Could not get package info from Emulab!");
 	}
 	print "Removing conflicting packages.\n";
-	mysystem("pkg_delete -r -x mysql-client")
+	system("pkg_delete -r -x mysql-client")
 	    if (-e "/usr/local/bin/mysql");
-	mysystem("pkg_delete -x net-snmp")
+	system("pkg_delete -x net-snmp")
 	    if (-e "/usr/local/include/net-snmp");
     
+	# XXX 7.3 image is out of sync right now
+	if ($FBSD_VERSION == 7.3) {
+	    system("pkg_delete -f -x python25 -x py25");
+	    system("pkg_delete -f -x sudo -x png -x tiff");
+	}
+
 	print "Installing the boss metaport.\n";
 	RecreateDir("/usr/ports", 1);
 	$ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
@@ -1679,7 +1722,7 @@ sub SetupBossNode()
     #
     if ($FBSD_VERSION >= 6) {
 	print "Removing conflicting bind package.\n";
-	mysystem("pkg_delete -r -x bind9")
+	system("pkg_delete -r -x bind9")
 	    if (-e "/usr/local/sbin/rndc");
     }
 
@@ -2029,7 +2072,15 @@ sub CreateDefsFile($)
 		    }
 		    last SWITCH;
 		};
-
+		/^PROTOGENI_SUPPORT$/ && do {
+		    if ($emulabconfig{"LOAD_PROTOGENI"} && $FBSD_VERSION >= 6.2) {
+			print OUTDEFS "PROTOGENI_SUPPORT=1\n";
+		    }
+		    else {
+			print OUTDEFS "PROTOGENI_SUPPORT=0\n";
+		    }
+		    last SWITCH;
+		};
 		/^FSDIR_SCRATCH$/ && do {
 		    if ($emulabconfig{"CONFIG_SCRATCHFS"}) {
 			print OUTDEFS "FSDIR_SCRATCH=$FSMOUNTDIR/scratch\n";
@@ -2044,12 +2095,7 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		/^NSVERIFY$/ && do {
-		    # XXX cannot build full ns on FBSD7 yet
-		    if ($FBSD_VERSION > 6) {
-			print OUTDEFS "NSVERIFY=0\n";
-		    } else {
-			print OUTDEFS "NSVERIFY=1\n";
-		    }
+		    print OUTDEFS "NSVERIFY=1\n";
 		    last SWITCH;
 		};
 		

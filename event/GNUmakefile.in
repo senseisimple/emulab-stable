@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,14 @@ ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 SUBDIRS	       += trafgen
 endif
 ifeq ($(SYSTEM),FreeBSD)
-SUBDIRS	       += sched delay-agent stated
+FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+FBSDMAJ := $(basename $(FBSDREL))
+SUBDIRS	       += sched stated
+ifneq ($(FBSDMAJ),8)
+# doesn't build right now due to API changes
+SUBDIRS	       += delay-agent
+endif
+
 endif
 
 all:	etc-subdir trafgen-fetch all-subdirs
@@ -41,6 +48,7 @@ install:
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
 	@$(MAKE) -C program-agent install
+	@$(MAKE) -C proxy install
 
 client:		trafgen-fetch client-subdirs
 client-install: client client-install-subdirs
@@ -51,6 +59,7 @@ control-install:
 	@$(MAKE) -C sched control-install
 	@$(MAKE) -C linktest control-install
 	@$(MAKE) -C program-agent control-install
+	@$(MAKE) -C proxy control-install
 
 post-install: 
 	@$(MAKE) -C linktest post-install

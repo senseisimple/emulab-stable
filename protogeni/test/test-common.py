@@ -15,6 +15,7 @@
 from urlparse import urlsplit, urlunsplit
 from urllib import splitport
 import xmlrpclib
+import M2Crypto
 from M2Crypto import X509
 import socket
 
@@ -128,7 +129,10 @@ if os.path.exists( LOCALCONF ):
 if EXTRACONF and os.path.exists( EXTRACONF ):
     execfile( EXTRACONF )
 
-HOSTNAME = XMLRPC_SERVER[ "default" ]
+if "sa" in XMLRPC_SERVER:
+    HOSTNAME = XMLRPC_SERVER[ "sa" ]
+else:
+    HOSTNAME = XMLRPC_SERVER[ "default" ]
 DOMAIN   = HOSTNAME[HOSTNAME.find('.')+1:]
 SLICEURN = "urn:publicid:IDN+" + DOMAIN + "+slice+" + SLICENAME
 
@@ -160,10 +164,19 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
     from M2Crypto.util import passphrase_callback
     return passphrase_callback(v, prompt1, prompt2)
 
+def geni_am_response_handler(method, method_args):
+    """Handles the GENI AM responses, which are different from the
+    ProtoGENI responses. ProtoGENI always returns a dict with three
+    keys (code, value, and output. GENI AM operations return the
+    value, or an XML RPC Fault if there was a problem.
+    """
+    return apply(method, method_args)
+
 #
 # Call the rpc server.
 #
-def do_method(module, method, params, URI=None, quiet=False, version=None):
+def do_method(module, method, params, URI=None, quiet=False, version=None,
+              response_handler=None):
     if not os.path.exists(CERTIFICATE):
         return Fatal("error: missing emulab certificate: %s\n" % CERTIFICATE)
     
@@ -225,6 +238,11 @@ def do_method(module, method, params, URI=None, quiet=False, version=None):
     meth      = getattr(server, method)
     meth_args = [ params ]
 
+    if response_handler:
+        # If a response handler was passed, use it and return the result.
+        # This is the case when running the GENI AM.
+        return response_handler(meth, params)
+
     #
     # Make the call. 
     #
@@ -236,6 +254,14 @@ def do_method(module, method, params, URI=None, quiet=False, version=None):
         return (-1, None)
     except xmlrpclib.ProtocolError, e:
         if not quiet: print >> sys.stderr, e.errmsg
+        return (-1, None)
+    except M2Crypto.SSL.Checker.WrongHost, e:
+        if not quiet:
+            print >> sys.stderr, "Warning: certificate host name mismatch."
+            print >> sys.stderr, "Please consult:"
+            print >> sys.stderr, "    http://www.protogeni.net/trac/protogeni/wiki/HostNameMismatch"            
+            print >> sys.stderr, "for recommended solutions."
+            print >> sys.stderr, e
         return (-1, None)
 
     #
@@ -277,7 +303,10 @@ def resolve_slice( name, selfcredential ):
     params = {}
     params["credential"] = mycredential
     params["type"]       = "Slice"
-    params["hrn"]        = name
+    if name.startswith("urn:"):
+        params["urn"]       = name
+    else:
+        params["hrn"]       = name
     rval,response = do_method("sa", "Resolve", params)
     if rval:
         Fatal("Slice does not exist");

@@ -1,0 +1,82 @@
+#
+# Do things to set up shared node support.
+#
+use strict;
+use libinstall;
+
+my $EID       = "shared-nodes";
+my $SUDO      = "/usr/local/bin/sudo";
+my $BATCHEXP  = "$TBROOT/bin/batchexp";
+my $IDIR      = "$TOP_OBJDIR/install";
+my $DUMPDESC  = "$TBROOT/sbin/dumpdescriptor";
+my $LOADDESC  = "$IDIR/load-descriptors";
+my $DESCRIPTORS = "$TOP_SRCDIR/install/descriptors-sh.xml";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+    my $pid  = "emulab-ops";
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "shared-nodes", "Setting up shared node support", sub {
+	    #
+	    # This experiment is in the usual state; swapped. The pool
+	    # daemon will not do anything until it comes out of this
+	    # state, since we do not want the pool daemon to add shared
+	    # nodes unless the local testbed actually wants them. A
+	    # local administrator will have to do the first swap in by
+	    # running the pool daemon with the -s option.
+	    #
+	    Phase "experiment", "Creating shared node experiment", sub {
+		PhaseSkip("Experiment exists")
+		    if (-d "$PROJROOT/$pid/exp/$EID");
+	
+		ExecQuietFatal("$SUDO -u $PROTOUSER $WAP $BATCHEXP ".
+			       "  -q -i -k -j -w -f -n ".
+			       "  -S 'System Experiment' ".
+			       "  -L 'System Experiment' ".
+			       "  -E 'Nodes in shared mode - DO NOT DELETE' ".
+			       "  -p $pid -e $EID");
+	    };
+	    #
+	    # An administrator will need to go into the web interface
+	    # and edit the descriptors to add the appropriate node types.
+	    #
+	    Phase "descriptors", "Creating shared node descriptors", sub {
+		PhaseSkip("Descriptors exist")
+		    if (ExecQuiet("$DUMPDESC -o $pid,OPENVZ-STD") == 0);
+
+		ExecQuietFatal("$SUDO -u $PROTOUSER $WAP ".
+			       "  perl $LOADDESC $DESCRIPTORS");
+	    };
+	    #
+	    # An administrator will need to set these three sitevars
+	    # to something appropriate for the local site. 
+	    #
+	    # general/maxpoolsize
+	    # general/minpoolsize
+	    # general/poolnodetype
+	    #
+	    # And then check the node_auxtypes table to make sure that
+	    # nodes have a reasonable setting for the pcvm count. If
+	    # everything is 0, then the virtnode_capacity setting for that
+	    # node type is not set, and you need to go edit that type in
+	    # the web interface, and then update all of the existing entries
+	    # in the node_auxtypes table:
+	    #
+	    # mysql> update node_auxtypes set count='NN' where type='pcvm';
+	    #
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    return 0;
+}
+1;

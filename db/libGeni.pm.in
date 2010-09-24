@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $TBDOCBASE   = "@TBDOCBASE@";
+my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 
 my $ASSIGN	= "$TB/libexec/assign";
 
@@ -31,6 +32,7 @@ use Lan;
 use GeniEmulab;
 use GeniResource;
 use GeniResponse;
+use GeniXML;
 use English;
 use Socket;
 use XML::Simple;
@@ -74,22 +76,49 @@ sub MapResources($$$$)
 	or return -1;
 
     foreach my $ref (@{ $rspec->{'node'} }) {
+	my $resource;
 	my %copy = %{ $ref };
 	my $copy = \%copy;
 	
-	my $node_urn = $copy->{'component_urn'};
+	my $node_urn = $copy->{'request_urn'};
 	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
-
 	$copy->{'component_manager_uuid'} = $cm;
-	if ($node_id eq "*") {
-	    # assign will use this, but its format is bogus. Kill it.
-	    delete($copy->{'component_urn'});
+
+	#
+	# Get the resource object.
+	#
+	if (!exists($cm_urns{$cm})) {
+	    $resource = GeniResource->Lookup($experiment->idx(), $cm);
+	    if (!defined($resource)) {
+		$resource = GeniResource->Create($experiment, $cm);
+		if (!defined($resource)) {
+		    print STDERR "Could not create GeniResource for $cm\n";
+		    return -1;
+		}
+	    }
+	    $cm_urns{$cm} = $resource;
 	}
-	else {
-	    $copy->{'component_uuid'} = $node_urn;
+	$resource = $cm_urns{$cm};
+
+	#
+	# request_urn means nothing to assign; kill that from the copy.
+	#
+	delete($copy->{'request_urn'});
+	# Ditto
+	delete($copy->{'tarfiles'});
+
+	#
+	# If already have the ticket, then leave the urn alone.
+	# We do not run assign again, but we need the rspec to be
+	# complete for loops below.
+	#
+	if (!$resource->HaveTicket()) {
+	    if ($node_id ne "*")  {
+		$copy->{'component_uuid'} = $node_urn;
+		$copy->{'component_urn'}  = $node_urn;
+	    }
 	}
-	$cm_urns{$cm} = $cm;
 
 	#
 	# The point of this is to split the rspec apart, since at present
@@ -103,7 +132,12 @@ sub MapResources($$$$)
 	    $fragments{$cm} = {
 		'generated_by' => 'libvtop',
 		'type'  => 'request',
-		'xmlns' => 'http://www.protogeni.net/resources/rspec/0.1',
+		'xmlns' => 'http://www.protogeni.net/resources/rspec/0.2',
+		# Assign now wants this stuff. I have no clue what it means!
+		'xmlns:xsi' => "http://www.w3.org/2001/XMLSchema-instance",
+		'xsi:schemaLocation' =>
+		    "http://www.protogeni.net/resources/rspec/0.2 ".
+		    "http://www.protogeni.net/resources/rspec/0.2/request.xsd",
 		'node'  => [] };
 	}
 	push(@{ $fragments{$cm}->{'node'} }, $copy);
@@ -117,6 +151,9 @@ sub MapResources($$$$)
     if (exists($rspec->{'link'})) {
 	foreach my $ref (@{ $rspec->{'link'} }) {
 	    my $linkname   = $ref->{'virtual_id'};
+
+	    # means nothing to assign; added again below.
+	    delete($ref->{'component_manager'});
 
 	    # Skip tunnels until rspec stitching in place.
 	    next
@@ -150,27 +187,20 @@ sub MapResources($$$$)
     }
 
     #
-    # Get the resource objects.
-    #
-    foreach my $cm (keys(%cm_urns)) {
-	my $resource = GeniResource->Lookup($experiment->idx(), $cm);
-	if (!defined($resource)) {
-	    $resource = GeniResource->Create($experiment, $cm);
-	    if (!defined($resource)) {
-		print STDERR "Could not create GeniResource for $cm\n";
-		return -1;
-	    }
-	}
-	$cm_urns{$cm} = $resource;
-    }
-
-    #
     # Discover resources at the component and run assign.
     #
     foreach my $cm (keys(%cm_urns)) {
 	my $resource = $cm_urns{$cm};
 	my $fragment = $fragments{$cm};
 	my $advertisement;
+
+	#
+	# We got the ticket on a previous loop.
+	#
+	if ($resource->HaveTicket()) {
+	    print STDERR "Already have a ticket for $resource; skipping ...\n";
+	    next;
+	}
 
 	print STDERR "Asking for resource list from $resource\n";
 	if ($resource->Discover($user, \$advertisement)) {
@@ -203,8 +233,12 @@ sub MapResources($$$$)
 	$vtopfh->close();
 	$ptopfh->close();
 
-	system("nice $ASSIGN -uod -c .75 ".
-	       "-q $ptop -w $vtop -W $soln > $log 2>&1");
+	my $cmd = "nice $ASSIGN -uod -c .75 ".
+	    "-f rspec/rspec -W $soln $ptop $vtop > $log 2>&1";
+	if ($verbose) {
+	    print STDERR "$cmd\n";
+	}
+	system($cmd);
 	
 	if ($?) {
 	    print STDERR "Could not map to physical resources on $resource\n";
@@ -229,17 +263,27 @@ sub MapResources($$$$)
 
 	foreach my $ref (@{ $solution->{'node'} }) {
 	    my $virtual_id = $ref->{'virtual_id'};
-	    my $node_uuid  = $ref->{'component_uuid'};
+	    my $node_urn   = $ref->{'component_uuid'};
 	    my $cm_urn     = $ref->{'component_manager_uuid'};
 	    my $noderef    = $nodemap{$virtual_id};
 
 	    #
 	    # This writes the solution back into the original rspec. 
 	    #
-	    $noderef->{'component_uuid'} = $node_uuid;
-	    $noderef->{'component_urn'}  = $node_uuid;
+	    $noderef->{'component_uuid'} = $node_urn;
+	    $noderef->{'component_urn'}  = $node_urn;
 	    $noderef->{'component_manager_uuid'} = $cm_urn;
 
+	    if (exists($noderef->{'disk_image'})) {
+		my $osid = $noderef->{'disk_image'}->{'name'};
+		my ($auth,$type,$id) = GeniHRN::Parse($node_urn);
+
+		my $urn = GeniHRN::Generate($auth, "image", "emulab-ops");
+		$urn .= "//" . $osid;
+		
+		$noderef->{'disk_image'}->{'name'} = $urn;
+	    }
+	    
 	    if (exists($ref->{'interface'})) {
 		my $interfaces = $ref->{'interface'};
 
@@ -284,14 +328,22 @@ sub MapResources($$$$)
     if ($verbose) {
 	print STDERR "Final rspec:\n";
 	print STDERR Dumper($rspec);
+
+	if (1) {
+	    my $rspecdoc = GeniResource::ConvertRspec($rspec);
+	    my $rspecstr = GeniXML::Serialize($rspecdoc);
+	    print STDERR "In XML:\n";
+	    print STDERR "$rspecstr\n";
+	}
     }
     return 0;
 }
 
 sub GetTickets($$$$)
 {
-    my ($experiment, $impotent, $user, $rspec) = @_;
+    my ($experiment, $verbose, $user, $rspec) = @_;
     my %cm_urns   = ();
+    my %nodemap   = ();
 
     Register($experiment, $user) == 0
 	or return -1;
@@ -307,32 +359,49 @@ sub GetTickets($$$$)
 	    $ref->{'node_type'}->{'type_name'} eq "lan") {
 	    next;
 	}
+	my $virtual_id = $ref->{'virtual_id'};
 	my $node_urn = $ref->{'component_urn'};
 	my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
 	my $cm = GeniHRN::Generate($auth, "authority", "cm");
 
-	$cm_urns{$cm} = $cm;
-
+	#
+	# Get the resource objects for below.
+	#
+	if (!exists($cm_urns{$cm})) {
+	    my $resource = GeniResource->Lookup($experiment->idx(), $cm);
+	    if (!defined($resource)) {
+		print STDERR "Could not get GeniResource for $cm\n";
+		return -1;
+	    }
+	    $nodemap{$virtual_id} = $resource;
+	    
+	    #
+	    # We got the ticket on a previous loop.
+	    #
+	    next
+		if ($resource->HaveTicket());
+	    
+	    $cm_urns{$cm} = $resource;
+	}
 	#
 	# This is how we get the client side to do cooked mode properly.
 	#
 	$ref->{'tarfiles'} = "/usr/local/etc/emulab ".
 	    "$TBDOCBASE/downloads/geniclient.tar";
     }
+    # No tickets needed, return now.
+    return 0
+	if (! scalar(keys(%cm_urns)));
 
     #
-    # Get the resource objects.
+    # XXX Convert to a proper XML looking thing. This is just a temporay
+    # hack for now.
     #
-    foreach my $cm (keys(%cm_urns)) {
-	my $resource = GeniResource->Lookup($experiment->idx(), $cm);
-	if (!defined($resource)) {
-	    $resource = GeniResource->Create($experiment, $cm);
-	    if (!defined($resource)) {
-		print STDERR "Could not create GeniResource for $cm\n";
-		return -1;
-	    }
-	}
-	$cm_urns{$cm} = $resource;
+    my $rspecdoc = GeniResource::ConvertRspec($rspec);
+    my $rspecstr = GeniXML::Serialize($rspecdoc);
+    if ($verbose) {
+	print STDERR "In XML:\n";
+	print STDERR "$rspecstr\n";
     }
 
     #
@@ -344,7 +413,7 @@ sub GetTickets($$$$)
 	my ($resource) = @_;
 
 	print STDERR "Asking for ticket from $resource\n";
-	if ($resource->GetTicket($user, $rspec, $impotent)) {
+	if ($resource->GetTicket($user, $rspecstr, 0)) {
 	    #
 	    # Print this here since we do not save this in the
 	    # DB, and the parent side of the fork will not have
@@ -355,13 +424,16 @@ sub GetTickets($$$$)
 		$resource->last_rpc_value()) {
 		print STDERR $resource->last_rpc_value() . "\n";
 	    }
+	    # Return indicator of possible forward progress.
+	    return 1
+		if ($resource->last_rpc_output() =~ /Could not map to/i);
 	    return -1;
 	}
 	return 0;
     };
     print STDERR "Getting all tickets in parallel ...\n";
     
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR "*** GetTickets: Internal error getting tickets\n";
 	#
 	# Need to be careful here; some of the tickets might have been
@@ -374,8 +446,9 @@ sub GetTickets($$$$)
     #
     # Check the exit codes. Eventually return specific error info.
     #
-    my $errors = 0;
-    my $count  = 0;
+    my $errors   = 0;
+    my $count    = 0;
+    my $progress = 0;
     foreach my $result (@results) {
 	my $resource = $resources[$count];
 
@@ -390,11 +463,41 @@ sub GetTickets($$$$)
 	elsif ($result != 0) {
 	    print STDERR "*** Error getting ticket for $resource\n";
 	    $errors++;
+
+	    # Watch for forward progress. Not being able to map actually
+	    # means forward progress since we want to try again with
+	    # different resources. The mapper will try a few times before
+	    $progress++
+		if ($result > 1);
+	}
+	else {
+	    $progress++;
+
+	    #
+	    # Got a ticket; mark the proxy nodes so that libvtop knows.
+	    # Failure to get a ticket means we need to release the node
+	    # up in libvtop. Probably need a state variable instead.
+	    #
+	    foreach my $virtual_id (keys(%nodemap)) {
+		next
+		    if (!$resource->SameResource($nodemap{$virtual_id}));
+
+		my $node = $experiment->VnameToNode($virtual_id);
+		if (defined($node)) {
+		    $node->ModifyReservation({"external_resource_index" =>
+						  $resource->idx()})
+			== 0 or return -1;
+		}
+	    }
 	}
 	$count++;
     }
+    return 0
+	if (!$errors);
+    
     print STDERR Dumper($rspec) if ($errors);
-    return $errors;
+    # Return indication of forward progress so caller knows to to stop.
+    return ($progress ? 1 : -1);
 }
 
 #
@@ -428,7 +531,7 @@ sub RedeemTickets($$$)
     };
     print STDERR "Redeeming all tickets in parallel ...\n";
 
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR "*** RedeemTickets: Internal error getting tickets\n";
 	#
 	# Need to be careful here; some of the tickets might have been
@@ -487,21 +590,29 @@ sub MapNodes($$)
 	my $manifest = $resource->Manifest();
 	return -1
 	    if (!defined($manifest));
+	my $manifest_string = $resource->manifest_string();
 
-	print STDERR Dumper($manifest)
+	print STDERR "$manifest_string\n"
 	    if ($verbose);
-	
-	foreach my $ref (@{ $manifest->{'node'} }) {
-	    my $sliver_urn = $ref->{'sliver_urn'};
-	    my $vname      = $ref->{'virtual_id'};
+
+	foreach my $ref (GeniXML::FindNodes("n:node",
+					    $manifest)->get_nodelist()) {
+	    my $sliver_urn = GeniXML::GetText("sliver_urn", $ref);
+	    my $vname      = GeniXML::GetVirtualId($ref);
+	    my $sshdport   = GeniXML::GetText("sshdport", $ref);
+	    my $manager_urn= GeniXML::GetText("component_manager_urn", $ref);
 
 	    #
 	    # The manifest can include nodes from other CMs. There will not
 	    # be a sliver urn in that case.
 	    #
-	    my $component_manager_urn = $ref->{'component_manager_urn'};
 	    next
-		if (!defined($sliver_urn) && !defined($component_manager_urn));
+		if (!defined($sliver_urn));
+
+	    # Hmm, still need to check this. 
+	    next
+		if (!defined($manager_urn) ||
+		    $manager_urn ne $resource->manager_urn());
 	    
 	    my $node = $experiment->VnameToNode($vname);
 	    if (!defined($node)) {
@@ -515,9 +626,7 @@ sub MapNodes($$)
 				          $sliver_urn})
 		== 0 or return -1;
 
-	    if (exists($ref->{'sshdport'})) {
-		my $sshdport = $ref->{'sshdport'};
-
+	    if (defined($sshdport)) {
 		$node->Update({'sshdport' => $sshdport});
 	    }
 	    #
@@ -527,29 +636,40 @@ sub MapNodes($$)
 		"-s $BOSSNODE -k $eventkey,$keyhash -u '$sliver_urn'";
 	    $cmd .= " -j " . $node->node_id()
 		if ($node->isvirtnode());
-	    
-	    $ref->{'startup_command'} = "$cmd boot";
+	    $cmd .= " -e 16509"
+		if ($ELVIN_COMPAT);
+
+	    GeniXML::SetText("startup_command", $ref, "$cmd boot");
 
 	    # Interface map for loop below.
-	    if (exists($ref->{'interface'})) {
-		foreach my $ifaceref (@{ $ref->{'interface'} }) {
-		    my $virtid = $ifaceref->{'virtual_id'};
-		    my $compid = $ifaceref->{'component_id'};
+	    if (defined(GeniXML::FindFirst("n:interface", $ref))) {
+		foreach my $ifaceref (GeniXML::FindNodes("n:interface",
+						$ref)->get_nodelist()) {
+		    my $virtid = GeniXML::GetText("virtual_id", $ifaceref);
+		    my $compid = GeniXML::GetText("component_id", $ifaceref);
 
 		    $ifacemap{$virtid} = [$node, $compid];
 		}
 	    }
 	}
-	foreach my $ref (@{ $manifest->{'link'} }) {
-	    my $linkname   = $ref->{"virtual_id"};
-	    my $interfaces = $ref->{'interface_ref'};
-	    my %managers   = map { $_->{'id'} => $_->{'id'} }
-	                        @{ $ref->{'component_manager'} };
+	foreach my $ref (GeniXML::FindNodes("n:link",
+					    $manifest)->get_nodelist()) {
+	    my $linkname   = GeniXML::GetVirtualId($ref);
+	    my $link_type  = GeniXML::GetText("link_type", $ref);
+	    my $vlantag    = GeniXML::GetText("vlantag", $ref);
+	    my @ifacerefs  = GeniXML::FindNodes("n:interface_ref",
+						$ref)->get_nodelist();
+	    my %managers   = ();
+
+	    if (GeniXML::FindNodes("n:component_manager", $ref)) {
+		%managers = map { GeniXML::GetText("id", $_) => $_ } 
+		                  GeniXML::FindNodes("n:component_manager",
+						     $ref)->get_nodelist();
+	    }
 
 	    # Skip tunnels in this loop for now.
 	    next
-		if (exists($ref->{'link_type'}) &&
-		    $ref->{'link_type'} eq "tunnel");
+		if (defined($link_type) && $link_type eq "tunnel");
 
 	    #
 	    # The manifest can include links for other CMs. Skip those
@@ -558,13 +678,13 @@ sub MapNodes($$)
 	    next 
 		if (!exists($managers{$resource->manager_urn()}));
 
-	    if (exists($ref->{'vlantag'})) {
-		my $TAG = $ref->{'vlantag'};
+	    if (defined($vlantag)) {
+		my $TAG = $vlantag;
 		
 		if (defined($TAG)) {
 		    if (!($TAG =~ /^[\w]*$/)) {
 			print STDERR "Bad vlantag '$TAG' for $linkname\n";
-			print STDERR Dumper($manifest);
+			print STDERR "$manifest_string\n";
 			return -1;
 		    }
 		    my $lan = Lan->Lookup($experiment, $linkname, 1);
@@ -590,11 +710,12 @@ sub MapNodes($$)
 		}
 	    }
 
-	    foreach my $ifaceref (@{ $interfaces }) {
-		my $vname    = $ifaceref->{'virtual_node_id'};
-		my $iface_id = $ifaceref->{'virtual_interface_id'};
-		my $MAC      = $ifaceref->{'MAC'};
-		my $VMAC     = $ifaceref->{'VMAC'};
+	    foreach my $ifaceref (@ifacerefs) {
+		my $vname    = GeniXML::GetText("virtual_node_id", $ifaceref);
+		my $iface_id = GeniXML::GetText("virtual_interface_id",
+						$ifaceref);
+		my $MAC      = GeniXML::GetText("MAC", $ifaceref);
+		my $VMAC     = GeniXML::GetText("VMAC", $ifaceref);
 		my ($node, $compid) = @{ $ifacemap{$iface_id} };
 		my $iface;
 
@@ -607,7 +728,7 @@ sub MapNodes($$)
 		if (!defined($iface)) {
 		    print STDERR "Could not determine iface for" .
 			"$vname,$iface_id\n";
-		    print STDERR Dumper($manifest);
+		    print STDERR "$manifest_string\n";
 		    return -1;
 		}
 		#
@@ -619,32 +740,38 @@ sub MapNodes($$)
 		    my $pnode = $node->GetPhysHost();
 		    if (!defined($pnode)) {
 			print STDERR "Could not physical node for $node\n";
-			print STDERR Dumper($manifest);
+			print STDERR "$manifest_string\n";
 			return -1;
 		    }
 		    $node = $pnode;
 		}
-		
-		my $interface = Interface->LookupByIface($node,$iface);
-		if (!defined($interface)) {
-		    print STDERR "Could not map iface for $node,$iface\n";
-		    print STDERR Dumper($manifest);
-		    return -1;
-		}
-		if (!defined($MAC)) {
-		    print STDERR "No mac (or vmac) for $node,$iface\n";
-		    print STDERR Dumper($manifest);
-		    return -1;
-		}
-		if (! ($MAC =~ /^[\w]*$/)) {
-		    print STDERR "Bad mac '$MAC' for $node,$iface\n";
-		    print STDERR Dumper($manifest);
-		    return -1;
-		}
-		if ($interface->Update({"mac" => "$MAC"})) {
-		    print STDERR "Could not update $node,$iface\n";
-		    print Dumper($manifest);
-		    return -1;
+
+		#
+		# If the interface is the loopback, then we do not need
+		# to do this.
+		#
+		if ($iface ne "lo0" && $iface ne "loopback") {
+		    my $interface = Interface->LookupByIface($node,$iface);
+		    if (!defined($interface)) {
+			print STDERR "Could not map iface for $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
+		    if (!defined($MAC)) {
+			print STDERR "No mac (or vmac) for $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
+		    if (! ($MAC =~ /^[\w]*$/)) {
+			print STDERR "Bad mac '$MAC' for $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
+		    if ($interface->Update({"mac" => "$MAC"})) {
+			print STDERR "Could not update $node,$iface\n";
+			print STDERR "$manifest_string\n";
+			return -1;
+		    }
 		}
 		if (defined($VMAC)) {
 		    my $vinterface =
@@ -659,17 +786,20 @@ sub MapNodes($$)
 		    }
 		    if (! ($VMAC =~ /^[\w]*$/)) {
 			print STDERR "Bad vmac '$VMAC' for $linkname,$vname\n";
-			print STDERR Dumper($manifest);
+			print STDERR "$manifest_string\n";
 			return -1;
 		    }
 		    if ($vinterface->Update({"mac" => "$VMAC"})) {
 			print STDERR "Could not update $linkname,$vname\n";
-			print Dumper($manifest);
+			print STDERR "$manifest_string\n";
 			return -1;
 		    }
 		}
 	    }
 	}
+	print STDERR Dumper($manifest)
+	    if ($verbose);
+	
 	# The manifest was changed above.
 	if ($resource->UpdateManifest($manifest)) {
 	    print STDERR "Could not store manifest for $resource\n";
@@ -736,7 +866,7 @@ sub StartSlivers($$$$)
     };
     print STDERR "Starting all slivers in parallel ...\n";
 
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR "*** StartSlivers: Internal error starting slivers.\n";
 	return -1;
     }
@@ -746,12 +876,14 @@ sub StartSlivers($$$$)
     my $errors = 0;
     my $count  = 0;
     my @tmp    = ();
+    my @failed = ();
     foreach my $result (@results) {
 	my $resource = $resources[$count];
 	
 	if ($result != 0) {
 	    print STDERR "*** Error starting slivers for $resource\n";
 	    $errors++;
+	    push(@failed, $resource);
 	}
 	else {
 	    #
@@ -767,6 +899,39 @@ sub StartSlivers($$$$)
 	}
 	$count++;
     }
+    #
+    # Set the nodes to TBFAILED to avoid waiting in os_setup.
+    #
+    if (@failed) {
+	foreach my $resource (@failed) {
+	    my $manager_urn = $resource->manager_urn();
+	    my $manifest    = $resource->Manifest();
+	    return -1
+		if (!defined($manifest));
+
+	    foreach my $ref (GeniXML::FindNodes("n:node",
+						$manifest)->get_nodelist()) {
+		my $vname            = GeniXML::GetVirtualId($ref);
+		my $this_manager_urn = GeniXML::GetManagerId($ref);
+
+		next
+		    if (!defined($this_manager_urn) ||
+			$manager_urn ne $this_manager_urn);
+		
+		my $node = $experiment->VnameToNode($vname);
+		next
+		    if (!defined($node));
+
+		if ($node->eventstate() ne TBDB_NODESTATE_TBFAILED()) {
+		    $node->SetEventState(TBDB_NODESTATE_TBFAILED());
+		}
+	    }
+	}
+    }
+    # Everything failed, stop now. 
+    return -1
+	if (!@tmp);
+    
     MapNodes($experiment, $verbose);
     
     return WaitForSlivers($experiment, $user, $verbose, @tmp);
@@ -797,16 +962,17 @@ sub WaitForSlivers($$$@)
 	return -1
 	    if (!defined($manifest));
 
-	foreach my $ref (@{ $manifest->{'node'} }) {
-	    my $vname      = $ref->{'virtual_id'};
-	    my $urn        = $ref->{'component_urn'};
+	foreach my $ref (GeniXML::FindNodes("n:node",
+					    $manifest)->get_nodelist()) {
+	    my $vname      = GeniXML::GetVirtualId($ref);
+	    my $urn        = GeniXML::GetNodeId($ref);
 	    my $node       = $experiment->VnameToNode($vname);
 
 	    #
 	    # The manifest can include nodes from other CMs. There will not
 	    # be a sliver urn in that case.
 	    #
-	    my $sliver_urn = $ref->{'sliver_urn'};
+	    my $sliver_urn = GeniXML::GetSliverId($ref);
 	    next
 		if (!defined($sliver_urn));
 	    
@@ -838,7 +1004,9 @@ sub WaitForSlivers($$$@)
     my $coderef = sub {
 	my ($resource) = @_;
 	my $ref;
-	my $notready = 0;
+	my $failed   = 0;
+	my $ready    = 0;
+	my $count    = 0;
 
 	print STDERR "Getting ($$) sliver status for $resource\n";
 
@@ -879,19 +1047,28 @@ sub WaitForSlivers($$$@)
 	    }
 	    # State was changed in a another process.
 	    $node->Refresh();
-
+	    
+	    $count++;
 	    if ($status eq "ready") {
 		# print statement would be repeated.
+		# Normal node waiting at this point, for ISUP to arrive.
+		$ready++;
 	    }
 	    elsif ($status eq "failed") {
 		# print statement would be repeated.
-	    }
-	    else {
-		$notready++;
+		# We want to do something here, to avoid waiting
+		# for something that failed, but might not report in any
+		# status. os_setup might wait a really long time for the
+		# timeout, and that is silly.
+		#
+		if ($node->eventstate() ne TBDB_NODESTATE_TBFAILED()) {
+		    $node->SetEventState(TBDB_NODESTATE_TBFAILED());
+		}
+		$failed++;
 	    }
 	}
-	# Tell the parent to stop if ready or all failed.
-	if ($ref->{'status'} eq "ready" || $notready == 0) {
+	# Tell the parent to stop if all nodes are ready.
+	if ($ref->{'status'} eq "ready" || ($failed + $ready) == $count) {
 	    return 0;
 	}
 	# Tell the parent not ready.
@@ -937,16 +1114,17 @@ sub WaitForSlivers($$$@)
 	    if (@resources);
     }
     #
-    # If we get here, mark any nodes left over or failed, with TBFAILED.
+    # If we get here, mark nodes in failed resources, with TBFAILED.
     # This will stop the waiting up in os_setup.
     #
-    foreach my $resource (@resources, @failed) {	
+    foreach my $resource (@failed) {	
 	my $manifest = $resource->Manifest();
 	next
 	    if (!defined($manifest));
 
-	foreach my $ref (@{ $manifest->{'node'} }) {
-	    my $vname      = $ref->{'virtual_id'};
+	foreach my $ref (GeniXML::FindNodes("n:node",
+					    $manifest)->get_nodelist()) {
+	    my $vname      = GeniXML::GetVirtualId($ref);
 	    my $node       = $experiment->VnameToNode($vname);
 	    next
 		if (!defined($node));
@@ -1003,7 +1181,7 @@ sub DeleteAllSlivers($$)
     };
     print STDERR "Deleting all slivers in parallel ...\n";
 
-    if (ParRun(undef, \@results, $coderef, @resources)) {
+    if (ParRun({'maxwaittime' => 600}, \@results, $coderef, @resources)) {
 	print STDERR
 	    "*** DeleteAllSlivers: Internal error deleting slivers.\n";
 	#

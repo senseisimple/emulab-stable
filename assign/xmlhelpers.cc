@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+
 const XMLCh* getChildValue(const DOMElement *tag, const char *name) {
     DOMNodeList *list = tag->getElementsByTagName(XStr(name).x());
     if (list->getLength() != 1) {
@@ -35,7 +36,7 @@ void setChildValue(const DOMElement* parent, const char* tag, const char* value)
 DOMElement* getNodeByName (const DOMElement *root, const char* name)
 {
 	DOMNodeList *list = root -> getElementsByTagName(XStr("node").x());
-	for (int i = 0; i < list -> getLength() ; ++i)
+	for (unsigned int i = 0; i < list -> getLength() ; ++i)
 	{	
 		DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 		if (strcmp(XStr(ele->getAttribute(XStr("name").x())).c(),name) == 0)
@@ -47,7 +48,7 @@ DOMElement* getNodeByName (const DOMElement *root, const char* name)
 DOMElement* getElementByAttributeValue (const DOMElement* root, const char* tag, const char* attribute_name, const char* attribute_value)
 {
 	DOMNodeList *list = root -> getElementsByTagName(XStr(tag).x());
-	for (int i = 0; i < list -> getLength() ; ++i)
+	for (unsigned int i = 0; i < list -> getLength() ; ++i)
 	{	
 		DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 		if (strcmp(XStr(ele->getAttribute(XStr(attribute_name).x())).c(),attribute_value) == 0)
@@ -61,7 +62,7 @@ DOMElement* getElementByAttributeValue (vector<const DOMElement*> roots, const c
 	for (vector<const DOMElement*>::iterator it = roots.begin(); it != roots.end(); ++it)
 	{	
 		DOMNodeList *list = (*it)->getElementsByTagName(XStr(tag).x());
-		for (int i = 0; i < list -> getLength() ; ++i)
+		for (unsigned int i = 0; i < list -> getLength() ; ++i)
 		{
 			DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 			if (strcmp(XStr(ele->getAttribute(XStr(attribute_name).x())).c(),attribute_value) == 0)
@@ -75,7 +76,7 @@ vector<const DOMElement*> getElementsByAttributeValue (const DOMElement* root, c
 {
 	DOMNodeList *list = root -> getElementsByTagName(XStr(tag).x());
 	vector<const DOMElement*> elements;
-	for (int i = 0; i < list -> getLength() ; ++i)
+	for (unsigned int i = 0; i < list -> getLength() ; ++i)
 	{	
 		DOMElement *ele = dynamic_cast<DOMElement*>(list->item(i)); 
 		if (strcmp(XStr(ele->getAttribute(XStr(attribute_name).x())).c(),attribute_value) == 0)
@@ -88,7 +89,7 @@ vector<DOMElement*> getElementsHavingAttribute(const DOMElement* root, const cha
 {
 	DOMNodeList* list = root->getElementsByTagName(XStr(tag).x());
 	vector<DOMElement*> elements;
-	for (int i = 0; i < list->getLength(); ++i)
+	for (unsigned int i = 0; i < list->getLength(); ++i)
 	{
 		DOMElement* ele = dynamic_cast<DOMElement*>(list->item(i));
 		if (ele->hasAttribute(XStr(attribute_name).x()))
@@ -215,12 +216,12 @@ int parse_fds_vnode_xml (const DOMElement *tag, node_fd_set *fd_set)
 interface_spec parse_interface_rspec_xml(const DOMElement *tag) 
 {
 	interface_spec rv =
-		{	
-			string(XStr(tag->getAttribute(XStr("virtual_node_id").x())).c()),
-			string(XStr(tag->getAttribute(XStr("virtual_interface_id").x())).c()),
-                        string(XStr(find_urn(tag, "component_node"))),
-			string(XStr(tag->getAttribute(XStr("component_interface_id").x())).c())		
-		};
+	{	
+		string(XStr(tag->getAttribute(XStr("virtual_node_id").x())).c()),
+		string(XStr(tag->getAttribute(XStr("virtual_interface_id").x())).c()),
+		string(XStr(find_urn(tag, "component_node"))),
+		string(XStr(tag->getAttribute(XStr("component_interface_id").x())).c())
+	};
     return rv;
 }
 

@@ -29,7 +29,7 @@ sub usage()
     exit(-1);
 }
 my $optlist  = "id";
-my $debug    = 0;
+my $debug    = 1;
 my $impotent = 0;
 
 #
@@ -37,7 +37,6 @@ my $impotent = 0;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -258,9 +257,10 @@ foreach my $node (@nodelist) {
 
     #
     # Look for type specific module first. Eventually this should be more
-    # dynamic in how the modules are loaded/defined.
+    # dynamic in how the modules are loaded/defined, perhaps specified on
+    # a per-type basis in the DB.
     #
-    my $object = $MyStruct->TypeCache($node);
+    my $object = $MyStruct->TypeLookup($node);
     if (!defined($object)) {
 	$object = $MyStruct->NewType($type);
 	if (!defined($object)) {
@@ -278,33 +278,101 @@ foreach my $node (@nodelist) {
     $object->AddNode($node);
 }
 
-#
-# If the above worked, go through and set the OS that should boot,
-# as well as any reboots and reconfigs that are needed.
-#
-foreach my $node (@nodelist) {
-    my $node_id = $node->node_id();
+while (1) {
+    my $objects    = $MyStruct->OperationList();
+    my @volunteers = ();
+    my @nodes      = ();
 
-    $MyStruct->SetOS($node);
-}
-
-#
-# Now get the operation lists. 
-#
-foreach my $list ($MyStruct->NextOperationList()) {
+    #
+    # Do not bother if we got canceled.
+    #
+    if (! $MyStruct->canceled()) {
+	my $canceled = $experiment->canceled();
+	if ($canceled) {
+	    $MyStruct->canceled($canceled);
+	    
+	    tbnotice({cause => 'canceled', severity => SEV_IMMEDIATE,
+		      error => ['cancel_flag']},
+		     "Swap canceled; will terminate os_setup early!");
+	    last;
+	}
+    }
+    
     #
     # Clear the inform lists, since we want to send email in batches
     # as things fail.
     #
     $MyStruct->ClearInformLists();
-    
+
     #
-    # The list is the set that can be done in parallel. 
+    # Go through and ask each one for volunteers. 
     #
-    foreach my $object (@{ $list }) {
-	$object->LightUpNodes();
-	$object->WaitForNodes();
+    foreach my $object (@{ $objects }) {
+	print "Asking $object for volunteers\n"
+	    if ($debug);
+	my @list = $object->Volunteers();
+	print "$object returns volunteers: @list\n"
+	    if ($debug && @list);
+	next
+	    if (! @list);
+	@nodes = (@nodes, @list);
+	push(@volunteers, [$object, \@list]);
     }
+    last
+	if (!@nodes);
+
+    #
+    # Light up the nodes in parallel.
+    #
+    my @results   = ();
+    my $coderef   = sub {
+	my ($ref) = @_;
+	my ($object, $noderef) = @{ $ref };
+	my @nodelist = @{ $noderef };
+
+	print STDERR "Lighting up nodes: @nodelist\n"
+	    if ($debug);
+	if ($object->LightUpNodes(@nodelist)) {
+	    return -1;
+	}
+	return 0;
+    };
+    print STDERR "Lighting up nodes in parallel ...\n";
+    
+    if (ParRun({"maxwaittime" => 99999},
+	       \@results, $coderef, @volunteers)) {
+	$MyStruct->die_noretry("*** LightUpNodes: Internal error\n");
+    }
+
+    #
+    # Check the exit codes. An error at this phase is unusual, and
+    # we want to turn off retry.
+    #
+    my $errors = 0;
+    my $count  = 0;
+    foreach my $result (@results) {
+	my ($object, $noderef) = @{ $volunteers[$count] };
+	my @nodelist = @{ $noderef };
+
+	if ($result != 0) {
+	    print STDERR "*** Error lighting up nodes: @nodelist\n"
+		if ($debug);
+	    $MyStruct->noretry(1);
+
+	    #
+	    # Make sure all the nodes are marked as down so that
+	    # we do not wait for them.
+	    #
+	    foreach my $node (@nodelist) {
+		$node->SetAllocState(TBDB_ALLOCSTATE_DOWN());
+	    }
+	}
+	$count++;
+    }
+
+    # And wait. 
+    print STDERR "Waiting for nodes ...\n";
+    $MyStruct->WaitForNodes(@nodes);
 
     #
     # Fire off email for this batch.
@@ -417,6 +485,11 @@ foreach (keys(%{ $MyStruct->failedlist() })) {
 foreach (keys(%{ $MyStruct->nodelist() })) {
     my $node   = $MyStruct->node($_);
     my $osinfo = $node->_bootosinfo();
+
+    # Was not setup to do anything, so ignore.
+    next
+	if (!defined($osinfo));
+    
     my $osid   = $osinfo->osid();
     my $type   = $node->type();
     $total{$osid}{any_type}++;

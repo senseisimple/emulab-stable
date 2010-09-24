@@ -1061,28 +1061,28 @@ sub doListVlans ($) {
     # We need to 'coallate' the results from each stack by putting together
     # the results from each stack, based on the VLAN identifier
     #
-if ($ELABINELAB) {
-    #
-    # Sklower deliberately uglified this.  The intent is that eventually
-    # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
-    # it will just work.  For now, we dup the code.
-    #
-    @vlanList = RemoteDoList();
-    foreach my $vlan (@vlanList) {
-	my ($id,$ddep,$memberref) = @$vlan;
-	${$vlans{$id}}[0] = $ddep;
-	push @{${$vlans{$id}}[1]}, @$memberref;
+    if ($ELABINELAB) {
+        #
+        # Sklower deliberately uglified this.  The intent is that eventually
+        # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
+        # it will just work.  For now, we dup the code.
+        #
+        @vlanList = RemoteDoList();
+        foreach my $vlan (@vlanList) {
+            my ($id,$ddep,$memberref) = @$vlan;
+            ${$vlans{$id}}[0] = $ddep;
+            push @{${$vlans{$id}}[1]}, @$memberref;
+        }
+    } else {
+        foreach my $stack (@$stacks) {
+            @vlanList = $stack->listVlans();
+            foreach my $vlan (@vlanList) {
+                my ($id,$ddep,$memberref) = @$vlan;
+                ${$vlans{$id}}[0] = $ddep;
+                push @{${$vlans{$id}}[1]}, @$memberref;
+            }
+        }
     }
-} else {
-    foreach my $stack (@$stacks) {
-	@vlanList = $stack->listVlans();
-	foreach my $vlan (@vlanList) {
-	    my ($id,$ddep,$memberref) = @$vlan;
-	    ${$vlans{$id}}[0] = $ddep;
-	    push @{${$vlans{$id}}[1]}, @$memberref;
-	}
-    }
-}
 
     #
     # less code to do this for snmpit.proxy than for it to popen snmpit
@@ -1142,8 +1142,9 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
         my $vlan = VLan->Lookup($vlan_id);
         if (!defined($vlan)) {
 	    &debug("No such VLAN $vlan_id in lans table\n");
-	    next
-		if ($opt{l} == 1);
+            # Only print unknown VLANs if -l was given twice, or the 
+            # -O option was given
+	    next unless ($opt{l} > 1 || $opt{O});
 	    $vname = $vlan_id;
 	    $experiment = undef;
         }
@@ -1547,6 +1548,36 @@ sub doVlansFromTables($$@) {
 		}
 		delete($trunkedPorts{$port});
 	    }
+	    
+	    #
+	    # Set openflow
+	    #
+	    # A much more right place for the openflow settings is CreateOneVlan,
+	    # however, it is called by sync vlan function and others, which don't destroy
+	    # the existing vlan_arrtibutes rows.
+	    #
+	    # TODO: Move this part to CreateOneVlan and Make sure the existed 
+	    #       vlan_attributes rows are deleted
+	    #
+	    my $ofenabled;
+	    $vlan->GetAttribute("ofenabled", \$ofenabled);
+	    if (defined($ofenabled) && $ofenabled == 1) {
+	        $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	        my $ofcontroller;
+	        $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	        if (defined($ofcontroller) && $ofcontroller ne "") {
+	            $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	        }
+	    
+	        $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	        # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	        # should refresh itself. But here vlan will not be used any more, so
+	        # maybe we can comment this refresh.
+	        $vlan->Refresh();	    
+	    }
+	    
 	    # Delete this vlan from the list that will be created below.
 	    delete($vlans{"$vlanid"});
 	}
@@ -1586,6 +1617,35 @@ sub doVlansFromTables($$@) {
 	my @ports  = getVlanPorts($vlanid);
 
 	$errors += CreateOneVlan($stack, $vlanid, @ports);
+	
+	#
+	# Set openflow
+	# 
+	# A much more right place for the openflow settings is CreateOneVlan,
+	# however, it is called by sync vlan function and others, which don't destroy
+	# the existing vlan_arrtibutes rows.
+	#
+	# TODO: Move this part to CreateOneVlan and Make sure the existed 
+	#       vlan_attributes rows are deleted
+	#
+	my $ofenabled;
+	$vlan->GetAttribute("ofenabled", \$ofenabled);
+	if (defined($ofenabled) && $ofenabled == 1) {
+	    $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	    my $ofcontroller;
+	    $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	    if (defined($ofcontroller) && $ofcontroller ne "") {
+	        $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	    }
+	    
+	    $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	    # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	    # should refresh itself. But here vlan will not be used any more, so
+	    # maybe we can comment this refresh.
+	    $vlan->Refresh();	    
+	}
     }
     return $errors;
 }
@@ -2200,9 +2260,6 @@ sub doDeleteVlan($@) {
 	    $vlan_ids{$vlan_name} = $vlan->id();
 	}
     }
-    elsif ($ELABINELAB) {
-	die("Must provide an experiment for this operation\n");
-    }
     else {
 	foreach my $vlan_name (@vlan_names) {
 	    $vlan_ids{$vlan_name} = $vlan_name;
@@ -2211,17 +2268,28 @@ sub doDeleteVlan($@) {
 
     #
     # Hand over to outer boss.
+    # If experiment was not specified then list is vlan IDs (tbswap).
+    # If experiment was specified, list is vlan names (manual invocation).
     # 
     if ($ELABINELAB) {
-	foreach my $vlan (values(%vlans)) {
-	    if (RemoteDeleteVlan($vlan) == 0) {
-		if ($vlan->Destroy() != 0) {
-		    print STDERR "*** Could not destroy $vlan\n";
+	if (defined($experiment)) {
+	    foreach my $vlan (values(%vlans)) {
+		if (RemoteDeleteVlan($vlan) == 0) {
+		    if ($vlan->Destroy() != 0) {
+			print STDERR "*** Could not destroy $vlan\n";
+		    }
+		}
+		else {
+		    $errors++;
 		}
 	    }
-	    else {
-		$errors++;
+	}
+	else {
+	    my @vidlist = ();
+	    foreach my $vid (values(%vlan_ids)) {
+		push(@vidlist, $vid);
 	    }
+	    $errors = RemoteDoReset(undef, 0, @vidlist);
 	}
 	return $errors;
     }
@@ -2688,6 +2756,13 @@ sub doEnableOpenflowListener($$) {
     }
 
     ofunlock();
+    
+    #
+    # update the vlan object with the new listener string
+    # other openflow functions may also need this, especially doOpenflowEnable/doOpenflowDisable
+    #
+    my $vlaninst = VLan->Lookup($vlan);
+    $vlaninst->SetAttribute('oflistener', $listenerConnStr, 'string');
 
     return $errors;
 }

@@ -1,0 +1,16 @@
+#
+# Remove extraneous pcvm types; now added by ptopgen
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    DBQueryFatal("delete node_auxtypes.* from node_auxtypes ".
+		 "left join node_types_auxtypes on ".
+		 "     node_auxtypes.type=node_types_auxtypes.auxtype ".
+		 "where node_types_auxtypes.type='pcvm'");
+
+    return 0;
+}
+1;

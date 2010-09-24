@@ -464,6 +464,17 @@ CREATE TABLE `emulab_indicies` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `emulab_locks`
+--
+
+DROP TABLE IF EXISTS `emulab_locks`;
+CREATE TABLE `emulab_locks` (
+  `name` varchar(64) NOT NULL default '',
+  `value` int(10) NOT NULL default '0',
+  PRIMARY KEY  (`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `emulab_pubs`
 --
 
@@ -1450,6 +1461,22 @@ CREATE TABLE `image_history` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `subboss_images`
+--
+
+DROP TABLE IF EXISTS `subboss_images`;
+CREATE TABLE `subboss_images` (
+  `subboss_id` varchar(32) NOT NULL default '',
+  `imageid` int(8) unsigned NOT NULL default '0',
+  `load_address` text,
+  `frisbee_pid` int(11) default '0',
+  `load_busy` tinyint(4) NOT NULL default '0',
+  `sync` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`subboss_id`,`imageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+
+--
 -- Table structure for table `images`
 --
 
@@ -2381,7 +2408,7 @@ CREATE TABLE `nonlocal_user_bindings` (
   `uid` varchar(8) NOT NULL default '',
   `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `exptidx` int(11) NOT NULL default '0',
-   PRIMARY KEY  (`uid_idx`),
+   PRIMARY KEY  (`uid_idx`,`exptidx`),
    KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -3295,6 +3322,23 @@ CREATE TABLE `table_regex` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `template_stamps`
+--
+
+CREATE TABLE `template_stamps` (
+  `guid` varchar(16) NOT NULL default '',
+  `vers` smallint(5) unsigned NOT NULL default '0',
+  `id` smallint(5) unsigned NOT NULL auto_increment,
+  `instance` int(10) unsigned default NULL,
+  `stamp_type` varchar(32) NOT NULL default '',
+  `modifier` varchar(32) default NULL,
+  `stamp` int(10) unsigned default NULL,
+  `aux_type` varchar(32) default NULL,
+  `aux_data` float default '0',
+  PRIMARY KEY  (`guid`,`vers`,`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `testbed_stats`
 --
 
@@ -3812,6 +3856,10 @@ CREATE TABLE `virt_lans` (
   `trace_db` tinyint(1) NOT NULL default '0',
   `fixed_iface` varchar(128) default '',
   `layer` tinyint(4) NOT NULL default '2',
+  `implemented_by_path` tinytext,
+  `implemented_by_link` tinytext,
+  `ofenabled` tinyint(1) default '0',
+  `ofcontroller` tinytext,
   PRIMARY KEY  (`exptidx`,`vname`,`vnode`,`vport`),
   UNIQUE KEY `vport` (`pid`,`eid`,`vname`,`vnode`,`vport`),
   KEY `pid` (`pid`,`eid`,`vname`),
@@ -3913,6 +3961,25 @@ CREATE TABLE `virt_parameters` (
   `description` text,
   PRIMARY KEY  (`exptidx`,`name`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `virt_paths`
+--
+
+DROP TABLE IF EXISTS `virt_paths`;
+CREATE TABLE `virt_paths` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `pathname` varchar(32) NOT NULL default '',
+  `segmentname` varchar(32) NOT NULL default '',
+  `segmentindex` tinyint(4) unsigned NOT NULL default '0',
+  `layer` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`exptidx`,`pathname`,`segmentname`),
+  UNIQUE KEY `segidx` (`exptidx`,`pathname`,`segmentindex`),
+  KEY `pid` (`pid`,`eid`,`pathname`),
+  KEY `pideid` (`pid`,`eid`,`pathname`,`segmentname`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --

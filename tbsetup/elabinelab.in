@@ -855,7 +855,7 @@ sub DumpDBGoo()
 	       "    Could not dump table group_membership\n");
 
     #
-    # Initial images; not that these images are not going to exist inside!
+    # Initial images; note that these images are not going to exist inside!
     # 
     DBQueryWarn("select * from images ".
 		"where pid='$pid' or (pid='$TBOPSPID' and global=1) ".
