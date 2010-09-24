@@ -100,7 +100,7 @@
 			{
 				this.validateNow();
 				if(nameLabel != null)
-					width = width + (nameLabel.textWidth - nameLabel.width) + 4;
+					width = width + (nameLabel.textWidth - nameLabel.width) + 5;
 			}
 			
 			public var lastId:String = "";
