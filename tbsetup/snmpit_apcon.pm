@@ -1015,7 +1015,7 @@ sub createVlan($$$) {
         return 0;
     }
     
-    print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
+    print "  Creating VLAN $vlan_id as VLAN #$vlan_id on " .
         "$self->{NAME} ...\n";
 
     #
