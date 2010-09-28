@@ -2,7 +2,7 @@ include ../../variables.mk
 
 BUILDROOT	:=	$(PWD)/$(BUILDROOT)
 
-PROGS	:= imageunzip imagezip frisbee growdisk tmcc.bin binoffset groklilo teachswitch dhcp_packet_dump
+PROGS	:= imageunzip imagezip frisbee growdisk tmcc.bin binoffset groklilo teachswitch dhcp_packet_dump sethostname.dhclient
 BUILD_TARGETS := $(PROGS)
 INSTALL_TARGETS := $(addsuffix -install,$(PROGS))
 
@@ -56,7 +56,7 @@ script-install:
 	mkdir -p $(TARGET_PATH)/var/emulab/db
 	mkdir -p $(TARGET_PATH)/usr/share/udhcpc
 	ln -sf /etc/testbed $(TARGET_PATH)/usr/local/etc/emulab
-	install -m 755 $(TESTBEDOBJ_PATH)/tmcd/linux/sethostname.dhclient $(TARGET_PATH)/usr/share/udhcpc
+	install -m 755 $(TESTBED_BUILD_PATH)/sethostname.dhclient $(TARGET_PATH)/usr/share/udhcpc
 	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed
 	install -m 755 $(TMCD_PATH)/linux/rc.frisbee $(TARGET_PATH)/etc/testbed/rc
 	install -m 755 $(TMCD_PATH)/linux/rc.ipod $(TARGET_PATH)/etc/testbed/rc
@@ -121,6 +121,11 @@ clean:
 		rm -rf $(TESTBED_BUILD_PATH)
 
 install: $(INSTALL_TARGETS) script-install
+
+$(TESTBED_BUILD_PATH)/sethostname.dhclient:
+	mkdir -p $(TESTBED_BUILD_PATH)
+	sed -e 's/@DISABLE_NAMED_SETUP@/0/g' \
+	$(TMCD_PATH)/linux/sethostname.dhclient.in > $@
 
 $(TESTBED_BUILD_PATH)/groklilo:
 	mkdir -p $(TESTBED_BUILD_PATH)
