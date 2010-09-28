@@ -85,19 +85,21 @@ Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
+          [--redirect-err]
           [--of-disable name pid eid]
           [--of-enable name pid eid]
           [--of-controller name pid eid tcp:ip:port]
           [--of-listener name pid eid]
 General:
-  -h          Display this help message
-  -v <level>  Verbose mode
-  -q          Quiet mode
-  -n          Test mode - don't actually make any changes
-  -i <device> Operate on <device>, overriding default device list. Can be
-                  given multiple times
-  -S <stack>  Operate on the given stack, instead of the default of the
-                  experimental network
+  -h              Display this help message
+  -v <level>      Verbose mode
+  -q              Quiet mode
+  -n              Test mode - don't actually make any changes
+  -i <device>     Operate on <device>, overriding default device list. Can be
+                      given multiple times
+  -S <stack>      Operate on the given stack, instead of the default of the
+                      experimental network
+  --redirect-err  Redirect STDERR to STDOUT, for easier capturing in logfiles
 
 VLAN Control:
   -t <pid> <eid>    Create all VLANs for an experiment
@@ -174,11 +176,20 @@ GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
-    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
+    'redirect-err');
 # Unused: f,j
 
 if ($opt{h}) {
     exit &usage;
+}
+
+#
+# If requested, redirect STDERR to STDOUT - this makes it easier to capture
+# error output in logfiles
+#
+if ($opt{'redirect-err'}) {
+    open(STDERR, ">&STDOUT");
 }
 
 if ($opt{v}) {
