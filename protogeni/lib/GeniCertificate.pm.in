@@ -136,14 +136,10 @@ sub hrn($)
     # GENI AM compatibility with PlanetLab
     # Use the URN from the Subject Alt Name to create the HRN
     my ($authority, $type, $name) = GeniHRN::Parse($self->urn());
-    # Match authority up to the first colon, then add "." and name.
-    if ($authority =~ /^([^:]+):/) {
-        my $hrn = $1 . "." . $name;
-        return $hrn;
-    }
-    print STDERR "Cannot find hrn inside DN: '" . $self->DN() . "'\n";
-    print STDERR "Cannot find hrn inside urn: '" . $self->urn() . "'\n";
-    return "unknown";
+    # Substitute dots for colons
+    $authority =~ s/:/\./g;
+    my $hrn = $authority . "." . $name;
+    return $hrn;
 }
 sub email($)
 {
