@@ -189,7 +189,7 @@ if ($opt{h}) {
 # error output in logfiles
 #
 if ($opt{'redirect-err'}) {
-    *STDERR = *STDOUT;
+    open(STDERR, ">&STDOUT");
 }
 
 if ($opt{v}) {
