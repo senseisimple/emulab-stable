@@ -535,7 +535,7 @@ sub URN($)
 	if( /^\s+X509v3 Subject Alternative Name:\s*$/ ) {
 	    $altname = 1;
 	} elsif( $altname ) {
-	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $urn = $1
+	    m'^\s*URI:(urn:publicid:[-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $urn = $1
 		foreach split( /, / );
 	    $altname = 0;
 	}
