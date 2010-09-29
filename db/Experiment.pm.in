@@ -118,7 +118,8 @@ my $EXPT_RESOURCESHOSED = 0;
 		   "v2pmap"        => ["node_id", "vname"],
 		   "linkdelays"    => ["node_id", "vlan", "vnode"],
 		   "traces"        => ["node_id", "idx"],
-		   "portmap"       => undef); 
+		   "portmap"       => undef,
+		   "bridges"       => ["node_id", "bridx", "iface"]); 
 
 # These are slots in the node table that need to be restored. 
 my @nodetable_fields = ("def_boot_osid",
