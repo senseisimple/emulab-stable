@@ -804,7 +804,7 @@ sub RenewSlice($)
 	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 				    "Cooked mode Slice");
     }
-    
+
     my $this_user = GeniUser->Lookup($ENV{"GENIURN"}, 1);
     if (!defined($this_user)) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
@@ -844,6 +844,10 @@ sub RenewSlice($)
     }
     if ($when < time()) {
 	$message = "Expiration is in the past";
+	goto bad;
+    }
+    if ($when < timegm( strptime( $slice->expires() ) ) ) {
+	$message = "Cannot shorten slice lifetime";
 	goto bad;
     }
     if ($slice->Lock() != 0) {
