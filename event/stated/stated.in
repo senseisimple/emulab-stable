@@ -1010,8 +1010,7 @@ sub handleCtrlEvent($$) {
 		}
 		my $cmd = "$nodereboot -r $optarg $node";
 		debug("$cmd\n");
-		system("date 2>&1 >> $rebootlog");
-		system("$cmd 2>&1 >> $rebootlog &") and
+		system("(date; $cmd) >>$rebootlog 2>&1 &") and
 		    notify("$PXEWAKEUP retry: ".
 			   "Command '$cmd' failed, error $?: $!\n");
 
@@ -1103,8 +1102,9 @@ sub handleCommand($$;$$) {
 	    info("Rebooting nodes: $nodelist\n");
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
-
-	    system("(date; $nodereboot -r $nodelist) >>$rebootlog 2>&1 &") and
+	    my $cmd = "$nodereboot -r $nodelist";
+	    debug("$cmd\n");
+	    system("(date; $cmd) >>$rebootlog 2>&1 &") and
 		notify("$params/$command: ".
 		       "Command '$cmd' failed, error $?: $!\n");
 
