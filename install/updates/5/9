@@ -32,7 +32,8 @@ sub InstallUpdate($$)
 	    #
 	    Phase "experiment", "Creating shared node experiment", sub {
 		PhaseSkip("Experiment exists")
-		    if (-d "$PROJROOT/$pid/exp/$EID");
+		    if (-d "$PROJROOT/$pid/exp/$EID" ||
+			-d "$PROJROOT/$pid/exp/shared-node");
 	
 		ExecQuietFatal("$SUDO -u $PROTOUSER $WAP $BATCHEXP ".
 			       "  -q -i -k -j -w -f -n ".

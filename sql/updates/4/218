@@ -1,0 +1,61 @@
+#
+# State transition/triggers changes to detect nodes which incorrectly boot
+# from disk in op_mode RELOAD.  This happens when nodes cannot get their
+# boot info and pxeboot falls back to booting from the default partition.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+    my @transitions = (
+	["RELOAD", "ISUP",     "SHUTDOWN", "RebootAfterFail"],
+	["RELOAD", "TBFAILED", "SHUTDOWN", "RebootAfterFail"],
+	["RELOAD", "TBSETUP",  "TBFAILED", "FailedBoot"],
+	["RELOAD", "TBSETUP",  "ISUP",     "FailedBoot"],
+	["RELOAD", "BOOTING",  "TBSETUP",  "FailedBoot"]
+    );
+    my @triggers = (
+	["*", "RELOAD", "TBFAILED", "REBOOT"],
+	["*", "RELOAD", "ISUP",     "REBOOT"]
+    );
+
+    foreach my $row (@transitions) {
+	my ($opm,$s1,$s2,$lab) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT op_mode FROM state_transitions WHERE ".
+			 "op_mode='$opm' AND state1='$s1' AND state2='$s2'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_transitions VALUES ".
+			 "('$opm','$s1','$s2','$lab')");
+	}
+    }
+
+    foreach my $row (@triggers) {
+	my ($node,$opm,$s,$trig) = @$row;
+	my $query_result =
+	    DBQueryFatal("SELECT node_id FROM state_triggers WHERE ".
+			 "node_id='$node' AND op_mode='$opm' AND state='$s'");
+	if ($query_result->numrows == 0) {
+	    DBQueryFatal("INSERT INTO state_triggers VALUES ".
+			 "('$node','$opm','$s','$trig')");
+	}
+    }
+
+    #
+    # stated implements the reboot trigger by firing off a node_reboot in
+    # the background and queuing a timeout.  If it doesn't get a SHUTDOWN
+    # transition from the node before the timeout happens, it will fire
+    # off another node_reboot.  Thus if the timeout is too short, we could
+    # double reboot the node.
+    #
+    # Well, the timeout was too short.  We need to allow time enough for
+    # node_reboot to fail an ssh (~60 seconds) and send an ipod.
+    #
+    DBQueryFatal("UPDATE state_timeouts SET timeout=75 ".
+		 "WHERE op_mode='TBCOMMAND' and state='REBOOT'");
+
+    return 0;
+}
+1;

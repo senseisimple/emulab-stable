@@ -1354,7 +1354,7 @@ sub ListUsage($)
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my @credentials = @{ $credentials };
-    return GeniCM::ListUsage({"credentials" => $credentials[0]});
+    return GeniCM::ListUsage({"credential" => $credentials[0]});
 }
 
 sub ListHistory($)
@@ -1367,8 +1367,8 @@ sub ListHistory($)
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my @credentials = @{ $credentials };
-    return GeniCM::ListHistory({"credentials" => $credentials[0],
-				  "type"        => $type});
+    return GeniCM::ListHistory({"credential" => $credentials[0],
+				"type"       => $type});
 }
 
 #

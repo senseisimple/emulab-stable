@@ -819,8 +819,8 @@ sub stateTransition($$) {
 			      objname   => $node);
 		next;
 	    };
-	    (/^$TBPOWERCYCLE$/) && do {
-		handleCommand($node,$TBPOWERCYCLE);
+	    (/^$TBREBOOT$/ || /^$TBPOWERCYCLE$/) && do {
+		handleCommand($node,$trig);
 		next;
 	    };
 	    /^RELOADOLDMFS$/ && do {
@@ -1084,6 +1084,7 @@ sub handleCommand($$;$$) {
 		    debug("Checking rebooting: $node, $nodes{$node}, ".
 			  "$nodes{$node}{state}, $nodes{$node}{noretry}\n");
 		    if (($nodes{$node}{state} ne TBDB_NODESTATE_ISUP) &&
+			($nodes{$node}{state} ne TBDB_NODESTATE_TBFAILED) &&
 			(!$nodes{$node}{noretry}) ) {
 			# This node shouldn't be rebooted now...
 			# XXX Send feedback here somehow!
@@ -1103,13 +1104,9 @@ sub handleCommand($$;$$) {
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
 
-	    my $cmd = "$nodereboot -r $nodelist";
-	    my $redir = " 2>&1 >> $rebootlog &";
-	    debug("$cmd $redir\n");
-	    system("date $redir");
-	    system($cmd.$redir) and
-	      notify("$params/$command: ".
-		     "Command '$cmd' failed, error $?: $!\n");
+	    system("(date; $nodereboot -r $nodelist) >>$rebootlog 2>&1 &") and
+		notify("$params/$command: ".
+		       "Command '$cmd' failed, error $?: $!\n");
 
 	    # Set up a timeout, so we retry if we don't get SHUTDOWN in time
 	    foreach $node (@nodes) {
