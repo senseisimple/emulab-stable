@@ -833,6 +833,7 @@ sub main
 	my $lilo_default;
 	my $lilo_commandline = 0;
 
+	my $old_uuid = get_uuid($root);
 	set_random_rootfs_uuid($root);
 	my $fstype = mount_image($root, $imageroot);
 	my $uuid = get_uuid($root);
@@ -935,7 +936,7 @@ sub main
 	}
 
 	print "Rewriting /etc/fstab to use '$new_fstab_root' as root device\n";
-	file_replace_root_device($imageroot, '/etc/fstab', $old_fstab_root,
+	file_replace_string($imageroot, '/etc/fstab', $old_fstab_root,
 	                         $new_fstab_root);
 
 	print "Rewriting $bootloader config to use '$new_bootloader_root' as root device\n";
@@ -944,13 +945,14 @@ sub main
 		$lilo_commandline = set_runlilo_flag($imageroot, $lilo_default, $new_bootloader_root);
 	}
 	elsif ($bootloader eq 'grub') {
-		file_replace_root_device($imageroot, $grub_config, $old_bootloader_root,
+		file_replace_string($imageroot, $grub_config, $old_bootloader_root,
 		                         $new_bootloader_root);
 		set_grub_root_device($imageroot, $grub_config, $root);
 	}
 	elsif ($bootloader eq 'grub2') {
-		file_replace_root_device($imageroot, $grub_config, $old_bootloader_root,
+		file_replace_string($imageroot, $grub_config, $old_bootloader_root,
 		                         $new_bootloader_root);
+		file_replace_string($imageroot, $grub_config, $old_uuid, $uuid);
 		set_grub2_root_device($imageroot, $grub_config, $root);
 	}
 
