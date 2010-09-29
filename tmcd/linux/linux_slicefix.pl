@@ -52,7 +52,7 @@ sub get_uuid
 		while (<CMD>) {
 			next unless m#^$device:\s+#;
 			chomp;
-			s/.*\s+UUID="([a-f0-9-]+)".*/\1/;
+			next unless s/.*\s+UUID="([a-f0-9-]+)".*/\1/;
 			$uuid = $_;
 		}
 
@@ -86,7 +86,7 @@ sub get_label
 		while (<CMD>) {
 			next unless m#^$device:\s+#;
 			chomp;
-			s/.*\s+LABEL="([^"]*)".*/\1/;
+			next unless s/.*\s+LABEL="([^"]*)".*/\1/;
 			$label = $_;
 		}
 
@@ -334,6 +334,42 @@ sub find_default_grub_entry
 	return ($kernel, $cmdline, $initrd);
 }
 
+sub find_default_grub2_entry
+{
+	my ($imageroot, $conf) = @_;
+	my @buffer;
+	my $default = 0;
+	my $current_entry = -1;
+	my ($kernel, $cmdline, $initrd);
+
+	open FILE, "$imageroot/$conf" || die "Couldn't read grub config: $!\n";
+	while (<FILE>) {
+		if (/^set\s+default\s*=\s*["']?(\d+)["']?$/) {
+			$default = $1;
+			next;
+		}
+		elsif (/^\s*(\S+)\s+(.*)$/) {
+			if ($1 eq 'menuentry') {
+				$current_entry++;
+			}
+
+			next if ($current_entry < $default);
+			last if ($current_entry > $default);
+
+			if ($1 eq 'linux') {
+				$_ = $2;
+				($kernel, $cmdline) = /^(\S+)\s+(.*)$/;
+			}
+			elsif ($1 eq 'initrd') {
+				$initrd = $2;
+			}
+		}
+	}
+	close FILE;
+
+	return ($kernel, $cmdline, $initrd);
+}
+
 sub set_grub_root_device
 {
 	my ($imageroot, $grub_config, $root) = @_;
@@ -370,6 +406,48 @@ sub set_grub_root_device
 	my @buffer;
 	while (<FILE>) {
 		s/^(\s*)root \([^)]*\)/$1root (hd$grub_disk,$root_part)/;
+		push @buffer, $_;
+	}
+	seek FILE, 0, 0;
+	print FILE @buffer;
+	close FILE;
+}
+
+sub set_grub2_root_device
+{
+	my ($imageroot, $grub_config, $root) = @_;
+	my ($root_disk, $root_part) =
+	   ($root =~ m#/dev/(.+)(\d+)#);
+	my $grub_disk;
+
+	if (-f $BOOTDIR . "/edd_map") {
+		open FILE, $BOOTDIR . "/edd_map";
+		while (<FILE>) {
+			chomp;
+			split /=/;
+			if ($_[0] eq $root_disk) {
+				$grub_disk = hex($_[1]) - 0x80;
+				print "Found GRUB root device using EDD\n";
+				last;
+			}
+		}
+		close FILE;
+	}
+
+	if (not defined $grub_disk) {
+		$grub_disk = $root;
+		$grub_disk =~ s/^\/dev\/[hs]d(.).*$/$1/;
+		$grub_disk =~ y/[a-h]/[0-7]/;
+		print "Found GRUB root device by guessing\n";
+	}
+
+	printf "GRUB root device is (hd%d,%d)\n", $grub_disk, $root_part;
+
+	open FILE, "+<$imageroot/$grub_config" or
+	     die "Couldn't open GRUB config: $!\n";
+	my @buffer;
+	while (<FILE>) {
+		s/^(\s*set\s+root\s*=\s*["']?\(?)[^)]*(\)?["']?)/$1hd$grub_disk,$root_part$2/;
 		push @buffer, $_;
 	}
 	seek FILE, 0, 0;
@@ -490,6 +568,9 @@ sub udev_supports_label
 	}
 
 	my @files = glob "$imageroot/etc/udev/rules.d/*";
+	if (@files) {
+		@files = glob "$imageroot/lib/udev/rules.d/*";
+	}
 	for my $file (@files) {
 		open FILE, $file or next;
 		my @buffer = <FILE>;
@@ -758,6 +839,13 @@ sub main
 	my $label = get_label($root);
 	my $bootloader = guess_bootloader($root);
 	my $old_fstab_root = get_fstab_root($imageroot);
+
+	# HACK: there's no simple way to distinguish grub2 from grub
+	# by the boot sector.
+	if ($bootloader eq 'grub' && -f "$imageroot/boot/grub/grub.cfg") {
+		$bootloader = 'grub2';
+	}
+
 	if ($bootloader eq 'lilo') {
 		($lilo_default, $kernel, $cmdline, $initrd) =
 		    find_default_lilo_entry($imageroot, "/etc/lilo.conf");
@@ -772,6 +860,18 @@ sub main
 
 		($kernel, $cmdline, $initrd) =
 		    find_default_grub_entry($imageroot, $grub_config);
+
+	}
+	elsif ($bootloader eq 'grub2') {
+		for (qw#/boot/grub/grub.cfg#) {
+			if (-f "$imageroot/$_") {
+				$grub_config = $_;
+				last;
+			}
+		}
+
+		($kernel, $cmdline, $initrd) =
+		    find_default_grub2_entry($imageroot, $grub_config);
 
 	}
 	else {
@@ -847,6 +947,11 @@ sub main
 		file_replace_root_device($imageroot, $grub_config, $old_bootloader_root,
 		                         $new_bootloader_root);
 		set_grub_root_device($imageroot, $grub_config, $root);
+	}
+	elsif ($bootloader eq 'grub2') {
+		file_replace_root_device($imageroot, $grub_config, $old_bootloader_root,
+		                         $new_bootloader_root);
+		set_grub2_root_device($imageroot, $grub_config, $root);
 	}
 
 	fix_swap_partitions($imageroot, $root,
