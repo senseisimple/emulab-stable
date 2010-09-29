@@ -231,7 +231,7 @@ sub fix_swap_partitions
 	close FSTAB;
 }
 
-sub file_replace_root_device
+sub file_replace_string
 {
 	my ($imageroot, $file, $old_root, $new_root) = @_;
 	my @buffer;
