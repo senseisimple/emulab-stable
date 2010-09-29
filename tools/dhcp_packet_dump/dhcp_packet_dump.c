@@ -104,7 +104,7 @@ struct dhcp_option_info rfc2132_option_info[] = {
 	{STR(OPT_NIS_DOMAIN),                   parse_string,           0},
 	{STR(OPT_NIS_SERVER),                   parse_ip_address,       1},
 	{STR(OPT_NTP_SERVER),                   parse_ip_address,       1},
-	{STR(OPT_VENDOR_SPECIFIC_INFO),         parse_encapsulated,             0},
+	{STR(OPT_VENDOR_SPECIFIC_INFO),         parse_data,             0},
 	{STR(OPT_NETBIOS_NAME_SERVER),          parse_ip_address,       1},
 	{STR(OPT_NETBIOS_DATAGRAM_DIST_SERVER), parse_ip_address,       1},
 	{STR(OPT_NETBIOS_NODE_TYPE),            parse_int8,             0},
@@ -121,7 +121,7 @@ struct dhcp_option_info rfc2132_option_info[] = {
 	{STR(OPT_MAX_DHCP_MESSAGE_SIZE),        parse_int16,            0},
 	{STR(OPT_RENEWAL_TIME_VALUE),           parse_int32,            0},
 	{STR(OPT_REBINDING_TIME_VALUE),         parse_int32,            0},
-	{STR(OPT_VENDOR_CLASS_ID),              parse_string,           0},
+	{STR(OPT_VENDOR_CLASS_ID),              parse_data,             0},
 	{STR(OPT_CLIENT_ID),                    parse_data,             0},
 	{"",                                    NULL,             0},
 	{"",                                    NULL,             0},
@@ -471,6 +471,7 @@ int print_options(struct option *option_list, char *prefix,
 {
 	char tmp[128];
 	struct option *current;
+	struct option *vci;
 	int rc;
 	char *buffer;
 	int option_count;
@@ -481,12 +482,34 @@ int print_options(struct option *option_list, char *prefix,
 	}
 	option_count++;
 
+	/* Try to find the Vendor Class ID option.  If it exists, we
+	   use its value to determine how to parse the Vendor Specific
+	   Info block.
+	*/
+	for (vci = option_list; vci; vci = vci->next) {
+		 if (vci->code == OPT_VENDOR_CLASS_ID)
+			break;
+	}
+
 	for (current = option_list; current; current = current->next) {
+		struct dhcp_option_info *child_info = NULL;
 		buffer = NULL;
-		if (parse_values && option_info &&
+
+		if (vci && memcmp(vci->data, "PXEClient", 9) == 0)
+			child_info = pxe_option_info;
+
+		if (parse_values && (current->code < option_count) &&
 		    option_info[current->code].parser) {
-			rc = option_info[current->code].parser(current,
-			                                       &buffer);
+
+			if (child_info &&
+			    current->code == OPT_VENDOR_SPECIFIC_INFO) {
+				rc = parse_encapsulated(current,
+				                        &buffer);
+			} else {
+				rc = option_info[current->code].parser(current,
+				                                       &buffer);
+			}
+			
 			/* Option didn't meet the parser's requirements
 			   (min/max length, etc).  Print it as hexdump
 			   instead).
@@ -494,6 +517,8 @@ int print_options(struct option *option_list, char *prefix,
 			if (rc) {
 				if (buffer)
 					free(buffer);
+				child_info = NULL;
+				
 				rc = parse_data(current, &buffer);
 			}
 		} else {
@@ -501,12 +526,6 @@ int print_options(struct option *option_list, char *prefix,
 		}
 
 		if (current->child) {
-			struct dhcp_option_info *child_info = NULL;
-
-			if (current->code == OPT_VENDOR_SPECIFIC_INFO) {
-				child_info = &pxe_option_info[0];
-			}
-
 			memset(tmp, 0, sizeof(tmp));
 			if (use_pretty_names && option_info &&
 			    option_info[current->code].name[0]) {

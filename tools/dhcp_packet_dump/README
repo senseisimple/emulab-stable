@@ -45,6 +45,21 @@ doesn't appear to be of the expected type, such as a DHCP Server
 Identifier option with a value only 3 bytes long (should be 4 since
 it's an IPv4 address).
 
+
+Vendor-Specific Information Option
+----------------------------------
+The Vendor-Specific Information option (code 43) can hold a value of
+any type.  How this option should be parsed is guessed from the value
+of the Vendor Class Identifier option (code 60).  If the Vendor Class
+ID option isn't present or isn't recognized, then the Vendor Specific
+Information option is parsed as raw data.
+
+Currently only Vendor Class IDs starting with the string "PXEClient"
+are supported.  If the response has this VCI, the Vendor-Specific
+Information option will hold encapsulated suboptions.  Recognized PXE
+options are parsed appropriately and given meaningful names.
+
+
 command-line options
 --------------------
 dhcp_packet_dump understands the following command-line options:
@@ -58,6 +73,7 @@ dhcp_packet_dump understands the following command-line options:
       parsed either.  Meaningful names are used unless '-n' is also
       passed.  Useful if you need to deal with non-standard usage of a
       standard option.
+
 
 Notes
 -----
