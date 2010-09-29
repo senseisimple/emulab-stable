@@ -305,7 +305,7 @@ sub readTranslationTable($) {
 	    "from wires;");
     while ( my @row = $result->fetchrow_array()) {
         my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
-        $name = "$node_id1:$card1:$port1";
+        $name = "$node_id1:$card1.$port1";
         print "Name='$name'\t" if $self->{DEBUG} > 2;
         print "Dev='$node_id2'\t" if $self->{DEBUG} > 2;
         $switchport = "$node_id2:$card2.$port2";
@@ -854,7 +854,7 @@ sub convertPortFromNode2Dev($$) {
     my $self = shift;
     my $pcport = shift;
     
-    my $modport = $Ports{"$pcport:1"};
+    my $modport = $Ports{"$pcport.1"};
     if (defined($modport)) {
         return $self->convertPortFormat($modport);
     }
@@ -1276,7 +1276,7 @@ sub vlanHasPorts($$) {
 sub convertPortFromDev2Node($$) {
     my ($self, $devport) = @_;
     
-    my $pnum = $self->{NAME}."".$self->convertPortFormat($devport);
+    my $pnum = $self->{NAME}.":".$self->convertPortFormat($devport);
     if (!exists $Ports{$pnum}) {
         return undef;
     }
@@ -1309,7 +1309,7 @@ sub listVlans($) {
             }
         }
 
-        push @list, [$vlan_id, $vlan_id, @pcports];
+        push @list, [$vlan_id, $vlan_id, \@pcports];
     }
     
     return @list;
