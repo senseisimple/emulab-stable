@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007-2009 University of Utah and the Flux Group.
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Lan;
@@ -1389,6 +1389,22 @@ sub GetNodeIface($$$)
     return 0;
 }
 
+#
+# Get the Interface structure.
+#
+sub GetInterface($)
+{
+    my ($self) = @_;
+    my $node;
+    my $iface;
+
+    require Interface;
+
+    return -1
+	if ($self->GetNodeIface(\$node, \$iface));
+
+    return Interface->LookupByIface($node, $iface);
+}
 
 ############################################################################
 #
