@@ -319,7 +319,8 @@ sub ReportLockedSlices()
 			    "where locked is not null and ".
 			    "      DATE_SUB(NOW(),INTERVAL 1 DAY) >= locked");
     if (!$query_result) {
-	Fatal("ReportLockedSlices: Error getting info from the DB.");
+	print STDERR "ReportLockedSlices: Error getting info from the DB.\n";
+	return;
     }
     return
 	if (!$query_result->numrows);
@@ -344,11 +345,76 @@ sub ReportLockedSlices()
     # Send a message to the testbed list. 
     #
     SENDMAIL($TBOPS,
-	     "ProtoGENI expire daemon: Locked Slices",
+	     "ProtoGENI CM daemon: Locked Slices",
 	     "The following CM slices have been locked for a long time\n\n".
 	     $msg,
 	     $TBOPS);
 }
+
+#
+# Look for orphaned certificates.
+#
+sub ReportOrphanedCerts()
+{
+    my $msg = "";
+
+    GeniDB::DBQueryWarn("lock tables geni_certificates as c write, ".
+			"  geni_users as u write, ".
+			"  geni_slices as s write, ".
+			"  geni_slivers as sl write, ".
+			"  geni_aggregates as a write, ".
+			"  geni_authorities as auth write, ".
+			"  geni_components as cm write, ".
+			"  geni_credentials as cr write")
+	or return;
+    
+    my $query_result =
+	GeniDB::DBQueryWarn("select c.uuid,c.urn from geni_certificates as c ".
+		   "  left join geni_users as u on u.uuid=c.uuid ".
+		   "  left join geni_slices as s on s.uuid=c.uuid ".
+		   "  left join geni_slivers as sl on sl.uuid=c.uuid ".
+		   "  left join geni_aggregates as a on a.uuid=c.uuid ".
+		   "  left join geni_authorities as auth on auth.uuid=c.uuid ".
+		   "  left join geni_components as cm on cm.uuid=c.uuid ".
+	           "  left join geni_credentials as cr on cr.uuid=c.uuid ".
+	     	   "  where u.uuid is null and ".
+		   "        s.uuid is null and ".
+		   "        sl.uuid is null and ".
+		   "        a.uuid is null and ".
+		   "        auth.uuid is null and ".
+		   "        cm.uuid is null and ".
+		   "        cr.uuid is null ");
+
+    GeniDB::DBQueryWarn("unlock tables");
+    if (!$query_result) {
+	print STDERR "ReportOrphanedCerts: Error getting info from the DB.\n";
+	return;
+    }
+    return
+	if (!$query_result->numrows);
+
+    while (my ($uuid, $urn) = $query_result->fetchrow_array()) {
+	$msg .= "$uuid : $urn\n";
+
+	print STDERR "$uuid,$urn : orphaned certificates\n";
+    }
+    return
+	if ($msg eq "");
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "ProtoGENI CM daemon: Orphaned Certificates",
+	     "The following CM certificates are orphans\n\n".
+	     $msg,
+	     $TBOPS);
+}
+
+# Do this once at startup
+sleep(5);
+ReportLockedSlices();
+ReportOrphanedCerts();
 
 my $counter = 0;
 
@@ -369,6 +435,7 @@ while (1) {
     $counter += $SLEEP_INTERVAL;
     if ($counter >= (24 * 60 * 60)) {
 	ReportLockedSlices();
+	ReportOrphanedCerts();
 	$counter = 0;
     }
 

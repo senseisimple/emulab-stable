@@ -218,11 +218,32 @@ sub Create($$$$$;$$)
 	if (!defined($certificate));
 
     $certificate->{'CERT'}->{'privkey'} = $privkey;
+    #
+    # We need to be sure this certificate is unique, so do a table
+    # lock and check before calling Store.
+    #
+    DBQueryWarn("lock tables geni_certificates write")
+	or return undef;
+    $uuid = $certificate->uuid();
+    my $query_result =
+	DBQueryWarn("select urn from geni_certificates where uuid='$uuid'");
+    goto bad
+	if (!$query_result);
+    if ($query_result->numrows) {
+	my ($ourn) = $query_result->fetchrow_array();
+	print STDERR "*** Duplicate uuid in geni_certificates table\n";
+	print STDERR "*** $uuid,$urn : $ourn\n";
+	goto bad;
+    }
     if ($certificate->Store() != 0) {
 	print STDERR "Could not write new certificate to DB\n";
-	return undef;
+	goto bad;
     }
+    DBQueryWarn("unlock tables");
     return $certificate;
+  bad:
+    DBQueryWarn("unlock tables");
+    return undef;
 }
 
 #
