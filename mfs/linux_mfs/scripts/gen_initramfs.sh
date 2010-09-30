@@ -3,24 +3,8 @@
 compression=gzip
 
 usage() {
-	echo "USAGE: ${0##*/} [-c gzip|bzip2|lzma|none] root_dir image"
+	echo "USAGE: ${0##*/} root_dir [image.gz|image.bz2|image.lzma|image]"
 }
-
-if [ "$1" = "-c" ]; then
-	case $2 in
-		gzip|bzip2|lzma|none)
-			compression=$2
-			;;
-		*) echo \
-			"${0##*/}: invalid compresion method \"$2\"" 1>&2
-		   usage 1>&2
-		   exit 1
-		   ;;
-	esac
-
-	shift
-	shift
-fi
 
 if [ $# -lt 2 ]; then
 	usage 1>&2
@@ -29,6 +13,14 @@ fi
 
 TARGET="$1"
 INITRAMFS="$2"
+
+extension=${INITRAMFS##*.}
+case "$extension" in
+	[lL][zZ][mM][aA]) compression=lzma ;;
+	[gG][zZ]) compression=gzip ;;
+	[bB][zZ]2) compression=bzip2 ;;
+	*) compression=none ;;
+esac
 
 (
 cd "$TARGET"
