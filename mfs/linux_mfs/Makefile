@@ -31,6 +31,8 @@ all: $(MODULES) initramfs
 
 install: uclibc-install $(INSTALL_MODULES)
 	cp $(SCRIPTS_PATH)/remove_unneeded_modules.pl $(BOOT_PATH)
+	cp $(SCRIPTS_PATH)/compress_initramfs $(BOOT_PATH)
+	cp $(SCRIPTS_PATH)/extract_initramfs $(BOOT_PATH)
 
 clean:
 	rm -rf $(TARGET_PATH)
