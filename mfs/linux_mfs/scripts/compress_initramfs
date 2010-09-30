@@ -1,0 +1,31 @@
+#! /bin/sh
+
+if lzma --help > /dev/null 2>&1; then
+	compression=lzma
+	extension=.lzma
+elif bzip2 --help > /dev/null 2>&1; then
+	compression=bzip2
+	extension=.bz2
+elif gzip --hlep > /dev/null 2>&1; then
+	compression=gzip
+	extension=.gz
+else
+	compression=none
+	extension=''
+fi
+
+
+
+set -e
+
+cd extracted_initramfs
+(
+if [ $compression = none ]; then
+	find . | cpio -H newc -o
+else
+	find . | cpio -H newc -o | $compression -c9
+fi
+) > ../initramfs$extension.tmp
+
+cd ..
+mv -f initramfs$extension.tmp initramfs$extension

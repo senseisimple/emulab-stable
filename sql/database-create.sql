@@ -109,6 +109,25 @@ CREATE TABLE `archives` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `bridges`
+--
+
+DROP TABLE IF EXISTS `bridges`;
+CREATE TABLE `bridges` (
+  `pid` varchar(32) default NULL,
+  `eid` varchar(32) default NULL,
+  `exptidx` int(11) NOT NULL default '0',
+  `node_id` varchar(32) NOT NULL default '',
+  `bridx` mediumint(8) unsigned NOT NULL default '0',
+  `iface` varchar(8) NOT NULL default '',
+  `vname` varchar(32) NOT NULL default '',
+  `vnode` varchar(32) default NULL,
+  PRIMARY KEY  (`node_id`,`bridx`,`iface`),
+  KEY `pid` (`pid`,`eid`),
+  KEY `exptidx` (`exptidx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `buildings`
 --
 
@@ -3761,6 +3780,7 @@ CREATE TABLE `virt_lan_lans` (
   `exptidx` int(11) NOT NULL default '0',
   `idx` int(11) NOT NULL auto_increment,
   `vname` varchar(32) NOT NULL default '',
+  `failureaction` enum('fatal','nonfatal') NOT NULL default 'fatal',
   PRIMARY KEY  (`exptidx`,`idx`),
   UNIQUE KEY `vname` (`pid`,`eid`,`vname`),
   UNIQUE KEY `idx` (`pid`,`eid`,`idx`)

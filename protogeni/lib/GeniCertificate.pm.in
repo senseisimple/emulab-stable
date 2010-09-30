@@ -510,6 +510,8 @@ sub URL($)
     $self->{'URL'} = $url;
     return $url;
 }
+# So a certificate looks like other things (authorities).
+sub url($) { return $_[0]->URL(); }
 
 #
 # The URN is slightly easier, since it is always in the same place.

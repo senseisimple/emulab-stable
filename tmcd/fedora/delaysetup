@@ -639,6 +639,9 @@ sub LinkDelaySetup()
 			$imqnum = $1;
 		    }
 		}
+		if (! -e "/sys/class/net/imq${imqnum}") {
+		    die("No such IMQ device: imq${imqnum}");
+		}
 		
                 print DEL "$TC qdisc add dev $imqdev handle $pipeno ";
                 print DEL "root plr $rplr\n";

@@ -18,7 +18,7 @@ else
 	safeprog=/usr/local/bin/safe_mysqld
 fi
 
-options="--pid-file=/var/db/mysql/mysqld.pid --skip-grant-tables --skip-networking --user=mysql --log-long-format --log=@prefix@/log/mysql/base --log-bin=@prefix@/log/mysql/update --log-slow-queries=@prefix@/log/mysql/slowqueries -O max_connections=300 -O long_query_time=2 -O key_buffer=32M -O table_cache=256 -O sort_buffer=4M -O record_buffer=1M"
+options="--pid-file=/var/db/mysql/mysqld.pid --skip-grant-tables --skip-networking --user=mysql --log-long-format --log=@prefix@/log/mysql/base --log-bin=@prefix@/log/mysql/update --log-slow-queries=@prefix@/log/mysql/slowqueries -O max_connections=500 -O long_query_time=2 -O key_buffer=32M -O table_cache=256 -O sort_buffer=4M -O record_buffer=1M"
 
 case "$1" in
 	start|faststart)

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -14,7 +14,7 @@ use Data::Dumper;
 # 
 sub usage()
 {
-    print "Usage: listusage\n";
+    print "Usage: listusage [urn]\n";
     exit(1);
 }
 my $optlist    = "";
@@ -44,8 +44,8 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-usage()
-    if (@ARGV);
+my $urn = $ARGV[0]
+    if (@ARGV == 1);
 
 use vars qw($GENI_DBNAME);
 $GENI_DBNAME = "geni-ch";
@@ -60,60 +60,51 @@ require GeniCertificate;
 require GeniCredential; 
 require GeniAuthority;
 require GeniSlice;
+require GeniRegistry;
 
 #
 # The RPC context for this script is as the CH
 #
-my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
-my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+my $certificate = GeniRegistry::ClearingHouse->GetCertificate();
 if (!defined($certificate)) {
-    fatal("Could not load certificate from $EMULAB_PEMFILE");
+    fatal("Could not load ClearingHouse certificate");
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 Genixmlrpc->SetTimeout(15);
 
-#
-# The credential will be issued to the ClearingHouse.
-#
-my $authority = GeniAuthority->Lookup($certificate->uuid());
+my $authority = GeniAuthority->Lookup($certificate->urn());
 if (!defined($authority)) {
-    fatal("Could not find local authority object");
+    fatal("Could not locate ClearingHouse authority object");
 }
 
 #
-# List of all CMs.
+# Use a self signed clearinghouse credential.
 #
-my $query_result =
-    GeniDB::DBQueryWarn("select uuid from geni_authorities where type='cm'");
-fatal("Could not lookup CM list")
-    if (!defined($query_result));
-fatal("No managers listed in the DB; is this a ClearingHouse?")
-    if (!$query_result->numrows);
+my $credential = GeniCredential->GetSelfCredential($authority);
+if (!defined($credential)) {
+    fatal("Could not create self signed clearinghouse credential");
+}
 
-while (my ($manager_uuid) = $query_result->fetchrow_array()) {
-    my $manager = GeniAuthority->Lookup($manager_uuid);
-    print STDERR "Could not lookup up CM $manager_uuid\n"
-	if (!defined($manager));
-
-    my $manager_credential = GeniCredential->Create($manager, $authority);
-    if (!defined($manager_credential)) {
-	fatal("Could not create new credential for $manager");
-    }
-    if ($manager_credential->Sign($certificate) != 0) {
-	fatal("Could not sign credential for $manager");
-    }
-
+#
+# Call listusage on a CM.
+#
+sub ListUsage($)
+{
+    my ($manager) = @_;
+    
     print "$manager\n";
 	
     my $response =
 	Genixmlrpc::CallMethod($manager->url(), undef,
 			       "ListUsage",
-			       { "credential" =>
-				     $manager_credential->asString() });
+			       { "credential"  => $credential->asString(),
+				 "credentials" => [$credential->asString()]});
     if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR
-	    "Could not listusage on $manager: ". $response->output();
+	    "Could not listusage on $manager: ".
+	    (defined($response) ? $response->output() : "") . "\n";
 	    $errors++;
+	return;
     }
     foreach my $ref (@{$response->value()}) {
 	my $slice_hrn  = $ref->{'slice_hrn'};
@@ -130,7 +121,34 @@ while (my ($manager_uuid) = $query_result->fetchrow_array()) {
 	}
 
     }
-    $manager_credential->Delete();
+}
+
+if (defined($urn)) {
+    my $manager = GeniAuthority->Lookup($urn);
+    fatal("Could not find manager in the DB")
+	if (!defined($manager));
+    
+    ListUsage($manager);
+}
+else {
+    #
+    # List of all CMs.
+    #
+    my $query_result =
+	GeniDB::DBQueryWarn("select uuid from geni_authorities ".
+			    "where type='cm'");
+    fatal("Could not lookup CM list")
+	if (!defined($query_result));
+    fatal("No managers listed in the DB; is this a ClearingHouse?")
+	if (!$query_result->numrows);
+
+    while (my ($manager_uuid) = $query_result->fetchrow_array()) {
+	my $manager = GeniAuthority->Lookup($manager_uuid);
+	print STDERR "Could not lookup up CM $manager_uuid\n"
+	    if (!defined($manager));
+
+	ListUsage($manager);
+    }
 }
 exit($errors);
 

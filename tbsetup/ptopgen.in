@@ -1129,6 +1129,13 @@ if ($widearea && ! defined($component_name)) {
 	# normally get assigned. We want to include them, though, because we
 	# allow people to do fix-node to down nodes
 	#
+	if (!defined($status)) {
+	    fatal("status not defined for $physnode\n");
+	}
+	if (!defined($mpid) || !defined($meid)) {
+	    fatal("pid,eid not defined for $physnode\n");
+	}
+	
 	if (($status && ($status ne 'up')) ||
 	    ($mpid eq $DEADPID && $meid eq $DEADEID)) {
 	    # But not in genimode.

@@ -61,6 +61,7 @@ sub osload ($$) {
     # These come in from the caller.
     my @imageids;
     my $waitmode    = 1;
+    my $usecurrent  = 0;
     my @nodes       = ();
     my $noreboot    = 0;
     my $asyncmode   = 0;
@@ -99,6 +100,10 @@ sub osload ($$) {
     }
     if (defined($args->{'imageids'})) {
 	@imageids = @{$args->{'imageids'}};
+	$usedefault = 0;
+    }
+    if (defined($args->{'usecurrent'}) && $args->{'usecurrent'}) {
+	$usecurrent = 1;
 	$usedefault = 0;
     }
     if (defined($args->{'asyncmode'})) {
@@ -234,26 +239,41 @@ sub osload ($$) {
 	# loaded (and thus arrive here) if the user specifically set a loadable
 	# subOS for the node.
 	if (!$nodeobject->isvirtnode()) {
-	    my $default_imageid = $nodeobject->default_imageid();
-	    if (! defined($default_imageid)) {
-		tberror "$node: No default imageid defined!";
-		goto failednode;
-	    }
-	    my @default_imageids = split(/,/, $default_imageid);
-	    my @default_images;
-	    foreach my $default_imageid (@default_imageids) {
-		my $default_image = Image->Lookup($default_imageid);
-		if (!defined($default_image)) {
-		    tberror("Could not map $default_imageid to its object!");
-		    return -1;
-		}
-		push @default_images, $default_image;
-	    }
-
 	    if ($usedefault) {
+		my $default_imageid = $nodeobject->default_imageid();
+		if (! defined($default_imageid)) {
+		    tberror "$node: No default imageid defined!";
+		    goto failednode;
+		}
+		my @default_imageids = split(/,/, $default_imageid);
+		my @default_images;
+		foreach my $default_imageid (@default_imageids) {
+		    my $default_image = Image->Lookup($default_imageid);
+		    if (!defined($default_image)) {
+			tberror("Could not find $default_imageid in the DB!");
+			goto failednode;
+		    }
+		    push @default_images, $default_image;
+		}
 		$prepare = 1;
 		@imageids = @default_imageids;
 		@images   = @default_images;
+	    }
+	    elsif ($usecurrent) {
+		my $def_boot_osid  = $nodeobject->def_boot_osid();
+		my $osinfo = OSinfo->Lookup($def_boot_osid);
+
+		if (! defined($osinfo)) {
+		    tberror("Could not find OS $def_boot_osid in the DB!");
+		    goto failednode;
+		}
+		my $best_image = $osinfo->MapToImage($nodeobject->type());
+		if (!defined($best_image)) {
+		    tberror("Could not map $osinfo to an image for $node!");
+		    goto failednode;
+		}
+		@imageids = $best_image->imageid();
+		@images   = ($best_image);
 	    }
 	}
 	
@@ -285,11 +305,12 @@ sub osload ($$) {
 		if $debug;
 
 	    #
-	    # We try to avoid repeated queries to DB for info that does not change
-	    # by caching the image info on the first use.  GetImageInfo() will
-	    # perform various one-time checks as well.
+	    # We try to avoid repeated queries to DB for info that
+	    # does not change by caching the image info on the first
+	    # use.  GetImageInfo() will perform various one-time
+	    # checks as well.
 	    # 
-	    if (!exists($imageinfo{$imageid}) && !GetImageInfo($image, $node)) {
+	    if (!exists($imageinfo{$imageid}) && !GetImageInfo($image,$node)) {
 		goto failednode;
 	    }
 	    $rowref = $imageinfo{$imageid};

@@ -17,7 +17,7 @@ use Exporter;
 @EXPORT = qw(configtmcc tmcc tmccbossname tmccgetconfig tmccclrconfig
 	     tmcccopycache tmccbossinfo
 	     TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_STATE TMCCCMD_IFC
-	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_HOSTS TMCCCMD_RPM
+	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_BRIDGES TMCCCMD_HOSTS TMCCCMD_RPM
 	     TMCCCMD_TARBALL TMCCCMD_STARTUP TMCCCMD_STARTSTAT
 	     TMCCCMD_READY TMCCCMD_MOUNTS TMCCCMD_ROUTING TMCCCMD_TRAFFIC
 	     TMCCCMD_BOSSINFO TMCCCMD_TUNNEL TMCCCMD_NSECONFIGS
@@ -134,6 +134,7 @@ my %commandset =
       "ifconfig"	=> {TAG => "ifconfig"},
       "accounts"	=> {TAG => "accounts"},
       "delay"		=> {TAG => "delay"},
+      "bridges"		=> {TAG => "bridges"},
       "hostnames"	=> {TAG => "hostnames"},
       "rpms"		=> {TAG => "rpms"},
       "tarballs"	=> {TAG => "tarballs"},
@@ -203,6 +204,7 @@ sub TMCCCMD_STATE()	{ $commandset{"state"}->{TAG}; }
 sub TMCCCMD_IFC()	{ $commandset{"ifconfig"}->{TAG}; }
 sub TMCCCMD_ACCT()	{ $commandset{"accounts"}->{TAG}; }
 sub TMCCCMD_DELAY()	{ $commandset{"delay"}->{TAG}; }
+sub TMCCCMD_BRIDGES()	{ $commandset{"bridges"}->{TAG}; }
 sub TMCCCMD_HOSTS()	{ $commandset{"hostnames"}->{TAG}; }
 sub TMCCCMD_RPM()	{ $commandset{"rpms"}->{TAG}; }
 sub TMCCCMD_TARBALL()	{ $commandset{"tarballs"}->{TAG}; }

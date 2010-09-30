@@ -299,6 +299,7 @@ sub CreateFromLocal($$$)
 sub Register($)
 {
     my ($self) = @_;
+    my $idx    = $self->idx();
 
     return -1
 	if (! ref($self));
@@ -312,7 +313,14 @@ sub Register($)
 	print STDERR "Could not find creator for $self\n";
 	return -1;
     }
-    return $clearinghouse->RegisterSlice($creator->urn(), $self->cert(), {});
+    if (!$clearinghouse->RegisterSlice($creator->urn(), $self->expires(),
+				       $self->cert(), {})) {
+	DBQueryWarn("update geni_slices set registered=1 where idx='$idx'")
+	    or return -1;
+	return 0;
+    }
+    $self->SetRegisteredFlag(1);
+    return -1;
 }
 
 #
@@ -329,7 +337,11 @@ sub UnRegister($)
     return -1
 	if (!defined($clearinghouse));
 
-    return $clearinghouse->RemoveSlice($self->urn());
+    return -1
+	if ($clearinghouse->RemoveSlice($self->urn()));
+    $self->SetRegisteredFlag(0);
+
+    return 0;
 }
 
 #
@@ -615,6 +627,27 @@ sub SetFirewallFlag($$)
 	if (!$query_result);
 
     $self->{'SLICE'}->{'needsfirewall'} = $needsfirewall;
+    return 0;
+}
+
+#
+# Set the registered field.
+#
+sub SetRegisteredFlag($$)
+{
+    my ($self, $registered) = @_;
+    my $uuid  = $self->uuid();
+
+    $registered = ($registered ? 1 : 0);
+
+    my $query_result =
+	DBQueryWarn("update geni_slices set registered='$registered' " .
+		    "where uuid='$uuid'");
+    
+    return -1
+	if (!$query_result);
+
+    $self->{'SLICE'}->{'registered'} = $registered;
     return 0;
 }
 
