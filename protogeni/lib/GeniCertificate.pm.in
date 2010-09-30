@@ -279,6 +279,7 @@ sub LoadFromString($$)
     } else {
         print $tempfile "-----BEGIN CERTIFICATE-----\n";
         print $tempfile $string;
+        print $tempfile "\n" if $string !~ /\n$/;
         print $tempfile "-----END CERTIFICATE-----\n";
     }
 
