@@ -80,12 +80,62 @@ sub ListResources()
     }
 }
 
+sub auto_add_sa($)
+{
+    my ($cred_str) = @_;
+    my $verify_sig = 1;
+    my $cred = GeniCredential->CreateFromSigned($cred_str, $verify_sig);
+    my $signers = $cred->signer_certs();
+
+    # The credential has been verified, so the signer derives from a
+    # trusted root.
+    my $sa_cert = @$signers[0];
+
+    # These are borrowed from protogeni/scripts/addauthority
+    my $certificate = GeniCertificate->LoadFromString($sa_cert);
+    if (!defined($certificate)) {
+        print STDERR "auto_add_sa: could not get certificate from $sa_cert\n";
+        return;
+    }
+    if (! ($certificate->uuid() =~ /\w*-(\w*)$/)) {
+        print STDERR "auto_add_sa: could not get prefix from uuid\n";
+        return;
+    }
+    my $url = $certificate->URL();
+    if (!defined($url)) {
+        print STDERR "auto_add_sa: certificate does not have a URI extension";
+        return;
+    }
+    # CheckExisting does not appear to do what I expect, but for now,
+    # follow the example set by protogeni/scripts/addauthority.
+    if (GeniAuthority->CheckExisting($certificate, "sa")) {
+        print STDERR "auto_add_sa: sa is already registered in the DB\n";
+        return;
+    }
+    # if we're auto adding an authority, set the url to null
+    # so the PG/Emulab machinery does not try to contact the
+    # dynamic sa. It probably won't respond to the PG/Emulab
+    # protocols.
+    $url = undef
+    if (!GeniAuthority->Create($certificate, $url, "sa")) {
+        print STDERR "auto_add_sa: unable to add authority\n";
+        return;
+    }
+    return $certificate;
+}
+
 # Create a sliver by allocating and starting resources.
 sub CreateSliver()
 {
     my ($slice_urn, $credentials, $rspec, $users) = @_;
 
-    print STDERR "CreateSliver\n";
+    foreach my $cred (@$credentials) {
+        # If we want to remove the SA(s) after this call, push them
+        # onto a list here and remove them at the end of this
+        # function. The other AM calls do not need the dynamically
+        # added SA.
+        auto_add_sa($cred);
+    }
 
     # circulate through the users and bind them to the slice
     my $caller_urn = $ENV{'GENIURN'};
