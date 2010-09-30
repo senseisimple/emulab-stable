@@ -9,14 +9,13 @@ BUILDROOT_PATH		=	$(PWD)/buildroot-$(BUILDROOT_VERSION)
 FAKEROOT_ENVIRONMENT	=	$(PWD)/fs_fakeroot.env
 STAGING_DIR	=	$(PWD)/buildroot/build_$(MFS_ARCH)/staging_dir
 BOOT_PATH	=	$(PWD)/boot
-INITRAMFS_COMPRESSION	=	lzma
-INITRAMFS	=	$(BOOT_PATH)/initramfs
+INITRAMFS	=	$(BOOT_PATH)/initramfs.lzma
 
 #FAKEROOT_BIN	=	$(STAGING_DIR)/usr/bin/fakeroot
 FAKEROOT_BIN	=	fakeroot
 
 MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo \
-       	e2fsprogs openssl wget perl portmap file ethtool ncurses jove tcsh
+	e2fsprogs openssl wget perl portmap file ethtool ncurses jove tcsh
 #MODULES := busybox zlib linux dropbear testbed hdparm target_template sudo e2fsprogs openssl wget portmap file
 INSTALL_MODULES := $(addsuffix -install,$(MODULES))
 EXTRACT_MODULES := $(addsuffix -extract,$(MODULES) toolchain)
@@ -93,6 +92,6 @@ initramfs: install
 		-i $(FAKEROOT_ENVIRONMENT) \
 		$(SCRIPTS_PATH)/misc_fixup.sh $(TARGET_PATH)
 	$(FAKEROOT_BIN) -i $(FAKEROOT_ENVIRONMENT) \
-		$(SCRIPTS_PATH)/gen_initramfs.sh -c $(INITRAMFS_COMPRESSION) $(INITRAMFS_PATH) $(INITRAMFS)
+		$(SCRIPTS_PATH)/gen_initramfs.sh $(INITRAMFS_PATH) $(INITRAMFS)
 	rm -f $(FAKEROOT_ENVIRONMENT)
 	rm -rf $(INITRAMFS_PATH)
