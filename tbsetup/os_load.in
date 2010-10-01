@@ -22,6 +22,7 @@ sub usage()
 	  "Use -p to specify the project ID in which to find the imageid.\n".
 	  "       If the image is not found in <pid> also try ".TB_OPSPID().".\n".
 	  "Use -m to specify the internal name(s) if an image ID.\n".
+	  "Use -c to reload the current default.\n".
 	  "Use -s to start reload, but do not wait for it to complete.\n".
 	  "Use -w to wait for the nodes to finish booting.\n".
 	  "Use -r to supress rebooting nodes - you need to to it yourself\n".
@@ -34,13 +35,14 @@ sub usage()
           "Use -P to prepare the disk as if a whole disk image was loaded\n");
     exit(-1);
 }
-my $optlist   = "swldi:e:p:m:rz:P";
+my $optlist   = "swldi:e:p:m:rz:Pc";
 my $waitmode  = 1;
 my $listonly  = 0;
 my $debug     = 0;
 my $noreboot  = 0;
 my $zerofree  = 0;
 my $prepare   = 0;
+my $usecurrent= 0;
 my @nodes     = ();
 my $imagepid;
 my $pid;
@@ -99,6 +101,8 @@ $zerofree = $options{"z"}
     if (defined($options{"z"}));
 $prepare = 1
     if (defined($options{"P"}));
+$usecurrent = 1
+    if (defined($options{"c"}));
 
 #
 # Figure out which nodes. Choice of nodes on command line, or all nodes in an
@@ -316,6 +320,7 @@ $osloadargs{'nodelist'} = [ map { $_->node_id() } @nodes ];
 $osloadargs{'imageids'} = [ @imageids ]
     if (@imageids);
 $osloadargs{'swapinfo'} = 1;
+$osloadargs{'usecurrent'} = $usecurrent;
 
 exit(osload(\%osloadargs, \%failednodes));
 

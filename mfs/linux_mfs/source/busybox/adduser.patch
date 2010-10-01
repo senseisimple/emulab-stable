@@ -1,6 +1,6 @@
 diff -u -r busybox-1.16.0.orig/include/usage.h busybox-1.16.0/include/usage.h
---- busybox-1.16.0.orig/include/usage.h	2010-03-02 12:02:18.000000000 -0700
-+++ busybox-1.16.0/include/usage.h	2010-03-02 11:34:06.000000000 -0700
+--- busybox-1.16.0.orig/include/usage.src.h	2010-03-02 12:02:18.000000000 -0700
++++ busybox-1.16.0/include/usage.src.h	2010-03-02 11:34:06.000000000 -0700
 @@ -45,14 +45,16 @@
  #define adduser_full_usage "\n\n" \
         "Add a user\n" \

@@ -4176,8 +4176,10 @@ sub InterpNodes($)
 	my $vnode = $self->vnodes()->{$vname};
 	my $fixed = $self->fixednodes()->{$vname};
 
+	# Delay and internal nodes do not have an entry in vnodes().
 	next
-	    if (! ($vnode->_isvirtnode() && $vnode->_fixedvm()));
+	    if (! (defined($vnode) &&
+		   $vnode->_isvirtnode() && $vnode->_fixedvm()));
 
 	$self->AddNodeToSolution($vname, $self->solution()->{'V2P'}->{$fixed})
 	    if (!exists($self->solution()->{'V2P'}->{$vname}));
@@ -4647,7 +4649,8 @@ sub AllocNodes($)
 	# Routing table id for each vnode on a pnode. Do not use 0.
 	$pnode->_rtabid(1);
 	# For assigning dynamic ports.
-	$pnode->_portnext(TBDB_LOWVPORT);
+	$pnode->_portarray(undef);
+	$pnode->_portlow(TBDB_LOWVPORT);
 	$pnode->_porthigh(TBDB_MAXVPORT);
 	# To avoid unitialized access.
 	$pnode->_reuse("used");
@@ -4725,13 +4728,24 @@ sub AllocNodes($)
 	    $vpnode->isremotenode() || $vpnode->_onsharednode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
-	    my $sshdport  = nextipportnum($pnode);
+	    my $sshdport;
 
-	    return -1
-		if ($sshdport < 0);
+	    #
+	    # XXX What an absurd DB default for this! Should be null.
+	    #
+	    if (exists($self->current_v2v()->{$vnodename}) &&
+		$vpnode->sshdport() != 11000) {
+		
+		$sshdport = $vpnode->sshdport();
+		$self->printdb("sshdport: Reusing $sshdport on $vpnode\n");
+	    }
+	    else {
+		$sshdport = nextipportnum($pnode);
+		return -1
+		    if ($sshdport < 0);
 
-	    $self->printdb("sshdport: ".
-			   "$vnodename $vpnodename $pnodename $sshdport\n");
+		$self->printdb("sshdport: Using $sshdport on $vpnode\n");
+	    }
 
 	    DBQueryWarn("update nodes set sshdport=$sshdport ".
 			"where node_id='$vpnodename'")
@@ -4989,7 +5003,7 @@ sub AllocVirtNodes($)
 		return -1;
 	    }
 
-	    $self->solution_v2v()->{$virtual}  = $virtphys;
+	    $self->solution_v2v()->{$virtual} = $virtphys;
 	    $self->printdb("  Mapping $virtual to $virtphys on $physical\n");
 
 	    #
@@ -7439,12 +7453,19 @@ sub SetPortRange($)
 	if (! scalar(keys(%{ $self->solution_v2v() })));
 
     #
-    # Otherwise find a free slot in the table.
+    # Use existing port range when updating, or else find a free slot.
     #
-    my ($newlow,$newhigh) =
-	$self->experiment()->SetPortRange($self->impotent() ||
-					  $self->alloconly());
-
+    my ($newlow,$newhigh) = $self->experiment()->GetPortRange();
+    if (!defined($newlow)) {
+	#
+	# It is okay to do this in impotent mode; it is harmless.
+	#
+	($newlow,$newhigh) = $self->experiment()->SetPortRange(0);
+    }
+    if (!defined($newlow)) {
+	tberror("Could not set the portrange!\n");
+	return -1;
+    }
     $self->printdb("SetPortRange: $newlow,$newhigh\n");
 
     #
@@ -7460,10 +7481,38 @@ sub SetPortRange($)
 	my $pnodename  = $self->solution_v2p()->{$vnodename};
 	my $pnode      = $self->pnodes()->{$pnodename};
 
-	$vpnode->_portnext($newlow + 10);
+	$vpnode->_portlow($newlow);
 	$vpnode->_porthigh($newhigh);
-	$pnode->_portnext($newlow + 10);
+	$pnode->_portlow($newlow);
 	$pnode->_porthigh($newhigh);
+
+	my $portarray1 = [];
+	my $portarray2 = [];
+
+	#
+	# XXX This attempts to keep the sshd port the same across
+	# swapmod. We need a better (more general) way to do this.
+	#
+	my $sshdport;
+	if (exists($self->current_v2v()->{$vnodename}) &&
+		$vpnode->sshdport() != 11000) {
+
+	    $sshdport = $vpnode->sshdport();
+	    #$self->printdb("reserving sshdport $sshdport on $vpnode\n");
+	}
+	
+	for (my $i = 0, my $port = $pnode->_portlow();
+	     $i < $pnode->_porthigh() - $pnode->_portlow(); $i++,$port++) {
+	    
+	    $portarray1->[$i] = ($i < 10 ? $port : 0 - $port);
+	    $portarray2->[$i] = ($i < 10 ? $port : 0 - $port);
+
+	    if (defined($sshdport) && $port == $sshdport) {
+		$portarray1->[$i] = $sshdport;
+	    }
+	}
+	$pnode->_portarray($portarray1);
+	$vpnode->_portarray($portarray2);
 
 	# We only set the vpnodes. tmcd sends that to the client.
 	DBQueryWarn("update nodes set ipport_low=$newlow, ".
@@ -7480,14 +7529,21 @@ sub SetPortRange($)
 # 
 sub nextipportnum($)
 {
-    my ($pnode)  = @_;
-    my $port     = $pnode->_portnext();
+    my ($pnode, $default)  = @_;
+    my $portarray = $pnode->_portarray();
+    my $port = 0;
 
-    if ($port >= $pnode->_porthigh()) {
+    for (my $i = 0; $i < $pnode->_porthigh() - $pnode->_portlow(); $i++) {
+	if ($portarray->[$i] < 0) {
+	    $port = 0 - $portarray->[$i];
+	    $portarray->[$i] = $port;
+	    last;
+	}
+    }
+    if (!$port) {
 	tberror("No more dynamic ports available for $pnode!\n");
 	return -1;
     }
-    $pnode->_portnext($port + 1);
     return $port;
 }
 

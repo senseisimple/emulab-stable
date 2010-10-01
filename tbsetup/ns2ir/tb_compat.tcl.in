@@ -813,6 +813,18 @@ proc tb-set-node-failure-action {node type} {
     $node set failureaction $type
 }
 
+proc tb-set-link-failure-action {lanlink type} {
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+	perror "\[tb-set-link-failure-action] $lanlink is not a link or a lan."
+	return
+    }
+    if {[lsearch -exact {fatal nonfatal} $type] == -1} {
+	perror "\[tb-set-link-failure-action] must be one of fatal|nonfatal"
+	return
+    }
+    $lanlink set failureaction $type
+}
+
 proc tb-fix-node {vnode pnode} {
     if {[$vnode info class] != "Node"} {
 	perror "\[tb-fix-node] $vnode is not a node."
@@ -1962,10 +1974,6 @@ proc tb-fix-interface {vnode lanlink iface} {
 proc tb-set-link-layer {link mylayer} {
     if {[$link info class] != "Link"} {
 	perror "\[tb-set-link-layer] $link is not a link."
-	return
-    }
-    if {$mylayer != 1} {
-	perror "\[tb-set-link-layer] Only layer 1 is allowed."
 	return
     }
     $link instvar layer

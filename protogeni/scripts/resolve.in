@@ -14,12 +14,10 @@ use Data::Dumper;
 # 
 sub usage()
 {
-    print "Usage: resolve <type> [uuid | hrn]\n";
+    print "Usage: resolve <type> <urn>\n";
     exit(1);
 }
 my $optlist = "";
-my $uuid;
-my $hrn;
 
 #
 # Configure variables
@@ -61,15 +59,8 @@ if (! getopts($optlist, \%options)) {
 }
 usage()
     if (@ARGV != 2);
-my $type  = $ARGV[0];
-my $token = $ARGV[1];
-
-if ($type =~ /^([\w]*)$/) {
-    $type = $1;
-}
-else {
-    fatal("Illegal chars in type: $type");
-}
+my $type = $ARGV[0];
+my $urn  = $ARGV[1];
 
 #
 # Load the SA cert to act as caller context.
@@ -78,19 +69,17 @@ my $certificate = GeniCertificate->LoadFromFile($SACERT);
 if (!defined($certificate)) {
     fatal("Could not load certificate from $SACERT\n");
 }
-my $context = Genixmlrpc->Context($certificate);
-if (!defined($context)) {
-    fatal("Could not create context to talk to clearinghouse");
-}
-my $clearinghouse = GeniRegistry::ClearingHouse->Create($context);
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+my $clearinghouse = GeniRegistry::ClearingHouse->Create();
 if (!defined($clearinghouse)) {
     fatal("Could not create a clearinghouse client");
 }
 
 my $value;
 
-if ($clearinghouse->Resolve($token, uc($type), \$value) != 0) {
-    fatal("Could not resolve $token at the clearinghouse");
+if ($clearinghouse->Resolve($urn, uc($type), \$value) != 0) {
+    fatal("Could not resolve $urn at the clearinghouse");
 }
 print Dumper($value);
 exit(0);

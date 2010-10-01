@@ -127,6 +127,7 @@ sub vz_init {
     #
     if (-e "/vz/.nolvm") {
 	$DOLVM = 0;
+	mysystem("/sbin/dmsetup remove_all");
     }
     return 0;
 }

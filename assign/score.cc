@@ -305,7 +305,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
         // Check only whether the dest interface is fixed - this is the
         // last link in a multi-hop path
         SDEBUG(cerr << "    intraswitch: finding second link (" <<  ")" << endl;)
-        if (!find_best_link(dest_pv,*switch_it,vlink,second,flipped,
+        if (!find_best_link(dest_pv,*switch_it,vlink,second,!flipped,
                     false,true)) {
           // No link to this switch
           SDEBUG(cerr << "    intraswitch failed - no link second" <<
@@ -389,7 +389,7 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       if (second_link) {
         // Check only whether the dest interface is fixed - this is the
         // last link in a multi-hop path
-        if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,flipped,
+        if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,!flipped,
                     false,true)) {
           // No link to tshis switch
           SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
@@ -521,6 +521,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
 
   if (dest_vv == vv) {
     dest_vv = source(edge,VG);
+    SDEBUG(cerr << "  dest_vv is backwards" << endl);
   }
 
   /*
@@ -1508,14 +1509,14 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 
       // XXX: Not 100% sure it's better to do this inside find_best_link rather
       // than in the caller
-//       if (flipped) {
-//           // If the endpoints are flipped, then we need to flip our notion of
-//           // which ones need to be compared.
-//           bool tmp = check_src_iface;
-//           check_src_iface = check_dst_iface;
-//           check_dst_iface = tmp;
-//           SDEBUG(cerr << "         find_best_link: flipping interface comparisons" << endl;)
-//       }
+       if (flipped) {
+           // If the endpoints are flipped, then we need to flip our notion of
+           // which ones need to be compared.
+           bool tmp = check_src_iface;
+           check_src_iface = check_dst_iface;
+           check_dst_iface = tmp;
+           SDEBUG(cerr << "         find_best_link: flipping interface comparisons" << endl;)
+       }
 
       SDEBUG(cerr << "         find_best_link: fix_src_iface = " <<
               vlink->fix_src_iface << " check_src_iface = " << check_src_iface

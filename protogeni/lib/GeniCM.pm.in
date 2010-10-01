@@ -87,8 +87,7 @@ my $SNMPIT         = "$TB/bin/snmpit";
 my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $XMLLINT	   = "/usr/local/bin/xmllint";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
-
-my $API_VERSION = 1;
+my $API_VERSION    = 1;
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -1298,10 +1297,15 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $node           = GeniUtil::LookupNode($component_uuid);
 	my $colocate       = GeniXML::GetText("colocate", $rspec) ||
 	                     GeniXML::GetText("phys_nickname", $rspec);
-	my $exclusive      = GeniXML::GetText("exclusive", $rspec);
 	my $subnode_of     = GeniXML::GetText("subnode_of", $rspec);
-	$exclusive = 0
-	    if (!defined($exclusive));
+
+	#
+	# Regardless of whether the user asked for an exclusive node
+	# or not, we have to change the rspec (ticket) to reflect
+	# that it is a shared node node or not. We do not need to change
+	# the virt_nodes entry since exclusive is just a desire. 
+	#
+	my $exclusive = (defined($node->sharing_mode()) ? "0" : "1");
 	
 	GeniXML::SetText("component_urn", $rspec,
 			 GeniHRN::Generate( $OURDOMAIN, "node",
@@ -1309,6 +1313,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	GeniXML::SetText("component_uuid", $rspec, $component_uuid);
 	GeniXML::SetText("component_manager_urn", $rspec, $ENV{'MYURN'});
 	GeniXML::SetText("component_manager_uuid", $rspec, $ENV{'MYUUID'});
+	GeniXML::SetText("exclusive", $rspec, $exclusive);
 
 	# Also update the virtexperiment table row.
 	# Do not update subnodes; they are fixed to the parent,
@@ -2276,9 +2281,15 @@ sub SliverWorkAux($$$$$$$)
 		if (defined($interface));
 	    GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
 		if (defined($vinterface));
-	    GeniXML::SetText("IP", $ifaceref, $interface->IP())
-		if (defined($interface) &&
-		    defined($interface->IP()) && $interface->IP() ne "");
+	    if (defined($vinterface)) {
+		GeniXML::SetText("IP", $ifaceref, $vinterface->IP())
+		    if (defined($vinterface->IP()) && $vinterface->IP() ne "");
+	    }
+	    else {
+		GeniXML::SetText("IP", $ifaceref, $interface->IP())
+		    if (defined($interface) &&
+			defined($interface->IP()) && $interface->IP() ne "");
+	    }
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {
 		$message = "Could not add link sliver $sliver to $aggregate";
@@ -3074,7 +3085,7 @@ sub ShutdownAux($$)
     #
     my $slice = GeniSlice->Lookup($credential->target_urn());
     if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED);
     }
     #
     # Do not worry about locking when setting the shutdown time.
@@ -3128,15 +3139,9 @@ sub ListUsage($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    if ($credential->target_urn() ne $ENV{'MYURN'}) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "This is not your CM!");
-    }
-    # Just one of these, at Utah.
-    my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
-    my $certificate = GeniCertificate->LoadFromFile($GENICH_PEMFILE);
+    my $certificate = GeniRegistry::ClearingHouse->GetCertificate();
     if (!defined($certificate)) {
-	print STDERR "Could not load certificate from $GENICH_PEMFILE\n";
+	print STDERR "Could not load ClearingHouse certificate\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
@@ -3212,15 +3217,9 @@ sub ListHistory($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    if ($credential->target_urn() ne $ENV{'MYURN'}) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "This is not your CM!");
-    }
-    # Just one of these, at Utah.
-    my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
-    my $certificate = GeniCertificate->LoadFromFile($GENICH_PEMFILE);
+    my $certificate = GeniRegistry::ClearingHouse->GetCertificate();
     if (!defined($certificate)) {
-	print STDERR "Could not load certificate from $GENICH_PEMFILE\n";
+	print STDERR "Could not load clearinghouse certificate\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
@@ -3742,12 +3741,7 @@ sub RegisterAux($$)
 	    return -1;
 	}
     }
-    my $credential = GeniRegistry::Client->CreateCredential($authority);
-    if (!defined($authority)) {
-	print STDERR "Could not create a credential for $authority\n";
-	return -1;
-    }
-    my $registry = GeniRegistry::Client->Create($authority, undef,$credential);
+    my $registry = GeniRegistry::Client->Create($authority);
     if (!defined($registry)) {
 	print STDERR "Could not create a registry client for $authority\n";
 	return -1;

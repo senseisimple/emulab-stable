@@ -376,16 +376,6 @@ sub Register($)
 	my $expires = $argref->{'expiration'};
 
 	#
-	# Make sure the user creating the slice is registered at the
-	# clearinghouse. Ditto for anyone bound to the slice.
-	#
-	if ($this_user->Register() != 0) {
-	    print STDERR "Could not register $this_user at clearinghouse\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				"Could not register at clearinghouse");
-	}
-
-	#
 	# Figure out new expiration time; this is the time at which we can
 	# idleswap the slice out. 
 	#
@@ -404,14 +394,14 @@ sub Register($)
 	    }
 	    #
 	    # Do we need a policy limit?
-      # A sitevar controls the sliver lifetime.
-      #
-      my $max_sliver_lifetime = 0; 
-      if (!TBGetSiteVar('protogeni/max_sliver_lifetime', 
-            \$max_sliver_lifetime)) {
-          # Cannot get the value, default it to 90 days.
-          $max_sliver_lifetime = 90;
-      }
+	    # A sitevar controls the sliver lifetime.
+	    #
+	    my $max_sliver_lifetime = 0; 
+	    if (!TBGetSiteVar('protogeni/max_sliver_lifetime', 
+			      \$max_sliver_lifetime)) {
+		# Cannot get the value, default it to 90 days.
+		$max_sliver_lifetime = 90;
+	    }
 
 	    my $diff = $when - time();
 
@@ -484,14 +474,19 @@ sub Register($)
 	}
 
 	#
-	# Register new slice at the clearinghouse.
+	# Register new slice and creator at the clearinghouse.
 	#
-	if ($slice->Register() != 0) {
-	    $slice_credential->Delete();
-	    $slice->Delete();
-	    print STDERR "Could not register new slice at the clearinghouse\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			"Could not register new slice at clearinghouse");
+	if ($this_user->Register() != 0) {
+	    #
+	    # Non-fatal; the sa_daemon will do it later.
+	    #
+	    print STDERR "Could not register $this_user at clearinghouse\n";
+	}
+	elsif ($slice->Register() != 0) {
+	    #
+	    # Non-fatal; the sa_daemon will do it later.
+	    #
+	    print STDERR "Could not register $slice at the clearinghouse\n";
 	}
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
@@ -616,10 +611,10 @@ sub Remove($)
 	# Remove from the clearing house.
 	#
 	if ($slice->UnRegister()) {
+	    #
+	    # Not a fatal error; the CH will age it out eventually. 
+	    #
 	    print STDERR "Could not delete $slice from clearinghouse!\n";
-	    $slice->UnLock();
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"Slice could not be unregistered");
 	}
 	if ($slice->Delete()) {
 	    print STDERR "Could not delete $slice from SA!\n";
@@ -764,10 +759,10 @@ sub Shutdown($)
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "Unknown slice for this credential");
     }
-    my $slice_uuid = $slice->uuid();
-    system("$SLICESHUTDOWN $slice_uuid");
+    my $slice_urn = $slice->urn();
+    system("$SLICESHUTDOWN $slice_urn");
     if ($?) {
-	print STDERR "Could not shutdown $slice!\n";
+	print STDERR "Could not shutdown $slice_urn!\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Error shutting down slice");
     }
@@ -809,7 +804,7 @@ sub RenewSlice($)
 	return GeniResponse->Create(GENIRESPONSE_REFUSED, undef,
 				    "Cooked mode Slice");
     }
-    
+
     my $this_user = GeniUser->Lookup($ENV{"GENIURN"}, 1);
     if (!defined($this_user)) {
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
@@ -851,6 +846,10 @@ sub RenewSlice($)
 	$message = "Expiration is in the past";
 	goto bad;
     }
+    if ($when < timegm( strptime( $slice->expires() ) ) ) {
+	$message = "Cannot shorten slice lifetime";
+	goto bad;
+    }
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse("slice");
     }
@@ -859,6 +858,17 @@ sub RenewSlice($)
 	$slice->UnLock();
 	goto bad;
     }
+    #
+    # Tell the clearinghouse about the new expiration.
+    #
+    $slice->SetRegisteredFlag(0);
+    if ($slice->Register() != 0) {
+	#
+	# Non-fatal; the sa_daemon will do it later.
+	#
+	print STDERR "Could not update $slice at the clearinghouse\n";
+    }
+    
     #
     # Return a credential for the slice.
     #

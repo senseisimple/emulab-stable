@@ -446,6 +446,6 @@ if not debug:
 # when we process the request cause we want to look at the cert before
 # we decide on the priv level. 
 # 
-server = MyServer(debug);
-server.serve_forever()
-
+server = MyServer(debug)
+while 1:
+    server.handle_request()

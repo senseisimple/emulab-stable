@@ -813,6 +813,28 @@ if test "$TBMAINSITE" = 1; then
     FANCYBANNER=1
 fi
 
+#
+# Merge build
+#
+MERGE_BUILD=0
+MERGE_BUILD_SANDBOX=
+if test -e "$srcdir/.merge-build"; then
+   merge_sandbox=`grep source-tree "$srcdir/.merge-build" | cut -d' ' -f2`
+   merge_tree=`grep merge-tree "$srcdir/.merge-build" | cut -d' ' -f2`
+   if test "$srcdir" -ef "$srcdir/$merge_sandbox/$merge_tree"; then
+      MERGE_BUILD=1
+      MERGE_BUILD_SANDBOX=$srcdir/$merge_sandbox
+      echo "#/bin/sh"   > sync
+      echo              >> sync
+      echo "cd \"$srcdir\"" >> sync
+      echo "utils/merge-build sync" >> sync
+      chmod +x sync
+      echo "Merge-build enabled"
+   fi
+fi
+AC_SUBST(MERGE_BUILD)
+AC_SUBST(MERGE_BUILD_SANDBOX)
+
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
         named/GNUmakefile firewall/GNUmakefile \
@@ -935,6 +957,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
         tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
+	tmcd/ubuntu10/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
 	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \

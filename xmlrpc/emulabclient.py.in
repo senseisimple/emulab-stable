@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Permission to use, copy, modify and distribute this software is hereby
@@ -17,7 +17,6 @@ import re
 import sys
 import socket
 import os
-import popen2
 import getopt
 import string
 
