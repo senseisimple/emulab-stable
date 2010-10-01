@@ -233,7 +233,7 @@ sub Create($$$$$;$$)
 	my ($ourn) = $query_result->fetchrow_array();
 	print STDERR "*** Duplicate uuid in geni_certificates table\n";
 	print STDERR "*** $uuid,$urn : $ourn\n";
-	goto bad;
+	#goto bad;
     }
     if ($certificate->Store() != 0) {
 	print STDERR "Could not write new certificate to DB\n";
