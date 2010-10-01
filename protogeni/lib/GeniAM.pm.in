@@ -116,7 +116,7 @@ sub auto_add_sa($)
     # so the PG/Emulab machinery does not try to contact the
     # dynamic sa. It probably won't respond to the PG/Emulab
     # protocols.
-    $url = undef
+    $url = undef;
     if (!GeniAuthority->Create($certificate, $url, "sa")) {
         print STDERR "auto_add_sa: unable to add authority\n";
         return;
