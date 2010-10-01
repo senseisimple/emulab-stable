@@ -617,7 +617,7 @@ sub getTestSwitches () {
     while (my @row = $result->fetchrow()) {
 	push @switches, $row[0];
     }
-
+    
     return @switches;
 }
 
