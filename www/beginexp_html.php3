@@ -146,8 +146,13 @@ fputs($sock, "$postdata\r\n");
 fputs($sock, "\r\n");
 
 $headers = "";
-while ($str = trim(fgets($sock, 4096)))
+while (!feof($sock)) { 
+    $str = fgets($sock, 4096);
+    if ($str == '') continue; # no data
+    $str = trim($str);
+    if ($str == '') break;    # blank line
     $headers .= "$str\n";
+}
 
 $reply = "";
 while (!feof($sock))
