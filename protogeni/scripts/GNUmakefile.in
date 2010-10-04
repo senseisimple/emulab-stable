@@ -34,7 +34,7 @@ SETUID_LIBX_SCRIPTS  =
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SBIN_STUFF) $(PSBIN_STUFF) resolve resolvenode
+all:	$(SBIN_STUFF) $(PSBIN_STUFF) resolve resolvenode resolve-ch
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
