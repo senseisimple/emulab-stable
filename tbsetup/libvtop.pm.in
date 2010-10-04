@@ -5126,6 +5126,7 @@ sub InterpLinks($)
 					 
 	$protovlan->SetRole("encapsulation");
 	$protovlan->SetType("vlan");
+	$protovlan->SetAttribute("link/lan", "sharedlan");
 	$protovlan->SetEncapStyle("default");
 	# Total hack ... see snmpit.
 	$protovlan->SetAttribute("trunk_mode", "dual");
@@ -5320,6 +5321,8 @@ sub InterpLinksAux($)
 	    $protolandst->SetType("vlan");
 	    $protolansrc->SetRole("delay");
 	    $protolandst->SetRole("delay");
+	    $protolansrc->SetAttribute("link/lan", $lan);
+	    $protolandst->SetAttribute("link/lan", $lan);
 	    $protolan->SetRole("link/lan");
 	    $protolan->AddInterface($nodeC, $vnodeC, $vportC, $portC);
 	    $protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -5385,6 +5388,7 @@ sub InterpLinksAux($)
 						$protolan);
 		$protolanlan->SetType("vlan");
 		$protolanlan->SetRole("delay");
+		$protolanlan->SetAttribute("link/lan", $lan);
 	    }
 	    $protolanlan->AddMember($nodeD, $portD);
 	
@@ -5393,6 +5397,7 @@ sub InterpLinksAux($)
 						$protolan);
 	    $protolanlink->SetType("vlan");
 	    $protolanlink->SetRole("delay");
+	    $protolanlink->SetAttribute("link/lan", $lan);
 	    $protolanlink->AddMember($nodeA, $portA);
 	    $protolanlink->AddMember($nodeB, $portB);
 
@@ -5541,6 +5546,7 @@ sub InterpLinksAux($)
 						  $self->alloconly());
 		    $protolink->SetType("vlan");
 		    $protolink->SetRole("link/lan");
+		    $protolink->SetAttribute("link/lan", $lan);
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
 		}
@@ -5749,9 +5755,11 @@ sub InterpLinksAux($)
 						 $protolan);
 			    $protolanlan->SetType("vlan");
 			    $protolanlan->SetRole("delay");
+			    $protolanlan->SetAttribute("link/lan", $lan);
 			}
 			else {
 			    $protolan->SetType("vlan");
+			    $protolan->SetAttribute("link/lan", $lan);
 			}
 			$protolan->SetRole("link/lan");
 		    }
