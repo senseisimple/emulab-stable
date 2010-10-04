@@ -400,7 +400,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     #
     my $authority = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
     if (!defined($authority)) {
-	print STDERR " Could not get uuid from $EMULAB_PEMFILE\n";
+	print STDERR " Could not load authority for $EMULAB_PEMFILE\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
@@ -679,11 +679,11 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    my $node_nickname = GeniXML::GetVirtualId($ref);
 	    my $colocate      = GeniXML::GetText("colocate", $ref) ||
 		                GeniXML::GetText("phys_nickname", $ref);
-	    my $resource_uuid = GeniXML::GetNodeId($ref);
-	    my $node = GeniUtil::LookupNode($resource_uuid);
+	    my $component_id  = GeniXML::GetNodeId($ref);
+	    my $node = GeniUtil::LookupNode($component_id);
 	    if (!defined($node)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				 "Bad resource $resource_uuid in ticket");
+				 "Bad resource $component_id in ticket");
 		goto bad;
 	    }
 
@@ -712,8 +712,8 @@ sub GetTicketAuxAux($$$$$$$$$)
     print GeniXML::Serialize($rspec);
 
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
-	my $resource_uuid = GeniXML::GetNodeId($ref);
-	my $manager_uuid  = GeniXML::GetManagerId($ref);
+	my $component_id  = GeniXML::GetNodeId($ref);
+	my $manager_id    = GeniXML::GetManagerId($ref);
 	my $node_nickname = GeniXML::GetVirtualId($ref);
 	my $colocate      = GeniXML::GetText("colocate", $ref) ||
 	                    GeniXML::GetText("phys_nickname", $ref);
@@ -867,7 +867,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	#
 	# Allow wildcarding.
 	#
-	if (!defined($resource_uuid) || $resource_uuid eq "*") {
+	if (!defined($component_id) || $component_id eq "*") {
 	    if (defined($colocate) && exists($colomap{$colocate})) {
 		$node = $colomap{$colocate};
 	    }
@@ -884,12 +884,12 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	}
 	else {
-	    $node = GeniUtil::LookupNode($resource_uuid);
+	    $node = GeniUtil::LookupNode($component_id);
 
 	    if (!defined($node)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					 "Bad resource $resource_uuid");
+					 "Bad resource $component_id");
 		goto bad;
 	    }
 	    $pctype = $node->type()
@@ -999,8 +999,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (!defined(GeniXML::FindFirst("n:link", $rspec)));
     
     #
-    # Now deal with links for wildcarded nodes. We need to fill in the
-    # node_uuid.
+    # Now deal with links for wildcarded nodes. 
     #
     my $linknum = 1;
     
@@ -1286,7 +1285,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$solution)->get_nodelist()) {
 	my $virtual_id     = GeniXML::GetVirtualId($ref);
-	my $component_uuid = GeniXML::GetNodeId($ref);
+	my $component_id   = GeniXML::GetNodeId($ref);
 	if (!exists($nodemap{$virtual_id})) {
 	    $response =
 		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1295,7 +1294,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	}
 	my $rspec          = $nodemap{$virtual_id}->{'rspec'};
 	my $virtnode       = $nodemap{$virtual_id}->{'virtnode'};
-	my $node           = GeniUtil::LookupNode($component_uuid);
+	my $node           = GeniUtil::LookupNode($component_id);
 	my $colocate       = GeniXML::GetText("colocate", $rspec) ||
 	                     GeniXML::GetText("phys_nickname", $rspec);
 	my $subnode_of     = GeniXML::GetText("subnode_of", $rspec);
@@ -1311,7 +1310,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	GeniXML::SetText("component_urn", $rspec,
 			 GeniHRN::Generate( $OURDOMAIN, "node",
 					    $node->node_id() ));
-	GeniXML::SetText("component_uuid", $rspec, $component_uuid);
+	GeniXML::SetText("component_uuid", $rspec, $component_id);
 	GeniXML::SetText("component_manager_urn", $rspec, $ENV{'MYURN'});
 	GeniXML::SetText("component_manager_uuid", $rspec, $ENV{'MYUUID'});
 	GeniXML::SetText("exclusive", $rspec, $exclusive);
@@ -1741,9 +1740,9 @@ sub SliverWorkAux($$$$$$$)
     #
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$rspec)->get_nodelist()) {
-	my $resource_uuid = GeniXML::GetNodeId($ref);
+	my $resource_id   = GeniXML::GetNodeId($ref);
 	my $node_nickname = GeniXML::GetVirtualId($ref);
-	my $manager_uuid  = GeniXML::GetManagerId($ref);
+	my $manager_id    = GeniXML::GetManagerId($ref);
 	
 	# Let remote nodes pass through.
 	next
@@ -1759,9 +1758,9 @@ sub SliverWorkAux($$$$$$$)
 	    next;
 	}
 
-	my $node = GeniUtil::LookupNode($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_id);
 	if (!defined($node)) {
-	    $message = "Bad resource_uuid $resource_uuid";
+	    $message = "Bad resource_id $resource_id";
 	    goto bad;
 	}
 
@@ -1792,12 +1791,12 @@ sub SliverWorkAux($$$$$$$)
 		$node->Refresh();
 	    }
 	    elsif (!$reservation->SameExperiment($experiment)) {
-		$message = "$resource_uuid ($node) is not available";
+		$message = "$resource_id ($node) is not available";
 		goto bad;
 	    }
 	}
 	else {
-	    $message = "$resource_uuid ($node) is not available";
+	    $message = "$resource_id ($node) is not available";
 	    goto bad;
 	}
     
@@ -1986,9 +1985,9 @@ sub SliverWorkAux($$$$$$$)
     my %ifacemap  = ();
     my %rspecmap  = ();
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
-	my $resource_uuid = GeniXML::GetNodeId($ref);
+	my $resource_id   = GeniXML::GetNodeId($ref);
 	my $virtual_id    = GeniXML::GetVirtualId($ref);
-	my $manager_uuid  = GeniXML::GetManagerId($ref);
+	my $manager_id    = GeniXML::GetManagerId($ref);
 
 	$rspecmap{$virtual_id} = $ref;
 
@@ -2019,9 +2018,9 @@ sub SliverWorkAux($$$$$$$)
 	next
 	    if (grep {$_ eq $virtual_id} keys(%nodemap));
 	
-	my $node = GeniUtil::LookupNode($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_id);
 	if (!defined($node)) {
-	    $message = "Unknown resource_uuid in ticket: $resource_uuid";
+	    $message = "Unknown resource_id in ticket: $resource_id";
 	    goto bad;
 	}
 	my $sliver = GeniSliver::Node->Create($slice,
@@ -2047,7 +2046,7 @@ sub SliverWorkAux($$$$$$$)
 
 	# See below; setup all plab nodes at once.
 	if ($node->isplabphysnode()) {
-	    my $vnode = GeniUtil::LookupNode($sliver->uuid());
+	    my $vnode = GeniUtil::LookupNode($sliver->resource_id());
 	    if (!defined($vnode)) {
 		print STDERR "Could not locate vnode $sliver\n";
 		goto bad;
@@ -2229,7 +2228,7 @@ sub SliverWorkAux($$$$$$$)
 	    #
 	    if ($node->isvirtnode()) {
 		$vnode = $node;
-		$node  = GeniUtil::LookupNode($nodesliver->resource_uuid());
+		$node  = GeniUtil::LookupNode($nodesliver->resource_id());
 		if (!defined($node)) {
 		    $message = "Could not find node object for $nodesliver";
 		    goto bad;
@@ -3304,27 +3303,28 @@ sub SliceStatus($)
 	next
 	    if ($sliver->resource_type() ne "Node");
 
-	my $node_uuid = $sliver->uuid();
-	my $node = GeniUtil::LookupNode($node_uuid);
+	my $node_id   = $sliver->resource_id();
+	my $node_uuid = $sliver->resource_uuid();
+	my $node = GeniUtil::LookupNode($node_id);
 	if (!defined($node)) {
 	    $slice->UnLock();
-	    print STDERR "Cannot find node by uuid $node_uuid\n";
+	    print STDERR "Cannot find node $node_id\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $hrn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
+	my $urn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
 
 	if ($node->IsUp()) {
 	    $details{$node_uuid} = "ready";
-	    $detailsNew{$hrn}    = "ready";
+	    $detailsNew{$urn}    = "ready";
 	}
 	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
 	    $details{$node_uuid} = "failed";
-	    $detailsNew{$hrn}    = "failed";
+	    $detailsNew{$urn}    = "failed";
 	    $summary = "failed";
 	}
 	else {
 	    $details{$node_uuid} = "notready";
-	    $detailsNew{$hrn}    = "notready";
+	    $detailsNew{$urn}    = "notready";
 	    $summary = "notready";
 	}
     }
@@ -3499,22 +3499,23 @@ sub SliverStatus($)
 	next
 	    if ($sliver->resource_type() ne "Node");
 
+	my $node_id   = $sliver->resource_id();
 	my $node_uuid = $sliver->uuid();
-	my $node = GeniUtil::LookupNode($node_uuid);
+	my $node = GeniUtil::LookupNode($node_id);
 	if (!defined($node)) {
 	    $slice->UnLock();
-	    print STDERR "Cannot find node by uuid $node_uuid\n";
+	    print STDERR "Cannot find node $node_id\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $hrn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
+	my $urn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
 
 	if ($node->IsUp()) {
 	    $details{$node_uuid} = "ready";
-	    $detailsNew{$hrn}    = "ready";
+	    $detailsNew{$urn}    = "ready";
 	}
 	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
 	    $details{$node_uuid} = "failed";
-	    $detailsNew{$hrn}    = "failed";
+	    $detailsNew{$urn}    = "failed";
 	    $summary = "failed";
 
 	    my $bootlog;
@@ -3527,7 +3528,7 @@ sub SliverStatus($)
 	}
 	else {
 	    $details{$node_uuid} = "notready";
-	    $detailsNew{$hrn}    = "notready";
+	    $detailsNew{$urn}    = "notready";
 	    $summary = "notready";
 	}
     }
@@ -3657,7 +3658,7 @@ sub CreateUserFromCertificate($)
     return $user
 	if (defined($user));
 
-    # Try using the uuid, in case we have a stale certificate.
+    # Try using the uuid, in case we have a stale (pre-urn) certificate.
     $user = GeniUser->Lookup($certificate->uuid());
     if (defined($user)) {
 	#
@@ -3741,12 +3742,8 @@ sub RegisterAux($$)
     }
     my $authority = $slice->SliceAuthority();
     if (!defined($authority)) {
-	$authority =
-	    GeniAuthority->CreateFromRegistry("SA", $slice->sa_uuid());
-	if (!defined($authority)) {
-	    print STDERR "Could not find authority for $slice\n";
-	    return -1;
-	}
+	print STDERR "Could not find authority for $slice\n";
+	return -1;
     }
     if (!defined($authority->url()) || $authority->url() eq "") {
 	print STDERR "No url for $authority; skipping registration\n";

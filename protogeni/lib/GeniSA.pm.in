@@ -59,19 +59,15 @@ sub GetVersion()
 }
 
 #
-# Get a credential for an object. Ignoring the type for now. If no credential
-# provided, then return a generic credential for the registered Emulab user.
-# This is the easiest way to get credentials to registered users.
+# Get a credential for an object. If no credential provided, then return a
+# generic credential for the registered Emulab user.  This is the easiest
+# way to get credentials to registered users.
 #
 sub GetCredential($)
 {
-    # FIXME once migration to URNs is complete, $uuid should be removed,
-    # and $type automatically deduced from the URN.
     my ($argref) = @_;
-    my $uuid = $argref->{'uuid'};
     my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
-    my $type = $argref->{'type'};
     
     #
     # No credential, then return a generic credential giving user permission
@@ -103,14 +99,8 @@ sub GetCredential($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    $credential->asString());
     }
-    # Currently accept either a UUID or a URN, but not both.  Once we
-    # have migrated the federation to URNs, UUID support will be removed.
     return GeniResponse->MalformedArgsResponse()
-	if( defined( $uuid ) == defined( $urn ) );
-    return GeniResponse->MalformedArgsResponse()
-	if( defined( $uuid ) && $uuid !~ /^[-\w]*$/ );
-    return GeniResponse->MalformedArgsResponse()
-	if( defined( $urn ) && !GeniHRN::IsValid( $urn ) );
+	if (! (defined($urn) && GeniHRN::IsValid($urn)));
 
     my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
@@ -131,13 +121,14 @@ sub GetCredential($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN,
 				    undef, "Who are you?");
     }
-    
+    my ($undef, $type, $id) = GeniHRN::Parse($urn);
+	
     #
     # User provided a credential, and wants a new credential to access
     # the object referenced by the URN.
     #
-    if ($type eq "Slice") {
-	my $slice = GeniSlice->Lookup( defined( $urn ) ? $urn : $uuid );
+    if (lc($type) eq "slice") {
+	my $slice = GeniSlice->Lookup($urn);
 
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No such Slice")
@@ -145,7 +136,7 @@ sub GetCredential($)
 	if ($slice->Lock() != 0) {
 	    return GeniResponse->BusyResponse("slice");
 	}
-	if ($slice->creator_uuid() ne $this_user->uuid() &&
+	if ($slice->creator_urn() ne $this_user->urn() &&
 	    !$slice->IsBound($this_user)) {
 	    $slice->UnLock();
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
@@ -171,18 +162,17 @@ sub GetCredential($)
 }
 
 #
-# Resolve a uuid or HRN to a record.
+# Resolve a record.
 #
 sub Resolve($)
 {
     my ($argref) = @_;
-    my $uuid = $argref->{'uuid'};
     my $hrn  = $argref->{'hrn'};
     my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
     my $type = $argref->{'type'};
 
-    if (! (defined($uuid) || defined($hrn) || defined($urn))) {
+    if (! (defined($hrn) || defined($urn))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     # URN always takes precedence and all items should now have URNs
@@ -190,16 +180,13 @@ sub Resolve($)
     if (defined($urn)) {
 	return GeniResponse->MalformedArgsResponse()
 	    if (!GeniHRN::IsValid($urn));
-	$hrn = $uuid = undef;
+	$hrn = undef;
     }
     elsif (defined($hrn) && GeniHRN::IsValid($hrn)) {
 	$urn = $hrn;
-	$hrn = $uuid = undef;
+	$hrn = undef;
     }
-    elsif (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    elsif (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
+    elsif (defined($hrn) && (!defined($type) || !($hrn =~ /^[-\w\.]*$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     #
@@ -207,7 +194,10 @@ sub Resolve($)
     # XXX Form hrn from the uid and domain. This is backwards.
     #
     if (defined($hrn) && !($hrn =~ /\./)) {
-	$hrn = "${PGENIDOMAIN}.${hrn}";
+	$hrn  = "${PGENIDOMAIN}.${hrn}";
+    }
+    else {
+	(undef,$type,undef) = GeniHRN::Parse($urn);
     }
     $type = lc($type);
     if (! defined($cred)) {
@@ -238,7 +228,7 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
 				    "Who are you? No local record");
     }
-    my $lookup_token = $urn || $hrn || $uuid;
+    my $lookup_token = $urn || $hrn;
     
     if ($type eq "user") {
 	my $geniuser = GeniUser->Lookup($lookup_token, 1);
@@ -437,7 +427,7 @@ sub Register($)
 	}
 	    
 	#
-	# Generate a certificate (and uuid) for this new slice.
+	# Generate a certificate for this new slice.
 	#
 	my $certificate = GeniCertificate->Create("slice", $urn, $hrn,
 						  $this_user->email());
@@ -502,35 +492,26 @@ sub Register($)
 sub Remove($)
 {
     # FIXME once migration to URNs is complete, $type should be removed
-    # (it's deduced automatically from the URN).  $uuid should die, too.
+    # (it's deduced automatically from the URN).
     my ($argref) = @_;
-    my $uuid = $argref->{'uuid'};
     my $hrn  = $argref->{'hrn'};
     my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
-    my $type = lc( $argref->{'type'} );
+    my $type = $argref->{'type'};
 
-    if (! ((defined($hrn) || defined($urn) || defined($uuid)) &&
-	   defined($cred))) {
+    if (! ((defined($hrn) || defined($urn)) && defined($cred))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (defined($urn)) {
 	return GeniResponse->MalformedArgsResponse()
 	    if (!GeniHRN::IsValid($urn));
-	$hrn = $uuid = undef;
+	$hrn = undef;
     }
     elsif (defined($hrn) && GeniHRN::IsValid($hrn)) {
 	$urn = $hrn;
-	$hrn = $uuid = undef;
+	$hrn = undef;
     }
-    elsif (defined($uuid) && GeniHRN::IsValid($uuid)) {
-	$urn = $uuid;
-	$hrn = $uuid = undef;
-    }
-    elsif (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
-    elsif (defined($uuid) && !($uuid =~ /^[-\w]*$/)) {
+    elsif (defined($hrn) && (!defined($type) || !($hrn =~ /^[-\w\.]*$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     #
@@ -538,23 +519,12 @@ sub Remove($)
     # XXX Form hrn from the uid and domain. This is backwards.
     #
     if (defined($hrn) && !($hrn =~ /\./)) {
-	$hrn = "${PGENIDOMAIN}.${hrn}";
+	$hrn  = "${PGENIDOMAIN}.${hrn}";
     }
-    if (defined($urn)) {
-	my ($auth,$t,$id) = GeniHRN::Parse($urn);
-
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				     "Authority mismatch")
-	    if ($auth ne $OURDOMAIN);
-
-	#
-	# If the user supplies a URN, we get the type from it.
-	#
-	$type = $t;
+    else {
+	(undef,$type,undef) = GeniHRN::Parse($urn);
     }
-    elsif (!defined($type)) {
-	return GeniResponse->MalformedArgsResponse();
-    }
+    $type = lc($type);
 
     my $authority = GeniAuthority->Lookup($ENV{'MYURN'});
     if (!defined($authority)) {
@@ -577,7 +547,7 @@ sub Remove($)
     }
     
     if ($type eq "slice") {
-	my $slice = GeniSlice->Lookup($uuid || $urn || $hrn);
+	my $slice = GeniSlice->Lookup($urn || $hrn);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice");
@@ -675,15 +645,11 @@ sub BindToSlice($)
 {
     my ($argref) = @_;
     my $cred  = $argref->{'credential'};
-    my $uuid  = $argref->{'uuid'};
     my $urn   = $argref->{'urn'};
-    my $which = $uuid || $urn;
 
-    if (! ((defined($uuid) || defined($urn)) && defined($cred))) {
+    if (! (defined($urn) && defined($cred))) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    return GeniResponse->MalformedArgsResponse()
-	if (defined($uuid) && $uuid !~ /^[-\w]*$/);
     return GeniResponse->MalformedArgsResponse()
 	if (defined($urn) && !GeniHRN::IsValid($urn));
 
@@ -716,10 +682,10 @@ sub BindToSlice($)
     #
     # Locate the target user; must exist locally.
     #
-    my $target_user = GeniUser->Lookup($which, 1);
+    my $target_user = GeniUser->Lookup($urn, 1);
     if (!defined($target_user)) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
-				    undef, "No such user $which here");
+				    undef, "No such user here");
     }
     if ($slice->Lock() != 0) {
 	return GeniResponse->BusyResponse("slice");

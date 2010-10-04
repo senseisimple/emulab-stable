@@ -752,7 +752,7 @@ sub Start($$$)
 	next
 	    if (ref($sliver) ne "GeniSliver::Node");
 
-	my $node = Node->Lookup($sliver->uuid());
+	my $node = Node->Lookup($sliver->resource_id());
 	if (!defined($node)) {
 	    print STDERR "Could not map $sliver to a node\n";
 	    return -1;
@@ -1002,7 +1002,7 @@ sub Stop($$)
 	next
 	    if (ref($sliver) ne "GeniSliver::Node");
 
-	my $node = Node->Lookup($sliver->uuid());
+	my $node = Node->Lookup($sliver->resource_id());
 	if (!defined($node)) {
 	    print STDERR "Could not map $sliver to a node\n";
 	    return -1;
@@ -1413,7 +1413,7 @@ sub Create($$$$$$)
     # We need the control network addresses, but it is possible that
     # one of the nodes is not on this testbed.
     if (defined($node1sliver)) {
-	my $node1 = Node->Lookup($node1sliver->resource_uuid());
+	my $node1 = Node->Lookup($node1sliver->resource_id());
 	if (!defined($node1)) {
 	    print STDERR "Tunnel: Could not lookup node for $node1sliver\n";
 	    goto bad;
@@ -1429,11 +1429,11 @@ sub Create($$$$$$)
 	}
     }
     else {
-	my $node_uuid = GeniXML::GetNodeId($node1rspec);
-	my $component = GeniComponent->CreateFromRegistry($node_uuid);
+	my $component_id = GeniXML::GetNodeId($node1rspec);
+	my $component    = GeniComponent->CreateFromRegistry($component_id);
 	
 	if (!defined($component)) {
-	    print STDERR "Could not create component for $node_uuid\n";
+	    print STDERR "Could not create component for $component_id\n";
 	    goto bad;
 	}
 	my $blob = $component->Resolve();
@@ -1448,7 +1448,7 @@ sub Create($$$$$$)
 	$ctrlip1 = $blob->{'physctrl'};
     }
     if (defined($node2sliver)) {
-	my $node2 = Node->Lookup($node2sliver->resource_uuid());
+	my $node2 = Node->Lookup($node2sliver->resource_id());
 	if (!defined($node2)) {
 	    print STDERR "Tunnel: Could not lookup node for $node2sliver\n";
 	    goto bad;
@@ -1464,11 +1464,11 @@ sub Create($$$$$$)
 	}
     }
     else {
-	my $node_uuid = GeniXML::GetNodeId($node2rspec);
-	my $component = GeniComponent->CreateFromRegistry($node_uuid);
+	my $component_id = GeniXML::GetNodeId($node2rspec);
+	my $component    = GeniComponent->CreateFromRegistry($component_id);
 	
 	if (!defined($component)) {
-	    print STDERR "Could not create component for $node_uuid\n";
+	    print STDERR "Could not create component for $component_id\n";
 	    goto bad;
 	}
 	my $blob = $component->Resolve();
