@@ -1427,6 +1427,12 @@ sub snap($) {
 		$device = new snmpit_hp($devicename,$self->{DEBUG});
 		last;
 		}; # /hp.*/
+	    (/apcon/)
+		    && do {
+		use snmpit_apcon;
+		$device = new snmpit_apcon($devicename,$self->{DEBUG});
+		last;
+	        }; # /apcon.*/
 	    print "Device $devicename is not of a known type\n";
 	}
 	if (!$device) {

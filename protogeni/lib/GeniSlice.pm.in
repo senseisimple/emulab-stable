@@ -254,7 +254,7 @@ sub CreateFromLocal($$$)
     my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
     my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
     if (!defined($certificate)) {
-	print STDERR "Could not get uuid from $EMULAB_PEMFILE\n";
+	print STDERR "Could not load certificate from $EMULAB_PEMFILE\n";
 	return undef;
     }
 

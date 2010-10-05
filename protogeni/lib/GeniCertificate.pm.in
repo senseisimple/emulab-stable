@@ -136,14 +136,10 @@ sub hrn($)
     # GENI AM compatibility with PlanetLab
     # Use the URN from the Subject Alt Name to create the HRN
     my ($authority, $type, $name) = GeniHRN::Parse($self->urn());
-    # Match authority up to the first colon, then add "." and name.
-    if ($authority =~ /^([^:]+):/) {
-        my $hrn = $1 . "." . $name;
-        return $hrn;
-    }
-    print STDERR "Cannot find hrn inside DN: '" . $self->DN() . "'\n";
-    print STDERR "Cannot find hrn inside urn: '" . $self->urn() . "'\n";
-    return "unknown";
+    # Substitute dots for colons
+    $authority =~ s/:/\./g;
+    my $hrn = $authority . "." . $name;
+    return $hrn;
 }
 sub email($)
 {
@@ -237,7 +233,7 @@ sub Create($$$$$;$$)
 	my ($ourn) = $query_result->fetchrow_array();
 	print STDERR "*** Duplicate uuid in geni_certificates table\n";
 	print STDERR "*** $uuid,$urn : $ourn\n";
-	#goto bad;
+	goto bad;
     }
     if ($certificate->Store() != 0) {
 	print STDERR "Could not write new certificate to DB\n";
@@ -304,6 +300,7 @@ sub LoadFromString($$)
     } else {
         print $tempfile "-----BEGIN CERTIFICATE-----\n";
         print $tempfile $string;
+        print $tempfile "\n" if $string !~ /\n$/;
         print $tempfile "-----END CERTIFICATE-----\n";
     }
 
@@ -558,7 +555,7 @@ sub URN($)
 	if( /^\s+X509v3 Subject Alternative Name:\s*$/ ) {
 	    $altname = 1;
 	} elsif( $altname ) {
-	    m'^\s*URI:([-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $urn = $1
+	    m'^\s*URI:(urn:publicid:[-!#$%()*+,./0-9:;=?@A-Z_a-z~]+)\s*$' and $urn = $1
 		foreach split( /, / );
 	    $altname = 0;
 	}

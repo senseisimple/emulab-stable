@@ -66,7 +66,7 @@ $(TARGET_PATH)/usr/sbin/dropbear: $(DROPBEAR_PATH)/dropbearmulti
 	install -m 755 $(SOURCE_PATH)/dropbear/S50dropbear $(TARGET_PATH)/etc/init.d/S50dropbear
 	mkdir -p $(TARGET_PATH)/usr/lib
 	mkdir -p $(TARGET_PATH)/etc/dropbear
-	ln -snf /etc/dropbear $(TARGET_PATH)/etc/ssh
+	ln -snf dropbear $(TARGET_PATH)/etc/ssh
 	touch -c $@
 
 clean:
