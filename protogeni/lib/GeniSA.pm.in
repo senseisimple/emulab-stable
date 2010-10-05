@@ -429,9 +429,16 @@ sub Register($)
 	#
 	# Generate a certificate for this new slice.
 	#
-	my $certificate = GeniCertificate->Create("slice", $urn, $hrn,
-						  $this_user->email());
+	my $error;
+	my $certificate =
+	    GeniCertificate->Create({'urn'  => $urn,
+				     'hrn'  => $hrn,
+				     'email'=> $this_user->email()}, \$error);
 	if (!defined($certificate)) {
+	    if (defined($error)) {
+		return GeniResponse->Create($error, undef,
+					    GENIRESPONSE_STRING($error));
+	    }
 	    print STDERR "Could not create new certificate for slice\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}

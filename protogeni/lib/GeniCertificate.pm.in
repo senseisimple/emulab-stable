@@ -18,6 +18,7 @@ use vars qw(@ISA @EXPORT);
 
 # Must come after package declaration!
 use GeniDB;
+use GeniResponse;
 use emutil qw(TBGetUniqueIndex);
 use English;
 use XML::Simple;
@@ -156,9 +157,15 @@ sub email($)
 #
 # Create a certificate pair, which gives us a uuid to use for an object.
 #
-sub Create($$$$$;$$)
+sub Create($$;$)
 {
-    my ($class, $what, $urn, $hrn, $email, $uuid, $url) = @_;
+    my ($class, $argref, $error) = @_;
+    my $urn   = (exists($argref->{'urn'})   ? $argref->{'urn'}   : undef);
+    my $hrn   = (exists($argref->{'hrn'})   ? $argref->{'hrn'}   : undef);
+    my $email = (exists($argref->{'email'}) ? $argref->{'email'} : undef);
+    my $uuid  = (exists($argref->{'uuid'})  ? $argref->{'uuid'}  : undef);
+    my $url   = (exists($argref->{'url'})   ? $argref->{'url'}   : undef);
+
     # Let mkcert generate a new one.
     $uuid = ""
 	if (!defined($uuid));
@@ -233,6 +240,20 @@ sub Create($$$$$;$$)
 	my ($ourn) = $query_result->fetchrow_array();
 	print STDERR "*** Duplicate uuid in geni_certificates table\n";
 	print STDERR "*** $uuid,$urn : $ourn\n";
+	$$error = GENIRESPONSE_UNAVAILABLE
+	    if (defined($error));
+	goto bad;
+    }
+    $query_result =
+	DBQueryWarn("select uuid from geni_certificates where urn='$urn'");
+    goto bad
+	if (!$query_result);
+    if ($query_result->numrows) {
+	my ($ouuid) = $query_result->fetchrow_array();
+	print STDERR "*** Duplicate urn in geni_certificates table\n";
+	print STDERR "*** $uuid,$urn : $ouuid\n";
+	$$error = GENIRESPONSE_UNAVAILABLE
+	    if (defined($error));
 	goto bad;
     }
     if ($certificate->Store() != 0) {

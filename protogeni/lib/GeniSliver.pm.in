@@ -189,7 +189,9 @@ sub Create($$$$$$$$)
 	    "Already have a certificate for $hrn/$urn\n";
 	return undef;
     }
-    $certificate = GeniCertificate->Create("sliver", $urn, $hrn, $TBOPS);
+    $certificate = GeniCertificate->Create({'urn'  => $urn,
+					    'hrn'  => $hrn,
+					    'email'=> $TBOPS});
     if (!defined($certificate)) {
 	print STDERR "GeniSliver::Create: ".
 	    "Could not generate new certificate for $hrn/$urn\n";

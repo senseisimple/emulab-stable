@@ -178,7 +178,9 @@ sub Create($$$$$$)
 
     # Create a cert pair, which gives us a new uuid.
     my $urn = GeniHRN::Generate( "@OURDOMAIN@", "sliver", $idx );
-    my $certificate = GeniCertificate->Create("aggregate", $urn, $hrn, $TBOPS);
+    my $certificate = GeniCertificate->Create({'urn'   => $urn,
+					       'hrn'   => $hrn,
+					       'email' => $TBOPS});
     if (!defined($certificate)) {
 	print STDERR "GeniAggregate::Create: ".
 	    "Could not generate new certificate and UUID for $hrn\n";
