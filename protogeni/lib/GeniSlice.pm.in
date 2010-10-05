@@ -277,8 +277,9 @@ sub CreateFromLocal($$$)
     #
     # Generate a certificate.
     #
-    $certificate = GeniCertificate->Create("slice", $urn, $hrn,
-					   $geniuser->email());
+    $certificate = GeniCertificate->Create({'urn'  => $urn,
+					    'hrn'  => $hrn,
+					    'email'=> $geniuser->email()});
     if (!defined($certificate)) {
 	print STDERR "GeniSlice::CreateFromLocal: ".
 	    "Could not generate new certificate $experiment\n";
