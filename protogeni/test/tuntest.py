@@ -413,7 +413,7 @@ rval,response = do_method(None, "RedeemTicket", params,
 if rval:
     Fatal("Could not redeem new ticket on CM1")
     pass
-manifest1 = response["value"]
+sliver1,manifest1 = response["value"]
 print "Redeemed new ticket CM1. Redeeming new ticket on CM2 ..."
 #print str(manifest1);
 
@@ -427,7 +427,7 @@ rval,response = do_method(None, "RedeemTicket", params,
 if rval:
     Fatal("Could not redeem new ticket on CM2")
     pass
-manifest2 = response["value"]
+sliver2,manifest2 = response["value"]
 print "Redeemed new ticket on CM2. Starting sliver on CM1 ..."
 #print str(manifest1);
 
