@@ -23,7 +23,7 @@ use Carp qw(cluck carp);
 
 use vars qw($RSPEC_0_1 $RSPEC_2);
 $RSPEC_0_1 = "0.1";
-$RSPEC_2 = "2"l
+$RSPEC_2 = "2";
 
 # Configure variables
 my $TB		   = "@prefix@";
