@@ -82,6 +82,7 @@ print "Got the slice credential, renewing the sliver";
 params = {}
 params["credentials"]  = (slicecred,)
 params["slice_urn"]    = SLICEURN
+params["valid_until"]  = valid_until
 rval,response = do_method("cm", "RenewSlice", params, version="2.0")
 if rval:
     Fatal("Could not renew sliver")
