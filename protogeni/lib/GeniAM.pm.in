@@ -310,7 +310,7 @@ sub RenewSliver()
     };
     my $response = GeniCMV2::RenewSlice($renew_args);
     if (GeniResponse::IsError($response)) {
-        return $response
+        return $response;
     }
 
     # Return an XML-RPC boolean
@@ -322,7 +322,18 @@ sub Shutdown()
 {
     my ($slice_urn, $credentials) = @_;
 
-    return GeniResponse->Create( GENIRESPONSE_UNSUPPORTED );
+    my $shutdown_args = {
+        'slice_urn' => $slice_urn,
+        'credentials' => $credentials
+    };
+    my $response = GeniCMV2::Shutdown($shutdown_args);
+    if (GeniResponse::IsError($response)) {
+        return $response;
+    }
+
+    # Return an XML-RPC boolean
+    my $coder = Frontier::RPC2->new();
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $coder->boolean(1));
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
