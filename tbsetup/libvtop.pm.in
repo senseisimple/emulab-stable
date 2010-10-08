@@ -4651,6 +4651,7 @@ sub AllocNodes($)
 	# For assigning dynamic ports.
 	$pnode->_portarray(undef);
 	$pnode->_portlow(TBDB_LOWVPORT);
+	$pnode->_portnext(TBDB_LOWVPORT);
 	$pnode->_porthigh(TBDB_MAXVPORT);
 	# To avoid unitialized access.
 	$pnode->_reuse("used");
@@ -7452,10 +7453,9 @@ sub array_diff($$)
 sub SetPortRange($)
 {
     my ($self) = @_;
-    
+
     #
-    # See if any virtual nodes. If not, no need to do anything since
-    # all port allocations will come from the physical node. 
+    # No virtual nodes, fall back to simple approach.
     #
     return 0
 	if (! scalar(keys(%{ $self->solution_v2v() })));
@@ -7534,12 +7534,21 @@ sub SetPortRange($)
 #
 # Bump and return the IP port number for a node. This is
 # required for multiplexing virtual nodes on a physical node. 
-# 
+#
 sub nextipportnum($)
 {
     my ($pnode, $default)  = @_;
     my $portarray = $pnode->_portarray();
     my $port = 0;
+
+    if (!defined($portarray)) {
+	#
+	# Fall back to simple approach; no shared nodes.
+	#
+	$port = $pnode->_portnext();
+	$pnode->_portnext($port + 2);
+	return $port;
+    }
 
     for (my $i = 0; $i < $pnode->_porthigh() - $pnode->_portlow(); $i++) {
 	if ($portarray->[$i] < 0) {
