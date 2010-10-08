@@ -216,33 +216,18 @@ sub CreateSliver()
     return GeniResponse->Create( GENIRESPONSE_SUCCESS, $manifest_rspec );
 }
 
+# Just delegate to CMV2::DeleteSlice. If we ever change to sliver_urns
+# for this call, we'll probably want to call CMV2::DeleteSliver
+# instead.
 sub DeleteSliver()
 {
     my ($slice_urn, $credentials) = @_;
 
-    # Invoke StopSliver
-    my $stop_args = {
-        'slice_urn' => $slice_urn,
-        'credentials' => $credentials
-    };
-
-    my $response = GeniCMV2::StopSliver($stop_args);
-    # Ignore refused error, it means the sliver was not started yet.
-    # A better way to go might be to check the sliver state and only
-    # invoke stop sliver if the sliver is started.
-    if (GeniResponse::IsError($response)
-        && GeniResponse::code($response) != GENIRESPONSE_REFUSED()) {
-        # The stop failed, so return the response.
-        return $response
-    }
-
-    # The sliver is stopped, now delete it.
     my $delete_args = {
         'slice_urn' => $slice_urn,
         'credentials' => $credentials
     };
-    # XXX Open question: Call "DeleteSlice" or "DeleteSliver"?
-    $response = GeniCMV2::DeleteSlice($delete_args);
+    my $response = GeniCMV2::DeleteSlice($delete_args);
     if (GeniResponse::IsError($response)) {
         return $response;
     } else {
