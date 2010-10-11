@@ -1553,6 +1553,13 @@ sub Credential2SliceAggregate($)
         $slice = GeniSlice->Lookup($target_uuid);
     }
     if (defined($slice)) {
+	if( $credential->expires() > $slice->expires() ) {
+	    # The credential presented lasts longer than we though the
+	    # slice did: our expiry date must have been stale.  This can
+	    # happen because the SA is always free to extend the lifetime
+	    # of a slice, and is not required to tell us.
+	    $slice->SetExpiration( $credential->expires() );
+	}
 	$aggregate = GeniAggregate->SliceAggregate($slice);
     }
     else {

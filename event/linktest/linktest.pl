@@ -18,7 +18,7 @@ my $LINKTEST_VERSION = "1.2";
 #
 # XXX config stuff that does not belong on the client-side
 #
-my $PROJROOT      = "@PROJROOT_DIR@";
+#my $PROJROOT      = "@PROJROOT_DIR@";
 
 #
 # Linktest test script. This script is set up to run as root on
@@ -39,12 +39,22 @@ sub usage()
 	  " [DOARP=<1=yes, 0=no>]\n".
 	  " [REPORTONLY=<1=yes, 0=no>]\n".
 	  " [NODES=<n1,n2...>\n".
-	  " [DEBUG=<debugging level. 1=on, 0=off>]\n");
+	  " [DEBUG=<debugging level. 1=on, 0=off>]\n".
+	  " [LOGRUN=<command/used/for/logging>]\n".
+	  " [LOGDIR=<path/to/log/root>]\n".
+	  " [BINDIR=<path/to/binary/files>]\n".
+	  " [VARDIR=<path/to/config/files>]\n".
+	  " [EVENTSERVER=<eventserver hostname>]\n");
     print("    <test step>: 1=conn/latency, 2=routing, 3=loss, 4=BW\n".
 	  "    COMPAT=<version>: remain compatible with version <version> or earlier\n".
 	  "    DOARP=1: run a single-ping pass to create ARP entries\n".
 	  "    REPORTONLY=1: report stats only, do not pass judgement\n".
-	  "    NODES: comma-separated list of virtnames to run on\n");
+	  "    NODES: comma-separated list of virtnames to run on\n".
+	  "    LOGRUN: Command to run for high-level logging. The log message as its only argument.".
+	  "    LOGDIR: Path used to store stderr logs of individual test utilities.\n".
+	  "    BINDIR: Path must contain emulab-rude emulab-crude emulab-iperf\n".
+	  "    VARDIR: Path must contain...\n".
+	  "    EVENTSERVER: Hostname of event server\n");
     exit(0);
 }
 
@@ -52,23 +62,6 @@ sub usage()
 ##############################################################################
 # Constants
 ##############################################################################
-
-# path to applications and files
-use constant PATH_NICKNAME => "@CLIENT_VARDIR@/boot/nickname";
-use constant PATH_KEYFILE => "@CLIENT_VARDIR@/boot/eventkey";
-use constant PATH_RUDE => "@CLIENT_BINDIR@/emulab-rude";
-use constant PATH_CRUDE => "@CLIENT_BINDIR@/emulab-crude";
-use constant PATH_IPERF => "@CLIENT_BINDIR@/emulab-iperf";
-use constant PATH_RCTOPO => "@CLIENT_BINDIR@/rc/rc.topomap";
-use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
-use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
-use constant PATH_TEVC => "@CLIENT_BINDIR@/tevc";
-use constant RUN_PATH => "@CLIENT_BINDIR@"; # where the linktest-ns runs.
-use constant EVENTSERVER => "@EVENTSERVER@";
-use constant PATH_SCHEDFILE => "@CLIENT_VARDIR@/logs/linktest.sched";
-use constant PATH_SYNCSERVER => "@CLIENT_VARDIR@/boot/syncserver";
-use constant PATH_TOPOFILE => "@CLIENT_VARDIR@/boot/ltmap";
-use constant PATH_PTOPOFILE => "@CLIENT_VARDIR@/boot/ltpmap";
 
 # log files used by tests.
 use constant CRUDE_DAT => "/tmp/crude.dat"; # binary data
@@ -244,6 +237,12 @@ $| = 1; #Turn off line buffering on output
 # Make sure that files written into the experiment subdir are group writable.
 umask(0002);
 
+our $LOGRUN = "";
+our $PROJROOT = "";
+our $VARDIR = "";
+our $BINDIR = "";
+our $EVENTSERVER = "";
+
 #
 # Parse command arguments. Since Linktest is run via the event system,
 # parse out pairs of <symbol>=<value>.
@@ -268,14 +267,7 @@ foreach my $arg (@ARGV) {
 	$debug_level=$1;
     }
     if($arg =~ /PRINTSCHED=(\d)/) {
-	my $schedfile = PATH_SCHEDFILE;
 	$printsched=$1;
-	if ($printsched) {
-	    open(SCHED, ">$schedfile") or
-		die("Could not open schedule log file $schedfile");
-	} else {
-	    unlink($schedfile);
-	}
     }
     if($arg =~ /TOKEN=(\d+)/) {
 	$token=$1;
@@ -283,6 +275,21 @@ foreach my $arg (@ARGV) {
     if($arg =~ /SWAPPER=(\w+)/) {
 	$swapper=$1;
 	(undef,undef,$swapperid,$swappergid) = getpwnam($swapper);
+    }
+    if($arg =~ /LOGRUN=(.+)/) {
+	$LOGRUN = $1;
+    }
+    if($arg =~ /LOGDIR=(.+)/) {
+	$PROJROOT = $1;
+    }
+    if($arg =~ /VARDIR=(.+)/) {
+	$VARDIR = $1;
+    }
+    if($arg =~ /BINDIR=(.+)/) {
+	$BINDIR = $1;
+    }
+    if($arg =~ /EVENTSERVER=(.+)/) {
+	$EVENTSERVER = $1;
     }
 }
 
@@ -294,11 +301,35 @@ if ($compat < 1.2) {
     $arpit = 0;
 }
 
+# path to applications and files
+our $PATH_NICKNAME = "$VARDIR/boot/nickname";
+our $PATH_KEYFILE = "$VARDIR/boot/eventkey";
+our $PATH_RUDE = "$BINDIR/emulab-rude";
+our $PATH_CRUDE = "$BINDIR/emulab-crude";
+our $PATH_IPERF = "$BINDIR/emulab-iperf";
+our $PATH_RCTOPO = "$BINDIR/rc/rc.topomap";
+our $PATH_EMULAB_SYNC = "$BINDIR/emulab-sync";
+our $PATH_LTEVENT = "$BINDIR/ltevent";
+our $PATH_TEVC = "$BINDIR/tevc";
+our $RUN_PATH = "$BINDIR"; # where the linktest-ns runs.
+our $PATH_SCHEDFILE = "$VARDIR/logs/linktest.sched";
+our $PATH_SYNCSERVER = "$VARDIR/boot/syncserver";
+our $PATH_TOPOFILE = "$VARDIR/boot/ltmap";
+our $PATH_PTOPOFILE = "$VARDIR/boot/ltpmap";
+
+my $schedfile = $PATH_SCHEDFILE;
+if ($printsched) {
+    open(SCHED, ">$schedfile") or
+    die("Could not open schedule log file $schedfile");
+} else {
+    unlink($schedfile);
+}
+
 #
 # Parse the nickname file to obtain the host name, 
 # experiment ID and the project ID.
 #
-my $fname = PATH_NICKNAME;
+my $fname = $PATH_NICKNAME;
 die("Could not locate $fname\n") unless -e $fname;
 my @results = &read_file($fname);
 ($hostname, $exp_id, $proj_id) = split /\./, $results[0];
@@ -321,8 +352,8 @@ $gid = $proj_id;
 #
 $expt_path = "$PROJROOT/$proj_id/exp/$exp_id/tbdata";
 $linktest_path = "$expt_path/linktest";
-$topology_file = PATH_TOPOFILE;
-$ptopology_file = PATH_PTOPOFILE;
+$topology_file = $PATH_TOPOFILE;
+$ptopology_file = $PATH_PTOPOFILE;
 
 #
 # Determine what OS we are.  Used for handling the occasional difference
@@ -337,7 +368,7 @@ $ptopology_file = PATH_PTOPOFILE;
 # the NFS server.
 #
 sleep(int(rand(5)));
-&my_system(PATH_RCTOPO, "reconfig");
+&my_system($PATH_RCTOPO, "reconfig");
 &get_topo($topology_file, $ptopology_file);
 &debug_top();
 
@@ -347,7 +378,7 @@ sleep(int(rand(5)));
 # is not participating, we choose the first node on the host list.
 #
 $synserv = "";
-my $ssname = PATH_SYNCSERVER;
+my $ssname = $PATH_SYNCSERVER;
 if ($ssname) {
     @results = &read_file($ssname);
     ($synserv) = split/\./, $results[0];
@@ -438,7 +469,7 @@ if (&dotest(TEST_BW)) {
 	&schedlog("start iperf listener");
     } else {
 	$listener_iperf = &start_listener(PATH_NICE, "-n", "-10",
-					  PATH_IPERF,"-s","-f","b","-u",
+					  $PATH_IPERF,"-s","-f","b","-u",
 					  "-w","200000","-l",IPERF_PKTSIZE);
 	$listeners++;
     }
@@ -447,7 +478,7 @@ if (&dotest(TEST_LOSS)) {
     if ($printsched) {
 	&schedlog("start crude listener");
     } else {
-	$listener_crude = &start_listener(PATH_CRUDE,"-l",CRUDE_DAT,
+	$listener_crude = &start_listener($PATH_CRUDE,"-l",CRUDE_DAT,
 					  "-P",CRUDE_PRI);
 	$listeners++;
     }
@@ -744,7 +775,7 @@ sub loss_test {
 				  ", time=" .
 				  LOSS_TEST_DURATION . "s, psize=20)");
 		    } else {
-			&my_system(PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI,
+			&my_system($PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI,
 				   $rude_arg);
 			$analyze{$stream_id} = $other_edge;
 		    }
@@ -768,7 +799,7 @@ sub loss_test {
 				  ", time=" .
 				  LOSS_TEST_DURATION . "s, psize=20)");
 		    } else {
-			&my_system(PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI,
+			&my_system($PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI,
 				   $rude_arg);
 			$analyze{$stream_id} = $edge;
 		    }
@@ -801,7 +832,7 @@ sub loss_test {
     if ($printsched) {
 	@results = ();
     } else {
-	@results = &my_tick(PATH_CRUDE,"-d",CRUDE_DAT);
+	@results = &my_tick($PATH_CRUDE,"-d",CRUDE_DAT);
     }
     my $result_count = @results;
     &debug("result_count from crude: $result_count\n");
@@ -1470,7 +1501,7 @@ sub bw_test {
 				  " (bw=${bw}bps, time=${duration}s," .
 				  " sbsize=200000, acktime=${acktime}ms)");
 		    } else {
-			&my_system(PATH_NICE, "-n", "-10", PATH_IPERF,
+			&my_system(PATH_NICE, "-n", "-10", $PATH_IPERF,
 				   "-c", $edge->src . "-" . $edge->name,
 				   "-t", "$duration", "-f", "b",
 				   "-r", "-u", "-w", "200000",
@@ -2196,12 +2227,12 @@ sub barrier {
 	return
 	    if (! $barr_count);
 
-	$rc = &my_system(PATH_EMULAB_SYNC,"-i",$barr_count,
+	$rc = &my_system($PATH_EMULAB_SYNC,"-i",$barr_count,
 			 "-n",SYNC_NAMESPACE,
 			 "-e",$error_count);
     }
     else {
-	$rc = &my_system(PATH_EMULAB_SYNC,"-n",
+	$rc = &my_system($PATH_EMULAB_SYNC,"-n",
 			 SYNC_NAMESPACE,"-e",$error_count);
     }
 
@@ -2395,43 +2426,55 @@ sub wait_all {
 sub post_event {
     my ($event,$args) = map { $1 if (/(.*)/) } @_;
     if($hostname eq $synserv) {
+	if ($LOGRUN ne "") {
+	    system("$LOGRUN '$args'");
+	} elsif ($EVENTSERVER ne "") {
 
-	if ($printsched) {
-	    &schedlog("syncserver ltevent $event");
-	    return;
+	    if ($printsched) {
+		&schedlog("syncserver ltevent $event");
+		return;
+	    }
+
+	    system($PATH_LTEVENT,
+		   "-s",
+		   $EVENTSERVER,
+		   "-e",
+		   "$proj_id/$exp_id",
+		   "-k", 
+		   $PATH_KEYFILE,
+		   "-x",
+		   "$event",
+		   "$args");
+	} else {
+	    print $args . "\n";
 	}
-
-	system(PATH_LTEVENT,
-	       "-s",
-	       EVENTSERVER,
-	       "-e",
-	       "$proj_id/$exp_id",
-	       "-k", 
-	       PATH_KEYFILE,
-	       "-x",
-	       "$event",
-	       "$args");
     }
 }
 
 sub post_event2 {
     my ($event,$args) = map { $1 if (/(.*)/) } @_;
 
-    if ($printsched) {
-	&schedlog("ltevent $event");
-	return;
-    }
+    if ($LOGRUN ne "") {
+	system("$LOGRUN '$args'");
+    } elsif ($EVENTSERVER ne "") {
+	if ($printsched) {
+	    &schedlog("ltevent $event");
+	    return;
+	}
 
-    system(PATH_LTEVENT,
-	   "-s",
-	   EVENTSERVER,
-	   "-e",
-	   "$proj_id/$exp_id",
-	   "-k", 
-	   PATH_KEYFILE,
-	   "-x",
-	   "$event",
-	   "$args");
+	system($PATH_LTEVENT,
+	       "-s",
+	       $EVENTSERVER,
+	       "-e",
+	       "$proj_id/$exp_id",
+	       "-k", 
+	       $PATH_KEYFILE,
+	       "-x",
+	       "$event",
+	       "$args");
+    } else {
+	print $args . "\n";
+    }
 }
 
 #
@@ -2441,14 +2484,14 @@ sub post_event2 {
 #
 sub sim_event {
     my ($event,$args) = map { $1 if (/(.*)/) } @_;
-    if($hostname eq $synserv) {
+    if($hostname eq $synserv && $EVENTSERVER ne "") {
 
 	if ($printsched) {
 	    &schedlog("syncserver tevc $event");
 	    return;
 	}
 
-	system(PATH_TEVC,
+	system($PATH_TEVC,
 	       "-e", "$proj_id/$exp_id",
 	       "now",
 	       $simname,
@@ -2460,17 +2503,19 @@ sub sim_event {
 sub sim_event2 {
     my ($event,$args) = map { $1 if (/(.*)/) } @_;
 
-    if ($printsched) {
-	&schedlog("tevc $event");
-	return;
-    }
+    if ($EVENTSERVER ne "") {
+	if ($printsched) {
+	    &schedlog("tevc $event");
+	    return;
+	}
 
-    system(PATH_TEVC,
-	   "-e", "$proj_id/$exp_id",
-	   "now",
-	   $simname,
-	   "$event",
-	   "$args");
+	system($PATH_TEVC,
+	       "-e", "$proj_id/$exp_id",
+	       "now",
+	       $simname,
+	       "$event",
+	       "$args");
+    }
 }
 
 # cleanup any child procs.
