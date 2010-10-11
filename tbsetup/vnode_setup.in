@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -65,9 +65,7 @@ use libtestbed;
 use libtblog;
 use Experiment;
 use Node;
-if ($PGENISUPPORT) {
-    require libGeni;
-}
+use User;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';

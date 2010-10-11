@@ -34,10 +34,6 @@ my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
-if ($PGENISUPPORT) {
-    require libGeni;
-}
-
 #
 # The number of nodes we reboot at a time and the time to wait between batches.
 # The batch size determines the degree of parallelism.
@@ -56,7 +52,6 @@ my $MAXWAITTIME	= (6 * 60);
 #
 # Testbed Support libraries
 #
-use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use event;

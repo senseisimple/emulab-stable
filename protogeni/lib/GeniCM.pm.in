@@ -40,7 +40,6 @@ use emutil;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
 	     TBDB_NODESTATE_TBFAILED);
-use User;
 use Node;
 use Lan;
 use OSinfo;

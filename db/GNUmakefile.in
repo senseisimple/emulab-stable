@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -29,7 +29,8 @@ LIBEXEC_SCRIPTS = $(WEB_BIN_SCRIPTS) $(WEB_SBIN_SCRIPTS) xmlconvert
 LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm Experiment.pm \
 		  NodeType.pm Interface.pm User.pm Group.pm Project.pm \
 		  Image.pm OSinfo.pm Archive.pm Logfile.pm Lan.pm emdbi.pm \
-		  emdb.pm emutil.pm Firewall.pm VirtExperiment.pm libGeni.pm
+		  emdb.pm emutil.pm Firewall.pm VirtExperiment.pm libGeni.pm \
+		  libEmulab.pm EmulabConstants.pm TraceUse.pm
 
 # Stuff installed on plastic.
 USERSBINS	= genelists.proxy dumperrorlog.proxy backup

@@ -188,11 +188,10 @@ use vars qw(@ISA @EXPORT);
     qw ( TBAdmissionControlCheck TBUpdateNodeTypeXpidPermissions );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use English;
 use libdb;
 use libtestbed;
-use libtblog;
+use libtblog_simple;
 use Experiment;
 use User;
 use Group;

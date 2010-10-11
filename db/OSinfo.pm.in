@@ -14,12 +14,8 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-use Project;
-use User;
-use Image;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -343,6 +339,7 @@ sub Update($$)
 sub GetProject($)
 {
     my ($self) = @_;
+    require Project;
 
     # Must be a real reference. 
     return undef
@@ -650,6 +647,7 @@ sub RunsOnParent($$)
 sub MapToImage($$)
 {
     my ($self, $type) = @_;
+    require Image;
 
     if (ref($type)) {
 	$type = $type->type();

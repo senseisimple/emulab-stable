@@ -87,6 +87,7 @@ use Experiment;
 use Node;
 use libtestbed;
 use emutil;
+use libEmulab;
 use POSIX qw(strftime ceil);
 
 #

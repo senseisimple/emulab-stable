@@ -1594,12 +1594,10 @@ use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
 
-if ($PGENISUPPORT) {
-    require libGeni;
-}
-
 sub New($$) {
     my ($class, $parent) = @_;
+
+    require libGeni;
 
     my $self = $class->SUPER::New("protogeni", $parent);
     bless($self, $class);

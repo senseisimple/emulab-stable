@@ -14,13 +14,8 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-use Project;
-use Group;
-use User;
-use OSinfo;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -173,6 +168,7 @@ sub Create($$$$$$$$)
 {
     my ($class, $project, $group, $creator,
 	$imagename, $imageid, $argref, $usrerr_ref) = @_;
+    require OSinfo;
 
     return undef
 	if (ref($class) || !ref($project));
@@ -505,6 +501,7 @@ sub Update($$)
 sub GetProject($)
 {
     my ($self) = @_;
+    require Project;
 
     # Must be a real reference. 
     return undef
@@ -525,6 +522,7 @@ sub GetProject($)
 sub GetGroup($)
 {
     my ($self) = @_;
+    require Group;
 
     # Must be a real reference. 
     return undef

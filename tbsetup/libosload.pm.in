@@ -17,7 +17,6 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( osload osload_wait osload_setupswapinfo );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use libtestbed; # for TBGenSecretKey();
 use libdb;
 use libreboot;

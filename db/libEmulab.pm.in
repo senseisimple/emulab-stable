@@ -1,0 +1,139 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+package libEmulab;
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+@ISA    = qw(Exporter);
+@EXPORT = qw(SiteVarExists GetSiteVar SetSiteVar NoLogins);
+
+use emdb;
+
+#
+# Check if a site-specific variable exists.
+#
+# usage: SiteVarExists($name)
+#        returns 1 if variable exists;
+#        returns 0 otherwise.
+#
+sub SiteVarExists($)
+{
+    my($name) = @_;
+
+    $name = DBQuoteSpecial( $name );
+
+    my $query_result =
+	DBQueryWarn("select name from sitevariables where name=$name");
+
+    return 0
+	if (!$query_result);
+    
+    return $query_result->numrows;
+}
+
+#
+# Get site-specific variable.
+# Get the value of the variable, or the default value if
+# the value is undefined (NULL).
+#
+
+# usage: GetSiteVar($name, char \*rptr )
+#        Without rptr: returns value if variable is defined; dies otherwise.
+#        With rptr:    returns value in $rptr if variable is defined; returns
+#                      zero otherwise, or any failure.
+#
+sub GetSiteVar($;$)
+{
+    my ($name, $rptr) = @_;
+    my $value;
+
+    $name = DBQuoteSpecial( $name );
+    
+    my $query_string =
+	"select value,defaultvalue from sitevariables where name=$name";
+
+    my $query_result;
+    if (defined($rptr)) {
+	#
+	# I added the result parameter as an option to avoid changing every
+	# call to TBGetSiteVar(). Sorry. When called in this manner, it is
+	# up to the caller to decide what to do when it fails. 
+	#
+	$query_result = DBQueryWarn($query_string);
+
+	return 0
+	    if (! $query_result)
+    }
+    else {
+	$query_result = DBQueryFatal($query_string);
+    }
+
+    if ($query_result->numrows > 0) {
+	my ($curvalue, $defaultvalue) = $query_result->fetchrow_array();
+
+	if (defined($curvalue)) {
+	    $value = $curvalue;
+	}
+	elsif (defined($defaultvalue)) {
+	    $value = $defaultvalue;
+	}
+    }
+    if (defined($rptr)) {
+	if (defined($value)) {
+	    $$rptr = $value;
+	    return 1;
+	}
+	return 0;
+    }
+    elsif (defined($value)) {
+	return $value;
+    }
+    die("*** $0:\n".
+	"    Attempted to fetch unknown site variable $name\n");
+}
+
+#
+# Set a sitevar. Assumed to be a real sitevar.
+#
+# usage: SetSiteVar($name, $value)
+#
+sub SetSiteVar($$)
+{
+    my ($name, $value) = @_;
+
+    $name  = DBQuoteSpecial($name);
+    $value = DBQuoteSpecial($value);
+
+    my $query_result =
+	DBQueryWarn("update sitevariables set value=$value where name=$name");
+
+    return 0
+	if (!$query_result);
+    return 1;
+}
+
+#
+# Check for nologins; web interface disabled means other interfaces
+# should be disabled. Not using libdb:GetSiteVar cause do not want to
+# drag all that stuff in. Predicate; retun 1 if no logins is set.
+#
+sub NoLogins()
+{
+    my $query_result =
+	DBQueryWarn("select value from sitevariables ".
+		    "where name='web/nologins'");
+
+    return 1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+    my ($value) = $query_result->fetchrow_array();
+
+    return ($value ? 1 : 0);
+}
+
+1;

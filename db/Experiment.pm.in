@@ -8,19 +8,15 @@ package Experiment;
 
 use strict;
 use Exporter;
+use SelfLoader ();
 use vars qw(@ISA @EXPORT $AUTOLOAD);
-
-@ISA    = "Exporter";
+@ISA    = qw(Exporter SelfLoader);
 @EXPORT = qw ( );
 
 use libdb;
+use EmulabConstants;
 use libtestbed;
-use User;
-use Project;
-use Group;
 use Node;
-use Interface;
-use VirtExperiment;
 use Logfile;
 use English;
 use Data::Dumper;
@@ -33,27 +29,58 @@ use vars qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPIN $EXPT_SWAPUPDATE
 	    $EXPT_FLAGS_NAMESONLY $EXPT_FLAGS_INCLUDEVIRT
 	    $EXPT_FLAGS_LOCALONLY
 	    $EXPT_GENIFLAGS_EXPT $EXPT_GENIFLAGS_COOKED
-	    @EXPORT_OK);
-
+	    @nodetable_fields %experiments
+	    $EXPT_STARTCLOCK $EXPT_RESOURCESHOSED
+	    @EXPORT_OK
+	    $TB $BOSSNODE $CONTROL $TBOPS $PROJROOT $STAMPS $TBBASE  
+	    $TEVC $DBCONTROL $RSYNC $MKEXPDIR $TBPRERUN $TBSWAP   
+	    $TBREPORT $TBEND $DU $MD5);
+	  
 # Configure variables
-my $TB		= "@prefix@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $CONTROL	= "@USERNODE@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $PROJROOT    = "@PROJROOT_DIR@";
-my $EVENTSYS    = @EVENTSYS@;
-my $STAMPS      = @STAMPS@;
-my $TBBASE      = "@TBBASE@";
-my $TEVC	= "$TB/bin/tevc";
-my $DBCONTROL   = "$TB/sbin/opsdb_control";
-my $RSYNC	= "/usr/local/bin/rsync";
-my $MKEXPDIR    = "$TB/libexec/mkexpdir";
-my $TBPRERUN    = "$TB/bin/tbprerun";
-my $TBSWAP      = "$TB/bin/tbswap";
-my $TBREPORT    = "$TB/bin/tbreport";
-my $TBEND       = "$TB/bin/tbend";
-my $DU          = "/usr/bin/du";
-my $MD5         = "/sbin/md5";
+$TB	     = "@prefix@";
+$BOSSNODE    = "@BOSSNODE@";
+$CONTROL     = "@USERNODE@";
+$TBOPS       = "@TBOPSEMAIL@";
+$PROJROOT    = "@PROJROOT_DIR@";
+$STAMPS      = @STAMPS@;
+$TBBASE      = "@TBBASE@";
+$TEVC	     = "$TB/bin/tevc";
+$DBCONTROL   = "$TB/sbin/opsdb_control";
+$RSYNC	     = "/usr/local/bin/rsync";
+$MKEXPDIR    = "$TB/libexec/mkexpdir";
+$TBPRERUN    = "$TB/bin/tbprerun";
+$TBSWAP      = "$TB/bin/tbswap";
+$TBREPORT    = "$TB/bin/tbreport";
+$TBEND       = "$TB/bin/tbend";
+$DU          = "/usr/bin/du";
+$MD5         = "/sbin/md5";
+
+# To avoid writting out all the methods.
+AUTOLOAD {
+    #print STDERR "$AUTOLOAD\n";
+
+    if (!ref($_[0])) {
+	$SelfLoader::AUTOLOAD = $AUTOLOAD;
+	return SelfLoader::AUTOLOAD(@_);
+    }
+    my $self  = $_[0];
+    my $name  = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    # A DB row proxy method call.
+    if (exists($self->{'EXPT'}->{$name})) {
+	return $self->{'EXPT'}->{$name};
+    }
+    elsif (exists($self->{'STATS'}->{$name})) {
+	return $self->{'STATS'}->{$name};
+    }
+    elsif (exists($self->{'RSRC'}->{$name})) {
+	return $self->{'RSRC'}->{$name};
+    }
+    $SelfLoader::AUTOLOAD = $AUTOLOAD;
+    my $ref = \&SelfLoader::AUTOLOAD;
+    goto &$ref;
+}
 
 # Swap Actions
 $EXPT_PRELOAD		= TBDB_STATS_PRELOAD();
@@ -72,8 +99,8 @@ $EXPT_GENIFLAGS_EXPT    = 0x01;
 $EXPT_GENIFLAGS_COOKED  = 0x02;
 
 # For stats gathering code.
-my $EXPT_STARTCLOCK;
-my $EXPT_RESOURCESHOSED = 0;
+$EXPT_STARTCLOCK        = undef;
+$EXPT_RESOURCESHOSED    = 0;
 
 # Why, why, why?
 @EXPORT_OK = qw($EXPT_PRELOAD $EXPT_START $EXPT_SWAPUPDATE
@@ -122,7 +149,7 @@ my $EXPT_RESOURCESHOSED = 0;
 		   "bridges"       => ["node_id", "bridx", "iface"]); 
 
 # These are slots in the node table that need to be restored. 
-my @nodetable_fields = ("def_boot_osid",
+@nodetable_fields = ("def_boot_osid",
 			"def_boot_path",
 			"def_boot_cmd_line",
 			"temp_boot_osid",
@@ -151,15 +178,8 @@ my @nodetable_fields = ("def_boot_osid",
 			"sshdport",
 			"rtabid");
 
-# Hmm, this is silly. 
-if ($EVENTSYS) {
-    require event;
-    import event;
-}
-
 # Cache of instances to avoid regenerating them.
-my %experiments   = ();
-my $debug	  = 0;
+%experiments   = ();
 
 # Little helper and debug function.
 sub mysystem($)
@@ -170,7 +190,7 @@ sub mysystem($)
     chomp($cwd = `/bin/pwd`);
 
     print STDERR "Running '$command' in $cwd\n"
-	if ($debug);
+	if (0);
     return system($command);
 }
 
@@ -278,34 +298,6 @@ sub Lookup($$;$)
     return $self;
 }
 
-# To avoid writting out all the methods.
-sub AUTOLOAD {
-    my $self = shift;
-    my $type = ref($self) or die("$self is not an object\n");
-
-    my $name = $AUTOLOAD;
-    $name =~ s/.*://;   # strip fully-qualified portion
-
-    if (exists($self->{'EXPT'}->{$name})) {
-	return $self->{'EXPT'}->{$name};
-    }
-    elsif (exists($self->{'STATS'}->{$name})) {
-	return $self->{'STATS'}->{$name};
-    }
-    elsif (exists($self->{'RSRC'}->{$name})) {
-	return $self->{'RSRC'}->{$name};
-    }
-    print STDERR "$self: tried to access unknown slot $name\n";
-    return undef;
-}
-sub dbrow($$)     { return $_[0]->{'EXPT'}; }
-sub locked($)     { return $_[0]->expt_locked(); }
-sub elabinelab($) { return $_[0]->elab_in_elab(); }
-sub description($){ return $_[0]->expt_name(); }
-sub creator($)    { return $_[0]->expt_head_uid(); }
-sub created($)	  { return $_[0]->expt_created(); }
-sub swapper($)	  { return $_[0]->expt_swap_uid(); }
-
 # Break circular reference someplace to avoid exit errors.
 sub DESTROY {
     my $self = shift;
@@ -315,6 +307,46 @@ sub DESTROY {
     $self->{"RSRC"}     = undef;
     $self->{'VIRTEXPT'} = undef;
 }
+
+#
+# Flush from our little cache, as for the expire daemon.
+#
+sub Flush($)
+{
+    my ($self) = @_;
+
+    delete($experiments{$self->idx()});
+}
+sub FlushAll($)
+{
+    my ($class) = @_;
+
+    %experiments = ();
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $pid   = $self->pid();
+    my $eid   = $self->eid();
+
+    return "[Experiment: $pid/$eid]";
+}
+
+1;
+__DATA__
+
+sub dbrow($$)     { return $_[0]->{'EXPT'}; }
+sub locked($)     { return $_[0]->expt_locked(); }
+sub elabinelab($) { return $_[0]->elab_in_elab(); }
+sub description($){ return $_[0]->expt_name(); }
+sub creator($)    { return $_[0]->expt_head_uid(); }
+sub created($)	  { return $_[0]->expt_created(); }
+sub swapper($)	  { return $_[0]->expt_swap_uid(); }
 
 #
 # For canceled, goto to the DB.
@@ -801,22 +833,6 @@ sub Delete($;$)
 }
 
 #
-# Flush from our little cache, as for the expire daemon.
-#
-sub Flush($)
-{
-    my ($self) = @_;
-
-    delete($experiments{$self->idx()});
-}
-sub FlushAll($)
-{
-    my ($class) = @_;
-
-    %experiments = ();
-}
-
-#
 # Add an input file to the template. The point of this is to reduce
 # duplication by taking an md5 of the input file, and sharing that
 # record/file.
@@ -1005,6 +1021,7 @@ sub GetInputFile($$$)
 sub GetVirtExperiment($)
 {
     my ($self) = @_;
+    require VirtExperiment;
 
     return undef
 	if (! ref($self));
@@ -1278,19 +1295,6 @@ sub SetBatchMode($$) {
 }
 
 #
-# Stringify for output.
-#
-sub Stringify($)
-{
-    my ($self) = @_;
-    
-    my $pid   = $self->pid();
-    my $eid   = $self->eid();
-
-    return "[Experiment: $pid/$eid]";
-}
-
-#
 # Generic function to look up some table values given a set of desired
 # fields and some conditions. Pretty simple, not widely useful, but it
 # helps to avoid spreading queries around then we need to. 
@@ -1357,8 +1361,8 @@ sub AccessCheck($$$)
     return 0
 	if (! ref($self));
 
-    if ($access_type < TB_EXPT_MIN ||
-	$access_type > TB_EXPT_MAX) {
+    if ($access_type < TB_EXPT_MIN() ||
+	$access_type > TB_EXPT_MAX()) {
 	die("*** Invalid access type: $access_type!");
     }
 
@@ -1379,11 +1383,11 @@ sub AccessCheck($$$)
     #
     my $mintrust;
     
-    if ($access_type == TB_EXPT_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
+    if ($access_type == TB_EXPT_READINFO()) {
+	$mintrust = PROJMEMBERTRUST_USER();
     }
     else {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+	$mintrust = PROJMEMBERTRUST_LOCALROOT();
     }
 
     #
@@ -1392,7 +1396,7 @@ sub AccessCheck($$$)
     # those in groups they do not belong to.
     #
     return TBMinTrust($group->Trust($user), $mintrust) ||
-	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT);
+	TBMinTrust($project->Trust($user), PROJMEMBERTRUST_GROUPROOT());
 }
 
 #
@@ -1424,6 +1428,7 @@ sub CreateDirectory($)
 sub GetProject($)
 {
     my ($self) = @_;
+    require Project;
 
     # Must be a real reference. 
     return undef
@@ -1444,6 +1449,7 @@ sub GetProject($)
 sub GetGroup($)
 {
     my ($self) = @_;
+    require Group;
 
     # Must be a real reference. 
     return undef
@@ -1640,15 +1646,15 @@ sub Unlock($;$)
     }
     
     if (defined($newstate)) {
+	require event;
+	
 	$self->{'EXPT'}->{'state'} = $newstate;
 
-	if ($EVENTSYS) {
-	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
-			  objname   => "$pid/$eid",
-			  eventtype => $newstate,
-			  expt      => "$pid/$eid",
-			  host      => $BOSSNODE);
-	}
+	event::EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE(),
+			     objname   => "$pid/$eid",
+			     eventtype => $newstate,
+			     expt      => "$pid/$eid",
+			     host      => $BOSSNODE);
     }
     
     return 0;
@@ -1689,15 +1695,15 @@ sub Lock(;$$)
 	if ($unlocktables);
     
     if (defined($newstate)) {
+	require event;
+	
 	$self->{'EXPT'}->{'state'} = $newstate;
 
-	if ($EVENTSYS) {
-	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
-			  objname   => "$pid/$eid",
-			  eventtype => $newstate,
-			  expt      => "$pid/$eid",
-			  host      => $BOSSNODE);
-	}
+	event::EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE(),
+			     objname   => "$pid/$eid",
+			     eventtype => $newstate,
+			     expt      => "$pid/$eid",
+			     host      => $BOSSNODE);
     }
     return 0;
 }
@@ -1723,15 +1729,15 @@ sub SetState($$)
     }
     
     if (defined($newstate)) {
+	require event;
+	
 	$self->{'EXPT'}->{'state'} = $newstate;
 
-	if ($EVENTSYS) {
-	    EventSendWarn(objtype   => libdb::TBDB_TBEVENT_EXPTSTATE(),
-			  objname   => "$pid/$eid",
-			  eventtype => $newstate,
-			  expt      => "$pid/$eid",
-			  host      => $BOSSNODE);
-	}
+	event::EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE(),
+			     objname   => "$pid/$eid",
+			     eventtype => $newstate,
+			     expt      => "$pid/$eid",
+			     host      => $BOSSNODE);
     }
     
     return 0;
@@ -1972,6 +1978,8 @@ sub PreRun($;$$)
 sub PreSwap($$$$)
 {
     my ($self, $swapper, $which, $estate) = @_;
+    # We know we need this later.
+    require User;
 
     # Must be a real reference. 
     return -1
@@ -1981,7 +1989,7 @@ sub PreSwap($$$$)
     my $rsrcidx  = $self->rsrcidx();
     my $lastrsrc = $rsrcidx;
     my $uid_idx  = $swapper->uid_idx();
-    my $isactive = ($estate eq EXPTSTATE_ACTIVE);
+    my $isactive = ($estate eq EXPTSTATE_ACTIVE());
 
     #
     # We should never get here with a lastrsrc in the stats record; it
@@ -2069,7 +2077,7 @@ sub PreSwap($$$$)
 
     # Old swap gathering stuff.
     $self->GatherSwapStats($swapper, $which, 0,
-			   libdb::TBDB_STATS_FLAGS_START()) == 0
+			   TBDB_STATS_FLAGS_START()) == 0
 	or goto failed;
 
     # We do these here since even failed operations implies activity.
@@ -2226,7 +2234,7 @@ sub PostSwap($$$$)
 	my $when = "UNIX_TIMESTAMP(now())";
 	# unless its active, in which case pick up swapin time.
 	$when = $self->swapin_time()
-	    if ($self->state() eq libdb::EXPTSTATE_ACTIVE());
+	    if ($self->state() eq EXPTSTATE_ACTIVE());
 	
 	DBQueryWarn("update experiment_resources set ".
 		    "  swapmod_time=$when ".
@@ -2236,7 +2244,7 @@ sub PostSwap($$$$)
 
     if ($which eq $EXPT_SWAPOUT ||
 	($which eq $EXPT_SWAPMOD &&
-	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
+	 $self->state() eq EXPTSTATE_ACTIVE())) {
 	
 	#
 	# If this is a swapout, we use the current resource record. If this
@@ -2285,7 +2293,7 @@ sub PostSwap($$$$)
     # if this fails, so do not worry about it.
     #
     if ($which eq $EXPT_SWAPOUT &&
-	$flags & libdb::TBDB_STATS_FLAGS_IDLESWAP()) {
+	$flags & TBDB_STATS_FLAGS_IDLESWAP()) {
 	DBQueryWarn("update experiment_stats ".
 		    "set idle_swaps=idle_swaps+1 ".
 		    "where exptidx=$exptidx");
@@ -2301,7 +2309,7 @@ sub PostSwap($$$$)
     if ($which eq $EXPT_START ||
 	$which eq $EXPT_SWAPIN ||
 	($which eq $EXPT_SWAPMOD &&
-	 $self->state() eq libdb::EXPTSTATE_ACTIVE())) {
+	 $self->state() eq EXPTSTATE_ACTIVE())) {
 	$query_result =
 	    DBQueryWarn("select r.node_id,n.type,r.erole,r.vname, ".
 			"    n.phys_nodeid,nt.isremotenode,nt.isvirtnode ".
@@ -2423,7 +2431,7 @@ sub GatherSwapStats($$$;$$)
     # variable and return. This is cheezy, but the interface I'm providing
     # allows for fancier stuff later if desired.
     #
-    if ($flags & libdb::TBDB_STATS_FLAGS_START()) {
+    if ($flags & TBDB_STATS_FLAGS_START()) {
 	$EXPT_STARTCLOCK = time();
 	return 0;
     }
@@ -2583,8 +2591,8 @@ sub OldReservedNodeList($$)
     @$plist     = ();
     my @result  = ();
     my $exptidx = $self->idx();
-    my $oldreserved_pid = OLDRESERVED_PID;
-    my $oldreserved_eid = OLDRESERVED_EID;
+    my $oldreserved_pid = OLDRESERVED_PID();
+    my $oldreserved_eid = OLDRESERVED_EID();
 
     my $query_result =
 	DBQueryWarn("select r.node_id from reserved as r ".
@@ -2826,6 +2834,7 @@ sub SetSwapper($$)
 sub GetSwapper($)
 {
     my ($self) = @_;
+    require User;
 
     # Must be a real reference. 
     return undef
@@ -2842,6 +2851,7 @@ sub GetSwapper($)
 sub GetCreator($)
 {
     my ($self) = @_;
+    require User;
 
     # Must be a real reference. 
     return undef
@@ -3472,7 +3482,7 @@ sub SetupNetworkAgents($)
     my $pid = $self->pid();
     my $eid = $self->eid();
     my $idx = $self->idx();
-    my $virtexp = VirtExperiment->Lookup($self);
+    my $virtexp = $self->GetVirtExperiment();
     return -1
 	if (!defined($virtexp));
 
@@ -4100,6 +4110,7 @@ sub LinkInterfaces($$$)
 {
     my ($self, $linkname, $pref) = @_;
     my @result = ();
+    require Interface;
 
     my $idx = $self->idx();
 
@@ -4186,20 +4197,20 @@ sub SetPortRange($$)
 	if (!defined($range_result));
 
     if (!$range_result->num_rows) {
-	$newlow = TBDB_LOWVPORT;
+	$newlow = TBDB_LOWVPORT();
     }
     else {
 	($lastlow, $lasthigh) = $range_result->fetchrow_array();
 
 	# A hole at the bottom of the range ...
-	if ($lastlow >= TBDB_LOWVPORT + TBDB_PORTRANGE) {
-	    $newlow = TBDB_LOWVPORT;
+	if ($lastlow >= TBDB_LOWVPORT() + TBDB_PORTRANGE()) {
+	    $newlow = TBDB_LOWVPORT();
 	}
 	# Else, find a free hole. 
 	else {
 	    while (my ($thislow,$thishigh) = $range_result->fetchrow_array()) {
 		if ($thislow != $lasthigh + 1 &&
-		    $thislow - $lasthigh > TBDB_PORTRANGE) {
+		    $thislow - $lasthigh > TBDB_PORTRANGE()) {
 		    $newlow = $lasthigh + 1;
 		    last;
 		}
@@ -4211,11 +4222,11 @@ sub SetPortRange($$)
 	# No holes, tack onto the end. 
 	$newlow = $lasthigh + 1;
     }
-    if ($newlow >= TBDB_MAXVPORT) {
+    if ($newlow >= TBDB_MAXVPORT()) {
 	DBQueryWarn("unlock tables");
 	return undef;
     }
-    $newhigh = $newlow + TBDB_PORTRANGE - 1;
+    $newhigh = $newlow + TBDB_PORTRANGE() - 1;
 
     my $idx = $self->idx();
     my $pid = $self->pid();
@@ -4496,3 +4507,5 @@ sub ReserveSharedBandwidth($;$$)
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
+
+

@@ -60,14 +60,10 @@ use libtestbed;
 use libadminctrl;
 use libadminmfs;
 use libtblog;
-use libArchive;
 use Experiment;
 use User;
 use Lan;
 use Firewall;
-if ($PGENISUPPORT) {
-    require libGeni;
-}
 
 #
 # Actual swap-in and swap-out functions, defined below.
@@ -300,14 +296,6 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
     #
     $errors = ($swapop eq "modify" ? doSwapout(MODIFY) : 0);
 
-    if (0) {
-	print STDERR "Doing a swapmodswapout on the experiment archive ...\n";
-	if (libArchive::TBExperimentArchiveSwapModSwapOut($pid, $eid) < 0) {
-	    tberror("Failed swapmodswapout on the experiment archive!");
-	    $errors = 1;
-	}
-    }
-
     if ($errors) {
 	#
 	# Clean up the mess, leaving the experiment in the SWAPPED state,
@@ -512,7 +500,7 @@ sub doSwapout($) {
 		#
 		# Stop the location piper.
 		#
-		if (-x $piper) {
+		if (0 && -x $piper) {
 		    print "Stopping the location piper\n";
 		    if (system("$piper -k $pid $eid")) {
 			tberror({type => 'secondary', severity => SEV_SECONDARY,
@@ -659,6 +647,8 @@ sub doSwapout($) {
 	# Clear away Geni slivers. Do not proceed if this fails.
 	#
 	if ($PGENISUPPORT) {
+	    require libGeni;
+	    
 	    if (libGeni::DeleteAllSlivers($experiment, $this_user)) {
 		tberror("Could not delete slivers\n");
 		return 1;
@@ -1405,7 +1395,7 @@ sub doSwapin($) {
 	# For the robot testbed, start the location piper *before* the event
 	# system.
 	#
-	if (-x $piper && ($type != MODIFY && $type != MODIFY_RECOVER)) {
+	if (0 && -x $piper && ($type != MODIFY && $type != MODIFY_RECOVER)) {
 	    print "Starting the location piper.\n";
 	    if (system("$piper $pid $eid")) {
 		tberror "Failed to start the location piper.";

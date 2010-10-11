@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Group;
@@ -665,7 +665,7 @@ sub Trust($$)
     #
     # User must be active to be trusted.
     #
-    return PROJMEMBERTRUST_NONE
+    return PROJMEMBERTRUST_NONE()
 	if ($user->status() ne USERSTATUS_ACTIVE());
 
     #
@@ -676,7 +676,7 @@ sub Trust($$)
     #
     # No membership is the same as no trust. True? Maybe an error instead?
     #
-    return PROJMEMBERTRUST_NONE
+    return PROJMEMBERTRUST_NONE()
 	if (!defined($membership));
     
     return TBTrustConvert($membership->trust());
@@ -698,57 +698,55 @@ sub AccessCheck($$$)
     my $gid = $self->gid();
     my $uid = $user->uid();
 
-    if ($access_type < TB_PROJECT_MIN ||
-	$access_type > TB_PROJECT_MAX) {
+    if ($access_type < TB_PROJECT_MIN() ||
+	$access_type > TB_PROJECT_MAX()) {
 	print "*** Invalid access type: $access_type!\n";
 	return 0;
     }
     # Admins do whatever they want. Treat leadgroup special though since
     # the user has to actually be a member of the project, not just an admin.
     return 1
-	if ($user->IsAdmin() && $access_type != TB_PROJECT_LEADGROUP);
+	if ($user->IsAdmin() && $access_type != TB_PROJECT_LEADGROUP());
 
-    if ($access_type == TB_PROJECT_READINFO) {
-	$mintrust = PROJMEMBERTRUST_USER;
+    if ($access_type == TB_PROJECT_READINFO()) {
+	$mintrust = PROJMEMBERTRUST_USER();
     }
-    elsif ($access_type == TB_PROJECT_MAKEGROUP ||
-	   $access_type == TB_PROJECT_DELGROUP) {
-	$mintrust = PROJMEMBERTRUST_GROUPROOT;
+    elsif ($access_type == TB_PROJECT_MAKEGROUP() ||
+	   $access_type == TB_PROJECT_DELGROUP()) {
+	$mintrust = PROJMEMBERTRUST_GROUPROOT();
     }
-    elsif ($access_type == TB_PROJECT_LEADGROUP) {
+    elsif ($access_type == TB_PROJECT_LEADGROUP()) {
 	#
 	# Allow mere user (in default group) to lead a subgroup.
 	# 
-	$mintrust = PROJMEMBERTRUST_USER;
+	$mintrust = PROJMEMBERTRUST_USER();
     }
-    elsif ($access_type == TB_PROJECT_MAKEOSID ||
-	   $access_type == TB_PROJECT_MAKEIMAGEID ||
-	   $access_type == TB_PROJECT_CREATEEXPT) {
-	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    elsif ($access_type == TB_PROJECT_MAKEOSID() ||
+	   $access_type == TB_PROJECT_MAKEIMAGEID() ||
+	   $access_type == TB_PROJECT_CREATEEXPT()) {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT();
     }
-    elsif ($access_type == TB_PROJECT_ADDUSER ||
-	   $access_type == TB_PROJECT_EDITGROUP) {
+    elsif ($access_type == TB_PROJECT_ADDUSER() ||
+	   $access_type == TB_PROJECT_EDITGROUP()) {
 	#
 	# If user is project_root or group_root in default group, 
 	# allow them to add/edit/remove users in any group.
 	#
-	if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
-		       PROJMEMBERTRUST_GROUPROOT)) {
+	if (TBMinTrust($self->Trust($user), PROJMEMBERTRUST_GROUPROOT())) {
 	    return 1;
 	}
 	#
 	# Otherwise, editing a group requires group_root 
 	# in that group.
 	#	
-	$mintrust = PROJMEMBERTRUST_GROUPROOT;
+	$mintrust = PROJMEMBERTRUST_GROUPROOT();
     }
-    elsif ($access_type == TB_PROJECT_BESTOWGROUPROOT) {
+    elsif ($access_type == TB_PROJECT_BESTOWGROUPROOT()) {
 	#
 	# If user is project_root, 
 	# allow them to bestow group_root in any group.
 	#
-	if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
-		       PROJMEMBERTRUST_PROJROOT)) {
+	if (TBMinTrust($self->Trust($user), PROJMEMBERTRUST_PROJROOT())) {
 	    return 1;
 	}
 
@@ -765,8 +763,7 @@ sub AccessCheck($$$)
 	    # Non-default group.
 	    # group_root in default group may bestow group_root.
 	    #
-	    if (TBMinTrust(TBGrpTrust($uid, $pid, $pid),
-			   PROJMEMBERTRUST_GROUPROOT)) {
+	    if (TBMinTrust($self->Trust($user), PROJMEMBERTRUST_GROUPROOT())) {
 		return 1;
 	    }
 
@@ -774,10 +771,10 @@ sub AccessCheck($$$)
 	    # group_root in the group in question may also bestow
 	    # group_root.
 	    #
-	    $mintrust = PROJMEMBERTRUST_GROUPROOT;
+	    $mintrust = PROJMEMBERTRUST_GROUPROOT();
 	}
     }
-    elsif ($access_type == TB_PROJECT_GROUPGRABUSERS) {
+    elsif ($access_type == TB_PROJECT_GROUPGRABUSERS()) {
 	#
 	# Only project_root or group_root in default group
 	# may grab (involuntarily add) users into groups.
@@ -785,10 +782,10 @@ sub AccessCheck($$$)
 	if (! $self->IsProjectGroup()) {
 	    return $self->GetProject()->AccessCheck($user, $access_type);
 	}
-	$mintrust = PROJMEMBERTRUST_GROUPROOT;
+	$mintrust = PROJMEMBERTRUST_GROUPROOT();
     }
-    elsif ($access_type == TB_PROJECT_DELUSER) {
-	$mintrust = PROJMEMBERTRUST_PROJROOT;
+    elsif ($access_type == TB_PROJECT_DELUSER()) {
+	$mintrust = PROJMEMBERTRUST_PROJROOT();
     }
     else {
 	print "*** Invalid access type: $access_type!\n";
@@ -1264,7 +1261,7 @@ sub UpdateStats($$$$$)
 		"        allexpt_pnode_duration+($pnodes * ${duration}) ".
 		"where gid_idx='$gid_idx'");
 
-    if ($mode eq TBDB_STATS_SWAPIN || $mode eq TBDB_STATS_START) {
+    if ($mode eq TBDB_STATS_SWAPIN() || $mode eq TBDB_STATS_START()) {
 	DBQueryWarn("update groups set ".
 		    " expt_last=now(),expt_count=expt_count+1 ".
 		    "where gid_idx='$gid_idx'");

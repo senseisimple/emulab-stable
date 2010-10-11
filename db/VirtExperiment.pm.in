@@ -14,7 +14,6 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use emdb;
 use emutil;
 use libtestbed;
@@ -304,7 +303,8 @@ sub Store($;$)
 	else {
 	    # Sanity check the fields.
 	    if (TBcheck_dbslot($val, "experiments", $key,
-			       TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+			       TBDB_CHECKDBSLOT_WARN()|
+			       TBDB_CHECKDBSLOT_ERROR())) {
 		$val = DBQuoteSpecial($val);
 		    
 		push(@setlist, "$key=$val");
@@ -949,7 +949,8 @@ sub Store($;$)
 	else {
 	    # Sanity check the fields.
 	    if (TBcheck_dbslot($val, $tablename, $key,
-			       TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+			       TBDB_CHECKDBSLOT_WARN()|
+			       TBDB_CHECKDBSLOT_ERROR())) {
 		push(@values, DBQuoteSpecial($val));
 	    }
 	    else {

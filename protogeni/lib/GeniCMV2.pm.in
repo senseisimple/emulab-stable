@@ -40,11 +40,7 @@ use emutil;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
 	     TBDB_NODESTATE_TBFAILED);
-use User;
 use Node;
-use OSinfo;
-use Image;
-use Interface;
 use English;
 use Data::Dumper;
 use XML::Simple;
@@ -52,7 +48,6 @@ use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
 use Experiment;
-use VirtExperiment;
 use Compress::Zlib;
 use MIME::Base64;
 

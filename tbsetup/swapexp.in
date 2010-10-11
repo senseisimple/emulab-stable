@@ -86,9 +86,6 @@ use Template;
 use Experiment;
 use User;
 
-# Be careful not to exit on transient error; 0 means infinite retry.
-$libdb::DBQUERY_MAXTRIES = 0;
-
 # For the END block below.
 my $cleaning = 0;
 my $justexit = 1;

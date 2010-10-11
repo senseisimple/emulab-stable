@@ -17,20 +17,12 @@ use GeniRegistry;
 use GeniAuthority;
 use GeniCredential;
 use GeniCertificate;
-use GeniAggregate;
 use GeniUser;
 use GeniHRN;
 use English;
 use Date::Parse;
 use Data::Dumper;
 use vars qw();
-
-# Do not load this for the Clearinghouse XML server.
-BEGIN { 
-    if (! defined($main::GENI_ISCLRHOUSE)) {
-	require Experiment;
-    }
-}
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -361,6 +353,7 @@ sub Flush($)
 sub GetExperiment($)
 {
     my ($self) = @_;
+    require Experiment;
 
     return undef
 	if (!ref($self));
@@ -658,6 +651,7 @@ sub SetRegisteredFlag($$)
 sub DeleteAll($$)
 {
     my ($class, $authority) = @_;
+    require GeniAggregate;
 
     my $uuid = $authority->uuid();
     my $query_result =

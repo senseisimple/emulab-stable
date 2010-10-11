@@ -121,12 +121,14 @@ SETUID_BIN_SCRIPTS  =
 SETUID_SBIN_SCRIPTS =
 SETUID_LIBX_SCRIPTS = 
 endif
+#COMPILED_TARGETS    = $(filter %.pm, $(TARGETS))
+COMPILED_TARGETS    = 
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(TARGETS)
+all:	$(TARGETS) $(addprefix compiled/, $(COMPILED_TARGETS))
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -362,3 +364,8 @@ $(INSTALL_DIR)/opsdir/sbin/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL) $< $@
+
+compiled/%: %
+	@echo "Compiling $< to $@"
+	-mkdir -p compiled
+	perlcc -I $(INSTALL_LIBDIR) -B -o $@ $<

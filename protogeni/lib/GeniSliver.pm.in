@@ -24,7 +24,6 @@ use GeniUsage;
 use GeniHRN;
 use GeniXML;
 use emutil;
-use Experiment;
 use OSinfo;
 use Node;
 use English;
@@ -446,6 +445,7 @@ sub SetState($$)
 sub GetExperiment($)
 {
     my ($self) = @_;
+    require Experiment;
 
     return undef
 	if (! ref($self));
@@ -570,7 +570,6 @@ use GeniSlice;
 use GeniCredential;
 use GeniCertificate;
 use GeniUtil;
-use Experiment;
 use emutil;
 use XML::Simple;
 use libdb qw(TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_NODESTATE_SHUTDOWN
@@ -718,7 +717,7 @@ sub Provision($;$)
     # a virt_nodes entry, and possibly more virt table entries, so that the
     # node will boot properly, and is otherwise controllable.
     #
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -789,7 +788,7 @@ sub UnProvision($;$)
     $nophysfree = 0
 	if (!defined($nophysfree));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -908,7 +907,7 @@ sub ProcessManifest($$)
     return -1
 	if (! ref($self));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -971,7 +970,7 @@ sub Start($$$)
     return -1
 	if (! ref($self));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -1035,7 +1034,7 @@ sub Stop($$)
     return -1
 	if (! ref($self));
 
-    my $experiment = Experiment->Lookup($self->slice_uuid());
+    my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
 	return -1;
@@ -1093,7 +1092,7 @@ sub ComputeStatus($$)
     #
     # If the sliver is "broken" then call it failed.
     #
-    if ($self->status() eq "broken") {
+    if ($self->status() eq "broken" || $self->status() eq "failed") {
 	$$pref = "failed";
 	return 0;
     }

@@ -14,11 +14,9 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use Node;
-use Experiment;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -702,6 +700,7 @@ sub SetRole($$)
 sub GetExperiment($)
 {
     my ($self) = @_;
+    require Experiment;
 
     return -1
 	if (!ref($self));
@@ -939,6 +938,7 @@ sub Initialize($)
     my %delays     = ();
     my %elabinelab = ();
     my %vinterfaces= ();
+    require Experiment;
 
     # Prevent vlan insertion above.
     $initialize = 1;

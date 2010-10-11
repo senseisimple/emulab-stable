@@ -9,36 +9,33 @@
 package emutil;
 use strict;
 use Exporter;
+use SelfLoader;
 use vars qw(@ISA @EXPORT);
-@ISA = "Exporter";
-@EXPORT = qw (TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
-	      TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
-	      TBGetUniqueIndex ParRun NoLogins);
+@ISA = qw(Exporter SelfLoader);
+@EXPORT = qw(TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
+	     TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
+	     TBGetUniqueIndex ParRun);
 
 use emdb;
 use English;
 
-# Configure variables
-my $TB		= "@prefix@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $EVENTSYS    = "@EVENTSYS@";
+#
+# Support for checking field values against what is specified.
+#
+use vars qw(%DBFieldData $DBFieldErrstr);
 
-if ($EVENTSYS) {
-    require event;
-    import event;
-}
+%DBFieldData   = ();
+$DBFieldErrstr = "";
+
+# _Always_ make sure that this 1 is at the end of the file...
+1;
+
+__DATA__
 
 # Constants for checkslot code.
 sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
 sub TBDB_CHECKDBSLOT_WARN()	{ 0x1; }
 sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
-
-#
-# Support for checking field values against what is specified.
-#
-my %DBFieldData;
-my $DBFieldErrstr = "";
 
 sub TBFieldErrorString() { return $DBFieldErrstr; }
 
@@ -289,6 +286,8 @@ sub ParRun($$$@)
     my @results  = ();
     my $counter  = 0;
     my $signaled = 0;
+    # We need this below.
+    require event;
 
     # options.
     my $maxchildren = 10;
@@ -357,10 +356,8 @@ sub ParRun($$$@)
 		$SIG{QUIT} = 'DEFAULT';
 		$SIG{HUP}  = 'DEFAULT';
 		
-		if ($EVENTSYS) {
-		    # So we get the event system fork too ...
-		    EventFork();
-		}
+		# So we get the event system fork too ...
+		event::EventFork();
 		exit(&$function($object));
 	    }
 	}
@@ -464,27 +461,4 @@ sub ParRun($$$@)
     return 0;
 }
 
-#
-# Check for nologins; web interface disabled means other interfaces
-# should be disabled. Not using libdb:GetSiteVar cause do not want to
-# drag all that stuff in. Predicate; retun 1 if no logins is set.
-#
-sub NoLogins()
-{
-    my $query_result =
-	DBQueryWarn("select value from sitevariables ".
-		    "where name='web/nologins'");
-
-    return 1
-	if (!$query_result);
-    return 0
-	if (!$query_result->numrows);
-    my ($value) = $query_result->fetchrow_array();
-
-    return ($value ? 1 : 0);
-}
-
-# _Always_ make sure that this 1 is at the end of the file...
-
 1;
-
