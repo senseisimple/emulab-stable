@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Perl code to access an XMLRPC server using http. Derived from the
@@ -21,7 +21,7 @@ use vars qw(@ISA @EXPORT);
 	      GENIRESPONSE_RPCERROR GENIRESPONSE_UNAVAILABLE
 	      GENIRESPONSE_SEARCHFAILED GENIRESPONSE_UNSUPPORTED
 	      GENIRESPONSE_BUSY GENIRESPONSE_EXPIRED GENIRESPONSE_INPROGRESS
-	      GENIRESPONSE);
+	      GENIRESPONSE GENIRESPONSE_STRING);
 
 use overload ('""' => 'Stringify');
 my $current_response = undef;
@@ -68,6 +68,12 @@ my @GENIRESPONSE_STRINGS =
      "Expired",
      "In Progress",
     );
+sub GENIRESPONSE_STRING($)
+{
+    my ($error) = @_;
+
+    return $GENIRESPONSE_STRINGS[$error] || "Unknown Error $error";
+}
 
 #
 # This is the (python-style) "structure" we want to return.

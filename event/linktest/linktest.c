@@ -26,7 +26,7 @@
 
 #define TRUE    1
 #define FALSE   0
-#define LINKTEST_SCRIPT CLIENT_BINDIR "/linktest.pl"
+#define LINKTEST_SCRIPT CLIENT_BINDIR "/elab_linktest.pl"
 #define MAX_ARGS 10
 
 static int	      debug;

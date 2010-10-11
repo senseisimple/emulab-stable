@@ -185,6 +185,9 @@ LanLink instproc init {s nodes bw d type} {
     # Default type is a plain "ethernet". User can change this.
     $self set protocol "ethernet"
 
+    # Default failure action.
+    $self set failureaction "fatal"
+
     # Colocation is on by default, but this only applies to emulated links
     # between virtual nodes anyway.
     $self set trivial_ok 1
@@ -360,7 +363,12 @@ Link instproc implemented_by {impl} {
 	    perror "\[$self implemented_by] no layer set in $impl!"
 	    return
 	}
-	if {$impl_layer >= $layer} {
+	# Special case.
+	if {$impl_layer == $layer && $layer != 2} {
+	    perror "\[$self implemented_by] $impl is at the same layer!"
+	    return
+	}
+	if {$impl_layer > $layer} {
 	    perror "\[$self implemented_by] $impl is not at a lower layer!"
 	    return
 	}
@@ -764,6 +772,7 @@ Link instproc updatedb {DB} {
     $self instvar sim
     $self instvar netmask
     $self instvar protocol
+    $self instvar failureaction
     $self instvar mustdelay
     $self instvar fixed_iface
     $self instvar layer
@@ -771,7 +780,7 @@ Link instproc updatedb {DB} {
     $self instvar ofenabled
     $self instvar ofcontroller
 
-    $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
+    $sim spitxml_data "virt_lan_lans" [list "vname" "failureaction"] [list $self $failureaction]
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -947,6 +956,7 @@ Lan instproc updatedb {DB} {
     $self instvar sim
     $self instvar netmask
     $self instvar protocol
+    $self instvar failureaction
     $self instvar accesspoint
     $self instvar settings
     $self instvar member_settings
@@ -960,7 +970,7 @@ Lan instproc updatedb {DB} {
 	return
     }
 
-    $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
+    $sim spitxml_data "virt_lan_lans" [list "vname" "failureaction"] [list $self $failureaction]
 
     #
     # Upload lan settings and them per-member settings

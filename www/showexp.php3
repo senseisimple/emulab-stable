@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -672,9 +672,16 @@ echo "<script type='text/javascript' language='javascript'>
         function ModifyAnno_cb(val) {
         }
         function Setup() {
-	    li = getObjbyName(li_current);
-            li.style.backgroundColor = 'white';
-            li.style.borderBottom = '1px solid white';
+	    var urllocation = location.href; //find url parameter
+	    if (urllocation && urllocation.indexOf('#') >= 0) {
+                var which = urllocation.substr(urllocation.indexOf('#') + 1);
+                Show(which);
+            }
+            else {
+	        li = getObjbyName(li_current);
+                li.style.backgroundColor = 'white';
+                li.style.borderBottom = '1px solid white';
+            }
         }
       </script>\n";
 
@@ -684,31 +691,37 @@ echo "<script type='text/javascript' language='javascript'>
 echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 echo "<li>
-          <a href=\"#A\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#settings\" ".
+               "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_settings\" onclick=\"Show('settings');\">".
                "Settings</a></li>\n";
 echo "<li>
-          <a href=\"#B\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#vis\" ".
+               "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_vis\" onclick=\"Show('vis');\">".
                "Visualization</a></li>\n";
 echo "<li>
-          <a href=\"#C\" class=topnavbar onfocus=\"this.hideFocus=true;\"  ".
+          <a href=\"#nsfile\" ".
+              "class=topnavbar onfocus=\"this.hideFocus=true;\"  ".
               "id=\"li_nsfile\" onclick=\"Show('nsfile');\">".
               "NS File</a></li>\n";
 echo "<li>
-          <a href=\"#D\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#details\" ".
+              "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
               "id=\"li_details\" onclick=\"Show('details');\">".
               "Details</a></li>\n";
 
 if ($instance) {
     echo "<li>
-              <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+              <a href=\"#anno\" ".
+	          "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	          "id=\"li_anno\" onclick=\"Show('anno');\">".
                   "Annotation</a></li>\n";
 }
 if ($HAVE_USER_VIS) {
     echo "<li>
-              <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+              <a href=\"#uservis\" ".
+	          "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	          "id=\"li_uservis\" onclick=\"Show('uservis');\">".
                   "User Visualization</a></li>\n";
 }

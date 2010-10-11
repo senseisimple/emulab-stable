@@ -9,7 +9,6 @@ import socket
 import os
 import os.path
 import stat
-import popen2
 import tempfile
 import time
 import re
@@ -4619,7 +4618,8 @@ class subboss:
 	# has permission to load the image in libosload so we don't need to
 	# check again in frisbeelauncher.  Only a subboss can make this request
 	# anyway.
-        (exitval, output) = runcommand(TBDIR + "/sbin/wap " + TBDIR + "/sbin/frisbeelauncher " + argstr)
+        (exitval, output) = runcommand(TBDIR + "/sbin/subboss_wrapper frisbeelauncher " + argstr)
+
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         

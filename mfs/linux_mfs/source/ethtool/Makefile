@@ -71,6 +71,7 @@ $(ETHTOOL_PATH)/ethtool: $(ETHTOOL_PATH)/.config-stamp
 $(TARGET_PATH)/usr/sbin/ethtool: $(ETHTOOL_PATH)/ethtool
 	install -d -m 755 $(TARGET_PATH)/usr
 	install -d -m 755 $(TARGET_PATH)/usr/bin
+	mkdir -p $(TARGET_PATH)/usr/sbin
 	install -m 755 $(ETHTOOL_PATH)/ethtool \
 		$(TARGET_PATH)/usr/sbin/ethtool
 	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/usr/sbin/ethtool

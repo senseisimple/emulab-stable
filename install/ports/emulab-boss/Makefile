@@ -9,7 +9,11 @@ OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/
 
 PORTNAME=	emulab-boss
 .if ${OSMAJOR} > 6
+.if ${OSMINOR} > 2
+PORTVERSION=	3.1
+.else
 PORTVERSION=	3.0
+.endif
 .else
 .if ${OSMAJOR} > 5
 .if ${OSMINOR} >= 3
@@ -30,6 +34,21 @@ COMMENT=	"Meta-port for an Emulab boss node"
 MAINTAINER=	testbed-ops@flux.utah.edu
 
 #
+# Select PHP and Apache versions
+# Fix up some port diffs
+#
+.if ${PORTVERSION} == "3.1"
+PHP_VER=	5
+PERL_VER=	5.10.1
+BOOST_PORT=	devel/boost-all
+P5SNMP_PORT=	misc/p5-SNMP
+.else
+PHP_VER=	4
+BOOST_PORT=	devel/boost
+P5SNMP_PORT=	net-mgmt/p5-SNMP
+.endif
+
+#
 # We set this so that the mysql server port doesn't do name resolution
 #
 .MAKEFLAGS+=	-DSKIP_DNS_CHECK
@@ -38,8 +57,12 @@ MAINTAINER=	testbed-ops@flux.utah.edu
 # We must make sure PERL is built with this.
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
+.if ${PORTVERSION} == "3.1"
+.MAKEFLAGS+=	PERL_VERSION=5.10.1 PERL_VER=5.10.1 PERL_ARCH=mach
+.else
 .if ${PORTVERSION} == "3.0"
 .MAKEFLAGS+=	PERL_VERSION=5.10.0 PERL_VER=5.10.0 PERL_ARCH=mach
+.endif
 .endif
 
 #
@@ -50,16 +73,22 @@ MAINTAINER=	testbed-ops@flux.utah.edu
 .MAKEFLAGS+=    WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes
 
 #
-# Have not taken the plunge to PHP5
+# For PHP, specify the version and that we want the Apache module
+# Version is specified via PHP_VER above.
 #
-.MAKEFLAGS+=	PHP_VER=4
+.MAKEFLAGS+=	WANT_PHP_MOD=yes
 
 #
 # Various ports need to agree on what version of apache. Make sure this
-# agrees with what is in the emulab-ops and emulab-php4 metaports.
+# agrees with what is in the emulab-ops and emulab-php* metaports.
 #
 .MAKEFLAGS+=	-DWITH_APACHE
 .MAKEFLAGS+=	APACHE_PORT=www/apache13-modssl
+
+#
+# Use the base version of openssl
+#
+.MAKEFLAGS+=	WITH_OPENSSL_BASE=yes
 
 #
 # This prevents any ports from trying to run interactively - some, like the
@@ -68,12 +97,13 @@ MAINTAINER=	testbed-ops@flux.utah.edu
 .MAKEFLAGS+=	-DBATCH
 
 #
-# XXX not really a build dependency, but needs to get installed before
-# any attempt to install mysql50-* ports
+# XXX not rbuild dependencies, but these Emulab-specific ports need to get
+# installed before any attempt to install the standard versions.
 #
-.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0" || ${PORTVERSION} == "3.1")
 BUILD_DEPENDS=	\
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old \
+	${LOCALBASE}/libexec/apache/libphp${PHP_VER}.so:${PORTSDIR}/misc/emulab-php${PHP_VER}
 .else
 BUILD_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
@@ -85,6 +115,10 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	mysqlclient.15:${PORTSDIR}/databases/mysql50-client \
 	snmp.4:${PORTSDIR}/net-mgmt/net-snmp4 \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
+
+.if ${OSMAJOR} >= 6
+LIB_DEPENDS+= xerces-c.27:${PORTSDIR}/textproc/xerces-c2
+.endif
 
 #
 # Until/unless the pubsub Makefile is changed, we must include libelvin.
@@ -110,7 +144,7 @@ RUN_DEPENDS=	\
 	anytopnm:${PORTSDIR}/graphics/netpbm \
 	tclsh8.4:${PORTSDIR}/lang/tcl84 \
 	otclsh:${PORTSDIR}/lang/otcl \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/net-mgmt/p5-SNMP \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/${P5SNMP_PORT} \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/SNMP_Session.pm:${PORTSDIR}/net-mgmt/p5-SNMP_Session \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
@@ -123,14 +157,14 @@ RUN_DEPENDS=	\
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
-	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
+	${LOCALBASE}/include/boost:${PORTSDIR}/${BOOST_PORT} \
 	gmake:${PORTSDIR}/devel/gmake \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \
 	mysqlhotcopy:${PORTSDIR}/databases/mysql50-scripts
 
-.if ${PORTVERSION} == "3.0"
+.if (${PORTVERSION} == "3.0" || ${PORTVERSION} == "3.1")
 # must handle patching of m2crypto when the port is built
 RUN_DEPENDS+=	\
 	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/misc/emulab-py-m2crypto
@@ -140,8 +174,8 @@ RUN_DEPENDS+=	\
 	${PYTHON_PKGNAMEPREFIX}m2crypto>0:${PORTSDIR}/security/py-m2crypto
 .endif
 
-.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
-.if ${PORTVERSION} == "3.0"
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0" || ${PORTVERSION} == "3.1")
+.if ${PORTVERSION} != "2.1"
 RUN_DEPENDS+=	\
 	dhcpd:${PORTSDIR}/net/isc-dhcp30-server
 .else
@@ -157,7 +191,6 @@ RUN_DEPENDS+=	\
 # not getting installed via dependencies?
 RUN_DEPENDS+=	\
 	${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries \
-	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/misc/emulab-php4 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/graphics/p5-GD
 .else
 # for old versions there used to be a problem with newer GD + older perl 
@@ -174,8 +207,8 @@ RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/Date/Parse.pm:${PORTSDIR}/devel/p5-TimeDate
 .else
 RUN_DEPENDS+= cvsup:${PORTSDIR}/net/cvsup-without-gui \
-	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/www/mod_php4 \
-	${LOCALBASE}/include/php/ext/openssl/php_openssl.h:${PORTSDIR}/lang/php4-extensions \
+	${LOCALBASE}/libexec/apache/libphp${PHP_VER}.so:${PORTSDIR}/www/mod_php${PHP_VER} \
+	${LOCALBASE}/include/php/ext/openssl/php_openssl.h:${PORTSDIR}/lang/php${PHP_VER}-extensions \
 	${LOCALBASE}/lib/tcl8.4/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI-137 \
 	swig1.1:${PORTSDIR}/devel/swig11 \
@@ -197,3 +230,4 @@ vars:
 	@echo "BUILD_DEPENDS=$(BUILD_DEPENDS)"
 	@echo "LIB_DEPENDS=$(LIB_DEPENDS)"
 	@echo "RUN_DEPENDS=$(RUN_DEPENDS)"
+	@echo "PERL_VER/ARCH=${PERL_VER}/${PERL_ARCH}"

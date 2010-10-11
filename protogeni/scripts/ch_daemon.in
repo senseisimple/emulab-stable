@@ -177,6 +177,30 @@ sub ProbeCMs()
 	     $up . "\n" . $down . "\n" . $disabled . "\n", $TBOPS);
 }
 
+#
+# Look for slices that have expired.  In theory this shouldn't be
+# necessary, since SAs should tell the CH when they unregister expired
+# slices and nobody should care about stale slice entries at the CH
+# anyway, but in practice it's helpful to expire stale CH records
+# because (a) we don't want to collect junk indefinitely from misbehaving
+# SAs and (b) old versions of the SA treated CH registration failure
+# as fatal and so wouldn't be able to reuse slice names if a stale
+# entry somehow survived at the CH.
+#
+sub ExpireSlices()
+{
+    if( !$impotent ) {
+	GeniDB::DBQueryWarn("delete from geni_slices ".
+			    "where UNIX_TIMESTAMP(now()) > ".
+			    "      UNIX_TIMESTAMP(expires) and ".
+			    "      shutdown is null");
+    }
+
+    # We've only updated the database and not cleaned out the stale
+    # entries from our cache, but that is about to be flushed anyway
+    # (see below).
+}
+
 while (1) {
     if (NoLogins()) {
 	sleep(5);
@@ -189,6 +213,7 @@ while (1) {
     $probe_countdown -= $SLEEP_INTERVAL;
     if ($probe_countdown <= 0) {
 	ProbeCMs();
+	ExpireSlices();
 	$probe_countdown = $PROBE_INTERVAL;
     }
 

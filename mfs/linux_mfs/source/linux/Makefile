@@ -1,6 +1,6 @@
 include ../../variables.mk
 
-LINUX_VERSION		=	2.6.27.8
+LINUX_VERSION		=	2.6.32.9
 LINUX_PATH		=	$(TARGET_BUILD_PATH)/linux-$(LINUX_VERSION)
 
 KERNEL_CONFIG	=	$(SOURCE_PATH)/linux/linux.config.$(MFS_ARCH)

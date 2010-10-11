@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -1767,7 +1767,7 @@ parse_configfile(char *filename)
 	while (fgets(buf, sizeof(buf), fp)) {
 		int cc = strlen(buf);
 		if (buf[cc-1] == '\n')
-			buf[cc-1] = (char) NULL;
+			buf[cc-1] = '\0';
 
 		if (!strncmp(buf, "UID=", 4)) {
 			if (user) {
@@ -1896,7 +1896,7 @@ parse_configfile_env(char *filename)
 		FILE *file;
 		
 		if (buf[cc-1] == '\n')
-			buf[cc-1] = (char) NULL;
+			buf[cc-1] = '\0';
 
 		if (isops)
 			bp = buf;

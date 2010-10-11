@@ -14,10 +14,122 @@ fi
 LOCKDIR=/var/lock/udhcpc.lock
 SUCCESS_FLAG=$BOOTDIR/myip
 
+parse_cached_pxe_lease() {
+	local broadcast=""
+	local netmask=""
+	local ip=""
+	local domain=""
+	local routers=""
+	local nameservers=""
+	local hostname=""
+	local mac=""
+	local iface=""
+	local ifcfg_opts=""
+	
+	echo "Trying cached PXE lease..."
+	
+	while read line; do
+		key=${line%%=*}
+		value=${line#*=}
+		
+		case $key in
+		OPT_BROADCAST_ADDRESS)
+			broadcast="$value"; ;;
+		OPT_SUBNET_MASK)
+			netmask="$value"; ;;
+		OPT_HOST_NAME)
+			hostname="$value"; ;;
+		OPT_DOMAIN_NAME)
+			domain="$value"; ;;
+		OPT_DNS_SERVER)
+			nameservers="$value"; ;;
+		OPT_ROUTER)
+			routers="$value"; ;;
+		GIADDR)
+			[ -z "$routers" ] && routers="$value"; ;;
+		YIADDR)
+			ip="$value"; ;;
+		CHADDR)
+			mac="$value"; ;;
+		esac
+	done
+		
+	for a in /sys/class/net/*/address; do
+		addr=`cat $a`
+		if [ "$addr" = "$mac" ]; then
+			iface=${a%/*}
+			iface=${iface##*/}
+			break
+		fi
+	done
+	
+	if [ -z "$iface" ]; then
+		echo "*** failed to find interface with mac $mac" 1>&2
+		return 1
+	fi
+	
+	if [ -n "$broadcast" ]; then
+		ifcfg_opts="$ifcfg_opts broadcast $broadcast"
+	fi
+	
+	if [ -n "$netmask" ]; then
+		ifcfg_opts="$ifcfg_opts netmask $netmask"
+	fi
+	
+	echo "configuring $iface with ip $ip, $ifcfg_opts"
+	/sbin/ifconfig $iface $ip $ifcfg_opts
+	
+	echo "deleting default routes"
+	while /sbin/route del default gw 0.0.0.0 dev $iface 2>/dev/null; do
+		:
+	done
+	
+	for gw in $routers; do
+		[ $gw = 0.0.0.0 ] && continue
+		echo "adding default route via $gw"
+		/sbin/route add default gw $gw dev $iface
+	done
+	
+	echo -n > /etc/resolv.conf
+	if [ -n "$domain" ]; then
+		echo "setting domain to $domain"
+		echo "search $domain" >> /etc/resolv.conf
+	fi
+	
+	for server in $nameservers; do
+		echo "adding nameserver $server"
+		echo "nameserver $server" >> /etc/resolv.conf
+	done
+		
+	if [ -n "$hostname" ]; then
+		echo "setting hostname to $hostname"
+		hostname $hostname
+		if [ -x /usr/share/udhcpc/sethostname.dhclient ]; then
+			/usr/share/udhcpc/sethostname.dhclient
+		fi
+	fi
+	
+	mkdir -p $BOOTDIR
+	echo $ip > $BOOTDIR/myip
+}
+
 start() {
 	interfaces=""
 	child_pids=""
+	
+ 	[ -f $SUCCESS_FLAG ] && return 0
+ 	
  	echo "Starting network..."
+ 	
+ 	if [ -f /pxe_dhcp_ack ] && [ -x /usr/bin/dhcp_packet_dump ]; then
+ 		/usr/bin/dhcp_packet_dump /pxe_dhcp_ack | \
+ 			parse_cached_pxe_lease
+ 		if [ $? -eq 0 ]; then
+ 			echo "Used cached PXE lease"
+ 			return 0
+ 		fi
+ 	fi
+ 			
 	for iface in `echo /sys/class/net/*`; do
 		iface=${iface##*/}
 		interfaces="$interfaces $iface"
@@ -32,7 +144,7 @@ start() {
 		time=`expr $time + 1`
 	done
 
-	if ! mkdir $LOCKDIR 2> /dev/null; then
+	if [ $time -ge $timeout ]; then
 		echo "*** ERROR: Timeout while searching for control network" 1>&2
 		echo "*** ERROR: Killing all dhcp clients..." 1>&2
 		kill -9 $child_pids
@@ -42,7 +154,7 @@ start() {
 		done
 		route del default
 		cat /dev/null > /etc/resolv.conf
-		rmdir $LOCKDIR
+		rm -rf $LOCKDIR
 
 		exit 1
 	fi
@@ -55,13 +167,13 @@ start() {
 
 	kill -9 $child_pids 2> /dev/null
 
-	rmdir $LOCKDIR
+	rm -rf $LOCKDIR
 
 	return $rc
 }
 
 stop() {
-	echo -n "Stopping network..."
+	echo "Stopping network..."
 	for iface in `echo /sys/class/net/*`; do
 		iface=${iface##*/}
 		[ $iface = 'lo' ] && continue

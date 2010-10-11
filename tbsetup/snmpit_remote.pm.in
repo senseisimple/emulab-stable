@@ -227,7 +227,7 @@ sub RemoteDeleteVlan($)
 {
     my $vlan      = shift();
 
-    return RemoteDoReset($vlan->id(), 0);
+    return RemoteDoReset(undef, 0, ($vlan->id()));
 }
 
 #

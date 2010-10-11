@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -233,7 +233,6 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/extract_image_info $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/mount_bsd_slice $(BINDIR)
 	$(INSTALL) -m 755 $(SRCDIR)/get_edd_map $(BINDIR)
-	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc
 
 sfs-install:

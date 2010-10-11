@@ -16,10 +16,11 @@ sub InstallUpdate($$)
     #
     if ($phase eq "pre") {
 	Phase "xerces-c2", "Checking xerces-c2 status", sub {
-	    Phase "port", "Checking for port xerces-c2", sub {
-		DoneIfPackageInstalled("xerces-c2");
+	    Phase "port", "Installing port xerces-c2", sub {
+		DoneIfPackageInstalled("xerces");
 		ExecQuietFatal("cd $PORTSDIR/textproc/xerces-c2; ".
-			       "make -DBATCH install");
+			       "make clean; make rmconfig; ".
+			       "make -DBATCH WITH_DEBUG=on install");
 	    };
 	    Phase "reconfig", "Checking to see if reconfigure needed", sub {
 		PhaseSkip("No reconfig needed")

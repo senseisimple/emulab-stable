@@ -8,7 +8,11 @@ OSMINOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/[0-9][0-9]*\.\([0-9][0-9]*\).*/
 
 PORTNAME=	emulab-ops
 .if ${OSMAJOR} > 6
+.if ${OSMINOR} > 2
+PORTVERSION=	3.1
+.else
 PORTVERSION=	3.0
+.endif
 .else
 .if ${OSMAJOR} > 5
 .if ${OSMINOR} >= 3
@@ -29,6 +33,17 @@ COMMENT=	"Meta-port for an Emulab ops node"
 MAINTAINER=	testbed-ops@flux.utah.edu
 
 #
+# Select PHP and Apache versions
+# Fix up some port diffs
+#
+.if ${PORTVERSION} == "3.1"
+PHP_VER=	5
+PERL_VER=	5.10.1
+.else
+PHP_VER=	4
+.endif
+
+#
 # We set this so that the mysql server port doesn't do name resolution
 #
 .MAKEFLAGS+=	-DSKIP_DNS_CHECK
@@ -37,8 +52,12 @@ MAINTAINER=	testbed-ops@flux.utah.edu
 # We must make sure PERL is built with this.
 #
 .MAKEFLAGS+=	ENABLE_SUIDPERL=yes
+.if ${PORTVERSION} == "3.1"
+.MAKEFLAGS+=	PERL_VERSION=5.10.1 PERL_VER=5.10.1 PERL_ARCH=mach
+.else
 .if ${PORTVERSION} == "3.0"
 .MAKEFLAGS+=	PERL_VERSION=5.10.0 PERL_VER=5.10.0 PERL_ARCH=mach
+.endif
 .endif
 
 #
@@ -49,14 +68,16 @@ MAINTAINER=	testbed-ops@flux.utah.edu
 .MAKEFLAGS+=    WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes
 
 #
-# Have not taken the plunge to PHP5
+# For PHP, specify the version and that we want the Apache module
+# Version is specified via PHP_VER above.
 #
-.MAKEFLAGS+=	PHP_VER=4
+.MAKEFLAGS+=	WANT_PHP_MOD=yes
 
 #
 # Various ports need to agree on what version of apache. Make sure this
-# agrees with what is in the emulab-ops and emulab-php4 metaports.
+# agrees with what is in the emulab-ops and emulab-php* metaports.
 #
+.MAKEFLAGS+=	-DWITH_APACHE
 .MAKEFLAGS+=	APACHE_PORT=www/apache13-modssl
 
 #
@@ -71,12 +92,13 @@ MAINTAINER=	testbed-ops@flux.utah.edu
 .MAKEFLAGS+=	-DBATCH
 
 #
-# XXX not really a build dependency, but needs to get installed before
-# any attempt to install mysql50-* ports
+# XXX not rbuild dependencies, but these Emulab-specific ports need to get
+# installed before any attempt to install the standard versions.
 #
-.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0" || ${PORTVERSION} == "3.1")
 BUILD_DEPENDS=	\
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/misc/p5-DBD-mysql50-old \
+	${LOCALBASE}/libexec/apache/libphp${PHP_VER}.so:${PORTSDIR}/misc/emulab-php${PHP_VER}
 .else
 BUILD_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-DBD-mysql50
@@ -109,7 +131,7 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 RUN_DEPENDS+= ${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind
 .endif
 
-.if ${PORTVERSION} == "3.0"
+.if (${PORTVERSION} == "3.0" || ${PORTVERSION} == "3.1")
 # must handle patching of m2crypto when the port is built
 # also needs swig to install!
 RUN_DEPENDS+=	\
@@ -142,7 +164,7 @@ RUN_DEPENDS+= \
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 .endif
 
-.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0")
+.if (${PORTVERSION} == "2.1" || ${PORTVERSION} == "3.0" || ${PORTVERSION} == "3.1")
 # not sure why this is just needed for 6.3
 RUN_DEPENDS+= ${X11BASE}/libdata/xorg/libraries:${PORTSDIR}/x11/xorg-libraries
 .endif

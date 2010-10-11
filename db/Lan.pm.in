@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007-2009 University of Utah and the Flux Group.
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Lan;
@@ -1389,6 +1389,22 @@ sub GetNodeIface($$$)
     return 0;
 }
 
+#
+# Get the Interface structure.
+#
+sub GetInterface($)
+{
+    my ($self) = @_;
+    my $node;
+    my $iface;
+
+    require Interface;
+
+    return -1
+	if ($self->GetNodeIface(\$node, \$iface));
+
+    return Interface->LookupByIface($node, $iface);
+}
 
 ############################################################################
 #
@@ -2584,7 +2600,8 @@ sub ExperimentVLans($$$)
 	DBQueryWarn("select l.lanid from lans as l ".
 		    "left join lan_attributes as la on ".
 		    "  la.lanid=l.lanid and la.attrkey='class' ".
-		    "where l.type='vlan' and l.exptidx='$exptidx' and ".
+		    "where (l.type='vlan' or l.type='wire') ".
+                    " and l.exptidx='$exptidx' and ".
 		    "      (la.attrvalue='Experimental' or ".
 		    "       la.attrvalue is null)");
     return -1

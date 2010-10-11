@@ -1095,14 +1095,15 @@ sub LoadVirtNodes($)
 	$vnode->_isdedremote($isded);
 	# Set below from a desire.
 	$vnode->_sharedokay(0);
+	$vnode->_fixedvm(undef);
 
 	# For a list of interfaces on this node, as for rspec generation
 	$vnode->_virtifaces([]);
 
 	# The mapped osname to actual osinfo structure.
 	$vnode->_osinfo(undef);
-	# If the virtnode tries to specify its parent os in addition to its own,
-	# store that osinfo here.
+	# If the virtnode tries to specify its parent os in addition
+	# to its own, store that osinfo here.
 	$vnode->_parent_osinfo(undef);
 	# Eventual physical mapping. 
 	$vnode->_physnode(undef);
@@ -1135,6 +1136,12 @@ sub LoadVirtNodes($)
 	if (defined($fixed) && $fixed ne "") {
 	    # Store the name since we use FIXED_NODES for delay nodes too.
 	    $self->fixednodes()->{$vname} = $fixed;
+
+	    # We do not know until all the nodes are loaded, if fixing
+	    # to a physical node or another node in the topology. See
+	    # the post pass loop below.
+	    $vnode->_fixedvm($fixed)
+		if ($isvirt);
 	}
 	else {
 	    $vnode->fixed(undef);
@@ -1260,6 +1267,59 @@ sub LoadVirtNodes($)
 	# Add to the list.
 	$self->vnodes()->{$vname} = $vnode;
     }
+
+    #
+    # Go back and look for any VMs that were fixed to nodes. Need to make
+    # the OS consistent.
+    #
+    foreach my $vname (sort(keys(%{ $self->{'VNODES'} }))) {
+	my $vnode = $self->vnodes()->{$vname};
+	my $osid;
+
+	next
+	    if ($vnode->_isgeninode());
+
+	next
+	    if (! ($vnode->_isvirtnode() && $vnode->_fixedvm()));
+	
+	my $fixnode = $self->vnodes()->{$vnode->_fixedvm()};
+	#
+	# If the node is fixed to a physical node, skip. This is a
+	# plain old fixnode operation, not our new support for fixing
+	# a VM to a real node in the topology.
+	#
+	if (!defined($fixnode)) {
+	    # Lets make sure its a real node.
+	    my $fixvname = $vnode->_fixedvm();
+	    
+	    if (!defined(Node->Lookup($fixvname))) {
+		tberror("Cannot fix $vnode to $fixvname; No such node\n");
+		return -1;
+	    }
+	    $vnode->_fixedvm(undef);
+	    next;
+	}
+
+	if (defined($vnode->_parent_osinfo())) {
+	    $osid = $vnode->_parent_osinfo()->osid();
+	}
+	else {
+	    $osid  = ($self->option("jail_osid") ||
+		      $self->nodejailosid($vnode));
+	}
+	return -1
+	    if (!defined($osid));
+	my $osinfo = OSinfo->Lookup($osid);
+	return -1
+	    if (!defined($osinfo));
+	
+	$fixnode->_osinfo($osinfo);
+	# Convert from the name to the local object.
+	$vnode->_fixedvm($fixnode);
+
+	$self->printdb("Fixing VM $vname to $fixnode, $osinfo\n");
+    }
+    
     return 0;
 }
 
@@ -1590,6 +1650,14 @@ sub GenVirtNodes($)
 	my $type  = $vnode->type();
 
 	#
+	# If the user specifed that a VM is fixed to a particular
+	# node in the topo, do not insert that into the top file.
+	# These are handled later in a post pass after assign runs.
+	#
+	next
+	    if ($vnode->_isvirtnode() && $vnode->_fixedvm());
+
+	#
 	# Temporary rpsec generation.
 	#
 	if ($vnode->_isgeninode()) {
@@ -1699,7 +1767,7 @@ sub GenVirtNodes($)
 		}
 		else {
 		    $desires->{"OS-" . $posinfo->osid()} = ['', 1.000000];
-		    $desires->{"OS-" . $posinfo->osid()-$osinfo->osid()} =
+		    $desires->{"OS-" . $posinfo->osid() . "-" . $osinfo->osid()} =
 			['', 1.000000];
 		}
 	    }
@@ -1709,7 +1777,7 @@ sub GenVirtNodes($)
 		}
 		else {
 		    $desires->{"OS-" . $posinfo->osid()} = ['', 1.000000];
-		    $desires->{"OS-" . $posinfo->osid()-$osinfo->osid()} =
+		    $desires->{"OS-" . $posinfo->osid() . "-" . $osinfo->osid()} =
 			['', 1.000000];
 		}
 	    }
@@ -1783,7 +1851,17 @@ sub GenFixNodes($)
 	#
 	next
 	    if (defined($vnode) && $vnode->_isgeninode());
-	
+
+	#
+	# When fixing a vnode to a particular physnode, ignore the 
+	# fix specification here; we do this as a post pass, and
+	# assume the user knows what she is doing (the number of
+	# nodes is okay for the machine).
+	#
+	next
+	    if (defined($vnode) && 
+		$vnode->_isvirtnode() && defined($vnode->_fixedvm()));
+
 	if ($self->isatoponode($vname) || $self->isadelaynode($vname)) {
 	    $self->createFixedNode($vname, $fixed);
 	}
@@ -2597,6 +2675,18 @@ sub GenVirtLans($)
 		    if ($trivial_ok) {
 			$others->{'trivial_ok'} = 1;
 		    }
+		    #
+		    # If the virtnode is a VM and it has been fixed to
+		    # a topology node, then we have to use that node
+		    # name, since the VM names do not appear in the vtop.
+		    #
+		    if (defined($virtnode0->_fixedvm())) {
+			$vname0 = $virtnode0->_fixedvm()->vname();
+		    }
+		    if (defined($virtnode1->_fixedvm())) {
+			$vname1 = $virtnode1->_fixedvm()->vname();
+		    }
+		    
 		    if ($fixsrc ne '') {
 			if (!exists($others->{'fixiface'})) {
 			    $others->{'fixiface'} = [];
@@ -2712,6 +2802,9 @@ sub GenVirtLans($)
 		if ($emulated) {
 		    $others->{'emulated'} = 1;
 		}
+		if ($layer == 1) {
+		    $protocol = "wire";
+		}
 		
 		if ($trivial_ok) {
 		    $others->{'trivial_ok'} = 1;
@@ -2750,6 +2843,17 @@ sub GenVirtLans($)
 		    $self->vlinks()->{"$vlan"} = $plink;
 		}
 		else {
+		    #
+		    # If the virtnode is a VM and it has been fixed to
+		    # a topology node, then we have to use that node
+		    # name, since the VM names do not appear in the vtop.
+		    #
+		    if (defined($virtnode0->_fixedvm())) {
+			$vname0 = $virtnode0->_fixedvm()->vname();
+		    }
+		    if (defined($virtnode1->_fixedvm())) {
+			$vname1 = $virtnode1->_fixedvm()->vname();
+		    }
 		    $self->createLink($plink, $cmid, $vname0, $vname1, $bw, 
 				      $protocol, $others);
 		}
@@ -2945,6 +3049,15 @@ sub GenVirtLans($)
 			if ($trivial_ok) {
 			    $others->{'trivial_ok'} = 1;
 			}
+			#
+			# If the virtnode is a VM and it has been fixed to
+			# a topology node, then we have to use that node
+			# name, since the VM names do not appear in the vtop.
+			#
+			if (defined($virtnode->_fixedvm())) {
+			    $vnodevname = $virtnode->_fixedvm()->vname();
+			}
+		    
 			if ($fixsrc0) {
 			    if(!exists($others->{'fixiface'})) {
 				$others->{'fixiface'} = [];
@@ -3029,6 +3142,15 @@ sub GenVirtLans($)
 		    if ($trivial_ok) {
 			$others->{'trivial_ok'} = 1;
 		    }
+		    #
+		    # If the virtnode is a VM and it has been fixed to
+		    # a topology node, then we have to use that node
+		    # name, since the VM names do not appear in the vtop.
+		    #
+		    if (defined($virtnode->_fixedvm())) {
+			$vnodevname = $virtnode->_fixedvm()->vname();
+		    }
+		    
 		    if ($fixsrc0) {
 			if (!exists($others->{'fixiface'})) {
 			    $others->{'fixiface'} = [];
@@ -3052,7 +3174,7 @@ sub GenVirtLans($)
 			    [$delay,$bw,$backfill,$loss,
 			     $rdelay,$rbw,$rbackfill,$rloss,1.000000];
 		    }
-		    $self->createLink("linklan/$vname/$member", $cmid,
+		    $self->createLink($plink, $cmid,
 				      "$vnodevname", "lan/$vname", 
 				      ($top_bw == 0 ? "*" : $top_bw), 
 				      $protocol, $others);
@@ -3248,7 +3370,7 @@ sub PrintXML($;$)
 }
 
 #
-# One time initializaton for a vtop. 
+# One time initialization for a vtop. 
 #
 sub CreateVtop($)
 {
@@ -3629,6 +3751,7 @@ sub solution_v2p($)	  { return $_[0]->{'SOLUTION'}->{'V2P'}; }
 sub solution_v2v($)	  { return $_[0]->{'SOLUTION'}->{'V2V'}; }
 sub solution_plinks($)	  { return $_[0]->{'SOLUTION'}->{'PLINKS'}; }
 sub solution_virtnodes($) { return $_[0]->{'SOLUTION'}->{'VIRTNODES'}; }
+sub solution_delaynodes($){ return $_[0]->{'SOLUTION'}->{'DELAYNODES'}; }
 sub solution_rtabmap($)	  { return $_[0]->{'SOLUTION'}->{'RTABMAP'}; }
 sub solution_vethmap($)   { return $_[0]->{'SOLUTION'}->{'VETHMAP'}; }
 sub solution_vethpatch($) { return $_[0]->{'SOLUTION'}->{'VETHPATCHES'}; }
@@ -3669,6 +3792,7 @@ sub ClearSolution($)
     $self->{'SOLUTION'}->{'V2V'}         = {};
     $self->{'SOLUTION'}->{'PLINKS'}      = {};
     $self->{'SOLUTION'}->{'VIRTNODES'}   = {};
+    $self->{'SOLUTION'}->{'DELAYNODES'}  = {};
     $self->{'SOLUTION'}->{'RTABMAP'}     = {};
     $self->{'SOLUTION'}->{'VETHMAP'}     = {};
     $self->{'SOLUTION'}->{'VETHPATCHES'} = {};
@@ -4044,6 +4168,23 @@ sub InterpNodes($)
 {
     my ($self) = @_;
 
+    #
+    # Pre pass; if the user fixed VMs to specific nodes, then have to
+    # augment the solution.
+    #
+    foreach my $vname (sort(keys(%{ $self->fixednodes() }))) {
+	my $vnode = $self->vnodes()->{$vname};
+	my $fixed = $self->fixednodes()->{$vname};
+
+	# Delay and internal nodes do not have an entry in vnodes().
+	next
+	    if (! (defined($vnode) &&
+		   $vnode->_isvirtnode() && $vnode->_fixedvm()));
+
+	$self->AddNodeToSolution($vname, $self->solution()->{'V2P'}->{$fixed})
+	    if (!exists($self->solution()->{'V2P'}->{$vname}));
+    }
+
     foreach my $virtual (keys(%{ $self->solution()->{'V2P'} })) {
 	my $physical = $self->solution()->{'V2P'}->{$virtual};
 	my $pnode    = $self->pnodes()->{$physical};
@@ -4144,6 +4285,11 @@ sub InterpNodes($)
 		tbwarn("Unknown node $virtual on $physical\n");
 		return -1;
 	    }
+	    if (!exists($self->solution_delaynodes()->{$physical})) {
+		$self->solution_delaynodes()->{$physical} = [];
+	    }
+	    push(@{$self->solution_delaynodes()->{$physical}}, $virtual);
+	    
 	}
 	elsif ($virtnode->_isvirtnode()) {
 	    #
@@ -4503,6 +4649,8 @@ sub AllocNodes($)
 	# Routing table id for each vnode on a pnode. Do not use 0.
 	$pnode->_rtabid(1);
 	# For assigning dynamic ports.
+	$pnode->_portarray(undef);
+	$pnode->_portlow(TBDB_LOWVPORT);
 	$pnode->_portnext(TBDB_LOWVPORT);
 	$pnode->_porthigh(TBDB_MAXVPORT);
 	# To avoid unitialized access.
@@ -4552,7 +4700,6 @@ sub AllocNodes($)
 		#
 		if ($virtnode->_onsharednode()) {
 		    foreach my $virtlan ($virtnode->memberlist()) {
-			$virtlan->_needvlan(1);
 			$virtlan->_encapstyle("vlan");
 		    }
 		}
@@ -4582,13 +4729,24 @@ sub AllocNodes($)
 	    $vpnode->isremotenode() || $vpnode->_onsharednode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
-	    my $sshdport  = nextipportnum($pnode);
+	    my $sshdport;
 
-	    return -1
-		if ($sshdport < 0);
+	    #
+	    # XXX What an absurd DB default for this! Should be null.
+	    #
+	    if (exists($self->current_v2v()->{$vnodename}) &&
+		$vpnode->sshdport() != 11000) {
+		
+		$sshdport = $vpnode->sshdport();
+		$self->printdb("sshdport: Reusing $sshdport on $vpnode\n");
+	    }
+	    else {
+		$sshdport = nextipportnum($pnode);
+		return -1
+		    if ($sshdport < 0);
 
-	    $self->printdb("sshdport: ".
-			   "$vnodename $vpnodename $pnodename $sshdport\n");
+		$self->printdb("sshdport: Using $sshdport on $vpnode\n");
+	    }
 
 	    DBQueryWarn("update nodes set sshdport=$sshdport ".
 			"where node_id='$vpnodename'")
@@ -4846,7 +5004,7 @@ sub AllocVirtNodes($)
 		return -1;
 	    }
 
-	    $self->solution_v2v()->{$virtual}  = $virtphys;
+	    $self->solution_v2v()->{$virtual} = $virtphys;
 	    $self->printdb("  Mapping $virtual to $virtphys on $physical\n");
 
 	    #
@@ -4969,6 +5127,7 @@ sub InterpLinks($)
 					 
 	$protovlan->SetRole("encapsulation");
 	$protovlan->SetType("vlan");
+	$protovlan->SetAttribute("link/lan", "sharedlan");
 	$protovlan->SetEncapStyle("default");
 	# Total hack ... see snmpit.
 	$protovlan->SetAttribute("trunk_mode", "dual");
@@ -5163,6 +5322,8 @@ sub InterpLinksAux($)
 	    $protolandst->SetType("vlan");
 	    $protolansrc->SetRole("delay");
 	    $protolandst->SetRole("delay");
+	    $protolansrc->SetAttribute("link/lan", $lan);
+	    $protolandst->SetAttribute("link/lan", $lan);
 	    $protolan->SetRole("link/lan");
 	    $protolan->AddInterface($nodeC, $vnodeC, $vportC, $portC);
 	    $protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -5228,6 +5389,7 @@ sub InterpLinksAux($)
 						$protolan);
 		$protolanlan->SetType("vlan");
 		$protolanlan->SetRole("delay");
+		$protolanlan->SetAttribute("link/lan", $lan);
 	    }
 	    $protolanlan->AddMember($nodeD, $portD);
 	
@@ -5236,6 +5398,7 @@ sub InterpLinksAux($)
 						$protolan);
 	    $protolanlink->SetType("vlan");
 	    $protolanlink->SetRole("delay");
+	    $protolanlink->SetAttribute("link/lan", $lan);
 	    $protolanlink->AddMember($nodeA, $portA);
 	    $protolanlink->AddMember($nodeB, $portB);
 
@@ -5302,8 +5465,9 @@ sub InterpLinksAux($)
 		    # supervlan since a nodeport can be in just a single vlan.
 		    #
 		    #
-		    if ($virtnodeA->_onsharednode() ||
-			$virtnodeB->_onsharednode() || $virtlan->_needvlan()) {
+		    if (!$virtlan->_sharednodes() ||
+			$virtlan->_sharednodes() ||
+			$virtlan->_needvlan()) {
 			my $lanid = "v" . "$lan" . $vlanid++;
 
 			$protovlan = ProtoLan->Create($experiment, $lanid,
@@ -5383,6 +5547,7 @@ sub InterpLinksAux($)
 						  $self->alloconly());
 		    $protolink->SetType("vlan");
 		    $protolink->SetRole("link/lan");
+		    $protolink->SetAttribute("link/lan", $lan);
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
 		}
@@ -5471,7 +5636,9 @@ sub InterpLinksAux($)
 		    #
 		    my $protovlan;
 		    
-		    if (!$virtlan->_sharednodes() || $virtlan->_needvlan()) {
+		    if (!$virtlan->_sharednodes() ||
+			$virtlan->_sharednodes() ||
+			$virtlan->_needvlan()) {
 			if (exists($protovlans{$lan})) {
 			    $protovlan = $protovlans{$lan};
 			}
@@ -5589,9 +5756,11 @@ sub InterpLinksAux($)
 						 $protolan);
 			    $protolanlan->SetType("vlan");
 			    $protolanlan->SetRole("delay");
+			    $protolanlan->SetAttribute("link/lan", $lan);
 			}
 			else {
 			    $protolan->SetType("vlan");
+			    $protolan->SetAttribute("link/lan", $lan);
 			}
 			$protolan->SetRole("link/lan");
 		    }
@@ -5703,23 +5872,92 @@ sub InitializePhysNodes($)
     # Init each pnode.
     #
     foreach my $pnodename (keys(%{ $self->solution_p2v() })) {
-    	#
-	# When initializing physical nodes, we can determine
-	# everything we need from the first virtual node (since
-	# there will be multiple vnodes/simnodes on each pnode).
+	my $pnode = $self->pnodes()->{$pnodename};
+	
+	$pnode->FlushReserved();
+	my $reservation = $pnode->Reservation();
+
 	#
-    	my $vnodename = $self->solution_p2v()->{$pnodename}[0];
-	    
-	$self->InitializePhysNode($pnodename, $vnodename) == 0
+	# We should never try to initialize a node that is not
+	# allocated to the experiment. 
+	#
+	# This case covers shared nodes as well since the phys node
+	# is in a holding experiment.
+	#
+	if ((!defined($reservation) || 
+	     !$self->experiment()->SameExperiment($reservation))) {
+	    if (defined($pnode->sharing_mode())) {
+		$self->printdb("InitPnode: Skipping shared host $pnodename\n");
+		next;
+	    }
+	    elsif (! ($self->impotent() && 
+		      exists($self->solution()->{'TORESERVE'}->{$pnodename}))){
+		tbinfo("InitPnode: Skipping $pnodename; reserved elsewhere\n");
+		next;
+	    }
+	}
+	
+	#
+	# Physical nodes can be plain nodes in the topo, delay nodes,
+	# internal nodes hosting other things (like virtual nodes),
+	# etc. Determine the role the node is going to play, and
+	# initialize it based on that role. Note that I am ignoring
+	# the simulation code these days since it no longer works and
+	# no one understands it.
+	#
+	# XXX A node cannot play multiple roles. This is unfortunate. 
+	#
+	my @vnodelist = @{ $self->solution_p2v()->{$pnodename} };
+    	my $vnodename;
+	my $role      = TBDB_RSRVROLE_NODE;
+
+	if (exists($self->solution_delaynodes()->{$pnodename})) {
+	    $role = TBDB_RSRVROLE_DELAYNODE;
+	    # Need only one of the virtnodes to complete the initialization
+	    $vnodename = $vnodelist[0];
+	}
+	elsif (exists($self->solution_virtnodes()->{$pnodename})) {
+	    $role = TBDB_RSRVROLE_VIRTHOST;
+	    #
+	    # Since we allow a VM to be "fixed" to a node in the topology, it
+	    # is possible that a physnode has two roles; its normal node role
+	    # and its role as a virthost. We want to initialize the pnode
+	    # for the VIRTHOST role, but using the normal node virtnode, not
+	    # one of the VM virtnodes. The only reason for using the VM
+	    # virtnode, is when we have to use the VM to figure out what
+	    # OS to run on the internally created pnode.
+	    #
+	    foreach my $vname (@vnodelist) {
+		my $virtnode = $self->vnodes()->{$vname};
+
+		# Find the one real node. Icky.
+		if (!$virtnode->_isvirtnode()) {
+		    $vnodename = $vname;
+		    last;
+		}
+	    }
+	    $vnodename = $vnodelist[0]
+		if (!defined($vnodename));
+	}
+	else {
+	    $vnodename = $vnodelist[0];
+	}
+	$self->InitializePhysNode($pnodename, $role, $vnodename) == 0
 	    or return -1;
     }
-    # Now do virtual nodes on each pnode.
+
+    #
+    # Now do each of the virtual physical nodes (pcvmxxx-yyy). These
+    # are naturally plain nodes and always one-to-one.
+    #
     foreach my $vnodename (keys(%{ $self->solution_v2v() })) {
 	my $vpnodename = $self->solution_v2v()->{$vnodename};
 
-	$self->InitializePhysNode($vpnodename, $vnodename) == 0
+	$self->InitializePhysNode($vpnodename, 
+				  TBDB_RSRVROLE_NODE, $vnodename) == 0
 	    or return -1;
     }
+    
     #
     # XXX This is here cause vnames were not set until now. Need to move.
     #
@@ -5739,13 +5977,14 @@ sub InitializePhysNodes($)
 #
 sub InitializePhysNode($$$)
 {
-    my ($self, $pnodename, $vnodename) = @_;
-    my $pnode  = $self->pnodes()->{$pnodename};
+    my ($self, $pnodename, $role, $vnodename) = @_;
+    my $pnode = $self->pnodes()->{$pnodename};
 
     $self->printdb("InitPnode: $pnodename,$vnodename\n");
 
     # If this is a node in the topology (in the vnodes() array) then
-    # there must be a virtual physical node.
+    # there must be a virtual physical node (which might be the same
+    # as the pnode if its a plain node, not a VM or subnode).
     my $virtnode;
     my $vpnode;
     if (exists($self->vnodes()->{$vnodename})) {
@@ -5756,88 +5995,34 @@ sub InitializePhysNode($$$)
 	    return -1;
 	}
     }
-    $pnode->FlushReserved();
-    my $reservation = $pnode->Reservation();
     
-    my %nodesets = ();
-    my %rsrvsets = ();
+    my %nodesets     = ();
+    my %rsrvsets     = ();
+    my $cmdline_role = "default";
+    my $cmdline      = "";
+    my $vname;
     my $osid;
+    my $routertype;
 
-    # XXX NSE hack. The pnode is hosting simnodes.
-    if (defined($vpnode) && $vpnode->issimnode()) {
-	my $osid = $self->options()->{'sim_osid'};
-	my $cmdline = $self->osidbootcmd($osid, "vnodehost", "/kernel.jail");
-	if (!defined($cmdline)) {
-	    tberror("Error determining boot command line for $pnode");
-	    return -1;
-	}
-	%nodesets = ("def_boot_cmd_line" => $cmdline,
-		     "startstatus"       => 'none',
-		     "bootstatus"        => 'unknown',
-		     "ready"             => 0,
-		     "rpms"              => '',
-		     "deltas"            => '',
-		     "tarballs"          => '',
-		     "startupcmd"        => '',
-		     "failureaction"     => '',
-		     "routertype"        => TBDB_ROUTERTYPE_STATIC());
-
-	%rsrvsets = ("vname"             => $self->newvname($pnodename,
-							    "simhost"),
-		     "erole"             => TBDB_RSRVROLE_SIMHOST,
-		     "simhost_violation" => 0);
-    }
-    elsif ($pnode->isremotenode() &&
-	   !$pnode->isvirtnode() &&
-	   !$pnode->isdedicatedremote() &&
-	   (!defined($reservation) || 
-	    !$self->experiment()->SameExperiment($reservation))) {
-	#
-	# Certain kinds of nodes are not actually allocated to the
-	# experiment. 
-	#
-	return 0;
-    }
-    elsif (!$pnode->isremotenode() &&
-	   (!defined($vpnode) ||
-	    exists($self->solution_virtnodes()->{$pnodename}))) {
-
-	#
-	# Watch for a local shared node that is not actually part of
-	# this experiment; just skip it since it was setup when its
-	# holding experiment swapped it in.
-	#
-	if (defined($pnode->sharing_mode()) && !$pnode->isvirtnode() &&
-	    $pnode->erole() eq "sharedhost") {
-	    $self->printdb("InitPnode: Skipping shared host $pnode\n");
-	    return 0;
-	}
-    
+    if ($role eq TBDB_RSRVROLE_DELAYNODE() ||
+	($role eq TBDB_RSRVROLE_VIRTHOST() && $virtnode->_isvirtnode())) {
 	#
 	# One of our internally created nodes. 
 	#
-	my $routertype;
-	my $cmdline_role = "default";
-	my $cmdline      = "";
-	my $vname;
-	my $role;
-
-	if (exists($self->delaynodes()->{$vnodename})) {
+	if ($role eq TBDB_RSRVROLE_DELAYNODE()) {
 	    #
 	    # A delay node.
 	    #
 	    $osid = ($self->option("delay_osid") || $pnode->delay_osid());
 	    $vname        = $vnodename;
-	    $role         = TBDB_RSRVROLE_DELAYNODE;
 	    $routertype   = TBDB_ROUTERTYPE_NONE;
-	    $cmdline      = "/kernel.delay";
 	    $cmdline_role = "delay";
 
 	    $self->exptstats()->{"delaynodes"} += 1;
 	}
 	else {
 	    #
-	    # A node hosting virtnodes (like jails).
+	    # An internal node hosting VMs.
 	    #
 	    if (defined($virtnode->_parent_osinfo())) {
 		$osid = $virtnode->_parent_osinfo()->osid();
@@ -5846,17 +6031,9 @@ sub InitializePhysNode($$$)
 		$osid  = ($self->option("jail_osid") ||
 			  $self->nodejailosid($virtnode));
 	    }
-	    return -1
-		if (!defined($osid));
-	    my $osinfo = OSinfo->Lookup($osid);
-	    return -1
-		if (!defined($osinfo));
-	    
 	    $vname        = $self->newvname($pnodename, "vhost");
-	    $role         = TBDB_RSRVROLE_VIRTHOST;
 	    $routertype   = TBDB_ROUTERTYPE_MANUAL;
 	    $cmdline_role = "vnodehost";
-	    $cmdline      = "/kernel.jail" if ($osinfo->OS() eq "FreeBSD");
 
 	    $self->exptstats()->{"jailnodes"} += 1;
 	}
@@ -5896,7 +6073,6 @@ sub InitializePhysNode($$$)
 	$osid = (defined($virtnode->_osinfo()) ?
 		 $virtnode->_osinfo()->osid() : $pnode->default_osid());
 	my $vname           = $vnodename;
-	my $role            = TBDB_RSRVROLE_NODE;
 	my $inner_elab_role = $virtnode->inner_elab_role();
 	my $plab_role       = $virtnode->plab_role();
 	my $sharing_mode;
@@ -5905,7 +6081,10 @@ sub InitializePhysNode($$$)
 	    (!defined($cmdline) || $cmdline eq "")) {
 	    # If the user has not overridden the command line, try to
 	    # find a default for this OSID. Only test real physical node.
-	    if ($pnode->_needslinkdelay()) {
+	    if ($role eq TBDB_RSRVROLE_VIRTHOST) {
+		$cmdline = $self->osidbootcmd($osid, "vnodehost", "");
+	    }
+	    elsif ($pnode->_needslinkdelay()) {
 		$cmdline = $self->osidbootcmd($osid, "linkdelay", "");
 	    }
 	    elsif (defined($inner_elab_role) &&
@@ -6022,7 +6201,7 @@ sub nodejailosid($$)
     # features/desires). 
     #
     my $osinfo    = $virtnode->_osinfo();
-    my $posinfo    = $virtnode->_parent_osinfo();
+    my $posinfo   = $virtnode->_parent_osinfo();
     my $nextosid;
 
     if (!defined($posinfo)) {
@@ -7274,21 +7453,27 @@ sub array_diff($$)
 sub SetPortRange($)
 {
     my ($self) = @_;
-    
+
     #
-    # See if any virtual nodes. If not, no need to do anything since
-    # all port allocations will come from the physical node. 
+    # No virtual nodes, fall back to simple approach.
     #
     return 0
 	if (! scalar(keys(%{ $self->solution_v2v() })));
 
     #
-    # Otherwise find a free slot in the table.
+    # Use existing port range when updating, or else find a free slot.
     #
-    my ($newlow,$newhigh) =
-	$self->experiment()->SetPortRange($self->impotent() ||
-					  $self->alloconly());
-
+    my ($newlow,$newhigh) = $self->experiment()->GetPortRange();
+    if (!defined($newlow)) {
+	#
+	# It is okay to do this in impotent mode; it is harmless.
+	#
+	($newlow,$newhigh) = $self->experiment()->SetPortRange(0);
+    }
+    if (!defined($newlow)) {
+	tberror("Could not set the portrange!\n");
+	return -1;
+    }
     $self->printdb("SetPortRange: $newlow,$newhigh\n");
 
     #
@@ -7304,10 +7489,38 @@ sub SetPortRange($)
 	my $pnodename  = $self->solution_v2p()->{$vnodename};
 	my $pnode      = $self->pnodes()->{$pnodename};
 
-	$vpnode->_portnext($newlow + 10);
+	$vpnode->_portlow($newlow);
 	$vpnode->_porthigh($newhigh);
-	$pnode->_portnext($newlow + 10);
+	$pnode->_portlow($newlow);
 	$pnode->_porthigh($newhigh);
+
+	my $portarray1 = [];
+	my $portarray2 = [];
+
+	#
+	# XXX This attempts to keep the sshd port the same across
+	# swapmod. We need a better (more general) way to do this.
+	#
+	my $sshdport;
+	if (exists($self->current_v2v()->{$vnodename}) &&
+		$vpnode->sshdport() != 11000) {
+
+	    $sshdport = $vpnode->sshdport();
+	    #$self->printdb("reserving sshdport $sshdport on $vpnode\n");
+	}
+	
+	for (my $i = 0, my $port = $pnode->_portlow();
+	     $i < $pnode->_porthigh() - $pnode->_portlow(); $i++,$port++) {
+	    
+	    $portarray1->[$i] = ($i < 10 ? $port : 0 - $port);
+	    $portarray2->[$i] = ($i < 10 ? $port : 0 - $port);
+
+	    if (defined($sshdport) && $port == $sshdport) {
+		$portarray1->[$i] = $sshdport;
+	    }
+	}
+	$pnode->_portarray($portarray1);
+	$vpnode->_portarray($portarray2);
 
 	# We only set the vpnodes. tmcd sends that to the client.
 	DBQueryWarn("update nodes set ipport_low=$newlow, ".
@@ -7321,17 +7534,33 @@ sub SetPortRange($)
 #
 # Bump and return the IP port number for a node. This is
 # required for multiplexing virtual nodes on a physical node. 
-# 
+#
 sub nextipportnum($)
 {
-    my ($pnode)  = @_;
-    my $port     = $pnode->_portnext();
+    my ($pnode, $default)  = @_;
+    my $portarray = $pnode->_portarray();
+    my $port = 0;
 
-    if ($port >= $pnode->_porthigh()) {
+    if (!defined($portarray)) {
+	#
+	# Fall back to simple approach; no shared nodes.
+	#
+	$port = $pnode->_portnext();
+	$pnode->_portnext($port + 2);
+	return $port;
+    }
+
+    for (my $i = 0; $i < $pnode->_porthigh() - $pnode->_portlow(); $i++) {
+	if ($portarray->[$i] < 0) {
+	    $port = 0 - $portarray->[$i];
+	    $portarray->[$i] = $port;
+	    last;
+	}
+    }
+    if (!$port) {
 	tberror("No more dynamic ports available for $pnode!\n");
 	return -1;
     }
-    $pnode->_portnext($port + 1);
     return $port;
 }
 

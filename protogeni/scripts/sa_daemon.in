@@ -314,6 +314,64 @@ sub ExpireSlices()
 }
 
 #
+# Look for slices that need to be registered at the CH.
+#
+sub RegisterSlices()
+{
+    #
+    # This query purposely skips slices that are attached to cooked
+    # mode experiments; those that have a non-null exptidx of a local
+    # experiment.
+    #
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_slices ".
+			    "where registered=0 and exptidx is null");
+
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	if ($slice->Lock() != 0) {
+	    print STDERR "Could not lock slice $slice.\n";
+	    goto skip;
+	}
+	my $creator = GeniUser->Lookup($slice->creator_uuid(), 1);
+	if (!defined($creator)) {
+	    print STDERR "Could not find creator for $slice\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	if ($impotent) {
+	    print STDERR "Would register $creator at the clearinghouse\n";
+	    print STDERR "Would register $slice at the clearinghouse\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	print "Registering $creator at the clearinghouse\n";
+	if ($creator->Register() != 0) {
+	    print STDERR "Could not register $creator at the clearinghouse\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	print "Registering $slice at the clearinghouse\n";
+	if ($slice->Register() != 0) {
+	    print STDERR "Could not register $slice at the clearinghouse\n";
+	    $slice->UnLock();
+	    goto skip;
+	}
+	$slice->UnLock();
+      skip:
+	$slice->Flush()
+	    if (defined($slice));
+	$creator->Flush()
+	    if (defined($creator));
+    }
+}
+
+#
 # Renew slices and slivers for local cooked mode experiments.
 #
 sub RenewSlices()
@@ -397,6 +455,7 @@ while (1) {
 
     WarnSlices();
     ExpireSlices();
+    RegisterSlices();
 #    RenewSlices();
 
     # Be certain stale info is gone.

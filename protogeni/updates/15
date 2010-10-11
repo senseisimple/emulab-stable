@@ -1,0 +1,19 @@
+#
+# Add a registered field to the geni_slices table.
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    DBQueryFatal("alter table `geni_slices` " .
+    		 "add column `registered` tinyint(1) not null default '0'")
+        unless DBSlotExists("geni_slices", "registered");
+    
+    return 0;
+}
+1;

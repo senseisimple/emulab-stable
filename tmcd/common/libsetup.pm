@@ -33,7 +33,7 @@ use Exporter;
 	 ISFW FAKEJAILED LINUXJAILED GENVNODE GENVNODETYPE GENVNODEHOST
 	 SHAREDHOST SUBBOSS
 
-	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC TMCCBIN
+	 CONFDIR LOGDIR TMDELAY TMBRIDGES TMJAILNAME TMSIMRC TMCC TMCCBIN
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP TMLTPMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY
@@ -333,6 +333,7 @@ sub TMGENVNODECONFIG()  { CONFDIR() . "/genvnodeconfig";}
 sub TMSTARTUPCMD()	{ CONFDIR() . "/startupcmd";}
 sub TMROUTECONFIG()     { CONFDIR() . "/rc.route";}
 sub TMGATEDCONFIG()     { CONFDIR() . "/gated.conf";}
+sub TMBRIDGES()		{ CONFDIR() . "/rc.bridges";}
 sub TMDELAY()		{ CONFDIR() . "/rc.delay";}
 sub TMLINKDELAY()	{ CONFDIR() . "/rc.linkdelay";}
 sub TMDELMAP()		{ CONFDIR() . "/delay_mapping";}
@@ -2249,14 +2250,15 @@ sub stashgenvnodeconfig()
 #
 # Return the generic vnode config info in a hash.  XXX: For now uses jailconfig.
 #
-sub getgenvnodeconfig($;$)
+sub getgenvnodeconfig($)
 {
-    my ($rptr,$nocache) = @_;
+    my ($rptr) = @_;
     my @tmccresults = ();
     my %vconfig = ();
+    my $issharedhost = SHAREDHOST();
 
     my %tmccopts = ();
-    if ($nocache) {
+    if ($issharedhost) {
 	$tmccopts{"nocache"} = 1;
     }
 

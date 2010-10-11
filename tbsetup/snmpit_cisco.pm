@@ -113,6 +113,17 @@ sub new($$$;$) {
 	return undef;
     }
 
+    #
+    # Cisco considers anything over 1k an 'extended' VLAN. There are some
+    # issues with supporing these on certain devices, so we want to know if
+    # we'll ever be called on to make VLANs in the extended range.
+    #
+    if ($self->{MAX_VLAN} > 1000) {
+        $self->{EXTENDED_VLANS} = 1;
+    } else {
+        $self->{EXTENDED_VLANS} = 0;
+    }
+
     if ($community) { # Allow this to over-ride the default
 	$self->{COMMUNITY}    = $community;
     } else {
@@ -1403,8 +1414,17 @@ sub vlanTrunkUtil($$$$) {
 
     my ($bitfield, %vranges, @result);
 
-    if ($op == $VOP_CLEARALL)
-        { @result = @vlans = (1, 1025, 2049, 3073); }
+    if ($op == $VOP_CLEARALL) {
+        #
+        # Clear the 'extended range' VLANs iff they might be used on this
+        # switch
+        #
+        if ($self->{EXTENDED_VLANS}) {
+            @result = @vlans = (1, 1025, 2049, 3073);
+        } else {
+            @result = @vlans = (1);
+        }
+    }
     foreach my $vlan (@vlans)
 	{ push @{$vranges{($vlan >> 10) & 3}}, $vlan; }
 
@@ -1756,11 +1776,10 @@ sub setVlansOnTrunk($$$$) {
     #
     # Some error checking
     #
-    if (($value != 1) && ($value != 0)) {
-	die "Invalid value $value passed to setVlanOnTrunk\n";
-    }
-    if (grep(/^1$/,@vlan_numbers)) {
-	die "VLAN 1 passed to setVlanOnTrunk\n"
+    if ((($value != 1) && ($value != 0)) || grep(/^1$/,@vlan_numbers)) {
+	warn "Invalid value $value or request to add vlan 1 ".
+	      "passed to setVlanOnTrunk\n";
+	return 0;
     }
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
@@ -1820,6 +1839,9 @@ sub resetVlanIfOnTrunk($$$) {
 sub enablePortTrunking2($$$$) {
     my ($self,$port,$native_vlan,$equaltrunking) = @_;
     my $trunking_vlan = ($equaltrunking ? 1 : $native_vlan);
+    my $id = $self->{NAME}.
+	"::enablePortTrunking2($port,$native_vlan,$equaltrunking)";
+    $self->debug("$id\n");
 
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
 
@@ -1862,13 +1884,13 @@ sub enablePortTrunking2($$$$) {
 	warn "ERROR: Unable to enable trunking\n";
 	return 0;
     }
-
-    if ($equaltrunking) { return 1; }
+    $self->portControl("enable",$port);
 
     #
     # Allow the native VLAN to cross the trunk
     #
-    $rv = $self->setVlansOnTrunk($port,1,$native_vlan);
+    $rv = $self->setVlansOnTrunk($port,1,$native_vlan)
+	    if ($native_vlan ne "1");
     if (!$rv) {
 	warn "ERROR: Unable to enable native VLAN on trunk\n";
 	return 0;
