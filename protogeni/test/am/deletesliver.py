@@ -52,7 +52,10 @@ params = [myslice["urn"], [slicecred]]
 try:
     response = do_method("am", "DeleteSliver", params,
                          response_handler=geni_am_response_handler)
-    print "Sliver %s has been deleted." % (SLICENAME)
-    print "value = %s" % (response)
+    if response:
+        print "Sliver %s has been deleted." % (SLICENAME)
+    else:
+        msg = "Something went wrong. Sliver %s has not been deleted."
+        print msg % (SLICENAME)
 except xmlrpclib.Fault, e:
     Fatal("Could not delete sliver: %s" % (str(e)))

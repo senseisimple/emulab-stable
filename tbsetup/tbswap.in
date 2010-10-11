@@ -199,6 +199,7 @@ if (!defined($experiment)) {
 }
 my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "geni" ||
 	       $pid eq "emulab-ops" || $pid eq "utahstud" ||
+	       $pid eq "ClemsonGENI" || 
                $pid eq "ResiliNets" || $pid eq "gec8tutorial");
 my $newsetup = $special;
 my $syncvlans = ($pid eq "emulab-ops" || ($MAINSITE && $special));
