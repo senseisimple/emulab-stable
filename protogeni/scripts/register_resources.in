@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -109,13 +109,15 @@ foreach my $node_id (@nodes) {
     if (!defined($component)) {
 	$certificate = GeniCertificate->Lookup($node->uuid());
 	if (!defined($certificate)) {
-	    $certificate = GeniCertificate->Create("Node",
-						   GeniHRN::Generate(
-						       $OURDOMAIN, "node",
-						       ${node_id} ),
-						   "${PGENIDOMAIN}.${node_id}",
-						   $TBOPS, $node->uuid(),
-						   $cmcertificate->URL());
+	    $certificate =
+		GeniCertificate->Create({'urn'  =>
+					     GeniHRN::Generate($OURDOMAIN,
+							       "node",
+							       ${node_id}),
+					 'hrn'  => "${PGENIDOMAIN}.${node_id}",
+					 'email'=> $TBOPS,
+					 'uuid' => $node->uuid(),
+					 'url'  => $cmcertificate->URL()});
 	    if (!defined($certificate)) {
 		die("*** $0:\n".
 		    "    Could not generate certificate for $node\n");

@@ -224,6 +224,7 @@ COMMAND_PROTOTYPE(donodeid);
 COMMAND_PROTOTYPE(dostatus);
 COMMAND_PROTOTYPE(doifconfig);
 COMMAND_PROTOTYPE(doaccounts);
+COMMAND_PROTOTYPE(dobridges);
 COMMAND_PROTOTYPE(dodelay);
 COMMAND_PROTOTYPE(dolinkdelay);
 COMMAND_PROTOTYPE(dohosts);
@@ -327,6 +328,7 @@ struct command {
 	{ "ifconfig",	  FULLCONFIG_ALL,  F_ALLOCATED, doifconfig },
 	{ "accounts",	  FULLCONFIG_ALL,  F_REMREQSSL, doaccounts },
 	{ "delay",	  FULLCONFIG_ALL,  F_ALLOCATED, dodelay },
+	{ "bridges",	  FULLCONFIG_ALL,  F_ALLOCATED, dobridges },
 	{ "linkdelay",	  FULLCONFIG_ALL,  F_ALLOCATED, dolinkdelay },
 	{ "hostnames",	  FULLCONFIG_NONE, F_ALLOCATED, dohosts },
 	{ "rpms",	  FULLCONFIG_ALL,  F_ALLOCATED, dorpms },
@@ -2739,8 +2741,8 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		 " i.node_id=d.node_id and i.iface=d.iface "
 		 "left join vinterfaces as v on "
 		 " v.node_id=d.node_id and v.IP=d.ip "
-		 "where d.node_id='%s' %s",
-		 28, reqp->pnodeid, buf);
+		 "where d.node_id='%s' and d.exptidx='%d' %s",
+		 28, reqp->pnodeid, reqp->exptidx, buf);
 	if (!res) {
 		error("LINKDELAY: %s: DB Error getting link delays!\n",
 		      reqp->nodeid);
@@ -2776,6 +2778,63 @@ COMMAND_PROTOTYPE(dolinkdelay)
 		nrows--;
 		if (verbose)
 			info("LINKDELAY: %s", buf);
+	}
+	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
+ * Return bridge config stuff.
+ */
+COMMAND_PROTOTYPE(dobridges)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	char		buf[2*MYBUFSIZE], *ebufp = &buf[sizeof(buf)];
+	int		nrows;
+
+	/*
+	 * Get bridge parameters for the machine. 
+	 */
+	res = mydb_query("select b.bridx,i.MAC,b.vnode,b.vname "
+			 " from bridges as b"
+			 "left join interfaces as i on "
+			 " i.node_id=b.node_id and i.iface=b.iface "
+			 " where b.node_id='%s' order by bridx",
+			 4, reqp->nodeid);
+	if (!res) {
+		error("BRIDGES: %s: DB Error getting bridges!\n", reqp->nodeid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	while (nrows) {
+		char	*bufp = buf;
+
+		row = mysql_fetch_row(res);
+
+		/*
+		 * Sanity check.
+		 */
+		if (!row[0] || !row[1] || !row[2] || !row[3]) {
+			error("BRIDGES: %s: DB values are bogus!\n",
+			      reqp->nodeid);
+			mysql_free_result(res);
+			return 1;
+		}
+
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "BRIDGE IDX=%s IFACE=%s VNODE=%s LINKNAME=%s\n",
+			       row[0], row[1], row[2], row[3]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("BRIDGES: %s", buf);
 	}
 	mysql_free_result(res);
 

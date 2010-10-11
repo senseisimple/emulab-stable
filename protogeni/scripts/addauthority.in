@@ -14,11 +14,12 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print "Usage: addauthority [-c] <certfile> <type>\n";
+    print "Usage: addauthority [-c] [-a] <certfile> <type>\n";
     exit(1);
 }
-my $optlist    = "c";
+my $optlist    = "ac";
 my $asch       = 0;
+my $asam       = 0;
 
 #
 # Check args.
@@ -30,6 +31,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"c"})) {
     $asch = 1;
 }
+if (defined($options{"a"})) {
+    $asam = 1;
+}
 usage()
     if (@ARGV != 2);
 
@@ -39,6 +43,9 @@ my $type     = $ARGV[1];
 use vars qw($GENI_DBNAME);
 if ($asch) {
     $GENI_DBNAME = "geni-ch";
+}
+elsif ($asam) {
+    $GENI_DBNAME = "geni-cm";
 }
 
 # Now we can load the libraries after setting the proper DB.

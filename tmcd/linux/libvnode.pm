@@ -315,7 +315,7 @@ sub makeBridgeMaps() {
     shift(@lines);
     my $curbr = '';
     foreach my $line (@lines) {
-	if ($line =~ /^([\w\d\-]+)\s+/) {
+	if ($line =~ /^([\w\d\-\.]+)\s+/) {
 	    $curbr = $1;
 	    $bridges{$curbr} = [];
 	}

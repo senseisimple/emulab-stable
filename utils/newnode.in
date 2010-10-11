@@ -40,8 +40,6 @@ my $exports_setup = "$TB/sbin/exports_setup";
 
 my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
 
-my $sudo = "/usr/local/bin/sudo -S";
-
 #
 # MFS to boot the nodes into initially
 #
@@ -110,13 +108,6 @@ $UID = $EUID = 0;
 
 if (@ARGV < 1) {
     usage();
-}
-
-#
-# The user has to be able to run sudo, so they can restart dhcpd.
-#
-if (system "$sudo /bin/pwd < /dev/null") {
-    die "You must be able to sudo to root to use this script\n";
 }
 
 #
@@ -529,18 +520,6 @@ if (!@succeeded_nodes) {
 print "Re-generating dhcpd.conf\n";
 if (system("$dhcpd_makeconf -i -r")) {
     die "Unable to open regenerate dhcpd config file\n";
-}
-
-print "Restarting dhcpd: $sudo $dhcpd_rc stop\n";
-my $sudo_rv = system "$sudo $dhcpd_rc stop";
-if ($sudo_rv) {
-    die "Error stopping dhcpd - return value was $sudo_rv\n";
-}
-sleep 2;
-print "Restarting dhcpd: $sudo $dhcpd_rc start\n";
-$sudo_rv = system "$sudo $dhcpd_rc start";
-if ($sudo_rv) {
-    die "Error starting dhcpd - return value was $sudo_rv\n";
 }
 
 print "Setting up nameserver\n";

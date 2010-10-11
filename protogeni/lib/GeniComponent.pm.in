@@ -399,9 +399,22 @@ sub Resolve($)
     return undef
 	if (!defined($manager_version));
 
-    my $credential = GeniRegistry::Client->CreateCredential($self);
+    #
+    # Need a credential to make this call. Seems kinda silly. 
+    #
+    if (!defined(Genixmlrpc->GetContext())) {
+	print STDERR "Need an RPC context to generate a self credential\n";
+	return undef;
+    }
+    my $context = Genixmlrpc->GetContext();
+    my $me      = GeniAuthority->Lookup($context->certificate()->uuid());
+    if (!defined($me)) {
+	print STDERR "Could not find my own authority for $context\n";
+	return undef;
+    }
+    my $credential = GeniCredential->GetSelfCredential($me);
     if (!defined($credential)) {
-	print STDERR "Could not create registry credential for $self\n";
+	print STDERR "Could not create self credential resolving $self\n";
 	return undef;
     }
 

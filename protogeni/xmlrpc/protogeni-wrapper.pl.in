@@ -34,12 +34,14 @@ my $TBOPS          = "@TBOPSEMAIL@";
 my $MODULE;
 my $GENIURN;
 
+my $AM_MODULE = "am";
+
 # These are the modules we load for each service.
-my %GENI_MODULES = ( "cm"  => "@prefix@/lib/protogeni-cm.pm",
-		     "am"  => "@prefix@/lib/geni-am.pm",
-		     "sa"  => "@prefix@/lib/protogeni-sa.pm",
-		     "ch"  => "@prefix@/lib/protogeni-ch.pm",
-		     "ses" => "@prefix@/lib/protogeni-ses.pm" );
+my %GENI_MODULES = ( "cm"        => "@prefix@/lib/protogeni-cm.pm",
+		     $AM_MODULE  => "@prefix@/lib/geni-am.pm",
+		     "sa"        => "@prefix@/lib/protogeni-sa.pm",
+		     "ch"        => "@prefix@/lib/protogeni-ch.pm",
+		     "ses"       => "@prefix@/lib/protogeni-ses.pm" );
 
 # These variables are shared with the loaded module.
 use vars qw($EMULAB_PEMFILE $GENI_METHODS $GENI_VERSION
@@ -131,6 +133,24 @@ $EUID = $UID    = $unix_uid;
 $ENV{'USER'}    = $user;
 $ENV{'LOGNAME'} = $user;
 
+if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
+    my $pathinfo = $ENV{'PATH_INFO'};
+    $pathinfo =~ s/^\///;
+    my @parts = split(/\//, $pathinfo);
+    if (@parts) {
+	my $m = shift(@parts);
+	if ($m =~ /^[-\w]+$/) {
+	    $MODULE = $m;
+	    if (@parts) {
+		my $v = shift(@parts);
+		if ($v =~ /^[\d\.]+$/) {
+		    $GENI_VERSION = "$v";
+		}
+	    }
+	}
+    }
+}
+
 #
 # The UUID of the client certificate is in the env var SSL_CLIENT_S_DN_CN.
 # If it actually looks like a UUID, then this correponds to an actual user,
@@ -142,6 +162,9 @@ if (exists($ENV{'SSL_CLIENT_S_DN_CN'}) &&
     $ENV{'SSL_CLIENT_S_DN_CN'} =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
     $ENV{'GENIUSER'} = $ENV{'SSL_CLIENT_S_DN_CN'};
     $ENV{'GENIUUID'} = $ENV{'SSL_CLIENT_S_DN_CN'};
+}
+elsif (defined($MODULE) && ($MODULE eq $AM_MODULE)) {
+    # Do not expect a UUID if calling to the AM.
 }
 else {
     XMLError(-1, "Invalid certificate; no UUID");
@@ -164,8 +187,8 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
 	XMLError(-1, "Error decoding certificate:" . $decoded->error);
     }
     foreach my $tmp (@{ $decoded->SubjectAltName }) {
-	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/ ||
-	    $tmp =~ /^(urn:.*)$/) {
+	if ($tmp =~ /^uniformResourceIdentifier=(urn:publicid:.*)$/ ||
+	    $tmp =~ /^(urn:publicid:.*)$/) {
 	    $GENIURN = $ENV{'GENIURN'} = $1;
 	}
     }
@@ -180,24 +203,6 @@ my $request = Frontier::Responder::get_cgi_request();
 if (!defined($request)) {
     print "Content-Type: text/txt\n\n";
     exit(0);
-}
-
-if (exists($ENV{'PATH_INFO'}) && $ENV{'PATH_INFO'} ne "") {
-    my $pathinfo = $ENV{'PATH_INFO'};
-    $pathinfo =~ s/^\///;
-    my @parts = split(/\//, $pathinfo);
-    if (@parts) {
-	my $m = shift(@parts);
-	if ($m =~ /^[-\w]+$/) {
-	    $MODULE = $m;
-	    if (@parts) {
-		my $v = shift(@parts);
-		if ($v =~ /^[\d\.]+$/) {
-		    $GENI_VERSION = "$v";
-		}
-	    }
-	}
-    }
 }
 
 if (!defined($MODULE) || !exists($GENI_MODULES{$MODULE})) {
@@ -273,14 +278,30 @@ my $method = $call->{'method_name'};
 if (!defined($GENI_METHODS->{$method})) {
     XMLError(3, "no such method $method\n");
 }
+# Strictly for debugging the CM.
+my $target;
+if (defined($call->{'value'})) {
+    my ($argref) = @{ $call->{'value'} };
+    if (ref($argref) eq "HASH") {
+	if (exists($argref->{'slice_urn'})) {
+	    $target = $argref->{'slice_urn'};
+	}
+	elsif (exists($argref->{'sliver_urn'})) {
+	    $target = $argref->{'sliver_urn'};
+	}
+    }
+}
+
 my $result;
 my $message =
-    "URN:     $GENIURN\n".
+    "URN:     $GENIURN\n";
+$message .=
+    "Target:  $target\n" if (defined($target));
+$message .=
     "Module:  $MODULE\n".
     "Method:  $method\n";
 $message .=
     "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
-
     
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {

@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# This script will be executed *after* all the other init scripts.
+# You can put your own initialization stuff in here if you don't
+# want to do the full Sys V style init stuff.
+
+# XXX compat with RedHat feature
+if [ ! -d /var/lock/subsys ]; then
+    mkdir /var/lock/subsys
+fi
+
+# XXX serial console seems to be in raw mode, makes our messages ugly :-)
+if [ -c /dev/ttyS0 ]; then
+    stty -F /dev/ttyS0 opost onlcr
+fi
+
+#
+# Testbed Setup.
+#
+if [ -f /usr/local/etc/emulab/rc/rc.testbed ] ; then
+        echo -n 'testbed config: '
+        /usr/local/etc/emulab/rc/rc.testbed
+        touch /var/lock/subsys/testbed
+fi
+
+echo "Boot Complete"

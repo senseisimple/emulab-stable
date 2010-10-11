@@ -286,7 +286,7 @@ foreach $key (keys(%{ $xmlparse->{'attribute'} })) {
 	}
     }
 
-    $newosid_args{$key} = $value;
+    $newosid_args{$dbslot} = $value;
 }
 UserError()
     if (keys(%errors));

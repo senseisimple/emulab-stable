@@ -28,6 +28,7 @@ install: $(PORTMAP_PATH)/portmap
 	install -m 755 $(PORTMAP_PATH)/portmap $(TARGET_PATH)/sbin
 	install -m 755 $(PORTMAP_PATH)/pmap_dump $(TARGET_PATH)/sbin
 	install -m 755 $(PORTMAP_PATH)/pmap_set $(TARGET_PATH)/sbin
+	mkdir -p $(TARGET_PATH)/etc/init.d
 	install -m 755 $(SOURCE_PATH)/portmap/S45portmap \
 		$(TARGET_PATH)/etc/init.d
 	$(STRIPCMD) --strip-unneeded $(TARGET_PATH)/sbin/portmap

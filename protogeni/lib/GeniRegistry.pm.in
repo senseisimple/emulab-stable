@@ -130,6 +130,7 @@ sub expires($)		{ return field($_[0], "expires"); }
 sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub exptidx($)		{ return field($_[0], "exptidx"); }
 sub needsfirewall($)	{ return field($_[0], "needsfirewall"); }
+sub registered($)	{ return field($_[0], "registered"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
@@ -477,8 +478,12 @@ package GeniRegistry::Client;
 
 use Genixmlrpc;
 use GeniResponse;
+use GeniCredential;
 use English;
 use Data::Dumper;
+use Date::Parse;
+use POSIX qw(strftime tmpnam);
+use Time::Local;
 
 #
 # Create an object that represents a client connection to a registry.
@@ -487,21 +492,10 @@ sub Create($$;$$)
 {
     my ($class, $authority, $context, $credential) = @_;
 
-    # Cause of the clearinghouse is currently represented by a URL.
-    $authority = $authority->url()
-	if (ref($authority));
-
     if (!defined($credential)) {
-	my $response =
-	    Genixmlrpc::CallMethod($authority, $context, "GetCredential", {});
-	
+	$credential = GeniRegistry::Client->GetCredential($authority);
 	return undef
-	    if (!defined($response) ||
-		$response->code() != GENIRESPONSE_SUCCESS);
-	$credential = $response->value();
-    }
-    elsif (ref($credential) eq "GeniCredential") {
-	$credential = $credential->asString();
+	    if (!defined($credential));
     }
 
     my $self              = {};
@@ -516,33 +510,58 @@ sub authority($)	{ return $_[0]->{"authority"}; }
 sub context($)		{ return $_[0]->{"context"}; }
 sub credential($)	{ return $_[0]->{"credential"}; }
 
-sub CreateCredential($$;$)
+sub GetCredential($;$$)
 {
     my ($class, $authority, $context) = @_;
-    
-    #
-    # We are creating a self signed credential here, which is fine
-    # since we all have the trusted root certs in our caches. This
-    # will change later.
-    #
+
+    my $credential =
+	GeniCredential->Lookup($authority->uuid(), $ENV{'MYUUID'});
+
+    if (defined($credential) &&
+	defined($credential->expires())) {
+	my $expires = str2time($credential->expires());
+	
+	# Some buffer.
+	if ($expires > time() + 3600) {
+	    #print STDERR "Reusing clearinghouse credential\n";
+	    return $credential;
+	}
+	$credential->Delete();
+    }
+    #print STDERR "Getting new clearinghouse credential\n";
+
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
-
+    
     if (!defined($context)) {
 	print STDERR "Need a context to create a registry credential\n";
 	return undef;
     }
-    my $credential = GeniCredential->Create($authority->GetCertificate(),
-					    $context->certificate());
+
+    my $url = $authority->url();
+    if (!defined($url)) {
+	print STDERR "$authority has no URL\n";
+	return undef;
+    }
+    my $response =
+	Genixmlrpc::CallMethod($url, $context, "GetCredential",
+			       {"gid" => $context->certificate()->cert()});
+	
+    return undef
+	if (!defined($response));
+    
+    if ($response->IsError()) {
+	print STDERR "GeniRegistry::Client->GetCredential: " .
+	    $response->Dump() . "\n";
+	return undef;
+    }
+    $credential = GeniCredential->CreateFromSigned($response->value(), 1);
     if (!defined($credential)) {
-	print STDERR "Could not create clearinghouse credential\n";
+	print STDERR "Could not parse credential from $authority\n";
 	return undef;
     }
-    if ($credential->Sign($context->certificate()) != 0) {
-	$credential->Delete();
-	print STDERR "Could not sign clearinghouse credential\n";
-	return undef;
-    }
+    $credential->Store();
+    
     return $credential;
 }
 
@@ -566,10 +585,11 @@ sub Resolve($$$$)
 	$which = "hrn";
     }
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(), 
 			       "Resolve",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 				 "type"       => $type,
 				 $which       => $token });
     return -1
@@ -615,10 +635,11 @@ sub Register($$$$)
     $info = {} if (!defined($info));
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "Register",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 				 "type"       => $type,
 			         "gid"        => $cert,
 			         "info"       => $info });
@@ -649,11 +670,12 @@ sub RegisterUser($$$$$)
 #
 # Register a slice.
 #
-sub RegisterSlice($$$$)
+sub RegisterSlice($$$$$)
 {
-    my ($self, $creator_urn, $cert, $bindings) = @_;
+    my ($self, $creator_urn, $expiration, $cert, $bindings) = @_;
 
     my $info = { "creator_urn"   => $creator_urn,
+		 "expiration"    => $expiration,
 	         "userbindings"  => $bindings };
 
     return $self->Register("Slice", $cert, $info);
@@ -667,10 +689,11 @@ sub Remove($$$)
     my ($self, $type, $urn) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "Remove",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 				 "type"       => $type,
 			         "urn"        => $urn });
     return -1
@@ -699,15 +722,16 @@ sub RemoveSlice($$)
 #
 sub Shutdown($$$)
 {
-    my ($self, $uuid, $clear) = @_;
+    my ($self, $urn, $clear) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "Shutdown",
-			       { "credential" => $self->credential(),
-				 "clear"      => $clear,
-			         "uuid"       => $uuid });
+			       { "credential"  =>
+				     $self->credential()->asString(),
+				 "clear"       => $clear,
+			         "urn"         => $urn });
     return -1
 	if (!defined($response));
 
@@ -726,10 +750,11 @@ sub ListComponents($$$)
     my ($self, $slice, $pref) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "CH::DiscoverResources",
-			       { "credential" => $self->credential() });
+			       { "credential" =>
+				     $self->credential()->asString() });
 
     return -1
 	if (!defined($response));
@@ -750,10 +775,11 @@ sub PostCRL($$)
     my ($self, $cert) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "PostCRL",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 			         "cert"       => $cert });
     return -1
 	if (!defined($response));
@@ -773,10 +799,11 @@ sub RegisterSliver($$$)
     my ($self, $slice_urn, $info) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "RegisterSliver",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 			         "slice_urn"  => $slice_urn,
 			         "info"       => $info });
     return -1
@@ -797,10 +824,11 @@ sub UnRegisterSliver($$)
     my ($self, $slice_urn) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "UnRegisterSliver",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 			         "slice_urn"  => $slice_urn });
     return -1
 	if (!defined($response));
@@ -820,86 +848,95 @@ use Genixmlrpc;
 use GeniResponse;
 use GeniCertificate;
 use GeniCredential;
+use Date::Parse;
+use POSIX qw(strftime tmpnam);
+use Time::Local;
 
 #
 # The clearinghouse is a registry.
+#
+# XXX This needs to go ... we cannot create a clearinghouse credential
+# locally since we cannot sign it (target_urn!=our_urn).
 #
 sub Create($;$$)
 {
     my ($class, $context, $credential) = @_;
     
-    my $EMULAB_PEMFILE1 = "@prefix@/etc/genich.pem";
-    my $url;
-
     if (!defined($credential)) {
-	my $pemfile;
-
-	if (-e $EMULAB_PEMFILE1) {
-	    $pemfile = $EMULAB_PEMFILE1
-	}
-	else {
-	    print STDERR "Cannot find the pem file for the clearinghouse!\n";
-	    return undef;
-	}
-
-	#
-	# We are creating a self signed credential here, which is fine
-	# since the Clearinghouse has the certs of all trusted roots.
-	#
-	my $certificate = GeniCertificate->LoadFromFile($pemfile);
-	if (!defined($certificate)) {
-	    print STDERR "Could not load certificate from $pemfile\n";
-	    return undef;
-	}
-	$context = Genixmlrpc->GetContext()
-	    if (!defined($context));
-
-	if (!defined($context)) {
-	    print STDERR "Need a context to create clearinghouse credential\n";
-	    return undef;
-	}
-	$credential = GeniCredential->Create($certificate,
-					     $context->certificate());
+	$credential = GeniRegistry::ClearingHouse->GetCredential();
 	if (!defined($credential)) {
 	    print STDERR "Could not create clearinghouse credential\n";
 	    return undef;
 	}
-	if ($credential->Sign($context->certificate()) != 0) {
-	    $credential->Delete();
-	    print STDERR "Could not sign clearinghouse credential\n";
-	    return undef;
-	}
     }
-    
-    return GeniRegistry::Client->Create($credential->target_cert()->URL(),
-					$context, $credential->asString());
-}
-
-#
-# Get a credential from the clearinghouse, as for bootstrapping.
-#
-sub GetCredential($;$$)
-{
-    my ($class, $context, $certfile) = @_;
-
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
 
-    if (!defined($certfile)) {
-	$certfile = "@prefix@/etc/genich.pem";
-	if (! -e $certfile) {
-	    print STDERR "$certfile does not exist!\n";
-	    return undef;
-	}
+    if (!defined($context)) {
+	print STDERR "Need a context to create clearinghouse credential\n";
+	return undef;
+    }
+    return GeniRegistry::Client->Create($credential->target_cert(),
+					$context, $credential);
+}
+
+#
+# Load the CH certificate.
+#
+sub GetCertificate($)
+{
+    my ($class) = @_;
+    my $ETCDIR  = "@prefix@/etc";
+
+    my $certfile = ((-s "$ETCDIR/genich-local.pem") ?
+		    "$ETCDIR/genich-local.pem" : "$ETCDIR/genich.pem");
+    if (! -e $certfile) {
+	print STDERR "$certfile does not exist!\n";
+	return undef;
     }
     my $certificate = GeniCertificate->LoadFromFile($certfile);
     if (!defined($certificate)) {
 	print STDERR "Could not load CH certificate from $certfile\n";
 	return undef;
     }
-    my $url = $certificate->URL();
+    return $certificate;
+}
+
+#
+# Get a credential from the clearinghouse to talk to it.
+#
+sub GetCredential($;$$)
+{
+    my ($class, $context, $certfile) = @_;
+
+    my $clearinghousecert = GeniRegistry::ClearingHouse->GetCertificate();
+    if (!defined($clearinghousecert)) {
+	return undef;
+    }
+    my $clearinghousecred =
+	GeniCredential->Lookup($clearinghousecert->uuid(), $ENV{'MYUUID'});
+
+    #print "$clearinghousecred\n";
+
+    if (defined($clearinghousecred) &&
+	defined($clearinghousecred->expires())) {
+	my $expires = str2time($clearinghousecred->expires());
+	
+	# Some buffer.
+	if ($expires > time() + 3600) {
+	    #print STDERR "Reusing clearinghouse credential\n";
+	    return $clearinghousecred;
+	}
+	$clearinghousecred->Delete();
+    }
+    #print STDERR "Getting new clearinghouse credential\n";
+
+    $context = Genixmlrpc->GetContext()
+	if (!defined($context));
+
+    my $url = $clearinghousecert->URL();
     if (!defined($url)) {
-	print STDERR "No URI extension in $certificate\n";
+	print STDERR "No URI extension in $clearinghousecert\n";
 	return undef;
     }
     my $response =
@@ -914,7 +951,15 @@ sub GetCredential($;$$)
 	    $response->Dump() . "\n";
 	return undef;
     }
-    return GeniCredential->CreateFromSigned($response->value(), 1);
+    $clearinghousecred =
+	GeniCredential->CreateFromSigned($response->value(), 1);
+    if (!defined($clearinghousecred)) {
+	print STDERR "Could not parse credential from clearinghouse\n";
+	return undef;
+    }
+    $clearinghousecred->Store();
+    
+    return $clearinghousecred;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

@@ -746,7 +746,7 @@ foreach $node (keys(%nodes)) {
     my $uuid = $nodetouuid{$node};
     
     my @types = ("$type:1");
-    my @features;
+    my @features = ();
     my @flags;
     my $needvirtgoo = 0;
 
@@ -924,8 +924,10 @@ foreach $node (keys(%nodes)) {
     }
     if ($cpu_ram_features_present) {
 	# Add CPU and RAM information
-	push @features, "?+cpu:$cpu_speed";
-	push @features, "?+ram:$ram";
+	push @features, "?+cpu:$cpu_speed"
+	    if (defined($cpu_speed));
+	push @features, "?+ram:$ram"
+	    if (defined($ram));
 	push @features, "?+cpupercent:92"; # XXX Hack
 	push @features, "?+rampercent:80"; # XXX Hack
     }
@@ -1127,6 +1129,13 @@ if ($widearea && ! defined($component_name)) {
 	# normally get assigned. We want to include them, though, because we
 	# allow people to do fix-node to down nodes
 	#
+	if (!defined($status)) {
+	    fatal("status not defined for $physnode\n");
+	}
+	if (!defined($mpid) || !defined($meid)) {
+	    fatal("pid,eid not defined for $physnode\n");
+	}
+	
 	if (($status && ($status ne 'up')) ||
 	    ($mpid eq $DEADPID && $meid eq $DEADEID)) {
 	    # But not in genimode.

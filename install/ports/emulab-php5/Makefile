@@ -11,6 +11,7 @@ WITH_OPENSSL=yes
 WITH_BZ2=yes
 WITH_GD=yes
 WITH_MCRYPT=yes
+WITH_MHASH=yes
 WITH_MYSQL=yes
 WITH_XML=yes
 # Additions for mediawiki
@@ -35,6 +36,6 @@ BATCH=yes
 #
 # But need this too!
 #
-.MAKEFLAGS+=	-DBATCH APACHE_PORT=www/apache13-modssl
+.MAKEFLAGS+=	-DBATCH APACHE_PORT=www/apache13-modssl WITH_APACHE=yes
 
 .include "../../lang/php5-extensions/Makefile"

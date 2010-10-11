@@ -201,6 +201,7 @@ my $special = ($pid eq "testbed" || $pid eq "tbres" || $pid eq "geni" ||
 	       $pid eq "emulab-ops" || $pid eq "utahstud" ||
                $pid eq "ResiliNets" || $pid eq "gec8tutorial");
 my $newsetup = $special;
+my $syncvlans = ($pid eq "emulab-ops" || ($MAINSITE && $special));
 
 #
 # Print starting message.
@@ -547,7 +548,7 @@ sub doSwapout($) {
 	    ($type == MODIFY && $ELABINELAB && Lan->GotTrunks($experiment))) {
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
-	    if (system("snmpit -r $pid $eid")) {
+	    if (system("snmpit --redirect-err -r $pid $eid")) {
 		tberror({type => 'secondary', severity => SEV_SECONDARY,
 			 error => ['vlan_reset_failed']},
 			"Failed to reset VLANs");
@@ -569,7 +570,8 @@ sub doSwapout($) {
 	    }
 	    if (@stale) {
 		print "Removing stale vlans @stale\n";
-		system("snmpit -f ". join(" ", map("-o $_", @stale)));
+		system("snmpit --redirect-err -f ".
+                    join(" ", map("-o $_", @stale)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_reset_failed']},
@@ -962,7 +964,7 @@ sub doSwapin($) {
 	my @same = ();
 	my $ret;
 
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    $ret = Lan->CompareVlansWithSwitches($experiment, \@diff, \@same);
 	}
 	else {
@@ -974,10 +976,10 @@ sub doSwapin($) {
 		    "Failed to compare old vlans");
 	    return 1;
 	}
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    if (@diff) {
 		print "Removing obsolete vlans @diff\n";
-		system("snmpit -f ". join(" ", map("-o $_", @diff)));
+		system("snmpit --redirect-err -f ". join(" ", map("-o $_", @diff)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_setup_failed']},
@@ -988,7 +990,7 @@ sub doSwapin($) {
 	}
 	else {
 	    print "Synchronizing VLANs.\n";
-	    system("snmpit -X $pid $eid");
+	    system("snmpit --redirect-err -X $pid $eid");
 	    if ($?) {
 		tberror({type => 'summary', severity => SEV_SECONDARY,
 			 error => ['vlan_setup_failed']},
@@ -1304,10 +1306,10 @@ sub doSwapin($) {
     # parallel with os_setup (no DB dependencies, etc.)
     #
     if (!$experiment->skipvlans() &&
-	($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special))) {
+	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
-	if (system("snmpit -t $pid $eid")) {
+	if (system("snmpit --redirect-err -t $pid $eid")) {
 	    tberror({type => 'summary', severity => SEV_SECONDARY,
 		     error => ['vlan_setup_failed']},
 		    "Failed to set up VLANs.");

@@ -118,7 +118,8 @@ my $EXPT_RESOURCESHOSED = 0;
 		   "v2pmap"        => ["node_id", "vname"],
 		   "linkdelays"    => ["node_id", "vlan", "vnode"],
 		   "traces"        => ["node_id", "idx"],
-		   "portmap"       => undef); 
+		   "portmap"       => undef,
+		   "bridges"       => ["node_id", "bridx", "iface"]); 
 
 # These are slots in the node table that need to be restored. 
 my @nodetable_fields = ("def_boot_osid",
@@ -4229,6 +4230,20 @@ sub SetPortRange($$)
     }
     DBQueryWarn("unlock tables");
     return ($newlow, $newhigh);
+}
+sub GetPortRange($)
+{
+    my ($self) = @_;
+    my $idx = $self->idx();
+
+    my $query_result =
+	DBQueryWarn("select low,high from ipport_ranges where exptidx=$idx");
+    
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($low,$high) = $query_result->fetchrow_array();
+    return ($low, $high);
 }
 
 #
