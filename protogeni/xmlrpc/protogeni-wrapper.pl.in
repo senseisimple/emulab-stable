@@ -52,7 +52,7 @@ use lib '@prefix@/lib';
 use Genixmlrpc;
 use GeniResponse;
 use libaudit;
-use emutil;
+use libEmulab;
 use libtestbed;
 
 # Geniuser.
