@@ -935,7 +935,7 @@ sub ProcessManifest($$)
 	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $manifest)->get_nodelist()) {
 	    my $sliver_urn = GeniXML::GetText("sliver_urn", $ref);
-	    if (defined($sliver_urn) && $sliver_urn eq $self->urn()) {
+	    if (defined($sliver_urn) && $sliver_urn eq $self->sliver_urn()) {
 		# startup command.
 		my $startupcmd = GeniXML::GetText("startup_command", $ref);
 		if (defined($startupcmd)) {
