@@ -228,12 +228,15 @@ sub GetVirtualId($)
     return GetText("virtual_id", $node) ||
 	GetText("nickname", $node) ||
 	GetText("client_id", $node);
+<<<<<<< Updated upstream:protogeni/lib/GeniXML.pm.in
 }
 
 sub GetSliverId($)
 {
     my ($node) = @_;
     return GetText("sliver_urn", $node);
+=======
+>>>>>>> Stashed changes:protogeni/lib/GeniXML.pm.in
 }
 
 sub GetManagerId($)
