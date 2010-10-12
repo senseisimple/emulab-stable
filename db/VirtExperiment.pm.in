@@ -497,6 +497,7 @@ use Carp;
 use English;
 use overload ('""' => 'Stringify');
 use libdb;
+use emutil;
 use VirtExperiment;
 
 my %dbslotnames = ();
@@ -786,6 +787,7 @@ use English;
 use overload ('""' => 'Stringify');
 use vars qw($AUTOLOAD);
 use libdb;
+use emutil;
 use VirtExperiment;
 
 sub AUTOLOAD {
