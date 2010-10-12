@@ -105,6 +105,7 @@ sub TB_EVENTSERVER()    { "@EVENTSERVER@" . "." . "@OURDOMAIN@"; }
 # Untainted scriptname for email below.
 if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
     $SCRIPTNAME = basename($1);
+    $PROGRAM_NAME = $SCRIPTNAME;
 }
 else {
     $SCRIPTNAME = "Tainted";
