@@ -965,6 +965,9 @@ sub UpdateNodeTypeXpidPermissions()
 	my $auxdata = $rowref->{'auxdata'};
 	my $count   = $rowref->{'count'};
 
+	next
+	    if (! ($policy eq TBADMINCTRL_POLICY_TYPE()));
+
 	if ($debug) {
 	    print "Type Perm: $ppid, $pgid, $count, $auxdata\n";
 	}

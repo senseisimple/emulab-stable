@@ -28,6 +28,12 @@ FILES	 = $(wildcard *.py)
 FILES   += $(wildcard $(SRCDIR)/*.py)
 FILES   += $(wildcard $(SRCDIR)/*.rspec)
 ALLFILES = $(notdir $(FILES))
+
+# Gather up the AM tests and include their subdirectory
+AMFILES1  = $(wildcard $(SRCDIR)/am/*.py)
+AMFILES   = $(addprefix am/, $(notdir $(AMFILES1)))
+ALLFILES += $(AMFILES)
+
 TARBALL  = $(INSTALL_WWWDIR)/downloads/protogeni-tests.tar.gz
 
 install:	install-mkdir \
@@ -37,7 +43,7 @@ install:	install-mkdir \
 control-install:
 
 install-mkdir:
-	-mkdir -p $(INSTALL_TOPDIR)/opsdir/protogeni/test
+	-mkdir -p $(INSTALL_TOPDIR)/opsdir/protogeni/test/am
 
 clean:
 	rm -f *.o core *.pl *.pm *.py

@@ -31,7 +31,6 @@ use Carp;
 use POSIX;
 use XML::LibXML;
 use XML::Simple;
-use GeniXML;
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -47,9 +46,7 @@ my $OURDOMAIN     = "@OURDOMAIN@";
 my $cmid          = '';
 
 if ($PGENISUPPORT) {
-    require libGeni;
     require GeniHRN;
-    $cmid = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 }
 
 # Flags.
@@ -1012,6 +1009,7 @@ sub LoadCurrentResources($)
 sub LoadVirtNodes($)
 {
     my ($self) = @_;
+    my $gotgeninodes = 0;
 
     $self->printdb("Loading virtual nodes\n");
 
@@ -1082,6 +1080,9 @@ sub LoadVirtNodes($)
 
 	# Mark this as being a virtual typed node.
 	$vnode->_isvtyped($isvtyped);
+
+	# dynamic inclusion below.
+	$gotgeninodes++ if ($isgeni);
 
 	# All this info is stashed in our local object.
 	$vnode->_nodeweight(undef);
@@ -1266,6 +1267,18 @@ sub LoadVirtNodes($)
 
 	# Add to the list.
 	$self->vnodes()->{$vname} = $vnode;
+    }
+    if ($gotgeninodes) {
+	if ($PGENISUPPORT) {
+	    require libGeni;
+	    require GeniXML;
+	    import GeniXML;
+	    $cmid = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+	}
+	else {
+	    tberror("Using geni nodes but PROTOGENI_SUPPORT is not defined\n");
+	    return -1;
+	}
     }
 
     #
