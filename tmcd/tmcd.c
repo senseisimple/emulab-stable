@@ -4447,7 +4447,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 	ssize_t		pcomplen, quotelen;
         int             quote_passed;
         char            result[16];
-	TPM_NONCE	nonce;
+	ETPM_NONCE	nonce;
 
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
@@ -4727,7 +4727,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 COMMAND_PROTOTYPE(doquoteprep)
 {
 	char            newstate[128];	/* More then we will ever need */
-        TPM_NONCE       nonce;
+        ETPM_NONCE       nonce;
         char            nonce_hex[2*TPM_NONCE_BYTES + 1];
         int             i;
 

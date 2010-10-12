@@ -21,7 +21,7 @@ int tmcd_tpm_free(void);
  */
 #define TPM_NONCE_BYTES 0x14 // 160 bits
 #define TPM_PCR_BYTES 0x14 // 160 bits
-typedef unsigned char TPM_NONCE[TPM_NONCE_BYTES];
+typedef unsigned char ETPM_NONCE[TPM_NONCE_BYTES];
 typedef unsigned char TPM_PCR[TPM_PCR_BYTES];
 int tmcd_tpm_generate_nonce(unsigned char*);
 
@@ -32,7 +32,7 @@ struct signed_pcomp {
 	unsigned char fixed[8];
 	/* Hash of PCR composite */
 	unsigned char comphash[20];
-	TPM_NONCE nonce;
+	ETPM_NONCE nonce;
 };
 
 struct pubkeydata {
@@ -70,7 +70,7 @@ struct keydata {
 #define	PCOMP_PCR_LEN		20
 #define	PCOMP_PCRMASK_BITS	16
 
-int tmcd_tpm_verify_quote(char *, ssize_t, unsigned char *, ssize_t, TPM_NONCE,
+int tmcd_tpm_verify_quote(char *, ssize_t, unsigned char *, ssize_t, ETPM_NONCE,
         unsigned short, TPM_PCR*, unsigned char*);
 int tpm_extract_key(unsigned char *, struct keydata *);
 

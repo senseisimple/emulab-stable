@@ -692,7 +692,7 @@ tmcd_quote_verifysig(void *final, void *sig, size_t siglen, void *pubkey)
 	}
 
 	/* Cannot fail */
-	tpm_extract_key((char *)pubkey, &k);
+	tpm_extract_key((unsigned char *)pubkey, &k);
 	rsa = convpubkey(&k.pub);
 	if (!rsa) {
 		error("Error extracting and converting key\n");
