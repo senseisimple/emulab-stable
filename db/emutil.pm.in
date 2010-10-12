@@ -159,7 +159,8 @@ sub TBcheck_dbslot($$$;$)
 	}
 	else {
 	    die("*** $0:\n" .
-		"    Functional DB checks not implemented: $table/$column!\n");
+		"    Functional DB check not implemented: ".
+		"$table/$column/$check\n");
 	}
     }
 
