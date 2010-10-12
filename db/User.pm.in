@@ -1600,6 +1600,7 @@ sub escapeshellarg($)
 # Non-local users, as for federation/geni.
 #
 package User::NonLocal;
+use emdb;
 use User;
 use libtestbed;
 use English;
