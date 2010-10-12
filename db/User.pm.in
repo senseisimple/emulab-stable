@@ -12,6 +12,7 @@ use vars qw(@ISA);
 @ISA    = "Exporter";
 
 use emdb;
+use emutil;
 use EmulabConstants;
 use libtestbed;
 use English;
