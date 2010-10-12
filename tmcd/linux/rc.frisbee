@@ -309,7 +309,7 @@ handle_loadinfo()
 		zapsuperblocks /dev/$DISK
 	fi
 
-	write_image $ADDRESS /dev/$DISK $PARTITION $ZFILL $PTYPE $SERVER
+	write_image "$ADDRESS" "/dev/$DISK" "$PARTITION" "$ZFILL" "$PTYPE" "$SERVER"
 	rc=$?
 	if [ $rc -ne 0 ]; then
 		echo "Failed to write image to disk, status $rc"

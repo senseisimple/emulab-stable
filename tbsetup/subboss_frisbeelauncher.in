@@ -20,14 +20,12 @@ use File::Path;
 #
 sub usage()
 {
-    print "Usage: $0 [-d] [-k] <imageid> <path> <size> <mtime>\n";
-    print "-k:	Kill running frisbee.\n";
+    print "Usage: $0 [-d] <imageid> <path> <size> <mtime>\n";
     print "-d:	Print debugging output.\n";
     exit(1);
 }
-my $optlist  = "dk";
+my $optlist  = "d";
 my $debug    = 0;
-my $killmode = 0;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -115,9 +113,6 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
-if (defined($options{"k"})) {
-    $killmode = 1;
-}
 usage()
     if (! @ARGV);
 
@@ -163,131 +158,21 @@ if (defined $naddress) {
 	# Try to discover if some other process is handling this address
 	$address = $$naddress{"address"};
 	$pid     = $$naddress{"frisbee_pid"};
-}
 
-if (!$killmode) {
-	#
-	# Pick an address to use before locking the DB.  Die if unsucessful,
-	# set address if sucessful.  If something goes wrong later or there is
-	# already a laucher active, we will wind up wasting this address,
-	# but hey, we can make more!
-	#
-
-
-	#
-	# Keep the current frisbeed running for another time period.
-	#
 	if ($pid && $address) {
 	    debug("A server ($address) is already running for image $imageid\n");
 	    exit(0);
-	} else {
-		$address = PickAddress($subbossid, $imageid);
 	}
-
-	if (-e $filename) {
-		my @img_stat = stat $filename;
-		if (!@img_stat) {
-			Fatal("Unable to get size and mtime for $imageid: $filename\n");
-		}
-
-		my $img_size = $img_stat[7];
-		my $img_mtime = $img_stat[9];
-
-		if (($img_size != $size) || ($img_mtime < $mtime)) {
-			if (!unlink $filename) {
-				Fatal("Unable to unlink $imageid: $filename for updating\n");
-			}
-		}
-	}
-
-	if (! -e $filename) {
-	    debug("Fetching image $filename ($imageid) from boss\n");
-	    $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
-
-	    SetSyncFlag(1);
-	    SetPid($PID);
-	    $EUID = $UID;
-	    $dlfilename = $filename;
-	    my $image_dir = dirname($filename);
-	    if (! -d $image_dir && !mkpath($image_dir)) {
-		    Fatal("Unable to create path \"$image_dir\"\n");
-	    }
-	    system($FRISBEEIMAGE, $imageid, $filename);
-	    ClearPid();
-	    ClearSyncFlag();
-	    $dlfilename = 0;
-	    $EUID = 0;
-	    if ($?) {
-		# XXX clear address if sync failed?
-		Fatal("No such image file: $filename!");
-	    }
-	}
-} else {
-
-    # Nothing running.
-    exit(0)
-	if (!$address && !$pid);
-
-    if (!$address && $pid) {
-	#
-	# This makes no sense. Just send email.
-	#
-	my $mesg = "Inconsistent DB state. PID ($pid) but no load address!";
-
-	SENDMAIL($TBOPS,
-		 "Frisbee Killer Failed!",
-		 "Image: $imageid\n".
-		 $mesg);
-
-	Fatal($mesg);
-    }
-    if ($address && !$pid) {
-	#
-	# Okay, minor problem. It is possible we caught the launcher between
-	# setting the address and setting the pid. Wait a moment, and then
-	# try again. If still no pid, bail.
-	#
-	sleep(1);
-	# XXX add call to get address and pid
-	$naddress = GetLoadAddress($imageid, $subbossid);
-	$address = $$naddress{"address"};
-	$pid = $$naddress{"frisbee_pid"};
-
-	# Okay, situation resolved itself; other frisbeelauncher bailed.
-	exit(0)
-	    if (!$address && !$pid);
-
-	#
-	# Still inconsistent so bail.
-	#
-	if ($address && !$pid) {
-	    my $mesg = "Inconsistent DB state. Load address but no PID!";
-
-	    SENDMAIL($TBOPS,
-		     "Frisbee Killer Failed!",
-		     "Image: $imageid\n".
-		     $mesg);
-
-	    Fatal($mesg);
-	}
-    }
-
-    #
-    # Okay, address and pid. We could clear the pid from the DB,
-    # preventing another killer from thinking it is running, but not
-    # much point since it is not likely to happen. If it turns out to
-    # be a problem we can change the way this works.
-    #
-    if (! kill('TERM', $pid)) {
-	SENDMAIL($TBOPS,
-		 "Frisbee Killer Failed!",
-		 "Failed to stop frisbee daemon for $imageid\n".
-		 "Could not kill(TERM) process $pid: $? $!");
-
-	Fatal("Failed to stop frisbee daemon for $imageid!");
-    }
-    exit(0);
 }
+
+#
+# Pick an address to use before locking the DB.  Die if unsucessful,
+# set address if sucessful.  If something goes wrong later or there is
+# already a laucher active, we will wind up wasting this address,
+# but hey, we can make more!
+#
+
+$address = PickAddress($subbossid, $imageid);
 
 # Ok, no process is already running for this image, we will use the new
 # address chosen earlier.
@@ -304,13 +189,13 @@ if (my $childpid = TBBackGround($LOGFILE)) {
     #
     sleep(1);
     my $foo = waitpid($childpid, &WNOHANG);
-    if ($foo) {
+    if ($foo && $?) {
 	#ClearAddress();
 	Fatal("Error $? backgrounding frisbeelauncher!");
-    }
+   }
     exit(0);
 }
-#XXX TBdbfork();
+##XXX TBdbfork();
 
 # Set up a signal handler that will clean up in case we get killed
 $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
@@ -319,11 +204,43 @@ $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
 # but that is unlikely. Look for it above though.
 SetPid($PID);
 
-#
-# Drop root permissions, if we have them
-#
-if ($EUID == 0) {
+
+if (-e $filename) {
+	my @img_stat = stat $filename;
+	if (!@img_stat) {
+		Fatal("Unable to get size and mtime for $imageid: $filename\n");
+	}
+
+	my $img_size = $img_stat[7];
+	my $img_mtime = $img_stat[9];
+
+	if (($img_size != $size) || ($img_mtime < $mtime)) {
+		if (!unlink $filename) {
+			Fatal("Unable to unlink $imageid: $filename for updating\n");
+		}
+	}
+}
+
+if (! -e $filename) {
+    debug("Fetching image $filename ($imageid) from boss\n");
+    $SIG{HUP} = $SIG{INT} = $SIG{TERM} = \&cleanup;
+
+    SetSyncFlag(1);
+    SetPid($PID);
     $EUID = $UID;
+    $dlfilename = $filename;
+    my $image_dir = dirname($filename);
+    if (! -d $image_dir && !mkpath($image_dir)) {
+	    Fatal("Unable to create path \"$image_dir\"\n");
+    }
+    system($FRISBEEIMAGE, $imageid, $filename);
+    ClearSyncFlag();
+    $dlfilename = 0;
+    $EUID = 0;
+    if ($?) {
+	# XXX clear address if sync failed?
+	Fatal("No such image file: $filename!");
+    }
 }
 
 my @args = ('-i', $MY_IP);
@@ -344,79 +261,77 @@ push @args, ('-K', '15');
 my $firsttry = 1;
 
 # Now, we actually launch Frisbee
-while (1) {
-        #
-        # Each time the server exits, test the busy bit to see if
-	# it should keep going. This has to be done with tables locked
-	# since another caller is going to bump it.
-	#
-	last if (!TestBusy());
-
-	if ($child_pid = fork()) {
-		# Wait for child to exit
-		waitpid($child_pid, 0);
-
-		if ($?) {
-		    #
-		    # If this is the first time we are firing up this server
-		    # and the port is already in use, try another port.
-		    #
-		    # If a server was running, died, and now we can no longer
-		    # get the port, something else might be wrong so just die
-		    # in the usual way.
-		    #
-		    my $err = $?;
-		    if ($firsttry && ($err >> 8) == EADDRINUSE()) {
-			warn("Frisbeed bind failed for address $address, ".
-			     "picking another address\n");
-		        ClearAddress();
-			$address = PickAddress($subbossid, $imageid);
-			next;
-		    }
-		    #SENDMAIL($TBOPS, "Frisbeed Failed!",
-		#	     "Image: $imageid\n".
-		#	     "Address: $address\n\n".
-		#	     "Process $child_pid exited with value $err.\n".
-		#	     "Please look at the syslog for frisbeed!\n\n".
-		#	     "NOTE: Another frisbeed will not start!\n");
-		    print STDERR "Frisbeed Failed!",
-			     "Image: $imageid\n".
-			     "Address: $address\n\n".
-			     "Process $child_pid exited with value $err.\n".
-			     "Please look at the syslog for frisbeed!\n\n".
-			     "NOTE: Another frisbeed will not start!\n";
+do {
+	while (1) {
+		#
+		# Each time the server exits, test the busy bit to see if
+		# it should keep going. This has to be done with tables locked
+		# since another caller is going to bump it.
+		#
+		last if (!TestBusy());
+		
+		if ($child_pid = fork()) {
+			# Wait for child to exit
+			waitpid($child_pid, 0);
+		
+			if ($?) {
+				#
+				# If this is the first time we are firing up this server
+				# and the port is already in use, try another port.
+				#
+				# If a server was running, died, and now we can no longer
+				# get the port, something else might be wrong so just die
+				# in the usual way.
+				#
+				my $err = $?;
+				if ($firsttry && ($err >> 8) == EADDRINUSE()) {
+					warn("Frisbeed bind failed for address $address, ".
+					     "picking another address\n");
+					ClearAddress();
+					$address = PickAddress($subbossid, $imageid);
+					next;
+				}
+				#SENDMAIL($TBOPS, "Frisbeed Failed!",
+				#	     "Image: $imageid\n".
+				#	     "Address: $address\n\n".
+				#	     "Process $child_pid exited with value $err.\n".
+				#	     "Please look at the syslog for frisbeed!\n\n".
+				#	     "NOTE: Another frisbeed will not start!\n");
+				print STDERR "Frisbeed Failed!",
+				  "Image: $imageid\n".
+				  "Address: $address\n\n".
+				  "Process $child_pid exited with value $err.\n".
+				  "Please look at the syslog for frisbeed!\n\n".
+				  "NOTE: Another frisbeed will not start!\n";
 			
-		    #
-		    # Dump early. This will leave the address in
-		    # in the DB, so that another one will not start
-		    # until the matter is resolved by someone.
-		    #
-		    ClearPid();
-		    exit(1);
-		}
-		else {
-		    $firsttry = 0;
+				#
+				# Dump early. This will leave the address in
+				# in the DB, so that another one will not start
+				# until the matter is resolved by someone.
+				#
+				ClearPid();
+				exit(1);
+			} else {
+				$firsttry = 0;
+			}
+		} else {
+			# Child branch
+			# The database format for address is host:port - however,
+			# we need to give them as seperate arguments to frisbeed.
+			if ($address =~ /(.*):(.*)/) {
+				my $addr = $1;
+				my $port = $2;
+				
+				print STDERR "$FRISBEED @args -m $addr -p $port $filename";
+				if (!exec($FRISBEED, @args, '-m', $addr, '-p', $port, $filename)) {
+					#Fatal("$$: Unable to exec $FRISBEED");
+					print STDERR "$$: Unable to exec $FRISBEED\n";
+				}
+			}
+			Fatal("$$: Bad address format: $address!");
 		}
 	}
-	else {
-		print STDERR "WTF???\n";
-		# Child branch
-		# The database format for address is host:port - however,
-		# we need to give them as seperate arguments to frisbeed.
-		if ($address =~ /(.*):(.*)/) {
-		    my $addr = $1;
-		    my $port = $2;
-
-		    print STDERR "$FRISBEED @args -m $addr -p $port $filename";
-		    if (!exec($FRISBEED, @args, '-m', $addr, '-p', $port, $filename)) {
-			#Fatal("$$: Unable to exec $FRISBEED");
-			print STDERR "$$: Unable to exec $FRISBEED\n";
-		    }
-		}
-		Fatal("$$: Bad address format: $address!");
-	}
-}
-ClearAddress();
+} while (not defined ClearAddress());
 exit(0);
 
 ######################################################################
@@ -478,7 +393,7 @@ sub ClearAddress()
 				     {"imageid" => "$imageid", "subboss_id" => $subbossid});
 
     if (not defined $rval) {
-	    Fatal("$$: Failed to clear mcast address from server!");
+	    Warn("$$: Failed to clear mcast address from server!");
     }
 
     return $rval;
@@ -538,7 +453,8 @@ sub TestBusy()
 				     {"imageid" => "$imageid", "subboss_id" => $subbossid});
 
     if (not defined $busy) {
-	    Fatal("$$: Failed to get image busy status for $imageid");
+	    Warn("$$: Failed to get image busy status for $imageid, assuming busy");
+	    $busy = 1;
     }
 
     return $busy;
@@ -563,6 +479,14 @@ sub cleanup
 	ClearSyncFlag();
 	exit(1);
 }
+
+sub Warn($)
+{
+	my ($msg) = @_;
+	
+	print STDERR "*** $0:\n",
+	               "    $msg\n";
+}	  
 
 sub Fatal($)
 {
