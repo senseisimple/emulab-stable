@@ -27,9 +27,39 @@ use vars qw(%DBFieldData $DBFieldErrstr);
 %DBFieldData   = ();
 $DBFieldErrstr = "";
 
+#
+# A helper function for checking lossrates. Bad place for this, I know.
+# Needs to be before the __DATA__ cause we used defined() on it. Sigh.
+#
+sub _checklossrate($)
+{
+    my ($token) = @_;
+
+    return 1
+	if ("$token" eq "0");
+
+    # floating point, no exponent. Stole this out of the perl tutorial.
+    if (! ($token =~ /^[+-]?(\d+\.\d+|\d+\.|\.\d+)([eE][+-]?\d+)?$/)) {
+	$DBFieldErrstr = "Improper floating number";
+	return 0;
+    }
+    if ($token > 1.0) {
+	$DBFieldErrstr = "Too big; must be < 1.0";
+	return 0;
+    }
+    if ($token < 0.0) {
+	$DBFieldErrstr = "Too small; must be > 0.0";
+	return 0;
+    }
+    if ($token > 0.0 && $token < 0.000001) {
+	$DBFieldErrstr = "Too small; must be >= 0.000001";
+	return 0;
+    }
+    return 1;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
-
 __DATA__
 
 # Constants for checkslot code.
@@ -205,36 +235,6 @@ sub TBcheck_dbslot($$$;$)
 	    "    Unrecognized column_type $column_type\n");
     }
     return 0;
-}
-
-#
-# A helper function for checking lossrates. Bad place for this, I know.
-#
-sub _checklossrate($)
-{
-    my ($token) = @_;
-
-    return 1
-	if ("$token" eq "0");
-
-    # floating point, no exponent. Stole this out of the perl tutorial.
-    if (! ($token =~ /^[+-]?(\d+\.\d+|\d+\.|\.\d+)([eE][+-]?\d+)?$/)) {
-	$DBFieldErrstr = "Improper floating number";
-	return 0;
-    }
-    if ($token > 1.0) {
-	$DBFieldErrstr = "Too big; must be < 1.0";
-	return 0;
-    }
-    if ($token < 0.0) {
-	$DBFieldErrstr = "Too small; must be > 0.0";
-	return 0;
-    }
-    if ($token > 0.0 && $token < 0.000001) {
-	$DBFieldErrstr = "Too small; must be >= 0.000001";
-	return 0;
-    }
-    return 1;
 }
 
 #
