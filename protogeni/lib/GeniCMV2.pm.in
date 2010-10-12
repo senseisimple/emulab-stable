@@ -327,6 +327,7 @@ sub CreateSliver($)
 	if (defined($slice)) {
 	    GeniCM::CleanupDeadSlice($slice, 1);
 	}
+	return $response;
     }
     my ($sliver_credential, $sliver_manifest) = @{ $response->{'value'} };
     
