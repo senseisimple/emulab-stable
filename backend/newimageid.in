@@ -51,6 +51,7 @@ use libdb;
 use libtestbed;
 use User;
 use Project;
+use OSinfo;
 use Image;
 use Node;
 
