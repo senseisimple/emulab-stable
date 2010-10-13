@@ -174,7 +174,7 @@ $PROJROOT    = "@PROJROOT_DIR@";
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
-__DATA__
+#__DATA__
 
 #
 # Needs to be configured.
