@@ -584,8 +584,8 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg,
     tb_plink *phys_link =
       new tb_plink(componentId.c_str(), 
 		   tb_plink::PLINK_NORMAL, str_first_type.c_str(),
-		   srcMac.c_str(), dstMac.c_str(), 
-		   shortNames[src_iface], shortNames[dst_iface]);
+                   src_pnode->name, srcMac.c_str(), shortNames[src_iface],
+                   dst_pnode->name, dstMac.c_str(), shortNames[dst_iface]);
     
     phys_link->delay_info.bandwidth = bandwidth;
     phys_link->delay_info.delay = latency;

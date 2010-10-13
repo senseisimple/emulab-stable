@@ -407,8 +407,9 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
         // other stuff if I remove them... bummer!
         tb_plink *phys_link =
             new tb_plink(name.c(), tb_plink::PLINK_NORMAL, str_first_type,
-                "(null)", "(null)", src_iface.c(), dst_iface.c());
-        
+                         src_pnode->name, "(null)", src_iface.c(),
+                         dst_pnode->name, "(null)", dst_iface.c());
+            
         phys_link->delay_info.bandwidth = bandwidth.i();
         phys_link->delay_info.delay = latency.i();
         phys_link->delay_info.loss = packet_loss.d();
