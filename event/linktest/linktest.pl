@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w -T
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -2493,6 +2493,7 @@ sub sim_event {
 
 	system($PATH_TEVC,
 	       "-e", "$proj_id/$exp_id",
+	       "-k", $PATH_KEYFILE,
 	       "now",
 	       $simname,
 	       "$event",
@@ -2511,6 +2512,7 @@ sub sim_event2 {
 
 	system($PATH_TEVC,
 	       "-e", "$proj_id/$exp_id",
+	       "-k", $PATH_KEYFILE,
 	       "now",
 	       $simname,
 	       "$event",
