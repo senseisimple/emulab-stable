@@ -165,7 +165,7 @@ my $infodir = $experiment->InfoDir();
 # Sanity check.
 if (! (-e $workdir && -e $userdir)) {
     die("*** $0:\n".
-	"    Missing a critical directory!\n");
+	"    $pid/$eid is missing a critical directory!\n");
 }
 if (! -e $infodir) {
     if (! -e "$TB/expinfo/$pid") {

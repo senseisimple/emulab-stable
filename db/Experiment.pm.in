@@ -186,11 +186,11 @@ sub mysystem($)
 {
     my ($command) = @_;
 
-    my $cwd;
-    chomp($cwd = `/bin/pwd`);
-
-    print STDERR "Running '$command' in $cwd\n"
-	if (0);
+    if (0) {
+	my $cwd;
+	chomp($cwd = `/bin/pwd`);
+	print STDERR "Running '$command' in $cwd\n";
+    }
     return system($command);
 }
 
@@ -1437,7 +1437,7 @@ sub GetProject($)
     my $project = Project->Lookup($self->pid_idx());
     
     if (! defined($project)) {
-	print("*** WARNING: Could not lookup project object for $self!", 1);
+	print("*** WARNING: Could not lookup project object for $self!\n");
 	return undef;
     }
     return $project;
