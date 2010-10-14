@@ -535,10 +535,14 @@ if (defined($switchtouse) && ! defined($component_name)) {
 }
 elsif (! defined($component_name)) {
     $result =
-	DBQueryFatal("select n.node_id, n.uuid, country, latitude, longitude " .
-                     "from nodes as n left join widearea_nodeinfo as wn ".
-                     "  on n.node_id=wn.node_id " .
-		     "where role='testswitch' or role='widearea_switch'");
+	DBQueryFatal("select n.node_id,n.uuid,country,latitude,longitude ".
+                     "   from nodes as n ".
+		     "left join widearea_nodeinfo as wn ".
+                     "     on n.node_id=wn.node_id " .
+		     "left join node_types as nt on ".
+		     "     nt.type=n.type ".
+		     "where role='testswitch' or role='widearea_switch' or ".
+		     "      (role='testnodefoo' and nt.isswitch=1)");
 
     while (($switch, $uuid, $country, $latitude, $longitude) =
             $result->fetchrow_array) {
@@ -1392,7 +1396,14 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 		$bw = $iface2bw;
 	    }
 	}
-	if ($node1obj->isswitch() && $node2obj->isswitch()) {
+	# For now, switches that are testnode should not be considered as
+	# an interconnect.
+	if (($node1obj->isswitch() &&
+	     ($node1obj->role() eq "testswitch" ||
+	      $node1obj->role() eq "widearea_switch")) &&
+	    ($node2obj->isswitch() &&
+	     ($node2obj->role() eq "testswitch" ||
+	      $node2obj->role() eq "widearea_switch"))) {
 	    # interswitch link
 	    if (defined($interconnects{"$node1:$node2"})) {
 		$interconnects{"$node1:$node2"} += $bw;
