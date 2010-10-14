@@ -46,6 +46,7 @@ struct dhcp_option_info {
 
 int parse_ip_address(struct option *option, char **out);
 int parse_ip_address_pair(struct option *option, char **out);
+int parse_classless_route(struct option *option, char **out);
 int parse_string(struct option *option, char **out);
 int parse_data(struct option *option, char **out);
 int parse_int8(struct option *option, char **out);
@@ -123,8 +124,8 @@ struct dhcp_option_info rfc2132_option_info[] = {
 	{STR(OPT_REBINDING_TIME_VALUE),         parse_int32,            0},
 	{STR(OPT_VENDOR_CLASS_ID),              parse_data,             0},
 	{STR(OPT_CLIENT_ID),                    parse_data,             0},
-	{"",                                    NULL,             0},
-	{"",                                    NULL,             0},
+	{"", /*62*/                             NULL,             0},
+	{"", /*63*/                             NULL,             0},
 	{STR(OPT_NISPLUS_DOMAIN),               parse_string,           0},
 	{STR(OPT_NISPLUS_SERVER),               parse_ip_address,       1},
 	{STR(OPT_TFTP_SERVER),                  parse_string,           0},
@@ -145,6 +146,7 @@ struct dhcp_option_info rfc2132_option_info[] = {
 	{STR(OPT_CLIENT_FQDN),                  parse_data,             0},
 	{STR(OPT_RELAY_AGENT_INFO),             parse_data, /* encap */ 0},
 	{STR(OPT_ISNS),                         parse_data,             0},
+	{"", /*84*/                             NULL,             0},
 	{STR(OPT_NDS_SERVERS),                  parse_ip_address,       1},
 	{STR(OPT_NDS_TREE_NAME),                parse_string,           0},
 	{STR(OPT_NDS_CONTEXT),                  parse_string,           0},
@@ -167,7 +169,7 @@ struct dhcp_option_info rfc2132_option_info[] = {
 	{"", /*104*/                            NULL,             0},
 	{"", /*105*/                            NULL,             0},
 	{"", /*106*/                            NULL,             0},
-	{"", /*106*/                            NULL,             0},
+	{"", /*107*/                            NULL,             0},
 	{"", /*108*/                            NULL,             0},
 	{"", /*109*/                            NULL,             0},
 	{"", /*110*/                            NULL,             0},
@@ -181,7 +183,7 @@ struct dhcp_option_info rfc2132_option_info[] = {
 	{STR(OPT_SUBNET_SELECTION),             parse_ip_address,       0},
 	{STR(OPT_DOMAIN_SEARCH),                parse_data, /* XXX */   0},
 	{STR(OPT_SIP_SERVER),                   parse_data, /* XXX */   0},
-	{STR(OPT_CLASSLESS_ROUTE),              parse_data,             0},
+	{STR(OPT_CLASSLESS_ROUTE),              parse_classless_route,  1},
 	{STR(OPT_CABLELABS_CLIENT_CONFIG),      parse_data, /* encap */ 0},
 	{STR(OPT_LOCATION_CONFIG_INFO),         parse_data,             0},
 	{STR(OPT_VENDOR_IDENT_CLASS),           parse_data,             0},
@@ -665,6 +667,101 @@ int _parse_ip_address(uint8_t *data, size_t len, int pair, char **out)
 
 	return ERROR_NONE;
 }
+
+int parse_classless_route(struct option *option, char **out)
+{
+	size_t buffer_len, len;
+	char *buffer, *b;
+	uint8_t *data, *p;
+
+	data = option->data;
+	len = option->length;
+
+	/*
+	 * The buffer must be long enough to hold all routes with a
+	 * space between each one, a '/' separating the mask size from
+	 * the address, a ':' separating the destination from the
+	 * router, and two bytes for the mask size (and a terminating
+	 * null at the end).
+	 *
+	 * Note that the minimum length for a route description is 5
+	 * bytes, so the option value can describe at most length / 5
+	 * routes.
+	 */
+	buffer_len = (len / 5) * (INET_ADDRSTRLEN * 2 + 5);
+	buffer = malloc(buffer_len);
+	if (!buffer)
+		return ERROR_MEM;
+
+	p = data;
+	b = buffer;
+	while (len > 0) {
+		const char *addr_str;
+		uint8_t mask_bits;
+		uint32_t dest_addr;
+		struct in_addr dest;
+		struct in_addr router;
+
+		mask_bits = *p++;
+
+		if (mask_bits > 32) {
+			free(buffer);
+			return ERROR_INVALID_VALUE;
+		}
+
+		if ((mask_bits > 24 && len < 9) ||
+		    (mask_bits > 16 && len < 7) ||
+		    (mask_bits >  8 && len < 6) ||
+		    (mask_bits >  0 && len < 5)) {
+			free(buffer);
+			return ERROR_INVALID_LENGTH;
+		}
+
+		dest_addr = 0;
+		if (mask_bits > 0)
+			dest_addr |= (uint32_t)(*p++) << 24;
+		if (mask_bits > 8)
+			dest_addr |= (uint32_t)(*p++) << 16;
+		if (mask_bits > 16)
+			dest_addr |= (uint32_t)(*p++) << 8;
+		if (mask_bits > 24)
+			dest_addr |= (uint32_t)(*p++);
+
+		dest.s_addr = (in_addr_t)htonl(dest_addr);
+		router.s_addr = *(in_addr_t *)p;
+
+		addr_str = inet_ntop(AF_INET, &dest, b,
+					INET_ADDRSTRLEN);
+		if (addr_str == NULL) {
+			perror("parse_classless_route");
+			free(buffer);
+			return ERROR_INVALID_VALUE;
+		}
+		b += strlen(b);
+
+		b += sprintf(b, "/%d:", mask_bits);
+
+		addr_str = inet_ntop(AF_INET, &router, b,
+		                     INET_ADDRSTRLEN);
+		if (addr_str == NULL) {
+			perror("parse_classless_route");
+			free(buffer);
+			return ERROR_INVALID_VALUE;
+		}
+		b += strlen(b);
+		p += 4;
+
+		len -= 1 + 4 + (mask_bits / 8 + (mask_bits % 8 ? 1 : 0));
+
+		if (len > 0)
+			*b++ = ' ';
+	}
+
+	*out = buffer;
+
+	return ERROR_NONE;
+}
+
 
 int parse_ip_address(struct option *option, char **out) {
 	return _parse_ip_address(option->data, option->length, 0, out);
