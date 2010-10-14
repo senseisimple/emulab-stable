@@ -4911,7 +4911,7 @@ sub AllocVirtNodes($)
 	    
 	    if ($virtnode->_isdynamic()) {
 		# Always use the base type ... node type system sucks.
-		my $basetype = $virtnode->_typeinfo->type();
+		my $basetype = $virtnode->_typeinfo()->type();
 
 		#
 		# We might be expecting to allocate a shared vnode on
@@ -4927,7 +4927,7 @@ sub AllocVirtNodes($)
 		#
 		# Call into library. Be sure to pass impotent mode along.
 		#
-		if (Node::CreateVnodes(\@plist,
+		if (Node->CreateVnodes(\@plist,
 				       {"pid"      => "$pid",
 					"eid"      => "$eid",
 					"count"    => $numvs,
