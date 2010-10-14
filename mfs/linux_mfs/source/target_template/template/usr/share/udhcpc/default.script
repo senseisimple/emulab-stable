@@ -47,6 +47,14 @@ case "$1" in
 			done
 		fi
 
+		if [ -n "$staticroutes" ] ; then
+			echo "creating static routes"
+
+			echo $staticroutes | while read dest router; do
+				route add -net $dest gw $router
+			done
+		fi
+
 		echo -n > $RESOLV_CONF
 		[ -n "$domain" ] && echo search $domain >> $RESOLV_CONF
 		for i in $dns ; do

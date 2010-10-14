@@ -3,7 +3,7 @@
 # Start the network....
 #
 
-udhcpc_opts="-q"
+udhcpc_opts="-q -O staticroutes"
 
 if [ -f /etc/emulab/paths.sh ]; then
 	. /etc/emulab/paths.sh
