@@ -25,6 +25,7 @@ use GeniCredential;
 
 use Compress::Zlib;
 use MIME::Base64;
+use XML::LibXML;
 
 # Disable UUID checks in GeniCredential.
 $GeniCredential::CHECK_UUID = 0;
@@ -237,6 +238,34 @@ sub DeleteSliver()
     }
 }
 
+# No prototype because it is recursive and as such, the prototype
+# causes a warning.
+#
+# Return a hash containing a JSONish representation of the given node.
+sub XmlToJson
+{
+    my ($node) = @_;
+ 
+    my $attrs = {};
+    foreach my $attr ($node->attributes) {
+        $attrs->{$attr->nodeName()} = $attr->nodeValue();
+    }
+
+    my $children = [];
+    foreach my $child ($node->childNodes) {
+        if ($child->nodeType() == XML_ELEMENT_NODE) {
+            push(@$children, XmlToJson($child));
+        }
+    }
+
+    my $result = {
+        "name" => $node->nodeName(),
+        "attributes" => $attrs,
+        "children" => $children
+    };
+    return $result;
+}
+
 # Get the status of the sliver associated with the given slice. This
 # just passes on to the CM SliverStatus operation.
 sub SliverStatus()
@@ -255,9 +284,7 @@ sub SliverStatus()
     my $pgstatus = GeniResponse::value($response);
     my $status = {};
 
-    # How do we determine the sliver URN? Is there one for the whole
-    # sliver, or just for each individual sliver?
-    $status->{'geni_urn'} = 'Unknown';
+    $status->{'geni_urn'} = $slice_urn;
 
     # Determine geni_status. XXX how to determine 'configuring'?
     if ($pgstatus->{'status'} eq 'ready') {
@@ -268,15 +295,44 @@ sub SliverStatus()
         $status->{'geni_status'} = 'unknown';
     }
 
+    # include the pg status
+    $status->{'pg_status'} = $pgstatus->{'status'};
+
+    # include the expiration
+    my $slice = GeniSlice->Lookup($slice_urn);
+    $status->{'pg_expires'} = $slice->expires();
+
     my $details = $pgstatus->{'details'};
     my @children = ();
     while ( my ($pgurn, $pgrstat) = each(%$details) ) {
+        # Look up the sliver so we can extract info from the manifest.
+        my $sliver = GeniSliver->Lookup($pgurn);
         my $child = {
             'geni_urn' => $pgurn,
             # XXX Need to massage status to one of the AM status values
             'geni_status' => $pgrstat->{'status'},
             'geni_error' => $pgrstat->{'error'},
+            'pg_status' => $pgrstat->{'status'},
         };
+
+        # Put manifest info in...
+        my $manifest = $sliver->GetManifest(0);
+        if (0) {
+            # An example of how to include a single element from the
+            # manifest. Abondoned this approach and went to XmlToJson
+            # instead. Finds the "login", then the "hostname" inside
+            # the rspec
+            my $login = GeniXML::FindNodes(".//n:services//n:login", $manifest);
+            if (defined($login)) {
+                my $login = @$login[0];
+                my $host = GeniXML::GetText("hostname", $login);
+                if (defined($host)) {
+                    $child->{'pg_hostname'} = $host;
+                }
+            }
+        }
+        $child->{'pg_manifest'} = XmlToJson($manifest);
+        #$child->{'pg_xml_manifest'} = GeniXML::Serialize($manifest);
         push @children, $child;
     }
     $status->{'geni_resources'} = \@children;
