@@ -356,6 +356,7 @@ sub CreateSliver($)
     Node->FlushAll();
 
     if ($aggregate->Start($API_VERSION, 0) != 0) {
+	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start sliver");
     }
