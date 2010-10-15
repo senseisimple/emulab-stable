@@ -219,6 +219,7 @@ AC_SUBST(GMAP_API_KEY)
 AC_SUBST(NODE_USAGE_SUPPORT)
 AC_SUBST(NOSTACKMIB)
 AC_SUBST(EXP_VIS_SUPPORT)
+AC_SUBST(SELFLOADER_DATA)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -307,6 +308,7 @@ STANDALONE_CLEARINGHOUSE=0
 NODE_USAGE_SUPPORT=0
 EXP_VIS_SUPPORT=0
 NOSTACKMIB=0
+SELFLOADER_DATA="__DATA__"
 
 #
 # XXX You really don't want to change these!
@@ -545,6 +547,13 @@ if test -z "$EVENTSERVER"; then
     EVENTSERVER="event-server"
 fi
 AC_DEFINE_UNQUOTED(EVENTSERVER, "$EVENTSERVER")
+
+#
+# Perl SelfLoader
+# XXX this is a hack which enables us to disable it on versions of perl
+# where there are problems with taint checking in the SelfLoader module.
+#
+AC_DEFINE_UNQUOTED(SELFLOADER_DATA, "$SELFLOADER_DATA")
 
 #
 # LEDA library path

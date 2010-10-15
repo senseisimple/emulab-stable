@@ -338,7 +338,7 @@ sub Stringify($)
 }
 
 1;
-__DATA__
+@SELFLOADER_DATA@
 
 sub dbrow($$)     { return $_[0]->{'EXPT'}; }
 sub locked($)     { return $_[0]->expt_locked(); }
@@ -4507,5 +4507,3 @@ sub ReserveSharedBandwidth($;$$)
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
-
-

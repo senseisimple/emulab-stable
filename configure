@@ -1588,6 +1588,7 @@ STANDALONE_CLEARINGHOUSE=0
 NODE_USAGE_SUPPORT=0
 EXP_VIS_SUPPORT=0
 NOSTACKMIB=0
+SELFLOADER_DATA="__DATA__"
 
 #
 # XXX You really don't want to change these!
@@ -1949,6 +1950,16 @@ if test -z "$EVENTSERVER"; then
 fi
 cat >> confdefs.h <<EOF
 #define EVENTSERVER "$EVENTSERVER"
+EOF
+
+
+#
+# Perl SelfLoader
+# XXX this is a hack which enables us to disable it on versions of perl
+# where there are problems with taint checking in the SelfLoader module.
+#
+cat >> confdefs.h <<EOF
+#define SELFLOADER_DATA "$SELFLOADER_DATA"
 EOF
 
 
@@ -3094,6 +3105,7 @@ s%@GMAP_API_KEY@%$GMAP_API_KEY%g
 s%@NODE_USAGE_SUPPORT@%$NODE_USAGE_SUPPORT%g
 s%@NOSTACKMIB@%$NOSTACKMIB%g
 s%@EXP_VIS_SUPPORT@%$EXP_VIS_SUPPORT%g
+s%@SELFLOADER_DATA@%$SELFLOADER_DATA%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
 s%@TBROBOCOPSEMAIL@%$TBROBOCOPSEMAIL%g
