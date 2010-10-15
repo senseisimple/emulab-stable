@@ -535,7 +535,7 @@ if (isset($types['garcia']) ||
 		       ($expstate == $TB_EXPTSTATE_ACTIVE ?
 			"?pid=$exp_pid&eid=$exp_eid" : ""));
     if ($expstate == $TB_EXPTSTATE_SWAPPED) {
-	if ($types['static-mica2']) {
+	if (isset($types['static-mica2']) && $types['static-mica2']) {
 	    WRITESUBMENUBUTTON("Selector Applet",
 			       "robotrack/selector.php3?".
 			       "pid=$exp_pid&eid=$exp_eid");
