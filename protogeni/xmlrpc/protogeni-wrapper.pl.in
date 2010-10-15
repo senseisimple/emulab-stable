@@ -232,11 +232,7 @@ if (!defined($certificate)) {
 	"    Could not get uuid from $EMULAB_PEMFILE\n");
 }
 $ENV{'MYUUID'} = $certificate->uuid();
-# The URN could also come from the certificate, and that might be preferable
-# in some ways (if anybody is doing something silly like authenticating
-# with somebody else's certificate).  But that would require everybody to
-# upgrade to URNs in their certificates, so we can't assume it yet.
-$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+$MODULE";
+$ENV{'MYURN'}  = $certificate->urn();
 
 #
 # Create and set our RPC context for any calls we end up making.

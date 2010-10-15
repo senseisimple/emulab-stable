@@ -3,7 +3,7 @@
 # Start the network....
 #
 
-udhcpc_opts="-q"
+udhcpc_opts="-q -O staticroutes"
 
 if [ -f /etc/emulab/paths.sh ]; then
 	. /etc/emulab/paths.sh
@@ -22,6 +22,7 @@ parse_cached_pxe_lease() {
 	local routers=""
 	local nameservers=""
 	local hostname=""
+	local classless_routes=""
 	local mac=""
 	local iface=""
 	local ifcfg_opts=""
@@ -35,6 +36,8 @@ parse_cached_pxe_lease() {
 		case $key in
 		OPT_BROADCAST_ADDRESS)
 			broadcast="$value"; ;;
+		OPT_CLASSLESS_ROUTES)
+			classless_routes="$value"; ;;
 		OPT_SUBNET_MASK)
 			netmask="$value"; ;;
 		OPT_HOST_NAME)
@@ -89,6 +92,16 @@ parse_cached_pxe_lease() {
 		echo "adding default route via $gw"
 		/sbin/route add default gw $gw dev $iface
 	done
+
+	if [ -n "$classless_routes" ]; then
+		echo "creating static routes"
+		for route in $classless_routes; do
+			dest=${route%%:*}
+			gw=${route##*:}
+
+			/sbin/route add -net $dest gw $gw
+		done
+	fi
 	
 	echo -n > /etc/resolv.conf
 	if [ -n "$domain" ]; then

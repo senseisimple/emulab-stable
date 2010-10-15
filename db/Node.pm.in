@@ -416,8 +416,16 @@ sub Create($$$$)
 	my $hostname = $argref->{'hostname'};
 	my $external = $argref->{'external_node_id'};
 	my $IP       = $argref->{'IP'};
-	    
-	if (!DBQueryWarn("replace into widearea_nodeinfo ".
+
+	# Hmm, wanodecreate already does this.
+	my $wa_result =
+	    DBQueryWarn("select node_id from widearea_nodeinfo ".
+			"where node_id='$node_id'");
+	goto bad
+	    if (!$wa_result);
+	
+	if ($wa_result->numrows == 0 &&
+	    !DBQueryWarn("replace into widearea_nodeinfo ".
 			 " (node_id, contact_uid, contact_idx, hostname," .
 			 "  external_node_id, IP) ".
 			 " values ('$node_id', 'nobody', '0', ".
@@ -1667,9 +1675,9 @@ sub SetEventState($$)
 # be used when creating the new node(s). A list of the node names is
 # returned.
 #
-sub CreateVnodes($$)
+sub CreateVnodes($$$)
 {
-    my ($rptr, $options) = @_;
+    my ($class, $rptr, $options) = @_;
     my @created   = ();
     my @tocreate  = ();
     require Interface;

@@ -83,6 +83,14 @@ if ($opt{a}) {
 	     'ifOutOctets', 'ifOutUcastPkts', 'ifOutNUcastPkts');
 }
 
+#
+# Warn about OIDs that do not return numeric values.
+# Most likely these are ones that are unimplemented.
+# It will only warn once per device per OID, but even that might get tedious
+# so warnings can be turned off entirely here.
+#
+my $badoidwarnings = 1;
+
 my ($pid, $eid);
 if (!$opt{p} && !$opt{s}) {
     if (@ARGV < 2) {
@@ -275,6 +283,7 @@ my %portMap = mapPortsToDevices(@ports);
 my @stats;
 DEVICE: foreach my $name (keys %portMap) {
     my @ports = @{$portMap{$name}};
+    my %oidwarned = ();
 
     #
     # Connect to the switch and get the data we want off of it
@@ -335,6 +344,21 @@ DEVICE: foreach my $name (keys %portMap) {
 	    my $dbresult = DBQueryFatal("select * from port_counters where ".
 	    		"node_id='$switch_id' and card=$switch_card and ".
 			"port=$switch_port");
+
+	    #
+	    # Make sure returned values are integers.  If not, warn (just
+	    # once per device) and set to zero.
+	    #
+	    for (my $i = 0; $i < @oids; $i++) {
+		if ($result->[$i] !~ /^(\d+)$/) {
+		    if ($badoidwarnings && !$oidwarned{$oids[$i]}) {
+			warn("WARNING: invalid value '" , $result->[$i],
+			     "' for OID '", $oids[$i], "'\n");
+			$oidwarned{$oids[$i]} = 1;
+		    }
+		    $result->[$i] = 0;
+		}
+	    }
 
 	    my $oldresult = [@$result];
 
