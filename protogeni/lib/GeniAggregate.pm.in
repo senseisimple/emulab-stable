@@ -678,7 +678,11 @@ sub GetManifest($$)
     #
     my $valid_date = POSIX::strftime("20%y-%m-%dT%H:%M:%S",
 				     gmtime(str2time($slice->expires())));
-    GeniXML::SetText("valid_until", $manifest, $valid_date);
+    if (GeniXML::IsVersion0($manifest)) {
+	GeniXML::SetText("valid_until", $manifest, $valid_date);
+    } else {
+	GeniXML::SetText("expires", $manifest, $valid_date);
+    }
 
     return $manifest
 	if (!$asxml);
