@@ -341,7 +341,7 @@ sub SetVirtualizationType($$)
     my ($node, $arg) = @_;
     my $result = 1;
     if (IsVersion0($node)) {
-	$result = SetText("virtualization_type", $arg);
+	$result = SetText("virtualization_type", $node, $arg);
     }
     return $result;
 }
@@ -376,7 +376,7 @@ sub GetExclusive($)
     return $result;
 }
 
-sub SetExclusive($)
+sub SetExclusive($$)
 {
     my ($node, $arg) = @_;
     my $result = 1;

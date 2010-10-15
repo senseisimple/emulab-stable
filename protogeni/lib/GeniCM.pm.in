@@ -1320,7 +1320,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	} else {
 	  GeniXML::SetText("component_id", $rspec,
 			   GeniHRN::Generate( $OURDOMAIN, "node",
-					      $node->node_id() );
+					      $node->node_id() ));
 	    GeniXML::SetText("component_manager_id", $rspec, $ENV{'MYURN'});
 	}
 	GeniXML::SetExclusive($rspec, $exclusive);
@@ -2236,7 +2236,7 @@ sub SliverWorkAux($$$$$$$)
 	    my $node_id    = GeniXML::GetText("virtual_node_id",
 					      $ifaceref);
 	    if (! GeniXML::IsVersion0($ifaceref) && defined($iface_id)) {
-		$node_id = $iface2ref{$iface_id};
+		$node_id = $iface2node{$iface_id};
 	    }
 	    my ($vnode,$vinterface);
 
