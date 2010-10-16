@@ -172,9 +172,8 @@ $TBOPSPID    = "emulab-ops";
 $EXPTLOGNAME = "activity.log";
 $PROJROOT    = "@PROJROOT_DIR@";
 
-# _Always_ make sure that this 1 is at the end of the file...
 1;
-__DATA__
+@SELFLOADER_DATA@
 
 #
 # Needs to be configured.
@@ -649,4 +648,5 @@ sub TBMinTrust($$)
     return $trust_value >= $minimum;
 }
 
+# _Always_ make sure that this 1 is at the end of the file...
 1;

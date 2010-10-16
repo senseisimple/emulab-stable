@@ -2227,7 +2227,7 @@ sub SliverWorkAux($$$$$$$)
 	    #
 	    if ($node->isvirtnode()) {
 		$vnode = $node;
-		$node  = GeniUtil::LookupNode($nodesliver->resource_id());
+		$node  = GeniUtil::LookupNode($vnode->phys_nodeid());
 		if (!defined($node)) {
 		    $message = "Could not find node object for $nodesliver";
 		    goto bad;
