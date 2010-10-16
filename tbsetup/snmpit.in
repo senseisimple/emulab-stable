@@ -1709,6 +1709,12 @@ sub CreateOneVlan($$@)
     #
     if (!$NOSTACKMIB) {
 	foreach my $port (@ports) {
+	    #
+	    # Switch ports are evil and we don't touch them.
+	    #
+	    if (isSwitchPort($port)) {
+		next;
+	    }
 	    my ($speed,$duplex) = getInterfaceSettings($port);
 	    #
 	    # If either is not set, we do nothing. We could make

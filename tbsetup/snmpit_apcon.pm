@@ -22,6 +22,7 @@ use libdb;
 
 use libtestbed;
 use Expect;
+use Lan;
 
 
 # CLI constants
@@ -270,11 +271,17 @@ my %PortIface=();
 # Maps pcX:Y<==>pcX:iface
 
 my %Ports=();
+# Ports maps pcX:Y.port<==>switch:port
+
+my %OldPorts=();
 # Ports maps pcX:Y<==>switch:port
+
+my %MorePortIface=();
+# Maps node:card.port <==> node:iface
 
 #
 # This function fills in %Interfaces and %Ports
-# They hold pcX:Y<==>MAC and pcX:Y<==>switch:port respectively
+# They hold pcX:Y<==>MAC and pcX:Y.port<==>switch:port respectively
 #
 # XXX: Temp workround for portnum
 #
@@ -297,6 +304,10 @@ sub readTranslationTable($) {
         $Interfaces{$mac} = $name;
         $PortIface{$name} = $iface;
         $PortIface{$iface} = $name;
+        
+        $MorePortIface{"$_[0]:$_[1].$_[2]"} = $iface;
+        $MorePortIface{$iface} = "$_[0]:$_[1].$_[2]";
+        
         print "Interfaces: $mac <==> $name\n" if $self->{DEBUG} > 1;
     }
 
@@ -305,6 +316,8 @@ sub readTranslationTable($) {
 	    "from wires;");
     while ( my @row = $result->fetchrow_array()) {
         my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
+        my $oldname = "$node_id1:$card1";
+        
         $name = "$node_id1:$card1.$port1";
         print "Name='$name'\t" if $self->{DEBUG} > 2;
         print "Dev='$node_id2'\t" if $self->{DEBUG} > 2;
@@ -312,9 +325,86 @@ sub readTranslationTable($) {
         print "switchport='$switchport'\n" if $self->{DEBUG} > 2;
         $Ports{$name} = $switchport;
         $Ports{$switchport} = $name;
+        
+        if (exists($OldPorts{$oldname})) {
+            if ($OldPorts{$oldname} ne "") {
+                delete $OldPorts{$OldPorts{$oldname}};
+            }
+            $OldPorts{$oldname} = "";
+        } else {
+            $OldPorts{$oldname} = $switchport;
+            $OldPorts{$switchport} = $oldname;
+        }
+        
         print "Ports: '$name' <==> '$switchport'\n" if $self->{DEBUG} > 1;
     }
 
+}
+
+#
+# More robust version of convertPortFromNode2Dev
+#
+sub getRealSwitchPortFromPCPort($$) {
+    my $self = shift;
+    my $port = shift;
+    my $realport = "";
+    
+    $self->debug("get real port on switch from PC port: $port\n");
+    
+    if (exists($OldPorts{$port})) {
+        $realport = $OldPorts{$port};
+        if ($realport ne "") {
+            return $realport;
+        }
+    }
+
+    if (exists($Ports{$port})) {
+        $realport = $Ports{$port};
+	return $realport;
+    }
+    
+    my $fullport = $port.".1";
+    if (exists($Ports{$fullport})) {
+        return $Ports{$fullport};
+    }
+    
+    return undef;    
+}
+
+#
+# Try to guess if the given ports contains switch ports
+# and refine it to be full port format.
+#
+sub refineVlanPorts($$@) {
+    my ($self, $vlanid, @givenports) = @_;
+    
+    my @ifaces = getVlanIfaces($vlanid);
+
+    # Now we have to guess...
+    if ($#givenports == $#ifaces) {
+	# 
+	# seems like all ports are here
+	#
+	my @fullports = ();
+	foreach my $iface (@ifaces) {
+	    if (exists($MorePortIface{$iface})) {
+		push @fullports, $MorePortIface{$iface};
+	    } else {
+		#
+		# iface doesn't exist, may God bless the givenports
+		# be new... new enough to be not in DB.
+		#
+		$self->debug("refine failed: Iface $iface not found\n");
+		return @givenports;
+	    }
+	}
+
+	return @fullports;
+    }
+
+    $self->debug("refine failed: ports numbers not equal @givenports, @ifaces\n");
+
+    return @givenports;
 }
 
 ##############################################################################
@@ -853,8 +943,14 @@ sub setPortRate($$$)
 sub convertPortFromNode2Dev($$) {
     my $self = shift;
     my $pcport = shift;
-    
-    my $modport = $Ports{"$pcport.1"};
+    my $modport;
+
+    if ($pcport =~ /(.+):(.+)\.(.+)/) {
+	$modport = $Ports{"$pcport"};
+    } else {
+	$modport = $Ports{"$pcport.1"};
+    }
+
     if (defined($modport)) {
         return $self->convertPortFormat($modport);
     }
@@ -875,14 +971,26 @@ sub portControl ($$@) {
     my $self = shift;
 
     my $cmd = shift;
-    my @ports = @_;
+    my @pcports = @_;
 
-    $self->debug("portControl: $cmd -> (@ports)\n");
+    $self->debug("portControl: $cmd -> (@pcports)\n");
+
+    #my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
+    #my @ports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
 
     my $errors = 0;
-    foreach my $port (@ports) { 
-        $port = $self->convertPortFromNode2Dev($port);
-        my $rt = $self->setPortRate($port, $cmd);
+    foreach my $port (@pcports) { 
+        my $swport = $self->getRealSwitchPortFromPCPort($port);
+	if (!defined($swport)) {
+	    if (isSwitchPort($port)) {
+		next;
+	    } else {
+		$self->debug("No such port: $port\n");
+		$errors++;
+		next;
+	    }
+	}
+        my $rt = $self->setPortRate($swport, $cmd);
         if ($rt) {
             if ($rt =~ /^ERROR: port rate unsupported/) {
                 #
@@ -1049,8 +1157,10 @@ sub setPortVlan($$@) {
         return 1;
     }
 
-    my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
-    
+    #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
+    my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
+    my @ports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
+
     $self->lock();
 
     # Check if ports are free
@@ -1112,8 +1222,11 @@ sub delPortVlan($$@) {
 
     $self->debug($self->{NAME} . "::delPortVlan $vlan_id ");
     $self->debug("ports: " . join(",",@pcports) . "\n");
-    my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
-    
+
+    #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
+    my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
+    my @ports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
+
     $self->lock();
 
     # Remember all ports for empty check after remove

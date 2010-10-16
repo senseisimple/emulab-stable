@@ -15,7 +15,7 @@ use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum portiface Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
-                getSwitchesInStacks
+                getSwitchesInStacks getVlanIfaces
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
 		getExperimentTrunks setVlanTag setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
@@ -33,7 +33,7 @@ use Exporter;
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
 	        getExperimentVlanPorts
-                uniq);
+                uniq isSwitchPort);
 
 use English;
 use libdb;
@@ -161,6 +161,39 @@ sub ReadTranslationTable {
 }
 
 #
+# Return an array of ifaces belonging to the VLAN
+#
+sub getVlanIfaces($) {
+    my $vlanid = shift;
+    my @ports = ();
+
+    my $vlan = VLan->Lookup($vlanid);
+    if (!defined($vlan)) {
+        die("*** $0:\n".
+	    "    No vlanid $vlanid in the DB!\n");
+    }
+    my @members;
+    if ($vlan->MemberList(\@members) != 0) {
+        die("*** $0:\n".
+	    "    Unable to load members for $vlan\n");
+	}
+    foreach my $member (@members) {
+	my $nodeid;
+	my $iface;
+	
+	if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
+	    $member->GetAttribute("iface", \$iface) != 0) {
+	    die("*** $0:\n".
+		"    Missing attributes for $member in $vlan\n");
+	}
+	push(@ports, "$nodeid:$iface");
+    }
+
+    return @ports;
+}
+
+
+#
 # Returns an array of ports (in node:card form) used by the given VLANs
 #
 sub getVlanPorts (@) {
@@ -172,27 +205,8 @@ sub getVlanPorts (@) {
     my @ports = ();
 
     foreach my $vlanid (@vlans) {
-	my $vlan = VLan->Lookup($vlanid);
-	if (!defined($vlan)) {
-	    die("*** $0:\n".
-		"    No vlanid $vlanid in the DB!\n");
-	}
-	my @members;
-	if ($vlan->MemberList(\@members) != 0) {
-	    die("*** $0:\n".
-		"    Unable to load members for $vlan\n");
-	}
-	foreach my $member (@members) {
-	    my $nodeid;
-	    my $iface;
-
-	    if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
-		$member->GetAttribute("iface", \$iface) != 0) {
-		die("*** $0:\n".
-		    "    Missing attributes for $member in $vlan\n");
-	    }
-	    push(@ports, "$nodeid:$iface");
-	}
+	my @ifaces = getVlanIfaces($vlanid);
+	push @ports, @ifaces;
     }
     # Convert from the DB format to the one used by the snmpit modules
     return convertPortsFromIfaces(@ports);
@@ -417,19 +431,62 @@ sub convertPortsFromIfaces(@) {
 sub convertPortFromIface($) {
     my ($port) = $_;
     if ($port =~ /(.+):(.+)/) {
-        my ($node,$iface) =  ($1,$2);
-        my $result = DBQueryFatal("SELECT card FROM interfaces " .
-            "WHERE node_id='$node' AND iface='$iface'");
+	my ($node,$iface) =  ($1,$2);
+        my $result = DBQueryFatal("SELECT card, port FROM interfaces " .
+				  "WHERE node_id='$node' AND iface='$iface'");
         if (!$result->num_rows()) {
             warn "WARNING: convertPortFromIface($port) - Unable to get card\n";
             return $port;
         }
-        my $card = ($result->fetchrow())[0];
+        my @row = $result->fetchrow();
+        my $card = $row[0];
+        my $cport = $row[1];
+
+        $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+                               "(SELECT type FROM nodes WHERE node_id='$node')");
+
+        if (!$result->num_rows()) {
+            warn "WARNING: convertPortFromIface($port) -".
+                " Uable to decide if $node is a switch or not\n";
+            return $port;
+        }
+
+        if (($result->fetchrow())[0] == 1) {
+	    #
+	    # Should return the later one, but many places in snmpit
+	    # and this file depend on the old format...
+	    #
+            return "$node:$card";
+            #return "$node:$card.$cport";                                            
+        }
+
         return "$node:$card";
+
     } else {
         warn "WARNING: convertPortFromIface($port) - Bad port format\n";
         return $port;
     }
+}
+
+#                                                                                    
+# If a port is on switch, some port ops in snmpit                                    
+# should be avoided.                                                                 
+#                                                                                    
+sub isSwitchPort($) {
+    my $port = shift;
+
+    if ($port =~ /^(.+):(.+)/) {
+        my $node = $1;
+
+        my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+                                  "(SELECT type FROM nodes WHERE node_id='$node')");
+
+        if (($result->fetchrow())[0] == 1) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 #
