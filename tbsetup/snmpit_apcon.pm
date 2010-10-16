@@ -454,7 +454,7 @@ sub parseNames($$)
     foreach ( split ( /\n/, $raw ) ) {
         if ( /^([A-I][0-9]{2}):\s+(\w+)\W*/ ) {
             if ( $2 !~ /$CLI_UNNAMED_PATTERN/ ) {
-            $names{$1} = $2;
+		$names{$1} = $2;
             }
         }
     }
@@ -554,6 +554,7 @@ sub doCLICmd($$)
 
     $cmd = quotemeta($cmd);
     if ( $output =~ /^($cmd)\n(ERROR:.+)\r\n[.\n]*$/ ) {
+	$self->debug("snmpit_apcon: Error in doCLICmd: $2\n");
         return (1, $2);
     } else {
         return (0, $output);
@@ -613,6 +614,7 @@ sub getPortName($$)
     my $raw = $self->getRawOutput("show port info $port\r");
     if ( $raw =~ /$port Name:\s+(\w+)\W*\n/ ) {
         if (  $1 !~ /$CLI_UNNAMED_PATTERN/ ) {
+	    $self->debug("snmpit_apcon: getPortName: $port as $1\n");
             return $1;
         }
     }
@@ -634,6 +636,8 @@ sub getNamedPorts($$)
             push @ports, $1;
         }
     }
+
+    $self->debug("snmpit_apcon: getNamedPorts: ".join(", ", @ports)."\n");
 
     return \@ports;
 }
@@ -792,6 +796,8 @@ sub connectMulticast($$@)
     my ($self, $src, @dsts) = @_;
     my $cmd = "connect multicast $src".join("", @dsts)."\r";
 
+    $self->debug("snmpit_apcon: connectMulticast: $cmd\n");
+
     return $self->doCLICmd($cmd);
 }
 
@@ -802,6 +808,8 @@ sub connectDuplex($$$)
 {
     my ($self, $src, $dst) = @_;
     my $cmd = "connect duplex $src"."$dst"."\r";
+
+    $self->debug("snmpit_apcon: connectDuplex: $cmd\n");
 
     return $self->doCLICmd($cmd);
 }
@@ -832,6 +840,9 @@ sub namePorts($$@)
 
         # undo set name
         if ( $rt ) {
+
+	    $self->debug("snmpit_apcon: namePorts failed: ".join(", ", @ports)."\n");
+
             for ($i--; $i >= 0; $i-- ) {            
                 $self->doCLICmd(
                     "configure port name $ports[$i] $CLI_UNNAMED_NAME\r");
@@ -990,6 +1001,8 @@ sub portControl ($$@) {
 		next;
 	    }
 	}
+
+	$swport = $self->convertPortFormat($swport);
         my $rt = $self->setPortRate($swport, $cmd);
         if ($rt) {
             if ($rt =~ /^ERROR: port rate unsupported/) {
@@ -1159,8 +1172,11 @@ sub setPortVlan($$@) {
 
     #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
     my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
-    my @ports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
+    my @swports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
 
+    $self->debug("$id: set ports in vlan: ".join(", ",@swports)."\n");
+
+    my @ports = map {$self->convertPortFormat($_)} @swports;
     $self->lock();
 
     # Check if ports are free
@@ -1168,14 +1184,18 @@ sub setPortVlan($$@) {
         if ($self->getPortName($port)) {
             warn "ERROR: Port $port already in use.\n";
             $self->unlock();
+	    $self->debug("Port $port already in use in $_.\n");
             return 1;
         }
     }
+
+    $self->debug("$id: ports is free\n");
     
     my $errmsg = $self->namePorts($vlan_id, @ports);
     if ($errmsg) {
         warn "$errmsg";
         $self->unlock();
+	$self->debug("$errmsg");
         return 1;
     }
 
@@ -1183,6 +1203,7 @@ sub setPortVlan($$@) {
     if ($rt) {
 	$self->unnamePorts(@ports);
 	warn "$id: ports connection failed. $msg\n";
+	$self->debug("$id: ports connection failed. $msg\n");
 
 	# We unnamed the ports so vlan doesn't exist now.
 	if (exists($emptyVlans{$vlan_id})) {
@@ -1225,7 +1246,11 @@ sub delPortVlan($$@) {
 
     #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
     my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
-    my @ports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
+    my @swports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
+
+    $self->debug("snmpit_apcon:delPortVlan: set ports in vlan: ".join(", ",@swports)."\n");
+
+    my @ports = map {$self->convertPortFormat($_)} @swports;
 
     $self->lock();
 
