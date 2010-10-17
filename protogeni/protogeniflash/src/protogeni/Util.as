@@ -15,11 +15,17 @@
 package protogeni
 {
   import flash.external.ExternalInterface;
+  import flash.net.*;
   
   import mx.collections.ArrayCollection;
 
   public class Util
   {
+	  public static function showSetup():void
+	  {
+		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlashClientSetup"), "_blank");
+	  }
+	  
     public static function makeUrn(authority : String,
                                    type : String,
                                    name : String) : String

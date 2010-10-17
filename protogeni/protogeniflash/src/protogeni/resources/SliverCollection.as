@@ -9,6 +9,26 @@ package protogeni.resources
 			super(source);
 		}
 		
+		public function addIfNotExisting(s:Sliver):void
+		{
+			for each(var sliver:Sliver in this)
+			{
+				if(sliver.componentManager == s.componentManager)
+					return;
+			}
+			this.addItem(s);
+		}
+		
+		public function clone():SliverCollection
+		{
+			var sc:SliverCollection = new SliverCollection();
+			for each(var sliver:Sliver in this)
+			{
+				sc.addItem(sliver);
+			}
+			return sc;
+		}
+		
 		public function getByUrn(urn:String):Sliver
 		{
 			for each(var sliver:Sliver in this)

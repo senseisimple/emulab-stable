@@ -4,6 +4,7 @@
 		  preinitialize="mappreinit()"
 		  mapevent_mappreinitialize="onMapPreinitialize(event)"
 		  mapevent_mapready="onMapReady(event)"
+		  sensor="false"
 		  key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg">
 	<mx:Script>
 		<![CDATA[

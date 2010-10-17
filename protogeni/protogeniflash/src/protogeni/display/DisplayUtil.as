@@ -126,6 +126,10 @@
 		public static var playIcon:Class;
 		
 		[Bindable]
+		[Embed(source="../../../images/control_repeat_blue.png")]
+		public static var repeatIcon:Class;
+		
+		[Bindable]
 		[Embed(source="../../../images/delete.png")]
 		public static var deleteIcon:Class;
 		

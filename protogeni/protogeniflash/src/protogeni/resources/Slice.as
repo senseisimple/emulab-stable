@@ -246,7 +246,7 @@
 					newNode.status = node.status;
 					for each(var nodeSliver:Sliver in node.slivers)
 					{
-						newNode.slivers.push(newSlice.slivers.getByUrn(nodeSliver.urn));
+						newNode.slivers.addIfNotExisting(newSlice.slivers.getByCm(nodeSliver.componentManager));
 						if(nodeSliver != sliver)
 							newSlice.slivers.getByUrn(nodeSliver.urn).nodes.addItem(newNode);
 					}

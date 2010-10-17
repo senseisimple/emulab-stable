@@ -14,8 +14,9 @@
 
 package protogeni.communication
 {
-	import flash.events.ErrorEvent;
 	import com.mattism.http.xmlrpc.MethodFault;
+	
+	import flash.events.ErrorEvent;
 	
   public class CommunicationUtil
   {

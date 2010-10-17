@@ -18,5 +18,22 @@ package protogeni.resources
 			}
 			return null;
 		}
+		
+		public function getForNode(vn:VirtualNode):VirtualLinkCollection
+		{
+			var vlc:VirtualLinkCollection = new VirtualLinkCollection();
+			for each(var vl:VirtualLink in this)
+			{
+				for each(var vli:VirtualInterface in vl.interfaces)
+				{
+					if(vli.virtualNode == vn)
+					{
+						vlc.addItem(vl);
+						break;
+					}
+				}
+			}
+			return vlc;
+		}
 	}
 }

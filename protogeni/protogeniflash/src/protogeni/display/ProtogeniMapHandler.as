@@ -55,6 +55,28 @@ package protogeni.display
 		public var userResourcesOnly:Boolean = false;
 		public var selectedSlice:Slice = null;
 		
+		public static function getBounds(a:Array):LatLngBounds
+		{
+			var s:Number = (a[0] as LatLng).lat();
+			var n:Number = (a[0] as LatLng).lat();
+			var w:Number = (a[0] as LatLng).lng();
+			var e:Number = (a[0] as LatLng).lng();
+			for each(var ll:LatLng in a)
+			{
+				if(ll.lat() < s)
+					s = ll.lat();
+				else if(ll.lat() > n)
+					n = ll.lat();
+				
+				if(ll.lng() < w)
+					w = ll.lng();
+				if(ll.lng() > e)
+					e = ll.lng();
+			}
+			
+			return new LatLngBounds(new LatLng(s,w), new LatLng(n,e));
+		}
+		
 		public function zoomToPhysicalNode(n:PhysicalNode):void
 		{
 			map.panTo(new LatLng(n.GetLatitude(), n.GetLongitude()));

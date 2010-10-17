@@ -197,7 +197,7 @@
 				
 				// Remove links
 				while(sn.links.length > 0)
-					sn.links[0].removeLink()
+					sn.links[0].removeLink();
 				
 				// Remove nodes and slivers
 				for each(var s:Sliver in sn.node.slivers)

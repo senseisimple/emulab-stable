@@ -22,6 +22,7 @@
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
+	import mx.events.CloseEvent;
 	import mx.utils.Base64Decoder;
 	
 	import protogeni.Util;
@@ -30,6 +31,7 @@
 	import protogeni.resources.ComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
+	import protogeni.resources.SliverCollection;
     
     // Handles all the XML-RPC calls
 	public class ProtogeniRpcHandler
@@ -82,10 +84,33 @@
 			var old:Slice = Main.protogeniHandler.CurrentUser.slices.getByUrn(slice.urn);
 			if(old != null && old.hasAllocatedResources())
 			{
-				// Update
+				var newSlivers:SliverCollection = new SliverCollection();
+				var deleteSlivers:SliverCollection = new SliverCollection();
+				var updateSlivers:SliverCollection = slice.slivers.clone();
+				for each(var s:Sliver in old.slivers)
+				{
+					if(slice.slivers.getByCm(s.componentManager) == null)
+						deleteSlivers.addItem(s);
+				}
+				for each(s in slice.slivers)
+				{
+					if(old.slivers.getByCm(s.componentManager) == null)
+					{
+						newSlivers.addItem(s);
+						updateSlivers.removeItemAt(updateSlivers.getItemIndex(s));
+					}
+				}
 				Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
-				for each(var sliver:Sliver in slice.slivers)
+				
+				// Create
+				for each(sliver in newSlivers)
+					pushRequest(new RequestSliverCreate(sliver));
+				// Update
+				for each(var sliver:Sliver in updateSlivers)
 					pushRequest(new RequestSliverUpdate(sliver));
+				// Delete
+				for each(sliver in deleteSlivers)
+					pushRequest(new RequestSliverDelete(sliver));
 			} else {
 				// Create
 				Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
@@ -225,6 +250,21 @@
 					queue.push(next);
 				
 				tryNext();
+			}
+			
+			if(msg.search("#2048") > -1 || msg.search("#2032") > -1)
+			{
+				if(Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0)
+				{
+					Alert.show("It appears that you may have never run this program before.  In order to run correctly, you will need to follow the steps at https://www.protogeni.net/trac/protogeni/wiki/FlashClientSetup.  Would you like to visit now?", "Set up", Alert.YES | Alert.NO, Main.Pgmap(),
+						function runSetup(e:CloseEvent):void
+						{
+							if(e.detail == Alert.YES)
+							{
+								Util.showSetup();
+							}
+						});
+				}
 			}
 		}
 		

@@ -236,13 +236,13 @@
 			</display:SliceCanvas>
 	</mx:HDividedBox>
 	<mx:ControlBar>
-		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
-		<display:ImageButton id="createButton" toolTip="Create slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);" source="{DisplayUtil.acceptIcon}"/>
+		<mx:Button id="createButton" toolTip="Create slivers" label="Create" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
 		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
+		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
 		<mx:VRule height="16"/>
 		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
 		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
-		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
+		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
 		<mx:Button label="Embed"/>
 	</mx:ControlBar>
 	

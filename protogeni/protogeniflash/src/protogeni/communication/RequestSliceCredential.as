@@ -24,7 +24,7 @@ package protogeni.communication
 		super("SliceCredential", "Getting the slice credential for " + s.hrn, CommunicationUtil.getCredential, true);
 		slice = s;
 		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
-		op.addField("uuid", slice.uuid);
+		op.addField("urn", slice.urn);
 		op.addField("type", "Slice");
 		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }
