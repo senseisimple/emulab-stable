@@ -6,12 +6,17 @@
 	<mx:Script>
 		<![CDATA[
 			import mx.managers.PopUpManager;
+			
+			import protogeni.Util;
 		]]>
 	</mx:Script>
 	
 	<mx:Label text="Displays resources from ProtoGENI" fontSize="12"/>
+	<mx:LinkButton label="Setup information">
+		<mx:click>Util.showSetup();</mx:click>
+	</mx:LinkButton>
 	<mx:HRule/>
-	<mx:Label text="Special thanks to" fontWeight="bold"/>
+	<mx:Label text="Special thanks to" fontWeight="bold" fontStyle="italic"/>
 	<mx:HBox width="100%" horizontalAlign="center">
 		<mx:Label text="Fatcow (CCA3 Icons)"/>
 		<mx:LinkButton label="Website">

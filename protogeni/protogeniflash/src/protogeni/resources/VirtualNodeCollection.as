@@ -28,5 +28,11 @@ package protogeni.resources
 			}
 			return null;
 		}
+		
+		public function remove(n:VirtualNode):void
+		{
+			if(this.getItemIndex(n) > -1)
+				this.removeItemAt(this.getItemIndex(n));
+		}
 	}
 }

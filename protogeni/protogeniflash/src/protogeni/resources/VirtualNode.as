@@ -21,15 +21,19 @@
 	{
 		public function VirtualNode(owner:Sliver)
 		{
-			slivers = new Array(owner);
+			slivers = new SliverCollection();
+			if(owner != null)
+			{
+				slivers.addItem(owner);
+				manager = owner.componentManager;
+			}
+				
 			interfaces = new VirtualInterfaceCollection();
 			var controlInterface:VirtualInterface = new VirtualInterface(this);
 			controlInterface.id = "control";
 			controlInterface.role = PhysicalNodeInterface.CONTROL;
 			controlInterface.isVirtual = true;
 			interfaces.Add(controlInterface);
-			if(owner != null)
-				manager = owner.componentManager;
 		}
 		
 		[Bindable]
@@ -66,7 +70,7 @@
 		public var rspec:XML;
 		
 		[Bindable]
-		public var slivers:Array;
+		public var slivers:SliverCollection;
 		public var hostname:String;
 		public var sshdport:String;
 		

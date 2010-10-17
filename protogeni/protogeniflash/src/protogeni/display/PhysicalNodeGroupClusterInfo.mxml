@@ -21,11 +21,14 @@
 			public function Load(cluster:ArrayCollection):void 
 			{
 				var nodeCount:int = 0;
+				var coords:Array = new Array();
 				for each(var ng:PhysicalNodeGroup in cluster)
 				{
 					addNodeGroup(ng);
 					nodeCount += ng.collection.length;
+					coords.push(new LatLng(ng.latitude, ng.longitude));
 				}
+				setZoomButton(ProtogeniMapHandler.getBounds(coords));
 				clusterLabel.text = nodeCount + " Nodes in " + cluster.length + " Groups";
 			}	
 			

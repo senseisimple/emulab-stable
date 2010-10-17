@@ -14,6 +14,7 @@
  
  package protogeni.resources
 {
+	import mx.charts.renderers.DiamondItemRenderer;
 	import mx.collections.ArrayCollection;
 	
 	// Link as part of a sliver/slice connecting virtual nodes
@@ -123,11 +124,23 @@
 					vi.virtualNode.interfaces.collection.removeItemAt(vi.virtualNode.interfaces.collection.getItemIndex(vi));
 			}
 			interfaces.removeAll();
+			// Remove nodes
 			firstNode.links.removeItemAt(firstNode.links.getItemIndex(this));
+			for(var i:int = 1; i < firstNode.slivers.length; i++)
+			{
+				if((firstNode.slivers[i] as Sliver).links.getForNode(firstNode).length == 0)
+					(firstNode.slivers[i] as Sliver).nodes.remove(firstNode);
+			}
 			secondNode.links.removeItemAt(secondNode.links.getItemIndex(this));
+			for(i = 1; i < secondNode.slivers.length; i++)
+			{
+				if((secondNode.slivers[i] as Sliver).links.getForNode(secondNode).length == 0)
+					(secondNode.slivers[i] as Sliver).nodes.remove(secondNode);
+			}
 			for each(var s:Sliver in slivers)
+			{
 				s.links.removeItemAt(s.links.getItemIndex(this));
-			// Remove nodes without links??
+			}
 		}
 		
 		public function isTunnel():Boolean

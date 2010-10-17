@@ -69,6 +69,28 @@
 			status = "";
 		}
 		
+		public function localNodes():VirtualNodeCollection
+		{
+			var on:VirtualNodeCollection = new VirtualNodeCollection();
+			for each(var vn:VirtualNode in this.nodes)
+			{
+				if(vn.manager == this.componentManager)
+					on.addItem(vn);
+			}
+			return on;
+		}
+		
+		public function outsideNodes():VirtualNodeCollection
+		{
+			var on:VirtualNodeCollection = new VirtualNodeCollection();
+			for each(var vn:VirtualNode in this.nodes)
+			{
+				if(vn.manager != this.componentManager)
+					on.addItem(vn);
+			}
+			return on;
+		}
+		
 		public function getVirtualNodeFor(pn:PhysicalNode):VirtualNode
 		{
 			for each(var vn:VirtualNode in this.nodes)
@@ -207,13 +229,13 @@
 				// Deal with tunnel
 				if(virtualLink.firstNode.slivers[0] != this)
 				{
-					Util.addIfNonexistingToArray(virtualLink.firstNode.slivers, this);
-					Util.addIfNonexistingToArray(virtualLink.secondNode.slivers, virtualLink.firstNode.slivers[0]);
+					Util.addIfNonexistingToArrayCollection(virtualLink.firstNode.slivers, this);
+					Util.addIfNonexistingToArrayCollection(virtualLink.secondNode.slivers, virtualLink.firstNode.slivers[0]);
 					virtualLink.firstNode.slivers[0].links.addItem(virtualLink);
 				} else if(virtualLink.secondNode.slivers[0] != this)
 				{
-					Util.addIfNonexistingToArray(virtualLink.secondNode.slivers, this);
-					Util.addIfNonexistingToArray(virtualLink.firstNode.slivers, virtualLink.secondNode.slivers[0]);
+					Util.addIfNonexistingToArrayCollection(virtualLink.secondNode.slivers, this);
+					Util.addIfNonexistingToArrayCollection(virtualLink.firstNode.slivers, virtualLink.secondNode.slivers[0]);
 					virtualLink.secondNode.slivers[0].links.addItem(virtualLink);
 				}
 				
