@@ -175,9 +175,8 @@ sub LocalExpLookup(@)
     return Experiment->Lookup(@_);
 }
 
-# _Always_ make sure that this 1 is at the end of the file...
 1;
-__DATA__
+@SELFLOADER_DATA@
 
 #
 # Create a fake object, as for the mapper (assign_wrapper) during debugging.
@@ -2640,5 +2639,6 @@ sub IsOSLoaded($$)
 
     return $query_result->numrows;
 }
-1;
 
+# _Always_ make sure that this 1 is at the end of the file...
+1;

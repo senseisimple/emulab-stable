@@ -1036,6 +1036,7 @@ sub IsProjectGroup($)
 sub GetProject($)
 {
     my ($self) = @_;
+    require Project;
 
     # Must be a real reference. 
     return undef
