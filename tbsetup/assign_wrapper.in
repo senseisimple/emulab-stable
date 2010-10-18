@@ -4581,6 +4581,7 @@ sub LoadExperiment()
     $expt_stats{"wanodes"}  = $remotecount;
     $expt_stats{"plabnodes"}= $plabcount;
     $expt_stats{"simnodes"} = $simcount;
+    $expt_stats{"elabinelab"} => $elabinelab;
 }
 
 #
