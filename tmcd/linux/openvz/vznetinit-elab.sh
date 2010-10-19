@@ -92,7 +92,7 @@ echo "$ELABROUTES" | sed -e 's/;/\n/g' | \
         _if=`echo "$route" | sed -r -e 's/([^,]*),[^,]*/\1/'`
         _rt=`echo "$route" | sed -r -e 's/[^,]*,([^,]*)/\1/'`
 
-	if [ $_if = $DEV ]; then
+	if [ $_if == $DEV ]; then
 	    echo "Emulab configuring route for CT$VEID: exp net ($_if)"
 	    $ROUTE add -host $_rt dev $_if
 	fi

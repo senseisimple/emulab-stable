@@ -1018,6 +1018,8 @@ sub AddNode($$)
     if ($node->_iseinenode()) {
 	print "Will skip reload/reboot of inner elab node: $node_id.\n";
 	$node->ClearOsids();
+	# Need to initialize this for the stats code.
+	$node->_bootosinfo(undef);
 	return 0;
     }
 
