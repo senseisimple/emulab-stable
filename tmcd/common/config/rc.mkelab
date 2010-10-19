@@ -311,7 +311,7 @@ sub doboot()
     #
     # FreeBSD version specific adjustments for defaults.
     #
-    if ($FBSD_VERSION == 7.2) {
+    if ($FBSD_VERSION >= 7.2) {
 	$emulabconfig{"MFSVERSION"} = "72";
     } else {
 	$emulabconfig{"MFSVERSION"} = "62";
@@ -2099,6 +2099,19 @@ sub CreateDefsFile($)
 		    last SWITCH;
 		};
 		
+		/^SELFLOADER_DATA$/ && do {
+		    #
+		    # XXX we know that the emulab-*-3.x package sets include
+		    # perl 5.10 which has a bug with taint checking which in
+		    # turn is triggered by the SelfLoader we use.  So turn
+		    # it off when perl 5.10 is used.  Otherwise don't set
+		    # the variable at all so it will default correctly.
+		    #
+		    if ($emulabconfig{BOSS_PKG} =~ /^emulab-boss-3/) {
+			print OUTDEFS "SELFLOADER_DATA=""\n";
+		    }
+		    last SWITCH;
+		};
 		print OUTDEFS $line;
 	    }
 	}
@@ -2305,6 +2318,7 @@ sub GetEmulabSource($)
 	mysystem("rsync -a --delete /usr/src/ $destdir/testbed");
     }
     else {
+	print "Downloading current testbed software from ${bossname}\n";
 	#
 	# Get the tarball from the server.
 	#
@@ -2359,12 +2373,12 @@ sub RecreateDir($$)
     # If it is a mount point, unmount it.  Otherwise, rename it.
     #
     if (-d "$dir") {
-	if (system("umount $dir") == 0) {
+	if (system("umount $dir >/dev/null 2>&1") == 0) {
 	    # was a mounted FS, need to remove it from fstab if present
 	    mysystem("sed -i '.orig' -E '\\;\[\[:space:\]\]$TBDIR\[\[:space:\]\];d' /etc/fstab");
 	}
 	# remove it if it is empty
-	rmdir("$dir");
+	rmdir("$dir >/dev/null 2>&1");
     }
 
     #
