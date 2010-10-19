@@ -51,7 +51,7 @@ sub usage()
 }
 my $optlist  = "p:wsd";
 my $waitmode = 0;
-my $sshmode = @NOSHAREDFS@;
+my $sshmode = 0;
 
 #
 # Configure variables
