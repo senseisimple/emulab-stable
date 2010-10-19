@@ -11,7 +11,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA = "Exporter";
-@EXPORT = qw(Parse ParseFile GetVersion IsVersion0 FindNodes FindNodesNS
+@EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
 FindFirst FindElement FindAttr IsLanNode IsLocalNode IsTunnel GetExpires
 GetNodeId GetVirtualId GetSliverId GetManagerId GetColocate GetSubnodeOf
 GetVirtualizationType SetVirtualizationType GetVirtualizationSubtype

@@ -1814,7 +1814,7 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "$resource_id ($node) is not available";
 	    goto bad;
 	}
-	foreach my $iface (GeniXML::FindNode("n:interface",
+	foreach my $iface (GeniXML::FindNodes("n:interface",
 					     $ref)->get_nodelist()) {
 	    my $iface_id = GeniXML::GetVirtualId($iface);
 	    if (defined($iface_id)) {
