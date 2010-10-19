@@ -3418,7 +3418,6 @@ sub CreateVtop($)
 	'minlinks'    => 100000,
 	# includes emulated links. Maybe thats wrong.
 	'maxlinks'    => 0,
-	'elabinelab'  => $self->experiment()->elabinelab(),
     };
 
     # Initialize counters.
