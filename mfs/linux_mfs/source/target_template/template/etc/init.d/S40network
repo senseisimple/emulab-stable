@@ -56,6 +56,15 @@ parse_cached_pxe_lease() {
 			mac="$value"; ;;
 		esac
 	done
+
+	# elab-in-elab hack: if nameserver is 1.1.1.1, this
+	# is outer boss's lease.  we should ignore it and
+	# request a new one.
+	if [ -n "$nameservers" ]; then
+		for i in $nameservers; do
+			[ $i = 1.1.1.1 ] && return 0
+		done
+	fi
 		
 	for a in /sys/class/net/*/address; do
 		addr=`cat $a`
