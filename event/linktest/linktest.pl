@@ -16,11 +16,6 @@ use Socket;
 my $LINKTEST_VERSION = "1.2";
 
 #
-# XXX config stuff that does not belong on the client-side
-#
-#my $PROJROOT      = "@PROJROOT_DIR@";
-
-#
 # Linktest test script. This script is set up to run as root on
 # experiment nodes. It is invoked by the Linktest daemon after the
 # daemon receives a Linktest "START" event. The script runs tests
@@ -182,7 +177,6 @@ my $rtproto;    # routing protocol
 my $hostname;   # this hosts name
 my $exp_id;     # experiment id
 my $proj_id;    # project id
-my $gid;        # group id
 my $platform;   # name of platform
 my $startat=1;  # which test to start at
 my $stopat=99;  # which test to stop at
@@ -207,7 +201,6 @@ my %linkmembers;
 my @links; # links: list of edge structs.
            # sorted alphabetically by src . dst
 
-my $expt_path;  # experiment path (ie, tbdata) set by init.
 my $linktest_path;   # log path (ie tbdata/linktest) set by init.
 my $simname = "ns";
 my $swapper = "";
@@ -237,11 +230,15 @@ $| = 1; #Turn off line buffering on output
 # Make sure that files written into the experiment subdir are group writable.
 umask(0002);
 
+# Traditional Emulab defaults that can be overridden but must be set
+our $VARDIR = "/var/emulab";
+our $BINDIR = "/usr/local/etc/emulab";
+our $PROJDIR = "/proj";
+
 our $LOGRUN = "";
-our $PROJROOT = "";
-our $VARDIR = "";
-our $BINDIR = "";
+our $LOGDIR = "";
 our $EVENTSERVER = "";
+our $EVENTID = "";
 
 #
 # Parse command arguments. Since Linktest is run via the event system,
@@ -280,10 +277,13 @@ foreach my $arg (@ARGV) {
 	$LOGRUN = $1;
     }
     if($arg =~ /LOGDIR=(.+)/) {
-	$PROJROOT = $1;
+	$LOGDIR = $1;
     }
     if($arg =~ /VARDIR=(.+)/) {
 	$VARDIR = $1;
+    }
+    if($arg =~ /PROJDIR=(.+)/) {
+	$PROJDIR = $1;
     }
     if($arg =~ /BINDIR=(.+)/) {
 	$BINDIR = $1;
@@ -330,28 +330,32 @@ if ($printsched) {
 # experiment ID and the project ID.
 #
 my $fname = $PATH_NICKNAME;
-die("Could not locate $fname\n") unless -e $fname;
-my @results = &read_file($fname);
-($hostname, $exp_id, $proj_id) = split /\./, $results[0];
-chomp $hostname;
-chomp $exp_id;
-chomp $proj_id;
+if (-r $fname) {
+    my $name = `cat $fname`;
+    if ($name =~ /([-\@\w]*)\.([-\@\w]*)\.([-\@\w]*)/) {
+	$hostname = $1;
+	$exp_id = $2;
+	$proj_id = $3;
+    } else {
+	die("Could not parse $fname info\n");
+    }
+} else {
+    die("Could not locate $fname\n");
+}
 
-# taint check pid/eid
-if ($proj_id =~ /([-\w]*)/) {
-    $proj_id = $1;
-}
-if ($exp_id =~ /([-\w]*)/) {
-    $exp_id = $1;
-}
-$gid = $proj_id;
+#
+# Now that we know the pid/eid, defaults some values (unless otherwise set).
+#
+$LOGDIR = "$PROJDIR/$proj_id/exp/$exp_id/tbdata"
+    if ($LOGDIR eq "");
+$EVENTID = "$proj_id/$exp_id"
+    if ($EVENTID eq "");
 
 #
 # Set path variables storing the experiment logging path,
 # the current ns file and the output file for topology info.
 #
-$expt_path = "$PROJROOT/$proj_id/exp/$exp_id/tbdata";
-$linktest_path = "$expt_path/linktest";
+$linktest_path = "$LOGDIR/linktest";
 $topology_file = $PATH_TOPOFILE;
 $ptopology_file = $PATH_PTOPOFILE;
 
@@ -380,7 +384,7 @@ sleep(int(rand(5)));
 $synserv = "";
 my $ssname = $PATH_SYNCSERVER;
 if ($ssname) {
-    @results = &read_file($ssname);
+    my @results = &read_file($ssname);
     ($synserv) = split/\./, $results[0];
     chomp $synserv;
 }
@@ -2439,7 +2443,7 @@ sub post_event {
 		   "-s",
 		   $EVENTSERVER,
 		   "-e",
-		   "$proj_id/$exp_id",
+		   $EVENTID,
 		   "-k", 
 		   $PATH_KEYFILE,
 		   "-x",
@@ -2466,7 +2470,7 @@ sub post_event2 {
 	       "-s",
 	       $EVENTSERVER,
 	       "-e",
-	       "$proj_id/$exp_id",
+	       $EVENTID,
 	       "-k", 
 	       $PATH_KEYFILE,
 	       "-x",
@@ -2492,7 +2496,7 @@ sub sim_event {
 	}
 
 	system($PATH_TEVC,
-	       "-e", "$proj_id/$exp_id",
+	       "-e", $EVENTID,
 	       "-k", $PATH_KEYFILE,
 	       "now",
 	       $simname,
@@ -2511,7 +2515,7 @@ sub sim_event2 {
 	}
 
 	system($PATH_TEVC,
-	       "-e", "$proj_id/$exp_id",
+	       "-e", $EVENTID,
 	       "-k", $PATH_KEYFILE,
 	       "now",
 	       $simname,

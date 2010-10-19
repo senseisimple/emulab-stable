@@ -1,18 +1,29 @@
-#!/usr/bin/perl -w -T
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use strict;
 
-my $PROJROOT = "@PROJROOT_DIR@";
-my $CLIENT_VARDIR = "@CLIENT_VARDIR@";
-my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
-my $EVENTSERVER = "@EVENTSERVER@";
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $argString = join(" ", @ARGV);
-my $argString .= " LOGDIR=$PROJROOT VARDIR=$CLIENT_VARDIR BINDIR=$CLIENT_BINDIR EVENTSERVER=$EVENTSERVER";
+my $linktest = "@CLIENT_BINDIR@/linktest.pl";
 
-system("$CLIENT_BINDIR/linktest.pl $argString");
+my @emulab_defaults = (
+    "PROJDIR=@PROJROOT_DIR@",
+    "VARDIR=@CLIENT_VARDIR@",
+    "BINDIR=@CLIENT_BINDIR@",
+    "EVENTSERVER=@EVENTSERVER@"
+);
+
+my $argString = join(" ", @emulab_defaults);
+
+# add these after the defaults so we can override the defaults
+$argString .= " " . join(" ", @ARGV);
+
+exec("$linktest $argString") or
+    die("could not exec linktest.pl");
