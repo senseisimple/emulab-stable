@@ -35,10 +35,6 @@ $RSPEC_2 = "2";
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
 
-my $NS_0_1 = "http://www.protogeni.net/resources/rspec/0.1";
-my $NS_0_2 = "http://www.protogeni.net/resources/rspec/0.2";
-my $NS_2 = "http://www.protogeni.net/resources/rspec/2";
-
 # Returns the document element by parsing a given string. If the
 # string fails to parse, returns undefined.
 sub Parse($)
@@ -80,11 +76,11 @@ sub GetVersion($)
     my $result = $RSPEC_0_1;
     my $ns = $node->namespaceURI();
     if (defined($ns)) {
-	if ($ns eq $NS_0_1) {
+	if ($ns =~ /protogeni.net\/resources\/rspec\/0.1$/) {
 	    $result = $RSPEC_0_1;
-	} elsif ($ns eq $NS_0_2) {
+	} elsif ($ns =~ /protogeni.net\/resources\/rspec\/0.2$/) {
 	    $result = $RSPEC_0_2;
-	} elsif ($ns eq $NS_2) {
+	} elsif ($ns =~ /protogeni.net\/resources\/rspec\/2$/) {
 	    $result = $RSPEC_2;
 	} else {
 	    carp("Unknown rspec namespace: " . $ns);
