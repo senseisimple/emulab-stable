@@ -89,6 +89,19 @@ tweakmbr()
 	echo "Installing MBR version $new_mbr_ver ..."
 	dd if=$MBR_PATH/mbr${new_mbr_ver}.dd of=$disk bs=512 count=1
 
+	# Zero out the partition type bytes for FreeBSD and Linux partitions
+	# so that if the user tries to make a whole-disk image later it will
+	# work without imagezip complaining about filesystem-specific errors
+	# when the partition offsets have been adjusted.  Frisbee/imagezip
+	# will write the correct type byte when it writes the image.
+	#
+	# The Linux swap partition is left alone because imagezip currently
+	# blindly includes just the first portion of the swap partition without
+	# checking to ensure it is valid.
+	for i in 0 1; do
+		dd if=/dev/zero of=$disk bs=1 count=1 seek=$(( $i * 16 + 450 )) > /dev/null 2>&1
+	done
+
 	# Linux won't re-read the partition table unless told to do so.
 	# hdparm could be used for this, but it may not be installed.
 	# fdisk tells the kernel to re-read the table after writing it
