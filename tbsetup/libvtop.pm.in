@@ -8009,7 +8009,7 @@ sub PrintSolution($$)
     my $root = $doc->createElement("rspec");
     $root->setAttribute("pid", "$pid");
     $root->setAttribute("eid", "$eid");
-    $root->setAttribute("xmlns:rspec", "http://emulab.net/resources/rspec/0.1");
+    $root->setAttribute("xmlns:rspec", "http://www.protogeni.net/resources/rspec/0.1");
     $doc->setDocumentElement($root);
 
     foreach my $pnodename (keys(%{ $self->solution_p2v() })) {
