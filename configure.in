@@ -58,7 +58,7 @@ AC_SUBST(PATH)
 CPPFLAGS="-I/usr/local/include"
 
 # BEGIN Python detection.
-AC_PATH_PROGS(PYTHON, python python2.4 python2.3 python2.2)
+AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
 
 if test x"$PYTHON" = x""; then
     AC_MSG_ERROR([python not detected])
@@ -219,6 +219,7 @@ AC_SUBST(GMAP_API_KEY)
 AC_SUBST(NODE_USAGE_SUPPORT)
 AC_SUBST(NOSTACKMIB)
 AC_SUBST(EXP_VIS_SUPPORT)
+AC_SUBST(NOSHAREDFS)
 AC_SUBST(SELFLOADER_DATA)
 
 #
@@ -308,6 +309,8 @@ STANDALONE_CLEARINGHOUSE=0
 NODE_USAGE_SUPPORT=0
 EXP_VIS_SUPPORT=0
 NOSTACKMIB=0
+NOSHAREDFS=0
+NFSRACY=1
 SELFLOADER_DATA="__DATA__"
 
 #
@@ -425,7 +428,12 @@ fi
 if test $TPM -eq 1; then
     AC_DEFINE_UNQUOTED(TPM, 1)
 fi
-
+if test $NOSHAREDFS -eq 1; then
+    AC_DEFINE_UNQUOTED(NOSHAREDFS, 1)
+fi
+if test $NFSRACY -eq 1; then
+    AC_DEFINE_UNQUOTED(NFSRACY, 1)
+fi
 
 LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
 AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
@@ -745,7 +753,6 @@ else
 	optional_subdirs="$optional_subdirs";
         AC_DEFINE_UNQUOTED(WINSUPPORT, 1)
 fi
-
 
 #
 # Check for ulsshxmlrpc header

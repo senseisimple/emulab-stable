@@ -151,6 +151,9 @@ my $SCRATCHFS  = 0;
 # Single or dual control network.
 my $SINGLE_CONTROLNET = 0;
 
+# Support a shared filesystem between fs server and nodes
+my $SHAREDFS   = 1;
+
 #
 # Defaults for configuration attributes (options).
 # These can be overridden if values are passed in via the emulabconfig command.
@@ -180,6 +183,7 @@ my %emulabconfig = (
     #   CONFIG_MAILMAN	support integrated mailman lists (part of COLLAB)
     #	CONFIG_USERDB	support integrated MySQL DB (part of COLLAB)
     #   CONFIG_WIKI	support integrated wiki (part of COLLAB)
+    #	CONFIG_SHAREDFS	support shared filesystem	    
     #
     "CONFIG_NOSETUP"    => $NOSETUP,
     "CONFIG_SCRATCHFS"  => $SCRATCHFS,
@@ -193,6 +197,7 @@ my %emulabconfig = (
     "CONFIG_MAILMAN"    => !$NOCOLLAB,
     "CONFIG_USERDB"     => !$NOCOLLAB,
     "CONFIG_WIKI"       => !$NOCOLLAB,
+    "CONFIG_SHAREDFS"	=> $SHAREDFS,
 
     #
     # Elabinelab build options:
@@ -2098,7 +2103,14 @@ sub CreateDefsFile($)
 		    print OUTDEFS "NSVERIFY=1\n";
 		    last SWITCH;
 		};
-		
+		/^NOSHAREDFS$/ && do {
+		    if ($emulabconfig{"CONFIG_SHAREDFS"}) {
+			print OUTDEFS "NOSHAREDFS=0\n";
+		    } else {
+			print OUTDEFS "NOSHAREDFS=1\n";
+		    }
+		    last SWITCH;
+		};
 		/^SELFLOADER_DATA$/ && do {
 		    #
 		    # XXX we know that the emulab-*-3.x package sets include
@@ -2108,10 +2120,11 @@ sub CreateDefsFile($)
 		    # the variable at all so it will default correctly.
 		    #
 		    if ($emulabconfig{BOSS_PKG} =~ /^emulab-boss-3/) {
-			print OUTDEFS "SELFLOADER_DATA=""\n";
+			print OUTDEFS "SELFLOADER_DATA=\"\"\n";
 		    }
 		    last SWITCH;
 		};
+
 		print OUTDEFS $line;
 	    }
 	}

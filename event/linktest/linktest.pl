@@ -237,6 +237,7 @@ our $PROJDIR = "/proj";
 
 our $LOGRUN = "";
 our $LOGDIR = "";
+our $SHAREDDIR = "";
 our $EVENTSERVER = "";
 our $EVENTID = "";
 
@@ -275,6 +276,9 @@ foreach my $arg (@ARGV) {
     }
     if($arg =~ /LOGRUN=(.+)/) {
 	$LOGRUN = $1;
+    }
+    if($arg =~ /SHAREDDIR=(.+)/) {
+	$SHAREDDIR = $1;
     }
     if($arg =~ /LOGDIR=(.+)/) {
 	$LOGDIR = $1;
@@ -397,7 +401,7 @@ if (@hosts > 0 && (!$synserv || !exists($hostmap{$synserv}))) {
 # If the current node is the special node, do some housekeeping
 # and initialize the barrier count.
 #
-if(&is_special_node()) {
+if(&is_special_node() || !$SHAREDDIR) {
     #
     # If the shared path used by Linktest for logging and temporary
     # files already exists, clear its contents for this run.
@@ -423,8 +427,10 @@ if(&is_special_node()) {
 	chown($swapperid, $swappergid, $linktest_path);
     }
 
-    $barr_count = @hosts;
-    $barr_count--;
+    if (&is_special_node()) {
+	$barr_count = @hosts;
+	$barr_count--;
+    }
 }
 
 #

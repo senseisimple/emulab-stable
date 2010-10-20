@@ -2412,12 +2412,14 @@ COMMAND_PROTOTYPE(doaccounts)
 		 * Add an argument of "pubkeys" to get the PUBKEY data.
 		 * An "windows" argument also returns a user's Windows Password.
 		 */
+#ifndef NOSHAREDFS
 		if (reqp->islocal &&
 		    ! reqp->genisliver_idx &&
 		    ! reqp->sharing_mode[0] &&
 		    ! (strncmp(rdata, "pubkeys", 7) == 0
 		       || strncmp(rdata, "windows", 7) == 0))
 			goto skipsshkeys;
+#endif
 
 		/*
 		 * Need a list of keys for this user.
@@ -2482,7 +2484,9 @@ COMMAND_PROTOTYPE(doaccounts)
 		}
 		mysql_free_result(pubkeys_res);
 
+#ifndef NOSHAREDFS
 	skipsshkeys:
+#endif
 		/*
 		 * Do not bother to send back SFS keys if the node is not
 		 * running SFS.
@@ -3396,16 +3400,33 @@ COMMAND_PROTOTYPE(domounts)
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
+	char		*bufp, *ebufp = &buf[sizeof(buf)];
 	int		nrows, usesfs;
+	int		nomounts = 0;
 #ifdef  ISOLATEADMINS
 	int		isadmin;
 #endif
 
 	/*
+	 * Do we export filesystems at all?
+	 * XXX this could be made per-experiment/project/whatever.
+	 */
+#ifdef	NOSHAREDFS
+	nomounts = 1;
+#endif
+
+	/*
+	 * Older clients will not properly handle the new format mount
+	 * lines, so just return nothing and hope for the best.
+	 */
+	if (vers < 32 && nomounts)
+		return 0;
+
+	/*
 	 * Should SFS mounts be served?
 	 */
 	usesfs = 0;
-	if (vers >= 6 && strlen(fshostid)) {
+	if (vers >= 6 && strlen(fshostid) && !nomounts) {
 		if (strlen(reqp->sfshostid))
 			usesfs = 1;
 		else {
@@ -3433,31 +3454,70 @@ COMMAND_PROTOTYPE(domounts)
 		return 0;
 
 	/*
+	 * Return info about the file server
+	 */
+	if (vers >= 32) {
+		char *fstype = "";
+
+		/* XXX sanity for code below */
+		if (reqp->sharing_mode[0] && !reqp->isvnode)
+			usesfs = 0;
+
+		if (nomounts) {
+			fstype = "LOCAL";
+		} else if (usesfs) {
+			fstype = "SFS";
+		} else {
+#ifdef NFSRACY
+			fstype = "NFS-RACY";
+#else
+			fstype = "NFS";
+#endif
+		}
+
+		OUTPUT(buf, sizeof(buf), "FSTYPE=%s\n", fstype);
+		client_writeback(sock, buf, strlen(buf), tcp);
+	}
+
+
+	/*
 	 * A local phys node acting as a shared host gets toplevel mounts only.
 	 */
 	if (reqp->sharing_mode[0] && !reqp->isvnode) {
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
-		       FSUSERDIR, USERDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSUSERDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", USERDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 
 #ifdef FSSCRATCHDIR
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
-		       FSSCRATCHDIR, SCRATCHDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSSCRATCHDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", SCRATCHDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
 #ifdef FSSHAREDIR
-		OUTPUT(buf, sizeof(buf),
-		       "REMOTE=%s LOCAL=%s\n", FSSHAREDIR, SHAREDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSSHAREDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", SHAREDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s LOCAL=%s\n",
-		       FSPROJDIR, PROJDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSPROJDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", PROJDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
@@ -3467,8 +3527,12 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return project mount first.
 		 */
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
-			FSPROJDIR, reqp->pid, PROJDIR, reqp->pid);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s/%s ", FSPROJDIR, reqp->pid);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s\n",
+		       PROJDIR, reqp->pid);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
@@ -3483,8 +3547,13 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return scratch mount if its defined.
 		 */
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
-		       FSSCRATCHDIR, reqp->pid, SCRATCHDIR, reqp->pid);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s/%s ",
+				       FSSCRATCHDIR, reqp->pid);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s\n",
+		       SCRATCHDIR, reqp->pid);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
@@ -3493,8 +3562,11 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return share mount if its defined.
 		 */
-		OUTPUT(buf, sizeof(buf),
-		       "REMOTE=%s LOCAL=%s\n",FSSHAREDIR, SHAREDIR);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp,
+				       "REMOTE=%s ", FSSHAREDIR);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s\n", SHAREDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
@@ -3504,9 +3576,12 @@ COMMAND_PROTOTYPE(domounts)
 		 * a mount for the group directory too.
 		 */
 		if (strcmp(reqp->pid, reqp->gid)) {
-			OUTPUT(buf, sizeof(buf),
-			       "REMOTE=%s/%s/%s LOCAL=%s/%s/%s\n",
-			       FSGROUPDIR, reqp->pid, reqp->gid,
+			bufp = buf;
+			if (!nomounts)
+				bufp += OUTPUT(bufp, ebufp-bufp,
+					       "REMOTE=%s/%s/%s ", FSGROUPDIR,
+					       reqp->pid, reqp->gid);
+			OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s/%s\n",
 			       GROUPDIR, reqp->pid, reqp->gid);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			/* Leave this logging on all the time for now. */
@@ -3670,8 +3745,11 @@ COMMAND_PROTOTYPE(domounts)
 			continue;
 		}
 #endif
-		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
-			FSUSERDIR, row[0], USERDIR, row[0]);
+		bufp = buf;
+		if (!nomounts)
+			bufp += OUTPUT(bufp, ebufp-bufp, "REMOTE=%s/%s ",
+				       FSUSERDIR, row[0]);
+		OUTPUT(bufp, ebufp-bufp, "LOCAL=%s/%s\n", USERDIR, row[0]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 
 		if (verbose)
@@ -3928,10 +4006,10 @@ COMMAND_PROTOTYPE(doloadinfo)
 	 */
 	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
 			 "   mustwipe,mbr_version,access_key,imageid,prepare,"
-			 "   i.imagename,p.pid,g.gid,i.path"
-			 "  from current_reloads as r "
-			 "left join images as i on i.imageid = r.image_id "
-			 "left join os_info as o on i.default_osid = o.osid "
+			 "   i.imagename,p.pid,g.gid,i.path "
+			 "from current_reloads as r "
+			 "left join images as i on i.imageid=r.image_id "
+			 "left join os_info as o on i.default_osid=o.osid "
 			 "left join projects as p on i.pid_idx=p.pid_idx "
 			 "left join groups as g on i.gid_idx=g.gid_idx "
 			 "where node_id='%s' order by r.idx",
@@ -3989,12 +4067,18 @@ COMMAND_PROTOTYPE(doloadinfo)
 		OS = row[2];
 		prepare = row[8];
 
-		res2 = mydb_query("select load_address,frisbee_pid,IP from subboss_images as i "
-				 "left join subbosses as s on s.subboss_id = i.subboss_id "
-				 "left join interfaces as n on n.node_id =  s.subboss_id "
-				 "where s.node_id = '%s' and s.service = 'frisbee' and "
-				 "i.imageid = '%s' and i.load_address != '' and "
-				 "n.role='ctrl' and i.sync != 1", 3, reqp->nodeid, row[7]);
+		res2 = mydb_query("select load_address,frisbee_pid,IP "
+				  "from subboss_images as i "
+				  "left join subbosses as s "
+				  "  on s.subboss_id=i.subboss_id "
+				  "left join interfaces as n "
+				  "  on n.node_id=s.subboss_id "
+				  "where s.node_id='%s' and "
+				  "  s.service='frisbee' and "
+				  "  i.imageid='%s' and "
+				  "  i.load_address!='' and "
+				  "  n.role='ctrl' and i.sync!=1",
+				  3, reqp->nodeid, row[7]);
 
 		if (!res2) {
 			error("doloadinfo: %s: DB Error getting subboss info!\n",

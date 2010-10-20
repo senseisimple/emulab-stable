@@ -436,7 +436,7 @@ my $defaultosidquery = 'select distinct o.osid, t.type, o.osname, o.pid, o.OS, o
 # For subOS support (i.e., vnode OSes running atop vhost OSes), we have to
 # check both the subosid and all the parent_osid it can run on.
 #
-my $subosidquery = "select o.osid,o.parent_osid from os_submap as o " .
+my $subosidquery = "select distinct o.osid,o.parent_osid from os_submap as o " .
 	"left join osidtoimageid as oi1 on o.osid = oi1.osid " .
 	"left join osidtoimageid as oi2 on o.parent_osid = oi2.osid " .
 	"left join images as i1 on oi1.imageid = i1.imageid ".
