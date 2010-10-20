@@ -44,6 +44,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libEmulab;
 
 #
 # Parse command arguments.
@@ -69,6 +70,14 @@ usage()
 if ($UID) {
     Fatal("This script must be run as root! Maybe use sudo?")
 }
+
+# Chicken or Egg.
+DBQueryFatal("INSERT INTO sitevariables VALUES ".
+	     " ('general/testbed_shutdown',NULL,'0', ".
+	     "  'Non-zero value indicates that the testbed is shutdown ".
+	     "and scripts should not do anything when they run. ".
+	     "DO NOT SET THIS BY HAND!', 0)")
+    if (!SiteVarExists("general/testbed_shutdown"));
 
 sub Restart()
 {
