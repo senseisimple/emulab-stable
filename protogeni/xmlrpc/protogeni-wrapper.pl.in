@@ -18,6 +18,7 @@ use Data::Dumper;
 use POSIX;
 use Crypt::X509;
 use Crypt::OpenSSL::X509;
+use Time::HiRes qw( gettimeofday tv_interval );
 
 # Yack. apache does not close fds before the exec, and if this dies
 # we are left with a giant mess.
@@ -298,7 +299,8 @@ $message .=
     "Method:  $method\n";
 $message .=
     "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
-    
+
+my $starttime = [gettimeofday()];
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {
     #
@@ -312,6 +314,9 @@ if ($@) {
 		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
 }
 else {
+    my $elapsed = tv_interval($starttime);
+    $message .= "Elapsed: " . sprintf("%f", $elapsed) . "\n";
+    
     if (GeniResponse::IsError($result)) {
 	$message .= "Error:   " . $result->{'code'} . "\n";
 	if ($mailerrors) {
