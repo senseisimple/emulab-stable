@@ -318,7 +318,7 @@ if (my $instance = Template::Instance->LookupByExptidx($experiment->idx())) {
 # Sanity check.
 if (! (-e $workdir && -e $userdir)) {
     die("*** $0:\n".
-	"    Missing a critical directory! Stopping now ...\n");
+	"    $pid/$eid is missing a critical directory! Stopping now ...\n");
 }
 if (! -e $infodir) {
     if (! -e "$TB/expinfo/$pid") {
