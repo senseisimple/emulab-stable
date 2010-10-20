@@ -319,6 +319,11 @@ sub GetSubnodeOf($)
 	    }
 	}
     }
+    if (defined($result)) {
+	carp("--subnode = ".$result);
+    } else {
+	carp("--subnode undefined");
+    }
     return $result;
 }
 
@@ -347,7 +352,7 @@ sub GetVirtualizationSubtype($)
     my ($node) = @_;
     my $result = undef;
     if (IsVersion0($node)) {
-	my $result = GeniXML::GetText("virtualization_subtype", $node);
+	$result = GeniXML::GetText("virtualization_subtype", $node);
     } else {
 	my @types = FindNodes("n:type", $node)->get_nodelist();
 	foreach my $current (@types) {
