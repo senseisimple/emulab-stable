@@ -65,7 +65,7 @@ sub GetCredential($)
     my ($argref) = @_;
     my $urn  = $argref->{'urn'};
     my $cred = $argref->{'credential'};
-    
+
     #
     # No credential, then return a generic credential giving user permission
     # to do other things.
@@ -86,10 +86,27 @@ sub GetCredential($)
 		"Could not find local authority object for $ENV{'MYURN'}\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $credential =
-	    GeniCredential->CreateSigned($authority,
-					 $geniuser,
-					 $GeniCredential::LOCALSA_FLAG);
+	my $credential = GeniCredential->Lookup($authority, $geniuser);
+	if (defined($credential)) {
+	    #
+	    # Check for expiration and for changed certificate.
+	    #
+	    if ($credential->IsExpired() ||
+		!$credential->SameCerts($authority, $geniuser)) {
+		$credential->Delete();
+		$credential = undef;
+	    }
+	}
+	if (!defined($credential)) {
+	    $credential =
+		GeniCredential->CreateSigned($authority,
+					     $geniuser,
+					     $GeniCredential::LOCALSA_FLAG);
+
+	    # Okay if this fails.
+	    $credential->Store()
+		if (defined($credential));
+	}
 	return GeniResponse->Create(GENIRESPONSE_ERROR)
 	    if (!defined($credential));
 
@@ -142,10 +159,26 @@ sub GetCredential($)
 	#
 	# Return a credential for the slice.
 	#
-	my $slice_credential =
-	    GeniCredential->CreateSigned($slice,
-					 $this_user,
-					 $GeniCredential::LOCALSA_FLAG);
+	my $slice_credential = GeniCredential->Lookup($slice, $this_user);
+	if (defined($slice_credential)) {
+	    #
+	    # Check for expiration and for changed certificate.
+	    #
+	    if ($slice_credential->IsExpired() ||
+		!$slice_credential->SameCerts($slice, $this_user)) {
+		$slice_credential->Delete();
+		$slice_credential = undef;
+	    }
+	}
+	if (!defined($slice_credential)) {
+	    $slice_credential =
+		GeniCredential->CreateSigned($slice,
+					     $this_user,
+					     $GeniCredential::LOCALSA_FLAG);
+	    # Okay if this fails.
+	    $slice_credential->Store()
+		if (defined($slice_credential));
+	}
 	if (!defined($slice_credential)) {
 	    $slice->UnLock();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -466,6 +499,8 @@ sub Register($)
 	    $slice->Delete();
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
+	# Okay if this fails.
+	$slice_credential->Store();
 
 	#
 	# Register new slice and creator at the clearinghouse.
@@ -584,6 +619,9 @@ sub Remove($)
 	}
 	# Needs to move.
 	GeniRegistry::ClientSliver->SliceDelete($slice);
+
+	# Remove any stored credentials for this slice.
+	GeniCredential->DeleteForTarget($slice);
 	
 	#
 	# Remove from the clearing house.
@@ -843,6 +881,9 @@ sub RenewSlice($)
 	print STDERR "Could not update $slice at the clearinghouse\n";
     }
     
+    # Remove any stored credentials for this slice so callers get new ones.
+    GeniCredential->DeleteForTarget($slice);
+
     #
     # Return a credential for the slice.
     #

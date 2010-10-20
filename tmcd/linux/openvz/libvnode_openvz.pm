@@ -125,7 +125,7 @@ sub vz_init {
     #
     # Turn off LVM if already using a /vz mount.
     #
-    if (-e "/vz/.nolvm") {
+    if (-e "/vz/.nolvm" || -e "/vz.save/.nolvm" || -e "/.nolvm") {
 	$DOLVM = 0;
 	mysystem("/sbin/dmsetup remove_all");
     }
@@ -216,18 +216,39 @@ sub vz_rootPreConfig {
 	mysystem("vgchange -a y openvz");
     }
     else {
+	#
+	# We need to create a local filesystem.
+	# First see if the "extra" filesystem has already been created,
+	# Emulab often mounts it as /local for various purposes.
+	#
 	# about the funny quoting: don't ask... emacs perl mode foo.
-	if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
-	    mysystem("$VZRC stop");
-	    mysystem("rm -rf /vz")
-		if (-e "/vz");
-	    mysystem("mkdir /vz");
-	    mysystem("$MKEXTRAFS -f /vz");
-	    mysystem("cp -pR /vz.save/* /vz/");
-	    mysystem("touch /vz/.nolvm");
+	if (!system('grep -q '."'".'^/dev/.*/local.*$'."'".' /etc/fstab')) {
+	    # local filesystem already exists, just create a subdir
+	    if (! -d "/local/vz") {
+		mysystem("$VZRC stop");
+		mysystem("mkdir /local/vz");
+		mysystem("cp -pR /vz.save/* /local/vz/");
+		mysystem("touch /local/vz/.nolvm");
+	    }
+	    if (-e "/vz") {
+		mysystem("rm -rf /vz");
+		mysystem("ln -s /local/vz /vz");
+	    }
 	}
-	if (system('mount | grep -q \'on /vz\'')) {
-	    mysystem("mount /vz");
+	else {
+	    # about the funny quoting: don't ask... emacs perl mode foo.
+	    if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
+		mysystem("$VZRC stop");
+		mysystem("rm -rf /vz")
+		    if (-e "/vz");
+		mysystem("mkdir /vz");
+		mysystem("$MKEXTRAFS -f /vz");
+		mysystem("cp -pR /vz.save/* /vz/");
+		mysystem("touch /vz/.nolvm");
+	    }
+	    if (system('mount | grep -q \'on /vz\'')) {
+		mysystem("mount /vz");
+	    }
 	}
     }
 

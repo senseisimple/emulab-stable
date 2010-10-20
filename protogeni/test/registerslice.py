@@ -19,13 +19,15 @@
 import sys
 import pwd
 import getopt
+import time
 import os
 import re
 import xmlrpclib
 from M2Crypto import X509
 
 ACCEPTSLICENAME=1
-OtherUser = None
+OtherUser  = None
+Expiration = (60 * 60 * 6)
 
 execfile( "test-common.py" )
 
@@ -40,7 +42,7 @@ mycredential = get_self_credential()
 print "Got my SA credential"
 
 #
-# Lookup slice, delete before proceeding.
+# Lookup slice.
 #
 params = {}
 params["credential"] = mycredential
@@ -48,16 +50,15 @@ params["type"]       = "Slice"
 params["hrn"]        = SLICENAME
 rval,response = do_method("sa", "Resolve", params)
 if rval == 0:
-    print "Deleting previously registered slice";
-    params = {}
-    params["credential"] = mycredential
-    params["type"]       = "Slice"
-    params["hrn"]        = SLICENAME
-    rval,response = do_method("sa", "Remove", params)
-    if rval:
-        Fatal("Could not remove slice record")
-        pass
+    print "Slice already exists."
+    sys.exit(0)
     pass
+
+#
+# Set up expiration.
+#
+valid_until = time.strftime("%Y%m%dT%H:%M:%S",
+                            time.gmtime(time.time() + Expiration))
 
 #
 # Create a slice. 
@@ -67,6 +68,7 @@ params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
 params["hrn"]        = SLICENAME
+params["expiration"] = valid_until
 rval,response = do_method("sa", "Register", params)
 if rval:
     Fatal("Could not get my slice")

@@ -9,7 +9,7 @@ use strict;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA    = qw(Exporter);
-@EXPORT = qw(SiteVarExists GetSiteVar SetSiteVar NoLogins);
+@EXPORT = qw(SiteVarExists GetSiteVar SetSiteVar NoLogins IsShutDown);
 
 use emdb;
 
@@ -123,9 +123,29 @@ sub SetSiteVar($$)
 #
 sub NoLogins()
 {
+    my $shutdown = IsShutDown();
+    return 1
+	if ($shutdown);
+    
     my $query_result =
 	DBQueryWarn("select value from sitevariables ".
 		    "where name='web/nologins'");
+
+    return 1
+	if (!$query_result);
+    return 0
+	if (!$query_result->numrows);
+    my ($value) = $query_result->fetchrow_array();
+
+    return ($value ? 1 : 0);
+}
+
+# Ditto shutdown.
+sub IsShutDown()
+{
+    my $query_result =
+	DBQueryWarn("select value from sitevariables ".
+		    "where name='general/testbed_shutdown'");
 
     return 1
 	if (!$query_result);

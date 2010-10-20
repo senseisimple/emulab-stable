@@ -124,6 +124,8 @@ database	= $dir/crl.txt		# database index file.
 crl		= $dir/crl.pem 		# The current CRL
 RANDFILE	= $dir/.rand		# private random number file
 default_crl_days= 30			# how long before next CRL
+# Added for update 5.10
+default_md	= md5			# CRL md to use
 preserve	= no			# keep passed DN ordering
 unique_subject  = no
 

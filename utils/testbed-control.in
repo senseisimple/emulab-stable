@@ -44,6 +44,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libEmulab;
 
 #
 # Parse command arguments.
@@ -70,6 +71,14 @@ if ($UID) {
     Fatal("This script must be run as root! Maybe use sudo?")
 }
 
+# Chicken or Egg.
+DBQueryFatal("INSERT INTO sitevariables VALUES ".
+	     " ('general/testbed_shutdown',NULL,'0', ".
+	     "  'Non-zero value indicates that the testbed is shutdown ".
+	     "and scripts should not do anything when they run. ".
+	     "DO NOT SET THIS BY HAND!', 0)")
+    if (!SiteVarExists("general/testbed_shutdown"));
+
 sub Restart()
 {
     print "Starting up testbed daemons.\n";
@@ -81,7 +90,8 @@ sub Restart()
     print "\n";
 
     print "Turning on the web interface and allowing swaps\n";
-    if (system("$SETSITEVAR web/nologins -") ||
+    if (system("$SETSITEVAR general/testbed_shutdown -") ||
+	system("$SETSITEVAR web/nologins -") ||
 	system("$SETSITEVAR web/message -")) {
 	print "*** Could not renable the web interface and swapping!\n";
 	exit(1);
@@ -109,6 +119,10 @@ if ($?) {
 system("$SETSITEVAR web/nologins 1");
 if ($?) {
     Fatal("Could not disable web logins and experiment swaps");
+}
+system("$SETSITEVAR general/testbed_shutdown 1");
+if ($?) {
+    Fatal("Could not set general/testbed_shutdown");
 }
     
 print "-> Waiting a few seconds for testbed to quiet down ...\n";
