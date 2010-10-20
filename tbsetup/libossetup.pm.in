@@ -150,7 +150,7 @@ sub osmap($$;$)
     return undef;
 }
 
-# To avoid writting out all the methods.
+# To avoid writing out all the methods.
 sub AUTOLOAD {
     my $self = shift;
     my $type = ref($self) or die("$self is not an object\n");
@@ -1185,6 +1185,7 @@ use base qw(libossetup_handler);
 use libdb;
 use libtestbed;
 use libossetup;
+use libosload;
 use libtblog;
 use Node;
 use English;
