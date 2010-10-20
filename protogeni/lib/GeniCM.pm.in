@@ -2462,10 +2462,20 @@ sub SliverWorkAux($$$$$$$)
     # The API states we return a credential to control the aggregate.
     #
     my $sliver_credential = $aggregate->NewCredential($owner);
+
     if (!defined($sliver_credential)) {
 	$message = "Could not create credential";
 	goto bad;
     }
+    #
+    # Cache the credential for subsequent requests. See GetSliver().
+    # Okay if this fails.
+    #
+    if ($isupdate) {
+	GeniCredential->DeleteForTarget($aggregate);
+    }
+    $sliver_credential->Store();
+    
     if (!$isupdate) {
 	$experiment->SetState(EXPTSTATE_ACTIVE());
 	
@@ -2672,6 +2682,13 @@ sub RenewSliverAux($$)
     if ($slice->SetExpiration($when) != 0) {
 	$message = "Could not set expiration time";
 	goto bad;
+    }
+    #
+    # Need to delete any cached credentials.
+    #
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
+    if (defined($aggregate)) {
+	GeniCredential->DeleteForTarget($aggregate);
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
@@ -3032,15 +3049,31 @@ sub GetSliverAux($)
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slivers here for slice");
     }
-    
-    my $new_credential = $aggregate->NewCredential($user);
-    if (!defined($new_credential)) {
+    my $agg_credential = GeniCredential->Lookup($aggregate, $user);
+    if (defined($agg_credential)) {
+	#
+	# Check for expiration and for changed certificate.
+	#
+	if ($agg_credential->IsExpired() ||
+	    !$agg_credential->SameCerts($aggregate, $user)) {
+	    $agg_credential->Delete();
+	    $agg_credential = undef;
+	}
+    }
+    if (!defined($agg_credential)) {
+	$agg_credential = $aggregate->NewCredential($user);
+
+	# Okay if this fails.
+	$agg_credential->Store()
+	    if (defined($agg_credential));
+    }
+    if (!defined($agg_credential)) {
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS,
-				$new_credential->asString());
+				$agg_credential->asString());
 }
 
 #
@@ -3912,6 +3945,8 @@ sub CleanupDeadSlice($;$)
 	# Unregister the slice at the SA.
 	UnRegisterSliver($slice);
     }
+    GeniCredential->DeleteForTarget($topaggregate)
+	if (defined($topaggregate));
 
     #
     # Find any aggregates and tear them down.
