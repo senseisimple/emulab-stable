@@ -218,6 +218,22 @@ WINSUPPORT=0
 NSVERIFY=1
 
 #
+# Turn this on to disable exporting NFS filesystems to nodes.
+# User home directories on all nodes will be local and unsynchronized in
+# this case.  There will also be no access to a central /proj, /group or
+# /share either.
+#
+NOSHAREDFS=0
+
+#
+# Set to one if you are using an NFS server that has an "exports race".
+# FreeBSDs before 8.x have this condition.  FreeBSD 8 and above (and
+# probably newer Linuxes) do not.  Since we currently only support FreeBSD
+# 7.x and below fileservers, leave this at one.
+#
+NFSRACY=1
+
+#
 # Virtual node network configuration (if you don't want virtual nodes,
 # just leave this as is)
 #

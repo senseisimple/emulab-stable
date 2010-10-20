@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2008 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,6 +42,7 @@ my @childpids  = ();
 # library and initialize itself. 
 # 
 use libsetup;
+use liblocsetup;
 use libtmcc;
 use librc;
 
@@ -147,8 +148,7 @@ sub doboot()
 		or fatal("Could not mkdir /local");
 	}
         if (! PLAB()) {
-            system("$BINDIR/mkextrafs.pl -f /local");
-            if (! -d "/local") {
+	    if (!os_mountextrafs("/local")) {
                 fatal("Could not create the /local filesystem");
             }
         }

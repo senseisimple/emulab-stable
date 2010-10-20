@@ -544,9 +544,16 @@ sub Cleanup()
     if (exists($vnconfig{'SSHDPORT'}) && $vnconfig{'SSHDPORT'} ne "") {
 	my $sshdport = $vnconfig{'SSHDPORT'};
 	my $ctrlip   = $vnconfig{'CTRLIP'};
-	
-	system("$IPTABLES -v -t nat -D PREROUTING -p tcp -d $ext_ctrlip ".
-	       "--dport $sshdport -j DNAT --to-destination $ctrlip:$sshdport");
+
+	# Retry a few times cause of iptables locking stupidity.
+	for (my $i = 0; $i < 3; $i++) {
+	    system("$IPTABLES -v -t nat -D PREROUTING -p tcp -d $ext_ctrlip ".
+		   "--dport $sshdport -j DNAT ".
+		   "--to-destination $ctrlip:$sshdport");
+	    last
+		if ($? == 0);
+	    sleep(2);
+	}
     }
 
     # if not halted, try that first

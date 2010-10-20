@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -36,6 +36,7 @@ static char           *pideid;
 static char           *swapper;
 static event_handle_t handle;
 static unsigned long  token = ~0;
+static char	      *nodelocal_dir;
 
 static void	      callback(event_handle_t handle,
 			       event_notification_t notification, void *data);
@@ -52,7 +53,7 @@ usage(char *progname)
 {
 	fprintf(stderr,
 		"Usage: %s [-d] "
-		"[-s server] [-p port] [-k keyfile] [-l logfile] [-u user] -e pid/eid\n",
+		"[-s server] [-p port] [-k keyfile] [-l logfile] [-u user] [-N dir] -e pid/eid\n",
 		progname);
 	exit(-1);
 }
@@ -74,7 +75,7 @@ main(int argc, char **argv) {
 	
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "s:p:e:l:dk:i:Vu:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:e:l:dk:i:Vu:N:")) != -1) {
 	  switch (c) {
 	  case 'd':
 	    debug++;
@@ -99,6 +100,9 @@ main(int argc, char **argv) {
 	    break;
 	  case 'u':
 	    swapper = optarg;
+	    break;
+	  case 'N':
+	    nodelocal_dir = optarg;
 	    break;
 	  case 'V':
 	    fprintf(stderr, "%s\n", build_info);
@@ -347,6 +351,7 @@ start_callback(event_handle_t handle,
 static void
 exec_linktest(char *args, int buflen) {
 	char	   *word, *argv[MAX_ARGS], swapperarg[128], tokenarg[32];
+	char	   logdirarg[128];
 	int	   i,res;
 
 	/*
@@ -355,14 +360,18 @@ exec_linktest(char *args, int buflen) {
 	 */
 	word = strtok(args," \t");
 	i=1;
-	sprintf(swapperarg, "SWAPPER=%s", swapper);
+	snprintf(swapperarg, sizeof(swapperarg), "SWAPPER=%s", swapper);
 	argv[i++] = swapperarg;
-	sprintf(tokenarg, "TOKEN=%lu", token);
+	snprintf(tokenarg, sizeof(tokenarg), "TOKEN=%lu", token);
 	argv[i++] = tokenarg;
+	if (nodelocal_dir) {
+		snprintf(logdirarg, sizeof(logdirarg),
+			 "SHAREDDIR=0 LOGDIR=%s", nodelocal_dir);
+		argv[i++] = logdirarg;
+	}
 	do {
-	  argv[i++] = word;
-	} while ((word = strtok(NULL," \t"))
-		 && (i<MAX_ARGS));
+		argv[i++] = word;
+	} while ((word = strtok(NULL," \t")) && (i<MAX_ARGS));
 	argv[i] = NULL;
 	argv[0] = LINKTEST_SCRIPT;
 
@@ -376,7 +385,7 @@ exec_linktest(char *args, int buflen) {
 	/*
 	 * Execute the script with the arguments from the event
 	 */
-	res = execv( LINKTEST_SCRIPT,argv);
+	res = execv(LINKTEST_SCRIPT, argv);
 	if(res < 0) {
 	    error("Could not execute the Linktest script.");
 	    return;

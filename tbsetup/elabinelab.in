@@ -48,7 +48,7 @@ my $remove   = 0;
 #		     avoiding all node reboots
 #
 my $inparallel = 1;
-my $restartnodes = 1;
+my $restartnodes = 0;
 
 sub DumpDBGoo();
 
@@ -495,7 +495,7 @@ rebootnodes:
     TBDebugTimeStamp("Rebooting experimental nodes");
     # Run as real user again.
     $EUID = $UID;
-    system("$nodereboot @expnodes");
+    system("$nodereboot -b @expnodes");
     if ($?) {
 	die("*** $0:\n".
 	    "    Error rebooting the expnodes (@expnodes)!\n");

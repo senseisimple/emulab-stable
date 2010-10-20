@@ -3843,7 +3843,7 @@ sub AddNodeToSolution($$$)
 	}
 	$physical = $proxynode->node_id();
     }
-    elsif (GeniHRN::IsValid($physical)) {
+    elsif ($PGENISUPPORT && GeniHRN::IsValid($physical)) {
 	(undef,undef,$physical) = GeniHRN::Parse($physical);
     }
 
