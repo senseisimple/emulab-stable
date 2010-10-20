@@ -1,0 +1,39 @@
+<!-- The namespace of an rspec determines its version. -->
+<!-- type="request" - This is a request rspec for asking for resources. --> 
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.2" type="request">
+ <!-- rspecs contain a list of nodes and links which make up a topology. -->
+ <!-- virtual_id="client" - The virtual_id of a node is the name you come up with to refer to it. When talking about what nodes link to other nodes, the virtual_id uniquely refers to a node. -->
+ <!-- component_manager_id - This is the URN of the component manager you want this node to be allocated on. In this case, the Utah Emulab. -->
+ <!-- exclusive="1" - This says you want sole use of the resource and don't want to share the same physical hardware with other experimenters. -->
+ <!-- virtualization_type="emulab-vnode" - For now, all nodes should have this virtualization type. -->
+ <!-- virtualization_subtype="raw" - This says you want a whole physical PC rather than a virtual container. -->
+ <node virtual_id="client" 
+       component_manager_uuid="urn:publicid:IDN+emulab.net+authority+cm"
+       exclusive="1"
+       virtualization_type="emulab-vnode"
+       virtualization_subtype="raw">
+    <!-- Interfaces are connected together by links. Declare interfaces inside the node declaration and refer to them in links. -->
+    <!-- virtual_id="int1" - This is your name for the interface. In rspec version 0.2 (this version), they are unique within a node. -->
+    <interface virtual_id="int1"/>
+    <interface virtual_id="control"/>
+ </node>
+ <node virtual_id="server" 
+       component_manager_uuid="urn:publicid:IDN+emulab.net+authority+cm"
+       exclusive="1"
+       virtualization_type="emulab-vnode"
+       virtualization_subtype="raw">
+    <interface virtual_id="int1"/>
+    <interface virtual_id="control"/>
+ </node>
+ <!-- Links connect nodes together into a topology. -->
+ <!-- This link connects the client and server node. -->
+ <!-- Once again, virtual_id is a label you provide to uniquely designate the link. -->
+  <link virtual_id="link">
+    <!-- The interface_ref tags refer to (node, interface) name pairs which uniquely specify an interface on a node. -->
+    <!-- This link connects the 'int1' interface on node 'client' with the 'int1' interface on node 'server'. -->
+    <interface_ref virtual_node_id="client"
+                   virtual_interface_id="int1" />
+    <interface_ref virtual_node_id="server" 
+                   virtual_interface_id="int1" />
+  </link>
+</rspec>
