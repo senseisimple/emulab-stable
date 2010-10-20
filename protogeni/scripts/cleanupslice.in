@@ -48,6 +48,7 @@ use GeniUtil;
 use GeniCM;
 use Genixmlrpc;
 use GeniCertificate;
+use GeniCredential;
 
 #
 # We don't want to run this script unless its the real version.
@@ -155,6 +156,9 @@ sub DoSA()
     }
     # Needs to move.
     GeniRegistry::ClientSliver->SliceDelete($slice);
+
+    # Remove any stored credentials for this slice.
+    GeniCredential->DeleteForTarget($slice);
 
     if ($slice->Delete()) {
 	fatal("Could not delete $slice from slice authority DB!");
