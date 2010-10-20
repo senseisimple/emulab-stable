@@ -336,13 +336,15 @@ sub Stringify($)
 
     return "[Experiment: $pid/$eid]";
 }
+# Keep this above @SELFLOADER_DATA@ ... elabinelab is a slot in
+# the stats stats record, but was not being updated
+sub elabinelab($) { return $_[0]->elab_in_elab(); }
 
 1;
-__DATA__
+@SELFLOADER_DATA@
 
 sub dbrow($$)     { return $_[0]->{'EXPT'}; }
 sub locked($)     { return $_[0]->expt_locked(); }
-sub elabinelab($) { return $_[0]->elab_in_elab(); }
 sub description($){ return $_[0]->expt_name(); }
 sub creator($)    { return $_[0]->expt_head_uid(); }
 sub created($)	  { return $_[0]->expt_created(); }
@@ -4507,5 +4509,3 @@ sub ReserveSharedBandwidth($;$$)
 
 # _Always_ make sure that this 1 is at the end of the file...
 1;
-
-

@@ -442,7 +442,7 @@ sub vz_rootPreConfigNetwork {
 		}
 		if ($i == $MAXIMQ) {
 		    print STDERR "*** No more IMQs\n";
-		    TBScriptUnLock();
+		    TBScriptUnlock();
 		    return -1;
 		}
 	    }
@@ -822,6 +822,8 @@ sub vz_vnodeState {
     }
 
     my $status = vmstatus($vmid);
+    return VNODE_STATUS_UNKNOWN()
+	if (!defined($status));
 
     if ($status eq 'running') {
 	return VNODE_STATUS_RUNNING();
@@ -941,7 +943,13 @@ sub vz_vnodePreConfig {
     if ($DOLVM) {
 	$privroot = "/mnt/$vnode_id/private";
     }
+    # Serialize the callback. Sucks. iptables.
+    if (TBScriptLock($GLOBAL_CONF_LOCK, 0, 900) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "Could not get callback lock after a long time!\n";
+	return -1;
+    }
     my $ret = &$callback("$privroot");
+    TBScriptUnlock();
     if ($didmount) {
 	mysystem("$VZCTL umount $vnode_id");
     }
@@ -964,20 +972,33 @@ sub vz_vnodePreConfigControlNetwork {
 		$ipa[2] & $maska[2],$ipa[3] & $maska[3]);
     my $net = join('.',@neta);
 
+    #
+    # Have to serialize iptables access. Silly locking problem in the kernel.
+    #
+    if (TBScriptLock($GLOBAL_CONF_LOCK, 0, 900) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "PreConfigControlNetwork: ".
+	    "Could not get the lock after a long time!\n";
+	return -1;
+    }
     # If the SNAT rule is there, probably we're good.
     if (system('iptables -t nat -L POSTROUTING' . 
 	       ' | grep -q -e \'^SNAT.* ' . $net . '\'')) {
-	mysystem("$MODPROBE ip_nat");
-	mysystem("$IPTABLES -t nat -A POSTROUTING" . 
-		 " -s $net/$mask" . 
-		 " -d $cnetwork/$cnetmask -j ACCEPT");
-	mysystem("$IPTABLES -t nat -A POSTROUTING" . 
-		 " -s $net/$mask" . 
-		 " -d $net/$mask -j ACCEPT");
-	mysystem("$IPTABLES -t nat -A POSTROUTING" . 
-		 " -s $net/$mask" . 
-		 " -o $ciface -j SNAT --to-source $cip");
+	if (system("$MODPROBE ip_nat") ||
+	    system("$IPTABLES -t nat -A POSTROUTING" . 
+		   " -s $net/$mask" . 
+		   " -d $cnetwork/$cnetmask -j ACCEPT") ||
+	    system("$IPTABLES -t nat -A POSTROUTING" . 
+		   " -s $net/$mask" . 
+		   " -d $net/$mask -j ACCEPT") ||
+	    system("$IPTABLES -t nat -A POSTROUTING" . 
+		   " -s $net/$mask" . 
+		   " -o $ciface -j SNAT --to-source $cip")) {
+	    print STDERR "Could not PreConfigControlNetwork iptables\n";
+	    TBScriptUnlock();
+	    return -1;
+	}
     }
+    TBScriptUnlock();
 
     # Make sure we're mounted so that vzlist and friends work; see NOTE about
     # mounting LVM logical devices above.

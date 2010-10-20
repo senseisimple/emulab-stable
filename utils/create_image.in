@@ -6,7 +6,7 @@
 #
 use English;
 use Getopt::Std;
-use POSIX qw(setsid);
+use POSIX qw(setsid :sys_wait_h);
 use File::Basename;
 
 #
@@ -40,16 +40,18 @@ my $maximagesize = (6 * 1024**3); # 20GB
 sub usage()
 {
     print(STDERR
-	  "Usage: create_image [-w] [-p <pid>] <imagename> <node>\n" .
+	  "Usage: create_image [-ws] [-p <pid>] <imagename> <node>\n" .
 	  "switches and arguments:\n".
 	  "-w          - wait for image to be fully created\n".
+	  "-s          - use ssh instead of writing across NFS\n".
 	  "-p <pid>    - project ID of the image; defaults to system project\n".
 	  "<imagename> - imagename to use\n".
 	  "<node>      - nodeid to create the image from\n");
     exit(-1);
 }
-my $optlist  = "p:w";
+my $optlist  = "p:wsd";
 my $waitmode = 0;
+my $sshmode = 0;
 
 #
 # Configure variables
@@ -87,6 +89,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 sub cleanup();
 sub fatal($);
+sub check_progress($$);
 
 my $nodereboot	= "$TB/bin/node_reboot";
 my $createimage = "/usr/local/bin/create-image";
@@ -115,6 +118,13 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
+}
+if (defined($options{"s"})) {
+    $sshmode = 1;
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+    $waitmode = 0;
 }
 if (@ARGV != 2) {
     usage();
@@ -341,17 +351,22 @@ my $loadlength = $image->loadlength();
 my $command    = "$createimage ";
 
 if ($startslice || $loadlength == 1) {
-    $command = "$command -s $startslice $device $filename";
+    $command = "$command -s $startslice $device";
 }
 else {
-    $command = "$command $device $filename";
+    $command = "$command $device";
+}
+if ($sshmode) {
+    $command .= " -";
+} else {
+    $command .= " $filename";
 }
 
 #
 # Go to the background since this is going to take a while.
 # 
 if (!$debug) {
-    $logfile = Logfile->Create();
+    $logfile = Logfile->Create($experiment->gid_idx());
     fatal("Could not create a logfile")
 	if (!defined($logfile));
     # Mark it open since we are going to start using it right away.
@@ -412,19 +427,6 @@ $needcleanup = 1;
 # Clear the bootlog; see below.
 $node->ClearBootLog();
 
-#
-# Reboot into admin mode and run the command.
-#
-my $me           = $0;
-my %args         = ();
-$args{'name'}    = $me;
-$args{'command'} = $command;
-$args{'timeout'} = $maxwait + $checkwait;
-$args{'prepare'} = 1;
-
-$args{'pfunc'}     = \&check_progress;
-$args{'pinterval'} = $checkwait;
-
 # check_progress state
 my $runticks	 = 0;
 my $maxticks	 = int($maxwait / $checkwait);
@@ -434,14 +436,99 @@ my $maxidleticks = int($idlewait / $checkwait);
 my $lastsize     = 0;
 my $result;
 
-my $retry = 1;
-while ($retry) {
-    $retry = 0;
-    if (TBAdminMfsRunCmd(\%args, undef, $node_id)) {
-	$result = "setupfailed"
-	    if (!defined($result));
+#
+# Reboot into admin mode and run the command.
+# Note that without a shared FS, we just boot the node into the admin MFS
+# and run the command via SSH, capturing the output.
+#
+my $me           = $0;
+my %args         = ();
+$args{'name'}    = $me;
+$args{'prepare'} = 1;
+
+if ($sshmode) {
+    #
+    # Put the node in admin mode...
+    #
+    $args{'on'} = 1;
+    $args{'clearall'} = 0;
+    if (TBAdminMfsSelect(\%args, undef, $node_id)) {
+	$result = "setupfailed";
+	goto done;
+    }
+
+    #
+    # ...boot it...
+    #
+    $args{'reboot'} = 1;
+    $args{'retry'} = 0;
+    $args{'wait'} = 1;
+    my @failed = ();
+    if (TBAdminMfsBoot(\%args, \@failed, $node_id)) {
+	$result = "setupfailed";
+	goto done;
+    }
+
+    #
+    # ...execute command and wait!
+    #
+    my $mypid = fork();
+    if ($mypid < 0) {
+	$result = "setupfailed";
+	goto done;
+    }
+    if (!$mypid) {
+	exit(system("$TB/bin/sshtb -host $node_id $command > $filename"));
+    }
+
+    #
+    # Parent.  Wait for ssh to finish, reporting periodic progress
+    # as TBAdminMfsRunCmd would do.
+    #
+    my $endtime = time() + $maxwait + $checkwait;
+    while (1) {
+	my $kid = waitpid($mypid, &WNOHANG);
+	# ssh finished
+	if ($kid == $mypid) {
+	    $result = $?;
+	    last;
+	}
+
+	# huh?
+	if ($kid == -1) {
+	    $result = -1;
+	    last;
+	}
+
+	# check on progress
+	if (!check_progress(undef, undef)) {
+	    last;
+	}
+
+	# wait for awhile
+	sleep($checkwait);
+	if (time() >= $endtime) {
+	    $result = "timeout";
+	    last;
+	}
+    }
+} else {
+    $args{'command'} = $command;
+    $args{'timeout'} = $maxwait + $checkwait;
+    $args{'pfunc'}     = \&check_progress;
+    $args{'pinterval'} = $checkwait;
+
+    my $retry = 1;
+    while ($retry) {
+	$retry = 0;
+	if (TBAdminMfsRunCmd(\%args, undef, $node_id)) {
+	    $result = "setupfailed"
+		if (!defined($result));
+	}
     }
 }
+
+done:
 
 if (! cleanup()) {
     fatal("Problem encountered while cleaning up!\n");
@@ -596,7 +683,7 @@ sub check_progress($$)
     #
     # Command has finished for better or worse, record status and finish.
     #
-    if ($statusp->{$node_id} ne "none") {
+    if (defined($statusp) && $statusp->{$node_id} ne "none") {
 	$result = $statusp->{$node_id};
 	return 0;
     }

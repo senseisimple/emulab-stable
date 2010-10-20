@@ -606,7 +606,7 @@ sub Create($$$$$$)
 {
     # $rspec is a LibXML element representing a single node.
     my ($class, $slice, $user, $resource_uuid, $rspec) = @_;
-    my $virtualization_type = GeniXML::GetText("virtualization_type", $rspec);
+    my $virtualization_type = GeniXML::GetVirtualizationType($rspec);
     if (!defined($virtualization_type)) {
 	print STDERR "Node does not contain a virtualization_type\n";
 	return undef;
@@ -682,22 +682,28 @@ sub Create($$$$$$)
     #
     # Add this stuff to the rspec (which becomes the manifest).
     #
-    GeniXML::SetText("hostname", $rspec, $hostname);
-    GeniXML::SetText("sshdport", $rspec, $sshdport) if (defined($sshdport));
-
-    # This is a version 2.0 thing.
-    my $services = GeniXML::AddElement("services", $rspec);
-    my $login = GeniXML::AddElement("login", $services);
-    GeniXML::SetText("authentication", $login, "ssh-keys");
-    GeniXML::SetText("hostname", $login, $phostname);
-    GeniXML::SetText("port", $login, $sshdport);
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("hostname", $rspec, $hostname);
+	GeniXML::SetText("sshdport", $rspec, $sshdport)
+	    if (defined($sshdport));
+    } else {
+	my $services = GeniXML::AddElement("services", $rspec);
+	my $login = GeniXML::AddElement("login", $services);
+	GeniXML::SetText("authentication", $login, "ssh-keys");
+	GeniXML::SetText("hostname", $login, $phostname);
+	GeniXML::SetText("port", $login, $sshdport);
+    }
 
     my $sliver = GeniSliver->Create($slice, $user, $resource_uuid, "Node",
 				    $resource_id, $hrn, $nickname, $rspec);
     return undef
 	if (!defined($sliver));
 
-    GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
+    } else {
+	GeniXML::SetText("sliver_id", $rspec, $sliver->sliver_urn());
+    }
     return $sliver;
 }
 
@@ -743,7 +749,7 @@ sub Provision($;$)
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
 
-    my $virt_type = GeniXML::GetText("virtualization_type", $self->rspec());
+    my $virt_type = GeniXML::GetVirtualizationType($self->rspec());
     if (!$node->isremotenode() &&
 	defined($virt_type) &&
 	$virt_type eq "emulab-vnode") {
@@ -756,8 +762,7 @@ sub Provision($;$)
 	# Mark
 	$node->ModifyReservation({"genisliver_idx" => $self->idx()});
 
-	my $subtype = GeniXML::GetText("virtualization_subtype",
-				       $self->rspec());
+	my $subtype = GeniXML::GetVirtualizationSubtype($self->rspec());
 	if (defined($subtype)) {
 	    if (!$pnode->sharing_mode()) {
 		$pnode->ModifyReservation({"genisliver_idx" => $self->idx()});
@@ -827,8 +832,7 @@ sub UnProvision($;$)
 	    }
 	}
 
-	my $virt_type = GeniXML::GetText("virtualization_type",
-					 $self->rspec());
+	my $virt_type = GeniXML::GetVirtualizationType($self->rspec());
 	if (!$node->isremotenode() &&
 	    defined($virt_type) &&
 	    $virt_type eq "emulab-vnode") {
@@ -934,7 +938,7 @@ sub ProcessManifest($$)
 	#
 	foreach my $ref (GeniXML::FindNodes("n:node",
 					    $manifest)->get_nodelist()) {
-	    my $sliver_urn = GeniXML::GetText("sliver_urn", $ref);
+	    my $sliver_urn = GeniXML::GetSliverId($ref);
 	    if (defined($sliver_urn) && $sliver_urn eq $self->sliver_urn()) {
 		# startup command.
 		my $startupcmd = GeniXML::GetText("startup_command", $ref);
@@ -1169,15 +1173,21 @@ sub Create()
     #
     # Add this stuff to the rspec (which becomes the manifest).
     #
-    GeniXML::SetText("component_urn", $rspec, $component_urn);
-
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("component_urn", $rspec, $component_urn);
+    } else {
+	GeniXML::SetText("component_id", $rspec, $component_urn);
+    }
     my $sliver = GeniSliver->Create($slice, $user, $interface_uuid,
 				    "Interface", $resource_id,
 				    $hrn, $nickname, $rspec);
     return undef
 	if (!defined($sliver));
-    
-    GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
+    if (GeniXML::IsVersion0($rspec)) {
+	GeniXML::SetText("sliver_uuid", $rspec, $sliver->uuid());
+    } else {
+	GeniXML::SetText("sliver_id", $rspec, $sliver->sliver_urn());
+    }
     return $sliver;
 }
 

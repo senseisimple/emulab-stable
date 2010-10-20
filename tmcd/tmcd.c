@@ -2798,7 +2798,7 @@ COMMAND_PROTOTYPE(dobridges)
 	 * Get bridge parameters for the machine. 
 	 */
 	res = mydb_query("select b.bridx,i.MAC,b.vnode,b.vname "
-			 " from bridges as b"
+			 " from bridges as b "
 			 "left join interfaces as i on "
 			 " i.node_id=b.node_id and i.iface=b.iface "
 			 " where b.node_id='%s' order by bridx",

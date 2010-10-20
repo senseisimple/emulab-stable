@@ -101,9 +101,8 @@ sub TBdbfork()
 sub hash_recurse2($%);
 sub array_recurse2($%);
 
-# _Always_ make sure that this 1 is at the end of the file...
 1;
-__DATA__
+@SELFLOADER_DATA@
 
 # Local lookup for a Node, to avoid dragging in the module.
 sub LocalNodeLookup($)
@@ -2632,5 +2631,6 @@ sub TBSetNodeHistory($$$$$)
     }
     return $node->SetNodeHistory($op, $this_user, $experiment);
 }
-1;
 
+# _Always_ make sure that this 1 is at the end of the file...
+1;

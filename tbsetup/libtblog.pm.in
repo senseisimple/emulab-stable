@@ -970,18 +970,26 @@ sub tbreport( $@ ) {
 
 	DBQueryFatal($sql);
 
-	if (@context > 0) {
-	    croak("$error_type has no associated entry in CONTEXT_MAP")
-		unless defined(CONTEXT_MAP->{$error_type}); 
-
-	    my ($table, @columns) = @{CONTEXT_MAP->{$error_type}};
-
-	    my $sql = sprintf("insert into %s (seq, " . join(', ', @columns) .
-			      ") values(%d" . ", %s" x @columns . ")",
-			      $table, $seq, map(DBQuoteSpecial($_), @context));
-
-	    DBQueryFatal($sql);
-	}
+	# XXX: Nuke for now, not used for anything important and is more
+	#      trouble than it's worth.  If ever reenabled the arguments
+	#      should be checked and a useful error message should be
+	#      returned if they are invalid.  Also DBQueryFatal should
+	#      probably not be used, instead DBQuery should be used and
+	#      special action should be taken on error as done in
+	#      dblog_real to avoid generating the DBError email.  Ditto
+	#      for the DBQueryFatal above (for report_error). -- kevina
+	#if (@context > 0) {
+	#    croak("$error_type has no associated entry in CONTEXT_MAP")
+	#	unless defined(CONTEXT_MAP->{$error_type}); 
+	#
+	#   my ($table, @columns) = @{CONTEXT_MAP->{$error_type}};
+	#
+	#   my $sql = sprintf("insert into %s (seq, " . join(', ', @columns) .
+	#		      ") values(%d" . ", %s" x @columns . ")",
+	#		      $table, $seq, map(DBQuoteSpecial($_), @context));
+	#
+	#    DBQueryFatal($sql);
+	#}
     };
     # Print a warning on failure but don't log the results to the database
     # as that is likely to fail also

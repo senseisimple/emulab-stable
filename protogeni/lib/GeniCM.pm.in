@@ -460,7 +460,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     # slice record expires, which was given by the expiration time of the
     # slice credential.
     #
-    my $expires = GeniXML::GetText("valid_until", $rspec);
+    my $expires = GeniXML::GetExpires($rspec);
     if (defined($expires)) {
 	if (! ($expires =~ /^[-\w:.\/]+/)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -627,6 +627,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     my %namemap  = ();
     my %colomap  = ();
     my %ifacemap = ();
+    my %iface2node = ();
     my %vportmap = ();
     my %nodemap  = ();
     my @nodeids  = ();
@@ -676,8 +677,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 		if (GeniXML::IsLanNode($ref));
 
 	    my $node_nickname = GeniXML::GetVirtualId($ref);
-	    my $colocate      = GeniXML::GetText("colocate", $ref) ||
-		                GeniXML::GetText("phys_nickname", $ref);
+	    my $colocate      = GeniXML::GetColocate($ref);
 	    my $component_id  = GeniXML::GetNodeId($ref);
 	    my $node = GeniUtil::LookupNode($component_id);
 	    if (!defined($node)) {
@@ -714,15 +714,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $component_id  = GeniXML::GetNodeId($ref);
 	my $manager_id    = GeniXML::GetManagerId($ref);
 	my $node_nickname = GeniXML::GetVirtualId($ref);
-	my $colocate      = GeniXML::GetText("colocate", $ref) ||
-	                    GeniXML::GetText("phys_nickname", $ref);
-	my $subnode_of    = GeniXML::GetText("subnode_of", $ref);
-	my $virtualization_type
-                          = GeniXML::GetText("virtualization_type", $ref);
+	my $colocate      = GeniXML::GetColocate($ref);
+	my $subnode_of    = GeniXML::GetSubnodeOf($ref);
+	my $virtualization_type = GeniXML::GetVirtualizationType($ref);
+	
 	my $virtualization_subtype
-                          = GeniXML::GetText("virtualization_subtype",
-					     $ref);
-	my $exclusive     = GeniXML::GetText("exclusive", $ref);
+                          = GeniXML::GetVirtualizationSubtype($ref);
+	my $exclusive     = GeniXML::GetExclusive($ref);
 	my $pctype;
 	my $osname;
 	my $node;
@@ -803,7 +801,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$osname = "SPPVM-FAKE";
 			$pctype = "sppvm";
 			# Lets force to shared node.
-			if (! GeniXML::SetText("exclusive", $ref, 0)) {
+			if (! GeniXML::SetExclusive($ref, 0)) {
 			    $response
 				= GeniResponse->Create(GENIRESPONSE_BADARGS,
 						       undef,
@@ -836,14 +834,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    else {
 	      raw:
 		# Lets force to exclusive real node.
-		if (! GeniXML::SetText("exclusive", $ref, 1)) {
+		if (! GeniXML::SetExclusive($ref, 1)) {
 		    $response = GeniResponse->Create(GENIRESPONSE_BADARGS,
 						     undef,
 			"Malformed rspec: Cannot set exclusive tag to true");
 		    goto bad;
 		}
 		$exclusive = 1;
-		if (! GeniXML::SetText("virtualization_type", $ref, "raw")) {
+		if (! GeniXML::SetVirtualizationType($ref, "raw")) {
 		    $response = GeniResponse->Create(GENIRESPONSE_BADARGS,
 						     undef,
 			"Malformed rspec: Cannot set virtualization_type to raw");
@@ -971,13 +969,15 @@ sub GetTicketAuxAux($$$$$$$$$)
 	
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
-	    my $virtual_id   = GeniXML::GetText("virtual_id", $linkref);
+	    my $virtual_id   = GeniXML::GetVirtualId($linkref);
 
 	    if (!defined($virtual_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 			     "Must provide a virtual_id for interfaces");
 		goto bad;
 	    }
+
+	    $iface2node{$virtual_id} = $node_nickname;
 	    
 	    $ifacemap{$node_nickname} = {}
 	        if (!exists($ifacemap{$node_nickname}));
@@ -1005,8 +1005,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
 	my $lanname    = GeniXML::GetVirtualId($linkref);
-	my $link_type  = GeniXML::GetText("link_type", $linkref);
-	my $istunnel   = (defined($link_type) && $link_type eq "tunnel");
+	my $istunnel   = GeniXML::IsTunnel($linkref);
 	my @interfaces = GeniXML::FindNodes("n:linkendpoints | ".
 					    "n:interface_ref",
 					    $linkref)->get_nodelist();
@@ -1025,7 +1024,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	# we assume the link is for thie CM.
 	#
 	if (GeniXML::FindNodes("n:component_manager", $linkref)) {
-	    %managers = map { GeniXML::GetText("id", $_) => $_ } 
+	    %managers = map { GetLinkManager($_) => $_ } 
 	                      GeniXML::FindNodes("n:component_manager",
 						 $linkref)->get_nodelist();
 
@@ -1064,18 +1063,24 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    my $node_nickname = GeniXML::GetText("virtual_node_id", $ref) ||
 		                GeniXML::GetText("node_nickname", $ref);
 	    my $iface_id = GeniXML::GetText("virtual_interface_id", $ref) ||
-		           GeniXML::GetText("iface_name", $ref);
+		           GeniXML::GetText("iface_name", $ref) ||
+			   GeniXML::GetText("client_id", $ref);
+
+	    if (!defined($iface_id)) {
+		$response =
+		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				 "$lanname: Need interface id for links");
+		goto bad;
+	    }
+
+	    if (! GeniXML::IsVersion0($ref)) {
+		$node_nickname = $iface2node{$iface_id};
+	    }
 
 	    if (!defined($node_nickname)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				 "$lanname: Need node id for links");
-		goto bad;
-	    }
-	    if (!defined($iface_id)) {
-		$response =
-		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "$lanname: Need interface id for links");
 		goto bad;
 	    }
 
@@ -1294,9 +1299,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $rspec          = $nodemap{$virtual_id}->{'rspec'};
 	my $virtnode       = $nodemap{$virtual_id}->{'virtnode'};
 	my $node           = GeniUtil::LookupNode($component_id);
-	my $colocate       = GeniXML::GetText("colocate", $rspec) ||
-	                     GeniXML::GetText("phys_nickname", $rspec);
-	my $subnode_of     = GeniXML::GetText("subnode_of", $rspec);
+	my $colocate       = GeniXML::GetColocate($rspec);
+	my $subnode_of     = GeniXML::GetSubnodeOf($rspec);
 
 	#
 	# Regardless of whether the user asked for an exclusive node
@@ -1306,13 +1310,20 @@ sub GetTicketAuxAux($$$$$$$$$)
 	#
 	my $exclusive = (defined($node->sharing_mode()) ? "0" : "1");
 	
-	GeniXML::SetText("component_urn", $rspec,
-			 GeniHRN::Generate( $OURDOMAIN, "node",
-					    $node->node_id() ));
-	GeniXML::SetText("component_uuid", $rspec, $component_id);
-	GeniXML::SetText("component_manager_urn", $rspec, $ENV{'MYURN'});
-	GeniXML::SetText("component_manager_uuid", $rspec, $ENV{'MYUUID'});
-	GeniXML::SetText("exclusive", $rspec, $exclusive);
+	if (GeniXML::IsVersion0($rspec)) {
+	    GeniXML::SetText("component_urn", $rspec,
+			     GeniHRN::Generate( $OURDOMAIN, "node",
+						$node->node_id() ));
+	    GeniXML::SetText("component_uuid", $rspec, $component_id);
+	    GeniXML::SetText("component_manager_urn", $rspec, $ENV{'MYURN'});
+	    GeniXML::SetText("component_manager_uuid", $rspec, $ENV{'MYUUID'});
+	} else {
+	  GeniXML::SetText("component_id", $rspec,
+			   GeniHRN::Generate( $OURDOMAIN, "node",
+					      $node->node_id() ));
+	    GeniXML::SetText("component_manager_id", $rspec, $ENV{'MYURN'});
+	}
+	GeniXML::SetExclusive($rspec, $exclusive);
 
 	# Also update the virtexperiment table row.
 	# Do not update subnodes; they are fixed to the parent,
@@ -1336,12 +1347,16 @@ sub GetTicketAuxAux($$$$$$$$$)
 						   $ref)->get_nodelist();
 
 	foreach my $iface_ref (@interfaces) {
+	    my $virtual_port_id   =
+		GeniXML::GetText("virtual_interface_id", $iface_ref)
+		|| GeniXML::GetText("virtual_port_id", $iface_ref)
+		|| GeniXML::GetText("client_id", $iface_ref);
 	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
 						     $iface_ref);
-	    my $virtual_port_id   = GeniXML::GetText("virtual_interface_id",
-						     $iface_ref) ||
-				    GeniXML::GetText("virtual_port_id",
-						     $iface_ref);
+	    if (! GeniXML::IsVersion0($iface_ref)
+		&& defined($virtual_port_id)) {
+		$virtual_node_id = $iface2node{$virtual_port_id};
+	    }
 	    my $component_id      = GeniXML::GetText("component_id",
 						     $iface_ref);
 	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
@@ -1651,6 +1666,7 @@ sub SliverWorkAux($$$$$$$)
     my @allocated= ();
     my @freenodes= ();
     my @freelinks= ();
+    my %iface2node = ();
     my $needplabslice = 0;
 
     print GeniXML::Serialize($rspec);
@@ -1685,14 +1701,14 @@ sub SliverWorkAux($$$$$$$)
     # Figure out new expiration time; this is the time at which we can
     # idleswap the slice out. 
     #
-    my $expires = GeniXML::GetText("valid_until", $rspec);
+    my $expires = GeniXML::GetExpires($rspec);
     if (defined($expires)) {
 	if (! ($expires =~ /^[-\w:.\/]+/)) {
 	    $message = "Illegal valid_until in rspec";
 	    goto bad;
 	}
 	# Convert to a localtime.
-	my $when = timegm(strptime($expires));
+        my $when = timegm(strptime($expires));
 	if (!defined($when)) {
 	    $message = "Could not parse valid_until";
 	    goto bad;
@@ -1798,7 +1814,13 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "$resource_id ($node) is not available";
 	    goto bad;
 	}
-    
+	foreach my $iface (GeniXML::FindNodes("n:interface",
+					     $ref)->get_nodelist()) {
+	    my $iface_id = GeniXML::GetVirtualId($iface);
+	    if (defined($iface_id)) {
+		$iface2node{$iface_id} = $node_nickname;
+	    }
+	}
 	# Unincorporated nodes have no genisliver_idx.
 	my $restable = $node->ReservedTableEntry();
 	if (defined($restable) &&
@@ -2004,7 +2026,8 @@ sub SliverWorkAux($$$$$$$)
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
 	    my $component_id     = GeniXML::GetText("component_id", $linkref);
-	    my $virtual_iface_id = GeniXML::GetText("virtual_id", $linkref);
+	    my $virtual_iface_id = GeniXML::GetText("virtual_id", $linkref)
+		|| GeniXML::GetText("client_id", $linkref);
 
 	    $ifacemap{$virtual_id} = {}
 	        if (!exists($ifacemap{$virtual_id}));
@@ -2034,8 +2057,13 @@ sub SliverWorkAux($$$$$$$)
 	$nodemap{$virtual_id} = $sliver;
 
 	# For the manifest.
-	GeniXML::SetText("sliver_urn", $ref, $sliver->sliver_urn());
-	GeniXML::SetText("component_urn", $ref, $sliver->component_urn());
+	if (GeniXML::IsVersion0($ref)) {
+	    GeniXML::SetText("sliver_urn", $ref, $sliver->sliver_urn());
+	    GeniXML::SetText("component_urn", $ref, $sliver->component_urn());
+	} else {
+	    GeniXML::SetText("sliver_id", $ref, $sliver->sliver_urn());
+	    GeniXML::SetText("component_id", $ref, $sliver->component_urn());
+	}
 
 	# Add to the aggregate.
 	if ($sliver->SetAggregate($aggregate) != 0) {
@@ -2081,7 +2109,7 @@ sub SliverWorkAux($$$$$$$)
 	# we assume the link is for thie CM.
 	#
 	if (GeniXML::FindNodes("n:component_manager", $linkref)) {
-	    %managers = map { GeniXML::GetText("id", $_) => $_ } 
+	    %managers = map { GeniXML::GetLinkManager($_) => $_ } 
 	                      GeniXML::FindNodes("n:component_manager",
 						 $linkref)->get_nodelist();
 
@@ -2093,13 +2121,13 @@ sub SliverWorkAux($$$$$$$)
 		if (!exists($managers{$ENV{'MYURN'}}));
 	}
 
-	my $link_type = GeniXML::GetText("link_type", $linkref);
+	my $is_tunnel = GeniXML::IsTunnel($linkref);
 
 	# Do not worry about modifying a link that is setup, unless a tunnel.
 	# Need to deal with this later.
 	if (grep {$_ eq $linkname} keys(%linkmap)) {
 	    next
-		if (! (defined($link_type) && $link_type eq "tunnel"));
+		if ($is_tunnel);
 
 	    #
 	    # Gack, we have to recreate all the tunnel physical state, but
@@ -2107,7 +2135,8 @@ sub SliverWorkAux($$$$$$$)
 	    # The aggregate needs to get rebuilt, so delete the existing
 	    # one. Needs a lot more thought.
 	    #
-	    my $sliver_urn = GeniXML::GetText("sliver_urn", $linkref);
+	    my $sliver_urn = GeniXML::GetText("sliver_urn", $linkref)
+		|| GeniXML::GetText("sliver_id", $linkref);
 	    if (!defined($sliver_urn)) {
 		print STDERR
 		    "Could not find sliver_urn in existing link $linkname\n";
@@ -2124,7 +2153,7 @@ sub SliverWorkAux($$$$$$$)
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	if (defined($link_type) && $link_type eq "tunnel") {
+	if ($is_tunnel) {
 
 	    my $iface1ref   = $interfaces[0];
 	    my $iface2ref   = $interfaces[1];
@@ -2161,8 +2190,12 @@ sub SliverWorkAux($$$$$$$)
 	    $linkmap{$linkname} = $tunnel;
 	    
 	    # Manifest goes back to the user.
-	    GeniXML::SetText("sliver_uuid", $linkref, $tunnel->uuid());
-	    GeniXML::SetText("sliver_urn", $linkref, $tunnel->urn());
+	    if (GeniXML::IsVersion0($linkref)) {
+		GeniXML::SetText("sliver_uuid", $linkref, $tunnel->uuid());
+		GeniXML::SetText("sliver_urn", $linkref, $tunnel->urn());
+	    } else {
+		GeniXML::SetText("sliver_id", $linkref, $tunnel->urn());
+	    }
 
 	    # Add to the aggregate.
 	    if ($tunnel->SetAggregate($aggregate) != 0) {
@@ -2182,8 +2215,12 @@ sub SliverWorkAux($$$$$$$)
 	$linkmap{$linkname} = $linkaggregate;
 
 	# Manifest goes back to the user.
-	GeniXML::SetText("sliver_uuid", $linkref, $linkaggregate->uuid());
-	GeniXML::SetText("sliver_urn", $linkref, $linkaggregate->urn());
+	if (GeniXML::IsVersion0($linkref)) {
+	    GeniXML::SetText("sliver_uuid", $linkref, $linkaggregate->uuid());
+	    GeniXML::SetText("sliver_urn", $linkref, $linkaggregate->urn());
+	} else {
+	    GeniXML::SetText("sliver_id", $linkref, $linkaggregate->urn());
+	}
 
 	# Add to the aggregate.
 	if ($linkaggregate->SetAggregate($aggregate) != 0) {
@@ -2194,9 +2231,13 @@ sub SliverWorkAux($$$$$$$)
 
 	foreach my $ifaceref (@interfaces) {
 	    my $iface_id   = GeniXML::GetText("virtual_interface_id",
-					      $ifaceref);
+					      $ifaceref)
+		|| GeniXML::GetText("client_id", $ifaceref);
 	    my $node_id    = GeniXML::GetText("virtual_node_id",
 					      $ifaceref);
+	    if (! GeniXML::IsVersion0($ifaceref) && defined($iface_id)) {
+		$node_id = $iface2node{$iface_id};
+	    }
 	    my ($vnode,$vinterface);
 
 	    #
@@ -2227,7 +2268,7 @@ sub SliverWorkAux($$$$$$$)
 	    #
 	    if ($node->isvirtnode()) {
 		$vnode = $node;
-		$node  = GeniUtil::LookupNode($nodesliver->resource_id());
+		$node  = GeniUtil::LookupNode($vnode->phys_nodeid());
 		if (!defined($node)) {
 		    $message = "Could not find node object for $nodesliver";
 		    goto bad;
@@ -2275,19 +2316,27 @@ sub SliverWorkAux($$$$$$$)
 		goto bad;
 	    }
 	    # Manifest goes back to the user.
-	    GeniXML::SetText("sliver_urn", $ifaceref, $sliver->sliver_urn());
-	    GeniXML::SetText("MAC", $ifaceref, $interface->mac())
-		if (defined($interface));
-	    GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
-		if (defined($vinterface));
-	    if (defined($vinterface)) {
-		GeniXML::SetText("IP", $ifaceref, $vinterface->IP())
-		    if (defined($vinterface->IP()) && $vinterface->IP() ne "");
-	    }
-	    else {
-		GeniXML::SetText("IP", $ifaceref, $interface->IP())
-		    if (defined($interface) &&
-			defined($interface->IP()) && $interface->IP() ne "");
+	    if (GeniXML::IsVersion0($ifaceref)) {
+		GeniXML::SetText("sliver_urn", $ifaceref,
+				 $sliver->sliver_urn());
+		GeniXML::SetText("MAC", $ifaceref, $interface->mac())
+		    if (defined($interface));
+		GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
+		    if (defined($vinterface));
+		if (defined($vinterface)) {
+		    GeniXML::SetText("IP", $ifaceref, $vinterface->IP())
+			if (defined($vinterface->IP())
+			    && $vinterface->IP() ne "");
+		}
+		else {
+		    GeniXML::SetText("IP", $ifaceref, $interface->IP())
+			if (defined($interface) &&
+			    defined($interface->IP())
+			    && $interface->IP() ne "");
+		}
+	    } else {
+		GeniXML::SetText("sliver_id", $ifaceref,
+				 $sliver->sliver_urn());
 	    }
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {
@@ -3409,9 +3458,9 @@ sub SliverTicket($)
     #
     # Update the returned ticket to reflect the current expiration time.
     #
-    GeniXML::SetText("valid_until", $rspec,
-		     POSIX::strftime("20%y-%m-%dT%H:%M:%S",
-				     gmtime(str2time($slice->expires()))));
+    GeniXML::SetExpires($rspec,
+			POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+					gmtime(str2time($slice->expires()))));
 
     my $rspec_xml = GeniXML::Serialize($rspec);
 

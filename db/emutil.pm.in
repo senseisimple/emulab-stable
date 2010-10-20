@@ -58,9 +58,8 @@ sub _checklossrate($)
     return 1;
 }
 
-# _Always_ make sure that this 1 is at the end of the file...
 1;
-__DATA__
+@SELFLOADER_DATA@
 
 # Constants for checkslot code.
 sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
@@ -462,4 +461,5 @@ sub ParRun($$$@)
     return 0;
 }
 
+# _Always_ make sure that this 1 is at the end of the file...
 1;

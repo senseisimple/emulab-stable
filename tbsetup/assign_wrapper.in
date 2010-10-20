@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -1713,7 +1713,7 @@ foreach my $pnode (sort(keys(%virtnodes))) {
 	    #
 	    # Call into library. Be sure to pass impotent mode along.
 	    #
-	    if (Node::CreateVnodes(\@plist,
+	    if (Node->CreateVnodes(\@plist,
 				   {"pid" => "$pid", "eid" => "$eid",
 				    "count" => $numvs,
 				    "vtype" => $vtype,
