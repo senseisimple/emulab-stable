@@ -65,7 +65,7 @@ my $power	= "$TB/bin/power";
 my $ipod	= "$TB/sbin/apod";
 my $vnodesetup	= "$TB/sbin/vnode_setup";
 my $bisend      = "$TB/sbin/bootinfosend";
-my $logfile	= "$TB/log/power.log";
+my $logfile	= "$TB/log/reboot.log";
 my $ping	= "/sbin/ping";
 my $reboot      = "$TB/bin/node_reboot";
 
