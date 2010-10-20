@@ -125,7 +125,7 @@ sub vz_init {
     #
     # Turn off LVM if already using a /vz mount.
     #
-    if (-e "/vz/.nolvm") {
+    if (-e "/vz/.nolvm" || -e "/vz.save/.nolvm" || -e "/.nolvm") {
 	$DOLVM = 0;
 	mysystem("/sbin/dmsetup remove_all");
     }
