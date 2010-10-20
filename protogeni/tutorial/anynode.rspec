@@ -1,0 +1,6 @@
+<rspec xmlns="http://protogeni.net/resources/rspec/0.1">
+ <node virtual_id="mypc" 
+       virtualization_type="emulab-vnode" 
+       exclusive="1"> 
+ </node>
+</rspec>
