@@ -1207,7 +1207,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -a -d -v -u -o $tmpfile $pid $eid");
+    system("$MAPPER -a -d -v -u -z -o $tmpfile $pid $eid");
     if ($?) {
 	my $logstuff = undef;
 	
@@ -1956,7 +1956,7 @@ sub SliverWorkAux($$$$$$$)
 	goto bad;
     }
     # Add -u for update mode, but not -f (fixnode). 
-    system("$MAPPER -d -v -u $pid $eid");
+    system("$MAPPER -d -v -z -u $pid $eid");
     if ($?) {
 	my $logstuff = undef;
 	$message = "Could not map to resources";

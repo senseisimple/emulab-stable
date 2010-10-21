@@ -38,7 +38,7 @@ my $NoRecover = 0;
 
 sub usage ()
 {
-    print STDERR "Usage: $0 [-v] [-u [-f] | -n] pid eid\n";
+    print STDERR "Usage: $0 [-v] [-u [-f] | -n] [-z] pid eid\n";
     print STDERR " -v   - Enables verbose output\n";
     print STDERR " -u   - Enables update mode\n";
     print STDERR " -f   - Fix current resources during update mode\n";
@@ -49,9 +49,10 @@ sub usage ()
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
     print STDERR " -l   - Use rspec v2 instead of the text file format\n";
+    print STDERR " -z   - Randomize node order printed by ptopgen\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:alt";
+my $optlist    = "dvunfprqczxm:ko:altz";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
@@ -73,6 +74,7 @@ my $warnings   = 0;
 my $maxrun     = 3;		# Maximum number of times we run assign.
 my $gotlock    = 0;
 my $userspec   = 0;
+my $randomize  = 0;
 my $vtop;
 
 #
@@ -192,6 +194,9 @@ if (defined($options{"c"})) {
 }
 if (defined($options{"l"})) {
     $userspec = 1;
+}
+if (defined($options{"z"})) {
+    $randomize = 1;
 }
 
 my $pid = $ARGV[0];
@@ -518,6 +523,9 @@ sub RunAssign($$)
     	if (defined($experiment->delay_capacity()));
     if ($userspec == 1) {
 	$ptopargs .= "-x -g 2 ";
+    }
+    if ($randomize == 1) {
+	$ptopargs .= "-z ";
     }
     $ptopargs .= "-l $typelimitfile"
 	if (scalar(keys(%admission_control)));
