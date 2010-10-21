@@ -64,6 +64,7 @@
 			Main.protogeniHandler = new ProtogeniHandler();
 			Main.protogeniHandler.mapHandler.map = map;
 			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
 			
 	    	console = new ConsoleWindow();
 			PopUpManager.addPopUp(console, this, false);
@@ -113,6 +114,17 @@
 	      	Alert.show("Fullscreen isn't supported on the current system.  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
 	      }
 	    }
+		
+		public function userChanged(pe:ProtogeniEvent):void {
+			if(Main.protogeniHandler.CurrentUser == null
+				|| Main.protogeniHandler.CurrentUser.credential == null
+				|| Main.protogeniHandler.CurrentUser.credential.length == 0)
+			{
+				this.userButton.source = DisplayUtil.noUserIcon;
+			} else {
+				this.userButton.source = DisplayUtil.userIcon;
+			}
+		}
 	    
 	    // ComboBox
 	    public function fillCombobox(junk:* = null):void {
@@ -137,20 +149,20 @@
 		<mx:Label text="ProtoGENI" fontWeight="bold" fontSize="12"/>
 		<mx:VRule height="14"/>
 		<display:ImageButton id="refreshButton"
-			source="@Embed('../images/arrow_refresh.png')"
+			source="{DisplayUtil.refreshIcon}"
 			click="Main.protogeniHandler.ComponentManagers.clear(); Main.protogeniHandler.rpcHandler.loadComponentManagers();"
-			toolTip="Reload data" />
-		<display:ImageButton id="changeCMButton"
-			source="@Embed('../images/server_edit.png')"
+			toolTip="Reload all data" />
+		<display:ImageButton id="cmButton"
+			source="@Embed('../images/building.png')"
 			click="cms.show()"
-			toolTip="Change component manager"/>
+			toolTip="Manage component managers"/>
 		<display:ImageButton id="consoleButton"
 			source="@Embed('../images/application_xp_terminal.png')"
 			click="Main.log.open()" 
 			toolTip="View the console"/>
 		<mx:VRule height="14" includeInLayout="true" visible="true" />
 		<display:ImageButton id="sliceButton" includeInLayout="true" visible="true"
-						   source="@Embed('../images/layers.png')"
+						   source="{DisplayUtil.graphIcon}"
 						   click="slices.show()"
 						   toolTip="Work with slices"/>
 		<mx:VRule height="14"/>
@@ -163,7 +175,7 @@
 		<mx:Spacer width="100%"/>
 		<mx:Label  text="{Main.protogeniHandler.CurrentUser.uid}"/>
 		<display:ImageButton id="userButton"
-							 source="@Embed(source='../images/user.png')"
+							 source="{DisplayUtil.noUserIcon}"
 							 click="user.show()"
 							 toolTip="View user information" />
 		<display:ImageButton id="searchButton"
@@ -178,6 +190,10 @@
 			source="@Embed('../images/arrow_out.png')"
 			click="toggleFullScreen()"
 			toolTip="Toggle fullscreen" />
+		<display:ImageButton id="helpButton"
+							 source="{DisplayUtil.helpIcon}"
+							 click="Util.showManual()"
+							 toolTip="View more information" />
 		<display:ImageButton id="infoButton"
 			source="@Embed('../images/information.png')"
 			click="showAbout()"

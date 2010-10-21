@@ -58,6 +58,22 @@
 		
 		// Embedded images used around the application
 		[Bindable]
+		[Embed(source="../../../images/chart_bar.png")]
+		public static var statisticsIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/help.png")]
+		public static var helpIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/user.png")]
+		public static var userIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/user_gray.png")]
+		public static var noUserIcon:Class;
+		
+		[Bindable]
         [Embed(source="../../../images/tick.png")]
         public static var availableIcon:Class;
 
@@ -110,10 +126,6 @@
 		public static var addIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/add.png")]
-		public static var acceptIcon:Class;
-		
-		[Bindable]
 		[Embed(source="../../../images/cancel.png")]
 		public static var cancelIcon:Class;
 		
@@ -144,6 +156,30 @@
 		[Bindable]
 		[Embed(source="../../../images/map.png")]
 		public static var mapIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/graph.png")]
+		public static var graphIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/page.png")]
+		public static var pageIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/page_code.png")]
+		public static var pageCodeIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/page_white.png")]
+		public static var pageWhiteIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/page_white_code.png")]
+		public static var pageWhiteCodeIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/wand.png")]
+		public static var actionIcon:Class;
 		
 		public static function getLabel(text:String):Label
 		{

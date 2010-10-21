@@ -16,6 +16,7 @@ package protogeni.communication
 {
 	import mx.controls.Alert;
 	
+	import protogeni.Util;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
@@ -23,7 +24,12 @@ package protogeni.communication
   {
     public function RequestSliceResolve(s:Slice, willBeCreating:Boolean = false) : void
     {
-		super("SliceResolve (" + s.hrn + ")", "Resolving slice named " + s.hrn, CommunicationUtil.resolve);
+		var name:String;
+		if(s.hrn == null)
+			name = Util.shortenString(s.urn, 12);
+		else
+			name = s.hrn;
+		super("SliceResolve (" + name + ")", "Resolving slice named " + s.hrn, CommunicationUtil.resolve);
 		slice = s;
 		isCreating = willBeCreating;
 		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);

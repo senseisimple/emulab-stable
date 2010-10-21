@@ -2,7 +2,7 @@
 <display:DefaultWindow
 	xmlns:mx="http://www.adobe.com/2006/mxml"
 	xmlns:protogeniflash="protogeniflash.*" initialize="init()"
-	title="Slice" xmlns:display="protogeni.display.*" xmlns:resources="protogeni.resources.*">
+	title="Slice" xmlns:display="protogeni.display.*" xmlns:resources="protogeni.resources.*" xmlns:s="library://ns.adobe.com/flex/spark">
 	
 	<mx:Script>
 		<![CDATA[
@@ -100,9 +100,36 @@
 				nodesPredefined.addItem(shared);
 			}
 			
+			public function refreshInterface():void
+			{
+				var isCreated:Boolean;
+				
+				if(sliceCanvas.slice.slivers.length == 0)
+					isCreated = false;
+
+				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				{
+					if(s.rspec != null)
+					{
+						isCreated = true;
+						break;
+					}
+				}
+				
+				if(isCreated)
+				{
+					this.rspecButton.source = DisplayUtil.pageWhiteCodeIcon;
+					this.rspecButton.toolTip = "View RSPEC(s) from the created sliver(s)";
+				} else {
+					this.rspecButton.source = DisplayUtil.pageWhiteIcon;
+					this.rspecButton.toolTip = "Sliver(s) not created yet";
+				}
+			}
+			
 			public function refreshSlice():void
 			{
 				sliceCanvas.refreshSlice();
+				refreshInterface();
 			}
 			
 			public function loadSlice(s:Slice):void
@@ -122,6 +149,8 @@
 					
 				selectCm.selectedIndex = 0;
 				loadNodes();
+				
+				refreshInterface();
 			}
 			
 			private function assignAvailableIconPhysical(item:Object):Class {
@@ -168,11 +197,14 @@
 					tab.percentHeight = 100;
 					tab.percentWidth = 100;
 					tab.label = s.componentManager.Hrn;
-					var previewRspecText:TextArea = new TextArea();
-					previewRspecText.percentHeight = 100;
-					previewRspecText.percentWidth = 100;
-					previewRspecText.text = s.rspec.toString();
-					tab.addChild(previewRspecText);
+					var reviewRspecText:TextArea = new TextArea();
+					reviewRspecText.percentHeight = 100;
+					reviewRspecText.percentWidth = 100;
+					if(s.rspec != null)
+						reviewRspecText.text = s.rspec.toString();
+					else
+						reviewRspecText.text = "No valid RSPEC yet";
+					tab.addChild(reviewRspecText);
 					tabs.addChild(tab);
 				}
 				viewRspec.show();
@@ -209,11 +241,11 @@
 		<mx:Spacer width="100%"/>
 		<mx:Label text="{sliceCanvas.slice.urn}" selectable="true"/>
 		<display:ImageButton id="rspecButton"
-							 source="@Embed('../images/page_white_code.png')"
+							 source="{DisplayUtil.pageWhiteIcon}"
 							 click="viewRspecs()"
 							 toolTip="View the most recent valid RSPEC" />
 		<display:ImageButton id="previewRspecButton"
-							 source="@Embed('../images/page_code.png')"
+							 source="{DisplayUtil.pageCodeIcon}"
 							 click="previewRspecs()"
 							 toolTip="Preview the Request RSPEC" />
 	</mx:HBox>
@@ -236,14 +268,13 @@
 			</display:SliceCanvas>
 	</mx:HDividedBox>
 	<mx:ControlBar>
-		<mx:Button id="createButton" toolTip="Create slivers" label="Create" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
+		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
 		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
 		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
 		<mx:VRule height="16"/>
 		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
 		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
 		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
-		<mx:Button label="Embed"/>
 	</mx:ControlBar>
 	
 </display:DefaultWindow>

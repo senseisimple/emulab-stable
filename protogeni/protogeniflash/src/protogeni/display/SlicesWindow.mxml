@@ -2,17 +2,18 @@
 <display:DefaultWindow
 	xmlns:mx="http://www.adobe.com/2006/mxml"
 	title="Slices" show="refreshView()"
-	width="272" height="226"
+	width="300" height="220"
 	xmlns:display="protogeni.display.*">
 	
 	<mx:Script>
 		<![CDATA[
 			import mx.controls.Alert;
+			import mx.controls.Button;
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.ProtogeniHandler;
 			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
 			import protogeni.resources.Slice; 
 			
 			public function openFirst():void {
@@ -63,7 +64,7 @@
 	
 	<mx:ControlBar>
 		<mx:TextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-"/>
-		<mx:Button id="createButton" label="Create" click="createSlice();"/>
+		<display:ImageButton id="createButton" source="{DisplayUtil.actionIcon}" click="createSlice();" />
 	</mx:ControlBar>
 	
 </display:DefaultWindow>
