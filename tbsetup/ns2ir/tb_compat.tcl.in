@@ -2045,7 +2045,7 @@ proc oml_write_init {h_fd s_fd} {
     puts $h_fd $init_dec
 
     append init_def " {\n\tint argc = 7;\n"
-    append init_def "\tchar *argv\[\] = \{\"emulab_oml\", \"--oml-id\", \"emulab_oml\","
+    append init_def "\tconst char *argv\[\] = \{\"emulab_oml\", \"--oml-id\", \"emulab_oml\","
 
     set oml_server "${omlserver}"
     if {$oml_use_control == 1} {
@@ -2102,6 +2102,9 @@ proc begin_oml_code_generator {} {
         return
     }
 
+    # Make header C++ compatible
+    puts $h_fd "#ifdef __cplusplus\nextern \"C\" {\n#endif\n\n"
+
     # write "#includes" into MP.c and MP.h
     oml_write_include $h_fd $s_fd
 
@@ -2116,6 +2119,8 @@ proc begin_oml_code_generator {} {
 
     # write initialization
     oml_write_init $h_fd $s_fd
+
+    puts $h_fd "\n#ifdef __cplusplus\n}\n#endif\n"
 
     close $h_fd
     close $s_fd
