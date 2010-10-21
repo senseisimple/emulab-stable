@@ -25,6 +25,15 @@ package protogeni
 	  {
 		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlashClientSetup"), "_blank");
 	  }
+	  public static function showManual():void
+	  {
+		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/MapClientManual"), "_blank");
+	  }
+	  
+	  public static function openWebsite(url:String):void
+	  {
+		  navigateToURL(new URLRequest(url), "_blank");
+	  }
 	  
     public static function makeUrn(authority : String,
                                    type : String,

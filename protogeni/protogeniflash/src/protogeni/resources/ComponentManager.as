@@ -56,6 +56,10 @@
 		public var Status : int = UNKOWN;
 		
 		public var main : protogeniflash;
+		
+		public var totalNodes:int = 0;
+		public var availableNodes:int = 0;
+		public var unavailableNodes:int = 0;
 	    
 		public function ComponentManager()
 		{
@@ -152,6 +156,9 @@
 	    		interfaceDictionary = null;
 	    		nodeNameDictionary = null;
 	    		subnodeList = null;
+				this.totalNodes = this.AllNodes.length;
+				this.availableNodes = this.getAvailableNodes().length;
+				this.unavailableNodes = this.AllNodes.length - availableNodes;
 	      		Status = ComponentManager.VALID;
 				Main.protogeniHandler.dispatchComponentManagerChanged(this);
 				main.stage.removeEventListener(Event.ENTER_FRAME, parseNext);
