@@ -1886,8 +1886,8 @@ proc tb-set-use-oml {args} {
 
     uplevel #0 {set omlserver [$ns node]}
     uplevel #0 {set oml_server_port ${::TBCOMPAT::oml_server_port} }
-    uplevel #0 {tb-set-node-os $omlserver Ubuntu9_General}
-    uplevel #0 {set omlserverstartcmd "/usr/bin/oml2-server -l $oml_server_port --logfile=/var/log/oml-server.log --data-dir=/tmp/"}
+    uplevel #0 {tb-set-node-os $omlserver UBUNTU10-OML}
+    uplevel #0 {set omlserverstartcmd "/usr/bin/oml2-server -l $oml_server_port --logfile=/local/logs/oml-server.log --data-dir=/local/logs"}
     uplevel #0 {tb-set-node-startcmd $omlserver $omlserverstartcmd}
 }
 
@@ -1910,9 +1910,9 @@ proc tb-set-oml-server {node} {
     }
 
     #puts "oml server name: $node\n"
-    $node set osid Ubuntu9_General
+    $node set osid UBUNTU10-OML
 
-    set command "/usr/bin/oml2-server -l $oml_server_port --logfile=/var/log/oml-server.log --data-dir=/tmp/"
+    set command "/usr/bin/oml2-server -l $oml_server_port --logfile=/local/logs/oml-server.log --data-dir=/local/logs"
     set omlcommand "($command ; /usr/local/etc/emulab/startcmddone \$?)"
     $node start-command $omlcommand
 
