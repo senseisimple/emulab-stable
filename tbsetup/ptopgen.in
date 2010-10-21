@@ -778,6 +778,15 @@ foreach $node (@nodenames) {
 	push(@features, "FBSD-NSE:0.0");
     }
 
+    #
+    # XXX: Temporary hack - don't march switches that are testnodes
+    # as having class 'switch' - assign treats those specially. We
+    # use the knowledge that 'real' switches don't hit this point!
+    #
+    if ($class eq "switch") {
+	$class = $type;
+    }
+        
     # Might be equal, which assign would sum as two, not one!
     if ($type ne $class) {
 	push(@types, "$class:1");
