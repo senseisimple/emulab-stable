@@ -6170,7 +6170,8 @@ sub InitializePhysNode($$$)
     #
     # Now call os_select.
     #
-    if (defined($osid) && !$pnode->isremotenode()) {
+    if (defined($osid) && (!$pnode->isremotenode()
+			   || $pnode->isdedicatedremote()) {
 	if ($self->impotent() || $self->alloconly()) {
 	    $self->printdb("  pretending to os_select $osid\n");
 	}
