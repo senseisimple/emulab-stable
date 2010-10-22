@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -61,10 +61,6 @@ int	filemode  = 0;
 off_t	datawritten;
 partmap_t ignore, forceraw;
 
-#ifdef WITH_SHD
-char	*chkpointdev;
-#endif
-
 #ifdef WITH_HASH
 char	*hashfile;
 #endif
@@ -118,11 +114,6 @@ int	read_image(u_int32_t start, int pstart, u_int32_t extstart);
 int	read_raw(void);
 int	compress_image(void);
 void	usage(void);
-
-#ifdef WITH_SHD
-int	read_shd(char *shddev, char *infile, int infd, u_int32_t ssect,
-		 void (*add)(uint32_t, uint32_t));
-#endif
 
 #ifdef WITH_HASH
 struct range *hashmap_compute_delta(struct range *, char *, int, u_int32_t);
@@ -379,7 +370,7 @@ main(int argc, char *argv[])
 	extern char build_info[];
 
 	gettimeofday(&sstamp, 0);
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:ofI:1F:DR:S:XC:H:M")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:ofI:1F:DR:S:XH:M")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -447,14 +438,6 @@ main(int argc, char *argv[])
 		case 'X':
 			forcereads++;
 			break;
-		case 'C':
-#ifdef WITH_SHD
-			chkpointdev = optarg;
-#else
-			fprintf(stderr, "'C' option not supported\n");
-			usage();
-#endif
-			break;
 		case 'H':
 #ifdef WITH_HASH
 			hashfile = optarg;
@@ -487,9 +470,6 @@ main(int argc, char *argv[])
 					fprintf(stderr, "%c %s",
 						ch > 1 ? ',' : ':',
 						fsmap[ch].desc);
-#ifdef WITH_SHD
-			fprintf(stderr, ", SHD device");
-#endif
 #ifdef WITH_HASH
 			fprintf(stderr, ", hash-signature comparison");
 #endif
@@ -538,73 +518,33 @@ main(int argc, char *argv[])
 		inputmaxsec = getdisksize(infd);
 #endif
 
-#ifdef WITH_SHD
-	if (chkpointdev) {
-		rval = 0;
-		if (dorelocs) {
-			fprintf(stderr, "WARNING: no relocation info "
-				"generated for checkpoint images\n");
-			dorelocs = 0;
-		}
-
-		/*
-		 * Slice indicates the slice shadowed for checkpointing.
-		 * XXX we need this right now to determine the offset of
-		 * the block numbers returned by the shd device.
-		 */
-		if (slicemode) {
-			struct doslabel doslabel;
-
-			rval = read_doslabel(infd, DOSBBSECTOR, 0, &doslabel);
-			if (rval == 0) {
-				inputminsec = doslabel.parts[slice-1].dp_start;
-				inputmaxsec = inputminsec + 
-					doslabel.parts[slice-1].dp_size;
-			}
-		}
-
-		if (rval == 0) {
-			rval = read_shd(chkpointdev, infilename, infd,
-					inputminsec, addvalid);
-			if (rval == 0)
-				sortrange(&ranges, 1, 0);
-		}
-		if (rval) {
-			fprintf(stderr, "* * * Aborting * * *\n");
-			exit(1);
-		}
-	} else
-#endif
-	{
-		/*
-		 * Create the skip list by scanning the filesystems on
-		 * the disk or indicated partition.
-		 */
-		if (slicetype != 0) {
-			rval = read_slice(-1, slicetype, 0, 0,
-					  infilename, infd);
-			if (rval == -1)
-				fprintf(stderr, ", cannot process\n");
-		} else if (rawmode)
-			rval = read_raw();
-		else
-			rval = read_image(DOSBBSECTOR, 0, 0);
-		if (rval) {
-			fprintf(stderr, "* * * Aborting * * *\n");
-			exit(1);
-		}
-
-		/*
-		 * Create a valid range list from the skip list
-		 */
-		(void) mergeskips(debug > 1);
-		if (debug)
-			dumpskips(debug > 1);
-		makeranges();
+	/*
+	 * Create the skip list by scanning the filesystems on
+	 * the disk or indicated partition.
+	 */
+	if (slicetype != 0) {
+		rval = read_slice(-1, slicetype, 0, 0,
+				  infilename, infd);
+		if (rval == -1)
+			fprintf(stderr, ", cannot process\n");
+	} else if (rawmode)
+		rval = read_raw();
+	else
+		rval = read_image(DOSBBSECTOR, 0, 0);
+	if (rval) {
+		fprintf(stderr, "* * * Aborting * * *\n");
+		exit(1);
 	}
+
+	/*
+	 * Create a valid range list from the skip list
+	 */
+	(void) mergeskips(debug > 1);
+	if (debug)
+		dumpskips(debug > 1);
+	makeranges();
 	if (debug)
 		dumpranges(debug > 1);
-
 	sortrange(&fixups, 0, cmpfixups);
 	if (debug > 1)
 		dumpfixups(debug > 2);
