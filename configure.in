@@ -1012,6 +1012,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	apache/GNUmakefile apache/httpd.conf \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
+	xmlrpc/sslxmlrpc_client.py xmlrpc/sslxmlrpc_server.py \
 	xmlrpc/webxmlrpc xmlrpc/script_wrapper.py xmlrpc/libxmlrpc.pm \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,10 +41,6 @@ WITH_LTHREADS	= 1
 endif
 endif
 endif
-
-# XXX special checkpoint/shadow device support
-WITH_SHD	= 0
-
 endif
 
 # Linux specific goop
@@ -145,14 +141,6 @@ SUBDIRS		+= fat
 ZIPLIBS		+= fat/libfat.a
 endif
 
-# with SHD
-ifeq ($(WITH_SHD),1)
-CFLAGS		+= -DWITH_SHD
-SUBDIRS		+= shd
-ZIPLIBS		+= shd/libshd.a
-SHDLIBS		+= shd/libshd.a
-endif
-
 # with HASH
 ifeq ($(WITH_HASH),1)
 CFLAGS		+= -DWITH_HASH -DHASHSTATS
@@ -185,8 +173,8 @@ imageunzip: imageunzip.o disksize.o crc.o version.o
 imageunzip.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
 
-imagedump: imagedump.o version.o $(SHDLIBS)
-	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) $(SHDLIBS) -o imagedump
+imagedump: imagedump.o version.o
+	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
 
 imagehash: imagehash.o version.o
 	$(CC) $(CFLAGS) imagehash.o version.o $(HASHLIBS) -o imagehash
