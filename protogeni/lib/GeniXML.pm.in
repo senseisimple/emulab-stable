@@ -319,11 +319,6 @@ sub GetSubnodeOf($)
 	    }
 	}
     }
-    if (defined($result)) {
-	carp("--subnode = ".$result);
-    } else {
-	carp("--subnode undefined");
-    }
     return $result;
 }
 
