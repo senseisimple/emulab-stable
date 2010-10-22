@@ -19,6 +19,19 @@ RESOLV_CONF="/etc/resolv.conf"
 [ -n "$subnet" ] && NETMASK="netmask $subnet"
 
 case "$1" in
+	selecting)
+		# XXX hack to check for inner boss vs. outer boss
+		# if the nameserver is 1.1.1.1, it's outer boss,
+		# and we should try again for a lease from the
+		# inner boss
+		if [ -n "$dns" ]; then
+			for i in $dns; do
+				if [ $i = 1.1.1.1 ]; then
+					exit 1
+				fi
+			done
+		fi
+		;;
 	deconfig)
 		/sbin/ifconfig $interface 0.0.0.0
 		;;
@@ -57,10 +70,12 @@ case "$1" in
 
 		echo -n > $RESOLV_CONF
 		[ -n "$domain" ] && echo search $domain >> $RESOLV_CONF
-		for i in $dns ; do
-			echo adding dns $i
-			echo nameserver $i >> $RESOLV_CONF
-		done
+		if [ -n "$dns" ]; then
+			for i in $dns ; do
+				echo adding dns $i
+				echo nameserver $i >> $RESOLV_CONF
+			done
+		fi
 
 		if [ -n "$hostname" ]; then
 			hostname $hostname
