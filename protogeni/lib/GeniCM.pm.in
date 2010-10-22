@@ -1349,16 +1349,29 @@ sub GetTicketAuxAux($$$$$$$$$)
 	foreach my $iface_ref (@interfaces) {
 	    my $virtual_port_id   =
 		GeniXML::GetText("virtual_interface_id", $iface_ref)
-		|| GeniXML::GetText("virtual_port_id", $iface_ref)
-		|| GeniXML::GetText("client_id", $iface_ref);
+		|| GeniXML::GetText("virtual_port_id", $iface_ref);
+# TODO: Fix all foo || bar declarations. They do not work correctly in
+# the presence of an attribute which is '0'.
+#		|| GeniXML::GetText("client_id", $iface_ref);
 	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
 						     $iface_ref);
-	    if (! GeniXML::IsVersion0($iface_ref)
-		&& defined($virtual_port_id)) {
-		$virtual_node_id = $iface2node{$virtual_port_id};
-	    }
+# TODO: Fix this for RSpec V2.
+#	    if (! GeniXML::IsVersion0($iface_ref)
+#		&& defined($virtual_port_id)) {
+#		$virtual_node_id = $iface2node{$virtual_port_id};
+#	    }
 	    my $component_id      = GeniXML::GetText("component_id",
 						     $iface_ref);
+	    if (defined($virtual_node_id)) {
+		warn("Virtual node id: " . $virtual_node_id);
+	    } else {
+		warn("Virtual node id undefined");
+	    }
+	    if (defined($virtual_port_id)) {
+		warn("Virtual port id: " . $virtual_port_id);
+	    } else {
+		warn("Virtual port id undefined");
+	    }
 	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 						 "Virtual node ID or virtual interface ID missing on interface");
