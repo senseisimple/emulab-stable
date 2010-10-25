@@ -245,8 +245,7 @@ sub Disable($$)
 #
 sub DeleteAll($$)
 {
-    my ($self, $target) = @_;
-    my $featurename = $self->feature();
+    my ($class, $target) = @_;
 
     if (ref($target) eq "User") {
 	my $uid_idx = $target->uid_idx();
