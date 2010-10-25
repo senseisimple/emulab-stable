@@ -1,0 +1,122 @@
+#
+# Add Emulab Features.
+#
+use strict;
+use libdb;
+use EmulabFeatures;
+use EmulabConstants;
+use Project;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("CREATE TABLE `emulab_features` ( ".
+		 " `feature` varchar(64) NOT NULL default '', ".
+		 " `description` mediumtext, ".
+		 " `added` datetime NOT NULL, ".
+		 " `enabled` tinyint(1) NOT NULL default '0', ".
+		 " `disabled` tinyint(1) NOT NULL default '0', ".
+		 " PRIMARY KEY (`feature`) ".
+		 ") ENGINE=MyISAM DEFAULT CHARSET=latin1")
+	if (! DBTableExists("emulab_features"));
+
+    DBQueryFatal("CREATE TABLE `group_features` ( ".
+		 " `feature` varchar(64) NOT NULL default '', ".
+		 " `added` datetime NOT NULL, ".
+		 " `pid_idx` mediumint(8) unsigned NOT NULL default '0', ".
+		 " `gid_idx` mediumint(8) unsigned NOT NULL default '0', ".
+		 " `pid` varchar(12) NOT NULL default '', ".
+		 " `gid` varchar(12) NOT NULL default '', ".
+		 " PRIMARY KEY (`feature`,`gid_idx`) ".
+		 ") ENGINE=MyISAM DEFAULT CHARSET=latin1")
+	if (! DBTableExists("group_features"));
+
+    DBQueryFatal("CREATE TABLE `user_features` ( ".
+		 " `feature` varchar(64) NOT NULL default '', ".
+		 " `added` datetime NOT NULL, ".
+		 " `uid_idx` mediumint(8) unsigned NOT NULL default '0', ".
+		 " `uid` varchar(8) NOT NULL default '', ".
+		 "PRIMARY KEY (`feature`,`uid_idx`) ".
+		 ") ENGINE=MyISAM DEFAULT CHARSET=latin1")
+	if (! DBTableExists("user_features"));
+
+    DBQueryFatal("CREATE TABLE `experiment_features` ( ".
+		 " `feature` varchar(64) NOT NULL default '', ".
+		 " `added` datetime NOT NULL, ".
+		 " `exptidx` int(11) NOT NULL default '0', ".
+		 " `pid` varchar(12) NOT NULL default '', ".
+		 " `eid` varchar(32) NOT NULL default '', ".
+		 "PRIMARY KEY (`feature`,`exptidx`) ".
+		 ") ENGINE=MyISAM DEFAULT CHARSET=latin1")
+	if (! DBTableExists("experiment_features"));
+
+    my $emulabops = Project->Lookup("emulab-ops");
+    my $testbed   = Project->Lookup("testbed");
+
+    #
+    # These are the features in production code at this time.
+    #
+    my $feature = EmulabFeatures->Lookup("SyncVlans");
+    if (!defined($feature)) {
+	$feature = EmulabFeatures->Create("SyncVlans",
+			"Use SyncVlansFromTables() instead of ".
+			"DoVlansFromTables() in snmpit, which reduces ".
+			"churning on the switches.");
+    }
+    return -1
+	if (!defined($feature));
+    $feature->Enable($emulabops) == 0
+	or return -1 if (defined($emulabops));
+    
+    $feature = EmulabFeatures->Lookup("NewMapper");
+    if (!defined($feature)) {
+	$feature = EmulabFeatures->Create("NewMapper",
+			"Use mapper instead of assign_wrapper. ".
+			"The mapper replaces assign_wrapper.");
+    }
+    return -1
+	if (!defined($feature));
+    $feature->Enable($emulabops) == 0
+	or return -1 if (defined($emulabops));
+    $feature->Enable($testbed) == 0
+	or return -1 if (defined($testbed));
+    
+    $feature = EmulabFeatures->Lookup("NewOsSetup");
+    if (!defined($feature)) {
+	$feature = EmulabFeatures->Create("NewOsSetup",
+			  "Use os_setup_new instead of os_setup. ".
+			  "os_setup_new will eventually replace os_setup.");
+    }
+    return -1
+	if (!defined($feature));
+    $feature->Enable($emulabops) == 0
+	or return -1 if (defined($emulabops));
+    $feature->Enable($testbed) == 0
+	or return -1 if (defined($testbed));
+
+    #
+    # Utah only ...
+    #
+    if ($EmulabConstants::MAINSITE) {
+	foreach my $projname ("tbres", "geni", "utahstud", "ClemsonGENI",
+			      "ResiliNets", "gec8tutorial") {
+
+	    my $project = Project->Lookup($projname);
+	    next
+		if (!defined($project));
+
+	    foreach my $fname ("NewMapper", "NewOsSetup", "SyncVlans") {
+		$feature = EmulabFeatures->Lookup($fname);
+		return -1
+		    if (!defined($feature));
+
+		$feature->Enable($project) == 0
+		    or return -1;
+	    }
+	}
+    }
+    return 0;
+}
+1;
+
