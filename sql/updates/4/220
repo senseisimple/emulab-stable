@@ -100,7 +100,8 @@ sub DoUpdate($$$)
     #
     if ($EmulabConstants::MAINSITE) {
 	foreach my $projname ("tbres", "geni", "utahstud", "ClemsonGENI",
-			      "ResiliNets", "gec8tutorial") {
+			      "ResiliNets", "gec8tutorial",
+			      "gec9tutorial", "GPO-GENI") {
 
 	    my $project = Project->Lookup($projname);
 	    next
