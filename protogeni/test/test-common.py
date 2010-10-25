@@ -18,6 +18,7 @@ import xmlrpclib
 import M2Crypto
 from M2Crypto import X509
 import socket
+import time;
 
 # Debugging output.
 debug           = 0
@@ -246,23 +247,31 @@ def do_method(module, method, params, URI=None, quiet=False, version=None,
     #
     # Make the call. 
     #
-    try:
-        response = apply(meth, meth_args)
+    while True:
+        try:
+            response = apply(meth, meth_args)
+            break
+        except xmlrpclib.Fault, e:
+            if not quiet: print >> sys.stderr, e.faultString
+            if e.faultCode == 511:
+                print >> sys.stderr, "Will try again in a moment. Be patient!"
+                time.sleep(5.0)
+                continue
+                pass
+            return (-1, None)
+        except xmlrpclib.ProtocolError, e:
+            if not quiet: print >> sys.stderr, e.errmsg
+            return (-1, None)
+        except M2Crypto.SSL.Checker.WrongHost, e:
+            if not quiet:
+                print >> sys.stderr, "Warning: certificate host name mismatch."
+                print >> sys.stderr, "Please consult:"
+                print >> sys.stderr, "    http://www.protogeni.net/trac/protogeni/wiki/HostNameMismatch"            
+                print >> sys.stderr, "for recommended solutions."
+                print >> sys.stderr, e
+                pass
+            return (-1, None)
         pass
-    except xmlrpclib.Fault, e:
-        if not quiet: print >> sys.stderr, e.faultString
-        return (-1, None)
-    except xmlrpclib.ProtocolError, e:
-        if not quiet: print >> sys.stderr, e.errmsg
-        return (-1, None)
-    except M2Crypto.SSL.Checker.WrongHost, e:
-        if not quiet:
-            print >> sys.stderr, "Warning: certificate host name mismatch."
-            print >> sys.stderr, "Please consult:"
-            print >> sys.stderr, "    http://www.protogeni.net/trac/protogeni/wiki/HostNameMismatch"            
-            print >> sys.stderr, "for recommended solutions."
-            print >> sys.stderr, e
-        return (-1, None)
 
     #
     # Parse the Response, which is a Dictionary. See EmulabResponse in the
