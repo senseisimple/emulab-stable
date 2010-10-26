@@ -102,6 +102,12 @@ proc tb-fix-interface {vnode lanlink iface} {}
 proc tb-set-node-usesharednode {node weight} {}
 proc tb-set-node-sharingmode {node sharemode} {}
 
+#add for OML
+proc tb-set-use-oml {args} {}
+proc tb-set-oml-server {node} {}
+proc tb-set-oml-mp {args} {}
+proc tb-set-oml-use-control {args} {}
+
 proc tb-set-security-level {level} {
 
     switch -- $level {
