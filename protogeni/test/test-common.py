@@ -316,12 +316,28 @@ def resolve_slice( name, selfcredential ):
         params["urn"]       = name
     else:
         params["hrn"]       = name
-    rval,response = do_method("sa", "Resolve", params)
-    if rval:
-        Fatal("Slice does not exist");
         pass
-    else:
-        return response["value"]
+    
+    count = 2
+    while True:
+        rval,response = do_method("sa", "Resolve", params)
+        if rval:
+            if rval == 14:
+                if count:
+                    print " Will try again in a few seconds"
+                    count = count - 1;
+                    time.sleep(5.0)
+                else:
+                    Fatal("Giving up, busy for too long");
+                    pass
+            else:
+                Fatal("Slice does not exist");
+                pass
+            pass
+        else:
+            break
+        pass
+    return response["value"]
 
 def get_slice_credential( slice, selfcredential ):
     if slicecredentialfile:
@@ -337,8 +353,25 @@ def get_slice_credential( slice, selfcredential ):
         params["urn"]       = slice["urn"]
     else:
         params["uuid"]      = slice["uuid"]
-    rval,response = do_method("sa", "GetCredential", params)
-    if rval:
-        Fatal("Could not get Slice credential")
+        pass
+
+    count = 2
+    while True:
+        rval,response = do_method("sa", "GetCredential", params)
+        if rval:
+            if rval == 14:
+                if count:
+                    print " Will try again in a few seconds"
+                    count = count - 1;
+                    time.sleep(5.0)
+                else:
+                    Fatal("Giving up, busy for too long");
+                    pass
+            else:
+                Fatal("Could not get Slice credential")
+                pass
+            pass
+        else:
+            break
         pass
     return response["value"]
