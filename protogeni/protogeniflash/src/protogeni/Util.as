@@ -23,7 +23,7 @@ package protogeni
   {
 	  public static function showSetup():void
 	  {
-		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlashClientSetup"), "_blank");
+		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup"), "_blank");
 	  }
 	  public static function showManual():void
 	  {

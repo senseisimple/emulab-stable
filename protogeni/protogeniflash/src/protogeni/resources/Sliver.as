@@ -162,6 +162,8 @@
 							var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
 							virtualInterface.id = ix.@virtual_id;
 							virtualNode.interfaces.Add(virtualInterface);
+						} else if(ix.localName() == "disk_image") {
+							virtualNode.diskImage = ix.@name;
 						}
 					}
 					

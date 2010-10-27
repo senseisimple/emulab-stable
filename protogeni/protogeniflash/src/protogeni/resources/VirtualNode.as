@@ -59,6 +59,7 @@
 		public var superNode:VirtualNode;
 		public var subNodes:Array = new Array();
 		
+		[Bindable]
 		public var diskImage:String = "";
 		public var tarfiles:String = "";
 		public var startupCommand:String = "";
@@ -107,6 +108,32 @@
 			isVirtual = true;
 			isShared = newIsShared;
 			// deal with rest
+		}
+		
+		public function getDiskImageShort():String
+		{
+			if(diskImage.indexOf("urn:publicid:IDN+emulab.net+image+emulab-ops//") > -1)
+				return diskImage.replace("urn:publicid:IDN+emulab.net+image+emulab-ops//", "");
+			else
+				return diskImage;
+		}
+		
+		public function setDiskImageFromOSID(osid:String):void
+		{
+			this.diskImage = "urn:publicid:IDN+emulab.net+image+emulab-ops//" + osid;
+		}
+		
+		public function setDiskImage(img:String):void
+		{
+			if(img != null && img.length > 0)
+			{
+				if(img.length > 3 && img.substr(0, 3) == "urn")
+					this.diskImage = img;
+				else
+					this.setDiskImageFromOSID(img);
+			} else
+				this.diskImage = "";
+			
 		}
 		
 		public function allocateInterface():VirtualInterface
@@ -191,7 +218,7 @@
 		public function GetLinks(n:VirtualNode):ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 
-			for each(var i:VirtualInterface in interfaces) {
+			for each(var i:VirtualInterface in interfaces.collection) {
 				for each(var l:VirtualLink in i.virtualLinks) {
 					for each(var nl:VirtualInterface in l.interfaces) {
 						if(nl != i && nl.virtualNode == n && !ac.contains(l)) {

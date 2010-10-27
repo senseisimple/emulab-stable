@@ -59,6 +59,7 @@ package protogeni.communication
 					newSliver.componentManager = Main.protogeniHandler.ComponentManagers.getByUrn(sliverCm);
 					slice.slivers.addItem(newSliver);
 				}
+				
 				Main.protogeniHandler.dispatchSliceChanged(slice);
 				newRequest = new RequestSliceCredential(slice);
 			}

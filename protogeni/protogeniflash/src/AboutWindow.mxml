@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical" title="About ProtoGENI Tools" showCloseButton="true" horizontalAlign="center"
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
+	title="About" showCloseButton="true" horizontalAlign="center"
 	borderAlpha=".9" borderColor="#D2E1F0"
 	close="PopUpManager.removePopUp(this)" xmlns:display="protogeni.display.*">
 	
@@ -12,9 +13,6 @@
 	</mx:Script>
 	<display:ImageButton source="@Embed('../images/protogeni.png')" click="Util.openWebsite('http://www.protogeni.net')" />
 	<mx:Label text="Displays resources from the ProtoGENI federation." fontSize="12"/>
-	<mx:LinkButton label="Click here for instructions on setting up this client">
-		<mx:click>Util.showSetup();</mx:click>
-	</mx:LinkButton>
 	<mx:HRule/>
 	<mx:Label text="Special thanks to" fontWeight="bold" fontStyle="italic"/>
 	<mx:LinkButton label="Fatcow (CCA3 Icons)">

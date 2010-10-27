@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow
 	xmlns:mx="http://www.adobe.com/2006/mxml"
-	xmlns:protogeniflash="protogeniflash.*" initialize="init()"
+	xmlns:protogeniflash="protogeniflash.*" initialize="init()" close="sliceStatusRefresher.stop()"
 	title="Slice" xmlns:display="protogeni.display.*" xmlns:resources="protogeni.resources.*" xmlns:s="library://ns.adobe.com/flex/spark">
 	
 	<mx:Script>
@@ -15,6 +15,7 @@
 			import mx.controls.scrollClasses.ScrollThumb;
 			import mx.core.DragSource;
 			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
 			
 			import protogeni.ProtogeniEvent;
@@ -37,6 +38,8 @@
 			
 			private var cm:ComponentManager;
 			
+			public var sliceStatusRefresher:Timer = new Timer(10000);
+			
 			public function init():void
 			{
 				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, cmChanged);
@@ -46,7 +49,9 @@
 			public function sliceChanged(e:ProtogeniEvent):void
 			{
 				if(e.changedObject == sliceCanvas.slice)
+				{
 					refreshSlice();
+				}
 			}
 			
 			public function cmChanged(e:ProtogeniEvent):void
@@ -151,6 +156,18 @@
 				loadNodes();
 				
 				refreshInterface();
+				
+				sliceStatusRefresher.addEventListener(TimerEvent.TIMER, autorefresh);
+				sliceStatusRefresher.start();
+			}
+			
+			private function autorefresh(e:TimerEvent):void
+			{
+				if(this.autoRefreshCheckbox.selected
+					&& this.sliceCanvas.slice != null
+					&& this.sliceCanvas.slice.hasAllAllocatedResources()
+					&& Main.protogeniHandler.rpcHandler.queue.isEmpty())
+					Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);
 			}
 			
 			private function assignAvailableIconPhysical(item:Object):Class {
@@ -233,7 +250,6 @@
 				}
 				previewRspec.show();
 			}
-
 		]]>
 	</mx:Script>
 	<mx:HBox width="100%">
@@ -269,8 +285,9 @@
 	</mx:HDividedBox>
 	<mx:ControlBar>
 		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
-		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
 		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
+		<mx:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
+		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
 		<mx:VRule height="16"/>
 		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
 		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
