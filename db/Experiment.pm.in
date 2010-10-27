@@ -3101,6 +3101,7 @@ sub ClearBackupState($)
 sub RemovePhysicalState($)
 {
     my ($self) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
@@ -3172,6 +3173,7 @@ sub RemovePhysicalState($)
 sub BackupPhysicalState($;$$)
 {
     my ($self, $directory, $regression) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
@@ -3277,6 +3279,7 @@ sub BackupPhysicalState($;$$)
 sub RestorePhysicalState($)
 {
     my ($self) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
