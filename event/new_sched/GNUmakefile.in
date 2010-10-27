@@ -1,0 +1,105 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= event/sched
+
+include $(OBJDIR)/Makeconf
+
+all: event-sched_rrpc
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS   += -g -pthread -DBINDIR='"$(INSTALL_BINDIR)"'
+CFLAGS   += -DSBINDIR='"$(INSTALL_SBINDIR)"'
+#CFLAGS  += -DDEBUG
+CFLAGS	 += -O -Wall
+CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
+CFLAGS   += -I/usr/local/include
+
+LDFLAGS  += -pthread
+LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
+LDFLAGS  += $(LDSTATIC)
+DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
+LIBS     += -levent_r -ltb -lz
+
+ULXRINC   = -I/usr/local/include -I/usr/local/include/ulxmlrpcpp
+CXXFLAGS += -pthread -O $(ULXRINC) -I$(OBJDIR) -I$(TESTBED_SRCDIR)/lib/libtb
+CXXFLAGS += -I$(SRCDIR)/../lib
+ULXRLIBS  = -L/usr/local/lib  -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
+
+#
+# XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
+#     build on freebsd. I made a vain attempt to filter it out, but
+#     gave up quickly. Deal with it later. 
+#
+#LIBS     += `elvin-config --libs vin4mt`
+LIBS	 += -L/usr/local/lib -lpubsub_r -lssl -lcrypto -lm
+
+OBJS	  = event-sched.o 
+
+version.c: event-sched.c
+	echo >$@ "char build_info[] = \"Built on `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
+
+OBJS = \
+	console-agent.o \
+	error-record.o \
+	event-sched_rpc.o \
+	group-agent.o \
+	listNode.o \
+	local-agent.o \
+	node-agent.o \
+	queue.o \
+	rrpc.o \
+	simulator-agent.o \
+	timeline-agent.o \
+	version.o
+
+event-sched_rrpc: $(OBJS) event-sched.h ../lib/libevent.a
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
+
+DEPS = \
+	console-agent.h error-record.h event-sched.h group-agent.h listNode.h \
+	local-agent.h node-agent.h rpc.h simulator-agent.h timeline-agent.h \
+	../lib/event.h
+
+queue.o:		queue.c $(DEPS)
+listNode.o:		listNode.c $(DEPS)
+error-record.o:		error-record.c $(DEPS)
+local-agent.o:		local-agent.c $(DEPS)
+group-agent.o:		group-agent.c $(DEPS)
+simulator-agent.o:	simulator-agent.cc $(DEPS)
+console-agent.o:	console-agent.cc $(DEPS)
+node-agent.o:		node-agent.cc $(DEPS)
+event-sched_rpc.o:	event-sched.c $(DEPS)
+	$(CC) $(CFLAGS) -DRPC -c -o $@ $<
+rpc.o:			rpc.cc rpc.h event-sched.h
+	$(CXX) $(CXXFLAGS) -DSSHRPC $(ULXRINC) -c $<
+
+rrpc.o:			rpc.cc $(DEPS)
+	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
+
+install: event-sched_rrpc
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL_PROGRAM) $< $(INSTALL_DIR)/opsdir/sbin/event-sched
+	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
+	$(INSTALL) -m 0644 $(SRCDIR)/event-sched.8 \
+		$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	$(INSTALL_PROGRAM) $(SRCDIR)/elog2xplot \
+		$(INSTALL_DIR)/opsdir/bin/elog2xplot
+
+control-install: event-sched_rrpc
+	$(INSTALL_PROGRAM) $< $(INSTALL_SBINDIR)/event-sched
+
+# not a client thing
+client:
+client-install: client
+
+clean:
+	/bin/rm -f *.o event-sched event-sched_rpc event-sched_rrpc version.c
