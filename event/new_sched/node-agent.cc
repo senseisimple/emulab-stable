@@ -1,7 +1,7 @@
 /*
  * EMULAB-COPYRIGHT
  * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
- * All rights reserved.
+n * All rights reserved.
  */
 
 #include "config.h"
@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <cstring>
 
 #include "systemf.h"
 #include "rpc.h"
@@ -165,7 +166,7 @@ static void dump_node_logs(int token, struct agent **agent_array, int aa_len,
 	FILE *file;
 	int lpc;
 	
-	output = er->getOutput().c_str();
+	output = ((std::string)er->getOutput()).c_str();
 
 	for (lpc = 0; lpc < aa_len; lpc++) {
 		char filename[1024];

@@ -7,7 +7,7 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
-SUBDIR		= event/sched
+SUBDIR		= event/new_sched
 
 include $(OBJDIR)/Makeconf
 
@@ -28,10 +28,10 @@ LDFLAGS  += $(LDSTATIC)
 DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
 LIBS     += -levent_r -ltb -lz
 
-ULXRINC   = -I/usr/local/include -I/usr/local/include/ulxmlrpcpp
-CXXFLAGS += -pthread -O $(ULXRINC) -I$(OBJDIR) -I$(TESTBED_SRCDIR)/lib/libtb
+XMLRPCINC = `xmlrpc-c-config c++2 client --cflags`
+CXXFLAGS += -pthread -O $(XMLRPCINC) -I$(OBJDIR) -I$(TESTBED_SRCDIR)/lib/libtb
 CXXFLAGS += -I$(SRCDIR)/../lib
-ULXRLIBS  = -L/usr/local/lib  -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
+XMLRPCLIBS = `xmlrpc-c-config c++2 client --libs`
 
 #
 # XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
@@ -47,6 +47,7 @@ version.c: event-sched.c
 	echo >$@ "char build_info[] = \"Built on `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 OBJS = \
+	emulab_proxy.o \
 	console-agent.o \
 	error-record.o \
 	event-sched_rpc.o \
@@ -61,13 +62,14 @@ OBJS = \
 	version.o
 
 event-sched_rrpc: $(OBJS) event-sched.h ../lib/libevent.a
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(XMLRPCLIBS) $(LIBS)
 
 DEPS = \
 	console-agent.h error-record.h event-sched.h group-agent.h listNode.h \
 	local-agent.h node-agent.h rpc.h simulator-agent.h timeline-agent.h \
 	../lib/event.h
 
+emulab_proxy.o:		emulab_proxy.cc $(DEPS)
 queue.o:		queue.c $(DEPS)
 listNode.o:		listNode.c $(DEPS)
 error-record.o:		error-record.c $(DEPS)
@@ -79,14 +81,14 @@ node-agent.o:		node-agent.cc $(DEPS)
 event-sched_rpc.o:	event-sched.c $(DEPS)
 	$(CC) $(CFLAGS) -DRPC -c -o $@ $<
 rpc.o:			rpc.cc rpc.h event-sched.h
-	$(CXX) $(CXXFLAGS) -DSSHRPC $(ULXRINC) -c $<
+	$(CXX) $(CXXFLAGS) -DSSHRPC $(XMLRPCINC) -c $<
 
 rrpc.o:			rpc.cc $(DEPS)
-	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
+	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(XMLRPCINC) -c -o rrpc.o $<
 
 install: event-sched_rrpc
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
-	$(INSTALL_PROGRAM) $< $(INSTALL_DIR)/opsdir/sbin/event-sched
+	$(INSTALL_PROGRAM) $< $(INSTALL_DIR)/opsdir/sbin/new-event-sched
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/event-sched.8 \
 		$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
@@ -95,7 +97,7 @@ install: event-sched_rrpc
 		$(INSTALL_DIR)/opsdir/bin/elog2xplot
 
 control-install: event-sched_rrpc
-	$(INSTALL_PROGRAM) $< $(INSTALL_SBINDIR)/event-sched
+	$(INSTALL_PROGRAM) $< $(INSTALL_SBINDIR)/new-event-sched
 
 # not a client thing
 client:

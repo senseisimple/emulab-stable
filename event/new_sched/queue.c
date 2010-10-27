@@ -20,6 +20,14 @@
 #include <errno.h>
 #include "event-sched.h"
 
+
+#ifndef TIMEVAL_TO_TIMESPEC
+#define TIMEVAL_TO_TIMESPEC(tv, ts) {	  \
+		(ts)->tv_sec = (tv)->tv_sec; \
+		(ts)->tv_nsec = (tv)->tv_usec * 1000; \
+	}
+#endif
+
 /* The size of the event queue (i.e., the number of events that can be
    pending at any given time). */
 #define EVENT_QUEUE_LENGTH (1024 * 32)

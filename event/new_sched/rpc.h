@@ -11,32 +11,23 @@
 
 #ifdef __cplusplus
 
-#include <ulxmlrpcpp.h>  // always first header
+#include <xmlrpc-c/base.hpp>
+#include <xmlrpc-c/girerr.hpp>
+#include <xmlrpc-c/client.hpp>
 #include <iostream>
-#include <ulxr_tcpip_connection.h>  // first, don't move: msvc #include bug
-#include <ulxr_ssl_connection.h> 
-#include <ulxr_http_protocol.h> 
-#include <ulxr_requester.h>
-#include <ulxr_value.h>
-#include <ulxr_except.h>
-#include <emulab_proxy.h>
+#include "emulab_proxy.h"
 
 int RPC_invoke(char *method,
 	       emulab::EmulabResponse *er_out,
 	       emulab::spa_attr_t tag,
 	       ...);
 
-struct rpc_conn_proto {
-	ulxr::Connection *conn;
-	ulxr::Protocol *proto;
-};
-
 struct r_rpc_data {
 	const char *certpath;
 	const char *host;
 	unsigned short port;
 	int refcount;
-	struct rpc_conn_proto conn_proto;
+	xmlrpc_c::clientXmlTransport *transport;
 	pthread_mutex_t mutex;
 };
 

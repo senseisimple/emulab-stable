@@ -15,6 +15,8 @@
 #include <pwd.h>
 
 #include <string>
+#include <cstring>
+#include <sstream>
 #include <set>
 using namespace std;
 
@@ -30,7 +32,7 @@ struct r_rpc_data rpc_data = {
 	BOSSNODE,
 	DEFAULT_RPC_PORT,
 	-1,
-	{ NULL, NULL },
+	NULL,
 	PTHREAD_MUTEX_INITIALIZER
 };
 
@@ -100,11 +102,9 @@ void RPC_drop(void)
 
 	rpc_data.refcount -= 1;
 	if (rpc_data.refcount == 0) {
-		if (rpc_data.conn_proto.proto != NULL) {
-			delete rpc_data.conn_proto.proto;
-			rpc_data.conn_proto.proto = NULL;
-			delete rpc_data.conn_proto.conn;
-			rpc_data.conn_proto.conn = NULL;
+		if (rpc_data.transport != NULL) {
+			delete rpc_data.transport;
+			rpc_data.transport = NULL;
 		}
 	}
 	
@@ -113,34 +113,29 @@ void RPC_drop(void)
 }
 
 static int
-RPC_connect(struct rpc_conn_proto *rcp_out)
+RPC_connect(xmlrpc_c::clientXmlTransport **transport)
 {
-	ulxr::SSLConnection *sslconn;
 	int retval = 0;
 	
-	assert(rcp_out != NULL);
+	assert(transport != NULL);
 
 	if (pthread_mutex_lock(&rpc_data.mutex) != 0)
 		assert(0);
 	
-	if (rpc_data.conn_proto.conn != NULL) {
-		*rcp_out = rpc_data.conn_proto;
-		rpc_data.conn_proto.conn = NULL;
-		rpc_data.conn_proto.proto = NULL;
+	if (rpc_data.transport != NULL) {
+		*transport = rpc_data.transport;
+		rpc_data.transport = NULL;
 	}
 	else {
-		rcp_out->conn = sslconn =
-			new ulxr::SSLConnection(false,
-						rpc_data.host,
-						rpc_data.port);
-		sslconn->setTimeout(30 * 60);
-		rcp_out->proto =
-			new ulxr::HttpProtocol(rcp_out->conn,
-					       sslconn->getHostName());
-		rcp_out->proto->setPersistent(true);
-		sslconn->setCryptographyData("",
-					     rpc_data.certpath,
-					     rpc_data.certpath);
+		*transport = new xmlrpc_c::clientXmlTransport_curl(
+			xmlrpc_c::clientXmlTransport_curl::constrOpt()
+			.sslcertpasswd("")
+			.ssl_cert(rpc_data.certpath)
+			.sslkey(rpc_data.certpath)
+			.no_ssl_verifyhost(true)
+			.no_ssl_verifypeer(true)
+//			.timeout(30 * 60 * 1000)
+			);
 	}
 	
 	if (pthread_mutex_unlock(&rpc_data.mutex) != 0)
@@ -148,24 +143,19 @@ RPC_connect(struct rpc_conn_proto *rcp_out)
 }
 
 static void
-RPC_disconnect(struct rpc_conn_proto *rcp)
+RPC_disconnect(xmlrpc_c::clientXmlTransport **transport)
 {
-	assert(rcp != NULL);
-	assert(rcp->proto != NULL);
-	assert(rcp->conn != NULL);
+	assert(transport != NULL);
 	
 	if (pthread_mutex_lock(&rpc_data.mutex) != 0)
 		assert(0);
 
-	if (rpc_data.conn_proto.conn == NULL) {
-		rpc_data.conn_proto = *rcp;
+	if (rpc_data.transport == NULL) {
+		rpc_data.transport = *transport;
 	}
 	else {
-		delete rcp->proto;
-		delete rcp->conn;
+		delete *transport;
 	}
-	rcp->conn = NULL;
-	rcp->proto = NULL;
 	
 	if (pthread_mutex_unlock(&rpc_data.mutex) != 0)
 		assert(0);
@@ -177,65 +167,81 @@ RPC_invoke(char *method,
 	   emulab::spa_attr_t tag,
 	   ...)
 {
-	struct rpc_conn_proto rcp;
 	int retval = 0;
 	va_list args;
+	xmlrpc_c::clientXmlTransport *transport = NULL;
 
-	ULXR_COUT << "Beginning call to " << method << "\n";
-	RPC_connect(&rcp);
+	cout << "Beginning call to " << method << "\n";
+	RPC_connect(&transport);
 
 	va_start(args, tag);
 	try
 	{
-		emulab::ServerProxy proxy(rcp.proto, false, XMLRPC_ROOT);
+		ostringstream buffer;
+		string url;
+		
+		buffer << "https://" << rpc_data.host << ':'
+		       << rpc_data.port << XMLRPC_ROOT;
+		url = buffer.str();
+		
+		emulab::ServerProxy proxy(transport, false, url.c_str());
 		
 		*er_out = proxy.invoke(method, tag, args);
 		
-		if (! er_out->isSuccess()){
-			ULXR_CERR << "RPC_invoke failed: "
-				  << method
-				  << " "
-				  << er_out->getOutput()
-				  << std::endl;
+		if (!er_out->isSuccess()){
+			cerr << "RPC_invoke failed: "
+			     << method
+			     << " "
+			     << (string)(er_out->getOutput())
+			     << std::endl;
 			retval = -1;
 		}
 	}
-	catch(ulxr::Exception &ex)
+	catch(girerr::error &ex)
 	{
-		ULXR_COUT << ULXR_PCHAR("Error occured: ") <<
-			ULXR_GET_STRING(ex.why()) << std::endl;
+		cout << "Error occured: " <<
+			ex.what() << std::endl;
 		retval = -1;
 	}
 	catch(...)
 	{
-		ULXR_COUT << ULXR_PCHAR("unknown Error occured.\n");
+		cout << "unknown Error occured.\n";
 		retval = -1;
 	}
 	va_end(args);
 	
-	RPC_disconnect(&rcp);
+	RPC_disconnect(&transport);
 
-	ULXR_COUT << "Finished with call to " << method << "\n";
+	cout << "Finished with call to " << method << "\n";
 	return retval;
 }
 
 int
 RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
 {
-	struct rpc_conn_proto rcp;
 	int retval = 0;
+	xmlrpc_c::clientXmlTransport *transport;
 
 	assert(pid != NULL);
 	assert(eid != NULL);
 	assert(method != NULL);
 	assert(er != NULL);
+
+	transport = NULL;
 	
-	ULXR_COUT << "Beginning call to " << method << "\n";
-	RPC_connect(&rcp);
+	cout << "Beginning call to " << method << "\n";
+	RPC_connect(&transport);
 	
 	try
 	{
-		emulab::ServerProxy proxy(rcp.proto, false, XMLRPC_ROOT);
+		ostringstream buffer;
+		string url;
+		
+		buffer << "https://" << rpc_data.host << ':'
+		       << rpc_data.port << XMLRPC_ROOT;
+		url = buffer.str();
+		
+		emulab::ServerProxy proxy(transport, false, url.c_str());
 		
 		*er = proxy.invoke(method,
 				   emulab::SPA_String, "proj", pid,
@@ -243,28 +249,28 @@ RPC_invoke(char *pid, char *eid, char *method, emulab::EmulabResponse *er)
 				   emulab::SPA_TAG_DONE);
 		
 		if (! er->isSuccess()){
-			ULXR_CERR << "RPC_invoke failed: "
-				  << method
-				  << " "
-				  << er->getOutput()
-				  << std::endl;
+			cerr << "RPC_invoke failed: "
+			     << method
+			     << " "
+			     << (string)er->getOutput()
+			     << std::endl;
 			retval = -1;
 		}
 	}
-	catch(ulxr::Exception &ex)
+	catch(girerr::error &ex)
 	{
-		ULXR_COUT << ULXR_PCHAR("Error occured: ") <<
-			ULXR_GET_STRING(ex.why()) << std::endl;
+		cout << "Error occured: " <<
+			ex.what() << std::endl;
 		retval = -1;
 	}
 	catch(...)
 	{
-		ULXR_COUT << ULXR_PCHAR("unknown Error occured.\n");
+		cout << "unknown Error occured.\n";
 		retval = -1;
 	}
 
-	RPC_disconnect(&rcp);
-	ULXR_COUT << "Finished with call to " << method << "\n";
+	RPC_disconnect(&transport);
+	cout << "Finished with call to " << method << "\n";
 
 	return retval;
 }
@@ -279,29 +285,26 @@ RPC_metadata(char *pid, char *eid)
 	assert(eid != NULL);
 
 	if ((retval = RPC_invoke(pid, eid, "experiment.metadata", &er)) == 0) {
-		ulxr::RpcString path;
-		ulxr::Array userenv;
-		ulxr::Struct md;
+		string path;
+		vector<xmlrpc_c::value> userenv;
+		map <string, xmlrpc_c::value> md;
 
-		md = (ulxr::Struct)er.getValue();
-		path = md.getMember(ULXR_PCHAR("path"));
-		SetExpPath(path.getString().c_str());
+		md = (xmlrpc_c::value_struct)er.getValue();
+		path = (xmlrpc_c::value_string)md["path"];
+		SetExpPath(((string)path).c_str());
 
-		userenv = md.getMember(ULXR_PCHAR("user_environment"));
+		userenv = ((xmlrpc_c::value_array)md["user_environment"]).vectorValueValue();
+		
 		if (userenv.size() > 0) {
 			int lpc;
 
 			for (lpc = 0; lpc < userenv.size(); lpc++) {
-				ulxr::RpcString tmp;
 				char *name, *value;
-				ulxr::Struct ue;
+				map<string, xmlrpc_c::value> ue;
 				
-				ue = (ulxr::Struct)userenv.getItem(lpc);
-				tmp = ue.getMember("name");
-				name = (char *)tmp.getString().c_str();
-				ue = (ulxr::Struct)userenv.getItem(lpc);
-				tmp = ue.getMember("value");
-				value = (char *)tmp.getString().c_str();
+				ue = (xmlrpc_c::value_struct)userenv[lpc];
+				name = (char *)((string)(xmlrpc_c::value_string)ue["name"]).c_str();
+				value = (char *)((string)(xmlrpc_c::value_string)ue["value"]).c_str();
 
 				if ((retval = AddUserEnv(name, value)) != 0)
 					return retval;
@@ -324,11 +327,11 @@ RPC_expt_state(char *pid, char *eid)
 	assert(strlen(eid) > 0);
 
 	if (RPC_invoke(pid, eid, "experiment.state", &er) == 0) {
-		ulxr::RpcString tmp;
 		const char *state;
+		string tmp;
 
-		tmp = er.getValue();
-		state = tmp.getString().c_str();
+		tmp = (string)(xmlrpc_c::value_string)er.getValue();
+		state = tmp.c_str();
 		if (strcmp(state, "activating") == 0)
 			retval = ES_ACTIVATING;
 		else if (strcmp(state, "active") == 0)
@@ -384,28 +387,28 @@ RPC_cameralist(FILE *emcd_config, char *area)
 	if (rc < 0)
 		return -1;
 	
-	ulxr::Array cameras;
+	vector<xmlrpc_c::value> cameras;
 	
-	cameras = (ulxr::Array)er.getValue();
+	cameras = ((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
 	for (lpc = 0; lpc < cameras.size(); lpc++) {
-		ulxr::RpcString tmp;
-		ulxr::Struct attr;
+		string tmp;
+		map<string, xmlrpc_c::value> attr;
 		int port;
 
-		attr = cameras.getItem(lpc);
-		tmp = attr.getMember("hostname");
-		port = ((ulxr::Integer)attr.getMember("port")).getInteger();
+		attr = (xmlrpc_c::value_struct)cameras[lpc];
+		tmp = (xmlrpc_c::value_string)attr["hostname"];
+		port = (xmlrpc_c::value_int)attr["port"];
 		fprintf(emcd_config,
 			"camera %s %s %d %f %f %f %f %f %f\n",
 			area,
-			tmp.getString().c_str(),
+		        tmp.c_str(),
 			port,
-			((ulxr::Double)attr.getMember("loc_x")).getDouble(),
-			((ulxr::Double)attr.getMember("loc_y")).getDouble(),
-			((ulxr::Double)attr.getMember("width")).getDouble(),
-			((ulxr::Double)attr.getMember("height")).getDouble(),
-			((ulxr::Double)attr.getMember("fixed_x")).getDouble(),
-			((ulxr::Double)attr.getMember("fixed_y")).getDouble());
+		        ((double)(xmlrpc_c::value_double)attr["loc_x"]),
+		        ((double)(xmlrpc_c::value_double)attr["loc_y"]),
+		        ((double)(xmlrpc_c::value_double)attr["width"]),
+		        ((double)(xmlrpc_c::value_double)attr["height"]),
+		        ((double)(xmlrpc_c::value_double)attr["fixed_x"]),
+		        ((double)(xmlrpc_c::value_double)attr["fixed_y"]));
 	}
 	
 	return 0;
@@ -429,22 +432,21 @@ RPC_obstaclelist(FILE *emcd_config, char *area)
 	if (rc < 0)
 		return -1;
 	
-	ulxr::Array obstacles;
+	vector<xmlrpc_c::value> obstacles =
+		((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
 	
-	obstacles = (ulxr::Array)er.getValue();
 	for (lpc = 0; lpc < obstacles.size(); lpc++) {
-		ulxr::Struct attr;
+		map<string, xmlrpc_c::value> attr =
+			(xmlrpc_c::value_struct)obstacles[lpc];
 		
-		attr = obstacles.getItem(lpc);
 		fprintf(emcd_config,
 			"obstacle %s %d %f %f %f %f\n",
 			area,
-			((ulxr::Integer)attr.getMember("obstacle_id")).
-			getInteger(),
-			((ulxr::Double)attr.getMember("x1")).getDouble(),
-			((ulxr::Double)attr.getMember("y1")).getDouble(),
-			((ulxr::Double)attr.getMember("x2")).getDouble(),
-			((ulxr::Double)attr.getMember("y2")).getDouble());
+		        ((int)(xmlrpc_c::value_int)attr["obstacle_id"]),
+		        ((double)(xmlrpc_c::value_double)attr["x1"]),
+		        ((double)(xmlrpc_c::value_double)attr["y1"]),
+		        ((double)(xmlrpc_c::value_double)attr["x2"]),
+		        ((double)(xmlrpc_c::value_double)attr["y2"]));
 	}
 	
 	return 0;
@@ -483,13 +485,13 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 		return rc;
 	
 	set<string> buildings;
-	ulxr::Array top, locs;
-	ulxr::Struct tables;
+	vector<xmlrpc_c::value> top, locs;
+	map<string, xmlrpc_c::value> tables;
 	
-	top = (ulxr::Array)er.getValue();
-	tables = (ulxr::Struct)top.getItem(0);
-	tables = tables.getMember("experiment");
-	locs = tables.getMember("node_startlocs");
+	top = ((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
+	tables = (xmlrpc_c::value_struct)top[0];
+	tables = ((xmlrpc_c::value_struct)tables["experiment"]);
+	locs = ((xmlrpc_c::value_array)tables["node_startlocs"]).vectorValueValue();
 	
 	if (locs.size() == 0)
 		return 0;
@@ -506,20 +508,21 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 	}
 	
 	for (lpc = 0; lpc < locs.size(); lpc++) {
-		ulxr::Struct loc = (ulxr::Struct)locs.getItem(lpc);
+		map<string, xmlrpc_c::value> loc;
 		emulab::EmulabResponse ner;
-		ulxr::RpcString tmp, bldg;
+		string bldg;
 		double x, y, orientation;
 		struct agent *agent;
 		char *vname;
-		
-		tmp = loc.getMember("vname");
-		vname = (char *) tmp.getString().c_str();
-		bldg = loc.getMember("building");
-		x = ((ulxr::Double)loc.getMember("loc_x")).getDouble();
-		y = ((ulxr::Double)loc.getMember("loc_y")).getDouble();
-		orientation = ((ulxr::Double)loc.getMember("orientation")).
-			getDouble();
+
+		loc = ((xmlrpc_c::value_struct)locs[lpc]);
+		vname =
+			(char *)((string)(xmlrpc_c::value_string)loc["vname"]).c_str();
+		bldg = (xmlrpc_c::value_string)loc["building"];
+		x = ((xmlrpc_c::value_double)loc["loc_x"]);
+		y = ((xmlrpc_c::value_double)loc["loc_y"]);
+		orientation =
+			((xmlrpc_c::value_double)loc["orientation"]);
 		if ((agent = (struct agent *)
 		     lnFindName(&agents, vname)) == NULL) {
 			error("unknown robot %s\n", vname);
@@ -540,14 +543,14 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 		else {
 			fprintf(emcd_config,
 				"robot %s %d %s %f %f %f %s\n",
-				bldg.getString().c_str(),
+			        ((string)(bldg)).c_str(),
 				lpc + 1,
 				agent->nodeid,
 				x,
 				y,
 				orientation * M_PI / 180.0,
 				agent->name);
-			buildings.insert(bldg.getString());
+			buildings.insert((string)bldg);
 
 			AddRobot(handle, agent, x, y, orientation);
 		}
@@ -578,23 +581,19 @@ RPC_agentlist(event_handle_t handle, char *pid, char *eid)
 	if (foo)
 		return foo;
 	
-	ulxr::Array agents = (ulxr::Array)er.getValue();
+	vector<xmlrpc_c::value> agents =
+		((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
 	
 	for (i = 0; i < agents.size(); i++) {
 		char *vname, *vnode, *nodeid, *ipaddr, *type;
-		ulxr::RpcString tmp;
-		ulxr::Array agent = (ulxr::Array)agents.getItem(i);
+		vector<xmlrpc_c::value>agent =
+			((xmlrpc_c::value_array)agents[i]).vectorValueValue();
 		
-		tmp = agent.getItem(0);
-		vname = (char *) tmp.getString().c_str();
-		tmp = agent.getItem(1);
-		vnode = (char *) tmp.getString().c_str();
-		tmp = agent.getItem(2);
-		nodeid = (char *) tmp.getString().c_str();
-		tmp = agent.getItem(3);
-		ipaddr = (char *) tmp.getString().c_str();
-		tmp = agent.getItem(4);
-		type = (char *) tmp.getString().c_str();
+		vname = (char *)((string)(xmlrpc_c::value_string)agent[0]).c_str();
+		vnode = (char *)((string)(xmlrpc_c::value_string)agent[1]).c_str();
+		nodeid = (char *)((string)(xmlrpc_c::value_string)agent[2]).c_str();
+		ipaddr = (char *)((string)(xmlrpc_c::value_string)agent[3]).c_str();
+		type = (char *)((string)(xmlrpc_c::value_string)agent[4]).c_str();
 		info("D: adding agent %s\n", vname);
 		if (AddAgent(handle, vname, vnode, nodeid, ipaddr, type) < 0) {
 			return -1;
@@ -613,18 +612,17 @@ RPC_grouplist(event_handle_t handle, char *pid, char *eid)
 	if (foo)
 		return foo;
 	
-	ulxr::Array groups = (ulxr::Array)er.getValue();
+	vector<xmlrpc_c::value> groups =
+		((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
 	
 	for (i = 0; i < groups.size(); i++) {
 		char *groupname, *agentname;
-		ulxr::RpcString tmp;
-		ulxr::Array group = (ulxr::Array)groups.getItem(i);
+		vector<xmlrpc_c::value> group =
+			((xmlrpc_c::value_array)groups[i]).vectorValueValue();
 		
-		tmp = group.getItem(0);
-		groupname = (char *) tmp.getString().c_str();
+		groupname = (char *)((string)(xmlrpc_c::value_string)group[0]).c_str();
 		info("D: \tIn GroupList() parsed name %s\n", groupname);
-		tmp = group.getItem(1);
-		agentname = (char *) tmp.getString().c_str();
+		agentname = (char *)((string)(xmlrpc_c::value_string)group[1]).c_str();
 		info("D: \tIn GroupList() parsed agent %s\n", agentname);
 		
 		if (AddGroup(handle, groupname, agentname) != 0) {
@@ -650,8 +648,9 @@ RPC_eventlist(char *pid, char *eid,
 
 // XXX
 //	info("rpc.cc:RPC_eventlist(): calling getValue()\n");
-// XXX	
-	ulxr::Array events = (ulxr::Array)er.getValue();
+// XXX
+	vector<xmlrpc_c::value> events =
+		((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
 	
 // XXX
 //	info("rpc.cc:RPC_eventlist(): Interating over invoke results\n");
@@ -659,25 +658,17 @@ RPC_eventlist(char *pid, char *eid,
 	for (i = 0; i < events.size(); i++) {
 		char *exidx, *extime, *objname, *objtype, *evttype, *exargs;
 		char *parent, *triggertype;
-		ulxr::RpcString tmp;
-		ulxr::Array event = (ulxr::Array)events.getItem(i);
-		
-		tmp = event.getItem(0);
-		exidx = (char *) tmp.getString().c_str();
-		tmp = event.getItem(1);
-		extime = (char *) tmp.getString().c_str();
-		tmp = event.getItem(2);
-		objname = (char *) tmp.getString().c_str();
-		tmp = event.getItem(3);
-		objtype = (char *) tmp.getString().c_str();
-		tmp = event.getItem(4);
-		evttype = (char *) tmp.getString().c_str();
-		tmp = event.getItem(5);
-		exargs = (char *) tmp.getString().c_str();
-		tmp = event.getItem(6);
-		parent = (char *) tmp.getString().c_str();
-		tmp = event.getItem(7);
-		triggertype = (char *) tmp.getString().c_str();
+		vector<xmlrpc_c::value> event =
+			((xmlrpc_c::value_array)events[i]).vectorValueValue();
+
+		exidx = (char *)((string)(xmlrpc_c::value_string)event[0]).c_str();
+		extime = (char *)((string)(xmlrpc_c::value_string)event[1]).c_str();
+		objname = (char *)((string)(xmlrpc_c::value_string)event[2]).c_str();
+		objtype = (char *)((string)(xmlrpc_c::value_string)event[3]).c_str();
+		evttype = (char *)((string)(xmlrpc_c::value_string)event[4]).c_str();
+		exargs = (char *)((string)(xmlrpc_c::value_string)event[5]).c_str();
+		parent = (char *)((string)(xmlrpc_c::value_string)event[6]).c_str();
+		triggertype = (char *)((string)(xmlrpc_c::value_string)event[7]).c_str();
 // XXX
 //	info("rpc.cc:RPC_eventlist(): Adding an event\n");
 // XXX 		
