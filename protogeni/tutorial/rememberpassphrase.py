@@ -21,8 +21,12 @@ import pwd
 import getopt
 import os
 import re
+import stat
 import xmlrpclib
-from M2Crypto import X509
+from M2Crypto import SSL, X509
+
+def RememberCB( c, prompt1 = '', prompt2 = '' ):
+    return passphrase
 
 execfile( "test-common.py" )
 
@@ -30,7 +34,22 @@ if os.path.exists( PASSPHRASEFILE ):
     Fatal( "A passphrase has already been stored." )
 
 from M2Crypto.util import passphrase_callback
-passphrase = passphrase_callback(0)
+while True: # #!(%ing Python doesn't have do loops
+    passphrase = passphrase_callback(0)
+    if not os.path.exists(CERTIFICATE):
+        print >> sys.stderr, "Warning:", CERTIFICATE, "not found; cannot " \
+            "verify passphrase."
+        break
+
+    try:
+        ctx = SSL.Context( "sslv23" )
+        ctx.load_cert( CERTIFICATE, CERTIFICATE, RememberCB )
+    except M2Crypto.SSL.SSLError, err:
+        print >> sys.stderr, "Could not decrypt key.  Please try again."
+        continue
+
+    break
 
 f = open( PASSPHRASEFILE, "w" )
+os.chmod( PASSPHRASEFILE, stat.S_IRUSR | stat.S_IWUSR )
 f.write( passphrase )
