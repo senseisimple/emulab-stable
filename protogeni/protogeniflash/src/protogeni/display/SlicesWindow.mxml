@@ -18,10 +18,15 @@
 			
 			public function openFirst():void {
 				show();
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, refreshView);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refreshView);
+				init();
 				
 				focusManager.setFocus(sliceName);
+			}
+			
+			public function init():void
+			{
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, refreshView);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refreshView);
 			}
 			
 			public function createSlice():void

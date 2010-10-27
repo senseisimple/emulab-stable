@@ -36,5 +36,15 @@ package protogeni.resources
 			}
 			return null;
 		}
+		
+		public function getByHrn(hrn:String):ComponentManager
+		{
+			for each(var cm : ComponentManager in this)
+			{
+				if(cm.Hrn == hrn)
+					return cm;
+			}
+			return null;
+		}
 	}
 }

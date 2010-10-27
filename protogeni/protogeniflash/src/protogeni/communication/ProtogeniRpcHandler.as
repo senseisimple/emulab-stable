@@ -322,6 +322,12 @@
 				forceStop = false;
 		}
 		
+		public function clearAll():void
+		{
+			// Should probably be different
+			this.queue.head = null;
+		}
+		
 		public function codeFailure(name:String, detail:String = "", e:Error = null, stop:Boolean = true) : void
 		{
 			if(stop)

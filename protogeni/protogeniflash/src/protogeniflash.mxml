@@ -60,17 +60,16 @@
 	    
 	    // Start out by asking the user for the CM URL
 	    private function init():void {
-			
 			Main.protogeniHandler = new ProtogeniHandler();
 			Main.protogeniHandler.mapHandler.map = map;
 			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
 			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
 			
-	    	console = new ConsoleWindow();
+			console = new ConsoleWindow();
 			PopUpManager.addPopUp(console, this, false);
 			PopUpManager.centerPopUp(console);
 			PopUpManager.removePopUp(console);
-	    	Main.log = console;
+			Main.log = console;
 			
 			cms = new ChooseComponentManagerWindow();
 			cms.openFirst();
@@ -87,9 +86,21 @@
 			user.show();
 			user.load(Main.protogeniHandler.CurrentUser);
 			user.close();
-	    	
-	    	Security.allowDomain("localhost");	
+			
+			Security.allowDomain("localhost");	
 	    }
+		
+		private function reinit():void
+		{
+			Main.protogeniHandler = new ProtogeniHandler();
+			Main.protogeniHandler.mapHandler.map = map;
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
+			
+			cms.init();
+			user.load(Main.protogeniHandler.CurrentUser);
+			slices.init();
+		}
         
         public function showAbout():void {
 	    	PopUpManager.addPopUp(about, this, false);
@@ -142,6 +153,14 @@
 			Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
 	    	Main.protogeniHandler.mapHandler.drawMap();
 	    }
+		
+		public function startover():void
+		{
+			Main.protogeniHandler.rpcHandler.pause();
+			Main.protogeniHandler.rpcHandler.clearAll();
+			reinit();
+			Main.protogeniHandler.rpcHandler.startInitiationSequence();
+		}
     ]]>
 </mx:Script>
 
@@ -150,7 +169,7 @@
 		<mx:VRule height="14"/>
 		<display:ImageButton id="refreshButton"
 			source="{DisplayUtil.refreshIcon}"
-			click="Main.protogeniHandler.ComponentManagers.clear(); Main.protogeniHandler.rpcHandler.loadComponentManagers();"
+			click="startover()" includeInLayout="false" visible="false"
 			toolTip="Reload all data" />
 		<display:ImageButton id="cmButton"
 			source="@Embed('../images/building.png')"
