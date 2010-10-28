@@ -99,6 +99,18 @@ if (NoLogins()) {
 }
 
 #
+# Check for excessive load
+#
+if ($MAINSITE) {
+    my $uptime = `uptime`;
+    if ($uptime =~ /load averages:\s+([\.\d]+),\s+([\.\d]+),\s+[\.\d]+/) {
+	if ($1 > 10.0) {
+	    XMLError(511, "Server is WAY too busy; please try again later");
+	}
+    }
+}
+
+#
 # Make sure the client presented a valid certificate that apache says
 # is okay.
 #

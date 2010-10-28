@@ -1,0 +1,219 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Create/Delete and globally enable/disable emulab features.
+#
+sub usage()
+{
+    print STDERR "Usage: emulabfeature <action> <feature>\n";
+    print STDERR "  -h       This message\n";
+    print STDERR "  create   Create a feature. Provide pithy description.\n";
+    print STDERR "  delete   Delete existing feature.\n";
+    print STDERR "  enable   Globally enable feature. Provide onoff flag.\n";
+    print STDERR "  disable  Globally disable feature. Provide onoff flag.\n";
+    print STDERR "  show     Show details of feature.\n";
+    print STDERR "  list     List of all features.\n";
+    exit(-1);
+}
+my $optlist  = "h";
+my $debug    = 0;
+
+# Protos
+sub fatal($);
+
+#
+# Please do not run as root. Hard to track what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Configure variables
+#
+my $TB		 = "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use emdb;
+use EmulabFeatures;
+use libtestbed;
+use User;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{h})) {
+    usage();
+}
+usage()
+    if (@ARGV < 1 || @ARGV > 3);
+
+my $action = $ARGV[0];
+
+#
+# Verify user, must be admin.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+if (!$this_user->IsAdmin()) {
+    fatal("You are not a testbed administrator!");
+
+}
+
+sub ShowFeature($)
+{
+    my ($feature) = @_;
+
+    my $featurename = $feature->feature();
+    my $enabled     = $feature->enabled();
+    my $disabled    = $feature->disabled();
+    my $description = $feature->description();
+    my $created     = $feature->added();
+    my @flags       = ();
+
+    push(@flags, "Globally enabled")
+	if ($enabled);
+    push(@flags, "Globally disabled")
+	if ($disabled);
+    my $flags = join(",", @flags);
+
+    print "$featurename: $flags\n";
+    print "  Created: $created\n";
+    print "  $description\n";
+}
+
+if ($action eq "list") {
+    my @list = EmulabFeatures->List();
+    
+    foreach my $feature (@list) {
+	ShowFeature($feature);
+    }
+    exit(0);
+}
+
+#
+# Everything else needs a featurename.
+#
+usage()
+    if (@ARGV < 2);
+
+my $featurename = $ARGV[1];
+my $feature = EmulabFeatures->Lookup($featurename);
+
+if ($action eq "create") {
+    usage()
+	if (@ARGV != 3);
+    
+    fatal("Feature $featurename already exists!")
+	if (defined($feature));
+    my $description = $ARGV[2];
+
+    $feature = EmulabFeatures->Create($featurename, $description);
+    fatal("Could not create new feature $featurename!")
+	if (!defined($feature));
+    print "Feature $featurename has been created.\n";
+}
+elsif ($action eq "delete") {
+    fatal("Feature $featurename does not exist!")
+	if (!defined($feature));
+
+    $feature->Delete() == 0
+	or fatal("Could not delete feature $featurename!");
+}    
+elsif ($action eq "enable" || $action eq "disable") {
+    fatal("Feature $featurename does not exist!")
+	if (!defined($feature));
+    
+    my $result;
+    #
+    # By default, we are setting the global enable/disable flag.
+    # Override on command line.
+    #
+    my $onoff = (@ARGV == 3 ? ($ARGV[2] ? 1 : 0) : 1);
+    
+    if ($action eq "enable") {
+	$result = $feature->SetGlobalEnable($onoff);
+    }
+    elsif ($action eq "disable") {
+	$result = $feature->SetGlobalDisable($onoff);
+    }
+    fatal("Could not $action feature $featurename!")
+	if ($result != 0);
+}
+elsif ($action eq "show") {
+    fatal("Feature $featurename does not exist!")
+	if (!defined($feature));
+
+    my @users  = ();
+    my @groups = ();
+    my @experiments = ();
+    $feature->ListEnabled(\@users, \@groups, \@experiments);
+    
+    ShowFeature($feature);
+    if (@users) {
+	print "Users: ";
+	foreach my $user (@users) {
+	    print $user->uid;
+	    print " ";
+	}
+	print "\n";
+    }
+    if (@groups) {
+	print "Groups: ";
+	foreach my $group (@groups) {
+	    print $group->pid() . "/" . $group->gid();
+	    print " ";
+	}
+	print "\n";
+    }
+    if (@experiments) {
+	print "Experiments: ";
+	foreach my $experiment (@experiments) {
+	    print $experiment->pid() . "/" . $experiment->eid();
+	    print " ";
+	}
+	print "\n";
+    }
+}
+else {
+    fatal("Unknown action $action!");
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+

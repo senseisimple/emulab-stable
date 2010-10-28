@@ -911,10 +911,12 @@ foreach $node (@nodenames) {
 	if ($trivspeed) {
 	    push @flags, "trivial_bw:$trivspeed";
 	}
-	# Add CPU and RAM information
-	$cpu_ram_features_present++;
-	# This number can be use for fine-tuning packing
-	push @features, "?+virtpercent:100";
+	if (! $sharing_mode{$node}) {
+	    # Add CPU and RAM information
+	    $cpu_ram_features_present++;
+	    # This number can be use for fine-tuning packing
+	    push @features, "?+virtpercent:100";
+	}
 	# Put this silly feature in so that we can try to keep vnodes
 	# on the same pnode they were before - but only if updating
         if ($exempt_eid) {
@@ -949,9 +951,11 @@ foreach $node (@nodenames) {
     }
 
     # Add features
-    push(@features, @{$typemap{$type}->{'FEATURES'}});
-    if (defined($features{$node})) {
-	push @features, @{$features{$node}};
+    if (! $sharing_mode{$node}) {
+	push(@features, @{$typemap{$type}->{'FEATURES'}});
+	if (defined($features{$node})) {
+	    push @features, @{$features{$node}};
+	}
     }
 
     #
@@ -995,7 +999,7 @@ foreach $node (@nodenames) {
     }
 
     # Add features indicating what this node has connections to
-    if ($connections{$node}) {
+    if ($connections{$node} && !$sharing_mode{$node}) {
         my @connected_to  = @{$connections{$node}};
         foreach my $other_end (@connected_to) {
             push(@features,"connected-to-$other_end:0.0");
@@ -1019,14 +1023,6 @@ foreach $node (@nodenames) {
     }
     if (defined($curr_batt{$node})) {
 	push(@features,"powerneeded:" . (1.0 - $curr_batt{$node} / 100.0));
-    }
-
-    # Add in modelnet stuff.
-    if ($mnetcores) {
-	push(@types, "modelnet-core:$mnetcores");
-    }
-    if ($mnetedges) {
-	push(@types, "modelnet-edge:$mnetedges");
     }
 
     #

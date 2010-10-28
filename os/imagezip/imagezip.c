@@ -686,9 +686,9 @@ read_doslabel(int infd, int lsect, int pstart, struct doslabel *label)
 			fprintf(stderr, "  P%d: ", bsdix + 1);
 			smap = getslicemap(label->parts[i].dp_typ);
 			if (smap == 0)
-				fprintf(stderr, "%-10s", "UNKNOWN");
+				fprintf(stderr, "%-12s", "UNKNOWN");
 			else
-				fprintf(stderr, "%-10s", smap->desc);
+				fprintf(stderr, "%-12s", smap->desc);
 
 			start = label->parts[i].dp_start;
 #if 0
@@ -718,6 +718,35 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 	struct doslabel doslabel;
 
 	if (read_doslabel(infd, bbstart, pstart, &doslabel) != 0)
+		return 1;
+
+	/*
+	 * Quick, brute-force check for overlap of partitions.
+	 * XXX right now, any overlap is bad and we bail.  In the future,
+	 * we could determine all areas of intersection and be conservative
+	 * with those areas; i.e., always save unless overlap is strictly
+	 * between unused/ignored partitions.
+	 */
+	for (i = 0; i < NDOSPART-1; i++) {
+		u_int32_t start1, size1, start2, size2;
+		int i2;
+
+		if ((size1 = doslabel.parts[i].dp_size) == 0)
+			continue;
+
+		start1 = bbstart + doslabel.parts[i].dp_start;
+		for (i2 = i+1; i2 < NDOSPART; i2++) {
+			if ((size2 = doslabel.parts[i2].dp_size) == 0)
+				continue;
+			start2 = bbstart + doslabel.parts[i2].dp_start;
+			if (start2+size2 > start1 &&
+			    start1+size1 > start2) {
+				warnx("P%d and P%d overlap!", i+1, i2+1);
+				rval++;
+			}
+		}
+	}
+	if (rval)
 		return 1;
 
 	/*

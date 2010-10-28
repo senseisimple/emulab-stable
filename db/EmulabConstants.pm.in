@@ -163,7 +163,7 @@ use vars qw(@ISA @EXPORT);
 	 );
 
 use English;
-use vars qw($TB $TBOPS $TBOPSPID $EXPTLOGNAME $PROJROOT);
+use vars qw($TB $TBOPS $TBOPSPID $EXPTLOGNAME $PROJROOT $MAINSITE);
 
 # Configure variables
 $TB	     = "@prefix@";
@@ -171,6 +171,7 @@ $TBOPS       = "@TBOPSEMAIL@";
 $TBOPSPID    = "emulab-ops";
 $EXPTLOGNAME = "activity.log";
 $PROJROOT    = "@PROJROOT_DIR@";
+$MAINSITE    = @TBMAINSITE@;
 
 1;
 @SELFLOADER_DATA@

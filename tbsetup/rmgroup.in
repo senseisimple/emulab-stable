@@ -77,6 +77,7 @@ use libdb;
 use libtestbed;
 use User;
 use Group;
+use EmulabFeatures;
 
 # Defined in libtestbed;
 my $PROJROOT    = PROJROOT();
@@ -253,6 +254,12 @@ if (system("grep -q '^${unix_gid}:' /etc/group")) {
 	}
     }
 }
+
+#
+# Kill any features
+#
+EmulabFeatures->DeleteAll($group) == 0 or
+    fatal("Could not delete all features for $group");
 
 # Last step, so we can repeat above actions on failures.
 $group->Delete() == 0 or

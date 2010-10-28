@@ -71,7 +71,7 @@ my $usecurrent = 0;  # Only with regression mode, use current solution.
 my $quiet      = 0;
 my $clear      = 0;
 my $warnings   = 0;
-my $maxrun     = 3;		# Maximum number of times we run assign.
+my $maxrun     = 3;  # Maximum number of times we run assign.
 my $gotlock    = 0;
 my $userspec   = 0;
 my $randomize  = 0;
@@ -301,6 +301,7 @@ sub AssignLoop()
 {
     my $currentrun     = 1;
     my $canceled       = 0;
+    my $noprogress     = 0;
     my $tried_precheck = 0;
     # Admission control counts
     my %admission_control = ();
@@ -354,7 +355,7 @@ sub AssignLoop()
 	# RunAssign returns  0 if successful.
 	#           returns -1 if failure, but assign says to stop trying.
 	#           returns  1 if failure, but assign says to try again.
-	#           returns  2 if we made some forward progress.
+	#           returns  2 if assign succeeds, but nodes were allocated
 	#
 	my $retval = RunAssign($precheck, $prefix);
 
@@ -405,11 +406,14 @@ sub AssignLoop()
 	    $tried_precheck = 1;
 	}
 
-	if ($currentrun >= $maxrun && $retval != 2) {
+	# If we made progress, keep trying until no progress twice in a row.
+	if ($currentrun >= $maxrun && $noprogress) {
 	    fatal({type => 'primary', severity => SEV_ERROR,
 		   error => ['reached_assign_run_limit']},
 		  "Reached run limit. Giving up.");
 	}
+	# See if we made progress or not. We try one extra time. See above.
+	$noprogress = ($retval == 2);
 
 	chat("Waiting 5 seconds and trying again...\n");
 	sleep(5);
@@ -694,8 +698,8 @@ sub RunAssign($$)
     my $retval = $vtop->AllocNodes();
     if ($retval != 0) {
 	if ($retval < 1) {
-	    print("Could not allocate any nodes.\n");
-	    return -1;
+	    # Could not allocate any nodes.
+	    return 2;
 	}
 	return 1;
     }
