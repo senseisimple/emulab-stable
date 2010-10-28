@@ -5452,10 +5452,9 @@ sub InterpLinksAux($)
 		$self->printdb("LINK simple: $virtA,$virtB - ".
 			       "$nodeA:$portA,$nodeB:$portB\n");
 
-		if ($virtlan->_layer() == 1 || $direct) {
+		if ($virtlan->_layer() == 1) {
 		    #
-		    # Just a wire. At layer two, its a wire between
-		    # two nodes.
+		    # Just a wire.
 		    #
 		    $protolink = ProtoLan->Create($experiment, $lan,
 						  $self->impotent() ||
@@ -5558,7 +5557,12 @@ sub InterpLinksAux($)
 		    $protolink = ProtoLan->Create($experiment, $lan,
 						  $self->impotent() ||
 						  $self->alloconly());
-		    $protolink->SetType("vlan");
+		    #
+		    # At layer 2, a direct link is a wire between two
+		    # interfaces. We want them setup like any layer 2
+		    # link.
+		    #
+		    $protolink->SetType(($direct ? "direct" : "vlan"));
 		    $protolink->SetRole("link/lan");
 		    $protolink->SetAttribute("link/lan", $lan);
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
