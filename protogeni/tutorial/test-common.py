@@ -162,7 +162,6 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
     else:
         if debug:
             print 'passphrase file %s does not exist' % (PASSPHRASEFILE)
-    # %.(&ing Python doesn't have static variables.  So we jump through hoops.
     if not "passphrase" in dir( PassPhraseCB ):
         # Prompt user if PASSPHRASEFILE does not exist or could not be read.
         from M2Crypto.util import passphrase_callback
@@ -180,7 +179,6 @@ def geni_am_response_handler(method, method_args):
 def dotty():
     counter = 0
     while threading.currentThread().keep_going:
-        # #@(%ing stupid Python #@(%s up the whitespace if you try "print"
         sys.stderr.write( ( "/-\\|"[ counter ] ) + "\010" )
         counter = ( counter + 1 ) & 3
         sys.stderr.flush()

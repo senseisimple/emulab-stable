@@ -153,7 +153,7 @@ sys.stdout.flush()
 params = {}
 params["slice_urn"]   = SLICEURN
 params["credentials"] = (sliver,)
-while True: # #@(%ing Python doesn't have do loops
+while True:
     rval,response = do_method("cm", "SliverStatus", params, quiet=True, version="2.0")
     if rval:
         sys.stdout.write( "*" )
@@ -162,8 +162,7 @@ while True: # #@(%ing Python doesn't have do loops
     elif response[ "value" ][ "status" ] == "ready":
         break
     elif response[ "value" ][ "status" ] == "changing" or response[ "value" ][ "status" ] == "mixed":
-        sys.stdout.write( "." ) # #@(%ing stupid Python #@(%s up the
-                                # whitespace if you try "print"
+        sys.stdout.write( "." )
         sys.stdout.flush()
         time.sleep( 3 )
     else:
