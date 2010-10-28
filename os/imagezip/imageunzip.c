@@ -1082,7 +1082,7 @@ write_subblock(int chunkno, const char *chunkbufp)
 	writebuf_t	*wbuf;
 	off_t		offset, size, bytesleft;
 	
-	offset = chunkno * CHUNKSIZE;
+	offset = (off_t)chunkno * CHUNKSIZE;
 	bytesleft = CHUNKSIZE;
 	while (bytesleft > 0) {
 		size = (bytesleft >= OUTSIZE) ? OUTSIZE : bytesleft;
