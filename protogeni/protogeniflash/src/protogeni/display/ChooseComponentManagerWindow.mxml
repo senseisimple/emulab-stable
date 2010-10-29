@@ -260,7 +260,7 @@
 			
 	<mx:HBox width="100%" horizontalAlign="right">
 	<mx:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true"/>
-	<display:ImageButton id="refreshButton" source="@Embed('../images/arrow_refresh.png')" click="Main.protogeniHandler.rpcHandler.loadComponentManagers();"/>
+	<display:ImageButton id="refreshButton" source="{DisplayUtil.refreshIcon}" click="Main.protogeniHandler.rpcHandler.loadComponentManagers();"/>
 	<mx:Spacer width="100%"/>
 	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 	<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 
@@ -269,7 +269,7 @@
 	</mx:VBox>
 	<mx:ControlBar>
 		<mx:Spacer width="100%"/>
-		<mx:Button id="cancelButton" label="Cancel" icon="@Embed('../images/cross.png')" click="close();"/>
-		<mx:Button id="okButton" label="Apply" icon="@Embed('../images/tick.png')" click="success();" enabled="false"/>
+		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" click="close();"/>
+		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" enabled="false"/>
 	</mx:ControlBar>
 </display:DefaultWindow>

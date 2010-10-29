@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:display="protogeni.display.*"
-		 title="User Information" icon="@Embed(source='../../../images/user.png')" width="400" height="300">
+		 title="User Information" icon="{DisplayUtil.userIcon}" width="400" height="300">
 	
 	<mx:Script>
 		<![CDATA[

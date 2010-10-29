@@ -272,7 +272,7 @@
 			<mx:Label text="Queued Requests"  fontWeight="bold" fontSize="12"/>
 			<mx:HBox width="100%" horizontalAlign="center">
 				<display:ImageButton id="startButton"
-									 source="@Embed('../images/control_play_blue.png')"
+									 source="{DisplayUtil.playIcon}"
 									 click="Main.protogeniHandler.rpcHandler.start();"
 									 toolTip="Force start the queue" />
 			</mx:HBox>

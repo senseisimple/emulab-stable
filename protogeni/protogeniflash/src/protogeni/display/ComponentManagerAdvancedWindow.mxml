@@ -110,7 +110,7 @@
 									 click="openGraph()"
 									 toolTip="View the graph information" />
 				<display:ImageButton id="messageButton"
-									 source="@Embed('../images/flag_red.png')"
+									 source="{DisplayUtil.flagRedIcon}"
 									 click="viewMessage()"
 									 toolTip="View Message" />
 			</mx:GridItem>

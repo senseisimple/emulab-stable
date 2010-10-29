@@ -70,6 +70,8 @@
 				else imgExclusive.toolTip = "Exclusive";
 				
 				this.diskImageText.text = n.getDiskImageShort();
+				this.starupCommandText.text = n.startupCommand;
+				this.tarfilesText.text = n.tarfiles;
 				
 				if(node.rspec != null)
 					this.rspecButton.source = DisplayUtil.pageWhiteCodeIcon;
@@ -205,7 +207,7 @@
 				<mx:GridItem width="100%">
 					<mx:Label id="idLabel" text="{node.id}" fontSize="17" fontWeight="bold" width="100%" selectable="true"/>
 					<display:ImageButton id="physicalButton"
-										 source="@Embed('../images/drive_network.png')"
+										 source="{DisplayUtil.physicalNodeIcon}"
 										 click="DisplayUtil.viewPhysicalNode(node.physicalNode)"
 										 toolTip="View physical node" visible="false" />
 					<display:ImageButton id="rspecButton"
