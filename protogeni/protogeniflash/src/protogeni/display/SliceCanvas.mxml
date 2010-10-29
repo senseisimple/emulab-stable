@@ -127,6 +127,30 @@
 				hostWindow.loadNodes();
 			}
 			
+			public function refreshStatus():void
+			{
+				switch(this.slice.Status())
+				{
+					case Sliver.STATUS_READY:
+						this.setStyle("borderColor", "green");
+						this.setStyle("backgroundColor", "#CCFFCC");
+						break;
+					case Sliver.STATUS_FAILED:
+						this.setStyle("borderColor", "red");
+						this.setStyle("backgroundColor", "#FFD9D9");
+					case Sliver.STATUS_CHANGING:
+					case Sliver.STATUS_NOTREADY:
+					case Sliver.STATUS_UNKOWN:
+					case Sliver.STATUS_MIXED:
+						this.setStyle("borderColor", "#FF7F00");
+						this.setStyle("backgroundColor", "#FFE0C1");
+						break;
+					default:
+						this.setStyle("borderColor", "#CDC2C2");
+						this.setStyle("backgroundColor", "#F6F6F6");
+				}
+			}
+			
 			private  function dragEnterHandler(event:DragEvent):void {
 				if (event.dragSource.hasFormat("canvas") ||
 					event.dragSource.hasFormat("marker") ||

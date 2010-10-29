@@ -72,11 +72,15 @@
 		
 		[Bindable]
 		public var slivers:SliverCollection;
+		[Bindable]
 		public var hostname:String;
 		public var sshdport:String;
 		
+		[Bindable]
 		public var error:String;
+		[Bindable]
 		public var state:String;
+		[Bindable]
 		public var status:String;
 		
 		public static var STATUS_CHANGING:String = "changing";

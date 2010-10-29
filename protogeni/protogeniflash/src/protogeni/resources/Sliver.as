@@ -32,8 +32,8 @@
 		public static var STATUS_READY:String = "ready";
 		public static var STATUS_NOTREADY:String = "notready";
 		public static var STATUS_FAILED:String = "changing";
-		public static var STATUS_UNKOWN:String = "ready";
-		public static var STATUS_MIXED:String = "notready";
+		public static var STATUS_UNKOWN:String = "unknown";
+		public static var STATUS_MIXED:String = "mixed";
 		
 		public var created:Boolean = false;
 	    

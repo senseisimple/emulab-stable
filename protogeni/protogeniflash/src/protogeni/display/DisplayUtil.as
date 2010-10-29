@@ -79,7 +79,7 @@
 
         [Bindable]
         [Embed(source="../../../images/cross.png")]
-        public static var notAvailableIcon:Class;
+        public static var crossIcon:Class;
         
         [Bindable]
         [Embed(source="../../../images/drive_network.png")]
@@ -193,7 +193,7 @@
 			if (val)
 	            return availableIcon;
 	        else
-	            return notAvailableIcon;
+	            return crossIcon;
         }
         
         // Gets the icon for the given node
@@ -205,7 +205,7 @@
 	            if (val.available)
 	                return availableIcon;
 	            else
-	                return notAvailableIcon;
+	                return cancelIcon;
             }
         }
         
@@ -214,7 +214,7 @@
 			if(val.Status == ComponentManager.VALID)
 				return availableIcon;
 			else
-				return notAvailableIcon;
+				return crossIcon;
         }
 		
 		public static function getLogMessageButton(msg:LogMessage):Button {
