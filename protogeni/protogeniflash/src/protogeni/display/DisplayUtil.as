@@ -84,6 +84,10 @@
         [Bindable]
         [Embed(source="../../../images/drive_network.png")]
         public static var ownedIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/drive_network.png")]
+		public static var physicalNodeIcon:Class;
         
         [Bindable]
         [Embed(source="../../../images/link.png")]

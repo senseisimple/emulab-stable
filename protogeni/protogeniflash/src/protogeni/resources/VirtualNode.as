@@ -257,12 +257,13 @@
 			var nodeTypeXml:XML = <node_type />;
 			nodeTypeXml.@type_name = nodeType;
 			nodeTypeXml.@type_slots = 1;
+			result.appendChild(nodeTypeXml);
 			
 			if(startupCommand.length > 0)
-				nodeTypeXml.@startup_command = startupCommand;
+				result.@startup_command = startupCommand;
 			
 			if(tarfiles.length > 0)
-				nodeTypeXml.@tarfiles = tarfiles;
+				result.@tarfiles = tarfiles;
 			
 			if(diskImage.length > 0)
 			{

@@ -211,11 +211,11 @@
 											 click="Main.protogeniHandler.mapHandler.zoomToPhysicalNode(node)"
 											 toolTip="View Advertisement RSPEC" />
 						<display:ImageButton id="componentButton"
-							source="@Embed('../images/page_white_code.png')"
+							source="{DisplayUtil.pageWhiteCodeIcon}"
 							click="viewComponentRspec()"
 							toolTip="View Advertisement RSPEC" />
 						<display:ImageButton id="sliverButton"
-							source="@Embed('../images/page_code.png')"
+							source="{DisplayUtil.pageCodeIcon}"
 							click="viewSliverRspec()"
 							toolTip="View Request RSPEC" visible="false" />
 					</mx:GridItem>
