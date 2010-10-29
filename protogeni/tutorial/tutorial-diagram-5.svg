@@ -9,40 +9,41 @@
    xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="792pt"
-   height="612pt"
+   width="912.97253"
+   height="427.72058"
    id="svg3237"
    sodipodi:version="0.32"
    inkscape:version="0.46"
    sodipodi:docname="tutorial-diagram-5.svg"
-   inkscape:output_extension="org.inkscape.output.svg.inkscape">
+   inkscape:output_extension="org.inkscape.output.svg.inkscape"
+   version="1.0">
   <defs
      id="defs3239">
     <marker
        inkscape:stockid="Arrow1Mend"
        orient="auto"
-       refY="0.0"
-       refX="0.0"
+       refY="0"
+       refX="0"
        id="Arrow1Mend"
-       style="overflow:visible;">
+       style="overflow:visible">
       <path
          id="path4203"
-         d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z "
-         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none;"
-         transform="scale(0.4) rotate(180) translate(10,0)" />
+         d="M 0,0 L 5,-5 L -12.5,0 L 5,5 L 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(-0.4,0,0,-0.4,-4,0)" />
     </marker>
     <marker
        inkscape:stockid="Arrow1Lend"
        orient="auto"
-       refY="0.0"
-       refX="0.0"
+       refY="0"
+       refX="0"
        id="Arrow1Lend"
-       style="overflow:visible;">
+       style="overflow:visible">
       <path
          id="path4197"
-         d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z "
-         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none;"
-         transform="scale(0.8) rotate(180) translate(12.5,0)" />
+         d="M 0,0 L 5,-5 L -12.5,0 L 5,5 L 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(-0.8,0,0,-0.8,-10,0)" />
     </marker>
     <linearGradient
        inkscape:collect="always"
@@ -101,7 +102,7 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="1.2279853"
+     inkscape:zoom="0.43415837"
      inkscape:cx="555.55959"
      inkscape:cy="445.78776"
      inkscape:current-layer="layer1"
@@ -109,8 +110,8 @@
      showgrid="false"
      inkscape:window-width="950"
      inkscape:window-height="772"
-     inkscape:window-x="131"
-     inkscape:window-y="181" />
+     inkscape:window-x="486"
+     inkscape:window-y="530" />
   <metadata
      id="metadata3243">
     <rdf:RDF>
@@ -125,12 +126,13 @@
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
-     id="layer1">
+     id="layer1"
+     transform="translate(-59.020446,-64.957536)">
     <path
        sodipodi:nodetypes="ccccc"
        id="path17716"
        d="M 766.51201,310.53085 C 767.05004,309.57778 768.80446,309.20584 769.3191,310.53085 C 769.3191,315.43569 769.38927,319.38746 769.3191,323.64142 C 768.50036,324.78046 767.40092,324.68747 766.60558,323.64142 C 766.46523,319.38746 766.48862,315.43569 766.51201,310.53085 z"
-       style="fill:#0059a4;fill-rule:evenodd;stroke:#000000;stroke-width:0.55965381999999997;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1" />
+       style="fill:#0059a4;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.55965382;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
     <path
        sodipodi:nodetypes="cssc"
        id="path17718"
@@ -160,7 +162,7 @@
        sodipodi:nodetypes="ccccc"
        id="path17732"
        d="M 719.67183,310.5419 C 719.08325,309.58883 717.16394,309.21689 716.60095,310.5419 C 716.60095,315.44674 716.52418,319.39851 716.60095,323.65247 C 717.49662,324.79151 718.69939,324.69852 719.56947,323.65247 C 719.72302,319.39851 719.69742,315.44674 719.67183,310.5419 z"
-       style="fill:#0059a4;fill-rule:evenodd;stroke:#000000;stroke-width:0.58536087999999997;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1" />
+       style="fill:#0059a4;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.58536088;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
     <path
        sodipodi:nodetypes="cssc"
        id="path17734"
@@ -190,7 +192,7 @@
        sodipodi:nodetypes="ccccc"
        id="path17746"
        d="M 719.75256,310.87263 C 742.12864,303.45206 741.85171,313.7118 766.38786,311.00168 C 766.33248,312.55032 766.38786,321.77763 766.49863,323.51985 C 741.57478,326.42355 741.85171,314.48612 719.86333,323.26175 C 719.91871,321.58405 719.86333,312.87296 719.75256,310.87263 z"
-       style="fill:#005aa4;fill-rule:evenodd;stroke:#000000;stroke-width:0.71738482000000003;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;fill-opacity:1" />
+       style="fill:#005aa4;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.71738482;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1" />
     <path
        sodipodi:nodetypes="cccc"
        id="path17748"
@@ -564,11 +566,11 @@
       </g>
     </g>
     <path
-       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.50000000000000000;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend)"
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.5;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend);stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        d="M 594.25321,345.79812 C 602.31479,277.85056 640.31935,211.05466 710.57022,196.08316"
        id="path13518" />
     <path
-       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.50000000000000000;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend)"
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.5;marker-start:none;marker-mid:none;marker-end:url(#Arrow1Mend);stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        d="M 755.4847,232.93608 C 754.33305,305.49025 737.05825,353.8597 690.99211,378.04442"
        id="path15604" />
   </g>

@@ -8,53 +8,54 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   width="792pt"
-   height="612pt"
+   width="951.40411"
+   height="731.53174"
    id="svg23313"
    sodipodi:version="0.32"
    inkscape:version="0.46"
    sodipodi:docname="slice.svg"
-   inkscape:output_extension="org.inkscape.output.svg.inkscape">
+   inkscape:output_extension="org.inkscape.output.svg.inkscape"
+   version="1.0">
   <defs
      id="defs23315">
     <marker
        inkscape:stockid="Arrow2Send"
        orient="auto"
-       refY="0.0"
-       refX="0.0"
+       refY="0"
+       refX="0"
        id="Arrow2Send"
-       style="overflow:visible;">
+       style="overflow:visible">
       <path
          id="path4227"
-         style="font-size:12.0;fill-rule:evenodd;stroke-width:0.62500000;stroke-linejoin:round;"
-         d="M 8.7185878,4.0337352 L -2.2072895,0.016013256 L 8.7185884,-4.0017078 C 6.9730900,-1.6296469 6.9831476,1.6157441 8.7185878,4.0337352 z "
-         transform="scale(0.3) rotate(180) translate(-2.3,0)" />
+         style="font-size:12px;fill-rule:evenodd;stroke-width:0.625;stroke-linejoin:round"
+         d="M 8.7185878,4.0337352 L -2.2072895,0.016013256 L 8.7185884,-4.0017078 C 6.97309,-1.6296469 6.9831476,1.6157441 8.7185878,4.0337352 z"
+         transform="matrix(-0.3,0,0,-0.3,0.69,0)" />
     </marker>
     <marker
        inkscape:stockid="Arrow1Send"
        orient="auto"
-       refY="0.0"
-       refX="0.0"
+       refY="0"
+       refX="0"
        id="Arrow1Send"
-       style="overflow:visible;">
+       style="overflow:visible">
       <path
          id="path4209"
-         d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z "
-         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none;"
-         transform="scale(0.2) rotate(180) translate(6,0)" />
+         d="M 0,0 L 5,-5 L -12.5,0 L 5,5 L 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(-0.2,0,0,-0.2,-1.2,0)" />
     </marker>
     <marker
        inkscape:stockid="Arrow1Lend"
        orient="auto"
-       refY="0.0"
-       refX="0.0"
+       refY="0"
+       refX="0"
        id="Arrow1Lend"
-       style="overflow:visible;">
+       style="overflow:visible">
       <path
          id="path4197"
-         d="M 0.0,0.0 L 5.0,-5.0 L -12.5,0.0 L 5.0,5.0 L 0.0,0.0 z "
-         style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none;"
-         transform="scale(0.8) rotate(180) translate(12.5,0)" />
+         d="M 0,0 L 5,-5 L -12.5,0 L 5,5 L 0,0 z"
+         style="fill-rule:evenodd;stroke:#000000;stroke-width:1pt;marker-start:none"
+         transform="matrix(-0.8,0,0,-0.8,-10,0)" />
     </marker>
     <inkscape:perspective
        sodipodi:type="inkscape:persp3d"
@@ -79,8 +80,8 @@
      showgrid="false"
      inkscape:window-width="1014"
      inkscape:window-height="823"
-     inkscape:window-x="93"
-     inkscape:window-y="257" />
+     inkscape:window-x="408"
+     inkscape:window-y="248" />
   <metadata
      id="metadata23319">
     <rdf:RDF>
@@ -95,7 +96,8 @@
   <g
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
-     id="layer1">
+     id="layer1"
+     transform="translate(-12.903156,-20.565084)">
     <path
        style="fill:none;fill-opacity:1;stroke:#0000ff;stroke-width:27;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.09411765"
        d="M 573.29677,515.81135 C 578.18283,447.40662 600.9844,416.46162 648.21624,385.51662"
@@ -107,7 +109,7 @@
        d="M 776.88228,624.93317 C 609.12782,564.67186 612.38519,281.28085 770.36754,234.04901"
        style="fill:none;fill-opacity:1;stroke:#e1e1ff;stroke-width:27;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" />
     <path
-       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.50999999999999979;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:none;fill-opacity:1;stroke:#000000;stroke-width:3.50999999;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        d="M 776.88228,624.93317 C 609.12782,564.67186 612.38519,281.28085 770.36754,234.04901"
        id="path23908"
        sodipodi:nodetypes="cc" />
@@ -117,12 +119,12 @@
        id="path23932"
        sodipodi:nodetypes="cc" />
     <path
-       style="fill:none;fill-opacity:1;stroke:#fa0000;stroke-width:27;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.09411765000000000;marker-end:none"
+       style="fill:none;fill-opacity:1;stroke:#fa0000;stroke-width:27;stroke-linejoin:miter;marker-end:none;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:0.09411765"
        d="M 563.52467,97.239553 C 607.49913,27.206141 677.53255,17.434037 745.93728,71.18061"
        id="path23930"
        sodipodi:nodetypes="cc" />
     <rect
-       style="fill:#e1e1ff;fill-opacity:1;stroke:#f0f0f0;stroke-width:3.50999998999999985;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:#e1e1ff;fill-opacity:1;stroke:#f0f0f0;stroke-width:3.50999999;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect23906"
        width="618.8999"
        height="223.12971"
@@ -131,7 +133,7 @@
        rx="50.489204"
        ry="50.489204" />
     <rect
-       style="fill:#e1ffe1;fill-opacity:1;stroke:#f0f0f0;stroke-width:3.50999998999999985;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:#e1ffe1;fill-opacity:1;stroke:#f0f0f0;stroke-width:3.50999999;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect23904"
        width="539.09448"
        height="133.55217"
@@ -140,7 +142,7 @@
        rx="50.489204"
        ry="50.489204" />
     <rect
-       style="fill:#ffe1e1;fill-opacity:1;stroke:#f0f0f0;stroke-width:3.50999998999999985;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:#ffe1e1;fill-opacity:1;stroke:#f0f0f0;stroke-width:3.50999999;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="rect23393"
        width="631.92938"
        height="273.61893"
@@ -161,11 +163,11 @@
          y="44.58461">&lt;rspec xmlns=&quot;...&quot; type=&quot;request&quot;&gt;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
-         y="84.704575"
+         y="84.704567"
          id="tspan23328"> &lt;node virtual_id=&quot;client&quot;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
-         y="124.82453"
+         y="124.82452"
          id="tspan23330">       component_manager_uuid=&quot;...&quot;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
@@ -173,7 +175,7 @@
          id="tspan23332">       ...&gt;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
-         y="205.06445"
+         y="205.06444"
          id="tspan23334">  &lt;interface virtual_id=&quot;int1&quot; /&gt;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
@@ -197,7 +199,7 @@
          id="tspan23344"> &lt;/node&gt;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
-         y="445.78421"
+         y="445.78418"
          id="tspan23346"> &lt;link virtual_id=&quot;link&quot;&gt;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
@@ -213,7 +215,7 @@
          id="tspan23352">  ...</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
-         y="606.26398"
+         y="606.26404"
          id="tspan23354"> &lt;/link&gt;</tspan><tspan
          sodipodi:role="line"
          x="14.614328"
@@ -221,7 +223,7 @@
          id="tspan23356">&lt;/rspec&gt;</tspan></text>
     <path
        sodipodi:type="arc"
-       style="fill:#ffe1e1;fill-opacity:1;stroke:#000000;stroke-width:3.50999998999999985;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:#ffe1e1;fill-opacity:1;stroke:#000000;stroke-width:3.50999999;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        id="path23358"
        sodipodi:cx="808.6416"
        sodipodi:cy="176.23073"
@@ -245,7 +247,7 @@
        sodipodi:cy="176.23073"
        sodipodi:cx="808.6416"
        id="path23379"
-       style="fill:#e1ffe1;fill-opacity:1;stroke:#000000;stroke-width:3.50999998999999985;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       style="fill:#e1ffe1;fill-opacity:1;stroke:#000000;stroke-width:3.50999999;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
        sodipodi:type="arc"
        transform="translate(0,420.20047)" />
     <text
