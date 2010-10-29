@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -142,13 +142,22 @@ TraceDump(int serverrel, int level)
 			fprintf(fd, "%c: ", evisclient ? 'C' : 'S');
 			switch (ptr->event) {
 			case EV_JOINREQ:
-				fprintf(fd, "%s: JOIN request, ID=%lx\n",
-					inet_ntoa(ptr->srcip), ptr->args[0]);
+				fprintf(fd, "%s: JOIN request, ID=%lx, vers=%lu\n",
+					inet_ntoa(ptr->srcip), ptr->args[0],
+					ptr->args[1]);
 				break;
 			case EV_JOINREP:
-				fprintf(fd, "%s: JOIN reply, blocks=%lu\n",
-					inet_ntoa(ptr->srcip), ptr->args[0]);
+			{
+				unsigned long long bytes;
+				bytes = (unsigned long long)ptr->args[2] << 32;
+				bytes |= ptr->args[3];
+				fprintf(fd, "%s: JOIN reply, "
+					"chunksize=%lu, blocksize=%lu, "
+					"imagebytes=%llu\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1], bytes);
 				break;
+			}
 			case EV_LEAVEMSG:
 				fprintf(fd, "%s: LEAVE msg, ID=%lx, time=%lu\n",
 					inet_ntoa(ptr->srcip),
@@ -359,11 +368,17 @@ TraceDump(int serverrel, int level)
 					inet_ntoa(ptr->srcip), ptr->args[0]);
 				break;
 			case EV_CLIJOINREP:
-				fprintf(fd, "%s: got JOIN reply, blocks=%lu, "
-					"blocksize=%lu\n",
-					inet_ntoa(ptr->srcip), ptr->args[0],
-					ptr->args[1]);
+			{
+				unsigned long long bytes;
+				bytes = (unsigned long long)ptr->args[2] << 32;
+				bytes |= ptr->args[3];
+				fprintf(fd, "%s: got JOIN reply, "
+					"chunksize=%lu, blocksize=%lu, "
+					"imagebytes=%llu\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1], bytes);
 				break;
+			}
 			case EV_CLILEAVE:
 			{
 				unsigned long long bytes;
@@ -380,6 +395,12 @@ TraceDump(int serverrel, int level)
 					inet_ntoa(ptr->srcip), ptr->args[0],
 					ptr->args[1], ptr->args[2]);
 				break;
+			case EV_CLIREDO:
+				fprintf(fd, "%s: redo needed on chunk %lu, "
+					"lastreq at %lu.%06lu\n",
+					inet_ntoa(ptr->srcip), ptr->args[0],
+					ptr->args[1], ptr->args[2]);
+				break;
 			case EV_CLIDCSTART:
 				fprintf(fd, "%s: decompressing chunk %lu, "
 					"idle=%lu, (dblock=%lu, widle=%lu)\n",
@@ -388,19 +409,21 @@ TraceDump(int serverrel, int level)
 					ptr->args[2], ptr->args[3]);
 				break;
 			case EV_CLIDCDONE:
-				fprintf(fd, "%s: chunk %lu decompressed, "
-					"%lu left, (dblock=%lu, widle=%lu)\n",
+				fprintf(fd, "%s: chunk %lu (%lu bytes) "
+					"decompressed, %lu left\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
-					ptr->args[2], ptr->args[3]);
+					ptr->args[2]);
 				break;
 			case EV_CLIDCSTAT:
 			{
 				unsigned long long bytes;
 				bytes = (unsigned long long)ptr->args[0] << 32;
 				bytes |= ptr->args[1];
-				fprintf(fd, "%s: decompressed %llu bytes total\n",
-					inet_ntoa(ptr->srcip), bytes);
+				fprintf(fd, "%s: decompressed %llu bytes total"
+					" (dblock=%lu, widle=%lu)\n",
+					inet_ntoa(ptr->srcip), bytes,
+					ptr->args[2], ptr->args[3]);
 				break;
 			}
 			case EV_CLIDCIDLE:
