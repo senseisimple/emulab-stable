@@ -4,6 +4,39 @@
 	xmlns:protogeniflash="protogeniflash.*" initialize="init()" close="sliceStatusRefresher.stop()"
 	title="Slice" xmlns:display="protogeni.display.*" xmlns:resources="protogeni.resources.*" xmlns:s="library://ns.adobe.com/flex/spark">
 	
+	<mx:Style>
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+			borderColor:red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+			borderColor:green;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+			borderColor:#B6B6B6;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+	</mx:Style>
+	
 	<mx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
@@ -129,6 +162,25 @@
 					this.rspecButton.source = DisplayUtil.pageWhiteIcon;
 					this.rspecButton.toolTip = "Sliver(s) not created yet";
 				}
+				
+				switch(this.sliceCanvas.slice.Status())
+				{
+					case Sliver.STATUS_READY:
+						this.hrnLabel.styleName = "validStyle";
+						break;
+					case Sliver.STATUS_FAILED:
+						this.hrnLabel.styleName = "failedStyle";
+					case Sliver.STATUS_CHANGING:
+					case Sliver.STATUS_NOTREADY:
+					case Sliver.STATUS_UNKOWN:
+					case Sliver.STATUS_MIXED:
+						this.hrnLabel.styleName = "inprogressStyle";
+						break;
+					default:
+						this.hrnLabel.styleName = "unknownStyle";
+				}
+				
+				this.sliceCanvas.refreshStatus();
 			}
 			
 			public function refreshSlice():void
@@ -166,7 +218,9 @@
 				if(this.autoRefreshCheckbox.selected
 					&& this.sliceCanvas.slice != null
 					&& this.sliceCanvas.slice.hasAllAllocatedResources()
-					&& Main.protogeniHandler.rpcHandler.queue.isEmpty())
+					&& Main.protogeniHandler.rpcHandler.queue.isEmpty()
+					&& this.sliceCanvas.slice.Status() != Slice.READY
+					&& this.sliceCanvas.slice.Status() != Slice.FAILED)
 					Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);
 			}
 			
@@ -177,7 +231,7 @@
 					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
 					{
 						if(!sn.node.isVirtual && sn.node.physicalNode == node)
-							return DisplayUtil.notAvailableIcon;
+							return DisplayUtil.cancelIcon;
 					}
 				}
 				return DisplayUtil.assignAvailabilityIcon(item as PhysicalNode);
@@ -253,9 +307,9 @@
 		]]>
 	</mx:Script>
 	<mx:HBox width="100%">
-		<mx:Label text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" selectable="true"/>
+		<mx:Label id="hrnLabel" text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" selectable="true"/>
 		<mx:Spacer width="100%"/>
-		<mx:Label text="{sliceCanvas.slice.urn}" selectable="true"/>
+		<mx:Label id="urnLabel" text="{sliceCanvas.slice.urn}" selectable="true"/>
 		<display:ImageButton id="rspecButton"
 							 source="{DisplayUtil.pageWhiteIcon}"
 							 click="viewRspecs()"

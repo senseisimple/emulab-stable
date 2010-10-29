@@ -86,7 +86,8 @@
 			public function setZoomButton(bounds:LatLngBounds):void {
 				zoomButton.addEventListener(MouseEvent.CLICK,
 					function zoomin(evt:MouseEvent):void {
-						var map:ProtogeniMap = Main.Pgmap().map;
+						var mapclient:protogeniflash = Main.Pgmap();
+						var map:ProtogeniMap = mapclient.map;
 						var bzl:Number  = map.getBoundsZoomLevel(bounds);
 				        if(map.getZoom() != bzl-1)
 				          map.setZoom(bzl-1);
