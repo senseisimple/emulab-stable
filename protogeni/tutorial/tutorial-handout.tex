@@ -1,15 +1,14 @@
 \documentclass{article}
-\title{GEC 8 ProtoGENI Tutorial}
-\date{20th July, 2010}
-\author{James Griffioen \and Hussamuddin Nasir \and Robert Ricci \and
-  Gary Wong}
+\title{GEC 9 ProtoGENI Tutorial}
+\date{November 2nd, 2010}
+\author{Jonathon Duerig \and James Griffioen \and Hussamuddin Nasir \and Robert Ricci}
 \begin{document}
 \maketitle
 \section{Basic slice operation}
 \begin{enumerate}
 \item Connect to the client machine:\\
 ssh to \emph{username}{\tt @users.emulab.net}\\
-{\tt cd /proj/gec8tutorial/scripts}
+{\tt cd /proj/gec9tutorial/scripts}
 \item Store your passphrase (optional):\\
 {\tt ./rememberpassphrase.py}
 \item Inspect your account:\\
@@ -39,12 +38,12 @@ Try editing a copy of {\tt gec.rspec}\\
 Please refer to the documentation available from:
 \begin{quote}{\tt http://www.netlab.uky.edu/p/instools/}\end{quote}
 \noindent{}Note that the instrumentation tools are available on {\tt users.emulab.net}, in:
-\begin{quote}{\tt /proj/gec8tutorial/tarfiles/INSTOOLSv3\_0.tgz}\end{quote}
+\begin{quote}{\tt /proj/gec9tutorial/tarfiles/INSTOOLSv3\_0.tgz}\end{quote}
 \begin{enumerate}
 \item To create an experiment:\\
 {\tt python createExp.py -n} \emph{slicename} {\tt $\backslash$}\\
 {\tt -m https://www.uky.emulab.net/protogeni/xmlrpc/cm
-rspecs/gec8-kentucky.rspec}
+rspecs/gec9-kentucky.rspec}
 \item To instrument this experiment:\\
 {\tt python instrumentize.py -n} \emph{slicename}
 \item To generate traffic from {\tt ky1} to {\tt ky2}:\\
@@ -53,5 +52,5 @@ rspecs/gec8-kentucky.rspec}
 
 \section{Emulab frontend}
 This part of the tutorial is described on the WWW:
-\begin{quote}{\tt http://www.protogeni.net/trac/protogeni/wiki/GEC8Tutorial}\end{quote}
+\begin{quote}{\tt http://www.protogeni.net/trac/protogeni/wiki/GEC9Tutorial}\end{quote}
 \end{document}
