@@ -29,29 +29,37 @@ execfile( "test-common.py" )
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
+print "Obtaining SA credential...",
+sys.stdout.flush()
 mycredential = get_self_credential()
-print "Got my SA credential. Looking for slice ..."
+print " "
 
 #
 # Lookup slice, delete before proceeding.
 #
+print "Looking up slice...",
+sys.stdout.flush()
 myslice = resolve_slice( SLICENAME, mycredential )
-print "Found the slice, asking for a credential ..."
+print " "
 
 #
 # Get the slice credential.
 #
+print "Obtaining slice credential...",
+sys.stdout.flush()
 slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential"
+print " "
 
 #
 # Delete the Slice
 #
-print "Deleting the slice"
+print "Deleting the slice...",
+sys.stdout.flush()
 params = {}
 params["credentials"] = (slicecred,)
 params["slice_urn"]   = SLICEURN
 rval,response = do_method("cm", "DeleteSlice", params, version="2.0")
+print " "
 if rval:
     Fatal("Could not delete slice")
     pass

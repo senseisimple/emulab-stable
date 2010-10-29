@@ -582,8 +582,8 @@ proc tb-set-link-loss {srclink args} {
 }
 
 # This takes two possible formats:
-# tb-set-link-est-bandwidth <link> <loss>
-# tb-set-link-est-bandwidth <src> <dst> <loss>
+# tb-set-link-est-bandwidth <link> <bandwidth>
+# tb-set-link-est-bandwidth <src> <dst> <bandwidth>
 proc tb-set-link-est-bandwidth {srclink args} {
     if {[llength $args] == 2} {
 	set dst [lindex $args 0]

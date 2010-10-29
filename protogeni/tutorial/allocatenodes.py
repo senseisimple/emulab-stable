@@ -53,15 +53,20 @@ else:
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
-print "Obtaining SA credential..."
+print "Obtaining SA credential...",
+sys.stdout.flush()
 mycredential = get_self_credential()
+print " "
 
 #
 # Lookup my ssh keys.
 #
 params = {}
 params["credential"] = mycredential
+print "Looking up SSH keys...",
+sys.stdout.flush()
 rval,response = do_method("sa", "GetKeys", params)
+print " "
 if rval:
     Fatal("Could not get my keys")
     pass
@@ -80,17 +85,22 @@ params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
 params["hrn"]        = SLICENAME
+print "Looking up slice...",
+sys.stdout.flush()
 rval,response = do_method("sa", "Resolve", params)
+print " "
 if rval:
     #
     # Create a slice. 
     #
-    print "Creating new slice called " + SLICENAME
+    print "Creating new slice called " + SLICENAME + "...",
+    sys.stdout.flush()
     params = {}
     params["credential"] = mycredential
     params["type"]       = "Slice"
     params["hrn"]        = SLICENAME
     rval,response = do_method("sa", "Register", params)
+    print " "
     if rval:
         Fatal("Could not create new slice")
         pass
@@ -101,16 +111,18 @@ else:
     #
     # Get the slice credential.
     #
-    print "Asking for slice credential for " + SLICENAME + "..."
+    print "Asking for slice credential for " + SLICENAME + "...",
+    sys.stdout.flush()
     myslice = response["value"]
     myslice = get_slice_credential( myslice, mycredential )
-    print "Got the slice credential."
+    print " "
     pass
 
 #
 # Create the sliver.
 #
-print "Creating the sliver..."
+print "Creating the sliver...",
+sys.stdout.flush()
 params = {}
 params["credentials"] = (myslice,)
 params["slice_urn"]   = SLICEURN
@@ -118,6 +130,7 @@ params["rspec"]       = rspec
 params["keys"]        = mykeys
 params["impotent"]    = impotent
 rval,response = do_method("cm", "CreateSliver", params, version="2.0")
+print " "
 if rval:
     Fatal("Could not create sliver")
     pass
@@ -140,7 +153,7 @@ sys.stdout.flush()
 params = {}
 params["slice_urn"]   = SLICEURN
 params["credentials"] = (sliver,)
-while True: # #@(%ing Python doesn't have do loops
+while True:
     rval,response = do_method("cm", "SliverStatus", params, quiet=True, version="2.0")
     if rval:
         sys.stdout.write( "*" )
@@ -149,8 +162,7 @@ while True: # #@(%ing Python doesn't have do loops
     elif response[ "value" ][ "status" ] == "ready":
         break
     elif response[ "value" ][ "status" ] == "changing" or response[ "value" ][ "status" ] == "mixed":
-        sys.stdout.write( "." ) # #@(%ing stupid Python #@(%s up the
-                                # whitespace if you try "print"
+        sys.stdout.write( "." )
         sys.stdout.flush()
         time.sleep( 3 )
     else:

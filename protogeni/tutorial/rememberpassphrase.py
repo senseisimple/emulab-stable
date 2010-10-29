@@ -34,7 +34,7 @@ if os.path.exists( PASSPHRASEFILE ):
     Fatal( "A passphrase has already been stored." )
 
 from M2Crypto.util import passphrase_callback
-while True: # #!(%ing Python doesn't have do loops
+while True:
     passphrase = passphrase_callback(0)
     if not os.path.exists(CERTIFICATE):
         print >> sys.stderr, "Warning:", CERTIFICATE, "not found; cannot " \

@@ -46,18 +46,22 @@ if len( args ) != 1:
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
-print "Obtaining SA credential..."
+print "Obtaining SA credential...",
+sys.stdout.flush()
 mycredential = get_self_credential()
+print " "
 
 #
 # Lookup the user.
 #
-print "Looking up user..."
+print "Looking up user...",
+sys.stdout.flush()
 params = {}
 params["hrn"] = args[ 0 ]
 params["credential"] = mycredential
 params["type"]       = "User"
 rval,response = do_method("sa", "Resolve", params)
+print " "
 if rval:
     Fatal("Could not resolve " + params[ "hrn" ] )
 
