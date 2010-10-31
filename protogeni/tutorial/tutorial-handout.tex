@@ -4,6 +4,8 @@
 \author{Jonathon Duerig \and James Griffioen \and Hussamuddin Nasir \and Robert Ricci}
 \begin{document}
 \maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
 \section{Basic slice operation}
 \begin{enumerate}
 \item Connect to the client machine:\\
@@ -35,22 +37,37 @@ Try editing a copy of {\tt gec.rspec}\\
 \end{itemize}
 
 \section{Instrumentation tools}
-Please refer to the documentation available from:
+Instructions for this part of the tutorial can be found online at:
 \begin{quote}{\tt http://www.netlab.uky.edu/p/instools/}\end{quote}
-\noindent{}Note that the instrumentation tools are available on {\tt users.emulab.net}, in:
-\begin{quote}{\tt /proj/gec9tutorial/tarfiles/INSTOOLSv3\_0.tgz}\end{quote}
-\begin{enumerate}
-\item To create an experiment:\\
-{\tt python createExp.py -n} \emph{slicename} {\tt $\backslash$}\\
-{\tt -m https://www.uky.emulab.net/protogeni/xmlrpc/cm
-rspecs/gec9-kentucky.rspec}
-\item To instrument this experiment:\\
-{\tt python instrumentize.py -n} \emph{slicename}
-\item To generate traffic from {\tt ky1} to {\tt ky2}:\\
-{\tt /usr/bin/traffic\_gen.sh} (on {\tt ky1})
-\end{enumerate}
+%\noindent{}Note that the instrumentation tools are available on {\tt users.emulab.net}, in:
+%\begin{quote}{\tt /proj/gec9tutorial/tarfiles/INSTOOLSv3\_0.tgz}\end{quote}
+%\begin{enumerate}
+%\item To create an experiment:\\
+%{\tt python createExp.py -n} \emph{slicename} {\tt $\backslash$}\\
+%{\tt -m https://www.uky.emulab.net/protogeni/xmlrpc/cm
+%rspecs/gec9-kentucky.rspec}
+%\item To instrument this experiment:\\
+%{\tt python instrumentize.py -n} \emph{slicename}
+%\item To generate traffic from {\tt ky1} to {\tt ky2}:\\
+%{\tt /usr/bin/traffic\_gen.sh} (on {\tt ky1})
+%\end{enumerate}
 
-\section{Emulab frontend}
-This part of the tutorial is described on the WWW:
+\section{Other Interfaces to ProtoGENI}
+If you have extra time, or a future date, you can try using the Emulab
+frontend to ProtoGENI, as described at:
 \begin{quote}{\tt http://www.protogeni.net/trac/protogeni/wiki/GEC9Tutorial}\end{quote}
+
+You can also try using the map interface, described at:
+\begin{quote}{\tt http://www.protogeni.net/trac/protogeni/wiki/MapClientManual}\end{quote}
+{\it Note: Flash is required to use the map interface}
+
+
+\section{Additional information}
+More information about using ProtoGENI can be found at:
+\begin{itemize}
+\item {\tt http://www.protogeni.net}
+\item {\tt http://www.protogeni.net/trac/protogeni/wiki/Tutorial}
+\item {\tt http://www.protogeni.net/trac/protogeni/wiki/API}
+\end{itemize}
+
 \end{document}
