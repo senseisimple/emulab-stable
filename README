@@ -1,11 +1,8 @@
-Emulab network testbed source release
-Version 5.0
-September 1, 2008
-University of Utah, Flux Research Group
+Welcome to Emulab!
 
-This is the first "official" release of the full current source code for the
-software that runs the Emulab network testbed at the University of Utah,
-as well as over 20 testbeds at other sites:
+This is the "official" source code for the software that runs the Emulab
+network testbed at the University of Utah, as well as dozens of testbeds at
+other sites around the world. 
 
    http://www.emulab.net/
 
@@ -16,38 +13,45 @@ and running.
 
 Emulab is being actively developed, so there may be features in deployed
 Emulabs (in particular, Utah's) that are not included in this release.
-In the future it is our intention to make new snapshots frequently.
-
+Emulab is also a research project, and is rapidly evolving to satisfy the
+needs of both our research needs and external researchers. For that reason,
+you might find bugs! We hope you will tell us about them (nicely) and maybe
+even help us to fix them. More on this below.
 
 HOW TO SETUP AN EMULAB
 The Emulab installation documentation is located on the Utah Emulab Wiki:
- http://users.emulab.net/trac/emulab/wiki/InstallRoot
-under "Installation Documentation".
-
+ https://users.emulab.net/trac/emulab/wiki/InstallRoot
+ 
 HOW TO UPDATE AN EMULAB
-Updating your existing Emulab is a bit harder than a fresh install,
-as different sites are running different combinations of FreeBSD,
-FreeBSD ports, and Emulab software.  A process that we hope will work
-for most sites is located on the Utah Emulab Wiki:
+Updating your existing Emulab is a bit harder than a fresh install, but is
+mostly automated. A process that we hope will work for most sites is
+located on the Utah Emulab Wiki:
  http://users.emulab.net/trac/emulab/wiki/InstallRoot
 under "Upgrade Documentation".
 
+TRACKING THE EMULAB SOURCE CODE
+We encourage you to track the Emulab source code in real time and stay
+current with our stable versions More info on how to access the
+Emulab source code repository is here:
+ http://users.emulab.net/trac/emulab/wiki/GitRepository
+
 MAILING LISTS
 If you are bringing up an Emulab, be sure to join the mailing list:
-    testbed-admins@flux.utah.edu
-    http://www.flux.utah.edu/mailman/listinfo/testbed-admins
+    emulab-admins@googlegroups.com
+    http://groups.google.com/group/emulab-admins
 which has open archives.
 
+Users of your Emulab should join the Emulab users groups, which is intended
+for all users of Emulabs anywhere, to help each:
+    emulab-users@googlegroups.com
+    http://groups.google.com/group/emulab-uses
 
 HELP/CONTACT INFORMATION
-For help and to report bugs and problems, mail
-   testbed-admins@flux.utah.edu   (preferable)
-      or
-   testbed-ops@flux.utah.edu      (if you insist on privacy)
+For help and to report bugs and problems, mail to
+   emulab-admins@googlegroups.com
 
-Don't be shy!  We may be able to get on the phone with you, too,
-for "big picture" issues and problems.
-
+Don't be shy! In most cases, you will have the same questions other people
+have. Search the archives too! There is lots of good information there.
 
 LICENSE
 See the file AGPL-COPYING for licensing conditions.  In summary, the
@@ -57,39 +61,28 @@ consists of the GNU General Public License version 3 (GPLv3) with a
 single short added Section 13, which requires that the source be freely
 available to all users who interact with the software through a network.
 
-
 DOCUMENTATION
-We are in the process of moving all our documentation to the Utah Emulab
-wiki at
-  http://users.emulab.net/trac/emulab/wiki/ .
-Soon, but not yet, that should be considered the primary source of
-information.
+All of the Emulab documentation is available from the Utah Emulab site:
+  http://users.emulab.net/trac/emulab/wiki
 
-Within this source tree,
-- doc/* contains documentation for developers.
-- www/*.html and www/{doc,tutorial}/*.html contain end-user documentation,
-  all linked from www/doc.php3.
+We encourage people to help us improve our documentation. If you want to
+make changes, please apply for an account at Utah; anyone with an account
+at the Utah Emulab is allowed to edit the wiki pages.
 
 Other good places to start would include:
-  - The search box at www.emulab.net for the absolutely latest FAQs and info
-  - The user tutorial (www/tutorial/tutorial.html)
-  - The user FAQ (www/faq.html)
-  - The user authorization document (www/auth.html)
-  - Software architecture preliminary diagram (doc/arch-diagram.ps)
-  - Notes on the source tree and architecture (doc/arch.txt)
-  - Overview of some major systems (doc/overview.txt)
-  - The doc/papers directory, which contains a few of the papers we've
-    published about Emulab  
-  - Diagrams and brief explanations of the state machines used in the 
-    system (www/doc/states.html and www/doc/*.gif)
-  - Mail we have exchanged with others about hardware recommendations
-    (doc/hardware-mail.mbox)
+  - The search box at www.emulab.net
+  - The Emulab Wiki (http://users.emulab.net/trac/emulab/wiki)
+  - Getting Started document (http://users.emulab.net/trac/emulab/wiki/Auth)
+  - The user tutorial (http://users.emulab.net/trac/emulab/wiki/Tutorial)
+  - The user FAQ (http://users.emulab.net/trac/emulab/wiki/FAQ)
+  - Papers and talks about Emulab (http://www.emulab.net/pubs.php3)
+  - Papers using Emulab (http://www.emulab.net/expubs.php)
 
 
 QUICK TOUR
- - The Database maintains most testbed state.
-   * LibDB (db/libdb.pm.in) and the assorted modules (db/*.pm.in) are the
-     main DB interface for testbed software.
+ - The Database maintains most testbed state. 
+   * Assorted modules (db/*.pm.in) are the main DB interface for testbed
+     software.
    * sql/database-create.sql contains the DB schema.
    
  - The Web Interface (www/*) is the primary means of managing and
@@ -167,27 +160,6 @@ wiki      -  Support for per-project WIKIs
 www       -  Web Interface / User Documentation
 xmlrpc    -  Programatic XML-RPC interface to testbed
 
-UPGRADING FROM the 4.9.0 RELEASE
-There are a surprising number of differences given that we have only
-advanced 0.1 in version!  In a nutshell:
-
- * Updated FreeBSD packages from FreeBSD 6.1-era to 6.3-era
- * Much more of the documentation has moved into the Wiki
- * Changes to the (unused) "protogeni" code
- * Improvements to the installation scripts
- * Integration of code/fixes from Keith Sklower and DETER (Thanks!)
- * Assorted fixes
-
-If you did install the 4.9 release on FreeBSD 6.3, and want to upgrade
-to 5.0 (you should), it should be straightforward.  You will need to apply
-the sql/database-migrate.txt changes 4.157 to 4.160 (which are all trivial)
-and rebuild and reinstall your Emulab software.
-
-It would be good to also update your ports.  In theory, this is all handled
-by a magic script we provide.  Refer to the "Update ports" section of
-  http://users.emulab.net/trac/emulab/wiki/appendix/upgrade-410-63.html
-
 Good luck!
-Jay Lepreau, lepreau@cs.utah.edu, and the Utah testbed crew.
-September 1, 2008
+The Emulab Team
 
