@@ -169,7 +169,7 @@ sub Create($$$$)
     # For now, all tickets expire very quickly ...
     #
     $self->{'redeem_before'} =
-	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (5*60)));
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (10*60)));
 
     #
     # Locally generated tickets need a local DB index, which can be the
