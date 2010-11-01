@@ -165,7 +165,10 @@
 </mx:Script>
 
 	<mx:ApplicationControlBar dock="true">
-		<mx:Label text="ProtoGENI" fontWeight="bold" fontSize="12"/>
+		<display:ImageButton id="infoButton"
+							 source="@Embed('../images/protogeni-logo.png')"
+							 click="showAbout()"
+							 toolTip="View more information about ProtoGENI" />
 		<mx:VRule height="14"/>
 		<display:ImageButton id="refreshButton"
 			source="{DisplayUtil.refreshIcon}"
@@ -213,10 +216,6 @@
 							 source="{DisplayUtil.helpIcon}"
 							 click="Util.showManual()"
 							 toolTip="View more information" />
-		<display:ImageButton id="infoButton"
-			source="@Embed('../images/information.png')"
-			click="showAbout()"
-			toolTip="View more information" />
 	</mx:ApplicationControlBar>
 
 	<display:ProtogeniMap id="map" />

@@ -66,6 +66,14 @@
 		public static var helpIcon:Class;
 		
 		[Bindable]
+		[Embed(source="../../../images/arrow_left.png")]
+		public static var leftIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/arrow_right.png")]
+		public static var rightIcon:Class;
+		
+		[Bindable]
 		[Embed(source="../../../images/user.png")]
 		public static var userIcon:Class;
 		
@@ -224,13 +232,21 @@
 		public static function getLogMessageButton(msg:LogMessage):Button {
 			var logButton:Button = new Button();
 			logButton.label = msg.name;
+			logButton.toolTip = msg.groupId;
 			if(msg.isError)
 			{
 				logButton.setStyle("icon",DisplayUtil.errorIcon);
 				logButton.styleName = "failedStyle";
 			}
 			else
-				logButton.setStyle("icon",DisplayUtil.availableIcon);
+			{
+				if(msg.type == LogMessage.TYPE_START)
+					logButton.setStyle("icon",DisplayUtil.rightIcon);
+				else if(msg.type == LogMessage.TYPE_END)
+					logButton.setStyle("icon",DisplayUtil.leftIcon);
+				else
+					logButton.setStyle("icon",DisplayUtil.availableIcon);
+			}
 			logButton.addEventListener(MouseEvent.CLICK,
 				function openLog():void {
 					var logw:LogMessageWindow = new LogMessageWindow();

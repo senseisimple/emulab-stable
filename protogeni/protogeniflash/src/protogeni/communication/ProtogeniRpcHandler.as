@@ -185,7 +185,7 @@
 			var op:Operation = start.start();
 			op.call(complete, failure);
 			Main.log.setStatus(start.name, false);
-			Main.log.appendMessage(new LogMessage(op.getUrl(), "Send: " + start.name, op.getSendXml(), false, LogMessage.TYPE_START));
+			Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSendXml(), false, LogMessage.TYPE_START));
 				
 			Main.protogeniHandler.dispatchQueueChanged();
 			
@@ -286,7 +286,7 @@
 					Main.log.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponseXml(), true, LogMessage.TYPE_END));
 				} else {
 					Main.log.setStatus(node.name + " done", false);
-					Main.log.appendMessage(new LogMessage(node.op.getUrl(), "Response: " + node.name, node.op.getResponseXml(), false, LogMessage.TYPE_END));
+					Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponseXml(), false, LogMessage.TYPE_END));
 				}
 				next = node.complete(code, response);
 			}
