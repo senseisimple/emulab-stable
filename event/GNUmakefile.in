@@ -20,7 +20,7 @@ endif
 ifeq ($(SYSTEM),FreeBSD)
 FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
 FBSDMAJ := $(basename $(FBSDREL))
-SUBDIRS	       += sched stated
+SUBDIRS	       += sched new_sched stated
 ifneq ($(FBSDMAJ),8)
 # doesn't build right now due to API changes
 SUBDIRS	       += delay-agent
@@ -44,6 +44,7 @@ etc-subdir:
 install: 
 	@$(MAKE) -C lib install
 	@$(MAKE) -C sched install
+	@$(MAKE) -C new_sched install
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
@@ -57,6 +58,7 @@ control-install:
 	@$(MAKE) -C lib control-install
 	@$(MAKE) -C tbgen control-install
 	@$(MAKE) -C sched control-install
+	@$(MAKE) -C new_sched control-install
 	@$(MAKE) -C linktest control-install
 	@$(MAKE) -C program-agent control-install
 	@$(MAKE) -C proxy control-install

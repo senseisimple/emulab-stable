@@ -82,8 +82,6 @@ def is_urn( u ):
 	    val == 0x7E ): urn += chr( val )
         else: urn += '%' + m.group( 2 )
         u = m.group( 3 )
-        # this is only so $#&*(#%ing ugly because Python does not know
-        # that assignments are expressions
         m = re.match( "([^%]*)%([0-9A-Fa-f]{2})(.*)", u )
     urn += u
 

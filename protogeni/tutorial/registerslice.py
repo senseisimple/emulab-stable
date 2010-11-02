@@ -36,8 +36,10 @@ if len(REQARGS) == 1:
 #
 # Get a credential for myself, that allows me to do things at the SA.
 #
+print "Obtaining SA credential...",
+sys.stdout.flush()
 mycredential = get_self_credential()
-print "Got my SA credential"
+print " "
 
 #
 # Lookup slice, delete before proceeding.
@@ -46,7 +48,10 @@ params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
 params["hrn"]        = SLICENAME
+print "Looking for existing slice...",
+sys.stdout.flush()
 rval,response = do_method("sa", "Resolve", params)
+print " "
 if rval == 0:
     print "Deleting previously registered slice";
     params = {}
@@ -62,12 +67,14 @@ if rval == 0:
 #
 # Create a slice. 
 #
-print "Creating new slice called " + SLICENAME
+print "Creating new slice called " + SLICENAME + "...",
+sys.stdout.flush()
 params = {}
 params["credential"] = mycredential
 params["type"]       = "Slice"
 params["hrn"]        = SLICENAME
 rval,response = do_method("sa", "Register", params)
+print " "
 if rval:
     Fatal("Could not get my slice")
     print str(rval)

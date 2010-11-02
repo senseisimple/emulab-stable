@@ -70,7 +70,7 @@ if debug:
 params = {}
 params["slice_urn"]   = SLICEURN
 params["credentials"] = (slivercred,)
-while True: # #@(%ing Python doesn't have do loops
+while True:
     rval,response = do_method("cm", "SliverStatus", params, version="2.0")
     if rval:
         Fatal("Could not get sliver status")

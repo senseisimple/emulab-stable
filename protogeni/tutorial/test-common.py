@@ -18,6 +18,8 @@ import xmlrpclib
 import M2Crypto
 from M2Crypto import X509
 import socket
+import time;
+import threading;
 
 # Debugging output.
 debug           = 0
@@ -160,7 +162,6 @@ def PassPhraseCB(v, prompt1='Enter passphrase:', prompt2='Verify passphrase:'):
     else:
         if debug:
             print 'passphrase file %s does not exist' % (PASSPHRASEFILE)
-    # %.(&ing Python doesn't have static variables.  So we jump through hoops.
     if not "passphrase" in dir( PassPhraseCB ):
         # Prompt user if PASSPHRASEFILE does not exist or could not be read.
         from M2Crypto.util import passphrase_callback
@@ -174,6 +175,14 @@ def geni_am_response_handler(method, method_args):
     value, or an XML RPC Fault if there was a problem.
     """
     return apply(method, method_args)
+
+def dotty():
+    counter = 0
+    while threading.currentThread().keep_going:
+        sys.stderr.write( ( "/-\\|"[ counter ] ) + "\010" )
+        counter = ( counter + 1 ) & 3
+        sys.stderr.flush()
+        time.sleep( 0.125 )
 
 #
 # Call the rpc server.
@@ -246,26 +255,46 @@ def do_method(module, method, params, URI=None, quiet=False, version=None,
         # This is the case when running the GENI AM.
         return response_handler(meth, params)
 
+    if not quiet:
+        t = threading.Thread( None, dotty )
+        t.daemon = True
+        t.keep_going = True
+        t.start()
     #
     # Make the call. 
     #
-    try:
-        response = apply(meth, meth_args)
-        pass
-    except xmlrpclib.Fault, e:
-        if not quiet: print >> sys.stderr, e.faultString
-        return (-1, None)
-    except xmlrpclib.ProtocolError, e:
-        if not quiet: print >> sys.stderr, e.errmsg
-        return (-1, None)
-    except M2Crypto.SSL.Checker.WrongHost, e:
-        if not quiet:
-            print >> sys.stderr, "Warning: certificate host name mismatch."
-            print >> sys.stderr, "Please consult:"
-            print >> sys.stderr, "    http://www.protogeni.net/trac/protogeni/wiki/HostNameMismatch"            
-            print >> sys.stderr, "for recommended solutions."
-            print >> sys.stderr, e
-        return (-1, None)
+    while True:
+        try:
+            response = apply(meth, meth_args)
+            break
+        except xmlrpclib.Fault, e:
+            if not quiet:
+                t.keep_going = False
+                print >> sys.stderr, e.faultString
+            if e.faultCode == 511:
+                print >> sys.stderr, "Will try again in a moment. Be patient!"
+                time.sleep(5.0)
+                continue
+                pass
+            return (-1, None)
+        except xmlrpclib.ProtocolError, e:
+            if not quiet:
+                t.keep_going = False
+                print >> sys.stderr, e.errmsg
+            t.keep_going = False
+            return (-1, None)
+        except M2Crypto.SSL.Checker.WrongHost, e:
+            if not quiet:
+                t.keep_going = False
+                print >> sys.stderr, "Warning: certificate host name mismatch."
+                print >> sys.stderr, "Please consult:"
+                print >> sys.stderr, "    http://www.protogeni.net/trac/protogeni/wiki/HostNameMismatch"            
+                print >> sys.stderr, "for recommended solutions."
+                print >> sys.stderr, e
+                pass
+            return (-1, None)
+
+    if not quiet: t.keep_going = False
 
     #
     # Parse the Response, which is a Dictionary. See EmulabResponse in the
@@ -310,12 +339,28 @@ def resolve_slice( name, selfcredential ):
         params["urn"]       = name
     else:
         params["hrn"]       = name
-    rval,response = do_method("sa", "Resolve", params)
-    if rval:
-        Fatal("Slice does not exist");
         pass
-    else:
-        return response["value"]
+    
+    count = 2
+    while True:
+        rval,response = do_method("sa", "Resolve", params)
+        if rval:
+            if rval == 14:
+                if count:
+                    print " Will try again in a few seconds"
+                    count = count - 1;
+                    time.sleep(5.0)
+                else:
+                    Fatal("Giving up, busy for too long");
+                    pass
+            else:
+                Fatal("Slice does not exist");
+                pass
+            pass
+        else:
+            break
+        pass
+    return response["value"]
 
 def get_slice_credential( slice, selfcredential ):
     if slicecredentialfile:
@@ -331,8 +376,25 @@ def get_slice_credential( slice, selfcredential ):
         params["urn"]       = slice["urn"]
     else:
         params["uuid"]      = slice["uuid"]
-    rval,response = do_method("sa", "GetCredential", params)
-    if rval:
-        Fatal("Could not get Slice credential")
+        pass
+
+    count = 2
+    while True:
+        rval,response = do_method("sa", "GetCredential", params)
+        if rval:
+            if rval == 14:
+                if count:
+                    print " Will try again in a few seconds"
+                    count = count - 1;
+                    time.sleep(5.0)
+                else:
+                    Fatal("Giving up, busy for too long");
+                    pass
+            else:
+                Fatal("Could not get Slice credential")
+                pass
+            pass
+        else:
+            break
         pass
     return response["value"]

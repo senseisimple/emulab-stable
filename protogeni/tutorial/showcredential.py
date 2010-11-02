@@ -118,7 +118,6 @@ def ShowCredential( cred, level ):
     except Exception:
         return
     
-    # Pretend Python has better tail recursion support than it really does.
     ShowCredential( Lookup( parent, "credential" ), level + 1 )
 
 if len( sys.argv ) > 2:
