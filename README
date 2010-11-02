@@ -2,11 +2,11 @@ Welcome to Emulab!
 
 This is the "official" source code for the software that runs the Emulab
 network testbed at the University of Utah, as well as dozens of testbeds at
-other sites around the world. 
+other sites around the world.
 
-   http://www.emulab.net/
+    http://www.emulab.net/
 
-This is a snapshot of a rapidly-evolving system.  It contains all Emulab
+This is a snapshot of a rapidly evolving system.  It contains all Emulab
 source required to build a running testbed, but interaction with Emulab
 admins at Utah and elsewhere will likely be required to get things up
 and running.
@@ -14,26 +14,30 @@ and running.
 Emulab is being actively developed, so there may be features in deployed
 Emulabs (in particular, Utah's) that are not included in this release.
 Emulab is also a research project, and is rapidly evolving to satisfy the
-needs of both our research needs and external researchers. For that reason,
-you might find bugs! We hope you will tell us about them (nicely) and maybe
-even help us to fix them. More on this below.
+needs of both our research needs and external researchers.  For that reason,
+you might find bugs!  We hope you will tell us about them (nicely) and maybe
+even help us to fix them.  More on this below.
+
 
 HOW TO SETUP AN EMULAB
 The Emulab installation documentation is located on the Utah Emulab Wiki:
- https://users.emulab.net/trac/emulab/wiki/InstallRoot
- 
+    https://users.emulab.net/trac/emulab/wiki/InstallRoot
+
+
 HOW TO UPDATE AN EMULAB
 Updating your existing Emulab is a bit harder than a fresh install, but is
-mostly automated. A process that we hope will work for most sites is
+mostly automated.  A process that we hope will work for most sites is
 located on the Utah Emulab Wiki:
- http://users.emulab.net/trac/emulab/wiki/InstallRoot
-under "Upgrade Documentation".
+    http://users.emulab.net/trac/emulab/wiki/InstallRoot
+under "Upgrade Documentation."
+
 
 TRACKING THE EMULAB SOURCE CODE
 We encourage you to track the Emulab source code in real time and stay
-current with our stable versions More info on how to access the
+current with our stable versions.  More info on how to access the
 Emulab source code repository is here:
- http://users.emulab.net/trac/emulab/wiki/GitRepository
+    http://users.emulab.net/trac/emulab/wiki/GitRepository
+
 
 MAILING LISTS
 If you are bringing up an Emulab, be sure to join the mailing list:
@@ -41,33 +45,52 @@ If you are bringing up an Emulab, be sure to join the mailing list:
     http://groups.google.com/group/emulab-admins
 which has open archives.
 
-Users of your Emulab should join the Emulab users groups, which is intended
-for all users of Emulabs anywhere, to help each:
+Users of your Emulab should join the Emulab users group, which is intended
+for all users of Emulabs anywhere, to help each other:
     emulab-users@googlegroups.com
-    http://groups.google.com/group/emulab-uses
+    http://groups.google.com/group/emulab-users
+
 
 HELP/CONTACT INFORMATION
 For help and to report bugs and problems, mail to
-   emulab-admins@googlegroups.com
+    emulab-admins@googlegroups.com
 
-Don't be shy! In most cases, you will have the same questions other people
-have. Search the archives too! There is lots of good information there.
+Don't be shy!  In most cases, you will have the same questions other people
+have.  Search the archives, too!  There is lots of good information there.
 
-LICENSE
-See the file AGPL-COPYING for licensing conditions.  In summary, the
-Emulab software is distributed under a free and open source license, the
-GNU Affero General Public License version 3 (AGPLv3).  The AGPLv3
-consists of the GNU General Public License version 3 (GPLv3) with a
-single short added Section 13, which requires that the source be freely
+
+COPYRIGHT, LICENSE, AND DISTRIBUTION
+Emulab is copyrighted by the Flux Research Group and the University of Utah.
+
+This release of the Emulab software is distributed under the terms of the GNU
+Affero General Public License, version 3 (AGPLv3).  The AGPLv3 is a popular
+open source license; see the file AGPL-COPYING for licensing conditions.  The
+AGPLv3 consists of the GNU General Public License version 3 (GPLv3) with a
+single short addition (Section 13), which requires that the source be freely
 available to all users who interact with the software through a network.
+
+The Emulab source tree contains various third-party, open-source packages that
+are used by Emulab.  These third-party packages are copyrighted and licensed as
+described in their source files.
+
+The development of Emulab has been supported by numerous organizations
+including NSF, DARPA, Intel, HP, Microsoft, Novell, Nortel, and the University
+of Utah.  We thank all of these organizations for making Emulab possible.
+
+The following statement is required by DARPA and pertains to DARPA's support
+for portions of the Emulab software:
+
+    DoD Distribution Statement A: Approved for public release; distribution is
+    unlimited.
+
 
 DOCUMENTATION
 All of the Emulab documentation is available from the Utah Emulab site:
-  http://users.emulab.net/trac/emulab/wiki
+    http://users.emulab.net/trac/emulab/wiki
 
-We encourage people to help us improve our documentation. If you want to
+We encourage people to help us improve our documentation.  If you want to
 make changes, please apply for an account at Utah; anyone with an account
-at the Utah Emulab is allowed to edit the wiki pages.
+at the Utah Emulab is allowed to edit the Wiki pages.
 
 Other good places to start would include:
   - The search box at www.emulab.net
@@ -80,27 +103,27 @@ Other good places to start would include:
 
 
 QUICK TOUR
- - The Database maintains most testbed state. 
+ - The database maintains most testbed state.
    * Assorted modules (db/*.pm.in) are the main DB interface for testbed
      software.
    * sql/database-create.sql contains the DB schema.
-   
- - The Web Interface (www/*) is the primary means of managing and
-   interfacing with the system. There is also an experimental
+
+ - The Web interface (www/*) is the primary means of managing and
+   interfacing with the system.  There is also an experimental
    standalone GUI that uses this interface.
 
  - The tbsetup and backend directories contain the bulk of the server-side
    experiment setup and management code.
-   * startexp (tbsetup/startexp.in) is the backend for experiment creation;
-     Important scripts it calls include tbprerun (tbsetup/tbprerun.in) 
+   * startexp (tbsetup/startexp.in) is the back end for experiment creation.
+     Important scripts it calls include tbprerun (tbsetup/tbprerun.in)
      and tbswap (tbsetup/tbswap.in).
    * ns2ir (tbsetup/ns2ir/*) converts NS files to DB state (via TCL and XML).
    * snmpit (tbsetup/snmpit.in) configures VLANs on switch hardware.
 
  - assign (assign/*) maps experiments to available hardware.
 
- - The frisbee subsystem (os/frisbee.redux, os/imagezip) is used for creation
-   and rapid deployment of disk images.
+ - The frisbee subsystem (os/frisbee.redux, os/imagezip) is used for the
+   creation and rapid deployment of disk images.
 
  - The client-driven node configuration is handled by scripts on the client
    which communicate with the server via a custom configuration protocol.
@@ -116,12 +139,12 @@ SOURCE TREE ORGANIZATION
 account   -  Account creation and management
 apache    -  Apache HTTPD configuration
 assign    -  Resource allocation software
-backend	  -  Server-side of the Emulab XML RPC interface
+backend   -  Server-side of the Emulab XML-RPC interface
 bugdb     -  Optional per-project bug database
 capture   -  Node serial line server software
 cdrom     -  Software related to CD-booting local and remote machines
 collab    -  Optional per-project "collaboration" tools: CVS, jabber, mailman
-db        -  Variety of interfaces to testbed state 
+db        -  Variety of interfaces to testbed state
 delay     -  RHL9 patches for supporting "end-node" traffic shaping
 dhcpd     -  DHCPD configuration
 doc       -  Documentation (mainly internal)
@@ -137,7 +160,7 @@ mote      -  Initial testbed support for Berkeley/Crossbow motes
 named     -  BIND configuration files
 os        -  Client-side software (disk loading, route calculation, etc.)
 patches   -  Patches needed to compile standard software packages
-pelab     -  Preliminary support for "Flexlab", an Emulab/PlanetLab hybrid
+pelab     -  Preliminary support for "Flexlab," an Emulab/PlanetLab hybrid
                (see http://www.cs.utah.edu/flux/flexlab/)
 protogeni -  Evolving software for a prototype GENI system based on Emulab
                (see http://www.protogeni.net/)
@@ -156,10 +179,9 @@ tmcd      -  Testbed master control daemon and client (for node configuration)
 tools     -  Miscellaneous infrastructure tools
 utils     -  Testbed configuration and maintenance tools
 vis       -  Experiment visualization
-wiki      -  Support for per-project WIKIs
+wiki      -  Support for per-project Wikis
 www       -  Web Interface / User Documentation
 xmlrpc    -  Programatic XML-RPC interface to testbed
 
 Good luck!
 The Emulab Team
-

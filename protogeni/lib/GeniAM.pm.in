@@ -137,12 +137,30 @@ sub auto_add_sa($)
         print STDERR "auto_add_sa: certificate does not have a URI extension";
         return;
     }
-    # CheckExisting does not appear to do what I expect, but for now,
-    # follow the example set by protogeni/scripts/addauthority.
-    if (GeniAuthority->CheckExisting($certificate, "sa")) {
-        print STDERR "auto_add_sa: sa is already registered in the DB\n";
+    my $urn = $certificate->urn();
+    if (!defined($urn)) {
+        print STDERR "auto_add_sa: certificate does not have a URN extension";
         return;
     }
+    # Look to see if already registered.
+    my $authority = GeniAuthority->Lookup($urn);
+    if (defined($authority)) {
+	#
+	# See if the certificate has changed. If so we want to replace it.
+	#
+	return
+	    if ($certificate->SameCert($authority->GetCertificate()));
+
+	#
+	# Do nothing; needs more thought. The problem is that the caller
+	# could be from a conforming PG authority, and so setting the url
+	# to undef in the code below is wrong. We should probably probe the
+	# SA here, to see if it is conforming. Or maybe set the URL and not
+	# worry of the sliver registration throws an error. 
+	#
+	return;
+    }
+
     # if we're auto adding an authority, set the url to null
     # so the PG/Emulab machinery does not try to contact the
     # dynamic sa. It probably won't respond to the PG/Emulab
