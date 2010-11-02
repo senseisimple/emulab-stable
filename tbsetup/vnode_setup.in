@@ -172,7 +172,7 @@ if (defined($this_user) && !$this_user->IsAdmin() &&
 #
 my @nodes = $experiment->NodeList(1, 1);
 if (! @nodes) {
-    tbwarn("No allocated nodes in experiment $pid/$eid.");
+    # Silent.
     exit(0);
 }
 
