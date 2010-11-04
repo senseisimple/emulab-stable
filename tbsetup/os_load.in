@@ -32,10 +32,12 @@ sub usage()
 	  "       style==0: do not zero (same as not using -z)\n".
 	  "       style==1: let frisbee do the zeroing\n".
 	  "       style==2: zero disk before running frisbee\n".
-          "Use -P to prepare the disk as if a whole disk image was loaded\n");
+          "Use -P to prepare the disk as if a whole disk image was loaded\n".
+          "Use -F to force the load if Emulab tries to optimize it away\n".
+          "Use -R to push a reconfig to the node after the reload\n");
     exit(-1);
 }
-my $optlist   = "swldi:e:p:m:rz:Pc";
+my $optlist   = "swldi:e:p:m:rz:PcRF";
 my $waitmode  = 1;
 my $listonly  = 0;
 my $debug     = 0;
@@ -43,6 +45,8 @@ my $noreboot  = 0;
 my $zerofree  = 0;
 my $prepare   = 0;
 my $usecurrent= 0;
+my $reconfig  = 0;
+my $force     = 0;
 my @nodes     = ();
 my $imagepid;
 my $pid;
@@ -62,6 +66,8 @@ use Experiment;
 use Node;
 use OSinfo;
 use Image;
+use EmulabFeatures;
+use User;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -103,11 +109,16 @@ $prepare = 1
     if (defined($options{"P"}));
 $usecurrent = 1
     if (defined($options{"c"}));
+$reconfig = 1
+    if (defined($options{"R"}));
+$force   = 1
+    if (defined($options{"F"}));
 
 #
 # Figure out which nodes. Choice of nodes on command line, or all nodes in an
 # experiment. To get all free nodes, must use sched_reload. 
 # 
+my $experiment;
 if (defined($options{"e"})) {
     usage()
 	if (@ARGV);
@@ -118,7 +129,7 @@ if (defined($options{"e"})) {
 	$pid = $1;
 	$eid = $2;
 
-        my $experiment = Experiment->Lookup($pid, $eid);
+        $experiment = Experiment->Lookup($pid, $eid);
 	if (!defined($experiment)) {
 	    die("*** $0:\n".
 		"    No such experiment $pid/$eid!\n");
@@ -321,6 +332,26 @@ $osloadargs{'imageids'} = [ @imageids ]
     if (@imageids);
 $osloadargs{'swapinfo'} = 1;
 $osloadargs{'usecurrent'} = $usecurrent;
+
+my $user = User->ThisUser();
+if (EmulabFeatures->FeatureEnabled("NewOsload",$user,undef,$experiment)) {
+    require libosload_new;
+    my $loadobj = libosload_new->New();
+    $loadobj->debug($debug);
+    #
+    # XXX basically, tell devices that try not to reload (like switches)
+    # that they really need to do it -- if the user or reload daemon actually
+    # invokes this script, we *have* to reload!
+    #
+    $osloadargs{'force'} = $force;
+    #
+    # XXX basically, tell devices that might be reconfig'd via push from us
+    # (like switches) that a reconfig should follow the reload!
+    #
+    $osloadargs{'reconfig'} = $reconfig;
+
+    exit($loadobj->osload(\%osloadargs, \%failednodes));
+}
 
 exit(osload(\%osloadargs, \%failednodes));
 
