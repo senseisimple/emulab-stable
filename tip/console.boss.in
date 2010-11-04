@@ -10,15 +10,15 @@ use POSIX qw(setsid);
 use File::Temp qw(tempfile);
 
 #
-# Wrapper for console program; grab tipacl from XMLRPC server, and feed it
-# to the console binary.
+# Wrapper for console and tiptunnel programs; grab tipacl from XMLRPC server, 
+# and feed it to the appropriate binary.
 #
 sub usage()
 {
-    print(STDOUT "Usage: console [-d] pcXXX\n");
+    print(STDOUT "Usage: console.boss [-d] [-t -s <speed>] pcXXX\n");
     exit(-1);
 }
-my $optlist  = "dp:";
+my $optlist  = "dp:ts:";
 my @opts = ();
 
 #
@@ -27,6 +27,7 @@ my @opts = ();
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CONSOLEBIN  = "$TB/bin/console.bin";
+my $TIPTUNNELBIN = "$TB/bin/tiptunnel";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -63,6 +64,9 @@ if (! getopts($optlist, \%options)) {
     usage();
 }
 
+my $tipmode = 0;
+my $interactivetip = 1;
+
 # pass through select options
 if (defined($options{"d"})) {
     push @opts, "-d";
@@ -70,6 +74,23 @@ if (defined($options{"d"})) {
 if (defined($options{"p"})) {
     push @opts, "-p";
     push @opts, $options{"p"};
+}
+# are we going to run tiptunnel instead?
+if (defined($options{"t"})) {
+    $tipmode = 1;
+    push @opts, "-l";
+}
+if ($tipmode) {
+    # allow users to set serial line speed
+    if (defined($options{"s"})) {
+	push @opts, "-s";
+	push @opts, $options{"s"};
+	$interactivetip = 0;
+    }
+    # otherwise give them an interactive session
+    else {
+	push @opts, "-";
+    }
 }
 
 usage()
@@ -82,16 +103,18 @@ if (! defined($this_user)) {
     fatal("You ($UID) do not exist!");
 }
 
-#
-# Figure out who called us. Must have admin status to do this.
-#
-if (!$this_user->IsAdmin()) {
-    fatal("You must be a TB administrator to run this script!");
-}
-
 my $node = Node->Lookup($nodeid);
 if (!defined($node)) {
     fatal("No such node $nodeid");
+}
+
+#
+# Figure out who called us. Must have admin status to do this, OR must have
+# permission to mess with the node!
+#
+if (!$this_user->IsAdmin() 
+    && !$node->AccessCheck($this_user,TB_NODEACCESS_MAX)) {
+    fatal("You must be a TB administrator, or have permission to acces this node's serial console, to run this script!");
 }
 
 #
@@ -130,7 +153,17 @@ if (!$syspid) {
     unlink($tempfile);
     exit(0);
 }
-my @cmdargs = ($CONSOLEBIN, "-a", "$tempfile", @opts, "$nodeid");
+my @cmdargs;
+if ($tipmode) {
+    @cmdargs = ($TIPTUNNELBIN);
+}
+else {
+    @cmdargs = ($CONSOLEBIN);
+}
+push @cmdargs, "-a", "$tempfile", @opts, "$nodeid";
+if ($tipmode && $interactivetip) {
+    push @cmdargs, "-";
+}
 exec(@cmdargs);
 die("*** $0:\n".
     "    Exec failure: '@cmdargs'\n");
