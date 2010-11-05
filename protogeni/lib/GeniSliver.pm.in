@@ -686,13 +686,13 @@ sub Create($$$$$$)
 	GeniXML::SetText("hostname", $rspec, $hostname);
 	GeniXML::SetText("sshdport", $rspec, $sshdport)
 	    if (defined($sshdport));
-    } else {
-	my $services = GeniXML::AddElement("services", $rspec);
-	my $login = GeniXML::AddElement("login", $services);
-	GeniXML::SetText("authentication", $login, "ssh-keys");
-	GeniXML::SetText("hostname", $login, $phostname);
-	GeniXML::SetText("port", $login, $sshdport);
     }
+
+    my $services = GeniXML::AddElement("services", $rspec);
+    my $login = GeniXML::AddElement("login", $services);
+    GeniXML::SetText("authentication", $login, "ssh-keys");
+    GeniXML::SetText("hostname", $login, $phostname);
+    GeniXML::SetText("port", $login, $sshdport);
 
     my $sliver = GeniSliver->Create($slice, $user, $resource_uuid, "Node",
 				    $resource_id, $hrn, $nickname, $rspec);
