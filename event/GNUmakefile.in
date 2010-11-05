@@ -8,6 +8,7 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= event
+ISMAINSITE      = @TBMAINSITE@
 
 include $(OBJDIR)/Makeconf
 
@@ -20,7 +21,10 @@ endif
 ifeq ($(SYSTEM),FreeBSD)
 FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
 FBSDMAJ := $(basename $(FBSDREL))
-SUBDIRS	       += sched new_sched stated
+SUBDIRS	       += sched stated
+ifeq ($(ISMAINSITE),1)
+SUBDIRS        += new_sched
+endif
 ifneq ($(FBSDMAJ),8)
 # doesn't build right now due to API changes
 SUBDIRS	       += delay-agent
@@ -44,7 +48,9 @@ etc-subdir:
 install: 
 	@$(MAKE) -C lib install
 	@$(MAKE) -C sched install
+ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched install
+endif
 	@$(MAKE) -C tbgen install
 	@$(MAKE) -C stated install
 	@$(MAKE) -C linktest install
@@ -58,7 +64,9 @@ control-install:
 	@$(MAKE) -C lib control-install
 	@$(MAKE) -C tbgen control-install
 	@$(MAKE) -C sched control-install
+ifeq ($(ISMAINSITE),1)
 	@$(MAKE) -C new_sched control-install
+endif
 	@$(MAKE) -C linktest control-install
 	@$(MAKE) -C program-agent control-install
 	@$(MAKE) -C proxy control-install
