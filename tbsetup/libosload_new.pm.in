@@ -42,7 +42,6 @@ my $PROJROOT    = "@PROJROOT_DIR@";
 
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $SUBBOSS_FRISBEELAUNCHER = "$TB/sbin/subboss_frisbeelauncher_wrapper";
-my $osselect	    = "$TB/bin/os_select";
 my $TBUISP	    = "$TB/bin/tbuisp";
 #
 # Max number of retries (per node) before its deemed fatal. This allows
@@ -1869,11 +1868,89 @@ sub SetBootOS($$)
 
     print "$self ($nodeobject): Changing default OS to $osinfo\n";
     if (!$TESTMODE) {
-	system("$osselect $defosid $node_id");
-	if ($?) {
+	if ($nodeobject->OSSelect($osinfo,"def_boot_osid",$self->debug())) {
 	    tberror "$self ($nodeobject): os_select $defosid failed!";
 	    return -1;
 	}
+    }
+
+    return 0;
+}
+
+#
+# Save the current osid, def_boot_osid, and partitions info for this node.
+# This is not useful to most nodes, but for nodes where we *know* the reboot
+# has failed (and for which we don't want to lie about which OS is actually
+# on the node *because* we don't always force a reload if we think we know
+# what OS is on "disk" -- like for switches!), we can do a reset if we save
+# the old info.
+#
+# Note that none of this is called by default -- subclasses must manually
+# invoke if they need it!
+#
+sub SaveNodeDiskInfo($$)
+{
+    my ($self,$nodeobject) = @_;
+    my $node_id = $nodeobject->node_id();
+
+    $self->dprint("SaveNodeDiskInfo($node_id) saving partition and osid");
+
+    #
+    # Save the old ones off first!
+    #
+    my $dbres;
+    $dbres = DBQueryFatal("select node_id,partition,osid,imageid,imagepid" . 
+			  " from partitions where node_id='$node_id'");
+    if (defined($dbres) && $dbres->numrows()) {
+	my @rows = ();
+	while (my $rowref = $dbres->fetchrow_hashref()) {
+	    push @rows,$rowref;
+	}
+	$self->nodeinfo($nodeobject,'old_partitions',\@rows);
+    }
+
+    $dbres = DBQueryFatal("select osid,def_boot_osid" . 
+			  " from nodes where node_id='$node_id'");
+    if (defined($dbres) && $dbres->numrows()) {
+	my $rowref = $dbres->fetchrow_hashref();
+	$self->nodeinfo($nodeobject,'old_osid',$rowref->{'osid'});
+	$self->nodeinfo($nodeobject,'old_def_boot_osid',
+			$rowref->{'def_boot_osid'});
+    }
+    return 0;
+}
+
+#
+# Restore osid and partitions info if we saved it off!
+#
+sub RestoreNodeDiskInfo($$)
+{
+    my ($self,$nodeobject) = @_;
+    my $node_id = $nodeobject->node_id();
+
+    $self->dprint("RestoreNodeDiskInfo($node_id) restoring partition and osid");
+
+    my $partref = $self->nodeinfo($nodeobject,'old_partitions');
+    if (defined($partref) && @$partref) {
+	DBQueryFatal("delete from partitions where node_id='$node_id'");
+
+	foreach my $rowref (@$partref) {
+	    my ($part,$osid,$imageid,$imagepid) = 
+		( $rowref->{'partition'},$rowref->{'osid'},
+		  $rowref->{'imageid'},$rowref->{'imagepid'} );
+	    DBQueryFatal("insert into partitions " . 
+			 " (node_id,partition,osid,imageid,imagepid)" . 
+			 " values" . 
+			 " ('$node_id','$part','$osid','$imageid','$imagepid')");
+	}
+    }
+
+    my $osid = $self->nodeinfo($nodeobject,'old_osid');
+    my $def_boot_osid = $self->nodeinfo($nodeobject,'old_def_boot_osid');
+    if (defined($osid) && defined($def_boot_osid)) {
+	DBQueryFatal("update nodes set osid='$osid'," . 
+		     "                 def_boot_osid='$def_boot_osid'" . 
+		     " where node_id='$node_id'");
     }
 
     return 0;
@@ -2209,8 +2286,8 @@ sub SetupReload($$)
 	++$idx;
     }
 
-    system("$osselect -1 $osid $node_id");
-    if ($?) {
+    my $osinfo = OSinfo->Lookup($osid);
+    if ($nodeobject->OSSelect($osinfo,"next_boot_osid",$self->debug())) {
 	tberror "$self: os_select $osid failed!";
 	return -1;
     }
@@ -2440,8 +2517,9 @@ sub Reload($$)
     #
     TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADDONE);
 
-    system("$osselect $osid $node_id");
-    if ($?) {
+
+    my $osinfo = OSinfo->Lookup($osid);
+    if ($nodeobject->OSSelect($osinfo,"def_boot_osid",$self->debug())) {
 	tberror "$self ($nodeobject): os_select $osid failed!";
 	return -1;
     }

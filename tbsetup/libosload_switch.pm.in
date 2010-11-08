@@ -78,7 +78,6 @@ sub AUTOLOAD {
 my $TB		= "@prefix@";
 my $TESTMODE    = @TESTMODE@;
 my $TBOPS       = "@TBOPSEMAIL@";
-my $OSSELECT	= "$TB/bin/os_select";
 my $SSHTB       = "$TB/bin/sshtb";
 my $POWER       = "$TB/bin/power";
 my $USERS       = "@USERNODE@";
@@ -199,11 +198,16 @@ sub AddNode($$$$)
 
     #
     # Never force node reloads -- only reload if new/old image is actually
-    # different
+    # different.  So, if they haven't set a force flag, default it 0.
     #
     if (!defined($self->nodeflag($nodeobject,'force'))) {
 	$self->nodeflag($nodeobject,'force',0);
     }
+
+    #
+    # We never allow switches to be rebooted -- we control that ourselves.
+    # Power cycling during a flash operation could be disastrous.
+    #
     $self->nodeflag($nodeobject,'noreboot',1);
 
     return $retval;
@@ -214,7 +218,7 @@ sub GetMaxRetries($)
     return 0;
 }
 
-sub UpdatePartitions($$)
+sub PreSetupReload($$)
 {
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
@@ -251,6 +255,22 @@ sub UpdatePartitions($$)
 	    }
 	}
     }
+
+    #
+    # If we're really gonna do it, then save our state so we can restore
+    # if it seems like our load failed.
+    #
+    if ($self->nodeflag($nodeobject,'force',1)) {
+	$self->SaveNodeDiskInfo($nodeobject);
+    }
+
+    return $self->SUPER::PreSetupReload($nodeobject);
+}
+
+sub UpdatePartitions($$)
+{
+    my ($self,$nodeobject) = @_;
+    my $node_id = $nodeobject->node_id();
 
     if ($self->nodeflag($nodeobject,'force',1)) {
 	return $self->SUPER::UpdatePartitions($nodeobject);
@@ -755,7 +775,8 @@ sub Reload($$)
     TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADING);
 
     # try with tftp
-    $retval = $self->uploadImageTftp($nodeobject,$filename);
+    my $didflash = 0;
+    $retval = $self->uploadImageTftp($nodeobject,$filename,\$didflash);
     if ($retval < 0) {
 	if (defined($self->nodeinfo($nodeobject,'osload_allowxmodem'))
 	    && $self->nodeinfo($nodeobject,'osload_allowxmodem')) {
@@ -813,8 +834,8 @@ sub Reload($$)
     #
     TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADDONE);
 
-    system("$OSSELECT $osid $node_id");
-    if ($?) {
+    my $osinfo = OSinfo->Lookup($osid);
+    if ($nodeobject->OSSelect($osinfo,"def_boot_osid",$self->debug())) {
 	tberror "$self ($node_id): os_select $osid failed!";
 	goto failure;
     }
@@ -849,7 +870,10 @@ sub Reload($$)
 	
 
   failure:
-    ;
+    if (!$didflash) {
+	$self->RestoreNodeDiskInfo($nodeobject);
+    }
+
   done:
     # and finally remove this guy!
     $self->_undoTiptunnel($nodeobject);
@@ -1320,10 +1344,11 @@ sub writeConfig($$$) {
     return 0;
 }
 
-sub uploadImageTftp($$$) {
-    my ($self,$nodeobject,$filename) = @_;
+sub uploadImageTftp($$$;$) {
+    my ($self,$nodeobject,$filename,$flashedref) = @_;
     my $node_id = $nodeobject->node_id();
     my $retval;
+    my $didflash = 0;
 
     #
     # This must be done from the OS serial command prompt!  We need to disable
@@ -1379,6 +1404,8 @@ sub uploadImageTftp($$$) {
 					 [ '#\s*$', undef, 'line' ] ] });
     if ($retval < 0) {
 	tberror "$self uploadImageTftp($nodeobject): could not upload file via tftp: $retval,$!";
+	# we have to assume that it happened
+	$didflash = 1;
 	goto failure;
     }
 
@@ -1397,16 +1424,24 @@ sub uploadImageTftp($$$) {
     if (defined($errormsg)) {
 	tberror "$self Reload($node_id): tftp upload failed: $errormsg\n";
 	$retval = -2;
+	# we didn't actually flash anything
+	$didflash = 0;
 	goto failure;
     }
 
     $self->dprint("uploadImageTftp($nodeobject): tftp upload appears successful!");
 
     unlink($tmpfilename);
+    if (defined($flashedref)) {
+	$$flashedref = 1;
+    }
     return 0;
 
   failure:
     unlink($tmpfilename);
+    if (defined($flashedref)) {
+	$$flashedref = $didflash;
+    }
     return -1;
 }
 
