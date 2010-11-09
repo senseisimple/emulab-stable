@@ -1,0 +1,317 @@
+#!/usr/bin/perl 
+
+#
+# See http://users.emulab.net/trac/emulab/wiki/MergeBuild
+#
+
+use Cwd;
+use File::Temp qw(mktemp);
+
+use warnings;
+use strict;
+
+sub cd ($) {
+    print "cd $_[0]\n";
+    chdir $_[0] or die "Unable to cd to $_[0]\n";
+}
+
+sub echo_command (@) {
+    print "@_\n";
+}
+
+sub sys (@) {
+    my $ops = ref $_[0] ? shift : {};
+    echo_command @_ unless $ops->{quiet};
+    system @_;
+    my $failed = $? != 0;
+    my $ret = $? >> 8;
+    if ($failed && $ops->{ok_exit_code}) {
+	$failed = 0 if $ret == $ops->{ok_exit_code};
+    }
+    die "ERROR: @_ failed\n" if $failed && !$ops->{ignore_errors};
+    return $ret;
+}
+
+sub sysq (@) {
+    my $ops = ref $_[0] ? shift : {};
+    sys {%$ops, 'quiet'=>1}, @_;
+}
+
+sub sysp (@) {
+    my $cmd = join(' ', @_, '|');
+    #print "$cmd\n";
+    open F, $cmd or die $!;
+    local $/ = undef;
+    my $output = <F>;
+    close F;
+    die "ERROR: $cmd faild\n" unless $? == 0;
+    chop $output;
+    return $output;
+}
+
+sub usage() {
+    print "usage: merge-build prep|reset|sync\n";
+    exit(1);
+}
+
+#
+# Read config file
+#
+open F, ".merge-build" or die "Unable to open .merge-build\n";
+my $source_tree;
+my $merge_tree;
+my @branches;
+my $branches_str;
+my $merge_branch = "merge";
+my $merge_base = "merge-base";
+my $auto_reset = 1;
+while (<F>) {
+    s/#.+//;
+    next unless /\S/;
+    my ($key, $value) = /^\s*(\S+)\s+(.+?)\s*$/ or die "Bad Line\n";
+    if ($key eq 'source-tree') {
+	$source_tree = $value;
+    } elsif ($key eq 'merge-tree') {
+	$merge_tree = $value;
+    } elsif ($key eq 'branches') {
+	@branches = split /\s+/, $value;
+    } elsif ($key eq 'merge-branch') {
+	$merge_branch = $value;
+    } elsif ($key eq 'merge-base') {
+	$merge_base = $value;
+    } elsif ($key eq 'auto-reset') {
+	if ($value eq 'yes') { 
+	    $auto_reset = 1;
+	} elsif ($value eq 'no') {
+	    $auto_reset = 0;
+	} else {
+	    die "Expected \"yes\" or \"no\" for auto-reset value\n";
+	}
+    } else {
+	die "Unknown key in .merge-build: $key\n";
+    }
+}
+sub missing_key($) {die "Missing key in .merge-build: $_[0]\n";}
+missing_key('source-tree') unless defined $source_tree;
+missing_key('merge-tree') unless defined $merge_tree;
+missing_key('branches') unless @branches;
+@branches = map {"origin/$_"} @branches;
+my $branch_str = join ' ', @branches;
+
+#
+# Figure out where we are
+#
+sub same_file($$) {
+    my ($dev0,$ino0) = stat $_[0];
+    my ($dev1,$ino1) = stat $_[1];
+    return defined $dev0 && defined $dev1 && $dev0 == $dev1 && $ino0 == $ino1;
+}
+sub where_am_i() {
+    my $cwd = cwd();
+    if (same_file($cwd,"$cwd/$source_tree/$merge_tree")) {
+	return 'merge';
+    } elsif (same_file($cwd,"$cwd/$merge_tree/$source_tree")) {
+	return 'source';
+    } else {
+	die "I don't know where I am! Check that source-tree and merge-tree are correct.\n";
+    }
+}
+sub cd_source() {
+    cd $source_tree if where_am_i() eq 'merge';
+    die unless where_am_i() eq 'source';
+}
+sub cd_merge() {
+    cd $merge_tree if where_am_i() eq 'source';
+    die unless where_am_i() eq 'merge';
+}
+
+#
+#
+#
+
+#
+#
+#
+
+sub check_for_conflicts() {
+    my @files = split /\n/, sysp "git ls-files -u";
+    my %files;
+    foreach (@files) {
+	/\S+\s+\S+\s+\S+\s+(\S+)/ or die;
+	$files{$1} = 1;
+    }
+    my @ok;
+    my @unresolved;
+    foreach my $f (keys %files) {
+	local $/ = undef;
+	open F, $f or die $!;
+	local $_ = <F>;
+	if (/^={7}|^<{7}|^>{7}/m) {push @unresolved, $f}
+	else                      {push @ok, $f}
+    }
+    sys 'git', 'add', '--', @ok if @ok;
+    return @unresolved;
+}
+
+sub save_uncommited() {
+    cd_source();
+    print "Saving Uncommited Changes ...\n";
+    sysq "git update-index -q --refresh";
+    local $ENV{GIT_INDEX_FILE} = mktemp ".git/index.XXXXXX";
+    sysq "cp -p .git/index $ENV{GIT_INDEX_FILE}";
+    sysq "git add -A";
+    sysq "git reset -q .merge-build";
+    my $tree_id = sysp "git write-tree";
+    my $date = localtime();
+    my $msg = "Uncommitted changes: $date";
+    my $stash_id = sysp "echo '$msg' | git commit-tree $tree_id -p HEAD";
+    unlink($ENV{GIT_INDEX_FILE});
+    sysq ": >> .git/logs/build-stash"; # make sure the reflogs are kept.
+    sysq "git update-ref -m '$msg' build-stash $stash_id";
+    print "... done, commit id $stash_id\n";
+    return $stash_id;
+}
+
+sub apply_uncommited($) {
+    my ($stash_id) = @_;
+    my $ret = sys({ok_exit_code=>1},
+                  "git merge-recursive -- HEAD $stash_id");
+    if ($ret == 1) {
+	sys "git rerere";
+	my @unresolved = check_for_conflicts();
+	if (@unresolved) {
+	    print "Fix conflicts in:\n";
+	    print '  ', join (' ', @unresolved), "\n";
+	    print "and run \"git rerere\"\n";
+	    exit 1;
+	}
+    }
+}
+
+sub merge_base(@) {
+    cd_merge();
+    my $res = shift @_;
+    while (@_) {
+        my $other = shift @_;
+        $res = sysp "git merge-base $res $other";
+    }
+    return $res;
+}
+
+sub init($) {
+    my ($cmd) = @_;
+    cd_merge();
+    my $base = merge_base @branches;
+    sys "git $cmd $base";
+    #sys "git clean -f -d";
+    sys "git commit -q --allow-empty -m Marker";
+    sys "git tag -f merge-base";
+}
+
+sub notall { $_ || return 1 for @_; 0 }
+sub auto_reset() {
+    cd_merge();
+    my $merge_base = sysp "git rev-parse merge-base";
+    my $new_base = merge_base @branches;
+    open F, "git rev-list $branch_str ^$new_base |" or die $!;
+    my %source_commits;
+    while (<F>) {
+	chop;
+  	$source_commits{$_} = 1;
+    }
+    $source_commits{$merge_base} = 1;
+    close F or die $!;
+    cd_merge();
+    $/ = "\0";
+    open F, "git log --pretty=raw -z --first-parent --topo-order merge-base..HEAD | " or die $!;
+    my $reset_point;
+    my $last;
+    while (<F>) {
+	my ($commit) = /^commit (.+)$/m or die;
+	next if $source_commits{$commit};
+	my @parents = /^parent (.+)$/mg;
+	shift @parents;
+	next unless @parents;
+	$last = $commit;
+	$reset_point = $commit if notall map {$source_commits{$_}} @parents;
+    }
+    close F or die $!;
+    if ($reset_point) {
+	if ($reset_point eq $last) {
+	    print "Starting over\n"; 
+	    init("reset -q --hard");
+	} else {
+	    print "Need to reset to $reset_point^\n"; 
+	    sys "git reset -q --hard $reset_point^";
+	    #sys "git clean -f -d";
+	}
+    }
+}
+
+#
+# Finally, do the work
+#
+my $op = shift @ARGV || '';
+if ($op eq 'prep') {
+    if (-e $merge_tree) {
+	print "Fixing up existing merge tree...\n";
+	cd_merge();
+	sys "git checkout `git rev-parse HEAD`";
+	sys {ignore_errors=>1}, "git branch -D $merge_branch";
+    } else {
+	sys "git clone -sn . $merge_tree";
+	cd_merge();
+    }
+    sys "git config rerere.enabled true";
+    init("checkout -q -b $merge_branch");
+    sys "ln -s $source_tree/.merge-build" unless -e "$merge_tree/.merge-build";
+    print "Writing .git/info/exclude\n";
+    open F, ">.git/info/exclude";
+    print F ".merged\n";
+    print F ".merge-build\n";
+    close F;
+} elsif ($op eq 'reset') {
+    cd_merge();
+    sys "git fetch -q origin";
+    init("reset -q --hard");
+} elsif ($op eq 'auto-reset') {
+    cd_merge();
+    sys "git fetch -q origin";
+    auto_reset();
+} elsif ($op eq 'sync') {
+    cd_source();
+    my $stash_id = save_uncommited();
+    cd_merge();
+    sys "git fetch -q origin";
+    auto_reset() if $auto_reset;
+    sys "git reset -q --hard";
+    #sys "git clean -f -d";
+    foreach (@branches) {
+	unlink ".git/MERGE_HEAD";
+	my $cmd = "git merge -q $_";
+	echo_command $cmd;
+	open F, "$cmd |" or die $!;
+	my $conflicts = 0;
+	while (<F>) {
+	    print;
+	    $conflicts = 1 if /fix conflicts and then commit the result/;
+	}
+	close F;
+	my $failed = $? != 0;
+	$failed = 0 if $conflicts && ($? & 127) == 0 && -e ".git/MERGE_HEAD";
+	die "ERROR: $cmd faild\n" if $failed;
+	if ($conflicts) {
+	    my @unresolved = check_for_conflicts();
+	    if (@unresolved) {
+		exit (1);
+	    } else {
+		print "All conflicts resolved with rerere, continuing.\n";
+		sys "git commit -q -F .git/MERGE_MSG";
+	    }
+	}
+    }
+    apply_uncommited($stash_id);
+    sys "touch .merged";
+} else {
+    usage();
+}

@@ -1,7 +1,7 @@
 include ../../variables.mk
 
 BUSYBOX_CONFIG		=	$(SOURCE_PATH)/busybox/busybox.config
-BUSYBOX_VERSION		=	1.16.0
+BUSYBOX_VERSION		=	1.17.2
 BUSYBOX_PATH		=	$(TARGET_BUILD_PATH)/busybox-$(BUSYBOX_VERSION)
 
 .PHONY: extract patch config busybox

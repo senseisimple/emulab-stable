@@ -85,19 +85,21 @@ Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
-          [--of-disable name pid eid]
-          [--of-enable name pid eid]
-          [--of-controller name pid eid tcp:ip:port]
-          [--of-listener name pid eid]
+          [--redirect-err]
+          [--of-disable vlanid pid eid]
+          [--of-enable vlanid pid eid]
+          [--of-controller vlanid pid eid tcp:ip:port]
+          [--of-listener vlanid pid eid]
 General:
-  -h          Display this help message
-  -v <level>  Verbose mode
-  -q          Quiet mode
-  -n          Test mode - don't actually make any changes
-  -i <device> Operate on <device>, overriding default device list. Can be
-                  given multiple times
-  -S <stack>  Operate on the given stack, instead of the default of the
-                  experimental network
+  -h              Display this help message
+  -v <level>      Verbose mode
+  -q              Quiet mode
+  -n              Test mode - don't actually make any changes
+  -i <device>     Operate on <device>, overriding default device list. Can be
+                      given multiple times
+  -S <stack>      Operate on the given stack, instead of the default of the
+                      experimental network
+  --redirect-err  Redirect STDERR to STDOUT, for easier capturing in logfiles
 
 VLAN Control:
   -t <pid> <eid>    Create all VLANs for an experiment
@@ -127,19 +129,19 @@ VLAN Control:
                         WITH EXTREME CAUTION **
   -F                Create all vlans in the given stack on the leader for
 		    use in leader->{ALLVLANSONLEADER} (Internal use only)
-  --of-enable <name> <pid> <eid> 
-                    Enable Openflow on VLAN with the name <name> that is 
+  --of-enable <vlanid> <pid> <eid> 
+                    Enable Openflow on VLAN with the id <vlanid> that is 
 		        associated with the given experiment 
-  --of-disable <name> <pid> <eid>
-                    Disable Openflow on VLAN with the name <name> that is 
+  --of-disable <vlanid> <pid> <eid>
+                    Disable Openflow on VLAN with the id <vlanid> that is 
 		        associated with the given experiment
-  --of-controller <name> <pid> <eid> tcp:ip:port
+  --of-controller <vlanid> <pid> <eid> tcp:ip:port
                     Set controller for Openflow-enabled VLAN with the 
-		        name <name> that is associated with the given 
+		        id <vlanid> that is associated with the given 
 			experiment
-  --of-listener <name> <pid> <eid> 
+  --of-listener <vlanid> <pid> <eid> 
                     Enable listener for Openflow-enabled VLAN with the 
-		        name <name> that is associated with the given 
+		        id <vlanid> that is associated with the given 
 			experiment, snmpit will print out the listener 
 			connection string
 
@@ -174,11 +176,20 @@ GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
-    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
+    'redirect-err');
 # Unused: f,j
 
 if ($opt{h}) {
     exit &usage;
+}
+
+#
+# If requested, redirect STDERR to STDOUT - this makes it easier to capture
+# error output in logfiles
+#
+if ($opt{'redirect-err'}) {
+    open(STDERR, ">&STDOUT");
 }
 
 if ($opt{v}) {

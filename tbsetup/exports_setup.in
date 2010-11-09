@@ -47,6 +47,7 @@ my $scratchdir  = "@FSDIR_SCRATCH@";
 my $DISABLED	= "@DISABLE_EXPORTS_SETUP@";
 my $WINSUPPORT  = @WINSUPPORT@;
 my $ISOLATEADMIN= @ISOLATEADMINS@;
+my $NOSHAREDFS	= @NOSHAREDFS@;
 
 # XXX for TESTMODE: output to stdout
 my $TOSTDOUT	= 0;
@@ -67,8 +68,9 @@ my $EXPORT_PAT	= q(on ([\S]+)\s\(.*NFS exported.*\));
 
 #
 # Testbed doesn't support changing exports file
+# or we just do not export filesystems.
 #
-if ($DISABLED) {
+if ($DISABLED || $NOSHAREDFS) {
     exit(0);
 }
 

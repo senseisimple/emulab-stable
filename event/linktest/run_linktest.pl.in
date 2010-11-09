@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -10,13 +10,15 @@ use English;
 use POSIX;
 
 #
-# XXX config stuff that does not belong on the client-side
+# XXX config stuff that does not belong on the client-side.
+# Since run_linktest is typically run on ops instead of a client, I'll live.
 #
 my $TB            = "@prefix@";
 my $CLIENT_BINDIR = "@CLIENT_BINDIR@";
 my $EVENTSERVER   = "@EVENTSERVER@";
 my $PROJROOT      = "@PROJROOT_DIR@";
-
+my $NOSHAREDFS	  = "@NOSHAREDFS@";
+my $NODELOGDIR	  = "@CLIENT_VARDIR@/logs";
 #
 # Wrapper for running the linktest daemon. This script is currently
 # setup so it can run on either ops or from an experimental node.
@@ -24,15 +26,17 @@ my $PROJROOT      = "@PROJROOT_DIR@";
 sub usage()
 {
     print "Usage: run_linktest.pl ".
-	  "[-q] [-r] [-d level] [-t timeout] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
+	  "[-q] [-r] [-d level] [-t timeout] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] [-N] -e pid/eid\n".
 	  "Use -q for quick termination mode, which skips the Bandwidth test\n".
 	  "Use -r to report results, but not errors\n" .
           "Use -v for verbose feedback messages\n" .
-	  "Use -t <time> to set a timeout in seconds\n";
+	  "Use -t <time> to set a timeout in seconds\n" .
+	  "Use -N to use a per-node directory for data collection\n" .
+	  "   (default is to use a shared NFS directory).\n";
 	     
     exit(1);
 }
-my $optlist = "vqrd:s:p:k:e:L:l:o:t:";
+my $optlist = "vqrd:s:p:k:e:L:l:o:t:N";
 my $debug   = 0;
 my $verbose = 0;
 my $timeout = 0;
@@ -47,8 +51,13 @@ my $child_pid;
 my $startAt = 1; # default start level
 my $stopAt = 4 ; # default stop level
 
+my $nodelogdir = "";
+if ($NOSHAREDFS) {
+    # Must use node-local logdir if there is no shared FS
+    $nodelogdir = $NODELOGDIR;
+}
+
 # Local goo
-my $TMCC	= "$CLIENT_BINDIR/tmcc";
 my $LTEVENT     = "$CLIENT_BINDIR/ltevent";
 my $LOGHOLE     = "$TB/bin/loghole";
 my $LTEVENTOPS  = "$TB/libexec/ltevent";
@@ -169,6 +178,9 @@ if (defined($options{"o"})) {
 	    "    Bad data in logfile: $logfile\n");
     }
 }
+if (defined($options{"N"})) {
+    $nodelogdir = $NODELOGDIR;
+}
 if (defined($options{"p"})) {
     $port = $options{"p"};
     if ($port =~ /^(\d+)$/) {
@@ -216,14 +228,33 @@ if (!defined($server)) {
 }
 
 #
-# These days, must use a keyfile!
+# Assorted paths
 #
-if (!defined($keyfile)) {
-    $keyfile = "$PROJROOT/$pid/exp/$eid/tbdata/eventkey";
-}
+my $expdata_path = "$PROJROOT/$pid/exp/$eid/tbdata";
 
+# These days, must use a keyfile!
+if (!defined($keyfile)) {
+    $keyfile = "$expdata_path/eventkey";
+}
 # path to linktest data.
-my $linktest_path = "$PROJROOT/$pid/exp/$eid/tbdata/linktest";
+my $linktest_path = "$expdata_path/linktest";
+if ($NOSHAREDFS) {
+    #
+    # We have to make the log directory since it is not in a shared FS
+    # (normally the "master" linktest node would do this).
+    #
+    if (-e $linktest_path) {
+	die("Path $linktest_path is not a directory\n") 
+	    unless -d $linktest_path;
+	system("rm -rf $linktest_path/*");
+    } else {
+	# 
+	# The shared path does not exist, create it.
+	#
+	mkdir($linktest_path, 0775)
+	    || die("Could not create directory $linktest_path: $!");
+    }
+}
 
 # send the startup event.
 my $args = starter();
@@ -373,6 +404,45 @@ else {
 }
 
 #
+# If we don't have a shared filesystem where nodes can put their data,
+# we must collect it from each node first using loghole.
+#
+sub getdata($) {
+    my ($datadir) = @_;
+    my $tmpdir = "$expdata_path/tmp";
+
+    &run_loghole($datadir, $tmpdir);
+
+    # XXX move stuff up from where loghole leaves it
+    my @dir_contents;
+    opendir(DIR, "$tmpdir") ||
+	die("*** $0:\n".
+	    "    Cannot open $tmpdir\n");
+    my @nodes = grep(/^[-\w]+$/, readdir(DIR));
+    closedir(DIR);
+    foreach my $node (@nodes) {
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	}
+	my $nodedir = "$tmpdir/$node/$datadir";
+	opendir(DIR, $nodedir) ||
+	    die("*** $0:\n".
+		"    Cannot open $nodedir\n");
+	my @files = grep(/\.fatal$|\.error$/, readdir(DIR));
+	closedir(DIR);
+	foreach my $file (@files) {
+	    if ($file =~ /^([-\w\.\/]+)$/) {
+		$file = $1;
+		rename("$nodedir/$file", "$linktest_path/$file") ||
+		    die("*** $0:\n".
+			"    Cannot move $nodedir/$file to $linktest_path\n");
+	    }
+	}
+    }
+    system("rm -rf $tmpdir");
+}
+
+#
 # Spits out the results from the Linktest path,
 # with a return code that indicates whether errors were found
 # by Linktest on the nodes.
@@ -380,6 +450,10 @@ else {
 sub analyze($) {
     my ($timedout) = @_;    
     
+    if ($nodelogdir) {
+	&getdata("$nodelogdir/linktest");
+    }
+
     my @dir_contents;
     opendir(DIR, $linktest_path) ||
 	die("*** $0:\n".
@@ -472,16 +546,21 @@ sub kill_linktest_run {
     }
 }
 
-sub run_loghole {
-    my $ltlogs = "$PROJROOT/$pid/exp/$eid/tbdata/ltlogs";
+sub run_loghole(;$$) {
+    my ($remdir,$localdir) = @_;
 
-    print "Downloading logs...\n";
+    # defaults
+    if (!$remdir || !$localdir) {
+	$remdir = "/var/emulab/logs";
+	$localdir = "$PROJROOT/$pid/exp/$eid/tbdata/ltlogs";
+	print "Downloading logs...\n";
+    }
 
-    system("rm -rf $ltlogs");
-    system("mkdir -p $ltlogs");
-    system("chmod 775 $ltlogs");
-    system("$LOGHOLE -e $pid/$eid sync -P -n -l $ltlogs -r /var/emulab/logs ".
-	   "> $ltlogs/loghole.out 2>&1");
+    system("rm -rf $localdir");
+    system("mkdir -p $localdir");
+    system("chmod 775 $localdir");
+    system("$LOGHOLE -e $pid/$eid sync -P -n -l $localdir -r $remdir ".
+	   "> $localdir/loghole.out 2>&1");
 }
 
 sub TBTimeStamp {

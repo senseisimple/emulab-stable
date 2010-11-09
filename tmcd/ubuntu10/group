@@ -1,4 +1,4 @@
-root:x:0:stoller,rdjackso,ricci,johnsond,ayers,kevina,operator,danderse,dreading,gary,mike,elabckup
+root:x:0:
 daemon:x:1:
 bin:x:2:
 sys:x:3:

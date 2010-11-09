@@ -11,7 +11,12 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA = "Exporter";
-@EXPORT = qw(Parse ParseFile FindNodes FindNodesNS FindFirst FindElement FindAttr IsLanNode IsLocalNode GetNodeId GetVirtualId GetManagerId SetText GetText CreateDocument AddElement PolicyExists);
+@EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
+FindFirst FindElement FindAttr IsLanNode IsLocalNode IsTunnel GetExpires
+GetNodeId GetVirtualId GetSliverId GetManagerId GetColocate GetSubnodeOf
+GetVirtualizationType SetVirtualizationType GetVirtualizationSubtype
+GetExclusive SetExclusive GetLinkManager SetText GetText Serialize
+CreateDocument AddElement RemoveChild PolicyExists);
 
 use English;
 use XML::LibXML;
@@ -21,7 +26,11 @@ use GeniHRN;
 use GeniUtil;
 use Carp qw(cluck carp);
 
-# Configure variables
+use vars qw($RSPEC_0_1 $RSPEC_0_2 $RSPEC_2);
+$RSPEC_0_1 = "0.1";
+$RSPEC_0_2 = "0.2";
+$RSPEC_2 = "2";
+
 # Configure variables
 my $TB		   = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
@@ -58,6 +67,33 @@ sub ParseFile($)
     } else {
 	return $doc->documentElement();
     }
+}
+
+# Determines the rspec version of a node by examining is namespace URI
+sub GetVersion($)
+{
+    my ($node) = @_;
+    my $result = $RSPEC_0_1;
+    my $ns = $node->namespaceURI();
+    if (defined($ns)) {
+	if ($ns =~ /protogeni.net\/resources\/rspec\/0.1$/) {
+	    $result = $RSPEC_0_1;
+	} elsif ($ns =~ /protogeni.net\/resources\/rspec\/0.2$/) {
+	    $result = $RSPEC_0_2;
+	} elsif ($ns =~ /protogeni.net\/resources\/rspec\/2$/) {
+	    $result = $RSPEC_2;
+	} else {
+	    carp("Unknown rspec namespace: " . $ns);
+	    $result = $RSPEC_0_1;
+	}
+    }
+    return $result;
+}
+
+sub IsVersion0($)
+{
+    my $version = GetVersion($_[0]);
+    return $version eq $RSPEC_0_1 || $version eq $RSPEC_0_2;
 }
 
 # Returns a NodeList for a given XPath using a given node as
@@ -158,8 +194,10 @@ sub IsLanNode($)
     my ($node) = @_;
     my $result = 0;
     if (defined($node) && $node->localname() eq "node") {
-	foreach my $lan (FindNodes("n:node_type", $node)->get_nodelist()) {
-	    my $typeName = GetText("type_name", $lan);
+	foreach my $lan (FindNodes("n:node_type | n:hardware_type",
+				   $node)->get_nodelist()) {
+	    my $typeName = GetText("type_name", $lan) ||
+		GetText("name", $lan);
 	    if (defined($typeName) && $typeName eq "lan") {
 		$result = 1;
 		last;
@@ -188,33 +226,172 @@ sub IsLocalNode($)
     return $result;
 }
 
+sub IsTunnel($)
+{
+    my ($link) = @_;
+    my $result = 0;
+    if (IsVersion0($link)) {
+	my $link_type = GetText("link_type", $link);
+	$result = (defined($link_type) && $link_type eq "tunnel");
+    } else {
+	my @types = FindNodes("n:link_type", $link);
+	foreach my $current (@types) {
+	    my $name = GetText("name", $current);
+	    if ($name eq "gre-tunnel") {
+		$result = 1;
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub GetExpires($)
+{
+    my ($node) = @_;
+    return GetText("valid_until", $node) ||
+	GetText("expires", $node);
+}
+
+sub SetExpires($$)
+{
+    my ($node, $arg) = @_;
+    if (IsVersion0($node)) {
+	SetText("valid_until", $node, $arg);
+    } else {
+	SetText("expires", $node, $arg);
+    }
+}
+
 # Returns the uuid or urn of an RSpec node or undef if it is not a node.
 sub GetNodeId($)
 {
     my ($node) = @_;
     return GetText("component_uuid", $node) ||
 	GetText("component_urn", $node) ||
-	GetText("uuid", $node);
+	GetText("uuid", $node) ||
+	GetText("component_id", $node);
 }
 
 sub GetVirtualId($)
 {
     my ($node) = @_;
     return GetText("virtual_id", $node) ||
-	GetText("nickname", $node);
+	GetText("nickname", $node) ||
+	GetText("client_id", $node);
 }
 
 sub GetSliverId($)
 {
     my ($node) = @_;
-    return GetText("sliver_urn", $node);
+    return GetText("sliver_urn", $node)
+	|| GetText("sliver_id", $node);
 }
 
 sub GetManagerId($)
 {
     my ($node) = @_;
     return GetText("component_manager_uuid", $node) ||
-	GetText("component_manager_urn", $node);
+	GetText("component_manager_urn", $node) ||
+	GetText("component_manager_id", $node);
+}
+
+sub GetColocate($)
+{
+    my ($node) = @_;
+    my $result = GetText("colocate", $node) ||
+	GetText("phys_nickname", $node);
+    return $result;
+}
+
+sub GetSubnodeOf($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = GetText("subnode_of", $node);
+    } else {
+	my @relations = FindNodes("n:relation", $node)->get_nodelist();
+	foreach my $current (@relations) {
+	    if (GetText("type", $current) == "subnode_of") {
+		$result = GetText("client_id", $current);
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub GetVirtualizationType($)
+{
+    my ($node) = @_;
+    my $result = "emulab-vnode";
+    if (IsVersion0($node)) {
+	$result = GetText("virtualization_type", $node);
+    }
+    return $result;
+}
+
+sub SetVirtualizationType($$)
+{
+    my ($node, $arg) = @_;
+    my $result = 1;
+    if (IsVersion0($node)) {
+	$result = SetText("virtualization_type", $node, $arg);
+    }
+    return $result;
+}
+
+sub GetVirtualizationSubtype($)
+{
+    my ($node) = @_;
+    my $result = undef;
+    if (IsVersion0($node)) {
+	$result = GeniXML::GetText("virtualization_subtype", $node);
+    } else {
+	my @types = FindNodes("n:type", $node)->get_nodelist();
+	foreach my $current (@types) {
+	    my $parent = GetText("implemented_by", $current);
+	    if (defined($parent)) {
+		$result = GetText("name", $current);
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub GetExclusive($)
+{
+    my ($node) = @_;
+    my $exclusive = GetText("exclusive", $node);
+    my $result = $exclusive;
+    if (defined($exclusive) && ! IsVersion0($node)) {
+	$result = ($exclusive eq "true");
+    }
+    return $result;
+}
+
+sub SetExclusive($$)
+{
+    my ($node, $arg) = @_;
+    my $result = 1;
+    if (IsVersion0($node)) {
+	$result = SetText("exclusive", $node, $arg);
+    } else {
+	my $textArg = "false";
+	if ($arg) {
+	    $textArg = "true";
+	}
+	$result = SetText("exclusive", $node, $textArg);
+    }
+    return $result;
+}
+
+sub GetLinkManager($)
+{
+    my ($link) = @_;
+    return GetText("id", $link) || GetText("name", $link);
 }
 
 # Takes an attribute/element name, *NOT AN XPATH* and a node and sets

@@ -40,11 +40,7 @@ use emutil;
 # Hate to import all this crap; need a utility library.
 use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
 	     TBDB_NODESTATE_TBFAILED);
-use User;
 use Node;
-use OSinfo;
-use Image;
-use Interface;
 use English;
 use Data::Dumper;
 use XML::Simple;
@@ -52,7 +48,6 @@ use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
 use Experiment;
-use VirtExperiment;
 use Compress::Zlib;
 use MIME::Base64;
 
@@ -82,6 +77,8 @@ my $VTOPGEN        = "$TB/bin/vtopgen";
 my $SNMPIT         = "$TB/bin/snmpit";
 my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
+# Just one of these, at Utah.
+my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
 
 my $API_VERSION = 2;
 
@@ -330,6 +327,7 @@ sub CreateSliver($)
 	if (defined($slice)) {
 	    GeniCM::CleanupDeadSlice($slice, 1);
 	}
+	return $response;
     }
     my ($sliver_credential, $sliver_manifest) = @{ $response->{'value'} };
     
@@ -358,6 +356,7 @@ sub CreateSliver($)
     Node->FlushAll();
 
     if ($aggregate->Start($API_VERSION, 0) != 0) {
+	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start sliver");
     }
@@ -889,15 +888,73 @@ sub Shutdown($)
     my $clear        = $argref->{'clear'} || 0;
     my $credentials  = $argref->{'credentials'};
 
-    # For now, I am not worrying about the slice_urn argument.
-    if (! (defined($credentials))) {
+    if (! (defined($credentials) && defined($slice_urn))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my $credential = CheckCredentials($credentials);
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    return GeniCM::ShutdownAux($credential, $clear);
+    $credential->HasPrivilege( "pi" ) or
+	$credential->HasPrivilege( "instantiate" ) or
+	$credential->HasPrivilege( "control" ) or
+	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
+				     "Insufficient privilege" );
+
+    #
+    # The clearinghouse generates a different credential to do this.
+    #
+    if ($slice_urn ne $credential->target_urn()) {
+	my $certificate = GeniCertificate->LoadFromFile($GENICH_PEMFILE);
+	if (!defined($certificate)) {
+	    print STDERR "Could not load certificate from $GENICH_PEMFILE\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR);
+	}
+
+	# The caller has to match the clearinghouse.
+	if ($credential->owner_urn() ne $certificate->urn()) {
+	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+					"Insufficient privilege");
+	}
+    }
+
+    #
+    # No slice here? Done.
+    #
+    my $slice = GeniSlice->Lookup($slice_urn);
+    if (!defined($slice)) {
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+    }
+    #
+    # Do not worry about locking when setting the shutdown time.
+    # This can lead to race though, if a clear shutdown comes in first.
+    # Seems unlikely though. 
+    #
+    if (!$clear) {
+	# Do not overwrite original shutdown time
+	$slice->SetShutdown(1)
+	    if (!defined($slice->shutdown()) || $slice->shutdown() eq "");
+    }
+    else {
+	$slice->SetShutdown(0);
+    }
+    # Always make sure the slice is shutdown.
+    if ($slice->shutdown()) {
+	# The expire daemon is going to look for this, so it will get
+	# taken care of shortly.
+	if ($slice->Lock() != 0) {
+	    return GeniResponse->BusyResponse();
+	}
+	if (GeniCM::CleanupDeadSlice($slice, 0) != 0) {
+	    SENDMAIL($TBOPS, "Emergency Shutdown failed",
+		     "Emergency shutdown failed on $slice\n");
+	    print STDERR "Could not shutdown $slice!\n";
+	    # Lets call this a non-error since the local admin person
+	    # is going to have to deal with it anyway. 
+	}
+	$slice->UnLock();
+    }
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
 }
 
 #
@@ -1335,6 +1392,10 @@ sub ReleaseTicket($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "This ticket is for another slice");
     }
+    #
+    # XXX Need to do a restore backup state operation if this ticket
+    # was the result of an update.
+    #
     if ($ticket->Lock() != 0) {
 	return GeniResponse->BusyResponse("ticket");
     }
@@ -1354,7 +1415,7 @@ sub ListUsage($)
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my @credentials = @{ $credentials };
-    return GeniCM::ListUsage({"credentials" => $credentials[0]});
+    return GeniCM::ListUsage({"credential" => $credentials[0]});
 }
 
 sub ListHistory($)
@@ -1367,8 +1428,8 @@ sub ListHistory($)
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
     }
     my @credentials = @{ $credentials };
-    return GeniCM::ListHistory({"credentials" => $credentials[0],
-				  "type"        => $type});
+    return GeniCM::ListHistory({"credential" => $credentials[0],
+				"type"       => $type});
 }
 
 #
@@ -1489,6 +1550,13 @@ sub Credential2SliceAggregate($)
         $slice = GeniSlice->Lookup($target_uuid);
     }
     if (defined($slice)) {
+	if( $credential->expires() gt $slice->expires() ) {
+	    # The credential presented lasts longer than we though the
+	    # slice did: our expiry date must have been stale.  This can
+	    # happen because the SA is always free to extend the lifetime
+	    # of a slice, and is not required to tell us.
+	    $slice->SetExpiration( $credential->expires() );
+	}
 	$aggregate = GeniAggregate->SliceAggregate($slice);
     }
     else {

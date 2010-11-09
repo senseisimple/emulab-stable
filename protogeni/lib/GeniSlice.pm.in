@@ -17,20 +17,12 @@ use GeniRegistry;
 use GeniAuthority;
 use GeniCredential;
 use GeniCertificate;
-use GeniAggregate;
 use GeniUser;
 use GeniHRN;
 use English;
 use Date::Parse;
 use Data::Dumper;
 use vars qw();
-
-# Do not load this for the Clearinghouse XML server.
-BEGIN { 
-    if (! defined($main::GENI_ISCLRHOUSE)) {
-	require Experiment;
-    }
-}
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -254,7 +246,7 @@ sub CreateFromLocal($$$)
     my $EMULAB_PEMFILE = "@prefix@/etc/genisa.pem";
     my $certificate = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
     if (!defined($certificate)) {
-	print STDERR "Could not get uuid from $EMULAB_PEMFILE\n";
+	print STDERR "Could not load certificate from $EMULAB_PEMFILE\n";
 	return undef;
     }
 
@@ -277,8 +269,9 @@ sub CreateFromLocal($$$)
     #
     # Generate a certificate.
     #
-    $certificate = GeniCertificate->Create("slice", $urn, $hrn,
-					   $geniuser->email());
+    $certificate = GeniCertificate->Create({'urn'  => $urn,
+					    'hrn'  => $hrn,
+					    'email'=> $geniuser->email()});
     if (!defined($certificate)) {
 	print STDERR "GeniSlice::CreateFromLocal: ".
 	    "Could not generate new certificate $experiment\n";
@@ -299,6 +292,7 @@ sub CreateFromLocal($$$)
 sub Register($)
 {
     my ($self) = @_;
+    my $idx    = $self->idx();
 
     return -1
 	if (! ref($self));
@@ -312,7 +306,14 @@ sub Register($)
 	print STDERR "Could not find creator for $self\n";
 	return -1;
     }
-    return $clearinghouse->RegisterSlice($creator->urn(), $self->cert(), {});
+    if (!$clearinghouse->RegisterSlice($creator->urn(), $self->expires(),
+				       $self->cert(), {})) {
+	DBQueryWarn("update geni_slices set registered=1 where idx='$idx'")
+	    or return -1;
+	return 0;
+    }
+    $self->SetRegisteredFlag(1);
+    return -1;
 }
 
 #
@@ -329,7 +330,11 @@ sub UnRegister($)
     return -1
 	if (!defined($clearinghouse));
 
-    return $clearinghouse->RemoveSlice($self->urn());
+    return -1
+	if ($clearinghouse->RemoveSlice($self->urn()));
+    $self->SetRegisteredFlag(0);
+
+    return 0;
 }
 
 #
@@ -348,6 +353,7 @@ sub Flush($)
 sub GetExperiment($)
 {
     my ($self) = @_;
+    require Experiment;
 
     return undef
 	if (!ref($self));
@@ -619,11 +625,33 @@ sub SetFirewallFlag($$)
 }
 
 #
+# Set the registered field.
+#
+sub SetRegisteredFlag($$)
+{
+    my ($self, $registered) = @_;
+    my $uuid  = $self->uuid();
+
+    $registered = ($registered ? 1 : 0);
+
+    my $query_result =
+	DBQueryWarn("update geni_slices set registered='$registered' " .
+		    "where uuid='$uuid'");
+    
+    return -1
+	if (!$query_result);
+
+    $self->{'SLICE'}->{'registered'} = $registered;
+    return 0;
+}
+
+#
 # Delete all slices for an authority.
 #
 sub DeleteAll($$)
 {
     my ($class, $authority) = @_;
+    require GeniAggregate;
 
     my $uuid = $authority->uuid();
     my $query_result =

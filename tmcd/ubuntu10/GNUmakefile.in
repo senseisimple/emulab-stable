@@ -14,7 +14,7 @@
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
-SUBDIR		= tmcd/ubuntu7
+SUBDIR		= tmcd/ubuntu10
 
 include $(OBJDIR)/Makeconf
 
@@ -72,7 +72,6 @@ sysetc-fixup:
 	$(INSTALL) -m 644 $(SRCDIR)/rsyslog-emulab.conf $(SYSETCDIR)/rsyslog.d/60-emulab.conf
 	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(SYSETCDIR)/rc.local
 	$(INSTALL) -m 644 $(SRCDIR)/interfaces $(SYSETCDIR)/network/interfaces
-	$(INSTALL) -m 755 $(SRCDIR)/ntp.sh $(RCDIR)/init.d/ntp
 
 script-install:	dir-install $(SCRIPTS)
 	(cd ../linux; $(MAKE) DESTDIR=$(DESTDIR) RCDIR=$(RCDIR) script-install)

@@ -329,7 +329,7 @@ REPLACE INTO state_timeouts VALUES ('USERSTATUS','ACTIVE',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','FROZEN',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','NEWUSER',0,'');
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,'');
-REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',15,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',75,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWEROFF',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERON',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERCYCLE',0,'CMDRETRY');
@@ -534,6 +534,11 @@ REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADSETUP','RELOADING','
 REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADING','RELOADDONE','ReloadDone');
 REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','RELOADDONE','SHUTDOWN','ReloadDone');
 REPLACE INTO state_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','RELOADSETUP','ReloadSetup');
+REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','TBSETUP','FailedBoot');
+REPLACE INTO state_transitions VALUES ('RELOAD','TBSETUP','ISUP','FailedBoot');
+REPLACE INTO state_transitions VALUES ('RELOAD','TBSETUP','TBFAILED','FailedBoot');
+REPLACE INTO state_transitions VALUES ('RELOAD','ISUP','SHUTDOWN','RebootAfterFail');
+REPLACE INTO state_transitions VALUES ('RELOAD','TBFAILED','SHUTDOWN','RebootAfterFail');
 
 --
 -- Dumping data for table `state_triggers`
@@ -552,6 +557,8 @@ REPLACE INTO state_triggers VALUES ('*','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
 REPLACE INTO state_triggers VALUES ('*','NORMALv2','WEDGED','POWERCYCLE');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADOLDMFS','RELOADOLDMFS');
 REPLACE INTO state_triggers VALUES ('*','RELOAD-PCVM','RELOADDONE','RESET, RELOADDONE');
+REPLACE INTO state_triggers VALUES ('*','RELOAD','ISUP','REBOOT');
+REPLACE INTO state_triggers VALUES ('*','RELOAD','TBFAILED','REBOOT');
 
 --
 -- Dumping data for table `table_regex`
@@ -816,6 +823,7 @@ REPLACE INTO table_regex VALUES ('event_groups','agent_name','text','redirect','
 REPLACE INTO table_regex VALUES ('virt_lan_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lan_lans','failureaction','text','regex','^(fatal|nonfatal)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','eid','text','redirect','experimenets:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','fwname','text','redirect','virt_nodes:vname',0,0,NULL);

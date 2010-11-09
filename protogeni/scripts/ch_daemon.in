@@ -91,6 +91,7 @@ require GeniAuthority;
 require libGeni;
 use libtestbed;
 use emutil;
+use libEmulab;
 use POSIX qw(strftime ceil);
 
 #

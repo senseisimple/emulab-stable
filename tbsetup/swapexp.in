@@ -86,9 +86,6 @@ use Template;
 use Experiment;
 use User;
 
-# Be careful not to exit on transient error; 0 means infinite retry.
-$libdb::DBQUERY_MAXTRIES = 0;
-
 # For the END block below.
 my $cleaning = 0;
 my $justexit = 1;
@@ -321,7 +318,7 @@ if (my $instance = Template::Instance->LookupByExptidx($experiment->idx())) {
 # Sanity check.
 if (! (-e $workdir && -e $userdir)) {
     die("*** $0:\n".
-	"    Missing a critical directory! Stopping now ...\n");
+	"    $pid/$eid is missing a critical directory! Stopping now ...\n");
 }
 if (! -e $infodir) {
     if (! -e "$TB/expinfo/$pid") {

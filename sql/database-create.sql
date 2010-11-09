@@ -109,6 +109,25 @@ CREATE TABLE `archives` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `bridges`
+--
+
+DROP TABLE IF EXISTS `bridges`;
+CREATE TABLE `bridges` (
+  `pid` varchar(32) default NULL,
+  `eid` varchar(32) default NULL,
+  `exptidx` int(11) NOT NULL default '0',
+  `node_id` varchar(32) NOT NULL default '',
+  `bridx` mediumint(8) unsigned NOT NULL default '0',
+  `iface` varchar(8) NOT NULL default '',
+  `vname` varchar(32) NOT NULL default '',
+  `vnode` varchar(32) default NULL,
+  PRIMARY KEY  (`node_id`,`bridx`,`iface`),
+  KEY `pid` (`pid`,`eid`),
+  KEY `exptidx` (`exptidx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `buildings`
 --
 
@@ -453,6 +472,20 @@ CREATE TABLE `elabinelab_vlans` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `emulab_features`
+--
+
+DROP TABLE IF EXISTS `emulab_features`;
+CREATE TABLE `emulab_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `description` mediumtext,
+  `added` datetime NOT NULL,
+  `enabled` tinyint(1) NOT NULL default '0',
+  `disabled` tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (`feature`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `emulab_indicies`
 --
 
@@ -621,6 +654,20 @@ CREATE TABLE `eventlist` (
   PRIMARY KEY  (`exptidx`,`idx`),
   UNIQUE KEY `pideid` (`pid`,`eid`,`idx`),
   KEY `vnode` (`vnode`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `experiment_features`
+--
+
+DROP TABLE IF EXISTS `experiment_features`;
+CREATE TABLE `experiment_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `added` datetime NOT NULL,
+  `exptidx` int(11) NOT NULL default '0',
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  PRIMARY KEY (`feature`,`exptidx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1295,6 +1342,21 @@ CREATE TABLE `global_vtypes` (
   `weight` float NOT NULL default '0.5',
   `types` text NOT NULL,
   PRIMARY KEY  (`vtype`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `group_features`
+--
+
+DROP TABLE IF EXISTS `group_features`;
+CREATE TABLE `group_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `added` datetime NOT NULL,
+  `pid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `gid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `pid` varchar(12) NOT NULL default '',
+  `gid` varchar(12) NOT NULL default '',
+  PRIMARY KEY  (`feature`,`gid_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3461,6 +3523,19 @@ CREATE TABLE `unixgroup_membership` (
 -- Table structure for table `user_policies`
 --
 
+DROP TABLE IF EXISTS `user_features`;
+CREATE TABLE `user_features` (
+  `feature` varchar(64) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `added` datetime NOT NULL,
+  `uid` varchar(8) NOT NULL default '',
+  PRIMARY KEY  (`feature`,`uid_idx`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `user_policies`
+--
+
 DROP TABLE IF EXISTS `user_policies`;
 CREATE TABLE `user_policies` (
   `uid` varchar(8) NOT NULL default '',
@@ -3761,6 +3836,7 @@ CREATE TABLE `virt_lan_lans` (
   `exptidx` int(11) NOT NULL default '0',
   `idx` int(11) NOT NULL auto_increment,
   `vname` varchar(32) NOT NULL default '',
+  `failureaction` enum('fatal','nonfatal') NOT NULL default 'fatal',
   PRIMARY KEY  (`exptidx`,`idx`),
   UNIQUE KEY `vname` (`pid`,`eid`,`vname`),
   UNIQUE KEY `idx` (`pid`,`eid`,`idx`)

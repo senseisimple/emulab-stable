@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -125,6 +125,7 @@ sub doboot()
     my %sfsdeletes;
     my @tmccresults;
     my %curmounts;
+    my $dolocaldirs = 0;
 
     print STDOUT "Mounting project and home directories ... \n";    
 
@@ -133,17 +134,27 @@ sub doboot()
     }
 
     foreach my $str (@tmccresults) {
-	if ($str =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
+	if ($str =~ /^FSTYPE=([-\w]+)/) {
+	    # XXX we have no business doing this here!
+	    libsetup::setFSRVTYPE($1);
+	}
+	elsif ($str =~ /^REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
 	    $mounts{$1} = $2;
 	}
 	elsif ($str =~ /^SFS REMOTE=([-:\@\w\.\/]+) LOCAL=([-\@\w\.\/]+)/) {
 	    $sfsmounts{$1} = $2;
+	}
+	elsif ($str =~ /^LOCAL=([-\@\w\.\/]+)/) {
+	    $dolocaldirs = 1;
+	    $mounts{$1} = $1;
 	}
 	else {
 	    warning("Malformed mount information: $str");
 	}
     }
     
+    print STDOUT "  Mount type is ", FSRVTYPE(), "\n";
+
     #
     # The MFS version does not support (or need) this DB stuff. Just mount
     # them up.
@@ -157,24 +168,153 @@ sub doboot()
 		}
 	    }
 	
-	    print STDOUT "  Mounting $remote on $local\n";
-	    if (os_nfsmount($remote,$local)) {
-		warning("Could not os_nfsmount $remote on $local: $!");
-		next;
+	    if (!$dolocaldirs) {
+		print STDOUT "  Mounting $remote on $local\n";
+		if (os_nfsmount($remote,$local)) {
+		    warning("Could not os_nfsmount $remote on $local: $!");
+		    next;
+		}
 	    }
 	}
 	return;
     }
 
-    # On CygWin, the Samba mount is set up per-user by rc.cygwinxp-user, and what is
-    # available through the mount is controlled by the smb.conf file on the file
-    # server.  All that's left is to CygWin mount the //fs directory paths.
+    #
+    # On CygWin, the Samba mount is set up per-user by rc.cygwinxp-user,
+    # and what is available through the mount is controlled by the smb.conf
+    # file on the file server.  All that's left is to CygWin mount the //fs
+    # directory paths.
+    #
     if (WINDOWS()) {
 	while (($remote, $local) = each %mounts) {
 	    my $host = "fs";
-	    print "Mount $local from //$host\n";
-	    os_samba_mount($local, $host, 0);
+	    if ($dolocaldirs) {
+		if (!os_mkdir($local, "0770")) {
+		    warning("Could not make directory $local: $!");
+		}
+	    } else {
+		print "Mount $local from //$host\n";
+		os_samba_mount($local, $host, 0);
+	    }
 	}
+	return;
+    }
+
+    #
+    # If we are creating local directories rather than NFS mounting,
+    # we first try to create a large local filesystem in the extra
+    # partition to host them.  If the extra partition already exists,
+    # just use it.  Failing this, they will just get created in place
+    # (probably on /).
+    #
+    my $localfsdir;
+    if ($dolocaldirs) {
+	print STDOUT "Creating filesystem for project and home directories ... \n";    
+
+	$localfsdir = os_mountextrafs("/local");
+	if ($localfsdir eq "") {
+	    $localfsdir = "/";
+	}
+
+	dbmopen(%MDB, $MOUNTDB, 0660) or
+	    fatal("Could not open $MOUNTDB");
+
+	while (($remote, $local) = each %mounts) {
+	    #
+	    # Create the "real" directory on $localfsdir as necessary.
+	    #
+	    if ($localfsdir ne "/") {
+		$remote = "$localfsdir$local";
+	    }
+	    if (! -d "$remote" && !os_mkdir($remote, "0770")) {
+		fatal("Could not make directory $remote: $!");
+	    }
+	    
+	    #
+	    # Now symlink it to the desired "mount point".
+	    # Note that we could do a loopback or localhost NFS mount here.
+	    #
+	    if ($remote ne $local) {
+		# If it is a symlink, remove it
+		if (-l "$local") {
+		    # unless it is already correct
+		    if (readlink($local) eq $remote) {
+			$curmounts{$remote} = $local;
+			$MDB{$remote} = $local;
+			next;
+		    }
+		    unlink($local);
+		}
+
+		# Otherwise if it exists, move it out of the way.
+		if (-e "$local") {
+		    my $bak = "$local.$PID.bak";
+		    if (-e "$bak" || !rename($local, $bak)) {
+			warning("Could not create $local, already exists!");
+			next;
+		    }
+		}
+
+		print STDOUT "  Symlinking $remote to $local\n";
+		if (!symlink($remote, $local)) {
+		    warning("Could not make symlink $local: $!");
+		    next;
+		}
+
+	    }
+
+	    $curmounts{$remote} = $local;
+	    $MDB{$remote} = $local;
+	}
+
+	#
+	# Be really paranoid before we remove any directories.
+	# There should be no NFS mounted directories in this world.
+	# If there are, refuse to remove directories.
+	#
+	# XXX this should never happen, but it would really suck if it did.
+	#
+	my %nfsmounts;
+	if (os_getnfsmounts(\%nfsmounts) < 0 || keys(%nfsmounts) > 0) {
+	    warning("NFS mounts in non-NFS environment, not cleaning up!");
+	    dbmclose(%MDB);
+	    return;
+	}
+
+	#
+	# Now get rid of any directories that were previously needed, but are
+	# now no longer needed (as told to us by the TMCD). Note, we cannot
+	# delete them directly from MDB since that would mess up the foreach
+	# loop, so just stick them in temp and postpass it.
+	#
+	while (($remote, $local) = each %MDB) {
+	    if (defined($curmounts{$remote})) {
+		next;
+	    }
+
+	    print STDOUT "  Removing $local\n";
+	    if (system("rm -rf $remote")) {
+		warning("Could not remove $remote");
+		next;
+	    }
+	    if ($local ne $remote && system("rm -f $local")) {
+		warning("Could not remove $local");
+		next;
+	    }
+	
+	    #
+	    # Only delete from set if we actually deleted it. This way
+	    # we can retry it later (or next time).
+	    # 
+	    $deletes{$remote} = $local;
+	}
+	while (($remote, $local) = each %deletes) {
+	    delete($MDB{$remote});
+	}
+
+	# Write the DB back out!
+	dbmclose(%MDB);
+
 	return;
     }
 

@@ -120,9 +120,9 @@ sub Stringify($)
 {
     my ($self) = @_;
     
-    my $hrn = $self->hrn();
+    my $urn = $self->urn();
 
-    return "[GeniAuthority: $hrn]";
+    return "[GeniAuthority: $urn]";
 }
 
 #

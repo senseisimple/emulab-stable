@@ -71,20 +71,22 @@ rval,response = do_method("sa", "RenewSlice", params)
 if rval:
     Fatal("Could not renew slice at the SA")
     pass
-print "Renewed the slice, asking for slice credential again";
+print "The slice has been renewed successfully."
+print "Now asking for slice credential again...";
 
 #
 # Get the slice credential again so we have the new time in it.
 #
 slicecred = get_slice_credential( myslice, mycredential )
-print "Got the slice credential, renewing the sliver";
+print "Got the slice credential, attempting to renew the sliver...";
 
 params = {}
 params["credentials"]  = (slicecred,)
 params["slice_urn"]    = SLICEURN
+params["valid_until"]  = valid_until
 rval,response = do_method("cm", "RenewSlice", params, version="2.0")
 if rval:
-    Fatal("Could not renew sliver")
+    Fatal("Renewed slice, but not sliver.")
     pass
 print "Sliver has been renewed until " + valid_until
 

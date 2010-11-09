@@ -96,6 +96,8 @@ INSERT INTO sitevariables VALUES ('oml/default_server_startcmd',NULL,'','Default
 INSERT INTO sitevariables VALUES ('images/create/maxwait',NULL,'72','Max time (minutes) to allow for saving an image',0);
 INSERT INTO sitevariables VALUES ('images/create/idlewait',NULL,'8','Max time (minutes) to allow between periods of progress (image file getting larger) when saving an image (should be <= maxwait)',0);
 INSERT INTO sitevariables VALUES ('images/create/maxsize',NULL,'6','Max size (GB) of a created image',0);
+INSERT INTO sitevariables VALUES ('general/testbed_shutdown',NULL,'0','Non-zero value indicates that the testbed is shutdown and scripts should not do anything when they run. DO NOT SET THIS BY HAND!',0);
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

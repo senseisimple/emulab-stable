@@ -34,10 +34,6 @@ my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $PGENISUPPORT= @PROTOGENI_SUPPORT@;
 
-if ($PGENISUPPORT) {
-    require libGeni;
-}
-
 #
 # The number of nodes we reboot at a time and the time to wait between batches.
 # The batch size determines the degree of parallelism.
@@ -56,7 +52,6 @@ my $MAXWAITTIME	= (6 * 60);
 #
 # Testbed Support libraries
 #
-use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use event;
@@ -70,7 +65,7 @@ my $power	= "$TB/bin/power";
 my $ipod	= "$TB/sbin/apod";
 my $vnodesetup	= "$TB/sbin/vnode_setup";
 my $bisend      = "$TB/sbin/bootinfosend";
-my $logfile	= "$TB/log/power.log";
+my $logfile	= "$TB/log/reboot.log";
 my $ping	= "/sbin/ping";
 my $reboot      = "$TB/bin/node_reboot";
 

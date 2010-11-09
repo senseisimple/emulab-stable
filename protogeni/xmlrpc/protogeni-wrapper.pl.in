@@ -18,6 +18,7 @@ use Data::Dumper;
 use POSIX;
 use Crypt::X509;
 use Crypt::OpenSSL::X509;
+use Time::HiRes qw( gettimeofday tv_interval );
 
 # Yack. apache does not close fds before the exec, and if this dies
 # we are left with a giant mess.
@@ -52,7 +53,7 @@ use lib '@prefix@/lib';
 use Genixmlrpc;
 use GeniResponse;
 use libaudit;
-use emutil;
+use libEmulab;
 use libtestbed;
 
 # Geniuser.
@@ -95,6 +96,18 @@ sub XMLError($$)
 #
 if (NoLogins()) {
     XMLError(503, "CM temporarily offline; please try again later");
+}
+
+#
+# Check for excessive load
+#
+if ($MAINSITE) {
+    my $uptime = `uptime`;
+    if ($uptime =~ /load averages:\s+([\.\d]+),\s+([\.\d]+),\s+[\.\d]+/) {
+	if ($1 > 10.0) {
+	    XMLError(511, "Server is WAY too busy; please try again later");
+	}
+    }
 }
 
 #
@@ -187,8 +200,8 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
 	XMLError(-1, "Error decoding certificate:" . $decoded->error);
     }
     foreach my $tmp (@{ $decoded->SubjectAltName }) {
-	if ($tmp =~ /^uniformResourceIdentifier=(.*)$/ ||
-	    $tmp =~ /^(urn:.*)$/) {
+	if ($tmp =~ /^uniformResourceIdentifier=(urn:publicid:.*)$/ ||
+	    $tmp =~ /^(urn:publicid:.*)$/) {
 	    $GENIURN = $ENV{'GENIURN'} = $1;
 	}
     }
@@ -232,11 +245,7 @@ if (!defined($certificate)) {
 	"    Could not get uuid from $EMULAB_PEMFILE\n");
 }
 $ENV{'MYUUID'} = $certificate->uuid();
-# The URN could also come from the certificate, and that might be preferable
-# in some ways (if anybody is doing something silly like authenticating
-# with somebody else's certificate).  But that would require everybody to
-# upgrade to URNs in their certificates, so we can't assume it yet.
-$ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+$MODULE";
+$ENV{'MYURN'}  = $certificate->urn();
 
 #
 # Create and set our RPC context for any calls we end up making.
@@ -302,7 +311,8 @@ $message .=
     "Method:  $method\n";
 $message .=
     "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
-    
+
+my $starttime = [gettimeofday()];
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {
     #
@@ -316,6 +326,9 @@ if ($@) {
 		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
 }
 else {
+    my $elapsed = tv_interval($starttime);
+    $message .= "Elapsed: " . sprintf("%f", $elapsed) . "\n";
+    
     if (GeniResponse::IsError($result)) {
 	$message .= "Error:   " . $result->{'code'} . "\n";
 	if ($mailerrors) {

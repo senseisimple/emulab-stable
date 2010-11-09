@@ -42,6 +42,13 @@ WINSUPPORT=1
 ELVIN_COMPAT=1
 NSVERIFY=1
 
+# Set to one to disable exporting NFS filesystems to nodes
+NOSHAREDFS=0
+
+# Set to one if you are using an NFS server that has an exports race
+# If you don't know what this means, leave it at one, it won't hurt
+NFSRACY=1
+
 #
 # If enabled, needs setup, see:
 #   http://users.emulab.net/trac/emulab/wiki/NodeUsageInstall

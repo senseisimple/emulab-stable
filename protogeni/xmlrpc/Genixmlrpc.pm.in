@@ -18,12 +18,6 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration.
 use English;
 use GeniResponse;
-#use IO::Socket::SSL;
-use RPC::XML;
-use RPC::XML::Parser;
-use LWP::UserAgent;
-use HTTP::Request::Common qw(POST);
-use HTTP::Headers;
 use Data::Dumper;
 
 my $debug   = 1;
@@ -140,6 +134,12 @@ sub SetTimeout($$)
 sub CallMethod($$$@)
 {
     my ($httpURL, $context, $method, @args) = @_;
+    require RPC::XML;
+    require RPC::XML::Parser;
+    require LWP::UserAgent;
+    require HTTP::Request::Common;
+    import HTTP::Request::Common;
+    require HTTP::Headers;
 
     # Default context if not set.
     $context = $MyContext

@@ -9,6 +9,7 @@
 use English;
 use Getopt::Std;
 use Math::BigInt;
+use List::Util 'shuffle';
 
 use lib "@prefix@/lib";
 use libdb qw(TBGetSiteVar);
@@ -34,7 +35,7 @@ sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor] " .
 	  "[-n c/e] [-x] [-g (0.1 | 2)] [-c component-name]".
-	  "[-l type-limit-file]\n" .
+	  "[-l type-limit-file] [-z]\n" .
 	  "       -p include nodes the project has permission to use\n".
 	  "       -e include given experiments resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
@@ -50,11 +51,12 @@ sub usage()
 	  "       -x Output into the new xml ptop format\n".
 	  "       -g version With -x, geni version. Must be '0', '0.1' or '2'\n".
 	  "       -l specifies the location of the type limit file\n" .
-          "       -1 Print an rspec containing only the node component-name");
+          "       -1 Print an rspec containing only the node component-name" .
+	  "       -z Randomize node output order");
         exit(-1);
 }
 
-my $optlist = "s:e:m:vp:rSan:c:uxg:h1:l:";
+my $optlist = "s:e:m:vp:rSan:c:uxg:h1:l:z";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -67,6 +69,7 @@ my $do_xml    = 0;
 my $genimode  = $NO_GENI;
 my $useshared = 0;
 my $component_name = undef;
+my $randomize = 0;
 
 my $OURDOMAIN = "@OURDOMAIN@";
 my $MAINSITE  = @TBMAINSITE@;
@@ -216,6 +219,9 @@ if (defined($options{"l"})) {
 }
 if (defined($options{"1"})) {
     $component_name = $options{"1"};
+}
+if (defined($options{"z"})) {
+    $randomize = 1;
 }
 
 usage()
@@ -430,7 +436,7 @@ my $defaultosidquery = 'select distinct o.osid, t.type, o.osname, o.pid, o.OS, o
 # For subOS support (i.e., vnode OSes running atop vhost OSes), we have to
 # check both the subosid and all the parent_osid it can run on.
 #
-my $subosidquery = "select o.osid,o.parent_osid from os_submap as o " .
+my $subosidquery = "select distinct o.osid,o.parent_osid from os_submap as o " .
 	"left join osidtoimageid as oi1 on o.osid = oi1.osid " .
 	"left join osidtoimageid as oi2 on o.parent_osid = oi2.osid " .
 	"left join images as i1 on oi1.imageid = i1.imageid ".
@@ -535,10 +541,14 @@ if (defined($switchtouse) && ! defined($component_name)) {
 }
 elsif (! defined($component_name)) {
     $result =
-	DBQueryFatal("select n.node_id, n.uuid, country, latitude, longitude " .
-                     "from nodes as n left join widearea_nodeinfo as wn ".
-                     "  on n.node_id=wn.node_id " .
-		     "where role='testswitch' or role='widearea_switch'");
+	DBQueryFatal("select n.node_id,n.uuid,country,latitude,longitude ".
+                     "   from nodes as n ".
+		     "left join widearea_nodeinfo as wn ".
+                     "     on n.node_id=wn.node_id " .
+		     "left join node_types as nt on ".
+		     "     nt.type=n.type ".
+		     "where role='testswitch' or role='widearea_switch' or ".
+		     "      (role='testnodefoo' and nt.isswitch=1)");
 
     while (($switch, $uuid, $country, $latitude, $longitude) =
             $result->fetchrow_array) {
@@ -726,10 +736,16 @@ while (my ($node_id1, $node_id2) = $result->fetchrow()) {
     }
 }
 
+@nodenames = keys(%nodes);
+if ($randomize)
+{
+    @nodenames = shuffle(@nodenames);
+}
+
 #
 # Loop through and print out all nodes
 #
-foreach $node (keys(%nodes)) {
+foreach $node (@nodenames) {
     my $current = $top->nodes()->{$node};
 
     # Wide area nodes are handled below
@@ -895,10 +911,12 @@ foreach $node (keys(%nodes)) {
 	if ($trivspeed) {
 	    push @flags, "trivial_bw:$trivspeed";
 	}
-	# Add CPU and RAM information
-	$cpu_ram_features_present++;
-	# This number can be use for fine-tuning packing
-	push @features, "?+virtpercent:100";
+	if (! $sharing_mode{$node}) {
+	    # Add CPU and RAM information
+	    $cpu_ram_features_present++;
+	    # This number can be use for fine-tuning packing
+	    push @features, "?+virtpercent:100";
+	}
 	# Put this silly feature in so that we can try to keep vnodes
 	# on the same pnode they were before - but only if updating
         if ($exempt_eid) {
@@ -933,9 +951,11 @@ foreach $node (keys(%nodes)) {
     }
 
     # Add features
-    push(@features, @{$typemap{$type}->{'FEATURES'}});
-    if (defined($features{$node})) {
-	push @features, @{$features{$node}};
+    if (! $sharing_mode{$node}) {
+	push(@features, @{$typemap{$type}->{'FEATURES'}});
+	if (defined($features{$node})) {
+	    push @features, @{$features{$node}};
+	}
     }
 
     #
@@ -979,7 +999,7 @@ foreach $node (keys(%nodes)) {
     }
 
     # Add features indicating what this node has connections to
-    if ($connections{$node}) {
+    if ($connections{$node} && !$sharing_mode{$node}) {
         my @connected_to  = @{$connections{$node}};
         foreach my $other_end (@connected_to) {
             push(@features,"connected-to-$other_end:0.0");
@@ -1003,14 +1023,6 @@ foreach $node (keys(%nodes)) {
     }
     if (defined($curr_batt{$node})) {
 	push(@features,"powerneeded:" . (1.0 - $curr_batt{$node} / 100.0));
-    }
-
-    # Add in modelnet stuff.
-    if ($mnetcores) {
-	push(@types, "modelnet-core:$mnetcores");
-    }
-    if ($mnetedges) {
-	push(@types, "modelnet-edge:$mnetedges");
     }
 
     #
@@ -1129,6 +1141,13 @@ if ($widearea && ! defined($component_name)) {
 	# normally get assigned. We want to include them, though, because we
 	# allow people to do fix-node to down nodes
 	#
+	if (!defined($status)) {
+	    fatal("status not defined for $physnode\n");
+	}
+	if (!defined($mpid) || !defined($meid)) {
+	    fatal("pid,eid not defined for $physnode\n");
+	}
+	
 	if (($status && ($status ne 'up')) ||
 	    ($mpid eq $DEADPID && $meid eq $DEADEID)) {
 	    # But not in genimode.
@@ -1385,7 +1404,14 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 		$bw = $iface2bw;
 	    }
 	}
-	if ($node1obj->isswitch() && $node2obj->isswitch()) {
+	# For now, switches that are testnode should not be considered as
+	# an interconnect.
+	if (($node1obj->isswitch() &&
+	     ($node1obj->role() eq "testswitch" ||
+	      $node1obj->role() eq "widearea_switch")) &&
+	    ($node2obj->isswitch() &&
+	     ($node2obj->role() eq "testswitch" ||
+	      $node2obj->role() eq "widearea_switch"))) {
 	    # interswitch link
 	    if (defined($interconnects{"$node1:$node2"})) {
 		$interconnects{"$node1:$node2"} += $bw;

@@ -1,0 +1,160 @@
+This file gives an uneven overview of the "libvnode" API.  This API is intended
+to be used by scripts external to a vnode.  In its current uses (OpenVZ and
+Xen) it is used by scripts running on the host OS (Linux in both cases).
+
+This is only part of the vnode setup story.  Currently, Emulab vnodes also
+run a subset of the rc.* setup scripts when they are booted.  Unfortunately,
+there is far less coherency in that process.  Look at the scripts in
+tmcd/common, tmcd/common/config, and the machine dependent tmcd/* directories
+to piece together this process.  There are a variety of checks used to identify
+when code is running in a VM: GENVNODE(), JAILED(), LINUXJAILED(), INXENVM(),
+etc.
+
+A. The vnode bootstrap path:
+
+The overall picture is that the physical host node for the vnodes is
+configured via the usual procedures.  Then, after it has reported ISUP,
+it starts configuring its own vnodes.
+
+1. /usr/local/etc/emulab/rc/rc.bootsetup calls bootvnodes
+2. /usr/local/etc/emulab/bootvnodes calls vnodesetup for each vnode
+3. /usr/local/etc/emulab/vnodesetup calls mkvnode.pl
+4. /usr/local/etc/emulab/mkvnode.pl does the heavy lifting, calling
+   the libvnode functions.
+
+Note that mkvnode.pl is specific to each hostOS (FreeBSD or Linux) and
+libvnode.pm is specific to each hostOS/virttechnology pair.
+
+At some point in mkvnode.pl, the actual vnode is booted and it will commence
+to run a subset of the Emulab rc scripts.  Exactly what vnodes configure for
+themselves depends on the type of the vnode; e.g., Xen-based vnodes do more
+for themselves than openvz- or jail-based vnodes.
+
+Finally note that BSD jail-based vnodes do not use the libvnode interface
+though they follow pretty much the same steps.
+
+B. Order of libvnode ops:
+
+<basic tmcc config info fetched, then:>
+  rootPreConfig
+  [ Called for every vnode, but is intended (as the name suggests) to do 
+    one-time (per boot), system-wide initialization.  Make sure LVM or other
+    vnode disk or filesystem exists and is ready; load kernel modules
+    for veths, tunnels, and shaping stuff that should be done in ConfigNetwork
+    but that cannot.  Uses global config "script lock" (to synch with what?).
+    No inverse to this operation (e.g., for a later fatal error in setup)? ]
+
+<ifconfig/linkdelay/tunnel info fetched, then:>
+  rootPreConfigNetwork([ifconfig, linkdelay stuff])
+  [ Prepare any network stuff in the root context on a global basis.
+    Called with the ifconfig and linkdelay info.  Once again, it is called
+    for every vnode but should really only do one-time stuff.  Typically this
+    means: plumb the control network, create enet bridge devices.  Uses global
+    config "script lock" (to synch with what?) No inverse to this operation
+    (e.g., for a later fatal error in setup)? ]
+
+<check if vnodes need to be reloaded (getbootwhat, getloadinfo)>
+<if vnode doesn't exist, then:>
+  vnodeCreate([imageID, imageinfo])
+  [ Creates a per-vnode container/VM.  Optionally called with a unique image
+    identifier and a hash containing the results of the tmcc loadinfo command.
+    The identifier is a string that is a combo of image name, pid, and gid
+    info from the IMAGEID key of loadinfo.  In this form, Create is responsible
+    for downloading the image (a tarball for OpenVZ).
+
+    Whether image or not, Create should create and initialize the virtual
+    disk.  Returns a VMID which the lib can use internally.  Note that due to
+    the way this library is invoked, that internal state associated with the
+    ID must be on persistent storage, as vnodes may be added, modified, and
+    removed in a library context different than the boottime invocation.
+
+    Does NOT actually start the container. ]
+
+<or if vnode needs to be recreated, then:>
+  vnodeDestroy
+  vnodeCreate
+
+<now with clean vnode:>
+  vnodePreConfig(vmid, &callback)
+  [ First of several PreConfig routines, all called with different arguments.
+    The primary distinguisher for this call is that it has a callback which
+    allows the caller access to the vnode's root filesystem.  This function
+    may need to temporarily mount that filesystem before invoking the callback
+    and should then unmount afterward.  The OpenVZ version of this function
+    also ensures that all virtual network devices exist in the vnode.
+
+    Note that this is the only use of a callback in the API, which makes
+    me think that there should just be a vnodeMount call that the caller
+    will use explicitly along with vnodeUnmount to do this themselves
+    after PreConfig returns. Note also that there is no guarantee that
+    the host can even mount the vnode root, the vnode might be a completely
+    different OS. ]
+
+  vnodePreConfigControlNetwork(vmid, ip, mask, mac, ext_ip, vname, vdomain,
+	                       rdomain, bossip)
+  [ Create per-vnode control network interface and tie it into any node-wide
+    root infrastructure (e.g., bridge or NAT setup).  Passes in a whole host
+    of possibly needed parameters.  Configures loopback device as well.
+    Preconfigures boot time state in the VM filesystem, including resolv.conf
+    and DHCP created files. ]
+
+  vnodePreConfigExpNetwork(vmid, iface-info, linkdelay-info, tunnel-info)
+  [ Matches up network devices with any root* created devices, or more
+    generally, creates any such devices that are needed (bridges, shaping
+    pipes, tunnels).  Updates vnode config file used when container is
+    actually created. ]
+
+  vnodeConfigResources(vmid)
+  [ Does nothing right now.  Once tmcd supports it, we will use this to
+    pass shares of global resources like CPU, memory, etc.) that can be
+    reserved to a vnode. ]
+
+  vnodeConfigDevices(vmid)
+  [ Does nothing right now.  Once tmcd supports it, we will use this to
+    pass info about physical devices that can be reserved to a vnode. ]
+
+<use iptables NAT to create route to inner sshd>
+<fork a child and in child:>
+  vnodeBoot
+  [ Starts the vnode. ]
+
+<child exits>
+<in parent, after child exit:>
+  vnodePostConfig
+  [ Does nothing. (What would this do?) ]
+
+  rootPostConfig
+  [ Does nothing. (What would this do?) ]
+
+<create the magic "running" file to signal done>
+<wait for container exit: fork, and in parent waitpid til done, in child:>
+  vnodeExec
+  [ Executes a command in the container/VM.  In this context it is used
+    to exec a command that does not exit as long as the container/VM is
+    still alive.  Used to catch "reboot" of a vnode. ]
+
+<on container exit or signal:>
+  vnodeState
+  [ Returns the run state of a VM.  Currently can be "running" for everything
+    is peachy, "stopped" if it exists but is not running, "mounted" for some
+    OpenVZ specific condition where container is halted but logical disk
+    exists? ]
+
+<if running:>
+  vnodeHalt
+  [ Stops (in a restartable way?) a container/VM but doesn't not destroy it. ]
+
+<else if "mounted" (filesystems?):>
+  vnodeUnmount
+  [ "Unmounts" a container.  Probably openvz specific?  Destroys/detaches
+    any logical fs/disk associated with a container? ]
+
+<after halted and unmounted, and if not keeping the vnode setup:>
+  vnodeDestroy
+  [ Container/VM should be stopped.  Destroys any logical disk and the
+    VM itself. ]
+
+Others:
+
+  vnodeReboot
+  [ Reboots a vnode. ]

@@ -11,13 +11,14 @@ use Exporter;
 use vars qw(@ISA);
 @ISA    = "Exporter";
 
-use libdb;
+use emdb;
+use emutil;
+use EmulabConstants;
 use libtestbed;
 use English;
 use Data::Dumper;
 use File::Basename;
 use overload ('""' => 'Stringify');
-use Project;
 use vars qw($NEWUSER_FLAGS_PROJLEADER $NEWUSER_FLAGS_WIKIONLY
 	    $NEWUSER_FLAGS_WEBONLY $NEWUSER_FLAGS_ARCHIVED
 	    $NEWUSER_FLAGS_NOUUID
@@ -640,6 +641,7 @@ sub ImpliedUser($)
 sub IsOpsGuy($)
 {
     my ($self) = @_;
+    require Group;
 
     return 0
 	if (! ref($self));
@@ -648,8 +650,12 @@ sub IsOpsGuy($)
 	print STDERR "*** IsOpsGuy: Must be invoked on current user!\n";
 	return 0;
     }
-    return TBMinTrust(TBProjTrust($self->uid_idx(), TBOPSPID()),
-		      PROJMEMBERTRUST_USER());
+    my $group = Group->Lookup(TBOPSPID(), TBOPSPID());
+    if (!defined($group)) {
+	print STDERR "*** IsOpsGuy: No emulab-ops project!\n";
+	return 0;
+    }
+    return TBMinTrust($group->Trust($self), PROJMEMBERTRUST_USER());
 }
 
 #
@@ -966,6 +972,7 @@ sub SameUser($$)
 sub FirstApprovedProject($$)
 {
     my ($self, $pptr) = @_;
+    require Project;
 
     # Must be a real reference. 
     return -1
@@ -1188,6 +1195,7 @@ sub SetUserInterface($$)
 sub SendVerifiedEmail($)
 {
     my ($self) = @_;
+    require Group;
 
     # Must be a real reference. 
     return -1
@@ -1249,6 +1257,7 @@ sub SendVerifiedEmail($)
 sub GroupMembershipList($$;$)
 {
     my ($self, $prval, $desired_trust) = @_;
+    require Group;
 
     # Must be a real reference. 
     return -1
@@ -1296,6 +1305,8 @@ sub GroupMembershipList($$;$)
 sub ProjectMembershipList($$;$)
 {
     my ($self, $prval, $desired_trust) = @_;
+    require Project;
+    require Group;
 
     # Must be a real reference. 
     return -1
@@ -1344,6 +1355,7 @@ sub ProjectMembershipList($$;$)
 sub ProjectLeaderList($$;$)
 {
     my ($self, $prval) = @_;
+    require Project;
 
     # Must be a real reference. 
     return -1
@@ -1524,7 +1536,7 @@ sub AccessCheck($$$)
 
     my $mintrust;
 
-    if ($access_type < TB_USERINFO_MIN || $access_type > TB_USERINFO_MAX) {
+    if ($access_type < TB_USERINFO_MIN() || $access_type > TB_USERINFO_MAX()) {
 	print "*** Invalid access type $access_type!\n";
 	return 0;
     }
@@ -1542,7 +1554,7 @@ sub AccessCheck($$$)
     #
     # Only project leader in same project as user.
     #
-    if ($access_type == TB_USERINFO_MODIFYINFO) {
+    if ($access_type == TB_USERINFO_MODIFYINFO()) {
         #
         # This join will allow the operation if the current user is in the 
         # same project (any project) as the target user, but with root permissions.
@@ -1588,8 +1600,8 @@ sub escapeshellarg($)
 # Non-local users, as for federation/geni.
 #
 package User::NonLocal;
+use emdb;
 use User;
-use libdb;
 use libtestbed;
 use English;
 use overload ('""' => 'Stringify');

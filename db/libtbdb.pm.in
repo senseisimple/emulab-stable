@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,7 +19,6 @@ use vars qw(@ISA @EXPORT);
 	 );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use English;
 use File::Basename;
 require Mysql;

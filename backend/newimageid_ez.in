@@ -52,6 +52,8 @@ use libtestbed;
 use User;
 use Project;
 use Image;
+use OSinfo;
+use Node;
 
 # Protos
 sub fatal($);

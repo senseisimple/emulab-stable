@@ -1,4 +1,4 @@
-<rspec xmlns="http://protogeni.net/resources/rspec/0.1">
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.1">
  <node virtual_id="bbg1" 
        component_urn="urn:publicid:IDN+emulab.net+node+bbg1"
        virtualization_type="emulab-vnode" 

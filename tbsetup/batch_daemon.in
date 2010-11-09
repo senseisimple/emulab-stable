@@ -1,8 +1,8 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -27,7 +27,6 @@ sub usage()
 
 sub dosomething($$);
 sub isexpdone($);
-sub TBBatchUnLockExp($$;$);
 
 my  $optlist = "d";
 
@@ -46,6 +45,17 @@ if ($UID) {
     die("*** $0:\n".
 	"    Only root can run this script!\n");
 }
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Testbed Support libraries
@@ -93,17 +103,6 @@ my $workdir;
 my $user_name  = "Testbed Operations";
 my $user_email = "$TBOPS";
 my $template;
-
-#
-# Turn off line buffering on output
-#
-$| = 1;
-
-#
-# Untaint the path
-# 
-$ENV{'PATH'} = "/bin:/usr/bin:";
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Parse command arguments. Once we return from getopts, all that should be

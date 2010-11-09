@@ -225,6 +225,22 @@ WINSUPPORT=0
 NSVERIFY=1
 
 #
+# Turn this on to disable exporting NFS filesystems to nodes.
+# User home directories on all nodes will be local and unsynchronized in
+# this case.  There will also be no access to a central /proj, /group or
+# /share either.
+#
+NOSHAREDFS=0
+
+#
+# Set to one if you are using an NFS server that has an "exports race".
+# FreeBSDs before 8.x have this condition.  FreeBSD 8 and above (and
+# probably newer Linuxes) do not.  Since we currently only support FreeBSD
+# 7.x and below fileservers, leave this at one.
+#
+NFSRACY=1
+
+#
 # Virtual node network configuration (if you don't want virtual nodes,
 # just leave this as is)
 #
@@ -242,6 +258,25 @@ VIRTNODE_NETMASK=255.240.0.0
 # XXX compat
 JAILIPBASE=$VIRTNODE_NETWORK
 JAILIPMASK=$VIRTNODE_NETMASK
+
+#
+# Selective disable of a couple of features.
+#
+# DISABLE_NAMED_SETUP	If you are not running a name server on your boss.
+#			This will prevent you from using the virtual node
+#			names (e.g., node1.eid.pid.<your-domain>).
+#
+# DISABLE_EXPORTS_SETUP	Prevent dynamic configuration of the exports file
+#			on your "fs" node.  You will need to use this if
+#			your fs node is not running FreeBSD or is otherwise
+#			not under your control.  If you set this option, you
+#			will need to ensure that ALL your Emulab filesystems
+#			(e.g., /proj, /users) are exported to ALL your nodes.
+#			This has obvious security implications and YOU REALLY
+#			SHOULD NOT DO THIS. 
+#
+DISABLE_NAMED_SETUP=0
+DISABLE_EXPORTS_SETUP=0
 
 #
 # Only supported on the Mother Ship (emulab.net) right now.
@@ -274,3 +309,9 @@ FRISEBEEMCASTPORT=3564
 # Sometimes the main page is down in a directory on WWWHOST
 # No trailing '/'!
 #WWW=www.example.emulab.net/emulab-www
+
+# Some switches do not support the stack MIB. This means snmpit cannot
+# set the port/duplex during swapin, so youare stuck at a particular
+# bandwidth, and have to change them from the console. Set to 1 if
+# your switch has no stack MIB.
+NOSTACKMIB=0

@@ -49,6 +49,7 @@ require GeniCertificate;
 require GeniAuthority;
 require GeniSlice;
 require GeniUser;
+require GeniComponent;
 
 my $authority = GeniAuthority->Lookup($uuid);
 if (!defined($authority)) {

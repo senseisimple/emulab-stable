@@ -14,6 +14,7 @@ NSTOIRDIR	= $(TESTBED_SRCDIR)/tbsetup/ns2ir
 DAEMON	        = linktest
 LTEVENT		= ltevent
 SCRIPT		= linktest.pl
+SCRIPT_ELAB	= elab_linktest.pl
 SCRIPT_RUN	= run_linktest.pl
 SCRIPT_PROXY	= linktest.proxy
 SCRIPT_CONTROL  = linktest_control
@@ -30,7 +31,7 @@ SYSTEM	       := $(patsubst CYGWIN%,CYGWIN,$(shell uname -s))
 
 include $(OBJDIR)/Makeconf
 
-all:	binaries $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_PROXY) \
+all:	binaries $(SCRIPT) $(SCRIPT_ELAB) $(SCRIPT_RUN) $(SCRIPT_PROXY) \
 		weblinktest linktest_control
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -138,13 +139,14 @@ client-install: client
 	fi
 	$(INSTALL_PROGRAM) $(DAEMON) $(DESTDIR)$(CLIENT_BINDIR)/$(DAEMON)
 	$(INSTALL_PROGRAM) $(LTEVENT) $(DESTDIR)$(CLIENT_BINDIR)/$(LTEVENT)
-	$(INSTALL_PROGRAM) $(SCRIPT) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
+	$(INSTALL_PROGRAM) $(SRCDIR)/$(SCRIPT) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
+	$(INSTALL_PROGRAM) $(SCRIPT_ELAB) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_ELAB)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
 	$(MAKE) -C iperf client-install
 	$(MAKE) -C rude client-install
 
 clean:
-	rm -f *.o *-debug $(TESTS) $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_PROXY) \
+	rm -f *.o *-debug $(TESTS) $(SCRIPT) $(SCRIPT_ELAB) $(SCRIPT_RUN) $(SCRIPT_PROXY) \
 		weblinktest linktest_control $(DAEMON) $(LTEVENT) version.c
 	-$(MAKE) -C iperf clean
 	-$(MAKE) -C rude clean

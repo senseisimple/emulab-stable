@@ -31,7 +31,6 @@ use Carp;
 use POSIX;
 use XML::LibXML;
 use XML::Simple;
-use GeniXML;
 
 # Configure variables
 my $TB		  = "@prefix@";
@@ -47,9 +46,7 @@ my $OURDOMAIN     = "@OURDOMAIN@";
 my $cmid          = '';
 
 if ($PGENISUPPORT) {
-    require libGeni;
     require GeniHRN;
-    $cmid = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
 }
 
 # Flags.
@@ -1012,6 +1009,7 @@ sub LoadCurrentResources($)
 sub LoadVirtNodes($)
 {
     my ($self) = @_;
+    my $gotgeninodes = 0;
 
     $self->printdb("Loading virtual nodes\n");
 
@@ -1082,6 +1080,9 @@ sub LoadVirtNodes($)
 
 	# Mark this as being a virtual typed node.
 	$vnode->_isvtyped($isvtyped);
+
+	# dynamic inclusion below.
+	$gotgeninodes++ if ($isgeni);
 
 	# All this info is stashed in our local object.
 	$vnode->_nodeweight(undef);
@@ -1266,6 +1267,18 @@ sub LoadVirtNodes($)
 
 	# Add to the list.
 	$self->vnodes()->{$vname} = $vnode;
+    }
+    if ($gotgeninodes) {
+	if ($PGENISUPPORT) {
+	    require libGeni;
+	    require GeniXML;
+	    import GeniXML;
+	    $cmid = GeniHRN::Generate($OURDOMAIN, "authority", "cm");
+	}
+	else {
+	    tberror("Using geni nodes but PROTOGENI_SUPPORT is not defined\n");
+	    return -1;
+	}
     }
 
     #
@@ -3830,7 +3843,7 @@ sub AddNodeToSolution($$$)
 	}
 	$physical = $proxynode->node_id();
     }
-    elsif (GeniHRN::IsValid($physical)) {
+    elsif ($PGENISUPPORT && GeniHRN::IsValid($physical)) {
 	(undef,undef,$physical) = GeniHRN::Parse($physical);
     }
 
@@ -4651,6 +4664,7 @@ sub AllocNodes($)
 	# For assigning dynamic ports.
 	$pnode->_portarray(undef);
 	$pnode->_portlow(TBDB_LOWVPORT);
+	$pnode->_portnext(TBDB_LOWVPORT);
 	$pnode->_porthigh(TBDB_MAXVPORT);
 	# To avoid unitialized access.
 	$pnode->_reuse("used");
@@ -4897,7 +4911,7 @@ sub AllocVirtNodes($)
 	    
 	    if ($virtnode->_isdynamic()) {
 		# Always use the base type ... node type system sucks.
-		my $basetype = $virtnode->_typeinfo->type();
+		my $basetype = $virtnode->_typeinfo()->type();
 
 		#
 		# We might be expecting to allocate a shared vnode on
@@ -4913,7 +4927,7 @@ sub AllocVirtNodes($)
 		#
 		# Call into library. Be sure to pass impotent mode along.
 		#
-		if (Node::CreateVnodes(\@plist,
+		if (Node->CreateVnodes(\@plist,
 				       {"pid"      => "$pid",
 					"eid"      => "$eid",
 					"count"    => $numvs,
@@ -5126,6 +5140,7 @@ sub InterpLinks($)
 					 
 	$protovlan->SetRole("encapsulation");
 	$protovlan->SetType("vlan");
+	$protovlan->SetAttribute("link/lan", "sharedlan");
 	$protovlan->SetEncapStyle("default");
 	# Total hack ... see snmpit.
 	$protovlan->SetAttribute("trunk_mode", "dual");
@@ -5320,6 +5335,8 @@ sub InterpLinksAux($)
 	    $protolandst->SetType("vlan");
 	    $protolansrc->SetRole("delay");
 	    $protolandst->SetRole("delay");
+	    $protolansrc->SetAttribute("link/lan", $lan);
+	    $protolandst->SetAttribute("link/lan", $lan);
 	    $protolan->SetRole("link/lan");
 	    $protolan->AddInterface($nodeC, $vnodeC, $vportC, $portC);
 	    $protolan->AddInterface($nodeA, $vnodeA, $vportA, $portA);
@@ -5385,6 +5402,7 @@ sub InterpLinksAux($)
 						$protolan);
 		$protolanlan->SetType("vlan");
 		$protolanlan->SetRole("delay");
+		$protolanlan->SetAttribute("link/lan", $lan);
 	    }
 	    $protolanlan->AddMember($nodeD, $portD);
 	
@@ -5393,6 +5411,7 @@ sub InterpLinksAux($)
 						$protolan);
 	    $protolanlink->SetType("vlan");
 	    $protolanlink->SetRole("delay");
+	    $protolanlink->SetAttribute("link/lan", $lan);
 	    $protolanlink->AddMember($nodeA, $portA);
 	    $protolanlink->AddMember($nodeB, $portB);
 
@@ -5433,10 +5452,9 @@ sub InterpLinksAux($)
 		$self->printdb("LINK simple: $virtA,$virtB - ".
 			       "$nodeA:$portA,$nodeB:$portB\n");
 
-		if ($virtlan->_layer() == 1 || $direct) {
+		if ($virtlan->_layer() == 1) {
 		    #
-		    # Just a wire. At layer two, its a wire between
-		    # two nodes.
+		    # Just a wire.
 		    #
 		    $protolink = ProtoLan->Create($experiment, $lan,
 						  $self->impotent() ||
@@ -5539,8 +5557,14 @@ sub InterpLinksAux($)
 		    $protolink = ProtoLan->Create($experiment, $lan,
 						  $self->impotent() ||
 						  $self->alloconly());
-		    $protolink->SetType("vlan");
+		    #
+		    # At layer 2, a direct link is a wire between two
+		    # interfaces. We want them setup like any layer 2
+		    # link.
+		    #
+		    $protolink->SetType(($direct ? "direct" : "vlan"));
 		    $protolink->SetRole("link/lan");
+		    $protolink->SetAttribute("link/lan", $lan);
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
 		}
@@ -5749,9 +5773,11 @@ sub InterpLinksAux($)
 						 $protolan);
 			    $protolanlan->SetType("vlan");
 			    $protolanlan->SetRole("delay");
+			    $protolanlan->SetAttribute("link/lan", $lan);
 			}
 			else {
 			    $protolan->SetType("vlan");
+			    $protolan->SetAttribute("link/lan", $lan);
 			}
 			$protolan->SetRole("link/lan");
 		    }
@@ -6148,7 +6174,8 @@ sub InitializePhysNode($$$)
     #
     # Now call os_select.
     #
-    if (defined($osid) && !$pnode->isremotenode()) {
+    if (defined($osid) && (!$pnode->isremotenode()
+			   || $pnode->isdedicatedremote())) {
 	if ($self->impotent() || $self->alloconly()) {
 	    $self->printdb("  pretending to os_select $osid\n");
 	}
@@ -7444,10 +7471,9 @@ sub array_diff($$)
 sub SetPortRange($)
 {
     my ($self) = @_;
-    
+
     #
-    # See if any virtual nodes. If not, no need to do anything since
-    # all port allocations will come from the physical node. 
+    # No virtual nodes, fall back to simple approach.
     #
     return 0
 	if (! scalar(keys(%{ $self->solution_v2v() })));
@@ -7526,12 +7552,21 @@ sub SetPortRange($)
 #
 # Bump and return the IP port number for a node. This is
 # required for multiplexing virtual nodes on a physical node. 
-# 
+#
 sub nextipportnum($)
 {
     my ($pnode, $default)  = @_;
     my $portarray = $pnode->_portarray();
     my $port = 0;
+
+    if (!defined($portarray)) {
+	#
+	# Fall back to simple approach; no shared nodes.
+	#
+	$port = $pnode->_portnext();
+	$pnode->_portnext($port + 2);
+	return $port;
+    }
 
     for (my $i = 0; $i < $pnode->_porthigh() - $pnode->_portlow(); $i++) {
 	if ($portarray->[$i] < 0) {
@@ -7979,7 +8014,7 @@ sub PrintSolution($$)
     my $root = $doc->createElement("rspec");
     $root->setAttribute("pid", "$pid");
     $root->setAttribute("eid", "$eid");
-    $root->setAttribute("xmlns:rspec", "http://emulab.net/resources/rspec/0.1");
+    $root->setAttribute("xmlns:rspec", "http://www.protogeni.net/resources/rspec/0.1");
     $doc->setDocumentElement($root);
 
     foreach my $pnodename (keys(%{ $self->solution_p2v() })) {
