@@ -143,11 +143,13 @@ my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
 	       );
 
 # Chicken or Egg.
-DBQueryFatal("INSERT INTO sitevariables VALUES ".
+# XXX only set specific fields as the ns_include field may not be there yet.
+DBQueryFatal("INSERT INTO sitevariables (name,value,defaultvalue,description)".
+	     " VALUES ".
 	     " ('general/testbed_shutdown',NULL,'0', ".
 	     "  'Non-zero value indicates that the testbed is shutdown ".
 	     "and scripts should not do anything when they run. ".
-	     "DO NOT SET THIS BY HAND!', 0)")
+	     "DO NOT SET THIS BY HAND!')")
     if (!SiteVarExists("general/testbed_shutdown"));
 
 #

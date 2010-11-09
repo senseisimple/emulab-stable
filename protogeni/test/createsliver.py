@@ -68,45 +68,20 @@ mykeys = response["value"]
 if debug: print str(mykeys)
 
 #
-# Lookup slice.
+# Lookup slice and get credential.
 #
-params = {}
-params["credential"] = mycredential
-params["type"]       = "Slice"
-params["hrn"]        = SLICENAME
-rval,response = do_method("sa", "Resolve", params)
-if rval:
-    #
-    # Create a slice. 
-    #
-    print "Creating new slice called " + SLICENAME
-    params = {}
-    params["credential"] = mycredential
-    params["type"]       = "Slice"
-    params["hrn"]        = SLICENAME
-    rval,response = do_method("sa", "Register", params)
-    if rval:
-        Fatal("Could not create new slice")
-        pass
-    myslice = response["value"]
-    print "New slice created"
-    pass
-else:
-    #
-    # Get the slice credential.
-    #
-    print "Asking for slice credential for " + SLICENAME
-    myslice = response["value"]
-    myslice = get_slice_credential( myslice, mycredential )
-    print "Got the slice credential"
-    pass
+myslice = resolve_slice( SLICEURN, mycredential )
+
+print "Asking for slice credential for " + SLICENAME
+slicecredential = get_slice_credential( myslice, mycredential )
+print "Got the slice credential"
 
 #
 # Create the sliver.
 #
 print "Creating the Sliver ..."
 params = {}
-params["credentials"] = (myslice,)
+params["credentials"] = (slicecredential,)
 params["slice_urn"]   = SLICEURN
 params["rspec"]       = rspec
 params["keys"]        = mykeys
@@ -117,5 +92,5 @@ if rval:
     pass
 sliver,manifest = response["value"]
 print "Created the sliver"
-print str(manifest)
+#print str(manifest)
 

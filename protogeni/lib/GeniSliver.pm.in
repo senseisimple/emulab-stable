@@ -24,7 +24,6 @@ use GeniUsage;
 use GeniHRN;
 use GeniXML;
 use emutil;
-use OSinfo;
 use Node;
 use English;
 use XML::Simple;
@@ -605,7 +604,7 @@ sub component_urn($)
 sub Create($$$$$$)
 {
     # $rspec is a LibXML element representing a single node.
-    my ($class, $slice, $user, $resource_uuid, $rspec) = @_;
+    my ($class, $slice, $user, $node, $rspec) = @_;
     my $virtualization_type = GeniXML::GetVirtualizationType($rspec);
     if (!defined($virtualization_type)) {
 	print STDERR "Node does not contain a virtualization_type\n";
@@ -615,17 +614,6 @@ sub Create($$$$$$)
     my $experiment = $slice->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $slice to its experiment\n";
-	return undef;
-    }
-
-    #
-    # the node is already allocated to the sliver, but still need to enter
-    # a virt_nodes entry, and possibly more virt table entries, so that the
-    # node will boot properly, and is otherwise controllable.
-    #
-    my $node = Node->Lookup($resource_uuid);
-    if (!defined($node)) {
-	print STDERR "Could not map node $resource_uuid to its object\n";
 	return undef;
     }
 
@@ -651,32 +639,16 @@ sub Create($$$$$$)
 	print STDERR "Node does not contain a virtual_id\n";
 	return undef;
     }
-    my $hrn;
-    my $sshdport = 22;
-    my $hostname;
-    my $phostname;
-    my $resource_id;
+    my $resource_uuid = $node->uuid();
+    my $resource_id   = $node->node_id();
+    my $hrn           = "${PGENIDOMAIN}." . $node->node_id();
+    my $sshdport      = 22;
+    my $hostname      = GeniUtil::FindHostname($node->node_id());
+    my $phostname     = $hostname;
 
-    #
-    # The resource UUID refers to the physical node, but the virtualization
-    # type might require a vnode.
-    # 
-    if ($virtualization_type eq "emulab-vnode") {
-	my $vnode = $experiment->VnameToNode($nickname);
-	if (!defined($vnode)) {
-	    print STDERR "Could not lookup node $nickname in $experiment\n";
-	    return undef;
-	}
-	$hrn = "${PGENIDOMAIN}." . $vnode->node_id();
-	$resource_id = $vnode->node_id();
-	$hostname = GeniUtil::FindHostname($vnode->node_id());
-	$phostname = GeniUtil::FindHostname($vnode->phys_nodeid());
-	$sshdport = $vnode->sshdport();
-    }
-    else {
-	$hrn = "${PGENIDOMAIN}." . $node->node_id();
-	$resource_id = $node->node_id();
-	$phostname = $hostname = GeniUtil::FindHostname($node->node_id());
+    if ($node->isvirtnode()) {
+	$sshdport  = $node->sshdport();
+	$phostname = GeniUtil::FindHostname($node->phys_nodeid());
     }
 
     #
@@ -796,7 +768,7 @@ sub UnProvision($;$)
     my $experiment = $self->GetExperiment();
     if (!defined($experiment)) {
 	print STDERR "Could not map $self to its experiment\n";
-	return -1;
+	return 0;
     }
     my $node_id = $self->resource_id();
     return 0

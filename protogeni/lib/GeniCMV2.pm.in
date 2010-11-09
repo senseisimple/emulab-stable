@@ -20,34 +20,24 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use GeniDB;
-use Genixmlrpc;
 use GeniResponse;
 use GeniTicket;
 use GeniCredential;
 use GeniCertificate;
 use GeniSlice;
 use GeniAggregate;
-use GeniAuthority;
 use GeniSliver;
-use GeniUser;
-use GeniRegistry;
 use GeniUtil;
 use GeniCM;
 use GeniHRN;
 use GeniXML;
-use libtestbed qw(SENDMAIL);
 use emutil;
-# Hate to import all this crap; need a utility library.
-use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
-	     TBDB_NODESTATE_TBFAILED);
-use Node;
 use English;
 use Data::Dumper;
 use XML::Simple;
 use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
-use Experiment;
 use Compress::Zlib;
 use MIME::Base64;
 
@@ -79,8 +69,7 @@ my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
 # Just one of these, at Utah.
 my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
-
-my $API_VERSION = 2;
+my $API_VERSION    = 2;
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -97,7 +86,7 @@ sub GetVersion()
 	"output_rspec" => "0.1"
     };
 
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob );
+    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $blob);
 }
 
 #
@@ -268,6 +257,8 @@ sub CreateSliver($)
     my $credentials  = $argref->{'credentials'};
     my $keys         = $argref->{'keys'};
     my $impotent     = $argref->{'impotent'} || 0;
+    require Node;
+    require Experiment;
     
     # For now, I am not worrying about the slice_urn argument.
     if (! (defined($credentials) &&
@@ -699,24 +690,21 @@ sub SliverAction($$$$$)
     my $PerformAction = sub {
 	my ($object, $action) = @_;
 
+	my $exitval = 0;
+
 	if ($action eq "start") {
-	    if ($object->Start($API_VERSION, 0) != 0) {
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not start sliver");
-	    }
+	    $exitval = $object->Start($API_VERSION, 0);
 	}
 	elsif ($action eq "stop") {
-	    if ($object->Stop($API_VERSION) != 0) {
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not stop sliver");
-	    }
+	    $exitval = $object->Stop($API_VERSION);
 	}
 	elsif ($action eq "restart") {
-	    if ($object->Start($API_VERSION, 1) != 0) {
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not restart sliver");
-	    }	    
+	    $exitval = $object->Start($API_VERSION, 1);
 	}
+	return GeniResponse->Create(GENIRESPONSE_ERROR, 
+				    "Could not $action sliver")
+	    if ($exitval);
+	
 	return 0;
     };
 
@@ -887,6 +875,7 @@ sub Shutdown($)
     my $slice_urn    = $argref->{'slice_urn'};
     my $clear        = $argref->{'clear'} || 0;
     my $credentials  = $argref->{'credentials'};
+    require libtestbed;
 
     if (! (defined($credentials) && defined($slice_urn))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
@@ -946,8 +935,8 @@ sub Shutdown($)
 	    return GeniResponse->BusyResponse();
 	}
 	if (GeniCM::CleanupDeadSlice($slice, 0) != 0) {
-	    SENDMAIL($TBOPS, "Emergency Shutdown failed",
-		     "Emergency shutdown failed on $slice\n");
+	    libtestbed::SENDMAIL($TBOPS, "Emergency Shutdown failed",
+				 "Emergency shutdown failed on $slice\n");
 	    print STDERR "Could not shutdown $slice!\n";
 	    # Lets call this a non-error since the local admin person
 	    # is going to have to deal with it anyway. 
@@ -1365,7 +1354,7 @@ sub ReleaseTicket($)
 
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
     if (! (defined($slice))) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice here");
     }
     if ($slice_urn ne $slice->urn()) {
