@@ -279,6 +279,10 @@ REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','ISUP','Re
 REPLACE INTO mode_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','ALWAYSUP','ISUP','ReloadDone');
 REPLACE INTO mode_transitions VALUES ('PCVM','SHUTDOWN','RELOAD-PCVM','SHUTDOWN','ReloadSetup');
 REPLACE INTO mode_transitions VALUES ('RELOAD-PCVM','SHUTDOWN','PCVM','SHUTDOWN','ReloadDone');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','MINIMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','NORMAL','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','NORMALv2','SHUTDOWN','');
+REPLACE INTO mode_transitions VALUES ('SECUREBOOT','TPMSIGNOFF','PXEFBSD','SHUTDOWN','');
 
 --
 -- Dumping data for table `priorities`
@@ -344,6 +348,19 @@ REPLACE INTO state_timeouts VALUES ('NORMALv2','TBSETUP',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('NORMALv2','BOOTING',180,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('GARCIA-STARGATEv1','TBSETUP',600,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('PXEKERNEL','PXEWAKEUP',20,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','BOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','GPXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','PXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','SHUTDOWN',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECUREBOOT','TPMSIGNOFF',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','BOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','GPXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','PXEBOOTING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','RELOADDONE',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','RELOADING',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','RELOADSETUP',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','SHUTDOWN',3600,'STATE:SECVIOLATION');
+REPLACE INTO state_timeouts VALUES ('SECURELOAD','TPMSIGNOFF',3600,'STATE:SECVIOLATION');
 
 --
 -- Dumping data for table `state_transitions`
@@ -539,6 +556,22 @@ REPLACE INTO state_transitions VALUES ('RELOAD','TBSETUP','ISUP','FailedBoot');
 REPLACE INTO state_transitions VALUES ('RELOAD','TBSETUP','TBFAILED','FailedBoot');
 REPLACE INTO state_transitions VALUES ('RELOAD','ISUP','SHUTDOWN','RebootAfterFail');
 REPLACE INTO state_transitions VALUES ('RELOAD','TBFAILED','SHUTDOWN','RebootAfterFail');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','BOOTING','SECVIOLATION','QuoteFailed');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','BOOTING','TPMSIGNOFF','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','GPXEBOOTING','PXEBOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('SECUREBOOT','PXEBOOTING','BOOTING','BootInfo');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','BOOTING','PXEBOOTING','re-BootInfo');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','BOOTING','RELOADSETUP','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','BOOTING','SECVIOLATION','QuoteFailed');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','GPXEBOOTING','PXEBOOTING','DHCP');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','PXEBOOTING','BOOTING','BootInfo');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADDONE','SECVIOLATION','QuoteFailed');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADDONE','TPMSIGNOFF','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADING','RELOADDONE','ImageOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADING','SECVIOLATION','ImageBad');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','RELOADSETUP','RELOADING','ReloadReady');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','SHUTDOWN','GPXEBOOTING','QuoteOK');
+REPLACE INTO state_transitions VALUES ('SECURELOAD','SHUTDOWN','SECVIOLATION','QuoteFailed');
 
 --
 -- Dumping data for table `state_triggers`
@@ -559,6 +592,14 @@ REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADOLDMFS','RELOADOLDMFS');
 REPLACE INTO state_triggers VALUES ('*','RELOAD-PCVM','RELOADDONE','RESET, RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','ISUP','REBOOT');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','TBFAILED','REBOOT');
+REPLACE INTO state_triggers VALUES ('*','*','GPXEBOOTING','SECUREBOOT');
+REPLACE INTO state_triggers VALUES ('*','*','SECVIOLATION','POWEROFF, EMAILNOTIFY');
+REPLACE INTO state_triggers VALUES ('*','SECUREBOOT','BOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECUREBOOT','PXEBOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECUREBOOT','TPMSIGNOFF','PXEBOOT, BOOTING, CHECKGENISUP');
+REPLACE INTO state_triggers VALUES ('*','SECURELOAD','BOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECURELOAD','PXEBOOTING','');
+REPLACE INTO state_triggers VALUES ('*','SECURELOAD','RELOADDONE','RESET, RELOADDONE');
 
 --
 -- Dumping data for table `table_regex`
@@ -993,6 +1034,10 @@ REPLACE INTO table_regex VALUES ('elabinelab_attributes','role','text','regex','
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','attrkey','text','regex','^[-\\w\\.]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','attrvalue','text','regex','^[-\\w\\.\\+,\\s\\/]+$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('elabinelab_attributes','ordering','int','redirect','default:tinyint',0,0,NULL);
+
+REPLACE INTO table_regex VALUES ('images','auth_key','text','regex','^[0-9a-fA-F,]+$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','auth_uuid','text','regex','^[0-9a-fA-F]+$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','decryption_key','text','regex','^[0-9a-fA-F]+$',0,0,NULL);
 
 REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,256,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
