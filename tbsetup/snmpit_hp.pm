@@ -949,7 +949,7 @@ sub delPortVlan($$@) {
     my $vlan_number = shift;
     my @ports = @_;
 
-    return $self->updateOneVlan(0,0,0,$vlan_number,0,@ports);
+    return $self->updateOneVlan(0,0,0,$vlan_number,@ports);
 }
 
 sub updateOneVlan($$$$$@)
