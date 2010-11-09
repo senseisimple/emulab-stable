@@ -805,8 +805,10 @@ sub Reload($$)
     # If we're going to do a reconfig too, stop in the ROM monitor so that
     # Reconfigure can wipe the current configs.
     #
-    if (defined($self->nodeflag($nodeobject,'reconfig')) 
-	&& $self->nodeflag($nodeobject,'reconfig')) {
+    if ((defined($self->nodeflag($nodeobject,'reconfig')) 
+	 && $self->nodeflag($nodeobject,'reconfig'))
+	|| (defined($self->nodeflag($nodeobject,'reconfig_will_follow')) 
+	    && $self->nodeflag($nodeobject,'reconfig_will_follow'))) {
 	$self->dprint("Reload($node_id): running bootToRom after load");
 	if (($retval = $self->expect($nodeobject,undef,undef,
 				     $sequences{'bootToRom'})) < 0) {
@@ -1397,7 +1399,7 @@ sub uploadImageTftp($$$;$) {
 
     my @linehist = ();
     $retval = $self->expect($nodeobject,\@linehist,undef,
-			    { 'timeout' => 60,
+			    { 'timeout' => 120,
 			      'presend' => $tchar,
 			      'seq' => [ [ '#\s*$', "copy tftp flash ${BOSSNODE_IP} $tmpfilename\n", 'line' ],
 					 [ 'continue \[y\/n\]\?\s*', "y\n", 'line' ],
