@@ -29,7 +29,6 @@ use GeniComponent;
 use GeniHRN;
 use GeniXML;
 use emutil;
-use Lan;
 use Data::Dumper;
 use English;
 use overload ('""' => 'Stringify');
@@ -730,6 +729,8 @@ sub ProcessManifest($$)
 sub Start($$$)
 {
     my ($self, $version, $restart) = @_;
+    require Lan;
+    require OSinfo;
 
     return -1
 	if (! ref($self));
