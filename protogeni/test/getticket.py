@@ -55,37 +55,13 @@ mycredential = get_self_credential()
 print "Got my SA credential, looking up " + SLICENAME
 
 #
-# Lookup slice.
+# Lookup slice and get credential.
 #
-params = {}
-params["credential"] = mycredential
-params["type"]       = "Slice"
-params["hrn"]        = SLICENAME
-rval,response = do_method("sa", "Resolve", params)
-if rval:
-    #
-    # Create a slice. 
-    #
-    print "Creating new slice called " + SLICENAME
-    params = {}
-    params["credential"] = mycredential
-    params["type"]       = "Slice"
-    params["hrn"]        = SLICENAME
-    rval,response = do_method("sa", "Register", params)
-    if rval:
-        Fatal("Could not create new slice")
-        pass
-    myslice = response["value"]
-    print "New slice created"
-    pass
-else:
-    #
-    # Get the slice credential.
-    #
-    print "Asking for slice credential for " + SLICENAME
-    myslice = get_slice_credential( response[ "value" ], mycredential )
-    print "Got the slice credential"
-    pass
+myslice = resolve_slice( SLICEURN, mycredential )
+
+print "Asking for slice credential for " + SLICENAME
+slicecredential = get_slice_credential( myslice, mycredential )
+print "Got the slice credential"
 
 #
 # Get a ticket. We do not have a real resource discovery tool yet, so
@@ -96,7 +72,7 @@ print "Asking for a ticket from the local CM"
 
 params = {}
 params["slice_urn"]   = SLICEURN
-params["credentials"] = (myslice,)
+params["credentials"] = (slicecredential,)
 params["rspec"]       = rspec
 params["impotent"]    = 0
 rval,response = do_method("cm", "GetTicket", params, version="2.0")
@@ -105,6 +81,7 @@ if rval:
     pass
 ticket = response["value"]
 #print str(ticket)
+sys.exit(0)
 
 #
 # Update the ticket. Send back the original rspec, but technically wrong.
@@ -115,7 +92,7 @@ print "Got the ticket, doing a update on it. "
 params = {}
 params["slice_urn"]   = SLICEURN
 params["ticket"]      = ticket
-params["credentials"] = (myslice,)
+params["credentials"] = (slicecredential,)
 params["rspec"]       = rspec
 params["impotent"]    = 0
 rval,response = do_method("cm", "UpdateTicket", params, version="2.0")
@@ -123,4 +100,5 @@ if rval:
     Fatal("Could not update ticket")
     pass
 ticket = response["value"]
+print "Updated the ticket."
 print str(ticket)

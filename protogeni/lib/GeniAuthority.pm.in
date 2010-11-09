@@ -95,6 +95,8 @@ sub Lookup($$)
     my $self              = {};
     $self->{'AUTHORITY'}  = $query_result->fetchrow_hashref();
     $self->{'version'}    = undef;
+    $self->{'apilevel'}   = undef;
+    $self->{'api'}        = undef;
     bless($self, $class);
 
     #
@@ -178,7 +180,9 @@ sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub type($)		{ return field($_[0], "type"); }
 sub disabled($)		{ return field($_[0], "disabled"); }
-sub version($)		{ return field($_[0], "version"); }
+sub version($)		{ return $_[0]->{"version"}; }
+sub apilevel($)		{ return $_[0]->{"apilevel"}; }
+sub api($)		{ return $_[0]->{"api"}; }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
@@ -329,12 +333,52 @@ sub Version($)
 	return undef;
     }
     if (ref($response->value())) {
-	$self->{'version'} = $response->value()->{'api'};
+	# Look for the AM interface.
+	if (exists($response->value()->{'geni_api'})) {
+	    $self->{'version'}  = $response->value()->{'geni_api'};
+	    # This was wrong; it should be 2.0 not 1.0
+	    $self->{'version'}  = 2.0 if ($self->{'version'} == 1.0);
+	    $self->{'apilevel'} = 0;
+	    $self->{'api'}      = "AM";
+	}
+	else {
+	    $self->{'version'}  = $response->value()->{'api'};
+	    $self->{'apilevel'} = $response->value()->{'level'};
+	    $self->{'apilevel'} = 0;
+	    $self->{'api'}      = "CM";
+	}
     }
     else {
-	$self->{'version'} = $response->value();
+	$self->{'version'}  = $response->value();
+	$self->{'apilevel'} = 1;
+	$self->{'api'}      = "CM";
     }
     return $self->{'version'};
+}
+# Ditto for the API level
+sub ApiLevel($)
+{
+    my ($self) = @_;
+
+    return $self->apilevel()
+	if (defined($self->apilevel()));
+
+    return undef
+	if (!defined($self->Version()));
+
+    return $self->apilevel();
+}
+sub Api($)
+{
+    my ($self) = @_;
+
+    return $self->api()
+	if (defined($self->api()));
+
+    return undef
+	if (!defined($self->Version()));
+
+    return $self->api();
 }
 
 #
