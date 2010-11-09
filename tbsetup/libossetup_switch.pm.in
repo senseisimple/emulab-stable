@@ -193,6 +193,15 @@ sub LightUpNodes($@)
 	    delete $reboots{$node_id};
 	    delete $reconfigs{$node_id};
 	    $rebooted{$node_id} = 1;
+
+	    # if we're going to do a reconfig after the load, stop in the ROM
+	    # monitor so we can avoid an extra reboot
+	    my $oplistref = $self->{OPLIST}->{$node_id};
+	    if (scalar(@$oplistref) > 1 
+		&& $oplistref->[0] == $libossetup::RELOAD
+		&& $oplistref->[1] == $libossetup::RECONFIG) {
+		$nodeflags{$node_id}{'reconfig_will_follow'} = 1;
+	    }
 	}
 
 	my %reload_args     = ();
