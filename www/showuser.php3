@@ -331,34 +331,48 @@ if ($message != "") {
 # Function to change what is being shown.
 #
 echo "<script type='text/javascript' language='javascript'>
-        var li_current = 'li_experiments';
-        var table_current = 'experiments_table';
+        var li_current = 'li_profile';
+        var table_current = 'profile_table';
         function Show(which) {
 	    li = getObjbyName(li_current);
-            li.style.backgroundColor = '#DDE';
-            li.style.borderBottom = '1px solid #778';
-            table = getObjbyName(table_current);
-            table.style.display = 'none';
+            if (li) {
+                li.style.backgroundColor = '#DDE';
+                li.style.borderBottom = '1px solid #778';
+                table = getObjbyName(table_current);
+                table.style.display = 'none';
+            }
 
             li_current = 'li_' + which;
-	    li = getObjbyName(li_current);
-            li.style.backgroundColor = 'white';
-            li.style.borderBottom = '1px solid white';
             table_current = which + '_table';
-            table = getObjbyName(table_current);
-            table.style.display = 'block';
+   	    li = getObjbyName(li_current);
+            if (li) {
+                li.style.backgroundColor = 'white';
+                li.style.borderBottom = '1px solid white';
+                table = getObjbyName(table_current);
+                table.style.display = 'block';
+            }
 
             return false;
         }
-        function Setup(which) {
-            li_current = 'li_' + which;
-            table_current = which + '_table';
-	    li = getObjbyName(li_current);
-            li.style.backgroundColor = 'white';
-            li.style.borderBottom = '1px solid white';
-
-            table = getObjbyName(table_current);
-            table.style.display = 'block';
+        function Setup() {
+	    var urllocation = location.href; //find url parameter
+	    if (urllocation && urllocation.indexOf('#') >= 0) {
+                var which = urllocation.substr(urllocation.indexOf('#') + 1);
+	        li = getObjbyName('li_' + which);
+                if (!li) {
+                    which = 'profile';
+                }
+                Show(which);
+            }
+            else {
+	        li = getObjbyName(li_current);
+                if (li) {
+                    li.style.backgroundColor = 'white';
+                    li.style.borderBottom = '1px solid white';
+                    table = getObjbyName(table_current);
+                    table.style.display = 'block';
+                }
+            }
         }
       </script>\n";
 
@@ -369,42 +383,49 @@ echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 if ($html_templates) {
     echo "<li>
-           <a href=\"#A\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+           <a href=\"#templates\" ".
+	       "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_templates\" onclick=\"Show('templates');\">".
                "Templates</a></li>\n";
 }
 if ($html_experiments) {
      echo "<li>
-            <a href=\"#B\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+            <a href=\"#experiments\" ".
+	       "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_experiments\" onclick=\"Show('experiments');\">".
                "Experiments</a></li>\n";
 }
 if ($html_instances) {
     echo "<li>
-           <a href=\"#C\" class=topnavbar onfocus=\"this.hideFocus=true;\"  ".
+           <a href=\"#instances\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\"  ".
               "id=\"li_instances\" onclick=\"Show('instances');\">".
               "Instances</a></li>\n";
 }
 if ($html_groups) {
     echo "<li>
-          <a href=\"#D\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#groups\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_groups\" onclick=\"Show('groups');\">".
               "Projects</a></li>\n";
 }
 echo "<li>
-      <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+      <a href=\"#profile\" ".
+           "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
            "id=\"li_profile\" onclick=\"Show('profile');\">".
            "Profile</a></li>\n";
 
 if ($isadmin && $html_stats) {
     echo "<li>
-          <a href=\"#F\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#stats\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_stats\" onclick=\"Show('stats');\">".
               "User Stats</a></li>\n";
 }
 if ($html_pubs) {
     echo "<li>
-          <a href=\"#G\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#pubs\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_pubs\" onclick=\"Show('pubs');\">".
               "Publications</a></li>\n";
 }
@@ -438,7 +459,7 @@ if ($html_experiments) {
 $current = ($html_experiments ? "experiments" : "profile");
 
 echo "<script type='text/javascript' language='javascript'>
-      Setup(\"$current\");
+      Setup();
       </script>\n";
 
 #
