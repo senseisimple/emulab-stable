@@ -2584,10 +2584,12 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "join nonlocal_users as u on "
 				 "     b.uid_idx=u.uid_idx "
 				 "join groups as g on "
-				 "     g.pid='%s' and g.pid=g.gid "
+				 "     g.pid='%s' and "
+				 "     (g.pid=g.gid or g.gid='%s') "
 				 "where (b.exptidx='%d') "
 				 "order by u.uid",
-				 18, reqp->pid, reqp->exptidx);
+				 18, reqp->pid, reqp->gid,
+				 reqp->exptidx);
 
 		if (res) {
 			if ((nrows = mysql_num_rows(res)))
