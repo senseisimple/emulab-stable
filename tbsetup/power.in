@@ -23,7 +23,7 @@ my $RPCSERVER  = "@OUTERBOSS_NODENAME@";
 my $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
 my $RPCCERT    = "@OUTERBOSS_SSLCERTNAME@";
 my $WOL        = "$TB/sbin/whol";
-my $logfile    = "$TB/log/power.log";
+my $TBLOG	= "@TBLOGFACIL@";
 
 use lib "@prefix@/lib";
 use libdb;
@@ -44,6 +44,7 @@ use strict;
 use English;
 use Getopt::Std;
 use POSIX qw(strftime);
+use Sys::Syslog;
 
 sub usage() {
     print << "END";
@@ -136,6 +137,9 @@ foreach my $n (0..$#machines) {
 # Dump the args
 #
 print "do \"$op\" to @machines\n" if $verbose > 1;
+
+# Set up syslog
+openlog("power", "pid", $TBLOG);
 
 #
 # Handle the status command which is not a per-node operation and not
@@ -674,8 +678,9 @@ sub logit($)
     my ($message) = @_;
     my ($me) = getpwuid($UID);
 
-    # Sep 20 09:36:00 [$me] $message
-    open(LOG,">> $logfile");
-    print LOG strftime("%b %e %H:%M:%S", localtime) . " [$me] $message";
-    close(LOG);
+    syslog("info", "[$me] $message");
+}
+
+END {
+    closelog();
 }

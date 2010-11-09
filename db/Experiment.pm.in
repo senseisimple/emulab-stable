@@ -2717,7 +2717,7 @@ sub CleanLogFiles($)
 	    if ($file =~ /^.*\.ns$/);
 	
 	push(@delete, "${workdir}/$1")
-	    if ($file =~ /^(.*\.(log|ptop|top|assign|soln|xml))$/);
+	    if ($file =~ /^(.*\.(log|ptop|top|assign|soln|xml|limits))$/);
 
 	push(@delete, "${workdir}/$1")
 	    if ($file =~ /^((swap|start|cancel|newrun).*\..*)$/);

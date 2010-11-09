@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2005-2010 University of Utah and the Flux Group.
@@ -17,7 +17,7 @@ use vars qw(@ISA @EXPORT @EXPORT_OK
 @EXPORT = qw( );
 
 use libdb;
-use libtblog;
+use libtblog_simple;
 use libtestbed;
 use Experiment;
 use VirtExperiment;
@@ -632,6 +632,7 @@ sub Create($$$$)
     $self->{'MEMBERLIST'}    = [];
     $self->{'VIRTLANHASH'}   = {};
     $self->{'VIRTLANLIST'}   = [];
+    $self->{'IMPLEMENTS'}    = {};
     $self->{'HASH'}          = {};
 
     return $self;
@@ -641,10 +642,12 @@ sub pathname($)		{ return $_[0]->{'PATHNAME'}; }
 sub layer($)		{ return $_[0]->{'LAYER'}; }
 sub members($)		{ return $_[0]->{'MEMBERHASH'}; }
 sub memberlist($)       { return @{ $_[0]->{'MEMBERLIST'} }; }
+sub virtlanlist($)      { return @{ $_[0]->{'VIRTLANLIST'} }; }
 sub member($$)		{ return $_[0]->{'MEMBERLIST'}->[$_[1]]; }
 sub lanlink($$)		{ return $_[0]->{'VIRTLANLIST'}->[$_[1]]; }
 sub vtop($)		{ return $_[0]->{'VTOP'}; }
 sub hash($)		{ return $_[0]->{'HASH'}; }
+sub implements($)	{ return $_[0]->{'IMPLEMENTS'}; }
 
 # Break circular reference someplace to avoid exit errors.
 sub DESTROY {
@@ -657,6 +660,7 @@ sub DESTROY {
     $self->{'VIRTLANHASH'} = undef;
     $self->{'VIRTLANLIST'} = undef;
     $self->{'VTOP'}       = undef;
+    $self->{'IMPLEMENTS'} = undef;
     $self->{'HASH'}       = undef;
 }
 
@@ -707,6 +711,19 @@ sub lastmember($)
 
     # The last member.
     return $member1;
+}
+
+sub addimplements($$)
+{
+    my ($self, $virtlan) = @_;
+
+    $self->implements()->{$virtlan->vname()} = $virtlan;
+}
+sub doesimplement($$)
+{
+    my ($self, $virtlan) = @_;
+
+    return exists($self->implements()->{$virtlan->vname()});
 }
 
 #############################################################################
@@ -1100,6 +1117,9 @@ sub LoadVirtNodes($)
 
 	# For a list of interfaces on this node, as for rspec generation
 	$vnode->_virtifaces([]);
+
+	# dynamic inclusion below.
+	$gotgeninodes++ if ($isgeni);
 
 	# The mapped osname to actual osinfo structure.
 	$vnode->_osinfo(undef);
@@ -1584,7 +1604,11 @@ sub LoadVirtLans($)
 	    tberror("Could not find path $implemented_by for $virtlan");
 	    return -1;
 	}
-	if ($vpath->layer() >= $virtlan->_layer()) {
+	if ($vpath->layer() == $virtlan->_layer() && $vpath->layer() != 2) {
+	    tberror("Path $vpath at the same layer as $virtlan");
+	    return -1;
+	}
+	if ($vpath->layer() > $virtlan->_layer()) {
 	    tberror("Path $vpath at a higher layer then $virtlan");
 	    return -1;
 	}
@@ -1626,6 +1650,7 @@ sub LoadVirtLans($)
 	
 	$self->printdb("$virtlan is implemented by $vpath\n");
 	$virtlan->_implemented_by($vpath);
+	$vpath->addimplements($virtlan);
     }
     return 0;
 }
@@ -1734,6 +1759,11 @@ sub GenVirtNodes($)
 		    'generated_by' => 'libvtop',
 		    'type'  => 'request',
 		    'xmlns' => 'http://www.protogeni.net/resources/rspec/0.2',
+		    # Assign now wants this stuff. 
+		    'xmlns:xsi' => "http://www.w3.org/2001/XMLSchema-instance",
+		    'xsi:schemaLocation' =>
+		    "http://www.protogeni.net/resources/rspec/0.2 ".
+		    "http://www.protogeni.net/resources/rspec/0.2/request.xsd",
 		    'node'  => [] };
 	    }
 	    push(@{ $self->genirspec()->{'node'} }, $ref);
@@ -1856,7 +1886,7 @@ sub GenFixNodes($)
 
 	# Normal nodes have a vnode but delay nodes do not.
 	if (!defined($vnode) && !$self->isadelaynode($vname)) {
-	    tbwarn("GenFixNodes: No vnode for $vname\n");
+	    tbinfo("GenFixNodes: No vnode for $vname\n");
 	}
 
 	#
@@ -4632,8 +4662,7 @@ sub AllocNodes($)
 	if (defined($self->genirspec())) {
 	    $self->printdb("Redeeming geni tickets ...\n");
 	    
-	    if (libGeni::RedeemTickets($self->experiment(),
-				       $self->user(), $self->genirspec())) {
+	    if (libGeni::RedeemTickets($self->experiment(), $self->user())) {
 		tberror("Could not redeem Geni Tickets\n");
 		return -1;
 	    }
@@ -5074,16 +5103,10 @@ sub InterpLinks($)
     my $eid = $experiment->eid();
 
     $self->printdb("Interpreting link/lan results from assign\n");
-    return -1
-	if ($self->InterpLinksAux() != 0);
 
     #
-    # MLE Post pass. Once the paths are set up, need to find the vlans
-    # that are implemented by those paths, and process the links using
-    # the underlying members. 
+    # MLE: Add the links that are implemented by others.
     #
-    $self->{'SOLUTION'}->{'PLINKS'} = {};
-
     foreach my $virtlan (values(%{ $self->vlans() })) {
 	my $vpath = $virtlan->_implemented_by();
 
@@ -5101,12 +5124,34 @@ sub InterpLinks($)
 				 $lastmember->_pnode(),
 				 $lastmember->_pport());
     }
-    if (keys(%{ $self->solution_plinks() })) {
-	#
-	# Rerun InterpLinksAux with the new set of plinks. 
-	#
-	return -1
-	    if ($self->InterpLinksAux() != 0);
+    return -1
+	if ($self->InterpLinksAux() != 0);
+
+    #
+    # Find all the layer 2 paths and add the bridges between them.
+    # Eventually this should be optional; the user should be free
+    # to set this up themselves.
+    #
+    foreach my $pathname (keys(%{ $self->vpaths() })) {
+	my $vpath = $self->vpaths()->{$pathname};
+
+	next
+	    if ($vpath->layer() != 2);
+
+	my @members = $vpath->virtlanlist();
+	next
+	    if (scalar(@members) < 2);
+
+	# A list of virtlans (segments)
+	my $prev = shift(@members);
+	my $next = shift(@members);
+	while ($next) {
+	    my (undef, $member0) = $prev->memberlist();
+	    my ($member1, undef) = $next->memberlist();
+	    $self->AddBridge($vpath, $member0, $member1);
+	    $prev = $next;
+	    $next = shift(@members);
+	}
     }
 
     #
@@ -5161,8 +5206,6 @@ sub InterpLinks($)
 		    if ($interface->role() ne TBDB_IFACEROLE_EXPERIMENT() ||
 			!$wiredup);
 
-		$protovlan->AddMember($pnodename, $iface);
-		
 		my $speed = $self->interfacespeedmbps($type, "ethernet");
 		DBQueryWarn("update interfaces set " .
 			    "   current_speed='$speed',trunk=1 " .
@@ -5170,6 +5213,12 @@ sub InterpLinks($)
 		    or return -1 if (!($self->impotent() ||
 				       $self->alloconly()));
 
+		# Use attributes in the future, instead of above query.
+		my $mem =
+		    $protovlan->AddMember($pnodename, $iface,
+					  {"trunk_mode"    => "dual",
+					   "current_speed" => $speed});
+		
 		#
 		# Do not do this for nodes already in the shared experiment.
 		# It would reset the in-use bandwidth. Bad.
@@ -5459,12 +5508,81 @@ sub InterpLinksAux($)
 		    $protolink = ProtoLan->Create($experiment, $lan,
 						  $self->impotent() ||
 						  $self->alloconly());
+		    #
+		    # Hmm, until we have a layer one switch, lets say that
+		    # a layer one link is just a vlan between the nodes, and
+		    # the ports are put into trunk mode so that tagged vlans
+		    # can operate over it. 
+		    # We should generalize this somehow.
+		    #
 		    $protolink->SetType("wire");
 		    $protolink->SetRole("link");
-		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
-		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
+		    my $ifaceA =
+			$protolink->AddInterface($nodeA, $vnodeA,
+						 $vportA, $portA);
+		    my $ifaceB =
+			$protolink->AddInterface($nodeB, $vnodeB,
+						 $vportB, $portB);
+		    next;
 		}
-		elsif ($virtlan->usevirtiface()) {
+		elsif ($virtlan->_layer() == 2 && $virtlan->_vpath()) {
+		    #
+		    # A layer two path. We know we want to put the
+		    # ports into trunk mode, but we might not know the
+		    # vlan(s) yet since the link(s) running over this
+		    # path might not have been created.
+		    #
+		    # Note that the current implementation of a layer
+		    # two path is a set of nodes, with each interior
+		    # node in the path acting as a bridge. All of the
+		    # ports along the way are added to the vlan that
+		    # was created for the link. 
+		    #
+		    # Look at the list of all the links this path
+		    # implements. If not all of them have been
+		    # processed then push this back on the vlinks list
+		    # to be processed later.
+		    #
+		    my $vpath = $virtlan->_vpath();
+		    
+		    foreach my $implements (values(%{$vpath->implements()})) {
+			if (!exists($protovlans{$implements->vname()})) {
+			    push(@plinks, $plink);
+			    goto loop;
+			}
+		    }
+		    #
+		    # Okay, all of the vlans implemented by this path
+		    # (segment) have been created. Put the ports of this
+		    # segment into the those vlans, and make sure the
+		    # ports are marked for trunking. 
+		    #
+		    foreach my $implements (values(%{$vpath->implements()})) {
+			my $protovlan = $protovlans{$implements->vname()};
+
+			$protovlan->AddMember($nodeA, $portA,
+					      {"trunk_mode" => "equal"})
+			    if (! $protovlan->IsMember($nodeA, $portA));
+
+			$protovlan->AddMember($nodeB, $portB,
+					      {"trunk_mode" => "equal"})
+			    if (! $protovlan->IsMember($nodeB, $portB));
+
+			$self->printdb("Path Segment: $vpath:$implements\n");
+		    }
+		    next;
+		}
+		#
+		# Okay, now make sure that if the link is layer 2 and
+		# is implemented by a layer 1 link, the layer 1 link
+		# is already done. Otherwise, push the link back on
+		# the list and keep going.
+		#
+		if ($virtlan->_implemented_by() && 0) {
+
+		    next;
+		}
+		if ($virtlan->usevirtiface()) {
 		    my $protovlan;
 		    
 		    #
@@ -5489,6 +5607,7 @@ sub InterpLinksAux($)
 			$protovlan->SetType("vlan");
 			$protovlan->SetEncapStyle($virtlan->_encapstyle());
 			$protovlan->SetAttribute("link/lan", $lan);
+			$protovlans{$lan} = $protovlan;
 
 			$protovlan->AddMember($nodeA, $portA)
 			    if (!$protovlan->IsMember($nodeA, $portA));
@@ -5567,6 +5686,7 @@ sub InterpLinksAux($)
 		    $protolink->SetAttribute("link/lan", $lan);
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
+		    $protovlans{$lan} = $protolink;
 		}
 	    }
 	    else {
@@ -5872,6 +5992,7 @@ sub InterpLinksAux($)
 	else {
 	    warn("Bad plink: $plink\n");
 	}
+      loop:
     }
     $self->{'SOLUTION'}->{'PORTMAP'} = \%portmap;
 
@@ -6398,7 +6519,7 @@ sub NewVirtIface($$$$;$)
     #
     # For veth and vlan interfaces, we need to set the characteristics
     # of the underlying physical interface, but only if we actually own
-    # the node; it might be a veth on a shread physical node.
+    # the node; it might be on a shared physical node.
     #
     # If the pnode is a shared host, we do not want to do this; the physical
     # interfaces are all set up the right way, do not mess it up. 
@@ -6701,6 +6822,75 @@ sub AddLinkDelay($$$$$$)
 }
 
 #
+# Add a bridge. The DB table for bridges allows for any number of
+# interfaces, but in practice there are only two when creating them
+# inside of libvtop.
+#
+sub AddBridge($$$$)
+{
+    my ($self, $vpath, $member0, $member1) = @_;
+    my $iface0 = $member0->_pport();
+    my $iface1 = $member1->_pport();
+    my $pnodename = $member0->_pnode();
+    my $pnode =  $self->pnodes()->{$pnodename};
+
+    # Bridge index, multiple rows in the table under the same index.
+    my $bridgeidx = $pnode->_pipenumber();
+    $pnode->_pipenumber($bridgeidx + 1);
+
+    my $vnodename0 = $member0->vnode();
+    my $vnodename1 = $member1->vnode();
+    my $experiment = $self->experiment();
+    my $pid   = $experiment->pid();
+    my $eid   = $experiment->eid();
+    my $idx   = $experiment->idx();
+    my $vname = $vpath->pathname();
+
+    $self->printdb("  Bridge:$bridgeidx $iface0:$pnodename:$iface1\n");
+
+    DBQueryWarn("insert into bridges " .
+		" (pid,eid,exptidx,node_id,bridx,iface,vname,vnode) ".
+		" values ('$pid','$eid','$idx','$pnodename','$bridgeidx', ".
+		"         '$iface0','$vname','$vnodename0')")
+	or return -1 if (! ($self->impotent() || $self->alloconly()));
+
+    DBQueryWarn("insert into bridges " .
+		" (pid,eid,exptidx,node_id,bridx,iface,vname,vnode) ".
+		" values ('$pid','$eid','$idx','$pnodename','$bridgeidx', ".
+		"         '$iface1','$vname','$vnodename1')")
+	or return -1 if (! ($self->impotent() || $self->alloconly()));
+    
+    #
+    # XXX - Whenever a bridge node is inserted, port speeds are set to
+    #       their maximum speed on the ports. This is to ensure that
+    #       they get a valid number instead of something left over, but
+    #       also because this is a simplification.
+    my $speed0 =
+	$self->interfacespeedmbps(physinterfacetype($pnode, $iface0),
+				  "ethernet");
+    my $speed1 =
+	$self->interfacespeedmbps(physinterfacetype($pnode, $iface1),
+				  "ethernet");
+
+    $self->printdb("  Setting port speeds on $pnodename: ".
+		   "$iface0:$speed0 $iface1:$speed1\n");
+
+    DBQueryWarn("update interfaces set " .
+		"current_speed='$speed0' " .
+		"where node_id='$pnodename' and ".
+		"iface='$iface0'")
+	or return -1 if (!($self->impotent() || $self->alloconly()));
+
+    DBQueryWarn("update interfaces set " .
+		"current_speed='$speed1' " .
+		"where node_id='$pnodename' and ".
+		"iface='$iface1'")
+	or return -1 if (!($self->impotent() || $self->alloconly()));
+
+    return 0;
+}
+
+#
 # Setup tracing on a link.
 #
 sub SetUpTracing($$$$$)
@@ -6854,15 +7044,16 @@ sub UploadVlans($)
 	    return -1;
 	}
 
-	# Once the lans are instantiated we have to go back and update the
-	# vinterfaces table. Eventually I want to roll vinterface creation
-	# into lan instantiation.
-	#
 	my @lans;
 	if (Lan->ExperimentLans($experiment, \@lans) != 0) {
 	    tberror("Could not get list of all lans for $experiment\n");
 	    return -1;
 	}
+	#
+	# Once the lans are instantiated we have to go back and update the
+	# vinterfaces table. Eventually I want to roll vinterface creation
+	# into lan instantiation.
+	#
 	foreach my $lan (@lans) {
 	    # Only care about encapsulated links.
 	    next
@@ -6888,6 +7079,52 @@ sub UploadVlans($)
 			"where virtlanidx='$virtlanidx' and ".
 			"      exptidx='$exptidx'")
 		or return -1;
+	}
+
+	#
+	# Set the trunk/speed for any physical ports so marked.
+	#
+	foreach my $lan (@lans) {
+	    next
+		if ($lan->type() ne "vlan");
+
+	    # Set the failureaction on the vlan according to the link/lan.
+	    my $lanname;
+	    $lan->GetAttribute("link/lan", \$lanname);
+	    my $virtlan = $self->vlans()->{$lanname};
+	    if (!defined($virtlan)) {
+		tberror("Could not find link/lan $lanname in lan list!\n");
+		return -1;
+	    }
+	    $lan->SetAttribute("failureaction", $virtlan->failureaction());
+	    
+	    my @members;
+	    if ($lan->MemberList(\@members) != 0) {
+		tberror("Could not get member list for $lan\n");
+		return -1;
+	    }
+	    foreach my $member (@members) {
+		my $current_speed;
+		my $trunk_mode;
+		$member->GetAttribute("trunk_mode", \$trunk_mode);
+		$member->GetAttribute("current_speed", \$current_speed);
+
+		next
+		    if (! (defined($trunk_mode) || defined($current_speed)));
+		
+		my $interface = $member->GetInterface();
+		if (!defined($interface)) {
+		    tberror("No interface for $member\n");
+		    return -1;
+		}
+		my $args = {};
+		$args->{'current_speed'} = $current_speed
+		    if (defined($current_speed));
+		$args->{'trunk_mode'} = $trunk_mode
+		    if (defined($trunk_mode));
+		$interface->Update($args) == 0
+		    or return -1;
+	    }
 	}
     }
     else {
@@ -8022,7 +8259,12 @@ sub PrintSolution($$)
 	my $pnode = $self->pnodes()->{$pnodename};
 
 	foreach my $vnodename (@vnodenames) {
+	    my $vnode   = $self->vnodes()->{$vnodename};
 	    my $newNode = addNode($doc, $root, "node");
+
+	    if (defined($vnode) && $vnode->_isvirtnode()) {
+		$pnode = $vnode->_pnode();
+	    }
 	    
 	    $newNode->setAttribute("virtual_id", $vnodename);
 	    $newNode->setAttribute("component_uuid", $pnode->uuid());
