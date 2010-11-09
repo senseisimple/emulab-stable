@@ -20,14 +20,14 @@ sub InstallUpdate($$)
 	Phase "p5-Crypt-X509", "Checking for port p5-Crypt-X509", sub {
 	    DoneIfPackageInstalled("p5-Crypt-X509");
 	    ExecQuietFatal("cd $PORTSDIR/security/p5-Crypt-X509; ".
-			   "make -DBATCH install");
+			   "make MASTER_SITE_FREEBSD=1 -DBATCH install");
 	};
     
 	Phase "p5-Crypt-OpenSSL-X509",
 	      "Checking for port p5-Crypt-OpenSSL-X509", sub {
 	    DoneIfPackageInstalled("p5-Crypt-OpenSSL-X509");
 	    ExecQuietFatal("cd $PORTSDIR/security/p5-Crypt-OpenSSL-X509; ".
-			   "make -DBATCH install");
+			   "make MASTER_SITE_FREEBSD=1 -DBATCH install");
 	};
     }
     

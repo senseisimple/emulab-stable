@@ -20,7 +20,7 @@ sub InstallUpdate($$)
 		DoneIfPackageInstalled("xerces");
 		ExecQuietFatal("cd $PORTSDIR/textproc/xerces-c2; ".
 			       "make clean; make rmconfig; ".
-			       "make -DBATCH WITH_DEBUG=on install");
+			       "make MASTER_SITE_FREEBSD=1 -DBATCH WITH_DEBUG=on install");
 	    };
 	    Phase "reconfig", "Checking to see if reconfigure needed", sub {
 		PhaseSkip("No reconfig needed")
