@@ -617,6 +617,11 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        */
       oldassigned = vn->assigned;
       oldpos = vn->assignment;
+
+      if (oldassigned) {
+          RDEBUG(cout << "   was assigned to " <<
+                  get(pvertex_pmap,oldpos)->name << endl;)
+      }
       
       /*
        * Problem: If we free the chosen vnode now, we might just try remapping
@@ -652,6 +657,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
       tb_pnode *newpnode = NULL;
       if ((use_connected_pnode_find != 0)
 	  && ((RANDOM() % 1000) < (use_connected_pnode_find * 1000))) {
+        RDEBUG(cout << "   using find_pnode_connected" << endl;)
 	newpnode = find_pnode_connected(vv,vn);
       }
       
@@ -660,6 +666,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        * fall back on the regular algorithm to find a pnode
        */
       if (newpnode == NULL) {
+        RDEBUG(cout << "   using find_pnode" << endl;)
 	newpnode = find_pnode(vn);
       }
       
@@ -702,6 +709,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        * since we just marked it as unmapped. But now, there will be at least one
        * free pnode
        */
+      RDEBUG(cout << "Failed to find a possible mapping; try again..." << endl;)
       continue;	
 #else /* SMART_UNMAP */
       // XXX: This code is broken for now, which is okay, because we weren't
@@ -715,6 +723,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        * Okay, we've got pnode to map this vnode to - let's do it
        */
       if (newpnode != NULL) {	
+        RDEBUG(cout << "MOVE: " << vn->name << " to " << newpnode->name << " ";)
         newpos = pnode2vertex[newpnode];
         if (scoring_selftest) {
 	  // Run a little test here - see if the score we get by adding	
@@ -748,6 +757,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
          */
         if (add_node(vv,newpos,false,false,false) != 0) {
 	  unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
+          RDEBUG(cout << "failed" << endl;)
 	  continue;
         }
       } else { // pnode != NULL
@@ -832,7 +842,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
         } else if (accept(scorediff,temp)) {
 	  accepttrans = true;
 	  RDEBUG(cout << "accept: metropolis (" << newscore << ","
-		 << bestscore << "," << expf(scorediff/(temp*sensitivity))
+		 << bestscore << "," << scorediff << "," << temp
 		 << ")" << endl;)
         }
 #else // no SPECIAL_VIOLATION_TREATMENT
