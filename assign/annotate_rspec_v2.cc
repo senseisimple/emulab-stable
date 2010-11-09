@@ -687,8 +687,27 @@ annotate_rspec_v2::reorderLinks (list<const char*>* links)
     prev = this->find_next_link_in_path(prev, links);
     string* link 
       = new string(XStr(prev->getAttribute(XStr("component_id").x())).c());
-    links->remove(link->c_str());
-    ordered->push_back(link->c_str());
+
+    // Remove this link from the list - would rather use links->remove(), but
+    // it doesn't seem to be able to compare strings
+    list<const char*>::iterator it;
+    bool found = false;
+    for (it = links->begin(); it != links->end(); it++) {
+        if (!strcmp(link->c_str(),*it)) {
+            found = true;
+            links->erase(it);
+            break;
+        }
+    }
+
+    if (found) {
+        ordered->push_back(link->c_str());
+    } else {
+        // Sanity check 
+        cerr << "Error annotating link: couldn't find link (" <<
+            link->c_str() << ")" << endl;
+        exit(EXIT_FATAL);
+    }
   }
   
   return ordered;
