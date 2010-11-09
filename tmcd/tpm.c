@@ -49,6 +49,7 @@ static ENGINE *tpme;
 static char *tpmhash = "\x71\x10\xed\xa4\xd0\x9e\x06\x2a\xa5\xe4\xa3\x90\xb0"
 			"\xa5\x72\xac\x0d\x2c\x02\x20";
 #endif
+static void tpm_dump_pcr(char *msg, unsigned char *pcrbuf);
 
 int
 tmcd_tpm_loadengine(void)
@@ -270,6 +271,10 @@ int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, unsigned char *pcomp,
 			if (memcmp(&pcomp[PCOMP_PCRBLOB + PCOMP_PCR_LEN * c],
 			    pcrs[c], PCOMP_PCR_LEN)) {
 				error("PCR %d doesn't match\n", i);
+				tpm_dump_pcr("  should be:  ",
+					     (unsigned char *)pcrs[c]);
+				tpm_dump_pcr("  quote says: ", 
+					     &pcomp[PCOMP_PCRBLOB+PCOMP_PCR_LEN * c]);
 				return 0;
                         }
                         c++;
@@ -403,4 +408,16 @@ int tpm_extract_key(unsigned char *keybuff, struct keydata * k)
 		memcpy(k->encprivkey, keybuff + offset, k->privkeylen);
 	offset += k->privkeylen;
 	return offset;
+}
+
+static void
+tpm_dump_pcr(char *msg, unsigned char *pcrbuf)
+{
+	int i;
+	char strbuf[PCOMP_PCR_LEN*2+1], *bp;
+
+	bp = strbuf;
+	for (i = 0; i < PCOMP_PCR_LEN; i++)
+		bp += sprintf(bp, "%02x", pcrbuf[i]);
+	error("%s%s\n", msg, strbuf);
 }
