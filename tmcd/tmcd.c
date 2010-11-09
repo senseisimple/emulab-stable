@@ -41,6 +41,9 @@
 #include "event.h"
 #endif
 
+/* XXX: Not sure this is okay! */
+#include "tpm.h"
+
 /*
  * XXX This needs to be localized!
  */
@@ -110,6 +113,10 @@ CHECKMASK(char *arg)
 #define DBNAME_SIZE	64
 #define HOSTID_SIZE	(32+64)
 #define DEFAULT_DBNAME	TBDBNAME
+
+/* For secure disk loading */
+#define SECURELOAD_OPMODE "SECURELOAD"
+#define SECURELOAD_STATE  "RELOADSETUP"
 
 int		debug = 0;
 static int	verbose = 0;
@@ -293,6 +300,9 @@ COMMAND_PROTOTYPE(dotpmblob);
 COMMAND_PROTOTYPE(dotpmpubkey);
 COMMAND_PROTOTYPE(dotpmdummy);
 COMMAND_PROTOTYPE(dodhcpdconf);
+COMMAND_PROTOTYPE(dosecurestate);
+COMMAND_PROTOTYPE(doquoteprep);
+COMMAND_PROTOTYPE(doimagekey);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -395,6 +405,9 @@ struct command {
 	{ "tpmpubkey",	  FULLCONFIG_ALL, 0, dotpmpubkey },
 	{ "tpmdummy",	  FULLCONFIG_ALL, F_REQTPM, dotpmdummy },
 	{ "dhcpdconf",	  FULLCONFIG_ALL, 0, dodhcpdconf },
+	{ "securestate",  FULLCONFIG_NONE, F_REMREQSSL, dosecurestate},
+	{ "quoteprep",    FULLCONFIG_NONE, F_REMREQSSL, doquoteprep},
+	{ "imagekey",     FULLCONFIG_NONE, F_REQTPM, doimagekey},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1349,6 +1362,7 @@ static int checkcerts(char *nid)
 
 	return ret;
 }
+
 
 /*
  * Accept notification of reboot.
@@ -4435,6 +4449,8 @@ COMMAND_PROTOTYPE(donseconfigs)
 COMMAND_PROTOTYPE(dostate)
 {
 	char 		newstate[128];	/* More then we will ever need */
+	MYSQL_RES	*res;
+	int		nrows;
 	int		i;
 #ifdef EVENTSYS
 	address_tuple_t tuple;
@@ -4452,6 +4468,37 @@ COMMAND_PROTOTYPE(dostate)
 		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
+
+        /*
+         * Check to make sure that this is not a state that must be reported
+         * by the securestate mechanism - we can tell because there are one
+         * or more PCR values required in the tpm_quote_values table for
+         * the state.
+         */
+	res = mydb_query("select q.pcr from nodes as n "
+			"left join tpm_quote_values as q "
+                        "on n.op_mode = q.op_mode "
+			"where n.node_id='%s' and q.state ='%s'",
+			1, reqp->nodeid,newstate);
+	if (!res){
+		error("state: %s: DB error check for pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+        mysql_free_result(res);
+
+	if (nrows){
+            error("state: %s: tried to go into secure state %s using "
+                    "insecure state command\n",reqp->nodeid,newstate);
+            return 1;
+            // XXX Probably should send a SECVIOLATION state and/or send
+            // mail, but this needs more thought before making it the
+            // default action.
+        }
+
 	/*
 	 * Sanity check. No special or weird chars.
 	 */
@@ -4462,7 +4509,7 @@ COMMAND_PROTOTYPE(dostate)
 			return 1;
 		}
 	}
-	
+
 #ifdef EVENTSYS
 	/*
 	 * Send the state out via an event
@@ -4491,6 +4538,577 @@ COMMAND_PROTOTYPE(dostate)
 	info("%s: STATE: %s\n", reqp->nodeid, newstate);
 	return 0;
 
+}
+
+/* There are probably classic functions available to do this but I couldn't
+ * find one that will convert two bytes of ACII to one byte.  sscanf writes a
+ * full int and atoi gives us an int too
+ */
+static unsigned char hextochar(char *in)
+{
+	unsigned char lh, rh;
+
+	lh = in[0];
+	if (lh >= '0' && lh <= '9')
+		lh = lh - '0';
+	else if (lh >= 'A' && lh <= 'F')
+		lh = lh - 'A' + 10;
+	else if (lh >= 'a' && lh <= 'f')
+		lh = lh - 'a' + 10;
+
+	rh = in[1];
+	if (rh >= '0' && rh <= '9')
+		rh = rh - '0';
+	else if (rh >= 'A' && rh <= 'F')
+		rh = rh - 'A' + 10;
+	else if (rh >= 'a' && rh <= 'f')
+		rh = rh - 'a' + 10;
+
+	return (lh << 4) | rh;
+}
+
+static int ishex(char in)
+{
+	return ((in >= 'a' && in <= 'f') || (in >= 'A' && in <= 'F') ||
+	    (in >= '0' && in <= '9'));
+}
+
+/*
+ * Report that the node has entered a new state - secure version: the report
+ * includes a TPM quote that will be checked against the database.
+ * If this check fails, we report a SECVIOLATION event instead, and tell the
+ * client so.
+ * TODO: Should probably reduce code duplication from dostate()
+ */
+COMMAND_PROTOTYPE(dosecurestate)
+{
+	char 		newstate[128];	/* More then we will ever need */
+        char            quote[1024];
+        char            pcomp[256];
+        unsigned char   quote_bin[256];
+        unsigned char   pcomp_bin[128];
+	ssize_t		pcomplen, quotelen;
+        int             quote_passed;
+        char            result[16];
+	ETPM_NONCE	nonce;
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+        int             i,j;
+
+        unsigned short  wantpcrs;
+        TPM_PCR         *pcrs;
+
+#ifdef EVENTSYS
+	address_tuple_t tuple;
+#endif
+
+	/*
+	 * Dig out state that the node is reporting and the quote
+	 */
+	if (rdata == NULL ||
+	    sscanf(rdata, "%127s %1023s %255s", newstate, quote, pcomp) != 3 ||
+	    strlen(newstate) + 1 == sizeof(newstate) || strlen(quote) + 1 ==
+	    sizeof(quote) || strlen(pcomp) + 1 == sizeof(pcomp)) {
+		error("SECURESTATE: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+        // Have to covert the hex representations of quote and pcomp into
+        // simple binary
+        if ((strlen(quote) % 2) != 0) {
+            error("SECURESTATE: %s: Malformed quote: odd length\n");
+            return 1;
+        }
+        quotelen = strlen(quote)/2;
+        printf("quotelen is %d\n",quotelen);
+        for (i = 0; i < quotelen; i++) {
+		if (!ishex(quote[i * 2]) || !ishex(quote[i * 2 + 1])) {
+			error("Error parsing quote\n");
+			// XXX: Send error to client
+			return 1;
+		}
+		quote_bin[i] = hextochar(&quote[i * 2]);
+        }
+
+        if ((strlen(pcomp) % 2) != 0) {
+            error("SECURESTATE: %s: Malformed pcomp: odd length\n");
+            return 1;
+        }
+        pcomplen = strlen(pcomp)/2;
+        for (i = 0; i < pcomplen; i++) {
+		if (!ishex(pcomp[i * 2]) || !ishex(pcomp[i * 2 + 1])) {
+			error("Error parsing pcomp\n");
+			// XXX: Send error to client
+			return 1;
+		}
+		pcomp_bin[i] = hextochar(&pcomp[i * 2]);
+        }
+
+        /*
+         * Pull the nonce out, verify the exipration date, and clear it so that
+         * it can't be used again.
+         */
+	res = mydb_query("select nonce, (expires >= UNIX_TIMESTAMP()) "
+			"from nonces "
+			"where node_id='%s' and purpose='state-%s'",
+			2, reqp->nodeid,newstate);
+	if (!res){
+		error("SECURESTATE: %s: DB error getting nonce\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no nonce in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+                // XXX: return error to client
+		return 1;
+	}
+
+        // Delete from the database so that it can't be used again
+	mydb_update("delete from nonces where node_id='%s' and "
+                "purpose='state-%s' ", reqp->nodeid,newstate);
+
+
+        row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+        // XXX: Check to make sure the expire check is working
+        if (strcmp(row[1],"1") != 0) {
+            error("SECURESTATE: %s: Nonce is expired\n");
+            mysql_free_result(res);
+            // XXX: return error to client
+            return 1;
+        }
+
+        // Have to covert the hex representation in the database back into
+        // simple binary
+        if (nlen[0] != TPM_NONCE_BYTES * 2) {
+            error("SECURESTATE: %s: Nonce length is incorrect (%d)",
+                    reqp->nodeid, nlen[0]);
+        }
+        for (i = 0; i < TPM_NONCE_BYTES; i++) {
+            if (sscanf(row[0] + (i*2),"%2x",&(nonce[i])) != 1) {
+                error("SECURESTATE: %s: Error parsing nonce\n", reqp->nodeid);
+                mysql_free_result(res);
+                // XXX: return error to client
+                return 1;
+            }
+        }
+
+        mysql_free_result(res);
+
+        /*
+         * Make a list of the PCR values we need to have verified
+         */
+	res = mydb_query("select q.pcr,q.value from nodes as n "
+			"left join tpm_quote_values as q "
+                        "on (n.op_mode = q.op_mode or q.op_mode='*') "
+			"where (q.node_id='%s' and n.node_id='%s' "
+			"and q.state ='%s') "
+                        "order by q.pcr",
+			2, reqp->nodeid, reqp->nodeid, newstate);
+	if (!res){
+		error("SECURESTATE: %s: DB error getting pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no TPM quote values in database for state %s\n",
+			reqp->nodeid,newstate);
+		mysql_free_result(res);
+		return 1;
+	}
+
+        wantpcrs = 0;
+        pcrs = malloc(nrows*sizeof(TPM_PCR));
+        for (i = 0; i < nrows; i++) {
+            int pcr;
+
+            row = mysql_fetch_row(res);
+            // XXX: Check for nonsensical values for the pcr index
+            // XXX: Check for nlen...
+            // XXX: Check for proper PCR size
+            pcr = atoi(row[0]);
+            wantpcrs |= (1 << pcr);
+            for (j = 0; j < TPM_PCR_BYTES; j++) {
+                if (sscanf(row[1] + (j*2),"%2x",&(pcrs[i][j])) != 1) {
+                    error("SECURESTATE: %s: Error parsing PCR\n", reqp->nodeid);
+                    free(pcrs);
+                    mysql_free_result(res);
+                    // XXX: return error to client
+                    return 1;
+                }
+            }
+
+        }
+
+        mysql_free_result(res);
+
+        /*
+         * Get the identity key for vertification purposes
+         */
+	res = mydb_query("select tpmidentity "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+
+	if (!res){
+		error("securestate: %s: DB error getting tpmidentity\n",
+			reqp->nodeid);
+                free(pcrs);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no tpmidentity in database for this node.\n",
+			reqp->nodeid);
+                free(pcrs);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen || !nlen[0]){
+		error("%s: invalid identity length.\n",
+			reqp->nodeid);
+                free(pcrs);
+		mysql_free_result(res);
+		return 1;
+	}
+
+        // NOTE: Do *not* free the mysql result until *after* the call to
+        // verify, as we're passing the identiy key directly from the SQL
+        // result.
+
+        /*
+         * Parse and check the quote
+         *
+	 * quote and pcomp both come from the client's TPM - they are both
+	 * returned from the quote operation.  We must dig up our nonce again.
+         */
+        quote_passed = tmcd_tpm_verify_quote(quote_bin, quotelen, pcomp_bin,
+                pcomplen, nonce, wantpcrs, pcrs, row[0]);
+
+	mysql_free_result(res);
+        free(pcrs);
+
+#ifdef EVENTSYS
+	/*
+	 * Send the state out via an event
+	 */
+	/* XXX: Maybe we don't need to alloc a new tuple every time through */
+	tuple = address_tuple_alloc();
+	if (tuple == NULL) {
+		error("dostate: Unable to allocate address tuple!\n");
+		return 1;
+	}
+
+        // TODO: It might be nice to mark in the event that it was verified
+        // securely, but the connection to the event server is secure, and
+        // we'll refuse the insecure state command for secure states.
+	tuple->host      = BOSSNODE;
+	tuple->objtype   = "TBNODESTATE";
+	tuple->objname	 = reqp->nodeid;
+
+        // The state we report depends on whether we the quote check passed or
+        // not.
+        if (quote_passed) {
+            tuple->eventtype = newstate;
+        } else {
+            tuple->eventtype = "SECVIOLATION";
+        }
+
+	if (myevent_send(tuple)) {
+		error("dostate: Error sending event\n");
+		return 1;
+	}
+
+	address_tuple_free(tuple);
+#endif /* EVENTSYS */
+
+        /*
+         * Let the client know whether the quote checks out or not. Note that
+         * we do this *after* sending the event so that a malicious client
+         * can't stall or prevent the event notification by trying to hold up
+         * the TCP connection.
+         * Probably a slightly simpler way to do this, but want to stick with
+         * the common idioms in this file.
+         */
+        if (quote_passed) {
+            OUTPUT(result, sizeof(result), "OK");
+        } else { 
+            OUTPUT(result, sizeof(result), "FAILED");
+        }
+	client_writeback(sock, result, strlen(result), tcp);
+
+
+	/* Leave this logging on all the time for now. */
+	info("%s: SECURESTATE: %s\n", reqp->nodeid, newstate);
+	return 0;
+
+}
+
+/*
+ * Prepare for a TPM quote: give the client the encrypted identity key,
+ * a nonce to use in the quote, and the set of PCRs that need to be included in
+ * the quote. This saves some state (the nonce) that will be checked again in
+ * dosecurestate().
+ */
+COMMAND_PROTOTYPE(doquoteprep)
+{
+	char            newstate[128];	/* More then we will ever need */
+        ETPM_NONCE       nonce;
+        char            nonce_hex[2*TPM_NONCE_BYTES + 1];
+        int             i;
+
+        // XXX: is MYBUFSIZE big enough?
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf;
+	char		*bufe = &buf[MYBUFSIZE];
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+	/*
+	 * Dig out state that the node is reporting - we need this so that we
+         * can tell it what PCRs to include
+	 */
+	if (rdata == NULL || sscanf(rdata, "%128s", newstate) != 1 ||
+	    strlen(newstate) == sizeof(newstate)) {
+		error("DOQUOTEPREP: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
+	}
+
+        /*
+         * Get the set of PCRs that have to be quoted to move into this state.
+         */
+	res = mydb_query("select q.pcr from nodes as n "
+			"left join tpm_quote_values as q "
+                        "on (n.op_mode = q.op_mode or q.op_mode='*') "
+			"where (q.node_id='%s' and n.node_id='%s' "
+			"and q.state ='%s') "
+                        "order by q.pcr",
+			1, reqp->nodeid, reqp->nodeid, newstate);
+	if (!res){
+		error("quoteprep: %s: DB error getting pcr list\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no TPM quote values in database for state %s\n",
+			reqp->nodeid,newstate);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	bufp += OUTPUT(bufp, bufe - bufp, "PCR=");
+
+        for (i = 0; i < nrows; i++) {
+            row = mysql_fetch_row(res);
+            // XXX: Is this already passed to us as a string?
+            bufp += OUTPUT(bufp, bufe - bufp,"%s",row[0]);
+            if (i < (nrows - 1)) {
+                    bufp += OUTPUT(bufp, bufe - bufp, ",");
+            }
+        }
+
+        bufp += OUTPUT(bufp, bufe - bufp, " ");
+        mysql_free_result(res);
+
+        /*
+         * Grab the (encrypted) identity key for the node - noone else will be
+         * able to decrypt it, so we don't have to be too paranoid about who
+         * we give it to.
+         */
+	res = mydb_query("select tpmidentity "
+			"from node_hostkeys "
+			"where node_id='%s' ",
+			1, reqp->nodeid);
+
+	if (!res){
+		error("quoteprep: %s: DB error getting tpmidentity\n",
+			reqp->nodeid);
+		return 1;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	if (!nrows){
+		error("%s: no tpmidentity in database for this node.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen || !nlen[0]){
+		error("%s: invalid identity length.\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	bufp += OUTPUT(bufp, bufe - bufp, "IDENTITY=");
+        for (i = 0;i < nlen[0];++i)
+                bufp += OUTPUT(bufp, bufe - bufp,
+                        "%.02x", (0xff & ((char)*(row[0]+i))));
+
+        bufp += OUTPUT(bufp, bufe - bufp, " ");
+	mysql_free_result(res);
+        
+        /*
+         * Generate a cryptographic nonce - we have to keep track of this to
+         * prevent replay attacks.
+         */
+        if (tmcd_tpm_generate_nonce(nonce)) {
+            error("DOQUOTEPREP: %s: Failed to generate nonce\n", reqp->nodeid);
+            return 1;
+        }
+
+        // Make a hex representation of the nonce
+        for (i = 0; i < TPM_NONCE_BYTES; i++) {
+            sprintf(nonce_hex + (i*2),"%.02x",nonce[i]);
+        }
+        nonce_hex[TPM_NONCE_BYTES*2] = '\0';
+        // XXX
+        info("NONCE: %s\n", nonce_hex);
+
+        // Store the nonce in the database. It expires in one minute, and we
+        // overwrite any existing nonces for this node/state combo
+	mydb_update("replace into nonces "
+		    " (node_id, purpose, nonce, expires) "
+		    " values ('%s', 'state-%s','%s', UNIX_TIMESTAMP()+60)",
+		    reqp->nodeid,newstate,nonce_hex);
+
+	bufp += OUTPUT(bufp, bufe - bufp, "NONCE=%s",nonce_hex);
+
+	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+
+        /*
+         * Return to the client
+         */
+	client_writeback(sock, buf, bufp - buf, tcp);
+
+        return 0;
+}
+
+/*
+ * Get the decryption key for the image a node is suposed to be loading
+ */
+COMMAND_PROTOTYPE(doimagekey)
+{
+	char		buf[MYBUFSIZE];
+	char		*bufp = buf;
+	char		*bufe = &buf[MYBUFSIZE];
+
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+	int		nrows;
+        unsigned long   *nlen;
+
+        /* No arguments - we don't allow the client to ask for a specific image
+         * key, just the one for the image they are supposed to be loading
+         * according to the database
+         */
+        
+        /*
+         * Make sure that this node is in the right state - hardcoding it is
+         * probably not a good idea, but the right way to get it isn't clear
+         */
+        res = mydb_query("select op_mode, eventstate from nodes where "
+                "node_id='%s'",2,reqp->nodeid);
+
+	if (!res) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) != 1) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+	if (!nlen) {
+		error("IMAGEKEY: %s: DB Error getting event state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+                return 1;
+        }
+
+        if (strncmp(row[0],SECURELOAD_OPMODE,nlen[0]) ||
+            strncmp(row[1],SECURELOAD_STATE,nlen[1])) {
+		error("IMAGEKEY: %s: Node is in the wrong state\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+                return 1;
+        }
+        mysql_free_result(res);
+
+        /*
+         * Grab and return the key itself
+         */
+	res = mydb_query("select r.decryption_key from current_reloads as r "
+			 "left join images as i on i.imageid = r.image_id "
+			 "where node_id='%s' order by r.idx",
+			 1, reqp->nodeid);
+	if (!res) {
+		error("IMAGEKEY: %s: DB Error getting key\n", reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		info("IMAGEKEY: %s: No current reload for this node\n",
+                        reqp->nodeid);
+		mysql_free_result(res);
+		return 0;
+	}
+
+        // Note: if there is more than one reload, we are only grabbing the
+        // 'most recent' due to the 'order by' clause
+	row = mysql_fetch_row(res);
+	nlen = mysql_fetch_lengths(res);
+
+	if (!nlen || !nlen[0]){
+		error("IMAGEKEY: %s: invalid key length\n",
+			reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
+	}
+        
+        // Print out the KEY= even if the key is empty - this will just
+        // help the client realize there isn't one (as opposed to there being
+        // some error)
+	bufp += OUTPUT(bufp, bufe - bufp, "KEY=");
+        if (row[0] != NULL && nlen[0] > 0) {
+            bufp += OUTPUT(bufp, bufe - bufp, "%s",row[0]);
+        }
+	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+        mysql_free_result(res);
+        return 0;
 }
 
 /*

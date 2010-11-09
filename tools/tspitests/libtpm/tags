@@ -1,0 +1,140 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.6	//
+ADD32	tpm.h	44;"	d
+ERR_BAD_ARG	tpm.h	20;"	d
+ERR_BAD_RESP	tpm.h	17;"	d
+ERR_CRYPT_ERR	tpm.h	21;"	d
+ERR_HMAC_FAIL	tpm.h	18;"	d
+ERR_IO	tpm.h	22;"	d
+ERR_MASK	tpm.h	16;"	d
+ERR_MEM_ERR	tpm.h	23;"	d
+ERR_NULL_ARG	tpm.h	19;"	d
+HMAC_H	hmac.h	14;"	d
+LOAD16	tpm.h	41;"	d
+LOAD16N	tpm.h	43;"	d
+LOAD32	tpm.h	40;"	d
+LOAD32N	tpm.h	42;"	d
+MAXPCRINFOLEN	seal.c	23;"	d	file:
+OIAPOSAP_H	oiaposap.h	14;"	d
+PCRS_H	pcrs.h	14;"	d
+RSA_MODULUS_BIT_SIZE	owner.c	31;"	d	file:
+RSA_MODULUS_BYTE_SIZE	owner.c	30;"	d	file:
+STORE16	tpm.h	37;"	d
+STORE16N	tpm.h	39;"	d
+STORE32	tpm.h	36;"	d
+STORE32N	tpm.h	38;"	d
+TPMFUNC_H	tpmfunc.h	14;"	d
+TPMKEYS_H	tpmkeys.h	14;"	d
+TPMUTIL_H	tpmutil.h	14;"	d
+TPM_AuthorizeMigrationKey	migrate.c	/^uint32_t TPM_AuthorizeMigrationKey(unsigned char *ownpass,$/;"	f
+TPM_BuildKey	keys.c	/^uint32_t TPM_BuildKey(unsigned char *buffer, keydata * k)$/;"	f
+TPM_ChangeAuth	chgauth.c	/^uint32_t TPM_ChangeAuth(uint32_t keyhandle,$/;"	f
+TPM_ChangeOwnAuth	chgauth.c	/^uint32_t TPM_ChangeOwnAuth(unsigned char *ownauth, unsigned char *newauth)$/;"	f
+TPM_ChangeSRKAuth	chgauth.c	/^uint32_t TPM_ChangeSRKAuth(unsigned char *ownauth, unsigned char *newauth)$/;"	f
+TPM_ConvertMigrationBlob	migrate.c	/^uint32_t TPM_ConvertMigrationBlob(unsigned int keyhandle,$/;"	f
+TPM_CreateMigrationBlob	migrate.c	/^uint32_t TPM_CreateMigrationBlob(unsigned int keyhandle,$/;"	f
+TPM_CreateWrapKey	keys.c	/^uint32_t TPM_CreateWrapKey(uint32_t keyhandle,$/;"	f
+TPM_DATA_OFFSET	tpm.h	34;"	d
+TPM_DisableReadPubek	keys.c	/^uint32_t TPM_DisableReadPubek(unsigned char *ownauth)$/;"	f
+TPM_EvictKey	keys.c	/^uint32_t TPM_EvictKey(uint32_t keyhandle)$/;"	f
+TPM_Extend	pcrs.c	/^uint32_t TPM_Extend(uint32_t pcrindex, unsigned char *pcrvalue)$/;"	f
+TPM_GetCapability	miscfunc.c	/^uint32_t TPM_GetCapability(uint32_t caparea, unsigned char *subcap,$/;"	f
+TPM_GetCapabilityOwner	miscfunc.c	/^uint32_t TPM_GetCapabilityOwner(unsigned char *ownpass,$/;"	f
+TPM_GetErrMsg	miscfunc.c	/^unsigned char *TPM_GetErrMsg(uint32_t code)$/;"	f
+TPM_GetPubKey	keys.c	/^uint32_t TPM_GetPubKey(uint32_t keyhandle,$/;"	f
+TPM_GetRandom	tpmutil.c	/^uint32_t TPM_GetRandom(unsigned char *buf)$/;"	f
+TPM_H	tpm.h	14;"	d
+TPM_HASH_SIZE	tpm.h	26;"	d
+TPM_LoadKey	keys.c	/^uint32_t TPM_LoadKey(uint32_t keyhandle, unsigned char *keyauth,$/;"	f
+TPM_MAX_BUFF_SIZE	tpm.h	25;"	d
+TPM_NONCE_SIZE	tpm.h	27;"	d
+TPM_OWNER_ETYPE	miscfunc.c	22;"	d	file:
+TPM_OWNER_EVALUE	miscfunc.c	23;"	d	file:
+TPM_OwnerClear	owner.c	/^uint32_t TPM_OwnerClear(unsigned char *ownpass)$/;"	f
+TPM_OwnerReadPubek	keys.c	/^uint32_t TPM_OwnerReadPubek(unsigned char *ownauth, pubkeydata * k)$/;"	f
+TPM_PARAMSIZE_OFFSET	tpm.h	32;"	d
+TPM_PCR_MASK_SIZE	pcrs.h	17;"	d
+TPM_PCR_NUM	pcrs.h	16;"	d
+TPM_PcrRead	pcrs.c	/^uint32_t TPM_PcrRead(uint32_t pcrindex, unsigned char *pcrvalue)$/;"	f
+TPM_Quote	pcrs.c	/^uint32_t TPM_Quote(uint32_t keyhandle,$/;"	f
+TPM_RETURN_OFFSET	tpm.h	33;"	d
+TPM_ReadPubek	keys.c	/^uint32_t TPM_ReadPubek(pubkeydata * k)$/;"	f
+TPM_Reset	miscfunc.c	/^uint32_t TPM_Reset()$/;"	f
+TPM_SRK_PARAM_BUFF_SIZE	owner.c	29;"	d	file:
+TPM_Seal	seal.c	/^uint32_t TPM_Seal(uint32_t keyhandle,$/;"	f
+TPM_SealCurrPCR	seal.c	/^uint32_t TPM_SealCurrPCR(uint32_t keyhandle, uint32_t pcrmap,$/;"	f
+TPM_Sign	signature.c	/^uint32_t TPM_Sign(uint32_t keyhandle, unsigned char *keyauth,$/;"	f
+TPM_TAG_RSP_AUTH1_COMMAND	hmac.c	25;"	d	file:
+TPM_TAG_RSP_AUTH2_COMMAND	hmac.c	26;"	d	file:
+TPM_TAG_RSP_COMMAND	hmac.c	24;"	d	file:
+TPM_TakeOwnership	owner.c	/^uint32_t TPM_TakeOwnership(unsigned char *ownpass, unsigned char *srkpass,$/;"	f
+TPM_Transmit	tpmutil.c	/^uint32_t TPM_Transmit(unsigned char *buff, char *msg)$/;"	f
+TPM_U16_SIZE	tpm.h	29;"	d
+TPM_U32_SIZE	tpm.h	30;"	d
+TPM_UnBind	bind.c	/^uint32_t TPM_UnBind(uint32_t keyhandle,$/;"	f
+TPM_Unseal	seal.c	/^uint32_t TPM_Unseal(uint32_t keyhandle,$/;"	f
+TPM_setlog	tpmutil.c	/^int TPM_setlog(int flag)$/;"	f
+TSS_Bind	bind.c	/^uint32_t TSS_Bind(RSA * key,$/;"	f
+TSS_GenPCRInfo	pcrs.c	/^uint32_t TSS_GenPCRInfo(uint32_t pcrmap, unsigned char *pcrinfo,$/;"	f
+TSS_GenPCRSel	pcrs.c	/^static uint32_t TSS_GenPCRSel(uint32_t pcrmap, unsigned char *pcrselect,$/;"	f	file:
+TSS_HANDclose	oiaposap.c	/^uint32_t TSS_HANDclose(uint32_t handle)$/;"	f
+TSS_Key2Pub	keys.c	/^void TSS_Key2Pub(unsigned char *keybuff, unsigned char *pkey,$/;"	f
+TSS_KeyExtract	keys.c	/^int TSS_KeyExtract(unsigned char *keybuff, keydata * k)$/;"	f
+TSS_KeySize	keys.c	/^int TSS_KeySize(unsigned char *keybuff)$/;"	f
+TSS_OIAPclose	oiaposap.c	/^uint32_t TSS_OIAPclose(uint32_t handle)$/;"	f
+TSS_OIAPopen	oiaposap.c	/^uint32_t TSS_OIAPopen(uint32_t * handle, char *enonce)$/;"	f
+TSS_OSAPclose	oiaposap.c	/^uint32_t TSS_OSAPclose(osapsess * sess)$/;"	f
+TSS_OSAPopen	oiaposap.c	/^uint32_t TSS_OSAPopen(osapsess *sess, unsigned char *key, uint16_t etype,$/;"	f
+TSS_PubKeyExtract	keys.c	/^int TSS_PubKeyExtract(unsigned char *keybuff, pubkeydata * k,$/;"	f
+TSS_PubKeySize	keys.c	/^int TSS_PubKeySize(unsigned char *keybuff, int pcrpresent)$/;"	f
+TSS_authhmac	hmac.c	/^uint32_t TSS_authhmac(unsigned char *digest, unsigned char *key,$/;"	f
+TSS_buildbuff	tpmutil.c	/^uint32_t TSS_buildbuff(char *format, unsigned char *buffer, ...)$/;"	f
+TSS_checkhmac1	hmac.c	/^uint32_t TSS_checkhmac1(unsigned char *buffer, uint32_t command,$/;"	f
+TSS_checkhmac2	hmac.c	/^uint32_t TSS_checkhmac2(unsigned char *buffer, uint32_t command,$/;"	f
+TSS_convpubkey	keys.c	/^RSA *TSS_convpubkey(pubkeydata * k)$/;"	f
+TSS_gennonce	tpmutil.c	/^int TSS_gennonce(unsigned char *buf)$/;"	f
+TSS_getsize	tpmutil.c	/^uint32_t TSS_getsize(unsigned char *rsp)$/;"	f
+TSS_keyprint	keys.c	/^void TSS_keyprint(unsigned char *keybuff, unsigned char *fprint)$/;"	f
+TSS_lkeyprint	keys.c	/^uint32_t TSS_lkeyprint(uint32_t keyhandle, unsigned char *keyauth,$/;"	f
+TSS_pkeyprint	keys.c	/^void TSS_pkeyprint(pubkeydata * key, unsigned char *fprint)$/;"	f
+TSS_rawhmac	hmac.c	/^uint32_t TSS_rawhmac(unsigned char *digest, unsigned char *key,$/;"	f
+TSS_sha1	tpmutil.c	/^void TSS_sha1(unsigned char *input, int len, unsigned char *output)$/;"	f
+algorithm	tpmkeys.h	/^	uint32_t algorithm;$/;"	m	struct:pubkeydata
+authdatausage	tpmkeys.h	/^	unsigned char authdatausage;$/;"	m	struct:keydata
+encprivkey	tpmkeys.h	/^	unsigned char encprivkey[1024];$/;"	m	struct:keydata
+encscheme	tpmkeys.h	/^	uint16_t encscheme;$/;"	m	struct:pubkeydata
+enonce	oiaposap.h	/^	unsigned char enonce[TPM_NONCE_SIZE];$/;"	m	struct:osapsess
+enonceOSAP	oiaposap.h	/^	unsigned char enonceOSAP[TPM_NONCE_SIZE];$/;"	m	struct:osapsess
+exponent	tpmkeys.h	/^	unsigned char exponent[3];$/;"	m	struct:pubkeydata
+expsize	tpmkeys.h	/^	uint32_t expsize;$/;"	m	struct:pubkeydata
+getrandom	tpmutil.c	/^static unsigned char getrandom[] = {$/;"	v	file:
+handle	oiaposap.h	/^	uint32_t handle;$/;"	m	struct:osapsess
+keybitlen	tpmkeys.h	/^	uint32_t keybitlen;$/;"	m	struct:pubkeydata
+keydata	tpmkeys.h	/^typedef struct keydata {$/;"	s
+keydata	tpmkeys.h	/^} keydata;$/;"	t	typeref:struct:keydata
+keyflags	tpmkeys.h	/^	uint32_t keyflags;$/;"	m	struct:keydata
+keylength	tpmkeys.h	/^	uint32_t keylength;$/;"	m	struct:pubkeydata
+keyusage	tpmkeys.h	/^	uint16_t keyusage;$/;"	m	struct:keydata
+logflag	tpmutil.c	/^static unsigned int logflag = 0;$/;"	v	file:
+modulus	tpmkeys.h	/^	unsigned char modulus[256];$/;"	m	struct:pubkeydata
+msgs	miscfunc.c	/^static unsigned char *msgs[] = {$/;"	v	file:
+msgs2	miscfunc.c	/^static unsigned char *msgs2[] = {$/;"	v	file:
+numprimes	tpmkeys.h	/^	uint32_t numprimes;$/;"	m	struct:pubkeydata
+ononce	oiaposap.h	/^	unsigned char ononce[TPM_NONCE_SIZE];$/;"	m	struct:osapsess
+ononceOSAP	oiaposap.h	/^	unsigned char ononceOSAP[TPM_NONCE_SIZE];$/;"	m	struct:osapsess
+osapsess	oiaposap.h	/^typedef struct osapsess {$/;"	s
+osapsess	oiaposap.h	/^} osapsess;$/;"	t	typeref:struct:osapsess
+pcrinfo	tpmkeys.h	/^	unsigned char pcrinfo[256];$/;"	m	struct:pubkeydata
+pcrinfolen	tpmkeys.h	/^	uint32_t pcrinfolen;$/;"	m	struct:pubkeydata
+privkeylen	tpmkeys.h	/^	uint32_t privkeylen;$/;"	m	struct:keydata
+pub	tpmkeys.h	/^	pubkeydata pub;$/;"	m	struct:keydata
+pubkeydata	tpmkeys.h	/^typedef struct pubkeydata {$/;"	s
+pubkeydata	tpmkeys.h	/^} pubkeydata;$/;"	t	typeref:struct:pubkeydata
+showBuff	tpmutil.c	/^static void showBuff(unsigned char *buff, char *string)$/;"	f	file:
+sigscheme	tpmkeys.h	/^	uint16_t sigscheme;$/;"	m	struct:pubkeydata
+ssecret	oiaposap.h	/^	unsigned char ssecret[TPM_HASH_SIZE];$/;"	m	struct:osapsess
+version	tpmkeys.h	/^	unsigned char version[4];$/;"	m	struct:keydata

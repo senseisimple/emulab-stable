@@ -140,6 +140,9 @@ my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 # Special PXEBOOT state machine that all local nodes use.
 my $PXEKERNEL	 = "PXEKERNEL";
 
+# Even special-er SECURELOAD state machine that local nodes may use.
+my $SECURELOAD	 = "SECURELOAD";
+
 # Protos.
 sub debug(@);
 sub fatal($);
@@ -625,6 +628,14 @@ sub stateTransition($$) {
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
 	       "to $newstate\n");
+        # XXX: Bad hack for TPM booting paper: this ought to be in the
+        # database, not harcoded here for a specific op_mode
+        # Let specifc op_modes drive nodes into particular states on invalid
+        # transitions
+        if ($mode eq TBDB_NODEOPMODE_SECURELOAD) {
+            $newstate = TBDB_NODESTATE_SECVIOLATION;
+            notify("Moving $node to $newstate because it's in $mode\n");
+        }
     }
 
     my $now = time();
@@ -715,6 +726,19 @@ sub stateTransition($$) {
 		    info("$node: Forcing mode transition into $PXEKERNEL!\n");
 		    opModeTransition($node, $PXEKERNEL, 1);
 		    $mode=$PXEKERNEL;
+		}
+		next;
+	    };
+	    /^SECURELOAD$/ && do {
+		#
+		# Force machine into the SECURELOAD op_mode.
+		# Currently triggered only by receipt of GPXEBOOTING state.
+		#
+		debug("Running $SECURELOAD trigger\n");
+		if ($mode ne $SECURELOAD) {
+		    info("$node: Forcing mode transition into $SECURELOAD!\n");
+		    opModeTransition($node, $SECURELOAD, 1);
+		    $mode=$SECURELOAD;
 		}
 		next;
 	    };
@@ -823,6 +847,18 @@ sub stateTransition($$) {
 		handleCommand($node,$trig);
 		next;
 	    };
+	    (/^$TBPOWEROFF$/) && do {
+		handleCommand($node,$TBPOWEROFF);
+		next;
+	    };
+            (/^EMAILNOTIFY$/) && do {
+		SENDMAIL($REALTBOPS,
+			 "STATED: $node entered state $newstate",
+			 "$node entered state $mode/$newstate from " .
+                         "$mode/$oldstate",
+			 "Stated Daemon <".$TBOPS.">");
+		next;
+            };
 	    /^RELOADOLDMFS$/ && do {
 		my $frisbee_osid = TBNodeDiskloadOSID($node);
 		my $frisbee_name = DBQuerySingleFatal("select osname from os_info where osid=$frisbee_osid");
@@ -1040,6 +1076,11 @@ sub handleCtrlEvent($$) {
 		/^$TBTIMEOUTNOTIFY/ && do {
 		    notify("Node $node has timed out in state $mode/$state\n");
 		    last; };
+                /^STATE:([-\w\/]+)$/ && do {
+                    my $newstate = $1;
+                    # Force the node into a new state
+                    stateTransition($node,$newstate);
+                    last; };
 		notify("$node: Unknown Timeout Action: $action\n");
 	    }
 	    next;
