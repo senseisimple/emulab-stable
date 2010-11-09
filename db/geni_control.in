@@ -133,6 +133,16 @@ if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	"    You do not have permission to allocate nodes in $pid/$eid\n");
 }
 
+#
+# Need an RPC context for this to work.
+#
+my $certificate = GeniCertificate->LoadFromFile("$TB/etc/genisa.pem");
+fatal("Could not load SA certificate")
+    if (!defined($certificate));
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+$ENV{'MYUUID'} = $certificate->uuid();
+$ENV{'MYURN'}  = $certificate->urn();
+    
 my $foo = "urn:publicid:IDN+emulab.net+authority+cm";
 my $fee = "urn:publicid:IDN+emulab.net+node+pc172";
 
