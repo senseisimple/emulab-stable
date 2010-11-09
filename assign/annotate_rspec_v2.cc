@@ -672,19 +672,30 @@ string annotate_rspec_v2::getShortInterfaceName (string interface)
 // Re-orders the links so that all the links on an interswitch link
 // are in the correct order
 // WARNING: This will distroy the input list
-// NOTE: The pointer to the list returned by this should be freed
+// NOTE: The caller has the responsibility to return the freed list and all
+// char*s it contains
 list<const char*>* 
 annotate_rspec_v2::reorderLinks (list<const char*>* links)
 {
   list<const char*> *ordered = new list<const char*>();
   //  list<const char*>::iterator it;
-  
-  string link = links->front();
+
+  // IMPORTANT: The *only* reason we can push this char* directly into ordered
+  // (instead of making a copy) is that we know that it came from an fstring
+  // when the 'links' structure was created, and fstring never frees its
+  // strings. If that were not true, this code could produce dangling pointers
+  const char *link = links->front();
   links->pop_front();
-  DOMElement* prev = ((this->physical_elements)->find(link.c_str()))->second;
-  ordered->push_back(link.c_str());
+  DOMElement* prev = (this->physical_elements)->find(link)->second;
+  ordered->push_back(link);
+
   while(!links->empty()) {
     prev = this->find_next_link_in_path(prev, links);
+
+    // TODO: This is a minor memory leak - we keep the pointer to the char*
+    // inside the string, but not the pointer to the string object itself, so
+    // it cannot be freed. The best way to clean this up would be to make links
+    // and ordered lists of fstrings (not pointers to fstrings)
     string* link 
       = new string(XStr(prev->getAttribute(XStr("component_id").x())).c());
 
