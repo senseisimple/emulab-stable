@@ -389,6 +389,7 @@ sub osload($$$) {
 
     $self->dprintts("osload starting on nodes " . join(' ',@{$args->{'nodelist'}}));
 
+    # set some default flags
     my %flags = ();
     $flags{waitmode}    = 1;
     $flags{usecurrent}  = 0;
@@ -425,45 +426,19 @@ sub osload($$$) {
 	    return -1;
 	}
     }
-    
-    if (defined($args->{'waitmode'})) {
-	$flags{waitmode} = $args->{'waitmode'};
+
+    # override our defaults
+    foreach my $flag (keys(%$args)) {
+	$flags{$flag} = $args->{$flag};
     }
-    if (defined($args->{'noreboot'})) {
-	$flags{noreboot} = $args->{'noreboot'};
-    }
-    if (defined($args->{'debug'})) {
-	$flags{debug} = $args->{'debug'};
-    }
+    # handle some of the flags specially
     if (defined($args->{'imageid'})) {
 	@imageids = split(/,/, $args->{'imageid'});
     }
     if (defined($args->{'imageids'})) {
 	@imageids = @{$args->{'imageids'}};
     }
-    if (defined($args->{'usecurrent'}) && $args->{'usecurrent'}) {
-	$flags{usecurrent} = 1;
-    }
-    if (defined($args->{'asyncmode'})) {
-	$flags{asyncmode} = $args->{'asyncmode'};
-    }
-    if (defined($args->{'zerofree'})) {
-	$flags{zerofree} = $args->{'zerofree'};
-    }
-    if (defined($args->{'prepare'})) {
-	$flags{prepare} = $args->{'prepare'};
-    }
-    if (defined($args->{'swapinfo'})) {
-	$flags{swapinfo} = $args->{'swapinfo'};
-    }
-    if (defined($args->{'reconfig'})) {
-	$flags{reconfig} = $args->{'reconfig'};
-    }
-    if (defined($args->{'force'})) {
-	$flags{force} = $args->{'force'};
-    }
     if (defined($args->{'nodeflags'})) {
-	$flags{nodeflags} = $args->{'nodeflags'};
 	%nodeflags = %{$args->{'nodeflags'}};
     }
 
@@ -622,7 +597,7 @@ sub osload($$$) {
 	foreach my $k (keys(%flags)) {
 	    $nargs{$k} = $flags{$k};
 	}
-	foreach my $k (keys(%nodeflags)) {
+	foreach my $k (keys(%{$nodeflags{$node}})) {
 	    $nargs{$k} = $nodeflags{$node}{$k};
 	}
 	# Wait, don't do this -- waitmode is global; nowait is per-node!
