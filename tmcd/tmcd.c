@@ -1361,7 +1361,6 @@ static int checkcerts(char *nid)
 	return ret;
 }
 
-
 /*
  * Accept notification of reboot.
  */
@@ -4024,7 +4023,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=%s PART=%s PARTOS=%s", address, loadpart, OS);
-		
+
 		if (server_address[0] && (vers >= 31)) {
 			bufp += OUTPUT(bufp, ebufp - bufp,
 			               " SERVER=%s", server_address);
@@ -4468,14 +4467,17 @@ COMMAND_PROTOTYPE(dosecurestate)
 	 */
 	if (rdata == NULL ||
 	    sscanf(rdata, "%127s %1023s %255s", newstate, quote, pcomp) != 3 ||
-	    strlen(newstate) + 1 == sizeof(newstate) || strlen(quote) + 1 ==
-	    sizeof(quote) || strlen(pcomp) + 1 == sizeof(pcomp)) {
+	    strlen(newstate) + 1 == sizeof(newstate) ||
+	    strlen(quote) + 1 == sizeof(quote) ||
+	    strlen(pcomp) + 1 == sizeof(pcomp)) {
 		error("SECURESTATE: %s: Bad arguments\n", reqp->nodeid);
 		return 1;
 	}
 
-        // Have to covert the hex representations of quote and pcomp into
-        // simple binary
+	/*
+	 * Have to covert the hex representations of quote and pcomp into
+	 * simple binary.
+	 */
         if ((strlen(quote) % 2) != 0) {
             error("SECURESTATE: %s: Malformed quote: odd length\n");
             return 1;
@@ -4565,13 +4567,13 @@ COMMAND_PROTOTYPE(dosecurestate)
          * Make a list of the PCR values we need to have verified
          */
 	res = mydb_query("select q.pcr,q.value from nodes as n "
-			"left join tpm_quote_values as q "
-                        "on (n.op_mode = q.op_mode or q.op_mode='*') "
-			"where (q.node_id='%s' and n.node_id='%s' "
-			"and q.state ='%s') "
-                        "order by q.pcr",
-			2, reqp->nodeid, reqp->nodeid, newstate);
-	if (!res){
+			 "left join tpm_quote_values as q "
+			 "on (n.op_mode = q.op_mode or q.op_mode='*') "
+			 "and n.node_id = q.node_id "
+			 "where n.node_id='%s' and q.state ='%s' "
+			 "order by q.pcr",
+			 2, reqp->nodeid, newstate);
+	if (!res) {
 		error("SECURESTATE: %s: DB error getting pcr list\n",
 			reqp->nodeid);
 		return 1;
@@ -4581,7 +4583,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 
 	if (!nrows){
 		error("%s: no TPM quote values in database for state %s\n",
-			reqp->nodeid,newstate);
+			reqp->nodeid, newstate);
 		mysql_free_result(res);
 		return 1;
 	}
@@ -4662,6 +4664,10 @@ COMMAND_PROTOTYPE(dosecurestate)
 	mysql_free_result(res);
         free(pcrs);
 
+	/* The state reported below depends on whether the quote checked. */
+	if (!quote_passed)
+		strcpy(newstate, "SECVIOLATION");
+
 #ifdef EVENTSYS
 	/*
 	 * Send the state out via an event
@@ -4679,14 +4685,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 	tuple->host      = BOSSNODE;
 	tuple->objtype   = "TBNODESTATE";
 	tuple->objname	 = reqp->nodeid;
-
-        // The state we report depends on whether we the quote check passed or
-        // not.
-        if (quote_passed) {
-            tuple->eventtype = newstate;
-        } else {
-            tuple->eventtype = "SECVIOLATION";
-        }
+	tuple->eventtype = newstate;
 
 	if (myevent_send(tuple)) {
 		error("dostate: Error sending event\n");
@@ -4755,12 +4754,12 @@ COMMAND_PROTOTYPE(doquoteprep)
          * Get the set of PCRs that have to be quoted to move into this state.
          */
 	res = mydb_query("select q.pcr from nodes as n "
-			"left join tpm_quote_values as q "
-                        "on (n.op_mode = q.op_mode or q.op_mode='*') "
-			"where (q.node_id='%s' and n.node_id='%s' "
-			"and q.state ='%s') "
-                        "order by q.pcr",
-			1, reqp->nodeid, reqp->nodeid, newstate);
+			 "left join tpm_quote_values as q "
+			 "on (n.op_mode = q.op_mode or q.op_mode='*') "
+			 "and n.node_id = q.node_id "
+			 "where n.node_id='%s' and q.state ='%s' "
+			 "order by q.pcr",
+			 1, reqp->nodeid, newstate);
 	if (!res){
 		error("quoteprep: %s: DB error getting pcr list\n",
 			reqp->nodeid);
@@ -4927,10 +4926,11 @@ COMMAND_PROTOTYPE(doimagekey)
         /*
          * Grab and return the key itself
          */
-	res = mydb_query("select r.decryption_key from current_reloads as r "
-			 "left join images as i on i.imageid = r.image_id "
+	res = mydb_query("select i.auth_uuid,i.auth_key,i.decryption_key "
+			 "from current_reloads as r "
+			 "left join images as i on i.imageid=r.image_id "
 			 "where node_id='%s' order by r.idx",
-			 1, reqp->nodeid);
+			 3, reqp->nodeid);
 	if (!res) {
 		error("IMAGEKEY: %s: DB Error getting key\n", reqp->nodeid);
 		return 1;
@@ -4942,26 +4942,31 @@ COMMAND_PROTOTYPE(doimagekey)
 		return 0;
 	}
 
-        // Note: if there is more than one reload, we are only grabbing the
-        // 'most recent' due to the 'order by' clause
+	/*
+	 * Note: if there is more than one reload, we are only grabbing the
+	 * 'most recent' due to the 'order by' clause.
+	 */
 	row = mysql_fetch_row(res);
 	nlen = mysql_fetch_lengths(res);
-
-	if (!nlen || !nlen[0]){
-		error("IMAGEKEY: %s: invalid key length\n",
-			reqp->nodeid);
+	if (!row || !nlen) {
+		error("IMAGEKEY: %s: no auth/encryption key information\n",
+		      reqp->nodeid);
 		mysql_free_result(res);
 		return 1;
 	}
         
-        // Print out the KEY= even if the key is empty - this will just
-        // help the client realize there isn't one (as opposed to there being
-        // some error)
-	bufp += OUTPUT(bufp, bufe - bufp, "KEY=");
-        if (row[0] != NULL && nlen[0] > 0) {
-            bufp += OUTPUT(bufp, bufe - bufp, "%s",row[0]);
-        }
-	bufp += OUTPUT(bufp, bufe - bufp, "\n");
+	/*
+	 * Put out the authentication UUID and signing key.
+	 * XXX these don't need to be protected as the encryption key,
+	 * they could be sent back via "loadinfo".
+	 */
+	if (row[0])
+		bufp += OUTPUT(bufp, bufe - bufp, "UUID=%s\n", row[0]);
+	if (row[1])
+		bufp += OUTPUT(bufp, bufe - bufp, "SIGKEY=%s\n", row[1]);
+	if (row[2])
+		bufp += OUTPUT(bufp, bufe - bufp, "ENCKEY=%s\n", row[2]);
+
 	client_writeback(sock, buf, strlen(buf), tcp);
 
         mysql_free_result(res);
