@@ -747,7 +747,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	  }	
 	  if ((oldscore != get_score()) || (oldviolated != violated)) {
 	    cerr << "Scoring problem adding a mapping - oldscore was " <<
-		oldscore <<  " newscore is " << newscore << " tempscore was "
+		oldscore <<  " current score is " << get_score() << " tempscore was "
 		<< tempscore << endl;
 	    cerr << "oldviolated was " << oldviolated << " newviolated is "
 		<< violated << " tempviolated was " << tempviolated << endl;
@@ -1321,6 +1321,7 @@ NOTQUITEDONE:
 	       * Okay, now that we've jumped through enough hoops, we can actually
 	       * do the scoring
 	       */
+              mark_vlink_assigned(vlink);
 	      score_link_info(*vedge_it, src_pnode, dst_pnode, src_vnode, dst_vnode);
 	  } else {
               /*
@@ -1329,9 +1330,9 @@ NOTQUITEDONE:
                * mapped, then we have to make sure the score reflects that.
                */
 	      if (!dst_vnode->assigned || !src_vnode->assigned) {
-                  vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
-              } else {
-                  mark_vlink_unassigned(vlink);
+                  if (!vlink->no_connection) {
+                      mark_vlink_unassigned(vlink);
+                  }
               }
 	  }
       }

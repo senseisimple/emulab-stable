@@ -266,7 +266,7 @@ int parse_top(tb_vgraph &vg, istream& input)
 	    (sscanf(lossweight.c_str(),"%lg",&(l->delay_info.loss_weight)) != 1)) {
 	  top_error("Bad line line, bad delay characteristics.");
 	}
-	l->no_connection = false;
+	l->no_connection = true;
 	l->name = name;
 	l->allow_delayed = true;
 #ifdef ALLOW_TRIVIAL_DEFAULT

@@ -183,8 +183,11 @@ void init_score()
   tie(vedge_it,end_vedge_it) = edges(VG);
   for (;vedge_it!=end_vedge_it;++vedge_it) {
     tb_vlink *vlink=get(vedge_pmap,*vedge_it);
-    vlink->link_info.type_used=tb_link_info::LINK_UNMAPPED;
-    vlink->no_connection=false;
+    SADD(SCORE_NO_CONNECTION);
+    vlink->no_connection=true;
+    vinfo.no_connection++;
+    vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
+    violated++;
   }
   pvertex_iterator pvertex_it,end_pvertex_it;
   tie(pvertex_it,end_pvertex_it) = vertices(PG);
@@ -509,11 +512,25 @@ inline float resolution_cost(tb_link_info::linkType res_type) {
  * Mark a vlink as unassigned
  */
 void mark_vlink_unassigned(tb_vlink *vlink) {
+    SDEBUG(cerr << "    marking " << vlink->name << " unassigned" << endl;)
+    assert(!vlink->no_connection);
     SADD(SCORE_NO_CONNECTION);
     vlink->no_connection=true;
     vinfo.no_connection++;
     vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
     violated++;
+}
+
+/*
+ * Mark a vlink as assigned: fix up violations
+ */
+void mark_vlink_assigned(tb_vlink *vlink) {
+    SDEBUG(cerr << "    marking " << vlink->name << " assigned" << endl;)
+    assert(vlink->no_connection);
+    SSUB(SCORE_NO_CONNECTION);
+    vlink->no_connection=false;
+    vinfo.no_connection--;
+    violated--;
 }
 
 /*
@@ -570,9 +587,16 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
          * Note: We can't get here when doing adjust_to_native_bandwidth,
          * since it's illegal to allow trivial links when it's in use.
          */
+        SDEBUG(cerr << "    allowed" << endl;)
+        if (vlink->no_connection) {
+          mark_vlink_assigned(vlink);
+        }
         score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
       } else {
-	  mark_vlink_unassigned(vlink);
+        SDEBUG(cerr << "    not allowed" << endl;)
+        if (!vlink->no_connection) {
+          mark_vlink_unassigned(vlink);
+        }
       }
     } else {
       //assert(resolution_index <= 1)
@@ -589,18 +613,10 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
        */
       if (resolution_index == 0) {
         SDEBUG(cerr << "  Could not find any resolutions" << endl;)
-        mark_vlink_unassigned(vlink);
-      } else {
-        /*
-         * Check to see if we are fixing a violation
-         */
-        if (vlink->no_connection) {
-          SDEBUG(cerr << "  Fixing previous violations." << endl);
-          SSUB(SCORE_NO_CONNECTION);
-          vlink->no_connection=false;
-          vinfo.no_connection--;
-          violated--;
+        if (!vlink->no_connection) {
+            mark_vlink_unassigned(vlink);
         }
+      } else {
         /*
          * Choose a link
          */
@@ -658,9 +674,20 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
 #ifdef PENALIZE_UNUSED_INTERFACES
         pnode->used_interfaces++;
 #endif
+        /*
+         * Make it so
+         */
         vlink->link_info = resolutions[index];
         SDEBUG(cerr << "  choice:" << vlink->link_info);
         score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
+
+        /*
+         * Check to see if we are fixing a violation
+         */
+        if (vlink->no_connection) {
+          SDEBUG(cerr << "  Fixing previous violations." << endl);
+          mark_vlink_assigned(vlink);
+        }
       }
     }
   }
@@ -1002,16 +1029,7 @@ void remove_node(vvertex vv)
       }
     }
 
-    // A 'not-connected' vlink only counts as a violation if both of its
-    // endpoints are assigned
-    if (vlink->no_connection) {
-      SDEBUG(cerr << "  link no longer in violation.\n";)
-      SSUB(SCORE_NO_CONNECTION);
-      vlink->no_connection=false;
-      vinfo.no_connection--;
-      violated--;
-    }
-    
+
     // Only unscore the link if the vnode on the other end is assigned - this
     // way, only the first end to be unmapped causes unscoring
     if (! dest_vnode->assigned) {
@@ -1022,6 +1040,13 @@ void remove_node(vvertex vv)
     pvertex dest_pv = dest_vnode->assignment;
     tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
     unscore_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
+    
+    // If the other end was connected before, it's not now
+    if (!vlink->no_connection) {
+      SDEBUG(cerr << "      link now in violation.\n";)
+      mark_vlink_unassigned(vlink);
+    }
+    
   }
  
 #ifdef PENALIZE_UNUSED_INTERFACES
