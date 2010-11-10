@@ -1,0 +1,32 @@
+#
+# Add missing sitevars.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		 "('protogeni/max_components','-1','-1', ".
+		 " 'Maximum number of components that can be allocated.".
+		 " -1 indicates any number of components can be allocated.', ".
+		 " 0")
+	if (!TBSiteVarExists("protogeni/max_components"));
+
+    my $foo = "When set, external users may allocate slivers on your testbed.";
+
+    if (TBSiteVarExists("protogeni/max_components")) {
+	DBQueryFatal("update sitevariables set ".
+		     "description='$foo' ".
+		     "where name='protogeni/max_externalnodes'");
+    }
+    else {
+	DBQueryFatal("INSERT INTO sitevariables VALUES ".
+		     "('protogeni/max_externalnodes',NULL,'1024', ".
+		     " '$foo', 0");
+    }
+    return 0;
+}
+1;
