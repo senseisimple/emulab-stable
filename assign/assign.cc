@@ -145,9 +145,19 @@ bool ptop_rspec_input = false;
 bool vtop_rspec_input = false;
 #endif
 
-// XXX - shouldn't be in this file
-double absbest;
-int absbestviolated, iters, iters_to_best;
+/*
+ * Score and violations for the best score found so far
+ * XXX - shouldn't be in this file
+ */
+double best_score;
+int best_violated;
+
+/*
+ * Number of iterations executed so far, and how many it took us to find the
+ * best solution
+ * XXX - shouldn't be in this file
+ */
+int iters, iters_to_best;
 
 // Map of all physical types in use in the system
 tb_ptype_map ptypes;
@@ -831,7 +841,7 @@ void exit_unretryable(int signal) {
 extern double temp;
 void status_report(int signal) {
   cout << "I: " << iters << " T: " << temp << " S: " << get_score() << " V: "
-    << violated << " (Best S: " << absbest << " V:" << absbestviolated << ")"
+    << violated << " (Best S: " << best_score << " V:" << best_violated << ")"
     << endl;
   cout.flush();
 }
@@ -1218,11 +1228,11 @@ int main(int argc,char **argv) {
   fclose(deltaout);
 #endif
 
-  if ((!compare_scores(get_score(),absbest)) || (violated > absbestviolated)) {
+  if ((!compare_scores(get_score(),best_score)) || (violated > best_violated)) {
     cout << "WARNING: Internal scoring inconsistency." << endl;
-    cout << "score:" << get_score() << " absbest:" << absbest <<
-      " violated:" << violated << " absbestviolated:" <<
-      absbestviolated << endl;
+    cout << "score:" << get_score() << " best_score:" << best_score <<
+      " violated:" << violated << " best_violated:" <<
+      best_violated << endl;
   }
   
   cout << "   BEST SCORE:  " << get_score() << " in " << iters <<

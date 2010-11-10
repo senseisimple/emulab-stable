@@ -20,9 +20,6 @@ static const char rcsid[] = "$Id: anneal.cc,v 1.46 2009-05-20 18:06:07 tarunp Ex
  * Internal variables
  */
 // These variables store the best solution.
-//node_map absassignment;		// assignment field of vnode
-//assigned_map absassigned;	// assigned field of vnode
-//type_map abstypes;		// type field of vnode
 solution best_solution;
 
 // Map of virtual node name to its vertex descriptor.
@@ -207,15 +204,24 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 {
   cout << "Annealing." << endl;
 
-  double newscore = 0;
-  double bestscore = 0;
+  /*
+   * The score and number of violations at the start of the inner annealing
+   * loop
+   */
+  double prev_score = 0;
+  int prev_violated = 0;
+
+  /*
+   * 
+   */
+  double new_score = 0;
+  double scorediff;
  
   // The number of iterations that took place.
   iters = 0;
   iters_to_best = 0;
   int accepts = 0;
   
-  double scorediff;
 
   int nnodes = num_vertices(VG);
   //int npnodes = num_vertices(PG);
@@ -228,7 +234,6 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
   int naccepts = 20*(nnodes + PHYSICAL(npnodes));
   pvertex oldpos;
   bool oldassigned;
-  int bestviolated;
   int num_fixed=0;
   double meltedtemp;
   temp = init_temp;
@@ -378,16 +383,16 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
   /*
    * Find out the starting temperature
    */
-  bestscore = get_score();
-  bestviolated = violated;
+  prev_score = get_score();
+  prev_violated = violated;
 
 #ifdef VERBOSE
-  cout << "Problem started with score "<<bestscore<<" and "<< violated
+  cout << "Problem started with score "<<prev_score<<" and "<< violated
        << " violations." << endl;
 #endif
 
-  absbest = bestscore;
-  absbestviolated = bestviolated;
+  best_score = prev_score;
+  best_violated = prev_violated;
 
   /*
    * Make a list of all nodes that are still unassigned
@@ -397,9 +402,6 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
   for (;vit!=veit;++vit) {
     tb_vnode *vn = get(vvertex_pmap,*vit);
     if (vn->assigned) {
-	// XXX
-//      absassignment[*vit] = vn->assignment;
-//      abstypes[*vit] = vn->type;
 	best_solution.set_assignment(*vit,vn->assignment);
 	best_solution.set_vtype_assignment(*vit,vn->type);
     } else {
@@ -530,10 +532,10 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 #endif
       
 #ifdef VERBOSE
-    cout << "Temperature:  " << temp << " AbsBest: " << absbest <<
-      " (" << absbestviolated << ")" << endl;
+    cout << "Temperature:  " << temp << " Best: " << best_score <<
+      " (" << best_violated << ")" << endl;
 #endif
-    
+
     /*
      * Initialize this temperature step
      */
@@ -541,9 +543,9 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
     accepts = 0;
     nincreases = ndecreases = 0;
     avgincrease = 0.0;
-    avgscore = bestscore;
+    avgscore = prev_score;
 #ifdef CHILL
-    scores[0] = bestscore;
+    scores[0] = prev_score;
 #endif
 
     // Adjust the number of transitions we're going to do based on the number
@@ -568,6 +570,9 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 #else
 	    || (!melting && (trans < mintrans && accepts < naccepts))) {
 #endif
+
+    RDEBUG(cout << "ANNEALING: Loop starts with score " << get_score() <<
+            " violations " << violated << endl;)
 
 #ifdef STATS
       cout << "STATS temp:" << temp << " score:" << get_score() <<
@@ -701,7 +706,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	    toremove = (toremove +1) % nnodes;
 	  if (toremove == start) {
 	    toremove = -1;
-            RDEBUG("Not removing a node" << endl;)
+            RDEBUG(cout << "Not removing a node" << endl;)
 	    break;
 	  }	
       }	
@@ -731,7 +736,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        * Okay, we've got pnode to map this vnode to - let's do it
        */
       if (newpnode != NULL) {	
-        RDEBUG(cout << "MOVE: " << vn->name << " to " << newpnode->name << " ";)
+        RDEBUG(cout << "MOVE: " << vn->name << " to " << newpnode->name << " " << endl;)
         newpos = pnode2vertex[newpnode];
         if (scoring_selftest) {
 	  // Run a little test here - see if the score we get by adding	
@@ -780,11 +785,11 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
       /*
        * Okay, now that we've mapped some new node, let's check the scoring
        */
-      newscore = get_score();
-      assert(newscore >= 0);
+      new_score = get_score();
+      assert(new_score >= 0);
 
       // Negative means bad
-      scorediff = bestscore - newscore;
+      scorediff = prev_score - new_score;
       // This looks funny, because < 0 means worse, which means an increase in
       // score
       if (scorediff < 0) {
@@ -808,14 +813,14 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 #ifdef NO_VIOLATIONS
         // Here, we don't consider violations at all, just whether the regular
         // simulated annealing accept conditions
-	if (newscore < bestscore) {
+	if (new_score < prev_score) {
 	    accepttrans = true;
-	    RDEBUG(cout << "accept: better (" << newscore << "," << bestscore
+	    RDEBUG(cout << "accept: better (" << new_score << "," << prev_score
 		   << ")" << endl;)
         } else if (accept(scorediff,temp)) {
   	  accepttrans = true;
-	  RDEBUG(cout << "accept: metropolis (" << newscore << ","
-		 << bestscore << "," << expf(scorediff/(temp*sensitivity))
+	  RDEBUG(cout << "accept: metropolis (" << new_score << ","
+		 << prev_score << "," << expf(scorediff/(temp*sensitivity))
 		 << ")" << endl;)
         }
 #else
@@ -836,21 +841,24 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
          * progress. This prevents the cooling schedule from converging for
          * much, much longer than it should really take.
          */
-        if ((violated == bestviolated) && (newscore < bestscore)) {
+        RDEBUG(cout << "CRITERIA: v=" << violated << " bv=" <<
+                prev_violated << " ns=" << new_score << " bs=" <<
+                prev_score << " sd=" << scorediff << " t=" << temp << endl;)
+        if ((violated == prev_violated) && (new_score < prev_score)) {
 	  accepttrans = true;
-	  RDEBUG(cout << "accept: better (" << newscore << "," << bestscore
+	  RDEBUG(cout << "accept: better (" << new_score << "," << prev_score
 		 << ")" << endl;)
-	} else if (violated < bestviolated) {
+	} else if (violated < prev_violated) {
 	  accepttrans = true;
-	  RDEBUG(cout << "accept: better (violations) (" << newscore << ","
-		 << bestscore << "," << violated << "," << bestviolated
+	  RDEBUG(cout << "accept: better (violations) (" << new_score << ","
+		 << prev_score << "," << violated << "," << prev_violated
 		 << ")" << endl;
 	    cout << "Violations: (new) " << violated << endl;
 	    cout << vinfo;)
         } else if (accept(scorediff,temp)) {
 	  accepttrans = true;
-	  RDEBUG(cout << "accept: metropolis (" << newscore << ","
-		 << bestscore << "," << scorediff << "," << temp
+	  RDEBUG(cout << "accept: metropolis (" << new_score << ","
+		 << prev_score << "," << scorediff << "," << temp
 		 << ")" << endl;)
         }
 #else // no SPECIAL_VIOLATION_TREATMENT
@@ -865,8 +873,8 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
          * adding a violation results in a _lower_ score than a solution with
          * fewer violations.
          */
-        double adjusted_new_score = newscore + violated * VIOLATION_SCORE;
-        double adjusted_old_score = bestscore + bestviolated * VIOLATION_SCORE;
+        double adjusted_new_score = new_score + violated * VIOLATION_SCORE;
+        double adjusted_old_score = prev_score + prev_violated * VIOLATION_SCORE;
 
         if (adjusted_new_score < adjusted_old_score) {
           accepttrans = true;
@@ -883,21 +891,22 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        * Okay, we've decided to accep this transition - do some bookkeeping
        */
       if (accepttrans) {
-	bestscore = newscore;
-	bestviolated = violated;
+	// Accept change
+	prev_score = new_score;
+	prev_violated = violated;
 
 #ifdef GNUPLOT_OUTPUT
 	fprintf(tempout,"%f\n",temp);
-	fprintf(scoresout,"%f\n",newscore);
+	fprintf(scoresout,"%f\n",new_score);
 	fprintf(deltaout,"%f\n",-scorediff);
 #endif // GNUPLOT_OUTPUT
 
-	avgscore += newscore;
+	avgscore += new_score;
 	accepts++;
 
 #ifdef CHILL
 	 if (!melting) {
-	     scores[accepts] = newscore;
+	     scores[accepts] = new_score;
 	 }
 #endif // CHILL
 
@@ -906,11 +915,11 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	 * further bookkeeping - copy it into the structures for our best solution
 	 */
 #ifdef NO_VIOLATIONS
-	if (newscore < absbest) {
+	if (new_score < best_score) {
 #else // NO_VIOLATIONS
-	if ((violated < absbestviolated) ||
-	    ((violated == absbestviolated) &&
-	     (newscore < absbest))) {
+	if ((violated < best_violated) ||
+	    ((violated == best_violated) &&
+	     (new_score < best_score))) {
 #endif // NO_VIOLATIONS
 	    
 #ifdef SCORE_DEBUG
@@ -925,9 +934,6 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	      } else {
 		  best_solution.clear_assignment(*vit);
 	      }
-	    //absassignment[*vit] = get(vvertex_pmap,*vit)->assignment;
-	    //absassigned[*vit] = get(vvertex_pmap,*vit)->assigned;
-	    //abstypes[*vit] = get(vvertex_pmap,*vit)->type;
 	  }
 	  
 	  vedge_iterator edge_it, edge_it_end;
@@ -941,14 +947,13 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	      }
 	  }	
 	  
-	  absbest = newscore;
-	  absbestviolated = violated;
+	  best_score = new_score;
+	  best_violated = violated;
 	  iters_to_best = iters;
 #ifdef SCORE_DEBUG
 	  cerr << "New best recorded" << endl;
 #endif
 	}
-	// Accept change
       } else { // !acceptrans
 	// Reject change, go back to the state we were in before
 	RDEBUG(cout << "removing: rejected change" << endl;)
@@ -1147,7 +1152,7 @@ NOTQUITEDONE:
 	(deltaavg > 0) && ((temp / initialavg) * (deltaavg/ deltatemp) < epsilon)) {
 #endif
 #ifdef FINISH_HILLCLIMB
-        if (!finishedonce && ((absbestviolated <= violated) && (absbest < bestscore))) {
+        if (!finishedonce && ((best_violated <= violated) && (best_score < prev_score))) {
 	    // We don't actually stop, we just go do a hill-climb (basically) at the best
 	    // one we previously found
 	    finishedonce = true;
@@ -1216,11 +1221,11 @@ NOTQUITEDONE:
      * it either in violations or in score.
      */
 #ifndef NO_REVERT
-    if (REVERT_VIOLATIONS && (absbestviolated < violated)) {
+    if (REVERT_VIOLATIONS && (best_violated < violated)) {
 	cout << "Reverting: REVERT_VIOLATIONS" << endl;
 	revert = true;
     }
-    if (absbest < bestscore) {
+    if (best_score < prev_score) {
 	cout << "Reverting: best score" << endl;
 	revert = true;
     }

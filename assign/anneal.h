@@ -84,8 +84,8 @@ extern float temp_rate;
 extern pclass_types type_table;
 extern pclass_list pclasses;
 extern pnode_pvertex_map pnode2vertex;
-extern double absbest;
-extern int absbestviolated, iters, iters_to_best;
+extern double best_score;
+extern int best_violated, iters, iters_to_best;
 extern bool allow_overload;
 
 #ifdef PER_VNODE_TT
