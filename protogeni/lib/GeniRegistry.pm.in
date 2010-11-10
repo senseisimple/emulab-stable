@@ -933,7 +933,7 @@ sub GetCredential($;$$)
     my $clearinghousecred =
 	GeniCredential->Lookup($clearinghousecert->uuid(), $myuuid);
 
-    #print "$clearinghousecred\n";
+    #print "$clearinghousecred\n" if (defined($clearinghousecred));
 
     if (defined($clearinghousecred) &&
 	defined($clearinghousecred->expires())) {

@@ -461,11 +461,12 @@ sub GetText($$)
 
 # Converts the XML representation of a node to a UTF-8 string and
 # outputs it as a complete XML document.
-sub Serialize($)
+sub Serialize($;$)
 {
-    my ($node) = @_;
+    my ($node, $format) = @_;
+    $format = 0 if (!defined($format));
     my $newnode = $node->cloneNode(1);
-    return $newnode->toString();
+    return $newnode->toString($format);
 }
 
 # Create a new XML document with a given namespace URI and document

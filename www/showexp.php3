@@ -618,15 +618,18 @@ echo "<script type='text/javascript' language='javascript'>
         var li_current = 'li_settings';
         function Show(which) {
 	    li = getObjbyName(li_current);
-            li.style.backgroundColor = '#DDE';
-            li.style.borderBottom = '1px solid #778';
+            if (li) {
+                li.style.backgroundColor = '#DDE';
+                li.style.borderBottom = '1px solid #778';
+            }
 
             li_current = 'li_' + which;
 	    li = getObjbyName(li_current);
-            li.style.backgroundColor = 'white';
-            li.style.borderBottom = '1px solid white';
-
-            x_Show(which, 0, 0, Show_cb);
+            if (li) {
+                li.style.backgroundColor = 'white';
+                li.style.borderBottom = '1px solid white';
+                x_Show(which, 0, 0, Show_cb);
+            }
             return false;
         }
         function Show_cb(html) {
@@ -675,12 +678,19 @@ echo "<script type='text/javascript' language='javascript'>
 	    var urllocation = location.href; //find url parameter
 	    if (urllocation && urllocation.indexOf('#') >= 0) {
                 var which = urllocation.substr(urllocation.indexOf('#') + 1);
+
+	        li = getObjbyName('li_' + which);
+                if (!li) {
+                    which = 'settings';
+                }
                 Show(which);
             }
             else {
 	        li = getObjbyName(li_current);
-                li.style.backgroundColor = 'white';
-                li.style.borderBottom = '1px solid white';
+                if (li) {
+                    li.style.backgroundColor = 'white';
+                    li.style.borderBottom = '1px solid white';
+                }
             }
         }
       </script>\n";

@@ -37,23 +37,14 @@ use GeniXML;
 use GeniUsage;
 use libtestbed qw(SENDMAIL);
 use emutil;
-# Hate to import all this crap; need a utility library.
-use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
-	     TBDB_NODESTATE_TBFAILED);
-use Node;
-use Lan;
-use OSinfo;
-use Image;
-use Interface;
+use EmulabConstants;
+use libEmulab;
 use English;
 use Data::Dumper;
 use XML::Simple;
 use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
-use Experiment;
-use VirtExperiment;
-use Firewall;
 use Compress::Zlib;
 use File::Temp qw(tempfile);
 use MIME::Base64;
@@ -83,6 +74,7 @@ my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
 my $MAPPER         = "$TB/bin/mapper";
 my $VTOPGEN        = "$TB/bin/vtopgen";
 my $SNMPIT         = "$TB/bin/snmpit";
+my $NEWGROUP       = "$TB/bin/newgroup";
 my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $XMLLINT	   = "/usr/local/bin/xmllint";
 my $ADDAUTHORITY   = "$TB/sbin/protogeni/addauthority";
@@ -144,6 +136,7 @@ sub Resolve($)
 	if (GeniResponse::IsResponse($credential));
 
     if ($type eq "node") {
+	require Interface;
 	my $node;
 	
 	if (defined($uuid)) {
@@ -218,7 +211,7 @@ sub DiscoverResourcesAux($$$)
     # A sitevar controls whether external users can get any nodes.
     #
     my $allow_externalusers = 0;
-    if (!TBGetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
+    if (!GetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
 	      # Cannot get the value, say no.
 	      $allow_externalusers = 0;
     }
@@ -393,6 +386,8 @@ sub GetTicketAuxAux($$$$$$$$$)
     my $response    = undef;
     my $restorevirt = 0;	# Flag to restore virtual state
     my $restorephys = 0;	# Flag to restore physical state
+    require OSinfo;
+    require VirtExperiment;
 
     #
     # We need this below to sign the ticket.
@@ -431,7 +426,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     # A sitevar controls whether external users can get any nodes.
     #
     my $allow_externalusers = 0;
-    if (!TBGetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
+    if (!GetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
 	    # Cannot get the value, say no.
 	    $allow_externalusers = 0;
     }
@@ -478,7 +473,7 @@ sub GetTicketAuxAux($$$$$$$$$)
   # A sitevar controls the sliver lifetime.
   #
   my $max_sliver_lifetime = 0;
-  if (!TBGetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)){
+  if (!GetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)){
 	    # Cannot get the value, default it to 90 days.
 	    $max_sliver_lifetime = 90;
   }
@@ -615,10 +610,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     $virtexperiment->allowfixnode(0);
     $virtexperiment->multiplex_factor(3);
 
-    # This is where nodes are parked until a ticket is redeemed.
-    # This experiment no longer has to exist.
-    my $reserved_holding = Experiment->Lookup("GeniSlices", "reservations");
-
     #
     # An rspec is a structure that requests specific nodes. If those
     # nodes are available, then reserve it. Otherwise the ticket
@@ -686,22 +677,6 @@ sub GetTicketAuxAux($$$$$$$$$)
 		goto bad;
 	    }
 
-	    #
-	    # Grab the reservation. For backwards compatibility, we want
-	    # to find nodes in the reservations holding area, and move them
-	    # into the slice experiment. The holding area is no longer going
-	    # to be used, at least not until we have a reservations system.
-	    #
-	    my $reservation = $node->Reservation();
-	    if (defined($reservation) &&
-		defined($reserved_holding) &&
-		$reservation->SameExperiment($reserved_holding)) {
-		if ($node->MoveReservation($slice_experiment)) {
-		    print STDERR "Could not move $node to $slice_experiment\n";
-		    goto bad;
-		}
-		$node->Refresh();
-	    }
 	    $namemap{$node_nickname} = $node;
 	    $colomap{$colocate} = $node
 		if (defined($colocate));
@@ -1207,15 +1182,29 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -a -d -v -u -z -o $tmpfile $pid $eid");
+    $slice_experiment->CleanLogFiles();
+    
+    my $output =
+	GeniUtil::ExecQuiet("$MAPPER -a -d -v -u -z -o $tmpfile $pid $eid");
     if ($?) {
-	my $logstuff = undef;
+	my $logstuff = "";
 	
 	unlink($tmpfile);
 	if ($isupdate) {
 	    $slice_experiment->RemovePhysicalState();
 	    $slice_experiment->RestorePhysicalState();
 	}
+	#
+	# Find the important lines and print them first.
+	#
+	while ($output =~ /^(.*)$/gm) {
+	    my $line = $1;
+	    if ($line =~ /^\*\*\* .*$/) {
+		$logstuff .= $line;
+	    }
+	}
+	$logstuff .= "\n";
+	
 	# Dump the vtop.
 	if (-e "$pid-$eid.vtop") {
 	    print STDERR "----------------------------------------------\n";
@@ -1231,17 +1220,27 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (-e "assign.log") {
 	    print STDERR "----------------------------------------------\n";
 	    print STDERR "------------- Assign Error Log ---------------\n";
-	    $logstuff = `cat assign.log`;
-	    print STDERR $logstuff . "\n";
+	    my $log = `cat assign.log`;
+	    print STDERR $log . "\n";
 	    print STDERR "----------------------------------------------\n";
-	}	    
+	    $logstuff .= $log;
+	}
+
+	# Dump the output to STDERR for debugging.
+	print STDERR "----------------------------------------------\n";
+	print STDERR "---------------- Mapper Log ------------------\n";
+	print STDERR $output;
+
 	$response =
-	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff,
-				 "Could not map to resources");
+	    GeniResponse->Create(GENIRESPONSE_ERROR,
+				 "Could not map to resources", $logstuff);
 	# So we can find things later.
 	$slice_experiment->SaveLogFiles();
 	goto bad;
     }
+    # Dump the output to STDERR for debugging.
+    print STDERR $output;
+    
     # So we can find things later.
     $slice_experiment->SaveLogFiles();
 
@@ -1257,7 +1256,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     # be allocated to an experiment.
 
     my $max_components = 0;
-    if (!TBGetSiteVar('protogeni/max_components', \$max_components)) {
+    if (!GetSiteVar('protogeni/max_components', \$max_components)) {
 	      # Cannot get the value, default it to -1. Which means there is no limit.
 	      $max_components = -1;
     }
@@ -1329,7 +1328,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	# Do not update subnodes; they are fixed to the parent,
 	# while the parent is fixed to an actual node.
 	if (!defined($subnode_of)) {
-	    $virtnode->fixed($node->node_id());
+	    # Remember, we fix to the physnode not the virtual.
+	    $virtnode->fixed(($node->isvirtnode() ?
+			      $node->phys_nodeid() : $node->node_id()));
 	}
 
 	# New node unless already mapped.
@@ -1545,6 +1546,7 @@ sub SliverWorkAux($$$$$$$)
     my $response;
     my $ticket;
     my $rspec;
+    require Interface;
 
     # V2 API support.
     if ($v2 && $level == 0) {
@@ -1749,10 +1751,6 @@ sub SliverWorkAux($$$$$$$)
 	}
     }
 
-    # Nodes are in this holding experiment.
-    # This experiment no longer has to exist!
-    my $reserved_holding = Experiment->Lookup("GeniSlices", "reservations");
-
     #
     # Make sure all nodes requested are allocated. 
     #
@@ -1799,16 +1797,7 @@ sub SliverWorkAux($$$$$$$)
 	#
 	my $reservation = $node->Reservation();
 	if (defined($reservation)) {
-	    if (defined($reserved_holding) &&
-		$reservation->SameExperiment($reserved_holding)) {
-		# This is for backwards compatibility.
-		if ($node->MoveReservation($experiment)) {
-		    print STDERR "Could not move $node to $experiment\n";
-		    goto bad;
-		}
-		$node->Refresh();
-	    }
-	    elsif (!$reservation->SameExperiment($experiment)) {
+	    if (!$reservation->SameExperiment($experiment)) {
 		$message = "$resource_id ($node) is not available";
 		goto bad;
 	    }
@@ -1958,13 +1947,37 @@ sub SliverWorkAux($$$$$$$)
 	print STDERR "Could not chdir to workdir\n";
 	goto bad;
     }
+    $experiment->CleanLogFiles();
+    
     # Add -u for update mode, but not -f (fixnode). 
-    system("$MAPPER -d -v -z -u $pid $eid");
+    my $output = GeniUtil::ExecQuiet("$MAPPER -d -v -z -u $pid $eid");
     if ($?) {
-	my $logstuff = undef;
+	my $logstuff = "";
 	$message = "Could not map to resources";
-	
+
 	print STDERR "Mapper failed!\n";
+	#
+	# Find the important lines and print them first.
+	#
+	while ($output =~ /^(.*)$/gm) {
+	    my $line = $1;
+	    if ($line =~ /^\*\*\* .*$/) {
+		$logstuff .= $line;
+	    }
+	}
+	$logstuff .= "\n";
+	
+	#
+	# Lets dump the error log, so it ends up in the email.
+	#
+	if (-e "assign.log") {
+	    print STDERR "----------------------------------------------\n";
+	    print STDERR "------------- Assign Error Log ---------------\n";
+	    my $log = `cat assign.log`;
+	    print STDERR $log . "\n";
+	    print STDERR "----------------------------------------------\n";
+	    $logstuff .= $log;
+	}
 	# Dump the vtop.
 	if (-e "$pid-$eid.vtop") {
 	    print STDERR "----------------------------------------------\n";
@@ -1973,25 +1986,24 @@ sub SliverWorkAux($$$$$$$)
 	    print STDERR $log . "\n";
 	    print STDERR "----------------------------------------------\n";
 	}	    
-	#
-	# Lets dump the error log too, so it ends up in the email.
-	# Have to figure out a better approach for this.
-	#
-	if (-e "assign.log") {
-	    print STDERR "----------------------------------------------\n";
-	    print STDERR "------------- Assign Error Log ---------------\n";
-	    $logstuff = `cat assign.log`;
-	    print STDERR $logstuff . "\n";
-	    print STDERR "----------------------------------------------\n";
-	}
+	# Dump the output to STDERR for debugging.
+	print STDERR "----------------------------------------------\n";
+	print STDERR "---------------- Mapper Log ------------------\n";
+	print STDERR $output;
+
 	$response =
-	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
+	    GeniResponse->Create(GENIRESPONSE_ERROR, $message, $logstuff);
 
 	# So we can find things later.
 	$experiment->SaveLogFiles();
 	goto bad;
     }
+    # Dump the output to STDERR for debugging.
+    print STDERR $output;
   
+    # So we can find things later.
+    $experiment->SaveLogFiles();
+
     #
     # Must do this after the mapper runs.
     #
@@ -2048,10 +2060,7 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "Unknown resource_id in ticket: $resource_id";
 	    goto bad;
 	}
-	my $sliver = GeniSliver::Node->Create($slice,
-					      $owner,
-					      $node->node_id(),
-					      $ref);
+	my $sliver = GeniSliver::Node->Create($slice, $owner, $node, $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $virtual_id";
 	    goto bad;
@@ -2362,9 +2371,12 @@ sub SliverWorkAux($$$$$$$)
 
     # Do firewall stuff.
     if ($slice->needsfirewall()) {
+	require Firewall;
+	
 	my @nodeids = map { $_->node_id() } values(%newnodes);
 
-	if (@nodeids && doFWlans($experiment, FWADDNODES, \@nodeids) != 0) {
+	if (@nodeids && doFWlans($experiment,
+				 Firewall::FWADDNODES(), \@nodeids) != 0) {
 	    print STDERR "FireWall setup failed\n";
 	    goto bad;
 	}
@@ -2387,6 +2399,8 @@ sub SliverWorkAux($$$$$$$)
     # Must have the topofile for node boot. Might need locking on this.
     #
     if (!$v2) {
+	require Lan;
+	
 	if (system("$GENTOPOFILE $pid $eid")) {
 	    print STDERR "$GENTOPOFILE failed\n";
 	    goto bad;
@@ -2523,7 +2537,7 @@ sub SliverWorkAux($$$$$$$)
 	my @oldnodeids = map { $_->node_id() } values(%newnodes);
 	
 	if ($slice->needsfirewall() && $didfwsetup) {
-	    if (@oldnodeids && doFWlans($experiment, FWDELNODES,
+	    if (@oldnodeids && doFWlans($experiment, Firewall::FWDELNODES(),
 					\@oldnodeids)) {
 		print STDERR "FireWall cleanup failed\n";
 	    }
@@ -2645,7 +2659,7 @@ sub RenewSliverAux($$)
 	# A sitevar controls the sliver lifetime.
 	#
 	my $max_sliver_lifetime = 0;
-	if (!TBGetSiteVar('protogeni/max_sliver_lifetime',
+	if (!GetSiteVar('protogeni/max_sliver_lifetime',
 			  \$max_sliver_lifetime)){
 	    # Cannot get the value, default it to 90 days.
 	    $max_sliver_lifetime = 90;
@@ -2855,6 +2869,7 @@ sub DeleteSliverAux($$$)
 {
     my ($credential, $impotent, $v2) = @_;
     my $response;
+    require Firewall;
 
     $credential->HasPrivilege( "pi" ) or
 	$credential->HasPrivilege( "instantiate" ) or
@@ -3912,6 +3927,7 @@ sub RegisterAux($$)
 sub CleanupDeadSlice($;$)
 {
     my ($slice, $purge) = @_;
+    require Firewall;
 
     # Default to full purge.
     $purge = 1
@@ -4083,43 +4099,108 @@ sub GeniExperiment($)
 
     my $uuid = $slice->uuid();
     my $needsfirewall = $slice->needsfirewall();
+    my $pid  = "GeniSlices";
+    my $gid  = $pid;
+    my $hrn  = $slice->hrn();
+    my $urn  = $slice->urn();
+    require Experiment;
 
     my $experiment = Experiment->Lookup($uuid);
-    if (!defined($experiment)) {
-	#
-	# Form an eid for the experiment. 
-	#
-	my $eid    = "slice" . TBGetUniqueIndex('next_sliceid', 1);
-	my $nsfile = "";
+    return $experiment
+	if (defined($experiment));
+
+    #
+    # Use the first token of the manifest for the gid of the experiment.
+    # This effectively puts slivers from each SA in their own subgroup.
+    #
+    if (1) {
+	require Project;
+	require Group;
+
+	($gid) = ($hrn =~ /^([-\w]*).*$/);
 
 	#
-	# Need a way to can experiments.
+	# See if the group exists.
 	#
-	if ($needsfirewall) {
-	    $nsfile = "/tmp/$$.ns";
-	    open(NS, "> $nsfile")
- 		or return undef;
-	    print NS "source tb_compat.tcl\n";
-	    print NS "set ns [new Simulator]\n";
-	    print NS "tb-set-security-level Blue\n";
-	    print NS "\$ns run\n";
-	    close(NS);
+	my $group = Group->Lookup("$pid,$gid");
+	if (!defined($group)) {
+	    my $project = Project->Lookup($pid);
+	    if (!defined($project)) {
+		print STDERR "Could not get project for $pid\n";
+		return undef;
+	    }
+	    my $pid_idx = $project->pid_idx();
+	    
+	    #
+	    # Write out a little XML file describing the group, and
+	    # let the existing backend script deal with it all.
+	    #
+	    my ($fh, $filename) = tempfile(UNLINK => 0);
+	    if (!defined($fh)) {
+		print STDERR "Could not create temp file for group $gid\n";
+		return undef;
+	    }
+	    print $fh "<group>\n";
+	    print $fh " <attribute name=\"project\">\n";
+	    print $fh "  <value>$pid_idx</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh " <attribute name=\"group_id\">\n";
+	    print $fh "  <value>$gid</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh " <attribute name=\"group_leader\">\n";
+	    print $fh "  <value>geniuser</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh "</group>\n";
+	    close($fh);
+	    my $output = GeniUtil::ExecQuiet("$NEWGROUP $filename");
+	    if ($?) {
+		print STDERR $output;
+		return undef;
+	    }
+	    unlink($filename);
+
+	    $group = Group->Lookup("$pid,$gid");
 	}
-
-	# Note the -h option; allows experiment with no NS file.
-	system("$CREATEEXPT -N -q -i -k -w ".
-	       "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	       "-E 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	       "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	       "-h '$uuid' -p GeniSlices -e $eid $nsfile");
-	if ($?) {
+	if (!defined($group)) {
+	    print STDERR "Could not get group for $pid,$gid\n";
 	    return undef;
 	}
-	$experiment = Experiment->Lookup($uuid);
-	$experiment->SetState(EXPTSTATE_SWAPPED());
-	$experiment->Update({"geniflags" => $Experiment::EXPT_GENIFLAGS_EXPT});
-	$slice->SetExperiment($experiment);
+	GeniUtil::ResetGroups($group->unix_gid());
     }
+
+    #
+    # Form an eid for the experiment. 
+    #
+    my $eid    = "slice" . TBGetUniqueIndex('next_sliceid', 1);
+    my $nsfile = "";
+
+    #
+    # Need a way to can experiments.
+    #
+    if ($needsfirewall) {
+	$nsfile = "/tmp/$$.ns";
+	open(NS, "> $nsfile")
+	    or return undef;
+	print NS "source tb_compat.tcl\n";
+	print NS "set ns [new Simulator]\n";
+	print NS "tb-set-security-level Blue\n";
+	print NS "\$ns run\n";
+	close(NS);
+    }
+
+    # Note the -h option; allows experiment with no NS file.
+    system("$CREATEEXPT -N -q -i -k -w ".
+	   "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
+	   "-E '$urn -- DO NOT SWAP OR TERMINATE' ".
+	   "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
+	   "-h '$uuid' -p $pid -g $gid -e $eid $nsfile");
+    if ($?) {
+	return undef;
+    }
+    $experiment = Experiment->Lookup($uuid);
+    $experiment->SetState(EXPTSTATE_SWAPPED());
+    $experiment->Update({"geniflags" => $Experiment::EXPT_GENIFLAGS_EXPT});
+    $slice->SetExperiment($experiment);
     return $experiment;
 }
 
@@ -4129,6 +4210,7 @@ sub GeniExperiment($)
 sub UpdateManifest($)
 {
     my ($slice) = @_;
+    require Lan;
 
     my $experiment = GeniExperiment($slice);
     if (!defined($experiment)) {
