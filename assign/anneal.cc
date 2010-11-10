@@ -151,8 +151,7 @@ void smart_unmap() {
 	  vvertex toremove = vname2vertex[kickout->name];
 	  newpnode = *it;
 	  remove_node(toremove);
-	  unassigned_nodes.push(vvertex_int_pair(toremove,
-		RANDOM()));
+	  unassigned_nodes.push_front(toremove);
 	} else {
 	  cerr << "Failed to find a replacement!" << endl;
 	}
@@ -235,10 +234,8 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
   temp = init_temp;
   double deltatemp, deltaavg;
 
-  // Priority queue of unassigned virtual nodes.  Basically a fancy way
-  // of randomly choosing a unassigned virtual node.  When nodes become
-  // unassigned they are placed in the queue with a random priority.
-  vvertex_int_priority_queue unassigned_nodes;
+  // List of unassigned virtual nodes
+  slist<vvertex> unassigned_nodes;
 
 #ifdef VERBOSE
   cout << "Initialized to cycles="<<cycles<<" mintrans="
@@ -407,7 +404,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	best_solution.set_vtype_assignment(*vit,vn->type);
     } else {
 	best_solution.clear_assignment(*vit);
-	unassigned_nodes.push(vvertex_int_pair(*vit,RANDOM()));
+	unassigned_nodes.push_front(*vit);
     }
   }
   
@@ -589,9 +586,18 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        * If not, find some other random vnode, which we'll unmap then remap
        */
       if (! unassigned_nodes.empty()) {
-	vv = unassigned_nodes.top().first;
+        // Pick a random node from the list of unassigned nodes
+        int choice = RANDOM() % unassigned_nodes.size();
+        slist<vvertex>::iterator uit = unassigned_nodes.begin();
+        for (int i = 0; i < choice; i++) { uit++; }
+        assert(uit != unassigned_nodes.end());
+
+        vv = *uit;
 	assert(!get(vvertex_pmap,vv)->assigned);
-	unassigned_nodes.pop();
+        unassigned_nodes.erase(uit);
+        RDEBUG(cout << "Using unassigned node " << choice << ": " <<
+                get(vvertex_pmap,vv)->name << " (" <<
+                unassigned_nodes.size() << " in queue)" << endl;)
       } else {
 	int start = RANDOM()%nnodes;
 	int choice = start;
@@ -687,7 +693,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
       if (newpnode == NULL) {
 #ifndef SMART_UNMAP
 	// Push this node back onto the unassigned map
-	unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
+	unassigned_nodes.push_front(vv);
 	int start = RANDOM()%nnodes;
 	int toremove = start;
 	while (get(vvertex_pmap,virtual_nodes[toremove])->fixed ||
@@ -695,13 +701,15 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	    toremove = (toremove +1) % nnodes;
 	  if (toremove == start) {
 	    toremove = -1;
+            RDEBUG("Not removing a node" << endl;)
 	    break;
 	  }	
       }	
       if (toremove >= 0) {
-	RDEBUG(cout << "removing: freeing up nodes" << endl;)
+	RDEBUG(cout << "removing: freeing up node " <<
+                get(vvertex_pmap,virtual_nodes[toremove])->name << endl;)
 	remove_node(virtual_nodes[toremove]);
-	unassigned_nodes.push(vvertex_int_pair(virtual_nodes[toremove], RANDOM()));
+	unassigned_nodes.push_front(virtual_nodes[toremove]);
       }	
       
       /*
@@ -756,13 +764,13 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
          * unassigned, and we go back and try with another
          */
         if (add_node(vv,newpos,false,false,false) != 0) {
-	  unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
+	  unassigned_nodes.push_front(vv);
           RDEBUG(cout << "failed" << endl;)
 	  continue;
         }
       } else { // pnode != NULL
 #ifdef SMART_UNMAP
-        unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
+        unassigned_nodes.push_front(vv);
 #endif
         if (freednode) {
 	  continue;
@@ -947,7 +955,9 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	remove_node(vv);
 	if (oldassigned) {
 	  add_node(vv,oldpos,false,false,false);
-	}
+	} else {
+          unassigned_nodes.push_front(vv);
+        }
       }
 
       /*
