@@ -167,9 +167,3 @@ PENALIZE_BANDWIDTH	Penalize based on the bandwidth of links that, for
 			but not well tested yet
 TRIVIAL_LINK_BW		Allow, in the ptop file, specification of how much
 			bandwidth can be used on the node for trivial links
-
-Bugfixes
---------
-FIX_SHARED_INTERFACES	Fix a bug in which assign was happily re-using
-			interfaces for more than one vlink, without penalty.
-			Should be the default
