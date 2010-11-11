@@ -173,9 +173,3 @@ Bugfixes
 FIX_SHARED_INTERFACES	Fix a bug in which assign was happily re-using
 			interfaces for more than one vlink, without penalty.
 			Should be the default
-PNODE_SWITCH_LOAD	When putting a pnode back into a pclass list, swith the
-			order in which it is inserted, based on its current
-			load. Should be the default
-PNODE_ALWAYS_FRONT	Always put a pnode into the front of its pclass list,
-			regardless of whether it is being used or not. Only for
-			debugging PNODE_SWITCH_LOAD - should go away

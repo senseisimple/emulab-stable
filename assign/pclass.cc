@@ -423,19 +423,11 @@ int pclass_unset(tb_pnode *p)
       // remove_node empty means only one user.
       if (! (*dit).second->exists(p)) {
 	assert(p->current_type_record->get_current_load() > 0);
-#ifdef PNODE_ALWAYS_FRONT
-	(*dit).second->push_front(p);
-#else
-#ifdef PNODE_SWITCH_LOAD
 	if (p->current_type_record->get_current_load() == 0) {
-#else
-	if (p->get_current_load() == 1) {
-#endif
 	  (*dit).second->push_back(p);
 	} else {
 	  (*dit).second->push_front(p);
 	}
-#endif
       }
     }
   }
