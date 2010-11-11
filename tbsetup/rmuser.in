@@ -81,6 +81,7 @@ use libtestbed;
 use User;
 use Project;
 use Experiment;
+use EmulabFeatures;
 
 my $HOMEDIR	= USERROOT();
 
@@ -298,6 +299,12 @@ if (! $nuke) {
 
     $EUID = 0;
 }
+
+#
+# Kill any features
+#
+EmulabFeatures->DeleteAll($target_user) == 0 or
+    fatal("Could not delete all features for $target_user");
 
 #
 # Rename the users home dir if its there.

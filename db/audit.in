@@ -1,7 +1,7 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -200,12 +200,14 @@ if ($today == 7) {
 
 if (! ($query_result = 
        DBQueryWarn("select n.node_id from nodes as n ".
+		   "left join node_types as t on t.type=n.type ".
 		   "left join reserved as r on r.node_id=n.node_id ".
 		   "where (n.eventstate!='". TBDB_NODESTATE_ISUP ."' and ".
 		   "       n.eventstate!='". TBDB_NODESTATE_PXEWAIT ."' and ".
 		   "       n.eventstate!='". TBDB_NODESTATE_ALWAYSUP ."' and ".
 		   "       n.eventstate!='". TBDB_NODESTATE_POWEROFF ."') ".
-		   " and r.pid is null and n.role='testnode'"))) {
+		   " and r.pid is null and n.role='testnode' and ".
+		   "     t.isfednode=0"))) {
     fatal("Error accessing the database.");
 }
 

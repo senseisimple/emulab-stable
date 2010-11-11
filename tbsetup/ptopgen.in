@@ -436,7 +436,7 @@ my $defaultosidquery = 'select distinct o.osid, t.type, o.osname, o.pid, o.OS, o
 # For subOS support (i.e., vnode OSes running atop vhost OSes), we have to
 # check both the subosid and all the parent_osid it can run on.
 #
-my $subosidquery = "select o.osid,o.parent_osid from os_submap as o " .
+my $subosidquery = "select distinct o.osid,o.parent_osid from os_submap as o " .
 	"left join osidtoimageid as oi1 on o.osid = oi1.osid " .
 	"left join osidtoimageid as oi2 on o.parent_osid = oi2.osid " .
 	"left join images as i1 on oi1.imageid = i1.imageid ".
@@ -920,10 +920,12 @@ foreach $node (@nodenames) {
 	if ($trivspeed) {
 	    push @flags, "trivial_bw:$trivspeed";
 	}
-	# Add CPU and RAM information
-	$cpu_ram_features_present++;
-	# This number can be use for fine-tuning packing
-	push @features, "?+virtpercent:100";
+	if (! $sharing_mode{$node}) {
+	    # Add CPU and RAM information
+	    $cpu_ram_features_present++;
+	    # This number can be use for fine-tuning packing
+	    push @features, "?+virtpercent:100";
+	}
 	# Put this silly feature in so that we can try to keep vnodes
 	# on the same pnode they were before - but only if updating
         if ($exempt_eid) {
@@ -958,9 +960,11 @@ foreach $node (@nodenames) {
     }
 
     # Add features
-    push(@features, @{$typemap{$type}->{'FEATURES'}});
-    if (defined($features{$node})) {
-	push @features, @{$features{$node}};
+    if (! $sharing_mode{$node}) {
+	push(@features, @{$typemap{$type}->{'FEATURES'}});
+	if (defined($features{$node})) {
+	    push @features, @{$features{$node}};
+	}
     }
 
     #
@@ -1004,7 +1008,7 @@ foreach $node (@nodenames) {
     }
 
     # Add features indicating what this node has connections to
-    if ($connections{$node}) {
+    if ($connections{$node} && !$sharing_mode{$node}) {
         my @connected_to  = @{$connections{$node}};
         foreach my $other_end (@connected_to) {
             push(@features,"connected-to-$other_end:0.0");
@@ -1028,14 +1032,6 @@ foreach $node (@nodenames) {
     }
     if (defined($curr_batt{$node})) {
 	push(@features,"powerneeded:" . (1.0 - $curr_batt{$node} / 100.0));
-    }
-
-    # Add in modelnet stuff.
-    if ($mnetcores) {
-	push(@types, "modelnet-core:$mnetcores");
-    }
-    if ($mnetedges) {
-	push(@types, "modelnet-edge:$mnetedges");
     }
 
     #

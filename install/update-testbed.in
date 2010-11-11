@@ -83,6 +83,7 @@ BEGIN
     }
 }
 use emdb;
+use libEmulab;
 use libtestbed;
 
 #
@@ -140,6 +141,16 @@ my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
 	       # To catch a few extra things that do not normally change.
 	       "-I@prefix@/lib"
 	       );
+
+# Chicken or Egg.
+# XXX only set specific fields as the ns_include field may not be there yet.
+DBQueryFatal("INSERT INTO sitevariables (name,value,defaultvalue,description)".
+	     " VALUES ".
+	     " ('general/testbed_shutdown',NULL,'0', ".
+	     "  'Non-zero value indicates that the testbed is shutdown ".
+	     "and scripts should not do anything when they run. ".
+	     "DO NOT SET THIS BY HAND!')")
+    if (!SiteVarExists("general/testbed_shutdown"));
 
 #
 # Dump the testbed version numbers in all modes.
@@ -216,7 +227,8 @@ sub Restart()
     }
     if ($nologins) {
 	print "Turning on the web interface and allowing swaps\n";
-	if (system("$SETSITEVAR web/nologins -") ||
+	if (system("$SETSITEVAR general/testbed_shutdown -") ||
+	    system("$SETSITEVAR web/nologins -") ||
 	    system("$SETSITEVAR web/message -")) {
 	    print "*** Could not renable the web interface and swapping!\n";
 	    exit(1);
@@ -249,6 +261,10 @@ if ($stopbed) {
     system("$SETSITEVAR web/nologins 1");
     if ($?) {
 	Fatal("Could not disable web logins and experiment swaps");
+    }
+    system("$SETSITEVAR general/testbed_shutdown 1");
+    if ($?) {
+	Fatal("Could not set general/testbed_shutdown");
     }
     $nologins = 1;
     

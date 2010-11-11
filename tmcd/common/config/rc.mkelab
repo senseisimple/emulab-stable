@@ -151,6 +151,9 @@ my $SCRATCHFS  = 0;
 # Single or dual control network.
 my $SINGLE_CONTROLNET = 0;
 
+# Support a shared filesystem between fs server and nodes
+my $SHAREDFS   = 1;
+
 #
 # Defaults for configuration attributes (options).
 # These can be overridden if values are passed in via the emulabconfig command.
@@ -180,6 +183,7 @@ my %emulabconfig = (
     #   CONFIG_MAILMAN	support integrated mailman lists (part of COLLAB)
     #	CONFIG_USERDB	support integrated MySQL DB (part of COLLAB)
     #   CONFIG_WIKI	support integrated wiki (part of COLLAB)
+    #	CONFIG_SHAREDFS	support shared filesystem	    
     #
     "CONFIG_NOSETUP"    => $NOSETUP,
     "CONFIG_SCRATCHFS"  => $SCRATCHFS,
@@ -193,6 +197,7 @@ my %emulabconfig = (
     "CONFIG_MAILMAN"    => !$NOCOLLAB,
     "CONFIG_USERDB"     => !$NOCOLLAB,
     "CONFIG_WIKI"       => !$NOCOLLAB,
+    "CONFIG_SHAREDFS"	=> $SHAREDFS,
 
     #
     # Elabinelab build options:
@@ -311,7 +316,7 @@ sub doboot()
     #
     # FreeBSD version specific adjustments for defaults.
     #
-    if ($FBSD_VERSION == 7.2) {
+    if ($FBSD_VERSION >= 7.2) {
 	$emulabconfig{"MFSVERSION"} = "72";
     } else {
 	$emulabconfig{"MFSVERSION"} = "62";
@@ -2098,7 +2103,28 @@ sub CreateDefsFile($)
 		    print OUTDEFS "NSVERIFY=1\n";
 		    last SWITCH;
 		};
-		
+		/^NOSHAREDFS$/ && do {
+		    if ($emulabconfig{"CONFIG_SHAREDFS"}) {
+			print OUTDEFS "NOSHAREDFS=0\n";
+		    } else {
+			print OUTDEFS "NOSHAREDFS=1\n";
+		    }
+		    last SWITCH;
+		};
+		/^SELFLOADER_DATA$/ && do {
+		    #
+		    # XXX we know that the emulab-*-3.x package sets include
+		    # perl 5.10 which has a bug with taint checking which in
+		    # turn is triggered by the SelfLoader we use.  So turn
+		    # it off when perl 5.10 is used.  Otherwise don't set
+		    # the variable at all so it will default correctly.
+		    #
+		    if ($emulabconfig{BOSS_PKG} =~ /^emulab-boss-3/) {
+			print OUTDEFS "SELFLOADER_DATA=\"\"\n";
+		    }
+		    last SWITCH;
+		};
+
 		print OUTDEFS $line;
 	    }
 	}
@@ -2305,6 +2331,7 @@ sub GetEmulabSource($)
 	mysystem("rsync -a --delete /usr/src/ $destdir/testbed");
     }
     else {
+	print "Downloading current testbed software from ${bossname}\n";
 	#
 	# Get the tarball from the server.
 	#
@@ -2359,12 +2386,12 @@ sub RecreateDir($$)
     # If it is a mount point, unmount it.  Otherwise, rename it.
     #
     if (-d "$dir") {
-	if (system("umount $dir") == 0) {
+	if (system("umount $dir >/dev/null 2>&1") == 0) {
 	    # was a mounted FS, need to remove it from fstab if present
 	    mysystem("sed -i '.orig' -E '\\;\[\[:space:\]\]$TBDIR\[\[:space:\]\];d' /etc/fstab");
 	}
 	# remove it if it is empty
-	rmdir("$dir");
+	rmdir("$dir >/dev/null 2>&1");
     }
 
     #

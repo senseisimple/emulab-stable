@@ -169,7 +169,7 @@ sub Create($$$$)
     # For now, all tickets expire very quickly ...
     #
     $self->{'redeem_before'} =
-	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (5*60)));
+	POSIX::strftime("20%y-%m-%dT%H:%M:%S", localtime(time() + (10*60)));
 
     #
     # Locally generated tickets need a local DB index, which can be the
@@ -777,6 +777,7 @@ sub Release($$)
     my $eid     = $experiment->eid();
     my @nodeids = ();
     my @nodes   = ();
+    my @vhosts  = ();
 
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$self->rspec())->get_nodelist()) {
@@ -795,7 +796,6 @@ sub Release($$)
 	    return -1;
 	}
 
-	# Virtual nodes not created until ticket redeemed.
 	my $node = GeniUtil::LookupNode($resource_id);
 	next
 	    if (!defined($node));
@@ -803,10 +803,6 @@ sub Release($$)
 	my $reservation = $node->Reservation();
 	next
 	    if (!defined($reservation));
-
-	# Watch for duplicates, as in multiple vnodes on a pnode.
-	next
-	    if (grep {$_ eq $node->node_id()} @nodeids);
 
 	#
 	# If the node is still in the experiment and not incorporated,
@@ -819,6 +815,13 @@ sub Release($$)
 		 $restable->{'genisliver_idx'} == 0)) {
 		push(@nodeids, $node->node_id());
 		push(@nodes, $node);
+
+		# So we can tell if we need to deallocate a physical
+		# host once all the VMs on it are gone. 
+		if ($node->isvirtnode() && !$node->sharing_mode()) {
+		    push(@vhosts, $node->phys_nodeid())
+			if (! grep {$_ eq $node->phys_nodeid()} @vhosts);
+		}
 	    }
 	}
     }
@@ -828,10 +831,50 @@ sub Release($$)
 	#
 	#system("export NORELOAD=1; $NFREE -x -q $pid $eid @nodeids");
 	system("$NFREE -x -q $pid $eid @nodeids");
+	return -1
+	    if ($?);
     }
     foreach my $node (@nodes) {
 	$node->Refresh();
     }
+
+    @nodes = @nodeids = ();
+    #
+    # Now go through the vhosts that belong to us, and see if we can
+    # free them cause there are no longer VMs on them.
+    #
+    foreach my $pnode_id (@vhosts) {
+	my $pnode = Node->Lookup($pnode_id);
+	if (!defined($pnode)) {
+	    print STDERR "ReleaseTicket: *** No such pnode $pnode_id\n";
+	    next;
+	}
+	
+	my $reservation = $pnode->Reservation();
+	next
+	    if (!defined($reservation) ||
+		!$reservation->SameExperiment($experiment));
+	
+	my @vnodes = ();
+	if ($pnode->VirtualNodes(\@vnodes) != 0) {
+	    print STDERR
+		"ReleaseTicket: *** Could not get vnode list for $pnode_id\n";
+	    return -1;
+	}
+	if (!@vnodes) {
+	    push(@nodeids, $pnode->node_id());
+	    push(@nodes, $pnode);
+	}
+    }
+    if (@nodeids) {
+	system("$NFREE -x -q $pid $eid @nodeids");
+	return -1
+	    if ($?);
+    }
+    foreach my $node (@nodes) {
+	$node->Refresh();
+    }
+    
     $self->Delete($flag);
     return 0;
 }

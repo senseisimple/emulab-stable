@@ -38,7 +38,7 @@ my $NoRecover = 0;
 
 sub usage ()
 {
-    print STDERR "Usage: $0 [-v] [-u [-f] | -n] pid eid\n";
+    print STDERR "Usage: $0 [-v] [-u [-f] | -n] [-z] pid eid\n";
     print STDERR " -v   - Enables verbose output\n";
     print STDERR " -u   - Enables update mode\n";
     print STDERR " -f   - Fix current resources during update mode\n";
@@ -49,9 +49,10 @@ sub usage ()
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
     print STDERR " -l   - Use rspec v2 instead of the text file format\n";
+    print STDERR " -z   - Randomize node order printed by ptopgen\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:alt";
+my $optlist    = "dvunfprqczxm:ko:altz";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
@@ -70,9 +71,10 @@ my $usecurrent = 0;  # Only with regression mode, use current solution.
 my $quiet      = 0;
 my $clear      = 0;
 my $warnings   = 0;
-my $maxrun     = 3;		# Maximum number of times we run assign.
+my $maxrun     = 3;  # Maximum number of times we run assign.
 my $gotlock    = 0;
 my $userspec   = 0;
+my $randomize  = 0;
 my $vtop;
 
 #
@@ -193,6 +195,9 @@ if (defined($options{"c"})) {
 if (defined($options{"l"})) {
     $userspec = 1;
 }
+if (defined($options{"z"})) {
+    $randomize = 1;
+}
 
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
@@ -296,6 +301,7 @@ sub AssignLoop()
 {
     my $currentrun     = 1;
     my $canceled       = 0;
+    my $noprogress     = 0;
     my $tried_precheck = 0;
     # Admission control counts
     my %admission_control = ();
@@ -349,7 +355,7 @@ sub AssignLoop()
 	# RunAssign returns  0 if successful.
 	#           returns -1 if failure, but assign says to stop trying.
 	#           returns  1 if failure, but assign says to try again.
-	#           returns  2 if we made some forward progress.
+	#           returns  2 if assign succeeds, but nodes were allocated
 	#
 	my $retval = RunAssign($precheck, $prefix);
 
@@ -400,11 +406,14 @@ sub AssignLoop()
 	    $tried_precheck = 1;
 	}
 
-	if ($currentrun >= $maxrun && $retval != 2) {
+	# If we made progress, keep trying until no progress twice in a row.
+	if ($currentrun >= $maxrun && $noprogress) {
 	    fatal({type => 'primary', severity => SEV_ERROR,
 		   error => ['reached_assign_run_limit']},
 		  "Reached run limit. Giving up.");
 	}
+	# See if we made progress or not. We try one extra time. See above.
+	$noprogress = ($retval == 2);
 
 	chat("Waiting 5 seconds and trying again...\n");
 	sleep(5);
@@ -518,6 +527,9 @@ sub RunAssign($$)
     	if (defined($experiment->delay_capacity()));
     if ($userspec == 1) {
 	$ptopargs .= "-x -g 2 ";
+    }
+    if ($randomize == 1) {
+	$ptopargs .= "-z ";
     }
     $ptopargs .= "-l $typelimitfile"
 	if (scalar(keys(%admission_control)));
@@ -686,8 +698,8 @@ sub RunAssign($$)
     my $retval = $vtop->AllocNodes();
     if ($retval != 0) {
 	if ($retval < 1) {
-	    print("Could not allocate any nodes.\n");
-	    return -1;
+	    # Could not allocate any nodes.
+	    return 2;
 	}
 	return 1;
     }

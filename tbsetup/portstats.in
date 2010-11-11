@@ -14,6 +14,12 @@
 # can't pick up on, so it warns about this variable being only used once
 #
 
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
 
 #
 # Configure variables

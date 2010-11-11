@@ -628,14 +628,14 @@ sub GenDefsFile($)
     #
     my %defvalues = (
 	"elabinelab/singlenet" => 0,
-	"elabinelab/boss_osid" => "FBSD63-STD",
-	"elabinelab/ops_osid"  => "FBSD63-STD",
-	"elabinelab/fs_osid"   => "FBSD63-STD"
+	"elabinelab/boss_osid" => "FBSD73-STD",
+	"elabinelab/ops_osid"  => "FBSD73-STD",
+	"elabinelab/fs_osid"   => "FBSD73-STD"
     );
     while (my ($var, $def) = each(%defvalues)) {
 	if (!exists($sitevars{$var})) {
-	    print "*** WARNING: sitevar $var does not exist or has no value, ",
-	          "defaulting to $def\n";
+	    ## don't be so alarmist
+	    #print "*** WARNING: sitevar $var does not exist or has no value, defaulting to $def\n";
 	    print TCL "set sitevariables($var) $def\n";
 	    $sitevars{$var} = $def;
 	}

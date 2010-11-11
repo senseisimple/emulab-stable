@@ -1,0 +1,159 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+
+#
+# Grant and revoke permission to use specific emulab features.
+#
+sub usage()
+{
+    print STDERR "Usage: grantfeature [-r] ";
+    print STDERR "[-p <pid> | -u <user> | -e <exp> ] <feature>\n";
+    print STDERR "	-h   This message\n";
+    print STDERR "	-r   Revoke access instead of grant\n";
+    exit(-1);
+}
+my $optlist  = "hp:dnru:e:";
+my $impotent = 0;
+my $debug    = 0;
+my $revoke   = 0;
+my $pid;
+my $uid;
+my $eid;
+my $target;
+
+# Protos
+sub fatal($);
+
+#
+# Please do not run as root. Hard to track what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
+
+#
+# Configure variables
+#
+my $TB		 = "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use emdb;
+use EmulabFeatures;
+use libtestbed;
+use Experiment;
+use Project;
+use Group;
+use User;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{h})) {
+    usage();
+}
+if (defined($options{n})) {
+    $impotent = 1;
+}
+if (defined($options{r})) {
+    $revoke = 1;
+}
+if (defined($options{d})) {
+    $debug = 1;
+}
+if (defined($options{p})) {
+    $pid = $options{p};
+}
+if (defined($options{u})) {
+    $uid = $options{u};
+}
+if (defined($options{e})) {
+    $eid = $options{e};
+}
+usage()
+    if (@ARGV != 1);
+usage()
+    if (! (defined($pid) || defined($uid) || defined($eid)));
+
+my $featurename = $ARGV[0];
+
+#
+# Verify user, must be admin.
+#
+my $this_user = User->ThisUser();
+if (! defined($this_user)) {
+    fatal("You ($UID) do not exist!");
+}
+if (!$this_user->IsAdmin()) {
+    fatal("You are not a testbed administrator!");
+}
+
+if (defined($eid)) {
+    $target = Experiment->Lookup($eid);
+    if (!defined($target)) {
+	fatal("No such experiment $eid\n");
+    }
+}
+elsif (defined($pid)) {
+    $target = Project->Lookup($pid);
+    if (!defined($target)) {
+	$target = Group->Lookup($pid);
+    }
+    if (!defined($target)) {
+	fatal("No such project or group $pid\n");
+    }
+}
+elsif (defined($uid)) {
+    $target = User->Lookup($uid);
+    if (!defined($target)) {
+	fatal("No such user $uid\n");
+    }
+}
+my $feature = EmulabFeatures->Lookup($featurename);
+if (!defined($feature)) {
+    fatal("No such feature $featurename; please create it first");
+}
+
+if ($revoke) {
+    $feature->Disable($target) == 0
+	or fatal("Could not disable $featurename for $target");
+}
+else {
+    $feature->Enable($target) == 0
+	or fatal("Could not enable $featurename for $target");
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+

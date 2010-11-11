@@ -909,14 +909,31 @@ sub GetCredential($;$$)
 {
     my ($class, $context, $certfile) = @_;
 
+    $context = Genixmlrpc->GetContext()
+	if (!defined($context));
+
+    #
+    # If there is no UUID in the environment, then try to figure it
+    # out from the context.
+    #
+    my $myuuid = (exists($ENV{'MYUUID'}) ? $ENV{'MYUUID'} : undef);
+    if (!defined($myuuid) && defined($context)) {
+	$myuuid = $context->certificate()->uuid();
+    }
+    if (!defined($myuuid)) {
+	print STDERR "*** GeniRegistry::ClearingHouse::GetCredential: ".
+	    "No context or MYUUID for RPC\n";
+	return undef;
+    }
+
     my $clearinghousecert = GeniRegistry::ClearingHouse->GetCertificate();
     if (!defined($clearinghousecert)) {
 	return undef;
     }
     my $clearinghousecred =
-	GeniCredential->Lookup($clearinghousecert->uuid(), $ENV{'MYUUID'});
+	GeniCredential->Lookup($clearinghousecert->uuid(), $myuuid);
 
-    #print "$clearinghousecred\n";
+    #print "$clearinghousecred\n" if (defined($clearinghousecred));
 
     if (defined($clearinghousecred) &&
 	defined($clearinghousecred->expires())) {
@@ -930,9 +947,6 @@ sub GetCredential($;$$)
 	$clearinghousecred->Delete();
     }
     #print STDERR "Getting new clearinghouse credential\n";
-
-    $context = Genixmlrpc->GetContext()
-	if (!defined($context));
 
     my $url = $clearinghousecert->URL();
     if (!defined($url)) {
@@ -957,8 +971,11 @@ sub GetCredential($;$$)
 	print STDERR "Could not parse credential from clearinghouse\n";
 	return undef;
     }
-    $clearinghousecred->Store();
-    
+    if ($clearinghousecred->Store()) {
+	print STDERR "*** GeniRegistry::ClearingHouse::GetCredential: ".
+	    "Could not store credential for clearinghouse\n";
+	return undef;
+    }
     return $clearinghousecred;
 }
 

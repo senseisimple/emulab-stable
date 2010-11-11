@@ -23,11 +23,12 @@ use Exporter;
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
 	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
          getlinkdelayconfig getloadinfo getbootwhat gendhcpdconf
+	 forcecopy
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE REMOTEDED CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP
-	 USESFS SHADOW
+	 USESFS SHADOW FSRVTYPE PROJDIR EXPDIR
 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
 	 ISFW FAKEJAILED LINUXJAILED GENVNODE GENVNODETYPE GENVNODEHOST
@@ -54,7 +55,7 @@ use librc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 30; };
+sub TMCD_VERSION()	{ 32; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -125,6 +126,13 @@ my $inixp;
 #
 my $shadow;
 my $SHADOWDIR = "$VARDIR/shadow";
+
+#
+# Fileserver type.
+# Default is "racy NFS" (the historical only choice) until proven otherwise
+# (via "mounts" tmcc call).
+#
+my $fsrvtype = "NFS-RACY";
 
 #
 # The role of this pnode
@@ -371,6 +379,30 @@ if (defined($ENV{'TIMESTAMPS'})) {
     $TIMESTAMPS = $ENV{'TIMESTAMPS'};
 }
 
+#
+# Any reason NOT to hardwire these?
+#
+sub PROJDIR() {
+    my $p = $pid;
+    if (!$p) {
+	($p, undef, undef) = check_nickname();
+	return ""
+	    if (!$p);
+    }
+    return "/proj/$p";
+}
+
+sub EXPDIR() {
+    my $p = $pid;
+    my $e = $eid;
+    if (!$p || !$e) {
+	($p, $e, undef) = check_nickname();
+	return ""
+	    if (!$p || !$e);
+    }
+    return "/proj/$p/exp/$e";
+}
+
 # When on the MFS, we do a much smaller set of stuff.
 # Cause of the way the packages are loaded (which I do not understand),
 # this is computed on the fly instead of once.
@@ -456,6 +488,34 @@ sub SHADOW()	   { return (defined($shadow) ? 1 : 0); }
 # Is this node using SFS. Several scripts need to know this.
 #
 sub USESFS()	{ if (-e TMUSESFS()) { return 1; } else { return 0; } }
+
+#
+# What type of fileserver is this node using.  Choices are:
+#
+# NFS-RACY	FreeBSD NFS server with mountd race (the default)
+# NFS		NFS server
+# LOCAL		No shared filesystems
+#
+# XXX should come from tmcd
+#
+sub FSRVTYPE() {
+    if (-e "$BOOTDIR/fileserver") {
+	open(FD, "$BOOTDIR/fileserver");
+	$fsrvtype = <FD>;
+	close(FD);
+	chomp($fsrvtype);
+    }
+    return $fsrvtype;
+}
+
+# XXX fer now hack: comes from rc.mounts
+sub setFSRVTYPE($) {
+    $fsrvtype = shift;
+    if (open(FD, ">$BOOTDIR/fileserver")) {
+	print FD "$fsrvtype\n";
+	close(FD);
+    }
+}
 
 #
 # XXX fernow hack so I can readily identify code that is special to Xen VMs
@@ -1743,6 +1803,34 @@ sub getbootwhat($)
     return 0;
 }
 
+#
+# Do everything in our power to copy a file.
+# The main "specialness" about this function is that it tries to work
+# around the old FreeBSD NFS server race with changing the exports list--
+# we retry the copy several times before failing.
+# Returns one on success, zero on failure.
+#
+sub forcecopy($$)
+{
+    my ($ffile, $tfile) = @_;
+    my $tries = 1;
+
+    #
+    # If the file server has NFS races, we try operations multiple
+    # times in case we hit the EPERM window.
+    #
+    if (FSRVTYPE() eq "NFS-RACY") {
+	$tries = 5;
+    }
+
+    for (my $i = 0; $i < $tries; $i++) {
+	if (system("cp -fp $ffile $tfile >/dev/null 2>&1") == 0) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 my %fwvars = ();
 
 #
@@ -2052,7 +2140,7 @@ sub shadowsetup($$)
     #
     donodeid();
 
-    my $eiddir = "/proj/$pid/exp/$eid/tbdata";
+    my $eiddir = EXPDIR() . "/tbdata";
     os_mkdir($eiddir, "0777");
 
     return ($pid, $eid, $vname);

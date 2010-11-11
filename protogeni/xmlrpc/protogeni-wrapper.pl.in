@@ -18,6 +18,7 @@ use Data::Dumper;
 use POSIX;
 use Crypt::X509;
 use Crypt::OpenSSL::X509;
+use Time::HiRes qw( gettimeofday tv_interval );
 
 # Yack. apache does not close fds before the exec, and if this dies
 # we are left with a giant mess.
@@ -95,6 +96,18 @@ sub XMLError($$)
 #
 if (NoLogins()) {
     XMLError(503, "CM temporarily offline; please try again later");
+}
+
+#
+# Check for excessive load
+#
+if ($MAINSITE) {
+    my $uptime = `uptime`;
+    if ($uptime =~ /load averages:\s+([\.\d]+),\s+([\.\d]+),\s+[\.\d]+/) {
+	if ($1 > 10.0) {
+	    XMLError(511, "Server is WAY too busy; please try again later");
+	}
+    }
 }
 
 #
@@ -298,7 +311,8 @@ $message .=
     "Method:  $method\n";
 $message .=
     "Version: $GENI_VERSION\n" if (defined($GENI_VERSION));
-    
+
+my $starttime = [gettimeofday()];
 eval { $result = &{ $GENI_METHODS->{$method} }(@{ $call->{'value'} }) };
 if ($@) {
     #
@@ -312,11 +326,11 @@ if ($@) {
 		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
 }
 else {
+    my $elapsed = tv_interval($starttime);
+    $message .= "Elapsed: " . sprintf("%f", $elapsed) . "\n";
+    
     if (GeniResponse::IsError($result)) {
 	$message .= "Error:   " . $result->{'code'} . "\n";
-	if ($mailerrors) {
-	    print STDERR "Mail Errors is on.\n";
-	}
     }
     else {
 	$message .= "Code:    " . $result->{'code'} . "\n";
@@ -328,6 +342,23 @@ else {
     $message .= "Request:\n" . $request . "\n";
     
     AddAuditInfo("message", $message);
+
+    #
+    # If the response indicates error, and no output is defined in
+    # the response, then send back the contents of the audit file.
+    # Not sure this makes any sense at all yet, but the point is to
+    # get more info back to the user.
+    #
+    if (GeniResponse::IsError($result) &&
+	(!defined($result->{'output'}) || $result->{'output'} eq "") &&
+	exists($ENV{'TBAUDITLOG'}) && -s $ENV{'TBAUDITLOG'}) {
+	$result->{'output'} = `cat $ENV{'TBAUDITLOG'}`;
+    }
+    # Do this after above so that silly comment is not sent to user.
+    if (GeniResponse::IsError($result) && $mailerrors &&
+	$result->{'code'} != GENIRESPONSE_SEARCHFAILED()) {
+	print STDERR "Mail Errors is on.\n";
+    }
 
     #
     # Added this for geni-am ...

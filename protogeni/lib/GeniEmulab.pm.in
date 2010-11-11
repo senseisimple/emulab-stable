@@ -62,8 +62,19 @@ sub RegisterExperiment($$)
     my ($experiment, $user) = @_;
 
     my $slice = GeniSlice->LookupByExperiment($experiment);
-    return 0
-	if (defined($slice));
+
+    #
+    # If we have a slice for it, check to see if its expired. We just
+    # go ahead and renew it.
+    #
+    if (defined($slice)) {
+	if ($slice->IsExpired() &&
+	    $slice->SetExpiration(time() + (24 * 3600 * 30))) {
+	    print STDERR "Could not reset slice expiration\n";
+	    return -1;
+	}
+	return 0;
+    }
 
     #
     # Load the SA cert to act as caller context.

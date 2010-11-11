@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -435,6 +435,7 @@ sub doboot()
 		    my $sshdir  = "$homedir/.ssh";
 		    my $forward = "$homedir/.forward";
 
+		    print "updating local home directory\n";
 		    # Sanity; this does not always happen correctly.
 		    my $cmd = "$CHMOD 755 $homedir";
 		    if (system($cmd) != 0) {

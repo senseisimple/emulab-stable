@@ -81,6 +81,7 @@ require GeniDB;
 require GeniUtil;
 require GeniSlice;
 require GeniCertificate;
+require GeniCredential;
 require GeniUser;
 require libGeni;
 use Experiment;
@@ -296,6 +297,13 @@ sub ExpireSlices()
 	my $hrn       = $slice->hrn();
 	
 	print STDERR "Expiring $slice\n";
+
+	# Needs to move.
+	GeniRegistry::ClientSliver->SliceDelete($slice);
+
+	# Remove any stored credentials for this slice.
+	GeniCredential->DeleteForTarget($slice);
+	
 	system("$CLEANUPSLICE -f -s $idx");
 	if (! $?) {
 	    $slice->UnLock();

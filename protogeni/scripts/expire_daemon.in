@@ -88,6 +88,7 @@ require GeniTicket;
 require GeniSlice;
 require GeniCM;
 require GeniCertificate;
+require GeniCredential;
 use Experiment;
 use Node;
 use libtestbed;
@@ -229,7 +230,10 @@ sub ExpireSlices()
 		    goto skip;
 		}
 	    }
-	    print STDERR "$slice is idle; releasing.\n";
+	    print STDERR "$slice ($experiment) is idle; releasing.\n";
+	}
+	else {
+	    print STDERR "$slice ($experiment) has expired; releasing.\n";
 	}
       cleanup:
 	if (GeniCM::CleanupDeadSlice($slice) != 0) {

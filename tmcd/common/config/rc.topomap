@@ -130,15 +130,14 @@ sub docleanup()
 #
 sub dotopomap()
 {
-    my ($pid, $eid, $vname) = check_nickname();
-    
     #
     # Copy over the topomap so that it is locally resident. We will eventually
     # get this via a tarfile instead of NFS.
     #
-    my $topomap = "/proj/$pid/exp/$eid/tbdata/topomap.gz";
-    my $ltmap = "/proj/$pid/exp/$eid/tbdata/ltmap.gz";
-    my $ltpmap = "/proj/$pid/exp/$eid/tbdata/ltpmap.gz";
+    my $datadir = EXPDIR() . "/tbdata";
+    my $topomap = "$datadir/topomap.gz";
+    my $ltmap = "$datadir/ltmap.gz";
+    my $ltpmap = "$datadir/ltpmap.gz";
     my $tempmap = "/tmp/topomap.gz";
     my $templt = "/tmp/ltmap.gz";
     my $templtp = "/tmp/ltpmap.gz";
@@ -150,28 +149,18 @@ sub dotopomap()
     unlink("$templt");
     unlink("$templtp");
     
-    #
-    # Try a couple of times to get the file cause of NFS sillyness.
-    # Should probably have our own version of cp that retries at the block
-    # level?
-    #
-    if (! (USESFS() || WINDOWS() || REMOTEDED())) {
-	for (my $i = 0; $i < 5; $i++) {
-	    last
-		if (system("cp -fp $topomap $tempmap") == 0);
+    if (! (USESFS() || WINDOWS() || REMOTEDED() || (FSRVTYPE() eq "LOCAL"))) {
+	if (!forcecopy($topomap, $tempmap)) {
+	    warning("NFS cp of $topomap failed, will try tmcc ...");
 	    unlink("$tempmap");
 	}
-	for (my $i = 0; $i < 5; $i++) {
-	    last
-		if (system("cp -fp $ltmap $templt") == 0);
+	if (!forcecopy($ltmap, $templt)) {
+	    warning("NFS cp of $ltmap failed, will try tmcc ...");
 	    unlink("$templt");
 	}
-	if (-e $ltpmap) {
-	    for (my $i = 0; $i < 5; $i++) {
-		last
-		    if (system("cp -fp $ltpmap $templtp") == 0);
-		unlink("$templtp");
-	    }
+	if (!forcecopy($ltpmap, $templtp)) {
+	    warning("NFS cp of $ltpmap failed, will try tmcc ...");
+	    unlink("$templtp");
 	}
     }
     my $optarg = (defined($vnodeid) ? "-n $vnodeid" : "");
@@ -181,8 +170,6 @@ sub dotopomap()
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	#
-	print "foo $optarg $urnarg\n";
-	
 	system(TMCCBIN() . " $optarg $urnarg topomap > $tempmap");
 	#
 	# tmcc does not really return useful error codes.

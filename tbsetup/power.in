@@ -23,6 +23,7 @@ my $RPCSERVER  = "@OUTERBOSS_NODENAME@";
 my $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
 my $RPCCERT    = "@OUTERBOSS_SSLCERTNAME@";
 my $WOL        = "$TB/sbin/whol";
+my $TBLOG	= "@TBLOGFACIL@";
 
 use lib "@prefix@/lib";
 use libdb;
@@ -42,6 +43,8 @@ use StateWait;
 use strict;
 use English;
 use Getopt::Std;
+use POSIX qw(strftime);
+use Sys::Syslog;
 
 sub usage() {
     print << "END";
@@ -71,6 +74,7 @@ my $this_user;
 # Protos
 sub dostatus(@);
 sub dowol(@);
+sub logit($);
 
 #
 # Process command-line arguments
@@ -134,6 +138,9 @@ foreach my $n (0..$#machines) {
 #
 print "do \"$op\" to @machines\n" if $verbose > 1;
 
+# Set up syslog
+openlog("power", "pid", $TBLOG);
+
 #
 # Handle the status command which is not a per-node operation and not
 # allowed by anyone except admins.
@@ -163,6 +170,8 @@ if ($ELABINELAB) {
 
     exit(0)
 	if (! @nodelist);
+
+    logit("$op: @nodelist\n");
 
     libxmlrpc::Config({"server"  => $RPCSERVER,
 		       "verbose" => 1,
@@ -319,6 +328,8 @@ foreach my $power_id (keys %outlets) {
 	}
 	($type, $IP, $class) = $result->fetchrow();
     }
+    # Log now, and not worry about errors. Just want to know we tried.
+    logit("$op: @nodes\n");
 
     #
     # Finally, we look at the controller type and construct the proper type
@@ -595,6 +606,7 @@ sub dowol(@)
     @nodeids = keys(%macs);
 
     print "Doing a plain WOL to @nodeids via interface $iface\n";
+    logit("WOL: @nodeids\n");
 
     #
     # This is going to take an arbitrary length of time; we have no idea
@@ -659,4 +671,16 @@ sub dowol(@)
 	return -1;
     }
     return 0;
+}
+
+sub logit($)
+{
+    my ($message) = @_;
+    my ($me) = getpwuid($UID);
+
+    syslog("info", "[$me] $message");
+}
+
+END {
+    closelog();
 }

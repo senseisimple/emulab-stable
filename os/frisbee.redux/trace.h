@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2002-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2002-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -97,8 +97,9 @@ if (evlogging >= (l)) { \
 #define EV_CLIREUSE	43
 #define EV_CLIDUBPROMO	44
 #define EV_CLIDCSTAT	45
+#define EV_CLIREDO	46
 
-#define EV_MAX		45
+#define EV_MAX		46
 
 extern void ClientTraceInit(char *file);
 extern void ClientTraceReinit(char *file);

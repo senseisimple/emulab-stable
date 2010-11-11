@@ -336,13 +336,15 @@ sub Stringify($)
 
     return "[Experiment: $pid/$eid]";
 }
+# Keep this above @SELFLOADER_DATA@ ... elabinelab is a slot in
+# the stats stats record, but was not being updated
+sub elabinelab($) { return $_[0]->elab_in_elab(); }
 
 1;
 @SELFLOADER_DATA@
 
 sub dbrow($$)     { return $_[0]->{'EXPT'}; }
 sub locked($)     { return $_[0]->expt_locked(); }
-sub elabinelab($) { return $_[0]->elab_in_elab(); }
 sub description($){ return $_[0]->expt_name(); }
 sub creator($)    { return $_[0]->expt_head_uid(); }
 sub created($)	  { return $_[0]->expt_created(); }
@@ -2715,7 +2717,7 @@ sub CleanLogFiles($)
 	    if ($file =~ /^.*\.ns$/);
 	
 	push(@delete, "${workdir}/$1")
-	    if ($file =~ /^(.*\.(log|ptop|top|assign|soln|xml))$/);
+	    if ($file =~ /^(.*\.(log|ptop|top|assign|soln|xml|limits))$/);
 
 	push(@delete, "${workdir}/$1")
 	    if ($file =~ /^((swap|start|cancel|newrun).*\..*)$/);
@@ -3099,6 +3101,7 @@ sub ClearBackupState($)
 sub RemovePhysicalState($)
 {
     my ($self) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
@@ -3170,6 +3173,7 @@ sub RemovePhysicalState($)
 sub BackupPhysicalState($;$$)
 {
     my ($self, $directory, $regression) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1
@@ -3275,6 +3279,7 @@ sub BackupPhysicalState($;$$)
 sub RestorePhysicalState($)
 {
     my ($self) = @_;
+    require Lan;
 
     # Must be a real reference. 
     return -1

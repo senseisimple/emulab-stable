@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -331,7 +331,7 @@ sub doboot()
     }
 
     #
-    # Start the elvin proxy.
+    # Start the event proxy.
     #
     if (SHAREDHOST() || (!(REMOTE() && !REMOTEDED()) && !GENVNODE())) {  
 	my $evproxy =
@@ -342,7 +342,7 @@ sub doboot()
 	    if (REMOTE()) {
 		$eventserver = TB_EVENTSERVER();
 	    }
-	    print("Starting elvin proxy daemon\n");
+	    print("Starting event proxy daemon\n");
 	    if (SHAREDHOST()) {
 		my $file    = TMNODEID();
 		my $pnodeid = `cat $file`;

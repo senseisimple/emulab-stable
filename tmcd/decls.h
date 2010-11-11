@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -26,4 +26,4 @@
  * NB: See ron/libsetup.pm. That is version 4! I'll merge that in. 
  */
 #define DEFAULT_VERSION		2
-#define CURRENT_VERSION		31
+#define CURRENT_VERSION		32
