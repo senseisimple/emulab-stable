@@ -419,11 +419,12 @@ int pclass_unset(tb_pnode *p)
   for (dit=c->members.begin();dit!=c->members.end();++dit) {
     if ((*dit).first == p->current_type) {
       // If it's not in the list then we need to add it to the back if it's
-      // empty and the front if it's not.  Since unset is called before
-      // remove_node empty means only one user.
+      // empty (so that it will be picked last) and the front if it's not (so 
+      // hat it will be picked first). Since unset is called before remove_node
+      // is finished decremeting the counts, empty means only one user.
       if (! (*dit).second->exists(p)) {
 	assert(p->current_type_record->get_current_load() > 0);
-	if (p->current_type_record->get_current_load() == 0) {
+	if (p->current_type_record->get_current_load() == 1) {
 	  (*dit).second->push_back(p);
 	} else {
 	  (*dit).second->push_front(p);
