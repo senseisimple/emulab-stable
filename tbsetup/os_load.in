@@ -34,10 +34,11 @@ sub usage()
 	  "       style==2: zero disk before running frisbee\n".
           "Use -P to prepare the disk as if a whole disk image was loaded\n".
           "Use -F to force the load if Emulab tries to optimize it away\n".
-          "Use -R to push a reconfig to the node after the reload\n");
+          "Use -R to push a reconfig to the node after the reload\n".
+          "Use -D to set a specific debug level\n");
     exit(-1);
 }
-my $optlist   = "swldi:e:p:m:rz:PcRF";
+my $optlist   = "swldD:i:e:p:m:rz:PcRF";
 my $waitmode  = 1;
 my $listonly  = 0;
 my $debug     = 0;
@@ -89,6 +90,9 @@ if (! getopts($optlist, \%options)) {
 }
 $debug = 1
     if (defined($options{"d"}));
+if (defined($options{"D"}) && $options{"D"} =~ /^(\d+)$/) {
+    $debug = $1;
+}
 
 # List only mode. No need to do anymore argument processing.
 sub dolisting();

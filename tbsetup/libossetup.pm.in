@@ -104,7 +104,6 @@ sub New($$$@)
 
     if (EmulabFeatures->FeatureEnabled("NewOsload",$user,
 				       $self->{'GROUP'},$experiment)) {
-	print STDERR "libossetup New NewOsload enabled\n";
 	require libosload_new;
 	# XXX -- @nodelist
 	$self->loadobj(libosload_new->New());
@@ -819,10 +818,6 @@ sub NewType($$)
     if ($type eq "pcfedphys" || $type eq "pcfed") {
 	$type = "protogeni";
     }
-#    elsif ($type eq 'hp5406') {
-#	print STDERR "changing type from $type to switch\n";
-#	$type = "switch";
-#    }
     elsif (defined($typeinfo) && $typeinfo->issubnode()) {
 	$type = "subnode";
     }
@@ -831,11 +826,11 @@ sub NewType($$)
     my $newtype  = eval { $packname->New($self); };
     # Not loaded?
     if ($@) {
-	print STDERR "module load failed: " . $@ . "\n";
+	#print STDERR "module load failed: " . $@ . "\n";
 	eval "require libossetup_$type";
 	$newtype  = eval { $packname->New($self); };
 	if ($@) {
-	    print STDERR "module load failed: " . $@ . "\n";
+	    print STDERR "$self NewType($type): module load failed: " . $@ . "\n";
 	    return undef;
 	}
     }
@@ -900,7 +895,6 @@ sub New($$$)
     $self->{'TYPE'}      = $type;
     $self->{'NODES'}     = {};
     $self->{'PARENT'}    = $parent;
-    print STDERR "just set parent in $self to $parent\n";
     $self->{'FAILCOUNT'} = 0;
     $self->{'TODOLIST'}  = {};
 
@@ -950,7 +944,6 @@ sub AddNode($$)
     # This sets the OS that should boot, as well as any reloads, reboots
     # and reconfigs that are needed.
     #
-    print STDERR "trying get parent in $self\n";
     $self->parent()->SetOS($node);
     return 0;
 }

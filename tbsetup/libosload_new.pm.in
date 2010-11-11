@@ -102,10 +102,10 @@ sub experiment($)	{ return $_[0]->{'EXPT'}; }
 sub incrfailcount($)    { $_[0]->{'FAILCOUNT'}++ }
 sub failed($)           { return $_[0]->{'FAILCOUNT'}; }
 
-sub dprint($@) {
-    my ($self,@args) = @_;
+sub dprint($$;@) {
+    my ($self,$level,@args) = @_;
     print STDERR "$self " . join('',@args) . "\n"
-	if ($self->debug());
+	if ($self->debug() > $level);
 }
 sub dprintts($@) {
     my ($self,@args) = @_;
@@ -154,25 +154,26 @@ sub nodeinfo($$$;$)
 
     if (defined($data)) {
 	$self->{NODEINFO}->{$node_id}->{$key} = $data;
-	$self->dprint("nodeinfo setting ($nodeobject,$key,$data)");
+	$self->dprint(3,"nodeinfo($node_id,$key) <- $data)");
 	return $data;
     }
     if (exists($self->{NODEINFO}->{$node_id}->{$key})) {
 	my $retval = $self->{NODEINFO}->{$node_id}->{$key};
 	my $pretval = defined($retval) ? $retval : "undef";
-	#$self->dprint("nodeinfo($nodeobject,$key) -> $pretval");
+	$self->dprint(3,"nodeinfo($node_id,$key) -> $pretval");
 	return $retval;
     }
     return undef;
 }
 sub nodeinfo_unset($$$)
 {
-    my ($self,$nodeobject,$key,$data) = @_;
+    my ($self,$nodeobject,$key) = @_;
     if (!defined($nodeobject)) {
-	tbwarn "$self nodeinfo called with $key and no node!\n";
+	tbwarn "$self nodeinfo_unset called with $key and no node!\n";
     }
     my $node_id = $nodeobject->node_id();
     
+    $self->dprint(3,"nodeinfo_unset($nodeobject,$key)");
     if (exists($self->{NODEINFO}->{$node_id}->{$key})) {
 	delete $self->{NODEINFO}->{$node_id}->{$key};
     }
@@ -201,7 +202,7 @@ sub nodeflag($$$;$)
     }
 
     my $pretval = defined($retval) ? $retval : "undef";
-    $self->dprint("nodeflag($nodeobject,$flagname) -> $pretval");
+    $self->dprint(2,"nodeflag($node_id,$flagname) -> $pretval");
 
     return $retval;
 }
@@ -212,8 +213,6 @@ sub imageinfo($$;$)
     my ($self,$imageid,$imageinfo) = @_;
     if (defined($imageinfo)) {
 	# set it
-	#print STDERR "$self imageinfo(base): setting for $imageid to " . Dumper($imageinfo) . "\n"
-	#    if ($self->debug());
 	$self->{'IMAGEINFO'}->{$imageid} = $imageinfo;
 	return $imageinfo;
     }
@@ -263,24 +262,23 @@ sub NewType($$)
 {
     my ($self, $type) = @_;
 
-    $self->dprint("trying to create object for type $type!");
+    $self->dprint(2,"NewType($type): trying to create type object");
 
     my $packname = "libosload_${type}";
     my $newtype  = eval { $packname->New($self); };
     # Not loaded?
     if ($@) {
-	print STDERR "simple module load failed: " . $@ . "\n";
+	$self->dprint(2,"NewType($type): simple module load failed: " . $@);
 	eval "require libosload_$type";
-	#use libosload_switch;
 	$newtype  = eval { $packname->New($self); };
 	if ($@) {
-	    print STDERR "second module load failed: " . $@ . "\n";
+	    $self->dprint(1,"$self NewType($type): module load failed: " . $@);
 	    return undef;
 	}
     }
     $self->{'TYPECACHE'}->{$type} = $newtype;
     
-    $self->dprint("created type object $newtype");
+    $self->dprint(3,"NewType($type): created type object $newtype");
     
     return $newtype;
 }
@@ -294,16 +292,13 @@ sub TypeLookup($$;$)
 
     my $type  = $nodeobject->type();
     my $class = $nodeobject->class();
+    my $node_id = $nodeobject->node_id();
 
     if (defined($forcedtype)) {
-	$self->dprint("typelookup on forced type $forcedtype!");
-
 	return $self->{'TYPECACHE'}->{$forcedtype}
             if (exists($self->{'TYPECACHE'}->{$forcedtype}));
     }
     else {
-	$self->dprint("typelookup on node $nodeobject");
-
 	return $self->{'TYPECACHE'}->{$type}
             if (exists($self->{'TYPECACHE'}->{$type}));
 
@@ -337,7 +332,7 @@ sub ChildCreate($$;$)
 
 	$self->{CHILDREN}->{$childpid} = [ $PARENT_READER, $data ];
 
-	$self->dprint("ChildCreate -> $childpid");
+	$self->dprint(4,"ChildCreate: created $childpid");
 
 	return $childpid;
     }
@@ -585,7 +580,7 @@ sub osload($$$) {
 		}
 	    }
 
-	    $self->dprint("used $object for $nodeobject");
+	    $self->dprint(2,"osload($node): used typeobject $object");
 	}
 
 	# Save off this type object for this node
@@ -609,7 +604,6 @@ sub osload($$$) {
 	#    $nargs{waitmode} = $nargs{nowait};
 	#}
 
-	$self->dprint("adding $node to type object " . $object->type());
 	#
 	# Add the node with the given images and arguments
 	#
@@ -661,7 +655,7 @@ sub osload($$$) {
 	#
 	# Setup the reload, finally!
 	#
-	print " ($object): Setting up reload for $node\n";
+	print "$object: setting up reload for $node\n";
 
 	if (!$TESTMODE) {
 	    if ($object->SetupReload($nodeobject)) {
@@ -871,24 +865,24 @@ sub osload($$$) {
     print "$self: Done! There were $failures failures.\n";
 
     if ($flags{asyncmode}) {
-	$self->dprint("asyncmode osload writing results to $CHILD_WRITER");
+	$self->dprint(3,"osload: asyncmode osload writing results");
 	#
 	# We are a child. Send back the results to the parent side
 	# and *exit* with status instead of returning it.
 	# 
 	foreach my $node (keys(%{ $result })) {
 	    my $status = $result->{$node};
-	    $self->dprint("asyncmode osload writing result ($node,$status)");
+	    $self->dprint(3,"osload: asyncmode osload writing result ($node,$status)");
 	    print $CHILD_WRITER "$node,$status\n";
 	}
 	close($CHILD_WRITER);
 
-	$self->dprintts("asyncmode osload finished");
+	$self->dprintts("osload: asyncmode finished");
 
 	exit($failures);
     }
 
-    $self->dprintts("osload finished");
+    $self->dprintts("osload: finished");
     return $failures;
 }
 
@@ -907,7 +901,7 @@ sub AddNode($$$$)
     my ($self, $nodeobject, $imagelist, $args) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprintts("adding $nodeobject with args " . Dumper($args));
+    $self->dprint(0,"AddNode($node_id): starting");
 
     $self->{'NODES'}->{$node_id}    = $nodeobject;
     $self->{'NODEFLAGS'}->{$node_id}    = $args;
@@ -986,7 +980,7 @@ sub GetImageInfo($$$)
 	return -1;
     }
 
-    $self->dprint("GetImageInfo($image): loadpart=", $rowref->{'loadpart'},
+    $self->dprint(3,"GetImageInfo($image): loadpart=", $rowref->{'loadpart'},
 		  ", loadlen=", $rowref->{'loadlength'},
 		  ", imagepath=", $rowref->{'path'},
 		  ", defosid=", $rowref->{'default_osid'});
@@ -1003,7 +997,7 @@ sub WaitTillReloadDone($$$$$@)
     my $count   = @nodes;
     my @failed  = ();
 
-    $self->dprintts("WaitTillReloadDone starting");
+    $self->dprintts("WaitTillReloadDone(" . join(',',@nodes) . ") starting");
 
     foreach my $node ( @nodes ) {
 	my $nodeobject = $self->node($node);
@@ -1017,7 +1011,7 @@ sub WaitTillReloadDone($$$$$@)
 	}
     }
 
-    $self->dprint("Waiting for @nodes to finish reloading (".`date`.")")
+    $self->dprint(1,"WaitTillReloadDone(" . join(',',@nodes) . "): waiting for nodes to finish reloading (".`date`.")")
 	if ($count && $self->debug());
 
     # figure out our per-node max wait times
@@ -1080,7 +1074,7 @@ sub WaitTillReloadDone($$$$$@)
 		#
 		my ($typewaitstatus,$typeretval,@typeoutput) = 
 		    $typeobject->WaitForNode($nodeobject);
-		$self->dprint("$typeobject->WaitForNode($nodeobject) -> $typewaitstatus");
+		$self->dprint(2,"$typeobject->WaitForNode($node) -> $typewaitstatus");
 		if ($typewaitstatus > 0) {
 		    --$count;
 		    if ($typeretval) {
@@ -1119,7 +1113,7 @@ sub WaitTillReloadDone($$$$$@)
 		    # We simply wait for stated to clear the current_reloads entry.
 		    #
 		    if (!$query_result->numrows) {
-			$self->dprint("($node): left reloading mode at ".`date`)
+			$self->dprint(1,"$self: WaitTillReloadDone($node): left reloading mode at ".`date`)
 			    if ($self->debug());
 		    
 			$count--;
@@ -1134,7 +1128,7 @@ sub WaitTillReloadDone($$$$$@)
 		#
 		my $eventstate;
 		if ($nodeobject->GetEventState(\$eventstate)) {
-		    $self->dprint("($node): Could not get event state");
+		    $self->dprint(2,"$self ($node): Could not get event state");
 		}
 	
 		# Soon we will have stated's timeouts take care of
@@ -1202,7 +1196,7 @@ sub WaitTillReloadDone($$$$$@)
 	}
     }
 
-    $self->dprintts("WaitTillReloadDone finished");
+    $self->dprintts("WaitTillReloadDone(" . join(',',@nodes) . "): finished");
 
     return @failed;
 }
@@ -1241,7 +1235,7 @@ sub osload_wait($$)
 {
     my ($self,$childpid) = @_;
 
-    $self->dprintts("osload_wait($childpid) starting");
+    $self->dprintts("osload_wait($childpid): starting");
 
     my ($data,$retval,@output) = $self->ChildReap($childpid);
     my ($result,$args) = @$data;
@@ -1251,7 +1245,7 @@ sub osload_wait($$)
 
 	if ($line =~ /^([-\w]+),([-\d])+$/) {
 	    $result->{$1} = $2;
-	    print STDERR "reload ($1): child returned $2 status.\n";
+	    print STDERR "$self osload_wait($1): child returned $2 status.\n";
 	}
 	else {
 	    tberror "$self osload_wait: improper response from child: $_"; # INTERNAL
@@ -1581,66 +1575,6 @@ sub type($)		{ return $_[0]->{'TYPE'}; }
 sub parent($)		{ return $_[0]->{'PARENT'}; }
 sub GetImages($$)       { return $_[0]->{'IMAGES'}{$_[1]->node_id()}; }
 
-# check our parent first!
-#sub imageinfo($$;$) 
-#{
-#    my ($self,$imageid,$imageinfo) = @_;
-#    if (defined($imageinfo)) {
-#	# set it
-#	print STDERR "$self imageinfo: setting for $imageid to " . Dumper($imageinfo) . "\n"
-#	    if ($self->debug());
-#	$self->{'IMAGEINFO'}->{$imageid} = $imageinfo;
-#	return $imageinfo;
-#    }
-#    elsif (exists($self->{IMAGEINFO}->{$imageid})) {
-#	return $self->{IMAGEINFO}->{$imageid};
-#    }
-#    elsif (defined($self->parent())) {
-#	print STDERR "foo $imageinfo\n" if ($self->debug());
-#	my $ii = $self->SUPER::imageinfo($self->parent(),$imageid);
-#	return $ii 
-#	    if (defined($ii));
-#    }
-#
-#    return undef;
-#}
-
-# Store/retrieve global or node-specific osload flags
-#
-# Check our parent if it exists, and use those 
-#sub reloadflag($$;$$)
-#{
-#    my ($self,$flagname,$node,$flagval) = @_;
-#
-#    # first just try our object, then...
-#    my $retval = $self->SUPER::reloadflag($self,$flagname,$node,$flagval);
-#
-#    # ... check parent too if we have a parent
-#    if (!defined($retval) && defined($self->parent())) {
-#	$retval = $self->SUPER::reloadflag($self->parent(),$flagname,$node,$flagval);
-#    }
-
-# Get/Set the osid->osinfo mapping. Nice to keep this to avoid lookups.
-#sub osmap($$;$)
-#{
-#    my ($self, $osid, $osinfo) = @_;
-#
-#    if (defined($osinfo)) {
-#	return $self->{'OSMAP'}->{$osid} = $osinfo;
-#    }
-#
-#    if (defined($self->parent())) {
-#	my $ii = $self->SUPER::osmap($self->parent(),$osid);
-#	return $ii 
-#	    if (defined($ii));
-#    }
-#
-#    if (exists($self->{'OSMAP'}->{$osid})) {
-#	return $self->{'OSMAP'}->{$osid};
-#    }
-#    return undef;
-#}
-
 #
 # If specific images were not specified, load the info for the default image
 # setup the images list accordingly.
@@ -1650,11 +1584,11 @@ sub _LoadDefaultImages($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("loading default images for $nodeobject");
+    $self->dprint(3,"loading default images for $node_id");
 
     my $default_imageid = $nodeobject->default_imageid();
     if (!defined($default_imageid)) {
-	tberror("$nodeobject: No default imageid defined!");
+	tberror("$node_id: No default imageid defined!");
 	return -1;
     }
     my @default_imageids = split(/,/, $default_imageid);
@@ -1680,7 +1614,7 @@ sub _LoadCurrentImages($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("loading current images for $nodeobject");
+    $self->dprint(3,"loading current images for $node_id");
 
     my $def_boot_osid  = $nodeobject->def_boot_osid();
     my $osinfo = OSinfo->Lookup($def_boot_osid);
@@ -1690,7 +1624,7 @@ sub _LoadCurrentImages($$)
     }
     my $best_image = $osinfo->MapToImage($nodeobject->type());
     if (!defined($best_image)) {
-	tberror("Could not map $osinfo to an image for $nodeobject!");
+	tberror("Could not map $osinfo to an image for $node_id!");
 	return undef;
     }
 
@@ -1738,7 +1672,7 @@ sub AddNode($$$$)
 	$args = {};
     }
 
-    $self->dprint("adding $nodeobject with args " . Dumper($args));
+    $self->dprint(0,"AddNode($node_id)");
 
     $self->{'NODES'}->{$node_id}    = $nodeobject;
     $self->{'NODEFLAGS'}->{$node_id}    = $args;
@@ -1758,7 +1692,7 @@ sub AddNode($$$$)
 
     if ($self->nodeflag($nodeobject,'usecurrent')) {
 	if (defined($imagelistref) && scalar(@$imagelistref)) {
-	    tbwarn("$self ($nodeobject): we were given $imagelist, but are " . 
+	    tbwarn("$self AddNode($node_id): we were given $imagelist, but are " . 
 		   " going to use the current OS instead!");
 	}
 
@@ -1779,7 +1713,7 @@ sub _CheckImages($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("checking images for $nodeobject");
+    $self->dprint(0,"_CheckImages($node_id)");
 
     my @images = @{$self->GetImages($nodeobject)};
     my @imageids = map { $_->imageid() } @images;
@@ -1789,7 +1723,7 @@ sub _CheckImages($$)
 	my $imageid = $imageids[$i];
 	my $image = $images[$i];
 
-	$self->dprint("Using $image for $nodeobject");
+	$self->dprint(1,"_CheckImages($node_id): using $image");
 
 	#
 	# We try to avoid repeated queries to DB for info that
@@ -1810,7 +1744,7 @@ sub _CheckImages($$)
 	    return -1;
 	}
 
-	$self->dprint("imageinfo for $imageid: " . Dumper($rowref));
+	$self->dprint(2,"_CheckImages($node_id): imageinfo for $imageid: " . Dumper($rowref));
     }
 
     return 0;
@@ -1821,11 +1755,9 @@ sub SetBootOS($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("setting boot os for $nodeobject");
+    $self->dprint(0,"SetBootOS($node_id): setting boot os");
 
     my @images = @{$self->GetImages($nodeobject)};
-#    print STDERR "$self SetBootOS($nodeobject) choosing from " . Dumper(@images) . "\n"
-#	if ($self->debug());
     #
     # When loading multiple images, use the osinfo from the
     # last image
@@ -1837,14 +1769,14 @@ sub SetBootOS($$)
     my $defosid = $rowref->{'default_osid'};
     my $osinfo = OSinfo->Lookup($defosid);
     if (!defined($osinfo)) {
-	tberror("Could map map OSID $defosid to its object!");
+	tberror("$self SetBootOS($node_id): could not map OSID $defosid to its object!");
 	return -1;
     }
 
-    print "$self ($nodeobject): Changing default OS to $osinfo\n";
+    print "$self SetBootOS($node_id): changing default OS to $osinfo\n";
     if (!$TESTMODE) {
 	if ($nodeobject->OSSelect($osinfo,"def_boot_osid",$self->debug())) {
-	    tberror "$self ($nodeobject): os_select $defosid failed!";
+	    tberror "$self SetBootOS($node_id): os_select $defosid failed!";
 	    return -1;
 	}
     }
@@ -1868,7 +1800,7 @@ sub SaveNodeDiskInfo($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("SaveNodeDiskInfo($node_id) saving partition and osid");
+    $self->dprint(0,"SaveNodeDiskInfo($node_id): saving partition and osid");
 
     #
     # Save the old ones off first!
@@ -1903,7 +1835,7 @@ sub RestoreNodeDiskInfo($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("RestoreNodeDiskInfo($node_id) restoring partition and osid");
+    $self->dprint(0,"RestoreNodeDiskInfo($node_id): restoring partition and osid");
 
     my $partref = $self->nodeinfo($nodeobject,'old_partitions');
     if (defined($partref) && @$partref) {
@@ -1936,7 +1868,7 @@ sub UpdatePartitions($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("updating partitions for $nodeobject");
+    $self->dprint(0,"UpdatePartitions($node_id): starting");
 
     my @images = @{$self->GetImages($nodeobject)};
     my @imageids = map { $_->imageid() } @images;
@@ -2009,7 +1941,7 @@ sub UpdatePartitions($$)
 			my ($pmbr) = $dbresult->fetchrow_array();
 			if ($pmbr != $rowref->{'mbr_version'}) {
 			    # XXX: Is this right in the context of multiple images
-			    tbinfo("$nodeobject: Existing partition $i inconsistent".
+			    tbinfo("$node_id: Existing partition $i inconsistent".
 				   " with new image partitioning,".
 				   " invalidating existing partition");
 			    $whackit = 1;
@@ -2022,7 +1954,7 @@ sub UpdatePartitions($$)
 				    "where node_id='$node_id' and ".
 				    "partition='$i'");
 		    if (!$dbresult) {
-			tberror("$nodeobject: Could not update partition table");
+			tberror("$node_id: Could not update partition table");
 			return -1;
 		    }
 		}
@@ -2052,7 +1984,7 @@ sub UpdatePartitions($$)
 				"where node_id='$node_id' and partition='$i'");
 	    }
 	    if (!$dbresult) {
-		tberror "$nodeobject: Could not update partition table";
+		tberror "$node_id: Could not update partition table";
 		return -1;
 	    }
 	}
@@ -2066,7 +1998,7 @@ sub RemoveNode($$)
     my ($self, $nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("removing node $nodeobject");
+    $self->dprint(0,"RemoveNode($node_id)");
 
     $self->{'NODES'}->{$node_id}    = undef;
     $self->{'ARGS'}->{$node_id}     = undef;
@@ -2142,6 +2074,7 @@ sub SetupReload($$)
 sub WaitForNode($$)
 {
     my ($self,$nodeobject) = @_;
+    my $node_id = $nodeobject->node_id();
 
     my $retval = 0;
 
@@ -2154,18 +2087,18 @@ sub WaitForNode($$)
 	# if we've coded a bug ;).
 	$retval = kill(0,$childpid);
 
-	$self->dprint("WaitForNode: kill returned $retval for $nodeobject,$childpid");
-
 	if ($retval != 0) {
 	    my ($data,$rc,@output) = $self->ChildReap($childpid);
 	    # make room for another reload on this node!
 	    $self->nodeinfo_unset($nodeobject,'reloadchildpid');
 	    # caller should know that the node is done, with the following
 	    # status
+	    $self->dprint(2,"WaitForNode($node_id): $childpid is done with $rc");
 	    return (1,$rc,@output);
 	}
 	else {
 	    # caller should still wait for it!
+	    $self->dprint(2,"WaitForNode($node_id): $childpid is stil working");
 	    return (0,);
 	}
     }
@@ -2228,7 +2161,7 @@ sub SetupReload($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("setting up reload for $nodeobject");
+    $self->dprint(0,"SetupReload($node_id): setting up reload");
 
     my @images = @{$self->GetImages($nodeobject)};
     my @imageids = map { $_->imageid() } @images;
@@ -2340,7 +2273,7 @@ sub SetupReload($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("setting up reload for $nodeobject");
+    $self->dprint(0,"SetupReload($node_id): setting up reload");
 
     if ($self->SUPER::SetupReload($nodeobject)) {
 	return -1;
@@ -2450,7 +2383,7 @@ sub Reload($$)
     my $node_id = $nodeobject->node_id();
 
     if (defined($self->nodeinfo($nodeobject,'reloadchildpid'))) {
-	tberror "$self Reload $nodeobject: there is already a reload in progress?\n";
+	tberror "$self Reload($node_id): there is already a reload in progress?\n";
 	return -1;
     }
 
@@ -2483,7 +2416,7 @@ sub Reload($$)
     #
     my $rv = system("$TBUISP upload $path $node_id");
     if ($rv) {
-	tberror "$self ($nodeobject): tbuisp failed";
+	tberror "$self Reload($node_id): tbuisp failed";
 	return -1;
     }
 
@@ -2495,7 +2428,7 @@ sub Reload($$)
 
     my $osinfo = OSinfo->Lookup($osid);
     if ($nodeobject->OSSelect($osinfo,"def_boot_osid",$self->debug())) {
-	tberror "$self ($nodeobject): os_select $osid failed!";
+	tberror "$self Reload($node_id): os_select $osid failed!";
 	return -1;
     }
 

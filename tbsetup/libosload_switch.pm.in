@@ -2,15 +2,11 @@
 package libosload_switch;
 
 use strict;
-#use Exporter;
 use lib '@prefix@/lib';
 use libosload;
 
 use base qw(libosload_common);
-
 use vars qw($AUTOLOAD);
-
-#@ISA = ( "libosload_common" );
 
 use libdb;
 use libtestbed;
@@ -34,15 +30,6 @@ sub New($$;$)
     bless($self, $class);
 
     $self->{TIPTUNNELS} = {};
-
-    my $key;
-    if (TBGetSiteVar("node/ssh_pubkey",\$key) 
-	&& (defined($key) && $key ne '')) {
-	$self->rootpubkey($key);
-    }
-    else {
-	$self->rootpubkey('');
-    }
 
     return $self;
 }
@@ -327,7 +314,7 @@ sub SetupReconfigure($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    $self->dprint("SetupReconfigure($node_id): putting switch in SHUTDOWN");
+    $self->dprint(0,"SetupReconfigure($node_id): putting switch in SHUTDOWN");
     #
     # The switch goes 'down', then starts to reconfigure.
     #
@@ -358,10 +345,10 @@ sub _doTiptunnel($$;$)
     }
 
     # XXX do later!
-    #$self->dprint("_doTipTunnel($nodeobject): forcing capture reset!");
+    #$self->dprint(0,"_doTipTunnel($node_id): forcing capture reset!");
     #system("${CONSOLE_RESET} $node_id");
 
-    $self->dprint("_doTipTunnel($nodeobject): opening console connection");
+    $self->dprint(0,"_doTipTunnel($node_id): opening console connection");
 
     my ($chin,$chout,$cherr);
     my $tippid = open3($chout,$chin,$cherr,"$TIPCMD " . $node_id);
@@ -371,24 +358,10 @@ sub _doTiptunnel($$;$)
     #
     $SIG{PIPE} = sub {
 	my $signo = shift;
-	tbwarn "$self Reload($nodeobject): reload tiptunnel exited" . 
+	tbwarn "$self _doTipTunnel($node_id): reload tiptunnel exited" . 
 	    " unexpectedly with SIG$signo!\n";
 	return 0;
     };
-#    $SIG{CHLD} = sub {
-#	my $signo = shift;
-#
-#	my $pid = wait();
-#	if ($pid == $tippid) {
-#	    tberror "$self Reload($nodeobject): reload tiptunnel exited" . 
-#		" unexpectedly with SIG$signo, exiting!\n";
-#	    return -1;
-#	}
-	# THIS MUST BE HERE -- if you don't return from a sig handler,
-	# perl will auto-reap children, which prevents us from getting child
-	# return values!  This wasn't documented where I was looking!
-#	return 0;
-#    };
 
     %tiphash = ( 'in' => $chin, 'out' => $chout, 'err' => $cherr,
 		 'pid' => $tippid, 'linehist' => [], 'databuf' => '' );
@@ -413,7 +386,7 @@ sub _undoTiptunnel($$)
     # don't catch these when we kill our tiptunnel child
     $SIG{PIPE} = 'IGNORE';
 
-    $self->dprint("_undoTiptunnel($node_id): killing tiptunnel");
+    $self->dprint(0,"_undoTiptunnel($node_id): killing tiptunnel");
 
     # try to kill tiptunnel
     kill(1,$tippid);
@@ -436,6 +409,8 @@ sub Reconfigure($$;$)
     my ($self,$nodeobject,$dowait) = @_;
     my $node_id = $nodeobject->node_id();
     my $retval;
+    
+    $self->dprint(0,"Reconfigure($node_id): starting");
 
     # By default, don't create a child
     if (!defined($dowait)) {
@@ -476,14 +451,14 @@ sub Reconfigure($$;$)
     #
     # XXX -- should be TBSETUP, but ALWAYSUP doesn't give us that.
     #
-    $self->dprint("Reconfigure($node_id): child setting state to SHUTDOWN");
+    $self->dprint(2,"Reconfigure($node_id): child setting state to SHUTDOWN");
     TBSetNodeEventState($node_id,TBDB_NODESTATE_SHUTDOWN);
 
-    $self->dprint("Reconfigure($node_id): trying to generate config first");
+    $self->dprint(2,"Reconfigure($node_id): trying to generate config first");
     my @config = $self->generateConfig($nodeobject);
     if ($self->debug()) {
 	foreach my $cl (@config) {
-	    #print "$self ($nodeobject) config line: $cl\n";
+	    $self->dprint(4,"Reconfigure($node_id): config line: $cl\n");
 	}
     }
 
@@ -505,16 +480,15 @@ sub Reconfigure($$;$)
 	goto failure;
     }
     elsif ($retval == 2) {
-	$self->dprint("Reconfigure($node_id): switch already in OS, attempting reboot");
+	$self->dprint(1,"Reconfigure($node_id): switch already in OS, attempting reboot");
 
-	#$self->dprint("Reconfigure($node_id): running godumb");
 	if ($self->expect($nodeobject,undef,undef,
 			  $sequences{'godumb'}) < 0) {
 	    tbwarn "$self Reconfigure($node_id): could not set dumb mode; continuing anyway!\n"
 		if ($self->debug());
 	}
 
-	$self->dprint("Reconfigure($nodeobject): trying console reboot");
+	$self->dprint(1,"Reconfigure($node_id): trying console reboot");
 	if ($self->expect($nodeobject,undef,undef,
 			  $sequences{'rebootContinue'}) < 0) {
 	    tbwarn "$self Reconfigure($node_id): console reboot failed; power cycling!\n";
@@ -534,7 +508,7 @@ sub Reconfigure($$;$)
     }
     elsif ($retval <= 0) {
 	# have to reboot -- no other choice
-	$self->dprint("Reconfigure($node_id): could not obtain output on switch; rebooting!");
+	$self->dprint(0,"Reconfigure($node_id): could not obtain output on switch; rebooting!");
 
 	my %reboot_failures = ();
 	if (nodereboot(\%reboot_args,\%reboot_failures)) {
@@ -545,7 +519,7 @@ sub Reconfigure($$;$)
 	$rebooting = 1;
     }
 
-    $self->dprint("Reconfigure($node_id): child setting state to BOOTING");
+    $self->dprint(1,"Reconfigure($node_id): child setting state to BOOTING");
     TBSetNodeEventState($node_id,TBDB_NODESTATE_BOOTING);
 
     #
@@ -555,7 +529,7 @@ sub Reconfigure($$;$)
 	# reset capture speed to default
 	$self->setSpeed($nodeobject,$DEFSPEED);
 
-	$self->dprint("Reconfigure($node_id): running bootToRom");
+	$self->dprint(1,"Reconfigure($node_id): running bootToRom");
 	if (($retval = $self->expect($nodeobject,undef,undef,
 				     $sequences{'bootToRom'})) < 0) {
 	    # XXX retry?
@@ -572,7 +546,7 @@ sub Reconfigure($$;$)
     }
 
     # Boot the node from the ROM monitor to the primary flash slot OS
-    $self->dprint("Reconfigure($node_id): booting into OS");
+    $self->dprint(1,"Reconfigure($node_id): booting into OS");
     $retval = $self->expect($nodeobject,undef,undef,
 			    $sequences{'bootFromRomToPrimary'});
     if ($retval < 0) {
@@ -619,10 +593,10 @@ sub Reconfigure($$;$)
     $self->_undoTiptunnel($nodeobject);
     # only exit if we created a child
     if (!$dowait) {
-	$self->dprint("Reconfigure($node_id): exiting with $rc");
+	$self->dprint(1,"Reconfigure($node_id): exiting with $rc");
 	exit $rc;
     }
-    $self->dprint("Reconfigure($node_id): returning $rc");
+    $self->dprint(0,"Reconfigure($node_id): returning $rc");
     return $rc;
 }
 
@@ -649,9 +623,11 @@ sub Reload($$)
     if (!((defined($self->nodeflag($nodeobject,'force'))
 	   && $self->nodeflag($nodeobject,'force'))
 	  || $self->nodeflag($nodeobject,'reconfig'))) {
-	$self->dprint("Reload($node_id): no reload or reconfig to do, exiting!");
+	$self->dprint(0,"Reload($node_id): no reload or reconfig to do, exiting!");
 	return 0;
     }
+
+    $self->dprint(0,"Reload($node_id): starting");
 
     #
     # Reload can't block, so fork and make a note of ourself!
@@ -668,16 +644,13 @@ sub Reload($$)
     if (!defined($self->nodeflag($nodeobject,'force'))
 	|| !$self->nodeflag($nodeobject,'force')) {
 	if ($self->nodeflag($nodeobject,'reconfig')) {
-	    $self->dprint("Reload($node_id): jumping straight to Reconfigure");
+	    $self->dprint(1,"Reload($node_id): jumping straight to Reconfigure");
 	    $rc = $self->Reconfigure($nodeobject);
 	    goto done;
 	}
-	#$self->dprint("Reload($node_id): not forcing reload");
-	#$retval = 0;
-	#goto done;
     }
 
-    $self->dprint("Reload($node_id): child setting state to RELOADSETUP");
+    $self->dprint(1,"Reload($node_id): child setting state to RELOADSETUP");
     TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADSETUP);
 
     if (!defined($self->_doTiptunnel($nodeobject))) {
@@ -701,11 +674,11 @@ sub Reload($$)
     }
     elsif ($retval == 2) {
 	# already in OS
-	$self->dprint("Reload($node_id): switch already in OS");
+	$self->dprint(1,"Reload($node_id): switch already in OS");
     }
     elsif ($retval == 1) {
 	# already in ROM monitor: boot into OS so we can try tftp
-	$self->dprint("Reload($node_id): booting into OS");
+	$self->dprint(1,"Reload($node_id): booting into OS");
 	if ($self->expect($node_id,undef,undef,
 			  $sequences{'godumb'}) < 0) {
 	    tbwarn "$self Reload($node_id): could not set dumb mode; continuing anyway!\n"
@@ -713,11 +686,11 @@ sub Reload($$)
 	}
 
 	# Boot the node from the ROM monitor to the primary flash slot OS
-	$self->dprint("Reload($node_id): booting into OS");
+	$self->dprint(0,"Reload($node_id): booting into OS");
 	$retval = $self->expect($nodeobject,undef,undef,
 				$sequences{'bootFromRomToPrimary'});
 	if ($retval < 0) {
-	    tbwarn "$self Reload($nodeobject): console reboot failed; power cycling!\n"
+	    tbwarn "$self Reload($node_id): console reboot failed; power cycling!\n"
 		if ($self->debug());
 	    $doreboot = 1;
 	}
@@ -732,7 +705,7 @@ sub Reload($$)
     # we're going to try to reboot into the OS
     if ($doreboot) {
 	# have to reboot -- no other choice
-	$self->dprint("Reload($node_id): power cycling into OS!");
+	$self->dprint(1,"Reload($node_id): power cycling into OS!");
 
 	my %reboot_failures = ();
 	if (nodereboot(\%reboot_args,\%reboot_failures)) {
@@ -752,7 +725,7 @@ sub Reload($$)
 	# reset capture speed to default
 	$self->setSpeed($nodeobject,$DEFSPEED);
 
-	$self->dprint("Reload($node_id): running bootIntoOS");
+	$self->dprint(1,"Reload($node_id): running bootIntoOS");
 	if (($retval = $self->expect($nodeobject,undef,undef,
 				     $sequences{'bootIntoOS'})) < 0) {
 	    # XXX retry?
@@ -771,7 +744,7 @@ sub Reload($$)
     # Ok, we're in the OS -- try tftp reload!
     #
 
-    $self->dprint("Reload($node_id): child setting state to RELOADING");
+    $self->dprint(1,"Reload($node_id): child setting state to RELOADING");
     TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADING);
 
     # try with tftp
@@ -809,7 +782,7 @@ sub Reload($$)
 	 && $self->nodeflag($nodeobject,'reconfig'))
 	|| (defined($self->nodeflag($nodeobject,'reconfig_will_follow')) 
 	    && $self->nodeflag($nodeobject,'reconfig_will_follow'))) {
-	$self->dprint("Reload($node_id): running bootToRom after load");
+	$self->dprint(1,"Reload($node_id): running bootToRom after load");
 	if (($retval = $self->expect($nodeobject,undef,undef,
 				     $sequences{'bootToRom'})) < 0) {
 	    # XXX retry?
@@ -822,7 +795,7 @@ sub Reload($$)
     # more time!
     #
     else {
-	$self->dprint("Reload($node_id): running bootIntoOS after reload");
+	$self->dprint(1,"Reload($node_id): running bootIntoOS after reload");
 	if (($retval = $self->expect($nodeobject,undef,undef,
 				     $sequences{'bootIntoOS'})) < 0) {
 	    # XXX retry?
@@ -859,8 +832,7 @@ sub Reload($$)
     # If we're supposed to push a new config too, do that.
     #
     if ($self->nodeflag($nodeobject,'reconfig')) {
-	#$self->_undoTiptunnel($nodeobject);
-	$self->dprint("Reload($node_id): doing reconfig after reload");
+	$self->dprint(1,"Reload($node_id): doing reconfig after reload");
 	$rc = $self->Reconfigure($nodeobject);
     }
     else {
@@ -880,7 +852,7 @@ sub Reload($$)
     # and finally remove this guy!
     $self->_undoTiptunnel($nodeobject);
     # yes, this assumes we create a child!
-    $self->dprint("Reload($node_id): exiting with $rc");
+    $self->dprint(0,"Reload($node_id): exiting with $rc");
     exit $rc;
 }
 
@@ -903,34 +875,12 @@ sub setSpeed($$$) {
 	$retval = $retval >> 8;
     }
 
-#    my $pid = fork();
-#    if ($pid == 0) {
-#	exec("$TIPCMD -s $speed $nodeid");
-#	exit(-2);
-#    }
-#    elsif ($pid < 0) {
-#	tberror "$self setSpeed: fork failed: $!\n";
-#	return -1;
-#    }
-
-#    return 0;
-
-#    my $wpid;
-#    my $maxtries = 3;
-#    while (($wpid = waitpid($pid,0)) < 0) {
-#	$self->dprint("waitpid $wpid: $!, $@, $?");
-#	sleep(1);
-#    }
-#    my $retval = $?;# >> 8;
-    $self->dprint("setSpeed($nodeobject): flipped speed to $speed, pausing briefly");
+    $self->dprint(3,"setSpeed($nodeid): flipped speed to $speed, pausing briefly");
 
     select(undef,undef,undef,0.50);
-    $self->dprint("setSpeed($nodeobject): done with status $retval");
-
-    #return -1;
+    $self->dprint(3,"setSpeed($nodeid): done with status $retval");
 
     return $retval;
-    #return 0;
 }
 
 sub probeForOutput($$) {
@@ -953,9 +903,9 @@ sub probeForOutput($$) {
     my ($chin,$chout,$cherr) = 
 	($tipref->{'in'},$tipref->{'out'},$tipref->{'err'});
 
-    $self->dprint("probeForOutput($nodeobject): starting switch probing");
+    $self->dprint(0,"probeForOutput($node_id): starting probing");
 
-    $self->dprint("probeForOutput($nodeobject): probing via current/INT");
+    $self->dprint(2,"probeForOutput($node_id): probing via current/INT");
     # try current speed
     $retval = $self->expect($nodeobject,\@linehist,undef,
 			    { 'timeout' => 2,
@@ -965,9 +915,9 @@ sub probeForOutput($$) {
     if ($retval < 0) {
 	foreach my $speed (@speeds) {
 	    @linehist = ();
-	    $self->dprint("probeForOutput($nodeobject): probing via $speed/INT");
+	    $self->dprint(2,"probeForOutput($node_id): probing via $speed/INT");
 	    if ($self->setSpeed($nodeobject,$speed)) {
-		tberror "$self probeForOutput($nodeobject): setSpeed failed with $!\n";
+		tberror "$self probeForOutput($node_id): setSpeed failed with $!\n";
 	    }
 	    else {
 		# try the interrupt char option
@@ -976,7 +926,7 @@ sub probeForOutput($$) {
 					  'presend' => $tchar,
 					  'seq' => [ [ $prompt,undef,'line' ] ] });
 		if ($retval < 0) {
-		$self->dprint("probeForOutput($nodeobject): probing via $speed/ENTER");
+		$self->dprint(2,"probeForOutput($node_id): probing via $speed/ENTER");
 		    # try the <ENTER> option
 		    syswrite($chout,"\r");
 		    sleep(3); syswrite($chout,"\r");
@@ -991,22 +941,22 @@ sub probeForOutput($$) {
 		}
 
 		if ($retval >= 0) {
-		    $self->dprint("probeForOutput($nodeobject): found switch at $speed!");
+		    $self->dprint(0,"probeForOutput($node_id): found switch at $speed!");
 		    $sfound = 1;
 		    $sspeed = $speed;
 		    last;
 		}
 		elsif ($retval == -3) {
-		    tbwarn "$self probeForOutput($nodeobject): timed out.\n";
+		    tbwarn "$self probeForOutput($node_id): timed out.\n";
 		}
 		elsif ($retval == -1) {
-		    tbwarn "$self probeForOutput($nodeobject): prompt not found.\n";
+		    tbwarn "$self probeForOutput($node_id): prompt not found.\n";
 		}
 		elsif ($retval == -2) {
-		    tbwarn "$self probeForOutput($nodeobject): error in read.\n";
+		    tbwarn "$self probeForOutput($node_id): error in read.\n";
 		}
 		else {
-		    tbwarn "$self probeForOutput($nodeobject): unknown error!\n";
+		    tbwarn "$self probeForOutput($node_id): unknown error!\n";
 		}
 	    }
 	}
@@ -1021,17 +971,17 @@ sub probeForOutput($$) {
 	if (@linehist[scalar(@linehist)-1] =~ /#\s*/ 
 	    || (scalar(@linehist) > 1 
 		&& @linehist[scalar(@linehist)-2] =~ /#\s*/)) {
-	    $self->dprint("probeForOutput: found OS");
+	    $self->dprint(0,"probeForOutput: found OS");
 	    return 2;
 	}
 	elsif (@linehist[scalar(@linehist)-1] =~ /=>\s*$/ 
 	       || (scalar(@linehist) > 1 
 		   && @linehist[scalar(@linehist)-2] =~ /=>\s*$/)) {
-	    $self->dprint("probeForOutput: found ROM monitor");
+	    $self->dprint(0,"probeForOutput: found ROM monitor");
 	    return 1;
 	}
 	else {
-	    $self->dprint("probeForOutput: got output, but not sure how to parse:" . Dumper(@linehist));
+	    $self->dprint(0,"probeForOutput: got output, but not sure how to parse:" . Dumper(@linehist));
 	    return 0;
 	}
     }
@@ -1046,14 +996,14 @@ sub _checkFlashSlots($$)
     my @linehist = ();
     my $retval;
 
-    $self->dprint("_checkFlashSlots($nodeobject): getting flash contents");
+    $self->dprint(0,"_checkFlashSlots($node_id): getting flash contents");
     $retval = $self->expect($nodeobject,\@linehist,undef,
 			    { 'timeout' => 3,
 			      'presend' => $tchar,
 			      'seq' => [ [ '#\s+', "show flash\n", 'line' ],
 					 [ '#\s+', undef, 'line'] ] });
     if ($retval < 0) {
-	tbwarn "$self _checkFlashSlots($nodeobject): could not get flash contents: $retval,$!\n";
+	tbwarn "$self _checkFlashSlots($node_id): could not get flash contents: $retval,$!\n";
 	return -1;
     }
 
@@ -1088,22 +1038,23 @@ sub wipeFiles($$) {
 
     foreach my $path ('/cfa0/cfg','/cfa0/ssh','/cfa0/ssl') {
 	@linehist = ();
-	$self->dprint("wipeFiles($nodeobject): getting files in $path");
+	$self->dprint(1,"wipeFiles($node_id): getting files in $path");
 	$retval = $self->expect($nodeobject,\@linehist,undef,
 				{ 'timeout' => 10,
 				  'presend' => $tchar,
 				  'seq' => [ [ '=>', "ll ${path}\n", 'line' ],
 					     [ '=>', undef, 'line'] ] });
 	if ($retval < 0) {
-	    tbwarn "$self wipeFiles($nodeobject): could not list configs: $retval,$!\n";
+	    tbwarn "$self wipeFiles($node_id): could not list configs: $retval,$!\n";
 	    return -1;
 	}
 
 	my @files = ();
 	foreach my $line (@linehist) {
 	    chomp($line);
-	    $self->dprint("wipeFiles($nodeobject): rm checking line '$line'");
-	    if ($line =~ /^[dwrx\-]+\s+\d+\s+\d+\s+\d+\s+\d+\s+\w+\s+\d+\s+\d+\s+([^\r\n]+)\r*$/) {
+	    $self->dprint(3,"wipeFiles($node_id): rm checking line '$line'");
+	    if ($line =~ /^[\w\-]+\s+\d+\s+\d+\s+\d+\s+\d+\s+\w+\s+\d+\s+\d+\s+([^\r\n]+)\r*$/
+		|| $line =~ /^[\w\-]+\s+\d+\s+\d+\s+\d+\s+\d+\s+\w+\s+\d+\s+\d+:\d+\s+([^\r\n]+)\r*$/) {
 		push @files, $1;
 	    }
 	}
@@ -1119,14 +1070,14 @@ sub wipeFiles($$) {
 		if ($file =~ /host_ssh/);
 
 	    my $filepath = "${path}/${file}";
-	    $self->dprint("wipeFiles($nodeobject): trying to rm file '$filepath'");
+	    $self->dprint(2,"wipeFiles($node_id): trying to rm file '$filepath'");
 	    $retval = $self->expect($nodeobject,undef,undef,
 				    { 'timeout' => 10,
 				      'presend' => $tchar,
 				      'seq' => [ [ '=>', "rm ${filepath}\n", 'line' ],
 						 [ '=>', undef, 'line'] ] });
 	    if ($retval < 0) {
-		tberror "$self wipeFiles($nodeobject): could not delete $filepath: $retval, $!\n";
+		tberror "$self wipeFiles($node_id): could not delete $filepath: $retval, $!\n";
 		return -2;
 	    }
 	}
@@ -1153,8 +1104,9 @@ sub generateConfig($$) {
     my ($cnetport,$cnetip,$cnetmask,$cnetgw);
 
     # install boss's root pubkey first!
-    my $rootpubkey = $self->rootpubkey();
-    if ($rootpubkey ne '') {
+    my $rootpubkey;
+    TBGetSiteVar("node/ssh_pubkey",\$rootpubkey);
+    if (defined($rootpubkey) && $rootpubkey ne '') {
 	push @keylines, "ip ssh public-key manager \"$rootpubkey\"";
     }
 
@@ -1162,6 +1114,11 @@ sub generateConfig($$) {
 	my $expt = $nodeobject->Reservation();
 	if (defined($expt)) {
 	    my $group = Group->Lookup($expt->pid(),$expt->gid());
+
+	    my $dopasswds = 
+		$self->nodeinfo($nodeobject,'osload_loadpasswds');
+	    my $useonlydefaultkeys = 
+		$self->nodeinfo($nodeobject,'osload_onlydefaultkeys');
 
 	    my @users = ();
 	    $group->MemberList(\@users,$Group::MEMBERLIST_FLAGS_GETTRUST);
@@ -1184,17 +1141,11 @@ sub generateConfig($$) {
 		    next;
 		}
 
-		my $dopasswds = 
-		    $self->nodeinfo($nodeobject,'osload_loadpasswds');
-
 		if (defined($dopasswds) && $dopasswds) {
 		    push @passwdlines, "password $level user-name $uid sha1 \"" . sha1_hex($u->pswd()) . "\"";
 		}
 
 		my @keys = ();
-
-		my $useonlydefaultkeys = 
-		    $self->nodeinfo($nodeobject,'osload_onlydefaultkeys');
 
 		if (defined($useonlydefaultkeys) && $useonlydefaultkeys) {
 		    $u->GetDefaultSSHKeys(\@keys);
@@ -1286,6 +1237,7 @@ sub generateConfig($$) {
 
 sub writeConfig($$$) {
     my ($self,$nodeobject,$configref) = @_;
+    my $node_id = $nodeobject->node_id();
     my @config = @$configref;
 
     # setup most of our config lines
@@ -1306,7 +1258,7 @@ sub writeConfig($$$) {
 			      'seq' => [ [ '#\s+$', "configure terminal\n", 'line' ],
 					 [ '#\s*$', undef, 'line'] ] });
     if ($retval < 0) {
-	tberror "$self writeConfig($nodeobject): could not get into configure terminal mode: $retval, $!\n";
+	tberror "$self writeConfig($node_id): could not get into configure terminal mode: $retval, $!\n";
 	return -1;
     }
 
@@ -1321,7 +1273,7 @@ sub writeConfig($$$) {
 					 [ '\?\[y\/n\]\s+$', "y\n", 'line' ],
 					 [ '\?\[y\/n\]\s+$', "y\n", 'line' ] ] });
     if ($retval < 0) {
-	tbwarn "$self writeConfig($nodeobject): include-credentials funky, but continuing!: $retval, $!\n";
+	tbwarn "$self writeConfig($node_id): include-credentials funky, but continuing!: $retval, $!\n";
     }
 
 #    my @configseq = ( [ '#\s+$', "configure terminal\n", 'line' ],
@@ -1331,17 +1283,17 @@ sub writeConfig($$$) {
 
     # NOTE: we give it a huge timeout below so that we can generate a hostkey
     # (this can take a long time)
-    $self->dprint("writeConfig($nodeobject): starting main body");
+    $self->dprint(0,"writeConfig($node_id): starting main body");
     $retval = $self->expect($nodeobject,undef,undef,
 			    { 'timeout' => 90,
 			      'presend' => $tchar,
 			      'seq' => [ @configseq,
 					 [ '#\s*$', undef, 'line'] ] });
     if ($retval < 0) {
-	tberror "$self writeConfig($nodeobject): could not write config: $retval: $!\n";
+	tberror "$self writeConfig($node_id): could not write config: $retval: $!\n";
 	return -1;
     }
-    $self->dprint("writeConfig($nodeobject): done");
+    $self->dprint(0,"writeConfig($node_id): done");
 
     return 0;
 }
@@ -1359,19 +1311,19 @@ sub uploadImageTftp($$$;$) {
     # can send it, and make sure we remove the file once the command completes
     # successfully.
     #
-    $self->dprint("uploadImageTftp($nodeobject): ");
+    $self->dprint(0,"uploadImageTftp($node_id): starting");
 
     #
     # Make a temp file for the image.
     #
     my (undef,$tmpfilename) = tempfile("/tftpboot/osload-tmp/osload_switch_img_XXXXXX",OPEN => 0);
     if (!defined($tmpfilename)) {
-	tberror "$self uploadImageTftp($nodeobject): could not create tempfile for switch image binary: $!";
+	tberror "$self uploadImageTftp($node_id): could not create tempfile for switch image binary: $!";
 	goto failure;
     }
 
     if (system("cp $filename $tmpfilename")) {
-	tberror "$self uploadImageTftp($nodeobject): could not copy $filename to $tmpfilename: $!";
+	tberror "$self uploadImageTftp($node_id): could not copy $filename to $tmpfilename: $!";
 	goto failure;
     }
 
@@ -1393,7 +1345,7 @@ sub uploadImageTftp($$$;$) {
 					 [ '#\s+', "write memory\n", 'line' ],
 					 [ '#\s*$', undef, 'line'] ] });
     if ($retval < 0) {
-	tberror "$self uploadImageTftp($nodeobject): could not enable tftp client on switch: $retval,$!";
+	tberror "$self uploadImageTftp($node_id): could not enable tftp client on switch: $retval,$!";
 	goto failure;
     }
 
@@ -1405,7 +1357,7 @@ sub uploadImageTftp($$$;$) {
 					 [ 'continue \[y\/n\]\?\s*', "y\n", 'line' ],
 					 [ '#\s*$', undef, 'line' ] ] });
     if ($retval < 0) {
-	tberror "$self uploadImageTftp($nodeobject): could not upload file via tftp: $retval,$!";
+	tberror "$self uploadImageTftp($node_id): could not upload file via tftp: $retval,$!";
 	# we have to assume that it happened
 	$didflash = 1;
 	goto failure;
@@ -1431,7 +1383,7 @@ sub uploadImageTftp($$$;$) {
 	goto failure;
     }
 
-    $self->dprint("uploadImageTftp($nodeobject): tftp upload appears successful!");
+    $self->dprint(0,"uploadImageTftp($node_id): tftp upload appears successful!");
 
     unlink($tmpfilename);
     if (defined($flashedref)) {
@@ -1456,26 +1408,28 @@ sub uploadImageXmodem($$$) {
     my ($chin,$chout,$cherr) = 
 	($tipref->{'in'},$tipref->{'out'},$tipref->{'err'});
 
+    $self->dprint(0,"uploadImageXmodem($node_id): starting");
+
     #
     # Ok, we're here... let's setup the load.  Change speeds on both switch and
     # capture.  Then do the expect dance, and trigger lsz.
     #
-    $self->dprint("uploadImageXmodem($nodeobject): changing speed to 115200 for upload");
+    $self->dprint(1,"uploadImageXmodem($node_id): changing speed to 115200 for upload");
     syswrite($chout,"speed 115200\n");
     if ($retval = $self->setSpeed($nodeobject,115200)) {
-	tberror "$self uploadImageXmodem($nodeobject): setSpeed failed with $retval, $!\n";
+	tberror "$self uploadImageXmodem($node_id): setSpeed failed with $retval, $!\n";
 	return -1;
     }
 
     if (0) {
-	$self->dprint("uploadImageXmodem($nodeobject): running initxmodem");
+	$self->dprint(1,"uploadImageXmodem($node_id): running initxmodem");
 	$retval = $self->expect($nodeobject,undef,undef,
 				$sequences{'initxmodem'});
 	if ($retval < 0) {
-	    tberror "$self uploadImageXmodem($nodeobject): initxmodem expect sequence failed: $retval, $!\n";
+	    tberror "$self uploadImageXmodem($node_id): initxmodem expect sequence failed: $retval, $!\n";
 	    return -1;
 	}
-	$self->dprint("uploadImageXmodem($nodeobject): hooking up lsz child");
+	$self->dprint(1,"uploadImageXmodem($node_id): hooking up lsz child");
 	my $pid = fork();
 	if (!$pid) {
 	    # hook up child stdin/out to tiptunnel so lsz can write there.
@@ -1487,7 +1441,7 @@ sub uploadImageXmodem($$$) {
 	    exit(-5);
 	}
 
-	$self->dprint("uploadImageXmodem($nodeobject): parent waiting for child $pid");
+	$self->dprint(1,"uploadImageXmodem($node_id): parent waiting for child $pid");
 	$retval = waitpid($pid,0);
 
 	#
@@ -1495,41 +1449,41 @@ sub uploadImageXmodem($$$) {
 	# Fortunately, the switch is slow to process the upload, so we can pretty
 	# much count on getting some lines showing success or failure.
 	#
-	$self->dprint("uploadImageXmodem($nodeobject): child returned $retval");
+	$self->dprint(1,"uploadImageXmodem($node_id): child returned $retval");
 
-	$self->dprint("uploadImageXmodem($nodeobject): running finishxmodem");
+	$self->dprint(1,"uploadImageXmodem($node_id): running finishxmodem");
 	$retval = $self->expect($nodeobject,undef,undef,
 				$sequences{'finishxmodem'});
 	if ($retval < 0) {
-	    tberror "$self uploadImageXmodem($nodeobject): finishxmodem expect sequence failed: $retval, $!\n";
+	    tberror "$self uploadImageXmodem($node_id): finishxmodem expect sequence failed: $retval, $!\n";
 	    return -1;
 	}
     }
     else {
-	$self->dprint("uploadImageXmodem($nodeobject): skipping imaging and reloading, rebooting");
+	$self->dprint(1,"uploadImageXmodem($node_id): skipping imaging and reloading, rebooting");
 	$retval = $self->expect($nodeobject,undef,undef,
 				$sequences{'reboot'});
 	if ($retval < 0) {
-	    tberror "$self uploadImageXmodem($nodeobject): skipping imaging and reboot failed: $retval, $!\n";
+	    tberror "$self uploadImageXmodem($node_id): skipping imaging and reboot failed: $retval, $!\n";
 	    return -1;
 	}
     }
 
-    $self->dprint("uploadImageXmodem($nodeobject): flipping capture to default speed");
+    $self->dprint(1,"uploadImageXmodem($node_id): flipping capture to default speed");
     if ($retval = $self->setSpeed($nodeobject,$DEFSPEED)) {
-	tbwarn "$self uploadImageXmodem($nodeobject): setSpeed($DEFSPEED) failed with $retval, $!\n";
+	tbwarn "$self uploadImageXmodem($node_id): setSpeed($DEFSPEED) failed with $retval, $!\n";
 	return -1;
     }
 
-    $self->dprint("uploadImageXmodem($nodeobject): waiting for switch to boot");
+    $self->dprint(1,"uploadImageXmodem($node_id): waiting for switch to boot");
     $retval = $self->expect($nodeobject,undef,undef,
 			    $sequences{'bootAfterLoad'});
     if ($retval < 0) {
-	tberror "$self uploadImageXmodem($nodeobject): bootAfterLoad expect sequence failed: $retval, $!\n";
+	tberror "$self uploadImageXmodem($node_id): bootAfterLoad expect sequence failed: $retval, $!\n";
 	return -1;
     }
 
-    $self->dprint("uploadImageXmodem($nodeobject): success!");
+    $self->dprint(0,"uploadImageXmodem($node_id): success!");
     return 0;
 }
 
@@ -1573,7 +1527,7 @@ sub expect($$$$$) {
     }
 
     if (defined($presend)) {
-	$self->dprint("expect: draining before presend");
+	$self->dprint(3,"expect: draining before presend");
 
 	my $escseq = undef;
 	while (1) {
@@ -1587,7 +1541,6 @@ sub expect($$$$$) {
 	    # pick up where we left off if there is history
 	    if (scalar(@$histbufref)
 		&& $histbufref->[scalar(@$histbufref)-1] !~ /\n$/) {
-		###$self->dprint("expect: drain: previous line '".$histbufref->[scalar(@$histbufref)-1]."' did not end in newline");
 		$lineref = \$histbufref->[scalar(@$histbufref)-1];
 	    }
 	    else {
@@ -1598,17 +1551,16 @@ sub expect($$$$$) {
 	    my $retval;
 	    while (($retval = select($rout=$rin,undef,$eout=$ein,2)) < 0 
 		   && $! =~ /Interrupted system call/) {
-		$self->dprint("expect: select interrupted, retrying");
+		$self->dprint(2,"expect: select interrupted, retrying");
 		sleep(1);
 	    }
-	    #$retval = select($rout=$rin,undef,$eout=$ein,2);
 	    if ($retval < 0) {
 		tbwarn "$self expect: error in select: $retval,$!\n";
 		$rc = -2;
 		goto out;
 	    }
 	    elsif ($retval == 0) {
-		$self->dprint("expect: select found nothing to read!");
+		$self->dprint(2,"expect: select found nothing to read!");
 		last;
 	    }
 
@@ -1636,7 +1588,7 @@ sub expect($$$$$) {
 	    if (defined($escseq)) {
 		$escseq .= $char;
 		if ($char =~ /[HfABCDsuJKmh\|p]/) {
-		    #$self->dprint("expect: esc $escseq");
+		    $self->dprint(4,"expect: esc $escseq");
 		    $escseq = undef;
 		}
 		next;
@@ -1646,13 +1598,13 @@ sub expect($$$$$) {
 	    $$lineref .= $char;
 
 	    if ($char eq "\n") {
-		#$self->dprint("expect: drain rotating line buf");
+		$self->dprint(4,"expect: drain rotating line buf");
 		$histbufref->[scalar(@$histbufref)] = '';
 		$lineref = \$histbufref->[scalar(@$histbufref)-1];
 	    }
 	}
 
-	$self->dprint("expect: presending '$presend'");
+	$self->dprint(3,"expect: presending '$presend'");
 	syswrite($out,$presend);
     }
 
@@ -1661,7 +1613,7 @@ sub expect($$$$$) {
     for ($i = 0; $i < scalar(@seqs); ++$i) {
 	my ($rval,$sval,$mtype) = @{$seqs[$i]};
 
-	$self->dprint("expect: looking for '$rval':");
+	$self->dprint(3,"expect: looking for '$rval':");
 
 	my ($rin,$ein) = ('','');
 	my ($rout,$eout);
@@ -1672,7 +1624,6 @@ sub expect($$$$$) {
 	# pick up where we left off if there is history
 	if (scalar(@$histbufref)
 	    && $histbufref->[scalar(@$histbufref)-1] !~ /\n$/) {
-	    ###$self->dprint("expect: previous line '".$histbufref->[scalar(@$histbufref)-1]."' did not end in newline");
 	    $lineref = \$histbufref->[scalar(@$histbufref)-1];
 	}
 	else {
@@ -1688,17 +1639,16 @@ sub expect($$$$$) {
 	    my $retval;
 	    while (($retval = select($rout=$rin,undef,$eout=$ein,$timeout)) < 0 
 		   && $! =~ /Interrupted system call/) {
-		$self->dprint("expect: select interrupted, retrying");
+		$self->dprint(2,"expect: select interrupted, retrying");
 		sleep(1);
 	    }
-	    #$retval = select($rout=$rin,undef,$eout=$ein,2);
 	    if ($retval < 0) {
 		tberror "$self expect: error in select: $retval,$!\n";
 		$rc = -2;
 		goto out;
 	    }
 	    elsif ($retval == 0) {
-		$self->dprint("expect: select found nothing to read!");
+		$self->dprint(2,"expect: select found nothing to read!");
 		$rc = -3;
 		goto out;
 	    }
@@ -1728,8 +1678,6 @@ sub expect($$$$$) {
 #		last;
 #	    }
 
-	    #$self->dprint("expect: read newline") if ($char eq "\n");
-
 	    #
 	    # Strip out ANSI escape sequences
 	    #
@@ -1741,13 +1689,12 @@ sub expect($$$$$) {
 	    if (defined($escseq)) {
 		$escseq .= $char;
 		if ($char =~ /[HfABCDsuJKmh\|p]/) {
-		    #$self->dprint("expect: esc $escseq");
+		    $self->dprint(4,"expect: esc $escseq");
 		    $escseq = undef;
 		}
 		next;
 	    }
 
-	    #dprint "read a byte: '$char'\n";
 	    $$databufref .= $char;
 	    $$lineref .= $char;
 
@@ -1756,23 +1703,23 @@ sub expect($$$$$) {
 		$mdataref = $databufref;
 	    }
 
-	    ###$self->dprint("expect: checking if '".$$mdataref."' matches '$rval'");
+	    $self->dprint(4,"expect: checking if '".$$mdataref."' matches '$rval'");
 	    if ($$mdataref =~ $rval) {
-		$self->dprint("expect: '".$$mdataref."' matched '$rval'!");
+		$self->dprint(2,"expect: '".$$mdataref."' matched '$rval'!");
 		if (defined($sval)) {
 		    if (ref($sval) eq 'CODE') {
 			$sval->($out);
-			$self->dprint("expect: ran code instead of sending!");
+			$self->dprint(3,"expect: ran code instead of sending!");
 		    }
 		    else {
 			syswrite($out,$sval);
-			$self->dprint("expect: sent '$sval'");
+			$self->dprint(3,"expect: sent '$sval'");
 		    }
 		}
 		else {
-		    $self->dprint("expect: matched but not sending because undef was given");
+		    $self->dprint(3,"expect: matched but not sending because undef was given");
 		}
-		#$self->dprint("expect: rotating line buf at match");
+		$self->dprint(4,"expect: rotating line buf at match");
 		$histbufref->[scalar(@$histbufref)] = '';
 		$lineref = \$histbufref->[scalar(@$histbufref)-1];
 
@@ -1780,8 +1727,8 @@ sub expect($$$$$) {
 	    }
 
 	    if ($char eq "\n") {
-		#dprint "read '".chomp($line)."' while looking for '$rval'\n";
-		#$self->dprint("expect: rotating line buf at newline");
+		$self->dprint(4,"read '".chomp($$lineref)."' while looking for '$rval'\n");
+		$self->dprint(4,"expect: rotating line buf at newline");
 		$histbufref->[scalar(@$histbufref)] = '';
 		$lineref = \$histbufref->[scalar(@$histbufref)-1];
 	    }
