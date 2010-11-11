@@ -94,105 +94,6 @@ inline bool accept(double change, double temperature) {
   return 0;
 }
 
-
-#ifdef SMART_UNMAP
-/*
- * XXX - I pulled this code out of the anneal loop, and it needs to be fixed
- * up (and get some arguments and a return type) before it will compile
- */
-void smart_unmap() {
-	// XXX: Should probably randomize this
-	// XXX: Add support for not using PER_VNODE_TT
-	// XXX: Not very robust
-
-	freednode = true;
-
-	tt_entry tt = vnode_type_table[vn->name];
-	int size = tt.first;
-	pclass_vector *acceptable_types = tt.second;
-	// Find a node to kick out
-	bool foundnode = false;
-	int offi = RANDOM();
-	int index;
-	for (int i = 0; i < size; i++) {
-	  index = (i + offi) % size;
-	  if ((*acceptable_types)[index]->used_members.find(vn->type) ==
-	      (*acceptable_types)[index]->used_members.end()) {
-	    continue;
-	  }
-	  if ((*acceptable_types)[index]->used_members[vn->type]->size() == 0) {
-	    continue;
-	  }
-	  foundnode = true;
-	  break;
-	}
-
-	if (foundnode) {
-	  assert((*acceptable_types)[index]->used_members[vn->type]->size());
-	  tb_pclass::tb_pnodeset::iterator it =
-	    (*acceptable_types)[index]->used_members[vn->type]->begin();
-	  int j = RANDOM() %
-	    (*acceptable_types)[index]->used_members[vn->type]->size();
-	  while (j > 0) {
-	    it++;
-	    j--;
-	  }
-	  tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
-	  int k = RANDOM() % (*it)->assigned_nodes.size();
-	  while (k > 0) {
-	    it2++;
-	    k--;
-	  }
-	  tb_vnode *kickout = *it2;
-	  assert(kickout->assigned);
-	  vvertex toremove = vname2vertex[kickout->name];
-	  newpnode = *it;
-	  remove_node(toremove);
-	  unassigned_nodes.push_front(toremove);
-	} else {
-	  cerr << "Failed to find a replacement!" << endl;
-	}
-#endif /* SMART_UNMAP */
-
-#ifdef SMART_UNMAP
-/*
- * Part II of the smart_unmap code - again, needs to be fixed before it
- * will compile.
- */
-void smart_unmap_part2() {
-#ifdef PER_VNODE_TT
-	  tt_entry tt = vnode_type_table[vn->name];
-#else
-	  tt_entry tt = type_table[vn->type];
-#endif
-	  pclass_vector *acceptable_types = tt.second;
-
-	  while (1) {
-	    bool keepgoing = false;
-	    if (get(vvertex_pmap,virtual_nodes[toremove])->fixed) {
-	      keepgoing = true;
-	    } else if (! get(vvertex_pmap,virtual_nodes[toremove])->assigned) {
-	      keepgoing = true;
-	    } else {
-	      pvertex pv = get(vvertex_pmap,virtual_nodes[toremove])->assignment;
-	      tb_pnode *pn = get(pvertex_pmap,pv);
-	      int j;
-	      for (j = 0; j < acceptable_types->size(); j++) {
-		if ((*acceptable_types)[j] == pn->my_class) {
-		  break;
-		}
-	      }
-	      if (j == acceptable_types->size()) {
-		keepgoing = true;
-	      }
-	    }
-
-	    if (!keepgoing) {
-	      break;
-	    }
-	}
-#endif	
-	
 // We put the temperature outside the function so that external stuff, like
 // status_report in assign.cc, can see it.
 double temp;
@@ -696,7 +597,6 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
        * vnode so that we can make progress - otherwise, we could get stuck
        */
       if (newpnode == NULL) {
-#ifndef SMART_UNMAP
 	// Push this node back onto the unassigned map
 	unassigned_nodes.push_front(vv);
 	int start = RANDOM()%nnodes;
@@ -709,27 +609,21 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
             RDEBUG(cout << "Not removing a node" << endl;)
 	    break;
 	  }	
-      }	
-      if (toremove >= 0) {
-	RDEBUG(cout << "removing: freeing up node " <<
-                get(vvertex_pmap,virtual_nodes[toremove])->name << endl;)
-	remove_node(virtual_nodes[toremove]);
-	unassigned_nodes.push_front(virtual_nodes[toremove]);
-      }	
+        }	
+        if (toremove >= 0) {
+          RDEBUG(cout << "removing: freeing up node " <<
+                  get(vvertex_pmap,virtual_nodes[toremove])->name << endl;)
+          remove_node(virtual_nodes[toremove]);
+          unassigned_nodes.push_front(virtual_nodes[toremove]);
+        }	
       
-      /*
-       * Start again with another vnode - which will probably be the same one,
-       * since we just marked it as unmapped. But now, there will be at least one
-       * free pnode
-       */
-      RDEBUG(cout << "Failed to find a possible mapping; try again..." << endl;)
-      continue;	
-#else /* SMART_UNMAP */
-      // XXX: This code is broken for now, which is okay, because we weren't
-      // using it
-      smart_unmap();
-      smart_unmap_part2();
-#endif
+        /*
+         * Start again with another vnode - which will probably be the same one,
+         * since we just marked it as unmapped. But now, there will be at least one
+         * free pnode
+         */
+        RDEBUG(cout << "Failed to find a possible mapping; try again..." << endl;)
+        continue;	
       }
     
       /*
@@ -774,9 +668,6 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
 	  continue;
         }
       } else { // pnode != NULL
-#ifdef SMART_UNMAP
-        unassigned_nodes.push_front(vv);
-#endif
         if (freednode) {
 	  continue;
         }	

@@ -402,17 +402,6 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
 	  (*dit).second->remove(p);
       }
     }
-#ifdef SMART_UNMAP
-    if (c->used_members.find((*dit).first) == c->used_members.end()) {
-	c->used_members[(*dit).first] = new tb_pclass::tb_pnodeset;
-    }
-
-    // XXX: bogus? Maybe we're only supposed to insert if it was in the
-    // other list?
-    //if (find((*dit).second->L.begin(),(*dit).second->L.end(),p) != (*dit).second->L.end()) {
-    c->used_members[(*dit).first]->insert(p);
-    //}
-#endif
   }
 
   c->used_members++;
@@ -449,10 +438,6 @@ int pclass_unset(tb_pnode *p)
 #endif
       }
     }
-
-#ifdef SMART_UNMAP
-      c->used_members[(*dit).first]->erase(p);
-#endif
   }
 
   if (p->my_own_class && (p->total_load == 1)) {

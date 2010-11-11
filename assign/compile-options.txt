@@ -134,11 +134,6 @@ PER_VNODE_TT		Normally, assign keeps a 'type table' indicating which
 			be mapped, and could be used to prune down the size of
 			the search space, since we can ignore nodes that are not
 			in any node's TT.
-SMART_UNMAP		When assign decides that it needs to unmap some existing
-			mapping, because there are no potential matches for a
-			vnode, causes it to intelligently unmap a pnode that
-			could be a match for the current vnode, rather than
-			picking one a random. Requires PER_VNODE_TT
 
 Scoring Options
 ---------------

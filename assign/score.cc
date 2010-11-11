@@ -946,10 +946,6 @@ void remove_node(vvertex vv)
     }
   }
 
-#ifdef SMART_UNMAP
-  pnode->assigned_nodes.erase(vnode);
-#endif
-
   // pclass
   if ((!disable_pclasses) && !(tr->is_static()) && pnode->my_class
 	  && (pnode->my_class->used_members == 0)) {
@@ -1407,10 +1403,6 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
   pnode->used_interfaces = 0;
 #endif
  
-#ifdef SMART_UNMAP
-  pnode->assigned_nodes.insert(vnode);
-#endif
-
   /*
    * Record the node's assignment. Need to do this now so that 'loopback' links
    * work below.

@@ -70,8 +70,6 @@ CXXFLAGS += -DFIND_PNODE_SEARCH -DNO_REVERT
 # Keeps information about which pclasses are potential mappings for vnodes on a
 # per-vnode basis, not a per-type basis
 CXXFLAGS += -DPER_VNODE_TT
-# Should be on by default, but not well tested enough
-#CXXFLAGS += -DSMART_UNMAP
 # Make sure that all emulated links that are assigned to a plink have the same
 # endpoints
 CXXFLAGS += -DFIX_PLINK_ENDPOINTS

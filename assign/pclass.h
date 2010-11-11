@@ -81,9 +81,6 @@ public:
   int size;
   int used_members;
   pclass_members_map members;
-#ifdef SMART_UNMAP
-  pclass_members_set used_members;
-#endif
 
   bool disabled;
 
