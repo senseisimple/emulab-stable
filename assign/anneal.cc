@@ -733,7 +733,7 @@ void anneal(bool scoring_selftest, bool check_fixed_nodes,
          * much, much longer than it should really take.
          */
         RDEBUG(cout << "CRITERIA: v=" << violated << " bv=" <<
-                prev_violated << " ns=" << new_score << " bs=" <<
+                prev_violated << " ns=" << new_score << " ps=" <<
                 prev_score << " sd=" << scorediff << " t=" << temp << endl;)
         if ((violated == prev_violated) && (new_score < prev_score)) {
 	  accepttrans = true;
