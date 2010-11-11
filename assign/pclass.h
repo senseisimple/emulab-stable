@@ -130,6 +130,10 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
 int pclass_set(tb_vnode *v,tb_pnode *p);
 int pclass_unset(tb_pnode *p);
 
+// This should be called when the pnode becomes free (and pclass_unset should
+// still be called first)
+int pclass_reset_maps(tb_pnode *p); 
+
 void pclass_debug();
 
 int count_enabled_pclasses();

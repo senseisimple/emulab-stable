@@ -412,7 +412,9 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
 
 int pclass_unset(tb_pnode *p)
 {
-  // add pnode to all lists in equivalence class.
+  // add pnode back to the list in the equivalence class that corresponds with
+  // the current type of the vnode - may be used whether or not the pnode is
+  // empty.
   tb_pclass *c = p->my_class;
 
   tb_pclass::pclass_members_map::iterator dit;
@@ -440,6 +442,22 @@ int pclass_unset(tb_pnode *p)
   c->used_members--;
   
   //assert_own_class_invariant(p);
+  return 0;
+}
+
+int pclass_reset_maps(tb_pnode *p)
+{
+  // add pnode to *all* lists in equivalence class - should only be called if
+  // the pnode is empty
+  tb_pclass *c = p->my_class;
+
+  tb_pclass::pclass_members_map::iterator dit;
+  for (dit=c->members.begin();dit!=c->members.end();++dit) {
+    if (! (*dit).second->exists(p)) {
+      (*dit).second->push_front(p);
+    }
+  }
+
   return 0;
 }
 

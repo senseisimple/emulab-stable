@@ -1068,6 +1068,7 @@ void remove_node(vvertex vv)
     SDEBUG(cerr << "  releasing pnode" << endl);
     SSUB(SCORE_PNODE);
     pnode->remove_current_type();
+    pclass_reset_maps(pnode);
     // ptypes
     tb_pnode::types_list::iterator lit = pnode->type_list.begin();
     while (lit != pnode->type_list.end()) {
