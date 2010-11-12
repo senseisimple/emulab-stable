@@ -8136,7 +8136,7 @@ COMMAND_PROTOTYPE(dotopomap)
 		reqp->pid, reqp->eid);
 
 	if ((fp = fopen(buf, "r")) == NULL) {
-		errorc("DOTOPOMAP: Could not open topomap for %s:",
+		errorc("DOTOPOMAP: Could not open topomap for %s",
 		       reqp->nodeid);
 		return 1;
 	}
@@ -8173,7 +8173,7 @@ COMMAND_PROTOTYPE(doltmap)
 		reqp->pid, reqp->eid);
 
 	if ((fp = fopen(buf, "r")) == NULL) {
-		errorc("DOLTMAP: Could not open ltmap for %s:",
+		errorc("DOLTMAP: Could not open ltmap for %s",
 		       reqp->nodeid);
 		return 1;
 	}

@@ -45,6 +45,7 @@ my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $INSTALLUPDATE= "$TB/sbin/update-install";
 my $SETSITEVAR   = "$TB/sbin/setsitevar";
 my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
+my $FRISBEE      = "$TB/sbin/frisbeelauncher";
 my $tempfile     = "/var/tmp/update.$$";
 
 # Protos
@@ -85,6 +86,7 @@ BEGIN
 use emdb;
 use libEmulab;
 use libtestbed;
+use Image;
 
 #
 # Parse command arguments.
@@ -305,6 +307,23 @@ if ($stopbed) {
 	Fatal("Could not stop testbed daemons. Stopping.");
     }
     $stopped = 1;
+
+    my $activeimages = Image->ActiveImages();
+    if (defined($activeimages)) {
+	my @activeimages = @{ $activeimages };
+	if (@activeimages) {
+	    print "** Stopping running frisbee processes ...\n";
+	}
+	foreach my $image (@activeimages) {
+	    my $imageid = $image->imageid();
+	    print "-> Killing frisbee for $image ...\n";
+	    system("$FRISBEE -k $imageid");
+	    if ($?) {
+		Fatal("Could not stop frisbee for $image!");
+	    }
+	}
+    }
+    
     print "** Testbed is stopped. Proceeding to update\n";
 
     #

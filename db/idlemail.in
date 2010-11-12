@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -165,7 +165,7 @@ EOT
 	$time= $r{'idle_time'};
 	$lastact= $r{'lastact'};
         $staleness = $r{'staleness'};
-        if ($staleness >= 600) { # 10 minute stale limit
+        if (!defined($staleness) || $staleness >= 600) { # 10 minute stale limit
             $stale=1;
         }
 	
@@ -283,7 +283,7 @@ EOT
 	    $time= $r{'idle_time'};
 	    $lastact= $r{'lastact'};
 	    $staleness = $r{'staleness'};
-	    if ($staleness >= 600) { # 10 minute stale limit
+	    if (!defined($staleness) || $staleness >= 600) { # 10 minute stale limit
 		$stale=1;
 	    }
 	    SendMessage($pid,$pid,$eid,1,0,$nodes,$time,$lastact,$stale,
@@ -363,7 +363,7 @@ EOT
 	$time= $r{'idle_time'};
 	$lastact= $r{'lastact'};
         $staleness = $r{'staleness'};
-        if ($staleness >= 600) { # 10 minute stale limit
+        if (!defined($staleness) || $staleness >= 600) { # 10 minute stale limit
             $stale=1;
         }
 	
