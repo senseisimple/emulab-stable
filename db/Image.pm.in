@@ -138,6 +138,30 @@ sub mbr_version($)      { return field($_[0], "mbr_version"); }
 sub access_key($)       { return field($_[0], "access_key"); }
 
 #
+# Get a list of all running frisbee images.
+#
+sub ActiveImages($)
+{
+    my ($class) = @_;
+    my @result  = ();
+
+    my $query_result =
+	DBQueryWarn("select imageid from images where frisbee_pid!=0");
+    return undef
+	if (!defined($query_result));
+
+    while (my ($imageid) = $query_result->fetchrow_array()) {
+	my $image = Image->Lookup($imageid);
+	if (!defined($image)) {
+	    print STDERR "*** Could not find DB object for image $imageid\n";
+	    return undef;
+	}
+	push(@result, $image);
+    }
+    return \@result;
+}
+
+#
 # Refresh a class instance by reloading from the DB.
 #
 sub Refresh($)
