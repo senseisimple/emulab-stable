@@ -230,17 +230,35 @@ sub PreSetupReload($$)
 	    if ($rowref->{partition} == $newpart) {
 		if ($newimageid == $rowref->{imageid}
 		    && $newosid == $rowref->{osid}) {
-		    tbinfo "$self UpdatePartitions($node_id): not forcing reload because new and current images are the same!\n";
+		    tbinfo "$self PreSetupReload($node_id): not forcing reload because new and current images are the same!\n";
 		    return 0;
 		}
 		else {
-		    tbinfo "$self UpdatePartitions($node_id): forcing reload because new and current images are different!\n";
+		    tbinfo "$self PreSetupReload($node_id): forcing reload because new and current images are different!\n";
 		    $self->nodeflag($nodeobject,'force',1);
 		}
 
 		last;
 	    }
 	}
+    }
+
+    #
+    # We have to check to see if the user can really do a reload -- if not,
+    # we have to bail, unfortunately!  It's unfortunate because we have now 
+    # failed the swapin when we probably should detect it much sooner.
+    #
+    if ($self->nodeflag($nodeobject,'force',1)) {
+	if (!EmulabFeatures->FeatureEnabled("SwitchFlash",
+					    $self->nodeflag($nodeobject,'user'),
+					    $self->nodeflag($nodeobject,'group'),
+					    $self->nodeflag($nodeobject,'experiment'))) {
+	    tberror "$self PreSetupReload($node_id): you do not have permission to flash switches!\n";
+	    return -1;
+	}
+	require libosload_new;
+	# XXX -- @nodelist
+	$self->loadobj(libosload_new->New());
     }
 
     #

@@ -546,6 +546,12 @@ sub LightUpNodes($@)
 					   $self->group(),
 					   $self->experiment())) {
 	    ($self->loadobj())->debug($self->debug());
+
+	    # add a few more things for feature checks down the line:
+	    $reload_args{user} = $self->user();
+	    $reload_args{group} = $self->group();
+	    $reload_args{experiment} = $self->experiment();
+
 	    $pid = ($self->loadobj())->osload(\%reload_args, $reload_failures);
 	    $coderef = sub {
 		my $childpid = shift;
@@ -1316,6 +1322,12 @@ sub AddNode($$)
 					   $self->group(),
 					   $self->experiment())) {
 	    ($parent->loadobj())->debug($self->debug());
+
+	    # add a few more things for feature checks down the line:
+	    $reload_args{user} = $self->user();
+	    $reload_args{group} = $self->group();
+	    $reload_args{experiment} = $self->experiment();
+
 	    ($parent->loadobj())->osload(\%reload_args, $reload_failures);
 	}
 	else {

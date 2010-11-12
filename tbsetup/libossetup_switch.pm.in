@@ -219,6 +219,12 @@ sub LightUpNodes($@)
 					   $parent->group(),
 					   $parent->experiment())) {
 	    ($parent->loadobj())->debug($parent->debug());
+
+	    # add a few more things for feature checks down the line:
+	    $reload_args{user} = $parent->user();
+	    $reload_args{group} = $parent->group();
+	    $reload_args{experiment} = $parent->experiment();
+
 	    $pid = ($parent->loadobj())->osload(\%reload_args,$reload_failures);
 	    print STDERR "$self: kicking off wait for osload pid $pid\n";
 	    $coderef = sub {
@@ -372,8 +378,8 @@ sub WaitDone($@)
 
 	print STDERR "$self: WaitDone: $node_id,$setupstatus,$eventstate\n";
 
-	if ($eventstate eq TBDB_NODESTATE_ISUP()) {
-
+	if ($eventstate eq TBDB_NODESTATE_ISUP()
+	    && $setupstatus == $libossetup::SETUP_OKAY) {
 	    #
 	    # If there is another op in our list, keep going with that op -- 
 	    # i.e., keep the node in our todo list!
@@ -411,6 +417,21 @@ sub WaitDone($@)
 	    $node->_rebooted(1)
 		if ($node->_setupoperation() != $libossetup::NOSTATE);
 	    next;
+	}
+	elsif ($setupstatus != $libossetup::SETUP_OKAY) {
+	    #
+	    # Our last op failed; don't continue!
+	    #
+	    my $op = shift @{$self->{OPLIST}->{$node_id}};
+	    my $opname = "RELOAD";
+	    if ($op == $libossetup::RECONFIG) {
+		$opname = "RECONFIG";
+	    }
+	    elsif ($op == $libossetup::REBOOT) {
+		$opname = "REBOOT";
+	    }
+	    tbwarn "$self WaitDone: $node_id failed $opname; NOT doing more ops!\n";
+	    $self->{OPLIST}->{$node_id} = [];
 	}
 
 	#

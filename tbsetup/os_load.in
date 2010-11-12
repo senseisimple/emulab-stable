@@ -123,6 +123,7 @@ $force   = 1
 # experiment. To get all free nodes, must use sched_reload. 
 # 
 my $experiment;
+my $group;
 if (defined($options{"e"})) {
     usage()
 	if (@ARGV);
@@ -138,6 +139,7 @@ if (defined($options{"e"})) {
 	    die("*** $0:\n".
 		"    No such experiment $pid/$eid!\n");
 	}
+	$group = $experiment->GetGroup();
 	if (! (@nodes = $experiment->NodeList(0, 1))) {
 	    die("*** $0:\n".
 		"    There are no nodes in $pid/$eid!\n");
@@ -162,7 +164,12 @@ else {
 	if (!$node->IsReserved()) {
 	    die("*** $0:\n".
 		"    Node $nodeid is not reserved; reserve it first!\n");
-	}    
+        }
+        else {
+	    $experiment = $node->Reservation();
+	    $group = $experiment->GetGroup();
+        }
+
 	push(@nodes, $node);
     }
 }
@@ -338,7 +345,7 @@ $osloadargs{'swapinfo'} = 1;
 $osloadargs{'usecurrent'} = $usecurrent;
 
 my $user = User->ThisUser();
-if (EmulabFeatures->FeatureEnabled("NewOsload",$user,undef,$experiment)) {
+if (EmulabFeatures->FeatureEnabled("NewOsload",$user,$group,$experiment)) {
     require libosload_new;
     my $loadobj = libosload_new->New();
     $loadobj->debug($debug);
@@ -353,6 +360,11 @@ if (EmulabFeatures->FeatureEnabled("NewOsload",$user,undef,$experiment)) {
     # (like switches) that a reconfig should follow the reload!
     #
     $osloadargs{'reconfig'} = $reconfig;
+
+    # add a few more things for feature checks down the line:
+    $osloadargs{user} = $user;
+    $osloadargs{group} = $group;
+    $osloadargs{experiment} = $experiment;
 
     exit($loadobj->osload(\%osloadargs, \%failednodes));
 }
