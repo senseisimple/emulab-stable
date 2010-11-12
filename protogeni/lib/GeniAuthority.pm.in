@@ -344,7 +344,6 @@ sub Version($)
 	else {
 	    $self->{'version'}  = $response->value()->{'api'};
 	    $self->{'apilevel'} = $response->value()->{'level'};
-	    $self->{'apilevel'} = 0;
 	    $self->{'api'}      = "CM";
 	}
     }

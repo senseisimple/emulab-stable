@@ -1132,7 +1132,7 @@ sub handleCommand($$;$$) {
 	    # so we don't need to do any fancy stuff here.
 
 	    my $cmd = "$power $func $nodelist &";
-	    debug("$cmd\n") and
+	    debug("$cmd\n");
 	    system($cmd) and
 	      notify("$params/$command: ".
 		     "Command '$cmd' failed, error $?: $!\n");
