@@ -1493,7 +1493,7 @@ PlayFrisbee(void)
 			if (!nodecompress) {
 				subtype = p->hdr.subtype = PKTSUBTYPE_JOIN;
 				p->hdr.datalen = sizeof(p->msg.join);
-				p->msg.join2.clientid = myid;
+				p->msg.join.clientid = myid;
 			} else {
 				subtype = p->hdr.subtype = PKTSUBTYPE_JOIN2;
 				p->hdr.datalen = sizeof(p->msg.join2);
@@ -1514,6 +1514,12 @@ PlayFrisbee(void)
 		if (PacketReceive(p) == 0 &&
 		    p->hdr.subtype == subtype &&
 		    p->hdr.type == PKTTYPE_REPLY) {
+			if (subtype == PKTSUBTYPE_JOIN) {
+				p->msg.join2.chunksize = MAXCHUNKSIZE;
+				p->msg.join2.blocksize = MAXBLOCKSIZE;
+				p->msg.join2.bytecount =
+					p->msg.join.blockcount * MAXBLOCKSIZE;
+			}
 			CLEVENT(1, EV_CLIJOINREP,
 				CHUNKSIZE, BLOCKSIZE,
 				(p->msg.join2.bytecount >> 32),
