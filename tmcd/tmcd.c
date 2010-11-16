@@ -238,6 +238,7 @@ COMMAND_PROTOTYPE(dohosts);
 COMMAND_PROTOTYPE(dorpms);
 COMMAND_PROTOTYPE(dodeltas);
 COMMAND_PROTOTYPE(dotarballs);
+COMMAND_PROTOTYPE(doblobs);
 COMMAND_PROTOTYPE(dostartcmd);
 COMMAND_PROTOTYPE(dostartstat);
 COMMAND_PROTOTYPE(doready);
@@ -344,6 +345,7 @@ struct command {
 	{ "rpms",	  FULLCONFIG_ALL,  F_ALLOCATED, dorpms },
 	{ "deltas",	  FULLCONFIG_NONE, F_ALLOCATED, dodeltas },
 	{ "tarballs",	  FULLCONFIG_ALL,  F_ALLOCATED, dotarballs },
+	{ "blobs",	  FULLCONFIG_ALL,  F_ALLOCATED, doblobs },
 	{ "startupcmd",	  FULLCONFIG_ALL,  F_ALLOCATED, dostartcmd },
 	{ "startstatus",  FULLCONFIG_NONE, F_ALLOCATED, dostartstat }, /* Before startstat*/
 	{ "startstat",	  FULLCONFIG_NONE, 0, dostartstat },
@@ -3237,6 +3239,73 @@ COMMAND_PROTOTYPE(dotarballs)
 	return 0;
 }
 
+/* 
+ *
+ */
+COMMAND_PROTOTYPE(doblobs)
+{
+	MYSQL_RES       *res;
+	MYSQL_ROW       row;
+	int             nrows;
+	char            buf[MYBUFSIZE];
+	char            *bufp = buf, *ebufp = &buf[sizeof(buf)];
+	char            path[255], action[255];
+	char            address[MYBUFSIZE], server_address[MYBUFSIZE];
+	int             frisbee_pid;
+
+	
+	res = mydb_query("select b.path,action,load_address,frisbee_pid from experiment_blobs as b join frisbee_blobs as f on b.path=f.path where exptidx=%d order by b.idx",
+			 4, reqp->exptidx);
+	
+	if (!res) {
+		error("BLOBS: %d: DB Error getting blobs!\n",
+		      reqp->exptidx);
+		return 1;
+	}
+	
+	nrows = (int)mysql_num_rows(res);
+
+	if (nrows <= 0) {
+		return 1;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+		frisbee_pid = 0;
+		path[0] = '\0';
+		action[0] = '\0';
+		address[0] = '\0';
+		server_address[0] = '\0';
+		strcpy(address, row[2]);
+
+		if (row[0] && row[0][0])
+			strncpy(path, row[0], 255);
+		
+		if (row[1] && row[1][0])
+			strncpy(action, row[1], 255);
+
+		if (row[2] && row[2][0])
+			strcpy(address, row[2]);
+		
+		if (row[3] && row[3][0])
+			frisbee_pid = atoi(row[3]);
+			
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "URL=frisbee.mcast://%s%s ACTION=%s\n",
+			       address, path, action);
+		nrows--;
+	}
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	if (verbose)
+		info("doblobs: %s", buf);
+
+	mysql_free_result(res);
+	return 0;
+}
+
+
 /*
  * This is deprecated, but left in case old images reference it.
  */
@@ -4020,10 +4089,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	 * Get the address the node should contact to load its image
 	 */
 	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
-			 "   mustwipe,mbr_version,access_key,imageid,prepare,"
+			 "   mustwipe,mbr_version,access_key,i.imageid,prepare,"
 			 "   i.imagename,p.pid,g.gid,i.path "
 			 "from current_reloads as r "
 			 "left join images as i on i.imageid=r.image_id "
+			 "left join frisbee_blobs as f on f.imageid=i.imageid "
 			 "left join os_info as o on i.default_osid=o.osid "
 			 "left join projects as p on i.pid_idx=p.pid_idx "
 			 "left join groups as g on i.gid_idx=g.gid_idx "

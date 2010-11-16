@@ -262,37 +262,38 @@ function SPITFORM($image, $formfields, $errors)
               <td class=left>". ($defaults["global"] ? "Yes" : "No") . "</td>
           </tr>\n";
 
-    echo "<tr>
-            <td>Load Address: </td>
-            <td class=left>\n";
+    # XXX: Bring back functionaly in some way
+    #echo "<tr>
+    #        <td>Load Address: </td>
+    #        <td class=left>\n";
 
-    if ($isadmin) {
-	echo "  <input type=text
-                       name=\"formfields[load_address]\"
-                       value=\"" . $formfields["load_address"] . "\"
-	               size=20 maxlength=256>";
-    }
-    else {
-	echo $defaults["load_address"];
-    }
-    echo "  </td>
-          </tr>\n";
-
-    echo "<tr>
-            <td>Frisbee pid: </td>
-            <td class=left>\n";
-
-    if ($isadmin) {
-	echo "  <input type=text
-                       name=\"formfields[frisbee_pid]\"
-                       value=\"" . $formfields["frisbee_pid"] . "\"
-	               size=6 maxlength=10>";
-    }
-    else {
-	echo $defaults["frisbee_pid"];
-    }
-    echo "  </td>
-          </tr>\n";
+    #if ($isadmin) {
+    #	echo "  <input type=text
+    #                   name=\"formfields[load_address]\"
+    #                   value=\"" . $formfields["load_address"] . "\"
+    #	               size=20 maxlength=256>";
+    #}
+    #else {
+    #	echo $defaults["load_address"];
+    #}
+    #echo "  </td>
+    #      </tr>\n";
+    #
+    #echo "<tr>
+    #        <td>Frisbee pid: </td>
+    #        <td class=left>\n";
+    #
+    #if ($isadmin) {
+    #	echo "  <input type=text
+    #                   name=\"formfields[frisbee_pid]\"
+    #                   value=\"" . $formfields["frisbee_pid"] . "\"
+    #	               size=6 maxlength=10>";
+    #}
+    #else {
+    #	echo $defaults["frisbee_pid"];
+    #}
+    #echo "  </td>
+    #      </tr>\n";
 
     echo "<tr>
               <td align=center colspan=2>
@@ -383,15 +384,16 @@ foreach ($mtypes_array as $type) {
     }
 }
 
-if (isset($formfields["load_address"]) && $formfields["load_address"] != "" &&
-    ($formfields["load_address"] != $image->load_address())) {
-    $args["load_address"] = $formfields["load_address"];
-}
-
-if (isset($formfields["frisbee_pid"]) && $formfields["frisbee_pid"] != "" &&
-    ($formfields["frisbee_pid"] != $image->frisbee_pid())) {
-    $args["frisbee_pid"] = $formfields["frisbee_pid"];
-}
+# XXX: Bring back functionaly in some way
+#if (isset($formfields["load_address"]) && $formfields["load_address"] != "" &&
+#    ($formfields["load_address"] != $image->load_address())) {
+#    $args["load_address"] = $formfields["load_address"];
+#}
+#
+#if (isset($formfields["frisbee_pid"]) && $formfields["frisbee_pid"] != "" &&
+#    ($formfields["frisbee_pid"] != $image->frisbee_pid())) {
+#    $args["frisbee_pid"] = $formfields["frisbee_pid"];
+#}
 
 #
 # Mereusers are not allowed to create more than one osid/imageid mapping

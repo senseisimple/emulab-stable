@@ -28,6 +28,7 @@ proc tb-set-node-rpms {node args} {}
 proc tb-set-node-startup {node cmd} {}
 proc tb-set-node-cmdline {node cmd} {}
 proc tb-set-node-tarfiles {node args} {}
+proc tb-set-tarfiles {args} {}
 proc tb-set-node-lan-delay {node lan delay} {}
 proc tb-set-node-lan-bandwidth {node lan bw} {}
 proc tb-set-node-lan-loss {node lan loss} {}

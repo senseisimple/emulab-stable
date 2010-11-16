@@ -1,0 +1,181 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:";
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo
+my $FRISBEE     = "/usr/local/etc/emulab/frisbee -N ";
+my $TARINSTALL  = "/usr/local/bin/install-tarfile";
+my $TARDBFILE   = "/var/db/testbed.tarfiles";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || (REMOTE() && !(REMOTEDED() || JAILED() || PLAB())));
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    my $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my @blobs;
+    my $errors = 0;
+
+    if (-e "/var/emulab/boot/rc.blobs-ran") {
+	print STDOUT "Blobs installation already ran on this node.\n";
+	print STDOUT "  Remove /var/emulab/boot/rc.blobs-ran to run again.\n";
+	exit 0;
+    }
+
+    print STDOUT "Checking Testbed Blobs configuration ... \n";
+
+    if (tmcc(TMCCCMD_BLOBS, undef, \@blobs, nocache => 1) < 0) {
+	fatal("Could not get blobs from server!");
+    }
+    return
+	if (! @blobs);
+
+    foreach my $blob (@blobs) {
+	eval {
+	    ($mcastaddr, $portnum, undef, $basename, $dest) = 
+		$blob =~ m|^URL=frisbee.mcast://(.+):(.+)/(.+/)?(.+) ACTION=unpack:(\S+)|
+		or die "Bad Blobs line\n";
+
+	    # FIXME: Make sure $basename doesn't exist...
+	    my $local_path = "/var/tmp/$basename";
+	    my $frisbee_cmd = "$FRISBEE -p $portnum -m $mcastaddr $local_path";
+
+	    print STDOUT "Fetching blob $basename to $local_path and unpacking to $dest\n";
+
+	    #print STDOUT "$frisbee_cmd\n";
+	    # launch frisbee
+	    if (system($frisbee_cmd)) {
+		die "Frisbee failed\n";
+	    }
+
+	    my $unpack_cmd = "$TARINSTALL $dest $local_path";
+	    #print STDOUT "$unpack_cmd\n";
+	    if (system($unpack_cmd)) {
+		if ($? >> 8 == 255) {
+		    die "Tarinstall failed\n";
+		}
+	    }
+	};
+	if ($@) {
+	    my $err = $@;
+	    chomp $err;
+	    warning("$err on line: $blob");
+	    $errors++;
+	}
+    }
+    
+    if (!$errors) {
+	system("touch /var/emulab/boot/rc.blobs-ran");
+    }
+
+    exit($errors);
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    # Nothing to do.
+    return;
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Same as booting
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to clean state, as if just allocated).
+#
+sub docleanup()
+{
+    # Remove DB file. No attempt is made to uninstall though.
+    if (-e "$TARDBFILE") {
+	unlink "$TARDBFILE";
+    }
+}

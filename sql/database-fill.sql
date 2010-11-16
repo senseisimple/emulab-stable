@@ -1039,6 +1039,9 @@ REPLACE INTO table_regex VALUES ('images','auth_key','text','regex','^[0-9a-fA-F
 REPLACE INTO table_regex VALUES ('images','auth_uuid','text','regex','^[0-9a-fA-F]+$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','decryption_key','text','regex','^[0-9a-fA-F]+$',0,0,NULL);
 
+REPLACE INTO table_regex VALUES ('experiment_blobs','path','text','redirect','default:text',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiment_blobs','action','text','redirect','default:text',0,0,NULL);
+
 REPLACE INTO table_regex VALUES ('default','tinytext_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,256,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','text_utf8','text','regex','^(?:[\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');
 REPLACE INTO table_regex VALUES ('default','fulltext_utf8','text','regex','^(?:[\\x09\\x0A\\x0D\\x20-\\x7E]|[\\xC2-\\xDF][\\x80-\\xBF]|\\xE0[\\xA0-\\xBF][\\x80-\\xBF]|[\\xE1-\\xEC\\xEE\\xEF][\\x80-\\xBF]{2}|\\xED[\\x80-\\x9F][\\x80-\\xBF])*$',0,65535,'adopted from http://www.w3.org/International/questions/qa-forms-utf-8.en.php');

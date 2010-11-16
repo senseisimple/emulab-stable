@@ -1,0 +1,76 @@
+use strict;
+use libdb;
+
+#
+# Refactor frisbee info into its own table and create new
+# experiment_blobs table
+#
+my $running_frisbee_messages = <<EOF;
+You appear to have running frisbee servers.  Please make sure the
+    testbed is shutdown before applying this upgrade.  This should normally
+    be taken care of automatically if you use "gmake update-testbed".  If
+    the testbed is shutdown than see the instruction at the end of
+    sql/updates/4/XXX for how to rectify the situation.
+EOF
+chop $running_frisbee_messages;
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (DBSlotExists("images", "load_address")) {
+	my $query_result = 
+	    DBQueryFatal("select load_address, frisbee_pid from images where load_address != '' or frisbee_pid != 0");
+	if ($query_result->numrows) {
+	    Fatal($running_frisbee_messages);
+	}
+	DBQueryFatal("alter table images drop load_address, drop frisbee_pid, drop load_busy");
+    }
+    
+    if (!DBTableExists("frisbee_blobs")) {
+	DBQueryFatal("CREATE TABLE `frisbee_blobs` ("
+		     ."  `idx` int(11) unsigned NOT NULL auto_increment,"
+		     ."  `path` varchar(255) NOT NULL default '',"
+		     ."  `imageid` int(8) unsigned default NULL,"
+		     ."  `load_address` text,"
+		     ."  `frisbee_pid` int(11) default '0',"
+		     ."  `load_busy` tinyint(4) NOT NULL default '0',"
+		     ."  PRIMARY KEY (`idx`),"
+		     ."  UNIQUE KEY `path` (`path`),"
+		     ."  UNIQUE KEY `imageid` (`imageid`)"
+		     .") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+
+    if (!DBTableExists("experiment_blobs")) {
+	DBQueryFatal("CREATE TABLE `experiment_blobs` ("
+		     ."  `idx` int(11) unsigned NOT NULL auto_increment,"
+		     ."  `pid` varchar(12) NOT NULL default '',"
+		     ."  `eid` varchar(32) NOT NULL default '',"
+		     ."  `exptidx` int(11) NOT NULL default '0',"
+		     ."  `path` varchar(255) NOT NULL default '',"
+		     ."  `action` varchar(255) NOT NULL default '',"
+		     ."  PRIMARY KEY  (`idx`),"
+		     ."  UNIQUE KEY `exptidx` (`exptidx`, `path`, `action`)"
+		     .") ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=latin1");
+    }
+
+    DBQueryFatal("REPLACE INTO table_regex VALUES "
+		 ."('experiment_blobs','path','text','redirect','default:text',0,0,NULL)");
+    DBQueryFatal("REPLACE INTO table_regex VALUES "
+		 ."('experiment_blobs','action','text','redirect','default:text',0,0,NULL)");
+
+    return 0;
+}
+1;
+
+#
+# Dealing with stale database state:
+#
+# If you made sure the testbed was shutdown and you are still having
+# problems running this script it is likely that there is some stale
+# database state in the table.  To rectify the situation, make sure
+# there are no running frisbee servers:
+#   ps xa | grep "frisbeed"
+# than execute the following query to clean out the state:
+#   update images set load_address = '', frisbee_pid = 0
+# and try the update process again
+#
