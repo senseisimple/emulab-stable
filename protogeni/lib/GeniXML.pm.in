@@ -472,7 +472,7 @@ sub GetFirstText($@)
 {
     my $node = shift(@_);
     my $result = undef;
-    foreach $name (@_) {
+    foreach my $name (@_) {
 	$result = GetText($name, $node);
 	if (defined($result)) {
 	    last;
