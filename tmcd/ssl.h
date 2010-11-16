@@ -1,9 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
-#include<openssl/x509.h>
+#include <sys/socket.h>
+#include <openssl/x509.h>
 
 /*
  * SSL prototypes and definitions.
