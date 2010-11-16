@@ -1574,6 +1574,9 @@ CREATE TABLE `images` (
   `mbr_version` varchar(50) NOT NULL default '1',
   `updated` datetime default NULL,
   `access_key` varchar(64) default NULL,
+  `auth_uuid` varchar(64) default NULL,
+  `auth_key` varchar(512) default NULL,
+  `decryption_key` varchar(256) default NULL,
   PRIMARY KEY  (`imageid`),
   UNIQUE KEY `pid` (`pid`,`imagename`),
   KEY `gid` (`gid`),
@@ -2178,6 +2181,7 @@ CREATE TABLE `node_hostkeys` (
   `sshdsa_v2` mediumtext,
   `tpmblob` mediumtext,
   `tpmx509` mediumtext,
+  `tpmidentity` mediumtext,
   `sfshostid` varchar(128) default NULL,
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -2443,6 +2447,19 @@ DROP TABLE IF EXISTS `nologins`;
 CREATE TABLE `nologins` (
   `nologins` tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (`nologins`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `nonces`
+--
+
+DROP TABLE IF EXISTS `nonces`;
+CREATE TABLE `nonces` (
+  `node_id` varchar(32) NOT NULL,
+  `purpose` varchar(64) NOT NULL,
+  `nonce` mediumtext,
+  `expires` int(10) NOT NULL,
+  PRIMARY KEY  (`node_id`,`purpose`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3470,6 +3487,20 @@ CREATE TABLE `tmcd_redirect` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `tpm_quote_values`
+--
+
+DROP TABLE IF EXISTS `tpm_quote_values`;
+CREATE TABLE `tpm_quote_values` (
+  `node_id` varchar(32) NOT NULL default '',
+  `op_mode` varchar(20) NOT NULL,
+  `state` varchar(20) NOT NULL,
+  `pcr` int(11) NOT NULL,
+  `value` mediumtext,
+  PRIMARY KEY  (`node_id`,`op_mode`,`state`,`pcr`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `traces`
 --
 
@@ -3520,7 +3551,7 @@ CREATE TABLE `unixgroup_membership` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
--- Table structure for table `user_policies`
+-- Table structure for table `user_features`
 --
 
 DROP TABLE IF EXISTS `user_features`;
