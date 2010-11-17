@@ -897,10 +897,8 @@ sub stateTransition($$) {
 				"and reset the eventstate before powering on.";
 		    }
 		}
-		SENDMAIL($REALTBOPS,
-			 "STATED: $node entered state $newstate",
-			 $msg,
-			 "Stated Daemon <".$TBOPS.">");
+		SENDMAIL($dest, "STATED: $node entered state $newstate",
+			 $msg, "Stated Daemon <".$TBOPS.">");
 		next;
             };
 	    /^RELOADOLDMFS$/ && do {
@@ -1212,6 +1210,13 @@ sub handleCommand($$;$$) {
 			    $TBPOWERON    => "on",
 			    $TBPOWEROFF   => "off");
 	    my $func = $funcmap{$command};
+
+	    if ($soft_secviolation && $func eq "off" && @nodes > 0 &&
+		$nodes{$nodes[0]}{state} eq TBDB_NODESTATE_SECVIOLATION) {
+		info("soft SECVIOLATION: NOT powering off $params\n");
+		next;
+	    }
+
 	    info("Sending power $func for nodes: $nodelist\n");
 	    #
 	    # Permissions were checked in order to send the message,
