@@ -1408,8 +1408,10 @@ sub TBNodeDiskloadOSID($)
 
     my $mfs;
     
-    return 0
-	if ($node->NodeTypeAttribute("diskloadmfs_osid", \$mfs) != 0);
+    if ($node->NodeAttribute("diskloadmfs_osid", \$mfs) || !defined($mfs)) {
+	return 0
+	    if ($node->NodeTypeAttribute("diskloadmfs_osid", \$mfs) != 0);
+    }
 
     $mfs = TB_OSID_FREEBSD_MFS()
 	if (!defined($mfs));
