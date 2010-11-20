@@ -63,7 +63,7 @@ EmulabResponse::~EmulabResponse()
 }
 
 
-ServerProxy::ServerProxy(xmlrpc_c::clientXmlTransportPtr transport,
+ServerProxy::ServerProxy(xmlrpc_c::clientXmlTransport *transport,
 			 bool wbxml_mode,
 			 const char *url)
 {
