@@ -379,19 +379,35 @@ else {
     die("Bad data in tarlist name: $tarlist");
 }
 my $oumask = umask(0);
-system("tar $decompressflag -xvf $tarfile > $tarlist");
+my $TAR = "tar";
+$TAR = "/usr/bin/gtar"       if -e "/usr/bin/tar";
+$TAR = "/usr/local/bin/gtar" if -e "/usr/local/bin/tar";
+open VER, "$TAR --version 2>&1 |";
+my $GNU_TAR = 0;
+while (<VER>) {
+    $GNU_TAR = 1 if /GNU tar/;
+}
+my $TAR_FLAGS = $GNU_TAR ? "-xvf" : "-xf";
+
+system("tar $decompressflag $TAR_FLAGS $tarfile >$tarlist 2>&1");
 $exit_status = $? >> 8;
 umask($oumask);
 if ($copymode) {
     unlink($copyfile);
 }
 
-if ($unknownuser) {
+if ($unknownuser && $GNU_TAR) {
     open(TARIN, "< $tarlist");
     while (my $line = <TARIN>) {
 	chop $line;
 	if ($line =~ /^(.*)$/) {
-	    $line = "$installdir/$1";
+	    my $file = $1;
+
+	    # XXX hack for bsdtar
+	    if (! -e "$installdir/$file" && $file =~ /^x (.*)$/) {
+		$file = $1;
+	    }
+	    $line = "$installdir/$file";
 	    if (-e $line &&
 		(my (undef,undef,undef,undef,$fuid,$fgid) = stat $line)) {
 		if ($fuid < 100) {
@@ -417,6 +433,8 @@ if ($unknownuser) {
 	}
     }
     close(TARIN);
+} elsif ($unknownuser) {
+    warn("*** WARNING: -u option requires GNU tar, ignoring.\n");
 }
 unlink($tarlist);
 
