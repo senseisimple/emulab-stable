@@ -379,9 +379,9 @@ else {
     die("Bad data in tarlist name: $tarlist");
 }
 my $oumask = umask(0);
-my $TAR = "tar";
-$TAR = "/usr/bin/gtar"       if -e "/usr/bin/tar";
-$TAR = "/usr/local/bin/gtar" if -e "/usr/local/bin/tar";
+my $TAR = `which gtar`;
+chomp $TAR;
+$TAR = "tar" if $TAR eq '';
 open VER, "$TAR --version 2>&1 |";
 my $GNU_TAR = 0;
 while (<VER>) {
