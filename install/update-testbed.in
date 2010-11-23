@@ -308,12 +308,31 @@ if ($stopbed) {
     }
     $stopped = 1;
 
-    my $activeimages = Image->ActiveImages();
-    if (defined($activeimages)) {
-	my @activeimages = @{ $activeimages };
-	if (@activeimages) {
-	    print "** Stopping running frisbee processes ...\n";
+    #
+    # XXX cannot just call Image->ActiveImages as the implementation
+    # changed and thus the code would not work when upgrading from a
+    # code base with the old implementation to one with the new.
+    #
+    my $table = "images";
+    if (!emdb::DBSlotExists("images", "frisbee_pid")) {
+	$table = "frisbee_blobs";
+    }
+    my $query_result =
+      emdb::DBQueryWarn("select imageid from $table where frisbee_pid!=0");
+    my @activeimages = ();
+    if ($query_result) {
+	while (my ($imageid) = $query_result->fetchrow_array()) {
+	    my $image = Image->Lookup($imageid);
+	    if (!defined($image)) {
+		print STDERR
+		    "*** Could not find DB object for image $imageid\n";
+		next;
+	    }
+	    push(@activeimages, $image);
 	}
+    }
+    if (@activeimages > 0) {
+	print "** Stopping running frisbee processes ...\n";
 	foreach my $image (@activeimages) {
 	    my $imageid = $image->imageid();
 	    print "-> Killing frisbee for $image ...\n";
