@@ -471,7 +471,13 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 			#ifdef PER_VNODE_TT
 				src_pnode->total_bandwidth += bandwidth.i();
 			#endif
-		}
+		} else {
+                    // Neither is a switch - a direct node->node link
+#ifdef PER_VNODE_TT
+                    dst_pnode->total_bandwidth += bandwidth.i();
+                    src_pnode->total_bandwidth += bandwidth.i();
+#endif
+                }
 
 	//XMLDEBUG("created link " << *phys_link << endl);
     // XXX: Special treatment for switches

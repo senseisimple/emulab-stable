@@ -322,7 +322,13 @@ int parse_ptop(tb_pgraph &pg, tb_sgraph &sg, istream& input)
 #ifdef PER_VNODE_TT
 	  srcnode->total_bandwidth += ibw;
 #endif
-	}
+	} else {
+          // Neither is a switch - a direct node->node link
+#ifdef PER_VNODE_TT
+          dstnode->total_bandwidth += ibw;
+          srcnode->total_bandwidth += ibw;
+#endif
+        }
       }
     } else if (command == "set-type-limit") {
       if (parsed_line.size() != 3) {
