@@ -60,6 +60,8 @@ int		zero = 0;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
+char		*imageid;
+int		askonly;
 static struct timeval stamp;
 static struct in_addr serverip;
 
@@ -137,18 +139,28 @@ ClientStats_t	Stats;
 #endif
 
 char *usagestr = 
- "usage: frisbee [-drzbn] [-s #] <-p #> <-m ipaddr> <output filename>\n"
+ "usage: frisbee [-drzbnN] [-s #] <-m ipaddr> <-p #> <output filename>\n"
+ "  or\n"
+ "usage: frisbee [-drzbnN] [-s #] <-S server> <-F fileid> <output filename>\n"
+ "\n"
  " -d              Turn on debugging. Multiple -d options increase output.\n"
  " -r              Randomly delay first request by up to one second.\n"
  " -z              Zero fill unused block ranges (default is to seek past).\n"
  " -b              Use broadcast instead of multicast\n"
  " -n              Do not use extra threads in diskwriter\n"
  " -N              Do not decompress the received data, just write to output.\n"
+ " -S server-IP    Specify the IP address of the server to use.\n"
  " -p portnum      Specify a port number.\n"
  " -m mcastaddr    Specify a multicast address in dotted notation.\n"
  " -i mcastif      Specify a multicast interface in dotted notation.\n"
  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
  "                 NOTE: Must specify a raw disk device for output filename.\n"
+ " -D DOS-type     With -s, sets the DOS type of the slice in the MBR\n"
+ " -F file-ID      Specify the ID of the file (image) to download.\n"
+ "                 Here -S specifies the 'master' server which will\n"
+ "                 return unicast/multicast info to use for image download.\n"
+ " -Q file-ID      Ask the server (-S) about the indicated file (image).\n"
+ "                 Tells whether the image is accessible by this node/user.\n"
  "\n"
  "tuning options (if you don't know what they are, don't use em!):\n"
  " -C MB           Max MB of memory to use for network chunk buffering.\n"
@@ -187,11 +199,11 @@ int
 main(int argc, char **argv)
 {
 	int	ch, mem;
-	char   *filename;
+	char   *filename = NULL;
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ON")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONF:Q:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -237,6 +249,15 @@ main(int argc, char **argv)
 					optarg);
 				exit(1);
 			}
+			break;
+
+		case 'F':
+			imageid = optarg;
+			break;
+
+		case 'Q':
+			imageid = optarg;
+			askonly = 1;
 			break;
 
 		case 't':
@@ -314,14 +335,26 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
-		usage();
-	filename = argv[0];
+	if (!askonly) {
+		if (argc != 1)
+			usage();
+		filename = argv[0];
+	}
 
-	if (!portnum || ! mcastaddr.s_addr)
+	if (!((imageid != NULL && serverip.s_addr != 0) ||
+	      (mcastaddr.s_addr != 0 && portnum != 0)))
 		usage();
 
 	ClientLogInit();
+#ifdef MASTER_SERVER
+	if (imageid && !ClientNetFindServer(&serverip, imageid, askonly, 5)) {
+		fprintf(stderr, "Could not get download info for '%s'\n",
+			imageid);
+		exit(1);
+	}
+	if (askonly)
+		exit(0);
+#endif
 	ClientNetInit();
 
 #ifdef DOEVENTS

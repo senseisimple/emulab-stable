@@ -136,7 +136,7 @@ CommonInit(int dobind)
 		unsigned int loop = 0, ttl = MCAST_TTL;
 		struct ip_mreq mreq;
 
-		log("Using Multicast");
+		log("Using Multicast %s", inet_ntoa(mcastaddr));
 
 		mreq.imr_multiaddr.s_addr = mcastaddr.s_addr;
 
@@ -470,3 +470,204 @@ PacketValid(Packet_t *p, int nchunks)
 
 	return 1;
 }
+
+#ifdef MASTER_SERVER
+int
+MsgSend(int msock, MasterMsg_t *msg, size_t size, int timo)
+{
+	void *buf = msg;
+	int cc;
+	struct timeval tv, now, then;
+	fd_set wfds;
+
+	if (timo) {
+		tv.tv_sec = timo;
+		tv.tv_usec = 0;
+		gettimeofday(&then, NULL);
+		timeradd(&then, &tv, &then);
+	}
+	while (size > 0) {
+		if (timo) {
+			gettimeofday(&now, NULL);
+			if (timercmp(&now, &then, >=)) {
+				cc = 0;
+			} else {
+				timersub(&then, &now, &tv);
+				FD_ZERO(&wfds);
+				FD_SET(msock, &wfds);
+				cc = select(msock+1, NULL, &wfds, NULL, &tv);
+			}
+			if (cc <= 0) {
+				if (cc == 0) {
+					errno = ETIMEDOUT;
+					cc = -1;
+				}
+				break;
+			}
+		}
+
+		cc = write(msock, buf, size);
+		if (cc <= 0)
+			break;
+
+		size -= cc;
+		buf += cc;
+	}
+
+	if (size != 0) {
+		char *estr = "master server message send";
+		if (cc == 0)
+			fprintf(stderr, "%s: Unexpected EOF\n", estr);
+		else
+			perror(estr);
+		return 0;
+	}
+	return 1;
+}
+
+int
+MsgReceive(int msock, MasterMsg_t *msg, size_t size, int timo)
+{
+	void *buf = msg;
+	int cc;
+	struct timeval tv, now, then;
+	fd_set rfds;
+
+	if (timo) {
+		tv.tv_sec = timo;
+		tv.tv_usec = 0;
+		gettimeofday(&then, NULL);
+		timeradd(&then, &tv, &then);
+	}
+	while (size > 0) {
+		if (timo) {
+			gettimeofday(&now, NULL);
+			if (timercmp(&now, &then, >=)) {
+				cc = 0;
+			} else {
+				timersub(&then, &now, &tv);
+				FD_ZERO(&rfds);
+				FD_SET(msock, &rfds);
+				cc = select(msock+1, &rfds, NULL, NULL, &tv);
+			}
+			if (cc <= 0) {
+				if (cc == 0) {
+					errno = ETIMEDOUT;
+					cc = -1;
+				}
+				break;
+			}
+		}
+
+		cc = read(msock, buf, size);
+		if (cc <= 0)
+			break;
+
+		size -= cc;
+		buf += cc;
+	}
+
+	if (size != 0) {
+		char *estr = "master server message receive";
+		if (cc == 0)
+			fprintf(stderr, "%s: Unexpected EOF\n", estr);
+		else
+			perror(estr);
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * Contact the master server to discover download information for imageid.
+ * 'serverip' and 'portnum' refer to the master server at this point,
+ * it in turn will return the addr/port for the actual download.
+ */
+int
+ClientNetFindServer(struct in_addr *sip, char *imageid,
+		    int statusonly, int timeout)
+{
+	struct sockaddr_in name;
+	MasterMsg_t msg;
+	int msock, len, err;
+	
+	if ((msock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+		perror("Could not allocate socket for master server");
+		return 0;
+	}
+	if (portnum == 0)
+		portnum = MS_PORTNUM;
+
+	name.sin_family = AF_INET;
+	name.sin_addr = *sip;
+	name.sin_port = htons(portnum);
+	if (connect(msock, (struct sockaddr *)&name, sizeof(name)) < 0) {
+		perror("Connecting to master server");
+		close(msock);
+		return 0;
+	}
+
+	memset(&msg, 0, sizeof msg);
+	msg.type = htonl(MS_MSGTYPE_GETREQUEST);
+	if (statusonly) {
+		msg.body.getrequest.status = 1;
+		msg.body.getrequest.methods = MS_METHOD_ANY;
+	} else {
+		msg.body.getrequest.methods = MS_METHOD_MULTICAST;
+	}
+	len = strlen(imageid);
+	if (len > MS_MAXIDLEN)
+		len = MS_MAXIDLEN;
+	msg.body.getrequest.idlen = htons(len);
+	strncpy(msg.body.getrequest.imageid, imageid, MS_MAXIDLEN);
+
+	len = sizeof msg.type + sizeof msg.body.getrequest;
+	if (!MsgSend(msock, &msg, len, timeout)) {
+		close(msock);
+		return 0;
+	}
+
+	memset(&msg, 0, sizeof msg);
+	len = sizeof msg.type + sizeof msg.body.getreply;
+	if (!MsgReceive(msock, &msg, len, timeout)) {
+		close(msock);
+		return 0;
+	}
+
+	if (ntohl(msg.type) != MS_MSGTYPE_GETREPLY) {
+		fprintf(stderr, "Got incorrect reply from master server\n");
+		close(msock);
+		return 0;
+	}
+	close(msock);
+
+	err = ntohs(msg.body.getreply.error);
+	if (!err) {
+		mcastaddr.s_addr = msg.body.getreply.addr;
+		portnum = (int)ntohs(msg.body.getreply.port);
+	}
+
+	if (statusonly) {
+		if (err)
+			fprintf(stderr, "%s: server denied access (%d)\n",
+				imageid, err);
+		else if (msg.body.getreply.isrunning)
+			fprintf(stderr, "%s: server running %s:%d\n",
+				imageid, inet_ntoa(mcastaddr), portnum);
+		else
+			fprintf(stderr, "%s: access allowed, methods=0x%x\n",
+				imageid, msg.body.getreply.method);
+		return 1;
+	}
+
+	if (err)
+		fprintf(stderr, "%s: server returned error %d\n",
+			imageid, err);
+	else
+		fprintf(stderr, "%s: address: %s:%d\n",
+			imageid, inet_ntoa(mcastaddr), portnum);
+
+	return (err == 0);
+}
+#endif
+

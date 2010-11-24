@@ -314,6 +314,50 @@ typedef struct {
 #define PKTSUBTYPE_PREQUEST	6
 #define PKTSUBTYPE_JOIN2	7
 
+#ifdef MASTER_SERVER
+#include <netinet/in.h>
+
+/* default port number: 0xfbee */
+#define MS_PORTNUM	64494
+
+/* imageid length: large enough to hold an ascii encoded SHA 1024 hash */
+#define MS_MAXIDLEN	256
+
+/*
+ * Master server messages.
+ * These are sent via unicast TCP.
+ */
+typedef struct {
+	int32_t		type;
+	union {
+		struct {
+			uint8_t		methods;
+			uint8_t		status;
+			uint16_t	idlen;
+			char		imageid[MS_MAXIDLEN];
+		} __attribute__((__packed__)) getrequest;
+		struct {
+			uint8_t		method;
+			uint8_t		isrunning;
+			uint16_t	error;	
+			in_addr_t	addr;
+			in_port_t	port;
+		} __attribute__((__packed__)) getreply;
+	} body;
+} MasterMsg_t;
+
+#define MS_MSGTYPE_GETREQUEST	1
+#define MS_MSGTYPE_GETREPLY	2
+#define MS_MSGTYPE_PUTREQUEST	3
+#define MS_MSGTYPE_PUTREPLY	4
+
+#define MS_METHOD_UNKNOWN	0
+#define MS_METHOD_UNICAST	1
+#define MS_METHOD_MULTICAST	2
+#define MS_METHOD_BROADCAST	4
+#define MS_METHOD_ANY		7
+#endif
+
 /*
  * Protos.
  */
@@ -327,6 +371,11 @@ void	PacketSend(Packet_t *p, int *resends);
 void	PacketReply(Packet_t *p);
 int	PacketValid(Packet_t *p, int nchunks);
 void	dump_network(void);
+#ifdef MASTER_SERVER
+int	ClientNetFindServer(struct in_addr *, char *, int, int);
+int	MsgSend(int, MasterMsg_t *, size_t, int);
+int	MsgReceive(int, MasterMsg_t *, size_t, int);
+#endif
 
 /*
  * Globals

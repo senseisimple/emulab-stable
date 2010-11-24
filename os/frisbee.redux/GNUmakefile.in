@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -63,7 +63,13 @@ SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
 SERVEROBJS	= server.o $(SHAREDOBJS)
 
-CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS
+MYSQLCFLAGS	= -I/usr/local/include
+MYSQLLIBS	= -L/usr/local/lib/mysql -lmysqlclient
+MSERVERFLAGS	= $(CFLAGS) $(MYSQLCFLAGS) -DUSE_EMULAB_CONFIG -I$(TESTBED_SRCDIR)/lib/libtb -I$(OBJDIR)
+MSERVERLIBS	= $(OBJDIR)/lib/libtb/libtb.a $(MYSQLLIBS) $(PTHREADLIBS)
+MSERVEROBJS	= mserver.o config.o config_emulab.o $(SHAREDOBJS)
+
+CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS -DMASTER_SERVER
 LDFLAGS		= $(LDSTATIC)
 
 #
@@ -110,6 +116,15 @@ frisbeed: $(SERVEROBJS)
 	cp frisbeed frisbeed.debug
 	strip frisbeed
 
+mfrisbeed: $(MSERVEROBJS)
+	$(CC) $(LDFLAGS) $(MSERVERFLAGS) $(MSERVEROBJS) $(MSERVERLIBS) -o mfrisbeed
+	cp mfrisbeed mfrisbeed.debug
+	strip mfrisbeed
+
+config.o: $(SRCDIR)/config.c configdefs.h log.h
+	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/config.c
+config_emulab.o: $(SRCDIR)/config_emulab.c configdefs.h log.h
+	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/config_emulab.c
 
 log.o:		$(SRCDIR)/log.c decls.h log.h
 	$(CC) $(CFLAGS) -DLOG_TESTBED=$(LOG_TESTBED) -c $(SRCDIR)/log.c
