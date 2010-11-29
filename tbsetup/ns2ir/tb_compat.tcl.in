@@ -442,17 +442,18 @@ proc tb-set-node-rpms {node args} {
 proc tb-set-node-startup {node cmd} {
     $node set startup $cmd
 }
-proc tb-set-node-tarfiles {node args} {
-    if {$args == {}} {
-	perror "\[tb-set-node-tarfiles] tb-set-node-tarfiles <node> (<dir> <tar>)+"
-	return
-    }
+proc tb-proc-tarfiles {cmd args0} { ; # args has special meaning that we
+				      # don't want here
+    set SHAREDNFS [expr {! "@NOSHAREDFS@"}]
+    set args $args0
+
     # Lets assume that a single argument is a string and break it up.
     if {[llength $args] == 1} {
 	set args [split [lindex $args 0] " "]
     }
+
     if {[expr [llength $args] % 2] != 0} {
-	perror "\[tb-set-node-tarfiles] Arguments should be node and series of pairs."
+	perror "\[$cmd] Arguments should be node and series of pairs."
 	return
     }
     set tarfiles {}
@@ -471,16 +472,17 @@ proc tb-set-node-tarfiles {node args} {
 	# XXX This is a hack check because they can specify '/' and have
 	# "proj/foo/..." in the tarball and still clobber themselves.
 	#
-	if {[string match "${::TBCOMPAT::PROJROOT}/*" $dir] ||
-	    [string match "${::TBCOMPAT::GROUPROOT}/*" $dir] ||
-	    [string match "${::TBCOMPAT::USERROOT}/*" $dir] ||
-	    [string match "${::TBCOMPAT::SHAREROOT}/*" $dir] ||
-	    (${::TBCOMPAT::SCRATCHROOT} != "" &&
-	     [string match "${::TBCOMPAT::SCRATCHROOT}/*" $dir])} {
-	    perror "\[tb-set-node-tarfiles] '$dir' refers to an NFS directory instead of the node's local disk."
+	if {$SHAREDNFS && 
+	    ([string match "${::TBCOMPAT::PROJROOT}/*" $dir] ||
+	     [string match "${::TBCOMPAT::GROUPROOT}/*" $dir] ||
+	     [string match "${::TBCOMPAT::USERROOT}/*" $dir] ||
+	     [string match "${::TBCOMPAT::SHAREROOT}/*" $dir] ||
+	     (${::TBCOMPAT::SCRATCHROOT} != "" &&
+	      [string match "${::TBCOMPAT::SCRATCHROOT}/*" $dir]))} {
+	    perror "\[$cmd] '$dir' refers to an NFS directory instead of the node's local disk."
 	    return
 	} elseif {![string match "/*" $dir]} {
-	    perror "\[tb-set-node-tarfiles] '$dir' is not an absolute path."
+	    perror "\[$cmd] '$dir' is not an absolute path."
 	    return
 	}
 
@@ -493,23 +495,24 @@ proc tb-set-node-tarfiles {node args} {
 	if {[string match "*://*" $tarfile]} {
 	    # It is a URL, check for a valid protocol.
 	    if {![::TBCOMPAT::verify-url $tarfile]} {
-		perror "\[tb-set-node-tarfiles] '$tarfile' is not an http, https, or ftp URL."
+		perror "\[$cmd] '$tarfile' is not an http, https, or ftp URL."
 		return
 	    }
 	} elseif {![string match "${::TBCOMPAT::PROJROOT}/*" $tarfile] &&
 	          ![string match "${::TBCOMPAT::GROUPROOT}/*" $tarfile] &&
+	          ![string match "${::TBCOMPAT::USERROOT}/*" $tarfile] &&
 	          (${::TBCOMPAT::SCRATCHROOT} == "" ||
 	           ![string match "${::TBCOMPAT::SCRATCHROOT}/*" $tarfile])} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not in an allowed directory"
+	    perror "\[$cmd] '$tarfile' is not in an allowed directory"
 	    return
 	} elseif {![file exists $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' does not exist."
+	    perror "\[$cmd] '$tarfile' does not exist."
 	    return
 	} elseif {![file isfile $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not a file."
+	    perror "\[$cmd] '$tarfile' is not a file."
 	    return
 	} elseif {![file readable $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' is not readable."
+	    perror "\[$cmd] '$tarfile' is not readable."
 	    return
 	}
 
@@ -519,13 +522,36 @@ proc tb-set-node-tarfiles {node args} {
 	    ![string match "*.tar.gz" $tarfile] &&
 	    ![string match "*.tgz" $tarfile] &&
 	    ![string match "*.tar.bz2" $tarfile]} {
-	    perror "\[tb-set-node-tarfiles] '$tarfile' does not have a valid extension (e.g. *.tar, *.tar.Z, *.tar.gz, *.tgz)."
+	    perror "\[$cmd] '$tarfile' does not have a valid extension (e.g. *.tar, *.tar.Z, *.tar.gz, *.tgz)."
 	    return
 	}
-	lappend tarfiles "$dir $tarfile"
+	lappend tarfiles [list $dir $tarfile]
 	set args [lrange $args 2 end]
     }
+    return $tarfiles
+}
+proc tb-set-node-tarfiles {node args} {
+    if {$args == {}} {
+	perror "\[tb-set-node-tarfiles] tb-set-node-tarfiles <node> (<dir> <tar>)+"
+	return
+    }
+    set tarfiles {}
+    foreach el [tb-proc-tarfiles "tb-set-node-tarfiles" $args] {
+	lappend tarfiles [join $el " "]
+    }
     $node set tarfiles [join $tarfiles ";"]
+}
+proc tb-set-tarfiles {args} {
+    if {$args == {}} {
+	perror "\[tb-set-tarfiles] tb-set-tarfiles (<dir> <tar>)+"
+	return
+    }
+    set tarfiles [tb-proc-tarfiles "tb-set-tarfiles" $args]
+    if [info exists ::TBCOMPAT::tarfiles] {
+	set ::TBCOMPAT::tarfiles [concat $::TBCOMPAT::tarfiles $tarfiles]
+    } else {
+	set ::TBCOMPAT::tarfiles $tarfiles
+    }
 }
 proc tb-set-ip-routing {type} {
     var_import ::GLOBALS::default_ip_routing_type

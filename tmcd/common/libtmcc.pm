@@ -18,7 +18,7 @@ use Exporter;
 	     tmcccopycache tmccbossinfo
 	     TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_STATE TMCCCMD_IFC
 	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_BRIDGES TMCCCMD_HOSTS TMCCCMD_RPM
-	     TMCCCMD_TARBALL TMCCCMD_STARTUP TMCCCMD_STARTSTAT
+	     TMCCCMD_TARBALL TMCCCMD_BLOBS TMCCCMD_STARTUP TMCCCMD_STARTSTAT
 	     TMCCCMD_READY TMCCCMD_MOUNTS TMCCCMD_ROUTING TMCCCMD_TRAFFIC
 	     TMCCCMD_BOSSINFO TMCCCMD_TUNNEL TMCCCMD_NSECONFIGS
 	     TMCCCMD_VNODELIST TMCCCMD_SUBNODELIST TMCCCMD_ISALIVE
@@ -138,6 +138,7 @@ my %commandset =
       "hostnames"	=> {TAG => "hostnames"},
       "rpms"		=> {TAG => "rpms"},
       "tarballs"	=> {TAG => "tarballs"},
+      "blobs"		=> {TAG => "blobs"},
       "startupcmd"	=> {TAG => "startupcmd"},
       "startstatus"	=> {TAG => "startstatus"},
       "ready"		=> {TAG => "ready"},
@@ -208,6 +209,7 @@ sub TMCCCMD_BRIDGES()	{ $commandset{"bridges"}->{TAG}; }
 sub TMCCCMD_HOSTS()	{ $commandset{"hostnames"}->{TAG}; }
 sub TMCCCMD_RPM()	{ $commandset{"rpms"}->{TAG}; }
 sub TMCCCMD_TARBALL()	{ $commandset{"tarballs"}->{TAG}; }
+sub TMCCCMD_BLOBS()	{ $commandset{"blobs"}->{TAG}; }
 sub TMCCCMD_STARTUP()	{ $commandset{"startupcmd"}->{TAG}; }
 sub TMCCCMD_STARTSTAT()	{ $commandset{"startstatus"}->{TAG}; }
 sub TMCCCMD_READY()	{ $commandset{"ready"}->{TAG}; }

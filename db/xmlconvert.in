@@ -122,6 +122,9 @@ my %virtual_tables =
      "virt_paths"               => { rows  => undef,
 				     tag   => "path_members",
 				     row   => "path_member"},
+     "experiment_blobs"         => { rows => undef,
+				     tag   => "blobs",
+				     row   => "blob"},
      # This is a fake table. See below. If we add more, lets generalize.
      "external_sourcefiles"	=> { rows  => undef, 
 				     tag   => "nsfiles",

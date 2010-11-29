@@ -67,17 +67,19 @@ int RPC_eventlist(char *pid, char *eid,
 		  event_handle_t handle, address_tuple_t tuple);
 
 extern int SetExpPath(const char *path);
-extern int AddUserEnv(char *name, char *value);
+extern int AddUserEnv(const char *name, const char *value);
 
 extern int AddAgent(event_handle_t handle,
-		    char *vname, char *vnode, char *nodeid,
-		    char *ipaddr, char *type);
+		    const char *vname, const char *vnode, const char *nodeid,
+		    const char *ipaddr, const char *type);
 
-extern int AddGroup(event_handle_t handle, char *groupname, char *agentname);
+extern int AddGroup(event_handle_t handle, const char *groupname,
+                    const char *agentname);
 
 extern int AddEvent(event_handle_t handle, address_tuple_t tuple,
-		    char *exidx, char *ftime, char *objname, char *exargs,
-		    char *objtype, char *evttype, char *parent, char *triggertype);
+		    const char *exidx, const char *ftime, const char *objname,
+                    const char *exargs, const char *objtype, const char *evttype,
+                    const char *parent, const char *triggertype);
 
 extern int AddRobot(event_handle_t handle,
 		    struct agent *agent,

@@ -57,6 +57,9 @@ my %msgs = ();
 my $reload_time = 600;
 my $last_reload = time;
 
+# Handling of SECVIOLATIONS, eventually controlled by a sitevar
+my $soft_secviolation = 1;
+
 # Command line opts.
 my $dbtag = "";
 my $debug = 0;
@@ -139,6 +142,9 @@ my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 
 # Special PXEBOOT state machine that all local nodes use.
 my $PXEKERNEL	 = "PXEKERNEL";
+
+# Even special-er SECUREBOOT state machine that local nodes may use.
+my $SECUREBOOT	 = "SECUREBOOT";
 
 # Protos.
 sub debug(@);
@@ -625,6 +631,34 @@ sub stateTransition($$) {
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
 	       "to $newstate\n");
+	#
+	# Machines in the secure boot path are not allowed to jump
+	# willy-nilly into unknown states.
+	#
+        if ($mode eq TBDB_NODEOPMODE_SECUREBOOT ||
+	    $mode eq TBDB_NODEOPMODE_SECURELOAD) {
+            $newstate = TBDB_NODESTATE_SECVIOLATION;
+            notify("Moving $node to $newstate because it's in $mode\n");
+        }
+    }
+    #
+    # Nodes that are in the SECVIOLATION state are not allowed to leave!
+    #
+    if ($oldstate eq TBDB_NODESTATE_SECVIOLATION &&
+	$newstate ne TBDB_NODESTATE_SECVIOLATION) {
+	#
+	# Allow transitions to SHUTDOWN.
+	# This allows someone to reboot a node in the SECVIOLATION state
+	# getting it back to MINIMAL/SHUTDOWN.
+	#
+	# XXX DEBUG ONLY!
+	# 
+	if ($soft_secviolation && $newstate eq TBDB_NODESTATE_SHUTDOWN) {
+	    notify("$node allowed to transition: SECVIOLATION => SHUTDOWN\n");
+	} else {
+	    notify("$node tried to leave SECVIOLATION (to $newstate)\n");
+	    $newstate = TBDB_NODESTATE_SECVIOLATION;
+	}
     }
 
     my $now = time();
@@ -715,6 +749,32 @@ sub stateTransition($$) {
 		    info("$node: Forcing mode transition into $PXEKERNEL!\n");
 		    opModeTransition($node, $PXEKERNEL, 1);
 		    $mode=$PXEKERNEL;
+		}
+		next;
+	    };
+	    /^$SECUREBOOT$/ && do {
+		#
+		# Force machine into the SECUREBOOT/LOAD op_mode.
+		# Currently triggered by receipt of GPXEBOOTING state.
+		# This could come from any state as it just indicates that
+		# a machine with a gPXE dongle has rebooted.
+		#
+		# To differentiate BOOT from LOAD we check next_op_mode.
+		# It will be set to SECURELOAD when we need to go there,
+		# otherwise we force it to SECUREBOOT.
+		#
+		debug("Running $SECUREBOOT trigger\n");
+		my $query_result =
+		    DBQueryWarn("select next_op_mode from nodes ".
+				"where node_id='$node'");
+		my ($nextmode) = $query_result->fetchrow();
+		if (!$nextmode || $nextmode ne TBDB_NODEOPMODE_SECURELOAD) {
+		    $nextmode = TBDB_NODEOPMODE_SECUREBOOT;
+		}
+		if ($mode ne $nextmode) {
+		    info("$node: Forcing mode transition to $nextmode!\n");
+		    opModeTransition($node, $nextmode, 1);
+		    $mode=$nextmode;
 		}
 		next;
 	    };
@@ -819,10 +879,28 @@ sub stateTransition($$) {
 			      objname   => $node);
 		next;
 	    };
-	    (/^$TBREBOOT$/ || /^$TBPOWERCYCLE$/) && do {
+	    (/^$TBREBOOT$/ || /^$TBPOWERCYCLE$/ || /^$TBPOWEROFF$/) && do {
 		handleCommand($node,$trig);
 		next;
 	    };
+            (/^EMAILNOTIFY$/) && do {
+		my $msg = "$node entered state $mode/$newstate from " .
+		    "$mode/$oldstate";
+		my $dest = $REALTBOPS;
+		if ($newstate eq TBDB_NODESTATE_SECVIOLATION) {
+		    if ($soft_secviolation) {
+			$msg .= "\n\nNode $node was allowed to continue.\n";
+			$dest = $TBOPS;
+		    } else {
+			$msg .= "\n\nNode $node has been powered off.\n" .
+			        "You must address the cause of the violation ".
+				"and reset the eventstate before powering on.";
+		    }
+		}
+		SENDMAIL($dest, "STATED: $node entered state $newstate",
+			 $msg, "Stated Daemon <".$TBOPS.">");
+		next;
+            };
 	    /^RELOADOLDMFS$/ && do {
 		my $frisbee_osid = TBNodeDiskloadOSID($node);
 		my $frisbee_name = DBQuerySingleFatal("select osname from os_info where osid=$frisbee_osid");
@@ -1040,6 +1118,11 @@ sub handleCtrlEvent($$) {
 		/^$TBTIMEOUTNOTIFY/ && do {
 		    notify("Node $node has timed out in state $mode/$state\n");
 		    last; };
+                /^STATE:([-\w\/]+)$/ && do {
+                    my $newstate = $1;
+                    # Force the node into a new state
+                    stateTransition($node,$newstate);
+                    last; };
 		notify("$node: Unknown Timeout Action: $action\n");
 	    }
 	    next;
@@ -1127,11 +1210,21 @@ sub handleCommand($$;$$) {
 			    $TBPOWERON    => "on",
 			    $TBPOWEROFF   => "off");
 	    my $func = $funcmap{$command};
+
+	    if ($soft_secviolation && $func eq "off" && @nodes > 0 &&
+		$nodes{$nodes[0]}{state} eq TBDB_NODESTATE_SECVIOLATION) {
+		info("soft SECVIOLATION: NOT powering off $params\n");
+		next;
+	    }
+
 	    info("Sending power $func for nodes: $nodelist\n");
+	    #
 	    # Permissions were checked in order to send the message,
 	    # so we don't need to do any fancy stuff here.
-
-	    my $cmd = "$power $func $nodelist &";
+	    # We do invoke with -e to prevent power from sending a
+	    # further SHUTDOWN event.
+	    #
+	    my $cmd = "$power -e $func $nodelist &";
 	    debug("$cmd\n");
 	    system($cmd) and
 	      notify("$params/$command: ".
@@ -1634,4 +1727,3 @@ END {
     # Restore $? in case one of the things I called changed it
     $? = $stat;
 }
-
