@@ -10,7 +10,7 @@ You appear to have running frisbee servers.  Please make sure the
     testbed is shutdown before applying this upgrade.  This should normally
     be taken care of automatically if you use "gmake update-testbed".  If
     the testbed is shutdown than see the instruction at the end of
-    sql/updates/4/XXX for how to rectify the situation.
+    sql/updates/4/225 for how to rectify the situation.
 EOF
 chop $running_frisbee_messages;
 sub DoUpdate($$$)

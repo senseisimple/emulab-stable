@@ -146,7 +146,7 @@ sub ActiveImages($)
     my @result  = ();
 
     my $query_result =
-	DBQueryWarn("select imageid from images where frisbee_pid!=0");
+	DBQueryWarn("select imageid from frisbee_blobs where frisbee_pid!=0");
     return undef
 	if (!defined($query_result));
 

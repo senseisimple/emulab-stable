@@ -294,8 +294,8 @@ sub FeatureEnabled($$$$)
     # A non existent feature is always disabled.
     # Do not warn; not all sites will have the same set.
     if (!defined($feature)) {
-	print STDERR
-	    "*** Checking for non-existent Emulab Feature: $featurename\n"
+	print STDERR "*** WARNING: ".
+	    "Checking for non-existent Emulab Feature: $featurename\n"
 	    if ($MAINSITE || $debug);
 	return 0;
     }

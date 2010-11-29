@@ -57,6 +57,9 @@ my %msgs = ();
 my $reload_time = 600;
 my $last_reload = time;
 
+# Handling of SECVIOLATIONS, eventually controlled by a sitevar
+my $soft_secviolation = 1;
+
 # Command line opts.
 my $dbtag = "";
 my $debug = 0;
@@ -643,8 +646,19 @@ sub stateTransition($$) {
     #
     if ($oldstate eq TBDB_NODESTATE_SECVIOLATION &&
 	$newstate ne TBDB_NODESTATE_SECVIOLATION) {
-	notify("$node tried to leave SECVIOLATION (to $newstate)\n");
-	$newstate = TBDB_NODESTATE_SECVIOLATION;
+	#
+	# Allow transitions to SHUTDOWN.
+	# This allows someone to reboot a node in the SECVIOLATION state
+	# getting it back to MINIMAL/SHUTDOWN.
+	#
+	# XXX DEBUG ONLY!
+	# 
+	if ($soft_secviolation && $newstate eq TBDB_NODESTATE_SHUTDOWN) {
+	    notify("$node allowed to transition: SECVIOLATION => SHUTDOWN\n");
+	} else {
+	    notify("$node tried to leave SECVIOLATION (to $newstate)\n");
+	    $newstate = TBDB_NODESTATE_SECVIOLATION;
+	}
     }
 
     my $now = time();
@@ -872,15 +886,19 @@ sub stateTransition($$) {
             (/^EMAILNOTIFY$/) && do {
 		my $msg = "$node entered state $mode/$newstate from " .
 		    "$mode/$oldstate";
+		my $dest = $REALTBOPS;
 		if ($newstate eq TBDB_NODESTATE_SECVIOLATION) {
-		    $msg .= "\n\nNode $node has been powered off.\n" .
-			    "You must address the cause of the violation ".
-			    "and reset the eventstate before powering on.";
+		    if ($soft_secviolation) {
+			$msg .= "\n\nNode $node was allowed to continue.\n";
+			$dest = $TBOPS;
+		    } else {
+			$msg .= "\n\nNode $node has been powered off.\n" .
+			        "You must address the cause of the violation ".
+				"and reset the eventstate before powering on.";
+		    }
 		}
-		SENDMAIL($REALTBOPS,
-			 "STATED: $node entered state $newstate",
-			 $msg,
-			 "Stated Daemon <".$TBOPS.">");
+		SENDMAIL($dest, "STATED: $node entered state $newstate",
+			 $msg, "Stated Daemon <".$TBOPS.">");
 		next;
             };
 	    /^RELOADOLDMFS$/ && do {
@@ -1192,6 +1210,13 @@ sub handleCommand($$;$$) {
 			    $TBPOWERON    => "on",
 			    $TBPOWEROFF   => "off");
 	    my $func = $funcmap{$command};
+
+	    if ($soft_secviolation && $func eq "off" && @nodes > 0 &&
+		$nodes{$nodes[0]}{state} eq TBDB_NODESTATE_SECVIOLATION) {
+		info("soft SECVIOLATION: NOT powering off $params\n");
+		next;
+	    }
+
 	    info("Sending power $func for nodes: $nodelist\n");
 	    #
 	    # Permissions were checked in order to send the message,

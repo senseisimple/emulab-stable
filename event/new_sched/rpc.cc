@@ -299,14 +299,15 @@ RPC_metadata(char *pid, char *eid)
 			int lpc;
 
 			for (lpc = 0; lpc < userenv.size(); lpc++) {
-				char *name, *value;
+				string name, value;
 				map<string, xmlrpc_c::value> ue;
 				
 				ue = (xmlrpc_c::value_struct)userenv[lpc];
-				name = (char *)((string)(xmlrpc_c::value_string)ue["name"]).c_str();
-				value = (char *)((string)(xmlrpc_c::value_string)ue["value"]).c_str();
+				name = (xmlrpc_c::value_string)ue["name"];
+				value = (xmlrpc_c::value_string)ue["value"];
 
-				if ((retval = AddUserEnv(name, value)) != 0)
+				if ((retval = AddUserEnv(name.c_str(),
+				                         value.c_str())) != 0)
 					return retval;
 			}
 		}
@@ -585,17 +586,18 @@ RPC_agentlist(event_handle_t handle, char *pid, char *eid)
 		((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
 	
 	for (i = 0; i < agents.size(); i++) {
-		char *vname, *vnode, *nodeid, *ipaddr, *type;
+		string vname, vnode, nodeid, ipaddr, type;
 		vector<xmlrpc_c::value>agent =
 			((xmlrpc_c::value_array)agents[i]).vectorValueValue();
 		
-		vname = (char *)((string)(xmlrpc_c::value_string)agent[0]).c_str();
-		vnode = (char *)((string)(xmlrpc_c::value_string)agent[1]).c_str();
-		nodeid = (char *)((string)(xmlrpc_c::value_string)agent[2]).c_str();
-		ipaddr = (char *)((string)(xmlrpc_c::value_string)agent[3]).c_str();
-		type = (char *)((string)(xmlrpc_c::value_string)agent[4]).c_str();
-		info("D: adding agent %s\n", vname);
-		if (AddAgent(handle, vname, vnode, nodeid, ipaddr, type) < 0) {
+		vname = (xmlrpc_c::value_string)agent[0];
+		vnode = (xmlrpc_c::value_string)agent[1];
+		nodeid = (xmlrpc_c::value_string)agent[2];
+		ipaddr = (xmlrpc_c::value_string)agent[3];
+		type = (xmlrpc_c::value_string)agent[4];
+		info("D: adding agent %s\n", (char *)vname.c_str());
+		if (AddAgent(handle, vname.c_str(), vnode.c_str(),
+		             nodeid.c_str(), ipaddr.c_str(), type.c_str()) < 0) {
 			return -1;
 		}
 	}
@@ -616,16 +618,19 @@ RPC_grouplist(event_handle_t handle, char *pid, char *eid)
 		((xmlrpc_c::value_array)er.getValue()).vectorValueValue();
 	
 	for (i = 0; i < groups.size(); i++) {
-		char *groupname, *agentname;
+		string groupname, agentname;
 		vector<xmlrpc_c::value> group =
 			((xmlrpc_c::value_array)groups[i]).vectorValueValue();
 		
-		groupname = (char *)((string)(xmlrpc_c::value_string)group[0]).c_str();
-		info("D: \tIn GroupList() parsed name %s\n", groupname);
-		agentname = (char *)((string)(xmlrpc_c::value_string)group[1]).c_str();
-		info("D: \tIn GroupList() parsed agent %s\n", agentname);
+		groupname = (xmlrpc_c::value_string)group[0];
+		info("D: \tIn GroupList() parsed name %s\n",
+		     (char *)groupname.c_str());
+		agentname = (xmlrpc_c::value_string)group[1];
+		info("D: \tIn GroupList() parsed agent %s\n",
+		     (char *)agentname.c_str());
 		
-		if (AddGroup(handle, groupname, agentname) != 0) {
+		if (AddGroup(handle, groupname.c_str(),
+		             agentname.c_str()) != 0) {
 			return -1;
 		}
 	}
@@ -656,25 +661,27 @@ RPC_eventlist(char *pid, char *eid,
 //	info("rpc.cc:RPC_eventlist(): Interating over invoke results\n");
 // XXX	
 	for (i = 0; i < events.size(); i++) {
-		char *exidx, *extime, *objname, *objtype, *evttype, *exargs;
-		char *parent, *triggertype;
+		string exidx, extime, objname, objtype, evttype, exargs;
+		string parent, triggertype;
 		vector<xmlrpc_c::value> event =
 			((xmlrpc_c::value_array)events[i]).vectorValueValue();
 
-		exidx = (char *)((string)(xmlrpc_c::value_string)event[0]).c_str();
-		extime = (char *)((string)(xmlrpc_c::value_string)event[1]).c_str();
-		objname = (char *)((string)(xmlrpc_c::value_string)event[2]).c_str();
-		objtype = (char *)((string)(xmlrpc_c::value_string)event[3]).c_str();
-		evttype = (char *)((string)(xmlrpc_c::value_string)event[4]).c_str();
-		exargs = (char *)((string)(xmlrpc_c::value_string)event[5]).c_str();
-		parent = (char *)((string)(xmlrpc_c::value_string)event[6]).c_str();
-		triggertype = (char *)((string)(xmlrpc_c::value_string)event[7]).c_str();
+		exidx = (xmlrpc_c::value_string)event[0];
+		extime = (xmlrpc_c::value_string)event[1];
+		objname = (xmlrpc_c::value_string)event[2];
+		objtype = (xmlrpc_c::value_string)event[3];
+		evttype = (xmlrpc_c::value_string)event[4];
+		exargs = (xmlrpc_c::value_string)event[5];
+		parent = (xmlrpc_c::value_string)event[6];
+		triggertype = (xmlrpc_c::value_string)event[7];
 // XXX
 //	info("rpc.cc:RPC_eventlist(): Adding an event\n");
 // XXX 		
-		if (AddEvent(handle, tuple, exidx,
-			     extime, objname, exargs, objtype, evttype,
-			     parent, triggertype) < 0) {
+		if (AddEvent(handle, tuple, exidx.c_str(),
+			     extime.c_str(), objname.c_str(),
+		             exargs.c_str(), objtype.c_str(),
+		             evttype.c_str(), parent.c_str(),
+		             triggertype.c_str()) < 0) {
 			return -1;
 		}
 	}

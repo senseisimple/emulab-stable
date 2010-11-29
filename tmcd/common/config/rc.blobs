@@ -38,6 +38,7 @@ my $TARDBFILE   = "/var/db/testbed.tarfiles";
 # library and initialize itself. 
 # 
 use libsetup;
+use liblocsetup;
 use libtmcc;
 use librc;
 
@@ -95,10 +96,11 @@ sub doboot()
 {
     my @blobs;
     my $errors = 0;
+    my $need_mkextrafs = 1;
 
-    if (-e "/var/emulab/boot/rc.blobs-ran") {
-	print STDOUT "Blobs installation already ran on this node.\n";
-	print STDOUT "  Remove /var/emulab/boot/rc.blobs-ran to run again.\n";
+    if (-e "$BOOTDIR/rc.blobs-ran") {
+	print STDOUT "  Blobs installation already done.\n";
+	print STDOUT "  (Remove $BOOTDIR/rc.blobs-ran to run again.)\n";
 	exit 0;
     }
 
@@ -110,17 +112,24 @@ sub doboot()
     return
 	if (! @blobs);
 
+    unlink("$LOGDIR/blobs.log");
     foreach my $blob (@blobs) {
 	eval {
 	    ($mcastaddr, $portnum, undef, $basename, $dest) = 
-		$blob =~ m|^URL=frisbee.mcast://(.+):(.+)/(.+/)?(.+) ACTION=unpack:(\S+)|
+		$blob =~ m|^URL=frisbee.mcast://(.+?):(.+?)/(.+/)?(.+) ACTION=unpack:(\S+)|
 		or die "Bad Blobs line\n";
 
 	    # FIXME: Make sure $basename doesn't exist...
 	    my $local_path = "/var/tmp/$basename";
-	    my $frisbee_cmd = "$FRISBEE -p $portnum -m $mcastaddr $local_path";
+	    my $frisbee_cmd = "$FRISBEE -p $portnum -m $mcastaddr $local_path".
+		              " >>$LOGDIR/blobs.log 2>&1";
 
-	    print STDOUT "Fetching blob $basename to $local_path and unpacking to $dest\n";
+	    if ($dest =~ /^\/local/ && $need_mkextrafs) {
+		os_mountextrafs("/local");
+		$need_mkextrafs = 0;
+	    }
+
+	    print STDOUT "  Downloading blob $basename to $local_path\n";
 
 	    #print STDOUT "$frisbee_cmd\n";
 	    # launch frisbee
@@ -128,13 +137,17 @@ sub doboot()
 		die "Frisbee failed\n";
 	    }
 
-	    my $unpack_cmd = "$TARINSTALL $dest $local_path";
+	    print STDOUT "  Unpacking to $dest\n";
+	    my $unpack_cmd = "$TARINSTALL -f $dest $local_path".
+		             " >>$LOGDIR/blobs.log 2>&1";
 	    #print STDOUT "$unpack_cmd\n";
 	    if (system($unpack_cmd)) {
 		if ($? >> 8 == 255) {
-		    die "Tarinstall failed\n";
+		    die "Tarinstall failed (see $LOGDIR/blobs.log)\n";
 		}
 	    }
+
+	    system("rm $local_path");
 	};
 	if ($@) {
 	    my $err = $@;
@@ -145,7 +158,7 @@ sub doboot()
     }
     
     if (!$errors) {
-	system("touch /var/emulab/boot/rc.blobs-ran");
+	system("touch $BOOTDIR/rc.blobs-ran");
     }
 
     exit($errors);

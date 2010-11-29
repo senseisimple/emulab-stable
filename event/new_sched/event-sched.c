@@ -997,7 +997,7 @@ SetExpPath(const char *path)
 }
 
 int
-AddUserEnv(char *name, char *path)
+AddUserEnv(const char *name, const char *path)
 {
 	int retval = 0;
 	FILE *file;
@@ -1042,7 +1042,8 @@ AddUserEnv(char *name, char *path)
  */
 int
 AddAgent(event_handle_t handle,
-	 char *vname, char *vnode, char *nodeid, char *ipaddr, char *type)
+	 const char *vname, const char *vnode, const char *nodeid,
+        const char *ipaddr, const char *type)
 {
 	struct agent *agentp;
 
@@ -1173,7 +1174,7 @@ AddAgent(event_handle_t handle,
  * Add an agent group to the list.
  */
 int
-AddGroup(event_handle_t handle, char *groupname, char *agentname)
+AddGroup(event_handle_t handle, const char *groupname, const char *agentname)
 {
 	struct agent *group = NULL, *agent;
 	int retval = 0;
@@ -1238,8 +1239,9 @@ AddGroup(event_handle_t handle, char *groupname, char *agentname)
 
 int
 AddEvent(event_handle_t handle, address_tuple_t tuple,
-	 char *exidx, char *ftime, char *objname, char *exargs,
-	 char *objtype, char *evttype, char *parent, char *triggertype)
+	 const char *exidx, const char *ftime, const char *objname,
+         const char *exargs, const char *objtype, const char *evttype,
+         const char *parent, const char *triggertype)
 {
 	timeline_agent_t     ta = NULL;
 	sched_event_t	     event;

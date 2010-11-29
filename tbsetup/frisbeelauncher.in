@@ -496,39 +496,6 @@ sub UnlockTables()
 }
 
 #
-# One-time conversion function.
-# Convert overly complex frisbee_mcastaddr index into simple incremented one.
-#
-sub CreateIndex()
-{
-    my $idx = 0;
-
-    DBQueryFatal("lock tables emulab_indicies write");
-
-    my $baseaddr_query =
-	DBQueryFatal("select idx from emulab_indicies ".
-		     "where name='frisbee_mcastaddr'");
-    if ($baseaddr_query->num_rows) {
-	($idx) = $baseaddr_query->fetchrow_array();
-	my $orig = unpack("N", inet_aton("${BASEADDR}.1"));
-	$idx -= $orig;
-	# absolutely anal: we didn't use 2 of every 256 addresses
-	my $tweak = int($idx / 256) * 2;
-	$idx -= $tweak;
-	if ($idx < 0 || $idx > 1000000) {
-	    $idx = 0;
-	}
-    }
-    $idx++;
-
-    DBQueryFatal("insert into emulab_indicies (name, idx) ".
-		 " values ('frisbee_index', $idx)");
-
-    DBQueryFatal("unlock tables");
-    return $idx;
-}
-
-#
 # Pick out an address to use.
 # DB tables must be *unlocked* for this to work!
 #
@@ -540,13 +507,8 @@ sub PickAddress()
 		     "where name='frisbee_index'");
 
     if ($index_query->affectedrows <= 0) {
-	my $msg = "Doing one-time creation of frisbee_index in emulab_indicies table";
-	SENDMAIL($TBOPS,
-		 "FrisbeeLauncher Notice!",
-		 "File: $filename\n".
-		 $msg);
-
-	$idx = CreateIndex();
+	Fatal("emulab_indicies frisbee_index entry does not exist!".
+	      " See sql/updates/4/226 in the source tree.");
     } else {
 	$idx = $index_query->insertid();
     }
