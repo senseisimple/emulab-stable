@@ -320,7 +320,7 @@ typedef struct {
 int	GetSockbufSize(void);
 int	ClientNetInit(void);
 int	ServerNetInit(void);
-int	ServerNetMCKeepAlive(void);
+int	NetMCKeepAlive(void);
 unsigned long ClientNetID(void);
 int	PacketReceive(Packet_t *p);
 void	PacketSend(Packet_t *p, int *resends);

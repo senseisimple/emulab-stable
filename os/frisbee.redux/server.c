@@ -604,7 +604,7 @@ ServerRecvThread(void *arg)
 		pthread_testcancel();
 		if (PacketReceive(p) != 0) {
 			if (keepalive && ++idles > keepalive) {
-				if (ServerNetMCKeepAlive()) {
+				if (NetMCKeepAlive()) {
 					warning("Multicast keepalive failed");
 					if (++kafails > 5) {
 						warning("too many failures, disabled");
