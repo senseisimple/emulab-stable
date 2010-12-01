@@ -2230,7 +2230,7 @@ sub SliverWorkAux($$$$$$$)
 
 	foreach my $ifaceref (@interfaces) {
 	    my $iface_id   = GeniXML::GetInterfaceId($ifaceref);
-	    my $node_id    = GeniXML::GetInterfaceNode($ifaceref);
+	    my $node_id    = GeniXML::GetInterfaceNodeId($ifaceref);
 	    if (! GeniXML::IsVersion0($ifaceref) && defined($iface_id)) {
 		$node_id = $iface2node{$iface_id};
 	    }

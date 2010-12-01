@@ -301,7 +301,7 @@ sub AssignLoop()
 {
     my $currentrun     = 1;
     my $canceled       = 0;
-    my $noprogress     = 0;
+    my $progress       = 0;
     my $tried_precheck = 0;
     # Admission control counts
     my %admission_control = ();
@@ -355,7 +355,8 @@ sub AssignLoop()
 	# RunAssign returns  0 if successful.
 	#           returns -1 if failure, but assign says to stop trying.
 	#           returns  1 if failure, but assign says to try again.
-	#           returns  2 if assign succeeds, but nodes were allocated
+	#           returns  2 if assign succeeds, but no nodes allocated.
+	#           returns  3 if assign succeeds, but some nodes allocated.
 	#
 	my $retval = RunAssign($precheck, $prefix);
 
@@ -405,15 +406,17 @@ sub AssignLoop()
 	    $impotent = $save_impotent;
 	    $tried_precheck = 1;
 	}
-
-	# If we made progress, keep trying until no progress twice in a row.
-	if ($currentrun >= $maxrun && $noprogress) {
+	# We try a minimum number of times, cause the node pool is
+	# always changing. But once we hit the maxrun, we continue
+	# only if progress on the last loop.
+	if ($currentrun >= $maxrun && !$progress) {
 	    fatal({type => 'primary', severity => SEV_ERROR,
 		   error => ['reached_assign_run_limit']},
 		  "Reached run limit. Giving up.");
 	}
-	# See if we made progress or not. We try one extra time. See above.
-	$noprogress = ($retval == 2);
+	# See if we made progress or not.
+	# Keep going if we allocated some nodes.
+	$progress = ($retval == 3);
 
 	chat("Waiting 5 seconds and trying again...\n");
 	sleep(5);
@@ -641,12 +644,18 @@ sub RunAssign($$)
     #
     system("/bin/cp assign.log ${prefix}.assign");
 
-    #
-    # We no longer care what assign has to say when it fails.
-    # Any relevent info was already sent to stderr so just 
-    # tell the caller whether we want to keep trying or not.
-    #
     if ($assignexitcode) {
+	print "Assign exited with $assignexitcode\n" if ($debug);
+	
+	system("/bin/cat assign.log");
+	#
+	# assign returns two positive error codes (that we care about).
+	# The distinction between them is somewhat murky. An exitval of
+	# 1 means "retryable" while 2 means "unretryable". The former
+	# means we can try again, while the later says there is no possible
+	# way to map it. We pass this back to the caller so that we know
+	# to exit the loop or try again.
+	#
 	return (($assignexitcode == 1) ? 1 : -1);
     }
     #
@@ -696,13 +705,9 @@ sub RunAssign($$)
 	return -1;
     }
     my $retval = $vtop->AllocNodes();
-    if ($retval != 0) {
-	if ($retval < 1) {
-	    # Could not allocate any nodes.
-	    return 2;
-	}
-	return 1;
-    }
+    return $retval
+	if ($retval != 0);
+
     TBDebugTimeStamp("AllocNodes ended, InterpLinks Started");
     if ($vtop->InterpLinks() != 0) {
 	print("Could not setup links\n");

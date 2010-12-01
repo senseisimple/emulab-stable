@@ -57,6 +57,7 @@ int		tracing = 0;
 char		traceprefix[64];
 int		randomize = 1;
 int		zero = 0;
+int		keepalive;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
@@ -155,12 +156,12 @@ char *usagestr =
  " -i mcastif      Specify a multicast interface in dotted notation.\n"
  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
  "                 NOTE: Must specify a raw disk device for output filename.\n"
- " -D DOS-type     With -s, sets the DOS type of the slice in the MBR\n"
  " -F file-ID      Specify the ID of the file (image) to download.\n"
  "                 Here -S specifies the 'master' server which will\n"
  "                 return unicast/multicast info to use for image download.\n"
  " -Q file-ID      Ask the server (-S) about the indicated file (image).\n"
  "                 Tells whether the image is accessible by this node/user.\n"
+ " -K seconds      Send a multicast keep alive after a period of inactivity.\n"
  "\n"
  "tuning options (if you don't know what they are, don't use em!):\n"
  " -C MB           Max MB of memory to use for network chunk buffering.\n"
@@ -203,7 +204,7 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONF:Q:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:F:Q:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -325,6 +326,12 @@ main(int argc, char **argv)
 
 		case 'N':
 			nodecompress = 1;
+			break;
+
+		case 'K':
+			keepalive = atoi(optarg);
+			if (keepalive < 0)
+				keepalive = 0;
 			break;
 
 		case 'h':
@@ -492,6 +499,14 @@ main(int argc, char **argv)
 			DiskStatusCallback = WriterStatusCallback;
 	}
 
+	/*
+	 * Set the MC keepalive counter (but only if we are multicasting!)
+	 */
+	if (broadcast || (ntohl(mcastaddr.s_addr) >> 28) != 14)
+		keepalive = 0;
+	if (keepalive)
+		log("Enabling MC keepalive at %d seconds", keepalive);
+
 	PlayFrisbee();
 
 	if (tracing) {
@@ -532,11 +547,13 @@ void *
 ClientRecvThread(void *arg)
 {
 	Packet_t	packet, *p = &packet;
-	int		IdleCounter, BackOff;
+	int		IdleCounter, BackOff, KACounter;
 	static int	gotone;
 
 	if (debug)
 		log("Receive pthread starting up ...");
+
+	KACounter = keepalive * TIMEOUT_HZ;
 
 	/*
 	 * Use this to control the rate at which we request blocks.
@@ -582,6 +599,23 @@ ClientRecvThread(void *arg)
 		 */
 		if (PacketReceive(p) != 0) {
 			pthread_testcancel();
+
+			/*
+			 * See if we should send a keep alive
+			 */
+			if (KACounter == 1) {
+				/* If for some reason it fails, stop trying */
+				if (debug)
+					log("sending keepalive...");
+				if (NetMCKeepAlive()) {
+					log("Multicast keepalive failed, "
+					    "disabling keepalive");
+					keepalive = 0;
+				}
+				KACounter = keepalive * TIMEOUT_HZ;
+			} else if (KACounter > 1)
+				KACounter--;
+
 			if (--IdleCounter <= 0) {
 				if (gotone)
 					DOSTAT(recvidles++);
@@ -602,6 +636,8 @@ ClientRecvThread(void *arg)
 			continue;
 		}
 		pthread_testcancel();
+		if (keepalive)
+			KACounter = keepalive * TIMEOUT_HZ;
 		gotone = 1;
 
 		if (! PacketValid(p, TotalChunkCount)) {
