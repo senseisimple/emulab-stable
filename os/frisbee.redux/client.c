@@ -354,13 +354,31 @@ main(int argc, char **argv)
 
 	ClientLogInit();
 #ifdef MASTER_SERVER
-	if (imageid && !ClientNetFindServer(&serverip, imageid, askonly, 5)) {
-		fprintf(stderr, "Could not get download info for '%s'\n",
-			imageid);
-		exit(1);
+	if (imageid) {
+		GetReply reply;
+		int method = askonly ? MS_METHOD_ANY : MS_METHOD_MULTICAST;
+		int timo = 5; /* XXX */
+
+		if (!ClientNetFindServer(ntohl(serverip.s_addr), portnum,
+					 imageid, method, askonly, timo,
+					 &reply))
+			fatal("Could not get download info for '%s'", imageid);
+
+		if (askonly) {
+			PrintGetInfo(imageid, &reply);
+			exit(0);
+		}
+
+		if (reply.error)
+			fatal("%s: server returned error: %s",
+			      imageid, GetMSError(reply.error));
+
+		log("%s: address: %s:%d",
+		    imageid, inet_ntoa(mcastaddr), portnum);
+
+		mcastaddr.s_addr = htonl(reply.addr);
+		portnum = reply.port;
 	}
-	if (askonly)
-		exit(0);
 #endif
 	ClientNetInit();
 

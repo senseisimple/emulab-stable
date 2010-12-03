@@ -6,6 +6,7 @@
 
 #ifdef USE_EMULAB_CONFIG
 #include <sys/param.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -39,8 +40,10 @@ static char *GROUPSDIR	 = GROUPSROOT_DIR;
 static char *USERSDIR	 = USERSROOT_DIR;
 static char *SCRATCHDIR	 = SCRATCHROOT_DIR;
 
+#ifndef ELABINELAB
 /* XXX should be autoconfiged as part of Emulab build */
 static char *IMAGEDIR    = "/usr/testbed/images";
+#endif
 
 /* Emit aliases when dumping the config info; makes it smaller */
 static int dump_doaliases = 1;
@@ -204,6 +207,7 @@ emulab_free_host_authinfo(struct config_host_authinfo *ai)
 		for (i = 0; i < ai->numimages; i++) {
 			FREE(ai->imageinfo[i].imageid);
 			FREE(ai->imageinfo[i].path);
+			FREE(ai->imageinfo[i].sig);
 			FREE(ai->imageinfo[i].get_options);
 			FREE(ai->imageinfo[i].put_options);
 			FREE(ai->imageinfo[i].extra);
@@ -325,6 +329,8 @@ allow_stddirs(char *imageid,
 	char *fpath, *shdir, *pdir, *gdir, *scdir, *udir;
 	int doput = 0, doget = 0;
 	struct emulab_ha_extra_info *ei;
+	struct config_imageinfo *ci;
+	struct stat sb;
 
 	if (get == NULL && put == NULL)
 		return;
@@ -359,7 +365,6 @@ allow_stddirs(char *imageid,
 		int ni, i;
 		size_t ns;
 		char *dirs[8];
-		struct config_imageinfo *ci;
 
 		/*
 		 * Right now, only allow PUT to scratchdir if it exists.
@@ -376,7 +381,13 @@ allow_stddirs(char *imageid,
 				ci = &put->imageinfo[i];
 				ci->imageid = NULL;
 				ci->path = mystrdup(dirs[i - put->numimages]);
-				ci->flags = CONFIG_IMAGE_ISDIR;
+				ci->flags = CONFIG_PATH_ISDIR;
+				if (stat(ci->path, &sb) == 0) {
+					ci->sig = mymalloc(sizeof(time_t));
+					*(time_t *)ci->sig = sb.st_mtime;
+					ci->flags |= CONFIG_SIG_ISMTIME;
+				} else
+					ci->sig = NULL;
 				ci->get_options = NULL;
 				ci->get_methods = 0;
 				ci->put_options = NULL;
@@ -403,7 +414,13 @@ allow_stddirs(char *imageid,
 				ci = &get->imageinfo[i];
 				ci->imageid = NULL;
 				ci->path = mystrdup(dirs[i - get->numimages]);
-				ci->flags = CONFIG_IMAGE_ISDIR;
+				ci->flags = CONFIG_PATH_ISDIR;
+				if (stat(ci->path, &sb) == 0) {
+					ci->sig = mymalloc(sizeof(time_t));
+					*(time_t *)ci->sig = sb.st_mtime;
+					ci->flags |= CONFIG_SIG_ISMTIME;
+				} else
+					ci->sig = NULL;
 				set_get_options(get, i);
 				set_get_methods(get, i);
 				ci->put_options = NULL;
@@ -441,26 +458,40 @@ allow_stddirs(char *imageid,
 
 		put->imageinfo = mymalloc(sizeof(struct config_imageinfo));
 		put->numimages = 1;
-		put->imageinfo[0].imageid = mystrdup(imageid);
-		put->imageinfo[0].path = mystrdup(fpath);
-		put->imageinfo[0].flags = CONFIG_IMAGE_ISFILE;
-		put->imageinfo[0].get_options = NULL;
-		put->imageinfo[0].get_methods = 0;
-		put->imageinfo[0].put_options = NULL;
-		put->imageinfo[0].extra = NULL;
+		ci = &put->imageinfo[0];
+		ci->imageid = mystrdup(imageid);
+		ci->path = mystrdup(fpath);
+		ci->flags = CONFIG_PATH_ISFILE;
+		if (stat(ci->path, &sb) == 0) {
+			ci->sig = mymalloc(sizeof(time_t));
+			*(time_t *)ci->sig = sb.st_mtime;
+			ci->flags |= CONFIG_SIG_ISMTIME;
+		} else
+			ci->sig = NULL;
+		ci->get_options = NULL;
+		ci->get_methods = 0;
+		ci->put_options = NULL;
+		ci->extra = NULL;
 	}
 	if (doget) {
 		assert(get->imageinfo == NULL);
 
 		get->imageinfo = mymalloc(sizeof(struct config_imageinfo));
 		get->numimages = 1;
-		get->imageinfo[0].imageid = mystrdup(imageid);
-		get->imageinfo[0].path = mystrdup(fpath);
-		get->imageinfo[0].flags = CONFIG_IMAGE_ISFILE;
+		ci = &get->imageinfo[0];
+		ci->imageid = mystrdup(imageid);
+		ci->path = mystrdup(fpath);
+		ci->flags = CONFIG_PATH_ISFILE;
+		if (stat(ci->path, &sb) == 0) {
+			ci->sig = mymalloc(sizeof(time_t));
+			*(time_t *)ci->sig = sb.st_mtime;
+			ci->flags |= CONFIG_SIG_ISMTIME;
+		} else
+			ci->sig = NULL;
 		set_get_options(get, 0);
 		set_get_methods(get, 0);
-		get->imageinfo[0].put_options = NULL;
-		get->imageinfo[0].extra = NULL;
+		ci->put_options = NULL;
+		ci->extra = NULL;
 	}
 
  done:
@@ -643,6 +674,8 @@ emulab_get_host_authinfo(struct in_addr *in, char *imageid,
 		put->numimages = 0;
 		for (i = 0; i < nrows; i++) {
 			struct emulab_ii_extra_info *ii;
+			struct config_imageinfo *ci;
+			struct stat sb;
 			char *imageid;
 
 			row = mysql_fetch_row(res);
@@ -657,16 +690,22 @@ emulab_get_host_authinfo(struct in_addr *in, char *imageid,
 			strcpy(imageid, row[0]);
 			strcat(imageid, "/");
 			strcat(imageid, row[2]);
-			put->imageinfo[put->numimages].imageid = imageid;
-			put->imageinfo[put->numimages].path = mystrdup(row[3]);
-			put->imageinfo[put->numimages].flags =
-				CONFIG_IMAGE_ISFILE;
-			put->imageinfo[put->numimages].get_methods = 0;
-			put->imageinfo[put->numimages].get_options = NULL;
-			put->imageinfo[put->numimages].put_options = NULL;
+			ci = &put->imageinfo[put->numimages];
+			ci->imageid = imageid;
+			ci->path = mystrdup(row[3]);
+			ci->flags = CONFIG_PATH_ISFILE;
+			if (stat(ci->path, &sb) == 0) {
+				ci->sig = mymalloc(sizeof(time_t));
+				*(time_t *)ci->sig = sb.st_mtime;
+				ci->flags |= CONFIG_SIG_ISMTIME;
+			} else
+				ci->sig = NULL;
+			ci->get_methods = 0;
+			ci->get_options = NULL;
+			ci->put_options = NULL;
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);
-			put->imageinfo[put->numimages].extra = ii;
+			ci->extra = ii;
 			put->numimages++;
 		}
 		mysql_free_result(res);
@@ -703,6 +742,8 @@ emulab_get_host_authinfo(struct in_addr *in, char *imageid,
 		get->numimages = 0;
 		for (i = 0; i < nrows; i++) {
 			struct emulab_ii_extra_info *ii;
+			struct config_imageinfo *ci;
+			struct stat sb;
 			char *imageid;
 
 			row = mysql_fetch_row(res);
@@ -717,16 +758,22 @@ emulab_get_host_authinfo(struct in_addr *in, char *imageid,
 			strcpy(imageid, row[0]);
 			strcat(imageid, "/");
 			strcat(imageid, row[2]);
-			get->imageinfo[get->numimages].imageid = imageid;
-			get->imageinfo[get->numimages].path = mystrdup(row[3]);
-			get->imageinfo[get->numimages].flags =
-				CONFIG_IMAGE_ISFILE;
+			ci = &get->imageinfo[get->numimages];
+			ci->imageid = imageid;
+			ci->path = mystrdup(row[3]);
+			ci->flags = CONFIG_PATH_ISFILE;
+			if (stat(ci->path, &sb) == 0) {
+				ci->sig = mymalloc(sizeof(time_t));
+				*(time_t *)ci->sig = sb.st_mtime;
+				ci->flags |= CONFIG_SIG_ISMTIME;
+			} else
+				ci->sig = NULL;
 			set_get_methods(get, get->numimages);
 			set_get_options(get, get->numimages);
-			get->imageinfo[get->numimages].put_options = NULL;
+			ci->put_options = NULL;
 			ii = mymalloc(sizeof *ii);
 			ii->DB_imageid = atoi(row[4]);
-			get->imageinfo[get->numimages].extra = ii;
+			ci->extra = ii;
 			get->numimages++;
 		}
 		mysql_free_result(res);
@@ -735,7 +782,8 @@ emulab_get_host_authinfo(struct in_addr *in, char *imageid,
 	/*
 	 * Finally add on the standard directories that a node can access.
 	 */
-	allow_stddirs(NULL, get, put);
+	if (imageid == NULL)
+		allow_stddirs(imageid, get, put);
 
  done:
 	free(node);
@@ -775,7 +823,7 @@ dump_host_authinfo(FILE *fd, char *node, char *cmd,
 	 */
 	else {
 		for (i = 0; i < ai->numimages; i++)
-			if (ai->imageinfo[i].flags == CONFIG_IMAGE_ISFILE)
+			if (ai->imageinfo[i].flags == CONFIG_PATH_ISFILE)
 				fprintf(fd, "%s ", ai->imageinfo[i].imageid);
 	}
 
@@ -783,7 +831,7 @@ dump_host_authinfo(FILE *fd, char *node, char *cmd,
 	 * And dump any directories that can be accessed
 	 */
 	for (i = 0; i < ai->numimages; i++)
-		if (ai->imageinfo[i].flags == CONFIG_IMAGE_ISDIR)
+		if (ai->imageinfo[i].flags == CONFIG_PATH_ISDIR)
 			fprintf(fd, "%s/* ", ai->imageinfo[i].path);
 
 	fprintf(fd, "\n");

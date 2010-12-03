@@ -8,6 +8,7 @@
 struct config_imageinfo {
 	char *imageid;		/* unique name of image */
 	char *path;		/* path where image is stored */
+	void *sig;		/* signature of image */
 	int flags;		/* */
 	char *get_options;	/* options for GET operation */
 	int get_methods;	/* allowed GET transfer mechanisms */
@@ -16,10 +17,13 @@ struct config_imageinfo {
 };
 
 /* flags */
-#define CONFIG_IMAGE_ISFILE	0x1	/* path is an image file */
-#define CONFIG_IMAGE_ISDIR	0x2	/* path is a directory */
-#define CONFIG_IMAGE_ISGLOB	0x4	/* path is a file glob */
-#define CONFIG_IMAGE_ISRE	0x8	/* path is a perl RE */
+#define CONFIG_PATH_ISFILE	0x1	/* path is an image file */
+#define CONFIG_PATH_ISDIR	0x2	/* path is a directory */
+#define CONFIG_PATH_ISGLOB	0x4	/* path is a file glob */
+#define CONFIG_PATH_ISRE	0x8	/* path is a perl RE */
+#define CONFIG_SIG_ISMTIME	0x10	/* sig is path mtime */
+#define CONFIG_SIG_ISMD5	0x20	/* sig is MD5 hash of path */
+#define CONFIG_SIG_ISSHA1	0x40	/* sig is SHA1 hash of path */
 
 /* methods */
 #define CONFIG_IMAGE_UNKNOWN	0x0
@@ -59,18 +63,12 @@ extern int	config_read(void);
 extern int	config_get_host_authinfo(struct in_addr *, char *,
 					 struct config_host_authinfo **,
 					 struct config_host_authinfo **);
+extern void	config_dump_host_authinfo(struct config_host_authinfo *);
 extern void	config_free_host_authinfo(struct config_host_authinfo *);
 extern int	config_auth_by_IP(struct in_addr *, char *,
 				  struct config_host_authinfo **);
 extern int	config_get_server_address(struct config_host_authinfo *, int,
 					  in_addr_t *, in_port_t *, int *);
-extern char *	config_perror(int);
 extern void *	config_save(void);
 extern int	config_restore(void *);
 extern void	config_dump(FILE *);
-
-#define CONFIG_ERR_HA_FAILED	1	/* internal host auth error */
-#define CONFIG_ERR_HA_NOHOST	2	/* no such host */
-#define CONFIG_ERR_HA_NOIMAGE	3	/* no such image */
-#define CONFIG_ERR_HA_NOACCESS	4	/* access not allowed for host */
-#define CONFIG_ERR_HA_NOMETHOD	5	/* not avail to host via method */

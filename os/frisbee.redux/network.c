@@ -580,27 +580,32 @@ MsgReceive(int msock, MasterMsg_t *msg, size_t size, int timo)
 
 /*
  * Contact the master server to discover download information for imageid.
- * 'serverip' and 'portnum' refer to the master server at this point,
- * it in turn will return the addr/port for the actual download.
+ * 'sip' and 'sport' are the addr/port of the master server, 'method'
+ * specifies the desired download method, 'askonly' is set to just ask
+ * for information about the image (without starting a server), 'timeout'
+ * is how long to wait for a response.
+ *
+ * On success, return non-zero with 'reply' filled in with the server's
+ * response IN HOST ORDER.  On failure returns zero.
  */
 int
-ClientNetFindServer(struct in_addr *sip, char *imageid,
-		    int statusonly, int timeout)
+ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
+		    int method, int askonly, int timeout, GetReply *reply)
 {
 	struct sockaddr_in name;
 	MasterMsg_t msg;
-	int msock, len, err;
+	int msock, len;
 	
 	if ((msock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 		perror("Could not allocate socket for master server");
 		return 0;
 	}
-	if (portnum == 0)
-		portnum = MS_PORTNUM;
+	if (sport == 0)
+		sport = MS_PORTNUM;
 
 	name.sin_family = AF_INET;
-	name.sin_addr = *sip;
-	name.sin_port = htons(portnum);
+	name.sin_addr.s_addr = htonl(sip);
+	name.sin_port = htons(sport);
 	if (connect(msock, (struct sockaddr *)&name, sizeof(name)) < 0) {
 		perror("Connecting to master server");
 		close(msock);
@@ -609,17 +614,17 @@ ClientNetFindServer(struct in_addr *sip, char *imageid,
 
 	memset(&msg, 0, sizeof msg);
 	msg.type = htonl(MS_MSGTYPE_GETREQUEST);
-	if (statusonly) {
+	if (askonly) {
 		msg.body.getrequest.status = 1;
 		msg.body.getrequest.methods = MS_METHOD_ANY;
 	} else {
-		msg.body.getrequest.methods = MS_METHOD_MULTICAST;
+		msg.body.getrequest.methods = method;
 	}
 	len = strlen(imageid);
 	if (len > MS_MAXIDLEN)
 		len = MS_MAXIDLEN;
 	msg.body.getrequest.idlen = htons(len);
-	strncpy(msg.body.getrequest.imageid, imageid, MS_MAXIDLEN);
+	strncpy((char *)msg.body.getrequest.imageid, imageid, MS_MAXIDLEN);
 
 	len = sizeof msg.type + sizeof msg.body.getrequest;
 	if (!MsgSend(msock, &msg, len, timeout)) {
@@ -641,33 +646,16 @@ ClientNetFindServer(struct in_addr *sip, char *imageid,
 	}
 	close(msock);
 
-	err = ntohs(msg.body.getreply.error);
-	if (!err) {
-		mcastaddr.s_addr = msg.body.getreply.addr;
-		portnum = (int)ntohs(msg.body.getreply.port);
-	}
+	/*
+	 * Convert the reply info to host order
+	 */
+	*reply = msg.body.getreply;
+	reply->error = ntohs(reply->error);
+	reply->addr = ntohl(reply->addr);
+	reply->port = ntohs(reply->port);
+	reply->sigtype = ntohs(reply->sigtype);
 
-	if (statusonly) {
-		if (err)
-			fprintf(stderr, "%s: server denied access (%d)\n",
-				imageid, err);
-		else if (msg.body.getreply.isrunning)
-			fprintf(stderr, "%s: server running %s:%d\n",
-				imageid, inet_ntoa(mcastaddr), portnum);
-		else
-			fprintf(stderr, "%s: access allowed, methods=0x%x\n",
-				imageid, msg.body.getreply.method);
-		return 1;
-	}
-
-	if (err)
-		fprintf(stderr, "%s: server returned error %d\n",
-			imageid, err);
-	else
-		fprintf(stderr, "%s: address: %s:%d\n",
-			imageid, inet_ntoa(mcastaddr), portnum);
-
-	return (err == 0);
+	return 1;
 }
 #endif
 

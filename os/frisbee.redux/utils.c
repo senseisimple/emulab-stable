@@ -594,3 +594,96 @@ ClientStatsDump(unsigned int id, ClientStats_t *stats)
 	}
 }
 #endif
+
+#ifdef MASTER_SERVER
+#include "configdefs.h"
+
+char *
+GetMSError(int error)
+{
+	char *err;
+
+	switch (error) {
+	case MS_ERROR_FAILED:
+		err = "server authentication error";
+		break;
+	case MS_ERROR_NOHOST:
+		err = "unknown host";
+		break;
+	case MS_ERROR_NOIMAGE:
+		err = "unknown image";
+		break;
+	case MS_ERROR_NOACCESS:
+		err = "access not allowed";
+		break;
+	case MS_ERROR_NOMETHOD:
+		err = "not available via specified method";
+		break;
+	case MS_ERROR_INVALID:
+		err = "invalid argument";
+		break;
+	default:
+		err = "unknown error";
+		break;
+	}
+
+	return err;
+}
+
+char *
+GetMSMethods(int methods)
+{
+	static char mbuf[256];
+
+	mbuf[0] = '\0';
+	if (methods & MS_METHOD_UNICAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "unicast");
+	}
+	if (methods & MS_METHOD_MULTICAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "multicast");
+	}
+	if (methods & MS_METHOD_BROADCAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "broadcast");
+	}
+	if (mbuf[0] == '\0')
+		strcat(mbuf, "UNKNOWN");
+
+	return mbuf;
+}
+
+void
+PrintGetInfo(char *imageid, GetReply *reply)
+{
+	if (reply->error) {
+		log("%s: server denied access: %s",
+		    imageid, GetMSError(reply->error));
+		return;
+	}
+
+	if (reply->isrunning) {
+		struct in_addr in;
+		in.s_addr = htonl(reply->addr);
+		log("%s: access allowed, server running at %s:%d using %s",
+		    imageid, inet_ntoa(in), reply->port,
+		    GetMSMethods(reply->method));
+	} else
+		log("%s: access allowed, available methods=%s",
+		    imageid, GetMSMethods(reply->method));
+
+	switch (reply->sigtype) {
+	case MS_SIGTYPE_MTIME:
+	{
+		time_t mt = ntohl(*(time_t *)reply->signature);
+		log("  modtime=%s", ctime(&mt));
+	}
+	default:
+		break;
+	}
+}
+#endif

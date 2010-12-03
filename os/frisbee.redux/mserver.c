@@ -9,6 +9,8 @@
  * handler processes.
  */
 #include <paths.h>
+#include <sys/stat.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -24,19 +26,22 @@
 #include <errno.h>
 #include <assert.h>
 #include "decls.h"
+#include "utils.h"
 #include "configdefs.h"
+
+#define FRISBEE_SERVER	"/usr/testbed/sbin/frisbeed"
+#define FRISBEE_CLIENT	"/usr/testbed/sbin/frisbee"
 
 static void	get_options(int argc, char **argv);
 static int	makesocket(int portnum, int *tcpsockp);
 static void	handle_request(int sock);
-static void	childdeath(int sig);
 static int	reapchildren(void);
 
 static int	daemonize = 1;
 int		debug = 0;
 static int	dumpconfig = 0;
-
-static	sigjmp_buf env;
+static int	fetchfromabove = 0;
+static struct in_addr serverip;
 
 /* XXX the following just keep network.c happy */
 int		portnum;
@@ -50,7 +55,8 @@ main(int argc, char **argv)
 	FILE			*fp;
 	char			buf[BUFSIZ];
 	char			*pidfile = (char *) NULL;
-	sigset_t		mask;
+	struct timeval		tv;
+	fd_set			ready;
 
 	get_options(argc, argv);
 
@@ -94,17 +100,22 @@ main(int argc, char **argv)
 	/*
 	 * Handle connections
 	 */
-	signal(SIGCHLD, childdeath);
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGCHLD);
+	FD_ZERO(&ready);
 	while (1) {
 		struct sockaddr_in client;
 		socklen_t length;
-		int newsock;
-		
-		sigprocmask(SIG_BLOCK, &mask, NULL);
-		if (sigsetjmp(env, 1) == 0) {
-			sigprocmask(SIG_UNBLOCK, &mask, NULL);
+		int newsock, rv;
+
+		FD_SET(tcpsock, &ready);
+		tv.tv_sec = 0;
+		tv.tv_usec = 100000;
+		rv = select(tcpsock+1, &ready, NULL, NULL, &tv);
+		if (rv < 0) {
+			if (errno == EINTR)
+				continue;
+			pfatal("select failed");
+		}
+		if (rv) {
 			length  = sizeof(client);
 			newsock = accept(tcpsock, (struct sockaddr *)&client,
 					 &length);
@@ -115,10 +126,8 @@ main(int argc, char **argv)
 				handle_request(newsock);
 				close(newsock);
 			}
-		} else {
-			reapchildren();
-			sigprocmask(SIG_UNBLOCK, &mask, NULL);
 		}
+		reapchildren();
 	}
 	close(tcpsock);
 	log("daemon terminating");
@@ -128,16 +137,49 @@ main(int argc, char **argv)
 struct childinfo {
 	struct childinfo *next;
 	struct config_host_authinfo *ai;
+	int ptype;
 	int method;
 	int pid;
-	struct in_addr iface;
 	in_addr_t addr;
 	in_port_t port;
 };
-static struct childinfo *findchild(struct config_host_authinfo *, int);
+#define PTYPE_CLIENT	1
+#define PTYPE_SERVER	2
+
+static struct childinfo *findchild(struct config_host_authinfo *, int, int);
 static struct childinfo *startchild(struct config_host_authinfo *,
-				    struct in_addr *, struct in_addr *, int,
-				    int *);
+				    struct in_addr *, struct in_addr *,
+				    int, int, int *);
+
+/*
+ * Attempt to fetch an image from our parent by firing off a frisbee.
+ * Or, hook the child up directly with our parent.
+ * Or, both.
+ */
+int
+fetch_parent(in_addr_t pip, in_port_t pport, struct config_imageinfo *ii,
+	     int *methodp, in_addr_t *addrp, in_port_t *portp)
+{
+#if 0
+	GetReply reply;
+
+	/*
+	 * Send our parent a GET request and see what it says.
+	 */
+	if (!ClientNetFindServer(pip, pport, ii->imageid, ii->get_methods,
+				 0, 5, &reply))
+		return MS_ERROR_NOIMAGE;
+	if (reply.error)
+		return reply.error;
+
+	/*
+	 * Parent has started up a frisbeed, we either need to fire off
+	 * a frisbee to talk to it, or hook our client up with it.
+	 */
+#endif
+
+	return MS_ERROR_NOIMAGE;
+}
 
 void
 handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
@@ -147,7 +189,9 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	char clientip[sizeof("XXX.XXX.XXX.XXX")+1];
 	int len = ntohs(msg->body.getrequest.idlen);
 	struct config_host_authinfo *ai;
+	struct config_imageinfo *ii;
 	struct childinfo *ci;
+	struct stat sb;
 	int rv, methods, wantstatus;
 	char *op;
 
@@ -171,23 +215,82 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	rv = config_auth_by_IP(&cip->sin_addr, imageid, &ai);
 	if (rv) {
 		warning("%s: client %s %s failed: %s",
-			imageid, clientip, op, config_perror(rv));
+			imageid, clientip, op, GetMSError(rv));
 		msg->body.getreply.error = rv;
 		goto reply;
 	}
-	assert(ai->numimages == 1 && ai->imageinfo != NULL);
+	if (debug)
+		config_dump_host_authinfo(ai);
+	if (ai->numimages > 1) {
+		rv = MS_ERROR_INVALID;
+		warning("%s: client %s %s failed: "
+			"lookup returned multiple (%d) images",
+			imageid, clientip, op, ai->numimages);
+		msg->body.getreply.error = rv;
+		goto reply;
+
+	}
+	ii = &ai->imageinfo[0];
+	assert((ii->flags & CONFIG_PATH_ISFILE) != 0);
+
+	/*
+	 * See if image actually exists.
+	 *
+	 * If the file exists but is not a regular file, we return an error.
+	 *
+	 * If the file does not exist (it is possible to request an
+	 * image that doesn't exist if the authentication check allows
+	 * access to the containing directory), then for now we just return
+	 * an error, but in the future, we could request the image from
+	 * our parent mserver.
+	 */
+	if (stat(ii->path, &sb) == 0) {
+		if (!S_ISREG(sb.st_mode)) {
+			rv = MS_ERROR_INVALID;
+			warning("%s: client %s %s failed: "
+				"not a regular file",
+				imageid, clientip, op);
+			msg->body.getreply.error = rv;
+			goto reply;
+		}
+	} else {
+		if (errno == ENOENT) {
+			if (fetchfromabove) {
+				int m;
+				in_addr_t a;
+				in_port_t p;
+
+				rv = fetch_parent(ntohl(serverip.s_addr),
+						  MS_PORTNUM, ii, &m, &a, &p);
+				if (rv == 0) {
+					msg->body.getreply.method = m;
+					msg->body.getreply.isrunning = 1;
+					msg->body.getreply.addr = htonl(a);
+					msg->body.getreply.port = htons(p);
+					goto reply;
+				}
+			} else
+				rv = MS_ERROR_NOIMAGE;
+		} else {
+			rv = MS_ERROR_INVALID;
+		}
+		warning("%s: client %s %s failed: %s",
+			imageid, clientip, op, GetMSError(rv));
+		msg->body.getreply.error = rv;
+		goto reply;
+	}
 
 	/*
 	 * Figure out what transfer method to use.
 	 */
 	if (debug)
 		info("  request methods: 0x%x, image methods: 0x%x",
-		     methods, ai->imageinfo[0].get_methods);
-	methods &= ai->imageinfo[0].get_methods;
+		     methods, ii->get_methods);
+	methods &= ii->get_methods;
 	if (methods == 0) {
-		rv = CONFIG_ERR_HA_NOMETHOD;
+		rv = MS_ERROR_NOMETHOD;
 		warning("%s: client %s %s failed: %s",
-			imageid, clientip, op, config_perror(rv));
+			imageid, clientip, op, GetMSError(rv));
 		msg->body.getreply.error = rv;
 		goto reply;
 	}
@@ -196,19 +299,28 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * Otherwise see if there is a frisbeed already running, starting
 	 * one if not.  Then construct a reply with the available info.
 	 */
-	ci = findchild(ai, methods);
+	ci = findchild(ai, PTYPE_SERVER, methods);
 	if (ci == NULL) {
 		struct in_addr in;
 
 		if (wantstatus) {
+			if (ii->sig != NULL) {
+				int32_t mt = *(int32_t *)ii->sig;
+				assert((ii->flags & CONFIG_SIG_ISMTIME) != 0);
+
+				msg->body.getreply.sigtype =
+					htons(MS_SIGTYPE_MTIME);
+				*(int32_t *)msg->body.getreply.signature =
+					htonl(mt);
+			}
 			config_free_host_authinfo(ai);
 			msg->body.getreply.method = methods;
 			msg->body.getreply.isrunning = 0;
 			log("%s: STATUS is not running", imageid);
 			goto reply;
 		}
-		ci = startchild(ai, &sip->sin_addr, &cip->sin_addr, methods,
-				&rv);
+		ci = startchild(ai, &sip->sin_addr, &cip->sin_addr,
+				PTYPE_SERVER, methods, &rv);
 		if (ci == NULL) {
 			config_free_host_authinfo(ai);
 			msg->body.getreply.error = rv;
@@ -220,6 +332,13 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	} else {
 		struct in_addr in;
 
+		if (wantstatus && ii->sig != NULL) {
+			int32_t mt = *(int32_t *)ii->sig;
+			assert((ii->flags & CONFIG_SIG_ISMTIME) != 0);
+
+			msg->body.getreply.sigtype = htons(MS_SIGTYPE_MTIME);
+			*(int32_t *)msg->body.getreply.signature = htonl(mt);
+		}
 		config_free_host_authinfo(ai);
 		in.s_addr = htonl(ci->addr);
 		if (wantstatus)
@@ -235,7 +354,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	msg->body.getreply.addr = htonl(ci->addr);
 	msg->body.getreply.port = htons(ci->port);
 
-reply:
+ reply:
 	msg->body.getreply.error = htons(msg->body.getreply.error);
 	len = sizeof msg->type + sizeof msg->body.getreply;
 	if (!MsgSend(sock, msg, len, 10))
@@ -294,7 +413,7 @@ get_options(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "Ddh")) != -1)
+	while ((ch = getopt(argc, argv, "DS:dh")) != -1)
 		switch(ch) {
 		case 'd':
 			daemonize = 0;
@@ -302,6 +421,14 @@ get_options(int argc, char **argv)
 			break;
 		case 'D':
 			dumpconfig = 1;
+			break;
+		case 'S':
+			if (!inet_aton(optarg, &serverip)) {
+				fprintf(stderr, "Invalid server IP `%s'\n",
+					optarg);
+				exit(1);
+			}
+			fetchfromabove = 1;
 			break;
 		case 'h':
 		case '?':
@@ -367,17 +494,18 @@ makesocket(int portnum, int *tcpsockp)
 }
 
 static struct childinfo *children;
+static int nchildren;
 
 static struct childinfo *
-findchild(struct config_host_authinfo *ai, int methods)
+findchild(struct config_host_authinfo *ai, int ptype, int methods)
 {
 	struct childinfo *ci;
 
 	assert(ai->numimages == 1 && ai->imageinfo != NULL);
 	for (ci = children; ci != NULL; ci = ci->next)
-		if (!strcmp(ci->ai->imageinfo[0].imageid,
-			    ai->imageinfo[0].imageid) &&
-		    (ci->method & methods) != 0)
+		if (ci->ptype == ptype && (ci->method & methods) != 0 &&
+		    !strcmp(ci->ai->imageinfo[0].imageid,
+			    ai->imageinfo[0].imageid))
 			return ci;
 
 	return NULL;
@@ -388,16 +516,16 @@ findchild(struct config_host_authinfo *ai, int methods)
  */
 static struct childinfo *
 startchild(struct config_host_authinfo *ai, struct in_addr *sip,
-	   struct in_addr *cip, int methods, int *errorp)
+	   struct in_addr *cip, int ptype, int methods, int *errorp)
 {
 	struct childinfo *ci;
 
-	assert(findchild(ai, methods) == NULL);
+	assert(findchild(ai, ptype, methods) == NULL);
 
 	ci = calloc(1, sizeof(struct childinfo));
 	if (ci == NULL) {
 		if (errorp)
-			*errorp = CONFIG_ERR_HA_FAILED;
+			*errorp = MS_ERROR_FAILED;
 		return NULL;
 	}
 
@@ -408,10 +536,11 @@ startchild(struct config_host_authinfo *ai, struct in_addr *sip,
 				      &ci->addr, &ci->port, &ci->method)) {
 		free(ci);
 		if (errorp)
-			*errorp = CONFIG_ERR_HA_FAILED;
+			*errorp = MS_ERROR_FAILED;
 		return NULL;
 	}
 	ci->ai = ai;
+	ci->ptype = ptype;
 
 	/*
 	 * Fork off the process
@@ -421,7 +550,7 @@ startchild(struct config_host_authinfo *ai, struct in_addr *sip,
 		pwarning("startchild");
 		free(ci);
 		if (errorp)
-			*errorp = CONFIG_ERR_HA_FAILED;
+			*errorp = MS_ERROR_FAILED;
 		return NULL;
 	}
 	if (ci->pid == 0) {
@@ -429,14 +558,14 @@ startchild(struct config_host_authinfo *ai, struct in_addr *sip,
 		char *argv[64], **ap, *args;
 		int argc;
 		struct in_addr in;
-		char *serverip;
-		char *pname = "/usr/testbed/sbin/frisbeed";
+		char *server;
+		char *pname = FRISBEE_SERVER;
 
-		serverip = strdup(inet_ntoa(*sip));
+		server = strdup(inet_ntoa(*sip));
 		in.s_addr = htonl(ci->addr);
 		snprintf(argbuf, sizeof argbuf,
 			 "%s -i %s %s -m %s -p %d %s",
-			 pname, serverip, ci->ai->imageinfo[0].get_options,
+			 pname, server, ci->ai->imageinfo[0].get_options,
 			 inet_ntoa(in), ci->port, ci->ai->imageinfo[0].path);
 		if (debug)
 			info("execing: %s", argbuf);
@@ -462,6 +591,7 @@ startchild(struct config_host_authinfo *ai, struct in_addr *sip,
 
 	ci->next = children;
 	children = ci;
+	nchildren++;
 
 	if (errorp)
 		*errorp = 0;
@@ -474,11 +604,20 @@ killchild(struct childinfo *ci)
 	return 0;
 }
 
+/*
+ * Cleanup zombies.
+ * Called with SIGCHLD blocked.
+ */
 static int
 reapchildren(void)
 {
 	int pid, status;
 	struct childinfo **cip, *ci;
+
+	if (nchildren == 0) {
+		assert(children == NULL);
+		return 0;
+	}
 
 	while (1) {
 		struct in_addr in;
@@ -496,6 +635,7 @@ reapchildren(void)
 			continue;
 		}
 		*cip = ci->next;
+		nchildren--;
 		in.s_addr = htonl(ci->addr);
 		log("%s: server process %d on %s:%d exited (status=0x%x)",
 		    ci->ai->imageinfo[0].imageid, pid, inet_ntoa(in), ci->port,
@@ -504,12 +644,4 @@ reapchildren(void)
 		 * XXX if it exits non-zero, we should try to restart?
 		 */
 	}
-}
-
-static void
-childdeath(int sig)
-{
-	if (debug)
-		info("got SIGCHLD");
-	siglongjmp(env, 1);
 }

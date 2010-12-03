@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <assert.h>
+#include "decls.h"
 #include "configdefs.h"
 #include "log.h"
 
@@ -82,6 +83,27 @@ config_get_host_authinfo(struct in_addr *in, char *imageid,
 }
 
 void
+config_dump_host_authinfo(struct config_host_authinfo *ai)
+{
+	char *none = "<NONE>";
+	int i;
+
+	if (ai == NULL)
+		return;
+
+	fprintf(stderr, "HOST authinfo %p:\n", ai);
+	fprintf(stderr, "  hostid: %s\n", ai->hostid ? ai->hostid : none);
+	if (ai->numimages > 0) {
+		fprintf(stderr, "  %d image(s):\n", ai->numimages);
+		for (i = 0; i < ai->numimages; i++)
+			fprintf(stderr, "    [%d]: imageid='%s', path='%s'\n",
+				i, ai->imageinfo[i].imageid,
+				ai->imageinfo[i].path);
+	}
+	fprintf(stderr, "  extra: %p\n", ai->extra);
+}
+
+void
 config_free_host_authinfo(struct config_host_authinfo *ai)
 {
 	assert(myconfig != NULL);
@@ -100,14 +122,14 @@ config_auth_by_IP(struct in_addr *host, char *imageid,
 	struct config_host_authinfo *ai;
 
 	if (config_get_host_authinfo(host, imageid, &ai, 0))
-		return CONFIG_ERR_HA_FAILED;
+		return MS_ERROR_FAILED;
 	if (ai->hostid == NULL) {
 		config_free_host_authinfo(ai);
-		return CONFIG_ERR_HA_NOHOST;
+		return MS_ERROR_NOHOST;
 	}
 	if (ai->numimages == 0) {
 		config_free_host_authinfo(ai);
-		return CONFIG_ERR_HA_NOACCESS;
+		return MS_ERROR_NOACCESS;
 	}
 	if (aip)
 		*aip = ai;
@@ -121,25 +143,6 @@ config_get_server_address(struct config_host_authinfo *ai, int methods,
 	assert(myconfig != NULL);
 	return myconfig->config_get_server_address(ai, methods,
 						   addr, port, method);
-}
-
-char *
-config_perror(int code)
-{
-	switch (code) {
-	case CONFIG_ERR_HA_FAILED:
-		return "host authentication failed";
-	case CONFIG_ERR_HA_NOHOST:
-		return "unknown host";
-	case CONFIG_ERR_HA_NOIMAGE:
-		return "unknown image";
-	case CONFIG_ERR_HA_NOACCESS:
-		return "permission denied";
-	case CONFIG_ERR_HA_NOMETHOD:
-		return "invalid method";
-	default:
-		return "unknown error";
-	}
 }
 
 void

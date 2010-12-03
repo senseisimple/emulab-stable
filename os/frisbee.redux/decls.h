@@ -322,27 +322,35 @@ typedef struct {
 
 /* imageid length: large enough to hold an ascii encoded SHA 1024 hash */
 #define MS_MAXIDLEN	256
+/* ditto for signature */
+#define MS_MAXSIGLEN	256
 
 /*
  * Master server messages.
  * These are sent via unicast TCP.
  */
 typedef struct {
-	int32_t		type;
+	uint8_t		methods;
+	uint8_t		status;
+	uint16_t	idlen;
+	uint8_t		imageid[MS_MAXIDLEN];
+} __attribute__((__packed__)) GetRequest;
+
+typedef struct {
+	uint8_t		method;
+	uint8_t		isrunning;
+	uint16_t	error;	
+	in_addr_t	addr;
+	in_port_t	port;
+	uint16_t	sigtype;
+	uint8_t		signature[MS_MAXSIGLEN];
+} __attribute__((__packed__)) GetReply;
+
+typedef struct {
+	int32_t			type;
 	union {
-		struct {
-			uint8_t		methods;
-			uint8_t		status;
-			uint16_t	idlen;
-			char		imageid[MS_MAXIDLEN];
-		} __attribute__((__packed__)) getrequest;
-		struct {
-			uint8_t		method;
-			uint8_t		isrunning;
-			uint16_t	error;	
-			in_addr_t	addr;
-			in_port_t	port;
-		} __attribute__((__packed__)) getreply;
+		GetRequest	getrequest;
+		GetReply	getreply;
 	} body;
 } MasterMsg_t;
 
@@ -356,6 +364,19 @@ typedef struct {
 #define MS_METHOD_MULTICAST	2
 #define MS_METHOD_BROADCAST	4
 #define MS_METHOD_ANY		7
+
+#define MS_SIGTYPE_NONE		0
+#define MS_SIGTYPE_MTIME	1
+#define MS_SIGTYPE_MD5		2
+#define MS_SIGTYPE_SHA1		3
+
+#define MS_ERROR_FAILED		1	/* internal host auth error */
+#define MS_ERROR_NOHOST		2	/* no such host */
+#define MS_ERROR_NOIMAGE	3	/* no such image */
+#define MS_ERROR_NOACCESS	4	/* access not allowed for host */
+#define MS_ERROR_NOMETHOD	5	/* not avail to host via method */
+#define MS_ERROR_INVALID	6	/* invalid argument */
+#define MS_ERROR_TRYAGAIN	7	/* try again later */
 #endif
 
 /*
@@ -372,7 +393,8 @@ void	PacketReply(Packet_t *p);
 int	PacketValid(Packet_t *p, int nchunks);
 void	dump_network(void);
 #ifdef MASTER_SERVER
-int	ClientNetFindServer(struct in_addr *, char *, int, int);
+int	ClientNetFindServer(in_addr_t, in_port_t, char *, int, int, int,
+			    GetReply *);
 int	MsgSend(int, MasterMsg_t *, size_t, int);
 int	MsgReceive(int, MasterMsg_t *, size_t, int);
 #endif
