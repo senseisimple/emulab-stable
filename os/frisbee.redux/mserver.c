@@ -41,10 +41,12 @@ static int	daemonize = 1;
 int		debug = 0;
 static int	dumpconfig = 0;
 static int	fetchfromabove = 0;
-static struct in_addr serverip;
+static int	canredirect = 0;
+static struct in_addr parentip;
+static int	parentport = MS_PORTNUM;
 
 /* XXX the following just keep network.c happy */
-int		portnum;
+int		portnum = MS_PORTNUM;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
 
@@ -62,7 +64,7 @@ main(int argc, char **argv)
 
 	MasterServerLogInit();
 
-	log("mfrisbee daemon starting");
+	log("mfrisbee daemon starting, debug level %d", debug);
 	config_init(1);
 
 	/* Just dump the config to stdout in human readable form and exit. */
@@ -74,7 +76,7 @@ main(int argc, char **argv)
 	/*
 	 * Create TCP server.
 	 */
-	if (makesocket(MS_PORTNUM, &tcpsock) < 0) {
+	if (makesocket(portnum, &tcpsock) < 0) {
 		error("Could not make primary tcp socket!");
 		exit(1);
 	}
@@ -136,20 +138,72 @@ main(int argc, char **argv)
 
 struct childinfo {
 	struct childinfo *next;
-	struct config_host_authinfo *ai;
+	struct config_imageinfo *imageinfo;
 	int ptype;
 	int method;
 	int pid;
 	in_addr_t addr;
 	in_port_t port;
+	void (*done)(struct childinfo *, int);
+	void *extra;
 };
 #define PTYPE_CLIENT	1
 #define PTYPE_SERVER	2
 
-static struct childinfo *findchild(struct config_host_authinfo *, int, int);
-static struct childinfo *startchild(struct config_host_authinfo *,
-				    struct in_addr *, struct in_addr *,
-				    int, int, int *);
+static struct childinfo *findchild(struct config_imageinfo *, int, int);
+static int startchild(struct childinfo *, struct in_addr *, struct in_addr *);
+static struct childinfo *startserver(struct config_imageinfo *,
+				     struct in_addr *, struct in_addr *,
+				     int, int *);
+static struct childinfo *startclient(struct config_imageinfo *,
+				     struct in_addr *, struct in_addr *,
+				     in_addr_t, in_port_t, int, int *);
+
+static void
+free_imageinfo(struct config_imageinfo *ii)
+{
+	if (ii) {
+		if (ii->imageid)
+			free(ii->imageid);
+		if (ii->path)
+			free(ii->path);
+		if (ii->sig)
+			free(ii->sig);
+		if (ii->get_options)
+			free(ii->get_options);
+		free(ii);
+	}
+}
+
+/*
+ * (Deep) copy an imageinfo structure.
+ * Returns pointer or null on error.
+ */
+static struct config_imageinfo *
+copy_imageinfo(struct config_imageinfo *ii)
+{
+	struct config_imageinfo *nii;
+
+	if ((nii = calloc(1, sizeof *nii)) == NULL)
+		goto fail;
+	if (ii->imageid && (nii->imageid = strdup(ii->imageid)) == NULL)
+		goto fail;
+	if (ii->path && (nii->path = strdup(ii->path)) == NULL)
+		goto fail;
+	if (ii->sig && (nii->sig = strdup(ii->sig)) == NULL)
+		goto fail;
+	nii->flags = ii->flags;
+	if (ii->get_options &&
+	    (nii->get_options = strdup(ii->get_options)) == NULL)
+		goto fail;
+	nii->get_methods = ii->get_methods;
+	/* XXX don't care about put_options and extra right now */
+	return nii;
+
+ fail:
+	free_imageinfo(nii);
+	return NULL;
+}
 
 /*
  * Attempt to fetch an image from our parent by firing off a frisbee.
@@ -157,28 +211,50 @@ static struct childinfo *startchild(struct config_host_authinfo *,
  * Or, both.
  */
 int
-fetch_parent(in_addr_t pip, in_port_t pport, struct config_imageinfo *ii,
+fetch_parent(struct in_addr *myip, struct in_addr *pip, in_port_t pport,
+	     struct config_imageinfo *ii,
 	     int *methodp, in_addr_t *addrp, in_port_t *portp)
 {
-#if 0
+	struct childinfo *ci;
+	struct in_addr ifip;
 	GetReply reply;
+	int rv;
+
+	/*
+	 * See if a fetch is already in progress.
+	 * If so we will either return "try again later" or point them to
+	 * our parent.
+	 */
+	ci = findchild(ii, PTYPE_CLIENT, ii->get_methods);
+	if (ci != NULL)
+		goto done;
 
 	/*
 	 * Send our parent a GET request and see what it says.
 	 */
-	if (!ClientNetFindServer(pip, pport, ii->imageid, ii->get_methods,
-				 0, 5, &reply))
+	if (!ClientNetFindServer(ntohl(pip->s_addr), pport,
+				 ii->imageid, ii->get_methods, 0, 5,
+				 &reply, &ifip))
 		return MS_ERROR_NOIMAGE;
 	if (reply.error)
 		return reply.error;
 
 	/*
-	 * Parent has started up a frisbeed, we either need to fire off
-	 * a frisbee to talk to it, or hook our client up with it.
+	 * Parent has started up a frisbeed, spawn a frisbee to capture it.
 	 */
-#endif
+	ci = startclient(ii, &ifip, pip, reply.addr, reply.port, reply.method,
+			 &rv);
+	if (ci == NULL)
+		return rv;
 
-	return MS_ERROR_NOIMAGE;
+ done:
+	if (!canredirect)
+		return MS_ERROR_TRYAGAIN;
+
+	*methodp = ci->method;
+	*addrp = ci->addr;
+	*portp = ci->port;
+	return 0;
 }
 
 void
@@ -219,7 +295,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		msg->body.getreply.error = rv;
 		goto reply;
 	}
-	if (debug)
+	if (debug > 1)
 		config_dump_host_authinfo(ai);
 	if (ai->numimages > 1) {
 		rv = MS_ERROR_INVALID;
@@ -255,13 +331,13 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 	} else {
 		if (errno == ENOENT) {
-			if (fetchfromabove) {
+			if (!wantstatus && fetchfromabove) {
 				int m;
 				in_addr_t a;
 				in_port_t p;
 
-				rv = fetch_parent(ntohl(serverip.s_addr),
-						  MS_PORTNUM, ii, &m, &a, &p);
+				rv = fetch_parent(&sip->sin_addr, &parentip,
+						  parentport, ii, &m, &a, &p);
 				if (rv == 0) {
 					msg->body.getreply.method = m;
 					msg->body.getreply.isrunning = 1;
@@ -299,7 +375,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * Otherwise see if there is a frisbeed already running, starting
 	 * one if not.  Then construct a reply with the available info.
 	 */
-	ci = findchild(ai, PTYPE_SERVER, methods);
+	ci = findchild(ii, PTYPE_SERVER, methods);
 	if (ci == NULL) {
 		struct in_addr in;
 
@@ -319,8 +395,8 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			log("%s: STATUS is not running", imageid);
 			goto reply;
 		}
-		ci = startchild(ai, &sip->sin_addr, &cip->sin_addr,
-				PTYPE_SERVER, methods, &rv);
+		ci = startserver(ii, &sip->sin_addr, &cip->sin_addr,
+				 methods, &rv);
 		if (ci == NULL) {
 			config_free_host_authinfo(ai);
 			msg->body.getreply.error = rv;
@@ -413,22 +489,28 @@ get_options(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "DS:dh")) != -1)
+	while ((ch = getopt(argc, argv, "DS:P:p:dh")) != -1)
 		switch(ch) {
 		case 'd':
 			daemonize = 0;
-			debug = 1;
+			debug++;
 			break;
 		case 'D':
 			dumpconfig = 1;
 			break;
 		case 'S':
-			if (!inet_aton(optarg, &serverip)) {
+			if (!inet_aton(optarg, &parentip)) {
 				fprintf(stderr, "Invalid server IP `%s'\n",
 					optarg);
 				exit(1);
 			}
 			fetchfromabove = 1;
+			break;
+		case 'P':
+			parentport = atoi(optarg);
+			break;
+		case 'p':
+			portnum = atoi(optarg);
 			break;
 		case 'h':
 		case '?':
@@ -450,7 +532,7 @@ get_options(int argc, char **argv)
  * Create socket on specified port.
  */
 static int
-makesocket(int portnum, int *tcpsockp)
+makesocket(int port, int *tcpsockp)
 {
 	struct sockaddr_in	name;
 	int			i, tcpsock;
@@ -475,7 +557,7 @@ makesocket(int portnum, int *tcpsockp)
 	/* Create name. */
 	name.sin_family = AF_INET;
 	name.sin_addr.s_addr = INADDR_ANY;
-	name.sin_port = htons((u_short) portnum);
+	name.sin_port = htons((u_short) port);
 	if (bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
 		pfatal("binding stream socket");
 	}
@@ -497,76 +579,58 @@ static struct childinfo *children;
 static int nchildren;
 
 static struct childinfo *
-findchild(struct config_host_authinfo *ai, int ptype, int methods)
+findchild(struct config_imageinfo *ii, int ptype, int methods)
 {
 	struct childinfo *ci;
 
-	assert(ai->numimages == 1 && ai->imageinfo != NULL);
 	for (ci = children; ci != NULL; ci = ci->next)
 		if (ci->ptype == ptype && (ci->method & methods) != 0 &&
-		    !strcmp(ci->ai->imageinfo[0].imageid,
-			    ai->imageinfo[0].imageid))
+		    !strcmp(ci->imageinfo->imageid, ii->imageid))
 			return ci;
 
 	return NULL;
 }
 
 /*
- * Fire off a frisbeed process to handle an image.
+ * Fire off a frisbee server or client process to serve or download an image.
  */
-static struct childinfo *
-startchild(struct config_host_authinfo *ai, struct in_addr *sip,
-	   struct in_addr *cip, int ptype, int methods, int *errorp)
+static int
+startchild(struct childinfo *ci, struct in_addr *myip, struct in_addr *yourip)
 {
-	struct childinfo *ci;
-
-	assert(findchild(ai, ptype, methods) == NULL);
-
-	ci = calloc(1, sizeof(struct childinfo));
-	if (ci == NULL) {
-		if (errorp)
-			*errorp = MS_ERROR_FAILED;
-		return NULL;
-	}
-
-	/*
-	 * First find the appropriate multicast address and port to use.
-	 */
-	if (config_get_server_address(ai, methods,
-				      &ci->addr, &ci->port, &ci->method)) {
-		free(ci);
-		if (errorp)
-			*errorp = MS_ERROR_FAILED;
-		return NULL;
-	}
-	ci->ai = ai;
-	ci->ptype = ptype;
-
 	/*
 	 * Fork off the process
 	 */
 	ci->pid = fork();
 	if (ci->pid < 0) {
 		pwarning("startchild");
-		free(ci);
-		if (errorp)
-			*errorp = MS_ERROR_FAILED;
-		return NULL;
+		return MS_ERROR_FAILED;
 	}
 	if (ci->pid == 0) {
 		static char argbuf[1024];
+		char mestr[sizeof("XXX.XXX.XXX.XXX")+1];
+		char youstr[sizeof("XXX.XXX.XXX.XXX")+1];
 		char *argv[64], **ap, *args;
 		int argc;
 		struct in_addr in;
-		char *server;
-		char *pname = FRISBEE_SERVER;
+		char *pname;
 
-		server = strdup(inet_ntoa(*sip));
+		pname = (ci->ptype == PTYPE_SERVER) ?
+			FRISBEE_SERVER : FRISBEE_CLIENT;
+		strncpy(mestr, inet_ntoa(*myip), sizeof mestr);
+		strncpy(youstr, inet_ntoa(*yourip), sizeof youstr);
 		in.s_addr = htonl(ci->addr);
-		snprintf(argbuf, sizeof argbuf,
-			 "%s -i %s %s -m %s -p %d %s",
-			 pname, server, ci->ai->imageinfo[0].get_options,
-			 inet_ntoa(in), ci->port, ci->ai->imageinfo[0].path);
+		if (ci->ptype == PTYPE_SERVER)
+			snprintf(argbuf, sizeof argbuf,
+				 "%s -i %s %s -m %s -p %d %s",
+				 pname, mestr,
+				 ci->imageinfo->get_options,
+				 inet_ntoa(in), ci->port, ci->imageinfo->path);
+		else
+			snprintf(argbuf, sizeof argbuf,
+				 "%s -N -S %s -i %s %s -m %s -p %d %s",
+				 pname, youstr, mestr,
+				 debug > 1 ? "" : "-q",
+				 inet_ntoa(in), ci->port, ci->imageinfo->path);
 		if (debug)
 			info("execing: %s", argbuf);
 
@@ -593,8 +657,122 @@ startchild(struct config_host_authinfo *ai, struct in_addr *sip,
 	children = ci;
 	nchildren++;
 
-	if (errorp)
-		*errorp = 0;
+	return 0;
+}
+
+static struct childinfo *
+startserver(struct config_imageinfo *ii, struct in_addr *myip,
+	    struct in_addr *clientip, int methods, int *errorp)
+{
+	struct childinfo *ci;
+
+	assert(findchild(ii, PTYPE_SERVER, methods) == NULL);
+	assert(errorp != NULL);
+
+	ci = calloc(1, sizeof(struct childinfo));
+	if (ci == NULL) {
+		*errorp = MS_ERROR_FAILED;
+		return NULL;
+	}
+
+	/*
+	 * Find the appropriate address, port and method to use.
+	 */
+	if (config_get_server_address(ii, methods, &ci->addr,
+				      &ci->port, &ci->method)) {
+		free(ci);
+		*errorp = MS_ERROR_FAILED;
+		return NULL;
+	}
+	ci->imageinfo = copy_imageinfo(ii);
+	ci->ptype = PTYPE_SERVER;
+	if ((*errorp = startchild(ci, myip, clientip)) != 0) {
+		free_imageinfo(ci->imageinfo);
+		free(ci);
+		return NULL;
+	}
+
+	return ci;
+}
+
+static void
+finishclient(struct childinfo *ci, int status)
+{
+	char *bakname, *tmpname, *realname;
+	int len, didbackup;
+
+	assert(ci->extra != NULL);
+	realname = ci->extra;
+	ci->extra = NULL;
+	tmpname = ci->imageinfo->path;
+	ci->imageinfo->path = realname;
+
+	if (status != 0) {
+		error("%s: download failed, removing tmpfile %s",
+		      realname, tmpname);
+		unlink(tmpname);
+		return;
+	}
+
+	len = strlen(realname) + 5;
+	bakname = malloc(len);
+	snprintf(bakname, len, "%s.bak", realname);
+	didbackup = 1;
+	if (rename(realname, bakname) < 0)
+		didbackup = 0;
+	if (rename(tmpname, realname) < 0) {
+		error("%s: failed to install new version, leaving as %s",
+		      realname, tmpname);
+		if (didbackup)
+			rename(bakname, realname);
+	}
+	free(tmpname);
+	free(bakname);
+	log("%s: download complete", realname);
+}
+
+static struct childinfo *
+startclient(struct config_imageinfo *ii, struct in_addr *myip,
+	    struct in_addr *serverip, in_addr_t addr, in_port_t port,
+	    int methods, int *errorp)
+{
+	struct childinfo *ci;
+	char *tmpname;
+	int len;
+
+	assert(findchild(ii, PTYPE_CLIENT, methods) == NULL);
+	assert(errorp != NULL);
+
+	ci = calloc(1, sizeof(struct childinfo));
+	if (ci == NULL) {
+		*errorp = MS_ERROR_FAILED;
+		return NULL;
+	}
+	ci->addr = addr;
+	ci->port = port;
+	ci->method = methods;
+	ci->imageinfo = copy_imageinfo(ii);
+	ci->ptype = PTYPE_CLIENT;
+
+	/*
+	 * Arrange to download the image as <path>.tmp and then
+	 * rename it into place when done.
+	 */
+	len = strlen(ci->imageinfo->path) + 5;
+	if ((tmpname = malloc(len)) != NULL) {
+		ci->extra = ci->imageinfo->path;
+		snprintf(tmpname, len, "%s.tmp", ci->imageinfo->path);
+		ci->imageinfo->path = tmpname;
+		ci->done = finishclient;
+	}
+	if ((*errorp = startchild(ci, myip, serverip)) != 0) {
+		if (ci->extra)
+			free(ci->extra);
+		free_imageinfo(ci->imageinfo);
+		free(ci);
+		return NULL;
+	}
+
 	return ci;
 }
 
@@ -638,10 +816,13 @@ reapchildren(void)
 		nchildren--;
 		in.s_addr = htonl(ci->addr);
 		log("%s: server process %d on %s:%d exited (status=0x%x)",
-		    ci->ai->imageinfo[0].imageid, pid, inet_ntoa(in), ci->port,
+		    ci->imageinfo->imageid, pid, inet_ntoa(in), ci->port,
 		    status);
-		/*
-		 * XXX if it exits non-zero, we should try to restart?
-		 */
+		if (ci->done)
+			ci->done(ci, status);
+		if (ci->extra)
+			free(ci->extra);
+		free_imageinfo(ci->imageinfo);
+		free(ci);
 	}
 }

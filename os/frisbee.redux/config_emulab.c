@@ -111,6 +111,7 @@ emulab_init(void)
 	} else
 		SCRATCHDIR = NULL;
 
+	log("Read Emulab configuration");
 	return 0;
 }
 
@@ -239,13 +240,11 @@ emulab_free_host_authinfo(struct config_host_authinfo *ai)
  * Return zero on success, non-zero otherwise.
  */
 static int
-emulab_get_server_address(struct config_host_authinfo *ai, int methods,
+emulab_get_server_address(struct config_imageinfo *ii, int methods,
 			  in_addr_t *addrp, in_port_t *portp, int *methp)
 {
 	int	  idx;
 	int	  a, b, c, d;
-
-	assert(ai->numimages == 1 && ai->imageinfo != NULL);
 
 	if ((methods & CONFIG_IMAGE_MCAST) == 0) {
 		error("get_server_address: only support MCAST right now!");
@@ -282,7 +281,7 @@ emulab_get_server_address(struct config_host_authinfo *ai, int methods,
 
 	*methp = CONFIG_IMAGE_MCAST;
 	*addrp = (a << 24) | (b << 16) | (c << 8) | d;
-	*portp = mc_port + (((c << 8) | d) & 0x7FFFF);
+	*portp = mc_port + (((c << 8) | d) & 0x7FFF);
 
 	return 0;
 }

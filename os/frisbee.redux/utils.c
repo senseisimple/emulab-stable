@@ -622,6 +622,9 @@ GetMSError(int error)
 	case MS_ERROR_INVALID:
 		err = "invalid argument";
 		break;
+	case MS_ERROR_TRYAGAIN:
+		err = "image busy, try again later";
+		break;
 	default:
 		err = "unknown error";
 		break;

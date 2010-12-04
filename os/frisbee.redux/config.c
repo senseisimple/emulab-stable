@@ -137,11 +137,11 @@ config_auth_by_IP(struct in_addr *host, char *imageid,
 }
 
 int
-config_get_server_address(struct config_host_authinfo *ai, int methods,
+config_get_server_address(struct config_imageinfo *ii, int methods,
 			  in_addr_t *addr, in_port_t *port, int *method)
 {
 	assert(myconfig != NULL);
-	return myconfig->config_get_server_address(ai, methods,
+	return myconfig->config_get_server_address(ii, methods,
 						   addr, port, method);
 }
 

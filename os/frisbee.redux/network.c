@@ -590,7 +590,8 @@ MsgReceive(int msock, MasterMsg_t *msg, size_t size, int timo)
  */
 int
 ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
-		    int method, int askonly, int timeout, GetReply *reply)
+		    int method, int askonly, int timeout,
+		    GetReply *reply, struct in_addr *myip)
 {
 	struct sockaddr_in name;
 	MasterMsg_t msg;
@@ -610,6 +611,22 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
 		perror("Connecting to master server");
 		close(msock);
 		return 0;
+	}
+
+	/*
+	 * XXX recover the IP address of the interface used to talk to
+	 * the server.
+	 */
+	if (myip) {
+		struct sockaddr_in me;
+		socklen_t len = sizeof me;
+
+		if (getsockname(msock, (struct sockaddr *)&me, &len) < 0) {
+			perror("getsockname");
+			close(msock);
+			return 0;
+		}
+		*myip = me.sin_addr;
 	}
 
 	memset(&msg, 0, sizeof msg);

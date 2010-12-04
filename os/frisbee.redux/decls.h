@@ -394,7 +394,7 @@ int	PacketValid(Packet_t *p, int nchunks);
 void	dump_network(void);
 #ifdef MASTER_SERVER
 int	ClientNetFindServer(in_addr_t, in_port_t, char *, int, int, int,
-			    GetReply *);
+			    GetReply *, struct in_addr *);
 int	MsgSend(int, MasterMsg_t *, size_t, int);
 int	MsgReceive(int, MasterMsg_t *, size_t, int);
 #endif

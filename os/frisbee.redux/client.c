@@ -53,6 +53,7 @@ int		startdelay = 0, startat = 0;
 int		nothreads = 0;
 int		nodecompress = 0;
 int		debug = 0;
+int		quiet = 0;
 int		tracing = 0;
 char		traceprefix[64];
 int		randomize = 1;
@@ -63,6 +64,7 @@ struct in_addr	mcastaddr;
 struct in_addr	mcastif;
 char		*imageid;
 int		askonly;
+int		busywait = 0;
 static struct timeval stamp;
 static struct in_addr serverip;
 
@@ -140,15 +142,16 @@ ClientStats_t	Stats;
 #endif
 
 char *usagestr = 
- "usage: frisbee [-drzbnN] [-s #] <-m ipaddr> <-p #> <output filename>\n"
+ "usage: frisbee [-drzbnqN] [-s #] <-m ipaddr> <-p #> <output filename>\n"
  "  or\n"
- "usage: frisbee [-drzbnN] [-s #] <-S server> <-F fileid> <output filename>\n"
+ "usage: frisbee [-drzbnqN] [-s #] <-S server> <-F fileid> <output filename>\n"
  "\n"
  " -d              Turn on debugging. Multiple -d options increase output.\n"
  " -r              Randomly delay first request by up to one second.\n"
  " -z              Zero fill unused block ranges (default is to seek past).\n"
  " -b              Use broadcast instead of multicast\n"
  " -n              Do not use extra threads in diskwriter\n"
+ " -q              Quiet mode (no dots)\n"
  " -N              Do not decompress the received data, just write to output.\n"
  " -S server-IP    Specify the IP address of the server to use.\n"
  " -p portnum      Specify a port number.\n"
@@ -161,6 +164,7 @@ char *usagestr =
  "                 return unicast/multicast info to use for image download.\n"
  " -Q file-ID      Ask the server (-S) about the indicated file (image).\n"
  "                 Tells whether the image is accessible by this node/user.\n"
+ " -B seconds      Time to wait between queries if an image is busy (-F).\n"
  " -K seconds      Send a multicast keep alive after a period of inactivity.\n"
  "\n"
  "tuning options (if you don't know what they are, don't use em!):\n"
@@ -204,12 +208,16 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:F:Q:")) != -1)
+	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:B:F:Q:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
 			break;
 			
+		case 'q':
+			quiet++;
+			break;
+
 		case 'b':
 			broadcast++;
 			break;
@@ -252,14 +260,18 @@ main(int argc, char **argv)
 			}
 			break;
 
+#ifdef MASTER_SERVER
+		case 'B':
+			busywait = atoi(optarg);
+			break;
 		case 'F':
 			imageid = optarg;
 			break;
-
 		case 'Q':
 			imageid = optarg;
 			askonly = 1;
 			break;
+#endif
 
 		case 't':
 			tracing++;
@@ -359,25 +371,37 @@ main(int argc, char **argv)
 		int method = askonly ? MS_METHOD_ANY : MS_METHOD_MULTICAST;
 		int timo = 5; /* XXX */
 
-		if (!ClientNetFindServer(ntohl(serverip.s_addr), portnum,
-					 imageid, method, askonly, timo,
-					 &reply))
-			fatal("Could not get download info for '%s'", imageid);
+		while (1) {
+			if (!ClientNetFindServer(ntohl(serverip.s_addr),
+						 portnum, imageid, method,
+						 askonly, timo, &reply, NULL))
+				fatal("Could not get download info for '%s'",
+				      imageid);
 
-		if (askonly) {
-			PrintGetInfo(imageid, &reply);
-			exit(0);
+			if (askonly) {
+				PrintGetInfo(imageid, &reply);
+				exit(0);
+			}
+
+			if (reply.error) {
+				if (busywait == 0 ||
+				    reply.error != MS_ERROR_TRYAGAIN)
+					fatal("%s: server returned error: %s",
+					      imageid,
+					      GetMSError(reply.error));
+				log("%s: image busy, waiting %d seconds...",
+				    imageid, busywait);
+				sleep(busywait);
+				continue;
+			}
+
+			mcastaddr.s_addr = htonl(reply.addr);
+			portnum = reply.port;
+
+			log("%s: address: %s:%d",
+			    imageid, inet_ntoa(mcastaddr), portnum);
+			break;
 		}
-
-		if (reply.error)
-			fatal("%s: server returned error: %s",
-			      imageid, GetMSError(reply.error));
-
-		log("%s: address: %s:%d",
-		    imageid, inet_ntoa(mcastaddr), portnum);
-
-		mcastaddr.s_addr = htonl(reply.addr);
-		portnum = reply.port;
 	}
 #endif
 	ClientNetInit();
@@ -507,8 +531,8 @@ main(int argc, char **argv)
 	 * This call fires off the disk writer thread as required.
 	 * The writer thread synchronizes only with us (the decompresser).
 	 */
-	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype, 3,
-		       maxwritebufmem*1024*1024);
+	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype,
+		       quiet ? 0 : 3, maxwritebufmem*1024*1024);
 
 	if (tracing) {
 		ClientTraceInit(traceprefix);
@@ -1677,8 +1701,11 @@ PlayFrisbee(void)
 	p->msg.leave2.stats      = Stats;
 	PacketSend(p, 0);
 
-	log("");
-	ClientStatsDump(myid, &Stats);
+	if (!quiet) {
+		log("");
+		ClientStatsDump(myid, &Stats);
+		log("");
+	}
 #else
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_LEAVE;
@@ -1687,5 +1714,5 @@ PlayFrisbee(void)
 	p->msg.leave.elapsed  = estamp.tv_sec;
 	PacketSend(p, 0);
 #endif
-	log("\nLeft the team after %ld seconds on the field!", estamp.tv_sec);
+	log("Left the team after %ld seconds on the field!", estamp.tv_sec);
 }
