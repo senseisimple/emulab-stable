@@ -56,7 +56,7 @@ open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 # Clear the frisbee_blobs table since any frisbee's
 # that were running are obviously not running anymore! 
 #
-DBQueryFatel("delete from frisbee_blobs");
+DBQueryFatal("delete from frisbee_blobs");
 
 #
 # Clear the event scheduler pids. Its okay to set them to zero since
