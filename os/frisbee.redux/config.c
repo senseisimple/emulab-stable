@@ -136,12 +136,18 @@ config_auth_by_IP(struct in_addr *host, char *imageid,
 	return 0;
 }
 
+/*
+ * If first is non-zero, then we need to return a "new" address and *addr
+ * and *port are uninitialized.  If non-zero, then our last choice failed
+ * (probably due to a port conflict) and we need to choose a new address
+ * to try, possibly based on the existing info in *addr and *port.
+ */
 int
-config_get_server_address(struct config_imageinfo *ii, int methods,
+config_get_server_address(struct config_imageinfo *ii, int methods, int first,
 			  in_addr_t *addr, in_port_t *port, int *method)
 {
 	assert(myconfig != NULL);
-	return myconfig->config_get_server_address(ii, methods,
+	return myconfig->config_get_server_address(ii, methods, first,
 						   addr, port, method);
 }
 

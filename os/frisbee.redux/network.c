@@ -668,6 +668,7 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
 	 */
 	*reply = msg.body.getreply;
 	reply->error = ntohs(reply->error);
+	reply->servaddr = ntohl(reply->servaddr);
 	reply->addr = ntohl(reply->addr);
 	reply->port = ntohs(reply->port);
 	reply->sigtype = ntohs(reply->sigtype);

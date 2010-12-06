@@ -156,6 +156,9 @@ void
 set_get_methods(struct config_host_authinfo *ai, int ix)
 {
 	ai->imageinfo[ix].get_methods = CONFIG_IMAGE_MCAST;
+#if 1
+	ai->imageinfo[ix].get_methods |= CONFIG_IMAGE_UCAST;
+#endif
 }
 
 /*
@@ -231,23 +234,30 @@ emulab_free_host_authinfo(struct config_host_authinfo *ai)
  * Return the IP address/port to be used by the server/clients for
  * the image listed in ai->imageinfo[0].  Methods lists one or more transfer
  * methods that the client can handle, we return the method chosen.
+ * If first is non-zero, then we need to return a "new" address and *addrp
+ * and *portp are uninitialized.  If non-zero, then our last choice failed
+ * (probably due to a port conflict) and we need to choose a new address
+ * to try, possibly based on the existing info in *addrp and *portp.
  *
  * For Emulab, we use the frisbee_index from the DB along with the base
  * multicast address and port to compute a unique address/port.  Uses the
- * same logic that frisbeelauncher used to use.
- * XXX right now we only do multicast.
+ * same logic that frisbeelauncher used to use.  For retries (first==0),
+ * we choose a whole new addr/port for multicast.
+ *
+ * For unicast, we use the index as well, just to produce a unique port
+ * number.
  *
  * Return zero on success, non-zero otherwise.
  */
 static int
-emulab_get_server_address(struct config_imageinfo *ii, int methods,
+emulab_get_server_address(struct config_imageinfo *ii, int methods, int first,
 			  in_addr_t *addrp, in_port_t *portp, int *methp)
 {
 	int	  idx;
 	int	  a, b, c, d;
 
-	if ((methods & CONFIG_IMAGE_MCAST) == 0) {
-		error("get_server_address: only support MCAST right now!");
+	if ((methods & (CONFIG_IMAGE_MCAST|CONFIG_IMAGE_UCAST)) == 0) {
+		error("get_server_address: only support UCAST/MCAST");
 		return 1;
 	}
 
@@ -279,8 +289,13 @@ emulab_get_server_address(struct config_imageinfo *ii, int methods,
 		return 1;
 	}
 
-	*methp = CONFIG_IMAGE_MCAST;
-	*addrp = (a << 24) | (b << 16) | (c << 8) | d;
+	if (methods & CONFIG_IMAGE_MCAST) {
+		*methp = CONFIG_IMAGE_MCAST;
+		*addrp = (a << 24) | (b << 16) | (c << 8) | d;
+	} else if (methods & CONFIG_IMAGE_UCAST) {
+		*methp = CONFIG_IMAGE_UCAST;
+		*addrp = 0;
+	}
 	*portp = mc_port + (((c << 8) | d) & 0x7FFF);
 
 	return 0;

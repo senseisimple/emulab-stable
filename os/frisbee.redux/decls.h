@@ -340,6 +340,7 @@ typedef struct {
 	uint8_t		method;
 	uint8_t		isrunning;
 	uint16_t	error;	
+	in_addr_t	servaddr;
 	in_addr_t	addr;
 	in_port_t	port;
 	uint16_t	sigtype;

@@ -395,6 +395,7 @@ main(int argc, char **argv)
 				continue;
 			}
 
+			serverip.s_addr = htonl(reply.servaddr);
 			mcastaddr.s_addr = htonl(reply.addr);
 			portnum = reply.port;
 

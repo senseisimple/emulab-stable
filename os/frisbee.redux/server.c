@@ -978,7 +978,7 @@ main(int argc, char **argv)
 	if (argc != 1)
 		usage();
 
-	if (!portnum || ! mcastaddr.s_addr)
+	if (!portnum || !mcastaddr.s_addr)
 		usage();
 
 	if (timeout > 0 && keepalive > timeout) {
