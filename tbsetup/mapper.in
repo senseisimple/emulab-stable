@@ -99,6 +99,7 @@ use libtblog;
 use libvtop;
 use libadminctrl;
 use User;
+use EmulabFeatures;
 
 # Protos
 sub fatal(@);
@@ -220,6 +221,11 @@ if (!TBAdmin() &&
 # multiplex_factor default.
 $mfactor = $experiment->multiplex_factor()
     if (!defined($mfactor) && defined($experiment->multiplex_factor()));
+
+my $newassign =
+    EmulabFeatures->FeatureEnabled("NewAssign",
+				   $this_user,
+				   $experiment->GetGroup(), $experiment);
     
 #
 # These are the flags to the vtop creation code. 
@@ -557,6 +563,8 @@ sub RunAssign($$)
 
     # Run assign
     my $cmd  = "assign";
+    $cmd .= "-new"
+	if ($newassign);
     my $args = "";
     $args .= "-f rspec " 
 	if ($userspec == 1);
