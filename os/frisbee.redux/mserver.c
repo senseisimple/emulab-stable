@@ -29,11 +29,12 @@
 
 #define FRISBEE_SERVER	"/usr/testbed/sbin/frisbeed"
 #define FRISBEE_CLIENT	"/usr/testbed/sbin/frisbee"
+#define FRISBEE_RETRIES	3
 
 static void	get_options(int argc, char **argv);
 static int	makesocket(int portnum, int *tcpsockp);
 static void	handle_request(int sock);
-static int	reapchildren(void);
+static int	reapchildren(int apid);
 
 static int	daemonize = 1;
 int		debug = 0;
@@ -129,7 +130,7 @@ main(int argc, char **argv)
 				close(newsock);
 			}
 		}
-		reapchildren();
+		(void) reapchildren(0);
 	}
 	close(tcpsock);
 	log("daemon terminating");
@@ -142,6 +143,7 @@ struct childinfo {
 	int ptype;
 	int method;
 	int pid;
+	int retries;
 	in_addr_t servaddr;	/* -S arg */
 	in_addr_t ifaceaddr;	/* -i arg */
 	in_addr_t addr;		/* -m arg */
@@ -262,6 +264,13 @@ fetch_parent(struct in_addr *myip, struct in_addr *pip, in_port_t pport,
 			 reply.addr, reply.port, reply.method, &rv);
 	if (ci == NULL)
 		return rv;
+
+	/*
+	 * XXX more unicast hackary...if we are talking unicast with our
+	 * parent, we cannot redirect the child there as well.
+	 */
+	if (ci->method == MS_METHOD_UNICAST)
+		return MS_ERROR_TRYAGAIN;
 
  done:
 	if (!canredirect)
@@ -693,6 +702,7 @@ findchild(struct config_imageinfo *ii, int ptype, int methods)
 
 /*
  * Fire off a frisbee server or client process to serve or download an image.
+ * Return zero on success, an error code on failure.
  */
 static int
 startchild(struct childinfo *ci)
@@ -759,6 +769,14 @@ startchild(struct childinfo *ci)
 	children = ci;
 	nchildren++;
 
+	/*
+	 * Watch for an immediate death so we don't leave any clients
+	 * hanging unnecessarily.
+	 */
+	sleep(2);
+	if (reapchildren(ci->pid))
+		return MS_ERROR_FAILED;
+
 	return 0;
 }
 
@@ -800,6 +818,7 @@ startserver(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	ci->ifaceaddr = meaddr;
 	ci->imageinfo = copy_imageinfo(ii);
 	ci->ptype = PTYPE_SERVER;
+	ci->retries = FRISBEE_RETRIES;
 	if ((*errorp = startchild(ci)) != 0) {
 		free_imageinfo(ci->imageinfo);
 		free(ci);
@@ -868,6 +887,7 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	ci->method = methods;
 	ci->imageinfo = copy_imageinfo(ii);
 	ci->ptype = PTYPE_CLIENT;
+	ci->retries = 0;
 
 	/*
 	 * Arrange to download the image as <path>.tmp and then
@@ -899,12 +919,15 @@ killchild(struct childinfo *ci)
 
 /*
  * Cleanup zombies.
+ * If pid is non-zero, we wait for that specific process.
+ * Returns the number of children reaped.
  */
 static int
-reapchildren(void)
+reapchildren(int wpid)
 {
 	int pid, status;
 	struct childinfo **cip, *ci;
+	int corpses = 0;
 
 	if (nchildren == 0) {
 		assert(children == NULL);
@@ -914,7 +937,10 @@ reapchildren(void)
 	while (1) {
 		struct in_addr in;
 
-		pid = waitpid(0, &status, WNOHANG);
+		pid = waitpid(wpid, &status, WNOHANG);
+		if (debug && wpid)
+			log("wait for %d returns %d, status=%x",
+			    wpid, pid, status);
 		if (pid <= 0)
 			return 0;
 		for (cip = &children; *cip != NULL; cip = &(*cip)->next) {
@@ -924,6 +950,8 @@ reapchildren(void)
 		ci = *cip;
 		if (ci == NULL) {
 			error("Child died that was not ours!?");
+			if (wpid)
+				break;
 			continue;
 		}
 		*cip = ci->next;
@@ -933,11 +961,38 @@ reapchildren(void)
 		    ci->imageinfo->imageid,
 		    ci->ptype == PTYPE_SERVER ? "server" : "client",
 		    pid, inet_ntoa(in), ci->port, status);
+
+		/*
+		 * Special case exit value.
+		 * Server (or client) could not bind to the port we gave it.
+		 * For the server, we get a new address and try again up to
+		 * FRISBEE_RETRIES times.  For a client, we just fail right
+		 * now.  Maybe we should sleep awhile and try again or
+		 * reask our server?
+		 */
+		if (ci->retries > 0 && WEXITSTATUS(status) == EADDRINUSE) {
+			ci->retries--;
+			if (ci->ptype == PTYPE_SERVER &&
+			    !config_get_server_address(ci->imageinfo,
+						       ci->method, 0,
+						       &ci->addr, &ci->port,
+						       &ci->method) &&
+			    !startchild(ci))
+				continue;
+		}
 		if (ci->done)
 			ci->done(ci, status);
 		if (ci->extra)
 			free(ci->extra);
 		free_imageinfo(ci->imageinfo);
 		free(ci);
+		corpses++;
+		if (wpid) {
+			if (debug)
+				error("  process %d exited immediately", wpid);
+			break;
+		}
 	}
+
+	return corpses;
 }

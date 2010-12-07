@@ -30,7 +30,7 @@ unsigned long nonetbufs;
 #endif
 
 /* Max number of times to attempt bind to port before failing. */
-#define MAXBINDATTEMPTS		2
+#define MAXBINDATTEMPTS		1
 
 /* Max number of hops multicast hops. */
 #define MCAST_TTL		5
