@@ -1078,7 +1078,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		/*
 		 * Look for external key
 		 */
-		if (sscanf(bp, "KEY=%" XSTRINGIFY(PRIV_LEN) "s", buf)) {
+		if (sscanf(bp, "KEY=%" XSTRINGIFY(PRIVKEY_LEN) "s", buf)) {
 			for (i = 0; i < strlen(buf); i++){
 				if (! isalnum(buf[i])) {
 					info("tmcd client provided invalid "
