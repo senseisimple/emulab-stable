@@ -167,14 +167,14 @@ sub dotopomap()
 	}
     }
     my $optarg = (defined($vnodeid) ? "-n $vnodeid" : "");
-    my $urnarg = (exists($ENV{'URN'}) ? "URN=" . $ENV{'URN'} : "");
+    my $idarg  = (exists($ENV{'IDKEY'}) ? "IDKEY=" . $ENV{'IDKEY'} : "");
     
     if (! -e $tempmap) {
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
 	# XXX note that tmcc does not return a meaningful exit value.
 	#
-	system(TMCCBIN() . " $optarg $urnarg topomap > $tempmap");
+	system(TMCCBIN() . " $optarg $idarg topomap > $tempmap");
     }
 
     if (! -e $templt) {
@@ -182,7 +182,7 @@ sub dotopomap()
 	# Try using tmcc. It returns compressed data so do it directly.
 	# XXX note that tmcc does not return a meaningful exit value.
 	#
-	system(TMCCBIN() . " $optarg $urnarg ltmap > $templt");
+	system(TMCCBIN() . " $optarg $idarg ltmap > $templt");
     }
 
     if (! -e $templtp) {
@@ -190,7 +190,7 @@ sub dotopomap()
 	# Try using tmcc. It returns compressed data so do it directly.
 	# XXX note that tmcc does not return a meaningful exit value.
 	#
-	system(TMCCBIN() . " $optarg $urnarg ltpmap > $templtp");
+	system(TMCCBIN() . " $optarg $idarg ltpmap > $templtp");
     }
 
     if (-s $tempmap) {

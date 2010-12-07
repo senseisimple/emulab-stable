@@ -16,8 +16,8 @@ use vars qw(@ISA @EXPORT);
 # Configure variables
 my $TB		= "@prefix@";
 my $BOSSNODE    = "@BOSSNODE@";
-#my $TBDOCBASE   = "@TBDOCBASE@";
-my $TBDOCBASE   = "http://www.emulab.net";
+my $TBDOCBASE   = "@TBDOCBASE@";
+#my $TBDOCBASE   = "http://www.emulab.net";
 my $ELVIN_COMPAT= @ELVIN_COMPAT@;
 my $ASSIGN	= "$TB/libexec/assign";
 
@@ -508,7 +508,7 @@ sub GetTickets($)
 			   "$TBDOCBASE/downloads/geniclient.tar");
 	    
 	my $cmd = "sudo /usr/local/etc/emulab/rc/rc.pgeni ".
-	    "-s $BOSSNODE -k $eventkey,$keyhash -r '$key'";
+	    "-s $BOSSNODE -k $eventkey,$keyhash -i '$key'";
 	$cmd .= " -j " . $node->node_id()
 	    if ($node->isvirtnode());
 	$cmd .= " -e 16509"
