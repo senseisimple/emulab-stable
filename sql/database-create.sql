@@ -3246,6 +3246,7 @@ CREATE TABLE `reserved` (
   `genisliver_idx` int(10) unsigned default NULL,
   `external_resource_index` int(10) unsigned default NULL,
   `external_resource_id` tinytext,
+  `external_resource_key` tinytext,
   `tmcd_redirect` tinytext,
   `sharing_mode` varchar(32) default NULL,
   PRIMARY KEY  (`node_id`),
