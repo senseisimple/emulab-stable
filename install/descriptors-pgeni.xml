@@ -1,0 +1,75 @@
+<descriptors>
+<osid>
+  <attribute name="magic">
+    <value></value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,isup,veths,veth-ne,veth-en,mlinks,vlans</value>
+  </attribute>
+  <attribute name="version">
+    <value>0.1</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>600</value>
+  </attribute>
+  <attribute name="description">
+    <value>Phoney OSID for GENI nodes</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>MINIMAL</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>GENI</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Other</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value></value>
+  </attribute>
+  <attribute name="features">
+    <value>ping,ssh,isup,veths,veth-ne,veth-en,mlinks,vlans</value>
+  </attribute>
+  <attribute name="version">
+    <value>0.1</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>600</value>
+  </attribute>
+  <attribute name="description">
+    <value>Phony OSID for Geni vnodes</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>MINIMAL</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>GENIVM</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Other</value>
+  </attribute>
+  <attribute name="nextosid">
+    <value>emulab-ops,GENI</value>
+  </attribute>
+</osid>
+</descriptors>
