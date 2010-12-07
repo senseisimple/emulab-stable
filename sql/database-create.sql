@@ -3948,6 +3948,7 @@ CREATE TABLE `virt_lans` (
   `vname` varchar(32) NOT NULL default '',
   `vnode` varchar(32) NOT NULL default '',
   `vport` tinyint(3) NOT NULL default '0',
+  `vindex` int(11) NOT NULL default '-1',
   `ip` varchar(15) NOT NULL default '',
   `delay` float(10,2) default '0.00',
   `bandwidth` int(10) unsigned default NULL,
