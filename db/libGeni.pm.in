@@ -575,7 +575,7 @@ sub GetTickets($)
     my $count    = 0;
     my $progress = 0;
     foreach my $result (@results) {
-	my $resource = $resources[$count];
+	my $resource = $todo[$count];
 
 	#
 	# ParRun does a fork; so need to refresh the resource object
@@ -989,7 +989,8 @@ sub StartSlivers($$$)
 	my ($resource) = @_;
 
 	# The sliver was auto started. We just need to wait for it.
-	if ($resource->ManagerApi() eq "AM" || $resource->ManagerApiLevel() == 0) {
+	if ($resource->ManagerApi() eq "AM" ||
+	    $resource->ManagerApiLevel() == 0) {
 	    print STDERR
 		"Skipping start sliver on level 0 resource $resource\n";
 	    return 0;
@@ -997,8 +998,9 @@ sub StartSlivers($$$)
 
 	if ($resource->ManagerVersion() >= 2) {
 	    #
-	    # First get the state; we might not need to start it (would be wrong)
-	    # if the sliver is in the started start. We deal with restart later.
+	    # First get the state; we might not need to start it
+	    # (would be wrong) if the sliver is in the started
+	    # start. We deal with restart later.
 	    #
 	    print STDERR "Getting current sliver status for $resource\n";
 	    my $status;
