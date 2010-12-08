@@ -1,16 +1,3 @@
-diff -ru linux-2.6.34/net/ipv4/Kconfig linux-2.6.34-emulab/net/ipv4/Kconfig
---- linux-2.6.34/net/ipv4/Kconfig	2008-08-29 09:50:50.000000000 -0600
-+++ linux-2.6.34-emulab/net/ipv4/Kconfig	2008-08-29 09:53:39.000000000 -0600
-@@ -627,3 +627,9 @@
- 
- 	  If unsure, say N.
- 
-+#
-+# Emulab special
-+#
-+config ICMP_PINGOFDEATH
-+       bool "ICMP: ICMP Ping-of-Death (Emulab)"
-+
 diff -ru linux-2.6.34/net/ipv4/icmp.c linux-2.6.34-emulab/net/ipv4/icmp.c
 --- linux-2.6.34/net/ipv4/icmp.c	2010-05-16 23:17:36.000000000 +0200
 +++ linux-2.6.34-emulab/net/ipv4/icmp.c	2010-06-03 17:32:26.000000000 +0200

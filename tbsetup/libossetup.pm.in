@@ -1645,14 +1645,45 @@ sub LightUpNodes($@)
     my $experiment = $parent->experiment();
     my $pid        = $experiment->pid();
     my $eid        = $experiment->eid();
+    my @rebootlist = ();
 
+    #
+    # What nodes need reboot.
+    #
+    foreach my $node (@nodelist) {
+	push (@rebootlist, $node)
+	    if ($node->allocstate() eq TBDB_ALLOCSTATE_RES_REBOOT());
+    }
+    
     TBDebugTimeStamp("Starting Geni setup.");
+    #
+    # This will start newly added slivers, but not existing.
+    #
     if (libGeni::StartSlivers($experiment,
-			      $parent->user(), 0, $parent->debug())) {
+			      $parent->user(), $parent->debug())) {
 	print STDERR "*** Could not start Geni slivers\n";
 	return 1;
     }
     TBDebugTimeStamp("Geni slivers have been started.");
+
+    # Now reboot the rest.
+    if (@rebootlist) {
+	if (libGeni::RestartNodes($parent->user(), $parent->debug(), @rebootlist)) {
+	    tbdie("Could not restart protogeni nodes\n");
+	}
+	#
+	# We always do a wait for geni nodes since for nodes in "basic"
+	# cooked mode, nothing will be reporting a state change from the
+	# node. We have to go poll it to make sure that the node is alive,
+	# and so we can report ISUP for it. This is a bit of a violation of
+	# the default reboot model, which is fire and forget when waitmode
+	# is not set, but no way around it.
+	#
+	if (libGeni::WaitForNodes($parent->user(),
+				  $parent->debug(), undef, @rebootlist)) {
+	    tbdie("Error in waiting for protogeni nodes\n");
+	}
+    }
     return 0;
 }
 

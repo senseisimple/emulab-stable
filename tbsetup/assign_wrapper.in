@@ -1542,7 +1542,7 @@ sub RunAssign ()
 	    # Node is being reused, but for a different purpose, so
 	    # it should be rebooted.
 	    #
-	    TBSetNodeAllocState($pnode, TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+	    TBSetNodeAllocState($pnode, TBDB_ALLOCSTATE_RES_REBOOT());
 	}
     }
     return 0;
@@ -1805,7 +1805,7 @@ foreach my $pnode (sort(keys(%virtnodes))) {
 	    elsif ($reserved_v2vmap{$virtual} ne $physical) {
 		# Node has moved! Nuts!
 		TBSetNodeAllocState($physical,
-				    TBDB_ALLOCSTATE_RES_INIT_DIRTY());
+				    TBDB_ALLOCSTATE_RES_REBOOT());
 	    }
 	}
     }

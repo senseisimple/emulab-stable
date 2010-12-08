@@ -1021,7 +1021,7 @@ sub doSwapin($) {
 		if ($isvirt) {
 		    push(@virtnodes, $node);
 		}
-		elsif (!$isrem) {
+		else {
 		    push(@physnodes, $node);
 		}
 	    }
@@ -1234,16 +1234,19 @@ sub doSwapin($) {
 			 "where r.pid='$pid' and r.eid='$eid'");
 
 	while (my ($node,$allocstate) = $db_result->fetchrow_array) {
+	    print STDERR "A: $node, $allocstate\n";
+	    
 	    #
-	    # If the node is INIT_CLEAN, leave it alone. It will still get
-	    # rebooted, but will not falsely be tagged as dirty. This is
-	    # important for vnodes too, where INIT_CLEAN indicated the vnode
-	    # does not even exist yet (plab nodes).
+	    # INIT_CLEAN and INIT_DIRTY indicate brand new nodes. Leave
+	    # the state alone for os_setup so it knows. REBOOT means libvtop
+	    # knows something we do not, so do not change that either.
 	    #
-	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN() &&
+		$allocstate ne TBDB_ALLOCSTATE_RES_INIT_DIRTY() &&
+		$allocstate ne TBDB_ALLOCSTATE_RES_REBOOT()) {
 		TBSetNodeAllocState($node,
 				    ($needreboot ?
-				     TBDB_ALLOCSTATE_RES_INIT_DIRTY() :
+				     TBDB_ALLOCSTATE_RES_REBOOT() :
 				     TBDB_ALLOCSTATE_RES_RECONFIG()));
 	    }
 	}

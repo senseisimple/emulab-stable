@@ -12,7 +12,8 @@ use vars qw(@ISA @EXPORT);
 
 @ISA = "Exporter";
 @EXPORT = qw(Parse ParseFile IsVersion0 FindNodes FindNodesNS
-FindFirst FindElement FindAttr IsLanNode IsLocalNode IsTunnel GetExpires
+FindFirst FindElement FindAttr GetNodeByVirtualId GetLinkByVirtualId
+IsLanNode IsLocalNode IsTunnel GetExpires
 GetNodeId GetVirtualId GetInterfaceId GetInterfaceNodeId GetSliverId
 GetManagerId GetColocate GetSubnodeOf
 GetVirtualizationType SetVirtualizationType GetVirtualizationSubtype
@@ -187,6 +188,35 @@ sub FindAttr($$)
 {
     my ($path, $node) = @_;
     return FindNodeType($path, $node, XML_ATTRIBUTE_NODE);
+}
+
+sub GetElementByVirtualId($$$)
+{
+    my ($name, $type, $node) = @_;
+    my @list = FindNodes('n:'.$type.'[@virtual_id = "'.$name.'"]',
+			 $node)->get_nodelist();
+    my $result = undef;
+    if (scalar(@list) > 0)
+    {
+	$result = $list[0];
+    }
+    if (scalar(@list) > 1)
+    {
+	cluck("WARNING: Multiple $type with virtual_id $name found");
+    }
+    return $result;
+}
+
+sub GetNodeByVirtualId($$)
+{
+    my ($name, $node) = @_;
+    return GetElementByVirtualId($name, 'node', $node);
+}
+
+sub GetLinkByVirtualId($$)
+{
+    my ($name, $node) = @_;
+    return GetElementByVirtualId($name, 'link', $node);    
 }
 
 # Returns true if a given XML Node is an RSpec node and is of type lan
@@ -524,6 +554,14 @@ sub RemoveChild($$)
     if (defined($child)) {
 	$node->removeChild($child);
     }
+}
+
+# Replaces a node (oldnode) with a copy of another node (newnode)
+sub ReplaceNode($$)
+{
+    my ($oldnode, $newnode) = @_;
+    my $copy = $newnode->cloneNode(1);
+    $oldnode->replaceNode($copy);
 }
 
 # checks for the existense of policy in extensions of the given

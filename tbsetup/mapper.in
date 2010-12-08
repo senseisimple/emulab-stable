@@ -99,6 +99,7 @@ use libtblog;
 use libvtop;
 use libadminctrl;
 use User;
+use EmulabFeatures;
 
 # Protos
 sub fatal(@);
@@ -220,6 +221,11 @@ if (!TBAdmin() &&
 # multiplex_factor default.
 $mfactor = $experiment->multiplex_factor()
     if (!defined($mfactor) && defined($experiment->multiplex_factor()));
+
+my $newassign =
+    EmulabFeatures->FeatureEnabled("NewAssign",
+				   $this_user,
+				   $experiment->GetGroup(), $experiment);
     
 #
 # These are the flags to the vtop creation code. 
@@ -315,9 +321,9 @@ sub AssignLoop()
 
     TBDebugTimeStamp("mapper loop started");
     while (1) {
-	chat("Assign run $currentrun\n");
+	chat("Mapper loop $currentrun\n");
 
-	my $prefix = ($debug || $regression ? "$pid-$eid" : "$pid-$eid-$$");
+	my $prefix = "$pid-$eid-$$";
 
 	#
 	# When precheck is on, we only do one run in impotent mode and exit.
@@ -463,8 +469,23 @@ sub RunAssign($$)
 	return -1;
     }
     close(VTOPFILE);
+    system("/bin/cp -fp $vtopfile ${pid}-${eid}.vtop") if ($debug);
     return 0
 	if ($toponly);
+
+    if (! ($impotent || $regression || $alloconly)) {
+	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
+				 "minimum_nodes" => $vtop->minimum_nodes(),
+				 "virtnode_count"=> $vtop->virtnodecount() })){
+	    tberror("Could not update min/max/virt nodes for $experiment\n");
+	    return -1;
+	}
+    }
+    # New solution each time.
+    $vtop->ClearSolution();
+
+    goto skipassign
+	if ($vtop->nodecount() == $vtop->genicount());
 
     # Debugging hack for regression mode. Avoid really long assign runs.
     if ($regression && $noassign) {
@@ -544,19 +565,13 @@ sub RunAssign($$)
 	tberror("Failure in ptopgen\n");
 	return -1;
     }
+    system("/bin/cp -fp $ptopfile ${pid}-${eid}.ptop") if ($debug);
     TBDebugTimeStamp("ptopgen finished");
-
-    if (! ($impotent || $regression || $alloconly)) {
-	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
-				 "minimum_nodes" => $vtop->minimum_nodes(),
-				 "virtnode_count"=> $vtop->virtnodecount() })){
-	    tberror("Could not update min/max/virt nodes for $experiment\n");
-	    return -1;
-	}
-    }
 
     # Run assign
     my $cmd  = "assign";
+    $cmd .= "-new"
+	if ($newassign);
     my $args = "";
     $args .= "-f rspec " 
 	if ($userspec == 1);
@@ -642,7 +657,8 @@ sub RunAssign($$)
     # purposes We do not call it .log though, since we do not want it
     # copied out to the user directory every swapin. See Experiment.pm
     #
-    system("/bin/cp assign.log ${prefix}.assign");
+    system("/bin/cp -fp assign.log ${prefix}.assign");
+    system("/bin/cp -fp assign.log ${pid}-${eid}.assign") if ($debug);
 
     if ($assignexitcode) {
 	print "Assign exited with $assignexitcode\n" if ($debug);
@@ -672,9 +688,6 @@ sub RunAssign($$)
 	print("Could not open assign logfile! $!\n");
 	return -1;
     }
-    # New solution each time.
-    $vtop->ClearSolution();
-
     TBDebugTimeStamp("ReadSolution started");
     if ($vtop->ReadTextSolution(*ASSIGNFP) != 0) {
 	print("Could not parse assign logfile! $!\n");
@@ -682,8 +695,9 @@ sub RunAssign($$)
     }
     close(ASSIGNFP);
     TBDebugTimeStamp("ReadSolution ended");
+  skipassign:
     
-    if (defined($vtop->genirspec())) {
+    if (defined($vtop->genicount())) {
 	TBDebugTimeStamp("Map Geni Resources Started");
 	if ($vtop->MapResources() != 0) {
 	    print("Could not map external resources! $!\n");

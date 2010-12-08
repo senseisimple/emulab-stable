@@ -54,10 +54,14 @@ my $MAXWAITTIME	= (6 * 60);
 #
 use libdb;
 use libtestbed;
+use User;
 use event;
 use POSIX qw(strftime);
 use IO::Handle;
 use Fcntl;
+if ($PGENISUPPORT) {
+    require libGeni;
+}
 
 # External Programs
 my $ssh		= "$TB/bin/sshtb -n";
@@ -189,6 +193,13 @@ sub nodereboot($$)
     my %realnodes = ();
     my %virtnodes = ();
 
+    #
+    # Geni node reboot/wait is optimized inside libGeni, so keep them
+    # separate. Both real and virtual; libGeni treats them the same
+    # since the Protogeni interface makes no distinction.
+    #
+    my %geninodes = ();
+
     foreach my $node (@nodes) {
 	my $nodeobj = $nodeobjects{$node};
 	if (!defined($nodeobj)) {
@@ -203,8 +214,11 @@ sub nodereboot($$)
 	# All nodes start out as being successful; altered later as needed.
 	$result->{$node} = 0;
 
-	if ($nodeobj->isvirtnode()) {
-	    if (!$jailed && !$plab && !$geninode && !$rebootable) {
+	if ($geninode) {
+	    $geninodes{$node} = $nodeobj;
+	}
+	elsif ($nodeobj->isvirtnode()) {
+	    if (!$jailed && !$plab && !$rebootable) {
 		print "reboot ($node): Skipping old style virtual node\n";
 		next;
 	    }
@@ -227,7 +241,7 @@ sub nodereboot($$)
 	    delete($virtnodes{$node});
 	}
     }
-    if (! keys(%realnodes) && ! keys(%virtnodes)) {
+    if (! (keys(%realnodes) || keys(%virtnodes) || keys(%geninodes))) {
 	print "reboot: No nodes to reboot.\n";
 	return 0;
     }
@@ -301,6 +315,31 @@ sub nodereboot($$)
 
 	print STDERR "reboot: Running in pipemode ($pipemode).\n"
 	    if ($debug);
+    }
+
+    #
+    # Fire off the geninode reboots. 
+    #
+    if (keys(%geninodes)) {
+	my $this_user = User->ThisUser();
+	if (!defined($this_user)) {
+	    tbdie("Could not determine current user for libGeni\n");
+	}
+	if (libGeni::RestartNodes($this_user, $debug, values(%geninodes))) {
+	    tbdie("Could not restart protogeni nodes\n");
+	}
+	#
+	# We always do a wait for geni nodes since for nodes in "basic"
+	# cooked mode, nothing will be reporting a state change from the
+	# node. We have to go poll it to make sure that the node is alive,
+	# and so we can report ISUP for it. This is a bit of a violation of
+	# the default reboot model, which is fire and forget when waitmode
+	# is not set, but no way around it.
+	#
+	if (libGeni::WaitForNodes($this_user, $debug,
+				  undef, values(%geninodes))) {
+	    tbdie("Error in waiting for protogeni nodes\n");
+	}
     }
 
     #
@@ -823,19 +862,6 @@ sub RebootVNode($$) {
 	    }
 	}
 	return($exitstatus);
-    }
-
-    if ($geninode) {
-	#
-	# Do this via the Geni API and return that status to the caller.
-	#
-	my $experiment = $nodeobj->Reservation();
-	if (!defined($experiment)) {
-	    print STDERR "*** reboot ($vnode): geninode not allocated.\n";
-	    exit(1);
-	}
-	$EUID = $UID;
-	exit(GeniEmulab->StartSlivers($experiment, [ $nodeobj ]));
     }
 
     my $addargs = "-t ";	# Turn on timestamps.
