@@ -1,0 +1,150 @@
+--------------------------
+Running in Standalone Mode
+--------------------------
+
+run-standalone <run-level> <run-path> <log-path> <host-list> [node-list]
+
+Uses pssh to simultaneously run linktest in standalone mode for all
+hosts listed.
+
+    run-level -- An integer betweeen 1 and 4 with higher numbers
+                 performing more tests (see:
+                 http://users.emulab.net/trac/emulab/wiki/linktest).
+    run-path -- Contains the standalone package (manifest described below).
+    log-path -- An empty directory where low-level error logs are kept.
+    host-list -- Comma-delimeted list of hostnames to run on.
+    node-list -- If the nodes have different control and experimental
+                 interfaces, the hostlist should contain the control
+                 interface names (accessed via pssh) and the nodelist
+                 should contain experimental interface names (used
+                 internally in linktest). If the nodes do not have
+                 separate control interfaces, the nodelist may be
+                 omitted.
+
+Note: Currently node names (those listed in the node-list and the
+nickname and syncserver hostname described below) are all assumed to
+be a single unqualified name (like node-0).
+
+standalone.sh <run-level> <run-path> <log-path> <node-list>
+
+Invokes linktest with the appropriate arguments.
+
+
+---------------------------
+Standalone Package Manifest
+---------------------------
+
+Executables:
+
+standalone.sh -- Invokes linktest in standalone mode
+linktest.pl -- Main linktest script
+bin/emulab-rude -- Link testing tool
+bin/emulab-crude -- Link testing tool
+bin/emulab-iperf -- Link testing tool
+bin/emulab-sync -- Sync client for synchronizing different clients
+
+-------------------------------------------------------------------------------
+
+Configuration:
+
+boot/nickname -- Contains a single line with the hostname of the
+	experimental interface on this node.
+Example:
+  node0
+
+-------------------------------------------------------------------------------
+
+boot/syncserver -- Contains a single line with the hostname of the sync server.
+Example:
+  node4
+
+-------------------------------------------------------------------------------
+
+boot/ltmap -- Contains 'virtual topology', the logical topology
+              implemented by tunnels and VLANs at layer 2. Format:
+	# the file format is simple:
+	# expr := h <node name>
+	#      || l <src node> <dst node> <bw (Mb/s)> <latency (s)> <loss (%)>
+Example:
+
+h node0
+h node1
+h node2
+h node3
+h node4
+h node5
+l node2 node3 100000000 0.0000 0.000000 link2 droptail
+l node3 node2 100000000 0.0000 0.000000 link2 droptail
+l node2 node4 100000000 0.0000 0.000000 link3 droptail
+l node4 node2 100000000 0.0000 0.000000 link3 droptail
+l node1 node2 100000000 0.0000 0.000000 link1 droptail
+l node2 node1 100000000 0.0000 0.000000 link1 droptail
+l node0 node2 100000000 0.0000 0.000000 link0 droptail
+l node2 node0 100000000 0.0000 0.000000 link0 droptail
+l node3 node4 100000000 0.0000 0.000000 lan0 droptail
+l node3 node5 100000000 0.0000 0.000000 lan0 droptail
+l node4 node3 100000000 0.0000 0.000000 lan0 droptail
+l node4 node5 100000000 0.0000 0.000000 lan0 droptail
+l node5 node3 100000000 0.0000 0.000000 lan0 droptail
+l node5 node4 100000000 0.0000 0.000000 lan0 droptail
+
+-------------------------------------------------------------------------------
+
+boot/ltpmap -- This file describes the physical link and node
+characteristics. linktest currently expect version 2 (V 2) at the top
+of the file. The format lists a number of nodes (lines beginning with
+H) and a number of links (lines beginning with L).
+
+Host lines:
+H <node-name> <physical-node-name> <physical-host-name> <type> <osid> <os-name> <os-version> <os-features>
+
+node-name -- node name from ltmap
+physical-node-name -- physical name (used for debugging output)
+physical-host-name -- host name of physical machine (node is
+                      considered virtual if not identical to
+                      physical-node-name).
+type -- used for debugging output
+osid -- not used
+os-name -- "Linux" or "FreeBSD", different queuing behaviour based on OS
+os-version -- not used
+os-features -- Comma-delimited list. If 'linktest' feature is not
+               present, this node will be skipped.
+
+Link lines:
+L <first-node> <second-node> <link-name> <mac-address> <mpx-style> <dstyle>
+
+first-node, second-node -- node names of link
+link-name -- Name of link or lan. All pairs in the link/lan in every
+             direction must be represented.
+mac-address -- MAC address of specified interface. Used for debugging output.
+mpxstyle -- If 'veth' for virtual ethernet device, changes header size
+            calculations.
+dstyle -- If ends in '-nobw', skips bandwidth test for this link. If
+          dstyle is 'linkdelay', this means that there is end-to-end
+          shaping (at end nodes) and some tests are slightly different
+          because of this.
+
+Example:
+
+V 2
+H node0 pc20 pc20 pc600 526 Linux 0 ping,ssh,ipod,isup,linktest,linkdelays,vlans
+H node1 pc15 pc15 pc600 526 Linux 0 ping,ssh,ipod,isup,linktest,linkdelays,vlans
+H node2 pc28 pc28 pc600 526 Linux 0 ping,ssh,ipod,isup,linktest,linkdelays,vlans
+H node3 pc5 pc5 pc600 526 Linux 0 ping,ssh,ipod,isup,linktest,linkdelays,vlans
+H node4 pc6 pc6 pc600 526 Linux 0 ping,ssh,ipod,isup,linktest,linkdelays,vlans
+H node5 pc13 pc13 pc600 526 Linux 0 ping,ssh,ipod,isup,linktest,linkdelays,vlans
+L node2 node3 link2 00d0b71029ba none dnode
+L node3 node2 link2 00d0b713f178 none dnode
+L node2 node4 link3 00d0b70efaa4 none dnode
+L node4 node2 link3 00d0b713f41c none dnode
+L node1 node2 link1 00d0b713f6b1 none dnode
+L node2 node1 link1 00d0b70ee067 none dnode
+L node0 node2 link0 00d0b713f66b none dnode
+L node2 node0 link0 00d0b71029ce none dnode
+L node3 node4 lan0 00d0b713f473 none dnode
+L node3 node5 lan0 00d0b713f473 none dnode
+L node4 node3 lan0 00d0b713f607 none dnode
+L node4 node5 lan0 00d0b713f607 none dnode
+L node5 node3 lan0 00d0b713f689 none dnode
+L node5 node4 lan0 00d0b713f689 none dnode
+
