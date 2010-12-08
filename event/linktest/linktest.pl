@@ -340,6 +340,8 @@ if (-r $fname) {
 	$hostname = $1;
 	$exp_id = $2;
 	$proj_id = $3;
+    } elsif ($name =~ /^([-\@\w]*)$/) {
+	$hostname = $1;
     } else {
 	die("Could not parse $fname info\n");
     }
