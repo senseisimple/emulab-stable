@@ -23,7 +23,7 @@ use libdb;
 
 sub usage() {
     print STDOUT "Usage: inuse [-a | -t type] [-p pid [-e eid]] [-s|-r] " .
-        "[-f|-F] [-h]\n";
+        "[-f|-F] [-h] [-R]\n";
     print STDOUT "  -h          This message\n";
     print STDOUT "  -a          Print all nodes (default: only PCs\n";
     print STDOUT "  -t type     Limit to nodes of type (or class)\n";
@@ -33,11 +33,12 @@ sub usage() {
     print STDOUT "  -r          Sort by reserve time rather than node id\n";
     print STDOUT "  -f          Include free nodes\n";
     print STDOUT "  -F          Include ONLY free nodes\n";
+    print STDOUT "  -R          Only include pre-reserved nodes\n";
     exit (-1);
 }
-my $optlist = "t:p:e:srafFh";
+my $optlist = "t:p:e:srafFhR";
 
-my @columns = ("n.node_id","pid","eid","rsrv_time");
+my @columns = ("n.node_id","pid","eid","rsrv_time","reserved_pid");
 
 my %opt = ();
 if (! getopts($optlist, \%opt)) {
@@ -65,9 +66,12 @@ if ($opt{F}) {
     push @whereclauses, "r.pid is null";
 } elsif ($opt{f}) {
     # Nothing to insert - include all nodes
+} elsif ($opt{R}) {
+    # include only pre-reserved nodes
+    push @whereclauses, "reserved_pid is not null";
 } else {
     # include only reserved nodes (default)
-    push @whereclauses, "r.pid is not null";
+    push @whereclauses, "r.pid is not null or reserved_pid is not null";
 }
 
 # Figure out type limits
