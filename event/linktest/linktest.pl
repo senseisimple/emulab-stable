@@ -39,6 +39,7 @@ sub usage()
 	  " [LOGDIR=<path/to/log/root>]\n".
 	  " [BINDIR=<path/to/binary/files>]\n".
 	  " [VARDIR=<path/to/config/files>]\n".
+	  " [STANDALONE=<1|0>]\n".
 	  " [EVENTSERVER=<eventserver hostname>]\n");
     print("    <test step>: 1=conn/latency, 2=routing, 3=loss, 4=BW\n".
 	  "    COMPAT=<version>: remain compatible with version <version> or earlier\n".
@@ -240,6 +241,7 @@ our $LOGDIR = "";
 our $SHAREDDIR = "";
 our $EVENTSERVER = "";
 our $EVENTID = "";
+our $STANDALONE = 0;
 
 #
 # Parse command arguments. Since Linktest is run via the event system,
@@ -294,6 +296,11 @@ foreach my $arg (@ARGV) {
     }
     if($arg =~ /EVENTSERVER=(.+)/) {
 	$EVENTSERVER = $1;
+    }
+    if ($arg =~ /STANDALONE=(.+)/) {
+	if ($1 eq "1") {
+	    $STANDALONE = 1;
+	}
     }
 }
 
@@ -378,7 +385,9 @@ $ptopology_file = $PATH_PTOPOFILE;
 # the NFS server.
 #
 sleep(int(rand(5)));
-&my_system($PATH_RCTOPO, "reconfig");
+if (! $STANDALONE) {
+    &my_system($PATH_RCTOPO, "reconfig");
+}
 &get_topo($topology_file, $ptopology_file);
 &debug_top();
 

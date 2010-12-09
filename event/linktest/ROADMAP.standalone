@@ -2,7 +2,7 @@
 Running in Standalone Mode
 --------------------------
 
-run-standalone <run-level> <run-path> <log-path> <host-list> [node-list]
+run-standalone <run-level> <run-path> <var-path> <log-path> <host-list> [node-list]
 
 Uses pssh to simultaneously run linktest in standalone mode for all
 hosts listed.
@@ -10,7 +10,8 @@ hosts listed.
     run-level -- An integer betweeen 1 and 4 with higher numbers
                  performing more tests (see:
                  http://users.emulab.net/trac/emulab/wiki/linktest).
-    run-path -- Contains the standalone package (manifest described below).
+    run-path -- Contains execution package (manifest described below).
+    var-path -- Contains configuration files (manifest described below).
     log-path -- An empty directory where low-level error logs are kept.
     host-list -- Comma-delimeted list of hostnames to run on.
     node-list -- If the nodes have different control and experimental
@@ -25,7 +26,7 @@ Note: Currently node names (those listed in the node-list and the
 nickname and syncserver hostname described below) are all assumed to
 be a single unqualified name (like node-0).
 
-standalone.sh <run-level> <run-path> <log-path> <node-list>
+standalone.sh <run-level> <run-path> <var-path> <log-path> <node-list>
 
 Invokes linktest with the appropriate arguments.
 
@@ -34,7 +35,7 @@ Invokes linktest with the appropriate arguments.
 Standalone Package Manifest
 ---------------------------
 
-Executables:
+Executables in run-path:
 
 standalone.sh -- Invokes linktest in standalone mode
 linktest.pl -- Main linktest script
@@ -45,7 +46,7 @@ bin/emulab-sync -- Sync client for synchronizing different clients
 
 -------------------------------------------------------------------------------
 
-Configuration:
+Configuration in var-path:
 
 boot/nickname -- Contains a single line with the hostname of the
 	experimental interface on this node.
