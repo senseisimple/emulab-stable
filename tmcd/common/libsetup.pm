@@ -169,7 +169,7 @@ BEGIN
     #
     if (exists($ENV{'SHADOW'})) {
 	$shadow = $ENV{'SHADOW'};
-	my ($server,$urn) = split(',', $shadow);
+	my ($server,$idkey) = split(',', $shadow);
 	#
 	# Need to taint check these to avoid breakage later.
 	#
@@ -179,17 +179,17 @@ BEGIN
 	else {
 	    die("Bad data in server: $server");
 	}
-	if ($urn =~ /^([-\w\+\:\.]*)$/) {
-	    $urn = $1;
+	if ($idkey =~ /^([-\w\+\:\.]*)$/) {
+	    $idkey = $1;
 	}
 	else {
-	    die("Bad data in urn: $urn");
+	    die("Bad data in urn: $idkey");
 	}
 
 	# The cache needs to go in a difference location.
 	libtmcc::configtmcc("cachedir", $SHADOWDIR);
 	libtmcc::configtmcc("server", $server);
-	libtmcc::configtmcc("urn", $urn);
+	libtmcc::configtmcc("idkey", $idkey);
 	# No proxy.
 	libtmcc::configtmcc("noproxy", 1);
     }
@@ -2094,21 +2094,21 @@ sub bootsetup()
 #
 sub shadowsetup($$)
 {
-    my ($server, $urn) = @_;
+    my ($server, $idkey) = @_;
 
     $shadow = 1;
 
     # This changes where tmcc is going to store the data.
     libtmcc::configtmcc("cachedir", $SHADOWDIR);
     libtmcc::configtmcc("server", $server);
-    libtmcc::configtmcc("urn", $urn);
+    libtmcc::configtmcc("idkey", $idkey);
 
     # No proxy.
     libtmcc::configtmcc("noproxy", 1);
 
     # Tell children.
-    $ENV{'SHADOW'} = "$server,$urn";
-    $ENV{'URN'}    = $urn;
+    $ENV{'SHADOW'} = "$server,$idkey";
+    $ENV{'IDKEY'}  = $idkey;
 
     # Tell libtmcc to forget anything it knows.
     tmccclrconfig();

@@ -21,7 +21,9 @@ use vars qw(@ISA @EXPORT);
 	      GENIRESPONSE_RPCERROR GENIRESPONSE_UNAVAILABLE
 	      GENIRESPONSE_SEARCHFAILED GENIRESPONSE_UNSUPPORTED
 	      GENIRESPONSE_BUSY GENIRESPONSE_EXPIRED GENIRESPONSE_INPROGRESS
-	      GENIRESPONSE GENIRESPONSE_STRING);
+	      GENIRESPONSE GENIRESPONSE_STRING
+	      XMLRPC_PARSE_ERROR XMLRPC_SERVER_ERROR XMLRPC_APPLICATION_ERROR
+	      XMLRPC_SYSTEM_ERROR XMLRPC_TRANSPORT_ERROR);
 
 use overload ('""' => 'Stringify');
 my $current_response = undef;
@@ -74,6 +76,15 @@ sub GENIRESPONSE_STRING($)
 
     return $GENIRESPONSE_STRINGS[$error] || "Unknown Error $error";
 }
+
+#
+# These are the real XMLRPC errors as defined by the RFC
+#
+sub XMLRPC_PARSE_ERROR()	{ -32700; }
+sub XMLRPC_SERVER_ERROR()       { -32600; }
+sub XMLRPC_APPLICATION_ERROR()  { -32500; }
+sub XMLRPC_SYSTEM_ERROR()       { -32400; }
+sub XMLRPC_TRANSPORT_ERROR()    { -32300; }
 
 #
 # This is the (python-style) "structure" we want to return.

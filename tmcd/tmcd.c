@@ -209,7 +209,8 @@ typedef struct {
 	char		testdb[TBDB_FLEN_TINYTEXT];
 	char		sharing_mode[TBDB_FLEN_TINYTEXT];
 	char            privkey[PRIVKEY_LEN+1];
-	char            urn[URN_LEN+1];
+        /* This key is a replacement for privkey, on protogeni resources */
+	char            external_key[PRIVKEY_LEN+1];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *, char*);
 static int	checkdbredirect(tmcdreq_t *);
@@ -1075,23 +1076,21 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		}
 
 		/*
-		 * Look for URN.
+		 * Look for external key
 		 */
-		if (sscanf(bp, "URN=%" XSTRINGIFY(URN_LEN) "s", buf)) {
+		if (sscanf(bp, "IDKEY=%" XSTRINGIFY(PRIVKEY_LEN) "s", buf)) {
 			for (i = 0; i < strlen(buf); i++){
-				if (! (isalnum(buf[i]) ||
-				       buf[i] == '_' || buf[i] == '-' ||
-				       buf[i] == '.' || buf[i] == '/' ||
-				       buf[i] == ':' || buf[i] == '+')) {
+				if (! isalnum(buf[i])) {
 					info("tmcd client provided invalid "
-					     "characters in URN");
+					     "characters in IDKEY");
 					goto skipit;
 				}
 			}
-			strncpy(reqp->urn, buf, sizeof(reqp->urn));
+			strncpy(reqp->external_key,
+				buf, sizeof(reqp->external_key));
 
 			if (debug) {
-				info("URN %s\n", buf);
+				info("IDKEY %s\n", buf);
 			}
 			continue;
 		}
@@ -1120,12 +1119,13 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		if (privkey) {
 			error("No such node with wanode_key [%s]\n", privkey);
 		}
-		else if (reqp->urn[0]) {
+		else if (reqp->external_key[0]) {
 			if (reqp->isvnode)
-				error("No such vnode %s with urn %s\n",
-				      reqp->vnodeid, reqp->urn);
+				error("No such vnode %s with key %s\n",
+				      reqp->vnodeid, reqp->external_key);
 			else
-				error("No such node with urn %s\n", reqp->urn);
+				error("No such node with key %s\n",
+				      reqp->external_key);
 		}
 		else if (reqp->isvnode) {
 			error("No such vnode %s associated with %s\n",
@@ -5546,11 +5546,11 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	else if (reqp->isvnode) {
 		char	clause[BUFSIZ];
 
-		if (reqp->urn[0]) {
+		if (reqp->external_key[0]) {
 			sprintf(clause,
-				"r.external_resource_id is not null and "
-				"r.external_resource_id='%s'",
-				reqp->urn);
+				"r.external_resource_key is not null and "
+				"r.external_resource_key='%s'",
+				reqp->external_key);
 		}
 		else {
 			sprintf(clause,
@@ -5596,11 +5596,11 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp, char* nodekey)
 	else {
 		char	clause[BUFSIZ];
 
-		if (reqp->urn[0]) {
+		if (reqp->external_key[0]) {
 			sprintf(clause,
-				"r.external_resource_id is not null and "
-				"r.external_resource_id='%s'",
-				reqp->urn);
+				"r.external_resource_key is not null and "
+				"r.external_resource_key='%s'",
+				reqp->external_key);
 		}
 		else {
 			sprintf(clause,

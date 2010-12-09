@@ -105,7 +105,7 @@ if ($MAINSITE) {
     my $uptime = `uptime`;
     if ($uptime =~ /load averages:\s+([\.\d]+),\s+([\.\d]+),\s+[\.\d]+/) {
 	if ($1 > 10.0) {
-	    XMLError(511, "Server is WAY too busy; please try again later");
+	    XMLError(503, "Server is WAY too busy; please try again later");
 	}
     }
 }
@@ -123,7 +123,7 @@ if ($MAINSITE) {
 #
 if (! (exists($ENV{'SSL_CLIENT_VERIFY'}) &&
        $ENV{'SSL_CLIENT_VERIFY'} eq "SUCCESS")) {
-    XMLError(-1, "Invalid or missing certificate");
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid or missing certificate");
 }
 
 #
@@ -180,7 +180,7 @@ elsif (defined($MODULE) && ($MODULE eq $AM_MODULE)) {
     # Do not expect a UUID if calling to the AM.
 }
 else {
-    XMLError(-1, "Invalid certificate; no UUID");
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid certificate; no UUID");
 }
 
 #
@@ -190,14 +190,16 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
     my $x509 = eval {
 	Crypt::OpenSSL::X509->new_from_string($ENV{'SSL_CLIENT_CERT'}); };
     if ($@) {
-	XMLError(-1, "Invalid certificate: $@");
+	XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid certificate: $@");
     }
     my $cert = $x509->as_string(Crypt::OpenSSL::X509::FORMAT_ASN1);
-    XMLError(-1, "Could not convert certificate to ASN1")
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "Could not convert certificate to ASN1")
 	if (!defined($cert) || $cert eq '');
     my $decoded = Crypt::X509->new( cert => $cert );
     if ($decoded->error) {
-	XMLError(-1, "Error decoding certificate:" . $decoded->error);
+	XMLError(XMLRPC_APPLICATION_ERROR(),
+		 "Error decoding certificate:" . $decoded->error);
     }
     foreach my $tmp (@{ $decoded->SubjectAltName }) {
 	if ($tmp =~ /^uniformResourceIdentifier=(urn:publicid:.*)$/ ||
@@ -206,7 +208,8 @@ if (exists($ENV{'SSL_CLIENT_CERT'})) {
 	}
     }
 }
-XMLError(-1, "Invalid authentication certificate; no URN. Please regenerate.")
+XMLError(XMLRPC_APPLICATION_ERROR(),
+	 "Invalid authentication certificate; no URN. Please regenerate.")
     if (!exists($ENV{'GENIURN'}));
 
 #
@@ -219,7 +222,7 @@ if (!defined($request)) {
 }
 
 if (!defined($MODULE) || !exists($GENI_MODULES{$MODULE})) {
-    XMLError(-1, "Invalid module specification")
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Invalid module specification")
 }
 my $file = $GENI_MODULES{$MODULE};
 
@@ -228,12 +231,13 @@ my $return = do $file;
 if (!defined($return)) {
     SENDMAIL($TBOPS, "Error loading module",
 	     ($@ ? $@ : ($! ? $! : Dumper(%ENV))));
-    XMLError(-1, "Internal error loading module");
+    XMLError(XMLRPC_APPLICATION_ERROR(), "Internal error loading module");
 }
 if (!(defined($GENI_METHODS) && defined($EMULAB_PEMFILE))) {
     SENDMAIL($TBOPS, "Error loading module $MODULE",
 	     "No definition for GENI_METHODS or EMULAB_PEMFILE");
-    XMLError(-1, "Internal error loading module; missing definitions");
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "Internal error loading module; missing definitions");
 }
 
 #
@@ -278,14 +282,15 @@ my $response;
 $request =~ s/(<\?XML\s+VERSION)/\L$1\E/;
 eval { $call = $decoder->decode($request) };
 if ($@) {
-    XMLError(1, "error decoding RPC:\n" . $@);
+    XMLError(XMLRPC_PARSE_ERROR(), "error decoding RPC:\n" . $@);
 }
 if ($call->{'type'} ne 'call') {
-    XMLError(1, "expected RPC methodCall, got $call->{'type'}");
+    XMLError(XMLRPC_APPLICATION_ERROR(),
+	     "expected RPC methodCall, got $call->{'type'}");
 }
 my $method = $call->{'method_name'};
 if (!defined($GENI_METHODS->{$method})) {
-    XMLError(3, "no such method $method\n");
+    XMLError(XMLRPC_APPLICATION_ERROR() + 3, "no such method $method\n");
 }
 # Strictly for debugging the CM.
 my $target;
@@ -320,7 +325,8 @@ if ($@) {
     #
     print STDERR "Error executing RPC method $method:\n" . $@ . "\n";
     AddAuditInfo("to", $TBOPS);
-    $response = $decoder->encode_fault(4, "Internal Error executing $method");
+    $response = $decoder->encode_fault(XMLRPC_SERVER_ERROR(),
+				       "Internal Error executing $method");
 
     AddAuditInfo("message", $message .
 		 "Error executing RPC:\n" . $@ . "\n\n" . $request);
@@ -395,7 +401,8 @@ END {
 
 	my $decoder = Frontier::RPC2->new();
 	print "Content-Type: text/xml \n\n";
-	print $decoder->encode_fault(-2, "XMLRPC Server Error");
+	print $decoder->encode_fault(XMLRPC_SYSTEM_ERROR(),
+				     "XMLRPC Server Error");
 
 	# Since we converted to a normal error and sent the log message.
 	$? = 0;
