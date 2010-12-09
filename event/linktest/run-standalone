@@ -1,4 +1,32 @@
-#!/usr/bin/perl -w -T
+#!/usr/bin/perl -w
+
+if (scalar(@ARGV) < 5) {
+	print STDERR 'run-standalone <run-level> <run-path> <var-path> <log-path> <host-list> [node-list]
+
+Uses pssh to simultaneously run linktest in standalone mode for all
+hosts listed.
+
+    run-level -- An integer betweeen 1 and 4 with higher numbers
+                 performing more tests (see:
+                 http://users.emulab.net/trac/emulab/wiki/linktest).
+    run-path -- Contains execution package (manifest described below).
+    var-path -- Contains configuration files (manifest described below).
+    log-path -- An empty directory where low-level error logs are kept.
+    host-list -- Comma-delimeted list of hostnames to run on.
+    node-list -- If the nodes have different control and experimental
+                 interfaces, the hostlist should contain the control
+                 interface names (accessed via pssh) and the nodelist
+                 should contain experimental interface names (used
+                 internally in linktest). If the nodes do not have
+                 separate control interfaces, the nodelist may be
+                 omitted.
+
+Note: Currently node names (those listed in the node-list and the
+nickname and syncserver hostname described below) are all assumed to
+be a single unqualified name (like node-0).
+';
+	exit(1);
+}
 
 ($level, $runpath, $varpath, $logpath, $hosts, $nodes) = @ARGV;
 
