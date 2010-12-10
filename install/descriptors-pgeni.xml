@@ -1,75 +1,94 @@
-<descriptors>
-<osid>
-  <attribute name="magic">
-    <value></value>
-  </attribute>
-  <attribute name="features">
-    <value>ping,ssh,isup,veths,veth-ne,veth-en,mlinks,vlans</value>
+<image>
+  <attribute name="global">
+    <value>1</value>
   </attribute>
   <attribute name="version">
-    <value>0.1</value>
+    <value>1.0</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/GENI.ndz</value>
   </attribute>
   <attribute name="reboot_waittime">
-    <value>600</value>
+    <value>60</value>
+  </attribute>
+  <attribute name="mbr_version">
+    <value>1</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
   </attribute>
   <attribute name="description">
-    <value>Phoney OSID for GENI nodes</value>
-  </attribute>
-  <attribute name="mustclean">
-    <value>1</value>
-  </attribute>
-  <attribute name="shared">
-    <value>1</value>
+    <value>Dummy descriptor for GENI physical nodes</value>
   </attribute>
   <attribute name="op_mode">
-    <value>MINIMAL</value>
+    <value>NORMALv2</value>
   </attribute>
-  <attribute name="pid">
-    <value>emulab-ops</value>
+  <attribute name="shared">
+    <value>0</value>
   </attribute>
-  <attribute name="osname">
+  <attribute name="imagename">
     <value>GENI</value>
   </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
   <attribute name="OS">
     <value>Other</value>
   </attribute>
-</osid>
-<osid>
-  <attribute name="magic">
-    <value></value>
+  <attribute name="gid">
+    <value>emulab-ops</value>
   </attribute>
-  <attribute name="features">
-    <value>ping,ssh,isup,veths,veth-ne,veth-en,mlinks,vlans</value>
+  <attribute name="mtype_pcfedphys">
+    <value>1</value>
+  </attribute>
+</image>
+<image>
+  <attribute name="global">
+    <value>1</value>
   </attribute>
   <attribute name="version">
-    <value>0.1</value>
+    <value>1.0</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/GENIVM.ndz</value>
   </attribute>
   <attribute name="reboot_waittime">
-    <value>600</value>
+    <value>60</value>
+  </attribute>
+  <attribute name="mbr_version">
+    <value>1</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
   </attribute>
   <attribute name="description">
-    <value>Phony OSID for Geni vnodes</value>
-  </attribute>
-  <attribute name="mustclean">
-    <value>1</value>
-  </attribute>
-  <attribute name="shared">
-    <value>1</value>
+    <value>Dummy descriptor for GENI virtual nodes</value>
   </attribute>
   <attribute name="op_mode">
-    <value>MINIMAL</value>
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>GENIVM</value>
   </attribute>
   <attribute name="pid">
     <value>emulab-ops</value>
   </attribute>
-  <attribute name="osname">
-    <value>GENIVM</value>
-  </attribute>
   <attribute name="OS">
     <value>Other</value>
   </attribute>
-  <attribute name="nextosid">
-    <value>emulab-ops,GENI</value>
+  <attribute name="gid">
+    <value>emulab-ops</value>
   </attribute>
-</osid>
-</descriptors>
+  <attribute name="mtype_pcfed">
+    <value>1</value>
+  </attribute>
+</image>
