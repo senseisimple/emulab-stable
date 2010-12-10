@@ -74,6 +74,7 @@ sub SET_TESTBED_VERSION($)  { $updatemode = $MAGIC_TESTBED_VERSION = $_[0]; }
 my $impotent   = 0;
 my $logfp;
 sub SET_IMPOTENT_MODE($)	    { $impotent = 1; $logfp = $_[0]; };
+sub IMPOTENT_MODE()		    { return $impotent; }
 
 #
 # Some programs we may call
