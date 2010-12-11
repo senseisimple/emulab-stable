@@ -239,7 +239,7 @@ sub BulkLookup($$$)
 	$node->{"TYPEINFO"} = undef;
 	$node->{"ATTRS"}    = undef;
 	$node->{"IFACES"}   = undef;
-	$self->{"WAROW"}    = undef;
+	$node->{"WAROW"}    = undef;
 	$node->{"HASH"}     = {};
 	
 	$nodelist{$nodeid} = $node;
