@@ -39,6 +39,7 @@ sub usage()
 	  " [LOGDIR=<path/to/log/root>]\n".
 	  " [BINDIR=<path/to/binary/files>]\n".
 	  " [VARDIR=<path/to/config/files>]\n".
+	  " [STANDALONE=<1|0>]\n".
 	  " [EVENTSERVER=<eventserver hostname>]\n");
     print("    <test step>: 1=conn/latency, 2=routing, 3=loss, 4=BW\n".
 	  "    COMPAT=<version>: remain compatible with version <version> or earlier\n".
@@ -109,12 +110,14 @@ use constant TEST_LATENCY => 1; # direct link connectivity & latency
 use constant TEST_RT_STATIC => 2;   # prior plus static routing
 use constant TEST_LOSS => 3;   # prior plus loss
 use constant TEST_BW => 4; # prior plus bandwidth
+use constant TEST_UNLINK => 5; # prior plus unconnected interfaces
 
 # test names
 use constant NAME_RT_STATIC => "Routing";
 use constant NAME_LATENCY => "Latency";
 use constant NAME_LOSS => "Loss";
 use constant NAME_BW => "Bandwidth";
+use constant NAME_UNLINK => "Unlink";
 
 # error suffix for logs
 use constant SUFFIX_ERROR => ".error";
@@ -240,6 +243,7 @@ our $LOGDIR = "";
 our $SHAREDDIR = "";
 our $EVENTSERVER = "";
 our $EVENTID = "";
+our $STANDALONE = 0;
 
 #
 # Parse command arguments. Since Linktest is run via the event system,
@@ -295,6 +299,11 @@ foreach my $arg (@ARGV) {
     if($arg =~ /EVENTSERVER=(.+)/) {
 	$EVENTSERVER = $1;
     }
+    if ($arg =~ /STANDALONE=(.+)/) {
+	if ($1 eq "1") {
+	    $STANDALONE = 1;
+	}
+    }
 }
 
 $compat = 99
@@ -307,6 +316,7 @@ if ($compat < 1.2) {
 
 # path to applications and files
 our $PATH_NICKNAME = "$VARDIR/boot/nickname";
+our $PATH_CONTROL_IF = "$VARDIR/boot/controlif";
 our $PATH_KEYFILE = "$VARDIR/boot/eventkey";
 our $PATH_RUDE = "$BINDIR/emulab-rude";
 our $PATH_CRUDE = "$BINDIR/emulab-crude";
@@ -378,7 +388,9 @@ $ptopology_file = $PATH_PTOPOFILE;
 # the NFS server.
 #
 sleep(int(rand(5)));
-&my_system($PATH_RCTOPO, "reconfig");
+if (! $STANDALONE) {
+    &my_system($PATH_RCTOPO, "reconfig");
+}
 &get_topo($topology_file, $ptopology_file);
 &debug_top();
 
@@ -639,6 +651,22 @@ if(&dotest(TEST_BW)){
     &report_status(NAME_BW);
 }
 
+if(&dotest(TEST_UNLINK)) {
+    my $stamp = TimeStamp();
+    my $msg   = "Testing Unconnected Interfaces ... $stamp";
+    &post_event(EVENT_REPORT,$msg);
+    &sim_event(EVENT_LOG,$msg);
+    # Ick, this barrier makes sure the above message gets into the log
+    # first, so as not to confuse Mike
+    if ($printsched) {
+	&schedlog("barrier $barriers_hit: pre-unlink test");
+    }
+    &barrier();
+    &debug("\n$msg\n\n");
+    &unlink_test;
+    &report_status(NAME_UNLINK);
+}
+
 &cleanup;
 
 if ($printsched) {
@@ -656,6 +684,113 @@ $msg = "Linktest Done";
 &post_event(EVENT_COMPLETE,"ERROR=$total_error_count CTOKEN=$token");
 
 exit(EXIT_OK);
+
+##############################################################################
+# Unlink Test Functions
+##############################################################################
+
+our $control_if = "";
+our %interfaces = ();
+
+sub setup_interfaces {
+    $control_if = `cat $PATH_CONTROL_IF`;
+    chomp($control_if);
+    foreach my $link (@{ $hostmap{$hostname}->links }) {
+	$interfaces{lc($link->mac)} = 1;
+	my $foo = $link->mac;
+    }
+}
+
+sub get_iflist {
+    my $raw = `/sbin/ifconfig -a`;
+    my @result = split("\n\n", $raw);
+    return \@result;
+}
+
+sub gather_stats {
+    my @result = ();
+    my @iflist = @{ &get_iflist() };
+    foreach my $ifline (@iflist) {
+	if ($ifline =~ /^(\w+)\W.*RX packets:([0-9]+) /) {
+	    if ($1 ne $control_if) {
+		push(@result, $2);
+	    }
+	}
+    }
+    return \@result;
+}
+
+sub check_stats {
+    my @first = @{ $_[0] };
+    my @second = @{ $_[1] };
+    my $result = 0;
+    if (scalar(@first) == scalar(@second)) {
+	$result = 1;
+	for (my $i = 0; $i < scalar(@first); ++$i) {
+	    if ($first[$i] != $second[$i]) {
+		$result = 0;
+		last;
+	    }
+	}
+    }
+    return $result;
+}
+
+sub arpping {
+    my @iflist = @{ &get_iflist() };
+    foreach my $ifline (@iflist) {
+	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+	    my $ifname = $1;
+	    my $mac = lc(join('', split(':', $2)));
+	    if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
+		my $command
+		    = "sudo /sbin/ifconfig $ifname up; ".
+		      "sudo /sbin/arping -c 1 -w 1 -I $ifname 10.0.0.1; ".
+		      "sudo /sbin/ifconfig $ifname down";
+#		print($command."\n");
+		system($command);
+	    }
+	}
+    }
+}
+
+sub modify_interfaces {
+    my ($speed, $duplex) = @_;
+    my @iflist = @{ &get_iflist() };
+    foreach my $ifline (@iflist) {
+	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+	    my $ifname = $1;
+	    my $mac = lc(join('', split(':', $2)));
+	    if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
+		my $command = "sudo /sbin/ethtool -s $ifname speed $speed ".
+		              "duplex $duplex autoneg off";
+#		print($command."\n");
+		system($command);
+	    }
+	}
+    }
+}
+
+sub unlink_test {
+    my @speeds = ('10', '100', '1000');
+    my @duplexes = ('half', 'full');
+    &setup_interfaces();
+    my $start = &gather_stats();
+    &barrier();
+    &arpping();
+    foreach my $speed (@speeds) {
+	foreach my $duplex (@duplexes) {
+	    &modify_interfaces($speed, $duplex);
+	    &arpping();
+	}
+    }
+    &barrier();
+    my $end = &gather_stats();
+    if (! &check_stats($start, $end)) {
+	&error(NAME_UNLINK, undef,
+	       "Some interfaces received packets");
+    }
+}
 
 
 ##############################################################################
