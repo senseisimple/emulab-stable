@@ -42,6 +42,25 @@ int			broadcast = 0;
 static int		isclient = 0;
 static int		sndportnum;	/* kept in network order */
 
+/*
+ * Convert a string to an IPv4 address.  We first try to interpret it as
+ * an IPv4 address.  If that fails, we attempt to resolve it as a host name.
+ * Return non-zero on success.
+ */
+int
+GetIP(char *str, struct in_addr *in)
+{
+	struct hostent *he;
+
+	if (inet_aton(str, in) == 0) {
+		if ((he = gethostbyname(str)) == NULL)
+			return 0;
+		memcpy(in, he->h_addr, sizeof(*in));
+	}
+
+	return 1;
+}
+
 int
 GetSockbufSize(void)
 {
@@ -585,11 +604,16 @@ MsgReceive(int msock, MasterMsg_t *msg, size_t size, int timo)
  * for information about the image (without starting a server), 'timeout'
  * is how long to wait for a response.
  *
+ * If 'hostip' is not zero, then we are requesting information on behalf of
+ * that node.  The calling node (us) must have "proxy" permission on the
+ * server for this to work.
+ *
  * On success, return non-zero with 'reply' filled in with the server's
  * response IN HOST ORDER.  On failure returns zero.
  */
 int
-ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
+ClientNetFindServer(in_addr_t sip, in_port_t sport,
+		    in_addr_t hostip, char *imageid,
 		    int method, int askonly, int timeout,
 		    GetReply *reply, struct in_addr *myip)
 {
@@ -630,7 +654,9 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
 	}
 
 	memset(&msg, 0, sizeof msg);
+	strncpy(msg.version, MS_MSGVERS_1, sizeof(msg.version));
 	msg.type = htonl(MS_MSGTYPE_GETREQUEST);
+	msg.body.getrequest.hostip = htonl(hostip);
 	if (askonly) {
 		msg.body.getrequest.status = 1;
 		msg.body.getrequest.methods = MS_METHOD_ANY;
@@ -656,6 +682,11 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
 		return 0;
 	}
 
+	if (strncmp(msg.version, MS_MSGVERS_1, sizeof(msg.version))) {
+		fprintf(stderr, "Got incorrect version from master server\n");
+		close(msock);
+		return 0;
+	}
 	if (ntohl(msg.type) != MS_MSGTYPE_GETREPLY) {
 		fprintf(stderr, "Got incorrect reply from master server\n");
 		close(msock);
@@ -672,7 +703,11 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport, char *imageid,
 	reply->addr = ntohl(reply->addr);
 	reply->port = ntohs(reply->port);
 	reply->sigtype = ntohs(reply->sigtype);
-
+	if (reply->sigtype == MS_SIGTYPE_MTIME)
+		*(uint32_t *)reply->signature =
+			ntohl(*(uint32_t *)reply->signature);
+	reply->hisize = ntohl(reply->hisize);
+	reply->losize = ntohl(reply->losize);
 	return 1;
 }
 #endif

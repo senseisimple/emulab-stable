@@ -73,13 +73,26 @@ config_read(void)
 	return myconfig->config_read();
 }
 
+/*
+ * Return the set of images that IP address 'auth' can access for GET or PUT.
+ *
+ * If 'imageid' is not NULL, then we are requesting information for a specific
+ * image, and the 'get' and 'put' lists will return at most one entry depending
+ * on whether the node can GET/PUT that image.
+ *
+ * If 'reqip' is not equal to 'authip', then the former is requesting info
+ * on behalf of the latter.  The requester must have "proxy" capability for
+ * this to work.
+ */
 int
-config_get_host_authinfo(struct in_addr *in, char *imageid,
-		     struct config_host_authinfo **get,
-		     struct config_host_authinfo **put)
+config_get_host_authinfo(struct in_addr *reqip,
+			 struct in_addr *authip, char *imageid,
+			 struct config_host_authinfo **get,
+			 struct config_host_authinfo **put)
 {
 	assert(myconfig != NULL);
-	return myconfig->config_get_host_authinfo(in, imageid, get, put);
+	return myconfig->config_get_host_authinfo(reqip, authip, imageid,
+						  get, put);
 }
 
 void
@@ -116,12 +129,12 @@ config_free_host_authinfo(struct config_host_authinfo *ai)
  * on success, an error code otherwise.
  */
 int
-config_auth_by_IP(struct in_addr *host, char *imageid,
+config_auth_by_IP(struct in_addr *reqip, struct in_addr *hostip, char *imageid,
 		  struct config_host_authinfo **aip)
 {
 	struct config_host_authinfo *ai;
 
-	if (config_get_host_authinfo(host, imageid, &ai, 0))
+	if (config_get_host_authinfo(reqip, hostip, imageid, &ai, 0))
 		return MS_ERROR_FAILED;
 	if (ai->hostid == NULL) {
 		config_free_host_authinfo(ai);

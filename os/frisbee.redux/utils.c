@@ -604,6 +604,9 @@ GetMSError(int error)
 	char *err;
 
 	switch (error) {
+	case 0:
+		err = "no error";
+		break;
 	case MS_ERROR_FAILED:
 		err = "server authentication error";
 		break;
@@ -660,30 +663,90 @@ GetMSMethods(int methods)
 	return mbuf;
 }
 
+/*
+ * Print the contents of a GET reply to stdout.
+ * The reply struct fields should be in HOST order; i.e., as returned
+ * by ClientNetFindServer.
+ */
 void
-PrintGetInfo(char *imageid, GetReply *reply)
+PrintGetInfo(char *imageid, GetReply *reply, int raw)
 {
+	struct in_addr in;
+	uint64_t isize;
+	int len;
+
+	if (raw) {
+		printf("imageid=%s\n", imageid);
+		printf("error=%d\n", reply->error);
+		if (reply->error)
+			return;
+
+		printf("method=0x%x\n", reply->method);
+		isize = ((uint64_t)reply->hisize << 32) | reply->losize;
+		printf("size=%llu\n", isize);
+		printf("sigtype=0x%x\n", reply->sigtype);
+		switch (reply->sigtype) {
+		case MS_SIGTYPE_MTIME:
+			/* XXX has been converted to 32-bit host order */
+			printf("sig=0x%x\n", *(uint32_t *)reply->signature);
+			len = 0;
+			break;
+		case MS_SIGTYPE_MD5:
+			len = 16;
+			break;
+		case MS_SIGTYPE_SHA1:
+			len = 20;
+			break;
+		default:
+			len = 0;
+			break;
+		}
+		if (len > 0) {
+			char sigbuf[MS_MAXSIGLEN*2+1], *sbp;
+			int i;
+
+			sbp = sigbuf;
+			for (i = 0; i < len; i++) {
+				sprintf(sbp, "%02x", reply->signature[i]);
+				sbp += 2;
+			}
+			*sbp = '\0';
+			printf("sig=0x%s\n", sigbuf);
+		}
+		printf("running=%d\n", reply->isrunning);
+		if (reply->isrunning) {
+			in.s_addr = htonl(reply->servaddr);
+			printf("servaddr=%s\n", inet_ntoa(in));
+			in.s_addr = htonl(reply->addr);
+			printf("addr=%s\n", inet_ntoa(in));
+			printf("port=%d\n", reply->port);
+		}
+		return;
+	}
+
 	if (reply->error) {
-		log("%s: server denied access: %s",
+		printf("%s: server denied access: %s\n",
 		    imageid, GetMSError(reply->error));
 		return;
 	}
 
 	if (reply->isrunning) {
-		struct in_addr in;
 		in.s_addr = htonl(reply->addr);
-		log("%s: access allowed, server running at %s:%d using %s",
+		printf("%s: access OK, server running at %s:%d using %s\n",
 		    imageid, inet_ntoa(in), reply->port,
 		    GetMSMethods(reply->method));
 	} else
-		log("%s: access allowed, available methods=%s",
+		printf("%s: access OK, available methods=%s\n",
 		    imageid, GetMSMethods(reply->method));
+
+	isize = ((uint64_t)reply->hisize << 32) | reply->losize;
+	printf("  size=%llu\n", isize);
 
 	switch (reply->sigtype) {
 	case MS_SIGTYPE_MTIME:
 	{
-		time_t mt = ntohl(*(time_t *)reply->signature);
-		log("  modtime=%s", ctime(&mt));
+		time_t mt = *(time_t *)reply->signature;
+		printf("  modtime=%s\n", ctime(&mt));
 	}
 	default:
 		break;

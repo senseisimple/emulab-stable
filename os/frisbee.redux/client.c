@@ -253,8 +253,8 @@ main(int argc, char **argv)
 			break;
 
 		case 'S':
-			if (!inet_aton(optarg, &serverip)) {
-				fprintf(stderr, "Invalid server IP `%s'\n",
+			if (!GetIP(optarg, &serverip)) {
+				fprintf(stderr, "Invalid server name '%s'\n",
 					optarg);
 				exit(1);
 			}
@@ -373,13 +373,13 @@ main(int argc, char **argv)
 
 		while (1) {
 			if (!ClientNetFindServer(ntohl(serverip.s_addr),
-						 portnum, imageid, method,
+						 portnum, 0, imageid, method,
 						 askonly, timo, &reply, NULL))
 				fatal("Could not get download info for '%s'",
 				      imageid);
 
 			if (askonly) {
-				PrintGetInfo(imageid, &reply);
+				PrintGetInfo(imageid, &reply, 1);
 				exit(0);
 			}
 

@@ -330,6 +330,7 @@ typedef struct {
  * These are sent via unicast TCP.
  */
 typedef struct {
+	uint32_t	hostip;
 	uint8_t		methods;
 	uint8_t		status;
 	uint16_t	idlen;
@@ -340,20 +341,25 @@ typedef struct {
 	uint8_t		method;
 	uint8_t		isrunning;
 	uint16_t	error;	
-	in_addr_t	servaddr;
-	in_addr_t	addr;
-	in_port_t	port;
+	uint32_t	servaddr;
+	uint32_t	addr;
+	uint16_t	port;
 	uint16_t	sigtype;
 	uint8_t		signature[MS_MAXSIGLEN];
+	uint32_t	hisize;
+	uint32_t	losize;
 } __attribute__((__packed__)) GetReply;
 
 typedef struct {
+	int8_t			version[4];
 	int32_t			type;
 	union {
 		GetRequest	getrequest;
 		GetReply	getreply;
 	} body;
 } MasterMsg_t;
+
+#define MS_MSGVERS_1		"V01"
 
 #define MS_MSGTYPE_GETREQUEST	1
 #define MS_MSGTYPE_GETREPLY	2
@@ -383,6 +389,7 @@ typedef struct {
 /*
  * Protos.
  */
+int	GetIP(char *str, struct in_addr *in);
 int	GetSockbufSize(void);
 int	ClientNetInit(void);
 int	ServerNetInit(void);
@@ -394,8 +401,8 @@ void	PacketReply(Packet_t *p);
 int	PacketValid(Packet_t *p, int nchunks);
 void	dump_network(void);
 #ifdef MASTER_SERVER
-int	ClientNetFindServer(in_addr_t, in_port_t, char *, int, int, int,
-			    GetReply *, struct in_addr *);
+int	ClientNetFindServer(in_addr_t, in_port_t, in_addr_t, char *,
+			    int, int, int, GetReply *, struct in_addr *);
 int	MsgSend(int, MasterMsg_t *, size_t, int);
 int	MsgReceive(int, MasterMsg_t *, size_t, int);
 #endif

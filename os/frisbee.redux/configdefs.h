@@ -45,7 +45,8 @@ struct config {
 	int (*config_init)(void);
 	void (*config_deinit)(void);
 	int (*config_read)(void);
-	int (*config_get_host_authinfo)(struct in_addr *, char *,
+	int (*config_get_host_authinfo)(struct in_addr *,
+					struct in_addr *, char *,
 					struct config_host_authinfo **,
 					struct config_host_authinfo **);
 	void (*config_free_host_authinfo)(struct config_host_authinfo *);
@@ -60,12 +61,13 @@ struct config {
 extern int	config_init(int);
 extern void	config_deinit(void);
 extern int	config_read(void);
-extern int	config_get_host_authinfo(struct in_addr *, char *,
+extern int	config_get_host_authinfo(struct in_addr *,
+					 struct in_addr *, char *,
 					 struct config_host_authinfo **,
 					 struct config_host_authinfo **);
 extern void	config_dump_host_authinfo(struct config_host_authinfo *);
 extern void	config_free_host_authinfo(struct config_host_authinfo *);
-extern int	config_auth_by_IP(struct in_addr *, char *,
+extern int	config_auth_by_IP(struct in_addr *, struct in_addr *, char *,
 				  struct config_host_authinfo **);
 extern int	config_get_server_address(struct config_imageinfo *, int, int,
 					  in_addr_t *, in_port_t *, int *);

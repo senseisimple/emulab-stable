@@ -35,7 +35,7 @@ endif
 
 include $(OBJDIR)/Makeconf
 
-all:	frisbee frisbeed
+all:	frisbee frisbeed mfrisbeed
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -146,7 +146,7 @@ log.o:		decls.h log.h
 network.o:	decls.h utils.h
 trace.o:	decls.h trace.h log.h
 
-install:	$(INSTALL_SBINDIR)/frisbeed $(INSTALL_SBINDIR)/frisbee
+install:	$(INSTALL_SBINDIR)/mfrisbeed $(INSTALL_SBINDIR)/frisbeed $(INSTALL_SBINDIR)/frisbee
 
 client: frisbee
 
@@ -154,7 +154,7 @@ client-install: client
 	$(INSTALL_PROGRAM) frisbee $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
-	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug
+	/bin/rm -f *.o *.a frisbee frisbeed mfrisbeed *.debug
 	/bin/rm -f frisbee.tar frisbee.tar.gz
 	/bin/rm -rf frisbee-dist
 

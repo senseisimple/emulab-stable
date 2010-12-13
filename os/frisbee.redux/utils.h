@@ -74,7 +74,7 @@ void	ClientStatsDump(unsigned int id, ClientStats_t *stats);
 #ifdef MASTER_SERVER
 char	*GetMSError(int error);
 char	*GetMSMethods(int methods);
-void	PrintGetInfo(char *imageid, GetReply *reply);
+void	PrintGetInfo(char *imageid, GetReply *reply, int raw);
 #endif
 
 /* Compat */

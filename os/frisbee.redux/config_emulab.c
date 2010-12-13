@@ -519,6 +519,42 @@ allow_stddirs(char *imageid,
 }
 
 /*
+ * Get the Emulab nodeid for the node with the indicated control net IP.
+ * Return a malloc'ed string on success, NULL otherwise.
+ */
+static char *
+emulab_nodeid(struct in_addr *cnetip)
+{
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+	char *node;
+
+	res = mydb_query("SELECT node_id FROM interfaces"
+			 " WHERE IP='%s' AND role='ctrl'",
+			 1, inet_ntoa(*cnetip));
+	if (res == NULL)
+		return NULL;
+
+	/* No such node */
+	if (mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return NULL;
+	}
+
+	/* NULL node_id!? */
+	row = mysql_fetch_row(res);
+	if (!row[0]) {
+		error("config_host_authinfo: null node_id!?");
+		mysql_free_result(res);
+		return NULL;
+	}
+	node = mystrdup(row[0]);
+	mysql_free_result(res);
+
+	return node;
+}
+
+/*
  * Find all images (imageid==NULL) or a specific image (imageid!=NULL)
  * that a particular node can access for GET/PUT.  At any time, a node is
  * associated with a specific project and group.  These determine the
@@ -540,16 +576,20 @@ allow_stddirs(char *imageid,
  * Return zero on success, non-zero otherwise.
  */
 static int
-emulab_get_host_authinfo(struct in_addr *in, char *imageid,
-			    struct config_host_authinfo **getp,
-			    struct config_host_authinfo **putp)
+emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
+			 char *imageid,
+			 struct config_host_authinfo **getp,
+			 struct config_host_authinfo **putp)
 {
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
-	char		*node;
+	char		*node, *proxy, *role = NULL;
 	int		i, nrows;
 	char		*wantpid = NULL, *wantname = NULL;
 	struct config_host_authinfo *get = NULL, *put = NULL;
+
+	if (getp == NULL && putp == NULL)
+		return 0;
 
 	if (getp) {
 		get = mymalloc(sizeof *get);
@@ -559,34 +599,110 @@ emulab_get_host_authinfo(struct in_addr *in, char *imageid,
 		put = mymalloc(sizeof *put);
 		memset(put, 0, sizeof(*put));
 	}
-	/* Find the node name from its control net IP */
-	res = mydb_query("SELECT node_id"
-			 " FROM interfaces"
-			 " WHERE IP='%s' AND role='ctrl'",
-			 1, inet_ntoa(*in));
-	assert(res != NULL);
 
-	/* No such node */
-	if (mysql_num_rows(res) == 0) {
+	/*
+	 * If the requester is not the same as the host, then it is a proxy
+	 * request.  In Emulab, the only proxy scenarios we support are
+	 * elabinelab inner bosses and subbosses.  So we first ensure that
+	 * the requester is listed as one of those.
+	 */
+	if (req->s_addr != host->s_addr) {
+		proxy = emulab_nodeid(req);
+		if (proxy == NULL) {
+			emulab_free_host_authinfo(get);
+			emulab_free_host_authinfo(put);
+			return 1;
+		}
+
+		/* Make sure the node really is a inner-boss/subboss */
+		res = mydb_query("SELECT erole,inner_elab_role FROM reserved"
+				 " WHERE node_id='%s'", 2, proxy);
+		assert(res != NULL);
+
+		/* Node is free */
+		if (mysql_num_rows(res) == 0) {
+			mysql_free_result(res);
+			free(proxy);
+			emulab_free_host_authinfo(get);
+			emulab_free_host_authinfo(put);
+			return 1;
+		}
+
+		/*
+		 * Is node an inner boss?
+		 * Note that string could be "boss" or "boss+router"
+		 * so we just check the prefix.
+		 */
+		row = mysql_fetch_row(res);
+		if (row[1] && strncmp(row[1], "boss", 4) == 0)
+			role = "innerboss";
+		/* or a subboss? */
+		else if (row[0] && strcmp(row[0], "subboss") == 0)
+			role = "subboss";
+		/* neither, return an error */
+		else {
+			mysql_free_result(res);
+			free(proxy);
+			emulab_free_host_authinfo(get);
+			emulab_free_host_authinfo(put);
+			return 1;
+		}
+		mysql_free_result(res);
+	} else
+		proxy = NULL;
+
+	/*
+	 * Find the node name from its control net IP.
+	 * If the node doesn't exist, we return an empty list.
+	 */
+	node = emulab_nodeid(host);
+	if (node == NULL) {
+		if (proxy) free(proxy);
 		if (getp) *getp = get;
 		if (putp) *putp = put;
 		return 0;
 	}
-
-	row = mysql_fetch_row(res);
-	if (!row[0]) {
-		error("config_host_authinfo: null node_id!?");
-		mysql_free_result(res);
-		emulab_free_host_authinfo(get);
-		emulab_free_host_authinfo(put);
-		return 1;
-	}
-	node = mystrdup(row[0]);
 	if (get != NULL)
 		get->hostid = mystrdup(node);
 	if (put != NULL)
 		put->hostid = mystrdup(node);
-	mysql_free_result(res);
+
+	/*
+	 * We have a proxy node.  It should be either:
+	 * - a subboss and a frisbee subboss for the node
+	 * - an inner-boss and in the same experiment as the node
+	 * Note that we could not do this check until we had the node name.
+	 * Note also that we no longer care about proxy or not after this.
+	 */
+	if (proxy) {
+		if (strcmp(role, "subboss") == 0)
+			res = mydb_query("SELECT node_id"
+					 " FROM subbosses"
+					 " WHERE subboss_id='%s'"
+					 "  AND node_id='%s'"
+					 "  AND service='frisbee'",
+					 1, proxy, node);
+		else
+			res = mydb_query("SELECT r1.node_id"
+					 " FROM reserved as r1,reserved as r2"
+					 " WHERE r1.node_id='%s'"
+					 "  AND r2.node_id='%s'"
+					 "  AND r1.pid=r2.pid"
+					 "  AND r1.eid=r2.eid",
+					 1, proxy, node);
+		assert(res != NULL);
+
+		if (mysql_num_rows(res) == 0) {
+			mysql_free_result(res);
+			free(proxy);
+			free(node);
+			emulab_free_host_authinfo(get);
+			emulab_free_host_authinfo(put);
+			return 1;
+		}
+		mysql_free_result(res);
+		free(proxy);
+	}
 
 	/* Find the pid/gid to which the node is currently assigned */
 	res = mydb_query("SELECT e.pid,e.gid,r.eid,u.uid"
@@ -598,6 +714,7 @@ emulab_get_host_authinfo(struct in_addr *in, char *imageid,
 
 	/* Node is free */
 	if (mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
 		free(node);
 		if (getp) *getp = get;
 		if (putp) *putp = put;
@@ -996,7 +1113,8 @@ emulab_dump(FILE *fd)
 			struct in_addr in;
 
 			inet_aton(row[1], &in);
-			if (emulab_get_host_authinfo(&in, NULL, &get, &put)) {
+			if (emulab_get_host_authinfo(&in, &in, NULL,
+						     &get, &put)) {
 				warning("Could not get node authinfo for %s",
 					row[0]);
 			}

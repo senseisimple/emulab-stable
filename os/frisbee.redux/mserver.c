@@ -39,11 +39,20 @@ static int	reapchildren(int apid);
 static int	daemonize = 1;
 int		debug = 0;
 static int	dumpconfig = 0;
-static int	fetchfromabove = 0;
-static int	canredirect = 0;
 static int	onlymethods = (MS_METHOD_UNICAST|MS_METHOD_MULTICAST);
+
+/*
+ * For recursively GETing images:
+ *   parentip/parentport  address of a parent master server (-S,-P)
+ *   fetchfromabove       true if a parent has been specified
+ *   canredirect          if true, redirect our clients to our parent (-R)
+ *   usechildauth         if true, pass client's authinfo to our parent (-A)
+ */
 static struct in_addr parentip;
 static int	parentport = MS_PORTNUM;
+static int	fetchfromabove = 0;
+static int	canredirect = 0;
+static int	usechildauth = 0;
 
 /* XXX the following just keep network.c happy */
 int		portnum = MS_PORTNUM;
@@ -66,6 +75,8 @@ main(int argc, char **argv)
 
 	log("mfrisbee daemon starting, methods=%s (debug level %d)",
 	    GetMSMethods(onlymethods), debug);
+	if (fetchfromabove)
+		log("  using parent %s:%d", inet_ntoa(parentip), parentport);
 	config_init(1);
 
 	/* Just dump the config to stdout in human readable form and exit. */
@@ -209,19 +220,51 @@ copy_imageinfo(struct config_imageinfo *ii)
 }
 
 /*
- * Attempt to fetch an image from our parent by firing off a frisbee.
- * Or, hook the child up directly with our parent.
- * Or, both.
+ * Fetch an image from our parent by getting image info from it and firing
+ * off a frisbee.  If canredirect is non-zero, we also hook our child up
+ * directly with our parent so that it can fetch in parallel.  If statusonly
+ * is non-zero, we just request info from our parent and return that.
+ * Returns zero if Reply struct contains the desired info, TRYAGAIN if we
+ * have started up a frisbee to fetch from our parent, or an error otherwise.
  */
 int
-fetch_parent(struct in_addr *myip, struct in_addr *pip, in_port_t pport,
-	     struct config_imageinfo *ii, int *methodp,
-	     in_addr_t *servaddrp, in_addr_t *addrp, in_port_t *portp)
+fetch_parent(struct in_addr *myip, struct in_addr *hostip,
+	     struct in_addr *pip, in_port_t pport,
+	     struct config_imageinfo *ii, int statusonly, GetReply *replyp)
 {
 	struct childinfo *ci;
 	struct in_addr pif;
+	in_addr_t authip;
 	GetReply reply;
 	int rv;
+
+	/*
+	 * If usechildauth is set, we pass the child host IP to our parent
+	 * for authentication, otherwise we use our own.
+	 */
+	authip = usechildauth ? ntohl(hostip->s_addr) : 0;
+
+	/*
+	 * Send our parent a GET request and see what it says.
+	 */
+	if (!ClientNetFindServer(ntohl(pip->s_addr), pport, authip,
+				 ii->imageid, ii->get_methods, statusonly, 5,
+				 &reply, &pif))
+		return MS_ERROR_NOIMAGE;
+	if (reply.error)
+		return reply.error;
+
+	/*
+	 * For a status call, we just return the image size and signature
+	 */
+	if (statusonly) {
+		memset(replyp, 0, sizeof *replyp);
+		replyp->sigtype = reply.sigtype;
+		memcpy(replyp->signature, reply.signature, MS_MAXSIGLEN);
+		replyp->hisize = reply.hisize;
+		replyp->losize = reply.losize;
+		return 0;
+	}
 
 	/*
 	 * See if a fetch is already in progress.
@@ -239,16 +282,6 @@ fetch_parent(struct in_addr *myip, struct in_addr *pip, in_port_t pport,
 			return MS_ERROR_TRYAGAIN;
 		goto done;
 	}
-
-	/*
-	 * Send our parent a GET request and see what it says.
-	 */
-	if (!ClientNetFindServer(ntohl(pip->s_addr), pport,
-				 ii->imageid, ii->get_methods, 0, 5,
-				 &reply, &pif))
-		return MS_ERROR_NOIMAGE;
-	if (reply.error)
-		return reply.error;
 
 	/*
 	 * Parent has started up a frisbeed, spawn a frisbee to capture it.
@@ -276,10 +309,11 @@ fetch_parent(struct in_addr *myip, struct in_addr *pip, in_port_t pport,
 	if (!canredirect)
 		return MS_ERROR_TRYAGAIN;
 
-	*methodp = ci->method;
-	*servaddrp = ci->servaddr;
-	*addrp = ci->addr;
-	*portp = ci->port;
+	memset(replyp, 0, sizeof *replyp);
+	replyp->method = ci->method;
+	replyp->servaddr = ci->servaddr;
+	replyp->addr = ci->addr;
+	replyp->port = ci->port;
 	return 0;
 }
 
@@ -287,16 +321,29 @@ void
 handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	   MasterMsg_t *msg)
 {
+	struct in_addr host;
 	char imageid[MS_MAXIDLEN+1];
 	char clientip[sizeof("XXX.XXX.XXX.XXX")+1];
-	int len = ntohs(msg->body.getrequest.idlen);
+	int len;
 	struct config_host_authinfo *ai;
 	struct config_imageinfo *ii;
 	struct childinfo *ci;
 	struct stat sb;
+	uint64_t isize;
 	int rv, methods, wantstatus;
+	int getfromparent;
 	char *op;
 
+	/*
+	 * If an explicit host was listed, use that as the host we are
+	 * authenticating, otherwise use the caller's IP.
+	 */
+	if (msg->body.getrequest.hostip)
+		host.s_addr = msg->body.getrequest.hostip;
+	else
+		host.s_addr = cip->sin_addr.s_addr;
+
+	len = ntohs(msg->body.getrequest.idlen);
 	memcpy(imageid, msg->body.getrequest.imageid, len);
 	imageid[len] = '\0';
 	methods = msg->body.getrequest.methods;
@@ -304,8 +351,12 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	op = wantstatus ? "STATUS" : "GET";
 
 	strncpy(clientip, inet_ntoa(cip->sin_addr), sizeof clientip);
-	log("%s: %s from %s, (methods: 0x%x)",
-	    imageid, op, clientip, methods);
+	if (host.s_addr != cip->sin_addr.s_addr)
+		log("%s: %s from %s (for %s), methods: 0x%x",
+		    imageid, op, clientip, inet_ntoa(host), methods);
+	else
+		log("%s: %s from %s, (methods: 0x%x)",
+		    imageid, op, clientip, methods);
 
 	memset(msg, 0, sizeof *msg);
 	msg->type = htonl(MS_MSGTYPE_GETREPLY);
@@ -322,7 +373,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * See if node has access to the image.
 	 * If not, return an error code immediately.
 	 */
-	rv = config_auth_by_IP(&cip->sin_addr, imageid, &ai);
+	rv = config_auth_by_IP(&cip->sin_addr, &host, imageid, &ai);
 	if (rv) {
 		warning("%s: client %s %s failed: %s",
 			imageid, clientip, op, GetMSError(rv));
@@ -348,12 +399,17 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 *
 	 * If the file exists but is not a regular file, we return an error.
 	 *
-	 * If the file does not exist (it is possible to request an
-	 * image that doesn't exist if the authentication check allows
-	 * access to the containing directory), then for now we just return
-	 * an error, but in the future, we could request the image from
-	 * our parent mserver.
+	 * If the file does not exist (it is possible to request an image
+	 * that doesn't exist if the authentication check allows access to
+	 * the containing directory) and we have a parent, we request it
+	 * from the parent.
+	 *
+	 * N.B. right now, a status op (wantstatus) returns info about the
+	 * local state of an image, it does not fetch state from the parent
+	 * if the image doesn't exist or is out of date.
 	 */
+	isize = 0;
+	getfromparent = 0;
 	if (stat(ii->path, &sb) == 0) {
 		if (!S_ISREG(sb.st_mode)) {
 			rv = MS_ERROR_INVALID;
@@ -363,30 +419,90 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			msg->body.getreply.error = rv;
 			goto reply;
 		}
-	} else {
-		if (errno == ENOENT) {
-			if (!wantstatus && fetchfromabove) {
-				int m;
-				in_addr_t s, a;
-				in_port_t p;
+		isize = sb.st_size;
 
-				rv = fetch_parent(&sip->sin_addr, &parentip,
-						  parentport, ii,
-						  &m, &s, &a, &p);
-				if (rv == 0) {
-					msg->body.getreply.method = m;
-					msg->body.getreply.isrunning = 1;
-					msg->body.getreply.servaddr = htonl(s);
-					msg->body.getreply.addr = htonl(a);
-					msg->body.getreply.port = htons(p);
+		/*
+		 * If the file exists and we have a parent, get the signature
+		 * from the parent and see if we need to update our copy.
+		 */
+		if (!wantstatus && fetchfromabove) {
+			GetReply r;
+
+			rv = fetch_parent(&sip->sin_addr, &host,
+					  &parentip, parentport, ii, 1, &r);
+			/*
+			 * If our parent is busy, we put off our client.
+			 * If there is any other error, we just use our
+			 * local copy under the assumption that our parent
+			 * doesn't know anything about this image.
+			 */
+			if (rv) {
+				log("%s: failed getting parent status: %s, %s",
+				    imageid, GetMSError(rv),
+				    rv == MS_ERROR_TRYAGAIN ?
+				    "failing" : "using local copy");
+				if (rv == MS_ERROR_TRYAGAIN) {
+					msg->body.getreply.error = rv;
 					goto reply;
 				}
-			} else
-				rv = MS_ERROR_NOIMAGE;
-		} else {
-			rv = MS_ERROR_INVALID;
+			}
+			if (rv == 0 && r.sigtype == MS_SIGTYPE_MTIME &&
+			    *(time_t *)r.signature > sb.st_mtime) {
+				log("%s: local copy out of date, "
+				    "attempting %s from parent", imageid, op);
+				getfromparent = 1;
+			}
 		}
+	} else if (fetchfromabove && !wantstatus) {
+		log("%s: no local copy, "
+		    "attempting %s from parent", imageid, op);
+		getfromparent = 1;
+	} else {
+		rv = (errno == ENOENT) ? MS_ERROR_NOIMAGE : MS_ERROR_INVALID;
 		warning("%s: client %s %s failed: %s",
+			imageid, clientip, op, GetMSError(rv));
+		msg->body.getreply.error = rv;
+		goto reply;
+	}
+
+	/*
+	 * Either we did not have the image or our copy is out of date,
+	 * attempt to fetch from our parent.
+	 */
+	if (getfromparent) {
+		GetReply r;
+
+		rv = fetch_parent(&sip->sin_addr, &host,
+				  &parentip, parentport, ii, 0, &r);
+		/*
+		 * Redirecting to parent
+		 */
+		if (rv == 0) {
+			msg->body.getreply.method = r.method;
+			msg->body.getreply.isrunning = 1;
+			msg->body.getreply.servaddr =
+				htonl(r.servaddr);
+			msg->body.getreply.addr =
+				htonl(r.addr);
+			msg->body.getreply.port =
+				htons(r.port);
+			goto reply;
+		}
+		/*
+		 * If parent callout failed, but we have a copy
+		 * use our stale version.
+		 */
+		if (rv != MS_ERROR_TRYAGAIN && isize > 0) {
+			warning("%s: client %s %s from parent failed: %s, "
+				"using our stale copy",
+				imageid, clientip, op, GetMSError(rv));
+		}
+
+		/*
+		 * Otherwise, we are busy fetching the new copy (TRYAGAIN),
+		 * or we had a real failure and we don't have a copy.
+		 */
+		warning("%s: client %s %s from parent failed: %s",
 			imageid, clientip, op, GetMSError(rv));
 		msg->body.getreply.error = rv;
 		goto reply;
@@ -443,6 +559,8 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			config_free_host_authinfo(ai);
 			msg->body.getreply.method = methods;
 			msg->body.getreply.isrunning = 0;
+			msg->body.getreply.hisize = htonl(isize >> 32);
+			msg->body.getreply.losize = htonl(isize);
 			log("%s: STATUS is not running", imageid);
 			goto reply;
 		}
@@ -480,6 +598,8 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			    inet_ntoa(in), ci->port, ci->pid);
 	}
 
+	msg->body.getreply.hisize = htonl(isize >> 32);
+	msg->body.getreply.losize = htonl(isize);
 	msg->body.getreply.method = ci->method;
 	msg->body.getreply.isrunning = 1;
 	msg->body.getreply.servaddr = htonl(ci->servaddr);
@@ -557,8 +677,11 @@ get_options(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "C:DRS:P:p:dh")) != -1)
+	while ((ch = getopt(argc, argv, "AC:DRS:P:p:dh")) != -1)
 		switch(ch) {
+		case 'A':
+			usechildauth = 1;
+			break;
 		case 'C':
 		{
 			char *ostr, *str, *cp;
@@ -596,7 +719,7 @@ get_options(int argc, char **argv)
 			canredirect = 1;
 			break;
 		case 'S':
-			if (!inet_aton(optarg, &parentip)) {
+			if (!GetIP(optarg, &parentip)) {
 				fprintf(stderr, "Invalid server IP `%s'\n",
 					optarg);
 				exit(1);
@@ -940,7 +1063,7 @@ reapchildren(int wpid)
 		pid = waitpid(wpid, &status, WNOHANG);
 		if (debug && wpid)
 			log("wait for %d returns %d, status=%x",
-			    wpid, pid, status);
+			    wpid, pid, pid > 0 ? status : 0);
 		if (pid <= 0)
 			return 0;
 		for (cip = &children; *cip != NULL; cip = &(*cip)->next) {
