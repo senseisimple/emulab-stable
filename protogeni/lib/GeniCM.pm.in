@@ -1009,6 +1009,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					    $linkref)->get_nodelist();
 	my %managers   = ();
 	my $ifacenum   = 1;
+	my $vindex     = 0;
 	my $trivial_ok = 0;
 
 	if (!defined($lanname)) {
@@ -1152,6 +1153,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 {"vname"       => $lanname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
+					  "vindex"	=> $vindex,
 					  "trivial_ok"  => $trivial_ok,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
@@ -1165,6 +1167,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					  "fixed_iface" => $iface_name});
 	    $vportmap{$member}->{"virtlan"} = $virtlan;
 	    $ifacenum++;
+	    $vindex++;
 	}
 	$linknum++;
     }
