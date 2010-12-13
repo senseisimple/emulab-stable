@@ -1009,6 +1009,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					    $linkref)->get_nodelist();
 	my %managers   = ();
 	my $ifacenum   = 1;
+	my $vindex     = 0;
 	my $trivial_ok = 0;
 
 	if (!defined($lanname)) {
@@ -1152,6 +1153,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 {"vname"       => $lanname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
+					  "vindex"	=> $vindex,
 					  "trivial_ok"  => $trivial_ok,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
@@ -1165,6 +1167,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					  "fixed_iface" => $iface_name});
 	    $vportmap{$member}->{"virtlan"} = $virtlan;
 	    $ifacenum++;
+	    $vindex++;
 	}
 	$linknum++;
     }
@@ -1318,6 +1321,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $node           = GeniUtil::LookupNode($component_id);
 	my $colocate       = GeniXML::GetColocate($rspec);
 	my $subnode_of     = GeniXML::GetSubnodeOf($rspec);
+
+	# Need to do this after the mapper has run.
+	$node->Refresh();
 
 	#
 	# Regardless of whether the user asked for an exclusive node
@@ -2094,6 +2100,9 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "Unknown resource_id in ticket: $resource_id";
 	    goto bad;
 	}
+	# Must do this after mapper has run
+	$node->Refresh();
+	
 	my $sliver = GeniSliver::Node->Create($slice, $owner, $node, $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $virtual_id";
@@ -2336,6 +2345,9 @@ sub SliverWorkAux($$$$$$$)
 		    $message = "Could not find node object for $nodesliver";
 		    goto bad;
 		}
+		# Must do this after mapper has run
+		$node->Refresh();
+		
 		$vinterface =
 		    Interface::VInterface->LookupByVirtLan($experiment,
 				     $linkname, $node_id);

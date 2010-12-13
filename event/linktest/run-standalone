@@ -1,5 +1,7 @@
 #!/usr/bin/perl -w
 
+use File::Temp qw/ tempfile /;
+
 if (scalar(@ARGV) < 5) {
 	print STDERR 'run-standalone <run-level> <run-path> <var-path> <log-path> <host-list> [node-list]
 
@@ -30,15 +32,16 @@ be a single unqualified name (like node-0).
 
 ($level, $runpath, $varpath, $logpath, $hosts, $nodes) = @ARGV;
 
-open HOSTS, ">hosts.txt";
+($fh, $filename) = tempfile();
 @hostList = split(",", $hosts);
-print HOSTS join("\n", @hostList);
-close HOSTS;
+print $fh join("\n", @hostList);
+close $fh;
 
 if (! defined($nodes)) {
 	$nodes = $hosts;
 }
 
-$command = "pssh -h hosts.txt -o out -e err -t 3000 sh $runpath/standalone.sh $level $runpath $varpath $logpath $nodes";
+$command = "sh -i -c 'pssh -h $filename -o out -e err -t 3000 sh $runpath/standalone.sh $level $runpath $varpath $logpath $nodes'";
 
+print($command."\n");
 system($command);

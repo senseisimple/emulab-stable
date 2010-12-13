@@ -14,7 +14,12 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDERR "Usage: update-testbed [-v] [-f]\n";
+    print STDERR "Usage: update-testbed\n";
+    print STDERR "-v     - Verify install scripts by loading them only\n";
+    print STDERR "-n     - Run install script in impotent mode\n";
+    print STDERR "-d     - Debugging mode\n";
+    print STDERR "-i     - Run 'gmake boss-install' after running scripts\n";
+    print STDERR "-s     - Stop/Restart the testbed before/after running scripts\n";
     exit(-1);
 }
 my $optlist   = "idsvfn";
