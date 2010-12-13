@@ -319,6 +319,33 @@ sub isdedicatedremote($;$) {
 }
 sub control_interface($;$) { return control_iface($_[0], $_[1]); }
 
+#
+# Set the value of an attribute
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $attrkey, $attrvalue, $attrtype) = @_;
+    
+    goto bad
+	if (!ref($self));
+
+    $self->LoadAttributes() == 0
+	or return -1;
+
+    $attrtype = "string"
+	if (!defined($attrtype));
+    my $safe_attrvalue = DBQuoteSpecial($attrvalue);
+    my $type = $self->type();
+
+    DBQueryWarn("replace into node_type_attributes set ".
+		"  type='$type', attrkey='$attrkey', ".
+		"  attrtype='$attrtype', attrvalue=$safe_attrvalue")
+	or return -1;
+
+    $self->{"ATTRS"}->{$attrkey} = $attrvalue;
+    return 0;
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 
 1;

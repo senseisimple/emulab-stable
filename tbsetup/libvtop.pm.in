@@ -2740,6 +2740,7 @@ sub GenVirtLans($)
 				       'virtual_interface_id' => "$member1" },
 				      {'virtual_node_id' => $delayname,
 				       'virtual_interface_id' =>"$member0" },
+				      ($top_bw == 0 ? "*" : $top_bw), 
 				      $protocol, $others);
 		    
 		    $self->printdb("Delay node $plink ($delayname) = " . 

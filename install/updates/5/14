@@ -1,0 +1,190 @@
+#
+# Do things to set up cooked mode support.
+#
+use strict;
+use libinstall;
+use emdb;
+use Image;
+use NodeType;
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+    my $pid  = "emulab-ops";
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	my $SUDO      = "/usr/local/bin/sudo";
+	my $IDIR      = "$TOP_OBJDIR/install";
+	my $DUMPDESC  = "$TBROOT/sbin/dumpdescriptor";
+	my $LOADDESC  = "$IDIR/load-descriptors";
+	my $DESCRIPTORS = "$TOP_SRCDIR/install/descriptors-pgeni.xml";
+
+	Phase "cooked-mode", "Setting up cooked mode support", sub {
+	    Phase "pcfedphys", "Creating pcfedphys node type", sub {
+		my $nodetype = NodeType->Lookup("pcfedphys");
+		if (!defined($nodetype)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Created pcfedphys");
+		    }
+		    else {
+			if (DBQueryWarn("REPLACE INTO node_type_attributes VALUES ".
+			       "('pcfedphys','nobootinfo','1','boolean')") &&
+			    DBQueryWarn("REPLACE INTO node_type_attributes VALUES ".
+			       "('pcfedphys','virtnode_capacity','1','integer')") &&
+			    DBQueryWarn("REPLACE INTO node_type_attributes VALUES ".
+			       "('pcfedphys','imageable','0','boolean')") &&
+			    DBQueryWarn("REPLACE INTO node_type_attributes VALUES ".
+			       "('pcfedphys','rebootable','1','boolean')") &&
+			    DBQueryWarn("REPLACE INTO node_type_attributes VALUES ".
+			       "('pcfedphys','bios_waittime','60','integer')") &&
+			    DBQueryWarn("REPLACE INTO `node_types` VALUES ".
+					"('pcfedphys','pcfedphys',NULL,NULL, ".
+					" 0,0,0,0,1,0,0,0,0,0,1,0)")) {
+			    PhaseSucceed();
+			}
+			else {
+			    PhaseFail("Could not create pcfedphys");
+			}
+		    }
+		}
+		else {
+		    PhaseSkip("pcfedphys already exists");
+		}
+	    };
+	    Phase "pcfed", "Creating pcfed node type", sub {
+		my $nodetype = NodeType->Lookup("pcfed");
+		if (!defined($nodetype)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Created pcfed");
+		    }
+		    else {
+			if (DBQueryWarn("REPLACE INTO node_type_attributes VALUES ".
+					"('pcfed','rebootable','1','boolean')") &&
+			    DBQueryWarn("REPLACE INTO node_type_attributes VALUES ".
+					"('pcfed','nobootinfo','1','boolean')") &&
+			    DBQueryWarn("REPLACE INTO `node_types` VALUES ".
+					"('pcfed','pcfed',NULL,NULL, ".
+					" 1,0,0,1,1,0,0,0,0,0,1,0)")) {
+			    PhaseSucceed();
+			}
+			else {
+			    PhaseFail("Could not create pcfed");
+			}
+		    }
+		}
+		else {
+		    PhaseSkip("pcfed already exists");
+		}
+	    };
+	    Phase "descriptors", "Creating cooked mode descriptors", sub {
+		my $image = Image->Lookup("$pid,GENI");
+		if (!defined($image)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Creating descriptors");
+		    }
+		    else {
+			ExecQuietFatal("$SUDO -u $PROTOUSER $WAP ".
+				       "  perl $LOADDESC $DESCRIPTORS");
+			PhaseSucceed();
+		    }
+		}
+		else {
+		    PhaseSkip("Descriptors exist");
+		}
+	    };
+	    Phase "GENI", "Setting up default osid for pcfedphys", sub {
+		my $nodetype = NodeType->Lookup("pcfedphys");
+		if (!defined($nodetype)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Updated osid for pcfedphys");
+		    }
+		    else {
+			PhaseFail("Could not lookup pcfedphys");
+		    }
+		}
+		my $osid = $nodetype->default_osid();
+		if (!defined($osid)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Updated osid for pcfedphys");
+		    }
+		}
+		else {
+		    PhaseSkip("osid already set");
+		}
+		my $image = Image->Lookup("$pid,GENI");
+		if (!defined($image)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Updated osid for pcfedphys");
+		    }
+		    else {
+			PhaseFail("Could not lookup $pid,GENI");
+		    }
+		}
+		PhaseWouldHave("Updated osid for pcfedphys")
+		    if (IMPOTENT_MODE());
+		
+		$osid = $image->default_osid();
+		if ($nodetype->SetAttribute("default_osid", $osid)) {
+		    PhaseFail("Could not set default_osid for pcfedphys");
+		}
+		if (!DBQueryWarn("replace into osidtoimageid set ".
+				 "osid='$osid',imageid='$osid',type='pcfedphys'")) {
+		    PhaseFail("Could not initialize osidtoimageid for pcfedphys");
+		}
+		PhaseSucceed();
+	    };
+	    Phase "GENIVM", "Setting up default osid for pcfed", sub {
+		my $nodetype = NodeType->Lookup("pcfed");
+		if (!defined($nodetype)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Updated osid for pcfed");
+		    }
+		    else {
+			PhaseFail("Could not lookup pcfed");
+		    }
+		}
+		my $osid = $nodetype->default_osid();
+		if (!defined($osid)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Updated osid for pcfed");
+		    }
+		}
+		else {
+		    PhaseSkip("osid already set");
+		}
+		my $image = Image->Lookup("$pid,GENIVM");
+		if (!defined($image)) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Updated osid for pcfed");
+		    }
+		    else {
+			PhaseFail("Could not lookup $pid,GENIVM");
+		    }
+		}
+		PhaseWouldHave("Updated osid for pcfed")
+		    if (IMPOTENT_MODE());
+
+		$osid = $image->default_osid();
+		if ($nodetype->SetAttribute("default_osid", $osid)) {
+		    PhaseFail("Could not set default_osid for pcfed");
+		}
+		if (!DBQueryWarn("replace into osidtoimageid set ".
+				 "osid='$osid',imageid='$osid',type='pcfed'")) {
+		    PhaseFail("Could not initialize osidtoimageid for pcfed");
+		}
+		PhaseSucceed();
+	    };
+	};
+    }
+
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    return 0;
+}
+1;
