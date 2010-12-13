@@ -1322,6 +1322,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $colocate       = GeniXML::GetColocate($rspec);
 	my $subnode_of     = GeniXML::GetSubnodeOf($rspec);
 
+	# Need to do this after the mapper has run.
+	$node->Refresh();
+
 	#
 	# Regardless of whether the user asked for an exclusive node
 	# or not, we have to change the rspec (ticket) to reflect
@@ -2097,6 +2100,9 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "Unknown resource_id in ticket: $resource_id";
 	    goto bad;
 	}
+	# Must do this after mapper has run
+	$node->Refresh();
+	
 	my $sliver = GeniSliver::Node->Create($slice, $owner, $node, $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $virtual_id";
@@ -2339,6 +2345,9 @@ sub SliverWorkAux($$$$$$$)
 		    $message = "Could not find node object for $nodesliver";
 		    goto bad;
 		}
+		# Must do this after mapper has run
+		$node->Refresh();
+		
 		$vinterface =
 		    Interface::VInterface->LookupByVirtLan($experiment,
 				     $linkname, $node_id);
