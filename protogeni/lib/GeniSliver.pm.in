@@ -888,7 +888,7 @@ sub UnProvision($;$)
     else {
 	print STDERR "$node is reserved to another, not $self\n";
 	# Signal error so we can look at what happened.
-	return -1;
+	return 0;
     }
     return 0;
 }
