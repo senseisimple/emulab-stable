@@ -195,6 +195,14 @@ sub GetElementByVirtualId($$$)
     my ($name, $type, $node) = @_;
     my @list = FindNodes('n:'.$type.'[@virtual_id = "'.$name.'"]',
 			 $node)->get_nodelist();
+    if (scalar(@list) == 0) {
+	@list = FindNodes('n:'.$type.'[@nickname = "'.$name.'"]',
+			  $node)->get_nodelist();
+    }
+    if (scalar(@list) == 0) {
+	@list = FindNodes('n:'.$type.'[@client_id = "'.$name.'"]',
+			  $node)->get_nodelist();
+    }
     my $result = undef;
     if (scalar(@list) > 0)
     {
