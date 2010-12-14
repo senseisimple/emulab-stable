@@ -178,23 +178,15 @@ sub new($$$;$) {
     bless($self, $class);
 
     #
-    # Create the Expect object
+    # Lazy initialization of the Expect object is adopted, so
+    # we set the session object to be undef.
     #
-    # We'd better set a long timeout on Apcon switch
-    # to keep the connection alive.
-    $self->{SESS} = $self->createExpectObject();
-    if (!$self->{SESS}) {
-        warn "WARNNING: Unable to connect via SSH to $self->{NAME}\n";
-        return undef;
-    }
+    $self->{SESS} = undef;
 
-    # TODO: may need this:
-    #$self->readifIndex();
     $self->readTranslationTable();
 
     return $self;
 }
-
 
 #
 # Create an Expect object that spawns the ssh process 
@@ -543,6 +535,20 @@ sub doCLICmd($$)
     my ($self, $cmd) = @_;
     my $output = "";
     my $exp = $self->{SESS};
+
+    if (!$exp) {
+	#
+	# Create the Expect object, lazy initialization.
+	#
+	# We'd better set a long timeout on Apcon switch
+	# to keep the connection alive.
+	$self->{SESS} = $self->createExpectObject();
+	if (!$self->{SESS}) {
+	    warn "WARNNING: Unable to connect to $self->{NAME}\n";
+	    return (1, "Unable to connect to switch $self->{NAME}.");
+	}
+	$exp = $self->{SESS};
+    }
 
     $exp->clear_accum(); # Clean the accumulated output, as a rule.
     $exp->send($cmd);
