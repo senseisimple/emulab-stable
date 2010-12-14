@@ -506,16 +506,23 @@ while (my %row = $db_result->fetchhash()) {
 }
 
 #
-# XXX Inner elab nodes should never report in to us.
-# If they do, make sure they wind up in PXEWAIT.
+# XXX Inner elab fu.
+# 1. If nodes try to report in to us, make sure they wind up in PXEWAIT
+#    (ClearOsids)
+# 2. Make sure nodes appear successfully allocated
+#    (SetBootStatus, SetAllocState)
+# Note that they will appear to be in PXEWAIT via the web interface.
+# Maybe we should 
 #
 if (keys(%einenodes)) {
-    DBQueryFatal("update nodes set ".
-		 "  def_boot_osid=NULL,".
-		 "  next_boot_osid=NULL,".
-		 "  temp_boot_osid=NULL ".
-		 "where node_id in (".
-		 join(",", map("'$_'", keys %einenodes)). ")");
+    foreach my $node (keys %einenodes) {
+	my $nodeobj = $nodeobjs{$node};
+	if ($nodeobj) {
+	    $nodeobj->ClearOsids();
+	    $nodeobj->SetBootStatus(NODEBOOTSTATUS_OKAY);
+	    $nodeobj->SetAllocState(TBDB_ALLOCSTATE_RES_READY());
+	}
+    }
 }    
 
 @all_nodes = (keys %nodes, keys %vnodes);
