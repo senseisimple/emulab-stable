@@ -135,6 +135,7 @@ sub Lookup($$)
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
+    $self->{"WAROW"}    = undef;
     $self->{"HASH"}     = {};
     bless($self, $class);
 
@@ -153,6 +154,7 @@ sub DESTROY {
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
     $self->{"HASH"}     = undef;
+    $self->{"WAROW"}    = undef;
 }
 
 #
@@ -191,6 +193,7 @@ sub MakeFake($$$$)
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
+    $self->{"WAROW"}    = undef;
     $self->{"HASH"}     = {};
     bless($self, $class);
 
@@ -236,6 +239,7 @@ sub BulkLookup($$$)
 	$node->{"TYPEINFO"} = undef;
 	$node->{"ATTRS"}    = undef;
 	$node->{"IFACES"}   = undef;
+	$node->{"WAROW"}    = undef;
 	$node->{"HASH"}     = {};
 	
 	$nodelist{$nodeid} = $node;
@@ -540,6 +544,7 @@ sub Refresh($)
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
+    $self->{"WAROW"}    = undef;
     return 0;
 }
 
@@ -557,6 +562,33 @@ sub FlushAll($)
     my ($class) = @_;
     
     %nodes = ();
+}
+
+#
+# Convenience access method for widearea info
+#
+sub WideAreaInfo($$)
+{
+    my ($self, $slot) = @_;
+    my $node_id = $self->node_id();
+
+    if (!defined($self->{'WAROW'})) {
+	my $query_result =
+	    DBQueryWarn("select * from widearea_nodeinfo ".
+			"where node_id='$node_id'");
+
+	if (!$query_result || !$query_result->numrows) {
+	    print STDERR "*** $node_id is not a widearea node\n";
+	    return undef;
+	}
+	$self->{'WAROW'} = $query_result->fetchrow_hashref();
+    }
+    if (!exists($self->{'WAROW'}->{$slot})) {
+	print STDERR
+	    "*** Nonexistent slot '$slot' request for widearea node $node_id\n";
+	return undef;
+    }
+    return $self->{'WAROW'}->{$slot};
 }
 
 #
@@ -772,7 +804,7 @@ sub SetAllocState($$)
     
     my $now = time();
     my $node_id = $self->node_id();
-    
+
     DBQueryWarn("update nodes set allocstate='$state', " .
 		"    allocstate_timestamp=$now where node_id='$node_id'")
 	or return -1;
@@ -1177,6 +1209,8 @@ sub external_resource_index($) {
     return L__reservation($_[0], 'external_resource_index'); }
 sub external_resource_id($) {
     return L__reservation($_[0], 'external_resource_id'); }
+sub external_resource_key($) {
+    return L__reservation($_[0], 'external_resource_key'); }
 sub inner_elab_role($) {
     return L__reservation($_[0], 'inner_elab_role'); }
 

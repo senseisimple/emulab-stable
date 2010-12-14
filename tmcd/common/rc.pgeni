@@ -15,17 +15,17 @@ use Getopt::Std;
 sub usage()
 {
     print "Usage: " . scriptname() .
-	" -s server -u urn [-j vnodeid] boot|shutdown|reconfig|reset\n";
+	" -s server -i key [-j vnodeid] boot|shutdown|reconfig|reset\n";
     exit(1);
 }
-my $optlist = "s:j:u:k:e:";
+my $optlist = "s:j:u:k:e:i:";
 my $vnodeid;
 my $server;
 my $action;
+my $idkey;
 my $eventkey;
 my $keyhash;
 my $v0_compat;
-my $urn;
 
 # Turn off line buffering on output
 $| = 1;
@@ -71,8 +71,8 @@ if (defined($options{'s'})) {
 if (defined($options{'k'})) {
     ($eventkey,$keyhash) = split(',', $options{'k'});
 }
-if (defined($options{'u'})) {
-    $urn = $options{'u'};
+if (defined($options{'i'})) {
+    $idkey = $options{'i'};
 }
 if (defined($options{'e'})) {
     $v0_compat = $options{'e'};
@@ -86,7 +86,7 @@ if (@ARGV) {
     $action = $ARGV[0];
 }
 usage()
-    if (! (defined($server) && defined($urn) && defined($action)));
+    if (! (defined($server) && defined($idkey) && defined($action)));
 
 # For tmcc client.
 $ENV{'BOSSNAME'} = $server;
@@ -177,7 +177,7 @@ sub BootFatal($$)
 sub doboot()
 {
     print("Checking Testbed reservation status on $server\n");
-    my ($pid, $eid, $vname) = libsetup::shadowsetup($server, $urn);
+    my ($pid, $eid, $vname) = libsetup::shadowsetup($server, $idkey);
 
     if (!defined($pid)) {
 	print "Node is free\n";

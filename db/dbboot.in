@@ -53,10 +53,10 @@ open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
 open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
 #
-# Clear the load_address field of the images table since any frisbee's
+# Clear the frisbee_blobs table since any frisbee's
 # that were running are obviously not running anymore! 
 #
-DBQueryFatal("update images set load_address='',frisbee_pid=0,load_busy=0");
+DBQueryFatal("delete from frisbee_blobs");
 
 #
 # Clear the event scheduler pids. Its okay to set them to zero since

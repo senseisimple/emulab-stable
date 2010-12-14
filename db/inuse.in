@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002,2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -12,6 +12,8 @@
 #
 
 use English;
+use Getopt::Std;
+use strict;
 
 #
 # Configure variables
@@ -19,13 +21,96 @@ use English;
 use lib '@prefix@/lib';
 use libdb;
 
+sub usage() {
+    print STDOUT "Usage: inuse [-a | -t type] [-p pid [-e eid]] [-s|-r] " .
+        "[-f|-F] [-h] [-R]\n";
+    print STDOUT "  -h          This message\n";
+    print STDOUT "  -a          Print all nodes (default: only PCs\n";
+    print STDOUT "  -t type     Limit to nodes of type (or class)\n";
+    print STDOUT "  -p pid      Limit to project\n";
+    print STDOUT "  -e eid      Limit to experiment\n";
+    print STDOUT "  -s          Sort by pid,eid, rather than node id\n";
+    print STDOUT "  -r          Sort by reserve time rather than node id\n";
+    print STDOUT "  -f          Include free nodes\n";
+    print STDOUT "  -F          Include ONLY free nodes\n";
+    print STDOUT "  -R          Only include pre-reserved nodes\n";
+    exit (-1);
+}
+my $optlist = "t:p:e:srafFhR";
+
+my @columns = ("n.node_id","pid","eid","rsrv_time","reserved_pid");
+
+my %opt = ();
+if (! getopts($optlist, \%opt)) {
+    usage();
+}
+if (@ARGV != 0 || $opt{h}) {
+    usage();
+}
+
+# Check for mutually exclusive options or ones that must go together
+if (($opt{s} && $opt{r}) || ($opt{e} && !$opt{p}) ||
+    ($opt{a} && $opt{t}) || ($opt{f} && $opt{F})) {
+    usage();
+}
 
 if (($UID != 0) && (!TBAdmin())) {
 	die "Sorry, only testbed administrators can use this script\n";
 }
 
-my $result = DBQueryFatal("select r.* from reserved as r left join nodes " .
-		" as n on r.node_id=n.node_id order by priority");
+my @whereclauses = ();
+
+# Require that the node be reserved (unless otherwise specified)
+if ($opt{F}) {
+    # include only free nodes
+    push @whereclauses, "r.pid is null";
+} elsif ($opt{f}) {
+    # Nothing to insert - include all nodes
+} elsif ($opt{R}) {
+    # include only pre-reserved nodes
+    push @whereclauses, "reserved_pid is not null";
+} else {
+    # include only reserved nodes (default)
+    push @whereclauses, "r.pid is not null or reserved_pid is not null";
+}
+
+# Figure out type limits
+if ($opt{t}) {
+    push @whereclauses, "t.type='$opt{t}' or t.class='$opt{t}'";
+} elsif ($opt{a}) {
+    # Push no type-related clauses
+} else {
+    # Default to only showing nodes with class 'pc'
+    push @whereclauses, "t.class='pc'";
+}
+
+if ($opt{p}) {
+    if ($opt{e}) {
+        push @whereclauses, "pid='$opt{p}' and eid='$opt{e}'";
+    } else {
+        push @whereclauses, "pid='$opt{p}'";
+    }
+}
+
+my $whereclause = "";
+if (@whereclauses) {
+    $whereclause = "where " . join(" and ",map {"($_)"} @whereclauses);
+}
+
+my $sortclause = "order by priority";
+if ($opt{s}) {
+    $sortclause = "order by pid,eid,priority";
+} elsif ($opt{r}) {
+    $sortclause = "order by rsrv_time,priority";
+}
+
+my $columns = join(",",@columns);
+
+my $result = DBQueryFatal("select $columns from nodes as n " .
+                "left join reserved as r on r.node_id=n.node_id " .
+                "left join node_types as t on n.type=t.type " .
+                "$whereclause " .
+                "$sortclause");
 
 print $result->as_string();
 

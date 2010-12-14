@@ -249,7 +249,7 @@ ServerNetInit(void)
  * We need a better way to do this!
  */
 int
-ServerNetMCKeepAlive(void)
+NetMCKeepAlive(void)
 {
 	struct ip_mreq mreq;
 

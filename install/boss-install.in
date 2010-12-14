@@ -112,6 +112,7 @@ my $BATCHEXP        = "$PREFIX/bin/batchexp";
 my $NAMED_SETUP     = "$PREFIX/sbin/named_setup";
 my $ADDPUBKEY       = "$PREFIX/sbin/addpubkey";
 my $TBACCT          = "$PREFIX/sbin/tbacct";
+my $GENTOPOFILE     = "$PREFIX/libexec/gentopofile";
 my $WWWDIR          = "$PREFIX/www";
 
 my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
@@ -1622,6 +1623,11 @@ Phase "experiments", "Setting up system experiments", sub {
 			   "  -L 'System Experiment' ".
 			   "  -E '$desc - DO NOT DELETE' ".
 			   "  -p $pid -e $eid");
+	    #
+	    # XXX create an empty topomap so that nodes booting up in
+	    # one of these experiments won't fail in rc.topomap.
+	    #
+	    ExecQuiet("$SUDO -u $PROTOUSER $GENTOPOFILE $pid $eid");
 	};
     }
 };

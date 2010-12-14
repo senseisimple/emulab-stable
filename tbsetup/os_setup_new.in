@@ -278,6 +278,24 @@ foreach my $node (@nodelist) {
     $object->AddNode($node);
 }
 
+# XXX: Hack alert: This needs to go away as soon as the master frisbee
+#   server is implemented
+# 
+# Launch frisbee for global "tb-set-node-tarfiles"
+# 
+my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
+my $db_result = 
+    DBQueryFatal("select path from experiment_blobs where pid='$pid' and eid='$eid'");
+while (my $path = $db_result->fetchrow) {
+    print STDERR "Launching frisbee for experiment wide tarfile $path.\n";
+    system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$path");
+    if ($?) {
+	tberror "Frisbeelauncher for $path failed!";
+	# XXX: Should I abort here
+    }
+}
+
+
 while (1) {
     my $objects    = $MyStruct->OperationList();
     my @volunteers = ();

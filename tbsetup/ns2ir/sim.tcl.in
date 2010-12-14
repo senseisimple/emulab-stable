@@ -751,6 +751,13 @@ Simulator instproc run {} {
 	}
     }
 
+    if [info exists ::TBCOMPAT::tarfiles] {
+	foreach tarfile $::TBCOMPAT::tarfiles {
+	    set path [lindex $tarfile 1]
+	    set dest [lindex $tarfile 0]
+	    $self spitxml_data "experiment_blobs" [list "path" "action"] [list $path "unpack:$dest"]
+	}
+    }
     $self spitxml_finish
 }
 

@@ -1,9 +1,10 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
-#include<openssl/x509.h>
+#include <sys/socket.h>
+#include <openssl/x509.h>
 
 /*
  * SSL prototypes and definitions.
@@ -17,6 +18,8 @@ int		tmcd_sslwrite(int sock, const void *buf, size_t nbytes);
 int		tmcd_sslread(int sock, void *buf, size_t nbytes);
 int		tmcd_sslclose(int sock);
 int		tmcd_sslverify_client(char *, char *, char *, int);
+int		tmcd_quote_hash(void *, size_t, void *);
+int		tmcd_quote_verifysig(void *, void *, size_t, void *);
 X509*		tmcd_sslgetpeercert(void);
 X509*		tmcd_sslrowtocert(char*, char*);
 int		isssl;

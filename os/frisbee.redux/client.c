@@ -57,6 +57,7 @@ int		tracing = 0;
 char		traceprefix[64];
 int		randomize = 1;
 int		zero = 0;
+int		keepalive;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
@@ -137,7 +138,7 @@ ClientStats_t	Stats;
 #endif
 
 char *usagestr = 
- "usage: frisbee [-drzbn] [-s #] <-p #> <-m ipaddr> <output filename>\n"
+ "usage: frisbee [-drzbnN] [-s #] <-m ipaddr> <-p #> <output filename>\n"
  " -d              Turn on debugging. Multiple -d options increase output.\n"
  " -r              Randomly delay first request by up to one second.\n"
  " -z              Zero fill unused block ranges (default is to seek past).\n"
@@ -149,6 +150,7 @@ char *usagestr =
  " -i mcastif      Specify a multicast interface in dotted notation.\n"
  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
  "                 NOTE: Must specify a raw disk device for output filename.\n"
+ " -K seconds      Send a multicast keep alive after a period of inactivity.\n"
  "\n"
  "tuning options (if you don't know what they are, don't use em!):\n"
  " -C MB           Max MB of memory to use for network chunk buffering.\n"
@@ -191,7 +193,7 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ON")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -304,6 +306,12 @@ main(int argc, char **argv)
 
 		case 'N':
 			nodecompress = 1;
+			break;
+
+		case 'K':
+			keepalive = atoi(optarg);
+			if (keepalive < 0)
+				keepalive = 0;
 			break;
 
 		case 'h':
@@ -459,6 +467,14 @@ main(int argc, char **argv)
 			DiskStatusCallback = WriterStatusCallback;
 	}
 
+	/*
+	 * Set the MC keepalive counter (but only if we are multicasting!)
+	 */
+	if (broadcast || (ntohl(mcastaddr.s_addr) >> 28) != 14)
+		keepalive = 0;
+	if (keepalive)
+		log("Enabling MC keepalive at %d seconds", keepalive);
+
 	PlayFrisbee();
 
 	if (tracing) {
@@ -499,11 +515,13 @@ void *
 ClientRecvThread(void *arg)
 {
 	Packet_t	packet, *p = &packet;
-	int		IdleCounter, BackOff;
+	int		IdleCounter, BackOff, KACounter;
 	static int	gotone;
 
 	if (debug)
 		log("Receive pthread starting up ...");
+
+	KACounter = keepalive * TIMEOUT_HZ;
 
 	/*
 	 * Use this to control the rate at which we request blocks.
@@ -549,6 +567,23 @@ ClientRecvThread(void *arg)
 		 */
 		if (PacketReceive(p) != 0) {
 			pthread_testcancel();
+
+			/*
+			 * See if we should send a keep alive
+			 */
+			if (KACounter == 1) {
+				/* If for some reason it fails, stop trying */
+				if (debug)
+					log("sending keepalive...");
+				if (NetMCKeepAlive()) {
+					log("Multicast keepalive failed, "
+					    "disabling keepalive");
+					keepalive = 0;
+				}
+				KACounter = keepalive * TIMEOUT_HZ;
+			} else if (KACounter > 1)
+				KACounter--;
+
 			if (--IdleCounter <= 0) {
 				if (gotone)
 					DOSTAT(recvidles++);
@@ -569,6 +604,8 @@ ClientRecvThread(void *arg)
 			continue;
 		}
 		pthread_testcancel();
+		if (keepalive)
+			KACounter = keepalive * TIMEOUT_HZ;
 		gotone = 1;
 
 		if (! PacketValid(p, TotalChunkCount)) {
@@ -1493,7 +1530,7 @@ PlayFrisbee(void)
 			if (!nodecompress) {
 				subtype = p->hdr.subtype = PKTSUBTYPE_JOIN;
 				p->hdr.datalen = sizeof(p->msg.join);
-				p->msg.join2.clientid = myid;
+				p->msg.join.clientid = myid;
 			} else {
 				subtype = p->hdr.subtype = PKTSUBTYPE_JOIN2;
 				p->hdr.datalen = sizeof(p->msg.join2);
@@ -1514,6 +1551,12 @@ PlayFrisbee(void)
 		if (PacketReceive(p) == 0 &&
 		    p->hdr.subtype == subtype &&
 		    p->hdr.type == PKTTYPE_REPLY) {
+			if (subtype == PKTSUBTYPE_JOIN) {
+				p->msg.join2.chunksize = MAXCHUNKSIZE;
+				p->msg.join2.blocksize = MAXBLOCKSIZE;
+				p->msg.join2.bytecount =
+					p->msg.join.blockcount * MAXBLOCKSIZE;
+			}
 			CLEVENT(1, EV_CLIJOINREP,
 				CHUNKSIZE, BLOCKSIZE,
 				(p->msg.join2.bytecount >> 32),

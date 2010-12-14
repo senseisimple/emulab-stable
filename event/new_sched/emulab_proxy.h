@@ -135,7 +135,7 @@ class ServerProxy
      * @param wbxml_mode Indicate whether or not wbxml should be used.
      * @param url The url to use.
      */
-	ServerProxy(xmlrpc_c::clientXmlTransportPtr transport,
+	ServerProxy(xmlrpc_c::clientXmlTransport *transport,
 		bool wbxml_mode = false,
 		const char *url = "");
 
@@ -176,7 +176,7 @@ class ServerProxy
 private:
     xmlrpc_c::value call(xmlrpc_c::rpcPtr rpc);
     
-    xmlrpc_c::clientXmlTransportPtr transport;
+    xmlrpc_c::clientXmlTransport *transport;
     std::string server_url;
 };
     

@@ -253,7 +253,7 @@ def do_method(module, method, params, URI=None, quiet=False, version=None,
             break
         except xmlrpclib.Fault, e:
             if not quiet: print >> sys.stderr, e.faultString
-            if e.faultCode == 511:
+            if e.faultCode == 503:
                 print >> sys.stderr, "Will try again in a moment. Be patient!"
                 time.sleep(5.0)
                 continue

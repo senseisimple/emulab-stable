@@ -1624,6 +1624,30 @@ sub WriteEnvVariables($)
 }
 
 #
+# Get value of a specific env variable
+#
+sub GetEnvVariable($$)
+{
+    my ($self, $var) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    my $query_result =
+	DBQueryWarn("select value from virt_user_environment ".
+		    "where  pid='$pid' and eid='$eid' and name='$var'");
+    return undef
+	if (!defined($query_result) || !$query_result->numrows);
+
+    my ($value) = $query_result->fetchrow_array();
+    return $value;
+}
+
+#
 # Experiment locking and state changes.
 #
 sub Unlock($;$)

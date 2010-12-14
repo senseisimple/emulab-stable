@@ -239,6 +239,17 @@ sub GetCertificate($)   { return $_[0]->{'CERTIFICATE'}; }
 # An alias so that slivers look like aggregates.
 sub resource_type($)	{ return field($_[0], "type"); }
 
+# A place to stash a temporary rspec.
+sub rspec($;$)
+{
+    my ($self, $rspec) = @_;
+
+    if (defined($rspec)) {
+	$self->{'RSPEC'} = $rspec;
+    }
+    return $self->{'RSPEC'};
+}
+
 # Return the URN.
 sub urn($)
 {
@@ -770,6 +781,8 @@ sub Start($$$)
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
+	    my $vnode;
+	    
 	    #
 	    # Since this is an aggregate, some slivers may already be
 	    # in the started state. Skip those, unless doing a restart.
@@ -778,14 +791,28 @@ sub Start($$$)
 		if ($sliver->state() eq "started" && !$restart);
 	    
 	    if ($node->isvirtnode()) {
-		$vnodes{$node->node_id} = $node;
-
-		# A virtnode on a shared physical node needs nothing else.
-		next
-		    if ($node->sharing_mode());
-
-		# But if non-shared, have to make sure that the phys node
-		# gets loaded.
+		# A virtnode on a shared physical node needs reboot or setup
+		if ($node->sharing_mode()) {
+		    if ($restart && $sliver->state() eq "started") {
+			$reboots{$node->node_id} = $node;
+		    }
+		    else {
+			$vnodes{$node->node_id} = $node;
+		    }
+		    next;
+		}
+		# See below.
+		$vnode = $node;
+		
+		#
+		# Now it gets messy. Do not want to mess with the physnode
+		# if its running other vnodes, and we just need to fire up
+		# a new one. But if the physnode is going to get rebooted,
+		# then there is no need to do anything with the vnodes; they
+		# will boot up with the physnode. 
+		#
+		# But, have to make sure that the phys node gets setup.
+		#
 		my $physnodeid = $node->phys_nodeid();
 		next
 		    if (exists($poweron{$physnodeid}) ||
@@ -798,21 +825,22 @@ sub Start($$$)
 		}
 	    }
 	    #
-	    # Look to see if local physical node was stopped (powered off).
+	    # If the node is not imageable, then there is not much to
+	    # do except turn it on or reboot it. I am assuming that a
+	    # a non imageable node is always in raw mode.
 	    #
-	    if (!$node->isremotenode() &&
-		($sliver->state() eq "stopped")) {
-		$poweron{$node->node_id} = $node;
+	    if (!$node->imageable()) {
+		if ($sliver->state() eq "stopped") {
+		    $poweron{$node->node_id} = $node;
+		}
+		else  {
+		    $reboots{$node->node_id} = $node;
+		}
+		next;
 	    }
-	    else {
-		# node_reboot is smart enough to know that if a pnode
-		# is rebooted it can ignore the vnodes on it, so do
-		# not optimize this here.
-		$reboots{$node->node_id} = $node;
-	    }
-	    next
-		if (!$node->imageable());
-
+	    #
+	    # See if the node is running the requested OS.
+	    #
 	    my $osinfo = OSinfo->Lookup($node->def_boot_osid());
 	    if (!defined($osinfo)) {
 		print STDERR "Could not get osinfo for $node\n";
@@ -852,6 +880,14 @@ sub Start($$$)
 		    $reloads{$image->imageid()} = [ ];
 		} 
 		push(@{ $reloads{$image->imageid()} }, $node);
+		
+		# Reload means reboot or power on.
+		if (!defined($vnode) && $sliver->state() eq "stopped") {
+		    $poweron{$node->node_id} = $node;
+		}
+		else  {
+		    $reboots{$node->node_id} = $node;
+		}
 	    }
 	    else {
 		#
@@ -860,6 +896,33 @@ sub Start($$$)
 		if ($node->OSSelect($osinfo, "def_boot_osid", 0)) {
 		    print STDERR "  Could not os_select $node to $osinfo\n";
 		    return -1;
+		}
+		#
+		# If the node is going to get rebooted, then do not need
+		# to worry about the vnodes on it. But if the node is ready
+		# to go, then we have to do the vnodes. Remember, we do not
+		# reboot the physnode since we might only be adding a new node
+		# in which case, a full reboot is wrong.
+		#
+		if (! $node->IsUp()) {
+		    if ($sliver->state() eq "stopped" && !defined($vnode)) {
+			$poweron{$node->node_id} = $node;
+		    }
+		    else {
+			$reboots{$node->node_id} = $node;
+		    }
+		}
+		elsif ($restart && !defined($vnode)) {
+		    # Just a physnode that needs restarting.
+		    $reboots{$node->node_id} = $node;
+		}
+		elsif (defined($vnode)) {
+		    if ($sliver->state() eq "started") {
+			$reboots{$vnode->node_id} = $vnode;
+		    }
+		    else {
+			$vnodes{$vnode->node_id} = $vnode;
+		    }
 		}
 	    }
 	}

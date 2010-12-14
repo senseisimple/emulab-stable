@@ -254,9 +254,16 @@ sub CallMethod($$$@)
     elsif ($goo->value()->is_fault() 
 	|| (ref($goo->value()) && UNIVERSAL::isa($goo->value(),"HASH") 
 	    && exists($goo->value()->{'faultCode'}))) {
-	$code   = GENIRESPONSE_RPCERROR();
+	$code   = $goo->value()->{"faultCode"}->value;
 	$value  = $goo->value()->{"faultCode"}->value;
 	$output = $goo->value()->{"faultString"}->value;
+    }
+    elsif (! (ref($goo->value()) && UNIVERSAL::isa($goo->value(),"HASH") 
+	      && exists($goo->value()->{'code'}))) {
+	# Sadly, the AM interface returns a different structure.
+	$code   = GENIRESPONSE_SUCCESS();
+	$value  = $goo->value()->value;
+	$output = undef;
     }
     else {
 	$code   = $goo->value()->{'code'}->value;

@@ -1,0 +1,27 @@
+#
+# Change sitevar description
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    my $foo = "Allow members of this project to view all running experiments ".
+              "on the experiment list page";
+
+    if (TBSiteVarExists("general/open_showexplist")) {
+
+        DBQueryFatal("UPDATE sitevariables SET ".
+                    "description='Allow members of this project to view all running experiments on the experiment list page' ".
+		    "WHERE name='general/open_showexplist'");
+    }
+    else {
+        DBQueryFatal("INSERT INTO sitevariables VALUES ".
+                     "('general/open_showexplist',NULL,'',".
+                     "'$foo',0)");
+    }
+    return 0;
+}
+1;

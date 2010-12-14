@@ -657,6 +657,22 @@ CREATE TABLE `eventlist` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `experiment_blobs`
+--
+
+DROP TABLE IF EXISTS `experiment_blobs`;
+CREATE TABLE `experiment_blobs` (
+  `idx` int(11) unsigned NOT NULL auto_increment,
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `path` varchar(255) NOT NULL default '',
+  `action` varchar(255) NOT NULL default '',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `exptidx` (`exptidx`, `path`, `action`)
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `experiment_features`
 --
 
@@ -1320,6 +1336,23 @@ CREATE TABLE `fs_resources` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `frisbee_blobs`
+--
+
+DROP TABLE IF EXISTS `frisbee_blobs`;
+CREATE TABLE `frisbee_blobs` (
+  `idx` int(11) unsigned NOT NULL auto_increment,
+  `path` varchar(255) NOT NULL default '',
+  `imageid` int(8) unsigned default NULL,
+  `load_address` text,
+  `frisbee_pid` int(11) default '0',
+  `load_busy` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY (`idx`),
+  UNIQUE KEY `path` (`path`),
+  UNIQUE KEY `imageid` (`imageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `global_policies`
 --
 
@@ -1565,15 +1598,15 @@ CREATE TABLE `images` (
   `default_osid` int(8) unsigned NOT NULL default '0',
   `path` tinytext,
   `magic` tinytext,
-  `load_address` text,
-  `frisbee_pid` int(11) default '0',
-  `load_busy` tinyint(4) NOT NULL default '0',
   `ezid` tinyint(4) NOT NULL default '0',
   `shared` tinyint(4) NOT NULL default '0',
   `global` tinyint(4) NOT NULL default '0',
   `mbr_version` varchar(50) NOT NULL default '1',
   `updated` datetime default NULL,
   `access_key` varchar(64) default NULL,
+  `auth_uuid` varchar(64) default NULL,
+  `auth_key` varchar(512) default NULL,
+  `decryption_key` varchar(256) default NULL,
   PRIMARY KEY  (`imageid`),
   UNIQUE KEY `pid` (`pid`,`imagename`),
   KEY `gid` (`gid`),
@@ -2178,6 +2211,7 @@ CREATE TABLE `node_hostkeys` (
   `sshdsa_v2` mediumtext,
   `tpmblob` mediumtext,
   `tpmx509` mediumtext,
+  `tpmidentity` mediumtext,
   `sfshostid` varchar(128) default NULL,
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -2443,6 +2477,19 @@ DROP TABLE IF EXISTS `nologins`;
 CREATE TABLE `nologins` (
   `nologins` tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (`nologins`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `nonces`
+--
+
+DROP TABLE IF EXISTS `nonces`;
+CREATE TABLE `nonces` (
+  `node_id` varchar(32) NOT NULL,
+  `purpose` varchar(64) NOT NULL,
+  `nonce` mediumtext,
+  `expires` int(10) NOT NULL,
+  PRIMARY KEY  (`node_id`,`purpose`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3199,6 +3246,7 @@ CREATE TABLE `reserved` (
   `genisliver_idx` int(10) unsigned default NULL,
   `external_resource_index` int(10) unsigned default NULL,
   `external_resource_id` tinytext,
+  `external_resource_key` tinytext,
   `tmcd_redirect` tinytext,
   `sharing_mode` varchar(32) default NULL,
   PRIMARY KEY  (`node_id`),
@@ -3470,6 +3518,20 @@ CREATE TABLE `tmcd_redirect` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `tpm_quote_values`
+--
+
+DROP TABLE IF EXISTS `tpm_quote_values`;
+CREATE TABLE `tpm_quote_values` (
+  `node_id` varchar(32) NOT NULL default '',
+  `op_mode` varchar(20) NOT NULL,
+  `state` varchar(20) NOT NULL,
+  `pcr` int(11) NOT NULL,
+  `value` mediumtext,
+  PRIMARY KEY  (`node_id`,`op_mode`,`state`,`pcr`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `traces`
 --
 
@@ -3520,7 +3582,7 @@ CREATE TABLE `unixgroup_membership` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
--- Table structure for table `user_policies`
+-- Table structure for table `user_features`
 --
 
 DROP TABLE IF EXISTS `user_features`;
@@ -3887,6 +3949,7 @@ CREATE TABLE `virt_lans` (
   `vname` varchar(32) NOT NULL default '',
   `vnode` varchar(32) NOT NULL default '',
   `vport` tinyint(3) NOT NULL default '0',
+  `vindex` int(11) NOT NULL default '-1',
   `ip` varchar(15) NOT NULL default '',
   `delay` float(10,2) default '0.00',
   `bandwidth` int(10) unsigned default NULL,

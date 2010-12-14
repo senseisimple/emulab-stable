@@ -126,13 +126,16 @@ sub docleanup()
 }
 
 #
-# Get topomap
+# Get topomap and assorted linktest files.
+# Right now we first try to fetch across NFS.  Failing that we use tmcc.
+# Eventually we should get this via http or frisbee.
+#
+# Failure to get the topomap is considered fatal, not so with linktest files.
 #
 sub dotopomap()
 {
     #
-    # Copy over the topomap so that it is locally resident. We will eventually
-    # get this via a tarfile instead of NFS.
+    # Copy over the topomap so that it is locally resident.
     #
     my $datadir = EXPDIR() . "/tbdata";
     my $topomap = "$datadir/topomap.gz";
@@ -164,45 +167,30 @@ sub dotopomap()
 	}
     }
     my $optarg = (defined($vnodeid) ? "-n $vnodeid" : "");
-    my $urnarg = (exists($ENV{'URN'}) ? "URN=" . $ENV{'URN'} : "");
+    my $idarg  = (exists($ENV{'IDKEY'}) ? "IDKEY=" . $ENV{'IDKEY'} : "");
     
     if (! -e $tempmap) {
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
+	# XXX note that tmcc does not return a meaningful exit value.
 	#
-	system(TMCCBIN() . " $optarg $urnarg topomap > $tempmap");
-	#
-	# tmcc does not really return useful error codes.
-	#
-	if ($?) {
-	    fatal("Could not get topomap from tmcd or from NFS");
-	}
+	system(TMCCBIN() . " $optarg $idarg topomap > $tempmap");
     }
 
     if (! -e $templt) {
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
+	# XXX note that tmcc does not return a meaningful exit value.
 	#
-	system(TMCCBIN() . " $optarg $urnarg ltmap > $templt");
-	#
-	# tmcc does not really return useful error codes.
-	#
-	if ($?) {
-	    fatal("Could not get ltmap from tmcd or from NFS");
-	}
+	system(TMCCBIN() . " $optarg $idarg ltmap > $templt");
     }
 
     if (! -e $templtp) {
 	#
 	# Try using tmcc. It returns compressed data so do it directly.
+	# XXX note that tmcc does not return a meaningful exit value.
 	#
-	system(TMCCBIN() . " $optarg $urnarg ltpmap > $templtp");
-	#
-	# tmcc does not really return useful error codes.
-	#
-	if ($?) {
-	    fatal("Could not get ltpmap from tmcd or from NFS");
-	}
+	system(TMCCBIN() . " $optarg $idarg ltpmap > $templtp");
     }
 
     if (-s $tempmap) {
@@ -210,9 +198,14 @@ sub dotopomap()
 	if ($?) {
 	    fatal("Could not unzip topomap");
 	}
-	unlink("$tempmap");
     }
     else {
+	#
+	# We make this fatal since route setup depends on this file.
+	# We could let it go, in which case route setup would non-fatally
+	# fail, but then we also wouldn't run linktest (since the topomap
+	# is missing) so we might not detect that route setup failed.
+	#
 	fatal("Could not get topomap");
     }
 
@@ -221,7 +214,6 @@ sub dotopomap()
 	if ($?) {
 	    fatal("Could not unzip ltmap");
 	}
-	unlink("$templt");
     }
     else {
 	warning("Could not get ltmap");
@@ -232,9 +224,12 @@ sub dotopomap()
 	if ($?) {
 	    fatal("Could not unzip ltpmap");
 	}
-	unlink("$templtp");
     }
     else {
 	warning("Could not get ltpmap");
     }
+
+    unlink("$tempmap");
+    unlink("$templt");
+    unlink("$templtp");
 }

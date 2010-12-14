@@ -4626,7 +4626,7 @@ class subboss:
         #
         # Success. Must get the loadinfo out of the DB so we can pass it back.
         #
-        res = DBQueryFatal("select load_address from images where imageid=%s",
+        res = DBQueryFatal("select load_address from frisbee_blobs where imageid=%s",
                            (str(argdict["imageid"]),))
         
         # Hmm, something went wrong?
@@ -5013,7 +5013,7 @@ class elabinelab:
         #
         # Success. Must get the loadinfo out of the DB so we can pass it back.
         #
-        res = DBQueryFatal("select load_address from images where imageid=%s",
+        res = DBQueryFatal("select load_address from frisbee_blobs where imageid=%s",
                            (argdict["imageid"],))
         
         # Hmm, something went wrong?

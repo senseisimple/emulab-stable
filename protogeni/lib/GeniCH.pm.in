@@ -208,7 +208,8 @@ sub Resolve($)
     elsif (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (! (defined($type) && ($type =~ /^(SA|CM|MA|Component|Slice|User)$/i))){
+    if (! (defined($type) &&
+	   ($type =~ /^(SA|AM|CM|MA|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
     $type = lc($type);
@@ -281,7 +282,7 @@ sub Resolve($)
 		 };
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "cm") {
+    if ($type eq "cm" || $type eq "am") {
 	my $manager = GeniAuthority->Lookup($lookup_token);
 	if (!defined($manager)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -339,7 +340,7 @@ sub Register($)
     my $type  = $argref->{'type'};
 
     if (! (defined($type) &&
-	   ($type =~ /^(SA|MA|CM|SES|Component|Slice|User)$/i))){
+	   ($type =~ /^(SA|MA|AM|CM|SES|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
     $type = lc($type);
@@ -614,7 +615,7 @@ sub Register($)
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
-    if ($type eq "cm" || $type eq "sa" || $type eq "ses") {
+    if ($type eq "cm" || $type eq "sa" || $type eq "ses" || $type eq "am") {
 	my ($auth, $which, $type) = GeniHRN::Parse($certificate->urn());
 	
 	my $url = $certificate->URL();
@@ -661,7 +662,7 @@ sub Remove($)
     my $type  = $argref->{'type'};
     my $token = $uuid || $urn;
 
-    if (! (defined($type) && ($type =~ /^(SA|MA|CM|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(Slice|User)$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! ((defined($uuid) || defined($urn)) && defined($cred))) {
@@ -815,7 +816,7 @@ sub ListComponents($)
     #
     my @results = ();
     my $query_result = DBQueryWarn("select uuid from geni_authorities ".
-				   "where type='cm'");
+				   "where type='cm' or type='am'");
     return GeniResponse->Create(GENIRESPONSE_DBERROR)
 	if (!defined($query_result));
 

@@ -323,7 +323,8 @@ foreach my $node (@nodes) {
 		    print "$node is already set up on $pnode\n";
 		    next;
 		}
-		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_DIRTY()) {
+		elsif ($allocstate eq TBDB_ALLOCSTATE_RES_INIT_DIRTY() ||
+		       $allocstate eq TBDB_ALLOCSTATE_RES_REBOOT()) {
 		    print "$node needs a reboot on $pnode\n";
 		    $mode = "reboot";
 		}

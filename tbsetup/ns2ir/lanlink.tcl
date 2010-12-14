@@ -779,6 +779,7 @@ Link instproc updatedb {DB} {
     $self instvar implemented_by
     $self instvar ofenabled
     $self instvar ofcontroller
+    set vindex 0
 
     $sim spitxml_data "virt_lan_lans" [list "vname" "failureaction"] [list $self $failureaction]
 
@@ -925,6 +926,10 @@ Link instproc updatedb {DB} {
 	    lappend values ""
 	}
 
+	lappend fields "vindex"
+	lappend values $vindex
+	set vindex [expr $vindex + 1]
+
 	$sim spitxml_data "virt_lans" $fields $values
     }
 }
@@ -964,6 +969,7 @@ Lan instproc updatedb {DB} {
     $self instvar fixed_iface
     $self instvar ofenabled
     $self instvar ofcontroller
+    set vindex 0
 
     if {$modelnet_cores > 0 || $modelnet_edges > 0} {
 	perror "Lans are not allowed when using modelnet; just duplex links."
@@ -1107,6 +1113,10 @@ Lan instproc updatedb {DB} {
 	} else {
 	    lappend values ""
 	}
+
+	lappend fields "vindex"
+	lappend values $vindex
+	set vindex [expr $vindex + 1]
 
 	$sim spitxml_data "virt_lans" $fields $values
 
