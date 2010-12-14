@@ -33,7 +33,7 @@ use Exporter;
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
 	        getExperimentVlanPorts
-                uniq isSwitchPort);
+                uniq isSwitchPort getPathVlanIfaces);
 
 use English;
 use libdb;
@@ -190,6 +190,93 @@ sub getVlanIfaces($) {
     }
 
     return @ports;
+}
+
+#
+# Get real ifaces on switch node in a VLAN that implements a path
+# that consists of two layer 1 connections and also has a switch as
+# the middle node.
+#
+sub getPathVlanIfaces($) {
+    my $vlanid = shift;
+
+    my $vlan = VLan->Lookup($vlanid);
+    my $experiment = $vlan->GetExperiment();
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+
+    # find the underline path of the link
+    my $query_result =
+	DBQueryWarn("select distinct implemented_by from ".
+		    "virt_lans where pid='$pid' and eid='$eid' and vname='".
+		    $vlan->vname()."';");
+    if (!$query_result || !$query_result->numrows) {
+	warn "Can't find VLAN $vlanid definition in DB.";
+	return undef;
+    }
+
+    # default implemented_by is empty
+    my ($path) = $query_result->fetchrow_array();
+    if ($path == "" || !$path) {
+	print "VLAN $vlanid is not implemented by a path\n" if $debug;
+	return undef;
+    }
+
+    # find the segments of the path
+    $query_result = DBQueryWarn("select segmentname, segmentindex from virt_paths ".
+				"where pid='$pid' and eid='$eid' and pathname='$path';");
+    if (!$query_result || !$query_result->numrows) {
+	warn "Can't find path $path definition in DB.";
+	return undef;
+    }
+
+    if ($query_result->numrow > 2) {
+	warn "We can't handle the path with more than two segments.";
+	return undef;
+    }
+
+    my %ifacesonswitchnode = ();
+    
+    my @vlans = ();
+    VLan->ExperimentVLans($experiment, \@vlans);
+    
+    while (my ($segname, $segindex) = $query_result->fetchrow())
+    {
+	foreach my $myvlan (@vlans)
+	{	    
+	    if ($myvlan->vname == $segname) {
+		my @members;
+
+		$vlan->MemberList(\@members);		
+		foreach my $member (@members) {
+		    my ($node,$iface);
+
+		    $member->GetAttribute("node_id",  \$node);
+		    $member->GetAttribute("iface", \$iface);
+
+		    if ($myvlan->IsMember($node, $iface)) {
+			my @pref;
+
+			$myvlan->PortList(\@pref);
+
+			# only two ports allowed in the vlan
+			if (@pref != 2) {
+			    warn "Vlan ".$myvlan->id()." doesnot have exact two ports.\n";
+			    return undef;
+			}
+
+			if ($pref[0] == "$node:$iface") {
+			    $ifacesonswitchnode{"$node:$iface"} = $pref[1];
+			} else {
+			    $ifacesonswitchnode{"$node:$iface"} = $pref[0];
+			}
+		    }
+		}
+	    }
+	}
+    }
+
+    return %ifacesonswitchnode;    
 }
 
 
