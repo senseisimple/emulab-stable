@@ -699,7 +699,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Bad resource $component_id in ticket");
 		goto bad;
 	    }
-
+	    #
+	    # Is the node a virtual node? Must be an update to an
+	    # existing sliver/ticket, since we now return the node_id
+	    # of the allocated virtual node, not the physical node.
+	    #
+	    if ($node->isvirtnode()) {
+		my $pnode = Node->Lookup($node->phys_nodeid());
+		if (!defined($pnode)) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "No physical resource for $component_id");
+		    goto bad;
+		}
+		$node = $pnode;
+	    }
 	    $namemap{$node_nickname} = $node;
 	    $colomap{$colocate} = $node
 		if (defined($colocate));
@@ -887,6 +901,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "Bad resource $component_id");
 		goto bad;
 	    }
+	    #
+	    # Is the node a virtual node? Must be an update to an
+	    # existing sliver/ticket, since we now return the node_id
+	    # of the allocated virtual node, not the physical node.
+	    #
+	    if ($node->isvirtnode()) {
+		if (!$isupdate ||
+		    !exists($namemap{$node_nickname})) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "Bad resource for $node_nickname");
+		    goto bad;
+		}
+		$node = $namemap{$node_nickname};
+	    }
 	    $pctype = $node->type()
 		if (!defined($pctype));
 	}
@@ -1010,7 +1039,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my %managers   = ();
 	my $ifacenum   = 1;
 	my $vindex     = 0;
-	my $trivial_ok = 0;
+	my $trivial_ok = 1;
 
 	if (!defined($lanname)) {
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
