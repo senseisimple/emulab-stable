@@ -39,7 +39,7 @@ THISHOMEBASE=Emulab.Net
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 WINSUPPORT=1
-ELVIN_COMPAT=1
+ELVIN_COMPAT=0
 NSVERIFY=1
 
 # Set to one to disable exporting NFS filesystems to nodes
