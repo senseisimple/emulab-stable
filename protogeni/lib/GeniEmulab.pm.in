@@ -324,7 +324,7 @@ sub CreatePhysNode($)
 		    "role"      => $ref->{'role'},
 		    "MAC"       => $MAC,
 		    "IP"        => $IIP,
-		    "type"      => "fxp",
+		    "type"      => "generic",
 		};
 		push(@ifaces, $ifaceargs);
 
@@ -383,7 +383,7 @@ sub CreatePhysNode($)
 		    "role"      => $role,
 		    "MAC"       => $MAC,
 		    "IP"        => '',
-		    "type"      => "fxp",
+		    "type"      => "generic",
 		};
 		push(@ifaces, $ifaceargs);
 
