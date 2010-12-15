@@ -109,6 +109,29 @@ CREATE TABLE `archives` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `blob_files`
+--
+
+DROP TABLE IF EXISTS `blob_files`;
+CREATE TABLE `blob_files` (
+  `filename` varchar(255) NOT NULL,
+  `hash` varchar(64) default NULL,
+  `hash_mtime` datetime default NULL,
+  PRIMARY KEY  (`filename`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `blobs`
+--
+
+DROP TABLE IF EXISTS `blobs`;
+CREATE TABLE `blobs` (
+  `uuid` varchar(40) NOT NULL,
+  `filename` tinytext,
+  PRIMARY KEY  (`uuid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `bridges`
 --
 
@@ -444,6 +467,7 @@ CREATE TABLE `deltas` (
 -- Table structure for table `elabinelab_attributes`
 --
 
+DROP TABLE IF EXISTS `elabinelab_attributes`;
 CREATE TABLE `elabinelab_attributes` (
   `pid` varchar(12) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
@@ -628,7 +652,7 @@ DROP TABLE IF EXISTS `event_triggertypes`;
 CREATE TABLE `event_triggertypes` (
   `idx` smallint(5) unsigned NOT NULL,
   `type` tinytext NOT NULL,
-  PRIMARY KEY (`idx`)
+  PRIMARY KEY  (`idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -669,8 +693,8 @@ CREATE TABLE `experiment_blobs` (
   `path` varchar(255) NOT NULL default '',
   `action` varchar(255) NOT NULL default '',
   PRIMARY KEY  (`idx`),
-  UNIQUE KEY `exptidx` (`exptidx`, `path`, `action`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+  UNIQUE KEY `exptidx` (`exptidx`,`path`,`action`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
 -- Table structure for table `experiment_features`
@@ -683,7 +707,7 @@ CREATE TABLE `experiment_features` (
   `exptidx` int(11) NOT NULL default '0',
   `pid` varchar(12) NOT NULL default '',
   `eid` varchar(32) NOT NULL default '',
-  PRIMARY KEY (`feature`,`exptidx`)
+  PRIMARY KEY  (`feature`,`exptidx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1226,6 +1250,7 @@ CREATE TABLE `experiments` (
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `pideid` (`pid`,`eid`),
   UNIQUE KEY `pididxeid` (`pid_idx`,`eid`),
+  UNIQUE KEY `keyhash` (`keyhash`),
   KEY `batchmode` (`batchmode`),
   KEY `state` (`state`),
   KEY `eid_uuid` (`eid_uuid`)
@@ -1320,6 +1345,23 @@ CREATE TABLE `foreign_keys` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `frisbee_blobs`
+--
+
+DROP TABLE IF EXISTS `frisbee_blobs`;
+CREATE TABLE `frisbee_blobs` (
+  `idx` int(11) unsigned NOT NULL auto_increment,
+  `path` varchar(255) NOT NULL default '',
+  `imageid` int(8) unsigned default NULL,
+  `load_address` text,
+  `frisbee_pid` int(11) default '0',
+  `load_busy` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`idx`),
+  UNIQUE KEY `path` (`path`),
+  UNIQUE KEY `imageid` (`imageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `fs_resources`
 --
 
@@ -1333,23 +1375,6 @@ CREATE TABLE `fs_resources` (
   PRIMARY KEY  (`rsrcidx`,`fileidx`),
   KEY `rsrcidx` (`rsrcidx`),
   KEY `fileidx` (`fileidx`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
--- Table structure for table `frisbee_blobs`
---
-
-DROP TABLE IF EXISTS `frisbee_blobs`;
-CREATE TABLE `frisbee_blobs` (
-  `idx` int(11) unsigned NOT NULL auto_increment,
-  `path` varchar(255) NOT NULL default '',
-  `imageid` int(8) unsigned default NULL,
-  `load_address` text,
-  `frisbee_pid` int(11) default '0',
-  `load_busy` tinyint(4) NOT NULL default '0',
-  PRIMARY KEY (`idx`),
-  UNIQUE KEY `path` (`path`),
-  UNIQUE KEY `imageid` (`imageid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -1552,24 +1577,9 @@ CREATE TABLE `image_history` (
   PRIMARY KEY  (`history_id`),
   KEY `node_id` (`node_id`,`history_id`),
   KEY `stamp` (`stamp`),
-  KEY `rsrcidx` (`rsrcidx`)
+  KEY `rsrcidx` (`rsrcidx`),
+  KEY `node_history_id` (`node_history_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
--- Table structure for table `subboss_images`
---
-
-DROP TABLE IF EXISTS `subboss_images`;
-CREATE TABLE `subboss_images` (
-  `subboss_id` varchar(32) NOT NULL default '',
-  `imageid` int(8) unsigned NOT NULL default '0',
-  `load_address` text,
-  `frisbee_pid` int(11) default '0',
-  `load_busy` tinyint(4) NOT NULL default '0',
-  `sync` tinyint(4) NOT NULL default '0',
-  PRIMARY KEY  (`subboss_id`,`imageid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
 
 --
 -- Table structure for table `images`
@@ -2209,10 +2219,10 @@ CREATE TABLE `node_hostkeys` (
   `sshrsa_v1` mediumtext,
   `sshrsa_v2` mediumtext,
   `sshdsa_v2` mediumtext,
+  `sfshostid` varchar(128) default NULL,
   `tpmblob` mediumtext,
   `tpmx509` mediumtext,
   `tpmidentity` mediumtext,
-  `sfshostid` varchar(128) default NULL,
   PRIMARY KEY  (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -2493,6 +2503,19 @@ CREATE TABLE `nonces` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `nonlocal_user_bindings`
+--
+
+DROP TABLE IF EXISTS `nonlocal_user_bindings`;
+CREATE TABLE `nonlocal_user_bindings` (
+  `uid` varchar(8) NOT NULL default '',
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
+  `exptidx` int(11) NOT NULL default '0',
+  PRIMARY KEY  (`uid_idx`,`exptidx`),
+  KEY `uid` (`uid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `nonlocal_user_pubkeys`
 --
 
@@ -2509,19 +2532,6 @@ CREATE TABLE `nonlocal_user_pubkeys` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
--- Table structure for table `nonlocal_user_bindings`
---
-
-DROP TABLE IF EXISTS `nonlocal_user_bindings`;
-CREATE TABLE `nonlocal_user_bindings` (
-  `uid` varchar(8) NOT NULL default '',
-  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
-  `exptidx` int(11) NOT NULL default '0',
-   PRIMARY KEY  (`uid_idx`,`exptidx`),
-   KEY `uid` (`uid`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
 -- Table structure for table `nonlocal_users`
 --
 
@@ -2533,9 +2543,9 @@ CREATE TABLE `nonlocal_users` (
   `created` datetime default NULL,
   `name` tinytext,
   `email` tinytext,
-   PRIMARY KEY  (`uid_idx`),
-   KEY `uid` (`uid`),
-   UNIQUE KEY `uid_uuid` (`uid_uuid`)
+  PRIMARY KEY  (`uid_idx`),
+  UNIQUE KEY `uid_uuid` (`uid_uuid`),
+  KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3346,6 +3356,21 @@ CREATE TABLE `state_triggers` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `subboss_images`
+--
+
+DROP TABLE IF EXISTS `subboss_images`;
+CREATE TABLE `subboss_images` (
+  `subboss_id` varchar(32) NOT NULL default '',
+  `imageid` int(8) unsigned NOT NULL default '0',
+  `load_address` text,
+  `frisbee_pid` int(11) default '0',
+  `load_busy` tinyint(4) NOT NULL default '0',
+  `sync` tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (`subboss_id`,`imageid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
 -- Table structure for table `subbosses`
 --
 
@@ -3355,6 +3380,21 @@ CREATE TABLE `subbosses` (
   `service` varchar(20) NOT NULL default '',
   `subboss_id` varchar(20) NOT NULL default '',
   PRIMARY KEY  (`node_id`,`service`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `sw_configfiles`
+--
+
+DROP TABLE IF EXISTS `sw_configfiles`;
+CREATE TABLE `sw_configfiles` (
+  `id` int(11) NOT NULL auto_increment,
+  `node_id` varchar(32) NOT NULL,
+  `connection_id` int(11) NOT NULL default '0',
+  `file` varchar(4) NOT NULL,
+  `data` text,
+  `swid` varchar(20) NOT NULL,
+  PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3368,21 +3408,6 @@ CREATE TABLE `switch_paths` (
   `vname` varchar(32) default NULL,
   `node_id1` varchar(32) default NULL,
   `node_id2` varchar(32) default NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
-
---
--- Table structure for table `openvpn_config`
---
-
-DROP TABLE IF EXISTS `sw_configfiles`;
-CREATE TABLE `sw_configfiles` (
-  `id` int(11) NOT NULL auto_increment,
-  `node_id` varchar(32) NOT NULL,
-  `connection_id` int(11) NOT NULL default '0',
-  `file` varchar(4) NOT NULL,
-  `data` text,
-  `swid` varchar(20) NOT NULL,
-   PRIMARY KEY(`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3435,6 +3460,7 @@ CREATE TABLE `table_regex` (
 -- Table structure for table `template_stamps`
 --
 
+DROP TABLE IF EXISTS `template_stamps`;
 CREATE TABLE `template_stamps` (
   `guid` varchar(16) NOT NULL default '',
   `vers` smallint(5) unsigned NOT NULL default '0',
@@ -3588,8 +3614,8 @@ CREATE TABLE `unixgroup_membership` (
 DROP TABLE IF EXISTS `user_features`;
 CREATE TABLE `user_features` (
   `feature` varchar(64) NOT NULL default '',
-  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `added` datetime NOT NULL,
+  `uid_idx` mediumint(8) unsigned NOT NULL default '0',
   `uid` varchar(8) NOT NULL default '',
   PRIMARY KEY  (`feature`,`uid_idx`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
@@ -3747,10 +3773,10 @@ CREATE TABLE `users` (
   `wikionly` tinyint(1) default '0',
   `mailman_password` tinytext,
   PRIMARY KEY  (`uid_idx`),
-  KEY `uid` (`uid`),
   KEY `unix_uid` (`unix_uid`),
   KEY `status` (`status`),
-  KEY `uid_uuid` (`uid_uuid`)
+  KEY `uid_uuid` (`uid_uuid`),
+  KEY `uid` (`uid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
@@ -3953,8 +3979,8 @@ CREATE TABLE `virt_lans` (
   `ip` varchar(15) NOT NULL default '',
   `delay` float(10,2) default '0.00',
   `bandwidth` int(10) unsigned default NULL,
-  `est_bandwidth` int(10) unsigned default NULL,
   `backfill` int(10) unsigned default '0',
+  `est_bandwidth` int(10) unsigned default NULL,
   `lossrate` float(10,8) default NULL,
   `q_limit` int(11) default '0',
   `q_maxthresh` int(11) default '0',
@@ -3973,8 +3999,8 @@ CREATE TABLE `virt_lans` (
   `mask` varchar(15) default '255.255.255.0',
   `rdelay` float(10,2) default NULL,
   `rbandwidth` int(10) unsigned default NULL,
-  `rest_bandwidth` int(10) unsigned default NULL,
   `rbackfill` int(10) unsigned default '0',
+  `rest_bandwidth` int(10) unsigned default NULL,
   `rlossrate` float(10,8) default NULL,
   `cost` float NOT NULL default '1',
   `widearea` tinyint(4) default '0',
@@ -4537,6 +4563,4 @@ CREATE TABLE `wires` (
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
-
 
