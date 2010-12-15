@@ -197,29 +197,32 @@ sub getVlanIfaces($) {
 # that consists of two layer 1 connections and also has a switch as
 # the middle node.
 #
-sub getPathVlanIfaces($) {
+sub getPathVlanIfaces($$) {
     my $vlanid = shift;
+    my $ifaces = shift;
 
     my $vlan = VLan->Lookup($vlanid);
     my $experiment = $vlan->GetExperiment();
     my $pid = $experiment->pid();
     my $eid = $experiment->eid();
-
+    
+    my %ifacesonswitchnode = ();
+    
     # find the underline path of the link
     my $query_result =
-	DBQueryWarn("select distinct implemented_by from ".
+	DBQueryWarn("select distinct implemented_by_path from ".
 		    "virt_lans where pid='$pid' and eid='$eid' and vname='".
 		    $vlan->vname()."';");
     if (!$query_result || !$query_result->numrows) {
 	warn "Can't find VLAN $vlanid definition in DB.";
-	return undef;
+	return -1;
     }
 
     # default implemented_by is empty
     my ($path) = $query_result->fetchrow_array();
-    if ($path == "" || !$path) {
+    if (!$path || $path eq "") {
 	print "VLAN $vlanid is not implemented by a path\n" if $debug;
-	return undef;
+	return -1;
     }
 
     # find the segments of the path
@@ -227,15 +230,13 @@ sub getPathVlanIfaces($) {
 				"where pid='$pid' and eid='$eid' and pathname='$path';");
     if (!$query_result || !$query_result->numrows) {
 	warn "Can't find path $path definition in DB.";
-	return undef;
+	return -1;
     }
 
-    if ($query_result->numrow > 2) {
+    if ($query_result->numrows > 2) {
 	warn "We can't handle the path with more than two segments.";
-	return undef;
+	return -1;
     }
-
-    my %ifacesonswitchnode = ();
     
     my @vlans = ();
     VLan->ExperimentVLans($experiment, \@vlans);
@@ -244,7 +245,7 @@ sub getPathVlanIfaces($) {
     {
 	foreach my $myvlan (@vlans)
 	{	    
-	    if ($myvlan->vname == $segname) {
+	    if ($myvlan->vname eq $segname) {
 		my @members;
 
 		$vlan->MemberList(\@members);		
@@ -262,10 +263,10 @@ sub getPathVlanIfaces($) {
 			# only two ports allowed in the vlan
 			if (@pref != 2) {
 			    warn "Vlan ".$myvlan->id()." doesnot have exact two ports.\n";
-			    return undef;
+			    return -1;
 			}
 
-			if ($pref[0] == "$node:$iface") {
+			if ($pref[0] eq "$node:$iface") {
 			    $ifacesonswitchnode{"$node:$iface"} = $pref[1];
 			} else {
 			    $ifacesonswitchnode{"$node:$iface"} = $pref[0];
@@ -276,7 +277,8 @@ sub getPathVlanIfaces($) {
 	}
     }
 
-    return %ifacesonswitchnode;    
+    %$ifaces = %ifacesonswitchnode;
+    return 0;
 }
 
 
