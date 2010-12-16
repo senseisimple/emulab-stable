@@ -403,8 +403,8 @@ bool populate_node(DOMElement* elt,
   // If a component manager has been specified, then the node must be 
   // managed by that CM. We implement this as a desire.
   if (hasCMId) {
-    tb_node_featuredesire node_fd (XStr(cmId.c_str()).f(), 
-				   0.9);//, false, featuredesire::FD_TYPE_NORMAL);
+    tb_node_featuredesire node_fd (XStr(cmId.c_str()).f(), 1.0,
+				   true, featuredesire::FD_TYPE_NORMAL);
     node_fd.add_desire_user(0.9);
     (v->desires).push_front(node_fd);
   }
