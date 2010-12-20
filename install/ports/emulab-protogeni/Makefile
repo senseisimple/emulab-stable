@@ -49,11 +49,6 @@ PHP_VER=	4
 .MAKEFLAGS+=    WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes
 
 #
-# Have not taken the plunge to PHP5
-#
-.MAKEFLAGS+=	PHP_VER=4
-
-#
 # Various ports need to agree on what version of apache. Make sure this
 # agrees with what is in the emulab-ops and emulab-php4 metaports.
 #
@@ -71,6 +66,8 @@ RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Crypt/SSLeay.pm:${PORTSDIR}/security/p5-Crypt-SSLeay \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/LibXML.pm:${PORTSDIR}/textproc/p5-XML-LibXML \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/Frontier/Client.pm:${PORTSDIR}/net/p5-Frontier-RPC \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/Crypt/X509.pm:${PORTSDIR}/security/p5-Crypt-X509 \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/Crypt/OpenSSL/X509.pm:${PORTSDIR}/security/p5-Crypt-OpenSSL-X509 \
 	xmlsec1:${PORTSDIR}/security/xmlsec1
 
 USE_PERL5=	yes

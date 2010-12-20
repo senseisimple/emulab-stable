@@ -1,0 +1,34 @@
+#
+# Add extenal references slots to nodes table, as for geni.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if( !DBTableExists( "blobs" ) ) {
+	DBQueryFatal( "CREATE TABLE blobs ( " .
+		      "uuid VARCHAR( 40 ) NOT NULL, " .
+		      "filename TINYTEXT, " .
+		      "PRIMARY KEY( uuid ) );" );
+    }
+
+    if( !DBTableExists( "blob_files" ) ) {
+	DBQueryFatal( "CREATE TABLE blob_files ( " .
+		      "filename VARCHAR( 255 ) NOT NULL, " .
+		      "hash VARCHAR( 64 ) DEFAULT NULL, " .
+		      "hash_mtime DATETIME DEFAULT NULL, " .
+		      "PRIMARY KEY( filename ) );" );
+    }
+
+    if( !DBKeyExists( "experiments", "keyhash" ) ) {
+	DBQueryFatal( "ALTER TABLE experiments " .
+		      "ADD UNIQUE KEY keyhash ( keyhash );" );
+    }
+
+    return 0;
+}
+
+1;
