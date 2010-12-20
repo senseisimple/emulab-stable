@@ -539,6 +539,7 @@ sub osload($$$) {
 	#
     }
 
+    my %access_keys = ();
     # Loop for each node.
     foreach my $node (@nodes) {
 	# All nodes start out as being successful; altered later as needed.
@@ -625,32 +626,28 @@ sub osload($$$) {
 	if ($object->PreSetupReload($nodeobject)) {
 	    goto failednode;
 	}
-	
+
 	#
 	# This is a bad place for this, but it has to go somewhere, and handling
 	# remote nodes is not really a type-specific thing!  It's more a 
 	# feature mixin than a type-specific class!
 	#
-	# Since all type objects share the same image objects, updating one
-	# should catch them all.
-	#
-
-	#
-	# XXX fixup access keys
-	#
-#	foreach my $image (@images) {
-#	    # This is passed along so that remote node can request the file.
-#	    # Make sure the image object has an access key defined.
-#	    if ($nodeobject->isremotenode() && !defined($access_keys[$i])) {
-#		$access_keys[$i] = TBGenSecretKey();
-#		
-#		$rowref->{'access_key'} = $access_keys[$i];
-#		if ($images[$i]->Update({'access_key' => $access_keys[$i]}) != 0) {
-#		    tberror "$node: Could not initialize image access key";
-#		    goto failednode;
-#		}
-#	    }
-#	}
+	foreach my $image (@images) {
+	    # This is passed along so that remote node can request the file.
+	    # Make sure the image object has an access key defined.
+	    if (defined($image->access_key()) && $image->access_key() ne '') {
+		$access_keys{$image} = $image->access_key();
+	    }
+	    elsif ($nodeobject->isremotenode() && !defined($access_keys{$i]}) {
+		$access_keys{$image} = TBGenSecretKey();
+		
+		$rowref->{'access_key'} = $access_keys{$image};
+		if ($image->Update({'access_key' => $access_keys{$i}}) != 0) {
+		    tberror "$node: Could not initialize image access key";
+		    goto failednode;
+		}
+	    }
+	}
 
 	#
 	# Setup the reload, finally!
