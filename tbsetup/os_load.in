@@ -35,10 +35,11 @@ sub usage()
           "Use -P to prepare the disk as if a whole disk image was loaded\n".
           "Use -F to force the load if Emulab tries to optimize it away\n".
           "Use -R to push a reconfig to the node after the reload\n".
-          "Use -D to set a specific debug level\n");
+          "Use -D to set a specific debug level\n".
+          "Use -o <opt1=foo,opt2=bar,...> to set custom options\n");
     exit(-1);
 }
-my $optlist   = "swldD:i:e:p:m:rz:PcRF";
+my $optlist   = "swldD:i:e:p:m:rz:PcRFo:";
 my $waitmode  = 1;
 my $listonly  = 0;
 my $debug     = 0;
@@ -48,6 +49,7 @@ my $prepare   = 0;
 my $usecurrent= 0;
 my $reconfig  = 0;
 my $force     = 0;
+my %reload_args = ();
 my @nodes     = ();
 my $imagepid;
 my $pid;
@@ -117,6 +119,18 @@ $reconfig = 1
     if (defined($options{"R"}));
 $force   = 1
     if (defined($options{"F"}));
+if (defined($options{"o"})) {
+    my @kva = split(/,/,$options{"o"});
+    foreach my $kv (@kva) {
+        if ($kv =~ /^([\w\-]+)=([^,]+)$/) {
+	    $reload_args{$1} = $2;
+        }
+        else {
+	    print STDERR "Improper -o custom option '$kv'!\n";
+	    usage();
+        }
+    }
+}
 
 #
 # Figure out which nodes. Choice of nodes on command line, or all nodes in an
@@ -343,6 +357,13 @@ $osloadargs{'imageids'} = [ @imageids ]
     if (@imageids);
 $osloadargs{'swapinfo'} = 1;
 $osloadargs{'usecurrent'} = $usecurrent;
+
+#
+# Allow command-line osloadargs overrides
+#
+foreach my $key (keys(%reload_args)) {
+    $osloadargs{$key} = $reload_args{$key};
+}
 
 my $user = User->ThisUser();
 if (EmulabFeatures->FeatureEnabled("NewOsload",$user,$group,$experiment)) {
