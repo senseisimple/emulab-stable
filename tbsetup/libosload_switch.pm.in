@@ -152,6 +152,17 @@ my %sequences =
 	'presend' => $tchar,
 	'seq' => [ [ '((#\s+)|(=>))$', "boot\n", 'line' ],
 		   [ 'continue \[y\/n\]\?\s*$', "y", 'line' ] ] },
+      'rebootContinueOpt' =>
+      { 'timeout' => 5,
+	'presend' => $tchar,
+	'seq' => [ [ '((#\s+)|(=>))$', "boot\n", 'line' ],
+		   [ 'continue \[y\/n\]\?\s*$', "y", 'line' ],
+		   [ 'save current configuration \[y\/n\/\^C\]\s*$?', 'y', 'line' ] ] },
+      # just drain, send nothing.
+      'drain' =>
+      { 'timeout' => 10,
+	'drain' => 1,
+	'seq' => [  ] },
       # do stuff before and after we kick off xmodem
       'initxmodem' =>
       { 'timeout' => 30,
@@ -197,6 +208,18 @@ sub AddNode($$$$)
     #
     $self->nodeflag($nodeobject,'noreboot',1);
 
+    #
+    # Set default values for dotftp and doxmodem if the user didn't set
+    # them.  Basically these let callers directly influence whether tftp
+    # and/or xmodem are invoked to handle the reload.
+    #
+    if (!defined($self->nodeflag($nodeobject,'dotftp'))) {
+	$self->nodeflag($nodeobject,'dotftp',1);
+    }
+    if (!defined($self->nodeflag($nodeobject,'doxmodem'))) {
+	$self->nodeflag($nodeobject,'doxmodem',0);
+    }
+
     return $retval;
 }
 
@@ -226,6 +249,11 @@ sub PreSetupReload($$)
     if (!$self->nodeflag($nodeobject,'force')) {
 	my $qres = DBQueryWarn("select * from partitions".
 			       " where node_id='$node_id' and partition=$newpart");
+	if (!$qres->numrows()) {
+	    tbinfo "$self PreSetupReload($node_id): forcing reload; nothing in partitions table for this node\n";
+	    $self->nodeflag($nodeobject,'force',1);
+	}
+
 	while (my $rowref = $qres->fetchrow_hashref()) {
 	    if ($rowref->{partition} == $newpart) {
 		if ($newimageid == $rowref->{imageid}
@@ -248,7 +276,7 @@ sub PreSetupReload($$)
     # we have to bail, unfortunately!  It's unfortunate because we have now 
     # failed the swapin when we probably should detect it much sooner.
     #
-    if ($self->nodeflag($nodeobject,'force',1)) {
+    if ($self->nodeflag($nodeobject,'force')) {
 	if (!EmulabFeatures->FeatureEnabled("SwitchFlash",
 					    $self->nodeflag($nodeobject,'user'),
 					    $self->nodeflag($nodeobject,'group'),
@@ -265,7 +293,7 @@ sub PreSetupReload($$)
     # If we're really gonna do it, then save our state so we can restore
     # if it seems like our load failed.
     #
-    if ($self->nodeflag($nodeobject,'force',1)) {
+    if ($self->nodeflag($nodeobject,'force')) {
 	$self->SaveNodeDiskInfo($nodeobject);
     }
 
@@ -277,7 +305,7 @@ sub UpdatePartitions($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
 
-    if ($self->nodeflag($nodeobject,'force',1)) {
+    if ($self->nodeflag($nodeobject,'force')) {
 	return $self->SUPER::UpdatePartitions($nodeobject);
     }
 
@@ -466,9 +494,6 @@ sub Reconfigure($$;$)
 
     # child continues:
 
-    #
-    # XXX -- should be TBSETUP, but ALWAYSUP doesn't give us that.
-    #
     $self->dprint(2,"Reconfigure($node_id): child setting state to SHUTDOWN");
     TBSetNodeEventState($node_id,TBDB_NODESTATE_SHUTDOWN);
 
@@ -488,10 +513,14 @@ sub Reconfigure($$;$)
     # get set for any potential power cycles
     my %reboot_args     = ();
     $reboot_args{'debug'}    = $self->debug();
-    $reboot_args{'waitmode'} = 1;
+    $reboot_args{'waitmode'} = 0;
     $reboot_args{'nodelist'} = [ $node_id ];
     $reboot_args{'powercycle'} = 1;
+    $reboot_args{'force'}    = 1;
 
+    #
+    # First, get the switch to respond on console.
+    #
     $retval = $self->probeForOutput($nodeobject);
     my $rebooting = 0;
     if ($FAIL_ON_SPEEDSET && $retval < 0) {
@@ -509,12 +538,19 @@ sub Reconfigure($$;$)
 	$self->dprint(1,"Reconfigure($node_id): trying console reboot");
 	if ($self->expect($nodeobject,undef,undef,
 			  $sequences{'rebootContinue'}) < 0) {
-	    tbwarn "$self Reconfigure($node_id): console reboot failed; power cycling!\n";
+	    if (defined($self->nodeinfo($nodeobject,'flashing'))
+		&& !$self->nodeinfo($nodeobject,'flashing')) {
+		tbwarn "$self Reconfigure($node_id): console reboot failed; power cycling!\n";
 
-	    my %reboot_failures = ();
-	    if (nodereboot(\%reboot_args,\%reboot_failures)) {
-		# && exists($reboot_failures{$node_id})) {
-		tberror "$self Reconfigure($node_id): power cycle failed!\n";
+		my %reboot_failures = ();
+		if (nodereboot(\%reboot_args,\%reboot_failures)) {
+		    # && exists($reboot_failures{$node_id})) {
+		    tberror "$self Reconfigure($node_id): power cycle failed!\n";
+		    goto failure;
+		}
+	    }
+	    else {
+		tberror "$self Reconfigure($node_id): console reboot failed and cannot power cycle (maybe still flashing)\n";
 		goto failure;
 	    }
 	}
@@ -526,12 +562,19 @@ sub Reconfigure($$;$)
     }
     elsif ($retval <= 0) {
 	# have to reboot -- no other choice
-	$self->dprint(0,"Reconfigure($node_id): could not obtain output on switch; rebooting!");
+	if (defined($self->nodeinfo($nodeobject,'flashing'))
+	    && !$self->nodeinfo($nodeobject,'flashing')) {
+	    $self->dprint(0,"Reconfigure($node_id): could not obtain output on switch; rebooting!");
 
-	my %reboot_failures = ();
-	if (nodereboot(\%reboot_args,\%reboot_failures)) {
-	    #&& exists($reboot_failures{$node_id})) {
-	    tberror "$self Reconfigure($node_id): power cycle failed!\n";
+	    my %reboot_failures = ();
+	    if (nodereboot(\%reboot_args,\%reboot_failures)) {
+		#&& exists($reboot_failures{$node_id})) {
+		tberror "$self Reconfigure($node_id): power cycle failed!\n";
+		goto failure;
+	    }
+	}
+	else {
+	    tberror "$self Reconfigure($node_id): could not obtain output on switch and cannot reboot (possibly flashing)!\n";
 	    goto failure;
 	}
 	$rebooting = 1;
@@ -623,6 +666,7 @@ sub Reload($$)
     my ($self,$nodeobject) = @_;
     my $node_id = $nodeobject->node_id();
     my $retval;
+    my $didflash = 0;
 
     # Our return code: defaults to fail; only succeeds near end
     my $rc = -1;
@@ -673,57 +717,82 @@ sub Reload($$)
 
     if (!defined($self->_doTiptunnel($nodeobject))) {
 	tberror "$self Reload($node_id): could not get tiptunnel info!\n";
-	return -1;
+	$rc = -1;
+	goto failure;
     }
 
     # get set for any potential power cycles
     my %reboot_args     = ();
     $reboot_args{'debug'}    = $self->debug();
-    $reboot_args{'waitmode'} = 1;
+    $reboot_args{'waitmode'} = 0;
     $reboot_args{'nodelist'} = [ $node_id ];
     $reboot_args{'powercycle'} = 1;
-
-    $retval = $self->probeForOutput($nodeobject);
+    $reboot_args{'force'}    = 1;
 
     my $rebooting = 0;
     my $doreboot = 0;
-    if ($FAIL_ON_SPEEDSET && $retval < 0) {
+    my $dotftp = $self->nodeflag($nodeobject,'dotftp');
+    my $doxmodem = $self->nodeflag($nodeobject,'doxmodem');
+
+    #
+    # First, get the switch to respond on console.
+    #
+    $retval = $self->probeForOutput($nodeobject);
+    # if it times out, or the prompt is not found, just whack it
+    if ($retval == -3 || $retval == -1) {
+	$doreboot = 1;
+    }
+    elsif ($retval < 0) {
 	goto failure;
     }
     elsif ($retval == 2) {
-	# already in OS
-	$self->dprint(1,"Reload($node_id): switch already in OS");
+	if ($dotftp) {
+	    # If we want tftp, we want to stay in the OS!
+	    $self->dprint(1,"Reload($node_id): switch already in OS");
+	}
+	elsif ($doxmodem) {
+	    # If we want xmodem, we have to reboot into the ROM monitor
+	    $self->dprint(1,"Reload($node_id): switch already in OS, rebooting to ROM monitor");
+	    my $seqnum;
+	    if ($self->expect($nodeobject,undef,undef,
+			      $sequences{'rebootContinueOpt'},\$seqnum) < 0
+		&& $seqnum < 1) {
+		tbwarn "$self Reload($node_id): reboot to ROM monitor failed; power cycling!\n"
+		    if ($self->debug());
+		$doreboot = 1;
+	    }
+	    else {
+		$rebooting = 1;
+	    }
+	}
     }
     elsif ($retval == 1) {
-	# already in ROM monitor: boot into OS so we can try tftp
-	$self->dprint(1,"Reload($node_id): booting into OS");
-	if ($self->expect($node_id,undef,undef,
-			  $sequences{'godumb'}) < 0) {
-	    tbwarn "$self Reload($node_id): could not set dumb mode; continuing anyway!\n"
-		if ($self->debug());
+	if ($dotftp) {
+	    # Boot the node from the ROM monitor to the primary flash slot OS
+	    $self->dprint(0,"Reload($node_id): booting into OS");
+	    $retval = $self->expect($nodeobject,undef,undef,
+				    $sequences{'bootFromRomToPrimary'});
+	    if ($retval < 0) {
+		tbwarn "$self Reload($node_id): console reboot failed; power cycling!\n"
+		    if ($self->debug());
+		$doreboot = 1;
+	    }
+	    else {
+		$rebooting = 1;
+	    }
 	}
-
-	# Boot the node from the ROM monitor to the primary flash slot OS
-	$self->dprint(0,"Reload($node_id): booting into OS");
-	$retval = $self->expect($nodeobject,undef,undef,
-				$sequences{'bootFromRomToPrimary'});
-	if ($retval < 0) {
-	    tbwarn "$self Reload($node_id): console reboot failed; power cycling!\n"
-		if ($self->debug());
-	    $doreboot = 1;
-	}
-	else {
-	    $rebooting = 1;
+	elsif ($doxmodem) {
+	    # If we want xmodem, we want to stay in the ROM monitor!
+	    $self->dprint(1,"Reload($node_id): switch already in ROM monitor");
 	}
     }
     elsif ($retval <= 0) {
 	$doreboot = 1;
     }
 
-    # we're going to try to reboot into the OS
+    # we're going to try to reboot
     if ($doreboot) {
-	# have to reboot -- no other choice
-	$self->dprint(1,"Reload($node_id): power cycling into OS!");
+	$self->dprint(1,"Reload($node_id): power cycling!");
 
 	my %reboot_failures = ();
 	if (nodereboot(\%reboot_args,\%reboot_failures)) {
@@ -743,48 +812,76 @@ sub Reload($$)
 	# reset capture speed to default
 	$self->setSpeed($nodeobject,$DEFSPEED);
 
-	$self->dprint(1,"Reload($node_id): running bootIntoOS");
-	if (($retval = $self->expect($nodeobject,undef,undef,
-				     $sequences{'bootIntoOS'})) < 0) {
-	    # XXX retry?
-	    tberror "$self Reload($node_id): could not enter OS for tftp load! ($retval, $!)\n";
-	    goto failure;
+	if ($dotftp) {
+	    $self->dprint(1,"Reload($node_id): running bootIntoOS");
+	    if (($retval = $self->expect($nodeobject,undef,undef,
+					 $sequences{'bootIntoOS'})) < 0) {
+		# XXX retry?
+		tberror "$self Reload($node_id): could not enter OS for tftp load! ($retval, $!)\n";
+		goto failure;
+	    }
+	}
+	elsif ($doxmodem) {
+	    # Boot the node into the ROM monitor
+	    $self->dprint(0,"Reload($node_id): booting into ROM monitor");
+	    $retval = $self->expect($nodeobject,undef,undef,
+				    $sequences{'bootToRom'});
+	    if ($retval < 0) {
+		tberror "$self Reload($node_id): could not enter ROM monitor for xmodem load! ($retval, $!)\n";
+		goto failure;
+	    }
 	}
     }
 
-    if ($self->expect($nodeobject,undef,undef,
-		      $sequences{'godumb'}) < 0) {
-	tbwarn "$self Reload($node_id): could not set dumb mode; continuing anyway!\n"
-	    if ($self->debug());
+    # If we need to get to the OS, get rid of all the terminal junk.
+    if ($dotftp) {
+	if ($self->expect($nodeobject,undef,undef,
+			  $sequences{'godumb'}) < 0) {
+	    tbwarn "$self Reload($node_id): could not set dumb mode; continuing anyway!\n"
+		if ($self->debug());
+	}
     }
 
     #
-    # Ok, we're in the OS -- try tftp reload!
+    # Ok, we're in either the OS (try tftp) or ROM monitor (try xmodem)!
     #
 
     $self->dprint(1,"Reload($node_id): child setting state to RELOADING");
     TBSetNodeEventState($node_id,TBDB_NODESTATE_RELOADING);
 
-    # try with tftp
-    my $didflash = 0;
-    $retval = $self->uploadImageTftp($nodeobject,$filename,\$didflash);
-    if ($retval < 0) {
-	if (defined($self->nodeinfo($nodeobject,'osload_allowxmodem'))
-	    && $self->nodeinfo($nodeobject,'osload_allowxmodem')) {
-	    tbwarn "$self Reload($node_id): tftp failed; trying xmodem\n";
-	    # XXX xmodem
-	    goto failure;
+    if ($dotftp) {
+	$retval = $self->uploadImageTftp($nodeobject,$filename,\$didflash);
+	if ($didflash) {
+	    $self->nodeinfo($nodeobject,'flashing',1);
+	}
+	if ($retval < 0) {
+	    if (defined($self->nodeinfo($nodeobject,'osload_allowxmodem'))
+		&& $self->nodeinfo($nodeobject,'osload_allowxmodem')) {
+		tbwarn "$self Reload($node_id): tftp failed; trying xmodem\n";
+		# XXX xmodem
+		goto failure;
+	    }
+	    else {
+		tberror "$self Reload($node_id): could not upload new image via tftp: $retval,$!\n";
+		goto failure;
+	    }
 	}
 	else {
-	    tberror "$self Reload($node_id): could not upload new image via tftp: $retval,$!\n";
-	    goto failure;
+	    # reboot!
+	    if (($retval = $self->expect($nodeobject,undef,undef,
+					 $sequences{'rebootContinue'})) < 0) {
+		tberror "$self Reload($node_id): could not reboot into new image: $retval,$!\n";
+		goto failure;
+	    }
 	}
     }
-    else {
-	# reboot!
-	if (($retval = $self->expect($nodeobject,undef,undef,
-				     $sequences{'rebootContinue'})) < 0) {
-	    tberror "$self Reload($node_id): could not reboot into new image: $retval,$!\n";
+    if ($doxmodem) {
+	$retval = $self->uploadImageXmodem($nodeobject,$filename,\$didflash);
+	if ($didflash) {
+	    $self->nodeinfo($nodeobject,'flashing',1);
+	}
+	if ($retval < 0) {
+	    tberror "$self Reload($node_id): could not upload new image via xmodem: $retval,$!\n";
 	    goto failure;
 	}
     }
@@ -935,7 +1032,14 @@ sub probeForOutput($$) {
 	    @linehist = ();
 	    $self->dprint(2,"probeForOutput($node_id): probing via $speed/INT");
 	    if ($self->setSpeed($nodeobject,$speed)) {
-		tberror "$self probeForOutput($node_id): setSpeed failed with $!\n";
+		if ($FAIL_ON_SPEEDSET) {
+		    tberror "$self probeForOutput($node_id): setSpeed failed with $!\n";
+		    $retval = -4;
+		    last;
+		}
+		else {
+		    tbwarn "$self probeForOutput($node_id): setSpeed failed with $!\n";
+		}
 	    }
 	    else {
 		# try the interrupt char option
@@ -1004,7 +1108,7 @@ sub probeForOutput($$) {
 	}
     }
 
-    return -1;
+    return $retval;
 }
 
 sub _checkFlashSlots($$)
@@ -1082,7 +1186,7 @@ sub wipeFiles($$) {
 		if ($file eq '.' || $file eq '..' || $file eq './' 
 		    || $file eq '../');
 
-	    # XXX also filter out hostkey removal... this makes switch boot
+	    # also filter out hostkey removal... this makes switch boot
 	    # take a *long* time! ... or so it seems.
 	    next 
 		if ($file =~ /host_ssh/);
@@ -1214,11 +1318,12 @@ sub generateConfig($$) {
 	    push @cnetlines, "ip dns server-address priority 1 ${BOSSNODE_IP}";
 	    push @cnetlines, "ip dns domain-name ${OURDOMAIN}";
 	    #
-	    # XXX don't do this -- assume that the hostkey never gets 
+	    # don't do this -- assume that the hostkey never gets 
 	    # overwritten.  Generating takes too long!  Eventually, maybe
 	    # detect if it got wiped and then generate if necessary.
 	    #
 	    #push @cnetlines, "crypto key generate ssh";
+	    #
 	    # We allow ssh, but not scp/sftp (because otherwise we can't
 	    # have our tftp client support... which we prefer for reloads
 	    push @cnetlines, "ip ssh";
@@ -1234,7 +1339,7 @@ sub generateConfig($$) {
     my @config = (
 	"hostname \"" . $node_id . "\"",
 	@cnetlines,
-	# XXX: this prompts; must handle manually!
+	# this prompts; must handle manually!
 	#"include-credentials",
 	"aaa authentication ssh login public-key",
 	"aaa authentication ssh login local",
@@ -1417,8 +1522,8 @@ sub uploadImageTftp($$$;$) {
     return -1;
 }
 
-sub uploadImageXmodem($$$) {
-    my ($self,$nodeobject,$filename) = @_;
+sub uploadImageXmodem($$$;$) {
+    my ($self,$nodeobject,$filename,$flashedref) = @_;
     my $node_id = $nodeobject->node_id();
     my $retval;
 
@@ -1427,6 +1532,10 @@ sub uploadImageXmodem($$$) {
 	($tipref->{'in'},$tipref->{'out'},$tipref->{'err'});
 
     $self->dprint(0,"uploadImageXmodem($node_id): starting");
+
+    if (defined($flashedref)) {
+	$$flashedref = 0;
+    }
 
     #
     # Ok, we're here... let's setup the load.  Change speeds on both switch and
@@ -1439,7 +1548,7 @@ sub uploadImageXmodem($$$) {
 	return -1;
     }
 
-    if (0) {
+    if (1) {
 	$self->dprint(1,"uploadImageXmodem($node_id): running initxmodem");
 	$retval = $self->expect($nodeobject,undef,undef,
 				$sequences{'initxmodem'});
@@ -1447,6 +1556,12 @@ sub uploadImageXmodem($$$) {
 	    tberror "$self uploadImageXmodem($node_id): initxmodem expect sequence failed: $retval, $!\n";
 	    return -1;
 	}
+
+	# drain what we can...
+	$self->dprint(1,"uploadImageXmodem($node_id): draining");
+	$self->expect($nodeobject,undef,undef,
+		      $sequences{'drain'});
+
 	$self->dprint(1,"uploadImageXmodem($node_id): hooking up lsz child");
 	my $pid = fork();
 	if (!$pid) {
@@ -1461,6 +1576,7 @@ sub uploadImageXmodem($$$) {
 
 	$self->dprint(1,"uploadImageXmodem($node_id): parent waiting for child $pid");
 	$retval = waitpid($pid,0);
+	$retval = $? >> 8;
 
 	#
 	# bit of a race here -- we can't read from capture until lsz finishes.
@@ -1468,6 +1584,14 @@ sub uploadImageXmodem($$$) {
 	# much count on getting some lines showing success or failure.
 	#
 	$self->dprint(1,"uploadImageXmodem($node_id): child returned $retval");
+
+	if ($retval) {
+	    return -1;
+	}
+
+	if (defined($flashedref)) {
+	    $$flashedref = 1;
+	}
 
 	$self->dprint(1,"uploadImageXmodem($node_id): running finishxmodem");
 	$retval = $self->expect($nodeobject,undef,undef,
@@ -1505,8 +1629,8 @@ sub uploadImageXmodem($$$) {
     return 0;
 }
 
-sub expect($$$$$) {
-    my ($self,$nodeobject,$histbufref,$databufref,$seqref) = @_;
+sub expect($$$$$;$) {
+    my ($self,$nodeobject,$histbufref,$databufref,$seqref,$seqnumref) = @_;
     my $node_id = $nodeobject->node_id();
     my $retval;
 
@@ -1519,7 +1643,7 @@ sub expect($$$$$) {
     return -1 
 	if (!defined($seqref));
 
-    my ($timeout,@seqs,$presend);
+    my ($timeout,@seqs,$presend,$drain);
     if (exists($seqref->{'timeout'})) {
 	$timeout = $seqref->{'timeout'};
     }
@@ -1531,6 +1655,9 @@ sub expect($$$$$) {
     }
     if (exists($seqref->{'presend'})) {
 	$presend = $seqref->{'presend'};
+    }
+    if (exists($seqref->{'drain'})) {
+	$drain = $seqref->{'drain'};
     }
 
     # if they didn't give us any history buffers to fill, just do it locally
@@ -1544,8 +1671,8 @@ sub expect($$$$$) {
 	$databufref = \$databuf;
     }
 
-    if (defined($presend)) {
-	$self->dprint(3,"expect: draining before presend");
+    if (defined($presend) || (defined($drain) && $drain)) {
+	$self->dprint(3,"expect: draining");
 
 	my $escseq = undef;
 	while (1) {
@@ -1622,8 +1749,10 @@ sub expect($$$$$) {
 	    }
 	}
 
-	$self->dprint(3,"expect: presending '$presend'");
-	syswrite($out,$presend);
+	if (defined($presend)) {
+	    $self->dprint(3,"expect: presending '$presend'");
+	    syswrite($out,$presend);
+	}
     }
 
     my $found = 0;
@@ -1763,6 +1892,13 @@ sub expect($$$$$) {
     }
 
   out:
+    # Save off which sequence number we were on in case we need to return
+    # negative to tell caller how we failed.  This gives callers the option
+    # of having a partially-failed sequence still be useful, depending on
+    # how far it got!
+    if (defined($seqnumref)) {
+	$$seqnumref = $i;
+    }
     #
     # Save off our histories if there is anything in them!
     #
