@@ -195,7 +195,7 @@ if (!defined($group)) {
 #
 my $cmd = $proxy;
 
-if (EmulabFeatures->FeatureEnabled("NewScheduler", $this_user, $group,
+if (EmulabFeatures->FeatureEnabled("NewEventScheduler", $this_user, $group,
                                    $experiment)) {
 	$cmd .= " -N ";
 }

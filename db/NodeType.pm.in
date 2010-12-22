@@ -279,6 +279,23 @@ sub GetAttribute($$;$$)
     $$pattrvalue = undef;
     return -1;
 }
+
+#
+# Look for an attribute.
+#
+sub GetAttributes($)
+{
+    my ($self) = @_;
+    
+    return undef
+	if (!ref($self));
+
+    $self->LoadAttributes() == 0
+	or return undef;
+
+    return $self->{"ATTRS"};
+}
+
 # Shortcuts for typical attributes.
 sub default_osid($;$)  {return GetAttribute($_[0], "default_osid", $_[1]); }
 sub default_imageid($;$){return GetAttribute($_[0], "default_imageid",$_[1]); }
