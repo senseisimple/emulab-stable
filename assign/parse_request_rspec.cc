@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -699,7 +699,7 @@ bool populate_link (DOMElement* elt,
   virt_link->emulated = emulated;
   virt_link->allow_delayed = allow_delayed;
   virt_link->allow_trivial = allow_trivial;
-  virt_link->no_connection = false;
+  virt_link->no_connection = true;
   virt_link->delay_info.bandwidth = bandwidth;
   virt_link->delay_info.delay = latency;
   virt_link->delay_info.loss = packetLoss;
