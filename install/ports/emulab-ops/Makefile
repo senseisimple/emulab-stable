@@ -118,6 +118,9 @@ LIB_DEPENDS+= pubsub.1:${PORTSDIR}/misc/emulab-pubsub
 LIB_DEPENDS+= mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.15:${PORTSDIR}/databases/mysql50-client
 .endif
+.if ${OSMAJOR} >= 7
+LIB_DEPENDS+= xmlrpc.9:${PORTSDIR}/net/xmlrpc-c
+.endif
 
 RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	sudo:${PORTSDIR}/security/sudo \

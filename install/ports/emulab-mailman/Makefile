@@ -6,6 +6,7 @@
 # We happen to run the web server as "nobody"
 #
 CGI_GID=	nobody
+WITH_SENDMAIL=	yes
 
 #
 # This prevents the option screen.

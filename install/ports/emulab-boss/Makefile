@@ -119,6 +119,9 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 .if ${OSMAJOR} >= 6
 LIB_DEPENDS+= xerces-c.27:${PORTSDIR}/textproc/xerces-c2
 .endif
+.if ${OSMAJOR} >= 7
+LIB_DEPENDS+= xmlrpc.9:${PORTSDIR}/net/xmlrpc-c
+.endif
 
 #
 # Until/unless the pubsub Makefile is changed, we must include libelvin.
@@ -149,6 +152,7 @@ RUN_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/MD5.pm:${PORTSDIR}/security/p5-MD5 \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Digest/SHA1.pm:${PORTSDIR}/security/p5-Digest-SHA1 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/IO/Pty.pm:${PORTSDIR}/devel/p5-IO-Tty \
 	rpm:${PORTSDIR}/archivers/rpm \
 	xvcg:${PORTSDIR}/graphics/vcg \
