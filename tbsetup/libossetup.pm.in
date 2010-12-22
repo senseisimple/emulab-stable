@@ -28,6 +28,7 @@ use NodeType;
 use libtblog;
 use English;
 use Data::Dumper;
+use EmulabFeatures;
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -73,6 +74,7 @@ sub New($$$@)
     my $self              = {};
     $self->{'USER'}       = $user;
     $self->{'EXPT'}       = $experiment;
+    $self->{'GROUP'}      = (defined($experiment)) ? $experiment->GetGroup() : undef;
     $self->{'HASH'}       = {};
     $self->{'NODES'}      = {};
     $self->{'PHYSNODES'}  = {};
@@ -99,6 +101,14 @@ sub New($$$@)
     # XXX
     $self->noretry(0);
     $self->canceled(0);
+
+    if (EmulabFeatures->FeatureEnabled("NewOsload",$user,
+				       $self->{'GROUP'},$experiment)) {
+	require libosload_new;
+	# XXX -- @nodelist
+	$self->loadobj(libosload_new->New());
+    }
+
     return $self;
 }
 # Break circular reference someplace to avoid exit errors.
@@ -118,6 +128,7 @@ sub sharednodes($)      { return $_[0]->{'SHAREDNODES'}; }
 sub oplist($)		{ return $_[0]->{'OPLIST'}; }
 sub user($)		{ return $_[0]->{'USER'}; }
 sub experiment($)	{ return $_[0]->{'EXPT'}; }
+sub group($)		{ return $_[0]->{'GROUP'}; }
 sub IncrFailCount($)    { $_[0]->{'FAILCOUNT'}++ }
 sub failed($)           { return $_[0]->{'FAILCOUNT'}; }
 
@@ -529,8 +540,29 @@ sub LightUpNodes($@)
 	$reload_args{'nodelist'}  = [ @list ];
 	$reload_args{'nodeflags'} = \%nodeflags;
 
-	my $pid = osload(\%reload_args, $reload_failures);
-	push(@children, [ $pid, \&osload_wait,
+	my $pid;
+	my $coderef;
+	if (EmulabFeatures->FeatureEnabled("NewOsload",$self->user(),
+					   $self->group(),
+					   $self->experiment())) {
+	    ($self->loadobj())->debug($self->debug());
+
+	    # add a few more things for feature checks down the line:
+	    $reload_args{user} = $self->user();
+	    $reload_args{group} = $self->group();
+	    $reload_args{experiment} = $self->experiment();
+
+	    $pid = ($self->loadobj())->osload(\%reload_args, $reload_failures);
+	    $coderef = sub {
+		my $childpid = shift;
+		return ($self->loadobj())->osload_wait($childpid);
+	    };
+	}
+	else {
+	    $pid = osload(\%reload_args, $reload_failures);
+	    $coderef = \&osload_wait;
+	}
+	push(@children, [ $pid, $coderef,			  ,
 			  [ @list ], $reload_failures ]);
 	sleep(5);
     }
@@ -800,12 +832,17 @@ sub NewType($$)
     my $newtype  = eval { $packname->New($self); };
     # Not loaded?
     if ($@) {
-	#print STDERR $@;
-	return undef;
+	#print STDERR "module load failed: " . $@ . "\n";
+	eval "require libossetup_$type";
+	$newtype  = eval { $packname->New($self); };
+	if ($@) {
+	    print STDERR "$self NewType($type): module load failed: " . $@ . "\n";
+	    return undef;
+	}
     }
     $self->{'TYPECACHE'}->{$type} = $newtype;
     
-    print STDERR "Created type object $type\n"
+    print STDERR "Created type object $type with parent $self\n"
 	if ($self->debug());
     
     return $newtype;
@@ -854,6 +891,8 @@ use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
 
+use vars qw($AUTOLOAD);
+
 sub New($$$)
 {
     my ($class, $type, $parent) = @_;
@@ -876,6 +915,23 @@ sub nodelist($)         { return values(%{ $_[0]->{'NODES'} }); }
 sub todo($)		{ return $_[0]->{'TODOLIST'}; }
 sub todolist($)		{ return values(%{ $_[0]->{'TODOLIST'} }); }
 sub IncrFailCount($)    { $_[0]->{'FAILCOUNT'}++ }
+
+sub AUTOLOAD {
+    my $self = shift;
+    my $type = ref($self) or die("$self is not an object\n");
+
+    my $name = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    if (@_) {
+	return $self->{'HASH'}->{$name} = shift;
+    }
+    elsif (exists($self->{'HASH'}->{$name})) {
+	return $self->{'HASH'}->{$name};
+    }
+    print STDERR "$self: tried to access unknown slot $name\n";
+    return undef;
+}
 
 #
 # Add a node to the list.
@@ -1262,7 +1318,21 @@ sub AddNode($$)
 	$reload_args{'imageid'}   = $image->imageid();
 	$reload_args{'nodelist'}  = [ $node_id ];
 
-	osload(\%reload_args, $reload_failures);
+	if (EmulabFeatures->FeatureEnabled("NewOsload",$self->user(),
+					   $self->group(),
+					   $self->experiment())) {
+	    ($parent->loadobj())->debug($self->debug());
+
+	    # add a few more things for feature checks down the line:
+	    $reload_args{user} = $self->user();
+	    $reload_args{group} = $self->group();
+	    $reload_args{experiment} = $self->experiment();
+
+	    ($parent->loadobj())->osload(\%reload_args, $reload_failures);
+	}
+	else {
+	    osload(\%reload_args, $reload_failures)
+	}
 
 	# Reset this. Updated in Volunteers() below. 
 	$node->_setupoperation($libossetup::NOSTATE);
