@@ -726,6 +726,13 @@ sub getInterfaceSettings ($) {
 
     my ($interface) = @_;
 
+    #
+    # Switch ports are evil and we don't touch them.
+    #
+    if (isSwitchPort($interface)) {
+	return ();
+    }
+
     $interface =~ /^(.+):(\d+)$/;
     my ($node, $port) = ($1, $2);
     if ((!defined $node) || (!defined $port)) {
