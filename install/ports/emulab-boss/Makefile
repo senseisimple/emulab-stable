@@ -136,7 +136,10 @@ LIB_DEPENDS+= vin4.2:${PORTSDIR}/misc/libelvin \
 LIB_DEPENDS+= pubsub.1:${PORTSDIR}/misc/emulab-pubsub
 .endif
 
-RUN_DEPENDS=	\
+# We need the BUILD_DEPENDS above to wind up in the dependency list
+RUN_DEPENDS:= ${BUILD_DEPENDS}
+
+RUN_DEPENDS+=	\
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	mod_auth_mysql>1:${PORTSDIR}/www/mod_auth_mysql \
 	fping:${PORTSDIR}/net/fping \
@@ -163,6 +166,8 @@ RUN_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
 	${LOCALBASE}/include/boost:${PORTSDIR}/${BOOST_PORT} \
 	gmake:${PORTSDIR}/devel/gmake \
+	autoconf-2.13:${PORTSDIR}/devel/autoconf213 \
+	git:${PORTSDIR}/devel/git \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \

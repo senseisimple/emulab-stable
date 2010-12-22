@@ -122,7 +122,13 @@ LIB_DEPENDS+= mhash.2:${PORTSDIR}/security/mhash \
 LIB_DEPENDS+= xmlrpc.9:${PORTSDIR}/net/xmlrpc-c
 .endif
 
-RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
+# We need the BUILD_DEPENDS above to wind up in the dependency list
+RUN_DEPENDS:= ${BUILD_DEPENDS}
+
+RUN_DEPENDS+=	\
+	gmake:${PORTSDIR}/devel/gmake \
+	autoconf-2.13:${PORTSDIR}/devel/autoconf213 \
+	git:${PORTSDIR}/devel/git \
 	sudo:${PORTSDIR}/security/sudo \
 	rsync:${PORTSDIR}/net/rsync \
 	otclsh:${PORTSDIR}/lang/otcl \
