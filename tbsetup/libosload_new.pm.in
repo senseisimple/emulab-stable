@@ -29,7 +29,6 @@ use OSinfo;
 use English;
 use event;
 use Data::Dumper;
-use File::stat;
 use IO::Handle;
 use overload ('""' => 'Stringify');
 
@@ -577,7 +576,7 @@ sub osload($$$) {
 		#
 		$object = $self->NewType($nodeobject->class());
 		if ($@) {
-		    die_noretry("$self: no type/class specific setup module for $node");
+		    die_noretry("$self: no type/class specific osload module for $node");
 		}
 	    }
 
@@ -638,12 +637,12 @@ sub osload($$$) {
 	    if (defined($image->access_key()) && $image->access_key() ne '') {
 		$access_keys{$image} = $image->access_key();
 	    }
-	    elsif ($nodeobject->isremotenode() && !defined($access_keys{$i]}) {
+	    elsif ($nodeobject->isremotenode() && !defined($access_keys{$image})) {
 		$access_keys{$image} = TBGenSecretKey();
 		
 		$rowref->{'access_key'} = $access_keys{$image};
-		if ($image->Update({'access_key' => $access_keys{$i}}) != 0) {
-		    tberror "$node: Could not initialize image access key";
+		if ($image->Update({'access_key' => $access_keys{$image}}) != 0) {
+		    tberror "$self ($node): Could not initialize image access key";
 		    goto failednode;
 		}
 	    }
@@ -961,17 +960,18 @@ sub GetImageInfo($$$)
 	}
     }
 
-    my $sb = stat($imagepath);
+    my (undef,undef,undef,undef,undef,undef,undef,$ssize,
+		undef,$smtime,undef,undef,undef) = stat($imagepath);
 
     # cache as long as we just looked!
-    $rowref->{size} = $sb->size;
+    $rowref->{size} = $ssize;
 
     #
     # A zero-length image cannot be right and will result in much confusion
     # if allowed to pass: the image load will succeed, but the disk will be
     # unchanged, making it appear that os_load loaded the default image.
     #
-    if ($sb->size == 0) {
+    if ($ssize == 0) {
 	tberror "$imagepath is empty!";
 	$$rowrefptr = 'BADIMAGE';
 	return -1;
@@ -1425,8 +1425,10 @@ sub osload_setupswapinfo($$$;@)
 	if (! -r $basesig) {
 	    $mustcopy = 1;
 	} elsif (!defined($gotsig{$basesig})) {
-	    my $fromtime = stat("$sigdir/$signame")->mtime;
-	    my $totime = stat($basesig)->mtime;
+	    my (undef,undef,undef,undef,undef,undef,undef,undef,
+		undef,$fromtime,undef,undef,undef) = stat("$sigdir/$signame");
+	    my (undef,undef,undef,undef,undef,undef,undef,undef,
+		undef,$totime,undef,undef,undef) = stat($basesig);
 	    if ($fromtime > $totime) {
 		print "*** swapinfo: WARNING: ".
 		    "$rimagename.sig out of date, updating...\n";
@@ -2200,9 +2202,10 @@ sub SetupReload($$)
     foreach my $idx (@imageidxs) {
 	my $image = $images[$idx];
 	my $imageid = $imageids[$idx];
-	if (defined $subboss) {
+	if (defined($subboss)) {
 	    my $filename = $image->path();
-	    my $stats = stat $filename;
+	    my (undef,undef,undef,undef,undef,undef,undef,$ssize,
+		undef,$smtime,undef,undef,undef) = stat($filename);
 
 	    my $query_result = DBQueryWarn("select sync from subboss_images " . 
 					   " where subboss_id='$subboss' " . 
@@ -2213,7 +2216,7 @@ sub SetupReload($$)
 		system("$SUBBOSS_FRISBEELAUNCHER " . 
 		       ($self->debug() ? "-d ": "") .
 		       "$subboss " . "$imageid " . "\"$filename\" " .
-		       $stats->size() . ' ' . $stats->mtime());
+		       $ssize . ' ' . $smtime);
 		if ($?) {
 		    tberror "$self: Subboss Frisbee Launcher ($imageid on $subboss) failed!";
 		    return -1;
@@ -2231,6 +2234,17 @@ sub SetupReload($$)
     return 0;
 }
 
+package libosload_pcRemote;
+use base qw(libosload_pc);
+
+use libdb;
+use libtestbed;
+use libossetup;
+use libtblog;
+use Node;
+use English;
+use Data::Dumper;
+use overload ('""' => 'Stringify');
 
 package libosload_virtnode;
 use base qw(libosload_pc);
