@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -402,17 +402,6 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
 	  (*dit).second->remove(p);
       }
     }
-#ifdef SMART_UNMAP
-    if (c->used_members.find((*dit).first) == c->used_members.end()) {
-	c->used_members[(*dit).first] = new tb_pclass::tb_pnodeset;
-    }
-
-    // XXX: bogus? Maybe we're only supposed to insert if it was in the
-    // other list?
-    //if (find((*dit).second->L.begin(),(*dit).second->L.end(),p) != (*dit).second->L.end()) {
-    c->used_members[(*dit).first]->insert(p);
-    //}
-#endif
   }
 
   c->used_members++;
@@ -423,36 +412,27 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
 
 int pclass_unset(tb_pnode *p)
 {
-  // add pnode to all lists in equivalence class.
+  // add pnode back to the list in the equivalence class that corresponds with
+  // the current type of the vnode - may be used whether or not the pnode is
+  // empty.
   tb_pclass *c = p->my_class;
 
   tb_pclass::pclass_members_map::iterator dit;
   for (dit=c->members.begin();dit!=c->members.end();++dit) {
     if ((*dit).first == p->current_type) {
       // If it's not in the list then we need to add it to the back if it's
-      // empty and the front if it's not.  Since unset is called before
-      // remove_node empty means only one user.
+      // empty (so that it will be picked last) and the front if it's not (so 
+      // hat it will be picked first). Since unset is called before remove_node
+      // is finished decremeting the counts, empty means only one user.
       if (! (*dit).second->exists(p)) {
 	assert(p->current_type_record->get_current_load() > 0);
-#ifdef PNODE_ALWAYS_FRONT
-	(*dit).second->push_front(p);
-#else
-#ifdef PNODE_SWITCH_LOAD
-	if (p->current_type_record->get_current_load() == 0) {
-#else
-	if (p->get_current_load() == 1) {
-#endif
+	if (p->current_type_record->get_current_load() == 1) {
 	  (*dit).second->push_back(p);
 	} else {
 	  (*dit).second->push_front(p);
 	}
-#endif
       }
     }
-
-#ifdef SMART_UNMAP
-      c->used_members[(*dit).first]->erase(p);
-#endif
   }
 
   if (p->my_own_class && (p->total_load == 1)) {
@@ -462,6 +442,22 @@ int pclass_unset(tb_pnode *p)
   c->used_members--;
   
   //assert_own_class_invariant(p);
+  return 0;
+}
+
+int pclass_reset_maps(tb_pnode *p)
+{
+  // add pnode to *all* lists in equivalence class - should only be called if
+  // the pnode is empty
+  tb_pclass *c = p->my_class;
+
+  tb_pclass::pclass_members_map::iterator dit;
+  for (dit=c->members.begin();dit!=c->members.end();++dit) {
+    if (! (*dit).second->exists(p)) {
+      (*dit).second->push_front(p);
+    }
+  }
+
   return 0;
 }
 

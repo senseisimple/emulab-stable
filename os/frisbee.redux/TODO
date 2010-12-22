@@ -178,6 +178,10 @@ ENHANCEMENTS:
    Minor changes would be needed to PacketSend/Recv to track the client
    IP/port rather than just assuming/using the global mcastaddr/portnum.
 
+   One nice side-effect of this is that the client would no longer have
+   to bind to a specific port in the unicast case, since each reply from
+   the server could be tagged with the proper destination port.
+
 9. Allow the frisbee client to be used in a pipe.
 
    If we could pipe the output of frisbee into another utility, this would

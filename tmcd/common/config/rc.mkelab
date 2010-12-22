@@ -783,7 +783,11 @@ sub SetupFsNode()
 
     print RC "ntpdate_enable=\"YES\"\n";
     print RC "ntpdate_flags=\"boss\"\n";
-    print RC "xntpd_enable=\"YES\"\n";
+    if ($FBSD_VERSION >= 5) {
+	print RC "ntpd_enable=\"YES\"\n";
+    } else {
+	print RC "xntpd_enable=\"YES\"\n";
+    }
     print RC "linux_enable=\"YES\"\n";
 
     print RC "rpcbind_enable=\"YES\"\n";
@@ -1196,7 +1200,11 @@ sub SetupOpsNode($)
 
     print RC "ntpdate_enable=\"YES\"\n";
     print RC "ntpdate_flags=\"boss\"\n";
-    print RC "xntpd_enable=\"YES\"\n";
+    if ($FBSD_VERSION >= 5) {
+	print RC "ntpd_enable=\"YES\"\n";
+    } else {
+	print RC "xntpd_enable=\"YES\"\n";
+    }
     print RC "linux_enable=\"YES\"\n";
     print RC "accounting_enable=\"YES\"\n";
 

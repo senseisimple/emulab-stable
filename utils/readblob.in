@@ -1,0 +1,179 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use Cwd;
+use Digest::SHA1;
+use English;
+use Getopt::Std;
+use POSIX qw( getuid setuid );
+use strict;
+
+#
+# Configure variables
+#
+my $TB			= "@prefix@";
+my $FSDIR_PROJ		= "@FSDIR_PROJ@";
+my $FSDIR_GROUPS	= "@FSDIR_GROUPS@";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+if ($EUID != 0) {
+    # We don't want to run this script unless its the real version.
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+# Temporarily drop privileges as soon as possible.
+$EUID = $UID;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Handle command-line options.
+#
+sub usage() {
+    print STDERR "Usage: $0 [-h hash] [-q] <key> <blob>\n";
+    exit( 1 );
+}
+my $hash = 0;
+my $query = 0;
+my %options = ();
+if (! getopts("h:q", \%options)) {
+    usage();
+}
+if ($options{q}) {
+    $query = 1;
+}
+if ($options{'h'}) {
+    $hash = $options{'h'};
+}
+
+usage() unless @ARGV == 2;
+my ( $key, $blob ) = @ARGV;
+#
+# Must taint check!
+#
+if ($key =~ /^([-\w]+)$/) {
+    $key = $1;
+}
+else {
+    print STDERR "Bad data in argument: $key\n";
+    exit( 1 );
+}
+   
+if ($blob =~ /^([-\w]+)$/) {
+    $blob = $1;
+}
+else {
+    print STDERR "Bad data in argument: $blob\n";
+    exit( 1 );
+}
+   
+my $result = DBQueryWarn( "SELECT groups.unix_gid FROM experiments, groups " .
+			  "WHERE experiments.keyhash='$key' AND " .
+			  "experiments.gid_idx=groups.gid_idx;" );
+
+if( !$result || $result->numrows != 1 ) {
+    print STDERR "Could not resolve key\n";
+    exit( 1 );
+}
+
+my ( $unix_gid ) = $result->fetchrow_array();
+
+# Temporarily reacquire privileges.
+$EUID = 0;
+
+# Add the supplementary group ID.
+$EGID = $EGID . " " . $unix_gid;
+
+# Now we can permanently drop all privileges.
+setuid( getuid() );
+
+$result = DBQueryWarn( "SELECT filename FROM blobs WHERE uuid='$blob';" );
+
+unless( $result && $result->numrows == 1 ) {
+    print STDERR "could not resolve $blob\n";
+    exit( 1 );
+}
+
+my ( $filename ) = $result->fetchrow_array();
+
+$filename = Cwd::realpath( $filename );
+
+# FIXME verify that $filename lives in a legitimate part of the filesystem
+
+my $mtime = ( stat( $filename ) )[ 9 ];
+
+if( !defined( $mtime ) ) {
+    print STDERR $filename . ": " . $ERRNO . "\n";
+    exit( 1 );
+}
+
+$result = DBQueryWarn( "SELECT hash, UNIX_TIMESTAMP( hash_mtime ) FROM " .
+			  "blob_files WHERE filename='$filename';" );
+if( $result && $result->numrows == 1 ) {
+    my ( $file_hash, $file_mtime ) = $result->fetchrow_array();
+
+    # Don't trust any existing hash unless the mtimes match _exactly_.  Even
+    # if our mtime appears more recent than the file's, that is an
+    # excellent indication that our hash cannot be trusted (e.g. the
+    # file might have been restored from backup).
+    exit( 2 ) if( lc( $hash ) eq lc( $file_hash ) && $mtime == $file_mtime );
+}
+
+exit( 0 ) if $query;
+
+if( !open( FILE, $filename ) ) {
+    print STDERR $filename . ": " . $ERRNO . "\n";
+    exit( 1 );    
+}
+
+my $sha1 = Digest::SHA1->new;
+
+my $buffer;
+my $len;
+while( ( $len = sysread( FILE, $buffer, 0x10000 ) ) > 0 ) {
+    if( syswrite( STDOUT, $buffer, $len ) < $len ) {
+	print STDERR "error writing output\n";
+	exit( 1 );
+    }
+
+    $sha1->add( $buffer );
+}
+
+if( !defined( $len ) ) {
+    print STDERR $filename . ": " . $ERRNO . "\n";
+    exit( 1 );    
+} else {
+    my $newhash = $sha1->hexdigest;
+    DBQueryWarn( "REPLACE INTO blob_files SET filename='$filename', " .
+		 "hash='$newhash', hash_mtime=FROM_UNIXTIME($mtime);" );
+
+    exit( 0 );
+}

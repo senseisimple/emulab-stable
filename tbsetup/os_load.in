@@ -32,10 +32,14 @@ sub usage()
 	  "       style==0: do not zero (same as not using -z)\n".
 	  "       style==1: let frisbee do the zeroing\n".
 	  "       style==2: zero disk before running frisbee\n".
-          "Use -P to prepare the disk as if a whole disk image was loaded\n");
+          "Use -P to prepare the disk as if a whole disk image was loaded\n".
+          "Use -F to force the load if Emulab tries to optimize it away\n".
+          "Use -R to push a reconfig to the node after the reload\n".
+          "Use -D to set a specific debug level\n".
+          "Use -o <opt1=foo,opt2=bar,...> to set custom options\n");
     exit(-1);
 }
-my $optlist   = "swldi:e:p:m:rz:Pc";
+my $optlist   = "swldD:i:e:p:m:rz:PcRFo:";
 my $waitmode  = 1;
 my $listonly  = 0;
 my $debug     = 0;
@@ -43,6 +47,9 @@ my $noreboot  = 0;
 my $zerofree  = 0;
 my $prepare   = 0;
 my $usecurrent= 0;
+my $reconfig  = 0;
+my $force     = 0;
+my %reload_args = ();
 my @nodes     = ();
 my $imagepid;
 my $pid;
@@ -62,6 +69,8 @@ use Experiment;
 use Node;
 use OSinfo;
 use Image;
+use EmulabFeatures;
+use User;
 
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
@@ -83,6 +92,9 @@ if (! getopts($optlist, \%options)) {
 }
 $debug = 1
     if (defined($options{"d"}));
+if (defined($options{"D"}) && $options{"D"} =~ /^(\d+)$/) {
+    $debug = $1;
+}
 
 # List only mode. No need to do anymore argument processing.
 sub dolisting();
@@ -103,11 +115,29 @@ $prepare = 1
     if (defined($options{"P"}));
 $usecurrent = 1
     if (defined($options{"c"}));
+$reconfig = 1
+    if (defined($options{"R"}));
+$force   = 1
+    if (defined($options{"F"}));
+if (defined($options{"o"})) {
+    my @kva = split(/,/,$options{"o"});
+    foreach my $kv (@kva) {
+        if ($kv =~ /^([\w\-]+)=([^,]+)$/) {
+	    $reload_args{$1} = $2;
+        }
+        else {
+	    print STDERR "Improper -o custom option '$kv'!\n";
+	    usage();
+        }
+    }
+}
 
 #
 # Figure out which nodes. Choice of nodes on command line, or all nodes in an
 # experiment. To get all free nodes, must use sched_reload. 
 # 
+my $experiment;
+my $group;
 if (defined($options{"e"})) {
     usage()
 	if (@ARGV);
@@ -118,11 +148,12 @@ if (defined($options{"e"})) {
 	$pid = $1;
 	$eid = $2;
 
-        my $experiment = Experiment->Lookup($pid, $eid);
+        $experiment = Experiment->Lookup($pid, $eid);
 	if (!defined($experiment)) {
 	    die("*** $0:\n".
 		"    No such experiment $pid/$eid!\n");
 	}
+	$group = $experiment->GetGroup();
 	if (! (@nodes = $experiment->NodeList(0, 1))) {
 	    die("*** $0:\n".
 		"    There are no nodes in $pid/$eid!\n");
@@ -147,7 +178,12 @@ else {
 	if (!$node->IsReserved()) {
 	    die("*** $0:\n".
 		"    Node $nodeid is not reserved; reserve it first!\n");
-	}    
+        }
+        else {
+	    $experiment = $node->Reservation();
+	    $group = $experiment->GetGroup();
+        }
+
 	push(@nodes, $node);
     }
 }
@@ -321,6 +357,38 @@ $osloadargs{'imageids'} = [ @imageids ]
     if (@imageids);
 $osloadargs{'swapinfo'} = 1;
 $osloadargs{'usecurrent'} = $usecurrent;
+
+#
+# Allow command-line osloadargs overrides
+#
+foreach my $key (keys(%reload_args)) {
+    $osloadargs{$key} = $reload_args{$key};
+}
+
+my $user = User->ThisUser();
+if (EmulabFeatures->FeatureEnabled("NewOsload",$user,$group,$experiment)) {
+    require libosload_new;
+    my $loadobj = libosload_new->New();
+    $loadobj->debug($debug);
+    #
+    # XXX basically, tell devices that try not to reload (like switches)
+    # that they really need to do it -- if the user or reload daemon actually
+    # invokes this script, we *have* to reload!
+    #
+    $osloadargs{'force'} = $force;
+    #
+    # XXX basically, tell devices that might be reconfig'd via push from us
+    # (like switches) that a reconfig should follow the reload!
+    #
+    $osloadargs{'reconfig'} = $reconfig;
+
+    # add a few more things for feature checks down the line:
+    $osloadargs{user} = $user;
+    $osloadargs{group} = $group;
+    $osloadargs{experiment} = $experiment;
+
+    exit($loadobj->osload(\%osloadargs, \%failednodes));
+}
 
 exit(osload(\%osloadargs, \%failednodes));
 

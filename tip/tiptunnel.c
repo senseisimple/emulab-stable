@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
 #include <fcntl.h>
 #include <grp.h>
 #include <pwd.h>
@@ -35,6 +36,8 @@
 
 int localmode = 0;
 int uploadmode = 0;
+int optionsmode = 0;
+int speed = -1;
 
 #define ACLDIR "/var/log/tiplogs"
 #define DEFAULT_PROGRAM "xterm -T TIP -e telnet localhost @s"
@@ -88,6 +91,8 @@ char * certString = NULL;
 
 #endif /* WITHSSL */
 
+static void dotippipe(int capsock,int localin,int localout);
+
 #if defined(TIPPTY)
 
 #if defined(__FreeBSD__)
@@ -138,6 +143,8 @@ int main( int argc, char ** argv )
   const char * name = argv[0];
   char * aclfile = (char *) NULL;
   int op;
+  int oldflags;
+  struct termios tios;
 
 #if defined(LOCALBYDEFAULT) || defined(TIPPTY)
   localmode++;
@@ -146,7 +153,7 @@ int main( int argc, char ** argv )
 #endif
 #endif
 
-  while ((op = getopt( argc, argv, "hlp:rdu:c:a:" )) != -1) {
+  while ((op = getopt( argc, argv, "hlp:rdu:c:a:os:" )) != -1) {
     switch (op) {
       case 'h':
         usage(name);
@@ -172,6 +179,15 @@ int main( int argc, char ** argv )
 	uploadmode++;
 	usingSSL++;
 	break;
+      case 's':
+	speed = atoi(optarg);
+	if (speed <= 0) {
+	    fprintf(stderr,"Speed option must be greater than 0\n");
+	    usage(name);
+	}
+	optionsmode++;
+	usingSSL++;
+	break;
       case 'c':
 	certfile = optarg;
 	break;
@@ -190,6 +206,14 @@ int main( int argc, char ** argv )
     programToLaunch = strdup( argv[1] );    
   } else {
     programToLaunch = strdup( DEFAULT_PROGRAM );
+  }
+  if (debug) printf("Will launch program '%s'\n",programToLaunch);
+
+  if (uploadmode && optionsmode) {
+      fprintf(stderr,
+	      "You cannot specify both an upload and options; "
+	      "  they must be done with multiple invocations of %s",name);
+      usage(name);
   }
 
   if (localmode) {
@@ -252,6 +276,9 @@ int main( int argc, char ** argv )
     }
   }
 
+  if (optionsmode)
+      exit(0);
+
   if (uploadmode) {
     int fd = STDIN_FILENO;
 
@@ -293,6 +320,36 @@ int main( int argc, char ** argv )
 
   dotippty(argv[0]);
 #else
+  if (localmode && strcmp(programToLaunch,"-") == 0) {
+      // just hook stdin/out to connection ;)
+      oldflags = fcntl(STDIN_FILENO,F_GETFL);
+      oldflags |= O_NONBLOCK;
+      fcntl(STDIN_FILENO,F_SETFL,oldflags);
+
+      // also get rid of line buffering -- we do enough buffering
+      // internally!
+      setvbuf(stdin,NULL,_IONBF,0);
+      setvbuf(stdout,NULL,_IONBF,0);
+
+      if (isatty(STDOUT_FILENO)) {
+	  tcgetattr(STDOUT_FILENO,&tios);
+	  tios.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+	  tios.c_oflag &= ~OPOST;
+	  tcsetattr(STDOUT_FILENO,TCSANOW,&tios);
+      }
+
+      oldflags = fcntl(STDOUT_FILENO,F_GETFL);
+      oldflags |= O_NONBLOCK;
+      fcntl(STDOUT_FILENO,F_SETFL,oldflags);
+
+      oldflags = fcntl(sock,F_GETFL);
+      oldflags |= O_NONBLOCK;
+      fcntl(sock,F_SETFL,oldflags);
+
+      dotippipe(sock,STDIN_FILENO,STDOUT_FILENO);
+      exit(0);
+  }
+
   doCreateTunnel();
 
   if (programToLaunch) {
@@ -739,6 +796,15 @@ void sslConnect()
     sslHintKey.keylen = 7;
     if (uploadmode)
       strcpy( sslHintKey.key, "UPLOAD" );
+    else if (optionsmode) {
+	strcpy(sslHintKey.key,"OPTIONS ");
+	if (speed > 0) {
+	    // copy in the speed option safely
+	    snprintf((char *)(sslHintKey.key+strlen(sslHintKey.key)),
+		     sizeof(sslHintKey.key)-strlen(sslHintKey.key)-1,
+		     "SPEED=%d ",speed);
+	}
+    }
     else
       strncpy( sslHintKey.key, "USESSL", 7 );
     write( sock, &sslHintKey, sizeof( sslHintKey ) );
@@ -774,7 +840,7 @@ void sslConnect()
     exit(-1);
   }
 
-  if (uploadmode)
+  if (uploadmode || optionsmode)
     return;
 
   peer = SSL_get_peer_certificate( ssl );
@@ -824,6 +890,205 @@ int readSSL( void * data, int size )
 }
 
 #endif /* WITHSSL */
+
+// Just do a very simple select loop that ties the remote capture
+// to a pair of fds -- probably stdin/out.
+static void dotippipe(int capsock,int localin,int localout) {
+    fd_set rfds,rfds_master,wfds,wfds_master;
+    int nfds = 0;
+    struct timeval tv = { 1,0 };
+    int retval, rc;
+    char fromsock[1024];
+    char fromlocal[1024];
+    int sockrc = 0,localrc = 0,len = 0;
+    char *sockhptr,*socktptr,*localhptr,*localtptr;
+    sockhptr = socktptr = fromsock;
+    localhptr = localtptr = fromlocal;
+
+
+    nfds = (capsock > localin) ? capsock + 1 : localin + 1;
+    nfds = (nfds > localout) ? nfds : localout + 1;
+
+    FD_ZERO(&rfds_master);
+    FD_ZERO(&wfds_master);
+    FD_SET(capsock,&rfds_master);
+    FD_SET(localin,&rfds_master);
+    FD_SET(capsock,&wfds_master);
+    FD_SET(localout,&wfds_master);
+
+    while (1) {
+	memcpy(&rfds,&rfds_master,sizeof(rfds));
+	memcpy(&wfds,&wfds_master,sizeof(wfds));
+
+	retval = select(nfds,&rfds,NULL,NULL,NULL);
+	if (retval < 0) {
+	    printf("dotippipe select: %s\n",strerror(retval));
+	    exit(retval);
+	}
+
+	if (FD_ISSET(capsock,&rfds)) {
+	    if (sockrc == sizeof(fromsock)) {
+		// we're full... let it buffer elsewhere
+		if (debug) fprintf(stderr,"sock read buf full\n");
+	    }
+	    else {
+		// simple, non-optimal ring buffering
+		if (socktptr > sockhptr || sockrc == 0) 
+		    len = (fromsock + sizeof(fromsock)) - socktptr;
+		else
+		    len = sockhptr - socktptr;
+
+		if (len > 0) {
+		    retval = readFunc(socktptr,len);
+		    if (retval < 0) {
+			if (retval == ECONNRESET) {
+			    if (debug) fprintf(stderr,"remote hung up\n");
+			    FD_CLR(capsock,&rfds_master);
+			    FD_CLR(capsock,&wfds_master);
+			}
+			else {
+			    fprintf(stderr,"dotippipe sock read: %s\n",
+				    strerror(retval));
+			    exit(retval);
+			}
+		    }
+		    else if (retval > 0) {
+			if (debug) fprintf(stderr,"read %d sock\n",retval);
+			sockrc += retval;
+			socktptr += retval;
+			if (socktptr == fromsock + sizeof(fromsock)) {
+			    // move from end to head of buffer
+			    socktptr = fromsock;
+			}
+		    }
+		    else {
+			if (debug) fprintf(stderr,"sock EOF\n");
+			FD_CLR(capsock,&rfds_master);
+		    }
+		}
+	    }
+	}
+
+	if (FD_ISSET(localin,&rfds)) {
+	    if (localrc == sizeof(fromlocal)) {
+		// we're full... let it buffer elsewhere
+	    }
+	    else {
+		// simple, non-optimal ring buffering
+		if (localtptr > localhptr || localrc == 0) 
+		    len = (fromlocal + sizeof(fromlocal)) - localtptr;
+		else 
+		    len = localhptr - localtptr;
+
+		if (len > 0) {
+		    retval = read(localin,localtptr,len);
+		    if (retval < 0) {
+			if (retval == ECONNRESET) {
+			    FD_CLR(localin,&rfds_master);
+			    FD_CLR(localin,&wfds_master);
+			}
+			else {
+			    printf("dotippipe localin read: %s\n",
+				    strerror(retval));
+			    exit(retval);
+			}
+		    }
+		    else if (retval > 0) {
+			if (debug) fprintf(stderr,"read %d local\n",retval);
+			localrc += retval;
+			localtptr += retval;
+			if (localtptr == fromlocal + sizeof(fromlocal)) {
+			    // move from end to head of buffer
+			    localtptr = fromlocal;
+			}
+		    }
+		    else {
+			FD_CLR(localin,&rfds_master);
+		    }
+		}
+	    }
+	}
+
+	if (sockrc && FD_ISSET(localout,&wfds)) {
+	    // write what we can
+	    if (sockhptr > socktptr || sockrc == sizeof(fromsock)) 
+		len = (fromsock + sizeof(fromsock)) - sockhptr;
+	    else
+		len = socktptr - sockhptr;
+
+	    if (debug) fprintf(stderr,"trying write %d local\n",len);
+	    retval = write(localout,sockhptr,len);
+	    if (retval < 0) {
+		if (retval == EPIPE) {
+		    FD_CLR(localout,&wfds_master);
+		    FD_CLR(capsock,&rfds_master);
+		    sockrc = 0;
+		}
+		else if (retval == EAGAIN) {
+		    ;
+		}
+		else {
+		    printf("dotippipe local write: %s\n",
+			    strerror(retval));
+		    exit(retval);
+		}
+	    }
+	    else {
+		if (debug) fprintf(stderr,"wrote %d local\n",retval);
+		sockrc -= retval;
+		sockhptr += retval;
+		if (sockhptr == fromsock + sizeof(fromsock)) {
+		    // move from end to head of buffer
+		    sockhptr = fromsock;
+		}
+	    }
+	}
+
+	if (localrc && FD_ISSET(capsock,&wfds)) {
+	    // write what we can
+	    if (localhptr > localtptr || localrc == sizeof(fromlocal)) 
+		len = (fromlocal + sizeof(fromlocal)) - localhptr;
+	    else
+		len = localtptr - localhptr;
+
+	    retval = writeFunc(localhptr,len);
+	    if (retval < 0) {
+		if (retval == EPIPE) {
+		    FD_CLR(capsock,&wfds_master);
+		    FD_CLR(localin,&rfds_master);
+		    localrc = 0;
+		}
+		else if (retval == EAGAIN) {
+		    ;
+		}
+		else {
+		    printf("dotippipe sock write: %s\n",
+			    strerror(retval));
+		    exit(retval);
+		}
+	    }
+	    else {
+		if (debug) fprintf(stderr,"wrote %d sock\n",retval);
+		localrc -= retval;
+		localhptr += retval;
+		if (localhptr == fromlocal + sizeof(fromlocal)) {
+		    // move from end to head of buffer
+		    localhptr = fromlocal;
+		}
+	    }
+	}
+
+        if ((!FD_ISSET(capsock,&rfds_master) 
+	     || !FD_ISSET(localin,&rfds_master))
+	    && sockrc == 0 && localrc == 0) {
+	    // if one of the src ends has closed, and we have nothing 
+	    // queued, we're done
+	    if (debug) fprintf(stderr,"Exiting sanely.\n");
+	    exit(0);
+	}
+    }
+    
+}
 
 #ifdef TIPPTY
 

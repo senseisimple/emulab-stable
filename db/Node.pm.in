@@ -1215,11 +1215,11 @@ sub inner_elab_role($) {
     return L__reservation($_[0], 'inner_elab_role'); }
 
 #
-# Lookup a specific attribute in the node_attributes table, 
+# Load all attributes from the node_attributes table, 
 #
-sub NodeAttribute($$$;$)
+sub LoadNodeAttributes($)
 {
-    my ($self, $attrkey, $pattrvalue, $pattrtype) = @_;
+    my ($self) = @_;
     
     return -1
 	if (!ref($self));
@@ -1241,6 +1241,27 @@ sub NodeAttribute($$$;$)
 	    $self->{"ATTRS"}->{$key} = $row;
 	}
     }
+
+    return 0;
+}
+
+#
+# Lookup a specific attribute in the node_attributes table, 
+#
+sub NodeAttribute($$$;$)
+{
+    my ($self, $attrkey, $pattrvalue, $pattrtype) = @_;
+    
+    return -1
+	if (!ref($self));
+
+    my $node_id = $self->node_id();
+
+    if (!defined($self->{"ATTRS"})) {
+	if ($self->LoadNodeAttributes()) {
+	    return -1;
+	}
+    }
     
     if (!exists($self->{"ATTRS"}->{$attrkey})) {
 	$$pattrvalue = undef;
@@ -1253,6 +1274,27 @@ sub NodeAttribute($$$;$)
         if (defined($pattrtype));
 
     return 0;
+}
+
+#
+# Return a hash of the node attributes for this node.
+#
+sub GetNodeAttributes($)
+{
+    my ($self) = @_;
+    
+    return undef
+	if (!ref($self));
+
+    my $node_id = $self->node_id();
+
+    if (!defined($self->{"ATTRS"})) {
+	if ($self->LoadNodeAttributes()) {
+	    return undef;
+	}
+    }
+
+    return $self->{"ATTRS"};
 }
 
 #
@@ -1295,6 +1337,24 @@ sub NodeTypeAttribute($$$;$)
 	if (!defined($typeinfo));
 
     return $typeinfo->GetAttribute($attrkey, $pattrvalue, $pattrtype);
+}
+
+#
+# Returns a hash of node type attributes in the nodetype info. 
+#
+sub GetNodeTypeAttributes($)
+{
+    my ($self) = @_;
+    
+    return undef
+	if (!ref($self));
+
+    my $typeinfo = $self->NodeTypeInfo();
+
+    return undef
+	if (!defined($typeinfo));
+
+    return $typeinfo->GetAttributes();
 }
 
 #

@@ -78,7 +78,7 @@ else {
     # Read in the fingerprint of the capture certificate
     #
     $capfile = "$TBETC_DIR/capture.fingerprint";
-    $lines = file($capfile,"r");
+    $lines = file($capfile);
     if (!$lines) {
 	TBERROR("Unable to open $capfile!",1);
     }

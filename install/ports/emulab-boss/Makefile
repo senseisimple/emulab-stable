@@ -119,6 +119,9 @@ LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 .if ${OSMAJOR} >= 6
 LIB_DEPENDS+= xerces-c.27:${PORTSDIR}/textproc/xerces-c2
 .endif
+.if ${OSMAJOR} >= 7
+LIB_DEPENDS+= xmlrpc.9:${PORTSDIR}/net/xmlrpc-c
+.endif
 
 #
 # Until/unless the pubsub Makefile is changed, we must include libelvin.
@@ -133,7 +136,10 @@ LIB_DEPENDS+= vin4.2:${PORTSDIR}/misc/libelvin \
 LIB_DEPENDS+= pubsub.1:${PORTSDIR}/misc/emulab-pubsub
 .endif
 
-RUN_DEPENDS=	\
+# We need the BUILD_DEPENDS above to wind up in the dependency list
+RUN_DEPENDS:= ${BUILD_DEPENDS}
+
+RUN_DEPENDS+=	\
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	mod_auth_mysql>1:${PORTSDIR}/www/mod_auth_mysql \
 	fping:${PORTSDIR}/net/fping \
@@ -149,6 +155,7 @@ RUN_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/MD5.pm:${PORTSDIR}/security/p5-MD5 \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Digest/SHA1.pm:${PORTSDIR}/security/p5-Digest-SHA1 \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/IO/Pty.pm:${PORTSDIR}/devel/p5-IO-Tty \
 	rpm:${PORTSDIR}/archivers/rpm \
 	xvcg:${PORTSDIR}/graphics/vcg \
@@ -159,6 +166,8 @@ RUN_DEPENDS=	\
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/RPC/XML.pm:${PORTSDIR}/net/p5-RPC-XML \
 	${LOCALBASE}/include/boost:${PORTSDIR}/${BOOST_PORT} \
 	gmake:${PORTSDIR}/devel/gmake \
+	autoconf-2.13:${PORTSDIR}/devel/autoconf213 \
+	git:${PORTSDIR}/devel/git \
 	kmetis:${PORTSDIR}/math/metis \
         curl:${PORTSDIR}/ftp/curl \
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb \

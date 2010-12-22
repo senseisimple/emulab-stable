@@ -25,6 +25,8 @@ view "internal" {
 	%virtnode_network_withmask%;
     };
 
+    allow-recursion { any; };
+
     zone "@OURDOMAIN@" in {
         type master;
         file "@OURDOMAIN@.internal.db";

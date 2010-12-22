@@ -1,0 +1,70 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use strict;
+
+#
+# Configure variables
+#
+my $TB			= "@prefix@";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Handle command-line options.
+#
+sub usage() {
+    print STDERR "Usage: $0 <filename>\n";
+    exit( 1 );
+}
+
+usage() unless @ARGV == 1;
+my ( $filename ) = @ARGV;
+#
+# Must taint check!
+#
+if ($filename =~ /^([-\w #%&*+,.\/:;=?@\[\\\]^{|}]+)$/) {
+    $filename = $1;
+}
+else {
+    print STDERR "Bad character in filename\n";
+    exit( 1 );
+}
+
+# We could use MySQL's UUID() function, but if we call it in the INSERT it
+# becomes a pain to retrieve it.  So we do the job ourselves.
+my $uuid = `@UUIDGEN@`;
+chomp $uuid;
+
+my $result = DBQueryWarn( "INSERT INTO blobs SET uuid='$uuid', " .
+			  "filename='$filename';" );
+unless( $result ) {
+    print STDERR "Could not insert record.\n";
+    exit( 1 );
+}
+
+print "$uuid\n";
+
+exit( 0 );
