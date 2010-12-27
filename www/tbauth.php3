@@ -1109,7 +1109,7 @@ function DOLOGOUT($user) {
 	return 1;
 
     $uid_idx = $user->uid_idx();
-    $uid = $user->$uid();
+    $uid = $user->uid();
 
     #
     # An admin logging out another user. Nothing else to do.
