@@ -22,6 +22,7 @@ use libdb;
 
 use libtestbed;
 use Expect;
+use Lan;
 
 
 # CLI constants
@@ -177,23 +178,15 @@ sub new($$$;$) {
     bless($self, $class);
 
     #
-    # Create the Expect object
+    # Lazy initialization of the Expect object is adopted, so
+    # we set the session object to be undef.
     #
-    # We'd better set a long timeout on Apcon switch
-    # to keep the connection alive.
-    $self->{SESS} = $self->createExpectObject();
-    if (!$self->{SESS}) {
-        warn "WARNNING: Unable to connect via SSH to $self->{NAME}\n";
-        return undef;
-    }
+    $self->{SESS} = undef;
 
-    # TODO: may need this:
-    #$self->readifIndex();
     $self->readTranslationTable();
 
     return $self;
 }
-
 
 #
 # Create an Expect object that spawns the ssh process 
@@ -270,11 +263,17 @@ my %PortIface=();
 # Maps pcX:Y<==>pcX:iface
 
 my %Ports=();
+# Ports maps pcX:Y.port<==>switch:port
+
+my %OldPorts=();
 # Ports maps pcX:Y<==>switch:port
+
+my %MorePortIface=();
+# Maps node:card.port <==> node:iface
 
 #
 # This function fills in %Interfaces and %Ports
-# They hold pcX:Y<==>MAC and pcX:Y<==>switch:port respectively
+# They hold pcX:Y<==>MAC and pcX:Y.port<==>switch:port respectively
 #
 # XXX: Temp workround for portnum
 #
@@ -297,6 +296,10 @@ sub readTranslationTable($) {
         $Interfaces{$mac} = $name;
         $PortIface{$name} = $iface;
         $PortIface{$iface} = $name;
+        
+        $MorePortIface{"$_[0]:$_[1].$_[2]"} = $iface;
+        $MorePortIface{$iface} = "$_[0]:$_[1].$_[2]";
+        
         print "Interfaces: $mac <==> $name\n" if $self->{DEBUG} > 1;
     }
 
@@ -305,6 +308,8 @@ sub readTranslationTable($) {
 	    "from wires;");
     while ( my @row = $result->fetchrow_array()) {
         my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
+        my $oldname = "$node_id1:$card1";
+        
         $name = "$node_id1:$card1.$port1";
         print "Name='$name'\t" if $self->{DEBUG} > 2;
         print "Dev='$node_id2'\t" if $self->{DEBUG} > 2;
@@ -312,9 +317,86 @@ sub readTranslationTable($) {
         print "switchport='$switchport'\n" if $self->{DEBUG} > 2;
         $Ports{$name} = $switchport;
         $Ports{$switchport} = $name;
+        
+        if (exists($OldPorts{$oldname})) {
+            if ($OldPorts{$oldname} ne "") {
+                delete $OldPorts{$OldPorts{$oldname}};
+            }
+            $OldPorts{$oldname} = "";
+        } else {
+            $OldPorts{$oldname} = $switchport;
+            $OldPorts{$switchport} = $oldname;
+        }
+        
         print "Ports: '$name' <==> '$switchport'\n" if $self->{DEBUG} > 1;
     }
 
+}
+
+#
+# More robust version of convertPortFromNode2Dev
+#
+sub getRealSwitchPortFromPCPort($$) {
+    my $self = shift;
+    my $port = shift;
+    my $realport = "";
+    
+    $self->debug("get real port on switch from PC port: $port\n");
+    
+    if (exists($OldPorts{$port})) {
+        $realport = $OldPorts{$port};
+        if ($realport ne "") {
+            return $realport;
+        }
+    }
+
+    if (exists($Ports{$port})) {
+        $realport = $Ports{$port};
+	return $realport;
+    }
+    
+    my $fullport = $port.".1";
+    if (exists($Ports{$fullport})) {
+        return $Ports{$fullport};
+    }
+    
+    return undef;    
+}
+
+#
+# Try to guess if the given ports contains switch ports
+# and refine it to be full port format.
+#
+sub refineVlanPorts($$@) {
+    my ($self, $vlanid, @givenports) = @_;
+    
+    my @ifaces = getVlanIfaces($vlanid);
+
+    # Now we have to guess...
+    if ($#givenports == $#ifaces) {
+	# 
+	# seems like all ports are here
+	#
+	my @fullports = ();
+	foreach my $iface (@ifaces) {
+	    if (exists($MorePortIface{$iface})) {
+		push @fullports, $MorePortIface{$iface};
+	    } else {
+		#
+		# iface doesn't exist, may God bless the givenports
+		# be new... new enough to be not in DB.
+		#
+		$self->debug("refine failed: Iface $iface not found\n");
+		return @givenports;
+	    }
+	}
+
+	return @fullports;
+    }
+
+    $self->debug("refine failed: ports numbers not equal @givenports, @ifaces\n");
+
+    return @givenports;
 }
 
 ##############################################################################
@@ -364,7 +446,7 @@ sub parseNames($$)
     foreach ( split ( /\n/, $raw ) ) {
         if ( /^([A-I][0-9]{2}):\s+(\w+)\W*/ ) {
             if ( $2 !~ /$CLI_UNNAMED_PATTERN/ ) {
-            $names{$1} = $2;
+		$names{$1} = $2;
             }
         }
     }
@@ -454,6 +536,20 @@ sub doCLICmd($$)
     my $output = "";
     my $exp = $self->{SESS};
 
+    if (!$exp) {
+	#
+	# Create the Expect object, lazy initialization.
+	#
+	# We'd better set a long timeout on Apcon switch
+	# to keep the connection alive.
+	$self->{SESS} = $self->createExpectObject();
+	if (!$self->{SESS}) {
+	    warn "WARNNING: Unable to connect to $self->{NAME}\n";
+	    return (1, "Unable to connect to switch $self->{NAME}.");
+	}
+	$exp = $self->{SESS};
+    }
+
     $exp->clear_accum(); # Clean the accumulated output, as a rule.
     $exp->send($cmd);
     $exp->expect($CLI_TIMEOUT,
@@ -464,6 +560,7 @@ sub doCLICmd($$)
 
     $cmd = quotemeta($cmd);
     if ( $output =~ /^($cmd)\n(ERROR:.+)\r\n[.\n]*$/ ) {
+	$self->debug("snmpit_apcon: Error in doCLICmd: $2\n");
         return (1, $2);
     } else {
         return (0, $output);
@@ -523,6 +620,7 @@ sub getPortName($$)
     my $raw = $self->getRawOutput("show port info $port\r");
     if ( $raw =~ /$port Name:\s+(\w+)\W*\n/ ) {
         if (  $1 !~ /$CLI_UNNAMED_PATTERN/ ) {
+	    $self->debug("snmpit_apcon: getPortName: $port as $1\n");
             return $1;
         }
     }
@@ -544,6 +642,8 @@ sub getNamedPorts($$)
             push @ports, $1;
         }
     }
+
+    $self->debug("snmpit_apcon: getNamedPorts: ".join(", ", @ports)."\n");
 
     return \@ports;
 }
@@ -702,6 +802,8 @@ sub connectMulticast($$@)
     my ($self, $src, @dsts) = @_;
     my $cmd = "connect multicast $src".join("", @dsts)."\r";
 
+    $self->debug("snmpit_apcon: connectMulticast: $cmd\n");
+
     return $self->doCLICmd($cmd);
 }
 
@@ -712,6 +814,8 @@ sub connectDuplex($$$)
 {
     my ($self, $src, $dst) = @_;
     my $cmd = "connect duplex $src"."$dst"."\r";
+
+    $self->debug("snmpit_apcon: connectDuplex: $cmd\n");
 
     return $self->doCLICmd($cmd);
 }
@@ -742,6 +846,9 @@ sub namePorts($$@)
 
         # undo set name
         if ( $rt ) {
+
+	    $self->debug("snmpit_apcon: namePorts failed: ".join(", ", @ports)."\n");
+
             for ($i--; $i >= 0; $i-- ) {            
                 $self->doCLICmd(
                     "configure port name $ports[$i] $CLI_UNNAMED_NAME\r");
@@ -853,8 +960,14 @@ sub setPortRate($$$)
 sub convertPortFromNode2Dev($$) {
     my $self = shift;
     my $pcport = shift;
-    
-    my $modport = $Ports{"$pcport.1"};
+    my $modport;
+
+    if ($pcport =~ /(.+):(.+)\.(.+)/) {
+	$modport = $Ports{"$pcport"};
+    } else {
+	$modport = $Ports{"$pcport.1"};
+    }
+
     if (defined($modport)) {
         return $self->convertPortFormat($modport);
     }
@@ -875,14 +988,28 @@ sub portControl ($$@) {
     my $self = shift;
 
     my $cmd = shift;
-    my @ports = @_;
+    my @pcports = @_;
 
-    $self->debug("portControl: $cmd -> (@ports)\n");
+    $self->debug("portControl: $cmd -> (@pcports)\n");
+
+    #my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
+    #my @ports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
 
     my $errors = 0;
-    foreach my $port (@ports) { 
-        $port = $self->convertPortFromNode2Dev($port);
-        my $rt = $self->setPortRate($port, $cmd);
+    foreach my $port (@pcports) { 
+        my $swport = $self->getRealSwitchPortFromPCPort($port);
+	if (!defined($swport)) {
+	    if (isSwitchPort($port)) {
+		next;
+	    } else {
+		$self->debug("No such port: $port\n");
+		$errors++;
+		next;
+	    }
+	}
+
+	$swport = $self->convertPortFormat($swport);
+        my $rt = $self->setPortRate($swport, $cmd);
         if ($rt) {
             if ($rt =~ /^ERROR: port rate unsupported/) {
                 #
@@ -1049,8 +1176,13 @@ sub setPortVlan($$@) {
         return 1;
     }
 
-    my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
-    
+    #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
+    my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
+    my @swports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
+
+    $self->debug("$id: set ports in vlan: ".join(", ",@swports)."\n");
+
+    my @ports = map {$self->convertPortFormat($_)} @swports;
     $self->lock();
 
     # Check if ports are free
@@ -1058,14 +1190,18 @@ sub setPortVlan($$@) {
         if ($self->getPortName($port)) {
             warn "ERROR: Port $port already in use.\n";
             $self->unlock();
+	    $self->debug("Port $port already in use in $_.\n");
             return 1;
         }
     }
+
+    $self->debug("$id: ports is free\n");
     
     my $errmsg = $self->namePorts($vlan_id, @ports);
     if ($errmsg) {
         warn "$errmsg";
         $self->unlock();
+	$self->debug("$errmsg");
         return 1;
     }
 
@@ -1073,6 +1209,7 @@ sub setPortVlan($$@) {
     if ($rt) {
 	$self->unnamePorts(@ports);
 	warn "$id: ports connection failed. $msg\n";
+	$self->debug("$id: ports connection failed. $msg\n");
 
 	# We unnamed the ports so vlan doesn't exist now.
 	if (exists($emptyVlans{$vlan_id})) {
@@ -1112,8 +1249,15 @@ sub delPortVlan($$@) {
 
     $self->debug($self->{NAME} . "::delPortVlan $vlan_id ");
     $self->debug("ports: " . join(",",@pcports) . "\n");
-    my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
-    
+
+    #my @ports = map {$self->convertPortFromNode2Dev($_)} @pcports;
+    my @fullports = $self->refineVlanPorts($vlan_id, @pcports);
+    my @swports = map {$self->getRealSwitchPortFromPCPort($_)} @fullports;
+
+    $self->debug("snmpit_apcon:delPortVlan: set ports in vlan: ".join(", ",@swports)."\n");
+
+    my @ports = map {$self->convertPortFormat($_)} @swports;
+
     $self->lock();
 
     # Remember all ports for empty check after remove
