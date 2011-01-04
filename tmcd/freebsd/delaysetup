@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -276,7 +276,11 @@ sub DelaySetup
 	}
 
 	# polling
-	print DEL "    if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
+	if ($FBSD_VERSION >= 8) {
+	    print DEL "    if [ -n \"`sysctl kern.polling.phase 2>/dev/null`\" ]; then\n";
+	} else {
+	    print DEL "    if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
+	}
 	if ($FBSD_VERSION >= 6) {
 	    foreach my $bridge (@bridges) {
 		my (undef,$if1,$if2) = @$bridge;
@@ -424,9 +428,15 @@ sub DelaySetup
 	# in question.  For older FreeBSDs, we just have to turn it on
 	# globally.
  	#
-	print DEL "if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
+	if ($FBSD_VERSION >= 8) {
+	    print DEL "    if [ -n \"`sysctl kern.polling.phase 2>/dev/null`\" ]; then\n";
+	} else {
+	    print DEL "if [ -n \"`sysctl kern.polling.enable 2>/dev/null`\" ]; then\n";
+	}
 	if ($FBSD_VERSION >= 6) {
-	    print DEL "    sysctl -w kern.polling.enable=0\n";
+	    if ($FBSD_VERSION < 8) {
+		print DEL "    sysctl -w kern.polling.enable=0\n";
+	    }
 	    foreach my $bridge (@bridges) {
 		my (undef,$if1,$if2) = @$bridge;
 		print DEL "    ifconfig $if1 polling\n";
