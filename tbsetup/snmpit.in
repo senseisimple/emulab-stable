@@ -1147,8 +1147,11 @@ sub doListVlans ($) {
     #
     # These need to be declared here for the benefit of the format string
     # See perlform(1) for help with formats
+    # Note that they are declared 'our' rather than 'my' due to a stupid
+    # bug in perl 5.10
     #
-    my ($vlan_id,$ddep,$pideid,$vname,$members);
+    our ($vlan_id,$ddep,$pideid,$vname,$members);
+
     #
     # Check to see if they want device-specific VLAN numbers, which makes the
     # display more cramped, but is useful for debugging
@@ -1301,7 +1304,7 @@ sub doListPorts($) {
     #
     # See perlform(1) for help with formats
     #
-    my ($port,$enabled,$up,$speed,$duplex);
+    our ($port,$enabled,$up,$speed,$duplex);
     print << "END";
 Port      Enabled Up   Speed      Duplex
 --------------------------------------------
@@ -1504,7 +1507,7 @@ sub doGetStats($) {
 	push @statList, $stack->getStats();
     }
 
-    my ($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr,
+    our ($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr,
         $inunk, $outoctets, $outunicast, $outnunicast, $outdiscards,
 	$outerr,$outq);
     #

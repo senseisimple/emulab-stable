@@ -1067,7 +1067,7 @@ function DOLOGIN_MAGIC($uid, $uid_idx, $email = null, $adminon = 0)
     # Proj-vis cookies
     if ($EXP_VIS) {
 	setcookie("exp_vis_session", $opskey, 0, "/", $TBAUTHDOMAIN, 0);
-        SUEXEC($uid,"nobody", "write-vis-auth &", $SUEXEC_ACTION_CONTINUE);
+        SUEXEC($uid,"nobody", "write-vis-auth &", SUEXEC_ACTION_CONTINUE);
     }
 
     return 0;
@@ -1109,6 +1109,7 @@ function DOLOGOUT($user) {
 	return 1;
 
     $uid_idx = $user->uid_idx();
+    $uid = $user->uid();
 
     #
     # An admin logging out another user. Nothing else to do.
@@ -1182,7 +1183,7 @@ function DOLOGOUT($user) {
     #
     if ($EXP_VIS) {
 	setcookie("exp_vis_session", "", $timeout, "/", $TBAUTHDOMAIN, 0);
-        SUEXEC($uid,"nobody", "write-vis-auth &", $SUEXEC_ACTION_CONTINUE);
+        SUEXEC($uid, "nobody", "write-vis-auth &", SUEXEC_ACTION_CONTINUE);
     }
 
     return 0;

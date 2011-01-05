@@ -805,7 +805,7 @@ sub SliverStatus($)
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
     if (! (defined($slice) && defined($aggregate))) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice or aggregate here");
     }
     if ($slice_urn ne $slice->urn()) {

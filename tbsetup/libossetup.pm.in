@@ -836,14 +836,15 @@ sub NewType($$)
 	eval "require libossetup_$type";
 	$newtype  = eval { $packname->New($self); };
 	if ($@) {
-	    print STDERR "$self NewType($type): module load failed: " . $@ . "\n";
+#	    print STDERR "$self NewType($type): module load failed: " . $@ . "\n"
+#		if ($self->debug());
 	    return undef;
 	}
     }
     $self->{'TYPECACHE'}->{$type} = $newtype;
     
-    print STDERR "Created type object $type with parent $self\n"
-	if ($self->debug());
+#    print STDERR "Created type object $type with parent $self\n"
+#	if ($self->debug());
     
     return $newtype;
 }

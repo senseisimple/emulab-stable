@@ -12,7 +12,7 @@ sub DoUpdate($$$)
 		 "('protogeni/max_components','-1','-1', ".
 		 " 'Maximum number of components that can be allocated.".
 		 " -1 indicates any number of components can be allocated.', ".
-		 " 0")
+		 " 0)")
 	if (!TBSiteVarExists("protogeni/max_components"));
 
     my $foo = "When set, external users may allocate slivers on your testbed.";
