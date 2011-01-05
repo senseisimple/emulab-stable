@@ -33,7 +33,7 @@ use Exporter;
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
 	        getExperimentVlanPorts
-                uniq isSwitchPort getPathVlanIfaces);
+                uniq isSwitchPort getPathVlanIfaces arraySub ifacemodport);
 
 use English;
 use libdb;
@@ -62,6 +62,9 @@ my %Interfaces=();
 
 my %PortIface=();
 # Maps pcX:Y<==>pcX:iface
+
+my %IfaceModPorts=();
+# Maps switch:iface <=> switch:card.port
 
 my %Ports=();
 # Ports maps pcX:Y<==>switch:port
@@ -119,6 +122,14 @@ sub Dev {
 }
 
 #
+# Map between ifaces and switch port
+#
+sub ifacemodport {
+    my $val = shift || "";
+    return $IfaceModPorts{$val};
+}
+
+#
 # This function fills in %Interfaces and %Ports
 # They hold pcX:Y<==>MAC and pcX:Y<==>switch:port respectively
 #
@@ -140,6 +151,8 @@ sub ReadTranslationTable {
 	$Interfaces{$mac} = $name;
 	$PortIface{$name} = $iface;
 	$PortIface{$iface} = $name;
+	$IfaceModPorts{$iface} = $name.".$_[2]";
+	$IfaceModPorts{$name.".$_[2]"} = $iface;
 	print "Interfaces: $mac <==> $name\n" if $debug > 1;
     }
 
@@ -158,6 +171,29 @@ sub ReadTranslationTable {
 	print "Ports: '$name' <==> '$switchport'\n" if $debug > 1;
     }
 
+}
+
+#
+# Return different(union(@lhs,@rhs), intersection(@lhs,@rhs))
+#
+sub arraySub($$) {
+    my ($l,$r) = @_;
+    my @lhs = @$l;
+    my @rhs = @$r;
+    my @result = ();
+
+    my %count = ();
+    foreach my $e (@lhs, @rhs) {
+	$count{$e}++;
+    }
+    
+    foreach my $e (keys %count) {
+	if ($count{$e} == 1) {
+	    push @result, $e;
+	}
+    }
+
+    return @result;
 }
 
 #
