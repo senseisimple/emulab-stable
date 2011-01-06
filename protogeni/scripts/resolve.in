@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -10,11 +10,11 @@ use Getopt::Std;
 use Data::Dumper;
 
 #
-# Resolve a uuid or hrn at the clearinghouse or an SA.
+# Resolve a urn at its authority.
 # 
 sub usage()
 {
-    print "Usage: resolve <type> <urn>\n";
+    print "Usage: resolve <urn>\n";
     exit(1);
 }
 my $optlist = "";
@@ -47,8 +47,7 @@ use libaudit;
 use GeniDB;
 use GeniCertificate;
 use GeniAuthority;
-use GeniRegistry;
-use Genixmlrpc;
+use GeniComponent;
 
 #
 # Check args.
@@ -58,9 +57,8 @@ if (! getopts($optlist, \%options)) {
     usage();
 }
 usage()
-    if (@ARGV != 2);
-my $type = $ARGV[0];
-my $urn  = $ARGV[1];
+    if (@ARGV != 1);
+my $urn = $ARGV[0];
 
 #
 # Load the SA cert to act as caller context.
@@ -71,17 +69,15 @@ if (!defined($certificate)) {
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
-my $clearinghouse = GeniRegistry::ClearingHouse->Create();
-if (!defined($clearinghouse)) {
-    fatal("Could not create a clearinghouse client");
+my $component = GeniComponent->Lookup($urn);
+if (!defined($component)) {
+    $component = GeniComponent->CreateFromRegistry($urn);
 }
-
-my $value;
-
-if ($clearinghouse->Resolve($urn, uc($type), \$value) != 0) {
+my $blob = $component->Resolve();
+if (!defined($blob)) {
     fatal("Could not resolve $urn at the clearinghouse");
 }
-print Dumper($value);
+print Dumper($blob);
 exit(0);
 
 sub fatal($)

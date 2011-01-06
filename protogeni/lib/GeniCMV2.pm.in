@@ -24,6 +24,7 @@ use GeniResponse;
 use GeniTicket;
 use GeniCredential;
 use GeniCertificate;
+use GeniComponent;
 use GeniSlice;
 use GeniAggregate;
 use GeniSliver;
@@ -127,21 +128,58 @@ sub Resolve($)
 	my $node  = $object;
 	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id(), "0.1", undef);
 	if (! defined($rspec)) {
+	    print STDERR "Could not get advertisement for $node!\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Error getting advertisement");
 	}
+	my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+	if (!defined($me)) {
+	    print STDERR
+		"Could not find local authority object for $ENV{'MYURN'}\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Error getting advertisement");
+	}
+	my $myurn = GeniHRN::Generate($OURDOMAIN, "node", $node->node_id());
+	my $myhrn = "${PGENIDOMAIN}." . $node->node_id();
+
+	#
+	# See if the component object exists; if not create it.
+	#
+	my $component = GeniComponent->Lookup($node->uuid());
+	if (!defined($component)) {
+	    my $certificate = GeniCertificate->Lookup($node->uuid());
+	    if (!defined($certificate)) {
+		$certificate =
+		    GeniCertificate->Create({'urn'  => $myurn,
+					     'hrn'  => $myhrn,
+					     'email'=> $TBOPS,
+					     'uuid' => $node->uuid(),
+					     'url'  => $me->url()});
+		if (!defined($certificate)) {
+		    print STDERR "Could not generate certificate for $node\n";
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Error getting advertisement");
+		}
+	    }
+	    $component = GeniComponent->Create($certificate, $me);
+	    if (!defined($component)) {
+		print STDERR "Could not create component for $node\n";
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Error getting advertisement");
+	    }
+	}
 	# Return a blob.
-	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
+	my $blob = { "hrn"          => $myhrn,
 		     "uuid"         => $node->uuid(),
 		     "role"	    => $node->role(),
 		     "hostname"     =>
 			 GeniUtil::FindHostname($node->node_id()),
 		     "physctrl"     => 
 			 Interface->LookupControl($node->phys_nodeid())->IP(),
-		     "urn"          => GeniHRN::Generate($OURDOMAIN,
-							 "node",
-							 $node->node_id()),
-		     "rspec"        => $rspec
+		     "urn"          => $myurn,
+		     "rspec"        => $rspec,
+		     "url"          => $me->url(),
+		     "gid"          => $component->cert(),
 		   };
 
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
@@ -228,6 +266,7 @@ sub DiscoverResources($)
     my $credentials = $argref->{'credentials'};
     my $available   = $argref->{'available'} || 0;
     my $compress    = $argref->{'compress'} || 0;
+    my $version     = $argref->{'rspec_version'} || undef;
 
     if (! (defined($credentials))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
