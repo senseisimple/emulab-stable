@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,7 +49,7 @@ sub doTrunkEnable($$$@);
 sub doTrunkDisable($$);
 sub doRestorePortStatus($@);
 sub doSynchLeader($);
-sub CreateOneVlan($$@);
+sub CreateOneVlan($$$@);
 sub doOpenflowEnable($$);
 sub doOpenflowDisable($$);
 sub doSetOpenflowController($$$);
@@ -1522,7 +1522,8 @@ sub doVlansFromTables($$@) {
     }
 
     my ($stack) = @$stacks;
-    my @trunkedPorts = getExperimentTrunks($pid,$eid);
+    my @trunkedPorts = getExperimentTrunks($experiment->pid(),
+					   $experiment->eid());
     my %trunkedPorts = map { $_ => $_ } @trunkedPorts;
 
     #
@@ -1549,7 +1550,7 @@ sub doVlansFromTables($$@) {
 	    my @ports = getVlanPorts($vlanid);
 	    
 	    # Create this vlan now.
-	    if (CreateOneVlan($stack, $vlanid, @ports))  {
+	    if (CreateOneVlan($experiment,$stack, $vlanid, @ports))  {
 		die("Could not create dual trunked $vlan\n");
 	    }
 	    # Trunk these ports, removing from list.
@@ -1627,7 +1628,7 @@ sub doVlansFromTables($$@) {
 	my $vlanid = $vlan->id();
 	my @ports  = getVlanPorts($vlanid);
 
-	$errors += CreateOneVlan($stack, $vlanid, @ports);
+	$errors += CreateOneVlan($experiment, $stack, $vlanid, @ports);
 	
 	#
 	# Set openflow
@@ -1664,8 +1665,9 @@ sub doVlansFromTables($$@) {
 #
 # Create a single vlan.
 #
-sub CreateOneVlan($$@)
+sub CreateOneVlan($$$@)
 {
+    my $experiment = shift();
     my $stack  = shift();
     my $vlanid = shift();
     my @ports  = @_;
@@ -1984,7 +1986,7 @@ sub syncVlansFromTables($$) {
 		if (@ports);
 		
 	    if (!$impotent && @ports &&
-		CreateOneVlan($stack, $vlanid, @ports))  {
+		CreateOneVlan($experiment, $stack, $vlanid, @ports))  {
 		print STDERR "Could not create dual trunked $vlan\n";
 		goto bad;
 	    }
@@ -2052,7 +2054,7 @@ sub syncVlansFromTables($$) {
 	next
 	    if ($impotent);
 	
-	if (CreateOneVlan($stack, $vlanid, @newports)) {
+	if (CreateOneVlan($experiment, $stack, $vlanid, @newports)) {
 	    goto bad;
 	}
     }
@@ -2071,7 +2073,7 @@ sub syncVlansFromTables($$) {
 	next
 	    if ($impotent);
 	
-	if (CreateOneVlan($stack, $vlanid, @ports)) {
+	if (CreateOneVlan($experiment, $stack, $vlanid, @ports)) {
 	    goto bad;
 	}
     }
