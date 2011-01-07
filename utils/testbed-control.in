@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -14,7 +14,7 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDERR "Usage: testbed-control [-d] [-f] shutdown | boot\n";
+    print STDERR "Usage: testbed-control [-d] [-f] shutdown | boot | restart\n";
     exit(-1);
 }
 my $optlist   = "df";
@@ -64,7 +64,8 @@ if (defined($options{"f"})) {
 usage()
     if (@ARGV != 1);
 usage()
-    if (! ($ARGV[0] eq "boot" || $ARGV[0] eq "shutdown"));
+    if (! ($ARGV[0] eq "boot" || $ARGV[0] eq "shutdown" ||
+	   $ARGV[0] eq "restart"));
 
 #
 # Must be root if actually doing this.
@@ -177,6 +178,12 @@ if (defined($activeimages)) {
 	    Fatal("Could not stop frisbee for $image!");
 	}
     }
+}
+if ($ARGV[0] eq "restart") {
+    print "** Testbed is stopped. Waiting a moment before restarting ...\n";
+    sleep(2);
+    Restart();
+    exit(0);
 }
 print "** Testbed is stopped. Safe to power off or reboot\n";
 exit(0);
