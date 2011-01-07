@@ -191,7 +191,13 @@ sub Create($$$$;$$)
 	if (! DBQueryWarn("insert into geni_slices set " .
 			  join(",", @insert_data)));
 
-    return GeniSlice->Lookup($idx);
+    my $slice = GeniSlice->Lookup($idx);
+    return undef
+	if (!defined($slice));
+
+    $slice->{'LOCKED'} = $$
+	if (defined($lock) && $lock);
+    return $slice;
 }
 # accessors
 sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLICE'}->{$_[1]}); }
