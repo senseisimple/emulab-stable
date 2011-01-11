@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Optional flag argument says "do not reboot"
@@ -147,7 +147,7 @@ write_image()
 	local zfill=$4
 	local ptype=$5
 	local server=$6
-	local port=""
+	local imageid=""
 	local imagefile=""
 	local frisbee_opts="$FRISBEE_OPTS"
 	local imageunzip_opts="$IMAGEUNZIP_OPTS"
@@ -170,8 +170,9 @@ write_image()
 	local protocol=${address%%://*}
 	if [ $protocol = $address ]; then
 		case $address in
-			/*) protocol=file ;;
-			*) protocol=frisbee ;;
+			/*)  protocol=file ;;
+			*,*) protocol=mfrisbee ;;
+			*)   protocol=frisbee ;;
 		esac
 	fi
 
@@ -183,6 +184,17 @@ write_image()
 				return 1
 			fi
 			address=${address%%:*}
+			imageid="-m $address -p $port"
+			;;
+		mfrisbee)
+			# address is of the form pid,gid,imagename
+			pid=${address%%,*}
+			imagename=${address##*,}
+			if [ $pid = $address -o $imagename = $address ]; then
+				echo "*** WARNING: could not parse imageid spec: $address"
+				return 1
+			fi
+			imageid="-B 30 -F $pid/$imagename"
 			;;
 		http|https)
 			server=${address%%/*}
@@ -220,10 +232,10 @@ write_image()
 
 	$BINDIR/tmcc state RELOADING
 
-	if [ $protocol = frisbee ]; then
+	if [ $protocol = frisbee -o $protocol = mfrisbee ]; then
 		[ -n "$server" ] || server=$BOSSIP
-		echo "$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk"
-		$BINDIR/frisbee -m $address -p $port -S $server $frisbee_opts $disk
+		echo "$BINDIR/frisbee -S $server $imageid $frisbee_opts $disk"
+		$BINDIR/frisbee -S $server $imageid $frisbee_opts $disk
 		rc=$?
 
 		if [ $rc -ne 0 ]; then
@@ -253,6 +265,7 @@ handle_loadinfo()
 	local PARTOS=`get_value "$LOADINFO" PARTOS`
 	local PARTITION=`get_value "$LOADINFO" PART`
 	PARTITION=${PARTITION:-'0'}
+	local IMAGEID=`get_value "$LOADINFO" IMAGEID`
 
 	local FREEBSD_DISK=''
 	local DISK=`get_value "$LOADINFO" DISK`
@@ -268,8 +281,11 @@ handle_loadinfo()
 	local PTYPE=''
 
 	if [ -z "$ADDRESS" ]; then
-		echo "Unable to get address for loading image"
-		return 1
+		if [ -z "$IMAGEID" ]; then
+		    echo "Unable to get imageid or address for loading image"
+		    return 1
+		fi
+		ADDRESS=$IMAGEID
 	fi
 
 	FREEBSD_DISK=$DISK

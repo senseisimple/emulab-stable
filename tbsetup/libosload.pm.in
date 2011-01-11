@@ -43,12 +43,14 @@ my $PROJROOT    = "@PROJROOT_DIR@";
 # for the occasional pxeboot failure.
 my $MAXRETRIES  = 1;
 
+my $OUTERBOSS	    = "@OUTERBOSS_NODENAME@";
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $SUBBOSS_FRISBEELAUNCHER = "$TB/sbin/subboss_frisbeelauncher_wrapper";
 my $osselect	    = "$TB/bin/os_select";
 my $TBUISP	    = "$TB/bin/tbuisp";
 
 # Locals
+my $FRISBEE         = "$TB/sbin/frisbee";
 my %imageinfo       = ();	# Per imageid DB info.
 my $debug           = 0;
 my %children        = ();	# Child pids in when asyncmode=1
@@ -742,6 +744,7 @@ sub osload ($$) {
 sub GetImageInfo($;$)
 {
     my ($image, $node) = @_;
+    my $imagesize = 0;
 
     my $imageid = $image->imageid();
     my $rowref  = $image->DBData();
@@ -765,40 +768,46 @@ sub GetImageInfo($;$)
     }
 
     if (! -R $imagepath) {
+	#
+	# If the image doesn't exist and we are in an inner elab,
+	# make sure real boss has it and see how big it is.
+	#
+	# Note that we don't actually pre-fetch the image here,
+	# that will be done automatically when the image is first requested.
+	#
 	if ($ELABINELAB) {
-	    #
-	    # Yuck. See if we can get it via frisbeelauncher before giving up.
-	    #
-	    system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
-	    if ($?) {
-		tberror "Frisbeelauncher ($image) failed!";
+	    my $frisimageid = $rowref->{'pid'} . "/" . $rowref->{'imagename'};
+
+	    my $attr = `$FRISBEE -S $OUTERBOSS -Q $frisimageid`;
+	    if ($attr =~ /error=0/) {
+		if ($attr =~ /size=(\d+)/) {
+		    $imagesize = $1;
+		} else {
+		    $imagesize = 1 * 1024 * 1024 * 1024;
+		}
+	    } else {
+		tberror "Query to $OUTERBOSS for info on $image failed!";
 		$imageinfo{$imageid} = 'BADIMAGE';
 		return 0;
 	    }
-	    if (! -R $imagepath) {
-		tberror	"Frisbeelauncher could not fetch $imagepath ($image)!";
-		$imageinfo{$imageid} = 'BADIMAGE';
-		return 0;
-	    }
-	}
-	else {
+	} else {
 	    tberror "$imagepath does not exist or cannot be read!";
 	    $imageinfo{$imageid} = 'BADIMAGE';
 	    return 0;
 	}
-    }
+    } else {
+	$imagesize = stat($imagepath)->size;
 
-    my $sb = stat($imagepath);
-
-    #
-    # A zero-length image cannot be right and will result in much confusion
-    # if allowed to pass: the image load will succeed, but the disk will be
-    # unchanged, making it appear that os_load loaded the default image.
-    #
-    if ($sb->size == 0) {
-	tberror "$imagepath is empty!";
-	$imageinfo{$imageid} = 'BADIMAGE';
-	return 0;
+	#
+	# A zero-length image cannot be right and will result in much confusion
+	# if allowed to pass: the image load will succeed, but the disk will be
+	# unchanged, making it appear that os_load loaded the default image.
+	#
+	if ($imagesize == 0) {
+	    tberror "$imagepath is empty!";
+	    $imageinfo{$imageid} = 'BADIMAGE';
+	    return 0;
+	}
     }
 
     #
@@ -808,7 +817,7 @@ sub GetImageInfo($;$)
     # image DB state, so we store it in the imageinfo array too.
     #
     if (!defined($rowref->{'maxloadwait'})) {
-	my $chunks = $sb->size >> 20; # size may be > 2^31, shift is unsigned
+	my $chunks = $imagesize >> 20; # size may be > 2^31, shift is unsigned
 
 	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 65) + (5 * 60));
     }
@@ -817,6 +826,7 @@ sub GetImageInfo($;$)
 	"$image: loadpart=", $rowref->{'loadpart'},
 	", loadlen=", $rowref->{'loadlength'},
 	", imagepath=", $rowref->{'path'},
+	", imagesize=", $imagesize,
 	", defosid=", $rowref->{'default_osid'},
 	", maxloadwait=", $rowref->{'maxloadwait'}, "\n"
 	    if ($debug);
@@ -1040,6 +1050,7 @@ sub SetupReloadFrisbee($)
 	TBSetNodeEventState($node,TBDB_NODESTATE_SHUTDOWN);
     }
 
+if (0) {
     foreach my $imageid (@$imageids) {
 	if (defined $subboss) {
 		my $image = Image->Lookup($imageid);
@@ -1066,6 +1077,7 @@ sub SetupReloadFrisbee($)
 	    return -1;
 	}
     }
+}
     return 0;
 }
 

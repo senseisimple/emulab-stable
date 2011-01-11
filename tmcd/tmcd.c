@@ -4083,14 +4083,12 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		mbrvers[51];
 	char            *loadpart, *OS, *prepare;
 	int		disknum, nrows, zfill;
-	int             frisbee_pid;
 
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,"
-			 "   mustwipe,mbr_version,access_key,i.imageid,prepare,"
-			 "   i.imagename,p.pid,g.gid,i.path "
+	res = mydb_query("select loadpart,OS,mustwipe,mbr_version,access_key,"
+			 "   i.imageid,prepare,i.imagename,p.pid,g.gid,i.path "
 			 "from current_reloads as r "
 			 "left join images as i on i.imageid=r.image_id "
 			 "left join frisbee_blobs as f on f.imageid=i.imageid "
@@ -4098,7 +4096,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 			 "left join projects as p on i.pid_idx=p.pid_idx "
 			 "left join groups as g on i.gid_idx=g.gid_idx "
 			 "where node_id='%s' order by r.idx",
-			 13, reqp->nodeid);
+			 11, reqp->nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -4112,11 +4110,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	}
 
 	if (nrows > 1 && vers <= 29) {
-
+	neednewmfs:
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=/NEWER-MFS-NEEDED PART=0 PARTOS=Bogus\n");
 
-		error("doloadinfo: %s: Old MFS Version found, need version 30\n",
+		error("doloadinfo: %s: Old MFS Version found, need version 33\n",
 		      reqp->nodeid);
 
 #ifdef EVENTSYS
@@ -4148,11 +4146,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 	else while (nrows) {
 
 		row = mysql_fetch_row(res);
-		loadpart = row[1];
-		OS = row[2];
-		prepare = row[8];
+		loadpart = row[0];
+		OS = row[1];
+		prepare = row[6];
 
-		res2 = mydb_query("select load_address,frisbee_pid,IP "
+		res2 = mydb_query("select IP "
 				  "from subboss_images as i "
 				  "left join subbosses as s "
 				  "  on s.subboss_id=i.subboss_id "
@@ -4161,9 +4159,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 				  "where s.node_id='%s' and "
 				  "  s.service='frisbee' and "
 				  "  i.imageid='%s' and "
-				  "  i.load_address!='' and "
 				  "  n.role='ctrl' and i.sync!=1",
-				  3, reqp->nodeid, row[7]);
+				  1, reqp->nodeid, row[5]);
 
 		if (!res2) {
 			error("doloadinfo: %s: DB Error getting subboss info!\n",
@@ -4172,69 +4169,37 @@ COMMAND_PROTOTYPE(doloadinfo)
 			return 1;
 		}
 
-		frisbee_pid = 0;
-		address[0] = '\0';
-		server_address[0] = '\0';
-
 		if (mysql_num_rows(res2)) {
 			row2 = mysql_fetch_row(res2);
-
-			if (row2[0] && row2[0][0])
-				strcpy(address, row2[0]);
-
-			if (row2[1] && row2[1][0])
-				frisbee_pid = atoi(row2[1]);
-			
-			strcpy(server_address, row2[2]);
+			strcpy(server_address, row2[0]);
 		} else {
-			if (row[0] && row[0][0])
-				strcpy(address, row[0]);
-
-			if (row[3] && row[3][0])
-				frisbee_pid = atoi(row[3]);
-			
 			strcpy(server_address, BOSSNODE_IP);
 		}
-
 		mysql_free_result(res2);
 
 		/*
 		 * Remote nodes get a URL for the address.
 		 */
 		if (!reqp->islocal) {
-			if (!row[6] || !row[6][0]) {
+			if (!row[4] || !row[4][0]) {
 				error("doloadinfo: %s: "
 				      "No access key associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
 			OUTPUT(address, sizeof(address),
 			       "%s/spewimage.php?imageid=%s&access_key=%s",
-			       TBBASE, row[7], row[6]);
+			       TBBASE, row[5], row[4]);
 			
 			server_address[0] = 0;
 		}
-		else {
-			/*
-			 * Simple text string.
-			 */
-			if (!address[0]) {
-				mysql_free_result(res);
-				return 0;
-			}
-
-			/*
-			 * Sanity check
-			 */
-			if (!frisbee_pid) {
-				error("doloadinfo: %s: "
-				      "No pid associated with address %s\n",
-				      reqp->nodeid, address);
-				mysql_free_result(res);
-				return 1;
-			}
-		}
+		/*
+		 * As of version 33, local nodes no longer get an address,
+		 * they contact the frisbee master server instead.
+		 */
+		else
+			strcpy(address, "NEED_TO_UPDATE_YOUR_FRISBEE");
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=%s PART=%s PARTOS=%s", address, loadpart, OS);
@@ -4245,14 +4210,14 @@ COMMAND_PROTOTYPE(doloadinfo)
 		}
 
 		/*
-		 * Remember zero-fill free space, mbr version fields, and access_key
+		 * Add zero-fill free space, MBR version fields, and access_key
 		 */
 		zfill = 0;
-		if (row[4] && row[4][0])
-			zfill = atoi(row[4]);
-		strcpy(mbrvers,"1");
-		if (row[5] && row[5][0])
-			strcpy(mbrvers, row[5]);
+		if (row[2] && row[2][0])
+			zfill = atoi(row[2]);
+		strcpy(mbrvers, "1");
+		if (row[3] && row[3][0])
+			strcpy(mbrvers, row[3]);
 
 		/*
 		 * Get disk type and number
@@ -4308,63 +4273,75 @@ COMMAND_PROTOTYPE(doloadinfo)
 			       disktype, disknum, zfill, useacpi, mbrvers, useasf, prepare);
 
 		/*
-		 * If this is a vnode, tack on some additional image metadata
-		 * fields so that all vnodes (shared and not) can uniquely
-		 * identify the image to load, and see if it needs to be
-		 * re-fetched.
+		 * Local nodes and vnodes, get additional image metadata
+		 * fields so that they can uniquely identify the image.
 		 */
-		if (reqp->isvnode) {
+		if (reqp->islocal || reqp->isvnode) {
 			struct stat sb;
 
-			if (!row[9] || !row[9][0]) {
+ 			if (!row[7] || !row[7][0]) {
 				error("doloadinfo: %s: No imagename"
 				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
-			if (!row[10] || !row[10][0]) {
+			if (!row[8] || !row[8][0]) {
 				error("doloadinfo: %s: No pid"
 				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
-			if (!row[11] || !row[11][0]) {
+			if (!row[9] || !row[9][0]) {
 				error("doloadinfo: %s: No gid"
 				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
-				mysql_free_result(res);
-				return 1;
-			}
-			if (!row[12] || !row[12][0]) {
-				error("doloadinfo: %s: No path"
-				      " associated with imageid %s\n",
-				      reqp->nodeid, row[7]);
-				mysql_free_result(res);
-				return 1;
-			}
-			else if (stat(row[12],&sb)) {
-				error("doloadinfo: %s: Could not stat path %s"
-				      " associated with imageid %s: %s\n",
-				      reqp->nodeid, row[12], row[7],
-				      strerror(errno));
+				      reqp->nodeid, row[5]);
 				mysql_free_result(res);
 				return 1;
 			}
 
-			bufp += OUTPUT(bufp, ebufp - bufp,
-				       " IMAGEID=%s,%s,%s IMAGEMTIME=%d\n",
-				       row[10],row[11],row[9],sb.st_mtime);
+			bufp += OUTPUT(bufp, ebufp - bufp, " IMAGEID=%s,%s,%s",
+				       row[8], row[9], row[7]);
+
+			/*
+			 * Vnodes also get a time stamp for the imagepath.
+			 * This is not strictly necessary since the master
+			 * frisbee server will return this info, but vnodes
+			 * use this to create a file name before calling
+			 * the server.
+			 */
+			if (reqp->isvnode) {
+				if (!row[10] || !row[10][0]) {
+					error("doloadinfo: %s: No path"
+					      " associated with imageid %s\n",
+					      reqp->nodeid, row[5]);
+					mysql_free_result(res);
+					return 1;
+				}
+				else if (stat(row[10], &sb)) {
+					error("doloadinfo: %s: Could not stat path %s"
+					      " associated with imageid %s: %s\n",
+					      reqp->nodeid, row[10], row[5],
+					      strerror(errno));
+					mysql_free_result(res);
+					return 1;
+				}
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " IMAGEMTIME=%u\n",
+					       sb.st_mtime);
+			}
+
 		}
 
 		/* Tack on the newline, finally */
-		bufp += OUTPUT(bufp, ebufp - bufp,"\n");
+		bufp += OUTPUT(bufp, ebufp - bufp, "\n");
 
 		nrows--;
 	}
 
-	mysql_free_result(res);
+	if (res)
+		mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
@@ -4768,7 +4745,7 @@ COMMAND_PROTOTYPE(dosecurestate)
                     reqp->nodeid, nlen[0]);
         }
         for (i = 0; i < TPM_NONCE_BYTES; i++) {
-            if (sscanf(row[0] + (i*2),"%2x",&(nonce[i])) != 1) {
+            if (sscanf(row[0]+(i*2), "%2x", (unsigned int *)&nonce[i]) != 1) {
                 error("SECURESTATE: %s: Error parsing nonce\n", reqp->nodeid);
                 mysql_free_result(res);
                 // XXX: return error to client
@@ -4815,7 +4792,7 @@ COMMAND_PROTOTYPE(dosecurestate)
             pcr = atoi(row[0]);
             wantpcrs |= (1 << pcr);
             for (j = 0; j < TPM_PCR_BYTES; j++) {
-                if (sscanf(row[1] + (j*2),"%2x",&(pcrs[i][j])) != 1) {
+                if (sscanf(row[1]+(j*2), "%2x", (unsigned int *)&pcrs[i][j]) != 1) {
                     error("SECURESTATE: %s: Error parsing PCR\n", reqp->nodeid);
                     free(pcrs);
                     mysql_free_result(res);
@@ -4874,7 +4851,7 @@ COMMAND_PROTOTYPE(dosecurestate)
 	 * returned from the quote operation.  We must dig up our nonce again.
          */
         quote_passed = tmcd_tpm_verify_quote(quote_bin, quotelen, pcomp_bin,
-                pcomplen, nonce, wantpcrs, pcrs, row[0]);
+                pcomplen, nonce, wantpcrs, pcrs, (unsigned char *)row[0]);
 
 	mysql_free_result(res);
         free(pcrs);

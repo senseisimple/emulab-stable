@@ -142,15 +142,16 @@ loadone() {
     for parm in $_LOADINFO; do
         case $parm in
 	ADDR=*|\
-	SERVER=*|\
 	PART=*|\
 	PARTOS=*|\
+	SERVER=*|\
 	DISK=*|\
 	ZFILL=*|\
 	ACPI=*|\
-	ASF=*|\
 	MBRVERS=*|\
-	PREPARE=*)
+	ASF=*|\
+	PREPARE=*|\
+        IMAGEID=*)
 	    # XXX need to parse better, eval is dangerous!
 	    eval $parm
 	    ;;
@@ -162,7 +163,7 @@ loadone() {
 
     #
     # Assign defaults where needed.
-    # Assumed to be set: ADDR
+    # Assumed to be set: ADDR or IMAGEID
     #
     SERVER=${SERVER:-$BOSSIP}
     PART=${PART:-'0'}
@@ -173,6 +174,17 @@ loadone() {
     ASF=${ASF:-'unknown'}
     MBRVERS=${MBRVERS:-'1'}
     PREPARE=${PREPARE:-'0'}
+
+    if [ x"$IMAGEID" != x ]; then
+        ADDR=""
+    	# IMAGEID=pid,gid,imagename
+	pid=`echo $IMAGEID | awk -F, '{ printf $1 }'`
+	name=`echo $IMAGEID | awk -F, '{ printf $3 }'`
+	IMAGEID="$pid/$name"
+    elif [ x"$ADDR" = x ]; then
+	echo "Unable to get imageid or address for loading image"
+	return 1
+    fi
 
     if [ "$PART" != "0" ]; then
 	SLICE="-s $PART"
@@ -223,9 +235,9 @@ loadone() {
     fi
 
     #
-    # Make sure the necessary device files exist (only necessary on FreeBSD 4.x)
-    # Note that we create partition files for all slices, not just slice 1,
-	# for the benefit of the slicefix script.
+    # Make sure the necessary device files exist (only necessary on
+    # FreeBSD 4.x).  Note that we create partition files for all slices,
+    # not just slice 1, for the benefit of the slicefix script.
     #
     if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
 	(cd /dev; ./MAKEDEV $DISK ${DISK}s2a ${DISK}s3a ${DISK}s4a)
@@ -257,7 +269,7 @@ loadone() {
 		return 1
 	    fi
 	    imagefile="$ADDR"
-        else
+	else
 	    PORT=`echo $ADDR | awk -F: '{ printf $2 }'`
 	    MCAST=`echo $ADDR | awk -F: '{ printf $1 }'`
 	    if [ -e $BOOTDIR/myip ]; then
@@ -266,139 +278,141 @@ loadone() {
 		MCASTIF=""
 	    fi
 	    MCASTADDR="-m $MCAST -p $PORT"
+	    IMAGEID="$MCASTIF $MCASTADDR"
 	    isurl=0
 	    ispath=0
 	fi
+    else
+        IMAGEID="-B 30 -F $IMAGEID"
+	isurl=0
+	ispath=0
+    fi
 
-	#
-	# ZFILL==1: use frisbee
-	# ZFILL==2: separate disk-wipe pass (not yet implemented)
-	#
-	if [ "$ZFILL" != "0" ]; then
-	    ZFILL="-z"
-	else
-	    ZFILL=""
+    #
+    # ZFILL==1: use frisbee
+    # ZFILL==2: separate disk-wipe pass (not yet implemented)
+    #
+    if [ "$ZFILL" != "0" ]; then
+	ZFILL="-z"
+    else
+	ZFILL=""
+    fi
+
+    #
+    # Make sure the write-cache is enabled on SCSI disks.  It makes a
+    # huge difference.  We don't worry about data corruption in the
+    # case of a crash, because we will just reload the disk again anyway
+    # in that situation.
+    #
+    turncacheoff=0
+    case $DISK in
+    da*)
+	if [ -x $BINDIR/camwce ] && $BINDIR/camwce on $DISK; then
+	    turncacheoff=1;
 	fi
+	;;
+    esac
 
-	#
-	# Make sure the write-cache is enabled on SCSI disks.  It makes a
-	# huge difference.  We don't worry about data corruption in the
-	# case of a crash, because we will just reload the disk again anyway
-	# in that situation.
-	#
-	turncacheoff=0
-	case $DISK in
-	da*)
-	    if [ -x $BINDIR/camwce ] && $BINDIR/camwce on $DISK; then
-		turncacheoff=1;
-	    fi
-	    ;;
-	esac
+    #
+    # For slice images, ensure that the MBR is the correct version
+    # and replace if not.
+    #
+    if [ $_NUM -eq 0 ]; then
+	if [ "$PART" != "0" ]; then
+	    tweakmbr $DISK $MBRVERS
+	fi
+        FIRSTMBR=$MBRVERS
+    else
+	if [ "$FIRSTMBR" != "$MBRVERS" ]; then
+	    echo "MBR Mismatch: First MBR is \"$FIRSTMBR\" while image #$_NUM is \"$MBRVERS\""
+	fi
+    fi
 
-	#
-	# For slice images, ensure that the MBR is the correct version
-	# and replace if not.
-	#
-        if [ $_NUM -eq 0 ]; then
-	    if [ "$PART" != "0" ]; then
-		tweakmbr $DISK $MBRVERS
-	    fi
-            FIRSTMBR=$MBRVERS
-        else
-            if [ "$FIRSTMBR" != "$MBRVERS" ]; then
-		echo "MBR Mismatch: First MBR is \"$FIRSTMBR\" while image #$_NUM is \"$MBRVERS\""
-	    fi
-        fi
-
-	#
-	# If a remote node and we have a URL, make sure that we have a place
-	# to put it. Done after the MBR tweak of course. Then download the URL.
-	#
-	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
-	    echo "Downloading image \'$ADDR\' to /images directory ..."
-	    $BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
-		$BINDIR/mkextrafs.pl -n -f -s 4 -r $DISK /images || {
-		    echo "Could not create /images partition"
-		    return 1
-		}
-	    }
-	    wget -nv -N -P /images "$ADDR"
-	    wstat=$?
-	    case $wstat in
-	    0)
-		echo "wget succeeded getting the image"
-		;;
-	    *)
-		echo "wget failed, status $wstat"
+    #
+    # If a remote node and we have a URL, make sure that we have a place
+    # to put it. Done after the MBR tweak of course. Then download the URL.
+    #
+    if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
+	echo "Downloading image \'$ADDR\' to /images directory ..."
+	$BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
+	    $BINDIR/mkextrafs.pl -n -f -s 4 -r $DISK /images || {
+		echo "Could not create /images partition"
 		return 1
-		;;
-	    esac
-	fi
-
-	#
-	# If not zeroing the disk and we are loading a full disk image
-	# we need to ensure that we at least invalidate any old superblocks
-	# that might leak through (most likely in partition 4 which isn't
-	# touched by our current image).  We do this before running frisbee
-	# so that any legit filesystems loaded from the image work.
-	#
-	# Since we do it before frisbee, we are counting on the current
-	# MBR being the same as the MBR being layed down.  While not
-	# a reasonable assumption in general, it mostly works in our
-	# environment and at least won't hurt anything if not true.
-	#
-	if [ $PREPARE -eq 1 -o \
-             \( $isrem -eq 0 -a x"$ZFILL" = x -a "$PART" = "0" \) ]
-        then
-	    zapsuperblocks $DISK
-	fi
-
-	if [ x"$imagefile" != x ]; then
-	    echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PART}"
-	    /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PART}
-	else
-	    echo "Running $BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
-	    $BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
-	fi
-        fstat=$?
-
-	#
-	# If we mounted a partition from the disk to store the image,
-	# we must unmount it now so that slicefix and others don't fail
-	# due to an in-use partition.
-	#
-	if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
-	    umount /images || {
-	        echo "WARNING: could not unmount /images"
 	    }
-	fi
-
-	#
-	# Turn the cache back off if we turned it on.
-	# Is this sufficient to ensure the cache gets flushed?
-	#
-	if [ $turncacheoff -eq 1 ]; then
-	    $BINDIR/camwce off $DISK
-	fi
-
-	case $fstat in
+	}
+	wget -nv -N -P /images "$ADDR"
+	wstat=$?
+	case $wstat in
 	0)
-	    echo "Resizing final disk partition"
-	    $BINDIR/growdisk -vW /dev/$DISK
-	    echo "Adjusting slice-related files"
-	    export SLICEFIX_ACPI=$ACPI
-	    export SLICEFIX_ASF=$ASF
-	    $BINDIR/slicefix $PART $DISK
-	    echo "Image #$_NUM load complete at `date`"
-	    return 0
+	    echo "wget succeeded getting the image"
 	    ;;
 	*)
-	    echo "Frisbee run failed, status $fstat"
+	    echo "wget failed, status $wstat"
+	    return 1
 	    ;;
 	esac
-    else
-	echo "Unable to get address for loading image"
     fi
+
+    #
+    # If not zeroing the disk and we are loading a full disk image
+    # we need to ensure that we at least invalidate any old superblocks
+    # that might leak through (most likely in partition 4 which isn't
+    # touched by our current image).  We do this before running frisbee
+    # so that any legit filesystems loaded from the image work.
+    #
+    # Since we do it before frisbee, we are counting on the current
+    # MBR being the same as the MBR being layed down.  While not
+    # a reasonable assumption in general, it mostly works in our
+    # environment and at least won't hurt anything if not true.
+    #
+    if [ $PREPARE -eq 1 -o \
+         \( $isrem -eq 0 -a x"$ZFILL" = x -a "$PART" = "0" \) ]; then
+	zapsuperblocks $DISK
+    fi
+
+    if [ x"$imagefile" != x ]; then
+	echo "Running /usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PART}"
+	/usr/local/bin/imageunzip -o -O -W 32 $ZFILL $imagefile /dev/${DISK}s${PART}
+    else
+	echo "Running $BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $IMAGEID /dev/$DISK at `date`"
+	$BINDIR/frisbee -S $SERVER $MEMARGS $ZFILL $SLICE $IMAGEID /dev/$DISK
+    fi
+    fstat=$?
+
+    #
+    # If we mounted a partition from the disk to store the image,
+    # we must unmount it now so that slicefix and others don't fail
+    # due to an in-use partition.
+    #
+    if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
+	umount /images || {
+	    echo "WARNING: could not unmount /images"
+	}
+    fi
+
+    #
+    # Turn the cache back off if we turned it on.
+    # Is this sufficient to ensure the cache gets flushed?
+    #
+    if [ $turncacheoff -eq 1 ]; then
+	$BINDIR/camwce off $DISK
+    fi
+
+    case $fstat in
+    0)
+	echo "Resizing final disk partition"
+	$BINDIR/growdisk -vW /dev/$DISK
+	echo "Adjusting slice-related files"
+	export SLICEFIX_ACPI=$ACPI
+	export SLICEFIX_ASF=$ASF
+	$BINDIR/slicefix $PART $DISK
+	echo "Image #$_NUM load complete at `date`"
+	return 0
+	;;
+    *)
+	echo "Frisbee run failed, status $fstat"
+	;;
+    esac
     return 1
 }
 

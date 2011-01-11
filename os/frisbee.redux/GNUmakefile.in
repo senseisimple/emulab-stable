@@ -33,6 +33,9 @@ endif
 endif
 endif
 
+WITH_MSERVER_NULL	= 1
+WITH_MSERVER_EMULAB	= 0
+
 include $(OBJDIR)/Makeconf
 
 all:	frisbee frisbeed mfrisbeed
@@ -63,11 +66,22 @@ SERVERFLAGS	= $(CFLAGS)
 SERVERLIBS	= $(PTHREADLIBS)
 SERVEROBJS	= server.o $(SHAREDOBJS)
 
+#
+# Master server configuration
+#
+# Default master server config
+MSERVERFLAGS	= -DUSE_NULL_CONFIG $(CFLAGS) -I$(OBJDIR)
+MSERVEROBJS	= mserver.o $(SHAREDOBJS) config.o config_null.o
+MSERVERLIBS	= 
+
+ifeq ($(WITH_MSERVER_EMULAB),1)
+# Emulab master server config
 MYSQLCFLAGS	= -I/usr/local/include
 MYSQLLIBS	= -L/usr/local/lib/mysql -lmysqlclient
-MSERVERFLAGS	= $(CFLAGS) $(MYSQLCFLAGS) -DUSE_EMULAB_CONFIG -I$(TESTBED_SRCDIR)/lib/libtb -I$(OBJDIR)
-MSERVERLIBS	= $(OBJDIR)/lib/libtb/libtb.a $(MYSQLLIBS)
-MSERVEROBJS	= mserver.o config.o config_emulab.o $(SHAREDOBJS)
+MSERVERFLAGS	+= -DUSE_EMULAB_CONFIG $(MYSQLCFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
+MSERVEROBJS	+= config_emulab.o
+MSERVERLIBS	+= $(OBJDIR)/lib/libtb/libtb.a $(MYSQLLIBS)
+endif
 
 CFLAGS		= -O2 -g -Wall -fno-builtin-log $(LDSTATIC) $(PTHREADCFLAGS) -DSTATS -DMASTER_SERVER
 LDFLAGS		= $(LDSTATIC)
@@ -125,6 +139,8 @@ config.o: $(SRCDIR)/config.c configdefs.h log.h
 	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/config.c
 config_emulab.o: $(SRCDIR)/config_emulab.c configdefs.h log.h
 	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/config_emulab.c
+config_null.o: $(SRCDIR)/config_null.c configdefs.h log.h
+	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/config_null.c
 
 log.o:		$(SRCDIR)/log.c decls.h log.h
 	$(CC) $(CFLAGS) -DLOG_TESTBED=$(LOG_TESTBED) -c $(SRCDIR)/log.c

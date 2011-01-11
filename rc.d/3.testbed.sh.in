@@ -51,6 +51,17 @@ case "$1" in
 			@prefix@/sbin/sslxmlrpc_server.py
 		fi
 
+		if [ -x @prefix@/sbin/mfrisbeed ]; then
+			echo -n " mfrisbeed"
+			if [ -x @prefix@/sbin/daemon_wrapper ]; then
+				@prefix@/sbin/daemon_wrapper \
+				  -i 30 -l @prefix@/log/mfrisbeed_wrapper.log \
+				  @prefix@/sbin/mfrisbeed
+			else
+				@prefix@/sbin/mfrisbeed
+			fi
+		fi
+
 		if [ -x @prefix@/sbin/reload_daemon  ]; then
 			echo -n " reloadd"
 			@prefix@/sbin/reload_daemon

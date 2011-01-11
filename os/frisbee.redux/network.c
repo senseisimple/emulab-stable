@@ -654,7 +654,7 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport,
 	}
 
 	memset(&msg, 0, sizeof msg);
-	strncpy(msg.version, MS_MSGVERS_1, sizeof(msg.version));
+	strncpy((char *)msg.version, MS_MSGVERS_1, sizeof(msg.version));
 	msg.type = htonl(MS_MSGTYPE_GETREQUEST);
 	msg.body.getrequest.hostip = htonl(hostip);
 	if (askonly) {
@@ -682,7 +682,7 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport,
 		return 0;
 	}
 
-	if (strncmp(msg.version, MS_MSGVERS_1, sizeof(msg.version))) {
+	if (strncmp((char *)msg.version, MS_MSGVERS_1, sizeof(msg.version))) {
 		fprintf(stderr, "Got incorrect version from master server\n");
 		close(msock);
 		return 0;

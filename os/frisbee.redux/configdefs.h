@@ -42,7 +42,6 @@ struct config_host_authinfo {
  * Config file functions
  */
 struct config {
-	int (*config_init)(void);
 	void (*config_deinit)(void);
 	int (*config_read)(void);
 	int (*config_get_host_authinfo)(struct in_addr *,

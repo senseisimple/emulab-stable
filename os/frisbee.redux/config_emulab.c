@@ -56,65 +56,6 @@ static void *mymalloc(size_t size);
 static void *myrealloc(void *ptr, size_t size);
 static char *mystrdup(const char *str);
 
-static int
-emulab_init(void)
-{
-	static int called;
-	char pathbuf[PATH_MAX], *path;
-
-	if (!dbinit())
-		return -1;
-
-	if (called)
-		return 0;
-	called++;
-
-	/* One time parsing of MC address info */
-	if (sscanf(MC_BASEADDR, "%d.%d.%d", &mc_a, &mc_b, &mc_c) != 3) {
-		error("emulab_init: MC_BASEADDR '%s' not in A.B.C format!",
-		      MC_BASEADDR);
-		return -1;
-	}
-	mc_port = atoi(MC_BASEPORT);
-
-	if ((path = realpath(SHAREROOT_DIR, pathbuf)) == NULL) {
-		error("emulab_init: could not resolve '%s'", SHAREROOT_DIR);
-		return -1;
-	}
-	SHAREDIR = mystrdup(path);
-
-	if ((path = realpath(PROJROOT_DIR, pathbuf)) == NULL) {
-		error("emulab_init: could not resolve '%s'", PROJROOT_DIR);
-		return -1;
-	}
-	PROJDIR = mystrdup(path);
-
-	if ((path = realpath(GROUPSROOT_DIR, pathbuf)) == NULL) {
-		error("emulab_init: could not resolve '%s'", GROUPSROOT_DIR);
-		return -1;
-	}
-	GROUPSDIR = mystrdup(path);
-
-	if ((path = realpath(USERSROOT_DIR, pathbuf)) == NULL) {
-		error("emulab_init: could not resolve '%s'", USERSROOT_DIR);
-		return -1;
-	}
-	USERSDIR = mystrdup(path);
-
-	if (strlen(SCRATCHROOT_DIR) > 0) {
-		if ((path = realpath(SCRATCHROOT_DIR, pathbuf)) == NULL) {
-			error("emulab_init: could not resolve '%s'",
-			      SCRATCHROOT_DIR);
-			return -1;
-		}
-		SCRATCHDIR = mystrdup(path);
-	} else
-		SCRATCHDIR = NULL;
-
-	log("Read Emulab configuration");
-	return 0;
-}
-
 static void
 emulab_deinit(void)
 {
@@ -152,7 +93,7 @@ emulab_free(void *state)
  * Set the allowed GET methods.
  * XXX for now, just multicast.
  */
-void
+static void
 set_get_methods(struct config_host_authinfo *ai, int ix)
 {
 	ai->imageinfo[ix].get_methods = CONFIG_IMAGE_MCAST;
@@ -169,7 +110,7 @@ set_get_methods(struct config_host_authinfo *ai, int ix)
  * loading a "standard" image: 72Mb/sec
  * any other image:            54Mb/sec
  */
-void
+static void
 set_get_options(struct config_host_authinfo *ai, int ix)
 {
 	char str[256];
@@ -1017,7 +958,7 @@ dump_image_aliases(FILE *fd)
 			 " GROUP by e.pid,e.gid", 2);
 	assert(res != NULL);
 
-	lastpid = strdup("NONE");
+	lastpid = mystrdup("NONE");
 	nrows = mysql_num_rows(res);
 	for (i = 0; i < nrows; i++) {
 		MYSQL_RES	*res2;
@@ -1033,7 +974,7 @@ dump_image_aliases(FILE *fd)
 		/* New pid, put out shared project image alias */
 		if (strcmp(lastpid, row[0])) {
 			free(lastpid);
-			lastpid = strdup(row[0]);
+			lastpid = mystrdup(row[0]);
 
 			res2 = mydb_query("SELECT imagename"
 					  " FROM images"
@@ -1134,7 +1075,6 @@ emulab_dump(FILE *fd)
 }
 
 struct config emulab_config = {
-	emulab_init,
 	emulab_deinit,
 	emulab_read,
 	emulab_get_host_authinfo,
@@ -1145,6 +1085,65 @@ struct config emulab_config = {
 	emulab_free,
 	emulab_dump
 };
+
+struct config *
+emulab_init(void)
+{
+	static int called;
+	char pathbuf[PATH_MAX], *path;
+
+	if (!dbinit())
+		return NULL;
+
+	if (called)
+		return &emulab_config;
+	called++;
+
+	/* One time parsing of MC address info */
+	if (sscanf(MC_BASEADDR, "%d.%d.%d", &mc_a, &mc_b, &mc_c) != 3) {
+		error("emulab_init: MC_BASEADDR '%s' not in A.B.C format!",
+		      MC_BASEADDR);
+		return NULL;
+	}
+	mc_port = atoi(MC_BASEPORT);
+
+	if ((path = realpath(SHAREROOT_DIR, pathbuf)) == NULL) {
+		error("emulab_init: could not resolve '%s'", SHAREROOT_DIR);
+		return NULL;
+	}
+	SHAREDIR = mystrdup(path);
+
+	if ((path = realpath(PROJROOT_DIR, pathbuf)) == NULL) {
+		error("emulab_init: could not resolve '%s'", PROJROOT_DIR);
+		return NULL;
+	}
+	PROJDIR = mystrdup(path);
+
+	if ((path = realpath(GROUPSROOT_DIR, pathbuf)) == NULL) {
+		error("emulab_init: could not resolve '%s'", GROUPSROOT_DIR);
+		return NULL;
+	}
+	GROUPSDIR = mystrdup(path);
+
+	if ((path = realpath(USERSROOT_DIR, pathbuf)) == NULL) {
+		error("emulab_init: could not resolve '%s'", USERSROOT_DIR);
+		return NULL;
+	}
+	USERSDIR = mystrdup(path);
+
+	if (strlen(SCRATCHROOT_DIR) > 0) {
+		if ((path = realpath(SCRATCHROOT_DIR, pathbuf)) == NULL) {
+			error("emulab_init: could not resolve '%s'",
+			      SCRATCHROOT_DIR);
+			return NULL;
+		}
+		SCRATCHDIR = mystrdup(path);
+	} else
+		SCRATCHDIR = NULL;
+
+	log("Read Emulab configuration");
+	return &emulab_config;
+}
 
 /*
  * XXX memory allocation functions that either return memory or abort.
@@ -1219,4 +1218,11 @@ warning(const char *fmt, ...)
 }
 
 #endif
+
+#else
+struct config *
+emulab_init(void)
+{
+	return NULL;
+}
 #endif

@@ -45,15 +45,17 @@ config_init(int readit)
 	int rv;
 
 #ifdef USE_EMULAB_CONFIG
-	extern struct config emulab_config;
-	myconfig = &emulab_config;
-#else
-	extern struct config file_config;
-	myconfig = &file_config;
+	extern struct config *emulab_init();
+	if (myconfig == NULL)
+		myconfig = emulab_init();
 #endif
-	rv = myconfig->config_init();
-	if (rv)
-		return rv;
+#ifdef USE_NULL_CONFIG
+	extern struct config *null_init();
+	if (myconfig == NULL)
+		myconfig = null_init();
+#endif
+	if (myconfig == NULL)
+		return -1;
 
 	if (readit) {
 		rv = myconfig->config_read();

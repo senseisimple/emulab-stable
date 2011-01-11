@@ -53,6 +53,7 @@ static int	parentport = MS_PORTNUM;
 static int	fetchfromabove = 0;
 static int	canredirect = 0;
 static int	usechildauth = 0;
+static int	mirrormode = 0;
 
 /* XXX the following just keep network.c happy */
 int		portnum = MS_PORTNUM;
@@ -76,7 +77,8 @@ main(int argc, char **argv)
 	log("mfrisbee daemon starting, methods=%s (debug level %d)",
 	    GetMSMethods(onlymethods), debug);
 	if (fetchfromabove)
-		log("  using parent %s:%d", inet_ntoa(parentip), parentport);
+		log("  using parent %s:%d%s", inet_ntoa(parentip), parentport,
+		    mirrormode ? " in mirror mode" : "");
 	config_init(1);
 
 	/* Just dump the config to stdout in human readable form and exit. */
@@ -336,7 +338,9 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 
 	/*
 	 * If an explicit host was listed, use that as the host we are
-	 * authenticating, otherwise use the caller's IP.
+	 * authenticating, otherwise use the caller's IP.  config_auth_by_IP
+	 * will reject the former if the caller is not allowed to proxy for
+	 * the node in question.
 	 */
 	if (msg->body.getrequest.hostip)
 		host.s_addr = msg->body.getrequest.hostip;
@@ -360,6 +364,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 
 	memset(msg, 0, sizeof *msg);
 	msg->type = htonl(MS_MSGTYPE_GETREPLY);
+	strncpy((char *)msg->version, MS_MSGVERS_1, sizeof(msg->version));
 
 	/*
 	 * If they request a method we don't support, reject them before
@@ -369,27 +374,28 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	if (methods == 0)
 		goto badmethod;
 
-	/*
-	 * See if node has access to the image.
-	 * If not, return an error code immediately.
-	 */
-	rv = config_auth_by_IP(&cip->sin_addr, &host, imageid, &ai);
-	if (rv) {
-		warning("%s: client %s %s failed: %s",
-			imageid, clientip, op, GetMSError(rv));
-		msg->body.getreply.error = rv;
-		goto reply;
-	}
-	if (debug > 1)
-		config_dump_host_authinfo(ai);
-	if (ai->numimages > 1) {
-		rv = MS_ERROR_INVALID;
-		warning("%s: client %s %s failed: "
-			"lookup returned multiple (%d) images",
-			imageid, clientip, op, ai->numimages);
-		msg->body.getreply.error = rv;
-		goto reply;
-
+	if (!mirrormode) {
+		/*
+		 * See if node has access to the image.
+		 * If not, return an error code immediately.
+		 */
+		rv = config_auth_by_IP(&cip->sin_addr, &host, imageid, &ai);
+		if (rv) {
+			warning("%s: client %s %s failed: %s",
+				imageid, clientip, op, GetMSError(rv));
+			msg->body.getreply.error = rv;
+			goto reply;
+		}
+		if (debug > 1)
+			config_dump_host_authinfo(ai);
+		if (ai->numimages > 1) {
+			rv = MS_ERROR_INVALID;
+			warning("%s: client %s %s failed: "
+				"lookup returned multiple (%d) images",
+				imageid, clientip, op, ai->numimages);
+			msg->body.getreply.error = rv;
+			goto reply;
+		}
 	}
 	ii = &ai->imageinfo[0];
 	assert((ii->flags & CONFIG_PATH_ISFILE) != 0);
@@ -677,7 +683,7 @@ get_options(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "AC:DRS:P:p:dh")) != -1)
+	while ((ch = getopt(argc, argv, "AC:DI:RS:P:p:dh")) != -1)
 		switch(ch) {
 		case 'A':
 			usechildauth = 1;
@@ -715,6 +721,15 @@ get_options(int argc, char **argv)
 		case 'D':
 			dumpconfig = 1;
 			break;
+		case 'I':
+		{
+			extern char *imagedir;
+			imagedir = optarg;
+			break;
+		}
+		case 'M':
+			mirrormode = 1;
+			break;
 		case 'R':
 			canredirect = 1;
 			break;
@@ -744,6 +759,12 @@ get_options(int argc, char **argv)
 		fprintf(stderr,
 			"Error: Unrecognized command line arguments: %s ...\n",
 			argv[0]);
+		usage();
+	}
+
+	if (mirrormode && !fetchfromabove) {
+		fprintf(stderr,
+			"Error: Must specify a parent (-S) in mirror mode\n");
 		usage();
 	}
 }
