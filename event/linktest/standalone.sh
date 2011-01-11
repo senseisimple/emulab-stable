@@ -1,1 +1,1 @@
-perl -w -T linktest.pl.in STARTAT=1 STOPAT=4 DOARP=0 NODES=node1,node2 PROJDIR=/proj BINDIR=/usr/testbed/lib VARDIR=/var/emulab
+sudo perl -w -T $2/linktest.pl STARTAT=1 STOPAT=$1 DOARP=0 LOGDIR=$4 BINDIR=$2 VARDIR=$3 STANDALONE=1

@@ -1,0 +1,94 @@
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="version">
+    <value>1.0</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/GENI.ndz</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>60</value>
+  </attribute>
+  <attribute name="mbr_version">
+    <value>1</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
+  </attribute>
+  <attribute name="description">
+    <value>Dummy descriptor for GENI physical nodes</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>GENI</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Other</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="mtype_pcfedphys">
+    <value>1</value>
+  </attribute>
+</image>
+<image>
+  <attribute name="global">
+    <value>1</value>
+  </attribute>
+  <attribute name="version">
+    <value>1.0</value>
+  </attribute>
+  <attribute name="osfeatures">
+    <value>ping,ssh</value>
+  </attribute>
+  <attribute name="path">
+    <value>/usr/testbed/images/GENIVM.ndz</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>60</value>
+  </attribute>
+  <attribute name="mbr_version">
+    <value>1</value>
+  </attribute>
+  <attribute name="loadpart">
+    <value>1</value>
+  </attribute>
+  <attribute name="description">
+    <value>Dummy descriptor for GENI virtual nodes</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>NORMALv2</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="imagename">
+    <value>GENIVM</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Other</value>
+  </attribute>
+  <attribute name="gid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="mtype_pcfed">
+    <value>1</value>
+  </attribute>
+</image>

@@ -125,7 +125,7 @@ sub Resolve($)
     
     if ($type eq "node") {
 	my $node  = $object;
-	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id(), "0.1");
+	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id(), "0.1", undef);
 	if (! defined($rspec)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Error getting advertisement");
@@ -585,6 +585,8 @@ sub SliverAction($$$$$)
 {
     my ($action, $slice_urn, $sliver_urns, $credentials, $manifest) = @_;
     my $response;
+
+    print STDERR "fooey\n";
     
     if (! (defined($credentials) &&
 	   (defined($slice_urn) || defined($sliver_urns)))) {
@@ -803,7 +805,7 @@ sub SliverStatus($)
     #
     my ($slice, $aggregate) = Credential2SliceAggregate($credential);
     if (! (defined($slice) && defined($aggregate))) {
-	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slice or aggregate here");
     }
     if ($slice_urn ne $slice->urn()) {

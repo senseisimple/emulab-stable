@@ -322,6 +322,26 @@ sub GetManifest($$)
 }
 
 #
+# Store the rspec/manifest string.
+#
+sub UpdateRspec($$)
+{
+    my ($self, $rspec) = @_;
+
+    my $idx          = $self->idx();
+    my $rspec_string = GeniXML::Serialize($rspec);
+    my $safe_rspec   = DBQuoteSpecial($rspec_string);
+
+    return -1
+	if (!DBQueryWarn("update geni_slivers set ".
+			 "  rspec_string=$safe_rspec ".
+			 "where idx='$idx'"));
+    
+    $self->{'RSPEC'} = $rspec;
+    return 0;
+}
+
+#
 # Set the aggregate for a sliver.
 #
 sub SetAggregate($$)
@@ -868,7 +888,7 @@ sub UnProvision($;$)
     else {
 	print STDERR "$node is reserved to another, not $self\n";
 	# Signal error so we can look at what happened.
-	return -1;
+	return 0;
     }
     return 0;
 }

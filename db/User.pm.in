@@ -1077,6 +1077,41 @@ sub GetSSHKeys($$)
 }
 
 #
+# Get (hopefully) unencrypted, locally-generated user ssh keys.  This is 
+# bogus; I am making sure to only return locally-generated keys.
+#
+sub GetDefaultSSHKeys($$;$)
+{
+    my ($self, $pref, $onlylatest) = @_;
+    my @result = ();
+    
+    # Must be a real reference. 
+    return -1
+	if (! (ref($self) && ref($pref)));
+
+    my $uid_idx = $self->uid_idx();
+
+    my $extra = '';
+    if (defined($onlylatest) && $onlylatest) {
+	$extra = 'order by stamp desc limit 1';
+    }
+
+    my $query_result =
+	DBQueryWarn("select pubkey from user_pubkeys ".
+		    "where uid_idx='$uid_idx' and ".
+		    "      comment like '%\@${OURDOMAIN}' $extra");
+
+    return -1
+	if (!defined($query_result));
+
+    while (my ($key) = $query_result->fetchrow_array()) { 
+	push(@result, $key);
+    }    
+    @$pref = @result;
+    return 0;
+}
+
+#
 # Get the passphrase for the encrypted key.
 #
 sub SSLPassPhrase($$$)

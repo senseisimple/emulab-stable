@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -67,13 +67,12 @@ $ENV{'PATH'} = "/tmp:/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
-# Determine if we need the magic to enable writing the active disk.
+# Determine if we should use the "geom" tools to make everything happen.
 # Empirically, this seems to only be needed for FreeBSD 8 and above.
 #
-my $needsysctl = 0;
-my $didsysctl = 0;
+my $usegeom = 0;
 if (`uname -r` =~ /^(\d+)\./ && $1 > 7) {
-    $needsysctl = $1;
+    $usegeom = $1;
 }
 
 #
@@ -244,9 +243,12 @@ if (!$forceit) {
 #
 # Dark magic to allow us to modify the open boot disk
 #
-if ($needsysctl) {
-    mysystem("sysctl kern.geom.debugflags=16");
-    $didsysctl = 1;
+if ($usegeom && $slice != 0) {
+    if ($stype != 0) {
+	mysystem("gpart delete -i $slice $disk");
+    }
+    mysystem("gpart add -i $slice -t freebsd $disk");
+    $stype = 165;
 }
 
 #
@@ -269,18 +271,9 @@ elsif ($stype != 165) {
 # If not recreating the filesystems, just try to mount it
 #
 elsif ($noinit) {
-    if ($didsysctl) {
-	system("sysctl kern.geom.debugflags=0");
-	$didsysctl = 0;
-    }
     mysystem("mount $fsdevice $mountpoint");
     mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
     exit(0);
-}
-
-if ($didsysctl) {
-    system("sysctl kern.geom.debugflags=0");
-    $didsysctl = 0;
 }
 
 #
@@ -380,8 +373,6 @@ sub mysystem($)
 	print "'$command'\n";
 	my $rv = system($command);
 	if ($rv) {
-	    system("sysctl kern.geom.debugflags=0")
-		if ($didsysctl);
 	    die("*** $0:\n".
 		"    Failed ($rv): '$command'\n");
 	}

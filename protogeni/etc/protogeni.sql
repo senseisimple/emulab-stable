@@ -206,8 +206,17 @@ CREATE TABLE `geni_resources` (
   `manifest_idx` mediumint(8) unsigned NOT NULL default '0',
   `ticket_idx` mediumint(8) unsigned NOT NULL default '0',
   `newticket_idx` mediumint(8) unsigned NOT NULL default '0',
+  `rspec_idx` mediumint(8) unsigned default NULL,
   PRIMARY KEY  (`idx`),
   UNIQUE KEY `manager` (`exptidx`,`manager_urn`(255))
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+DROP TABLE IF EXISTS `geni_rspecs`;
+CREATE TABLE `geni_rspecs` (
+  `idx` int(10) unsigned NOT NULL auto_increment,
+  `created` datetime default NULL,
+  `rspec` text,
+  PRIMARY KEY  (`idx`),
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 DROP TABLE IF EXISTS `geni_bindings`;

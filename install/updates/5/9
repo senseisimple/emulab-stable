@@ -43,17 +43,6 @@ sub InstallUpdate($$)
 			       "  -p $pid -e $EID");
 	    };
 	    #
-	    # An administrator will need to go into the web interface
-	    # and edit the descriptors to add the appropriate node types.
-	    #
-	    Phase "descriptors", "Creating shared node descriptors", sub {
-		PhaseSkip("Descriptors exist")
-		    if (ExecQuiet("$DUMPDESC -o $pid,OPENVZ-STD") == 0);
-
-		ExecQuietFatal("$SUDO -u $PROTOUSER $WAP ".
-			       "  perl $LOADDESC $DESCRIPTORS");
-	    };
-	    #
 	    # An administrator will need to set these three sitevars
 	    # to something appropriate for the local site. 
 	    #
@@ -77,6 +66,17 @@ sub InstallUpdate($$)
     # If something should run in the post-install phase.
     #
     if ($phase eq "post") {
+	#
+	# An administrator will need to go into the web interface
+	# and edit the descriptors to add the appropriate node types.
+	#
+	Phase "descriptors", "Creating shared node descriptors", sub {
+	    PhaseSkip("Descriptors exist")
+		if (ExecQuiet("$DUMPDESC -o $pid,OPENVZ-STD") == 0);
+
+	    ExecQuietFatal("$SUDO -u $PROTOUSER $WAP ".
+			   "  perl $LOADDESC $DESCRIPTORS");
+	};
     }
     return 0;
 }

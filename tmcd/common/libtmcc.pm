@@ -87,7 +87,7 @@ my $beproxy     = 0;
       "noproxy"         => 0,
       "nossl"           => 0,
       "cachedir"        => undef,
-      "urn"             => undef,
+      "idkey"           => undef,
       "usetpm"          => 0,
     );
 
@@ -368,8 +368,8 @@ sub runtmcc ($;$$%)
 	if (%optconfig);
 
     # Must be last option, before command
-    if (defined($config{"urn"})) {
-	$options .= " URN=" . $config{"urn"};
+    if (defined($config{"idkey"})) {
+	$options .= " IDKEY=" . $config{"idkey"};
     }
 
     if (!defined($args)) {

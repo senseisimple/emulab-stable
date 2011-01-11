@@ -234,6 +234,16 @@ NOSHAREDFS=0
 NFSRACY=1
 
 #
+# Set this if you are running Perl 5.8.
+# This enables serious runtime performance improvements.
+#
+# XXX Unfortunately, it triggers a taint-check problem in perl 5.10 so
+# we have to leave it off by default (since newer installs of Emulab use
+# Perl 5.10).  Supposedly this is fixed in 5.12; we will see when we get there.
+#
+#SELFLOADER_DATA="__DATA__"
+
+#
 # Virtual node network configuration (if you don't want virtual nodes,
 # just leave this as is)
 #
