@@ -87,6 +87,7 @@ main(void)
 	TSS_HTPM	hTPM;
 	UINT32		srklen, bloblen;
 	BYTE		*srkpub, blob[1024];
+	BYTE		wellknown[20] = TSS_WELL_KNOWN_SECRET;
 	TSS_HPCRS	hpcomp;
 	TSS_VALIDATION	valdata;
 	TSS_HHASH hHash;
@@ -121,7 +122,7 @@ main(void)
 	/* srk password */
 	ret = Tspi_GetPolicyObject(hSRK, TSS_POLICY_USAGE, &srkpol);
 	check("get policy object", ret);
-	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN, 4, "1234");
+	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_SHA1, 20, wellknown);
 	check("policy set secret", ret);
 
 	/* owner TPM password */

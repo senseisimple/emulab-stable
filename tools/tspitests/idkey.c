@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 #include <err.h>
 #include <errno.h>
@@ -25,6 +26,10 @@
 
 #define FATAL(x)	do{printf("**\t");printf(x);printf("\n"); return 1;}while(0);
 #define print_error(x,y)	do{printf(x);}while(0);
+
+/*
+ * This code is hideous because it has never been loved properly.
+ */
 
 void check(char *msg, int cin){
 	int in = TSS_ERROR_CODE(cin);
@@ -187,26 +192,47 @@ make_fake_key(TSS_HCONTEXT hContext, TSS_HKEY *hCAKey, RSA **rsa, int padding)
 	return TSS_SUCCESS;
 }
 
-int
-main(void)
+void usage(char *name)
 {
-	TSS_HCONTEXT hContext;
-	TSS_HKEY hKey, hSRK, hCAKey;
-	TSS_HPOLICY hPolicy, hTPMPolicy, hidpol;
-	TSS_UUID srkUUID = TSS_UUID_SRK;
-	TSS_UUID myuuid = {1,1,1,1,1,{1,1,1,1,1,1}};
-	TSS_HPOLICY srkpol;
-	TSS_HTPM hTPM;
-	UINT32	idbloblen;
-	BYTE			*labelString = "My Identity Label";
-	UINT32			labelLen = strlen(labelString) + 1;
-	BYTE			*rgbIdentityLabelData = NULL, *identityReqBlob;
-	UINT32			ulIdentityReqBlobLen;
+	printf("\n");
+	printf("%s -t <tpmpass> -s <srkpass>\n", name);
+	printf("\n");
+	exit(EXIT_FAILURE);
+}
 
-	int ret,i, blobos, fd;
-	RSA	*rsa = NULL;
+int
+main(int argc, char **argv)
+{
+	RSA			*rsa = NULL;
+	TSS_HCONTEXT 		hContext;
+	TSS_HKEY 		hKey, hSRK, hCAKey;
+	TSS_HPOLICY 		hTPMPolicy, hidpol;
+	TSS_UUID 		srkUUID = TSS_UUID_SRK;
+	TSS_HPOLICY		srkpol;
+	TSS_HTPM 		hTPM;
+	UINT32			idbloblen, ch;
+	int			ret,i, blobos, fd;
+	BYTE			*srkpass, *tpmpass;
+	BYTE			*blobo, *idblob;
 
-	BYTE *blobo, *idblob;
+	srkpass = tpmpass = NULL;
+	while ((ch = getopt(argc, argv, "hs:t:")) != -1) {
+		switch (ch) {
+			case 's':
+				srkpass = optarg;
+				break;
+			case 't':
+				tpmpass = optarg;
+				break;
+			case 'h':
+			default:
+				usage(argv[0]);
+				break;
+		}
+	}
+
+	if (!srkpass || !tpmpass)
+		usage(argv[0]);
 
 	/* create context and connect */
 	ret = Tspi_Context_Create(&hContext);
@@ -220,7 +246,9 @@ main(void)
 
 	ret = Tspi_GetPolicyObject(hSRK, TSS_POLICY_USAGE, &srkpol);
 	check("get policy object", ret);
-	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN, 4, "1234");
+	//ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN, 4, "1234");
+	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN,
+	    strlen(srkpass), srkpass);
 	check("policy set secret", ret);
 
 	ret = Tspi_Context_GetTpmObject(hContext, &hTPM);
@@ -231,7 +259,7 @@ main(void)
 	check("get tpm policy", ret);
 
 	ret = Tspi_Policy_SetSecret(hTPMPolicy, TSS_SECRET_MODE_PLAIN,
-		3, "123");
+		strlen(tpmpass), tpmpass);
 	check("set owner secret", ret);
 
 	ret = Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_RSAKEY, 
@@ -247,7 +275,7 @@ main(void)
 	check("get id key policy", ret);
 
 	ret = Tspi_Policy_SetSecret(hidpol, TSS_SECRET_MODE_PLAIN,
-		4, "1234");
+	    strlen(srkpass), srkpass);
 	check("set idkey secret", ret);
 
 	/* We must create this fake privacy CA key in software so that

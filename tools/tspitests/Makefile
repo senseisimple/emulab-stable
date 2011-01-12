@@ -11,3 +11,5 @@ all:
 	    libtpm/hmac.c libtpm/keys.c libtpm/migrate.c libtpm/miscfunc.c \
 	    libtpm/oiaposap.c libtpm/owner.c libtpm/pcrs.c libtpm/seal.c \
 	    libtpm/signature.c libtpm/tpmutil.c -Ilibtpm -lcrypto
+clean:
+	rm -f idkey keygen doquote tpm-signoff getpub loadkey fail pcrcomposite ltpmloadkey
