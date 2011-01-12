@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <err.h>
@@ -31,7 +32,8 @@
  * This code is hideous because it has never been loved properly.
  */
 
-void check(char *msg, int cin){
+void check(char *msg, int cin)
+{
 	int in = TSS_ERROR_CODE(cin);
 	printf("%s: ", msg);
 	if(in == TSS_SUCCESS)
@@ -58,7 +60,38 @@ void check(char *msg, int cin){
 		printf("TSS_E_P_KEY_NOTFOUND\n");
 	else
 		printf("Not here: 0x%x\n", in);
-	return;
+}
+
+void check_fail(char *msg, int cin)
+{
+	int in = TSS_ERROR_CODE(cin);
+	printf("%s: ", msg);
+	if(in == TSS_SUCCESS) {
+		printf("TSS_SUCCESS\n");
+		return;
+	} else if(in == TSS_E_INVALID_HANDLE)
+		printf("TSS_E_INVALID_HANDLE\n");
+	else if(in == TSS_E_INTERNAL_ERROR)
+		printf("TSS_E_INTERNAL_ERROR\n");
+	else if(in == TSS_E_BAD_PARAMETER)
+		printf("TSS_E_BAD_PARAMETER\n");
+	else if(in == TSS_E_HASH_INVALID_LENGTH)
+		printf("TSS_E_HASH_INVALID_LENGTH\n");
+	else if(in == TSS_E_HASH_NO_DATA)
+		printf("TSS_E_HASH_NO_DATA\n");
+	else if(in == TSS_E_INVALID_SIGSCHEME)
+		printf("TSS_E_INVALID_SIGSCHEME\n");
+	else if(in == TSS_E_HASH_NO_IDENTIFIER)
+		printf("TSS_E_HASH_NO_IDENTIFIER\n");
+	else if(in == TSS_E_PS_KEY_NOTFOUND)
+		printf("TSS_E_PS_KEY_NOTFOUND\n");
+	else if(in == TSS_E_BAD_PARAMETER)
+		printf("TSS_E_BAD_PARAMETER\n");
+	else if(in == TSS_E_PS_KEY_NOTFOUND)
+		printf("TSS_E_P_KEY_NOTFOUND\n");
+	else
+		printf("Not here: 0x%x\n", in);
+	exit(EXIT_FAILURE);
 }
 
 int blob_pubkey(char *out, unsigned int olen, char *in, unsigned int ilen,
@@ -236,31 +269,31 @@ main(int argc, char **argv)
 
 	/* create context and connect */
 	ret = Tspi_Context_Create(&hContext);
-	check("context create", ret);
+	check_fail("context create", ret);
 	ret = Tspi_Context_Connect(hContext, NULL);
-	check("context connect", ret);
+	check_fail("context connect", ret);
 
 	ret = Tspi_Context_LoadKeyByUUID(hContext, TSS_PS_TYPE_SYSTEM, srkUUID,
 	    &hSRK);
-	check("loadkeybyuuid", ret);
+	check_fail("loadkeybyuuid", ret);
 
 	ret = Tspi_GetPolicyObject(hSRK, TSS_POLICY_USAGE, &srkpol);
-	check("get policy object", ret);
+	check_fail("get policy object", ret);
 	//ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN, 4, "1234");
 	ret = Tspi_Policy_SetSecret(srkpol, TSS_SECRET_MODE_PLAIN,
 	    strlen(srkpass), srkpass);
-	check("policy set secret", ret);
+	check_fail("policy set secret", ret);
 
 	ret = Tspi_Context_GetTpmObject(hContext, &hTPM);
-	check("get policy object", ret);
+	check_fail("get policy object", ret);
 
 	//Insert the owner auth into the TPM's policy
 	ret = Tspi_GetPolicyObject(hTPM, TSS_POLICY_USAGE, &hTPMPolicy);
-	check("get tpm policy", ret);
+	check_fail("get tpm policy", ret);
 
 	ret = Tspi_Policy_SetSecret(hTPMPolicy, TSS_SECRET_MODE_PLAIN,
 		strlen(tpmpass), tpmpass);
-	check("set owner secret", ret);
+	check_fail("set owner secret", ret);
 
 	ret = Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_RSAKEY, 
 		  //TSS_KEY_TYPE_STORAGE
@@ -269,14 +302,14 @@ main(int argc, char **argv)
 		| TSS_KEY_SIZE_2048 | TSS_KEY_NO_AUTHORIZATION
 		| TSS_KEY_NOT_MIGRATABLE | TSS_KEY_VOLATILE
 		, &hKey);
-	check("create object - key", ret);
+	check_fail("create object - key", ret);
 
 	ret = Tspi_GetPolicyObject(hKey, TSS_POLICY_USAGE, &hidpol);
-	check("get id key policy", ret);
+	check_fail("get id key policy", ret);
 
 	ret = Tspi_Policy_SetSecret(hidpol, TSS_SECRET_MODE_PLAIN,
 	    strlen(srkpass), srkpass);
-	check("set idkey secret", ret);
+	check_fail("set idkey secret", ret);
 
 	/* We must create this fake privacy CA key in software so that
 	 * Tspi_TPM_CollateIdentityRequest will happily work.  It needs it to
@@ -284,7 +317,7 @@ main(int argc, char **argv)
 	 * attestion procedure.  It is not needed in our setup though.
 	 */
 	ret = make_fake_key(hContext, &hCAKey, &rsa, RSA_PKCS1_OAEP_PADDING);
-	check("ca nonsense", ret);
+	check_fail("ca nonsense", ret);
 
 	/* We do not care about idblob - that is the certificate request that
 	 * we are supposed to send to our CA in normal remote attestation.  The
@@ -292,14 +325,14 @@ main(int argc, char **argv)
 	 */
 	ret = Tspi_TPM_CollateIdentityRequest(hTPM, hSRK, hCAKey, 8, "id label",
 	    hKey, TSS_ALG_3DES, &idbloblen, &idblob);
-	check("collate id", ret);
+	check_fail("collate id", ret);
 
 	blobo = NULL;
 	/*ret = Tspi_GetAttribData(hKey, TSS_TSPATTRIB_KEY_BLOB,
 	    TSS_TSPATTRIB_KEYBLOB_PUBLIC_KEY, &blobos, &blobo);*/
 	ret = Tspi_GetAttribData(hKey, TSS_TSPATTRIB_KEY_BLOB,
 	    TSS_TSPATTRIB_KEYBLOB_BLOB, &blobos, &blobo);
-	check("get blob", ret);
+	check_fail("get blob", ret);
 
 	if (!blobo) {
 		Tspi_Context_FreeMemory(hContext, NULL);
@@ -329,4 +362,3 @@ main(int argc, char **argv)
 
 	return 0;
 }
-
