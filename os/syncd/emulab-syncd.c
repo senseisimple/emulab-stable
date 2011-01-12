@@ -71,6 +71,7 @@ void fatal(const char * fmt, ...)
   va_end(args);
 
   fprintf(stderr, "FATAL: %s\n", buf);
+  exit(-1);
 }
 void pfatal(const char *fmt, ...)
 {
