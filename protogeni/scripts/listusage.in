@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -136,7 +136,7 @@ else {
     #
     my $query_result =
 	GeniDB::DBQueryWarn("select uuid from geni_authorities ".
-			    "where type='cm'");
+			    "where type='cm' and disabled=0");
     fatal("Could not lookup CM list")
 	if (!defined($query_result));
     fatal("No managers listed in the DB; is this a ClearingHouse?")
