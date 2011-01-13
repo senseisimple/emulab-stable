@@ -20,6 +20,8 @@ sub usage()
 my $optlist   = "df";
 my $debug     = 0;
 my $force     = 0;
+my $stopped   = 0;
+my $committed = 0;
 
 #
 # Configure variables
@@ -84,13 +86,18 @@ DBQueryFatal("INSERT INTO sitevariables VALUES ".
 
 sub Restart()
 {
-    print "Starting up testbed daemons.\n";
-    system("$STARTUP start");
-    if ($?) {
-	print "*** Could not restart testbed daemons.\n";
-	exit(1);
+    # Do not let the restart get interrupted. Bad.
+    $SIG{INT} = 'IGNORE';
+
+    if ($stopped) {
+	print "Starting up testbed daemons.\n";
+	system("$STARTUP start");
+	if ($?) {
+	    print "*** Could not restart testbed daemons.\n";
+	    exit(1);
+	}
+	print "\n";
     }
-    print "\n";
 
     print "Turning on the web interface and allowing swaps\n";
     if (system("$SETSITEVAR general/testbed_shutdown -") ||
@@ -102,9 +109,25 @@ sub Restart()
 }
 
 if ($ARGV[0] eq "boot") {
+    #
+    # What if the system is currently started? We do not want to start
+    # two copies of things. Look to see if stated and/or bootinfo are
+    # running, since these are the two most critical and quickly missed
+    # daemons.
+    #
+    if (CheckDaemonRunning("stated") || CheckDaemonRunning("bootinfo")) {
+	Fatal("Testbed appears to be running (stated and/or bootinfo running)");
+    }
     Restart();
     exit(0);
 }
+
+sub Handler()
+{
+    Restart();
+    exit(1);
+}
+$SIG{INT} = 'IGNORE';
 
 #
 # Stop the testbed before doing the update.
@@ -129,6 +152,7 @@ if ($?) {
 }
     
 print "-> Waiting a few seconds for testbed to quiet down ...\n";
+$SIG{INT} = \&Handler;
 sleep(5);
 print "-> Looking for experiments still in transition.\n";
 
@@ -164,6 +188,8 @@ system("$STARTUP stop >/dev/null 2>&1");
 if ($?) {
     Fatal("Could not stop testbed daemons. Stopping. Best to reboot!");
 }
+$stopped = 1;
+
 my $activeimages = Image->ActiveImages();
 if (defined($activeimages)) {
     my @activeimages = @{ $activeimages };
