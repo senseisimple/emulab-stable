@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCM;
@@ -3373,7 +3373,7 @@ sub ListUsage($)
 
 	    my $node = {"sliver_gid"    => $sliver->cert(),
 			"sliver_hrn"    => $sliver->hrn(),
-			"sliver_urn"    => $sliver->urn() };
+			"sliver_urn"    => $sliver->sliver_urn() };
 	    
 	    my $component = GeniComponent->Lookup($sliver->resource_uuid());
 	    if (defined($component)) {
