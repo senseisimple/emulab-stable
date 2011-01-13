@@ -3382,7 +3382,7 @@ sub ListUsage($)
 
 	    my $node = {"sliver_gid"    => $sliver->cert(),
 			"sliver_hrn"    => $sliver->hrn(),
-			"sliver_urn"    => $sliver->urn() };
+			"sliver_urn"    => $sliver->sliver_urn() };
 	    
 	    my $component = GeniComponent->Lookup($sliver->resource_uuid());
 	    if (defined($component)) {
