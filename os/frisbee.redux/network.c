@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -654,8 +654,9 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport,
 	}
 
 	memset(&msg, 0, sizeof msg);
-	strncpy((char *)msg.version, MS_MSGVERS_1, sizeof(msg.version));
-	msg.type = htonl(MS_MSGTYPE_GETREQUEST);
+	strncpy((char *)msg.hdr.version, MS_MSGVERS_1,
+		sizeof(msg.hdr.version));
+	msg.hdr.type = htonl(MS_MSGTYPE_GETREQUEST);
 	msg.body.getrequest.hostip = htonl(hostip);
 	if (askonly) {
 		msg.body.getrequest.status = 1;
@@ -669,25 +670,26 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport,
 	msg.body.getrequest.idlen = htons(len);
 	strncpy((char *)msg.body.getrequest.imageid, imageid, MS_MAXIDLEN);
 
-	len = sizeof msg.type + sizeof msg.body.getrequest;
+	len = sizeof msg.hdr + sizeof msg.body.getrequest;
 	if (!MsgSend(msock, &msg, len, timeout)) {
 		close(msock);
 		return 0;
 	}
 
 	memset(&msg, 0, sizeof msg);
-	len = sizeof msg.type + sizeof msg.body.getreply;
+	len = sizeof msg.hdr + sizeof msg.body.getreply;
 	if (!MsgReceive(msock, &msg, len, timeout)) {
 		close(msock);
 		return 0;
 	}
 
-	if (strncmp((char *)msg.version, MS_MSGVERS_1, sizeof(msg.version))) {
+	if (strncmp((char *)msg.hdr.version, MS_MSGVERS_1,
+		    sizeof(msg.hdr.version))) {
 		fprintf(stderr, "Got incorrect version from master server\n");
 		close(msock);
 		return 0;
 	}
-	if (ntohl(msg.type) != MS_MSGTYPE_GETREPLY) {
+	if (ntohl(msg.hdr.type) != MS_MSGTYPE_GETREPLY) {
 		fprintf(stderr, "Got incorrect reply from master server\n");
 		close(msock);
 		return 0;

@@ -1,12 +1,16 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2010 University of Utah and the Flux Group.
+ * Copyright (c) 2010-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 /*
  * Frisbee master server.  Listen for GET/PUT requests and fork off
  * handler processes.
+ * 
+ * TODO:
+ * - timeouts for child frisbee processes
+ * - make mirror mode work
  */
 #include <paths.h>
 #include <sys/stat.h>
@@ -167,6 +171,15 @@ struct childinfo {
 #define PTYPE_CLIENT	1
 #define PTYPE_SERVER	2
 
+struct clientextra {
+	char *realname;
+	/* info from our parent */
+	uint16_t sigtype;
+	uint8_t signature[MS_MAXSIGLEN];
+	uint32_t hisize;
+	uint32_t losize;
+};
+
 static struct childinfo *findchild(struct config_imageinfo *, int, int);
 static int startchild(struct childinfo *);
 static struct childinfo *startserver(struct config_imageinfo *,
@@ -228,6 +241,7 @@ copy_imageinfo(struct config_imageinfo *ii)
  * is non-zero, we just request info from our parent and return that.
  * Returns zero if Reply struct contains the desired info, TRYAGAIN if we
  * have started up a frisbee to fetch from our parent, or an error otherwise.
+ * Status is returned in host order.
  */
 int
 fetch_parent(struct in_addr *myip, struct in_addr *hostip,
@@ -235,6 +249,7 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 	     struct config_imageinfo *ii, int statusonly, GetReply *replyp)
 {
 	struct childinfo *ci;
+	struct clientextra *ce;
 	struct in_addr pif;
 	in_addr_t authip;
 	GetReply reply;
@@ -247,6 +262,72 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 	authip = usechildauth ? ntohl(hostip->s_addr) : 0;
 
 	/*
+	 * See if a fetch is already in progress.
+	 * If so we will either return "try again later" or point them to
+	 * our parent.
+	 */
+	ci = findchild(ii, PTYPE_CLIENT, ii->get_methods);
+	if (ci != NULL) {
+		if (debug)
+			info("%s: fetch from %s in progress",
+			     ii->imageid, inet_ntoa(*pip));
+
+		/*
+		 * Since a download is in progress we don't normally need
+		 * to revalidate since we wouldn't be downloading the image
+		 * if we didn't have access.
+		 *
+		 * However, when acting for a child, we do need to validate
+		 * every time since the child making the current request
+		 * might not have the same access as the child we are
+		 * currently downloading for.
+		 */
+		if (authip) {
+			if (!ClientNetFindServer(ntohl(pip->s_addr),
+						 pport, authip, ii->imageid,
+						 ii->get_methods, 1, 5,
+						 &reply, &pif))
+				return MS_ERROR_NOIMAGE;
+			if (reply.error)
+				return reply.error;
+
+		}
+		/*
+		 * We return the info we got from our parent.
+		 */
+		assert(ci->extra != NULL);
+		ce = ci->extra;
+
+		memset(replyp, 0, sizeof *replyp);
+		replyp->sigtype = ce->sigtype;
+		memcpy(replyp->signature, ce->signature, MS_MAXSIGLEN);
+		replyp->hisize = ce->hisize;
+		replyp->losize = ce->losize;
+		if (statusonly) {
+			if (debug)
+				info("%s: parent status: "
+				     "sigtype=%d, sig=0x%08x..., size=%x/%x",
+				     ii->imageid,
+				     ce->sigtype, *(uint32_t *)ce->signature,
+				     ce->hisize, ce->losize);
+			return 0;
+		}
+
+		/*
+		 * A real get request.
+		 * We either tell them to try again later or redirect them
+		 * to our parent.
+		 */
+		goto done;
+	}
+
+	if (debug)
+		info("%s: requesting %simage from %s",
+		     ii->imageid, (statusonly ? "status of ": ""),
+		     inet_ntoa(*pip));
+
+	/*
+	 * Image fetch is not in progress.
 	 * Send our parent a GET request and see what it says.
 	 */
 	if (!ClientNetFindServer(ntohl(pip->s_addr), pport, authip,
@@ -257,32 +338,21 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 		return reply.error;
 
 	/*
-	 * For a status call, we just return the image size and signature
+	 * Return the image size and signature from our parent
 	 */
+	memset(replyp, 0, sizeof *replyp);
+	replyp->sigtype = reply.sigtype;
+	memcpy(replyp->signature, reply.signature, MS_MAXSIGLEN);
+	replyp->hisize = reply.hisize;
+	replyp->losize = reply.losize;
 	if (statusonly) {
-		memset(replyp, 0, sizeof *replyp);
-		replyp->sigtype = reply.sigtype;
-		memcpy(replyp->signature, reply.signature, MS_MAXSIGLEN);
-		replyp->hisize = reply.hisize;
-		replyp->losize = reply.losize;
+		if (debug)
+			info("%s: parent status: "
+			     "sigtype=%d, sig=0x%08x..., size=%x/%x",
+			     ii->imageid,
+			     reply.sigtype, *(uint32_t *)reply.signature,
+			     reply.hisize, reply.losize);
 		return 0;
-	}
-
-	/*
-	 * See if a fetch is already in progress.
-	 * If so we will either return "try again later" or point them to
-	 * our parent.
-	 */
-	ci = findchild(ii, PTYPE_CLIENT, ii->get_methods);
-	if (ci != NULL) {
-		/*
-		 * XXX right now frisbeed doesn't support mutiple clients
-		 * on the same unicast address.  We could do multiple servers
-		 * for the same image, but we don't.
-		 */
-		if (ci->method == MS_METHOD_UNICAST)
-			return MS_ERROR_TRYAGAIN;
-		goto done;
 	}
 
 	/*
@@ -301,14 +371,31 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 		return rv;
 
 	/*
-	 * XXX more unicast hackary...if we are talking unicast with our
-	 * parent, we cannot redirect the child there as well.
+	 * Cache the size/signature info for use in future calls when
+	 * we are busy (the case above).
 	 */
-	if (ci->method == MS_METHOD_UNICAST)
-		return MS_ERROR_TRYAGAIN;
+	assert(ci->extra != NULL);
+	ce = ci->extra;
+	ce->sigtype = replyp->sigtype;
+	memcpy(ce->signature, replyp->signature, MS_MAXSIGLEN);
+	ce->hisize = replyp->hisize;
+	ce->losize = replyp->losize;
+	if (debug)
+		info("%s cache status: "
+		     "sigtype=%d, sig=0x%08x..., size=%x/%x",
+		     ii->imageid,
+		     ce->sigtype, *(uint32_t *)ce->signature,
+		     ce->hisize, ce->losize);
 
  done:
 	if (!canredirect)
+		return MS_ERROR_TRYAGAIN;
+
+	/*
+	 * XXX more unicast "fer now" hackary...if we are talking unicast with
+	 * our parent, we cannot redirect the child there as well.
+	 */
+	if (ci->method == MS_METHOD_UNICAST)
 		return MS_ERROR_TRYAGAIN;
 
 	memset(replyp, 0, sizeof *replyp);
@@ -319,6 +406,28 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 	return 0;
 }
 
+/*
+ * Handle a GET request.
+ *
+ * This can be either a request to get the actual image (status==0)
+ * or a request to get just the status of the image (status==1).
+ *
+ * A request for the actual image causes us to start up a frisbee server
+ * for the image if one is not already running.  If we are configured with
+ * a parent, we may need to first fetch the image from our parent with a
+ * GET request.  In this case, we may return a TRYAGAIN status while the
+ * image transfer is in progress. Alternatively, if we are configured to
+ * allow redirection, we could just point our client to our parent and allow
+ * them to download the image along side us.
+ *
+ * A request for status will not fire up a server, but may require a status
+ * call on our parent.  A status call will never return TRYAGAIN, it will
+ * always return the most recent status for an image or some other error.
+ * If we have a parent, we will always get its status for the image and
+ * return that if "newer" than ours. Thus status is a synchronous call that
+ * will return the attributes of the image that will ultimately be transferred
+ * to the client upon a GET request.
+ */
 void
 handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	   MasterMsg_t *msg)
@@ -327,7 +436,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	char imageid[MS_MAXIDLEN+1];
 	char clientip[sizeof("XXX.XXX.XXX.XXX")+1];
 	int len;
-	struct config_host_authinfo *ai;
+	struct config_host_authinfo *ai = NULL;
 	struct config_imageinfo *ii;
 	struct childinfo *ci;
 	struct stat sb;
@@ -363,12 +472,14 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		    imageid, op, clientip, methods);
 
 	memset(msg, 0, sizeof *msg);
-	msg->type = htonl(MS_MSGTYPE_GETREPLY);
-	strncpy((char *)msg->version, MS_MSGVERS_1, sizeof(msg->version));
+	msg->hdr.type = htonl(MS_MSGTYPE_GETREPLY);
+	strncpy((char *)msg->hdr.version, MS_MSGVERS_1,
+		sizeof(msg->hdr.version));
 
 	/*
 	 * If they request a method we don't support, reject them before
-	 * we do any other work.
+	 * we do any other work.  XXX maybe the method should not matter
+	 * for a status-only call?
 	 */
 	methods &= onlymethods;
 	if (methods == 0)
@@ -409,10 +520,6 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * that doesn't exist if the authentication check allows access to
 	 * the containing directory) and we have a parent, we request it
 	 * from the parent.
-	 *
-	 * N.B. right now, a status op (wantstatus) returns info about the
-	 * local state of an image, it does not fetch state from the parent
-	 * if the image doesn't exist or is out of date.
 	 */
 	isize = 0;
 	getfromparent = 0;
@@ -431,39 +538,98 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		 * If the file exists and we have a parent, get the signature
 		 * from the parent and see if we need to update our copy.
 		 */
-		if (!wantstatus && fetchfromabove) {
+		if (fetchfromabove) {
 			GetReply r;
+
+			log("%s: have local copy, STATUS from parent",
+			    imageid, op);
 
 			rv = fetch_parent(&sip->sin_addr, &host,
 					  &parentip, parentport, ii, 1, &r);
 			/*
-			 * If our parent is busy, we put off our client.
-			 * If there is any other error, we just use our
-			 * local copy under the assumption that our parent
-			 * doesn't know anything about this image.
+			 * If our parent returns failure for any reason
+			 * and we are mirroring, then we propogate the error
+			 * to our client.  Otherwise, we use the local copy
+			 * under the assumption that this is a strictly
+			 * local image and any overlap with the parent is
+			 * strictly coincidental.
+			 *
+			 * XXX this latter assumption is dubious; may need
+			 * to revisit or make the behavior explicit.
 			 */
 			if (rv) {
 				log("%s: failed getting parent status: %s, %s",
 				    imageid, GetMSError(rv),
-				    rv == MS_ERROR_TRYAGAIN ?
-				    "failing" : "using local copy");
-				if (rv == MS_ERROR_TRYAGAIN) {
+				    (mirrormode ?
+				     "failing" : "using local copy"));
+				if (mirrormode) {
 					msg->body.getreply.error = rv;
 					goto reply;
 				}
 			}
-			if (rv == 0 && r.sigtype == MS_SIGTYPE_MTIME &&
-			    *(time_t *)r.signature > sb.st_mtime) {
+			/*
+			 * Signature is out of date, fetch from our parent.
+			 * Return the attributes we got via the check above.
+			 *
+			 * XXX need checks for other signature types.
+			 */
+			if (rv == 0 &&
+			    (r.sigtype == MS_SIGTYPE_MTIME &&
+			     *(time_t *)r.signature > sb.st_mtime)) {
+				msg->body.getreply.sigtype = htons(r.sigtype);
+				if (r.sigtype == MS_SIGTYPE_MTIME) {
+					uint32_t mt;
+					mt = *(uint32_t *)r.signature;
+					*(uint32_t *)r.signature = htonl(mt);
+				}
+				memcpy(msg->body.getreply.signature,
+				       r.signature, MS_MAXSIGLEN);
+				msg->body.getreply.hisize = htonl(r.hisize);
+				msg->body.getreply.losize = htonl(r.losize);
+
+				if (wantstatus)
+					goto reply;
+
 				log("%s: local copy out of date, "
-				    "attempting %s from parent", imageid, op);
+				    "GET from parent", imageid);
 				getfromparent = 1;
 			}
 		}
-	} else if (fetchfromabove && !wantstatus) {
-		log("%s: no local copy, "
-		    "attempting %s from parent", imageid, op);
+	} else if (fetchfromabove) {
+		GetReply r;
+
+		log("%s: no local copy, %s from parent", imageid, op);
+
+		/*
+		 * We don't have the image, but we have a parent,
+		 * request the status as we did above. Any error is reflected
+		 * to our caller.
+		 */
+		rv = fetch_parent(&sip->sin_addr, &host,
+				  &parentip, parentport, ii, 1, &r);
+		if (rv) {
+			log("%s: failed getting parent status: %s, failing",
+			    imageid, GetMSError(rv));
+			msg->body.getreply.error = rv;
+			goto reply;
+		}
+		/*
+		 * And we must always fetch from the parent.
+		 * Return the attributes we got via the check above.
+		 */
+		msg->body.getreply.sigtype = htons(r.sigtype);
+		memcpy(msg->body.getreply.signature, r.signature,
+		       MS_MAXSIGLEN);
+		msg->body.getreply.hisize = htonl(r.hisize);
+		msg->body.getreply.losize = htonl(r.losize);
+
+		if (wantstatus)
+			goto reply;
 		getfromparent = 1;
 	} else {
+		/*
+		 * No image and no parent, just flat fail.
+		 */
 		rv = (errno == ENOENT) ? MS_ERROR_NOIMAGE : MS_ERROR_INVALID;
 		warning("%s: client %s %s failed: %s",
 			imageid, clientip, op, GetMSError(rv));
@@ -503,15 +669,16 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 				"using our stale copy",
 				imageid, clientip, op, GetMSError(rv));
 		}
-
 		/*
 		 * Otherwise, we are busy fetching the new copy (TRYAGAIN),
 		 * or we had a real failure and we don't have a copy.
 		 */
-		warning("%s: client %s %s from parent failed: %s",
-			imageid, clientip, op, GetMSError(rv));
-		msg->body.getreply.error = rv;
-		goto reply;
+		else {
+			warning("%s: client %s %s from parent failed: %s",
+				imageid, clientip, op, GetMSError(rv));
+			msg->body.getreply.error = rv;
+			goto reply;
+		}
 	}
 
 	/*
@@ -541,7 +708,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * on the same unicast address.  We could do multiple servers
 	 * for the same image, but we don't.
 	 */
-	if (ci != NULL && ci->method == MS_METHOD_UNICAST) {
+	if (!wantstatus && ci != NULL && ci->method == MS_METHOD_UNICAST) {
 		warning("%s: client %s %s failed: "
 			"unicast server already running",
 			imageid, clientip, op);
@@ -552,17 +719,14 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	if (ci == NULL) {
 		struct in_addr in;
 
-		if (wantstatus) {
-			if (ii->sig != NULL) {
-				int32_t mt = *(int32_t *)ii->sig;
-				assert((ii->flags & CONFIG_SIG_ISMTIME) != 0);
+		if (ii->sig != NULL) {
+			int32_t mt = *(int32_t *)ii->sig;
+			assert((ii->flags & CONFIG_SIG_ISMTIME) != 0);
 
-				msg->body.getreply.sigtype =
-					htons(MS_SIGTYPE_MTIME);
-				*(int32_t *)msg->body.getreply.signature =
-					htonl(mt);
-			}
-			config_free_host_authinfo(ai);
+			msg->body.getreply.sigtype = htons(MS_SIGTYPE_MTIME);
+			*(int32_t *)msg->body.getreply.signature = htonl(mt);
+		}
+		if (wantstatus) {
 			msg->body.getreply.method = methods;
 			msg->body.getreply.isrunning = 0;
 			msg->body.getreply.hisize = htonl(isize >> 32);
@@ -574,7 +738,6 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 				 ntohl(cip->sin_addr.s_addr),
 				 methods, &rv);
 		if (ci == NULL) {
-			config_free_host_authinfo(ai);
 			msg->body.getreply.error = rv;
 			goto reply;
 		}
@@ -585,14 +748,13 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	} else {
 		struct in_addr in;
 
-		if (wantstatus && ii->sig != NULL) {
+		if (ii->sig != NULL) {
 			int32_t mt = *(int32_t *)ii->sig;
 			assert((ii->flags & CONFIG_SIG_ISMTIME) != 0);
 
 			msg->body.getreply.sigtype = htons(MS_SIGTYPE_MTIME);
 			*(int32_t *)msg->body.getreply.signature = htonl(mt);
 		}
-		config_free_host_authinfo(ai);
 		in.s_addr = htonl(ci->addr);
 		if (wantstatus)
 			log("%s: STATUS is running %s on %s:%d (pid %d)",
@@ -626,9 +788,18 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 
  reply:
 	msg->body.getreply.error = htons(msg->body.getreply.error);
-	len = sizeof msg->type + sizeof msg->body.getreply;
+	if (debug) {
+		info("%s reply: sigtype=%d, sig=0x%08x..., size=%x/%x",
+		     op, ntohs(msg->body.getreply.sigtype),
+		     ntohl(*(uint32_t *)msg->body.getreply.signature),
+		     ntohl(msg->body.getreply.hisize),
+		     ntohl(msg->body.getreply.losize));
+	}
+	len = sizeof msg->hdr + sizeof msg->body.getreply;
 	if (!MsgSend(sock, msg, len, 10))
 		error("%s: could not send reply", inet_ntoa(cip->sin_addr));
+	if (ai)
+		config_free_host_authinfo(ai);		
 }
 
 static void
@@ -651,22 +822,22 @@ handle_request(int sock)
 	}
 
 	cc = read(sock, &msg, sizeof msg);
-	if (cc < sizeof msg.type) {
+	if (cc < sizeof msg.hdr) {
 		if (cc < 0)
 			perror("request message failed");
 		else
 			error("request message too small");
 		return;
 	}
-	switch (ntohl(msg.type)) {
+	switch (ntohl(msg.hdr.type)) {
 	case MS_MSGTYPE_GETREQUEST:
-		if (cc < sizeof msg.type + sizeof msg.body.getrequest)
+		if (cc < sizeof msg.hdr + sizeof msg.body.getrequest)
 			error("request message too small");
 		else
 			handle_get(sock, &me, &you, &msg);
 		break;
 	default:
-		error("unreconized message type %d", ntohl(msg.type));
+		error("unreconized message type %d", ntohl(msg.hdr.type));
 		break;
 	}
 }
@@ -674,7 +845,20 @@ handle_request(int sock)
 static void
 usage(void)
 {
-	fprintf(stderr, "mfrisbeed [-d]\n");
+	fprintf(stderr, "mfrisbeed [-ADRd] [-C method] [-I imagedir] [-S parentIP] [-P parentport] [-p port]\n");
+	fprintf(stderr, "Basic:\n");
+	fprintf(stderr, "  -C <method> transfer methods to allow: ucast, mcast, bcast or any\n");
+	fprintf(stderr, "  -I <dir>    default directory where images are stored\n");
+	fprintf(stderr, "  -p <port>   port to listen on\n");
+	fprintf(stderr, "Debug:\n");
+	fprintf(stderr, "  -d          debug mode; does not daemonize\n");
+	fprintf(stderr, "  -D          dump configuration and exit\n");
+	fprintf(stderr, "Proxying:\n");
+	fprintf(stderr, "  -S <parent> parent name or IP\n");
+	fprintf(stderr, "  -P <pport>  parent port to contact\n");
+	fprintf(stderr, "  -A          pass on authentication info from our child to parent\n");
+	fprintf(stderr, "  -M          act as a strict mirror for our parent\n");
+	fprintf(stderr, "  -R          redirect child to parent if local image not available\n");
 	exit(-1);
 }
 
@@ -683,7 +867,7 @@ get_options(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "AC:DI:RS:P:p:dh")) != -1)
+	while ((ch = getopt(argc, argv, "AC:DI:MRS:P:p:dh")) != -1)
 		switch(ch) {
 		case 'A':
 			usechildauth = 1;
@@ -977,9 +1161,15 @@ finishclient(struct childinfo *ci, int status)
 {
 	char *bakname, *tmpname, *realname;
 	int len, didbackup;
+	struct clientextra *ce;
+	time_t mtime = 0;
 
 	assert(ci->extra != NULL);
-	realname = ci->extra;
+	ce = ci->extra;
+	realname = ce->realname;
+	if (ce->sigtype == MS_SIGTYPE_MTIME)
+		mtime = *(time_t *)ce->signature;
+	free(ci->extra);
 	ci->extra = NULL;
 	tmpname = ci->imageinfo->path;
 	ci->imageinfo->path = realname;
@@ -989,6 +1179,15 @@ finishclient(struct childinfo *ci, int status)
 		      realname, tmpname);
 		unlink(tmpname);
 		return;
+	}
+
+	if (mtime > 0) {
+		struct timeval tv[2];
+		gettimeofday(&tv[0], NULL);
+		tv[1].tv_sec = mtime;
+		tv[1].tv_usec = 0;
+		if (utimes(tmpname, tv) < 0)
+			warning("%s: failed to set mtime", tmpname);
 	}
 
 	len = strlen(realname) + 5;
@@ -1013,6 +1212,7 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	    in_addr_t addr, in_port_t port, int methods, int *errorp)
 {
 	struct childinfo *ci;
+	struct clientextra *ce;
 	char *tmpname;
 	int len;
 
@@ -1033,13 +1233,21 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	ci->ptype = PTYPE_CLIENT;
 	ci->retries = 0;
 
+	ce = ci->extra = malloc(sizeof(struct clientextra));
+	if (ce == NULL) {
+		free(ci);
+		*errorp = MS_ERROR_FAILED;
+		return NULL;
+	}
+	memset(ce, 0, sizeof(*ce));
+
 	/*
 	 * Arrange to download the image as <path>.tmp and then
 	 * rename it into place when done.
 	 */
 	len = strlen(ci->imageinfo->path) + 5;
 	if ((tmpname = malloc(len)) != NULL) {
-		ci->extra = ci->imageinfo->path;
+		ce->realname = ci->imageinfo->path;
 		snprintf(tmpname, len, "%s.tmp", ci->imageinfo->path);
 		ci->imageinfo->path = tmpname;
 		ci->done = finishclient;

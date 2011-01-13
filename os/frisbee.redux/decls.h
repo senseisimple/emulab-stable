@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -351,8 +351,10 @@ typedef struct {
 } __attribute__((__packed__)) GetReply;
 
 typedef struct {
-	int8_t			version[4];
-	int32_t			type;
+	struct {
+		int8_t		version[4];
+		int32_t		type;
+	} hdr;
 	union {
 		GetRequest	getrequest;
 		GetReply	getreply;

@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2010-2011 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * Configuration "file" handling for Emulab.
  *
  * Uses info straight from the Emulab database.

@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2010-2011 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * Configuration file functions.
  */
 #include <stdio.h>
@@ -46,13 +52,17 @@ config_init(int readit)
 
 #ifdef USE_EMULAB_CONFIG
 	extern struct config *emulab_init();
-	if (myconfig == NULL)
-		myconfig = emulab_init();
+	if (myconfig == NULL) {
+		if ((myconfig = emulab_init()) != NULL)
+			log("Using Emulab configuration");
+	}
 #endif
 #ifdef USE_NULL_CONFIG
 	extern struct config *null_init();
-	if (myconfig == NULL)
-		myconfig = null_init();
+	if (myconfig == NULL) {
+		if ((myconfig = null_init()) != NULL)
+			log("Using default configuration");
+	}
 #endif
 	if (myconfig == NULL)
 		return -1;

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -687,7 +687,6 @@ PrintGetInfo(char *imageid, GetReply *reply, int raw)
 		printf("sigtype=0x%x\n", reply->sigtype);
 		switch (reply->sigtype) {
 		case MS_SIGTYPE_MTIME:
-			/* XXX has been converted to 32-bit host order */
 			printf("sig=0x%x\n", *(uint32_t *)reply->signature);
 			len = 0;
 			break;

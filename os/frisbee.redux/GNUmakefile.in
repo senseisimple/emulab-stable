@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -34,7 +34,7 @@ endif
 endif
 
 WITH_MSERVER_NULL	= 1
-WITH_MSERVER_EMULAB	= 0
+WITH_MSERVER_EMULAB	= 1
 
 include $(OBJDIR)/Makeconf
 
