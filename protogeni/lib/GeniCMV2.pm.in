@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCMV2;
@@ -99,6 +99,7 @@ sub Resolve($)
     my $credentials = $argref->{'credentials'};
     my $urn         = $argref->{'urn'};
     my $admin       = 0;
+    my $isauth	    = 0;
 
     if (! (defined($credentials) && defined($urn))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
@@ -117,11 +118,18 @@ sub Resolve($)
     #
     # This is a convenience for testing. If a local user and that
     # user is an admin person, then do whatever it says. This is
-    # easier then trying to do this with credential privs.
+    # easier then trying to do this with credential privs. But,
+    # watch for credentials from authorities instead of users.
     #
-    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (defined($user) && $user->IsLocal() && $user->admin()) {
-	$admin = 1;
+    my (undef,$callertype,$callerid) = GeniHRN::Parse($credential->owner_urn());
+    if ($callertype eq "user") {
+	my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+	if (defined($user) && $user->IsLocal() && $user->admin()) {
+	    $admin = 1;
+	}
+    }
+    elsif ($callertype eq "authority" && $callerid eq "cm") {
+	$isauth = 1;
     }
     
     if ($type eq "node") {
@@ -191,7 +199,8 @@ sub Resolve($)
 	# In this implementation, the caller must hold a valid slice
 	# credential for the slice being looked up. 
 	#
-	if (! ($admin || $slice->urn() eq $credential->target_urn())) {
+	if (! ($isauth || $admin ||
+	       $slice->urn() eq $credential->target_urn())) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
 	}
 	# Return a blob.
@@ -200,6 +209,10 @@ sub Resolve($)
 	my $aggregate = GeniAggregate->SliceAggregate($slice);
 	if (defined($aggregate)) {
 	    $blob->{'sliver_urn'} = $aggregate->urn();
+	    my $manifest = $aggregate->GetManifest(1);
+	    if (defined($manifest)) {
+		$blob->{'manifest'}   = $manifest;
+	    }
 	}
 	my $ticket = GeniTicket->SliceTicket($slice);
 	if (defined($ticket)) {
@@ -625,8 +638,6 @@ sub SliverAction($$$$$)
     my ($action, $slice_urn, $sliver_urns, $credentials, $manifest) = @_;
     my $response;
 
-    print STDERR "fooey\n";
-    
     if (! (defined($credentials) &&
 	   (defined($slice_urn) || defined($sliver_urns)))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
