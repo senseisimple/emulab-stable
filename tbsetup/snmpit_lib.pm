@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ use Exporter;
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks getStacksForSwitches
-		getStackType getStackLeader
+		getStackType getStackLeader filterVlansBySwitches
 		getDeviceOptions getTrunks getTrunksFromSwitches
                 getTrunkHash 
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
@@ -386,6 +386,45 @@ sub getPlannedStacksForVlans(@) {
         print("getPlannedStacksForVlans: got stacks " . join(",",@stacks) . "\n");
     }
     return @stacks;
+}
+
+#
+# Filter a set of vlans by devices; return only those vlans that exist
+# on the set of provided stacks. Do not worry about vlans that cross
+# stacks; that is caught higher up.
+#
+sub filterVlansBySwitches($@) {
+    my ($devref, @vlans) = @_;
+    my @result   = ();
+    my %devices  = ();
+
+    if ($debug) {
+	print("filterVlansBySwitches: " . join(",", @{ $devref }) . "\n");
+    }
+
+    foreach my $device (@{ $devref }) {
+	$devices{$device} = $device;
+    }
+    
+    foreach my $vlanid (@vlans) {
+	my @ports = getVlanPorts($vlanid);
+	if ($debug) {
+	    print("filterVlansBySwitches: ".
+		  "ports for $vlanid: " . join(",",@ports) . "\n");
+	}
+	my @tmp = getDeviceNames(@ports);
+	if ($debug) {
+	    print("filterVlansBySwitches: ".
+		  "devices for $vlanid: " . join(",",@tmp) . "\n");
+	}
+	foreach my $device (@tmp) {
+	    if (exists($devices{$device})) {
+		push(@result, $vlanid);
+		last;
+	    }
+	}
+    }
+    return @result;
 }
 
 #

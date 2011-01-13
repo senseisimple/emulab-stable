@@ -440,7 +440,7 @@ if (!@commands) {
 # User-supplied switch lists
 #
 my @supplied_switches = ();
-my @supplied_stacks = ();
+my @supplied_stacks   = ();
 my $supplied_switches = 0; # Whether -i or -S was given
 if ($opt{i}) {
     $supplied_switches = 1;
@@ -457,6 +457,7 @@ if ($opt{S}) {
 	    my @switches = getSwitchesInStack($stack);
 	    if (@switches) {
 		push @supplied_stacks, $stack;
+		push @supplied_switches, @switches;
 	    } else {
 		tbdie({type => 'primary', severity => SEV_ERROR,
 		       error => ['invalid_switch_stack', $stack]},
@@ -465,6 +466,8 @@ if ($opt{S}) {
 	}
     }
 }
+@supplied_switches = uniq(@supplied_switches);
+@supplied_stacks   = uniq(@supplied_stacks);
 
 #
 # Arguments for making private VLANs
@@ -661,6 +664,13 @@ COMMAND: foreach my $command (@commands) {
             if ($supplied_switches) {
                 debug("Tables: using supplied switches\n");
                 @devicenames = @supplied_switches;
+		@vlans = filterVlansBySwitches(\@supplied_switches, @vlans);
+		if (!@vlans) {
+		    print "snmpit: $pid/$eid has no VLANs to create ".
+			"on supplied devices, skipping\n"
+			if (!$quiet);
+		    next COMMAND;
+		}
             } else {
                 @devicenames =
                     getSwitchesInStacks(getPlannedStacksForVlans(@vlans));
@@ -693,6 +703,13 @@ COMMAND: foreach my $command (@commands) {
             if ($supplied_switches) {
                 debug("Reset: using supplied switches\n");
                 @devicenames = @supplied_switches;
+		@vlans = filterVlansBySwitches(\@supplied_switches, @vlans);
+		if (!@vlans) {
+		    print "snmpit: $pid/$eid has no VLANs to reset ".
+			"on supplied devices, skipping\n"
+			if (!$quiet);
+		    next COMMAND;
+		}
             } else {
                 @devicenames =
                     getSwitchesInStacks(getActualStacksForVlans(@vlans));
@@ -710,35 +727,30 @@ COMMAND: foreach my $command (@commands) {
 	};
 	(/synctables/) && do {
             # We operate on all stacks on which we think VLANs do, or should,
-            # exist
+            # exist.
+	    my @newvlans = getExperimentVlans($pid,$eid,@optvlanids);
+	    my @oldvlans;
+	    VLan->StaleVlanList($experiment,\@oldvlans);
+	    my @vlans = uniq(@newvlans, @oldvlans);
+
             if ($supplied_switches) {
                 debug("Sync: using supplied switches\n");
                 @devicenames = @supplied_switches;
+		@vlans = filterVlansBySwitches(\@supplied_switches, @vlans);
+		if (!@vlans) {
+		    print "snmpit: $pid/$eid has no VLANs to sync ".
+			"on supplied devices, skipping\n"
+			if (!$quiet);
+		    next COMMAND;
+		}
             } else {
-                # Get both the VLANs that do exist and the VLANs that should
-                # exist
-                my @newvlans = getExperimentVlans($pid,$eid,@optvlanids);
                 @devicenames =
-                    getSwitchesInStacks(getPlannedStacksForVlans(@newvlans));
-                debug("Sync: New devices are " . join(",",@devicenames) .
-                    "\n");
-
-                my @oldvlans;
-                VLan->StaleVlanList($experiment,\@oldvlans);
-                my @oldports;
-                foreach my $oldvlan (@oldvlans) {
-                    push @oldports, getExperimentVlanPorts($oldvlan);
-                }
-                push @devicenames,
-                    getSwitchesInStacks(getStacksForSwitches(getDeviceNames(@oldports)));
-                debug("Sync: With old devices, list is " .
-                    join(",",@devicenames) .  "\n");
-
-                @devicenames = uniq(@devicenames);
+                    getSwitchesInStacks(getPlannedStacksForVlans(@vlans));
+                debug("Sync: list from database: " . join(",",@devicenames) .
+		      "\n");
             }
-
             # Fallthrough - if we haven't found any switches yet, operate
-            # on the whole experimetnal net
+            # on the whole experimental net
             if (scalar(@devicenames) == 0) {
                 debug("Reset: falling back to test swtiches\n");
                 @devicenames = getTestSwitches();
@@ -817,21 +829,13 @@ COMMAND: foreach my $command (@commands) {
     my %stacks = ();
     if (! $ELABINELAB) {
 	#
-	# First, look at the device names we've got and map them to stacks 
+	# Map all the devices to stacks.
 	#
 	foreach my $devicename (@devicenames) {
 	    my $stack = getSwitchPrimaryStack($devicename);
 	    if (defined($stack)) {
 		push @{$stacks{$stack}}, $devicename;
 	    }
-	}
-	#
-	# Next, add in stacks that were specified as a whole
-	#
-	foreach my $stack (@supplied_stacks) {
-	    # We checked for non-existent stacks above
-	    my @switches = getSwitchesInStack($stack);
-	    push @{$stacks{$stack}}, @switches;
 	}
     }
 
