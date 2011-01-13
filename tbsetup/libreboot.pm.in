@@ -130,6 +130,7 @@ sub nodereboot($$)
     my $reconfig    = 0;
     my $asyncmode   = 0;
     my $pipemode    = 0;
+    my $force       = 0;
 
     $powercycle  = $args->{'powercycle'} if (exists($args->{'powercycle'}));
     $rebootmode  = $args->{'rebootmode'} if (exists($args->{'rebootmode'}));
@@ -141,6 +142,7 @@ sub nodereboot($$)
     $prepare     = $args->{'prepare'}    if (exists($args->{'prepare'}));
     $reconfig    = $args->{'reconfig'}   if (exists($args->{'reconfig'}));
     $asyncmode   = $args->{'asyncmode'}  if (exists($args->{'asyncmode'}));
+    $force       = $args->{'force'}      if (exists($args->{'force'}));
 
     #
     # If pipeno is specified in the environment, we write the results to
@@ -179,7 +181,7 @@ sub nodereboot($$)
 	my $rebootable = $nodeobject->rebootable();
 
 	$nodeobjects{$node} = $nodeobject;
-	push(@temp,$node) if $rebootable;
+	push(@temp,$node) if ($rebootable || $force);
     }
     @nodes = @temp;
     # END XXX
@@ -1029,6 +1031,8 @@ sub nodereboot_exec($$)
 	if (exists($args->{'reconfig'}) && $args->{'reconfig'});
     $cmdline .= " -W$args->{waittime}"
 	if (exists($args->{'waittime'}) && $args->{'waittime'});
+    $cmdline .= " -F"
+	if (exists($args->{'force'}));
     $cmdline .= " @{ $args->{'nodelist'}}";
     
     $asyncmode = $args->{'asyncmode'} if (exists($args->{'asyncmode'}));

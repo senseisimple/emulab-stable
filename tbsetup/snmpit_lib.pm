@@ -15,7 +15,7 @@ use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum portiface Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
-                getSwitchesInStacks
+                getSwitchesInStacks getVlanIfaces
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
 		getExperimentTrunks setVlanTag setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
@@ -33,7 +33,7 @@ use Exporter;
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
 	        getExperimentVlanPorts
-                uniq);
+                uniq isSwitchPort getPathVlanIfaces);
 
 use English;
 use libdb;
@@ -161,6 +161,128 @@ sub ReadTranslationTable {
 }
 
 #
+# Return an array of ifaces belonging to the VLAN
+#
+sub getVlanIfaces($) {
+    my $vlanid = shift;
+    my @ports = ();
+
+    my $vlan = VLan->Lookup($vlanid);
+    if (!defined($vlan)) {
+        die("*** $0:\n".
+	    "    No vlanid $vlanid in the DB!\n");
+    }
+    my @members;
+    if ($vlan->MemberList(\@members) != 0) {
+        die("*** $0:\n".
+	    "    Unable to load members for $vlan\n");
+	}
+    foreach my $member (@members) {
+	my $nodeid;
+	my $iface;
+	
+	if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
+	    $member->GetAttribute("iface", \$iface) != 0) {
+	    die("*** $0:\n".
+		"    Missing attributes for $member in $vlan\n");
+	}
+	push(@ports, "$nodeid:$iface");
+    }
+
+    return @ports;
+}
+
+#
+# Get real ifaces on switch node in a VLAN that implements a path
+# that consists of two layer 1 connections and also has a switch as
+# the middle node.
+#
+sub getPathVlanIfaces($$) {
+    my $vlanid = shift;
+    my $ifaces = shift;
+
+    my $vlan = VLan->Lookup($vlanid);
+    my $experiment = $vlan->GetExperiment();
+    my $pid = $experiment->pid();
+    my $eid = $experiment->eid();
+    
+    my %ifacesonswitchnode = ();
+    
+    # find the underline path of the link
+    my $query_result =
+	DBQueryWarn("select distinct implemented_by_path from ".
+		    "virt_lans where pid='$pid' and eid='$eid' and vname='".
+		    $vlan->vname()."';");
+    if (!$query_result || !$query_result->numrows) {
+	warn "Can't find VLAN $vlanid definition in DB.";
+	return -1;
+    }
+
+    # default implemented_by is empty
+    my ($path) = $query_result->fetchrow_array();
+    if (!$path || $path eq "") {
+	print "VLAN $vlanid is not implemented by a path\n" if $debug;
+	return -1;
+    }
+
+    # find the segments of the path
+    $query_result = DBQueryWarn("select segmentname, segmentindex from virt_paths ".
+				"where pid='$pid' and eid='$eid' and pathname='$path';");
+    if (!$query_result || !$query_result->numrows) {
+	warn "Can't find path $path definition in DB.";
+	return -1;
+    }
+
+    if ($query_result->numrows > 2) {
+	warn "We can't handle the path with more than two segments.";
+	return -1;
+    }
+    
+    my @vlans = ();
+    VLan->ExperimentVLans($experiment, \@vlans);
+    
+    while (my ($segname, $segindex) = $query_result->fetchrow())
+    {
+	foreach my $myvlan (@vlans)
+	{	    
+	    if ($myvlan->vname eq $segname) {
+		my @members;
+
+		$vlan->MemberList(\@members);		
+		foreach my $member (@members) {
+		    my ($node,$iface);
+
+		    $member->GetAttribute("node_id",  \$node);
+		    $member->GetAttribute("iface", \$iface);
+
+		    if ($myvlan->IsMember($node, $iface)) {
+			my @pref;
+
+			$myvlan->PortList(\@pref);
+
+			# only two ports allowed in the vlan
+			if (@pref != 2) {
+			    warn "Vlan ".$myvlan->id()." doesnot have exact two ports.\n";
+			    return -1;
+			}
+
+			if ($pref[0] eq "$node:$iface") {
+			    $ifacesonswitchnode{"$node:$iface"} = $pref[1];
+			} else {
+			    $ifacesonswitchnode{"$node:$iface"} = $pref[0];
+			}
+		    }
+		}
+	    }
+	}
+    }
+
+    %$ifaces = %ifacesonswitchnode;
+    return 0;
+}
+
+
+#
 # Returns an array of ports (in node:card form) used by the given VLANs
 #
 sub getVlanPorts (@) {
@@ -172,27 +294,8 @@ sub getVlanPorts (@) {
     my @ports = ();
 
     foreach my $vlanid (@vlans) {
-	my $vlan = VLan->Lookup($vlanid);
-	if (!defined($vlan)) {
-	    die("*** $0:\n".
-		"    No vlanid $vlanid in the DB!\n");
-	}
-	my @members;
-	if ($vlan->MemberList(\@members) != 0) {
-	    die("*** $0:\n".
-		"    Unable to load members for $vlan\n");
-	}
-	foreach my $member (@members) {
-	    my $nodeid;
-	    my $iface;
-
-	    if ($member->GetAttribute("node_id", \$nodeid) != 0 ||
-		$member->GetAttribute("iface", \$iface) != 0) {
-		die("*** $0:\n".
-		    "    Missing attributes for $member in $vlan\n");
-	    }
-	    push(@ports, "$nodeid:$iface");
-	}
+	my @ifaces = getVlanIfaces($vlanid);
+	push @ports, @ifaces;
     }
     # Convert from the DB format to the one used by the snmpit modules
     return convertPortsFromIfaces(@ports);
@@ -417,19 +520,62 @@ sub convertPortsFromIfaces(@) {
 sub convertPortFromIface($) {
     my ($port) = $_;
     if ($port =~ /(.+):(.+)/) {
-        my ($node,$iface) =  ($1,$2);
-        my $result = DBQueryFatal("SELECT card FROM interfaces " .
-            "WHERE node_id='$node' AND iface='$iface'");
+	my ($node,$iface) =  ($1,$2);
+        my $result = DBQueryFatal("SELECT card, port FROM interfaces " .
+				  "WHERE node_id='$node' AND iface='$iface'");
         if (!$result->num_rows()) {
             warn "WARNING: convertPortFromIface($port) - Unable to get card\n";
             return $port;
         }
-        my $card = ($result->fetchrow())[0];
+        my @row = $result->fetchrow();
+        my $card = $row[0];
+        my $cport = $row[1];
+
+        $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+                               "(SELECT type FROM nodes WHERE node_id='$node')");
+
+        if (!$result->num_rows()) {
+            warn "WARNING: convertPortFromIface($port) -".
+                " Uable to decide if $node is a switch or not\n";
+            return $port;
+        }
+
+        if (($result->fetchrow())[0] == 1) {
+	    #
+	    # Should return the later one, but many places in snmpit
+	    # and this file depend on the old format...
+	    #
+            return "$node:$card";
+            #return "$node:$card.$cport";                                            
+        }
+
         return "$node:$card";
+
     } else {
         warn "WARNING: convertPortFromIface($port) - Bad port format\n";
         return $port;
     }
+}
+
+#                                                                                    
+# If a port is on switch, some port ops in snmpit                                    
+# should be avoided.                                                                 
+#                                                                                    
+sub isSwitchPort($) {
+    my $port = shift;
+
+    if ($port =~ /^(.+):(.+)/) {
+        my $node = $1;
+
+        my $result = DBQueryFatal("SELECT isswitch FROM node_types WHERE type IN ".
+                                  "(SELECT type FROM nodes WHERE node_id='$node')");
+
+        if (($result->fetchrow())[0] == 1) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 #
@@ -579,6 +725,13 @@ sub getDeviceType ($) {
 sub getInterfaceSettings ($) {
 
     my ($interface) = @_;
+
+    #
+    # Switch ports are evil and we don't touch them.
+    #
+    if (isSwitchPort($interface)) {
+	return ();
+    }
 
     $interface =~ /^(.+):(\d+)$/;
     my ($node, $port) = ($1, $2);

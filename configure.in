@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 AC_PREREQ(2.13)
@@ -857,14 +857,16 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile \
-	db/Experiment.pm db/Group.pm db/Interface.pm db/Node.pm \
-	db/NodeType.pm db/Project.pm db/User.pm db/Image.pm db/OSinfo.pm \
+	db/EmulabConstants.pm db/EmulabFeatures.pm db/Experiment.pm \
+	db/Firewall.pm db/Group.pm db/Image.pm db/Interface.pm \
+	db/Lan.pm db/Logfile.pm db/Node.pm db/NodeType.pm db/OSinfo.pm \
+	db/Project.pm db/User.pm db/VirtExperiment.pm \
 	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	db/dumperrorlog.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/emdb.pm db/emdbi.pm \
+	db/emdb.pm db/emdbi.pm db/emutil.pm \
 	db/dhcpd_makeconf db/nodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
