@@ -1188,43 +1188,6 @@ mystrdup(const char *str)
 	return nstr;
 }
 
-#if 0
-/*
- * XXX Gak! Override some logging functions that the tbdb mysql code uses.
- * Otherwise we are going to have log messages going every which way.
- */
-void
-info(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	log_vwrite(LOG_INFO, fmt, args);
-	va_end(args);
-}
-
-void
-error(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	log_vwrite(LOG_ERR, fmt, args);
-	va_end(args);
-}
-
-void
-warning(const char *fmt, ...)
-{
-	va_list args;
-
-	va_start(args, fmt);
-	log_vwrite(LOG_ERR, fmt, args);
-	va_end(args);
-}
-
-#endif
-
 #else
 struct config *
 emulab_init(void)

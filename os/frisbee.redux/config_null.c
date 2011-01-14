@@ -13,6 +13,8 @@
 #ifdef USE_NULL_CONFIG
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -20,6 +22,8 @@
 #include <assert.h>
 #include "log.h"
 #include "configdefs.h"
+
+static int debug = 1;
 
 static char *DEFAULT_IMAGEDIR	= "/usr/local/images";
 static char *DEFAULT_MCADDR	= "239.192.1";
@@ -31,6 +35,9 @@ static char *rimagedir;
 
 /* Multicast address/port base info */
 static int mc_a, mc_b, mc_c, mc_port;
+
+static char *imageidtopath(char *imageid);
+static char *myrealpath(char *path, char rpath[PATH_MAX]);
 
 /* Memory alloc functions that abort when no memory */
 static void *mymalloc(size_t size);
@@ -179,6 +186,7 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 		fclose(fd);
 		return 1;
 	}
+	fclose(fd);
 
 	a = mc_a;
 	b = mc_b;
@@ -208,27 +216,12 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 	}
 	*portp = mc_port + (((c << 8) | d) & 0x7FFF);
 
+	if (debug)
+		fprintf(stderr,
+			"get_server_address: idx %d, addr 0x%x, port %d\n",
+			idx, *addrp, *portp);
+
 	return 0;
-}
-
-/*
- * Return one if 'path' is in 'dir'; i.e., is 'dir' a prefix of 'path'?
- * Note: returns zero if path == dir.
- * Note: assumes realpath has been run on both.
- */
-static int
-isindir(char *dir, char *path)
-{
-	int len = dir ? strlen(dir) : 0;
-	int rv = 1;
-
-	if (dir == NULL || path == NULL || *dir == '\0' || *path == '\0' ||
-	    strncmp(dir, path, len) || path[len] != '/')
-		rv = 0;
-	if (0)
-		fprintf(stderr, "isindir(dir=%s, path=%s) => %d\n",
-			dir ? dir : "", path ? path : "", rv);
-	return rv;
 }
 
 /*
@@ -345,13 +338,31 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		       struct config_host_authinfo **getp,
 		       struct config_host_authinfo **putp)
 {
-	char rpath[PATH_MAX], *path;
 	struct config_host_authinfo *get = NULL, *put = NULL;
 	struct config_imageinfo *ci;
 	struct stat sb;
+	int exists;
+	char *path = NULL;
 
-	if (getp == NULL && putp == NULL)
+	/*
+	 * If the requester is not the same as the host, then it is a proxy
+	 * request.  We don't do proxying.
+	 */
+	if (req->s_addr != host->s_addr)
+		return 1;
+
+	/*
+	 * If an imageid is specified and it doesn't resolve to a valid
+	 * path, it is an error.
+	 */
+	if (imageid != NULL && (path = imageidtopath(imageid)) == NULL)
+		return 1;
+
+	if (getp == NULL && putp == NULL) {
+		if (path)
+			free(path);
 		return 0;
+	}
 
 	if (getp) {
 		get = mymalloc(sizeof *get);
@@ -360,16 +371,6 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	if (putp) {
 		put = mymalloc(sizeof *put);
 		memset(put, 0, sizeof(*put));
-	}
-
-	/*
-	 * If the requester is not the same as the host, then it is a proxy
-	 * request.  We don't do proxying.
-	 */
-	if (req->s_addr != host->s_addr) {
-		null_free_host_authinfo(get);
-		null_free_host_authinfo(put);
-		return 1;
 	}
 
 	/*
@@ -392,101 +393,61 @@ null_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	}
 
 	/*
-	 * If imageid is specified and starts with a '/', it is an
-	 * absolute path.  We prepend imagedir if it doesn't already
-	 * exist.
+	 * Need to make sure path really exists.
 	 *
-	 * If it doesn't start with a '/' we prepend imagedir.
+	 * imageidtopath will return success even when the final component
+	 * does not exist.  That is alright for a put, but not a get.
+	 * What do we return for flags on a PUT?  What about sig?
 	 */
-	assert(imagedir && imagedir[0]);
-	if (imageid[0] != '/' ||
-	    strstr(imageid, imagedir) != imageid) {
-		path = mymalloc(strlen(imagedir)+strlen(imageid)+2);
-		strcpy(path, imagedir);
-		if (imageid[0] != '/')
-			strcat(path, "/");
-		strcat(path, imageid);
-	} else
-		path = mystrdup(imageid);
+	if (stat(path, &sb) < 0)
+		exists = 0;
+	else
+		exists = 1;
 
 	/*
-	 * Run it through realpath.
-	 * If it returns success, make sure it falls in our image directory.
+	 * Otherwise, return this image
 	 */
-	rpath[0] = '\0';
-	if (realpath(path, rpath) != NULL) {
-		int exists;
-
-		if (strstr(rpath, rimagedir) != rpath) {
-			free(path);
-			goto done;
-		}
-
-		/*
-		 * Also need to make sure file really exists.
-		 * realpath return OK even when the final component does
-		 * not exist.  That is alright for a put, but not a get.
-		 * What do we return for flags on a PUT?  What about sig?
-		 */
-		if (stat(path, &sb) < 0) {
-			exists = 0;
+	if (put != NULL) {
+		put->imageinfo = mymalloc(sizeof(struct config_imageinfo));
+		put->numimages = 1;
+		ci = &put->imageinfo[0];
+		ci->imageid = mystrdup(imageid);
+		ci->path = mystrdup(path);
+		ci->flags = CONFIG_PATH_ISFILE;
+		if (exists) {
+			ci->sig = mymalloc(sizeof(time_t));
+			*(time_t *)ci->sig = sb.st_mtime;
+			ci->flags |= CONFIG_SIG_ISMTIME;
 		} else
-			exists = 1;
-
-		/*
-		 * Otherwise, return this image
-		 */
-		if (put != NULL) {
-			put->imageinfo =
-				mymalloc(sizeof(struct config_imageinfo));
-			put->numimages = 1;
-			ci = &put->imageinfo[0];
-			ci->imageid = mystrdup(imageid);
-			ci->path = mystrdup(path);
-			ci->flags = CONFIG_PATH_ISFILE;
-			if (exists) {
-				ci->sig = mymalloc(sizeof(time_t));
-				*(time_t *)ci->sig = sb.st_mtime;
-				ci->flags |= CONFIG_SIG_ISMTIME;
-			} else
-				ci->sig = NULL;
-			ci->get_methods = 0;
-			ci->get_options = NULL;
-			ci->put_options = NULL;
-			ci->extra = NULL;
-		}
-
-		if (get != NULL) {
-			get->imageinfo =
-				mymalloc(sizeof(struct config_imageinfo));
-			get->numimages = 1;
-			ci = &get->imageinfo[0];
-			ci->imageid = mystrdup(imageid);
-			ci->path = mystrdup(path);
-			ci->flags = CONFIG_PATH_ISFILE;
-			if (exists) {
-				ci->sig = mymalloc(sizeof(time_t));
-				*(time_t *)ci->sig = sb.st_mtime;
-				ci->flags |= CONFIG_SIG_ISMTIME;
-			} else
-				ci->sig = NULL;
-			set_get_methods(get, 0);
-			set_get_options(get, 0);
-			ci->put_options = NULL;
-			ci->extra = NULL;
-		}
-		free(path);
-		goto done;
+			ci->sig = NULL;
+		ci->get_methods = 0;
+		ci->get_options = NULL;
+		ci->put_options = NULL;
+		ci->extra = NULL;
 	}
 
-	/*
-	 * If realpath fails, it could still be okay.
-	 * We might just need to make some intermediate directories.
-	 * It should probably be optional whether to allow creation of these.
-	 */
-fprintf(stderr, "FAIL: rpath='%s'\n", rpath);
+	if (get != NULL) {
+		get->imageinfo = mymalloc(sizeof(struct config_imageinfo));
+		get->numimages = 1;
+		ci = &get->imageinfo[0];
+		ci->imageid = mystrdup(imageid);
+		ci->path = mystrdup(path);
+		ci->flags = CONFIG_PATH_ISFILE;
+		if (exists) {
+			ci->sig = mymalloc(sizeof(time_t));
+			*(time_t *)ci->sig = sb.st_mtime;
+			ci->flags |= CONFIG_SIG_ISMTIME;
+		} else
+			ci->sig = NULL;
+		set_get_methods(get, 0);
+		set_get_options(get, 0);
+		ci->put_options = NULL;
+		ci->extra = NULL;
+	}
 
  done:
+	if (path)
+		free(path);
 	if (getp) *getp = get;
 	if (putp) *putp = put;
 	return 0;
@@ -547,7 +508,7 @@ null_init(void)
 
 	if (imagedir == NULL)
 		imagedir = DEFAULT_IMAGEDIR;
-	if ((path = realpath(imagedir, pathbuf)) == NULL) {
+	if ((path = myrealpath(imagedir, pathbuf)) == NULL) {
 		error("null_init: could not resolve '%s'", imagedir);
 		return NULL;
 	}
@@ -580,6 +541,191 @@ null_init(void)
 	return &null_config;
 }
 
+/*
+ * Validate an imageid and convert it into a filesystem path in our
+ * imageid directory.  Returns a pointer to a dynamically allocated path
+ * path string on success, NULL otherwise.  On success, the path will either
+ * point to an existing regular file or to a non-existent file within the
+ * image directory.
+ */
+static char *
+imageidtopath(char *imageid)
+{
+	char rpath[PATH_MAX], *path, *cp;
+	int idlen;
+
+	assert(imageid != NULL);
+
+	/*
+	 * We seriously limit what chars can be in an imageid since we
+	 * use it as a file name.
+	 */
+	idlen = strlen(imageid);
+	if (idlen == 0 || idlen >= PATH_MAX) {
+		if (debug)
+			fprintf(stderr, "imageid too short/long\n");
+		return NULL;
+	}
+	for (cp = imageid; *cp != '\0'; cp++) {
+		if (isalnum(*cp) ||
+		    *cp == '-' || *cp == '.' || *cp == '+' || *cp == '_')
+			continue;
+		if (*cp == '/')
+			continue;
+		if (debug)
+			fprintf(stderr, "bogus char (0x%x) in imageid\n", *cp);
+		return NULL;
+	}
+
+	/*
+	 * If imageid is specified and starts with a '/', it is an
+	 * absolute path.  We prepend imagedir if it doesn't already
+	 * exist.
+	 *
+	 * If it doesn't start with a '/' we prepend imagedir.
+	 */
+	assert(imagedir && imagedir[0]);
+	if (imageid[0] != '/' || strstr(imageid, imagedir) != imageid) {
+		path = mymalloc(strlen(imagedir) + idlen + 2);
+		strcpy(path, imagedir);
+		if (imageid[0] != '/')
+			strcat(path, "/");
+		strcat(path, imageid);
+	} else
+		path = mystrdup(imageid);
+	if (debug)
+		fprintf(stderr, "imageid %s: mapped to path '%s'\n",
+			imageid, path);
+
+	/*
+	 * Run it through realpath.
+	 * Sounds easy enough, right?  Well, except that the whole path
+	 * doesn't need to exist.  The imageid can effectively create
+	 * subdirectories if it contains a slash, so realpath can fail
+	 * because of missing intermediate subdirs and not because of
+	 * an invalid path.
+	 */
+	if (myrealpath(path, rpath) == NULL) {
+		char pathbuf[PATH_MAX];
+		char *next, *ep;
+
+		/*
+		 * Make sure all intermediate directories exist.
+		 * So we start with the imagedir path, and iterate through
+		 * the path, adding one component from the imageid each time.
+		 * As long as realpath succeeds each time and the resulting
+		 * path is within the imagedir, everything is okay and we
+		 * create the subdir and continue.
+		 */
+		strncpy(pathbuf, path, PATH_MAX);
+		assert(strncmp(pathbuf, imagedir, strlen(imagedir)) == 0);
+		next = &pathbuf[strlen(imagedir)+1];
+		assert(next[-1] == '/');
+		while ((ep = index(next, '/')) != NULL) {
+			*ep = '\0';
+			if (debug)
+				fprintf(stderr, "Testing: %s\n", pathbuf);
+
+			/*
+			 * If realpath fails on the component, see if
+			 * it failed due to a missing component in our path.
+			 * If so, create the component and continue.
+			 *
+			 * N.B. realpath returning the canonicalized version
+			 * of the path resolved so far in the case of an
+			 * error, is documented behavior for the FreeBSD
+			 * version but not for Linux. However, it is the
+			 * observed behavior for Linux and we rely on it
+			 * for now.
+			 */
+			if (myrealpath(pathbuf, rpath) == NULL) {
+				if (errno != ENOENT ||
+				    strstr(rpath, rimagedir) != rpath) {
+					fprintf(stderr,
+						"  resolves bad (%s)\n",
+						rpath);
+					free(path);
+					return NULL;
+				}
+				/*
+				 * Try creating the missing component.
+				 */
+				if (mkdir(rpath, 0755) < 0) {
+					fprintf(stderr,
+						"  could not create (%s)\n",
+						rpath);
+					free(path);
+					return NULL;
+				}
+				if (debug)
+					fprintf(stderr, "  created (%s)\n",
+						rpath);
+			} else {
+				if (debug)
+					fprintf(stderr, "  exists (%s)\n",
+						rpath);
+			}
+			*ep = '/';
+			next = ep+1;
+		}
+
+		/*
+		 * We are down to the final component of the original path.
+		 * It should either exist and be a regular file or not
+		 * exist at all.
+		 */
+		if (myrealpath(pathbuf, rpath) == NULL &&
+		    (errno != ENOENT || strstr(rpath, rimagedir) != rpath)) {
+			if (debug)
+				fprintf(stderr,
+					"imageid %s: realpath (%s) bad\n",
+					imageid, rpath);
+			free(path);
+			return NULL;
+		}
+	}
+	free(path);
+
+	/*
+	 * Realpath worked if we got here.
+	 * But we still need to make sure it resolved within the imagedir.
+	 */
+	if (strstr(rpath, rimagedir) != rpath) {
+		fprintf(stderr, "imageid %s: realpath (%s) bad\n",
+			imageid, rpath);
+		return NULL;
+	}
+
+	if (debug)
+		fprintf(stderr, "imageid %s: path '%s' resolved to '%s'\n",
+			imageid, path, rpath);
+
+	return mystrdup(rpath);
+}
+
+/*
+ * Account for differences between BSD and Linux realpath.
+ * In particular, BSD realpath() apparently doesn't even test the
+ * final component.  It will return success even if the final component
+ * doesn't exist. Settle on the Linux behavior.
+ */
+static char *
+myrealpath(char *path, char rpath[PATH_MAX])
+{
+	char *rv;
+
+	rv = realpath(path, rpath);
+#ifndef linux
+	if (rv != NULL) {
+		struct stat sb;
+		/* also sets errno correctly */
+		if (stat(path, &sb) < 0)
+			rv = NULL;
+	}
+#endif
+	return rv;
+}
+ 
 /*
  * XXX memory allocation functions that either return memory or abort.
  * We shouldn't run out of memory and don't want to check every return values.

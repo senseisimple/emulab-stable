@@ -30,6 +30,7 @@ struct config_imageinfo {
 #define CONFIG_IMAGE_UCAST	0x1
 #define CONFIG_IMAGE_MCAST	0x2
 #define CONFIG_IMAGE_BCAST	0x4
+#define CONFIG_IMAGE_ANY	0x7
 
 struct config_host_authinfo {
 	char *hostid;		/* unique name of host */
@@ -57,7 +58,7 @@ struct config {
 	void (*config_dump)(FILE *);
 };
 
-extern int	config_init(int);
+extern int	config_init(char *, int);
 extern void	config_deinit(void);
 extern int	config_read(void);
 extern int	config_get_host_authinfo(struct in_addr *,

@@ -58,6 +58,7 @@ static int	fetchfromabove = 0;
 static int	canredirect = 0;
 static int	usechildauth = 0;
 static int	mirrormode = 0;
+static char     *configstyle = "null";
 
 /* XXX the following just keep network.c happy */
 int		portnum = MS_PORTNUM;
@@ -83,7 +84,7 @@ main(int argc, char **argv)
 	if (fetchfromabove)
 		log("  using parent %s:%d%s", inet_ntoa(parentip), parentport,
 		    mirrormode ? " in mirror mode" : "");
-	config_init(1);
+	config_init(configstyle, 1);
 
 	/* Just dump the config to stdout in human readable form and exit. */
 	if (dumpconfig) {
@@ -290,7 +291,6 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 				return MS_ERROR_NOIMAGE;
 			if (reply.error)
 				return reply.error;
-
 		}
 		/*
 		 * We return the info we got from our parent.
@@ -436,8 +436,8 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	char imageid[MS_MAXIDLEN+1];
 	char clientip[sizeof("XXX.XXX.XXX.XXX")+1];
 	int len;
-	struct config_host_authinfo *ai = NULL;
-	struct config_imageinfo *ii;
+	struct config_host_authinfo *ai;
+	struct config_imageinfo *ii = NULL;
 	struct childinfo *ci;
 	struct stat sb;
 	uint64_t isize;
@@ -461,7 +461,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	imageid[len] = '\0';
 	methods = msg->body.getrequest.methods;
 	wantstatus = msg->body.getrequest.status;
-	op = wantstatus ? "STATUS" : "GET";
+	op = wantstatus ? "GETSTATUS" : "GET";
 
 	strncpy(clientip, inet_ntoa(cip->sin_addr), sizeof clientip);
 	if (host.s_addr != cip->sin_addr.s_addr)
@@ -485,30 +485,51 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	if (methods == 0)
 		goto badmethod;
 
-	if (!mirrormode) {
-		/*
-		 * See if node has access to the image.
-		 * If not, return an error code immediately.
-		 */
-		rv = config_auth_by_IP(&cip->sin_addr, &host, imageid, &ai);
-		if (rv) {
-			warning("%s: client %s %s failed: %s",
-				imageid, clientip, op, GetMSError(rv));
-			msg->body.getreply.error = rv;
-			goto reply;
-		}
-		if (debug > 1)
-			config_dump_host_authinfo(ai);
-		if (ai->numimages > 1) {
-			rv = MS_ERROR_INVALID;
-			warning("%s: client %s %s failed: "
-				"lookup returned multiple (%d) images",
-				imageid, clientip, op, ai->numimages);
-			msg->body.getreply.error = rv;
+	/*
+	 * In mirrormode, we first validate access with our parent
+	 * before doing anything locally.
+	 */
+	if (mirrormode) {
+		struct in_addr pif;
+		GetReply reply;
+		in_addr_t authip;
+
+		authip = usechildauth ? ntohl(host.s_addr) : 0;
+
+		if (!ClientNetFindServer(ntohl(parentip.s_addr),
+					 parentport, authip, imageid,
+					 methods, 1, 5,
+					 &reply, &pif))
+			reply.error = MS_ERROR_NOIMAGE;
+		if (reply.error) {
+			msg->body.getreply.error = reply.error;
 			goto reply;
 		}
 	}
-	ii = &ai->imageinfo[0];
+
+	/*
+	 * See if node has access to the image.
+	 * If not, return an error code immediately.
+	 */
+	rv = config_auth_by_IP(&cip->sin_addr, &host, imageid, &ai);
+	if (rv) {
+		warning("%s: client %s %s failed: %s",
+			imageid, clientip, op, GetMSError(rv));
+		msg->body.getreply.error = rv;
+		goto reply;
+	}
+	if (debug > 1)
+		config_dump_host_authinfo(ai);
+	if (ai->numimages > 1) {
+		rv = MS_ERROR_INVALID;
+		warning("%s: client %s %s failed: "
+			"lookup returned multiple (%d) images",
+			imageid, clientip, op, ai->numimages);
+		msg->body.getreply.error = rv;
+		goto reply;
+	}
+	ii = copy_imageinfo(&ai->imageinfo[0]);
+	config_free_host_authinfo(ai);		
 	assert((ii->flags & CONFIG_PATH_ISFILE) != 0);
 
 	/*
@@ -541,7 +562,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		if (fetchfromabove) {
 			GetReply r;
 
-			log("%s: have local copy, STATUS from parent",
+			log("%s: have local copy, GETSTATUS from parent",
 			    imageid, op);
 
 			rv = fetch_parent(&sip->sin_addr, &host,
@@ -798,8 +819,8 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	len = sizeof msg->hdr + sizeof msg->body.getreply;
 	if (!MsgSend(sock, msg, len, 10))
 		error("%s: could not send reply", inet_ntoa(cip->sin_addr));
-	if (ai)
-		config_free_host_authinfo(ai);		
+	if (ii)
+		free_imageinfo(ii);
 }
 
 static void
@@ -845,11 +866,11 @@ handle_request(int sock)
 static void
 usage(void)
 {
-	fprintf(stderr, "mfrisbeed [-ADRd] [-C method] [-I imagedir] [-S parentIP] [-P parentport] [-p port]\n");
+	fprintf(stderr, "mfrisbeed [-ADRd] [-X method] [-I imagedir] [-S parentIP] [-P parentport] [-p port]\n");
 	fprintf(stderr, "Basic:\n");
-	fprintf(stderr, "  -C <method> transfer methods to allow: ucast, mcast, bcast or any\n");
+	fprintf(stderr, "  -C <style>  configuration style: emulab, file, or null\n");
 	fprintf(stderr, "  -I <dir>    default directory where images are stored\n");
-	fprintf(stderr, "  -p <port>   port to listen on\n");
+	fprintf(stderr, "  -X <method> transfer methods to allow: ucast, mcast, bcast or any\n");	fprintf(stderr, "  -p <port>   port to listen on\n");
 	fprintf(stderr, "Debug:\n");
 	fprintf(stderr, "  -d          debug mode; does not daemonize\n");
 	fprintf(stderr, "  -D          dump configuration and exit\n");
@@ -867,12 +888,24 @@ get_options(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "AC:DI:MRS:P:p:dh")) != -1)
+	while ((ch = getopt(argc, argv, "AC:DI:MRX:S:P:p:dh")) != -1)
 		switch(ch) {
 		case 'A':
 			usechildauth = 1;
 			break;
 		case 'C':
+			if (strcmp(optarg, "emulab") == 0 ||
+			    strcmp(optarg, "file") == 0 ||
+			    strcmp(optarg, "null") == 0)
+				configstyle = optarg;
+			else {
+				fprintf(stderr,
+					"-C should specify one: "
+					"'emulab', 'file', 'null'\n");
+				exit(1);
+			}
+			break;
+		case 'X':
 		{
 			char *ostr, *str, *cp;
 			int nm = 0;
@@ -891,7 +924,7 @@ get_options(int argc, char **argv)
 			free(ostr);
 			if (nm == 0) {
 				fprintf(stderr,
-					"-C should specify one or more of: "
+					"-X should specify one or more of: "
 					"'ucast', 'mcast', 'bcast', 'any'\n");
 				exit(1);
 			}
@@ -1067,9 +1100,10 @@ startchild(struct childinfo *ci)
 				 inet_ntoa(in), ci->port, ci->imageinfo->path);
 		else
 			snprintf(argbuf, sizeof argbuf,
-				 "%s -N -S %s -i %s %s -m %s -p %d %s",
+				 "%s -N -S %s -i %s %s %s -m %s -p %d %s",
 				 pname, servstr, ifacestr,
 				 debug > 1 ? "" : "-q",
+				 ci->method == CONFIG_IMAGE_UCAST ? "-O" : "",
 				 inet_ntoa(in), ci->port, ci->imageinfo->path);
 		if (debug)
 			info("execing: %s", argbuf);

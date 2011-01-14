@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <string.h>
 #include <assert.h>
 #include "decls.h"
 #include "configdefs.h"
@@ -46,26 +47,38 @@ config_signal(int sig)
 }
 
 int
-config_init(int readit)
+config_init(char *style, int readit)
 {
 	int rv;
 
+	if (strcmp(style, "emulab") == 0) {
 #ifdef USE_EMULAB_CONFIG
-	extern struct config *emulab_init();
-	if (myconfig == NULL) {
-		if ((myconfig = emulab_init()) != NULL)
-			log("Using Emulab configuration");
-	}
+		extern struct config *emulab_init();
+		if (myconfig == NULL) {
+			if ((myconfig = emulab_init()) != NULL)
+				log("Using Emulab configuration");
+		} else
+			log("Emulab config init failed");
+#else
+		log("Not built with Emulab configuration");
 #endif
+	}
+	if (strcmp(style, "null") == 0) {
 #ifdef USE_NULL_CONFIG
-	extern struct config *null_init();
-	if (myconfig == NULL) {
-		if ((myconfig = null_init()) != NULL)
-			log("Using default configuration");
-	}
+		extern struct config *null_init();
+		if (myconfig == NULL) {
+			if ((myconfig = null_init()) != NULL)
+				log("Using null configuration");
+		} else
+			log("Null config init failed");
+#else
+		log("Not built with Null configuration");
 #endif
-	if (myconfig == NULL)
+	}
+	if (myconfig == NULL) {
+		error("*** No configuration found");
 		return -1;
+	}
 
 	if (readit) {
 		rv = myconfig->config_read();
