@@ -55,6 +55,7 @@ sub doOpenflowDisable($$);
 sub doSetOpenflowController($$$);
 sub doSetOpenflowListener($$$);
 sub doEnableOpenflowListener($$);
+sub doReserveVlanTags($$@);
 
 #
 # Defaults
@@ -173,7 +174,7 @@ END
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt,
-    'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
+    'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n', 'A',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
     'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
@@ -221,6 +222,7 @@ my $equaltrunking = 0;
 my $this_user;
 my $ofconnstr; # Openflow connection string, for controller 
 our $next_vlan_tag; # XXX see doMakeVlan for explanation
+my %stack_ids = ();
 
 #
 # Verify user and get his DB uid for later. 
@@ -250,7 +252,7 @@ if ($opt{m} || $opt{o}) {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
     }
 }
-if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X}) {
+if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X} || $opt{A}) {
     #
     # Options that take 'pid eid'
     #
@@ -344,6 +346,7 @@ if ($opt{c}) { push @commands, ["recreate"]; }
 if ($opt{U}) { push @commands, ["trunkdisable"]; }
 if ($opt{b}) { push @commands, ["portstatus"]; }
 if ($opt{F}) { push @commands, ["synchleader"]; }
+if ($opt{A}) { push @commands, ["reservetags"]; }
 
 #
 # Commands that can appear once, and take an argument
@@ -650,7 +653,7 @@ COMMAND: foreach my $command (@commands) {
             }
             last;
         };
-        (/^tables$/) && do {
+        (/^tables$/ || /^reservetags$/) && do {
             # Grab all stacks that any ports in the experiment are members
             # of.
             # (We need the entire stack, since the VLAN may have to traverse
@@ -843,7 +846,7 @@ COMMAND: foreach my $command (@commands) {
     # Now, make the object for each stack that we discovered
     #
     my @stacks;
-    my %stack_ids;
+    %stack_ids = ();
     foreach my $stack_id (keys %stacks) {
 	my ($stack_type, $supports_private, $single_domain, $community)
 		= getStackType($stack_id);
@@ -955,6 +958,10 @@ COMMAND: foreach my $command (@commands) {
 	    $exitval += doVlansFromTables($experiment,\@stacks,@vlans);
 	    last;
 	}; # /tables/ && do
+	/^reservetags$/ && do {
+	    $exitval += doReserveVlanTags($experiment,\@stacks,@vlans);
+	    last;
+	}; # /reservetags/ && do
 	/synctables/ && do {
 	    $exitval += syncVlansFromTables($experiment,\@stacks);
 	    last;
@@ -2088,6 +2095,82 @@ sub syncVlansFromTables($$) {
 
  bad:
     return -1;
+}
+
+#
+# Reserve vlan tags.
+# 
+sub doReserveVlanTags($$@) {
+    my $experiment = shift;
+    my $stacks  = shift;
+    my @vlanids = @_;
+    my %vlans   = ();
+    my %vstacks = ();
+    my $errors  = 0;
+    my @stacknames = map { $_->{STACKID} } @$stacks;
+
+    print STDERR "@stacknames\n";
+
+    #
+    # First do sanity checks on the entire set of vlans
+    #
+    foreach my $id (@vlanids) {
+	my $vlan = VLan->Lookup($id);
+	if (!defined($vlan)) {
+	    die("Could not locate vlan $id in the DB\n");
+	}
+	$vlans{"$id"} = $vlan;
+
+	my @planned = getPlannedStacksForVlans($id);
+	if (@planned > 1) {
+	    print STDERR "$vlan crosses multiple stacks. Cannot reserve tag\n";
+	    $errors++;
+	    next;
+	}
+	my $stack = $planned[0];
+	
+	if (! (grep {$_ eq $stack} @stacknames)) {
+	    print STDERR "$vlan is in stack $stack, but not in given stacks!\n";
+	    $errors++;
+	    next;
+	}
+	$vstacks{"$id"} = $stack_ids{$stack};
+    }
+    return $errors
+	if ($errors);
+
+    #
+    # Now do the reservations. Have to deal with roll back on error.
+    #
+    my @assigned = ();
+    
+    foreach my $vlan (values(%vlans)) {
+	my $vlanid = $vlan->id();
+	my $stack  = $vstacks{"$vlanid"};
+	my $tag    = getReservedVlanTag($vlanid);
+
+	# Do nothing if tag already assigned.
+	next
+	    if ($tag);
+
+	#
+	# If we can assign a tag, remember we did so that we can
+	# undo whatever we did, if there is an error. 
+	#
+	$tag = $stack->newVlanNumber($vlanid);
+	if ($tag <= 0) {
+	    print STDERR "Could not pre-reserve tag for $vlan\n";
+	    $errors++;
+	    last;
+	}
+	push(@assigned, $vlan);
+    }
+    if ($errors) {
+	foreach my $vlan (@assigned) {
+	    clearReservedVlanTag($vlan->id());
+	}
+    }
+    return $errors;
 }
 
 #

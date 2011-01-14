@@ -33,7 +33,9 @@ use Exporter;
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
 	        getExperimentVlanPorts
-                uniq isSwitchPort getPathVlanIfaces);
+                uniq isSwitchPort getPathVlanIfaces
+		reserveVlanTag getReservedVlanTag clearReservedVlanTag
+);
 
 use English;
 use libdb;
@@ -486,6 +488,44 @@ sub setVlanStack($$) {
 	if ($vlan->SetStack($stack_id) != 0);
 
     return 0;
+}
+
+#
+# Update database to reserve a vlan tag. The tables will be locked to
+# make sure we can get it. 
+#
+sub reserveVlanTag ($$) {
+    my ($vlan_id, $tag) = @_;
+    
+    if (!$vlan_id || !defined($tag)) {
+	return 0;
+    }
+
+    my $vlan = VLan->Lookup($vlan_id);
+    return 0
+	if (!defined($vlan));
+
+    return $vlan->ReserveVlanTag($tag);
+}
+
+sub clearReservedVlanTag ($) {
+    my ($vlan_id) = @_;
+    
+    my $vlan = VLan->Lookup($vlan_id);
+    return -1
+	if (!defined($vlan));
+
+    return $vlan->ClearReservedVlanTag();
+}
+
+sub getReservedVlanTag ($) {
+    my ($vlan_id) = @_;
+
+    my $vlan = VLan->Lookup($vlan_id);
+    return 0
+	if (!defined($vlan));
+
+    return $vlan->GetReservedVlanTag();
 }
 
 #

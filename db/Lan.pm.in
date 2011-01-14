@@ -2196,6 +2196,7 @@ sub ready($)	{ return $_[0]->GetLan()->ready(); }
 sub type($)	{ return $_[0]->GetLan()->type(); }
 sub GetLan($)   { return $_[0]->{'LAN'}; }
 sub GetExperiment($) { return $_[0]->GetLan()->GetExperiment(); }
+sub vlanid($)   { return $_[0]->lanid(); }
 
 #
 # Create a new VLan object and return it. No members yet ... which means
@@ -2486,6 +2487,50 @@ sub GetClass($)
 
     # Assume experimental LAN
     return "Experimental";
+}
+
+# VLan reservation.
+sub ReserveVlanTag($$)
+{
+    my ($self, $tag) = @_;
+
+    DBQueryWarn("lock tables lans write, lan_attributes write")
+	or return undef;
+
+    my $query_result =
+	DBQueryWarn("select attrvalue from lan_attributes ".
+		    "where attrkey='reservedvlantag' and attrvalue='$tag'");
+
+    $tag = undef
+	if (!$query_result || $query_result->numrows ||
+	    $self->SetAttribute("reservedvlantag", $tag) != 0);
+
+    DBQueryWarn("unlock tables");
+    return $tag;
+}
+
+sub ClearReservedVlanTag($)
+{
+    my ($self) = @_;
+    my $lanid = $self->lanid();
+
+    DBQueryWarn("delete from lan_attributes ".
+		"where attrkey='reservedvlantag' and lanid='$lanid'")
+	or return -1;
+
+    return 0;
+}
+
+sub GetReservedVlanTag($)
+{
+    my ($self) = @_;
+    my $tag;
+
+    return undef
+	if ($self->GetAttribute("reservedvlantag",\$tag) != 0);
+
+    return $tag;
+
 }
 
 # Find out which stack a VLAN resides on
