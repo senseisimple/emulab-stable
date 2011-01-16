@@ -10,7 +10,9 @@
  * 
  * TODO:
  * - timeouts for child frisbee processes
- * - make mirror mode work
+ * - record the state of running frisbeeds in persistant store so that
+ *   they can be restarted if we die and restart
+ * - related: make sure we don't leave orphans when we die!
  */
 #include <paths.h>
 #include <sys/stat.h>
@@ -38,12 +40,13 @@
 static void	get_options(int argc, char **argv);
 static int	makesocket(int portnum, int *tcpsockp);
 static void	handle_request(int sock);
-static int	reapchildren(int apid);
+static int	reapchildren(int apid, int *status);
 
 static int	daemonize = 1;
 int		debug = 0;
 static int	dumpconfig = 0;
 static int	onlymethods = (MS_METHOD_UNICAST|MS_METHOD_MULTICAST);
+static int	parentmethods = (MS_METHOD_UNICAST|MS_METHOD_MULTICAST);
 
 /*
  * For recursively GETing images:
@@ -82,8 +85,10 @@ main(int argc, char **argv)
 	log("mfrisbee daemon starting, methods=%s (debug level %d)",
 	    GetMSMethods(onlymethods), debug);
 	if (fetchfromabove)
-		log("  using parent %s:%d%s", inet_ntoa(parentip), parentport,
-		    mirrormode ? " in mirror mode" : "");
+		log("  using parent %s:%d%s, methods=%s",
+		    inet_ntoa(parentip), parentport,
+		    mirrormode ? " in mirror mode" : "",
+		    GetMSMethods(parentmethods));
 	config_init(configstyle, 1);
 
 	/* Just dump the config to stdout in human readable form and exit. */
@@ -148,7 +153,7 @@ main(int argc, char **argv)
 				close(newsock);
 			}
 		}
-		(void) reapchildren(0);
+		(void) reapchildren(0, NULL);
 	}
 	close(tcpsock);
 	log("daemon terminating");
@@ -254,7 +259,7 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 	struct in_addr pif;
 	in_addr_t authip;
 	GetReply reply;
-	int rv;
+	int rv, methods;
 
 	/*
 	 * If usechildauth is set, we pass the child host IP to our parent
@@ -263,11 +268,18 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 	authip = usechildauth ? ntohl(hostip->s_addr) : 0;
 
 	/*
+	 * Allowed image methods are constrained by any parent methods
+	 */
+	methods = ii->get_methods & parentmethods;
+	if (methods == 0)
+		return MS_ERROR_NOMETHOD;
+
+	/*
 	 * See if a fetch is already in progress.
 	 * If so we will either return "try again later" or point them to
 	 * our parent.
 	 */
-	ci = findchild(ii, PTYPE_CLIENT, ii->get_methods);
+	ci = findchild(ii, PTYPE_CLIENT, methods);
 	if (ci != NULL) {
 		if (debug)
 			info("%s: fetch from %s in progress",
@@ -286,7 +298,7 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 		if (authip) {
 			if (!ClientNetFindServer(ntohl(pip->s_addr),
 						 pport, authip, ii->imageid,
-						 ii->get_methods, 1, 5,
+						 methods, 1, 5,
 						 &reply, &pif))
 				return MS_ERROR_NOIMAGE;
 			if (reply.error)
@@ -331,7 +343,7 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 	 * Send our parent a GET request and see what it says.
 	 */
 	if (!ClientNetFindServer(ntohl(pip->s_addr), pport, authip,
-				 ii->imageid, ii->get_methods, statusonly, 5,
+				 ii->imageid, methods, statusonly, 5,
 				 &reply, &pif))
 		return MS_ERROR_NOIMAGE;
 	if (reply.error)
@@ -558,8 +570,9 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		/*
 		 * If the file exists and we have a parent, get the signature
 		 * from the parent and see if we need to update our copy.
+		 * We only do this for mirror mode.
 		 */
-		if (fetchfromabove) {
+		if (mirrormode) {
 			GetReply r;
 
 			log("%s: have local copy, GETSTATUS from parent",
@@ -639,6 +652,11 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		 * Return the attributes we got via the check above.
 		 */
 		msg->body.getreply.sigtype = htons(r.sigtype);
+		if (r.sigtype == MS_SIGTYPE_MTIME) {
+			uint32_t mt;
+			mt = *(uint32_t *)r.signature;
+			*(uint32_t *)r.signature = htonl(mt);
+		}
 		memcpy(msg->body.getreply.signature, r.signature,
 		       MS_MAXSIGLEN);
 		msg->body.getreply.hisize = htonl(r.hisize);
@@ -668,18 +686,28 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		rv = fetch_parent(&sip->sin_addr, &host,
 				  &parentip, parentport, ii, 0, &r);
 		/*
-		 * Redirecting to parent
+		 * Redirecting to parent.
+		 * Can only do this if our parents method is compatible
+		 * with the client's request.
 		 */
 		if (rv == 0) {
-			msg->body.getreply.method = r.method;
-			msg->body.getreply.isrunning = 1;
-			msg->body.getreply.servaddr =
-				htonl(r.servaddr);
-			msg->body.getreply.addr =
-				htonl(r.addr);
-			msg->body.getreply.port =
-				htons(r.port);
-			goto reply;
+			if ((r.method & methods) != 0) {
+				msg->body.getreply.method = r.method;
+				msg->body.getreply.isrunning = 1;
+				msg->body.getreply.servaddr =
+					htonl(r.servaddr);
+				msg->body.getreply.addr =
+					htonl(r.addr);
+				msg->body.getreply.port =
+					htons(r.port);
+				log("%s: redirecting %s to our parent",
+				    imageid, clientip);
+				goto reply;
+			}
+			log("%s: cannot redirect %s to parent; "
+			    "incompatible transfer methods",
+			    imageid, clientip);
+			rv = MS_ERROR_TRYAGAIN;
 		}
 		/*
 		 * If parent callout failed, but we have a copy
@@ -739,6 +767,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 
 	if (ci == NULL) {
 		struct in_addr in;
+		int stat;
 
 		if (ii->sig != NULL) {
 			int32_t mt = *(int32_t *)ii->sig;
@@ -762,10 +791,27 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			msg->body.getreply.error = rv;
 			goto reply;
 		}
+
 		in.s_addr = htonl(ci->addr);
 		log("%s: started %s server on %s:%d (pid %d)",
 		    imageid, GetMSMethods(ci->method),
 		    inet_ntoa(in), ci->port, ci->pid);
+
+		/*
+		 * Watch for an immediate death so we don't tell our client
+		 * a server is running when it really isn't.
+		 *
+		 * XXX what is the right response? Right now we just tell
+		 * them to try again and hope the problem is transient.
+		 */
+		sleep(2);
+		if (reapchildren(ci->pid, &stat)) {
+			msg->body.getreply.error = MS_ERROR_TRYAGAIN;
+			log("%s: server immediately exited (stat=%d), ",
+			    "telling client to try again!",
+			    imageid, stat);
+			goto reply;
+		}
 	} else {
 		struct in_addr in;
 
@@ -870,7 +916,9 @@ usage(void)
 	fprintf(stderr, "Basic:\n");
 	fprintf(stderr, "  -C <style>  configuration style: emulab, file, or null\n");
 	fprintf(stderr, "  -I <dir>    default directory where images are stored\n");
-	fprintf(stderr, "  -X <method> transfer methods to allow: ucast, mcast, bcast or any\n");	fprintf(stderr, "  -p <port>   port to listen on\n");
+	fprintf(stderr, "  -x <methods> transfer methods to allow from clients: ucast, mcast, bcast or any\n");
+	fprintf(stderr, "  -X <method> transfer method to request from parent\n");
+	fprintf(stderr, "  -p <port>   port to listen on\n");
 	fprintf(stderr, "Debug:\n");
 	fprintf(stderr, "  -d          debug mode; does not daemonize\n");
 	fprintf(stderr, "  -D          dump configuration and exit\n");
@@ -905,6 +953,7 @@ get_options(int argc, char **argv)
 				exit(1);
 			}
 			break;
+		case 'x':
 		case 'X':
 		{
 			char *ostr, *str, *cp;
@@ -924,11 +973,15 @@ get_options(int argc, char **argv)
 			free(ostr);
 			if (nm == 0) {
 				fprintf(stderr,
-					"-X should specify one or more of: "
-					"'ucast', 'mcast', 'bcast', 'any'\n");
+					"-%c should specify one or more of: "
+					"'ucast', 'mcast', 'bcast', 'any'\n",
+					ch);
 				exit(1);
 			}
-			onlymethods = nm;
+			if (ch == 'x')
+				onlymethods = nm;
+			else
+				parentmethods = nm;
 			break;
 		}
 		case 'd':
@@ -1131,14 +1184,6 @@ startchild(struct childinfo *ci)
 	children = ci;
 	nchildren++;
 
-	/*
-	 * Watch for an immediate death so we don't leave any clients
-	 * hanging unnecessarily.
-	 */
-	sleep(2);
-	if (reapchildren(ci->pid))
-		return MS_ERROR_FAILED;
-
 	return 0;
 }
 
@@ -1212,6 +1257,7 @@ finishclient(struct childinfo *ci, int status)
 		error("%s: download failed, removing tmpfile %s",
 		      realname, tmpname);
 		unlink(tmpname);
+		free(tmpname);
 		return;
 	}
 
@@ -1309,7 +1355,7 @@ killchild(struct childinfo *ci)
  * Returns the number of children reaped.
  */
 static int
-reapchildren(int wpid)
+reapchildren(int wpid, int *statusp)
 {
 	int pid, status;
 	struct childinfo **cip, *ci;
@@ -1376,6 +1422,8 @@ reapchildren(int wpid)
 		if (wpid) {
 			if (debug)
 				error("  process %d exited immediately", wpid);
+			if (statusp)
+				*statusp = status;
 			break;
 		}
 	}
