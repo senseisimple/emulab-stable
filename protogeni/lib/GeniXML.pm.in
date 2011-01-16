@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniXML;
@@ -304,8 +304,8 @@ sub SetExpires($$)
 sub GetNodeId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_uuid", "component_urn", "uuid",
-			"component_id");
+    return GetFirstText($node, "component_urn", "component_id",
+			"component_uuid", "uuid");
 }
 
 sub GetVirtualId($)
@@ -336,8 +336,8 @@ sub GetSliverId($)
 sub GetManagerId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_manager_uuid",
-			"component_manager_urn", "component_manager_id");
+    return GetFirstText($node, "component_manager_urn",
+			"component_manager_id", "component_manager_uuid");
 }
 
 sub GetColocate($)

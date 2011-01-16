@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package libvtop;
@@ -181,7 +181,7 @@ sub fixcurrent($)	{ return $_[0]->flags() & $VTOP_FLAGS_FIXNODES; }
 sub impotent($)		{ return $_[0]->flags() & $VTOP_FLAGS_IMPOTENT; }
 sub alloconly($)	{ return $_[0]->flags() & $VTOP_FLAGS_ALLOCONLY; }
 sub regression($)	{ return $_[0]->flags() & $VTOP_FLAGS_REGRESSION; }
-sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); }
+sub printdb($$)		{ print $_[1] if ($_[0]->verbose()); return 1; }
 
 # We name delay nodes internally as they are needed.
 sub nextdelayname($)    { return "tbdelay" . $_[0]->{'DELAYID'}++; }
@@ -5478,13 +5478,17 @@ sub InterpLinksAux($)
 			}
 
 			if ($virtnodeA->_onsharednode() &&
-			    !($self->impotent() || $self->alloconly()) && 
+			    $self->printdb("  Reserving shared BW: ".
+					   "$member0,$bandwidth,$virtifaceA\n") &&
+			    !($self->impotent() || $self->alloconly()) &&
 			    $virtifaceA->ReserveSharedBandwidth($bandwidth)) {
 			    tbinfo("Could not reserve shared bandwidth: ".
 				   "$member0,$bandwidth,$virtifaceA\n");
 			    return -1;
 			}
 			if ($virtnodeB->_onsharednode() &&
+			    $self->printdb("  Reserving shared BW: ".
+					   "$member1,$rbandwidth,$virtifaceB\n") &&
 			    !($self->impotent() || $self->alloconly()) && 
 			    $virtifaceB->ReserveSharedBandwidth($rbandwidth)) {
 			    tbinfo("Could not reserve shared bandwidth: ".
@@ -5651,6 +5655,8 @@ sub InterpLinksAux($)
 			}
 			my $maxbw = max($bandwidth, $rbandwidth);
 			if ($virtnodeA->_onsharednode() &&
+			    $self->printdb("  Reserving shared BW: ".
+					   "$member0,$maxbw,$virtiface\n") &&
 			    !($self->impotent() || $self->alloconly) && 
 			    $virtiface->ReserveSharedBandwidth($maxbw)) {
 			    tbinfo("Could not reserve shared bandwidth: ".

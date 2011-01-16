@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCM;
@@ -184,6 +184,7 @@ sub DiscoverResources($)
     my $credstr   = $argref->{'credential'};
     my $available = $argref->{'available'} || 0;
     my $compress  = $argref->{'compress'} || 0;
+    my $version   = $argref->{'rspec_version'} || undef;
 
     my $credential = CheckCredential($credstr);
     return $credential
@@ -192,10 +193,18 @@ sub DiscoverResources($)
     return DiscoverResourcesAux($available, $compress, [$credential]);
 }
 # Helper function for V2.
-sub DiscoverResourcesAux($$$)
+sub DiscoverResourcesAux($$$;$)
 {
-    my ($available, $compress, $credentials) = @_;
+    my ($available, $compress, $credentials, $version) = @_;
     my $user_urn  = $ENV{'GENIRN'};
+    $version   = "0.2"
+	if (!defined($version));
+
+    # Sanity check since this can come from client.
+    if (! ($version eq "0.1" || $version eq "0.2" ||$version eq "2.0")) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper version request");
+    }
 
     # Oh, for $*%(s sake.  Frontier::RPC2 insists on representing a
     # Boolean as its own object type -- which Perl always interprets as
@@ -259,7 +268,7 @@ sub DiscoverResourcesAux($$$)
     #
     # Acquire the advertisement from ptopgen and compress it if requested.
     #
-    my $xml = GetAdvertisement($available, undef, "0.2", $experiment);
+    my $xml = GetAdvertisement($available, undef, $version, $experiment);
     if (! defined($xml)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
@@ -3373,7 +3382,7 @@ sub ListUsage($)
 
 	    my $node = {"sliver_gid"    => $sliver->cert(),
 			"sliver_hrn"    => $sliver->hrn(),
-			"sliver_urn"    => $sliver->urn() };
+			"sliver_urn"    => $sliver->sliver_urn() };
 	    
 	    my $component = GeniComponent->Lookup($sliver->resource_uuid());
 	    if (defined($component)) {

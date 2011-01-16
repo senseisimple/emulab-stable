@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniSliver;
@@ -1234,12 +1234,26 @@ sub UnProvision($)
 #
 sub Start($$)
 {
-    my ($self) = @_;
+    my ($self, $version) = @_;
 
     #
     # This is actually implemented in GeniAggregate since currently "link"
     # is the smallest entity; you cannot operate on an individual interface.
     #
+    return -1
+	if (! ref($self));
+
+    $self->SetState("started");
+    return 0;
+}
+
+#
+# Stop
+#
+sub Stop($$)
+{
+    my ($self, $version) = @_;
+
     return -1
 	if (! ref($self));
 

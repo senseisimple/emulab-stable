@@ -24,6 +24,7 @@ use GeniResponse;
 use GeniTicket;
 use GeniCredential;
 use GeniCertificate;
+use GeniComponent;
 use GeniSlice;
 use GeniAggregate;
 use GeniSliver;
@@ -98,6 +99,7 @@ sub Resolve($)
     my $credentials = $argref->{'credentials'};
     my $urn         = $argref->{'urn'};
     my $admin       = 0;
+    my $isauth	    = 0;
 
     if (! (defined($credentials) && defined($urn))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
@@ -116,32 +118,76 @@ sub Resolve($)
     #
     # This is a convenience for testing. If a local user and that
     # user is an admin person, then do whatever it says. This is
-    # easier then trying to do this with credential privs.
+    # easier then trying to do this with credential privs. But,
+    # watch for credentials from authorities instead of users.
     #
-    my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (defined($user) && $user->IsLocal() && $user->admin()) {
-	$admin = 1;
+    my (undef,$callertype,$callerid) = GeniHRN::Parse($credential->owner_urn());
+    if ($callertype eq "user") {
+	my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
+	if (defined($user) && $user->IsLocal() && $user->admin()) {
+	    $admin = 1;
+	}
+    }
+    elsif ($callertype eq "authority" && $callerid eq "cm") {
+	$isauth = 1;
     }
     
     if ($type eq "node") {
 	my $node  = $object;
 	my $rspec = GeniCM::GetAdvertisement(0, $node->node_id(), "0.1", undef);
 	if (! defined($rspec)) {
+	    print STDERR "Could not get advertisement for $node!\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Error getting advertisement");
 	}
+	my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+	if (!defined($me)) {
+	    print STDERR
+		"Could not find local authority object for $ENV{'MYURN'}\n";
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					"Error getting advertisement");
+	}
+	my $myurn = GeniHRN::Generate($OURDOMAIN, "node", $node->node_id());
+	my $myhrn = "${PGENIDOMAIN}." . $node->node_id();
+
+	#
+	# See if the component object exists; if not create it.
+	#
+	my $component = GeniComponent->Lookup($node->uuid());
+	if (!defined($component)) {
+	    my $certificate = GeniCertificate->Lookup($node->uuid());
+	    if (!defined($certificate)) {
+		$certificate =
+		    GeniCertificate->Create({'urn'  => $myurn,
+					     'hrn'  => $myhrn,
+					     'email'=> $TBOPS,
+					     'uuid' => $node->uuid(),
+					     'url'  => $me->url()});
+		if (!defined($certificate)) {
+		    print STDERR "Could not generate certificate for $node\n";
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Error getting advertisement");
+		}
+	    }
+	    $component = GeniComponent->Create($certificate, $me);
+	    if (!defined($component)) {
+		print STDERR "Could not create component for $node\n";
+		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					    "Error getting advertisement");
+	    }
+	}
 	# Return a blob.
-	my $blob = { "hrn"          => "${PGENIDOMAIN}." . $node->node_id(),
+	my $blob = { "hrn"          => $myhrn,
 		     "uuid"         => $node->uuid(),
 		     "role"	    => $node->role(),
 		     "hostname"     =>
 			 GeniUtil::FindHostname($node->node_id()),
 		     "physctrl"     => 
 			 Interface->LookupControl($node->phys_nodeid())->IP(),
-		     "urn"          => GeniHRN::Generate($OURDOMAIN,
-							 "node",
-							 $node->node_id()),
-		     "rspec"        => $rspec
+		     "urn"          => $myurn,
+		     "rspec"        => $rspec,
+		     "url"          => $me->url(),
+		     "gid"          => $component->cert(),
 		   };
 
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
@@ -153,7 +199,8 @@ sub Resolve($)
 	# In this implementation, the caller must hold a valid slice
 	# credential for the slice being looked up. 
 	#
-	if (! ($admin || $slice->urn() eq $credential->target_urn())) {
+	if (! ($isauth || $admin ||
+	       $slice->urn() eq $credential->target_urn())) {
 	    return GeniResponse->Create(GENIRESPONSE_FORBIDDEN());
 	}
 	# Return a blob.
@@ -162,6 +209,10 @@ sub Resolve($)
 	my $aggregate = GeniAggregate->SliceAggregate($slice);
 	if (defined($aggregate)) {
 	    $blob->{'sliver_urn'} = $aggregate->urn();
+	    my $manifest = $aggregate->GetManifest(1);
+	    if (defined($manifest)) {
+		$blob->{'manifest'}   = $manifest;
+	    }
 	}
 	my $ticket = GeniTicket->SliceTicket($slice);
 	if (defined($ticket)) {
@@ -232,6 +283,7 @@ sub DiscoverResources($)
     my $credentials = $argref->{'credentials'};
     my $available   = $argref->{'available'} || 0;
     my $compress    = $argref->{'compress'} || 0;
+    my $version     = $argref->{'rspec_version'} || undef;
 
     if (! (defined($credentials))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");
@@ -590,8 +642,6 @@ sub SliverAction($$$$$)
     my ($action, $slice_urn, $sliver_urns, $credentials, $manifest) = @_;
     my $response;
 
-    print STDERR "fooey\n";
-    
     if (! (defined($credentials) &&
 	   (defined($slice_urn) || defined($sliver_urns)))) {
 	return GeniResponse->MalformedArgsResponse("Missing arguments");

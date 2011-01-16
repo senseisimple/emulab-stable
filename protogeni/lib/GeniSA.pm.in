@@ -294,7 +294,7 @@ sub Resolve($)
 	if ($slice->Lock() != 0) {
 	    return GeniResponse->BusyResponse("slice");
 	}
-	my @slivers = GeniRegistry::ClientSliver->LookupBySlice($slice);
+	my @slivers = GeniSlice::ClientSliver->LookupBySlice($slice);
 	my @managers = ();
 	foreach my $sliver (@slivers) {
 	    push(@managers, $sliver->manager_urn());
@@ -620,7 +620,7 @@ sub Remove($)
 					"Slice has not expired");
 	}
 	# Needs to move.
-	GeniRegistry::ClientSliver->SliceDelete($slice);
+	GeniSlice::ClientSliver->SliceDelete($slice);
 
 	# Remove any stored credentials for this slice.
 	GeniCredential->DeleteForTarget($slice);
@@ -1004,12 +1004,12 @@ sub RegisterSliver($)
     # See if one already exists; overwrite it.
     #
     my $clientsliver =
-	GeniRegistry::ClientSliver->LookupByAuthority($slice, $manager_urn);
+	GeniSlice::ClientSliver->LookupByAuthority($slice, $manager_urn);
     $clientsliver->Delete()
 	if (defined($clientsliver));
     
     $clientsliver =
-	GeniRegistry::ClientSliver->Create($slice, $manager_urn, $user, $blob);
+	GeniSlice::ClientSliver->Create($slice, $manager_urn, $user, $blob);
     if (!defined($clientsliver)) {
 	print STDERR "Could not register sliver for $slice_urn\n";
 	print STDERR Dumper($blob);
@@ -1105,7 +1105,7 @@ sub UnRegisterSliver($)
     # See if one already exists; overwrite it.
     #
     my $clientsliver =
-	GeniRegistry::ClientSliver->LookupByAuthority($slice, $manager_urn);
+	GeniSlice::ClientSliver->LookupByAuthority($slice, $manager_urn);
 
     $clientsliver->Delete()
 	if (defined($clientsliver));
