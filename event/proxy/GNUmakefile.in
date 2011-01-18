@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -78,7 +78,11 @@ PLIBS    += -ldl -lz
 endif
 
 evproxy-debug:	evproxy.o $(LIBTBDIR)/log.o
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	$(CC) $(PLDFLAGS) -o $@ -pthread evproxy.o $(PLIBS)
+else
+	$(CC) $(LDFLAGS) -o $@ evproxy.o $(LIBS)
+endif
 
 # Dave swears we use this on plab nodes. Hand installed into the rootball.
 evproxyplab.o: evproxyplab.cc

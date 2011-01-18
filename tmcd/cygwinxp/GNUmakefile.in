@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,7 +47,7 @@ simple-install:	common-install script-install bin-install
 dir-install:
 
 baselinux-install: dir-install
-	(cd ../linux; $(MAKE) client-install)
+	(cd ../linux; $(MAKE) DIRGROUP=wheel client-install)
 	rm -f $(BINDIR)/rc/rc.healthd
 	rm -f $(BINDIR)/rc/rc.slothd
 

@@ -276,7 +276,7 @@ static const char *fstypenames[] = {
 #define	D_RAMDISK	0x08		/* disk emulator */
 #define	D_CHAIN		0x10		/* can do back-back transfers */
 
-#ifndef linux
+#if !defined(linux) && !defined(__CYGWIN__)
 #include <sys/ioccom.h>
 
 /*
