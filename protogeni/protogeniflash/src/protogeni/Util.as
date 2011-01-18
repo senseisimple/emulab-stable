@@ -18,6 +18,8 @@ package protogeni
   import flash.net.*;
   
   import mx.collections.ArrayCollection;
+  import mx.formatters.NumberBaseRoundType;
+  import mx.formatters.NumberFormatter;
 
   public class Util
   {
@@ -150,6 +152,24 @@ package protogeni
 			browser = "Undefined";
 		
 		return (browser);
+	}
+	
+	public static function keepUniqueObjects(ac:ArrayCollection, oc:ArrayCollection = null):ArrayCollection
+	{
+		var newAc:ArrayCollection;
+		if(oc != null)
+			newAc = oc;
+		else
+			newAc = new ArrayCollection();
+		for each(var o:Object in ac) {
+			if(o is ArrayCollection)
+				newAc = keepUniqueObjects((o as ArrayCollection), newAc);
+			else {
+				if(!newAc.contains(o))
+					newAc.addItem(o);
+			}
+		}
+		return newAc;
 	}
   }
 }

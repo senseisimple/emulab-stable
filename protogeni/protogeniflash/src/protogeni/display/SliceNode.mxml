@@ -147,6 +147,7 @@
 					finalX = Math.round(Math.random() * parent.width);
 					finalY = Math.round(Math.random() * parent.height);
 					
+					// Make sure it isn't off the edges
 					if(finalX > (parent.width - this.width))
 						finalX -= this.width;
 					if(finalY > (parent.height - this.height))

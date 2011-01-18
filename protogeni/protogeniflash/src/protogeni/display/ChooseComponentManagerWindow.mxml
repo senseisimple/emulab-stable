@@ -47,11 +47,13 @@
 			import mx.containers.HBox;
 			import mx.controls.Alert;
 			import mx.controls.CheckBox;
+			import mx.controls.TextArea;
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
 			
 			import protogeni.ProtogeniEvent;
 			import protogeni.ProtogeniHandler;
+			import protogeni.Util;
 			import protogeni.resources.ComponentManager;
 
 			public function success():void {

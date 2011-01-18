@@ -33,7 +33,7 @@ package protogeni.communication
 		slice = s;
 		isCreating = willBeCreating;
 		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
-		op.addField("hrn", slice.urn);
+		op.addField("urn", slice.urn);
 		op.addField("type", "Slice");
 		op.setUrl("https://boss.emulab.net:443/protogeni/xmlrpc");
     }

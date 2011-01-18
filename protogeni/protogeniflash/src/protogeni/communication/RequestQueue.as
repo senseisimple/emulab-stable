@@ -98,9 +98,10 @@ package protogeni.communication
 		var count:int = 0;
 		var n:RequestQueueNode = head;
 		
-		while(n != null && n != nextRequest && (n.item as Request).running)
+		while(n != null && n != nextRequest)
 		{
-			count++;
+			if((n.item as Request).running)
+				count++;
 			n = n.next;
 		}
 

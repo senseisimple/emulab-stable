@@ -22,6 +22,7 @@
 	import flash.display.DisplayObject;
 	import flash.events.MouseEvent;
 	import flash.text.StyleSheet;
+	import flash.xml.XMLNode;
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
