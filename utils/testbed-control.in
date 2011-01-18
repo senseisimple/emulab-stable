@@ -118,6 +118,7 @@ if ($ARGV[0] eq "boot") {
     if (CheckDaemonRunning("stated") || CheckDaemonRunning("bootinfo")) {
 	Fatal("Testbed appears to be running (stated and/or bootinfo running)");
     }
+    $stopped = 1;
     Restart();
     exit(0);
 }
