@@ -18,6 +18,7 @@
 			import mx.controls.Spacer;
 			import mx.controls.TextArea;
 			import mx.events.CloseEvent;
+			import mx.formatters.NumberFormatter;
 			import mx.managers.PopUpManager;
 			
 			import protogeni.resources.ComponentManager;
@@ -33,9 +34,10 @@
 				messageButton.includeInLayout = cm.errorDescription.length > 0;
 				rpsecButton.visible = cm.Rspec != null;
 				rpsecButton.includeInLayout = cm.Rspec != null;
-				dotButton.visible = cm.Rspec != null;
-				dotButton.includeInLayout = cm.Rspec != null;
+				graphInfoButton.visible = cm.Rspec != null;
+				graphInfoButton.includeInLayout = cm.Rspec != null;
 				nodesButton.label = cm.AllNodes.length.toString();
+				availabilityLabel.text = cm.availableNodes + " / " + cm.percentageAvailable.toFixed() + "% Available";
 			}
 			
 			public function viewRspec():void {
@@ -50,7 +52,7 @@
 				Alert.show(cm.errorDescription);
 			}
 			
-			public function openGraph():void
+			public function openGraphInfo():void
 			{
 				var cw:DefaultWindow = new DefaultWindow();
 				PopUpManager.addPopUp(cw, main, false);
@@ -60,9 +62,9 @@
 				tabContainer.percentHeight = 100;
 				tabContainer.percentWidth = 100;
 				
-				// DOT graph
+				// Full DOT graph
 				var dotTab:VBox = new VBox();
-				dotTab.label = "DOT graph";
+				dotTab.label = "Full DOT graph";
 				var textd:TextArea = new TextArea();
 				textd.percentHeight = 100;
 				textd.percentWidth = 100;
@@ -70,7 +72,28 @@
 				dotTab.addChild(textd);
 				tabContainer.addChild(dotTab);
 				
+				// Grouped DOT graph
+				var dotGroupedTab:VBox = new VBox();
+				dotGroupedTab.label = "Grouped DOT graph";
+				var textgd:TextArea = new TextArea();
+				textgd.percentHeight = 100;
+				textgd.percentWidth = 100;
+				textgd.text = cm.getDotGroupedGraph();
+				dotGroupedTab.addChild(textgd);
+				tabContainer.addChild(dotGroupedTab);
+				
+				// Grouped GraphML
+				var groupedgraphmlTab:VBox = new VBox();
+				groupedgraphmlTab.label = "Grouped GraphML";
+				var textgg:TextArea = new TextArea();
+				textgg.percentHeight = 100;
+				textgg.percentWidth = 100;
+				textgg.text = cm.getGroupedGraphML()
+				groupedgraphmlTab.addChild(textgg);
+				tabContainer.addChild(groupedgraphmlTab);
+				
 				// GraphML
+				/*
 				var graphmlTab:VBox = new VBox();
 				graphmlTab.label = "GraphML";
 				var textg:TextArea = new TextArea();
@@ -79,6 +102,7 @@
 				textg.text = cm.getGraphML();
 				graphmlTab.addChild(textg);
 				tabContainer.addChild(graphmlTab);
+				*/
 				
 				cw.addChild(tabContainer);
 			}
@@ -105,9 +129,9 @@
 									 source="@Embed('../images/page_white_code.png')"
 									 click="viewRspec()"
 									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="dotButton"
+				<display:ImageButton id="graphInfoButton"
 									 source="@Embed('../images/chart_organisation.png')"
-									 click="openGraph()"
+									 click="openGraphInfo()"
 									 toolTip="View the graph information" />
 				<display:ImageButton id="messageButton"
 									 source="{DisplayUtil.flagRedIcon}"
@@ -138,6 +162,7 @@
 			</mx:GridItem>
 			<mx:GridItem width="100%">
 				<mx:Button id="nodesButton" click="DisplayUtil.viewNodeCollection(cm.AllNodes);"/>
+				<mx:Label id="availabilityLabel" />
 			</mx:GridItem>
 		</mx:GridRow>
 	</mx:Grid>

@@ -68,7 +68,7 @@
 	</mx:Script>
 	
 	<mx:ControlBar>
-		<mx:TextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-"/>
+		<display:PromptingTextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-" prompt="New slice name..." />
 		<display:ImageButton id="createButton" source="{DisplayUtil.actionIcon}" click="createSlice();" />
 	</mx:ControlBar>
 	
