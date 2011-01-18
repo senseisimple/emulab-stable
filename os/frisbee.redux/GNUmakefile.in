@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -100,15 +100,15 @@ endif
 #CLIENTLIBS	+= `elvin-config --libs vin4c`
 #EVENTFLAGS	= $(CFLAGS) `elvin-config --cflags vin4c` -I$(TESTBED_SRCDIR)
 
-frisbee: $(CLIENTOBJS)
-	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o frisbee
-	cp frisbee frisbee.debug
-	strip frisbee
+frisbee-debug: $(CLIENTOBJS)
+	$(CC) $(LDFLAGS) $(CLIENTFLAGS) $(CLIENTOBJS) $(CLIENTLIBS) -o $@
+#	cp frisbee frisbee.debug
+#	strip frisbee
 
-frisbeed: $(SERVEROBJS)
-	$(CC) $(LDFLAGS) $(SERVERFLAGS) $(SERVEROBJS) $(SERVERLIBS) -o frisbeed
-	cp frisbeed frisbeed.debug
-	strip frisbeed
+frisbeed-debug: $(SERVEROBJS)
+	$(CC) $(LDFLAGS) $(SERVERFLAGS) $(SERVEROBJS) $(SERVERLIBS) -o $@
+#	cp frisbeed frisbeed.debug
+#	strip frisbeed
 
 
 log.o:		$(SRCDIR)/log.c decls.h log.h

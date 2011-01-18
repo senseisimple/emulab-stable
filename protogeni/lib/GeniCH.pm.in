@@ -19,7 +19,7 @@ use vars qw(@ISA @EXPORT);
 #use Devel::TraceUse;
 use GeniDB;
 use Genixmlrpc;
-use GeniRegistry;
+use GeniSlice;
 use GeniResponse;
 use GeniUser;
 use GeniComponent;
@@ -29,6 +29,8 @@ use emutil;
 use libtestbed qw(SENDMAIL);
 use English;
 use Data::Dumper;
+use Date::Parse;
+use Time::Local;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -206,7 +208,8 @@ sub Resolve($)
     elsif (defined($hrn) && !($hrn =~ /^[-\w\.]*$/)) {
 	return GeniResponse->MalformedArgsResponse();
     }
-    if (! (defined($type) && ($type =~ /^(SA|CM|MA|Component|Slice|User)$/i))){
+    if (! (defined($type) &&
+	   ($type =~ /^(SA|AM|CM|MA|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
     $type = lc($type);
@@ -265,21 +268,7 @@ sub Resolve($)
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "sa") {
-	my $authority = GeniAuthority->Lookup($lookup_token);
-	if (!defined($authority)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such authority $lookup_token");
-	}
-	# Return a blob.
-	my $blob = { "gid"         => $authority->cert(),
-		     "url"         => $authority->url(),
-		     "urn"         => $authority->urn(),
-		     "type"        => $authority->type(),
-		 };
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
-    }
-    if ($type eq "cm") {
+    if ($type eq "cm" || $type eq "am" || $type eq "sa") {
 	my $manager = GeniAuthority->Lookup($lookup_token);
 	if (!defined($manager)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -306,7 +295,7 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "slice") {
-	my $slice = GeniRegistry::GeniSlice->Lookup($lookup_token);
+	my $slice = GeniSlice->Lookup($lookup_token);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice $lookup_token");
@@ -337,7 +326,7 @@ sub Register($)
     my $type  = $argref->{'type'};
 
     if (! (defined($type) &&
-	   ($type =~ /^(SA|MA|CM|SES|Component|Slice|User)$/i))){
+	   ($type =~ /^(SA|MA|AM|CM|SES|Component|Slice|User)$/i))){
 	return GeniResponse->MalformedArgsResponse();
     }
     $type = lc($type);
@@ -409,9 +398,9 @@ sub Register($)
     }
     
     if ($type eq "user") {
-	my $name  = $info->{'name'};
-	my $email = $info->{'email'};
-	my $keys  = undef;
+	my $name    = $info->{'name'};
+	my $email   = $info->{'email'};
+	my $keys    = undef;
 
 	if (! TBcheck_dbslot($name, "users", "usr_name",
 			     TBDB_CHECKDBSLOT_ERROR)) {
@@ -482,6 +471,8 @@ sub Register($)
     }
     if ($type eq "slice") {
 	my $creator_token  = $info->{'creator_uuid'} || $info->{'creator_urn'};
+	my $slice_expires  = $info->{'valid_until'}  || $info->{'expiration'};
+
 	if (!defined($creator_token)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Who is the creator of this slice?");
@@ -509,11 +500,54 @@ sub Register($)
 	}
 
 	#
+	# Set the expiration; we age these out in the ch_daemon.
+	#
+	if (defined($slice_expires)) {
+	    # Convert slice expiration to a time.
+	    my $slice_when = str2time($slice_expires);
+	    if (!defined($slice_when)) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Could not parse slice expiration");
+	    }
+	    if ($slice_when < time()) {
+		return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					    "Expiration is in the past");
+	    }
+	    $slice_expires = $slice_when;
+	}
+	else {
+	    #
+	    # Default to 30 days until all CMs updated. We will get a new
+	    # expiration if the slice is renewed.
+	    #
+	    $slice_expires = time() + (30 * 24 * 3600);
+	}
+
+	#
 	# Reregistration of existing slice is okay.
 	#
-	my $existing = GeniRegistry::GeniSlice->Lookup($certificate->urn());
+	my $existing = GeniSlice->Lookup($certificate->urn());
 	if (defined($existing)) {
-	    return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+	    #
+	    # Same slice URN but a different certificate. Delete and
+	    # continue with the registration.
+	    #
+	    if ($certificate->uuid() ne $existing->uuid()) {
+		if ($existing->Delete()) {
+		    print STDERR "Could not delete $existing!\n";
+		    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"$existing could not be unregistered");
+		}
+	    }
+	    else {
+		if (defined($slice_expires) &&
+		    $existing->SetExpiration($slice_expires) != 0) {
+		    print STDERR
+			"Could not update expiration for $existing ".
+			"to $slice_expires\n";
+		}
+		return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+	    }
 	}
 	#
 	# Temporary: Look for existing slice with same uuid but no urn.
@@ -538,14 +572,18 @@ sub Register($)
 				"Slice already registered with HRN");
 	    }
 	}
-	my $newslice = GeniRegistry::GeniSlice->Create($certificate,
-						       $user,
-						       $slice_authority);
+	my $newslice = GeniSlice->Create($certificate,
+					 $user, $slice_authority);
 	if (!defined($newslice)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not be registered");
 	}
-
+	if (defined($slice_expires) &&
+	    $newslice->SetExpiration($slice_expires) != 0) {
+	    print STDERR
+		"Could not set expiration for $newslice to $slice_expires\n";
+	}
+	
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 				    "Slice has been registered");
     }
@@ -563,7 +601,7 @@ sub Register($)
 	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
     }
-    if ($type eq "cm" || $type eq "sa" || $type eq "ses") {
+    if ($type eq "cm" || $type eq "sa" || $type eq "ses" || $type eq "am") {
 	my ($auth, $which, $type) = GeniHRN::Parse($certificate->urn());
 	
 	my $url = $certificate->URL();
@@ -610,7 +648,7 @@ sub Remove($)
     my $type  = $argref->{'type'};
     my $token = $uuid || $urn;
 
-    if (! (defined($type) && ($type =~ /^(SA|MA|CM|Component|Slice|User)$/))) {
+    if (! (defined($type) && ($type =~ /^(Slice|User)$/))) {
 	return GeniResponse->MalformedArgsResponse();
     }
     if (! ((defined($uuid) || defined($urn)) && defined($cred))) {
@@ -650,7 +688,7 @@ sub Remove($)
 				    "$token has been unregistered");
     }
     if ($type eq "Slice") {
-	my $slice = GeniRegistry::GeniSlice->Lookup($token);
+	my $slice = GeniSlice->Lookup($token);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 					"No such slice $token");
@@ -674,7 +712,7 @@ sub Shutdown($)
     my ($argref) = @_;
     my $cred   = $argref->{'credential'};
     my $uuid   = $argref->{'uuid'};
-    my $urn    = $argref->{'urn'};
+    my $urn    = $argref->{'slice_urn'} || $argref->{'urn'};
     my $clear  = $argref->{'clear'};
 
     if (! ((defined($uuid) || defined($urn)) && defined($cred))) {
@@ -692,19 +730,34 @@ sub Shutdown($)
 	print STDERR "Could not find local authority object\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
-    my $credential = CheckCredential($cred, $authority);
+    #
+    # XXX This should be a slice credential, not a clearinghouse
+    # credential. But need to wait until new SA is running everywhere.
+    #
+    my $credential = CheckCredential($cred);
     return $credential
 	if (GeniResponse::IsResponse($credential));
-   
+
+    if ($credential->target_urn() ne $authority->urn() &&
+	$credential->target_urn() ne $urn) {
+	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+				    "Insufficient privilege");
+    }
     $credential->HasPrivilege( "authority" ) or
 	$credential->HasPrivilege( "operator" ) or
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $slice = GeniRegistry::GeniSlice->Lookup($uuid || $urn);
+    my $slice = GeniSlice->Lookup($uuid || $urn);
     if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "No such slice registered here");
+	if (!defined($urn)) {
+	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
+					"No such slice registered here");
+	}
+    }
+    else {
+	$urn = $slice->urn()
+	    if (!defined($urn));
     }
 
     #
@@ -713,9 +766,9 @@ sub Shutdown($)
     #
     my $opt = ($clear ? "-u": "");
     # -c option indicates acting as CH. 
-    system("$SLICESHUTDOWN -c $opt $uuid");
+    system("$SLICESHUTDOWN -c $opt $urn");
     if ($?) {
-	print STDERR "Could not shutdown $uuid!\n";
+	print STDERR "Could not shutdown $urn!\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Error shutting down slice");
     }
@@ -749,7 +802,7 @@ sub ListComponents($)
     #
     my @results = ();
     my $query_result = DBQueryWarn("select uuid from geni_authorities ".
-				   "where type='cm'");
+				   "where type='cm' or type='am'");
     return GeniResponse->Create(GENIRESPONSE_DBERROR)
 	if (!defined($query_result));
 
@@ -858,7 +911,7 @@ sub List($)
     if ($type eq "slices") {
 	my @slices;
 
-	if (GeniRegistry::GeniSlice->ListAll(\@slices) != 0) {
+	if (GeniSlice->ListAll(\@slices) != 0) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
 	foreach my $slice (@slices) {

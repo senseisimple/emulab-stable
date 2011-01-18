@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -54,7 +54,7 @@ $nodeversions = array();
 $res = DBQueryFatal("select feature from node_features" . 
 		    "  where feature like 'plabstatus-%' group by feature");
 while ($row = mysql_fetch_row($res)) {
-    list($foo,$feature) = split("\-",$row[0]);
+    list($foo,$feature) = preg_split('/\-/',$row[0]);
     $nodeversions[] = $feature;
 }
 if (count($nodeversions) == 0) {

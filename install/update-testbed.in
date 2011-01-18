@@ -14,7 +14,12 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDERR "Usage: update-testbed [-v] [-f]\n";
+    print STDERR "Usage: update-testbed\n";
+    print STDERR "-v     - Verify install scripts by loading them only\n";
+    print STDERR "-n     - Run install script in impotent mode\n";
+    print STDERR "-d     - Debugging mode\n";
+    print STDERR "-i     - Run 'gmake boss-install' after running scripts\n";
+    print STDERR "-s     - Stop/Restart the testbed before/after running scripts\n";
     exit(-1);
 }
 my $optlist   = "idsvfn";
@@ -37,11 +42,15 @@ my $TBOPS        = "@TBOPSEMAIL@";
 my $DBNAME       = "@TBDBNAME@";
 my $SRCDIR       = "@top_srcdir@";
 my $SQLUPDATEDIR = "$SRCDIR/sql/updates";
+my $PGENIUPDATEDIR = "$SRCDIR/protogeni/updates";
 my $UPDATEDIR    = "$SRCDIR/install/updates";
 my $DBUPDATE     = "$TB/sbin/dbupdate";
+my $PGENIUPDATE  = "$TB/sbin/protogeni/update";
+my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $INSTALLUPDATE= "$TB/sbin/update-install";
 my $SETSITEVAR   = "$TB/sbin/setsitevar";
 my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
+my $FRISBEE      = "$TB/sbin/frisbeelauncher";
 my $tempfile     = "/var/tmp/update.$$";
 
 # Protos
@@ -64,17 +73,25 @@ $| = 1;
 BEGIN
 {
     if (-e "../Makeconf") {
+	my $srcdir = "@top_srcdir@";
 	my $objdir = `/bin/pwd`;
 	chomp($objdir);
 	# Prior to first install or running from object dir.
 	unshift(@INC, "$objdir/../db");
-	unshift(@INC, "$objdir/@top_srcdir@/install");
-	unshift(@INC, "$objdir/@top_srcdir@/tbsetup");
+	if ($srcdir =~ /^\//) {
+	    unshift(@INC, "$srcdir/install");
+	    unshift(@INC, "$srcdir/tbsetup");
+	} else {
+	    unshift(@INC, "$objdir/$srcdir/install");
+	    unshift(@INC, "$objdir/$srcdir/tbsetup");
+	}
 	unshift(@INC, "$objdir/../tbsetup");
     }
 }
 use emdb;
+use libEmulab;
 use libtestbed;
+use Image;
 
 #
 # Parse command arguments.
@@ -117,13 +134,30 @@ if (! (-e "../db/dbupdate" && -e "./update-install")) {
 my $objdir = `/bin/pwd`;
 chomp($objdir);
 
+my $abssrcdir;
+if ($SRCDIR =~ /^\//) {
+    $abssrcdir = "$SRCDIR";
+} else {
+    $abssrcdir = "$objdir/$SRCDIR";
+}
+
 my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
 	       "-I${objdir}/../db", 
-	       "-I${objdir}/${SRCDIR}/tbsetup",
-	       "-I${objdir}/${SRCDIR}/install",
+	       "-I${abssrcdir}/tbsetup",
+	       "-I${abssrcdir}/install",
 	       # To catch a few extra things that do not normally change.
 	       "-I@prefix@/lib"
 	       );
+
+# Chicken or Egg.
+# XXX only set specific fields as the ns_include field may not be there yet.
+DBQueryFatal("INSERT INTO sitevariables (name,value,defaultvalue,description)".
+	     " VALUES ".
+	     " ('general/testbed_shutdown',NULL,'0', ".
+	     "  'Non-zero value indicates that the testbed is shutdown ".
+	     "and scripts should not do anything when they run. ".
+	     "DO NOT SET THIS BY HAND!')")
+    if (!SiteVarExists("general/testbed_shutdown"));
 
 #
 # Dump the testbed version numbers in all modes.
@@ -159,6 +193,14 @@ if ($verify) {
     $exitval++
 	if ($?);
 
+    if ($PGENISUPPORT) {
+	print "Checking for ProtoGENI DB updates ...\n";
+	system("perl @INCDIRS ../protogeni/scripts/update ".
+	       "       -q -v -p $PGENIUPDATEDIR");
+	$exitval++
+	    if ($?);
+    }
+
     exit(0)
 	if (!$exitval);
 
@@ -167,6 +209,8 @@ if ($verify) {
     print "    this is resolved. Typically, you can resolve this by:\n\n";
     print "        boss> cd /your/object/dir\n";
     print "        boss> gmake update-testbed\n\n";
+    print "    More information is available at:\n";
+    print "       https://users.emulab.net/trac/emulab/wiki/install/update-testbed-v2\n\n";
     exit($exitval);
 }
 
@@ -190,7 +234,8 @@ sub Restart()
     }
     if ($nologins) {
 	print "Turning on the web interface and allowing swaps\n";
-	if (system("$SETSITEVAR web/nologins -") ||
+	if (system("$SETSITEVAR general/testbed_shutdown -") ||
+	    system("$SETSITEVAR web/nologins -") ||
 	    system("$SETSITEVAR web/message -")) {
 	    print "*** Could not renable the web interface and swapping!\n";
 	    exit(1);
@@ -224,6 +269,10 @@ if ($stopbed) {
     if ($?) {
 	Fatal("Could not disable web logins and experiment swaps");
     }
+    system("$SETSITEVAR general/testbed_shutdown 1");
+    if ($?) {
+	Fatal("Could not set general/testbed_shutdown");
+    }
     $nologins = 1;
     
     print "-> Waiting a few seconds for testbed to quiet down ...\n";
@@ -250,7 +299,7 @@ if ($stopbed) {
 
 	print "-> Experiments still in transition:\n";
 	while (my ($pid,$eid,$idx,$state,$expt_locked) =
-	       $query_result->query_result()) {
+	       $query_result->fetchrow_array()) {
 
 	    print "  $pid,$eid,$idx -- $state, $expt_locked\n";
 	}
@@ -263,6 +312,42 @@ if ($stopbed) {
 	Fatal("Could not stop testbed daemons. Stopping.");
     }
     $stopped = 1;
+
+    #
+    # XXX cannot just call Image->ActiveImages as the implementation
+    # changed and thus the code would not work when upgrading from a
+    # code base with the old implementation to one with the new.
+    #
+    my $table = "images";
+    if (!emdb::DBSlotExists("images", "frisbee_pid")) {
+	$table = "frisbee_blobs";
+    }
+    my $query_result =
+      emdb::DBQueryWarn("select imageid from $table where frisbee_pid!=0");
+    my @activeimages = ();
+    if ($query_result) {
+	while (my ($imageid) = $query_result->fetchrow_array()) {
+	    my $image = Image->Lookup($imageid);
+	    if (!defined($image)) {
+		print STDERR
+		    "*** Could not find DB object for image $imageid\n";
+		next;
+	    }
+	    push(@activeimages, $image);
+	}
+    }
+    if (@activeimages > 0) {
+	print "** Stopping running frisbee processes ...\n";
+	foreach my $image (@activeimages) {
+	    my $imageid = $image->imageid();
+	    print "-> Killing frisbee for $image ...\n";
+	    system("$FRISBEE -k $imageid");
+	    if ($?) {
+		Fatal("Could not stop frisbee for $image!");
+	    }
+	}
+    }
+    
     print "** Testbed is stopped. Proceeding to update\n";
 
     #
@@ -281,6 +366,14 @@ print "Running pre-install updates ...\n";
 system("perl @INCDIRS ./update-install $forceopt -q -a pre -p $UPDATEDIR");
 exit(1)
     if ($?);
+
+if ($PGENISUPPORT) {
+    print "Running ProtoGENI DB updates ...\n";
+    system("perl @INCDIRS ../protogeni/scripts/update ".
+	   "       -q -p $PGENIUPDATEDIR");
+    exit(1)
+	if ($?);
+}
 
 if ($install) {
     print "Installing testbed software ... this will take a while!\n";

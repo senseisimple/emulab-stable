@@ -145,9 +145,19 @@ bool ptop_rspec_input = false;
 bool vtop_rspec_input = false;
 #endif
 
-// XXX - shouldn't be in this file
-double absbest;
-int absbestviolated, iters, iters_to_best;
+/*
+ * Score and violations for the best score found so far
+ * XXX - shouldn't be in this file
+ */
+double best_score;
+int best_violated;
+
+/*
+ * Number of iterations executed so far, and how many it took us to find the
+ * best solution
+ * XXX - shouldn't be in this file
+ */
+int iters, iters_to_best;
 
 // Map of all physical types in use in the system
 tb_ptype_map ptypes;
@@ -187,9 +197,10 @@ void read_physical_topology(char *filename) {
   
 #ifdef WITH_XML
   if (ptop_xml_input) {
-		cout << "Physical Graph: " << parse_ptop_xml(PG,SG,filename) << endl;
-  } else if (ptop_rspec_input) {
-	  cout << "Physical Graph: " << parse_ptop_rspec (PG, SG, filename) << endl;
+	cout << "Physical Graph: " << parse_ptop_xml(PG,SG,filename) << endl;
+  } 
+  else if (ptop_rspec_input) {
+	cout << "Physical Graph: " << parse_advertisement(PG, SG, filename) << endl;
 	}
 	else {
       cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
@@ -310,7 +321,7 @@ void read_virtual_topology(char *filename) {
 	cout << "Virtual Graph: " << parse_vtop_xml(VG,filename) << endl;
   }
   else if (vtop_rspec_input){
-  	  cout << "Virtual Graph: " << parse_vtop_rspec (VG, filename) << endl ;
+  	  cout << "Virtual Graph: " << parse_request (VG, filename) << endl;
   }
   else {
       cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
@@ -442,17 +453,17 @@ void print_help() {
       << endl;
   cout << "  -u           - Print a summary of the solution." << endl;
   cout << "  -c <float>   - Use the 'connected' pnode finding algorithm ";
-	cout <<                   "<float>*100%" << endl;
-	cout << "                 of the time." << endl;
+  cout <<                   "<float>*100%" << endl;
+  cout << "                 of the time." << endl;
   cout << "  -n           - Don't anneal - just do the prechecks." << endl;
 
   cout << "  -x <file>    - Specify a text ptop file" << endl;
   cout << "  -y <file>    - Specify a text top file" << endl;
 #ifdef WITH_XML
   cout << "  -W <file>    - Specify the output rspec file" << endl;
-	cout << "  -f <T>[/<T>] - Specify the ptop/vtop file formats " << endl;
-	cout << "                 T should be one of (text|xml|rspec-<rspec ver. number>)" << endl;;
-	cout << "                 Specifying only one T is equivalent to -f T/T"<<endl;
+  cout << "  -f <T>[/<T>] - Specify the ptop/vtop file formats " << endl;
+  cout << "                 T should be one of (text|xml|rspec)" << endl;
+  cout << "                 Specifying only one T is equivalent to -f T/T"<<endl;
 #endif
   cout << "  -F          - Apply additional checking to fixed nodes" << endl;
   cout << "  -D          - Dump configuration options" << endl;
@@ -582,6 +593,10 @@ int mapping_precheck() {
 	pclass_vector *vec = new pclass_vector();
 	vnode_type_table[v->name] = tt_entry(0,vec);
 
+	// Remember if there are no nodes of the requested type in the physical
+	// topology. Without this diagnostic, our "guess what's wrong with
+	// the vnode" code concludes that there was not enough bandwidth.
+	bool matched_node_type = true;
 	// This constitutes a list of the number of ptypes that matched the
 	// criteria. We use to guess what's wrong with the vnode.
 	int matched_bw = 0;
@@ -614,6 +629,7 @@ int mapping_precheck() {
             // Check to make sure there are actually nodes of this type in the
             // physical topology
             if (type_table.find(this_type) == type_table.end()) {
+                matched_node_type = false;
                 // Yes, I know, goto is evil. But I'm not gonna indent the next
                 // 100 lines of code for this error case
                 goto nosuchtype;
@@ -762,7 +778,10 @@ nosuchtype:
 	      }
 	    }
 
-	    if (!matched_bw) {
+	    if (!matched_node_type) {
+		cout << "      No physical nodes of requested type '"
+		     << v->type << "'!\n";
+	    } else if (!matched_bw) {
 		cout << "      Too much bandwidth on emulated links!" << endl;
 	    }
 
@@ -822,7 +841,7 @@ void exit_unretryable(int signal) {
 extern double temp;
 void status_report(int signal) {
   cout << "I: " << iters << " T: " << temp << " S: " << get_score() << " V: "
-    << violated << " (Best S: " << absbest << " V:" << absbestviolated << ")"
+    << violated << " (Best S: " << best_score << " V:" << best_violated << ")"
     << endl;
   cout.flush();
 }
@@ -946,6 +965,14 @@ int main(int argc,char **argv) {
     break;
 
 #ifdef WITH_XML
+
+    case 'W':
+    if (strcmp(optarg, "") == 0) {
+      print_help();
+    }
+    vtopOutputFilename = optarg;
+    break;
+
 	case 'f':
 		if (strcmp(optarg, "") == 0) {
 			print_help();
@@ -1201,11 +1228,11 @@ int main(int argc,char **argv) {
   fclose(deltaout);
 #endif
 
-  if ((!compare_scores(get_score(),absbest)) || (violated > absbestviolated)) {
+  if ((!compare_scores(get_score(),best_score)) || (violated > best_violated)) {
     cout << "WARNING: Internal scoring inconsistency." << endl;
-    cout << "score:" << get_score() << " absbest:" << absbest <<
-      " violated:" << violated << " absbestviolated:" <<
-      absbestviolated << endl;
+    cout << "score:" << get_score() << " best_score:" << best_score <<
+      " violated:" << violated << " best_violated:" <<
+      best_violated << endl;
   }
   
   cout << "   BEST SCORE:  " << get_score() << " in " << iters <<
@@ -1253,4 +1280,3 @@ int main(int argc,char **argv) {
       exit(EXIT_SUCCESS);
   }
 }
-

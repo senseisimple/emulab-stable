@@ -28,7 +28,7 @@ SUBDIRS = garcia-telemetry tutorial
 # is changed.
 # 
 all: defs.php3 dbdefs.php3 swish.conf websearch htmlinstall xmlrpc.php3 \
-	xmlrpcpipe.php3 all-subdirs
+	xmlrpcpipe.php3 blob/read.php3 all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -126,6 +126,8 @@ UMFILES += $(wildcard $(SRCDIR)/usermap/*.js)
 
 JSFILES += $(wildcard $(SRCDIR)/js/*.js)
 
+BLOBFILES += $(wildcard blob/*.php3)
+
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
 DOWNLOADFILES = $(wildcard $(SRCDIR)/downloads/*.gz)
@@ -182,6 +184,7 @@ ALLUM     = $(notdir $(UMFILES))
 ALLJS     = $(notdir $(JSFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
 ALLWISTATS = $(notdir $(WIRELESSSTATSFILES))
+ALLBLOB   = $(notdir $(BLOBFILES))
 
 INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
@@ -200,6 +203,7 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
 	$(addprefix $(INSTALL_WWWDIR)/wireless-stats/, $(ALLWISTATS)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
+	$(addprefix $(INSTALL_WWWDIR)/blob/, $(ALLBLOB)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB)) \

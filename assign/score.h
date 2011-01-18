@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -97,6 +97,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
 void resolve_links(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
     bool deterministic);
 void mark_vlink_unassigned(tb_vlink *vlink);
+void mark_vlink_assigned(tb_vlink *vlink);
 
 /*
  * Declaration of many of the variables used for scoring. Default values

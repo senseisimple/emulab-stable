@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -10,16 +10,14 @@ use Getopt::Std;
 use Data::Dumper;
 
 #
-# Resolve a uuid or hrn at the clearinghouse or an SA.
+# Resolve a urn at its authority.
 # 
 sub usage()
 {
-    print "Usage: resolve <type> [uuid | hrn]\n";
+    print "Usage: resolve <urn>\n";
     exit(1);
 }
 my $optlist = "";
-my $uuid;
-my $hrn;
 
 #
 # Configure variables
@@ -49,8 +47,7 @@ use libaudit;
 use GeniDB;
 use GeniCertificate;
 use GeniAuthority;
-use GeniRegistry;
-use Genixmlrpc;
+use GeniComponent;
 
 #
 # Check args.
@@ -60,16 +57,8 @@ if (! getopts($optlist, \%options)) {
     usage();
 }
 usage()
-    if (@ARGV != 2);
-my $type  = $ARGV[0];
-my $token = $ARGV[1];
-
-if ($type =~ /^([\w]*)$/) {
-    $type = $1;
-}
-else {
-    fatal("Illegal chars in type: $type");
-}
+    if (@ARGV != 1);
+my $urn = $ARGV[0];
 
 #
 # Load the SA cert to act as caller context.
@@ -78,21 +67,17 @@ my $certificate = GeniCertificate->LoadFromFile($SACERT);
 if (!defined($certificate)) {
     fatal("Could not load certificate from $SACERT\n");
 }
-my $context = Genixmlrpc->Context($certificate);
-if (!defined($context)) {
-    fatal("Could not create context to talk to clearinghouse");
-}
-my $clearinghouse = GeniRegistry::ClearingHouse->Create($context);
-if (!defined($clearinghouse)) {
-    fatal("Could not create a clearinghouse client");
-}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 
-my $value;
-
-if ($clearinghouse->Resolve($token, uc($type), \$value) != 0) {
-    fatal("Could not resolve $token at the clearinghouse");
+my $component = GeniComponent->Lookup($urn);
+if (!defined($component)) {
+    $component = GeniComponent->CreateFromRegistry($urn);
 }
-print Dumper($value);
+my $blob = $component->Resolve();
+if (!defined($blob)) {
+    fatal("Could not resolve $urn at the clearinghouse");
+}
+print Dumper($blob);
 exit(0);
 
 sub fatal($)

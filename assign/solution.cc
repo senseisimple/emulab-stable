@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -14,9 +14,10 @@ static const char rcsid[] = "$Id: solution.cc,v 1.15 2009-10-21 20:49:26 tarunp 
 #include <utility>
 
 #ifdef WITH_XML
-	#include "annotate_rspec.h"
-	#include "annotate_vtop.h"
-	#include "xstr.h"
+#include "annotate_rspec.h"
+#include "annotate_rspec_v2.h"
+#include "annotate_vtop.h"
+#include "xstr.h"
 #endif
 
 extern bool ptop_xml_input;
@@ -24,6 +25,8 @@ extern bool ptop_rspec_input;
 
 extern bool vtop_xml_input;
 extern bool vtop_rspec_input;
+
+extern int rspec_version;
 
 bool both_inputs_rspec = false;
 bool both_inputs_xml = false;
@@ -51,14 +54,22 @@ void print_solution(const solution &s) {
     tb_vnode *vn;
 
 #ifdef WITH_XML
-	bool is_generated = false;
-	both_inputs_xml = ptop_xml_input && vtop_xml_input;
-	both_inputs_rspec = ptop_rspec_input && vtop_rspec_input;
-	
-	if (both_inputs_rspec == true)
-		rspec_annotater = new annotate_rspec ();
-	else if (both_inputs_xml == true)
-		vtop_annotater = new annotate_vtop();
+    bool is_generated = false;
+    both_inputs_xml = ptop_xml_input && vtop_xml_input;
+    both_inputs_rspec = ptop_rspec_input && vtop_rspec_input;
+    
+    if (both_inputs_rspec == true) {
+      switch (rspec_version) {
+      case 2:
+	rspec_annotater = new annotate_rspec_v2();
+	break;
+      default:
+	rspec_annotater = new annotate_rspec ();
+	break;
+      }
+    }
+    else if (both_inputs_xml == true)
+      vtop_annotater = new annotate_vtop();
 #endif	
     /*
      * Start by printing out all node mappings
@@ -66,29 +77,30 @@ void print_solution(const solution &s) {
     cout << "Nodes:" << endl;
     tie(vit,veit) = vertices(VG);
     for (;vit != veit;++vit) {
-		vn = get(vvertex_pmap,*vit);
-		if (! s.is_assigned(*vit)) {
-			cout << "unassigned: " << vn->name << endl;
-		} else {
-	#ifdef WITH_XML
-			const char* node_name = XStr(vn -> name).c();
-			const char* assigned_to = XStr (get(pvertex_pmap,s.get_assignment(*vit))->name).c() ;
-			if (both_inputs_rspec == true)
-			{
-				rspec_annotater->annotate_element(node_name, assigned_to);
-				if (rspec_annotater->is_generated_element("node", "virtual_id", node_name))
-					continue;
-			}
-			else if (both_inputs_xml == true)
-			{
-				vtop_annotater->annotate_element(node_name, assigned_to);
-			}
-	#endif
-			cout << vn->name << " " << get(pvertex_pmap,s.get_assignment(*vit))->name << endl;
-		}
+      vn = get(vvertex_pmap,*vit);
+      if (! s.is_assigned(*vit)) {
+        cout << "unassigned: " << vn->name << endl;
+      } else {
+#ifdef WITH_XML
+	string node_name = XStr(vn -> name).c();
+	string assigned_to =XStr(get(pvertex_pmap,s.get_assignment(*vit))->name).c();
+	if (both_inputs_rspec) {
+	  rspec_annotater->annotate_element(node_name.c_str(), assigned_to.c_str());
+	  if (rspec_annotater->is_generated_element("node", "virtual_id",
+                                              node_name.c_str())) {
+	    continue;
+    }
 	}
+	else if (both_inputs_xml) {
+	  vtop_annotater->annotate_element(node_name.c_str(), assigned_to.c_str());
+	}
+#endif
+	cout << vn->name << " " 
+	     << get(pvertex_pmap,s.get_assignment(*vit))->name << endl;
+      }
+    }
     cout << "End Nodes" << endl;
-
+    
     /*
      * Next, edges
      */
@@ -96,17 +108,17 @@ void print_solution(const solution &s) {
     vedge_iterator eit,eendit;
     tie(eit,eendit) = edges(VG);
     for (;eit!=eendit;++eit) {
-	tb_vlink *vlink = get(vedge_pmap,*eit);
+      tb_vlink *vlink = get(vedge_pmap,*eit);
 
 #ifdef WITH_XML
-	if (both_inputs_rspec == true)
-	{
-		is_generated = rspec_annotater->is_generated_element("link", "virtual_id", (vlink->name).c_str());
-		if (!is_generated)
-			cout << vlink->name;
+	if (both_inputs_rspec) {
+	  is_generated = rspec_annotater->is_generated_element 
+	    ("link", "virtual_id", (vlink->name).c_str());
+	  if (!is_generated)
+	    cout << vlink->name;
 	}
 	else
-		cout << vlink->name;
+	  cout << vlink->name;
 #else
 	cout << vlink->name;
 #endif
@@ -117,20 +129,19 @@ void print_solution(const solution &s) {
 	    // Direct link - just need the source and destination
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());
 	    tb_plink *p2 = get(pedge_pmap,vlink->link_info.plinks.back());
-		// XXX: This is not correct because it contradicts the comment earlier
-		// It seems that it will work because the front and back of the list will have the same node
-		// But it needs to be checked anyway.
+	    // XXX: This is not correct because it contradicts the comment earlier
+	    // It seems that it will work because the front and back of the list will have the same node
+	    // But it needs to be checked anyway.
 #ifdef WITH_XML
-		if (both_inputs_rspec == true)
-		{
-			rspec_annotater->annotate_element((vlink->name).c_str(), (p->name).c_str());
-			if (is_generated)
-				continue;
-		}
-		else if (both_inputs_xml == true)
-		{
-// 			annotate_vtop((vlink->name).c_str(), (p->name).c_str());
-		}
+	    if (both_inputs_rspec) {
+	      rspec_annotater->annotate_element((vlink->name).c_str(), 
+                                          (p->name).c_str());
+	      if (is_generated)
+		continue;
+	    }
+	    else if (both_inputs_xml == true) {
+	      //	      annotate_vtop((vlink->name).c_str(), (p->name).c_str());
+	    }
 #endif
 	    cout << " direct " << p->name << " (" <<
 		p->srcmac << "," << p->dstmac << ") " <<
@@ -141,100 +152,96 @@ void print_solution(const solution &s) {
 	    tb_plink *p = get(pedge_pmap,vlink->link_info.plinks.front());
 	    tb_plink *p2 = get(pedge_pmap,vlink->link_info.plinks.back());
 #ifdef WITH_XML
-		links.push_back((p->name).c_str());
-		links.push_back((p2->name).c_str());
-		if (both_inputs_rspec == true)
-		{
-			rspec_annotater->annotate_element((vlink->name).c_str(), &links);
-			if (is_generated)
-				continue;
-		}
-		else if (both_inputs_xml == true)
-		{
-			vtop_annotater->annotate_element((vlink->name).c_str(), &links);
-		}
+	    links.push_back((p->name).c_str());
+	    links.push_back((p2->name).c_str());
+	    if (both_inputs_rspec) {
+	      rspec_annotater->annotate_element((vlink->name).c_str(), &links);
+	      if (is_generated)
+		continue;
+	    }
+	    else if (both_inputs_xml) {
+	      vtop_annotater->annotate_element((vlink->name).c_str(), &links);
+	    }
 #endif
 	    cout << " intraswitch " << p->name << " (" <<
-		p->srcmac << "," << p->dstmac << ") " <<
-		p2->name << " (" << p2->srcmac << "," << p2->dstmac << ")";
+	      p->srcmac << "," << p->dstmac << ") " <<
+	      p2->name << " (" << p2->srcmac << "," << p2->dstmac << ")";
 	} else if (vlink->link_info.type_used ==
-		tb_link_info::LINK_INTERSWITCH) {
-	    // Interswitch link - iterate through each intermediate link
-	    cout << " interswitch ";
-	    for (pedge_path::iterator it=vlink->link_info.plinks.begin(); it != vlink->link_info.plinks.end();++it) {
-			tb_plink *p = get(pedge_pmap,*it);
+		   tb_link_info::LINK_INTERSWITCH) {
+	  // Interswitch link - iterate through each intermediate link
+	  cout << " interswitch ";
+	  for (pedge_path::iterator it=vlink->link_info.plinks.begin(); 
+	       it != vlink->link_info.plinks.end();
+	       ++it) {
+	    tb_plink *p = get(pedge_pmap,*it);
 #ifdef WITH_XML
-			links.push_back((p->name).c_str());
-			if (!is_generated)
-				cout << " " << p->name << " (" << p->srcmac << "," << p->dstmac << ")";
+	    links.push_back((p->name).c_str());
+	    if (!is_generated)
+	      cout << " " << p->name 
+		   << " (" << p->srcmac << "," << p->dstmac << ")";
 #else
-			cout << " " << p->name << " (" << p->srcmac << "," << p->dstmac << ")";
+	    cout << " " << p->name 
+		 << " (" << p->srcmac << "," << p->dstmac << ")";
 #endif
-	    }
+	  }
 #ifdef WITH_XML
-		if (both_inputs_rspec == true)
-		{
-			rspec_annotater->annotate_element((vlink->name).c_str(), &links);
-		}
-		else if (both_inputs_xml == true)
-		{
-			vtop_annotater->annotate_element((vlink->name).c_str(), &links);
-		}
+	    if (both_inputs_rspec) {
+	      rspec_annotater->annotate_element((vlink->name).c_str(), &links);
+	    }
+	    else if (both_inputs_xml) {
+	      vtop_annotater->annotate_element((vlink->name).c_str(), &links);
+	    }
 #endif
 	} else if (vlink->link_info.type_used == tb_link_info::LINK_TRIVIAL) {
-	    // Trivial link - we really don't have useful information to
-	    // print, but we'll fake a bunch of output here just to make it
-	    // consistent with other (ie. intraswitch) output
-	    vvertex vv = vlink->src;
-	    tb_vnode *vnode = get(vvertex_pmap,vv);
-	    pvertex pv = vnode->assignment;
-	    tb_pnode *pnode = get(pvertex_pmap,pv);
-/*#ifdef WITH_XML
-		if (both_inputs_rspec == true)
-		{
-			rspec_annotater->annotate_trivial_link((vlink->name).c_str(), (pnode->name).c_str());
-			if (is_generated)
-				continue;
-		}
-#endif*/
-	    cout << " trivial " <<  pnode->name << ":loopback" <<
-		" (" << pnode->name << "/null,(null)) " <<
-		pnode->name << ":loopback" << " (" << pnode->name <<
-		"/null,(null)) ";
-		// TODO: Annotate trivial links in the rspec
+	  // Trivial link - we really don't have useful information to
+	  // print, but we'll fake a bunch of output here just to make it
+	  // consistent with other (ie. intraswitch) output
+	  vvertex vv = vlink->src;
+	  tb_vnode *vnode = get(vvertex_pmap,vv);
+	  pvertex pv = vnode->assignment;
+	  tb_pnode *pnode = get(pvertex_pmap,pv);
+#ifdef WITH_XML
+	  if (both_inputs_rspec) {
+	    rspec_annotater->annotate_element((vlink->name).c_str());
+	    if (is_generated)
+	      continue;
+	  }
+#endif
+	  cout << " trivial " <<  pnode->name << ":loopback" <<
+	    " (" << pnode->name << "/null,(null)) " <<
+	    pnode->name << ":loopback" << " (" << pnode->name <<
+	    "/null,(null)) ";
+	  // TODO: Annotate trivial links in the rspec
 	} else {
-	    // No mapping at all
-	    cout << " Mapping Failed";
+	  // No mapping at all
+	  cout << " Mapping Failed";
 	}
 	cout << endl;
     }
     cout << "End Edges" << endl;
     cout << "End solution" << endl;
 #ifdef WITH_XML
-	if (both_inputs_rspec == true)
-	{
-		rspec_annotater->cleanup();
-	}
+    if (both_inputs_rspec == true) {
+      rspec_annotater->cleanup();
+    }
 #endif
 }
 
 /* Print out the current solution and annotate the rspec */
 void print_solution (const solution &s, const char* output_filename)
 {
-	print_solution(s);
+  print_solution(s);
 #ifdef WITH_XML
-	// This will work because print_solution is called already
-	// and the objects have been created there
-	if (both_inputs_rspec == true)
-	{
-		cout << "Writing annotated rspec to " << output_filename << endl;
-		rspec_annotater->write_annotated_file (output_filename);
-	}
-	else if (both_inputs_xml == true)
-	{
-		cout << "Writing annotated xml to " << output_filename << endl;
-		vtop_annotater->write_annotated_file (output_filename);
-	}
+  // This will work because print_solution is called already
+  // and the objects have been created there
+  if (both_inputs_rspec == true) {
+      cout << "Writing annotated rspec to " << output_filename << endl;
+      rspec_annotater->write_annotated_file (output_filename);
+  }
+  else if (both_inputs_xml == true) {
+      cout << "Writing annotated xml to " << output_filename << endl;
+      vtop_annotater->write_annotated_file (output_filename);
+  }
 #endif
 }
 

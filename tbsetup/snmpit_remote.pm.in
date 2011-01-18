@@ -173,9 +173,9 @@ sub RemoteDoVlansFromTables($@)
     my $response = commonTail("setup", $vlantable);
     return 1
 	if ($response->{"code"});
-    my $xmlback = $response->{"output"};
+    my $xmlback = $response->{"value"};
 
-    if (defined($xmlback)) {
+    if (defined($xmlback) && $xmlback ne "") {
 	foreach my $vlres (split ',', $xmlback) {
 	    my ($vlanid, $tag) = split '#', $vlres;
 	    
@@ -227,7 +227,7 @@ sub RemoteDeleteVlan($)
 {
     my $vlan      = shift();
 
-    return RemoteDoReset($vlan->id(), 0);
+    return RemoteDoReset(undef, 0, ($vlan->id()));
 }
 
 #
@@ -337,8 +337,8 @@ sub RemoteDoList(@)
     tbdie({cause => 'hardware'},
           "elabinelab::vlansv2 returns '" . $response->{"code"} . "'\n")
 	if ($response->{"code"});
-    my $xmlback = $response->{"output"};
-    if (!defined($xmlback)) { return @list; }
+    my $xmlback = $response->{"value"};
+    if (!defined($xmlback) || $xmlback eq "") { return @list; }
 
     my $prefix = "" ;
     TBGetSiteVar("federation/localprefix",\$prefix);

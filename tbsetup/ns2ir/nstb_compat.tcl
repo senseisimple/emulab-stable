@@ -28,6 +28,7 @@ proc tb-set-node-rpms {node args} {}
 proc tb-set-node-startup {node cmd} {}
 proc tb-set-node-cmdline {node cmd} {}
 proc tb-set-node-tarfiles {node args} {}
+proc tb-set-tarfiles {args} {}
 proc tb-set-node-lan-delay {node lan delay} {}
 proc tb-set-node-lan-bandwidth {node lan bw} {}
 proc tb-set-node-lan-loss {node lan loss} {}
@@ -101,6 +102,12 @@ proc tb-set-dpdb {onoff} {}
 proc tb-fix-interface {vnode lanlink iface} {}
 proc tb-set-node-usesharednode {node weight} {}
 proc tb-set-node-sharingmode {node sharemode} {}
+
+#add for OML
+proc tb-set-use-oml {args} {}
+proc tb-set-oml-server {node} {}
+proc tb-set-oml-mp {args} {}
+proc tb-set-oml-use-control {args} {}
 
 proc tb-set-security-level {level} {
 
@@ -261,6 +268,9 @@ Simulator instproc make-cloud {nodes bw delay args} {
     return [$self make-lan $nodes $bw $delay]
 }
 
+Simulator instproc make-path {linklist} {
+}
+
 Node instproc program-agent {args} {
 }
 
@@ -287,6 +297,9 @@ LanNode instproc trace {args} {
 }
 
 LanNode instproc trace_endnode {args} {
+}
+
+LanNode instproc implemented_by {args} {
 }
 
 LanNode instproc unknown {m args} {

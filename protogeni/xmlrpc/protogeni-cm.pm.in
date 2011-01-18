@@ -1,0 +1,81 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME $GENI_METHODS $EMULAB_PEMFILE $GENI_VERSION);
+BEGIN { $GENI_DBNAME = "geni-cm"; }
+
+# Configure variables
+my $ETCDIR         = "@prefix@/etc";
+$EMULAB_PEMFILE    = "$ETCDIR/genicm.pem";
+
+# Testbed libraries.
+use lib '@prefix@/lib';
+use GeniCM;
+use GeniCMV2;
+
+# Default
+if (!defined($GENI_VERSION)) {
+    $GENI_VERSION = "2.0";
+}
+
+if ($GENI_VERSION eq "1.0") {
+    $GENI_METHODS = {
+	"GetVersion"        => \&GeniCM::GetVersion,
+	"Resolve"	    => \&GeniCM::Resolve,
+	"DiscoverResources" => \&GeniCM::DiscoverResources,
+	"GetTicket"         => \&GeniCM::GetTicket,
+	"UpdateTicket"      => \&GeniCM::UpdateTicket,
+	"ReleaseTicket"     => \&GeniCM::ReleaseTicket,
+	"RedeemTicket"      => \&GeniCM::RedeemTicket,
+	"StartSliver"       => \&GeniCM::StartSliver,
+	"DeleteSliver"      => \&GeniCM::DeleteSliver,
+	"DeleteSlice"       => \&GeniCM::DeleteSlice,
+	"SplitSliver"       => \&GeniCM::SplitSliver,
+	"UpdateSliver"      => \&GeniCM::UpdateSliver,
+	"GetSliver"         => \&GeniCM::GetSliver,
+	"BindToSlice"       => \&GeniCM::BindToSlice,
+	"Shutdown"          => \&GeniCM::Shutdown,
+	"ListUsage"         => \&GeniCM::ListUsage,
+	"SliceStatus"       => \&GeniCM::SliceStatus,
+	"SliverStatus"      => \&GeniCM::SliverStatus,
+	"SliverTicket"      => \&GeniCM::SliverTicket,
+	"ListTickets"       => \&GeniCM::ListTickets,
+	"ListHistory"       => \&GeniCM::ListHistory,
+	"RenewSlice"	    => \&GeniCM::RenewSlice,
+    };
+}
+elsif ($GENI_VERSION eq "2.0") {
+    $GENI_METHODS = {
+	"GetVersion"        => \&GeniCMV2::GetVersion,
+	"Resolve"	    => \&GeniCMV2::Resolve,
+	"DiscoverResources" => \&GeniCMV2::DiscoverResources,
+	"CreateSliver"      => \&GeniCMV2::CreateSliver,
+	"UpdateSliver"      => \&GeniCMV2::UpdateSliver,
+	"DeleteSliver"      => \&GeniCMV2::DeleteSliver,
+	"GetSliver"         => \&GeniCMV2::GetSliver,
+	"Shutdown"          => \&GeniCMV2::Shutdown,
+	"SliverStatus"      => \&GeniCMV2::SliverStatus,
+	"RenewSlice"        => \&GeniCMV2::RenewSlice,
+	"GetTicket"         => \&GeniCMV2::GetTicket,
+	"ReleaseTicket"     => \&GeniCMV2::ReleaseTicket,
+	"UpdateTicket"      => \&GeniCMV2::UpdateTicket,
+	"RedeemTicket"      => \&GeniCMV2::RedeemTicket,
+	"DeleteSlice"       => \&GeniCMV2::DeleteSlice,
+	"StartSliver"       => \&GeniCMV2::StartSliver,
+	"StopSliver"        => \&GeniCMV2::StopSliver,
+	"RestartSliver"     => \&GeniCMV2::RestartSliver,
+	"BindToSlice"       => \&GeniCMV2::BindToSlice,
+	"ListUsage"         => \&GeniCMV2::ListUsage,
+	"ListHistory"       => \&GeniCMV2::ListHistory,
+    };
+}
+
+1;
+

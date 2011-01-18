@@ -43,10 +43,13 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
 		  rmproj snmpit.proxynew snmpit.proxyv2 pool_daemon \
-		  checknodes_daemon
+		  checknodes_daemon subboss_frisbeelauncher_wrapper \
+		  subboss_wrapper
 ifeq ($(ISMAINSITE),1)
 SBIN_STUFF     += repos_daemon
 endif
+
+SUBBOSS_SBIN_STUFF = subboss_frisbeelauncher subboss_frisbeeimage
 
 CTRLSBIN_STUFF  = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
@@ -81,11 +84,13 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
 		  snmpit_cisco_stack.pm snmpit_intel_stack.pm power_sgmote.pm \
 		  snmpit_foundry.pm snmpit_stack.pm snmpit_remote.pm \
-		  snmpit_nortel.pm snmpit_hp.pm \
+		  snmpit_nortel.pm snmpit_hp.pm snmpit_apcon.pm\
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
-		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm
+		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm \
+		  power_ipmi.pm libosload_new.pm libosload_switch.pm \
+		  libossetup_switch.pm
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
@@ -93,7 +98,8 @@ SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \
 SETUID_SBIN_SCRIPTS  = mkproj rmgroup mkgroup frisbeelauncher frisbeeimage \
 			rmuser idleswap named_setup exports_setup \
 			sfskey_update setgroups newnode_reboot vnode_setup \
-			elabinelab nfstrace rmproj
+			elabinelab nfstrace rmproj subboss_frisbeelauncher_wrapper \
+			subboss_wrapper
 SETUID_LIBX_SCRIPTS  = console_setup spewlogfile
 
 ifeq ($(SYSTEM),FreeBSD)
@@ -116,12 +122,14 @@ SETUID_BIN_SCRIPTS  =
 SETUID_SBIN_SCRIPTS =
 SETUID_LIBX_SCRIPTS = 
 endif
+#COMPILED_TARGETS    = $(filter %.pm, $(TARGETS))
+COMPILED_TARGETS    = 
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(TARGETS)
+all:	$(TARGETS) $(addprefix compiled/, $(COMPILED_TARGETS))
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -229,6 +237,10 @@ endif
 	chmod u+s $(INSTALL_SBINDIR)/mkgroup
 	chown root $(INSTALL_SBINDIR)/frisbeelauncher
 	chmod u+s $(INSTALL_SBINDIR)/frisbeelauncher
+	chown root $(INSTALL_SBINDIR)/subboss_frisbeelauncher_wrapper
+	chmod u+s $(INSTALL_SBINDIR)/subboss_frisbeelauncher_wrapper
+	chown root $(INSTALL_SBINDIR)/subboss_wrapper
+	chmod u+s $(INSTALL_SBINDIR)/subboss_wrapper
 	chown root $(INSTALL_SBINDIR)/frisbeeimage
 	chmod u+s $(INSTALL_SBINDIR)/frisbeeimage
 	chown root $(INSTALL_SBINDIR)/rmuser
@@ -265,6 +277,11 @@ endif
 	chmod u+s $(INSTALL_BINDIR)/tbrsync
 	chown root $(INSTALL_SBINDIR)/nfstrace
 	chmod u+s $(INSTALL_SBINDIR)/nfstrace
+
+#
+# Subboss installation
+#
+subboss-install:	$(addprefix $(INSTALL_SBINDIR)/, $(SUBBOSS_SBIN_STUFF))
 
 #
 # Control node installation (okay, plastic)
@@ -348,3 +365,8 @@ $(INSTALL_DIR)/opsdir/sbin/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL) $< $@
+
+compiled/%: %
+	@echo "Compiling $< to $@"
+	-mkdir -p compiled
+	perlcc -I $(INSTALL_LIBDIR) -B -o $@ $<

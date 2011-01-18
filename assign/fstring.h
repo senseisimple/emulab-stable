@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2005-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -25,10 +25,15 @@
 
 #include <iostream>
 #include <map>
+#include <cstring>
 using namespace std;
 
 #ifdef NEW_GCC
-#include <ext/hash_fun.h>
+#ifdef NEWER_GCC
+  #include <backward/hash_fun.h>
+#else
+  #include <ext/hash_fun.h>
+#endif
 using namespace __gnu_cxx;
 #else
 #include <stl_hash_fun.h>
@@ -126,7 +131,11 @@ class fstring {
          * Output/debugging functions
          */
         friend ostream &operator<<(ostream &o, const fstring &s) {
-            return(o << s.str);
+            if (s.str != NULL) {
+                return(o << s.str);
+            } else {
+                return(o << "(null)");
+            }
         }
 		
 		

@@ -1,0 +1,18 @@
+#
+# Add extenal references slots to nodes table, as for geni.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("reserved", "external_resource_key")) {
+	DBQueryFatal("alter table reserved add ".
+		     "external_resource_key tinytext ".
+		     "after external_resource_id");
+    }
+    return 0;
+}
+1;

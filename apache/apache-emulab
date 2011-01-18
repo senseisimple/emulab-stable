@@ -48,6 +48,7 @@ case $1 in
 	# still not running? we have bigger problems
 	rc_pid=$(check_pidfile $pidfile $command)
 	if [ -z "$rc_pid" ]; then
+		echo "PHP restart hack failed, exiting..."
 		mv $CFFILE.orig $CFFILE
 		return 1
 	fi

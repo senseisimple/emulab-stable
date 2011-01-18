@@ -43,6 +43,7 @@ use Node;
 use libGeni;
 use GeniResource;
 use GeniHRN;
+use GeniXML;
 
 sub fatal($);
 sub AllocNodes();
@@ -51,7 +52,6 @@ sub Register();
 sub UnRegister();
 sub ClearAll();
 sub StartAll();
-sub RestartAll();
 sub StopAll();
 sub WaitAll();
 sub PurgeAll();
@@ -90,7 +90,7 @@ my $eid	   = shift;
 my $action = shift;
 
 if ($action =~
-    /^(alloc|free|clear|wait|purge|start|restart|mapnodes|status|stop|register|unregister||manifests|renew)$/) {
+    /^(alloc|free|clear|wait|purge|start|mapnodes|status|stop|register|unregister||manifests|renew)$/) {
     $action = $1;
 }
 else {
@@ -133,6 +133,16 @@ if (!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	"    You do not have permission to allocate nodes in $pid/$eid\n");
 }
 
+#
+# Need an RPC context for this to work.
+#
+my $certificate = GeniCertificate->LoadFromFile("$TB/etc/genisa.pem");
+fatal("Could not load SA certificate")
+    if (!defined($certificate));
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+$ENV{'MYUUID'} = $certificate->uuid();
+$ENV{'MYURN'}  = $certificate->urn();
+    
 my $foo = "urn:publicid:IDN+emulab.net+authority+cm";
 my $fee = "urn:publicid:IDN+emulab.net+node+pc172";
 
@@ -164,10 +174,6 @@ SWITCH: for ($action) {
     };
     /^start$/ && do {
 	StartAll();
-	last SWITCH;
-    };
-    /^restart$/ && do {
-	RestartAll();
 	last SWITCH;
     };
     /^stop$/ && do {
@@ -270,16 +276,8 @@ sub PurgeAll()
 
 sub StartAll()
 {
-    libGeni::StartSlivers($experiment, $this_user, 0, $debug) == 0 or
+    libGeni::StartSlivers($experiment, $this_user, $debug) == 0 or
 	fatal("Cannot start slivers!\n");
-}
-
-sub RestartAll()
-{
-    libGeni::StartSlivers($experiment, $this_user, 1, $debug) == 0 or
-	fatal("Cannot restart slivers!\n");
-
-    return 0;
 }
 
 sub StopAll()
@@ -343,8 +341,8 @@ sub GetManifests()
 	    print STDERR "No manifest for $resource\n";
 	    next;
 	}
-
-	print STDERR Dumper($manifest);
+	
+	print STDERR Dumper(GeniXML::Serialize($manifest, 1));
     }
 
     return 0;

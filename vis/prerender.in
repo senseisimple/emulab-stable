@@ -521,7 +521,17 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 		print STDERR "Error generating thumbnail.\n";
 	    }
 	    else {
-		TBExptSetThumbNail($pid, $eid, `cat $fname`);
+		open(FD, "< $fname")
+		    or fatal("Could not open $fname!\n");
+
+		my $binstuff = "";
+		my $buf;
+
+		while (read(FD, $buf, 8192)) {
+		    $binstuff .= $buf;
+		}
+		close(FD);
+		TBExptSetThumbNail($pid, $eid, $binstuff);
 	    }
 	}
     }

@@ -108,7 +108,7 @@ int handleupload(void);
 #define DEVNAME		"%s/%s"
 #define BUFSIZE		4096
 #define DROP_THRESH	(32*1024)
-#define MAX_UPLOAD_SIZE	(1 * 1024 * 1024)
+#define MAX_UPLOAD_SIZE	(32 * 1024 * 1024)
 #define DEFAULT_CERTFILE PREFIX"/etc/capture.pem"
 #define DEFAULT_CLIENT_CERTFILE PREFIX"/etc/client.pem"
 #define DEFAULT_CAFILE	PREFIX"/etc/emulab.pem"
@@ -1562,9 +1562,14 @@ clientconnect(void)
 	secretkey_t     key;
 	capret_t	capret;
 #ifdef WITHSSL
-	int             dorelay = 0, doupload = 0;
+	int             dorelay = 0, doupload = 0, dooptions = 0;
+	int             newspeed = 0;
+	speed_t         newsymspeed;
+	int             opterr = 0;
 	int             ret;
 	SSL	       *newssl;
+	struct termios  serial_opts;
+	char           *caddr;
 #endif
 
 	newfd = accept(sockfd, (struct sockaddr *)&sin, &length);
@@ -1588,6 +1593,7 @@ clientconnect(void)
 	if (cc == sizeof(key) && 
 	    (0 == strncmp( key.key, "USESSL", 6 ) ||
 	     (dorelay = (0 == strncmp( key.key, "RELAY", 5 ))) ||
+	     (dooptions = (0 == strncmp( key.key, "OPTIONS", 7 ))) ||
 	     (doupload = (0 == strncmp( key.key, "UPLOAD", 6 ))))) {
 	  /* 
 	     dolog(LOG_NOTICE, "Client %s wants to use SSL",
@@ -1662,6 +1668,56 @@ clientconnect(void)
 		die("fcntl(O_NONBLOCK): %s", geterr(errno));
 	      return 0;
 	    }
+	  }
+	  else if (dooptions) {
+	      /*
+	       * Just handle these quick inline -- then don't have to
+	       * worry about multiple option changes cause they all
+	       * happen "atomically" from the client point of view.
+	       */
+
+	      caddr = inet_ntoa(sin.sin_addr);
+	      sscanf(key.key,"OPTIONS SPEED=%d",&newspeed);
+	      newsymspeed = val2speed(newspeed);
+	      dolog(LOG_NOTICE,"%s changing speed to %d.",
+		    caddr,newspeed);
+	      if (newspeed == 0) {
+		  dolog(LOG_ERR,"%s invalid speed option %d.",
+			caddr,newspeed);
+		  opterr = 1;
+	      }
+
+	      if (opterr == 0 && tcgetattr(devfd,&serial_opts) == -1) {
+		  dolog(LOG_ERR,"%s failed to get attrs before speed change: %s.",
+			caddr,strerror(errno));
+		  opterr = 1;
+	      }
+
+	      // XXX testing
+	      //serial_opts.c_lflag |= ECHO | ECHONL;
+
+	      if (opterr) {
+	      }
+	      else if (cfsetispeed(&serial_opts,newsymspeed) == -1) {
+		  dolog(LOG_ERR,"%s cfsetispeed(%d) failed: %s.",
+			caddr,newspeed,strerror(errno));
+		  opterr = 1;
+	      }
+	      else if (cfsetospeed(&serial_opts,newsymspeed) == -1) {
+		  dolog(LOG_ERR,"%s cfsetospeed(%d) failed: %s.",
+			caddr,newspeed,strerror(errno));
+		  opterr = 1;
+	      }
+	      else if (tcsetattr(devfd,TCSANOW,&serial_opts) == -1) {
+		  dolog(LOG_ERR,"%s tcsetattr(%d) failed: %s.",
+			caddr,newspeed,strerror(errno));
+		  opterr = 1;
+	      }
+
+	      SSL_free(newssl);
+	      shutdown(newfd, SHUT_RDWR);
+	      close(newfd);
+	      return opterr;
 	  }
 	  else if (dorelay) {
 	    if (devfd >= 0) {
@@ -1837,7 +1893,7 @@ handleupload(void)
 		}
 	}
 	else if ((upfilesize + rc) > MAX_UPLOAD_SIZE) {
-		dolog(LOG_NOTICE, "upload to large");
+		dolog(LOG_NOTICE, "upload too large");
 		drop = 1;
 	}
 	else if (rc == 0) {

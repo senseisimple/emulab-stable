@@ -2,7 +2,7 @@
 
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -49,24 +49,9 @@ for my $db ( "geni", "geni-ch", "geni-cm" ) {
 }
 
 if ( $outofdate ) {
-    chdir( ".." );
-    my $objdir = `/bin/pwd`;
-    chomp($objdir);
-    
-    print << "EOSTR";
-The schemata described in $testbed_srcdir/protogeni/updates differ from
-the running databases. As a safety measure, you will not be able to
-install until this is resolved.
-
-If you are a user of the emulab software outside of Utah, this is
-probably because your database was created for an older version of the
-emulab software. You can update your database by:
-
-	boss> cd /your/srcdir/protogeni/updates
-	boss> sudo perl $objdir/scripts/update
-
-EOSTR
-
+    print "*** Your ProtoGENI DB schema is out of date with the master.\n";
+    print "    As a safety measure, you will not be able to install until\n";
+    print "    this is resolved.\n";
     exit(1);
 } else {
     exit(0);

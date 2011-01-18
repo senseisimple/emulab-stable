@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -13,9 +13,10 @@ sub usage()
 	scriptname() . " [-j vnodeid] [-n] boot|shutdown|reconfig|reset\n";
     exit(1);
 }
-my $optlist = "j:n";
+my $optlist = "j:nM";
 my $action  = "boot";
 my $doit = 1;
+my $updatemasterpasswdfiles = 0;
 
 # Turn off line buffering on output
 $| = 1;
@@ -61,6 +62,9 @@ if (defined($options{'j'})) {
 }
 if (defined($options{'n'})) {
     $doit = 0;
+}
+if (defined($options{'M'})) {
+    $updatemasterpasswdfiles = 1;
 }
 if (@ARGV) {
     $action = $ARGV[0];
@@ -431,6 +435,7 @@ sub doboot()
 		    my $sshdir  = "$homedir/.ssh";
 		    my $forward = "$homedir/.forward";
 
+		    print "updating local home directory\n";
 		    # Sanity; this does not always happen correctly.
 		    my $cmd = "$CHMOD 755 $homedir";
 		    if (system($cmd) != 0) {
@@ -651,7 +656,7 @@ sub docleanup()
 
     # Hand this off to liblocsetup to restore default passwd/group files.
     if ($doit) {
-	$retval = os_account_cleanup();
+	$retval = os_account_cleanup($updatemasterpasswdfiles);
     }
 
     my $pdb = $PASSDB . ".db";

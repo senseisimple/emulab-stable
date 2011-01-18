@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2009 University of Utah and the Flux Group.
+# Copyright (c) 2005-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Project;
@@ -299,12 +299,12 @@ sub Trust($$)
     my ($self, $user) = @_;
 
     # Must be a real reference. 
-    return PROJMEMBERTRUST_NONE
+    return PROJMEMBERTRUST_NONE()
 	if (! ref($self));
 
     my $group = $self->GetProjectGroup();
     # Should not happen!
-    return PROJMEMBERTRUST_NONE
+    return PROJMEMBERTRUST_NONE()
 	if (!defined($group));
 
     return $group->Trust($user);
@@ -634,7 +634,7 @@ sub UpdateStats($$$$$)
 		"        allexpt_pnode_duration+($pnodes * ${duration}) ".
 		"where pid_idx='$pid_idx'");
 
-    if ($mode eq TBDB_STATS_SWAPIN || $mode eq TBDB_STATS_START) {
+    if ($mode eq TBDB_STATS_SWAPIN() || $mode eq TBDB_STATS_START()) {
 	DBQueryWarn("update projects set ".
 		    " expt_last=now(),expt_count=expt_count+1 ".
 		    "where pid_idx='$pid_idx'");

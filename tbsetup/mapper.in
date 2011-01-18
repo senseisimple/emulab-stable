@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -38,7 +38,7 @@ my $NoRecover = 0;
 
 sub usage ()
 {
-    print STDERR "Usage: $0 [-v] [-u [-f] | -n] pid eid\n";
+    print STDERR "Usage: $0 [-v] [-u [-f] | -n] [-z] pid eid\n";
     print STDERR " -v   - Enables verbose output\n";
     print STDERR " -u   - Enables update mode\n";
     print STDERR " -f   - Fix current resources during update mode\n";
@@ -48,16 +48,20 @@ sub usage ()
     print STDERR " -m   - Set the multiplex factor; overrides experiment.\n";
     print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
 		 "implies -n\n";
+    print STDERR " -l   - Use rspec v2 instead of the text file format\n";
+    print STDERR " -z   - Randomize node order printed by ptopgen\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist    = "dvunfprqczxm:ko:";
+my $optlist    = "dvunfprqczxm:ko:altz";
 my $verbose    = 0;
 my $debug      = 0;
 my $fixmode    = 0;
 my $updating   = 0;
 my $impotent   = 0;
 my $precheck   = 0;
+my $toponly    = 0;
 my $prepass    = 0;
+my $alloconly  = 0;
 my $outfile;
 my $mfactor;
 my $regression = 0;
@@ -67,7 +71,10 @@ my $usecurrent = 0;  # Only with regression mode, use current solution.
 my $quiet      = 0;
 my $clear      = 0;
 my $warnings   = 0;
-my $maxrun     = 3;		# Maximum number of times we run assign.
+my $maxrun     = 3;  # Maximum number of times we run assign.
+my $gotlock    = 0;
+my $userspec   = 0;
+my $randomize  = 0;
 my $vtop;
 
 #
@@ -92,6 +99,7 @@ use libtblog;
 use libvtop;
 use libadminctrl;
 use User;
+use EmulabFeatures;
 
 # Protos
 sub fatal(@);
@@ -134,11 +142,18 @@ if (defined($options{"v"})) {
     TBDebugTimeStampsOn();
     $verbose++;
 }
+if (defined($options{"a"})) {
+    $alloconly++;
+}
 if (defined($options{"d"})) {
     $debug++;
 }
 if (defined($options{"u"})) {
     $updating = 1;
+}
+if (defined($options{"t"})) {
+    $toponly = 1;
+    $quiet   = 1;
 }
 if (defined($options{"n"})) {
     $impotent = 1;
@@ -163,7 +178,8 @@ if (defined($options{"r"})) {
 	fatal("Cannot use regression mode on main DB");
     }
     $regression = 1;
-    $clear      = 1;
+    $clear      = 1
+	if (!defined($options{"t"}));
     $fixmode    = 1;
     TBDebugTimeStampsOn();
     $usecurrent = 1
@@ -176,6 +192,12 @@ if (defined($options{"q"})) {
 }
 if (defined($options{"c"})) {
     $clear = 1;
+}
+if (defined($options{"l"})) {
+    $userspec = 1;
+}
+if (defined($options{"z"})) {
+    $randomize = 1;
 }
 
 my $pid = $ARGV[0];
@@ -199,6 +221,11 @@ if (!TBAdmin() &&
 # multiplex_factor default.
 $mfactor = $experiment->multiplex_factor()
     if (!defined($mfactor) && defined($experiment->multiplex_factor()));
+
+my $newassign =
+    EmulabFeatures->FeatureEnabled("NewAssign",
+				   $this_user,
+				   $experiment->GetGroup(), $experiment);
     
 #
 # These are the flags to the vtop creation code. 
@@ -214,6 +241,8 @@ $vtopflags |= $libvtop::VTOP_FLAGS_FIXNODES
     if ($fixmode || $usecurrent);
 $vtopflags |= $libvtop::VTOP_FLAGS_IMPOTENT
     if ($impotent);
+$vtopflags |= $libvtop::VTOP_FLAGS_ALLOCONLY
+    if ($alloconly);
 $vtopflags |= $libvtop::VTOP_FLAGS_REGRESSION
     if ($regression);
 
@@ -236,7 +265,13 @@ exit(0);
 
 sub MapperWrapper()
 {
-    chat("Starting the new and improved mapper wrapper.\n");
+    chat("Starting the new and improved mapper wrapper.\n")
+	if (!$toponly);
+
+    # Need to do this cause libvtop will add them again.
+    # Must be done before nodes are released.
+    $experiment->DeleteInternalProgramAgents()
+	if ($regression);
 
     TBDebugTimeStamp("Create libvtop started");
     $vtop = libvtop->Create($experiment, $this_user, $vtopflags);
@@ -245,7 +280,12 @@ sub MapperWrapper()
     }
     TBDebugTimeStamp("Create libvtop ended");
 
-    if (!$impotent && ($updating || $clear)) {
+    TBDebugTimeStamp("vtopgen started");
+    $vtop->CreateVtop() == 0
+	or fatal("Could not create vtop for $experiment");
+    TBDebugTimeStamp("vtopgen finished");
+    
+    if (!$impotent && !$alloconly && !$toponly && ($updating || $clear)) {
 	if ($clear) {
 	    chat("Freeing reserved nodes ...\n");
 	    system("export NORELOAD=1; $NFREE -x -a $pid $eid") == 0
@@ -256,10 +296,6 @@ sub MapperWrapper()
 	exit(0)
 	    if ($clear && !$regression);
     }
-    TBDebugTimeStamp("vtopgen started");
-    $vtop->CreateVtop() == 0
-	or fatal("Could not create vtop for $experiment");
-    TBDebugTimeStamp("vtopgen finished");
     AssignLoop();
     return 0;
 }
@@ -271,6 +307,7 @@ sub AssignLoop()
 {
     my $currentrun     = 1;
     my $canceled       = 0;
+    my $progress       = 0;
     my $tried_precheck = 0;
     # Admission control counts
     my %admission_control = ();
@@ -284,9 +321,9 @@ sub AssignLoop()
 
     TBDebugTimeStamp("mapper loop started");
     while (1) {
-	chat("Assign run $currentrun\n");
+	chat("Mapper loop $currentrun\n");
 
-	my $prefix = ($debug || $regression ? "$pid-$eid" : "$pid-$eid-$$");
+	my $prefix = "$pid-$eid-$$";
 
 	#
 	# When precheck is on, we only do one run in impotent mode and exit.
@@ -298,12 +335,42 @@ sub AssignLoop()
 	}
 
 	#
+	# Serialize with the pool daemon if using shared nodes.
+	#
+	if ((!($impotent || $regression)) && $vtop->sharednodecount()) {
+	    while (1) {
+		#
+		# Use a countup/countdown counter, so that multiple mappers
+		# can run, but not while the pool_daemon is running.
+		#
+		my $lock_result =
+		    DBQueryFatal("update emulab_locks set value=value+1 ".
+				 "where name='pool_daemon' and value>=0");
+
+		$gotlock = $lock_result->affectedrows;
+
+		last
+		    if ($gotlock);
+		
+		chat("Waiting for pool daemon lock ...\n");
+		sleep(10);
+	    }
+	}
+
+	#
 	# RunAssign returns  0 if successful.
 	#           returns -1 if failure, but assign says to stop trying.
 	#           returns  1 if failure, but assign says to try again.
-	#           returns  2 if we made some forward progress.
+	#           returns  2 if assign succeeds, but no nodes allocated.
+	#           returns  3 if assign succeeds, but some nodes allocated.
 	#
 	my $retval = RunAssign($precheck, $prefix);
+
+	if ($gotlock) {
+	    DBQueryFatal("update emulab_locks set value=value-1 ".
+			 "where name='pool_daemon'");
+	    $gotlock = 0;
+	}
 
 	# Success!
 	last
@@ -345,17 +412,24 @@ sub AssignLoop()
 	    $impotent = $save_impotent;
 	    $tried_precheck = 1;
 	}
-
-	if ($currentrun >= $maxrun && $retval != 2) {
+	# We try a minimum number of times, cause the node pool is
+	# always changing. But once we hit the maxrun, we continue
+	# only if progress on the last loop.
+	if ($currentrun >= $maxrun && !$progress) {
 	    fatal({type => 'primary', severity => SEV_ERROR,
 		   error => ['reached_assign_run_limit']},
 		  "Reached run limit. Giving up.");
 	}
+	# See if we made progress or not.
+	# Keep going if we allocated some nodes.
+	$progress = ($retval == 3);
 
 	chat("Waiting 5 seconds and trying again...\n");
 	sleep(5);
 	$currentrun++;
     }
+    GatherAssignStats($pid, $eid, %{ $vtop->exptstats() })
+	if (! ($impotent || $alloconly || $regression || $toponly));
     TBDebugTimeStamp("mapper loop finished");
     return 0;
 }
@@ -367,9 +441,51 @@ sub RunAssign($$)
 {
     my ($precheck, $prefix) = @_;
 
+    my $typelimitfile = $prefix .".limits";
     my $ptopfile = $prefix . ".ptop";
     my $vtopfile = $prefix . ".vtop";
+    if ($userspec) {
+	$ptopfile .= ".xml";
+	$vtopfile .= ".xml";
+    }
     my $assignexitcode = 0;
+
+    #
+    # Now generate a vtop file and dump it to a file.
+    #
+    if (! open(VTOPFILE, "> $vtopfile")) {
+	tberror("Could not open $vtopfile: $!\n");
+	return -1;
+    }
+    my $reslibvtop;
+    if ($userspec == 1) {
+	$reslibvtop = $vtop->PrintRspec(*VTOPFILE);
+    }
+    else {
+	$reslibvtop = $vtop->PrintTop(*VTOPFILE);
+    }
+    if ($reslibvtop != 0) {
+	tberror("Could not print vtop file for $experiment\n");
+	return -1;
+    }
+    close(VTOPFILE);
+    system("/bin/cp -fp $vtopfile ${pid}-${eid}.vtop") if ($debug);
+    return 0
+	if ($toponly);
+
+    if (! ($impotent || $regression || $alloconly)) {
+	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
+				 "minimum_nodes" => $vtop->minimum_nodes(),
+				 "virtnode_count"=> $vtop->virtnodecount() })){
+	    tberror("Could not update min/max/virt nodes for $experiment\n");
+	    return -1;
+	}
+    }
+    # New solution each time.
+    $vtop->ClearSolution();
+
+    goto skipassign
+	if ($vtop->nodecount() == $vtop->genicount());
 
     # Debugging hack for regression mode. Avoid really long assign runs.
     if ($regression && $noassign) {
@@ -391,6 +507,22 @@ sub RunAssign($$)
 	    return -1;
 	}
     }
+
+    #
+    # Append this admission control results to ptopgen.
+    #
+    if (scalar(keys(%admission_control))) {
+	open(TYPELIMIT, ">$typelimitfile") or
+	    return -1;
+
+	foreach my $typeclass (keys(%admission_control)) {
+	    my $count = $admission_control{$typeclass};
+
+	    print TYPELIMIT "$typeclass $count\n";
+	}
+	close(TYPELIMIT);
+    }
+
 
     #
     # Snapshot physical resources.
@@ -417,6 +549,14 @@ sub RunAssign($$)
     	if ($precheck);
     $ptopargs	.= "-c " . $experiment->delay_capacity() . " "
     	if (defined($experiment->delay_capacity()));
+    if ($userspec == 1) {
+	$ptopargs .= "-x -g 2 ";
+    }
+    if ($randomize == 1) {
+	$ptopargs .= "-z ";
+    }
+    $ptopargs .= "-l $typelimitfile"
+	if (scalar(keys(%admission_control)));
 
     chat("ptopargs: '$ptopargs'\n");
     TBDebugTimeStamp("ptopgen started");
@@ -425,48 +565,19 @@ sub RunAssign($$)
 	tberror("Failure in ptopgen\n");
 	return -1;
     }
+    system("/bin/cp -fp $ptopfile ${pid}-${eid}.ptop") if ($debug);
     TBDebugTimeStamp("ptopgen finished");
-
-    #
-    # Append this admission control results to ptopgen.
-    #
-    if (scalar(keys(%admission_control))) {
-	open(PTOP, ">> $ptopfile") or
-	    return -1;
-
-	foreach my $typeclass (keys(%admission_control)) {
-	    my $count = $admission_control{$typeclass};
-
-	    print PTOP "set-type-limit $typeclass $count\n";
-	}
-	close(PTOP);
-    }
-
-    #
-    # Now generate a vtop file and dump it to a file.
-    #
-    if (! open(VTOPFILE, "> $vtopfile")) {
-	tberror("Could not open $vtopfile: $!\n");
-	return -1;
-    }
-    if ($vtop->PrintTop(*VTOPFILE) != 0) {
-	tberror("Could not print vtop file for $experiment\n");
-	return -1;
-    }
-    close(VTOPFILE);
-
-    if (! ($impotent || $regression)) {
-	if ($experiment->Update({"maximum_nodes" => $vtop->maximum_nodes(),
-				 "minimum_nodes" => $vtop->minimum_nodes(),
-				 "virtnode_count"=> $vtop->virtnodecount() })){
-	    tberror("Could not update min/max/virt nodes for $experiment\n");
-	    return -1;
-	}
-    }
 
     # Run assign
     my $cmd  = "assign";
-    my $args = "$ptopfile $vtopfile";
+    $cmd .= "-new"
+	if ($newassign);
+    my $args = "";
+    $args .= "-f rspec " 
+	if ($userspec == 1);
+    $args .= "-f text "
+	if ($userspec == 0);
+    $args .= "$ptopfile $vtopfile";
     $args = "-P $args"
 	if (!$vtop->sharednodecount());
     $args = "-uod -c .75 $args"
@@ -546,14 +657,21 @@ sub RunAssign($$)
     # purposes We do not call it .log though, since we do not want it
     # copied out to the user directory every swapin. See Experiment.pm
     #
-    system("/bin/cp assign.log ${prefix}.assign");
+    system("/bin/cp -fp assign.log ${prefix}.assign");
+    system("/bin/cp -fp assign.log ${pid}-${eid}.assign") if ($debug);
 
-    #
-    # We no longer care what assign has to say when it fails.
-    # Any relevent info was already sent to stderr so just 
-    # tell the caller whether we want to keep trying or not.
-    #
     if ($assignexitcode) {
+	print "Assign exited with $assignexitcode\n" if ($debug);
+	
+	system("/bin/cat assign.log");
+	#
+	# assign returns two positive error codes (that we care about).
+	# The distinction between them is somewhat murky. An exitval of
+	# 1 means "retryable" while 2 means "unretryable". The former
+	# means we can try again, while the later says there is no possible
+	# way to map it. We pass this back to the caller so that we know
+	# to exit the loop or try again.
+	#
 	return (($assignexitcode == 1) ? 1 : -1);
     }
     #
@@ -570,9 +688,6 @@ sub RunAssign($$)
 	print("Could not open assign logfile! $!\n");
 	return -1;
     }
-    # New solution each time.
-    $vtop->ClearSolution();
-
     TBDebugTimeStamp("ReadSolution started");
     if ($vtop->ReadTextSolution(*ASSIGNFP) != 0) {
 	print("Could not parse assign logfile! $!\n");
@@ -580,8 +695,9 @@ sub RunAssign($$)
     }
     close(ASSIGNFP);
     TBDebugTimeStamp("ReadSolution ended");
+  skipassign:
     
-    if (defined($vtop->rspec())) {
+    if (defined($vtop->genicount())) {
 	TBDebugTimeStamp("Map Geni Resources Started");
 	if ($vtop->MapResources() != 0) {
 	    print("Could not map external resources! $!\n");
@@ -603,13 +719,9 @@ sub RunAssign($$)
 	return -1;
     }
     my $retval = $vtop->AllocNodes();
-    if ($retval != 0) {
-	if ($retval < 1) {
-	    print("Could not allocate any nodes.\n");
-	    return -1;
-	}
-	return 1;
-    }
+    return $retval
+	if ($retval != 0);
+
     TBDebugTimeStamp("AllocNodes ended, InterpLinks Started");
     if ($vtop->InterpLinks() != 0) {
 	print("Could not setup links\n");
@@ -621,7 +733,7 @@ sub RunAssign($$)
 	return -1;
     }
     TBDebugTimeStamp("InitializePhysNodes ended");
-    if (! ($impotent || $regression)) {
+    if (! ($impotent || $regression || $alloconly)) {
 	TBDebugTimeStamp("ReserveSharedBandwidth started");
 	if ($experiment->ReserveSharedBandwidth($updating) != 0) {
 	    print("Could not reserve shared bandwidth\n");
@@ -666,6 +778,9 @@ sub FinalizeRegression($)
 	}
 	close(VTOPFILE);
     }
+    # Must be done before nodes are released.
+    $experiment->DeleteInternalProgramAgents();
+    
     return 0
 	if ($noregfree);
     
@@ -712,6 +827,15 @@ sub PrintSolution()
 END {
     # Watch for getting here cause of a die()/exit() statement someplace.
     my $exitcode = $?;
+
+    #
+    # Do not want to leave this around, it will lock the pool daemon out.
+    #
+    if ($gotlock) {
+	DBQueryFatal("update emulab_locks set value=value-1 ".
+		     "where name='pool_daemon'");
+	$gotlock = 0;
+    }
 
     if ($exitcode && $exitcode != $WRAPPER_FAILED) {
 	$exitcode = $WRAPPER_FAILED|$WRAPPER_FAILED_FATALLY;

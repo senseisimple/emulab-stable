@@ -153,6 +153,13 @@ while (my ($node_id,$pid,$eid,$vname,$erole) = $db_result->fetchrow_array()) {
         ($erole eq "boss" || $erole eq "boss+router")) {
         push @{$cnames{$node_id}}, "www.$eid.$pid";
     }
+    #
+    # Special case for inner elab ops; add CNAME for event-server.
+    #
+    if (defined($erole) &&
+        ($erole eq "ops" || $erole eq "ops+fs")) {
+        push @{$cnames{$node_id}}, "event-server.$eid.$pid";
+    }
 }
 
 

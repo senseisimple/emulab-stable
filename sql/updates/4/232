@@ -1,0 +1,26 @@
+#
+# Add a new feature for libosload_new
+#
+use strict;
+use EmulabFeatures;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    #
+    # Add a new feature for libosload_new
+    #
+    my $feature = EmulabFeatures->Lookup("NewOsload");
+    if (!defined($feature)) {
+	$feature = EmulabFeatures->Create("NewOsload",
+			"Use libosload_new instead of libosload. ".
+			"libosload_new will eventually replace libosload.");
+    }
+    return -1
+	if (!defined($feature));
+
+    return 0;
+}
+1;
+

@@ -279,6 +279,23 @@ sub GetAttribute($$;$$)
     $$pattrvalue = undef;
     return -1;
 }
+
+#
+# Look for an attribute.
+#
+sub GetAttributes($)
+{
+    my ($self) = @_;
+    
+    return undef
+	if (!ref($self));
+
+    $self->LoadAttributes() == 0
+	or return undef;
+
+    return $self->{"ATTRS"};
+}
+
 # Shortcuts for typical attributes.
 sub default_osid($;$)  {return GetAttribute($_[0], "default_osid", $_[1]); }
 sub default_imageid($;$){return GetAttribute($_[0], "default_imageid",$_[1]); }
@@ -318,6 +335,33 @@ sub isdedicatedremote($;$) {
     return GetAttribute($_[0], "dedicated_widearea", $_[1]);
 }
 sub control_interface($;$) { return control_iface($_[0], $_[1]); }
+
+#
+# Set the value of an attribute
+#
+sub SetAttribute($$$;$)
+{
+    my ($self, $attrkey, $attrvalue, $attrtype) = @_;
+    
+    goto bad
+	if (!ref($self));
+
+    $self->LoadAttributes() == 0
+	or return -1;
+
+    $attrtype = "string"
+	if (!defined($attrtype));
+    my $safe_attrvalue = DBQuoteSpecial($attrvalue);
+    my $type = $self->type();
+
+    DBQueryWarn("replace into node_type_attributes set ".
+		"  type='$type', attrkey='$attrkey', ".
+		"  attrtype='$attrtype', attrvalue=$safe_attrvalue")
+	or return -1;
+
+    $self->{"ATTRS"}->{$attrkey} = $attrvalue;
+    return 0;
+}
 
 # _Always_ make sure that this 1 is at the end of the file...
 

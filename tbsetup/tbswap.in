@@ -60,14 +60,11 @@ use libtestbed;
 use libadminctrl;
 use libadminmfs;
 use libtblog;
-use libArchive;
+use EmulabFeatures;
 use Experiment;
 use User;
 use Lan;
 use Firewall;
-if ($PGENISUPPORT) {
-    require libGeni;
-}
 
 #
 # Actual swap-in and swap-out functions, defined below.
@@ -108,7 +105,6 @@ my $noswapout      = 0;
 my $genimode       = 0;
 my $errors         = 0;
 my $updatehosed    = 0;
-my $state;
 my $canceled;
 my $os_setup_pid;
 my $nextState;
@@ -197,25 +193,18 @@ my $experiment = Experiment->Lookup($pid, $eid);
 if (!defined($experiment)) {
     tbdie("Could not lookup experiment object!")
 }
-my $special = ($pid eq "testbed" || $pid eq "tbres" ||
-	       $pid eq "emulab-ops" || $pid eq "utahstud");
 
 #
 # Print starting message.
 #
-my $exptidx;
-TBExptIDX($pid, $eid, \$exptidx);
+my $exptidx = $experiment->idx();
+my $state   = $experiment->state();
+my $group   = $experiment->GetGroup();
 
 print "Beginning swap-$swapop for $pid/$eid ($exptidx). " .
     TBTimeStampWithDate() . "\n";
 TBDebugTimeStamp("tbswap $swapop started");
 
-#
-# Get experiment state; verify that experiment exists.
-#
-if (! ($state = ExpState($pid, $eid))) {
-    tbdie "No such experiment $pid/$eid";
-}
 # Sanity check the current state. 
 if (!$force) {
     if ($swapop eq "in") {
@@ -246,6 +235,14 @@ if ($elabinelab && $plabinelab) {
     TBDebugTimeStamp("tbswap $swapop finished (failed)");
     exit(1);
 }
+
+#
+# See if we use the new version of SyncVlans.
+#
+my $syncvlans =
+    (EmulabFeatures->FeatureEnabled("SyncVlans",
+				    $this_user, $group, $experiment)
+     || $pid eq "emulab-ops");
 
 #
 # See if the experiment is firewalled
@@ -296,14 +293,6 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
     #
     $errors = ($swapop eq "modify" ? doSwapout(MODIFY) : 0);
 
-    if (0) {
-	print STDERR "Doing a swapmodswapout on the experiment archive ...\n";
-	if (libArchive::TBExperimentArchiveSwapModSwapOut($pid, $eid) < 0) {
-	    tberror("Failed swapmodswapout on the experiment archive!");
-	    $errors = 1;
-	}
-    }
-
     if ($errors) {
 	#
 	# Clean up the mess, leaving the experiment in the SWAPPED state,
@@ -314,8 +303,8 @@ elsif ($swapop eq "update" || $swapop eq "modify") {
 	else {
 	    print STDERR "Cleaning up after errors.\n";
 	    doSwapout(CLEANUP);
+	    $updatehosed = 1;
 	}
-	$updatehosed = 1;
     }
     else {
 	#
@@ -508,7 +497,7 @@ sub doSwapout($) {
 		#
 		# Stop the location piper.
 		#
-		if (-x $piper) {
+		if (0 && -x $piper) {
 		    print "Stopping the location piper\n";
 		    if (system("$piper -k $pid $eid")) {
 			tberror({type => 'secondary', severity => SEV_SECONDARY,
@@ -545,7 +534,7 @@ sub doSwapout($) {
 	    ($type == MODIFY && $ELABINELAB && Lan->GotTrunks($experiment))) {
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
-	    if (system("snmpit -r $pid $eid")) {
+	    if (system("snmpit --redirect-err -r $pid $eid")) {
 		tberror({type => 'secondary', severity => SEV_SECONDARY,
 			 error => ['vlan_reset_failed']},
 			"Failed to reset VLANs");
@@ -567,7 +556,8 @@ sub doSwapout($) {
 	    }
 	    if (@stale) {
 		print "Removing stale vlans @stale\n";
-		system("snmpit -f ". join(" ", map("-o $_", @stale)));
+		system("snmpit --redirect-err -f ".
+                    join(" ", map("-o $_", @stale)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_reset_failed']},
@@ -654,6 +644,8 @@ sub doSwapout($) {
 	# Clear away Geni slivers. Do not proceed if this fails.
 	#
 	if ($PGENISUPPORT) {
+	    require libGeni;
+	    
 	    if (libGeni::DeleteAllSlivers($experiment, $this_user)) {
 		tberror("Could not delete slivers\n");
 		return 1;
@@ -910,7 +902,9 @@ sub doSwapin($) {
 	#
 	my $exitcode;
 	my $cmd = "$wrapper";
-	if ($special || $this_user->stud() || $experiment->virtnode_count()) {
+	if (EmulabFeatures->FeatureEnabled("NewMapper",
+					   $this_user, $group, $experiment) ||
+	    $this_user->stud() || $experiment->virtnode_count()) {
 	    $cmd = "$mapper";
 	}
 	$cmd .= " -f"
@@ -960,7 +954,7 @@ sub doSwapin($) {
 	my @same = ();
 	my $ret;
 
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    $ret = Lan->CompareVlansWithSwitches($experiment, \@diff, \@same);
 	}
 	else {
@@ -972,10 +966,10 @@ sub doSwapin($) {
 		    "Failed to compare old vlans");
 	    return 1;
 	}
-	if ($ELABINELAB || !$MAINSITE || !$special) {
+	if ($ELABINELAB || !$syncvlans) {
 	    if (@diff) {
 		print "Removing obsolete vlans @diff\n";
-		system("snmpit -f ". join(" ", map("-o $_", @diff)));
+		system("snmpit --redirect-err -f ". join(" ", map("-o $_", @diff)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_setup_failed']},
@@ -986,7 +980,7 @@ sub doSwapin($) {
 	}
 	else {
 	    print "Synchronizing VLANs.\n";
-	    system("snmpit -X $pid $eid");
+	    system("snmpit --redirect-err -X $pid $eid");
 	    if ($?) {
 		tberror({type => 'summary', severity => SEV_SECONDARY,
 			 error => ['vlan_setup_failed']},
@@ -1027,7 +1021,7 @@ sub doSwapin($) {
 		if ($isvirt) {
 		    push(@virtnodes, $node);
 		}
-		elsif (!$isrem) {
+		else {
 		    push(@physnodes, $node);
 		}
 	    }
@@ -1240,16 +1234,19 @@ sub doSwapin($) {
 			 "where r.pid='$pid' and r.eid='$eid'");
 
 	while (my ($node,$allocstate) = $db_result->fetchrow_array) {
+	    print STDERR "A: $node, $allocstate\n";
+	    
 	    #
-	    # If the node is INIT_CLEAN, leave it alone. It will still get
-	    # rebooted, but will not falsely be tagged as dirty. This is
-	    # important for vnodes too, where INIT_CLEAN indicated the vnode
-	    # does not even exist yet (plab nodes).
+	    # INIT_CLEAN and INIT_DIRTY indicate brand new nodes. Leave
+	    # the state alone for os_setup so it knows. REBOOT means libvtop
+	    # knows something we do not, so do not change that either.
 	    #
-	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+	    if ($allocstate ne TBDB_ALLOCSTATE_RES_INIT_CLEAN() &&
+		$allocstate ne TBDB_ALLOCSTATE_RES_INIT_DIRTY() &&
+		$allocstate ne TBDB_ALLOCSTATE_RES_REBOOT()) {
 		TBSetNodeAllocState($node,
 				    ($needreboot ?
-				     TBDB_ALLOCSTATE_RES_INIT_DIRTY() :
+				     TBDB_ALLOCSTATE_RES_REBOOT() :
 				     TBDB_ALLOCSTATE_RES_RECONFIG()));
 	    }
 	}
@@ -1285,8 +1282,13 @@ sub doSwapin($) {
     #
     print "Resetting OS and rebooting.\n";
     TBDebugTimeStamp("launching os_setup");
-    if (!($os_setup_pid = fork())) { 
-	exec("os_setup $pid $eid") or return 1;
+    if (!($os_setup_pid = fork())) {
+	my $oscmd = "os_setup";
+	if (EmulabFeatures->FeatureEnabled("NewOsSetup",
+					   $this_user, $group, $experiment)) {
+	    $oscmd = "os_setup_new";
+	}
+	exec("$oscmd $pid $eid") or return 1;
     } elsif ($os_setup_pid == -1) {
 	tberror "Fork failed.";
 	return 1;
@@ -1300,10 +1302,10 @@ sub doSwapin($) {
     # parallel with os_setup (no DB dependencies, etc.)
     #
     if (!$experiment->skipvlans() &&
-	($type != MODIFY || ($ELABINELAB || !$MAINSITE || !$special))) {
+	($type != MODIFY || ($ELABINELAB || !$syncvlans))) {
 	print "Setting up VLANs.\n";
 	TBDebugTimeStamp("snmpit started");
-	if (system("snmpit -t $pid $eid")) {
+	if (system("snmpit --redirect-err -t $pid $eid")) {
 	    tberror({type => 'summary', severity => SEV_SECONDARY,
 		     error => ['vlan_setup_failed']},
 		    "Failed to set up VLANs.");
@@ -1398,7 +1400,7 @@ sub doSwapin($) {
 	# For the robot testbed, start the location piper *before* the event
 	# system.
 	#
-	if (-x $piper && ($type != MODIFY && $type != MODIFY_RECOVER)) {
+	if (0 && -x $piper && ($type != MODIFY && $type != MODIFY_RECOVER)) {
 	    print "Starting the location piper.\n";
 	    if (system("$piper $pid $eid")) {
 		tberror "Failed to start the location piper.";

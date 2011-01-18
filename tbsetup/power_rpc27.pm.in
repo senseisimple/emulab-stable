@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -116,7 +116,31 @@ sub rpc27ctrl {
     if ($debug) {
 	print "outlet_strings: ", join(" ",map("($_)",@outlet_strings)), "\n";
     }
-    
+
+    #
+    # Run the rest in a child process, protected by an alarm to ensure that
+    # we are not hung up forever if the controller is in some funky state.
+    #
+    my $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	#
+	# Give it 30 seconds for initial connect plus time per outlet.
+	# Probably too long.
+	#
+	alarm 30 + (15 * scalar(@outlet_strings));
+	waitpid($syspid, 0);
+	alarm 0;
+	my $exitstatus = $?;
+
+	if ($exitstatus == 15) {
+	    print STDERR "*** power: $controller is wedged.\n";
+	}
+	return($exitstatus);
+    }
+    TBdbfork();
+
     #
     # Form the connection to the controller via a "tip" line to the
     # capture process. Once we have that, we can just talk to the
@@ -124,7 +148,7 @@ sub rpc27ctrl {
     #
     if (! ($TIP = tipconnect($controller))) {
 	print STDERR "*** Could not form TIP connection to $controller\n";
-	return 1;
+	exit(1);
     }
 
     foreach my $outlet (@outlet_strings) {
@@ -174,13 +198,11 @@ sub rpc27ctrl {
 	}
 	if ($status) {
 	    close($TIP);
-	    return 1;
+	    exit(1);
 	}
     }
-
     close($TIP);
-    return 0;
-
+    exit(0);
 }
 
 #

@@ -71,6 +71,7 @@ default_md	= md5			# which md to use.
 preserve	= no			# keep passed DN ordering
 unique_subject  = no
 copy_extensions = copy
+x509_extensions = v3_ca # Need this to set the version number to 3
 
 # A few difference way of specifying how similar the request should look
 # For type CA, the listed attributes must be the same, and the optional
@@ -85,6 +86,9 @@ organizationName	= match
 organizationalUnitName	= optional
 commonName		= optional
 emailAddress		= optional
+
+[ v3_ca ]
+
 
 [ usr_cert ]
 # These extensions are added when 'ca' signs a request.
@@ -124,5 +128,12 @@ database	= $dir/crl.txt		# database index file.
 crl		= $dir/crl.pem 		# The current CRL
 RANDFILE	= $dir/.rand		# private random number file
 default_crl_days= 30			# how long before next CRL
+# Added for update 5.10
+default_md	= md5			# CRL md to use
 preserve	= no			# keep passed DN ordering
 unique_subject  = no
+
+[ typical_extensions ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints = CA:false

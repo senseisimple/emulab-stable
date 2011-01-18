@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -25,6 +25,7 @@ sub usage()
 my $optlist  = "d";
 my $debug    = 1;
 my $leaveme  = 0;
+my $running  = 0;
 my $cleaning = 0;
 my $rebooting= 0;
 my $vnodeid;
@@ -137,7 +138,7 @@ if ($debug) {
 # Need the domain, but no conistent way to do it. Ask tmcc for the
 # boss node and parse out the domain. 
 #
-my $DOMAINNAME = tmccbossname();
+my ($DOMAINNAME,$BOSSIP) = tmccbossinfo();
 die("Could not get bossname from tmcc!")
     if (!defined($DOMAINNAME));
 
@@ -147,14 +148,8 @@ if ($DOMAINNAME =~ /^[-\w]+\.(.*)$/) {
 else {
     die("Could not parse domain name!");
 }
-
-#
-# Need the bossip, which we get from virthost emulab boot dir:
-#
-my $BOSSIP = `cat $BOOTDIR/bossip`;
-chomp($BOSSIP);
 if ($BOSSIP !~ /^\d+\.\d+\.\d+\.\d+$/) {
-    die "Bad bossip '$BOSSIP' in $BOOTDIR/bossip!";
+    die "Bad bossip '$BOSSIP' from bossinfo!";
 }
 
 #
@@ -289,6 +284,8 @@ if (! -e "$VNDIR/vnode.info") {
     mysystem("mkdir -p /var/emulab/jails/$vnodeid");
 }
 else {
+    $rebooting = 1;
+
     my $str = `cat $VNDIR/vnode.info`;
     chomp($str);
     ($vmid, $vmtype) = ($str =~ /^(\d*) (\w*)$/);
@@ -303,7 +300,6 @@ else {
     if ($ret ne VNODE_STATUS_STOPPED()) {
 	MyFatal("vnode $vnodeid not stopped, not booting!");
     }
-    $rebooting = 1;
 }
 
 my $cnet_mac = ipToMac($vnconfig{'CTRLIP'});
@@ -398,9 +394,16 @@ if (safeLibOp($vnodeid,'vnodeConfigDevices',1,1,$vnodeid,$vmid)) {
 if (exists($vnconfig{'SSHDPORT'}) && $vnconfig{'SSHDPORT'} ne "") {
     my $sshdport = $vnconfig{'SSHDPORT'};
     my $ctrlip   = $vnconfig{'CTRLIP'};
-	
-    system("$IPTABLES -v -t nat -A PREROUTING -p tcp -d $ext_ctrlip ".
-	   "--dport $sshdport -j DNAT --to-destination $ctrlip:$sshdport");
+
+    # Retry a few times cause of iptables locking stupidity.
+    for (my $i = 0; $i < 5; $i++) {
+	system("$IPTABLES -v -t nat -A PREROUTING -p tcp -d $ext_ctrlip ".
+	       "--dport $sshdport -j DNAT ".
+	       "--to-destination $ctrlip:$sshdport");
+	last
+	    if ($? == 0);
+	sleep(2);
+    }
 }
 
 #
@@ -448,6 +451,7 @@ TBDebugTimeStamp("finished $vmtype rootPostConfig()")
 
 # This is for vnodesetup
 mysystem("touch $VNDIR/running");
+$running = 1;
 
 #
 # Install a signal handler to catch signals from vnodesetup.
@@ -547,9 +551,16 @@ sub Cleanup()
     if (exists($vnconfig{'SSHDPORT'}) && $vnconfig{'SSHDPORT'} ne "") {
 	my $sshdport = $vnconfig{'SSHDPORT'};
 	my $ctrlip   = $vnconfig{'CTRLIP'};
-	
-	system("$IPTABLES -v -t nat -D PREROUTING -p tcp -d $ext_ctrlip ".
-	       "--dport $sshdport -j DNAT --to-destination $ctrlip:$sshdport");
+
+	# Retry a few times cause of iptables locking stupidity.
+	for (my $i = 0; $i < 5; $i++) {
+	    system("$IPTABLES -v -t nat -D PREROUTING -p tcp -d $ext_ctrlip ".
+		   "--dport $sshdport -j DNAT ".
+		   "--to-destination $ctrlip:$sshdport");
+	    last
+		if ($? == 0);
+	    sleep(2);
+	}
     }
 
     # if not halted, try that first
@@ -597,6 +608,13 @@ sub Cleanup()
 sub MyFatal($)
 {
     my ($msg) = @_;
+
+    #
+    # If rebooting but never got a chance to run, we do not want
+    # to kill off the container. Might lose user data.
+    #
+    $leaveme = 1
+	if ($rebooting && !$running);
 
     Cleanup();
     die("*** $0:\n".

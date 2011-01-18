@@ -10,15 +10,18 @@ use Data::Dumper;
 use Getopt::Std;
 
 #
-# Add an authority to the DB. Mostly for bootstrapping.
+# Add an authority to the DB. Mostly for bootstrapping. Use the -n option
+# to set the disabled bit in the DB.
 # 
 sub usage()
 {
-    print "Usage: addauthority [-c] <certfile> <type>\n";
+    print "Usage: addauthority [-c] [-a] [-n] <certfile> <type> [url]\n";
     exit(1);
 }
-my $optlist    = "c";
+my $optlist    = "acn";
 my $asch       = 0;
+my $asam       = 0;
+my $disable    = 0;
 
 #
 # Check args.
@@ -27,18 +30,28 @@ my %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"n"})) {
+    $disable = 1;
+}
 if (defined($options{"c"})) {
     $asch = 1;
 }
+if (defined($options{"a"})) {
+    $asam = 1;
+}
 usage()
-    if (@ARGV != 2);
+    if (@ARGV < 2 || @ARGV > 3);
 
 my $certfile = $ARGV[0];
 my $type     = $ARGV[1];
+my $url      = (@ARGV == 3 ? $ARGV[2] : undef);
 
 use vars qw($GENI_DBNAME);
 if ($asch) {
     $GENI_DBNAME = "geni-ch";
+}
+elsif ($asam) {
+    $GENI_DBNAME = "geni-cm";
 }
 
 # Now we can load the libraries after setting the proper DB.
@@ -54,14 +67,20 @@ if (!defined($certificate)) {
 if (! ($certificate->uuid() =~ /\w*-(\w*)$/)) {
     die("Could not get prefix from uuid\n");
 }
-my $url = $certificate->URL();
 if (!defined($url)) {
-    die("Certificate does not have a URI extension");
+    $url = $certificate->URL();
+    if (!defined($url)) {
+	die("Certificate does not have a URI extension");
+    }
 }
 if (GeniAuthority->CheckExisting($certificate)) {
     die("$certfile is already registered in the DB\n");
 }
-GeniAuthority->Create($certificate, $url, lc($type))
-    or die("Could not add new authority\n");
+my $authority = GeniAuthority->Create($certificate, $url, lc($type));
+if (!defined($authority)) {
+    die("Could not add new authority\n");
+}
+$authority->Disable()
+    if ($disable);
 
 exit(0);

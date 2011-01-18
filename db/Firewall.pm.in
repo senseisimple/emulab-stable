@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -33,7 +33,6 @@ sub FWTEARDOWN()	{ return 4; }
 my $cnetstack    = "-S Control";
 my $cnetvlanname = "Control";
 
-use lib '@prefix@/lib';
 use emdbi;
 use libdb;
 use libtestbed;

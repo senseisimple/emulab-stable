@@ -185,6 +185,9 @@ LanLink instproc init {s nodes bw d type} {
     # Default type is a plain "ethernet". User can change this.
     $self set protocol "ethernet"
 
+    # Default failure action.
+    $self set failureaction "fatal"
+
     # Colocation is on by default, but this only applies to emulated links
     # between virtual nodes anyway.
     $self set trivial_ok 1
@@ -214,8 +217,9 @@ LanLink instproc init {s nodes bw d type} {
     # XXX Allow user to set the accesspoint.
     $self set accesspoint {}
 
-    # Optional layer
+    # Optional layer and implemented-by relationship
     $self set layer {}
+    $self set implemented_by {}
 
     # A simulated lanlink unless we find otherwise
     $self set simulated 1
@@ -272,6 +276,11 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar iscloud
     $self set iscloud 0
 
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    #$self instvar oflistener   # this is not needed
+    $self set ofenabled 0
+
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
 	set bandwidth($nodepair) $bw
@@ -293,6 +302,16 @@ LanLink instproc init {s nodes bw d type} {
 	Queue lq$lq $self $type $node
 	set linkq($nodepair) lq$lq
     }
+}
+
+#
+# Enable Openflow on lan/link and set controller
+#
+LanLink instproc enable_openflow {ofcontrollerstr} {
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    set ofenabled 1
+    set ofcontroller $ofcontrollerstr
 }
 
 #
@@ -322,6 +341,42 @@ Link instproc trace {{ttype "header"} {texpr ""}} {
     
     $toqueue trace $ttype $texpr
     $fromqueue trace $ttype $texpr
+}
+
+#
+# A link can be implemented in terms of a path or
+# a link at a lower level of the stack.
+#
+Link instproc implemented_by {impl} {
+    $self instvar implemented_by
+    $self instvar layer
+    
+    if {[$impl info class] == "Path"} {
+	set implemented_by $impl
+    } elseif {[$impl info class] == "Link"} {
+	if {$layer == {}} {
+	    perror "\[$self implemented_by] no layer set!"
+	    return
+	}
+	set impl_layer [$impl set layer]
+	if {$impl_layer == {}} {
+	    perror "\[$self implemented_by] no layer set in $impl!"
+	    return
+	}
+	# Special case.
+	if {$impl_layer == $layer && $layer != 2} {
+	    perror "\[$self implemented_by] $impl is at the same layer!"
+	    return
+	}
+	if {$impl_layer > $layer} {
+	    perror "\[$self implemented_by] $impl is not at a lower layer!"
+	    return
+	}
+	set implemented_by $impl
+    } else {
+        perror "\[$self implemented_by] must be a link or a path!"
+        return
+    }
 }
 
 Lan instproc trace_snaplen {len} {
@@ -717,11 +772,16 @@ Link instproc updatedb {DB} {
     $self instvar sim
     $self instvar netmask
     $self instvar protocol
+    $self instvar failureaction
     $self instvar mustdelay
     $self instvar fixed_iface
     $self instvar layer
+    $self instvar implemented_by
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    set vindex 0
 
-    $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
+    $sim spitxml_data "virt_lan_lans" [list "vname" "failureaction"] [list $self $failureaction]
 
     foreach nodeport $nodelist {
 	set node [lindex $nodeport 0]
@@ -810,6 +870,13 @@ Link instproc updatedb {DB} {
 	if { $layer != {} } {
 	    lappend fields "layer"
 	}
+	if { $implemented_by != {} } {
+	    if {[$implemented_by info class] == "Path"} {
+		lappend fields "implemented_by_path"
+	    } else {
+		lappend fields "implemented_by_link"
+	    }
+	}
 
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $backfill($nodeport) $rbackfill($nodeport)  $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $encap $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $node $port $ip $mustdelay]
 
@@ -839,6 +906,29 @@ Link instproc updatedb {DB} {
 	if { $layer != {} } {
 	    lappend values $layer
 	}
+	if { $implemented_by != {} } {
+	    lappend values $implemented_by
+	}
+	
+	# openflow
+	#
+	# table: virt_lans
+	# columns: ofenabled = 0/1
+	#          ofcontroller = ""/"controller connection string"
+	#
+	lappend fields "ofenabled"
+	lappend fields "ofcontroller"
+	
+	lappend values $ofenabled
+	if {$ofenabled == 1} {
+	    lappend values $ofcontroller
+	} else {
+	    lappend values ""
+	}
+
+	lappend fields "vindex"
+	lappend values $vindex
+	set vindex [expr $vindex + 1]
 
 	$sim spitxml_data "virt_lans" $fields $values
     }
@@ -871,18 +961,22 @@ Lan instproc updatedb {DB} {
     $self instvar sim
     $self instvar netmask
     $self instvar protocol
+    $self instvar failureaction
     $self instvar accesspoint
     $self instvar settings
     $self instvar member_settings
     $self instvar mustdelay
     $self instvar fixed_iface
+    $self instvar ofenabled
+    $self instvar ofcontroller
+    set vindex 0
 
     if {$modelnet_cores > 0 || $modelnet_edges > 0} {
 	perror "Lans are not allowed when using modelnet; just duplex links."
 	return
     }
 
-    $sim spitxml_data "virt_lan_lans" [list "vname"] [list $self]
+    $sim spitxml_data "virt_lan_lans" [list "vname" "failureaction"] [list $self $failureaction]
 
     #
     # Upload lan settings and them per-member settings
@@ -1003,6 +1097,26 @@ Lan instproc updatedb {DB} {
         if {$fixed_iface($nodeport) != 0} {
             lappend values $fixed_iface($nodeport)
         }
+
+	# openflow
+	#
+	# table: virt_lans
+	# columns: ofenabled = 0/1
+	#          ofcontroller = ""/"controller connection string"
+	#
+	lappend fields "ofenabled"
+	lappend fields "ofcontroller"
+	
+	lappend values $ofenabled
+	if {$ofenabled == 1} {
+	    lappend values $ofcontroller
+	} else {
+	    lappend values ""
+	}
+
+	lappend fields "vindex"
+	lappend values $vindex
+	set vindex [expr $vindex + 1]
 
 	$sim spitxml_data "virt_lans" $fields $values
 

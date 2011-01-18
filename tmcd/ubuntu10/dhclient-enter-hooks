@@ -1,0 +1,115 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004-2009 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+#
+# Sweet! dhclient on linux wants to DHCP on the loopback interface
+# thus screwing up its default setting.  Put a stop to that early on!
+#
+if [ xxx$interface = xxxlo ]; then
+    exit_status=1
+    return
+fi
+
+echo "`date`: ${interface}: ${reason}" >>$LOGDIR/dhclient-enter.log 2>&1
+
+#
+# XXX Hack to force the duplex on interfaces
+#
+setduplex() {
+    _if=$1
+    _rc=0
+
+    if [ -x /sbin/ethtool ]; then
+	_ethtool=/sbin/ethtool
+    else
+	_ethtool=/usr/sbin/ethtool
+    fi
+
+    _out=`$_ethtool $_if`
+    if [ $? -eq 0 ]; then
+	_hmb=`echo $_out | grep -c 'Speed: 100Mb/s'`
+	_fdx=`echo $_out | grep -c 'Duplex: Full'`
+    else
+        _out=`/sbin/mii-tool $_if`
+	_hmb=`echo $_out | grep -c '100 Mbit'`
+	_fdx=`echo $_out | grep -c 'full duplex'`
+    fi
+
+    if [ $_hmb -ne 0 -a $_fdx -ne 0 ]; then
+	echo "$_if: speed/duplex correct"
+    else
+	echo -n "$_if: fixing speed/duplex..."
+	if $_ethtool $_if >/dev/null 2>&1; then
+	    $_ethtool -s $_if autoneg off speed 100 duplex full
+	else
+	    /sbin/mii-tool --force=100baseTx-FD $_if
+	fi
+	_rc=$?
+	echo "returns $_rc"
+    fi
+    return $_rc
+}
+
+if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
+then
+    # do nothing
+    true
+elif [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
+    #
+    # ElabinElab support.
+    #
+    # XXX oh so hacky.  Real boss is set to return 1.1.1.1 as a name server
+    # for nodes in inner elabs.  This is the hack de jour for determining
+    # who has responded to our DHCP request.  If it is outer boss and we are
+    # an inner node, we want to decline this offer and not configure the
+    # interface
+    #
+    exit_status=1
+
+    #
+    # XXX it just keeps getting better!  The Ubuntu (Debian?) dhclient-script
+    # doesn't check that status code and just plows ahead.  Thus we will wind
+    # up with a resolv.conf file with 1.1.1.1 as the name server.  So if we
+    # currently have a legit resolv.conf (one without a 1.1.1.1 nameserver),
+    # save that off so we can restore it in the exit hook.
+    #
+    if grep -q 1.1.1.1 /etc/resolv.conf; then
+	echo "`date`: ${interface}: resolv.conf already bad"
+    else
+	echo "`date`: ${interface}: saving current resolv.conf"
+	cp -p /etc/resolv.conf /etc/resolv.conf.good
+    fi >>$LOGDIR/dhclient-enter.log 2>&1
+
+    #
+    # XXX since we now know that we are in an inner elab and we know which
+    # interface is the real control net, we force 100Mb full-duplex on all
+    # other (experimental) interfaces.  This is necessary to ensure a
+    # response from the inner control net.
+    #
+    for _if in `ifconfig -s | awk '{ print $1 }' | grep -v Iface`
+    do
+	if [ $_if != "lo" -a x$_if != x$interface ]; then
+	    setduplex $_if >>$LOGDIR/dhclient-enter.log 2>&1
+	fi
+    done
+
+    #
+    # XXX sleep here so we don't pummel boss with REQUEST/DECLINE pairs.
+    #
+    sleep 3
+elif [ "$new_network_number" = "10.200.1.0" ]; then
+    #
+    # XXX sometime we can get a reply even if the duplex is wrong.
+    # If we get such a reply and we are inside an inner elab, again
+    # force 100Mb full-duplex to make sure we continue to communicate
+    # with the server.
+    #
+    setduplex $interface >>$LOGDIR/dhclient-enter.log 2>&1
+fi
+
+echo "`date`: ${interface}: ${reason}: done" >>$LOGDIR/dhclient-enter.log 2>&1

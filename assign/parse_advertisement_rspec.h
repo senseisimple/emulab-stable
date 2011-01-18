@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2009-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -26,7 +26,7 @@
 #include <xercesc/sax/HandlerBase.hpp>
 XERCES_CPP_NAMESPACE_USE
 
-int parse_ptop_rspec(tb_pgraph &PG, tb_sgraph &SG, char *filename);
+int parse_advertisement(tb_pgraph &PG, tb_sgraph &SG, char *filename);
 
 #endif // for __PARSE_ADVERTISEMENT_RSPEC_H
 

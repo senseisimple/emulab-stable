@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -61,74 +61,80 @@ require GeniSlice;
 
 if (@ARGV) {
     while (@ARGV) {
-	my $manager = shift(@ARGV);
-	my $query_result =
-	    GeniDB::DBQueryFatal("select uuid from geni_authorities ".
-				 "where hrn='${manager}.cm'");
-	fatal("No such manager $manager")
-	    if (!$query_result->numrows);
-	my ($uuid) = $query_result->fetchrow_array();
-	push(@managers, $uuid);
+	my $urn = shift(@ARGV);
+
+	my $manager = GeniAuthority->Lookup($urn);
+	print STDERR "Could not lookup up CM $urn\n"
+	    if (!defined($manager));
+
+	push(@managers, $manager);
+    }
+}
+else {
+    #
+    # List of all CMs.
+     #
+    my $query_result =
+	GeniDB::DBQueryWarn("select uuid from geni_authorities ".
+			    "where type='cm'");
+    fatal("Could not lookup CM list")
+	if (!defined($query_result));
+    fatal("No managers listed in the DB; is this a ClearingHouse?")
+	if (!$query_result->numrows);
+
+    while (my ($manager_uuid) = $query_result->fetchrow_array()) {
+	my $manager = GeniAuthority->Lookup($manager_uuid);
+	print STDERR "Could not lookup up CM $manager_uuid\n"
+	    if (!defined($manager));
+
+	push(@managers, $manager);
     }
 }
 
 #
 # The RPC context for this script is as the CH
 #
-my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
-my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+my $certificate = GeniRegistry::ClearingHouse->GetCertificate();
 if (!defined($certificate)) {
-    fatal("Could not load certificate from $EMULAB_PEMFILE");
+    fatal("Could not load ClearingHouse certificate");
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
 Genixmlrpc->SetTimeout(15);
 
-#
-# The credential will be issued to the ClearingHouse.
-#
-my $authority = GeniAuthority->Lookup($certificate->uuid());
+my $authority = GeniAuthority->Lookup($certificate->urn());
 if (!defined($authority)) {
-    fatal("Could not find local authority object");
+    fatal("Could not locate ClearingHouse authority object");
 }
 
 #
-# List of all CMs.
+# Use a self signed clearinghouse credential.
 #
-my $query_result =
-    GeniDB::DBQueryWarn("select uuid from geni_authorities ".
-			"where type='cm' ".
-			(!@managers ? "" :
-			 "and (" . join(" or ",
-					map("uuid='$_'", @managers)) . ")"));
-fatal("Could not lookup CM list")
-    if (!defined($query_result));
-fatal("No managers listed in the DB; is this a ClearingHouse?")
-    if (!$query_result->numrows);
+my $credential = GeniCredential->GetSelfCredential($authority);
+if (!defined($credential)) {
+    fatal("Could not create self signed clearinghouse credential");
+}
 
-while (my ($manager_uuid) = $query_result->fetchrow_array()) {
-    my $manager = GeniAuthority->Lookup($manager_uuid);
-    print STDERR "Could not lookup up CM $manager_uuid\n"
-	if (!defined($manager));
-
-    my $manager_credential = GeniCredential->Create($manager, $authority);
-    if (!defined($manager_credential)) {
-	fatal("Could not create new credential for $manager");
-    }
-    if ($manager_credential->Sign($certificate) != 0) {
-	fatal("Could not sign credential for $manager");
-    }
-
+#
+# Call ListHistory on a CM.
+#
+sub ListHistory($)
+{
+    my ($manager) = @_;
+    
     print "$manager\n";
 	
     my $response =
 	Genixmlrpc::CallMethod($manager->url(), undef,
 			       "ListHistory",
-			       { "credential" =>
-				     $manager_credential->asString() });
+			       { "type"        => "",
+				 "credential"  => $credential->asString(),
+				 "credentials" => [$credential->asString()]});
     if (!defined($response) || $response->code() != GENIRESPONSE_SUCCESS) {
 	print STDERR
-	    "Could not ListHistory on $manager: ". $response->output();
+	    "Could not listusage on $manager: ".
+	    (defined($response) ? $response->output() : "") . "\n";
 	    $errors++;
+	return;
     }
     foreach my $ref (@{$response->value()}) {
 	my $owner_hrn = $ref->{'owner_hrn'};
@@ -142,7 +148,9 @@ while (my ($manager_uuid) = $query_result->fetchrow_array()) {
 	print "$owner_hrn,$slice_hrn,$created,$redeemed,$expired,$released\n";
 	print "$rspec\n";
     }
-    $manager_credential->Delete();
+}
+foreach my $manager (@managers) {
+    ListHistory($manager);
 }
 exit($errors);
 

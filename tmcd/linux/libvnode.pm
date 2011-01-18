@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Implements the libvnode API for OpenVZ support in Emulab.
@@ -39,8 +39,6 @@ my $PCNET_GW_FILE   = "/var/emulab/boot/routerip";
 my $VCNET_NET	    = "172.16.0.0";
 my $VCNET_MASK      = "255.240.0.0";
 my $VCNET_GW	    = "172.16.0.1";
-
-my $BOSS_IP_FILE    = "/var/emulab/boot/bossip";
 
 my $debug = 0;
 
@@ -317,7 +315,7 @@ sub makeBridgeMaps() {
     shift(@lines);
     my $curbr = '';
     foreach my $line (@lines) {
-	if ($line =~ /^([\w\d\-]+)\s+/) {
+	if ($line =~ /^([\w\d\-\.]+)\s+/) {
 	    $curbr = $1;
 	    $bridges{$curbr} = [];
 	}
@@ -427,12 +425,11 @@ sub findDNS($)
 {
     my ($ip) = @_;
 
-    my $bossip = (-r $BOSS_IP_FILE) ? `cat $BOSS_IP_FILE` : "0";
-    chomp($bossip);
+    my ($bossname,$bossip) = libtmcc::tmccbossinfo();
     if ($bossip =~ /^(\d+\.\d+\.\d+\.\d+)$/) {
 	$bossip = $1;
     } else {
-	die "Could not find boss IP address (no $BOSS_IP_FILE?)";
+	die "Could not find boss IP address (tmccbossinfo failed?)";
     }
 
     return $bossip;

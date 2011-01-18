@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2007, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2002-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -44,16 +44,35 @@ $(INSTALL_APACHE_CONFIG)/%: %
 # This could (should?) be done with configure, but apache port might
 # not be installed when we configure our software.
 #
+# XXX ugh, do the same thing to detect php5...
+#
 httpd.conf.fixed: httpd.conf
 	-@cp httpd.conf httpd.conf.fixed
 	@if [ -x /usr/local/libexec/apache/mod_auth_mysql.so ]; then \
             sed -i "" -e '/^LoadModule auth_mysql/s/libauth/mod_auth/' httpd.conf.fixed; \
-	    echo "Updated httpd.conf"; \
+	    echo "Updated httpd.conf for auth_mysql"; \
+	fi
+	@if [ -x /usr/local/libexec/apache/libphp5.so ]; then \
+            sed -i "" -e 's/php4/php5/g' httpd.conf.fixed; \
+	    echo "Updated httpd.conf for php5"; \
+	fi
+
+httpd.conf-ops.fixed: httpd.conf-ops
+	-@cp httpd.conf-ops httpd.conf-ops.fixed
+	@if [ true -o -x /usr/local/libexec/apache/libphp5.so ]; then \
+            sed -i "" -e 's/php4/php5/g' httpd.conf-ops.fixed; \
+	    echo "Updated httpd.conf-ops for php5"; \
 	fi
 
 install-dirs:
 	-mkdir -p $(INSTALL_TOPDIR)/www
 
+#
+# Well, this is awkward.  Make sure we don't try to install anything from
+# a dev tree both because it doesn't make any sense and because it would
+# clobber the "real" version.
+#
+ifeq ($(TBROOT),/usr/testbed)
 #
 # XXX another woeful hack.  There appears to be a well-documented problem
 # with Apache and PHP4, where loading PHP with certain extensions will cause
@@ -76,7 +95,11 @@ endif
 install: install-dirs install-scripts httpd.conf.fixed
 	$(INSTALL_DATA) httpd.conf.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
 
-control-install: install-dirs install-scripts httpd.conf-ops
-	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
+control-install: install-dirs install-scripts httpd.conf-ops.fixed
+	$(INSTALL_DATA) httpd.conf-ops.fixed $(INSTALL_APACHE_CONFIG)/httpd.conf
+else
+install-scripts install control-install:
+	@echo "Cannot install Apache config in dev tree"
+endif
 
 clean:

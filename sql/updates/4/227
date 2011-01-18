@@ -1,0 +1,51 @@
+#
+# Add extenal references slots to nodes table, as for geni.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("virt_lans", "vindex")) {
+	DBQueryFatal("alter table virt_lans add ".
+		     "vindex int(11) NOT NULL default '-1' after vport");
+    }
+    DBQueryFatal("replace into table_regex VALUES ".
+		 " ('virt_lans','vindex','int','redirect','default:int', ".
+		 "  0,4098,NULL)");
+    
+    my $query_result =
+	DBQueryFatal("select * from virt_lans order by exptidx,vname,vindex");
+
+    my $curexp = -1;
+    my $curlan = "";
+    my $curidx = 0;
+
+    while (my $rowref = $query_result->fetchrow_hashref()) {
+	my $exptidx = $rowref->{'exptidx'};
+	my $vname   = $rowref->{'vname'};
+	my $vnode   = $rowref->{'vnode'};
+	my $vport   = $rowref->{'vport'};
+	my $vindex  = $rowref->{'vindex'};
+
+	# Already done.
+	next
+	    if ($vindex != -1);
+
+	if ($exptidx != $curexp || $vname ne $curlan) {
+	    $curidx = 0;
+	}
+	DBQueryFatal("update virt_lans set vindex=$curidx ".
+		     "where exptidx='$exptidx' and vname='$vname' and ".
+		     "      vnode='$vnode' and vport='$vport'");
+
+	$curidx++;
+	$curexp = $exptidx;
+	$curlan = $vname;
+    }
+    
+    return 0;
+}
+1;

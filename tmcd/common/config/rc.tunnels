@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2008, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -145,7 +145,7 @@ sub doboot()
     my $sysname = `uname -s`;
     chomp($sysname);
     if ($sysname eq "Linux") {
-	system("insmod ip_gre");
+	system("modprobe ip_gre");
     }
     else {
 	system("kldload if_tap");

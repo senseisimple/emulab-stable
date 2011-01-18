@@ -43,6 +43,7 @@ endif
 	$(MAKE) -C syncd client
 	$(MAKE) -C dijkstra client
 	$(MAKE) -C genhostsfile client
+	$(MAKE) -C frisbee.redux client
 
 client-install: client
 	-mkdir -p $(LBINDIR)
@@ -59,6 +60,17 @@ endif
 	$(MAKE) -C syncd client-install
 	$(MAKE) -C dijkstra client-install
 	$(MAKE) -C genhostsfile client-install
+	$(MAKE) -C frisbee.redux client-install
+
+subboss: client
+	$(MAKE) -C frisbee.redux all
+
+subboss-install: subboss client-install
+ifeq ($(SYSTEM),FreeBSD)
+	CLIENT_BINDIR=/etc/testbed $(MAKE) -e -C frisbee.redux install
+else
+	CLIENT_BINDIR=/usr/local/bin $(MAKE) -e -C frisbee.redux install
+endif
 
 mfs:
 	$(MAKE) -C imagezip client

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005, 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -48,6 +48,8 @@ function NLCLINKFIG2($link, $value, $caption, $explanation)
 # Drop into html mode
 #
 ?>
+<h1 id="doctitle">
+THIS PAGE IS OBSOLETE; MOBILE WIRELESS NO LONGER SUPPORTED</h1>
 
 <h2 id="doctitle">Emulab Tutorial - Mobile Wireless Networking</h2>
 

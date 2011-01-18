@@ -52,6 +52,10 @@ $rows = array();
 
 $rows[] = array("idx"      => $slice->idx());
 $rows[] = array("hrn"      => $slice->hrn());
+$urn = $slice->urn();
+if ($urn) {
+    $rows[] = array("urn"      => $slice->urn());
+}
 $rows[] = array("uuid"     => $slice->uuid());
 $rows[] = array("created"  => $slice->created());
 $rows[] = array("expires"  => $slice->expires());

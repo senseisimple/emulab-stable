@@ -122,6 +122,13 @@ sub vz_init {
     makeIfaceMaps();
     makeBridgeMaps();
 
+    #
+    # Turn off LVM if already using a /vz mount.
+    #
+    if (-e "/vz/.nolvm" || -e "/vz.save/.nolvm" || -e "/.nolvm") {
+	$DOLVM = 0;
+	mysystem("/sbin/dmsetup remove_all");
+    }
     return 0;
 }
 
@@ -149,7 +156,7 @@ sub vz_rootPreConfig {
         TBScriptUnlock();
         return 0;
     }
-    
+
     # make sure filesystem is setup 
     if ($DOLVM) {
 	# be ready to snapshot later on...
@@ -209,17 +216,39 @@ sub vz_rootPreConfig {
 	mysystem("vgchange -a y openvz");
     }
     else {
+	#
+	# We need to create a local filesystem.
+	# First see if the "extra" filesystem has already been created,
+	# Emulab often mounts it as /local for various purposes.
+	#
 	# about the funny quoting: don't ask... emacs perl mode foo.
-	if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
-	    mysystem("$VZRC stop");
-	    mysystem("rm -rf /vz")
-		if (-e "/vz");
-	    mysystem("mkdir /vz");
-	    mysystem("$MKEXTRAFS -f /vz");
-	    mysystem("cp -pR /vz.save/* /vz/");
+	if (!system('grep -q '."'".'^/dev/.*/local.*$'."'".' /etc/fstab')) {
+	    # local filesystem already exists, just create a subdir
+	    if (! -d "/local/vz") {
+		mysystem("$VZRC stop");
+		mysystem("mkdir /local/vz");
+		mysystem("cp -pR /vz.save/* /local/vz/");
+		mysystem("touch /local/vz/.nolvm");
+	    }
+	    if (-e "/vz") {
+		mysystem("rm -rf /vz");
+		mysystem("ln -s /local/vz /vz");
+	    }
 	}
-	if (system('mount | grep -q \'on /vz\'')) {
-	    mysystem("mount /vz");
+	else {
+	    # about the funny quoting: don't ask... emacs perl mode foo.
+	    if (system('grep -q '."'".'^/dev/.*/vz.*$'."'".' /etc/fstab')) {
+		mysystem("$VZRC stop");
+		mysystem("rm -rf /vz")
+		    if (-e "/vz");
+		mysystem("mkdir /vz");
+		mysystem("$MKEXTRAFS -f /vz");
+		mysystem("cp -pR /vz.save/* /vz/");
+		mysystem("touch /vz/.nolvm");
+	    }
+	    if (system('mount | grep -q \'on /vz\'')) {
+		mysystem("mount /vz");
+	    }
 	}
     }
 
@@ -247,7 +276,6 @@ sub vz_rootPreConfig {
 
     # For VLANs
     mysystem("$MODPROBE 8021q");
-    system("$VLANCONFIG set_name_type VLAN_PLUS_VID_NO_PAD");
 
     # we need this stuff for traffic shaping -- only root context can
     # modprobe, for now.
@@ -327,12 +355,25 @@ sub vz_rootPreConfigNetwork {
 	foreach my $ifc (@{$node_ifs->{$node}}) {
 	    next if (!$ifc->{ISVIRT});
 
-	    if ($ifc->{ITYPE} eq "vlan") {
+	    if ($ifc->{ITYPE} eq "loop") {
+		my $vtag  = $ifc->{VTAG};
+
+		#
+		# No physical device. Its a loopback (trivial) link/lan
+		# All we need is a common bridge to put the veth ifaces into.
+		#
+		my $brname = "br$vtag";
+		$brs{$brname}{ENCAP} = 0;
+		$brs{$brname}{SHORT} = 0;
+	    }
+	    elsif ($ifc->{ITYPE} eq "vlan") {
 		my $iface = $ifc->{IFACE};
 		my $vtag  = $ifc->{VTAG};
-		my $vdev  = "vlan${vtag}";
-		
+		my $vdev  = "${iface}.${vtag}";
+
+		system("$VLANCONFIG set_name_type DEV_PLUS_VID_NO_PAD");
 		system("$VLANCONFIG add $iface $vtag");
+		system("$VLANCONFIG set_name_type VLAN_PLUS_VID_NO_PAD");
 		system("$IFCONFIG $vdev up");
 
 		my $brname = "pbr$vdev";
@@ -422,7 +463,7 @@ sub vz_rootPreConfigNetwork {
 		}
 		if ($i == $MAXIMQ) {
 		    print STDERR "*** No more IMQs\n";
-		    TBScriptUnLock();
+		    TBScriptUnlock();
 		    return -1;
 		}
 	    }
@@ -802,6 +843,8 @@ sub vz_vnodeState {
     }
 
     my $status = vmstatus($vmid);
+    return VNODE_STATUS_UNKNOWN()
+	if (!defined($status));
 
     if ($status eq 'running') {
 	return VNODE_STATUS_RUNNING();
@@ -921,7 +964,13 @@ sub vz_vnodePreConfig {
     if ($DOLVM) {
 	$privroot = "/mnt/$vnode_id/private";
     }
+    # Serialize the callback. Sucks. iptables.
+    if (TBScriptLock($GLOBAL_CONF_LOCK, 0, 900) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "Could not get callback lock after a long time!\n";
+	return -1;
+    }
     my $ret = &$callback("$privroot");
+    TBScriptUnlock();
     if ($didmount) {
 	mysystem("$VZCTL umount $vnode_id");
     }
@@ -944,20 +993,33 @@ sub vz_vnodePreConfigControlNetwork {
 		$ipa[2] & $maska[2],$ipa[3] & $maska[3]);
     my $net = join('.',@neta);
 
+    #
+    # Have to serialize iptables access. Silly locking problem in the kernel.
+    #
+    if (TBScriptLock($GLOBAL_CONF_LOCK, 0, 900) != TBSCRIPTLOCK_OKAY()) {
+	print STDERR "PreConfigControlNetwork: ".
+	    "Could not get the lock after a long time!\n";
+	return -1;
+    }
     # If the SNAT rule is there, probably we're good.
     if (system('iptables -t nat -L POSTROUTING' . 
 	       ' | grep -q -e \'^SNAT.* ' . $net . '\'')) {
-	mysystem("$MODPROBE ip_nat");
-	mysystem("$IPTABLES -t nat -A POSTROUTING" . 
-		 " -s $net/$mask" . 
-		 " -d $cnetwork/$cnetmask -j ACCEPT");
-	mysystem("$IPTABLES -t nat -A POSTROUTING" . 
-		 " -s $net/$mask" . 
-		 " -d $net/$mask -j ACCEPT");
-	mysystem("$IPTABLES -t nat -A POSTROUTING" . 
-		 " -s $net/$mask" . 
-		 " -o $ciface -j SNAT --to-source $cip");
+	if (system("$MODPROBE ip_nat") ||
+	    system("$IPTABLES -t nat -A POSTROUTING" . 
+		   " -s $net/$mask" . 
+		   " -d $cnetwork/$cnetmask -j ACCEPT") ||
+	    system("$IPTABLES -t nat -A POSTROUTING" . 
+		   " -s $net/$mask" . 
+		   " -d $net/$mask -j ACCEPT") ||
+	    system("$IPTABLES -t nat -A POSTROUTING" . 
+		   " -s $net/$mask" . 
+		   " -o $ciface -j SNAT --to-source $cip")) {
+	    print STDERR "Could not PreConfigControlNetwork iptables\n";
+	    TBScriptUnlock();
+	    return -1;
+	}
     }
+    TBScriptUnlock();
 
     # Make sure we're mounted so that vzlist and friends work; see NOTE about
     # mounting LVM logical devices above.
@@ -1122,7 +1184,7 @@ sub vz_vnodePreConfigControlNetwork {
     close(FD);
     open(FD,">$mybootdir/bossip") 
 	or die "vz_vnodePreConfigControlNetwork: could not open bossip for $vnode_id: $!";
-    print FD "$vnode_id\n";
+    print FD "$bossip\n";
     close(FD);
 
     #
@@ -1130,6 +1192,7 @@ sub vz_vnodePreConfigControlNetwork {
     #
     open(FD,">$privroot/etc/resolv.conf") 
 	or die "vz_vnodePreConfigControlNetwork: could not open resolv.conf for $vnode_id: $!";
+
     print FD "nameserver $bossip\n";
     print FD "search $shortdomain\n";
     close(FD);
@@ -1174,11 +1237,12 @@ sub vz_vnodePreConfigExpNetwork {
 	my $br;
 	
 	if ($ifc->{ITYPE} eq "vlan") {
+	    my $iface = $ifc->{IFACE};
 	    my $vtag  = $ifc->{VTAG};
-	    my $vdev  = "vlan${vtag}";
+	    my $vdev  = "${iface}.${vtag}";
 	    $br = "pbr$vdev";
 	}
-	elsif ($ifc->{PMAC} eq "none") {
+	elsif ($ifc->{PMAC} eq "none" || $ifc->{ITYPE} eq "loop") {
 	    $br = "br" . $ifc->{VTAG};
 	}
 	else {

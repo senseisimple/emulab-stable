@@ -1,0 +1,57 @@
+#
+# Note that all actions *MUST* be idempotent; if this script is run
+# again, it should always do the right thing, not break if something
+# was already done. See boss-install for lots of example of how to use
+# libinstall to help with this.
+#
+use strict;
+use libinstall;
+
+my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+my $REBOOTLOG       = "$LOGDIR/reboot.log";
+my $POWERLOG        = "$LOGDIR/power.log";
+my $CACONF	    = "$TBROOT/lib/ssl/ca.cnf";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "newsyslog", "Updating $NEWSYSLOG_CONF", sub {
+	    DoneIfEdited($NEWSYSLOG_CONF);
+	    BackUpFileFatal($NEWSYSLOG_CONF);
+	    AppendToFileFatal($NEWSYSLOG_CONF, "$REBOOTLOG 640 14 300 * Z");
+	};
+
+	Phase "ca.cnf", "Updating ssl CA config file", sub {
+	    PhaseSkip("Already updated")
+		if (`grep 'Added for update 5.10' $CACONF`);
+
+	    BackUpFileFatal($CACONF);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl ca.cnf");
+
+	    # For impotent mode. 
+	    DiffFiles("$TOP_OBJDIR/ssl/ca.cnf", $CACONF);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl install-conf");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+        #
+	# Rename the older power log to reboot log.
+	#
+	Phase "newsyslog", "Renaming power log", sub {
+	    DoneIfExists($REBOOTLOG);
+	    DoneIfDoesntExist($POWERLOG);
+	    ExecQuietFatal("/bin/mv $POWERLOG $REBOOTLOG");
+	};
+    }
+    return 0;
+}
+1;

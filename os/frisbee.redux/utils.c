@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -16,7 +16,9 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
+#if !defined(linux) && !defined(__CYGWIN__)
 #include <sys/sysctl.h>
+#endif
 #include <assert.h>
 
 #include "decls.h"
@@ -61,7 +63,7 @@ sleeptime(unsigned int usecs, char *str, int doround)
 	int nusecs;
 
 	if (clockres_us == 0) {
-#ifndef linux
+#if !defined(linux) && !defined(__CYGWIN__)
 		struct clockinfo ci;
 		size_t cisize = sizeof(ci);
 
@@ -151,15 +153,102 @@ sleeptil(struct timeval *nexttime)
 	return 0;
 }
 
+/*
+ * Deal with variable chunk/block sizes
+ */
+static int _ChunkSize, _BlockSize;
+static int _TotalChunks, _TotalBlocks;
+static int _LastChunkSize, _LastBlockSize;
+
+void
+InitSizes(int32_t chunksize, int32_t blocksize, int64_t bytes)
+{
+	/* XXX no support for multiple chunk/block sizes yet */
+	assert(chunksize == MAXCHUNKSIZE);
+	assert(blocksize == MAXBLOCKSIZE);
+
+	_ChunkSize = chunksize;
+	_BlockSize = blocksize;
+	_TotalBlocks = (bytes + _BlockSize-1) / _BlockSize;
+	_TotalChunks = (_TotalBlocks + _ChunkSize-1) / _ChunkSize;
+
+	/* how many bytes in last block (zero means full) */
+	_LastBlockSize = bytes % _BlockSize;
+	/* how many blocks in last chunk (zero means full) */
+	_LastChunkSize = _TotalBlocks % _ChunkSize;
+}
+ 
+int
+TotalChunks(void)
+{
+	return _TotalChunks;
+}
+
+/*
+ * Return the size of a specific chunk.
+ * Always the image chunk size (_ChunkSize) except possibly for a
+ * final partial chunk.
+ * If called with -1, return the image chunk size.
+ */
+int
+ChunkSize(int chunkno)
+{
+	assert(chunkno < _TotalChunks);
+
+	if (chunkno < _TotalChunks-1 || _LastChunkSize == 0)
+		return _ChunkSize;
+	return _LastChunkSize;
+}
+
+/*
+ * Return the number of bytes in the indicated chunk.
+ * Always the image chunk size in bytes (_ChunkSize * _BlockSize) except
+ * possibly for a final partial chunk.
+ */
+int
+ChunkBytes(int chunkno)
+{
+	assert(chunkno < _TotalChunks);
+
+	if (chunkno < _TotalChunks-1 || _LastChunkSize == 0)
+		return (_ChunkSize * _BlockSize);
+	return ((_LastChunkSize-1) * _BlockSize + _LastBlockSize);
+}
+
+int
+TotalBlocks(void)
+{
+	return _TotalBlocks;
+}
+
+/*
+ * Return the size of a specific block.
+ * Always the image block size (_BlockSize) except possibly for a
+ * final partial block in the final chunk.
+ * If called with -1, return the image block size.
+ */
+int
+BlockSize(int chunkno, int blockno)
+{
+	int imageblock;
+
+	assert(chunkno < _TotalChunks && blockno < _BlockSize);
+
+	imageblock = chunkno * _ChunkSize + blockno;
+	if (chunkno < 0 || imageblock < _TotalBlocks-1 || _LastBlockSize == 0)
+		return _BlockSize;
+	return _LastBlockSize;
+}
+
 void
 BlockMapInit(BlockMap_t *blockmap, int block, int count)
 {
 	assert(block >= 0);
 	assert(count > 0);
-	assert(block < CHUNKSIZE);
-	assert(block + count <= CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
 
-	if (count == CHUNKSIZE) {
+	if (count == MAXCHUNKSIZE) {
 		memset(blockmap->map, ~0, sizeof(blockmap->map));
 		return;
 	}
@@ -174,8 +263,8 @@ BlockMapAdd(BlockMap_t *blockmap, int block, int count)
 
 	assert(block >= 0);
 	assert(count > 0);
-	assert(block < CHUNKSIZE);
-	assert(block + count <= CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
 
 	i = block / CHAR_BIT;
 	off = block % CHAR_BIT;
@@ -194,6 +283,33 @@ BlockMapAdd(BlockMap_t *blockmap, int block, int count)
 	}
 }
 
+void
+BlockMapClear(BlockMap_t *blockmap, int block, int count)
+{
+	int i, off;
+
+	assert(block >= 0);
+	assert(count > 0);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
+
+	i = block / CHAR_BIT;
+	off = block % CHAR_BIT;
+	while (count > 0) {
+		if (off == 0 && count >= CHAR_BIT) {
+			blockmap->map[i++] = 0;
+			count -= CHAR_BIT;
+		} else {
+			blockmap->map[i] &= ~(1 << off);
+			if (++off == CHAR_BIT) {
+				i++;
+				off = 0;
+			}
+			count--;
+		}
+	}
+}
+
 /*
  * Mark the specified block as allocated and return the old value
  */
@@ -203,7 +319,7 @@ BlockMapAlloc(BlockMap_t *blockmap, int block)
 	int i, off;
 
 	assert(block >= 0);
-	assert(block < CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
 
 	i = block / CHAR_BIT;
 	off = block % CHAR_BIT;
@@ -268,8 +384,8 @@ BlockMapIsAlloc(BlockMap_t *blockmap, int block, int count)
 
 	assert(block >= 0);
 	assert(count > 0);
-	assert(block < CHUNKSIZE);
-	assert(block + count <= CHUNKSIZE);
+	assert(block < MAXCHUNKSIZE);
+	assert(block + count <= MAXCHUNKSIZE);
 
 	i = block / CHAR_BIT;
 	off = block % CHAR_BIT;
@@ -333,14 +449,14 @@ BlockMapMerge(BlockMap_t *frommap, BlockMap_t *tomap)
 
 /*
  * Return the block number of the first block allocated in the map.
- * Returns CHUNKSIZE if no block is set.
+ * Returns MAXCHUNKSIZE if no block is set.
  */
 int
 BlockMapFirst(BlockMap_t *blockmap)
 {
 	int block, i;
 
-	assert(sizeof(blockmap->map) * CHAR_BIT == CHUNKSIZE);
+	assert(sizeof(blockmap->map) * CHAR_BIT == MAXCHUNKSIZE);
 
 	/*
 	 * Skip empty space at the front quickly

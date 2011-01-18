@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -249,7 +249,7 @@ ServerNetInit(void)
  * We need a better way to do this!
  */
 int
-ServerNetMCKeepAlive(void)
+NetMCKeepAlive(void)
 {
 	struct ip_mreq mreq;
 
@@ -427,7 +427,7 @@ PacketValid(Packet_t *p, int nchunks)
 		if (p->msg.block.chunk < 0 ||
 		    p->msg.block.chunk >= nchunks ||
 		    p->msg.block.block < 0 ||
-		    p->msg.block.block >= CHUNKSIZE)
+		    p->msg.block.block >= MAXCHUNKSIZE)
 			return 0;
 		break;
 	case PKTSUBTYPE_REQUEST:
@@ -436,9 +436,9 @@ PacketValid(Packet_t *p, int nchunks)
 		if (p->msg.request.chunk < 0 ||
 		    p->msg.request.chunk >= nchunks ||
 		    p->msg.request.block < 0 ||
-		    p->msg.request.block >= CHUNKSIZE ||
+		    p->msg.request.block >= MAXCHUNKSIZE ||
 		    p->msg.request.count < 0 ||
-		    p->msg.request.block+p->msg.request.count > CHUNKSIZE)
+		    p->msg.request.block+p->msg.request.count > MAXCHUNKSIZE)
 			return 0;
 		break;
 	case PKTSUBTYPE_PREQUEST:
@@ -450,6 +450,10 @@ PacketValid(Packet_t *p, int nchunks)
 		break;
 	case PKTSUBTYPE_JOIN:
 		if (p->hdr.datalen < sizeof(p->msg.join))
+			return 0;
+		break;
+	case PKTSUBTYPE_JOIN2:
+		if (p->hdr.datalen < sizeof(p->msg.join2))
 			return 0;
 		break;
 	case PKTSUBTYPE_LEAVE:

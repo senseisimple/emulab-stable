@@ -3090,9 +3090,10 @@ XML_COMMAND_PROTOTYPE(doloadinfo)
 	 * Get the address the node should contact to load its image
 	 */
 	res = mydb_query(reqp, "select load_address,loadpart,OS,frisbee_pid,"
-			 "   mustwipe,mbr_version,access_key,imageid"
+			 "   mustwipe,mbr_version,access_key,i.imageid"
 			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
+			 "left join frisbee_blobs as f on f.imageid=i.imageid "
 			 "left join os_info as o on i.default_osid = o.osid "
 			 "where node_id='%s'",
 			 8, reqp->nodeid);

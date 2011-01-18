@@ -218,6 +218,33 @@ WINSUPPORT=0
 NSVERIFY=1
 
 #
+# Turn this on to disable exporting NFS filesystems to nodes.
+# User home directories on all nodes will be local and unsynchronized in
+# this case.  There will also be no access to a central /proj, /group or
+# /share either.
+#
+NOSHAREDFS=0
+
+#
+# Set to one if you are using an NFS server that has an "exports race".
+# FreeBSDs before 8.x have this condition.  FreeBSD 8 and above (and
+# probably newer Linuxes) do not.  Since we currently only support FreeBSD
+# 7.x and below fileservers, leave this at one.
+#
+NFSRACY=1
+
+#
+# Set this if you are running:
+#	- Perl 5.8
+#	- Perl 5.10 with SelfLoader version 1.18 or greater
+#	- Pefl 5.12 or beyond
+# As of Jan 2011, this should include all Emulab installs (we apply a patch
+# to Perl 5.10.1 to update the SelfLoader, see patches/SelfLoader.patch).
+# This enables serious runtime performance improvements.
+#
+SELFLOADER_DATA="__DATA__"
+
+#
 # Virtual node network configuration (if you don't want virtual nodes,
 # just leave this as is)
 #

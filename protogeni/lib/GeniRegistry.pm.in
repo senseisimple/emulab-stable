@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniRegistry;
@@ -21,454 +21,26 @@ use GeniResponse;
 use English;
 use Data::Dumper;
 
-##########################################################################
 #
-package GeniRegistry::GeniSlice;
-
-use GeniDB;
-use GeniCertificate;
-use GeniHRN;
-use emutil qw(TBGetUniqueIndex);
-use English;
-use Data::Dumper;
-use overload ('""' => 'Stringify');
-
+# This is currently a hack since we have no ability to actually deal
+# with multiple clearinghouses/registries. For now, we know about PLC
+# or the Protogeni clearinghouse.
 #
-# Lookup by URN, idx or uuid.
-#
-sub Lookup($$)
+sub Create($$$$)
 {
-    my ($class, $token) = @_;
-    my $query_result;
-    my $idx;
+    my ($class, $target, $context, $credential) = @_;
 
-    if( GeniHRN::IsValid( $token ) ) {
-	my ($authority, $type, $id) = GeniHRN::Parse( $token );
+    my ($auth,$type,$id) = GeniHRN::Parse($target);
+    return undef
+	if (!defined($auth));
 
-	return undef if $type ne "slice";
-	
-	if( GeniHRN::Authoritative( $token, "@OURDOMAIN@" ) ) {
-	    # Good: this is one of our slices, and we can confidently
-	    # transform the name for direct lookup.  This method is
-	    # very general, and will even resolve a URN to a (deprecated)
-	    # pre-URN slice.
-	    $query_result =
-		DBQueryWarn("select idx from geni_slices ".
-			    "where hrn='@PROTOGENI_DOMAIN@.$id'");
-	} else {
-	    # Somebody else's slice.  We'll have to look up the slice
-	    # by its certificate, which will work only for post-URN slices.
-	    $query_result = DBQueryWarn(
-		"SELECT geni_slices.idx FROM geni_slices, geni_certificates " .
-		"WHERE geni_slices.uuid = geni_certificates.uuid AND " .
-		"geni_certificates.urn='$token';" );
-	}
-
-	return undef if (! $query_result || !$query_result->numrows);
-
-	($idx) = $query_result->fetchrow_array();
-    }
-    elsif ($token =~ /^\d+$/) {
-	$idx = $token;
-    }
-    elsif ($token =~ /^\w+\-\w+\-\w+\-\w+\-\w+$/) {
-	$query_result =
-	    DBQueryWarn("select idx from geni_slices ".
-			"where uuid='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
-
-	    ($idx) = $query_result->fetchrow_array();
-    }
-    elsif ($token =~ /^[-\w\.]*$/) {
-	$query_result =
-	    DBQueryWarn("select idx from geni_slices ".
-			"where hrn='$token'");
-	    return undef
-		if (! $query_result || !$query_result->numrows);
-
-	    ($idx) = $query_result->fetchrow_array();
+    if ($auth =~ /^plc:/) {
+	return GeniRegistry::PLC->Create("plc", $context);
     }
     else {
-	return undef;
+	return GeniRegistry::ClearingHouse->Create($context, $credential);
     }
-
-    $query_result =
-	DBQueryWarn("select * from geni_slices where idx='$idx'");
-    return undef
-	if (!$query_result || !$query_result->numrows);
-
-    my $self         = {};
-    $self->{'SLICE'} = $query_result->fetchrow_hashref();
-    bless($self, $class);
-
-    #
-    # Grab the certificate, since we will probably want it.
-    #
-    my $uuid = $self->{'SLICE'}->{'uuid'};
-    my $certificate = GeniCertificate->Lookup($uuid);
-    if (!defined($certificate)) {
-	print STDERR "Could not find certificate for slice $idx ($uuid)\n";
-	return undef;
-    }
-    $self->{'CERT'}     = $certificate;
-    $self->{'BINDINGS'} = undef;
-    $self->{'LOCKED'}   = 0;
-    
-    return $self;
-}
-# accessors
-sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLICE'}->{$_[1]}); }
-sub idx($)		{ return field($_[0], "idx"); }
-sub hrn($)		{ return field($_[0], "hrn"); }
-sub uuid($)		{ return field($_[0], "uuid"); }
-sub creator_uuid($)	{ return field($_[0], "creator_uuid"); }
-sub creator_urn($)	{ return field($_[0], "creator_urn"); }
-sub created($)		{ return field($_[0], "created"); }
-sub shutdown($)		{ return field($_[0], "shutdown"); }
-sub expires($)		{ return field($_[0], "expires"); }
-sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
-sub exptidx($)		{ return field($_[0], "exptidx"); }
-sub needsfirewall($)	{ return field($_[0], "needsfirewall"); }
-sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
-sub GetCertificate($)   { return $_[0]->{'CERT'}; }
-sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
-
-#
-# Class function to create new Geni slice and return the object.
-#
-sub Create($$$$;$$)
-{
-    my ($class, $certificate, $creator, $authority, $exptidx, $lock) = @_;
-    my @insert_data = ();
-
-    # Every slice gets a new unique index.
-    my $idx = TBGetUniqueIndex('next_exptidx', 1);
-
-    if (!defined($authority)) {
-	print STDERR "Need to specify an authority!\n";
-	return undef;
-    }
-    my $sa_uuid = $authority->uuid();
-
-    # Now tack on other stuff we need.
-    push(@insert_data, "created=now()");
-    push(@insert_data, "expires=DATE_ADD(now(), INTERVAL 6 HOUR)");
-    push(@insert_data, "idx='$idx'");
-    push(@insert_data, "sa_uuid='$sa_uuid'");
-    push(@insert_data, "exptidx=$exptidx")
-	if (defined($exptidx));
-    push(@insert_data, "locked=now()")
-	if (defined($lock) && $lock);
-    
-    my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
-    my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
-    my $safe_cuuid = DBQuoteSpecial($creator->uuid());
-    my $safe_curn  = DBQuoteSpecial($creator->urn());
-    push(@insert_data, "hrn=$safe_hrn");
-    push(@insert_data, "uuid=$safe_uuid");
-    push(@insert_data, "creator_uuid=$safe_cuuid");
-    push(@insert_data, "creator_urn=$safe_curn");
-
-    if ($certificate->Store() != 0) {
-	print STDERR "Could not store certificate for new slice.\n";
-	return undef;
-    }
-
-    # Insert into DB.
-    return undef
-	if (! DBQueryWarn("insert into geni_slices set " .
-			  join(",", @insert_data)));
-
-    return GeniRegistry::GeniSlice->Lookup($idx);
-}
-
-#
-# Delete the slice.
-#
-sub Delete($)
-{
-    my ($self) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $idx  = $self->idx();
-    my $uuid = $self->uuid();
-
-    DBQueryWarn("delete from geni_certificates where uuid='$uuid'")
-	or return -1;
-    DBQueryWarn("delete from geni_slices where idx='$idx'")
-	or return -1;
-    
-    return 0;
-}
-
-#
-# Return the URN. This is complicated by the fact that the DB does
-# not store the urn, but is in the certificate. Further, it might
-# be a slice from an SA not doing URNs yet, in which case set it to
-# the uuid and hope for the best.
-#
-sub urn($)
-{
-    my ($self) = @_;
-    my $urn = $self->GetCertificate()->urn();
-
-    return $urn
-	if (defined($urn) && $urn ne "");
-
-    return $self->uuid();
-}
-
-#
-# List all slices.
-#
-sub ListAll($$)
-{
-    my ($class, $pref) = @_;
-    my @result = ();
-    @$pref = ();
-
-    my $query = "select uuid from geni_slices ";
-    my $query_result = DBQueryWarn($query);
-
-    return -1
-	if (! $query_result);
-    return 0
-	if (!$query_result->numrows);
-
-    while (my ($uuid) = $query_result->fetchrow_array()) {
-	my $slice = GeniRegistry::GeniSlice->Lookup($uuid);
-	if (!defined($slice)) {
-	    print STDERR "Could not lookup slice $uuid\n";
-	    return -1;
-	}
-	push(@result, $slice);
-    }
-    @$pref = @result;
-    return 0;
-}
-
-#
-# Stringify for output.
-#
-sub Stringify($)
-{
-    my ($self) = @_;
-    
-    my $hrn = $self->hrn();
-    my $idx = $self->idx();
-
-    return "[GeniSlice: $hrn, IDX: $idx]";
-}
-
-##########################################################################
-#
-package GeniRegistry::ClientSliver;
-
-use GeniDB;
-use GeniSlice;
-use GeniHRN;
-use emutil qw(TBGetUniqueIndex);
-use English;
-use Data::Dumper;
-use overload ('""' => 'Stringify');
-
-#
-# Lookup.
-#
-sub Lookup($$)
-{
-    my ($class, $token) = @_;
-    my $query_result;
-    my $idx;
-
-    if( GeniHRN::IsValid( $token ) ) {
-	$token = GeniHRN::Normalise( $token );
-
-	my ($authority, $type, $id) = GeniHRN::Parse($token);
-	return undef if $type ne "sliver";
-	
-	$query_result = 
-	    DBQueryWarn("select idx from client_slivers ".
-			"where urn='$token'");
-	return undef
-	    if (! $query_result || !$query_result->numrows);
-
-	($idx) = $query_result->fetchrow_array();
-    }
-    elsif ($token =~ /^\d+$/) {
-	$idx = $token;
-    }
-    else {
-	return undef;
-    }
-
-    $query_result =
-	DBQueryWarn("select * from client_slivers where idx='$idx'");
-    return undef
-	if (!$query_result || !$query_result->numrows);
-
-    my $self         = {};
-    $self->{'SLIVER'} = $query_result->fetchrow_hashref();
-    bless($self, $class);
-
-    #
-    # Grab the slice, since we will probably want it.
-    #
-    my $slice = GeniSlice->Lookup($self->slice_idx());
-    if (!defined($slice)) {
-	print STDERR "Could not find slice for slice $idx\n";
-	return undef;
-    }
-    return $self;
-}
-# accessors
-sub field($$) { return ((! ref($_[0])) ? -1 : $_[0]->{'SLIVER'}->{$_[1]}); }
-sub idx($)		{ return field($_[0], "idx"); }
-sub urn($)		{ return field($_[0], "urn"); }
-sub manager_urn($)	{ return field($_[0], "manager_urn"); }
-sub slice_idx($)	{ return field($_[0], "slice_idx"); }
-sub creator_idx($)	{ return field($_[0], "creator_idx"); }
-sub created($)		{ return field($_[0], "created"); }
-sub expires($)		{ return field($_[0], "expires"); }
-sub manifest($)		{ return field($_[0], "manifest"); }
-sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
-
-sub LookupByAuthority($$$)
-{
-    my ($class, $slice, $urn) = @_;
-    my $slice_idx = $slice->idx();
-    my $query_result;
-    my $idx;
-
-    if (GeniHRN::IsValid($urn)) {
-	my $safe_urn = DBQuoteSpecial($urn);
-
-	$query_result = 
-	    DBQueryWarn("select idx from client_slivers ".
-			"where manager_urn=$safe_urn and ".
-			"slice_idx='$slice_idx'");
-	return undef
-	    if (! $query_result || !$query_result->numrows);
-
-	($idx) = $query_result->fetchrow_array();
-    }
-    else {
-	return undef;
-    }
-    return GeniRegistry::ClientSliver->Lookup($idx);
-}
-
-# Returns an array of client slivers belonging which belong to a
-# particular slice.
-sub LookupBySlice($$)
-{
-    my ($class, $slice) = @_;
-    my $slice_idx = $slice->idx();
-    my $query_result;
-    my @result = ();
-    $query_result =
-	DBQueryWarn("select idx from client_slivers ".
-		    "where slice_idx='$slice_idx'");
-    if ($query_result) {
-	while (my ($idx) = $query_result->fetchrow_array()) {
-	    my $sliver = GeniRegistry::ClientSliver->Lookup($idx);
-	    if (defined($sliver)) {
-		push(@result, $sliver);
-	    }
-	}
-    }
-    return @result;
-}
-
-#
-# Class function to create new Geni slice and return the object.
-#
-sub Create($$$$$)
-{
-    my ($class, $slice, $manager_urn, $user, $blob) = @_;
-    my @insert_data = ();
-
-    # Every one gets a new unique index.
-    my $idx = TBGetUniqueIndex('next_clientsliver', 1);
-    
-    my $slice_idx      = $slice->idx();
-    my $user_idx       = $user->idx();
-    my $safe_urn       = DBQuoteSpecial($blob->{'urn'});
-    my $safe_created   = DBQuoteSpecial($blob->{'created'});
-    my $safe_expires   = DBQuoteSpecial($blob->{'expires'});
-    my $safe_manager   = DBQuoteSpecial($manager_urn);
-
-    push(@insert_data, "idx='$idx'");
-    push(@insert_data, "slice_idx='$slice_idx'");
-    push(@insert_data, "creator_idx='$user_idx'");
-    push(@insert_data, "urn=$safe_urn");
-    push(@insert_data, "manager_urn=$safe_manager");
-    push(@insert_data, "created=$safe_created");
-    push(@insert_data, "expires=$safe_expires");
-
-    if (exists($blob->{'manifest'})) {
-	my $safe_manifest  = DBQuoteSpecial($blob->{'manifest'});
-	push(@insert_data, "manifest=$safe_manifest");
-    }
-
-    # Insert into DB.
-    return undef
-	if (! DBQueryWarn("insert into client_slivers set " .
-			  join(",", @insert_data)));
-
-    return GeniRegistry::ClientSliver->Lookup($idx);
-}
-
-#
-# Delete it.
-#
-sub Delete($)
-{
-    my ($self) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $idx  = $self->idx();
-
-    DBQueryWarn("delete from client_slivers where idx='$idx'")
-	or return -1;
-    
-    return 0;
-}
-
-#
-# Delete all for a slice.
-#
-sub SliceDelete($$)
-{
-    my ($self, $slice) = @_;
-
-    return -1
-	if (! ref($self));
-
-    my $slice_idx = $self->slice_idx();
-
-    DBQueryWarn("delete from client_slivers where slice_idx='$slice_idx'")
-	or return -1;
-    
-    return 0;
-}
-
-#
-# Stringify for output.
-#
-sub Stringify($)
-{
-    my ($self) = @_;
-    
-    my $urn = $self->urn();
-    my $idx = $self->idx();
-
-    return "[ClientSliver: $idx, $urn]";
+    return undef;
 }
 
 ##########################################################################
@@ -477,8 +49,12 @@ package GeniRegistry::Client;
 
 use Genixmlrpc;
 use GeniResponse;
+use GeniCredential;
 use English;
 use Data::Dumper;
+use Date::Parse;
+use POSIX qw(strftime tmpnam);
+use Time::Local;
 
 #
 # Create an object that represents a client connection to a registry.
@@ -487,21 +63,10 @@ sub Create($$;$$)
 {
     my ($class, $authority, $context, $credential) = @_;
 
-    # Cause of the clearinghouse is currently represented by a URL.
-    $authority = $authority->url()
-	if (ref($authority));
-
     if (!defined($credential)) {
-	my $response =
-	    Genixmlrpc::CallMethod($authority, $context, "GetCredential", {});
-	
+	$credential = GeniRegistry::Client->GetCredential($authority);
 	return undef
-	    if (!defined($response) ||
-		$response->code() != GENIRESPONSE_SUCCESS);
-	$credential = $response->value();
-    }
-    elsif (ref($credential) eq "GeniCredential") {
-	$credential = $credential->asString();
+	    if (!defined($credential));
     }
 
     my $self              = {};
@@ -516,33 +81,58 @@ sub authority($)	{ return $_[0]->{"authority"}; }
 sub context($)		{ return $_[0]->{"context"}; }
 sub credential($)	{ return $_[0]->{"credential"}; }
 
-sub CreateCredential($$;$)
+sub GetCredential($;$$)
 {
     my ($class, $authority, $context) = @_;
-    
-    #
-    # We are creating a self signed credential here, which is fine
-    # since we all have the trusted root certs in our caches. This
-    # will change later.
-    #
+
+    my $credential =
+	GeniCredential->Lookup($authority->uuid(), $ENV{'MYUUID'});
+
+    if (defined($credential) &&
+	defined($credential->expires())) {
+	my $expires = str2time($credential->expires());
+	
+	# Some buffer.
+	if ($expires > time() + 3600) {
+	    #print STDERR "Reusing clearinghouse credential\n";
+	    return $credential;
+	}
+	$credential->Delete();
+    }
+    #print STDERR "Getting new clearinghouse credential\n";
+
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
-
+    
     if (!defined($context)) {
 	print STDERR "Need a context to create a registry credential\n";
 	return undef;
     }
-    my $credential = GeniCredential->Create($authority->GetCertificate(),
-					    $context->certificate());
+
+    my $url = $authority->url();
+    if (!defined($url)) {
+	print STDERR "$authority has no URL\n";
+	return undef;
+    }
+    my $response =
+	Genixmlrpc::CallMethod($url, $context, "GetCredential",
+			       {"gid" => $context->certificate()->cert()});
+	
+    return undef
+	if (!defined($response));
+    
+    if ($response->IsError()) {
+	print STDERR "GeniRegistry::Client->GetCredential: " .
+	    $response->Dump() . "\n";
+	return undef;
+    }
+    $credential = GeniCredential->CreateFromSigned($response->value(), 1);
     if (!defined($credential)) {
-	print STDERR "Could not create clearinghouse credential\n";
+	print STDERR "Could not parse credential from $authority\n";
 	return undef;
     }
-    if ($credential->Sign($context->certificate()) != 0) {
-	$credential->Delete();
-	print STDERR "Could not sign clearinghouse credential\n";
-	return undef;
-    }
+    $credential->Store();
+    
     return $credential;
 }
 
@@ -566,10 +156,11 @@ sub Resolve($$$$)
 	$which = "hrn";
     }
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(), 
 			       "Resolve",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 				 "type"       => $type,
 				 $which       => $token });
     return -1
@@ -615,10 +206,11 @@ sub Register($$$$)
     $info = {} if (!defined($info));
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "Register",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 				 "type"       => $type,
 			         "gid"        => $cert,
 			         "info"       => $info });
@@ -649,11 +241,12 @@ sub RegisterUser($$$$$)
 #
 # Register a slice.
 #
-sub RegisterSlice($$$$)
+sub RegisterSlice($$$$$)
 {
-    my ($self, $creator_urn, $cert, $bindings) = @_;
+    my ($self, $creator_urn, $expiration, $cert, $bindings) = @_;
 
     my $info = { "creator_urn"   => $creator_urn,
+		 "expiration"    => $expiration,
 	         "userbindings"  => $bindings };
 
     return $self->Register("Slice", $cert, $info);
@@ -667,10 +260,11 @@ sub Remove($$$)
     my ($self, $type, $urn) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "Remove",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 				 "type"       => $type,
 			         "urn"        => $urn });
     return -1
@@ -699,15 +293,16 @@ sub RemoveSlice($$)
 #
 sub Shutdown($$$)
 {
-    my ($self, $uuid, $clear) = @_;
+    my ($self, $urn, $clear) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "Shutdown",
-			       { "credential" => $self->credential(),
-				 "clear"      => $clear,
-			         "uuid"       => $uuid });
+			       { "credential"  =>
+				     $self->credential()->asString(),
+				 "clear"       => $clear,
+			         "urn"         => $urn });
     return -1
 	if (!defined($response));
 
@@ -726,10 +321,11 @@ sub ListComponents($$$)
     my ($self, $slice, $pref) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "CH::DiscoverResources",
-			       { "credential" => $self->credential() });
+			       { "credential" =>
+				     $self->credential()->asString() });
 
     return -1
 	if (!defined($response));
@@ -750,10 +346,11 @@ sub PostCRL($$)
     my ($self, $cert) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "PostCRL",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 			         "cert"       => $cert });
     return -1
 	if (!defined($response));
@@ -773,10 +370,11 @@ sub RegisterSliver($$$)
     my ($self, $slice_urn, $info) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "RegisterSliver",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 			         "slice_urn"  => $slice_urn,
 			         "info"       => $info });
     return -1
@@ -797,10 +395,11 @@ sub UnRegisterSliver($$)
     my ($self, $slice_urn) = @_;
 
     my $response =
-	Genixmlrpc::CallMethod($self->authority(),
+	Genixmlrpc::CallMethod($self->authority()->url(),
 			       $self->context(),
 			       "UnRegisterSliver",
-			       { "credential" => $self->credential(),
+			       { "credential" =>
+				     $self->credential()->asString(),
 			         "slice_urn"  => $slice_urn });
     return -1
 	if (!defined($response));
@@ -820,63 +419,62 @@ use Genixmlrpc;
 use GeniResponse;
 use GeniCertificate;
 use GeniCredential;
+use Date::Parse;
+use POSIX qw(strftime tmpnam);
+use Time::Local;
 
 #
 # The clearinghouse is a registry.
+#
+# XXX This needs to go ... we cannot create a clearinghouse credential
+# locally since we cannot sign it (target_urn!=our_urn).
 #
 sub Create($;$$)
 {
     my ($class, $context, $credential) = @_;
     
-    my $EMULAB_PEMFILE1 = "@prefix@/etc/genich.pem";
-    my $url;
-
     if (!defined($credential)) {
-	my $pemfile;
-
-	if (-e $EMULAB_PEMFILE1) {
-	    $pemfile = $EMULAB_PEMFILE1
-	}
-	else {
-	    print STDERR "Cannot find the pem file for the clearinghouse!\n";
-	    return undef;
-	}
-
-	#
-	# We are creating a self signed credential here, which is fine
-	# since the Clearinghouse has the certs of all trusted roots.
-	#
-	my $certificate = GeniCertificate->LoadFromFile($pemfile);
-	if (!defined($certificate)) {
-	    print STDERR "Could not load certificate from $pemfile\n";
-	    return undef;
-	}
-	$context = Genixmlrpc->GetContext()
-	    if (!defined($context));
-
-	if (!defined($context)) {
-	    print STDERR "Need a context to create clearinghouse credential\n";
-	    return undef;
-	}
-	$credential = GeniCredential->Create($certificate,
-					     $context->certificate());
+	$credential = GeniRegistry::ClearingHouse->GetCredential();
 	if (!defined($credential)) {
 	    print STDERR "Could not create clearinghouse credential\n";
 	    return undef;
 	}
-	if ($credential->Sign($context->certificate()) != 0) {
-	    $credential->Delete();
-	    print STDERR "Could not sign clearinghouse credential\n";
-	    return undef;
-	}
     }
-    
-    return GeniRegistry::Client->Create($credential->target_cert()->URL(),
-					$context, $credential->asString());
+    $context = Genixmlrpc->GetContext()
+	if (!defined($context));
+
+    if (!defined($context)) {
+	print STDERR "Need a context to create clearinghouse credential\n";
+	return undef;
+    }
+    return GeniRegistry::Client->Create($credential->target_cert(),
+					$context, $credential);
 }
 
 #
-# Get a credential from the clearinghouse, as for bootstrapping.
+# Load the CH certificate.
+#
+sub GetCertificate($)
+{
+    my ($class) = @_;
+    my $ETCDIR  = "@prefix@/etc";
+
+    my $certfile = ((-s "$ETCDIR/genich-local.pem") ?
+		    "$ETCDIR/genich-local.pem" : "$ETCDIR/genich.pem");
+    if (! -e $certfile) {
+	print STDERR "$certfile does not exist!\n";
+	return undef;
+    }
+    my $certificate = GeniCertificate->LoadFromFile($certfile);
+    if (!defined($certificate)) {
+	print STDERR "Could not load CH certificate from $certfile\n";
+	return undef;
+    }
+    return $certificate;
+}
+
+#
+# Get a credential from the clearinghouse to talk to it.
 #
 sub GetCredential($;$$)
 {
@@ -885,21 +483,45 @@ sub GetCredential($;$$)
     $context = Genixmlrpc->GetContext()
 	if (!defined($context));
 
-    if (!defined($certfile)) {
-	$certfile = "@prefix@/etc/genich.pem";
-	if (! -e $certfile) {
-	    print STDERR "$certfile does not exist!\n";
-	    return undef;
-	}
+    #
+    # If there is no UUID in the environment, then try to figure it
+    # out from the context.
+    #
+    my $myuuid = (exists($ENV{'MYUUID'}) ? $ENV{'MYUUID'} : undef);
+    if (!defined($myuuid) && defined($context)) {
+	$myuuid = $context->certificate()->uuid();
     }
-    my $certificate = GeniCertificate->LoadFromFile($certfile);
-    if (!defined($certificate)) {
-	print STDERR "Could not load CH certificate from $certfile\n";
+    if (!defined($myuuid)) {
+	print STDERR "*** GeniRegistry::ClearingHouse::GetCredential: ".
+	    "No context or MYUUID for RPC\n";
 	return undef;
     }
-    my $url = $certificate->URL();
+
+    my $clearinghousecert = GeniRegistry::ClearingHouse->GetCertificate();
+    if (!defined($clearinghousecert)) {
+	return undef;
+    }
+    my $clearinghousecred =
+	GeniCredential->Lookup($clearinghousecert->uuid(), $myuuid);
+
+    #print "$clearinghousecred\n" if (defined($clearinghousecred));
+
+    if (defined($clearinghousecred) &&
+	defined($clearinghousecred->expires())) {
+	my $expires = str2time($clearinghousecred->expires());
+	
+	# Some buffer.
+	if ($expires > time() + 3600) {
+	    #print STDERR "Reusing clearinghouse credential\n";
+	    return $clearinghousecred;
+	}
+	$clearinghousecred->Delete();
+    }
+    #print STDERR "Getting new clearinghouse credential\n";
+
+    my $url = $clearinghousecert->URL();
     if (!defined($url)) {
-	print STDERR "No URI extension in $certificate\n";
+	print STDERR "No URI extension in $clearinghousecert\n";
 	return undef;
     }
     my $response =
@@ -914,7 +536,113 @@ sub GetCredential($;$$)
 	    $response->Dump() . "\n";
 	return undef;
     }
-    return GeniCredential->CreateFromSigned($response->value(), 1);
+    $clearinghousecred =
+	GeniCredential->CreateFromSigned($response->value(), 1);
+    if (!defined($clearinghousecred)) {
+	print STDERR "Could not parse credential from clearinghouse\n";
+	return undef;
+    }
+    if ($clearinghousecred->Store()) {
+	print STDERR "*** GeniRegistry::ClearingHouse::GetCredential: ".
+	    "Could not store credential for clearinghouse\n";
+	return undef;
+    }
+    return $clearinghousecred;
+}
+
+##########################################################################
+#
+package GeniRegistry::PLC;
+
+use Genixmlrpc;
+use GeniResponse;
+use GeniCertificate;
+use GeniCredential;
+use overload ('""' => 'Stringify');
+
+#
+# Interoperate with the PLC registry.
+#
+# We do not need to do much with PLC; just resolve things. For this we
+# need to supply a self credential.
+#
+sub Create($;$$)
+{
+    my ($class, $aggregate, $context) = @_;
+    
+    $context = Genixmlrpc->GetContext()
+	if (!defined($context));
+
+    if (!defined($context)) {
+	print STDERR "GeniRegistry::PLC::Create: ".
+	    "Need a context to create self credential\n";
+	return undef;
+    }
+    my $me = GeniAuthority->Lookup($context->certificate()->uuid());
+    if (!defined($me)) {
+	print STDERR "Could not find my own authority for $context\n";
+	return undef;
+    }
+    my $credential = GeniCredential->GetSelfCredential($me);
+    if (!defined($credential)) {
+	print STDERR "Could not create self credential for $me\n";
+	return undef;
+    }
+
+    #
+    # At the moment, we support only plc. Eventually support others once
+    # plc exports proper certs and resolve of aggregates (that include url).
+    #
+    my $self              = {};
+    $self->{'url'}        = "https://www.planet-lab.org:12345";
+    $self->{'context'}    = $context;
+    $self->{'credential'} = $credential;
+    $self->{'aggregate'}  = $aggregate;
+    bless($self, $class);
+
+    return $self;
+}
+sub authority($)	{ return undef; }
+sub url($)		{ return $_[0]->{"url"}; }
+sub context($)		{ return $_[0]->{"context"}; }
+sub credential($)	{ return $_[0]->{"credential"}; }
+sub aggregate($)	{ return $_[0]->{"aggregate"}; }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    my $aggregate = $self->aggregate();
+
+    return "[GeniRegistry: $aggregate]";
+}
+
+#
+# Lookup a record.
+#
+sub Resolve($$$$)
+{
+    my ($self, $urn, $type, $pref) = @_;
+
+    $$pref = undef;
+
+    my $response =
+	Genixmlrpc::CallMethod($self->url(), $self->context(), "Resolve",
+			       $urn, $self->credential()->asString());
+
+    return -1
+	if (!defined($response));
+
+    if ($response->IsError()) {
+	print STDERR "Resolve: " . $response->Dump() . "\n"
+	    if ($response->code() != GENIRESPONSE_SEARCHFAILED());
+	return -1;
+    }
+    
+    $$pref = $response->value();
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

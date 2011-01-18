@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -15,15 +15,17 @@ use Data::Dumper;
 #
 sub usage()
 {
-    print STDOUT "Usage: snmpit.proxy [-d] -p <pid> -e <eid> <xmldoc>\n";
+    print STDOUT "Usage: snmpit.proxy ".
+	"[-d] [-o outfile] -p <pid> -e <eid> <xmldoc>\n";
     exit(-1);
 }
-my $optlist  = "dnp:e:";
+my $optlist  = "dnp:e:o:";
 my $debug    = 0;
 my $dlevel   = 1;
 my $impotent = 0;
 my $exitval  = 0;
 my $output;
+my $outfile;
 my $pid;
 my $eid;
 my @inner_ids   = ();
@@ -107,8 +109,32 @@ if (defined($options{"e"})) {
 	die("Tainted argument $eid!\n");
     }
 }
+if (defined($options{"o"})) {
+    $outfile = $options{"o"};
+
+    if (! ($outfile =~ /^\/var\/tmp\//)) {
+	fatal("$outfile does not resolve to an appropriate directory!");
+    }
+}
 usage()
     if (@ARGV != 1 || !defined($pid) || !defined($eid));
+
+#
+# Need a version of system that ensures that all output goes to STDERR
+# since anything that goes to STDOUT will confuse the caller (xmlrpc).
+# This is sad; the results should not go back as STDOUT text.
+#
+sub mysystem($)
+{
+    my ($command) = @_;
+    
+    open(PIPE,"$command 2>&1 |") or return -1;
+    while (<PIPE>) {
+	print STDERR $_;
+    }
+    close(PIPE);
+    return $?;
+}
 
 #
 # Log audit since it is hard to debug this one.
@@ -213,13 +239,22 @@ AddAuditInfo("message", "$op\n\n" . Dumper($args) .
 # for the RPC server. 
 #
 if ($exitval || $debug) {
-    LogEnd($exitval);
+    LogEnd($exitval + $debug);
 }
 else {
     LogAbort();
 }
-print $output
-    if (defined($output));
+if (defined($output)) {
+    if (defined($outfile)) {
+	open(OUTF, ">>$outfile") or
+	    fatal("$outfile could not be opened for writing!");
+	print OUTF $output;
+	close(OUTF);
+    }
+    else {
+	print $output;
+    }
+}
 exit($exitval);
 
 #
@@ -494,7 +529,7 @@ sub SetupVlans($)
     return $errors
 	if ($impotent);
     
-    system("$TB/bin/snmpit $debugopt $stackopt -t $pid $eid @outer_ids");
+    mysystem("$TB/bin/snmpit $debugopt $stackopt -t $pid $eid @outer_ids");
     if ($?) {
 	#
 	# Yuck failed. We leave things as is, and wait for experiment
@@ -634,7 +669,7 @@ sub DestroyVlans($)
 	    if ($debug) {
 		print STDERR "Running 'snmpit -U $port'\n";
 	    }
-	    system("$TB/bin/snmpit $debugopt -U $port");
+	    mysystem("$TB/bin/snmpit $debugopt -U $port");
 
 	    if ($?) {
 		print STDERR "*** $0:\n".
@@ -662,7 +697,7 @@ sub DestroyVlans($)
 	if ($debug) {
 	    print STDERR "Running 'snmpit $stackopt -f -o $outer_id'\n";
 	}
-	system("$TB/bin/snmpit $debugopt $stackopt -f -o $outer_id");
+	mysystem("$TB/bin/snmpit $debugopt $stackopt -f -o $outer_id");
 	if ($?) {
 	    #
 	    # Yuck failed. We leave things as is, and wait for the
@@ -808,7 +843,7 @@ sub Trunk($)
 	if ($debug) {
 	    print STDERR "Running 'snmpit $stackopt -U $port'\n";
 	}
-	system("$TB/bin/snmpit $debugopt $stackopt -U $port");
+	mysystem("$TB/bin/snmpit $debugopt $stackopt -U $port");
 	if ($?) {
 	    # Yuck failed.
 	    fatal("snmpit $stackopt -U failed!");
@@ -835,7 +870,7 @@ sub Trunk($)
 	my $command =
 	    "$TB/bin/snmpit $debugopt $stackopt $mode $port @outer_ids";
 	if ($debug) { print STDERR "Running $command\n"; }
-	system($command);
+	mysystem($command);
 	if ($?) {
 	    # Yuck failed.
 	    fatal("Trunk: snmpit $stackopt $mode $mode @outer_ids failed!");
@@ -931,7 +966,7 @@ sub PortControl($)
     if ($debug) {
 	print STDERR "Running 'snmpit $command @ports\n";
     }
-    system("$TB/bin/snmpit $debugopt $command @ports");
+    mysystem("$TB/bin/snmpit $debugopt $command @ports");
     if ($?) {
 	# Yuck failed.
 	fatal("snmpit $command @ports");

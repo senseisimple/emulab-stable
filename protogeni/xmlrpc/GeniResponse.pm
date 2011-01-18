@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2009 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Perl code to access an XMLRPC server using http. Derived from the
@@ -21,7 +21,9 @@ use vars qw(@ISA @EXPORT);
 	      GENIRESPONSE_RPCERROR GENIRESPONSE_UNAVAILABLE
 	      GENIRESPONSE_SEARCHFAILED GENIRESPONSE_UNSUPPORTED
 	      GENIRESPONSE_BUSY GENIRESPONSE_EXPIRED GENIRESPONSE_INPROGRESS
-	      GENIRESPONSE);
+	      GENIRESPONSE GENIRESPONSE_STRING
+	      XMLRPC_PARSE_ERROR XMLRPC_SERVER_ERROR XMLRPC_APPLICATION_ERROR
+	      XMLRPC_SYSTEM_ERROR XMLRPC_TRANSPORT_ERROR);
 
 use overload ('""' => 'Stringify');
 my $current_response = undef;
@@ -68,6 +70,24 @@ my @GENIRESPONSE_STRINGS =
      "Expired",
      "In Progress",
     );
+sub GENIRESPONSE_STRING($)
+{
+    my ($code) = @_;
+
+    return "Unknown Error $code"
+	if ($code < 0 || $code > scalar(@GENIRESPONSE_STRINGS));
+
+    return $GENIRESPONSE_STRINGS[$code];
+}
+
+#
+# These are the real XMLRPC errors as defined by the RFC
+#
+sub XMLRPC_PARSE_ERROR()	{ -32700; }
+sub XMLRPC_SERVER_ERROR()       { -32600; }
+sub XMLRPC_APPLICATION_ERROR()  { -32500; }
+sub XMLRPC_SYSTEM_ERROR()       { -32400; }
+sub XMLRPC_TRANSPORT_ERROR()    { -32300; }
 
 #
 # This is the (python-style) "structure" we want to return.
@@ -86,8 +106,13 @@ sub new($$;$$)
 {
     my ($class, $code, $value, $output) = @_;
 
-    $output = ""
-	if (!defined($output));
+    if (!defined($output)) {
+	$output = "";
+	# Unless its an error, then return standard error string.
+	if ($code != GENIRESPONSE_SUCCESS()) {
+	    $output = GENIRESPONSE_STRING($code);
+	}
+    }
     $value = 0
 	if (!defined($value));
 
@@ -102,8 +127,13 @@ sub Create($$;$$)
 {
     my ($class, $code, $value, $output) = @_;
 
-    $output = ""
-	if (!defined($output));
+    if (!defined($output)) {
+	$output = "";
+	# Unless its an error, then return standard error string.
+	if ($code != GENIRESPONSE_SUCCESS()) {
+	    $output = GENIRESPONSE_STRING($code);
+	}
+    }
     $value = 0
 	if (!defined($value));
 

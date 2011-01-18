@@ -58,7 +58,8 @@ $default_image = Image::LookupByName($emulab_ops, $default_imagename);
 if ($freebsd_mfs == null || $default_image == null ||
     $rhl_std == null || $fbsd_std == null || $frisbee_mfs == null) {
     PAGEERROR("You must add images from Utah into your database" .
-              " before adding a nodetype. See installation documentation for details!",1);
+              " before adding a nodetype. ".
+	      "See installation documentation for details!",1);
 }
 
 # This belongs elsewhere!

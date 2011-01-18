@@ -182,8 +182,14 @@ sub doboot()
 	    # with a local interface. 
 	    push(@ifacemap, "$iface $inet $mac");
 	}
-	elsif ($ifconfig->{ISVIRT}
-	       && (INXENVM() || (GENVNODE() && GENVNODETYPE() eq 'openvz'))) {
+	elsif ($ifconfig->{ISVIRT} &&
+	       (INXENVM() || SHADOW() ||
+		(GENVNODE() && GENVNODETYPE() eq 'openvz'))) {
+
+	    #
+	    # 
+	    #
+	    
 	    #
 	    # Yes, these are veths, but we config them from the inside just
 	    # like for a phys node!
@@ -379,7 +385,7 @@ sub mygetifconfig($)
     for (my $tries = 0; $tries < $maxtries; $tries++) {
 	my $bad = 0;
 	foreach my $ifconfig (@ifacelist) {
-	    if (!INXENVM() &&
+	    if (!INXENVM() && 
 		$ifconfig->{ISVIRT} &&
 		$ifconfig->{ITYPE} eq "vlan" && $ifconfig->{VTAG} == 0) {
 		$bad++;

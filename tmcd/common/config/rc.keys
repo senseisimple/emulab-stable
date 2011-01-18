@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -153,7 +153,7 @@ sub dokeyhash()
     #
     # Write a file so the node knows the key.
     #
-    my $oldumask = umask(0227);
+    my $oldumask = umask((FAKEJAILED() ? 0227 : 0222));
     
     if (system("echo '$keyhash' > ". TMKEYHASH)) {
 	fatal("Could not write " . TMKEYHASH);
@@ -190,7 +190,7 @@ sub doeventkey()
     #
     # Write a file so the node knows the key.
     #
-    my $oldumask = umask(0227);
+    my $oldumask = umask((FAKEJAILED() ? 0227 : 0222));
     
     if (system("echo -n '$eventkey' > ". TMEVENTKEY)) {
 	fatal("Could not write " . TMEVENTKEY);

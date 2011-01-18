@@ -333,10 +333,23 @@ sub Create($$$$;$)
     }
 
     # Insert the sshkey if we got one.
-    if (defined($keys)) {
+    if (defined($keys) && ref($keys)) {
 	foreach my $keyref (@{ $keys }) {
-	    my $safe_key  = DBQuoteSpecial($keyref->{'key'});
-	    my $safe_type = DBQuoteSpecial($keyref->{'type'});
+	    next
+		if (!ref($keyref));
+	    
+	    my $key  = $keyref->{'key'};
+	    my $type = $keyref->{'type'};
+
+	    next
+		if (! (defined($key) && defined($type) &&
+		       $key ne "" && $type ne ""));
+		
+	    chomp($key);
+	    chomp($type);
+	    
+	    my $safe_key  = DBQuoteSpecial($key);
+	    my $safe_type = DBQuoteSpecial($type);
 	    
 	    DBQueryWarn("replace into geni_userkeys set ".
 			"  uuid=$safe_uuid, created=now(), ".
@@ -375,13 +388,26 @@ sub Modify($$$$)
 			     "where idx='$idx'"));
     }
 
-    if (defined($keys)) {
+    if (defined($keys) && ref($keys)) {
 	return -1
 	    if (!DBQueryWarn("delete from geni_userkeys where uuid='$uuid'"));
 	
 	foreach my $keyref (@{ $keys }) {
-	    my $safe_key  = DBQuoteSpecial($keyref->{'key'});
-	    my $safe_type = DBQuoteSpecial($keyref->{'type'});
+	    next
+		if (!ref($keyref));
+
+	    my $key  = $keyref->{'key'};
+	    my $type = $keyref->{'type'};
+
+	    next
+		if (! (defined($key) && defined($type) &&
+		       $key ne "" && $type ne ""));
+		
+	    chomp($key);
+	    chomp($type);
+	    
+	    my $safe_key  = DBQuoteSpecial($key);
+	    my $safe_type = DBQuoteSpecial($type);
 	    
 	    DBQueryWarn("replace into geni_userkeys set ".
 			"  uuid='$uuid', created=now(), ".

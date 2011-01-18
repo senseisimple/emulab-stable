@@ -1,0 +1,82 @@
+dhcp_packet_dump
+----------------
+
+This is a simple tool to parse a BOOTP/DHCP packet and print out the
+options and standard fields in a simple key-value pair format which
+can be easily parsed by a shell script.
+
+Options are printed in the format "NAME=VALUE".  "NAME" can take a
+couple of different formats:
+
+- Standard options (as defined by RFCs) are printed with meaningful
+  names (like OPT_SUBNET_MASK or OPT_ROUTER).
+
+- Unknown options are printed as "OPT_N", where N is the DHCP option
+  code in decimal.
+
+- Suboptions in encapsulated option blocks are printed as
+  "OPT_X_SUBOPT_Y", where X is the name of the encapsulating option
+  and Y is the name of the suboption.  Either or both of X or Y can be
+  decimal numbers if the option or suboption names are not known.
+
+- BOOTP field names are the same as specified in RFC 951. Note that
+  the FILE and SNAME fields are only printed if they have not been
+  overloaded to hold more options (as specified by the OPTION OVERLOAD
+  option).
+
+"VALUE" can also take several formats:
+
+- Integer values (in decimal)
+- Strings
+- IP addresses (in dotted-quad format)
+- IP address pairs (usually an address + mask) (e.g. 'a.b.c.d:w.x.y.z')
+- Boolean values ('true' or 'false')
+- Binary data (printed as a string of 2-digit hexadecimal numbers with
+  each pair separated by a colon (':')).
+
+Except for strings and binary data, VALUE can also be a list of values
+(all list items are of the same type), sepated by spaces.
+
+The 'binary data' format is used for options containing structured
+data and for options of unknown type.  This allows these options to be
+parsed by another program that knows what the type or structure of the
+value should be.  It is also used for standard options if the value
+doesn't appear to be of the expected type, such as a DHCP Server
+Identifier option with a value only 3 bytes long (should be 4 since
+it's an IPv4 address).
+
+
+Vendor-Specific Information Option
+----------------------------------
+The Vendor-Specific Information option (code 43) can hold a value of
+any type.  How this option should be parsed is guessed from the value
+of the Vendor Class Identifier option (code 60).  If the Vendor Class
+ID option isn't present or isn't recognized, then the Vendor Specific
+Information option is parsed as raw data.
+
+Currently only Vendor Class IDs starting with the string "PXEClient"
+are supported.  If the response has this VCI, the Vendor-Specific
+Information option will hold encapsulated suboptions.  Recognized PXE
+options are parsed appropriately and given meaningful names.
+
+
+command-line options
+--------------------
+dhcp_packet_dump understands the following command-line options:
+
+'-n': do not print meaningful names for options (values are still
+      parsed as specified in the relevant RFC(s)).  Useful if you
+      need to deal with option numbers instead of names.
+
+'-r': do not parse option values (all values are printed in the
+      'binary data' format given above). Encapsulating options are not
+      parsed either.  Meaningful names are used unless '-n' is also
+      passed.  Useful if you need to deal with non-standard usage of a
+      standard option.
+
+
+Notes
+-----
+- BOOTP fields are always printed with meaningful names
+- If multiple options with the same code are found in the packet, they
+  will be concatenated before decoding as specified in RFC 3396.

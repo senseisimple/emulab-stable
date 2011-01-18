@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -62,6 +62,7 @@ bincheck:
 	fi
 
 dir-install:
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/boot
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/rc.d
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/rc.conf.d
@@ -106,14 +107,37 @@ sysetc-install:	dir-install netif-emulab
 	$(INSTALL) -m 444 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
 	$(INSTALL) -m 444 $(SRCDIR)/sysctl.conf $(SYSETCDIR)/sysctl.conf
 	$(INSTALL) -m 555 ./netif-emulab $(SYSETCDIR)/rc.d/netif-emulab
+	rm -f $(SYSETCDIR)/rc.early
+	$(INSTALL) -m 644 $(SRCDIR)/loader.conf $(DESTDIR)/boot/loader.conf
 
 script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.freebsd $(BINDIR)/rc
 
+#
+# XXX we still do this like freebsd5!
+#
 frisbee-mfs-install: destdircheck
-	(cd ../freebsd; $(MAKE) frisbee-mfs-install)
-	rm -f $(SYSETCDIR)/rc.early
-	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.conf $(SYSETCDIR)/rc.conf
-	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
-	$(INSTALL) -m 444 $(SRCDIR)/rc.dhclient $(SYSETCDIR)/rc.conf.d/dhclient
+	(cd ../freebsd5; $(MAKE) all frisbee-mfs-install)
+	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+	@if [ -r $(SRCDIR)/master.passwd ]; then \
+	    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
+	    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
+	fi
+	@if [ -r $(SRCDIR)/group ]; then \
+	    $(INSTALL) -m 644 $(SRCDIR)/group $(SYSETCDIR); \
+	fi
 
+mfs-install:
+	(cd ../freebsd5; $(MAKE) all mfs-install)
+	rm -f $(SYSETCDIR)/testbed/dhclient
+	rm -f $(DESTDIR)/usr/local/etc/dhclient*
+	ln -s /etc/dhclient* $(DESTDIR)/usr/local/etc/
+	@if [ -r $(SRCDIR)/master.passwd ]; then \
+	    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
+	    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
+	fi
+	@if [ -r $(SRCDIR)/group ]; then \
+	    $(INSTALL) -m 644 $(SRCDIR)/group $(SYSETCDIR); \
+	fi

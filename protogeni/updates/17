@@ -1,0 +1,28 @@
+#
+# 
+#
+use strict;
+use GeniDB;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBSetDefault($dbhandle);
+
+    if (!DBTableExists("geni_rspecs")) {
+	DBQueryFatal("CREATE TABLE `geni_rspecs` ( ".
+		     " `idx` int(10) unsigned NOT NULL auto_increment, ".
+		     " `created` datetime default NULL, ".
+		     " `rspec` text, ".
+		     " PRIMARY KEY  (`idx`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+
+    DBQueryFatal("alter table `geni_resources` " .
+    		 "add column `rspec_idx` mediumint(8) unsigned default NULL")
+        unless DBSlotExists("geni_resources", "rspec_idx");
+
+    return 0;
+}
+1;

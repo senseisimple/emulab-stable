@@ -25,11 +25,11 @@ my %res;
 
 sub tally ($$@) {
     my ($str, $what, @d) = @_;
-    if ($d[0] != $d[0]) { # ie NaN
-	$res{$what}{data}{$str}{invalid}++;
-    } else {
-	$res{$what}{data}{$str}{count}++;
-	foreach my $i (@idxs) {
+    foreach my $i (@idxs) {
+	if ($d[$i] != $d[$i]) { # ie NaN
+	    $res{$what}{data}{$str}{invalid}[$i]++;
+	} else {
+	    $res{$what}{data}{$str}{count}[$i]++;
 	    $res{$what}{data}{$str}{data}[$i] += $d[$i];
 	}
     }
@@ -37,9 +37,9 @@ sub tally ($$@) {
 
 sub tally_mod ($$@) {
     my ($bin, $what, @d) = @_;
-    return if $d[0] != $d[0]; # ie NaN
-    $res{$what}{data}[$bin]{count}++;
     foreach my $i (@idxs) {
+	next if $d[$i] != $d[$i]; # ie NaN
+	$res{$what}{data}[$bin]{count}[$i]++;
 	$res{$what}{data}[$bin]{data}[$i] += $d[$i];
     }
 }
@@ -91,13 +91,14 @@ foreach my $k (keys %res) {
 	foreach my $i (sort keys %{$res{$k}{data}}) {
 	    my @r;
 	    my $d = $res{$k}{data}{$i};
-	    my $invalid = $d->{invalid};
-	    my $count = $d->{count};
-	    if ($invalid / ($invalid + $count) > $TOLERANCE_INTERVAL) {
-		@r = map {'NaN'} @idxs;
-	    } else {
-		foreach my $j (@idxs) {
+	    foreach my $j (@idxs) {
+		my $invalid = $d->{invalid}[$j];
+		my $count = $d->{count}[$j];
+		if ($invalid / ($invalid + $count) > $TOLERANCE_INTERVAL) {
+		    $r[$j] = 'NaN';
+		} else {
 		    $r[$j] = $d->{data}[$j]/$count;
+		    die "Unexpected NaN" if $r[$j] != $r[$j];
 		}
 	    }
 	    print F join(' ', "$i ", map {sprintf("%5.1f", $_)} @r),"\n" 
@@ -108,9 +109,8 @@ foreach my $k (keys %res) {
 	foreach my $i (0 .. $#{$res{$k}{data}}) {
 	    my @r;
 	    my $d = $res{$k}{data}[$i];
-	    my $count = $d->{count};
 	    foreach my $j (@idxs) {
-		$r[$j] = $d->{data}[$j]/$count;
+		$r[$j] = $d->{data}[$j] ? $d->{data}[$j]/$d->{count}[$j] : 0;
 	    }
 	    print F join(' ', sprintf("%6.3f ", $i/$div), map {sprintf("%5.1f", $_)} @r),"\n" 
 	}

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -48,6 +48,10 @@ my $CONTROL	= "@USERNODE@";
 my $TBBASE	= "@TBBASE@";
 my $SSH		= "$TB/bin/sshtb";
 
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
 #
 # Testbed Support libraries
 #
@@ -56,10 +60,6 @@ use libdb;
 use libtestbed;
 use User;
 use Experiment;
-
-# un-taint path
-$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Turn off line buffering on output

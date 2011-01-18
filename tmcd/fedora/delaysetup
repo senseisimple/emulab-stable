@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -639,6 +639,9 @@ sub LinkDelaySetup()
 			$imqnum = $1;
 		    }
 		}
+		if (! -e "/sys/class/net/imq${imqnum}") {
+		    die("No such IMQ device: imq${imqnum}");
+		}
 		
                 print DEL "$TC qdisc add dev $imqdev handle $pipeno ";
                 print DEL "root plr $rplr\n";
@@ -669,19 +672,16 @@ sub LinkDelaySetup()
 		# the proper bandwidth. Not ideal, especially since at 1000HZ
 		# 1 queue slot is not enough. Make it 4 instead. 
 		# 
-                # XXX: Why do we do this, and does Linux need to?
+                # XXX: Why do we do this, and does Linux need to? 
                 #
-            }
-
-            #print STDOUT "  $iface pipe $pipeno config delay ";
-	    #print STDOUT "${delay}ms bw ${bandw}Kbit/s plr $plr ";
-	    #print STDOUT "$queue $redparams\n";
-	    #if ($type eq "duplex") {
-	    #	print STDOUT "  $iface pipe $rpipeno config delay ".
-	    #	    "${rdelay}ms bw ${rbandw}Kbit/s plr $rplr queue 4\n";
-	    #}
-
-	    if ($type eq "duplex") {
+		# LBS: Say, multiple nodes are sending to the same
+		#      target node at the same time. The incoming BW
+		#      restriction will make sure that the target sees
+		#      the proper BW, but the senders will not see the
+		#      proper queing behavior, or at least the behaviour
+		#      that would occur in the real world. Well, thats
+		#      my story.
+		
 		print MAP "$linkname duplex $vnode $vnode $iface $imqdev ".
 		    "$pipeno $rpipeno\n";
 	    }

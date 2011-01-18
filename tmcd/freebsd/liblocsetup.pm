@@ -12,14 +12,14 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD $HOSTSFILE
-	 $LOOPBACKMOUNT
+    qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
+	 $HOSTSFILE $LOOPBACKMOUNT $CHMOD
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth os_viface_name os_modpasswd
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_getnfsmounts os_islocaldir
+	 os_groupdel os_getnfsmounts os_islocaldir os_mountextrafs
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre os_nfsmount
 	 os_find_freedisk os_gendhcpdconf os_get_ctrlnet_ip
        );
@@ -68,6 +68,7 @@ $SFSCD		= "/usr/local/sbin/sfscd";
 $RPMCMD		= "/usr/local/bin/rpm";
 $HOSTSFILE	= "/etc/hosts";
 $WGET		= "/usr/local/bin/wget";
+$CHMOD		= "/bin/chmod";
 
 #
 # These are not exported
@@ -98,8 +99,14 @@ my $DEFSHELL	= "/bin/tcsh";
 # OS dependent part of account cleanup. On a remote node, this will
 # only be called from inside a JAIL, or from the prepare script.
 #
-sub os_account_cleanup()
+sub os_account_cleanup($)
 {
+    # XXX this stuff should be lifted up into rc.accounts, sigh
+    my ($updatemasterpasswdfiles) = @_;
+    if (!defined($updatemasterpasswdfiles)) {
+	$updatemasterpasswdfiles = 0;
+    }
+
     printf STDOUT "Resetting passwd and group files\n";
     if (system("$CP -f $TMGROUP /etc/group") != 0) {
 	print STDERR "Could not copy default group file into place: $!\n";
@@ -1024,6 +1031,32 @@ sub os_nfsmount($$)
     }
 
     return 0;
+}
+
+#
+# Create/mount a local filesystem on the extra partition if it hasn't
+# already been done.  Returns the resulting mount point (which may be
+# different than what was specified as an argument if it already existed).
+#
+sub os_mountextrafs($)
+{
+    my $dir = shift;
+    my $mntpt = "";
+    my $log = "$VARDIR/logs/mkextrafs.log";
+
+    #
+    # XXX this is a most bogus hack right now, we look for partition 4
+    # in /etc/fstab.
+    #
+    my $fstabline = `grep 0s4e /etc/fstab`;
+    if ($fstabline =~ /^\/dev\/\S*0s4e\s+(\S+)\s+/) {
+	$mntpt = $1;
+    } elsif (!system("$BINDIR/mkextrafs.pl -f $dir >$log 2>&1")) {
+	$mntpt = $dir;
+    } else {
+	print STDERR "mkextrafs failed, see $log\n";
+    }
+    return $mntpt;
 }
 
 #

@@ -5,6 +5,8 @@
 -- these is not idempotent, since a site may have changed them for some reason.
 --
 
+INSERT IGNORE INTO `node_types` VALUES ('pc','pc',NULL,NULL,0,0,0,0,0,0,0,0,0,0,0,0);
+INSERT IGNORE INTO`node_type_attributes` VALUES ('pc','imageable','1','boolean');
 INSERT IGNORE INTO `node_types` VALUES ('pcvm','pcvm',NULL,NULL,1,0,1,1,0,0,0,0,0,0,0,0);
 INSERT IGNORE INTO `node_types` VALUES ('pcvwa','pcvwa',NULL,NULL,1,0,0,1,1,0,0,0,0,0,0,0);
 INSERT IGNORE INTO `node_type_attributes` VALUES ('pcvwa','default_osid','0','integer');
@@ -16,7 +18,15 @@ INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','5.4','delay','/boot/kernel.del
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','5.4','linkdelay','/boot/kernel.linkdelay/kernel');
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.2','delay','/boot/kernel.poll/kernel HZ=10000');
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.2','linkdelay','/boot/kernel/kernel HZ=1000');
+INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','7.3','delay','/boot/kernel.poll/kernel HZ=10000');
+INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','8.1','delay','/boot/kernel.poll/kernel HZ=10000');
 INSERT IGNORE INTO os_boot_cmd VALUES ('Linux','9.0','linkdelay','linkdelay');
 
 INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('cur_log_seq', 1);
+INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('frisbee_index', 1);
 INSERT IGNORE INTO emulab_indicies (name,idx) VALUES ('next_osid', 10000);
+INSERT IGNORE INTO emulab_locks (name,value) VALUES ('pool_daemon', 0);
+
+INSERT IGNORE INTO `interface_capabilities` VALUES ('generic','protocols','ethernet');
+INSERT IGNORE INTO `interface_capabilities` VALUES ('generic','ethernet_defspeed','100000');
+INSERT IGNORE INTO `interface_types` VALUES ('generic',100000,1,'Generic','Generic',1,'RJ45');

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 AC_PREREQ(2.13)
@@ -58,7 +58,7 @@ AC_SUBST(PATH)
 CPPFLAGS="-I/usr/local/include"
 
 # BEGIN Python detection.
-AC_PATH_PROGS(PYTHON, python python2.4 python2.3 python2.2)
+AC_PATH_PROGS(PYTHON, python python2.6 python2.5 python2.4 python2.3 python2.2)
 
 if test x"$PYTHON" = x""; then
     AC_MSG_ERROR([python not detected])
@@ -101,7 +101,7 @@ AC_SUBST(optional_subdirs)
 # These get defined in the definitions file (--with-TBDEFS).
 # NB: See AC_DEFINE_UNQUOTED() calls below, if you want a variable
 # to appear in config.h.
-# 
+#
 AC_SUBST(TBDBNAME)
 AC_SUBST(TBERRORLOGDBNAME)
 AC_SUBST(TBADMINGROUP)
@@ -156,6 +156,7 @@ AC_SUBST(ELABINELAB)
 AC_SUBST(OUTERBOSS_NODENAME)
 AC_SUBST(OUTERBOSS_XMLRPCPORT)
 AC_SUBST(OUTERBOSS_SSLCERTNAME)
+AC_SUBST(SUBBOSS_SSLCERTNAME)
 AC_SUBST(PLABSUPPORT)
 AC_SUBST(PUBSUPPORT)
 AC_SUBST(WIKISUPPORT)
@@ -218,6 +219,8 @@ AC_SUBST(GMAP_API_KEY)
 AC_SUBST(NODE_USAGE_SUPPORT)
 AC_SUBST(NOSTACKMIB)
 AC_SUBST(EXP_VIS_SUPPORT)
+AC_SUBST(NOSHAREDFS)
+AC_SUBST(SELFLOADER_DATA)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -250,7 +253,7 @@ AC_SUBST(TBERRORSEMAIL_NOSLASH)
 
 #
 # Defaults for for above variables.
-# 
+#
 TBERRORLOGDBNAME="errorlog"
 TBADMINGROUP="flux"
 CLIENT_ETCDIR="/etc/emulab"
@@ -270,6 +273,7 @@ ELABINELAB=0
 OUTERBOSS_NODENAME=""
 OUTERBOSS_XMLRPCPORT=3069
 OUTERBOSS_SSLCERTNAME="/etc/outer_emulab.pem"
+SUBBOSS_SSLCERTNAME="/etc/subboss.pem"
 PLABSUPPORT=0
 PUBSUPPORT=0
 WIKISUPPORT=0
@@ -305,6 +309,9 @@ STANDALONE_CLEARINGHOUSE=0
 NODE_USAGE_SUPPORT=0
 EXP_VIS_SUPPORT=0
 NOSTACKMIB=0
+NOSHAREDFS=0
+NFSRACY=1
+SELFLOADER_DATA="__DATA__"
 
 #
 # XXX You really don't want to change these!
@@ -421,7 +428,12 @@ fi
 if test $TPM -eq 1; then
     AC_DEFINE_UNQUOTED(TPM, 1)
 fi
-
+if test $NOSHAREDFS -eq 1; then
+    AC_DEFINE_UNQUOTED(NOSHAREDFS, 1)
+fi
+if test $NFSRACY -eq 1; then
+    AC_DEFINE_UNQUOTED(NFSRACY, 1)
+fi
 
 LOG_TESTBED=`echo "LOG_$TBLOGFACIL" | tr a-z A-Z`
 AC_DEFINE_UNQUOTED(LOG_TESTBED, $LOG_TESTBED)
@@ -431,7 +443,7 @@ AC_SUBST(LOG_TESTBED)
 # If the private network is different then the control network, we need
 # an extra subnet decl for it in dhcpd.conf.template. This is enormously
 # crude and simplistic, but works for the local case!
-# 
+#
 if test "$PRIVATE_NETWORK" != "$CONTROL_NETWORK"; then
     DHCPD_CONTROLNET_DECL="subnet $PRIVATE_NETWORK netmask $PRIVATE_NETMASK {}"
 fi
@@ -543,6 +555,13 @@ if test -z "$EVENTSERVER"; then
     EVENTSERVER="event-server"
 fi
 AC_DEFINE_UNQUOTED(EVENTSERVER, "$EVENTSERVER")
+
+#
+# Perl SelfLoader
+# XXX this is a hack which enables us to disable it on versions of perl
+# where there are problems with taint checking in the SelfLoader module.
+#
+AC_DEFINE_UNQUOTED(SELFLOADER_DATA, "$SELFLOADER_DATA")
 
 #
 # LEDA library path
@@ -660,7 +679,7 @@ AC_SUBST(OPT_CFLAGS)
 
 #
 # Disable event system. Relies on Elvin. On by default.
-# 
+#
 AC_ARG_ENABLE(events,
 [  --disable-events      Disable events (requires Elvin libraries)])
 
@@ -672,6 +691,7 @@ else
 		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
 		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
 		    event/sched/GNUmakefile \
+		    event/new_sched/GNUmakefile \
                     event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
@@ -690,7 +710,6 @@ else
 		    event/linktest/GNUmakefile \
 		    event/linktest/iperf/GNUmakefile \
 		    event/linktest/rude/GNUmakefile \
-		    event/linktest/linktest.pl \
 		    event/linktest/weblinktest event/linktest/linktest.proxy \
 		    event/linktest/linktest_control \
 		    event/linktest/run_linktest.pl";
@@ -715,7 +734,7 @@ fi
 # Enable Windows support.
 # Right now this means NTFS support in imagezip, maybe more things later.
 # Relies on Linux NTFS library.
-# 
+#
 AC_ARG_ENABLE(windows,
 [  --enable-windows      Enable Windows XP support (default)])
 
@@ -735,7 +754,6 @@ else
 	optional_subdirs="$optional_subdirs";
         AC_DEFINE_UNQUOTED(WINSUPPORT, 1)
 fi
-
 
 #
 # Check for ulsshxmlrpc header
@@ -811,20 +829,44 @@ if test "$TBMAINSITE" = 1; then
     FANCYBANNER=1
 fi
 
+#
+# Merge build
+#
+MERGE_BUILD=0
+MERGE_BUILD_SANDBOX=
+if test -e "$srcdir/.merge-build"; then
+   merge_sandbox=`grep source-tree "$srcdir/.merge-build" | cut -d' ' -f2`
+   merge_tree=`grep merge-tree "$srcdir/.merge-build" | cut -d' ' -f2`
+   if test "$srcdir" -ef "$srcdir/$merge_sandbox/$merge_tree"; then
+      MERGE_BUILD=1
+      MERGE_BUILD_SANDBOX=$srcdir/$merge_sandbox
+      echo "#/bin/sh"   > sync
+      echo              >> sync
+      echo "cd \"$srcdir\"" >> sync
+      echo "utils/merge-build sync" >> sync
+      chmod +x sync
+      echo "Merge-build enabled"
+   fi
+fi
+AC_SUBST(MERGE_BUILD)
+AC_SUBST(MERGE_BUILD_SANDBOX)
+
 outfiles="$outfiles Makeconf GNUmakefile \
 	assign/GNUmakefile \
         named/GNUmakefile firewall/GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile \
-	db/Experiment.pm db/Group.pm db/Interface.pm db/Node.pm \
-	db/NodeType.pm db/Project.pm db/User.pm db/Image.pm db/OSinfo.pm \
+	db/EmulabConstants.pm db/EmulabFeatures.pm db/Experiment.pm \
+	db/Firewall.pm db/Group.pm db/Image.pm db/Interface.pm \
+	db/Lan.pm db/Logfile.pm db/Node.pm db/NodeType.pm db/OSinfo.pm \
+	db/Project.pm db/User.pm db/VirtExperiment.pm \
 	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	db/dumperrorlog.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/emdb.pm db/emdbi.pm \
+	db/emdb.pm db/emdbi.pm db/emutil.pm \
 	db/dhcpd_makeconf db/nodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
@@ -836,7 +878,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	os/imagezip/ffs/GNUmakefile os/imagezip/extfs/GNUmakefile os/imagezip/ext4fs/GNUmakefile \
-	os/imagezip/shd/GNUmakefile os/imagezip/hashmap/GNUmakefile \
+	os/imagezip/hashmap/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
         os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
 	os/genhostsfile/GNUmakefile os/zapdisk/GNUmakefile \
@@ -868,6 +910,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
 	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
 	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
+	tbsetup/subboss_frisbeelauncher tbsetup/subboss_frisbeeimage \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
@@ -932,6 +975,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/fedora/GNUmakefile tmcd/fedora/supfile \
         tmcd/linux-sg/GNUmakefile tmcd/ubuntu7/GNUmakefile \
+	tmcd/ubuntu10/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
 	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile tmcd/freebsd6/netif-emulab \
 	tmcd/freebsd7/GNUmakefile tmcd/freebsd7/supfile tmcd/freebsd7/netif-emulab \
@@ -971,6 +1015,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	apache/GNUmakefile apache/httpd.conf \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \
+	xmlrpc/sslxmlrpc_client.py xmlrpc/sslxmlrpc_server.py \
 	xmlrpc/webxmlrpc xmlrpc/script_wrapper.py xmlrpc/libxmlrpc.pm \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
@@ -984,6 +1029,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/load-descriptors install/dump-descriptors \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
         install/clrhouse-install \
+	install/libinstall.pm install/update-install install/update-testbed \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
 	mote/sgtools/GNUmakefile \
 	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
@@ -1007,6 +1053,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
         protogeni/scripts/GNUmakefile protogeni/etc/GNUmakefile \
         protogeni/test/GNUmakefile protogeni/rspec/GNUmakefile \
         protogeni/rspec/0.1/GNUmakefile \
+	protogeni/rspec/0.2/GNUmakefile \
+	protogeni/rspec/2/GNUmakefile \
         collab/GNUmakefile \
         collab/trac/GNUmakefile \
         collab/jabber/GNUmakefile \

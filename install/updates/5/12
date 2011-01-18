@@ -1,0 +1,64 @@
+#
+# Create a null topomap for system experiments.
+#
+# This way, when a node happens to boot from disk while in one of these
+# experiments (e.g., hwdown), it won't fail in rc.topomap.  For new installs,
+# this is now done by boss-install.
+#
+# Is this important?  No, but it irritated me.
+#
+use strict;
+use libinstall;
+
+# XXX lifted from boss-install.in
+my %EXPERIMENTS =
+    ("hwdown"	     => {"pid"	       => "emulab-ops",
+			 "description" => "Node reported as down"},
+     "reloading"     => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes reloading images"},
+     "reloadpending" => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes waiting for reload"},
+     "oldreserved"   => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in limbo during swap modify"},
+     "nfree-leases"  => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in limbo during nfree"},
+     "nfree-locked"  => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in limbo during nfree"},
+     "opsnodes"	     => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes designated as Ops Nodes"},
+     "holding"	     => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in a holding pattern"},
+     "shared-nodes"  => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes in shared mode"},
+     "hwcheckup"     => {"pid"	       => "emulab-ops",
+			 "description" => "Nodes being testing after failure"},
+    );
+
+my $SUDO        = "/usr/local/bin/sudo";
+my $GENTOPOFILE = "$TBROOT/libexec/gentopofile";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "gentopo", "Creating NULL topomap for system experiments", sub {
+	    foreach my $eid (keys(%EXPERIMENTS)) {
+		my $pid  = $EXPERIMENTS{$eid}->{"pid"};
+		ExecQuiet("$SUDO -u $PROTOUSER $GENTOPOFILE $pid $eid");
+	    }
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    
+    return 0;
+}
+1;

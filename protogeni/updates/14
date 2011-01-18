@@ -10,8 +10,10 @@ sub DoUpdate($$$)
 
     DBSetDefault($dbhandle);
 
-    DBQueryFatal("ALTER TABLE `geni_authorities` " .
-		 "add unique key `urn` (`urn`(256))");
+    if (! DBKeyExists("geni_authorities", "urn")) {
+	DBQueryFatal("ALTER TABLE `geni_authorities` " .
+		     "add unique key `urn` (`urn`(255))");
+    }
 
     DBQueryFatal("ALTER TABLE `geni_slices` " .
     		 "ADD COLUMN `creator_urn` tinytext after creator_uuid")
