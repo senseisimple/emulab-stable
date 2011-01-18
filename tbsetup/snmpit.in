@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -49,7 +49,7 @@ sub doTrunkEnable($$$@);
 sub doTrunkDisable($$);
 sub doRestorePortStatus($@);
 sub doSynchLeader($);
-sub CreateOneVlan($$@);
+sub CreateOneVlan($$$@);
 sub doOpenflowEnable($$);
 sub doOpenflowDisable($$);
 sub doSetOpenflowController($$$);
@@ -85,19 +85,21 @@ Usage: $0 [-h] [-v level] [-q] [-n] [-i device] [-S stack]
 	  [-d ports] [-e ports] [-a ports]
 	  [-p <10|100|1000> ports] [-u <half|full> ports]
 	  [-c]
-          [--of-disable name pid eid]
-          [--of-enable name pid eid]
-          [--of-controller name pid eid tcp:ip:port]
-          [--of-listener name pid eid]
+          [--redirect-err]
+          [--of-disable vlanid pid eid]
+          [--of-enable vlanid pid eid]
+          [--of-controller vlanid pid eid tcp:ip:port]
+          [--of-listener vlanid pid eid]
 General:
-  -h          Display this help message
-  -v <level>  Verbose mode
-  -q          Quiet mode
-  -n          Test mode - don't actually make any changes
-  -i <device> Operate on <device>, overriding default device list. Can be
-                  given multiple times
-  -S <stack>  Operate on the given stack, instead of the default of the
-                  experimental network
+  -h              Display this help message
+  -v <level>      Verbose mode
+  -q              Quiet mode
+  -n              Test mode - don't actually make any changes
+  -i <device>     Operate on <device>, overriding default device list. Can be
+                      given multiple times
+  -S <stack>      Operate on the given stack, instead of the default of the
+                      experimental network
+  --redirect-err  Redirect STDERR to STDOUT, for easier capturing in logfiles
 
 VLAN Control:
   -t <pid> <eid>    Create all VLANs for an experiment
@@ -127,19 +129,19 @@ VLAN Control:
                         WITH EXTREME CAUTION **
   -F                Create all vlans in the given stack on the leader for
 		    use in leader->{ALLVLANSONLEADER} (Internal use only)
-  --of-enable <name> <pid> <eid> 
-                    Enable Openflow on VLAN with the name <name> that is 
+  --of-enable <vlanid> <pid> <eid> 
+                    Enable Openflow on VLAN with the id <vlanid> that is 
 		        associated with the given experiment 
-  --of-disable <name> <pid> <eid>
-                    Disable Openflow on VLAN with the name <name> that is 
+  --of-disable <vlanid> <pid> <eid>
+                    Disable Openflow on VLAN with the id <vlanid> that is 
 		        associated with the given experiment
-  --of-controller <name> <pid> <eid> tcp:ip:port
+  --of-controller <vlanid> <pid> <eid> tcp:ip:port
                     Set controller for Openflow-enabled VLAN with the 
-		        name <name> that is associated with the given 
+		        id <vlanid> that is associated with the given 
 			experiment
-  --of-listener <name> <pid> <eid> 
+  --of-listener <vlanid> <pid> <eid> 
                     Enable listener for Openflow-enabled VLAN with the 
-		        name <name> that is associated with the given 
+		        id <vlanid> that is associated with the given 
 			experiment, snmpit will print out the listener 
 			connection string
 
@@ -174,11 +176,20 @@ GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
-    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s');
+    'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
+    'redirect-err');
 # Unused: f,j
 
 if ($opt{h}) {
     exit &usage;
+}
+
+#
+# If requested, redirect STDERR to STDOUT - this makes it easier to capture
+# error output in logfiles
+#
+if ($opt{'redirect-err'}) {
+    open(STDERR, ">&STDOUT");
 }
 
 if ($opt{v}) {
@@ -1061,28 +1072,28 @@ sub doListVlans ($) {
     # We need to 'coallate' the results from each stack by putting together
     # the results from each stack, based on the VLAN identifier
     #
-if ($ELABINELAB) {
-    #
-    # Sklower deliberately uglified this.  The intent is that eventually
-    # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
-    # it will just work.  For now, we dup the code.
-    #
-    @vlanList = RemoteDoList();
-    foreach my $vlan (@vlanList) {
-	my ($id,$ddep,$memberref) = @$vlan;
-	${$vlans{$id}}[0] = $ddep;
-	push @{${$vlans{$id}}[1]}, @$memberref;
+    if ($ELABINELAB) {
+        #
+        # Sklower deliberately uglified this.  The intent is that eventually
+        # $stack->listVlans() will call a $<remotedevobj>->listVlans() and
+        # it will just work.  For now, we dup the code.
+        #
+        @vlanList = RemoteDoList();
+        foreach my $vlan (@vlanList) {
+            my ($id,$ddep,$memberref) = @$vlan;
+            ${$vlans{$id}}[0] = $ddep;
+            push @{${$vlans{$id}}[1]}, @$memberref;
+        }
+    } else {
+        foreach my $stack (@$stacks) {
+            @vlanList = $stack->listVlans();
+            foreach my $vlan (@vlanList) {
+                my ($id,$ddep,$memberref) = @$vlan;
+                ${$vlans{$id}}[0] = $ddep;
+                push @{${$vlans{$id}}[1]}, @$memberref;
+            }
+        }
     }
-} else {
-    foreach my $stack (@$stacks) {
-	@vlanList = $stack->listVlans();
-	foreach my $vlan (@vlanList) {
-	    my ($id,$ddep,$memberref) = @$vlan;
-	    ${$vlans{$id}}[0] = $ddep;
-	    push @{${$vlans{$id}}[1]}, @$memberref;
-	}
-    }
-}
 
     #
     # less code to do this for snmpit.proxy than for it to popen snmpit
@@ -1102,8 +1113,11 @@ if ($ELABINELAB) {
     #
     # These need to be declared here for the benefit of the format string
     # See perlform(1) for help with formats
+    # Note that they are declared 'our' rather than 'my' due to a stupid
+    # bug in perl 5.10
     #
-    my ($vlan_id,$ddep,$pideid,$vname,$members);
+    our ($vlan_id,$ddep,$pideid,$vname,$members);
+
     #
     # Check to see if they want device-specific VLAN numbers, which makes the
     # display more cramped, but is useful for debugging
@@ -1142,8 +1156,9 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
         my $vlan = VLan->Lookup($vlan_id);
         if (!defined($vlan)) {
 	    &debug("No such VLAN $vlan_id in lans table\n");
-	    next
-		if ($opt{l} == 1);
+            # Only print unknown VLANs if -l was given twice, or the 
+            # -O option was given
+	    next unless ($opt{l} > 1 || $opt{O});
 	    $vname = $vlan_id;
 	    $experiment = undef;
         }
@@ -1255,7 +1270,7 @@ sub doListPorts($) {
     #
     # See perlform(1) for help with formats
     #
-    my ($port,$enabled,$up,$speed,$duplex);
+    our ($port,$enabled,$up,$speed,$duplex);
     print << "END";
 Port      Enabled Up   Speed      Duplex
 --------------------------------------------
@@ -1458,7 +1473,7 @@ sub doGetStats($) {
 	push @statList, $stack->getStats();
     }
 
-    my ($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr,
+    our ($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr,
         $inunk, $outoctets, $outunicast, $outnunicast, $outdiscards,
 	$outerr,$outq);
     #
@@ -1510,7 +1525,8 @@ sub doVlansFromTables($$@) {
     }
 
     my ($stack) = @$stacks;
-    my @trunkedPorts = getExperimentTrunks($pid,$eid);
+    my @trunkedPorts = getExperimentTrunks($experiment->pid(),
+					   $experiment->eid());
     my %trunkedPorts = map { $_ => $_ } @trunkedPorts;
 
     #
@@ -1537,7 +1553,7 @@ sub doVlansFromTables($$@) {
 	    my @ports = getVlanPorts($vlanid);
 	    
 	    # Create this vlan now.
-	    if (CreateOneVlan($stack, $vlanid, @ports))  {
+	    if (CreateOneVlan($experiment,$stack, $vlanid, @ports))  {
 		die("Could not create dual trunked $vlan\n");
 	    }
 	    # Trunk these ports, removing from list.
@@ -1547,6 +1563,36 @@ sub doVlansFromTables($$@) {
 		}
 		delete($trunkedPorts{$port});
 	    }
+	    
+	    #
+	    # Set openflow
+	    #
+	    # A much more right place for the openflow settings is CreateOneVlan,
+	    # however, it is called by sync vlan function and others, which don't destroy
+	    # the existing vlan_arrtibutes rows.
+	    #
+	    # TODO: Move this part to CreateOneVlan and Make sure the existed 
+	    #       vlan_attributes rows are deleted
+	    #
+	    my $ofenabled;
+	    $vlan->GetAttribute("ofenabled", \$ofenabled);
+	    if (defined($ofenabled) && $ofenabled == 1) {
+	        $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	        my $ofcontroller;
+	        $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	        if (defined($ofcontroller) && $ofcontroller ne "") {
+	            $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	        }
+	    
+	        $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	        # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	        # should refresh itself. But here vlan will not be used any more, so
+	        # maybe we can comment this refresh.
+	        $vlan->Refresh();	    
+	    }
+	    
 	    # Delete this vlan from the list that will be created below.
 	    delete($vlans{"$vlanid"});
 	}
@@ -1585,7 +1631,36 @@ sub doVlansFromTables($$@) {
 	my $vlanid = $vlan->id();
 	my @ports  = getVlanPorts($vlanid);
 
-	$errors += CreateOneVlan($stack, $vlanid, @ports);
+	$errors += CreateOneVlan($experiment, $stack, $vlanid, @ports);
+	
+	#
+	# Set openflow
+	# 
+	# A much more right place for the openflow settings is CreateOneVlan,
+	# however, it is called by sync vlan function and others, which don't destroy
+	# the existing vlan_arrtibutes rows.
+	#
+	# TODO: Move this part to CreateOneVlan and Make sure the existed 
+	#       vlan_attributes rows are deleted
+	#
+	my $ofenabled;
+	$vlan->GetAttribute("ofenabled", \$ofenabled);
+	if (defined($ofenabled) && $ofenabled == 1) {
+	    $errors += doOpenflowEnable($stacks, $vlanid);
+	    
+	    my $ofcontroller;
+	    $vlan->GetAttribute("ofcontroller", \$ofcontroller);
+	    if (defined($ofcontroller) && $ofcontroller ne "") {
+	        $errors += doSetOpenflowController($stacks, $vlanid, $ofcontroller);
+	    }
+	    
+	    $errors += doEnableOpenflowListener($stacks, $vlanid);
+	    
+	    # doEnableOpenflowListener updates the lan_arrtibutes table, so vlan 
+	    # should refresh itself. But here vlan will not be used any more, so
+	    # maybe we can comment this refresh.
+	    $vlan->Refresh();	    
+	}
     }
     return $errors;
 }
@@ -1593,8 +1668,9 @@ sub doVlansFromTables($$@) {
 #
 # Create a single vlan.
 #
-sub CreateOneVlan($$@)
+sub CreateOneVlan($$$@)
 {
+    my $experiment = shift();
     my $stack  = shift();
     my $vlanid = shift();
     my @ports  = @_;
@@ -1913,7 +1989,7 @@ sub syncVlansFromTables($$) {
 		if (@ports);
 		
 	    if (!$impotent && @ports &&
-		CreateOneVlan($stack, $vlanid, @ports))  {
+		CreateOneVlan($experiment, $stack, $vlanid, @ports))  {
 		print STDERR "Could not create dual trunked $vlan\n";
 		goto bad;
 	    }
@@ -1981,7 +2057,7 @@ sub syncVlansFromTables($$) {
 	next
 	    if ($impotent);
 	
-	if (CreateOneVlan($stack, $vlanid, @newports)) {
+	if (CreateOneVlan($experiment, $stack, $vlanid, @newports)) {
 	    goto bad;
 	}
     }
@@ -2000,7 +2076,7 @@ sub syncVlansFromTables($$) {
 	next
 	    if ($impotent);
 	
-	if (CreateOneVlan($stack, $vlanid, @ports)) {
+	if (CreateOneVlan($experiment, $stack, $vlanid, @ports)) {
 	    goto bad;
 	}
     }
@@ -2200,9 +2276,6 @@ sub doDeleteVlan($@) {
 	    $vlan_ids{$vlan_name} = $vlan->id();
 	}
     }
-    elsif ($ELABINELAB) {
-	die("Must provide an experiment for this operation\n");
-    }
     else {
 	foreach my $vlan_name (@vlan_names) {
 	    $vlan_ids{$vlan_name} = $vlan_name;
@@ -2211,17 +2284,28 @@ sub doDeleteVlan($@) {
 
     #
     # Hand over to outer boss.
+    # If experiment was not specified then list is vlan IDs (tbswap).
+    # If experiment was specified, list is vlan names (manual invocation).
     # 
     if ($ELABINELAB) {
-	foreach my $vlan (values(%vlans)) {
-	    if (RemoteDeleteVlan($vlan) == 0) {
-		if ($vlan->Destroy() != 0) {
-		    print STDERR "*** Could not destroy $vlan\n";
+	if (defined($experiment)) {
+	    foreach my $vlan (values(%vlans)) {
+		if (RemoteDeleteVlan($vlan) == 0) {
+		    if ($vlan->Destroy() != 0) {
+			print STDERR "*** Could not destroy $vlan\n";
+		    }
+		}
+		else {
+		    $errors++;
 		}
 	    }
-	    else {
-		$errors++;
+	}
+	else {
+	    my @vidlist = ();
+	    foreach my $vid (values(%vlan_ids)) {
+		push(@vidlist, $vid);
 	    }
+	    $errors = RemoteDoReset(undef, 0, @vidlist);
 	}
 	return $errors;
     }
@@ -2688,6 +2772,13 @@ sub doEnableOpenflowListener($$) {
     }
 
     ofunlock();
+    
+    #
+    # update the vlan object with the new listener string
+    # other openflow functions may also need this, especially doOpenflowEnable/doOpenflowDisable
+    #
+    my $vlaninst = VLan->Lookup($vlan);
+    $vlaninst->SetAttribute('oflistener', $listenerConnStr, 'string');
 
     return $errors;
 }

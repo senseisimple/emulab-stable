@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -108,6 +108,8 @@ struct FileInfo {
 	int	fd;		/* Open file descriptor */
 	int	blocks;		/* Number of BLOCKSIZE blocks */
 	int	chunks;		/* Number of CHUNKSIZE chunks */
+	int	isimage;	/* non-zero if this is a 1MB-rounded file */
+	off_t	filesize;	/* Real size of file */
 };
 static struct FileInfo FileInfo;
 
@@ -181,7 +183,7 @@ WorkQueueEnqueue(int chunk, BlockMap_t *map, int count)
 	 * Common case: a full chunk request for the full block we are
 	 * currently sending.  Don't queue.
 	 */
-	if (count == CHUNKSIZE && chunk == WorkChunk && count == WorkCount) {
+	if (count == MAXCHUNKSIZE && chunk == WorkChunk && count == WorkCount) {
 		EVENT(1, EV_WORKMERGE, mcastaddr, chunk, count, count, ~0);
 		pthread_mutex_unlock(&WorkQLock);
 		return 0;
@@ -206,15 +208,15 @@ WorkQueueEnqueue(int chunk, BlockMap_t *map, int count)
 			 * We have a queued request for the entire chunk
 			 * already, nothing to do.
 			 */
-			if (wqel->nblocks == CHUNKSIZE)
+			if (wqel->nblocks == MAXCHUNKSIZE)
 				blocks = 0;
 			/*
 			 * Or if incoming request is an entire chunk
 			 * just copy that map.
 			 */
-			else if (count == CHUNKSIZE) {
+			else if (count == MAXCHUNKSIZE) {
 				wqel->blockmap = *map;
-				blocks = CHUNKSIZE - wqel->nblocks;
+				blocks = MAXCHUNKSIZE - wqel->nblocks;
 			}
 			/*
 			 * Otherwise do the full merge
@@ -224,7 +226,7 @@ WorkQueueEnqueue(int chunk, BlockMap_t *map, int count)
 			EVENT(1, EV_WORKMERGE, mcastaddr,
 			      chunk, wqel->nblocks, blocks, elt);
 			wqel->nblocks += blocks;
-			assert(wqel->nblocks <= CHUNKSIZE);
+			assert(wqel->nblocks <= MAXCHUNKSIZE);
 			pthread_mutex_unlock(&WorkQLock);
 			return 0;
 		}
@@ -277,9 +279,9 @@ WorkQueueDequeue(int *chunkp, int *blockp, int *countp)
 	
 	wqel = (WQelem_t *) queue_first(&WorkQ);
 	chunk = wqel->chunk;
-	if (wqel->nblocks == CHUNKSIZE) {
+	if (wqel->nblocks == MAXCHUNKSIZE) {
 		block = 0;
-		count = CHUNKSIZE;
+		count = MAXCHUNKSIZE;
 	} else
 		count = BlockMapExtract(&wqel->blockmap, &block);
 	assert(count <= wqel->nblocks);
@@ -308,7 +310,7 @@ ClientEnqueueMap(int chunk, BlockMap_t *map, int count, int isretry)
 {
 	int		enqueued;
 
-	if (count != CHUNKSIZE) {
+	if (count != MAXCHUNKSIZE) {
 		DOSTAT(blockslost+=count);
 		blockslost += count;
 		DOSTAT(partialreq++);
@@ -318,7 +320,7 @@ ClientEnqueueMap(int chunk, BlockMap_t *map, int count, int isretry)
 	if (!enqueued)
 		DOSTAT(qmerges++);
 #ifdef STATS
-	else if (chunkmap != 0 && count == CHUNKSIZE) {
+	else if (chunkmap != 0 && count == MAXCHUNKSIZE) {
 		if (chunkmap[chunk]) {
 			if (debug > 1)
 				log("Duplicate chunk request: %d", chunk);
@@ -356,7 +358,7 @@ ClientEnqueueMap(int chunk, BlockMap_t *map, int count, int isretry)
  * reply are harmless.
  */
 static void
-ClientJoin(Packet_t *p)
+ClientJoin(Packet_t *p, int version)
 {
 	struct in_addr	ipaddr   = { p->hdr.srcip };
 	unsigned int    clientid = p->msg.join.clientid;
@@ -364,10 +366,31 @@ ClientJoin(Packet_t *p)
 	/*
 	 * Return fileinfo. Duplicates are harmless.
 	 */
-	EVENT(1, EV_JOINREQ, ipaddr, clientid, 0, 0, 0);
-	p->hdr.type            = PKTTYPE_REPLY;
-	p->hdr.datalen         = sizeof(p->msg.join);
-	p->msg.join.blockcount = FileInfo.blocks;
+	EVENT(1, EV_JOINREQ, ipaddr, clientid, version, 0, 0);
+	p->hdr.type = PKTTYPE_REPLY;
+	if (version == 1) {
+		/*
+		 * XXX we cannot accept JOINv1 requests if the image we
+		 * are serving is not a "traditional" 1MB padded image.
+		 * Otherwise, they would ultimately make requests for
+		 * parts of the non-rouded file that don't exist and we
+		 * would not respond.  We could fake up some data to return
+		 * but I'm not sure that is any better.
+		 */
+		if (!FileInfo.isimage) {
+			log("%s requested JOINv1 for non-image file, "
+			    "ignoring...", inet_ntoa(ipaddr));
+			return;
+		}
+		p->hdr.datalen = sizeof(p->msg.join);
+		p->msg.join.blockcount = FileInfo.blocks;
+	} else {
+		p->hdr.datalen = sizeof(p->msg.join2);
+		p->msg.join2.blockcount = 0;
+		p->msg.join2.chunksize = CHUNKSIZE;
+		p->msg.join2.blocksize = BLOCKSIZE;
+		p->msg.join2.bytecount = FileInfo.filesize;
+	}
 	PacketReply(p);
 #ifdef STATS
 	{
@@ -410,8 +433,8 @@ ClientJoin(Packet_t *p)
 	 * Log after we send reply so that we get the packet off as
 	 * quickly as possible!
 	 */
-	log("%s (id %u, image %s) joins at %s!  %d active clients.",
-	    inet_ntoa(ipaddr), clientid, filename,
+	log("%s (id %u, image %s) joins (v%d) at %s!  %d active clients.",
+	    inet_ntoa(ipaddr), clientid, filename, version,
 	    CurrentTimeString(), activeclients);
 }
 
@@ -516,7 +539,7 @@ ClientRequest(Packet_t *p)
 		log("WARNING: ClientRequest with zero count");
 
 	EVENT(1, EV_REQMSG, ipaddr, chunk, block, count, 0);
-	if (block + count > CHUNKSIZE)
+	if (block + count > MAXCHUNKSIZE)
 		fatal("Bad request from %s - chunk:%d block:%d size:%d", 
 		      inet_ntoa(ipaddr), chunk, block, count);
 
@@ -541,7 +564,7 @@ ClientPartialRequest(Packet_t *p)
 	int		chunk = p->msg.prequest.chunk;
 	int		count;
 
-	count = BlockMapIsAlloc(&p->msg.prequest.blockmap, 0, CHUNKSIZE);
+	count = BlockMapIsAlloc(&p->msg.prequest.blockmap, 0, MAXCHUNKSIZE);
 
 	if (count == 0)
 		log("WARNING: ClientPartialRequest with zero count");
@@ -581,7 +604,7 @@ ServerRecvThread(void *arg)
 		pthread_testcancel();
 		if (PacketReceive(p) != 0) {
 			if (keepalive && ++idles > keepalive) {
-				if (ServerNetMCKeepAlive()) {
+				if (NetMCKeepAlive()) {
 					warning("Multicast keepalive failed");
 					if (++kafails > 5) {
 						warning("too many failures, disabled");
@@ -621,7 +644,11 @@ ServerRecvThread(void *arg)
 		switch (p->hdr.subtype) {
 		case PKTSUBTYPE_JOIN:
 			DOSTAT(joins++);
-			ClientJoin(p);
+			ClientJoin(p, 1);
+			break;
+		case PKTSUBTYPE_JOIN2:
+			DOSTAT(joins++);
+			ClientJoin(p, 2);
 			break;
 		case PKTSUBTYPE_LEAVE:
 			DOSTAT(leaves++);
@@ -659,7 +686,7 @@ PlayFrisbee(void)
 	off_t		offset;
 	struct timeval	startnext;
 
-	if ((databuf = malloc(readsize * BLOCKSIZE)) == NULL)
+	if ((databuf = malloc(readsize * MAXBLOCKSIZE)) == NULL)
 		fatal("could not allocate read buffer");
 
 	while (1) {
@@ -722,14 +749,15 @@ PlayFrisbee(void)
 		lastblock = startblock + blockcount;
 
 		/* Offset within the file */
-		offset = (((off_t) BLOCKSIZE * chunk * CHUNKSIZE) +
-			  ((off_t) BLOCKSIZE * startblock));
+		offset = (((off_t) MAXBLOCKSIZE * chunk * MAXCHUNKSIZE) +
+			  ((off_t) MAXBLOCKSIZE * startblock));
 
 		for (block = startblock; block < lastblock; ) {
 			int	readcount;
 			int	readbytes;
 			int	resends;
 			int	thisburst = 0;
+			int	resid = 0;
 #if defined(NEVENTS) || defined(STATS)
 			struct timeval rstamp;
 			gettimeofday(&rstamp, 0);
@@ -742,7 +770,30 @@ PlayFrisbee(void)
 				readcount = readsize;
 			else
 				readcount = lastblock - block;
-			readbytes = readcount * BLOCKSIZE;
+			readbytes = readcount * MAXBLOCKSIZE;
+
+			/*
+			 * Check for final partial block and truncate
+			 * read if necessary.  This should only happen
+			 * for the last block of a file, a request beyond
+			 * that is an error (and do what?)
+			 */
+			if (offset+readbytes > FileInfo.filesize) {
+				off_t diff =
+					(offset+readbytes) - FileInfo.filesize;
+				if (!FileInfo.isimage &&
+				    diff < (off_t)MAXBLOCKSIZE) {
+					readbytes -= diff;
+					resid = (int)diff;
+				} else {
+					warning("Attempt to read beyond EOF "
+						"(offset %llu > %llu)\n",
+						offset+readbytes,
+						FileInfo.filesize);
+					/* XXX just do not respond */
+					break;
+				}
+			}
 
 			if ((cc = mypread(FileInfo.fd, databuf,
 					  readbytes, offset)) <= 0) {
@@ -776,10 +827,26 @@ PlayFrisbee(void)
 				p->hdr.datalen = sizeof(p->msg.block);
 				p->msg.block.chunk = chunk;
 				p->msg.block.block = block + j;
-				memcpy(p->msg.block.buf,
-				       &databuf[j * BLOCKSIZE],
-				       BLOCKSIZE);
 
+				/*
+				 * If final block is short, pad it out.
+				 * The receiver knows the exact size and
+				 * can compensate.
+				 */
+				if (resid && j == readcount-1) {
+					int count = MAXBLOCKSIZE - resid;
+					memcpy(p->msg.block.buf,
+					       &databuf[j * MAXBLOCKSIZE],
+					       count);
+					memset(&p->msg.block.buf[count],
+					       0, resid);
+					if (debug)
+						log("Handle partial final block, padded with %d bytes", resid);
+				} else {
+					memcpy(p->msg.block.buf,
+					       &databuf[j * MAXBLOCKSIZE],
+					       MAXBLOCKSIZE);
+				}
 				PacketSend(p, &resends);
 				sendretries += resends;
 				DOSTAT(blockssent++);
@@ -939,10 +1006,18 @@ main(int argc, char **argv)
 	if ((fsize = lseek(fd, (off_t)0, SEEK_END)) < 0)
 		pfatal("Cannot lseek to end of file");
 
-	FileInfo.fd     = fd;
-	FileInfo.blocks = (int) (roundup(fsize, (off_t)BLOCKSIZE) / BLOCKSIZE);
-	FileInfo.chunks = FileInfo.blocks / CHUNKSIZE;
-	log("Opened %s: %d blocks", filename, FileInfo.blocks);
+	InitSizes(MAXCHUNKSIZE, MAXBLOCKSIZE, fsize);
+	FileInfo.fd = fd;
+	FileInfo.filesize = fsize;
+	FileInfo.blocks = TotalBlocks();
+	FileInfo.chunks = TotalChunks();
+	if ((FileInfo.filesize % (BLOCKSIZE * CHUNKSIZE)) == 0)
+		FileInfo.isimage = 1;
+	else
+		warning("NOTE: serving non-image file, will ignore V1 JOINs");
+
+	log("Opened %s: %d blocks (%lld bytes)",
+	    filename, FileInfo.blocks, FileInfo.filesize);
 
 	compute_sendrate();
 
@@ -984,7 +1059,7 @@ main(int argc, char **argv)
 
 		getrusage(RUSAGE_SELF, &ru);
 		log("Params:");
-		log("  chunk/block size    %d/%d", CHUNKSIZE, BLOCKSIZE);
+		log("  chunk/block size    %d/%d", MAXCHUNKSIZE, MAXBLOCKSIZE);
 		log("  burst size/interval %d/%d", burstsize, burstinterval);
 		log("  file read size      %d", readsize);
 		log("  file:size           %s:%qd",
@@ -1007,12 +1082,12 @@ main(int argc, char **argv)
 		log("  client re-req:     %d",
 		    Stats.clientlost);
 		log("  %dk blocks sent:    %d (%d repeated)",
-		    (BLOCKSIZE/1024),
+		    (MAXBLOCKSIZE/1024),
 		    Stats.blockssent, Stats.blockssent ?
 		    (Stats.blockssent-FileInfo.blocks) : 0);
 		log("  file reads:        %d (%qu bytes, %qu repeated)",
 		    Stats.filereads, Stats.filebytes, Stats.filebytes ?
-		    (Stats.filebytes - FileInfo.blocks * BLOCKSIZE) : 0);
+		    (Stats.filebytes - FileInfo.filesize) : 0);
 		log("  file read time:    %d.%03d sec (%llu us/op, %d us max)",
 		    (int)(Stats.fileusecs / 1000000),
 		    (int)((Stats.fileusecs % 1000000) / 1000),
@@ -1274,7 +1349,7 @@ compute_sendrate(void)
 		maxburstsize = burstsize;
 
 	if (burstsize * sizeof(Packet_t) > GetSockbufSize()) {
-		warning("Burst size exceeds socket buffer size, "
+		warning("NOTE: burst size exceeds socket buffer size, "
 			"may drop packets");
 	}
 

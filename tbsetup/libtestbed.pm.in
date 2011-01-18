@@ -32,7 +32,6 @@ use POSIX qw(strftime);
 use POSIX qw(setsid);
 use Fcntl;
 use Fcntl ':flock';
-use IO::Handle;
 use File::Basename;
 use Time::HiRes qw(gettimeofday);
 use vars qw(@EXPORT_OK);
@@ -105,6 +104,7 @@ sub TB_EVENTSERVER()    { "@EVENTSERVER@" . "." . "@OURDOMAIN@"; }
 # Untainted scriptname for email below.
 if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
     $SCRIPTNAME = basename($1);
+    $PROGRAM_NAME = $SCRIPTNAME;
 }
 else {
     $SCRIPTNAME = "Tainted";
@@ -113,10 +113,10 @@ else {
 #
 # Turn off line buffering on output
 #
-STDOUT->autoflush(1);
-STDERR->autoflush(1);
-
-# A library of useful stuff.
+select STDERR;
+$OUTPUT_AUTOFLUSH = 1;
+select STDOUT;
+$OUTPUT_AUTOFLUSH = 1;
 
 # Send an email message via sendmail -t.
 #
@@ -343,7 +343,7 @@ sub TBDebugTimeStampsOn()
 sub TBBackGround($)
 {
     my ($logname) = @_;
-    
+
     my $mypid = fork();
     if ($mypid) {
 	return $mypid;
@@ -391,8 +391,10 @@ sub ReOpenLog($)
     #
     # Turn off line buffering on output
     #
-    STDOUT->autoflush(1);
-    STDERR->autoflush(1);
+    select STDERR;
+    $OUTPUT_AUTOFLUSH = 1;
+    select STDOUT;
+    $OUTPUT_AUTOFLUSH = 1;
 
     return 0;
 }
@@ -662,7 +664,7 @@ sub TBScriptLock($;$$)
     my ($token, $global, $waittime) = @_;
     local *LOCK;
 
-    $waittime = 30
+    $waittime = 120
 	if (!defined($waittime));
     $global = 0
 	if (!defined($global));

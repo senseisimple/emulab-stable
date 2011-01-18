@@ -397,6 +397,9 @@ if ($showlinks) {
 	    my $rbackfill   = $row{"rbackfill"};
 	    my $rlossrate   = $row{"rlossrate"};
 	    my $protocol    = $row{"protocol"};
+	    my $fixed_iface = $row{"fixed_iface"};
+	    $protocol .= " ($fixed_iface)"
+		if (defined($fixed_iface) && $fixed_iface ne "");
 	    push @data, [$vname, $member, $ipmap{$member}, 
 		        $delay, $bandwidth, $backfill, $lossrate];
 	    push @data, ["", $protocol, $mask, $rdelay, $rbandwidth, $rbackfill, $rlossrate];

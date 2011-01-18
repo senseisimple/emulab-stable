@@ -25,6 +25,7 @@ import xmlrpclib
 import urllib
 from xml.sax.handler import ContentHandler
 import xml.sax
+import xml.dom.minidom
 import string
 from M2Crypto import X509
 
@@ -32,7 +33,7 @@ ACCEPTSLICENAME=1
 
 def Usage():
     print "usage: " + sys.argv[ 0 ] + " [option...] \
-[component-manager-1 component-manager-2]"
+[component-manager-1 component-manager-2 [rspec1-file rspec2-file tunnel-file]]"
     print """Options:
     -c file, --credentials=file         read self-credentials from file
                                             [default: query from SA]
@@ -46,17 +47,59 @@ def Usage():
                                             [default: ~/.ssl/password]
     -r file, --read-commands=file       specify additional configuration file
     -s file, --slicecredentials=file    read slice credentials from file
-                                            [default: query from SA]"""
+                                            [default: query from SA]
+
+    component-manager-1 and component-manager-2 are hrns
+    rspec1-file and rspec2-file are the rspecs to be sent to the two component managers.
+    tunnel-file contains just link tags for the tunnels between them."""
 
 execfile( "test-common.py" )
 
-if len( args ) == 2:
+def makeRequest(mainText, otherText, tun):
+  main = xml.dom.minidom.parseString(mainText)
+  other = xml.dom.minidom.parseString(otherText)
+  result = '''<?xml version="1.0" encoding="UTF-8"?>
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.2" type="request">'''
+  result += "\n"
+  for node in main.getElementsByTagName("node"):
+    result += node.toxml()
+    result += "\n"
+  for node in other.getElementsByTagName("node"):
+    result += node.toxml()
+    result += "\n"
+  for link in main.getElementsByTagName("link"):
+    result += link.toxml()
+    result += "\n"
+  result += tun
+  result += "</rspec>"
+  return result
+
+if len( args ) >= 2:
     managers = ( args[ 0 ], args[ 1 ] )
+    if len ( args ) == 5:
+      try:
+        rspecfile = open(args[ 2 ])
+        rspec1 = rspecfile.read()
+        rspecfile.close()
+        rspecfile = open(args[ 3 ])
+        rspec2 = rspecfile.read()
+        rspecfile.close()
+        rspecfile = open(args[ 4 ])
+        tunnel = rspecfile.read()
+        rspecfile.close()
+      except IOError, e:
+        print >> sys.stderr, args[ 0 ] + ": " + e.strerror
+        sys.exit( 1 )
+    else:
+      rspec1 = None
+      rspec2 = None
+      tunnel = None
 elif len( args ):
     Usage()
     sys.exit( 1 )
 else:
     managers = None
+    rspec = None
 
 class findElement(ContentHandler):
     name       = None
@@ -159,8 +202,8 @@ else:
     url1 = components[0]["url"]
     url2 = components[1]["url"]
 
-url1 = "https://boss.emulab.net/protogeni/xmlrpc/cm"
-url2 = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
+#url1 = "https://boss.emulab.net/protogeni/xmlrpc/cm"
+#url2 = "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/cm"
 
 def DeleteSlivers():
     #
@@ -210,11 +253,12 @@ if debug: print str(mykeys)
 #
 # Get a ticket for a node on a CM.
 #
-rspec1 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node virtual_id=\"geni1\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        "</rspec>"
+if not rspec1:
+  rspec1 = ("<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
+          " <node virtual_id=\"geni1\" "+\
+          "       virtualization_type=\"emulab-vnode\"> " +\
+          " </node>" +\
+          "</rspec>")
 
 print "Asking for a ticket from CM1 ..."
 params = {}
@@ -236,18 +280,19 @@ print "Got a ticket from CM1, asking for a ticket from CM2 ..."
 #
 # Get the uuid of the node assigned so we can specify it in the tunnel.
 #
-ticket_element = findElement("ticket", ticket1)
-node_element   = findElement("node", str(ticket_element.string))
-node1_rspec    = str(node_element.string);
+#ticket_element = findElement("ticket", ticket1)
+#node_element   = findElement("node", str(ticket_element.string))
+#node1_rspec    = str(node_element.string);
 
 #
 # Get a ticket for a node on another CM.
 #
-rspec2 = "<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
-        " <node virtual_id=\"geni2\" "+\
-        "       virtualization_type=\"emulab-vnode\"> " +\
-        " </node>" +\
-        "</rspec>"
+if not rspec2:
+  rspec2 = ("<rspec xmlns=\"http://protogeni.net/resources/rspec/0.1\"> " +\
+          " <node virtual_id=\"geni2\" "+\
+          "       virtualization_type=\"emulab-vnode\"> " +\
+          " </node>" +\
+          "</rspec>")
 
 params = {}
 params["slice_urn"]   = SLICEURN
@@ -268,9 +313,9 @@ print "Got a ticket from CM2, redeeming ticket on CM1 ..."
 #
 # Get the uuid of the node assigned so we can specify it in the tunnel.
 #
-ticket_element = findElement("ticket", ticket2)
-node_element   = findElement("node", str(ticket_element.string))
-node2_rspec    = str(node_element.string);
+#ticket_element = findElement("ticket", ticket2)
+#node_element   = findElement("node", str(ticket_element.string))
+#node2_rspec    = str(node_element.string);
 
 #
 # Create the slivers.
@@ -308,18 +353,25 @@ sliver2_urn = str(findElement("target_urn", sliver2).value)
 #
 # Now add the tunnel part since we have the uuids for the two nodes.
 #
-rspec = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +\
-        "<rspec xmlns=\"http://www.protogeni.net/resources/rspec/0.1\" " +\
-        "        type=\"request\"> " + node1_rspec + " " + node2_rspec + " " +\
-        " <link virtual_id=\"link0\" link_type=\"tunnel\"> " +\
+if not tunnel:
+  tunnel = (" <link virtual_id=\"link0\" link_type=\"tunnel\"> " +\
         "  <interface_ref virtual_node_id=\"geni1\" " +\
         "                 virtual_interface_id=\"virt0\" "+\
         "                 tunnel_ip=\"192.168.1.1\" />" +\
         "  <interface_ref virtual_node_id=\"geni2\" " +\
         "                 virtual_interface_id=\"virt0\" "+\
         "                 tunnel_ip=\"192.168.1.2\" />" +\
-        " </link> " +\
-        "</rspec>"
+        " </link> ")
+
+rspec1 = makeRequest(manifest1, manifest2, tunnel)
+sys.stderr.write("RSPEC1: \n\n\n" + rspec1 + "\n\n\n")
+rspec2 = makeRequest(manifest2, manifest1, tunnel)
+sys.stderr.write("RSPEC2: \n\n\n" + rspec2 + "\n\n\n")
+
+#rspec = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +\
+#        "<rspec xmlns=\"http://www.protogeni.net/resources/rspec/0.1\" " +\
+#        "        type=\"request\"> " + node1_rspec + " " + node2_rspec + " " +\
+#        "</rspec>"
 
 #print str(rspec)
 
@@ -327,7 +379,7 @@ print "Updating sliver on CM1 with tunnel stuff ..."
 params = {}
 params["credentials"] = (myslice,)
 params["sliver_urn"]  = sliver1_urn
-params["rspec"]       = rspec
+params["rspec"]       = rspec1
 rval,response = do_method(None, "UpdateSliver", params,
                           URI=url1, version="2.0")
 if rval:
@@ -339,7 +391,7 @@ print "Updated sliver on CM1. Updating sliver on CM2 with tunnel stuff ..."
 params = {}
 params["credentials"] = (myslice,)
 params["sliver_urn"]  = sliver2_urn
-params["rspec"]       = rspec
+params["rspec"]       = rspec2
 rval,response = do_method(None, "UpdateSliver", params,
                           URI=url2, version="2.0")
 if rval:
@@ -361,7 +413,7 @@ rval,response = do_method(None, "RedeemTicket", params,
 if rval:
     Fatal("Could not redeem new ticket on CM1")
     pass
-manifest1 = response["value"]
+sliver1,manifest1 = response["value"]
 print "Redeemed new ticket CM1. Redeeming new ticket on CM2 ..."
 #print str(manifest1);
 
@@ -375,7 +427,7 @@ rval,response = do_method(None, "RedeemTicket", params,
 if rval:
     Fatal("Could not redeem new ticket on CM2")
     pass
-manifest2 = response["value"]
+sliver2,manifest2 = response["value"]
 print "Redeemed new ticket on CM2. Starting sliver on CM1 ..."
 #print str(manifest1);
 
@@ -399,8 +451,8 @@ if rval:
     Fatal("Could not start sliver on CM2")
     pass
 
-print "Slivers have been started, waiting for input to delete it"
+print "Slivers have been started"
 print "You should be able to log into the sliver after a little bit"
 sys.stdin.readline();
 
-DeleteSlivers()
+#DeleteSlivers()

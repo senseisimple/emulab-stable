@@ -1,0 +1,68 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Frontier::Responder;
+use Frontier::RPC2;
+
+# Do this early so that we talk to the right DB.
+use vars qw($GENI_DBNAME $GENI_METHODS $EMULAB_PEMFILE
+	    $GENI_RESPONSE_CONVERTER);
+BEGIN { $GENI_DBNAME = "geni-cm"; }
+
+# Configure variables
+my $ETCDIR         = "@prefix@/etc";
+$EMULAB_PEMFILE    = "$ETCDIR/genicm.pem";
+
+# Testbed libraries.
+use lib '@prefix@/lib';
+use GeniAM;
+use GeniResponse;
+
+if (!defined($GENI_VERSION) || $GENI_VERSION eq "1.0") {
+    $GENI_METHODS = {
+        "GetVersion"    => \&GeniAM::GetVersion,
+        "ListResources" => \&GeniAM::ListResources,
+        "CreateSliver"  => \&GeniAM::CreateSliver,
+        "DeleteSliver"  => \&GeniAM::DeleteSliver,
+        "SliverStatus"  => \&GeniAM::SliverStatus,
+        "RenewSliver"   => \&GeniAM::RenewSliver,
+        "Shutdown"      => \&GeniAM::Shutdown,
+    };
+}
+
+#----------------------------------------------------------------------
+# Morph the ProtoGENI response (a hash with three keys; a
+# GeniResponse) into a GENI AM response (a single value or a fault if
+# there is an error).
+#
+# $response is an XML RPC response, which is a three element hash. The
+# value element is the GeniResponse hash.
+#----------------------------------------------------------------------
+sub ConvertResponse($)
+{
+    my ($geni_response) = @_;
+
+    my $decoder = Frontier::RPC2->new();
+    my $response;
+    
+    if (GeniResponse::IsError($geni_response)) {
+	# An error result gets mapped to an XML RPC fault
+	$response =
+	    $decoder->encode_fault(GeniResponse::code($geni_response),
+				   GeniResponse::output($geni_response));
+    } else {
+	# A successful result means return the value
+	$response =
+	    $decoder->encode_response(GeniResponse::value($geni_response));
+    }
+    return $response;
+}
+$GENI_RESPONSE_CONVERTER = \&ConvertResponse;
+
+1;
+

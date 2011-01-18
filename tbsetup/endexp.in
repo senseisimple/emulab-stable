@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -85,6 +85,7 @@ use libArchive;
 use User;
 use Template;
 use Experiment;
+use EmulabFeatures;
 
 my $tbdir       = "$TB/bin/";
 my $tbdata      = "tbdata";
@@ -165,7 +166,7 @@ my $infodir = $experiment->InfoDir();
 # Sanity check.
 if (! (-e $workdir && -e $userdir)) {
     die("*** $0:\n".
-	"    Missing a critical directory!\n");
+	"    $pid/$eid is missing a critical directory!\n");
 }
 if (! -e $infodir) {
     if (! -e "$TB/expinfo/$pid") {
@@ -487,6 +488,16 @@ if ($estate eq EXPTSTATE_ACTIVE) {
     system("$archcontrol -t endexp commit $pid $eid");
 }
 
+#
+# At this point, there should not be any nodes allocated. But lets
+# make this sanity check cause it happens when administrators bypass
+# the normal order of things.
+#
+my @pnodes = $experiment->NodeList(1, 1);
+if (@pnodes) {
+    fatal("Experiment is not active, but there are nodes allocated: @pnodes\n");
+}
+
 if ($estate eq EXPTSTATE_SWAPPED ||
     $estate eq EXPTSTATE_QUEUED) {
     $experiment->GatherSwapStats($this_user, TBDB_STATS_TERMINATE, 0,
@@ -531,6 +542,12 @@ if (!$template_mode) {
     print "Experiment $pid/$eid has been successfully terminated!\n";
     $experiment->ClearLogFile();
 }
+
+#
+# Kill any features
+#
+EmulabFeatures->DeleteAll($experiment) == 0 or
+    fatal("Could not delete all features for $experiment");
 
 #
 # Cleanup DB state and remove directory. Purge flag is optional and generally

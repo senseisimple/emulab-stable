@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -98,7 +98,7 @@ if ((!isset($cdkey) || !strcmp($cdkey, ""))) {
     return;
 }
 
-if (!ereg("[0-9a-zA-Z]+", $cdkey)) {
+if (!preg_match('/[0-9a-zA-Z]+/', $cdkey)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
@@ -157,14 +157,14 @@ if ((!isset($privkey) || !strcmp($privkey, "")) ||
     return;
 }
 
-if (!ereg("[0-9a-zA-Z ]+", $privkey) ||
-    !ereg("[0-9\.]+", $IP)) {
+if (!preg_match('/[0-9a-zA-Z ]+/', $privkey) ||
+    !preg_match('/[0-9\.]+/', $IP)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
 
 if (isset($wahostname) &&
-    !ereg("[-_0-9a-zA-Z\.]+", $wahostname)) {
+    !preg_match('/[-_0-9a-zA-Z\.]+/', $wahostname)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }
@@ -183,7 +183,7 @@ if (isset($wahostname)) {
 }
 
 if (isset($roottag) &&
-    !ereg("[0-9a-zA-Z]+", $roottag)) {
+    !preg_match('/[0-9a-zA-Z]+/', $roottag)) {
     SPITSTATUS(CDROMSTATUS_INVALIDARGS);
     return;
 }

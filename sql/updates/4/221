@@ -1,0 +1,22 @@
+#
+# Add sitevariables for OML support (that someone forgot).
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("INSERT INTO sitevariables VALUES (".
+		 "'oml/default_osid',NULL,'',".
+		 "'Default OSID to use for OML server',1)")
+	if (!TBSiteVarExists("oml/default_osid"));
+    DBQueryFatal("INSERT INTO sitevariables VALUES (".
+		 "'oml/default_server_startcmd',NULL,'',".
+		 "'Default command line to use to start OML server',1)")
+	if (!TBSiteVarExists("oml/default_server_startcmd"));
+
+    return 0;
+}
+1;

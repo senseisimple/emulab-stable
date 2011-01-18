@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -68,7 +68,7 @@ public:
 
 class tb_pclass {
 public:
-  tb_pclass() : name(), size(0), used_members(0), refcount(0), disabled(false),
+  tb_pclass() : name(), size(0), used_members(0), disabled(false), refcount(0),
     is_dynamic(false) {;}
 
   typedef map<fstring,tb_pnodelist*> pclass_members_map;
@@ -81,9 +81,6 @@ public:
   int size;
   int used_members;
   pclass_members_map members;
-#ifdef SMART_UNMAP
-  pclass_members_set used_members;
-#endif
 
   bool disabled;
 
@@ -132,6 +129,10 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
    datastructures */
 int pclass_set(tb_vnode *v,tb_pnode *p);
 int pclass_unset(tb_pnode *p);
+
+// This should be called when the pnode becomes free (and pclass_unset should
+// still be called first)
+int pclass_reset_maps(tb_pnode *p); 
 
 void pclass_debug();
 

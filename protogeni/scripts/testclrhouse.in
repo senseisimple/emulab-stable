@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -60,12 +60,13 @@ require GeniRegistry;
 #
 # The RPC context for this script is as the CH
 #
-my $EMULAB_PEMFILE = "@prefix@/etc/genich.pem";
-my $certificate  = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
+my $certificate  = GeniRegistry::ClearingHouse->GetCertificate();
 if (!defined($certificate)) {
-    fatal("Could not load certificate from $EMULAB_PEMFILE");
+    fatal("Could not load ClearingHouse certificate");
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+print $certificate->uuid() . "\n";
 
 my $authority = GeniAuthority->Lookup($certificate->uuid());
 if (!defined($authority)) {
@@ -80,8 +81,7 @@ if (!defined($credential)) {
 }
 print "Got the credential back. Resolving ourself ...\n";
 
-my $clearinghouse = GeniRegistry::Client->Create($authority,
-						 undef, $credential);
+my $clearinghouse = GeniRegistry::Client->Create($authority);
 if (!defined($clearinghouse)) {
     fatal("Could not create a clearinghouse client object");
 }

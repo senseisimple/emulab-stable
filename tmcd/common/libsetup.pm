@@ -23,17 +23,18 @@ use Exporter;
 	 gettraceconfig genhostsfile getmotelogconfig calcroutes fakejailsetup
 	 getlocalevserver genvnodesetup getgenvnodeconfig stashgenvnodeconfig
          getlinkdelayconfig getloadinfo getbootwhat gendhcpdconf
+	 forcecopy
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE REMOTEDED CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP
-	 USESFS SHADOW
+	 USESFS SHADOW FSRVTYPE PROJDIR EXPDIR
 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
 	 ISFW FAKEJAILED LINUXJAILED GENVNODE GENVNODETYPE GENVNODEHOST
 	 SHAREDHOST SUBBOSS
 
-	 CONFDIR LOGDIR TMDELAY TMJAILNAME TMSIMRC TMCC TMCCBIN
+	 CONFDIR LOGDIR TMDELAY TMBRIDGES TMJAILNAME TMSIMRC TMCC TMCCBIN
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP TMLTPMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY
@@ -54,7 +55,7 @@ use librc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 30; };
+sub TMCD_VERSION()	{ 32; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -127,6 +128,13 @@ my $shadow;
 my $SHADOWDIR = "$VARDIR/shadow";
 
 #
+# Fileserver type.
+# Default is "racy NFS" (the historical only choice) until proven otherwise
+# (via "mounts" tmcc call).
+#
+my $fsrvtype = "NFS-RACY";
+
+#
 # The role of this pnode
 #
 my $role;
@@ -161,7 +169,7 @@ BEGIN
     #
     if (exists($ENV{'SHADOW'})) {
 	$shadow = $ENV{'SHADOW'};
-	my ($server,$urn) = split(',', $shadow);
+	my ($server,$idkey) = split(',', $shadow);
 	#
 	# Need to taint check these to avoid breakage later.
 	#
@@ -171,17 +179,17 @@ BEGIN
 	else {
 	    die("Bad data in server: $server");
 	}
-	if ($urn =~ /^([-\w\+\:\.]*)$/) {
-	    $urn = $1;
+	if ($idkey =~ /^([-\w\+\:\.]*)$/) {
+	    $idkey = $1;
 	}
 	else {
-	    die("Bad data in urn: $urn");
+	    die("Bad data in urn: $idkey");
 	}
 
 	# The cache needs to go in a difference location.
 	libtmcc::configtmcc("cachedir", $SHADOWDIR);
 	libtmcc::configtmcc("server", $server);
-	libtmcc::configtmcc("urn", $urn);
+	libtmcc::configtmcc("idkey", $idkey);
 	# No proxy.
 	libtmcc::configtmcc("noproxy", 1);
     }
@@ -333,6 +341,7 @@ sub TMGENVNODECONFIG()  { CONFDIR() . "/genvnodeconfig";}
 sub TMSTARTUPCMD()	{ CONFDIR() . "/startupcmd";}
 sub TMROUTECONFIG()     { CONFDIR() . "/rc.route";}
 sub TMGATEDCONFIG()     { CONFDIR() . "/gated.conf";}
+sub TMBRIDGES()		{ CONFDIR() . "/rc.bridges";}
 sub TMDELAY()		{ CONFDIR() . "/rc.delay";}
 sub TMLINKDELAY()	{ CONFDIR() . "/rc.linkdelay";}
 sub TMDELMAP()		{ CONFDIR() . "/delay_mapping";}
@@ -368,6 +377,30 @@ my $TIMESTAMPS  = 0;
 # Allow override from the environment;
 if (defined($ENV{'TIMESTAMPS'})) {
     $TIMESTAMPS = $ENV{'TIMESTAMPS'};
+}
+
+#
+# Any reason NOT to hardwire these?
+#
+sub PROJDIR() {
+    my $p = $pid;
+    if (!$p) {
+	($p, undef, undef) = check_nickname();
+	return ""
+	    if (!$p);
+    }
+    return "/proj/$p";
+}
+
+sub EXPDIR() {
+    my $p = $pid;
+    my $e = $eid;
+    if (!$p || !$e) {
+	($p, $e, undef) = check_nickname();
+	return ""
+	    if (!$p || !$e);
+    }
+    return "/proj/$p/exp/$e";
 }
 
 # When on the MFS, we do a much smaller set of stuff.
@@ -455,6 +488,34 @@ sub SHADOW()	   { return (defined($shadow) ? 1 : 0); }
 # Is this node using SFS. Several scripts need to know this.
 #
 sub USESFS()	{ if (-e TMUSESFS()) { return 1; } else { return 0; } }
+
+#
+# What type of fileserver is this node using.  Choices are:
+#
+# NFS-RACY	FreeBSD NFS server with mountd race (the default)
+# NFS		NFS server
+# LOCAL		No shared filesystems
+#
+# XXX should come from tmcd
+#
+sub FSRVTYPE() {
+    if (-e "$BOOTDIR/fileserver") {
+	open(FD, "$BOOTDIR/fileserver");
+	$fsrvtype = <FD>;
+	close(FD);
+	chomp($fsrvtype);
+    }
+    return $fsrvtype;
+}
+
+# XXX fer now hack: comes from rc.mounts
+sub setFSRVTYPE($) {
+    $fsrvtype = shift;
+    if (open(FD, ">$BOOTDIR/fileserver")) {
+	print FD "$fsrvtype\n";
+	close(FD);
+    }
+}
 
 #
 # XXX fernow hack so I can readily identify code that is special to Xen VMs
@@ -1077,50 +1138,52 @@ sub gendhcpdconf($$)
 			    my $singlenet = $$row{"SINGLENET"};
 			    my $inner_elab_boot = $$row{"INNER_ELAB_BOOT"};
 			    my $plab_boot = $$row{"PLAB_BOOT"};
+			    my $booting;
+			    my $dns;
 
-			if (defined $hostname) {
-				$hostname =
+			    if (defined $hostname) {
+			    	$hostname =
 				    "${spaces}\toption host-name \"$hostname\";\n";
-			}
+			    }
 
-			if (defined $filename) {
+    			    if (defined $filename) {
 				$filename =~ s/^"(.*)"$/$1/;
 				$filename =
 				    "${spaces}\tfilename \"$filename\";\n";
-			}
+			    }
 
 
-			if (defined $next_server) {
+			    if (defined $next_server) {
 				$next_server = "${spaces}\tnext-server " .
 					$next_server . ";\n";
-			}
+			    }
 
-			if (defined $bootinfo_server) {
+			    if (defined $bootinfo_server) {
 				$bootinfo_server = "${spaces}\toption " .
 				"PXE.emulab-bootinfo " . $bootinfo_server . ";\n";
-			}
+			    }
 
-			if ($inner_elab_boot) {
+			    if ($inner_elab_boot) {
 				if ($singlenet) {
 					$booting  = "${spaces}\tignore booting;\n";
 				} else {
 					$dns = "${spaces}\toption ".
 					    "domain-name-servers 1.1.1.1;\n";
 				}
-			}
-
-			#
-			# Handle alternate boot program filename if it exists.
-			# Use mutable nodes.pxe_boot_path if it is defined.
-			# Otherwise use the node_types.pxe_boot_path if it is
-			# defined.  Otherwise don't set anything (use the global
-			# default).
-			#
-			if (defined $filename) {
-			    # make sure it is pretty constrained
-			    if ($filename =~ /^\/tftpboot\// && $fn !~ /\.\./) {
-			        $filename = "${spaces}\tfilename \"$filename\";\n";
 			    }
+
+			    #
+			    # Handle alternate boot program filename if it exists.
+			    # Use mutable nodes.pxe_boot_path if it is defined.
+			    # Otherwise use the node_types.pxe_boot_path if it is
+			    # defined.  Otherwise don't set anything (use the global
+			    # default).
+			    #
+			    if (defined $filename) {
+			        # make sure it is pretty constrained
+			        if ($filename =~ /^\/tftpboot\// && $fn !~ /\.\./) {
+			            $filename = "${spaces}\tfilename \"$filename\";\n";
+			        }
 			}
 
 			# Need to make MAC look right..
@@ -1740,6 +1803,34 @@ sub getbootwhat($)
     return 0;
 }
 
+#
+# Do everything in our power to copy a file.
+# The main "specialness" about this function is that it tries to work
+# around the old FreeBSD NFS server race with changing the exports list--
+# we retry the copy several times before failing.
+# Returns one on success, zero on failure.
+#
+sub forcecopy($$)
+{
+    my ($ffile, $tfile) = @_;
+    my $tries = 1;
+
+    #
+    # If the file server has NFS races, we try operations multiple
+    # times in case we hit the EPERM window.
+    #
+    if (FSRVTYPE() eq "NFS-RACY") {
+	$tries = 5;
+    }
+
+    for (my $i = 0; $i < $tries; $i++) {
+	if (system("cp -fp $ffile $tfile >/dev/null 2>&1") == 0) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 my %fwvars = ();
 
 #
@@ -2003,21 +2094,21 @@ sub bootsetup()
 #
 sub shadowsetup($$)
 {
-    my ($server, $urn) = @_;
+    my ($server, $idkey) = @_;
 
     $shadow = 1;
 
     # This changes where tmcc is going to store the data.
     libtmcc::configtmcc("cachedir", $SHADOWDIR);
     libtmcc::configtmcc("server", $server);
-    libtmcc::configtmcc("urn", $urn);
+    libtmcc::configtmcc("idkey", $idkey);
 
     # No proxy.
     libtmcc::configtmcc("noproxy", 1);
 
     # Tell children.
-    $ENV{'SHADOW'} = "$server,$urn";
-    $ENV{'URN'}    = $urn;
+    $ENV{'SHADOW'} = "$server,$idkey";
+    $ENV{'IDKEY'}  = $idkey;
 
     # Tell libtmcc to forget anything it knows.
     tmccclrconfig();
@@ -2049,7 +2140,7 @@ sub shadowsetup($$)
     #
     donodeid();
 
-    my $eiddir = "/proj/$pid/exp/$eid/tbdata";
+    my $eiddir = EXPDIR() . "/tbdata";
     os_mkdir($eiddir, "0777");
 
     return ($pid, $eid, $vname);
@@ -2247,14 +2338,15 @@ sub stashgenvnodeconfig()
 #
 # Return the generic vnode config info in a hash.  XXX: For now uses jailconfig.
 #
-sub getgenvnodeconfig($;$)
+sub getgenvnodeconfig($)
 {
-    my ($rptr,$nocache) = @_;
+    my ($rptr) = @_;
     my @tmccresults = ();
     my %vconfig = ();
+    my $issharedhost = SHAREDHOST();
 
     my %tmccopts = ();
-    if ($nocache) {
+    if ($issharedhost) {
 	$tmccopts{"nocache"} = 1;
     }
 

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2006 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -60,7 +60,7 @@ extern tb_sgraph SG;		// switch fabric
 void score_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 void unscore_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-                    pedge &out_edge, bool flipped, bool check_src_iface,
+                    pedge &out_edge, bool check_src_iface,
                     bool check_dst_iface);
 int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
@@ -88,8 +88,18 @@ void score_link_endpoints(pedge pe);
 #define SDEBADD(amount) cerr << "SADD: " << #amount << "=" << amount << " from " << score;score+=amount;cerr << " to " << score << endl
 #define SDEBSUB(amount)  cerr << "SSUB: " << #amount << "=" << amount << " from " << score;score-=amount;cerr << " to " << score << endl
 
+#ifdef SCORE_DEBUG_MAX
+// Handy way to print only the first N debugging messages, since that's usually
+// enough to get the idea
+static unsigned long scoredebugcount = 0;
+#endif
+
 #ifdef SCORE_DEBUG
+#ifdef SCORE_DEBUG_MAX
+#define SDEBUG(a) if (scoredebugcount++ < SCORE_DEBUG_MAX) { a; }
+#else
 #define SDEBUG(a) a
+#endif
 #else
 #define SDEBUG(a) 
 #endif
@@ -173,8 +183,11 @@ void init_score()
   tie(vedge_it,end_vedge_it) = edges(VG);
   for (;vedge_it!=end_vedge_it;++vedge_it) {
     tb_vlink *vlink=get(vedge_pmap,*vedge_it);
-    vlink->link_info.type_used=tb_link_info::LINK_UNMAPPED;
-    vlink->no_connection=false;
+    SADD(SCORE_NO_CONNECTION);
+    vlink->no_connection=true;
+    vinfo.no_connection++;
+    vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
+    violated++;
   }
   pvertex_iterator pvertex_it,end_pvertex_it;
   tie(pvertex_it,end_pvertex_it) = vertices(PG);
@@ -207,7 +220,7 @@ void init_score()
 float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
     pvertex dest_pv, tb_vlink *vlink, tb_pnode *pnode, tb_pnode *dest_pnode,
     bool flipped) {
-  SDEBUG(cerr << "   finding link resolutions" << endl);
+  SDEBUG(cerr << "   finding link resolutions from " << pnode->name << " to " << dest_pnode->name << endl);
   /* We need to calculate all possible link resolutions, stick
    * them in a nice datastructure along with their weights, and
    * then select one randomly.
@@ -240,19 +253,32 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
 
   pedge pe;
   // Direct link (have to check both interfaces if they are fixed)
-  if (find_best_link(dest_pv,pv,vlink,pe,flipped,true,true)) {
+  if (find_best_link(dest_pv,pv,vlink,pe,true,true)) {
     tb_link_info info(tb_link_info::LINK_DIRECT);
     info.plinks.push_back(pe);
     resolutions.push_back(info);
     total_weight += LINK_RESOLVE_DIRECT;
-    SDEBUG(cerr << "    direct_link " << pe << endl);
+    SDEBUG(cerr << "    added a direct_link " << pe << endl);
   }
+
+  /*
+   * IMPORTANT NOTE ABOUT find_best_link -
+   *
+   * We have to tell it whether it is supposed to check the source of the
+   * vlink, the dest of the vlink, or both, for fixed interfaces. Of course, we
+   * only want to check the 'node' side, not the switch side, of interswitch
+   * and intraswitch paths. Of course, which end we're looking at depends on
+   * the order we're traversing the vlink - the flipped variable. This is why
+   * you see 'flipped' and '!flipped' passed to find_best_link() below.
+   */
+
   // Intraswitch link
   pedge first,second;
   for (pvertex_set::iterator switch_it = pnode->switches.begin();
       switch_it != pnode->switches.end();++switch_it) {
     if (dest_pnode->switches.find(*switch_it) !=
         dest_pnode->switches.end()) {
+      SDEBUG(cerr << "    intraswitch: both are connected to " << *switch_it << endl);
       bool first_link, second_link;
       /*
        * Check to see if either, or both, pnodes are actually
@@ -280,9 +306,8 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
 
       if (first_link) {
         SDEBUG(cerr << "    intraswitch: finding first link" << endl;)
-        // Check only whether the source interface is fixed - this is the
-        // first link in a multi-hop path
-        if (!find_best_link(pv,*switch_it,vlink,first,flipped,true,false)) {
+        // See note above
+        if (!find_best_link(pv,*switch_it,vlink,first,!flipped,flipped)) {
           SDEBUG(cerr << "    intraswitch failed - no link first" <<
               endl;)
             // No link to this switch
@@ -291,11 +316,9 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (second_link) {
-        // Check only whether the dest interface is fixed - this is the
-        // last link in a multi-hop path
         SDEBUG(cerr << "    intraswitch: finding second link (" <<  ")" << endl;)
-        if (!find_best_link(dest_pv,*switch_it,vlink,second,flipped,
-                    false,true)) {
+        // See note above
+        if (!find_best_link(dest_pv,*switch_it,vlink,second,flipped,!flipped)) {
           // No link to this switch
           SDEBUG(cerr << "    intraswitch failed - no link second" <<
               endl;)
@@ -348,22 +371,24 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       if ((pv == *source_switch_it) || (pv ==
             *dest_switch_it)) {
         first_link = false;
+        SDEBUG(cerr << "    interswitch: not first link in a path" << endl);
       } else {
+        SDEBUG(cerr << "    interswitch: *is* first link in a path" << endl);
         first_link = true;
       }
       if ((dest_pv == *source_switch_it) ||
           (dest_pv == *dest_switch_it)) {
         second_link = false;
+        SDEBUG(cerr << "    interswitch: not second link in a path" << endl);
       } else {
+        SDEBUG(cerr << "    interswitch: *is* second link in a path" << endl);
         second_link = true;
       }
 
       // Get link objects
       if (first_link) {
-        // Check only whether the source interface is fixed - this is the
-        // first link in a multi-hop path
-        if (!find_best_link(pv,*source_switch_it,vlink,first,flipped,
-                    true,false)) {
+        // See note above
+        if (!find_best_link(pv,*source_switch_it,vlink,first,!flipped,flipped)) {
             // No link to this switch
             SDEBUG(cerr << "    interswitch failed - no first link"
                 << endl;)
@@ -372,11 +397,9 @@ float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
       }
 
       if (second_link) {
-        // Check only whether the dest interface is fixed - this is the
-        // last link in a multi-hop path
-        if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,flipped,
-                    false,true)) {
-          // No link to tshis switch
+        // See note above
+        if (!find_best_link(dest_pv,*dest_switch_it,vlink,second,flipped,!flipped)) {
+          // No link to this switch
           SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
             continue;
         }
@@ -489,11 +512,25 @@ inline float resolution_cost(tb_link_info::linkType res_type) {
  * Mark a vlink as unassigned
  */
 void mark_vlink_unassigned(tb_vlink *vlink) {
+    SDEBUG(cerr << "    marking " << vlink->name << " unassigned" << endl;)
+    assert(!vlink->no_connection);
     SADD(SCORE_NO_CONNECTION);
     vlink->no_connection=true;
     vinfo.no_connection++;
     vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
     violated++;
+}
+
+/*
+ * Mark a vlink as assigned: fix up violations
+ */
+void mark_vlink_assigned(tb_vlink *vlink) {
+    SDEBUG(cerr << "    marking " << vlink->name << " assigned" << endl;)
+    assert(vlink->no_connection);
+    SSUB(SCORE_NO_CONNECTION);
+    vlink->no_connection=false;
+    vinfo.no_connection--;
+    violated--;
 }
 
 /*
@@ -506,6 +543,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
 
   if (dest_vv == vv) {
     dest_vv = source(edge,VG);
+    SDEBUG(cerr << "  dest_vv is backwards" << endl);
   }
 
   /*
@@ -517,6 +555,7 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
   if (vlink->src != vv) {
     SDEBUG(cerr << "  vlink is flipped" << endl);
     flipped = true;
+    assert(vlink->dst == vv);
   }
 
   /*
@@ -548,9 +587,16 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
          * Note: We can't get here when doing adjust_to_native_bandwidth,
          * since it's illegal to allow trivial links when it's in use.
          */
+        SDEBUG(cerr << "    allowed" << endl;)
+        if (vlink->no_connection) {
+          mark_vlink_assigned(vlink);
+        }
         score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
       } else {
-	  mark_vlink_unassigned(vlink);
+        SDEBUG(cerr << "    not allowed" << endl;)
+        if (!vlink->no_connection) {
+          mark_vlink_unassigned(vlink);
+        }
       }
     } else {
       //assert(resolution_index <= 1)
@@ -567,18 +613,10 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
        */
       if (resolution_index == 0) {
         SDEBUG(cerr << "  Could not find any resolutions" << endl;)
-        mark_vlink_unassigned(vlink);
-      } else {
-        /*
-         * Check to see if we are fixing a violation
-         */
-        if (vlink->no_connection) {
-          SDEBUG(cerr << "  Fixing previous violations." << endl);
-          SSUB(SCORE_NO_CONNECTION);
-          vlink->no_connection=false;
-          vinfo.no_connection--;
-          violated--;
+        if (!vlink->no_connection) {
+            mark_vlink_unassigned(vlink);
         }
+      } else {
         /*
          * Choose a link
          */
@@ -636,9 +674,20 @@ void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
 #ifdef PENALIZE_UNUSED_INTERFACES
         pnode->used_interfaces++;
 #endif
+        /*
+         * Make it so
+         */
         vlink->link_info = resolutions[index];
         SDEBUG(cerr << "  choice:" << vlink->link_info);
         score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
+
+        /*
+         * Check to see if we are fixing a violation
+         */
+        if (vlink->no_connection) {
+          SDEBUG(cerr << "  Fixing previous violations." << endl);
+          mark_vlink_assigned(vlink);
+        }
       }
     }
   }
@@ -897,10 +946,6 @@ void remove_node(vvertex vv)
     }
   }
 
-#ifdef SMART_UNMAP
-  pnode->assigned_nodes.erase(vnode);
-#endif
-
   // pclass
   if ((!disable_pclasses) && !(tr->is_static()) && pnode->my_class
 	  && (pnode->my_class->used_members == 0)) {
@@ -980,16 +1025,7 @@ void remove_node(vvertex vv)
       }
     }
 
-    // A 'not-connected' vlink only counts as a violation if both of its
-    // endpoints are assigned
-    if (vlink->no_connection) {
-      SDEBUG(cerr << "  link no longer in violation.\n";)
-      SSUB(SCORE_NO_CONNECTION);
-      vlink->no_connection=false;
-      vinfo.no_connection--;
-      violated--;
-    }
-    
+
     // Only unscore the link if the vnode on the other end is assigned - this
     // way, only the first end to be unmapped causes unscoring
     if (! dest_vnode->assigned) {
@@ -1000,6 +1036,13 @@ void remove_node(vvertex vv)
     pvertex dest_pv = dest_vnode->assignment;
     tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
     unscore_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
+    
+    // If the other end was connected before, it's not now
+    if (!vlink->no_connection) {
+      SDEBUG(cerr << "      link now in violation.\n";)
+      mark_vlink_unassigned(vlink);
+    }
+    
   }
  
 #ifdef PENALIZE_UNUSED_INTERFACES
@@ -1025,6 +1068,7 @@ void remove_node(vvertex vv)
     SDEBUG(cerr << "  releasing pnode" << endl);
     SSUB(SCORE_PNODE);
     pnode->remove_current_type();
+    pclass_reset_maps(pnode);
     // ptypes
     tb_pnode::types_list::iterator lit = pnode->type_list.begin();
     while (lit != pnode->type_list.end()) {
@@ -1360,10 +1404,6 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
   pnode->used_interfaces = 0;
 #endif
  
-#ifdef SMART_UNMAP
-  pnode->assigned_nodes.insert(vnode);
-#endif
-
   /*
    * Record the node's assignment. Need to do this now so that 'loopback' links
    * work below.
@@ -1466,8 +1506,19 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip
   return 0;
 }
 
+/*
+ * Find the best link between two physical nodes, making sure it matches the
+ * requirements of the given vlink. Returns results in the out_edge parameter
+ * NOTE: assumes the caller has done enough bookkeeping to know whether the
+ * source and dest interfaces need to be checked for fixed interfaces - that
+ * is: check_src_iface should be set if:
+ *    this is a direct link OR
+ *    we're mapping the end of an inter or intra switch link that connects to
+ *       the 'source' vnode in the vlink structure
+ * Similar rules apply to check_dst_iface
+ */
 bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
-			 pedge &out_edge, bool flipped, bool check_src_iface,
+			 pedge &out_edge, bool check_src_iface,
                          bool check_dst_iface)
 {
   pvertex dest_pv;
@@ -1490,39 +1541,62 @@ bool find_best_link(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 	  continue;
       }
 
+      SDEBUG(cerr << "         find_best_link: fix_src_iface = " <<
+              vlink->fix_src_iface << " check_src_iface = " << check_src_iface
+              << " fix_dst_iface = " << vlink->fix_dst_iface
+              << " check_dst_iface = " << check_dst_iface << endl;)
+
+      // Whether we check the 'source' or 'destination' on the vlink against
+      // the phyisical link's source interface depends on whether the
+      // interface order in the in the pedge matches the interface order in 
+      // the vlink
+      bool plink_order_reversed;
+      tb_vnode *src_vnode = get(vvertex_pmap,vlink->src);
+      tb_pnode *src_pnode = get(pvertex_pmap,src_vnode->assignment);
+      if (src_pnode->name != plink->srcnode) {
+          SDEBUG(cerr << "          find_best_link: plink and vlink in " <<
+                  "different order (" << src_pnode->name << " != " <<
+                  plink->srcnode << ")" << endl;)
+          plink_order_reversed = true;
+      } else {
+          SDEBUG(cerr << "          find_best_link: plink and vlink in " <<
+                  "same order (" << src_pnode->name << " == " <<
+                  plink->srcnode << ")" << endl;)
+          plink_order_reversed = false;
+      }
+
+
       // If the vlink has a fixed source interface, and it doesn't match
       // this plink, skip it
       if (vlink->fix_src_iface && check_src_iface) {
-          // Whether we check the 'source' or 'destination' on the vlink against
-          // the phyisical link's source interface depends on whether we're
-          // traversing the link if forward or reverse (flipped) order
-          fstring compare_iface = (flipped?vlink->dst_iface:vlink->src_iface);
-          if (plink->srciface != compare_iface) {
+          // The interface name we compare to on the plink depends on wether it
+          // goes in the same 'direction' as the vlink
+	  fstring compare_iface = (plink_order_reversed? plink->dstiface : plink->srciface);
+          if (vlink->src_iface != compare_iface) {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
-                      "): Fix source: " << plink->srciface << " != " <<
+                      "): Fix source: " << vlink->src_iface << " != " <<
                       compare_iface << endl);
               continue;
           } else {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
-                      "): Fix source: " << plink->srciface << " == " <<
+                      "): Fix source: " << vlink->src_iface << " == " <<
                       compare_iface << endl);
           }
       }
 
       // Same for destination
-      // Yes, this really is srciface
-      // XXX: This only works because we always have the node as the 'source'
-      // of a plink! Shouldn't depend on this!
       if (vlink->fix_dst_iface && check_dst_iface) {
-          fstring compare_iface = (flipped?vlink->src_iface:vlink->dst_iface);
-          if (plink->srciface != compare_iface) {
+          // The interface name we compare to on the plink depends on wether it
+          // goes in the same 'direction' as the vlink
+	  fstring compare_iface = (plink_order_reversed? plink->srciface : plink->dstiface);
+          if (vlink->dst_iface != compare_iface) {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
-                      "): Fix dst: " << plink->srciface << " != " <<
+                      "): Fix dst: " << vlink->dst_iface << " != " <<
                       compare_iface << endl);
               continue;
           } else {
               SDEBUG(cerr << "          find_best_link (" << vlink->name <<
-                      "): Fix dst: " << plink->srciface << " == " <<
+                      "): Fix dst: " << vlink->dst_iface << " == " <<
                       compare_iface << endl);
           }
       }

@@ -82,11 +82,8 @@ if (@ARGV) {
 # Add all users to the Trac DB.
 #
 $query_result =
-    DBQueryFatal("select distinct uid from group_membership where pid=gid ".
-		 "and (pid='testbed' or pid='tbres' or ".
-		 "     pid='utahstud')" .
-		 "");
-
+    DBQueryFatal("select uid from users where status!='archived'");
+    
 while (my ($uid) = $query_result->fetchrow_array()) {
     system("$ADDTRACUSER $uid") == 0
 	or fatal("Could not add Trac account for $uid");

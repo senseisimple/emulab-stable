@@ -1022,7 +1022,7 @@ class Experiment
                    </td>
               </tr>\n";
 
-	    if (ISADMIN()) {
+	    if (ISADMIN() || STUDLY() || OPSGUY()) {
 		$thisflip = ($skipvlans ? 0 : 1);
 		$flipval  = ($skipvlans ? "Yes" : "No");
 		echo "<tr>
@@ -1111,6 +1111,7 @@ class Experiment
 
 		if ($slice) {
 		    $slice_hrn = $slice->hrn();
+		    $slice_urn = $slice->urn();
 		    if (ISADMIN()) {
 			$url = CreateURL("showslice", "slice_idx",
 					 $slice->idx(), "showtype", "cm");
@@ -1118,13 +1119,13 @@ class Experiment
 			echo "<tr>
                                 <td>Geni Slice (CM): </td>
                                 <td class=\"left\">
-                                     <a href='$url'>$slice_hrn</a></td>
+                                     <a href='$url'>$slice_urn</a></td>
                               </tr>\n";
 		    }
 		    else {
 			echo "<tr>
                                 <td>Geni Slice (CM): </td>
-                                <td class=\"left\">$slice_hrn</td>
+                                <td class=\"left\">$slice_urn</td>
                               </tr>\n";
 		    }
 		}
@@ -1133,6 +1134,7 @@ class Experiment
 		$slice = GeniSlice::LookupByExperiment("geni-sa", $this);
 		if ($slice) {
 		    $slice_hrn = $slice->hrn();
+		    $slice_urn = $slice->urn();
 		    if (ISADMIN()) {
 			$url = CreateURL("showslice", "slice_idx",
 					 $slice->idx(), "showtype", "sa");
@@ -1140,13 +1142,13 @@ class Experiment
 			echo "<tr>
                                  <td>Geni Slice (SA): </td>
                                  <td class=\"left\">
-                                      <a href='$url'>$slice_hrn</a></td>
+                                      <a href='$url'>$slice_urn</a></td>
                              </tr>\n";
 		    }
 		    else {
 			echo "<tr>
                                 <td>Geni Slice (SA): </td>
-                                <td class=\"left\">$slice_hrn</td>
+                                <td class=\"left\">$slice_urn</td>
                               </tr>\n";
 		    }
 		    $slice = GeniSlice::Lookup("geni-cm", $slice_hrn);
@@ -1158,13 +1160,13 @@ class Experiment
 			    echo "<tr>
                                      <td>Geni Slice (CM): </td>
                                      <td class=\"left\">
-                                           <a href='$url'>$slice_hrn</a></td>
+                                           <a href='$url'>$slice_urn</a></td>
                                   </tr>\n";
 			}
 			else {
 			    echo "<tr>
                                     <td>Geni Slice (SA): </td>
-                                    <td class=\"left\">$slice_hrn</td>
+                                    <td class=\"left\">$slice_urn</td>
                                   </tr>\n";
 			}
 		    }
@@ -1578,5 +1580,4 @@ function ShowExperimentList_internal($templates_only,
     }
     return $html;
 }
-
-    
+?>

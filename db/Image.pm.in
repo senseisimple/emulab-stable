@@ -14,13 +14,8 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
-use Project;
-use Group;
-use User;
-use OSinfo;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -132,15 +127,39 @@ sub part4_osid($)       { return field($_[0], "part4_osid"); }
 sub default_osid($)     { return field($_[0], "default_osid"); }
 sub path($)             { return field($_[0], "path"); }
 sub magic($)            { return field($_[0], "magic"); }
-sub load_address($)     { return field($_[0], "load_address"); }
-sub frisbee_pid($)      { return field($_[0], "frisbee_pid"); }
-sub load_busy($)        { return field($_[0], "load_busy"); }
+#sub load_address($)     { return field($_[0], "load_address"); }
+#sub frisbee_pid($)      { return field($_[0], "frisbee_pid"); }
+#sub load_busy($)        { return field($_[0], "load_busy"); }
 sub ezid($)             { return field($_[0], "ezid"); }
 sub shared($)           { return field($_[0], "shared"); }
 sub global($)           { return field($_[0], "global"); }
 sub updated($)          { return field($_[0], "updated"); }
 sub mbr_version($)      { return field($_[0], "mbr_version"); }
 sub access_key($)       { return field($_[0], "access_key"); }
+
+#
+# Get a list of all running frisbee images.
+#
+sub ActiveImages($)
+{
+    my ($class) = @_;
+    my @result  = ();
+
+    my $query_result =
+	DBQueryWarn("select imageid from frisbee_blobs where frisbee_pid!=0");
+    return undef
+	if (!defined($query_result));
+
+    while (my ($imageid) = $query_result->fetchrow_array()) {
+	my $image = Image->Lookup($imageid);
+	if (!defined($image)) {
+	    print STDERR "*** Could not find DB object for image $imageid\n";
+	    return undef;
+	}
+	push(@result, $image);
+    }
+    return \@result;
+}
 
 #
 # Refresh a class instance by reloading from the DB.
@@ -173,6 +192,7 @@ sub Create($$$$$$$$)
 {
     my ($class, $project, $group, $creator,
 	$imagename, $imageid, $argref, $usrerr_ref) = @_;
+    require OSinfo;
 
     return undef
 	if (ref($class) || !ref($project));
@@ -350,7 +370,8 @@ sub EditImageid($$$$)
     # (Others above already did their own updates.)
     #
     my %updates;
-    foreach my $col ("description", "path", "load_address", "frisbee_pid" ) {
+    #foreach my $col ("description", "path", "load_address", "frisbee_pid" ) {
+    foreach my $col ("description", "path") {
 	# Copy args we want so that others can't get through.
 	if (exists($argref->{$col})) {
 	    $updates{$col} = $mods{$col} = $argref->{$col};
@@ -505,6 +526,7 @@ sub Update($$)
 sub GetProject($)
 {
     my ($self) = @_;
+    require Project;
 
     # Must be a real reference. 
     return undef
@@ -525,6 +547,7 @@ sub GetProject($)
 sub GetGroup($)
 {
     my ($self) = @_;
+    require Group;
 
     # Must be a real reference. 
     return undef
@@ -634,25 +657,6 @@ sub UnLockTables($)
 
     DBQueryWarn("unlock tables")
 	or return -1;
-    return 0;
-}
-
-#
-# Bump the busy indicator to keep the frisbeed going.
-#
-sub KeepBusy($)
-{
-    my ($self) = @_;
-
-    # Must be a real reference. 
-    return -1
-	if (! ref($self));
-
-    my $imageid = $self->imageid();
-
-    DBQueryFatal("update images set load_busy=GREATEST(load_busy,1) " .
-		 "where imageid='$imageid'");
-
     return 0;
 }
 

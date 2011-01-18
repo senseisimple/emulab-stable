@@ -152,13 +152,13 @@ dostype-debug: dostype.o
 
 ssl.o:	ssl.c ssl.h decls.h
 
-tpm.o:	tpm.c tpm.h
-	$(CC) -c $(CFLAGS) $(TESTBED_SRCDIR)/tmcd/tpm.c \
+tpm.o:	tpm.c tpm.h ssl.h
+	$(CC) -c $(CFLAGS) $(SSLFLAGS) $(TESTBED_SRCDIR)/tmcd/tpm.c \
 		-I$(TESTBED_SRCDIR)/tmcd/
 
-notpm: tpm.c tpm.h
-	$(CC) -c $(CFLAGS) -DTPMOVERRIDE $(TESTBED_SRCDIR)/tmcd/tpm.c \
-		-I$(TESTBED_SRCDIR)/tmcd/
+notpm: tpm.c tpm.h ssl.h
+	$(CC) -c $(CFLAGS) $(SSLFLAGS) -DTPMOVERRIDE \
+	    $(TESTBED_SRCDIR)/tmcd/tpm.c -I$(TESTBED_SRCDIR)/tmcd/
 
 version.c: tmcd.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"

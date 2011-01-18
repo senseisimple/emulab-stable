@@ -177,7 +177,7 @@ my ($dev,$ino,$mode,$nlink,undef,undef,$rdev,$size,
 my $if_mod_since = 0;
 $if_mod_since = str2time($ENV{HTTP_IF_MODIFIED_SINCE}) 
     if defined $ENV{HTTP_IF_MODIFIED_SINCE};
-if ($if_mod_since > 0 && $if_mod_since <= $mtime) {
+if ($mtime <= $if_mod_since) {
     print "Status: 304 Not Modified\n\n";
 } else {
     print "Content-Type: $mime_type\n" if defined $mime_type;

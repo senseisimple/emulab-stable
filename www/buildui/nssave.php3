@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ $optargs = OptionalPageArguments("guid", PAGEARG_INTEGER,
 #
 # Only known and logged in users.
 #
-if (isset($guid) && ereg("^[0-9]+$", $guid)) {
+if (isset($guid) && preg_match('/^[0-9]+$/', $guid)) {
 	$uid = $guid;
 }
 else {
@@ -38,7 +38,7 @@ if (!isset($nsdata)) {
 	USERERROR("Need to send NSFILE!", 1);
 } 
 
-if (!isset($nsref) || !ereg("^[0-9]+$", $nsref)) {
+if (!isset($nsref) || !preg_match('/^[0-9]+$/', $nsref)) {
 	USERERROR("Need to send valid NSREF!", 1);
 }
 

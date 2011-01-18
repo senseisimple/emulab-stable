@@ -20,6 +20,8 @@ function MayEditPub($user, $isadmin, $row) {
     if ($pid == '') 
         return false;
     $proj = Project::LookupByPid($pid);
+    if (!$proj)
+	return false;
     return TBMinTrust($proj->UserTrust($user), $TBDB_TRUST_LOCALROOT);
 }
 

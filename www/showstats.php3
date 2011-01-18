@@ -175,15 +175,20 @@ else {
     USERERROR("Bad page arguments!", 1);
 }
 
-$startclause = ($startwith ? "t.idx<$startwith " : "");
+# Do the endwith to ensure the query does not take too long
+$endwith     = ($startwith ? $startwith - 1000 : 0);
+$startclause = ($startwith ? "(t.idx<$startwith and t.idx>$endwith)" : "");
 
 if (strlen($wclause)) {
     if (strlen($startclause)) {
 	$wclause = "$wclause and $startclause";
     }
 }
+else if (strlen($startclause)) {
+    $wclause = "where ($startclause)";
+}
 else {
-    $wclause = $startclause;
+    $wclause = "";
 }
 
 $query_result =

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -350,12 +350,8 @@ if (!$experiment->elabinelab()) {
 # This is the only DB state that is modified during a top only run.
 #
 if (!$zeemode) {
-    my $cmd = "$wrapper -t $pid $eid";
+    my $cmd = "$vtopgen -p $pid $eid";
 
-    if ($pid eq "testbed" || $pid eq "tbres" || $pid eq "emulab-ops" ||
-	$this_user->stud()) {
-	$cmd = "$vtopgen -p $pid $eid";
-    }
     TBDebugTimeStamp("assign prerun started");
     print "Doing a pre-assign: '$cmd' ...\n";
 

@@ -1,0 +1,30 @@
+#
+# Install new port, for ProtoGENI.
+#
+use strict;
+use libinstall;
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "p5-XML-SemanticDiff", "Checking for p5-XML-SemanticDiff", sub {
+	    DoneIfPackageInstalled("p5-XML-SemanticDiff");
+	    ExecQuietFatal("cd $PORTSDIR/textproc/p5-XML-SemanticDiff; ".
+			   "make MASTER_SITE_FREEBSD=1 -DBATCH install");
+	};
+    }    
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    
+    return 0;
+}
+1;

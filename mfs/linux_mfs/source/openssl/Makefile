@@ -3,11 +3,11 @@ include ../../variables.mk
 .PHONY: extract patch config \
 	openssl install clean all
 
-OPENSSL_VERSION =	0.9.7m
+OPENSSL_VERSION =	0.9.8n
 OPENSSL_PATH	=	$(TARGET_BUILD_PATH)/openssl-$(OPENSSL_VERSION)
 
 SYSROOT_OPENSSL_SHARED = $(STAGING_DIR)/usr/lib/libcrypto.a
-TARGET_OPENSSL_SHARED = $(TARGET_PATH)/usr/lib/libcrypto.so.0.9.7
+TARGET_OPENSSL_SHARED = $(TARGET_PATH)/usr/lib/libcrypto.so.0.9.8
 
 all: openssl
 
@@ -45,10 +45,12 @@ $(OPENSSL_PATH)/.config-stamp: $(OPENSSL_PATH)/.patch-stamp
 	(cd $(OPENSSL_PATH); \
 		CFLAGS="-DOPENSSL_NO_KRB5 -DOPENSSL_NO_IDEA -DOPENSSL_NO_MDC2 -DOPENSSL_NO_RC5 $(TARGET_CFLAGS)" \
 		PATH=$(STAGING_DIR)/usr/bin:$(PATH) \
-		./Configure linux-$(MFS_ARCH) --prefix=/ \
-			--openssldir=/lib/ssl -L$(STAGING_DIR)/lib -ldl \
+		MACHINE=$(MFS_ARCH) \
+		./config --prefix=/usr \
+			--openssldir=/usr/lib/ssl -L$(STAGING_DIR)/lib -ldl \
 			-I$(STAGING_DIR)/usr/include $(OPENSSL_OPTS) threads \
 			shared no-idea no-mdc2 no-rc5)
+	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) CC=$(MFS_ARCH)-linux-uclibc-gcc -C $(OPENSSL_PATH) depend
 	touch $@
 
 $(OPENSSL_PATH)/apps/openssl: $(OPENSSL_PATH)/.config-stamp
@@ -61,29 +63,31 @@ $(OPENSSL_PATH)/apps/openssl: $(OPENSSL_PATH)/.config-stamp
 
 $(STAGING_DIR)/usr/lib/libcrypto.a: $(OPENSSL_PATH)/apps/openssl
 	PATH=$(STAGING_DIR)/usr/bin:$(PATH) $(MAKE) \
-		CC=$(TARGET_CC) INSTALL_PREFIX=$(STAGING_DIR)/usr \
+		CC=$(TARGET_CC) INSTALL_PREFIX=$(STAGING_DIR) \
 		-C $(OPENSSL_PATH) install
 	cp -fa $(OPENSSL_PATH)/libcrypto.so* $(STAGING_DIR)/usr/lib/
-	chmod a-x $(STAGING_DIR)/usr/lib/libcrypto.so.0.9.7
+	chmod a-x $(STAGING_DIR)/usr/lib/libcrypto.so.0.9.8
 	(cd $(STAGING_DIR)/usr/lib; \
-	 ln -fs libcrypto.so.0.9.7 libcrypto.so; \
-	 ln -fs libcrypto.so.0.9.7 libcrypto.so.0; \
+	 ln -fs libcrypto.so.0.9.8 libcrypto.so; \
+	 ln -fs libcrypto.so.0.9.8 libcrypto.so.0; \
 	)
 	cp -fa $(OPENSSL_PATH)/libssl.so* $(STAGING_DIR)/usr/lib/
-	chmod a-x $(STAGING_DIR)/usr/lib/libssl.so.0.9.7
+	chmod a-x $(STAGING_DIR)/usr/lib/libssl.so.0.9.8
 	(cd $(STAGING_DIR)/usr/lib; \
-	 ln -fs libssl.so.0.9.7 libssl.so; \
-	 ln -fs libssl.so.0.9.7 libssl.so.0; \
+	 ln -fs libssl.so.0.9.8 libssl.so; \
+	 ln -fs libssl.so.0.9.8 libssl.so.0; \
 	)
 	touch -c $@
 
-$(TARGET_PATH)/usr/lib/libcrypto.so.0.9.7: $(STAGING_DIR)/usr/lib/libcrypto.a
+$(TARGET_PATH)/usr/lib/libcrypto.so.0.9.8: $(STAGING_DIR)/usr/lib/libcrypto.a
 	mkdir -p $(TARGET_PATH)/usr/lib
+	mkdir -p $(TARGET_PATH)/usr/lib/ssl
+	mkdir -p $(TARGET_PATH)/usr/lib/engines
 	cp -fa $(STAGING_DIR)/usr/lib/libcrypto.so* $(TARGET_PATH)/usr/lib/
 	cp -fa $(STAGING_DIR)/usr/lib/libssl.so* $(TARGET_PATH)/usr/lib/
 	#cp -fa $(STAGING_DIR)/bin/openssl $(TARGET_PATH)/bin/
-	$(STRIPCMD) $(TARGET_PATH)/usr/lib/libssl.so.0.9.7
-	$(STRIPCMD) $(TARGET_PATH)/usr/lib/libcrypto.so.0.9.7
+	$(STRIPCMD) $(TARGET_PATH)/usr/lib/libssl.so.0.9.8
+	$(STRIPCMD) $(TARGET_PATH)/usr/lib/libcrypto.so.0.9.8
 
 $(TARGET_DIR)/usr/lib/libssl.a: $(STAGING_DIR)/usr/lib/libcrypto.a
 	mkdir -p $(TARGET_DIR)/usr/include

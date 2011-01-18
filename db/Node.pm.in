@@ -5,41 +5,34 @@
 # All rights reserved.
 #
 package Node;
-
 use strict;
 use Exporter;
-use vars qw(@ISA @EXPORT $AUTOLOAD);
-
-@ISA    = "Exporter";
+use SelfLoader ();
+use vars qw(@ISA @EXPORT $AUTOLOAD @EXPORT_OK);
+@ISA = qw(Exporter SelfLoader);
 @EXPORT = qw();
 
 # Configure variables
-my $TB		= "@prefix@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $EVENTSYS    = @EVENTSYS@;
-my $WOL         = "$TB/sbin/whol";
-my $OSSELECT    = "$TB/bin/os_select";
+use vars qw($TB $BOSSNODE $WOL $OSSELECT $ISUTAH $CONTROL_NETMASK);
+$TB	     = "@prefix@";
+$BOSSNODE    = "@BOSSNODE@";
+$WOL         = "$TB/sbin/whol";
+$OSSELECT    = "$TB/bin/os_select";
 # XXX stinky hack detection
-my $ISUTAH	= @TBMAINSITE@;
-
+$ISUTAH	     = @TBMAINSITE@;
 # Need this for jail ip assignment.
-my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
+$CONTROL_NETMASK = "@CONTROL_NETMASK@";
 
 use libdb;
 use libtestbed;
-require NodeType;
-require Interface;
-require Experiment;
-require OSinfo;
+use event;
 use English;
 use Socket;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
-if ($EVENTSYS) {
-    require event;
-    import event;
-}
-use vars qw($NODEROLE_TESTNODE @EXPORT_OK);
+
+use vars qw($NODEROLE_TESTNODE $MFS_INITIAL $STATE_INITIAL
+	    %nodes @cleantables);
 
 # Exported defs
 $NODEROLE_TESTNODE	= 'testnode';
@@ -47,16 +40,8 @@ $NODEROLE_TESTNODE	= 'testnode';
 # Why, why, why?
 @EXPORT_OK = qw($NODEROLE_TESTNODE);
 
-# Defaults
-#
-# MFS to boot the nodes into initially
-my $MFS_INITIAL = TB_OSID_FREEBSD_MFS();
-# Initial event system state to put the nodes into
-my $STATE_INITIAL = TBDB_NODESTATE_SHUTDOWN;
-
 # Cache of instances to avoid regenerating them.
-my %nodes	= ();
-my $debug	= 0;
+%nodes = ();
 
 # Little helper and debug function.
 sub mysystem($)
@@ -64,9 +49,50 @@ sub mysystem($)
     my ($command) = @_;
 
     print STDERR "Running '$command'\n"
-	if ($debug);
+	if (0);
     return system($command);
 }
+
+# To avoid writting out all the methods.
+AUTOLOAD {
+#    print STDERR "$AUTOLOAD $_[0]\n";
+
+    if (!ref($_[0])) {
+	$SelfLoader::AUTOLOAD = $AUTOLOAD;
+	return SelfLoader::AUTOLOAD(@_);
+    }
+    my $self  = $_[0];
+    my $name  = $AUTOLOAD;
+    $name =~ s/.*://;   # strip fully-qualified portion
+
+    # A DB row proxy method call.
+    if (exists($self->{'DBROW'}->{$name})) {
+	return $self->{'DBROW'}->{$name};
+    }
+
+    # The method is possibly for a SelfLoader method after __DATA__
+    # Or it is for a local storage slot.
+    if ($name =~ /^_.*$/) {
+	if (scalar(@_) == 2) {
+	    return $self->{'HASH'}->{$name} = $_[1];
+	}
+	elsif (exists($self->{'HASH'}->{$name})) {
+	    return $self->{'HASH'}->{$name};
+	}
+    }
+    $SelfLoader::AUTOLOAD = $AUTOLOAD;
+    my $ref = \&SelfLoader::AUTOLOAD;
+    goto &$ref;
+}
+
+#
+# The list of table we have to clear if anything goes wrong when
+# creating a new node.
+# 
+@cleantables = ("nodes", "node_hostkeys", "node_status",
+		"node_activity", "node_utilization",
+		"node_auxtypes", "reserved", "widearea_nodeinfo");
+
 
 #
 # Lookup a (physical) node and create a class instance to return.
@@ -109,6 +135,7 @@ sub Lookup($$)
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
+    $self->{"WAROW"}    = undef;
     $self->{"HASH"}     = {};
     bless($self, $class);
 
@@ -127,7 +154,31 @@ sub DESTROY {
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
     $self->{"HASH"}     = undef;
+    $self->{"WAROW"}    = undef;
 }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+    
+    my $nodeid = $self->node_id();
+
+    return "[Node: $nodeid]";
+}
+
+# Local lookup for an Experiment, to avoid dragging in the module.
+sub LocalExpLookup(@)
+{
+    require Experiment;
+
+    return Experiment->Lookup(@_);
+}
+
+1;
+@SELFLOADER_DATA@
 
 #
 # Create a fake object, as for the mapper (assign_wrapper) during debugging.
@@ -142,6 +193,7 @@ sub MakeFake($$$$)
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
+    $self->{"WAROW"}    = undef;
     $self->{"HASH"}     = {};
     bless($self, $class);
 
@@ -187,6 +239,7 @@ sub BulkLookup($$$)
 	$node->{"TYPEINFO"} = undef;
 	$node->{"ATTRS"}    = undef;
 	$node->{"IFACES"}   = undef;
+	$node->{"WAROW"}    = undef;
 	$node->{"HASH"}     = {};
 	
 	$nodelist{$nodeid} = $node;
@@ -229,40 +282,21 @@ sub BulkLookup($$$)
     @$pref = values(%nodelist);
     return 0;
 }
-# To avoid writting out all the methods.
-sub AUTOLOAD {
-    my $self = shift;
-    my $type = ref($self) or die("$self is not an object\n");
-
-    my $name = $AUTOLOAD;
-    $name =~ s/.*://;   # strip fully-qualified portion
-
-    if (@_) {
-	return $self->{'HASH'}->{$name} = shift;
-    }
-    elsif (exists($self->{'DBROW'}->{$name})) {
-	return $self->{'DBROW'}->{$name};
-    }
-    elsif (exists($self->{'HASH'}->{$name})) {
-	return $self->{'HASH'}->{$name};
-    }
-    print STDERR "$self: tried to access unknown slot $name\n";
-    return undef;
-}
-
-#
-# Create a new node.
-#
-# The list of table we have to clear if anything goes wrong.
-my @cleantables = ("nodes", "node_hostkeys", "node_status",
-		   "node_activity", "node_utilization",
-		   "node_auxtypes", "reserved", "widearea_nodeinfo");
 
 sub Create($$$$)
 {
     my ($class, $node_id, $experiment, $argref) = @_;
     my ($control_iface,$virtnode_capacity,$adminmfs,$adminmfs_osid);
     my ($priority, $osid, $opmode, $state);
+    require OSinfo;
+    require NodeType;
+
+    # Defaults. Leave these here to avoid startup costs of libdb.
+    #
+    # MFS to boot the nodes into initially
+    my $MFS_INITIAL   = TB_OSID_FREEBSD_MFS();
+    # Initial event system state to put the nodes into
+    my $STATE_INITIAL = TBDB_NODESTATE_SHUTDOWN();
 
     my $type = $argref->{'type'};
     my $role = $argref->{'role'};
@@ -291,8 +325,12 @@ sub Create($$$$)
 	    print STDERR "*** No virtnode_capacity for $type! Using zero.\n";
 	    $virtnode_capacity = 0;
 	}
-	if ($isremote) {
-	    $osid   = 0;
+	if ($typeinfo->isswitch()) {
+	    $osid   = "NULL";
+	    $opmode = "ALWAYSUP";
+	}
+	elsif ($isremote) {
+	    $osid   = "NULL";
 	    $opmode = "";
 
 	    if (defined($typeinfo->default_osid())) {
@@ -330,7 +368,7 @@ sub Create($$$$)
 	}
     }
     else {
-	$osid   = 0;
+	$osid   = "NULL";
 	$opmode = "";
     }
     $state  = $STATE_INITIAL;
@@ -338,8 +376,11 @@ sub Create($$$$)
     #
     # Lock the tables to prevent concurrent creation
     #
-    DBQueryWarn("lock tables nodes write, widearea_nodeinfo write")
-	or return -1;
+    DBQueryWarn("lock tables nodes write, widearea_nodeinfo write, ".
+		"node_hostkeys write, node_status write, ".
+		"node_utilization write, ".
+		"node_activity write, reserved write, node_auxtypes write")
+	or return undef;
 
     #
     # Make up a priority (just used for sorting)
@@ -351,12 +392,23 @@ sub Create($$$$)
 	$priority = 1;
     }
 
+    #
+    # See if we have a record; if we do, we can stop now and get the
+    # existing record.
+    #
+    my $query_result =
+	DBQueryWarn("select node_id from nodes where node_id='$node_id'");
+    if ($query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	return Node->Lookup($node_id);
+    }
+
     if (!DBQueryWarn("insert into nodes set ".
 		     "  node_id='$node_id', type='$type', " .
 		     "  phys_nodeid='$node_id', role='$role', ".
 		     "  priority=$priority, " .
 		     "  eventstate='$state', op_mode='$opmode', " .
-		     "  def_boot_osid='$osid', " .
+		     "  def_boot_osid=$osid, " .
 		     "  inception=now(), uuid=$uuid, ".
 		     "  state_timestamp=unix_timestamp(NOW()), " .
 		     "  op_mode_timestamp=unix_timestamp(NOW())")) {
@@ -367,8 +419,16 @@ sub Create($$$$)
 	my $hostname = $argref->{'hostname'};
 	my $external = $argref->{'external_node_id'};
 	my $IP       = $argref->{'IP'};
-	    
-	if (!DBQueryWarn("replace into widearea_nodeinfo ".
+
+	# Hmm, wanodecreate already does this.
+	my $wa_result =
+	    DBQueryWarn("select node_id from widearea_nodeinfo ".
+			"where node_id='$node_id'");
+	goto bad
+	    if (!$wa_result);
+	
+	if ($wa_result->numrows == 0 &&
+	    !DBQueryWarn("replace into widearea_nodeinfo ".
 			 " (node_id, contact_uid, contact_idx, hostname," .
 			 "  external_node_id, IP) ".
 			 " values ('$node_id', 'nobody', '0', ".
@@ -378,7 +438,6 @@ sub Create($$$$)
 	    return undef;
 	}
     }
-    DBQueryWarn("unlock tables");
 
     if ($role eq "testnode") {
 	DBQueryWarn("insert into node_hostkeys (node_id) ".
@@ -435,12 +494,14 @@ sub Create($$$$)
 		    "type='$vtype', count=$virtnode_capacity")
 	    or goto bad;
     }
+    DBQueryWarn("unlock tables");
     return Node->Lookup($node_id);
     
   bad:
     foreach my $table (@cleantables) {
 	DBQueryWarn("delete from $table where node_id='$node_id'");
     }
+    DBQueryWarn("unlock tables");
     return undef;
 }
 
@@ -483,6 +544,7 @@ sub Refresh($)
     $self->{"TYPEINFO"} = undef;
     $self->{"ATTRS"}    = undef;
     $self->{"IFACES"}   = undef;
+    $self->{"WAROW"}    = undef;
     return 0;
 }
 
@@ -503,15 +565,30 @@ sub FlushAll($)
 }
 
 #
-# Stringify for output.
+# Convenience access method for widearea info
 #
-sub Stringify($)
+sub WideAreaInfo($$)
 {
-    my ($self) = @_;
-    
-    my $nodeid = $self->node_id();
+    my ($self, $slot) = @_;
+    my $node_id = $self->node_id();
 
-    return "[Node: $nodeid]";
+    if (!defined($self->{'WAROW'})) {
+	my $query_result =
+	    DBQueryWarn("select * from widearea_nodeinfo ".
+			"where node_id='$node_id'");
+
+	if (!$query_result || !$query_result->numrows) {
+	    print STDERR "*** $node_id is not a widearea node\n";
+	    return undef;
+	}
+	$self->{'WAROW'} = $query_result->fetchrow_hashref();
+    }
+    if (!exists($self->{'WAROW'}->{$slot})) {
+	print STDERR
+	    "*** Nonexistent slot '$slot' request for widearea node $node_id\n";
+	return undef;
+    }
+    return $self->{'WAROW'}->{$slot};
 }
 
 #
@@ -590,6 +667,46 @@ sub IsReserved($)
 	return 1;
     }
     return 1;
+}
+
+
+sub GetSubboss($$)
+{
+    my ($self, $service, $subboss_id) = @_;
+
+    return 0
+	if (! ref($self));
+
+    my $ref;
+
+    if (defined $self->{"SUBBOSSES"}) {
+	my $ref = $self->{"SUBBOSSES"}->{$service};
+    }
+
+    if (!defined $ref) {
+	my $nodeid = $self->node_id();
+
+	my $query_result =
+	    DBQueryWarn("select * from subbosses " .
+			"where node_id='$nodeid' and " .
+			"service = '$service'");
+
+	return 0
+	    if (!$query_result);
+	return 0
+	    if (!$query_result->numrows);
+
+	if (!defined($self->{"SUBBOSSES"})) {
+	    $self->{"SUBBOSSES"} = {};
+	}
+
+	$ref = $self->{"SUBBOSSES"}->{$service} =
+	    $query_result->fetchrow_hashref();
+    }
+
+    $$subboss_id = $ref->{'subboss_id'};
+
+    return 0;
 }
 
 #
@@ -687,7 +804,7 @@ sub SetAllocState($$)
     
     my $now = time();
     my $node_id = $self->node_id();
-    
+
     DBQueryWarn("update nodes set allocstate='$state', " .
 		"    allocstate_timestamp=$now where node_id='$node_id'")
 	or return -1;
@@ -767,7 +884,7 @@ sub Reservation($)
     return undef
 	if (! $self->IsReserved());
 
-    return Experiment->Lookup($self->{"RSRV"}->{'exptidx'});
+    return LocalExpLookup($self->{"RSRV"}->{'exptidx'});
 }
 
 #
@@ -808,7 +925,7 @@ sub NextReservation($)
 
     my ($pid,$eid) = $query_result->fetchrow_array();
 
-    return Experiment->Lookup($pid, $eid);
+    return LocalExpLookup($pid, $eid);
 }
 
 #
@@ -924,7 +1041,7 @@ sub OldReservation($)
 
     my ($pid,$eid) = $query_result->fetchrow_array();
     
-    return Experiment->Lookup($pid, $eid);
+    return LocalExpLookup($pid, $eid);
 }
 
 sub OldReservationID($)
@@ -1072,7 +1189,7 @@ sub HasVirtualNodes($)
 #
 # Access methods for the reservation.
 #
-sub __reservation($$)
+sub L__reservation($$)
 {
     my ($self, $slotname) = @_;
 
@@ -1085,22 +1202,24 @@ sub __reservation($$)
 
     return $self->{"RSRV"}->{$slotname};
 }
-sub vname($)		{ return __reservation($_[0], 'vname'); }
-sub sharing_mode($)	{ return __reservation($_[0], 'sharing_mode'); }
-sub erole($)		{ return __reservation($_[0], 'erole'); }
+sub vname($)		{ return L__reservation($_[0], 'vname'); }
+sub sharing_mode($)	{ return L__reservation($_[0], 'sharing_mode'); }
+sub erole($)		{ return L__reservation($_[0], 'erole'); }
 sub external_resource_index($) {
-    return __reservation($_[0], 'external_resource_index'); }
+    return L__reservation($_[0], 'external_resource_index'); }
 sub external_resource_id($) {
-    return __reservation($_[0], 'external_resource_id'); }
+    return L__reservation($_[0], 'external_resource_id'); }
+sub external_resource_key($) {
+    return L__reservation($_[0], 'external_resource_key'); }
 sub inner_elab_role($) {
-    return __reservation($_[0], 'inner_elab_role'); }
+    return L__reservation($_[0], 'inner_elab_role'); }
 
 #
-# Lookup a specific attribute in the node_attributes table, 
+# Load all attributes from the node_attributes table, 
 #
-sub NodeAttribute($$$;$)
+sub LoadNodeAttributes($)
 {
-    my ($self, $attrkey, $pattrvalue, $pattrtype) = @_;
+    my ($self) = @_;
     
     return -1
 	if (!ref($self));
@@ -1122,6 +1241,27 @@ sub NodeAttribute($$$;$)
 	    $self->{"ATTRS"}->{$key} = $row;
 	}
     }
+
+    return 0;
+}
+
+#
+# Lookup a specific attribute in the node_attributes table, 
+#
+sub NodeAttribute($$$;$)
+{
+    my ($self, $attrkey, $pattrvalue, $pattrtype) = @_;
+    
+    return -1
+	if (!ref($self));
+
+    my $node_id = $self->node_id();
+
+    if (!defined($self->{"ATTRS"})) {
+	if ($self->LoadNodeAttributes()) {
+	    return -1;
+	}
+    }
     
     if (!exists($self->{"ATTRS"}->{$attrkey})) {
 	$$pattrvalue = undef;
@@ -1137,13 +1277,35 @@ sub NodeAttribute($$$;$)
 }
 
 #
+# Return a hash of the node attributes for this node.
+#
+sub GetNodeAttributes($)
+{
+    my ($self) = @_;
+    
+    return undef
+	if (!ref($self));
+
+    my $node_id = $self->node_id();
+
+    if (!defined($self->{"ATTRS"})) {
+	if ($self->LoadNodeAttributes()) {
+	    return undef;
+	}
+    }
+
+    return $self->{"ATTRS"};
+}
+
+#
 # Return type info. We cache this in the instance since node_type stuff
 # does not change much.
 #
 sub NodeTypeInfo($)
 {
     my ($self) = @_;
-
+    require NodeType;
+    
     return undef
 	if (! ref($self));
 
@@ -1178,6 +1340,24 @@ sub NodeTypeAttribute($$$;$)
 }
 
 #
+# Returns a hash of node type attributes in the nodetype info. 
+#
+sub GetNodeTypeAttributes($)
+{
+    my ($self) = @_;
+    
+    return undef
+	if (!ref($self));
+
+    my $typeinfo = $self->NodeTypeInfo();
+
+    return undef
+	if (!defined($typeinfo));
+
+    return $typeinfo->GetAttributes();
+}
+
+#
 # Shortcuts to "common" type information.
 # Later these might be overriden by node attributes.
 #
@@ -1196,15 +1376,34 @@ sub isdedicatedremote($) { return NodeTypeInfo($_[0])->isdedicatedremote(); }
 sub isswitch($)       { return NodeTypeInfo($_[0])->isswitch(); }
 
 #
+# Later has arrived...
+# Look for node_attributes settings first and if none, fall back on
+# node_type_attributes info.
+#
+sub default_osid($;$) {
+    my ($self,$stuff) = @_;
+    my $val = undef;
+
+    if (NodeAttribute($self, "default_osid", \$val) == 0 && defined($val)) {
+	return $val;
+    }
+    return NodeTypeInfo($self)->default_osid($stuff);
+}
+
+sub default_imageid($;$) {
+    my ($self,$stuff) = @_;
+    my $val = undef;
+
+    if (NodeAttribute($self, "default_imageid", \$val) == 0 && defined($val)) {
+	return $val;
+    }
+    return NodeTypeInfo($self)->default_imageid($stuff);
+}
+
+#
 # And these are the less common attributes, but still common enough to
 # warrant shortcuts.
 #
-sub default_osid($;$) {
-    return NodeTypeInfo($_[0])->default_osid($_[1]);
-}
-sub default_imageid($;$) {
-    return NodeTypeInfo($_[0])->default_imageid($_[1]);
-}
 sub delay_osid($;$) {
     return NodeTypeInfo($_[0])->delay_osid($_[1]);
 }
@@ -1388,6 +1587,7 @@ sub ReleaseSharedBandwidth($)
 sub AllInterfaces($$)
 {
     my ($self, $pref) = @_;
+    require Interface;
 
     # Must be a real reference. 
     return -1
@@ -1402,6 +1602,7 @@ sub AllInterfaces($$)
 sub LoadInterfaces($)
 {
     my ($self) = @_;
+    require Interface;
 
     # Must be a real reference. 
     return -1
@@ -1553,12 +1754,11 @@ sub SetEventState($$)
     # If using the event system, we send out an event for the state daemon to
     # pick up. Otherwise, we just set the state in the database ourselves
     #
-    if ($EVENTSYS) {
-	return EventSendFatal(objtype   => TBDB_TBEVENT_NODESTATE,
-			      objname   => $node_id,
-			      eventtype => $state,
-			      host      => $BOSSNODE);
-    }
+    return EventSendFatal(objtype   => TBDB_TBEVENT_NODESTATE,
+			  objname   => $node_id,
+			  eventtype => $state,
+			  host      => $BOSSNODE);
+
     return $self->Update({"eventstate"      => $state,
 			  "state_timestamp" => time()});
 }
@@ -1568,12 +1768,14 @@ sub SetEventState($$)
 # be used when creating the new node(s). A list of the node names is
 # returned.
 #
-sub CreateVnodes($$)
+sub CreateVnodes($$$)
 {
-    my ($rptr, $options) = @_;
+    my ($class, $rptr, $options) = @_;
     my @created   = ();
     my @tocreate  = ();
-
+    require Interface;
+    require NodeType;
+    
     if (!defined($options->{'pid'})) {
 	print STDERR "*** CreateVnodes: Must supply a pid!\n";
 	return -1;
@@ -1616,7 +1818,7 @@ sub CreateVnodes($$)
 	return -1;
     }
 
-    my $experiment = Experiment->Lookup($pid, $eid);
+    my $experiment = LocalExpLookup($pid, $eid);
     if (!defined($experiment)) {
 	print STDERR "*** CreateVnodes: No such experiment $pid/$eid!\n";
 	return -1;
@@ -2014,7 +2216,7 @@ sub SetNodeHistory($$$$)
 		$checkexp = $experiment;
 	    }
 	    else {
-		$checkexp = Experiment->Lookup($lastexptidx);
+		$checkexp = LocalExpLookup($lastexptidx);
 	    }
 	    if (defined($checkexp)) {
 		if ($checkexp->pid() eq NODEDEAD_PID() &&
@@ -2082,7 +2284,7 @@ sub MarkAsDown($)
     }
     my $pid = NODEDEAD_PID();
     my $eid = NODEDEAD_EID();
-    my $experiment = Experiment->Lookup($pid, $eid);
+    my $experiment = LocalExpLookup($pid, $eid);
     if (!defined($experiment)) {
 	print STDERR "*** WARNING: No such experiment $pid/$eid!\n";
 	return -1;
@@ -2109,7 +2311,7 @@ sub MarkAsIll($)
     }
     my $pid = NODEILL_PID();
     my $eid = NODEILL_EID();
-    my $experiment = Experiment->Lookup($pid, $eid);
+    my $experiment = LocalExpLookup($pid, $eid);
     if (!defined($experiment)) {
 	print STDERR "*** WARNING: No such experiment $pid/$eid!\n";
 	return -1;
@@ -2306,6 +2508,7 @@ sub OSSelect($$$$)
     my ($self, $osinfo, $field, $debug) = @_;
     my $nodeid  = $self->node_id();
     my $curmode = $self->op_mode();
+    require OSinfo;
 
     # Why? When will this happen?
     return 0
@@ -2509,6 +2712,7 @@ sub LookupWideArea($$)
 sub IsOSLoaded($$)
 {
     my ($self, $osinfo) = @_;
+    require OSinfo;
 
     if (!ref($osinfo)) {
 	my $tmp = OSinfo->Lookup($osinfo);

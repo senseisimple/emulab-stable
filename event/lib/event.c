@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2008 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -33,6 +33,15 @@
 
 #ifdef ELVIN_COMPAT
 #include <pubsub/elvin_hash.h>
+#endif
+
+/* So we can tell with a strings what kind of event library. */
+char	emulab_event_library_buildinfo[] =
+    "Emulab Event Library: Version " EVENT_LIBRARY_VERSION
+#ifdef ELVIN_COMPAT
+    " with Elvin Compat";
+#else
+    "";
 #endif
 
 #define ERROR(fmt,...) \
@@ -142,7 +151,9 @@ event_register_withkeydata_withretry(char *name, int threaded,
 			   unsigned char *keydata, int keylen,
 			   int retrycount)
 {
+#ifndef __CYGWIN__
     extern int pubsub_is_threaded[] __attribute__ ((weak));
+#endif
     
     event_handle_t	handle;
     pubsub_handle_t    *server;
@@ -209,11 +220,15 @@ event_register_withkeydata_withretry(char *name, int threaded,
     handle->disconnect = pubsub_disconnect;
 #ifdef THREADED
     assert(threaded == 1);
+#ifndef __CYGWIN__
     assert(pubsub_is_threaded != NULL);
+#endif
     handle->mainloop = NULL; /* no mainloop for mt programs */
 #else
     assert(threaded == 0);
+#ifndef __CYGWIN__
     assert(pubsub_is_threaded == NULL);
+#endif
     handle->mainloop = pubsub_mainloop;
 #endif
     handle->notify = pubsub_notify;
@@ -583,6 +598,15 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
     notification->pubsub_notification = pubsub_notification;
     notification->has_hmac = 0;
 
+    /*
+     * Event version number
+     */
+    if (!event_notification_set_version(handle, notification,
+					EVENT_LIBRARY_VERSION)) {
+        ERROR("pubsub_notification_alloc failed to set version number\n");
+	event_notification_free(handle, notification);
+        return NULL;
+    }
     if (tuple == NULL)
 	    return notification;
 
@@ -673,7 +697,6 @@ event_notification_clone(event_handle_t handle,
     clone->has_hmac = notification->has_hmac;
 
     return clone;
-
 }
 
 
@@ -910,7 +933,6 @@ event_notification_put_double(event_handle_t handle,
         pubsub_error_fprintf(stderr, &handle->status);
         return 0;
     }
-
     return 1;
 }
 
@@ -1399,7 +1421,7 @@ notify_callback(pubsub_handle_t *server,
 	handle->keydata &&
 	event_notification_check_hmac(handle, &notification)) {
 	    ERROR("bad hmac\n");
-        return;
+	    return;
     }
 
     if (0) {
@@ -1407,7 +1429,8 @@ notify_callback(pubsub_handle_t *server,
 	    
 	    gettimeofday(&now, NULL);
 
-	    INFO("note arrived at %ld:%ld\n", now.tv_sec, now.tv_usec);
+	    INFO("note arrived at %ld:%ld\n",
+		 (long)now.tv_sec, (long)now.tv_usec);
     }
 	
     callback = arg->callback;
@@ -1487,9 +1510,12 @@ hmac_traverse(void *rock, char *name,
 	if (!strcmp(name, "__hmac__")) 
 		return 1;
 
+	if (!strcmp(name, "__elvin_hmac__")) 
+		return 1;
+
 	/*
-	 * The elvin gateway sticks this flag in, but we need to ignore it
-	 * when doing hmac computation.
+	 * Never include this in hmac computation. See elvin_gateway and
+	 * the elvin compat code below. 
 	 */
 	if (!strcmp(name, "___elvin_ordered___"))
 		return 1;
@@ -1540,53 +1566,27 @@ hmac_fill_hash(void *rock, char *name,
 {
 	struct elvin_hashtable	*table = (struct elvin_hashtable *) rock;
 
-	if (elvin_hashtable_add(table, name, value, type, status) == -1)
-		return 0;
-	
+	if (elvin_hashtable_add(table, name, value, type, status) == -1) {
+	    ERROR("hmac_fill_hash failure %s: ", name);
+	    pubsub_error_fprintf(stderr, status);
+	    return 0;
+	}
 	return 1;
 }
 #endif
 
-static int
-notification_hmac(pubsub_notification_t *notification, HMAC_CTX *ctx,
-		  pubsub_error_t *status)
+static void
+hmac_dump(char *msg, unsigned char *mac, int len)
 {
-	int retval = 0;
-#ifdef ELVIN_COMPAT
-	struct elvin_hashtable  *table;
-	int			elvin_ordered;
-
-	if (pubsub_notification_get_int32(notification,
-					  "___elvin_ordered___",
-					  &elvin_ordered, status) == 0) {
-		if (!pubsub_notification_traverse(notification, hmac_traverse,
-						  ctx, status)) {
-			return -1;
-		}
-		return 0;
-	}
-	if ((table = elvin_hashtable_alloc(0, status)) == NULL) {
-		return -1;
-	}
-	else if (!pubsub_notification_traverse(notification, hmac_fill_hash,
-					       table, status)) {
-		retval = -1;
-	}
-	else if (!elvin_hashtable_traverse(table, hmac_traverse,
-					   ctx, status)) {
-		retval = -1;
-	}
-
-	elvin_hashtable_free(table);
-	table = NULL;
-#else
-	if (!pubsub_notification_traverse(notification, hmac_traverse,
-					  ctx, status)) {
-		return -1;
-	}
-#endif
-	
-	return retval;
+	unsigned char *up;
+	int i;
+		
+	fprintf(stderr, "%s: ", msg);
+	up = (unsigned char *)mac;
+	for (i = 0; i < len; i++, up++) {
+		fprintf(stderr, "%02hhx", *up);
+	}		
+	fprintf(stderr, "\n");
 }
 
 int
@@ -1595,25 +1595,23 @@ event_notification_insert_hmac(event_handle_t handle,
 {
 	HMAC_CTX	ctx;
 	unsigned char	mac[EVP_MAX_MD_SIZE];
-	int		i, len = EVP_MAX_MD_SIZE;
+	unsigned int	len = EVP_MAX_MD_SIZE;
 
 	if (0)
-	    INFO("event_notification_insert_hmac: %d %s\n",
-		 handle->keylen, handle->keydata);
+		INFO("event_notification_insert_hmac (key): %s\n",
+		     handle->keydata);
 
 	if (notification->has_hmac) {
 		event_notification_remove(handle, notification, "__hmac__");
 		notification->has_hmac = 0;
 	}
-#ifdef  ELVIN_COMPAT
+
 	/*
-	 * Remove this so we recompute the elvin ordering above, since the
-	 * notification might have changed, and the exiting linear order
-	 * will no longer correspond to elvin ordering.
+	 * Always remove this; we will add it back below if ELVIN_COMPAT=1
 	 */
 	pubsub_notification_remove(notification->pubsub_notification,
 				   "___elvin_ordered___", &handle->status);
-#endif	
+
 	memset(&ctx, 0, sizeof(ctx));
 #if (OPENSSL_VERSION_NUMBER < 0x0090703f)
 	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
@@ -1621,34 +1619,101 @@ event_notification_insert_hmac(event_handle_t handle,
 	HMAC_CTX_init(&ctx);
 	HMAC_Init_ex(&ctx, handle->keydata, handle->keylen, EVP_sha1(), NULL);
 #endif
-	if (notification_hmac(notification->pubsub_notification,
-			      &ctx, &handle->status) == -1) {
-		HMAC_cleanup(&ctx);
-		return 1;
+	if (!pubsub_notification_traverse(notification->pubsub_notification,
+					  hmac_traverse,
+					  &ctx, &handle->status)) {
+	    ERROR("event_notification_insert_hmac failed: hmac_traverse\n");
+	    HMAC_cleanup(&ctx);
+	    return 1;
 	}
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
 	if (0) {
-		unsigned char   *up;
-		
-		INFO("event_notification_insert_hmac: %d\n", len);
-		up = (unsigned char *) mac;
-		for (i = 0; i < len; i++, up++) {
-			fprintf(stderr, "%02hhx", *up);
-		}		
-		fprintf(stderr, "\n");
+		hmac_dump("event_notification_insert_hmac", mac, len);
 	}
 
 	/*
 	 * Okay, now insert the MAC into the notification as an opaque field.
 	 */
 	if (pubsub_notification_add_opaque(notification->pubsub_notification,
-				"__hmac__", mac, len, &handle->status) != 0) {
+					   "__hmac__", (char *)mac, (int)len,
+					   &handle->status) != 0) {
 		ERROR("pubsub_notification_add_opaque failed: ");
 		pubsub_error_fprintf(stderr, &handle->status);
 		return 1;
 	}
+	
+#ifdef  ELVIN_COMPAT
+	/*
+	 * The intent of this craziness is to deal with the fact that
+	 * pubsub and elvin traverse notifications in different order,
+	 * and so will generate a different HMAC. If the testbed has
+	 * images that employ old elvin, and new pubsub, then the different
+	 * HMAC makes it impossible for them to interoperate; notifications
+	 * are rejected cause the HMAC is not what they expect.
+	 *
+	 * In Version "0" of this library, I did something totally stupid.
+	 * When ELVIN_COMPAT is defined, I generate the HMAC for the elvin
+	 * ordered traversal, but otherwise leave the note alone. Well, that
+	 * means that a no ELVIN_COMPAT client has no chance of getting the
+	 * proper MAC. Thus, I introduced incompatibility while trying to
+	 * solve an incompatibility. But anyway, when a notification comes
+	 * in from an elvin client, it goes through the pubsub elvin_gateway
+	 * which converts the elvin note to a pubsub note, and adds a flag
+	 * named ___elvin_ordered___, which tells the library code that
+	 * it can traverse the note in pubsub order, and get the same HMAC.
+	 * Why? Cause elvin_gateway traversed it in elvin order and so the
+	 * pubsub note is in that same order, and so the HMAC it generates
+	 * is the same. 
+	 *
+	 * The problem is that it is now impossible to turn off ELVIN_COMPAT
+	 * on a site, since any existing images will no longer understand
+	 * the notifications it gets since HMAC was generated in elvin
+	 * order, but the notes are in pubsub order.
+	 *
+	 * So now lets talk about Version 1 of this code, which will try to
+	 * solve this problem. Well, its easy to solve the problem if all
+	 * we had to worry about was Version 1, but we also want to see if
+	 * we can be backwards compatible with Version 0. Turns out that we
+	 * can make use of ___elvin_ordered___, since that tells the
+	 * Version 0 ELVIN_COMPAT library to traverse in pubsub order.
+	 * However, we cannot do the same thing with the plain libraries,
+	 * since the existence of ___elvin_ordered___ will change the HMAC
+	 * it generates. However, I am going to stipulate that if you
+	 * started without elvin compatibility, there is no reason why you
+	 * would ever start using elvin compatibility. Therefore, we only
+	 * need to worry about the first case.
+	 *
+	 * Further, we no longer care about about existing elvin library
+	 * based images, and so we are never going to generate elvin
+	 * ordered HMACS again. Yippie!
+	 *
+	 * Unfortunately, we still have to deal with version 0 images, and
+	 * so we need the elvin hash code to generate a hash we can use
+	 * to compare against. Note that if you never had elvin-compat
+	 * turned on, none of this matters. Be happy!
+	 *
+	 * Changes:
+	 * 1. Add event library version number to the notification.
+	 *    Version numbers are good, we need more of them.
+	 * 2. Always generate the HMAC in normal pubsub order.
+	 * 3. When ELVIN_COMPAT is on, set ___elvin_ordered___ to on,
+	 *    so that existing elvin-compat images will know that its
+	 *    a pubsub ordered hmac (I know, stupid name), and do the
+	 *    comparison accordingly.
+	 *
+	 * When a Version 0 notification arrives at a Version 1 client,
+	 * we can handle it just fine.
+	 */
+	if (pubsub_notification_add_int32(notification->pubsub_notification,
+					  "___elvin_ordered___", 1, 
+					  &handle->status) != 0) {
+		ERROR("pubsub_notification_add_int32 ___elvin_ordered___: ");
+		pubsub_error_fprintf(stderr, &handle->status);
+		return 1;
+	}
+#endif
 	notification->has_hmac = 1;
     	return 0;
 }
@@ -1663,17 +1728,24 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_CTX	ctx;
 	unsigned char	srcmac[EVP_MAX_MD_SIZE], mac[EVP_MAX_MD_SIZE];
 	char		*pmac;
-	int		i, srclen, len = EVP_MAX_MD_SIZE;
-
+	unsigned int	srclen, len = EVP_MAX_MD_SIZE;
+	int		tmp, elvin, elvincompat, elvin_ordered;
+	pubsub_notification_t *pubsub_notification;
+#ifdef ELVIN_COMPAT
+	struct elvin_hashtable  *hashtable;
+#endif
 	if (0)
-	    INFO("event_notification_check_hmac: %d %s\n",
-		 handle->keylen, handle->keydata);
+		INFO("event_notification_check_hmac (key): %s\n",
+		     handle->keydata);
+
+	pubsub_notification = notification->pubsub_notification;
 		
 	/*
 	 * Pull out the MAC from the notification so we can compare it.
 	 */
-	if (pubsub_notification_get_opaque(notification->pubsub_notification,
-			"__hmac__", &pmac, &srclen, &handle->status) != 0) {
+	if (pubsub_notification_get_opaque(pubsub_notification,
+					   "__hmac__", &pmac, (int *)&srclen,
+					   &handle->status) != 0) {
 		ERROR("MAC not present!\n");
 		notification->has_hmac = 0;
 		return -1;
@@ -1682,16 +1754,89 @@ event_notification_check_hmac(event_handle_t handle,
 	memcpy(srcmac, pmac, srclen);
 
 	if (0) {
-		unsigned char   *up;
-		
-		INFO("event_notification_check_hmac1: %d\n", srclen);
-		up = (unsigned char *) srcmac;
-		for (i = 0; i < srclen; i++, up++) {
-			fprintf(stderr, "%02hhx", *up);
-		}		
-		fprintf(stderr, "\n");
+		hmac_dump("event_notification_check_hmac (__hmac__)",
+			  srcmac, srclen);
 	}
 	
+	/*
+	 * Look to see if the notification is from an elvin compatabile
+	 * client. These would always be a version 0 version of this
+	 * code since we do not generate the elvin HMACs anymore.
+	 */
+	elvin = elvincompat = elvin_ordered = 0;
+#ifdef ELVIN_COMPAT
+	elvincompat = 1;
+#endif
+	
+	if (! pubsub_notification_get_int32(pubsub_notification,
+					    "___PUBSUB___",
+					    &tmp, &handle->status)) {
+	    elvin = 1;
+	}
+#ifdef ELVIN_COMPAT
+	if (elvin) {
+	    /*
+	     * elvin_ordered says how to deal with the hmac; it says
+	     * __hmac__ was/is generated from a normal traversal of the
+	     * notification. 
+	     */
+	    if (pubsub_notification_get_int32(pubsub_notification,
+					      "___elvin_ordered___",
+					      &elvin_ordered,
+					      &handle->status) == 0) {
+		    elvin_ordered = 1;
+	    }
+	    /*
+	     * If elvin_ordered is set, we can fall through to the
+	     * case below which processes the notification is pubsub
+	     * order, and uses __hmac__ to compare against.
+	     */
+	    if (! elvin_ordered) {
+	        memset(&ctx, 0, sizeof(ctx));
+#if (OPENSSL_VERSION_NUMBER < 0x0090703f)
+		HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
+#else	
+		HMAC_CTX_init(&ctx);
+		HMAC_Init_ex(&ctx, handle->keydata, handle->keylen,
+			     EVP_sha1(), NULL);
+#endif
+		hashtable = elvin_hashtable_alloc(0, &handle->status);
+		if (hashtable == NULL) {
+		    ERROR("event_notification_check_hmac failed: "
+			  "hashtable alloc\n");
+		    return -1;
+		}
+		if (!pubsub_notification_traverse(pubsub_notification,
+						  hmac_fill_hash,
+						  hashtable,
+						  &handle->status)) {
+		    ERROR("event_notification_check_hmac failed: "
+			  "hmac_fill_hash\n");
+		    elvin_hashtable_free(hashtable);
+		    return -1;
+		}
+		if (!elvin_hashtable_traverse(hashtable, hmac_traverse,
+					      &ctx, &handle->status)) {
+		    ERROR("event_notification_check_hmac failed: "
+			  "notify_traverse\n");
+		    elvin_hashtable_free(hashtable);
+		    return -1;
+		}
+		elvin_hashtable_free(hashtable);
+		HMAC_Final(&ctx, mac, &len);
+		HMAC_cleanup(&ctx);
+
+		if (0) {
+			hmac_dump("event_notification_check_hmac (elvin)",
+				  mac, len);
+		}
+		goto docmp;
+	    }
+	}
+#endif
+	/*
+	 * Do a normal HMAC check.
+	 */
 	memset(&ctx, 0, sizeof(ctx));
 #if (OPENSSL_VERSION_NUMBER < 0x0090703f)
 	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
@@ -1699,33 +1844,49 @@ event_notification_check_hmac(event_handle_t handle,
 	HMAC_CTX_init(&ctx);
 	HMAC_Init_ex(&ctx, handle->keydata, handle->keylen, EVP_sha1(), NULL);
 #endif
-	
-	/* Compute the MAC */
-	if (notification_hmac(notification->pubsub_notification,
-			      &ctx, &handle->status) == -1) {
-		HMAC_cleanup(&ctx);
-		return -1;
+	if (!pubsub_notification_traverse(pubsub_notification,
+					  hmac_traverse,
+					  &ctx, &handle->status)) {
+	    HMAC_cleanup(&ctx);
+	    return -1;
 	}
+
 	HMAC_Final(&ctx, mac, &len);
 	HMAC_cleanup(&ctx);
 
 	if (0) {
-		unsigned char   *up;
-		
-		INFO("event_notification_check_hmac2: %d\n", len);
-		up = (unsigned char *) mac;
-		for (i = 0; i < len; i++, up++) {
-			fprintf(stderr, "%02hhx", *up);
-		}		
-		fprintf(stderr, "\n");
+		hmac_dump("event_notification_check_hmac (plain)", mac, len);
 	}
+#ifdef ELVIN_COMPAT
+ docmp:
+#endif
+	if (srclen == len && memcmp(srcmac, mac, len) == 0) {
+	    notification->has_hmac = 1;
+	    return 0;
+	}
+	ERROR("MAC mismatch! myelvincompat=%d, elvin=%d, ordered=%d\n",
+	      elvincompat, elvin, elvin_ordered);
+	if (1) {
+		char _obj[128];
+		char _evt[128];
+		char _args[1024];
 
-	if (srclen != len || memcmp(srcmac, mac, len)) {
-		ERROR("MAC mismatch!\n");
-		return 1;
+		if (!event_notification_get_objname(handle, notification,
+						    _obj, sizeof(_obj)))
+			strncpy(_obj, "<UNKNOWN>", sizeof(_obj));
+		if (!event_notification_get_eventtype(handle, notification,
+						      _evt, sizeof(_evt)))
+			strncpy(_evt, "<UNKNOWN>", sizeof(_evt));
+		event_notification_get_arguments(handle, notification,
+						 _args, sizeof(_args));
+		fprintf(stderr,
+			"  object=%s, event=%s, args=%s\n", _obj, _evt, _args);
+		if (0) {
+			hmac_dump("     inmsg", srcmac, srclen);
+			hmac_dump("  computed", mac, len);
+		}
 	}
-	notification->has_hmac = 1;
-    	return 0;
+	return 1;
 }
 
 #ifdef NOTYET

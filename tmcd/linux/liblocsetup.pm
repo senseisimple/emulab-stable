@@ -13,13 +13,13 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( $CP $EGREP $NFSMOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $RPMCMD
-	 $HOSTSFILE $LOOPBACKMOUNT $TMGROUP $TMSHADOW $TMGSHADOW
+	 $HOSTSFILE $LOOPBACKMOUNT $TMGROUP $TMSHADOW $TMGSHADOW $CHMOD
 	 os_account_cleanup os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth os_viface_name os_modpasswd
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
-	 os_groupdel os_getnfsmounts os_islocaldir
+	 os_groupdel os_getnfsmounts os_islocaldir os_mountextrafs
 	 os_fwconfig_line os_fwrouteconfig_line os_config_gre
 	 os_get_disks os_get_disk_size os_get_partition_info os_nfsmount
 	 os_gendhcpdconf os_get_ctrlnet_ip
@@ -77,6 +77,7 @@ $SFSCD		= "/usr/local/sbin/sfscd";
 $RPMCMD		= "/bin/rpm";
 $HOSTSFILE	= "/etc/hosts";
 $WGET		= "/usr/bin/wget";
+$CHMOD		= "/bin/chmod";
 
 #
 # These are not exported
@@ -119,8 +120,14 @@ my $debug = 0;
 #
 # OS dependent part of cleanup node state.
 #
-sub os_account_cleanup()
+sub os_account_cleanup($)
 {
+    # XXX this stuff should be lifted up into rc.accounts, sigh
+    my ($updatemasterpasswdfiles) = @_;
+    if (!defined($updatemasterpasswdfiles)) {
+	$updatemasterpasswdfiles = 0;
+    }
+
     #
     # Don't just splat the master passwd/group files into place from $ETCDIR.
     # Instead, grab the current Emulab uids/gids, grab the current group/passwd
@@ -129,6 +136,14 @@ sub os_account_cleanup()
     # into the master files in $ETCDIR.  Also, we remove accounts from the
     # master files if they no longer appear in the current files.  Finally, we
     # strip deleted uids from any groups they might appear in (!).
+    #
+    # And now we only do the merge if told to do so.  This is the default 
+    # coming from prepare, now.  If not merging, we just overwrite the real 
+    # files with the master files -- we do not update the master files.
+    #
+    # We *do* output the diff to say what *would* have changed, so that
+    # an operator can know that they need to manually add a user to the 
+    # master files.
     #
     my %PDB;
     my %GDB;
@@ -312,16 +327,34 @@ sub os_account_cleanup()
 	    print STDERR "Running 'diff -u $file ${file}.new'\n";
 	    $retval = system("diff -u $file ${file}.new");
 	    if ($retval) {
-		print STDERR "Files ${file}.new and $file differ; updating $file.\n";
-		system("mv ${file}.new $file");
+		if ($updatemasterpasswdfiles) {
+		    print STDERR "Files ${file}.new and $file differ; updating $file.\n";
+		    system("mv ${file}.new $file");
+		}
+		else {
+		    print STDERR "Files ${file}.new and $file differ, but I was told not to update the master files!.\n";
+		    system("rm -f ${file}.new");
+		}
+	    }
+	    else {
+		system("rm -f ${file}.new");
 	    }
 	}
 	else {
 	    print STDERR "Running 'diff -q -u $file ${file}.new'\n";
 	    $retval = system("diff -q -u $file ${file}.new");
 	    if ($retval) {
-		print STDERR "Files ${file}.new and $file differ, but we can't show the changes!  Updating $file anyway!\n";
-		system("mv ${file}.new $file");
+		if ($updatemasterpasswdfiles) {
+		    print STDERR "Files ${file}.new and $file differ, but we can't show the changes!  Updating $file anyway!\n";
+		    system("mv ${file}.new $file");
+		}
+		else {
+		    print STDERR "Files ${file}.new and $file differ, but we can't show the changes, and I was told not to update the master files!\n";
+		    system("rm -f ${file}.new");
+		}
+	    }
+	    else {
+		system("rm -f ${file}.new");
 	    }
 	}
     }
@@ -1922,6 +1955,32 @@ sub os_nfsmount($$)
     }
 
     return 0;
+}
+
+#
+# Create/mount a local filesystem on the extra partition if it hasn't
+# already been done.  Returns the resulting mount point (which may be
+# different than what was specified as an argument if it already existed).
+#
+sub os_mountextrafs($)
+{
+    my $dir = shift;
+    my $mntpt = "";
+    my $log = "$VARDIR/logs/mkextrafs.log";
+
+    #
+    # XXX this is a most bogus hack right now, we look for partition 4
+    # in /etc/fstab.
+    #
+    my $fstabline = `grep -E '(hda|sda)4' /etc/fstab`;
+    if ($fstabline =~ /^\/dev\/\S*4\s+(\S+)\s+/) {
+	$mntpt = $1;
+    } elsif (!system("$BINDIR/mkextrafs.pl -f $dir >$log 2>&1")) {
+	$mntpt = $dir;
+    } else {
+	print STDERR "mkextrafs failed, see $log\n";
+    }
+    return $mntpt;
 }
 
 1;

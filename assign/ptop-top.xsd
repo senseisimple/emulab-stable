@@ -22,6 +22,10 @@
         </xs:annotation>
       </xs:attribute>
       <xs:attribute name="type_slots" use="required">
+        <xs:annotation>
+          <xs:documentation>How many virtual nodes of this type this physical node can
+handle.</xs:documentation>
+        </xs:annotation>
         <xs:simpleType>
           <xs:union>
             <xs:simpleType>
@@ -38,6 +42,14 @@
         </xs:simpleType>
       </xs:attribute>
       <xs:attribute name="static">
+        <xs:annotation>
+          <xs:documentation>element unlimited { empty }?,
+A flag that indicates that this physical node *always*
+has this type - a node is only allowed to have one dynamic
+(ie. not flagged as static) type at a time, but any number
+of static types at a time
+element static { empty }?</xs:documentation>
+        </xs:annotation>
         <xs:simpleType>
           <xs:restriction base="xs:token">
             <xs:enumeration value="true"/>
@@ -52,6 +64,10 @@
     </xs:complexType>
   </xs:element>
   <xs:group name="LinkEndPoints">
+    <xs:annotation>
+      <xs:documentation>A link has two endpoints. Right now, they are order
+independent. But they might become order-dependant later.</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
       <xs:element ref="ptop:source_interface"/>
       <xs:element ref="ptop:destination_interface"/>
@@ -68,6 +84,11 @@
     </xs:annotation>
   </xs:element>
   <xs:group name="LinkCharacteristics">
+    <xs:annotation>
+      <xs:documentation>Link characterstics which affect traffic.
+TODO: In the future, the bandwidth, latency, and packet loss will be
+moved to features and/or properties</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
       <xs:element ref="ptop:bandwidth"/>
       <xs:element ref="ptop:latency"/>
@@ -95,6 +116,10 @@
     </xs:simpleType>
   </xs:element>
   <xs:element name="packet_loss">
+    <xs:annotation>
+      <xs:documentation>Static packet loss probability of the link as a fraction
+(ie. 0.01 == 1%)</xs:documentation>
+    </xs:annotation>
     <xs:simpleType>
       <xs:restriction base="xs:float">
         <xs:minInclusive value="0.0"/>
@@ -103,9 +128,24 @@
   </xs:element>
   <xs:element name="fd">
     <xs:complexType>
-      <xs:attribute name="fd_name" use="required"/>
-      <xs:attribute name="fd_weight" use="required"/>
+      <xs:attribute name="fd_name" use="required">
+        <xs:annotation>
+          <xs:documentation>Name of this feature or desire
+element fd_name { text },</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="fd_weight" use="required">
+        <xs:annotation>
+          <xs:documentation>Weight assocated with the feature or desire
+element fd_weight { xsd:float },</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
       <xs:attribute name="violatable">
+        <xs:annotation>
+          <xs:documentation>A flag indicating whether or not a failure to match the desire with a
+a feature is a constraint violation
+element violatable { empty }?,</xs:documentation>
+        </xs:annotation>
         <xs:simpleType>
           <xs:restriction base="xs:token">
             <xs:enumeration value="true"/>
@@ -130,6 +170,11 @@
     </xs:complexType>
   </xs:element>
   <xs:attributeGroup name="GlobalSpec">
+    <xs:annotation>
+      <xs:documentation>GlobalSpec = element global {
+	element operator { "OnceOnly" | "FirstFree" }
+}</xs:documentation>
+    </xs:annotation>
     <xs:attribute name="global_operator" use="required">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -140,6 +185,12 @@
     </xs:attribute>
   </xs:attributeGroup>
   <xs:attributeGroup name="LocalSpec">
+    <xs:annotation>
+      <xs:documentation>LocalSpec = element local {
+	element operator { "+" }
+	attribute local_operator { "+" }
+}</xs:documentation>
+    </xs:annotation>
     <xs:attribute name="local_operator" use="required">
       <xs:simpleType>
         <xs:restriction base="xs:token">
@@ -149,6 +200,10 @@
     </xs:attribute>
   </xs:attributeGroup>
   <xs:complexType name="InterfaceSpec">
+    <xs:annotation>
+      <xs:documentation>Interfaces
+InterfaceSpec = element interface { InterfaceContents }</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
       <xs:element minOccurs="0" maxOccurs="unbounded" ref="ptop:property"/>
     </xs:sequence>
@@ -208,7 +263,12 @@
       <xs:documentation>Name of this property</xs:documentation>
     </xs:annotation>
   </xs:element>
-  <xs:element name="property_value" type="xs:string"/>
+  <xs:element name="property_value" type="xs:string">
+    <xs:annotation>
+      <xs:documentation>Value associated with this property
+TODO: Add ranges and other types from rspec</xs:documentation>
+    </xs:annotation>
+  </xs:element>
   <xs:element name="property_penalty">
     <xs:annotation>
       <xs:documentation>The penalty associated with this property</xs:documentation>

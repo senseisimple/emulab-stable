@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -78,7 +78,7 @@ else {
     # Read in the fingerprint of the capture certificate
     #
     $capfile = "$TBETC_DIR/capture.fingerprint";
-    $lines = file($capfile,"r");
+    $lines = file($capfile);
     if (!$lines) {
 	TBERROR("Unable to open $capfile!",1);
     }
@@ -105,4 +105,3 @@ echo "keylen: $keylen\n";
 echo "key:    $keydata\n";
 echo "ssl-server-cert: $certhash\n";
 ?>
-

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2008 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -407,8 +407,9 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
         // other stuff if I remove them... bummer!
         tb_plink *phys_link =
             new tb_plink(name.c(), tb_plink::PLINK_NORMAL, str_first_type,
-                "(null)", "(null)", src_iface.c(), dst_iface.c());
-        
+                         src_pnode->name, "(null)", src_iface.c(),
+                         dst_pnode->name, "(null)", dst_iface.c());
+            
         phys_link->delay_info.bandwidth = bandwidth.i();
         phys_link->delay_info.delay = latency.i();
         phys_link->delay_info.loss = packet_loss.d();
@@ -470,7 +471,13 @@ bool populate_links(DOMElement *root, tb_pgraph &pg, tb_sgraph &sg) {
 			#ifdef PER_VNODE_TT
 				src_pnode->total_bandwidth += bandwidth.i();
 			#endif
-		}
+		} else {
+                    // Neither is a switch - a direct node->node link
+#ifdef PER_VNODE_TT
+                    dst_pnode->total_bandwidth += bandwidth.i();
+                    src_pnode->total_bandwidth += bandwidth.i();
+#endif
+                }
 
 	//XMLDEBUG("created link " << *phys_link << endl);
     // XXX: Special treatment for switches

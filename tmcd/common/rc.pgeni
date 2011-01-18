@@ -15,16 +15,17 @@ use Getopt::Std;
 sub usage()
 {
     print "Usage: " . scriptname() .
-	" -s server -u urn [-j vnodeid] boot|shutdown|reconfig|reset\n";
+	" -s server -i key [-j vnodeid] boot|shutdown|reconfig|reset\n";
     exit(1);
 }
-my $optlist = "s:j:u:k:";
+my $optlist = "s:j:u:k:e:i:";
 my $vnodeid;
 my $server;
 my $action;
+my $idkey;
 my $eventkey;
 my $keyhash;
-my $urn;
+my $v0_compat;
 
 # Turn off line buffering on output
 $| = 1;
@@ -50,6 +51,8 @@ use libtestbed;
 # Script specific goo.
 my $RCDIR	= "$BINDIR/rc";
 my $LOGFILE	= "$LOGDIR/pgeniboot.debug";
+my $PAGENT      = "$BINDIR/program-agent";
+my @SAVEARGV    = @ARGV;
 
 # Protos.
 sub doboot();
@@ -68,8 +71,11 @@ if (defined($options{'s'})) {
 if (defined($options{'k'})) {
     ($eventkey,$keyhash) = split(',', $options{'k'});
 }
-if (defined($options{'u'})) {
-    $urn = $options{'u'};
+if (defined($options{'i'})) {
+    $idkey = $options{'i'};
+}
+if (defined($options{'e'})) {
+    $v0_compat = $options{'e'};
 }
 if (defined($options{'j'})) {
     $vnodeid = $options{'j'};
@@ -80,10 +86,22 @@ if (@ARGV) {
     $action = $ARGV[0];
 }
 usage()
-    if (! (defined($server) && defined($urn) && defined($action)));
+    if (! (defined($server) && defined($idkey) && defined($action)));
 
 # For tmcc client.
 $ENV{'BOSSNAME'} = $server;
+
+my @BOOTSCRIPTS = ("rc.misc", "rc.topomap", 
+		   "rc.tarfiles", "rc.rpms",
+		   "rc.route", "rc.ifconfig", "rc.hostnames",
+		   "rc.trafgen", "rc.progagent");
+
+# For event clients. See progagent and trafgen.
+if (defined($v0_compat) &&
+    system("strings $PAGENT | grep -q -s 'Emulab Event Library:'") &&
+    system("strings $PAGENT | grep -q -s '___elvin_ordered___'")) {
+    $ENV{'V0_COMPAT'} = $v0_compat;
+}
 
 #
 # We want to save all of the output off
@@ -159,13 +177,33 @@ sub BootFatal($$)
 sub doboot()
 {
     print("Checking Testbed reservation status on $server\n");
-    my ($pid, $eid, $vname) = libsetup::shadowsetup($server, $urn);
+    my ($pid, $eid, $vname) = libsetup::shadowsetup($server, $idkey);
 
     if (!defined($pid)) {
 	print "Node is free\n";
 	return;
     }
     my $optarg = (defined($vnodeid) ? "-j $vnodeid" : "");
+
+    #
+    # Generate a script to shut this down.
+    #
+    my $shutdown_script = "$VARDIR/shadow/boot/rc.shutdown";
+    if (open(FOO, ">$shutdown_script")) {
+	if ($SAVEARGV[$#SAVEARGV] eq "boot") {
+	    pop(@SAVEARGV);
+	}
+	push(@SAVEARGV, "shutdown");
+	
+	print FOO "#!/bin/sh\n";
+	print FOO "$PROGRAM_NAME @SAVEARGV\n";
+	close(FOO);
+	chmod(0755, $shutdown_script);
+	print "Created $shutdown_script\n";
+    }
+    else {
+	BootFatal(-1, "Could not create $shutdown_script");
+    }
 
     if (-x "$BINDIR/watchdog") {
         print("Starting testbed update watchdog\n");
@@ -227,12 +265,7 @@ sub doboot()
     }
     }
 
-    my @bootscripts = ("rc.misc", "rc.topomap", 
-		       "rc.tarfiles", "rc.rpms",
-		       "rc.route", "rc.ifconfig", "rc.hostnames",
-		       "rc.progagent");
-
-    foreach my $script (@bootscripts) {
+    foreach my $script (@BOOTSCRIPTS) {
 	next
 	    if (!-x "$BINDIR/rc/$script");
 
@@ -255,6 +288,22 @@ sub doboot()
 #
 sub doshutdown()
 {
+    my %TMCCTIMEOUT  = ("timeout" => 5);
+    my $optarg       = (defined($vnodeid) ? "-j $vnodeid" : "");
+    
+    foreach my $script (reverse(@BOOTSCRIPTS)) {
+	next
+	    if (!-x "$BINDIR/rc/$script");
+
+	print "Running $BINDIR/rc/$script $optarg shutdown\n";
+	
+	system("$BINDIR/rc/$script $optarg shutdown");
+    }
+
+    print("Informing Emulab Control that we are are rebooting\n");
+    if (tmcc(TMCCCMD_STATE, "SHUTDOWN", undef, %TMCCTIMEOUT) < 0) {
+	fatal("Error sending SHUTDOWN to Emulab Control!");
+    }
 }
 
 #

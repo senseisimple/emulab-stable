@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007 University of Utah and the Flux Group.
+# Copyright (c) 2007-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Logfile;
@@ -14,11 +14,9 @@ use vars qw(@ISA @EXPORT);
 @EXPORT = qw ( );
 
 # Must come after package declaration!
-use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 use English;
-use Group;
 use Data::Dumper;
 
 # Configure variables
@@ -146,6 +144,7 @@ sub Delete($;$)
 sub AccessCheck($$)
 {
     my ($self, $user) = @_;
+    require Group;
 
     # Must be a real reference. 
     return 0

@@ -434,10 +434,11 @@ function WRITESIDEBAR() {
     }
 
     NavMenuButton("Documentation", "$WIKIDOCURL");
+    NavMenuButtonNew("Forums", "http://groups.google.com/group/emulab-users");
 
     if ($rootEmulab) {
 	# Leave New here about 2 weeks
-        NavMenuButton("Papers and Talks (Apr 4)", "$TBDOCBASE/pubs.php3");
+        NavMenuButtonNew("Papers and Talks (Jul 18)", "$TBDOCBASE/pubs.php3");
 	NavMenuButton("Emulab Software (Sep 1)", "$TBDOCBASE/software.php3");
 
 	NavMenuButton("List People",
@@ -729,6 +730,9 @@ function WRITESIDEBAR() {
 
 	NavMenuButton("Edit Site Variables",
 		      "$TBBASE/editsitevars.php3");
+
+	NavMenuButton("Show Shared Node Pool",
+		      "$TBBASE/showpool.php");
 
 	NavMenuButton("Edit Knowledge Base",
 		      "$TBBASE/kb-manage.php3");
@@ -1137,10 +1141,9 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL,
 	    TBGetVersionInfo($major, $minor, $build);
 	
 	    $versioninfo = "Vers: $major.$minor Build: $build";
-
-	    $hash = TBGetCommitHash();
-	    if ($hash) {
-		$commithash = "$hash";
+	    $commithash  = TBGetCommitHash();
+	    if (!$commithash) {
+		$commithash = "";
 	    }
 	}
 	echo "<div id='versioninfo'>$versioninfo";
@@ -1212,7 +1215,7 @@ function PAGEFOOTER($view = NULL) {
                 </ul>
                 <!-- begin copyright -->
                 <span class='copyright'>
-                <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
+                <a href=$TBDOCBASE/copyright.php>
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </span>\n";
     }
@@ -1222,12 +1225,12 @@ function PAGEFOOTER($view = NULL) {
     echo "       <tr>\n";
     
     if ($login_user) {
-	echo "    <td class=reportbug>";
-	echo "      <a href='$TBBASE/gototrac.php3?do=newticket&login=1'>";
-	echo "        Report Bug, Gripe, Request Feature</a>";
+	echo "    <td class=reportbug>Questions? Join the ";
+	echo "      <a href='http://groups.google.com/group/emulab-users'>";
+	echo "        Help Forum</a>";
 	echo "    </td>";
     }
-    echo "        <td class=contact>Questions? Contact $TBMAILADDR</td>";
+    echo "        <td class=contact>Bug? Contact $TBMAILADDR</td>";
     echo "       </tr>\n";
     echo "      </table>\n";
     echo "      <!-- end copyright -->\n";

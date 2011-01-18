@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2009 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -53,8 +53,15 @@ char   *CurrentTimeString(void);
 int	sleeptime(unsigned int usecs, char *str, int doround);
 int	fsleep(unsigned int usecs);
 int	sleeptil(struct timeval *nexttime);
+void	InitSizes(int32_t chunksize, int32_t blocksize, int64_t bytes);
+int	TotalChunks(void);
+int	ChunkSize(int chunkno);
+int	ChunkBytes(int chunkno);
+int	TotalBlocks(void);
+int	BlockSize(int chunkno, int blockno);
 void	BlockMapInit(BlockMap_t *blockmap, int block, int count);
 void	BlockMapAdd(BlockMap_t *blockmap, int block, int count);
+void	BlockMapClear(BlockMap_t *blockmap, int block, int count);
 int	BlockMapAlloc(BlockMap_t *blockmap, int block);
 int	BlockMapIsAlloc(BlockMap_t *blockmap, int block, int count);
 int	BlockMapExtract(BlockMap_t *blockmap, int *blockp);
@@ -64,3 +71,7 @@ int	BlockMapFirst(BlockMap_t *blockmap);
 int	BlockMapApply(BlockMap_t *blockmap, int chunk,
 		      int (*func)(int, int, int, void *), void *farg);
 void	ClientStatsDump(unsigned int id, ClientStats_t *stats);
+
+/* Compat */
+#define CHUNKSIZE	ChunkSize(-1)
+#define BLOCKSIZE	BlockSize(-1, -1)

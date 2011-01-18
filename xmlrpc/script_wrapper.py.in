@@ -149,6 +149,8 @@ API = {
                             "help" : "Modify resources for run" },
     "template_stoprun"  : { "func" : "template_stoprun",
                             "help" : "Stop current experiment run" },
+    "mkblob"            : { "func" : "mkblob",
+                            "help" : "Create a new blob in the blob store" }
 };
 
 #
@@ -2597,6 +2599,43 @@ class template_stoprun:
         print "  cwd   The template GUID will be inferred from the current"
         print "        working directory, if it is inside the templates's"
         print "        directory (e.g. /proj/foo/templates/10005/18)."
+        wrapperoptions();
+        return
+    pass
+
+#
+# mkblob
+#
+class mkblob:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "h", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+
+        # Do this after so --help is seen.
+        if len(req_args) != 1:
+            self.usage();
+            return -1;
+
+        rval,response = do_method( "blob", "mkblob",
+                                   { "filename" : req_args[ 0 ] } );
+        return rval;
+
+    def usage(self):
+        print "mkblob [options] filename"
         wrapperoptions();
         return
     pass

@@ -1,0 +1,9 @@
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.2" type="request">
+ <node virtual_id="kentucky1" 
+       component_manager_uuid="urn:publicid:IDN+uky.emulab.net+authority+cm"
+       exclusive="1"
+       virtualization_type="emulab-vnode"
+       virtualization_subtype="raw">
+    <interface virtual_id="control"/>
+ </node>
+</rspec>

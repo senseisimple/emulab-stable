@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -75,6 +75,9 @@ use lib "@prefix@/lib";
 use libaudit;
 use libdb;
 use libtestbed;
+use User;
+use Group;
+use EmulabFeatures;
 
 # Defined in libtestbed;
 my $PROJROOT    = PROJROOT();
@@ -251,6 +254,12 @@ if (system("grep -q '^${unix_gid}:' /etc/group")) {
 	}
     }
 }
+
+#
+# Kill any features
+#
+EmulabFeatures->DeleteAll($group) == 0 or
+    fatal("Could not delete all features for $group");
 
 # Last step, so we can repeat above actions on failures.
 $group->Delete() == 0 or

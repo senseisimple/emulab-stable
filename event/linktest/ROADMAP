@@ -9,7 +9,7 @@ Boss:
 Ops:
 	-> linktest.proxy -> run_linktest.pl
 Nodes:
-	-> linktest -> linktest.pl
+	-> linktest -> elab_linktest.pl -> linktest.pl
 
 Description of files...
 
@@ -27,10 +27,21 @@ What it does:
 	for a KILL event.
 Who it should run as:
 	experiment swapper
-	
 
 Name:
-	linktest.pl.in
+	elab_linktest.pl.in
+Description:
+	A wrapper which interfaces with Emulab config variables and passes
+        them on as parameters to linktest.pl
+Where it runs:
+	On nodes only.  Runs in the current directory.
+What it does:
+	Invokes linktest.pl with Emulab-specific arguments.
+Who it should run as:
+	Invoked by linktest; therefore experiment swapper.
+
+Name:
+	linktest.pl
 Description:
 	A test suite for Emulab experiments.
 Where it runs:
@@ -44,7 +55,7 @@ What it does:
 	REPORT events to report on its progress and ultimately,
 	a COMPLETE event when all tests are completed.
 Who it should run as:
-	Invoked by linktest; therefore experiment swapper.
+	Invoked by elab_linktest.pl; therefore experiment swapper.
 
 Name:
 	run_linktest.pl.in

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2007 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -209,7 +209,7 @@ main(int argc, char **argv)
 			
 			if ((bp = strchr(temp, '/')) == NULL)
 				fatal("Malformed pid/eid: %s", myeid);
-			*bp++ = (char) NULL;
+			*bp++ = '\0';
 
 			sprintf(keyfilebuf, "/proj/%s/exp/%s/tbdata/eventkey",
 				temp, bp);
@@ -292,7 +292,7 @@ main(int argc, char **argv)
 	 * XXX For now, uppercase the strings, and remove trailing _.
 	 */
 	if (argc) {
-		buf[0] = (char) NULL;
+		buf[0] = '\0';
 		while (argc) {
 			if (strlen(*argv) + strlen(buf) >= sizeof(buf)-2)
 				fatal("Too many event argument strings!");
@@ -309,8 +309,8 @@ main(int argc, char **argv)
 				bp++;
 			    }
 			    if (*(bp-1) == '_')
-				*(bp-1) = (char) NULL;
-			    *bp++ = (char) NULL;
+				*(bp-1) = '\0';
+			    *bp++ = '\0';
 
 			    sprintf(&buf[strlen(buf)], "%s=%s ", *argv, bp);
 			}

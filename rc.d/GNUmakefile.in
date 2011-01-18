@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # For installation.
@@ -29,7 +29,7 @@ TIP_SCRIPTS	=
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 
-ifeq ($(FBSDVERSION),FreeBSD6)
+ifneq ($(FBSDVERSION),FreeBSD4)
 ifeq ($(WINSUPPORT),1)
 OPS_SCRIPTS += silly.sh
 endif
@@ -48,7 +48,7 @@ endif
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
 # 
-all: $(RC_SCRIPTS) $(OPS_SCRIPTS) capture.sh
+all: $(RC_SCRIPTS) $(OPS_SCRIPTS) capture.sh 3.v0_gateway.sh
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -64,6 +64,13 @@ $(INSTALL_RCDIR)/capture: capture.sh
 	-mkdir -p $(INSTALL_RCDIR)
 	$(INSTALL_PROGRAM) capture.sh $@
 
+#
+# Well, this is awkward.  Make sure we don't try to install anything from
+# a dev tree both because it doesn't make any sense and because it would
+# clobber the "real" version.
+#
+ifeq ($(TBROOT),/usr/testbed)
+
 install: $(addprefix $(INSTALL_RCDIR)/, $(RC_SCRIPTS))
 
 control-install:	$(addprefix $(INSTALL_RCDIR)/, $(OPS_SCRIPTS))
@@ -73,4 +80,11 @@ subboss-install:	$(addprefix $(INSTALL_RCDIR)/, $(SUBBOSS_SCRIPTS))
 clrhouse-install:	$(INSTALL_RCDIR)/2.mysql-server.sh \
 			$(INSTALL_RCDIR)/1.mysql-client.sh
 
+gateway-install:	$(INSTALL_RCDIR)/3.v0_gateway.sh
+
+
 tipserv-install:	$(addprefix $(INSTALL_RCDIR)/, $(TIP_SCRIPTS))
+else
+install control-install subboss-install clrhouse-install tipserv-install:
+	@echo "Cannot install startup scripts in dev tree"
+endif

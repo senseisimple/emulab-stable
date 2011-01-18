@@ -1,0 +1,11 @@
+<rspec xmlns="http://protogeni.net/resources/rspec/0.2">
+ <node virtual_id="geni1" 
+       exclusive="1"
+       virtualization_type="emulab-vnode"
+       virtualization_subtype="raw">
+   <disk_image
+      name="urn:publicid:IDN+emulab.net+image+emulab-ops//FBSD62-STD" />
+ </node>
+</rspec>
+
+

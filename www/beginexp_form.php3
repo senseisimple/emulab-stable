@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2007, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -35,12 +35,12 @@ function INITFORM($formfields, $projlist)
         # this is to have another page for netbuild that does some magic and
         # redirects the browser to this page. 
         #
-	if (isset($nsref) && $nsref != "" && ereg("^[0-9]+$", $nsref))
+	if (isset($nsref) && $nsref != "" && preg_match('/^[0-9]+$/', $nsref))
 	    $defaults["nsref"] = $nsref;
 	else
 	    unset($nsref);
 	
-	if (isset($guid) && $guid != "" &&  ereg("^[0-9]+$", $guid))
+	if (isset($guid) && $guid != "" && preg_match('/^[0-9]+$/', $guid))
 	    $defaults["guid"] = $guid;
 	else
 	    unset($guid);
@@ -159,7 +159,7 @@ function SPITFORM($formfields, $errors)
     global $EXPOSELINKTEST, $EXPOSEARCHIVE;
     global $EXPOSESTATESAVE;
     global $TBVALIDDIRS_HTML;
-    global $WIKIDOCURL;
+    global $WIKIDOCURL, $WIKINODE;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -214,15 +214,20 @@ function SPITFORM($formfields, $errors)
           <li><b>If you have an NS file:</b><br> You may want to
               <b><a href='nscheck_form.php3'>syntax check it first</a></b>
           <li><b>If you do not have an NS file:</b><br>
-              <b><a href='clientui.php3'>New GUI editor</a></b> - An enhanced Java applet for editing topologies.<br>
+              <b><a href='clientui.php3'>New GUI editor</a></b> -
+                An enhanced Java applet for editing topologies.
+              (<b><a href='clientui-alt.php3'>ProtoGeni Version</a></b> -
+                <a href='http://$WIKINODE/trac/protogeni/wiki'>
+                  What's ProtoGeni?</a>)<br>
               The older <b><a href='buildui/bui.php3'>NetBuild GUI</a></b>
               can be used to graphically create topologies.<font size=-2>
               (<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
-              information</a>)</font>.<br>
-              Or, you can download the Emulab
-              <a href='netlab/client.php3'><b>client</b></a> and graphically
-              create one from your desktop.
-          </ul></p><br>";
+              information</a>)</font>.";
+          #echo "<br>
+          #    Or, you can download the Emulab
+          #    <a href='netlab/client.php3'><b>client</b></a> and graphically
+          #    create one from your desktop.
+          echo "</ul></p><br>";
 	} else {
 	    if (isset($view['plab_ns_message'])) {
 		echo "<center>

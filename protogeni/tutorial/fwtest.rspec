@@ -1,0 +1,7 @@
+<rspec xmlns="http://protogeni.net/resources/rspec/0.1">
+ <node virtual_id="geni1" 
+       virtualization_type="emulab-vnode" 
+       exclusive="1"> 
+ </node>
+ <needsfirewall>1</needsfirewall>
+</rspec>

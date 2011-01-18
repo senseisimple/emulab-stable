@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -64,7 +64,7 @@ use libtestbed;
 use libtblog;
 use Experiment;
 use User;
-use Template;
+use EmulabFeatures;
 
 #
 # Turn off line buffering on output
@@ -194,6 +194,12 @@ if (!defined($group)) {
 # flip back. 
 #
 my $cmd = $proxy;
+
+if (EmulabFeatures->FeatureEnabled("NewEventScheduler", $this_user, $group,
+                                   $experiment)) {
+	$cmd .= " -N ";
+}
+
 $cmd .= " -d"
     if ($debug);
 $cmd .= " -a"

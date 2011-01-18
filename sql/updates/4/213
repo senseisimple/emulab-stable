@@ -1,0 +1,25 @@
+#
+# Add a locks table, for the pool_daemon.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    if (!DBTableExists("emulab_locks")) {
+	DBQueryFatal("CREATE TABLE `emulab_locks` ( ".
+		     " `name` varchar(64) NOT NULL default '', ".
+		     " `value` int(10) unsigned NOT NULL default '0', ".
+		     " PRIMARY KEY  (`name`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    DBQueryFatal("lock tables emulab_locks write");
+    my $query_result =
+	DBQueryFatal("select * from emulab_locks where name='pool_daemon'");
+    if (!$query_result->numrows) {
+	DBQueryFatal("insert into emulab_locks values ('pool_daemon', 0)");
+    }
+    DBQueryFatal("unlock tables");
+    return 0;
+}
+1;

@@ -1,0 +1,35 @@
+#
+# Add bridges table and failureaction to virt_lans.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("bridges")) {
+	DBQueryFatal("CREATE TABLE `bridges` ( ".
+	     "  `pid` varchar(32) default NULL, ".
+	     "  `eid` varchar(32) default NULL, ".
+	     "  `exptidx` int(11) NOT NULL default '0', ".
+	     "  `node_id` varchar(32) NOT NULL default '', ".
+	     "  `bridx` mediumint(8) unsigned NOT NULL default '0', ".
+	     "  `iface` varchar(8) NOT NULL default '', ".
+	     "  `vname` varchar(32) NOT NULL default '', ".
+	     "  `vnode` varchar(32) default NULL, ".
+	     "  PRIMARY KEY  (`node_id`,`bridx`,`iface`), ".
+	     "  KEY `pid` (`pid`,`eid`), ".
+	     "  KEY `exptidx` (`exptidx`) ".
+	     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+    if (!DBSlotExists("virt_lan_lans", "failureaction")) {
+        DBQueryFatal("alter table virt_lan_lans add  `failureaction` ".
+		     "  enum('fatal','nonfatal') NOT NULL default 'fatal'");
+    }
+    DBQueryFatal("replace into table_regex values ".
+		 "('virt_lan_lans','failureaction','text','regex', ".
+		 "  '^(fatal|nonfatal)\$',0,0,NULL)");
+    return 0;
+}
+1;

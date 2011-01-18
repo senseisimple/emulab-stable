@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -81,7 +81,7 @@ while (my ($opskey,$uid) = $db_result->fetchrow_array) {
 
 close O;
 
-die "ssh to ops failed: $!\n" if $!;
+#die "ssh to ops failed: $!\n" if $!;
 die "ssh to ops failed with exit code $?\n" if $? != 0;
 
 unlink $logfile;

@@ -72,6 +72,10 @@ foreach my $filename (@filenames) {
     # Do the actual replacement
     #
     while (<IN>) {
+        # Skip comment lines
+        if (/^\s*!/) {
+            next;
+        }
 	while (/\$(\w+)/) {
 	    if (!$vars{$1}) {
 		die "Unknown variable: $1\n";

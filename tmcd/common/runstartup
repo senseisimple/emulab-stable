@@ -49,11 +49,12 @@ else {
     if (!defined($eid)) {
 	fatal("Could not determine pid/eid");
     }
-    if (! -e "/proj/$pid/logs") {
+    my $piddir = PROJDIR();
+    if (! -e "$piddir/logs") {
 	$logtemplate = "$VARDIR/logs/runlog.XXXXXX";
     }
     else {
-	$logtemplate = "/proj/$pid/logs/runlog-$eid.$vname.XXXXXX";
+	$logtemplate = "$piddir/logs/runlog-$eid.$vname.XXXXXX";
     }
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCM;
@@ -37,24 +37,14 @@ use GeniXML;
 use GeniUsage;
 use libtestbed qw(SENDMAIL);
 use emutil;
-# Hate to import all this crap; need a utility library.
-use libdb qw(TBGetSiteVar EXPTSTATE_SWAPPED EXPTSTATE_ACTIVE TBOPSPID
-	     TBDB_NODESTATE_TBFAILED);
-use User;
-use Node;
-use Lan;
-use OSinfo;
-use Image;
-use Interface;
+use EmulabConstants;
+use libEmulab;
 use English;
 use Data::Dumper;
 use XML::Simple;
 use Date::Parse;
 use POSIX qw(strftime tmpnam);
 use Time::Local;
-use Experiment;
-use VirtExperiment;
-use Firewall;
 use Compress::Zlib;
 use File::Temp qw(tempfile);
 use MIME::Base64;
@@ -84,11 +74,12 @@ my $TARFILES_SETUP = "$TB/bin/tarfiles_setup";
 my $MAPPER         = "$TB/bin/mapper";
 my $VTOPGEN        = "$TB/bin/vtopgen";
 my $SNMPIT         = "$TB/bin/snmpit";
+my $NEWGROUP       = "$TB/bin/newgroup";
 my $PRERENDER      = "$TB/libexec/vis/prerender";
 my $XMLLINT	   = "/usr/local/bin/xmllint";
+my $ADDAUTHORITY   = "$TB/sbin/protogeni/addauthority";
 my $EMULAB_PEMFILE = "@prefix@/etc/genicm.pem";
-
-my $API_VERSION = 1;
+my $API_VERSION    = 1;
 
 #
 # Tell the client what API revision we support.  The correspondence
@@ -145,6 +136,7 @@ sub Resolve($)
 	if (GeniResponse::IsResponse($credential));
 
     if ($type eq "node") {
+	require Interface;
 	my $node;
 	
 	if (defined($uuid)) {
@@ -158,7 +150,7 @@ sub Resolve($)
 					undef, "Nothing here by that name");
 	}
 
-	my $rspec = GetAdvertisement(0, $node->node_id());
+	my $rspec = GetAdvertisement(0, $node->node_id(), "0.1", undef);
 	if (! defined($rspec)) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					"Could not start avail");
@@ -192,6 +184,7 @@ sub DiscoverResources($)
     my $credstr   = $argref->{'credential'};
     my $available = $argref->{'available'} || 0;
     my $compress  = $argref->{'compress'} || 0;
+    my $version   = $argref->{'rspec_version'} || undef;
 
     my $credential = CheckCredential($credstr);
     return $credential
@@ -200,10 +193,18 @@ sub DiscoverResources($)
     return DiscoverResourcesAux($available, $compress, [$credential]);
 }
 # Helper function for V2.
-sub DiscoverResourcesAux($$$)
+sub DiscoverResourcesAux($$$;$)
 {
-    my ($available, $compress, $credentials) = @_;
+    my ($available, $compress, $credentials, $version) = @_;
     my $user_urn  = $ENV{'GENIRN'};
+    $version   = "0.2"
+	if (!defined($version));
+
+    # Sanity check since this can come from client.
+    if (! ($version eq "0.1" || $version eq "0.2" ||$version eq "2.0")) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper version request");
+    }
 
     # Oh, for $*%(s sake.  Frontier::RPC2 insists on representing a
     # Boolean as its own object type -- which Perl always interprets as
@@ -219,7 +220,7 @@ sub DiscoverResourcesAux($$$)
     # A sitevar controls whether external users can get any nodes.
     #
     my $allow_externalusers = 0;
-    if (!TBGetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
+    if (!GetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
 	      # Cannot get the value, say no.
 	      $allow_externalusers = 0;
     }
@@ -246,9 +247,28 @@ sub DiscoverResourcesAux($$$)
     }
 
     #
+    # See if one of the credentials is a slice credential. If it is, and
+    # that slice is active, pass it to ptopgen so that it includes the current
+    # resources as available.
+    #
+    my $experiment = undef;
+    foreach my $credential (@$credentials) {
+	my ($auth, $type, $id) = GeniHRN::Parse($credential->target_urn());
+	if ($type eq "slice") {
+	    # Might not exist here yet.
+	    my $slice = GeniSlice->Lookup($credential->target_urn());
+	    if (defined($slice)) {
+		# See if the local experiment exists yet.
+		$experiment = Experiment->Lookup($slice->uuid());
+	    }
+	    last;
+	}
+    }
+
+    #
     # Acquire the advertisement from ptopgen and compress it if requested.
     #
-    my $xml = GetAdvertisement($available, undef);
+    my $xml = GetAdvertisement($available, undef, $version, $experiment);
     if (! defined($xml)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
@@ -266,12 +286,16 @@ sub DiscoverResourcesAux($$$)
 #
 # Use ptopgen in xml mode to spit back an xml file. 
 #
-sub GetAdvertisement($$)
+sub GetAdvertisement($$$$)
 {
-    my ($available, $pc) = @_;
+    my ($available, $pc, $version, $experiment) = @_;
     my $xml = undef;
 
-    my $invocation = "$PTOPGEN -x -g 0.2 -r -p GeniSlices";
+    my $invocation = "$PTOPGEN -x -g $version -r -p GeniSlices";
+    if (defined($experiment)) {
+	my $eid = $experiment->eid();
+	$invocation .= " -e $eid";
+    }
     $invocation .= " -a" unless $available;
     if (defined($pc)) {
 	$invocation .= " -1 $pc";
@@ -394,13 +418,15 @@ sub GetTicketAuxAux($$$$$$$$$)
     my $response    = undef;
     my $restorevirt = 0;	# Flag to restore virtual state
     my $restorephys = 0;	# Flag to restore physical state
+    require OSinfo;
+    require VirtExperiment;
 
     #
     # We need this below to sign the ticket.
     #
     my $authority = GeniCertificate->LoadFromFile($EMULAB_PEMFILE);
     if (!defined($authority)) {
-	print STDERR " Could not get uuid from $EMULAB_PEMFILE\n";
+	print STDERR " Could not load authority for $EMULAB_PEMFILE\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
@@ -432,7 +458,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     # A sitevar controls whether external users can get any nodes.
     #
     my $allow_externalusers = 0;
-    if (!TBGetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
+    if (!GetSiteVar('protogeni/allow_externalusers', \$allow_externalusers)){
 	    # Cannot get the value, say no.
 	    $allow_externalusers = 0;
     }
@@ -461,7 +487,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     # slice record expires, which was given by the expiration time of the
     # slice credential.
     #
-    my $expires = GeniXML::GetText("valid_until", $rspec);
+    my $expires = GeniXML::GetExpires($rspec);
     if (defined($expires)) {
 	if (! ($expires =~ /^[-\w:.\/]+/)) {
 	    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -479,7 +505,7 @@ sub GetTicketAuxAux($$$$$$$$$)
   # A sitevar controls the sliver lifetime.
   #
   my $max_sliver_lifetime = 0;
-  if (!TBGetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)){
+  if (!GetSiteVar('protogeni/max_sliver_lifetime', \$max_sliver_lifetime)){
 	    # Cannot get the value, default it to 90 days.
 	    $max_sliver_lifetime = 90;
   }
@@ -616,10 +642,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     $virtexperiment->allowfixnode(0);
     $virtexperiment->multiplex_factor(3);
 
-    # This is where nodes are parked until a ticket is redeemed.
-    # This experiment no longer has to exist.
-    my $reserved_holding = Experiment->Lookup("GeniSlices", "reservations");
-
     #
     # An rspec is a structure that requests specific nodes. If those
     # nodes are available, then reserve it. Otherwise the ticket
@@ -628,11 +650,11 @@ sub GetTicketAuxAux($$$$$$$$$)
     my %namemap  = ();
     my %colomap  = ();
     my %ifacemap = ();
+    my %iface2node = ();
     my %vportmap = ();
     my %nodemap  = ();
     my @nodeids  = ();
     my %lannodes = ();
-    my @dealloc;
 
     #
     # If this is a ticket update, we want to seed the namemap with
@@ -678,31 +700,28 @@ sub GetTicketAuxAux($$$$$$$$$)
 		if (GeniXML::IsLanNode($ref));
 
 	    my $node_nickname = GeniXML::GetVirtualId($ref);
-	    my $colocate      = GeniXML::GetText("colocate", $ref) ||
-		                GeniXML::GetText("phys_nickname", $ref);
-	    my $resource_uuid = GeniXML::GetNodeId($ref);
-	    my $node = GeniUtil::LookupNode($resource_uuid);
+	    my $colocate      = GeniXML::GetColocate($ref);
+	    my $component_id  = GeniXML::GetNodeId($ref);
+	    my $node = GeniUtil::LookupNode($component_id);
 	    if (!defined($node)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-				 "Bad resource $resource_uuid in ticket");
+				 "Bad resource $component_id in ticket");
 		goto bad;
 	    }
-
 	    #
-	    # Grab the reservation. For backwards compatibility, we want
-	    # to find nodes in the reservations holding area, and move them
-	    # into the slice experiment. The holding area is no longer going
-	    # to be used, at least not until we have a reservations system.
+	    # Is the node a virtual node? Must be an update to an
+	    # existing sliver/ticket, since we now return the node_id
+	    # of the allocated virtual node, not the physical node.
 	    #
-	    my $reservation = $node->Reservation();
-	    if (defined($reservation) &&
-		defined($reserved_holding) &&
-		$reservation->SameExperiment($reserved_holding)) {
-		if ($node->MoveReservation($slice_experiment)) {
-		    print STDERR "Could not move $node to $slice_experiment\n";
+	    if ($node->isvirtnode()) {
+		my $pnode = Node->Lookup($node->phys_nodeid());
+		if (!defined($pnode)) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "No physical resource for $component_id");
 		    goto bad;
 		}
-		$node->Refresh();
+		$node = $pnode;
 	    }
 	    $namemap{$node_nickname} = $node;
 	    $colomap{$colocate} = $node
@@ -713,18 +732,16 @@ sub GetTicketAuxAux($$$$$$$$$)
     print GeniXML::Serialize($rspec);
 
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
-	my $resource_uuid = GeniXML::GetNodeId($ref);
-	my $manager_uuid  = GeniXML::GetManagerId($ref);
+	my $component_id  = GeniXML::GetNodeId($ref);
+	my $manager_id    = GeniXML::GetManagerId($ref);
 	my $node_nickname = GeniXML::GetVirtualId($ref);
-	my $colocate      = GeniXML::GetText("colocate", $ref) ||
-	                    GeniXML::GetText("phys_nickname", $ref);
-	my $subnode_of    = GeniXML::GetText("subnode_of", $ref);
-	my $virtualization_type
-                          = GeniXML::GetText("virtualization_type", $ref);
+	my $colocate      = GeniXML::GetColocate($ref);
+	my $subnode_of    = GeniXML::GetSubnodeOf($ref);
+	my $virtualization_type = GeniXML::GetVirtualizationType($ref);
+	
 	my $virtualization_subtype
-                          = GeniXML::GetText("virtualization_subtype",
-					     $ref);
-	my $exclusive     = GeniXML::GetText("exclusive", $ref);
+                          = GeniXML::GetVirtualizationSubtype($ref);
+	my $exclusive     = GeniXML::GetExclusive($ref);
 	my $pctype;
 	my $osname;
 	my $node;
@@ -766,19 +783,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    goto bad;
 		}
 		#
-		# For now, the project has to be emulab-ops. 
+		# For now, the project has to be emulab-ops or the
+		# the current project.
 		#
-		if ($ospid ne TBOPSPID()) {
+		if (! ($ospid eq TBOPSPID() ||
+		       $ospid eq $slice_experiment->pid())) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 				 "Illegal project name in URN: $dname");
 		    goto bad;
 		}
-		my $osinfo = OSinfo->LookupByName($os);
+		my $osinfo = OSinfo->Lookup($ospid, $os);
 		if (!defined($osinfo)) {
 		    $response =
 			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					     "Bad osname in URN: $dname");
+					     "Unknown image URN: $dname");
 		    goto bad;
 		}
 		#
@@ -803,7 +822,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$osname = "SPPVM-FAKE";
 			$pctype = "sppvm";
 			# Lets force to shared node.
-			if (! GeniXML::SetText("exclusive", $ref, 0)) {
+			if (! GeniXML::SetExclusive($ref, 0)) {
 			    $response
 				= GeniResponse->Create(GENIRESPONSE_BADARGS,
 						       undef,
@@ -820,6 +839,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$pctype = undef;
 			goto raw;
 		    }
+		    else {
+			$response
+			    = GeniResponse->Create(GENIRESPONSE_BADARGS,
+						   undef,
+				       "Malformed rspec: ".
+				       "Unknown virtualization_subtype");
+			goto bad;
+		    }
 		}
 		else {
 		    goto raw;
@@ -828,14 +855,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    else {
 	      raw:
 		# Lets force to exclusive real node.
-		if (! GeniXML::SetText("exclusive", $ref, 1)) {
+		if (! GeniXML::SetExclusive($ref, 1)) {
 		    $response = GeniResponse->Create(GENIRESPONSE_BADARGS,
 						     undef,
 			"Malformed rspec: Cannot set exclusive tag to true");
 		    goto bad;
 		}
 		$exclusive = 1;
-		if (! GeniXML::SetText("virtualization_type", $ref, "raw")) {
+		if (! GeniXML::SetVirtualizationType($ref, "raw")) {
 		    $response = GeniResponse->Create(GENIRESPONSE_BADARGS,
 						     undef,
 			"Malformed rspec: Cannot set virtualization_type to raw");
@@ -858,7 +885,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	#
 	# Allow wildcarding.
 	#
-	if (!defined($resource_uuid) || $resource_uuid eq "*") {
+	if (!defined($component_id) || $component_id eq "*") {
 	    if (defined($colocate) && exists($colomap{$colocate})) {
 		$node = $colomap{$colocate};
 	    }
@@ -875,13 +902,28 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    }
 	}
 	else {
-	    $node = GeniUtil::LookupNode($resource_uuid);
+	    $node = GeniUtil::LookupNode($component_id);
 
 	    if (!defined($node)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
-					 "Bad resource $resource_uuid");
+					 "Bad resource $component_id");
 		goto bad;
+	    }
+	    #
+	    # Is the node a virtual node? Must be an update to an
+	    # existing sliver/ticket, since we now return the node_id
+	    # of the allocated virtual node, not the physical node.
+	    #
+	    if ($node->isvirtnode()) {
+		if (!$isupdate ||
+		    !exists($namemap{$node_nickname})) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "Bad resource for $node_nickname");
+		    goto bad;
+		}
+		$node = $namemap{$node_nickname};
 	    }
 	    $pctype = $node->type()
 		if (!defined($pctype));
@@ -963,13 +1005,15 @@ sub GetTicketAuxAux($$$$$$$$$)
 	
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
-	    my $virtual_id   = GeniXML::GetText("virtual_id", $linkref);
+	    my $virtual_id   = GeniXML::GetVirtualId($linkref);
 
 	    if (!defined($virtual_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
 			     "Must provide a virtual_id for interfaces");
 		goto bad;
 	    }
+
+	    $iface2node{$virtual_id} = $node_nickname;
 	    
 	    $ifacemap{$node_nickname} = {}
 	        if (!exists($ifacemap{$node_nickname}));
@@ -982,7 +1026,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 							"vport" => $vport};
 
 	    # This is used after the mapper runs since it uses vname:vport.
-	    $vportmap{"$node_nickname:$vport"} = $linkref;
+	    $vportmap{"$node_nickname:$vport"} = {"rspec" => $linkref};
 	}
     }
 
@@ -990,22 +1034,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (!defined(GeniXML::FindFirst("n:link", $rspec)));
     
     #
-    # Now deal with links for wildcarded nodes. We need to fill in the
-    # node_uuid.
+    # Now deal with links for wildcarded nodes. 
     #
     my $linknum = 1;
     
     foreach my $linkref (GeniXML::FindNodes("n:link",
 					    $rspec)->get_nodelist()) {
 	my $lanname    = GeniXML::GetVirtualId($linkref);
-	my $link_type  = GeniXML::GetText("link_type", $linkref);
-	my $istunnel   = (defined($link_type) && $link_type eq "tunnel");
+	my $istunnel   = GeniXML::IsTunnel($linkref);
 	my @interfaces = GeniXML::FindNodes("n:linkendpoints | ".
 					    "n:interface_ref",
 					    $linkref)->get_nodelist();
 	my %managers   = ();
 	my $ifacenum   = 1;
-	my $trivial_ok = 0;
+	my $vindex     = 0;
+	my $trivial_ok = 1;
 
 	if (!defined($lanname)) {
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -1018,7 +1061,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	# we assume the link is for thie CM.
 	#
 	if (GeniXML::FindNodes("n:component_manager", $linkref)) {
-	    %managers = map { GeniXML::GetText("id", $_) => $_ } 
+	    %managers = map { GetLinkManager($_) => $_ } 
 	                      GeniXML::FindNodes("n:component_manager",
 						 $linkref)->get_nodelist();
 
@@ -1039,9 +1082,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 	#
 	if (!$istunnel) {
 	    foreach my $ref (@interfaces) {
-		my $node_nickname =
-		    GeniXML::GetText("virtual_node_id", $ref) ||
-		    GeniXML::GetText("node_nickname", $ref);
+		my $node_nickname = GeniXML::GetInterfaceNodeId($ref);
 
 		if (exists($lannodes{$node_nickname})) {
 		    $lanname = $node_nickname;
@@ -1054,21 +1095,24 @@ sub GetTicketAuxAux($$$$$$$$$)
 	}
 	
 	foreach my $ref (@interfaces) {
-	    my $node_nickname = GeniXML::GetText("virtual_node_id", $ref) ||
-		                GeniXML::GetText("node_nickname", $ref);
-	    my $iface_id = GeniXML::GetText("virtual_interface_id", $ref) ||
-		           GeniXML::GetText("iface_name", $ref);
+	    my $node_nickname = GeniXML::GetInterfaceNodeId($ref);
+	    my $iface_id = GeniXML::GetInterfaceId($ref);
+
+	    if (!defined($iface_id)) {
+		$response =
+		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				 "$lanname: Need interface id for links");
+		goto bad;
+	    }
+
+	    if (! GeniXML::IsVersion0($ref)) {
+		$node_nickname = $iface2node{$iface_id};
+	    }
 
 	    if (!defined($node_nickname)) {
 		$response =
 		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				 "$lanname: Need node id for links");
-		goto bad;
-	    }
-	    if (!defined($iface_id)) {
-		$response =
-		    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "$lanname: Need interface id for links");
 		goto bad;
 	    }
 
@@ -1121,6 +1165,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    GeniHRN::ParseInterface( $iface_name );
 		$iface_name = $urn_iface;
 	    }
+	    #
+	    # Hack to catch a loopback (trivial link).
+	    #
+	    if ($iface_name eq "loopback") {
+		$iface_name = "";
+		$trivial_ok = 1;
+	    }
 	    my $iface_vport = $ifacemap{$node_nickname}->{$iface_id}->{"vport"};
 
 	    # XXX
@@ -1134,11 +1185,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    if (defined($user_bandwidth)) {
 		$bandwidth = $user_bandwidth;
 	    }
-	    
-	    $virtexperiment->NewTableRow("virt_lans",
+
+	    my $virtlan =
+		$virtexperiment->NewTableRow("virt_lans",
 					 {"vname"       => $lanname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
+					  "vindex"	=> $vindex,
 					  "trivial_ok"  => $trivial_ok,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
@@ -1150,7 +1203,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 					  "rbandwidth"  => $bandwidth, # kbps
 					  "rlossrate"   => 0.0,
 					  "fixed_iface" => $iface_name});
+	    $vportmap{$member}->{"virtlan"} = $virtlan;
 	    $ifacenum++;
+	    $vindex++;
 	}
 	$linknum++;
     }
@@ -1186,15 +1241,29 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Could not verify topo");
 	goto bad;
     }
-    system("$MAPPER -n -d -v -u -o $tmpfile $pid $eid");
+    $slice_experiment->CleanLogFiles();
+    
+    my $output =
+	GeniUtil::ExecQuiet("$MAPPER -a -d -v -u -z -o $tmpfile $pid $eid");
     if ($?) {
-	my $logstuff = undef;
+	my $logstuff = "";
 	
 	unlink($tmpfile);
 	if ($isupdate) {
 	    $slice_experiment->RemovePhysicalState();
 	    $slice_experiment->RestorePhysicalState();
 	}
+	#
+	# Find the important lines and print them first.
+	#
+	while ($output =~ /^(.*)$/gm) {
+	    my $line = $1;
+	    if ($line =~ /^\*\*\* .*$/) {
+		$logstuff .= $line;
+	    }
+	}
+	$logstuff .= "\n";
+	
 	# Dump the vtop.
 	if (-e "$pid-$eid.vtop") {
 	    print STDERR "----------------------------------------------\n";
@@ -1210,15 +1279,30 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (-e "assign.log") {
 	    print STDERR "----------------------------------------------\n";
 	    print STDERR "------------- Assign Error Log ---------------\n";
-	    $logstuff = `cat assign.log`;
-	    print STDERR $logstuff . "\n";
+	    my $log = `cat assign.log`;
+	    print STDERR $log . "\n";
 	    print STDERR "----------------------------------------------\n";
-	}	    
+	    $logstuff .= $log;
+	}
+
+	# Dump the output to STDERR for debugging.
+	print STDERR "----------------------------------------------\n";
+	print STDERR "---------------- Mapper Log ------------------\n";
+	print STDERR $output;
+
 	$response =
-	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff,
-				 "Could not map to resources");
+	    GeniResponse->Create(GENIRESPONSE_ERROR,
+				 "Could not map to resources", $logstuff);
+	# So we can find things later.
+	$slice_experiment->SaveLogFiles();
 	goto bad;
     }
+    # Dump the output to STDERR for debugging.
+    print STDERR $output;
+    
+    # So we can find things later.
+    $slice_experiment->SaveLogFiles();
+
     my $solution = GeniXML::ParseFile($tmpfile);
     if ($@) {
 	$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1231,7 +1315,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     # be allocated to an experiment.
 
     my $max_components = 0;
-    if (!TBGetSiteVar('protogeni/max_components', \$max_components)) {
+    if (!GetSiteVar('protogeni/max_components', \$max_components)) {
 	      # Cannot get the value, default it to -1. Which means there is no limit.
 	      $max_components = -1;
     }
@@ -1263,7 +1347,7 @@ sub GetTicketAuxAux($$$$$$$$$)
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$solution)->get_nodelist()) {
 	my $virtual_id     = GeniXML::GetVirtualId($ref);
-	my $component_uuid = GeniXML::GetNodeId($ref);
+	my $component_id   = GeniXML::GetNodeId($ref);
 	if (!exists($nodemap{$virtual_id})) {
 	    $response =
 		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1272,40 +1356,49 @@ sub GetTicketAuxAux($$$$$$$$$)
 	}
 	my $rspec          = $nodemap{$virtual_id}->{'rspec'};
 	my $virtnode       = $nodemap{$virtual_id}->{'virtnode'};
-	my $node           = GeniUtil::LookupNode($component_uuid);
-	my $colocate       = GeniXML::GetText("colocate", $rspec) ||
-	                     GeniXML::GetText("phys_nickname", $rspec);
-	my $exclusive      = GeniXML::GetText("exclusive", $rspec);
-	my $subnode_of     = GeniXML::GetText("subnode_of", $rspec);
-	$exclusive = 0
-	    if (!defined($exclusive));
+	my $node           = GeniUtil::LookupNode($component_id);
+	my $colocate       = GeniXML::GetColocate($rspec);
+	my $subnode_of     = GeniXML::GetSubnodeOf($rspec);
+
+	# Need to do this after the mapper has run.
+	$node->Refresh();
+
+	#
+	# Regardless of whether the user asked for an exclusive node
+	# or not, we have to change the rspec (ticket) to reflect
+	# that it is a shared node node or not. We do not need to change
+	# the virt_nodes entry since exclusive is just a desire. 
+	#
+	my $exclusive = (defined($node->sharing_mode()) ? "0" : "1");
 	
-	GeniXML::SetText("component_urn", $rspec,
-			 GeniHRN::Generate( $OURDOMAIN, "node",
-					    $node->node_id() ));
-	GeniXML::SetText("component_uuid", $rspec, $component_uuid);
-	GeniXML::SetText("component_manager_urn", $rspec, $ENV{'MYURN'});
-	GeniXML::SetText("component_manager_uuid", $rspec, $ENV{'MYUUID'});
+	if (GeniXML::IsVersion0($rspec)) {
+	    GeniXML::SetText("component_urn", $rspec,
+			     GeniHRN::Generate( $OURDOMAIN, "node",
+						$node->node_id() ));
+	    GeniXML::SetText("component_uuid", $rspec, $component_id);
+	    GeniXML::SetText("component_manager_urn", $rspec, $ENV{'MYURN'});
+	    GeniXML::SetText("component_manager_uuid", $rspec, $ENV{'MYUUID'});
+	} else {
+	  GeniXML::SetText("component_id", $rspec,
+			   GeniHRN::Generate( $OURDOMAIN, "node",
+					      $node->node_id() ));
+	    GeniXML::SetText("component_manager_id", $rspec, $ENV{'MYURN'});
+	}
+	GeniXML::SetExclusive($rspec, $exclusive);
 
 	# Also update the virtexperiment table row.
 	# Do not update subnodes; they are fixed to the parent,
 	# while the parent is fixed to an actual node.
 	if (!defined($subnode_of)) {
-	    $virtnode->fixed($node->node_id());
+	    # Remember, we fix to the physnode not the virtual.
+	    $virtnode->fixed(($node->isvirtnode() ?
+			      $node->phys_nodeid() : $node->node_id()));
 	}
 
-	#
-	# Shared and virt nodes do not need to be allocated.
-	#
-	# XXX This is going to cause breakage since the reservations
-	# are not recorded anyplace until the ticket is redeemed.
-	#
-	if (! ($node->sharing_mode() || $node->isplabphysnode() ||
-	       ($node->isremotenode() && !$exclusive))) {
-	    # Need to allocate this node unless already mapped.
-	    push(@nodeids, $node->node_id())
-		if (!exists($namemap{$virtual_id}));
-	}
+	# New node unless already mapped.
+	push(@nodeids, $node->node_id())
+	    if (!exists($namemap{$virtual_id}));
+
 	$namemap{$virtual_id} = $node;
 	$colomap{$colocate} = $node
 	    if (defined($colocate));
@@ -1317,12 +1410,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 						   $ref)->get_nodelist();
 
 	foreach my $iface_ref (@interfaces) {
-	    my $virtual_node_id   = GeniXML::GetText("virtual_node_id",
-						     $iface_ref);
-	    my $virtual_port_id   = GeniXML::GetText("virtual_interface_id",
-						     $iface_ref) ||
-				    GeniXML::GetText("virtual_port_id",
-						     $iface_ref);
+	    my $virtual_port_id   = GeniXML::GetInterfaceId($iface_ref);
+	    my $virtual_node_id   = GeniXML::GetInterfaceNodeId($iface_ref);
+
+	    if (! GeniXML::IsVersion0($iface_ref)
+		&& defined($virtual_port_id)) {
+		$virtual_node_id = $iface2node{$virtual_port_id};
+	    }
 	    my $component_id      = GeniXML::GetText("component_id",
 						     $iface_ref);
 	    if (!defined($virtual_node_id) || !defined($virtual_port_id)) {
@@ -1330,12 +1424,16 @@ sub GetTicketAuxAux($$$$$$$$$)
 						 "Virtual node ID or virtual interface ID missing on interface");
 		goto bad;
 	    }
-	    my $linkref     = $vportmap{"$virtual_node_id:$virtual_port_id"};
+	    my $vportp      = $vportmap{"$virtual_node_id:$virtual_port_id"};
+	    my $linkref     = $vportp->{'rspec'};
+	    my $virtlan     = $vportp->{'virtlan'};
+	    $virtlan->fixed_iface($component_id)
+		if (defined($component_id));
 	    $component_id = "lo0"
 		if (!defined($component_id));
 	    if (! GeniXML::SetText("component_id", $linkref, $component_id)) {
 		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-						 "Bad XML: Failed to add component_id");
+				 "Bad XML: Failed to add component_id");
 		goto bad;
 	    }
 	}
@@ -1348,25 +1446,6 @@ sub GetTicketAuxAux($$$$$$$$$)
     }
 
     print GeniXML::Serialize($rspec);
-
-    # Nalloc might fail if the node gets picked up by someone else.
-    if (@nodeids && !$impotent) {
-	system("$NALLOC $pid $eid @nodeids");
-	if (($? >> 8) < 0) {
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				     "Allocation failure");
-	    goto bad;
-	}
-	elsif (($? >> 8) > 0) {
-	    $response =
-		GeniResponse->Create(GENIRESPONSE_UNAVAILABLE, undef,
-				     "Could not allocate some nodes");
-	    goto bad;
-	}
-	# In case the code below fails, before ticket is created.
-	@dealloc = @nodeids;
-    }
 
     #
     # For the version 2 minimal API, just return the annotated rspec.
@@ -1423,9 +1502,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    # Delete, not Release (which frees nodes).
 	    $newticket->Delete(TICKET_PURGED);
 	}
-	if (@dealloc) {
+	if (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @nodeids");
 	}
 	if (defined($slice_experiment) && $restorevirt) {
 	    $slice_experiment->RemoveVirtualState();
@@ -1437,9 +1516,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	if (defined($newticket)) {
 	    $newticket->Release(TICKET_PURGED);
 	}
-	elsif (@dealloc) {
+	elsif (@nodeids) {
 	    system("export NORELOAD=1; ".
-		   "$NFREE -x -q GeniSlices $eid @dealloc");
+		   "$NFREE -x -q GeniSlices $eid @nodeids");
 	}
 	#
 	# Lets leave the experiment lying around; it will get cleaned
@@ -1523,6 +1602,8 @@ sub SliverWorkAux($$$$$$$)
     my $response;
     my $ticket;
     my $rspec;
+    my $oldmanifest;
+    require Interface;
 
     # V2 API support.
     if ($v2 && $level == 0) {
@@ -1617,6 +1698,10 @@ sub SliverWorkAux($$$$$$$)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	$response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$owner->Modify(undef, undef, $keys);
     }
 
@@ -1643,14 +1728,23 @@ sub SliverWorkAux($$$$$$$)
     my @allocated= ();
     my @freenodes= ();
     my @freelinks= ();
+    my %iface2node = ();
     my $needplabslice = 0;
 
     print GeniXML::Serialize($rspec);
+
+    # The Manifest starts out as a copy of the rspec. 
+    my $manifest = $rspec->cloneNode(1);
 
     #
     # Find current slivers and save.
     #
     if (defined($aggregate)) {
+	$oldmanifest = $aggregate->GetManifest(0);
+	if (!defined($oldmanifest)) {
+	    $message = "Internal error getting manifest";
+	    goto bad;
+	}
 	my @slivers;
 	if ($aggregate->SliverList(\@slivers) != 0) {
 	    $message = "Could not get sliverlist for $aggregate";
@@ -1677,14 +1771,14 @@ sub SliverWorkAux($$$$$$$)
     # Figure out new expiration time; this is the time at which we can
     # idleswap the slice out. 
     #
-    my $expires = GeniXML::GetText("valid_until", $rspec);
+    my $expires = GeniXML::GetExpires($rspec);
     if (defined($expires)) {
 	if (! ($expires =~ /^[-\w:.\/]+/)) {
 	    $message = "Illegal valid_until in rspec";
 	    goto bad;
 	}
 	# Convert to a localtime.
-	my $when = timegm(strptime($expires));
+        my $when = timegm(strptime($expires));
 	if (!defined($when)) {
 	    $message = "Could not parse valid_until";
 	    goto bad;
@@ -1722,18 +1816,14 @@ sub SliverWorkAux($$$$$$$)
 	}
     }
 
-    # Nodes are in this holding experiment.
-    # This experiment no longer has to exist!
-    my $reserved_holding = Experiment->Lookup("GeniSlices", "reservations");
-
     #
     # Make sure all nodes requested are allocated. 
     #
     foreach my $ref (GeniXML::FindNodes("n:node",
 					$rspec)->get_nodelist()) {
-	my $resource_uuid = GeniXML::GetNodeId($ref);
+	my $resource_id   = GeniXML::GetNodeId($ref);
 	my $node_nickname = GeniXML::GetVirtualId($ref);
-	my $manager_uuid  = GeniXML::GetManagerId($ref);
+	my $manager_id    = GeniXML::GetManagerId($ref);
 	
 	# Let remote nodes pass through.
 	next
@@ -1749,9 +1839,9 @@ sub SliverWorkAux($$$$$$$)
 	    next;
 	}
 
-	my $node = GeniUtil::LookupNode($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_id);
 	if (!defined($node)) {
-	    $message = "Bad resource_uuid $resource_uuid";
+	    $message = "Bad resource_id $resource_id";
 	    goto bad;
 	}
 
@@ -1772,25 +1862,22 @@ sub SliverWorkAux($$$$$$$)
 	#
 	my $reservation = $node->Reservation();
 	if (defined($reservation)) {
-	    if (defined($reserved_holding) &&
-		$reservation->SameExperiment($reserved_holding)) {
-		# This is for backwards compatibility.
-		if ($node->MoveReservation($experiment)) {
-		    print STDERR "Could not move $node to $experiment\n";
-		    goto bad;
-		}
-		$node->Refresh();
-	    }
-	    elsif (!$reservation->SameExperiment($experiment)) {
-		$message = "$resource_uuid ($node) is not available";
+	    if (!$reservation->SameExperiment($experiment)) {
+		$message = "$resource_id ($node) is not available";
 		goto bad;
 	    }
 	}
 	else {
-	    $message = "$resource_uuid ($node) is not available";
+	    $message = "$resource_id ($node) is not available";
 	    goto bad;
 	}
-    
+	foreach my $iface (GeniXML::FindNodes("n:interface",
+					     $ref)->get_nodelist()) {
+	    my $iface_id = GeniXML::GetVirtualId($iface);
+	    if (defined($iface_id)) {
+		$iface2node{$iface_id} = $node_nickname;
+	    }
+	}
 	# Unincorporated nodes have no genisliver_idx.
 	my $restable = $node->ReservedTableEntry();
 	if (defined($restable) &&
@@ -1925,13 +2012,37 @@ sub SliverWorkAux($$$$$$$)
 	print STDERR "Could not chdir to workdir\n";
 	goto bad;
     }
+    $experiment->CleanLogFiles();
+    
     # Add -u for update mode, but not -f (fixnode). 
-    system("$MAPPER -d -v -u $pid $eid");
+    my $output = GeniUtil::ExecQuiet("$MAPPER -d -v -z -u $pid $eid");
     if ($?) {
-	my $logstuff = undef;
+	my $logstuff = "";
 	$message = "Could not map to resources";
-	
+
 	print STDERR "Mapper failed!\n";
+	#
+	# Find the important lines and print them first.
+	#
+	while ($output =~ /^(.*)$/gm) {
+	    my $line = $1;
+	    if ($line =~ /^\*\*\* .*$/) {
+		$logstuff .= $line;
+	    }
+	}
+	$logstuff .= "\n";
+	
+	#
+	# Lets dump the error log, so it ends up in the email.
+	#
+	if (-e "assign.log") {
+	    print STDERR "----------------------------------------------\n";
+	    print STDERR "------------- Assign Error Log ---------------\n";
+	    my $log = `cat assign.log`;
+	    print STDERR $log . "\n";
+	    print STDERR "----------------------------------------------\n";
+	    $logstuff .= $log;
+	}
 	# Dump the vtop.
 	if (-e "$pid-$eid.vtop") {
 	    print STDERR "----------------------------------------------\n";
@@ -1940,22 +2051,24 @@ sub SliverWorkAux($$$$$$$)
 	    print STDERR $log . "\n";
 	    print STDERR "----------------------------------------------\n";
 	}	    
-	#
-	# Lets dump the error log too, so it ends up in the email.
-	# Have to figure out a better approach for this.
-	#
-	if (-e "assign.log") {
-	    print STDERR "----------------------------------------------\n";
-	    print STDERR "------------- Assign Error Log ---------------\n";
-	    $logstuff = `cat assign.log`;
-	    print STDERR $logstuff . "\n";
-	    print STDERR "----------------------------------------------\n";
-	}
+	# Dump the output to STDERR for debugging.
+	print STDERR "----------------------------------------------\n";
+	print STDERR "---------------- Mapper Log ------------------\n";
+	print STDERR $output;
+
 	$response =
-	    GeniResponse->Create(GENIRESPONSE_ERROR, $logstuff, $message);
+	    GeniResponse->Create(GENIRESPONSE_ERROR, $message, $logstuff);
+
+	# So we can find things later.
+	$experiment->SaveLogFiles();
 	goto bad;
     }
+    # Dump the output to STDERR for debugging.
+    print STDERR $output;
   
+    # So we can find things later.
+    $experiment->SaveLogFiles();
+
     #
     # Must do this after the mapper runs.
     #
@@ -1973,9 +2086,9 @@ sub SliverWorkAux($$$$$$$)
     my %ifacemap  = ();
     my %rspecmap  = ();
     foreach my $ref (GeniXML::FindNodes("n:node", $rspec)->get_nodelist()) {
-	my $resource_uuid = GeniXML::GetNodeId($ref);
+	my $resource_id   = GeniXML::GetNodeId($ref);
 	my $virtual_id    = GeniXML::GetVirtualId($ref);
-	my $manager_uuid  = GeniXML::GetManagerId($ref);
+	my $manager_id    = GeniXML::GetManagerId($ref);
 
 	$rspecmap{$virtual_id} = $ref;
 
@@ -1993,7 +2106,7 @@ sub SliverWorkAux($$$$$$$)
 	foreach my $linkref (GeniXML::FindNodes("n:interface",
 						$ref)->get_nodelist()) {
 	    my $component_id     = GeniXML::GetText("component_id", $linkref);
-	    my $virtual_iface_id = GeniXML::GetText("virtual_id", $linkref);
+	    my $virtual_iface_id = GeniXML::GetInterfaceId($linkref);
 
 	    $ifacemap{$virtual_id} = {}
 	        if (!exists($ifacemap{$virtual_id}));
@@ -2003,18 +2116,32 @@ sub SliverWorkAux($$$$$$$)
 	}
 
 	# Already in the aggregate?
-	next
-	    if (grep {$_ eq $virtual_id} keys(%nodemap));
+	if (grep {$_ eq $virtual_id} keys(%nodemap)) {
+	    #
+	    # Need to find the old manifest entry and make sure it
+	    # gets into the new manifest.
+	    #
+	    if (defined($oldmanifest)) {
+		my $oldnode = GeniXML::GetNodeByVirtualId($virtual_id,
+							  $oldmanifest);
+		my $curnode = GeniXML::GetNodeByVirtualId($virtual_id,
+							  $manifest);
+		if (defined($oldnode) && defined($curnode)) {
+		    GeniXML::ReplaceNode($curnode, $oldnode);
+		}
+	    }
+	    next;
+	}
 	
-	my $node = GeniUtil::LookupNode($resource_uuid);
+	my $node = GeniUtil::LookupNode($resource_id);
 	if (!defined($node)) {
-	    $message = "Unknown resource_uuid in ticket: $resource_uuid";
+	    $message = "Unknown resource_id in ticket: $resource_id";
 	    goto bad;
 	}
-	my $sliver = GeniSliver::Node->Create($slice,
-					      $owner,
-					      $node->node_id(),
-					      $ref);
+	# Must do this after mapper has run
+	$node->Refresh();
+	
+	my $sliver = GeniSliver::Node->Create($slice, $owner, $node, $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $virtual_id";
 	    goto bad;
@@ -2023,8 +2150,13 @@ sub SliverWorkAux($$$$$$$)
 	$nodemap{$virtual_id} = $sliver;
 
 	# For the manifest.
-	GeniXML::SetText("sliver_urn", $ref, $sliver->sliver_urn());
-	GeniXML::SetText("component_urn", $ref, $sliver->component_urn());
+	if (GeniXML::IsVersion0($ref)) {
+	    GeniXML::SetText("sliver_urn", $ref, $sliver->sliver_urn());
+	    GeniXML::SetText("component_urn", $ref, $sliver->component_urn());
+	} else {
+	    GeniXML::SetText("sliver_id", $ref, $sliver->sliver_urn());
+	    GeniXML::SetText("component_id", $ref, $sliver->component_urn());
+	}
 
 	# Add to the aggregate.
 	if ($sliver->SetAggregate($aggregate) != 0) {
@@ -2034,13 +2166,20 @@ sub SliverWorkAux($$$$$$$)
 
 	# See below; setup all plab nodes at once.
 	if ($node->isplabphysnode()) {
-	    my $vnode = GeniUtil::LookupNode($sliver->uuid());
+	    my $vnode = GeniUtil::LookupNode($sliver->resource_id());
 	    if (!defined($vnode)) {
 		print STDERR "Could not locate vnode $sliver\n";
 		goto bad;
 	    }
 	    push(@plabnodes, $vnode);
 	}
+	# Store the updated rspec for later.
+	goto bad
+	    if ($sliver->UpdateRspec($ref));
+
+	# And store into the new manifest.
+	my $oldnode = GeniXML::GetNodeByVirtualId($virtual_id, $manifest);
+	GeniXML::ReplaceNode($oldnode, $ref);
     }
 
     #
@@ -2070,7 +2209,7 @@ sub SliverWorkAux($$$$$$$)
 	# we assume the link is for thie CM.
 	#
 	if (GeniXML::FindNodes("n:component_manager", $linkref)) {
-	    %managers = map { GeniXML::GetText("id", $_) => $_ } 
+	    %managers = map { GeniXML::GetLinkManager($_) => $_ } 
 	                      GeniXML::FindNodes("n:component_manager",
 						 $linkref)->get_nodelist();
 
@@ -2082,15 +2221,52 @@ sub SliverWorkAux($$$$$$$)
 		if (!exists($managers{$ENV{'MYURN'}}));
 	}
 
-	# Do not worry about modifying a link that is setup. Later.
-	next
-	    if (grep {$_ eq $linkname} keys(%linkmap));
+	my $is_tunnel = GeniXML::IsTunnel($linkref);
+
+	# Do not worry about modifying a link that is setup, unless a tunnel.
+	# Need to deal with this later.
+	if (grep {$_ eq $linkname} keys(%linkmap)) {
+	    if (!$is_tunnel) {
+		#
+		# Need to find the old manifest entry and make sure it
+		# gets into the new manifest.
+		#
+		if (defined($oldmanifest)) {
+		    my $oldlink = GeniXML::GetLinkByVirtualId($linkname,
+							      $oldmanifest);
+		    my $curlink = GeniXML::GetLinkByVirtualId($linkname,
+							      $manifest);
+		    if (defined($oldlink) && defined($curlink)) {
+			GeniXML::ReplaceNode($curlink, $oldlink);
+		      }
+		}
+		next;
+	    }
+
+	    #
+	    # Gack, we have to recreate all the tunnel physical state, but
+	    # that was lost when we did the RemovePhysicalState() above.
+	    # The aggregate needs to get rebuilt, so delete the existing
+	    # one. Needs a lot more thought.
+	    #
+	    my $sliver_urn = GeniXML::GetSliverId($linkref);
+	    if (!defined($sliver_urn)) {
+		print STDERR
+		    "Could not find sliver_urn in existing link $linkname\n";
+		next;
+	    }
+	    my $tunnel_aggregate = GeniAggregate->Lookup($sliver_urn);
+	    if (!defined($tunnel_aggregate)) {
+		print STDERR "No aggregate for existing tunnel $sliver_urn\n";
+		next;
+	    }
+	    $tunnel_aggregate->Delete(GENI_PURGEFLAG);
+	}
 
 	#
 	# XXX Tunnels are a total kludge right now ...
 	#
-	my $link_type = GeniXML::GetText("link_type", $linkref);
-	if (defined($link_type) && $link_type eq "tunnel") {
+	if ($is_tunnel) {
 
 	    my $iface1ref   = $interfaces[0];
 	    my $iface2ref   = $interfaces[1];
@@ -2127,15 +2303,19 @@ sub SliverWorkAux($$$$$$$)
 	    $linkmap{$linkname} = $tunnel;
 	    
 	    # Manifest goes back to the user.
-	    GeniXML::SetText("sliver_uuid", $linkref, $tunnel->uuid());
-	    GeniXML::SetText("sliver_urn", $linkref, $tunnel->urn());
+	    if (GeniXML::IsVersion0($linkref)) {
+		GeniXML::SetText("sliver_uuid", $linkref, $tunnel->uuid());
+		GeniXML::SetText("sliver_urn", $linkref, $tunnel->urn());
+	    } else {
+		GeniXML::SetText("sliver_id", $linkref, $tunnel->urn());
+	    }
 
 	    # Add to the aggregate.
 	    if ($tunnel->SetAggregate($aggregate) != 0) {
 		$message = "Could not set aggregate for $tunnel to $aggregate";
 		goto bad;
 	    }
-	    next;
+	    goto manifest;
 	}
 
 	my $linkaggregate = GeniAggregate::Link->Create($slice, $owner,
@@ -2148,8 +2328,12 @@ sub SliverWorkAux($$$$$$$)
 	$linkmap{$linkname} = $linkaggregate;
 
 	# Manifest goes back to the user.
-	GeniXML::SetText("sliver_uuid", $linkref, $linkaggregate->uuid());
-	GeniXML::SetText("sliver_urn", $linkref, $linkaggregate->urn());
+	if (GeniXML::IsVersion0($linkref)) {
+	    GeniXML::SetText("sliver_uuid", $linkref, $linkaggregate->uuid());
+	    GeniXML::SetText("sliver_urn", $linkref, $linkaggregate->urn());
+	} else {
+	    GeniXML::SetText("sliver_id", $linkref, $linkaggregate->urn());
+	}
 
 	# Add to the aggregate.
 	if ($linkaggregate->SetAggregate($aggregate) != 0) {
@@ -2159,10 +2343,11 @@ sub SliverWorkAux($$$$$$$)
 	}
 
 	foreach my $ifaceref (@interfaces) {
-	    my $iface_id   = GeniXML::GetText("virtual_interface_id",
-					      $ifaceref);
-	    my $node_id    = GeniXML::GetText("virtual_node_id",
-					      $ifaceref);
+	    my $iface_id   = GeniXML::GetInterfaceId($ifaceref);
+	    my $node_id    = GeniXML::GetInterfaceNodeId($ifaceref);
+	    if (! GeniXML::IsVersion0($ifaceref) && defined($iface_id)) {
+		$node_id = $iface2node{$iface_id};
+	    }
 	    my ($vnode,$vinterface);
 
 	    #
@@ -2193,11 +2378,14 @@ sub SliverWorkAux($$$$$$$)
 	    #
 	    if ($node->isvirtnode()) {
 		$vnode = $node;
-		$node  = GeniUtil::LookupNode($nodesliver->resource_uuid());
+		$node  = GeniUtil::LookupNode($vnode->phys_nodeid());
 		if (!defined($node)) {
 		    $message = "Could not find node object for $nodesliver";
 		    goto bad;
 		}
+		# Must do this after mapper has run
+		$node->Refresh();
+		
 		$vinterface =
 		    Interface::VInterface->LookupByVirtLan($experiment,
 				     $linkname, $node_id);
@@ -2241,20 +2429,39 @@ sub SliverWorkAux($$$$$$$)
 		goto bad;
 	    }
 	    # Manifest goes back to the user.
-	    GeniXML::SetText("sliver_urn", $ifaceref, $sliver->sliver_urn());
-	    GeniXML::SetText("MAC", $ifaceref, $interface->mac())
-		if (defined($interface));
-	    GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
-		if (defined($vinterface));
-	    GeniXML::SetText("IP", $ifaceref, $interface->IP())
-		if (defined($interface) &&
-		    defined($interface->IP()) && $interface->IP() ne "");
+	    if (GeniXML::IsVersion0($ifaceref)) {
+		GeniXML::SetText("sliver_urn", $ifaceref,
+				 $sliver->sliver_urn());
+		GeniXML::SetText("MAC", $ifaceref, $interface->mac())
+		    if (defined($interface));
+		GeniXML::SetText("VMAC", $ifaceref, $vinterface->mac())
+		    if (defined($vinterface));
+		if (defined($vinterface)) {
+		    GeniXML::SetText("IP", $ifaceref, $vinterface->IP())
+			if (defined($vinterface->IP())
+			    && $vinterface->IP() ne "");
+		}
+		else {
+		    GeniXML::SetText("IP", $ifaceref, $interface->IP())
+			if (defined($interface) &&
+			    defined($interface->IP())
+			    && $interface->IP() ne "");
+		}
+	    } else {
+		GeniXML::SetText("sliver_id", $ifaceref,
+				 $sliver->sliver_urn());
+	    }
 	    
 	    if ($sliver->SetAggregate($linkaggregate) != 0) {
 		$message = "Could not add link sliver $sliver to $aggregate";
 		goto bad;
 	    }
 	}
+      manifest:
+	# And store into the new manifest.
+	my $oldlink = GeniXML::GetLinkByVirtualId($linkname, $manifest);
+	GeniXML::ReplaceNode($oldlink, $linkref);
+	
     }
   skiplinks:
     #
@@ -2270,9 +2477,12 @@ sub SliverWorkAux($$$$$$$)
 
     # Do firewall stuff.
     if ($slice->needsfirewall()) {
+	require Firewall;
+	
 	my @nodeids = map { $_->node_id() } values(%newnodes);
 
-	if (@nodeids && doFWlans($experiment, FWADDNODES, \@nodeids) != 0) {
+	if (@nodeids && doFWlans($experiment,
+				 Firewall::FWADDNODES(), \@nodeids) != 0) {
 	    print STDERR "FireWall setup failed\n";
 	    goto bad;
 	}
@@ -2295,6 +2505,8 @@ sub SliverWorkAux($$$$$$$)
     # Must have the topofile for node boot. Might need locking on this.
     #
     if (!$v2) {
+	require Lan;
+	
 	if (system("$GENTOPOFILE $pid $eid")) {
 	    print STDERR "$GENTOPOFILE failed\n";
 	    goto bad;
@@ -2355,14 +2567,12 @@ sub SliverWorkAux($$$$$$$)
 	}
     }
 
-    # The Manifest.
-    my $manifest = GeniXML::Serialize($rspec);
-
     #
     # Move this elsewhere.
     #
+    my $manifest_string = GeniXML::Serialize($manifest);
     DBQueryWarn("replace into geni_manifests set ".
-		"  manifest=". DBQuoteSpecial($manifest) . ", " .
+		"  manifest=". DBQuoteSpecial($manifest_string) . ", " .
 		"  idx=NULL, slice_uuid='$slice_uuid', created=now()");
 
     if (GeniUsage->NewManifest($aggregate, $rspec)) {
@@ -2372,20 +2582,30 @@ sub SliverWorkAux($$$$$$$)
     #
     # The API states we return a credential to control the aggregate.
     #
+    my $sliver_credential = $aggregate->NewCredential($owner);
+
+    if (!defined($sliver_credential)) {
+	$message = "Could not create credential";
+	goto bad;
+    }
+    #
+    # Cache the credential for subsequent requests. See GetSliver().
+    # Okay if this fails.
+    #
+    if ($isupdate) {
+	GeniCredential->DeleteForTarget($aggregate);
+    }
+    $sliver_credential->Store();
+    
     if (!$isupdate) {
 	$experiment->SetState(EXPTSTATE_ACTIVE());
 	
-	my $sliver_credential = $aggregate->NewCredential($owner);
-	if (!defined($sliver_credential)) {
-	    $message = "Could not create credential";
-	    goto bad;
-	}
 	$ticket->Redeem()
 	    if (defined($ticket));
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
 				    [$sliver_credential->asString(),
-				     $manifest]);
+				     $manifest_string]);
     }
     #
     # Free any slivers that were no longer wanted.
@@ -2402,7 +2622,13 @@ sub SliverWorkAux($$$$$$$)
 	if (defined($ticket));
     $aggregate->SetRegistered(0);
     $slice->UnLock();
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $manifest);
+    if ($v2) {
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				    [$sliver_credential->asString(),
+				     $manifest_string]);
+    } else {
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $manifest_string);
+    }
 
   bad:
     foreach my $sliver (values(%slivers)) {
@@ -2415,7 +2641,7 @@ sub SliverWorkAux($$$$$$$)
 	my @oldnodeids = map { $_->node_id() } values(%newnodes);
 	
 	if ($slice->needsfirewall() && $didfwsetup) {
-	    if (@oldnodeids && doFWlans($experiment, FWDELNODES,
+	    if (@oldnodeids && doFWlans($experiment, Firewall::FWDELNODES(),
 					\@oldnodeids)) {
 		print STDERR "FireWall cleanup failed\n";
 	    }
@@ -2537,7 +2763,7 @@ sub RenewSliverAux($$)
 	# A sitevar controls the sliver lifetime.
 	#
 	my $max_sliver_lifetime = 0;
-	if (!TBGetSiteVar('protogeni/max_sliver_lifetime',
+	if (!GetSiteVar('protogeni/max_sliver_lifetime',
 			  \$max_sliver_lifetime)){
 	    # Cannot get the value, default it to 90 days.
 	    $max_sliver_lifetime = 90;
@@ -2577,6 +2803,13 @@ sub RenewSliverAux($$)
     if ($slice->SetExpiration($when) != 0) {
 	$message = "Could not set expiration time";
 	goto bad;
+    }
+    #
+    # Need to delete any cached credentials.
+    #
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
+    if (defined($aggregate)) {
+	GeniCredential->DeleteForTarget($aggregate);
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS);
@@ -2740,6 +2973,7 @@ sub DeleteSliverAux($$$)
 {
     my ($credential, $impotent, $v2) = @_;
     my $response;
+    require Firewall;
 
     $credential->HasPrivilege( "pi" ) or
 	$credential->HasPrivilege( "instantiate" ) or
@@ -2937,15 +3171,31 @@ sub GetSliverAux($)
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 				    "No slivers here for slice");
     }
-    
-    my $new_credential = $aggregate->NewCredential($user);
-    if (!defined($new_credential)) {
+    my $agg_credential = GeniCredential->Lookup($aggregate, $user);
+    if (defined($agg_credential)) {
+	#
+	# Check for expiration and for changed certificate.
+	#
+	if ($agg_credential->IsExpired() ||
+	    !$agg_credential->SameCerts($aggregate, $user)) {
+	    $agg_credential->Delete();
+	    $agg_credential = undef;
+	}
+    }
+    if (!defined($agg_credential)) {
+	$agg_credential = $aggregate->NewCredential($user);
+
+	# Okay if this fails.
+	$agg_credential->Store()
+	    if (defined($agg_credential));
+    }
+    if (!defined($agg_credential)) {
 	$slice->UnLock();
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     $slice->UnLock();
     return GeniResponse->Create(GENIRESPONSE_SUCCESS,
-				$new_credential->asString());
+				$agg_credential->asString());
 }
 
 #
@@ -2985,6 +3235,10 @@ sub BindToSlice($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
     if (defined($keys)) {
+	my $response = CheckKeys($keys);
+	return $response
+	    if (GeniResponse::IsResponse($response));
+	
 	$user->Modify(undef, undef, $keys);
     }
     if ($slice->Lock() != 0) {
@@ -3040,7 +3294,7 @@ sub ShutdownAux($$)
     #
     my $slice = GeniSlice->Lookup($credential->target_urn());
     if (!defined($slice)) {
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS);
+	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED);
     }
     #
     # Do not worry about locking when setting the shutdown time.
@@ -3094,15 +3348,9 @@ sub ListUsage($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    if ($credential->target_urn() ne $ENV{'MYURN'}) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "This is not your CM!");
-    }
-    # Just one of these, at Utah.
-    my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
-    my $certificate = GeniCertificate->LoadFromFile($GENICH_PEMFILE);
+    my $certificate = GeniRegistry::ClearingHouse->GetCertificate();
     if (!defined($certificate)) {
-	print STDERR "Could not load certificate from $GENICH_PEMFILE\n";
+	print STDERR "Could not load ClearingHouse certificate\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
@@ -3134,7 +3382,7 @@ sub ListUsage($)
 
 	    my $node = {"sliver_gid"    => $sliver->cert(),
 			"sliver_hrn"    => $sliver->hrn(),
-			"sliver_urn"    => $sliver->urn() };
+			"sliver_urn"    => $sliver->sliver_urn() };
 	    
 	    my $component = GeniComponent->Lookup($sliver->resource_uuid());
 	    if (defined($component)) {
@@ -3178,15 +3426,9 @@ sub ListHistory($)
     return $credential
 	if (GeniResponse::IsResponse($credential));
 
-    if ($credential->target_urn() ne $ENV{'MYURN'}) {
-	return GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-				    "This is not your CM!");
-    }
-    # Just one of these, at Utah.
-    my $GENICH_PEMFILE = "@prefix@/etc/genich.pem";
-    my $certificate = GeniCertificate->LoadFromFile($GENICH_PEMFILE);
+    my $certificate = GeniRegistry::ClearingHouse->GetCertificate();
     if (!defined($certificate)) {
-	print STDERR "Could not load certificate from $GENICH_PEMFILE\n";
+	print STDERR "Could not load clearinghouse certificate\n";
 	return GeniResponse->Create(GENIRESPONSE_ERROR);
     }
 
@@ -3270,27 +3512,28 @@ sub SliceStatus($)
 	next
 	    if ($sliver->resource_type() ne "Node");
 
-	my $node_uuid = $sliver->uuid();
-	my $node = GeniUtil::LookupNode($node_uuid);
+	my $node_id   = $sliver->resource_id();
+	my $node_uuid = $sliver->resource_uuid();
+	my $node = GeniUtil::LookupNode($node_id);
 	if (!defined($node)) {
 	    $slice->UnLock();
-	    print STDERR "Cannot find node by uuid $node_uuid\n";
+	    print STDERR "Cannot find node $node_id\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $hrn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
+	my $urn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
 
 	if ($node->IsUp()) {
 	    $details{$node_uuid} = "ready";
-	    $detailsNew{$hrn}    = "ready";
+	    $detailsNew{$urn}    = "ready";
 	}
 	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
 	    $details{$node_uuid} = "failed";
-	    $detailsNew{$hrn}    = "failed";
+	    $detailsNew{$urn}    = "failed";
 	    $summary = "failed";
 	}
 	else {
 	    $details{$node_uuid} = "notready";
-	    $detailsNew{$hrn}    = "notready";
+	    $detailsNew{$urn}    = "notready";
 	    $summary = "notready";
 	}
     }
@@ -3370,9 +3613,9 @@ sub SliverTicket($)
     #
     # Update the returned ticket to reflect the current expiration time.
     #
-    GeniXML::SetText("valid_until", $rspec,
-		     POSIX::strftime("20%y-%m-%dT%H:%M:%S",
-				     gmtime(str2time($slice->expires()))));
+    GeniXML::SetExpires($rspec,
+			POSIX::strftime("20%y-%m-%dT%H:%M:%S",
+					gmtime(str2time($slice->expires()))));
 
     my $rspec_xml = GeniXML::Serialize($rspec);
 
@@ -3465,22 +3708,23 @@ sub SliverStatus($)
 	next
 	    if ($sliver->resource_type() ne "Node");
 
+	my $node_id   = $sliver->resource_id();
 	my $node_uuid = $sliver->uuid();
-	my $node = GeniUtil::LookupNode($node_uuid);
+	my $node = GeniUtil::LookupNode($node_id);
 	if (!defined($node)) {
 	    $slice->UnLock();
-	    print STDERR "Cannot find node by uuid $node_uuid\n";
+	    print STDERR "Cannot find node $node_id\n";
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
-	my $hrn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
+	my $urn = GeniHRN::Generate($OURDOMAIN, "sliver", $node->node_id());
 
 	if ($node->IsUp()) {
 	    $details{$node_uuid} = "ready";
-	    $detailsNew{$hrn}    = "ready";
+	    $detailsNew{$urn}    = "ready";
 	}
 	elsif ($node->eventstate() eq TBDB_NODESTATE_TBFAILED()) {
 	    $details{$node_uuid} = "failed";
-	    $detailsNew{$hrn}    = "failed";
+	    $detailsNew{$urn}    = "failed";
 	    $summary = "failed";
 
 	    my $bootlog;
@@ -3493,7 +3737,7 @@ sub SliverStatus($)
 	}
 	else {
 	    $details{$node_uuid} = "notready";
-	    $detailsNew{$hrn}    = "notready";
+	    $detailsNew{$urn}    = "notready";
 	    $summary = "notready";
 	}
     }
@@ -3623,7 +3867,7 @@ sub CreateUserFromCertificate($)
     return $user
 	if (defined($user));
 
-    # Try using the uuid, in case we have a stale certificate.
+    # Try using the uuid, in case we have a stale (pre-urn) certificate.
     $user = GeniUser->Lookup($certificate->uuid());
     if (defined($user)) {
 	#
@@ -3698,35 +3942,69 @@ sub UnRegisterSliver($)
 sub RegisterAux($$)
 {
     my ($slice, $unregister) = @_;
+    my $credential;
 
+    my $aggregate = GeniAggregate->SliceAggregate($slice);
+    if (!defined($aggregate)) {
+	print STDERR "Could not find aggregate for $slice\n";
+	return -1;
+    }
     my $authority = $slice->SliceAuthority();
     if (!defined($authority)) {
-	$authority =
-	    GeniAuthority->CreateFromRegistry("SA", $slice->sa_uuid());
-	if (!defined($authority)) {
-	    print STDERR "Could not find authority for $slice\n";
+	print STDERR "Could not find authority for $slice\n";
+	return -1;
+    }
+    if (!defined($authority->url()) || $authority->url() eq "") {
+	print STDERR "No url for $authority; skipping registration\n";
+	$aggregate->SetRegistered(1);
+	return 0;
+    }
+    #
+    # Ask for the version number to see how we need to do this.
+    #
+    my $version = $authority->Version();
+    if (!defined($version)) {
+	print STDERR "No version for $authority; skipping registration\n";
+	return 0;
+    }
+    if ($version == 1) {
+	#
+	# Old API; uses a bogus self signed credential.
+	#
+	my $context = Genixmlrpc->GetContext();
+	$credential = GeniCredential->CreateSigned($authority,
+						   $context->certificate(),
+						   $context->certificate());
+    }
+    else {
+	my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+	
+	if (!defined($me)) {
+	    # This should be done in initsite.
+	    system("$ADDAUTHORITY -a $EMULAB_PEMFILE cm");
+	}
+	$me = GeniAuthority->Lookup($ENV{'MYURN'});
+	if (!defined($me)) {
+	    print STDERR
+		"Could not find local authority object for $ENV{'MYURN'}\n";
 	    return -1;
 	}
+	$credential = $aggregate->NewCredential($me);
     }
-    my $credential = GeniRegistry::Client->CreateCredential($authority);
-    if (!defined($authority)) {
+    if (!defined($credential)) {
 	print STDERR "Could not create a credential for $authority\n";
 	return -1;
     }
-    my $registry = GeniRegistry::Client->Create($authority, undef,$credential);
+    my $registry = GeniRegistry::Client->Create($authority,undef,$credential);
     if (!defined($registry)) {
 	print STDERR "Could not create a registry client for $authority\n";
 	return -1;
     }
+    
     if ($unregister) {
 	$registry->UnRegisterSliver($slice->urn());
     }
     else {
-	my $aggregate = GeniAggregate->SliceAggregate($slice);
-	if (!defined($aggregate)) {
-	    print STDERR "Could not find aggregate for $slice\n";
-	    return -1;
-	}
 	my $creator = $aggregate->GetCreator();
 	if (!defined($creator)) {
 	    print STDERR "Could not find creator for $slice\n";
@@ -3753,6 +4031,7 @@ sub RegisterAux($$)
 sub CleanupDeadSlice($;$)
 {
     my ($slice, $purge) = @_;
+    require Firewall;
 
     # Default to full purge.
     $purge = 1
@@ -3789,6 +4068,8 @@ sub CleanupDeadSlice($;$)
 	# Unregister the slice at the SA.
 	UnRegisterSliver($slice);
     }
+    GeniCredential->DeleteForTarget($topaggregate)
+	if (defined($topaggregate));
 
     #
     # Find any aggregates and tear them down.
@@ -3922,43 +4203,108 @@ sub GeniExperiment($)
 
     my $uuid = $slice->uuid();
     my $needsfirewall = $slice->needsfirewall();
+    my $pid  = "GeniSlices";
+    my $gid  = $pid;
+    my $hrn  = $slice->hrn();
+    my $urn  = $slice->urn();
+    require Experiment;
 
     my $experiment = Experiment->Lookup($uuid);
-    if (!defined($experiment)) {
-	#
-	# Form an eid for the experiment. 
-	#
-	my $eid    = "slice" . TBGetUniqueIndex('next_sliceid', 1);
-	my $nsfile = "";
+    return $experiment
+	if (defined($experiment));
+
+    #
+    # Use the first token of the manifest for the gid of the experiment.
+    # This effectively puts slivers from each SA in their own subgroup.
+    #
+    if (1) {
+	require Project;
+	require Group;
+
+	($gid) = ($hrn =~ /^([-\w]*).*$/);
 
 	#
-	# Need a way to can experiments.
+	# See if the group exists.
 	#
-	if ($needsfirewall) {
-	    $nsfile = "/tmp/$$.ns";
-	    open(NS, "> $nsfile")
- 		or return undef;
-	    print NS "source tb_compat.tcl\n";
-	    print NS "set ns [new Simulator]\n";
-	    print NS "tb-set-security-level Blue\n";
-	    print NS "\$ns run\n";
-	    close(NS);
+	my $group = Group->Lookup("$pid,$gid");
+	if (!defined($group)) {
+	    my $project = Project->Lookup($pid);
+	    if (!defined($project)) {
+		print STDERR "Could not get project for $pid\n";
+		return undef;
+	    }
+	    my $pid_idx = $project->pid_idx();
+	    
+	    #
+	    # Write out a little XML file describing the group, and
+	    # let the existing backend script deal with it all.
+	    #
+	    my ($fh, $filename) = tempfile(UNLINK => 0);
+	    if (!defined($fh)) {
+		print STDERR "Could not create temp file for group $gid\n";
+		return undef;
+	    }
+	    print $fh "<group>\n";
+	    print $fh " <attribute name=\"project\">\n";
+	    print $fh "  <value>$pid_idx</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh " <attribute name=\"group_id\">\n";
+	    print $fh "  <value>$gid</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh " <attribute name=\"group_leader\">\n";
+	    print $fh "  <value>geniuser</value>\n";
+	    print $fh " </attribute>\n";
+	    print $fh "</group>\n";
+	    close($fh);
+	    my $output = GeniUtil::ExecQuiet("$NEWGROUP $filename");
+	    if ($?) {
+		print STDERR $output;
+		return undef;
+	    }
+	    unlink($filename);
+
+	    $group = Group->Lookup("$pid,$gid");
 	}
-
-	# Note the -h option; allows experiment with no NS file.
-	system("$CREATEEXPT -N -q -i -k -w ".
-	       "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	       "-E 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	       "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
-	       "-h '$uuid' -p GeniSlices -e $eid $nsfile");
-	if ($?) {
+	if (!defined($group)) {
+	    print STDERR "Could not get group for $pid,$gid\n";
 	    return undef;
 	}
-	$experiment = Experiment->Lookup($uuid);
-	$experiment->SetState(EXPTSTATE_SWAPPED());
-	$experiment->Update({"geniflags" => $Experiment::EXPT_GENIFLAGS_EXPT});
-	$slice->SetExperiment($experiment);
+	GeniUtil::ResetGroups($group->unix_gid());
     }
+
+    #
+    # Form an eid for the experiment. 
+    #
+    my $eid    = "slice" . TBGetUniqueIndex('next_sliceid', 1);
+    my $nsfile = "";
+
+    #
+    # Need a way to can experiments.
+    #
+    if ($needsfirewall) {
+	$nsfile = "/tmp/$$.ns";
+	open(NS, "> $nsfile")
+	    or return undef;
+	print NS "source tb_compat.tcl\n";
+	print NS "set ns [new Simulator]\n";
+	print NS "tb-set-security-level Blue\n";
+	print NS "\$ns run\n";
+	close(NS);
+    }
+
+    # Note the -h option; allows experiment with no NS file.
+    system("$CREATEEXPT -N -q -i -k -w ".
+	   "-S 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
+	   "-E '$urn -- DO NOT SWAP OR TERMINATE' ".
+	   "-L 'Geni Slice Experiment -- DO NOT SWAP OR TERMINATE' ".
+	   "-h '$uuid' -p $pid -g $gid -e $eid $nsfile");
+    if ($?) {
+	return undef;
+    }
+    $experiment = Experiment->Lookup($uuid);
+    $experiment->SetState(EXPTSTATE_SWAPPED());
+    $experiment->Update({"geniflags" => $Experiment::EXPT_GENIFLAGS_EXPT});
+    $slice->SetExperiment($experiment);
     return $experiment;
 }
 
@@ -3968,6 +4314,7 @@ sub GeniExperiment($)
 sub UpdateManifest($)
 {
     my ($slice) = @_;
+    require Lan;
 
     my $experiment = GeniExperiment($slice);
     if (!defined($experiment)) {
@@ -4063,7 +4410,7 @@ sub CheckCredential($)
 
 sub CheckTicket($)
 {
-    my $ticket = GeniCredential->CreateFromSignedTicket($_[0]);
+    my $ticket = GeniTicket->CreateFromSignedTicket($_[0]);
     if (!defined($ticket)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create ticket object");
@@ -4095,6 +4442,29 @@ sub CheckTicket($)
     }
     
     return $ticket;
+}
+
+sub CheckKeys($)
+{
+    my ($keys) = @_;
+
+    goto bad
+	if (!ref($keys));
+    
+    foreach my $keyref (@{ $keys }) {
+	goto bad
+	    if (!ref($keyref));
+	
+	my $key  = $keyref->{'key'};
+	my $type = $keyref->{'type'};
+
+	goto bad
+	    if (! (defined($key) && defined($type) &&
+		   $key ne "" && $type ne ""));
+    }		
+    return 0;
+  bad:
+    return GeniResponse->Create(GENIRESPONSE_BADARGS, undef, "Malformed keys")
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

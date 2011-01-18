@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -134,29 +134,44 @@ echo "<script type='text/javascript' language='javascript'>
         var div_current = 'div_profile';
         function Show(which) {
 	    li = getObjbyName(li_current);
-            li.style.backgroundColor = '#DDE';
-            li.style.borderBottom = '1px solid #778';
-            div = getObjbyName(div_current);
-            div.style.display = 'none';
+            if (li) {
+                li.style.backgroundColor = '#DDE';
+                li.style.borderBottom = '1px solid #778';
+                div = getObjbyName(div_current);
+                div.style.display = 'none';
+            }
 
             li_current = 'li_' + which;
-	    li = getObjbyName(li_current);
-            li.style.backgroundColor = 'white';
-            li.style.borderBottom = '1px solid white';
             div_current = 'div_' + which;
-            div = getObjbyName(div_current);
-            div.style.display = 'block';
-
+	    li = getObjbyName(li_current);
+            if (li) {
+                li.style.backgroundColor = 'white';
+                li.style.borderBottom = '1px solid white';
+                div = getObjbyName(div_current);
+                div.style.display = 'block';
+            }
             return false;
         }
-        function Setup(which) {
-            li_current = 'li_' + which;
-            div_current = 'div_' + which;
-	    li = getObjbyName(li_current);
-            li.style.backgroundColor = 'white';
-            li.style.borderBottom = '1px solid white';
-            div = getObjbyName(div_current);
-            div.style.display = 'block';
+        function Setup() {
+	    var urllocation = location.href; //find url parameter
+	    if (urllocation && urllocation.indexOf('#') >= 0) {
+                var which = urllocation.substr(urllocation.indexOf('#') + 1);
+
+	        li = getObjbyName('li_' + which);
+                if (!li) {
+                    which = 'profile';
+                }
+                Show(which);
+            }
+            else {
+	        li = getObjbyName(li_current);
+                if (li) {
+                    li.style.backgroundColor = 'white';
+                    li.style.borderBottom = '1px solid white';
+                    div = getObjbyName(div_current);
+                    div.style.display = 'block';
+                }
+            }
         }
       </script>\n";
 
@@ -167,30 +182,35 @@ echo "<div width=\"100%\" align=center>\n";
 echo "<ul id=\"topnavbar\">\n";
 if ($templates_html) {
     echo "<li>
-           <a href=\"#A\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+           <a href=\"#templates\" ".
+	       "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_templates\" onclick=\"Show('templates');\">".
                "Templates</a></li>\n";
 }
 if ($experiments_html) {
      echo "<li>
-            <a href=\"#B\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+            <a href=\"#experiments\" ".
+	       "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
                "id=\"li_experiments\" onclick=\"Show('experiments');\">".
                "Experiments</a></li>\n";
 }
 if ($groups_html) {
     echo "<li>
-          <a href=\"#C\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#groups\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_groups\" onclick=\"Show('groups');\">".
               "Groups</a></li>\n";
 }
 if ($members_html) {
     echo "<li>
-          <a href=\"#D\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#members\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_members\" onclick=\"Show('members');\">".
               "Members</a></li>\n";
 }
 echo "<li>
-      <a href=\"#E\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+      <a href=\"#profile\" ".
+           "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
            "id=\"li_profile\" onclick=\"Show('profile');\">".
            "Profile</a></li>\n";
 
@@ -202,13 +222,15 @@ if ($isadmin && $stats_html) {
 }
 if ($papers_html) {
     echo "<li>
-          <a href=\"#G\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#papers\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_papers\" onclick=\"Show('papers');\">".
               "Publications</a></li>\n";
 }
 if ($vis_html) {
     echo "<li>
-          <a href=\"#G\" class=topnavbar onfocus=\"this.hideFocus=true;\" ".
+          <a href=\"#vis\" ".
+	      "class=topnavbar onfocus=\"this.hideFocus=true;\" ".
 	      "id=\"li_vis\" onclick=\"Show('vis');\">".
               "Visualization</a></li>\n";
 }
@@ -244,7 +266,7 @@ SUBPAGEEND();
 # Get the active tab to look right.
 #
 echo "<script type='text/javascript' language='javascript'>
-      Setup(\"profile\");
+      Setup();
       </script>\n";
 
 #

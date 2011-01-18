@@ -1,16 +1,11 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
-#
-# A library of useful DB stuff. Mostly things that get done a lot.
-# Saves typing.
-#
-# NOTE: Overrides perl's builtin fork()
+# This library mostly contains old stuff that should phased out in
+# favor of the per-object libraries in this directory.
 #
 # XXX: The notion of "uid" is a tad confused. A unix uid is a number,
 #      while in the DB a user uid is a string (equiv to unix login).
@@ -20,147 +15,19 @@
 package libdb;
 use strict;
 use Exporter;
+use SelfLoader;
 use vars qw(@ISA @EXPORT);
-@ISA = "Exporter";
+@ISA = qw(Exporter SelfLoader);
 
 @EXPORT =
-    qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
-	 OLDRESERVED_PID OLDRESERVED_EID NFREELOCKED_PID NFREELOCKED_EID 
-	 NODEBOOTSTATUS_OKAY NODEBOOTSTATUS_FAILED NODEBOOTSTATUS_UNKNOWN
-	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
-	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
-	 PROJMEMBERTRUST_PROJROOT PROJMEMBERTRUST_LOCALROOT
-	 NODEILL_PID NODEILL_EID
-
-	 TBOPSPID EXPTLOGNAME
-	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
-         PLABTESTING_PID PLABTESTING_EID PLABDOWN_PID PLABDOWN_EID
-
-	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust MapNumericUID
-
-	 TB_NODEACCESS_READINFO TB_NODEACCESS_MODIFYINFO
-	 TB_NODEACCESS_LOADIMAGE TB_NODEACCESS_REBOOT
-	 TB_NODEACCESS_POWERCYCLE TB_NODEACCESS_MODIFYVLANS
-	 TB_NODEACCESS_MIN TB_NODEACCESS_MAX
-
-	 NODEFAILMODE_FATAL NODEFAILMODE_NONFATAL NODEFAILMODE_IGNORE
-
-	 TB_USERINFO_READINFO TB_USERINFO_MODIFYINFO
-	 TB_USERINFO_MIN TB_USERINFO_MAX
-
-	 USERSTATUS_ACTIVE USERSTATUS_FROZEN
-	 USERSTATUS_UNAPPROVED USERSTATUS_UNVERIFIED USERSTATUS_NEWUSER
-
-	 TB_EXPT_READINFO TB_EXPT_MODIFY TB_EXPT_DESTROY TB_EXPT_UPDATE
-	 TB_EXPT_MIN TB_EXPT_MAX
-
-	 TB_PROJECT_READINFO TB_PROJECT_MAKEGROUP
-	 TB_PROJECT_EDITGROUP TB_PROJECT_DELGROUP
-	 TB_PROJECT_GROUPGRABUSERS TB_PROJECT_BESTOWGROUPROOT
-	 TB_PROJECT_LEADGROUP TB_PROJECT_ADDUSER
-	 TB_PROJECT_DELUSER TB_PROJECT_MAKEOSID
-	 TB_PROJECT_DELOSID TB_PROJECT_MAKEIMAGEID TB_PROJECT_DELIMAGEID
-	 TB_PROJECT_CREATEEXPT TB_PROJECT_MIN TB_PROJECT_MAX
-
-	 TB_OSID_READINFO TB_OSID_CREATE
-	 TB_OSID_DESTROY TB_OSID_MIN TB_OSID_MAX
-	 TB_OSID_OSIDLEN TB_OSID_OSNAMELEN TB_OSID_VERSLEN
-
-	 TB_IMAGEID_READINFO TB_IMAGEID_MODIFYINFO
-	 TB_IMAGEID_CREATE TB_IMAGEID_DESTROY
-	 TB_IMAGEID_ACCESS TB_IMAGEID_MIN TB_IMAGEID_MAX
-	 TB_IMAGEID_IMAGEIDLEN TB_IMAGEID_IMAGENAMELEN
-
-	 DBLIMIT_NSFILESIZE NODERELOADPENDING_EID
-
-	 NODEREPOSITIONING_PID NODEREPOSITIONING_EID NODEREPOSPENDING_EID
-
-	 EXPTSTATE_NEW EXPTSTATE_PRERUN EXPTSTATE_SWAPPED EXPTSTATE_SWAPPING
-	 EXPTSTATE_ACTIVATING EXPTSTATE_ACTIVE EXPTSTATE_PANICED
-	 EXPTSTATE_TERMINATING EXPTSTATE_TERMINATED EXPTSTATE_QUEUED
-	 EXPTSTATE_MODIFY_PARSE EXPTSTATE_MODIFY_REPARSE EXPTSTATE_MODIFY_RESWAP
-	 EXPTSTATE_RESTARTING
-	 BATCHSTATE_LOCKED BATCHSTATE_UNLOCKED
-	 EXPTCANCEL_CLEAR EXPTCANCEL_TERM EXPTCANCEL_SWAP EXPTCANCEL_DEQUEUE
-
+    qw ( MapNumericUID
 	 TBSetCancelFlag TBGetCancelFlag
-
-	 TB_NODELOGTYPE_MISC TB_NODELOGTYPES TB_DEFAULT_NODELOGTYPE
-
-	 TB_DEFAULT_RELOADTYPE TB_RELOADTYPE_FRISBEE TB_RELOADTYPE_NETDISK
-
-	 TB_EXPTPRIORITY_LOW TB_EXPTPRIORITY_HIGH
-
-	 TB_ASSIGN_TOOFEWNODES TB_OPSPID
-
-	 TBDB_TBEVENT_NODESTATE TBDB_TBEVENT_NODEOPMODE TBDB_TBEVENT_CONTROL
-	 TBDB_TBEVENT_COMMAND
-
-	 TBDB_NODESTATE_ISUP TBDB_NODESTATE_REBOOTING TBDB_NODESTATE_REBOOTED
-	 TBDB_NODESTATE_SHUTDOWN TBDB_NODESTATE_BOOTING TBDB_NODESTATE_TBSETUP
-	 TBDB_NODESTATE_RELOADSETUP TBDB_NODESTATE_RELOADING
-	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_RELOADDONE_V2
-	 TBDB_NODESTATE_UNKNOWN
-	 TBDB_NODESTATE_PXEWAIT TBDB_NODESTATE_PXEWAKEUP
-	 TBDB_NODESTATE_PXEFAILED TBDB_NODESTATE_PXELIMBO
-	 TBDB_NODESTATE_PXEBOOTING TBDB_NODESTATE_ALWAYSUP
-	 TBDB_NODESTATE_MFSSETUP TBDB_NODESTATE_TBFAILED
-	 TBDB_NODESTATE_POWEROFF
-
-	 TBDB_NODEOPMODE_NORMAL TBDB_NODEOPMODE_DELAYING
-	 TBDB_NODEOPMODE_UNKNOWNOS TBDB_NODEOPMODE_RELOADING
-	 TBDB_NODEOPMODE_NORMALv1 TBDB_NODEOPMODE_MINIMAL TBDB_NODEOPMODE_PCVM
-	 TBDB_NODEOPMODE_RELOAD TBDB_NODEOPMODE_RELOADMOTE TBDB_NODEOPMODE_RELOADPCVM
-	 TBDB_NODEOPMODE_DELAY
-	 TBDB_NODEOPMODE_BOOTWHAT
-	 TBDB_NODEOPMODE_ANY
-	 TBDB_NODEOPMODE_UNKNOWN
-
-	 TBDB_COMMAND_REBOOT
-	 TBDB_COMMAND_POWEROFF TBDB_COMMAND_POWERON TBDB_COMMAND_POWERCYCLE
-
-	 TBDB_STATED_TIMEOUT_REBOOT TBDB_STATED_TIMEOUT_NOTIFY
-	 TBDB_STATED_TIMEOUT_CMDRETRY
-
-	 TBDB_ALLOCSTATE_FREE_CLEAN TBDB_ALLOCSTATE_FREE_DIRTY
-	 TBDB_ALLOCSTATE_DOWN TBDB_ALLOCSTATE_RELOAD_TO_FREE
-	 TBDB_ALLOCSTATE_RELOAD_PENDING TBDB_ALLOCSTATE_RES_RELOAD
-	 TBDB_ALLOCSTATE_RES_INIT_DIRTY TBDB_ALLOCSTATE_RES_INIT_CLEAN
-	 TBDB_ALLOCSTATE_RES_REBOOT_DIRTY TBDB_ALLOCSTATE_RES_REBOOT_CLEAN
-	 TBDB_ALLOCSTATE_RES_READY TBDB_ALLOCSTATE_UNKNOWN
-	 TBDB_ALLOCSTATE_RES_TEARDOWN TBDB_ALLOCSTATE_DEAD
-	 TBDB_ALLOCSTATE_RES_RECONFIG
-
-	 TBDB_STATS_PRELOAD TBDB_STATS_START TBDB_STATS_TERMINATE
-	 TBDB_STATS_SWAPIN TBDB_STATS_SWAPOUT TBDB_STATS_SWAPMODIFY
-	 TBDB_STATS_FLAGS_IDLESWAP TBDB_STATS_FLAGS_PREMODIFY
-	 TBDB_STATS_FLAGS_START TBDB_STATS_FLAGS_PRESWAPIN
-	 TBDB_STATS_FLAGS_MODHOSED TBDB_STATS_SWAPUPDATE
-
-	 TBDB_JAILIPBASE TBDB_JAILIPMASK
-
-	 TBDB_RSRVROLE_NODE TBDB_RSRVROLE_VIRTHOST TBDB_RSRVROLE_DELAYNODE
-	 TBDB_RSRVROLE_SIMHOST
-
-	 TBDB_EXPT_WORKDIR
 	 TBSetNodeEventState TBGetNodeEventState
 	 TBNodeEventStateUpdated
 	 TBSetNodeAllocState TBGetNodeAllocState
 	 TBSetNodeOpMode TBGetNodeOpMode TBSetNodeNextOpMode
-	 TB_OSID_MBKERNEL 
-	 TB_OSID_FREEBSD_MFS TB_OSID_FRISBEE_MFS
 	 TBBootWhat TBNodeStateTimeout
-	 TBDB_TBCONTROL_RESET TBDB_TBCONTROL_RELOADDONE
-	 TBDB_TBCONTROL_RELOADDONE_V2
-	 TBDB_TBCONTROL_TIMEOUT TBDB_NO_STATE_TIMEOUT
-	 TBDB_TBCONTROL_PXEBOOT TBDB_TBCONTROL_BOOTING
-	 TBDB_TBCONTROL_CHECKGENISUP
-
-	 TBDB_LOWVPORT TBDB_MAXVPORT TBDB_PORTRANGE
-
-	 TBDB_PHYSICAL_NODE_TABLES
-
-	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck 
+	 TBAdmin TBNodeAccessCheck 
 	 TBExptAccessCheck NodeidToExp 
 	 ExpState
 	 ExpNodes ExpNodeVnames ExpNodesOldReserved
@@ -182,619 +49,106 @@ use vars qw(@ISA @EXPORT);
 	 TBExptIsElabInElab TBExptIsPlabInElab
 	 TBExptPlabInElabPLC TBExptPlabInElabNodes
 	 TBBatchUnLockExp TBExptIsBatchExp
-	 
 	 TBExptFirewall TBNodeFirewall TBExptFirewallAndPort
 	 TBSetExptFirewallVlan TBClearExptFirewallVlan
 	 TBNodeConsoleTail TBExptGetSwapoutAction TBExptGetSwapState
-
 	 TBNodeSubNodes
 	 TBNodeAdminOSID TBNodeDiskloadOSID
 	 TBNodeType TBNodeTypeProcInfo TBNodeTypeBiosWaittime
-
 	 TBExptPortRange
-
-	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID TBTipServers
-
 	 TBSiteVarExists TBGetSiteVar TBSetSiteVar
-
 	 TBActivityReport GatherAssignStats
 	 TBAvailablePCs
-
-	 TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT
-	 TBDB_IFACEROLE_JAIL TBDB_IFACEROLE_FAKE TBDB_IFACEROLE_OTHER
-	 TBDB_IFACEROLE_GW TBDB_IFACEROLE_OUTER_CONTROL
-
-	 TBDB_ROUTERTYPE_NONE	TBDB_ROUTERTYPE_OSPF
-	 TBDB_ROUTERTYPE_STATIC TBDB_ROUTERTYPE_MANUAL
-	 TBDB_USER_INTERFACE_EMULAB TBDB_USER_INTERFACE_PLAB
-	 TBDB_EVENTKEY TBDB_WEBKEY
          max min 
 	 hash_recurse array_recurse hash_recurse2 array_recurse2
-
 	 TBExptMinMaxNodes TBExptSecurityLevel TBExptIDX
-	 TBDB_SECLEVEL_GREEN TBDB_SECLEVEL_BLUE TBDB_SECLEVEL_YELLOW
-	 TBDB_SECLEVEL_ORANGE TBDB_SECLEVEL_RED TBDB_SECLEVEL_ZAPDISK
-
 	 TBExptSetPanicBit TBExptGetPanicBit TBExptClearPanicBit
-
-	 TB_NODEHISTORY_OP_FREE TB_NODEHISTORY_OP_ALLOC TB_NODEHISTORY_OP_MOVE
 	 TBSetNodeHistory
-
 	 TBGetOSBootCmd
-
 	 TBRobotLabExpt
-
 	 TBExptContainsNodeCT
 	 );
 
 use emdb;
 use emutil;
+use libEmulab;
+use EmulabConstants;
 use libtblog_simple;
 use English;
 use File::Basename;
-use POSIX qw(strftime);
 
 # This line has to come before the requires.
-@EXPORT = (@emutil::EXPORT, @emdb::EXPORT, @EXPORT);
-# These are requires because of cross dependency hell.
-require User;
-require Project;
-require Group;
-require Node;
-require NodeType;
-require Lan;
+@EXPORT = (@emutil::EXPORT, @emdb::EXPORT, @EmulabConstants::EXPORT, @EXPORT);
+
+use vars qw($TB $TBOPS $BOSSNODE $TESTMODE $TBOPSPID $EXPTLOGNAME $PROJROOT);
 
 # Configure variables
-my $TB		= "@prefix@";
-my $DBNAME	= "@TBDBNAME@";
-my $TBOPS       = "@TBOPSEMAIL@";
-my $EVENTSYS    = "@EVENTSYS@";
-my $BOSSNODE    = "@BOSSNODE@";
-my $TESTMODE    = @TESTMODE@;
-my $TBOPSPID	= "emulab-ops";
-my $EXPTLOGNAME = "activity.log";
-my $PROJROOT    = "@PROJROOT_DIR@";
+$TB	     = "@prefix@";
+$TBOPS       = "@TBOPSEMAIL@";
+$BOSSNODE    = "@BOSSNODE@";
+$TESTMODE    = @TESTMODE@;
+$TBOPSPID    = "emulab-ops";
+$EXPTLOGNAME = "activity.log";
+$PROJROOT    = "@PROJROOT_DIR@";
 
-if ($EVENTSYS) {
-    require event;
-    import event;
-}
 sub TBdbfork()
 {
-    if ($EVENTSYS) {
-	EventFork();
-    }
+    require event;
+    
+    event::EventFork();
 }
+sub hash_recurse2($%);
+sub array_recurse2($%);
 
-#
-# Needs to be config'ed.
-#
-sub TBDB_EXPT_WORKDIR()		{ "/usr/testbed/expwork"; }
+1;
+@SELFLOADER_DATA@
 
-#
-# Define exported "constants". Basically, these are just perl subroutines
-# that look like constants cause you do not need to call a perl subroutine
-# with parens. That is, FOO and FOO() are the same thing.
-#
-sub NODERELOADING_PID()		{ $TBOPSPID; }
-sub NODERELOADING_EID()		{ "reloading"; }
-sub NODERELOADPENDING_EID()	{ "reloadpending"; }
-sub NODEREPOSITIONING_PID()	{ $TBOPSPID; }
-sub NODEREPOSITIONING_EID()	{ "repositioning"; }
-sub NODEREPOSPENDING_EID()	{ "repositionpending"; }
-sub NODEDEAD_PID()		{ $TBOPSPID; }
-sub NODEDEAD_EID()		{ "hwdown"; }
-sub NODEILL_PID()		{ $TBOPSPID; }
-sub NODEILL_EID()		{ "hwcheckup"; }
-sub PLABMOND_PID()		{ $TBOPSPID; }
-sub PLABMOND_EID()		{ "plab-monitor"; }
-sub PLABTESTING_PID()		{ $TBOPSPID; }
-sub PLABTESTING_EID()		{ "plab-testing"; }
-sub PLABHOLDING_PID()		{ $TBOPSPID; }
-sub PLABHOLDING_EID()		{ "plabnodes"; }
-sub PLABDOWN_PID()		{ $TBOPSPID; }
-sub PLABDOWN_EID()		{ "hwdown"; }
-sub OLDRESERVED_PID()		{ $TBOPSPID; }
-sub OLDRESERVED_EID()		{ "oldreserved"; }
-sub NFREELOCKED_PID()		{ $TBOPSPID; }
-sub NFREELOCKED_EID()		{ "nfree-locked"; }
-sub TBOPSPID()			{ $TBOPSPID; }
-sub EXPTLOGNAME()		{ $EXPTLOGNAME; }
+# Local lookup for a Node, to avoid dragging in the module.
+sub LocalNodeLookup($)
+{
+    require Node;
 
-sub NODEBOOTSTATUS_OKAY()	{ "okay" ; }
-sub NODEBOOTSTATUS_FAILED()	{ "failed"; }
-sub NODEBOOTSTATUS_UNKNOWN()	{ "unknown"; }
-sub NODESTARTSTATUS_NOSTATUS()	{ "none"; }
+    return Node->Lookup($_[0]);
+}
+# Local lookup for an Experiment, to avoid dragging in the module.
+sub LocalExpLookup(@)
+{
+    require Experiment;
 
-sub NODEFAILMODE_FATAL()	{ "fatal"; }
-sub NODEFAILMODE_NONFATAL()	{ "nonfatal"; }
-sub NODEFAILMODE_IGNORE()	{ "ignore"; }
+    return Experiment->Lookup(@_);
+}
+# Local lookup for a Group, to avoid dragging in the module.
+sub LocalGroupLookup(@)
+{
+    require Group;
 
-# Experiment states
-sub EXPTSTATE_NEW()		{ "new"; }
-sub EXPTSTATE_PRERUN()		{ "prerunning"; }
-sub EXPTSTATE_SWAPPED()		{ "swapped"; }
-sub EXPTSTATE_QUEUED()		{ "queued"; }
-sub EXPTSTATE_SWAPPING()	{ "swapping"; }
-sub EXPTSTATE_ACTIVATING()	{ "activating"; }
-sub EXPTSTATE_ACTIVE()		{ "active"; }
-sub EXPTSTATE_PANICED()		{ "paniced"; }
-sub EXPTSTATE_TERMINATING()	{ "terminating"; }
-sub EXPTSTATE_TERMINATED()	{ "ended"; }
-sub EXPTSTATE_MODIFY_PARSE()	{ "modify_parse"; }
-sub EXPTSTATE_MODIFY_REPARSE()	{ "modify_reparse"; }
-sub EXPTSTATE_MODIFY_RESWAP()	{ "modify_reswap"; }
-sub EXPTSTATE_RESTARTING()	{ "restarting"; }
-# For the batch_daemon.
-sub BATCHSTATE_LOCKED()		{ "locked";}
-sub BATCHSTATE_UNLOCKED()	{ "unlocked";}
+    return Group->Lookup(@_);
+}
+# Local lookup for a NodeType, to avoid dragging in the module.
+sub LocalNodeTypeLookup(@)
+{
+    require NodeType;
 
-# Cancel flags
-sub EXPTCANCEL_CLEAR()		{ 0 ;}
-sub EXPTCANCEL_TERM()		{ 1 ;}
-sub EXPTCANCEL_SWAP()		{ 2 ;}
-sub EXPTCANCEL_DEQUEUE()	{ 3 ;}
+    return NodeType->Lookup(@_);
+}
+# Local lookup for a User, to avoid dragging in the module.
+sub LocalUserLookup(@)
+{
+    require User;
 
-sub USERSTATUS_ACTIVE()		{ "active"; }
-sub USERSTATUS_FROZEN()		{ "frozen"; }
-sub USERSTATUS_UNAPPROVED()	{ "unapproved"; }
-sub USERSTATUS_UNVERIFIED()	{ "unverified"; }
-sub USERSTATUS_NEWUSER()	{ "newuser"; }
-sub USERSTATUS_ARCHIVED()	{ "archived"; }
+    return User->Lookup(@_);
+}
+sub LocalUserLookupByUnixId(@)
+{
+    require User;
 
-#
-# We want valid project membership to be non-zero for easy membership
-# testing. Specific trust levels are encoded thusly.
-#
-sub PROJMEMBERTRUST_NONE()	{ 0; }
-sub PROJMEMBERTRUST_USER()	{ 1; }
-sub PROJMEMBERTRUST_ROOT()	{ 2; }
-sub PROJMEMBERTRUST_LOCALROOT()	{ 2; }
-sub PROJMEMBERTRUST_GROUPROOT()	{ 3; }
-sub PROJMEMBERTRUST_PROJROOT()	{ 4; }
-sub PROJMEMBERTRUST_ADMIN()	{ 5; }
-
-#
-# Access types. Duplicated in the web interface. Make changes there too!
-#
-# Things you can do to a node.
-sub TB_NODEACCESS_READINFO()	{ 1; }
-sub TB_NODEACCESS_MODIFYINFO()	{ 2; }
-sub TB_NODEACCESS_LOADIMAGE()	{ 3; }
-sub TB_NODEACCESS_REBOOT()	{ 4; }
-sub TB_NODEACCESS_POWERCYCLE()	{ 5; }
-sub TB_NODEACCESS_MODIFYVLANS()	{ 6; }
-sub TB_NODEACCESS_MIN()		{ TB_NODEACCESS_READINFO; }
-sub TB_NODEACCESS_MAX()		{ TB_NODEACCESS_MODIFYVLANS; }
-
-# User Info (modinfo web page, etc).
-sub TB_USERINFO_READINFO()	{ 1; }
-sub TB_USERINFO_MODIFYINFO()	{ 2; }
-sub TB_USERINFO_MIN()		{ TB_USERINFO_READINFO; }
-sub TB_USERINFO_MAX()		{ TB_USERINFO_MODIFYINFO; }
-
-# Experiments.
-sub TB_EXPT_READINFO()		{ 1; }
-sub TB_EXPT_MODIFY()		{ 2; }
-sub TB_EXPT_DESTROY()		{ 3; }
-sub TB_EXPT_UPDATE()		{ 4; }
-sub TB_EXPT_MIN()		{ TB_EXPT_READINFO; }
-sub TB_EXPT_MAX()		{ TB_EXPT_UPDATE; }
-
-# Projects.
-sub TB_PROJECT_READINFO()	{ 1; }
-sub TB_PROJECT_MAKEGROUP()	{ 2; }
-sub TB_PROJECT_EDITGROUP()	{ 3; }
-sub TB_PROJECT_GROUPGRABUSERS() { 4; }
-sub TB_PROJECT_BESTOWGROUPROOT(){ 5; }
-sub TB_PROJECT_DELGROUP()	{ 6; }
-sub TB_PROJECT_LEADGROUP()	{ 7; }
-sub TB_PROJECT_ADDUSER()	{ 8; }
-sub TB_PROJECT_DELUSER()	{ 9; }
-sub TB_PROJECT_MAKEOSID()	{ 10; }
-sub TB_PROJECT_DELOSID()	{ 11; }
-sub TB_PROJECT_MAKEIMAGEID()	{ 12; }
-sub TB_PROJECT_DELIMAGEID()	{ 13; }
-sub TB_PROJECT_CREATEEXPT()	{ 14; }
-sub TB_PROJECT_MIN()		{ TB_PROJECT_READINFO; }
-sub TB_PROJECT_MAX()		{ TB_PROJECT_CREATEEXPT; }
-
-# OSIDs
-sub TB_OSID_READINFO()		{ 1; }
-sub TB_OSID_CREATE()		{ 2; }
-sub TB_OSID_DESTROY()		{ 3; }
-sub TB_OSID_MIN()		{ TB_OSID_READINFO; }
-sub TB_OSID_MAX()		{ TB_OSID_DESTROY; }
-sub TB_OSID_OSIDLEN()		{ 35; }
-sub TB_OSID_OSNAMELEN()		{ 20; }
-sub TB_OSID_VERSLEN()		{ 12; }
-
-# Magic OSID constants
-sub TB_OSID_MBKERNEL()          { "_KERNEL_"; } # multiboot kernel OSID
-
-# Magic MFS constants
-sub TB_OSID_FREEBSD_MFS()	{ "FREEBSD-MFS" };
-sub TB_OSID_FRISBEE_MFS()	{ "FRISBEE-MFS" };
-
-# ImageIDs
-#
-# Clarification:
-# READINFO is read-only access to the image and its contents
-# (This is what people get for shared images)
-# ACCESS means complete power over the image and its [meta]data
-sub TB_IMAGEID_READINFO()	{ 1; }
-sub TB_IMAGEID_MODIFYINFO()	{ 2; }
-sub TB_IMAGEID_CREATE()		{ 3; }
-sub TB_IMAGEID_DESTROY()	{ 4; }
-sub TB_IMAGEID_ACCESS()		{ 5; }
-sub TB_IMAGEID_MIN()		{ TB_IMAGEID_READINFO; }
-sub TB_IMAGEID_MAX()		{ TB_IMAGEID_ACCESS; }
-sub TB_IMAGEID_IMAGEIDLEN()	{ 45; }
-sub TB_IMAGEID_IMAGENAMELEN()	{ 30; }
-
-# Node Log Types
-sub TB_NODELOGTYPE_MISC		{ "misc"; }
-sub TB_NODELOGTYPES()		{ ( TB_NODELOGTYPE_MISC ) ; }
-sub TB_DEFAULT_NODELOGTYPE()	{ TB_NODELOGTYPE_MISC; }
-
-# Node History Stuff.
-sub TB_NODEHISTORY_OP_FREE	{ "free"; }
-sub TB_NODEHISTORY_OP_ALLOC	{ "alloc"; }
-sub TB_NODEHISTORY_OP_MOVE	{ "move"; }
-
-# Reload Types.
-sub TB_RELOADTYPE_NETDISK()	{ "netdisk"; }
-sub TB_RELOADTYPE_FRISBEE()	{ "frisbee"; }
-sub TB_DEFAULT_RELOADTYPE()	{ TB_RELOADTYPE_FRISBEE; }
-
-# Experiment priorities.
-sub TB_EXPTPRIORITY_LOW()	{ 0; }
-sub TB_EXPTPRIORITY_HIGH()	{ 20; }
-
-# Assign exit status for too few nodes.
-sub TB_ASSIGN_TOOFEWNODES()	{ 2; }
-
-# System PID.
-sub TB_OPSPID()			{ $TBOPSPID; }
-
-#
-# Events we may want to send
-#
-sub TBDB_TBEVENT_NODESTATE	{ "TBNODESTATE"; }
-sub TBDB_TBEVENT_NODEOPMODE	{ "TBNODEOPMODE"; }
-sub TBDB_TBEVENT_CONTROL	{ "TBCONTROL"; }
-sub TBDB_TBEVENT_COMMAND	{ "TBCOMMAND"; }
-sub TBDB_TBEVENT_EXPTSTATE	{ "TBEXPTSTATE"; }
-
-#
-# For nodes, we use this set of events.
-#
-sub TBDB_NODESTATE_ISUP()	{ "ISUP"; }
-sub TBDB_NODESTATE_ALWAYSUP()	{ "ALWAYSUP"; }
-sub TBDB_NODESTATE_REBOOTED()	{ "REBOOTED"; }
-sub TBDB_NODESTATE_REBOOTING()	{ "REBOOTING"; }
-sub TBDB_NODESTATE_SHUTDOWN()	{ "SHUTDOWN"; }
-sub TBDB_NODESTATE_BOOTING()	{ "BOOTING"; }
-sub TBDB_NODESTATE_TBSETUP()	{ "TBSETUP"; }
-sub TBDB_NODESTATE_RELOADSETUP(){ "RELOADSETUP"; }
-sub TBDB_NODESTATE_MFSSETUP()   { "MFSSETUP"; }
-sub TBDB_NODESTATE_TBFAILED()	{ "TBFAILED"; }
-sub TBDB_NODESTATE_RELOADING()	{ "RELOADING"; }
-sub TBDB_NODESTATE_RELOADDONE()	{ "RELOADDONE"; }
-sub TBDB_NODESTATE_RELOADDONE_V2(){ "RELOADDONEV2"; }
-sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
-sub TBDB_NODESTATE_PXEWAIT()	{ "PXEWAIT"; }
-sub TBDB_NODESTATE_PXELIMBO()	{ "PXELIMBO"; }
-sub TBDB_NODESTATE_PXEWAKEUP()	{ "PXEWAKEUP"; }
-sub TBDB_NODESTATE_PXEFAILED()	{ "PXEFAILED"; }
-sub TBDB_NODESTATE_PXEBOOTING()	{ "PXEBOOTING"; }
-sub TBDB_NODESTATE_POWEROFF()	{ "POWEROFF"; }
-
-sub TBDB_NODEOPMODE_ANY		{ "*"; } # A wildcard opmode
-sub TBDB_NODEOPMODE_NORMAL	{ "NORMAL"; }
-sub TBDB_NODEOPMODE_DELAYING	{ "DELAYING"; }
-sub TBDB_NODEOPMODE_UNKNOWNOS	{ "UNKNOWNOS"; }
-sub TBDB_NODEOPMODE_RELOADING	{ "RELOADING"; }
-sub TBDB_NODEOPMODE_NORMALv1	{ "NORMALv1"; }
-sub TBDB_NODEOPMODE_MINIMAL	{ "MINIMAL"; }
-sub TBDB_NODEOPMODE_PCVM	{ "PCVM"; }
-sub TBDB_NODEOPMODE_RELOAD	{ "RELOAD"; }
-sub TBDB_NODEOPMODE_RELOADMOTE	{ "RELOAD-MOTE"; }
-sub TBDB_NODEOPMODE_RELOADPCVM	{ "RELOAD-PCVM"; }
-sub TBDB_NODEOPMODE_DELAY	{ "DELAY"; }
-sub TBDB_NODEOPMODE_BOOTWHAT	{ "_BOOTWHAT_"; } # A redirection opmode
-sub TBDB_NODEOPMODE_UNKNOWN	{ "UNKNOWN"; }
-
-sub TBDB_COMMAND_REBOOT         { "REBOOT"; }
-sub TBDB_COMMAND_POWEROFF       { "POWEROFF"; }
-sub TBDB_COMMAND_POWERON        { "POWERON"; }
-sub TBDB_COMMAND_POWERCYCLE     { "POWERCYCLE"; }
-
-sub TBDB_STATED_TIMEOUT_REBOOT  { "REBOOT"; }
-sub TBDB_STATED_TIMEOUT_NOTIFY  { "NOTIFY"; }
-sub TBDB_STATED_TIMEOUT_CMDRETRY{ "CMDRETRY"; }
-
-sub TBDB_ALLOCSTATE_FREE_CLEAN()       { "FREE_CLEAN"; }
-sub TBDB_ALLOCSTATE_FREE_DIRTY()       { "FREE_DIRTY"; }
-sub TBDB_ALLOCSTATE_DOWN()             { "DOWN"; }
-sub TBDB_ALLOCSTATE_DEAD()             { "DEAD"; }
-sub TBDB_ALLOCSTATE_RELOAD_TO_FREE()   { "RELOAD_TO_FREE"; }
-sub TBDB_ALLOCSTATE_RELOAD_PENDING()   { "RELOAD_PENDING"; }
-sub TBDB_ALLOCSTATE_RES_RELOAD()       { "RES_RELOAD"; }
-sub TBDB_ALLOCSTATE_RES_REBOOT_DIRTY() { "RES_REBOOT_DIRTY"; }
-sub TBDB_ALLOCSTATE_RES_REBOOT_CLEAN() { "RES_REBOOT_CLEAN"; }
-sub TBDB_ALLOCSTATE_RES_INIT_DIRTY()   { "RES_INIT_DIRTY"; }
-sub TBDB_ALLOCSTATE_RES_INIT_CLEAN()   { "RES_INIT_CLEAN"; }
-sub TBDB_ALLOCSTATE_RES_READY()        { "RES_READY"; }
-sub TBDB_ALLOCSTATE_RES_RECONFIG()     { "RES_RECONFIG"; }
-sub TBDB_ALLOCSTATE_RES_TEARDOWN()     { "RES_TEARDOWN"; }
-sub TBDB_ALLOCSTATE_UNKNOWN()          { "UNKNOWN"; };
-
-sub TBDB_TBCONTROL_RESET	{ "RESET"; }
-sub TBDB_TBCONTROL_RELOADDONE	{ "RELOADDONE"; }
-sub TBDB_TBCONTROL_RELOADDONE_V2{ "RELOADDONEV2"; }
-sub TBDB_TBCONTROL_TIMEOUT	{ "TIMEOUT"; }
-sub TBDB_TBCONTROL_PXEBOOT	{ "PXEBOOT"; }
-sub TBDB_TBCONTROL_BOOTING	{ "BOOTING"; }
-sub TBDB_TBCONTROL_CHECKGENISUP	{ "CHECKGENISUP"; }
-
-# Constant we use for the timeout field when there is no timeout for a state
-sub TBDB_NO_STATE_TIMEOUT	{ 0; }
-
-#
-# Node name we use in the widearea_* tables to represent a generic local node.
-# All local nodes are considered to have the same network characteristcs.
-#
-sub TBDB_WIDEAREA_LOCALNODE     { "boss"; }
-
-#
-# We should list all of the DB limits.
-#
-sub DBLIMIT_NSFILESIZE()	{ (2**24 - 1); }
-
-#
-# Virtual nodes must operate within a restricted port range. The range
-# is effective across all virtual nodes in the experiment. When an
-# experiment is swapped in, allocate a subrange from this and setup
-# all the vnodes to allocate from that range. We tell the user this
-# range so this they can set up their programs to operate in that range.
-#
-sub TBDB_LOWVPORT()		{ 30000; }
-sub TBDB_MAXVPORT()		{ 60000; }
-sub TBDB_PORTRANGE()		{ 256;   }
-
-#
-# STATS constants.
-#
-sub TBDB_STATS_PRELOAD()	{ "preload"; }
-sub TBDB_STATS_START()		{ "start"; }
-sub TBDB_STATS_TERMINATE()	{ "destroy"; }
-sub TBDB_STATS_SWAPIN()		{ "swapin"; }
-sub TBDB_STATS_SWAPOUT()	{ "swapout"; }
-sub TBDB_STATS_SWAPMODIFY()	{ "swapmod"; }
-sub TBDB_STATS_SWAPUPDATE()	{ "swapupdate"; }
-sub TBDB_STATS_FLAGS_IDLESWAP()	{ 0x01; }
-sub TBDB_STATS_FLAGS_PREMODIFY(){ 0x02; }
-sub TBDB_STATS_FLAGS_START()    { 0x04; }
-sub TBDB_STATS_FLAGS_PRESWAPIN(){ 0x08; }
-sub TBDB_STATS_FLAGS_BATCHCTRL(){ 0x10; }
-sub TBDB_STATS_FLAGS_MODHOSED() { 0x20; }
-# Do not export these variables!
-my $TBDB_STATS_STARTCLOCK;
-my $TBDB_STATS_SAVEDSWAPUID;
-
-# Jail.
-sub TBDB_JAILIPBASE()		{ "@JAILIPBASE@"; }
-sub TBDB_JAILIPMASK()		{ "@JAILIPMASK@"; }
-
-# Reserved node "roles"
-sub TBDB_RSRVROLE_NODE()	{ "node"; }
-sub TBDB_RSRVROLE_VIRTHOST()	{ "virthost"; }
-sub TBDB_RSRVROLE_DELAYNODE()	{ "delaynode"; }
-sub TBDB_RSRVROLE_SIMHOST()	{ "simhost"; }
-
-# Interfaces roles.
-sub TBDB_IFACEROLE_CONTROL()	{ "ctrl"; }
-sub TBDB_IFACEROLE_EXPERIMENT()	{ "expt"; }
-sub TBDB_IFACEROLE_JAIL()	{ "jail"; }
-sub TBDB_IFACEROLE_FAKE()	{ "fake"; }
-sub TBDB_IFACEROLE_GW()		{ "gw"; }
-sub TBDB_IFACEROLE_OTHER()	{ "other"; }
-sub TBDB_IFACEROLE_OUTER_CONTROL(){ "outer_ctrl"; }
-
-# Routertypes.
-sub TBDB_ROUTERTYPE_NONE()	{ "none"; }
-sub TBDB_ROUTERTYPE_OSPF()	{ "ospf"; }
-sub TBDB_ROUTERTYPE_STATIC()	{ "static"; }
-sub TBDB_ROUTERTYPE_MANUAL()	{ "manual"; }
-
-# User Interface types.
-sub TBDB_USER_INTERFACE_EMULAB(){ "emulab"; }
-sub TBDB_USER_INTERFACE_PLAB()	{ "plab"; }
-
-# Key Stuff
-sub TBDB_EVENTKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/eventkey"; }
-sub TBDB_WEBKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/webkey"; }
-
-# Security Levels.
-sub TBDB_SECLEVEL_GREEN()	{ 0; }
-sub TBDB_SECLEVEL_BLUE()	{ 1; }
-sub TBDB_SECLEVEL_YELLOW()	{ 2; }
-sub TBDB_SECLEVEL_ORANGE()	{ 3; }
-sub TBDB_SECLEVEL_RED()		{ 4; }
-
-# This is the level at which we get extremely cautious when swapping out
-sub TBDB_SECLEVEL_ZAPDISK()	{ TBDB_SECLEVEL_YELLOW; }
-
-#
-# A hash of all tables that contain information about physical nodes - the
-# value for each key is the list of columns that could contain the node's ID.
-#
-sub TBDB_PHYSICAL_NODE_TABLES() {
-    return (
-	'current_reloads'	=> [ 'node_id' ],
-	'delays'		=> [ 'node_id' ],
-	'iface_counters'	=> [ 'node_id' ],
-	'interfaces'		=> [ 'node_id' ],
-	'interface_settings'	=> [ 'node_id' ],
-	'interface_state'	=> [ 'node_id' ],
-	'last_reservation'	=> [ 'node_id' ],
-	'linkdelays'		=> [ 'node_id' ],
-	'location_info'		=> [ 'node_id' ],
-	'next_reserve'		=> [ 'node_id' ],
-	'node_activity'		=> [ 'node_id' ],
-	'node_auxtypes'		=> [ 'node_id' ],
-	'node_features'		=> [ 'node_id' ],
-	'node_hostkeys'		=> [ 'node_id' ],
-	'node_idlestats'	=> [ 'node_id' ],
-	'node_status'   	=> [ 'node_id' ],
-	'node_rusage'		=> [ 'node_id' ],
-	'nodeipportnum'		=> [ 'node_id' ],
-	'nodelog'		=> [ 'node_id' ],
-	'nodes'			=> [ 'node_id', 'phys_nodeid' ],
-	'nodeuidlastlogin'	=> [ 'node_id' ],
-	'ntpinfo'		=> [ 'node_id' ],
-	'outlets'		=> [ 'node_id' ],
-	'outlets_remoteauth'	=> [ 'node_id' ],
-	'partitions'		=> [ 'node_id' ],
-	'plab_slice_nodes'	=> [ 'node_id' ],
-	'port_counters'		=> [ 'node_id' ],
-	'reserved'		=> [ 'node_id' ],
-	'scheduled_reloads'	=> [ 'node_id' ],
-	'state_triggers'	=> [ 'node_id' ],
-	'switch_stacks'		=> [ 'node_id' ],
-	'tiplines'		=> [ 'node_id' ],
-	'tmcd_redirect'		=> [ 'node_id' ],
-	'uidnodelastlogin'	=> [ 'node_id' ],
-	'v2pmap'		=> [ 'node_id' ],
-	'vinterfaces'		=> [ 'node_id' ],
-	'widearea_nodeinfo'	=> [ 'node_id' ],
-	'widearea_accounts'	=> [ 'node_id' ],
-	'widearea_delays'	=> [ 'node_id1', 'node_id2' ],
-	'widearea_recent'	=> [ 'node_id1', 'node_id2' ],
-	'wires'			=> [ 'node_id1', 'node_id2' ],
-	'node_startloc'		=> [ 'node_id' ],
-	'node_history'		=> [ 'node_id' ],
-	'node_bootlogs'		=> [ 'node_id' ],
-        'plab_mapping'          => [ 'node_id' ],
-        'node_utilization'      => [ 'node_id' ],
-    );
+    return User->LookupByUnixId(@_);
 }
 
 #
 # Auth stuff.
 #
-
-#
-# Convert a trust string to the above numeric values.
-#
-sub TBTrustConvert($)
-{
-    my($trust_string) = @_;
-    my $trust_value = 0;
-
-    #
-    # Convert string to value. Perhaps the DB should have done it this way?
-    #
-    if ($trust_string eq "none") {
-	$trust_value = PROJMEMBERTRUST_NONE;
-    }
-    elsif ($trust_string eq "user") {
-	$trust_value = PROJMEMBERTRUST_USER;
-    }
-    elsif ($trust_string eq "local_root") {
-	$trust_value = PROJMEMBERTRUST_LOCALROOT;
-    }
-    elsif ($trust_string eq "group_root") {
-	$trust_value = PROJMEMBERTRUST_GROUPROOT;
-    }
-    elsif ($trust_string eq "project_root") {
-	$trust_value = PROJMEMBERTRUST_PROJROOT;
-    }
-    elsif ($trust_string eq "admin") {
-	$trust_value = PROJMEMBERTRUST_ADMIN;
-    }
-    else {
-	    die("*** Invalid trust value $trust_string!");
-    }
-
-    return $trust_value;
-}
-
-#
-# Return true if the given trust string is >= to the minimum required.
-# The trust value can be either numeric or a string; if a string its
-# first converted to the numeric equiv.
-#
-sub TBMinTrust($$)
-{
-    my ($trust_value, $minimum) = @_;
-
-    if ($minimum < PROJMEMBERTRUST_NONE ||
-	$minimum > PROJMEMBERTRUST_ADMIN) {
-	    die("*** Invalid minimum trust $minimum!");
-    }
-
-    #
-    # Sleazy? How do you do a typeof in perl?
-    #
-    if (length($trust_value) != 1) {
-	$trust_value = TBTrustConvert($trust_value);
-    }
-
-    return $trust_value >= $minimum;
-}
-
-#
-# Determine the trust level for a uid/pid/gid. That is, each uid will have
-# a different trust level depending on the project/group in question.
-# Return that trust level as one of the numeric values above.
-#
-# usage: TBGrpTrust($dbuid, $pid, $gid)
-#        returns numeric trust value if a group member.
-#        returns PROJMEMBERTRUST_NONE if not a group member.
-#
-sub TBGrpTrust($$$)
-{
-    my ($uid, $pid, $gid) = @_;
-
-    #
-    # No group, then use the default group.
-    #
-    $gid = $pid
-	if (! $gid);
-
-    #
-    # Must map to an existing user to be trusted, obviously.
-    #
-    my $target_user = User->Lookup($uid);
-    return PROJMEMBERTRUST_NONE
-	if (! defined($target_user));
-
-    # Ditto the group.
-    my $target_group = Group->Lookup($pid, $gid);
-    return PROJMEMBERTRUST_NONE
-	if (! defined($target_group));
-
-    return $target_group->Trust($target_user)
-}
-
-#
-# Determine the project trust level for a uid/pid. This is the trust level
-# for the default group in the project.
-#
-# usage: TBProjTrust($dbuid, $pid)
-#        returns numeric trust value if a project member.
-#        returns PROJMEMBERTRUST_NONE if not a project member.
-#
-sub TBProjTrust($$)
-{
-    my ($uid, $pid) = @_;
-
-    return TBGrpTrust($uid, $pid, $pid);
-}
-
 #
 # Test admin status. Ignore argument; we only care if the current user
 # has admin privs turned on.
@@ -805,38 +159,13 @@ sub TBProjTrust($$)
 #
 sub TBAdmin(;$)
 {
+    require User;
+    
     my $this_user = User->ThisUser();
     return 0
 	if (! defined($this_user));
 
     return $this_user->IsAdmin();
-}
-
-#
-# Project permission checks. The group id (gid) can be undef, in which case
-# the pid is used (ie: a default group check is made).
-#
-# Usage: TBProjAccessCheck($uid, $pid, $gid, $access_type)
-#	 returns 0 if not allowed.
-#        returns 1 if allowed.
-#
-sub TBProjAccessCheck($$$$)
-{
-    my ($uid, $pid, $gid, $access_type) = @_;
-
-    #
-    # Must map to an existing user to be trusted, obviously.
-    #
-    my $target_user = User->LookupByUnixId($uid);
-    return 0
-	if (! defined($target_user));
-
-    # Ditto the group
-    my $target_group = Group->Lookup($pid, $gid);
-    return 0
-	if (! defined($target_group));
-
-    return $target_group->AccessCheck($target_user, $access_type);
 }
 
 #
@@ -853,12 +182,12 @@ sub TBExptAccessCheck($$$$)
     #
     # Must map to an existing user to be trusted, obviously.
     #
-    my $target_user = User->LookupByUnixId($uid);
+    my $target_user = LocalUserLookupByUnixId($uid);
     return 0
 	if (! defined($target_user));
 
     # Ditto the group
-    my $experiment = Experiment->Lookup($pid, $eid);
+    my $experiment = LocalExpLookup($pid, $eid);
     return 0
 	if (! defined($experiment));
 
@@ -880,14 +209,14 @@ sub TBNodeAccessCheck($$@)
     #
     # Must map to an existing user to be trusted, obviously.
     #
-    my $target_user = User->LookupByUnixId($uid);
+    my $target_user = LocalUserLookupByUnixId($uid);
     return 0
 	if (! defined($target_user));
     return 1
 	if ($target_user->IsAdmin());
 
     foreach my $nodeid (@nodelist) {
-	my $node = Node->Lookup($nodeid);
+	my $node = LocalNodeLookup($nodeid);
 	return 0
 	    if (!defined($node));
 
@@ -908,7 +237,7 @@ sub ExpState($$)
 {
     my ($pid, $eid) = @_;
 
-    my $experiment = Experiment->Lookup($pid, $eid);
+    my $experiment = LocalExpLookup($pid, $eid);
     return 0
 	if (!defined($experiment));
     return $experiment->state();
@@ -933,12 +262,14 @@ sub TBBatchUnLockExp($$;$)
 	return 0;
     }
     
-    if ($EVENTSYS && defined($newstate)) {
-	EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
-		      objname   => "$pid/$eid",
-		      eventtype => $newstate,
-		      expt      => "$pid/$eid",
-		      host      => $BOSSNODE);
+    if (defined($newstate)) {
+	require event;
+	
+	event::EventSendWarn(objtype   => TBDB_TBEVENT_EXPTSTATE,
+			     objname   => "$pid/$eid",
+			     eventtype => $newstate,
+			     expt      => "$pid/$eid",
+			     host      => $BOSSNODE);
     }
     return 1;
 }
@@ -1213,7 +544,7 @@ sub VnameToNodeid ($$$$) {
 sub DefaultImageID ($$) {
     my ($nodeid, $imageid) = @_;
 
-    my $node = Node->Lookup($nodeid);
+    my $node = LocalNodeLookup($nodeid);
 
     if (! $node) {
 	$$imageid = undef;
@@ -1349,7 +680,7 @@ sub TBResolveNextOSID($;$$)
     require OSinfo;
 
     if (defined($pid) && defined($eid)) {
-	$experiment = Experiment->Lookup($pid, $eid);
+	$experiment = LocalExpLookup($pid, $eid);
 	if (! defined($experiment)) {
 	    warn "TBResolveNextOSID: No such experiment $pid/$eid\n";
 	    return undef;
@@ -1446,11 +777,11 @@ sub TBSetNodeLogEntry($$$$)
 {
     my ($node_id, $dbuid, $type, $message) = @_;
 
-    my $node = Node->Lookup($node_id);
+    my $node = LocalNodeLookup($node_id);
     return 0
 	if (! defined($node));
 
-    return ($node->InsertNodeLogEntry(User->Lookup($dbuid),
+    return ($node->InsertNodeLogEntry(LocalUserLookup($dbuid),
 				      $type, $message) == 0 ? 1 : 0);
 }
 
@@ -1469,16 +800,12 @@ sub TBSetNodeEventState($$)
     # If using the event system, we send out an event for the state daemon to
     # pick up. Otherwise, we just set the state in the database ourselves
     #
-    if ($EVENTSYS) {
-	return EventSendFatal(objtype   => TBDB_TBEVENT_NODESTATE,
-			      objname   => $node,
-			      eventtype => $state,
-			      host      => $BOSSNODE);
-    } else {
-	my $now = time();
-	return DBQueryFatal("update nodes set eventstate='$state', " .
-			    "state_timestamp=$now where node_id='$node'");
-    }
+    require event;
+    
+    return event::EventSendFatal(objtype   => TBDB_TBEVENT_NODESTATE,
+				 objname   => $node,
+				 eventtype => $state,
+				 host      => $BOSSNODE);
 }
 
 #
@@ -1559,15 +886,12 @@ sub TBNodeStateTimeout($)
     my ($over,$none) = $query_result->fetchrow_array();
     if ($over && !$none) {
 	# We're overtime... send an event and return 1
-	if ($EVENTSYS) {
-	    EventSendFatal(objtype   => TBDB_TBEVENT_CONTROL,
-			   objname   => $node,
-			   eventtype => TBDB_TBCONTROL_TIMEOUT,
-			   host      => $BOSSNODE);
-	} else {
-	    # Don't know what to do... how are state timeouts handled
-	    # if we don't have stated?
-	}
+	require event;
+
+	event::EventSendFatal(objtype   => TBDB_TBEVENT_CONTROL,
+			      objname   => $node,
+			      eventtype => TBDB_TBCONTROL_TIMEOUT,
+			      host      => $BOSSNODE);
 	return 1;
     } else {
 	# We're good... return 0
@@ -1593,16 +917,12 @@ sub TBSetNodeOpMode($$)
     # If using the event system, we send out an event for the state daemon to
     # pick up. Otherwise, we just set the mode in the database ourselves
     #
-    if ($EVENTSYS) {
-	return EventSendFatal(objtype   => TBDB_TBEVENT_NODEOPMODE,
-			      objname   => $node,
-			      eventtype => $mode,
-			      host      => $BOSSNODE);
-    } else {
-	my $now = time();
-	return DBQueryFatal("update nodes set op_mode='$mode', " .
-			    "op_mode_timestamp=$now where node_id='$node'");
-    }
+    require event;
+
+    return event::EventSendFatal(objtype   => TBDB_TBEVENT_NODEOPMODE,
+				 objname   => $node,
+				 eventtype => $mode,
+				 host      => $BOSSNODE);
 }
 
 #
@@ -1917,17 +1237,7 @@ sub TBExptSecurityLevel($$$)
 #
 sub TBSiteVarExists($)
 {
-    my($name) = @_;
-
-    $name = DBQuoteSpecial( $name );
-
-    my $query_result =
-	DBQueryWarn("select name from sitevariables where name=$name");
-
-    return 0
-	if (!$query_result);
-    
-    return $query_result->numrows;
+    return libEmulab::SiteVarExists($_[0]);
 }
 
 #
@@ -1943,51 +1253,8 @@ sub TBSiteVarExists($)
 sub TBGetSiteVar($;$)
 {
     my ($name, $rptr) = @_;
-    my $value;
 
-    $name = DBQuoteSpecial( $name );
-    
-    my $query_string =
-	"select value,defaultvalue from sitevariables where name=$name";
-
-    my $query_result;
-    if (defined($rptr)) {
-	#
-	# I added the result parameter as an option to avoid changing every
-	# call to TBGetSiteVar(). Sorry. When called in this manner, it is
-	# up to the caller to decide what to do when it fails. 
-	#
-	$query_result = DBQueryWarn($query_string);
-
-	return 0
-	    if (! $query_result)
-    }
-    else {
-	$query_result = DBQueryFatal($query_string);
-    }
-
-    if ($query_result->numrows > 0) {
-	my ($curvalue, $defaultvalue) = $query_result->fetchrow_array();
-
-	if (defined($curvalue)) {
-	    $value = $curvalue;
-	}
-	elsif (defined($defaultvalue)) {
-	    $value = $defaultvalue;
-	}
-    }
-    if (defined($rptr)) {
-	if (defined($value)) {
-	    $$rptr = $value;
-	    return 1;
-	}
-	return 0;
-    }
-    elsif (defined($value)) {
-	return $value;
-    }
-    die("*** $0:\n".
-	"    Attempted to fetch unknown site variable $name\n");
+    return libEmulab::GetSiteVar($name, $rptr);
 }
 
 #
@@ -1999,15 +1266,7 @@ sub TBSetSiteVar($$)
 {
     my ($name, $value) = @_;
 
-    $name  = DBQuoteSpecial($name);
-    $value = DBQuoteSpecial($value);
-
-    my $query_result =
-	DBQueryWarn("update sitevariables set value=$value where name=$name");
-
-    return 0
-	if (!$query_result);
-    return 1;
+    return libEmulab::SetSiteVar($name, $value);
 }
 
 #
@@ -2122,7 +1381,7 @@ sub TBNodeAdminOSID($)
 {
     my ($nodeid) = @_;
 
-    my $node = Node->Lookup($nodeid);
+    my $node = LocalNodeLookup($nodeid);
 
     return 0
 	if (!defined($node));
@@ -2142,15 +1401,17 @@ sub TBNodeDiskloadOSID($)
 {
     my ($nodeid) = @_;
 
-    my $node = Node->Lookup($nodeid);
+    my $node = LocalNodeLookup($nodeid);
 
     return 0
 	if (!defined($node));
 
     my $mfs;
     
-    return 0
-	if ($node->NodeTypeAttribute("diskloadmfs_osid", \$mfs) != 0);
+    if ($node->NodeAttribute("diskloadmfs_osid", \$mfs) || !defined($mfs)) {
+	return 0
+	    if ($node->NodeTypeAttribute("diskloadmfs_osid", \$mfs) != 0);
+    }
 
     $mfs = TB_OSID_FREEBSD_MFS()
 	if (!defined($mfs));
@@ -2166,7 +1427,7 @@ sub TBNodeTypeProcInfo($)
 {
     my ($type) = @_;
 
-    my $typeinfo = NodeType->Lookup($type);
+    my $typeinfo = LocalNodeTypeLookup($type);
 
     return undef
 	if (!defined($typeinfo));
@@ -2190,7 +1451,7 @@ sub TBNodeTypeBiosWaittime($)
 {
     my ($type) = @_;
 
-    my $typeinfo = NodeType->Lookup($type);
+    my $typeinfo = LocalNodeTypeLookup($type);
 
     return 0
 	if (!defined($typeinfo));
@@ -3063,12 +2324,13 @@ sub TBExptGetSwapoutAction($$$) {
 sub DBDateTime(;$)
 {
     my($seconds) = @_;
+    require POSIX;
 
     if (! defined($seconds)) {
 	$seconds = 0;
     }
 
-    return strftime("20%y-%m-%d %H:%M:%S", localtime(time() + $seconds));
+    return POSIX::strftime("20%y-%m-%d %H:%M:%S", localtime(time() + $seconds));
 }
 
 #
@@ -3080,7 +2342,7 @@ sub MapNumericUID($)
     my $name;
 
     if ($uid =~ /^[0-9]+$/) {
-	my $user = User->LookupByUnixId($uid);
+	my $user = LocalUserLookupByUnixId($uid);
 	if (!defined($user)) {
 	    die("*** $uid not a valid Emulab user!\n");
 	}
@@ -3269,13 +2531,11 @@ sub min ( $$ ) {
     return ($_[0] < $_[1] ? $_[0] : $_[1]);
 }
 
-sub hash_recurse2($%);
 sub hash_recurse(%) {
     my (%hash) = @_;
     return hash_recurse2("",%hash);
 }
 
-sub array_recurse2($%);
 sub array_recurse(%) {
     my (%array) = @_;
     return array_recurse2("",%array);
@@ -3338,8 +2598,8 @@ sub TBSetNodeHistory($$$$$)
     # XXX Eventually this should change, but the use of $UID is funky.
     #
     my $dbid;
-    my $node = Node->Lookup($nodeid);
-    my $experiment = Experiment->Lookup($pid, $eid);
+    my $node = LocalNodeLookup($nodeid);
+    my $experiment = LocalExpLookup($pid, $eid);
     my $this_user;
 
     if (!defined($node)) {
@@ -3357,7 +2617,7 @@ sub TBSetNodeHistory($$$$$)
 	    $this_user = undef;
 	}
 	else {
-	    $this_user = User->LookupByUnixId($uid);
+	    $this_user = LocalUserLookupByUnixId($uid);
 	    if (! defined($this_user)) {
 		print "*** WARNING: $UID does not exist in the DB!";
 		return 0;
@@ -3365,7 +2625,7 @@ sub TBSetNodeHistory($$$$$)
 	}
     }
     else {
-	$this_user = User->Lookup($uid);
+	$this_user = LocalUserLookup($uid);
 	if (! defined($this_user)) {
 	    print "*** WARNING: $UID does not exist in the DB!";
 	    return 0;
@@ -3375,6 +2635,4 @@ sub TBSetNodeHistory($$$$$)
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
-
 1;
-

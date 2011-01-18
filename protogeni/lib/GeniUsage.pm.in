@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2009 University of Utah and the Flux Group.
+# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniUsage;
@@ -201,17 +201,6 @@ sub NewTicket($$)
     push(@insert_data, "owner_hrn=" . DBQuoteSpecial($owner_hrn));
     push(@insert_data, "created=now()");
 
-    if (defined($ticket->component_uuid())) {
-	my $component = $ticket->component();
-	if (!defined($component)) {
-	    print STDERR
-		"GeniUsage::AddTicket: Could not get component for $ticket\n";
-	}
-	else {
-	    push(@insert_data, "component_uuid='" . $component->uuid() . "'");
-	    push(@insert_data, "component_hrn='" . $component->hrn() . "'");
-	}
-    }
     if (defined($ticket->rspec())) {
 	my $safe_rspec = DBQuoteSpecial($ticket->rspecXML());
 

@@ -1,10 +1,9 @@
 --- Makefile.old	2009-07-08 11:51:42.000000000 -0600
 +++ Makefile	2010-04-07 09:47:42.000000000 -0600
-@@ -561,5 +561,25 @@
+@@ -563,5 +563,25 @@
      SUBDIR += ytree
      SUBDIR += zaptel
      SUBDIR += zoneinfo
-+    SUBDIR += elvind
 +    SUBDIR += emulab-boss
 +    SUBDIR += emulab-clrhouse
 +    SUBDIR += emulab-fs
@@ -12,17 +11,18 @@
 +    SUBDIR += emulab-mailman
 +    SUBDIR += emulab-ops
 +    SUBDIR += emulab-php4
++    SUBDIR += emulab-php5
 +    SUBDIR += emulab-protogeni
 +    SUBDIR += emulab-pubsub
-+    SUBDIR += emulab-pubsub-elvincompat
++    SUBDIR += emulab-py-m2crypto
 +    SUBDIR += emulab-tftp-hpa
-+    SUBDIR += libelvin
 +    SUBDIR += p5-DBD-mysql50-old
 +    SUBDIR += p5-GD-old
 +    SUBDIR += p5-IO-EventMux
 +    SUBDIR += p5-IO-EventMux-Socket-MsgHdr
 +    SUBDIR += p5-Privileges-Drop
 +    SUBDIR += p5-RPC-Async
++    SUBDIR += p5-SNMP
 +    SUBDIR += ulsshxmlrpcpp
  
  .include <bsd.port.subdir.mk>

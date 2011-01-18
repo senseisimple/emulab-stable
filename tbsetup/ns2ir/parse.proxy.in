@@ -195,9 +195,6 @@ my $exit_status = $?;
 if (($exit_status & 0xff) == SIGKILL) {
     my $msg = "Parser Exceeded CPU Limit";
 
-    SENDMAIL($TBOPS, "Parser Exceeded CPU Limit", $msg,
-	     undef, undef, ($nsfile));
-    
     print STDERR "$msg\n";
     unless($debug) {
       if (-d $tempdir) {
@@ -205,6 +202,20 @@ if (($exit_status & 0xff) == SIGKILL) {
       }
     }
     exit(15);
+}
+if ($exit_status & 0xff) {
+    # Get the mapping from signal num. to name
+    use Config;
+    my (%sig_num, @sig_name);
+    my @names = split ' ', $Config{sig_name};
+    @sig_num{@names} = split ' ', $Config{sig_num};
+    foreach (@names) {$sig_name[$sig_num{$_}] ||= $_}
+    
+    my $signal = $exit_status & 0x7f;
+    my $signame = $sig_name[$signal];
+    
+    print STDERR "Parser Died with SIG$signame.\n";
+    exit(128 + $signal);
 }
 unless($debug) {
      if (-d $tempdir) {
