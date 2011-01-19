@@ -218,10 +218,6 @@ sub Resolve($)
 	if (defined($ticket)) {
 	    $blob->{'ticket_urn'} = $ticket->urn();
 	}
-	my $manifest = $aggregate->GetManifest(1);
-	if (defined($manifest)) {
-	    $blob->{'manifest'}   = $manifest;
-	}
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "sliver") {
