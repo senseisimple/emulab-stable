@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# Copyright (c) 2004-2010 , 2011University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -96,7 +96,7 @@ sub doboot()
 {
     my @blobs;
     my $errors = 0;
-    my $need_mkextrafs = 1;
+    my $bossip;
 
     if (-e "$BOOTDIR/rc.blobs-ran") {
 	print STDOUT "  Blobs installation already done.\n";
@@ -112,22 +112,54 @@ sub doboot()
     return
 	if (! @blobs);
 
+    #
+    # Convention: blobs starting with /local/ in their install path
+    # trigger the creation of the extra filesystem.  If we do make the
+    # extrafs, put the tmpdir there as well.
+    #
+    my $tmpdir = "/var/tmp";
+    if (grep(/^\/local\//, @blobs) > 0) {
+	my $ldir = os_mountextrafs("/local");
+	if ($ldir ne "/local") {
+	    print STDOUT "  WARNING: /local is not a separate filesystem, ".
+		"hope everything fits!\n";
+	} elsif (-e "/local/tmp" || mkdir("/local/tmp", 0777)) {
+	    $tmpdir = "/local/tmp";
+	}
+    }
+
     unlink("$LOGDIR/blobs.log");
+    my $blobno = 1;
     foreach my $blob (@blobs) {
+	my ($basename, $dest, $frisbeeargs);
+
 	eval {
-	    ($mcastaddr, $portnum, undef, $basename, $dest) = 
-		$blob =~ m|^URL=frisbee.mcast://(.+?):(.+?)/(.+/)?(.+) ACTION=unpack:(\S+)|
-		or die "Bad Blobs line\n";
-
-	    # FIXME: Make sure $basename doesn't exist...
-	    my $local_path = "/var/tmp/$basename";
-	    my $frisbee_cmd = "$FRISBEE -p $portnum -m $mcastaddr $local_path".
-		              " >>$LOGDIR/blobs.log 2>&1";
-
-	    if ($dest =~ /^\/local/ && $need_mkextrafs) {
-		os_mountextrafs("/local");
-		$need_mkextrafs = 0;
+	    if ($blob =~ m|^URL=frisbee.mcast://(.+?):(.+?)/(.+/)?(.+) ACTION=unpack:(\S+)|) {
+		$basename = $4;
+		$dest = $5;
+		$frisbeeargs = "-m $1 -p $2";
 	    }
+	    elsif ($blob =~ m|^URL=frisbee://(\S+) ACTION=unpack:(\S+)|) {
+		$basename = $1;
+		$dest = $2;
+		# find the boss IP
+		if (!defined($bossip)) {
+		    $bossip = `cat $BOOTDIR/bossip`;
+		    if (!$bossip) {
+			die "Cannot determine boss address\n";
+		    }
+		    chomp($bossip);
+		}
+		$frisbeeargs = "-S $bossip -F $basename";
+	    }
+	    else {
+		die "Bad Blobs line\n";
+	    }
+
+	    my $local_path = "$tmpdir/blob$PID-$blobno";
+	    unlink($local_path);
+	    my $frisbee_cmd = "$FRISBEE $frisbeeargs $local_path".
+		              " >>$LOGDIR/blobs.log 2>&1";
 
 	    print STDOUT "  Downloading blob $basename to $local_path\n";
 
@@ -146,8 +178,7 @@ sub doboot()
 		    die "Tarinstall failed (see $LOGDIR/blobs.log)\n";
 		}
 	    }
-
-	    system("rm $local_path");
+	    unlink($local_path);
 	};
 	if ($@) {
 	    my $err = $@;
@@ -155,6 +186,7 @@ sub doboot()
 	    warning("$err on line: $blob");
 	    $errors++;
 	}
+	$blobno++;
     }
     
     if (!$errors) {

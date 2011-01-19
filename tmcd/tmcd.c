@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -3249,50 +3249,35 @@ COMMAND_PROTOTYPE(doblobs)
 	int             nrows;
 	char            buf[MYBUFSIZE];
 	char            *bufp = buf, *ebufp = &buf[sizeof(buf)];
-	char            path[255], action[255];
-	char            address[MYBUFSIZE], server_address[MYBUFSIZE];
-	int             frisbee_pid;
-
 	
-	res = mydb_query("select b.path,action,load_address,frisbee_pid from experiment_blobs as b join frisbee_blobs as f on b.path=f.path where exptidx=%d order by b.idx",
-			 4, reqp->exptidx);
+	res = mydb_query("select path,action from experiment_blobs "
+			 " where exptidx=%d order by idx",
+			 2, reqp->exptidx);
 	
 	if (!res) {
-		error("BLOBS: %d: DB Error getting blobs!\n",
-		      reqp->exptidx);
+		error("BLOBS: %s: DB Error getting blobs for %s/%s!\n",
+		      reqp->nodeid, reqp->pid, reqp->eid);
 		return 1;
 	}
 	
 	nrows = (int)mysql_num_rows(res);
-
 	if (nrows <= 0) {
-		return 1;
+		mysql_free_result(res);
+		return 0;
 	}
 
-	while (nrows) {
+	while (nrows > 0) {
 		row = mysql_fetch_row(res);
-		frisbee_pid = 0;
-		path[0] = '\0';
-		action[0] = '\0';
-		address[0] = '\0';
-		server_address[0] = '\0';
-		strcpy(address, row[2]);
+		if (row[0] == NULL || row[0][0] == '\0' ||
+		    row[1] == NULL || row[1][0] == '\0') {
+			error("BLOBS: %s: bogus path/action for %s/%s in DB\n",
+			      reqp->nodeid, reqp->pid, reqp->eid);
+			continue;
+		}
 
-		if (row[0] && row[0][0])
-			strncpy(path, row[0], 255);
-		
-		if (row[1] && row[1][0])
-			strncpy(action, row[1], 255);
-
-		if (row[2] && row[2][0])
-			strcpy(address, row[2]);
-		
-		if (row[3] && row[3][0])
-			frisbee_pid = atoi(row[3]);
-			
 		bufp += OUTPUT(bufp, ebufp - bufp,
-			       "URL=frisbee.mcast://%s%s ACTION=%s\n",
-			       address, path, action);
+			       "URL=frisbee://%s ACTION=%s\n",
+			       row[0], row[1]);
 		nrows--;
 	}
 
@@ -4110,7 +4095,6 @@ COMMAND_PROTOTYPE(doloadinfo)
 	}
 
 	if (nrows > 1 && vers <= 29) {
-	neednewmfs:
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=/NEWER-MFS-NEEDED PART=0 PARTOS=Bogus\n");
 
