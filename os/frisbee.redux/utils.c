@@ -16,7 +16,9 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/time.h>
+#if !defined(linux) && !defined(__CYGWIN__)
 #include <sys/sysctl.h>
+#endif
 #include <assert.h>
 
 #include "decls.h"
@@ -61,7 +63,7 @@ sleeptime(unsigned int usecs, char *str, int doround)
 	int nusecs;
 
 	if (clockres_us == 0) {
-#ifndef linux
+#if !defined(linux) && !defined(__CYGWIN__)
 		struct clockinfo ci;
 		size_t cisize = sizeof(ci);
 
