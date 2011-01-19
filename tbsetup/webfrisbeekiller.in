@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,6 +16,14 @@ use English;
 # Configure variables
 #
 my $TB       = "@prefix@";
+
+#
+# XXX do something a little more constructive in the future...
+#
+if (1) {
+    print "Eat flaming death frisbee!\n";
+    exit(0);
+}
 
 #
 # Run the real thing, and never return.

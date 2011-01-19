@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # For installation.
@@ -17,7 +17,7 @@ SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh \
+RC_SCRIPTS	= 2.mysql-server.sh 3.mfrisbeed.sh 3.testbed.sh \
 		  2.dhcpd.sh 1.mysql-client.sh
 SUBBOSS_SCRIPTS	= 2.dhcpd.sh
 OPS_SCRIPTS     = 3.and.sh 1.mysql-client.sh 1.mysql-server.sh

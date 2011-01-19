@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -49,8 +49,8 @@ my $PGENIUPDATE  = "$TB/sbin/protogeni/update";
 my $PGENISUPPORT = @PROTOGENI_SUPPORT@;
 my $INSTALLUPDATE= "$TB/sbin/update-install";
 my $SETSITEVAR   = "$TB/sbin/setsitevar";
+my $MFRISBEED	 = "/usr/local/etc/rc.d/3.mfrisbeed.sh";
 my $STARTUP      = "/usr/local/etc/rc.d/3.testbed.sh";
-my $FRISBEE      = "$TB/sbin/frisbeelauncher";
 my $tempfile     = "/var/tmp/update.$$";
 
 # Protos
@@ -225,8 +225,7 @@ sub Restart()
     }
     if ($stopped) {
 	print "Starting up testbed daemons.\n";
-	system("$STARTUP start");
-	if ($?) {
+	if (system("$MFRISBEED start") || system("$STARTUP start")) {
 	    print "*** Could not restart testbed daemons.\n";
 	    exit(1);
 	}
@@ -307,47 +306,12 @@ if ($stopbed) {
 	sleep(30);
     }
     print "** Testbed is quiet; stopping testbed daemons ... \n";
-    system("$STARTUP stop >/dev/null 2>&1");
-    if ($?) {
+    if (system("$STARTUP stop >/dev/null 2>&1") ||
+	system("$MFRISBEED stop >/dev/null 2>&1")) {
 	Fatal("Could not stop testbed daemons. Stopping.");
     }
     $stopped = 1;
 
-    #
-    # XXX cannot just call Image->ActiveImages as the implementation
-    # changed and thus the code would not work when upgrading from a
-    # code base with the old implementation to one with the new.
-    #
-    my $table = "images";
-    if (!emdb::DBSlotExists("images", "frisbee_pid")) {
-	$table = "frisbee_blobs";
-    }
-    my $query_result =
-      emdb::DBQueryWarn("select imageid from $table where frisbee_pid!=0");
-    my @activeimages = ();
-    if ($query_result) {
-	while (my ($imageid) = $query_result->fetchrow_array()) {
-	    my $image = Image->Lookup($imageid);
-	    if (!defined($image)) {
-		print STDERR
-		    "*** Could not find DB object for image $imageid\n";
-		next;
-	    }
-	    push(@activeimages, $image);
-	}
-    }
-    if (@activeimages > 0) {
-	print "** Stopping running frisbee processes ...\n";
-	foreach my $image (@activeimages) {
-	    my $imageid = $image->imageid();
-	    print "-> Killing frisbee for $image ...\n";
-	    system("$FRISBEE -k $imageid");
-	    if ($?) {
-		Fatal("Could not stop frisbee for $image!");
-	    }
-	}
-    }
-    
     print "** Testbed is stopped. Proceeding to update\n";
 
     #

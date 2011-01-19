@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2006, 2007 University of Utah and the Flux Group.
+# Copyright (c) 2006-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include_once("osinfo_defs.php");	# For SpitOSIDLink() below.
@@ -302,9 +302,6 @@ class Image
     function default_osid()	{ return $this->field("default_osid"); }
     function path()		{ return $this->field("path"); }
     function magic()		{ return $this->field("magic"); }
-    #function load_address()	{ return $this->field("load_address"); }
-    #function frisbee_pid()	{ return $this->field("frisbee_pid"); }
-    #function load_busy()	{ return $this->field("load_busy"); }
     function ezid()		{ return $this->field("ezid"); }
     function shared()		{ return $this->field("shared"); }
     function isglobal()		{ return $this->field("global"); }
@@ -421,8 +418,6 @@ class Image
 	$part4_osid	= $this->part4_osid();
 	$default_osid	= $this->default_osid();
 	$path		= $this->path();
-	#$loadaddr	= $this->load_address();
-	#$frisbee_pid	= $this->frisbee_pid();
 	$shared		= $this->shared();
 	$globalid	= $this->isglobal();
 	$creator	= $this->creator();
@@ -433,10 +428,6 @@ class Image
 	    $description = "&nbsp;";
 	if (!$path)
 	    $path = "&nbsp;";
-	#if (!$loadaddr)
-	#    $loadaddr = "&nbsp;";
-	#if (!$frisbee_pid)
-	#    $frisbee_pid = "&nbsp;";
 	if (!$created)
 	    $created = "N/A";
     
@@ -583,20 +574,6 @@ class Image
                 <td>UUID: </td>
                 <td class=left>$uuid</td>
               </tr>\n";
-
-	#echo "<tr>
-        #        <td>Load Address: </td>
-        #        <td class=left>\n";
-	#echo "$loadaddr";
-	#echo "  </td>
-        #      </tr>\n";
-
-	#echo "<tr>
-        #        <td>Frisbee pid: </td>
-        #        <td class=left>\n";
-	#echo "$frisbee_pid";
-	#echo "  </td>
-        #      </tr>\n";
 
 	echo "</table>\n";
     }

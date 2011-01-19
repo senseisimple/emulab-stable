@@ -13,6 +13,7 @@
  * - record the state of running frisbeeds in persistant store so that
  *   they can be restarted if we die and restart
  * - related: make sure we don't leave orphans when we die!
+ * - handle signals: INT/TERM should kill all frisbeeds and remove our pid
  */
 #include <paths.h>
 #include <sys/stat.h>
@@ -82,7 +83,7 @@ main(int argc, char **argv)
 
 	MasterServerLogInit();
 
-	log("mfrisbee daemon starting, methods=%s (debug level %d)",
+	log("mfrisbeed daemon starting, methods=%s (debug level %d)",
 	    GetMSMethods(onlymethods), debug);
 	if (fetchfromabove)
 		log("  using parent %s:%d%s, methods=%s",
@@ -113,7 +114,7 @@ main(int argc, char **argv)
 	 */
 	if (!geteuid()) {
 		if (!pidfile) {
-			sprintf(buf, "%s/mfrisbee.pid", _PATH_VARRUN);
+			sprintf(buf, "%s/mfrisbeed.pid", _PATH_VARRUN);
 			pidfile = buf;
 		}
 		fp = fopen(pidfile, "w");
