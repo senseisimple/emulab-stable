@@ -2124,7 +2124,11 @@ sub CreateDefsFile($)
 		    # Use the SelfLoader in perl 5.8 or beyond (though note
 		    # that 5.10 requires a patch that we make).
 		    #
-		    if ($FBSD_VERSION < 6) {
+		    # XXX patch only works for 5.10.1 which has SelfLoader
+		    # version 5.17.  So we cannot use the SelfLoader for
+		    # our FreeBSD 7.2 since that has perl 5.10.0.
+		    #
+		    if ($FBSD_VERSION < 6 || $FBSD_VERSION == 7.2) {
 			print OUTDEFS "SELFLOADER_DATA=\"\"\n";
 		    }
 		    last SWITCH;
