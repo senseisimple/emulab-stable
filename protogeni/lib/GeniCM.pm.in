@@ -4032,6 +4032,7 @@ sub CleanupDeadSlice($;$)
 {
     my ($slice, $purge) = @_;
     require Firewall;
+    require Lan;
 
     # Default to full purge.
     $purge = 1
@@ -4049,6 +4050,23 @@ sub CleanupDeadSlice($;$)
 	if ($?) {
 	    print STDERR "Could not tear down vlans\n";
 	    return -1;
+	}
+
+	#
+	# Remove any stale vlans.
+	#
+	my @stale;
+	if (VLan->StaleVlanList($experiment, \@stale) != 0) {
+	    print STDERR "Failed to get stale VLANs\n";
+	    return -1;
+	}
+	if (@stale) {
+	    print STDERR "Removing stale vlans @stale\n";
+	    system("$SNMPIT -f ". join(" ", map("-o $_", @stale)));
+	    if ($?) {
+		print STDERR "Failed to remove stale VLANs\n";
+		return -1;
+	    }
 	}
 
 	#
