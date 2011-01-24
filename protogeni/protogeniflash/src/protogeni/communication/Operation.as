@@ -15,20 +15,28 @@
 package protogeni.communication
 {
   import com.mattism.http.xmlrpc.ConnectionImpl;
+  import com.skinkers.air.net.GZIPLoader;
   
   import flash.events.ErrorEvent;
   import flash.events.Event;
+  import flash.events.IOErrorEvent;
   import flash.events.SecurityErrorEvent;
+  import flash.net.URLLoader;
+  import flash.net.URLRequest;
   import flash.system.Security;
   import flash.utils.Dictionary;
 
   public class Operation
   {
-    public function Operation(qualifiedMethod : Array = null, newNode:Request = null) : void
+	  public static var XMLRPC:int = 0;
+	  public static var HTTP:int = 1;
+	  
+    public function Operation(qualifiedMethod : Array = null, newNode:Request = null, newType:int = 0) : void
     {
       server = null;
 	  node = newNode;
       reset(qualifiedMethod);
+	  type = newType;
     }
 
     public function reset(qualifiedMethod : Array) : void
@@ -90,38 +98,77 @@ package protogeni.communication
 
     public function call(newSuccess : Function, newFailure : Function) : void
     {
-      try
-      {
-        if (visitedSites[url] != true)
-        {
-          visitedSites[url] = true;
-          var hostPattern : RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
-          var match : Object = hostPattern.exec(url);
-          if (match != null)
-          {
-            var host : String = match[1];
-            Security.loadPolicyFile(host + "/protogeni/crossdomain.xml");
-          }
-        }
-        success = newSuccess;
-        failure = newFailure;
-        server = new ConnectionImpl(url);
-		server.timeout = timeout;
-        server.addEventListener(Event.COMPLETE, callSuccess);
-        server.addEventListener(ErrorEvent.ERROR, callFailure);
-        server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
-        server.addParam(param, "struct");
-        server.call(method);
-      }
-      catch (e : Error)
-      {
-
-        Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on XMLRPC Call: "
-                                     + e.toString() + "\n\n", true));
-      }
+		if (visitedSites[url] != true)
+		{
+			visitedSites[url] = true;
+			var hostPattern : RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
+			var match : Object = hostPattern.exec(url);
+			if (match != null)
+			{
+				var host : String = match[1];
+				Security.loadPolicyFile(host + "/protogeni/crossdomain.xml");
+			}
+		}
+		success = newSuccess;
+		failure = newFailure;
+		
+		switch(type)
+		{
+			case XMLRPC:
+				try
+				{
+					server = new ConnectionImpl(url);
+					server.timeout = timeout;
+					server.addEventListener(Event.COMPLETE, callSuccess);
+					server.addEventListener(ErrorEvent.ERROR, callFailure);
+					server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
+					server.addParam(param, "struct");
+					server.call(method);
+				}
+				catch (e : Error)
+				{
+					Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on XMLRPC Call: "
+						+ e.toString() + "\n\n", true));
+				}
+				break;
+			case HTTP:
+				var request:URLRequest = new URLRequest(url); 
+				loader = new URLLoader(); 
+				loader.addEventListener(Event.COMPLETE, callSuccess);
+				loader.addEventListener(ErrorEvent.ERROR, callFailure);
+				loader.addEventListener(IOErrorEvent.IO_ERROR, callFailure);
+				try
+				{
+					loader.load(request);
+				}
+				catch (e : Error)
+				{
+					Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
+						+ e.toString() + "\n\n", true));
+				}
+				break;
+			default:
+				throw Error("Unknown Operation type");
+		}
+      
     }
+	
+	public function getSent() : String
+	{
+		switch(type)
+		{
+			case XMLRPC:
+				return getSendXml();
+				break;
+			case HTTP:
+				return "";
+				break;
+			default:
+				return "";
+		}
+	}
 
-    public function getSendXml() : String
+    private function getSendXml() : String
     {
 		try
 		{
@@ -136,8 +183,23 @@ package protogeni.communication
 		else
       		return x.toString();
     }
+	
+	public function getResponse() : String
+	{
+		switch(type)
+		{
+			case XMLRPC:
+				return getResponseXml();
+				break;
+			case HTTP:
+				return this.loader.data as String;
+				break;
+			default:
+				return "";
+		}
+	}
 
-    public function getResponseXml() : String
+    private function getResponseXml() : String
     {
       return String(server._response.data);
     }
@@ -146,16 +208,38 @@ package protogeni.communication
     {
 //      cleanup();
 
-      success(node, Number(server.getResponse().code),
-//              server.getResponse().value.toString(),
-//              String(server.getResponse().output),
-              server.getResponse());
+		switch(type)
+		{
+			case XMLRPC:
+				success(node, Number(server.getResponse().code),
+					//              server.getResponse().value.toString(),
+					//              String(server.getResponse().output),
+					server.getResponse());
+				break;
+			case HTTP:
+				success(node, CommunicationUtil.GENIRESPONSE_SUCCESS, loader.data);
+				break;
+			default:
+				throw Error("Success function not indicated");
+		}
+      
     }
 
     private function callFailure(event : ErrorEvent) : void
     {
 //      cleanup();
-      failure(node, event, server.getFault());
+		switch(type)
+		{
+			case XMLRPC:
+				failure(node, event, server.getFault());
+				break;
+			case HTTP:
+				failure(node, event, null);
+				break;
+			default:
+				failure(node, event, null);
+		}
+      
     }
 
     public function cleanup() : void
@@ -168,6 +252,7 @@ package protogeni.communication
                                    callFailure);
         server.cleanup();
         server = null;
+		loader = null;
       }
     }
 
@@ -175,10 +260,13 @@ package protogeni.communication
     private var method : String;
     private var url : String;
     private var param : Object;
-    private var server : ConnectionImpl;
     private var success : Function;
     private var failure : Function;
 	private var node:Request;
+	public var type:int;
+	
+	private var server : ConnectionImpl;
+	private var loader:URLLoader
 	
 	public var timeout:int = 60;
 

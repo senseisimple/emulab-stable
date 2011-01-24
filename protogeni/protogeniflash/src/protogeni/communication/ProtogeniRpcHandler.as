@@ -18,6 +18,7 @@
 	
 	import flash.events.ErrorEvent;
 	import flash.events.SecurityErrorEvent;
+	import flash.system.Security;
 	import flash.utils.ByteArray;
 	
 	import mx.collections.ArrayCollection;
@@ -47,9 +48,24 @@
 		// Run everything from the very beginning
 		public function startInitiationSequence():void
 		{
-			pushRequest(new RequestGetCredential());
-			pushRequest(new RequestGetKeys());
-			loadListAndComponentManagersAndSlices();
+			if(Main.protogeniHandler.unauthenticatedMode) {
+				
+				// Currently limited to Utah
+				var newCm:ComponentManager = new ComponentManager();
+				newCm.Url = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
+				newCm.Hrn = "utahemulab.cm";
+				newCm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
+				Main.protogeniHandler.ComponentManagers.add(newCm);
+				newCm.Status = ComponentManager.INPROGRESS;
+				pushRequest(new RequestDiscoverResourcesPublic(newCm));
+				Main.protogeniHandler.dispatchComponentManagerChanged(newCm);
+				Main.Pgmap().showAuthenticate();
+			} else {
+				pushRequest(new RequestGetCredential());
+				pushRequest(new RequestGetKeys());
+				loadListAndComponentManagersAndSlices();
+				Main.Pgmap().hideAuthenticate();
+			}
 		}
 		
 		public function loadListAndComponentManagers():void
@@ -185,7 +201,7 @@
 			var op:Operation = start.start();
 			op.call(complete, failure);
 			Main.log.setStatus(start.name, false);
-			Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSendXml(), false, LogMessage.TYPE_START));
+			Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
 				
 			Main.protogeniHandler.dispatchQueueChanged();
 			
@@ -233,8 +249,13 @@
 				failMessage += "\nFAILURE event: " + node.name + ": " + msg;
 				if(msg.search("#2048") > -1)
 					failMessage += "\nStream error, possibly due to server error";
-				else if(msg.search("#2032") > -1)
-					failMessage += "\nIO Error, possibly due to server problems or you have no SSL certificate";
+				else if(msg.search("#2032") > -1) {
+					if(Main.protogeniHandler.unauthenticatedMode)
+						failMessage += "\nIO Error, possibly due to server problems";
+					else
+						failMessage += "\nIO Error, possibly due to server problems or you have no SSL certificate";
+				}
+					
 			}
 			failMessage += "\nURL: " + node.op.getUrl();
 			Main.log.appendMessage(new LogMessage(node.op.getUrl(), "Failure", failMessage, true, LogMessage.TYPE_END));
@@ -254,7 +275,8 @@
 			
 			if(msg.search("#2048") > -1 || msg.search("#2032") > -1)
 			{
-				if(Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0)
+				if(!Main.protogeniHandler.unauthenticatedMode
+					&& (Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0))
 				{
 					Alert.show("It appears that you may have never run this program before.  In order to run correctly, you will need to follow the steps at https://www.protogeni.net/trac/protogeni/wiki/FlashClientSetup.  Would you like to visit now?", "Set up", Alert.YES | Alert.NO, Main.Pgmap(),
 						function runSetup(e:CloseEvent):void
@@ -283,10 +305,10 @@
 				if(code != CommunicationUtil.GENIRESPONSE_SUCCESS)
 				{
 					Main.log.setStatus(node.name + " done", true);
-					Main.log.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponseXml(), true, LogMessage.TYPE_END));
+					Main.log.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));
 				} else {
 					Main.log.setStatus(node.name + " done", false);
-					Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponseXml(), false, LogMessage.TYPE_END));
+					Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponse(), false, LogMessage.TYPE_END));
 				}
 				next = node.complete(code, response);
 			}

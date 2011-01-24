@@ -7,6 +7,21 @@
     preinitialize="preinit();"
 	creationComplete="init();" xmlns:display="protogeni.display.*">
 	
+	<mx:Style>
+		.infoTip {
+			color: #FFFFFF;
+			fontSize: 9;
+			fontWeight: "bold";
+			shadowColor: #000000;
+			borderColor: #CE2929;
+			borderStyle: "errorTipLeft";
+			paddingBottom: 4;
+			paddingLeft: 4;
+			paddingRight: 4;
+			paddingTop: 4;
+		}
+	</mx:Style>
+	
 	<mx:Script>
     <![CDATA[
 		import com.google.maps.LatLng;
@@ -17,12 +32,14 @@
 		import mx.controls.Alert;
 		import mx.controls.Image;
 		import mx.controls.Label;
+		import mx.controls.ToolTip;
 		import mx.core.mx_internal;
 		import mx.events.CloseEvent;
 		import mx.events.CollectionEvent;
 		import mx.events.ListEvent;
 		import mx.events.ResizeEvent;
 		import mx.managers.PopUpManager;
+		import mx.managers.ToolTipManager;
 		
 		import protogeni.ProtogeniEvent;
 		import protogeni.ProtogeniHandler;
@@ -34,6 +51,8 @@
 		import protogeni.display.SlicesWindow;
 		import protogeni.display.UserWindow;
 		import protogeni.resources.Slice;
+		
+		import spark.components.Application;
 	    
 	    //------------------------------------------
 	    // Embedded resources
@@ -50,6 +69,11 @@
 		public var user:UserWindow;
 		public var search:SearchWindow;
 		
+		private var errorTip:ToolTip;
+		
+		[Bindable]
+		public var allowAuthenticate:Boolean;
+		
 		[Bindable]
 		public var slicesMenu : ArrayCollection;
 	    
@@ -57,13 +81,29 @@
 	    	Security.allowDomain("*");
 	    	Security.allowInsecureDomain("*");
 	    }
-	    
-	    // Start out by asking the user for the CM URL
+
 	    private function init():void {
+			
 			Main.protogeniHandler = new ProtogeniHandler();
 			Main.protogeniHandler.mapHandler.map = map;
 			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
 			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
+			
+			// Default behavior (public)
+			allowAuthenticate = true;
+			Main.protogeniHandler.unauthenticatedMode = true;
+			
+			// Flash options
+			try{
+				if(Application.application.parameters.mode != null)
+				{
+					var input:String = Application.application.parameters.mode;
+					
+					allowAuthenticate = input != "publiconly";
+					Main.protogeniHandler.unauthenticatedMode = input != "authenticate";
+				}
+			} catch(all:Error) {
+			}
 			
 			console = new ConsoleWindow();
 			PopUpManager.addPopUp(console, this, false);
@@ -73,6 +113,7 @@
 			
 			cms = new ChooseComponentManagerWindow();
 			cms.openFirst();
+			cms.close();
 			
 			search = new SearchWindow();
 			search.show();
@@ -90,9 +131,10 @@
 			Security.allowDomain("localhost");	
 	    }
 		
-		private function reinit():void
+		private function reinit(authenticateUser:Boolean = false):void
 		{
 			Main.protogeniHandler = new ProtogeniHandler();
+			Main.protogeniHandler.unauthenticatedMode = !authenticateUser;
 			Main.protogeniHandler.mapHandler.map = map;
 			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
 			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
@@ -132,8 +174,44 @@
 				|| Main.protogeniHandler.CurrentUser.credential.length == 0)
 			{
 				this.userButton.source = DisplayUtil.noUserIcon;
+				this.userButton.toolTip = "Click to authenticate";
 			} else {
 				this.userButton.source = DisplayUtil.userIcon;
+				this.userButton.toolTip = "View user information"
+			}
+		}
+		
+		public function showAuthenticate():void
+		{
+			if(!allowAuthenticate)
+				return;
+			errorTip = ToolTipManager.createToolTip(
+				"Authenticate", userButton.x - userButton.width/2, userButton.y + userButton.height, "errorTipBelow") as ToolTip;
+			
+
+			// Apply the errorTip class selector.
+			errorTip.setStyle("styleName", "infoTip");
+		}
+		
+		public function hideAuthenticate():void
+		{
+			if(!allowAuthenticate)
+				return;
+			if (errorTip) {
+				ToolTipManager.destroyToolTip(errorTip);
+				errorTip = null;
+			}
+		}
+		
+		protected function loadUser():void
+		{
+			if(Main.protogeniHandler.CurrentUser == null
+				|| Main.protogeniHandler.CurrentUser.credential == null
+				|| Main.protogeniHandler.CurrentUser.credential.length == 0)
+			{
+				startover(true);
+			} else {
+				user.show();
 			}
 		}
 	    
@@ -154,13 +232,14 @@
 	    	Main.protogeniHandler.mapHandler.drawMap();
 	    }
 		
-		public function startover():void
+		public function startover(authenticateUser:Boolean = false):void
 		{
 			Main.protogeniHandler.rpcHandler.pause();
 			Main.protogeniHandler.rpcHandler.clearAll();
-			reinit();
+			reinit(authenticateUser);
 			Main.protogeniHandler.rpcHandler.startInitiationSequence();
 		}
+
     ]]>
 </mx:Script>
 
@@ -183,13 +262,13 @@
 			click="Main.log.open()" 
 			toolTip="View the console"/>
 		<mx:VRule height="14" includeInLayout="true" visible="true" />
-		<display:ImageButton id="sliceButton" includeInLayout="true" visible="true"
+		<display:ImageButton id="sliceButton" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}"
 						   source="{DisplayUtil.graphIcon}"
 						   click="slices.show()"
 						   toolTip="Work with slices"/>
-		<mx:VRule height="14"/>
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
-		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.protogeniHandler.mapHandler.drawMap()"/>
+		<mx:VRule height="14" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}" />
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}" ></mx:ComboBox>
+		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.protogeniHandler.mapHandler.drawMap()" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}" />
 		<mx:Spacer width="100%"/>
 		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
@@ -198,7 +277,8 @@
 		<mx:Label  text="{Main.protogeniHandler.CurrentUser.uid}"/>
 		<display:ImageButton id="userButton"
 							 source="{DisplayUtil.noUserIcon}"
-							 click="user.show()"
+							 click="loadUser()"
+							 visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
 							 toolTip="View user information" />
 		<display:ImageButton id="searchButton"
 							 source="{DisplayUtil.searchIcon}"

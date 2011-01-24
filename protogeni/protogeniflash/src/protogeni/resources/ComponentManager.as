@@ -126,8 +126,23 @@
 	    public function processRspec(afterCompletion : Function):void {
 			Main.log.setStatus("Parsing " + Hrn + " RSPEC", false);
 
-			var ns:String = (Rspec.namespace() as Namespace).uri;
-			Version = parseInt(ns.substring(ns.lastIndexOf('.')));
+			var ns:Namespace = Rspec.namespace();
+			
+			if (ns == null
+				|| ns.uri == "http://www.protogeni.net/resources/rspec/0.1"
+				|| ns.uri == "http://www.protogeni.net/resources/rspec/0.2")
+			{
+				Version = 1;
+			}
+			else if (ns.uri == "http://www.protogeni.net/resources/rspec/2")
+			{
+				Version = 2;
+			}
+			else
+			{
+				throw new Error("Unsupported ad rspec version: " + ns.uri);
+			}
+
 			var nodeName : QName = new QName(Rspec.namespace(), "node");
 			nodes = Rspec.elements(nodeName);
 			nodeName = new QName(Rspec.namespace(), "link");
@@ -227,14 +242,23 @@
 
 				var n:PhysicalNode = new PhysicalNode(ng);
 				n.name = p.@component_name;
-				n.urn = p.@component_uuid;
-				n.managerString = p.@component_manager_uuid;
-				n.manager = this;
+				switch(Version)
+				{
+					case 1:
+						n.urn = p.@component_uuid;
+						n.managerString = p.@component_manager_uuid;
+						break;
+					default:
+						n.urn = p.@component_id;
+						n.managerString = p.@component_manager_id;
+				}
+				
+				n.manager = Main.protogeniHandler.ComponentManagers.getByUrn(n.managerString);
 
 	        	for each(var ix:XML in p.children()) {
 	        		if(ix.localName() == "interface") {
 	        			var i:PhysicalNodeInterface = new PhysicalNodeInterface(n);
-	        			i.id = ix.@component_id;
+						i.id = ix.@component_id;
 						tempString = ix.@role;
 						i.role = PhysicalNodeInterface.RoleIntFromString(tempString);
 	        			n.interfaces.Add(i);
@@ -244,6 +268,8 @@
 	        			t.name = ix.@type_name;
 	        			t.slots = ix.@type_slots;
 	        			t.isStatic = ix.@static;
+						// isBgpMux = true?
+						// upstreamAs = value of key->upstream_as in field
 	        			n.types.addItem(t);
 	        		} else if(ix.localName() == "available") {
 						var availString:String = ix.toString();

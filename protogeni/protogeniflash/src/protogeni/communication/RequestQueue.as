@@ -178,6 +178,8 @@ package protogeni.communication
 	
 	public function remove(removeNode:RequestQueueNode):void
 	{
+		if(removeNode == null)
+			return;
 		if(head == removeNode)
 		{
 			if(nextRequest == head)

@@ -50,6 +50,9 @@
 		[Bindable]
 		public var CurrentUser:User;
 		
+		[Bindable]
+		public var unauthenticatedMode:Boolean;
+		
 		public var ComponentManagers:ComponentManagerCollection;
 
 		public function ProtogeniHandler()
@@ -59,6 +62,7 @@
 			addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, mapHandler.drawMap);
 			ComponentManagers = new ComponentManagerCollection();
 			CurrentUser = new User();
+			unauthenticatedMode = true;
 		}
 		
 		public function clearAll() : void
