@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -879,8 +879,9 @@ event_notification_get_opaque(event_handle_t handle,
 /*
  * Get the string attribute with name NAME from the event
  * notification NOTIFICATION.
- * Writes LENGTH bytes into *BUFFER and returns non-zero if the named
+ * Writes up to LENGTH bytes into *BUFFER and returns non-zero if the named
  * attribute is found, 0 otherwise.
+ * The returned value will always be null terminated.
  */
 
 int
@@ -902,6 +903,17 @@ event_notification_get_string(event_handle_t handle,
     }
 
     strncpy(buffer, v, length);
+
+    /*
+     * We never documented whether returned strings for values whose
+     * length is >= "length" are null-terminated or not.  Previously,
+     * there were not, but most of our callers never checked.  Hence,
+     * as of 1/25/11 we force null termination.
+     *
+     * Note that if someone passes a bogus length value, this will
+     * now blow up where it formerly might not have.
+     */
+    buffer[length-1] = '\0';
 
     return 1;
 }
