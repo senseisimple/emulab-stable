@@ -848,7 +848,13 @@ sub stateTransition($$) {
 		my $r = DBQueryWarn("select osid,def_boot_osid from nodes ".
 				    "where node_id='$node'");
 		my ($osid,$defosid) = $r->fetchrow();
-		if ($osid ne $defosid) {
+		if (! (defined($osid) && defined($defosid))) {
+		    info("$node: osid not defined\n")
+			if (!defined($osid));
+		    info("$node: def_boot_osid not defined\n")
+			if (!defined($defosid));
+		}
+		elsif ($osid ne $defosid) {
 		    handleCtrlEvent($node,$trig);
 		}
 		next;
