@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2004 University of Utah and the Flux Group.
@@ -91,6 +91,9 @@ if (! ($query_result = DBQueryWarn("show tables"))) {
 }
 
 while (my ($table) = $query_result->fetchrow()) {
+    next
+	if ($table eq "log");
+    
     print "Checking $table ...\n";
 
     # virt_routes is too big for this.

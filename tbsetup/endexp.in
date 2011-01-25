@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -486,6 +486,16 @@ if ($estate eq EXPTSTATE_ACTIVE) {
 
     # Commit the archive after swapout. Easier to use the script. 
     system("$archcontrol -t endexp commit $pid $eid");
+}
+
+#
+# At this point, there should not be any nodes allocated. But lets
+# make this sanity check cause it happens when administrators bypass
+# the normal order of things.
+#
+my @pnodes = $experiment->NodeList(1, 1);
+if (@pnodes) {
+    fatal("Experiment is not active, but there are nodes allocated: @pnodes\n");
 }
 
 if ($estate eq EXPTSTATE_SWAPPED ||

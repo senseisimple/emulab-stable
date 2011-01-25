@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -46,6 +46,7 @@ simple-install:	common-install script-install bin-install
 dir-install:
 	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/dhcp3
 	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/network
+	$(INSTALL) -m 755 -o root -g root -d $(SYSETCDIR)/rsyslog.d
 
 common-install:	dir-install
 	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) local-install)

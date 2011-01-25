@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007-2010 University of Utah and the Flux Group.
+# Copyright (c) 2007-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Lan;
@@ -2988,6 +2988,16 @@ sub AddMember($$)
 	if (!defined($member));
 
     return $member;
+}
+
+#
+# Return a list of members for a vlan.
+#
+sub MemberList($$)
+{
+    my ($self, $plist) = @_;
+
+    return $self->GetLan()->MemberList($plist);
 }
 
 #

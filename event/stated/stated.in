@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -45,6 +45,8 @@ use Getopt::Std;
 use English;
 use POSIX;			# for strftime, and sigprocmask and friends
 use Fcntl;			# file constants for pidfile
+use POSIX ":sys_wait_h";
+use IO::Poll qw(POLLIN);
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
@@ -67,6 +69,7 @@ my $server = "localhost";
 my $port   = @BOSSEVENTPORT@;
 my $lockfile;
 my $pidfile;
+my $eventchild;
 
 # Process command-line arguments
 
@@ -158,6 +161,8 @@ sub getTriggers();
 sub readStates(;@);
 sub handleCtrlEvent($$);
 sub reload();
+sub StartEvents();
+sub PollEvents($$);
     
 if (!$debug) {
     if ( $TB eq $REALTB ) {
@@ -200,29 +205,14 @@ if (defined($pidfile)) {
 # Change my $0 so that it is easier to see in a ps/top
 $0 = "$0";
 
-my $URL = "elvin://$server";
-if ($port) {
-    $URL .= ":$port";
+#
+# Start up the event system interface.
+#
+if (StartEvents() != 0) {
+    fatal("Error starting events");
 }
-
-# Connect to the event system, and subscribe the the events we want
-my $handle = event_register($URL,0);
-if (!$handle) {
-    fatal("Unable to register with event system\n");
-}
-
-my $tuple = address_tuple_alloc();
-if (!$tuple) {
-    fatal("Could not allocate an address tuple\n");
-}
-
-%$tuple = ( objtype => join(",",
-			    $TBNODESTATE, $TBNODEOPMODE,
-			    $TBCONTROL, $TBCOMMAND) );
-
-if (!event_subscribe($handle,\&handleEvent,$tuple)) {
-    fatal("Could not subscribe to events\n");
-}
+# We want to exit on any warning. 
+$SIG{__WARN__} = sub { print STDERR $_[0]; exit(-1); };
 
 # Read in the pre-existing node states, and timeout and valid transition
 # information from the database
@@ -295,11 +285,11 @@ sub process_event_queue() {
 	$lastcount = $event_count;
 	# Don't block if we got a signal!
 	if ($wait<=0 || $sigrestart || $sigcleanup || $do_reload) {
-	    event_poll($handle);
+	    PollEvents(0, 0);
 	} else {
 	    #debug("Using blocking event poll - $wait seconds\n");
 	    # timeout param is in milliseconds, so multiply
-	    event_poll_blocking($handle, $wait*1000);
+	    PollEvents(1, $wait*1000);
 	    $now = time();
 	    # subtract seconds elapsed from my wait time
 	    $wait = $finish - $now;
@@ -532,11 +522,7 @@ sub getTriggers() {
 # Gets called for every event that we recieve
 #
 sub handleEvent($$$) {
-    my ($handle,$notification,$data) = @_;
-    my $objtype = event_notification_get_objtype($handle,$notification);
-    my $objname = event_notification_get_objname($handle,$notification);
-    my $eventtype = event_notification_get_eventtype($handle,$notification);
-
+    my ($objtype,$objname,$eventtype) = @_;
     $event_count++;
 
     #
@@ -1658,9 +1644,6 @@ sub restart {
     $blockwait=0;
     process_event_queue;
     info("Restarting from '$prog".($params ne "" ? " $params" : "")."'\n");
-    if ($handle && event_unregister($handle) == 0) {
-	warn "Unable to unregister with event system\n";
-    }
     if (defined($lockfile) && $lockfile ne "") {
 	unlink $lockfile;
     }
@@ -1695,9 +1678,9 @@ END {
 	info("Recursive call to END block. Returning ...\n");
 	return;
     }
-    if (!defined($handle)) {
+    if (!defined($eventchild)) {
 	#
-	# No handle, nothing interesting happening. 
+	# No eventchild, nothing interesting happening. 
 	#
 	return;
     }
@@ -1714,16 +1697,151 @@ END {
 	info("Stated child exiting\n");
     }
     debug("Announced. Cleaning up...\n");
-    if ($handle) {
-	debug("Unregistering w/event system...\n");
-	if (event_unregister($handle) == 0) {
-	    info("Unable to unregister with event system\n");
-	}
-	else {
-	    debug("Unregistered.\n");
+    if ($eventchild) {
+	debug("Killing event reader child ...\n");
+	if (! kill('TERM', $eventchild)) {
+	    info("Could not kill event reader child\n");
 	}
     }
     debug("Cleaned up. Bye!\n");
     # Restore $? in case one of the things I called changed it
     $? = $stat;
+}
+
+#
+# Start up a child to talk to the event system. 
+#
+my $childpipe;
+my $eventpoll;
+
+sub StartEvents()
+{
+    my $URL = "elvin://$server";
+    if ($port) {
+	$URL .= ":$port";
+    }
+    local *PIPE;
+
+    $eventchild = open(PIPE, "-|");
+    if (!defined($eventchild)) {
+	fatal("could not fork event child");
+    }
+    if ($eventchild) {
+	#
+	# Hang out a bit, to make sure the child gets started okay.
+	#
+	sleep(2);
+	my $foo = waitpid($eventchild, &WNOHANG);
+	if ($foo) {
+	    my $status = $?;
+	
+	    fatal("Failed to start event child: $foo $status!\n");
+	}
+	if (0) {
+	    fcntl(PIPE, F_SETFL, O_NONBLOCK)
+		or fatal("cannot set event descriptor to non blocking: $!");
+	}
+	# Save the handle to read from later.
+	$childpipe = *PIPE;
+
+	$eventpoll = new IO::Poll;
+	$eventpoll->mask($childpipe => POLLIN);
+	return 0;
+    }
+
+    # Connect to the event system, and subscribe the the events we want
+    my $handle = event_register($URL,0);
+    if (!$handle) {
+	fatal("Unable to register with event system\n");
+    }
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) {
+	fatal("Could not allocate an address tuple\n");
+    }
+    %$tuple = ( objtype => join(",",
+				$TBNODESTATE, $TBNODEOPMODE,
+				$TBCONTROL, $TBCOMMAND) );
+
+    if (!event_subscribe($handle, \&StubHandleEvent, $tuple)) {
+	fatal("Could not subscribe to events\n");
+    }
+
+    # We want to exit on any warning. Let the caller notice.
+    $SIG{__WARN__} = sub { print STDERR $_[0]; exit(-1); };
+
+    #
+    # Just read events and print them to stdout. Parent gets them.
+    #
+    while (1) {
+	event_poll_blocking($handle, 5000);
+    }
+}
+
+sub StubHandleEvent($$$) {
+    my ($handle,$notification,$data) = @_;
+
+    my $objtype   = event_notification_get_objtype($handle,$notification);
+    my $objname   = event_notification_get_objname($handle,$notification);
+    my $eventtype = event_notification_get_eventtype($handle,$notification);
+
+    #
+    # Print the stuff we care about to stdout for the parent to pick up.
+    #
+    print  "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
+    if ($debug) {
+	print STDERR
+	    "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
+    }
+    return 0;
+}
+
+sub PollEvents($$)
+{
+    my ($blocking, $timeout) = @_;
+    my $pollval;
+
+    #
+    # Always check for a dead child.
+    #
+    my $foo = waitpid($eventchild, &WNOHANG);
+    if ($foo) {
+	my $status = $?;
+	
+	fatal("Event reader exited prematurely: $foo $status!\n");
+    }
+    if ($blocking) {
+	$timeout = undef
+	    if (!$timeout);
+	
+	$pollval = $eventpoll->poll($timeout);
+    }
+    else {
+	$pollval = $eventpoll->poll(0);
+    }
+    if ($pollval > 0) {
+	my $buf;
+	
+	while (sysread($childpipe, $buf, 4096)) {
+	    #
+	    # It is possible that we will get multiple lines
+	    # of output in one read. Hopefully not so much that we get
+	    # a partial line. Will need to deal with that at some
+	    # point.
+	    #
+	    my @foo = split(/^/m, $buf);
+	    foreach my $line (@foo) {
+		if ($line =~
+		    /^OBJTYPE='([^\']*)', OBJNAME='([^\']*)', EVENTTYPE='([^\']*)'$/) {
+		    handleEvent($1, $2, $3);
+		}
+		else {
+		    fatal("unrecognizable line $line from event reader");
+		}
+	    }
+	}
+    }
+    elsif ($pollval < 0) {
+	fatal("Error in nonblocking poll\n");
+    }
+    return undef;
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Perl code to access an XMLRPC server using http. Derived from the
@@ -72,9 +72,12 @@ my @GENIRESPONSE_STRINGS =
     );
 sub GENIRESPONSE_STRING($)
 {
-    my ($error) = @_;
+    my ($code) = @_;
 
-    return $GENIRESPONSE_STRINGS[$error] || "Unknown Error $error";
+    return "Unknown Error $code"
+	if ($code < 0 || $code > scalar(@GENIRESPONSE_STRINGS));
+
+    return $GENIRESPONSE_STRINGS[$code];
 }
 
 #
@@ -103,8 +106,13 @@ sub new($$;$$)
 {
     my ($class, $code, $value, $output) = @_;
 
-    $output = ""
-	if (!defined($output));
+    if (!defined($output)) {
+	$output = "";
+	# Unless its an error, then return standard error string.
+	if ($code != GENIRESPONSE_SUCCESS()) {
+	    $output = GENIRESPONSE_STRING($code);
+	}
+    }
     $value = 0
 	if (!defined($value));
 
@@ -119,8 +127,13 @@ sub Create($$;$$)
 {
     my ($class, $code, $value, $output) = @_;
 
-    $output = ""
-	if (!defined($output));
+    if (!defined($output)) {
+	$output = "";
+	# Unless its an error, then return standard error string.
+	if ($code != GENIRESPONSE_SUCCESS()) {
+	    $output = GENIRESPONSE_STRING($code);
+	}
+    }
     $value = 0
 	if (!defined($value));
 
