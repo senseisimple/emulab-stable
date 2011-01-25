@@ -1,9 +1,9 @@
 #!/bin/sh
 #
-# Fiecely bogus script to attempt to upgrade ports on an existing Emulab server
+# Fiercely bogus script to attempt to upgrade ports on an existing Emulab server
 #
-#DO=echo
-DO=
+DO=echo
+#DO=
 
 if [ -z "$1" ]; then
     echo '*** Usage: update-ports [boss|ops]'

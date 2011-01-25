@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniComponent;
@@ -146,7 +146,21 @@ sub Create($$;$)
 
     my $safe_hrn  = DBQuoteSpecial($certificate->hrn());
     my $safe_uuid = DBQuoteSpecial($certificate->uuid());
-    my $safe_url  = DBQuoteSpecial($certificate->URL());
+    my $safe_url  = "NULL";
+
+    # If there is a URL in the certificate, use that. If not, there had
+    # better be a manager supplied or else we will not be able to talk
+    # to it.
+    if (defined($certificate->URL())) {
+	$safe_url = DBQuoteSpecial($certificate->URL());
+    }
+    elsif (defined($manager)) {
+	$safe_url = DBQuoteSpecial($manager->url());
+    }
+    else {
+	print STDERR "GeniComponent::Create: No URL or authority supplied.\n";
+	return undef;
+    }
     
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
@@ -305,23 +319,20 @@ sub CreateFromRegistry($$)
 	if (defined($component) &&
 	    $component->urn() && $component->manager_uuid());
 
-    my $clearinghouse = GeniRegistry::ClearingHouse->Create();
+    my $registry = GeniRegistry->Create($token);
     return undef
-	if (!defined($clearinghouse));
+	if (!defined($registry));
 
     my $blob;
     return undef
-	if ($clearinghouse->Resolve($token, "Component", \$blob) != 0);
+	if ($registry->Resolve($token, "Component", \$blob) != 0);
+
+    # Why does PLC Resolve return an array of length one?
+    $blob = $blob->[0];
 
     my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
     return undef
 	if (!defined($certificate));
-
-    my $manager_certificate =
-	GeniCertificate->LoadFromString($blob->{'manager_gid'});
-    if (!defined($certificate)) {
-	goto bad;
-    }
 
     #
     # At this point, we do not support non-urn sites. They must re-register.
@@ -336,16 +347,48 @@ sub CreateFromRegistry($$)
     #
     # Create the manager authority as well.
     #
-    my $manager_urn = $manager_certificate->urn();
-    if (!defined($manager_urn)) {
-	print STDERR "GeniComponent::CreateFromRegistry: ".
-	    "$manager_certificate does not have a urn.\n";
-	goto bad;
+    my $manager_urn;
+    
+    if (exists($blob->{'manager_gid'})) {
+	my $manager_certificate =
+	    GeniCertificate->LoadFromString($blob->{'manager_gid'});
+	
+	if (!defined($certificate)) {
+	    goto bad;
+	}
+
+	$manager_urn = $manager_certificate->urn();
+	$manager_certificate->Delete();
+	if (!defined($manager_urn)) {
+	    print STDERR "GeniComponent::CreateFromRegistry: ".
+		"$manager_certificate does not have a urn.\n";
+	    goto bad;
+	}
     }
+    else {
+	#
+	# Only able to deal with PLC for now. The blob says that the "site"
+	# is the authority, but that is not true since we have to go all
+	# the way up to plc.sa to do anything. 
+	#
+	my ($auth,$type,$id) = GeniHRN::Parse($urn);
+	return undef
+	    if (!defined($auth));
+
+	if ($auth =~ /^plc:/) {
+	    $manager_urn = GeniHRN::Generate("plc", "authority", "sa");
+	}
+	else {
+	    print STDERR "Unsupported PLC component: $urn\n";
+	    goto bad;
+	}
+    }
+
     my $manager = GeniAuthority->CreateFromRegistry("CM", $manager_urn);
     if (!defined($manager)) {
 	print STDERR "GeniComponent::CreateFromRegistry: ".
 	    "could not create authority $manager_urn\n";
+	goto bad;
     }
     
     $component = GeniComponent->Create($certificate, $manager);
@@ -359,8 +402,6 @@ sub CreateFromRegistry($$)
   bad:
     $certificate->Delete()
 	if (defined($certificate));
-    $manager_certificate->Delete()
-	if (defined($manager_certificate));
     return undef;
 }
 
@@ -397,6 +438,23 @@ sub Resolve($)
     my $manager_version = $authority->Version();
     return undef
 	if (!defined($manager_version));
+
+    #
+    # XXX: The SFA stores all records in the central registry, not at
+    # the CM like we do. 
+    #
+    if ($authority->IsSFA()) {
+	my $registry = GeniRegistry->Create($self->urn());
+	return undef
+	    if (!defined($registry));
+
+	my $blob;
+	return undef
+	    if ($registry->Resolve($self->urn(), "Component", \$blob) != 0);
+
+	# Why does PLC resolve return an array of length one?
+	return $blob->[0];
+    }
 
     #
     # Need a credential to make this call. Seems kinda silly. 

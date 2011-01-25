@@ -49,9 +49,18 @@ bin/emulab-sync -- Sync client for synchronizing different clients
 Configuration in var-path:
 
 boot/nickname -- Contains a single line with the hostname of the
-	experimental interface on this node.
+                 experimental interface on this node.
 Example:
   node0
+
+-------------------------------------------------------------------------------
+
+boot/controlif -- Contains a single line with the control interface
+                  name. This is the interface which is not brought up
+                  or down or modified when doing unlinktest.
+
+Example:
+  eth4
 
 -------------------------------------------------------------------------------
 
@@ -117,7 +126,9 @@ L <first-node> <second-node> <link-name> <mac-address> <mpx-style> <dstyle>
 first-node, second-node -- node names of link
 link-name -- Name of link or lan. All pairs in the link/lan in every
              direction must be represented.
-mac-address -- MAC address of specified interface. Used for debugging output.
+mac-address -- MAC address of specified interface. Used for debugging
+               output and unlinktest when determining whether or not
+               to test this interface node.
 mpxstyle -- If 'veth' for virtual ethernet device, changes header size
             calculations.
 dstyle -- If ends in '-nobw', skips bandwidth test for this link. If

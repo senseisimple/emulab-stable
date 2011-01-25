@@ -299,7 +299,7 @@ sub ExpireSlices()
 	print STDERR "Expiring $slice\n";
 
 	# Needs to move.
-	GeniRegistry::ClientSliver->SliceDelete($slice);
+	GeniSlice::ClientSliver->SliceDelete($slice);
 
 	# Remove any stored credentials for this slice.
 	GeniCredential->DeleteForTarget($slice);

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003,2006,2010 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -134,11 +134,6 @@ PER_VNODE_TT		Normally, assign keeps a 'type table' indicating which
 			be mapped, and could be used to prune down the size of
 			the search space, since we can ignore nodes that are not
 			in any node's TT.
-SMART_UNMAP		When assign decides that it needs to unmap some existing
-			mapping, because there are no potential matches for a
-			vnode, causes it to intelligently unmap a pnode that
-			could be a match for the current vnode, rather than
-			picking one a random. Requires PER_VNODE_TT
 
 Scoring Options
 ---------------
@@ -172,15 +167,3 @@ PENALIZE_BANDWIDTH	Penalize based on the bandwidth of links that, for
 			but not well tested yet
 TRIVIAL_LINK_BW		Allow, in the ptop file, specification of how much
 			bandwidth can be used on the node for trivial links
-
-Bugfixes
---------
-FIX_SHARED_INTERFACES	Fix a bug in which assign was happily re-using
-			interfaces for more than one vlink, without penalty.
-			Should be the default
-PNODE_SWITCH_LOAD	When putting a pnode back into a pclass list, swith the
-			order in which it is inserted, based on its current
-			load. Should be the default
-PNODE_ALWAYS_FRONT	Always put a pnode into the front of its pclass list,
-			regardless of whether it is being used or not. Only for
-			debugging PNODE_SWITCH_LOAD - should go away

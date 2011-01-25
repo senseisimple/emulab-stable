@@ -72,6 +72,9 @@ elsif ($authority->type() eq "sa") {
 elsif ($authority->type() eq "ses") {
     # Nothing to do.
 }
+elsif ($authority->type() eq "am") {
+    # Nothing to do.
+}
 else {
     fatal("Do not know how to delete $authority");
 }

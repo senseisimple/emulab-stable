@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCM;
@@ -184,6 +184,7 @@ sub DiscoverResources($)
     my $credstr   = $argref->{'credential'};
     my $available = $argref->{'available'} || 0;
     my $compress  = $argref->{'compress'} || 0;
+    my $version   = $argref->{'rspec_version'} || undef;
 
     my $credential = CheckCredential($credstr);
     return $credential
@@ -192,10 +193,18 @@ sub DiscoverResources($)
     return DiscoverResourcesAux($available, $compress, [$credential]);
 }
 # Helper function for V2.
-sub DiscoverResourcesAux($$$)
+sub DiscoverResourcesAux($$$;$)
 {
-    my ($available, $compress, $credentials) = @_;
+    my ($available, $compress, $credentials, $version) = @_;
     my $user_urn  = $ENV{'GENIRN'};
+    $version   = "0.2"
+	if (!defined($version));
+
+    # Sanity check since this can come from client.
+    if (! ($version eq "0.1" || $version eq "0.2" ||$version eq "2.0")) {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Improper version request");
+    }
 
     # Oh, for $*%(s sake.  Frontier::RPC2 insists on representing a
     # Boolean as its own object type -- which Perl always interprets as
@@ -259,7 +268,7 @@ sub DiscoverResourcesAux($$$)
     #
     # Acquire the advertisement from ptopgen and compress it if requested.
     #
-    my $xml = GetAdvertisement($available, undef, "0.2", $experiment);
+    my $xml = GetAdvertisement($available, undef, $version, $experiment);
     if (! defined($xml)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not start avail");
@@ -699,7 +708,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 				 "Bad resource $component_id in ticket");
 		goto bad;
 	    }
-
+	    #
+	    # Is the node a virtual node? Must be an update to an
+	    # existing sliver/ticket, since we now return the node_id
+	    # of the allocated virtual node, not the physical node.
+	    #
+	    if ($node->isvirtnode()) {
+		my $pnode = Node->Lookup($node->phys_nodeid());
+		if (!defined($pnode)) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "No physical resource for $component_id");
+		    goto bad;
+		}
+		$node = $pnode;
+	    }
 	    $namemap{$node_nickname} = $node;
 	    $colomap{$colocate} = $node
 		if (defined($colocate));
@@ -887,6 +910,21 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "Bad resource $component_id");
 		goto bad;
 	    }
+	    #
+	    # Is the node a virtual node? Must be an update to an
+	    # existing sliver/ticket, since we now return the node_id
+	    # of the allocated virtual node, not the physical node.
+	    #
+	    if ($node->isvirtnode()) {
+		if (!$isupdate ||
+		    !exists($namemap{$node_nickname})) {
+		    $response =
+			GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				     "Bad resource for $node_nickname");
+		    goto bad;
+		}
+		$node = $namemap{$node_nickname};
+	    }
 	    $pctype = $node->type()
 		if (!defined($pctype));
 	}
@@ -1009,7 +1047,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 					    $linkref)->get_nodelist();
 	my %managers   = ();
 	my $ifacenum   = 1;
-	my $trivial_ok = 0;
+	my $vindex     = 0;
+	my $trivial_ok = 1;
 
 	if (!defined($lanname)) {
 	    $response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
@@ -1152,6 +1191,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 {"vname"       => $lanname,
 					  "vnode"       => $node_nickname,
 					  "vport"       => $iface_vport,
+					  "vindex"	=> $vindex,
 					  "trivial_ok"  => $trivial_ok,
 					  "ip"          => $ip,
 					  "delay"       => 0.0,
@@ -1165,6 +1205,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					  "fixed_iface" => $iface_name});
 	    $vportmap{$member}->{"virtlan"} = $virtlan;
 	    $ifacenum++;
+	    $vindex++;
 	}
 	$linknum++;
     }
@@ -1318,6 +1359,9 @@ sub GetTicketAuxAux($$$$$$$$$)
 	my $node           = GeniUtil::LookupNode($component_id);
 	my $colocate       = GeniXML::GetColocate($rspec);
 	my $subnode_of     = GeniXML::GetSubnodeOf($rspec);
+
+	# Need to do this after the mapper has run.
+	$node->Refresh();
 
 	#
 	# Regardless of whether the user asked for an exclusive node
@@ -2094,6 +2138,9 @@ sub SliverWorkAux($$$$$$$)
 	    $message = "Unknown resource_id in ticket: $resource_id";
 	    goto bad;
 	}
+	# Must do this after mapper has run
+	$node->Refresh();
+	
 	my $sliver = GeniSliver::Node->Create($slice, $owner, $node, $ref);
 	if (!defined($sliver)) {
 	    $message = "Could not create GeniSliver object for $virtual_id";
@@ -2336,6 +2383,9 @@ sub SliverWorkAux($$$$$$$)
 		    $message = "Could not find node object for $nodesliver";
 		    goto bad;
 		}
+		# Must do this after mapper has run
+		$node->Refresh();
+		
 		$vinterface =
 		    Interface::VInterface->LookupByVirtLan($experiment,
 				     $linkname, $node_id);
@@ -3332,7 +3382,7 @@ sub ListUsage($)
 
 	    my $node = {"sliver_gid"    => $sliver->cert(),
 			"sliver_hrn"    => $sliver->hrn(),
-			"sliver_urn"    => $sliver->urn() };
+			"sliver_urn"    => $sliver->sliver_urn() };
 	    
 	    my $component = GeniComponent->Lookup($sliver->resource_uuid());
 	    if (defined($component)) {
@@ -3982,6 +4032,7 @@ sub CleanupDeadSlice($;$)
 {
     my ($slice, $purge) = @_;
     require Firewall;
+    require Lan;
 
     # Default to full purge.
     $purge = 1
@@ -3999,6 +4050,23 @@ sub CleanupDeadSlice($;$)
 	if ($?) {
 	    print STDERR "Could not tear down vlans\n";
 	    return -1;
+	}
+
+	#
+	# Remove any stale vlans.
+	#
+	my @stale;
+	if (VLan->StaleVlanList($experiment, \@stale) != 0) {
+	    print STDERR "Failed to get stale VLANs\n";
+	    return -1;
+	}
+	if (@stale) {
+	    print STDERR "Removing stale vlans @stale\n";
+	    system("$SNMPIT -f ". join(" ", map("-o $_", @stale)));
+	    if ($?) {
+		print STDERR "Failed to remove stale VLANs\n";
+		return -1;
+	    }
 	}
 
 	#

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -403,8 +403,8 @@ bool populate_node(DOMElement* elt,
   // If a component manager has been specified, then the node must be 
   // managed by that CM. We implement this as a desire.
   if (hasCMId) {
-    tb_node_featuredesire node_fd (XStr(cmId.c_str()).f(), 
-				   0.9);//, false, featuredesire::FD_TYPE_NORMAL);
+    tb_node_featuredesire node_fd (XStr(cmId.c_str()).f(), 1.0,
+				   true, featuredesire::FD_TYPE_NORMAL);
     node_fd.add_desire_user(0.9);
     (v->desires).push_front(node_fd);
   }
@@ -699,7 +699,7 @@ bool populate_link (DOMElement* elt,
   virt_link->emulated = emulated;
   virt_link->allow_delayed = allow_delayed;
   virt_link->allow_trivial = allow_trivial;
-  virt_link->no_connection = false;
+  virt_link->no_connection = true;
   virt_link->delay_info.bandwidth = bandwidth;
   virt_link->delay_info.delay = latency;
   virt_link->delay_info.loss = packetLoss;

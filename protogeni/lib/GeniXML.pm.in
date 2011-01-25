@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniXML;
@@ -195,6 +195,14 @@ sub GetElementByVirtualId($$$)
     my ($name, $type, $node) = @_;
     my @list = FindNodes('n:'.$type.'[@virtual_id = "'.$name.'"]',
 			 $node)->get_nodelist();
+    if (scalar(@list) == 0) {
+	@list = FindNodes('n:'.$type.'[@nickname = "'.$name.'"]',
+			  $node)->get_nodelist();
+    }
+    if (scalar(@list) == 0) {
+	@list = FindNodes('n:'.$type.'[@client_id = "'.$name.'"]',
+			  $node)->get_nodelist();
+    }
     my $result = undef;
     if (scalar(@list) > 0)
     {
@@ -296,8 +304,8 @@ sub SetExpires($$)
 sub GetNodeId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_uuid", "component_urn", "uuid",
-			"component_id");
+    return GetFirstText($node, "component_urn", "component_id",
+			"component_uuid", "uuid");
 }
 
 sub GetVirtualId($)
@@ -328,8 +336,8 @@ sub GetSliverId($)
 sub GetManagerId($)
 {
     my ($node) = @_;
-    return GetFirstText($node, "component_manager_uuid",
-			"component_manager_urn", "component_manager_id");
+    return GetFirstText($node, "component_manager_urn",
+			"component_manager_id", "component_manager_uuid");
 }
 
 sub GetColocate($)

@@ -4669,6 +4669,7 @@ COMMAND_PROTOTYPE(dosecurestate)
         unsigned long   *nlen;
 
         int             i,j;
+	unsigned int	temp;
 
         unsigned short  wantpcrs;
         TPM_PCR         *pcrs;
@@ -4768,7 +4769,8 @@ COMMAND_PROTOTYPE(dosecurestate)
                     reqp->nodeid, nlen[0]);
         }
         for (i = 0; i < TPM_NONCE_BYTES; i++) {
-            if (sscanf(row[0] + (i*2),"%2x",&(nonce[i])) != 1) {
+            if (sscanf(row[0] + (i*2),"%2x", &temp) != 1) {
+		nonce[i] = (unsigned char)temp;
                 error("SECURESTATE: %s: Error parsing nonce\n", reqp->nodeid);
                 mysql_free_result(res);
                 // XXX: return error to client
@@ -4815,7 +4817,8 @@ COMMAND_PROTOTYPE(dosecurestate)
             pcr = atoi(row[0]);
             wantpcrs |= (1 << pcr);
             for (j = 0; j < TPM_PCR_BYTES; j++) {
-                if (sscanf(row[1] + (j*2),"%2x",&(pcrs[i][j])) != 1) {
+                if (sscanf(row[1] + (j*2),"%2x", &temp) != 1) {
+		    pcrs[i][j] = (unsigned char)temp;
                     error("SECURESTATE: %s: Error parsing PCR\n", reqp->nodeid);
                     free(pcrs);
                     mysql_free_result(res);

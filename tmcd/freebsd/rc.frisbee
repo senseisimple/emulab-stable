@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Optional flag argument says "do not reboot"
@@ -44,6 +44,7 @@ fi
 tweakmbr() {
     _DSK=$1
     _NEW=$2
+    _ALWAYS=$3
 
     dd if=/dev/$_DSK of=/dev/null bs=512 count=1 2>/dev/null || {
 	echo "WARNING: could not read from $_DSK, MBR not changed"
@@ -64,8 +65,13 @@ tweakmbr() {
 	_CUR=1000000
 	;;
     *)
-	echo "WARNING: custom MBR on $_DSK, not changed"
-	return
+        if [ $_ALWAYS -eq 1 ]; then
+	    echo "WARNING: overwriting unknown MBR on $_DSK with version $_NEW"
+	    _CUR=1000000
+	else
+	    echo "WARNING: custom MBR on $_DSK, not changed"
+	    return
+	fi
     	;;
     esac
 
@@ -301,7 +307,7 @@ loadone() {
 	#
         if [ $_NUM -eq 0 ]; then
 	    if [ "$PART" != "0" ]; then
-		tweakmbr $DISK $MBRVERS
+		tweakmbr $DISK $MBRVERS $PREPARE
 	    fi
             FIRSTMBR=$MBRVERS
         else
@@ -383,8 +389,6 @@ loadone() {
 
 	case $fstat in
 	0)
-	    echo "Resizing final disk partition"
-	    $BINDIR/growdisk -vW /dev/$DISK
 	    echo "Adjusting slice-related files"
 	    export SLICEFIX_ACPI=$ACPI
 	    export SLICEFIX_ASF=$ASF
@@ -472,8 +476,10 @@ while [ "$1"x != x ]; do
     shift
     NUM=`expr $NUM + 1`
 done
+echo "Frisbee run(s) finished"
 
-echo "Frisbee run finished"
+echo "Resizing final disk partition"
+$BINDIR/growdisk -vW /dev/$DISK
 
 #
 # If requested to reboot, do so.

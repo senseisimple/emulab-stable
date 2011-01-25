@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -404,6 +404,8 @@ sub informative_scriptname();
 # than call tblog_new_process
 #
 sub tblog_init() {
+    return if exists($ENV{'TBLOG_OFF'});
+
     # Connect to database
 
     $DB = NewTBDBHandle();
@@ -429,6 +431,7 @@ sub tblog_init() {
 # explanation.
 #
 sub tblog_new_process(@) {
+    return if exists($ENV{'TBLOG_OFF'});
     delete $ENV{TBLOG_BASE_SCRIPTNAME};
     tblog_init_process(@_);
 }
@@ -458,6 +461,8 @@ sub tblog_new_child_process() {
 sub tblog_init_process(@) {
     my ($script, @argv) = @_;
     local $DBQUERY_MAXTRIES = 3;
+
+    return if exists($ENV{'TBLOG_OFF'});
 
     # Set TBLOG_PID so that we can detect when we are a child. 
     $TBLOG_PID = $$;
@@ -540,6 +545,7 @@ See perlsub(1) for more info on "local"
 
 sub tblog_sub_process($@) {
     my $name = shift;
+    return if exists($ENV{'TBLOG_OFF'});
     tblog_init_process("$ENV{TBLOG_BASE_SCRIPTNAME}-$name",
 		       @_);
 }
@@ -553,6 +559,7 @@ be lost.
 =cut
 
 sub tblog_new_session() {
+    return if exists($ENV{'TBLOG_OFF'});
     check_env();
     delete $ENV{TBLOG_SESSION};
     $FORCED_SESSION = 1;
@@ -1673,7 +1680,6 @@ Returns the current session or undefined if it hasn't been defined yet.
 #
 # BEGIN
 #
-
 tblog_init();
 tblog_start_capture();
 

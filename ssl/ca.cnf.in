@@ -71,6 +71,7 @@ default_md	= md5			# which md to use.
 preserve	= no			# keep passed DN ordering
 unique_subject  = no
 copy_extensions = copy
+x509_extensions = v3_ca # Need this to set the version number to 3
 
 # A few difference way of specifying how similar the request should look
 # For type CA, the listed attributes must be the same, and the optional
@@ -85,6 +86,9 @@ organizationName	= match
 organizationalUnitName	= optional
 commonName		= optional
 emailAddress		= optional
+
+[ v3_ca ]
+
 
 [ usr_cert ]
 # These extensions are added when 'ca' signs a request.

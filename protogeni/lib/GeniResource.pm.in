@@ -24,6 +24,7 @@ use GeniTicket;
 use GeniCredential;
 use GeniAuthority;
 use GeniComponent;
+use GeniSlice;
 use GeniUtil;
 use GeniUser;
 use GeniHRN;
@@ -100,9 +101,7 @@ sub Lookup($$;$)
     $self->{'RSPEC'}      = undef;
     $self->{'NEWRSPEC'}   = undef;
     $self->{'MODIFIED'}   = 1;
-    $self->{'manager_version'}  = undef;
-    $self->{'manager_apilevel'} = undef;
-    $self->{'manager_api'}      = undef;
+    $self->{'_authority'} = undef;
     $self->{'last_rpc_error'}  = 0;
     $self->{'last_rpc_value'}  = undef;
     $self->{'last_rpc_output'} = undef;
@@ -240,9 +239,7 @@ sub manifest_idx($)     { return field($_[0], "manifest_idx"); }
 sub ticket_idx($)       { return field($_[0], "ticket_idx"); }
 sub newticket_idx($)    { return field($_[0], "newticket_idx"); }
 sub rspec_idx($)        { return field($_[0], "rspec_idx"); }
-sub manager_version($)  { return $_[0]->{'manager_version'}; }
-sub manager_apilevel($) { return $_[0]->{'manager_apilevel'}; }
-sub manager_api($)      { return $_[0]->{'manager_api'}; }
+sub _authority($)       { return $_[0]->{'_authority'}; }
 sub last_rpc_error($)   { return $_[0]->{'last_rpc_error'}; }
 sub last_rpc_output($)  { return $_[0]->{'last_rpc_output'}; }
 sub last_rpc_value($)   { return $_[0]->{'last_rpc_value'}; }
@@ -529,14 +526,14 @@ sub UpdateManifest($$)
 }
 
 #
-# Get Version. Ask the CM what version it is running. 
+# Get Authority.
 #
-sub ManagerVersion($)
+sub Authority($)
 {
     my ($self) = @_;
 
-    return $self->manager_version()
-	if (defined($self->manager_version()));
+    return $self->_authority()
+	if (defined($self->_authority()));
 
     my $manager_urn = $self->manager_urn();
 
@@ -566,35 +563,40 @@ sub ManagerVersion($)
 	    return undef;
 	}
     }
-    $self->{'manager_version'}  = $authority->Version();
-    $self->{'manager_apilevel'} = $authority->ApiLevel();
-    $self->{'manager_api'}      = $authority->Api();
-    return $self->{'manager_version'};
+    $self->{'_authority'} = $authority;
+    return $authority;
 }
-# Ditto the API level.
-sub ManagerApiLevel($)
+sub Version($)
+{
+    my ($self) = @_;
+    
+    return undef
+	if (!defined($self->Authority()));
+    return $self->Authority()->Version();
+}
+sub ApiLevel($)
 {
     my ($self) = @_;
 
-    return $self->manager_apilevel()
-	if (defined($self->manager_apilevel()));
-
     return undef
-	if (!defined($self->ManagerVersion()));
-
-    return $self->manager_apilevel();
+	if (!defined($self->Authority()));
+    return $self->Authority()->ApiLevel();
 }
-sub ManagerApi($)
+sub Api($)
 {
     my ($self) = @_;
 
-    return $self->manager_api()
-	if (defined($self->manager_api()));
+    return undef
+	if (!defined($self->Authority()));
+    return $self->Authority()->Api();
+}
+sub IsSFA($)
+{
+    my ($self) = @_;
 
     return undef
-	if (!defined($self->ManagerVersion()));
-
-    return $self->manager_api();
+	if (!defined($self->Authority()));
+    return $self->Authority()->IsSFA();
 }
 
 #
@@ -642,8 +644,8 @@ sub GetTicket($$$$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Create a Geni user from current user doing the operation.
@@ -817,9 +819,9 @@ sub RedeemTicket($$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
-    my $manager_apilevel= $self->ManagerApiLevel();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
+    my $manager_apilevel= $self->ApiLevel();
 
     #
     # Create a Geni user from current user doing the operation.
@@ -1078,8 +1080,8 @@ sub CreateSliver($$$$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Create a Geni user from current user doing the operation.
@@ -1251,8 +1253,8 @@ sub GetManifest($$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Create a Geni user from current user doing the operation.
@@ -1410,8 +1412,8 @@ sub ReleaseTicket($$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Create a Geni user from current user doing the operation.
@@ -1544,8 +1546,8 @@ sub Clear($$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Create a Geni user from current user doing the operation.
@@ -1689,7 +1691,7 @@ sub Clear($$)
     # Needs to move elsewhere I think.
     #
     my $clientsliver =
-	GeniRegistry::ClientSliver->LookupByAuthority($slice,
+	GeniSlice::ClientSliver->LookupByAuthority($slice,
 						      $manager_urn);
     $clientsliver->Delete()
 	if (defined($clientsliver));
@@ -1742,8 +1744,8 @@ sub Purge($$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Create a Geni user from current user doing the operation.
@@ -1853,7 +1855,7 @@ sub Purge($$)
     # Needs to move elsewhere I think.
     #
     my $clientsliver =
-	GeniRegistry::ClientSliver->LookupByAuthority($slice,
+	GeniSlice::ClientSliver->LookupByAuthority($slice,
 						      $manager_urn);
     $clientsliver->Delete()
 	if (defined($clientsliver));
@@ -1900,8 +1902,8 @@ sub SliverAction($$$@)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Not supported by the AM interface.
@@ -2028,8 +2030,8 @@ sub SliverStatus($$$)
 	print STDERR "*** Could not find $manager_urn at ClearingHouse\n";
 	return -1;
     }
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     #
     # Load sliver credential if we have it.
@@ -2164,8 +2166,8 @@ sub Discover($$$)
 	return -1;
     }
     my $manager_urn     = $self->manager_urn();
-    my $manager_version = $self->ManagerVersion();
-    my $manager_api     = $self->ManagerApi();
+    my $manager_version = $self->Version();
+    my $manager_api     = $self->Api();
 
     my $authority = GeniAuthority->CreateFromRegistry("cm", $manager_urn);
     if (!defined($authority)) {
@@ -2368,8 +2370,8 @@ sub RenewResources(@)
 	    print STDERR "RenewAll: Could not locate $manager_urn\n";
 	    next;
 	}
-	my $manager_version = $resource->ManagerVersion();
-	my $manager_api     = $resource->ManagerApi();
+	my $manager_version = $resource->Version();
+	my $manager_api     = $resource->Api();
 
 	#
 	# Generate a slice credential.
@@ -2438,6 +2440,19 @@ sub RenewResources(@)
 	}
     }
     return 0;
+}
+
+#
+# Create a local proxy node for a resource (node).
+#
+sub CreateProxyNode($$)
+{
+    my ($self, $urn) = @_;
+
+    #
+    #
+    #
+    return undef;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

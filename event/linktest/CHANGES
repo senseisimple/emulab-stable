@@ -84,4 +84,8 @@ Other changes:
   "kilobits" to be 1024 bits, not 1000 bits as we were assuming.  So we now
   specify bandwidth in raw bits rather than kilobits.
 
+* Added support for standalone mode (see ROADMAP.standalone)
+
+* Added initial attempt at unlinktest as level 5.
+
 

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009-2010 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -69,6 +69,9 @@ if (defined($options{"d"})) {
 if (defined($options{"n"})) {
     $impotent = 1;
 }
+
+# Set this to turn off tblog in libraries.
+$ENV{'TBLOG_OFF'} = "yep";
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
@@ -274,6 +277,7 @@ while (1) {
 
 	$reload_args{'debug'}     = $debug;
 	$reload_args{'waitmode'}  = 2; # XXX Wait till reboot after reload.
+	$reload_args{'prepare'}   = 1; # XXX Clear out old disk metadata.
 	$reload_args{'nodelist'}  = [ @nodenames ];
 	logit("Running osload on @nodenames", 0);
 	my $failures = osload(\%reload_args, \%reload_results);

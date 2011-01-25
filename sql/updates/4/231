@@ -1,0 +1,35 @@
+#
+# Make stated's MINIMAL mode a little more capable for reloading.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    DBQueryFatal("REPLACE INTO mode_transitions VALUES " . 
+		 "('MINIMAL','SHUTDOWN','RELOAD-PUSH','SHUTDOWN','ReloadStart')");
+    DBQueryFatal("REPLACE INTO mode_transitions VALUES " . 
+		 "('RELOAD-PUSH','SHUTDOWN','MINIMAL','SHUTDOWN','ReloadDone')");
+
+    DBQueryFatal("REPLACE INTO state_transitions VALUES " . 
+		 "('RELOAD-PUSH','BOOTING','BOOTING','BootRetry')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES " . 
+		 "('RELOAD-PUSH','RELOADDONE','SHUTDOWN','ReloadDone')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES " . 
+		 "('RELOAD-PUSH','RELOADING','RELOADDONE','ReloadDone')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES " . 
+		 "('RELOAD-PUSH','RELOADSETUP','RELOADING','ReloadStart')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES " . 
+		 "('RELOAD-PUSH','SHUTDOWN','BOOTING','Booting')");
+    DBQueryFatal("REPLACE INTO state_transitions VALUES " . 
+		 "('RELOAD-PUSH','SHUTDOWN','RELOADSETUP','ReloadSetup')");
+
+    DBQueryFatal("REPLACE INTO state_triggers VALUES " . 
+		 "('*','RELOAD-PUSH','RELOADDONE','RELOADDONE')");
+
+    return 0;
+}
+1;
+

@@ -330,6 +330,7 @@ class EmulabServer:
         self.instances["node"]       = node(self);
         self.instances["elabinelab"] = elabinelab(self);
         self.instances["subboss"] = subboss(self);
+        self.instances["blob"]       = blob(self);
         return
 
     def __getattr__(self, name):
@@ -5795,6 +5796,44 @@ class template:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
     pass
+
+#
+# This class implements the server side of the XMLRPC interface to blobs.
+#
+class blob:
+    ##
+    # Initialize the object.
+    #
+    def __init__(self, server):
+        self.server   = server
+        self.readonly = server.readonly
+        self.uid      = server.uid
+        self.uid_idx  = server.uid_idx
+        self.debug    = server.debug
+        self.VERSION  = VERSION
+        return
+
+    def mkblob( self, version, argdict ):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        
+        argerror = CheckRequiredArgs(argdict, ("filename",))
+        if (argerror):
+            return argerror
+
+        (exitval, output) = runcommand( TBDIR + "/bin/mkblob " + argdict[ "filename" ] )
+
+        if exitval:
+            return EmulabResponse( RESPONSE_ERROR, exitval >> 8, output=output )
+        else:
+            return EmulabResponse( RESPONSE_SUCCESS, value=0, output=output )
 
 #
 # Utility functions
