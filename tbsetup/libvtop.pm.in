@@ -6972,7 +6972,7 @@ sub UploadVlans($)
 		my $args = {};
 		$args->{'current_speed'} = $current_speed
 		    if (defined($current_speed));
-		$args->{'trunk_mode'} = $trunk_mode
+		$args->{'trunk'} = 1
 		    if (defined($trunk_mode));
 		$interface->Update($args) == 0
 		    or return -1;
