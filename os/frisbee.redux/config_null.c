@@ -208,6 +208,17 @@ null_get_server_address(struct config_imageinfo *ii, int methods, int first,
 	}
 
 	if (methods & CONFIG_IMAGE_MCAST) {
+		/*
+		 * XXX avoid addresses that "flood".
+		 * 224.0.0.x and 224.128.0.x are defined to flood,
+		 * but because of the way IP multicast addresses map
+		 * onto ethernet addresses (only the low 23 bits are used)
+		 * ANY MC address (224-239) with those bits will also flood.
+		 * So avoid those.
+		 */
+		if (c == 0 && (b == 0 || b == 128))
+			c++;
+
 		*methp = CONFIG_IMAGE_MCAST;
 		*addrp = (a << 24) | (b << 16) | (c << 8) | d;
 	} else if (methods & CONFIG_IMAGE_UCAST) {
