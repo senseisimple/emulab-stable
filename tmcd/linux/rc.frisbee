@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Optional flag argument says "do not reboot"
@@ -50,6 +50,7 @@ tweakmbr()
 {
 	local disk=$1
 	local new_mbr_ver=$2
+	local always=$3
 	local cur_mbr_ver=''
 
 	if ! dd if=$disk of=/dev/null bs=512 count=1 2>/dev/null; then
@@ -72,9 +73,13 @@ tweakmbr()
 			echo "Found no MBR on $disk, installing version $new_mbr_ver"
 			;;
 		*)
-			echo "WARNING: custom MBR on $disk, not changed"
-			return 0
-			;;
+			if [ $always -eq 1 ]; then
+			    echo "WARNING: overwriting unknown MBR on $disk with version $new_mbr_ver"
+			else
+			    echo "WARNING: custom MBR on $disk, not changed"
+			    return 0
+			fi
+    			;;
 	esac
 
 	if [ "$cur_mbr_ver" = $new_mbr_ver ]; then
@@ -296,7 +301,7 @@ handle_loadinfo()
 	# and replace if not.
 	if [ -z "$FIRSTMBR" ]; then
 		if [ "$PARTITION" != "0" ]; then
-		    tweakmbr /dev/$DISK $MBR
+		    tweakmbr /dev/$DISK $MBR $PREPARE
 		    echo "Resizing final disk partition"
 		    growdisk -vW /dev/$DISK
 		fi
