@@ -980,20 +980,18 @@ sub Start($$$)
 	    print STDERR "$NAMEDSETUP failed\n";
 	    return -1;
 	}
-	if ($restart) {
-	    my @diff = ();
-	    my @same = ();
+	my @diff = ();
+	my @same = ();
 	    
-	    if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same)) {
-		print STDERR "CompareVlansWithSwitches failed!\n";
+	if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same)) {
+	    print STDERR "CompareVlansWithSwitches failed!\n";
+	    return -1;
+	}
+	if (@diff) {
+	    system("$SNMPIT -f ". join(" ", map("-o $_", @diff)));
+	    if ($?) {
+		print STDERR "Failed to remove obsolete VLANs.\n";
 		return -1;
-	    }
-	    if (@diff) {
-		system("$SNMPIT -f ". join(" ", map("-o $_", @diff)));
-		if ($?) {
-		    print STDERR "Failed to remove obsolete VLANs.\n";
-		    return -1;
-		}
 	    }
 	}
 	system("$SNMPIT -q -t $pid $eid");
