@@ -6946,11 +6946,9 @@ sub UploadVlans($)
 	    my $lanname;
 	    $lan->GetAttribute("link/lan", \$lanname);
 	    my $virtlan = $self->vlans()->{$lanname};
-	    if (!defined($virtlan)) {
-		tberror("Could not find link/lan $lanname in lan list!\n");
-		return -1;
+	    if (defined($virtlan)) {
+		$lan->SetAttribute("failureaction", $virtlan->failureaction());
 	    }
-	    $lan->SetAttribute("failureaction", $virtlan->failureaction());
 	    
 	    my @members;
 	    if ($lan->MemberList(\@members) != 0) {
@@ -6974,7 +6972,7 @@ sub UploadVlans($)
 		my $args = {};
 		$args->{'current_speed'} = $current_speed
 		    if (defined($current_speed));
-		$args->{'trunk_mode'} = $trunk_mode
+		$args->{'trunk'} = 1
 		    if (defined($trunk_mode));
 		$interface->Update($args) == 0
 		    or return -1;

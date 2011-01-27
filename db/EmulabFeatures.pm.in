@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2009-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package EmulabFeatures;
@@ -285,7 +285,8 @@ sub FeatureEnabled($$$$)
 {
     my ($class, $featurename, $user, $group, $experiment) = @_;
 
-    print STDERR "Checking for feature $featurename.\n";
+    print STDERR "Checking for feature $featurename.\n"
+	if ($verbose);
 
     #
     # See if feature is globally disabled;

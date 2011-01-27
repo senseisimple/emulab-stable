@@ -17,6 +17,7 @@ use lib '@prefix@/lib';
 my $TESTMODE   = @TESTMODE@;
 my $ELABINELAB = @ELABINELAB@;
 my $NOSTACKMIB = @NOSTACKMIB@;
+my $MAINSITE   = @TBMAINSITE@;
 my $TB = '@prefix@';
 
 use libdb;
@@ -25,6 +26,7 @@ use Experiment;
 use snmpit_lib;
 use snmpit_remote;
 use libtblog;
+use EmulabFeatures;
 
 use English;
 use Getopt::Long;
@@ -171,12 +173,13 @@ END
     return 1;
 }
 
+my @SAVEARGV = @ARGV;
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt,
     'a','c','d','e','b','B=s@','g','h','i=s@','l+','m=s@','M','n', 'A',
     'N=s@','o=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
-    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'vlan_tag=i', 
+    'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'Z', 'vlan_tag=i', 
     'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
     'redirect-err');
 # Unused: f,j
@@ -430,6 +433,44 @@ if ($opt{u}) {
     }
 }
 
+#
+# If this is an operation on an experiment, make sure that they have permission
+# to modify that experiment
+#
+if ($pid && $eid) {
+    #
+    # First, make sure the experiment exists
+    #
+    $experiment = Experiment->Lookup($pid,$eid);
+    if (!defined($experiment)) {
+	die "There is no experiment $eid in project $pid\n";
+    }
+    if (defined($this_user) &&
+	!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
+	die "You do not have permission to modify experiment $pid/$eid\n";
+    }
+}
+#
+# See if we use the alternate version of snmpit from Rob.
+#
+if ($MAINSITE && $TB eq "/usr/testbed" && !$opt{Z}) {
+    my $group = (defined($experiment) ? $experiment->GetGroup() : undef);
+    $EmulabFeatures::verbose = 0;
+    my $newsnmpit =
+        (EmulabFeatures->FeatureEnabled("RobSnmpit",
+					$this_user, $group, $experiment));
+    if ($newsnmpit) {
+	# Rob, change this path:
+	my $newpath = "$TB/bin/snmpit";
+	print STDERR "Invoking alternate snmpit from $newpath\n";
+	
+        unshift(@SAVEARGV, "-Z");
+	exec $newpath, @SAVEARGV;
+	die("*** $0:\n".
+	    "    Could not exec $newpath: $!");
+    }
+}
+
 if (!@commands) {
     tbreport(SEV_ERROR, 'no_operation');
     die "No operation given\n";
@@ -514,24 +555,6 @@ if ($opt{y}) {
 # Determine which devices to talk to, and make the appropriate
 # stack objects
 ######################################################################
-
-#
-# If this is an operation on an experiment, make sure that they have permission
-# to modify that experiment
-#
-if ($pid && $eid) {
-    #
-    # First, make sure the experiment exists
-    #
-    $experiment = Experiment->Lookup($pid,$eid);
-    if (!defined($experiment)) {
-	die "There is no experiment $eid in project $pid\n";
-    }
-    if (defined($this_user) &&
-	!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
-	die "You do not have permission to modify experiment $pid/$eid\n";
-    }
-}
 
 #
 # If their operation involves a set of ports, make sure that the caller has
