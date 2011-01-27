@@ -17,6 +17,7 @@ use lib '@prefix@/lib';
 my $TESTMODE   = @TESTMODE@;
 my $ELABINELAB = @ELABINELAB@;
 my $NOSTACKMIB = @NOSTACKMIB@;
+my $MAINSITE   = @TBMAINSITE@;
 my $TB = '@prefix@';
 
 use libdb;
@@ -449,7 +450,7 @@ if ($pid && $eid) {
 #
 # See if we use the alternate version of snmpit from Rob.
 #
-if (! $opt{Z}) {
+if ($MAINSITE && $TB eq "/usr/testbed" && !$opt{Z}) {
     my $group = (defined($experiment) ? $experiment->GetGroup() : undef);
     $EmulabFeatures::verbose = 0;
     my $newsnmpit =
