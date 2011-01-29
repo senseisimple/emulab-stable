@@ -14,7 +14,9 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.AggregateManager;
 	import protogeni.resources.ComponentManager;
+	import protogeni.resources.GeniManager;
 
   public class RequestListComponents extends Request
   {
@@ -39,17 +41,39 @@ package protogeni.communication
 		{
 			for each(var obj:Object in response.value)
 			{
-				var newCm:ComponentManager = new ComponentManager();
-				newCm.Hrn = obj.hrn;
-				newCm.Url = obj.url;
-				newCm.Urn = obj.urn;
-				Main.protogeniHandler.ComponentManagers.add(newCm);
+				var newGm:GeniManager = null;
+				var ts:String = obj.url.substr(0, obj.url.length-3);
+				/*switch(ts)
+				{
+					case "https://www.emulab.net/protogeni/xmlrpc":
+					//case "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc":
+					//case "https://pg-boss.cis.fiu.edu/protogeni/xmlrpc":
+					//case "https://www.uky.emulab.net/protogeni/xmlrpc":
+					//case "https://www.pgeni.gpolab.bbn.com/protogeni/xmlrpc":
+						var newAm:AggregateManager = new AggregateManager();
+						newAm.Url = ts;
+						newAm.Hrn = "utahemulab.cm";
+						newAm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
+						Main.protogeniHandler.GeniManagers.add(newAm);
+						newGm = newAm;
+						break;
+					default:*/
+						var newCm:ComponentManager = new ComponentManager();
+						newCm.Hrn = obj.hrn;
+						newCm.Url = ts;
+						newCm.Urn = obj.urn;
+						Main.protogeniHandler.GeniManagers.add(newCm);
+						newGm = newCm;
+				//}
 				if(startDiscoverResources)
 				{
-					newCm.Status = ComponentManager.INPROGRESS;
-					newCalls.push(new RequestDiscoverResources(newCm));
+					newGm.Status = GeniManager.INPROGRESS;
+					if(newGm is AggregateManager)
+						newCalls.push(new RequestGetVersion(newGm as AggregateManager));
+					else if(newGm is ComponentManager)
+						newCalls.push(new RequestDiscoverResources(newGm as ComponentManager));
 				}
-				Main.protogeniHandler.dispatchComponentManagerChanged(newCm);
+				Main.protogeniHandler.dispatchGeniManagerChanged(newGm);
 			}
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());

@@ -21,11 +21,11 @@ package protogeni.communication
   {
     public function RequestSliverResolve(s:Sliver) : void
     {
-		super("SliverResolve", "Resolving sliver on " + s.componentManager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.resolveResource, true);
+		super("SliverResolve", "Resolving sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.resolveResource, true);
 		sliver = s;
 		op.addField("urn", sliver.urn);
 		op.addField("credentials", new Array(sliver.credential));
-		op.setExactUrl(sliver.componentManager.Url);
+		op.setUrl(sliver.manager.Url);
     }
 
 	override public function complete(code : Number, response : Object) : *

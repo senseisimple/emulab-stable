@@ -25,14 +25,14 @@ package protogeni.communication
   {
     public function RequestSliverCreate(s:Sliver) : void
     {
-		super("SliverCreate", "Creating sliver on " + s.componentManager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
+		super("SliverCreate", "Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
 		sliver = s;
 		s.created = false;
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("rspec", sliver.getRequestRspec().toXMLString());
 		op.addField("keys", sliver.slice.creator.keys);
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setExactUrl(sliver.componentManager.Url);
+		op.setUrl(sliver.manager.Url);
 		op.timeout = 360;
     }
 	

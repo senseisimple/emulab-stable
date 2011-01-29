@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow xmlns="protogeniflash.*" xmlns:mx="http://www.adobe.com/2006/mxml"
 	width="570" height="150"
-	title="Component Manager Information"
+	title="GENI Manager Information"
 	close="PopUpManager.removePopUp(this)" xmlns:display="protogeni.display.*">
 	
 	<mx:Script>
@@ -22,34 +22,35 @@
 			import mx.managers.PopUpManager;
 			
 			import protogeni.resources.ComponentManager;
+			import protogeni.resources.GeniManager;
 			
 			public var main:protogeniflash;
 
 			[Bindable]
-			private var cm:ComponentManager = null;
+			private var gm:GeniManager = null;
 			
-			public function load(n:ComponentManager):void {
-				cm = n;
-				messageButton.visible = cm.errorDescription.length > 0;
-				messageButton.includeInLayout = cm.errorDescription.length > 0;
-				rpsecButton.visible = cm.Rspec != null;
-				rpsecButton.includeInLayout = cm.Rspec != null;
-				graphInfoButton.visible = cm.Rspec != null;
-				graphInfoButton.includeInLayout = cm.Rspec != null;
-				nodesButton.label = cm.AllNodes.length.toString();
-				availabilityLabel.text = cm.availableNodes + " / " + cm.percentageAvailable.toFixed() + "% Available";
+			public function load(n:GeniManager):void {
+				gm = n;
+				messageButton.visible = gm.errorDescription.length > 0;
+				messageButton.includeInLayout = gm.errorDescription.length > 0;
+				rpsecButton.visible = gm.Rspec != null;
+				rpsecButton.includeInLayout = gm.Rspec != null;
+				graphInfoButton.visible = gm.Rspec != null;
+				graphInfoButton.includeInLayout = gm.Rspec != null;
+				nodesButton.label = gm.AllNodes.length.toString();
+				availabilityLabel.text = gm.availableNodes + " / " + gm.percentageAvailable.toFixed() + "% Available";
 			}
 			
 			public function viewRspec():void {
 				var rspecWindow:XmlWindow = new XmlWindow;
 				PopUpManager.addPopUp(rspecWindow, Main.Pgmap(), false);
 				PopUpManager.centerPopUp(rspecWindow);
-				rspecWindow.title = "Advertisement RSPEC from " + cm.Hrn;
-				rspecWindow.loadXml(cm.Rspec);
+				rspecWindow.title = "Advertisement RSPEC from " + gm.Hrn;
+				rspecWindow.loadXml(gm.Rspec);
 			}
 			
 			public function viewMessage():void {
-				Alert.show(cm.errorDescription);
+				Alert.show(gm.errorDescription);
 			}
 			
 			public function openGraphInfo():void
@@ -57,7 +58,7 @@
 				var cw:DefaultWindow = new DefaultWindow();
 				PopUpManager.addPopUp(cw, main, false);
 				PopUpManager.centerPopUp(cw);
-				cw.title = "Graph information for " + cm.Hrn;
+				cw.title = "Graph information for " + gm.Hrn;
 				var tabContainer:TabNavigator = new TabNavigator();
 				tabContainer.percentHeight = 100;
 				tabContainer.percentWidth = 100;
@@ -68,7 +69,7 @@
 				var textd:TextArea = new TextArea();
 				textd.percentHeight = 100;
 				textd.percentWidth = 100;
-				textd.text = cm.getDotGraph();
+				textd.text = gm.getDotGraph();
 				dotTab.addChild(textd);
 				tabContainer.addChild(dotTab);
 				
@@ -78,7 +79,7 @@
 				var textgd:TextArea = new TextArea();
 				textgd.percentHeight = 100;
 				textgd.percentWidth = 100;
-				textgd.text = cm.getDotGroupedGraph();
+				textgd.text = gm.getDotGroupedGraph();
 				dotGroupedTab.addChild(textgd);
 				tabContainer.addChild(dotGroupedTab);
 				
@@ -88,7 +89,7 @@
 				var textgg:TextArea = new TextArea();
 				textgg.percentHeight = 100;
 				textgg.percentWidth = 100;
-				textgg.text = cm.getGroupedGraphML()
+				textgg.text = gm.getGroupedGraphML()
 				groupedgraphmlTab.addChild(textgg);
 				tabContainer.addChild(groupedgraphmlTab);
 				
@@ -99,7 +100,7 @@
 				var textg:TextArea = new TextArea();
 				textg.percentHeight = 100;
 				textg.percentWidth = 100;
-				textg.text = cm.getGraphML();
+				textg.text = gm.getGraphML();
 				graphmlTab.addChild(textg);
 				tabContainer.addChild(graphmlTab);
 				*/
@@ -110,7 +111,7 @@
 			public function viewConsole():void
 			{
 				Main.log.open();
-				Main.log.openGroup(cm.Url);
+				Main.log.openGroup(gm.Url);
 			}
 		]]>
 	</mx:Script>
@@ -120,7 +121,7 @@
 				
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{cm.Hrn}" fontSize="17" fontWeight="bold" width="100%" selectable="true"/>
+				<mx:Label text="{gm.Hrn}" fontSize="17" fontWeight="bold" width="100%" selectable="true"/>
 				<display:ImageButton id="consoleButton"
 									 source="@Embed('../images/application_xp_terminal.png')"
 									 click="viewConsole()"
@@ -144,8 +145,8 @@
 				<mx:Label text="URL" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Button label="{cm.Url}" toolTip="Click to visit URL"
-						   click="navigateToURL(new URLRequest(cm.VisitUrl()), '_blank');"/>
+				<mx:Button label="{gm.Url}" toolTip="Click to visit URL"
+						   click="navigateToURL(new URLRequest(gm.VisitUrl()), '_blank');"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
@@ -153,7 +154,7 @@
 				<mx:Label text="URN" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{cm.Urn}" selectable="true"/>
+				<mx:Label text="{gm.Urn}" selectable="true"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
@@ -161,7 +162,7 @@
 				<mx:Label text="Nodes" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Button id="nodesButton" click="DisplayUtil.viewNodeCollection(cm.AllNodes);"/>
+				<mx:Button id="nodesButton" click="DisplayUtil.viewNodeCollection(gm.AllNodes);"/>
 				<mx:Label id="availabilityLabel" />
 			</mx:GridItem>
 		</mx:GridRow>

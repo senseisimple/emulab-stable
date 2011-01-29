@@ -28,7 +28,8 @@
 	import protogeni.display.DisplayUtil;
 	import protogeni.display.ProtogeniMapHandler;
 	import protogeni.resources.ComponentManager;
-	import protogeni.resources.ComponentManagerCollection;
+	import protogeni.resources.GeniManager;
+	import protogeni.resources.GeniManagerCollection;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.Slice;
@@ -53,37 +54,37 @@
 		[Bindable]
 		public var unauthenticatedMode:Boolean;
 		
-		public var ComponentManagers:ComponentManagerCollection;
+		public var GeniManagers:GeniManagerCollection;
 
 		public function ProtogeniHandler()
 		{
 			rpcHandler = new ProtogeniRpcHandler();
 			mapHandler = new ProtogeniMapHandler();
-			addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, mapHandler.drawMap);
-			ComponentManagers = new ComponentManagerCollection();
+			addEventListener(ProtogeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
+			GeniManagers = new GeniManagerCollection();
 			CurrentUser = new User();
 			unauthenticatedMode = true;
 		}
 		
 		public function clearAll() : void
 		{
-			ComponentManagers = new ComponentManagerCollection();
+			GeniManagers = new GeniManagerCollection();
 		}
 		
 		public function search(s:String, matchAll:Boolean):Array
 		{
 			var searchFrom:Array = s.split(' ');
 			var results:Array = new Array();
-			for each(var cm:ComponentManager in this.ComponentManagers)
+			for each(var gm:GeniManager in this.GeniManagers)
 			{
-				if(Util.findInAny(searchFrom, new Array(cm.Urn, cm.Hrn, cm.Url), matchAll))
-					results.push(DisplayUtil.getComponentManagerButton(cm));
-				for each(var pn:PhysicalNode in cm.AllNodes)
+				if(Util.findInAny(searchFrom, new Array(gm.Urn, gm.Hrn, gm.Url), matchAll))
+					results.push(DisplayUtil.getGeniManagerButton(gm));
+				for each(var pn:PhysicalNode in gm.AllNodes)
 				{
 					if(Util.findInAny(searchFrom, new Array(pn.urn, pn.name), matchAll))
 						results.push(DisplayUtil.getPhysicalNodeButton(pn));
 				}
-				for each(var pl:PhysicalLink in cm.AllLinks)
+				for each(var pl:PhysicalLink in gm.AllLinks)
 				{
 					//if(pl.urn == s)
 					//	results.push(DisplayUtil.getLinkButton((pn));
@@ -118,12 +119,12 @@
 		}
 		
 		// EVENTS
-		public function dispatchComponentManagerChanged(cm:ComponentManager):void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.COMPONENTMANAGER_CHANGED, cm));
+		public function dispatchGeniManagerChanged(gm:GeniManager):void {
+			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.GENIMANAGER_CHANGED, gm));
 		}
 		
-		public function dispatchComponentManagersChanged():void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.COMPONENTMANAGERS_CHANGED));
+		public function dispatchGeniManagersChanged():void {
+			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.GENIMANAGERS_CHANGED));
 		}
 		
 		public function dispatchQueueChanged():void {

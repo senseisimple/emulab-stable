@@ -54,6 +54,7 @@
 			import protogeni.ProtogeniEvent;
 			import protogeni.ProtogeniHandler;
 			import protogeni.resources.ComponentManager;
+			import protogeni.resources.GeniManager;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
@@ -75,7 +76,7 @@
 			
 			public function init():void
 			{
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, cmChanged);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.GENIMANAGER_CHANGED, cmChanged);
 				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, sliceChanged);
 			}
 			
@@ -195,12 +196,12 @@
 				
 				cms = new Array();
 				cmsSrc = new Array();
-				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+				for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers)
 				{
-					if(cm.Status == ComponentManager.VALID)
+					if(gm.Status == GeniManager.VALID)
 					{
-						cmsSrc.push(cm);
-						cms.push(cm.Hrn);
+						cmsSrc.push(gm);
+						cms.push(gm.Hrn);
 					}
 				}
 					
@@ -267,7 +268,7 @@
 					var tab:VBox = new VBox();
 					tab.percentHeight = 100;
 					tab.percentWidth = 100;
-					tab.label = s.componentManager.Hrn;
+					tab.label = s.manager.Hrn;
 					var reviewRspecText:TextArea = new TextArea();
 					reviewRspecText.percentHeight = 100;
 					reviewRspecText.percentWidth = 100;
@@ -294,7 +295,7 @@
 					var tab:VBox = new VBox();
 					tab.percentHeight = 100;
 					tab.percentWidth = 100;
-					tab.label = s.componentManager.Hrn;
+					tab.label = s.manager.Hrn;
 					var previewRspecText:TextArea = new TextArea();
 					previewRspecText.percentHeight = 100;
 					previewRspecText.percentWidth = 100;

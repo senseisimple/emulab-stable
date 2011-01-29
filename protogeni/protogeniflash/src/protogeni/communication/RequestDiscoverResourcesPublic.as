@@ -24,6 +24,7 @@ package protogeni.communication
   
   import protogeni.Util;
   import protogeni.resources.ComponentManager;
+  import protogeni.resources.GeniManager;
 
   public class RequestDiscoverResourcesPublic extends Request
   {
@@ -45,9 +46,9 @@ package protogeni.communication
 		}
 		else
 		{
-			cm.Status = ComponentManager.FAILED;
+			cm.Status = GeniManager.FAILED;
 			this.removeImmediately = true;
-			Main.protogeniHandler.dispatchComponentManagerChanged(cm);
+			Main.protogeniHandler.dispatchGeniManagerChanged(cm);
 		}
 		
 		return null;
@@ -55,20 +56,20 @@ package protogeni.communication
 	
 	override public function cancel():void
 	{
-		cm.Status = ComponentManager.UNKOWN;
-		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
+		cm.Status = GeniManager.UNKOWN;
+		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 	}
 	
 	override public function cleanup():void
 	{
 		running = false;
-		if(cm.Status == ComponentManager.INPROGRESS)
-			cm.Status = ComponentManager.FAILED;
+		if(cm.Status == GeniManager.INPROGRESS)
+			cm.Status = GeniManager.FAILED;
 		Main.protogeniHandler.rpcHandler.remove(this, false);
-		Main.protogeniHandler.dispatchComponentManagerChanged(cm);
+		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
-		if(cm.Status == ComponentManager.VALID)
+		if(cm.Status == GeniManager.VALID)
 			Main.log.setStatus("Parsing " + cm.Hrn + " RSPEC Done",false);
 		Main.protogeniHandler.rpcHandler.start();
 	}

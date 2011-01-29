@@ -68,9 +68,10 @@ package protogeni.communication
 	  }
 	  
     private static var sa : String = "sa";
-    private static var cm : String = null;
+    private static var cm : String = "cm";
     private static var ses : String = "ses";
     private static var ch : String = "ch";
+	private static var am : String = "am";
 
 //    public static var defaultAuthority : String = "myelab.testbed.emulab.net";
     public static var defaultAuthority : String = "emulab.net";
@@ -90,6 +91,14 @@ package protogeni.communication
 
     public static var discoverResources : Array = new Array(cm, "DiscoverResources");
 	public static var resolveResource : Array = new Array(cm, "Resolve");
+	// AM
+	public static var getVersionAm : Array = new Array(am, "GetVersion");
+	public static var listResourcesAm : Array = new Array(am, "ListResources");
+	public static var deleteSliverAm : Array = new Array(am, "DeleteSliver");
+	public static var createSliverAm : Array = new Array(am, "CreateSliver");
+	public static var sliverStatusAm : Array = new Array(am, "SliverStatus");
+	public static var renewSliverAm : Array = new Array(am, "RenewSliver");
+	public static var shutdownAm : Array = new Array(am, "Shutdown");
 	// Ticket
     public static var getTicket : Array = new Array(cm, "GetTicket");
     public static var updateTicket : Array = new Array(cm, "UpdateTicket");

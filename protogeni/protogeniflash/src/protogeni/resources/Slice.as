@@ -97,7 +97,7 @@
 			{
 				for each(var n:VirtualNode in s.nodes)
 				{
-					if(n.manager == s.componentManager)
+					if(n.manager == s.manager)
 						nodes.addItem(n);
 				}
 					
@@ -157,24 +157,24 @@
 			return null;
 		}
 		
-		public function hasSliverFor(cm:ComponentManager):Boolean
+		public function hasSliverFor(gm:GeniManager):Boolean
 		{
 			for each(var s:Sliver in slivers)
 			{
-				if(s.componentManager == cm)
+				if(s.manager == gm)
 					return true;
 			}
 			return false;
 		}
 		
-		public function getOrCreateSliverFor(cm:ComponentManager):Sliver
+		public function getOrCreateSliverFor(gm:GeniManager):Sliver
 		{
 			for each(var s:Sliver in slivers)
 			{
-				if(s.componentManager == cm)
+				if(s.manager == gm)
 					return s;
 			}
-			var newSliver:Sliver = new Sliver(this, cm);
+			var newSliver:Sliver = new Sliver(this, gm);
 			slivers.addItem(newSliver);
 			return newSliver;
 		}
@@ -196,7 +196,7 @@
 				var newSliver:Sliver = new Sliver(newSlice);
 				newSliver.created = sliver.created;
 				newSliver.credential = sliver.credential;
-				newSliver.componentManager = sliver.componentManager;
+				newSliver.manager = sliver.manager;
 				newSliver.rspec = sliver.rspec;
 				newSliver.urn = sliver.urn;
 				newSliver.ticket = sliver.ticket;
@@ -214,13 +214,13 @@
 			// Build up the slivers with nodes
 			for each(sliver in this.slivers)
 			{
-				newSliver = newSlice.slivers.getByCm(sliver.componentManager);
+				newSliver = newSlice.slivers.getByGm(sliver.manager);
 				
 				// Build up nodes
 				var retrace:Array = new Array();
 				for each(var node:VirtualNode in sliver.nodes)
 				{
-					if(node.manager != sliver.componentManager)
+					if(node.manager != sliver.manager)
 						continue;
 					var newNode:VirtualNode = new VirtualNode(newSliver);
 					newNode.id = node.id;
@@ -246,7 +246,7 @@
 					newNode.status = node.status;
 					for each(var nodeSliver:Sliver in node.slivers)
 					{
-						newNode.slivers.addIfNotExisting(newSlice.slivers.getByCm(nodeSliver.componentManager));
+						newNode.slivers.addIfNotExisting(newSlice.slivers.getByGm(nodeSliver.manager));
 						if(nodeSliver != sliver)
 							newSlice.slivers.getByUrn(nodeSliver.urn).nodes.addItem(newNode);
 					}
@@ -288,7 +288,7 @@
 			// Build up the links
 			for each(sliver in this.slivers)
 			{
-				newSliver = newSlice.slivers.getByCm(sliver.componentManager);
+				newSliver = newSlice.slivers.getByGm(sliver.manager);
 				
 				for each(var link:VirtualLink in sliver.links)
 				{

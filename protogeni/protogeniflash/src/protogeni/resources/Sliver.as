@@ -38,7 +38,7 @@
 		public var created:Boolean = false;
 	    
 		public var credential : Object = null;
-		public var componentManager : ComponentManager = null;
+		public var manager:GeniManager = null;
 		public var rspec : XML = null;
 		public var urn : String = null;
 		
@@ -55,10 +55,10 @@
 		
 		public var validUntil:Date;
 		
-		public function Sliver(owner : Slice, manager:ComponentManager = null)
+		public function Sliver(owner : Slice, newManager:GeniManager = null)
 		{
 			slice = owner;
-			componentManager = manager;
+			manager = newManager;
 		}
 		
 		public function reset():void
@@ -74,7 +74,7 @@
 			var on:VirtualNodeCollection = new VirtualNodeCollection();
 			for each(var vn:VirtualNode in this.nodes)
 			{
-				if(vn.manager == this.componentManager)
+				if(vn.manager == this.manager)
 					on.addItem(vn);
 			}
 			return on;
@@ -85,7 +85,7 @@
 			var on:VirtualNodeCollection = new VirtualNodeCollection();
 			for each(var vn:VirtualNode in this.nodes)
 			{
-				if(vn.manager != this.componentManager)
+				if(vn.manager != this.manager)
 					on.addItem(vn);
 			}
 			return on;
@@ -139,13 +139,13 @@
       		
       		for each(var nodeXml:XML in nodesXml)
       		{
-				var cmNode:PhysicalNode = componentManager.Nodes.GetByUrn(nodeXml.@component_urn);
+				var cmNode:PhysicalNode = manager.Nodes.GetByUrn(nodeXml.@component_urn);
 				if(cmNode != null)
 				{
 					var virtualNode:VirtualNode = new VirtualNode(this);
-					virtualNode.setToPhysicalNode(componentManager.Nodes.GetByUrn(nodeXml.@component_urn));
+					virtualNode.setToPhysicalNode(manager.Nodes.GetByUrn(nodeXml.@component_urn));
 					virtualNode.id = nodeXml.@virtual_id;
-					virtualNode.manager = Main.protogeniHandler.ComponentManagers.getByUrn(nodeXml.@component_manager_urn);
+					virtualNode.manager = Main.protogeniHandler.GeniManagers.getByUrn(nodeXml.@component_manager_urn);
 					if(nodeXml.@sliver_urn != null)
 						virtualNode.urn = nodeXml.@sliver_urn;
 					if(nodeXml.@sliver_uuid != null)

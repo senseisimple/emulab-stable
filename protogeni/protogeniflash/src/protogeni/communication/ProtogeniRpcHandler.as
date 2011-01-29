@@ -30,6 +30,7 @@
 	import protogeni.communication.Operation;
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.ComponentManager;
+	import protogeni.resources.GeniManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.SliverCollection;
@@ -55,10 +56,10 @@
 				newCm.Url = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
 				newCm.Hrn = "utahemulab.cm";
 				newCm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
-				Main.protogeniHandler.ComponentManagers.add(newCm);
-				newCm.Status = ComponentManager.INPROGRESS;
+				Main.protogeniHandler.GeniManagers.add(newCm);
+				newCm.Status = GeniManager.INPROGRESS;
 				pushRequest(new RequestDiscoverResourcesPublic(newCm));
-				Main.protogeniHandler.dispatchComponentManagerChanged(newCm);
+				Main.protogeniHandler.dispatchGeniManagerChanged(newCm);
 				Main.Pgmap().showAuthenticate();
 			} else {
 				pushRequest(new RequestGetCredential());
@@ -80,7 +81,7 @@
 		
 		public function loadComponentManagers():void
 		{
-			for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+			for each(var cm:ComponentManager in Main.protogeniHandler.GeniManagers)
 			{
 				pushRequest(new RequestDiscoverResources(cm));
 			}
@@ -105,12 +106,12 @@
 				var updateSlivers:SliverCollection = slice.slivers.clone();
 				for each(var s:Sliver in old.slivers)
 				{
-					if(slice.slivers.getByCm(s.componentManager) == null)
+					if(slice.slivers.getByGm(s.manager) == null)
 						deleteSlivers.addItem(s);
 				}
 				for each(s in slice.slivers)
 				{
-					if(old.slivers.getByCm(s.componentManager) == null)
+					if(old.slivers.getByGm(s.manager) == null)
 					{
 						newSlivers.addItem(s);
 						updateSlivers.removeItemAt(updateSlivers.getItemIndex(s));
@@ -258,7 +259,7 @@
 					
 			}
 			failMessage += "\nURL: " + node.op.getUrl();
-			Main.log.appendMessage(new LogMessage(node.op.getUrl(), "Failure", failMessage, true, LogMessage.TYPE_END));
+			Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, failMessage, true, LogMessage.TYPE_END));
 			Main.log.setStatus(node.name + " failed!", true);
 			if(!node.continueOnError)
 			{
@@ -302,7 +303,7 @@
 			try
 			{
 				// Output completed
-				if(code != CommunicationUtil.GENIRESPONSE_SUCCESS)
+				if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !node.ignoreReturnCode)
 				{
 					Main.log.setStatus(node.name + " done", true);
 					Main.log.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));

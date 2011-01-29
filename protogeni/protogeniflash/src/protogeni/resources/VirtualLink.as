@@ -147,7 +147,7 @@
 		{
 			if(interfaces.length > 0)
 			{
-				var basicManager:ComponentManager = (interfaces[0] as VirtualInterface).virtualNode.manager;
+				var basicManager:GeniManager = (interfaces[0] as VirtualInterface).virtualNode.manager;
 				for each(var i:VirtualInterface in interfaces)
 				{
 					if(i.virtualNode.manager != basicManager)

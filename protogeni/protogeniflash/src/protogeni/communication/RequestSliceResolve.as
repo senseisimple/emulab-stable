@@ -56,7 +56,7 @@ package protogeni.communication
 				slice.urn = response.value.urn;
 				for each(var sliverCm:String in response.value.component_managers) {
 					var newSliver:Sliver = new Sliver(slice);
-					newSliver.componentManager = Main.protogeniHandler.ComponentManagers.getByUrn(sliverCm);
+					newSliver.manager = Main.protogeniHandler.GeniManagers.getByUrn(sliverCm);
 					slice.slivers.addItem(newSliver);
 				}
 				

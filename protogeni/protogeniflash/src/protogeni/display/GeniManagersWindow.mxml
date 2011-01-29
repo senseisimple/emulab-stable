@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
-	title="Component Managers"
+	title="GENI Managers"
 	width="270" height="360"
 	defaultButton="{okButton}"
 	resize="cmVbox.height = this.height - 108"
@@ -55,6 +55,7 @@
 			import protogeni.ProtogeniHandler;
 			import protogeni.Util;
 			import protogeni.resources.ComponentManager;
+			import protogeni.resources.GeniManager;
 
 			public function success():void {
 				okButton.enabled = false;
@@ -68,10 +69,10 @@
 			
 			public function init():void
 			{
-				okButton.enabled = Main.protogeniHandler.ComponentManagers.length > 0;
+				okButton.enabled = Main.protogeniHandler.GeniManagers.length > 0;
 				refreshList();
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, Reset);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, refreshList);	
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.GENIMANAGER_CHANGED, Reset);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.GENIMANAGERS_CHANGED, refreshList);	
 			}
 			
 			public function refreshList(junk:* = null):void {
@@ -82,18 +83,18 @@
 				{
 					var found:Boolean = false;
 					var checkboxCm:CheckBox = (cmVbox.getChildAt(i) as HBox).getChildAt(0) as CheckBox;
-					for each(var testCm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+					for each(var testGm:GeniManager in Main.protogeniHandler.GeniManagers)
 					{
-						if(checkboxCm.label == testCm.Hrn)
+						if(checkboxCm.label == testGm.Hrn)
 						{
 							found = true;
-							if(testCm.Rspec == null && checkboxCm.selected)
+							if(testGm.Rspec == null && checkboxCm.selected)
 							{
 								okButton.enabled = true;
-								testCm.Show = true;
+								testGm.Show = true;
 							}
-							if(!existingCms.contains(testCm))
-								existingCms.addItem(testCm);
+							if(!existingCms.contains(testGm))
+								existingCms.addItem(testGm);
 							break;
 						}
 					}
@@ -104,10 +105,10 @@
 					}
 				}
 				
-				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers )
+				for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers )
 				{
-					if(!existingCms.contains(cm))
-						addCm(cm);
+					if(!existingCms.contains(gm))
+						addGm(gm);
 				}
 			}
 			
@@ -126,13 +127,13 @@
 			
 			public function Reset(e:ProtogeniEvent):void
 			{
-				var cm:ComponentManager = e.changedObject as ComponentManager;
+				var gm:GeniManager = e.changedObject as GeniManager;
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
 					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-					if(cm.Hrn == cmCheckbox.label)
+					if(gm.Hrn == cmCheckbox.label)
 					{
-						updateCmHbox(cmHbox, cm);
+						updateCmHbox(cmHbox, gm);
 						break;
 					}
 				}
@@ -143,11 +144,11 @@
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
 					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-					for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers )
+					for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers )
 					{
-						if(cm.Hrn == cmCheckbox.label)
+						if(gm.Hrn == cmCheckbox.label)
 						{
-							updateCmHbox(cmHbox, cm);
+							updateCmHbox(cmHbox, gm);
 							break;
 						}
 					}
@@ -165,7 +166,7 @@
 				}
 			}
 			
-			public function updateCmHbox(cmHbox:HBox, cm:ComponentManager):void
+			public function updateCmHbox(cmHbox:HBox, gm:GeniManager):void
 			{
 				var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
 				var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
@@ -173,33 +174,33 @@
 				if(cmHbox.numChildren == 3)
 					cmGoto = cmHbox.getChildAt(2) as ImageButton;
 				
-				if(cm.Status == ComponentManager.FAILED) {
+				if(gm.Status == GeniManager.FAILED) {
 					cmCheckbox.styleName = "failedStyle";
 					cmInfo.source = DisplayUtil.flagRedIcon;
-					cmHbox.toolTip = cm.errorDescription;
-					if(cmGoto == null && cm.mightNeedSecurityException())
+					cmHbox.toolTip = gm.errorDescription;
+					if(cmGoto == null && gm.mightNeedSecurityException())
 					{
 						cmGoto = new ImageButton();
 						cmGoto.source = DisplayUtil.exclamationIcon;
 						cmGoto.toolTip = "Click to open CM URL, it appears that you might need to add a security exception";
 						cmGoto.addEventListener(MouseEvent.CLICK,
-							function openCm():void {
-								navigateToURL(new URLRequest(cm.VisitUrl()), "_blank");
+							function openGm():void {
+								navigateToURL(new URLRequest(gm.VisitUrl()), "_blank");
 							});
 						cmHbox.addChild(cmGoto);
 					}
 				}
-				else if(cm.Status == ComponentManager.UNKOWN) {
+				else if(gm.Status == GeniManager.UNKOWN) {
 					cmCheckbox.styleName = "unknownStyle";
 					cmInfo.source = DisplayUtil.flagOrangeIcon;
 					cmHbox.toolTip = "Unknown status";
 				}
-				else if(cm.Status == ComponentManager.INPROGRESS) {
+				else if(gm.Status == GeniManager.INPROGRESS) {
 					cmCheckbox.styleName = "inprogressStyle";
 					cmInfo.source = DisplayUtil.flagOrangeIcon;
 					cmHbox.toolTip = "In progress...";
 				}
-				else if(cm.Status == ComponentManager.VALID)
+				else if(gm.Status == GeniManager.VALID)
 				{
 					cmCheckbox.styleName = "validStyle";
 					cmInfo.source = DisplayUtil.flagGreenIcon;
@@ -216,35 +217,35 @@
 					cmCheckbox.selected = true;
 					//cmCheckbox.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false, false));
 				}
-				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
-					cm.Show = true;
+				for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers)
+					gm.Show = true;
 				okButton.enabled = cmVbox.getChildren().length > 0;
 			}
 			
-			public function addCm(cm:ComponentManager):void
+			public function addGm(gm:GeniManager):void
 			{
 				var cmHbox:HBox = new HBox();
 				cmHbox.percentWidth = 100;
 				var cmCheckbox:CheckBox = new CheckBox();
-				cmCheckbox.selected = cm.Show;
-				cmCheckbox.label = cm.Hrn;
+				cmCheckbox.selected = gm.Show;
+				cmCheckbox.label = gm.Hrn;
 				cmHbox.addChild(cmCheckbox);
 				
 				var cmInfo:ImageButton = new ImageButton();
 				cmHbox.addChild(cmInfo);
 				
-				updateCmHbox(cmHbox, cm);
+				updateCmHbox(cmHbox, gm);
 				cmCheckbox.addEventListener(MouseEvent.CLICK,
 					function allowApply():void {
 						okButton.enabled = true;
-						cm.Show = cmCheckbox.selected;
+						gm.Show = cmCheckbox.selected;
 						if(!cmCheckbox.selected)
 							selectAllCheckBox.selected = false;
 					});
 				
 				cmInfo.addEventListener(MouseEvent.CLICK,
 					function openCm():void {
-						DisplayUtil.viewComponentManager(cm);
+						DisplayUtil.viewGeniManager(gm);
 					});
 				cmVbox.addChild(cmHbox);
 				updateWidth();

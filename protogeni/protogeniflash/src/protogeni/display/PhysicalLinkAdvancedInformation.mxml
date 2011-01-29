@@ -23,7 +23,7 @@
 				link = l;
 				txtBandwidth.text = Util.kbsToString(l.bandwidth);
 				managerGridItem.removeAllChildren();
-				managerGridItem.addChild(DisplayUtil.getComponentManagerButton(link.manager));
+				managerGridItem.addChild(DisplayUtil.getGeniManagerButton(link.manager));
 				interface1Button.setStyle("icon",DisplayUtil.assignAvailabilityIcon(l.interface1.owner));
 				interface2Button.setStyle("icon",DisplayUtil.assignAvailabilityIcon(l.interface2.owner));
 			}

@@ -14,7 +14,7 @@
 			fontWeight: "bold";
 			shadowColor: #000000;
 			borderColor: #CE2929;
-			borderStyle: "errorTipLeft";
+			borderStyle: "errorTipBelow";
 			paddingBottom: 4;
 			paddingLeft: 4;
 			paddingRight: 4;
@@ -24,6 +24,7 @@
 	
 	<mx:Script>
     <![CDATA[
+
 		import com.google.maps.LatLng;
 		import com.google.maps.MapOptions;
 		import com.google.maps.MapType;
@@ -33,6 +34,7 @@
 		import mx.controls.Image;
 		import mx.controls.Label;
 		import mx.controls.ToolTip;
+		import mx.core.FlexGlobals;
 		import mx.core.mx_internal;
 		import mx.events.CloseEvent;
 		import mx.events.CollectionEvent;
@@ -44,15 +46,13 @@
 		import protogeni.ProtogeniEvent;
 		import protogeni.ProtogeniHandler;
 		import protogeni.Util;
-		import protogeni.display.ChooseComponentManagerWindow;
+		import protogeni.display.GeniManagersWindow;
 		import protogeni.display.ConsoleWindow;
 		import protogeni.display.DisplayUtil;
 		import protogeni.display.SearchWindow;
 		import protogeni.display.SlicesWindow;
 		import protogeni.display.UserWindow;
 		import protogeni.resources.Slice;
-		
-		import spark.components.Application;
 	    
 	    //------------------------------------------
 	    // Embedded resources
@@ -63,7 +63,7 @@
         private var arrowIn:Class;
         
         public var console:ConsoleWindow;
-		public var cms:ChooseComponentManagerWindow;
+		public var cms:GeniManagersWindow;
         public var about:AboutWindow = new AboutWindow();
 		public var slices:SlicesWindow;
 		public var user:UserWindow;
@@ -95,9 +95,9 @@
 			
 			// Flash options
 			try{
-				if(Application.application.parameters.mode != null)
+				if(FlexGlobals.topLevelApplication.parameters.mode != null)
 				{
-					var input:String = Application.application.parameters.mode;
+					var input:String = FlexGlobals.topLevelApplication.parameters.mode;
 					
 					allowAuthenticate = input != "publiconly";
 					Main.protogeniHandler.unauthenticatedMode = input != "authenticate";
@@ -111,7 +111,7 @@
 			PopUpManager.removePopUp(console);
 			Main.log = console;
 			
-			cms = new ChooseComponentManagerWindow();
+			cms = new GeniManagersWindow();
 			cms.openFirst();
 			cms.close();
 			
@@ -256,11 +256,11 @@
 		<display:ImageButton id="cmButton"
 			source="@Embed('../images/building.png')"
 			click="cms.show()"
-			toolTip="Manage component managers"/>
+			toolTip="GENI managers"/>
 		<display:ImageButton id="consoleButton"
 			source="@Embed('../images/application_xp_terminal.png')"
 			click="Main.log.open()" 
-			toolTip="View the console"/>
+			toolTip="Console"/>
 		<mx:VRule height="14" includeInLayout="true" visible="true" />
 		<display:ImageButton id="sliceButton" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}"
 						   source="{DisplayUtil.graphIcon}"

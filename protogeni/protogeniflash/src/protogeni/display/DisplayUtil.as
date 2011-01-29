@@ -31,6 +31,7 @@
 	
 	import protogeni.communication.Request;
 	import protogeni.resources.ComponentManager;
+	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
 	import protogeni.resources.PhysicalNode;
@@ -223,8 +224,8 @@
         }
         
         // Get's the CM icon
-        public static function assignIconForComponentManager(val:ComponentManager):Class {
-			if(val.Status == ComponentManager.VALID)
+        public static function assignIconForGeniManager(val:GeniManager):Class {
+			if(val.Status == GeniManager.VALID)
 				return availableIcon;
 			else
 				return crossIcon;
@@ -286,14 +287,14 @@
 		}
 		
 		// Gets a button for the component manager
-		public static function getComponentManagerButton(cm:ComponentManager):Button {
+		public static function getGeniManagerButton(gm:GeniManager):Button {
 			var cmButton:Button = new Button();
-			cmButton.label = cm.Hrn;
-			cmButton.toolTip = cm.Hrn + " at " + cm.Url;
-			cmButton.setStyle("icon", DisplayUtil.assignIconForComponentManager(cm));
+			cmButton.label = gm.Hrn;
+			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
+			cmButton.setStyle("icon", DisplayUtil.assignIconForGeniManager(gm));
 			cmButton.addEventListener(MouseEvent.CLICK,
-				function openComponentManager(event:MouseEvent):void {
-					viewComponentManager(cm);
+				function openGeniManager(event:MouseEvent):void {
+					viewGeniManager(gm);
 				}
 			);
 			return cmButton;
@@ -393,12 +394,12 @@
 		}
 		
 		// Opens a component manager in a window
-		public static function viewComponentManager(cm:ComponentManager):void {
-			var cmWindow:ComponentManagerAdvancedWindow = new ComponentManagerAdvancedWindow();
+		public static function viewGeniManager(gm:GeniManager):void {
+			var cmWindow:GeniManagerAdvancedWindow = new GeniManagerAdvancedWindow();
 	    	cmWindow.main = Main.Pgmap();
 	    	PopUpManager.addPopUp(cmWindow, Main.Pgmap(), false);
        		PopUpManager.centerPopUp(cmWindow);
-       		cmWindow.load(cm);
+       		cmWindow.load(gm);
 		}
 		
 		// Opens a physical node in a window

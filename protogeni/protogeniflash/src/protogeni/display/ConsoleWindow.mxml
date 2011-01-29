@@ -51,7 +51,7 @@
 			import protogeni.communication.Request;
 			import protogeni.communication.RequestQueue;
 			import protogeni.communication.RequestQueueNode;
-			import protogeni.resources.ComponentManager;
+			import protogeni.resources.GeniManager;
 			
 			public var selectedIndex:int;
 			private var logList:Array;
@@ -64,7 +64,7 @@
 			{
 				clear();
 				Main.protogeniHandler.addEventListener(ProtogeniEvent.QUEUE_CHANGED, resetQueueView);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, loadComponentManagers);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.GENIMANAGERS_CHANGED, loadGeniManagers);
 			}
 			
 			public function setStatus(s:String, isError:Boolean):void
@@ -129,15 +129,15 @@
 					queue.removeAllChildren();
 			}
 			
-			public function loadComponentManagers(junk:* = null):void
+			public function loadGeniManagers(junk:* = null):void
 			{
 				groups = new Array("", CommunicationUtil.sesUrl, CommunicationUtil.chUrl);
 				groupNames = new Array("All", "Slice Embedding Service", "Clearing House");
 				
-				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+				for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers)
 				{
-					groups.push(cm.Url);
-					groupNames.push(cm.Hrn);
+					groups.push(gm.Url);
+					groupNames.push(gm.Hrn);
 				}
 				this.validateNow();
 			}

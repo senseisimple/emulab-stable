@@ -131,7 +131,7 @@
 				var managerLabel:Label = new Label();
 				managerLabel.text = "Hosted on";
 				managerHbox.addChild(managerLabel);
-				managerHbox.addChild(DisplayUtil.getComponentManagerButton(node.manager));
+				managerHbox.addChild(DisplayUtil.getGeniManagerButton(node.manager));
 				hierarchyVbox.addChild(managerHbox);
 				
 				// Parent node info

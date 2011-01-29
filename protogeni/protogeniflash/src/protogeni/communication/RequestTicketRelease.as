@@ -25,7 +25,7 @@ package protogeni.communication
 		op.addField("slice_urn", sliver.slice.urn);
 		op.addField("ticket", sliver.ticket);
 		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setExactUrl(sliver.componentManager.Url);
+		op.setUrl(sliver.componentManager.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *

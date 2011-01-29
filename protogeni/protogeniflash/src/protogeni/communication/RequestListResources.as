@@ -23,25 +23,30 @@ package protogeni.communication
   import mx.utils.Base64Decoder;
   
   import protogeni.Util;
+  import protogeni.resources.AggregateManager;
   import protogeni.resources.ComponentManager;
   import protogeni.resources.GeniManager;
 
-  public class RequestDiscoverResources extends Request
+  public class RequestListResources extends Request
   {
 	  
-    public function RequestDiscoverResources(newCm:ComponentManager) : void
+    public function RequestListResources(newAm:AggregateManager) : void
     {
-		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true, false);
+		super("ListResources (" + Util.shortenString(newAm.Url, 15) + ")", "Listing resources for " + newAm.Url, CommunicationUtil.listResourcesAm, true, true, false);
+		ignoreReturnCode = true;
 		op.timeout = 60;
-		cm = newCm;
+		am = newAm;
 		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
-		op.addField("compress", true);
-		op.setUrl(newCm.Url);
+		var options:Object = new Object();
+		options.geni_available = true;
+		options.geni_compressed = true;
+		op.addField("options", options);
+		op.setUrl(newAm.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *
 	{
-		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		try
 		{
 			var decodor:Base64Decoder = new Base64Decoder();
 			decodor.decode(response.value);
@@ -49,27 +54,15 @@ package protogeni.communication
 			bytes.uncompress();
 			var decodedRspec:String = bytes.toString();
 			
-			cm.Rspec = new XML(decodedRspec);
-			/*try
-			{
-				cm.Rspec = new XML(decodedRspec);
-			} catch(e:Error)
-			{
-				// Remove prefixes and try again
-				var prefixPattern:RegExp = /(<[\/]*)([\w]*:)/gi;
-				decodedRspec = decodedRspec.replace(prefixPattern, "$1");
-				cm.Rspec = new XML(decodedRspec);
-			}*/
-			
-			cm.processRspec(cleanup);
-		}
-		else
+			am.Rspec = new XML(decodedRspec);
+			am.processRspec(cleanup);
+		} catch(e:Error)
 		{
-			cm.errorMessage = response.output;
-			cm.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + cm.errorMessage;
-			cm.Status = GeniManager.FAILED;
+			am.errorMessage = response.output;
+			am.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + am.errorMessage;
+			am.Status = GeniManager.FAILED;
 			this.removeImmediately = true;
-			Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+			Main.protogeniHandler.dispatchGeniManagerChanged(am);
 		}
 		
 		return null;
@@ -77,39 +70,39 @@ package protogeni.communication
 
     override public function fail(event : ErrorEvent, fault : MethodFault) : *
     {
-		cm.errorMessage = event.toString();
-		cm.errorDescription = "";
-		if(cm.errorMessage.search("#2048") > -1)
-			cm.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + cm.VisitUrl();
-		else if(cm.errorMessage.search("#2032") > -1)
-			cm.errorDescription = "IO error, possibly due to the server being down";
-		else if(cm.errorMessage.search("timed"))
-			cm.errorDescription = event.text;
+		am.errorMessage = event.toString();
+		am.errorDescription = "";
+		if(am.errorMessage.search("#2048") > -1)
+			am.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + am.VisitUrl();
+		else if(am.errorMessage.search("#2032") > -1)
+			am.errorDescription = "IO error, possibly due to the server being down";
+		else if(am.errorMessage.search("timed"))
+			am.errorDescription = event.text;
 		
-		cm.Status = GeniManager.FAILED;
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		am.Status = GeniManager.FAILED;
+		Main.protogeniHandler.dispatchGeniManagerChanged(am);
 
       return null;
     }
 	
 	override public function cancel():void
 	{
-		cm.Status = GeniManager.UNKOWN;
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		am.Status = GeniManager.UNKOWN;
+		Main.protogeniHandler.dispatchGeniManagerChanged(am);
 		op.cleanup();
 	}
 	
 	override public function cleanup():void
 	{
-		if(cm.Status == GeniManager.INPROGRESS)
-			cm.Status = GeniManager.FAILED;
+		if(am.Status == GeniManager.INPROGRESS)
+			am.Status = GeniManager.FAILED;
 		running = false;
 		Main.protogeniHandler.rpcHandler.remove(this, false);
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		Main.protogeniHandler.dispatchGeniManagerChanged(am);
 		op.cleanup();
 		Main.protogeniHandler.rpcHandler.start();
 	}
 
-    private var cm : ComponentManager;
+    private var am:AggregateManager;
   }
 }

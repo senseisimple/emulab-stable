@@ -25,7 +25,7 @@
 			if(owner != null)
 			{
 				slivers.addItem(owner);
-				manager = owner.componentManager;
+				manager = owner.manager;
 			}
 				
 			interfaces = new VirtualInterfaceCollection();
@@ -49,7 +49,7 @@
 		public var virtualizationSubtype:String = "emulab-openvz";
 		
 		// Component
-		public var manager:ComponentManager;
+		public var manager:GeniManager;
 		
 		[Bindable]
 		public var urn:String;

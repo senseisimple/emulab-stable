@@ -14,33 +14,36 @@
 
 package protogeni.communication
 {
-	import protogeni.resources.Sliver;
+	import protogeni.Util;
+	import protogeni.resources.AggregateManager;
 
-  public class RequestSliverRestart extends Request
+  public class RequestGetVersion extends Request
   {
-    public function RequestSliverRestart(s:Sliver) : void
+    public function RequestGetVersion(newAm:AggregateManager) : void
     {
-		super("SliverRestart", "Restarting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.restartSliver);
-		sliver = s;
-		op.addField("slice_urn", sliver.slice.urn);
-		op.addField("credentials", new Array(sliver.slice.credential));
-		op.setUrl(sliver.manager.Url);
+      super("GetVersion (" + Util.shortenString(newAm.Url, 15) + ")", "Getting the version of the aggregate manager for " + newAm.Hrn, CommunicationUtil.getVersionAm, true, true, true);
+	  ignoreReturnCode = true;
+	  am = newAm;
+	  op.setUrl(am.Url);
     }
-	
+
+	// Should return Request or RequestQueueNode
 	override public function complete(code : Number, response : Object) : *
 	{
-		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		var r:Request = null;
+		try
 		{
-			return new RequestSliverStatus(sliver);
+			am.Version = response.geni_api;
+			r = new RequestListResources(am);
+			r.forceNext = true;
 		}
-		else
+		catch(e:Error)
 		{
-			// do nothing
 		}
 		
-		return null;
+		return r;
 	}
 	
-	public var sliver:Sliver;
+	private var am:AggregateManager;
   }
 }

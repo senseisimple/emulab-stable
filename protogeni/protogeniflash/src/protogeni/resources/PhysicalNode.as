@@ -36,7 +36,7 @@
 		public var managerString:String;
 		
 		[Bindable]
-		public var manager:ComponentManager;
+		public var manager:GeniManager;
 		
 		[Bindable]
 		public var available:Boolean;

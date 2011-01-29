@@ -4,8 +4,8 @@ package protogeni
 	
 	public class ProtogeniEvent extends Event
 	{
-		public static var COMPONENTMANAGER_CHANGED:String = "componentmanager_changed";
-		public static var COMPONENTMANAGERS_CHANGED:String = "componentmanagers_changed";
+		public static var GENIMANAGER_CHANGED:String = "genimanager_changed";
+		public static var GENIMANAGERS_CHANGED:String = "genimanagers_changed";
 		public static var QUEUE_CHANGED:String = "queue_changed";
 		public static var USER_CHANGED:String = "user_changed";
 		public static var SLICE_CHANGED:String = "slice_changed";

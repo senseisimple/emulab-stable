@@ -25,6 +25,7 @@ package protogeni.display
 	
 	import protogeni.Util;
 	import protogeni.resources.ComponentManager;
+	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
 	import protogeni.resources.PhysicalNode;
@@ -245,20 +246,20 @@ package protogeni.display
 	        markers = [];
 			
 	    	// Draw physical components
-	    	for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+	    	for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers)
 	    	{
-	    		if(!cm.Show)
+	    		if(!gm.Show)
 	    			continue;
 	    		
 	    		// Links
-		        for each(var l:PhysicalLinkGroup in cm.Links.collection) {
+		        for each(var l:PhysicalLinkGroup in gm.Links.collection) {
 			        	if(!l.IsSameSite()) {
 			        		addPhysicalLink(l);
 			        	}
 			       }
 		        
 		        // Nodes
-		    	for each(var g:PhysicalNodeGroup in cm.Nodes.collection) {
+		    	for each(var g:PhysicalNodeGroup in gm.Nodes.collection) {
 		        	addNodeGroupMarker(g);
 		        }
 	    	}
@@ -267,7 +268,7 @@ package protogeni.display
 	    		// Draw virtual links
 	    		for each(var sliver:Sliver in selectedSlice.slivers)
 	    		{
-	    			if(!sliver.componentManager.Show)
+	    			if(!sliver.manager.Show)
 	    				continue;
 	    			for each(var vl:VirtualLink in sliver.links) {
 			        	addVirtualLink(vl);

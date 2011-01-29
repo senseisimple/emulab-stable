@@ -125,6 +125,13 @@ package protogeni
 	
 	// Shortens the given string to a length, taking out from the middle
 	public static function shortenString(phrase : String, size : int) : String {
+		// Remove any un-needed elements
+		var a:Array = phrase.split("https://");
+		if(a.length == 1)
+			a = phrase.split("http://");
+		if(a.length == 2)
+			phrase = a[1];
+		
 		if(phrase.length < size)
 			return phrase;
 		

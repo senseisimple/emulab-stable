@@ -29,7 +29,7 @@ package protogeni.communication
 		op.addField("credentials", new Array(sliver.slice.credential));
 		op.addField("status", Sliver.STATUS_READY);
 		op.addField("timeout", 60000);
-		op.setExactUrl(sliver.componentManager.Url);
+		op.setUrl(sliver.componentManager.Url);
     }
 
 	override public function complete(code : Number, response : Object) : *

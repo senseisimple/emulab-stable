@@ -81,6 +81,8 @@ package protogeni.communication
 	public var continueOnError:Boolean;
 	public var running:Boolean = false;
 	public var nonXmlrpc:Boolean = false;
+	public var forceNext:Boolean = false;
+	public var ignoreReturnCode:Boolean = false;
 	
 	public var node:RequestQueueNode;
   }

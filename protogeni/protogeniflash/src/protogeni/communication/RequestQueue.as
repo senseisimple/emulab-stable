@@ -73,17 +73,29 @@ package protogeni.communication
 		
 		if (tail != null)
 		{
-			tail.next = newNode;
-			if(nextRequest == null)
+			if(newNode.item.forceNext && nextRequest != null)
+			{
+				var parseNode:RequestQueueNode = head;
+				while(parseNode.next != nextRequest)
+					parseNode = parseNode.next;
+				parseNode.next = newNode;
+				newTail.next = nextRequest;
 				nextRequest = newNode;
+				newTail = tail;
+			} else {
+				tail.next = newNode;
+				if(nextRequest == null)
+					nextRequest = newNode;
+			}
+			
 		}
 		else
 		{
 			head = newNode;
 			nextRequest = newNode;
 		}
-		
 		tail = newTail;
+		
 		if(pushEvents)
 			Main.protogeniHandler.dispatchQueueChanged();
     }

@@ -13,7 +13,7 @@ package protogeni.resources
 		{
 			for each(var sliver:Sliver in this)
 			{
-				if(sliver.componentManager == s.componentManager)
+				if(sliver.manager == s.manager)
 					return;
 			}
 			this.addItem(s);
@@ -39,11 +39,11 @@ package protogeni.resources
 			return null;
 		}
 		
-		public function getByCm(cm:ComponentManager):Sliver
+		public function getByGm(gm:GeniManager):Sliver
 		{
 			for each(var sliver:Sliver in this)
 			{
-				if(sliver.componentManager == cm)
+				if(sliver.manager == gm)
 					return sliver;
 			}
 			return null;
