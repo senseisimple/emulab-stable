@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -65,6 +65,7 @@ struct in_addr	mcastif;
 char		*imageid;
 int		askonly;
 int		busywait = 0;
+char		*proxyfor = NULL;
 static struct timeval stamp;
 static struct in_addr serverip;
 
@@ -208,7 +209,7 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:B:F:Q:")) != -1)
+	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:B:F:Q:P:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -270,6 +271,9 @@ main(int argc, char **argv)
 		case 'Q':
 			imageid = optarg;
 			askonly = 1;
+			break;
+		case 'P':
+			proxyfor = optarg;
 			break;
 #endif
 
@@ -370,11 +374,21 @@ main(int argc, char **argv)
 		GetReply reply;
 		int method = askonly ? MS_METHOD_ANY : MS_METHOD_MULTICAST;
 		int timo = 5; /* XXX */
+		int host = 0;
 
+		if (proxyfor) {
+			struct in_addr in;
+
+			if (!GetIP(proxyfor, &in))
+				fatal("Could not resolve host '%s'\n",
+				      proxyfor);
+			host = ntohl(in.s_addr);
+		}
 		while (1) {
 			if (!ClientNetFindServer(ntohl(serverip.s_addr),
-						 portnum, 0, imageid, method,
-						 askonly, timo, &reply, NULL))
+						 portnum, host, imageid,
+						 method, askonly, timo,
+						 &reply, NULL))
 				fatal("Could not get download info for '%s'",
 				      imageid);
 
@@ -382,7 +396,6 @@ main(int argc, char **argv)
 				PrintGetInfo(imageid, &reply, 1);
 				exit(0);
 			}
-
 			if (reply.error) {
 				if (busywait == 0 ||
 				    reply.error != MS_ERROR_TRYAGAIN)
@@ -403,6 +416,16 @@ main(int argc, char **argv)
 			    imageid, inet_ntoa(mcastaddr), portnum);
 			break;
 		}
+	}
+
+	/*
+	 * XXX if proxying for another node, assume that we are only
+	 * interested in starting up the frisbeed and don't care about
+	 * the image ourselves. So, our work is done!
+	 */
+	if (proxyfor) {
+		log("server started on behalf of %s", proxyfor);
+		exit(0);
 	}
 #endif
 	ClientNetInit();

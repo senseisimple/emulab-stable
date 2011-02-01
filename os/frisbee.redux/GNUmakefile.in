@@ -135,6 +135,8 @@ mfrisbeed: $(MSERVEROBJS)
 	cp mfrisbeed mfrisbeed.debug
 	strip mfrisbeed
 
+mserver.o: $(SRCDIR)/mserver.c decls.h configdefs.h utils.h
+	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/mserver.c
 config.o: $(SRCDIR)/config.c configdefs.h log.h
 	$(CC) -c $(MSERVERFLAGS) $(SRCDIR)/config.c
 config_emulab.o: $(SRCDIR)/config_emulab.c configdefs.h log.h

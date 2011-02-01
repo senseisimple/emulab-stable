@@ -4095,6 +4095,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 	}
 
 	if (nrows > 1 && vers <= 29) {
+	updatemfs:
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=/NEWER-MFS-NEEDED PART=0 PARTOS=Bogus\n");
 
@@ -4181,9 +4182,44 @@ COMMAND_PROTOTYPE(doloadinfo)
 		/*
 		 * As of version 33, local nodes no longer get an address,
 		 * they contact the frisbee master server instead.
+		 *
+		 * We provide temporary backward compat by firing off
+		 * a proxy request to the master server. If that doesn't
+		 * work, we draw attention to ourselves via the update MFS
+		 * path above.
 		 */
-		else
-			strcpy(address, "NEED_TO_UPDATE_YOUR_FRISBEE");
+		else if (vers >= 33) {
+			address[0] = '\0';
+		} else {
+			char _buf[512];
+			int gotit = 0;
+			FILE *cfd;
+
+			info("%s LOADINFO compat: starting server for imageid %s",
+			     reqp->nodeid, row[5]);
+			snprintf(_buf, sizeof _buf,
+				 "%s/sbin/frisbeehelper -n %s %s",
+				 TBROOT, reqp->nodeid, row[5]);
+			if ((cfd = popen(_buf, "r")) == NULL)
+				goto updatemfs;
+			while (fgets(_buf, sizeof _buf, cfd) != NULL) {
+#if 0
+				if (debug > 1)
+					info("got: '%s'\n", _buf);
+#endif
+				if (strncmp(_buf, "Address is ", 11) == 0) {
+					gotit = 1;
+					break;
+				}
+			}
+			pclose(cfd);
+			if (!gotit ||
+			    sscanf(_buf, "Address is %32s", address) != 1)
+				goto updatemfs;
+
+			/* XXX address info is for boss, not a subboss */
+			strcpy(server_address, BOSSNODE_IP);
+		}
 
 		bufp += OUTPUT(bufp, ebufp - bufp,
 			       "ADDR=%s PART=%s PARTOS=%s", address, loadpart, OS);
@@ -4257,10 +4293,11 @@ COMMAND_PROTOTYPE(doloadinfo)
 			       disktype, disknum, zfill, useacpi, mbrvers, useasf, prepare);
 
 		/*
-		 * Local nodes and vnodes, get additional image metadata
-		 * fields so that they can uniquely identify the image.
+		 * Vnodes (and post v32 local nodes) get additional image
+		 * metadata fields so that they can uniquely identify the
+		 * image.
 		 */
-		if (reqp->islocal || reqp->isvnode) {
+		if (reqp->isvnode || (reqp->islocal && vers >= 33)) {
 			struct stat sb;
 
  			if (!row[7] || !row[7][0]) {

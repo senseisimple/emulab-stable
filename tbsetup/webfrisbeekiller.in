@@ -18,18 +18,10 @@ use English;
 my $TB       = "@prefix@";
 
 #
-# XXX do something a little more constructive in the future...
-#
-if (1) {
-    print "Eat flaming death frisbee!\n";
-    exit(0);
-}
-
-#
 # Run the real thing, and never return.
 #
 unshift(@ARGV, "-k");
-exec "$TB/sbin/frisbeelauncher", @ARGV;
+exec "$TB/sbin/frisbeehelper", @ARGV;
 
 die("*** $0:\n".
     "    Could not exec program: $!");

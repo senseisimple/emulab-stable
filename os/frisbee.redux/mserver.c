@@ -167,6 +167,7 @@ struct childinfo {
 	int ptype;
 	int method;
 	int pid;
+	char *pidfile;
 	int retries;
 	in_addr_t servaddr;	/* -S arg */
 	in_addr_t ifaceaddr;	/* -i arg */
@@ -187,7 +188,7 @@ struct clientextra {
 	uint32_t losize;
 };
 
-static struct childinfo *findchild(struct config_imageinfo *, int, int);
+static struct childinfo *findchild(char *, int, int);
 static int startchild(struct childinfo *);
 static struct childinfo *startserver(struct config_imageinfo *,
 				     in_addr_t, in_addr_t, int, int *);
@@ -280,7 +281,7 @@ fetch_parent(struct in_addr *myip, struct in_addr *hostip,
 	 * If so we will either return "try again later" or point them to
 	 * our parent.
 	 */
-	ci = findchild(ii, PTYPE_CLIENT, methods);
+	ci = findchild(ii->imageid, PTYPE_CLIENT, methods);
 	if (ci != NULL) {
 		if (debug)
 			info("%s: fetch from %s in progress",
@@ -520,6 +521,34 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 	}
 
+#ifdef USE_EMULAB_CONFIG
+	/*
+	 * XXX Emulab special case if boss is making a non-proxied
+	 * status request for an image that is running.
+	 *
+	 * We allow boss access to any image that has a daemon
+	 * currently running.  This is a hack to allow boss to get info
+	 * for a running daemon so it can kill it.  I do it here because
+	 * it is easiest (access to the running process info).
+	 *
+	 * This should move to the Emulab config module and
+	 * perhaps boss should be able to access ANY valid image
+	 * or image directory, but I don't want to go there right
+	 * now...
+	 */
+	if (wantstatus &&
+	    cip->sin_addr.s_addr == htonl(INADDR_LOOPBACK) &&
+	    host.s_addr == htonl(INADDR_LOOPBACK) &&
+	    (ci = findchild(imageid, PTYPE_SERVER, methods)) != NULL) {
+		/* XXX only fill in the info boss cares about */
+		msg->body.getreply.method = ci->method;
+		msg->body.getreply.isrunning = 1;
+		msg->body.getreply.addr = htonl(ci->addr);
+		msg->body.getreply.port = htons(ci->port);
+		goto reply;
+	}
+#endif
+
 	/*
 	 * See if node has access to the image.
 	 * If not, return an error code immediately.
@@ -751,7 +780,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * Otherwise see if there is a frisbeed already running, starting
 	 * one if not.  Then construct a reply with the available info.
 	 */
-	ci = findchild(ii, PTYPE_SERVER, methods);
+	ci = findchild(ii->imageid, PTYPE_SERVER, methods);
 
 	/*
 	 * XXX right now frisbeed doesn't support mutiple clients
@@ -1091,7 +1120,7 @@ static struct childinfo *children;
 static int nchildren;
 
 static struct childinfo *
-findchild(struct config_imageinfo *ii, int ptype, int methods)
+findchild(char *imageid, int ptype, int methods)
 {
 	struct childinfo *ci, *bestci;
 	assert((methods & ~onlymethods) == 0);
@@ -1099,7 +1128,7 @@ findchild(struct config_imageinfo *ii, int ptype, int methods)
 	bestci = NULL;
 	for (ci = children; ci != NULL; ci = ci->next)
 		if (ci->ptype == ptype && (ci->method & methods) != 0 &&
-		    !strcmp(ci->imageinfo->imageid, ii->imageid)) {
+		    !strcmp(ci->imageinfo->imageid, imageid)) {
 			if (bestci == NULL)
 				bestci = ci;
 			else if (ci->method == MS_METHOD_BROADCAST)
@@ -1109,7 +1138,7 @@ findchild(struct config_imageinfo *ii, int ptype, int methods)
 				bestci = ci;
 			else
 				pfatal("multiple unicast servers for %s",
-				       ii->imageid);
+				       imageid);
 		}
 
 	return bestci;
@@ -1181,6 +1210,22 @@ startchild(struct childinfo *ci)
 		exit(-1);
 	}
 
+	/* create a pid file */
+	if (ci->ptype == PTYPE_SERVER) {
+		char pidfile[128];
+		struct in_addr in;
+		FILE *fd;
+
+		in.s_addr = htonl(ci->addr);
+		snprintf(pidfile, sizeof pidfile, "%s/frisbeed-%s-%d.pid",
+			 _PATH_VARRUN, inet_ntoa(in), ci->port);
+		fd = fopen(pidfile, "w");
+		if (fd != NULL) {
+			fprintf(fd, "%d\n", ci->pid);
+			fclose(fd);
+			ci->pidfile = strdup(pidfile);
+		}
+	}
 	ci->next = children;
 	children = ci;
 	nchildren++;
@@ -1194,7 +1239,7 @@ startserver(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 {
 	struct childinfo *ci;
 
-	assert(findchild(ii, PTYPE_SERVER, methods) == NULL);
+	assert(findchild(ii->imageid, PTYPE_SERVER, methods) == NULL);
 	assert(errorp != NULL);
 
 	ci = calloc(1, sizeof(struct childinfo));
@@ -1297,7 +1342,7 @@ startclient(struct config_imageinfo *ii, in_addr_t meaddr, in_addr_t youaddr,
 	char *tmpname;
 	int len;
 
-	assert(findchild(ii, PTYPE_CLIENT, methods) == NULL);
+	assert(findchild(ii->imageid, PTYPE_CLIENT, methods) == NULL);
 	assert(errorp != NULL);
 
 	ci = calloc(1, sizeof(struct childinfo));
@@ -1388,6 +1433,11 @@ reapchildren(int wpid, int *statusp)
 			continue;
 		}
 		*cip = ci->next;
+		if (ci->pidfile) {
+			unlink(ci->pidfile);
+			free(ci->pidfile);
+			ci->pidfile = NULL;
+		}
 		nchildren--;
 		in.s_addr = htonl(ci->addr);
 		log("%s: %s process %d on %s:%d exited (status=0x%x)",

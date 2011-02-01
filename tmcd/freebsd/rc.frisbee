@@ -343,6 +343,8 @@ loadone() {
     if [ $isrem -eq 1 -a $isurl -eq 1 ]; then
 	echo "Downloading image \'$ADDR\' to /images directory ..."
 	$BINDIR/mkextrafs.pl -c -s 4 -r $DISK /images || {
+	    # XXX run growdisk to ensure we have a partition in the MBR
+	    $BINDIR/growdisk -vW /dev/$DISK >/dev/null 2>&1
 	    $BINDIR/mkextrafs.pl -n -f -s 4 -r $DISK /images || {
 		echo "Could not create /images partition"
 		return 1

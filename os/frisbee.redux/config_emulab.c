@@ -565,6 +565,16 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	 * the requester is listed as one of those.
 	 */
 	if (req->s_addr != host->s_addr) {
+		/*
+		 * XXX if node_id is localhost (i.e., boss), then allow
+		 * proxying for any node.
+		 */
+		if (req->s_addr == htonl(INADDR_LOOPBACK)) {
+			role = "boss";
+			proxy = mystrdup(role);
+			goto isboss;
+		}
+
 		proxy = emulab_nodeid(req);
 		if (proxy == NULL) {
 			emulab_free_host_authinfo(get);
@@ -609,6 +619,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	} else
 		proxy = NULL;
 
+ isboss:
 	/*
 	 * Find the node name from its control net IP.
 	 * If the node doesn't exist, we return an empty list.
@@ -626,39 +637,46 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 		put->hostid = mystrdup(node);
 
 	/*
-	 * We have a proxy node.  It should be either:
-	 * - a subboss and a frisbee subboss for the node
-	 * - an inner-boss and in the same experiment as the node
+	 * We have a proxy node.  It should be one of:
+	 * - boss (for any node)
+	 * - a subboss (that is a frisbee subboss for the node)
+	 * - an inner-boss (in the same experiment as the node)
 	 * Note that we could not do this check until we had the node name.
 	 * Note also that we no longer care about proxy or not after this.
 	 */
 	if (proxy) {
-		if (strcmp(role, "subboss") == 0)
+		if (strcmp(role, "boss") == 0) {
+			res = NULL;
+		} else if (strcmp(role, "subboss") == 0) {
 			res = mydb_query("SELECT node_id"
 					 " FROM subbosses"
 					 " WHERE subboss_id='%s'"
 					 "  AND node_id='%s'"
 					 "  AND service='frisbee'",
 					 1, proxy, node);
-		else
+			assert(res != NULL);
+		} else {
 			res = mydb_query("SELECT r1.node_id"
-					 " FROM reserved as r1,reserved as r2"
+					 " FROM reserved as r1,"
+					 "  reserved as r2"
 					 " WHERE r1.node_id='%s'"
 					 "  AND r2.node_id='%s'"
 					 "  AND r1.pid=r2.pid"
 					 "  AND r1.eid=r2.eid",
 					 1, proxy, node);
-		assert(res != NULL);
-
-		if (mysql_num_rows(res) == 0) {
-			mysql_free_result(res);
-			free(proxy);
-			free(node);
-			emulab_free_host_authinfo(get);
-			emulab_free_host_authinfo(put);
-			return 1;
+			assert(res != NULL);
 		}
-		mysql_free_result(res);
+		if (res) {
+			if (mysql_num_rows(res) == 0) {
+				mysql_free_result(res);
+				free(proxy);
+				free(node);
+				emulab_free_host_authinfo(get);
+				emulab_free_host_authinfo(put);
+				return 1;
+			}
+			mysql_free_result(res);
+		}
 		free(proxy);
 	}
 
