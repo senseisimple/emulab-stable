@@ -93,7 +93,7 @@ find_disks() {
     _DISKS=""
     for d in `sed -n 's/^\([a-z]*[0-9][0-9]*\): [0-9][0-9]*MB/\1/p' /var/run/dmesg.boot`; do
 	case $d in
-	    ad*|da*|ar*|aacd*) _DISKS="$_DISKS $d"
+	    ad*|da*|ar*|aacd*|mfid*) _DISKS="$_DISKS $d"
 	esac
     done
 
@@ -145,6 +145,16 @@ loadone() {
     echo "Loading image #$_NUM"
 
     # Parse dem args
+    ADDR=""
+    SERVER=""
+    PART=""
+    PARTOS=""
+    DISK=""
+    ZFILL=""
+    ACPI=""
+    ASF=""
+    MBRVERS=""
+    PREPARE=""
     for parm in $_LOADINFO; do
         case $parm in
 	ADDR=*|\
@@ -263,7 +273,7 @@ loadone() {
 		return 1
 	    fi
 	    imagefile="$ADDR"
-        else
+	else
 	    PORT=`echo $ADDR | awk -F: '{ printf $2 }'`
 	    MCAST=`echo $ADDR | awk -F: '{ printf $1 }'`
 	    if [ -e $BOOTDIR/myip ]; then
