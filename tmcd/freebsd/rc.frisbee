@@ -155,6 +155,7 @@ loadone() {
     ASF=""
     MBRVERS=""
     PREPARE=""
+    IMAGEID=""
     for parm in $_LOADINFO; do
         case $parm in
 	ADDR=*|\
