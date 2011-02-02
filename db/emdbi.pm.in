@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package emdbi;
@@ -9,6 +9,7 @@ use strict;
 use File::Basename;
 use Mysql;
 use English;
+use Carp;
 use Exporter;
 use vars qw(@ISA @EXPORT);
 @ISA = "Exporter";
@@ -393,6 +394,8 @@ sub DBError($$;$)
 	    print MAIL "In $SCRIPTNAME\n\n";
 	    print MAIL "$message\n\n";
 	    print MAIL "$DBErrorString\n\n";
+	    print MAIL Carp::longmess();
+	    print MAIL "\n";
 	    close(MAIL);
 	}
     }
