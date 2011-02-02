@@ -404,6 +404,7 @@ sub newVlanNumber($$) {
     my $self = shift;
     my $vlan_id = shift;
     my %vlans;
+    my $limit;
 
     $self->debug("stack::newVlanNumber $vlan_id\n");
     if ($self->{ALLVLANSONLEADER}) {
@@ -412,15 +413,29 @@ sub newVlanNumber($$) {
 	%vlans = $self->findVlans();
     }
     my $number = $vlans{$vlan_id};
-    # XXX temp, see doMakeVlans in snmpit.in
-    if ($::next_vlan_tag)
-	{ $number = $::next_vlan_tag; $::next_vlan_tag = 0; return $number; }
-
     # Vlan exists, so tell caller a new number/vlan is not needed.
     if (defined($number)) { return 0; }
 
     my @numbers = sort values %vlans;
     $self->debug("newVlanNumbers: numbers ". "@numbers" . " \n");
+
+    # XXX temp, see doMakeVlans in snmpit.in
+    if ($::next_vlan_tag) {
+	$number = $::next_vlan_tag;
+	$::next_vlan_tag = 0;
+
+	#
+	# Reserve this number in the table. If we can actually
+	# assign it (tables locked), then we call it good. 
+	#
+	if ((grep {$_ == $number} @numbers) ||
+	    !defined(reserveVlanTag($vlan_id, $number))) {
+	    print STDERR "desired vlan tag for $vlan_id already in use!\n";
+	    # Indicates no tag assigned. 
+	    return 0;
+	}
+	return $number;
+    }
     #
     # See if there is a number already pre-assigned in the lans table.
     # But still make sure that the number does not conflict with an
@@ -430,14 +445,14 @@ sub newVlanNumber($$) {
     if ($number) {
 	if (grep {$_ == $number} @numbers) {
 	    print STDERR "reserved vlan tag for $vlan_id already in use!\n";
-	    return -1;
+	    return 0;
 	}
 	return $number;
     }
-    
     $number = $self->{MIN_VLAN}-1;
-    my $lim = $self->{MAX_VLAN};
-    while (++$number < $lim) {
+    $limit  = $self->{MAX_VLAN};
+
+    while (++$number < $limit) {
 	if (!(grep {$_ == $number} @numbers)) {
 	    #
 	    # Reserve this number in the table. If we can actually
@@ -451,8 +466,7 @@ sub newVlanNumber($$) {
 	    $self->debug("Failed to reserve tag $number for vlan $vlan_id\n");
 	}
     }
-    # Distinguish between already allocated and error. 
-    return -1;
+    return 0;
 }
 
 #
@@ -485,7 +499,7 @@ sub createVlan($$$;$$$) {
 	#
 	my ($res, $devicename, $device);
 	$vlan_number = $self->newVlanNumber($vlan_id);
-	if ($vlan_number <= 0) { last LOCKBLOCK;}
+	if ($vlan_number == 0) { last LOCKBLOCK;}
 	print "Creating VLAN $vlan_id as VLAN #$vlan_number on stack " .
                  "$self->{STACKID} ... \n";
 	if ($self->{ALLVLANSONLEADER}) {
