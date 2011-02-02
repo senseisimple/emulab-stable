@@ -1478,13 +1478,18 @@ sub ListHistory($)
 #
 sub CheckCredentials($)
 {
+    if (! ref($_[0]) != "ARRAY") {
+	return
+	    GeniResponse->MalformedArgsResponse("Credentials should be a ".
+						"array not a singleton");
+    }
+    
     my @credentials = @{ $_[0] };
-
     if (scalar(@credentials) != 1) {
 	return
 	    GeniResponse->MalformedArgsResponse("Wrong number of credentials");
     }
-    my $credential = GeniCredential->CreateFromSigned($credentials[0]);
+    my $credential  = GeniCredential->CreateFromSigned($credentials[0]);
     if (!defined($credential)) {
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Could not create credential object");
