@@ -39,7 +39,7 @@
 #define FRISBEE_RETRIES	3
 
 static void	get_options(int argc, char **argv);
-static int	makesocket(int portnum, int *tcpsockp);
+static int	makesocket(int portnum, struct in_addr *ifip, int *tcpsockp);
 static void	handle_request(int sock);
 static int	reapchildren(int apid, int *status);
 
@@ -63,6 +63,7 @@ static int	canredirect = 0;
 static int	usechildauth = 0;
 static int	mirrormode = 0;
 static char     *configstyle = "null";
+static struct in_addr ifaceip;
 
 /* XXX the following just keep network.c happy */
 int		portnum = MS_PORTNUM;
@@ -78,6 +79,9 @@ main(int argc, char **argv)
 	char			*pidfile = (char *) NULL;
 	struct timeval		tv;
 	fd_set			ready;
+#ifdef USE_LOCALHOST_PROXY
+	int			localsock = -1;
+#endif
 
 	get_options(argc, argv);
 
@@ -101,10 +105,24 @@ main(int argc, char **argv)
 	/*
 	 * Create TCP server.
 	 */
-	if (makesocket(portnum, &tcpsock) < 0) {
+	if (makesocket(portnum, &ifaceip, &tcpsock) < 0) {
 		error("Could not make primary tcp socket!");
 		exit(1);
 	}
+#ifdef USE_LOCALHOST_PROXY
+	/*
+	 * Listen on localhost too for proxy requests.
+	 */
+	if (ifaceip.s_addr != htonl(INADDR_ANY) &&
+	    ifaceip.s_addr != htonl(INADDR_LOOPBACK)) {
+		struct in_addr localip;
+		localip.s_addr = htonl(INADDR_LOOPBACK);
+		if (makesocket(portnum, &localip, &localsock) < 0) {
+			error("Could not create localhost tcp socket!");
+			exit(1);
+		}
+	}
+#endif
 	/* Now become a daemon */
 	if (daemonize)
 		daemon(0, 0);
@@ -131,20 +149,33 @@ main(int argc, char **argv)
 	while (1) {
 		struct sockaddr_in client;
 		socklen_t length;
-		int newsock, rv;
+		int newsock, rv, maxsock = 0;
 
 		FD_SET(tcpsock, &ready);
+		maxsock = tcpsock + 1;
+#ifdef USE_LOCALHOST_PROXY
+		if (localsock >= 0) {
+			FD_SET(localsock, &ready);
+			if (localsock > tcpsock)
+				maxsock = localsock + 1;
+		}
+#endif
 		tv.tv_sec = 0;
 		tv.tv_usec = 100000;
-		rv = select(tcpsock+1, &ready, NULL, NULL, &tv);
+		rv = select(maxsock, &ready, NULL, NULL, &tv);
 		if (rv < 0) {
 			if (errno == EINTR)
 				continue;
 			pfatal("select failed");
 		}
 		if (rv) {
+			int sock = tcpsock;
+#ifdef USE_LOCALHOST_PROXY
+			if (localsock >= 0 && FD_ISSET(localsock, &ready))
+				sock = localsock;
+#endif
 			length  = sizeof(client);
-			newsock = accept(tcpsock, (struct sockaddr *)&client,
+			newsock = accept(sock, (struct sockaddr *)&client,
 					 &length);
 			if (newsock < 0)
 				pwarning("accepting TCP connection");
@@ -157,6 +188,10 @@ main(int argc, char **argv)
 		(void) reapchildren(0, NULL);
 	}
 	close(tcpsock);
+#ifdef USE_LOCALHOST_PROXY
+	if (localsock >= 0)
+		close(localsock);
+#endif
 	log("daemon terminating");
 	exit(0);
 }
@@ -521,26 +556,23 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		}
 	}
 
-#ifdef USE_EMULAB_CONFIG
+#ifdef USE_LOCALHOST_PROXY
 	/*
-	 * XXX Emulab special case if boss is making a non-proxied
-	 * status request for an image that is running.
+	 * XXX this is really an Emulab special case for a boss node.
 	 *
-	 * We allow boss access to any image that has a daemon
-	 * currently running.  This is a hack to allow boss to get info
-	 * for a running daemon so it can kill it.  I do it here because
-	 * it is easiest (access to the running process info).
+	 * We allow localhost access to any image that has a daemon
+	 * currently running.  This is a hack to allow localhost to get
+	 * info for a running daemon so it can kill it.
 	 *
-	 * This should move to the Emulab config module and
-	 * perhaps boss should be able to access ANY valid image
-	 * or image directory, but I don't want to go there right
-	 * now...
+	 * Perhaps localhost should be able to access ANY valid image
+	 * or image directory (running or not), but I don't want to go
+	 * there right now...
 	 */
 	if (wantstatus &&
 	    cip->sin_addr.s_addr == htonl(INADDR_LOOPBACK) &&
 	    host.s_addr == htonl(INADDR_LOOPBACK) &&
 	    (ci = findchild(imageid, PTYPE_SERVER, methods)) != NULL) {
-		/* XXX only fill in the info boss cares about */
+		/* XXX only fill in the info that the caller cares about */
 		msg->body.getreply.method = ci->method;
 		msg->body.getreply.isrunning = 1;
 		msg->body.getreply.addr = htonl(ci->addr);
@@ -797,6 +829,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 
 	if (ci == NULL) {
 		struct in_addr in;
+		in_addr_t myaddr;
 		int stat;
 
 		if (ii->sig != NULL) {
@@ -814,8 +847,40 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			log("%s: STATUS is not running", imageid);
 			goto reply;
 		}
-		ci = startserver(ii, ntohl(sip->sin_addr.s_addr),
-				 ntohl(cip->sin_addr.s_addr),
+		myaddr = ntohl(sip->sin_addr.s_addr);
+#ifdef USE_LOCALHOST_PROXY
+		/*
+		 * If this was a proxy request from localhost,
+		 * we need to start the server on the real interface
+		 * instead.  If none was specified, we don't know what
+		 * interface to use, so just fail.
+		 */
+		if (myaddr == INADDR_LOOPBACK) {
+			myaddr = ntohl(ifaceip.s_addr);
+			if (myaddr == INADDR_ANY) {
+				warning("%s: cannot start server on behalf "
+					"of %s", imageid, clientip);
+				msg->body.getreply.error = MS_ERROR_FAILED;
+				goto reply;
+			}
+			/*
+			 * XXX ugh, fill in a longer wait time for the
+			 * server since we are starting this up at some
+			 * indeterminate time before the client.
+			 */
+			if (ii->get_options) {
+				char *gopts, *to = " -T 1800";
+				gopts = malloc(strlen(ii->get_options) +
+					       strlen(to) + 1);
+				assert(gopts != NULL);
+				strcpy(gopts, ii->get_options);
+				strcat(gopts, to);
+				free(ii->get_options);
+				ii->get_options = gopts;
+			}
+		}
+#endif
+		ci = startserver(ii, myaddr, ntohl(cip->sin_addr.s_addr),
 				 methods, &rv);
 		if (ci == NULL) {
 			msg->body.getreply.error = rv;
@@ -966,7 +1031,7 @@ get_options(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "AC:DI:MRX:S:P:p:dh")) != -1)
+	while ((ch = getopt(argc, argv, "AC:DI:MRX:S:P:p:i:dh")) != -1)
 		switch(ch) {
 		case 'A':
 			usechildauth = 1;
@@ -1047,6 +1112,13 @@ get_options(int argc, char **argv)
 		case 'p':
 			portnum = atoi(optarg);
 			break;
+		case 'i':
+			if (!GetIP(optarg, &ifaceip)) {
+				fprintf(stderr, "Invalid interface IP `%s'\n",
+					optarg);
+				exit(1);
+			}
+			break;
 		case 'h':
 		case '?':
 		default:
@@ -1073,10 +1145,10 @@ get_options(int argc, char **argv)
  * Create socket on specified port.
  */
 static int
-makesocket(int port, int *tcpsockp)
+makesocket(int port, struct in_addr *ifip, int *tcpsockp)
 {
 	struct sockaddr_in	name;
-	int			i, tcpsock;
+	int			i, sock;
 	socklen_t		length;
 
 	/*
@@ -1084,34 +1156,34 @@ makesocket(int port, int *tcpsockp)
 	 */
 
 	/* Create socket from which to read. */
-	tcpsock = socket(AF_INET, SOCK_STREAM, 0);
-	if (tcpsock < 0) {
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
 		pfatal("opening stream socket");
 	}
-	fcntl(tcpsock, F_SETFD, FD_CLOEXEC);
+	fcntl(sock, F_SETFD, FD_CLOEXEC);
 
 	i = 1;
-	if (setsockopt(tcpsock, SOL_SOCKET, SO_REUSEADDR,
+	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		       (char *)&i, sizeof(i)) < 0)
 		pwarning("setsockopt(SO_REUSEADDR)");;
 	
 	/* Create name. */
 	name.sin_family = AF_INET;
-	name.sin_addr.s_addr = INADDR_ANY;
+	name.sin_addr.s_addr = ifip->s_addr;
 	name.sin_port = htons((u_short) port);
-	if (bind(tcpsock, (struct sockaddr *) &name, sizeof(name))) {
+	if (bind(sock, (struct sockaddr *) &name, sizeof(name))) {
 		pfatal("binding stream socket");
 	}
 	/* Find assigned port value and print it out. */
 	length = sizeof(name);
-	if (getsockname(tcpsock, (struct sockaddr *) &name, &length)) {
+	if (getsockname(sock, (struct sockaddr *) &name, &length)) {
 		pfatal("getsockname");
 	}
-	if (listen(tcpsock, 128) < 0) {
+	if (listen(sock, 128) < 0) {
 		pfatal("listen");
 	}
-	*tcpsockp = tcpsock;
-	log("listening on TCP port %d", ntohs(name.sin_port));
+	*tcpsockp = sock;
+	log("listening on TCP %s:%d", inet_ntoa(*ifip), ntohs(name.sin_port));
 	
 	return 0;
 }

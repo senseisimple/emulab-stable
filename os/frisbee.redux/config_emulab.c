@@ -565,6 +565,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	 * the requester is listed as one of those.
 	 */
 	if (req->s_addr != host->s_addr) {
+#ifdef USE_LOCALHOST_PROXY
 		/*
 		 * XXX if node_id is localhost (i.e., boss), then allow
 		 * proxying for any node.
@@ -574,7 +575,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			proxy = mystrdup(role);
 			goto isboss;
 		}
-
+#endif
 		proxy = emulab_nodeid(req);
 		if (proxy == NULL) {
 			emulab_free_host_authinfo(get);
@@ -619,7 +620,9 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	} else
 		proxy = NULL;
 
+#ifdef USE_LOCALHOST_PROXY
  isboss:
+#endif
 	/*
 	 * Find the node name from its control net IP.
 	 * If the node doesn't exist, we return an empty list.
@@ -645,9 +648,12 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 	 * Note also that we no longer care about proxy or not after this.
 	 */
 	if (proxy) {
+#ifdef USE_LOCALHOST_PROXY
 		if (strcmp(role, "boss") == 0) {
 			res = NULL;
-		} else if (strcmp(role, "subboss") == 0) {
+		} else
+#endif
+		if (strcmp(role, "subboss") == 0) {
 			res = mydb_query("SELECT node_id"
 					 " FROM subbosses"
 					 " WHERE subboss_id='%s'"
@@ -783,7 +789,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			struct emulab_ii_extra_info *ii;
 			struct config_imageinfo *ci;
 			struct stat sb;
-			char *imageid;
+			char *iid;
 
 			row = mysql_fetch_row(res);
 			/* XXX ignore rows with null or empty info */
@@ -793,12 +799,12 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			    !row[3] || !row[3][0] ||
 			    !row[4] || !row[4][0])
 				continue;
-			imageid = mymalloc(strlen(row[0])+strlen(row[2])+2);
-			strcpy(imageid, row[0]);
-			strcat(imageid, "/");
-			strcat(imageid, row[2]);
+			iid = mymalloc(strlen(row[0]) + strlen(row[2]) + 2);
+			strcpy(iid, row[0]);
+			strcat(iid, "/");
+			strcat(iid, row[2]);
 			ci = &put->imageinfo[put->numimages];
-			ci->imageid = imageid;
+			ci->imageid = iid;
 			ci->path = mystrdup(row[3]);
 			ci->flags = CONFIG_PATH_ISFILE;
 			if (stat(ci->path, &sb) == 0) {
@@ -851,7 +857,7 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			struct emulab_ii_extra_info *ii;
 			struct config_imageinfo *ci;
 			struct stat sb;
-			char *imageid;
+			char *iid;
 
 			row = mysql_fetch_row(res);
 			/* XXX ignore rows with null or empty info */
@@ -861,12 +867,12 @@ emulab_get_host_authinfo(struct in_addr *req, struct in_addr *host,
 			    !row[3] || !row[3][0] ||
 			    !row[4] || !row[4][0])
 				continue;
-			imageid = mymalloc(strlen(row[0])+strlen(row[2])+2);
-			strcpy(imageid, row[0]);
-			strcat(imageid, "/");
-			strcat(imageid, row[2]);
+			iid = mymalloc(strlen(row[0]) + strlen(row[2]) + 2);
+			strcpy(iid, row[0]);
+			strcat(iid, "/");
+			strcat(iid, row[2]);
 			ci = &get->imageinfo[get->numimages];
-			ci->imageid = imageid;
+			ci->imageid = iid;
 			ci->path = mystrdup(row[3]);
 			ci->flags = CONFIG_PATH_ISFILE;
 			if (stat(ci->path, &sb) == 0) {

@@ -78,7 +78,7 @@ ifeq ($(WITH_MSERVER_EMULAB),1)
 # Emulab master server config
 MYSQLCFLAGS	= -I/usr/local/include
 MYSQLLIBS	= -L/usr/local/lib/mysql -lmysqlclient
-MSERVERFLAGS	+= -DUSE_EMULAB_CONFIG $(MYSQLCFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
+MSERVERFLAGS	+= -DUSE_EMULAB_CONFIG -DUSE_LOCALHOST_PROXY $(MYSQLCFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
 MSERVEROBJS	+= config_emulab.o
 MSERVERLIBS	+= $(OBJDIR)/lib/libtb/libtb.a $(MYSQLLIBS)
 endif
