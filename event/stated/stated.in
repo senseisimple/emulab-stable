@@ -1794,7 +1794,7 @@ sub StubHandleEvent($$$) {
     # Print the stuff we care about to stdout for the parent to pick up.
     #
     print  "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
-    if ($debug) {
+    if (1) {
 	print STDERR
 	    "OBJTYPE='$objtype', OBJNAME='$objname', EVENTTYPE='$eventtype'\n";
     }
@@ -1827,7 +1827,7 @@ sub PollEvents($$)
     if ($pollval > 0) {
 	my $buf;
 	
-	while (sysread($childpipe, $buf, 4096)) {
+	while (sysread($childpipe, $buf, 8192)) {
 	    #
 	    # It is possible that we will get multiple lines
 	    # of output in one read. Hopefully not so much that we get
