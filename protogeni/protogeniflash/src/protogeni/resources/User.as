@@ -36,11 +36,16 @@
 		[Bindable]
 		public var urn:String;
 		
+		public var sslCertificate:String;
+		public var sslPrivateKey:String;
+		
 		public var slices:SliceCollection;
 		
 		public function User()
 		{
 			slices = new SliceCollection();
+			sslCertificate = "";
+			sslPrivateKey = "";
 		}
 	}
 }

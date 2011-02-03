@@ -24,8 +24,8 @@
   public class Main
   {
 	// Returns the main class
-	public static function Application():geniflash {
-		return mx.core.FlexGlobals.topLevelApplication as geniflash;
+	public static function Application():protogeniflash {
+		return mx.core.FlexGlobals.topLevelApplication as protogeniflash;
 	}
 
 	[Bindable]

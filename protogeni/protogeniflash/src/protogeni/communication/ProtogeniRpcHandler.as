@@ -28,7 +28,7 @@
 	
 	import protogeni.Util;
 	import protogeni.communication.Operation;
-	import protogeni.display.DefaultAuthoritiesWindow;
+	import protogeni.display.InitialUserWindow;
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.ComponentManager;
@@ -64,7 +64,7 @@
 				Main.geniHandler.dispatchGeniManagerChanged(newCm);
 				Main.Application().showAuthenticate();
 			} else {
-				var chooseAuth:DefaultAuthoritiesWindow = new DefaultAuthoritiesWindow();
+				var chooseAuth:InitialUserWindow = new InitialUserWindow();
 				chooseAuth.showWindow();
 			}
 		}
