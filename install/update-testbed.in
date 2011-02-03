@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2010-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -142,7 +142,7 @@ if ($SRCDIR =~ /^\//) {
 }
 
 my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
-	       "-I${objdir}/../db", 
+	       "-I${objdir}/../db", "-I${objdir}/../event/lib", 
 	       "-I${abssrcdir}/tbsetup",
 	       "-I${abssrcdir}/install",
 	       # To catch a few extra things that do not normally change.
