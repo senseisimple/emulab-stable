@@ -10,22 +10,35 @@ use NodeType;
 sub InstallUpdate($$)
 {
     my ($version, $phase) = @_;
-    my $pid  = "emulab-ops";
+    my @scripts = (
+	"frisbeeimage",
+	"frisbeelauncher",
+	"subboss_frisbeelauncher_wrapper");
+
+    my $gotem = 0;
+    foreach my $s (@scripts) {
+	if (-x "$TBROOT/sbin/$s") {
+	    $gotem = 1;
+	    last;
+	}
+    }
 
     #
     # If something should run in the pre-install phase.
     #
     if ($phase eq "pre") {
-	if (-x "$TBROOT/sbin/frisbeelauncher") {
-	    print("To make effective use of the frisbee master server you\n",
-		  "will need to update your disk loader MFS(es).  You will\n",
-		  "need new /etc/testbed/{tmcd,frisbee,rc.frisbee} files.\n",
-		  "You can download them from:\n",
-		  "   http://www.emulab.net/downloads/frisbee-mfs-update.tar.gz\n",
-		  "and follow the instructions:\n",
-		  "   http://users.emulab.net/trac/emulab/wiki/UpdateMFS\n",
-		  "or install a completely new MFS from:\n",
-		  "   http://www.emulab.net/downloads/tftpboot-latest.tar.gz\n",
+	if ($gotem) {
+	    print("\n",
+		  "*** PLEASE NOTE:\n",
+		  "*** To make effective use of the frisbee master server you\n",
+		  "*** will need to update your disk loader MFS(es).  You will\n",
+		  "*** need new /etc/testbed/{tmcd,frisbee,rc.frisbee} files.\n",
+		  "*** You can download them from:\n",
+		  "***   http://www.emulab.net/downloads/frisbee-mfs-update.tar.gz\n",
+		  "*** and follow the instructions:\n",
+		  "***   http://users.emulab.net/trac/emulab/wiki/UpdateMFS\n",
+		  "*** or install a completely new MFS from:\n",
+		  "***   http://www.emulab.net/downloads/tftpboot-latest.tar.gz\n",
 		  "\n");
 	}
     }
@@ -41,9 +54,10 @@ sub InstallUpdate($$)
 	};
 	Phase "clean-scripts", "Clean out old frisbee scripts", sub {
 	    PhaseSkip("already done")
-		if (! -x "$TBROOT/sbin/frisbeelauncher");
-	    PhaseFail("Could not remove frisbeelauncher")
-		if (!unlink("$TBROOT/sbin/frisbeelauncher"));
+		if (!$gotem);
+	    foreach my $s (@scripts) {
+		unlink("$TBROOT/sbin/$s");
+	    }
 	    PhaseSucceed();
 	};
     }
