@@ -1,0 +1,52 @@
+#
+# Do things to set up the frisbee master server.
+#
+use strict;
+use libinstall;
+use emdb;
+use Image;
+use NodeType;
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+    my $pid  = "emulab-ops";
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	if (-x "$TBROOT/sbin/frisbeelauncher") {
+	    print("To make effective use of the frisbee master server you\n",
+		  "will need to update your disk loader MFS(es).  You will\n",
+		  "need new /etc/testbed/{tmcd,frisbee,rc.frisbee} files.\n",
+		  "You can download them from:\n",
+		  "   http://www.emulab.net/downloads/frisbee-mfs-update.tar.gz\n",
+		  "and follow the instructions:\n",
+		  "   http://users.emulab.net/trac/emulab/wiki/UpdateMFS\n",
+		  "or install a completely new MFS from:\n",
+		  "   http://www.emulab.net/downloads/tftpboot-latest.tar.gz\n",
+		  "\n");
+	}
+    }
+
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+	Phase "clean-DB", "Clean out the old frisbee info", sub {
+	    PhaseFail("Could not clean out frisbee_blobs table")
+		if (!DBQueryWarn("DELETE FROM frisbee_blobs"));
+	    PhaseSucceed();
+	};
+	Phase "clean-scripts", "Clean out old frisbee scripts", sub {
+	    PhaseSkip("already done")
+		if (! -x "$TBROOT/sbin/frisbeelauncher");
+	    PhaseFail("Could not remove frisbeelauncher")
+		if (!unlink("$TBROOT/sbin/frisbeelauncher"));
+	    PhaseSucceed();
+	};
+    }
+    return 0;
+}
+1;
