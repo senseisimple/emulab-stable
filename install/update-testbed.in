@@ -142,7 +142,7 @@ if ($SRCDIR =~ /^\//) {
 }
 
 my @INCDIRS = ("-I${objdir}", "-I${objdir}/../tbsetup",
-	       "-I${objdir}/../db", 
+	       "-I${objdir}/../db", "-I${objdir}/../event/lib", 
 	       "-I${abssrcdir}/tbsetup",
 	       "-I${abssrcdir}/install",
 	       # To catch a few extra things that do not normally change.
