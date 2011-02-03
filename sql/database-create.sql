@@ -3269,6 +3269,27 @@ CREATE TABLE `reserved` (
 --
 -- Table structure for table `scheduled_reloads`
 --
+DROP TABLE IF EXISTS `reserved_vlantags`;
+CREATE TABLE `reserved_vlantags` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `lanid` int(11) NOT NULL default '0',
+  `vname` varchar(128) NOT NULL default '',
+  `tag` smallint(5) NOT NULL default '0',
+  `reserve_time` datetime default NULL,  
+  `locked` datetime default NULL,
+  `state` varchar(32) NOT NULL default '',
+  PRIMARY KEY (`exptidx`,`lanid`,`tag`),
+  UNIQUE KEY `vname` (`pid`,`eid`,`vname`,`tag`),
+  UNIQUE KEY `lanid` (`pid`,`eid`,`lanid`,`tag`),
+  UNIQUE KEY `tag` (`tag`),
+  KEY `id` (`lanid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `scheduled_reloads`
+--
 
 DROP TABLE IF EXISTS `scheduled_reloads`;
 CREATE TABLE `scheduled_reloads` (
