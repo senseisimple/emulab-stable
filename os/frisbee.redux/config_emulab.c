@@ -131,11 +131,24 @@ set_get_options(struct config_host_authinfo *ai, int ix)
 		strcat(str, " -W 54000000");
 #endif
 
+#if 1
+	/*
+	 * In the short run, we leave this at pre-master-server levels
+	 * for compatibility (we still support advance startup of servers
+	 * via the localhost proxy).
+	 *
+	 * We also need this at Utah while we work out some MC problems on
+	 * our control net (sometimes nodes can take minutes before they
+	 * actually hook up with the server.
+	 */
+	strcat(str, " -T 1800");
+#else
 	/*
 	 * We use a small server inactive timeout since we no longer have
 	 * to start up a frisbeed well in advance of the client(s).
 	 */
 	strcat(str, " -T 60");
+#endif
 
 	ai->imageinfo[ix].get_options = mystrdup(str);
 }

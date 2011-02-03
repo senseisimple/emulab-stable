@@ -863,21 +863,6 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 				msg->body.getreply.error = MS_ERROR_FAILED;
 				goto reply;
 			}
-			/*
-			 * XXX ugh, fill in a longer wait time for the
-			 * server since we are starting this up at some
-			 * indeterminate time before the client.
-			 */
-			if (ii->get_options) {
-				char *gopts, *to = " -T 1800";
-				gopts = malloc(strlen(ii->get_options) +
-					       strlen(to) + 1);
-				assert(gopts != NULL);
-				strcpy(gopts, ii->get_options);
-				strcat(gopts, to);
-				free(ii->get_options);
-				ii->get_options = gopts;
-			}
 		}
 #endif
 		ci = startserver(ii, myaddr, ntohl(cip->sin_addr.s_addr),
