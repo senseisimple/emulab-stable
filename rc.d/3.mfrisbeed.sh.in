@@ -58,7 +58,9 @@ args="-C emulab -i @BOSSNODE_IP@"
 if [ -n "@OUTERBOSS_NODENAME@" ]; then
     args="$args -S @OUTERBOSS_NODENAME@"
 fi
-if [ -x @prefix@/sbin/daemon_wrapper ]; then
+
+# XXX I am actually NOT going to run it under the wrapper for now
+if false && [ -x @prefix@/sbin/daemon_wrapper ]; then
     @prefix@/sbin/daemon_wrapper -i 30 -l @prefix@/log/mfrisbeed_wrapper.log \
 	@prefix@/sbin/mfrisbeed -d $args
 else
