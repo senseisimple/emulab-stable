@@ -48,6 +48,7 @@
 			{
 				user.sslCertificate = this.sslCert.text;
 				user.sslPrivateKey = this.sslKey.text;
+				Main.Application().saveLocalData();
 			}
 		]]>
 	</fx:Script>

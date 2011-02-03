@@ -4,7 +4,9 @@
 						xmlns:mx="library://ns.adobe.com/flex/mx"
 						xmlns:display="protogeni.display.*"
 						title="Initial User Settings" close="closeWindow()"
-						defaultButton="{okButton}" initialize="authorities.selectedItem = Main.geniHandler.CurrentUser.authority">
+						defaultButton="{okButton}"
+						initialize="authorities.selectedItem = Main.geniHandler.CurrentUser.authority"
+						creationComplete="this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;">
 	<fx:Script>
 		<![CDATA[
 			import mx.core.FlexGlobals;
@@ -16,6 +18,7 @@
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
 				Main.geniHandler.CurrentUser.sslCertificate = sslCert.text;
 				Main.geniHandler.CurrentUser.sslPrivateKey = sslKey.text;
+				Main.Application().saveLocalData();
 				Main.geniHandler.rpcHandler.startAuthenticatedInitiationSequence();
 			}
 		]]>
@@ -26,9 +29,9 @@
 	<s:Label text="Which authority are you registered with?" />
 	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%"/>
 	<s:Label text="Certificate" />
-	<s:TextArea id="sslCert" width="100%" height="50%" />
+	<s:TextArea id="sslCert" text="{Main.geniHandler.CurrentUser.sslCertificate}" width="100%" height="50%" />
 	<s:Label text="Private Key" />
-	<s:TextArea id="sslKey" width="100%" height="50%" />
+	<s:TextArea id="sslKey" text="{Main.geniHandler.CurrentUser.sslPrivateKey}" width="100%" height="50%" />
 	<display:controlBarContent>
 		<s:Button id="okButton" label="OK" click="save(); closeWindow();" />
 		<s:Button label="Cancel" click="closeWindow()" />

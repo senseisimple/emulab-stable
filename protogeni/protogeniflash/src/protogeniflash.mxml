@@ -57,9 +57,9 @@
 			import protogeni.display.GeniManagersWindow;
 			import protogeni.display.SearchWindow;
 			import protogeni.display.SlicesWindow;
-			import protogeni.display.SlicesWindow;
 			import protogeni.display.UserWindow;
 			import protogeni.resources.Slice;
+			import protogeni.resources.SliceAuthority;
 			
 			//------------------------------------------
 			// Embedded resources
@@ -83,6 +83,8 @@
 			
 			[Bindable]
 			public var slicesMenu : ArrayCollection;
+			
+			var geniLocalSharedObject:SharedObject;
 			
 			private function preinit():void {
 				Security.allowDomain("*");
@@ -119,6 +121,10 @@
 				} catch(all:Error) {
 				}
 				
+				// Saved variables
+				geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
+				loadLocalData();
+				
 				console = new protogeni.display.ConsoleWindow();
 				PopUpManager.addPopUp(console, this, false);
 				PopUpManager.centerPopUp(console);
@@ -152,6 +158,7 @@
 				Main.geniHandler.mapHandler.map = map;
 				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
 				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				loadLocalData();
 				
 				cms.init();
 				user.load(Main.geniHandler.CurrentUser);
@@ -252,6 +259,37 @@
 				Main.geniHandler.rpcHandler.clearAll();
 				reinit(authenticateUser);
 				Main.geniHandler.rpcHandler.startInitiationSequence();
+			}
+			
+			public function loadLocalData():void
+			{
+				if (geniLocalSharedObject.size > 0)
+				{
+					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
+						if(sa.Url == geniLocalSharedObject.data.authority) {
+							Main.geniHandler.CurrentUser.authority = sa;
+							break;
+						}
+					}
+
+					Main.geniHandler.CurrentUser.sslCertificate = geniLocalSharedObject.data.sslCertificate;
+					Main.geniHandler.CurrentUser.sslPrivateKey = geniLocalSharedObject.data.sslPrivateKey;
+				}
+			}
+			
+			public function saveLocalData():void
+			{
+				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
+				geniLocalSharedObject.data.sslCertificate = Main.geniHandler.CurrentUser.sslCertificate;
+				geniLocalSharedObject.data.sslPrivateKey = Main.geniHandler.CurrentUser.sslPrivateKey;
+				try
+				{
+					geniLocalSharedObject.flush();
+				}
+				catch (e:Error)
+				{
+					trace("Problem saving shared object");
+				}
 			}
 			
 		]]>
