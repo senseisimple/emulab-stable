@@ -68,6 +68,9 @@ int		busywait = 0;
 char		*proxyfor = NULL;
 static struct timeval stamp;
 static struct in_addr serverip;
+#ifdef MASTER_SERVER
+static int	xfermethods = MS_METHOD_MULTICAST;
+#endif
 
 /* Forward Decls */
 static void	PlayFrisbee(void);
@@ -166,6 +169,7 @@ char *usagestr =
  " -Q file-ID      Ask the server (-S) about the indicated file (image).\n"
  "                 Tells whether the image is accessible by this node/user.\n"
  " -B seconds      Time to wait between queries if an image is busy (-F).\n"
+ " -X method       Transfer method for -F, one of: ucast, mcast or bcast.\n"
  " -K seconds      Send a multicast keep alive after a period of inactivity.\n"
  "\n"
  "tuning options (if you don't know what they are, don't use em!):\n"
@@ -209,7 +213,7 @@ main(int argc, char **argv)
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:B:F:Q:P:")) != -1)
+	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:B:F:Q:P:X:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -275,6 +279,32 @@ main(int argc, char **argv)
 		case 'P':
 			proxyfor = optarg;
 			break;
+		case 'X':
+		{
+			char *ostr, *str, *cp;
+			int nm = 0;
+
+			str = ostr = strdup(optarg);
+			while ((cp = strsep(&str, ",")) != NULL) {
+				if (strcmp(cp, "ucast") == 0)
+					nm |= MS_METHOD_UNICAST;
+				else if (strcmp(cp, "mcast") == 0)
+					nm |= MS_METHOD_MULTICAST;
+				else if (strcmp(cp, "bcast") == 0)
+					nm |= MS_METHOD_BROADCAST;
+				else if (strcmp(cp, "any") == 0)
+					nm = MS_METHOD_ANY;
+			}
+			free(ostr);
+			if (nm == 0) {
+				fprintf(stderr,
+					"-X should specify one or more of: "
+					"'ucast', 'mcast', 'bcast', 'any'\n");
+				exit(1);
+			}
+			xfermethods = nm;
+			break;
+		}
 #endif
 
 		case 't':
@@ -372,7 +402,7 @@ main(int argc, char **argv)
 #ifdef MASTER_SERVER
 	if (imageid) {
 		GetReply reply;
-		int method = askonly ? MS_METHOD_ANY : MS_METHOD_MULTICAST;
+		int method = askonly ? MS_METHOD_ANY : xfermethods;
 		int timo = 5; /* XXX */
 		int host = 0;
 
@@ -412,8 +442,18 @@ main(int argc, char **argv)
 			mcastaddr.s_addr = htonl(reply.addr);
 			portnum = reply.port;
 
-			log("%s: address: %s:%d",
-			    imageid, inet_ntoa(mcastaddr), portnum);
+			if (serverip.s_addr == mcastaddr.s_addr)
+				log("%s: address: %s:%d",
+				    imageid, inet_ntoa(mcastaddr), portnum);
+			else {
+				char serverstr[sizeof("XXX.XXX.XXX.XXX")+1];
+
+				strncpy(serverstr, inet_ntoa(serverip),
+					sizeof serverstr);
+				log("%s: address: %s:%d, server: %s",
+				    imageid, inet_ntoa(mcastaddr), portnum,
+				    serverstr);
+			}
 			break;
 		}
 	}
