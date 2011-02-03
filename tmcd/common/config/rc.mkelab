@@ -1196,6 +1196,9 @@ sub SetupOpsNode($)
 
     print RC "inetd_enable=\"YES\"\n";
     print RC "sendmail_enable=\"YES\"\n";
+    if ($emulabconfig{"CONFIG_MAILMAN"}) {
+	print RC "mailman_enable=\"YES\"\n";
+    }
     print RC "sshd_enable=\"YES\"\n";
 
     print RC "ntpdate_enable=\"YES\"\n";
@@ -1617,7 +1620,10 @@ sub SetupBossNode()
     # Disable TSO.  It causes horrific xmit throughput with divert sockets.
     # See: http://www.freebsd.org/cgi/query-pr.cgi?pr=121257
     #
-    my $tso = "-tso";
+    my $tso = "";
+    if ($FBSD_VERSION > 6) {
+	$tso = "-tso";
+    }
 
     print RC "network_interfaces=\"$outer_controlif\"\n";
     print RC "ifconfig_${outer_controlif}=".
