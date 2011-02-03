@@ -24,6 +24,7 @@ package protogeni.communication
       super("GetVersion (" + Util.shortenString(newAm.Url, 15) + ")", "Getting the version of the aggregate manager for " + newAm.Hrn, CommunicationUtil.getVersionAm, true, true, true);
 	  ignoreReturnCode = true;
 	  am = newAm;
+	  //op.setUrl(am.Url);
 	  op.setUrl(am.Url);
     }
 
@@ -34,7 +35,7 @@ package protogeni.communication
 		try
 		{
 			am.Version = response.geni_api;
-			r = new RequestListResources(am);
+			r = new RequestListResourcesAm(am);
 			r.forceNext = true;
 		}
 		catch(e:Error)

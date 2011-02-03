@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<display:ImageButton xmlns="protogeniflash.*" xmlns:mx="http://www.adobe.com/2006/mxml"
-	source="{DisplayUtil.pageWhiteCodeIcon}"
-	toolTip="View the most recent RSpec" xmlns:display="protogeni.display.*">
-</display:ImageButton>

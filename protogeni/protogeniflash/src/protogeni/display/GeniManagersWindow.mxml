@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
-	title="GENI Managers"
-	width="270" height="360"
-	defaultButton="{okButton}"
-	resize="cmVbox.height = this.height - 108"
-	creationComplete="okButton.setFocus()"
-	horizontalScrollPolicy="off" verticalScrollPolicy="off"
-	xmlns:display="protogeni.display.*">
-	
-	<mx:Style>
+<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						title="GENI Managers"
+						width="270" height="360"
+						defaultButton="{okButton}"
+						resize="cmVbox.height = this.height - 108"
+						creationComplete="okButton.setFocus()" close="closeWindow()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace display "protogeni.display.*";
 		
 		.validStyle {
 			color: green;
@@ -37,9 +42,8 @@
 			textSelectedColor: #FF7F00;
 			themeColor: #FF7F00;
 		}
-	</mx:Style>
-	
-	<mx:Script>
+	</fx:Style>
+	<fx:Script>
 		<![CDATA[
 			import flash.net.navigateToURL;
 			
@@ -51,28 +55,28 @@
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.ProtogeniEvent;
-			import protogeni.ProtogeniHandler;
+			import protogeni.GeniEvent;
+			import protogeni.GeniHandler;
 			import protogeni.Util;
 			import protogeni.resources.ComponentManager;
 			import protogeni.resources.GeniManager;
-
+			
 			public function success():void {
 				okButton.enabled = false;
-				Main.protogeniHandler.mapHandler.drawMap();
+				Main.geniHandler.mapHandler.drawMap();
 			}
 			
 			public function openFirst():void {
-				show();
-       			init();
+				showWindow();
+				init();
 			}
 			
 			public function init():void
 			{
-				okButton.enabled = Main.protogeniHandler.GeniManagers.length > 0;
+				okButton.enabled = Main.geniHandler.GeniManagers.length > 0;
 				refreshList();
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.GENIMANAGER_CHANGED, Reset);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.GENIMANAGERS_CHANGED, refreshList);	
+				Main.geniHandler.addEventListener(GeniEvent.GENIMANAGER_CHANGED, Reset);
+				Main.geniHandler.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, refreshList);	
 			}
 			
 			public function refreshList(junk:* = null):void {
@@ -83,7 +87,7 @@
 				{
 					var found:Boolean = false;
 					var checkboxCm:CheckBox = (cmVbox.getChildAt(i) as HBox).getChildAt(0) as CheckBox;
-					for each(var testGm:GeniManager in Main.protogeniHandler.GeniManagers)
+					for each(var testGm:GeniManager in Main.geniHandler.GeniManagers)
 					{
 						if(checkboxCm.label == testGm.Hrn)
 						{
@@ -105,7 +109,7 @@
 					}
 				}
 				
-				for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers )
+				for each(var gm:GeniManager in Main.geniHandler.GeniManagers )
 				{
 					if(!existingCms.contains(gm))
 						addGm(gm);
@@ -125,7 +129,7 @@
 				this.validateNow();
 			}
 			
-			public function Reset(e:ProtogeniEvent):void
+			public function Reset(e:GeniEvent):void
 			{
 				var gm:GeniManager = e.changedObject as GeniManager;
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
@@ -144,7 +148,7 @@
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
 					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-					for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers )
+					for each(var gm:GeniManager in Main.geniHandler.GeniManagers )
 					{
 						if(gm.Hrn == cmCheckbox.label)
 						{
@@ -217,8 +221,8 @@
 					cmCheckbox.selected = true;
 					//cmCheckbox.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false, false));
 				}
-				for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers)
-					gm.Show = true;
+				for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
+				gm.Show = true;
 				okButton.enabled = cmVbox.getChildren().length > 0;
 			}
 			
@@ -259,20 +263,19 @@
 				}
 			}
 		]]>
-	</mx:Script>
-			
+	</fx:Script>
 	<mx:HBox width="100%" horizontalAlign="right">
-	<mx:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true"/>
-	<display:ImageButton id="refreshButton" source="{DisplayUtil.refreshIcon}" click="Main.protogeniHandler.rpcHandler.loadComponentManagers();"/>
-	<mx:Spacer width="100%"/>
-	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
-	<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 
+		<mx:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true"/>
+		<display:ImageButton id="refreshButton" source="{DisplayUtil.refreshIcon}" click="Main.geniHandler.rpcHandler.loadComponentManagers();"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+		<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 
 	</mx:HBox>
 	<mx:VBox width="100%" height="200" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2" horizontalScrollPolicy="off">
 	</mx:VBox>
-	<mx:ControlBar>
+	<display:controlBarContent>
 		<mx:Spacer width="100%"/>
-		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" click="close();"/>
+		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" click="closeWindow();"/>
 		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" enabled="false"/>
-	</mx:ControlBar>
-</display:DefaultWindow>
+	</display:controlBarContent>
+</display:DefaultWindow2>

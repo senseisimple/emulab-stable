@@ -28,7 +28,9 @@
 	
 	import protogeni.Util;
 	import protogeni.communication.Operation;
+	import protogeni.display.DefaultAuthoritiesWindow;
 	import protogeni.display.DisplayUtil;
+	import protogeni.resources.AggregateManager;
 	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.Slice;
@@ -49,24 +51,30 @@
 		// Run everything from the very beginning
 		public function startInitiationSequence():void
 		{
-			if(Main.protogeniHandler.unauthenticatedMode) {
+			if(Main.geniHandler.unauthenticatedMode) {
 				
 				// Currently limited to Utah
 				var newCm:ComponentManager = new ComponentManager();
 				newCm.Url = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
 				newCm.Hrn = "utahemulab.cm";
 				newCm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
-				Main.protogeniHandler.GeniManagers.add(newCm);
+				Main.geniHandler.GeniManagers.add(newCm);
 				newCm.Status = GeniManager.INPROGRESS;
 				pushRequest(new RequestDiscoverResourcesPublic(newCm));
-				Main.protogeniHandler.dispatchGeniManagerChanged(newCm);
-				Main.Pgmap().showAuthenticate();
+				Main.geniHandler.dispatchGeniManagerChanged(newCm);
+				Main.Application().showAuthenticate();
 			} else {
-				pushRequest(new RequestGetCredential());
-				pushRequest(new RequestGetKeys());
-				loadListAndComponentManagersAndSlices();
-				Main.Pgmap().hideAuthenticate();
+				var chooseAuth:DefaultAuthoritiesWindow = new DefaultAuthoritiesWindow();
+				chooseAuth.showWindow();
 			}
+		}
+		
+		public function startAuthenticatedInitiationSequence():void
+		{
+			pushRequest(new RequestGetCredential());
+			pushRequest(new RequestGetKeys());
+			loadListAndComponentManagersAndSlices();
+			Main.Application().hideAuthenticate();
 		}
 		
 		public function loadListAndComponentManagers():void
@@ -81,7 +89,7 @@
 		
 		public function loadComponentManagers():void
 		{
-			for each(var cm:ComponentManager in Main.protogeniHandler.GeniManagers)
+			for each(var cm:ComponentManager in Main.geniHandler.GeniManagers)
 			{
 				pushRequest(new RequestDiscoverResources(cm));
 			}
@@ -92,13 +100,13 @@
 			var newSlice:Slice = new Slice();
 			newSlice.hrn = name;
 			newSlice.urn = Util.makeUrn(CommunicationUtil.defaultAuthority, "slice", name);
-			newSlice.creator = Main.protogeniHandler.CurrentUser;
+			newSlice.creator = Main.geniHandler.CurrentUser;
 			pushRequest(new RequestSliceResolve(newSlice, true));
 		}
 		
 		public function submitSlice(slice:Slice):void
 		{
-			var old:Slice = Main.protogeniHandler.CurrentUser.slices.getByUrn(slice.urn);
+			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(slice.urn);
 			if(old != null && old.hasAllocatedResources())
 			{
 				var newSlivers:SliverCollection = new SliverCollection();
@@ -117,44 +125,66 @@
 						updateSlivers.removeItemAt(updateSlivers.getItemIndex(s));
 					}
 				}
-				Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 				
 				// Create
-				for each(sliver in newSlivers)
-					pushRequest(new RequestSliverCreate(sliver));
+				for each(var sliver:Sliver in newSlivers) {
+					if(sliver.manager is AggregateManager)
+						pushRequest(new RequestSliverCreateAm(sliver));
+					else if(sliver.manager is ComponentManager)
+						pushRequest(new RequestSliverCreate(sliver));
+				}
+					
 				// Update
-				for each(var sliver:Sliver in updateSlivers)
+				for each(sliver in updateSlivers) {
 					pushRequest(new RequestSliverUpdate(sliver));
+				}
+				
 				// Delete
-				for each(sliver in deleteSlivers)
-					pushRequest(new RequestSliverDelete(sliver));
+				for each(sliver in deleteSlivers) {
+					if(sliver.manager is AggregateManager)
+						pushRequest(new RequestSliverDeleteAm(sliver));
+					else if(sliver.manager is ComponentManager)
+						pushRequest(new RequestSliverDelete(sliver));
+				}
 			} else {
 				// Create
-				Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
-				for each(sliver in slice.slivers)
-					pushRequest(new RequestSliverCreate(sliver));
+				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+				for each(sliver in slice.slivers) {
+					if(sliver.manager is AggregateManager)
+						pushRequest(new RequestSliverCreateAm(sliver));
+					else if(sliver.manager is ComponentManager)
+						pushRequest(new RequestSliverCreate(sliver));
+				}
 			}
 		}
 		
 		public function refreshSlice(slice:Slice):void
 		{
-			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers)
-				pushRequest(new RequestSliverStatus(sliver));
+			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
+			for each(var sliver:Sliver in slice.slivers) {
+				if(sliver.manager is AggregateManager)
+					pushRequest(new RequestSliverStatusAm(sliver));
+				else if(sliver.manager is ComponentManager)
+					pushRequest(new RequestSliverStatus(sliver));
+			}
 		}
 		
 		public function deleteSlice(slice:Slice):void
 		{
-			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
-				pushRequest(new RequestSliverDelete(sliver));
+				if(sliver.manager is AggregateManager)
+					pushRequest(new RequestSliverDeleteAm(sliver));
+				else if(sliver.manager is ComponentManager)
+					pushRequest(new RequestSliverDelete(sliver));
 			}
 		}
 		
 		public function startSlice(slice:Slice):void
 		{
-			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
 				pushRequest(new RequestSliverStart(sliver));
@@ -163,7 +193,7 @@
 		
 		public function stopSlice(slice:Slice):void
 		{
-			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
 				pushRequest(new RequestSliverStop(sliver));
@@ -172,7 +202,7 @@
 		
 		public function restartSlice(slice:Slice):void
 		{
-			Main.protogeniHandler.CurrentUser.slices.addOrReplace(slice);
+			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers)
 			{
 				pushRequest(new RequestSliverRestart(sliver));
@@ -204,7 +234,7 @@
 			Main.log.setStatus(start.name, false);
 			Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
 				
-			Main.protogeniHandler.dispatchQueueChanged();
+			Main.geniHandler.dispatchQueueChanged();
 			
 			this.start();
 		}
@@ -228,7 +258,7 @@
 				var name:String = r.name;
 				Main.log.appendMessage(new LogMessage(url, name + "Removed", "Request removed", false, LogMessage.TYPE_END));
 			}
-			Main.protogeniHandler.dispatchQueueChanged();
+			Main.geniHandler.dispatchQueueChanged();
 		}
 		
 		private function failure(node:Request, event : ErrorEvent, fault : MethodFault) : void
@@ -251,7 +281,7 @@
 				if(msg.search("#2048") > -1)
 					failMessage += "\nStream error, possibly due to server error";
 				else if(msg.search("#2032") > -1) {
-					if(Main.protogeniHandler.unauthenticatedMode)
+					if(Main.geniHandler.unauthenticatedMode)
 						failMessage += "\nIO Error, possibly due to server problems";
 					else
 						failMessage += "\nIO Error, possibly due to server problems or you have no SSL certificate";
@@ -276,10 +306,10 @@
 			
 			if(msg.search("#2048") > -1 || msg.search("#2032") > -1)
 			{
-				if(!Main.protogeniHandler.unauthenticatedMode
-					&& (Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0))
+				if(!Main.geniHandler.unauthenticatedMode
+					&& (Main.geniHandler.CurrentUser.credential == null || Main.geniHandler.CurrentUser.credential.length == 0))
 				{
-					Alert.show("It appears that you may have never run this program before.  In order to run correctly, you will need to follow the steps at https://www.protogeni.net/trac/protogeni/wiki/FlashClientSetup.  Would you like to visit now?", "Set up", Alert.YES | Alert.NO, Main.Pgmap(),
+					Alert.show("It appears that you may have never run this program before.  In order to run correctly, you will need to follow the steps at https://www.protogeni.net/trac/protogeni/wiki/FlashClientSetup.  Would you like to visit now?", "Set up", Alert.YES | Alert.NO, Main.Application(),
 						function runSetup(e:CloseEvent):void
 						{
 							if(e.detail == Alert.YES)

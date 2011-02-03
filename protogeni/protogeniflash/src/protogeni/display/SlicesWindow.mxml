@@ -1,23 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow
-	xmlns:mx="http://www.adobe.com/2006/mxml"
-	title="Slices" show="refreshView()"
-	width="300" height="220"
-	xmlns:display="protogeni.display.*">
-	
-	<mx:Script>
+<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						title="Slices" show="refreshView()"
+						width="300" height="220" close="closeWindow()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
 		<![CDATA[
 			import mx.controls.Alert;
 			import mx.controls.Button;
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.ProtogeniEvent;
-			import protogeni.ProtogeniHandler;
-			import protogeni.resources.Slice; 
+			import protogeni.GeniEvent;
+			import protogeni.GeniHandler;
+			import protogeni.resources.Slice;
 			
 			public function openFirst():void {
-				show();
+				showWindow();
 				init();
 				
 				focusManager.setFocus(sliceName);
@@ -25,51 +27,51 @@
 			
 			public function init():void
 			{
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, refreshView);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refreshView);
+				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, refreshView);
+				Main.geniHandler.addEventListener(GeniEvent.SLICE_CHANGED, refreshView);
 			}
 			
 			public function createSlice():void
 			{
-				if(Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0)
+				if(Main.geniHandler.CurrentUser.credential == null || Main.geniHandler.CurrentUser.credential.length == 0)
 				{
 					Alert.show("User credential needed before trying to create slice.");
 					return;
 				}
-					
-				if(Main.protogeniHandler.CurrentUser.keys == null || Main.protogeniHandler.CurrentUser.keys.length == 0)
+				
+				if(Main.geniHandler.CurrentUser.keys == null || Main.geniHandler.CurrentUser.keys.length == 0)
 				{
 					Alert.show("User keys needed before trying to create slice.");
 					return;
 				}
-
+				
 				if(sliceName.text.length == 0)
 				{
 					Alert.show("Please input a name for the slice");
 					focusManager.setFocus(sliceName);
 					return;
 				}
-
-				Main.protogeniHandler.rpcHandler.createSlice(sliceName.text);
+				
+				Main.geniHandler.rpcHandler.createSlice(sliceName.text);
 			}
 			
 			public function refreshView(junk:* = null):void
 			{
-				this.removeAllChildren();
-				for each(var s:Slice in Main.protogeniHandler.CurrentUser.slices)
+				slices.removeAllElements();
+				for each(var s:Slice in Main.geniHandler.CurrentUser.slices)
 				{
 					var b:Button = DisplayUtil.getSliceButton(s);
 					b.percentWidth = 100;
-					this.addChild(b);
+					slices.addElement(b);
 				}
 			}
-
 		]]>
-	</mx:Script>
-	
-	<mx:ControlBar>
+	</fx:Script>
+	<s:Scroller width="100%" height="100%">
+		<s:HGroup id="slices" />
+	</s:Scroller>
+	<display:controlBarContent>
 		<display:PromptingTextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-" prompt="New slice name..." />
 		<display:ImageButton id="createButton" source="{DisplayUtil.actionIcon}" click="createSlice();" />
-	</mx:ControlBar>
-	
-</display:DefaultWindow>
+	</display:controlBarContent>
+</display:DefaultWindow2>

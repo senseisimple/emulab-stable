@@ -37,11 +37,11 @@ package protogeni.display
 	import protogeni.resources.VirtualNode;
 	
     // Handles adding all the ProtoGENI info to the Google Map component
-	public class ProtogeniMapHandler
+	public class GeniMapHandler
 	{
-		public var map:ProtogeniMap;
+		public var map:GeniMap;
 		
-		public function ProtogeniMapHandler()
+		public function GeniMapHandler()
 		{
 		}
 		
@@ -103,7 +103,7 @@ package protogeni.display
 	    	}
 	    	
 	    	if(drawGroup.collection.length > 0) {
-	    		markers.push(new ProtogeniMapMarker(g));
+	    		markers.push(new GeniMapMarker(g));
 	    	} else {
 	    		// Draw an empty marker
 	    		var nonodes:Marker = new Marker(
@@ -232,7 +232,7 @@ package protogeni.display
 	    
 	    public function drawAll():void {
 	    	drawMap();
-	    	Main.Pgmap().fillCombobox();
+	    	Main.Application().fillCombobox();
 	    }
 	    
 	    public function drawMap(junk:* = null):void {
@@ -246,7 +246,7 @@ package protogeni.display
 	        markers = [];
 			
 	    	// Draw physical components
-	    	for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers)
+	    	for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
 	    	{
 	    		if(!gm.Show)
 	    			continue;
@@ -277,7 +277,7 @@ package protogeni.display
 	        }
 
 			// Cluster node groups close to each other
-			var marker:ProtogeniMapMarker;
+			var marker:GeniMapMarker;
 			clusterer = new Clusterer(markers, map.getZoom(), 35);
 			attachedMarkers = [];
 			var clusteredMarkers:Array = clusterer.clusters;
@@ -287,7 +287,7 @@ package protogeni.display
 					// there is only a single marker in this cluster
 					marker = cluster[0];
 				} else {
-					marker = new ProtogeniMapMarker(cluster);
+					marker = new GeniMapMarker(cluster);
 				}
 				map.addOverlay(marker);
 				attachedMarkers.push(marker);

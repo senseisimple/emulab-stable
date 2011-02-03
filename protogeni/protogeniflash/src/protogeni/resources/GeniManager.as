@@ -138,7 +138,7 @@ package protogeni.resources
 			interfaceDictionary = new Dictionary();
 			nodeNameDictionary = new Dictionary();
 			subnodeList = new ArrayCollection();
-			Main.Pgmap().stage.addEventListener(Event.ENTER_FRAME, parseNext);
+			Main.Application().stage.addEventListener(Event.ENTER_FRAME, parseNext);
 		}
 		
 		private function parseNext(event : Event) : void
@@ -162,8 +162,8 @@ package protogeni.resources
 				this.unavailableNodes = this.AllNodes.length - availableNodes;
 				this.percentageAvailable = (this.availableNodes / this.totalNodes) * 100;
 				Status = GeniManager.VALID;
-				Main.protogeniHandler.dispatchGeniManagerChanged(this);
-				Main.Pgmap().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
+				Main.geniHandler.dispatchGeniManagerChanged(this);
+				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				myAfter();
 			}
 			else
@@ -172,7 +172,7 @@ package protogeni.resources
 				interfaceDictionary = null;
 				nodeNameDictionary = null;
 				subnodeList = null;
-				Main.Pgmap().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
+				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				Alert.show("Problem parsing RSPEC");
 				// Throw exception
 			}
@@ -237,7 +237,7 @@ package protogeni.resources
 						n.managerString = p.@component_manager_id;
 				}
 				
-				n.manager = Main.protogeniHandler.GeniManagers.getByUrn(n.managerString);
+				n.manager = Main.geniHandler.GeniManagers.getByUrn(n.managerString);
 				
 				for each(var ix:XML in p.children()) {
 					if(ix.localName() == "interface") {
@@ -626,7 +626,7 @@ package protogeni.resources
 						nodeReferences[nac.urn] = ref;
 					}
 					if(locationReferences[ref] != null)
-						Alert.show("Duplicate reference!!!!", "Problem",4, Main.Pgmap());
+						Alert.show("Duplicate reference!!!!", "Problem",4, Main.Application());
 					locationReferences[ref] = newLocation;
 				}
 			}
@@ -658,7 +658,7 @@ package protogeni.resources
 					};
 					locations.addItem(newLocation);
 					if(locationReferences[ref] != null)
-						Alert.show("Duplicate reference!!!!", "Problem",4, Main.Pgmap());
+						Alert.show("Duplicate reference!!!!", "Problem",4, Main.Application());
 					locationReferences[ref] = newLocation;
 					locationReferences[nodeReferences[currentNode.urn]] = newLocation;
 				}

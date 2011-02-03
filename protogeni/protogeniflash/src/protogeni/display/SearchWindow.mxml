@@ -1,27 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:display="protogeni.display.*" title="Search" width="500" height="300">
-
-	<mx:Script>
+<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						width="500" height="300"
+						title="Search"
+						close="closeWindow()">
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
 		<![CDATA[
+			import mx.core.IVisualElement;
 			protected function search():void
 			{
-				resultsBox.removeAllChildren();
-				var results:Array = Main.protogeniHandler.search(searchText.text, matchCheck.selected);
+				resultsBox.removeAllElements();
+				var results:Array = Main.geniHandler.search(searchText.text, matchCheck.selected);
 				for each(var d:DisplayObject in results)
-					resultsBox.addChild(d);
+					resultsBox.addElement(d as IVisualElement);
 				if(results.length == 0)
-					resultsBox.addChild(DisplayUtil.getLabel("No results"));
+					resultsBox.addElement(DisplayUtil.getLabel("No results"));
 			}
 		]]>
-	</mx:Script>
+	</fx:Script>
 
-	<mx:HBox width="100%">
-		<mx:TextInput width="100%" id="searchText" enter="search()"/>
-		<mx:Button label="Search" click="search()"/>
-	</mx:HBox>
-	<mx:HBox width="100%">
-		<mx:CheckBox label="Match entire string" id="matchCheck"/>
-	</mx:HBox>
-	<mx:VBox width="100%" height="100%" id="resultsBox">
-	</mx:VBox>
-</display:DefaultWindow>
+	<s:HGroup width="100%">
+		<s:TextInput id="searchText" width="100%" enter="search()"/>
+		<s:Button label="Search" click="search()"/>
+	</s:HGroup>
+	<s:HGroup width="100%">
+		<s:CheckBox label="Match entire string" id="matchCheck"/>
+	</s:HGroup>
+	<s:Scroller width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" id="resultsBox" />
+	</s:Scroller>
+</display:DefaultWindow2>

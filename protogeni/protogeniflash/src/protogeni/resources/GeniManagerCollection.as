@@ -2,11 +2,11 @@ package protogeni.resources
 {
 	import mx.collections.ArrayCollection;
 	
-	import protogeni.ProtogeniHandler;
+	import protogeni.GeniHandler;
 	
 	public class GeniManagerCollection extends ArrayCollection
 	{
-		private var owner:ProtogeniHandler;
+		private var owner:GeniHandler;
 		
 		public function GeniManagerCollection(source:Array=null)
 		{
@@ -16,7 +16,7 @@ package protogeni.resources
 		public function add(gm:GeniManager):void
 		{
 			this.addItem(gm);
-			Main.protogeniHandler.dispatchGeniManagersChanged();
+			Main.geniHandler.dispatchGeniManagersChanged();
 		}
 		
 		public function clear():void

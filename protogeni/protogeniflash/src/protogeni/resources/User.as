@@ -29,6 +29,8 @@
 		public var email:String;
 		[Bindable]
 		public var name:String;
+		[Bindable]
+		public var authority:SliceAuthority;
 		public var credential:String;
 		public var keys:Array;
 		[Bindable]

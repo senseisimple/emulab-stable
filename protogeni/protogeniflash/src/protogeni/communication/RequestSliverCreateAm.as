@@ -21,24 +21,25 @@ package protogeni.communication
   import protogeni.resources.VirtualLinkCollection;
   import protogeni.resources.VirtualNodeCollection;
 
-  public class RequestSliverCreate extends Request
+  public class RequestSliverCreateAm extends Request
   {
-    public function RequestSliverCreate(s:Sliver) : void
+    public function RequestSliverCreateAm(s:Sliver) : void
     {
-		super("SliverCreate", "Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
+		super("SliverCreate", "Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliverAm);
+		ignoreReturnCode = true;
 		sliver = s;
 		s.created = false;
-		op.addField("slice_urn", sliver.slice.urn);
-		op.addField("rspec", sliver.getRequestRspec().toXMLString());
-		op.addField("keys", sliver.slice.creator.keys);
-		op.addField("credentials", new Array(sliver.slice.credential));
+		op.pushField(sliver.slice.urn);
+		op.pushField([sliver.slice.credential]);
+		op.pushField(sliver.getRequestRspec().toXMLString());
+		op.pushField([{urn:Main.geniHandler.CurrentUser.urn, keys:sliver.slice.creator.keys}]);
 		op.setUrl(sliver.manager.Url);
 		op.timeout = 360;
     }
 	
 	override public function complete(code : Number, response : Object) : *
 	{
-		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		try
 		{
 			sliver.credential = response.value[0];
 			sliver.created = true;
@@ -58,7 +59,7 @@ package protogeni.communication
 
 			return new RequestSliverStatus(sliver);
 		}
-		else
+		catch(e:Error)
 		{
 			// Cancel remaining calls
 			var tryDeleteNode:RequestQueueNode = this.node.next;

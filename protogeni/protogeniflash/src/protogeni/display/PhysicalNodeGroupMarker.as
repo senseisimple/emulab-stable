@@ -24,7 +24,7 @@ import mx.managers.DragManager;
 	public class PhysicalNodeGroupMarker extends UIComponent {
   [Embed('../../../images/circle_blue.png')] private var CloudImg:Class;
   
-  public function PhysicalNodeGroupMarker(newLabel:String, newMarker:ProtogeniMapMarker) {
+  public function PhysicalNodeGroupMarker(newLabel:String, newMarker:GeniMapMarker) {
 	  marker = newMarker;
 	  this.addEventListener(MouseEvent.MOUSE_MOVE, drag);
       addChild(new CloudImg());
@@ -68,7 +68,7 @@ import mx.managers.DragManager;
   }
   
   private var label:String;
-  public var marker:ProtogeniMapMarker;
+  public var marker:GeniMapMarker;
   
   public function drag(e:MouseEvent):void
   {

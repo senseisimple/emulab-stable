@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:Canvas
-	xmlns:mx="http://www.adobe.com/2006/mxml" initialize="adjustWidth();"
-	width="164" height="21" borderStyle="solid" backgroundColor="#EAEAEA" borderThickness="2"
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:protogeniflash="protogeniflash.*" 
+	xmlns:display="protogeni.display.*"
+	initialize="adjustWidth();"
+	width="164" height="21" borderStyle="solid" backgroundColor="#EAEAEA"
 	mouseDown="mouseMoveHandler(event)"
-	xmlns:protogeniflash="protogeniflash.*" verticalScrollPolicy="off" horizontalScrollPolicy="off" xmlns:display="protogeni.display.*">
+	verticalScrollPolicy="off" horizontalScrollPolicy="off">
 	
 	<mx:Style>
 		.failedStyle {

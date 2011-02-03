@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
-	verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0"
-	creationComplete="main = Main.Pgmap()">
+	verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0">
 
 	<mx:Script>
 		<![CDATA[
@@ -17,8 +16,6 @@
 			[Bindable]
 			public var link:PhysicalLink = null;
 			
-			public var main:protogeniflash = null;
-			
 			public function load(l:PhysicalLink):void {
 				link = l;
 				txtBandwidth.text = Util.kbsToString(l.bandwidth);
@@ -31,7 +28,7 @@
 			public function viewRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
 				rspecView.title = "Advertisement RSPEC for " + link.name;
-				PopUpManager.addPopUp(rspecView, main, false);
+				PopUpManager.addPopUp(rspecView, Main.Application() as DisplayObject, false);
        			PopUpManager.centerPopUp(rspecView);
        			rspecView.loadXml(link.rspec);
 			}

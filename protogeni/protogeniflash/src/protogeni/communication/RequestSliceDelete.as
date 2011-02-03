@@ -26,7 +26,7 @@ package protogeni.communication
 		super("SliceDelete", "Deleting slice named " + s.hrn, CommunicationUtil.deleteSlice);
 		slice = s;
 		op.addField("slice_urn", slice.urn);
-		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		op.addField("credential", Main.geniHandler.CurrentUser.credential);
 		// What CM???
     }
 	

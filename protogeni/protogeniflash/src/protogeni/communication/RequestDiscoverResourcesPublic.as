@@ -48,7 +48,7 @@ package protogeni.communication
 		{
 			cm.Status = GeniManager.FAILED;
 			this.removeImmediately = true;
-			Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+			Main.geniHandler.dispatchGeniManagerChanged(cm);
 		}
 		
 		return null;
@@ -57,7 +57,7 @@ package protogeni.communication
 	override public function cancel():void
 	{
 		cm.Status = GeniManager.UNKOWN;
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 	}
 	
@@ -66,12 +66,12 @@ package protogeni.communication
 		running = false;
 		if(cm.Status == GeniManager.INPROGRESS)
 			cm.Status = GeniManager.FAILED;
-		Main.protogeniHandler.rpcHandler.remove(this, false);
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		Main.geniHandler.rpcHandler.remove(this, false);
+		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 		if(cm.Status == GeniManager.VALID)
 			Main.log.setStatus("Parsing " + cm.Hrn + " RSPEC Done",false);
-		Main.protogeniHandler.rpcHandler.start();
+		Main.geniHandler.rpcHandler.start();
 	}
 
     private var cm : ComponentManager;

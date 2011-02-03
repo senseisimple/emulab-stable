@@ -1,30 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <mx:VBox xmlns:mx="http://www.adobe.com/2006/mxml"
 	verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0"
-	creationComplete="main = Main.Pgmap()" xmlns:protogeniflash="protogeniflash.*" xmlns:display="protogeni.display.*">
+	xmlns:protogeniflash="protogeniflash.*" xmlns:display="protogeni.display.*">
 
 	<mx:Script>
 		<![CDATA[
-			import protogeni.resources.VirtualLink;
-			import protogeni.resources.VirtualNode;
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.controls.Label;
+			import mx.controls.Spacer;
+			import mx.managers.PopUpManager;
+			
 			import protogeni.resources.PhysicalLink;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeInterface;
-			import mx.controls.Button;
-			import mx.controls.Label;
-			import mx.controls.Alert;
-			import mx.controls.Spacer;
-			import mx.containers.HBox;
-			import mx.collections.ArrayCollection;
-			import mx.managers.PopUpManager;
+			import protogeni.resources.VirtualLink;
+			import protogeni.resources.VirtualNode;
 			
 			[Bindable]
 			public var node:PhysicalNode = null;
 			
 			[Bindable]
 			public var virtualNode:VirtualNode = null;
-			
-			public var main:protogeniflash = null;
 			
 			public function load(n:PhysicalNode):void {
 				node = n;
@@ -44,13 +43,13 @@
 				var endpointArray:ArrayCollection = new ArrayCollection();
 				var startpointArray:ArrayCollection = new ArrayCollection();
 				
-				if(Main.protogeniHandler.mapHandler.selectedSlice != null
-					&& Main.protogeniHandler.mapHandler.selectedSlice.hrn != null
-					&& Main.protogeniHandler.mapHandler.selectedSlice.hrn.length>0)
+				if(Main.geniHandler.mapHandler.selectedSlice != null
+					&& Main.geniHandler.mapHandler.selectedSlice.hrn != null
+					&& Main.geniHandler.mapHandler.selectedSlice.hrn.length>0)
 				{
 					for each(var vn:VirtualNode in node.virtualNodes)
 					{
-						if(vn.slivers[0].slice == Main.protogeniHandler.mapHandler.selectedSlice)
+						if(vn.slivers[0].slice == Main.geniHandler.mapHandler.selectedSlice)
 						{
 							virtualNode = vn;
 							break;
@@ -180,7 +179,7 @@
 			public function viewComponentRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
 				rspecView.title = "Advertisement RSPEC for " + node.name;
-				PopUpManager.addPopUp(rspecView, main, false);
+				PopUpManager.addPopUp(rspecView, Main.Application() as DisplayObject, false);
        			PopUpManager.centerPopUp(rspecView);
        			rspecView.loadXml(node.rspec);
 			}
@@ -191,7 +190,7 @@
 				else {
 					var rspecView:XmlWindow = new XmlWindow();
 					rspecView.title = "Request RSPEC for " + node.name;
-					PopUpManager.addPopUp(rspecView, main, false);
+					PopUpManager.addPopUp(rspecView, Main.Application() as DisplayObject, false);
 	       			PopUpManager.centerPopUp(rspecView);
 	       			rspecView.loadXml(virtualNode.rspec);
 				}
@@ -208,7 +207,7 @@
 						<mx:Label text="{node.name}" fontSize="17" fontWeight="bold" width="100%" selectable="true"/>
 						<display:ImageButton id="locateButton"
 											 source="{DisplayUtil.mapIcon}"
-											 click="Main.protogeniHandler.mapHandler.zoomToPhysicalNode(node)"
+											 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
 											 toolTip="View Advertisement RSPEC" />
 						<display:ImageButton id="componentButton"
 							source="{DisplayUtil.pageWhiteCodeIcon}"

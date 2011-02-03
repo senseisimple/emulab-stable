@@ -14,8 +14,8 @@
 			import mx.managers.DragManager;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.ProtogeniEvent;
-			import protogeni.ProtogeniHandler;
+			import protogeni.GeniEvent;
+			import protogeni.GeniHandler;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
@@ -188,7 +188,7 @@
 				// Handle markers
 				else if(event.dragSource.hasFormat("marker"))
 				{
-					var dragSource:ProtogeniMapMarker = event.dragSource.dataForFormat( 'marker' ) as ProtogeniMapMarker;
+					var dragSource:GeniMapMarker = event.dragSource.dataForFormat( 'marker' ) as GeniMapMarker;
 					var vn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(dragSource.nodeGroups.collection[0].collection[0].manager));
 					vn.isVirtual = true;
 					vn.id = slice.getUniqueVirtualNodeId(vn);

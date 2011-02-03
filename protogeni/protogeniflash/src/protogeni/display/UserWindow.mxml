@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:display="protogeni.display.*"
-		 title="User Information" icon="{DisplayUtil.userIcon}" width="400" height="300">
-	
-	<mx:Script>
+<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						width="400" height="300"
+						minWidth="400" minHeight="300"
+						title="User Information" close="PopUpManager.removePopUp(this)">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
 		<![CDATA[
-			import protogeni.ProtogeniEvent;
-			import protogeni.ProtogeniHandler;
+			import mx.managers.PopUpManager;
+			
+			import protogeni.GeniEvent;
+			import protogeni.GeniHandler;
 			import protogeni.resources.Slice;
 			import protogeni.resources.User;
 			
@@ -16,92 +24,103 @@
 			{
 				user = u;
 				refresh();
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, refresh);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refresh);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, refresh);
+				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, refresh);
+				Main.geniHandler.addEventListener(GeniEvent.SLICE_CHANGED, refresh);
+				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, refresh);
 			}
 			
 			public function refresh(junk:* = null):void
 			{
 				credentialBasicImage.source = DisplayUtil.assignIcon(user.credential != null && user.credential.length > 0);
 				credentialKeysImage.source = DisplayUtil.assignIcon(user.keys != null && user.keys.length > 0);
-				slices.removeAllChildren();
+				slices.removeAllElements()
 				for each(var s:Slice in user.slices)
-					slices.addChild(DisplayUtil.getSliceButton(s));
+				slices.addElement(DisplayUtil.getSliceButton(s));
 			}
 		]]>
-	</mx:Script>
+	</fx:Script>
 	
-	<mx:Grid width="100%" height="100%">
+	<mx:Grid width="100%" height="100%" id="infoGrid" horizontalScrollPolicy="off" verticalScrollPolicy="off">
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Name" fontWeight="bold"/>
+				<s:Label text="Name" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{user.name}" selectable="true"/>
+				<s:Label text="{user.name}" />
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Credentials" fontWeight="bold"/>
+				<s:Label text="Authority" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="Basic"/>
+				<s:Label text="{user.authority.Name}" />
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<s:Label text="Credentials" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<s:Label text="Basic"/>
 				<mx:Image width="16" height="16" id="credentialBasicImage"/>
-				<mx:VRule height="16"/>
-				<mx:Label text="Keys"/>
+				<s:Group>
+					<display:DefaultLine percentHeight="90" />
+				</s:Group>
+				<s:Label text="Keys"/>
 				<mx:Image width="16" height="16" id="credentialKeysImage"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Uid" fontWeight="bold"/>
+				<s:Label text="Uid" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{user.uid}" selectable="true"/>
+				<s:Label text="{user.uid}"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Uuid" fontWeight="bold"/>
+				<s:Label text="Uuid" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{user.uuid}" selectable="true"/>
+				<s:Label text="{user.uuid}"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Hrn" fontWeight="bold"/>
+				<s:Label text="Hrn" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{user.hrn}" selectable="true"/>
+				<s:Label text="{user.hrn}"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Email" fontWeight="bold"/>
+				<s:Label text="Email" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{user.email}" selectable="true"/>
+				<s:Label text="{user.email}"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Urn" fontWeight="bold"/>
+				<s:Label text="Urn" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Label text="{user.urn}" selectable="true"/>
+				<s:Label text="{user.urn}"/>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
 			<mx:GridItem>
-				<mx:Label text="Slices" fontWeight="bold"/>
+				<s:Label text="Slices" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:VBox width="100%" height="82" id="slices">
-				</mx:VBox>
+				<s:VGroup width="100%" height="82" id="slices">
+					
+				</s:VGroup>
 			</mx:GridItem>
 		</mx:GridRow>
 	</mx:Grid>
 	
-</display:DefaultWindow>
+</display:DefaultWindow2>

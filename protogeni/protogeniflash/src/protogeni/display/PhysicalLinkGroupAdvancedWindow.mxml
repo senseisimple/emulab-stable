@@ -20,8 +20,6 @@
 			[Bindable]
 			public var links:ArrayCollection;
 			
-			public var main:protogeniflash;
-			
 			public function loadCollection(group:ArrayCollection):void {
 				links = group;
 				

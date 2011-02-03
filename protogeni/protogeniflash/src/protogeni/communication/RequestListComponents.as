@@ -29,7 +29,7 @@ package protogeni.communication
 	
 	override public function start():Operation
 	{
-		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		op.addField("credential", Main.geniHandler.CurrentUser.credential);
 		return op;
 	}
 
@@ -43,7 +43,7 @@ package protogeni.communication
 			{
 				var newGm:GeniManager = null;
 				var ts:String = obj.url.substr(0, obj.url.length-3);
-				/*switch(ts)
+				switch(ts)
 				{
 					case "https://www.emulab.net/protogeni/xmlrpc":
 					//case "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc":
@@ -54,17 +54,17 @@ package protogeni.communication
 						newAm.Url = ts;
 						newAm.Hrn = "utahemulab.cm";
 						newAm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
-						Main.protogeniHandler.GeniManagers.add(newAm);
+						Main.geniHandler.GeniManagers.add(newAm);
 						newGm = newAm;
 						break;
-					default:*/
+					default:
 						var newCm:ComponentManager = new ComponentManager();
 						newCm.Hrn = obj.hrn;
 						newCm.Url = ts;
 						newCm.Urn = obj.urn;
-						Main.protogeniHandler.GeniManagers.add(newCm);
+						Main.geniHandler.GeniManagers.add(newCm);
 						newGm = newCm;
-				//}
+				}
 				if(startDiscoverResources)
 				{
 					newGm.Status = GeniManager.INPROGRESS;
@@ -73,14 +73,15 @@ package protogeni.communication
 					else if(newGm is ComponentManager)
 						newCalls.push(new RequestDiscoverResources(newGm as ComponentManager));
 				}
-				Main.protogeniHandler.dispatchGeniManagerChanged(newGm);
+				Main.geniHandler.dispatchGeniManagerChanged(newGm);
 			}
+			
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());
 		}
 		else
 		{
-			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+			Main.geniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 		
 		return newCalls.head;

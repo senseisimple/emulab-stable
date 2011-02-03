@@ -34,7 +34,7 @@ package protogeni.communication
 		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true, false);
 		op.timeout = 60;
 		cm = newCm;
-		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
+		op.addField("credentials", new Array(Main.geniHandler.CurrentUser.credential));
 		op.addField("compress", true);
 		op.setUrl(newCm.Url);
     }
@@ -69,7 +69,7 @@ package protogeni.communication
 			cm.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + cm.errorMessage;
 			cm.Status = GeniManager.FAILED;
 			this.removeImmediately = true;
-			Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+			Main.geniHandler.dispatchGeniManagerChanged(cm);
 		}
 		
 		return null;
@@ -87,7 +87,7 @@ package protogeni.communication
 			cm.errorDescription = event.text;
 		
 		cm.Status = GeniManager.FAILED;
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		Main.geniHandler.dispatchGeniManagerChanged(cm);
 
       return null;
     }
@@ -95,7 +95,7 @@ package protogeni.communication
 	override public function cancel():void
 	{
 		cm.Status = GeniManager.UNKOWN;
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 	}
 	
@@ -104,10 +104,10 @@ package protogeni.communication
 		if(cm.Status == GeniManager.INPROGRESS)
 			cm.Status = GeniManager.FAILED;
 		running = false;
-		Main.protogeniHandler.rpcHandler.remove(this, false);
-		Main.protogeniHandler.dispatchGeniManagerChanged(cm);
+		Main.geniHandler.rpcHandler.remove(this, false);
+		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
-		Main.protogeniHandler.rpcHandler.start();
+		Main.geniHandler.rpcHandler.start();
 	}
 
     private var cm : ComponentManager;

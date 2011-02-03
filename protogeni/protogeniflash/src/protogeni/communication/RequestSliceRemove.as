@@ -25,9 +25,10 @@ package protogeni.communication
     {
 		super("SliceRemove", "Remove slice named " + s.hrn, CommunicationUtil.remove);
 		slice = s;
-		op.addField("credential", Main.protogeniHandler.CurrentUser.credential);
+		op.addField("credential", Main.geniHandler.CurrentUser.credential);
 		op.addField("hrn", slice.urn);
 		op.addField("type", "Slice");
+		op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -39,7 +40,7 @@ package protogeni.communication
 		}
 		else
 		{
-			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+			Main.geniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 		
 		return newRequest;

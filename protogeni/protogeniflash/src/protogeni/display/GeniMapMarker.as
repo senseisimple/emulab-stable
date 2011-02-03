@@ -18,9 +18,9 @@ package protogeni.display
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PhysicalNodeGroupCollection;
 	
-	public class ProtogeniMapMarker extends Marker
+	public class GeniMapMarker extends Marker
 	{
-		public function ProtogeniMapMarker(o:Object)
+		public function GeniMapMarker(o:Object)
 		{
 			var ll:LatLng;
 			// Single
@@ -33,7 +33,7 @@ package protogeni.display
 			else if(o is Array)
 			{
 				var clusters:Array = o as Array;
-				ll = (clusters[0] as ProtogeniMapMarker).getLatLng();
+				ll = (clusters[0] as GeniMapMarker).getLatLng();
 			}
 			
 			super(ll);
@@ -105,7 +105,7 @@ package protogeni.display
 			{
 				clusters = o as Array;
 				var totalNodes:Number = 0;
-				for each(var m:ProtogeniMapMarker in clusters) {
+				for each(var m:GeniMapMarker in clusters) {
 					totalNodes += m.nodeGroups.GetAll().length;
 					this.nodeGroups.Add(m.nodeGroups.collection[0]);
 				}

@@ -54,9 +54,6 @@
 			import protogeni.resources.PhysicalNodeInterface;
 			import protogeni.resources.VirtualLink;
 			import protogeni.resources.VirtualNode;
-
-			
-			public var main:protogeniflash;
 			
 			[Bindable]
 			public var node:VirtualNode = null;
@@ -179,7 +176,7 @@
 				if(node.rspec != null)
 				{
 					var rspecWindow:XmlWindow = new XmlWindow;
-					PopUpManager.addPopUp(rspecWindow, Main.Pgmap(), false);
+					PopUpManager.addPopUp(rspecWindow, Main.Application() as DisplayObject, false);
 					PopUpManager.centerPopUp(rspecWindow);
 					rspecWindow.title = "Last Successful RSPEC from " + node.urn;
 					rspecWindow.loadXml(node.rspec);
@@ -192,7 +189,7 @@
 			public function previewRspec():void
 			{
 				var rspecWindow:XmlWindow = new XmlWindow;
-				PopUpManager.addPopUp(rspecWindow, Main.Pgmap(), false);
+				PopUpManager.addPopUp(rspecWindow, Main.Application() as DisplayObject, false);
 				PopUpManager.centerPopUp(rspecWindow);
 				rspecWindow.title = "Preview RSPEC for " + node.id;
 				rspecWindow.loadXml(node.getXml());

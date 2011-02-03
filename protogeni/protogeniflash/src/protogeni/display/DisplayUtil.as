@@ -30,7 +30,6 @@
 	import mx.managers.PopUpManager;
 	
 	import protogeni.communication.Request;
-	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
@@ -252,7 +251,7 @@
 			logButton.addEventListener(MouseEvent.CLICK,
 				function openLog():void {
 					var logw:LogMessageWindow = new LogMessageWindow();
-					PopUpManager.addPopUp(logw, Main.Pgmap(), false);
+					PopUpManager.addPopUp(logw, Main.Application(), false);
 					PopUpManager.centerPopUp(logw);
 					logw.setMessage(msg);
 				});
@@ -356,8 +355,7 @@
 		// Opens a virtual link window
 		public static function viewVirtualLink(pl:VirtualLink):void {
 	    	var plWindow:VirtualLinkAdvancedWindow = new VirtualLinkAdvancedWindow();
-	    	plWindow.main = Main.Pgmap();
-	    	PopUpManager.addPopUp(plWindow, Main.Pgmap(), false);
+	    	PopUpManager.addPopUp(plWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(plWindow);
        		plWindow.loadPointLink(pl);
 	    }
@@ -365,8 +363,7 @@
 		// Opens a physical link window
 		public static function viewPhysicalLink(l:PhysicalLink):void {
 			var lgWindow:PhysicalLinkAdvancedWindow = new PhysicalLinkAdvancedWindow();
-	    	lgWindow.main = Main.Pgmap();
-	    	PopUpManager.addPopUp(lgWindow, Main.Pgmap(), false);
+	    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadLink(l);
 		}
@@ -377,8 +374,7 @@
 				viewPhysicalLink(lc[0]);
 			else {
 				var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
-		    	lgWindow.main = Main.Pgmap();
-		    	PopUpManager.addPopUp(lgWindow, Main.Pgmap(), false);
+		    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
 	       		PopUpManager.centerPopUp(lgWindow);
 	       		lgWindow.loadCollection(lc);
 			}
@@ -387,17 +383,15 @@
 		// Opens a group of physical links
 		public static function viewPhysicalLinkGroup(lg:PhysicalLinkGroup):void {
 			var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
-	    	lgWindow.main = Main.Pgmap();
-	    	PopUpManager.addPopUp(lgWindow, Main.Pgmap(), false);
+	    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadGroup(lg);
 		}
 		
 		// Opens a component manager in a window
 		public static function viewGeniManager(gm:GeniManager):void {
-			var cmWindow:GeniManagerAdvancedWindow = new GeniManagerAdvancedWindow();
-	    	cmWindow.main = Main.Pgmap();
-	    	PopUpManager.addPopUp(cmWindow, Main.Pgmap(), false);
+			var cmWindow:GeniManagerWindow = new GeniManagerWindow();
+	    	PopUpManager.addPopUp(cmWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(cmWindow);
        		cmWindow.load(gm);
 		}
@@ -405,15 +399,14 @@
 		// Opens a physical node in a window
 		public static function viewPhysicalNode(n:PhysicalNode):void {
 			var ngWindow:PhysicalNodeAdvancedWindow = new PhysicalNodeAdvancedWindow();
-	    	ngWindow.main = Main.Pgmap();
-	    	PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+	    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadNode(n);
 		}
 		
 		public static function viewVirtualNode(n:VirtualNode):void {
 			var ngWindow:VirtualNodeAdvancedWindow = new VirtualNodeAdvancedWindow();
-			PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+			PopUpManager.addPopUp(ngWindow, Main.Application(), false);
 			PopUpManager.centerPopUp(ngWindow);
 			ngWindow.loadNode(n);
 		}
@@ -421,8 +414,7 @@
 		// Opens a group of physical nodes in a window
 		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
 			var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
-	    	ngWindow.main = Main.Pgmap();
-	    	PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+	    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadGroup(ng);
 		}
@@ -433,8 +425,7 @@
 				viewPhysicalNode(nc[0]);
 			else {
 				var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
-		    	ngWindow.main = Main.Pgmap();
-		    	PopUpManager.addPopUp(ngWindow, Main.Pgmap(), false);
+		    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
 	       		PopUpManager.centerPopUp(ngWindow);
 	       		ngWindow.loadCollection(nc);
 			}
@@ -443,14 +434,14 @@
 		// Opens a component manager in a window
 		public static function viewSlice(s:Slice):void {
 			var sWindow:SliceWindow = new SliceWindow();
-			PopUpManager.addPopUp(sWindow, Main.Pgmap(), false);
+			PopUpManager.addPopUp(sWindow, Main.Application(), false);
 			PopUpManager.centerPopUp(sWindow);
 			sWindow.loadSlice(s);
 		}
 		
 		public static function viewRequest(r:Request):void {
 			var rWindow:RequestWindow = new RequestWindow();
-			PopUpManager.addPopUp(rWindow, Main.Pgmap(), false);
+			PopUpManager.addPopUp(rWindow, Main.Application() as DisplayObject, false);
 			PopUpManager.centerPopUp(rWindow);
 			rWindow.load(r);
 		}

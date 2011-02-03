@@ -27,20 +27,17 @@ package protogeni.communication
   import protogeni.resources.ComponentManager;
   import protogeni.resources.GeniManager;
 
-  public class RequestListResources extends Request
+  public class RequestListResourcesAm extends Request
   {
 	  
-    public function RequestListResources(newAm:AggregateManager) : void
+    public function RequestListResourcesAm(newAm:AggregateManager) : void
     {
 		super("ListResources (" + Util.shortenString(newAm.Url, 15) + ")", "Listing resources for " + newAm.Url, CommunicationUtil.listResourcesAm, true, true, false);
 		ignoreReturnCode = true;
 		op.timeout = 60;
 		am = newAm;
-		op.addField("credentials", new Array(Main.protogeniHandler.CurrentUser.credential));
-		var options:Object = new Object();
-		options.geni_available = true;
-		options.geni_compressed = true;
-		op.addField("options", options);
+		op.pushField([Main.geniHandler.CurrentUser.credential]);
+		op.pushField({geni_available:false, geni_compressed:true});	// geni_available:false = show all, true = show only available
 		op.setUrl(newAm.Url);
     }
 	
@@ -49,7 +46,7 @@ package protogeni.communication
 		try
 		{
 			var decodor:Base64Decoder = new Base64Decoder();
-			decodor.decode(response.value);
+			decodor.decode(response as String);
 			var bytes:ByteArray = decodor.toByteArray();
 			bytes.uncompress();
 			var decodedRspec:String = bytes.toString();
@@ -58,11 +55,11 @@ package protogeni.communication
 			am.processRspec(cleanup);
 		} catch(e:Error)
 		{
-			am.errorMessage = response.output;
-			am.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + am.errorMessage;
+			//am.errorMessage = response;
+			//am.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + am.errorMessage;
 			am.Status = GeniManager.FAILED;
 			this.removeImmediately = true;
-			Main.protogeniHandler.dispatchGeniManagerChanged(am);
+			Main.geniHandler.dispatchGeniManagerChanged(am);
 		}
 		
 		return null;
@@ -80,7 +77,7 @@ package protogeni.communication
 			am.errorDescription = event.text;
 		
 		am.Status = GeniManager.FAILED;
-		Main.protogeniHandler.dispatchGeniManagerChanged(am);
+		Main.geniHandler.dispatchGeniManagerChanged(am);
 
       return null;
     }
@@ -88,7 +85,7 @@ package protogeni.communication
 	override public function cancel():void
 	{
 		am.Status = GeniManager.UNKOWN;
-		Main.protogeniHandler.dispatchGeniManagerChanged(am);
+		Main.geniHandler.dispatchGeniManagerChanged(am);
 		op.cleanup();
 	}
 	
@@ -97,10 +94,10 @@ package protogeni.communication
 		if(am.Status == GeniManager.INPROGRESS)
 			am.Status = GeniManager.FAILED;
 		running = false;
-		Main.protogeniHandler.rpcHandler.remove(this, false);
-		Main.protogeniHandler.dispatchGeniManagerChanged(am);
+		Main.geniHandler.rpcHandler.remove(this, false);
+		Main.geniHandler.dispatchGeniManagerChanged(am);
 		op.cleanup();
-		Main.protogeniHandler.rpcHandler.start();
+		Main.geniHandler.rpcHandler.start();
 	}
 
     private var am:AggregateManager;

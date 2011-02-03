@@ -21,11 +21,12 @@ package protogeni.communication
 		public function RequestGetKeys() : void
 		{
 			super("GetKeys", "Getting the ssh credential", CommunicationUtil.getKeys);
+			op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
 		override public function start():Operation
 		{
-			op.addField("credential",Main.protogeniHandler.CurrentUser.credential);
+			op.addField("credential",Main.geniHandler.CurrentUser.credential);
 			return op;
 		}
 		
@@ -33,12 +34,12 @@ package protogeni.communication
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
-				Main.protogeniHandler.CurrentUser.keys = response.value;
-				Main.protogeniHandler.dispatchUserChanged();
+				Main.geniHandler.CurrentUser.keys = response.value;
+				Main.geniHandler.dispatchUserChanged();
 			}
 			else
 			{
-				Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+				Main.geniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 			}
 			
 			return null;

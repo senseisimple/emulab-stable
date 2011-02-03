@@ -1,280 +1,294 @@
 <?xml version="1.0" encoding="utf-8"?>
-<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
-	xmlns:maps="com.google.maps.*"
-	xmlns:protogeniflash="protogeniflash.*"
-	layout="vertical" paddingRight="0" paddingLeft="0" paddingTop="0" paddingBottom="0" horizontalAlign="left"
-	backgroundColor="#D2E1F0"
-    preinitialize="preinit();"
-	creationComplete="init();" xmlns:display="protogeni.display.*">
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   minWidth="955" minHeight="600" xmlns:display="protogeni.display.*"
+			   preinitialize="preinit();"
+			   backgroundColor="#D2E1F0"
+			   creationComplete="init();">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
 	
-	<mx:Style>
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace display "protogeni.display.*";
+		
 		.infoTip {
 			color: #FFFFFF;
-			fontSize: 9;
 			fontWeight: "bold";
 			shadowColor: #000000;
 			borderColor: #CE2929;
 			borderStyle: "errorTipBelow";
-			paddingBottom: 4;
-			paddingLeft: 4;
-			paddingRight: 4;
-			paddingTop: 4;
+			paddingBottom: 2;
+			paddingLeft: 2;
+			paddingRight: 2;
+			paddingTop: 2;
 		}
-	</mx:Style>
+		
+	</fx:Style>
 	
-	<mx:Script>
-    <![CDATA[
-
-		import com.google.maps.LatLng;
-		import com.google.maps.MapOptions;
-		import com.google.maps.MapType;
-		
-		import mx.collections.ArrayCollection;
-		import mx.controls.Alert;
-		import mx.controls.Image;
-		import mx.controls.Label;
-		import mx.controls.ToolTip;
-		import mx.core.FlexGlobals;
-		import mx.core.mx_internal;
-		import mx.events.CloseEvent;
-		import mx.events.CollectionEvent;
-		import mx.events.ListEvent;
-		import mx.events.ResizeEvent;
-		import mx.managers.PopUpManager;
-		import mx.managers.ToolTipManager;
-		
-		import protogeni.ProtogeniEvent;
-		import protogeni.ProtogeniHandler;
-		import protogeni.Util;
-		import protogeni.display.GeniManagersWindow;
-		import protogeni.display.ConsoleWindow;
-		import protogeni.display.DisplayUtil;
-		import protogeni.display.SearchWindow;
-		import protogeni.display.SlicesWindow;
-		import protogeni.display.UserWindow;
-		import protogeni.resources.Slice;
-	    
-	    //------------------------------------------
-	    // Embedded resources
-	    [Embed(source="../images/arrow_out.png")] 
-        private var arrowOut:Class;
-        
-        [Embed(source="../images/arrow_in.png")] 
-        private var arrowIn:Class;
-        
-        public var console:ConsoleWindow;
-		public var cms:GeniManagersWindow;
-        public var about:AboutWindow = new AboutWindow();
-		public var slices:SlicesWindow;
-		public var user:UserWindow;
-		public var search:SearchWindow;
-		
-		private var errorTip:ToolTip;
-		
-		[Bindable]
-		public var allowAuthenticate:Boolean;
-		
-		[Bindable]
-		public var slicesMenu : ArrayCollection;
-	    
-	    private function preinit():void {
-	    	Security.allowDomain("*");
-	    	Security.allowInsecureDomain("*");
-	    }
-
-	    private function init():void {
+	<fx:Script>
+		<![CDATA[
+			import com.google.maps.LatLng;
+			import com.google.maps.MapOptions;
+			import com.google.maps.MapType;
 			
-			Main.protogeniHandler = new ProtogeniHandler();
-			Main.protogeniHandler.mapHandler.map = map;
-			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
-			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.controls.Image;
+			import mx.controls.Label;
+			import mx.controls.ToolTip;
+			import mx.core.FlexGlobals;
+			import mx.core.mx_internal;
+			import mx.events.CloseEvent;
+			import mx.events.CollectionEvent;
+			import mx.events.ListEvent;
+			import mx.events.ResizeEvent;
+			import mx.managers.PopUpManager;
+			import mx.managers.ToolTipManager;
 			
-			// Default behavior (public)
-			allowAuthenticate = true;
-			Main.protogeniHandler.unauthenticatedMode = true;
+			import protogeni.GeniEvent;
+			import protogeni.GeniHandler;
+			import protogeni.Util;
+			import protogeni.display.ConsoleWindow;
+			import protogeni.display.DisplayUtil;
+			import protogeni.display.GeniManagersWindow;
+			import protogeni.display.SearchWindow;
+			import protogeni.display.SlicesWindow;
+			import protogeni.display.SlicesWindow;
+			import protogeni.display.UserWindow;
+			import protogeni.resources.Slice;
 			
-			// Flash options
-			try{
-				if(FlexGlobals.topLevelApplication.parameters.mode != null)
-				{
-					var input:String = FlexGlobals.topLevelApplication.parameters.mode;
-					
-					allowAuthenticate = input != "publiconly";
-					Main.protogeniHandler.unauthenticatedMode = input != "authenticate";
+			//------------------------------------------
+			// Embedded resources
+			[Embed(source="../images/arrow_out.png")] 
+			private var arrowOut:Class;
+			
+			[Embed(source="../images/arrow_in.png")] 
+			private var arrowIn:Class;
+			
+			public var console:protogeni.display.ConsoleWindow;
+			public var cms:protogeni.display.GeniManagersWindow;
+			public var about:AboutWindow = new AboutWindow();
+			public var slices:protogeni.display.SlicesWindow;
+			public var user:protogeni.display.UserWindow;
+			public var search:protogeni.display.SearchWindow;
+			
+			private var errorTip:ToolTip;
+			
+			[Bindable]
+			public var allowAuthenticate:Boolean;
+			
+			[Bindable]
+			public var slicesMenu : ArrayCollection;
+			
+			private function preinit():void {
+				Security.allowDomain("*");
+				Security.allowInsecureDomain("*");
+			}
+			
+			private function init():void {
+				
+				Main.geniHandler = new GeniHandler();
+				Main.geniHandler.mapHandler.map = map;
+				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
+				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				
+				// Default behavior (public)
+				allowAuthenticate = true;
+				Main.geniHandler.unauthenticatedMode = true;
+				
+				// Flash options
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.mode != null)
+					{
+						var input:String = FlexGlobals.topLevelApplication.parameters.mode;
+						
+						allowAuthenticate = input != "publiconly";
+						Main.geniHandler.unauthenticatedMode = input != "authenticate";
+					}
+				} catch(all:Error) {
 				}
-			} catch(all:Error) {
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.sa != null)
+					{
+						var sa:String = FlexGlobals.topLevelApplication.parameters.sa;
+					}
+				} catch(all:Error) {
+				}
+				
+				console = new protogeni.display.ConsoleWindow();
+				PopUpManager.addPopUp(console, this, false);
+				PopUpManager.centerPopUp(console);
+				PopUpManager.removePopUp(console);
+				Main.log = console;
+				
+				cms = new protogeni.display.GeniManagersWindow();
+				cms.openFirst();
+				cms.closeWindow();
+				
+				search = new protogeni.display.SearchWindow();
+				search.showWindow();
+				search.closeWindow();
+				
+				slices = new protogeni.display.SlicesWindow();
+				slices.openFirst();
+				slices.closeWindow();
+				
+				user = new protogeni.display.UserWindow();
+				user.showWindow();
+				user.load(Main.geniHandler.CurrentUser);
+				user.closeWindow();
+				
+				Security.allowDomain("localhost");	
 			}
 			
-			console = new ConsoleWindow();
-			PopUpManager.addPopUp(console, this, false);
-			PopUpManager.centerPopUp(console);
-			PopUpManager.removePopUp(console);
-			Main.log = console;
-			
-			cms = new GeniManagersWindow();
-			cms.openFirst();
-			cms.close();
-			
-			search = new SearchWindow();
-			search.show();
-			search.close();
-			
-			slices = new SlicesWindow();
-			slices.openFirst();
-			slices.close();
-			
-			user = new UserWindow();
-			user.show();
-			user.load(Main.protogeniHandler.CurrentUser);
-			user.close();
-			
-			Security.allowDomain("localhost");	
-	    }
-		
-		private function reinit(authenticateUser:Boolean = false):void
-		{
-			Main.protogeniHandler = new ProtogeniHandler();
-			Main.protogeniHandler.unauthenticatedMode = !authenticateUser;
-			Main.protogeniHandler.mapHandler.map = map;
-			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
-			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
-			
-			cms.init();
-			user.load(Main.protogeniHandler.CurrentUser);
-			slices.init();
-		}
-        
-        public function showAbout():void {
-	    	PopUpManager.addPopUp(about, this, false);
-       		PopUpManager.centerPopUp(about);
-	    }
-            
-	    //------------------------------------------
-	    // GUI
-	    private function toggleFullScreen():void {
-	      try {
-	        switch (systemManager.stage.displayState) {
-	          case StageDisplayState.FULL_SCREEN:
-	            systemManager.stage.displayState = StageDisplayState.NORMAL;
-	            fullscreenButton.source = new arrowOut();
-	            break;
-	          default:
-	            systemManager.stage.displayState = StageDisplayState.FULL_SCREEN;
-	            fullscreenButton.source = new arrowIn();
-	            break;
-	        }
-	      } catch (err:SecurityError) {
-	      	Alert.show("Fullscreen isn't supported on the current system.  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
-	      }
-	    }
-		
-		public function userChanged(pe:ProtogeniEvent):void {
-			if(Main.protogeniHandler.CurrentUser == null
-				|| Main.protogeniHandler.CurrentUser.credential == null
-				|| Main.protogeniHandler.CurrentUser.credential.length == 0)
+			private function reinit(authenticateUser:Boolean = false):void
 			{
-				this.userButton.source = DisplayUtil.noUserIcon;
-				this.userButton.toolTip = "Click to authenticate";
-			} else {
-				this.userButton.source = DisplayUtil.userIcon;
-				this.userButton.toolTip = "View user information"
+				Main.geniHandler = new GeniHandler();
+				Main.geniHandler.unauthenticatedMode = !authenticateUser;
+				Main.geniHandler.mapHandler.map = map;
+				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
+				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				
+				cms.init();
+				user.load(Main.geniHandler.CurrentUser);
+				slices.init();
 			}
-		}
-		
-		public function showAuthenticate():void
-		{
-			if(!allowAuthenticate)
-				return;
-			errorTip = ToolTipManager.createToolTip(
-				"Authenticate", userButton.x - userButton.width/2, userButton.y + userButton.height, "errorTipBelow") as ToolTip;
 			
-
-			// Apply the errorTip class selector.
-			errorTip.setStyle("styleName", "infoTip");
-		}
-		
-		public function hideAuthenticate():void
-		{
-			if(!allowAuthenticate)
-				return;
-			if (errorTip) {
-				ToolTipManager.destroyToolTip(errorTip);
-				errorTip = null;
+			public function showAbout():void {
+				PopUpManager.addPopUp(about, this, false);
+				PopUpManager.centerPopUp(about);
 			}
-		}
-		
-		protected function loadUser():void
-		{
-			if(Main.protogeniHandler.CurrentUser == null
-				|| Main.protogeniHandler.CurrentUser.credential == null
-				|| Main.protogeniHandler.CurrentUser.credential.length == 0)
+			
+			//------------------------------------------
+			// GUI
+			private function toggleFullScreen():void {
+				try {
+					switch (systemManager.stage.displayState) {
+						case StageDisplayState.FULL_SCREEN:
+							systemManager.stage.displayState = StageDisplayState.NORMAL;
+							fullscreenButton.source = new arrowOut();
+							break;
+						default:
+							systemManager.stage.displayState = StageDisplayState.FULL_SCREEN;
+							fullscreenButton.source = new arrowIn();
+							break;
+					}
+				} catch (err:SecurityError) {
+					Alert.show("Fullscreen isn't supported on the current system.  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
+				}
+			}
+			
+			public function userChanged(pe:GeniEvent):void {
+				if(Main.geniHandler.CurrentUser == null
+					|| Main.geniHandler.CurrentUser.credential == null
+					|| Main.geniHandler.CurrentUser.credential.length == 0)
+				{
+					this.userButton.source = DisplayUtil.noUserIcon;
+					this.userButton.toolTip = "Click to authenticate";
+				} else {
+					this.userButton.source = DisplayUtil.userIcon;
+					this.userButton.toolTip = "View user information"
+				}
+			}
+			
+			public function showAuthenticate():void
 			{
-				startover(true);
-			} else {
-				user.show();
+				if(!allowAuthenticate)
+					return;
+				errorTip = ToolTipManager.createToolTip(
+					"Authenticate", userButton.x - userButton.width/2, userButton.y + userButton.height, "errorTipBelow") as ToolTip;
+				
+				
+				// Apply the errorTip class selector.
+				errorTip.setStyle("styleName", "infoTip");
 			}
-		}
-	    
-	    // ComboBox
-	    public function fillCombobox(junk:* = null):void {
-	    	slicesMenu = Main.protogeniHandler.CurrentUser.slices.displaySlices();
-	    }
-	    
-	    public function getSliceLabel(s:Slice):String {
-	    	return s.DisplayString();
-	    }
-	    
-	    public function sliceSelected(evt:ListEvent):void {
-			Main.protogeniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
-	    	onlyMyResourcesCheckbox.selected = Main.protogeniHandler.mapHandler.selectedSlice.hrn != null &&
-				Main.protogeniHandler.mapHandler.selectedSlice.hrn.length > 0;
-			Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
-	    	Main.protogeniHandler.mapHandler.drawMap();
-	    }
-		
-		public function startover(authenticateUser:Boolean = false):void
-		{
-			Main.protogeniHandler.rpcHandler.pause();
-			Main.protogeniHandler.rpcHandler.clearAll();
-			reinit(authenticateUser);
-			Main.protogeniHandler.rpcHandler.startInitiationSequence();
-		}
-
-    ]]>
-</mx:Script>
-
-	<mx:ApplicationControlBar dock="true">
+			
+			public function hideAuthenticate():void
+			{
+				if(!allowAuthenticate)
+					return;
+				if (errorTip) {
+					ToolTipManager.destroyToolTip(errorTip);
+					errorTip = null;
+				}
+			}
+			
+			protected function loadUser():void
+			{
+				if(Main.geniHandler.CurrentUser == null
+					|| Main.geniHandler.CurrentUser.credential == null
+					|| Main.geniHandler.CurrentUser.credential.length == 0)
+				{
+					startover(true);
+				} else {
+					user.showWindow();
+				}
+			}
+			
+			// ComboBox
+			public function fillCombobox(junk:* = null):void {
+				slicesMenu = Main.geniHandler.CurrentUser.slices.displaySlices();
+			}
+			
+			public function getSliceLabel(s:Slice):String {
+				return s.DisplayString();
+			}
+			
+			public function sliceSelected(evt:ListEvent):void {
+				Main.geniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
+				onlyMyResourcesCheckbox.selected = Main.geniHandler.mapHandler.selectedSlice.hrn != null &&
+					Main.geniHandler.mapHandler.selectedSlice.hrn.length > 0;
+				Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
+				Main.geniHandler.mapHandler.drawMap();
+			}
+			
+			public function startover(authenticateUser:Boolean = false):void
+			{
+				Main.geniHandler.rpcHandler.pause();
+				Main.geniHandler.rpcHandler.clearAll();
+				reinit(authenticateUser);
+				Main.geniHandler.rpcHandler.startInitiationSequence();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:controlBarContent>
 		<display:ImageButton id="infoButton"
 							 source="@Embed('../images/protogeni-logo.png')"
 							 click="showAbout()"
 							 toolTip="View more information about ProtoGENI" />
-		<mx:VRule height="14"/>
+		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton id="refreshButton"
-			source="{DisplayUtil.refreshIcon}"
-			click="startover()" includeInLayout="false" visible="false"
-			toolTip="Reload all data" />
+							 source="{DisplayUtil.refreshIcon}"
+							 click="startover()" includeInLayout="false" visible="false"
+							 toolTip="Reload all data" />
 		<display:ImageButton id="cmButton"
-			source="@Embed('../images/building.png')"
-			click="cms.show()"
-			toolTip="GENI managers"/>
+							 source="@Embed('../images/building.png')"
+							 click="cms.showWindow()"
+							 toolTip="GENI managers"/>
 		<display:ImageButton id="consoleButton"
-			source="@Embed('../images/application_xp_terminal.png')"
-			click="Main.log.open()" 
-			toolTip="Console"/>
-		<mx:VRule height="14" includeInLayout="true" visible="true" />
-		<display:ImageButton id="sliceButton" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}"
-						   source="{DisplayUtil.graphIcon}"
-						   click="slices.show()"
-						   toolTip="Work with slices"/>
-		<mx:VRule height="14" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}" />
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}" ></mx:ComboBox>
-		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.protogeniHandler.mapHandler.drawMap()" includeInLayout="{!Main.protogeniHandler.unauthenticatedMode}" visible="{!Main.protogeniHandler.unauthenticatedMode}" />
-		<mx:Spacer width="100%"/>
-		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+							 source="@Embed('../images/application_xp_terminal.png')"
+							 click="Main.log.open()" 
+							 toolTip="Console"/>
+		<display:DefaultLine percentHeight="90" />
+		<display:ImageButton id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
+							 source="{DisplayUtil.graphIcon}"
+							 click="slices.showWindow()"
+							 toolTip="Work with slices"/>
+		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.geniHandler.mapHandler.drawMap()" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<s:Rect percentWidth="100" />
+		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
-		<mx:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
-		<mx:Spacer width="100%"/>
-		<mx:Label  text="{Main.protogeniHandler.CurrentUser.uid}"/>
+		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
+		<s:Rect percentWidth="100" />
+		<s:Label  text="{Main.geniHandler.CurrentUser.uid}"/>
 		<display:ImageButton id="userButton"
 							 source="{DisplayUtil.noUserIcon}"
 							 click="loadUser()"
@@ -282,22 +296,20 @@
 							 toolTip="View user information" />
 		<display:ImageButton id="searchButton"
 							 source="{DisplayUtil.searchIcon}"
-							 click="search.show()"
+							 click="search.showWindow()"
 							 toolTip="Search" />
 		<display:ImageButton id="resetZoomButton"
-			source="@Embed('../images/zoom.png')"
-			click="map.resetZoom();"
-			toolTip="Reset zoom" />
+							 source="@Embed('../images/zoom.png')"
+							 click="map.resetZoom();"
+							 toolTip="Reset zoom" />
 		<display:ImageButton id="fullscreenButton"
-			source="@Embed('../images/arrow_out.png')"
-			click="toggleFullScreen()"
-			toolTip="Toggle fullscreen" />
+							 source="@Embed('../images/arrow_out.png')"
+							 click="toggleFullScreen()"
+							 toolTip="Toggle fullscreen" />
 		<display:ImageButton id="helpButton"
 							 source="{DisplayUtil.helpIcon}"
 							 click="Util.showManual()"
 							 toolTip="View more information" />
-	</mx:ApplicationControlBar>
-
-	<display:ProtogeniMap id="map" />
-	
-</mx:Application>
+	</s:controlBarContent>
+	<display:GeniMap id="map" />
+</s:Application>

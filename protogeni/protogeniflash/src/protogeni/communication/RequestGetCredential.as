@@ -21,20 +21,21 @@ package protogeni.communication
     public function RequestGetCredential() : void
     {
       super("GetCredential", "Getting the basic user credential", CommunicationUtil.getCredential);
+	  op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
     }
 
     override public function complete(code : Number, response : Object) : *
     {
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			Main.protogeniHandler.CurrentUser.credential = String(response.value);
+			Main.geniHandler.CurrentUser.credential = String(response.value);
 			var cred:XML = new XML(response.value);
-			Main.protogeniHandler.CurrentUser.urn = cred.credential.owner_urn;
-			Main.protogeniHandler.dispatchUserChanged();
+			Main.geniHandler.CurrentUser.urn = cred.credential.owner_urn;
+			Main.geniHandler.dispatchUserChanged();
 		}
 		else
 		{
-			Main.protogeniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+			Main.geniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 
       return null;

@@ -9,22 +9,28 @@
 	<mx:Script>
 		<![CDATA[
 			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.PhysicalLink;
+			import protogeni.resources.PhysicalNodeInterface;
+			import protogeni.resources.VirtualLink;
+			import protogeni.resources.VirtualNode;
+			
+			import com.google.maps.View;
+			
+			import mx.controls.Button;
+			import mx.controls.Spacer;
 			import mx.controls.Spacer;
 			import mx.containers.HBox;
-			import mx.controls.Button;
-			import com.google.maps.View;
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
 			import mx.controls.Label;
 			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
-			
-			public var main:protogeniflash;
+
 			
 			public function loadNode(n:PhysicalNode):void {
 				nodeInfo.load(n);
 			}
 		]]>
 	</mx:Script>
-	<display:PhysicalNodeAdvancedInformation height="100%" width="100%" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" id="nodeInfo" />
+	<display:PhysicalNodeAdvancedInformation id="nodeInfo" verticalGap="0" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" horizontalGap="0" height="100%" width="100%" />
 </display:ResizeWindow>

@@ -145,7 +145,7 @@
 					var virtualNode:VirtualNode = new VirtualNode(this);
 					virtualNode.setToPhysicalNode(manager.Nodes.GetByUrn(nodeXml.@component_urn));
 					virtualNode.id = nodeXml.@virtual_id;
-					virtualNode.manager = Main.protogeniHandler.GeniManagers.getByUrn(nodeXml.@component_manager_urn);
+					virtualNode.manager = Main.geniHandler.GeniManagers.getByUrn(nodeXml.@component_manager_urn);
 					if(nodeXml.@sliver_urn != null)
 						virtualNode.urn = nodeXml.@sliver_urn;
 					if(nodeXml.@sliver_uuid != null)

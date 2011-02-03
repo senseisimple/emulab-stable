@@ -15,7 +15,6 @@
 package protogeni.communication
 {
   import com.mattism.http.xmlrpc.ConnectionImpl;
-  import com.skinkers.air.net.GZIPLoader;
   
   import flash.events.ErrorEvent;
   import flash.events.Event;
@@ -25,6 +24,8 @@ package protogeni.communication
   import flash.net.URLRequest;
   import flash.system.Security;
   import flash.utils.Dictionary;
+  
+  import mx.collections.ArrayCollection;
 
   public class Operation
   {
@@ -90,11 +91,23 @@ package protogeni.communication
     {
       param[key] = value;
     }
+	
+	public function pushField(value:Object):void
+	{
+		if(!(param is ArrayCollection))
+			setPositioned();
+		param.addItem(value);
+	}
 
-    public function clearFields() : void
+    public function clearFields():void
     {
       param = new Object();
     }
+	
+	public function setPositioned():void
+	{
+		param = new ArrayCollection();
+	}
 
     public function call(newSuccess : Function, newFailure : Function) : void
     {
@@ -122,7 +135,14 @@ package protogeni.communication
 					server.addEventListener(Event.COMPLETE, callSuccess);
 					server.addEventListener(ErrorEvent.ERROR, callFailure);
 					server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
-					server.addParam(param, "struct");
+					if(param is ArrayCollection)
+					{
+						for each(var o:* in param) {
+							server.addParam(o, null);
+						}
+					}	
+					else
+						server.addParam(param, "struct");
 					server.call(method);
 				}
 				catch (e : Error)
@@ -211,10 +231,10 @@ package protogeni.communication
 		switch(type)
 		{
 			case XMLRPC:
-				success(node, Number(server.getResponse().code),
-					//              server.getResponse().value.toString(),
-					//              String(server.getResponse().output),
-					server.getResponse());
+				if(server.getResponse() is String)
+					success(node, null, server.getResponse());
+				else
+					success(node, Number(server.getResponse().code), server.getResponse());
 				break;
 			case HTTP:
 				success(node, CommunicationUtil.GENIRESPONSE_SUCCESS, loader.data);

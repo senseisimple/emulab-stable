@@ -1,12 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<maps:Map xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:maps="com.google.maps.*"
+<maps:Map xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:maps="com.google.maps.*"
 		  height="100%" width="100%" maxWidth="{(mx.core.FlexGlobals.topLevelApplication as Application).width}"
 		  preinitialize="mappreinit()"
 		  mapevent_mappreinitialize="onMapPreinitialize(event)"
 		  mapevent_mapready="onMapReady(event)"
 		  sensor="false"
 		  key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg">
-	<mx:Script>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
 		<![CDATA[
 			import com.google.maps.LatLng;
 			import com.google.maps.MapMoveEvent;
@@ -54,12 +60,12 @@
 				enableContinuousZoom();
 				
 				addEventListener(MapZoomEvent.ZOOM_CHANGED, afterMove);
-				Main.protogeniHandler.rpcHandler.startInitiationSequence();
+				Main.geniHandler.rpcHandler.startInitiationSequence();
 			}
 			
 			private function afterMove(evt:MapZoomEvent):void
 			{
-				Main.protogeniHandler.mapHandler.drawMap();
+				Main.geniHandler.mapHandler.drawMap();
 			}
 			
 			public function resetZoom():void {
@@ -67,5 +73,5 @@
 				panTo(new LatLng(38,-97));
 			}
 		]]>
-	</mx:Script>
+	</fx:Script>
 </maps:Map>

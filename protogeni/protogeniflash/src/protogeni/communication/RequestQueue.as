@@ -76,9 +76,14 @@ package protogeni.communication
 			if(newNode.item.forceNext && nextRequest != null)
 			{
 				var parseNode:RequestQueueNode = head;
-				while(parseNode.next != nextRequest)
-					parseNode = parseNode.next;
-				parseNode.next = newNode;
+				if(parseNode == nextRequest) {
+					head = newNode;
+				} else {
+					while(parseNode.next != nextRequest)
+						parseNode = parseNode.next;
+					parseNode.next = newNode;
+				}
+				
 				newTail.next = nextRequest;
 				nextRequest = newNode;
 				newTail = tail;
@@ -97,7 +102,7 @@ package protogeni.communication
 		tail = newTail;
 		
 		if(pushEvents)
-			Main.protogeniHandler.dispatchQueueChanged();
+			Main.geniHandler.dispatchQueueChanged();
     }
 	
 	public function working():Boolean
@@ -166,7 +171,7 @@ package protogeni.communication
 			nextRequest = head.next;
         head = head.next;
 		if(pushEvents)
-			Main.protogeniHandler.dispatchQueueChanged();
+			Main.geniHandler.dispatchQueueChanged();
       }
       if (head == null)
       {
@@ -216,7 +221,7 @@ package protogeni.communication
 			}
 		}
 		if(pushEvents)
-			Main.protogeniHandler.dispatchQueueChanged();
+			Main.geniHandler.dispatchQueueChanged();
 	}
 
     public var head:RequestQueueNode;

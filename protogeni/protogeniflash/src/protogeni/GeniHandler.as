@@ -19,6 +19,7 @@
 	import flash.events.IEventDispatcher;
 	
 	import mx.collections.ArrayCollection;
+	import mx.collections.ArrayList;
 	
 	import protogeni.communication.ProtogeniRpcHandler;
 	import protogeni.communication.RequestDiscoverResources;
@@ -26,27 +27,28 @@
 	import protogeni.communication.RequestGetKeys;
 	import protogeni.communication.RequestListComponents;
 	import protogeni.display.DisplayUtil;
-	import protogeni.display.ProtogeniMapHandler;
+	import protogeni.display.GeniMapHandler;
 	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.GeniManagerCollection;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.Slice;
+	import protogeni.resources.SliceAuthority;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.User;
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
 	
 	// Holds and handles all information regarding ProtoGENI
-	public class ProtogeniHandler extends EventDispatcher
+	public class GeniHandler extends EventDispatcher
 	{
 		
 		[Bindable]
 		public var rpcHandler : ProtogeniRpcHandler;
 		
 		[Bindable]
-		public var mapHandler : ProtogeniMapHandler;
+		public var mapHandler : GeniMapHandler;
 		
 		[Bindable]
 		public var CurrentUser:User;
@@ -55,15 +57,34 @@
 		public var unauthenticatedMode:Boolean;
 		
 		public var GeniManagers:GeniManagerCollection;
+		
+		public var GeniAuthorities:ArrayList;
 
-		public function ProtogeniHandler()
+		public function GeniHandler()
 		{
 			rpcHandler = new ProtogeniRpcHandler();
-			mapHandler = new ProtogeniMapHandler();
-			addEventListener(ProtogeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
+			mapHandler = new GeniMapHandler();
+			addEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
 			GeniManagers = new GeniManagerCollection();
 			CurrentUser = new User();
 			unauthenticatedMode = true;
+			GeniAuthorities = new ArrayList([
+				new SliceAuthority("utahemulab.sa","urn:publicid:IDN+emulab.net+authority+sa","https://www.emulab.net/protogeni/xmlrpc/sa"),
+				new SliceAuthority("umlGENI.sa","urn:publicid:IDN+uml.emulab.net+authority+sa","https://boss.uml.emulab.net/protogeni/xmlrpc/sa"),
+				new SliceAuthority("wail.sa","urn:publicid:IDN+schooner.wail.wisc.edu+authority+sa","https://www.schooner.wail.wisc.edu/protogeni/xmlrpc/sa"),
+				new SliceAuthority("cmulab.sa","urn:publicid:IDN+cmcl.cs.cmu.edu+authority+sa","https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc/sa"),
+				new SliceAuthority("myelab.sa","urn:publicid:IDN+myelab.testbed.emulab.net+authority+sa","https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/sa"),
+				new SliceAuthority("bbn-pgeni.sa","urn:publicid:IDN+pgeni.gpolab.bbn.com+authority+sa","https://www.pgeni.gpolab.bbn.com/protogeni/xmlrpc/sa"),
+				new SliceAuthority("jonlab.sa","urn:publicid:IDN+jonlab.testbed.emulab.net+authority+sa","https://myboss.jonlab.testbed.emulab.net/protogeni/xmlrpc/sa"),
+				new SliceAuthority("ukgeni.sa","urn:publicid:IDN+uky.emulab.net+authority+sa","https://www.uky.emulab.net/protogeni/xmlrpc/sa"),
+				new SliceAuthority("cis.fiu.edu.sa","urn:publicid:IDN+cis.fiu.edu+authority+sa","https://pg-boss.cis.fiu.edu/protogeni/xmlrpc/sa"),
+				new SliceAuthority("geelab.sa","urn:publicid:IDN+elabinelab.geni.emulab.net+authority+sa","https://myboss.elabinelab.geni.emulab.net/protogeni/xmlrpc/sa"),
+				new SliceAuthority("bbn-pgeni3.sa","urn:publicid:IDN+pgeni3.gpolab.bbn.com+authority+sa","https://www.pgeni3.gpolab.bbn.com/protogeni/xmlrpc/sa"),
+				new SliceAuthority("cron.cct.lsu.edu.sa","urn:publicid:IDN+cron.cct.lsu.edu+authority+sa","https://www.cron.cct.lsu.edu/protogeni/xmlrpc/sa"),
+				new SliceAuthority("chihuas.sa","urn:publicid:IDN+chi.itesm.mx+authority+sa","https://boss.chi.itesm.mx/protogeni/xmlrpc/sa"),
+				new SliceAuthority("bbn-pgeni1.sa","urn:publicid:IDN+pgeni1.gpolab.bbn.com+authority+sa","https://www.pgeni1.gpolab.bbn.com/protogeni/xmlrpc/sa")
+								]);
+			CurrentUser.authority = GeniAuthorities.source[0] as SliceAuthority;
 		}
 		
 		public function clearAll() : void
@@ -120,27 +141,27 @@
 		
 		// EVENTS
 		public function dispatchGeniManagerChanged(gm:GeniManager):void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.GENIMANAGER_CHANGED, gm));
+			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGER_CHANGED, gm));
 		}
 		
 		public function dispatchGeniManagersChanged():void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.GENIMANAGERS_CHANGED));
+			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGERS_CHANGED));
 		}
 		
 		public function dispatchQueueChanged():void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.QUEUE_CHANGED));
+			dispatchEvent(new GeniEvent(GeniEvent.QUEUE_CHANGED));
 		}
 		
 		public function dispatchUserChanged():void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.USER_CHANGED));
+			dispatchEvent(new GeniEvent(GeniEvent.USER_CHANGED));
 		}
 		
 		public function dispatchSliceChanged(s:Slice):void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.SLICE_CHANGED, s));
+			dispatchEvent(new GeniEvent(GeniEvent.SLICE_CHANGED, s));
 		}
 		
 		public function dispatchSlicesChanged():void {
-			dispatchEvent(new ProtogeniEvent(ProtogeniEvent.SLICES_CHANGED));
+			dispatchEvent(new GeniEvent(GeniEvent.SLICES_CHANGED));
 		}
 	}
 }

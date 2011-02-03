@@ -17,33 +17,36 @@ package protogeni.communication
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
-	public class RequestSliverDelete extends Request
+	public class RequestSliverDeleteAm extends Request
 	{
-		public function RequestSliverDelete(s:Sliver) : void
+		public function RequestSliverDeleteAm(s:Sliver) : void
 		{
-			super("SliverDelete", "Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.deleteSlice);
+			super("SliverDelete", "Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.deleteSliverAm);
+			ignoreReturnCode = true;
 			sliver = s;
-			op.addField("slice_urn", sliver.slice.urn);
-			op.addField("credentials", new Array(sliver.slice.credential));
+			op.pushField(sliver.slice.urn);
+			op.pushField([sliver.slice.credential]);
 			op.setUrl(sliver.manager.Url);
 		}
 		
 		override public function complete(code : Number, response : Object) : *
 		{
-			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+			try
 			{
-				if(sliver.slice.slivers.getItemIndex(sliver) > -1)
-					sliver.slice.slivers.removeItemAt(sliver.slice.slivers.getItemIndex(sliver));
-				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
-				if(old != null)
-				{
-					if(old.slivers.getByUrn(sliver.urn) != null)
-						old.slivers.removeItemAt(old.slivers.getItemIndex(old.slivers.getByUrn(sliver.urn)));
-					Main.geniHandler.dispatchSliceChanged(old);
+				if(response == true) {
+					if(sliver.slice.slivers.getItemIndex(sliver) > -1)
+						sliver.slice.slivers.removeItemAt(sliver.slice.slivers.getItemIndex(sliver));
+					var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
+					if(old != null)
+					{
+						if(old.slivers.getByUrn(sliver.urn) != null)
+							old.slivers.removeItemAt(old.slivers.getItemIndex(old.slivers.getByUrn(sliver.urn)));
+						Main.geniHandler.dispatchSliceChanged(old);
+					}
 				}
 				Main.geniHandler.dispatchSliceChanged(sliver.slice);
 			}
-			else
+			catch(e:Error)
 			{
 				// problem removing??
 			}

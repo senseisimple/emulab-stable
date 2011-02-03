@@ -13,7 +13,7 @@
 			
 			public function show():void
 			{
-				PopUpManager.addPopUp(this, Main.Pgmap(), false);
+				PopUpManager.addPopUp(this, Main.Application() as DisplayObject, false);
 				PopUpManager.centerPopUp(this);
 			}
 		]]>

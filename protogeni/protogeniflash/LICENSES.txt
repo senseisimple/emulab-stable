@@ -2,6 +2,10 @@
  ProtoGENI Map External Resources
 =================================
 
+MIT License
+-----------
+* src/com/probertson.utils.*
+
 Apache License, Version 2.0
 ---------------------------
 * src/TooltipOverlay.as
@@ -19,10 +23,6 @@ Creative Commons Attribution 3.0 License
  ----------------------------------------
  * images/*
   - http://www.fatcow.com/free-icons/index.bml
-  
-  ===============================
-  Shared code with ProtoGENI Demo
-  ===============================
   
   GNU Library or Lesser General Public License (LGPL)
   ---------------------------------------------------

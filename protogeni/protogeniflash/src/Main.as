@@ -17,20 +17,19 @@
  package
 {
 	import mx.controls.Alert;
-	import mx.core.Application;
 	import mx.core.FlexGlobals;
 	
-	import protogeni.ProtogeniHandler;
+	import protogeni.GeniHandler;
 	
   public class Main
   {
 	// Returns the main class
-	public static function Pgmap():protogeniflash {
-		return mx.core.FlexGlobals.topLevelApplication as protogeniflash;
+	public static function Application():geniflash {
+		return mx.core.FlexGlobals.topLevelApplication as geniflash;
 	}
 
 	[Bindable]
-	public static var protogeniHandler:ProtogeniHandler;
+	public static var geniHandler:GeniHandler;
 	public static var log : LogRoot = null;
   }
 }

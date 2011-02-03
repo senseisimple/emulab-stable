@@ -51,9 +51,8 @@
 			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
 			
-			import protogeni.ProtogeniEvent;
-			import protogeni.ProtogeniHandler;
-			import protogeni.resources.ComponentManager;
+			import protogeni.GeniEvent;
+			import protogeni.GeniHandler;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
@@ -70,17 +69,17 @@
 			[Bindable]
 			public var nodesPredefined:ArrayCollection;
 			
-			private var cm:ComponentManager;
+			private var gm:GeniManager;
 			
 			public var sliceStatusRefresher:Timer = new Timer(10000);
 			
 			public function init():void
 			{
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.GENIMANAGER_CHANGED, cmChanged);
-				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, sliceChanged);
+				Main.geniHandler.addEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
+				Main.geniHandler.addEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
 			}
 			
-			public function sliceChanged(e:ProtogeniEvent):void
+			public function sliceChanged(e:GeniEvent):void
 			{
 				if(e.changedObject == sliceCanvas.slice)
 				{
@@ -88,29 +87,29 @@
 				}
 			}
 			
-			public function cmChanged(e:ProtogeniEvent):void
+			public function cmChanged(e:GeniEvent):void
 			{
-				if(e.changedObject == cm)
+				if(e.changedObject == gm)
 					loadNodes();
 			}
 			
 			public function loadNodes():void {
 				if(cms == null)
 					return;
-				cm = cmsSrc[selectCm.selectedIndex];
+				gm = cmsSrc[selectCm.selectedIndex];
 				if(this.hideUnavailableCheckBox.selected)
 				{
-					nodes = cm.getAvailableNodes();
+					nodes = gm.getAvailableNodes();
 					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
 					{
 						if(!sn.node.isVirtual &&
-							sn.node.manager == cm &&
+							sn.node.manager == gm &&
 							nodes.getItemIndex(sn.node.physicalNode) > -1)
 							nodes.removeItemAt(nodes.getItemIndex(sn.node.physicalNode));
 					}
 				}
 				else
-					nodes = cm.AllNodes;
+					nodes = gm.AllNodes;
 				
 				var nameSort:Sort = new Sort();
 				var dataSortField:SortField = new SortField();
@@ -127,13 +126,13 @@
 				exclusive.id = "Exclusive";
 				exclusive.isShared = false;
 				exclusive.isVirtual = true;
-				exclusive.manager = cm;
+				exclusive.manager = gm;
 				
 				var shared:VirtualNode = new VirtualNode(null);
 				shared.id = "Shared";
 				shared.isShared = true;
 				shared.isVirtual = true;
-				shared.manager = cm;
+				shared.manager = gm;
 				
 				nodesPredefined.addItem(exclusive);
 				nodesPredefined.addItem(shared);
@@ -196,7 +195,7 @@
 				
 				cms = new Array();
 				cmsSrc = new Array();
-				for each(var gm:GeniManager in Main.protogeniHandler.GeniManagers)
+				for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
 				{
 					if(gm.Status == GeniManager.VALID)
 					{
@@ -219,10 +218,10 @@
 				if(this.autoRefreshCheckbox.selected
 					&& this.sliceCanvas.slice != null
 					&& this.sliceCanvas.slice.hasAllAllocatedResources()
-					&& Main.protogeniHandler.rpcHandler.queue.isEmpty()
+					&& Main.geniHandler.rpcHandler.queue.isEmpty()
 					&& this.sliceCanvas.slice.Status() != Slice.READY
 					&& this.sliceCanvas.slice.Status() != Slice.FAILED)
-					Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);
+					Main.geniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);
 			}
 			
 			private function assignAvailableIconPhysical(item:Object):Class {
@@ -339,14 +338,14 @@
 			</display:SliceCanvas>
 	</mx:HDividedBox>
 	<mx:ControlBar>
-		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
-		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
+		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.geniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
+		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
 		<mx:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
-		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
+		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
 		<mx:VRule height="16"/>
-		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
-		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
-		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
+		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
+		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
+		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
 	</mx:ControlBar>
 	
 </display:DefaultWindow>

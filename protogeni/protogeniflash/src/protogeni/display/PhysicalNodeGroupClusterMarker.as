@@ -25,7 +25,7 @@ import mx.managers.DragManager;
   [Embed('../../../images/cloud.png')] private var CloudImg:Class;
   
   
-  public function PhysicalNodeGroupClusterMarker(newLabel:String, newMarker:ProtogeniMapMarker) {
+  public function PhysicalNodeGroupClusterMarker(newLabel:String, newMarker:GeniMapMarker) {
 	  marker = newMarker;
 	  this.addEventListener(MouseEvent.MOUSE_MOVE, drag);
       addChild(new CloudImg());
@@ -68,7 +68,7 @@ import mx.managers.DragManager;
   }
   
   private var label:String;
-  public var marker:ProtogeniMapMarker;
+  public var marker:GeniMapMarker;
   
   public function drag(e:MouseEvent):void
   {

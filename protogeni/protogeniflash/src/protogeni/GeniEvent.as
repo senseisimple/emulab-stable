@@ -2,7 +2,7 @@ package protogeni
 {
 	import flash.events.Event;
 	
-	public class ProtogeniEvent extends Event
+	public class GeniEvent extends Event
 	{
 		public static var GENIMANAGER_CHANGED:String = "genimanager_changed";
 		public static var GENIMANAGERS_CHANGED:String = "genimanagers_changed";
@@ -12,7 +12,7 @@ package protogeni
 		public static var SLIVER_CHANGED:String = "sliver_changed";
 		public static var SLICES_CHANGED:String = "slices_changed";
 		
-		public function ProtogeniEvent(type:String, object:Object = null)
+		public function GeniEvent(type:String, object:Object = null)
 		{
 			super(type);
 			changedObject = object;

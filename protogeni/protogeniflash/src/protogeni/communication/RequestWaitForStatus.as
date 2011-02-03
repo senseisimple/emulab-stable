@@ -45,7 +45,7 @@ package protogeni.communication
 				vn.state = nodeObject.state;
 				vn.error = nodeObject.error;
 			}
-			Main.protogeniHandler.dispatchSliceChanged(sliver.slice);
+			Main.geniHandler.dispatchSliceChanged(sliver.slice);
 		}
 		else
 		{
