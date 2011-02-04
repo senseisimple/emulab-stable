@@ -1478,7 +1478,7 @@ sub ListHistory($)
 #
 sub CheckCredentials($)
 {
-    if (! ref($_[0]) != "ARRAY") {
+    if (ref($_[0]) ne "ARRAY") {
 	return
 	    GeniResponse->MalformedArgsResponse("Credentials should be a ".
 						"array not a singleton");
