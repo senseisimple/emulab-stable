@@ -1488,7 +1488,7 @@ sub Create($$$$$$)
     my $iface2;
     my $manager1;
     my $manager2;
-    my $testing = 1;
+    my $testing = 0;
 
     # We need the control network addresses, but it is possible that
     # one of the nodes is not on this testbed.
@@ -1732,12 +1732,14 @@ sub Start($$)
 	    #
 	    my $dsturn;
 	    if ($member->GetAttribute("tunnel_dsturn", \$dsturn) != 0) {
-		print STDERR "Could not urn for $member in $tunnel ($self)\n";
+		print STDERR
+		    "Could not get urn for $member in $tunnel ($self)\n";
 		return -1;
 	    }
 	    my $peerid;
 	    if ($member->GetAttribute("tunnel_peerid", \$peerid) != 0) {
-		print STDERR "Could not peer for $member in $tunnel ($self)\n";
+		print STDERR
+		    "Could not get peer for $member in $tunnel ($self)\n";
 		return -1;
 	    }
 	    my $authority = GeniAuthority->CreateFromRegistry("CM", $dsturn);
