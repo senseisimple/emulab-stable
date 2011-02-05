@@ -2594,14 +2594,23 @@ sub GetReservedVlanTags($)
     }
     return @result;
 }
-sub GetReservedVlanTag($)
+# Lots of different ways to call this one. 
+sub GetReservedVlanTag($;$)
 {
-    my ($self) = @_;
-    my $lanid  = $self->lanid();
+    my ($arg, $linkname) = @_;
+    my $clause;
+
+    if (ref($arg) eq "Experiment") {
+	my $exptidx = $arg->idx();
+	$clause = "exptidx='$exptidx' and vname='$linkname'";
+    }
+    else {
+	my $lanid = $arg->lanid();
+	$clause = "lanid='$lanid'";
+    }
 
     my $query_result =
-	DBQueryWarn("select tag from reserved_vlantags ".
-		    "where lanid='$lanid'");
+	DBQueryWarn("select tag from reserved_vlantags where $clause");
 
     return undef
 	if (!$query_result || !$query_result->numrows);
