@@ -38,16 +38,13 @@
 				slices.removeAllElements()
 				for each(var s:Slice in user.slices)
 				slices.addElement(DisplayUtil.getSliceButton(s));
-				if(sslCert != null)
-					this.sslCert.text = user.sslCertificate;
-				if(sslKey != null)
-					this.sslKey.text = user.sslPrivateKey;
+				if(sslPem != null)
+					this.sslPem.text = user.sslPem;
 			}
 			
 			public function save():void
 			{
-				user.sslCertificate = this.sslCert.text;
-				user.sslPrivateKey = this.sslKey.text;
+				user.sslPem = this.sslPem.text;
 				Main.Application().saveLocalData();
 			}
 		]]>
@@ -138,9 +135,7 @@
 		<s:NavigatorContent height="100%" width="100%" label="SSL">
 			<s:VGroup height="100%" width="100%">
 				<s:Label text="Certificate" />
-				<s:TextArea id="sslCert" text="{user.sslCertificate}" width="100%" height="50%" />
-				<s:Label text="Private Key" />
-				<s:TextArea id="sslKey" text="{user.sslPrivateKey}" width="100%" height="50%" />
+				<s:TextArea id="sslPem" text="{user.sslPem}" width="100%" height="100%" />
 			</s:VGroup>
 		</s:NavigatorContent>
 	</mx:TabNavigator>

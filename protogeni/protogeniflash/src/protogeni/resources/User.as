@@ -37,17 +37,14 @@
 		public var urn:String;
 		
 		[Bindable]
-		public var sslCertificate:String;
-		[Bindable]
-		public var sslPrivateKey:String;
+		public var sslPem:String;
 		
 		public var slices:SliceCollection;
 		
 		public function User()
 		{
 			slices = new SliceCollection();
-			sslCertificate = "";
-			sslPrivateKey = "";
+			sslPem = "";
 		}
 	}
 }

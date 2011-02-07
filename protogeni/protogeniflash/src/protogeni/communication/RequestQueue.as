@@ -92,7 +92,6 @@ package protogeni.communication
 				if(nextRequest == null)
 					nextRequest = newNode;
 			}
-			
 		}
 		else
 		{

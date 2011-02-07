@@ -116,7 +116,9 @@ package com.mattism.http.xmlrpc
                 parameter = this.fixCDATAParameter(parameter);
 
                 this.debug("CreateParameterNode(): Creating object '"+parameter.value+"' as type "+parameter.type);
-                TypeNode = <{parameter.type}>{parameter.value}</{parameter.type}>;
+                if(parameter.type == XMLRPCDataTypes.BOOLEAN)
+					parameter.value = parameter.value ? 1 : 0;
+				TypeNode = <{parameter.type}>{parameter.value}</{parameter.type}>;
                 Node.appendChild(TypeNode);
                 return Node;
               }

@@ -6,27 +6,147 @@
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
 						initialize="authorities.selectedItem = Main.geniHandler.CurrentUser.authority"
-						width="260" height="130"
 						creationComplete="windowReady()">
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace display "protogeni.display.*";
+		
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+		
+	</fx:Style>
 	<fx:Script>
 		<![CDATA[
+			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.core.IFlexDisplayObject;
+			import mx.events.CloseEvent;
 			import mx.managers.PopUpManager;
+			
+			import protogeni.Util;
+			
+			private var certLoader:URLLoader;
+			private var closeAfter:Boolean = false;
+			private static var certLocation:String = "https://www.emulab.net/getsslcert.php3";
 			
 			public function windowReady():void
 			{
 				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
 				this.authorities.setFocus();
+				this.retrieveCertCheckbox.selected = sslPem.text.length == 0;
 			}
 			
-			public function save():void
+			public function trySubmit():void
+			{
+				if(passwordInput.text.length == 0) {
+					Alert.show("Please enter a password");
+					return;
+				}
+				if(retrieveCertCheckbox.selected) {
+					closeAfter = true;
+					tryLoadCert(certLocation);
+					return;
+				} else if(sslPem.text.length == 0) {
+					Alert.show("You must suply an SSL Cert");
+					return;
+				}
+				saveAndClose();
+			}
+			
+			public function saveAndClose():void
 			{
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
-				//Main.geniHandler.CurrentUser.sslCertificate = sslCert.text;
-				//Main.geniHandler.CurrentUser.sslPrivateKey = sslKey.text;
+				Main.geniHandler.CurrentUser.sslPem = sslPem.text;
 				FlexGlobals.topLevelApplication.saveLocalData();
 				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
+				closeWindow();
+			}
+			
+			public function visitLogin():void
+			{
+				Util.openWebsite('https://www.emulab.net/login.php3');
+			}
+			
+			public function checkCloseAfter():void
+			{
+				if(closeAfter && sslPem.text.length > 0){
+					saveAndClose();
+				} else
+					closeAfter = false;
+			}
+			
+			public function tryLoadCert(url:String):void
+			{
+				var request:URLRequest = new URLRequest(url); 
+				certLoader = new URLLoader(); 
+				certLoader.addEventListener(Event.COMPLETE, completeHandler);
+				certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+				certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
+				try
+				{
+					waitingIcon.visible = true;
+					getLabel.styleName = "inprogressStyle";
+					certLoader.load(request);
+				}
+				catch (e : Error)
+				{
+					waitingIcon.visible = false;
+					Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
+						+ e.toString() + "\n\n", true));
+					checkCloseAfter();
+				}
+			}
+			
+			private function completeHandler(event:Event):void {
+				if(certLoader.data != null && (certLoader.data as String).indexOf("-----BEGIN RSA PRIVATE KEY-----") != -1) {
+					sslPem.text = certLoader.data;
+					getLabel.text = "Success!"
+					getLabel.styleName = "validStyle";
+				} else {
+					getLabel.text = "Failed! Most likely not logged in.";
+					getLabel.styleName = "failedStyle";
+					checkCloseAfter();
+					Alert.show("You must be logged in on the website in order to automatically retrieve your SSL Cert.  Visit the login page?", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
+						function handleAction(e:CloseEvent):void {
+							if(e.detail == Alert.YES)
+								visitLogin();
+						});
+				}
+				waitingIcon.visible = false;
+				closeAfter = false;
+			}
+			
+			private function securityErrorHandler(event:SecurityErrorEvent):void {
+				getLabel.text = "Security Error!"
+				waitingIcon.visible = false;
+				getLabel.styleName = "failedStyle";
+				checkCloseAfter();
+			}
+			
+			private function ioErrorHandler(event:IOErrorEvent):void {
+				getLabel.text = "IO Error!"
+				waitingIcon.visible = false;
+				getLabel.styleName = "failedStyle";
+				checkCloseAfter();
 			}
 		]]>
 	</fx:Script>
@@ -35,14 +155,22 @@
 	</fx:Declarations>
 	<s:Label text="Which authority are you registered with?" />
 	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%"/>
-	<!--
-	<s:Label text="Certificate" />
-	<s:TextArea id="sslCert" text="{Main.geniHandler.CurrentUser.sslCertificate}" width="100%" height="50%" />
-	<s:Label text="Private Key" />
-	<s:TextArea id="sslKey" text="{Main.geniHandler.CurrentUser.sslPrivateKey}" width="100%" height="50%" />
-	-->
+	
+	<s:Label text="SSL Cert Password" />
+	<s:TextInput id="passwordInput" width="100%" displayAsPassword="true" />
+	<s:HGroup>
+		<s:CheckBox id="retrieveCertCheckbox" label="Retrieve SSL Cert? If not signed in, please sign in to" selected="true" />
+		<s:Button label="emulab.net" click="visitLogin();" />
+	</s:HGroup>
+	<s:HGroup verticalAlign="middle">
+		<s:Button label="Get!" click="this.tryLoadCert(certLocation);" />
+		<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
+		<s:Label id="getLabel" text="" />
+	</s:HGroup>
+	<s:Label text="If the automatic SSL Cert retrieval doesn't work, copy and paste it here" />
+	<s:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}" width="100%" height="100%" />
 	<display:controlBarContent>
-		<s:Button id="okButton" label="OK" click="save(); closeWindow();" />
+		<s:Button id="okButton" label="OK" click="trySubmit();" />
 		<s:Button label="Cancel" click="closeWindow()" />
 	</display:controlBarContent>
 </display:DefaultWindow>

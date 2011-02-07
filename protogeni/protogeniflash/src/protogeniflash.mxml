@@ -297,16 +297,14 @@
 						}
 					}
 
-					Main.geniHandler.CurrentUser.sslCertificate = geniLocalSharedObject.data.sslCertificate;
-					Main.geniHandler.CurrentUser.sslPrivateKey = geniLocalSharedObject.data.sslPrivateKey;
+					Main.geniHandler.CurrentUser.sslPem = geniLocalSharedObject.data.sslPem;
 				}
 			}
 			
 			public function saveLocalData():void
 			{
 				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
-				geniLocalSharedObject.data.sslCertificate = Main.geniHandler.CurrentUser.sslCertificate;
-				geniLocalSharedObject.data.sslPrivateKey = Main.geniHandler.CurrentUser.sslPrivateKey;
+				geniLocalSharedObject.data.sslPem = Main.geniHandler.CurrentUser.sslPem;
 				try
 				{
 					geniLocalSharedObject.flush();
