@@ -117,7 +117,7 @@ sub SetGlobalDisable($$)
 
     $value = ($value ? 1 : 0);
     
-    DBQueryWarn("update emulab_features set disable='$value' ".
+    DBQueryWarn("update emulab_features set disabled='$value' ".
 		"where feature='$featurename'")
 	or return -1;
 
