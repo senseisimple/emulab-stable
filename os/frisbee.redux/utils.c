@@ -596,3 +596,161 @@ ClientStatsDump(unsigned int id, ClientStats_t *stats)
 	}
 }
 #endif
+
+#ifdef MASTER_SERVER
+#include "configdefs.h"
+
+char *
+GetMSError(int error)
+{
+	char *err;
+
+	switch (error) {
+	case 0:
+		err = "no error";
+		break;
+	case MS_ERROR_FAILED:
+		err = "server authentication error";
+		break;
+	case MS_ERROR_NOHOST:
+		err = "unknown host";
+		break;
+	case MS_ERROR_NOIMAGE:
+		err = "unknown image";
+		break;
+	case MS_ERROR_NOACCESS:
+		err = "access not allowed";
+		break;
+	case MS_ERROR_NOMETHOD:
+		err = "not available via specified method";
+		break;
+	case MS_ERROR_INVALID:
+		err = "invalid argument";
+		break;
+	case MS_ERROR_TRYAGAIN:
+		err = "image busy, try again later";
+		break;
+	default:
+		err = "unknown error";
+		break;
+	}
+
+	return err;
+}
+
+char *
+GetMSMethods(int methods)
+{
+	static char mbuf[256];
+
+	mbuf[0] = '\0';
+	if (methods & MS_METHOD_UNICAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "unicast");
+	}
+	if (methods & MS_METHOD_MULTICAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "multicast");
+	}
+	if (methods & MS_METHOD_BROADCAST) {
+		if (mbuf[0] != '\0')
+			strcat(mbuf, "/");
+		strcat(mbuf, "broadcast");
+	}
+	if (mbuf[0] == '\0')
+		strcat(mbuf, "UNKNOWN");
+
+	return mbuf;
+}
+
+/*
+ * Print the contents of a GET reply to stdout.
+ * The reply struct fields should be in HOST order; i.e., as returned
+ * by ClientNetFindServer.
+ */
+void
+PrintGetInfo(char *imageid, GetReply *reply, int raw)
+{
+	struct in_addr in;
+	uint64_t isize;
+	int len;
+
+	if (raw) {
+		printf("imageid=%s\n", imageid);
+		printf("error=%d\n", reply->error);
+		if (reply->error)
+			return;
+
+		printf("method=0x%x\n", reply->method);
+		isize = ((uint64_t)reply->hisize << 32) | reply->losize;
+		printf("size=%llu\n", isize);
+		printf("sigtype=0x%x\n", reply->sigtype);
+		switch (reply->sigtype) {
+		case MS_SIGTYPE_MTIME:
+			printf("sig=0x%x\n", *(uint32_t *)reply->signature);
+			len = 0;
+			break;
+		case MS_SIGTYPE_MD5:
+			len = 16;
+			break;
+		case MS_SIGTYPE_SHA1:
+			len = 20;
+			break;
+		default:
+			len = 0;
+			break;
+		}
+		if (len > 0) {
+			char sigbuf[MS_MAXSIGLEN*2+1], *sbp;
+			int i;
+
+			sbp = sigbuf;
+			for (i = 0; i < len; i++) {
+				sprintf(sbp, "%02x", reply->signature[i]);
+				sbp += 2;
+			}
+			*sbp = '\0';
+			printf("sig=0x%s\n", sigbuf);
+		}
+		printf("running=%d\n", reply->isrunning);
+		if (reply->isrunning) {
+			in.s_addr = htonl(reply->servaddr);
+			printf("servaddr=%s\n", inet_ntoa(in));
+			in.s_addr = htonl(reply->addr);
+			printf("addr=%s\n", inet_ntoa(in));
+			printf("port=%d\n", reply->port);
+		}
+		return;
+	}
+
+	if (reply->error) {
+		printf("%s: server denied access: %s\n",
+		    imageid, GetMSError(reply->error));
+		return;
+	}
+
+	if (reply->isrunning) {
+		in.s_addr = htonl(reply->addr);
+		printf("%s: access OK, server running at %s:%d using %s\n",
+		    imageid, inet_ntoa(in), reply->port,
+		    GetMSMethods(reply->method));
+	} else
+		printf("%s: access OK, available methods=%s\n",
+		    imageid, GetMSMethods(reply->method));
+
+	isize = ((uint64_t)reply->hisize << 32) | reply->losize;
+	printf("  size=%llu\n", isize);
+
+	switch (reply->sigtype) {
+	case MS_SIGTYPE_MTIME:
+	{
+		time_t mt = *(time_t *)reply->signature;
+		printf("  modtime=%s\n", ctime(&mt));
+	}
+	default:
+		break;
+	}
+}
+#endif

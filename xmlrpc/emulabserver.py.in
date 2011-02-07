@@ -4662,6 +4662,7 @@ class elabinelab:
         self.clientip = server.clientip;
         self.pid      = None;
         self.eid      = None;
+	self.node     = None;
         return
 
     #
@@ -4727,6 +4728,8 @@ class elabinelab:
                                   "elabinelab method for " +
                                   res[0][1] + "/" + res[0][2]);
         
+	self.node = res[0][0];
+
         return None;
 
     #
@@ -4931,28 +4934,21 @@ class elabinelab:
         
         argstr = escapeshellarg(str(argdict["imageid"]))
         
-        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeelauncher " + argstr)
+        (exitval, output) = runcommand(TBDIR + "/sbin/frisbeehelper -n " +
+                                       self.node + " " + argstr)
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
         #
-        # Success. Must get the loadinfo out of the DB so we can pass it back.
+        # Success. Load address was output so parse it out.
         #
-        res = DBQueryFatal("select load_address from frisbee_blobs where imageid=%s",
-                           (argdict["imageid"],))
-        
-        # Hmm, something went wrong?
-        if len(res) == 0:
+	m = re.search("^Address is (.*)$", output)
+	if m == None or m.group(1) == None:
             return EmulabResponse(RESPONSE_ERROR,
-                                  output="Imageid is gone: " +
+                                  output="Could not image info for: " +
                                   argdict["imageid"])
-        
-        if (res[0][0] == None or res[0][0] == ""):
-            return EmulabResponse(RESPONSE_ERROR,
-                                  output="No load_address in DB: " +
-                                  argdict["imageid"])
-        
-        return EmulabResponse(RESPONSE_SUCCESS, str(res[0][0]), output=output)
+	addr = m.group(1)
+        return EmulabResponse(RESPONSE_SUCCESS, value=str(addr))
     
     #
     # Return the equivalent of what switchmac does. This is used so that

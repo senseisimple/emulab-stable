@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -30,7 +30,7 @@ unsigned long nonetbufs;
 #endif
 
 /* Max number of times to attempt bind to port before failing. */
-#define MAXBINDATTEMPTS		2
+#define MAXBINDATTEMPTS		1
 
 /* Max number of hops multicast hops. */
 #define MCAST_TTL		5
@@ -41,6 +41,25 @@ static int		nobufdelay = -1;
 int			broadcast = 0;
 static int		isclient = 0;
 static int		sndportnum;	/* kept in network order */
+
+/*
+ * Convert a string to an IPv4 address.  We first try to interpret it as
+ * an IPv4 address.  If that fails, we attempt to resolve it as a host name.
+ * Return non-zero on success.
+ */
+int
+GetIP(char *str, struct in_addr *in)
+{
+	struct hostent *he;
+
+	if (inet_aton(str, in) == 0) {
+		if ((he = gethostbyname(str)) == NULL)
+			return 0;
+		memcpy(in, he->h_addr, sizeof(*in));
+	}
+
+	return 1;
+}
 
 int
 GetSockbufSize(void)
@@ -136,7 +155,7 @@ CommonInit(int dobind)
 		unsigned int loop = 0, ttl = MCAST_TTL;
 		struct ip_mreq mreq;
 
-		log("Using Multicast");
+		log("Using Multicast %s", inet_ntoa(mcastaddr));
 
 		mreq.imr_multiaddr.s_addr = mcastaddr.s_addr;
 
@@ -470,3 +489,228 @@ PacketValid(Packet_t *p, int nchunks)
 
 	return 1;
 }
+
+#ifdef MASTER_SERVER
+int
+MsgSend(int msock, MasterMsg_t *msg, size_t size, int timo)
+{
+	void *buf = msg;
+	int cc;
+	struct timeval tv, now, then;
+	fd_set wfds;
+
+	if (timo) {
+		tv.tv_sec = timo;
+		tv.tv_usec = 0;
+		gettimeofday(&then, NULL);
+		timeradd(&then, &tv, &then);
+	}
+	while (size > 0) {
+		if (timo) {
+			gettimeofday(&now, NULL);
+			if (timercmp(&now, &then, >=)) {
+				cc = 0;
+			} else {
+				timersub(&then, &now, &tv);
+				FD_ZERO(&wfds);
+				FD_SET(msock, &wfds);
+				cc = select(msock+1, NULL, &wfds, NULL, &tv);
+			}
+			if (cc <= 0) {
+				if (cc == 0) {
+					errno = ETIMEDOUT;
+					cc = -1;
+				}
+				break;
+			}
+		}
+
+		cc = write(msock, buf, size);
+		if (cc <= 0)
+			break;
+
+		size -= cc;
+		buf += cc;
+	}
+
+	if (size != 0) {
+		char *estr = "master server message send";
+		if (cc == 0)
+			fprintf(stderr, "%s: Unexpected EOF\n", estr);
+		else
+			perror(estr);
+		return 0;
+	}
+	return 1;
+}
+
+int
+MsgReceive(int msock, MasterMsg_t *msg, size_t size, int timo)
+{
+	void *buf = msg;
+	int cc;
+	struct timeval tv, now, then;
+	fd_set rfds;
+
+	if (timo) {
+		tv.tv_sec = timo;
+		tv.tv_usec = 0;
+		gettimeofday(&then, NULL);
+		timeradd(&then, &tv, &then);
+	}
+	while (size > 0) {
+		if (timo) {
+			gettimeofday(&now, NULL);
+			if (timercmp(&now, &then, >=)) {
+				cc = 0;
+			} else {
+				timersub(&then, &now, &tv);
+				FD_ZERO(&rfds);
+				FD_SET(msock, &rfds);
+				cc = select(msock+1, &rfds, NULL, NULL, &tv);
+			}
+			if (cc <= 0) {
+				if (cc == 0) {
+					errno = ETIMEDOUT;
+					cc = -1;
+				}
+				break;
+			}
+		}
+
+		cc = read(msock, buf, size);
+		if (cc <= 0)
+			break;
+
+		size -= cc;
+		buf += cc;
+	}
+
+	if (size != 0) {
+		char *estr = "master server message receive";
+		if (cc == 0)
+			fprintf(stderr, "%s: Unexpected EOF\n", estr);
+		else
+			perror(estr);
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * Contact the master server to discover download information for imageid.
+ * 'sip' and 'sport' are the addr/port of the master server, 'method'
+ * specifies the desired download method, 'askonly' is set to just ask
+ * for information about the image (without starting a server), 'timeout'
+ * is how long to wait for a response.
+ *
+ * If 'hostip' is not zero, then we are requesting information on behalf of
+ * that node.  The calling node (us) must have "proxy" permission on the
+ * server for this to work.
+ *
+ * On success, return non-zero with 'reply' filled in with the server's
+ * response IN HOST ORDER.  On failure returns zero.
+ */
+int
+ClientNetFindServer(in_addr_t sip, in_port_t sport,
+		    in_addr_t hostip, char *imageid,
+		    int method, int askonly, int timeout,
+		    GetReply *reply, struct in_addr *myip)
+{
+	struct sockaddr_in name;
+	MasterMsg_t msg;
+	int msock, len;
+	
+	if ((msock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+		perror("Could not allocate socket for master server");
+		return 0;
+	}
+	if (sport == 0)
+		sport = MS_PORTNUM;
+
+	name.sin_family = AF_INET;
+	name.sin_addr.s_addr = htonl(sip);
+	name.sin_port = htons(sport);
+	if (connect(msock, (struct sockaddr *)&name, sizeof(name)) < 0) {
+		perror("Connecting to master server");
+		close(msock);
+		return 0;
+	}
+
+	/*
+	 * XXX recover the IP address of the interface used to talk to
+	 * the server.
+	 */
+	if (myip) {
+		struct sockaddr_in me;
+		socklen_t len = sizeof me;
+
+		if (getsockname(msock, (struct sockaddr *)&me, &len) < 0) {
+			perror("getsockname");
+			close(msock);
+			return 0;
+		}
+		*myip = me.sin_addr;
+	}
+
+	memset(&msg, 0, sizeof msg);
+	strncpy((char *)msg.hdr.version, MS_MSGVERS_1,
+		sizeof(msg.hdr.version));
+	msg.hdr.type = htonl(MS_MSGTYPE_GETREQUEST);
+	msg.body.getrequest.hostip = htonl(hostip);
+	if (askonly) {
+		msg.body.getrequest.status = 1;
+		msg.body.getrequest.methods = MS_METHOD_ANY;
+	} else {
+		msg.body.getrequest.methods = method;
+	}
+	len = strlen(imageid);
+	if (len > MS_MAXIDLEN)
+		len = MS_MAXIDLEN;
+	msg.body.getrequest.idlen = htons(len);
+	strncpy((char *)msg.body.getrequest.imageid, imageid, MS_MAXIDLEN);
+
+	len = sizeof msg.hdr + sizeof msg.body.getrequest;
+	if (!MsgSend(msock, &msg, len, timeout)) {
+		close(msock);
+		return 0;
+	}
+
+	memset(&msg, 0, sizeof msg);
+	len = sizeof msg.hdr + sizeof msg.body.getreply;
+	if (!MsgReceive(msock, &msg, len, timeout)) {
+		close(msock);
+		return 0;
+	}
+
+	if (strncmp((char *)msg.hdr.version, MS_MSGVERS_1,
+		    sizeof(msg.hdr.version))) {
+		fprintf(stderr, "Got incorrect version from master server\n");
+		close(msock);
+		return 0;
+	}
+	if (ntohl(msg.hdr.type) != MS_MSGTYPE_GETREPLY) {
+		fprintf(stderr, "Got incorrect reply from master server\n");
+		close(msock);
+		return 0;
+	}
+	close(msock);
+
+	/*
+	 * Convert the reply info to host order
+	 */
+	*reply = msg.body.getreply;
+	reply->error = ntohs(reply->error);
+	reply->servaddr = ntohl(reply->servaddr);
+	reply->addr = ntohl(reply->addr);
+	reply->port = ntohs(reply->port);
+	reply->sigtype = ntohs(reply->sigtype);
+	if (reply->sigtype == MS_SIGTYPE_MTIME)
+		*(uint32_t *)reply->signature =
+			ntohl(*(uint32_t *)reply->signature);
+	reply->hisize = ntohl(reply->hisize);
+	reply->losize = ntohl(reply->losize);
+	return 1;
+}
+#endif
+

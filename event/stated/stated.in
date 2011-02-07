@@ -1342,7 +1342,7 @@ sub CheckPortRegistration($) {
 
     my $exptidx;
     if (!TBExptIDX($pid, $eid, \$exptidx)) {
-	print "*** WARNING: No such experiment $pid/$eid!\n";
+	debug("*** WARNING: No such experiment $pid/$eid!\n");
 	return;
     }
 
@@ -1357,16 +1357,29 @@ sub CheckPortRegistration($) {
 		    "      sync_server='$vname'");
 
     if ($query_result && $query_result->num_rows) {
+	# exptidx+service is the primary key, must lookup based on that
 	$query_result =
-	    DBQueryWarn("select port from port_registration ".
-			"where pid='$pid' and eid='$eid' and ".
-			"      node_id='$node' and service='emulab_syncd'");
-	
-	if ($query_result && !$query_result->num_rows) {
-	    DBQueryWarn("insert into port_registration set ".
-			"     exptidx='$exptidx', pid='$pid', eid='$eid', ".
-			"     service='emulab_syncd', ".
-			"     node_id='$node', port='16534'");
+	    DBQueryWarn("select pid,eid,node_id from port_registration ".
+			"where exptidx='$exptidx' and service='emulab_syncd'");
+	if ($query_result) {
+	    if (!$query_result->num_rows) {
+		DBQueryWarn("insert into port_registration set ".
+			    "  exptidx='$exptidx', pid='$pid', eid='$eid', ".
+			    "  service='emulab_syncd', ".
+			    "  node_id='$node', port='16534'");
+	    } else {
+		#
+		# XXX check for an existing entry that doesn't match us.
+		# Some could register as a syncserver from another node
+		# in the experiment.  If so, we just warn for now.
+		#
+		my ($p,$e,$n) = $query_result->fetchrow();
+		if ($p ne $pid || $e ne $eid || $n ne $node) {
+		    info("*** WARNING: portregister sync_server ".
+			 "inconsistancy: $p/$e/$n should be ".
+			 "$pid/$eid/$node\n");
+		}
+	    }
 	}
     }
 }

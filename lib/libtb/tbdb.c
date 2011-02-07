@@ -175,6 +175,12 @@ mydb_update(char *query, ...)
 	return 1;
 }
 
+int
+mydb_insertid()
+{
+	return (int)mysql_insert_id(&db);
+}
+
 /*
  * Map IP to node ID. 
  */
