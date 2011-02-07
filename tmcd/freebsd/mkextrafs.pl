@@ -92,9 +92,6 @@ if (defined($options{"s"})) {
 if (defined($options{"c"})) {
     $checkit = 1;
 }
-if (defined($options{"c"})) {
-    $checkit = 1;
-}
 if (defined($options{"r"})) {
     $diskopt = $options{"r"};
 }

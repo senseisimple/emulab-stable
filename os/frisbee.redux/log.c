@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2010 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -47,6 +47,37 @@ ServerLogInit(void)
 	return 0;
 }
 
+int
+MasterServerLogInit(void)
+{
+	if (debug) {
+		usesyslog = 0;
+		return 1;
+	}
+
+	openlog("mfrisbeed", LOG_PID, LOG_TESTBED);
+
+	return 0;
+}
+
+void
+info(const char *fmt, ...)
+{
+	va_list args;
+	char	buf[BUFSIZ];
+
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
+
+	if (!usesyslog) {
+		fputs(buf, stderr);
+		fputc('\n', stderr);
+	}
+	else
+		syslog(LOG_INFO, "%s", buf);
+}
+
 void
 log(const char *fmt, ...)
 {
@@ -90,6 +121,7 @@ error(const char *fmt, ...)
 	va_start(args, fmt);
 	if (!usesyslog) {
 		vfprintf(stderr, fmt, args);
+		fputc('\n', stderr);
 		fflush(stderr);
 	}
 	else

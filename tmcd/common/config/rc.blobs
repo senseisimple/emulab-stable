@@ -96,6 +96,7 @@ sub doboot()
 {
     my @blobs;
     my $errors = 0;
+    my $bossip;
 
     if (-e "$BOOTDIR/rc.blobs-ran") {
 	print STDOUT "  Blobs installation already done.\n";
@@ -130,14 +131,34 @@ sub doboot()
     unlink("$LOGDIR/blobs.log");
     my $blobno = 1;
     foreach my $blob (@blobs) {
+	my ($basename, $dest, $frisbeeargs);
+
 	eval {
-	    ($mcastaddr, $portnum, undef, $basename, $dest) = 
-		$blob =~ m|^URL=frisbee.mcast://(.+?):(.+?)/(.+/)?(.+) ACTION=unpack:(\S+)|
-		or die "Bad Blobs line\n";
+	    if ($blob =~ m|^URL=frisbee.mcast://(.+?):(.+?)/(.+/)?(.+) ACTION=unpack:(\S+)|) {
+		$basename = $4;
+		$dest = $5;
+		$frisbeeargs = "-m $1 -p $2";
+	    }
+	    elsif ($blob =~ m|^URL=frisbee://(\S+) ACTION=unpack:(\S+)|) {
+		$basename = $1;
+		$dest = $2;
+		# find the boss IP
+		if (!defined($bossip)) {
+		    $bossip = `cat $BOOTDIR/bossip`;
+		    if (!$bossip) {
+			die "Cannot determine boss address\n";
+		    }
+		    chomp($bossip);
+		}
+		$frisbeeargs = "-S $bossip -F $basename";
+	    }
+	    else {
+		die "Bad Blobs line\n";
+	    }
 
 	    my $local_path = "$tmpdir/blob$PID-$blobno";
 	    unlink($local_path);
-	    my $frisbee_cmd = "$FRISBEE -p $portnum -m $mcastaddr $local_path".
+	    my $frisbee_cmd = "$FRISBEE $frisbeeargs $local_path".
 		              " >>$LOGDIR/blobs.log 2>&1";
 
 	    print STDOUT "  Downloading blob $basename to $local_path\n";

@@ -1,6 +1,7 @@
 #!/bin/sh
 
 THRESHOLD=1000
+DOIT=0
 
 if [ "$1" = "-t" ] && [ $# -eq 2 ] && [ "$2" -gt 0 ]; then
     THRESHOLD="$2"
@@ -15,10 +16,14 @@ fi
 find @prefix@/expinfo -depth 4 -name activity.log -mtime +"$THRESHOLD" \
         -print | sed 's/.activity.log$//' | \
     ( while read DIRNAME; do
-        echo -n "Compressing $DIRNAME... "
-        tar cy -C "$DIRNAME/.." -f "${DIRNAME}.tar.bz2" \
-                `basename "$DIRNAME"` && \
-            chown `stat -f %u "$DIRNAME"` "${DIRNAME}.tar.bz2" && \
-            rm -rf "$DIRNAME"
-        echo done
+        if [ $DOIT -ne 0 ]; then
+            echo -n "Compressing $DIRNAME... "
+            tar cy -C "$DIRNAME/.." -f "${DIRNAME}.tar.bz2" \
+                    `basename "$DIRNAME"` && \
+                chown `stat -f %u "$DIRNAME"` "${DIRNAME}.tar.bz2" && \
+                rm -rf "$DIRNAME"
+            echo done
+        else
+            echo -n "Would compress $DIRNAME... "
+        fi
       done )

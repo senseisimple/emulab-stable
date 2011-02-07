@@ -328,7 +328,9 @@ sub CreateFromRegistry($$)
 	if ($registry->Resolve($token, "Component", \$blob) != 0);
 
     # Why does PLC Resolve return an array of length one?
-    $blob = $blob->[0];
+    if (ref($blob) eq "ARRAY") {
+	$blob = $blob->[0];
+    }
 
     my $certificate = GeniCertificate->LoadFromString($blob->{'gid'});
     return undef
