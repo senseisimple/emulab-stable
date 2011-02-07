@@ -307,7 +307,8 @@ if ($stopbed) {
     }
     print "** Testbed is quiet; stopping testbed daemons ... \n";
     if (system("$STARTUP stop >/dev/null 2>&1") ||
-	system("$MFRISBEED stop >/dev/null 2>&1")) {
+	(-x $MFRISBEED &&
+	system("$MFRISBEED stop >/dev/null 2>&1"))) {
 	Fatal("Could not stop testbed daemons. Stopping.");
     }
     $stopped = 1;

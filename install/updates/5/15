@@ -7,6 +7,8 @@ use emdb;
 use Image;
 use NodeType;
 
+my $MFRISBEED_STARTUP = "/usr/local/etc/rc.d/3.mfrisbeed.sh";
+
 sub InstallUpdate($$)
 {
     my ($version, $phase) = @_;
@@ -27,6 +29,11 @@ sub InstallUpdate($$)
     # If something should run in the pre-install phase.
     #
     if ($phase eq "pre") {
+	Phase "startupfile", "Installing master frisbee startup file", sub {
+	    DoneIfExists($MFRISBEED_STARTUP);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d install");
+	};
+	
 	if ($gotem) {
 	    print("\n",
 		  "*** PLEASE NOTE:\n",
