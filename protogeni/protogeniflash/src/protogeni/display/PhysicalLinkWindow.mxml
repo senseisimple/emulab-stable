@@ -1,20 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*">
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						title="Link Information" close="closeWindow()">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			public function loadXml(val:XML):void {
-				if(val != null) {
-					txt.text = val.toXMLString();
-				} else {
-					txt.text = "No document found";
-				}
+			import protogeni.resources.PhysicalLink;
+			
+			public function loadLink(l:PhysicalLink):void {
+				linkInfo.load(l);
 			}
 		]]>
 	</fx:Script>
-	<s:TextArea id="txt" width="100%" height="100%"  editable="false"/>
+	<display:PhysicalLinkInfo id="linkInfo" height="100%" width="100%" />
 </display:DefaultWindow>

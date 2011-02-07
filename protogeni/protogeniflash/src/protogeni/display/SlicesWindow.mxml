@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="Slices" show="refreshView()"
@@ -52,7 +52,7 @@
 					return;
 				}
 				
-				Main.geniHandler.rpcHandler.createSlice(sliceName.text);
+				Main.geniHandler.requestHandler.createSlice(sliceName.text);
 			}
 			
 			public function refreshView(junk:* = null):void
@@ -74,4 +74,4 @@
 		<display:PromptingTextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-" prompt="New slice name..." />
 		<display:ImageButton id="createButton" source="{DisplayUtil.actionIcon}" click="createSlice();" />
 	</display:controlBarContent>
-</display:DefaultWindow2>
+</display:DefaultWindow>

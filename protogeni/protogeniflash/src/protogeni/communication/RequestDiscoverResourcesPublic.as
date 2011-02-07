@@ -66,12 +66,12 @@ package protogeni.communication
 		running = false;
 		if(cm.Status == GeniManager.INPROGRESS)
 			cm.Status = GeniManager.FAILED;
-		Main.geniHandler.rpcHandler.remove(this, false);
+		Main.geniHandler.requestHandler.remove(this, false);
 		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 		if(cm.Status == GeniManager.VALID)
 			Main.log.setStatus("Parsing " + cm.Hrn + " RSPEC Done",false);
-		Main.geniHandler.rpcHandler.start();
+		Main.geniHandler.requestHandler.start();
 	}
 
     private var cm : ComponentManager;

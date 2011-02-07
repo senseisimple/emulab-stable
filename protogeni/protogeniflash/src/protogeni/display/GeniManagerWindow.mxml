@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						width="570" height="150"
@@ -12,20 +12,18 @@
 			import com.google.maps.View;
 			
 			import mx.collections.ArrayCollection;
-			import mx.containers.HBox;
 			import mx.containers.TabNavigator;
-			import mx.containers.VBox;
 			import mx.controls.Alert;
-			import mx.controls.Button;
-			import mx.controls.Label;
-			import mx.controls.Spacer;
-			import mx.controls.TextArea;
 			import mx.events.CloseEvent;
 			import mx.formatters.NumberFormatter;
 			import mx.managers.PopUpManager;
 			
 			import protogeni.resources.ComponentManager;
 			import protogeni.resources.GeniManager;
+			
+			import spark.components.NavigatorContent;
+			import spark.components.TextArea;
+			import spark.components.VGroup;
 			
 			[Bindable]
 			private var gm:GeniManager = null;
@@ -65,33 +63,33 @@
 				tabContainer.percentWidth = 100;
 				
 				// Full DOT graph
-				var dotTab:VBox = new VBox();
+				var dotTab:NavigatorContent = new NavigatorContent();
 				dotTab.label = "Full DOT graph";
 				var textd:TextArea = new TextArea();
 				textd.percentHeight = 100;
 				textd.percentWidth = 100;
 				textd.text = gm.getDotGraph();
-				dotTab.addChild(textd);
+				dotTab.addElement(textd);
 				tabContainer.addChild(dotTab);
 				
 				// Grouped DOT graph
-				var dotGroupedTab:VBox = new VBox();
+				var dotGroupedTab:NavigatorContent = new NavigatorContent();
 				dotGroupedTab.label = "Grouped DOT graph";
 				var textgd:TextArea = new TextArea();
 				textgd.percentHeight = 100;
 				textgd.percentWidth = 100;
 				textgd.text = gm.getDotGroupedGraph();
-				dotGroupedTab.addChild(textgd);
+				dotGroupedTab.addElement(textgd);
 				tabContainer.addChild(dotGroupedTab);
 				
 				// Grouped GraphML
-				var groupedgraphmlTab:VBox = new VBox();
+				var groupedgraphmlTab:NavigatorContent = new NavigatorContent();
 				groupedgraphmlTab.label = "Grouped GraphML";
 				var textgg:TextArea = new TextArea();
 				textgg.percentHeight = 100;
 				textgg.percentWidth = 100;
 				textgg.text = gm.getGroupedGraphML()
-				groupedgraphmlTab.addChild(textgg);
+				groupedgraphmlTab.addElement(textgg);
 				tabContainer.addChild(groupedgraphmlTab);
 				
 				// GraphML
@@ -106,7 +104,7 @@
 				tabContainer.addChild(graphmlTab);
 				*/
 				
-				cw.addChild(tabContainer);
+				cw.addElement(tabContainer);
 			}
 			
 			public function viewConsole():void
@@ -125,15 +123,15 @@
 			<mx:GridItem width="100%">
 				<s:Label text="{gm.Hrn}" fontSize="17" fontWeight="bold" width="100%" />
 				<display:ImageButton id="consoleButton"
-									 source="@Embed('../images/application_xp_terminal.png')"
+									 source="@Embed('../../../images/application_xp_terminal.png')"
 									 click="viewConsole()"
 									 toolTip="View log messages in the console" />
 				<display:ImageButton id="rpsecButton"
-									 source="@Embed('../images/page_white_code.png')"
+									 source="@Embed('../../../images/page_white_code.png')"
 									 click="viewRspec()"
 									 toolTip="View Advertisement RSPEC" />
 				<display:ImageButton id="graphInfoButton"
-									 source="@Embed('../images/chart_organisation.png')"
+									 source="@Embed('../../../images/chart_organisation.png')"
 									 click="openGraphInfo()"
 									 toolTip="View the graph information" />
 				<display:ImageButton id="messageButton"
@@ -169,4 +167,4 @@
 			</mx:GridItem>
 		</mx:GridRow>
 	</mx:Grid>
-</display:DefaultWindow2>
+</display:DefaultWindow>

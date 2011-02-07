@@ -21,13 +21,13 @@
 	import mx.collections.ArrayCollection;
 	import mx.collections.ArrayList;
 	
-	import protogeni.communication.ProtogeniRpcHandler;
+	import protogeni.communication.GeniRequestHandler;
 	import protogeni.communication.RequestDiscoverResources;
 	import protogeni.communication.RequestGetCredential;
 	import protogeni.communication.RequestGetKeys;
 	import protogeni.communication.RequestListComponents;
 	import protogeni.display.DisplayUtil;
-	import protogeni.display.GeniMapHandler;
+	import protogeni.display.mapping.GeniMapHandler;
 	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.GeniManagerCollection;
@@ -45,7 +45,7 @@
 	{
 		
 		[Bindable]
-		public var rpcHandler : ProtogeniRpcHandler;
+		public var requestHandler : GeniRequestHandler;
 		
 		[Bindable]
 		public var mapHandler : GeniMapHandler;
@@ -55,34 +55,43 @@
 		
 		[Bindable]
 		public var unauthenticatedMode:Boolean;
+
+		public var publicUrl:String = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
+		public var publicUrn:String = "urn:publicid:IDN+emulab.net+authority+cm";
+		public var publicHrn:String = "utahemulab.cm";
+		
+		public var forceAuthority:SliceAuthority = null;
+		
+		public var forceMapKey:String = null;
 		
 		public var GeniManagers:GeniManagerCollection;
 		
+		[Bindable]
 		public var GeniAuthorities:ArrayList;
 
 		public function GeniHandler()
 		{
-			rpcHandler = new ProtogeniRpcHandler();
+			requestHandler = new GeniRequestHandler();
 			mapHandler = new GeniMapHandler();
 			addEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
 			GeniManagers = new GeniManagerCollection();
 			CurrentUser = new User();
 			unauthenticatedMode = true;
 			GeniAuthorities = new ArrayList([
-				new SliceAuthority("utahemulab.sa","urn:publicid:IDN+emulab.net+authority+sa","https://www.emulab.net/protogeni/xmlrpc/sa"),
-				new SliceAuthority("umlGENI.sa","urn:publicid:IDN+uml.emulab.net+authority+sa","https://boss.uml.emulab.net/protogeni/xmlrpc/sa"),
-				new SliceAuthority("wail.sa","urn:publicid:IDN+schooner.wail.wisc.edu+authority+sa","https://www.schooner.wail.wisc.edu/protogeni/xmlrpc/sa"),
-				new SliceAuthority("cmulab.sa","urn:publicid:IDN+cmcl.cs.cmu.edu+authority+sa","https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc/sa"),
-				new SliceAuthority("myelab.sa","urn:publicid:IDN+myelab.testbed.emulab.net+authority+sa","https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc/sa"),
-				new SliceAuthority("bbn-pgeni.sa","urn:publicid:IDN+pgeni.gpolab.bbn.com+authority+sa","https://www.pgeni.gpolab.bbn.com/protogeni/xmlrpc/sa"),
-				new SliceAuthority("jonlab.sa","urn:publicid:IDN+jonlab.testbed.emulab.net+authority+sa","https://myboss.jonlab.testbed.emulab.net/protogeni/xmlrpc/sa"),
-				new SliceAuthority("ukgeni.sa","urn:publicid:IDN+uky.emulab.net+authority+sa","https://www.uky.emulab.net/protogeni/xmlrpc/sa"),
-				new SliceAuthority("cis.fiu.edu.sa","urn:publicid:IDN+cis.fiu.edu+authority+sa","https://pg-boss.cis.fiu.edu/protogeni/xmlrpc/sa"),
-				new SliceAuthority("geelab.sa","urn:publicid:IDN+elabinelab.geni.emulab.net+authority+sa","https://myboss.elabinelab.geni.emulab.net/protogeni/xmlrpc/sa"),
-				new SliceAuthority("bbn-pgeni3.sa","urn:publicid:IDN+pgeni3.gpolab.bbn.com+authority+sa","https://www.pgeni3.gpolab.bbn.com/protogeni/xmlrpc/sa"),
-				new SliceAuthority("cron.cct.lsu.edu.sa","urn:publicid:IDN+cron.cct.lsu.edu+authority+sa","https://www.cron.cct.lsu.edu/protogeni/xmlrpc/sa"),
-				new SliceAuthority("chihuas.sa","urn:publicid:IDN+chi.itesm.mx+authority+sa","https://boss.chi.itesm.mx/protogeni/xmlrpc/sa"),
-				new SliceAuthority("bbn-pgeni1.sa","urn:publicid:IDN+pgeni1.gpolab.bbn.com+authority+sa","https://www.pgeni1.gpolab.bbn.com/protogeni/xmlrpc/sa")
+				new SliceAuthority("utahemulab.sa","urn:publicid:IDN+emulab.net+authority+sa","https://www.emulab.net/protogeni/xmlrpc"),
+				new SliceAuthority("umlGENI.sa","urn:publicid:IDN+uml.emulab.net+authority+sa","https://boss.uml.emulab.net/protogeni/xmlrpc"),
+				new SliceAuthority("wail.sa","urn:publicid:IDN+schooner.wail.wisc.edu+authority+sa","https://www.schooner.wail.wisc.edu/protogeni/xmlrpc"),
+				new SliceAuthority("cmulab.sa","urn:publicid:IDN+cmcl.cs.cmu.edu+authority+sa","https://boss.cmcl.cs.cmu.edu/protogeni/xmlrpc"),
+				new SliceAuthority("myelab.sa","urn:publicid:IDN+myelab.testbed.emulab.net+authority+sa","https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc"),
+				new SliceAuthority("bbn-pgeni.sa","urn:publicid:IDN+pgeni.gpolab.bbn.com+authority+sa","https://www.pgeni.gpolab.bbn.com/protogeni/xmlrpc"),
+				new SliceAuthority("jonlab.sa","urn:publicid:IDN+jonlab.testbed.emulab.net+authority+sa","https://myboss.jonlab.testbed.emulab.net/protogeni/xmlrpc"),
+				new SliceAuthority("ukgeni.sa","urn:publicid:IDN+uky.emulab.net+authority+sa","https://www.uky.emulab.net/protogeni/xmlrpc"),
+				new SliceAuthority("cis.fiu.edu.sa","urn:publicid:IDN+cis.fiu.edu+authority+sa","https://pg-boss.cis.fiu.edu/protogeni/xmlrpc"),
+				new SliceAuthority("geelab.sa","urn:publicid:IDN+elabinelab.geni.emulab.net+authority+sa","https://myboss.elabinelab.geni.emulab.net/protogeni/xmlrpc"),
+				new SliceAuthority("bbn-pgeni3.sa","urn:publicid:IDN+pgeni3.gpolab.bbn.com+authority+sa","https://www.pgeni3.gpolab.bbn.com/protogeni/xmlrpc"),
+				new SliceAuthority("cron.cct.lsu.edu.sa","urn:publicid:IDN+cron.cct.lsu.edu+authority+sa","https://www.cron.cct.lsu.edu/protogeni/xmlrpc"),
+				new SliceAuthority("chihuas.sa","urn:publicid:IDN+chi.itesm.mx+authority+sa","https://boss.chi.itesm.mx/protogeni/xmlrpc/"),
+				new SliceAuthority("bbn-pgeni1.sa","urn:publicid:IDN+pgeni1.gpolab.bbn.com+authority+sa","https://www.pgeni1.gpolab.bbn.com/protogeni/xmlrpc")
 								]);
 			CurrentUser.authority = GeniAuthorities.source[0] as SliceAuthority;
 		}

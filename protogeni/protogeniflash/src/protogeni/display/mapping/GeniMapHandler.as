@@ -1,4 +1,4 @@
-package protogeni.display
+package protogeni.display.mapping
 {
 	import com.google.maps.InfoWindowOptions;
 	import com.google.maps.LatLng;
@@ -35,6 +35,9 @@ package protogeni.display
 	import protogeni.resources.VirtualInterface;
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
+	import protogeni.display.Clusterer;
+	import protogeni.display.DisplayUtil;
+	import protogeni.display.TooltipOverlay;
 	
     // Handles adding all the ProtoGENI info to the Google Map component
 	public class GeniMapHandler
@@ -238,6 +241,9 @@ package protogeni.display
 	    public function drawMap(junk:* = null):void {
 			//Main.log.setStatus("Drawing map", true, false);
 	    	
+			if(!map.ready)
+				return;
+			
 	    	map.closeInfoWindow();
 	    	map.clearOverlays();
 

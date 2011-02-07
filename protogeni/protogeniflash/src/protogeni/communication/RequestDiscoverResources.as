@@ -104,10 +104,10 @@ package protogeni.communication
 		if(cm.Status == GeniManager.INPROGRESS)
 			cm.Status = GeniManager.FAILED;
 		running = false;
-		Main.geniHandler.rpcHandler.remove(this, false);
+		Main.geniHandler.requestHandler.remove(this, false);
 		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
-		Main.geniHandler.rpcHandler.start();
+		Main.geniHandler.requestHandler.start();
 	}
 
     private var cm : ComponentManager;

@@ -24,7 +24,7 @@ package protogeni.communication
     {
 		super("UserResolve", "Resolve user", CommunicationUtil.resolve);
 		op.addField("type", "User");
-		op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
+		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
     }
 	
 	override public function start():Operation
@@ -61,7 +61,7 @@ package protogeni.communication
 		}
 		else
 		{
-			Main.geniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+			Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 		
 		return newCalls.head;

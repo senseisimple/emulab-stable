@@ -38,9 +38,9 @@
 	import protogeni.resources.SliverCollection;
     
     // Handles all the XML-RPC calls
-	public class ProtogeniRpcHandler
+	public class GeniRequestHandler
 	{
-		public function ProtogeniRpcHandler()
+		public function GeniRequestHandler()
 		{
 		}
 		
@@ -52,20 +52,22 @@
 		public function startInitiationSequence():void
 		{
 			if(Main.geniHandler.unauthenticatedMode) {
-				
-				// Currently limited to Utah
 				var newCm:ComponentManager = new ComponentManager();
-				newCm.Url = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
-				newCm.Hrn = "utahemulab.cm";
-				newCm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
+				newCm.Url = Main.geniHandler.publicUrl;
+				newCm.Hrn = Main.geniHandler.publicHrn;
+				newCm.Urn = Main.geniHandler.publicUrn;
 				Main.geniHandler.GeniManagers.add(newCm);
 				newCm.Status = GeniManager.INPROGRESS;
 				pushRequest(new RequestDiscoverResourcesPublic(newCm));
 				Main.geniHandler.dispatchGeniManagerChanged(newCm);
 				Main.Application().showAuthenticate();
 			} else {
-				var chooseAuth:InitialUserWindow = new InitialUserWindow();
-				chooseAuth.showWindow();
+				if(Main.geniHandler.forceAuthority == null)
+				{
+					var chooseAuth:InitialUserWindow = new InitialUserWindow();
+					chooseAuth.showWindow();
+				} else
+					this.startAuthenticatedInitiationSequence();
 			}
 		}
 		
@@ -99,7 +101,7 @@
 		{
 			var newSlice:Slice = new Slice();
 			newSlice.hrn = name;
-			newSlice.urn = Util.makeUrn(CommunicationUtil.defaultAuthority, "slice", name);
+			newSlice.urn = Util.makeUrn(Main.geniHandler.CurrentUser.authority.Authority, "slice", name);
 			newSlice.creator = Main.geniHandler.CurrentUser;
 			pushRequest(new RequestSliceResolve(newSlice, true));
 		}
@@ -329,7 +331,7 @@
 				remove(node, false);
 			}
 			
-			var next;
+			var next:*;
 			try
 			{
 				// Output completed

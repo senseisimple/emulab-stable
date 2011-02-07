@@ -1,4 +1,4 @@
-package protogeni.display
+package protogeni.display.mapping
 {
 	import com.google.maps.InfoWindowOptions;
 	import com.google.maps.LatLng;
@@ -85,8 +85,8 @@ package protogeni.display
 						new InfoWindowOptions({
 							customContent:groupInfo,
 							customoffset: new Point(0, 10),
-							width:125,
-							height:160,
+							width:180,
+							height:130,
 							drawDefaultFrame:true
 						}));
 				});

@@ -101,7 +101,7 @@
 		}
 		
 		public function setToVirtualNode(virtualName:String,
-										 virtualManager:ComponentManager,
+										 virtualManager:GeniManager,
 										 virtualUrn:String,
 										 newIsShared:Boolean):void
 		{

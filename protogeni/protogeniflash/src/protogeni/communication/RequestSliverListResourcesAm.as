@@ -39,7 +39,7 @@ package protogeni.communication
 		sliver = s;
 		op.pushField([sliver.slice.credential]);
 		op.pushField({geni_available:false, geni_compressed:true, geni_slice_urn:sliver.slice.urn});	// geni_available:false = show all, true = show only available
-		op.setUrl(sliver.manager.Url);
+		op.setExactUrl(sliver.manager.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *

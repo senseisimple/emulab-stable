@@ -28,7 +28,7 @@ package protogeni.communication
 		op.addField("credential", Main.geniHandler.CurrentUser.credential);
 		op.addField("hrn", slice.urn);
 		op.addField("type", "Slice");
-		op.setExactUrl(Main.geniHandler.CurrentUser.authority.Url);
+		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -40,7 +40,7 @@ package protogeni.communication
 		}
 		else
 		{
-			Main.geniHandler.rpcHandler.codeFailure(name, "Recieved GENI response other than success");
+			Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
 		}
 		
 		return newRequest;

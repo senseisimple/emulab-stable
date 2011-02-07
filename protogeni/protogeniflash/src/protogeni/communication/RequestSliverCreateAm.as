@@ -33,7 +33,7 @@ package protogeni.communication
 		op.pushField([sliver.slice.credential]);
 		op.pushField(sliver.getRequestRspec().toXMLString());
 		op.pushField([{urn:Main.geniHandler.CurrentUser.urn, keys:sliver.slice.creator.keys}]);
-		op.setUrl(sliver.manager.Url);
+		op.setExactUrl(sliver.manager.Url);
 		op.timeout = 360;
     }
 	
@@ -41,10 +41,8 @@ package protogeni.communication
 	{
 		try
 		{
-			sliver.credential = response.value[0];
 			sliver.created = true;
-
-			sliver.rspec = new XML(response.value[1]);
+			sliver.rspec = new XML(response);
 			sliver.parseRspec();
 			
 			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
@@ -57,7 +55,7 @@ package protogeni.communication
 			
 			Main.geniHandler.dispatchSliceChanged(sliver.slice);
 
-			return new RequestSliverStatus(sliver);
+			return new RequestSliverStatusAm(sliver);
 		}
 		catch(e:Error)
 		{
@@ -65,7 +63,7 @@ package protogeni.communication
 			var tryDeleteNode:RequestQueueNode = this.node.next;
 			while(tryDeleteNode != null && tryDeleteNode is RequestSliverCreate && (tryDeleteNode as RequestSliverCreate).sliver.slice == sliver.slice)
 			{
-				Main.geniHandler.rpcHandler.remove(tryDeleteNode.item);
+				Main.geniHandler.requestHandler.remove(tryDeleteNode.item);
 				tryDeleteNode = tryDeleteNode.next;
 			}
 			

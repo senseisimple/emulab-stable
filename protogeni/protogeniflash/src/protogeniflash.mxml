@@ -2,10 +2,10 @@
 <s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
 			   xmlns:mx="library://ns.adobe.com/flex/mx"
-			   minWidth="955" minHeight="600" xmlns:display="protogeni.display.*"
+			   minWidth="700" minHeight="400" xmlns:display="protogeni.display.*"
 			   preinitialize="preinit();"
 			   backgroundColor="#D2E1F0"
-			   creationComplete="init();">
+			   creationComplete="init();" xmlns:mapping="protogeni.display.mapping.*">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
@@ -14,19 +14,17 @@
 		@namespace s "library://ns.adobe.com/flex/spark";
 		@namespace mx "library://ns.adobe.com/flex/mx";
 		@namespace display "protogeni.display.*";
+		@namespace mapping "protogeni.display.mapping.*";
 		
-		.infoTip {
-			color: #FFFFFF;
-			fontWeight: "bold";
-			shadowColor: #000000;
-			borderColor: #CE2929;
-			borderStyle: "errorTipBelow";
-			paddingBottom: 2;
-			paddingLeft: 2;
-			paddingRight: 2;
-			paddingTop: 2;
+		.authenticatedStyle {
+			themeColor: green;
+			chromeColor: green;
 		}
 		
+		.unauthenticatedStyle {
+			themeColor: red;
+			chromeColor: red;
+		}
 	</fx:Style>
 	
 	<fx:Script>
@@ -76,19 +74,27 @@
 			public var user:protogeni.display.UserWindow;
 			public var search:protogeni.display.SearchWindow;
 			
-			private var errorTip:ToolTip;
-			
 			[Bindable]
 			public var allowAuthenticate:Boolean;
 			
 			[Bindable]
 			public var slicesMenu : ArrayCollection;
 			
-			var geniLocalSharedObject:SharedObject;
+			private var geniLocalSharedObject:SharedObject;
+			
+			public var forceMapKey:String;
 			
 			private function preinit():void {
 				Security.allowDomain("*");
 				Security.allowInsecureDomain("*");
+				
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.mapkey != null)
+					{
+						forceMapKey = FlexGlobals.topLevelApplication.parameters.mapkey;
+					}
+				} catch(all:Error) {
+				}
 			}
 			
 			private function init():void {
@@ -103,23 +109,7 @@
 				Main.geniHandler.unauthenticatedMode = true;
 				
 				// Flash options
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.mode != null)
-					{
-						var input:String = FlexGlobals.topLevelApplication.parameters.mode;
-						
-						allowAuthenticate = input != "publiconly";
-						Main.geniHandler.unauthenticatedMode = input != "authenticate";
-					}
-				} catch(all:Error) {
-				}
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.sa != null)
-					{
-						var sa:String = FlexGlobals.topLevelApplication.parameters.sa;
-					}
-				} catch(all:Error) {
-				}
+				loadParams();
 				
 				// Saved variables
 				geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
@@ -149,16 +139,20 @@
 				user.closeWindow();
 				
 				Security.allowDomain("localhost");	
+				
+				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function reinit(authenticateUser:Boolean = false):void
 			{
 				Main.geniHandler = new GeniHandler();
-				Main.geniHandler.unauthenticatedMode = !authenticateUser;
 				Main.geniHandler.mapHandler.map = map;
 				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
 				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				loadParams();
 				loadLocalData();
+				// Override the params
+				Main.geniHandler.unauthenticatedMode = !authenticateUser;
 				
 				cms.init();
 				user.load(Main.geniHandler.CurrentUser);
@@ -194,11 +188,13 @@
 					|| Main.geniHandler.CurrentUser.credential == null
 					|| Main.geniHandler.CurrentUser.credential.length == 0)
 				{
-					this.userButton.source = DisplayUtil.noUserIcon;
-					this.userButton.toolTip = "Click to authenticate";
+					this.userButton.setStyle("icon", DisplayUtil.noUserIcon);
+					this.userButton.toolTip = "Authenticate";
+					this.userButton.label = "Authenticate";
 				} else {
-					this.userButton.source = DisplayUtil.userIcon;
+					this.userButton.setStyle("icon", DisplayUtil.userIcon);
 					this.userButton.toolTip = "View user information"
+					this.userButton.label = Main.geniHandler.CurrentUser.uid;
 				}
 			}
 			
@@ -206,22 +202,16 @@
 			{
 				if(!allowAuthenticate)
 					return;
-				errorTip = ToolTipManager.createToolTip(
-					"Authenticate", userButton.x - userButton.width/2, userButton.y + userButton.height, "errorTipBelow") as ToolTip;
 				
-				
-				// Apply the errorTip class selector.
-				errorTip.setStyle("styleName", "infoTip");
+				userButton.styleName = "unauthenticatedStyle";
 			}
 			
 			public function hideAuthenticate():void
 			{
 				if(!allowAuthenticate)
 					return;
-				if (errorTip) {
-					ToolTipManager.destroyToolTip(errorTip);
-					errorTip = null;
-				}
+				
+				userButton.styleName = "authenticatedStyle";
 			}
 			
 			protected function loadUser():void
@@ -255,10 +245,45 @@
 			
 			public function startover(authenticateUser:Boolean = false):void
 			{
-				Main.geniHandler.rpcHandler.pause();
-				Main.geniHandler.rpcHandler.clearAll();
+				Main.geniHandler.requestHandler.pause();
+				Main.geniHandler.requestHandler.clearAll();
 				reinit(authenticateUser);
-				Main.geniHandler.rpcHandler.startInitiationSequence();
+				Main.geniHandler.requestHandler.startInitiationSequence();
+			}
+			
+			public function loadParams():void
+			{
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.mode != null)
+					{
+						var input:String = FlexGlobals.topLevelApplication.parameters.mode;
+						
+						allowAuthenticate = input != "publiconly";
+						Main.geniHandler.unauthenticatedMode = input != "authenticate";
+					}
+				} catch(all:Error) {
+				}
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.saurl != null)
+					{
+						for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
+							if(sa.Url == FlexGlobals.topLevelApplication.parameters.saurl) {
+								Main.geniHandler.forceAuthority = sa;
+								break;
+							}
+						}
+					}
+				} catch(all:Error) {
+				}
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.publicurl != null)
+					{
+						Main.geniHandler.publicUrl = FlexGlobals.topLevelApplication.parameters.publicurl;
+						Main.geniHandler.publicUrn = FlexGlobals.topLevelApplication.parameters.publicurn;
+						Main.geniHandler.publicHrn = FlexGlobals.topLevelApplication.parameters.publichrn;
+					}
+				} catch(all:Error) {
+				}
 			}
 			
 			public function loadLocalData():void
@@ -291,7 +316,6 @@
 					trace("Problem saving shared object");
 				}
 			}
-			
 		]]>
 	</fx:Script>
 	
@@ -326,12 +350,10 @@
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
 		<s:Rect percentWidth="100" />
-		<s:Label  text="{Main.geniHandler.CurrentUser.uid}"/>
-		<display:ImageButton id="userButton"
-							 source="{DisplayUtil.noUserIcon}"
-							 click="loadUser()"
-							 visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
-							 toolTip="View user information" />
+		<mx:Button icon="{DisplayUtil.noUserIcon}" click="loadUser()"
+				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
+				   toolTip="Authenticate" label="Authenticate" styleName="unauthenticatedStyle"
+				   id="userButton" />
 		<display:ImageButton id="searchButton"
 							 source="{DisplayUtil.searchIcon}"
 							 click="search.showWindow()"
@@ -349,5 +371,5 @@
 							 click="Util.showManual()"
 							 toolTip="View more information" />
 	</s:controlBarContent>
-	<display:GeniMap id="map" />
+	<mapping:GeniMap id="map" />
 </s:Application>

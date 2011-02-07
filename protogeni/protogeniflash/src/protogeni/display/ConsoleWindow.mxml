@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="Console" implements="LogRoot" initialize="init()" close="closeWindow()">
@@ -43,11 +43,8 @@
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.collections.ArrayList;
-			import mx.containers.HBox;
 			import mx.controls.Alert;
 			import mx.controls.Button;
-			import mx.controls.HRule;
-			import mx.controls.Spacer;
 			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
 			import mx.managers.PopUpManager;
@@ -62,6 +59,7 @@
 			
 			import spark.components.Button;
 			import spark.components.Label;
+			import spark.primitives.Rect;
 			
 			[Bindable]
 			public var selectedIndex:int;
@@ -80,11 +78,11 @@
 			
 			public function setStatus(s:String, isError:Boolean):void
 			{
-				var isWorking:Boolean = Main.geniHandler.rpcHandler.queue.working();
+				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
 				Main.Application().waitingIcon.visible = isWorking;
 				Main.Application().progressLabel.text = s;
-				if(isWorking && Main.geniHandler.rpcHandler.queue.workingCount() > 1)
-					Main.Application().waitingCountLabel.text = Main.geniHandler.rpcHandler.queue.workingCount() + " reqs running";
+				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
+					Main.Application().waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
 				else
 					Main.Application().waitingCountLabel.text = "";
 				if(isWorking)
@@ -112,15 +110,15 @@
 				logs.addEventListener(FlexEvent.UPDATE_COMPLETE, doScroll);
 				if(msg.type == LogMessage.TYPE_START)
 				{
-					var split:Spacer = new Spacer();
+					var split:Rect = new Rect();
 					logs.addElement(split);
 				}
 				var b:mx.controls.Button = DisplayUtil.getLogMessageButton(msg);
-				var h:HBox = new HBox();
+				var h:HGroup = new HGroup();
 				h.percentWidth = 100;
 				if(msg.type == LogMessage.TYPE_END)
-					h.setStyle("horizontalAlign","right");
-				h.addChild(b);
+					h.horizontalAlign = "right";
+				h.addElement(b);
 				if(this.oldestRadio.selected)
 					logs.addElement(h);
 				else
@@ -149,6 +147,7 @@
 					groupNames.addItem(gm.Hrn);
 				}
 				this.validateNow();
+				
 			}
 			
 			public function clearScreen():void
@@ -159,9 +158,7 @@
 			
 			public function open():void
 			{
-				PopUpManager.addPopUp(this, Main.Application(), false);
-				PopUpManager.centerPopUp(this);
-				//groupComboBox.selectedIndex = selectedIndex;
+				showWindow();
 			}
 			
 			public function openGroup(id:String):void
@@ -174,13 +171,11 @@
 			{
 				this.resetLogView();
 				this.resetQueueView();
-				
-				//selectedIndex = groupComboBox.selectedIndex;
 			}
 			
 			public function addRequest(rqn:RequestQueueNode):void
 			{
-				var reqHbox:HBox = new HBox();
+				var reqHbox:HGroup = new HGroup();
 				var removeButton:ImageButton = new ImageButton();
 				removeButton.data = rqn;
 				removeButton.source = DisplayUtil.cancelIcon;
@@ -188,7 +183,7 @@
 				removeButton.addEventListener(MouseEvent.CLICK,
 					function remove(e:MouseEvent):void
 					{
-						Main.geniHandler.rpcHandler.remove(e.currentTarget.data);
+						Main.geniHandler.requestHandler.remove(e.currentTarget.data);
 						/*
 						Alert.show("Really remove '" + e.currentTarget.data.item.name + "' from the queue?", "Remove?", Alert.YES|Alert.NO, Main.Application(),
 						function removeRequest(e:CloseEvent):void
@@ -197,8 +192,8 @@
 						
 						});*/
 					});
-				reqHbox.addChild(removeButton);
-				reqHbox.addChild(DisplayUtil.getRequestButton(rqn.item));
+				reqHbox.addElement(removeButton);
+				reqHbox.addElement(DisplayUtil.getRequestButton(rqn.item));
 				queue.addElement(reqHbox);
 			}
 			
@@ -227,9 +222,9 @@
 				var selectedQueue:RequestQueue = new RequestQueue();
 				if(groupComboBox.selectedIndex == 0)
 				{
-					selectedQueue = Main.geniHandler.rpcHandler.queue;
+					selectedQueue = Main.geniHandler.requestHandler.queue;
 				} else {
-					var currentTestNode:RequestQueueNode = Main.geniHandler.rpcHandler.queue.head;
+					var currentTestNode:RequestQueueNode = Main.geniHandler.requestHandler.queue.head;
 					while(currentTestNode != null)
 					{
 						if((currentTestNode.item as Request).op.getUrl().indexOf(groups[groupComboBox.selectedIndex]) > -1)
@@ -295,7 +290,7 @@
 			<s:Label text="Queued Requests"  fontWeight="bold" fontSize="14"/>
 			<display:ImageButton id="startButton"
 								 source="{DisplayUtil.playIcon}"
-								 click="Main.geniHandler.rpcHandler.start();"
+								 click="Main.geniHandler.requestHandler.start();"
 								 toolTip="Force start the queue" />
 			<s:Scroller height="100%" width="100%">
 				<s:VGroup height="100%" width="100%" id="queue" />
@@ -304,6 +299,6 @@
 	</mx:HDividedBox>
 	<display:controlBarContent>
 		<s:Label text="View"  fontSize="12" fontWeight="bold"/>
-		<s:DropDownList id="groupComboBox" dataProvider="{groupNames}" selectedIndex="{selectedIndex}" change="refreshView()" width="150" />
+		<s:DropDownList id="groupComboBox" requireSelection="true" dataProvider="{groupNames}" selectedIndex="{selectedIndex}" change="refreshView()" width="150" creationComplete="selectedIndex = 0" />
 	</display:controlBarContent>
-</display:DefaultWindow2>
+</display:DefaultWindow>

@@ -17,15 +17,15 @@ package protogeni.communication
 	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
 
-  public class RequestGetVersion extends Request
+  public class RequestGetVersionAm extends Request
   {
-    public function RequestGetVersion(newAm:AggregateManager) : void
+    public function RequestGetVersionAm(newAm:AggregateManager) : void
     {
       super("GetVersion (" + Util.shortenString(newAm.Url, 15) + ")", "Getting the version of the aggregate manager for " + newAm.Hrn, CommunicationUtil.getVersionAm, true, true, true);
 	  ignoreReturnCode = true;
 	  am = newAm;
 	  //op.setUrl(am.Url);
-	  op.setUrl(am.Url);
+	  op.setExactUrl(am.Url);
     }
 
 	// Should return Request or RequestQueueNode

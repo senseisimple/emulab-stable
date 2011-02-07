@@ -26,7 +26,6 @@
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
-	import mx.controls.Label;
 	import mx.managers.PopUpManager;
 	
 	import protogeni.communication.Request;
@@ -40,11 +39,17 @@
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
 	
+	import spark.components.Label;
+	
 	public class DisplayUtil
 	{
-		public static var successColor:String = "#0E8219";
-		public static var failColor:String = "#FE0000";
-		public static var waitColor:String = "#FF7F00";
+		public static var successColorString:String = "#0E8219";
+		public static var failColorString:String = "#FE0000";
+		public static var waitColorString:String = "#FF7F00";
+		
+		public static var successColor:uint = 0x0E8219;
+		public static var failColor:uint = 0xFE0000;
+		public static var waitColor:uint = 0xFF7F00;
 		
 		public static var hideColor:Object = 0xCCCCCC;
 		public static var linkColor:Object = 0xFFCFD1;
@@ -354,7 +359,7 @@
 		
 		// Opens a virtual link window
 		public static function viewVirtualLink(pl:VirtualLink):void {
-	    	var plWindow:VirtualLinkAdvancedWindow = new VirtualLinkAdvancedWindow();
+	    	var plWindow:VirtualLinkWindow = new VirtualLinkWindow();
 	    	PopUpManager.addPopUp(plWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(plWindow);
        		plWindow.loadPointLink(pl);
@@ -362,7 +367,7 @@
 		
 		// Opens a physical link window
 		public static function viewPhysicalLink(l:PhysicalLink):void {
-			var lgWindow:PhysicalLinkAdvancedWindow = new PhysicalLinkAdvancedWindow();
+			var lgWindow:PhysicalLinkWindow = new PhysicalLinkWindow();
 	    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadLink(l);
@@ -373,7 +378,7 @@
 			if(lc.length == 1)
 				viewPhysicalLink(lc[0]);
 			else {
-				var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
+				var lgWindow:PhysicalLinkGroupWindow = new PhysicalLinkGroupWindow();
 		    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
 	       		PopUpManager.centerPopUp(lgWindow);
 	       		lgWindow.loadCollection(lc);
@@ -382,7 +387,7 @@
 		
 		// Opens a group of physical links
 		public static function viewPhysicalLinkGroup(lg:PhysicalLinkGroup):void {
-			var lgWindow:PhysicalLinkGroupAdvancedWindow = new PhysicalLinkGroupAdvancedWindow();
+			var lgWindow:PhysicalLinkGroupWindow = new PhysicalLinkGroupWindow();
 	    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(lgWindow);
        		lgWindow.loadGroup(lg);
@@ -398,14 +403,14 @@
 		
 		// Opens a physical node in a window
 		public static function viewPhysicalNode(n:PhysicalNode):void {
-			var ngWindow:PhysicalNodeAdvancedWindow = new PhysicalNodeAdvancedWindow();
+			var ngWindow:PhysicalNodeWindow = new PhysicalNodeWindow();
 	    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadNode(n);
 		}
 		
 		public static function viewVirtualNode(n:VirtualNode):void {
-			var ngWindow:VirtualNodeAdvancedWindow = new VirtualNodeAdvancedWindow();
+			var ngWindow:VirtualNodeWindow = new VirtualNodeWindow();
 			PopUpManager.addPopUp(ngWindow, Main.Application(), false);
 			PopUpManager.centerPopUp(ngWindow);
 			ngWindow.loadNode(n);
@@ -413,7 +418,7 @@
 		
 		// Opens a group of physical nodes in a window
 		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
-			var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
+			var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
 	    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
        		PopUpManager.centerPopUp(ngWindow);
        		ngWindow.loadGroup(ng);
@@ -424,7 +429,7 @@
 			if(nc.length == 1)
 				viewPhysicalNode(nc[0]);
 			else {
-				var ngWindow:PhysicalNodeGroupAdvancedWindow = new PhysicalNodeGroupAdvancedWindow();
+				var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
 		    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
 	       		PopUpManager.centerPopUp(ngWindow);
 	       		ngWindow.loadCollection(nc);

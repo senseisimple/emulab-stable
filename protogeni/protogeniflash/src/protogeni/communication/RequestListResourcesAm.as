@@ -38,7 +38,7 @@ package protogeni.communication
 		am = newAm;
 		op.pushField([Main.geniHandler.CurrentUser.credential]);
 		op.pushField({geni_available:false, geni_compressed:true});	// geni_available:false = show all, true = show only available
-		op.setUrl(newAm.Url);
+		op.setExactUrl(newAm.Url);
     }
 	
 	override public function complete(code : Number, response : Object) : *
@@ -68,13 +68,11 @@ package protogeni.communication
     override public function fail(event : ErrorEvent, fault : MethodFault) : *
     {
 		am.errorMessage = event.toString();
-		am.errorDescription = "";
+		am.errorDescription = event.text;
 		if(am.errorMessage.search("#2048") > -1)
 			am.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + am.VisitUrl();
 		else if(am.errorMessage.search("#2032") > -1)
 			am.errorDescription = "IO error, possibly due to the server being down";
-		else if(am.errorMessage.search("timed"))
-			am.errorDescription = event.text;
 		
 		am.Status = GeniManager.FAILED;
 		Main.geniHandler.dispatchGeniManagerChanged(am);
@@ -94,10 +92,10 @@ package protogeni.communication
 		if(am.Status == GeniManager.INPROGRESS)
 			am.Status = GeniManager.FAILED;
 		running = false;
-		Main.geniHandler.rpcHandler.remove(this, false);
+		Main.geniHandler.requestHandler.remove(this, false);
 		Main.geniHandler.dispatchGeniManagerChanged(am);
 		op.cleanup();
-		Main.geniHandler.rpcHandler.start();
+		Main.geniHandler.requestHandler.start();
 	}
 
     private var am:AggregateManager;

@@ -81,9 +81,9 @@
 					(first.slivers[0] as Sliver).nodes.addItem(second);
 				
 				// Add relative slivers
-				if(slivers[0].componentManager != first.slivers[0].componentManager)
+				if(slivers[0].manager != first.slivers[0].manager)
 					slivers.push(first.slivers[0]);
-				else if(slivers[0].componentManager != second.slivers[0].componentManager)
+				else if(slivers[0].manager != second.slivers[0].manager)
 					slivers.push(second.slivers[0]);
 			} else {
 				firstInterface = first.allocateInterface();
@@ -128,14 +128,14 @@
 			firstNode.links.removeItemAt(firstNode.links.getItemIndex(this));
 			for(var i:int = 1; i < firstNode.slivers.length; i++)
 			{
-				if((firstNode.slivers[i] as Sliver).links.getForNode(firstNode).length == 0)
-					(firstNode.slivers[i] as Sliver).nodes.remove(firstNode);
+				if((firstNode.slivers.getItemAt(i) as Sliver).links.getForNode(firstNode).length == 0)
+					(firstNode.slivers.getItemAt(i) as Sliver).nodes.remove(firstNode);
 			}
 			secondNode.links.removeItemAt(secondNode.links.getItemIndex(this));
 			for(i = 1; i < secondNode.slivers.length; i++)
 			{
-				if((secondNode.slivers[i] as Sliver).links.getForNode(secondNode).length == 0)
-					(secondNode.slivers[i] as Sliver).nodes.remove(secondNode);
+				if((secondNode.slivers.getItemAt(i) as Sliver).links.getForNode(secondNode).length == 0)
+					(secondNode.slivers.getItemAt(i) as Sliver).nodes.remove(secondNode);
 			}
 			for each(var s:Sliver in slivers)
 			{
@@ -157,13 +157,13 @@
 			return _isTunnel;
 		}
 		
-		public function hasTunnelTo(target : ComponentManager) : Boolean
+		public function hasTunnelTo(target:GeniManager) : Boolean
 		{
 			return isTunnel() && (this.firstNode.manager == target
 				|| secondNode.manager == target);
 		}
 		
-		public function isConnectedTo(target : ComponentManager) : Boolean
+		public function isConnectedTo(target:GeniManager) : Boolean
 		{
 			if(hasTunnelTo(target))
 				return true;
@@ -204,7 +204,7 @@
 			if (!isTunnel())
 				result.appendChild(XML("<bandwidth>" + bandwidth + "</bandwidth>"));
 			
-			if (slivers[0].componentManager.Version >= 3)
+			if (slivers[0].manager.Version >= 3)
 			{
 				var link_type:XML = <link_type />;
 				link_type.@name = "GRE";

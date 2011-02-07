@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow
-	xmlns:mx="http://www.adobe.com/2006/mxml"
-	xmlns:protogeniflash="protogeniflash.*" initialize="init()" close="sliceStatusRefresher.stop()"
-	title="Slice" xmlns:display="protogeni.display.*" xmlns:resources="protogeni.resources.*" xmlns:s="library://ns.adobe.com/flex/spark">
-	
-	<mx:Style>
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						xmlns:s="library://ns.adobe.com/flex/spark" 
+						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
+						title="Slice"
+						initialize="init()"
+						close="sliceStatusRefresher.stop(); closeWindow();">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		@namespace mx "library://ns.adobe.com/flex/mx";
+		@namespace display "protogeni.display.*";
+		
 		.failedStyle {
 			color: red;
 			textRollOverColor: red;
@@ -35,16 +43,14 @@
 			textSelectedColor: #FF7F00;
 			themeColor: #FF7F00;
 		}
-	</mx:Style>
-	
-	<mx:Script>
+	</fx:Style>
+	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.collections.Sort;
 			import mx.collections.SortField;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
-			import mx.controls.TextArea;
 			import mx.controls.scrollClasses.ScrollThumb;
 			import mx.core.DragSource;
 			import mx.core.UIComponent;
@@ -59,8 +65,12 @@
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualNode;
 			
+			import spark.components.NavigatorContent;
+			import spark.components.TextArea;
+			
 			[Bindable]
 			private var cms:Array;
+			
 			private var cmsSrc:Array;
 			
 			[Bindable]
@@ -144,7 +154,7 @@
 				
 				if(sliceCanvas.slice.slivers.length == 0)
 					isCreated = false;
-
+				
 				for each(var s:Sliver in sliceCanvas.slice.slivers)
 				{
 					if(s.rspec != null)
@@ -203,7 +213,7 @@
 						cms.push(gm.Hrn);
 					}
 				}
-					
+				
 				selectCm.selectedIndex = 0;
 				loadNodes();
 				
@@ -218,10 +228,10 @@
 				if(this.autoRefreshCheckbox.selected
 					&& this.sliceCanvas.slice != null
 					&& this.sliceCanvas.slice.hasAllAllocatedResources()
-					&& Main.geniHandler.rpcHandler.queue.isEmpty()
+					&& Main.geniHandler.requestHandler.queue.isEmpty()
 					&& this.sliceCanvas.slice.Status() != Slice.READY
 					&& this.sliceCanvas.slice.Status() != Slice.FAILED)
-					Main.geniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);
+					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);
 			}
 			
 			private function assignAvailableIconPhysical(item:Object):Class {
@@ -261,10 +271,10 @@
 				var tabs:TabNavigator = new TabNavigator();
 				tabs.percentHeight = 100;
 				tabs.percentWidth = 100;
-				viewRspec.addChild(tabs);
+				viewRspec.addElement(tabs);
 				for each(s in sliceCanvas.slice.slivers)
 				{
-					var tab:VBox = new VBox();
+					var tab:NavigatorContent = new NavigatorContent();
 					tab.percentHeight = 100;
 					tab.percentWidth = 100;
 					tab.label = s.manager.Hrn;
@@ -275,10 +285,10 @@
 						reviewRspecText.text = s.rspec.toString();
 					else
 						reviewRspecText.text = "No valid RSPEC yet";
-					tab.addChild(reviewRspecText);
+					tab.addElement(reviewRspecText);
 					tabs.addChild(tab);
 				}
-				viewRspec.show();
+				viewRspec.showWindow();
 			}
 			
 			public function previewRspecs():void
@@ -288,10 +298,10 @@
 				var tabs:TabNavigator = new TabNavigator();
 				tabs.percentHeight = 100;
 				tabs.percentWidth = 100;
-				previewRspec.addChild(tabs);
+				previewRspec.addElement(tabs);
 				for each(var s:Sliver in sliceCanvas.slice.slivers)
 				{
-					var tab:VBox = new VBox();
+					var tab:NavigatorContent = new NavigatorContent();
 					tab.percentHeight = 100;
 					tab.percentWidth = 100;
 					tab.label = s.manager.Hrn;
@@ -299,17 +309,18 @@
 					previewRspecText.percentHeight = 100;
 					previewRspecText.percentWidth = 100;
 					previewRspecText.text = s.getRequestRspec().toString();
-					tab.addChild(previewRspecText);
+					tab.addElement(previewRspecText);
 					tabs.addChild(tab);
 				}
-				previewRspec.show();
+				previewRspec.showWindow();
 			}
 		]]>
-	</mx:Script>
-	<mx:HBox width="100%">
-		<mx:Label id="hrnLabel" text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" selectable="true"/>
-		<mx:Spacer width="100%"/>
-		<mx:Label id="urnLabel" text="{sliceCanvas.slice.urn}" selectable="true"/>
+	</fx:Script>
+	
+	<s:HGroup width="100%">
+		<s:Label id="hrnLabel" text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" />
+		<s:Rect width="100%"/>
+		<s:Label id="urnLabel" text="{sliceCanvas.slice.urn}" />
 		<display:ImageButton id="rspecButton"
 							 source="{DisplayUtil.pageWhiteIcon}"
 							 click="viewRspecs()"
@@ -318,11 +329,11 @@
 							 source="{DisplayUtil.pageCodeIcon}"
 							 click="previewRspecs()"
 							 toolTip="Preview the Request RSPEC" />
-	</mx:HBox>
+	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
 		<mx:VBox height="100%" verticalGap="2">
-			<mx:ComboBox id="selectCm" width="100%" dataProvider="{cms}" change="loadNodes()"></mx:ComboBox>
-			<mx:CheckBox label="Hide unavailable" selected="true" id="hideUnavailableCheckBox" click="loadNodes()"/>
+			<mx:ComboBox id="selectCm" width="100%" dataProvider="{cms}" change="loadNodes()" />
+			<s:CheckBox label="Hide unavailable" selected="true" id="hideUnavailableCheckBox" click="loadNodes()"/>
 			<mx:List width="100%" height="100%" id="listNodes"
 					 dataProvider="{nodes}"
 					 labelField="name" dragEnabled="true"
@@ -334,18 +345,17 @@
 					 iconFunction="assignAvailableIcon">
 			</mx:List>
 		</mx:VBox>
-			<display:SliceCanvas id="sliceCanvas" hostWindow="{this}">
-			</display:SliceCanvas>
+		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />
 	</mx:HDividedBox>
-	<mx:ControlBar>
-		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.geniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
-		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
-		<mx:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
-		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
-		<mx:VRule height="16"/>
-		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
-		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
-		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.geniHandler.rpcHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
-	</mx:ControlBar>
 	
+	<display:controlBarContent>
+		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
+		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
+		<s:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
+		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
+		<display:DefaultLine percentHeight="90" />
+		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
+		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
+		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
+	</display:controlBarContent>
 </display:DefaultWindow>

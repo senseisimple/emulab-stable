@@ -2,7 +2,7 @@
  * Code taken from the official tutorials for Google Maps API for Flash
  */
  
- package protogeni.display {
+ package protogeni.display.mapping {
 
 import flash.display.BitmapData;
 import flash.display.Sprite;
@@ -21,10 +21,11 @@ import mx.managers.DragManager;
 /**
  * InfoWindowSprite is a sprite that contains sub sprites that function as tabs.
  */
-	public class PhysicalNodeGroupMarker extends UIComponent {
-  [Embed('../../../images/circle_blue.png')] private var CloudImg:Class;
+	public class PhysicalNodeGroupClusterMarker extends UIComponent {
+  [Embed('../../../../images/cloud.png')] private var CloudImg:Class;
   
-  public function PhysicalNodeGroupMarker(newLabel:String, newMarker:GeniMapMarker) {
+  
+  public function PhysicalNodeGroupClusterMarker(newLabel:String, newMarker:GeniMapMarker) {
 	  marker = newMarker;
 	  this.addEventListener(MouseEvent.MOUSE_MOVE, drag);
       addChild(new CloudImg());
@@ -45,7 +46,6 @@ import mx.managers.DragManager;
       var radius:int = 60;
     var labelMc:TextField = new TextField();
     labelMc.autoSize = TextFieldAutoSize.LEFT;
-	labelMc.textColor = 0xFFFFFF;
     labelMc.selectable = false;
     labelMc.border = false;
     labelMc.embedFonts = false;
@@ -55,11 +55,11 @@ import mx.managers.DragManager;
     labelMc.text = label;
     	labelMc.y = 8;
     if(label.length == 1)
-    	labelMc.x = 13;
+    	labelMc.x = 15;
     else if(label.length == 2)
-    	labelMc.x = 11;
+    	labelMc.x = 13;
     else
-    	labelMc.x = 9;
+    	labelMc.x = 11;
     
     addChild(labelMc);
     cacheAsBitmap = true;
@@ -75,7 +75,7 @@ import mx.managers.DragManager;
 	  var ds:DragSource = new DragSource();
 	  ds.addData(marker, 'marker');
 	  
-	  var d:PhysicalNodeGroupMarker = new PhysicalNodeGroupMarker(label, marker)
+	  var d:PhysicalNodeGroupClusterMarker = new PhysicalNodeGroupClusterMarker(label, marker)
 	  
 	  DragManager.doDrag(this, ds, e, d);
   }

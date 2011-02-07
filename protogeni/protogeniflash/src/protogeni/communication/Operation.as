@@ -73,7 +73,10 @@ package protogeni.communication
       url = newUrl;
       if (module != null)
       {
-        url += "/" + module;
+		  if(url.charAt(url.length-1) == "/")
+			url += module;
+		  else
+			url += "/" + module;
       }
     }
 
@@ -89,7 +92,9 @@ package protogeni.communication
 
     public function addField(key : String, value : Object) : void
     {
-      param[key] = value;
+		if(param == null)
+			setParameterized();
+      	param[key] = value;
     }
 	
 	public function pushField(value:Object):void
@@ -101,12 +106,17 @@ package protogeni.communication
 
     public function clearFields():void
     {
-      param = new Object();
+      param = null;
     }
 	
 	public function setPositioned():void
 	{
 		param = new ArrayCollection();
+	}
+	
+	public function setParameterized():void
+	{
+		param = new Object();
 	}
 
     public function call(newSuccess : Function, newFailure : Function) : void
@@ -141,7 +151,7 @@ package protogeni.communication
 							server.addParam(o, null);
 						}
 					}	
-					else
+					else if(param != null)
 						server.addParam(param, "struct");
 					server.call(method);
 				}

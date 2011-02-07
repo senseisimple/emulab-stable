@@ -2,7 +2,7 @@
 <maps:Map xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
 		  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:maps="com.google.maps.*"
-		  height="100%" width="100%" maxWidth="{(mx.core.FlexGlobals.topLevelApplication as Application).width}"
+		  height="100%" width="100%"
 		  preinitialize="mappreinit()"
 		  mapevent_mappreinitialize="onMapPreinitialize(event)"
 		  mapevent_mapready="onMapReady(event)"
@@ -26,6 +26,8 @@
 			import mx.core.Application;
 			import mx.core.FlexGlobals;
 			
+			public var ready:Boolean;
+			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
 				myMapOptions.zoom = 4;
@@ -35,32 +37,38 @@
 			}
 			
 			private function mappreinit():void {
-				// Set correct key
-				var url : String = mx.core.FlexGlobals.topLevelApplication.url;
-				if(url.indexOf("https://users.emulab.net") > -1)
-					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
-				else if(url.indexOf("http://users.emulab.net") > -1)
-					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRQhQD93Qa0bULV_1nZL9DPKN6w4xSZvcNEsTI1o7vjS_yayjPwrn1FOw";
-				else if(url.indexOf("http://boss.emulab.net") > -1)
-					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hT-JTA_kdlWCi1B9UqMb6PoH1IjshRNCq_RwaKn0XBDiQgigKEreNFnfw";
-				else if(url.indexOf("https://boss.emulab.net") > -1)
-					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTJAI3wyjNM51iUcfoH5qR3p3QFHBQ_Ukk2jOVwrIST7TsKH0dxYswnyg";
-				else if(url.indexOf("http://www.protogeni.net") > -1)
-					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTfdIoaYgi7tOvtC9dvhWwYlnAj4hTW5IpetuD9FvaEH3LDmTpL2Vs__w";
-				else if(url.indexOf("https://www.protogeni.net") > -1)
-					key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRNcqKgyvlELbhgjE5kl-gFNsMkyxTLoim3vJsPX9zTdq5dy1yGCfLGqw";
+				// Force a key
+				if(Main.Application().forceMapKey != null) {
+					key = Main.Application().forceMapKey;
+				}
+				// else detect a key from our default list
+				else
+				{
+					var url : String = mx.core.FlexGlobals.topLevelApplication.url;
+					
+					if(url.indexOf("https://users.emulab.net") > -1)
+						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";
+					else if(url.indexOf("http://users.emulab.net") > -1)
+						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRQhQD93Qa0bULV_1nZL9DPKN6w4xSZvcNEsTI1o7vjS_yayjPwrn1FOw";
+					else if(url.indexOf("http://boss.emulab.net") > -1)
+						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hT-JTA_kdlWCi1B9UqMb6PoH1IjshRNCq_RwaKn0XBDiQgigKEreNFnfw";
+					else if(url.indexOf("https://boss.emulab.net") > -1)
+						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTJAI3wyjNM51iUcfoH5qR3p3QFHBQ_Ukk2jOVwrIST7TsKH0dxYswnyg";
+					else if(url.indexOf("http://www.protogeni.net") > -1)
+						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTfdIoaYgi7tOvtC9dvhWwYlnAj4hTW5IpetuD9FvaEH3LDmTpL2Vs__w";
+					else if(url.indexOf("https://www.protogeni.net") > -1)
+						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRNcqKgyvlELbhgjE5kl-gFNsMkyxTLoim3vJsPX9zTdq5dy1yGCfLGqw";
+				}
 			}
 			
 			private function onMapReady(event:Event):void {
 				addControl(new ZoomControl());
-				//map.addControl(new PositionControl());
-				//addControl(new MapTypeControl());
-				
 				enableScrollWheelZoom();
 				enableContinuousZoom();
 				
 				addEventListener(MapZoomEvent.ZOOM_CHANGED, afterMove);
-				Main.geniHandler.rpcHandler.startInitiationSequence();
+				ready = true;
+				Main.geniHandler.mapHandler.drawMap();
 			}
 			
 			private function afterMove(evt:MapZoomEvent):void

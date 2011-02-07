@@ -1,25 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx"
 						xmlns:display="protogeni.display.*"
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
 						initialize="authorities.selectedItem = Main.geniHandler.CurrentUser.authority"
-						creationComplete="this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;">
+						width="260" height="130"
+						creationComplete="windowReady()">
 	<fx:Script>
 		<![CDATA[
 			import mx.core.FlexGlobals;
 			import mx.core.IFlexDisplayObject;
 			import mx.managers.PopUpManager;
 			
+			public function windowReady():void
+			{
+				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
+				this.authorities.setFocus();
+			}
+			
 			public function save():void
 			{
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
-				Main.geniHandler.CurrentUser.sslCertificate = sslCert.text;
-				Main.geniHandler.CurrentUser.sslPrivateKey = sslKey.text;
-				Main.Application().saveLocalData();
-				Main.geniHandler.rpcHandler.startAuthenticatedInitiationSequence();
+				//Main.geniHandler.CurrentUser.sslCertificate = sslCert.text;
+				//Main.geniHandler.CurrentUser.sslPrivateKey = sslKey.text;
+				FlexGlobals.topLevelApplication.saveLocalData();
+				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
 			}
 		]]>
 	</fx:Script>
@@ -28,12 +35,14 @@
 	</fx:Declarations>
 	<s:Label text="Which authority are you registered with?" />
 	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%"/>
+	<!--
 	<s:Label text="Certificate" />
 	<s:TextArea id="sslCert" text="{Main.geniHandler.CurrentUser.sslCertificate}" width="100%" height="50%" />
 	<s:Label text="Private Key" />
 	<s:TextArea id="sslKey" text="{Main.geniHandler.CurrentUser.sslPrivateKey}" width="100%" height="50%" />
+	-->
 	<display:controlBarContent>
 		<s:Button id="okButton" label="OK" click="save(); closeWindow();" />
 		<s:Button label="Cancel" click="closeWindow()" />
 	</display:controlBarContent>
-</display:DefaultWindow2>
+</display:DefaultWindow>

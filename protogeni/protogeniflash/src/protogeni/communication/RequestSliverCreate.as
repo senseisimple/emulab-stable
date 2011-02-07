@@ -64,7 +64,7 @@ package protogeni.communication
 			var tryDeleteNode:RequestQueueNode = this.node.next;
 			while(tryDeleteNode != null && tryDeleteNode is RequestSliverCreate && (tryDeleteNode as RequestSliverCreate).sliver.slice == sliver.slice)
 			{
-				Main.geniHandler.rpcHandler.remove(tryDeleteNode.item);
+				Main.geniHandler.requestHandler.remove(tryDeleteNode.item);
 				tryDeleteNode = tryDeleteNode.next;
 			}
 			

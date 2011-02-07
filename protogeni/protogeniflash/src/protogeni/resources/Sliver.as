@@ -40,6 +40,7 @@
 		public var credential : Object = null;
 		public var manager:GeniManager = null;
 		public var rspec : XML = null;
+		[Bindable]
 		public var urn : String = null;
 		
 		public var ticket:XML;
@@ -51,6 +52,7 @@
 		public var nodes:VirtualNodeCollection = new VirtualNodeCollection();
 		public var links:VirtualLinkCollection = new VirtualLinkCollection();
 		
+		[Bindable]
 		public var slice : Slice;
 		
 		public var validUntil:Date;
@@ -106,7 +108,7 @@
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
 				+ "<rspec "
-				+ "xmlns=\""+CommunicationUtil.rspec2Namespace+"\" "
+				+ "xmlns=\""+CommunicationUtil.rspec02Namespace+"\" "
 				+ "type=\"request\" />");
 			
 			for each(var vn:VirtualNode in nodes)

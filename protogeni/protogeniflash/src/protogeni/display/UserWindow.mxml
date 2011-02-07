@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow2 xmlns:fx="http://ns.adobe.com/mxml/2009" 
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						width="400" height="300"
+						width="400" height="300" defaultButton="{okButton}"
 						title="User Information" close="closeWindow()">
 	<display:layout>
 		<s:VerticalLayout/>
@@ -145,7 +145,7 @@
 		</s:NavigatorContent>
 	</mx:TabNavigator>
 	<display:controlBarContent>
-		<s:Button label="OK" click="save(); closeWindow();" />
+		<s:Button id="okButton" label="OK" click="save(); closeWindow();" />
 		<s:Button label="Cancel" click="refresh(); closeWindow();" />
 	</display:controlBarContent>
-</display:DefaultWindow2>
+</display:DefaultWindow>
