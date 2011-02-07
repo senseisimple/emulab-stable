@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniAuthority;
@@ -513,9 +513,14 @@ sub Resolve($$)
 	return undef;
     }
     my $context = Genixmlrpc->GetContext();
-    my $credential = GeniCredential->GetSelfCredential($self);
+    my $me      = GeniAuthority->Lookup($context->certificate()->uuid());
+    if (!defined($me)) {
+	print STDERR "Could not find my own authority for $context\n";
+	return undef;
+    }
+    my $credential = GeniCredential->GetSelfCredential($me);
     if (!defined($credential)) {
-	print STDERR "Could not create self credential for $self\n";
+	print STDERR "Could not create self credential for $me\n";
 	return undef;
     }
 
