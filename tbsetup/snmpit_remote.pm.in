@@ -397,8 +397,13 @@ sub RemoteDoReserveVlanTags($$@)
 	my $vlan = VLan->Lookup($vlanid);
 	return -1
 	    if (!defined($vlan));
+	# XXX If we already have a tag reserved, do not bother.
+	next
+	    if ($vlan->GetReservedVlanTags());
 	$vlans{"$vlanid"} = $vlan;
     }
+    return 0
+	if (! keys(%vlans));
 
     foreach my $id (keys(%vlans)) {
 	my $vlan  = $vlans{"$id"};
