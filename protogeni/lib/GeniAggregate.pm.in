@@ -783,7 +783,7 @@ sub Start($$$)
 	}
 	my $reservation = $node->Reservation();
 	if (!defined($reservation)) {
-	    print STDERR "$node no long belongs to $self\n";
+	    print STDERR "$node no longer belongs to $self\n";
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {

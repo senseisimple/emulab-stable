@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -532,9 +532,11 @@ sub doSwapout($) {
 	#
 	if ($type != MODIFY ||
 	    ($type == MODIFY && $ELABINELAB && Lan->GotTrunks($experiment))) {
+	    # Kill tag reservations on actual swapout.
+	    my $tagopt = ($type != MODIFY ? "-C" : "");
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
-	    if (system("snmpit --redirect-err -r $pid $eid")) {
+	    if (system("snmpit --redirect-err $tagopt -r $pid $eid")) {
 		tberror({type => 'secondary', severity => SEV_SECONDARY,
 			 error => ['vlan_reset_failed']},
 			"Failed to reset VLANs");
@@ -556,7 +558,7 @@ sub doSwapout($) {
 	    }
 	    if (@stale) {
 		print "Removing stale vlans @stale\n";
-		system("snmpit --redirect-err -f ".
+		system("snmpit --redirect-err -f -C ".
                     join(" ", map("-o $_", @stale)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
@@ -969,7 +971,8 @@ sub doSwapin($) {
 	if ($ELABINELAB || !$syncvlans) {
 	    if (@diff) {
 		print "Removing obsolete vlans @diff\n";
-		system("snmpit --redirect-err -f ". join(" ", map("-o $_", @diff)));
+		system("snmpit --redirect-err -f -C ".
+		       join(" ", map("-o $_", @diff)));
 		if ($?) {
 		    tberror({type => 'summary', severity => SEV_SECONDARY,
 			     error => ['vlan_setup_failed']},

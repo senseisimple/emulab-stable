@@ -1212,6 +1212,10 @@ sub MapNodes($$)
 	my $manifest = $resource->Manifest();
 	return -1
 	    if (!defined($manifest));
+	my $rspec = $resource->Rspec();
+	return -1
+	    if (!defined($rspec));
+	
 	$manifest_string = GeniXML::Serialize($manifest, 1);
 
 	if ($verbose) {

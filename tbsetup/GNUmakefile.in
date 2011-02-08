@@ -43,7 +43,8 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  elabinelab snmpit.proxy panic node_attributes \
 		  nfstrace plabinelab smbpasswd_setup smbpasswd_setup.proxy \
 		  rmproj snmpit.proxynew snmpit.proxyv2 pool_daemon \
-		  checknodes_daemon
+		  checknodes_daemon snmpit.proxyv3
+
 ifeq ($(ISMAINSITE),1)
 SBIN_STUFF     += repos_daemon
 endif

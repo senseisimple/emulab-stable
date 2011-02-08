@@ -497,7 +497,8 @@ sub CompareVlansWithSwitches($$$)
 	# This is bad; if one of these updates fails, we are screwed.
 	#
 	foreach my $table ("lans", "lan_attributes", "lan_members",
-			   "lan_member_attributes", "ifaces") {
+			   "lan_member_attributes", "ifaces",
+			   "reserved_vlantags") {
 	    DBQueryWarn("update $table set lanid=$oldid ".
 			"where lanid='$newid'")
 		or return -1;
@@ -557,7 +558,8 @@ sub CompareVlansWithSwitches2($$)
 	# This is bad; if one of these updates fails, we are screwed.
 	#
 	foreach my $table ("lans", "lan_attributes", "lan_members",
-			   "lan_member_attributes", "ifaces") {
+			   "lan_member_attributes", "ifaces",
+			   "reserved_vlantags") {
 	    DBQueryWarn("update $table set lanid=$oldid ".
 			"where lanid='$newid'")
 		or return -1;
@@ -1786,6 +1788,27 @@ sub Instantiate($)
 	}
     }
 
+    #
+    # Check to see if there is an entry in reserved_vlantags table.
+    # If so, use that lanid instead of generating a new one. This is
+    # mostly for the benefit of ProtoGeni stitching, but is also handy
+    # for swapmod so we can reuse existing vlan tags and lanids.
+    #
+    if (!defined($idx)) {
+	my $exptidx = $experiment->idx();
+
+	my $query_result =
+	    DBQueryWarn("select lanid from reserved_vlantags ".
+			"where exptidx='$exptidx' and vname='$vname'");
+
+	return -1
+	    if (!defined($query_result));
+
+	if ($query_result->numrows) {
+	    ($idx) = $query_result->fetchrow_array();
+	}
+    }
+
     # The new lan has the 'ready' bit set to zero.
     my $lan = Lan->Create($experiment, $vname, $type, $idx, $link);
     return -1
@@ -1831,20 +1854,23 @@ sub Instantiate($)
 	my $vnode       = $protomember->{'vnode'};
 	my $vport       = $protomember->{'vport'};
 	my $iface       = $protomember->{'iface'};
-	my $attributes  = $protomember->{'attrs'};
-	my $interface   = $lan->AddInterface($node, $vnode, $vport, $iface);
+	my $pport       = $protomember->{'pport'};
+	my $member;
+
+	if (defined($pport)) {
+	    $member = $lan->AddMember($node, $pport);
+	    
+	    if (!defined($member)) {
+		$lan->Destroy();
+		return -1;
+	    }
+	}
+	my $interface =
+	    $lan->AddInterface($node, $vnode, $vport, $iface, $member);
 	
 	if (!defined($interface)) {
 	    $lan->Destroy();
 	    return -1;
-	}
-
-	if (defined($attributes)) {
-	    foreach my $attrkey (keys(%{$attributes})) {
-		my $attrvalue = $attributes->{$attrkey};
-
-		$interface->SetAttribute($attrkey, $attrvalue);
-	    }
 	}
     }
     $self->{'INSTANCE'} = $lan;
@@ -1942,8 +1968,12 @@ sub Dump($)
 	my $vnode  = $interface->{'vnode'};
 	my $vport  = $interface->{'vport'};
 	my $iface  = $interface->{'iface'};
+	my $pport  = $interface->{'pport'};
 
-	$string .= "$vnode:$vport:$nodeid:$iface, ";
+	$string .= "$vnode:$vport:$nodeid:$iface";
+	$string .= ":$pport"
+	    if (defined($pport));
+	$string .= ", ";
     }
     return $string;
 }
@@ -1953,7 +1983,7 @@ sub Dump($)
 #
 sub AddInterface($$$$$;$)
 {
-    my ($self, $node, $vnode, $vport, $iface, $attributes) = @_;
+    my ($self, $node, $vnode, $vport, $iface, $pport) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -1971,7 +2001,7 @@ sub AddInterface($$$$$;$)
 					     "vnode" => $vnode,
 					     "vport" => $vport,
 					     "iface" => $iface,
-					     "attrs" => $attributes,
+					     "pport" => $pport,
 					    };
     return 0;
 }
@@ -2196,6 +2226,7 @@ sub ready($)	{ return $_[0]->GetLan()->ready(); }
 sub type($)	{ return $_[0]->GetLan()->type(); }
 sub GetLan($)   { return $_[0]->{'LAN'}; }
 sub GetExperiment($) { return $_[0]->GetLan()->GetExperiment(); }
+sub vlanid($)   { return $_[0]->lanid(); }
 
 #
 # Create a new VLan object and return it. No members yet ... which means
@@ -2488,6 +2519,147 @@ sub GetClass($)
     return "Experimental";
 }
 
+# VLan reservation for a specific lan in an experiment.
+sub ReserveVlanTag($$;$)
+{
+    my ($self, $tag, $checkonly) = @_;
+    my $lanid   = $self->lanid();
+    my $vname   = $self->vname();
+    my $pid     = $self->pid();
+    my $eid     = $self->eid();
+    my $exptidx = $self->exptidx();
+    $checkonly  = 0 if (!defined($checkonly));
+
+    DBQueryWarn("lock tables lan_attributes write, lans write, ".
+		"            reserved_vlantags write, vlans read")
+	or return undef;
+
+    #
+    # Use global table for all reservations.
+    #
+    my $query_result =
+	DBQueryWarn("select lanid from reserved_vlantags where tag='$tag'");
+
+    goto inuse
+	if (!$query_result || $query_result->numrows);
+
+    #
+    # But because of swapmod and syncvlansfromtables, must also check
+    # the vlans table since that is what is currently on the switches.
+    #
+    $query_result =
+	DBQueryWarn("select id from vlans where tag='$tag'");
+    
+    goto inuse
+	if (!$query_result || $query_result->numrows);
+
+    # Just checking ...
+    goto isfree
+	if ($checkonly);
+
+    goto inuse
+	if (!DBQueryWarn("insert into reserved_vlantags set ".
+			 "  lanid='$lanid', tag='$tag', vname='$vname', ".
+			 "  pid='$pid', eid='$eid', exptidx='$exptidx', ".
+			 "  reserve_time=now()"));
+  isfree:
+    DBQueryWarn("unlock tables");
+    return $tag;
+ inuse:
+    DBQueryWarn("unlock tables");
+    return undef;
+}
+
+# Both a class and an instance method.
+sub ClearReservedVlanTag($;$)
+{
+    my ($arg, $tag) = @_;
+    my $lanid  = (ref($arg) ? $arg->lanid() : $arg);
+    my $clause = (defined($tag) ? "and tag='$tag'" : "");
+
+    DBQueryWarn("delete from reserved_vlantags where lanid='$lanid' $clause")
+	or return -1;
+
+    return 0;
+}
+
+sub GetReservedVlanTags($)
+{
+    my ($self) = @_;
+    my $lanid  = $self->lanid();
+    my @result = ();
+
+    my $query_result =
+	DBQueryWarn("select tag from reserved_vlantags ".
+		    "where lanid='$lanid'");
+
+    return ()
+	if (!$query_result || !$query_result->numrows);
+
+    while (my ($tag) = $query_result->fetchrow_array()) {
+	push(@result, $tag);
+    }
+    return @result;
+}
+# Lots of different ways to call this one. 
+sub GetReservedVlanTag($;$)
+{
+    my ($arg, $linkname) = @_;
+    my $clause;
+
+    if (ref($arg) eq "Experiment") {
+	my $exptidx = $arg->idx();
+	$clause = "exptidx='$exptidx' and vname='$linkname'";
+    }
+    else {
+	my $lanid = $arg->lanid();
+	$clause = "lanid='$lanid'";
+    }
+
+    my $query_result =
+	DBQueryWarn("select tag from reserved_vlantags where $clause");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+    
+    my ($tag) = $query_result->fetchrow_array();
+    return $tag;
+}
+
+sub HasVlanTagReserved($$)
+{
+    my ($arg, $tag) = @_;
+    my $lanid  = (ref($arg) ? $arg->lanid() : $arg);
+
+    my $query_result =
+	DBQueryWarn("select tag from reserved_vlantags ".
+		    "where lanid='$lanid' and tag='$tag'");
+
+    return 0
+	if (!$query_result);
+
+    return $query_result->numrows;
+}
+
+sub VlanTagAvailable($$)
+{
+    my ($class, $tag) = @_;
+
+    my $query_result =
+	DBQueryWarn("select tag from reserved_vlantags where tag='$tag'");
+
+    return 0
+	if (!$query_result || $query_result->numrows);
+
+    $query_result =
+	DBQueryWarn("select id from vlans where tag='$tag'");
+    
+    return 0
+	if (!$query_result || $query_result->numrows);
+
+    return 1;
+}
+
 # Find out which stack a VLAN resides on
 sub GetStack($) {
     my ($self) = @_;
@@ -2545,7 +2717,7 @@ sub IsManual($)
 
 #
 # Check to see if we think the VLAN actually exists on any switches at the
-# moment (ie. has a vlans table entry)
+# moment (ie. has a vlans table entry). 
 #
 sub CreatedOnSwitches() {
     my ($self) = @_;

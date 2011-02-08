@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 #
@@ -397,13 +397,14 @@ sub setPortVlan($$@) {
 # usage: newVlanNumber(self, vlan_identifier)
 #
 # returns a number in $self->{VLAN_MIN} ... $self->{VLAN_MAX}
-# or zero indicating failure: either that the id exists,
-# or the number space is full.
+# or zero indicating that the id exists, or -1 indicating
+# the number space is full.
 #
 sub newVlanNumber($$) {
     my $self = shift;
     my $vlan_id = shift;
     my %vlans;
+    my $limit;
 
     $self->debug("stack::newVlanNumber $vlan_id\n");
     if ($self->{ALLVLANSONLEADER}) {
@@ -412,18 +413,60 @@ sub newVlanNumber($$) {
 	%vlans = $self->findVlans();
     }
     my $number = $vlans{$vlan_id};
-    # XXX temp, see doMakeVlans in snmpit.in
-    if ($::next_vlan_tag)
-	{ $number = $::next_vlan_tag; $::next_vlan_tag = 0; return $number; }
-
+    # Vlan exists, so tell caller a new number/vlan is not needed.
     if (defined($number)) { return 0; }
+
     my @numbers = sort values %vlans;
     $self->debug("newVlanNumbers: numbers ". "@numbers" . " \n");
+
+    # XXX temp, see doMakeVlans in snmpit.in
+    if ($::next_vlan_tag) {
+	$number = $::next_vlan_tag;
+	$::next_vlan_tag = 0;
+
+	#
+	# Reserve this number in the table. If we can actually
+	# assign it (tables locked), then we call it good. 
+	#
+	if ((grep {$_ == $number} @numbers) ||
+	    !defined(reserveVlanTag($vlan_id, $number))) {
+	    print STDERR "desired vlan tag for $vlan_id already in use!\n";
+	    # Indicates no tag assigned. 
+	    return 0;
+	}
+	return $number;
+    }
+    #
+    # See if there is a number already pre-assigned in the lans table.
+    # But still make sure that the number does not conflict with an
+    # existing vlan.
+    #
+    $number = getReservedVlanTag($vlan_id);
+    if ($number) {
+	if (grep {$_ == $number} @numbers) {
+	    print STDERR "reserved vlan tag for $vlan_id already in use!\n";
+	    return 0;
+	}
+	return $number;
+    }
     $number = $self->{MIN_VLAN}-1;
-    my $lim = $self->{MAX_VLAN};
-    do { ++$number }
-	until (!(grep {$_ == $number} @numbers) || ($number > $lim));
-    return $number <= $lim ? $number : 0;
+    $limit  = $self->{MAX_VLAN};
+
+    while (++$number < $limit) {
+	if (!(grep {$_ == $number} @numbers)) {
+	    #
+	    # Reserve this number in the table. If we can actually
+	    # assign it (tables locked), then we call it good. Else
+	    # go around again.
+	    #
+	    if (reserveVlanTag($vlan_id, $number)) {
+		$self->debug("Reserved tag $number to vlan $vlan_id\n");
+		return $number;
+	    }
+	    $self->debug("Failed to reserve tag $number for vlan $vlan_id\n");
+	}
+    }
+    return 0;
 }
 
 #
@@ -496,7 +539,7 @@ sub createVlan($$$;$$$) {
 
     }
     $self->unlock();
-    return $vlan_number;
+    return ($vlan_number <= 0 ? 0 : $vlan_number);
 }
 
 #
