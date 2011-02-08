@@ -1173,8 +1173,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 		    my $virtnode =
 			$virtexperiment->NewTableRow("virt_nodes",
 					     {"vname"   => $node_nickname,
-					      "type"    => "bbgeni",
-					      "osname"  => '',
+					      "type"    => "bbgenivm",
+					      "osname"  => 'BBGENIVM-FAKE',
 					      "ips"     => '', # deprecated
 					      "cmd_line"=> '', # bogus
 					      "fixed"   => "bbg1"});
@@ -1183,6 +1183,13 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$response = GeniResponse->Create(GENIRESPONSE_ERROR);
 			goto bad;
 		    }
+		    # These nodes are technically shared. 
+		    $virtexperiment->NewTableRow("virt_node_desires",
+						 {"vname"    => $node_nickname,
+						  "desire"   => "pcshared",
+						  "weight"   => 0.95});
+		    $virtexperiment->multiplex_factor(1);
+		    $virtexperiment->encap_style("vlan");
 		    $iface_name  = "";
 		    $iface_vport = 0;
 		    goto stitch;
