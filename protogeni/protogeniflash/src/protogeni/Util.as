@@ -37,6 +37,16 @@ package protogeni
 		  navigateToURL(new URLRequest(url), "_blank");
 	  }
 	  
+	  public static function tryGetBaseUrl(url:String):String
+	  {
+		  var hostPattern:RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
+		  var match : Object = hostPattern.exec(url);
+		  if (match != null)
+			  return match[1];
+		  else
+			  return url;
+	  }
+	  
     public static function makeUrn(authority : String,
                                    type : String,
                                    name : String) : String

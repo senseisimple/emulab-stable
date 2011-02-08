@@ -20,6 +20,7 @@
 	import flash.events.SecurityErrorEvent;
 	import flash.system.Security;
 	import flash.utils.ByteArray;
+	import flash.utils.Dictionary;
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
@@ -28,8 +29,8 @@
 	
 	import protogeni.Util;
 	import protogeni.communication.Operation;
-	import protogeni.display.InitialUserWindow;
 	import protogeni.display.DisplayUtil;
+	import protogeni.display.InitialUserWindow;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
@@ -93,7 +94,7 @@
 		{
 			for each(var cm:ComponentManager in Main.geniHandler.GeniManagers)
 			{
-				pushRequest(new RequestDiscoverResources(cm));
+				pushRequest(new RequestGetVersion(cm));
 			}
 		}
 		

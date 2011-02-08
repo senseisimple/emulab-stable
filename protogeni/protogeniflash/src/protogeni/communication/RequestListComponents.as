@@ -43,7 +43,7 @@ package protogeni.communication
 			{
 				var newGm:GeniManager = null;
 				var ts:String = obj.url.substr(0, obj.url.length-3);
-				switch(ts)
+				/*switch(ts)
 				{
 					case "https://www.emulab.net/protogeni/xmlrpc":
 					//case "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc":
@@ -57,26 +57,25 @@ package protogeni.communication
 						Main.geniHandler.GeniManagers.add(newAm);
 						newGm = newAm;
 						break;
-					default:
+					default:*/
 						var newCm:ComponentManager = new ComponentManager();
 						newCm.Hrn = obj.hrn;
 						newCm.Url = ts;
 						newCm.Urn = obj.urn;
 						Main.geniHandler.GeniManagers.add(newCm);
 						newGm = newCm;
-				}
+				//}
 				if(startDiscoverResources)
 				{
 					newGm.Status = GeniManager.INPROGRESS;
 					if(newGm is AggregateManager)
 						newCalls.push(new RequestGetVersionAm(newGm as AggregateManager));
 					else if(newGm is ComponentManager)
-						newCalls.push(new RequestDiscoverResources(newGm as ComponentManager));
+						newCalls.push(new RequestGetVersion(newGm as ComponentManager));
 				}
 				Main.geniHandler.dispatchGeniManagerChanged(newGm);
 			}
 			
-			/*
 			var planetLabAm:AggregateManager = new AggregateManager();
 			planetLabAm.Url = "https://planet-lab.org:12346";
 			planetLabAm.Hrn = "planet-lab.am";
@@ -85,7 +84,6 @@ package protogeni.communication
 			planetLabAm.Status = GeniManager.INPROGRESS;
 			newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
 			Main.geniHandler.dispatchGeniManagerChanged(planetLabAm);
-			*/
 			
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());

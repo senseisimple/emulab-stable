@@ -23,6 +23,7 @@ package protogeni.communication
 	  // Namespaces
 	  public static var rspec01Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
 	  public static var rspec02Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
+	  public static var rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/2";
 	  
 	  // Error codes
 	  public static var GENIRESPONSE_SUCCESS : int = 0;
@@ -84,7 +85,8 @@ package protogeni.communication
     public static var resolve : Array = new Array(sa, "Resolve");
     public static var remove : Array = new Array(sa, "Remove");
     public static var register : Array = new Array(sa, "Register");
-
+	
+	public static var getVersion : Array = new Array(cm, "GetVersion");
     public static var discoverResources : Array = new Array(cm, "DiscoverResources");
 	public static var resolveResource : Array = new Array(cm, "Resolve");
 	// AM

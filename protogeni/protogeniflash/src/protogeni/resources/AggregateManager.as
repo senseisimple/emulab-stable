@@ -14,12 +14,8 @@
  
  package protogeni.resources
 {
-	
-	// Acts as the component manager for physical nodes and links and slivers
 	public class AggregateManager extends GeniManager
 	{
-		public var componentManager:ComponentManager;
-	    
 		public function AggregateManager()
 		{
 			super();

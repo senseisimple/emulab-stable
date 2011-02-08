@@ -16,10 +16,14 @@
  
  package
 {
+	import flash.system.Security;
+	import flash.utils.Dictionary;
+	
 	import mx.controls.Alert;
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniHandler;
+	import protogeni.Util;
 	
   public class Main
   {
@@ -27,9 +31,24 @@
 	public static function Application():protogeniflash {
 		return mx.core.FlexGlobals.topLevelApplication as protogeniflash;
 	}
+	
+	public static function checkLoadCrossDomain(url:String, protogeniSite:Boolean = true):void
+	{
+		var baseUrl:String = Util.tryGetBaseUrl(url);
+		if (visitedSites[baseUrl] != true)
+		{
+			visitedSites[baseUrl] = true;
+			if(protogeniSite)
+				Security.loadPolicyFile(baseUrl + "/protogeni/crossdomain.xml");
+			else
+				Security.loadPolicyFile(baseUrl + "/crossdomain.xml");
+		}
+	}
 
 	[Bindable]
 	public static var geniHandler:GeniHandler;
 	public static var log : LogRoot = null;
+	
+	private static var visitedSites:Dictionary = new Dictionary();
   }
 }

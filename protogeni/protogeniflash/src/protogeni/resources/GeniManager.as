@@ -106,6 +106,7 @@ package protogeni.resources
 		private var nodeNameDictionary:Dictionary;
 		private var subnodeList:ArrayCollection;
 		private var linkDictionary:Dictionary;
+		private var rspecVersion:int;
 		
 		public function processRspec(afterCompletion : Function):void {
 			Main.log.setStatus("Parsing " + Hrn + " RSPEC", false);
@@ -116,11 +117,11 @@ package protogeni.resources
 				|| ns.uri == "http://www.protogeni.net/resources/rspec/0.1"
 				|| ns.uri == "http://www.protogeni.net/resources/rspec/0.2")
 			{
-				Version = 1;
+				rspecVersion = 1;
 			}
 			else if (ns.uri == "http://www.protogeni.net/resources/rspec/2")
 			{
-				Version = 2;
+				rspecVersion = 2;
 			}
 			else
 			{
@@ -226,7 +227,7 @@ package protogeni.resources
 				
 				var n:PhysicalNode = new PhysicalNode(ng);
 				n.name = p.@component_name;
-				switch(Version)
+				switch(rspecVersion)
 				{
 					case 1:
 						n.urn = p.@component_uuid;

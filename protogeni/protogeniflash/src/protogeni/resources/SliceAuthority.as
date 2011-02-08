@@ -6,6 +6,7 @@ package protogeni.resources
 		public var Name:String;
 		public var Urn:String;
 		public var Url:String;
+		[Bindable]
 		public var Authority:String;
 		
 		public function SliceAuthority(newName:String = "", newUrn:String = "", newUrl:String = "")

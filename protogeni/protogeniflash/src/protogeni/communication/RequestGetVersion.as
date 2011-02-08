@@ -20,17 +20,16 @@ package protogeni.communication
 	
 	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
+	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
 
-  public class RequestGetVersionAm extends Request
+  public class RequestGetVersion extends Request
   {
-    public function RequestGetVersionAm(newAm:AggregateManager) : void
+    public function RequestGetVersion(newCm:ComponentManager) : void
     {
-      super("GetVersion (" + Util.shortenString(newAm.Url, 15) + ")", "Getting the version of the aggregate manager for " + newAm.Hrn, CommunicationUtil.getVersionAm, true, true, true);
-	  ignoreReturnCode = true;
-	  am = newAm;
-	  //op.setUrl(am.Url);
-	  op.setExactUrl(am.Url);
+      super("GetVersion (" + Util.shortenString(newCm.Url, 15) + ")", "Getting the version of the component manager for " + newCm.Hrn, CommunicationUtil.getVersion, true, true, true);
+	  cm = newCm;
+	  op.setUrl(cm.Url);
     }
 
 	// Should return Request or RequestQueueNode
@@ -39,8 +38,11 @@ package protogeni.communication
 		var r:Request = null;
 		try
 		{
-			am.Version = response.geni_api;
-			r = new RequestListResourcesAm(am);
+			cm.Version = response.value.api;
+			//inputrspec[] = 0.1, 2
+			//output_rspec
+			cm.Level = response.value.level;
+			r = new RequestDiscoverResources(cm);
 			r.forceNext = true;
 		}
 		catch(e:Error)
@@ -52,28 +54,28 @@ package protogeni.communication
 	
 	override public function fail(event:ErrorEvent, fault:MethodFault) : *
 	{
-		am.errorMessage = event.toString();
-		am.errorDescription = "";
-		if(am.errorMessage.search("#2048") > -1)
-			am.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + am.VisitUrl();
-		else if(am.errorMessage.search("#2032") > -1)
-			am.errorDescription = "IO error, possibly due to the server being down";
-		else if(am.errorMessage.search("timed"))
-			am.errorDescription = event.text;
+		cm.errorMessage = event.toString();
+		cm.errorDescription = "";
+		if(cm.errorMessage.search("#2048") > -1)
+			cm.errorDescription = "Stream error, possibly due to server error.  Another possible error might be that you haven't added an exception for:\n" + cm.VisitUrl();
+		else if(cm.errorMessage.search("#2032") > -1)
+			cm.errorDescription = "IO error, possibly due to the server being down";
+		else if(cm.errorMessage.search("timed"))
+			cm.errorDescription = event.text;
 
-		am.Status = GeniManager.FAILED;
-		Main.geniHandler.dispatchGeniManagerChanged(am);
+		cm.Status = GeniManager.FAILED;
+		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		
 		return null;
 	}
 	
 	override public function cancel():void
 	{
-		am.Status = GeniManager.UNKOWN;
-		Main.geniHandler.dispatchGeniManagerChanged(am);
+		cm.Status = GeniManager.UNKOWN;
+		Main.geniHandler.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 	}
 	
-	private var am:AggregateManager;
+	private var cm:ComponentManager;
   }
 }

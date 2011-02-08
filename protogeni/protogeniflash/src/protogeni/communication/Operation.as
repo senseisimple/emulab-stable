@@ -121,17 +121,7 @@ package protogeni.communication
 
     public function call(newSuccess : Function, newFailure : Function) : void
     {
-		if (visitedSites[url] != true)
-		{
-			visitedSites[url] = true;
-			var hostPattern : RegExp = /^(http(s?):\/\/([^\/]+))(\/.*)?$/;
-			var match : Object = hostPattern.exec(url);
-			if (match != null)
-			{
-				var host : String = match[1];
-				Security.loadPolicyFile(host + "/protogeni/crossdomain.xml");
-			}
-		}
+		Main.checkLoadCrossDomain(url);
 		success = newSuccess;
 		failure = newFailure;
 		
@@ -241,10 +231,11 @@ package protogeni.communication
 		switch(type)
 		{
 			case XMLRPC:
-				if(server.getResponse() is String)
-					success(node, null, server.getResponse());
-				else
+				try{
 					success(node, Number(server.getResponse().code), server.getResponse());
+				} catch(e:Error) {
+					success(node, null, server.getResponse());
+				}
 				break;
 			case HTTP:
 				success(node, CommunicationUtil.GENIRESPONSE_SUCCESS, loader.data);
@@ -299,9 +290,7 @@ package protogeni.communication
 	private var loader:URLLoader
 	
 	public var timeout:int = 60;
-
-    private static var SERVER_PATH : String = "/protogeni/xmlrpc/";
-
-    private static var visitedSites : Dictionary = new Dictionary();
+	
+	private static var SERVER_PATH : String = "/protogeni/xmlrpc/";
   }
 }

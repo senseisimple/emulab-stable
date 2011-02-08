@@ -43,10 +43,16 @@
 			import mx.managers.PopUpManager;
 			
 			import protogeni.Util;
+			import protogeni.resources.SliceAuthority;
 			
 			private var certLoader:URLLoader;
 			private var closeAfter:Boolean = false;
-			private static var certLocation:String = "https://www.emulab.net/getsslcert.php3";
+			
+			private static var certLocation:String = "/getsslcert.php3";
+			private static var loginLocation:String = "/login.php3";
+			
+			[Bindable]
+			private var selectedAuthority:SliceAuthority;
 			
 			public function windowReady():void
 			{
@@ -83,7 +89,9 @@
 			
 			public function visitLogin():void
 			{
-				Util.openWebsite('https://www.emulab.net/login.php3');
+				var url:String = Util.tryGetBaseUrl(selectedAuthority.Url) + loginLocation;
+				Main.checkLoadCrossDomain(url);
+				Util.openWebsite( url );
 			}
 			
 			public function checkCloseAfter():void
@@ -96,15 +104,19 @@
 			
 			public function tryLoadCert(url:String):void
 			{
+				Main.checkLoadCrossDomain(url);
+				
 				var request:URLRequest = new URLRequest(url); 
 				certLoader = new URLLoader(); 
 				certLoader.addEventListener(Event.COMPLETE, completeHandler);
 				certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+				certLoader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatusHandler);
 				certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
 				try
 				{
 					waitingIcon.visible = true;
 					getLabel.styleName = "inprogressStyle";
+					getLabel.text = "Waiting...";
 					certLoader.load(request);
 				}
 				catch (e : Error)
@@ -121,32 +133,42 @@
 					sslPem.text = certLoader.data;
 					getLabel.text = "Success!"
 					getLabel.styleName = "validStyle";
-				} else {
-					getLabel.text = "Failed! Most likely not logged in.";
-					getLabel.styleName = "failedStyle";
 					checkCloseAfter();
-					Alert.show("You must be logged in on the website in order to automatically retrieve your SSL Cert.  Visit the login page?", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
-						function handleAction(e:CloseEvent):void {
-							if(e.detail == Alert.YES)
-								visitLogin();
-						});
+				} else {
+					askToLogin();
 				}
 				waitingIcon.visible = false;
-				closeAfter = false;
+				
+			}
+			
+			private function askToLogin():void
+			{
+				getLabel.text = "Failed! Most likely not logged in.";
+				getLabel.styleName = "failedStyle";
+				waitingIcon.visible = false;
+				checkCloseAfter();
+				Alert.show("You must be logged in on the website in order to automatically retrieve your SSL Cert.  Visit the login page?", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
+					function handleAction(e:CloseEvent):void {
+						if(e.detail == Alert.YES)
+							visitLogin();
+					});
 			}
 			
 			private function securityErrorHandler(event:SecurityErrorEvent):void {
-				getLabel.text = "Security Error!"
-				waitingIcon.visible = false;
+				/*getLabel.text = "Security Error!"
 				getLabel.styleName = "failedStyle";
-				checkCloseAfter();
+				askToLogin();*/
 			}
 			
 			private function ioErrorHandler(event:IOErrorEvent):void {
-				getLabel.text = "IO Error!"
-				waitingIcon.visible = false;
+				/*getLabel.text = "IO Error!"
 				getLabel.styleName = "failedStyle";
-				checkCloseAfter();
+				askToLogin();*/
+			}
+			
+			private function httpStatusHandler(event:HTTPStatusEvent):void{
+				if(event.status != 200)
+					askToLogin();
 			}
 		]]>
 	</fx:Script>
@@ -154,16 +176,15 @@
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
 	<s:Label text="Which authority are you registered with?" />
-	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%"/>
-	
+	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%" requireSelection="true" selectedItem="@{selectedAuthority}"/>
 	<s:Label text="SSL Cert Password" />
 	<s:TextInput id="passwordInput" width="100%" displayAsPassword="true" />
 	<s:HGroup>
 		<s:CheckBox id="retrieveCertCheckbox" label="Retrieve SSL Cert? If not signed in, please sign in to" selected="true" />
-		<s:Button label="emulab.net" click="visitLogin();" />
+		<s:Button label="{selectedAuthority.Authority}" click="visitLogin();" />
 	</s:HGroup>
 	<s:HGroup verticalAlign="middle">
-		<s:Button label="Get!" click="this.tryLoadCert(certLocation);" />
+		<s:Button label="Get!" click="this.tryLoadCert(Util.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
 		<s:Label id="getLabel" text="" />
 	</s:HGroup>

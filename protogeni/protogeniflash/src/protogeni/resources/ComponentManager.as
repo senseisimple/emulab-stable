@@ -14,18 +14,12 @@
  
  package protogeni.resources
 {
-	import flash.utils.Dictionary;
-	
-	import mx.collections.ArrayCollection;
-	import mx.controls.Alert;
-	
-	import protogeni.Util;
-	import protogeni.display.DisplayUtil;
-	
-	// Acts as the component manager for physical nodes and links and slivers
 	public class ComponentManager extends GeniManager
 	{
-		public var aggregateManager:AggregateManager = null;
+		public static var LEVEL_MINIMAL:int = 0;
+		public static var LEVEL_FULL:int = 1;
+		
+		public var Level:int;
 	    
 		public function ComponentManager()
 		{
