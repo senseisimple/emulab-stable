@@ -3250,18 +3250,6 @@ COMMAND_PROTOTYPE(doblobs)
 	char            buf[MYBUFSIZE];
 	char            *bufp = buf, *ebufp = &buf[sizeof(buf)];
 	
-	/*
-	 * Frisbee blobs did exist prior to version 33, but the infrastructure
-	 * was not deployed on more than a couple of images and only at Utah.
-	 * So we are not going to bother with frisbee backward compat changes
-	 * and just require that all images have the new frisbee master server
-	 * infrastructure.
-	 */
-	if (vers < 33) {
-		error("BLOBS: %s: requires new frisbee, rebuild image!\n",
-		      reqp->nodeid);
-		return 1;
-	}
 	res = mydb_query("select path,action from experiment_blobs "
 			 " where exptidx=%d order by idx",
 			 2, reqp->exptidx);
@@ -3276,6 +3264,20 @@ COMMAND_PROTOTYPE(doblobs)
 	if (nrows <= 0) {
 		mysql_free_result(res);
 		return 0;
+	}
+
+	/*
+	 * Frisbee blobs did exist prior to version 33, but the infrastructure
+	 * was not deployed on more than a couple of images and only at Utah.
+	 * So we are not going to bother with frisbee backward compat changes
+	 * and just require that all images have the new frisbee master server
+	 * infrastructure.
+	 */
+	if (vers < 33) {
+		error("BLOBS: %s: requires new frisbee, rebuild image!\n",
+		      reqp->nodeid);
+		mysql_free_result(res);
+		return 1;
 	}
 
 	while (nrows > 0) {
