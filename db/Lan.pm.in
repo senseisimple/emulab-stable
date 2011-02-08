@@ -1854,20 +1854,23 @@ sub Instantiate($)
 	my $vnode       = $protomember->{'vnode'};
 	my $vport       = $protomember->{'vport'};
 	my $iface       = $protomember->{'iface'};
-	my $attributes  = $protomember->{'attrs'};
-	my $interface   = $lan->AddInterface($node, $vnode, $vport, $iface);
+	my $pport       = $protomember->{'pport'};
+	my $member;
+
+	if (defined($pport)) {
+	    $member = $lan->AddMember($node, $pport);
+	    
+	    if (!defined($member)) {
+		$lan->Destroy();
+		return -1;
+	    }
+	}
+	my $interface =
+	    $lan->AddInterface($node, $vnode, $vport, $iface, $member);
 	
 	if (!defined($interface)) {
 	    $lan->Destroy();
 	    return -1;
-	}
-
-	if (defined($attributes)) {
-	    foreach my $attrkey (keys(%{$attributes})) {
-		my $attrvalue = $attributes->{$attrkey};
-
-		$interface->SetAttribute($attrkey, $attrvalue);
-	    }
 	}
     }
     $self->{'INSTANCE'} = $lan;
@@ -1965,8 +1968,12 @@ sub Dump($)
 	my $vnode  = $interface->{'vnode'};
 	my $vport  = $interface->{'vport'};
 	my $iface  = $interface->{'iface'};
+	my $pport  = $interface->{'pport'};
 
-	$string .= "$vnode:$vport:$nodeid:$iface, ";
+	$string .= "$vnode:$vport:$nodeid:$iface";
+	$string .= ":$pport"
+	    if (defined($pport));
+	$string .= ", ";
     }
     return $string;
 }
@@ -1976,7 +1983,7 @@ sub Dump($)
 #
 sub AddInterface($$$$$;$)
 {
-    my ($self, $node, $vnode, $vport, $iface, $attributes) = @_;
+    my ($self, $node, $vnode, $vport, $iface, $pport) = @_;
 
     if (!ref($node)) {
 	$node = Node->Lookup($node);
@@ -1994,7 +2001,7 @@ sub AddInterface($$$$$;$)
 					     "vnode" => $vnode,
 					     "vport" => $vport,
 					     "iface" => $iface,
-					     "attrs" => $attributes,
+					     "pport" => $pport,
 					    };
     return 0;
 }
