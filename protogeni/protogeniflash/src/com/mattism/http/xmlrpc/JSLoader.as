@@ -64,12 +64,10 @@ package com.mattism.http.xmlrpc
         var clearKey : String = decodeKey(desKey, iv, key);
         ExternalInterface.call("setClientCert", cert);
         ExternalInterface.call("setClientKey", clearKey);
-        Main.log.appendMessage(new LogMessage("debug", "Cert", cert, false));
-        Main.log.appendMessage(new LogMessage("debug", "Key", clearKey, false));
       }
       else
       {
-        Main.log.appendMessage(new LogMessage("error", "No IV", key, true));
+        Main.log.appendMessage(new LogMessage("error", "Invalid Key", key, true));
       }
     }
 
@@ -138,18 +136,12 @@ package com.mattism.http.xmlrpc
     private static function decodeKey(desKey : ByteArray, iv : ByteArray,
                                       key : String) : String
     {
-      Main.log.appendMessage(new LogMessage("debug", "decodeKey", "", false));
       var keyBinary : ByteArray = parseKey(key);
-      Main.log.appendMessage(new LogMessage("debug", "afterParseKey", "", false));
       var des : TripleDESKey = new TripleDESKey(desKey);
-      Main.log.appendMessage(new LogMessage("debug", "afterDes", "", false));
       var cbc : CBCMode = new CBCMode(des);
-      Main.log.appendMessage(new LogMessage("debug", "afterCbc", "", false));
       cbc.IV = iv;
       cbc.decrypt(keyBinary);
-      Main.log.appendMessage(new LogMessage("debug", "afterDecrypt", "", false));
 //      cbc.dispose();
-      Main.log.appendMessage(new LogMessage("debug", "afterDispose", "", false));
       return plainToString(keyBinary);
     }
 
@@ -169,13 +161,10 @@ package com.mattism.http.xmlrpc
 
     private static function plainToString(plain : ByteArray) : String
     {
-      Main.log.appendMessage(new LogMessage("debug", "plainToString", String(plain.length), false));
       var result : String = "-----BEGIN RSA KEY-----\n";
       var encoder : Base64Encoder = new Base64Encoder();
-      Main.log.appendMessage(new LogMessage("debug", "beforeEncode", "", false));
       encoder.encodeBytes(plain, 0, plain.length);
       result += encoder.toString();
-      Main.log.appendMessage(new LogMessage("debug", "afterEncode", result, false));
       result += "-----END RSA KEY-----";
       return result;
     }

@@ -46,8 +46,8 @@
 			import protogeni.resources.SliceAuthority;
 
                         import com.mattism.http.xmlrpc.JSLoader;
-			
-			private var certLoader:JSLoader;
+
+			private var certLoader:URLLoader;
 			private var closeAfter:Boolean = false;
 			
 			private static var certLocation:String = "/getsslcert.php3";
@@ -111,7 +111,7 @@
 				Main.checkLoadCrossDomain(url);
 				
 				var request:URLRequest = new URLRequest(url); 
-				certLoader = new JSLoader(); 
+				certLoader = new URLLoader(); 
 				certLoader.addEventListener(Event.COMPLETE, completeHandler);
 				certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
 				certLoader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatusHandler);
