@@ -59,6 +59,10 @@
 		
 		public var rspec:XML;
 		
+		// Planetlab
+		public var hostname:String;
+		public var bw_limitKbps:int;
+		
 		public function IsSwitch():Boolean {
 			for each(var d:NodeType in types) {
 				if(d.name == "switch")

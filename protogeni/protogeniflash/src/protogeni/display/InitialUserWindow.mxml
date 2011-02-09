@@ -64,7 +64,11 @@
 			public function trySubmit():void
 			{
 				if(passwordInput.text.length == 0) {
-					Alert.show("Please enter a password");
+					Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as protogeniflash,
+						function closed():void
+						{
+							this.passwordInput.setFocus();
+						});
 					return;
 				}
 				if(retrieveCertCheckbox.selected) {
@@ -147,7 +151,7 @@
 				getLabel.styleName = "failedStyle";
 				waitingIcon.visible = false;
 				checkCloseAfter();
-				Alert.show("You must be logged in on the website in order to automatically retrieve your SSL Cert.  Visit the login page?", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
+				Alert.show("You must be logged in on the authority's website in order to automatically retrieve your SSL Cert.  Visit the login page? After login, come back here and try again.", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
 					function handleAction(e:CloseEvent):void {
 						if(e.detail == Alert.YES)
 							visitLogin();
@@ -173,7 +177,7 @@
 		]]>
 	</fx:Script>
 	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		
 	</fx:Declarations>
 	<s:Label text="Which authority are you registered with?" />
 	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%" requireSelection="true" selectedItem="@{selectedAuthority}"/>

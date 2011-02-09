@@ -19,6 +19,7 @@
 		public function AggregateManager()
 		{
 			super();
+			// MUST define an AdParser!
 		}
 	}
 }

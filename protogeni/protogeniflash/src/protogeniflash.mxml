@@ -46,6 +46,7 @@
 			import mx.events.ResizeEvent;
 			import mx.managers.PopUpManager;
 			import mx.managers.ToolTipManager;
+			import mx.rpc.events.ResultEvent;
 			
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
@@ -88,6 +89,7 @@
 				Security.allowDomain("*");
 				Security.allowInsecureDomain("*");
 				
+				// Force a different Google Maps API key if given
 				try{
 					if(FlexGlobals.topLevelApplication.parameters.mapkey != null)
 					{
@@ -112,7 +114,16 @@
 				loadParams();
 				
 				// Saved variables
-				geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
+				try {
+					geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
+				} catch(e:Error) {
+					Alert.show("It looks like Flash is unable to save/load local data.  Would you like to load directions on how to enable local data?", "Enable Local Data?", Alert.YES|Alert.NO, this,
+						function allowData(e:CloseEvent):void {
+							if(e.detail == Alert.YES) {
+								Util.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
+							}
+						});
+				}
 				loadLocalData();
 				
 				console = new protogeni.display.ConsoleWindow();
@@ -140,6 +151,40 @@
 				
 				Security.allowDomain("localhost");	
 				
+				// Load the certificate bundle
+				var certRequest:URLRequest = new URLRequest("http://www.emulab.net/genica.bundle"); 
+				var certLoader:URLLoader = new URLLoader(); 
+				certLoader.addEventListener(Event.COMPLETE, certBundleResult);
+				certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+				certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
+				try
+				{
+					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Getting the Protogeni certificate bundle", false, LogMessage.TYPE_START));
+					certLoader.load(certRequest);
+				}
+				catch (e : Error)
+				{
+					Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
+						+ e.toString() + "\n\n", true));
+				}
+			}
+			
+			private function certBundleResult(e:Event):void
+			{
+				Main.certBundle = e.target.data;
+				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", Main.certBundle, false, LogMessage.TYPE_END));
+				Main.geniHandler.requestHandler.startInitiationSequence();
+			}
+			
+			private function securityErrorHandler(event:SecurityErrorEvent):void {
+				Main.certBundle = (new FallbackCertBundle()).toString();
+				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
+				Main.geniHandler.requestHandler.startInitiationSequence();
+			}
+			
+			private function ioErrorHandler(event:IOErrorEvent):void {
+				Main.certBundle = (new FallbackCertBundle()).toString();
+				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
@@ -288,7 +333,7 @@
 			
 			public function loadLocalData():void
 			{
-				if (geniLocalSharedObject.size > 0)
+				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
 				{
 					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
 						if(sa.Url == geniLocalSharedObject.data.authority) {
@@ -303,6 +348,9 @@
 			
 			public function saveLocalData():void
 			{
+				if(geniLocalSharedObject == null)
+					return;
+				
 				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
 				geniLocalSharedObject.data.sslPem = Main.geniHandler.CurrentUser.sslPem;
 				try

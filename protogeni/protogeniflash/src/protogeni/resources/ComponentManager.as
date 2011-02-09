@@ -24,6 +24,7 @@
 		public function ComponentManager()
 		{
 			super();
+			adParser = new ProtogeniAdParser(this);
 		}
 	}
 }

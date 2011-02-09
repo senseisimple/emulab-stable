@@ -38,8 +38,8 @@
 			
 			private function mappreinit():void {
 				// Force a key
-				if(Main.Application().forceMapKey != null) {
-					key = Main.Application().forceMapKey;
+				if((Main.Application() as protogeniflash).forceMapKey != null) {
+					key = Main.(Application() as protogeniflash).forceMapKey;
 				}
 				// else detect a key from our default list
 				else

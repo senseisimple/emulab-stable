@@ -19,16 +19,16 @@
 	// Group of physical nodes located in one area
 	public class PhysicalNodeGroup
 	{
-		public var latitude:Number = -1;
-		public var longitude:Number = -1;
-		public var country:String = "";
+		public var latitude:Number;
+		public var longitude:Number;
+		public var country:String;
 		public var city:String = "";
 		
 		public var owner:PhysicalNodeGroupCollection = null;
 		public var collection:ArrayCollection = new ArrayCollection;
 		public var links:PhysicalLinkGroup = null;
 		
-		public function PhysicalNodeGroup(lat:Number, lng:Number, cnt:String, own:PhysicalNodeGroupCollection)
+		public function PhysicalNodeGroup(lat:Number = -1, lng:Number = -1, cnt:String = "", own:PhysicalNodeGroupCollection = null)
 		{
 			latitude = lat;
 			longitude = lng;
