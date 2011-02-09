@@ -1448,31 +1448,31 @@ sub snap($) {
 	#
 	SWITCH: for ($type) {
 	    (/cisco/) && do {
-		use snmpit_cisco;
+		require snmpit_cisco;
 		$device = new snmpit_cisco($devicename,$self->{DEBUG});
 		last;
 		}; # /cisco/
 	    (/foundry1500/ || /foundry9604/)
 		    && do {
-		use snmpit_foundry;
+		require snmpit_foundry;
 		$device = new snmpit_foundry($devicename,$self->{DEBUG});
 		last;
 		}; # /foundry.*/
 	    (/nortel1100/ || /nortel5510/)
 		    && do {
-		use snmpit_nortel;
+		require snmpit_nortel;
 		$device = new snmpit_nortel($devicename,$self->{DEBUG});
 		last;
 		}; # /nortel.*/
 	    (/hp/)
 		    && do {
-		use snmpit_hp;
+		require snmpit_hp;
 		$device = new snmpit_hp($devicename,$self->{DEBUG});
 		last;
 		}; # /hp.*/
 	    (/apcon/)
 		    && do {
-		use snmpit_apcon;
+		require snmpit_apcon;
 		$device = new snmpit_apcon($devicename,$self->{DEBUG});
 		last;
 	        }; # /apcon.*/
