@@ -44,8 +44,10 @@
 			
 			import protogeni.Util;
 			import protogeni.resources.SliceAuthority;
+
+                        import com.mattism.http.xmlrpc.JSLoader;
 			
-			private var certLoader:URLLoader;
+			private var certLoader:JSLoader;
 			private var closeAfter:Boolean = false;
 			
 			private static var certLocation:String = "/getsslcert.php3";
@@ -82,6 +84,8 @@
 			{
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
 				Main.geniHandler.CurrentUser.sslPem = sslPem.text;
+				JSLoader.setClientInfo(passwordInput.text,
+				                       Main.geniHandler.CurrentUser.sslPem);
 				FlexGlobals.topLevelApplication.saveLocalData();
 				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
 				closeWindow();
@@ -107,7 +111,7 @@
 				Main.checkLoadCrossDomain(url);
 				
 				var request:URLRequest = new URLRequest(url); 
-				certLoader = new URLLoader(); 
+				certLoader = new JSLoader(); 
 				certLoader.addEventListener(Event.COMPLETE, completeHandler);
 				certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
 				certLoader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatusHandler);
