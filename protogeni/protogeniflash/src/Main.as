@@ -48,7 +48,7 @@
 	[Bindable]
 	public static var geniHandler:GeniHandler;
 	public static var log : LogRoot = null;
-	
 	private static var visitedSites:Dictionary = new Dictionary();
+	public static var certBundle:String;
   }
 }

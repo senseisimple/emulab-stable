@@ -17,6 +17,7 @@ package protogeni.communication
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetLabAggregateManager;
 
   public class RequestListComponents extends Request
   {
@@ -76,7 +77,7 @@ package protogeni.communication
 				Main.geniHandler.dispatchGeniManagerChanged(newGm);
 			}
 			
-			var planetLabAm:AggregateManager = new AggregateManager();
+			var planetLabAm:PlanetLabAggregateManager = new PlanetLabAggregateManager();
 			planetLabAm.Url = "https://planet-lab.org:12346";
 			planetLabAm.Hrn = "planet-lab.am";
 			planetLabAm.Urn = "urn:publicid:IDN+planet-lab.org+authority+am";
