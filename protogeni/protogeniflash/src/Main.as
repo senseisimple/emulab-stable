@@ -22,6 +22,7 @@
 	import mx.controls.Alert;
 	import mx.core.FlexGlobals;
 	
+	import protogeni.GeniDispatcher;
 	import protogeni.GeniHandler;
 	import protogeni.Util;
 	
@@ -47,6 +48,7 @@
 
 	[Bindable]
 	public static var geniHandler:GeniHandler;
+	public static var geniDispatcher:GeniDispatcher;
 	public static var log : LogRoot = null;
 	private static var visitedSites:Dictionary = new Dictionary();
 	public static var certBundle:String;

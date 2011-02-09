@@ -56,7 +56,7 @@ package protogeni.communication
 				}
 			}
 			
-			Main.geniHandler.dispatchUserChanged();
+			Main.geniDispatcher.dispatchUserChanged();
 			Main.geniHandler.mapHandler.drawAll();
 		}
 		else

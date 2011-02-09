@@ -61,7 +61,7 @@ package protogeni.resources
 				gm.unavailableNodes = 0;
 				gm.percentageAvailable = 100;
 				gm.Status = GeniManager.VALID;
-				Main.geniHandler.dispatchGeniManagerChanged(gm);
+				Main.geniDispatcher.dispatchGeniManagerChanged(gm);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				myAfter();
 			}

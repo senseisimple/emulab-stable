@@ -16,7 +16,7 @@ package protogeni.resources
 		public function add(gm:GeniManager):void
 		{
 			this.addItem(gm);
-			Main.geniHandler.dispatchGeniManagersChanged();
+			Main.geniDispatcher.dispatchGeniManagersChanged();
 		}
 		
 		public function clear():void

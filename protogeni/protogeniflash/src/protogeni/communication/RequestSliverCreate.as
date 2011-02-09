@@ -54,7 +54,7 @@ package protogeni.communication
 				old.slivers.addItem(sliver);
 			}
 			
-			Main.geniHandler.dispatchSliceChanged(sliver.slice);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 
 			return new RequestSliverStatus(sliver);
 		}

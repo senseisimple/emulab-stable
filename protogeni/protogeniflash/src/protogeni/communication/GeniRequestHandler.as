@@ -60,7 +60,7 @@
 				Main.geniHandler.GeniManagers.add(newCm);
 				newCm.Status = GeniManager.INPROGRESS;
 				pushRequest(new RequestDiscoverResourcesPublic(newCm));
-				Main.geniHandler.dispatchGeniManagerChanged(newCm);
+				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
 				Main.Application().showAuthenticate();
 			} else {
 				if(Main.geniHandler.forceAuthority == null)
@@ -237,7 +237,7 @@
 			Main.log.setStatus(start.name, false);
 			Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
 				
-			Main.geniHandler.dispatchQueueChanged();
+			Main.geniDispatcher.dispatchQueueChanged();
 			
 			this.start();
 		}
@@ -259,9 +259,9 @@
 			{
 				var url:String = r.op.getUrl();
 				var name:String = r.name;
-				Main.log.appendMessage(new LogMessage(url, name + "Removed", "Request removed", false, LogMessage.TYPE_END));
+				Main.log.appendMessage(new LogMessage(url, name + "Removed", "Request removed", false, LogMessage.TYPE_OTHER));
 			}
-			Main.geniHandler.dispatchQueueChanged();
+			Main.geniDispatcher.dispatchQueueChanged();
 		}
 		
 		private function failure(node:Request, event : ErrorEvent, fault : MethodFault) : void

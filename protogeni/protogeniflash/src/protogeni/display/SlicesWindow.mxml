@@ -27,8 +27,8 @@
 			
 			public function init():void
 			{
-				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, refreshView);
-				Main.geniHandler.addEventListener(GeniEvent.SLICE_CHANGED, refreshView);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, refreshView);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, refreshView);
 			}
 			
 			public function createSlice():void

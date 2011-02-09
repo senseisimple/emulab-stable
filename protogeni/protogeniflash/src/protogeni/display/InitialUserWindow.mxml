@@ -64,11 +64,7 @@
 			public function trySubmit():void
 			{
 				if(passwordInput.text.length == 0) {
-					Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as protogeniflash,
-						function closed():void
-						{
-							this.passwordInput.setFocus();
-						});
+					Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as protogeniflash);
 					return;
 				}
 				if(retrieveCertCheckbox.selected) {
@@ -106,8 +102,10 @@
 					closeAfter = false;
 			}
 			
+			private var certUrl:String;
 			public function tryLoadCert(url:String):void
 			{
+				certUrl = url;
 				Main.checkLoadCrossDomain(url);
 				
 				var request:URLRequest = new URLRequest(url); 
@@ -121,6 +119,7 @@
 					waitingIcon.visible = true;
 					getLabel.styleName = "inprogressStyle";
 					getLabel.text = "Waiting...";
+					Main.log.appendMessage(new LogMessage(url, "Getting SSL Cert", "Attempting to load user SSL certificate", false, LogMessage.TYPE_START));
 					certLoader.load(request);
 				}
 				catch (e : Error)
@@ -137,8 +136,10 @@
 					sslPem.text = certLoader.data;
 					getLabel.text = "Success!"
 					getLabel.styleName = "validStyle";
+					Main.log.appendMessage(new LogMessage(certUrl, "Got SSL Cert", certLoader.data, false, LogMessage.TYPE_END));
 					checkCloseAfter();
 				} else {
+					Main.log.appendMessage(new LogMessage(certUrl, "Error", event.toString(), true, LogMessage.TYPE_END));
 					askToLogin();
 				}
 				waitingIcon.visible = false;
@@ -162,17 +163,23 @@
 				/*getLabel.text = "Security Error!"
 				getLabel.styleName = "failedStyle";
 				askToLogin();*/
+				Main.log.appendMessage(new LogMessage(certUrl, "Security Error", event.toString(), true, LogMessage.TYPE_END));
 			}
 			
 			private function ioErrorHandler(event:IOErrorEvent):void {
 				/*getLabel.text = "IO Error!"
 				getLabel.styleName = "failedStyle";
 				askToLogin();*/
+				Main.log.appendMessage(new LogMessage(certUrl, "IO Error", event.toString(), true, LogMessage.TYPE_END));
 			}
 			
 			private function httpStatusHandler(event:HTTPStatusEvent):void{
-				if(event.status != 200)
+				if(event.status != 200) {
+					Main.log.appendMessage(new LogMessage(certUrl, "HTTP Status", "HTTP Status returned: "
+						+ event.status, true, LogMessage.TYPE_END));
 					askToLogin();
+				}
+					
 			}
 		]]>
 	</fx:Script>

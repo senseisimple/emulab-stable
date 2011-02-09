@@ -74,7 +74,7 @@ package protogeni.communication
 					else if(newGm is ComponentManager)
 						newCalls.push(new RequestGetVersion(newGm as ComponentManager));
 				}
-				Main.geniHandler.dispatchGeniManagerChanged(newGm);
+				Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
 			}
 			
 			var planetLabAm:PlanetLabAggregateManager = new PlanetLabAggregateManager();
@@ -84,7 +84,7 @@ package protogeni.communication
 			Main.geniHandler.GeniManagers.add(planetLabAm);
 			planetLabAm.Status = GeniManager.INPROGRESS;
 			newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
-			Main.geniHandler.dispatchGeniManagerChanged(planetLabAm);
+			Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
 			
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());

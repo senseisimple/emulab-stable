@@ -41,9 +41,8 @@
 	import protogeni.resources.VirtualNode;
 	
 	// Holds and handles all information regarding ProtoGENI
-	public class GeniHandler extends EventDispatcher
+	public class GeniHandler
 	{
-		
 		[Bindable]
 		public var requestHandler : GeniRequestHandler;
 		
@@ -146,31 +145,6 @@
 				//results.push(DisplayUtil.getLinkButton(this.CurrentUser);
 			
 			return results;
-		}
-		
-		// EVENTS
-		public function dispatchGeniManagerChanged(gm:GeniManager):void {
-			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGER_CHANGED, gm));
-		}
-		
-		public function dispatchGeniManagersChanged():void {
-			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGERS_CHANGED));
-		}
-		
-		public function dispatchQueueChanged():void {
-			dispatchEvent(new GeniEvent(GeniEvent.QUEUE_CHANGED));
-		}
-		
-		public function dispatchUserChanged():void {
-			dispatchEvent(new GeniEvent(GeniEvent.USER_CHANGED));
-		}
-		
-		public function dispatchSliceChanged(s:Slice):void {
-			dispatchEvent(new GeniEvent(GeniEvent.SLICE_CHANGED, s));
-		}
-		
-		public function dispatchSlicesChanged():void {
-			dispatchEvent(new GeniEvent(GeniEvent.SLICES_CHANGED));
 		}
 	}
 }

@@ -60,7 +60,7 @@ package protogeni.communication
 					slice.slivers.addItem(newSliver);
 				}
 				
-				Main.geniHandler.dispatchSliceChanged(slice);
+				Main.geniDispatcher.dispatchSliceChanged(slice);
 				newRequest = new RequestSliceCredential(slice);
 			}
 		}

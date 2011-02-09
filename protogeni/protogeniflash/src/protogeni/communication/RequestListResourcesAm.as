@@ -59,7 +59,7 @@ package protogeni.communication
 			//am.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + am.errorMessage;
 			am.Status = GeniManager.FAILED;
 			this.removeImmediately = true;
-			Main.geniHandler.dispatchGeniManagerChanged(am);
+			Main.geniDispatcher.dispatchGeniManagerChanged(am);
 		}
 		
 		return null;
@@ -75,7 +75,7 @@ package protogeni.communication
 			am.errorDescription = "IO error, possibly due to the server being down";
 		
 		am.Status = GeniManager.FAILED;
-		Main.geniHandler.dispatchGeniManagerChanged(am);
+		Main.geniDispatcher.dispatchGeniManagerChanged(am);
 
       return null;
     }
@@ -83,7 +83,7 @@ package protogeni.communication
 	override public function cancel():void
 	{
 		am.Status = GeniManager.UNKOWN;
-		Main.geniHandler.dispatchGeniManagerChanged(am);
+		Main.geniDispatcher.dispatchGeniManagerChanged(am);
 		op.cleanup();
 	}
 	
@@ -93,7 +93,7 @@ package protogeni.communication
 			am.Status = GeniManager.FAILED;
 		running = false;
 		Main.geniHandler.requestHandler.remove(this, false);
-		Main.geniHandler.dispatchGeniManagerChanged(am);
+		Main.geniDispatcher.dispatchGeniManagerChanged(am);
 		op.cleanup();
 		Main.geniHandler.requestHandler.start();
 	}

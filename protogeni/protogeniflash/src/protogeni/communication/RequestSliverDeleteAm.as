@@ -41,10 +41,10 @@ package protogeni.communication
 					{
 						if(old.slivers.getByUrn(sliver.urn) != null)
 							old.slivers.removeItemAt(old.slivers.getItemIndex(old.slivers.getByUrn(sliver.urn)));
-						Main.geniHandler.dispatchSliceChanged(old);
+						Main.geniDispatcher.dispatchSliceChanged(old);
 					}
 				}
-				Main.geniHandler.dispatchSliceChanged(sliver.slice);
+				Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			}
 			catch(e:Error)
 			{

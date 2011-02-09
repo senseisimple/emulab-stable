@@ -26,9 +26,9 @@
 			{
 				user = u;
 				refresh();
-				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, refresh);
-				Main.geniHandler.addEventListener(GeniEvent.SLICE_CHANGED, refresh);
-				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, refresh);
+				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, refresh);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, refresh);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, refresh);
 			}
 			
 			public function refresh(junk:* = null):void

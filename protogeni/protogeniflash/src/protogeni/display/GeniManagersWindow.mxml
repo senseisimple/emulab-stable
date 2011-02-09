@@ -75,8 +75,8 @@
 			{
 				okButton.enabled = Main.geniHandler.GeniManagers.length > 0;
 				refreshList();
-				Main.geniHandler.addEventListener(GeniEvent.GENIMANAGER_CHANGED, Reset);
-				Main.geniHandler.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, refreshList);	
+				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, Reset);
+				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, refreshList);	
 			}
 			
 			public function refreshList(junk:* = null):void {
