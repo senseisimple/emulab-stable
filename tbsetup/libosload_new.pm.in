@@ -979,8 +979,8 @@ sub GetImageInfo($$$)
 	#
 	if ($imagesize == 0) {
 	    tberror "$imagepath is empty!";
-	    $imageinfo{$imageid} = 'BADIMAGE';
-	    return 0;
+	    $$rowrefptr = 'BADIMAGE';
+	    return -1;
 	}
     }
 
@@ -992,7 +992,7 @@ sub GetImageInfo($$$)
     # if allowed to pass: the image load will succeed, but the disk will be
     # unchanged, making it appear that os_load loaded the default image.
     #
-    if ($ssize == 0) {
+    if ($imagesize == 0) {
 	tberror "$imagepath is empty!";
 	$$rowrefptr = 'BADIMAGE';
 	return -1;
