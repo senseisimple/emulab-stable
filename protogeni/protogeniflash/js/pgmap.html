@@ -1,0 +1,255 @@
+<html>
+   <head>
+      <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/swfobject/2.2/swfobject.js"></script>
+      <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+      <script type="text/javascript" src="forge/debug.js"></script>
+      <script type="text/javascript" src="forge/util.js"></script>
+      <script type="text/javascript" src="forge/log.js"></script>
+      <script type="text/javascript" src="forge/socket.js"></script>
+      <script type="text/javascript" src="forge/md5.js"></script>
+      <script type="text/javascript" src="forge/sha1.js"></script>
+      <script type="text/javascript" src="forge/hmac.js"></script>
+      <script type="text/javascript" src="forge/aes.js"></script>
+      <script type="text/javascript" src="forge/asn1.js"></script>
+      <script type="text/javascript" src="forge/jsbn.js"></script>
+      <script type="text/javascript" src="forge/jsbn2.js"></script>
+      <script type="text/javascript" src="forge/prng.js"></script>
+      <script type="text/javascript" src="forge/random.js"></script>
+      <script type="text/javascript" src="forge/pki.js"></script>
+      <script type="text/javascript" src="forge/tls.js"></script>
+      <script type="text/javascript" src="forge/http.js"></script>
+      
+      <script type="text/javascript">
+      //<![CDATA[
+  // logging category
+  var cat = 'forge.tests.tls';
+
+  swfobject.embedSWF(
+     'forge/SocketPool.swf', 'socketPool', '0', '0', '9.0.0',
+     false, {}, {allowscriptaccess: 'always'}, {});
+      
+  // CA certificate for test server
+  var serverCert =
+'-----BEGIN CERTIFICATE-----\n'+
+'MIIFPjCCBKegAwIBAgIJAJaf8ncNNYH7MA0GCSqGSIb3DQEBBQUAMIHsMQswCQYD'+
+'VQQGEwJVUzENMAsGA1UECBMEVXRhaDElMCMGA1UEBxMcU2FsdCBMYWtlIENpdHkg'+
+'VmlydHVhbCBXb3JsZDEgMB4GA1UEChMXVXRhaCBOZXR3b3JrIEVsYWJJbkVsYWIx'+
+'HjAcBgNVBAsTFUNlcnRpZmljYXRlIEF1dGhvcml0eTEpMCcGA1UEAxMgbXlib3Nz'+
+'LmpvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXQxOjA4BgkqhkiG9w0BCQEWK3Rlc3Ri'+
+'ZWQtb3BzQG15b3BzLmpvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXQwHhcNMTAwNjIz'+
+'MTgxNDAzWhcNMTUxMjE0MTgxNDAzWjCB7DELMAkGA1UEBhMCVVMxDTALBgNVBAgT'+
+'BFV0YWgxJTAjBgNVBAcTHFNhbHQgTGFrZSBDaXR5IFZpcnR1YWwgV29ybGQxIDAe'+
+'BgNVBAoTF1V0YWggTmV0d29yayBFbGFiSW5FbGFiMR4wHAYDVQQLExVDZXJ0aWZp'+
+'Y2F0ZSBBdXRob3JpdHkxKTAnBgNVBAMTIG15Ym9zcy5qb25sYWIudGVzdGJlZC5l'+
+'bXVsYWIubmV0MTowOAYJKoZIhvcNAQkBFit0ZXN0YmVkLW9wc0BteW9wcy5qb25s'+
+'YWIudGVzdGJlZC5lbXVsYWIubmV0MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB'+
+'gQCsA9D3YRrIzek4uuhbMql+K+RD/dYbDCjLwHAaIqUeBKTp1XhZGd9fTvbPu+b6'+
+'QNV1eCRT5EDk/KxNpCw4uWdaQ92KotOYU7J3YWldVHrbBB0irrQcJ6klYuhsd7Md'+
+'uKELpfS1Ipn83G8yjIslvSjmvcqD9h6OaK67yYzwX28pyQIDAQABo4IB5DCCAeAw'+
+'HQYDVR0OBBYEFFDbfgmvrVdLtnlERvu4dMWN4DloMIIBIwYDVR0jBIIBGjCCARaA'+
+'FFDbfgmvrVdLtnlERvu4dMWN4DlooYHypIHvMIHsMQswCQYDVQQGEwJVUzENMAsG'+
+'A1UECBMEVXRhaDElMCMGA1UEBxMcU2FsdCBMYWtlIENpdHkgVmlydHVhbCBXb3Js'+
+'ZDEgMB4GA1UEChMXVXRhaCBOZXR3b3JrIEVsYWJJbkVsYWIxHjAcBgNVBAsTFUNl'+
+'cnRpZmljYXRlIEF1dGhvcml0eTEpMCcGA1UEAxMgbXlib3NzLmpvbmxhYi50ZXN0'+
+'YmVkLmVtdWxhYi5uZXQxOjA4BgkqhkiG9w0BCQEWK3Rlc3RiZWQtb3BzQG15b3Bz'+
+'LmpvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXSCCQCWn/J3DTWB+zAMBgNVHRMEBTAD'+
+'AQH/MEQGA1UdEQQ9MDuGOXVybjpwdWJsaWNpZDpJRE4ram9ubGFiLnRlc3RiZWQu'+
+'ZW11bGFiLm5ldCthdXRob3JpdHkrcm9vdDBEBgNVHRIEPTA7hjl1cm46cHVibGlj'+
+'aWQ6SUROK2pvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXQrYXV0aG9yaXR5K3Jvb3Qw'+
+'DQYJKoZIhvcNAQEFBQADgYEAWrw3lg5x2VeORqKeD1zw47t4nBs1+Y5I+Bs1INGq'+
+'kSRJZ99XzXfaEPm8ewzjgS3csIlpE7Mea1NzqVLiKS26963UNCHlOp4BmgNWj8Ml'+
+'ivbrFTNQ/NgnfpxgYsjfjZTKURD0qz/ufFxgKZubYkIyhTaJRmAXrKDA2vsICm8t'+
+'igc=\n'+
+'-----END CERTIFICATE-----\n';
+
+  var clientCert = '';
+  var clientKey = '';
+
+  var flash_id = "";
+
+  function getSWF()
+  {
+    if (navigator.appName.indexOf("Microsoft") != -1)
+    {
+      return window[flash_id];
+    }
+    else
+    {
+      return document[flash_id];
+    }
+  }
+
+  var sp;
+
+  function init(new_flash_id)
+  {
+    flash_id = new_flash_id;
+    sp = net.createSocketPool({
+      flashId: 'socketPool',
+      policyPort: 843,
+      msie: false
+    });
+  }
+
+  // local aliases
+  var net = window.forge.net;
+  var tls = window.forge.tls;
+  var http = window.forge.http;
+  var util = window.forge.util;
+
+  var clients = new Object();
+
+  function make_request(instance, host, path, sendData)
+  {
+    var newClient = client_init(host);
+    if (clients[instance] == null)
+    {
+      clients[instance] = newClient;
+      client_send(newClient, path, sendData, instance);
+    }
+  }
+
+  function cancel_request(instance)
+  {
+    var client = clients[instance];
+    if (client != null)
+    {
+      client_cleanup(client);
+      delete client[instance];
+      if (client[instance] != null)
+      {
+        forge.log.debug(cat, "instance not really deleted", "");
+      }
+    }
+    return false;
+  }
+
+  function setServerCert(newCert)
+  {
+    serverCert = newCert;
+  }
+
+  function setClientCert(newCert)
+  {
+    clientCert = newCert;
+  }
+
+  function setClientKey(newKey)
+  {
+    clientKey = newKey;
+  }
+
+  function client_init(host)
+  {
+    var result = null;
+    try
+    {
+       result = http.createClient({
+          url: host,
+          socketPool: sp,
+          connections: 1,
+          caStore: [serverCert],
+          // optional cipher suites in order of preference
+          cipherSuites: [
+             tls.CipherSuites.TLS_RSA_WITH_AES_128_CBC_SHA,
+             tls.CipherSuites.TLS_RSA_WITH_AES_256_CBC_SHA],
+          verify: function(c, verified, depth, certs)
+          {
+             forge.log.debug(cat,
+                'TLS certificate ' + depth + ' verified', verified);
+             // Note: change to always true to test verifying without cert
+             //return verified;
+             // FIXME: temporarily accept any cert to allow hitting any bpe
+             if(verified !== true)
+             {
+                forge.log.warning(cat, 
+                   'Certificate NOT verified. Ignored for test.');
+             }
+             return true;
+          },
+          primeTlsSockets: false,
+          getCertificate : function(c, request) { return clientCert; },
+          getPrivateKey : function(c, cert) { return clientKey; }
+       });
+    }
+    catch(ex)
+    {
+       forge.log.error(cat, ex);
+    }
+
+    return result;
+  }
+      
+  function client_cleanup(client)
+  {
+    client.destroy();
+  }
+
+  function client_send(client, path, data, instance)
+  {
+     var request = http.createRequest({
+        method: 'POST',
+        path: path,
+        headers: [{'Content-Type': 'text/xml'}],
+        body: data
+     });
+     client.send({
+        request: request,
+        connected: function(e)
+        {
+//             forge.log.debug(cat, 'connected', e);
+        },
+        headerReady: function(e)
+        {
+//             forge.log.debug(cat, 'header ready', e);
+        },
+        bodyReady: function(e)
+        {
+           var response = e.response.body;
+           e.socket.close();
+           getSWF().flash_onbody(instance, response);
+        },
+        error: function(e)
+        {
+           var response = e.type + ": " + e.message;
+           e.socket.close();
+           getSWF().flash_onerror(instance, response);
+        }
+     });
+     return false;
+  }
+
+      //]]>
+      </script>
+   </head>
+   <body>
+
+      <div id="socketPool">
+         <p>Could not load the flash SocketPool.</p>
+      </div>
+
+<center>
+<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
+	id="pgmap" width="900" height="600" align="middle"
+	codebase="http://fpdownload.macromedia.com/get/flashplayer/current/swflash.cab">
+  <param name="movie" value="http://boss.emulab.net/pgmap-test.swf?mode=authenticate" />
+  <param name="quality" value="high" />
+  <param name="bgcolor" value="#d2e1f0" />
+  <param name="allowScriptAccess" value="always" />
+  <param name="allowFullScreen" value="true" /> 
+  <embed src="http://boss.emulab.net/pgmap-test.swf?mode=authenticate" bgcolor="#d2e1f0"
+	 width="900" height="600" align="middle"
+	 name="pgmap"
+	 play="true"
+	 loop="false"
+	 quality="high"
+	 allowScriptAccess="always"
+         allowFullScreen="true"
+	 type="application/x-shockwave-flash"
+	 pluginspage="http://www.adobe.com/go/getflashplayer">
+    </embed>
+</object>
+</center>
+
+   </body>
+</html>
