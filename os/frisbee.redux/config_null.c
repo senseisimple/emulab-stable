@@ -98,7 +98,7 @@ set_get_options(struct config_host_authinfo *ai, int ix)
 	char str[256];
 
 	strcpy(str, "");
-	strcat(str, " -W 54000000 -K 15");
+	strcat(str, " -W 100000000 -K 15");
 
 	/*
 	 * We use a small server inactive timeout since we no longer have
