@@ -55,7 +55,7 @@ package protogeni.communication
 			
 			sliver.created = true;
 			sliver.parseRspec();
-			Main.geniHandler.dispatchSliceChanged(sliver.slice);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 			return new RequestSliverStatusAm(sliver);
 			
 		} catch(e:Error)

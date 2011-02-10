@@ -101,7 +101,7 @@ package protogeni.communication
 		tail = newTail;
 		
 		if(pushEvents)
-			Main.geniHandler.dispatchQueueChanged();
+			Main.geniDispatcher.dispatchQueueChanged();
     }
 	
 	public function working():Boolean
@@ -170,7 +170,7 @@ package protogeni.communication
 			nextRequest = head.next;
         head = head.next;
 		if(pushEvents)
-			Main.geniHandler.dispatchQueueChanged();
+			Main.geniDispatcher.dispatchQueueChanged();
       }
       if (head == null)
       {
@@ -220,7 +220,7 @@ package protogeni.communication
 			}
 		}
 		if(pushEvents)
-			Main.geniHandler.dispatchQueueChanged();
+			Main.geniDispatcher.dispatchQueueChanged();
 	}
 
     public var head:RequestQueueNode;

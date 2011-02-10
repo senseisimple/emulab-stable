@@ -28,12 +28,6 @@ package protogeni.communication
           startSlices = shouldStartSlices;
     }
 
-        override public function start():Operation
-        {
-                op.addField("credential", Main.geniHandler.CurrentUser.credential);
-                return op;
-        }
-
         // Should return Request or RequestQueueNode
         override public function complete(code : Number, response : Object) : *
         {
@@ -74,9 +68,9 @@ package protogeni.communication
                                         else if(newGm is ComponentManager)
                                                 newCalls.push(new RequestGetVersion(newGm as ComponentManager));
                                 }
-                                Main.geniHandler.dispatchGeniManagerChanged(newGm);
+                                Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
                         }
-                        /*
+/*
                         var planetLabAm:PlanetLabAggregateManager = new PlanetLabAggregateManager();
                         planetLabAm.Url = "https://planet-lab.org:12346";
                         planetLabAm.Hrn = "planet-lab.am";
@@ -84,8 +78,8 @@ package protogeni.communication
                         Main.geniHandler.GeniManagers.add(planetLabAm);
                         planetLabAm.Status = GeniManager.INPROGRESS;
                         newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
-                        Main.geniHandler.dispatchGeniManagerChanged(planetLabAm);
-                        */
+                        Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
+*/
                         if(startSlices)
                                 newCalls.push(new RequestUserResolve());
                 }

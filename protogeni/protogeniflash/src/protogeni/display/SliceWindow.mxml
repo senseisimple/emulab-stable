@@ -85,8 +85,8 @@
 			
 			public function init():void
 			{
-				Main.geniHandler.addEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
-				Main.geniHandler.addEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
+				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
 			}
 			
 			public function sliceChanged(e:GeniEvent):void

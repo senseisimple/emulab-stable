@@ -31,7 +31,7 @@ package protogeni.communication
 			Main.geniHandler.CurrentUser.credential = String(response.value);
 			var cred:XML = new XML(response.value);
 			Main.geniHandler.CurrentUser.urn = cred.credential.owner_urn;
-			Main.geniHandler.dispatchUserChanged();
+			Main.geniDispatcher.dispatchUserChanged();
 		}
 		else
 		{

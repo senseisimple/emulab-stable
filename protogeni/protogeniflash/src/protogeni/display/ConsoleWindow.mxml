@@ -72,8 +72,8 @@
 			public function init():void
 			{
 				clear();
-				Main.geniHandler.addEventListener(GeniEvent.QUEUE_CHANGED, resetQueueView);
-				Main.geniHandler.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, loadGeniManagers);
+				Main.geniDispatcher.addEventListener(GeniEvent.QUEUE_CHANGED, resetQueueView);
+				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, loadGeniManagers);
 			}
 			
 			public function setStatus(s:String, isError:Boolean):void
@@ -183,7 +183,7 @@
 				removeButton.addEventListener(MouseEvent.CLICK,
 					function remove(e:MouseEvent):void
 					{
-						Main.geniHandler.requestHandler.remove(e.currentTarget.data);
+						Main.geniHandler.requestHandler.remove(e.currentTarget.data.item);
 						/*
 						Alert.show("Really remove '" + e.currentTarget.data.item.name + "' from the queue?", "Remove?", Alert.YES|Alert.NO, Main.Application(),
 						function removeRequest(e:CloseEvent):void

@@ -40,8 +40,8 @@ package protogeni.communication
 			//sliver.parseRspec();
 			// update existing?
 			
-			Main.geniHandler.dispatchSliceChanged(sliver.slice);
-			Main.geniHandler.dispatchSliceChanged(sliver.slice);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 		}
 		else
 		{

@@ -15,7 +15,7 @@ package protogeni.resources
 		public function add(s:Slice):void
 		{
 			this.addItem(s);
-			Main.geniHandler.dispatchSlicesChanged();
+			Main.geniDispatcher.dispatchSlicesChanged();
 		}
 		
 		public function getByUrn(urn:String):Slice

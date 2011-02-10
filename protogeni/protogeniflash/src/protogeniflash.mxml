@@ -50,6 +50,7 @@
 
                         import com.mattism.http.xmlrpc.JSLoader;
 			
+			import protogeni.GeniDispatcher;
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.Util;
@@ -102,11 +103,12 @@
 			}
 			
 			private function init():void {
+				Main.geniDispatcher = new GeniDispatcher();
 				
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
-				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
-				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
+				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
 				
 				// Default behavior (public)
 				allowAuthenticate = true;
@@ -197,8 +199,8 @@
 			{
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
-				Main.geniHandler.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
-				Main.geniHandler.addEventListener(GeniEvent.USER_CHANGED, userChanged);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
+				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
 				loadParams();
 				loadLocalData();
 				// Override the params
