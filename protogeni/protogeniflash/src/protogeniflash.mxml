@@ -47,6 +47,8 @@
 			import mx.managers.PopUpManager;
 			import mx.managers.ToolTipManager;
 			import mx.rpc.events.ResultEvent;
+
+                        import com.mattism.http.xmlrpc.JSLoader;
 			
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
@@ -172,18 +174,21 @@
 			private function certBundleResult(e:Event):void
 			{
 				Main.certBundle = e.target.data;
+			        JSLoader.setServerCertificate(Main.certBundle);
 				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", Main.certBundle, false, LogMessage.TYPE_END));
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function securityErrorHandler(event:SecurityErrorEvent):void {
 				Main.certBundle = (new FallbackCertBundle()).toString();
+			        JSLoader.setServerCertificate(Main.certBundle);
 				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function ioErrorHandler(event:IOErrorEvent):void {
 				Main.certBundle = (new FallbackCertBundle()).toString();
+			        JSLoader.setServerCertificate(Main.certBundle);
 				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}

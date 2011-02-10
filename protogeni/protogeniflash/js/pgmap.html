@@ -18,7 +18,7 @@
       <script type="text/javascript" src="forge/pki.js"></script>
       <script type="text/javascript" src="forge/tls.js"></script>
       <script type="text/javascript" src="forge/http.js"></script>
-      
+
       <script type="text/javascript">
       //<![CDATA[
   // logging category
@@ -27,41 +27,9 @@
   swfobject.embedSWF(
      'forge/SocketPool.swf', 'socketPool', '0', '0', '9.0.0',
      false, {}, {allowscriptaccess: 'always'}, {});
-      
-  // CA certificate for test server
-  var serverCert =
-'-----BEGIN CERTIFICATE-----\n'+
-'MIIFPjCCBKegAwIBAgIJAJaf8ncNNYH7MA0GCSqGSIb3DQEBBQUAMIHsMQswCQYD'+
-'VQQGEwJVUzENMAsGA1UECBMEVXRhaDElMCMGA1UEBxMcU2FsdCBMYWtlIENpdHkg'+
-'VmlydHVhbCBXb3JsZDEgMB4GA1UEChMXVXRhaCBOZXR3b3JrIEVsYWJJbkVsYWIx'+
-'HjAcBgNVBAsTFUNlcnRpZmljYXRlIEF1dGhvcml0eTEpMCcGA1UEAxMgbXlib3Nz'+
-'LmpvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXQxOjA4BgkqhkiG9w0BCQEWK3Rlc3Ri'+
-'ZWQtb3BzQG15b3BzLmpvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXQwHhcNMTAwNjIz'+
-'MTgxNDAzWhcNMTUxMjE0MTgxNDAzWjCB7DELMAkGA1UEBhMCVVMxDTALBgNVBAgT'+
-'BFV0YWgxJTAjBgNVBAcTHFNhbHQgTGFrZSBDaXR5IFZpcnR1YWwgV29ybGQxIDAe'+
-'BgNVBAoTF1V0YWggTmV0d29yayBFbGFiSW5FbGFiMR4wHAYDVQQLExVDZXJ0aWZp'+
-'Y2F0ZSBBdXRob3JpdHkxKTAnBgNVBAMTIG15Ym9zcy5qb25sYWIudGVzdGJlZC5l'+
-'bXVsYWIubmV0MTowOAYJKoZIhvcNAQkBFit0ZXN0YmVkLW9wc0BteW9wcy5qb25s'+
-'YWIudGVzdGJlZC5lbXVsYWIubmV0MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKB'+
-'gQCsA9D3YRrIzek4uuhbMql+K+RD/dYbDCjLwHAaIqUeBKTp1XhZGd9fTvbPu+b6'+
-'QNV1eCRT5EDk/KxNpCw4uWdaQ92KotOYU7J3YWldVHrbBB0irrQcJ6klYuhsd7Md'+
-'uKELpfS1Ipn83G8yjIslvSjmvcqD9h6OaK67yYzwX28pyQIDAQABo4IB5DCCAeAw'+
-'HQYDVR0OBBYEFFDbfgmvrVdLtnlERvu4dMWN4DloMIIBIwYDVR0jBIIBGjCCARaA'+
-'FFDbfgmvrVdLtnlERvu4dMWN4DlooYHypIHvMIHsMQswCQYDVQQGEwJVUzENMAsG'+
-'A1UECBMEVXRhaDElMCMGA1UEBxMcU2FsdCBMYWtlIENpdHkgVmlydHVhbCBXb3Js'+
-'ZDEgMB4GA1UEChMXVXRhaCBOZXR3b3JrIEVsYWJJbkVsYWIxHjAcBgNVBAsTFUNl'+
-'cnRpZmljYXRlIEF1dGhvcml0eTEpMCcGA1UEAxMgbXlib3NzLmpvbmxhYi50ZXN0'+
-'YmVkLmVtdWxhYi5uZXQxOjA4BgkqhkiG9w0BCQEWK3Rlc3RiZWQtb3BzQG15b3Bz'+
-'LmpvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXSCCQCWn/J3DTWB+zAMBgNVHRMEBTAD'+
-'AQH/MEQGA1UdEQQ9MDuGOXVybjpwdWJsaWNpZDpJRE4ram9ubGFiLnRlc3RiZWQu'+
-'ZW11bGFiLm5ldCthdXRob3JpdHkrcm9vdDBEBgNVHRIEPTA7hjl1cm46cHVibGlj'+
-'aWQ6SUROK2pvbmxhYi50ZXN0YmVkLmVtdWxhYi5uZXQrYXV0aG9yaXR5K3Jvb3Qw'+
-'DQYJKoZIhvcNAQEFBQADgYEAWrw3lg5x2VeORqKeD1zw47t4nBs1+Y5I+Bs1INGq'+
-'kSRJZ99XzXfaEPm8ewzjgS3csIlpE7Mea1NzqVLiKS26963UNCHlOp4BmgNWj8Ml'+
-'ivbrFTNQ/NgnfpxgYsjfjZTKURD0qz/ufFxgKZubYkIyhTaJRmAXrKDA2vsICm8t'+
-'igc=\n'+
-'-----END CERTIFICATE-----\n';
 
+  // CA certificate for test server
+  var serverCert = '';
   var clientCert = '';
   var clientKey = '';
 
@@ -126,6 +94,7 @@
 
   function setServerCert(newCert)
   {
+    forge.log.debug(cat, "setServerCert", "");
     serverCert = newCert;
   }
 
@@ -162,7 +131,7 @@
              // FIXME: temporarily accept any cert to allow hitting any bpe
              if(verified !== true)
              {
-                forge.log.warning(cat, 
+                forge.log.warning(cat,
                    'Certificate NOT verified. Ignored for test.');
              }
              return true;
@@ -179,7 +148,7 @@
 
     return result;
   }
-      
+
   function client_cleanup(client)
   {
     client.destroy();
@@ -230,23 +199,23 @@
 
 <center>
 <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
-	id="pgmap" width="900" height="600" align="middle"
-	codebase="http://fpdownload.macromedia.com/get/flashplayer/current/swflash.cab">
+        id="pgmap" width="900" height="600" align="middle"
+        codebase="http://fpdownload.macromedia.com/get/flashplayer/current/swflash.cab">
   <param name="movie" value="http://boss.emulab.net/pgmap-test.swf?mode=authenticate" />
   <param name="quality" value="high" />
   <param name="bgcolor" value="#d2e1f0" />
   <param name="allowScriptAccess" value="always" />
-  <param name="allowFullScreen" value="true" /> 
+  <param name="allowFullScreen" value="true" />
   <embed src="http://boss.emulab.net/pgmap-test.swf?mode=authenticate" bgcolor="#d2e1f0"
-	 width="900" height="600" align="middle"
-	 name="pgmap"
-	 play="true"
-	 loop="false"
-	 quality="high"
-	 allowScriptAccess="always"
+         width="900" height="600" align="middle"
+         name="pgmap"
+         play="true"
+         loop="false"
+         quality="high"
+         allowScriptAccess="always"
          allowFullScreen="true"
-	 type="application/x-shockwave-flash"
-	 pluginspage="http://www.adobe.com/go/getflashplayer">
+         type="application/x-shockwave-flash"
+         pluginspage="http://www.adobe.com/go/getflashplayer">
     </embed>
 </object>
 </center>

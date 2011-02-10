@@ -20,6 +20,11 @@ package com.mattism.http.xmlrpc
 
   public class JSLoader extends EventDispatcher
   {
+    public static function setServerCertificate(newCert : String) : void
+    {
+        ExternalInterface.call("setServerCert", newCert);
+    }
+
     public static function setClientInfo(password : String,
                                          pem : String) : void
     {
