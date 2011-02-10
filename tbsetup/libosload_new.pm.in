@@ -970,7 +970,8 @@ sub GetImageInfo($$$)
 	}
     }
     else {
-	$imagesize = stat($imagepath)->size;
+	(undef,undef,undef,undef,undef,undef,undef,$imagesize,
+	 undef,undef,undef,undef,undef) = stat($imagepath);
 
 	#
 	# A zero-length image cannot be right and will result in much confusion
