@@ -492,6 +492,7 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	uint64_t isize;
 	int rv, methods, wantstatus;
 	int getfromparent;
+	GetReply reply;
 	char *op;
 
 	/*
@@ -540,11 +541,9 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 */
 	if (mirrormode) {
 		struct in_addr pif;
-		GetReply reply;
 		in_addr_t authip;
 
 		authip = usechildauth ? ntohl(host.s_addr) : 0;
-
 		if (!ClientNetFindServer(ntohl(parentip.s_addr),
 					 parentport, authip, imageid,
 					 methods, 1, 5,
@@ -552,6 +551,8 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			reply.error = MS_ERROR_NOIMAGE;
 		if (reply.error) {
 			msg->body.getreply.error = reply.error;
+			log("%s: client %s authentication with parent failed: %s",
+			    imageid, clientip, GetMSError(reply.error));
 			goto reply;
 		}
 	}
@@ -635,53 +636,31 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 		 * We only do this for mirror mode.
 		 */
 		if (mirrormode) {
-			GetReply r;
+			log("%s: have local copy", imageid);
 
-			log("%s: have local copy, GETSTATUS from parent",
-			    imageid, op);
-
-			rv = fetch_parent(&sip->sin_addr, &host,
-					  &parentip, parentport, ii, 1, &r);
 			/*
-			 * If our parent returns failure for any reason
-			 * and we are mirroring, then we propogate the error
-			 * to our client.  Otherwise, we use the local copy
-			 * under the assumption that this is a strictly
-			 * local image and any overlap with the parent is
-			 * strictly coincidental.
-			 *
-			 * XXX this latter assumption is dubious; may need
-			 * to revisit or make the behavior explicit.
-			 */
-			if (rv) {
-				log("%s: failed getting parent status: %s, %s",
-				    imageid, GetMSError(rv),
-				    (mirrormode ?
-				     "failing" : "using local copy"));
-				if (mirrormode) {
-					msg->body.getreply.error = rv;
-					goto reply;
-				}
-			}
-			/*
-			 * Signature is out of date, fetch from our parent.
-			 * Return the attributes we got via the check above.
+			 * See if the signature is out of date.
+			 * Since this is mirror mode, we can use the status
+			 * info we got from the earlier call.
 			 *
 			 * XXX need checks for other signature types.
 			 */
-			if (rv == 0 &&
-			    (r.sigtype == MS_SIGTYPE_MTIME &&
-			     *(time_t *)r.signature > sb.st_mtime)) {
-				msg->body.getreply.sigtype = htons(r.sigtype);
-				if (r.sigtype == MS_SIGTYPE_MTIME) {
+			if ((reply.sigtype == MS_SIGTYPE_MTIME &&
+			     *(time_t *)reply.signature > sb.st_mtime)) {
+				msg->body.getreply.sigtype =
+					htons(reply.sigtype);
+				if (reply.sigtype == MS_SIGTYPE_MTIME) {
 					uint32_t mt;
-					mt = *(uint32_t *)r.signature;
-					*(uint32_t *)r.signature = htonl(mt);
+					mt = *(uint32_t *)reply.signature;
+					*(uint32_t *)reply.signature =
+						htonl(mt);
 				}
 				memcpy(msg->body.getreply.signature,
-				       r.signature, MS_MAXSIGLEN);
-				msg->body.getreply.hisize = htonl(r.hisize);
-				msg->body.getreply.losize = htonl(r.losize);
+				       reply.signature, MS_MAXSIGLEN);
+				msg->body.getreply.hisize =
+					htonl(reply.hisize);
+				msg->body.getreply.losize =
+					htonl(reply.losize);
 
 				if (wantstatus)
 					goto reply;
@@ -692,37 +671,41 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 			}
 		}
 	} else if (fetchfromabove) {
-		GetReply r;
-
 		log("%s: no local copy, %s from parent", imageid, op);
 
 		/*
 		 * We don't have the image, but we have a parent,
-		 * request the status as we did above. Any error is reflected
-		 * to our caller.
+		 * request the status as we did above. Again, in mirrormode,
+		 * we have already fetched the status so no additional call
+		 * is needed.
+		 *
+		 * Any error is reflected to our caller.
 		 */
-		rv = fetch_parent(&sip->sin_addr, &host,
-				  &parentip, parentport, ii, 1, &r);
-		if (rv) {
-			log("%s: failed getting parent status: %s, failing",
-			    imageid, GetMSError(rv));
-			msg->body.getreply.error = rv;
-			goto reply;
+		if (!mirrormode) {
+			rv = fetch_parent(&sip->sin_addr, &host, &parentip,
+					  parentport, ii, 1, &reply);
+			if (rv) {
+				log("%s: failed getting parent status: %s, "
+				    "failing",
+				    imageid, GetMSError(rv));
+				msg->body.getreply.error = rv;
+				goto reply;
+			}
 		}
 		/*
 		 * And we must always fetch from the parent.
 		 * Return the attributes we got via the check above.
 		 */
-		msg->body.getreply.sigtype = htons(r.sigtype);
-		if (r.sigtype == MS_SIGTYPE_MTIME) {
+		msg->body.getreply.sigtype = htons(reply.sigtype);
+		if (reply.sigtype == MS_SIGTYPE_MTIME) {
 			uint32_t mt;
-			mt = *(uint32_t *)r.signature;
-			*(uint32_t *)r.signature = htonl(mt);
+			mt = *(uint32_t *)reply.signature;
+			*(uint32_t *)reply.signature = htonl(mt);
 		}
-		memcpy(msg->body.getreply.signature, r.signature,
+		memcpy(msg->body.getreply.signature, reply.signature,
 		       MS_MAXSIGLEN);
-		msg->body.getreply.hisize = htonl(r.hisize);
-		msg->body.getreply.losize = htonl(r.losize);
+		msg->body.getreply.hisize = htonl(reply.hisize);
+		msg->body.getreply.losize = htonl(reply.losize);
 
 		if (wantstatus)
 			goto reply;
@@ -743,25 +726,23 @@ handle_get(int sock, struct sockaddr_in *sip, struct sockaddr_in *cip,
 	 * attempt to fetch from our parent.
 	 */
 	if (getfromparent) {
-		GetReply r;
-
 		rv = fetch_parent(&sip->sin_addr, &host,
-				  &parentip, parentport, ii, 0, &r);
+				  &parentip, parentport, ii, 0, &reply);
 		/*
 		 * Redirecting to parent.
 		 * Can only do this if our parents method is compatible
 		 * with the client's request.
 		 */
 		if (rv == 0) {
-			if ((r.method & methods) != 0) {
-				msg->body.getreply.method = r.method;
+			if ((reply.method & methods) != 0) {
+				msg->body.getreply.method = reply.method;
 				msg->body.getreply.isrunning = 1;
 				msg->body.getreply.servaddr =
-					htonl(r.servaddr);
+					htonl(reply.servaddr);
 				msg->body.getreply.addr =
-					htonl(r.addr);
+					htonl(reply.addr);
 				msg->body.getreply.port =
-					htons(r.port);
+					htons(reply.port);
 				log("%s: redirecting %s to our parent",
 				    imageid, clientip);
 				goto reply;
