@@ -256,7 +256,8 @@ if ($opt{m} || $opt{o}) {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
     }
 }
-if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X} || $opt{A} || $opt{C}) {
+if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X} ||
+    $opt{A} || ($opt{C} && !$opt{o})) {
     #
     # Options that take 'pid eid'
     #
