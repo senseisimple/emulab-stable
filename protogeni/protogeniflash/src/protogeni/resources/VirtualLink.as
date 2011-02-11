@@ -195,56 +195,5 @@
 			}
 			return false;
 		}
-		
-		public function getXml():XML
-		{
-			var result : XML = <link />;
-			result.@virtual_id = id;
-			
-			if (!isTunnel())
-				result.appendChild(XML("<bandwidth>" + bandwidth + "</bandwidth>"));
-			
-			if (slivers[0].manager.Version >= 3)
-			{
-				var link_type:XML = <link_type />;
-				link_type.@name = "GRE";
-				var key:XML = <field />;
-				key.@key = "key";
-				key.@value = "0";
-				var ttl:XML = <field />;
-				ttl.@key = "ttl";
-				ttl.@value = "0";
-				link_type.appendChild(key);
-				link_type.appendChild(ttl);
-				result.appendChild(link_type);
-			}
-			else
-			{
-				if (isTunnel())
-				{
-					result.@link_type = "tunnel";
-				}
-				else
-					result.@link_type = "ethernet";
-			}
-			
-			for each (var current:VirtualInterface in interfaces)
-			{
-				var interfaceRefXml:XML = <interface_ref />;
-				interfaceRefXml.@virtual_node_id = current.virtualNode.id;
-				if (isTunnel())
-				{
-					interfaceRefXml.@tunnel_ip = current.ip;
-					interfaceRefXml.@virtual_interface_id = "control";
-				}
-				else
-				{
-					interfaceRefXml.@virtual_interface_id = current.id;
-				}
-				result.appendChild(interfaceRefXml);
-			}
-
-			return result;
-		}
 	}
 }

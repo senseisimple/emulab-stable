@@ -24,7 +24,7 @@ package protogeni.display.mapping
 	import mx.events.FlexEvent;
 	
 	import protogeni.Util;
-	import protogeni.resources.ComponentManager;
+	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;

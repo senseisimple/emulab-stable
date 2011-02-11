@@ -192,15 +192,6 @@
 				}
 				
 			}
-			
-			public function previewRspec():void
-			{
-				var rspecWindow:XmlWindow = new XmlWindow;
-				PopUpManager.addPopUp(rspecWindow, Main.Application() as DisplayObject, false);
-				PopUpManager.centerPopUp(rspecWindow);
-				rspecWindow.title = "Preview RSPEC for " + node.id;
-				rspecWindow.loadXml(node.getXml());
-			}
 		]]>
 	</fx:Script>
 	
@@ -220,10 +211,6 @@
 										 source="{DisplayUtil.pageWhiteIcon}"
 										 click="viewRspec()"
 										 toolTip="View the most recent valid RSPEC" />
-					<display:ImageButton id="previewRspecButton"
-										 source="{DisplayUtil.pageCodeIcon}"
-										 click="previewRspec()"
-										 toolTip="Preview the Request RSPEC" />
 				</s:HGroup>
 			</mx:GridItem>
 		</mx:GridRow>

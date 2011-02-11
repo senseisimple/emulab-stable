@@ -24,7 +24,7 @@ package protogeni.communication
   
   import protogeni.Util;
   import protogeni.resources.AggregateManager;
-  import protogeni.resources.ComponentManager;
+  import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.GeniManager;
 
   public class RequestListResourcesAm extends Request
@@ -52,7 +52,7 @@ package protogeni.communication
 			var decodedRspec:String = bytes.toString();
 			
 			am.Rspec = new XML(decodedRspec);
-			am.processRspec(cleanup);
+			am.rspecProcessor.processResourceRspec(cleanup);
 		} catch(e:Error)
 		{
 			//am.errorMessage = response;

@@ -45,6 +45,11 @@
 				Security.loadPolicyFile(baseUrl + "/crossdomain.xml");
 		}
 	}
+	
+	public static function setCertBundle(c:String):void
+	{
+		certBundle = c;
+	}
 
 	[Bindable]
 	public static var geniHandler:GeniHandler;
@@ -52,5 +57,6 @@
 	public static var log : LogRoot = null;
 	private static var visitedSites:Dictionary = new Dictionary();
 	public static var certBundle:String;
+	public static var debugMode:Boolean = false;
   }
 }

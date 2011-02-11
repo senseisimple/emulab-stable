@@ -97,6 +97,8 @@ package protogeni.communication
 	public static var sliverStatusAm : Array = new Array(am, "SliverStatus");
 	public static var renewSliverAm : Array = new Array(am, "RenewSliver");
 	public static var shutdownAm : Array = new Array(am, "Shutdown");
+	// PL
+	public static var resolvePl : Array = new Array(am, "Resolve");
 	// Ticket
     public static var getTicket : Array = new Array(cm, "GetTicket");
     public static var updateTicket : Array = new Array(cm, "UpdateTicket");

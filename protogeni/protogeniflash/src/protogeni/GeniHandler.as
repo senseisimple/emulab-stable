@@ -28,7 +28,7 @@
 	import protogeni.communication.RequestListComponents;
 	import protogeni.display.DisplayUtil;
 	import protogeni.display.mapping.GeniMapHandler;
-	import protogeni.resources.ComponentManager;
+	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.GeniManagerCollection;
 	import protogeni.resources.PhysicalLink;

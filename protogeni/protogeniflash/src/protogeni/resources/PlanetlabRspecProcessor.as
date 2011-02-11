@@ -5,17 +5,21 @@ package protogeni.resources
 	import flash.xml.XMLNode;
 	
 	import mx.collections.ArrayCollection;
+	import mx.collections.ArrayList;
 	import mx.controls.Alert;
+	import mx.events.Request;
+	
+	import protogeni.communication.RequestResolvePl;
 	
 
-	public class PlanetLabAdParser implements AdParserInterface
+	public class PlanetlabRspecProcessor implements RspecProcessorInterface
 	{
-		public function PlanetLabAdParser(newGm:PlanetLabAggregateManager)
+		public function PlanetlabRspecProcessor(newGm:PlanetlabAggregateManager)
 		{
 			gm = newGm;
 		}
 		
-		private var gm:PlanetLabAggregateManager;
+		private var gm:PlanetlabAggregateManager;
 		
 		private static var PARSE : int = 0;
 		private static var DONE : int = 1;
@@ -27,7 +31,7 @@ package protogeni.resources
 		private var myState:int = PARSE;
 		private var sites:XMLList;
 		
-		public function processRspec(afterCompletion : Function):void {
+		public function processResourceRspec(afterCompletion : Function):void {
 			Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC", false);
 			
 			if (gm.Rspec.@type != "SFA")
@@ -63,6 +67,13 @@ package protogeni.resources
 				gm.Status = GeniManager.VALID;
 				Main.geniDispatcher.dispatchGeniManagerChanged(gm);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
+				
+				/*
+				var r:RequestResolvePl = new RequestResolvePl(gm);
+				r.forceNext = true;
+				Main.geniHandler.requestHandler.pushRequest(r);
+				*/
+				
 				myAfter();
 			}
 			else
@@ -104,11 +115,15 @@ package protogeni.resources
 							case "hostname":
 								node.hostname = tx.toString();
 								break;
+							case "urn":
+								node.urn = tx.toString();
+								break;
 							default:
 						}
 					}
 					node.rspec = p.copy();
 					node.manager = gm;
+					node.tag = site;
 					node.available = true;
 					node.exclusive = false;
 					processedNodes++;
@@ -117,6 +132,43 @@ package protogeni.resources
 				}
 				myIndex++;
 			}
+		}
+		
+		public function processSliverRspec(s:Sliver):void
+		{
+		}
+		
+		public function generateSliverRspec(s:Sliver):XML
+		{
+			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
+				+ "<RSpec type=\"SFA\" />");
+			var networkXml:XML = new XML("<network name=\""+gm.networkName+"\" />");
+			
+			var requestSites:ArrayCollection = new ArrayCollection();
+			var requestSitesDic:Dictionary = new Dictionary();
+			for each(var vn:VirtualNode in s.nodes) {
+				var newRequestSite:Object = requestSitesDic[vn.physicalNode.tag.id];
+				if(newRequestSite == null) {
+					newRequestSite = new Object();
+					newRequestSite.nodes = new ArrayCollection();
+					newRequestSite.site = vn.physicalNode.tag;
+					requestSites.addItem(newRequestSite);
+					requestSitesDic[vn.physicalNode.tag.id] = newRequestSite;
+				}
+				newRequestSite.nodes.addItem(vn);
+			}
+			for each(var requestSite:Object in requestSites) {
+				var siteXml:XML = new XML("<site id=\""+requestSite.site.id+"\"><name>"+requestSite.site.name+"</name></site>");
+				for each(var addvn:VirtualNode in requestSite.nodes) {
+					var nodeXml:XML = addvn.physicalNode.rspec.copy();
+					nodeXml.appendChild(<sliver/>);
+					siteXml.appendChild(nodeXml);
+				} 
+				networkXml.appendChild(siteXml);
+			}
+			
+			requestRspec.appendChild(networkXml);
+			return requestRspec;
 		}
 	}
 }

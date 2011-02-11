@@ -14,17 +14,17 @@
  
  package protogeni.resources
 {
-	public class ComponentManager extends GeniManager
+	public class ProtogeniComponentManager extends GeniManager
 	{
 		public static var LEVEL_MINIMAL:int = 0;
 		public static var LEVEL_FULL:int = 1;
 		
 		public var Level:int;
 	    
-		public function ComponentManager()
+		public function ProtogeniComponentManager()
 		{
 			super();
-			adParser = new ProtogeniAdParser(this);
+			this.rspecProcessor = new ProtogeniRspecProcessor(this);
 		}
 	}
 }

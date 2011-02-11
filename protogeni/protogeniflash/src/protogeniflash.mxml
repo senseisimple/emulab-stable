@@ -98,6 +98,16 @@
 					}
 				} catch(all:Error) {
 				}
+				
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.debug != null)
+					{
+						Main.debugMode = FlexGlobals.topLevelApplication.parameters.debug == "1";
+					}
+				} catch(all:Error) {
+					var s:String = all.toString();
+					trace(s);
+				}
 			}
 			
 			private function init():void {
@@ -126,17 +136,18 @@
 							}
 						});
 				}
-				loadLocalData();
+				loadLocalUserData();
 				
 				console = new protogeni.display.ConsoleWindow();
-				PopUpManager.addPopUp(console, this, false);
-				PopUpManager.centerPopUp(console);
-				PopUpManager.removePopUp(console);
+				console.showWindow();
+				if(!Main.debugMode)
+					console.closeWindow();
 				Main.log = console;
 				
 				cms = new protogeni.display.GeniManagersWindow();
 				cms.openFirst();
-				cms.closeWindow();
+				if(!Main.debugMode)
+					cms.closeWindow();
 				
 				search = new protogeni.display.SearchWindow();
 				search.showWindow();
@@ -173,20 +184,28 @@
 			
 			private function certBundleResult(e:Event):void
 			{
-				Main.certBundle = e.target.data;
+				Main.setCertBundle(e.target.data);
 				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", Main.certBundle, false, LogMessage.TYPE_END));
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function securityErrorHandler(event:SecurityErrorEvent):void {
-				Main.certBundle = (new FallbackCertBundle()).toString();
-				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
+				loadLocalBundleData();
+				if(Main.certBundle == null || Main.certBundle.length == 0) {
+					Main.setCertBundle((new FallbackCertBundle()).toString());
+					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
+				} else
+					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using locally saved cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function ioErrorHandler(event:IOErrorEvent):void {
-				Main.certBundle = (new FallbackCertBundle()).toString();
-				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
+				loadLocalBundleData();
+				if(Main.certBundle == null || Main.certBundle.length == 0) {
+					Main.setCertBundle((new FallbackCertBundle()).toString());
+					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using built-in cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
+				} else
+					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using locally saved cert bundle...\n" + Main.certBundle, true, LogMessage.TYPE_END));
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
@@ -197,7 +216,7 @@
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
 				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
 				loadParams();
-				loadLocalData();
+				loadLocalUserData();
 				// Override the params
 				Main.geniHandler.unauthenticatedMode = !authenticateUser;
 				
@@ -333,7 +352,7 @@
 				}
 			}
 			
-			public function loadLocalData():void
+			public function loadLocalUserData():void
 			{
 				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
 				{
@@ -348,13 +367,37 @@
 				}
 			}
 			
-			public function saveLocalData():void
+			public function saveLocalUserData():void
 			{
 				if(geniLocalSharedObject == null)
 					return;
 				
 				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
 				geniLocalSharedObject.data.sslPem = Main.geniHandler.CurrentUser.sslPem;
+				try
+				{
+					geniLocalSharedObject.flush();
+				}
+				catch (e:Error)
+				{
+					trace("Problem saving shared object");
+				}
+			}
+			
+			public function loadLocalBundleData():void
+			{
+				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
+				{
+					Main.certBundle = geniLocalSharedObject.data.certBundle;
+				}
+			}
+			
+			public function saveLocalBundleData():void
+			{
+				if(geniLocalSharedObject == null)
+					return;
+				
+				geniLocalSharedObject.data.certBundle = Main.certBundle;
 				try
 				{
 					geniLocalSharedObject.flush();

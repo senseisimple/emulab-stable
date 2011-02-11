@@ -47,7 +47,7 @@ package protogeni.resources
 		public var unavailableNodes:int = 0;
 		public var percentageAvailable:int;
 		
-		protected var adParser:AdParserInterface;
+		public var rspecProcessor:RspecProcessorInterface;
 		
 		public function GeniManager()
 		{
@@ -91,12 +91,6 @@ package protogeni.resources
 			Status = GeniManager.UNKOWN;
 			errorMessage = "";
 			errorDescription = "";
-		}
-		
-		// default to parse as Protogeni
-		public function processRspec(afterCompletion : Function):void {
-			
-			adParser.processRspec(afterCompletion);
 		}
 		
 		//---------------------------------------

@@ -233,56 +233,5 @@
 			}
 			return ac;
 		}
-		
-		public function getXml():XML
-		{
-			var result : XML = <node />;
-			if (!isVirtual)
-				result.@component_uuid = physicalNode.urn;
-			result.@component_manager_uuid = manager.Urn;
-			result.@virtual_id = id;
-			result.@virtualization_type = virtualizationType;
-			if (isShared)
-			{
-				result.@virtualization_subtype = virtualizationSubtype;
-				result.@exclusive = 0;
-			}
-			else
-				result.@exclusive = 1;
-
-			// Currently only pcs
-			var nodeType:String = "pc";
-			if (isShared)
-				nodeType = "pcvm";
-			var nodeTypeXml:XML = <node_type />;
-			nodeTypeXml.@type_name = nodeType;
-			nodeTypeXml.@type_slots = 1;
-			result.appendChild(nodeTypeXml);
-			
-			if(startupCommand.length > 0)
-				result.@startup_command = startupCommand;
-			
-			if(tarfiles.length > 0)
-				result.@tarfiles = tarfiles;
-			
-			if(diskImage.length > 0)
-			{
-				var diskImageXml:XML = <disk_image />;
-				diskImageXml.@name = diskImage;
-				result.appendChild(diskImageXml);
-			}
-			
-			if (superNode != null)
-				result.appendChild(XML("<subnode_of>" + superNode.urn + "</subnode_of>"));
-			
-			for each (var current:VirtualInterface in interfaces.collection)
-			{
-				var interfaceXml:XML = <interface />;
-				interfaceXml.@virtual_id = current.id;
-				result.appendChild(interfaceXml);
-			}
-
-			return result;
-		}
 	}
 }

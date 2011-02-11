@@ -15,9 +15,9 @@
 package protogeni.communication
 {
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
-	import protogeni.resources.PlanetLabAggregateManager;
+	import protogeni.resources.PlanetlabAggregateManager;
+	import protogeni.resources.ProtogeniComponentManager;
 
   public class RequestListComponents extends Request
   {
@@ -59,7 +59,7 @@ package protogeni.communication
 						newGm = newAm;
 						break;
 					default:*/
-						var newCm:ComponentManager = new ComponentManager();
+						var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 						newCm.Hrn = obj.hrn;
 						newCm.Url = ts;
 						newCm.Urn = obj.urn;
@@ -71,16 +71,13 @@ package protogeni.communication
 					newGm.Status = GeniManager.INPROGRESS;
 					if(newGm is AggregateManager)
 						newCalls.push(new RequestGetVersionAm(newGm as AggregateManager));
-					else if(newGm is ComponentManager)
-						newCalls.push(new RequestGetVersion(newGm as ComponentManager));
+					else if(newGm is ProtogeniComponentManager)
+						newCalls.push(new RequestGetVersion(newGm as ProtogeniComponentManager));
 				}
 				Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
 			}
 			
-			var planetLabAm:PlanetLabAggregateManager = new PlanetLabAggregateManager();
-			planetLabAm.Url = "https://planet-lab.org:12346";
-			planetLabAm.Hrn = "planet-lab.am";
-			planetLabAm.Urn = "urn:publicid:IDN+planet-lab.org+authority+am";
+			var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 			Main.geniHandler.GeniManagers.add(planetLabAm);
 			planetLabAm.Status = GeniManager.INPROGRESS;
 			newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));

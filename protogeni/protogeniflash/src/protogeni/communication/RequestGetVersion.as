@@ -20,12 +20,12 @@ package protogeni.communication
 	
 	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ComponentManager;
+	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.GeniManager;
 
   public class RequestGetVersion extends Request
   {
-    public function RequestGetVersion(newCm:ComponentManager) : void
+    public function RequestGetVersion(newCm:ProtogeniComponentManager) : void
     {
       super("GetVersion (" + Util.shortenString(newCm.Url, 15) + ")", "Getting the version of the component manager for " + newCm.Hrn, CommunicationUtil.getVersion, true, true, true);
 	  cm = newCm;
@@ -76,6 +76,6 @@ package protogeni.communication
 		op.cleanup();
 	}
 	
-	private var cm:ComponentManager;
+	private var cm:ProtogeniComponentManager;
   }
 }

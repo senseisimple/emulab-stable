@@ -46,5 +46,10 @@
 			slices = new SliceCollection();
 			sslPem = "";
 		}
+		
+		public function setPem(newPem:String):void
+		{
+			sslPem = newPem;
+		}
 	}
 }
