@@ -145,7 +145,7 @@
 			if(isVirtual)
 			{
 				var newVirtualInterface:VirtualInterface = new VirtualInterface(this);
-				newVirtualInterface.id = "virt-int-" + this.interfaces.collection.length;
+				newVirtualInterface.id = this.id + ":if" + this.interfaces.collection.length;
 				newVirtualInterface.role = PhysicalNodeInterface.EXPERIMENTAL;
 				newVirtualInterface.bandwidth = 100000;
 				newVirtualInterface.isVirtual = true;
@@ -166,7 +166,7 @@
 						{
 							var newPhysicalInterface:VirtualInterface = new VirtualInterface(this);
 							newPhysicalInterface.isVirtual = false;
-							newPhysicalInterface.id = "phy-int-" + this.interfaces.collection.length;
+							newPhysicalInterface.id = this.id + ":if" + this.interfaces.collection.length;
 							newPhysicalInterface.role = candidate.role;
 							newPhysicalInterface.physicalNodeInterface = candidate;
 							return newPhysicalInterface;

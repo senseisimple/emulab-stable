@@ -20,6 +20,8 @@
 		public static var LEVEL_FULL:int = 1;
 		
 		public var Level:int;
+		public var outputRspecVersion:Number;
+		public var inputRspecVersion:Number;
 	    
 		public function ProtogeniComponentManager()
 		{

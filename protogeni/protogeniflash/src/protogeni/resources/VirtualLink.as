@@ -52,6 +52,8 @@
 		
 		public static var tunnelNext:int = 1;
 		
+		public var urn:String;
+		
 		public static function getNextTunnel():String
 		{
 			var first : int = ((tunnelNext >> 8) & 0xff);
@@ -66,8 +68,17 @@
 			var secondInterface:VirtualInterface;
 			if(first.manager != second.manager)
 			{
-				firstInterface = first.interfaces.GetByID("control");
-				secondInterface = second.interfaces.GetByID("control");
+				//firstInterface = first.interfaces.GetByID("control");
+				//secondInterface = second.interfaces.GetByID("control");
+				// THIS WILL PROBABLY BREAK VERSION 1!!!!
+				firstInterface = first.allocateInterface();
+				secondInterface = second.allocateInterface();
+				if(firstInterface == null || secondInterface == null)
+					return false;
+				first.interfaces.Add(firstInterface);
+				second.interfaces.Add(secondInterface);
+				// END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
+				
 				_isTunnel = true;
 				if(firstInterface.ip.length == 0)
 					firstInterface.ip = getNextTunnel();
@@ -88,7 +99,7 @@
 			} else {
 				firstInterface = first.allocateInterface();
 				secondInterface = second.allocateInterface();
-				if(secondInterface == null || secondInterface == null)
+				if(firstInterface == null || secondInterface == null)
 					return false;
 				first.interfaces.Add(firstInterface);
 				second.interfaces.Add(secondInterface);
@@ -105,6 +116,8 @@
 			secondNode = second;
 			first.links.addItem(this);
 			second.links.addItem(this);
+			firstInterface.virtualLinks.addItem(this);
+			secondInterface.virtualLinks.addItem(this);
 			id = slivers[0].slice.getUniqueVirtualLinkId(this);
 			for each(var s:Sliver in slivers)
 				s.links.addItem(this);

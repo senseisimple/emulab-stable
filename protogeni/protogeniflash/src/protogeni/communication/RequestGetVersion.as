@@ -20,8 +20,8 @@ package protogeni.communication
 	
 	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.ProtogeniComponentManager;
 
   public class RequestGetVersion extends Request
   {
@@ -39,8 +39,12 @@ package protogeni.communication
 		try
 		{
 			cm.Version = response.value.api;
-			//inputrspec[] = 0.1, 2
-			//output_rspec
+			cm.inputRspecVersion = response.value.input_rspec[0];
+			for each(var n:Number in response.value.input_rspec) {
+				if(cm.inputRspecVersion < n)
+					cm.inputRspecVersion = n;
+			}
+			cm.outputRspecVersion = Number(response.value.output_rspec);
 			cm.Level = response.value.level;
 			r = new RequestDiscoverResources(cm);
 			r.forceNext = true;

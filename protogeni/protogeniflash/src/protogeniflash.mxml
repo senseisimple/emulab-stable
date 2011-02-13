@@ -82,7 +82,7 @@
 			[Bindable]
 			public var slicesMenu : ArrayCollection;
 			
-			private var geniLocalSharedObject:SharedObject;
+			public var geniLocalSharedObject:SharedObject;
 			
 			public var forceMapKey:String;
 			
@@ -105,8 +105,14 @@
 						Main.debugMode = FlexGlobals.topLevelApplication.parameters.debug == "1";
 					}
 				} catch(all:Error) {
-					var s:String = all.toString();
-					trace(s);
+				}
+				
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.usejs != null)
+					{
+						Main.useJavascript = FlexGlobals.topLevelApplication.parameters.usejs == "1";
+					}
+				} catch(all:Error) {
 				}
 			}
 			
@@ -128,6 +134,8 @@
 				// Saved variables
 				try {
 					geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
+					//var o:Object = geniLocalSharedObject.data.planetlab;
+					//var i:int = geniLocalSharedObject.size;
 				} catch(e:Error) {
 					Alert.show("It looks like Flash is unable to save/load local data.  Would you like to load directions on how to enable local data?", "Enable Local Data?", Alert.YES|Alert.NO, this,
 						function allowData(e:CloseEvent):void {

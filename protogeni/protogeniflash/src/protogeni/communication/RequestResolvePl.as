@@ -51,7 +51,16 @@ package protogeni.communication
 	{
 		try
 		{
-			var o:Object = response;
+			Main.Application().geniLocalSharedObject.data.planetlab = response;
+			try
+			{
+				Main.Application().geniLocalSharedObject.flush();
+				Main.log.appendMessage(new LogMessage("hey","hey"));
+			}
+			catch (e:Error)
+			{
+				trace("Problem saving shared object");
+			}
 		} catch(e:Error)
 		{
 			//plm.errorMessage = response;

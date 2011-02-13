@@ -299,6 +299,6 @@
 	</mx:HDividedBox>
 	<display:controlBarContent>
 		<s:Label text="View"  fontSize="12" fontWeight="bold"/>
-		<s:DropDownList id="groupComboBox" requireSelection="true" dataProvider="{groupNames}" selectedIndex="{selectedIndex}" change="refreshView()" width="150" creationComplete="selectedIndex = 0" />
+		<s:DropDownList id="groupComboBox" requireSelection="true" dataProvider="{groupNames}" selectedIndex="{selectedIndex}" change="refreshView()" width="250" creationComplete="selectedIndex = 0" />
 	</display:controlBarContent>
 </display:DefaultWindow>

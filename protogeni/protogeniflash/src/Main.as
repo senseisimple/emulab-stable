@@ -58,5 +58,7 @@
 	private static var visitedSites:Dictionary = new Dictionary();
 	public static var certBundle:String;
 	public static var debugMode:Boolean = false;
+	[Bindable]
+	public static var useJavascript:Boolean = false;
   }
 }
