@@ -117,6 +117,14 @@
 					}
 				} catch(all:Error) {
 				}
+				
+				try{
+					if(FlexGlobals.topLevelApplication.parameters.pgonly != null)
+					{
+						Main.protogeniOnly = FlexGlobals.topLevelApplication.parameters.pgonly == "1";
+					}
+				} catch(all:Error) {
+				}
 			}
 			
 			private function init():void {

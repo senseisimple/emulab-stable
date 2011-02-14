@@ -32,8 +32,9 @@
 	import protogeni.display.DisplayUtil;
 	import protogeni.display.InitialUserWindow;
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
+	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.SliverCollection;

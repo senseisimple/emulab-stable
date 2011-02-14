@@ -77,11 +77,13 @@ package protogeni.communication
 				Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
 			}
 			
-			var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
-			Main.geniHandler.GeniManagers.add(planetLabAm);
-			planetLabAm.Status = GeniManager.INPROGRESS;
-			newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
-			Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
+			if(!Main.protogeniOnly) {
+				var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
+				Main.geniHandler.GeniManagers.add(planetLabAm);
+				planetLabAm.Status = GeniManager.INPROGRESS;
+				newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
+				Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
+			}
 			
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());

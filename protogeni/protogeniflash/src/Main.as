@@ -60,5 +60,7 @@
 	public static var debugMode:Boolean = false;
 	[Bindable]
 	public static var useJavascript:Boolean = false;
+	
+	public static var protogeniOnly:Boolean = false;
   }
 }
