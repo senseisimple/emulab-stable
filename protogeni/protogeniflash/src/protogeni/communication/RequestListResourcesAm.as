@@ -24,8 +24,9 @@ package protogeni.communication
   
   import protogeni.Util;
   import protogeni.resources.AggregateManager;
-  import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.GeniManager;
+  import protogeni.resources.PlanetlabAggregateManager;
+  import protogeni.resources.ProtogeniComponentManager;
 
   public class RequestListResourcesAm extends Request
   {
@@ -43,6 +44,8 @@ package protogeni.communication
 	
 	override public function complete(code : Number, response : Object) : *
 	{
+		var r:Request = null;
+		
 		try
 		{
 			var decodor:Base64Decoder = new Base64Decoder();
@@ -53,6 +56,7 @@ package protogeni.communication
 			
 			am.Rspec = new XML(decodedRspec);
 			am.rspecProcessor.processResourceRspec(cleanup);
+			
 		} catch(e:Error)
 		{
 			//am.errorMessage = response;
@@ -62,7 +66,7 @@ package protogeni.communication
 			Main.geniDispatcher.dispatchGeniManagerChanged(am);
 		}
 		
-		return null;
+		return r;
 	}
 
     override public function fail(event : ErrorEvent, fault : MethodFault) : *

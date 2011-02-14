@@ -10,6 +10,7 @@ package protogeni.resources
 	import mx.events.Request;
 	
 	import protogeni.communication.RequestResolvePl;
+	import protogeni.communication.RequestSitesLocation;
 	
 
 	public class PlanetlabRspecProcessor implements RspecProcessorInterface
@@ -67,12 +68,10 @@ package protogeni.resources
 				gm.Status = GeniManager.VALID;
 				Main.geniDispatcher.dispatchGeniManagerChanged(gm);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
-				
-				/*
-				var r:RequestResolvePl = new RequestResolvePl(gm);
+
+				var r:RequestSitesLocation = new RequestSitesLocation(gm);
 				r.forceNext = true;
 				Main.geniHandler.requestHandler.pushRequest(r);
-				*/
 				
 				myAfter();
 			}
@@ -98,6 +97,7 @@ package protogeni.resources
 				var site:Site = new Site();
 				site.id = s.@id;
 				site.name = s.child("name")[0].toString();
+				site.hrn = gm.networkName + "." + site.id;
 				gm.sites.addItem(site);
 				for each(var p:XML in s.child("node")) {
 					var node:PhysicalNode = new PhysicalNode(null);

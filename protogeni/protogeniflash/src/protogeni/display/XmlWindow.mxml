@@ -3,18 +3,21 @@
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*">
 	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
+			import mx.utils.Base64Encoder;
+			[Bindable]
+			public var xmlString:String;
+			
 			public function loadXml(val:XML):void {
 				if(val != null) {
-					txt.text = val.toXMLString();
+					xmlString = val.toXMLString();
 				} else {
-					txt.text = "No document found";
+					xmlString = "No document found";
 				}
 			}
 		]]>
 	</fx:Script>
-	<s:TextArea id="txt" width="100%" height="100%"  editable="false"/>
+	<s:TextArea id="txt" width="100%" height="100%"  editable="false" text="{xmlString}"/>
 </display:DefaultWindow>

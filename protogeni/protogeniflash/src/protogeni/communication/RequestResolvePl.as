@@ -23,9 +23,15 @@ package protogeni.communication
   import mx.collections.ArrayList;
   
   import protogeni.Util;
+  import protogeni.display.DefaultWindow;
+  import protogeni.display.XmlWindow;
   import protogeni.resources.GeniManager;
   import protogeni.resources.PhysicalNode;
+  import protogeni.resources.PhysicalNodeGroup;
   import protogeni.resources.PlanetlabAggregateManager;
+  import protogeni.resources.Site;
+  
+  import spark.components.TextArea;
 
   public class RequestResolvePl extends Request
   {
@@ -36,13 +42,13 @@ package protogeni.communication
 			"Resolving resources for " + newPlm.registryUrl,
 			CommunicationUtil.resolvePl,
 			true, true, false);
-		ignoreReturnCode = true;
+		this.ignoreReturnCode = true;
 		op.timeout = 360;
 		plm = newPlm;
 		var a:ArrayList = new ArrayList();
-		for each(var n:PhysicalNode in plm.AllNodes)
-			a.addItem(n.urn);
-		op.pushField(a.source);	// xrns
+		for each(var s:Site in plm.sites)
+			a.addItem("plc." + s.id);
+		op.pushField(a.source);
 		op.pushField([Main.geniHandler.CurrentUser.credential]);	// credentials
 		op.setExactUrl(plm.registryUrl);
     }
@@ -51,16 +57,24 @@ package protogeni.communication
 	{
 		try
 		{
-			Main.Application().geniLocalSharedObject.data.planetlab = response;
-			try
-			{
-				Main.Application().geniLocalSharedObject.flush();
-				Main.log.appendMessage(new LogMessage("hey","hey"));
+			for each(var o:Object in response) {
+				var site:Site = plm.getSiteWithHrn(o.hrn);
+				site.latitude = o.latitude;
+				site.longitude = o.longitude;
+				
+				var ng:PhysicalNodeGroup = plm.Nodes.GetByLocation(site.latitude,site.longitude);
+				var tempString:String;
+				if(ng == null) {
+					ng = new PhysicalNodeGroup(site.latitude, site.longitude, "", plm.Nodes);
+					plm.Nodes.Add(ng);
+				}
+				for each(var n:PhysicalNode in site.nodes) {
+					ng.Add(n);
+				}
 			}
-			catch (e:Error)
-			{
-				trace("Problem saving shared object");
-			}
+			
+			Main.geniHandler.mapHandler.drawMap();
+			
 		} catch(e:Error)
 		{
 			//plm.errorMessage = response;

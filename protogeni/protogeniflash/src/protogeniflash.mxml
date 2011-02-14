@@ -32,6 +32,7 @@
 			import com.google.maps.LatLng;
 			import com.google.maps.MapOptions;
 			import com.google.maps.MapType;
+			import com.mattism.http.xmlrpc.MethodCallImpl;
 			
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
@@ -58,6 +59,7 @@
 			import protogeni.display.SearchWindow;
 			import protogeni.display.SlicesWindow;
 			import protogeni.display.UserWindow;
+			import protogeni.display.XmlWindow;
 			import protogeni.resources.Slice;
 			import protogeni.resources.SliceAuthority;
 			
@@ -89,6 +91,7 @@
 			private function preinit():void {
 				Security.allowDomain("*");
 				Security.allowInsecureDomain("*");
+				Security.allowDomain("localhost");	
 				
 				// Force a different Google Maps API key if given
 				try{
@@ -169,8 +172,6 @@
 				user.showWindow();
 				user.load(Main.geniHandler.CurrentUser);
 				user.closeWindow();
-				
-				Security.allowDomain("localhost");	
 				
 				// Load the certificate bundle
 				var certRequest:URLRequest = new URLRequest("http://www.emulab.net/genica.bundle"); 

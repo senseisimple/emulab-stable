@@ -1,12 +1,12 @@
 package protogeni.resources
 {
-	import mx.collections.ArrayList;
+	import mx.collections.ArrayCollection;
 
 	public class PlanetlabAggregateManager extends AggregateManager
 	{
 		public var registryUrl:String;
 		public var networkName:String;
-		public var sites:ArrayList;
+		public var sites:ArrayCollection;
 		public var Authority:String;
 		
 		public function PlanetlabAggregateManager()
@@ -17,9 +17,18 @@ package protogeni.resources
 			this.Hrn = "planet-lab.am";
 			this.Authority = "planet-lab.org";
 			this.Urn = "urn:publicid:IDN+planet-lab.org+authority+am";
-			this.sites = new ArrayList();
+			this.sites = new ArrayCollection();
 			
 			this.rspecProcessor = new PlanetlabRspecProcessor(this);
+		}
+		
+		public function getSiteWithHrn(n:String):Site
+		{
+			for each(var s:Site in sites) {
+				if(s.hrn == n)
+					return s;
+			}
+			return null;
 		}
 		
 		public function getSiteWithName(n:String):Site
