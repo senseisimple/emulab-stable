@@ -3198,5 +3198,76 @@ sub SetRole($$)
     return $self->GetLan()->SetRole($role);
 }
 
+############################################################################
+#
+# Another convenience package, for external references.
+#
+package ExternalNetwork;
+use libdb;
+use libtestbed;
+use English;
+use Lan;
+use overload ('""' => 'Stringify');
+
+#
+# Lookup by either the node or the network name. 
+#
+sub Lookup($$)
+{
+    my ($class, $arg) = @_;
+
+    # Always sanity check before hitting the DB.
+    return undef
+	if (! ($arg =~ /^[-\w]*$/));
+
+    my $query_result =
+	DBQueryWarn("select * from external_networks ".
+		    "where node_id='$arg' or network_id='$arg'");
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    # This would be unusual;
+    if ($query_result->numrows > 1) {
+	print STDERR "*** Multiple rows in external_networks for $arg\n";
+	return undef;
+    }
+    my $self          = {};
+    $self->{'DBROW'}  = $query_result->fetchrow_hashref();
+    bless($self, $class);
+    
+    return $self;
+}
+
+# accessors
+sub field($$)     { return ((! ref($_[0])) ? -1 : $_[0]->{'DBROW'}->{$_[1]}); }
+sub node_id($)	  { return field($_[0], 'node_id'); }
+sub node_type($)  { return field($_[0], 'node_type'); }
+sub network_id($) { return field($_[0], 'network_id'); }
+sub min_vlan($)	  { return field($_[0], 'min_vlan'); }
+sub max_vlan($)	  { return field($_[0], 'max_vlan'); }
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    my $node_id = $self->node_id();
+    my $network_id = $self->network_id();
+
+    return "[External Network: $network_id,$node_id]";
+}
+
+#
+# Given a vlan tag, is it okay (in the range).
+#
+sub VlanTagOkay($$)
+{
+    my ($self, $tag) = @_;
+
+    return ($tag >= $self->min_vlan() && $tag < $self->max_vlan() ? 1 : 0);
+}
+
 # _Always_ make sure that this 1 is at the end of the file...
 1;
