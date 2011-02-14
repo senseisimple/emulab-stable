@@ -21,7 +21,8 @@
 		
 		public var Level:int;
 		public var outputRspecVersion:Number;
-		public var inputRspecVersion:Number;
+		public var inputRspecMaxVersion:Number;
+		public var inputRspecMinVersion:Number;
 	    
 		public function ProtogeniComponentManager()
 		{

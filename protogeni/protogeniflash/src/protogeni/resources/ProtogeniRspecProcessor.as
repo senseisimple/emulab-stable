@@ -451,7 +451,7 @@ package protogeni.resources
 		public function generateSliverRspec(s:Sliver):XML
 		{
 			var requestRspec:XML;
-			switch(gm.inputRspecVersion) {
+			switch(gm.inputRspecMinVersion) {
 				case 0.1:
 					requestRspec = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
 						+ "<rspec "
@@ -483,14 +483,14 @@ package protogeni.resources
 				var nodeXml : XML = <node />;
 				
 				if (!vn.isVirtual) {
-					if(gm.inputRspecVersion == 0.1)
+					if(gm.inputRspecMinVersion == 0.1)
 						nodeXml.@component_uuid = vn.physicalNode.urn;
 					else {
 						nodeXml.@component_id = vn.physicalNode.urn;
 					}
 				}
 					
-				if(gm.inputRspecVersion == 0.1) {
+				if(gm.inputRspecMinVersion == 0.1) {
 					nodeXml.@virtual_id = vn.id;
 					nodeXml.@component_manager_uuid = vn.manager.Urn;
 					nodeXml.@virtualization_type = vn.virtualizationType;
@@ -501,7 +501,7 @@ package protogeni.resources
 				
 				if (vn.isShared)
 				{
-					if(gm.inputRspecVersion == 0.1) {
+					if(gm.inputRspecMinVersion == 0.1) {
 						nodeXml.@virtualization_subtype = vn.virtualizationSubtype;
 						nodeXml.@exclusive = 0;
 					} else {
@@ -509,14 +509,14 @@ package protogeni.resources
 					}
 				}
 				else {
-					if(gm.inputRspecVersion == 0.1)
+					if(gm.inputRspecMinVersion == 0.1)
 						nodeXml.@exclusive = 1;
 					else
 						nodeXml.@exclusive = "true";
 				}
 				
 				// Currently only pcs
-				if(gm.inputRspecVersion == 0.1) {
+				if(gm.inputRspecMinVersion == 0.1) {
 					var nodeType:String = "pc";
 					if (vn.isShared)
 						nodeType = "pcvm";
@@ -543,15 +543,15 @@ package protogeni.resources
 					nodeXml.appendChild(diskImageXml);
 				}
 				
-				if (gm.inputRspecVersion == 0.1 && vn.superNode != null)
+				if (gm.inputRspecMinVersion == 0.1 && vn.superNode != null)
 					nodeXml.appendChild(XML("<subnode_of>" + vn.superNode.urn + "</subnode_of>"));
 				
 				for each (var current:VirtualInterface in vn.interfaces.collection)
 				{
-					if(gm.inputRspecVersion >= 2 && current.id == "control")
+					if(gm.inputRspecMinVersion >= 2 && current.id == "control")
 						continue;
 					var interfaceXml:XML = <interface />;
-					if(gm.inputRspecVersion == 0.1)
+					if(gm.inputRspecMinVersion == 0.1)
 						interfaceXml.@virtual_id = current.id;
 					else {
 						interfaceXml.@client_id = current.id;
@@ -578,17 +578,17 @@ package protogeni.resources
 			for each(var vl:VirtualLink in s.links) {
 				var linkXml : XML = <link />;
 				
-				if(gm.inputRspecVersion == 0.1)
+				if(gm.inputRspecMinVersion == 0.1)
 					linkXml.@virtual_id = vl.id;
 				else
 					linkXml.@client_id = vl.id;
 				
-				if (gm.inputRspecVersion == 0.1 && !vl.isTunnel())
+				if (gm.inputRspecMinVersion == 0.1 && !vl.isTunnel())
 					linkXml.appendChild(XML("<bandwidth>" + vl.bandwidth + "</bandwidth>"));
 				
 				if (vl.isTunnel())
 				{
-					if(gm.inputRspecVersion == 0.1)
+					if(gm.inputRspecMinVersion == 0.1)
 						linkXml.@link_type = "tunnel";
 					else {
 						var link_type:XML = <link_type />;
@@ -597,16 +597,16 @@ package protogeni.resources
 					}
 				}
 				else {
-					if(gm.inputRspecVersion == 0.1)
+					if(gm.inputRspecMinVersion == 0.1)
 						linkXml.@link_type = "ethernet";
 				}
 				
 				for each (var currentVi:VirtualInterface in vl.interfaces)
 				{
-					if(gm.inputRspecVersion >= 2 && currentVi.id == "control")
+					if(gm.inputRspecMinVersion >= 2 && currentVi.id == "control")
 						continue;
 					var interfaceRefXml:XML = <interface_ref />;
-					if(gm.inputRspecVersion == 0.1) {
+					if(gm.inputRspecMinVersion == 0.1) {
 						interfaceRefXml.@virtual_node_id = currentVi.virtualNode.id;
 						if (vl.isTunnel())
 						{

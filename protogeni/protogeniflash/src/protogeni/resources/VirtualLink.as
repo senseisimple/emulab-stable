@@ -68,15 +68,17 @@
 			var secondInterface:VirtualInterface;
 			if(first.manager != second.manager)
 			{
-				//firstInterface = first.interfaces.GetByID("control");
-				//secondInterface = second.interfaces.GetByID("control");
+				firstInterface = first.interfaces.GetByID("control");
+				secondInterface = second.interfaces.GetByID("control");
 				// THIS WILL PROBABLY BREAK VERSION 1!!!!
+				/*
 				firstInterface = first.allocateInterface();
 				secondInterface = second.allocateInterface();
 				if(firstInterface == null || secondInterface == null)
 					return false;
 				first.interfaces.Add(firstInterface);
 				second.interfaces.Add(secondInterface);
+				*/
 				// END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
 				
 				_isTunnel = true;

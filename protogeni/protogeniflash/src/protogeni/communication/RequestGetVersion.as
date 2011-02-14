@@ -39,10 +39,13 @@ package protogeni.communication
 		try
 		{
 			cm.Version = response.value.api;
-			cm.inputRspecVersion = response.value.input_rspec[0];
+			cm.inputRspecMaxVersion = response.value.input_rspec[0];
+			cm.inputRspecMinVersion = response.value.input_rspec[0];
 			for each(var n:Number in response.value.input_rspec) {
-				if(cm.inputRspecVersion < n)
-					cm.inputRspecVersion = n;
+				if(cm.inputRspecMaxVersion < n)
+					cm.inputRspecMaxVersion = n;
+				if(cm.inputRspecMinVersion > n)
+					cm.inputRspecMinVersion = n;
 			}
 			cm.outputRspecVersion = Number(response.value.output_rspec);
 			cm.Level = response.value.level;
