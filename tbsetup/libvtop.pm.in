@@ -1214,8 +1214,15 @@ sub LoadVirtNodes($)
 	    $vnode->_osinfo($osinfo);
 	}
 	elsif ($isvirt) {
-	    # Silly default.
-	    my $osinfo = OSinfo->LookupByName("OPENVZ-STD");
+	    my $osinfo;
+	    if ($nodetype->type() eq "pcvm") {
+		# Silly default.
+		$osinfo = OSinfo->LookupByName("OPENVZ-STD");
+	    }
+	    else {
+		# Grab it from the typeinfo.
+		$osinfo = OSinfo->Lookup($nodetype->default_osid());
+	    }
 	    $vnode->_osinfo($osinfo);
 	}
 
@@ -5505,6 +5512,8 @@ sub InterpLinksAux($)
 		    $protolink->SetType((defined($protovlan) ?
 					"emulated" : "vlan"));
 		    $protolink->SetRole("link/lan");
+		    $protovlan->SetAttribute("link/lan", $lan)
+			if (!defined($protolan));
 
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA,
 					     $virtifaceA->viface(),
@@ -6204,17 +6213,19 @@ sub nodejailosid($$)
     my $posinfo   = $virtnode->_parent_osinfo();
     my $nextosid;
 
+    $self->printdb("nodejailosid: $virtnode, $osinfo\n");
+
     if (!defined($posinfo)) {
 	return undef
 	    if (!defined($osinfo->nextosid()));
-	$osinfo = $osinfo->ResolveNextOSID($self->experiment());
+	my $newosinfo = $osinfo->ResolveNextOSID($self->experiment());
 	return undef
-	    if (!defined($osinfo));
-	$nextosid = $osinfo->osid();
+	    if (!defined($newosinfo));
+	$nextosid = $newosinfo->osid();
     
 	if (defined($nextosid)) {
 	    $self->printdb("Mapping VM osinfo $osinfo to ".
-			   "$nextosid on $virtnode\n");
+			   "$newosinfo on $virtnode\n");
 	}
 	else {
 	    tbwarn("Could not map jail osid to real osid on $virtnode\n");
