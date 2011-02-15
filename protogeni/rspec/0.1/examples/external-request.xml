@@ -25,7 +25,17 @@
                    virtual_interface_id="if0" />
     <interface_ref virtual_node_id="right" 
                    virtual_interface_id="if0" />
-    <component_hop component_urn="urn:utah+link+link-ion"/>
-    <component_hop component_urn="urn:uky+link+link-ion"/>
+    <component_hop component_urn="urn:utah+link+link-ion">
+      <interface_ref component_node_uuid="urn:utah+node+cisco3"
+                     component_interface_id="ion"/>
+      <interface_ref component_node_uuid="urn:ion+node+ion"
+                     component_interface_id="interface"/>
+    </component_hop>
+    <component_hop component_urn="urn:uky+link+link-ion">
+      <interface_ref component_node_uuid="urn:uky+node+hp1"
+                     component_interface_id="ion"/>
+      <interface_ref component_node_uuid="urn:ion+node+ion"
+                     component_interface_id="interface"/>
+    </component_hop>
   </link>
 </rspec>
