@@ -290,7 +290,7 @@ typedef struct {
 			int32_t		blockcount;
 			int32_t		chunksize;
 			int32_t		blocksize;
-			int64_t		bytecount;
+			uint64_t		bytecount;
 		} join2;
 
 		/*
