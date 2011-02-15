@@ -5512,7 +5512,7 @@ sub InterpLinksAux($)
 		    $protolink->SetType((defined($protovlan) ?
 					"emulated" : "vlan"));
 		    $protolink->SetRole("link/lan");
-		    $protovlan->SetAttribute("link/lan", $lan)
+		    $protolink->SetAttribute("link/lan", $lan)
 			if (!defined($protovlan));
 
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA,
