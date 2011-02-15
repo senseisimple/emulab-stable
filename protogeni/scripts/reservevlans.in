@@ -19,7 +19,8 @@ sub usage()
     exit(1);
 }
 my $optlist = "";
-my $basetag = 750;
+my $mintag  = 750;
+my $maxtag  = 1000;
 my $other_manager;
 #
 # Configure variables
@@ -38,8 +39,8 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Protos
 sub fatal($);
-sub ReserveLocalTags();
-sub ReserveRemoteTags($@);
+sub ReserveLocalTags(@);
+sub ReserveRemoteTags($$@);
 
 #
 # Turn off line buffering on output
@@ -162,9 +163,10 @@ if (!defined($vlan)) {
     fatal("Could not create vlan for $linkname");
 }
 my $lanid = $vlan->lanid();
+my @othertags = ();
 
-while (my @tags = ReserveLocalTags()) {
-    my $tag = ReserveRemoteTags($other_manager, @tags);
+while (my @tags = ReserveLocalTags(@othertags)) {
+    my $tag = ReserveRemoteTags($other_manager, \@othertags, @tags);
     if ($tag) {
 	print STDERR "Agreeded on tag $tag. Releasing the rest.\n";
 	foreach my $t (@tags) {
@@ -175,14 +177,13 @@ while (my @tags = ReserveLocalTags()) {
     }
     # Clear all the tags so we can try again.
     $vlan->ClearReservedVlanTag();
-    last;
 }
 $vlan->Destroy();
 exit(0);
 
-sub ReserveRemoteTags($@)
+sub ReserveRemoteTags($$@)
 {
-    my ($authority, @tags) = @_;
+    my ($authority, $othertags, @tags) = @_;
 
     my $method_args = {};
     $method_args->{'credentials'}   = [$credential->asString()];
@@ -191,6 +192,7 @@ sub ReserveRemoteTags($@)
     $method_args->{'rspec'}         = $rspecstr;
     $method_args->{'linkname'}      = $linkname;
     $method_args->{'taglist'}       = \@tags;
+    @$othertags = ();
     
     my $response =
 	Genixmlrpc::CallMethod($authority->url(),
@@ -207,6 +209,16 @@ sub ReserveRemoteTags($@)
     }
     if ($response->code == GENIRESPONSE_SEARCHFAILED) {
 	print STDERR "*** Target CM did not like any of the tags we sent\n";
+	if (defined($response->value()) && ref($response->value()) eq "ARRAY"){
+	    my @otags = @{ $response->value() };
+	    print STDERR "*** But they said they like these tags: @otags\n";
+	    foreach my $t (@otags) {
+		if (! ($t =~ /^\d*$/)) {
+		    fatal("Bad tag return from target CM: $t");
+		}
+	    }
+	    @$othertags = @otags;
+	}
 	return undef;
     }
     my $tempstr  = $response->value();
@@ -228,38 +240,62 @@ sub ReserveRemoteTags($@)
 #
 # Reserve a set of local tags and return a list.
 #
-sub ReserveLocalTags()
+sub ReserveLocalTags(@)
 {
-    my @tags = ();
-    my @try  = ();
-    
-    for (my $i = 0; $i < 100; $i++) {
-	# Try for 10.
-	last
-	    if (scalar(@tags) >= 10);
+    my @otags = @_;
+    my @tags  = ();
+    my @try   = ();
+    my $gototags = scalar(@otags);
 
-	my $tag = $basetag++;
-
-	if (VLan->VlanTagAvailable($tag)) {
-	    push(@try, $tag);
-	    if (scalar(@try) > 5) {
-		# Need more then one tag to activate "block" mode.
-		print STDERR "Trying to allocate vlan tags: @try\n";
-		system("$SNMPIT -A $pid $eid $lanid," . join(",", @try));
-		if ($?) {
-		    fatal("Could not reserve vlan tags\n");
-		}
-		# See what tags we actually got.
-		foreach my $t (@try) {
-		    push(@tags, $t)
-			if ($vlan->HasVlanTagReserved($t));
-		}
-		@try = ();
+    #
+    # The goal is reserve 10 tags before we call the target CM, but
+    # we will take what we can get.
+    #
+    while (scalar(@tags) < 10) {
+	if ($gototags) {
+	    while (@otags) {
+		my $t = pop(@otags);
+		push(@try, $t)		
+		    if (VLan->VlanTagAvailable($t));
+		
+		# But do not let the other CM make us reserve too many at once
+		last
+		    if (scalar(@try) > 10);
 	    }
 	}
+	else {
+	    while ($mintag < $maxtag) {
+		my $t = $mintag++;
+		push(@try, $t)		
+		    if (VLan->VlanTagAvailable($t));
+		
+		# But not more then 10 at a time.
+		last
+		    if (scalar(@try) > 10);
+	    }
+	}
+	# Nothing is available to reserve.
+	last
+	    if (!@try);
+
+	#
+	# Do this in "blockmode" so that snmpit does not throw an error
+	# if one of the tags is not available.
+	#
+	print STDERR "Trying to allocate vlan tags: @try\n";
+	system("$SNMPIT --blockmode -A $pid $eid $lanid," . join(",", @try));
+	if ($?) {
+	    fatal("Could not reserve vlan tags\n");
+	}
+	# See what tags we actually got.
+	foreach my $t (@try) {
+	    push(@tags, $t)
+		if ($vlan->HasVlanTagReserved($t));
+	}
+	@try = ();
     }
-    if (scalar(@tags) < 10) {
-	fatal("Could not reserve enough tags for $linkname");
+    if (scalar(@tags) == 0) {
+	fatal("Could not reserve any tags for $linkname");
     }
     print STDERR "Reserved vlan tags: @tags\n";
     return @tags;

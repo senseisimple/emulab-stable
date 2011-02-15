@@ -1693,7 +1693,8 @@ PlayFrisbee(void)
 				p->msg.join2.chunksize = MAXCHUNKSIZE;
 				p->msg.join2.blocksize = MAXBLOCKSIZE;
 				p->msg.join2.bytecount =
-					p->msg.join.blockcount * MAXBLOCKSIZE;
+					(uint64_t)p->msg.join.blockcount *
+					MAXBLOCKSIZE;
 			}
 			CLEVENT(1, EV_CLIJOINREP,
 				CHUNKSIZE, BLOCKSIZE,

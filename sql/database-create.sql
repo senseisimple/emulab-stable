@@ -1279,6 +1279,21 @@ CREATE TABLE `exppid_access` (
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
 --
+-- Table structure for table `external_networks`
+--
+
+DROP TABLE IF EXISTS `external_networks`;
+CREATE TABLE `external_networks` (
+  `network_id` varchar(32) NOT NULL default '',
+  `node_id` varchar(32) NOT NULL default '',
+  `node_type` varchar(30) NOT NULL default '',
+  `min_vlan` int(11) NOT NULL default '256',
+  `max_vlan` int(11) NOT NULL default '1000',
+  PRIMARY KEY  (`network_id`),
+  UNIQUE KEY  (`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+  
+--
 -- Table structure for table `firewall_rules`
 --
 
