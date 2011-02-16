@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Node;
@@ -1862,6 +1862,7 @@ sub CreateVnodes($$$)
     else {
 	$nodeprefix = $pnode;
 	$nodenum    = "";
+	$ipbase     = 0;
 
 	if ($isjailed) {
 	    #
