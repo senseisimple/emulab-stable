@@ -842,6 +842,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$virtexperiment->multiplex_factor(1);
 			$virtexperiment->encap_style("vlan");
 		    }
+		    elsif ($virtualization_subtype eq "emulab-bbg") {
+			$osname = "BBGENIVM-FAKE";
+			$pctype = "bbgenivm";
+			# Lets force to shared node.
+			GeniXML::SetExclusive($ref, 0);
+			$exclusive = 0;
+			$virtexperiment->encap_style("vlan");
+		    }
 		    elsif ($virtualization_subtype eq "raw") {
 			$pctype = undef;
 			goto raw;
