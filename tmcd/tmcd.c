@@ -4211,9 +4211,18 @@ COMMAND_PROTOTYPE(doloadinfo)
 
 			info("%s LOADINFO compat: starting server for imageid %s",
 			     reqp->nodeid, row[5]);
+			/*
+			 * XXX for vnodes we use the pnode name since the
+			 * master server wants to validate a node_id by
+			 * looking up its control net IP address in the
+			 * interfaces table.  Vnodes have no interfaces
+			 * table entries so that won't work.
+			 */
 			snprintf(_buf, sizeof _buf,
 				 "%s/sbin/frisbeehelper -n %s %s",
-				 TBROOT, reqp->nodeid, row[5]);
+				 TBROOT,
+				 reqp->isvnode ? reqp->pnodeid : reqp->nodeid,
+				 row[5]);
 			if ((cfd = popen(_buf, "r")) == NULL)
 				goto updatemfs;
 			while (fgets(_buf, sizeof _buf, cfd) != NULL) {
