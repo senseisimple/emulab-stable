@@ -1179,7 +1179,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 			my ($auth,undef,undef) = GeniHRN::Parse($urn);
 			if (defined($auth) and $auth eq $OURDOMAIN) {
 			    $hopref = $hops{$urn};
-			    $hop_urn= $urn;
+			    $hop_urn = $urn;
 			    last;
 			}
 		    }
@@ -1189,32 +1189,38 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "$lanname: no local component_hop");
 			goto bad;
 		    }
-		    my (undef,undef,$hop_id) = GeniHRN::Parse($hop_urn);
-		    print "$hop_id\n";
-
 		    #
-		    # An artifact of the way we convert physical links
-		    # into urns is that we now have to undo that to
-		    # figure out what node and interface. At the moment
-		    # it looks like "link-ion:eth2-procurve-pgeni-wash:(null)"
+		    # Inside is an interface_ref.
 		    #
-		    my ($link,$iface,undef) = split(":", $hop_id);
-		    if (! (defined($link) && defined($iface))) {
+		    my $ifaceref =
+			GeniXML::FindFirst("n:interface_ref", $hopref);
+		    if (!defined($ifaceref)) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "$lanname: no iface in component_hop");
+			goto bad;
+		    }
+		    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+		    my $iface_node_urn =
+			GeniXML::GetText("component_node_urn", $ifaceref);
+		    my $iface_iface_id =
+			GeniXML::GetText("component_interface_id", $ifaceref);
+		    my (undef, undef, $iface_node_id) =
+			GeniHRN::Parse($iface_node_urn);
+		    
+		    if (! (defined($network_id) && defined($iface_node_id) &&
+			   defined($iface_iface_id))) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 					 "$lanname: bad component_hop");
 			goto bad;
 		    }
-		    # and strip off the link- stuff.
-		    my ($network_id) = ($link =~ /^link-(.*)$/);
-		    # ditto for the iface cruft.
-		    my ($iface_id) = ($iface =~ /^(eth\d*)/);
-
 		    if (! ($network_id =~ /^[-\w]*$/ &&
-			   $iface_id =~ /^[-\w]*$/)) {
+			   $iface_node_id =~ /^[-\w]*$/ &&
+			   $iface_iface_id =~ /^[-\w]*$/)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "$lanname: bad network or iface");
+					 "$lanname: bad network, node or iface");
 			goto bad;
 		    }
 
@@ -1229,7 +1235,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "$lanname: unknown component_hop");
 			goto bad;
 		    }
-		    my $network_node = Node->Lookup($network->node_id());
+		    my $network_node = Node->Lookup($iface_node_id);
 		    if (!defined($network_node)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
@@ -1259,7 +1265,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 						  "desire"   => "pcshared",
 						  "weight"   => 0.95});
 		    $virtexperiment->encap_style("vlan");
-		    $iface_name  = $iface_id;
+		    $iface_name  = $iface_iface_id;
 		    $iface_vport = 0;
 		    goto stitch;
 		}

@@ -746,17 +746,23 @@ sub AddInterface($$$$;$$)
 	if (!defined($interface));
 
     #print "fee $interface\n";
-    
+
+    #
     # Set the attribute for the physical interface.
-    if (defined($iface) &&
-	$interface->SetAttribute("iface", $iface) != 0) {
-	$interface->Destroy();
-	return undef;
-    }
-    # And the node
-    if ($interface->SetAttribute("node_id", $node->node_id()) != 0) {
-	$interface->Destroy();
-	return undef;
+    # If a member was provided, then the physical interface
+    # is already set. Do not overwrite it.
+    #
+    if (!defined($member)) {
+	if (defined($iface) &&
+	    $interface->SetAttribute("iface", $iface) != 0) {
+	    $interface->Destroy();
+	    return undef;
+	}
+	# And the node
+	if ($interface->SetAttribute("node_id", $node->node_id()) != 0) {
+	    $interface->Destroy();
+	    return undef;
+	}
     }
     return $interface;
 }

@@ -1711,23 +1711,7 @@ sub ReserveVlanTags($)
 	goto done;
     }
     my $hop_urn = GeniXML::GetNodeId($hopref);
-    my (undef,undef,$hop_id) = GeniHRN::Parse($hop_urn);
-
-    #
-    # An artifact of the way we convert physical links
-    # into urns is that we now have to undo that to
-    # figure out what node and interface. At the moment
-    # it looks like "link-ion:eth2-procurve-pgeni-wash:(null)"
-    #
-    my ($link,$iface,undef) = split(":", $hop_id);
-    if (! (defined($link) && defined($iface))) {
-	$response =
-	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "badly specified component_hop");
-	goto done;
-    }
-    # and strip off the link- stuff.
-    my ($network_id) = ($link =~ /^link-(.*)$/);
+    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
 
     my $network = ExternalNetwork->Lookup($network_id);
     if (!defined($network)) {
