@@ -24,7 +24,7 @@ package protogeni.communication
   
   import protogeni.Util;
   import protogeni.resources.AggregateManager;
-  import protogeni.resources.ComponentManager;
+  import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.GeniManager;
   import protogeni.resources.Sliver;
 

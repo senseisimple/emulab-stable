@@ -25,6 +25,7 @@
 	import protogeni.GeniDispatcher;
 	import protogeni.GeniHandler;
 	import protogeni.Util;
+	import com.mattism.http.xmlrpc.JSLoader;
 	
   public class Main
   {
@@ -45,6 +46,12 @@
 				Security.loadPolicyFile(baseUrl + "/crossdomain.xml");
 		}
 	}
+	
+	public static function setCertBundle(c:String):void
+	{
+		certBundle = c;
+	        JSLoader.setServerCertificate(Main.certBundle);
+	}
 
 	[Bindable]
 	public static var geniHandler:GeniHandler;
@@ -52,5 +59,10 @@
 	public static var log : LogRoot = null;
 	private static var visitedSites:Dictionary = new Dictionary();
 	public static var certBundle:String;
+	public static var debugMode:Boolean = false;
+	[Bindable]
+	public static var useJavascript:Boolean = false;
+	
+	public static var protogeniOnly:Boolean = false;
   }
 }

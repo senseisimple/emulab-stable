@@ -26,9 +26,11 @@
 		[Bindable]
 		public var collection:ArrayCollection = new ArrayCollection();
 		
-		public function GetByID(urn:String):PhysicalNodeInterface {
+		public function GetByID(urn:String, exact:Boolean = true):PhysicalNodeInterface {
 			for each(var ni:PhysicalNodeInterface in collection) {
 				if(ni.id == urn)
+					return ni;
+				if(!exact && ni.id.indexOf(urn) != -1)
 					return ni;
 			}
 			return null;

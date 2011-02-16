@@ -58,7 +58,7 @@
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.Util;
-			import protogeni.resources.ComponentManager;
+			import protogeni.resources.ProtogeniComponentManager;
 			import protogeni.resources.GeniManager;
 			
 			public function success():void {

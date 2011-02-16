@@ -52,6 +52,8 @@
 		
 		public static var tunnelNext:int = 1;
 		
+		public var urn:String;
+		
 		public static function getNextTunnel():String
 		{
 			var first : int = ((tunnelNext >> 8) & 0xff);
@@ -68,6 +70,17 @@
 			{
 				firstInterface = first.interfaces.GetByID("control");
 				secondInterface = second.interfaces.GetByID("control");
+				// THIS WILL PROBABLY BREAK VERSION 1!!!!
+				/*
+				firstInterface = first.allocateInterface();
+				secondInterface = second.allocateInterface();
+				if(firstInterface == null || secondInterface == null)
+					return false;
+				first.interfaces.Add(firstInterface);
+				second.interfaces.Add(secondInterface);
+				*/
+				// END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
+				
 				_isTunnel = true;
 				if(firstInterface.ip.length == 0)
 					firstInterface.ip = getNextTunnel();
@@ -88,7 +101,7 @@
 			} else {
 				firstInterface = first.allocateInterface();
 				secondInterface = second.allocateInterface();
-				if(secondInterface == null || secondInterface == null)
+				if(firstInterface == null || secondInterface == null)
 					return false;
 				first.interfaces.Add(firstInterface);
 				second.interfaces.Add(secondInterface);
@@ -105,6 +118,8 @@
 			secondNode = second;
 			first.links.addItem(this);
 			second.links.addItem(this);
+			firstInterface.virtualLinks.addItem(this);
+			secondInterface.virtualLinks.addItem(this);
 			id = slivers[0].slice.getUniqueVirtualLinkId(this);
 			for each(var s:Sliver in slivers)
 				s.links.addItem(this);
@@ -194,57 +209,6 @@
 					return true;
 			}
 			return false;
-		}
-		
-		public function getXml():XML
-		{
-			var result : XML = <link />;
-			result.@virtual_id = id;
-			
-			if (!isTunnel())
-				result.appendChild(XML("<bandwidth>" + bandwidth + "</bandwidth>"));
-			
-			if (slivers[0].manager.Version >= 3)
-			{
-				var link_type:XML = <link_type />;
-				link_type.@name = "GRE";
-				var key:XML = <field />;
-				key.@key = "key";
-				key.@value = "0";
-				var ttl:XML = <field />;
-				ttl.@key = "ttl";
-				ttl.@value = "0";
-				link_type.appendChild(key);
-				link_type.appendChild(ttl);
-				result.appendChild(link_type);
-			}
-			else
-			{
-				if (isTunnel())
-				{
-					result.@link_type = "tunnel";
-				}
-				else
-					result.@link_type = "ethernet";
-			}
-			
-			for each (var current:VirtualInterface in interfaces)
-			{
-				var interfaceRefXml:XML = <interface_ref />;
-				interfaceRefXml.@virtual_node_id = current.virtualNode.id;
-				if (isTunnel())
-				{
-					interfaceRefXml.@tunnel_ip = current.ip;
-					interfaceRefXml.@virtual_interface_id = "control";
-				}
-				else
-				{
-					interfaceRefXml.@virtual_interface_id = current.id;
-				}
-				result.appendChild(interfaceRefXml);
-			}
-
-			return result;
 		}
 	}
 }

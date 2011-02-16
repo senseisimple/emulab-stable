@@ -146,6 +146,17 @@
 			return null;
 		}
 		
+		public function getVirtualInterfaceWithId(id:String):VirtualInterface
+		{
+			for each(var s:Sliver in slivers)
+			{
+				var vi:VirtualInterface = s.nodes.getByInterfaceId(id);
+				if(vi != null)
+					return vi;
+			}
+			return null;
+		}
+		
 		public function getVirtualLinkWithId(id:String):VirtualLink
 		{
 			for each(var s:Sliver in slivers)

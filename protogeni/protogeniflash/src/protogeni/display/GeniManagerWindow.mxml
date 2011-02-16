@@ -18,7 +18,7 @@
 			import mx.formatters.NumberFormatter;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.resources.ComponentManager;
+			import protogeni.resources.ProtogeniComponentManager;
 			import protogeni.resources.GeniManager;
 			
 			import spark.components.NavigatorContent;

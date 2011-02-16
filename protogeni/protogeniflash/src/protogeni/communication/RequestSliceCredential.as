@@ -15,7 +15,7 @@
 package protogeni.communication
 {
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ComponentManager;
+	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
@@ -41,7 +41,7 @@ package protogeni.communication
 			for each(var s:Sliver in slice.slivers) {
 				if(s.manager is AggregateManager)
 					newCalls.push(new RequestSliverListResourcesAm(s));
-				else if(s.manager is ComponentManager)
+				else if(s.manager is ProtogeniComponentManager)
 					newCalls.push(new RequestSliverGet(s));
 			}
 		}

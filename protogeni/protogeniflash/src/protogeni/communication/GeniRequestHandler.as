@@ -32,8 +32,9 @@
 	import protogeni.display.DisplayUtil;
 	import protogeni.display.InitialUserWindow;
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
+	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.SliverCollection;
@@ -53,7 +54,7 @@
 		public function startInitiationSequence():void
 		{
 			if(Main.geniHandler.unauthenticatedMode) {
-				var newCm:ComponentManager = new ComponentManager();
+				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 				newCm.Url = Main.geniHandler.publicUrl;
 				newCm.Hrn = Main.geniHandler.publicHrn;
 				newCm.Urn = Main.geniHandler.publicUrn;
@@ -92,7 +93,7 @@
 		
 		public function loadComponentManagers():void
 		{
-			for each(var cm:ComponentManager in Main.geniHandler.GeniManagers)
+			for each(var cm:ProtogeniComponentManager in Main.geniHandler.GeniManagers)
 			{
 				pushRequest(new RequestGetVersion(cm));
 			}
@@ -134,7 +135,7 @@
 				for each(var sliver:Sliver in newSlivers) {
 					if(sliver.manager is AggregateManager)
 						pushRequest(new RequestSliverCreateAm(sliver));
-					else if(sliver.manager is ComponentManager)
+					else if(sliver.manager is ProtogeniComponentManager)
 						pushRequest(new RequestSliverCreate(sliver));
 				}
 					
@@ -147,7 +148,7 @@
 				for each(sliver in deleteSlivers) {
 					if(sliver.manager is AggregateManager)
 						pushRequest(new RequestSliverDeleteAm(sliver));
-					else if(sliver.manager is ComponentManager)
+					else if(sliver.manager is ProtogeniComponentManager)
 						pushRequest(new RequestSliverDelete(sliver));
 				}
 			} else {
@@ -156,7 +157,7 @@
 				for each(sliver in slice.slivers) {
 					if(sliver.manager is AggregateManager)
 						pushRequest(new RequestSliverCreateAm(sliver));
-					else if(sliver.manager is ComponentManager)
+					else if(sliver.manager is ProtogeniComponentManager)
 						pushRequest(new RequestSliverCreate(sliver));
 				}
 			}
@@ -168,7 +169,7 @@
 			for each(var sliver:Sliver in slice.slivers) {
 				if(sliver.manager is AggregateManager)
 					pushRequest(new RequestSliverStatusAm(sliver));
-				else if(sliver.manager is ComponentManager)
+				else if(sliver.manager is ProtogeniComponentManager)
 					pushRequest(new RequestSliverStatus(sliver));
 			}
 		}
@@ -180,7 +181,7 @@
 			{
 				if(sliver.manager is AggregateManager)
 					pushRequest(new RequestSliverDeleteAm(sliver));
-				else if(sliver.manager is ComponentManager)
+				else if(sliver.manager is ProtogeniComponentManager)
 					pushRequest(new RequestSliverDelete(sliver));
 			}
 		}

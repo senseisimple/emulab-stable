@@ -23,13 +23,13 @@ package protogeni.communication
   import mx.utils.Base64Decoder;
   
   import protogeni.Util;
-  import protogeni.resources.ComponentManager;
+  import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.GeniManager;
 
   public class RequestDiscoverResourcesPublic extends Request
   {
 	  
-    public function RequestDiscoverResourcesPublic(newCm:ComponentManager) : void
+    public function RequestDiscoverResourcesPublic(newCm:ProtogeniComponentManager) : void
     {
 		super("DiscoverResourcesPublic (" + Util.shortenString(newCm.Url, 15) + ")", "Publicly discovering resources for " + newCm.Url, null, true, true, false);
 		cm = newCm;
@@ -42,7 +42,7 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			cm.Rspec = new XML(response);
-			cm.processRspec(cleanup);
+			cm.rspecProcessor.processResourceRspec(cleanup);
 		}
 		else
 		{
@@ -69,11 +69,12 @@ package protogeni.communication
 		Main.geniHandler.requestHandler.remove(this, false);
 		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
 		op.cleanup();
+		Main.geniHandler.mapHandler.drawMap();
 		if(cm.Status == GeniManager.VALID)
 			Main.log.setStatus("Parsing " + cm.Hrn + " RSPEC Done",false);
 		Main.geniHandler.requestHandler.start();
 	}
 
-    private var cm : ComponentManager;
+    private var cm : ProtogeniComponentManager;
   }
 }

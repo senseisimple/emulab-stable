@@ -20,6 +20,7 @@
 		{
 			super();
 			// MUST define an AdParser!
+			// MUST define a RequestGenerator
 		}
 	}
 }

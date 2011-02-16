@@ -1,4 +1,4 @@
-﻿/* GENIPUBLIC-COPYRIGHT
+/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -14,11 +14,10 @@
 
 package protogeni.communication
 {
-        import protogeni.resources.AggregateManager;
-        import protogeni.resources.ComponentManager;
-        import protogeni.resources.GeniManager;
-        import protogeni.resources.PlanetLabAggregateManager;
-
+	import protogeni.resources.AggregateManager;
+	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
+	import protogeni.resources.ProtogeniComponentManager;
   public class RequestListComponents extends Request
   {
     public function RequestListComponents(shouldDiscoverResources:Boolean, shouldStartSlices:Boolean) : void
@@ -28,70 +27,69 @@ package protogeni.communication
           startSlices = shouldStartSlices;
     }
 
-        // Should return Request or RequestQueueNode
-        override public function complete(code : Number, response : Object) : *
-        {
-                var newCalls:RequestQueue = new RequestQueue();
-                if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
-                {
-                        for each(var obj:Object in response.value)
-                        {
-                                var newGm:GeniManager = null;
-                                var ts:String = obj.url.substr(0, obj.url.length-3);
-                                /*switch(ts)
-                                {
-                                        case "https://www.emulab.net/protogeni/xmlrpc":
-                                        //case "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc":
-                                        //case "https://pg-boss.cis.fiu.edu/protogeni/xmlrpc":
-                                        //case "https://www.uky.emulab.net/protogeni/xmlrpc":
-                                        //case "https://www.pgeni.gpolab.bbn.com/protogeni/xmlrpc":
-                                                var newAm:AggregateManager = new AggregateManager();
-                                                newAm.Url = "https://boss.emulab.net/protogeni/xmlrpc/am";
-                                                newAm.Hrn = "utahemulab.cm";
-                                                newAm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
-                                                Main.geniHandler.GeniManagers.add(newAm);
-                                                newGm = newAm;
-                                                break;
-                                        default:*/
-                                                var newCm:ComponentManager = new ComponentManager();
-                                                newCm.Hrn = obj.hrn;
-                                                newCm.Url = ts;
-                                                newCm.Urn = obj.urn;
-                                                Main.geniHandler.GeniManagers.add(newCm);
-                                                newGm = newCm;
-                                //}
-                                if(startDiscoverResources)
-                                {
-                                        newGm.Status = GeniManager.INPROGRESS;
-                                        if(newGm is AggregateManager)
-                                                newCalls.push(new RequestGetVersionAm(newGm as AggregateManager));
-                                        else if(newGm is ComponentManager)
-                                                newCalls.push(new RequestGetVersion(newGm as ComponentManager));
-                                }
-                                Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
-                        }
-/*
-                        var planetLabAm:PlanetLabAggregateManager = new PlanetLabAggregateManager();
-                        planetLabAm.Url = "https://planet-lab.org:12346";
-                        planetLabAm.Hrn = "planet-lab.am";
-                        planetLabAm.Urn = "urn:publicid:IDN+planet-lab.org+authority+am";
-                        Main.geniHandler.GeniManagers.add(planetLabAm);
-                        planetLabAm.Status = GeniManager.INPROGRESS;
-                        newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
-                        Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
-*/
-                        if(startSlices)
-                                newCalls.push(new RequestUserResolve());
-                }
-                else
-                {
-                        Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
-                }
-
-                return newCalls.head;
-        }
-
-        private var startDiscoverResources:Boolean;
-        private var startSlices:Boolean;
+	// Should return Request or RequestQueueNode
+	override public function complete(code : Number, response : Object) : *
+	{
+		var newCalls:RequestQueue = new RequestQueue();
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			for each(var obj:Object in response.value)
+			{
+				var newGm:GeniManager = null;
+				var ts:String = obj.url.substr(0, obj.url.length-3);
+				/*switch(ts)
+				{
+					case "https://www.emulab.net/protogeni/xmlrpc":
+					//case "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc":
+					//case "https://pg-boss.cis.fiu.edu/protogeni/xmlrpc":
+					//case "https://www.uky.emulab.net/protogeni/xmlrpc":
+					//case "https://www.pgeni.gpolab.bbn.com/protogeni/xmlrpc":
+						var newAm:AggregateManager = new AggregateManager();
+						newAm.Url = "https://boss.emulab.net/protogeni/xmlrpc/am";
+						newAm.Hrn = "utahemulab.cm";
+						newAm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
+						Main.geniHandler.GeniManagers.add(newAm);
+						newGm = newAm;
+						break;
+					default:*/
+						var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
+						newCm.Hrn = obj.hrn;
+						newCm.Url = ts;
+						newCm.Urn = obj.urn;
+						Main.geniHandler.GeniManagers.add(newCm);
+						newGm = newCm;
+				//}
+				if(startDiscoverResources)
+				{
+					newGm.Status = GeniManager.INPROGRESS;
+					if(newGm is AggregateManager)
+						newCalls.push(new RequestGetVersionAm(newGm as AggregateManager));
+					else if(newGm is ProtogeniComponentManager)
+						newCalls.push(new RequestGetVersion(newGm as ProtogeniComponentManager));
+				}
+				Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
+			}
+			
+			if(!Main.protogeniOnly) {
+				var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
+				Main.geniHandler.GeniManagers.add(planetLabAm);
+				planetLabAm.Status = GeniManager.INPROGRESS;
+				newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
+				Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
+			}
+			
+			if(startSlices)
+				newCalls.push(new RequestUserResolve());
+		}
+		else
+		{
+			Main.geniHandler.requestHandler.codeFailure(name, "Recieved GENI response other than success");
+		}
+		
+		return newCalls.head;
+	}
+	
+	private var startDiscoverResources:Boolean;
+	private var startSlices:Boolean;
   }
 }

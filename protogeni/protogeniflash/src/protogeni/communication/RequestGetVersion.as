@@ -20,12 +20,12 @@ package protogeni.communication
 	
 	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.ComponentManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.ProtogeniComponentManager;
 
   public class RequestGetVersion extends Request
   {
-    public function RequestGetVersion(newCm:ComponentManager) : void
+    public function RequestGetVersion(newCm:ProtogeniComponentManager) : void
     {
       super("GetVersion (" + Util.shortenString(newCm.Url, 15) + ")", "Getting the version of the component manager for " + newCm.Hrn, CommunicationUtil.getVersion, true, true, true);
 	  cm = newCm;
@@ -39,8 +39,15 @@ package protogeni.communication
 		try
 		{
 			cm.Version = response.value.api;
-			//inputrspec[] = 0.1, 2
-			//output_rspec
+			cm.inputRspecMaxVersion = response.value.input_rspec[0];
+			cm.inputRspecMinVersion = response.value.input_rspec[0];
+			for each(var n:Number in response.value.input_rspec) {
+				if(cm.inputRspecMaxVersion < n)
+					cm.inputRspecMaxVersion = n;
+				if(cm.inputRspecMinVersion > n)
+					cm.inputRspecMinVersion = n;
+			}
+			cm.outputRspecVersion = Number(response.value.output_rspec);
 			cm.Level = response.value.level;
 			r = new RequestDiscoverResources(cm);
 			r.forceNext = true;
@@ -76,6 +83,6 @@ package protogeni.communication
 		op.cleanup();
 	}
 	
-	private var cm:ComponentManager;
+	private var cm:ProtogeniComponentManager;
   }
 }

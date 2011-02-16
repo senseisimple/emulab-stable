@@ -59,6 +59,9 @@
 		
 		public var rspec:XML;
 		
+		// Use for anything, more inmportantly any additions by non-Protogeni managers
+		public var tag:*;
+		
 		// Planetlab
 		public var hostname:String;
 		public var bw_limitKbps:int;
