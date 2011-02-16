@@ -1,4 +1,6 @@
 <!-- This rspec works in Utah only. Replace pcXXX with a pg node.
+     Note that on the ion node, specify which of the pops you want
+     by changing the interface. eth0=salt,eth1=kans,eth2=wash
   -->
 <rspec xmlns="http://www.protogeni.net/resources/rspec/0.1">
  <node virtual_id="geni1"
