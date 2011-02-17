@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniAM;
@@ -224,6 +224,11 @@ sub CreateSliver()
     };
 
     my $response = GeniCMV2::CreateSliver($create_args);
+    if (!ref($response)) {
+	# This is cause GeniCMV2::CreateSliver does a fork, and the child
+	# returns plain status code, which should go to our caller. 
+	return $response;
+    }
     if (GeniResponse::IsError($response)) {
         # The create failed, so return the response.
         return $response
