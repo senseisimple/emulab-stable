@@ -407,10 +407,16 @@ sub vnodeCreate($$$)
 	fatal("xen_vnodeCreate: cannot load image without loadinfo\n");
     }
 
+    # Tell stated we are getting ready for a reload
+    libvnode::setState("RELOADSETUP");
+
     $lvname = createImageDisk($imagename, $raref);
     if (!$lvname) {
 	fatal("xen_vnodeCreate: cannot create logical volume for $imagename");
     }
+
+    # Tell stated via tmcd
+    libvnode::setState("RELOADING");
 
     #
     # Since we may have (re)loaded a new image for this vnode, check
@@ -777,6 +783,7 @@ sub vnodeBoot($)
 	die("libvnode_xen: vnodeBoot $vnode_id: could not create bridges");
     }
 
+    libvnode::setState("BOOTING");
     # and finally, create the VM
     mysystem("xm create $config");
     print "Created virtual machine $vnode_id\n";
@@ -968,18 +975,12 @@ sub createImageDisk($$)
 	return $lvname;
     }
 
-    # Tell stated we are getting ready for a reload
-    libvnode::setState("RELOADSETUP");
-
     my $size = $XEN_LDSIZE;
     if (system("/usr/sbin/lvcreate -n $lvname -L ${size}G $VGNAME")) {
 	print STDERR "libvnode_xen: could not create disk for $image\n";
 	TBScriptUnlock();
 	return 0;
     }
-
-    # Tell stated via tmcd
-    libvnode::setState("RELOADING");
 
     # Now we just download the file, then let create do its normal thing
     my $imagepath = lvmVolumePath($lvname);
