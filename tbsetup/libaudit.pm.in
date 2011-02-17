@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -298,8 +298,36 @@ sub AuditAbort()
 #
 sub AuditFork()
 {
-    $auditing = 0;
-    delete @ENV{'TBAUDITLOG', 'TBAUDITON'};
+    return 0
+	if (!$auditing || !defined($logfile));
+
+    $logfile = TBMakeLogname("$SCRIPTNAME");
+    $ENV{'TBAUDITLOG'} = $logfile;
+
+    # Need to close these so that this side of the fork is disconnected.
+    if (!$daemon && $PERL_VERSION >= 5.008) {
+	close($libaudit::SAVE_STDOUT);
+	close($libaudit::SAVE_STDERR);
+    }
+    close(STDOUT);
+    close(STDERR);
+
+    open(STDOUT, ">> $logfile") or
+	die("opening $logfile for STDOUT: $!");
+    open(STDERR, ">> $logfile") or
+	die("opening $logfile for STDERR: $!");
+
+    #
+    # Turn off line buffering on output
+    #
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
+
+    #
+    # Create a new session to ensure we are clear of any process group.
+    #
+    POSIX::setsid();
+    
     return 0;
 }
 
