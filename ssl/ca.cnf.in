@@ -121,6 +121,8 @@ preserve	= no			# keep passed DN ordering
 unique_subject  = no
 copy_extensions = copy
 policy		= policy_sslxmlrpc
+# Added for update 5.16
+x509_extensions = v3_ca # Need this to set the version number to 3
 
 [ CA_crl ]
 dir		= .			# Where everything is kept

@@ -842,6 +842,14 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$virtexperiment->multiplex_factor(1);
 			$virtexperiment->encap_style("vlan");
 		    }
+		    elsif ($virtualization_subtype eq "emulab-bbg") {
+			$osname = "BBGENIVM-FAKE";
+			$pctype = "bbgenivm";
+			# Lets force to shared node.
+			GeniXML::SetExclusive($ref, 0);
+			$exclusive = 0;
+			$virtexperiment->encap_style("vlan");
+		    }
 		    elsif ($virtualization_subtype eq "raw") {
 			$pctype = undef;
 			goto raw;
@@ -1053,6 +1061,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					    "n:interface_ref",
 					    $linkref)->get_nodelist();
 	my %managers   = ();
+	my %hops       = ();
 	my $ifacenum   = 1;
 	my $vindex     = 0;
 	my $trivial_ok = 1;
@@ -1065,7 +1074,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 
 	#
 	# Look for managers list; optional for now. If not specified then
-	# we assume the link is for thie CM.
+	# we assume the link is for this CM.
 	#
 	if (GeniXML::FindNodes("n:component_manager", $linkref)) {
 	    %managers = map { GetLinkManager($_) => $_ } 
@@ -1079,6 +1088,16 @@ sub GetTicketAuxAux($$$$$$$$$)
 	    next
 		if (!exists($managers{$ENV{'MYURN'}}));
 	}
+
+	#
+	# Look for hops list; optional.
+	#
+	if (GeniXML::FindNodes("n:component_hop", $linkref)) {
+	    %hops = map { GeniXML::GetNodeId($_) => $_ } 
+	                  GeniXML::FindNodes("n:component_hop",
+					     $linkref)->get_nodelist();
+	}
+	
 
 	#
 	# Ick. Before we create the virt_lan_lans entry, we have to check
@@ -1150,34 +1169,91 @@ sub GetTicketAuxAux($$$$$$$$$)
 		if (!exists($namemap{$node_nickname}) &&
 		    exists($external_nodemap{$node_nickname})) {
 		    #
-		    # I have completely punted on how we represent external
-		    # links in the DB so that we know what to put into the
-		    # virtual topology. For now, just hardwire the one test
-		    # case.
+		    # Find the hop that says how we get to the edge. For
+		    # now I assume a single hop is all we ever have. 
 		    #
-		    my $noderef  = $external_nodemap{$node_nickname};
-		    my $other_cm = GeniXML::GetManagerId($noderef);
-		    if (! ($other_cm eq "urn:publicid:IDN+" .
-			   "myelab.testbed.emulab.net+authority+cm" ||
-			   $other_cm eq "urn:publicid:IDN+" .
-			   "emulab.net+authority+cm")) {
+		    my $hopref;
+		    my $hop_urn;
+		    
+		    foreach my $urn (keys(%hops)) {
+			my ($auth,undef,undef) = GeniHRN::Parse($urn);
+			if (defined($auth) and $auth eq $OURDOMAIN) {
+			    $hopref = $hops{$urn};
+			    $hop_urn = $urn;
+			    last;
+			}
+		    }
+		    if (!defined($hopref)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					 "$lanname: links to external node");
+					 "$lanname: no local component_hop");
 			goto bad;
 		    }
 		    #
-		    # Stick in a reference to the fake bbg node that
-		    # corresponds to where the link comes in.
+		    # Inside is an interface_ref.
+		    #
+		    my $ifaceref =
+			GeniXML::FindFirst("n:interface_ref", $hopref);
+		    if (!defined($ifaceref)) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "$lanname: no iface in component_hop");
+			goto bad;
+		    }
+		    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+		    my $iface_node_urn =
+			GeniXML::GetText("component_node_urn", $ifaceref);
+		    my $iface_iface_id =
+			GeniXML::GetText("component_interface_id", $ifaceref);
+		    my (undef, undef, $iface_node_id) =
+			GeniHRN::Parse($iface_node_urn);
+		    
+		    if (! (defined($network_id) && defined($iface_node_id) &&
+			   defined($iface_iface_id))) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "$lanname: bad component_hop");
+			goto bad;
+		    }
+		    if (! ($network_id =~ /^[-\w]*$/ &&
+			   $iface_node_id =~ /^[-\w]*$/ &&
+			   $iface_iface_id =~ /^[-\w]*$/)) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "$lanname: bad network, node or iface");
+			goto bad;
+		    }
+
+		    #
+		    # Look in the external networks table to get the hop
+		    # details. 
+		    #
+		    my $network = ExternalNetwork->Lookup($network_id);
+		    if (!defined($network)) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+					 "$lanname: unknown component_hop");
+			goto bad;
+		    }
+		    my $network_node = Node->Lookup($iface_node_id);
+		    if (!defined($network_node)) {
+			$response =
+			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				 "$lanname: unknown component_hop node");
+			goto bad;
+		    }
+		    
+		    #
+		    # Stick in a reference to the fake node.
 		    #
 		    my $virtnode =
 			$virtexperiment->NewTableRow("virt_nodes",
-					     {"vname"   => $node_nickname,
-					      "type"    => "bbgenivm",
-					      "osname"  => 'BBGENIVM-FAKE',
-					      "ips"     => '', # deprecated
-					      "cmd_line"=> '', # bogus
-					      "fixed"   => "bbg1"});
+				    {"vname"   => $node_nickname,
+				     "type"    => $network->node_type(),
+				     "osname"  => '',
+				     "ips"     => '', # deprecated
+				     "cmd_line"=> '', # bogus
+				     "fixed"   => $network_node->node_id()});
 		    if (!defined($virtnode)) {
 			print STDERR "Error creating bbg node\n";
 			$response = GeniResponse->Create(GENIRESPONSE_ERROR);
@@ -1188,9 +1264,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 						 {"vname"    => $node_nickname,
 						  "desire"   => "pcshared",
 						  "weight"   => 0.95});
-		    $virtexperiment->multiplex_factor(1);
 		    $virtexperiment->encap_style("vlan");
-		    $iface_name  = "";
+		    $iface_name  = $iface_iface_id;
 		    $iface_vport = 0;
 		    goto stitch;
 		}

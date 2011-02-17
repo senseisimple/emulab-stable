@@ -314,6 +314,8 @@ sub CreateSliver($)
     my $impotent     = $argref->{'impotent'} || 0;
     require Node;
     require Experiment;
+    require libtestbed;
+    require libaudit;
     
     # For now, I am not worrying about the slice_urn argument.
     if (! (defined($credentials) &&
@@ -426,26 +428,33 @@ sub CreateSliver($)
 	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
 				    "Internal Error");
     }
+    #
+    # At this point we want to return and let the startsliver proceed
+    # in the background
+    #
+    if (0) {
+    my $mypid = fork();
+    if ($mypid) {
+	# Let the child get going.
+	sleep(1);
+	return GeniResponse->Create(GENIRESPONSE_SUCCESS,
+				    [$sliver_credential, $sliver_manifest]);
+    }
+    # This switches the file that we are writing to. 
+    libaudit::AuditFork();
+    }
+    
     # Make sure that the next phase sees all changes.
     Experiment->FlushAll();
     Node->FlushAll();
 
     if ($aggregate->Start($API_VERSION, 0) != 0) {
 	$slice->UnLock();
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Could not start sliver");
+	print STDERR "Could not start sliver\n";
+	return -1;
     }
-    # GeniCM::UpdateManifest($slice);
-    $sliver_manifest = $aggregate->GetManifest(1);
-    if (!defined($sliver_manifest)) {
-	print STDERR "CreateSliver: Could not get manifest for $aggregate\n";
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "Internal Error");
-    }
-    
     $slice->UnLock();
-    return GeniResponse->Create(GENIRESPONSE_SUCCESS,
-				[$sliver_credential, $sliver_manifest]);
+    return 0;
 }
 
 #
@@ -1547,6 +1556,7 @@ sub ReserveVlanTags($)
     my $taglist     = $argref->{'taglist'};
     my $response;
     my $actualtag;
+    my ($myauth,undef,undef) = GeniHRN::Parse($ENV{'MYURN'});
     # List of vlans to delete after getting the tags.
     my @delete      = ();
     my %linkmap     = ();
@@ -1682,6 +1692,36 @@ sub ReserveVlanTags($)
 					 "Could not find link in rspec");
 	goto done;
     }
+
+    #
+    # Go through the component hops and find the one that refers to us.
+    # This is our external network point.
+    #
+    my $hopref;
+    foreach my $ref (GeniXML::FindNodes("n:component_hop",
+					$linkref)->get_nodelist()) {
+	my $component_urn = GeniXML::GetNodeId($ref);
+	my ($auth,undef,undef) = GeniHRN::Parse($component_urn);
+	if (defined($auth) and $auth eq $myauth) {
+	    $hopref = $ref;
+	    last;
+	}
+    }
+    if (!defined($hopref)) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+					 "Could not find hop in link");
+	goto done;
+    }
+    my $hop_urn = GeniXML::GetNodeId($hopref);
+    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+
+    my $network = ExternalNetwork->Lookup($network_id);
+    if (!defined($network)) {
+	$response = GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				 "$hop_urn is not an external network");
+	goto done;
+    }
+    
     my $vlan = VLan->Lookup($slice_experiment, $linkname);
     if (!defined($vlan)) {
 	#
@@ -1715,6 +1755,29 @@ sub ReserveVlanTags($)
     }
     else {
 	#
+	# Check to see what tags are valid for us. 
+	#
+	my @tags = ();
+	foreach my $tag (@{ $taglist }) {
+	    push(@tags, $tag)
+		if ($network->VlanTagOkay($tag));
+	}
+	if (!@tags) {
+	    #
+	    # Return a list of okay tags. 
+	    #
+	    my @okaytags = ();
+	    for (my $i = $network->min_vlan();
+		 $i < $network->max_vlan(); $i++) {
+		push(@okaytags, $i);
+	    }
+	    $response = GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					     \@okaytags,
+					     "Could not find a suitable tag");
+	    goto done;
+	}
+	
+	#
 	# This is a debugging hack; Inside an elabinelab, it might be
 	# an other local elabinelab or the outer boss. In this case,
 	# there is no need to ask the outer boss to reserve a vlan, since
@@ -1722,7 +1785,6 @@ sub ReserveVlanTags($)
 	# In this case, we can just stipulate that one of the tags is good.
 	#
 	if ($ELABINELAB) {
-	    my ($myauth,undef,undef) = GeniHRN::Parse($ENV{'MYURN'});
 	    my ($hisauth,undef,undef) = GeniHRN::Parse($slice_urn);
 
 	    my @tmp = split('\.', $OURDOMAIN);
@@ -1732,7 +1794,7 @@ sub ReserveVlanTags($)
 	    if ($myauth =~ /$dom$/ && $hisauth =~ /$dom$/) {
 		print STDERR "ElabInElab clause is true: $myauth $hisauth\n";
 
-		my $tag = pop(@{ $taglist });
+		my $tag = pop(@tags);
 		if ($vlan->ReserveVlanTag($tag)) {
 		    $actualtag = $tag;
 		    goto gottag;
@@ -1751,7 +1813,7 @@ sub ReserveVlanTags($)
 	#
 	my $vlanid = $vlan->lanid();
 	my $tag = undef;
-	my @tmp = @{ $taglist };
+	my @tmp = @tags;
 	while (@tmp) {
 	    $tag = pop(@tmp);
 	    if ($vlan->ReserveVlanTag($tag, 1)) {

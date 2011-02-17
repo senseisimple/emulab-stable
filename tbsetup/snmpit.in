@@ -183,7 +183,7 @@ GetOptions(\%opt,
     'N=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'Z', 'vlan_tag=i', 
     'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
-    'o=s@{1,1}', 'redirect-err');
+    'o=s@{1,1}', 'redirect-err', 'blockmode');
 
 if ($opt{h}) {
     exit &usage;
@@ -2242,7 +2242,6 @@ sub doReserveVlanTags($$@) {
     foreach my $vlan (values(%vlans)) {
 	my $vlanid  = $vlan->id();
 	my $stack   = $vstacks{"$vlanid"};
-	my $isblock = 0;
 	my @tags    = ();
 
 	#
@@ -2250,9 +2249,6 @@ sub doReserveVlanTags($$@) {
 	#
 	if (exists($optvlantags{$vlanid})) {
 	    @tags = @{ $optvlantags{$vlanid} };
-	    # In block mode (multiple tags) do not signal an error on failure.
-	    # Caller will figure it out.
-	    $isblock = (scalar(@tags) > 1 ? 1 : 0);
 	}
 	elsif ($vlan->GetReservedVlanTag()) {
 	    # Wanted any tag, but lan has a tag.
@@ -2271,7 +2267,11 @@ sub doReserveVlanTags($$@) {
 	if ($tag) {
 	    push(@assigned, [$vlan,$tag]);
 	}
-	elsif (!$isblock) {
+	elsif (!$opt{'blockmode'}) {
+	    #
+	    # In block mode (multiple tags) do not signal an error on failure.
+	    # Caller will figure it out.
+	    #
 	    print STDERR "Could not pre-reserve tag for $vlan\n";
 	    $errors++;
 	    last;

@@ -219,6 +219,11 @@ if (!open(FRIS, "$cmd 2>&1 |")) {
 while (<FRIS>) {
     if (/^error=(.*)$/) {
 	if ($1 != 0) {
+	    # For killmode we take an error to mean no daemon is running
+	    if ($killmode) {
+		$running = 0;
+		last;
+	    }
 	    Fatal("frisbee returned error=$1");
 	}
 	next;
