@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniAggregate;
@@ -767,8 +767,14 @@ sub Start($$$)
     my %reloads  = ();
 
     foreach my $sliver (@slivers) {
-	next
-	    if (ref($sliver) ne "GeniSliver::Node");
+	if (ref($sliver) ne "GeniSliver::Node") {
+	    next
+		if ($sliver->state() eq "started" && !$restart);
+
+	    $sliver->Start($version) == 0
+		or return -1;
+	    next;
+	}
 
 	my $node = Node->Lookup($sliver->resource_id());
 	if (!defined($node)) {
@@ -777,7 +783,7 @@ sub Start($$$)
 	}
 	my $reservation = $node->Reservation();
 	if (!defined($reservation)) {
-	    print STDERR "$node no long belongs to $self\n";
+	    print STDERR "$node no longer belongs to $self\n";
 	    return -1;
 	}
 	if ($reservation->SameExperiment($experiment)) {
@@ -974,20 +980,18 @@ sub Start($$$)
 	    print STDERR "$NAMEDSETUP failed\n";
 	    return -1;
 	}
-	if ($restart) {
-	    my @diff = ();
-	    my @same = ();
+	my @diff = ();
+	my @same = ();
 	    
-	    if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same)) {
-		print STDERR "CompareVlansWithSwitches failed!\n";
+	if (Lan->CompareVlansWithSwitches($experiment, \@diff, \@same)) {
+	    print STDERR "CompareVlansWithSwitches failed!\n";
+	    return -1;
+	}
+	if (@diff) {
+	    system("$SNMPIT -f ". join(" ", map("-o $_", @diff)));
+	    if ($?) {
+		print STDERR "Failed to remove obsolete VLANs.\n";
 		return -1;
-	    }
-	    if (@diff) {
-		system("$SNMPIT -f ". join(" ", map("-o $_", @diff)));
-		if ($?) {
-		    print STDERR "Failed to remove obsolete VLANs.\n";
-		    return -1;
-		}
 	    }
 	}
 	system("$SNMPIT -q -t $pid $eid");
@@ -1391,11 +1395,12 @@ sub UnProvision($)
 #
 sub Start($$)
 {
-    my ($self) = @_;
+    my ($self, $version) = @_;
 
     return -1
 	if (! ref($self));
 
+    $self->SetState("started");
     return 0;
 }
 
@@ -1475,10 +1480,15 @@ sub Create($$$$$$)
     # These are the ips of the tunnel.
     my $ip1      = GeniXML::GetText("tunnel_ip", $iface1ref);
     my $ip2      = GeniXML::GetText("tunnel_ip", $iface2ref);
+    my $virtid1  = GeniXML::GetInterfaceNodeId($iface1ref);
+    my $virtid2  = GeniXML::GetInterfaceNodeId($iface2ref);
     my $ctrlip1;
     my $ctrlip2;
     my $iface1;
     my $iface2;
+    my $manager1;
+    my $manager2;
+    my $testing = 0;
 
     # We need the control network addresses, but it is possible that
     # one of the nodes is not on this testbed.
@@ -1488,6 +1498,16 @@ sub Create($$$$$$)
 	    print STDERR "Tunnel: Could not lookup node for $node1sliver\n";
 	    goto bad;
  	}
+	if ($testing) {
+	    # Testing
+	    my $manager_id = GeniXML::GetManagerId($node1rspec);
+	    
+	    if (!defined($manager_id)) {
+		print STDERR "No manager id for $linkname\n";
+		goto bad;
+	    }
+	    $manager1 = $manager_id;
+	}
 	my $interface = Interface->LookupControl($node1);
 	goto bad
 	    if (!defined($interface));
@@ -1500,22 +1520,34 @@ sub Create($$$$$$)
     }
     else {
 	my $component_id = GeniXML::GetNodeId($node1rspec);
-	my $component    = GeniComponent->CreateFromRegistry($component_id);
+	my $manager_id   = GeniXML::GetManagerId($node1rspec);
 	
-	if (!defined($component)) {
-	    print STDERR "Could not create component for $component_id\n";
-	    goto bad;
+	if (!defined($component_id)) {
+	    if (!defined($manager_id)) {
+		print STDERR "No manager id for $linkname\n";
+		goto bad;
+	    }
+	    $manager1 = $manager_id;
+	    $ctrlip1  = "";
 	}
-	my $blob = $component->Resolve();
-	if (!defined($blob)) {
-	    print STDERR "Could not Resolve $component\n";
-	    goto bad;
+	else {
+	    my $component    = GeniComponent->CreateFromRegistry($component_id);
+	
+	    if (!defined($component)) {
+		print STDERR "Could not create component for $component_id\n";
+		goto bad;
+	    }
+	    my $blob = $component->Resolve();
+	    if (!defined($blob)) {
+		print STDERR "Could not Resolve $component\n";
+		goto bad;
+	    }
+	    if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
+		print STDERR "Could not get control IP for $component\n";
+		goto bad;
+	    }
+	    $ctrlip1 = $blob->{'physctrl'};
 	}
-	if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
-	    print STDERR "Could not get control IP for $component\n";
-	    goto bad;
-	}
-	$ctrlip1 = $blob->{'physctrl'};
     }
     if (defined($node2sliver)) {
 	my $node2 = Node->Lookup($node2sliver->resource_id());
@@ -1523,6 +1555,16 @@ sub Create($$$$$$)
 	    print STDERR "Tunnel: Could not lookup node for $node2sliver\n";
 	    goto bad;
  	}
+	if ($testing) {
+	    # Testing
+	    my $manager_id = GeniXML::GetManagerId($node2rspec);
+	    
+	    if (!defined($manager_id)) {
+		print STDERR "No manager id for $linkname\n";
+		goto bad;
+	    }
+	    $manager2 = $manager_id;
+	}
 	my $interface = Interface->LookupControl($node2);
 	goto bad
 	    if (!defined($interface));
@@ -1534,23 +1576,35 @@ sub Create($$$$$$)
 	}
     }
     else {
-	my $component_id = GeniXML::GetNodeId($node2rspec);
-	my $component    = GeniComponent->CreateFromRegistry($component_id);
+	my $component_id  = GeniXML::GetNodeId($node2rspec);
+	my $manager_id    = GeniXML::GetManagerId($node2rspec);
 	
-	if (!defined($component)) {
-	    print STDERR "Could not create component for $component_id\n";
-	    goto bad;
+	if (!defined($component_id)) {
+	    if (!defined($manager_id)) {
+		print STDERR "No manager id for $linkname\n";
+		goto bad;
+	    }
+	    $manager2 = $manager_id;
+	    $ctrlip2  = "";
 	}
-	my $blob = $component->Resolve();
-	if (!defined($blob)) {
-	    print STDERR "Could not Resolve $component\n";
-	    goto bad;
+	else {
+	    my $component = GeniComponent->CreateFromRegistry($component_id);
+	
+	    if (!defined($component)) {
+		print STDERR "Could not create component for $component_id\n";
+		goto bad;
+	    }
+	    my $blob = $component->Resolve();
+	    if (!defined($blob)) {
+		print STDERR "Could not Resolve $component\n";
+		goto bad;
+	    }
+	    if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
+		print STDERR "Could not get control IP for $component\n";
+		goto bad;
+	    }
+	    $ctrlip2 = $blob->{'physctrl'};
 	}
-	if (!exists($blob->{'physctrl'}) || !defined($blob->{'physctrl'})) {
-	    print STDERR "Could not get control IP for $component\n";
-	    goto bad;
-	}
-	$ctrlip2 = $blob->{'physctrl'};
     }
     # print STDERR "$ip1, $ip2, $ctrlip1, $ctrlip2\n";
 
@@ -1558,21 +1612,27 @@ sub Create($$$$$$)
 	$iface1->SetAttribute("tunnel_ip", $ip1);
 	$iface1->SetAttribute("tunnel_peerip", $ip2);
 	$iface1->SetAttribute("tunnel_srcip", $ctrlip1);
-	$iface1->SetAttribute("tunnel_dstip", $ctrlip2);
+	$iface1->SetAttribute("tunnel_dstip", ($testing ? "" : $ctrlip2));
+	$iface1->SetAttribute("tunnel_dsturn", $manager2)
+	    if (defined($manager2));
 	$iface1->SetAttribute("tunnel_ipmask", "255.255.255.0");
 	$iface1->SetAttribute("tunnel_lan", $linkname);
 	$iface1->SetAttribute("tunnel_unit", $iface1->memberid() + 1);
 	$iface1->SetAttribute("tunnel_style", "gre");
+	$iface1->SetAttribute("tunnel_peerid", $virtid2);
     }
     if (defined($iface2)) {
 	$iface2->SetAttribute("tunnel_ip", $ip2);
 	$iface2->SetAttribute("tunnel_peerip", $ip1);
 	$iface2->SetAttribute("tunnel_srcip", $ctrlip2);
-	$iface2->SetAttribute("tunnel_dstip", $ctrlip1);
+	$iface2->SetAttribute("tunnel_dstip", ($testing ? "" : $ctrlip1));
+	$iface2->SetAttribute("tunnel_dsturn", $manager1)
+	    if (defined($manager1));
 	$iface2->SetAttribute("tunnel_ipmask", "255.255.255.0");
 	$iface2->SetAttribute("tunnel_lan", $linkname);
 	$iface2->SetAttribute("tunnel_unit", $iface2->memberid() + 1);
 	$iface2->SetAttribute("tunnel_style", "gre");
+	$iface2->SetAttribute("tunnel_peerid", $virtid1);
     }
     return $aggregate;
 
@@ -1631,11 +1691,101 @@ sub UnProvision($)
 #
 sub Start($$)
 {
-    my ($self) = @_;
+    my ($self, $version) = @_;
 
     return -1
 	if (! ref($self));
 
+    my $slice = $self->GetSlice();
+    if (!defined($slice)) {
+	print STDERR "Could not map $self to its slice\n";
+	return -1;
+    }
+    my $experiment = Experiment->Lookup($self->slice_uuid());
+    if (!defined($experiment)) {
+	print STDERR "Could not map $self to its experiment\n";
+	return -1;
+    }
+    my $tunnel = Tunnel->Lookup($experiment, $self->uuid());
+    if (!defined($tunnel)) {
+	print STDERR "Could not lookup tunnel entry for $self.\n";
+	return -1;
+    }
+    print STDERR "Starting tunnel $tunnel for $self\n";
+
+    my @members = ();
+    if ($tunnel->MemberList(\@members) != 0) {
+	print STDERR "Could not get members for $tunnel ($self)\n";
+	return -1;
+    }
+    foreach my $member (@members) {
+	my $dstip;
+
+	if ($member->GetAttribute("tunnel_dstip", \$dstip) != 0) {
+	    print STDERR "Could not dstip for $member in $tunnel ($self)\n";
+	    return -1;
+	}
+	if ($dstip eq "") {
+	    #
+	    # Need to contact the other CM to get the info we need, which
+	    # will be in the manifest.
+	    #
+	    my $dsturn;
+	    if ($member->GetAttribute("tunnel_dsturn", \$dsturn) != 0) {
+		print STDERR
+		    "Could not get urn for $member in $tunnel ($self)\n";
+		return -1;
+	    }
+	    my $peerid;
+	    if ($member->GetAttribute("tunnel_peerid", \$peerid) != 0) {
+		print STDERR
+		    "Could not get peer for $member in $tunnel ($self)\n";
+		return -1;
+	    }
+	    my $authority = GeniAuthority->CreateFromRegistry("CM", $dsturn);
+	    if (!defined($authority)) {
+		print STDERR "Could not lookup authority $dsturn\n";
+		return -1;
+	    }
+	    my $blob = $authority->Resolve($slice->urn());
+	    if (!defined($blob)) {
+		print STDERR "Could not resolve $slice at $authority\n";
+		return -1;
+	    }
+	    if (!exists($blob->{'manifest'})) {
+		print STDERR "No manifest returned for $dsturn from $self\n";
+		return -1;
+	    }
+	    my $manifest = GeniXML::Parse($blob->{'manifest'});
+	    #
+	    # Need to find the peer node in the nodes section.
+	    #
+	    foreach my $ref (GeniXML::FindNodes("n:node",
+						$manifest)->get_nodelist()) {
+		my $nodeid = GeniXML::GetVirtualId($ref);
+		next
+		    if ($nodeid ne $peerid);
+
+		#
+		# Okay, got the node. Now we need to resolve it at the CM.
+		#
+		my $component_id = GeniXML::GetNodeId($ref);
+		my $nodeblob     = $authority->Resolve($component_id);
+		if (!defined($nodeblob)) {
+		    print STDERR
+			"Could not resolve $component_id at $authority\n";
+		    return -1;
+		}
+		if (!exists($nodeblob->{'physctrl'}) ||
+		    !defined($nodeblob->{'physctrl'})) {
+		    print STDERR "Could not get control IP for $component_id\n";
+		    return -1;
+		}
+		$member->SetAttribute("tunnel_dstip", $nodeblob->{'physctrl'});
+	    }
+	}
+    }
+    $self->SetState("started");
     return 0;
 }
 
@@ -1644,7 +1794,7 @@ sub Start($$)
 #
 sub Stop($$)
 {
-    my ($self) = @_;
+    my ($self, $version) = @_;
 
     return -1
 	if (! ref($self));

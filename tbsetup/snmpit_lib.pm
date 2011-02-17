@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ use Exporter;
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks getStacksForSwitches
-		getStackType getStackLeader
+		getStackType getStackLeader filterVlansBySwitches
 		getDeviceOptions getTrunks getTrunksFromSwitches
                 getTrunkHash 
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
@@ -33,7 +33,9 @@ use Exporter;
 	        setPortEnabled setPortTagged
 		printVars tbsort getExperimentCurrentTrunks
 	        getExperimentVlanPorts
-                uniq isSwitchPort getPathVlanIfaces arraySub ifacemodport);
+                uniq isSwitchPort getPathVlanIfaces
+		reserveVlanTag getReservedVlanTag clearReservedVlanTag
+);
 
 use English;
 use libdb;
@@ -425,6 +427,45 @@ sub getPlannedStacksForVlans(@) {
 }
 
 #
+# Filter a set of vlans by devices; return only those vlans that exist
+# on the set of provided stacks. Do not worry about vlans that cross
+# stacks; that is caught higher up.
+#
+sub filterVlansBySwitches($@) {
+    my ($devref, @vlans) = @_;
+    my @result   = ();
+    my %devices  = ();
+
+    if ($debug) {
+	print("filterVlansBySwitches: " . join(",", @{ $devref }) . "\n");
+    }
+
+    foreach my $device (@{ $devref }) {
+	$devices{$device} = $device;
+    }
+    
+    foreach my $vlanid (@vlans) {
+	my @ports = getVlanPorts($vlanid);
+	if ($debug) {
+	    print("filterVlansBySwitches: ".
+		  "ports for $vlanid: " . join(",",@ports) . "\n");
+	}
+	my @tmp = getDeviceNames(@ports);
+	if ($debug) {
+	    print("filterVlansBySwitches: ".
+		  "devices for $vlanid: " . join(",",@tmp) . "\n");
+	}
+	foreach my $device (@tmp) {
+	    if (exists($devices{$device})) {
+		push(@result, $vlanid);
+		last;
+	    }
+	}
+    }
+    return @result;
+}
+
+#
 # Get the list of stacks that the given VLANs actually occupy
 #
 sub getActualStacksForVlans(@) {
@@ -483,6 +524,44 @@ sub setVlanStack($$) {
 	if ($vlan->SetStack($stack_id) != 0);
 
     return 0;
+}
+
+#
+# Update database to reserve a vlan tag. The tables will be locked to
+# make sure we can get it. 
+#
+sub reserveVlanTag ($$) {
+    my ($vlan_id, $tag) = @_;
+    
+    if (!$vlan_id || !defined($tag)) {
+	return 0;
+    }
+
+    my $vlan = VLan->Lookup($vlan_id);
+    return 0
+	if (!defined($vlan));
+
+    return $vlan->ReserveVlanTag($tag);
+}
+
+sub clearReservedVlanTag ($) {
+    my ($vlan_id) = @_;
+    
+    my $vlan = VLan->Lookup($vlan_id);
+    return -1
+	if (!defined($vlan));
+
+    return $vlan->ClearReservedVlanTag();
+}
+
+sub getReservedVlanTag ($) {
+    my ($vlan_id) = @_;
+
+    my $vlan = VLan->Lookup($vlan_id);
+    return 0
+	if (!defined($vlan));
+
+    return $vlan->GetReservedVlanTag();
 }
 
 #

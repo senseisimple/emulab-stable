@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Osload library. Basically the backend to the osload script, but also used
@@ -38,10 +38,12 @@ my $TESTMODE    = @TESTMODE@;
 my $TBOPS       = "@TBOPSEMAIL@";
 my $ELABINELAB  = @ELABINELAB@;
 my $PROJROOT    = "@PROJROOT_DIR@";
+my $OUTERBOSS	= "@OUTERBOSS_NODENAME@";
 
-my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
-my $SUBBOSS_FRISBEELAUNCHER = "$TB/sbin/subboss_frisbeelauncher_wrapper";
+# Paths to binaries
 my $TBUISP	    = "$TB/bin/tbuisp";
+my $FRISBEE         = "$TB/sbin/frisbee";
+
 #
 # Max number of retries (per node) before its deemed fatal. This allows
 # for the occasional pxeboot failure.
@@ -914,6 +916,7 @@ sub AddNode($$$$)
 sub GetImageInfo($$$)
 {
     my ($self, $image, $rowrefptr) = @_;
+    my $imagesize = 0;
 
     my $imageid = $image->imageid();
     my $rowref  = $image->DBData();
@@ -937,18 +940,25 @@ sub GetImageInfo($$$)
     }
 
     if (! -R $imagepath) {
+	#
+	# If the image doesn't exist and we are in an inner elab,
+	# make sure real boss has it and see how big it is.
+	#
+	# Note that we don't actually pre-fetch the image here,
+	# that will be done automatically when the image is first requested.
+	#
 	if ($ELABINELAB) {
-	    #
-	    # Yuck. See if we can get it via frisbeelauncher before giving up.
-	    #
-	    system("$FRISBEELAUNCHER " . ($self->debug() ? "-d ": "") . "$imageid");
-	    if ($?) {
-		tberror "Frisbeelauncher ($image) failed!";
-		$$rowrefptr = 'BADIMAGE';
-		return -1;
-	    }
-	    if (! -R $imagepath) {
-		tberror	"Frisbeelauncher could not fetch $imagepath ($image)!";
+	    my $frisimageid = $rowref->{'pid'} . "/" . $rowref->{'imagename'};
+
+	    my $attr = `$FRISBEE -S $OUTERBOSS -Q $frisimageid`;
+	    if ($attr =~ /error=0/) {
+		if ($attr =~ /size=(\d+)/) {
+		    $imagesize = $1;
+		} else {
+		    $imagesize = 1 * 1024 * 1024 * 1024;
+		}
+	    } else {
+		tberror "Query to $OUTERBOSS for info on $image failed!";
 		$$rowrefptr = 'BADIMAGE';
 		return -1;
 	    }
@@ -959,19 +969,30 @@ sub GetImageInfo($$$)
 	    return -1;
 	}
     }
+    else {
+	$imagesize = stat($imagepath)->size;
 
-    my (undef,undef,undef,undef,undef,undef,undef,$ssize,
-		undef,$smtime,undef,undef,undef) = stat($imagepath);
+	#
+	# A zero-length image cannot be right and will result in much confusion
+	# if allowed to pass: the image load will succeed, but the disk will be
+	# unchanged, making it appear that os_load loaded the default image.
+	#
+	if ($imagesize == 0) {
+	    tberror "$imagepath is empty!";
+	    $$rowrefptr = 'BADIMAGE';
+	    return -1;
+	}
+    }
 
     # cache as long as we just looked!
-    $rowref->{size} = $ssize;
+    $rowref->{size} = $imagesize;
 
     #
     # A zero-length image cannot be right and will result in much confusion
     # if allowed to pass: the image load will succeed, but the disk will be
     # unchanged, making it appear that os_load loaded the default image.
     #
-    if ($ssize == 0) {
+    if ($imagesize == 0) {
 	tberror "$imagepath is empty!";
 	$$rowrefptr = 'BADIMAGE';
 	return -1;
@@ -2169,8 +2190,6 @@ sub SetupReload($$)
     my $prepare = $self->nodeflag($nodeobject,'prepare');
     my $zerofree = $self->nodeflag($nodeobject,'zerofree');
     my $osid = TBNodeDiskloadOSID($node_id);
-    my $subboss;
-    $nodeobject->GetSubboss('frisbee', \$subboss);
 
     #
     # Put it in the current_reloads table so that nodes can find out which
@@ -2197,38 +2216,6 @@ sub SetupReload($$)
     if ($nodeobject->OSSelect($osinfo,"next_boot_osid",$self->debug())) {
 	tberror "$self: os_select $osid failed!";
 	return -1;
-    }
-
-    foreach my $idx (@imageidxs) {
-	my $image = $images[$idx];
-	my $imageid = $imageids[$idx];
-	if (defined($subboss)) {
-	    my $filename = $image->path();
-	    my (undef,undef,undef,undef,undef,undef,undef,$ssize,
-		undef,$smtime,undef,undef,undef) = stat($filename);
-
-	    my $query_result = DBQueryWarn("select sync from subboss_images " . 
-					   " where subboss_id='$subboss' " . 
-					   "   and imageid='$imageid' " . 
-					   "   and sync=1");
-
-	    if (!$query_result || !$query_result->numrows) {
-		system("$SUBBOSS_FRISBEELAUNCHER " . 
-		       ($self->debug() ? "-d ": "") .
-		       "$subboss " . "$imageid " . "\"$filename\" " .
-		       $ssize . ' ' . $smtime);
-		if ($?) {
-		    tberror "$self: Subboss Frisbee Launcher ($imageid on $subboss) failed!";
-		    return -1;
-		}
-		return 0;
-	    }
-	}
-	system("$FRISBEELAUNCHER " . ($self->debug() ? "-d ": "") . "$imageid");
-	if ($?) {
-	    tberror "$self: Frisbee Launcher ($imageid) failed!";
-	    return -1;
-	}
     }
 
     return 0;

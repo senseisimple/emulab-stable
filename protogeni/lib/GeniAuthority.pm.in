@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniAuthority;
@@ -66,9 +66,8 @@ sub Lookup($$)
 	$uuid = $token;
     }
     elsif ($token =~ /^P([\w]+)$/) {
-	# Only SAs are looked up this way.
-	# This will be flushed after URNs are fully pushed out.
-	return GeniAuthority->LookupByPrefix($1);
+	print STDERR "Deprecated authority lookup by prefix\n";
+	return undef;
     }
     elsif ($token =~ /^[\w\.]*$/) {
 	$query_result =
@@ -94,9 +93,7 @@ sub Lookup($$)
 
     my $self              = {};
     $self->{'AUTHORITY'}  = $query_result->fetchrow_hashref();
-    $self->{'version'}    = undef;
-    $self->{'apilevel'}   = undef;
-    $self->{'api'}        = undef;
+    $self->{'_version_info'} = undef;
     bless($self, $class);
 
     #
@@ -180,9 +177,12 @@ sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub type($)		{ return field($_[0], "type"); }
 sub disabled($)		{ return field($_[0], "disabled"); }
-sub version($)		{ return $_[0]->{"version"}; }
-sub apilevel($)		{ return $_[0]->{"apilevel"}; }
-sub api($)		{ return $_[0]->{"api"}; }
+sub _version_info($)	{ return $_[0]->{"_version_info"}; }
+sub version($)		{ return $_[0]->VersionInfo()->{"version"}; }
+sub apilevel($)		{ return $_[0]->VersionInfo()->{"apilevel"}; }
+sub api($)		{ return $_[0]->VersionInfo()->{"api"}; }
+sub issfa($)		{ return $_[0]->VersionInfo()->{"issfa"}; }
+sub versiondata($)	{ return $_[0]->VersionInfo()->{"versiondata"}; }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 
@@ -266,6 +266,8 @@ sub CheckExisting($$)
 
 #
 # Create authority from the ClearingHouse, by looking up the info.
+# All authorities are currently stored in the Utah Emulab ClearingHouse,
+# at least until we can deal with multiple clearinghouses/registries.
 #
 sub CreateFromRegistry($$$)
 {
@@ -310,12 +312,12 @@ sub CreateFromRegistry($$$)
 #
 # Get Version. Ask the Authority what version it is running. 
 #
-sub Version($)
+sub VersionInfo($)
 {
     my ($self) = @_;
 
-    return $self->version()
-	if (defined($self->version()));
+    return $self->_version_info()
+	if (defined($self->_version_info()));
 
     #
     # The caller had to set up the xmlrpc context.
@@ -332,38 +334,49 @@ sub Version($)
 	print STDERR "  " . $response->output() . "\n";
 	return undef;
     }
+    my $ref = {"versiondata" => $response->value() };
+    
     if (ref($response->value())) {
 	# Look for the AM interface.
 	if (exists($response->value()->{'geni_api'})) {
-	    $self->{'version'}  = $response->value()->{'geni_api'};
+	    $ref->{'version'}  = $response->value()->{'geni_api'};
 	    # This was wrong; it should be 2.0 not 1.0
-	    $self->{'version'}  = 2.0 if ($self->{'version'} == 1.0);
-	    $self->{'apilevel'} = 0;
-	    $self->{'api'}      = "AM";
+	    $ref->{'version'}  = 2.0 if ($ref->{'version'} == 1.0);
+	    $ref->{'apilevel'} = 0;
+	    $ref->{'api'}      = "AM";
+	    $ref->{'issfa'}    = exists($response->value()->{'sfa'});
 	}
 	else {
-	    $self->{'version'}  = $response->value()->{'api'};
-	    $self->{'apilevel'} = $response->value()->{'level'};
-	    $self->{'api'}      = "CM";
+	    $ref->{'version'}  = $response->value()->{'api'};
+	    $ref->{'apilevel'} = $response->value()->{'level'};
+	    $ref->{'api'}      = "CM";
+	    $ref->{'issfa'}    = 0;
 	}
     }
     else {
-	$self->{'version'}  = $response->value();
-	$self->{'apilevel'} = 1;
-	$self->{'api'}      = "CM";
+	$ref->{'version'}  = $response->value();
+	$ref->{'apilevel'} = 1;
+	$ref->{'api'}      = "CM";
+	$ref->{'issfa'}    = 0;
     }
-    return $self->{'version'};
+    $self->{'_version_info'} = $ref;
+    return $ref;
 }
-# Ditto for the API level
+sub Version($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (!defined($self->VersionInfo()));
+
+    return $self->version();
+}
 sub ApiLevel($)
 {
     my ($self) = @_;
 
-    return $self->apilevel()
-	if (defined($self->apilevel()));
-
     return undef
-	if (!defined($self->Version()));
+	if (!defined($self->VersionInfo()));
 
     return $self->apilevel();
 }
@@ -371,13 +384,19 @@ sub Api($)
 {
     my ($self) = @_;
 
-    return $self->api()
-	if (defined($self->api()));
-
     return undef
-	if (!defined($self->Version()));
+	if (!defined($self->VersionInfo()));
 
     return $self->api();
+}
+sub IsSFA($)
+{
+    my ($self) = @_;
+
+    return undef
+	if (!defined($self->VersionInfo()));
+
+    return $self->issfa();
 }
 
 #
@@ -458,6 +477,74 @@ sub LookupByPrefix($$)
     ($uuid) = $query_result->fetchrow_array();
 
     return GeniAuthority->Lookup($uuid);
+}
+
+#
+# Set the disabled bit.
+#
+sub Disable($)
+{
+    my ($self) = @_;
+    my $urn = $self->urn();
+    
+    DBQueryWarn("update geni_authorities set disabled=1 ".
+		"where urn='$urn'")
+	or return -1;
+
+    return 0;
+}
+
+#
+# Resolve something at an authority
+#
+sub Resolve($$)
+{
+    my ($self, $urn) = @_;
+
+    my $manager_version = $self->Version();
+    return undef
+	if (!defined($manager_version));
+
+    #
+    # Need a credential to make this call. 
+    #
+    if (!defined(Genixmlrpc->GetContext())) {
+	print STDERR "Need an RPC context to generate a self credential\n";
+	return undef;
+    }
+    my $context = Genixmlrpc->GetContext();
+    my $me      = GeniAuthority->Lookup($context->certificate()->uuid());
+    if (!defined($me)) {
+	print STDERR "Could not find my own authority for $context\n";
+	return undef;
+    }
+    my $credential = GeniCredential->GetSelfCredential($me);
+    if (!defined($credential)) {
+	print STDERR "Could not create self credential for $me\n";
+	return undef;
+    }
+
+    my $method_args;
+    if ($manager_version == 2.0) {
+	$method_args->{'credentials'} = [$credential->asString()];
+	$method_args->{'urn'}         = $urn;
+    }
+    else {
+	print STDERR "GeniAuthority::Resolve: Unknown version at $self\n";
+	return undef;
+    }
+    my $response =
+	Genixmlrpc::CallMethod($self->url(), undef, "Resolve", $method_args);
+    if (!defined($response)) {
+	print STDERR "*** Internal error Resolving $urn at $self\n";
+	return undef;
+    }
+    if ($response->code() != GENIRESPONSE_SUCCESS) {
+	print STDERR "Could not resolve $urn at $self Error:";
+	print STDERR " " . $response->output() . "\n";
+	return undef;
+    }
+    return $response->value();
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

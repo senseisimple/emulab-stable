@@ -71,6 +71,11 @@ int	BlockMapFirst(BlockMap_t *blockmap);
 int	BlockMapApply(BlockMap_t *blockmap, int chunk,
 		      int (*func)(int, int, int, void *), void *farg);
 void	ClientStatsDump(unsigned int id, ClientStats_t *stats);
+#ifdef MASTER_SERVER
+char	*GetMSError(int error);
+char	*GetMSMethods(int methods);
+void	PrintGetInfo(char *imageid, GetReply *reply, int raw);
+#endif
 
 /* Compat */
 #define CHUNKSIZE	ChunkSize(-1)

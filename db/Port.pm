@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2010 University of Utah and the Flux Group.
+# Copyright (c) 2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Port;
@@ -17,17 +17,27 @@ use libdb;
 use English;
 use Data::Dumper;
 
+# Some important terms used:
+# - Tokens: seperated fields of a port, e.g. "node1", "card2", "iface3", etc.
+# - Iface:  interface on a node, or a full representation of an interface, say "iface2", "node1:iface4".
+# - Triple: a port representation that uses three fields: node, card and port, like "node1:card2.port1".
+# - String: a string representation of a port, ususally a combination of tokens, e.g. "node1:iface3", "node1:card3.port4".
+#
+# All code that needs to convert between different representations or merely parse tokens from string and vice-verse must
+# use the converters provided in this class.
+
 # Cache of port instances, node:iface OR node:card.port => Port Instance
 my %allports = ();
 
-# Ends of wires, node:iface OR node:card.port => node:card.port
-# A better mapping should be triple/iface => Port instance, but the switch side
-# port may not exist in interfaces table, so we can't create that object by
-# LookupByXXX.
+# Ends of wires, node:iface OR node:card.port => Port Instance
 my %wiredports = ();
 
-
-sub GetTheOtherEndByTriple($;$$$)
+#
+# Get the other end port of a wire by triple representation of this end port
+# the classname can be ignored
+# the representation can be a triple-port string or triple tokens
+#
+sub GetOtherEndByTriple($;$$$)
 {
     my ($c, $node, $card, $port) = @_;
     my $str;
@@ -47,16 +57,57 @@ sub GetTheOtherEndByTriple($;$$$)
     }
 
     my $p = Port->LookupByTriple($str);
-    if (defined($p) && $p != 0 && $p != -1) {
+    if (defined($p)) {
 
-	$wiredports{$p->toTripleString()} = $p->getOtherEndTriple();
-	$wiredports{$p->toIfaceString()} = $p->getOtherEndTriple();
+	$wiredports{$p->toTripleString()} = $p->getOtherEndPort();
+	$wiredports{$p->toIfaceString()} = $p->getOtherEndPort();
 
-	return $p->getOtherEndTriple();
+	return $p->getOtherEndPort();
     } else {
 	return undef;
     }
 }
+
+#
+# Get the other end port of a wire by iface representation of this end port
+# the classname can be ignored
+# the representation can be a iface-port string or iface tokens
+#
+sub GetOtherEndByIface($;$$)
+{
+    my ($c, $node, $iface) = @_;
+    my $str;
+    my $p;
+    
+    if (defined($iface)) {
+	$str = Port->Tokens2IfaceString($node, $iface);
+    } elsif (!defined($node)) {
+        $str = $c;
+    } else {
+        $str = $node;
+        $p = Port->LookupByIface($str);
+        if (!defined($p)) {
+            $str = Port->Tokens2IfaceString($c, $node);
+            $p = Port->LookupByIface($str);
+            if (!defined($p)) {
+                return undef;
+            }
+        }
+    }
+    
+    if (!defined($p)) {
+    	$p = Port->LookupByIface($str);
+    }
+    if (defined($p)) {
+    
+    	$wiredports{$p->toTripleString()} = $p->getOtherEndPort();
+	$wiredports{$p->toIfaceString()} = $p->getOtherEndPort();
+
+	return $p->getOtherEndPort();
+    } else {
+	return undef;
+    }
+}    
 
 
 #
@@ -75,7 +126,7 @@ sub ParseIfaceString($;$)
 	return ($1, $2);
     }
 
-    return undef;
+    return (undef, undef);
 }
 
 #
@@ -94,7 +145,7 @@ sub ParseTripleString($;$)
 	return ($1, $2, $3);
     }
 
-    return undef;
+    return (undef, undef, undef);
 }
 
 sub Iface2Triple($;$)
@@ -166,6 +217,46 @@ sub Tokens2IfaceString($$;$)
     return "$nodeid:$iface";
 }
 
+sub fake_CardPort2Iface($$;$)
+{
+    my ($cn, $c, $p) = @_;
+
+    if (!defined($p)) {
+	$p = $c;
+	$c = $cn;
+    }
+    return "$c/$p";
+}
+
+sub fake_TripleString2IfaceString($;$)
+{
+    my ($cn, $t) = @_;
+
+    if (!defined($t)) {
+	$t = $cn;
+    }
+
+    my ($n, $c, $p) = ParseTripleString($t);
+
+    return "$n:".fake_CardPort2Iface($c, $p);
+}
+
+sub fake_IfaceString2TripleTokens($;$)
+{
+    my ($cn, $i) = @_;
+
+    if (!defined($i)) {
+	$i = $cn;
+    }
+
+    my ($n, $iface) = ParseIfaceString($i);
+    if ($iface =~ /^(.+)\/(.+)$/) {
+	return ($n, $1, $2);
+    }    
+
+    return (undef, undef, undef);
+}
+
 sub LookupByIface($$;$)
 {
     my ($class, $nodeid, $iface) = @_;
@@ -185,10 +276,17 @@ sub LookupByIface($$;$)
     # all fields
     my $query_result = DBQueryWarn("select * from interfaces ".
 		    "where node_id='$nodeid' AND iface='$iface'");
-    return -1
+    return undef
 	if (!$query_result);
-    return 0
-	if (!$query_result->numrows);
+    
+    if (!$query_result->numrows) {
+	my ($n, $c, $p) = fake_IfaceString2TripleTokens($class, $striface);
+	if (defined($n)) {
+	    return LookupByTriple($class, $n, $c, $p);
+	} else {
+	    return undef;
+	}
+    }
 
     my $rowref = $query_result->fetchrow_hashref();
 
@@ -202,7 +300,7 @@ sub LookupByIface($$;$)
     $query_result =
 	DBQueryWarn("select * from wires ".
 		    "where node_id1='$nodeid' AND card1='$card' AND port1='$port'");
-    return -1
+    return undef
 	if (!$query_result);
 
     $inst->{"WIRE_END"} = "pc";
@@ -211,9 +309,9 @@ sub LookupByIface($$;$)
 	$query_result =
 	    DBQueryWarn("select * from wires ".
 		    "where node_id2='$nodeid' AND card2='$card' AND port2='$port'");
-	return -1
+	return undef
 	    if (!$query_result);
-	return 0
+	return undef
 	    if (!$query_result->numrows);
 	$inst->{"WIRE_END"} = "switch";
     }
@@ -246,44 +344,58 @@ sub LookupByTriple($$;$$)
 	return $allports{$strtriple};
     }
 
+    # wire mapping:
     my $query_result =
-	DBQueryWarn("select * from interfaces ".
-		    "where node_id='$nodeid' AND card='$card' AND port='$port'");
-    return -1
-	if (!$query_result);
-    return 0
-	if (!$query_result->numrows);
-
-    my $rowref = $query_result->fetchrow_hashref();
-
-    my $iface  = $rowref->{'iface'};
-
-    my $inst = {};
-    $inst->{"INTERFACES_ROW"} = $rowref;
-
-    # wire mapping
-    $query_result =
 	DBQueryWarn("select * from wires ".
 		    "where node_id1='$nodeid' AND card1='$card' AND port1='$port'");
-    return -1
+    return undef
 	if (!$query_result);
 
+    my $inst = {};
     $inst->{"WIRE_END"} = "pc";
     
     if (!$query_result->numrows) {
 	$query_result =
 	    DBQueryWarn("select * from wires ".
 		    "where node_id2='$nodeid' AND card2='$card' AND port2='$port'");
-	return -1
+	return undef
 	    if (!$query_result);
-	return 0
+	return undef
 	    if (!$query_result->numrows);
 	$inst->{"WIRE_END"} = "switch";
     }
 
-    $rowref = $query_result->fetchrow_hashref();
+    my $rowref = $query_result->fetchrow_hashref();
     $inst->{"WIRES_ROW"} = $rowref;
 
+    $query_result =
+	DBQueryWarn("select * from interfaces ".
+		    "where node_id='$nodeid' AND card='$card' AND port='$port'");
+    return undef
+	if (!$query_result);
+    if (!$query_result->numrows) {
+	$rowref = {};
+	my $iface = fake_CardPort2Iface($card, $port);
+	$rowref->{'iface'} = $iface;
+	$rowref->{'node_id'} = $nodeid;
+	$rowref->{'card'} = $card;
+	$rowref->{'port'} = $port;
+	$rowref->{'mac'} = "";
+	$rowref->{'IP'} = "";
+	$rowref->{'role'} = "";
+	$rowref->{'interface_type'} = "";
+	$rowref->{'mask'} = "";
+	$rowref->{'uuid'} = "";
+    } else {
+	$rowref = $query_result->fetchrow_hashref();
+    }
+
+    my $iface = $rowref->{'iface'};
+
+    $inst->{"INTERFACES_ROW"} = $rowref;
+
+    # wire mapping
+    
     bless($inst, $class);
 
     $allports{$strtriple} = $inst;
@@ -356,8 +468,16 @@ sub toNodeCardString($) {
     return Tokens2IfaceString($_[0]->node_id(), $_[0]->card());
 }
 
-sub getOtherEndTriple($) {
+sub getOtherEndTripleString($) {
     return Tokens2TripleString($_[0]->other_end_node_id(), $_[0]->other_end_card(), $_[0]->other_end_port());
+}
+
+sub getOtherEndIfaceString($) {
+    return Tokens2IfaceString($_[0]->other_end_node_id(), $_[0]->other_end_iface());
+}
+
+sub getOtherEndPort($) {
+    return Port->LookupByTriple($_[0]->getOtherEndTripleString());
 }
 
 return 1;

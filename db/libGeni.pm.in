@@ -1,8 +1,10 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2009, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2009, 2010, 2011 University of Utah and the Flux Group.
 # All rights reserved.
+#
+# Merge internet nodes and links to them. 
 #
 package libGeni;
 
@@ -122,7 +124,7 @@ sub MapResources($$$$$)
 	#
 	my $fragment;
 	if (!exists($cmurn2frags{$manager_urn})) {
-	    $fragment = CreateNewRspec();
+	    $fragment = CreateNewRspec("request");
 	    return -1
 		if (!defined($fragment));
 
@@ -193,6 +195,18 @@ sub MapResources($$$$$)
 		print STDERR "Could not get resource list for $resource\n";
 		return -1;
 	}
+	#
+	# Is the advertisement from a non-conforming manager, such as the SFA?
+	# If so, must convert it to something assign can grok.
+	#
+	if ($resource->IsSFA()) {
+	    $advertisement = ConvertAdSFAtoPG($advertisement,
+					      $resource->manager_urn());
+	    return -1
+		if (!defined($advertisement));
+	    $advertisement = GeniXML::Serialize($advertisement, 1);
+	}
+	
 	my $soln = $tmp . ".soln";
 	my $log  = $tmp . ".log";
 	my $ptop = $tmp . ".ptop";
@@ -412,7 +426,7 @@ sub MapResources($$$$$)
 	    print STDERR " $change->{message} in context $change->{context}\n";
 	    $resource->setmodified(1);
 	}
-	if ($resource->modified() && $resource->ManagerApiLevel() == 0) {
+	if ($resource->modified() && $resource->ApiLevel() == 0) {
 	    print STDERR "*** Difference to rspec for level 0 $resource. ".
 		"Not allowed, aborting\n";
 	    return -1;
@@ -422,7 +436,7 @@ sub MapResources($$$$$)
     #
     # Combine the fragments into final rspec document.
     #
-    my $rspec = CombineRspecDocs(values(%vname2doc));
+    my $rspec = CombineRspecDocs("request", values(%vname2doc));
     return -1
 	if (!defined($rspec));
 
@@ -435,6 +449,442 @@ sub MapResources($$$$$)
 	print STDERR "$rspecstr\n";
     }
     $$rspecref = $rspec;
+    return 0;
+}
+
+sub MapResourcesNew($$$$$)
+{
+    my ($experiment, $user, $topo, $rspecref, $verbose) = @_;
+    my %cmurn2res   = ();
+    my %cmurn2links = ();
+    my %cmurn2frags = ();
+    my %vname2res   = ();
+    my %vname2doc   = ();
+    my %nodes2cmurn = ();
+	
+    Register($experiment, $user) == 0
+	or return -1;
+
+    #
+    # Build up rspec fragments from the "intermediate" representation
+    # that libvtop passed in. Ick.
+    #
+    foreach my $ref (@{ $topo->{'node'} }) {
+	# Skip non geni nodes; handled in libvtop
+	next
+	    if (! (exists($ref->{'isgeninode'}) && $ref->{'isgeninode'}));
+	
+	my $resource;
+	my $node_urn    = $ref->{'request_urn'};
+	my $manager_urn = $ref->{'manager_urn'};
+	my $virtual_id  = $ref->{'virtual_id'};
+	my (undef,undef,$node_id) = GeniHRN::Parse($node_urn);
+	
+	#
+	# Get the resource object.
+	#
+	if (!exists($cmurn2res{$manager_urn})) {
+	    $resource = GeniResource->Lookup($experiment->idx(), $manager_urn);
+	    if (!defined($resource)) {
+		$resource = GeniResource->Create($experiment, $manager_urn);
+		if (!defined($resource)) {
+		    print STDERR
+			"Could not create GeniResource for $manager_urn\n";
+		    return -1;
+		}
+	    }
+	    $cmurn2res{$manager_urn} = $resource;
+	}
+	$resource = $cmurn2res{$manager_urn};
+	$vname2res{$virtual_id} = $resource;
+
+	#
+	# The point of this is to split the rspec apart, since at present
+	# assign cannot handle multiple advertisements, and it will not work
+	# to pass in an rspec that references CMs other then the one
+	# advertisement being passed in.
+	#
+	my $fragment;
+	if (!exists($cmurn2frags{$manager_urn})) {
+	    $fragment = CreateNewRspec("request");
+	    return -1
+		if (!defined($fragment));
+
+	    $cmurn2frags{$manager_urn} = $fragment;
+	}
+	$fragment = $cmurn2frags{$manager_urn};
+
+	my $rspecdoc = AddNodeToRspec($fragment, $ref);
+	return -1
+	    if (!defined($rspecdoc));
+	$vname2doc{$virtual_id} = $rspecdoc;
+    }
+
+    #
+    # As above, need to split the interfaces into the correct fragments.
+    #
+    if (exists($topo->{'link'})) {
+	foreach my $ref (@{ $topo->{'link'} }) {
+	    my $linkname   = $ref->{'virtual_id'};
+
+	    # Skip tunnels until rspec stitching in place.
+	    next
+		if (exists($ref->{'link_type'}) &&
+		    $ref->{'link_type'} eq "tunnel");
+
+	    my $ifaceref0 = $ref->{'interface_ref'}->[0];
+	    my $ifaceref1 = $ref->{'interface_ref'}->[1];
+	    # Do not want to add this twice.
+	    my $virtid0   = $ifaceref0->{'virtual_node_id'};
+	    my $resource0 = $vname2res{$virtid0};
+	    my $fragment0 = $cmurn2frags{$resource0->manager_urn()};
+
+	    my $rspecdoc = AddLinkToRspec($fragment0, $ref);
+	    return -1
+		if (!defined($rspecdoc));
+	    # Only one of these in the array, for building combined rspec.
+	    $vname2doc{$linkname} = $rspecdoc;
+	    
+	    my $virtid1   = $ifaceref1->{'virtual_node_id'};
+	    my $resource1 = $vname2res{$virtid1};
+	    my $fragment1 = $cmurn2frags{$resource1->manager_urn()};
+	    if ($resource0->manager_urn() ne $resource1->manager_urn()) {
+		$rspecdoc = AddLinkToRspec($fragment1, $ref);
+		return -1
+		    if (!defined($rspecdoc));
+	    }
+	}
+    }
+
+    #
+    # Discover resources in parallel, writing the advertisement to a file.
+    #
+    my $coderef = sub {
+	my ($resource, $tmp) = @{ $_[0] };
+	my $advertisement;
+
+	print STDERR "Asking for resource list from $resource\n";
+	if ($resource->Discover($user, \$advertisement)) {
+		print STDERR "Could not get resource list for $resource\n";
+		return -1;
+	}
+	#
+	# Is the advertisement from a non-conforming manager, such as the SFA?
+	# If so, must convert it to something assign can grok.
+	#
+	if ($resource->IsSFA()) {
+	    $advertisement = ConvertAdSFAtoPG($advertisement,
+					      $resource->manager_urn());
+	    return -1
+		if (!defined($advertisement));
+	    $advertisement = GeniXML::Serialize($advertisement, 1);
+	}
+
+	my $ptop   = $tmp . ".ad";
+	my $ptopfh = new IO::File "> $ptop";
+	if (! defined($ptopfh)) {
+	    print STDERR "Could not create temporary files for ptop\n";
+	    return -1;
+	}
+	print $ptopfh $advertisement;
+	$ptopfh->close();
+
+	return 0;
+    };
+    
+    #
+    # Get advertisements in parallel. Need to cache these for the case that the
+    # resource request has not changed.
+    #
+    my @todo    = ();
+    my @results = ();
+    my $name    = time();
+    my $count   = 0;
+
+    foreach my $manager_urn (keys(%cmurn2res)) {
+	my $resource = $cmurn2res{$manager_urn};
+
+	my $tmp  = "$name-$count";
+	push(@todo, [$resource, $tmp]);
+	$count++;
+    }
+    
+    print STDERR "Getting advertisements in parallel ...\n";
+    if (ParRun({'maxwaittime' => 600, 'maxchildren' => 4},
+	       \@results, $coderef, @todo)) {
+	print STDERR "*** MapResources: Internal error mapping resources\n";
+	return -1;
+    }
+    
+    #
+    # Check the exit codes. 
+    #
+    my $errors   = 0;
+    $count = 0;
+    foreach my $result (@results) {
+	my ($resource, $tmp) = @{ $todo[$count] };
+
+	#
+	# ParRun does a fork; so need to refresh the resource object
+	# to sync it to the DB.
+	#
+	if ($resource->Refresh()) {
+	    print STDERR "*** MapResources: Error synchronizing $resource\n";
+	    $errors++;
+	}
+	elsif ($result != 0) {
+	    print STDERR "*** Error getting advertisement for $resource\n";
+	    $errors++;
+	}
+	$count++;
+    }
+    return -1
+	if ($errors);
+    
+    my $soln = $name . ".soln";
+    my $log  = $name . ".log";
+    my $vtop = $name . ".vtop";
+    my $ptop = $name . ".ptop";
+
+    my $vtopfh = new IO::File "> $vtop";
+    my $ptopfh = new IO::File "> $ptop";
+    if (! (defined($vtopfh) && defined($ptopfh))) {
+	print STDERR "Could not create temporary files for ptop/vtop\n";
+	return -1;
+    }
+    # Combine the fragments into a single rspec document.
+    my $rspec = CombineRspecDocs("request", values(%vname2doc));
+    return -1
+	if (!defined($rspec));
+    
+    my $rspecstr = GeniXML::Serialize($rspec, 1);
+    print $vtopfh $rspecstr;
+    $vtopfh->close();
+
+    if ($verbose) {
+	print STDERR "Initial Request:\n";
+	print STDERR "$rspecstr\n";
+    }
+
+    #
+    # Combine all the advertisements into one big file. Hope assign
+    # can handle this.
+    #
+    my %adfrags = ();
+    foreach my $ref (@todo) {
+	my ($resource, $tmp) = @{ $ref };
+
+	my $ad = $tmp . ".ad";
+	my $frag = GeniXML::ParseFile($ad);
+	if (!defined($frag)) {
+	    print STDERR "Cannot parse advertisement for $resource\n";
+	    return -1;
+	}
+	$adfrags{$resource->manager_urn()} = $frag;
+    }
+    my $advertisement = CombineRspecDocs("advertisement",
+					 map { $_->childNodes() }
+					 values(%adfrags));
+    my $adstr = GeniXML::Serialize($advertisement, 1);
+    print $ptopfh $adstr;
+    $ptopfh->close();
+
+    my $cmd = "nice $ASSIGN -uod -c .75 ".
+	"-f rspec/rspec -W $soln $ptop $vtop > $log 2>&1";
+    if ($verbose) {
+	print STDERR "$cmd\n";
+    }
+    system($cmd);
+	
+    if ($?) {
+	print STDERR "Could not map to physical resources\n";
+	my $logstuff = `cat $log`;
+	print STDERR "\n" . $logstuff . "\n";
+	print STDERR "$rspecstr\n";
+	return -1;
+    }
+
+    #
+    # Read the solutions and write back to the rspec.
+    #
+    my $solution =
+	eval { XMLin($soln, KeyAttr => [],
+		     ForceArray => ["node", "link", "interface",
+				    "interface_ref", "linkendpoints",
+				    "component_manager"]) };
+    if ($@) {
+	print STDERR "XMLin error reading $soln: $@\n";
+	return -1;
+    }
+    if ($verbose) {
+	print STDERR "Solution:\n";
+	print STDERR Dumper($solution);
+    }
+
+    foreach my $ref (@{ $solution->{'node'} }) {
+	my $virtual_id = $ref->{'virtual_id'};
+	my $node_urn   = $ref->{'component_uuid'};
+	my $cm_urn     = $ref->{'component_manager_uuid'};
+	my $node_name  = $ref->{'component_name'};
+	my $rspecdoc   = $vname2doc{$virtual_id};
+
+	$nodes2cmurn{$node_urn} = $cm_urn;
+	#
+	# This writes the solution back into the fragment.
+	#
+	$rspecdoc->setAttribute("component_uuid", $node_urn);
+	$rspecdoc->setAttribute("component_urn", $node_urn);
+	$rspecdoc->setAttribute("component_name", $node_name);
+	$rspecdoc->setAttribute("component_manager_uuid", $cm_urn);
+	$rspecdoc->setAttribute("component_manager_urn", $cm_urn);
+
+	if (exists($ref->{'interface'})) {
+	    my $interfaces = $ref->{'interface'};
+
+	    foreach my $ifaceref (@{ $interfaces }) {
+		my $virtid = $ifaceref->{'virtual_id'};
+		my $compid = $ifaceref->{'component_id'};
+
+		# Not supposed to happen, but does cause of issues
+		# with tunnels and rspec stitching. 
+		next
+		    if (!defined($compid));
+
+		foreach my $linkref (GeniXML::FindNodes("n:interface",
+						$rspecdoc)->get_nodelist()) {
+		    my $ovirtid = GeniXML::GetText("virtual_id", $linkref);
+		    if ($ovirtid eq $virtid) {
+			$linkref->setAttribute("component_id", $compid);
+			last;
+		    }
+		}
+	    }
+	}
+    }
+
+    #
+    # One last chore; we had to skip tunnels above since assign does
+    # not know how to deal with them.
+    #
+    if (exists($topo->{'link'})) {
+	foreach my $ref (@{ $topo->{'link'} }) {
+	    my $linkname   = $ref->{'virtual_id'};
+
+	    # Skip non-tunnels.
+	    next
+		if (! (exists($ref->{'link_type'}) &&
+		       $ref->{'link_type'} eq "tunnel"));
+
+	    my $ifaceref0 = $ref->{'interface_ref'}->[0];
+	    my $ifaceref1 = $ref->{'interface_ref'}->[1];
+	    # Do not want to add this twice.
+	    my $virtid0   = $ifaceref0->{'virtual_node_id'};
+	    my $resource0 = $vname2res{$virtid0};
+	    my $fragment0 = $cmurn2frags{$resource0->manager_urn()};
+
+	    my $rspecdoc = AddLinkToRspec($fragment0, $ref);
+	    return -1
+		if (!defined($rspecdoc));
+	    # Only one of these in the array, for building combined rspec.
+	    $vname2doc{$linkname} = $rspecdoc;
+	    
+	    my $virtid1   = $ifaceref1->{'virtual_node_id'};
+	    my $resource1 = $vname2res{$virtid1};
+	    my $fragment1 = $cmurn2frags{$resource1->manager_urn()};
+	    if ($resource0->manager_urn() ne $resource1->manager_urn()) {
+		$rspecdoc = AddLinkToRspec($fragment1, $ref);
+		return -1
+		    if (!defined($rspecdoc));
+	    }
+	}
+    }
+
+    #
+    # Compare to previous rspec; this tells us if we need to request
+    # a new ticket. Easier to use the rspec then the manifest since
+    # the CM added a ton of cruft to it.
+    #
+    foreach my $manager_urn (keys(%cmurn2res)) {
+	my $resource = $cmurn2res{$manager_urn};
+
+	# We got the ticket on a previous loop.
+	next
+	    if ($resource->HaveTicket());
+
+	my $fragment    = $cmurn2frags{$manager_urn};
+	my $frag_string = GeniXML::Serialize($fragment);
+	# Must stash for redeemticket.
+	$resource->stashrspec($frag_string);
+	
+	next
+	    if (! $resource->HaveRspec());
+
+	#
+	# The idea is to do a diff of the rspec. If there are no
+	# meaningful changes, then we can skip trying to get a new
+	# ticket.
+	#
+	my $rspec    = $resource->Rspec();
+	my $diff     = XML::SemanticDiff->new();
+	my $rspec_string = GeniXML::Serialize($rspec);
+	$resource->setmodified(0);
+
+	print STDERR "Comparing old and new rspecs for $resource\n"; 
+	foreach my $change ($diff->compare($rspec_string, $frag_string)) {
+	    print STDERR " $change->{message} in context $change->{context}\n";
+	    $resource->setmodified(1);
+	}
+	if ($resource->modified() && $resource->ApiLevel() == 0) {
+	    print STDERR "*** Difference to rspec for level 0 $resource. ".
+		"Not allowed, aborting\n";
+	    return -1;
+	}
+    }
+
+    #
+    # Combine the updated fragments into final rspec document.
+    #
+    $rspec = CombineRspecDocs("request", values(%vname2doc));
+    return -1
+	if (!defined($rspec));
+
+    # Make sure all that namespace stuff is done correctly. 
+    $rspec = GeniXML::Parse(GeniXML::Serialize($rspec));
+    
+    if ($verbose) {
+	print STDERR "Final rspec:\n";
+	my $rspecstr = GeniXML::Serialize($rspec, 1);
+	print STDERR "$rspecstr\n";
+
+	my $tmp = ConvertReqPGtoSFA($rspec);
+	$rspecstr = GeniXML::Serialize($tmp, 1);
+
+	print STDERR "SFA Version:\n";
+	print STDERR "$rspecstr\n";
+    }
+    $$rspecref = $rspec;
+
+    #
+    # Before we return, lets make sure all the proxy nodes exist.
+    # This is probably not the best place to do this, but remember
+    # that once a proxy node exists, it will be available next time.
+    #
+    foreach my $node_urn (keys(%nodes2cmurn)) {
+	my $cm_urn = $nodes2cmurn{$node_urn};
+
+	my $proxy = LookupProxyNode($node_urn);
+	if (!defined($proxy)) {
+	    $proxy = GeniEmulab::CreatePhysNode($cm_urn, $node_urn);
+	    if (!defined($proxy)) {
+		#
+		# It would be nice at this point to drop the node from
+		# the set and try again.
+		#
+		print STDERR "Could not create proxy node $node_urn\n";
+		return -1;
+	    }
+	}
+    }
     return 0;
 }
 
@@ -529,8 +979,12 @@ sub GetTickets($)
     my $coderef   = sub {
 	my ($resource) = @_;
 
-	if ($resource->ManagerApiLevel() == 0) {
+	if ($resource->ApiLevel() == 0) {
 	    print STDERR "Creating sliver on level 0 API $resource\n";
+	    if ($resource->IsSFA()) {
+		my $tmp = ConvertReqPGtoSFA($rspec);
+		$rspecstr = GeniXML::Serialize($tmp);
+	    }
 	    return 0
 		if ($resource->CreateSliver($user, $rspecstr, 0) == 0);
 	}
@@ -599,7 +1053,7 @@ sub GetTickets($)
 	    $progress++;
 	    my $object;
 
-	    if ($resource->ManagerApiLevel() == 0) {
+	    if ($resource->ApiLevel() == 0) {
 		#
 		# Created the sliver; 
 		#
@@ -758,6 +1212,10 @@ sub MapNodes($$)
 	my $manifest = $resource->Manifest();
 	return -1
 	    if (!defined($manifest));
+	my $rspec = $resource->Rspec();
+	return -1
+	    if (!defined($rspec));
+	
 	$manifest_string = GeniXML::Serialize($manifest, 1);
 
 	if ($verbose) {
@@ -989,14 +1447,14 @@ sub StartSlivers($$$)
 	my ($resource) = @_;
 
 	# The sliver was auto started. We just need to wait for it.
-	if ($resource->ManagerApi() eq "AM" ||
-	    $resource->ManagerApiLevel() == 0) {
+	if ($resource->Api() eq "AM" ||
+	    $resource->ApiLevel() == 0) {
 	    print STDERR
 		"Skipping start sliver on level 0 resource $resource\n";
 	    return 0;
 	}
 
-	if ($resource->ManagerVersion() >= 2) {
+	if ($resource->Version() >= 2) {
 	    #
 	    # First get the state; we might not need to start it
 	    # (would be wrong) if the sliver is in the started
@@ -1040,7 +1498,7 @@ sub StartSlivers($$$)
 	#
 	# Grab a new manifest;
 	#
-	if ($resource->ManagerVersion() == 2.0) {
+	if ($resource->Version() == 2.0) {
 	    while (1) {
 		print STDERR "Getting ($$) new manifest for $resource\n";
 		my $retval = $resource->GetManifest($user);
@@ -1173,7 +1631,7 @@ sub WaitForSlivers($$$@)
 		    "Could not locate node $vname in $experiment\n";
 		return -1;
 	    }
-	    if ($resource->ManagerVersion() == 1.0) {
+	    if ($resource->Version() == 1.0) {
 		my ($domain,undef,$node_id) = GeniHRN::Parse($urn);
 		$urn = GeniHRN::Generate($domain, "sliver", $node_id);
 		$nodemap{$urn} = $node;
@@ -1225,15 +1683,15 @@ sub WaitForSlivers($$$@)
 	    my $val  = $ref->{'details'}->{$key};
 	    my ($status, $node);
 
-	    if ($resource->ManagerApi() eq "AM") {
+	    if ($resource->Api() eq "AM") {
 		$node   = $nodemap{$key};
 		$status = $val->{'status'};
 	    }
-	    elsif ($resource->ManagerVersion() == 1.0) {
+	    elsif ($resource->Version() == 1.0) {
 		$node   = $nodemap{$key};
 		$status = $val;
 	    }
-	    elsif ($resource->ManagerVersion() == 2.0) {
+	    elsif ($resource->Version() == 2.0) {
 		$node   = $nodemap{$key};
 		$status = $val->{'status'};
 	    }
@@ -1394,7 +1852,7 @@ sub RestartNodes($$@)
 	my ($resource, $urns) = @{ $argref };
 	my @urns = @{ $urns };
 
-	if ($resource->ManagerApi() eq "AM") {
+	if ($resource->Api() eq "AM") {
 	    print STDERR "Skipping restart on AM $resource\n";
 	    return 0;
 	}
@@ -1526,15 +1984,15 @@ sub WaitForNodes($$$@)
 	    my $val  = $ref->{'details'}->{$key};
 	    my ($status, $node);
 
-	    if ($resource->ManagerApi() eq "AM") {
+	    if ($resource->Api() eq "AM") {
 		$node   = $nodemap{$key};
 		$status = $val->{'status'};
 	    }
-	    elsif ($resource->ManagerVersion() == 1.0) {
+	    elsif ($resource->Version() == 1.0) {
 		$node   = $nodemap{$key};
 		$status = $val;
 	    }
-	    elsif ($resource->ManagerVersion() == 2.0) {
+	    elsif ($resource->Version() == 2.0) {
 		$node   = $nodemap{$key};
 		$status = $val->{'status'};
 	    }
@@ -1754,22 +2212,20 @@ sub LookupProxyNode($)
 	}
 	return $node;
     }
-
-    #
-    # We have to create the local node proxy. 
-    #
-    return GeniEmulab::CreatePhysNode($node_urn);
+    return undef;
 }
 
 #
 # Generate a new fragment.
 #
-sub CreateNewRspec()
+sub CreateNewRspec($)
 {
+    my ($type) = @_;
+    
     my $doc = XML::LibXML::Document->new();
 
     my $root = $doc->createElement("rspec");
-    $root->setAttribute("type", "request");
+    $root->setAttribute("type", $type);
     $root->setAttribute("generated_by", "libvtop");
     $root->setAttribute("xmlns",
 			'http://www.protogeni.net/resources/rspec/0.2');
@@ -1777,7 +2233,8 @@ sub CreateNewRspec()
 			"http://www.w3.org/2001/XMLSchema-instance");
     $root->setAttribute("xsi:schemaLocation",
 		"http://www.protogeni.net/resources/rspec/0.2 ".
-		"http://www.protogeni.net/resources/rspec/0.2/request.xsd");
+		"http://www.protogeni.net/resources/rspec/0.2/".
+		  ($type eq "request" ? "request.xsd" : "ad.xsd"));
 
     $doc->setDocumentElement($root);
     return $doc;
@@ -1786,9 +2243,10 @@ sub CreateNewRspec()
 #
 # Combine a bunch of documents into a single rspec.
 #
-sub CombineRspecDocs(@)
+sub CombineRspecDocs($@)
 {
-    my $rspec = CreateNewRspec();
+    my ($type,@docs) = @_;
+    my $rspec = CreateNewRspec($type);
     return -1
 	if (!defined($rspec));
     my $root = $rspec->getDocumentElement();
@@ -1802,7 +2260,7 @@ sub CombineRspecDocs(@)
     $root->setAttribute("valid_until",
 			POSIX::strftime("20%y-%m-%dT%H:%M:%S",
 					gmtime($expiration)));
-    foreach my $element (@_) {
+    foreach my $element (@docs) {
 	$root->appendChild($element);
     }
     return $rspec;
@@ -1918,6 +2376,128 @@ sub AddLinkToRspec($$)
 	}
     }
     return $rspeclink;
+}
+
+sub ConvertAdSFAtoPG($$)
+{
+    my ($rspec, $manager_urn) = @_;
+
+    # Parse if a string.
+    if (! ref($rspec)) {
+	$rspec = GeniXML::Parse($rspec);
+	if (!defined($rspec)) {
+	    print STDERR "*** ConvertRspec: Cannot parse rspec\n";
+	    return undef;
+	}
+    }
+    my $doc  = XML::LibXML::Document->new();
+    my $root = $doc->createElement("rspec");
+    my ($authority,undef,$which) = GeniHRN::Parse($manager_urn);
+
+    $root->setAttribute("type", "advertisement");
+    $root->setAttribute("xmlns",
+			'http://www.protogeni.net/resources/rspec/0.2');
+    $root->setAttribute("xmlns:xsi",
+			"http://www.w3.org/2001/XMLSchema-instance");
+    $root->setAttribute("xsi:schemaLocation",
+		"http://www.protogeni.net/resources/rspec/0.2 ".
+		"http://www.protogeni.net/resources/rspec/0.2/ad.xsd");
+    $doc->setDocumentElement($root);
+
+    my %names = ();
+
+    foreach my $net (GeniXML::FindNodes("network",
+					 $rspec)->get_nodelist()) {
+	my $netid = GeniXML::GetText("name", $net);
+	foreach my $site (GeniXML::FindNodes("site",
+					     $net)->get_nodelist()) {
+	    my $siteid = GeniXML::GetText("id", $site);
+	    foreach my $node (GeniXML::FindNodes("node",
+						 $site)->get_nodelist()) {
+		# Dumb; plc uses the hostname in the URN.
+		my $hostname  = GeniXML::GetText("hostname", $node);
+		my ($hname)   = ($hostname =~ /^([^.]*)\./);		
+		my $nodeid    = GeniXML::GetText("id", $node);
+		my $urn       = GeniHRN::Generate("$netid:$siteid",
+						  "node", $hname);
+		# Dumb; the name to urn scheme for plc causes duplicates.
+		next
+		    if (exists($names{$urn}));
+		$names{$urn} = 1;
+		
+		my $rspecnode = addChildToRspec($doc, $root, 'node');
+		$rspecnode->setAttribute('component_manager_urn', $manager_urn);
+		$rspecnode->setAttribute('component_manager_uuid', $manager_urn);
+		$rspecnode->setAttribute('component_uuid', $urn);
+		$rspecnode->setAttribute('component_urn', $urn);
+		$rspecnode->setAttribute('component_name', "$nodeid:$hostname");
+		my $tmp = addChildToRspec($doc, $rspecnode, 'node_type');
+		$tmp->setAttribute("type_name",  "pc");
+		$tmp->setAttribute("type_slots", "1");
+
+		$tmp = addChildToRspec($doc, $rspecnode, 'available');
+		$tmp->appendText("true");
+		$tmp = addChildToRspec($doc, $rspecnode, 'exclusive');
+		$tmp->appendText("true");
+	    }
+	}
+    }
+    return $root;
+}
+
+sub ConvertReqPGtoSFA($$)
+{
+    my ($rspec) = @_;
+
+    # Parse if a string.
+    if (! ref($rspec)) {
+	$rspec = GeniXML::Parse($rspec);
+	if (!defined($rspec)) {
+	    print STDERR "*** ConvertRspec: Cannot parse rspec\n";
+	    return undef;
+	}
+    }
+    my $doc  = XML::LibXML::Document->new();
+    my $root = $doc->createElement("RSpec");
+
+    $root->setAttribute("type", "SFA");
+    $doc->setDocumentElement($root);
+
+    my $network;
+    my $request;
+    if (0) {
+	$network = addChildToRspec($doc, $root, 'network');
+	$network->setAttribute("name", "plc");
+    }
+    else {
+	$request = addChildToRspec($doc, $root, 'request');
+	$request->setAttribute("name", "plc");
+    }
+
+    foreach my $ref (GeniXML::FindNodes("n:node",
+					$rspec)->get_nodelist()) {
+	my $urn    = GeniXML::GetText("component_urn", $ref);
+	my $name   = GeniXML::GetText("component_name", $ref);
+	my ($auth,$which,$hname) = GeniHRN::Parse($urn);
+	my ($netid,$siteid) = split(":", $auth);
+	my ($nodeid,$hostname) = split(":", $name);
+
+	if (0) {
+	    my $sitenode = addChildToRspec($doc, $network, 'site');
+	    $sitenode->setAttribute("id", $siteid);
+	    my $nodenode = addChildToRspec($doc, $sitenode, 'node');
+	    $nodenode->setAttribute("id", $nodeid);
+
+	    my $tmp = addChildToRspec($doc, $nodenode, 'hostname');
+	    $tmp->appendText("$hostname");
+	    addChildToRspec($doc, $nodenode, 'sliver');
+	}
+	else {
+	    my $sliver = addChildToRspec($doc, $request, 'sliver');
+	    $sliver->setAttribute("nodeid", $nodeid);
+	}
+    }
+    return $root;
 }
 
 1;

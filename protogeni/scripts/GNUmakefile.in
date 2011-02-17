@@ -1,6 +1,6 @@
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,8 +18,8 @@ PSBIN_STUFF	= register_resources expire_daemon gencrl postcrl \
 		  gencrlbundle shutdownslice remauthority listusage \
 		  update reregister cleanupticket listhistory \
 		  register_sliver sa_daemon genadmincredential \
-		  genclrcredentials genallow_extcred advt-merge.py 
-
+		  genclrcredentials genallow_extcred advt-merge.py \
+		  reservevlans
 
 ifeq ($(ISMAINSITE),1)
 PSBIN_STUFF     += ch_daemon

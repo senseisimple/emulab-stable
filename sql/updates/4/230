@@ -8,7 +8,7 @@ sub DoUpdate($$$)
 {
     my ($dbhandle, $dbname, $version) = @_;
 
-    DBQueryFatal("delete from table_regex "
+    DBQueryFatal("delete from table_regex ".
 		 "where table_name='mailman_lists' and column_name='pid'");
     
     return 0;

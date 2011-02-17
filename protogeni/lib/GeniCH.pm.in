@@ -19,7 +19,7 @@ use vars qw(@ISA @EXPORT);
 #use Devel::TraceUse;
 use GeniDB;
 use Genixmlrpc;
-use GeniRegistry;
+use GeniSlice;
 use GeniResponse;
 use GeniUser;
 use GeniComponent;
@@ -268,21 +268,7 @@ sub Resolve($)
     
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
-    if ($type eq "sa") {
-	my $authority = GeniAuthority->Lookup($lookup_token);
-	if (!defined($authority)) {
-	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
-					"No such authority $lookup_token");
-	}
-	# Return a blob.
-	my $blob = { "gid"         => $authority->cert(),
-		     "url"         => $authority->url(),
-		     "urn"         => $authority->urn(),
-		     "type"        => $authority->type(),
-		 };
-	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
-    }
-    if ($type eq "cm" || $type eq "am") {
+    if ($type eq "cm" || $type eq "am" || $type eq "sa") {
 	my $manager = GeniAuthority->Lookup($lookup_token);
 	if (!defined($manager)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -309,7 +295,7 @@ sub Resolve($)
 	return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
     }
     if ($type eq "slice") {
-	my $slice = GeniRegistry::GeniSlice->Lookup($lookup_token);
+	my $slice = GeniSlice->Lookup($lookup_token);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
 					"No such slice $lookup_token");
@@ -702,7 +688,7 @@ sub Remove($)
 				    "$token has been unregistered");
     }
     if ($type eq "Slice") {
-	my $slice = GeniRegistry::GeniSlice->Lookup($token);
+	my $slice = GeniSlice->Lookup($token);
 	if (!defined($slice)) {
 	    return GeniResponse->Create(GENIRESPONSE_SUCCESS, undef,
 					"No such slice $token");
@@ -762,7 +748,7 @@ sub Shutdown($)
 	return GeniResponse->Create( GENIRESPONSE_FORBIDDEN, undef,
 				     "Insufficient privilege" );
 
-    my $slice = GeniRegistry::GeniSlice->Lookup($uuid || $urn);
+    my $slice = GeniSlice->Lookup($uuid || $urn);
     if (!defined($slice)) {
 	if (!defined($urn)) {
 	    return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -925,7 +911,7 @@ sub List($)
     if ($type eq "slices") {
 	my @slices;
 
-	if (GeniRegistry::GeniSlice->ListAll(\@slices) != 0) {
+	if (GeniSlice->ListAll(\@slices) != 0) {
 	    return GeniResponse->Create(GENIRESPONSE_ERROR);
 	}
 	foreach my $slice (@slices) {

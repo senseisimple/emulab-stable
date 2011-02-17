@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniEmulab;
@@ -44,6 +44,7 @@ use Experiment;
 use libdb qw(TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT);
 use POSIX qw(strftime);
 use Carp;
+use Socket;
 
 # Configure variables
 my $TB		   = "@prefix@";
@@ -184,7 +185,7 @@ sub UnRegisterExperiment($)
 	return -1;
     }
     # Needs to move.
-    GeniRegistry::ClientSliver->SliceDelete($slice);
+    GeniSlice::ClientSliver->SliceDelete($slice);
     
     if ($slice->Delete()) {
 	print STDERR "Could not delete $slice for $experiment\n";
@@ -196,9 +197,9 @@ sub UnRegisterExperiment($)
 #
 # Create a physical node on the fly. 
 #
-sub CreatePhysNode($)
+sub CreatePhysNode($$)
 {
-    my ($node_urn) = @_;
+    my ($manager_urn, $node_urn) = @_;
     my @ifaces;
     my $ctrliface;
 
@@ -206,10 +207,13 @@ sub CreatePhysNode($)
 	carp("Not a proper node urn: $node_urn\n");
 	return -1;
     }
-    print STDERR "$node_urn\n";
+    if (!defined($manager_urn) || ! GeniHRN::IsValid($manager_urn)) {
+	carp("Not a proper manager urn: $manager_urn\n");
+	return -1;
+    }
+    print STDERR "$node_urn, $manager_urn\n";
 
     my ($auth,$type,$node_id) = GeniHRN::Parse($node_urn);
-    my $manager_urn = GeniHRN::Generate($auth, "authority", "cm");
 
     #
     # Load the SA cert to act as caller context.
@@ -240,7 +244,7 @@ sub CreatePhysNode($)
 
     my $component = GeniComponent->CreateFromRegistry($node_urn);
     if (!defined($component)) {
-	print STDERR "Could not lookup $node_urn at ClearingHouse\n";
+	print STDERR "Could not lookup $node_urn at its registry\n";
 	return undef;
     }
     my $node = Node->LookupWideArea($node_urn);
@@ -256,18 +260,12 @@ sub CreatePhysNode($)
     my $hrn      = $blob->{'hrn'};
     my $IP       = $blob->{'physctrl'};
     my $hostname = $blob->{'hostname'};
-    my $uuid     = $blob->{'uuid'};
-    if (! (defined($hrn) && defined($IP) && defined($hostname) &&
-	   defined($uuid))) {
+    if (! (defined($hrn) && defined($hostname))) {
 	print STDERR "Missing stuff in blob from CM for $node_urn\n";
 	goto bad;
     }
     if (! ($hrn =~ /^[-\w\.]*$/)) {
 	print STDERR "Invalid hrn '$hrn' in blob from CM for $node_urn\n";
-	goto bad;
-    }
-    if (! ($uuid =~ /^[-\w\.]*$/)) {
-	print STDERR "Invalid uuid '$uuid' in blob from CM for $node_urn\n";
 	goto bad;
     }
     if (! ($hostname =~ /^[-\w\.]*$/)) {
@@ -286,7 +284,34 @@ sub CreatePhysNode($)
     #
     # Find control network.
     #
-    if (exists($blob->{'interfaces'})) {
+    if ($authority->IsSFA()) {
+	#
+	# Generate a suitable node_id.
+	#
+	my ($pl) = ($blob->{'hrn'} =~ /^([^.]*)\./);
+	$node_id = "$pl" . "-" . $blob->{'node_id'};
+
+	#
+	# Find the IP from the hostname and generate a stub iface entry.
+	#
+	my ($name,undef,undef,undef,@ipaddrs) = gethostbyname($hostname);
+	if (!defined($name)) {
+	    print STDERR "Cannot resolve $hostname for $node_urn:\n";
+	    goto bad;
+	}
+	$IP = inet_ntoa($ipaddrs[0]);
+
+	my $ifaceargs = {
+	    "card"      => 0,
+	    "role"      => TBDB_IFACEROLE_CONTROL(),
+	    "MAC"       => '000000000000',
+	    "IP"        => $IP,
+	    "type"      => "generic",
+	};
+	push(@ifaces, $ifaceargs);
+	$ctrliface = $ifaceargs;
+    }
+    elsif (exists($blob->{'interfaces'})) {
 	foreach my $ref (@{ $blob->{'interfaces'} }) {
 	    my $role = $ref->{'role'};
 	    

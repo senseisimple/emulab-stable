@@ -1,0 +1,33 @@
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.1">
+ <node virtual_id="geni1" 
+       virtualization_type="emulab-vnode" 
+       exclusive="1"
+       component_manager_urn="urn:publicid:IDN+emulab.net+authority+cm"> 
+   <interface virtual_id="virt0"/> 
+   <disk_image
+      name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA8-OVZ-STD" />
+ </node>
+ <node virtual_id="geni2" 
+       virtualization_type="emulab-vnode" 
+       exclusive="1"
+       component_manager_urn="urn:publicid:IDN+myelab.testbed.emulab.net+authority+cm">
+   <interface virtual_id="virt0"/> 
+   <disk_image
+      name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA8-OVZ-STD" />
+   </node>
+ <link virtual_id="link0"> 
+  <bandwidth>10000</bandwidth>
+  <interface_ref 
+            virtual_interface_id="virt0" 
+            virtual_node_id="geni1" 
+            /> 
+  <interface_ref 
+            virtual_interface_id="virt0" 
+            virtual_node_id="geni2" 
+            />
+  <component_manager
+     name="urn:publicid:IDN+emulab.net+authority+cm"/>
+  <component_manager
+     name="urn:publicid:IDN+myelab.testbed.emulab.net+authority+cm"/>
+ </link> 
+</rspec>

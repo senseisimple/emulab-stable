@@ -80,7 +80,9 @@ $(TARGET_PATH)/lib/libncurses.so.5.7: $(STAGING_DIR)/lib/libncurses.so.5.7
 	mkdir -p $(TARGET_PATH)/usr/share/terminfo/x
 	mkdir -p $(TARGET_PATH)/usr/share/tabset
 	cp -fa $(STAGING_DIR)/usr/share/tabset/* $(TARGET_PATH)/usr/share/tabset
-	cp -fa $(STAGING_DIR)/usr/share/terminfo/v/vt{100,220} \
+	cp -fa $(STAGING_DIR)/usr/share/terminfo/v/vt100 \
+		$(TARGET_PATH)/usr/share/terminfo/v
+	cp -fa $(STAGING_DIR)/usr/share/terminfo/v/vt220 \
 		$(TARGET_PATH)/usr/share/terminfo/v
 	cp -fa $(STAGING_DIR)/usr/share/terminfo/l/linux \
 		$(TARGET_PATH)/usr/share/terminfo/l

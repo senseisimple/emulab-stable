@@ -23,6 +23,33 @@ sub InstallUpdate($$)
 	my $DESCRIPTORS = "$TOP_SRCDIR/install/descriptors-pgeni.xml";
 
 	Phase "cooked-mode", "Setting up cooked mode support", sub {
+	    Phase "generic", "Creating generic interface type", sub {
+		my $query_result =
+		    DBQueryFatal("select type from interface_types ".
+				 "where type='generic'");
+		if (! $query_result->numrows) {
+		    if (IMPOTENT_MODE()) {
+			PhaseWouldHave("Created generic interface type");
+		    }
+		    else {
+			if (DBQueryWarn("REPLACE INTO interface_capabilities VALUES ".
+					"('generic','protocols','ethernet')") &&
+			    DBQueryWarn("REPLACE INTO interface_capabilities VALUES ".
+					"('generic','ethernet_defspeed','100000')") &&
+			    DBQueryWarn("REPLACE INTO interface_types VALUES ".
+					"('generic',100000,1,'Generic', ".
+					" 'Generic',1,'RJ45')")) {
+			    PhaseSucceed();
+			}
+			else {
+			    PhaseFail("Could not create generic interface type");
+			}
+		    }
+		}
+		else {
+		    PhaseSkip("generic interface type already exists");
+		}
+	    };
 	    Phase "pcfedphys", "Creating pcfedphys node type", sub {
 		my $nodetype = NodeType->Lookup("pcfedphys");
 		if (!defined($nodetype)) {

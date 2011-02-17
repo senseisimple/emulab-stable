@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -1196,6 +1196,9 @@ sub SetupOpsNode($)
 
     print RC "inetd_enable=\"YES\"\n";
     print RC "sendmail_enable=\"YES\"\n";
+    if ($emulabconfig{"CONFIG_MAILMAN"}) {
+	print RC "mailman_enable=\"YES\"\n";
+    }
     print RC "sshd_enable=\"YES\"\n";
 
     print RC "ntpdate_enable=\"YES\"\n";
@@ -1617,7 +1620,10 @@ sub SetupBossNode()
     # Disable TSO.  It causes horrific xmit throughput with divert sockets.
     # See: http://www.freebsd.org/cgi/query-pr.cgi?pr=121257
     #
-    my $tso = "-tso";
+    my $tso = "";
+    if ($FBSD_VERSION > 6) {
+	$tso = "-tso";
+    }
 
     print RC "network_interfaces=\"$outer_controlif\"\n";
     print RC "ifconfig_${outer_controlif}=".
@@ -2121,13 +2127,14 @@ sub CreateDefsFile($)
 		};
 		/^SELFLOADER_DATA$/ && do {
 		    #
-		    # XXX we know that the emulab-*-3.x package sets include
-		    # perl 5.10 which has a bug with taint checking which in
-		    # turn is triggered by the SelfLoader we use.  So turn
-		    # it off when perl 5.10 is used.  Otherwise don't set
-		    # the variable at all so it will default correctly.
+		    # Use the SelfLoader in perl 5.8 or beyond (though note
+		    # that 5.10 requires a patch that we make).
 		    #
-		    if ($emulabconfig{BOSS_PKG} =~ /^emulab-boss-3/) {
+		    # XXX patch only works for 5.10.1 which has SelfLoader
+		    # version 5.17.  So we cannot use the SelfLoader for
+		    # our FreeBSD 7.2 since that has perl 5.10.0.
+		    #
+		    if ($FBSD_VERSION < 6 || $FBSD_VERSION == 7.2) {
 			print OUTDEFS "SELFLOADER_DATA=\"\"\n";
 		    }
 		    last SWITCH;

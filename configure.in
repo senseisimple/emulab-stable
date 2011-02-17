@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 AC_PREREQ(2.13)
@@ -311,7 +311,7 @@ EXP_VIS_SUPPORT=0
 NOSTACKMIB=0
 NOSHAREDFS=0
 NFSRACY=1
-SELFLOADER_DATA=""
+SELFLOADER_DATA="__DATA__"
 
 #
 # XXX You really don't want to change these!
@@ -406,6 +406,8 @@ if test -n "$FSDIR_SCRATCH"; then
     AC_DEFINE_UNQUOTED(FSDIR_SCRATCH, "$FSDIR_SCRATCH")
 fi
 AC_DEFINE_UNQUOTED(BOSSEVENTPORT, "$BOSSEVENTPORT")
+AC_DEFINE_UNQUOTED(FRISEBEEMCASTADDR, "$FRISEBEEMCASTADDR")
+AC_DEFINE_UNQUOTED(FRISEBEEMCASTPORT, "$FRISEBEEMCASTPORT")
 
 if test $OPSDBSUPPORT -eq 1; then
     AC_DEFINE_UNQUOTED(OPSDBSUPPORT, 1)
@@ -857,14 +859,16 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	ssl/GNUmakefile ssl/mksig ssl/usercert.cnf \
 	capture/GNUmakefile \
 	db/GNUmakefile \
-	db/Experiment.pm db/Group.pm db/Interface.pm db/Node.pm \
-	db/NodeType.pm db/Project.pm db/User.pm db/Image.pm db/OSinfo.pm \
+	db/EmulabConstants.pm db/EmulabFeatures.pm db/Experiment.pm \
+	db/Firewall.pm db/Group.pm db/Image.pm db/Interface.pm \
+	db/Lan.pm db/Logfile.pm db/Node.pm db/NodeType.pm db/OSinfo.pm \
+	db/Project.pm db/User.pm db/VirtExperiment.pm \
 	db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
 	db/dumperrorlog.proxy \
 	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/libtbdb.pm db/inuse db/avail db/nodeip db/showgraph \
-	db/emdb.pm db/emdbi.pm \
+	db/emdb.pm db/emdbi.pm db/emutil.pm \
 	db/dhcpd_makeconf db/nodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
 	db/sitevarscheck db/dbfillcheck db/libadminctrl.pm \
@@ -907,8 +911,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/batchexp tbsetup/batch_daemon tbsetup/repos_daemon \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
 	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
-	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
-	tbsetup/subboss_frisbeelauncher tbsetup/subboss_frisbeeimage \
+	tbsetup/eventsys.proxy \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
@@ -923,7 +926,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/assign_wrapper2 \
-	tbsetup/frisbeelauncher tbsetup/node_update \
+	tbsetup/node_update \
 	tbsetup/savelogs tbsetup/setgroups \
 	tbsetup/savelogs.proxy tbsetup/rmgroup tbsetup/mkexpdir \
 	tbsetup/node_control tbsetup/node_attributes \

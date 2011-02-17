@@ -239,6 +239,7 @@ sub CallMethod($$$@)
     #
     # Convert the xmlgoo to Perl and return it.
     #
+    $xmlgoo =~ s/\<nil\/\>//g;
     my $parser   = RPC::XML::Parser->new();
     my $goo      = $parser->parse($xmlgoo);
     my ($value,$output,$code);

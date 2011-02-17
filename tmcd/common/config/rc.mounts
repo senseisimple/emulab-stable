@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2010 University of Utah and the Flux Group.
+# Copyright (c) 2004-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -543,6 +543,13 @@ sub VMmount()
     # No mounts on remote nodes.
     # 
     if (REMOTE()) {
+	return ();
+    }
+
+    #
+    # No VMs on Windows nodes.
+    #
+    if (WINDOWS()) {
 	return ();
     }
 
