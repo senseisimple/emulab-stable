@@ -432,6 +432,7 @@ sub CreateSliver($)
     # At this point we want to return and let the startsliver proceed
     # in the background
     #
+    if (0) {
     my $mypid = fork();
     if ($mypid) {
 	# Let the child get going.
@@ -441,6 +442,7 @@ sub CreateSliver($)
     }
     # This switches the file that we are writing to. 
     libaudit::AuditFork();
+    }
     
     # Make sure that the next phase sees all changes.
     Experiment->FlushAll();
