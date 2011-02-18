@@ -163,6 +163,18 @@ if (!defined($vlan)) {
     fatal("Could not create vlan for $linkname");
 }
 my $lanid = $vlan->lanid();
+
+#
+# Setup a signal handler to clean things up.
+#
+sub handler()
+{
+    fatal("Caught a signal ... cleaning up and exiting");
+}
+$SIG{HUP}  = \&handler;
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
 my @othertags = ();
 
 while (my @tags = ReserveLocalTags(@othertags)) {
@@ -193,6 +205,8 @@ sub ReserveRemoteTags($$@)
     $method_args->{'linkname'}      = $linkname;
     $method_args->{'taglist'}       = \@tags;
     @$othertags = ();
+    
+    print STDERR "Calling $authority with tags: @tags\n";
     
     my $response =
 	Genixmlrpc::CallMethod($authority->url(),

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -17,7 +17,8 @@ sub usage()
     print "Usage: ch_daemon [-d] [-n]\n";
     exit(1);
 }
-my $optlist   = "dn";
+my $optlist   = "dns";
+my $oneshot   = 0;
 my $debug     = 0;
 my $impotent  = 0;
 
@@ -30,6 +31,7 @@ my $TBLOGS        = "@TBLOGSEMAIL@";
 my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
 my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
 my $PGENICLRHOUSE = @PROTOGENI_CLEARINGHOUSE@;
+my $ADDIR         = "$TB/www/protogeni/advertisements";
 my $LOGFILE       = "$TB/log/ch_daemon.log";
 my $EMULAB_PEMFILE = "$TB/etc/genich.pem";
 my $SLEEP_INTERVAL = 60;
@@ -77,6 +79,9 @@ if (defined($options{"d"})) {
 if (defined($options{"n"})) {
     $impotent = 1;
 }
+if (defined($options{"s"})) {
+    $oneshot = 1;
+}
 
 # Do this early so that we talk to the right DB.
 use vars qw($GENI_DBNAME);
@@ -106,17 +111,19 @@ Genixmlrpc->SetTimeout(10);
 $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+ch";
 
-if (CheckDaemonRunning("ch_daemon")) {
-    fatal("Not starting another ch daemon!");
-}
-# Go to ground.
-if (! $debug) {
-    if (TBBackGround($LOGFILE)) {
-	exit(0);
+if (!$oneshot) {
+    if (CheckDaemonRunning("ch_daemon")) {
+	fatal("Not starting another ch daemon!");
     }
-}
-if (MarkDaemonRunning("ch_daemon")) {
-    fatal("Could not mark daemon as running!");
+    # Go to ground.
+    if (! $debug) {
+	if (TBBackGround($LOGFILE)) {
+	    exit(0);
+	}
+    }
+    if (MarkDaemonRunning("ch_daemon")) {
+	fatal("Could not mark daemon as running!");
+    }
 }
 #
 # Setup a signal handler for newsyslog.
@@ -130,7 +137,7 @@ sub handler()
     $EUID = $SAVEEUID;
 }
 $SIG{HUP} = \&handler
-    if (!$debug);
+    if (! ($debug || $oneshot));
 
 GeniUtil::FlipToGeniUser();
 
@@ -146,6 +153,7 @@ sub ProbeCMs()
     my $up	    = "Up:\n";
     my $down        = "Down:\n";
     my $disabled    = "Disabled:\n";
+    my %ads         = ();
     
     if (GeniAuthority->ListAll(\@authorities)) {
 	fatal("Could not get authorities list from the DB");
@@ -166,11 +174,42 @@ sub ProbeCMs()
 	if (!defined($version)) {
 	    print "Error getting version from $urn\n";
 	    $down .= "$urn\n";
+	    next;
+	}
+	print "  Running version $version\n";
+	$up .= "$urn, version $version\n";
+
+	#
+	# Discover resources and cache; for the map client.
+	# Returns a string of xml.
+	#
+	my $resources = $authority->DiscoverResources();
+	# Errors will go to the log.
+	next
+	    if (!defined($resources));
+
+	if (open(OUT, "> $ADDIR/$urn")) {
+	    print OUT $resources;
+	    print OUT "\n";
+	    close(OUT);
+
+	    # Save the name so we can write the text file at the end.
+	    $ads{$urn} = $urn;
 	}
 	else {
-	    print "  Running version $version\n";
-	    $up .= "$urn, version $version\n";
+	    notify("Could not open $ADDIR/$urn for output\n");
+	    next;
 	}
+    }
+    if (open(MAP, "> $ADDIR/list.txt")) {
+	foreach my $urn (keys(%ads)) {
+	    print MAP "$urn\n";
+	}
+	close(MAP);
+    }
+    else {
+	notify("Could not open $ADDIR/list.txt for output\n");
+	next;
     }
     SENDMAIL("geni-dev-utah\@flux.utah.edu",
 	     "ClearingHouse Daemon Message",
@@ -200,6 +239,12 @@ sub ExpireSlices()
     # We've only updated the database and not cleaned out the stale
     # entries from our cache, but that is about to be flushed anyway
     # (see below).
+}
+
+if ($oneshot) {
+    ProbeCMs();
+    ExpireSlices();
+    exit(0);
 }
 
 while (1) {
@@ -237,7 +282,9 @@ sub fatal($)
 	     $msg,
 	     $TBOPS);
 
-    MarkDaemonStopped("ch_daemon");
+    MarkDaemonStopped("ch_daemon")
+	if (!$oneshot);
+    
     die("*** $0:\n".
 	"    $msg\n");
 }

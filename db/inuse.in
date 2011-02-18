@@ -38,7 +38,7 @@ sub usage() {
 }
 my $optlist = "t:p:e:srafFhR";
 
-my @columns = ("n.node_id","pid","eid","rsrv_time","reserved_pid");
+my @columns = ("n.node_id","n.type","pid","eid","reserved_pid");
 
 my %opt = ();
 if (! getopts($optlist, \%opt)) {
@@ -101,6 +101,7 @@ my $sortclause = "order by priority";
 if ($opt{s}) {
     $sortclause = "order by pid,eid,priority";
 } elsif ($opt{r}) {
+    push @columns, "rsrv_time";
     $sortclause = "order by rsrv_time,priority";
 }
 
