@@ -20,7 +20,7 @@ use Exporter;
 
 # After package decl.
 use English;
-use POSIX qw(isatty setsid);
+use POSIX qw(isatty setsid dup2);
 use File::Basename;
 use IO::Handle;
 use Carp;
@@ -308,14 +308,25 @@ sub AuditFork()
     if (!$daemon && $PERL_VERSION >= 5.008) {
 	close($libaudit::SAVE_STDOUT);
 	close($libaudit::SAVE_STDERR);
+	$libaudit::SAVE_STDOUT = 0;
+	$libaudit::SAVE_STDERR = 0;
     }
     close(STDOUT);
     close(STDERR);
 
-    open(STDOUT, ">> $logfile") or
-	die("opening $logfile for STDOUT: $!");
-    open(STDERR, ">> $logfile") or
-	die("opening $logfile for STDERR: $!");
+    if (0) {
+	open(STDOUT, ">> $logfile") or
+	    die("opening $logfile for STDOUT: $!");
+	open(STDERR, ">> $logfile") or
+	    die("opening $logfile for STDERR: $!");
+    }
+    else {
+	open(LOG, "> $logfile") or
+	    die("opening $logfile for $logfile: $!");
+	
+	POSIX::dup2(fileno(LOG), 1);
+	POSIX::dup2(fileno(LOG), 2);
+    }
 
     #
     # Turn off line buffering on output
@@ -354,7 +365,7 @@ sub SendAuditMail($)
 	    &libtblog::tblog_find_error(); 
 	}
 
-	if (!$daemon && $PERL_VERSION >= 5.008) {
+	if (!$daemon && $PERL_VERSION >= 5.008 && $libaudit::SAVE_STDOUT) {
 	    eval("open(STDOUT, \">&\", \$libaudit::SAVE_STDOUT); ".
 		 "open(STDERR, \">&\", \$libaudit::SAVE_STDERR);");
 	}
