@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2009, 2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -94,6 +94,10 @@ sub new($$$$$@) {
     #
     $self->{PRUNE_VLANS} = 1;
 
+    # XXX
+    $self->{MAX_VLAN} = 1024;
+    $self->{MIN_VLAN} = 2;
+    
     #
     # Make a device-dependant object for each switch
     #
@@ -148,6 +152,25 @@ sub new($$$$$@) {
     bless($self,$class);
 
     return $self;
+}
+
+#
+# Prints out a debugging message, but only if debugging is on. If a level is
+# given, the debuglevel must be >= that level for the message to print. If
+# the level is omitted, 1 is assumed
+#
+# Usage: debug($self, $message, $level)
+#
+sub debug($$;$) {
+    my $self = shift;
+    my $string = shift;
+    my $debuglevel = shift;
+    if (!(defined $debuglevel)) {
+	$debuglevel = 1;
+    }
+    if ($self->{DEBUG} >= $debuglevel) {
+	print STDERR $string;
+    }
 }
 
 #
@@ -393,6 +416,81 @@ sub setPortVlan($$@) {
 }
 
 #
+# Allocate a vlan number currently not in use on the stack.
+# Is called from createVlan, here for  clarity and to
+# lower the lines of diff from snmpit_cisco_stack.pm
+#
+# usage: newVlanNumber(self, vlan_identifier)
+#
+# returns a number in $self->{VLAN_MIN} ... $self->{VLAN_MAX}
+# or zero indicating that the id exists, or -1 indicating
+# the number space is full.
+#
+sub newVlanNumber($$) {
+    my $self = shift;
+    my $vlan_id = shift;
+    my $limit;
+
+    $self->debug("stack::newVlanNumber $vlan_id\n");
+    my %vlans = $self->findVlans();
+    my $number = $vlans{$vlan_id};
+    # Vlan exists, so tell caller a new number/vlan is not needed.
+    if (defined($number)) { return 0; }
+
+    my @numbers = sort values %vlans;
+    $self->debug("newVlanNumbers: numbers ". "@numbers" . " \n");
+
+    # XXX temp, see doMakeVlans in snmpit.in
+    if ($::next_vlan_tag) {
+	$number = $::next_vlan_tag;
+	$::next_vlan_tag = 0;
+
+	#
+	# Reserve this number in the table. If we can actually
+	# assign it (tables locked), then we call it good. 
+	#
+	if ((grep {$_ == $number} @numbers) ||
+	    !defined(reserveVlanTag($vlan_id, $number))) {
+	    print STDERR "desired vlan tag for $vlan_id already in use!\n";
+	    # Indicates no tag assigned. 
+	    return 0;
+	}
+	return $number;
+    }
+    #
+    # See if there is a number already pre-assigned in the lans table.
+    # But still make sure that the number does not conflict with an
+    # existing vlan.
+    #
+    $number = getReservedVlanTag($vlan_id);
+    if ($number) {
+	if (grep {$_ == $number} @numbers) {
+	    print STDERR "reserved vlan tag for $vlan_id already in use!\n";
+	    return 0;
+	}
+	return $number;
+    }
+    $number = $self->{MIN_VLAN}-1;
+    $limit  = $self->{MAX_VLAN};
+
+    while (++$number < $limit) {
+	if (!(grep {$_ == $number} @numbers)) {
+	    #
+	    # Reserve this number in the table. If we can actually
+	    # assign it (tables locked), then we call it good. Else
+	    # go around again.
+	    #
+	    if (reserveVlanTag($vlan_id, $number)) {
+		$self->debug("Reserved tag $number to vlan $vlan_id\n");
+		return $number;
+	    }
+	    $self->debug("Failed to reserve tag $number for vlan $vlan_id\n");
+	}
+    }
+    return 0;
+}
+
+#
 # Creates a VLAN with the given VLAN identifier on the stack. If ports are
 # given, puts them into the newly created VLAN. It is an error to create a
 # VLAN that already exists.
@@ -416,18 +514,18 @@ sub createVlan($$$;$$$) {
     # What we do here depends on whether this stack uses VTP to synchronize
     # VLANs or not
     #
-    my $vlan_number;
-
-    # XXX temp, see doMakeVlans in snmpit.in
-    if ($::next_vlan_tag)
-	{ $vlan_number = $::next_vlan_tag; $::next_vlan_tag = 0; }
-
+    my $vlan_number = $self->newVlanNumber($vlan_id);
+    return 0
+	if ($vlan_number == 0);
+    
     if ($self->{VTP} || $self->{PRUNE_VLANS}) {
 	#
 	# We just need to create the VLAN on the stack leader
 	#
 	#
-	$vlan_number = $self->{LEADER}->createVlan($vlan_id,$vlan_number,@otherargs);
+	my $res = $self->{LEADER}->createVlan($vlan_id,$vlan_number,@otherargs);
+	return 0
+	    if (! $res);
     } else {
 	#
 	# We need to create the VLAN on all devices
@@ -442,13 +540,8 @@ sub createVlan($$$;$$$) {
 		#
 		# Ooops, failed. Don't try any more
 		#
-		last;
-	    } else {
-		#
-		# Use the VLAN number we just got back for the other switches
-		#
-		$vlan_number = $res;
-	    }
+		return 0;
+	    } 
 	}
     }
 
@@ -461,7 +554,7 @@ sub createVlan($$$;$$$) {
 	    print STDERR "*** Failed to add ports to vlan\n";
 	}
     }
-    return return $vlan_number;
+    return $vlan_number;
 }
 
 #
