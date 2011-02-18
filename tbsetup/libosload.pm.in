@@ -43,6 +43,10 @@ my $PROJROOT    = "@PROJROOT_DIR@";
 # for the occasional pxeboot failure.
 my $MAXRETRIES  = 1;
 
+# Hack constant factor (slop) to add to the max reload wait time for any node
+# This is set based on testbed-wide factors (like multicast being dog slow!)
+my $TBLOADWAIT  = (10 * 60);
+
 my $OUTERBOSS	    = "@OUTERBOSS_NODENAME@";
 my $osselect	    = "$TB/bin/os_select";
 my $TBUISP	    = "$TB/bin/tbuisp";
@@ -822,7 +826,7 @@ sub GetImageInfo($;$)
     if (!defined($rowref->{'maxloadwait'})) {
 	my $chunks = $imagesize >> 20; # size may be > 2^31, shift is unsigned
 
-	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 65) + (5 * 60));
+	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 65) + $TBLOADWAIT;
     }
 
     print STDERR
