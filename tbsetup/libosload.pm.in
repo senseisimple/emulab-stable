@@ -714,6 +714,14 @@ sub osload ($$) {
     }
   done:
     print "osload: Done! There were $failures failures.\n";
+    
+    #
+    # Since we use this in long running daemons, be sure to release
+    # the event system connection, or else we stack up lots of handles
+    # and socket connections to the event server. 
+    #
+    event_unregister($evhandle)
+	if (defined($evhandle));
 
     if ($asyncmode) {
 	#
