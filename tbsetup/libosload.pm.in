@@ -826,7 +826,7 @@ sub GetImageInfo($;$)
     if (!defined($rowref->{'maxloadwait'})) {
 	my $chunks = $imagesize >> 20; # size may be > 2^31, shift is unsigned
 
-	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 65) + $TBLOADWAIT;
+	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 65)) + $TBLOADWAIT;
     }
 
     print STDERR
