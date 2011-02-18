@@ -1,34 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-						xmlns:s="library://ns.adobe.com/flex/spark" 
-						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						width="570" height="150"
-						title="GENI Manager Information">
+<s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" xmlns:display="protogeni.display.*">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import com.google.maps.View;
-			
-			import mx.collections.ArrayCollection;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
-			import mx.events.CloseEvent;
-			import mx.formatters.NumberFormatter;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.resources.ProtogeniComponentManager;
 			import protogeni.resources.GeniManager;
 			
 			import spark.components.NavigatorContent;
 			import spark.components.TextArea;
-			import spark.components.VGroup;
 			
 			[Bindable]
 			private var gm:GeniManager = null;
 			
-			public function load(n:GeniManager):void {
+			public function load(n:GeniManager):void
+			{
 				gm = n;
 				messageButton.visible = gm.errorDescription.length > 0;
 				messageButton.includeInLayout = gm.errorDescription.length > 0;
@@ -38,6 +30,10 @@
 				graphInfoButton.includeInLayout = gm.Rspec != null;
 				nodesButton.label = gm.AllNodes.length.toString();
 				availabilityLabel.text = gm.availableNodes + " / " + gm.percentageAvailable.toFixed() + "% Available";
+				
+				if(gm.lastRequest != null) {
+					lastRequestButton.label = gm.lastRequest.name;
+				}
 			}
 			
 			public function viewRspec():void {
@@ -55,8 +51,7 @@
 			public function openGraphInfo():void
 			{
 				var cw:DefaultWindow = new DefaultWindow();
-				PopUpManager.addPopUp(cw, Main.Application() as DisplayObject, false);
-				PopUpManager.centerPopUp(cw);
+				cw.showWindow();
 				cw.title = "Graph information for " + gm.Hrn;
 				var tabContainer:TabNavigator = new TabNavigator();
 				tabContainer.percentHeight = 100;
@@ -114,8 +109,7 @@
 			}
 		]]>
 	</fx:Script>
-	
-	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" id="cmInfo">
+	<mx:Grid width="100%" height="100%" verticalGap="5" horizontalGap="5" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" id="cmInfo">
 		<mx:GridRow width="100%">
 			<mx:GridItem width="30">
 				
@@ -146,7 +140,15 @@
 			</mx:GridItem>
 			<mx:GridItem width="100%">
 				<s:Button label="{gm.Url}" toolTip="Click to visit URL"
-						   click="navigateToURL(new URLRequest(gm.VisitUrl()), '_blank');"/>
+						  click="navigateToURL(new URLRequest(gm.VisitUrl()), '_blank');"/>
+			</mx:GridItem>
+		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<s:Label text="Version" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<s:Label text="{gm.Version}" />
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">
@@ -166,5 +168,13 @@
 				<s:Label id="availabilityLabel" />
 			</mx:GridItem>
 		</mx:GridRow>
+		<mx:GridRow width="100%">
+			<mx:GridItem>
+				<s:Label text="Last Request" fontWeight="bold"/>
+			</mx:GridItem>
+			<mx:GridItem width="100%">
+				<s:Button id="lastRequestButton" click="Main.geniHandler.requestHandler.pushRequest(gm.lastRequest)" />
+			</mx:GridItem>
+		</mx:GridRow>
 	</mx:Grid>
-</display:DefaultWindow>
+</s:VGroup>

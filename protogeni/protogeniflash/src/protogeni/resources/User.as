@@ -14,6 +14,7 @@
  
  package protogeni.resources
 {
+	import com.mattism.http.xmlrpc.JSLoader;
 	
 	// ProtoGENI user information
 	public class User
@@ -47,9 +48,11 @@
 			sslPem = "";
 		}
 		
-		public function setPem(newPem:String):void
+		public function setPem(newPem:String, password:String = null):void
 		{
 			sslPem = newPem;
+			if(Main.useJavascript && password != null)
+				JSLoader.setClientInfo(password, sslPem);
 		}
 	}
 }

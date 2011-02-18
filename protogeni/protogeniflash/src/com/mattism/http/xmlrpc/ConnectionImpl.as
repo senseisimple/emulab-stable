@@ -16,13 +16,14 @@ package com.mattism.http.xmlrpc
   import com.mattism.http.xmlrpc.MethodFaultImpl;
   import com.mattism.http.xmlrpc.Parser;
   import com.mattism.http.xmlrpc.ParserImpl;
-
+  
   import flash.events.ErrorEvent;
   import flash.events.Event;
   import flash.events.EventDispatcher;
   import flash.events.IOErrorEvent;
   import flash.events.SecurityErrorEvent;
   import flash.events.TimerEvent;
+  import flash.net.URLLoader;
   import flash.net.URLRequest;
   import flash.net.URLRequestMethod;
   import flash.utils.Timer;
@@ -39,12 +40,12 @@ package com.mattism.http.xmlrpc
     public var _method : MethodCall;
     private var _rpc_response : Object;
     private var _parser : Parser;
-    public var _response : JSLoader;
-    private var _parsed_response : Object;
+    public var _response:URLLoader
+	private var _parsed_response : Object;
 
     private var _fault : MethodFault;
-
-        public var timeout:int = 60;
+	
+	public var timeout:int = 60;
 
     public function ConnectionImpl(url : String)
     {
@@ -58,7 +59,11 @@ package com.mattism.http.xmlrpc
       this._parser = new ParserImpl();
 
       //init response
-      this._response = new JSLoader();
+	  if(Main.useJavascript)
+        this._response = new JSLoader();
+      else
+        this._response = new URLLoader();
+			
       this._response.addEventListener(Event.COMPLETE, this._onLoad);
 //      this._response.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
       this._response.addEventListener(IOErrorEvent.IO_ERROR, ioError);
@@ -82,8 +87,8 @@ package com.mattism.http.xmlrpc
 //    this._response.removeEventListener(ProgressEvent.PROGRESS, progress);
       this._response.removeEventListener(SecurityErrorEvent.SECURITY_ERROR,
                                          securityError);
-          this._response.removeEventListener(IOErrorEvent.NETWORK_ERROR, networkError);
-
+	  this._response.removeEventListener(IOErrorEvent.NETWORK_ERROR, networkError);
+	  
                 if(observeTimer != null)
                 {
                         observeTimer.stop();
@@ -115,19 +120,19 @@ package com.mattism.http.xmlrpc
         request.method = URLRequestMethod.POST;
         request.url = this.getUrl();
 
-                try {
-                        this._response.load(request);
-                }
-                catch (error:ArgumentError)
-                {
-                        dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "Argument error on load"));
-                        trace("An ArgumentError has occurred.");
-                }
-                catch (error:SecurityError)
-                {
-                        dispatchEvent(new SecurityErrorEvent(SecurityErrorEvent.SECURITY_ERROR, false, false, "Security error on load"));
-                        trace("A SecurityError has occurred.");
-                }
+		try {
+			this._response.load(request);
+		}
+		catch (error:ArgumentError)
+		{
+			dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "Argument error on load"));
+			trace("An ArgumentError has occurred.");
+		}
+		catch (error:SecurityError)
+		{
+			dispatchEvent(new SecurityErrorEvent(SecurityErrorEvent.SECURITY_ERROR, false, false, "Security error on load"));
+			trace("A SecurityError has occurred.");
+		}
 
         observeTimeout(timeout);
       }
@@ -152,44 +157,44 @@ package com.mattism.http.xmlrpc
 
     private function _onLoad( evt:Event ):void
     {
-                try
-                {
-                if (observeTimer) {
-                        observeTimer.removeEventListener(TimerEvent.TIMER, timeoutError);
-                    }
-              var responseXML:XML = new XML(this._response.data);
-              _fault = null;
-                  if (this._response.bytesLoaded == 0)
-                  {
-                          trace("XMLRPC Fault: No data");
-                          dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "No data"));
-                  }
-                  else if (responseXML.fault.length() > 0)
-              {
-                // fault
-                var parsedFault:Object = parseResponse(responseXML.fault.value.*[0]);
-                _fault = new MethodFaultImpl( parsedFault );
-                trace("XMLRPC Fault (" + _fault.getFaultCode() + "):\n"
-                      + _fault.getFaultString());
-
-                dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
-              }
-              else if (responseXML.params)
-              {
-                _parsed_response = parseResponse(responseXML.params.param.value[0]);
-
-                dispatchEvent(new Event(Event.COMPLETE));
-              }
-              else
-              {
-                dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
-              }
-                }
-                catch (err:Error)
-                {
-                        dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
-                }
-
+		try
+		{
+	        if (observeTimer) {
+	                observeTimer.removeEventListener(TimerEvent.TIMER, timeoutError);
+	            }
+	      var responseXML:XML = new XML(this._response.data);
+	      _fault = null;
+		  if (this._response.bytesLoaded == 0)
+		  {
+			  trace("XMLRPC Fault: No data");
+			  dispatchEvent(new ErrorEvent(ErrorEvent.ERROR, false, false, "No data"));
+		  }
+		  else if (responseXML.fault.length() > 0)
+	      {
+	        // fault
+	        var parsedFault:Object = parseResponse(responseXML.fault.value.*[0]);
+	        _fault = new MethodFaultImpl( parsedFault );
+	        trace("XMLRPC Fault (" + _fault.getFaultCode() + "):\n"
+	              + _fault.getFaultString());
+	
+	        dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
+	      }
+	      else if (responseXML.params)
+	      {
+	        _parsed_response = parseResponse(responseXML.params.param.value[0]);
+	
+	        dispatchEvent(new Event(Event.COMPLETE));
+	      }
+	      else
+	      {
+	        dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
+	      }
+		}
+		catch (err:Error)
+		{
+			dispatchEvent(new ErrorEvent(ErrorEvent.ERROR));
+		}
+			
     }
 
     protected function ioError(event : IOErrorEvent) : void
@@ -204,12 +209,12 @@ package com.mattism.http.xmlrpc
       _fault = null;
       dispatchEvent(event);
     }
-
-        protected function networkError(event:IOErrorEvent) : void
-        {
-                _fault = null;
-                dispatchEvent(event);
-        }
+	
+	protected function networkError(event:IOErrorEvent) : void
+	{
+		_fault = null;
+		dispatchEvent(event);
+	}
 
     private function parseResponse(xml:XML):Object
     {

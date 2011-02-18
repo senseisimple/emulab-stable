@@ -1,4 +1,4 @@
-/* GENIPUBLIC-COPYRIGHT
+﻿/* GENIPUBLIC-COPYRIGHT
  * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
  * All rights reserved.
  *
@@ -18,14 +18,21 @@ package protogeni.communication
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
+
   public class RequestListComponents extends Request
   {
     public function RequestListComponents(shouldDiscoverResources:Boolean, shouldStartSlices:Boolean) : void
     {
       super("ListComponents", "Getting the information for the component managers", CommunicationUtil.listComponents);
-          startDiscoverResources = shouldDiscoverResources;
-          startSlices = shouldStartSlices;
+	  startDiscoverResources = shouldDiscoverResources;
+	  startSlices = shouldStartSlices;
     }
+	
+	override public function start():Operation
+	{
+		op.addField("credential", Main.geniHandler.CurrentUser.credential);
+		return op;
+	}
 
 	// Should return Request or RequestQueueNode
 	override public function complete(code : Number, response : Object) : *

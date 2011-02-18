@@ -37,6 +37,7 @@ package protogeni.communication
 		op.addField("credentials", new Array(Main.geniHandler.CurrentUser.credential));
 		op.addField("compress", true);
 		op.setUrl(newCm.Url);
+		cm.lastRequest = this;
     }
 	
 	override public function complete(code : Number, response : Object) : *

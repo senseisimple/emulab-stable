@@ -20,8 +20,11 @@
 		public static var LEVEL_FULL:int = 1;
 		
 		public var Level:int;
+		[Bindable]
 		public var outputRspecVersion:Number;
+		[Bindable]
 		public var inputRspecMaxVersion:Number;
+		[Bindable]
 		public var inputRspecMinVersion:Number;
 	    
 		public function ProtogeniComponentManager()

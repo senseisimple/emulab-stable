@@ -2,23 +2,25 @@ package com.mattism.http.xmlrpc
 {
   /* An HTTPS URL Loader which uses the external Forge TLS library */
 
+  import com.hurlant.crypto.hash.MD5;
+  import com.hurlant.crypto.symmetric.CBCMode;
+  import com.hurlant.crypto.symmetric.TripleDESKey;
+  
   import flash.events.Event;
   import flash.events.EventDispatcher;
   import flash.events.IOErrorEvent;
   import flash.events.SecurityErrorEvent;
   import flash.external.ExternalInterface;
+  import flash.net.URLLoader;
   import flash.net.URLRequest;
   import flash.net.URLRequestHeader;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
+  
   import mx.utils.Base64Decoder;
   import mx.utils.Base64Encoder;
 
-  import com.hurlant.crypto.hash.MD5;
-  import com.hurlant.crypto.symmetric.CBCMode;
-  import com.hurlant.crypto.symmetric.TripleDESKey;
-
-  public class JSLoader extends EventDispatcher
+  public class JSLoader extends URLLoader
   {
     public static function setServerCertificate(newCert : String) : void
     {
@@ -192,7 +194,7 @@ package com.mattism.http.xmlrpc
       id = NO_ID;
     }
 
-    public function load(request : URLRequest) : void
+    override public function load(request : URLRequest) : void
     {
       var sendData : String = request.data.toXMLString();
       var splitExp : RegExp = /^(https:\/\/[^\/]+)(\/.*)$/;
@@ -207,7 +209,7 @@ package com.mattism.http.xmlrpc
       loadInstance(id, host, path, sendData);
     }
 
-    public function close() : void
+	override public function close() : void
     {
       cleanupInstance(id);
       id = NO_ID;
@@ -228,8 +230,8 @@ package com.mattism.http.xmlrpc
                                      message));
     }
 
-    public var data : String;
-    public var bytesLoaded : uint;
+	//override public var data : String;
+	//override public var bytesLoaded : uint;
 
     private var id : int;
 

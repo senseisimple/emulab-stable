@@ -30,6 +30,7 @@ package protogeni.communication
       super("GetVersion (" + Util.shortenString(newCm.Url, 15) + ")", "Getting the version of the component manager for " + newCm.Hrn, CommunicationUtil.getVersion, true, true, true);
 	  cm = newCm;
 	  op.setUrl(cm.Url);
+	  cm.lastRequest = this;
     }
 
 	// Should return Request or RequestQueueNode

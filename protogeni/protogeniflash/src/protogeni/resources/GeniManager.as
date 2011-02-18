@@ -6,6 +6,7 @@ package protogeni.resources
 	import mx.controls.Alert;
 	
 	import protogeni.Util;
+	import protogeni.communication.Request;
 
 	public class GeniManager
 	{
@@ -23,6 +24,7 @@ package protogeni.resources
 		[Bindable]
 		public var Urn : String = "";
 		
+		[Bindable]
 		public var Version:int;
 		
 		public var errorMessage : String = "";
@@ -48,6 +50,8 @@ package protogeni.resources
 		public var percentageAvailable:int;
 		
 		public var rspecProcessor:RspecProcessorInterface;
+		
+		public var lastRequest:Request;
 		
 		public function GeniManager()
 		{

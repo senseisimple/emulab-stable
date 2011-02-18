@@ -39,6 +39,7 @@ package protogeni.communication
 		plm = newPlm;
 		op.setExactUrl("https://www.emulab.net/protogeni/planetlab-sites.xml");
 		op.type = Operation.HTTP;
+		plm.lastRequest = this;
 	}
 	
 	override public function complete(code : Number, response : Object) : *

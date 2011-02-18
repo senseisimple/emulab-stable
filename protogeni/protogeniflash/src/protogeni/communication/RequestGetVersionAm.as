@@ -31,6 +31,7 @@ package protogeni.communication
 	  am = newAm;
 	  //op.setUrl(am.Url);
 	  op.setExactUrl(am.Url);
+	  am.lastRequest = this;
     }
 
 	// Should return Request or RequestQueueNode

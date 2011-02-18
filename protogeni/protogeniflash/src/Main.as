@@ -50,7 +50,8 @@
 	public static function setCertBundle(c:String):void
 	{
 		certBundle = c;
-	        JSLoader.setServerCertificate(Main.certBundle);
+		if(useJavascript)
+			JSLoader.setServerCertificate(certBundle);
 	}
 
 	[Bindable]

@@ -51,6 +51,7 @@ package protogeni.communication
 		op.pushField(a.source);
 		op.pushField([Main.geniHandler.CurrentUser.credential]);	// credentials
 		op.setExactUrl(plm.registryUrl);
+		plm.lastRequest = this;
     }
 	
 	override public function complete(code : Number, response : Object) : *

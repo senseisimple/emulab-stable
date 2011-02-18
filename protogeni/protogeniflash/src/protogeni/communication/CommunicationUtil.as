@@ -75,6 +75,7 @@ package protogeni.communication
 	private static var am : String = "am";
 
     public static var defaultHost : String = "boss.emulab.net";
+	public static var defaultPublicList:String = "https://www.emulab.net/protogeni/advertisements/list.txt";
 
     public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
 

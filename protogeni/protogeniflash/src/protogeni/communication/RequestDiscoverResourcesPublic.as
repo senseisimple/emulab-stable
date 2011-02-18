@@ -35,6 +35,7 @@ package protogeni.communication
 		cm = newCm;
 		op.setExactUrl(newCm.Url);
 		op.type = Operation.HTTP;
+		cm.lastRequest = this;
 	}
 	
 	override public function complete(code : Number, response : Object) : *

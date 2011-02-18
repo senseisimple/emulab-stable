@@ -40,6 +40,7 @@ package protogeni.communication
 		op.pushField([Main.geniHandler.CurrentUser.credential]);
 		op.pushField({geni_available:false, geni_compressed:true});	// geni_available:false = show all, true = show only available
 		op.setExactUrl(newAm.Url);
+		am.lastRequest = this;
     }
 	
 	override public function complete(code : Number, response : Object) : *

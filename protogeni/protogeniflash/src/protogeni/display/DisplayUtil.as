@@ -35,6 +35,9 @@
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PhysicalNodeInterface;
+	import protogeni.resources.PlanetlabAggregateManager;
+	import protogeni.resources.ProtogeniComponentManager;
+	import protogeni.resources.Site;
 	import protogeni.resources.Slice;
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
@@ -298,7 +301,19 @@
 			cmButton.setStyle("icon", DisplayUtil.assignIconForGeniManager(gm));
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openGeniManager(event:MouseEvent):void {
-					viewGeniManager(gm);
+					DisplayUtil.viewGeniManager(gm);
+				}
+			);
+			return cmButton;
+		}
+		
+		// Gets a button for the component manager
+		public static function getSiteButton(s:Site):Button {
+			var cmButton:Button = new Button();
+			cmButton.label = s.id + " (" + s.name + ")";
+			cmButton.addEventListener(MouseEvent.CLICK,
+				function openGeniManager(event:MouseEvent):void {
+					DisplayUtil.viewNodeCollection(s.nodes);
 				}
 			);
 			return cmButton;
@@ -312,7 +327,7 @@
 			nodeButton.setStyle("icon", DisplayUtil.assignAvailabilityIcon(n));
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
-					viewPhysicalNode(n);
+					DisplayUtil.viewPhysicalNode(n);
 				}
 			);
 			return nodeButton;
@@ -325,7 +340,7 @@
 			nodeButton.toolTip = n.id + " on " + n.manager.Hrn;
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
-					viewVirtualNode(n);
+					DisplayUtil.viewVirtualNode(n);
 				}
 			);
 			return nodeButton;
@@ -338,7 +353,7 @@
 			linkButton.setStyle("icon", DisplayUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
-					viewPhysicalLink(nl);
+					DisplayUtil.viewPhysicalLink(nl);
 				}
 			);
 			return linkButton;
@@ -351,7 +366,7 @@
 			linkButton.setStyle("icon", DisplayUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
-					viewVirtualLink(pl);
+					DisplayUtil.viewVirtualLink(pl);
 				}
 			);
 			return linkButton;
@@ -360,16 +375,14 @@
 		// Opens a virtual link window
 		public static function viewVirtualLink(pl:VirtualLink):void {
 	    	var plWindow:VirtualLinkWindow = new VirtualLinkWindow();
-	    	PopUpManager.addPopUp(plWindow, Main.Application(), false);
-       		PopUpManager.centerPopUp(plWindow);
+			plWindow.showWindow();
        		plWindow.loadPointLink(pl);
 	    }
 		
 		// Opens a physical link window
 		public static function viewPhysicalLink(l:PhysicalLink):void {
 			var lgWindow:PhysicalLinkWindow = new PhysicalLinkWindow();
-	    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
-       		PopUpManager.centerPopUp(lgWindow);
+			lgWindow.showWindow();
        		lgWindow.loadLink(l);
 		}
 		
@@ -379,8 +392,7 @@
 				viewPhysicalLink(lc[0]);
 			else {
 				var lgWindow:PhysicalLinkGroupWindow = new PhysicalLinkGroupWindow();
-		    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
-	       		PopUpManager.centerPopUp(lgWindow);
+				lgWindow.showWindow();
 	       		lgWindow.loadCollection(lc);
 			}
 		}
@@ -388,39 +400,40 @@
 		// Opens a group of physical links
 		public static function viewPhysicalLinkGroup(lg:PhysicalLinkGroup):void {
 			var lgWindow:PhysicalLinkGroupWindow = new PhysicalLinkGroupWindow();
-	    	PopUpManager.addPopUp(lgWindow, Main.Application(), false);
-       		PopUpManager.centerPopUp(lgWindow);
+			lgWindow.showWindow();
        		lgWindow.loadGroup(lg);
 		}
 		
 		// Opens a component manager in a window
 		public static function viewGeniManager(gm:GeniManager):void {
-			var cmWindow:GeniManagerWindow = new GeniManagerWindow();
-	    	PopUpManager.addPopUp(cmWindow, Main.Application(), false);
-       		PopUpManager.centerPopUp(cmWindow);
-       		cmWindow.load(gm);
+			if(gm is ProtogeniComponentManager) {
+				var cmWindow:ProtogeniManagerWindow = new ProtogeniManagerWindow();
+				cmWindow.showWindow();
+				cmWindow.load(gm as ProtogeniComponentManager);
+			} else if (gm is PlanetlabAggregateManager) {
+				var plmWindow:PlanetlabManagerWindow = new PlanetlabManagerWindow();
+				plmWindow.showWindow();
+				plmWindow.load(gm as PlanetlabAggregateManager);
+			}
 		}
 		
 		// Opens a physical node in a window
 		public static function viewPhysicalNode(n:PhysicalNode):void {
 			var ngWindow:PhysicalNodeWindow = new PhysicalNodeWindow();
-	    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
-       		PopUpManager.centerPopUp(ngWindow);
+			ngWindow.showWindow();
        		ngWindow.loadNode(n);
 		}
 		
 		public static function viewVirtualNode(n:VirtualNode):void {
 			var ngWindow:VirtualNodeWindow = new VirtualNodeWindow();
-			PopUpManager.addPopUp(ngWindow, Main.Application(), false);
-			PopUpManager.centerPopUp(ngWindow);
+			ngWindow.showWindow();
 			ngWindow.loadNode(n);
 		}
 		
 		// Opens a group of physical nodes in a window
 		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
 			var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
-	    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
-       		PopUpManager.centerPopUp(ngWindow);
+			ngWindow.showWindow();
        		ngWindow.loadGroup(ng);
 		}
 		
@@ -430,8 +443,7 @@
 				viewPhysicalNode(nc[0]);
 			else {
 				var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
-		    	PopUpManager.addPopUp(ngWindow, Main.Application(), false);
-	       		PopUpManager.centerPopUp(ngWindow);
+				ngWindow.showWindow();
 	       		ngWindow.loadCollection(nc);
 			}
 		}
@@ -439,15 +451,13 @@
 		// Opens a component manager in a window
 		public static function viewSlice(s:Slice):void {
 			var sWindow:SliceWindow = new SliceWindow();
-			PopUpManager.addPopUp(sWindow, Main.Application(), false);
-			PopUpManager.centerPopUp(sWindow);
+			sWindow.showWindow();
 			sWindow.loadSlice(s);
 		}
 		
 		public static function viewRequest(r:Request):void {
 			var rWindow:RequestWindow = new RequestWindow();
-			PopUpManager.addPopUp(rWindow, Main.Application() as DisplayObject, false);
-			PopUpManager.centerPopUp(rWindow);
+			rWindow.showWindow();
 			rWindow.load(r);
 		}
 	}
