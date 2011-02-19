@@ -1998,6 +1998,8 @@ sub CreateVnodes($$$)
 
     # See below.
     my $eventstate = TBDB_NODESTATE_SHUTDOWN();
+    $eventstate = TBDB_NODESTATE_ISUP()
+	if ($opmode eq "ALWAYSUP");
     my $allocstate = TBDB_ALLOCSTATE_FREE_CLEAN();
 
     #
