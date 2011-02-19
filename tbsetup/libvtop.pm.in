@@ -1555,6 +1555,7 @@ sub LoadVirtLans($)
 	    $vlanmember->virt_node()->type() eq "bbgenivm") {
 	    $vlanmember->_reservebw($bandwidth);
 	    $vlanmember->_needtrunk(1);
+	    $vlanmember->_nobwshaping(1);
 	    $self->printdb("  Forcing $vlanmember to reserve shared bandwidth\n");
 	}
     }
