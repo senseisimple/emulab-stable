@@ -6929,24 +6929,30 @@ sub UploadVlans($)
 	foreach my $lan (@lans) {
 	    # Only care about encapsulated links.
 	    next
-		if ($lan->type() ne "emulated");
+		if (! ($lan->type() eq "emulated" ||
+		       $lan->type() eq "vlan"));
 
-	    my $linkedlan = $lan->GetLinkedLan();
-	    if (!defined($linkedlan)) {
-		tberror("Emulated lan $lan does not have a linked vlan!\n");
-		return -1;
-	    }
 	    my $virtlan     = $self->vlans()->{$lan->vname()};
 	    if (!defined($virtlan)) {
 		tberror("Could not find lan $lan in local lan list!\n");
 		return -1;
 	    }
 	    my $virtlanidx  = $virtlan->idx();
-	    my $linkedlanid = $linkedlan->lanid();
-	    
-	    $self->printdb("Update vinterfaces: $virtlan: ".
-			   "$virtlanidx -> $linkedlanid\n");
-	    
+	    my $linkedlanid = $lan->lanid();
+
+	    #
+	    # An encapsulated lan is linked to the real lan.
+	    # A vlan encapsulated link does not have a linked lan;
+	    # there is no need for it.
+	    #
+	    if ($lan->type() eq "emulated") {
+		my $linkedlan = $lan->GetLinkedLan();
+		if (!defined($linkedlan)) {
+		    tberror("Emulated lan $lan does not have a linked vlan!\n");
+		    return -1;
+		}
+		$linkedlanid = $linkedlan->lanid();
+	    }
 	    DBQueryWarn("update vinterfaces set vlanid='$linkedlanid' ".
 			"where virtlanidx='$virtlanidx' and ".
 			"      exptidx='$exptidx'")
