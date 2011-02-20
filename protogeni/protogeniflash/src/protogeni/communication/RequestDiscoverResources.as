@@ -68,7 +68,7 @@ package protogeni.communication
 		{
 			cm.errorMessage = response.output;
 			cm.errorDescription = CommunicationUtil.GeniresponseToString(code) + ": " + cm.errorMessage;
-			cm.Status = GeniManager.FAILED;
+			cm.Status = GeniManager.STATUS_FAILED;
 			this.removeImmediately = true;
 			Main.geniDispatcher.dispatchGeniManagerChanged(cm);
 		}
@@ -87,7 +87,7 @@ package protogeni.communication
 		else if(cm.errorMessage.search("timed"))
 			cm.errorDescription = event.text;
 		
-		cm.Status = GeniManager.FAILED;
+		cm.Status = GeniManager.STATUS_FAILED;
 		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
 
       return null;
@@ -95,15 +95,15 @@ package protogeni.communication
 	
 	override public function cancel():void
 	{
-		cm.Status = GeniManager.UNKOWN;
+		cm.Status = GeniManager.STATUS_UNKOWN;
 		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 	}
 	
 	override public function cleanup():void
 	{
-		if(cm.Status == GeniManager.INPROGRESS)
-			cm.Status = GeniManager.FAILED;
+		if(cm.Status == GeniManager.STATUS_INPROGRESS)
+			cm.Status = GeniManager.STATUS_FAILED;
 		running = false;
 		Main.geniHandler.requestHandler.remove(this, false);
 		Main.geniDispatcher.dispatchGeniManagerChanged(cm);

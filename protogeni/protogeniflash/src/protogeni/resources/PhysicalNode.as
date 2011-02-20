@@ -19,9 +19,10 @@
 	// Physical node
 	public class PhysicalNode
 	{
-		public function PhysicalNode(own:PhysicalNodeGroup)
+		public function PhysicalNode(own:PhysicalNodeGroup, ownedBy:GeniManager)
 		{
 			owner = own;
+			manager = ownedBy;
 		}
 		
 		public var owner:PhysicalNodeGroup;

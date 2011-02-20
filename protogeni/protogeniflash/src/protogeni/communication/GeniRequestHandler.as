@@ -54,15 +54,19 @@
 		public function startInitiationSequence():void
 		{
 			if(Main.geniHandler.unauthenticatedMode) {
+				//pushRequest(new RequestListComponentsPublic());
+				//Main.Application().showAuthenticate();
+				
 				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 				newCm.Url = Main.geniHandler.publicUrl;
 				newCm.Hrn = Main.geniHandler.publicHrn;
 				newCm.Urn = Main.geniHandler.publicUrn;
 				Main.geniHandler.GeniManagers.add(newCm);
-				newCm.Status = GeniManager.INPROGRESS;
+				newCm.Status = GeniManager.STATUS_INPROGRESS;
 				pushRequest(new RequestDiscoverResourcesPublic(newCm));
 				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
 				Main.Application().showAuthenticate();
+				
 			} else {
 				if(Main.geniHandler.forceAuthority == null)
 				{

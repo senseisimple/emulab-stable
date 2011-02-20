@@ -207,7 +207,7 @@
 				cmsSrc = new Array();
 				for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
 				{
-					if(gm.Status == GeniManager.VALID)
+					if(gm.Status == GeniManager.STATUS_VALID)
 					{
 						cmsSrc.push(gm);
 						cms.push(gm.Hrn);

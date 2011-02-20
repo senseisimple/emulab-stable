@@ -7,6 +7,7 @@
 import flash.display.BitmapData;
 import flash.display.Sprite;
 import flash.events.MouseEvent;
+import flash.filters.ColorMatrixFilter;
 import flash.filters.DropShadowFilter;
 import flash.geom.Matrix;
 import flash.text.TextField;
@@ -18,20 +19,29 @@ import mx.core.UIComponent;
 import mx.events.DragEvent;
 import mx.managers.DragManager;
 
+import protogeni.resources.GeniManager;
+
 /**
  * InfoWindowSprite is a sprite that contains sub sprites that function as tabs.
  */
 	public class PhysicalNodeGroupMarker extends UIComponent {
-  [Embed('../../../../images/circle_blue.png')] private var CloudImg:Class;
+		
+  [Embed('../../../../images/protogenisite.png')] private var ProtogeniImg:Class;
+  [Embed('../../../../images/planetlabsite.png')] private var PlanetlabImg:Class;
   
-  public function PhysicalNodeGroupMarker(newLabel:String, newMarker:GeniMapMarker) {
+  public function PhysicalNodeGroupMarker(newLabel:String, newMarker:GeniMapMarker, type:int) {
 	  marker = newMarker;
 	  this.addEventListener(MouseEvent.MOUSE_MOVE, drag);
-      addChild(new CloudImg());
+	  
+	  if(type == GeniManager.TYPE_PROTOGENI)
+      	addChild(new ProtogeniImg());
+	  else if(type == GeniManager.TYPE_PLANETLAB)
+		  addChild(new PlanetlabImg());
+	  managerType = type;
 	  
 	  // Apply the drop shadow filter to the box.
 	  var shadow:DropShadowFilter = new DropShadowFilter();
-	  shadow.distance = 10;
+	  shadow.distance = 5;
 	  shadow.angle = 25;
 	  
 	  // You can also set other properties, such as the shadow color,
@@ -53,13 +63,13 @@ import mx.managers.DragManager;
     labelMc.width = radius;
     labelMc.height = radius;
     labelMc.text = label;
-    	labelMc.y = 8;
+    	labelMc.y = 5;
     if(label.length == 1)
-    	labelMc.x = 13;
-    else if(label.length == 2)
     	labelMc.x = 11;
+    else if(label.length == 2)
+    	labelMc.x = 8;
     else
-    	labelMc.x = 9;
+    	labelMc.x = 6;
     
     addChild(labelMc);
     cacheAsBitmap = true;
@@ -69,13 +79,14 @@ import mx.managers.DragManager;
   
   private var label:String;
   public var marker:GeniMapMarker;
+  public var managerType:int;
   
   public function drag(e:MouseEvent):void
   {
 	  var ds:DragSource = new DragSource();
 	  ds.addData(marker, 'marker');
 	  
-	  var d:PhysicalNodeGroupMarker = new PhysicalNodeGroupMarker(label, marker)
+	  var d:PhysicalNodeGroupMarker = new PhysicalNodeGroupMarker(label, marker, managerType)
 	  
 	  DragManager.doDrag(this, ds, e, d);
   }

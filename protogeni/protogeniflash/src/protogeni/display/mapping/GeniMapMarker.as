@@ -37,7 +37,7 @@ package protogeni.display.mapping
 			}
 			
 			super(ll);
-			nodeGroups = new PhysicalNodeGroupCollection();
+			nodeGroups = new PhysicalNodeGroupCollection(null);
 			
 			// Single marker
 			if(o is PhysicalNodeGroup)
@@ -92,11 +92,11 @@ package protogeni.display.mapping
 				});
 				
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupMarker(g.collection.length.toString(), this),
+					icon:new PhysicalNodeGroupMarker(g.collection.length.toString(), this, g.owner.owner.type),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-18, -18)
 				}));
-				
+
 				nodeGroups.Add(g);
 				info = groupInfo;
 			}
@@ -105,8 +105,11 @@ package protogeni.display.mapping
 			{
 				clusters = o as Array;
 				var totalNodes:Number = 0;
+				var type:int = (clusters[0] as GeniMapMarker).nodeGroups.GetType();
 				for each(var m:GeniMapMarker in clusters) {
 					totalNodes += m.nodeGroups.GetAll().length;
+					if(type != m.nodeGroups.GetType())
+						type = -1;
 					this.nodeGroups.Add(m.nodeGroups.collection[0]);
 				}
 
@@ -129,7 +132,7 @@ package protogeni.display.mapping
 				});
 				
 				this.setOptions(new MarkerOptions({
-						icon:new PhysicalNodeGroupClusterMarker(totalNodes.toString(), this),
+						icon:new PhysicalNodeGroupClusterMarker(totalNodes.toString(), this, type),
 						//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 						iconOffset:new Point(-20, -20)
 					}));

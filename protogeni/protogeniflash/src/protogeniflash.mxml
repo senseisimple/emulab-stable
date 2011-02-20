@@ -48,8 +48,6 @@
 			import mx.managers.PopUpManager;
 			import mx.managers.ToolTipManager;
 			import mx.rpc.events.ResultEvent;
-
-                        import com.mattism.http.xmlrpc.JSLoader;
 			
 			import protogeni.GeniDispatcher;
 			import protogeni.GeniEvent;
@@ -184,21 +182,24 @@
 				user.closeWindow();
 				
 				// Load the certificate bundle
-				var certRequest:URLRequest = new URLRequest("http://www.emulab.net/genica.bundle"); 
-				var certLoader:URLLoader = new URLLoader(); 
-				certLoader.addEventListener(Event.COMPLETE, certBundleResult);
-				certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
-				certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
-				try
-				{
-					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Getting the Protogeni certificate bundle", false, LogMessage.TYPE_START));
-					certLoader.load(certRequest);
-				}
-				catch (e : Error)
-				{
-					Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
-						+ e.toString() + "\n\n", true));
-				}
+				if(Main.useJavascript) {
+					var certRequest:URLRequest = new URLRequest("http://www.emulab.net/genica.bundle"); 
+					var certLoader:URLLoader = new URLLoader(); 
+					certLoader.addEventListener(Event.COMPLETE, certBundleResult);
+					certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
+					certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
+					try
+					{
+						Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Getting the Protogeni certificate bundle", false, LogMessage.TYPE_START));
+						certLoader.load(certRequest);
+					}
+					catch (e : Error)
+					{
+						Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
+							+ e.toString() + "\n\n", true));
+					}
+				} else 
+					Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function certBundleResult(e:Event):void

@@ -14,14 +14,16 @@
 
 package protogeni.communication
 {
+	import mx.utils.StringUtil;
+	
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 
-  public class RequestListComponents extends Request
+  public class RequestListComponentsPublic extends Request
   {
-    public function RequestListComponents(shouldDiscoverResources:Boolean, shouldStartSlices:Boolean) : void
+    public function RequestListComponentsPublic() : void
     {
       super("ListComponentsPublic", "Getting the information for the component managers", null);
 	  op.setExactUrl(CommunicationUtil.defaultPublicList);
@@ -34,7 +36,17 @@ package protogeni.communication
 		var newCalls:RequestQueue = new RequestQueue();
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			// put code here ...
+			var a:Array = (response as String).split(/^(.*)$/);
+			for each(var s:String in a) {
+				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
+				newCm.Url = op.getUrl().substring(0, op.getUrl().lastIndexOf('/')) + s;
+				newCm.Urn = s;
+				newCm.Hrn = s.split('+')[1];
+				Main.geniHandler.GeniManagers.add(newCm);
+				newCm.Status = GeniManager.STATUS_INPROGRESS;
+				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
+				newCalls.push(new RequestDiscoverResourcesPublic(newCm));
+			}
 		}
 		else
 		{

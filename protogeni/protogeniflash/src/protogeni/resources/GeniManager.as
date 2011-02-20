@@ -10,10 +10,16 @@ package protogeni.resources
 
 	public class GeniManager
 	{
-		public static var UNKOWN : int = 0;
-		public static var INPROGRESS : int = 1;
-		public static var VALID : int = 2;
-		public static var FAILED : int = 3;
+		public static var STATUS_UNKOWN : int = 0;
+		public static var STATUS_INPROGRESS : int = 1;
+		public static var STATUS_VALID : int = 2;
+		public static var STATUS_FAILED : int = 3;
+		
+		public static var TYPE_PROTOGENI:int = 0;
+		public static var TYPE_PLANETLAB:int = 1;
+		
+		public static var processing:int = 0;
+		public static var maxProcessing:int = 20;
 		
 		[Bindable]
 		public var Url : String = "";
@@ -31,14 +37,14 @@ package protogeni.resources
 		public var errorDescription : String = "";
 		
 		[Bindable]
-		public var Status : int = UNKOWN;
+		public var Status : int = STATUS_UNKOWN;
 		
 		public var Rspec:XML = null;
 		
 		[Bindable]
 		public var Show : Boolean = true;
 		
-		public var Nodes:PhysicalNodeGroupCollection = new PhysicalNodeGroupCollection();
+		public var Nodes:PhysicalNodeGroupCollection;
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();
 		public var AllNodes:ArrayCollection = new ArrayCollection();
 		public var AllLinks:ArrayCollection = new ArrayCollection();
@@ -53,9 +59,11 @@ package protogeni.resources
 		
 		public var lastRequest:Request;
 		
+		public var type:int;
+		
 		public function GeniManager()
 		{
-			
+			Nodes = new PhysicalNodeGroupCollection(this);
 		}
 		
 		public function VisitUrl():String
@@ -87,12 +95,12 @@ package protogeni.resources
 		
 		public function clear():void
 		{
-			Nodes = new PhysicalNodeGroupCollection();
+			Nodes = new PhysicalNodeGroupCollection(this);
 			Links = new PhysicalLinkGroupCollection();
 			AllNodes = new ArrayCollection();
 			AllLinks = new ArrayCollection();
 			Rspec = null;
-			Status = GeniManager.UNKOWN;
+			Status = GeniManager.STATUS_UNKOWN;
 			errorMessage = "";
 			errorDescription = "";
 		}

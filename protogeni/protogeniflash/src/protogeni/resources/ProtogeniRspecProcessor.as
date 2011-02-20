@@ -34,6 +34,7 @@ package protogeni.resources
 		private var nodeNameDictionary:Dictionary;
 		private var subnodeList:ArrayCollection;
 		private var linkDictionary:Dictionary;
+		private var hasslot:Boolean = false;
 		
 		public function processResourceRspec(afterCompletion : Function):void {
 			Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC", false);
@@ -54,6 +55,12 @@ package protogeni.resources
 		
 		private function parseNext(event:Event) : void
 		{
+			if(!hasslot && GeniManager.processing > GeniManager.maxProcessing)
+				return;
+			if(!hasslot) {
+				hasslot = true;
+				GeniManager.processing++;
+			}
 			if (myState == NODE_PARSE)	    	
 			{
 				parseNextNode();
@@ -64,6 +71,7 @@ package protogeni.resources
 			}
 			else if (myState == DONE)
 			{
+				GeniManager.processing--;
 				Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
 				interfaceDictionary = null;
 				nodeNameDictionary = null;
@@ -72,7 +80,7 @@ package protogeni.resources
 				gm.availableNodes = gm.getAvailableNodes().length;
 				gm.unavailableNodes = gm.AllNodes.length - gm.availableNodes;
 				gm.percentageAvailable = (gm.availableNodes / gm.totalNodes) * 100;
-				gm.Status = GeniManager.VALID;
+				gm.Status = GeniManager.STATUS_VALID;
 				Main.geniDispatcher.dispatchGeniManagerChanged(gm);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				myAfter();
@@ -135,7 +143,7 @@ package protogeni.resources
 					gm.Nodes.Add(ng);
 				}
 				
-				var n:PhysicalNode = new PhysicalNode(ng);
+				var n:PhysicalNode = new PhysicalNode(ng, gm);
 				n.name = p.@component_name;
 				switch(gm.outputRspecVersion)
 				{
@@ -148,8 +156,6 @@ package protogeni.resources
 						n.urn = p.@component_id;
 						n.managerString = p.@component_manager_id;
 				}
-				
-				n.manager = Main.geniHandler.GeniManagers.getByUrn(n.managerString);
 				
 				for each(var ix:XML in p.children()) {
 					if(ix.localName() == "interface") {

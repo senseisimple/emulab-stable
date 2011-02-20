@@ -18,21 +18,37 @@ import mx.core.UIComponent;
 import mx.events.DragEvent;
 import mx.managers.DragManager;
 
+import protogeni.resources.GeniManager;
+
 /**
  * InfoWindowSprite is a sprite that contains sub sprites that function as tabs.
  */
 	public class PhysicalNodeGroupClusterMarker extends UIComponent {
-  [Embed('../../../../images/cloud.png')] private var CloudImg:Class;
+		
+  [Embed('../../../../images/planetlabmultisite.png')] private var PlanetlabmultiImg:Class;
+  [Embed('../../../../images/protogenimultisite.png')] private var ProtogenimultiImg:Class;
+  [Embed('../../../../images/mixedmultisite.png')] private var MixedmultiImg:Class;
   
   
-  public function PhysicalNodeGroupClusterMarker(newLabel:String, newMarker:GeniMapMarker) {
+  public function PhysicalNodeGroupClusterMarker(newLabel:String, newMarker:GeniMapMarker, type:int) {
 	  marker = newMarker;
 	  this.addEventListener(MouseEvent.MOUSE_MOVE, drag);
-      addChild(new CloudImg());
+
+	  switch(type) {
+		case GeniManager.TYPE_PLANETLAB:
+			addChild(new PlanetlabmultiImg());
+		  	break;
+		case GeniManager.TYPE_PROTOGENI:
+			addChild(new ProtogenimultiImg());
+			break;
+		default:
+			addChild(new MixedmultiImg());
+	  }
+	  managerType = type;
 	  
 	  // Apply the drop shadow filter to the box.
 	  var shadow:DropShadowFilter = new DropShadowFilter();
-	  shadow.distance = 10;
+	  shadow.distance = 5;
 	  shadow.angle = 25;
 	  
 	  // You can also set other properties, such as the shadow color,
@@ -46,6 +62,7 @@ import mx.managers.DragManager;
       var radius:int = 60;
     var labelMc:TextField = new TextField();
     labelMc.autoSize = TextFieldAutoSize.LEFT;
+	labelMc.textColor = 0xFFFFFF;
     labelMc.selectable = false;
     labelMc.border = false;
     labelMc.embedFonts = false;
@@ -53,13 +70,13 @@ import mx.managers.DragManager;
     labelMc.width = radius;
     labelMc.height = radius;
     labelMc.text = label;
-    	labelMc.y = 8;
+    	labelMc.y = 5;
     if(label.length == 1)
-    	labelMc.x = 15;
+    	labelMc.x = 10;
     else if(label.length == 2)
-    	labelMc.x = 13;
+    	labelMc.x = 7;
     else
-    	labelMc.x = 11;
+    	labelMc.x = 5;
     
     addChild(labelMc);
     cacheAsBitmap = true;
@@ -69,13 +86,14 @@ import mx.managers.DragManager;
   
   private var label:String;
   public var marker:GeniMapMarker;
+  public var managerType:int;
   
   public function drag(e:MouseEvent):void
   {
 	  var ds:DragSource = new DragSource();
 	  ds.addData(marker, 'marker');
 	  
-	  var d:PhysicalNodeGroupClusterMarker = new PhysicalNodeGroupClusterMarker(label, marker)
+	  var d:PhysicalNodeGroupClusterMarker = new PhysicalNodeGroupClusterMarker(label, marker, managerType)
 	  
 	  DragManager.doDrag(this, ds, e, d);
   }

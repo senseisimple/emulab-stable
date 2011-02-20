@@ -68,7 +68,7 @@ package protogeni.communication
 				//}
 				if(startDiscoverResources)
 				{
-					newGm.Status = GeniManager.INPROGRESS;
+					newGm.Status = GeniManager.STATUS_INPROGRESS;
 					if(newGm is AggregateManager)
 						newCalls.push(new RequestGetVersionAm(newGm as AggregateManager));
 					else if(newGm is ProtogeniComponentManager)
@@ -80,7 +80,7 @@ package protogeni.communication
 			if(!Main.protogeniOnly) {
 				var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 				Main.geniHandler.GeniManagers.add(planetLabAm);
-				planetLabAm.Status = GeniManager.INPROGRESS;
+				planetLabAm.Status = GeniManager.STATUS_INPROGRESS;
 				newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
 				Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
 			}

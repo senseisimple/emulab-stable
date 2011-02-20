@@ -149,6 +149,8 @@ package protogeni.display.mapping
 				linkLineOverlays.addItem(polyline);
 				
 				// Add link marker
+				if(map.getZoom() < 4)
+					return;
 				var ll:LatLng = new LatLng((drawGroup.latitude1 + drawGroup.latitude2)/2, (drawGroup.longitude1 + drawGroup.longitude2)/2);
 				
 				var t:TooltipOverlay = new TooltipOverlay(ll, Util.kbsToString(drawGroup.TotalBandwidth()), DisplayUtil.linkBorderColor, DisplayUtil.linkColor);

@@ -18,6 +18,7 @@ package protogeni.communication
   
   import flash.events.ErrorEvent;
   import flash.events.Event;
+  import flash.events.HTTPStatusEvent;
   import flash.events.IOErrorEvent;
   import flash.events.SecurityErrorEvent;
   import flash.net.URLLoader;
@@ -157,6 +158,8 @@ package protogeni.communication
 				loader.addEventListener(Event.COMPLETE, callSuccess);
 				loader.addEventListener(ErrorEvent.ERROR, callFailure);
 				loader.addEventListener(IOErrorEvent.IO_ERROR, callFailure);
+				loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
+				loader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
 				try
 				{
 					loader.load(request);
@@ -172,6 +175,11 @@ package protogeni.communication
 		}
       
     }
+	
+	public function httpStatus(event:HTTPStatusEvent):void
+	{
+		trace(event.toString());
+	}
 	
 	public function getSent() : String
 	{

@@ -31,6 +31,7 @@
 		{
 			super();
 			this.rspecProcessor = new ProtogeniRspecProcessor(this);
+			this.type = GeniManager.TYPE_PROTOGENI;
 		}
 	}
 }

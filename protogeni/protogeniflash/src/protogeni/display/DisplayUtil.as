@@ -232,7 +232,7 @@
         
         // Get's the CM icon
         public static function assignIconForGeniManager(val:GeniManager):Class {
-			if(val.Status == GeniManager.VALID)
+			if(val.Status == GeniManager.STATUS_VALID)
 				return availableIcon;
 			else
 				return crossIcon;

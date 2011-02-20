@@ -9,7 +9,6 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import protogeni.display.DisplayUtil;
 			import com.google.maps.LatLng;
 			import com.google.maps.LatLngBounds;
 			import com.google.maps.Map;
@@ -22,16 +21,21 @@
 			import mx.controls.Button;
 			import mx.core.FlexGlobals;
 			
+			import protogeni.display.DisplayUtil;
 			import protogeni.resources.PhysicalNodeGroup;
+			
+			private var nodes:ArrayCollection;
 			
 			public function Load(cluster:ArrayCollection):void 
 			{
+				nodes = new ArrayCollection();
 				var nodeCount:int = 0;
 				var coords:Array = new Array();
 				for each(var ng:PhysicalNodeGroup in cluster)
 				{
 					addNodeGroup(ng);
 					nodeCount += ng.collection.length;
+					nodes.addAll(ng.collection);
 					coords.push(new LatLng(ng.latitude, ng.longitude));
 				}
 				setZoomButton(GeniMapHandler.getBounds(coords));
@@ -107,6 +111,9 @@
 	<s:Scroller width="170" height="114">
 		<s:VGroup width="100%" height="100%" id="nodeGroupButtonsVbox" gap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
 	</s:Scroller>
-	<mx:Button label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
+	<s:HGroup>
+		<mx:Button label="All" id="allButton" click="DisplayUtil.viewNodeCollection(nodes);" />
+		<mx:Button label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
+	</s:HGroup>
 
 </s:VGroup>

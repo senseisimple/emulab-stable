@@ -31,6 +31,7 @@ package protogeni.resources
 		private var myIndex:int;
 		private var myState:int = PARSE;
 		private var sites:XMLList;
+		private var hasslot:Boolean = false;
 		
 		public function processResourceRspec(afterCompletion : Function):void {
 			Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC", false);
@@ -54,18 +55,25 @@ package protogeni.resources
 		
 		private function parseNext(event:Event) : void
 		{
+			if(!hasslot && GeniManager.processing > GeniManager.maxProcessing)
+				return;
+			if(!hasslot) {
+				hasslot = true;
+				GeniManager.processing++;
+			}
 			if (myState == PARSE)	    	
 			{
 				parseNextNode();
 			}
 			else if (myState == DONE)
 			{
+				GeniManager.processing--;
 				Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
 				gm.totalNodes = gm.AllNodes.length;
 				gm.availableNodes = gm.totalNodes;
 				gm.unavailableNodes = 0;
 				gm.percentageAvailable = 100;
-				gm.Status = GeniManager.VALID;
+				gm.Status = GeniManager.STATUS_VALID;
 				Main.geniDispatcher.dispatchGeniManagerChanged(gm);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 
@@ -100,7 +108,7 @@ package protogeni.resources
 				site.hrn = gm.networkName + "." + site.id;
 				gm.sites.addItem(site);
 				for each(var p:XML in s.child("node")) {
-					var node:PhysicalNode = new PhysicalNode(null);
+					var node:PhysicalNode = new PhysicalNode(null, gm);
 					node.name = p.@id;
 					for each(var tx:XML in p.children()) {
 						switch(tx.localName()) {
@@ -122,7 +130,6 @@ package protogeni.resources
 						}
 					}
 					node.rspec = p.copy();
-					node.manager = gm;
 					node.tag = site;
 					node.available = true;
 					node.exclusive = false;

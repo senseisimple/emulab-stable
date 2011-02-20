@@ -178,7 +178,7 @@
 				if(cmHbox.numChildren == 3)
 					cmGoto = cmHbox.getChildAt(2) as ImageButton;
 				
-				if(gm.Status == GeniManager.FAILED) {
+				if(gm.Status == GeniManager.STATUS_FAILED) {
 					cmCheckbox.styleName = "failedStyle";
 					cmInfo.source = DisplayUtil.flagRedIcon;
 					cmHbox.toolTip = gm.errorDescription;
@@ -194,17 +194,17 @@
 						cmHbox.addChild(cmGoto);
 					}
 				}
-				else if(gm.Status == GeniManager.UNKOWN) {
+				else if(gm.Status == GeniManager.STATUS_UNKOWN) {
 					cmCheckbox.styleName = "unknownStyle";
 					cmInfo.source = DisplayUtil.flagOrangeIcon;
 					cmHbox.toolTip = "Unknown status";
 				}
-				else if(gm.Status == GeniManager.INPROGRESS) {
+				else if(gm.Status == GeniManager.STATUS_INPROGRESS) {
 					cmCheckbox.styleName = "inprogressStyle";
 					cmInfo.source = DisplayUtil.flagOrangeIcon;
 					cmHbox.toolTip = "In progress...";
 				}
-				else if(gm.Status == GeniManager.VALID)
+				else if(gm.Status == GeniManager.STATUS_VALID)
 				{
 					cmCheckbox.styleName = "validStyle";
 					cmInfo.source = DisplayUtil.flagGreenIcon;

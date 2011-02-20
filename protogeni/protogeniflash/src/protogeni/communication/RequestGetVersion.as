@@ -71,7 +71,7 @@ package protogeni.communication
 		else if(cm.errorMessage.search("timed"))
 			cm.errorDescription = event.text;
 
-		cm.Status = GeniManager.FAILED;
+		cm.Status = GeniManager.STATUS_FAILED;
 		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
 		
 		return null;
@@ -79,7 +79,7 @@ package protogeni.communication
 	
 	override public function cancel():void
 	{
-		cm.Status = GeniManager.UNKOWN;
+		cm.Status = GeniManager.STATUS_UNKOWN;
 		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 	}

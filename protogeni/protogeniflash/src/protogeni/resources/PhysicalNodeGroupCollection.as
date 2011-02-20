@@ -19,11 +19,13 @@
 	// Collection of all physical node groups
 	public class PhysicalNodeGroupCollection
 	{
-		public function PhysicalNodeGroupCollection()
+		public function PhysicalNodeGroupCollection(own:GeniManager)
 		{
+			owner = own;
 		}
 		
 		public var collection:ArrayCollection = new ArrayCollection();
+		public var owner:GeniManager;
 		
 		public function GetByLocation(lat:Number, lng:Number):PhysicalNodeGroup {
 			for each(var ng:PhysicalNodeGroup in collection) {
@@ -74,6 +76,20 @@
 					d.push(n);
 			}
 			return d;
+		}
+		
+		public function GetType():int
+		{
+			var type:int = -2;
+			for each(var ng:PhysicalNodeGroup in collection) {
+				for each(var n:PhysicalNode in ng.collection) {
+					if(type == -2)
+						type = n.manager.type;
+					else if(n.manager.type != type)
+						type = -1;
+				}
+			}
+			return type;
 		}
 	}
 }
