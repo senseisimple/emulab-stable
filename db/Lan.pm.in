@@ -695,6 +695,20 @@ sub SetRole($$)
 
     return $self->SetAttribute("role", $role);
 }
+sub GetRole($;$)
+{
+    my ($self, $prole) = @_;
+    my $role;
+
+    return -1
+	if ($self->GetAttribute("role", \$role) != 0);
+
+    if (defined($prole)) {
+	$$prole = $role;
+	return 0;
+    }
+    return $role;
+}
 
 #
 # Get the experiment object for a lan.
@@ -2472,6 +2486,20 @@ sub SetRole($$)
     my ($self, $role) = @_;
 
     return $self->GetLan()->SetRole($role);
+}
+sub GetRole($;$)
+{
+    my ($self, $prole) = @_;
+    my $role;
+
+    return -1
+	if ($self->GetAttribute("role", \$role) != 0);
+
+    if (defined($prole)) {
+	$$prole = $role;
+	return 0;
+    }
+    return $role;
 }
 sub SetTag($$)
 {

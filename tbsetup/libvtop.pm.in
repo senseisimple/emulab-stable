@@ -5510,11 +5510,20 @@ sub InterpLinksAux($)
 						  $self->impotent() ||
 						  $self->alloconly(),
 						  $protovlan);
-		    $protolink->SetType((defined($protovlan) ?
-					"emulated" : "vlan"));
-		    $protolink->SetRole("link/lan");
-		    $protolink->SetAttribute("link/lan", $lan)
-			if (!defined($protovlan));
+		    my $vlan_type;
+		    my $vlan_role;
+
+		    if (defined($protovlan)) {
+			$vlan_type = "emulated";
+			$vlan_role = "link/lan";
+		    }
+		    else {
+			$vlan_type = "vlan";
+			$vlan_role = "emulated";
+			$protolink->SetAttribute("link/lan", $lan);
+		    }
+		    $protolink->SetType($vlan_type);
+		    $protolink->SetRole($vlan_role);
 
 		    $protolink->AddInterface($nodeA, $vnodeA, $vportA,
 					     $virtifaceA->viface(),
@@ -6931,7 +6940,7 @@ sub UploadVlans($)
 	    # Only care about encapsulated links.
 	    next
 		if (! ($lan->type() eq "emulated" ||
-		       $lan->type() eq "vlan"));
+		       $lan->GetRole() eq "emulated"));
 
 	    my $virtlan     = $self->vlans()->{$lan->vname()};
 	    if (!defined($virtlan)) {

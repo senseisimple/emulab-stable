@@ -994,7 +994,7 @@ sub Start($$$)
 		return -1;
 	    }
 	}
-	system("$SNMPIT -q -t $pid $eid");
+	system("$SNMPIT -t $pid $eid");
 	if ($?) {
 	    print STDERR "$SNMPIT failed\n";
 	    return -1;
@@ -1124,7 +1124,7 @@ sub Stop($$)
     %vnodes = %tmp;
 
     if ($version >= 2) {
-	system("$SNMPIT -q -r $pid $eid");
+	system("$SNMPIT -r $pid $eid");
 	if ($?) {
 	    print STDERR "$SNMPIT failed\n";
 	    return -1;
