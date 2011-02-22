@@ -14,18 +14,11 @@
 
 package protogeni.communication
 {
-  import com.mattism.http.xmlrpc.MethodFault;
-  
-  import flash.events.ErrorEvent;
-  import flash.events.SecurityErrorEvent;
   import flash.utils.ByteArray;
   
   import mx.utils.Base64Decoder;
   
   import protogeni.Util;
-  import protogeni.resources.AggregateManager;
-  import protogeni.resources.ProtogeniComponentManager;
-  import protogeni.resources.GeniManager;
   import protogeni.resources.Sliver;
 
   public class RequestSliverListResourcesAm extends Request

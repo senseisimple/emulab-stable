@@ -10,13 +10,9 @@
 			import protogeni.display.mapping.GeniMapMarker;
 			import mx.collections.ArrayCollection;
 			import mx.controls.List;
-			import mx.core.UIComponent;
 			import mx.events.DragEvent;
 			import mx.managers.DragManager;
-			import mx.managers.PopUpManager;
 			
-			import protogeni.GeniEvent;
-			import protogeni.GeniHandler;
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;

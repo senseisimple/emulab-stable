@@ -14,7 +14,6 @@
 
 package protogeni.communication
 {
-	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
   public class RequestSliverGet extends Request

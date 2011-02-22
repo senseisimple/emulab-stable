@@ -14,13 +14,6 @@
  
  package protogeni.resources
 {
-	import flash.utils.Dictionary;
-	
-	import mx.collections.ArrayCollection;
-	
-	import protogeni.Util;
-	import protogeni.communication.CommunicationUtil;
-	
 	// Sliver from a slice containing all resources from the CM
 	public class Sliver
 	{

@@ -14,7 +14,6 @@
  
  package protogeni.resources
 {
-	import mx.charts.renderers.DiamondItemRenderer;
 	import mx.collections.ArrayCollection;
 	
 	// Link as part of a sliver/slice connecting virtual nodes

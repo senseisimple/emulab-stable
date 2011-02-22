@@ -20,11 +20,12 @@ package protogeni.communication
   import flash.events.Event;
   import flash.events.HTTPStatusEvent;
   import flash.events.IOErrorEvent;
+  import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
   import flash.net.URLLoader;
+  import flash.net.URLLoaderDataFormat;
   import flash.net.URLRequest;
-  import flash.system.Security;
-  import flash.utils.Dictionary;
+  import flash.net.URLRequestMethod;
   
   import mx.collections.ArrayCollection;
 
@@ -153,8 +154,12 @@ package protogeni.communication
 				}
 				break;
 			case HTTP:
-				var request:URLRequest = new URLRequest(url); 
-				loader = new URLLoader(); 
+				var request:URLRequest = new URLRequest(url);
+				request.method = URLRequestMethod.GET;
+				loader = new URLLoader();
+				loader.dataFormat = URLLoaderDataFormat.TEXT;
+				loader.addEventListener(ProgressEvent.PROGRESS,onMessageProgress);
+				loader.addEventListener(Event.OPEN,onOpen);
 				loader.addEventListener(Event.COMPLETE, callSuccess);
 				loader.addEventListener(ErrorEvent.ERROR, callFailure);
 				loader.addEventListener(IOErrorEvent.IO_ERROR, callFailure);
@@ -175,6 +180,18 @@ package protogeni.communication
 		}
       
     }
+	
+	private function onMessageProgress(e:Event):void{
+		var L:URLLoader = e.target as URLLoader;
+		trace("PROGRESS: "+L.bytesLoaded+"/"+L.bytesTotal);
+		for(var k:* in L){
+			trace("   "+k+": "+L[k]);
+		}
+	}
+	
+	private function onOpen(e:Event):void{
+		trace("Connection opened");
+	}
 	
 	public function httpStatus(event:HTTPStatusEvent):void
 	{

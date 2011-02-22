@@ -14,8 +14,6 @@
 
 package protogeni.communication
 {
-	import flash.utils.Dictionary;
-
   public class RequestQueue
   {
     public function RequestQueue(shouldPushEvents:Boolean = false) : void
@@ -126,7 +124,9 @@ package protogeni.communication
 	
 	public function readyToStart():Boolean
 	{
-		return head != null && nextRequest != null && (nextRequest == head || nextRequest.item.startImmediately == true);
+		return head != null &&
+			nextRequest != null &&
+			(nextRequest == head || nextRequest.item.startImmediately == true);
 	}
 
     public function front() : *

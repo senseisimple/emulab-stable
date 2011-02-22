@@ -4,19 +4,14 @@
  
  package protogeni.display.mapping {
 
-import flash.display.BitmapData;
-import flash.display.Sprite;
 import flash.events.MouseEvent;
-import flash.filters.ColorMatrixFilter;
 import flash.filters.DropShadowFilter;
-import flash.geom.Matrix;
 import flash.text.TextField;
 import flash.text.TextFieldAutoSize;
 
 import mx.controls.Image;
 import mx.core.DragSource;
 import mx.core.UIComponent;
-import mx.events.DragEvent;
 import mx.managers.DragManager;
 
 import protogeni.resources.GeniManager;

@@ -17,7 +17,6 @@ package protogeni.communication
   import com.mattism.http.xmlrpc.MethodFault;
   
   import flash.events.ErrorEvent;
-  import flash.events.SecurityErrorEvent;
   import flash.utils.ByteArray;
   
   import mx.utils.Base64Decoder;

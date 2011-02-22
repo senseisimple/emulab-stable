@@ -14,20 +14,9 @@
 
 package protogeni.communication
 {
-  import com.mattism.http.xmlrpc.MethodFault;
-  
-  import flash.events.ErrorEvent;
-  import flash.events.SecurityErrorEvent;
-  import flash.utils.ByteArray;
-  
-  import mx.utils.Base64Decoder;
-  
-  import protogeni.Util;
-  import protogeni.resources.GeniManager;
   import protogeni.resources.PhysicalNode;
   import protogeni.resources.PhysicalNodeGroup;
   import protogeni.resources.PlanetlabAggregateManager;
-  import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.Site;
 
   public class RequestSitesLocation extends Request
@@ -49,17 +38,19 @@ package protogeni.communication
 			var sitesXml:XML = new XML(response);
 			for each(var siteXml:XML in sitesXml.children()) {
 				var site:Site = plm.getSiteWithHrn(siteXml.@hrn);
-				site.latitude = siteXml.@latitude;
-				site.longitude = siteXml.@longitude;
-				
-				var ng:PhysicalNodeGroup = plm.Nodes.GetByLocation(site.latitude,site.longitude);
-				var tempString:String;
-				if(ng == null) {
-					ng = new PhysicalNodeGroup(site.latitude, site.longitude, "", plm.Nodes);
-					plm.Nodes.Add(ng);
-				}
-				for each(var n:PhysicalNode in site.nodes) {
-					ng.Add(n);
+				if(site != null) {
+					site.latitude = siteXml.@latitude;
+					site.longitude = siteXml.@longitude;
+					
+					var ng:PhysicalNodeGroup = plm.Nodes.GetByLocation(site.latitude,site.longitude);
+					var tempString:String;
+					if(ng == null) {
+						ng = new PhysicalNodeGroup(site.latitude, site.longitude, "", plm.Nodes);
+						plm.Nodes.Add(ng);
+					}
+					for each(var n:PhysicalNode in site.nodes) {
+						ng.Add(n);
+					}
 				}
 			}
 

@@ -29,37 +29,18 @@
 	
 	<fx:Script>
 		<![CDATA[
-			import com.google.maps.LatLng;
-			import com.google.maps.MapOptions;
-			import com.google.maps.MapType;
-			import com.mattism.http.xmlrpc.MethodCallImpl;
-			
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
-			import mx.controls.Image;
-			import mx.controls.Label;
-			import mx.controls.ToolTip;
 			import mx.core.FlexGlobals;
-			import mx.core.mx_internal;
 			import mx.events.CloseEvent;
-			import mx.events.CollectionEvent;
 			import mx.events.ListEvent;
-			import mx.events.ResizeEvent;
-			import mx.managers.PopUpManager;
-			import mx.managers.ToolTipManager;
 			import mx.rpc.events.ResultEvent;
 			
 			import protogeni.GeniDispatcher;
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.Util;
-			import protogeni.display.ConsoleWindow;
 			import protogeni.display.DisplayUtil;
-			import protogeni.display.GeniManagersWindow;
-			import protogeni.display.SearchWindow;
-			import protogeni.display.SlicesWindow;
-			import protogeni.display.UserWindow;
-			import protogeni.display.XmlWindow;
 			import protogeni.resources.Slice;
 			import protogeni.resources.SliceAuthority;
 			
@@ -70,13 +51,6 @@
 			
 			[Embed(source="../images/arrow_in.png")] 
 			private var arrowIn:Class;
-			
-			public var console:protogeni.display.ConsoleWindow;
-			public var cms:protogeni.display.GeniManagersWindow;
-			public var about:AboutWindow = new AboutWindow();
-			public var slices:protogeni.display.SlicesWindow;
-			public var user:protogeni.display.UserWindow;
-			public var search:protogeni.display.SearchWindow;
 			
 			[Bindable]
 			public var allowAuthenticate:Boolean;
@@ -129,7 +103,6 @@
 			
 			private function init():void {
 				Main.geniDispatcher = new GeniDispatcher();
-				
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
@@ -157,29 +130,10 @@
 				}
 				loadLocalUserData();
 				
-				console = new protogeni.display.ConsoleWindow();
-				console.showWindow();
-				if(!Main.debugMode)
-					console.closeWindow();
-				Main.log = console;
-				
-				cms = new protogeni.display.GeniManagersWindow();
-				cms.openFirst();
-				if(!Main.debugMode)
-					cms.closeWindow();
-				
-				search = new protogeni.display.SearchWindow();
-				search.showWindow();
-				search.closeWindow();
-				
-				slices = new protogeni.display.SlicesWindow();
-				slices.openFirst();
-				slices.closeWindow();
-				
-				user = new protogeni.display.UserWindow();
-				user.showWindow();
-				user.load(Main.geniHandler.CurrentUser);
-				user.closeWindow();
+				if(Main.debugMode) {
+					Main.log.viewConsole();
+					DisplayUtil.viewManagersWindow();
+				}
 				
 				// Load the certificate bundle
 				if(Main.useJavascript) {
@@ -198,8 +152,18 @@
 						Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
 							+ e.toString() + "\n\n", true));
 					}
-				} else 
+				} else {
 					Main.geniHandler.requestHandler.startInitiationSequence();
+				}
+					
+			}
+			
+			private function resultHandler(event:ResultEvent):void {
+				trace(event.result);
+			}
+			
+			private function errorHandler(event:ErrorEvent):void {
+				trace(event.toString());
 			}
 			
 			private function certBundleResult(e:Event):void
@@ -231,23 +195,14 @@
 			
 			private function reinit(authenticateUser:Boolean = false):void
 			{
+				if(Main.geniHandler != null)
+					Main.geniHandler.removeHandlers();
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
-				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
 				loadParams();
 				loadLocalUserData();
 				// Override the params
 				Main.geniHandler.unauthenticatedMode = !authenticateUser;
-				
-				cms.init();
-				user.load(Main.geniHandler.CurrentUser);
-				slices.init();
-			}
-			
-			public function showAbout():void {
-				PopUpManager.addPopUp(about, this, false);
-				PopUpManager.centerPopUp(about);
 			}
 			
 			//------------------------------------------
@@ -308,7 +263,7 @@
 				{
 					startover(true);
 				} else {
-					user.showWindow();
+					DisplayUtil.viewUserWindow();
 				}
 			}
 			
@@ -365,8 +320,6 @@
 					if(FlexGlobals.topLevelApplication.parameters.publicurl != null)
 					{
 						Main.geniHandler.publicUrl = FlexGlobals.topLevelApplication.parameters.publicurl;
-						Main.geniHandler.publicUrn = FlexGlobals.topLevelApplication.parameters.publicurn;
-						Main.geniHandler.publicHrn = FlexGlobals.topLevelApplication.parameters.publichrn;
 					}
 				} catch(all:Error) {
 				}
@@ -427,13 +380,30 @@
 					trace("Problem saving shared object");
 				}
 			}
+			
+			public function setStatus(s:String, isError:Boolean):void
+			{
+				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
+				waitingIcon.visible = isWorking;
+				progressLabel.text = s;
+				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
+					waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
+				else
+					waitingCountLabel.text = "";
+				if(isWorking)
+					progressLabel.styleName = "inprogressStyle";
+				else if(isError)
+					progressLabel.styleName = "failedStyle";
+				else
+					progressLabel.styleName = "validStyle";
+			}
 		]]>
 	</fx:Script>
 	
 	<s:controlBarContent>
 		<display:ImageButton id="infoButton"
 							 source="@Embed('../images/protogeni-logo.png')"
-							 click="showAbout()"
+							 click="DisplayUtil.viewAboutWindow()"
 							 toolTip="View more information about ProtoGENI" />
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton id="refreshButton"
@@ -442,16 +412,16 @@
 							 toolTip="Reload all data" />
 		<display:ImageButton id="cmButton"
 							 source="@Embed('../images/building.png')"
-							 click="cms.showWindow()"
+							 click="DisplayUtil.viewManagersWindow();"
 							 toolTip="GENI managers"/>
 		<display:ImageButton id="consoleButton"
 							 source="@Embed('../images/application_xp_terminal.png')"
-							 click="Main.log.open()" 
+							 click="Main.log.viewConsole();" 
 							 toolTip="Console"/>
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
 							 source="{DisplayUtil.graphIcon}"
-							 click="slices.showWindow()"
+							 click="DisplayUtil.viewSlicesWindow();"
 							 toolTip="Work with slices"/>
 		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
 		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
@@ -467,7 +437,7 @@
 				   id="userButton" />
 		<display:ImageButton id="searchButton"
 							 source="{DisplayUtil.searchIcon}"
-							 click="search.showWindow()"
+							 click="DisplayUtil.viewSearchWindow()"
 							 toolTip="Search" />
 		<display:ImageButton id="resetZoomButton"
 							 source="@Embed('../images/zoom.png')"

@@ -45,21 +45,13 @@
 	</fx:Style>
 	<fx:Script>
 		<![CDATA[
-			import com.google.maps.View;
-			
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
-			import mx.controls.Button;
-			import mx.managers.PopUpManager;
 			
-			import protogeni.resources.PhysicalLink;
-			import protogeni.resources.PhysicalNode;
-			import protogeni.resources.PhysicalNodeInterface;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualLink;
 			import protogeni.resources.VirtualNode;
 			
-			import spark.components.HGroup;
 			import spark.primitives.Rect;
 			
 			[Bindable]
@@ -183,8 +175,7 @@
 				if(node.rspec != null)
 				{
 					var rspecWindow:XmlWindow = new XmlWindow;
-					PopUpManager.addPopUp(rspecWindow, Main.Application() as DisplayObject, false);
-					PopUpManager.centerPopUp(rspecWindow);
+					rspecWindow.showWindow();
 					rspecWindow.title = "Last Successful RSPEC from " + node.urn;
 					rspecWindow.loadXml(node.rspec);
 				} else {

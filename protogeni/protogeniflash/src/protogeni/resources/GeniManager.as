@@ -19,7 +19,7 @@ package protogeni.resources
 		public static var TYPE_PLANETLAB:int = 1;
 		
 		public static var processing:int = 0;
-		public static var maxProcessing:int = 20;
+		public static var maxProcessing:int = 2;
 		
 		[Bindable]
 		public var Url : String = "";

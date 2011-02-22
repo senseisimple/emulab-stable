@@ -7,9 +7,6 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import mx.collections.ArrayCollection;
-			import mx.managers.PopUpManager;
-			
 			import protogeni.Util;
 			import protogeni.resources.PhysicalLink;
 			
@@ -28,8 +25,7 @@
 			public function viewRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
 				rspecView.title = "Advertisement RSPEC for " + link.name;
-				PopUpManager.addPopUp(rspecView, Main.Application() as DisplayObject, false);
-				PopUpManager.centerPopUp(rspecView);
+				rspecView.showWindow();
 				rspecView.loadXml(link.rspec);
 			}
 		]]>

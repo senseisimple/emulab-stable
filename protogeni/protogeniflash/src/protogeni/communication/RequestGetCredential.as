@@ -14,8 +14,6 @@
 
 package protogeni.communication
 {
-	import flash.events.ErrorEvent;
-
   public class RequestGetCredential extends Request
   {
     public function RequestGetCredential() : void

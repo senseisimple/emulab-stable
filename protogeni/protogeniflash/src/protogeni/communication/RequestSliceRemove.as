@@ -14,10 +14,7 @@
 
 package protogeni.communication
 {
-	import mx.controls.Alert;
-	
 	import protogeni.resources.Slice;
-	import protogeni.resources.Sliver;
 
   public class RequestSliceRemove extends Request
   {

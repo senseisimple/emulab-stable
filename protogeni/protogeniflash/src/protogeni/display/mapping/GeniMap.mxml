@@ -15,16 +15,10 @@
 	<fx:Script>
 		<![CDATA[
 			import com.google.maps.LatLng;
-			import com.google.maps.MapMoveEvent;
 			import com.google.maps.MapOptions;
 			import com.google.maps.MapType;
 			import com.google.maps.MapZoomEvent;
-			import com.google.maps.controls.MapTypeControl;
-			import com.google.maps.controls.PositionControl;
 			import com.google.maps.controls.ZoomControl;
-			
-			import mx.core.Application;
-			import mx.core.FlexGlobals;
 			
 			public var ready:Boolean;
 			

@@ -1,30 +1,20 @@
 package protogeni.display.mapping
 {
-	import com.google.maps.InfoWindowOptions;
 	import com.google.maps.LatLng;
 	import com.google.maps.LatLngBounds;
-	import com.google.maps.Map;
-	import com.google.maps.MapMouseEvent;
 	import com.google.maps.overlays.Marker;
 	import com.google.maps.overlays.MarkerOptions;
 	import com.google.maps.overlays.Polyline;
 	import com.google.maps.overlays.PolylineOptions;
-	import com.google.maps.services.ClientGeocoder;
-	import com.google.maps.services.GeocodingEvent;
-	import com.google.maps.services.Placemark;
 	import com.google.maps.styles.FillStyle;
 	import com.google.maps.styles.StrokeStyle;
 	
-	import flash.display.DisplayObject;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
-	import flash.geom.Point;
 	
 	import mx.collections.ArrayCollection;
-	import mx.events.FlexEvent;
 	
 	import protogeni.Util;
-	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
@@ -35,9 +25,7 @@ package protogeni.display.mapping
 	import protogeni.resources.VirtualInterface;
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
-	import protogeni.display.Clusterer;
 	import protogeni.display.DisplayUtil;
-	import protogeni.display.TooltipOverlay;
 	
     // Handles adding all the ProtoGENI info to the Google Map component
 	public class GeniMapHandler
@@ -241,7 +229,7 @@ package protogeni.display.mapping
 	    }
 	    
 	    public function drawMap(junk:* = null):void {
-			//Main.log.setStatus("Drawing map", true, false);
+			//Main.Application().setStatus("Drawing map", true, false);
 	    	
 			if(!map.ready)
 				return;

@@ -9,7 +9,6 @@
 		<![CDATA[
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
-			import mx.managers.PopUpManager;
 			
 			import protogeni.resources.GeniManager;
 			
@@ -38,8 +37,7 @@
 			
 			public function viewRspec():void {
 				var rspecWindow:XmlWindow = new XmlWindow;
-				PopUpManager.addPopUp(rspecWindow, Main.Application() as DisplayObject, false);
-				PopUpManager.centerPopUp(rspecWindow);
+				rspecWindow.showWindow();
 				rspecWindow.title = "Advertisement RSPEC from " + gm.Hrn;
 				rspecWindow.loadXml(gm.Rspec);
 			}
@@ -101,12 +99,7 @@
 				
 				cw.addElement(tabContainer);
 			}
-			
-			public function viewConsole():void
-			{
-				Main.log.open();
-				Main.log.openGroup(gm.Url);
-			}
+
 		]]>
 	</fx:Script>
 	<mx:Grid width="100%" height="100%" verticalGap="5" horizontalGap="5" paddingTop="0" paddingRight="0" paddingLeft="0" paddingBottom="0" id="cmInfo">
@@ -118,7 +111,7 @@
 				<s:Label text="{gm.Hrn}" fontSize="17" fontWeight="bold" width="100%" />
 				<display:ImageButton id="consoleButton"
 									 source="@Embed('../../../images/application_xp_terminal.png')"
-									 click="viewConsole()"
+									 click="Main.log.viewGroup(gm.Url);"
 									 toolTip="View log messages in the console" />
 				<display:ImageButton id="rpsecButton"
 									 source="@Embed('../../../images/page_white_code.png')"

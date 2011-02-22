@@ -13,6 +13,7 @@
 	<fx:Script>
 		<![CDATA[
 			import mx.core.IVisualElement;
+			
 			protected function search():void
 			{
 				resultsBox.removeAllElements();

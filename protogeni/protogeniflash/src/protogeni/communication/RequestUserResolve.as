@@ -14,8 +14,6 @@
 
 package protogeni.communication
 {
-  import flash.events.ErrorEvent;
-  import flash.events.SecurityErrorEvent;
   import protogeni.resources.Slice;
 
   public class RequestUserResolve extends Request

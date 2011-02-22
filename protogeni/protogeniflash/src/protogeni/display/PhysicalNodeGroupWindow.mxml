@@ -9,15 +9,12 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import protogeni.resources.PhysicalNode;
-			import protogeni.resources.PhysicalNodeGroup;
 			import mx.collections.SortField;
 			import mx.collections.Sort;
-			import com.google.maps.View;
 			import mx.collections.ArrayCollection;
-			import mx.controls.Alert;
-			import mx.events.CloseEvent;
-			import mx.managers.PopUpManager;
+			
+			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.PhysicalNodeGroup;
 			
 			[Bindable]
 			public var nodes:ArrayCollection;

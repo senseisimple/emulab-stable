@@ -2,7 +2,9 @@
 <display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						title="Console" implements="LogRoot" initialize="init()" close="closeWindow()">
+						title="Console"
+						creationComplete="onCreationComplete()"
+						close="Main.log.closeConsole();">
 	<fx:Declarations>
 		<s:RadioButtonGroup id="sortGroup" selectedValue="newest" itemClick="resetLogView()" />
 	</fx:Declarations>
@@ -41,13 +43,9 @@
 	</fx:Style>
 	<fx:Script>
 		<![CDATA[
-			import mx.collections.ArrayCollection;
 			import mx.collections.ArrayList;
-			import mx.controls.Alert;
 			import mx.controls.Button;
-			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
-			import mx.managers.PopUpManager;
 			
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
@@ -57,53 +55,44 @@
 			import protogeni.communication.RequestQueueNode;
 			import protogeni.resources.GeniManager;
 			
-			import spark.components.Button;
-			import spark.components.Label;
 			import spark.primitives.Rect;
 			
 			[Bindable]
 			public var selectedIndex:int;
-			private var logList:Array;
-			public var groups:Array;
 			
 			[Bindable]
 			public var groupNames:ArrayList;
+			public var groups:Array;
 			
-			public function init():void
+			public function onCreationComplete():void
 			{
-				clear();
+				selectedIndex = 0;
+				refreshView();
 				Main.geniDispatcher.addEventListener(GeniEvent.QUEUE_CHANGED, resetQueueView);
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, loadGeniManagers);
+				Main.geniDispatcher.addEventListener(GeniEvent.LOGS_CHANGED, logsChanged);
 			}
 			
-			public function setStatus(s:String, isError:Boolean):void
-			{
-				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
-				Main.Application().waitingIcon.visible = isWorking;
-				Main.Application().progressLabel.text = s;
-				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
-					Main.Application().waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
-				else
-					Main.Application().waitingCountLabel.text = "";
-				if(isWorking)
-					Main.Application().progressLabel.styleName = "inprogressStyle";
-				else if(isError)
-					Main.Application().progressLabel.styleName = "failedStyle";
-				else
-					Main.Application().progressLabel.styleName = "validStyle";
+			public override function closeWindow(event:Event=null):void {
+				Main.geniDispatcher.removeEventListener(GeniEvent.QUEUE_CHANGED, resetQueueView);
+				Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGERS_CHANGED, loadGeniManagers);
+				Main.geniDispatcher.removeEventListener(GeniEvent.LOGS_CHANGED, logsChanged);
+				super.closeWindow(event);
 			}
 			
-			public function appendMessage(msg:LogMessage):void {
-				logList.push(msg);
-				if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
-					addMessage(msg);
+			public function logsChanged(e:GeniEvent):void {
+				if(e.changedObject != null) {
+					var msg:LogMessage = e.changedObject as LogMessage;
+					if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
+						addMessage(msg);
+				}
+				
 			}
 			
 			private function doScroll(event:FlexEvent): void
 			{
 				// REDO
 			}
-			
 			
 			private function addMessage(msg:LogMessage):void
 			{
@@ -125,17 +114,6 @@
 					logs.addElementAt(h, 0);
 			}
 			
-			public function clear():void {
-				logList = new Array();
-				groups = new Array("", CommunicationUtil.sesUrl, CommunicationUtil.chUrl);
-				groupNames = new ArrayList(["All", "Slice Embedding Service", "Clearing House"]);
-				selectedIndex = 0;
-				if(logs != null)
-					logs.removeAllElements();
-				if(queue != null)
-					queue.removeAllElements();
-			}
-			
 			public function loadGeniManagers(junk:* = null):void
 			{
 				groups = new Array("", CommunicationUtil.sesUrl, CommunicationUtil.chUrl);
@@ -147,7 +125,6 @@
 					groupNames.addItem(gm.Hrn);
 				}
 				this.validateNow();
-				
 			}
 			
 			public function clearScreen():void
@@ -171,6 +148,7 @@
 			{
 				this.resetLogView();
 				this.resetQueueView();
+				this.loadGeniManagers();
 			}
 			
 			public function addRequest(rqn:RequestQueueNode):void
@@ -202,12 +180,12 @@
 				logs.removeAllElements();
 				if(groupComboBox.selectedIndex == 0)
 				{
-					for each(var allMsg:LogMessage in logList)
+					for each(var allMsg:LogMessage in Main.log.logs)
 					{
 						addMessage(allMsg);
 					}
 				} else {
-					for each(var msg:LogMessage in logList)
+					for each(var msg:LogMessage in Main.log.logs)
 					{
 						if(msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1)
 							addMessage(msg);

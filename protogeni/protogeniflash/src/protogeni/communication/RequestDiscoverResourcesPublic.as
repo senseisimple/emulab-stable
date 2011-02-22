@@ -14,14 +14,6 @@
 
 package protogeni.communication
 {
-  import com.mattism.http.xmlrpc.MethodFault;
-  
-  import flash.events.ErrorEvent;
-  import flash.events.SecurityErrorEvent;
-  import flash.utils.ByteArray;
-  
-  import mx.utils.Base64Decoder;
-  
   import protogeni.Util;
   import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.GeniManager;
@@ -72,7 +64,7 @@ package protogeni.communication
 		op.cleanup();
 		Main.geniHandler.mapHandler.drawMap();
 		if(cm.Status == GeniManager.STATUS_VALID)
-			Main.log.setStatus("Parsing " + cm.Hrn + " RSPEC Done",false);
+			Main.Application().setStatus("Parsing " + cm.Hrn + " RSPEC Done",false);
 		Main.geniHandler.requestHandler.start();
 	}
 

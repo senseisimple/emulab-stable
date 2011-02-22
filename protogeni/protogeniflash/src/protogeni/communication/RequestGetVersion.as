@@ -19,7 +19,6 @@ package protogeni.communication
 	import flash.events.ErrorEvent;
 	
 	import protogeni.Util;
-	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.ProtogeniComponentManager;
 

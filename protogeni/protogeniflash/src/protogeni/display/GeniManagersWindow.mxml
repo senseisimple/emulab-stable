@@ -6,7 +6,8 @@
 						width="270" height="360"
 						defaultButton="{okButton}"
 						resize="cmVbox.height = this.height - 108"
-						creationComplete="okButton.setFocus()" close="closeWindow()">
+						close="closeWindow()"
+						creationComplete="onCreationComplete()">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
@@ -45,20 +46,9 @@
 	</fx:Style>
 	<fx:Script>
 		<![CDATA[
-			import flash.net.navigateToURL;
-			
 			import mx.collections.ArrayCollection;
-			import mx.containers.HBox;
-			import mx.controls.Alert;
-			import mx.controls.CheckBox;
-			import mx.controls.TextArea;
-			import mx.events.CloseEvent;
-			import mx.managers.PopUpManager;
 			
 			import protogeni.GeniEvent;
-			import protogeni.GeniHandler;
-			import protogeni.Util;
-			import protogeni.resources.ProtogeniComponentManager;
 			import protogeni.resources.GeniManager;
 			
 			public function success():void {
@@ -66,17 +56,19 @@
 				Main.geniHandler.mapHandler.drawMap();
 			}
 			
-			public function openFirst():void {
-				showWindow();
-				init();
-			}
-			
-			public function init():void
+			public function onCreationComplete():void
 			{
-				okButton.enabled = Main.geniHandler.GeniManagers.length > 0;
 				refreshList();
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, Reset);
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, refreshList);	
+				okButton.enabled = Main.geniHandler.GeniManagers.length > 0;
+				okButton.setFocus()
+			}
+			
+			public override function closeWindow(event:Event=null):void {
+				Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, Reset);
+				Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGERS_CHANGED, refreshList);	
+				super.closeWindow(event);
 			}
 			
 			public function refreshList(junk:* = null):void {

@@ -7,9 +7,7 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import protogeni.GeniHandler;
 			import protogeni.communication.Request;
-			import protogeni.resources.User;
 			
 			[Bindable]
 			private var request:Request;

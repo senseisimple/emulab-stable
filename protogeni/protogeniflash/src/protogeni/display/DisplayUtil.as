@@ -19,10 +19,7 @@
  
  package protogeni.display
 {
-	import flash.display.DisplayObject;
 	import flash.events.MouseEvent;
-	import flash.text.StyleSheet;
-	import flash.xml.XMLNode;
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
@@ -259,8 +256,7 @@
 			logButton.addEventListener(MouseEvent.CLICK,
 				function openLog():void {
 					var logw:LogMessageWindow = new LogMessageWindow();
-					PopUpManager.addPopUp(logw, Main.Application(), false);
-					PopUpManager.centerPopUp(logw);
+					logw.showWindow();
 					logw.setMessage(msg);
 				});
 			return logButton;
@@ -459,6 +455,32 @@
 			var rWindow:RequestWindow = new RequestWindow();
 			rWindow.showWindow();
 			rWindow.load(r);
+		}
+		
+		public static function viewSearchWindow():void {
+			var searchWindow:SearchWindow = new SearchWindow();
+			searchWindow.showWindow();
+		}
+		
+		public static function viewAboutWindow():void {
+			var aboutWindow:AboutWindow = new AboutWindow();
+			PopUpManager.addPopUp(aboutWindow, Main.Application(), false);
+			PopUpManager.centerPopUp(aboutWindow);
+		}
+		
+		public static function viewSlicesWindow():void {
+			var slicesWindow:SlicesWindow = new SlicesWindow();
+			slicesWindow.showWindow();
+		}
+		
+		public static function viewUserWindow():void {
+			var userWindow:UserWindow = new UserWindow();
+			userWindow.showWindow();
+		}
+		
+		public static function viewManagersWindow():void {
+			var managersWindow:GeniManagersWindow = new GeniManagersWindow();
+			managersWindow.showWindow();
 		}
 	}
 }

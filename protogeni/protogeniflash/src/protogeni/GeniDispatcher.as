@@ -37,5 +37,9 @@ package protogeni
 		public function dispatchSlicesChanged():void {
 			dispatchEvent(new GeniEvent(GeniEvent.SLICES_CHANGED));
 		}
+		
+		public function dispatchLogsChanged(m:LogMessage = null):void {
+			dispatchEvent(new GeniEvent(GeniEvent.LOGS_CHANGED, m));
+		}
 	}
 }

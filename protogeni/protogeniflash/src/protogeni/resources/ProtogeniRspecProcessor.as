@@ -37,7 +37,7 @@ package protogeni.resources
 		private var hasslot:Boolean = false;
 		
 		public function processResourceRspec(afterCompletion : Function):void {
-			Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC", false);
+			Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC", false);
 
 			var nodeName:QName = new QName(gm.Rspec.namespace(), "node");
 			nodes = gm.Rspec.elements(nodeName);
@@ -72,7 +72,7 @@ package protogeni.resources
 			else if (myState == DONE)
 			{
 				GeniManager.processing--;
-				Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
+				Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
 				interfaceDictionary = null;
 				nodeNameDictionary = null;
 				subnodeList = null;
@@ -87,7 +87,7 @@ package protogeni.resources
 			}
 			else
 			{
-				Main.log.setStatus("Fail",true);
+				Main.Application().setStatus("Fail",true);
 				interfaceDictionary = null;
 				nodeNameDictionary = null;
 				subnodeList = null;

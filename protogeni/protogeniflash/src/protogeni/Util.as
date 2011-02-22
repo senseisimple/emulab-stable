@@ -15,11 +15,10 @@
 package protogeni
 {
   import flash.external.ExternalInterface;
-  import flash.net.*;
+  import flash.net.navigateToURL;
+  import flash.net.URLRequest;
   
   import mx.collections.ArrayCollection;
-  import mx.formatters.NumberBaseRoundType;
-  import mx.formatters.NumberFormatter;
 
   public class Util
   {

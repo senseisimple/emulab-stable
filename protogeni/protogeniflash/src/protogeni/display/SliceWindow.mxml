@@ -3,8 +3,8 @@
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="Slice"
-						initialize="init()"
-						close="sliceStatusRefresher.stop(); closeWindow();">
+						creationComplete="onCreationComplete()"
+						close="closeWindow();">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
@@ -51,11 +51,6 @@
 			import mx.collections.SortField;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
-			import mx.controls.scrollClasses.ScrollThumb;
-			import mx.core.DragSource;
-			import mx.core.UIComponent;
-			import mx.events.CloseEvent;
-			import mx.events.FlexEvent;
 			
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
@@ -83,10 +78,17 @@
 			
 			public var sliceStatusRefresher:Timer = new Timer(10000);
 			
-			public function init():void
+			public function onCreationComplete():void
 			{
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
+			}
+			
+			public override function closeWindow(event:Event=null):void {
+				sliceStatusRefresher.stop();
+				Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, cmChanged);
+				Main.geniDispatcher.removeEventListener(GeniEvent.SLICE_CHANGED, sliceChanged);
+				super.closeWindow(event);
 			}
 			
 			public function sliceChanged(e:GeniEvent):void

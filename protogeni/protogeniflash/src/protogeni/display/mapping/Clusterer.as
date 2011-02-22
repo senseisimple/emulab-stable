@@ -1,4 +1,4 @@
-package protogeni.display
+package protogeni.display.mapping
 {
 	import com.google.maps.overlays.Marker;
 

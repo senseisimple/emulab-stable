@@ -14,8 +14,6 @@
 
 package protogeni.communication
 {
-	import flash.events.ErrorEvent;
-	
 	public class RequestGetKeys extends Request
 	{
 		public function RequestGetKeys() : void

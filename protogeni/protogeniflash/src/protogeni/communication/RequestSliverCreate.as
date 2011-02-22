@@ -14,12 +14,8 @@
 
 package protogeni.communication
 {
-  import flash.events.ErrorEvent;
-  
   import protogeni.resources.Slice;
   import protogeni.resources.Sliver;
-  import protogeni.resources.VirtualLinkCollection;
-  import protogeni.resources.VirtualNodeCollection;
 
   public class RequestSliverCreate extends Request
   {
@@ -69,7 +65,7 @@ package protogeni.communication
 			}
 			
 			// Show the error
-			Main.log.open();
+			Main.log.viewConsole();
 		}
 		
 		return null;

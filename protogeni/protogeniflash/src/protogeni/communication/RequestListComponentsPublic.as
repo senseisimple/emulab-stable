@@ -14,11 +14,7 @@
 
 package protogeni.communication
 {
-	import mx.utils.StringUtil;
-	
-	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
-	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 
   public class RequestListComponentsPublic extends Request
@@ -26,7 +22,7 @@ package protogeni.communication
     public function RequestListComponentsPublic() : void
     {
       super("ListComponentsPublic", "Getting the information for the component managers", null);
-	  op.setExactUrl(CommunicationUtil.defaultPublicList);
+	  op.setExactUrl(Main.geniHandler.publicUrl);
 	  op.type = Operation.HTTP;
     }
 
@@ -36,10 +32,12 @@ package protogeni.communication
 		var newCalls:RequestQueue = new RequestQueue();
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			var a:Array = (response as String).split(/^(.*)$/);
+			var a:Array = (response as String).split("\n");
 			for each(var s:String in a) {
+				if(s.length==0)
+					continue;
 				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
-				newCm.Url = op.getUrl().substring(0, op.getUrl().lastIndexOf('/')) + s;
+				newCm.Url = op.getUrl().substring(0, op.getUrl().lastIndexOf('/')+1) + s;
 				newCm.Urn = s;
 				newCm.Hrn = s.split('+')[1];
 				Main.geniHandler.GeniManagers.add(newCm);

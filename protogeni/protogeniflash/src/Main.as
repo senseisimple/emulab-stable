@@ -16,22 +16,22 @@
  
  package
 {
+	import com.mattism.http.xmlrpc.JSLoader;
+	
 	import flash.system.Security;
 	import flash.utils.Dictionary;
-	
-	import mx.controls.Alert;
+
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniDispatcher;
 	import protogeni.GeniHandler;
 	import protogeni.Util;
-	import com.mattism.http.xmlrpc.JSLoader;
 	
   public class Main
   {
 	// Returns the main class
 	public static function Application():protogeniflash {
-		return mx.core.FlexGlobals.topLevelApplication as protogeniflash;
+		return FlexGlobals.topLevelApplication as protogeniflash;
 	}
 	
 	public static function checkLoadCrossDomain(url:String, protogeniSite:Boolean = true):void
@@ -40,10 +40,13 @@
 		if (visitedSites[baseUrl] != true)
 		{
 			visitedSites[baseUrl] = true;
+			var crossdomainUrl:String = baseUrl;
 			if(protogeniSite)
-				Security.loadPolicyFile(baseUrl + "/protogeni/crossdomain.xml");
+				crossdomainUrl += "/protogeni/crossdomain.xml";
 			else
-				Security.loadPolicyFile(baseUrl + "/crossdomain.xml");
+				crossdomainUrl += "/crossdomain.xml";
+			Security.loadPolicyFile(crossdomainUrl);
+			log.appendMessage(new LogMessage(crossdomainUrl, "Loading CrossDomain", "Attempting to load a crossdomain.xml file so that calls may be made with the server located there.", false, LogMessage.TYPE_OTHER));
 		}
 	}
 	
@@ -57,7 +60,7 @@
 	[Bindable]
 	public static var geniHandler:GeniHandler;
 	public static var geniDispatcher:GeniDispatcher;
-	public static var log : LogRoot = null;
+
 	private static var visitedSites:Dictionary = new Dictionary();
 	public static var certBundle:String;
 	public static var debugMode:Boolean = false;
@@ -65,5 +68,7 @@
 	public static var useJavascript:Boolean = false;
 	
 	public static var protogeniOnly:Boolean = false;
+	
+	public static var log:LogHandler = new LogHandler();
   }
 }

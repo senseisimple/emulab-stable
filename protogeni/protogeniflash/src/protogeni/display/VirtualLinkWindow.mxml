@@ -10,17 +10,9 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import protogeni.resources.VirtualLink;
 			import protogeni.Util;
 			import protogeni.resources.VirtualInterface;
 			import protogeni.resources.VirtualLink;
-			
-			import com.google.maps.View;
-			
-			import mx.managers.CursorManager;
-			import mx.collections.ArrayCollection;
-			import mx.controls.Alert;
-			import mx.managers.PopUpManager;
 			
 			[Bindable]
 			public var pointLink:VirtualLink = null;
@@ -36,8 +28,7 @@
 			public function viewRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
 				rspecView.title = "Request RSPEC for " + pointLink.id;
-				PopUpManager.addPopUp(rspecView, Main.Application() as DisplayObject, false);
-				PopUpManager.centerPopUp(rspecView);
+				rspecView.showWindow();
 				rspecView.loadXml(pointLink.rspec);
 			}
 		]]>

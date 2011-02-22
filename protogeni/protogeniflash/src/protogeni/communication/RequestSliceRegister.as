@@ -16,7 +16,6 @@ package protogeni.communication
 {
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.Slice;
-	import protogeni.resources.Sliver;
 
   public class RequestSliceRegister extends Request
   {

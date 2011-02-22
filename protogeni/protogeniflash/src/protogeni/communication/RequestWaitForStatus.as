@@ -14,8 +14,6 @@
 
 package protogeni.communication
 {
-	import protogeni.resources.PhysicalNode;
-	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	

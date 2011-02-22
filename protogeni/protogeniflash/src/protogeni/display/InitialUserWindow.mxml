@@ -5,8 +5,7 @@
 						xmlns:display="protogeni.display.*"
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
-						initialize="authorities.selectedItem = Main.geniHandler.CurrentUser.authority"
-						creationComplete="windowReady()">
+						creationComplete="onCreationComplete()">
 	<fx:Style>
 		@namespace s "library://ns.adobe.com/flex/spark";
 		@namespace mx "library://ns.adobe.com/flex/mx";
@@ -38,14 +37,10 @@
 		<![CDATA[
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
-			import mx.core.IFlexDisplayObject;
 			import mx.events.CloseEvent;
-			import mx.managers.PopUpManager;
 			
 			import protogeni.Util;
 			import protogeni.resources.SliceAuthority;
-
-                        import com.mattism.http.xmlrpc.JSLoader;
 
 			private var certLoader:URLLoader;
 			private var closeAfter:Boolean = false;
@@ -56,7 +51,7 @@
 			[Bindable]
 			private var selectedAuthority:SliceAuthority;
 			
-			public function windowReady():void
+			public function onCreationComplete():void
 			{
 				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
 				this.authorities.setFocus();

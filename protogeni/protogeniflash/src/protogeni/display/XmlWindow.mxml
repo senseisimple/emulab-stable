@@ -6,7 +6,6 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import mx.utils.Base64Encoder;
 			[Bindable]
 			public var xmlString:String;
 			

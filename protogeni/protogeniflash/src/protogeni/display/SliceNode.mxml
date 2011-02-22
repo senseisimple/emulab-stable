@@ -44,10 +44,7 @@
 	<mx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
-			import mx.controls.Alert;
 			import mx.core.DragSource;
-			import mx.core.mx_internal;
-			import mx.graphics.ImageSnapshot;
 			import mx.managers.DragManager;
 			
 			import protogeni.resources.VirtualNode;

@@ -2,7 +2,7 @@
 <display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-						title="Slices" show="refreshView()"
+						title="Slices" show="refreshView()" creationComplete="openFirst()"
 						width="300" height="220" close="closeWindow()">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
@@ -11,17 +11,13 @@
 		<![CDATA[
 			import mx.controls.Alert;
 			import mx.controls.Button;
-			import mx.events.CloseEvent;
-			import mx.managers.PopUpManager;
 			
 			import protogeni.GeniEvent;
-			import protogeni.GeniHandler;
 			import protogeni.resources.Slice;
 			
 			public function openFirst():void {
-				showWindow();
+				refreshView();
 				init();
-				
 				focusManager.setFocus(sliceName);
 			}
 			
@@ -29,6 +25,12 @@
 			{
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, refreshView);
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, refreshView);
+			}
+			
+			public override function closeWindow(event:Event=null):void {
+				Main.geniDispatcher.removeEventListener(GeniEvent.SLICES_CHANGED, refreshView);
+				Main.geniDispatcher.removeEventListener(GeniEvent.SLICE_CHANGED, refreshView);
+				super.closeWindow(event);
 			}
 			
 			public function createSlice():void

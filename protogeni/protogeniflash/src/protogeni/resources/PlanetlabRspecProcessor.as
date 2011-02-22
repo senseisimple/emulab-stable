@@ -2,14 +2,11 @@ package protogeni.resources
 {
 	import flash.events.Event;
 	import flash.utils.Dictionary;
-	import flash.xml.XMLNode;
 	
 	import mx.collections.ArrayCollection;
-	import mx.collections.ArrayList;
 	import mx.controls.Alert;
-	import mx.events.Request;
 	
-	import protogeni.communication.RequestResolvePl;
+	//import protogeni.communication.RequestResolvePl;
 	import protogeni.communication.RequestSitesLocation;
 	
 
@@ -34,7 +31,7 @@ package protogeni.resources
 		private var hasslot:Boolean = false;
 		
 		public function processResourceRspec(afterCompletion : Function):void {
-			Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC", false);
+			Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC", false);
 			
 			if (gm.Rspec.@type != "SFA")
 			{
@@ -68,7 +65,7 @@ package protogeni.resources
 			else if (myState == DONE)
 			{
 				GeniManager.processing--;
-				Main.log.setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
+				Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
 				gm.totalNodes = gm.AllNodes.length;
 				gm.availableNodes = gm.totalNodes;
 				gm.unavailableNodes = 0;
@@ -85,7 +82,7 @@ package protogeni.resources
 			}
 			else
 			{
-				Main.log.setStatus("Fail",true);
+				Main.Application().setStatus("Fail",true);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				Alert.show("Problem parsing RSPEC");
 				// Throw exception

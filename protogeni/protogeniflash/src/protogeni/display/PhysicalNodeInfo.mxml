@@ -9,8 +9,6 @@
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
-			import mx.controls.Button;
-			import mx.managers.PopUpManager;
 			
 			import protogeni.resources.PhysicalLink;
 			import protogeni.resources.PhysicalNode;
@@ -18,7 +16,6 @@
 			import protogeni.resources.VirtualLink;
 			import protogeni.resources.VirtualNode;
 			
-			import spark.components.Button;
 			import spark.primitives.Rect;
 			
 			[Bindable]
@@ -189,8 +186,7 @@
 			public function viewComponentRspec():void {
 				var rspecView:XmlWindow = new XmlWindow();
 				rspecView.title = "Advertisement RSPEC for " + node.name;
-				PopUpManager.addPopUp(rspecView, Main.Application() as DisplayObject, false);
-				PopUpManager.centerPopUp(rspecView);
+				rspecView.showWindow();
 				rspecView.loadXml(node.rspec);
 			}
 			
@@ -200,8 +196,7 @@
 				else {
 					var rspecView:XmlWindow = new XmlWindow();
 					rspecView.title = "Request RSPEC for " + node.name;
-					PopUpManager.addPopUp(rspecView, Main.Application() as DisplayObject, false);
-					PopUpManager.centerPopUp(rspecView);
+					rspecView.showWindow();
 					rspecView.loadXml(virtualNode.rspec);
 				}
 			}

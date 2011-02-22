@@ -6,9 +6,7 @@ package protogeni.display
 	import flash.events.MouseEvent;
 	
 	import mx.core.UIComponent;
-	import mx.effects.easing.Linear;
 	
-	import protogeni.resources.VirtualInterface;
 	import protogeni.resources.VirtualLink;
 	
 	public class SliceLink extends UIComponent

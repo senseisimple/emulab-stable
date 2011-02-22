@@ -11,14 +11,11 @@
 		<![CDATA[
 			import com.google.maps.LatLng;
 			import com.google.maps.LatLngBounds;
-			import com.google.maps.Map;
 			import com.google.maps.services.ClientGeocoder;
 			import com.google.maps.services.GeocodingEvent;
 			import com.google.maps.services.Placemark;
 			
 			import mx.collections.ArrayCollection;
-			import mx.controls.Alert;
-			import mx.controls.Button;
 			import mx.core.FlexGlobals;
 			
 			import protogeni.display.DisplayUtil;

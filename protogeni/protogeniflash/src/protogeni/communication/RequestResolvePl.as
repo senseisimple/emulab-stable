@@ -60,17 +60,19 @@ package protogeni.communication
 		{
 			for each(var o:Object in response) {
 				var site:Site = plm.getSiteWithHrn(o.hrn);
-				site.latitude = o.latitude;
-				site.longitude = o.longitude;
-				
-				var ng:PhysicalNodeGroup = plm.Nodes.GetByLocation(site.latitude,site.longitude);
-				var tempString:String;
-				if(ng == null) {
-					ng = new PhysicalNodeGroup(site.latitude, site.longitude, "", plm.Nodes);
-					plm.Nodes.Add(ng);
-				}
-				for each(var n:PhysicalNode in site.nodes) {
-					ng.Add(n);
+				if(site != null) {
+					site.latitude = o.latitude;
+					site.longitude = o.longitude;
+					
+					var ng:PhysicalNodeGroup = plm.Nodes.GetByLocation(site.latitude,site.longitude);
+					var tempString:String;
+					if(ng == null) {
+						ng = new PhysicalNodeGroup(site.latitude, site.longitude, "", plm.Nodes);
+						plm.Nodes.Add(ng);
+					}
+					for each(var n:PhysicalNode in site.nodes) {
+						ng.Add(n);
+					}
 				}
 			}
 			

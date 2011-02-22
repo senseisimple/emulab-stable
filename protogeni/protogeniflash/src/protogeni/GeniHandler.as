@@ -14,31 +14,21 @@
  
  package protogeni
 {
-	import flash.events.Event;
-	import flash.events.EventDispatcher;
-	import flash.events.IEventDispatcher;
-	
-	import mx.collections.ArrayCollection;
-	import mx.collections.ArrayList;
-	
-	import protogeni.communication.GeniRequestHandler;
-	import protogeni.communication.RequestDiscoverResources;
-	import protogeni.communication.RequestGetCredential;
-	import protogeni.communication.RequestGetKeys;
-	import protogeni.communication.RequestListComponents;
-	import protogeni.display.DisplayUtil;
-	import protogeni.display.mapping.GeniMapHandler;
-	import protogeni.resources.ProtogeniComponentManager;
-	import protogeni.resources.GeniManager;
-	import protogeni.resources.GeniManagerCollection;
-	import protogeni.resources.PhysicalLink;
-	import protogeni.resources.PhysicalNode;
-	import protogeni.resources.Slice;
-	import protogeni.resources.SliceAuthority;
-	import protogeni.resources.Sliver;
-	import protogeni.resources.User;
-	import protogeni.resources.VirtualLink;
-	import protogeni.resources.VirtualNode;
+	 import mx.collections.ArrayList;
+	 
+	 import protogeni.communication.GeniRequestHandler;
+	 import protogeni.display.mapping.GeniMapHandler;
+	 import protogeni.display.DisplayUtil;
+	 import protogeni.resources.GeniManager;
+	 import protogeni.resources.GeniManagerCollection;
+	 import protogeni.resources.PhysicalLink;
+	 import protogeni.resources.PhysicalNode;
+	 import protogeni.resources.User;
+	 import protogeni.resources.Slice;
+	 import protogeni.resources.SliceAuthority;
+	 import protogeni.resources.Sliver;
+	 import protogeni.resources.VirtualLink;
+	 import protogeni.resources.VirtualNode;
 	
 	// Holds and handles all information regarding ProtoGENI
 	public class GeniHandler
@@ -55,9 +45,10 @@
 		[Bindable]
 		public var unauthenticatedMode:Boolean;
 
-		public var publicUrl:String = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
-		public var publicUrn:String = "urn:publicid:IDN+emulab.net+authority+cm";
-		public var publicHrn:String = "utahemulab.cm";
+		public var publicUrl:String = "https://www.emulab.net/protogeni/advertisements/list.txt";
+		//public var publicUrl:String = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
+		//public var publicUrn:String = "urn:publicid:IDN+emulab.net+authority+cm";
+		//public var publicHrn:String = "utahemulab.cm";
 		
 		public var forceAuthority:SliceAuthority = null;
 		
@@ -72,7 +63,6 @@
 		{
 			requestHandler = new GeniRequestHandler();
 			mapHandler = new GeniMapHandler();
-			addEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
 			GeniManagers = new GeniManagerCollection();
 			CurrentUser = new User();
 			unauthenticatedMode = true;
@@ -93,6 +83,16 @@
 				new SliceAuthority("bbn-pgeni1.sa","urn:publicid:IDN+pgeni1.gpolab.bbn.com+authority+sa","https://www.pgeni1.gpolab.bbn.com/protogeni/xmlrpc")
 								]);
 			CurrentUser.authority = GeniAuthorities.source[0] as SliceAuthority;
+			
+			Main.geniDispatcher.dispatchUserChanged();
+			Main.geniDispatcher.dispatchGeniManagersChanged();
+			Main.geniDispatcher.dispatchQueueChanged();
+			
+			Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
+		}
+		
+		public function removeHandlers():void {
+			Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
 		}
 		
 		public function clearAll() : void

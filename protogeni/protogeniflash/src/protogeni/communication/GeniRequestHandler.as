@@ -17,23 +17,13 @@
 	import com.mattism.http.xmlrpc.MethodFault;
 	
 	import flash.events.ErrorEvent;
-	import flash.events.SecurityErrorEvent;
-	import flash.system.Security;
-	import flash.utils.ByteArray;
-	import flash.utils.Dictionary;
-	
-	import mx.collections.ArrayCollection;
+
 	import mx.controls.Alert;
 	import mx.events.CloseEvent;
-	import mx.utils.Base64Decoder;
 	
 	import protogeni.Util;
-	import protogeni.communication.Operation;
-	import protogeni.display.DisplayUtil;
 	import protogeni.display.InitialUserWindow;
 	import protogeni.resources.AggregateManager;
-	import protogeni.resources.GeniManager;
-	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
@@ -50,14 +40,16 @@
 		public var forceStop:Boolean = false;
 		public var isPaused:Boolean = false;
 		
+		public static var MAX_RUNNING:int = 5;
+		
 		// Run everything from the very beginning
 		public function startInitiationSequence():void
 		{
 			if(Main.geniHandler.unauthenticatedMode) {
-				//pushRequest(new RequestListComponentsPublic());
-				//Main.Application().showAuthenticate();
+				pushRequest(new RequestListComponentsPublic());
+				Main.Application().showAuthenticate();
 				
-				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
+				/*var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 				newCm.Url = Main.geniHandler.publicUrl;
 				newCm.Hrn = Main.geniHandler.publicHrn;
 				newCm.Urn = Main.geniHandler.publicUrn;
@@ -65,7 +57,7 @@
 				newCm.Status = GeniManager.STATUS_INPROGRESS;
 				pushRequest(new RequestDiscoverResourcesPublic(newCm));
 				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
-				Main.Application().showAuthenticate();
+				Main.Application().showAuthenticate();*/
 				
 			} else {
 				if(Main.geniHandler.forceAuthority == null)
@@ -235,16 +227,18 @@
 			if(!queue.readyToStart())
 				return;
 			
-			var start:Request = queue.nextAndProgress();
-			start.running = true;
-			var op:Operation = start.start();
-			op.call(complete, failure);
-			Main.log.setStatus(start.name, false);
-			Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
+			if(queue.workingCount() < MAX_RUNNING) {
+				var start:Request = queue.nextAndProgress();
+				start.running = true;
+				var op:Operation = start.start();
+				op.call(complete, failure);
+				Main.Application().setStatus(start.name, false);
+				Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
 				
-			Main.geniDispatcher.dispatchQueueChanged();
-			
-			this.start();
+				Main.geniDispatcher.dispatchQueueChanged();
+				
+				this.start();
+			}
 		}
 		
 		public function pause():void
@@ -256,7 +250,7 @@
 		{
 			if(r.running)
 			{
-				Main.log.setStatus(r.name + " canceled!", false);
+				Main.Application().setStatus(r.name + " canceled!", false);
 				r.cancel();
 			}
 			queue.remove(queue.getRequestQueueNodeFor(r));
@@ -298,10 +292,10 @@
 			}
 			failMessage += "\nURL: " + node.op.getUrl();
 			Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, failMessage, true, LogMessage.TYPE_END));
-			Main.log.setStatus(node.name + " failed!", true);
+			Main.Application().setStatus(node.name + " failed!", true);
 			if(!node.continueOnError)
 			{
-				Main.log.open();
+				Main.log.viewConsole();
 			} else {
 				// Find out what to do next
 				var next : * = node.fail(event, fault);
@@ -343,10 +337,10 @@
 				// Output completed
 				if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !node.ignoreReturnCode)
 				{
-					Main.log.setStatus(node.name + " done", true);
+					Main.Application().setStatus(node.name + " done", true);
 					Main.log.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));
 				} else {
-					Main.log.setStatus(node.name + " done", false);
+					Main.Application().setStatus(node.name + " done", false);
 					Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponse(), false, LogMessage.TYPE_END));
 				}
 				next = node.complete(code, response);
@@ -393,7 +387,7 @@
 		{
 			if(stop)
 			{
-				Main.log.open();
+				Main.log.viewConsole();
 				forceStop = true;
 			}
 				

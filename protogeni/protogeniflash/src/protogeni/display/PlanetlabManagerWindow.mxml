@@ -3,26 +3,11 @@
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="PlanetLab Manager Information"
-						height="600" width="500">
+						height="300" width="500">
 	<fx:Script>
 		<![CDATA[
-			import com.google.maps.View;
-			
-			import mx.collections.ArrayCollection;
-			import mx.containers.TabNavigator;
-			import mx.controls.Alert;
-			import mx.events.CloseEvent;
-			import mx.formatters.NumberFormatter;
-			import mx.managers.PopUpManager;
-			
-			import protogeni.resources.GeniManager;
 			import protogeni.resources.PlanetlabAggregateManager;
-			import protogeni.resources.ProtogeniComponentManager;
 			import protogeni.resources.Site;
-			
-			import spark.components.NavigatorContent;
-			import spark.components.TextArea;
-			import spark.components.VGroup;
 			
 			[Bindable]
 			private var gm:PlanetlabAggregateManager = null;

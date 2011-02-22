@@ -9,13 +9,9 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
-			import protogeni.resources.PhysicalLinkGroup;
-			import mx.managers.CursorManager;
-			import com.google.maps.View;
 			import mx.collections.ArrayCollection;
-			import mx.controls.Alert;
-			import mx.events.CloseEvent;
-			import mx.managers.PopUpManager;
+			
+			import protogeni.resources.PhysicalLinkGroup;
 			
 			[Bindable]
 			public var links:ArrayCollection;
