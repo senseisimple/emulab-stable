@@ -1734,9 +1734,7 @@ sub ReserveVlanTags($)
 	}
 	push(@delete, $vlan);
     }
-    else {
-	print STDERR "$vlan already existed.\n";
-    }
+
     #
     # If there is already a reservation, it better be one of the
     # tags we got.
@@ -1746,7 +1744,13 @@ sub ReserveVlanTags($)
 	print STDERR "$vlan already had tag $tag.\n";
 	if (! (grep {$_ == $tag} @{ $taglist })) {
 	    print STDERR "  but the tag is not in the list we got.\n";
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	    #
+	    # Tell the caller about the tag; it is the only choice.
+	    #
+	    my @okaytags = ($tag);
+	    $response = GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					     \@okaytags,
+					     "Could not find a suitable tag");
 	    goto done;
 	}
 	$actualtag = $tag;
