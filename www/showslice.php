@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -81,7 +81,7 @@ if ($experiment) {
 
 $geniuser = GeniUser::Lookup($showtype, $slice->creator_uuid());
 if ($geniuser) {
-    $rows[] = array("Creator" => $geniuser->hrn());
+    $rows[] = array("Creator" => $geniuser->urn());
 }
 else {
     $user = User::LookupByUUID($slice->creator_uuid());
