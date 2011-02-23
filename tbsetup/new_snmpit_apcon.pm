@@ -239,6 +239,10 @@ sub toApconPort($$)
 {
         my ($self, $p) = @_;
         
+        if ($p->node_id() ne $self->{NAME}) [
+                return $p;
+        }
+        
         my $card = chr(ord('A')+int($p->card()) - 1);
         my $port = sprintf("%02d", int($p->port()));
         
@@ -855,11 +859,11 @@ sub portControl ($$@) { #@@@@
 
     my $errors = 0;
     foreach my $port (@pcports) { 	
-	if (isSwitchPort($port)) {
+	if (isSwitchPort($port) || ref($self->toApconPort($port->getSwitchPort()))) {
                 next;
         }
 
-        my $rt = $self->setPortRate($self->toApconPort($port), $cmd);
+        my $rt = $self->setPortRate($self->toApconPort($port->getSwitchPort()), $cmd);
         if ($rt) {
             if ($rt =~ /^ERROR: port rate unsupported/) {
                 #
@@ -1019,14 +1023,14 @@ sub setPortVlan($$@) { #@@@@
 
     my $id = $self->{NAME} . "::setPortVlan";
     $self->debug("$id: $vlan_id ");
-    $self->debug("ports: " . Port->toIfaceStrings(@pcports). "\n");
+    $self->debug("ports: " . Port->toStrings(@pcports). "\n");
 
     if (@pcports != 2) {
         warn "$id: supports only two ports in one VLAN.\n";
         return 1;
     }
 
-    my @ports = map {$self->toApconPort($_)} @pcports;
+    my @ports = grep(!ref($_), map( $self->toApconPort($_->getSwitchPort()), @pcports));
     $self->lock();
 
     # Check if ports are free
@@ -1092,9 +1096,9 @@ sub delPortVlan($$@) { #@@@@
     my @pcports = @_;
 
     $self->debug($self->{NAME} . "::delPortVlan $vlan_id ");
-    $self->debug("ports: " . Port->toIfaceStrings(@pcports) . "\n");
+    $self->debug("ports: " . Port->toStrings(@pcports) . "\n");
 
-    my @ports = map {$self->toApconPort($_)} @pcports;
+    my @ports = grep(!ref($_), map($self->toApconPort($_->getSwitchPort()), @pcports));
 
     $self->lock();
 
@@ -1273,7 +1277,9 @@ sub listVlans($) { #@@@@
     my $vlans = $self->getAllNamedPorts();
     foreach my $vlan_id (keys %$vlans) {
         my @swports = @{$vlans->{$vlan_id}};
-        my @pcports = map($self->fromApconPort($_), @swports);
+        my @pcports = map($_->getPCPort(), 
+                        grep(ref($_), 
+                        map($self->fromApconPort($_), @swports)));
         
         push @list, [$vlan_id, $vlan_id, \@pcports];
     }
@@ -1298,20 +1304,20 @@ sub listPorts($) { #@@@@
         my @strdrate = @{$portRates{$drate}};        
 
         my $finalport = $self->fromApconPort($port);
-        if (!defined($finalport) || ($finalport eq $port)) {
+        if (!ref($finalport)) {
 		next;
-        }  
+        }          
 
         #
         # if port is actived, use actual rate, otherwise use desired rate
         #
         if ( $arate[0] eq "00" ) {        
-            push @ports, [$finalport, "no", "down", $strdrate[2], $strdrate[1]];
+            push @ports, [$finalport->getPCPort(), "no", "down", $strdrate[2], $strdrate[1]];
         } else {
             #
             # Not sure if it is OK to just ignore the desired rate
             #
-            push @ports, [$finalport, "yes", "up", $arate[3], $arate[2]];
+            push @ports, [$finalport->getPCPort(), "yes", "up", $arate[3], $arate[2]];
         }
     }
     

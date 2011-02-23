@@ -1,3 +1,4 @@
+
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
@@ -146,6 +147,26 @@ sub ParseTripleString($;$)
     }
 
     return (undef, undef, undef);
+}
+
+sub ParseCardPortString($;$)
+{
+    my ($c, $cp) = @_;
+
+    if (!defiend($cp)) {
+	$cp = $c;
+    }
+
+    # Should not include all fields
+    if ($cp =~ /^(.+):(.+)[\/\.](.+)$/) {
+	return (undef, undef);
+    }
+
+    if ($cp =~ /^(.+)\.(.+)$/ || $cp =~ /^(.+)\/(.+)$/) {
+	return ($1, $2);
+    }
+
+    return (undef, undef);
 }
 
 sub Iface2Triple($;$)
@@ -404,6 +425,45 @@ sub LookupByTriple($$;$$)
     return $inst;
 }
 
+sub LookupByIfaces($@)
+{
+    my ($c, @ifs) = @_;
+
+    return map(Port->LookupByIface($_), @ifs);
+}
+
+sub LookupByTriples($@)
+{
+    my ($c, @ifs) = @_;
+
+    return map(Port->LookupByTriple($_), @ifs);
+}
+
+sub LookupByWireType($$)
+{
+	my ($c, $wt) = @_;
+	my @ports = ();
+	
+	my $result = DBQueryFatal("SELECT node_id1, card1, port1, " .
+		"node_id2, card2, port2 FROM wires WHERE type='$wt'");
+
+	if ($result) {
+		while (my @row = $result->fetchrow()) {
+			my ($node_id1, $card1, $port1, $node_id2, $card2, $port2)  = @row;
+			my $p1 = Port->LookupByTriple($node_id1, $card1, $port1);
+			if (defined($p1)) {
+				push @ports, $p1;
+			}
+			my $p2 = Port->LookupByTriple($node_id2, $card2, $port2);
+			if (defined($p2)) {
+				push @ports, $p2;
+			}
+		}
+	}
+	
+	return @ports;
+}
+
 sub field($$)  { return ((! ref($_[0])) ? -1 : $_[0]->{'INTERFACES_ROW'}->{$_[1]}); }
 sub node_id($) { return field($_[0], 'node_id'); }
 sub card($)    { return field($_[0], 'card'); }
@@ -417,8 +477,89 @@ sub mask($)    { return field($_[0], 'mask'); }
 sub uuid($)    { return field($_[0], 'uuid'); }
 
 sub wire_end($) { return $_[0]->{'WIRE_END'}; }
+sub is_switch_side($) { return $_[0]->wire_end() == "switch"; }
 
 sub wire_type($)   { return $_[0]->{'WIRES_ROW'}->{'type'}; }
+
+sub switch_node_id($)
+{
+    my $self = shift;
+    if ($self->is_switch_side()) {
+	return $self->node_id();
+    } else {
+	return $self->other_end_node_id();
+    }
+}
+
+sub switch_card($)
+{
+    my $self = shift;
+    if ($self->is_switch_side()) {
+	return $self->card();
+    } else {
+	return $self->other_end_card();
+    }
+}
+
+sub switch_port($)
+{
+    my $self = shift;
+    if ($self->is_switch_side()) {
+	return $self->port();
+    } else {
+	return $self->other_end_port();
+    }
+}
+
+sub switch_iface($)
+{
+    my $self = shift;
+    if ($self->is_switch_side()) {
+	return $self->iface();
+    } else {
+	return $self->other_end_iface();
+    }
+}
+
+sub pc_node_id($)
+{
+    my $self = shift;
+    if (!$self->is_switch_side()) {
+	return $self->node_id();
+    } else {
+	return $self->other_end_node_id();
+    }
+}
+
+sub pc_card($)
+{
+    my $self = shift;
+    if (!$self->is_switch_side()) {
+	return $self->card();
+    } else {
+	return $self->other_end_card();
+    }
+}
+
+sub pc_port($)
+{
+    my $self = shift;
+    if (!$self->is_switch_side()) {
+	return $self-port();
+    } else {
+	return $self->other_end_port();
+    }
+}
+
+sub pc_iface($)
+{
+    my $self = shift;
+    if (!$self->is_switch_side()) {
+	return $self->iface();
+    } else {
+	return $self->other_end_iface();
+    }
+}
 
 sub other_end_node_id($)   
 { 
@@ -453,6 +594,23 @@ sub other_end_port($)
     }
 }
 
+sub other_end_iface($)
+{
+    my $self = $_[0];
+
+    if ($self->wire_end() eq "pc") {
+	return Port->LookupByTriple(
+	    $self->{'WIRES_ROW'}->{'node_id2'},
+	    $self->{'WIRES_ROW'}->{'card2'},
+	    $self->{'WIRES_ROW'}->{'port2'})->iface(); 
+    } else {
+	return Port->LookupByTriple(
+	    $self->{'WIRES_ROW'}->{'node_id1'},
+	    $self->{'WIRES_ROW'}->{'card1'},
+	    $self->{'WIRES_ROW'}->{'port1'})->iface(); 
+    }
+}
+
 sub toIfaceString($) {
     return Tokens2IfaceString($_[0]->node_id(), $_[0]->iface());
 }
@@ -461,6 +619,9 @@ sub toTripleString($) {
     return Tokens2TripleString($_[0]->node_id(), $_[0]->card(), $_[0]->port());
 }
 
+sub toString($) {
+	return $_[0]->toTripleString();
+}
 #
 # Should not support.
 #
@@ -480,4 +641,41 @@ sub getOtherEndPort($) {
     return Port->LookupByTriple($_[0]->getOtherEndTripleString());
 }
 
+sub getPCPort($) {
+    my $self = $_[0];
+
+    if ($self->wire_end() eq "pc") {
+	return $self;
+    } else {
+	return $self->getOtherEndPort();
+    }
+}
+
+sub getSwitchPort($) {
+    my $self = $_[0];
+
+    if ($self->wire_end() ne "pc") {
+	return $self;
+    } else {
+	return $self->getOtherEndPort();
+    }
+}
+
+sub toIfaceStrings($$)
+{
+	my @pts = @{$_[1]};
+	return join(" ", map($_->toIfaceString(), @pts));
+}
+
+sub toTripleStrings($$)
+{
+	my @pts = @{$_[1]};
+	return join(" ", map($_->toTripleString(), @pts));
+}
+
+sub toStrings($$)
+{
+	my @pts = @{$_[1]};
+	return join(" ", map($_->toString(), @pts)); 
+}
 return 1;
