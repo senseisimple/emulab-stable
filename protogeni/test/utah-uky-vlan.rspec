@@ -5,9 +5,9 @@
        type="request" >
   <node virtual_id="geni1"
         virtualization_type="emulab-vnode"
-        component_id="urn:publicid:IDN+emulab.net+node+pg41"
         exclusive="1"
 	component_manager_urn="urn:publicid:IDN+emulab.net+authority+cm"> 
+    <node_type type_name="pcpg-i2" type_slots="1"/>
     <interface virtual_id="if0"/>
     <disk_image
       name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA10-STD" />
@@ -19,7 +19,7 @@
     <node_type type_name="pc" type_slots="1"/>
     <interface virtual_id="if0"/>
     <disk_image
-      name="urn:publicid:IDN+emulab.net+image+emulab-ops//FEDORA10-STD" />
+      name="urn:publicid:IDN+uky.emulab.net+image+emulab-ops//FEDORA10-STD" />
  </node>
   <link virtual_id="ionlink">
     <component_manager
