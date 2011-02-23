@@ -3,7 +3,7 @@
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="Console"
-						creationComplete="onCreationComplete()"
+						contentCreationComplete="onCreationComplete()" 
 						close="Main.log.closeConsole();">
 	<fx:Declarations>
 		<s:RadioButtonGroup id="sortGroup" selectedValue="newest" itemClick="resetLogView()" />

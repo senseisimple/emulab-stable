@@ -5,6 +5,7 @@ package protogeni.resources
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
+	import mx.core.FlexGlobals;
 	
 	import protogeni.Util;
 	import protogeni.communication.CommunicationUtil;
@@ -50,7 +51,9 @@ package protogeni.resources
 			interfaceDictionary = new Dictionary();
 			nodeNameDictionary = new Dictionary();
 			subnodeList = new ArrayCollection();
-			Main.Application().stage.addEventListener(Event.ENTER_FRAME, parseNext);
+			var tla:* = FlexGlobals.topLevelApplication;
+			var s:* = tla.stage;
+			FlexGlobals.topLevelApplication.stage.addEventListener(Event.ENTER_FRAME, parseNext);
 		}
 		
 		private function parseNext(event:Event) : void
@@ -461,7 +464,9 @@ package protogeni.resources
 				case 0.1:
 					requestRspec = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?> "
 						+ "<rspec "
-						+ "xmlns=\""+CommunicationUtil.rspec02Namespace+"\" "
+						+ "xmlns=\""+CommunicationUtil.rspec01Namespace+"\" "
+						+ "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" "
+						+ "xsi:schemaLocation=\"http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd\" "
 						+ "type=\"request\" />");
 					break;
 				case 2:
@@ -588,6 +593,12 @@ package protogeni.resources
 					linkXml.@virtual_id = vl.id;
 				else
 					linkXml.@client_id = vl.id;
+				
+				for each(var s:Sliver in vl.slivers) {
+					var cmXml:XML = <component_manager />
+					cmXml.@name = s.manager.Urn;
+					linkXml.appendChild(cmXml);
+				}
 				
 				if (gm.inputRspecMinVersion == 0.1 && !vl.isTunnel())
 					linkXml.appendChild(XML("<bandwidth>" + vl.bandwidth + "</bandwidth>"));

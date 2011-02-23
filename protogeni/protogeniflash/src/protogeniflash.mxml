@@ -2,10 +2,11 @@
 <s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
 			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:mapping="protogeni.display.mapping.*"
 			   minWidth="700" minHeight="400" xmlns:display="protogeni.display.*"
 			   preinitialize="preinit();"
 			   backgroundColor="#D2E1F0"
-			   creationComplete="init();" xmlns:mapping="protogeni.display.mapping.*">
+			   applicationComplete="init();">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
@@ -40,6 +41,7 @@
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.Util;
+			import protogeni.communication.RequestTest;
 			import protogeni.display.DisplayUtil;
 			import protogeni.resources.Slice;
 			import protogeni.resources.SliceAuthority;
@@ -118,8 +120,6 @@
 				// Saved variables
 				try {
 					geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
-					//var o:Object = geniLocalSharedObject.data.planetlab;
-					//var i:int = geniLocalSharedObject.size;
 				} catch(e:Error) {
 					Alert.show("It looks like Flash is unable to save/load local data.  Would you like to load directions on how to enable local data?", "Enable Local Data?", Alert.YES|Alert.NO, this,
 						function allowData(e:CloseEvent):void {
@@ -134,6 +134,8 @@
 					Main.log.viewConsole();
 					DisplayUtil.viewManagersWindow();
 				}
+				
+				Main.geniHandler.requestHandler.pushRequest(new RequestTest());
 				
 				// Load the certificate bundle
 				if(Main.useJavascript) {
@@ -336,7 +338,7 @@
 						}
 					}
 
-					Main.geniHandler.CurrentUser.sslPem = geniLocalSharedObject.data.sslPem;
+					Main.geniHandler.CurrentUser.setPem(geniLocalSharedObject.data.sslPem);
 				}
 			}
 			

@@ -3,7 +3,7 @@
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
 		  mouseDownEffect="{mDown}" mouseUpEffect="{mUp}" rollOverEffect="{mIn}" rollOutEffect="{mOut}"
-		  useHandCursor="true" buttonMode="true">
+		  useHandCursor="true" buttonMode="true" minHeight="16" minWidth="16">
 	<fx:Declarations>
 		<mx:Glow id="mIn" duration="250" 
 				 alphaFrom="0.8" alphaTo="0.3" 

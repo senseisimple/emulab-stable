@@ -1533,7 +1533,7 @@
          {
             var record = null;
             
-            if(c.handshakeState.certificateRequest !== null)
+            if(c.handshakeState.certificateRequest !== null && signature !== null)
             {
                // create certificate verify message
                record = tls.createRecord(
@@ -2888,8 +2888,27 @@
                });
             }
          }
-         b = forge.pki.rsa.encrypt(b, privateKey, 0x01);
+         try {
+         b = null;
+         if (privateKey !== null)
+         {
+           b = forge.pki.rsa.encrypt(b, privateKey, 0x01);
+         }
          callback(c, b);
+         }
+         catch (ex)
+         {
+               c.error(c, {
+                  message: 'null private key failed.',
+                  cause: ex,
+                  send: true,
+                  origin: 'client',
+                  alert: {
+                     level: tls.Alert.Level.fatal,
+                     description: tls.Alert.Description.internal_error
+                  }
+               });
+         }
       };
       
       // get client signature

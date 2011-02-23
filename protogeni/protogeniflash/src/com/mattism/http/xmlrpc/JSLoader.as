@@ -196,8 +196,10 @@ package com.mattism.http.xmlrpc
 
     override public function load(request : URLRequest) : void
     {
-      var sendData : String = request.data.toXMLString();
-      var splitExp : RegExp = /^(https:\/\/[^\/]+)(\/.*)$/;
+      var sendData : String = "";
+	  if(request.data != null)
+	  	sendData = request.data.toXMLString();
+      var splitExp : RegExp = /^(https?:\/\/[^\/]+)(\/.*)$/;
       var result : Array = splitExp.exec(request.url);
       var host : String = result[1];
       var path : String= result[2];

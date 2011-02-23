@@ -15,6 +15,7 @@
 package protogeni.communication
 {
   import com.mattism.http.xmlrpc.ConnectionImpl;
+  import com.mattism.http.xmlrpc.JSLoader;
   
   import flash.events.ErrorEvent;
   import flash.events.Event;
@@ -23,9 +24,9 @@ package protogeni.communication
   import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
   import flash.net.URLLoader;
-  import flash.net.URLLoaderDataFormat;
   import flash.net.URLRequest;
   import flash.net.URLRequestMethod;
+  import flash.system.Security;
   
   import mx.collections.ArrayCollection;
 
@@ -155,18 +156,19 @@ package protogeni.communication
 				break;
 			case HTTP:
 				var request:URLRequest = new URLRequest(url);
-				request.method = URLRequestMethod.GET;
-				loader = new URLLoader();
-				loader.dataFormat = URLLoaderDataFormat.TEXT;
-				loader.addEventListener(ProgressEvent.PROGRESS,onMessageProgress);
-				loader.addEventListener(Event.OPEN,onOpen);
+//				request.method = URLRequestMethod.GET;
+				loader = new JSLoader();
+//				loader.dataFormat = URLLoaderDataFormat.TEXT;
+				//loader.addEventListener(ProgressEvent.PROGRESS,onMessageProgress);
+				//loader.addEventListener(Event.OPEN,onOpen);
 				loader.addEventListener(Event.COMPLETE, callSuccess);
 				loader.addEventListener(ErrorEvent.ERROR, callFailure);
 				loader.addEventListener(IOErrorEvent.IO_ERROR, callFailure);
 				loader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
-				loader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
+				//loader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
 				try
 				{
+					Security.loadPolicyFile("http://pc534.emulab.net/crossdomain.xml");
 					loader.load(request);
 				}
 				catch (e : Error)
@@ -182,7 +184,7 @@ package protogeni.communication
     }
 	
 	private function onMessageProgress(e:Event):void{
-		var L:URLLoader = e.target as URLLoader;
+		var L:JSLoader = e.target as JSLoader;
 		trace("PROGRESS: "+L.bytesLoaded+"/"+L.bytesTotal);
 		for(var k:* in L){
 			trace("   "+k+": "+L[k]);
@@ -312,7 +314,7 @@ package protogeni.communication
 	public var type:int;
 	
 	private var server : ConnectionImpl;
-	private var loader:URLLoader
+	private var loader:JSLoader
 	
 	public var timeout:int = 60;
 	

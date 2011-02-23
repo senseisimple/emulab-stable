@@ -7,7 +7,7 @@
 						defaultButton="{okButton}"
 						resize="cmVbox.height = this.height - 108"
 						close="closeWindow()"
-						creationComplete="onCreationComplete()">
+						contentCreationComplete="onCreationComplete()">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
