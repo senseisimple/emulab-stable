@@ -3642,7 +3642,7 @@ sub MapResources($)
 	
 	$self->printdb("Mapping geni resources ...\n");
 	
-	if (libGeni::MapResources($self->experiment(),
+	if (libGeni::MapResourcesNew($self->experiment(),
 				  $self->user(), $self->rspec(),
 				  \$genirspec, $self->verbose())) {
 	    tberror("Could not map Geni resources\n");
