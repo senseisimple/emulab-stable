@@ -40,7 +40,7 @@ package com.mattism.http.xmlrpc
     public var _method : MethodCall;
     private var _rpc_response : Object;
     private var _parser : Parser;
-    public var _response:URLLoader
+    public var _response:Object;
 	private var _parsed_response : Object;
 
     private var _fault : MethodFault;

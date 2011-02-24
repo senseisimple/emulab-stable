@@ -185,7 +185,7 @@ package protogeni.communication
 	
 	private function onMessageProgress(e:Event):void{
 		var L:JSLoader = e.target as JSLoader;
-		trace("PROGRESS: "+L.bytesLoaded+"/"+L.bytesTotal);
+		//trace("PROGRESS: "+L.bytesLoaded+"/"+L.bytesTotal);
 		for(var k:* in L){
 			trace("   "+k+": "+L[k]);
 		}

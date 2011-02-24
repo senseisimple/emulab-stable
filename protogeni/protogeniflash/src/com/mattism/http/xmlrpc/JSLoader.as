@@ -11,7 +11,6 @@ package com.mattism.http.xmlrpc
   import flash.events.IOErrorEvent;
   import flash.events.SecurityErrorEvent;
   import flash.external.ExternalInterface;
-  import flash.net.URLLoader;
   import flash.net.URLRequest;
   import flash.net.URLRequestHeader;
   import flash.utils.ByteArray;
@@ -20,7 +19,7 @@ package com.mattism.http.xmlrpc
   import mx.utils.Base64Decoder;
   import mx.utils.Base64Encoder;
 
-  public class JSLoader extends URLLoader
+  public class JSLoader extends EventDispatcher
   {
     public static function setServerCertificate(newCert : String) : void
     {
@@ -194,7 +193,7 @@ package com.mattism.http.xmlrpc
       id = NO_ID;
     }
 
-    override public function load(request : URLRequest) : void
+    public function load(request : URLRequest) : void
     {
       var sendData : String = "";
 	  if(request.data != null)
@@ -211,7 +210,7 @@ package com.mattism.http.xmlrpc
       loadInstance(id, host, path, sendData);
     }
 
-	override public function close() : void
+	public function close() : void
     {
       cleanupInstance(id);
       id = NO_ID;
@@ -232,8 +231,8 @@ package com.mattism.http.xmlrpc
                                      message));
     }
 
-	//override public var data : String;
-	//override public var bytesLoaded : uint;
+	public var data : String;
+	public var bytesLoaded : uint;
 
     private var id : int;
 

@@ -39,7 +39,7 @@
           attributes.name = "protogeniflash";
           attributes.align = "middle";
           swfobject.embedSWF(
-              "protogeniflash.swf?mode=public&debug=1&usejs=0", "flashContent", 
+              "protogeniflash.swf?mode=public&debug=1&usejs=1", "flashContent", 
               "100%", "100%", 
               swfVersionStr, xiSwfUrlStr, 
               flashvars, params, attributes);
@@ -248,14 +248,15 @@
         request: request,
         connected: function(e)
         {
-//             forge.log.debug(cat, 'connected', e);
+             forge.log.debug(cat, 'connected', e);
         },
         headerReady: function(e)
         {
-//             forge.log.debug(cat, 'header ready', e);
+             forge.log.debug(cat, 'header ready', e);
         },
         bodyReady: function(e)
         {
+           forge.log.debug(cat, 'body ready called', e);
            var response = e.response.body;
            e.socket.close();
            getSWF().flash_onbody(instance, response);
@@ -263,6 +264,10 @@
         error: function(e)
         {
            var response = e.type + ": " + e.message;
+           if (e.cause != null)
+           {
+//             response += ": " + String(e.cause);
+           }
            e.socket.close();
            getSWF().flash_onerror(instance, response);
         }
@@ -298,13 +303,13 @@
 	  <noscript>
             <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
 			width="100%" height="100%" id="protogeniflash">
-                <param name="movie" value="protogeniflash.swf?mode=public&debug=1&usejs=0" />
+                <param name="movie" value="protogeniflash.swf?mode=public&debug=1&usejs=1" />
                 <param name="quality" value="high" />
                 <param name="bgcolor" value="#d2e1f0" />
                 <param name="allowScriptAccess" value="always" />
                 <param name="allowFullScreen" value="true" />
                 <!--[if !IE]>-->
-                <object type="application/x-shockwave-flash" data="protogeniflash.swf?mode=public&debug=1&usejs=0" width="100%" height="100%">
+                <object type="application/x-shockwave-flash" data="protogeniflash.swf?mode=public&debug=1&usejs=1" width="100%" height="100%">
                     <param name="quality" value="high" />
                     <param name="bgcolor" value="#d2e1f0" />
                     <param name="allowScriptAccess" value="always" />

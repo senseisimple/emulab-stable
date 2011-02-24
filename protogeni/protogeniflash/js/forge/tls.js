@@ -2889,17 +2889,22 @@
             }
          }
          try {
-         b = null;
          if (privateKey !== null)
          {
            b = forge.pki.rsa.encrypt(b, privateKey, 0x01);
+           callback(c, b);
          }
-         callback(c, b);
+         else
+         {
+           callback(c, null);
+         }
          }
          catch (ex)
          {
+//                    forge.log.error("ERROR!", String(ex));
+         
                c.error(c, {
-                  message: 'null private key failed.',
+                  message: 'private key encryption or callback failed.',
                   cause: ex,
                   send: true,
                   origin: 'client',

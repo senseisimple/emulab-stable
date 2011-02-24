@@ -51,8 +51,11 @@
 		public function setPem(newPem:String, password:String = null):void
 		{
 			sslPem = newPem;
-			if(Main.useJavascript && password != null)
+			if(Main.useJavascript && password != null) {
+				Main.log.appendMessage(new LogMessage("JS", "JS User Cert", "Setting the user certificate in JavaScript..,"));
 				JSLoader.setClientInfo(password, sslPem);
+			}
+				
 		}
 	}
 }
