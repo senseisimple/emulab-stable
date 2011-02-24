@@ -86,8 +86,12 @@
 			public function saveAndClose():void
 			{
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
-				if(Main.useJavascript)
-					Main.geniHandler.CurrentUser.setPem(sslPem.text, passwordInput.text);
+				if(Main.useJavascript) {
+					if(!Main.geniHandler.CurrentUser.setPem(sslPem.text, passwordInput.text)) {
+						Alert.show("Incorrect password", "It appears that the password is incorrect");
+						return;
+					}
+				}
 				FlexGlobals.topLevelApplication.saveLocalUserData();
 				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
 				closeWindow();

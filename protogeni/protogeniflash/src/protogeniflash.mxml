@@ -175,7 +175,7 @@
 			{
 				Main.setCertBundle(e.target.data);
 				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", Main.certBundle, false, LogMessage.TYPE_END));
-				//Main.geniHandler.requestHandler.startInitiationSequence();
+				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function securityErrorHandler(event:SecurityErrorEvent):void {
@@ -185,7 +185,7 @@
 					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using built-in cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
 				} else
 					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using locally saved cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
-				//Main.geniHandler.requestHandler.startInitiationSequence();
+				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function ioErrorHandler(event:IOErrorEvent):void {
@@ -195,7 +195,7 @@
 					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using built-in cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
 				} else
 					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using locally saved cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
-				//Main.geniHandler.requestHandler.startInitiationSequence();
+				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
 			private function reinit(authenticateUser:Boolean = false):void

@@ -20,7 +20,9 @@ package com.mattism.http.xmlrpc
   import flash.events.ErrorEvent;
   import flash.events.Event;
   import flash.events.EventDispatcher;
+  import flash.events.HTTPStatusEvent;
   import flash.events.IOErrorEvent;
+  import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
   import flash.events.TimerEvent;
   import flash.net.URLLoader;
@@ -61,14 +63,15 @@ package com.mattism.http.xmlrpc
       //init response
 	  if(Main.useJavascript)
         this._response = new JSLoader();
-      else
-        this._response = new URLLoader();
+      else {
+		  this._response = new URLLoader();
+		  //this._response.addEventListener(Event.OPEN, open);
+		  //this._response.addEventListener(ProgressEvent.PROGRESS, progress);
+		  //this._response.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
+	  }
 			
       this._response.addEventListener(Event.COMPLETE, this._onLoad);
-//      this._response.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
       this._response.addEventListener(IOErrorEvent.IO_ERROR, ioError);
-//      this._response.addEventListener(Event.OPEN, open);
-//      this._response.addEventListener(ProgressEvent.PROGRESS, progress);
       this._response.addEventListener(SecurityErrorEvent.SECURITY_ERROR,
                                       securityError);
       if (url)

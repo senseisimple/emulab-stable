@@ -265,6 +265,8 @@
          else
          {
             // handle unspecified content-length transfer
+			if (socket.options !== null)
+			{
             var response = socket.options.response;
             if(response.readBodyUntilClose)
             {
@@ -275,8 +277,9 @@
                   response: response,
                   socket: socket
                });
-            }
+			}
             socket.options.closed(e);
+			}
             _handleNextRequest(client, socket);
          }
       };
