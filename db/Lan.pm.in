@@ -17,6 +17,7 @@ use vars qw(@ISA @EXPORT);
 use libdb;
 use libtestbed;
 use Node;
+use Port;
 use English;
 use Data::Dumper;
 use overload ('""' => 'Stringify');
@@ -2342,7 +2343,7 @@ sub FindMember($$$)
 #
 # Add a member in snmpit port form (node:card).
 #
-sub AddPort($$)
+sub AddPort_OLD($$)
 {
     my ($self, $port) = @_;
     my ($node_id, $card) = split(":", $port);
@@ -2356,6 +2357,23 @@ sub AddPort($$)
 	if (defined($member));
 				   
     return $self->GetLan()->AddMember($node_id, $interface->iface());
+}
+
+#
+# Use Port class
+#
+sub AddPort($$)
+{
+    my ($self, $port) = @_;
+    if (!ref($port)) {
+	    return $self->AddPort_OLD($port);
+    }
+
+    my $member = $self->FindMember($port->node_id(), $port->iface());
+    return $member
+	if (defined($member));
+				   
+    return $self->GetLan()->AddMember($port->node_id(), $port->iface());
 }
 
 #
@@ -2955,7 +2973,7 @@ sub IsNodeInAVlan($$)
     return $query_result->numrows;
 }
 
-sub FindVlanByPort($$$)
+sub FindVlanByPort_OLD($$$) #@@@@ deprecated
 {
     my ($class, $experiment, $port) = @_;
     my ($node_id, $card) = split(":", $port);
@@ -2970,6 +2988,32 @@ sub FindVlanByPort($$$)
 	DBQueryWarn("select id from vlans  ".
 		    "where exptidx='$exptidx' and ".
 		    "      members like '%${node_id}:${iface}%'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my ($lanid) = $query_result->fetchrow_array();
+
+    return VLan->Lookup($lanid);
+}
+
+#
+# Refactored with Port class
+#
+sub FindVlanByPort($$$)
+{
+    my ($class, $experiment, $port) = @_;
+    if (!ref($port)) {
+	    return $class->FindVlanByPort_OLD($experiment, $port);
+    }
+ 
+    my $ifacestr = $port->toIfaceString();
+    my $exptidx = $experiment->idx();
+
+    my $query_result =
+	DBQueryWarn("select id from vlans  ".
+		    "where exptidx='$exptidx' and ".
+		    "      members like '%$ifacestr%'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);

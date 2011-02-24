@@ -223,7 +223,7 @@ sub listPorts($) { #@@@@ OK
 	foreach my $line ($device->listPorts()) {
 	    my $port = $$line[0]; 
 	    if (defined $portinfo{$port->toString()}) {
-		warn "WARNING: Two ports found for $port->toString()\n";
+		warn "WARNING: Two ports found for ".$port->toString()."\n";
 	    }
 	    $portinfo{$port->toString()} = $line;
 	}
@@ -881,7 +881,7 @@ sub getStats($) { #@@@@ OK
 	foreach my $line ($device->getStats()) {
 	    my $port = $$line[0];
 	    if (defined $stats{$port->toString()}) {
-		warn "WARNING: Two ports found for $port->toString()\n";
+		warn "WARNING: Two ports found for ".$port->toString()."\n";
 	    }
 	    $stats{$port->toString()} = $line;
 	}
@@ -944,7 +944,7 @@ sub enableTrunking2($$$@) { #@@@@ OK
     #
     # Simply make the appropriate call on the device
     #
-    print "Enable trunking: Port is $port->toString(), native VLAN is $native_vlan_id\n"
+    print "Enable trunking: Port is ".$port->toString().", native VLAN is $native_vlan_id\n"
 	if ($self->{DEBUG});
     my $rv = $device->enablePortTrunking2($port, $vlan_number, $equaltrunking);
 
@@ -961,7 +961,7 @@ sub enableTrunking2($$$@) { #@@@@ OK
 	    #
 	    my $error = $self->setPortVlan($vlan_id,$port);
 	    if ($error) {
-		warn "ERROR: could not add VLAN $vlan_id to trunk $port->toString()\n";
+		warn "ERROR: could not add VLAN $vlan_id to trunk ".$port->toString()."\n";
 		next;
 	    }
 	    push @vlan_numbers, $vlan_number;
