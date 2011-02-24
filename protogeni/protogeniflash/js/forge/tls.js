@@ -4158,6 +4158,7 @@
          inflate: options.inflate,
          connected: function(c)
          {
+	     try {
             // update session ID
             c.sessionId = c.handshakeState.sessionId;
             
@@ -4185,6 +4186,9 @@
                   bytesAvailable: c.data.length()
                });
             }
+	     } catch (ex) {
+		 forge.log.error("connected", ex);
+	     }
          },
          tlsDataReady: function(c)
          {
@@ -4193,20 +4197,29 @@
          },
          dataReady: function(c)
          {
+	     try {
             // indicate application data is ready
             tlsSocket.data({
                id: socket.id,
                type: 'socketData',
                bytesAvailable: c.data.length()
             });
+	     } catch (ex) {
+		 forge.log.error("dataReady", ex);
+	     }
          },
          closed: function(c)
          {
+	     try {
             // close socket
             socket.close();
+	     } catch (ex) {
+		 forge.log.error("closed", ex);
+	     }
          },
          error: function(c, e)
          {
+	     try {
             // send error, close socket
             tlsSocket.error({
                id: socket.id,
@@ -4216,18 +4229,26 @@
                error: e
             });
             socket.close();
+	     } catch (ex) {
+		 forge.log.error("error", ex);
+	     }
          }
       });
       
       // handle doing handshake after connecting
       socket.connected = function(e)
       {
+	  try {
          c.handshake(options.sessionId);
+	     } catch (ex) {
+		 forge.log.error("socket.connected", ex);
+	     }
       };
       
       // handle closing TLS connection
       socket.closed = function(e)
       {
+	  try {
          if(c.open && c.handshakeState)
          {
             // error
@@ -4247,11 +4268,15 @@
             type: 'close',
             bytesAvailable: 0
          });
+	     } catch (ex) {
+		 forge.log.error("socket.closed", ex);
+	     }
       };
       
       // handle error on socket
       socket.error = function(e)
       {
+	  try {
          // error
          tlsSocket.error({
             id: socket.id,
@@ -4260,6 +4285,9 @@
             bytesAvailable: 0
          });
          c.close();
+	     } catch (ex) {
+		 forge.log.error("socket.error", ex);
+	     }
       };
       
       // handle receiving raw TLS data from socket
