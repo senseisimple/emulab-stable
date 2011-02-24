@@ -108,6 +108,10 @@ sub Lookup($$)
     
     # Add to cache. 
     $authorities{$self->{'AUTHORITY'}->{'uuid'}} = $self;
+
+    # Get the domain as a convenience.
+    my ($domain,undef,undef) = GeniHRN::Parse($self->{'AUTHORITY'}->{'urn'});
+    $self->{'DOMAIN'} = $domain;
     
     return $self;
 }
@@ -177,6 +181,8 @@ sub url($)		{ return field($_[0], "url"); }
 sub hrn($)		{ return field($_[0], "hrn"); }
 sub type($)		{ return field($_[0], "type"); }
 sub disabled($)		{ return field($_[0], "disabled"); }
+# Convenience. 
+sub domain($)     	{ return $_[0]->{"DOMAIN"}; }
 sub _version_info($)	{ return $_[0]->{"_version_info"}; }
 sub version($)		{ return $_[0]->VersionInfo()->{"version"}; }
 sub apilevel($)		{ return $_[0]->VersionInfo()->{"apilevel"}; }
