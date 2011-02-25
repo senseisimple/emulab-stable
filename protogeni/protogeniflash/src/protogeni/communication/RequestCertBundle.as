@@ -23,7 +23,7 @@ package protogeni.communication
 	  
     public function RequestCertBundle() : void
     {
-		super("CertBundle", "Getting cert bundle", null, true, true);
+		super("CertBundle", "Getting cert bundle", null, true);
 		op.setExactUrl(Main.geniHandler.certBundleUrl);
 		op.type = Operation.HTTP;
 	}
