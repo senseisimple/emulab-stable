@@ -15,7 +15,6 @@
 package protogeni.communication
 {
   import com.mattism.http.xmlrpc.ConnectionImpl;
-  import com.mattism.http.xmlrpc.JSLoader;
   
   import flash.events.ErrorEvent;
   import flash.events.Event;
@@ -157,10 +156,8 @@ package protogeni.communication
 			case HTTP:
 				var request:URLRequest = new URLRequest(url);
 //				request.method = URLRequestMethod.GET;
-				loader = new JSLoader();
+				loader = Main.GetLoader();
 //				loader.dataFormat = URLLoaderDataFormat.TEXT;
-				//loader.addEventListener(ProgressEvent.PROGRESS,onMessageProgress);
-				//loader.addEventListener(Event.OPEN,onOpen);
 				loader.addEventListener(Event.COMPLETE, callSuccess);
 				loader.addEventListener(ErrorEvent.ERROR, callFailure);
 				loader.addEventListener(IOErrorEvent.IO_ERROR, callFailure);
@@ -168,7 +165,6 @@ package protogeni.communication
 				//loader.addEventListener(HTTPStatusEvent.HTTP_STATUS, httpStatus);
 				try
 				{
-					Security.loadPolicyFile("http://pc534.emulab.net/crossdomain.xml");
 					loader.load(request);
 				}
 				catch (e : Error)
@@ -182,18 +178,6 @@ package protogeni.communication
 		}
       
     }
-	
-	private function onMessageProgress(e:Event):void{
-		var L:JSLoader = e.target as JSLoader;
-		//trace("PROGRESS: "+L.bytesLoaded+"/"+L.bytesTotal);
-		for(var k:* in L){
-			trace("   "+k+": "+L[k]);
-		}
-	}
-	
-	private function onOpen(e:Event):void{
-		trace("Connection opened");
-	}
 	
 	public function httpStatus(event:HTTPStatusEvent):void
 	{
@@ -314,7 +298,7 @@ package protogeni.communication
 	public var type:int;
 	
 	private var server : ConnectionImpl;
-	private var loader:JSLoader
+	private var loader:Object
 	
 	public var timeout:int = 60;
 	

@@ -18,9 +18,11 @@
 {
 	import com.mattism.http.xmlrpc.JSLoader;
 	
+	import flash.events.IEventDispatcher;
+	import flash.net.URLLoader;
 	import flash.system.Security;
 	import flash.utils.Dictionary;
-
+	
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniDispatcher;
@@ -34,8 +36,17 @@
 		return FlexGlobals.topLevelApplication as protogeniflash;
 	}
 	
+	public static function GetLoader():IEventDispatcher {
+		if(Main.useJavascript)
+			return new JSLoader();
+		else
+			return new URLLoader();
+	}
+	
 	public static function checkLoadCrossDomain(url:String, protogeniSite:Boolean = true):void
 	{
+		if(Main.useJavascript)
+			return;
 		var baseUrl:String = Util.tryGetBaseUrl(url);
 		if (visitedSites[baseUrl] != true)
 		{
@@ -45,14 +56,17 @@
 				crossdomainUrl += "/protogeni/crossdomain.xml";
 			else
 				crossdomainUrl += "/crossdomain.xml";
-			Security.loadPolicyFile(crossdomainUrl);
 			log.appendMessage(new LogMessage(crossdomainUrl, "Loading CrossDomain", "Attempting to load a crossdomain.xml file so that calls may be made with the server located there.", false, LogMessage.TYPE_OTHER));
+			Security.loadPolicyFile(crossdomainUrl);
 		}
 	}
 	
-	public static function setCertBundle(c:String):void
+	public static function setCertBundle(c:String, append:Boolean = false):void
 	{
-		certBundle = c;
+		if(append)
+			certBundle += c;
+		else
+			certBundle = c;
 		if(useJavascript)
 			JSLoader.setServerCertificate(certBundle);
 	}
@@ -64,6 +78,7 @@
 	private static var visitedSites:Dictionary = new Dictionary();
 	public static var certBundle:String;
 	public static var debugMode:Boolean = false;
+	
 	[Bindable]
 	public static var useJavascript:Boolean = false;
 	

@@ -17,16 +17,16 @@
 	 import mx.collections.ArrayList;
 	 
 	 import protogeni.communication.GeniRequestHandler;
-	 import protogeni.display.mapping.GeniMapHandler;
 	 import protogeni.display.DisplayUtil;
+	 import protogeni.display.mapping.GeniMapHandler;
 	 import protogeni.resources.GeniManager;
 	 import protogeni.resources.GeniManagerCollection;
 	 import protogeni.resources.PhysicalLink;
 	 import protogeni.resources.PhysicalNode;
-	 import protogeni.resources.User;
 	 import protogeni.resources.Slice;
 	 import protogeni.resources.SliceAuthority;
 	 import protogeni.resources.Sliver;
+	 import protogeni.resources.User;
 	 import protogeni.resources.VirtualLink;
 	 import protogeni.resources.VirtualNode;
 	
@@ -46,9 +46,8 @@
 		public var unauthenticatedMode:Boolean;
 
 		public var publicUrl:String = "https://www.emulab.net/protogeni/advertisements/list.txt";
-		//public var publicUrl:String = "https://www.emulab.net/protogeni/emulab-advertisment-rspec.xml";
-		//public var publicUrn:String = "urn:publicid:IDN+emulab.net+authority+cm";
-		//public var publicHrn:String = "utahemulab.cm";
+		public var certBundleUrl:String = "http://www.emulab.net/genica.bundle";
+		public var rootBundleUrl:String = "http://www.emulab.net/rootca.bundle";
 		
 		public var forceAuthority:SliceAuthority = null;
 		

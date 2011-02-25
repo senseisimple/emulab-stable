@@ -30,8 +30,6 @@
 	
 	<fx:Script>
 		<![CDATA[
-			import com.mattism.http.xmlrpc.JSLoader;
-			
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
@@ -43,6 +41,8 @@
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.Util;
+			import protogeni.communication.RequestCertBundle;
+			import protogeni.communication.RequestRootBundle;
 			import protogeni.communication.RequestTest;
 			import protogeni.display.DisplayUtil;
 			import protogeni.resources.Slice;
@@ -142,61 +142,13 @@
 				
 				// Load the certificate bundle
 				if(Main.useJavascript) {
-					var certRequest:URLRequest = new URLRequest("http://www.emulab.net/genica.bundle"); 
-					var certLoader:JSLoader = new JSLoader(); 
-					certLoader.addEventListener(Event.COMPLETE, certBundleResult);
-					certLoader.addEventListener(IOErrorEvent.IO_ERROR, ioErrorHandler);
-					//certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
-					try
-					{
-						Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Getting the Protogeni certificate bundle", false, LogMessage.TYPE_START));
-						certLoader.load(certRequest);
-					}
-					catch (e : Error)
-					{
-						Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
-							+ e.toString() + "\n\n", true));
-					}
-				} else {
-					Main.geniHandler.requestHandler.startInitiationSequence();
+					Main.geniHandler.requestHandler.pushRequest(new RequestCertBundle());
+					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
 				}
-					
-			}
-			
-			private function resultHandler(event:ResultEvent):void {
-				trace(event.result);
-			}
-			
-			private function errorHandler(event:ErrorEvent):void {
-				trace(event.toString());
-			}
-			
-			private function certBundleResult(e:Event):void
-			{
-				Main.setCertBundle(e.target.data);
-				Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", Main.certBundle, false, LogMessage.TYPE_END));
+				
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
-			private function securityErrorHandler(event:SecurityErrorEvent):void {
-				//loadLocalBundleData();
-				if(Main.certBundle == null || Main.certBundle.length == 0) {
-					Main.setCertBundle((new FallbackCertBundle()).toString());
-					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using built-in cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
-				} else
-					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "Security error, using locally saved cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
-				Main.geniHandler.requestHandler.startInitiationSequence();
-			}
-			
-			private function ioErrorHandler(event:IOErrorEvent):void {
-				//loadLocalBundleData();
-				if(Main.certBundle == null || Main.certBundle.length == 0) {
-					Main.setCertBundle((new FallbackCertBundle()).toString());
-					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using built-in cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
-				} else
-					Main.log.appendMessage(new LogMessage("http://www.emulab.net/", "Get Cert Bundle", "IO error, using locally saved cert bundle...\n" + event.toString(), true, LogMessage.TYPE_END));
-				Main.geniHandler.requestHandler.startInitiationSequence();
-			}
 			
 			private function reinit(authenticateUser:Boolean = false):void
 			{

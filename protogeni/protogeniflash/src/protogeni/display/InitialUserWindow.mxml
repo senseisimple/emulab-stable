@@ -5,7 +5,7 @@
 						xmlns:display="protogeni.display.*"
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
-						creationComplete="onCreationComplete()">
+						contentCreationComplete="onCreationComplete()">
 	<fx:Style>
 		@namespace s "library://ns.adobe.com/flex/spark";
 		@namespace mx "library://ns.adobe.com/flex/mx";
@@ -55,6 +55,8 @@
 			
 			public function onCreationComplete():void
 			{
+				
+				
 				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
 				this.authorities.setFocus();
 				if(!Main.useJavascript) {
@@ -192,6 +194,7 @@
 				}
 					
 			}
+
 		]]>
 	</fx:Script>
 	<fx:Declarations>
