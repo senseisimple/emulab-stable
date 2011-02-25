@@ -933,7 +933,7 @@
       
       if(forge.log)
       {
-         forge.log.debug('forge.http', 'created client', options);
+//         forge.log.debug('forge.http', 'created client', options);
       }
       
       return client;

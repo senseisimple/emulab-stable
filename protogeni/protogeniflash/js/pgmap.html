@@ -76,7 +76,7 @@
      false, {}, {allowscriptaccess: 'always'}, {});
 
   // CA certificate for test server
-  var serverCert = '';
+  var serverCerts = [];
   var clientCert = '';
   var clientKey = '';
 
@@ -154,8 +154,12 @@
   function setServerCert(newCert)
   {
     try {
-    forge.log.debug(cat, "setServerCert", "");
-    serverCert = newCert;
+      serverCerts = [];
+      var list = newCert.split("-----END CERTIFICATE-----");
+      for (var i = 0; i < list.length - 1; ++i)
+      {
+        serverCerts.push(list[i] + "-----END CERTIFICATE-----\n");
+      }
     } catch(ex) {
        forge.log.error(cat, ex);
     }
@@ -189,11 +193,13 @@
           socketPool: sp,
           connections: 1,
           // optional cipher suites in order of preference
+          caCerts : serverCerts,
           cipherSuites: [
              tls.CipherSuites.TLS_RSA_WITH_AES_128_CBC_SHA,
              tls.CipherSuites.TLS_RSA_WITH_AES_256_CBC_SHA],
           verify: function(c, verified, depth, certs)
           {
+/*
              forge.log.debug(cat,
                 'TLS certificate ' + depth + ' subject: ' + certs[depth].subject.getField('CN').value + " issuer: " + certs[depth].issuer.getField('CN').value, verified);
              // Note: change to always true to test verifying without cert
@@ -205,6 +211,8 @@
                    'Certificate NOT verified. Ignored for test.');
              }
              return true;
+*/
+             return verified;
           },
           primeTlsSockets: false
        };
@@ -212,10 +220,6 @@
        {
           arg.getCertificate = function(c, request) { return clientCert; };
           arg.getPrivateKey = function(c, cert) { return clientKey; };
-       }
-       if (serverCert != "")
-       {
-          arg.caStore = [serverCert];
        }
        result = http.createClient(arg);
     }
@@ -248,15 +252,15 @@
         request: request,
         connected: function(e)
         {
-             forge.log.debug(cat, 'connected', e);
+//             forge.log.debug(cat, 'connected', e);
         },
         headerReady: function(e)
         {
-             forge.log.debug(cat, 'header ready', e);
+//             forge.log.debug(cat, 'header ready', e);
         },
         bodyReady: function(e)
         {
-           forge.log.debug(cat, 'body ready called', e);
+//           forge.log.debug(cat, 'body ready called', e);
            var response = e.response.body;
            e.socket.close();
            getSWF().flash_onbody(instance, response);

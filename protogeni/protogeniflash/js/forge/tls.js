@@ -3503,7 +3503,7 @@
          }
          
          // call application callback
-         var vfd = (error === null) ? true : error.alert.description;
+          var vfd = (error === null) ? true : error.message;//error.alert.description;
          var ret = c.verify(c, vfd, depth, certs);
          if(ret === true)
          {
@@ -4142,7 +4142,7 @@
          data: socket.data || function(e){},
          error: socket.error || function(e){}
       };
-      
+
       // create TLS connection
       var c = forge.tls.createConnection({
          sessionId: options.sessionId || null,
