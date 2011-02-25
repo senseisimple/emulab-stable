@@ -1482,7 +1482,7 @@
          {
             rval = true;
             var iattr, sattr;
-            for(var n; rval && n < i.attributes.length; ++i)
+            for(var n = 0; n < i.attributes.length; ++n)
             {
                iattr = i.attributes[n];
                sattr = s.attributes[n];
