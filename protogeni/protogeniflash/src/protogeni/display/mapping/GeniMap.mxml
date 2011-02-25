@@ -52,6 +52,8 @@
 						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTfdIoaYgi7tOvtC9dvhWwYlnAj4hTW5IpetuD9FvaEH3LDmTpL2Vs__w";
 					else if(url.indexOf("https://www.protogeni.net") > -1)
 						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRNcqKgyvlELbhgjE5kl-gFNsMkyxTLoim3vJsPX9zTdq5dy1yGCfLGqw";
+					else if(url.indexOf("https://www.emulab.net") > -1)
+						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hTs-lXJm7muGCxX8DXwkteJsQ0kTxQBr46PQguVO7zD3fj3JMteHHpVDg";
 				}
 			}
 			
