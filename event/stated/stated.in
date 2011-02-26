@@ -60,6 +60,11 @@ my %msgs = ();
 my $reload_time = 600;
 my $last_reload = time;
 
+# For startup and reload: maximum time in the past for which we will schedule
+# a timeout. Anything older is assumed to be ancient history and is ignored.
+# Note it is a negative value.
+my $maxpasttimeout = -(2 * 24 * 60 * 60);	# 2 days
+
 # Handling of SECVIOLATIONS, eventually controlled by a sitevar
 my $soft_secviolation = 1;
 
@@ -260,7 +265,7 @@ sub process_event_queue() {
     my $lastcount=-1;
     my $wait;
     my $now = time();
-    debug("Polling - mq=$mailqueue bw=$blockwait\n");
+    debug("Polling at $now - mq=$mailqueue bw=$blockwait ndl=$nextdeadline\n");
     if ( $mailqueue == 0) {
 	# no messages waiting...
 	if ($blockwait) {
@@ -334,14 +339,14 @@ while (1) {
     }
     $nextdeadline = $deadline;
 
-    if (qsize()==0) {
-	$blockwait=1;
-	debug("---Blocking wait okay---\n");
-    }
-
     if ($do_reload || ($now - $last_reload > $reload_time)) {
 	reload();
 	$do_reload = 0;
+    }
+
+    if (qsize()==0) {
+	$blockwait=1;
+	debug("---Blocking wait okay---\n");
     }
 
     # Send any messages in the queue if it is time
@@ -364,6 +369,7 @@ exit(0);
 # Read the current states of nodes from the database
 sub readStates(;@) {
     my %oldnodes = @_;
+    my $now = time();
 
     # Guard against undefined variable warnings
     if (! %oldnodes) {
@@ -411,8 +417,14 @@ sub readStates(;@) {
 	    $nodes{$node_id}{timedout}       = 0;
 	    $nodes{$node_id}{noretry}        = 0;
 	    # Is there a timeout? If so, set it up!
-	    if ($dbtag eq $nodes{$node_id}{"tag"}) {
-		setTimeout($mode,$state,$node_id,$timestamp);
+	    if (defined($timestamp) && $dbtag eq $nodes{$node_id}{"tag"}) {
+		my $TO = $timestamp - $now;
+		if ($TO > $maxpasttimeout) {
+		    setTimeout($mode,$state,$node_id,$timestamp);
+		} else {
+		    debug("Ignoring ancient timeout $TO for ",
+			  "($node_id,$mode,$state)\n");
+		}
 	    }
 	}
     }
@@ -1875,6 +1887,13 @@ sub PollEvents($$)
 		else {
 		    fatal("unrecognizable line $line from event reader");
 		}
+	    }
+	    #
+	    # If there is still more immediately available, loop back
+	    # and read again. Otherwise stop.
+	    #
+	    if ($eventpoll->poll(0) <= 0) {
+		last;
 	    }
 	}
     }
