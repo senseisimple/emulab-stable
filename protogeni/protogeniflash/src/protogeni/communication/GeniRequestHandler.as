@@ -41,7 +41,7 @@
 		public var forceStop:Boolean = false;
 		public var isPaused:Boolean = false;
 		
-		public static var MAX_RUNNING:int = 1;
+		public static var MAX_RUNNING:int = 3;
 		
 		// Run everything from the very beginning
 		public function startInitiationSequence(tryAuthenticate:Boolean = false):void
@@ -73,6 +73,7 @@
 		
 		public function loadListAndComponentManagers():void
 		{
+			Main.geniHandler.clearComponents();
 			if(Main.geniHandler.unauthenticatedMode)
 				pushRequest(new RequestListComponentsPublic());
 			else
@@ -82,6 +83,7 @@
 		
 		public function loadListAndComponentManagersAndSlices():void
 		{
+			Main.geniHandler.clearComponents();
 			if(Main.geniHandler.unauthenticatedMode)
 				pushRequest(new RequestListComponentsPublic());
 			else

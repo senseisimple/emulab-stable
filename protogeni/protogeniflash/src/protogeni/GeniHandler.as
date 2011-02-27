@@ -25,6 +25,7 @@
 	 import protogeni.resources.PhysicalNode;
 	 import protogeni.resources.Slice;
 	 import protogeni.resources.SliceAuthority;
+	 import protogeni.resources.SliceCollection;
 	 import protogeni.resources.Sliver;
 	 import protogeni.resources.User;
 	 import protogeni.resources.VirtualLink;
@@ -94,9 +95,11 @@
 			Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
 		}
 		
-		public function clearAll() : void
+		public function clearComponents() : void
 		{
 			GeniManagers = new GeniManagerCollection();
+			if(CurrentUser != null)
+				CurrentUser.slices = new SliceCollection();
 		}
 		
 		public function search(s:String, matchAll:Boolean):Array
