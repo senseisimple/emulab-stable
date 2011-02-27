@@ -69,7 +69,7 @@
 			private var cmsSrc:Array;
 			
 			[Bindable]
-			public var nodes:ArrayCollection;
+			public var nodes:ArrayCollection = new ArrayCollection();
 			
 			[Bindable]
 			public var nodesPredefined:ArrayCollection;
@@ -120,8 +120,10 @@
 							nodes.removeItemAt(nodes.getItemIndex(sn.node.physicalNode));
 					}
 				}
-				else
-					nodes = gm.AllNodes;
+				else {
+					nodes = new ArrayCollection(gm.AllNodesAsArray());
+				}
+					
 				
 				var nameSort:Sort = new Sort();
 				var dataSortField:SortField = new SortField();

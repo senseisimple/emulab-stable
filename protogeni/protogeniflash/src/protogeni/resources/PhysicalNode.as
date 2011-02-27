@@ -47,13 +47,13 @@
 		
 		[Bindable]
 		public var subNodeOf : PhysicalNode = null;
-		public var subNodes : ArrayCollection = new ArrayCollection();
+		public var subNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 		public var virtualNodes : ArrayCollection = new ArrayCollection();
 		
-		public var diskImages:ArrayCollection = new ArrayCollection();
+		public var diskImages:Vector.<DiskImage> = new Vector.<DiskImage>();
 		
 		[Bindable]
-		public var types:ArrayCollection = new ArrayCollection();
+		public var types:Vector.<NodeType> = new Vector.<NodeType>();
 		
 		[Bindable]
 		public var interfaces:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();

@@ -24,7 +24,7 @@ package protogeni.resources
 		private static var LINK_PARSE : int = 1;
 		private static var DONE : int = 2;
 		
-		private static var MAX_WORK : int = 60;
+		private static var MAX_WORK : int = 50;
 		
 		private var myAfter:Function;
 		private var myIndex:int;
@@ -112,7 +112,7 @@ package protogeni.resources
 					for each(var obj:Object in subnodeList)
 					{
 						var parentNode:PhysicalNode = nodeNameDictionary[obj.parentName];
-						parentNode.subNodes.addItem(obj.subNode);
+						parentNode.subNodes.push(obj.subNode);
 						obj.subNode.subNodeOf = parentNode;
 					}
 					
@@ -177,7 +177,7 @@ package protogeni.resources
 						t.isStatic = ix.@static;
 						// isBgpMux = true?
 						// upstreamAs = value of key->upstream_as in field
-						n.types.addItem(t);
+						n.types.push(t);
 					} else if(ix.localName() == "available") {
 						var availString:String = ix.toString();
 						n.available = availString == "true";
@@ -194,7 +194,7 @@ package protogeni.resources
 						newDiskImage.os = ix.@os;
 						newDiskImage.description = ix.@description;
 						newDiskImage.version = ix.@version;
-						n.diskImages.addItem(newDiskImage);
+						n.diskImages.push(newDiskImage);
 					}
 				}
 				
@@ -202,7 +202,7 @@ package protogeni.resources
 				ng.Add(n);
 				nodeNameDictionary[n.urn] = n;
 				nodeNameDictionary[n.name] = n;
-				gm.AllNodes.addItem(n);
+				gm.AllNodes.push(n);
 			}
 			myIndex += idx;
 		}
@@ -257,7 +257,7 @@ package protogeni.resources
 						
 						for each(var tx:XML in link.link_type) {
 							var s:String = tx.@type_name;
-							l.types.addItem(s);
+							l.types.push(s);
 						}
 						
 						lg.Add(l);
@@ -269,7 +269,7 @@ package protogeni.resources
 					}
 				}
 				
-				gm.AllLinks.addItem(l);
+				gm.AllLinks.push(l);
 			}
 			myIndex += idx;
 		}
@@ -290,14 +290,15 @@ package protogeni.resources
 			var nodesById:Dictionary = new Dictionary();
 			var interfacesById:Dictionary = new Dictionary();
 
-			var linksXml : ArrayCollection = new ArrayCollection();
-			var nodesXml : ArrayCollection = new ArrayCollection();
+			var linksXml:Vector.<XML>;
+			var nodesXml:Vector.<XML>;
+			
 			for each(var component:XML in s.rspec.children())
 			{
 				if(component.localName() == "link")
-					linksXml.addItem(component);
+					linksXml.push(component);
 				else if(component.localName() == "node")
-					nodesXml.addItem(component);
+					nodesXml.push(component);
 			}
 			
 			for each(var nodeXml:XML in nodesXml)

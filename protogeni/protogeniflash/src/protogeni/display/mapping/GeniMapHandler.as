@@ -11,6 +11,8 @@ package protogeni.display.mapping
 	
 	import flash.events.Event;
 	import flash.events.MouseEvent;
+	import flash.events.TimerEvent;
+	import flash.utils.Timer;
 	
 	import mx.collections.ArrayCollection;
 	
@@ -32,15 +34,20 @@ package protogeni.display.mapping
 	{
 		public var map:GeniMap;
 		
+		// Timer used to limit frequency of redraws
+		private var t:Timer;
+		
 		public function GeniMapHandler()
 		{
+			t = new Timer(1000, 1); // Draw at most once a second
+			t.addEventListener(TimerEvent.TIMER, timerHandler);
 		}
 		
 		private var markers:Array;
-		private var attachedMarkers:Array;
+		private var attachedMarkers:Vector.<GeniMapMarker>;
 		private var clusterer:Clusterer;
-		private var linkLineOverlays:ArrayCollection;
-		private var linkLabelOverlays:ArrayCollection;
+		private var linkLineOverlays:Vector.<Polyline>;
+		private var linkLabelOverlays:Vector.<TooltipOverlay>;
 
 		//private var nodeGroupClusters:ArrayCollection;		
 		
@@ -145,7 +152,7 @@ package protogeni.display.mapping
 					}));
 	
 				map.addOverlay(polyline);
-				linkLineOverlays.addItem(polyline);
+				linkLineOverlays.push(polyline);
 				
 				// Add link marker
 				if(map.getZoom() < 4)
@@ -159,7 +166,7 @@ package protogeni.display.mapping
 		        });
 		        
 		  		map.addOverlay(t);
-				linkLabelOverlays.addItem(t);
+				linkLabelOverlays.push(t);
 	    	} else {
 	    		// Add line
 				var blankline:Polyline = new Polyline([
@@ -213,7 +220,7 @@ package protogeni.display.mapping
 					}));
 	
 				map.addOverlay(polyline);
-				linkLineOverlays.addItem(polyline);
+				linkLineOverlays.push(polyline);
 					
 				// Add point link marker
 				var ll:LatLng = new LatLng((firstll.lat() + secondll.lat())/2, (firstll.lng() + secondll.lng())/2);
@@ -225,7 +232,7 @@ package protogeni.display.mapping
 		        });
 
 		  		map.addOverlay(t);
-				linkLabelOverlays.addItem(t);
+				linkLabelOverlays.push(t);
 				
 				node1 = node2;
 				current++;
@@ -240,53 +247,66 @@ package protogeni.display.mapping
 	    }
 	    
 	    public function drawMap(junk:* = null):void {
-			//Main.Application().setStatus("Drawing map", true, false);
-	    	
+			if(!t.running) {
+				drawMapNow();
+				t.start();
+			}
+			//else
+			//	Main.log.appendMessage(new LogMessage("", "Skipping drawing map"));
+	    }
+		
+		public function timerHandler(event:TimerEvent):void {
+			t.reset();
+		}
+		
+		public function drawMapNow():void {
+			//Main.log.appendMessage(new LogMessage("", "Drawing map"));
+			
 			if(!map.ready)
 				return;
 			
-	    	map.closeInfoWindow();
-	    	map.clearOverlays();
-
-	    	linkLabelOverlays = new ArrayCollection();
-	    	linkLineOverlays = new ArrayCollection();
-	        markers = [];
+			map.closeInfoWindow();
+			map.clearOverlays();
 			
-	    	// Draw physical components
-	    	for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
-	    	{
-	    		if(!gm.Show)
-	    			continue;
-	    		
-	    		// Links
-		        for each(var l:PhysicalLinkGroup in gm.Links.collection) {
-			        	if(!l.IsSameSite()) {
-			        		addPhysicalLink(l);
-			        	}
-			       }
-		        
-		        // Nodes
-		    	for each(var g:PhysicalNodeGroup in gm.Nodes.collection) {
-		        	addNodeGroupMarker(g);
-		        }
-	    	}
-	    	
-	    	if(userResourcesOnly && selectedSlice != null && selectedSlice.Status() != null) {
-	    		// Draw virtual links
-	    		for each(var sliver:Sliver in selectedSlice.slivers)
-	    		{
-	    			if(!sliver.manager.Show)
-	    				continue;
-	    			for each(var vl:VirtualLink in sliver.links) {
-			        	addVirtualLink(vl);
-			        }	    			
-	    		}
-	        }
-
+			linkLabelOverlays = new Vector.<TooltipOverlay>();
+			linkLineOverlays = new Vector.<Polyline>();
+			markers = [];
+			
+			// Draw physical components
+			for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
+			{
+				if(!gm.Show)
+					continue;
+				
+				// Links
+				for each(var l:PhysicalLinkGroup in gm.Links.collection) {
+					if(!l.IsSameSite()) {
+						addPhysicalLink(l);
+					}
+				}
+				
+				// Nodes
+				for each(var g:PhysicalNodeGroup in gm.Nodes.collection) {
+					addNodeGroupMarker(g);
+				}
+			}
+			
+			if(userResourcesOnly && selectedSlice != null && selectedSlice.Status() != null) {
+				// Draw virtual links
+				for each(var sliver:Sliver in selectedSlice.slivers)
+				{
+					if(!sliver.manager.Show)
+						continue;
+					for each(var vl:VirtualLink in sliver.links) {
+						addVirtualLink(vl);
+					}	    			
+				}
+			}
+			
 			// Cluster node groups close to each other
 			var marker:GeniMapMarker;
 			clusterer = new Clusterer(markers, map.getZoom(), 35);
-			attachedMarkers = [];
+			attachedMarkers = new Vector.<GeniMapMarker>();
 			var clusteredMarkers:Array = clusterer.clusters;
 			
 			for each (var cluster:Array in clusteredMarkers) {
@@ -299,6 +319,6 @@ package protogeni.display.mapping
 				map.addOverlay(marker);
 				attachedMarkers.push(marker);
 			}
-	    }
+		}
 	}
 }

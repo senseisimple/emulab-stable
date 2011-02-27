@@ -133,7 +133,7 @@ package protogeni.resources
 					node.available = true;
 					node.exclusive = false;
 					processedNodes++;
-					gm.AllNodes.addItem(node);
+					gm.AllNodes.push(node);
 					site.nodes.addItem(node);
 				}
 				myIndex++;

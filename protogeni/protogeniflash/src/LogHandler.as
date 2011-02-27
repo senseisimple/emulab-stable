@@ -30,7 +30,7 @@ package
 			console = null;
 		}
 		
-		public var logs:Array = new Array();
+		public var logs:Vector.<LogMessage> = new Vector.<LogMessage>();
 		private var console:ConsoleWindow = null;
 	}
 }

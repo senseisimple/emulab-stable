@@ -46,8 +46,23 @@ package protogeni.resources
 		
 		public var Nodes:PhysicalNodeGroupCollection;
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();
-		public var AllNodes:ArrayCollection = new ArrayCollection();
-		public var AllLinks:ArrayCollection = new ArrayCollection();
+		
+		public var AllNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
+		public function AllNodesAsArray():Array {
+			var allNodesArray:Array = new Array();
+			for each (var elem:PhysicalNode in AllNodes) {
+				allNodesArray.push(elem);
+			}
+			return allNodesArray;
+		}
+		public var AllLinks:Vector.<PhysicalLink> = new Vector.<PhysicalLink>();
+		public function AllLinksAsArray():Array {
+			var allLinksArray:Array = new Array();
+			for each (var elem:PhysicalLink in AllLinks) {
+				allLinksArray.push(elem);
+			}
+			return allLinksArray;
+		}
 		
 		// For now set when RSPEC is parsed
 		public var totalNodes:int = 0;
@@ -105,8 +120,8 @@ package protogeni.resources
 		public function clearComponents():void {
 			Nodes = new PhysicalNodeGroupCollection(this);
 			Links = new PhysicalLinkGroupCollection();
-			AllNodes = new ArrayCollection();
-			AllLinks = new ArrayCollection();
+			AllNodes = new Vector.<PhysicalNode>();
+			AllLinks = new Vector.<PhysicalLink>();
 		}
 		
 		//---------------------------------------
@@ -118,7 +133,7 @@ package protogeni.resources
 			var nodes:String = "";
 			var edges:String = "";
 			
-			var nodesToAdd:ArrayCollection = new ArrayCollection(AllNodes.toArray());
+			var nodesToAdd:ArrayCollection = new ArrayCollection(this.AllNodesAsArray());
 			var nodeGroups:ArrayCollection = new ArrayCollection();
 			
 			// Add nodes and combine similar nodes together
@@ -279,7 +294,7 @@ package protogeni.resources
 			return dot + links + "}";
 		}
 		
-		public var nodesToAdd:ArrayCollection = new ArrayCollection(AllNodes.toArray());
+		public var nodesToAdd:ArrayCollection;
 		public var locations:ArrayCollection = new ArrayCollection();
 		public var nodeReferences:Dictionary = new Dictionary();
 		public var switchReferences:Dictionary = new Dictionary();
@@ -292,7 +307,8 @@ package protogeni.resources
 		{
 			//if(graphGroupsCreated)
 			//	return;
-			nodesToAdd = new ArrayCollection(AllNodes.toArray());
+
+			nodesToAdd = new ArrayCollection(this.AllNodesAsArray());
 			locations = new ArrayCollection();
 			switchReferences = new Dictionary();
 			nodeReferences = new Dictionary();

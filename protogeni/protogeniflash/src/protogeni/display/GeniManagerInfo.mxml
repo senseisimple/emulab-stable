@@ -7,6 +7,7 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
+			import mx.collections.ArrayCollection;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
 			
@@ -157,7 +158,7 @@
 				<s:Label text="Nodes" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<s:Button id="nodesButton" click="DisplayUtil.viewNodeCollection(gm.AllNodes);"/>
+				<s:Button id="nodesButton" click="DisplayUtil.viewNodeCollection(new ArrayCollection(gm.AllNodesAsArray()));"/>
 				<s:Label id="availabilityLabel" />
 			</mx:GridItem>
 		</mx:GridRow>
