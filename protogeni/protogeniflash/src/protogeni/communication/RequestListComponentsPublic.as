@@ -32,7 +32,7 @@ package protogeni.communication
 		var newCalls:RequestQueue = new RequestQueue();
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			var a:Array = (response as String).split("\n");
+			var a:Array = (response as String).split(/[\n\r]/);
 			for each(var s:String in a) {
 				if(s.length==0)
 					continue;

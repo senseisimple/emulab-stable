@@ -27,8 +27,8 @@
 	</fx:Script>
 
 	<s:HGroup width="100%">
-		<s:TextInput id="searchText" width="100%" enter="search()"/>
-		<s:Button label="Search" click="search()"/>
+		<mx:TextInput id="searchText" width="100%" enter="search()" height="24"/>
+		<display:ImageButton2 icon="{DisplayUtil.searchIcon}" click="search()" />
 	</s:HGroup>
 	<s:HGroup width="100%">
 		<s:CheckBox label="Match entire string" id="matchCheck"/>

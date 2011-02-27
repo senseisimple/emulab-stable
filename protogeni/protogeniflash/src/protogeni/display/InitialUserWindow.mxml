@@ -55,8 +55,6 @@
 			
 			public function onCreationComplete():void
 			{
-				
-				
 				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
 				this.authorities.setFocus();
 				if(!Main.useJavascript) {
@@ -95,6 +93,7 @@
 					}
 				}
 				FlexGlobals.topLevelApplication.saveLocalUserData();
+				Main.geniHandler.unauthenticatedMode = false;
 				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
 				closeWindow();
 			}
@@ -204,7 +203,7 @@
 	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%" requireSelection="true" selectedItem="@{selectedAuthority}"/>
 	<s:VGroup width="100%" height="100%" visible="{Main.useJavascript}" includeInLayout="{Main.useJavascript}">
 		<s:Label text="SSL Certificate Password" />
-		<s:TextInput id="passwordInput" width="100%" displayAsPassword="true" />
+		<mx:TextInput id="passwordInput" width="100%" displayAsPassword="true" />
 		<s:HGroup>
 			<s:CheckBox id="retrieveCertCheckbox" label="Automatically retrieve SSL Certificate? If not signed in, please sign in to" selected="true" />
 			<s:Button label="{selectedAuthority.Authority}" click="visitLogin();" />
@@ -215,7 +214,7 @@
 			<s:Label id="getLabel" text="" />
 		</s:HGroup>
 		<s:Label text="If the automatic SSL Certificate retrieval doesn't work, copy and paste it here" />
-		<s:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}" width="100%" height="100%" />
+		<mx:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}" width="100%" height="100%" />
 	</s:VGroup>
 	<display:controlBarContent>
 		<s:Button id="okButton" label="OK" click="trySubmit();" />

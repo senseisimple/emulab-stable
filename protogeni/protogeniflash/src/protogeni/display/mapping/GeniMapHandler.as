@@ -15,6 +15,7 @@ package protogeni.display.mapping
 	import mx.collections.ArrayCollection;
 	
 	import protogeni.Util;
+	import protogeni.display.DisplayUtil;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
@@ -25,7 +26,6 @@ package protogeni.display.mapping
 	import protogeni.resources.VirtualInterface;
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
-	import protogeni.display.DisplayUtil;
 	
     // Handles adding all the ProtoGENI info to the Google Map component
 	public class GeniMapHandler
@@ -42,18 +42,29 @@ package protogeni.display.mapping
 		private var linkLineOverlays:ArrayCollection;
 		private var linkLabelOverlays:ArrayCollection;
 
-		private var nodeGroupClusters:ArrayCollection;		
+		//private var nodeGroupClusters:ArrayCollection;		
 		
 		public var userResourcesOnly:Boolean = false;
 		public var selectedSlice:Slice = null;
 		
-		public static function getBounds(a:Array):LatLngBounds
+		public static function getBounds(a:Array = null):LatLngBounds
 		{
-			var s:Number = (a[0] as LatLng).lat();
-			var n:Number = (a[0] as LatLng).lat();
-			var w:Number = (a[0] as LatLng).lng();
-			var e:Number = (a[0] as LatLng).lng();
-			for each(var ll:LatLng in a)
+			var coords:Array;
+			if(a == null) {
+				coords = new Array();
+				for each(var m:GeniMapMarker in Main.geniHandler.mapHandler.markers)
+					coords.push(m.getLatLng());
+			} else
+				coords = a;
+			
+			if(coords.length == 0)
+				return null;
+			
+			var s:Number = (coords[0] as LatLng).lat();
+			var n:Number = (coords[0] as LatLng).lat();
+			var w:Number = (coords[0] as LatLng).lng();
+			var e:Number = (coords[0] as LatLng).lng();
+			for each(var ll:LatLng in coords)
 			{
 				if(ll.lat() < s)
 					s = ll.lat();

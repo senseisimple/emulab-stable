@@ -13,6 +13,7 @@ package protogeni.display
 	import mx.managers.PopUpManager;
 	
 	import spark.components.TitleWindow;
+	import protogeni.display.skins.ResizableTitleWindowSkin;
 	
 	/**
 	 *  ResizableTitleWindow is a TitleWindow with

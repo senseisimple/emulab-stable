@@ -15,6 +15,7 @@
 	<fx:Script>
 		<![CDATA[
 			import com.google.maps.LatLng;
+			import com.google.maps.LatLngBounds;
 			import com.google.maps.MapOptions;
 			import com.google.maps.MapType;
 			import com.google.maps.MapZoomEvent;
@@ -24,7 +25,7 @@
 			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
-				myMapOptions.zoom = 4;
+				myMapOptions.zoom = 5;
 				myMapOptions.center = new LatLng(38,-97);
 				myMapOptions.mapType = MapType.PHYSICAL_MAP_TYPE;
 				setInitOptions(myMapOptions);
@@ -73,7 +74,18 @@
 			}
 			
 			public function resetZoom():void {
-				setZoom(4);
+				var bounds:LatLngBounds = GeniMapHandler.getBounds();
+				if(bounds != null) {
+					var bzl:Number  = this.getBoundsZoomLevel(bounds);
+					if(this.getZoom() != bzl)
+						this.setZoom(bzl);
+					this.panTo( bounds.getCenter() );
+				} else
+					setDefaultZoom();
+			}
+			
+			public function setDefaultZoom():void {
+				setZoom(5);
 				panTo(new LatLng(38,-97));
 			}
 		]]>

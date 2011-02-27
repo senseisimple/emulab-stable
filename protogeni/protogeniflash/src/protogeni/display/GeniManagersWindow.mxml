@@ -49,6 +49,7 @@
 			import mx.collections.ArrayCollection;
 			
 			import protogeni.GeniEvent;
+			import protogeni.display.skins.CheckBoxSkin;
 			import protogeni.resources.GeniManager;
 			
 			public function success():void {
@@ -79,9 +80,10 @@
 				{
 					var found:Boolean = false;
 					var checkboxCm:CheckBox = (cmVbox.getChildAt(i) as HBox).getChildAt(0) as CheckBox;
+					var buttonCm:Button = (cmVbox.getChildAt(i) as HBox).getChildAt(1) as Button;
 					for each(var testGm:GeniManager in Main.geniHandler.GeniManagers)
 					{
-						if(checkboxCm.label == testGm.Hrn)
+						if(buttonCm.label == testGm.Hrn)
 						{
 							found = true;
 							if(testGm.Rspec == null && checkboxCm.selected)
@@ -126,8 +128,8 @@
 				var gm:GeniManager = e.changedObject as GeniManager;
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
-					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-					if(gm.Hrn == cmCheckbox.label)
+					var cmButton:Button = cmHbox.getChildAt(1) as Button;
+					if(gm.Hrn == cmButton.label)
 					{
 						updateCmHbox(cmHbox, gm);
 						break;
@@ -139,10 +141,10 @@
 			{
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
-					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					var cmButton:Button = cmHbox.getChildAt(1) as Button;
 					for each(var gm:GeniManager in Main.geniHandler.GeniManagers )
 					{
-						if(gm.Hrn == cmCheckbox.label)
+						if(gm.Hrn == cmButton.label)
 						{
 							updateCmHbox(cmHbox, gm);
 							break;
@@ -156,23 +158,23 @@
 				for each(var cmHbox:HBox in cmVbox.getChildren() )
 				{
 					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-					var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
-					cmCheckbox.styleName = "unknownStyle";
-					cmInfo.source = DisplayUtil.flagOrangeIcon;
+					var cmInfo:Button = cmHbox.getChildAt(1) as Button;
+					cmInfo.styleName = "unknownStyle";
+					cmInfo.setStyle("icon", DisplayUtil.flagOrangeIcon);
 				}
 			}
 			
 			public function updateCmHbox(cmHbox:HBox, gm:GeniManager):void
 			{
 				var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-				var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
+				var cmInfo:Button = cmHbox.getChildAt(1) as Button;
 				var cmGoto:ImageButton;
 				if(cmHbox.numChildren == 3)
 					cmGoto = cmHbox.getChildAt(2) as ImageButton;
 				
 				if(gm.Status == GeniManager.STATUS_FAILED) {
-					cmCheckbox.styleName = "failedStyle";
-					cmInfo.source = DisplayUtil.flagRedIcon;
+					cmInfo.styleName = "failedStyle";
+					cmInfo.setStyle("icon", DisplayUtil.flagRedIcon);
 					cmHbox.toolTip = gm.errorDescription;
 					if(cmGoto == null && gm.mightNeedSecurityException())
 					{
@@ -187,19 +189,19 @@
 					}
 				}
 				else if(gm.Status == GeniManager.STATUS_UNKOWN) {
-					cmCheckbox.styleName = "unknownStyle";
-					cmInfo.source = DisplayUtil.flagOrangeIcon;
+					cmInfo.styleName = "unknownStyle";
+					cmInfo.setStyle("icon", DisplayUtil.flagOrangeIcon);
 					cmHbox.toolTip = "Unknown status";
 				}
 				else if(gm.Status == GeniManager.STATUS_INPROGRESS) {
-					cmCheckbox.styleName = "inprogressStyle";
-					cmInfo.source = DisplayUtil.flagOrangeIcon;
+					cmInfo.styleName = "inprogressStyle";
+					cmInfo.setStyle("icon", DisplayUtil.flagOrangeIcon);
 					cmHbox.toolTip = "In progress...";
 				}
 				else if(gm.Status == GeniManager.STATUS_VALID)
 				{
-					cmCheckbox.styleName = "validStyle";
-					cmInfo.source = DisplayUtil.flagGreenIcon;
+					cmInfo.styleName = "validStyle";
+					cmInfo.setStyle("icon", DisplayUtil.flagGreenIcon);
 					cmHbox.toolTip = "Valid";
 				}
 				updateWidth();
@@ -223,11 +225,13 @@
 				var cmHbox:HBox = new HBox();
 				cmHbox.percentWidth = 100;
 				var cmCheckbox:CheckBox = new CheckBox();
+				cmCheckbox.setStyle("skinClass", protogeni.display.skins.CheckBoxSkin);
 				cmCheckbox.selected = gm.Show;
-				cmCheckbox.label = gm.Hrn;
+				//cmCheckbox.label = gm.Hrn;
 				cmHbox.addChild(cmCheckbox);
 				
-				var cmInfo:ImageButton = new ImageButton();
+				var cmInfo:Button = DisplayUtil.getButton();
+				cmInfo.label = gm.Hrn;
 				cmHbox.addChild(cmInfo);
 				
 				updateCmHbox(cmHbox, gm);
@@ -257,8 +261,8 @@
 		]]>
 	</fx:Script>
 	<mx:HBox width="100%" horizontalAlign="right">
-		<mx:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true"/>
-		<display:ImageButton id="refreshButton" source="{DisplayUtil.refreshIcon}" click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
+		<s:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true" skinClass="protogeni.display.skins.CheckBoxSkin"/>
+		<display:ImageButton2 id="refreshButton" icon="{DisplayUtil.refreshIcon}" click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
 		<mx:Spacer width="100%"/>
 		<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 
@@ -267,7 +271,7 @@
 	</mx:VBox>
 	<display:controlBarContent>
 		<mx:Spacer width="100%"/>
-		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" click="closeWindow();"/>
-		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" enabled="false"/>
+		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" click="closeWindow();" height="24" />
+		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" enabled="false" height="24" />
 	</display:controlBarContent>
 </display:DefaultWindow>

@@ -17,13 +17,14 @@
 	import com.mattism.http.xmlrpc.MethodFault;
 	
 	import flash.events.ErrorEvent;
-
+	
 	import mx.controls.Alert;
 	import mx.events.CloseEvent;
 	
 	import protogeni.Util;
 	import protogeni.display.InitialUserWindow;
 	import protogeni.resources.AggregateManager;
+	import protogeni.resources.GeniManager;
 	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
@@ -40,37 +41,30 @@
 		public var forceStop:Boolean = false;
 		public var isPaused:Boolean = false;
 		
-		public static var MAX_RUNNING:int = 5;
+		public static var MAX_RUNNING:int = 1;
 		
 		// Run everything from the very beginning
-		public function startInitiationSequence():void
+		public function startInitiationSequence(tryAuthenticate:Boolean = false):void
 		{
-			if(Main.geniHandler.unauthenticatedMode) {
+			if(Main.geniHandler.unauthenticatedMode && !tryAuthenticate) {
 				pushRequest(new RequestListComponentsPublic());
 				Main.Application().showAuthenticate();
 				
-				/*var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
-				newCm.Url = Main.geniHandler.publicUrl;
-				newCm.Hrn = Main.geniHandler.publicHrn;
-				newCm.Urn = Main.geniHandler.publicUrn;
-				Main.geniHandler.GeniManagers.add(newCm);
-				newCm.Status = GeniManager.STATUS_INPROGRESS;
-				pushRequest(new RequestDiscoverResourcesPublic(newCm));
-				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
-				Main.Application().showAuthenticate();*/
-				
+			} else if(Main.geniHandler.unauthenticatedMode || Main.geniHandler.forceAuthority == null) {
+				var chooseAuth:InitialUserWindow = new InitialUserWindow();
+				chooseAuth.showWindow();
 			} else {
-				if(Main.geniHandler.forceAuthority == null)
-				{
-					var chooseAuth:InitialUserWindow = new InitialUserWindow();
-					chooseAuth.showWindow();
-				} else
-					this.startAuthenticatedInitiationSequence();
+				startAuthenticatedInitiationSequence();
 			}
 		}
 		
 		public function startAuthenticatedInitiationSequence():void
 		{
+			if(Main.geniHandler.unauthenticatedMode) {
+				var chooseAuth:InitialUserWindow = new InitialUserWindow();
+				chooseAuth.showWindow();
+				return;
+			}
 			pushRequest(new RequestGetCredential());
 			pushRequest(new RequestGetKeys());
 			loadListAndComponentManagersAndSlices();
@@ -79,19 +73,32 @@
 		
 		public function loadListAndComponentManagers():void
 		{
-			pushRequest(new RequestListComponents(true, false));
+			if(Main.geniHandler.unauthenticatedMode)
+				pushRequest(new RequestListComponentsPublic());
+			else
+				pushRequest(new RequestListComponents(true, false));
+			
 		}
 		
 		public function loadListAndComponentManagersAndSlices():void
 		{
-			pushRequest(new RequestListComponents(true, true));
+			if(Main.geniHandler.unauthenticatedMode)
+				pushRequest(new RequestListComponentsPublic());
+			else
+				pushRequest(new RequestListComponents(true, true));
 		}
 		
 		public function loadComponentManagers():void
 		{
 			for each(var cm:ProtogeniComponentManager in Main.geniHandler.GeniManagers)
 			{
-				pushRequest(new RequestGetVersion(cm));
+				if(Main.geniHandler.unauthenticatedMode) {
+					cm.Status = GeniManager.STATUS_INPROGRESS;
+					Main.geniDispatcher.dispatchGeniManagerChanged(cm);
+					pushRequest(new RequestDiscoverResourcesPublic(cm));
+				}
+				else
+					pushRequest(new RequestGetVersion(cm));
 			}
 		}
 		
@@ -236,8 +243,8 @@
 				Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
 				
 				Main.geniDispatcher.dispatchQueueChanged();
-				
-				this.start();
+
+				this.start()
 			}
 		}
 		

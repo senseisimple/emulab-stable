@@ -95,8 +95,8 @@
 					function zoomin(evt:MouseEvent):void {
 						var map:GeniMap = FlexGlobals.topLevelApplication.map;
 						var bzl:Number  = map.getBoundsZoomLevel(bounds);
-						if(map.getZoom() != bzl-1)
-							map.setZoom(bzl-1);
+						if(map.getZoom() != bzl)
+							map.setZoom(bzl);
 						map.panTo( bounds.getCenter() );
 					});
 				

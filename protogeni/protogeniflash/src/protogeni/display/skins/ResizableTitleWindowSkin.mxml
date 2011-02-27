@@ -116,7 +116,7 @@ in accordance with the terms of the license agreement accompanying it.
 			target.bottomLeftRadiusX = includeBottom ? cornerRadius : 0;
 			target.bottomRightRadiusX = includeBottom ? cornerRadius : 0;
 		}
-		
+
 		private var cornerRadius:Number;
 	</fx:Script>
 	
@@ -231,8 +231,8 @@ in accordance with the terms of the license agreement accompanying it.
 				<s:Group id="moveArea" left="0" right="0" top="0" bottom="0" />
 				
 				<!--- @copy spark.components.TitleWindow#closeButton -->
-				<s:Button id="closeButton" skinClass="spark.skins.spark.TitleWindowCloseButtonSkin"
-						  width="15" height="15" right="7" top="7" />
+				<s:Button id="closeButton" skinClass="protogeni.display.skins.TitleWindowCloseButtonSkin"
+						  width="24" height="24" right="2" top="2" />
 			</s:Group>
 			
 			<!--

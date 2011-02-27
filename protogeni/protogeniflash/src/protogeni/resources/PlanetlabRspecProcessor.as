@@ -31,6 +31,8 @@ package protogeni.resources
 		private var hasslot:Boolean = false;
 		
 		public function processResourceRspec(afterCompletion : Function):void {
+			gm.clearComponents();
+			
 			Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC", false);
 			
 			if (gm.Rspec.@type != "SFA")

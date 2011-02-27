@@ -50,6 +50,7 @@
 			
 			//------------------------------------------
 			// Embedded resources
+			[Bindable]
 			[Embed(source="../images/arrow_out.png")] 
 			private var arrowOut:Class;
 			
@@ -149,19 +150,6 @@
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
-			
-			private function reinit(authenticateUser:Boolean = false):void
-			{
-				if(Main.geniHandler != null)
-					Main.geniHandler.removeHandlers();
-				Main.geniHandler = new GeniHandler();
-				Main.geniHandler.mapHandler.map = map;
-				loadParams();
-				loadLocalUserData();
-				// Override the params
-				Main.geniHandler.unauthenticatedMode = !authenticateUser;
-			}
-			
 			//------------------------------------------
 			// GUI
 			private function toggleFullScreen():void {
@@ -169,11 +157,11 @@
 					switch (systemManager.stage.displayState) {
 						case StageDisplayState.FULL_SCREEN:
 							systemManager.stage.displayState = StageDisplayState.NORMAL;
-							fullscreenButton.source = new arrowOut();
+							fullscreenButton.setStyle("icon", arrowOut);
 							break;
 						default:
 							systemManager.stage.displayState = StageDisplayState.FULL_SCREEN;
-							fullscreenButton.source = new arrowIn();
+							fullscreenButton.setStyle("icon", arrowIn);
 							break;
 					}
 				} catch (err:SecurityError) {
@@ -214,11 +202,8 @@
 			
 			protected function loadUser():void
 			{
-				if(Main.geniHandler.CurrentUser == null
-					|| Main.geniHandler.CurrentUser.credential == null
-					|| Main.geniHandler.CurrentUser.credential.length == 0)
-				{
-					startover(true);
+				if(Main.geniHandler.unauthenticatedMode) {
+					Main.geniHandler.requestHandler.startInitiationSequence(true);
 				} else {
 					DisplayUtil.viewUserWindow();
 				}
@@ -241,13 +226,28 @@
 				Main.geniHandler.mapHandler.drawMap();
 			}
 			
-			public function startover(authenticateUser:Boolean = false):void
-			{
-				Main.geniHandler.requestHandler.pause();
-				Main.geniHandler.requestHandler.clearAll();
-				reinit(authenticateUser);
+			public function startover():void {
+				reinit();
 				Main.geniHandler.requestHandler.startInitiationSequence();
 			}
+			
+			public function reinit():void
+			{
+				if(Main.geniHandler != null) {
+					Main.geniHandler.requestHandler.pause();
+					Main.geniHandler.requestHandler.clearAll();
+					Main.geniHandler.removeHandlers();
+				}
+				Main.geniHandler = new GeniHandler();
+				Main.geniHandler.mapHandler.map = map;
+				//loadParams();
+				//loadLocalUserData();
+				// Override the params
+				//Main.geniHandler.unauthenticatedMode = !authenticateUser;
+				
+				//Main.geniHandler.requestHandler.startInitiationSequence();
+			}
+			
 			
 			public function loadParams():void
 			{
@@ -356,28 +356,30 @@
 			}
 		]]>
 	</fx:Script>
-	
+	<s:controlBarLayout>
+		<s:HorizontalLayout verticalAlign="middle" gap="4" paddingTop="2" paddingBottom="2" paddingLeft="2" paddingRight="2" />
+	</s:controlBarLayout>
 	<s:controlBarContent>
-		<display:ImageButton id="infoButton"
-							 source="@Embed('../images/protogeni-logo.png')"
+		<display:ImageButton2 id="infoButton"
+							 icon="@Embed('../images/protogeni-logo.png')"
 							 click="DisplayUtil.viewAboutWindow()"
 							 toolTip="View more information about ProtoGENI" />
 		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton id="refreshButton"
-							 source="{DisplayUtil.refreshIcon}"
-							 click="startover()" includeInLayout="false" visible="false"
+		<display:ImageButton2 id="refreshButton"
+							  icon="{DisplayUtil.refreshIcon}"
+							 click="startover()" includeInLayout="true" visible="true"
 							 toolTip="Reload all data" />
-		<display:ImageButton id="cmButton"
-							 source="@Embed('../images/building.png')"
+		<display:ImageButton2 id="cmButton"
+							  icon="@Embed('../images/building.png')"
 							 click="DisplayUtil.viewManagersWindow();"
 							 toolTip="GENI managers"/>
-		<display:ImageButton id="consoleButton"
-							 source="@Embed('../images/application_xp_terminal.png')"
+		<display:ImageButton2 id="consoleButton"
+							  icon="@Embed('../images/system_monitor.png')"
 							 click="Main.log.viewConsole();" 
 							 toolTip="Console"/>
 		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
-							 source="{DisplayUtil.graphIcon}"
+		<display:ImageButton2 id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
+							  icon="{DisplayUtil.graphIcon}"
 							 click="DisplayUtil.viewSlicesWindow();"
 							 toolTip="Work with slices"/>
 		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
@@ -388,24 +390,25 @@
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
 		<s:Rect percentWidth="100" />
-		<mx:Button icon="{DisplayUtil.noUserIcon}" click="loadUser()"
+		<mx:Button icon="{DisplayUtil.noUserIcon}"
+				   click="loadUser()"
 				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
 				   toolTip="Authenticate" label="Authenticate" styleName="unauthenticatedStyle"
-				   id="userButton" />
-		<display:ImageButton id="searchButton"
-							 source="{DisplayUtil.searchIcon}"
+				   id="userButton" height="24" />
+		<display:ImageButton2 id="searchButton"
+							  icon="{DisplayUtil.findIcon}"
 							 click="DisplayUtil.viewSearchWindow()"
 							 toolTip="Search" />
-		<display:ImageButton id="resetZoomButton"
-							 source="@Embed('../images/zoom.png')"
+		<display:ImageButton2 id="resetZoomButton"
+							  icon="@Embed('../images/zoom.png')"
 							 click="map.resetZoom();"
 							 toolTip="Reset zoom" />
-		<display:ImageButton id="fullscreenButton"
-							 source="@Embed('../images/arrow_out.png')"
+		<display:ImageButton2 id="fullscreenButton"
+							  icon="{arrowOut}"
 							 click="toggleFullScreen()"
 							 toolTip="Toggle fullscreen" />
-		<display:ImageButton id="helpButton"
-							 source="{DisplayUtil.helpIcon}"
+		<display:ImageButton2 id="helpButton"
+							  icon="{DisplayUtil.helpIcon}"
 							 click="Util.showManual()"
 							 toolTip="View more information" />
 	</s:controlBarContent>

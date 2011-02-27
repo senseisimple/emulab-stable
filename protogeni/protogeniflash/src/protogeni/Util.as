@@ -15,8 +15,8 @@
 package protogeni
 {
   import flash.external.ExternalInterface;
-  import flash.net.navigateToURL;
   import flash.net.URLRequest;
+  import flash.net.navigateToURL;
   
   import mx.collections.ArrayCollection;
 

@@ -95,14 +95,18 @@ package protogeni.resources
 		
 		public function clear():void
 		{
-			Nodes = new PhysicalNodeGroupCollection(this);
-			Links = new PhysicalLinkGroupCollection();
-			AllNodes = new ArrayCollection();
-			AllLinks = new ArrayCollection();
+			clearComponents();
 			Rspec = null;
 			Status = GeniManager.STATUS_UNKOWN;
 			errorMessage = "";
 			errorDescription = "";
+		}
+		
+		public function clearComponents():void {
+			Nodes = new PhysicalNodeGroupCollection(this);
+			Links = new PhysicalLinkGroupCollection();
+			AllNodes = new ArrayCollection();
+			AllLinks = new ArrayCollection();
 		}
 		
 		//---------------------------------------

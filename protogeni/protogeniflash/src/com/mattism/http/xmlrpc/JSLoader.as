@@ -29,7 +29,7 @@ package com.mattism.http.xmlrpc
     public static function setClientInfo(password : String,
                                          pem : String) : void
     {
-      var lines : Array = pem.split('\n');
+      var lines : Array = pem.split(/[\n\r]/);
       var key : String = "";
       var cert : String = "";
       var inKey : Boolean = false;
@@ -73,7 +73,7 @@ package com.mattism.http.xmlrpc
       }
       else
       {
-        Main.log.appendMessage(new LogMessage("error", "Invalid Key", key, true));
+		  throw new Error("Invalid Key: " + key);
       }
     }
 
@@ -81,7 +81,7 @@ package com.mattism.http.xmlrpc
     {
       var result : ByteArray = null;
       var patterns : Array = null;
-      var lines : Array = key.split("\n");
+      var lines : Array = key.split(/[\n\r]/);
       for each (var line : String in lines)
       {
         patterns = line.match(/^DEK-Info: ([\-a-zA-Z0-9]+),([A-Za-z0-9]+)$/);
@@ -154,7 +154,7 @@ package com.mattism.http.xmlrpc
     private static function parseKey(key : String) : ByteArray
     {
       var decoder : Base64Decoder = new Base64Decoder();
-      var lines : Array = key.split("\n");
+      var lines : Array = key.split(/[\n\r]/);
       for each (var line : String in lines)
       {
         if (! line.match("----") && ! line.match(": ") && line != "")

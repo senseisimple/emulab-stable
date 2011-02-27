@@ -23,6 +23,7 @@
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Button;
+	import mx.controls.ButtonLabelPlacement;
 	import mx.managers.PopUpManager;
 	
 	import protogeni.communication.Request;
@@ -61,6 +62,8 @@
 		
 		public static var windowHeight:int = 400;
 		public static var windowWidth:int = 700;
+		public static var buttonHeight:int = 24;
+		public static var buttonWidth:int = 24;
 		
 		// Embedded images used around the application
 		[Bindable]
@@ -78,6 +81,14 @@
 		[Bindable]
 		[Embed(source="../../../images/arrow_right.png")]
 		public static var rightIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/arrow_up.png")]
+		public static var upIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/arrow_down.png")]
+		public static var downIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/user.png")]
@@ -152,6 +163,10 @@
 		public static var stopIcon:Class;
 		
 		[Bindable]
+		[Embed(source="../../../images/control_pause_blue.png")]
+		public static var pauseIcon:Class;
+		
+		[Bindable]
 		[Embed(source="../../../images/control_play_blue.png")]
 		public static var playIcon:Class;
 		
@@ -169,6 +184,10 @@
 		
 		[Bindable]
 		[Embed(source="../../../images/find.png")]
+		public static var findIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/magnifier.png")]
 		public static var searchIcon:Class;
 		
 		[Bindable]
@@ -236,7 +255,7 @@
         }
 		
 		public static function getLogMessageButton(msg:LogMessage):Button {
-			var logButton:Button = new Button();
+			var logButton:Button = getButton();
 			logButton.label = msg.name;
 			logButton.toolTip = msg.groupId;
 			if(msg.isError)
@@ -246,12 +265,17 @@
 			}
 			else
 			{
-				if(msg.type == LogMessage.TYPE_START)
+				if(msg.type == LogMessage.TYPE_START) {
 					logButton.setStyle("icon",DisplayUtil.rightIcon);
-				else if(msg.type == LogMessage.TYPE_END)
-					logButton.setStyle("icon",DisplayUtil.leftIcon);
-				else
+					logButton.labelPlacement = ButtonLabelPlacement.LEFT;
+				}
+				else if(msg.type == LogMessage.TYPE_END) {
+					logButton.setStyle("icon",DisplayUtil.rightIcon);
+					logButton.labelPlacement = ButtonLabelPlacement.RIGHT;
+				}
+				else {
 					logButton.setStyle("icon",DisplayUtil.availableIcon);
+				}
 			}
 			logButton.addEventListener(MouseEvent.CLICK,
 				function openLog():void {
@@ -263,7 +287,7 @@
 		}
 		
 		public static function getRequestButton(r:Request):Button {
-			var requestButton:Button = new Button();
+			var requestButton:Button = getButton();
 			requestButton.label = r.name;
 			requestButton.toolTip = r.details;
 			requestButton.addEventListener(MouseEvent.CLICK,
@@ -276,7 +300,7 @@
 		
 		// Gets a button for the slice
 		public static function getSliceButton(s:Slice):Button {
-			var sButton:Button = new Button();
+			var sButton:Button = getButton();
 			if(s.hrn != null && s.hrn.length > 0)
 				sButton.label = s.hrn;
 			else
@@ -291,10 +315,9 @@
 		
 		// Gets a button for the component manager
 		public static function getGeniManagerButton(gm:GeniManager):Button {
-			var cmButton:Button = new Button();
+			var cmButton:Button = getButton(DisplayUtil.assignIconForGeniManager(gm));
 			cmButton.label = gm.Hrn;
 			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
-			cmButton.setStyle("icon", DisplayUtil.assignIconForGeniManager(gm));
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openGeniManager(event:MouseEvent):void {
 					DisplayUtil.viewGeniManager(gm);
@@ -305,7 +328,7 @@
 		
 		// Gets a button for the component manager
 		public static function getSiteButton(s:Site):Button {
-			var cmButton:Button = new Button();
+			var cmButton:Button = getButton();
 			cmButton.label = s.id + " (" + s.name + ")";
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openGeniManager(event:MouseEvent):void {
@@ -317,10 +340,9 @@
 		
 		// Gets a button for the physical node
 		public static function getPhysicalNodeButton(n:PhysicalNode):Button {
-			var nodeButton:Button = new Button();
+			var nodeButton:Button = getButton(DisplayUtil.assignAvailabilityIcon(n));
 			nodeButton.label = n.name;
 			nodeButton.toolTip = n.name + " on " + n.manager.Hrn;
-			nodeButton.setStyle("icon", DisplayUtil.assignAvailabilityIcon(n));
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
 					DisplayUtil.viewPhysicalNode(n);
@@ -331,7 +353,7 @@
 		
 		// Gets a button for the physical node
 		public static function getVirtualNodeButton(n:VirtualNode):Button {
-			var nodeButton:Button = new Button();
+			var nodeButton:Button = getButton();
 			nodeButton.label = n.id;
 			nodeButton.toolTip = n.id + " on " + n.manager.Hrn;
 			nodeButton.addEventListener(MouseEvent.CLICK,
@@ -344,9 +366,8 @@
 		
 		// Gets a button for a physical link
 		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
-			var linkButton:Button = new Button();
+			var linkButton:Button = getButton(DisplayUtil.linkIcon);
 			linkButton.label = ni.id;
-			linkButton.setStyle("icon", DisplayUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
 					DisplayUtil.viewPhysicalLink(nl);
@@ -481,6 +502,16 @@
 		public static function viewManagersWindow():void {
 			var managersWindow:GeniManagersWindow = new GeniManagersWindow();
 			managersWindow.showWindow();
+		}
+		
+		public static function getButton(img:Class = null, imgOnly:Boolean = false):Button {
+			var b:Button = new Button();
+			if(imgOnly)
+				b.width = buttonWidth;
+			b.height = buttonHeight;
+			if(img != null)
+				b.setStyle("icon", img);
+			return b;
 		}
 	}
 }
