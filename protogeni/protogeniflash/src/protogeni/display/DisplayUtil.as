@@ -62,8 +62,8 @@
 		
 		public static var windowHeight:int = 400;
 		public static var windowWidth:int = 700;
-		public static var buttonHeight:int = 24;
-		public static var buttonWidth:int = 24;
+		public static var minComponentHeight:int = 24;
+		public static var minComponentWidth:int = 24;
 		
 		// Embedded images used around the application
 		[Bindable]
@@ -159,20 +159,24 @@
 		public static var cancelIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/control_stop_blue.png")]
+		[Embed(source="../../../images/stop.png")]
 		public static var stopIcon:Class;
 		
 		[Bindable]
+		[Embed(source="../../../images/control_stop_blue.png")]
+		public static var stopControlIcon:Class;
+		
+		[Bindable]
 		[Embed(source="../../../images/control_pause_blue.png")]
-		public static var pauseIcon:Class;
+		public static var pauseControlIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/control_play_blue.png")]
-		public static var playIcon:Class;
+		public static var playControlIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/control_repeat_blue.png")]
-		public static var repeatIcon:Class;
+		public static var repeatControlIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/delete.png")]
@@ -515,11 +519,18 @@
 		public static function getButton(img:Class = null, imgOnly:Boolean = false):Button {
 			var b:Button = new Button();
 			if(imgOnly)
-				b.width = buttonWidth;
-			b.height = buttonHeight;
+				b.width = minComponentWidth;
+			b.height = minComponentHeight;
 			if(img != null)
 				b.setStyle("icon", img);
 			return b;
+		}
+		
+		private static var initialUserWindow:InitialUserWindow = null;
+		public static function viewInitialUserWindow():void {
+			if(initialUserWindow == null)
+				initialUserWindow = new InitialUserWindow();
+			initialUserWindow.showWindow();
 		}
 	}
 }

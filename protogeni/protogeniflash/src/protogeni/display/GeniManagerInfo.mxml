@@ -112,7 +112,7 @@
 				<s:Label text="{gm.Hrn}" fontSize="17" fontWeight="bold" width="100%" />
 				<display:ImageButton id="consoleButton"
 									 source="@Embed('../../../images/application_xp_terminal.png')"
-									 click="Main.log.viewGroup(gm.Url);"
+									 click="LogHandler.viewGroup(gm.Url);"
 									 toolTip="View log messages in the console" />
 				<display:ImageButton id="rpsecButton"
 									 source="@Embed('../../../images/page_white_code.png')"

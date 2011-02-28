@@ -369,12 +369,12 @@
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton2 id="startButton" toolTip="Start slivers"
 							  click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.playIcon}"/>
+							  icon="{DisplayUtil.playControlIcon}"/>
 		<display:ImageButton2 id="stopButton" toolTip="Stop slivers"
 							  click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.stopIcon}"/>
+							  icon="{DisplayUtil.stopControlIcon}"/>
 		<display:ImageButton2 id="restartButton" toolTip="Restart slivers"
 							  click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.repeatIcon}"/>
+							  icon="{DisplayUtil.repeatControlIcon}"/>
 	</display:controlBarContent>
 </display:DefaultWindow>

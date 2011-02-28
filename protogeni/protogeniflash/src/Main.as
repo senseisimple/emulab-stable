@@ -56,7 +56,7 @@
 				crossdomainUrl += "/protogeni/crossdomain.xml";
 			else
 				crossdomainUrl += "/crossdomain.xml";
-			log.appendMessage(new LogMessage(crossdomainUrl, "Loading CrossDomain", "Attempting to load a crossdomain.xml file so that calls may be made with the server located there.", false, LogMessage.TYPE_OTHER));
+			LogHandler.appendMessage(new LogMessage(crossdomainUrl, "Loading CrossDomain", "Attempting to load a crossdomain.xml file so that calls may be made with the server located there.", false, LogMessage.TYPE_OTHER));
 			Security.loadPolicyFile(crossdomainUrl);
 		}
 	}

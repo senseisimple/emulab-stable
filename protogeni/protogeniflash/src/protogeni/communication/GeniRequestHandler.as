@@ -22,6 +22,7 @@
 	import mx.events.CloseEvent;
 	
 	import protogeni.Util;
+	import protogeni.display.DisplayUtil;
 	import protogeni.display.InitialUserWindow;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
@@ -51,8 +52,7 @@
 				Main.Application().showAuthenticate();
 				
 			} else if(Main.geniHandler.unauthenticatedMode || Main.geniHandler.forceAuthority == null) {
-				var chooseAuth:InitialUserWindow = new InitialUserWindow();
-				chooseAuth.showWindow();
+				DisplayUtil.viewInitialUserWindow();
 			} else {
 				startAuthenticatedInitiationSequence();
 			}
@@ -61,8 +61,7 @@
 		public function startAuthenticatedInitiationSequence():void
 		{
 			if(Main.geniHandler.unauthenticatedMode) {
-				var chooseAuth:InitialUserWindow = new InitialUserWindow();
-				chooseAuth.showWindow();
+				DisplayUtil.viewInitialUserWindow();
 				return;
 			}
 			pushRequest(new RequestGetCredential());
@@ -73,7 +72,6 @@
 		
 		public function loadListAndComponentManagers():void
 		{
-			Main.geniHandler.clearComponents();
 			if(Main.geniHandler.unauthenticatedMode)
 				pushRequest(new RequestListComponentsPublic());
 			else
@@ -83,7 +81,6 @@
 		
 		public function loadListAndComponentManagersAndSlices():void
 		{
-			Main.geniHandler.clearComponents();
 			if(Main.geniHandler.unauthenticatedMode)
 				pushRequest(new RequestListComponentsPublic());
 			else
@@ -223,7 +220,7 @@
 			if (newRequest != null)
 			{
 				queue.push(newRequest);
-				if (queue.readyToStart() && forceStart)
+				if (queue.readyToStart() && forceStart && !isPaused)
 				{
 					start();
 				}
@@ -233,6 +230,7 @@
 		public function start() : void
 		{
 			isPaused = false;
+			forceStop = false;
 			if(!queue.readyToStart())
 				return;
 			
@@ -242,7 +240,7 @@
 				var op:Operation = start.start();
 				op.call(complete, failure);
 				Main.Application().setStatus(start.name, false);
-				Main.log.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
+				LogHandler.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
 				
 				Main.geniDispatcher.dispatchQueueChanged();
 
@@ -253,6 +251,18 @@
 		public function pause():void
 		{
 			isPaused = true;
+		}
+		
+		public function stop():void
+		{
+			pause();
+			removeAll();
+		}
+		
+		public function removeAll():void {
+			while(queue.head != null) {
+				remove(queue.head.item as Request, true);
+			}
 		}
 		
 		public function remove(r:Request, showAction:Boolean = true):void
@@ -267,7 +277,9 @@
 			{
 				var url:String = r.op.getUrl();
 				var name:String = r.name;
-				Main.log.appendMessage(new LogMessage(url, name + "Removed", "Request removed", false, LogMessage.TYPE_OTHER));
+				LogHandler.appendMessage(new LogMessage(url, name + "Removed", "Request removed", false, LogMessage.TYPE_OTHER));
+				if(!queue.working())
+					tryNext();
 			}
 			Main.geniDispatcher.dispatchQueueChanged();
 		}
@@ -300,11 +312,11 @@
 					
 			}
 			failMessage += "\nURL: " + node.op.getUrl();
-			Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, failMessage, true, LogMessage.TYPE_END));
+			LogHandler.appendMessage(new LogMessage(node.op.getUrl(), node.name, failMessage, true, LogMessage.TYPE_END));
 			Main.Application().setStatus(node.name + " failed!", true);
 			if(!node.continueOnError)
 			{
-				Main.log.viewConsole();
+				LogHandler.viewConsole();
 			} else {
 				// Find out what to do next
 				var next : * = node.fail(event, fault);
@@ -347,10 +359,10 @@
 				if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !node.ignoreReturnCode)
 				{
 					Main.Application().setStatus(node.name + " done", true);
-					Main.log.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));
+					LogHandler.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));
 				} else {
 					Main.Application().setStatus(node.name + " done", false);
-					Main.log.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponse(), false, LogMessage.TYPE_END));
+					LogHandler.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponse(), false, LogMessage.TYPE_END));
 				}
 				next = node.complete(code, response);
 			}
@@ -396,14 +408,14 @@
 		{
 			if(stop)
 			{
-				Main.log.viewConsole();
+				LogHandler.viewConsole();
 				forceStop = true;
 			}
 				
 			if(e != null)
-				Main.log.appendMessage(new LogMessage("", "Code Failure: " + name,detail + "\n\n" + e.toString() + "\n\n" + e.getStackTrace(),true,LogMessage.TYPE_END));
+				LogHandler.appendMessage(new LogMessage("", "Code Failure: " + name,detail + "\n\n" + e.toString() + "\n\n" + e.getStackTrace(),true,LogMessage.TYPE_END));
 			else
-				Main.log.appendMessage(new LogMessage("", "Code Failure: " + name,detail,true,LogMessage.TYPE_END));
+				LogHandler.appendMessage(new LogMessage("", "Code Failure: " + name,detail,true,LogMessage.TYPE_END));
 			
 		}
 	}

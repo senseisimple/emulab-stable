@@ -116,7 +116,7 @@ package protogeni.communication
 		Main.geniHandler.requestHandler.remove(this, false);
 		Main.geniDispatcher.dispatchGeniManagerChanged(plm);
 		op.cleanup();
-		Main.geniHandler.requestHandler.start();
+		Main.geniHandler.requestHandler.tryNext();
 	}
 
     private var plm:PlanetlabAggregateManager;

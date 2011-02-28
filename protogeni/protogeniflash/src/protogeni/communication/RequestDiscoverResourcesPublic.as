@@ -65,7 +65,7 @@ package protogeni.communication
 		Main.geniHandler.mapHandler.drawMap();
 		if(cm.Status == GeniManager.STATUS_VALID)
 			Main.Application().setStatus("Parsing " + cm.Hrn + " RSPEC Done",false);
-		Main.geniHandler.requestHandler.start();
+		Main.geniHandler.requestHandler.tryNext();
 	}
 
     private var cm : ProtogeniComponentManager;

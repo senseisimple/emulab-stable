@@ -8,29 +8,28 @@ package
 		{
 		}
 		
-		public function appendMessage(msg:LogMessage):void {
+		public static function appendMessage(msg:LogMessage):void {
 			logs.push(msg);
 			Main.geniDispatcher.dispatchLogsChanged(msg);
 		}
 		
-		public function viewConsole():void {
+		public static function viewConsole():void {
 			if(console == null)
 				console = new ConsoleWindow();
-			if(!console.isPopUp)
-				console.showWindow();
+			console.showWindow();
 		}
 		
-		public function viewGroup(s:String):void {
-			viewConsole();
-			console.openGroup(s);
-		}
-		
-		public function closeConsole():void {
+		public static function closeConsole():void {
 			console.closeWindow();
 			console = null;
 		}
 		
-		public var logs:Vector.<LogMessage> = new Vector.<LogMessage>();
-		private var console:ConsoleWindow = null;
+		public static function viewGroup(s:String):void {
+			viewConsole();
+			console.openGroup(s);
+		}
+		
+		public static var logs:Vector.<LogMessage> = new Vector.<LogMessage>();
+		private static var console:ConsoleWindow = null;
 	}
 }

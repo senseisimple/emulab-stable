@@ -21,7 +21,7 @@ package protogeni.communication
 
   public class RequestListComponents extends Request
   {
-    public function RequestListComponents(shouldDiscoverResources:Boolean, shouldStartSlices:Boolean) : void
+    public function RequestListComponents(shouldDiscoverResources:Boolean = true, shouldStartSlices:Boolean = false) : void
     {
       super("ListComponents", "Getting the information for the component managers", CommunicationUtil.listComponents);
 	  startDiscoverResources = shouldDiscoverResources;
@@ -40,6 +40,7 @@ package protogeni.communication
 		var newCalls:RequestQueue = new RequestQueue();
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
+			Main.geniHandler.clearComponents();
 			for each(var obj:Object in response.value)
 			{
 				var newGm:GeniManager = null;

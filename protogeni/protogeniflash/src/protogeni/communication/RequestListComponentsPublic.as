@@ -14,7 +14,9 @@
 
 package protogeni.communication
 {
+	import protogeni.Util;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 
   public class RequestListComponentsPublic extends Request
@@ -32,6 +34,7 @@ package protogeni.communication
 		var newCalls:RequestQueue = new RequestQueue();
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
+			Main.geniHandler.clearComponents();
 			var a:Array = (response as String).split(/[\n\r]/);
 			for each(var s:String in a) {
 				if(s.length==0)
@@ -44,6 +47,16 @@ package protogeni.communication
 				newCm.Status = GeniManager.STATUS_INPROGRESS;
 				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
 				newCalls.push(new RequestDiscoverResourcesPublic(newCm));
+			}
+
+			if(!Main.protogeniOnly) {
+				var plc:PlanetlabAggregateManager = new PlanetlabAggregateManager();
+				plc.Url = "https://www.emulab.net/protogeni/plc.xml";
+				plc.Urn = Util.makeUrn("plc","authority","am");
+				Main.geniHandler.GeniManagers.add(plc);
+				plc.Status = GeniManager.STATUS_INPROGRESS;
+				Main.geniDispatcher.dispatchGeniManagerChanged(plc);
+				newCalls.push(new RequestListResourcesAmPublic(plc));
 			}
 		}
 		else

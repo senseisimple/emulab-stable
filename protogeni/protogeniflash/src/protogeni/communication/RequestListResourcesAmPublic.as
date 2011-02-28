@@ -25,18 +25,15 @@ package protogeni.communication
   import protogeni.resources.AggregateManager;
   import protogeni.resources.GeniManager;
 
-  public class RequestListResourcesAm extends Request
+  public class RequestListResourcesAmPublic extends Request
   {
 	  
-    public function RequestListResourcesAm(newAm:AggregateManager) : void
+    public function RequestListResourcesAmPublic(newAm:AggregateManager) : void
     {
-		super("ListResourcesAm (" + Util.shortenString(newAm.Url, 15) + ")", "Listing resources for " + newAm.Url, CommunicationUtil.listResourcesAm, true, true, false);
-		ignoreReturnCode = true;
-		op.timeout = 60;
+		super("ListResourcesAmPublic (" + Util.shortenString(newAm.Url, 15) + ")", "Listing resources for " + newAm.Url, null, true, true, false);
 		am = newAm;
-		op.pushField([Main.geniHandler.CurrentUser.credential]);
-		op.pushField({geni_available:false, geni_compressed:true});	// geni_available:false = show all, true = show only available
-		op.setExactUrl(newAm.Url);
+		op.setExactUrl(am.Url);
+		op.type = Operation.HTTP;
 		am.lastRequest = this;
     }
 	
@@ -46,13 +43,7 @@ package protogeni.communication
 		
 		try
 		{
-			var decodor:Base64Decoder = new Base64Decoder();
-			decodor.decode(response as String);
-			var bytes:ByteArray = decodor.toByteArray();
-			bytes.uncompress();
-			var decodedRspec:String = bytes.toString();
-			
-			am.Rspec = new XML(decodedRspec);
+			am.Rspec = new XML(response);
 			am.rspecProcessor.processResourceRspec(cleanup);
 			
 		} catch(e:Error)

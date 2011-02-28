@@ -248,15 +248,23 @@ package protogeni.display.mapping
 	    	Main.Application().fillCombobox();
 	    }
 	    
+		public var drawAfter:Boolean = false;
 	    public function drawMap(junk:* = null):void {
-			if(!t.running)
+			if(!t.running) {
+				drawMapNow();
+				drawAfter = false;
 				t.start();
+			} else
+				drawAfter = true;
 			//else
 			//	Main.log.appendMessage(new LogMessage("", "Skipping drawing map"));
 	    }
 		
 		public function timerHandler(event:TimerEvent):void {
-			drawMapNow();
+			if(drawAfter) {
+				drawMapNow();
+				drawAfter = false;
+			}
 			t.reset();
 		}
 		

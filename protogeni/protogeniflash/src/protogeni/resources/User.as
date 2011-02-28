@@ -52,11 +52,11 @@
 		{
 			sslPem = newPem;
 			if(Main.useJavascript && password != null) {
-				Main.log.appendMessage(new LogMessage("JS", "JS User Cert", "Setting the user certificate in JavaScript..,"));
+				LogHandler.appendMessage(new LogMessage("JS", "JS User Cert", "Setting the user certificate in JavaScript..,"));
 				try {
 					JSLoader.setClientInfo(password, sslPem);
 				} catch ( e:Error) {
-					Main.log.appendMessage(new LogMessage("JS", "JS User Cert", e.toString(), true, LogMessage.TYPE_END));
+					LogHandler.appendMessage(new LogMessage("JS", "JS User Cert", e.toString(), true, LogMessage.TYPE_END));
 					return false;
 				}
 			}

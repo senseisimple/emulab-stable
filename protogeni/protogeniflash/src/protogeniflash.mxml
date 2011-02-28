@@ -41,7 +41,7 @@
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.Util;
-			import protogeni.communication.RequestCertBundle;
+			import protogeni.communication.RequestGeniBundle;
 			import protogeni.communication.RequestRootBundle;
 			import protogeni.communication.RequestTest;
 			import protogeni.display.DisplayUtil;
@@ -133,11 +133,11 @@
 							}
 						});
 				}
+				
 				loadLocalUserData();
-				loadLocalBundleData();
 				
 				if(Main.debugMode) {
-					Main.log.viewConsole();
+					LogHandler.viewConsole();
 					DisplayUtil.viewManagersWindow();
 				}
 				
@@ -145,7 +145,8 @@
 				
 				// Load the certificate bundle
 				if(Main.useJavascript) {
-					Main.geniHandler.requestHandler.pushRequest(new RequestCertBundle());
+					loadLocalBundleData();
+					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
 					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
 				}
 				
@@ -319,9 +320,9 @@
 			public function loadLocalBundleData():void
 			{
 				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
-				{
-					Main.certBundle = geniLocalSharedObject.data.certBundle;
-				}
+					Main.setCertBundle(geniLocalSharedObject.data.certBundle);
+				if(Main.certBundle == null || Main.certBundle.length == 0)
+					Main.setCertBundle((new FallbackGeniBundle()).toString() + (new FallbackRootBundle()).toString());
 			}
 			
 			public function saveLocalBundleData():void
@@ -377,7 +378,7 @@
 							 toolTip="GENI managers"/>
 		<display:ImageButton2 id="consoleButton"
 							  icon="@Embed('../images/system_monitor.png')"
-							 click="Main.log.viewConsole();" 
+							 click="LogHandler.viewConsole();" 
 							 toolTip="Console"/>
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton2 id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"

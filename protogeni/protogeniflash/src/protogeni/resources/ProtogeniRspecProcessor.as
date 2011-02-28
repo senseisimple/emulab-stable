@@ -24,7 +24,7 @@ package protogeni.resources
 		private static var LINK_PARSE : int = 1;
 		private static var DONE : int = 2;
 		
-		private static var MAX_WORK : int = 50;
+		private static var MAX_WORK : int = 40;
 		
 		private var myAfter:Function;
 		private var myIndex:int;

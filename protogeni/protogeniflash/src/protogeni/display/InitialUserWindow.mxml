@@ -133,7 +133,7 @@
 					getLabel.styleName = "inprogressStyle";
 					getLabel.text = "Waiting...";
 					Security.loadPolicyFile("https://www.emulab.net/protogeni/crossdomain.xml");
-					Main.log.appendMessage(new LogMessage(url, "Getting SSL Cert", "Attempting to load user SSL certificate", false, LogMessage.TYPE_START));
+					LogHandler.appendMessage(new LogMessage(url, "Getting SSL Cert", "Attempting to load user SSL certificate", false, LogMessage.TYPE_START));
 					certSuccess = false;
 					asked = false;
 					certLoader.load(request);
@@ -141,7 +141,7 @@
 				catch (e : Error)
 				{
 					waitingIcon.visible = false;
-					Main.log.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
+					LogHandler.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
 						+ e.toString() + "\n\n", true));
 					checkCloseAfter();
 				}
@@ -153,11 +153,11 @@
 					sslPem.text = certLoader.data;
 					getLabel.text = "Success!"
 					getLabel.styleName = "validStyle";
-					Main.log.appendMessage(new LogMessage(certUrl, "Got SSL Cert", certLoader.data, false, LogMessage.TYPE_END));
+					LogHandler.appendMessage(new LogMessage(certUrl, "Got SSL Cert", certLoader.data, false, LogMessage.TYPE_END));
 					this.retrieveCertCheckbox.selected = false;
 					checkCloseAfter();
 				} else {
-					Main.log.appendMessage(new LogMessage(certUrl, "Error", event.toString(), true, LogMessage.TYPE_END));
+					LogHandler.appendMessage(new LogMessage(certUrl, "Error", event.toString(), true, LogMessage.TYPE_END));
 					askToLogin();
 				}
 				waitingIcon.visible = false;
@@ -190,12 +190,12 @@
 			private function ioErrorHandler(event:IOErrorEvent):void {
 				getLabel.text = "IO Error!"
 				getLabel.styleName = "failedStyle";				askToLogin();
-				Main.log.appendMessage(new LogMessage(certUrl, "IO Error", event.toString(), true, LogMessage.TYPE_END));
+				LogHandler.appendMessage(new LogMessage(certUrl, "IO Error", event.toString(), true, LogMessage.TYPE_END));
 			}
 			
 			private function httpStatusHandler(event:HTTPStatusEvent):void{
 				if(event.status != 200) {
-					Main.log.appendMessage(new LogMessage(certUrl, "HTTP Status", "HTTP Status returned: "
+					LogHandler.appendMessage(new LogMessage(certUrl, "HTTP Status", "HTTP Status returned: "
 						+ event.status, true, LogMessage.TYPE_END));
 					askToLogin();
 				}

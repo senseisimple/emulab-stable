@@ -66,7 +66,7 @@ package protogeni.communication
 			}
 			
 			// Show the error
-			Main.log.viewConsole();
+			LogHandler.viewConsole();
 		}
 		
 		return null;

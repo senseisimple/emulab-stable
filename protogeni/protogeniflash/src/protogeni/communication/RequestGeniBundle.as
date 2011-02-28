@@ -18,10 +18,10 @@ package protogeni.communication
   import protogeni.resources.GeniManager;
   import protogeni.resources.ProtogeniComponentManager;
 
-  public class RequestCertBundle extends Request
+  public class RequestGeniBundle extends Request
   {
 	  
-    public function RequestCertBundle() : void
+    public function RequestGeniBundle() : void
     {
 		super("CertBundle", "Getting cert bundle", null, true);
 		op.setExactUrl(Main.geniHandler.certBundleUrl);

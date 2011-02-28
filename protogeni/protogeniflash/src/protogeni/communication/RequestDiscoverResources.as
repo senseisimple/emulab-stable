@@ -108,7 +108,7 @@ package protogeni.communication
 		Main.geniDispatcher.dispatchGeniManagerChanged(cm);
 		op.cleanup();
 		Main.geniHandler.mapHandler.drawMap();
-		Main.geniHandler.requestHandler.start();
+		Main.geniHandler.requestHandler.tryNext();
 	}
 
     private var cm : ProtogeniComponentManager;
