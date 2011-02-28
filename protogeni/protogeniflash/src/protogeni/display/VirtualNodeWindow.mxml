@@ -70,7 +70,7 @@
 				this.tarfilesText.text = n.tarfiles;
 				
 				if(node.rspec != null)
-					this.rspecButton.source = DisplayUtil.pageWhiteCodeIcon;
+					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteCodeIcon);
 				
 				if(node.error != null && node.error.length > 0)
 				{
@@ -194,12 +194,12 @@
 			<mx:GridItem width="100%">
 				<s:HGroup>
 					<s:Label id="idLabel" text="{node.id}" fontSize="17" fontWeight="bold" width="100%" />
-					<display:ImageButton id="physicalButton"
-										 source="{DisplayUtil.physicalNodeIcon}"
+					<display:ImageButton2 id="physicalButton"
+										 icon="{DisplayUtil.physicalNodeIcon}"
 										 click="DisplayUtil.viewPhysicalNode(node.physicalNode)"
 										 toolTip="View physical node" visible="false" />
-					<display:ImageButton id="rspecButton"
-										 source="{DisplayUtil.pageWhiteIcon}"
+					<display:ImageButton2 id="rspecButton"
+										 icon="{DisplayUtil.pageWhiteIcon}"
 										 click="viewRspec()"
 										 toolTip="View the most recent valid RSPEC" />
 				</s:HGroup>
@@ -316,7 +316,7 @@
 		</mx:GridRow>
 	</mx:Grid>
 	<display:controlBarContent>
-		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.cancelIcon}" click="closeWindow();"/>
-		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();"/>
+		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.cancelIcon}" click="closeWindow();" height="24" />
+		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" height="24" />
 	</display:controlBarContent>
 </display:DefaultWindow>

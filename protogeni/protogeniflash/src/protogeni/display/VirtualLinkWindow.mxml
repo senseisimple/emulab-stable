@@ -67,7 +67,7 @@
 			</mx:GridItem>
 			<mx:GridItem width="100%">
 				<mx:VBox width="100%">
-					<mx:Button id="interface1Button"
+					<mx:Button id="interface1Button" height="24"
 							   label="{(pointLink.interfaces.getItemAt(0) as VirtualInterface).virtualNode.physicalNode.name}"
 							   click="DisplayUtil.viewPhysicalNode((pointLink.interfaces.getItemAt(0) as VirtualInterface).virtualNode.physicalNode)" />
 				</mx:VBox>
@@ -80,7 +80,7 @@
 				</mx:VBox>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<mx:Button id="interface2Button"
+				<mx:Button id="interface2Button" height="24"
 						   label="{(pointLink.interfaces.getItemAt(1) as VirtualInterface).virtualNode.physicalNode.name}"
 						   click="DisplayUtil.viewPhysicalNode((pointLink.interfaces.getItemAt(1) as VirtualInterface).virtualNode.physicalNode)" />
 				<mx:VBox width="100%">

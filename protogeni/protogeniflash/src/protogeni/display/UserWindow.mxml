@@ -140,11 +140,11 @@
 			</mx:GridRow>
 		</mx:Grid>
 		<s:NavigatorContent height="100%" width="100%" label="SSL Certificate">
-			<s:TextArea id="sslPem" text="{user.sslPem}" width="100%" height="100%" />
+			<mx:TextArea id="sslPem" text="{user.sslPem}" width="100%" height="100%" />
 		</s:NavigatorContent>
 	</mx:TabNavigator>
 	<display:controlBarContent>
-		<s:Button id="okButton" label="OK" click="save(); closeWindow();" />
-		<s:Button label="Cancel" click="refresh(); closeWindow();" />
+		<s:Button id="okButton" label="OK" click="save(); closeWindow();" height="24" />
+		<s:Button label="Cancel" click="refresh(); closeWindow();" height="24" />
 	</display:controlBarContent>
 </display:DefaultWindow>

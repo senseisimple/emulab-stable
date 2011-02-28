@@ -40,7 +40,10 @@ package protogeni.display
 		
 		public function showWindow():void
 		{
-			PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, false);
+			if(!this.isPopUp)
+				PopUpManager.addPopUp(this, FlexGlobals.topLevelApplication as DisplayObject, false);
+			else
+				PopUpManager.bringToFront(this);				
 			PopUpManager.centerPopUp(this);
 		}
 		

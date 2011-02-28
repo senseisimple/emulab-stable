@@ -5,9 +5,11 @@
 						title="GENI Managers"
 						width="270" height="360"
 						defaultButton="{okButton}"
-						resize="cmVbox.height = this.height - 108"
 						close="closeWindow()"
 						contentCreationComplete="onCreationComplete()">
+	<display:layout>
+		<s:VerticalLayout />
+	</display:layout>
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
@@ -53,6 +55,14 @@
 			import protogeni.resources.GeniManager;
 			
 			public function success():void {
+				for(var i:int = 0; i < cmVbox.numElements; i++)
+				{
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
+					var checkboxCm:CheckBox = cmHgroup.getElementAt(0) as CheckBox;
+					var buttonCm:Button = cmHgroup.getElementAt(1) as Button;
+					(buttonCm.data as GeniManager).Show = checkboxCm.selected;
+				}
+				
 				okButton.enabled = false;
 				Main.geniHandler.mapHandler.drawMap();
 			}
@@ -76,11 +86,12 @@
 				var existingCms:ArrayCollection = new ArrayCollection();
 				
 				// Remove non-valid CMs
-				for(var i:int = 0; i < cmVbox.getChildren().length; i++)
+				for(var i:int = 0; i < cmVbox.numElements; i++)
 				{
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
 					var found:Boolean = false;
-					var checkboxCm:CheckBox = (cmVbox.getChildAt(i) as HBox).getChildAt(0) as CheckBox;
-					var buttonCm:Button = (cmVbox.getChildAt(i) as HBox).getChildAt(1) as Button;
+					var checkboxCm:CheckBox = cmHgroup.getElementAt(0) as CheckBox;
+					var buttonCm:Button = cmHgroup.getElementAt(1) as Button;
 					for each(var testGm:GeniManager in Main.geniHandler.GeniManagers)
 					{
 						if(buttonCm.label == testGm.Hrn)
@@ -98,7 +109,7 @@
 					}
 					if(!found)
 					{
-						cmVbox.removeChildAt(i);
+						cmVbox.removeElementAt(i);
 						i--;
 					}
 				}
@@ -114,10 +125,11 @@
 			{
 				this.validateNow();
 				var max:int = this.width;
-				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				for(var i:int = 0; i < cmVbox.numElements; i++)
 				{
-					if((cmHbox.minWidth+50) > max)
-						max = (cmHbox.minWidth+50);
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
+					if((cmHgroup.minWidth+50) > max)
+						max = (cmHgroup.minWidth+50);
 				}
 				this.width = max;
 				this.validateNow();
@@ -126,12 +138,13 @@
 			public function Reset(e:GeniEvent):void
 			{
 				var gm:GeniManager = e.changedObject as GeniManager;
-				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				for(var i:int = 0; i < cmVbox.numElements; i++)
 				{
-					var cmButton:Button = cmHbox.getChildAt(1) as Button;
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
+					var cmButton:Button = cmHgroup.getElementAt(1) as Button;
 					if(gm.Hrn == cmButton.label)
 					{
-						updateCmHbox(cmHbox, gm);
+						updateCmHbox(cmHgroup, gm);
 						break;
 					}
 				}
@@ -139,14 +152,15 @@
 			
 			public function ResetAll(junk:* = null):void
 			{
-				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				for(var i:int = 0; i < cmVbox.numElements; i++)
 				{
-					var cmButton:Button = cmHbox.getChildAt(1) as Button;
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
+					var cmButton:Button = cmHgroup.getElementAt(1) as Button;
 					for each(var gm:GeniManager in Main.geniHandler.GeniManagers )
 					{
 						if(gm.Hrn == cmButton.label)
 						{
-							updateCmHbox(cmHbox, gm);
+							updateCmHbox(cmHgroup, gm);
 							break;
 						}
 					}
@@ -155,22 +169,23 @@
 			
 			public function BlankAll():void
 			{
-				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				for(var i:int = 0; i < cmVbox.numElements; i++)
 				{
-					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-					var cmInfo:Button = cmHbox.getChildAt(1) as Button;
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
+					var cmCheckbox:CheckBox = cmHgroup.getElementAt(0) as CheckBox;
+					var cmInfo:Button = cmHgroup.getElementAt(1) as Button;
 					cmInfo.styleName = "unknownStyle";
 					cmInfo.setStyle("icon", DisplayUtil.flagOrangeIcon);
 				}
 			}
 			
-			public function updateCmHbox(cmHbox:HBox, gm:GeniManager):void
+			public function updateCmHbox(cmHbox:HGroup, gm:GeniManager):void
 			{
-				var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
-				var cmInfo:Button = cmHbox.getChildAt(1) as Button;
+				var cmCheckbox:CheckBox = cmHbox.getElementAt(0) as CheckBox;
+				var cmInfo:Button = cmHbox.getElementAt(1) as Button;
 				var cmGoto:ImageButton;
-				if(cmHbox.numChildren == 3)
-					cmGoto = cmHbox.getChildAt(2) as ImageButton;
+				if(cmHbox.numElements == 3)
+					cmGoto = cmHbox.getElementAt(2) as ImageButton;
 				
 				if(gm.Status == GeniManager.STATUS_FAILED) {
 					cmInfo.styleName = "failedStyle";
@@ -185,7 +200,7 @@
 							function openGm():void {
 								navigateToURL(new URLRequest(gm.VisitUrl()), "_blank");
 							});
-						cmHbox.addChild(cmGoto);
+						cmHbox.addElement(cmGoto);
 					}
 				}
 				else if(gm.Status == GeniManager.STATUS_UNKOWN) {
@@ -209,30 +224,33 @@
 			
 			public function selectAll():void
 			{
-				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				for(var i:int = 0; i < cmVbox.numElements; i++)
 				{
-					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
+					var cmCheckbox:CheckBox = cmHgroup.getElementAt(0) as CheckBox;
 					cmCheckbox.selected = true;
 					//cmCheckbox.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false, false));
 				}
 				for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
 				gm.Show = true;
-				okButton.enabled = cmVbox.getChildren().length > 0;
+				okButton.enabled = cmVbox.numElements > 0;
 			}
 			
 			public function addGm(gm:GeniManager):void
 			{
-				var cmHbox:HBox = new HBox();
+				var cmHbox:HGroup = new HGroup();
 				cmHbox.percentWidth = 100;
+				cmHbox.verticalAlign = "middle";
 				var cmCheckbox:CheckBox = new CheckBox();
 				cmCheckbox.setStyle("skinClass", protogeni.display.skins.CheckBoxSkin);
 				cmCheckbox.selected = gm.Show;
 				//cmCheckbox.label = gm.Hrn;
-				cmHbox.addChild(cmCheckbox);
+				cmHbox.addElement(cmCheckbox);
 				
 				var cmInfo:Button = DisplayUtil.getButton();
 				cmInfo.label = gm.Hrn;
-				cmHbox.addChild(cmInfo);
+				cmInfo.data = gm;
+				cmHbox.addElement(cmInfo);
 				
 				updateCmHbox(cmHbox, gm);
 				cmCheckbox.addEventListener(MouseEvent.CLICK,
@@ -247,31 +265,37 @@
 					function openCm():void {
 						DisplayUtil.viewGeniManager(gm);
 					});
-				cmVbox.addChild(cmHbox);
+				cmVbox.addElement(cmHbox);
 				updateWidth();
 			}
 			
 			public function selectAllChange():void
 			{
-				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				for(var i:int = 0; i < cmVbox.numElements; i++)
 				{
-					(cmHbox.getChildAt(0) as CheckBox).selected = selectAllCheckBox.selected;
+					var cmHgroup:HGroup = cmVbox.getElementAt(i) as HGroup;
+					(cmHgroup.getElementAt(0) as CheckBox).selected = selectAllCheckBox.selected;
 				}
 			}
 		]]>
 	</fx:Script>
-	<mx:HBox width="100%" horizontalAlign="right">
+	<s:HGroup width="100%" verticalAlign="middle" paddingTop="2" paddingRight="2" paddingLeft="2">
 		<s:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true" skinClass="protogeni.display.skins.CheckBoxSkin"/>
 		<display:ImageButton2 id="refreshButton" icon="{DisplayUtil.refreshIcon}" click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
 		<mx:Spacer width="100%"/>
-		<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+		<s:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 
-	</mx:HBox>
-	<mx:VBox width="100%" height="200" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2" horizontalScrollPolicy="off">
-	</mx:VBox>
+	</s:HGroup>
+	<s:Scroller width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" id="cmVbox" gap="2" paddingLeft="2" paddingRight="2" paddingTop="2" paddingBottom="2" />
+	</s:Scroller>
+	<display:controlBarLayout>
+		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
+	</display:controlBarLayout>
 	<display:controlBarContent>
-		<mx:Spacer width="100%"/>
-		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" click="closeWindow();" height="24" />
-		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" enabled="false" height="24" />
+		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" height="24"
+				   click="closeWindow();" />
+		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" height="24"
+				   click="success();" enabled="false" />
 	</display:controlBarContent>
 </display:DefaultWindow>

@@ -218,6 +218,14 @@
 		[Embed(source="../../../images/wand.png")]
 		public static var actionIcon:Class;
 		
+		[Bindable]
+		[Embed(source="../../../images/ssl_certificates.png")]
+		public static var sslIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/keyboard.png")]
+		public static var keyboardIcon:Class;
+		
 		public static function getLabel(text:String):Label
 		{
 			var l:Label = new Label();

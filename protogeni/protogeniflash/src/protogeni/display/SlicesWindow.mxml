@@ -11,6 +11,7 @@
 		<![CDATA[
 			import mx.controls.Alert;
 			import mx.controls.Button;
+			import mx.events.FlexEvent;
 			
 			import protogeni.GeniEvent;
 			import protogeni.resources.Slice;
@@ -18,7 +19,7 @@
 			public function openFirst():void {
 				refreshView();
 				init();
-				focusManager.setFocus(sliceName);
+				focusManager.setFocus(sliceName.textInput);
 			}
 			
 			public function init():void
@@ -33,7 +34,7 @@
 				super.closeWindow(event);
 			}
 			
-			public function createSlice():void
+			public function createSlice(junk:* = null):void
 			{
 				if(Main.geniHandler.CurrentUser.credential == null || Main.geniHandler.CurrentUser.credential.length == 0)
 				{
@@ -47,14 +48,14 @@
 					return;
 				}
 				
-				if(sliceName.text.length == 0)
+				if(sliceName.textInput.text.length == 0)
 				{
 					Alert.show("Please input a name for the slice");
-					focusManager.setFocus(sliceName);
+					focusManager.setFocus(sliceName.textInput);
 					return;
 				}
 				
-				Main.geniHandler.requestHandler.createSlice(sliceName.text);
+				Main.geniHandler.requestHandler.createSlice(sliceName.textInput.text);
 			}
 			
 			public function refreshView(junk:* = null):void
@@ -67,13 +68,22 @@
 					slices.addElement(b);
 				}
 			}
+			
+			public function readyInput():void {
+				sliceName.textInput.restrict = "a-zA-Z0-9\\-";
+				sliceName.setEnter(createSlice);
+			}
 		]]>
 	</fx:Script>
 	<s:Scroller width="100%" height="100%">
 		<s:HGroup id="slices" />
 	</s:Scroller>
+	<display:controlBarLayout>
+		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="10" paddingTop="2" />
+	</display:controlBarLayout>
 	<display:controlBarContent>
-		<display:PromptingTextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-" prompt="New slice name..." />
-		<display:ImageButton id="createButton" source="{DisplayUtil.actionIcon}" click="createSlice();" />
+		<s:Label text="Create new" />
+		<display:KeyboardTextInput id="sliceName" width="100%" creationComplete="readyInput()" />
+		<display:ImageButton2 id="createButton" icon="{DisplayUtil.actionIcon}" click="createSlice();" />
 	</display:controlBarContent>
 </display:DefaultWindow>

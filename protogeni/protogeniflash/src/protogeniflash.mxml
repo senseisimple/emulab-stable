@@ -45,6 +45,7 @@
 			import protogeni.communication.RequestRootBundle;
 			import protogeni.communication.RequestTest;
 			import protogeni.display.DisplayUtil;
+			import protogeni.display.KeyboardWindow;
 			import protogeni.resources.Slice;
 			import protogeni.resources.SliceAuthority;
 			
@@ -107,6 +108,7 @@
 			}
 			
 			private function init():void {
+				
 				Main.geniDispatcher = new GeniDispatcher();
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;

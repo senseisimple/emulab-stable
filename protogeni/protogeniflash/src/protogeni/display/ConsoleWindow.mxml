@@ -287,7 +287,7 @@
 		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingTop="2" paddingLeft="2" paddingRight="2" />
 	</display:controlBarLayout>
 	<display:controlBarContent>
-		<s:Label text="View"  fontSize="12" fontWeight="bold" verticalAlign="middle"/>
+		<s:Label text="View" fontWeight="bold" verticalAlign="middle"/>
 		<s:DropDownList id="groupComboBox" requireSelection="true"
 						dataProvider="{groupNames}"
 						selectedIndex="{selectedIndex}"

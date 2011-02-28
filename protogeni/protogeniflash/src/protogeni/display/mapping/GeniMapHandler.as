@@ -2,6 +2,8 @@ package protogeni.display.mapping
 {
 	import com.google.maps.LatLng;
 	import com.google.maps.LatLngBounds;
+	import com.google.maps.PaneId;
+	import com.google.maps.interfaces.IPane;
 	import com.google.maps.overlays.Marker;
 	import com.google.maps.overlays.MarkerOptions;
 	import com.google.maps.overlays.Polyline;
@@ -164,7 +166,7 @@ package protogeni.display.mapping
 		            e.stopImmediatePropagation();
 		            DisplayUtil.viewPhysicalLinkGroup(drawGroup)
 		        });
-		        
+
 		  		map.addOverlay(t);
 				linkLabelOverlays.push(t);
 	    	} else {
@@ -247,15 +249,14 @@ package protogeni.display.mapping
 	    }
 	    
 	    public function drawMap(junk:* = null):void {
-			if(!t.running) {
-				drawMapNow();
+			if(!t.running)
 				t.start();
-			}
 			//else
 			//	Main.log.appendMessage(new LogMessage("", "Skipping drawing map"));
 	    }
 		
 		public function timerHandler(event:TimerEvent):void {
+			drawMapNow();
 			t.reset();
 		}
 		

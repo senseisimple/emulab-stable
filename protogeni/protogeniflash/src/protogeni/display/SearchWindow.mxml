@@ -13,11 +13,12 @@
 	<fx:Script>
 		<![CDATA[
 			import mx.core.IVisualElement;
+			import mx.events.FlexEvent;
 			
 			protected function search():void
 			{
 				resultsBox.removeAllElements();
-				var results:Array = Main.geniHandler.search(searchText.text, matchCheck.selected);
+				var results:Array = Main.geniHandler.search(searchField.textInput.text, matchCheck.selected);
 				for each(var d:DisplayObject in results)
 					resultsBox.addElement(d as IVisualElement);
 				if(results.length == 0)
@@ -27,7 +28,7 @@
 	</fx:Script>
 
 	<s:HGroup width="100%">
-		<mx:TextInput id="searchText" width="100%" enter="search()" height="24"/>
+		<display:KeyboardTextInput id="searchField" width="100%" creationComplete="searchField.setEnter(search)" />
 		<display:ImageButton2 icon="{DisplayUtil.searchIcon}" click="search()" />
 	</s:HGroup>
 	<s:HGroup width="100%">

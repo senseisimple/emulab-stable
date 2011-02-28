@@ -3,7 +3,7 @@
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
 		  width="170" height="160"
-		  horizontalAlign="center" gap="2">
+		  horizontalAlign="center" gap="2" xmlns:display="protogeni.display.*">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
@@ -109,8 +109,9 @@
 		<s:VGroup width="100%" height="100%" id="nodeGroupButtonsVbox" gap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
 	</s:Scroller>
 	<s:HGroup>
-		<mx:Button label="All" id="allButton" click="DisplayUtil.viewNodeCollection(nodes);" />
-		<mx:Button label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
+		<mx:Button label="All" id="allButton" height="24"
+				   click="DisplayUtil.viewNodeCollection(nodes);" />
+		<display:ImageButton2 label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
 	</s:HGroup>
 
 </s:VGroup>

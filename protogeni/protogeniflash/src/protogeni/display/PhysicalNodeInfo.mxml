@@ -210,16 +210,16 @@
 			</mx:GridItem>
 			<mx:GridItem width="100%">
 				<s:Label text="{node.name}" fontSize="17" fontWeight="bold" width="100%" />
-				<display:ImageButton id="locateButton"
-									 source="{DisplayUtil.mapIcon}"
+				<display:ImageButton2 id="locateButton"
+									  icon="{DisplayUtil.mapIcon}"
 									 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
 									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="componentButton"
-									 source="{DisplayUtil.pageWhiteCodeIcon}"
+				<display:ImageButton2 id="componentButton"
+									  icon="{DisplayUtil.pageWhiteCodeIcon}"
 									 click="viewComponentRspec()"
 									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="sliverButton"
-									 source="{DisplayUtil.pageCodeIcon}"
+				<display:ImageButton2 id="sliverButton"
+									 icon="{DisplayUtil.pageCodeIcon}"
 									 click="viewSliverRspec()"
 									 toolTip="View Request RSPEC" visible="false" />
 			</mx:GridItem>

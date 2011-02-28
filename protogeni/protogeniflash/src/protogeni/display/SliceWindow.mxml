@@ -170,10 +170,10 @@
 				
 				if(isCreated)
 				{
-					this.rspecButton.source = DisplayUtil.pageWhiteCodeIcon;
+					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteCodeIcon);
 					this.rspecButton.toolTip = "View RSPEC(s) from the created sliver(s)";
 				} else {
-					this.rspecButton.source = DisplayUtil.pageWhiteIcon;
+					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteIcon);
 					this.rspecButton.toolTip = "Sliver(s) not created yet";
 				}
 				
@@ -321,29 +321,29 @@
 		]]>
 	</fx:Script>
 	
-	<s:HGroup width="100%">
+	<s:HGroup width="100%" verticalAlign="middle">
 		<s:Label id="hrnLabel" text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" />
 		<s:Rect width="100%"/>
 		<s:Label id="urnLabel" text="{sliceCanvas.slice.urn}" />
-		<display:ImageButton id="rspecButton"
-							 source="{DisplayUtil.pageWhiteIcon}"
+		<display:ImageButton2 id="rspecButton"
+							 icon="{DisplayUtil.pageWhiteIcon}"
 							 click="viewRspecs()"
 							 toolTip="View the most recent valid RSPEC" />
-		<display:ImageButton id="previewRspecButton"
-							 source="{DisplayUtil.pageCodeIcon}"
+		<display:ImageButton2 id="previewRspecButton"
+							  icon="{DisplayUtil.pageCodeIcon}"
 							 click="previewRspecs()"
 							 toolTip="Preview the Request RSPEC" />
 	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
 		<mx:VBox height="100%" verticalGap="2">
-			<mx:ComboBox id="selectCm" width="100%" dataProvider="{cms}" change="loadNodes()" />
-			<s:CheckBox label="Hide unavailable" selected="true" id="hideUnavailableCheckBox" click="loadNodes()"/>
-			<mx:List width="100%" height="100%" id="listNodes"
+			<mx:ComboBox id="selectCm" width="100%" dataProvider="{cms}" change="loadNodes()" height="24" />
+			<s:CheckBox label="Hide unavailable" selected="true" id="hideUnavailableCheckBox" click="loadNodes()" skinClass="protogeni.display.skins.CheckBoxSkin"/>
+			<mx:List width="100%" height="100%" id="listNodes" rowHeight="24"
 					 dataProvider="{nodes}"
 					 labelField="name" dragEnabled="true"
 					 iconFunction="assignAvailableIconPhysical">
 			</mx:List>
-			<mx:List width="100%" height="46" id="listNodesPredefined"
+			<mx:List width="100%" height="50" id="listNodesPredefined" rowHeight="24"
 					 dataProvider="{nodesPredefined}"
 					 labelField="id" dragEnabled="true"
 					 iconFunction="assignAvailableIcon">
@@ -351,15 +351,30 @@
 		</mx:VBox>
 		<display:SliceCanvas id="sliceCanvas" hostWindow="{this}" />
 	</mx:HDividedBox>
-	
+	<display:controlBarLayout>
+		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
+	</display:controlBarLayout>
 	<display:controlBarContent>
-		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
-		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
-		<s:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
-		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
+		<mx:Button id="createButton" toolTip="Create slivers" label="Create" height="24"
+				   icon="{DisplayUtil.actionIcon}"
+				   click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
+		<display:ImageButton2 id="refreshButton" toolTip="Refresh slivers"
+							  click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"
+							  icon="{DisplayUtil.refreshIcon}"/>
+		<s:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" 
+					skinClass="protogeni.display.skins.CheckBoxSkin" />
+		<display:ImageButton2 id="deleteButton" toolTip="Delete slivers"
+							  click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
+							  icon="{DisplayUtil.deleteIcon}"/>
 		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
-		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
-		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
+		<display:ImageButton2 id="startButton" toolTip="Start slivers"
+							  click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
+							  icon="{DisplayUtil.playIcon}"/>
+		<display:ImageButton2 id="stopButton" toolTip="Stop slivers"
+							  click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
+							  icon="{DisplayUtil.stopIcon}"/>
+		<display:ImageButton2 id="restartButton" toolTip="Restart slivers"
+							  click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
+							  icon="{DisplayUtil.repeatIcon}"/>
 	</display:controlBarContent>
 </display:DefaultWindow>
