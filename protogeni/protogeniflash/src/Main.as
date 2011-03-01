@@ -46,8 +46,8 @@
 	
 	public static function checkLoadCrossDomain(url:String, protogeniSite:Boolean = true):void
 	{
-		if(Main.useJavascript)
-			return;
+		//if(Main.useJavascript)
+		//	return;
 		var baseUrl:String = Util.tryGetBaseUrl(url);
 		if (visitedSites[baseUrl] != true)
 		{

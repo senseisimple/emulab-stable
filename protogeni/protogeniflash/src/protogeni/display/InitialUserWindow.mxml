@@ -132,7 +132,6 @@
 					waitingIcon.visible = true;
 					getLabel.styleName = "inprogressStyle";
 					getLabel.text = "Waiting...";
-					Security.loadPolicyFile("https://www.emulab.net/protogeni/crossdomain.xml");
 					LogHandler.appendMessage(new LogMessage(url, "Getting SSL Cert", "Attempting to load user SSL certificate", false, LogMessage.TYPE_START));
 					certSuccess = false;
 					asked = false;
