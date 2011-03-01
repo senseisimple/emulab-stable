@@ -64,6 +64,9 @@ package protogeni.communication
 					default:*/
 						var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 						newCm.Hrn = obj.hrn;
+						// Quick hack, giving exceptions in forge
+						if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm")
+							continue;
 						newCm.Url = ts;
 						newCm.Urn = obj.urn;
 						newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);

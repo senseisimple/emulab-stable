@@ -29,7 +29,7 @@ import protogeni.resources.GeniManager;
 	  this.addEventListener(MouseEvent.MOUSE_MOVE, drag);
 	  
 	  if(type == GeniManager.TYPE_PROTOGENI)
-      	addChild(new ProtogeniImg());
+		  addChild(new ProtogeniImg());
 	  else if(type == GeniManager.TYPE_PLANETLAB)
 		  addChild(new PlanetlabImg());
 	  managerType = type;
@@ -46,30 +46,30 @@ import protogeni.resources.GeniManager;
 	  this.filters = [shadow];
 	  
 	  label = newLabel;
-      
-      var radius:int = 60;
-    var labelMc:TextField = new TextField();
-    labelMc.autoSize = TextFieldAutoSize.LEFT;
-	labelMc.textColor = 0xFFFFFF;
-    labelMc.selectable = false;
-    labelMc.border = false;
-    labelMc.embedFonts = false;
-    labelMc.mouseEnabled = false;
-    labelMc.width = radius;
-    labelMc.height = radius;
-    labelMc.text = label;
-    	labelMc.y = 5;
-    if(label.length == 1)
-    	labelMc.x = 11;
-    else if(label.length == 2)
-    	labelMc.x = 8;
-    else
-    	labelMc.x = 6;
-    
-    addChild(labelMc);
-    cacheAsBitmap = true;
-	buttonMode=true;
-	useHandCursor = true;
+	  
+	  var radius:int = 60;
+	  var labelMc:TextField = new TextField();
+	  labelMc.autoSize = TextFieldAutoSize.LEFT;
+	  labelMc.textColor = 0xFFFFFF;
+	  labelMc.selectable = false;
+	  labelMc.border = false;
+	  labelMc.embedFonts = false;
+	  labelMc.mouseEnabled = false;
+	  labelMc.width = radius;
+	  labelMc.height = radius;
+	  labelMc.text = label;
+	  labelMc.y = 5;
+	  if(label.length == 1)
+		  labelMc.x = 11;
+	  else if(label.length == 2)
+		  labelMc.x = 8;
+	  else
+		  labelMc.x = 6;
+	  
+	  addChild(labelMc);
+	  cacheAsBitmap = true;
+	  buttonMode=true;
+	  useHandCursor = true;
   }
   
   private var label:String;

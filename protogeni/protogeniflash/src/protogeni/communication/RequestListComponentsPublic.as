@@ -44,6 +44,8 @@ package protogeni.communication
 				newCm.Urn = s;
 				newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
 				newCm.Hrn = s.split('+')[1];
+				//if(newCm.Hrn != "cron.cct.lsu.edu")
+				//	continue;
 				Main.geniHandler.GeniManagers.add(newCm);
 				newCm.Status = GeniManager.STATUS_INPROGRESS;
 				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
@@ -51,6 +53,7 @@ package protogeni.communication
 			}
 
 			if(!Main.protogeniOnly) {
+				
 				var plc:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 				plc.Url = "https://www.emulab.net/protogeni/plc.xml";
 				plc.Urn = Util.makeUrn("plc","authority","am");
@@ -58,6 +61,7 @@ package protogeni.communication
 				plc.Status = GeniManager.STATUS_INPROGRESS;
 				Main.geniDispatcher.dispatchGeniManagerChanged(plc);
 				newCalls.push(new RequestListResourcesAmPublic(plc));
+				
 			}
 		}
 		else

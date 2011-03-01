@@ -44,10 +44,10 @@
 			return new URLLoader();
 	}
 	
-	public static function checkLoadCrossDomain(url:String, protogeniSite:Boolean = true):void
+	public static function checkLoadCrossDomain(url:String, protogeniSite:Boolean = true, force:Boolean = false):void
 	{
-		//if(Main.useJavascript)
-		//	return;
+		if(Main.useJavascript && !force)
+			return;
 		var baseUrl:String = Util.tryGetBaseUrl(url);
 		if (visitedSites[baseUrl] != true)
 		{

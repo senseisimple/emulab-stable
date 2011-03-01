@@ -71,7 +71,7 @@
 						Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as protogeniflash);
 						return;
 					}
-					if(retrieveCertCheckbox.selected) {
+					if(retrieveCertCheckbox.selected && selectedAuthority.workingCertGet) {
 						closeAfter = true;
 						tryLoadCert(certLocation);
 						return;
@@ -119,7 +119,7 @@
 			public function tryLoadCert(url:String):void
 			{
 				certUrl = url;
-				Main.checkLoadCrossDomain(url);
+				Main.checkLoadCrossDomain(url, true, true);
 				
 				var request:URLRequest = new URLRequest(url); 
 				certLoader = new URLLoader(); 
@@ -207,16 +207,21 @@
 		
 	</fx:Declarations>
 	<s:Label text="Which authority are you registered with?" />
-	<s:DropDownList id="authorities" dataProvider="{Main.geniHandler.GeniAuthorities}" labelField="Name"  width="100%" height="24" requireSelection="true" selectedItem="@{selectedAuthority}"/>
+	<s:DropDownList id="authorities" labelField="Name"  width="100%" height="24" requireSelection="true" 
+					dataProvider="{Main.geniHandler.GeniAuthorities}"
+					selectedItem="@{selectedAuthority}" />
 	<s:VGroup width="100%" height="100%" visible="{Main.useJavascript}" includeInLayout="{Main.useJavascript}">
 		<s:Label text="SSL Certificate Password" />
 		<display:KeyboardTextInput id="passwordField" width="100%" creationComplete="passwordField.textInput.displayAsPassword = true" />
 		<s:HGroup verticalAlign="middle">
-			<s:CheckBox id="retrieveCertCheckbox" label="Automatically retrieve SSL Certificate? If not signed in, please sign in to" selected="true" skinClass="protogeni.display.skins.CheckBoxSkin" />
+			<s:CheckBox id="retrieveCertCheckbox" enabled="{selectedAuthority.workingCertGet}"
+						label="Automatically retrieve SSL Certificate? If not signed in, please sign in to"
+						selected="true"
+						skinClass="protogeni.display.skins.CheckBoxSkin" />
 			<mx:Button label="{selectedAuthority.Authority}"  height="24" click="visitLogin();" />
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle">
-			<mx:Button label="Get SSL Certificate" height="24"
+			<mx:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
 					  icon="{DisplayUtil.sslIcon}"
 					  click="this.tryLoadCert(Util.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
 			<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
