@@ -50,17 +50,6 @@ package protogeni.communication
 			var decodedRspec:String = bytes.toString();
 			
 			cm.Rspec = new XML(decodedRspec);
-			/*try
-			{
-				cm.Rspec = new XML(decodedRspec);
-			} catch(e:Error)
-			{
-				// Remove prefixes and try again
-				var prefixPattern:RegExp = /(<[\/]*)([\w]*:)/gi;
-				decodedRspec = decodedRspec.replace(prefixPattern, "$1");
-				cm.Rspec = new XML(decodedRspec);
-			}*/
-			
 			cm.rspecProcessor.processResourceRspec(cleanup);
 		}
 		else

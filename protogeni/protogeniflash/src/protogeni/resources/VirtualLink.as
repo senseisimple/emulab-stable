@@ -76,7 +76,8 @@
 			}
 			 else
 			 {
-				 if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon) {
+				 if((first.manager.supportsIon && second.manager.supportsIon && Main.useIon) ||
+					 (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)) {
 					 firstInterface = first.allocateInterface();
 					 secondInterface = second.allocateInterface();
 					 if(firstInterface == null || secondInterface == null)
@@ -122,6 +123,8 @@
 			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
 			if (first.id.slice(0, 2) == "pg" || second.id.slice(0, 2) == "pg")
 				bandwidth = 1000000;
+			if(this.isIon() || this.isGpeni())
+				bandwidth = 100000;
 			
 			this.interfaces.addItem(firstInterface);
 			this.interfaces.addItem(secondInterface);
@@ -181,7 +184,8 @@
 				for each(var i:VirtualInterface in interfaces)
 				{
 					if(i.virtualNode.manager != basicManager
-					&& !(i.virtualNode.manager.supportsIon && basicManager.supportsIon))
+					&& !(i.virtualNode.manager.supportsIon && basicManager.supportsIon)
+					&& !(i.virtualNode.manager.supportsGpeni && basicManager.supportsGpeni))
 						return true;
 				}
 			}
@@ -193,6 +197,12 @@
 		{
 			return firstNode.manager != secondNode.manager &&
 				firstNode.manager.supportsIon && secondNode.manager.supportsIon && !_isTunnel;
+		}
+		
+		public function isGpeni():Boolean
+		{
+			return firstNode.manager != secondNode.manager &&
+				firstNode.manager.supportsGpeni && secondNode.manager.supportsGpeni && !_isTunnel;
 		}
 		
 		public function hasTunnelTo(target:GeniManager) : Boolean

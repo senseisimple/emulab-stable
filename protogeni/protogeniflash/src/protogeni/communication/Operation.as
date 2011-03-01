@@ -22,10 +22,12 @@ package protogeni.communication
   import flash.events.IOErrorEvent;
   import flash.events.ProgressEvent;
   import flash.events.SecurityErrorEvent;
+  import flash.events.TimerEvent;
   import flash.net.URLLoader;
   import flash.net.URLRequest;
   import flash.net.URLRequestMethod;
   import flash.system.Security;
+  import flash.utils.Timer;
   
   import mx.collections.ArrayCollection;
 
@@ -120,6 +122,9 @@ package protogeni.communication
 	{
 		param = new Object();
 	}
+	
+	public var delaySeconds:int = 0;
+	private var delayTimer:Timer;
 
     public function call(newSuccess : Function, newFailure : Function) : void
     {
@@ -127,6 +132,21 @@ package protogeni.communication
 		success = newSuccess;
 		failure = newFailure;
 		
+		if(delaySeconds == 0)
+			makeCall();
+		else {
+			delayTimer = new Timer(delaySeconds*1000, 1);
+			delayTimer.addEventListener(TimerEvent.TIMER, delayedCall);
+			delayTimer.start();
+		}
+    }
+	
+	public function delayedCall(e:TimerEvent):void {
+		delayTimer.removeEventListener(TimerEvent.TIMER, delayedCall);
+		makeCall();
+	}
+	
+	private function makeCall():void {
 		switch(type)
 		{
 			case XMLRPC:
@@ -155,9 +175,9 @@ package protogeni.communication
 				break;
 			case HTTP:
 				var request:URLRequest = new URLRequest(url);
-//				request.method = URLRequestMethod.GET;
+				//				request.method = URLRequestMethod.GET;
 				loader = Main.GetLoader();
-//				loader.dataFormat = URLLoaderDataFormat.TEXT;
+				//				loader.dataFormat = URLLoaderDataFormat.TEXT;
 				loader.addEventListener(Event.COMPLETE, callSuccess);
 				loader.addEventListener(ErrorEvent.ERROR, callFailure);
 				loader.addEventListener(IOErrorEvent.IO_ERROR, callFailure);
@@ -176,8 +196,7 @@ package protogeni.communication
 			default:
 				throw Error("Unknown Operation type");
 		}
-      
-    }
+	}
 	
 	public function httpStatus(event:HTTPStatusEvent):void
 	{

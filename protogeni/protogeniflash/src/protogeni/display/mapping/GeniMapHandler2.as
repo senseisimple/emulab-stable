@@ -16,6 +16,7 @@ package protogeni.display.mapping
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.Slice;
+	import protogeni.resources.VirtualNode;
 
 	public class GeniMapHandler2
 	{
@@ -99,7 +100,7 @@ package protogeni.display.mapping
 		private static var CLUSTER : int = 2;
 		private static var DONE : int = 3;
 		
-		private static var MAX_WORK_MANAGER : int = 15;
+		private static var MAX_WORK_MANAGER : int = 10000;// 15;
 		
 		private var myIndexManager:int;
 		private var myStateManager:int;
@@ -189,7 +190,7 @@ package protogeni.display.mapping
 			drawMapNow();
 		}
 		
-		private static var MAX_WORK_DRAW : int = 15;
+		private static var MAX_WORK_DRAW : int = 10000;// 15;
 		
 		public var myIndexDraw:int;
 		public var myStateDraw:int;
@@ -270,7 +271,7 @@ package protogeni.display.mapping
 					return;
 			}
 
-			myStateDraw = DONE;
+			myStateDraw = CLUSTER;
 			myIndexDraw = 0;
 			
 			// Remove and do calculations

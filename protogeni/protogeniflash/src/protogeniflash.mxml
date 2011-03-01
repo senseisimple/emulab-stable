@@ -140,8 +140,6 @@
 					DisplayUtil.viewManagersWindow();
 				}
 				
-				//Main.geniHandler.requestHandler.pushRequest(new RequestTest());
-				
 				// Load the certificate bundle
 				if(Main.useJavascript) {
 					loadLocalBundleData();

@@ -208,6 +208,7 @@ package protogeni.resources
 						newDiskImage.os = ix.@os;
 						newDiskImage.description = ix.@description;
 						newDiskImage.version = ix.@version;
+						newDiskImage.isDefault = ix.@default == "true";
 						n.diskImages.push(newDiskImage);
 					}
 				}
@@ -659,13 +660,23 @@ package protogeni.resources
 				
 				if(vl.isIon()) {
 					for each(s in vl.slivers) {
-						var componentHopXml:XML = <component_hop />;
-						componentHopXml.@component_urn = Util.makeUrn(s.manager.Authority, "link", "ion");
+						var componentHopIonXml:XML = <component_hop />;
+						componentHopIonXml.@component_urn = Util.makeUrn(s.manager.Authority, "link", "ion");
 						interfaceRefXml = <interface_ref />;
 						interfaceRefXml.@component_node_urn = Util.makeUrn(s.manager.Authority, "node", "ion");
 						interfaceRefXml.@component_interface_id = "eth0";
-						componentHopXml.appendChild(interfaceRefXml);
-						linkXml.appendChild(componentHopXml);
+						componentHopIonXml.appendChild(interfaceRefXml);
+						linkXml.appendChild(componentHopIonXml);
+					}
+				} else if(vl.isGpeni()) {
+					for each(s in vl.slivers) {
+						var componentHopGpeniXml:XML = <component_hop />;
+						componentHopGpeniXml.@component_urn = Util.makeUrn(s.manager.Authority, "link", "gpeni");
+						interfaceRefXml = <interface_ref />;
+						interfaceRefXml.@component_node_urn = Util.makeUrn(s.manager.Authority, "node", "gpeni");
+						interfaceRefXml.@component_interface_id = "eth0";
+						componentHopGpeniXml.appendChild(interfaceRefXml);
+						linkXml.appendChild(componentHopGpeniXml);
 					}
 				}
 

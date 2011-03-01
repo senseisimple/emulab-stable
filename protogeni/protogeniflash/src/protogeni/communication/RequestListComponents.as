@@ -72,6 +72,8 @@ package protogeni.communication
 						newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
 						if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
 							newCm.supportsIon = true;
+						if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
+							newCm.supportsGpeni = true;
 						Main.geniHandler.GeniManagers.add(newCm);
 						newGm = newCm;
 				//}

@@ -116,15 +116,15 @@
 		
 		public function getDiskImageShort():String
 		{
-			if(diskImage.indexOf("urn:publicid:IDN+emulab.net+image+emulab-ops//") > -1)
-				return diskImage.replace("urn:publicid:IDN+emulab.net+image+emulab-ops//", "");
+			if(diskImage.indexOf("urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//") > -1)
+				return diskImage.replace("urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//", "");
 			else
 				return diskImage;
 		}
 		
 		public function setDiskImageFromOSID(osid:String):void
 		{
-			this.diskImage = "urn:publicid:IDN+emulab.net+image+emulab-ops//" + osid;
+			this.diskImage = "urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//" + osid;
 		}
 		
 		public function setDiskImage(img:String):void

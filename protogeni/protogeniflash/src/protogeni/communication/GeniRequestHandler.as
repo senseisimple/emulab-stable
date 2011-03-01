@@ -135,11 +135,21 @@
 				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 				
 				// Create
+				var addDelay:Boolean = false;
 				for each(var sliver:Sliver in newSlivers) {
+					var request:Request;
 					if(sliver.manager is AggregateManager)
-						pushRequest(new RequestSliverCreateAm(sliver));
+						request = new RequestSliverCreateAm(sliver);
 					else if(sliver.manager is ProtogeniComponentManager)
-						pushRequest(new RequestSliverCreate(sliver));
+						request = new RequestSliverCreate(sliver);
+					
+					// Add a delay for the other slivers in case there is any stitching
+					if(addDelay)
+						request.op.delaySeconds = 15;
+					else
+						addDelay = true;
+					
+					pushRequest(request);
 				}
 					
 				// Update
@@ -239,6 +249,7 @@
 				var start:Request = queue.nextAndProgress();
 				start.running = true;
 				var op:Operation = start.start();
+				start.numTries++;
 				op.call(complete, failure);
 				Main.Application().setStatus(start.name, false);
 				LogHandler.appendMessage(new LogMessage(op.getUrl(), start.name, op.getSent(), false, LogMessage.TYPE_START));
@@ -388,7 +399,8 @@
 			{
 				if (next != null)
 					queue.push(next);
-				node.cleanup();
+				if(next != node)
+					node.cleanup();
 			}
 			
 			tryNext();

@@ -44,6 +44,7 @@ package protogeni.resources
 		public var Rspec:XML = null;
 		
 		public var supportsIon:Boolean = false;
+		public var supportsGpeni:Boolean = false;
 		
 		[Bindable]
 		public var Show : Boolean = true;

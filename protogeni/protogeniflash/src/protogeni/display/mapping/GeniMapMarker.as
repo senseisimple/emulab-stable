@@ -16,6 +16,7 @@ package protogeni.display.mapping
 	import mx.events.FlexEvent;
 	
 	import protogeni.display.DisplayUtil;
+	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PhysicalNodeGroupCollection;
 	
@@ -93,7 +94,6 @@ package protogeni.display.mapping
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-18, -18)
 				}));
-				
 
 				nodeGroups.Add(nodeGroup);
 				info = groupInfo;

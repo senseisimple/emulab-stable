@@ -335,8 +335,12 @@
 							 toolTip="Preview the Request RSPEC" />
 		<s:CheckBox id="ionCheckbox"
 					skinClass="protogeni.display.skins.CheckBoxSkin" selected="{Main.useIon}"
-					label="Use ION when available"
+					label="Use ION"
 					valueCommit="Main.useIon = ionCheckbox.selected" />
+		<s:CheckBox id="pgeniCheckbox"
+					skinClass="protogeni.display.skins.CheckBoxSkin" selected="{Main.useGpeni}"
+					label="Use GPENI"
+					valueCommit="Main.useGpeni = pgeniCheckbox.selected" />
 	</s:HGroup>
 	<mx:HDividedBox width="100%" height="100%">
 		<mx:VBox height="100%" verticalGap="2">

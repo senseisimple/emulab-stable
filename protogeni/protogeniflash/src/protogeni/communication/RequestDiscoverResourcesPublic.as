@@ -14,9 +14,13 @@
 
 package protogeni.communication
 {
+  import flash.utils.ByteArray;
+  
+  import mx.utils.Base64Decoder;
+  
   import protogeni.Util;
-  import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.GeniManager;
+  import protogeni.resources.ProtogeniComponentManager;
 
   public class RequestDiscoverResourcesPublic extends Request
   {
@@ -34,7 +38,15 @@ package protogeni.communication
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			cm.Rspec = new XML(response);
+			var rspec:String = response as String;
+			if(rspec.charAt(0) != '<') {
+				var decodor:Base64Decoder = new Base64Decoder();
+				decodor.decode(rspec);
+				var bytes:ByteArray = decodor.toByteArray();
+				bytes.uncompress();
+				rspec = bytes.toString();
+			}
+			cm.Rspec = new XML(rspec);
 			cm.rspecProcessor.processResourceRspec(cleanup);
 		}
 		else

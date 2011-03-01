@@ -14,6 +14,10 @@
 
 package protogeni.communication
 {
+  import com.mattism.http.xmlrpc.MethodFault;
+  
+  import flash.events.ErrorEvent;
+  
   import protogeni.resources.Slice;
   import protogeni.resources.Sliver;
 
@@ -53,20 +57,50 @@ package protogeni.communication
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 
 			return new RequestSliverStatus(sliver);
+		} else if(code == CommunicationUtil.GENIRESPONSE_BUSY) {
+			if(this.numTries == 8) {
+				LogHandler.appendMessage(new LogMessage(this.op.getUrl(), this.name, "Reach limit of retries", true, LogMessage.TYPE_END ));
+				failed();
+			} else {
+				LogHandler.appendMessage(new LogMessage(this.op.getUrl(), this.name, "Preparing to retry", true, LogMessage.TYPE_END ));
+				op.delaySeconds = 10;
+				this.forceNext = true;
+				return this;
+			}
+			
 		}
 		else
 		{
-			// Cancel remaining calls
-			var tryDeleteNode:RequestQueueNode = this.node.next;
-			while(tryDeleteNode != null && tryDeleteNode is RequestSliverCreate && (tryDeleteNode as RequestSliverCreate).sliver.slice == sliver.slice)
-			{
-				Main.geniHandler.requestHandler.remove(tryDeleteNode.item);
-				tryDeleteNode = tryDeleteNode.next;
-			}
-			
-			// Show the error
-			LogHandler.viewConsole();
+			failed();
 		}
+		
+		return null;
+	}
+	
+	private function failed():void {
+		// Remove any pending SliverCreate calls
+		sliver.status = Sliver.STATUS_FAILED;
+		sliver.state = Sliver.STATE_FAILED;
+		
+		// Cancel remaining calls
+		var tryDeleteNode:RequestQueueNode = this.node.next;
+		while(tryDeleteNode != null && tryDeleteNode.item is RequestSliverCreate && (tryDeleteNode.item as RequestSliverCreate).sliver.slice == sliver.slice)
+		{
+			(tryDeleteNode.item as RequestSliverCreate).sliver.status = Sliver.STATUS_FAILED;
+			(tryDeleteNode.item as RequestSliverCreate).sliver.state = Sliver.STATE_FAILED;
+			Main.geniHandler.requestHandler.remove(tryDeleteNode.item, false);
+			tryDeleteNode = tryDeleteNode.next;
+		}
+		
+		Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
+		
+		// Show the error
+		LogHandler.viewConsole();
+	}
+	
+	override public function fail(event:ErrorEvent, fault:MethodFault) : *
+	{
+		failed();
 		
 		return null;
 	}

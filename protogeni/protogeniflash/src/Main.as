@@ -87,5 +87,8 @@
 	
 	[Bindable]
 	public static var useIon:Boolean = false;
+	
+	[Bindable]
+	public static var useGpeni:Boolean = false;
   }
 }
