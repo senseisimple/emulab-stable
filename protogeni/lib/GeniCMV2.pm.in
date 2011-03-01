@@ -1554,13 +1554,18 @@ sub ReserveVlanTags($)
     my $taglist     = $argref->{'taglist'};
     my $response;
     my $actualtag;
-    my ($myauth,undef,undef) = GeniHRN::Parse($ENV{'MYURN'});
     # List of vlans to delete after getting the tags.
     my @delete      = ();
     my %linkmap     = ();
 
     require Lan;
 
+    my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($me)) {
+	print STDERR
+	    "Could not find local authority object for $ENV{'MYURN'}\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
     if (! (defined($credentials) && defined($slice_cert) &&
 	   defined($taglist) &&
 	   defined($linkname) && defined($slice_urn) && defined($rspecstr))) {
@@ -1699,8 +1704,8 @@ sub ReserveVlanTags($)
     foreach my $ref (GeniXML::FindNodes("n:component_hop",
 					$linkref)->get_nodelist()) {
 	my $component_urn = GeniXML::GetNodeId($ref);
-	my ($auth,undef,undef) = GeniHRN::Parse($component_urn);
-	if (defined($auth) and $auth eq $myauth) {
+	my ($domain,undef,undef) = GeniHRN::Parse($component_urn);
+	if (defined($domain) and $domain eq $me->domain()) {
 	    $hopref = $ref;
 	    last;
 	}
@@ -1793,8 +1798,8 @@ sub ReserveVlanTags($)
 	    # Get the last two tokens. Not always the right thing to do. 
 	    my $dom = join('.', splice(@tmp, -2, 2));
 
-	    if ($myauth =~ /$dom$/ && $hisauth =~ /$dom$/) {
-		print STDERR "ElabInElab clause is true: $myauth $hisauth\n";
+	    if ($me->domain() =~ /$dom$/ && $hisauth =~ /$dom$/) {
+		print STDERR "ElabInElab clause is true\n";
 
 		my $tag = pop(@tags);
 		if ($vlan->ReserveVlanTag($tag)) {

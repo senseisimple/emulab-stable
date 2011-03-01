@@ -1201,6 +1201,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 			goto bad;
 		    }
 		    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+		    # We seem to ignore this for now, since the node we want
+		    # to use is inside the network data structure.
 		    my $iface_node_urn =
 			GeniXML::GetText("component_node_urn", $ifaceref);
 		    my $iface_iface_id =
@@ -1235,7 +1237,7 @@ sub GetTicketAuxAux($$$$$$$$$)
 					 "$lanname: unknown component_hop");
 			goto bad;
 		    }
-		    my $network_node = Node->Lookup($iface_node_id);
+		    my $network_node = Node->Lookup($network->node_id());
 		    if (!defined($network_node)) {
 			$response =
 			    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
