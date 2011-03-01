@@ -46,7 +46,7 @@ package protogeni.display.mapping {
 		}
 		
 		public override function getDefaultPane(map:IMap):IPane {
-			return map.getPaneManager().getPaneById(PaneId.PANE_FLOAT);
+			return map.getPaneManager().getPaneById(PaneId.PANE_OVERLAYS);
 		}
 		  
 		private function onOverlayAdded(event:MapEvent):void {

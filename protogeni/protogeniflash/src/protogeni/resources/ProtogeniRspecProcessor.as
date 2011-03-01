@@ -46,6 +46,15 @@ package protogeni.resources
 			nodes = gm.Rspec.elements(nodeName);
 			nodeName = new QName(gm.Rspec.namespace(), "link");
 			links = gm.Rspec.elements(nodeName);
+
+			switch(nodeName.uri) {
+				case CommunicationUtil.rspec01Namespace:
+				case CommunicationUtil.rspec02Namespace:
+					gm.outputRspecVersion = 0.1;
+					break;
+				case CommunicationUtil.rspec2Namespace:
+					gm.outputRspecVersion = 2;
+			}
 			
 			myAfter = afterCompletion;
 			myIndex = 0;
