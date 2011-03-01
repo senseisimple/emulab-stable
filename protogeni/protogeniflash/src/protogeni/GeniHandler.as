@@ -19,6 +19,7 @@
 	 import protogeni.communication.GeniRequestHandler;
 	 import protogeni.display.DisplayUtil;
 	 import protogeni.display.mapping.GeniMapHandler;
+	 import protogeni.display.mapping.GeniMapHandler2;
 	 import protogeni.resources.GeniManager;
 	 import protogeni.resources.GeniManagerCollection;
 	 import protogeni.resources.PhysicalLink;
@@ -35,10 +36,10 @@
 	public class GeniHandler
 	{
 		[Bindable]
-		public var requestHandler : GeniRequestHandler;
+		public var requestHandler:GeniRequestHandler;
 		
 		[Bindable]
-		public var mapHandler : GeniMapHandler;
+		public var mapHandler:GeniMapHandler;
 		
 		[Bindable]
 		public var CurrentUser:User;
@@ -62,7 +63,7 @@
 		public function GeniHandler()
 		{
 			requestHandler = new GeniRequestHandler();
-			mapHandler = new GeniMapHandler();
+			mapHandler = new GeniMapHandler(Main.Application().map);
 			GeniManagers = new GeniManagerCollection();
 			CurrentUser = new User();
 			unauthenticatedMode = true;

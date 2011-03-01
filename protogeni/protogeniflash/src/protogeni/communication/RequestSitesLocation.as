@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+  import protogeni.GeniEvent;
   import protogeni.resources.PhysicalNode;
   import protogeni.resources.PhysicalNodeGroup;
   import protogeni.resources.PlanetlabAggregateManager;
@@ -35,6 +36,7 @@ package protogeni.communication
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
+			var startTime:Date = new Date();
 			var sitesXml:XML = new XML(response);
 			for each(var siteXml:XML in sitesXml.children()) {
 				var site:Site = plm.getSiteWithHrn(siteXml.@hrn);
@@ -53,9 +55,12 @@ package protogeni.communication
 					}
 				}
 			}
+			
+			if(Main.debugMode)
+				LogHandler.appendMessage(new LogMessage(plm.Url, "Sites " + String((new Date()).time - startTime.time)));
 
+			Main.geniDispatcher.dispatchGeniManagerChanged(plm, GeniEvent.ACTION_POPULATED);
 			Main.geniHandler.mapHandler.drawMap();
-			Main.geniDispatcher.dispatchGeniManagerChanged(plm);
 		}
 		
 		return null;

@@ -7,7 +7,6 @@ package protogeni.resources
 		public var registryUrl:String;
 		public var networkName:String;
 		public var sites:ArrayCollection;
-		public var Authority:String;
 		
 		public function PlanetlabAggregateManager()
 		{

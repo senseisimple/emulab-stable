@@ -28,6 +28,7 @@
 	import protogeni.GeniDispatcher;
 	import protogeni.GeniHandler;
 	import protogeni.Util;
+	import protogeni.display.mapping.GeniMap;
 	
   public class Main
   {

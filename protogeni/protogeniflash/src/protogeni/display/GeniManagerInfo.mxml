@@ -110,20 +110,20 @@
 			</mx:GridItem>
 			<mx:GridItem width="100%">
 				<s:Label text="{gm.Hrn}" fontSize="17" fontWeight="bold" width="100%" />
-				<display:ImageButton id="consoleButton"
-									 source="@Embed('../../../images/application_xp_terminal.png')"
+				<display:ImageButton2 id="consoleButton"
+									  icon="{DisplayUtil.consoleIcon}"
 									 click="LogHandler.viewGroup(gm.Url);"
 									 toolTip="View log messages in the console" />
-				<display:ImageButton id="rpsecButton"
-									 source="@Embed('../../../images/page_white_code.png')"
+				<display:ImageButton2 id="rpsecButton"
+									  icon="@Embed('../../../images/page_white_code.png')"
 									 click="viewRspec()"
 									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="graphInfoButton"
-									 source="@Embed('../../../images/chart_organisation.png')"
+				<display:ImageButton2 id="graphInfoButton"
+									  icon="@Embed('../../../images/chart_organisation.png')"
 									 click="openGraphInfo()"
 									 toolTip="View the graph information" />
-				<display:ImageButton id="messageButton"
-									 source="{DisplayUtil.flagRedIcon}"
+				<display:ImageButton2 id="messageButton"
+									 icon="{DisplayUtil.flagRedIcon}"
 									 click="viewMessage()"
 									 toolTip="View Message" />
 			</mx:GridItem>
@@ -133,7 +133,7 @@
 				<s:Label text="URL" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<s:Button label="{gm.Url}" toolTip="Click to visit URL"
+				<s:Button label="{gm.Url}" toolTip="Click to visit URL" height="24"
 						  click="navigateToURL(new URLRequest(gm.VisitUrl()), '_blank');"/>
 			</mx:GridItem>
 		</mx:GridRow>
@@ -158,7 +158,8 @@
 				<s:Label text="Nodes" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<s:Button id="nodesButton" click="DisplayUtil.viewNodeCollection(new ArrayCollection(gm.AllNodesAsArray()));"/>
+				<s:Button id="nodesButton" height="24"
+						  click="DisplayUtil.viewNodeCollection(new ArrayCollection(gm.AllNodesAsArray()));"/>
 				<s:Label id="availabilityLabel" />
 			</mx:GridItem>
 		</mx:GridRow>
@@ -167,7 +168,8 @@
 				<s:Label text="Last Request" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<s:Button id="lastRequestButton" click="Main.geniHandler.requestHandler.pushRequest(gm.lastRequest)" />
+				<s:Button id="lastRequestButton" height="24"
+						  click="Main.geniHandler.requestHandler.pushRequest(gm.lastRequest)" />
 			</mx:GridItem>
 		</mx:GridRow>
 	</mx:Grid>

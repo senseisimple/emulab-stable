@@ -4,6 +4,11 @@ package protogeni
 	
 	public class GeniEvent extends Event
 	{
+		public static var ACTION_CHANGED:int = 0;
+		public static var ACTION_REMOVING:int = 1;
+		public static var ACTION_CREATED:int = 2;
+		public static var ACTION_POPULATED:int = 3;
+		
 		public static var GENIMANAGER_CHANGED:String = "genimanager_changed";
 		public static var GENIMANAGERS_CHANGED:String = "genimanagers_changed";
 		public static var QUEUE_CHANGED:String = "queue_changed";
@@ -13,12 +18,14 @@ package protogeni
 		public static var SLICES_CHANGED:String = "slices_changed";
 		public static var LOGS_CHANGED:String = "logs_changed";
 		
-		public function GeniEvent(type:String, object:Object = null)
+		public function GeniEvent(type:String, object:Object = null, newAction:int = 0)
 		{
 			super(type);
 			changedObject = object;
+			action = newAction;
 		}
 		
 		public var changedObject:Object = null;
+		public var action:int;
 	}
 }

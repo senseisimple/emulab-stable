@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PlanetlabAggregateManager;
@@ -41,6 +42,7 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			Main.geniHandler.clearComponents();
+
 			for each(var obj:Object in response.value)
 			{
 				var newGm:GeniManager = null;
@@ -64,6 +66,9 @@ package protogeni.communication
 						newCm.Hrn = obj.hrn;
 						newCm.Url = ts;
 						newCm.Urn = obj.urn;
+						newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
+						if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
+							newCm.supportsIon = true;
 						Main.geniHandler.GeniManagers.add(newCm);
 						newGm = newCm;
 				//}
@@ -77,7 +82,7 @@ package protogeni.communication
 				}
 				Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
 			}
-			
+
 			if(!Main.protogeniOnly) {
 				/*
 				var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();

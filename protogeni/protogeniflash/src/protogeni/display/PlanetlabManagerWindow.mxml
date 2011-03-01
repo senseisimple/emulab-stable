@@ -3,7 +3,7 @@
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="PlanetLab Manager Information"
-						height="300" width="500">
+						height="300">
 	<fx:Script>
 		<![CDATA[
 			import protogeni.resources.PlanetlabAggregateManager;

@@ -91,11 +91,11 @@
 		public static var downIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/user.png")]
+		[Embed(source="../../../images/status_online.png")]
 		public static var userIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/user_gray.png")]
+		[Embed(source="../../../images/status_offline.png")]
 		public static var noUserIcon:Class;
 		
 		[Bindable]
@@ -229,6 +229,10 @@
 		[Bindable]
 		[Embed(source="../../../images/keyboard.png")]
 		public static var keyboardIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/system_monitor.png")]
+		public static var consoleIcon:Class;
 		
 		public static function getLabel(text:String):Label
 		{

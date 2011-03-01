@@ -31,7 +31,7 @@ package protogeni.display.mapping
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
 	
-    // Handles adding all the ProtoGENI info to the Google Map component
+	// Handles adding all the ProtoGENI info to the Google Map component
 	public class GeniMapHandler
 	{
 		public var map:GeniMap;
@@ -39,8 +39,9 @@ package protogeni.display.mapping
 		// Timer used to limit frequency of redraws
 		private var t:Timer;
 		
-		public function GeniMapHandler()
+		public function GeniMapHandler(attachMap:GeniMap)
 		{
+			map = attachMap;
 			t = new Timer(1000, 1); // Draw at most once a second
 			t.addEventListener(TimerEvent.TIMER, timerHandler);
 		}
@@ -50,7 +51,7 @@ package protogeni.display.mapping
 		private var clusterer:Clusterer;
 		private var linkLineOverlays:Vector.<Polyline>;
 		private var linkLabelOverlays:Vector.<TooltipOverlay>;
-
+		
 		//private var nodeGroupClusters:ArrayCollection;		
 		
 		public var userResourcesOnly:Boolean = false;
@@ -62,7 +63,7 @@ package protogeni.display.mapping
 			if(a == null) {
 				coords = new Array();
 				for each(var m:GeniMapMarker in Main.geniHandler.mapHandler.markers)
-					coords.push(m.getLatLng());
+				coords.push(m.getLatLng());
 			} else
 				coords = a;
 			
@@ -95,44 +96,44 @@ package protogeni.display.mapping
 		}
 		
 		private function addNodeGroupMarker(g:PhysicalNodeGroup):void
-	    {
-	    	// Create the group to be drawn
-	    	var drawGroup:PhysicalNodeGroup = new PhysicalNodeGroup(g.latitude, g.longitude, g.country, g.owner);
-	    	if(userResourcesOnly) {
-	    		for each(var n:PhysicalNode in g.collection) {
-	    			for each(var vn:VirtualNode in n.virtualNodes)
-	    			{
-	    				if(vn.slivers[0].slice == selectedSlice)
-	    				{
-	    					drawGroup.Add(n);
-	    					break;
-	    				}
-	    			}
-	    		}
-	    	} else {
-	    		drawGroup = g;
-	    	}
-	    	
-	    	if(drawGroup.collection.length > 0) {
-	    		markers.push(new GeniMapMarker(g));
-	    	} else {
-	    		// Draw an empty marker
-	    		var nonodes:Marker = new Marker(
-			      	new LatLng(g.latitude, g.longitude),
-			      	new MarkerOptions({
-			                  strokeStyle: new StrokeStyle({color: 0x666666}),
-			                  fillStyle: new FillStyle({color: 0xCCCCCC, alpha: .8}),
-			                  radius: 8,
-			                  hasShadow: false
-			      	}));
-	
-		        map.addOverlay(nonodes);
-	    	}
-	    }
-	    
-	    public function addPhysicalLink(lg:PhysicalLinkGroup):void {
-	    	// Create the group to be drawn
-	    	var drawGroup:PhysicalLinkGroup = lg;
+		{
+			// Create the group to be drawn
+			var drawGroup:PhysicalNodeGroup = new PhysicalNodeGroup(g.latitude, g.longitude, g.country, g.owner);
+			if(userResourcesOnly) {
+				for each(var n:PhysicalNode in g.collection) {
+					for each(var vn:VirtualNode in n.virtualNodes)
+					{
+						if(vn.slivers[0].slice == selectedSlice)
+						{
+							drawGroup.Add(n);
+							break;
+						}
+					}
+				}
+			} else {
+				drawGroup = g;
+			}
+			
+			if(drawGroup.collection.length > 0) {
+				markers.push(new GeniMapMarker(g));
+			} else {
+				// Draw an empty marker
+				var nonodes:Marker = new Marker(
+					new LatLng(g.latitude, g.longitude),
+					new MarkerOptions({
+						strokeStyle: new StrokeStyle({color: 0x666666}),
+						fillStyle: new FillStyle({color: 0xCCCCCC, alpha: .8}),
+						radius: 8,
+						hasShadow: false
+					}));
+				
+				map.addOverlay(nonodes);
+			}
+		}
+		
+		public function addPhysicalLink(lg:PhysicalLinkGroup):void {
+			// Create the group to be drawn
+			var drawGroup:PhysicalLinkGroup = lg;
 			for each(var v:PhysicalLink in drawGroup.collection)
 			{
 				if(v.rspec.toXMLString().indexOf("ipv4") > -1)
@@ -141,18 +142,18 @@ package protogeni.display.mapping
 					return;
 				}
 			}
-	    	
-	    	if(drawGroup.collection.length > 0 && !userResourcesOnly) {
-	    		// Add line
+			
+			if(drawGroup.collection.length > 0 && !userResourcesOnly) {
+				// Add line
 				var polyline:Polyline = new Polyline([
 					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
 					new LatLng(drawGroup.latitude2, drawGroup.longitude2)
-					], new PolylineOptions({ strokeStyle: new StrokeStyle({
-						color: DisplayUtil.linkBorderColor,
-						thickness: 4,
-						alpha:1})
-					}));
-	
+				], new PolylineOptions({ strokeStyle: new StrokeStyle({
+					color: DisplayUtil.linkBorderColor,
+					thickness: 4,
+					alpha:1})
+				}));
+				
 				map.addOverlay(polyline);
 				linkLineOverlays.push(polyline);
 				
@@ -162,94 +163,94 @@ package protogeni.display.mapping
 				var ll:LatLng = new LatLng((drawGroup.latitude1 + drawGroup.latitude2)/2, (drawGroup.longitude1 + drawGroup.longitude2)/2);
 				
 				var t:TooltipOverlay = new TooltipOverlay(ll, Util.kbsToString(drawGroup.TotalBandwidth()), DisplayUtil.linkBorderColor, DisplayUtil.linkColor);
-		  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
-		            e.stopImmediatePropagation();
-		            DisplayUtil.viewPhysicalLinkGroup(drawGroup)
-		        });
-
-		  		map.addOverlay(t);
+				t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
+					e.stopImmediatePropagation();
+					DisplayUtil.viewPhysicalLinkGroup(drawGroup)
+				});
+				
+				map.addOverlay(t);
 				linkLabelOverlays.push(t);
-	    	} else {
-	    		// Add line
+			} else {
+				// Add line
 				var blankline:Polyline = new Polyline([
 					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
 					new LatLng(drawGroup.latitude2, drawGroup.longitude2)
-					], new PolylineOptions({ strokeStyle: new StrokeStyle({
-						color: 0x666666,
-						thickness: 3,
-						alpha:.8})
-					}));
-
+				], new PolylineOptions({ strokeStyle: new StrokeStyle({
+					color: 0x666666,
+					thickness: 3,
+					alpha:.8})
+				}));
+				
 				map.addOverlay(blankline);
-	    	}
-	    }
-	    
-	    public function addVirtualLink(pl:VirtualLink):void {
-    		// Add line
-    		var backColor:Object = DisplayUtil.linkColor;
-    		var borderColor:Object = DisplayUtil.linkBorderColor;
-    		if(pl.type == "tunnel")
-    		{
-    			backColor = DisplayUtil.tunnelColor;
-    			borderColor = DisplayUtil.tunnelBorderColor;
-    		}
-    		
-    		var current:int = 0;
-    		var node1:PhysicalNode = (pl.interfaces[pl.interfaces.length - 1] as VirtualInterface).virtualNode.physicalNode;
-    		while(current != pl.interfaces.length - 1)
-    		{
-    			var node2:PhysicalNode = (pl.interfaces[current] as VirtualInterface).virtualNode.physicalNode;
-    			
+			}
+		}
+		
+		public function addVirtualLink(pl:VirtualLink):void {
+			// Add line
+			var backColor:Object = DisplayUtil.linkColor;
+			var borderColor:Object = DisplayUtil.linkBorderColor;
+			if(pl.type == "tunnel")
+			{
+				backColor = DisplayUtil.tunnelColor;
+				borderColor = DisplayUtil.tunnelBorderColor;
+			}
+			
+			var current:int = 0;
+			var node1:PhysicalNode = (pl.interfaces[pl.interfaces.length - 1] as VirtualInterface).virtualNode.physicalNode;
+			while(current != pl.interfaces.length - 1)
+			{
+				var node2:PhysicalNode = (pl.interfaces[current] as VirtualInterface).virtualNode.physicalNode;
+				
 				if(node1.owner == node2.owner)
 				{
 					node1 = node2;
 					current++;
 					if(current == pl.interfaces.length)
-    				current = 0;
+						current = 0;
 					continue;
 				}
-					
-    			var firstll:LatLng = new LatLng(node1.GetLatitude(), node1.GetLongitude());
-	    		var secondll:LatLng = new LatLng(node2.GetLatitude(), node2.GetLongitude());
+				
+				var firstll:LatLng = new LatLng(node1.GetLatitude(), node1.GetLongitude());
+				var secondll:LatLng = new LatLng(node2.GetLatitude(), node2.GetLongitude());
 				
 				var polyline:Polyline = new Polyline([
 					firstll,
 					secondll
-					], new PolylineOptions({ strokeStyle: new StrokeStyle({
-						color: borderColor,
-						thickness: 4,
-						alpha:1})
-					}));
-	
+				], new PolylineOptions({ strokeStyle: new StrokeStyle({
+					color: borderColor,
+					thickness: 4,
+					alpha:1})
+				}));
+				
 				map.addOverlay(polyline);
 				linkLineOverlays.push(polyline);
-					
+				
 				// Add point link marker
 				var ll:LatLng = new LatLng((firstll.lat() + secondll.lat())/2, (firstll.lng() + secondll.lng())/2);
 				
 				var t:TooltipOverlay = new TooltipOverlay(ll, Util.kbsToString(pl.bandwidth), borderColor, backColor);
-		  		t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
-		            e.stopImmediatePropagation();
-		            DisplayUtil.viewVirtualLink(pl)
-		        });
-
-		  		map.addOverlay(t);
+				t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
+					e.stopImmediatePropagation();
+					DisplayUtil.viewVirtualLink(pl)
+				});
+				
+				map.addOverlay(t);
 				linkLabelOverlays.push(t);
 				
 				node1 = node2;
 				current++;
 				if(current == pl.interfaces.length)
-    				current = 0;
-    		}
-	    }
-	    
-	    public function drawAll():void {
-	    	drawMap();
-	    	Main.Application().fillCombobox();
-	    }
-	    
+					current = 0;
+			}
+		}
+		
+		public function drawAll():void {
+			drawMap();
+			Main.Application().fillCombobox();
+		}
+		
 		public var drawAfter:Boolean = false;
-	    public function drawMap(junk:* = null):void {
+		public function drawMap(junk:* = null):void {
 			if(!t.running) {
 				drawMapNow();
 				drawAfter = false;
@@ -258,7 +259,7 @@ package protogeni.display.mapping
 				drawAfter = true;
 			//else
 			//	Main.log.appendMessage(new LogMessage("", "Skipping drawing map"));
-	    }
+		}
 		
 		public function timerHandler(event:TimerEvent):void {
 			if(drawAfter) {
@@ -273,6 +274,8 @@ package protogeni.display.mapping
 			
 			if(!map.ready)
 				return;
+			
+			var startTime:Date = new Date();
 			
 			map.closeInfoWindow();
 			map.clearOverlays();
@@ -328,6 +331,9 @@ package protogeni.display.mapping
 				map.addOverlay(marker);
 				attachedMarkers.push(marker);
 			}
+			
+			if(Main.debugMode)
+				LogHandler.appendMessage(new LogMessage("", "Draw " + String((new Date()).time - startTime.time)));
 		}
 	}
 }

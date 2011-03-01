@@ -14,8 +14,8 @@ package protogeni
 		}
 		
 		// EVENTS
-		public function dispatchGeniManagerChanged(gm:GeniManager):void {
-			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGER_CHANGED, gm));
+		public function dispatchGeniManagerChanged(gm:GeniManager, action:int = 0):void {
+			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGER_CHANGED, gm, action));
 		}
 		
 		public function dispatchGeniManagersChanged():void {

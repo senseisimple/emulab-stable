@@ -7,6 +7,7 @@ package protogeni.resources
 	import mx.controls.Alert;
 	import mx.core.FlexGlobals;
 	
+	import protogeni.GeniEvent;
 	import protogeni.Util;
 	import protogeni.communication.CommunicationUtil;
 	
@@ -62,8 +63,6 @@ package protogeni.resources
 			interfaceDictionary = new Dictionary();
 			nodeNameDictionary = new Dictionary();
 			subnodeList = new ArrayCollection();
-			var tla:* = FlexGlobals.topLevelApplication;
-			var s:* = tla.stage;
 			FlexGlobals.topLevelApplication.stage.addEventListener(Event.ENTER_FRAME, parseNext);
 		}
 		
@@ -75,13 +74,19 @@ package protogeni.resources
 				hasslot = true;
 				GeniManager.processing++;
 			}
+			
+			var startTime:Date = new Date();
 			if (myState == NODE_PARSE)	    	
 			{
 				parseNextNode();
+				if(Main.debugMode)
+					LogHandler.appendMessage(new LogMessage(gm.Url, "ParseN " + String((new Date()).time - startTime.time)));
 			}
 			else if (myState == LINK_PARSE)
 			{
 				parseNextLink();
+				if(Main.debugMode)
+					LogHandler.appendMessage(new LogMessage(gm.Url, "ParseL " + String((new Date()).time - startTime.time)));
 			}
 			else if (myState == DONE)
 			{
@@ -95,7 +100,7 @@ package protogeni.resources
 				gm.unavailableNodes = gm.AllNodes.length - gm.availableNodes;
 				gm.percentageAvailable = (gm.availableNodes / gm.totalNodes) * 100;
 				gm.Status = GeniManager.STATUS_VALID;
-				Main.geniDispatcher.dispatchGeniManagerChanged(gm);
+				Main.geniDispatcher.dispatchGeniManagerChanged(gm, GeniEvent.ACTION_POPULATED);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				myAfter();
 			}
@@ -612,7 +617,7 @@ package protogeni.resources
 					linkXml.appendChild(cmXml);
 				}
 				
-				if (gm.inputRspecMinVersion == 0.1 && !vl.isTunnel())
+				if (gm.inputRspecMinVersion == 0.1 && !vl.isTunnel() && !vl.isIon())
 					linkXml.appendChild(XML("<bandwidth>" + vl.bandwidth + "</bandwidth>"));
 				
 				if (vl.isTunnel())
@@ -625,10 +630,9 @@ package protogeni.resources
 						linkXml.appendChild(link_type);
 					}
 				}
-				else {
-					if(gm.inputRspecMinVersion == 0.1)
+				else if(gm.inputRspecMinVersion == 0.1 &&
+						vl.firstNode.manager == vl.secondNode.manager)
 						linkXml.@link_type = "ethernet";
-				}
 				
 				for each (var currentVi:VirtualInterface in vl.interfaces)
 				{
@@ -653,6 +657,18 @@ package protogeni.resources
 					linkXml.appendChild(interfaceRefXml);
 				}
 				
+				if(vl.isIon()) {
+					for each(s in vl.slivers) {
+						var componentHopXml:XML = <component_hop />;
+						componentHopXml.@component_urn = Util.makeUrn(s.manager.Authority, "link", "ion");
+						interfaceRefXml = <interface_ref />;
+						interfaceRefXml.@component_node_urn = Util.makeUrn(s.manager.Authority, "node", "ion");
+						interfaceRefXml.@component_interface_id = "eth0";
+						componentHopXml.appendChild(interfaceRefXml);
+						linkXml.appendChild(componentHopXml);
+					}
+				}
+
 				requestRspec.appendChild(linkXml);
 			}
 			

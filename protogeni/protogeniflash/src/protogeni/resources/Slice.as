@@ -397,17 +397,6 @@
 				}
 			}
 			return "link-" + highest;
-			/*
-			if(l == null)
-				return "link-" + highest;
-			else
-			{
-				if(l.isTunnel())
-					return "tunnel-" + highest;
-				else
-					return "link-" + highest;
-			}
-			*/
 		}
 		
 		public function getUniqueVirtualNodeId(n:VirtualNode = null):String

@@ -53,6 +53,11 @@ package protogeni
       return "urn:publicid:IDN+" + authority + "+" + type + "+" + name;
     }
 	
+	public static function getAuthorityFromUrn(urn:String) : String
+	{
+		return urn.split("+")[1];
+	}
+	
 	// Takes the given bandwidth and creates a human readable string
 	public static function kbsToString(bandwidth:Number):String {
 		var bw:String = "";

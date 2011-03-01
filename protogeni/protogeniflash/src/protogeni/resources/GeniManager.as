@@ -30,6 +30,8 @@ package protogeni.resources
 		[Bindable]
 		public var Urn : String = "";
 		
+		public var Authority:String = "";
+		
 		[Bindable]
 		public var Version:int;
 		
@@ -40,6 +42,8 @@ package protogeni.resources
 		public var Status : int = STATUS_UNKOWN;
 		
 		public var Rspec:XML = null;
+		
+		public var supportsIon:Boolean = false;
 		
 		[Bindable]
 		public var Show : Boolean = true;

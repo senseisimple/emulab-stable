@@ -108,7 +108,6 @@
 			}
 			
 			private function init():void {
-				
 				Main.geniDispatcher = new GeniDispatcher();
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
@@ -377,7 +376,7 @@
 							 click="DisplayUtil.viewManagersWindow();"
 							 toolTip="GENI managers"/>
 		<display:ImageButton2 id="consoleButton"
-							  icon="@Embed('../images/system_monitor.png')"
+							  icon="{DisplayUtil.consoleIcon}"
 							 click="LogHandler.viewConsole();" 
 							 toolTip="Console"/>
 		<display:DefaultLine percentHeight="90" />
@@ -385,9 +384,15 @@
 							  icon="{DisplayUtil.graphIcon}"
 							 click="DisplayUtil.viewSlicesWindow();"
 							 toolTip="Work with slices"/>
-		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.geniHandler.mapHandler.drawMap()" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
+							 visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" height="24"
+					 change="sliceSelected(event)"
+					 includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" skinClass="protogeni.display.skins.CheckBoxSkin"
+					click="Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.geniHandler.mapHandler.drawMap()"
+					includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
+					visible="{!Main.geniHandler.unauthenticatedMode}" />
 		<s:Rect percentWidth="100" />
 		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 

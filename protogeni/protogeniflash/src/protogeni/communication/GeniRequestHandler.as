@@ -42,7 +42,8 @@
 		public var forceStop:Boolean = false;
 		public var isPaused:Boolean = false;
 		
-		public static var MAX_RUNNING:int = 3;
+		[Bindable]
+		public var maxRunning:int = 3;
 		
 		// Run everything from the very beginning
 		public function startInitiationSequence(tryAuthenticate:Boolean = false):void
@@ -227,14 +228,14 @@
 			}
 		}
 		
-		public function start() : void
+		public function start(continuous:Boolean = true) : void
 		{
 			isPaused = false;
 			forceStop = false;
 			if(!queue.readyToStart())
 				return;
 			
-			if(queue.workingCount() < MAX_RUNNING) {
+			if(queue.workingCount() < maxRunning) {
 				var start:Request = queue.nextAndProgress();
 				start.running = true;
 				var op:Operation = start.start();
@@ -244,7 +245,10 @@
 				
 				Main.geniDispatcher.dispatchQueueChanged();
 
-				this.start()
+				if(continuous)
+					this.start();
+				else
+					pause();
 			}
 		}
 		
@@ -390,10 +394,16 @@
 			tryNext();
 		}
 		
-		public function tryNext():void
+		public function step():void {
+			isPaused = false;
+			forceStop = false;
+			tryNext(false);
+		}
+		
+		public function tryNext(continuous:Boolean = true):void
 		{
 			if(!forceStop && !isPaused)
-				start();
+				start(continuous);
 			else
 				forceStop = false;
 		}

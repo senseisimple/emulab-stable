@@ -65,39 +65,8 @@
 		{
 			var firstInterface:VirtualInterface;
 			var secondInterface:VirtualInterface;
-			if(first.manager != second.manager)
+			if(first.manager == second.manager)
 			{
-				firstInterface = first.interfaces.GetByID("control");
-				secondInterface = second.interfaces.GetByID("control");
-				// THIS WILL PROBABLY BREAK VERSION 1!!!!
-				/*
-				firstInterface = first.allocateInterface();
-				secondInterface = second.allocateInterface();
-				if(firstInterface == null || secondInterface == null)
-					return false;
-				first.interfaces.Add(firstInterface);
-				second.interfaces.Add(secondInterface);
-				*/
-				// END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
-				
-				_isTunnel = true;
-				if(firstInterface.ip.length == 0)
-					firstInterface.ip = getNextTunnel();
-				if(secondInterface.ip.length == 0)
-					secondInterface.ip = getNextTunnel();
-				
-				// Make sure nodes are in both
-				if(!(second.slivers[0] as Sliver).nodes.contains(first))
-					(second.slivers[0] as Sliver).nodes.addItem(first);
-				if(!(first.slivers[0] as Sliver).nodes.contains(second))
-					(first.slivers[0] as Sliver).nodes.addItem(second);
-				
-				// Add relative slivers
-				if(slivers[0].manager != first.slivers[0].manager)
-					slivers.push(first.slivers[0]);
-				else if(slivers[0].manager != second.slivers[0].manager)
-					slivers.push(second.slivers[0]);
-			} else {
 				firstInterface = first.allocateInterface();
 				secondInterface = second.allocateInterface();
 				if(firstInterface == null || secondInterface == null)
@@ -105,6 +74,49 @@
 				first.interfaces.Add(firstInterface);
 				second.interfaces.Add(secondInterface);
 			}
+			 else
+			 {
+				 if(first.manager.supportsIon && second.manager.supportsIon) {
+					 firstInterface = first.allocateInterface();
+					 secondInterface = second.allocateInterface();
+					 if(firstInterface == null || secondInterface == null)
+						 return false;
+					 first.interfaces.Add(firstInterface);
+					 second.interfaces.Add(secondInterface);
+				 } else {
+					 firstInterface = first.interfaces.GetByID("control");
+					 secondInterface = second.interfaces.GetByID("control");
+					 
+					 // THIS WILL PROBABLY BREAK VERSION 1!!!!
+					 /*
+					 firstInterface = first.allocateInterface();
+					 secondInterface = second.allocateInterface();
+					 if(firstInterface == null || secondInterface == null)
+					 return false;
+					 first.interfaces.Add(firstInterface);
+					 second.interfaces.Add(secondInterface);
+					 */
+					 // END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
+					 
+					 _isTunnel = true;
+					 if(firstInterface.ip.length == 0)
+						 firstInterface.ip = getNextTunnel();
+					 if(secondInterface.ip.length == 0)
+						 secondInterface.ip = getNextTunnel();
+				 }
+				 
+				 // Make sure nodes are in both
+				 if(!(second.slivers[0] as Sliver).nodes.contains(first))
+					 (second.slivers[0] as Sliver).nodes.addItem(first);
+				 if(!(first.slivers[0] as Sliver).nodes.contains(second))
+					 (first.slivers[0] as Sliver).nodes.addItem(second);
+				 
+				 // Add relative slivers
+				 if(slivers[0].manager != first.slivers[0].manager)
+					 slivers.push(first.slivers[0]);
+				 else if(slivers[0].manager != second.slivers[0].manager)
+					 slivers.push(second.slivers[0]);
+			 }
 			
 			// Bandwidth
 			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
@@ -164,11 +176,18 @@
 				var basicManager:GeniManager = (interfaces[0] as VirtualInterface).virtualNode.manager;
 				for each(var i:VirtualInterface in interfaces)
 				{
-					if(i.virtualNode.manager != basicManager)
+					if(i.virtualNode.manager != basicManager
+					&& !(i.virtualNode.manager.supportsIon && basicManager.supportsIon))
 						return true;
 				}
 			}
 			return _isTunnel;
+		}
+		
+		public function isIon():Boolean
+		{
+			return firstNode.manager != secondNode.manager &&
+				firstNode.manager.supportsIon && secondNode.manager.supportsIon;
 		}
 		
 		public function hasTunnelTo(target:GeniManager) : Boolean

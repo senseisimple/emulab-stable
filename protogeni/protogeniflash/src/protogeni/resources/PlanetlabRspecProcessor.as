@@ -6,7 +6,7 @@ package protogeni.resources
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
 	
-	//import protogeni.communication.RequestResolvePl;
+	import protogeni.GeniEvent;
 	import protogeni.communication.RequestSitesLocation;
 	
 
@@ -60,9 +60,13 @@ package protogeni.resources
 				hasslot = true;
 				GeniManager.processing++;
 			}
+			
+			var startTime:Date = new Date();
 			if (myState == PARSE)	    	
 			{
 				parseNextNode();
+				if(Main.debugMode)
+					LogHandler.appendMessage(new LogMessage(gm.Url, "ParseN " + String((new Date()).time - startTime.time)));
 			}
 			else if (myState == DONE)
 			{
@@ -73,7 +77,7 @@ package protogeni.resources
 				gm.unavailableNodes = 0;
 				gm.percentageAvailable = 100;
 				gm.Status = GeniManager.STATUS_VALID;
-				Main.geniDispatcher.dispatchGeniManagerChanged(gm);
+				Main.geniDispatcher.dispatchGeniManagerChanged(gm); // not 'populated' until sites are resolved
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 
 				var r:RequestSitesLocation = new RequestSitesLocation(gm);

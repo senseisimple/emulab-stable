@@ -25,24 +25,22 @@ package protogeni.display.mapping
 			var ll:LatLng;
 			// Single
 			if(o is PhysicalNodeGroup)
-			{
-				var g:PhysicalNodeGroup = o as PhysicalNodeGroup;
-				ll = new LatLng(g.latitude, g.longitude);
-			}
+				ll = new LatLng(o.latitude, o.longitude);
 			// Cluster marker
 			else if(o is Array)
 			{
-				var clusters:Array = o as Array;
-				ll = (clusters[0] as GeniMapMarker).getLatLng();
+				ll = o[0].getLatLng();
 			}
 			
 			super(ll);
 			nodeGroups = new PhysicalNodeGroupCollection(null);
+			var totalNodes:Number = 0;
 			
 			// Single marker
 			if(o is PhysicalNodeGroup)
 			{
-				g = o as PhysicalNodeGroup;
+				var g:PhysicalNodeGroup = o as PhysicalNodeGroup;
+				totalNodes = g.collection.length;
 				var groupInfo:PhysicalNodeGroupInfo = new PhysicalNodeGroupInfo();
 				groupInfo.Load(g);
 				
@@ -92,7 +90,7 @@ package protogeni.display.mapping
 				});
 				
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupMarker(g.collection.length.toString(), this, g.owner.owner.type),
+					icon:new PhysicalNodeGroupMarker(totalNodes.toString(), this, g.owner.owner.type),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-18, -18)
 				}));
@@ -103,8 +101,7 @@ package protogeni.display.mapping
 			// Cluster marker
 			else if(o is Array)
 			{
-				clusters = o as Array;
-				var totalNodes:Number = 0;
+				var clusters:Array = o as Array;
 				var type:int = (clusters[0] as GeniMapMarker).nodeGroups.GetType();
 				for each(var m:GeniMapMarker in clusters) {
 					totalNodes += m.nodeGroups.GetAll().length;
@@ -141,5 +138,6 @@ package protogeni.display.mapping
 
 		public var nodeGroups:PhysicalNodeGroupCollection;
 		public var info:DisplayObject;
+		public var added:Boolean = false;
 	}
 }

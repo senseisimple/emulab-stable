@@ -42,6 +42,7 @@ package protogeni.communication
 				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 				newCm.Url = op.getUrl().substring(0, op.getUrl().lastIndexOf('/')+1) + s;
 				newCm.Urn = s;
+				newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
 				newCm.Hrn = s.split('+')[1];
 				Main.geniHandler.GeniManagers.add(newCm);
 				newCm.Status = GeniManager.STATUS_INPROGRESS;
