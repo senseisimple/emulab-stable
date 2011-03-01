@@ -19,8 +19,6 @@ sub usage()
     exit(1);
 }
 my $optlist = "";
-my $mintag  = 750;
-my $maxtag  = 1000;
 my $other_manager;
 #
 # Configure variables
@@ -138,6 +136,33 @@ foreach my $manager_urn (keys(%managers)) {
 if (!defined($other_manager)) {
     fatal("Who is the other manager?");
 }
+
+#
+# Go through the component hops and find the one that refers to us.
+# This is our external network point.
+#
+my $hopref;
+foreach my $ref (GeniXML::FindNodes("n:component_hop",
+				    $linkref)->get_nodelist()) {
+    my $component_urn = GeniXML::GetNodeId($ref);
+    my ($domain,undef,undef) = GeniHRN::Parse($component_urn);
+    if (defined($domain) and $domain eq $me->domain()) {
+	$hopref = $ref;
+	last;
+    }
+}
+if (!defined($hopref)) {
+    fatal("Could not find hop in link");
+}
+my $hop_urn = GeniXML::GetNodeId($hopref);
+my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+my $network = ExternalNetwork->Lookup($network_id);
+if (!defined($network)) {
+    fatal("$hop_urn is not an external network");
+}
+# The bounds of the vlan tags we can use for this network point.
+my $mintag  = $network->min_vlan();
+my $maxtag  = $network->max_vlan();
 
 #
 # Need the slice experiment as the context within to allocate the
@@ -270,7 +295,8 @@ sub ReserveLocalTags(@)
 	    while (@otags) {
 		my $t = pop(@otags);
 		push(@try, $t)		
-		    if (VLan->VlanTagAvailable($t));
+		    if ($network->VlanTagOkay($t) &&
+			VLan->VlanTagAvailable($t));
 		
 		# But do not let the other CM make us reserve too many at once
 		last
