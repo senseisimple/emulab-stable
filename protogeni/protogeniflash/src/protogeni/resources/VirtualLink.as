@@ -76,7 +76,7 @@
 			}
 			 else
 			 {
-				 if(first.manager.supportsIon && second.manager.supportsIon) {
+				 if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon) {
 					 firstInterface = first.allocateInterface();
 					 secondInterface = second.allocateInterface();
 					 if(firstInterface == null || secondInterface == null)
@@ -169,8 +169,12 @@
 			}
 		}
 		
+		// Needs some major work...
 		public function isTunnel():Boolean
 		{
+			if(_isTunnel)
+				return true;
+			
 			if(interfaces.length > 0)
 			{
 				var basicManager:GeniManager = (interfaces[0] as VirtualInterface).virtualNode.manager;
@@ -181,13 +185,14 @@
 						return true;
 				}
 			}
-			return _isTunnel;
+			
+			return false;
 		}
 		
 		public function isIon():Boolean
 		{
 			return firstNode.manager != secondNode.manager &&
-				firstNode.manager.supportsIon && secondNode.manager.supportsIon;
+				firstNode.manager.supportsIon && secondNode.manager.supportsIon && !_isTunnel;
 		}
 		
 		public function hasTunnelTo(target:GeniManager) : Boolean

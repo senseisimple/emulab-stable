@@ -85,6 +85,7 @@
 	
 	public static var protogeniOnly:Boolean = false;
 	
-	public static var log:LogHandler = new LogHandler();
+	[Bindable]
+	public static var useIon:Boolean = false;
   }
 }

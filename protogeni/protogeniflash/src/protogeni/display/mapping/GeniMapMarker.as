@@ -15,6 +15,7 @@ package protogeni.display.mapping
 	
 	import mx.events.FlexEvent;
 	
+	import protogeni.display.DisplayUtil;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PhysicalNodeGroupCollection;
 	
@@ -28,9 +29,7 @@ package protogeni.display.mapping
 				ll = new LatLng(o.latitude, o.longitude);
 			// Cluster marker
 			else if(o is Array)
-			{
 				ll = o[0].getLatLng();
-			}
 			
 			super(ll);
 			nodeGroups = new PhysicalNodeGroupCollection(null);
@@ -39,12 +38,12 @@ package protogeni.display.mapping
 			// Single marker
 			if(o is PhysicalNodeGroup)
 			{
-				var g:PhysicalNodeGroup = o as PhysicalNodeGroup;
-				totalNodes = g.collection.length;
+				var nodeGroup:PhysicalNodeGroup = o as PhysicalNodeGroup;
+				totalNodes = nodeGroup.collection.length;
 				var groupInfo:PhysicalNodeGroupInfo = new PhysicalNodeGroupInfo();
-				groupInfo.Load(g);
+				groupInfo.Load(nodeGroup);
 				
-				if(g.city.length == 0)
+				if(nodeGroup.city.length == 0)
 				{
 					var geocoder:ClientGeocoder = new ClientGeocoder();
 					geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
@@ -62,7 +61,7 @@ package protogeni.display.mapping
 											groupInfo.city = splitAddress[1];
 										else
 											groupInfo.city = fullAddress;
-									g.city = groupInfo.city;
+									nodeGroup.city = groupInfo.city;
 								} catch (err:Error) { }
 							}
 						});
@@ -73,9 +72,9 @@ package protogeni.display.mapping
 							//	new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
 						});
 					
-					geocoder.reverseGeocode(new LatLng(g.latitude, g.longitude));
+					geocoder.reverseGeocode(new LatLng(nodeGroup.latitude, nodeGroup.longitude));
 				} else {
-					groupInfo.city = g.city;
+					groupInfo.city = nodeGroup.city;
 				}
 				
 				addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
@@ -88,14 +87,15 @@ package protogeni.display.mapping
 							drawDefaultFrame:true
 						}));
 				});
-				
+
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupMarker(totalNodes.toString(), this, g.owner.owner.type),
+					icon:new PhysicalNodeGroupMarker(totalNodes.toString(), this, nodeGroup.owner.owner.type),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-18, -18)
 				}));
+				
 
-				nodeGroups.Add(g);
+				nodeGroups.Add(nodeGroup);
 				info = groupInfo;
 			}
 			// Cluster marker

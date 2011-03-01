@@ -5,10 +5,6 @@ package
 	
 	public class LogHandler
 	{
-		public function LogHandler()
-		{
-		}
-		
 		public static function appendMessage(msg:LogMessage):void {
 			logs.push(msg);
 			Main.geniDispatcher.dispatchLogsChanged(msg);

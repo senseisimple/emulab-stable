@@ -11,6 +11,7 @@ package protogeni.display.mapping
 	
 	import protogeni.GeniEvent;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
@@ -133,9 +134,21 @@ package protogeni.display.mapping
 			
 			while(myIndexManager < gm.Links.collection.length) {
 				var linkGroup:PhysicalLinkGroup = gm.Links.collection.getItemAt(myIndexManager) as PhysicalLinkGroup;
-				var gml:GeniMapLink = new GeniMapLink(linkGroup);
-				linksToAdd.push(gml);
-				//links.push(gml);
+				var add:Boolean = true;
+				for each(var v:PhysicalLink in linkGroup.collection)
+				{
+					if(v.rspec.toXMLString().indexOf("ipv4") > -1)
+					{
+						add = false;
+						break;
+					}
+				}
+				if(add) {
+					var gml:GeniMapLink = new GeniMapLink(linkGroup);
+					linksToAdd.push(gml);
+					//links.push(gml);
+				}
+				
 				idx++
 				if(idx == MAX_WORK_MANAGER)
 					return;
@@ -153,9 +166,10 @@ package protogeni.display.mapping
 			
 			while(myIndexManager < gm.Nodes.collection.length) {
 				var nodeGroup:PhysicalNodeGroup = gm.Nodes.collection.getItemAt(myIndexManager) as PhysicalNodeGroup;
-				var gmm:GeniMapMarker = new GeniMapMarker(nodeGroup);
-				markersToAdd.push(gmm);
-				//markers.push(gmm);
+				if(nodeGroup.collection.length > 0) {
+					markersToAdd.push(new GeniMapMarker(nodeGroup));
+					//markers.push(gmm);
+				}
 				idx++
 				if(idx == MAX_WORK_MANAGER)
 					return;
@@ -248,7 +262,7 @@ package protogeni.display.mapping
 			
 			while(markersToAdd.length > 0) {
 				var drawMarker:GeniMapMarker = markersToAdd.pop();
-				map.addOverlay(drawMarker);
+				map.addOverlay(drawMarker)
 				markers.push(drawMarker);
 				drawMarker.added = true;
 				idx++;
@@ -256,7 +270,7 @@ package protogeni.display.mapping
 					return;
 			}
 
-			myStateDraw = CLUSTER;
+			myStateDraw = DONE;
 			myIndexDraw = 0;
 			
 			// Remove and do calculations
