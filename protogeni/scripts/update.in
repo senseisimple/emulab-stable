@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -53,8 +53,18 @@ sub OneShot();
 #
 $| = 1; 
 
+#
+# Do not modify the include path if it was specified when invoked.
+# This allows update to run from the build tree.
+#
+BEGIN
+{
+    eval "require emutil";
+    if ($@) {
+	unshift(@INC, "@prefix@/lib");
+    }
+}
 # Load the Testbed support stuff.
-use lib "@prefix@/lib";
 use libtestbed;
 use libdb qw(TBSetSiteVar TBSiteVarExists TBGetSiteVar);
 use Experiment;

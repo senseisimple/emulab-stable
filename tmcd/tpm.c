@@ -196,9 +196,10 @@ tmcd_tpm_generate_nonce(unsigned char *nonce)
  *
  * Returns 1 if the quote is valid, 0 otherwise.
  */
-int tmcd_tpm_verify_quote(char *quote, ssize_t quotelen, unsigned char *pcomp,
-    ssize_t pcomplen, ETPM_NONCE nonce, unsigned short wantpcrs,
-    TPM_PCR *pcrs, unsigned char *idkey)
+int tmcd_tpm_verify_quote(unsigned char *quote, ssize_t quotelen,
+			  unsigned char *pcomp, ssize_t pcomplen,
+			  ETPM_NONCE nonce, unsigned short wantpcrs,
+			  TPM_PCR *pcrs, unsigned char *idkey)
 {
 #ifdef	WITHSSL
 	struct signed_pcomp sp;

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -78,15 +78,15 @@ DBQueryFatal("replace into emulab_locks set name='pool_daemon',value='0'");
 # Check for experiments stuck in transition.
 #
 $query_result =
-    DBQueryFatal("select pid,eid,expt_locked from experiments ".
+    DBQueryFatal("select pid,eid,expt_locked,state from experiments ".
 		 "where expt_locked is not NULL");
 if ($query_result->numrows) {
     print "The following experiments are stuck in transition.\n\n";
 
     print "Pid          Eid                  When\n";
     print "------------ -------------------- ------------------------\n";
-    while (($pid,$eid,$locked) = $query_result->fetchrow_array) {
-	printf("%-12s %-20s %s\n", $pid, $eid, $locked);
+    while (($pid,$eid,$locked,$state) = $query_result->fetchrow_array) {
+	printf("%-12s %-20s %s %s\n", $pid, $eid, $locked, $state);
     }
     print "\n";
 }

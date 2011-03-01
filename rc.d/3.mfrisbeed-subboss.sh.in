@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# PROVIDE: mfrisbeed
+# REQUIRE: mysql
+# BEFORE: testbed
+# KEYWORD: shutdown
+
+#
+# Start up the frisbee master server on a subboss.
+# There is no sure fire way to dynamically tell if we are a subboss right now.
+# We cannot use "tmcc role" because tmcc doesn't exist/work on real boss.
+# So we just do our own script right now.
+#
+# We run it under the daemon wrapper if available so that it will get
+# automatically restarted.
+#
+
+. /etc/rc.subr
+
+bindir=@prefix@/sbin
+if [ ! -x $bindir/mfrisbeed ]; then
+    echo "*** mfrisbeed.sh: $bindir/mfrisbeed not installed"
+    exit 1
+fi
+
+case "$1" in
+start|faststart)
+    ;;
+restart)
+    if [ -f /var/run/mfrisbeed_wrapper.pid ]; then
+	kill `cat /var/run/mfrisbeed_wrapper.pid` >/dev/null 2>&1
+	rm -f /var/run/mfrisbeed_wrapper.pid
+    fi
+    if [ -f /var/run/mfrisbeed.pid ]; then
+	kill `cat /var/run/mfrisbeed.pid` >/dev/null 2>&1
+	rm -f /var/run/mfrisbeed.pid
+    fi
+    ;;
+stop)
+    echo -n ' mfrisbeed'
+    if [ -f /var/run/mfrisbeed_wrapper.pid ]; then
+	kill `cat /var/run/mfrisbeed_wrapper.pid` >/dev/null 2>&1
+	rm -f /var/run/mfrisbeed_wrapper.pid
+    fi
+    if [ -f /var/run/mfrisbeed.pid ]; then
+	kill `cat /var/run/mfrisbeed.pid` >/dev/null 2>&1
+	rm -f /var/run/mfrisbeed.pid
+    fi
+    rm -f /var/run/frisbeed-*.pid
+    exit 0
+    ;;
+*)
+    echo "Usage: $0 {start|stop|restart}" >&2
+    exit 1
+    ;;
+esac
+
+echo -n " mfrisbeed"
+rm -f /var/run/frisbeed-*.pid
+args="-C null -S @BOSSNODE_IP@ -I /z/image_cache -A -M -R"
+if [ -x @prefix@/sbin/daemon_wrapper ]; then
+    @prefix@/sbin/daemon_wrapper -i 30 -l @prefix@/log/mfrisbeed_wrapper.log \
+	@prefix@/sbin/mfrisbeed -d $args
+else
+    @prefix@/sbin/mfrisbeed $args
+fi
+
+exit $?

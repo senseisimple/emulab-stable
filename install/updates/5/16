@@ -1,0 +1,37 @@
+#
+# Update ca.cnf so that geni certs are marked as version 3. 
+#
+use strict;
+use libinstall;
+
+my $CACONF	    = "$TBROOT/lib/ssl/ca.cnf";
+
+sub InstallUpdate($$)
+{
+    my ($version, $phase) = @_;
+
+    #
+    # If something should run in the pre-install phase.
+    #
+    if ($phase eq "pre") {
+	Phase "ca.cnf", "Updating ssl CA config file", sub {
+	    PhaseSkip("Already updated")
+		if (`grep 'Added for update 5.16' $CACONF`);
+
+	    BackUpFileFatal($CACONF);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl ca.cnf");
+
+	    # For impotent mode. 
+	    DiffFiles("$TOP_OBJDIR/ssl/ca.cnf", $CACONF);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/ssl install-conf");
+	};
+    }
+    
+    #
+    # If something should run in the post-install phase.
+    #
+    if ($phase eq "post") {
+    }
+    return 0;
+}
+1;

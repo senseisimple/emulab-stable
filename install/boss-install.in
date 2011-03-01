@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2010 , 2011University of Utah and the Flux Group.
+# Copyright (c) 2003-2010 , 2011, 2011University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -191,7 +191,7 @@ if ($SCRATCHDIR) {
 
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
-    "$LOGDIR/frisbeed.log", "$LOGDIR/proxydhcpd.log",
+    "$LOGDIR/frisbeed.log", "$LOGDIR/mfrisbeed.log", "$LOGDIR/proxydhcpd.log",
     "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
     "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log", "$LOGDIR/genlastlog.log",
     "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log",
@@ -723,6 +723,10 @@ Phase "patches", "Applying patches", sub {
     Phase "perlselfloaderpatch", "Fixing perl self-loader", sub {
 	my $perldir = "/usr/local/lib/perl5/5.10.1";
 	DoneIfDoesntExist("$perldir/SelfLoader.pm");
+	my $ver = `fgrep 'our \$VERSION =' $perldir/SelfLoader.pm 2>/dev/null`;
+	if ($? == 0 && $ver =~ /1\.18/) {
+	    PhaseSkip("Patch already applied");
+	}
 	ExecQuietFatal("$PATCH -d $perldir -i $SELFLOAD_PATCH");
     };
 };
@@ -834,6 +838,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!tftpd",     "*.*\t\t\t\t\t\t$LOGDIR/tftpd.log",
 	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
 	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
+	    "!mfrisbeed", "*.*\t\t\t\t\t\t$LOGDIR/mfrisbeed.log",
 	    "!pubsubd",   "*.*\t\t\t\t\t\t$LOGDIR/pubsubd.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log",
 	    "!genlastlog","*.*\t\t\t\t\t\t$LOGDIR/genlastlog.log",
@@ -882,6 +887,7 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/osselect.log           640  9     300  *     Z",
 	    "$LOGDIR/power.log              640  7     300  *     Z",
 	    "$LOGDIR/frisbeed.log           640  7     300  *     Z",
+	    "$LOGDIR/mfrisbeed.log          640  7     300  *     Z",
 	    "$LOGDIR/tftpd.log              640  7     200  *     Z",
 	    "$LOGDIR/dhcpd.log              640  7     200  *     Z",
 	    "$LOGDIR/bootinfo.log           640  7     200  *     Z",

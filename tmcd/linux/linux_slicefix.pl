@@ -236,6 +236,11 @@ sub file_replace_string
 	my ($imageroot, $file, $old_root, $new_root) = @_;
 	my @buffer;
 
+	if (!$old_root) {
+		print STDERR "old_root is empty\n";
+		return 1;
+	}
+
 	open FILE, "+<$imageroot/$file" ||
 	     die "Couldn't open $imageroot/$file: $!\n";
 
@@ -852,7 +857,7 @@ sub main
 		    find_default_lilo_entry($imageroot, "/etc/lilo.conf");
 	}
 	elsif ($bootloader eq 'grub') {
-		for (qw#/boot/grub/grub.conf /etc/grub.conf /boot/grub/menu.lst#) {
+		for (qw#/boot/grub/menu.lst#) {
 			if (-f "$imageroot/$_") {
 				$grub_config = $_;
 				last;
@@ -895,6 +900,7 @@ sub main
 	my ($kernel_version, $kernel_has_ide) = 
 	    check_kernel("$imageroot/$kernel");
 
+	print "Old root FS uuid: $old_uuid\n";
 	print "Root FS UUID: $uuid\n";
 	print "Root FS LABEL: $label\n";
 	print "Installed bootloader: $bootloader\n";
@@ -906,6 +912,7 @@ sub main
 	print "initrd: $initrd\n";
 	print "initrd blkid: $initrd_does_label $initrd_does_uuid\n";
 	print "mount blkid: $mount_does_label $mount_does_uuid\n";
+	print "old bootloader root: $old_bootloader_root\n";
 
 	if ($uuid && $mount_does_uuid) {
 		$new_fstab_root = "UUID=$uuid";
@@ -936,8 +943,10 @@ sub main
 	}
 
 	print "Rewriting /etc/fstab to use '$new_fstab_root' as root device\n";
-	file_replace_string($imageroot, '/etc/fstab', $old_fstab_root,
+ 	file_replace_string($imageroot, '/etc/fstab', $old_fstab_root,
 	                         $new_fstab_root);
+	file_replace_string($imageroot, '/etc/fstab', $old_uuid,
+	                         $uuid);
 
 	print "Rewriting $bootloader config to use '$new_bootloader_root' as root device\n";
 	if ($bootloader eq 'lilo') {
@@ -945,13 +954,16 @@ sub main
 		$lilo_commandline = set_runlilo_flag($imageroot, $lilo_default, $new_bootloader_root);
 	}
 	elsif ($bootloader eq 'grub') {
-		file_replace_string($imageroot, $grub_config, $old_bootloader_root,
-		                         $new_bootloader_root);
+		print "grub config is $grub_config\n";
+		#file_replace_string($imageroot, $grub_config, $old_bootloader_root,
+		 #                        $new_bootloader_root);
+		file_replace_string($imageroot, $grub_config, $old_uuid, $uuid);
 		set_grub_root_device($imageroot, $grub_config, $root);
 	}
 	elsif ($bootloader eq 'grub2') {
 		file_replace_string($imageroot, $grub_config, $old_bootloader_root,
 		                         $new_bootloader_root);
+		file_replace_string($imageroot, $grub_config, $old_uuid, $uuid);
 		file_replace_string($imageroot, $grub_config, $old_uuid, $uuid);
 		set_grub2_root_device($imageroot, $grub_config, $root);
 	}

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 ifeq ($(STANDALONE_CLEARINGHOUSE),0)
 TARGETS	= libinstall.pm boss-install ops-install fs-install dump-descriptors \
-	load-descriptors update-install update-testbed testbed-version
+	load-descriptors update-install update-mfs update-testbed testbed-version
 else
 TARGETS = clrhouse-install
 endif

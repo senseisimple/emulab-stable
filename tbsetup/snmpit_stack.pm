@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # Copyright (c) 2004-2009 Regents, University of California.
 # All rights reserved.
 #
@@ -397,13 +397,14 @@ sub setPortVlan($$@) {
 # usage: newVlanNumber(self, vlan_identifier)
 #
 # returns a number in $self->{VLAN_MIN} ... $self->{VLAN_MAX}
-# or zero indicating failure: either that the id exists,
-# or the number space is full.
+# or zero indicating that the id exists, or -1 indicating
+# the number space is full.
 #
 sub newVlanNumber($$) {
     my $self = shift;
     my $vlan_id = shift;
     my %vlans;
+    my $limit;
 
     $self->debug("stack::newVlanNumber $vlan_id\n");
     if ($self->{ALLVLANSONLEADER}) {
@@ -412,18 +413,68 @@ sub newVlanNumber($$) {
 	%vlans = $self->findVlans();
     }
     my $number = $vlans{$vlan_id};
-    # XXX temp, see doMakeVlans in snmpit.in
-    if ($::next_vlan_tag)
-	{ $number = $::next_vlan_tag; $::next_vlan_tag = 0; return $number; }
-
+    # Vlan exists, so tell caller a new number/vlan is not needed.
     if (defined($number)) { return 0; }
+
     my @numbers = sort values %vlans;
     $self->debug("newVlanNumbers: numbers ". "@numbers" . " \n");
+
+    # XXX temp, see doMakeVlans in snmpit.in
+    if ($::next_vlan_tag) {
+	$number = $::next_vlan_tag;
+	$::next_vlan_tag = 0;
+
+	#
+	# Reserve this number in the table. If we can actually
+	# assign it (tables locked), then we call it good. 
+	#
+	if ((grep {$_ == $number} @numbers) ||
+	    !defined(reserveVlanTag($vlan_id, $number))) {
+	    my $vlan_using_tag = $self->findVlanUsingTag($number);
+	    print STDERR
+		"*** desired vlan tag $number for vlan $vlan_id already in " .
+		"use" . ($vlan_using_tag ? " by vlan $vlan_using_tag" : "") .
+		"\n";
+	    # Indicates no tag assigned. 
+	    return 0;
+	}
+	return $number;
+    }
+    #
+    # See if there is a number already pre-assigned in the lans table.
+    # But still make sure that the number does not conflict with an
+    # existing vlan.
+    #
+    $number = getReservedVlanTag($vlan_id);
+    if ($number) {
+	if (grep {$_ == $number} @numbers) {
+	    my $vlan_using_tag = $self->findVlanUsingTag($number);
+	    print STDERR
+		"*** reserved vlan tag $number for vlan $vlan_id already in " .
+		"use" . ($vlan_using_tag ? " by vlan $vlan_using_tag" : "") .
+		"\n";
+	    return 0;
+	}
+	return $number;
+    }
     $number = $self->{MIN_VLAN}-1;
-    my $lim = $self->{MAX_VLAN};
-    do { ++$number }
-	until (!(grep {$_ == $number} @numbers) || ($number > $lim));
-    return $number <= $lim ? $number : 0;
+    $limit  = $self->{MAX_VLAN};
+
+    while (++$number < $limit) {
+	if (!(grep {$_ == $number} @numbers)) {
+	    #
+	    # Reserve this number in the table. If we can actually
+	    # assign it (tables locked), then we call it good. Else
+	    # go around again.
+	    #
+	    if (reserveVlanTag($vlan_id, $number)) {
+		$self->debug("Reserved tag $number to vlan $vlan_id\n");
+		return $number;
+	    }
+	    $self->debug("Failed to reserve tag $number for vlan $vlan_id\n");
+	}
+    }
+    return 0;
 }
 
 #
@@ -496,7 +547,7 @@ sub createVlan($$$;$$$) {
 
     }
     $self->unlock();
-    return $vlan_number;
+    return ($vlan_number <= 0 ? 0 : $vlan_number);
 }
 
 #
@@ -561,6 +612,37 @@ sub findVlan($$) {
 	my %dev_map = $device->findVlans($vlan_id);
 	my $vlan_num = $dev_map{$vlan_id};
 	if (defined($vlan_num)) { return $vlan_num; }
+    }
+    return 0;
+}
+
+#
+# Find what vlan a tag is associated with.
+# 
+# usage: findVlanUsingTag($self, $number)
+#        returns the vlan_id if found
+#        0 otherwise;
+#
+sub findVlanUsingTag($$) {
+    my ($self, $number) = @_;
+
+    $self->debug("snmpit_stack::findVlanUsingTag( $number )\n");
+    if ($parallelized) {
+	my %dev_map = $self->findVlans();
+	foreach my $vlan_id (keys(%dev_map)) {
+	    return $vlan_id
+		if ($number == $dev_map{$vlan_id});
+	}
+	return 0;
+    }
+    foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
+	my $device = $self->{DEVICES}->{$devicename};
+	my %dev_map = $device->findVlans();
+	foreach my $vlan_id (keys(%dev_map)) {
+	    return $vlan_id
+		if ($number == $dev_map{$vlan_id});
+	}
+	return 0;
     }
     return 0;
 }
@@ -1405,31 +1487,31 @@ sub snap($) {
 	#
 	SWITCH: for ($type) {
 	    (/cisco/) && do {
-		use snmpit_cisco;
+		require snmpit_cisco;
 		$device = new snmpit_cisco($devicename,$self->{DEBUG});
 		last;
 		}; # /cisco/
 	    (/foundry1500/ || /foundry9604/)
 		    && do {
-		use snmpit_foundry;
+		require snmpit_foundry;
 		$device = new snmpit_foundry($devicename,$self->{DEBUG});
 		last;
 		}; # /foundry.*/
 	    (/nortel1100/ || /nortel5510/)
 		    && do {
-		use snmpit_nortel;
+		require snmpit_nortel;
 		$device = new snmpit_nortel($devicename,$self->{DEBUG});
 		last;
 		}; # /nortel.*/
 	    (/hp/)
 		    && do {
-		use snmpit_hp;
+		require snmpit_hp;
 		$device = new snmpit_hp($devicename,$self->{DEBUG});
 		last;
 		}; # /hp.*/
 	    (/apcon/)
 		    && do {
-		use snmpit_apcon;
+		require snmpit_apcon;
 		$device = new snmpit_apcon($devicename,$self->{DEBUG});
 		last;
 	        }; # /apcon.*/

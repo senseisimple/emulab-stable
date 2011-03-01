@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -290,7 +290,7 @@ typedef struct {
 			int32_t		blockcount;
 			int32_t		chunksize;
 			int32_t		blocksize;
-			int64_t		bytecount;
+			uint64_t		bytecount;
 		} join2;
 
 		/*
@@ -314,9 +314,84 @@ typedef struct {
 #define PKTSUBTYPE_PREQUEST	6
 #define PKTSUBTYPE_JOIN2	7
 
+#ifdef MASTER_SERVER
+#include <netinet/in.h>
+
+/* default port number: 0xfbee */
+#define MS_PORTNUM	64494
+
+/* imageid length: large enough to hold an ascii encoded SHA 1024 hash */
+#define MS_MAXIDLEN	256
+/* ditto for signature */
+#define MS_MAXSIGLEN	256
+
+/*
+ * Master server messages.
+ * These are sent via unicast TCP.
+ */
+typedef struct {
+	uint32_t	hostip;
+	uint8_t		methods;
+	uint8_t		status;
+	uint16_t	idlen;
+	uint8_t		imageid[MS_MAXIDLEN];
+} __attribute__((__packed__)) GetRequest;
+
+typedef struct {
+	uint8_t		method;
+	uint8_t		isrunning;
+	uint16_t	error;	
+	uint32_t	servaddr;
+	uint32_t	addr;
+	uint16_t	port;
+	uint16_t	sigtype;
+	uint8_t		signature[MS_MAXSIGLEN];
+	uint32_t	hisize;
+	uint32_t	losize;
+} __attribute__((__packed__)) GetReply;
+
+typedef struct {
+	struct {
+		int8_t		version[4];
+		int32_t		type;
+	} hdr;
+	union {
+		GetRequest	getrequest;
+		GetReply	getreply;
+	} body;
+} MasterMsg_t;
+
+#define MS_MSGVERS_1		"V01"
+
+#define MS_MSGTYPE_GETREQUEST	1
+#define MS_MSGTYPE_GETREPLY	2
+#define MS_MSGTYPE_PUTREQUEST	3
+#define MS_MSGTYPE_PUTREPLY	4
+
+#define MS_METHOD_UNKNOWN	0
+#define MS_METHOD_UNICAST	1
+#define MS_METHOD_MULTICAST	2
+#define MS_METHOD_BROADCAST	4
+#define MS_METHOD_ANY		7
+
+#define MS_SIGTYPE_NONE		0
+#define MS_SIGTYPE_MTIME	1
+#define MS_SIGTYPE_MD5		2
+#define MS_SIGTYPE_SHA1		3
+
+#define MS_ERROR_FAILED		1	/* internal host auth error */
+#define MS_ERROR_NOHOST		2	/* no such host */
+#define MS_ERROR_NOIMAGE	3	/* no such image */
+#define MS_ERROR_NOACCESS	4	/* access not allowed for host */
+#define MS_ERROR_NOMETHOD	5	/* not avail to host via method */
+#define MS_ERROR_INVALID	6	/* invalid argument */
+#define MS_ERROR_TRYAGAIN	7	/* try again later */
+#endif
+
 /*
  * Protos.
  */
+int	GetIP(char *str, struct in_addr *in);
 int	GetSockbufSize(void);
 int	ClientNetInit(void);
 int	ServerNetInit(void);
@@ -327,6 +402,12 @@ void	PacketSend(Packet_t *p, int *resends);
 void	PacketReply(Packet_t *p);
 int	PacketValid(Packet_t *p, int nchunks);
 void	dump_network(void);
+#ifdef MASTER_SERVER
+int	ClientNetFindServer(in_addr_t, in_port_t, in_addr_t, char *,
+			    int, int, int, GetReply *, struct in_addr *);
+int	MsgSend(int, MasterMsg_t *, size_t, int);
+int	MsgReceive(int, MasterMsg_t *, size_t, int);
+#endif
 
 /*
  * Globals

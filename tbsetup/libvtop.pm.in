@@ -1214,8 +1214,15 @@ sub LoadVirtNodes($)
 	    $vnode->_osinfo($osinfo);
 	}
 	elsif ($isvirt) {
-	    # Silly default.
-	    my $osinfo = OSinfo->LookupByName("OPENVZ-STD");
+	    my $osinfo;
+	    if ($nodetype->type() eq "pcvm") {
+		# Silly default.
+		$osinfo = OSinfo->LookupByName("OPENVZ-STD");
+	    }
+	    else {
+		# Grab it from the typeinfo.
+		$osinfo = OSinfo->Lookup($nodetype->default_osid());
+	    }
 	    $vnode->_osinfo($osinfo);
 	}
 
@@ -1461,7 +1468,6 @@ sub LoadVirtLans($)
 	    if ($vlanmember->is_accesspoint());
 	$virtlan->_sharednodes(0);
 	$virtlan->_geninodes(0);
-	$virtlan->_needvlan(0);
 	$virtlan->_implemented_by($implemented_by);
 	$virtlan->_vpath(undef);
 
@@ -1545,10 +1551,11 @@ sub LoadVirtLans($)
 	# Terrible.
 	$vlanmember->_reservebw(0);
 	$vlanmember->_needtrunk(0);
-	if ($vlanmember->virt_node()->type() eq "sppvm") {
+	if ($vlanmember->virt_node()->type() eq "sppvm" ||
+	    $vlanmember->virt_node()->type() eq "bbgenivm") {
 	    $vlanmember->_reservebw($bandwidth);
 	    $vlanmember->_needtrunk(1);
-	    $virtlan->_needvlan(1);
+	    $vlanmember->_nobwshaping(1);
 	    $self->printdb("  Forcing $vlanmember to reserve shared bandwidth\n");
 	}
     }
@@ -3635,7 +3642,7 @@ sub MapResources($)
 	
 	$self->printdb("Mapping geni resources ...\n");
 	
-	if (libGeni::MapResources($self->experiment(),
+	if (libGeni::MapResourcesNew($self->experiment(),
 				  $self->user(), $self->rspec(),
 				  \$genirspec, $self->verbose())) {
 	    tberror("Could not map Geni resources\n");
@@ -4598,9 +4605,10 @@ sub AllocNodes($)
     foreach my $vnodename (sort(keys(%{ $self->solution_v2v() }))) {
 	my $vpnodename = $self->solution_v2v()->{$vnodename};
 	my $vpnode     = $self->pnodes()->{$vpnodename};
+	my $virtnode   = $self->vnodes()->{$vnodename};
 	
 	if ($vpnode->isjailed() ||
-	    $vpnode->isremotenode() || $vpnode->_onsharednode()) {
+	    $vpnode->isremotenode() || $virtnode->_onsharednode()) {
 	    my $pnodename = $self->solution_v2p()->{$vnodename};
 	    my $pnode     = $self->pnodes()->{$pnodename};
 	    my $sshdport;
@@ -5419,36 +5427,6 @@ sub InterpLinksAux($)
 		    my $protovlan;
 		    
 		    #
-		    # When using virtual interfaces we need to create a
-		    # protolan for the underlying vlan, and then another link
-		    # for the endpoints that run over that vlan. Note though
-		    # that there might be multiple emulated links running on
-		    # on this physical link. Once we have everything created
-		    # there is a postpass to merge the vlans into a single
-		    # supervlan since a nodeport can be in just a single vlan.
-		    #
-		    #
-		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() ||
-			$virtlan->_needvlan()) {
-			my $lanid = "v" . "$lan" . $vlanid++;
-
-			$protovlan = ProtoLan->Create($experiment, $lanid,
-						      $self->impotent() ||
-						      $self->alloconly());
-			$protovlan->SetRole("encapsulation");
-			$protovlan->SetType("vlan");
-			$protovlan->SetEncapStyle($virtlan->_encapstyle());
-			$protovlan->SetAttribute("link/lan", $lan);
-			$protovlans{$lan} = $protovlan;
-
-			$protovlan->AddMember($nodeA, $portA)
-			    if (!$protovlan->IsMember($nodeA, $portA));
-			$protovlan->AddMember($nodeB, $portB)
-			    if (!$protovlan->IsMember($nodeB, $portB));
-		    }
-
-		    #
 		    # Create some new virtual devices.
 		    #
 		    my $virtifaceA = $self->NewVirtIface($virtlan, $member0,
@@ -5477,18 +5455,20 @@ sub InterpLinksAux($)
 			    $rbandwidth = $member1->_reservebw();
 			}
 
-			if ($virtnodeA->_onsharednode() &&
-			    $self->printdb("  Reserving shared BW: ".
-					   "$member0,$bandwidth,$virtifaceA\n") &&
+			if (($virtnodeA->_onsharednode() ||
+			     $member0->_reservebw()) &&
+			    $self->printdb("  Reserving shared BW: $member0,".
+					   "$bandwidth,$virtifaceA\n") &&
 			    !($self->impotent() || $self->alloconly()) &&
 			    $virtifaceA->ReserveSharedBandwidth($bandwidth)) {
 			    tbinfo("Could not reserve shared bandwidth: ".
 				   "$member0,$bandwidth,$virtifaceA\n");
 			    return -1;
 			}
-			if ($virtnodeB->_onsharednode() &&
-			    $self->printdb("  Reserving shared BW: ".
-					   "$member1,$rbandwidth,$virtifaceB\n") &&
+			if (($virtnodeB->_onsharednode() ||
+			     $member1->_reservebw()) &&
+			    $self->printdb("  Reserving shared BW: $member1,".
+					   "$rbandwidth,$virtifaceB\n") &&
 			    !($self->impotent() || $self->alloconly()) && 
 			    $virtifaceB->ReserveSharedBandwidth($rbandwidth)) {
 			    tbinfo("Could not reserve shared bandwidth: ".
@@ -5496,18 +5476,66 @@ sub InterpLinksAux($)
 			    return -1;
 			}
 		    }
-		    $portA = $virtifaceA->viface();
-		    $portB = $virtifaceB->viface();
 
+		    #
+		    # When using virtual interfaces we need to create a
+		    # protolan for the underlying vlan, and then another link
+		    # for the endpoints that run over that vlan. Note though
+		    # that there might be multiple emulated links running on
+		    # on this physical link. Once we have everything created
+		    # there is a postpass to merge the vlans into a single
+		    # supervlan since a nodeport can be in just a single vlan.
+		    # Note that if the encapstype is "vlan" then the previous
+		    # is obviously false, since then the ports are going to
+		    # be in trunk mode, and the nodeports in multiple vlans.
+		    #
+		    if ($virtlan->_encapstyle() ne "vlan") {
+			my $lanid = "v" . "$lan" . $vlanid++;
+
+			$protovlan = ProtoLan->Create($experiment, $lanid,
+						      $self->impotent() ||
+						      $self->alloconly());
+			$protovlan->SetRole("encapsulation");
+			$protovlan->SetType("vlan");
+			$protovlan->SetEncapStyle($virtlan->_encapstyle());
+			$protovlan->SetAttribute("link/lan", $lan);
+			$protovlans{$lan} = $protovlan;
+
+			$protovlan->AddMember($nodeA, $portA)
+			    if (!$protovlan->IsMember($nodeA, $portA));
+			$protovlan->AddMember($nodeB, $portB)
+			    if (!$protovlan->IsMember($nodeB, $portB));
+		    }
 		    $protolink = ProtoLan->Create($experiment, $lan,
 						  $self->impotent() ||
 						  $self->alloconly(),
 						  $protovlan);
-		    $protolink->SetType((defined($protovlan) ?
-					"emulated" : "emulated-shared"));
-		    $protolink->SetRole("link/lan");
-		    $protolink->AddInterface($nodeA, $vnodeA, $vportA, $portA);
- 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB, $portB);
+		    my $vlan_type;
+		    my $vlan_role;
+
+		    if (defined($protovlan)) {
+			$vlan_type = "emulated";
+			$vlan_role = "link/lan";
+		    }
+		    else {
+			$vlan_type = "vlan";
+			$vlan_role = "emulated";
+			$protolink->SetAttribute("link/lan", $lan);
+		    }
+		    $protolink->SetType($vlan_type);
+		    $protolink->SetRole($vlan_role);
+
+		    $protolink->AddInterface($nodeA, $vnodeA, $vportA,
+					     $virtifaceA->viface(),
+					     (defined($protovlan) ?
+					      undef : $portA));
+ 		    $protolink->AddInterface($nodeB, $vnodeB, $vportB,
+					     $virtifaceB->viface(),
+					     (defined($protovlan) ?
+					      undef : $portB));
+		    # For portmap below
+		    $portA = $virtifaceA->viface();
+		    $portB = $virtifaceB->viface();
 		}
 		else {
 		    $protolink = ProtoLan->Create($experiment, $lan,
@@ -5610,9 +5638,7 @@ sub InterpLinksAux($)
 		    #
 		    my $protovlan;
 		    
-		    if (!$virtlan->_sharednodes() ||
-			$virtlan->_sharednodes() ||
-			$virtlan->_needvlan()) {
+		    if (1) {
 			if (exists($protovlans{$lan})) {
 			    $protovlan = $protovlans{$lan};
 			}
@@ -6197,17 +6223,19 @@ sub nodejailosid($$)
     my $posinfo   = $virtnode->_parent_osinfo();
     my $nextosid;
 
+    $self->printdb("nodejailosid: $virtnode, $osinfo\n");
+
     if (!defined($posinfo)) {
 	return undef
 	    if (!defined($osinfo->nextosid()));
-	$osinfo = $osinfo->ResolveNextOSID($self->experiment());
+	my $newosinfo = $osinfo->ResolveNextOSID($self->experiment());
 	return undef
-	    if (!defined($osinfo));
-	$nextosid = $osinfo->osid();
+	    if (!defined($newosinfo));
+	$nextosid = $newosinfo->osid();
     
 	if (defined($nextosid)) {
 	    $self->printdb("Mapping VM osinfo $osinfo to ".
-			   "$nextosid on $virtnode\n");
+			   "$newosinfo on $virtnode\n");
 	}
 	else {
 	    tbwarn("Could not map jail osid to real osid on $virtnode\n");
@@ -6911,24 +6939,30 @@ sub UploadVlans($)
 	foreach my $lan (@lans) {
 	    # Only care about encapsulated links.
 	    next
-		if ($lan->type() ne "emulated");
+		if (! ($lan->type() eq "emulated" ||
+		       $lan->GetRole() eq "emulated"));
 
-	    my $linkedlan = $lan->GetLinkedLan();
-	    if (!defined($linkedlan)) {
-		tberror("Emulated lan $lan does not have a linked vlan!\n");
-		return -1;
-	    }
 	    my $virtlan     = $self->vlans()->{$lan->vname()};
 	    if (!defined($virtlan)) {
 		tberror("Could not find lan $lan in local lan list!\n");
 		return -1;
 	    }
 	    my $virtlanidx  = $virtlan->idx();
-	    my $linkedlanid = $linkedlan->lanid();
-	    
-	    $self->printdb("Update vinterfaces: $virtlan: ".
-			   "$virtlanidx -> $linkedlanid\n");
-	    
+	    my $linkedlanid = $lan->lanid();
+
+	    #
+	    # An encapsulated lan is linked to the real lan.
+	    # A vlan encapsulated link does not have a linked lan;
+	    # there is no need for it.
+	    #
+	    if ($lan->type() eq "emulated") {
+		my $linkedlan = $lan->GetLinkedLan();
+		if (!defined($linkedlan)) {
+		    tberror("Emulated lan $lan does not have a linked vlan!\n");
+		    return -1;
+		}
+		$linkedlanid = $linkedlan->lanid();
+	    }
 	    DBQueryWarn("update vinterfaces set vlanid='$linkedlanid' ".
 			"where virtlanidx='$virtlanidx' and ".
 			"      exptidx='$exptidx'")

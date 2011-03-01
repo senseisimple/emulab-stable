@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ my $TB       = "@prefix@";
 # Run the real thing, and never return.
 #
 unshift(@ARGV, "-k");
-exec "$TB/sbin/frisbeelauncher", @ARGV;
+exec "$TB/sbin/frisbeehelper", @ARGV;
 
 die("*** $0:\n".
     "    Could not exec program: $!");

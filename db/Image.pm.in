@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2007-2010 University of Utah and the Flux Group.
+# Copyright (c) 2007-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Image;
@@ -127,9 +127,6 @@ sub part4_osid($)       { return field($_[0], "part4_osid"); }
 sub default_osid($)     { return field($_[0], "default_osid"); }
 sub path($)             { return field($_[0], "path"); }
 sub magic($)            { return field($_[0], "magic"); }
-#sub load_address($)     { return field($_[0], "load_address"); }
-#sub frisbee_pid($)      { return field($_[0], "frisbee_pid"); }
-#sub load_busy($)        { return field($_[0], "load_busy"); }
 sub ezid($)             { return field($_[0], "ezid"); }
 sub shared($)           { return field($_[0], "shared"); }
 sub global($)           { return field($_[0], "global"); }
@@ -139,6 +136,8 @@ sub access_key($)       { return field($_[0], "access_key"); }
 
 #
 # Get a list of all running frisbee images.
+# XXX if this is actually used, it will have to be fixed; DB no longer
+# tracks running frisbee daemons.
 #
 sub ActiveImages($)
 {
@@ -370,7 +369,6 @@ sub EditImageid($$$$)
     # (Others above already did their own updates.)
     #
     my %updates;
-    #foreach my $col ("description", "path", "load_address", "frisbee_pid" ) {
     foreach my $col ("description", "path") {
 	# Copy args we want so that others can't get through.
 	if (exists($argref->{$col})) {

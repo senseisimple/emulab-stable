@@ -1,0 +1,316 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use Getopt::Std;
+use Sys::Syslog;
+use English;
+use Socket;
+use Errno;
+
+#
+# This is a compatibility shim for the pre-mfrisbeed frisbee world.
+#
+# It can be used to start or kill a frisbeed via the master server.
+#
+
+#
+# This also kills a running frisbee.
+#
+sub usage()
+{
+    print "Usage: $0 [-d] -n nodeid <imageid>\n";
+    print "  or\n";
+    print "Usage: $0 [-d] -k <imageid>\n";
+    print "-n nodeid   Node used for authentication of image access\n";
+    print "-k:	       Kill (rather than start) a frisbeed.\n";
+    print "-d:	       Print debugging output.\n";
+    exit(1);
+}
+my $optlist  = "dkn:";
+my $debug    = 0;
+my $killmode = 0;
+my $nodeid;
+
+# Configure variables
+my $TB		= "@prefix@";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use Node;
+use User;
+use Image;
+
+# Protos.
+sub Fatal($);
+sub debug($);
+
+# Defines
+my $FRISBEE	= "$TB/sbin/frisbee";
+my $PIDDIR	= "/var/run";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
+}
+if (defined($options{"n"})) {
+    $nodeid = $options{"n"};
+    if ($nodeid =~ /^([-\w]+)$/) {
+	$nodeid = $1;
+    } else {
+	Fatal("invalid nodeid");
+    }
+}
+usage()
+    if (!@ARGV || (!$killmode && !$nodeid));
+
+my $imagename = $ARGV[0];
+if ($imagename =~ /^([-\w\.+\/]+)$/) {
+    $imagename = $1;
+} else {
+    Fatal("invalid imagename");
+}
+
+#
+# Authentication.
+#
+# Note that an imageid can be a traditional disk image or the pathname
+# of a file, the master frisbee server worries about that distinction.
+#
+# For starting an image server, we provide a node_id which the master
+# server can authenticate with. We would also like to make sure the calling
+# user has permission to manipulate the node given, but unfortunately we
+# are called from tmcd which runs as "nobody". So since this is a temporary
+# shim, and we only run on boss where access is limited to authorized users
+# or through constrained interfaces, we allow any user to start up a
+# daemon for an image.
+#
+# For killing a server, we don't always have a node context.  In the
+# case where we don't, it will be a true image and we can perform an access
+# check with respect to the image.
+#
+# So, the strategy is:
+#
+#  * If we have a node context, and it is a regular Emulab image,
+#    we let the master server worry about whether the node can access
+#    the image.  This is the "relaxed" case for tmcd.
+#
+#  * If we have a node context, but it is not an Emulab image,
+#    we check that the user can modify the node, and let the master server
+#    worry about the node/user's ability to access the file.
+#    We do the user check here because tmcd will never call us to check
+#    on a non-image file.
+#
+#  * If there is no node context, it can only be a "kill" and we check
+#    the user's ability to modify the image (if it isn't an image, this
+#    check will fail).
+#
+my ($this_user, $isadmin, $image);
+
+if ($UID) {
+    $this_user = User->ThisUser();
+    if (!defined($this_user)) {
+	# XXX allow unknown user to start a server for a specified node
+	if (!$nodeid || $killmode) {
+	    Fatal("$UID: not a valid Emulab user");
+	}
+	$isadmin = 1;
+    } else {
+	$isadmin = $this_user->IsAdmin();
+    }
+} else {
+    $isadmin = 1;
+}
+
+$image = Image->Lookup($imagename);
+if (!$image) {
+    # If not an Emulab image, we must have a node context to check
+    if (!$nodeid) {
+	Fatal("$imagename: not a valid Emulab image");
+    }
+    # We must also have a valid user
+    if (!$this_user) {
+	Fatal("$UID: not a valid Emulab user");
+    }
+}
+
+if ($nodeid) {
+    my $node = Node->Lookup($nodeid);
+    if (!$node) {
+	Fatal("$nodeid: no such node");
+    }
+    if (!$isadmin &&
+	!$node->AccessCheck($this_user, TB_NODEACCESS_LOADIMAGE)) {
+	Fatal("$nodeid: cannot access node");
+    }
+} else {
+    # must be a kill operation; we checked this above
+    # must be a real image; ditto
+    # only called this way when deleting an image, so check access accordingly
+    if (!$isadmin &&
+	!$image->AccessCheck($this_user, TB_IMAGEID_DESTROY)) {
+	Fatal("$imagename: no permission to destroy");
+    }
+}
+
+#
+# If it is a real image, we have to construct the proper master server
+# imageid for it (pid/imagename), otherwise the given name is treated
+# as a filename path.
+#
+my $imageid;
+if ($image) {
+    $imageid = $image->pid() . "/" . $image->imagename();
+} else {
+    $imageid = $imagename;
+}
+
+#
+# Now we use the frisbee client to contact the master server
+# and either request starting of a server or to get back info that
+# we can use to kill the server instance.
+#
+my $cmd = "$FRISBEE -S localhost";
+if ($nodeid) {
+    $cmd .= " -P $nodeid";
+}
+if ($killmode) {
+    $cmd .= " -Q $imageid";
+} else {
+    $cmd .= " -F $imageid /dev/null";
+}
+debug("Invoking: $cmd\n");
+
+#
+# Parse the query/get output to get the address/port to either report
+# to the user on startup or to use to form a pid file name that we can
+# use to kill a running server.
+#
+my ($addr,$port,$running);
+if (!open(FRIS, "$cmd 2>&1 |")) {
+    Fatal("frisbee invocation failed!");
+}
+while (<FRIS>) {
+    if (/^error=(.*)$/) {
+	if ($1 != 0) {
+	    # For killmode we take an error to mean no daemon is running
+	    if ($killmode) {
+		$running = 0;
+		last;
+	    }
+	    Fatal("frisbee returned error=$1");
+	}
+	next;
+    }
+    if (/^running=(\d)$/) {
+	$running = $1;
+	last
+	    if ($running == 0);
+	next;
+    }
+    if (/^addr=([\d.]+)$/) {
+	$addr = $1;
+	next;
+    }
+    if (/^port=(\d+)$/) {
+	$port = $1;
+	next;
+    }
+    if (/: address: ([\d.]+):(\d+)/) {
+	$running = 1;
+	$addr = $1;
+	$port = $2;
+	last;
+    }
+}
+close(FRIS);
+if ($running && (!$addr || !$port)) {
+    Fatal("$imageid: could not determine address/port for server");
+}
+
+#
+# Starting: just report information
+#
+if (!$killmode) {
+    if (!$running) {
+	Fatal("$imageid: could not start server");
+    }
+    print "Address is $addr:$port\n";
+    exit(0);
+}
+
+#
+# Killing: kill daemon if running
+#
+if ($running) {
+    my $pidfile = "$PIDDIR/frisbeed-$addr-$port.pid";
+    if (! -r "$pidfile") {
+	debug("no pidfile '$pidfile' found\n");
+    } else {
+	my $pid = `cat $pidfile`;
+	if ($?) {
+	    debug("could not open '$pidfile'\n");
+	} else {
+	    if ($pid =~ /^(\d+)/) {
+		$pid = $1;
+		if (!kill('TERM', $pid)) {
+		    debug("could not kill $imageid process $pid\n");
+		} else {
+		    print "Killed process $pid\n";
+		}
+	    } else {
+		debug("bogus pid in $pidfile\n");
+	    }
+	}
+    }
+}
+exit(0);
+
+
+######################################################################
+# Subroutines
+######################################################################
+
+# Only print if -d option was given. Also add $$ on the beginning of the
+# string, to ease debugging
+sub debug($)
+{
+    my ($msg) = @_;
+
+    print STDERR "$$: $msg"
+	if ($debug);
+}
+
+sub Fatal($)
+{
+    my ($msg) = @_;
+    
+    tbdie("*** $0:\n".
+	  "    $msg\n");
+}

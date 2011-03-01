@@ -1,0 +1,358 @@
+#!/usr/bin/perl -w
+#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use strict;
+use English;
+use Getopt::Std;
+use Data::Dumper;
+
+#
+# Reserve a vlan tag for a link in an rspec, by contacting the other
+# CM in the link. 
+# 
+sub usage()
+{
+    print STDERR "Usage: reservevlans <slice_urn> <linkname> <rspec>\n";
+    exit(1);
+}
+my $optlist = "";
+my $other_manager;
+#
+# Configure variables
+#
+my $TB		  = "@prefix@";
+my $TBOPS         = "@TBOPSEMAIL@";
+my $TBLOGS        = "@TBLOGSEMAIL@";
+my $PGENIDOMAIN   = "@PROTOGENI_DOMAIN@";
+my $PGENISUPPORT  = @PROTOGENI_SUPPORT@;
+my $CMCERT	  = "$TB/etc/genicm.pem";
+my $SNMPIT        = "$TB/bin/snmpit";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Protos
+sub fatal($);
+sub ReserveLocalTags(@);
+sub ReserveRemoteTags($$@);
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+use vars qw($GENI_DBNAME);
+$GENI_DBNAME = "geni-cm";
+
+# Now we can load the libraries after setting the proper DB.
+use lib '@prefix@/lib';
+use Lan;
+require GeniDB;
+require GeniSlice;
+require GeniCredential;
+require GeniCertificate;
+require GeniAuthority;
+require GeniComponent;
+require Genixmlrpc;
+require GeniXML;
+require Genixmlrpc;
+use GeniResponse;
+
+#
+# Check args.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV != 3);
+
+my $slice_urn = $ARGV[0];
+my $linkname  = $ARGV[1];
+my $rspecfile = $ARGV[2];
+
+#
+# Load the CM cert to act as caller context.
+#
+my $certificate = GeniCertificate->LoadFromFile($CMCERT);
+if (!defined($certificate)) {
+    fatal("Could not load certificate from $CMCERT\n");
+}
+Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
+
+my $me = GeniAuthority->Lookup($certificate->urn());
+if (!defined($me)) {
+    fatal("Could not lookup myself");
+}
+my $credential = GeniCredential->GetSelfCredential($me);
+if (!defined($credential)) {
+    fatal("Could not generate a selfsigned credential for $me");
+}
+
+my $slice = GeniSlice->Lookup($slice_urn);
+if (!defined($slice)) {
+    fatal("No such slice $slice_urn");
+}
+if (! -e $rspecfile) {
+    fatal("rspec file does not exist");
+}
+my $rspec = GeniXML::ParseFile($rspecfile);
+if (!defined($rspec)) {
+    fatal("Could not parse rspec from $rspecfile");
+}
+my $rspecstr= GeniXML::Serialize($rspec);
+my $linkref = GeniXML::GetLinkByVirtualId($linkname, $rspec);
+if (!defined($linkref)) {
+    fatal("Could not find link inside the rspec");
+}
+#
+# We need the managers list to know who the other side is.
+#
+if (! GeniXML::FindNodes("n:component_manager", $linkref)) {
+    fatal("No managers list in the link specification");
+
+}
+my %managers = map { GeniXML::GetLinkManager($_) => $_ } 
+                     GeniXML::FindNodes("n:component_manager",
+					$linkref)->get_nodelist();
+#
+# For now, only duplex links, so find the manager for the other side.
+#
+foreach my $manager_urn (keys(%managers)) {
+    my $manager = GeniAuthority->CreateFromRegistry("CM", $manager_urn);
+    if (!defined($manager)) {
+	fatal("Could not lookup $manager_urn");
+    }
+    $managers{$manager_urn} = $manager;
+
+    $other_manager = $manager
+	if ($manager_urn ne $me->urn());
+}
+if (!defined($other_manager)) {
+    fatal("Who is the other manager?");
+}
+
+#
+# Go through the component hops and find the one that refers to us.
+# This is our external network point.
+#
+my $hopref;
+foreach my $ref (GeniXML::FindNodes("n:component_hop",
+				    $linkref)->get_nodelist()) {
+    my $component_urn = GeniXML::GetNodeId($ref);
+    my ($domain,undef,undef) = GeniHRN::Parse($component_urn);
+    if (defined($domain) and $domain eq $me->domain()) {
+	$hopref = $ref;
+	last;
+    }
+}
+if (!defined($hopref)) {
+    fatal("Could not find hop in link");
+}
+my $hop_urn = GeniXML::GetNodeId($hopref);
+my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
+my $network = ExternalNetwork->Lookup($network_id);
+if (!defined($network)) {
+    fatal("$hop_urn is not an external network");
+}
+# The bounds of the vlan tags we can use for this network point.
+my $mintag  = $network->min_vlan();
+my $maxtag  = $network->max_vlan();
+
+#
+# Need the slice experiment as the context within to allocate the
+# the tags. 
+#
+my $experiment = $slice->GetExperiment();
+if (!defined($experiment)) {
+    fatal("$slice does not have an experiment");
+}
+my $pid  = $experiment->pid();
+my $eid  = $experiment->eid();
+
+my $vlan = VLan->Lookup($experiment, $linkname);
+if (defined($vlan)) {
+    fatal("There is already a lan object for $linkname; $vlan");
+}
+#
+# The point of this is to create the VLan object, just long enough to
+# get a lanid and a tag assigned.
+#
+$vlan = VLan->Create($experiment, $linkname);
+if (!defined($vlan)) {
+    fatal("Could not create vlan for $linkname");
+}
+my $lanid = $vlan->lanid();
+
+#
+# Setup a signal handler to clean things up.
+#
+sub handler()
+{
+    fatal("Caught a signal ... cleaning up and exiting");
+}
+$SIG{HUP}  = \&handler;
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+my @othertags = ();
+
+while (my @tags = ReserveLocalTags(@othertags)) {
+    my $tag = ReserveRemoteTags($other_manager, \@othertags, @tags);
+    if ($tag) {
+	print STDERR "Agreeded on tag $tag. Releasing the rest.\n";
+	foreach my $t (@tags) {
+	    $vlan->ClearReservedVlanTag($t)
+		if ($t != $tag);
+	}
+	last;
+    }
+    # Clear all the tags so we can try again.
+    $vlan->ClearReservedVlanTag();
+}
+$vlan->Destroy();
+exit(0);
+
+sub ReserveRemoteTags($$@)
+{
+    my ($authority, $othertags, @tags) = @_;
+
+    my $method_args = {};
+    $method_args->{'credentials'}   = [$credential->asString()];
+    $method_args->{'slice_urn'}     = $slice->urn();
+    $method_args->{'slice_cert'}    = $slice->cert();
+    $method_args->{'rspec'}         = $rspecstr;
+    $method_args->{'linkname'}      = $linkname;
+    $method_args->{'taglist'}       = \@tags;
+    @$othertags = ();
+    
+    print STDERR "Calling $authority with tags: @tags\n";
+    
+    my $response =
+	Genixmlrpc::CallMethod($authority->url(),
+			       undef, "ReserveVlanTags", $method_args);
+    
+    if (!defined($response)) {
+	fatal("*** Internal error reserving tags at $authority");
+    }
+    if ($response->code() != GENIRESPONSE_SUCCESS &&
+	$response->code() != GENIRESPONSE_SEARCHFAILED) {
+	print STDERR "Could not reserve tags at $authority - Error: ";
+	print STDERR "  " . $response->output() . "\n";
+	fatal("");
+    }
+    if ($response->code == GENIRESPONSE_SEARCHFAILED) {
+	print STDERR "*** Target CM did not like any of the tags we sent\n";
+	if (defined($response->value()) && ref($response->value()) eq "ARRAY"){
+	    my @otags = @{ $response->value() };
+	    print STDERR "*** But they said they like these tags: @otags\n";
+	    foreach my $t (@otags) {
+		if (! ($t =~ /^\d*$/)) {
+		    fatal("Bad tag return from target CM: $t");
+		}
+	    }
+	    @$othertags = @otags;
+	}
+	return undef;
+    }
+    my $tempstr  = $response->value();
+    my $tmprspec = GeniXML::Parse($tempstr);
+    if (!defined($tmprspec)) {
+	fatal("Could not parse rspec from response");
+    }
+    my $tmpref = GeniXML::GetLinkByVirtualId($linkname, $tmprspec);
+    if (!defined($tmpref)) {
+	fatal("Could not find link inside the returned rspec");
+    }
+    my $tag = GeniXML::GetText("vlantag", $tmpref);
+    if (!defined($tag)) {
+	fatal("There is no vlan tag in the returned rspec for $linkname");
+    }
+    return $tag;
+}
+
+#
+# Reserve a set of local tags and return a list.
+#
+sub ReserveLocalTags(@)
+{
+    my @otags = @_;
+    my @tags  = ();
+    my @try   = ();
+    my $gototags = scalar(@otags);
+
+    #
+    # The goal is reserve 10 tags before we call the target CM, but
+    # we will take what we can get.
+    #
+    while (scalar(@tags) < 10) {
+	if ($gototags) {
+	    while (@otags) {
+		my $t = pop(@otags);
+		push(@try, $t)		
+		    if ($network->VlanTagOkay($t) &&
+			VLan->VlanTagAvailable($t));
+		
+		# But do not let the other CM make us reserve too many at once
+		last
+		    if (scalar(@try) > 10);
+	    }
+	}
+	else {
+	    while ($mintag < $maxtag) {
+		my $t = $mintag++;
+		push(@try, $t)		
+		    if (VLan->VlanTagAvailable($t));
+		
+		# But not more then 10 at a time.
+		last
+		    if (scalar(@try) > 10);
+	    }
+	}
+	# Nothing is available to reserve.
+	last
+	    if (!@try);
+
+	#
+	# Do this in "blockmode" so that snmpit does not throw an error
+	# if one of the tags is not available.
+	#
+	print STDERR "Trying to allocate vlan tags: @try\n";
+	system("$SNMPIT --blockmode -A $pid $eid $lanid," . join(",", @try));
+	if ($?) {
+	    fatal("Could not reserve vlan tags\n");
+	}
+	# See what tags we actually got.
+	foreach my $t (@try) {
+	    push(@tags, $t)
+		if ($vlan->HasVlanTagReserved($t));
+	}
+	@try = ();
+    }
+    if (scalar(@tags) == 0) {
+	fatal("Could not reserve any tags for $linkname");
+    }
+    print STDERR "Reserved vlan tags: @tags\n";
+    return @tags;
+}
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    if (defined($vlan)) {
+	# Clears all the tags.
+	$vlan->ClearReservedVlanTag();
+	$vlan->Destroy();
+    }
+
+    print STDERR "*** $0:\n".
+	         "    $msg\n";
+    # exit value important.
+    exit(-1);
+}
