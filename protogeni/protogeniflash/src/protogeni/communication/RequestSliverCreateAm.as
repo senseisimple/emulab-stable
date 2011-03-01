@@ -30,7 +30,12 @@ package protogeni.communication
 		op.pushField(sliver.slice.urn);
 		op.pushField([sliver.slice.credential]);
 		op.pushField(sliver.getRequestRspec().toXMLString());
-		op.pushField([{urn:Main.geniHandler.CurrentUser.urn, keys:sliver.slice.creator.keys}]);
+		// Internal API error: <Fault 102: "person_id 1: AddPersonKey: Invalid key_fields['key'] value: expected string, got struct">
+		var userKeys:Array = [];
+		for each(var keyObject:Object in sliver.slice.creator.keys) {
+			userKeys.push(keyObject.key);
+		}
+		op.pushField([{urn:Main.geniHandler.CurrentUser.urn, keys:userKeys}]);
 		op.setExactUrl(sliver.manager.Url);
 		op.timeout = 360;
     }
