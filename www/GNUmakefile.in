@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -108,6 +108,8 @@ NLFILES += $(wildcard $(SRCDIR)/netlab/*.png)
 NLFILES += $(wildcard $(SRCDIR)/netlab/*.gif)
 NLFILES += $(wildcard $(SRCDIR)/netlab/*.txt)
 
+PGENIFILES = $(wildcard $(SRCDIR)/protogeni/*.php3)
+
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
 WEBDBFILES += $(wildcard $(SRCDIR)/webdb/*.php)
 
@@ -173,6 +175,7 @@ ALLDOCS   = $(notdir $(DOCFILES))
 ALLTUTS   = $(notdir $(TUTFILES))
 ALLICONS  = $(notdir $(AUTOICONS))
 ALLWEBDB  = $(notdir $(WEBDBFILES))
+ALLPGENI  = $(notdir $(PGENIFILES))
 ALLDOWNLOADS = $(notdir $(DOWNLOADFILES))
 ALLCVSWEB = $(notdir $(CVSWEBFILES))
 ALLOPSCVSWEB = $(notdir $(OPSCVSWEBFILES))
@@ -193,6 +196,7 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/tutorial/, $(ALLTUTS)) \
 	$(addprefix $(INSTALL_WWWDIR)/doc/, $(ALLDOCS)) \
 	$(addprefix $(INSTALL_WWWDIR)/webdb/, $(ALLWEBDB)) \
+	$(addprefix $(INSTALL_WWWDIR)/protogeni/, $(ALLPGENI)) \
 	$(addprefix $(INSTALL_WWWDIR)/downloads/, $(ALLDOWNLOADS)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
