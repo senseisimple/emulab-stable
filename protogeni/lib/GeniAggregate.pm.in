@@ -449,13 +449,6 @@ sub SetAggregate($$)
 			 "  aggregate_idx='$agg_idx' ".
 			 "where idx='$idx'"));
     
-    if (!DBQueryWarn("update aggregate_history set ".
-		     "  aggregate_uuid='$agg_uuid' ".
-		     "where idx='$idx'")) {
-	print STDERR "GeniAggregate::SetAggregate: ".
-	    "Failed to update aggregate_history for $self\n";
-    }
-
     $self->{'AGGREGATE'}->{'aggregate_idx'} = $agg_idx;
     $self->{'PARENT'} = $aggregate;
     return 0;
