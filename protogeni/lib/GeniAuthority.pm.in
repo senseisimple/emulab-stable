@@ -556,9 +556,16 @@ sub Resolve($$)
 #
 # Discover resources at an authority (CM).
 #
-sub DiscoverResources($$)
+sub DiscoverResources($$;$$)
 {
-    my ($self, $urn) = @_;
+    my ($self, $urn, $available, $compress) = @_;
+
+    if (! defined($available)) {
+	$available = 1;
+    }
+    if (! defined($compress)) {
+	$compress = 0;
+    }
 
     my $manager_version = $self->Version();
     return undef
@@ -586,7 +593,8 @@ sub DiscoverResources($$)
     my $method_args;
     if ($manager_version == 2.0) {
 	$method_args->{'credentials'} = [$credential->asString()];
-	$method_args->{'available'}   = 1;
+	$method_args->{'available'}   = $available;
+	$method_args->{'compress'}    = $compress;
     }
     else {
 	print STDERR "GeniAuthority::Discover: Unknown version at $self\n";
