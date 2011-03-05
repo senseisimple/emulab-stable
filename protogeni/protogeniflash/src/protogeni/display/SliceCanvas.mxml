@@ -2,7 +2,7 @@
 <s:BorderContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
 				   xmlns:s="library://ns.adobe.com/flex/spark" 
 				   xmlns:mx="library://ns.adobe.com/flex/mx"
-				   width="100%" height="100%" borderStyle="solid" backgroundColor="#F6F6F6" borderColor="#CDC2C2"
+				   width="100%" height="100%" backgroundColor="#F6F6F6" borderStyle="solid" borderColor="#CDC2C2"
 				   dragEnter="dragEnterHandler(event)"  dragDrop="dragDropHandler(event)"
 				   mouseMove="mouseMoveHandler(event)"
 				   mouseUp="mouseUpHandler(event)">
@@ -33,21 +33,20 @@
 			
 			public function load(newSlice:Slice):void
 			{
-				// Clone it so we can make changes w/o affecting original
 				slice = newSlice.clone(false);
 				
 				// Nodes
 				for each(var s:Sliver in slice.slivers)
 				{
 					for each(var n:VirtualNode in s.nodes)
-					this.addVirtualNodeToCanvas(n);
+						this.addVirtualNodeToCanvas(n);
 				}
 				
 				// Links
 				for each(s in slice.slivers)
 				{
 					for each(var l:VirtualLink in s.links)
-					this.addVirtualLinkToCanvas(l);
+						this.addVirtualLinkToCanvas(l);
 				}
 			}
 			
@@ -158,7 +157,7 @@
 								PhysicalNode(List(event.dragInitiator).selectedItem).available &&
 								!allNodes.containsPhysicalNode(PhysicalNode(List(event.dragInitiator).selectedItem))))))
 				{
-					DragManager.acceptDragDrop(BorderContainer(event.currentTarget));
+					DragManager.acceptDragDrop(SliceCanvas(event.currentTarget));
 				}
 			}
 			
@@ -169,8 +168,8 @@
 					if(List(event.dragInitiator).selectedItem is PhysicalNode)
 					{
 						addPhysicalNode(List(event.dragInitiator).selectedItem as PhysicalNode,
-							BorderContainer(event.currentTarget).mouseX,
-							BorderContainer(event.currentTarget).mouseY);
+							SliceCanvas(event.currentTarget).mouseX,
+							SliceCanvas(event.currentTarget).mouseY);
 						
 					} else if(List(event.dragInitiator).selectedItem is VirtualNode) {
 						var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor((List(event.dragInitiator).selectedItem as VirtualNode).manager));
@@ -178,8 +177,8 @@
 						nvn.isShared = (List(event.dragInitiator).selectedItem as VirtualNode).isShared;
 						nvn.id = slice.getUniqueVirtualNodeId(nvn);
 						this.addVirtualNode(nvn,
-							BorderContainer(event.currentTarget).mouseX,
-							BorderContainer(event.currentTarget).mouseY);
+							SliceCanvas(event.currentTarget).mouseX,
+							SliceCanvas(event.currentTarget).mouseY);
 					}
 				}
 					// Handle markers
@@ -190,15 +189,15 @@
 					vn.isVirtual = true;
 					vn.id = slice.getUniqueVirtualNodeId(vn);
 					this.addVirtualNode(vn,
-						BorderContainer(event.currentTarget).mouseX,
-						BorderContainer(event.currentTarget).mouseY);
+						SliceCanvas(event.currentTarget).mouseX,
+						SliceCanvas(event.currentTarget).mouseY);
 				}
 				
 				// Handle dragging old one
 				else if(this.contains(event.dragInitiator as DisplayObject))
 				{
-					SliceNode(event.dragInitiator).x = BorderContainer(event.currentTarget).mouseX - SliceNode(event.dragInitiator).startX;
-					SliceNode(event.dragInitiator).y = BorderContainer(event.currentTarget).mouseY - SliceNode(event.dragInitiator).startY;
+					SliceNode(event.dragInitiator).setLocation(SliceCanvas(event.currentTarget).mouseX - SliceNode(event.dragInitiator).startX,
+						SliceCanvas(event.currentTarget).mouseY - SliceNode(event.dragInitiator).startY);
 					redrawAllLinks();
 				}
 			}

@@ -26,6 +26,7 @@ package protogeni.communication
 		super("RootBundle", "Getting root bundle", null, true);
 		op.setExactUrl(Main.geniHandler.rootBundleUrl);
 		op.type = Operation.HTTP;
+		op.timeout = 20;
 	}
 	
 	override public function complete(code : Number, response : Object) : *

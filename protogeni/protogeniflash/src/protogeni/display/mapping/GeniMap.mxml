@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <maps:Map xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
-		  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:maps="com.google.maps.*"
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:maps="com.google.maps.*"
 		  height="100%" width="100%"
 		  preinitialize="mappreinit()"
 		  mapevent_mappreinitialize="onMapPreinitialize(event)"
 		  mapevent_mapready="onMapReady(event)"
 		  sensor="false"
+		  ssl="true"
 		  key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg">
 	
 	<fx:Script>

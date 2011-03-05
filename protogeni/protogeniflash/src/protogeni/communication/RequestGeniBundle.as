@@ -26,6 +26,7 @@ package protogeni.communication
 		super("CertBundle", "Getting cert bundle", null, true);
 		op.setExactUrl(Main.geniHandler.certBundleUrl);
 		op.type = Operation.HTTP;
+		op.timeout = 20;
 	}
 	
 	override public function complete(code : Number, response : Object) : *

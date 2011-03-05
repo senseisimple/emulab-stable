@@ -22,6 +22,7 @@ package protogeni.communication
   
   import mx.collections.ArrayList;
   
+  import protogeni.GeniEvent;
   import protogeni.Util;
   import protogeni.display.DefaultWindow;
   import protogeni.display.XmlWindow;
@@ -76,7 +77,7 @@ package protogeni.communication
 				}
 			}
 			
-			Main.geniHandler.mapHandler.drawMap();
+			Main.geniDispatcher.dispatchGeniManagerChanged(plm, GeniEvent.ACTION_POPULATED);
 			
 		} catch(e:Error)
 		{
@@ -91,7 +92,6 @@ package protogeni.communication
 
     override public function fail(event : ErrorEvent, fault : MethodFault) : *
     {
-
 		plm.errorMessage = event.toString();
 		plm.errorDescription = event.text;
 		if(plm.errorMessage.search("#2048") > -1)

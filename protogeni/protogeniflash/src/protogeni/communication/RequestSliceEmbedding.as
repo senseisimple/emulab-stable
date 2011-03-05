@@ -14,54 +14,31 @@
 
 package protogeni.communication
 {
-  class RequestSliceEmbedding extends Request
+	import protogeni.resources.Sliver;
+
+  public class RequestSliceEmbedding extends Request
   {
-    public function RequestSliceEmbedding(newManager : ComponentManager,
-                                          newNodes : ActiveNodes,
-                                          newRequest : String,
-                                          newUrl : String) : void
+    public function RequestSliceEmbedding(newSliver:Sliver) : void
     {
-      super("SES");
-      manager = newManager;
-      nodes = newNodes;
-      request = newRequest;
-      url = newUrl;
+      super("SES","Embedding the sliver", CommunicationUtil.map);
+      sliver = newSliver;
+	  op.timeout = 500;
+	  op.addField("credential", newSliver.slice.creator.credential);
+	  op.addField("advertisement", sliver.manager.Rspec.toXMLString());
+	  op.addField("request", sliver.getRequestRspec());
+	  op.setUrl(CommunicationUtil.sesUrl);
     }
 
-    override public function cleanup() : void
-    {
-      super.cleanup();
+	override public function complete(code : Number, response : Object) : *
+	{
+		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
+		{
+			//nodes.mapRequest(response.value, manager);
+		}
+		
+		return null;
     }
 
-    override public function start(credential : Credential) : Operation
-    {
-      opName = "Embedding Slice";
-      op.reset(Geni.map);
-      op.addField("credential", credential.base);
-      op.addField("advertisement", manager.getAd());
-      op.addField("request", request);
-      op.setUrl(url);
-      return op;
-    }
-
-    override public function complete(code : Number, response : Object,
-                                      credential : Credential) : Request
-    {
-      if (code == 0)
-      {
-        nodes.mapRequest(response.value, manager);
-      }
-      return null;
-    }
-
-    override public function fail(event : ErrorEvent) : Request
-    {
-      return null;
-    }
-
-    var manager : ComponentManager;
-    var nodes : ActiveNodes;
-    var request : String;
-    var url : String;
+    var sliver:Sliver;
   }
 }

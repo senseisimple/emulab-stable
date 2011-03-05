@@ -7,6 +7,7 @@ package protogeni.resources
 	import mx.controls.Alert;
 	
 	import protogeni.GeniEvent;
+	import protogeni.communication.RequestResolvePl;
 	import protogeni.communication.RequestSitesLocation;
 	
 
@@ -82,6 +83,8 @@ package protogeni.resources
 
 				var r:RequestSitesLocation = new RequestSitesLocation(gm);
 				r.forceNext = true;
+				//var r:RequestResolvePl = new RequestResolvePl(gm);
+				//r.forceNext = true;
 				Main.geniHandler.requestHandler.pushRequest(r);
 				
 				myAfter();

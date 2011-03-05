@@ -22,6 +22,7 @@
 	import flash.events.MouseEvent;
 	
 	import mx.collections.ArrayCollection;
+	import mx.controls.Alert;
 	import mx.controls.Button;
 	import mx.controls.ButtonLabelPlacement;
 	import mx.managers.PopUpManager;
@@ -497,7 +498,13 @@
 		public static function viewSlice(s:Slice):void {
 			var sWindow:SliceWindow = new SliceWindow();
 			sWindow.showWindow();
-			sWindow.loadSlice(s);
+			try {
+				sWindow.loadSlice(s);
+			} catch(e:Error) {
+				LogHandler.appendMessage(new LogMessage("", "View slice fail", e.toString(), true, LogMessage.TYPE_END));
+				Alert.show("Problem loading slice, try refreshing the page");
+			}
+			
 		}
 		
 		public static function viewRequest(r:Request):void {

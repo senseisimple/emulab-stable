@@ -110,20 +110,23 @@
 				var finalX:int = x;
 				var finalY:int = y;
 				if(x == -1)
-				{
 					finalX = Math.round(Math.random() * parent.width);
+				if(y == -1)
 					finalY = Math.round(Math.random() * parent.height);
-					
-					// Make sure it isn't off the edges
-					if(finalX > (parent.width - this.width))
-						finalX -= this.width;
-					if(finalY > (parent.height - this.height))
-						finalY -= this.height;
-					if(finalX < this.width)
-						finalX = this.width;
-					if(finalY < this.height)
-						finalY = this.height;
-				}
+				
+				// right edge
+				if(finalX > (parent.width - this.width/2))
+					finalX = parent.width - this.width/2;
+				// bottom edge
+				if(finalY > (parent.height - this.height/2))
+					finalY = parent.height - this.height/2;
+				// left edge
+				if(finalX < this.width/2)
+					finalX = this.width/2;
+				// top edge
+				if(finalY < this.height/2)
+					finalY = this.height/2;
+				
 				this.x = finalX - (this.width/2);
 				this.y = finalY - (this.height/2);
 			}

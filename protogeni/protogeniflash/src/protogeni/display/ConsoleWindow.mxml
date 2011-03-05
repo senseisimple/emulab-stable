@@ -284,7 +284,7 @@
 		<s:Label text="Max Running Ops" />
 		<s:NumericStepper id="maxRunningStepper" value="{Main.geniHandler.requestHandler.maxRunning}" minimum="1" valueCommit="Main.geniHandler.requestHandler.maxRunning = maxRunningStepper.value; Main.geniHandler.requestHandler.tryNext();" />
 		<display:DefaultLine height="90%" />
-		<s:DropDownList id="requestList" labelField="name" requireSelection="true" height="24">
+		<s:DropDownList id="requestList" labelField="name" requireSelection="true" height="24" width="150">
 			<s:ArrayCollection>
 				<communication:RequestUserResolve />
 				<communication:RequestGetCredential />

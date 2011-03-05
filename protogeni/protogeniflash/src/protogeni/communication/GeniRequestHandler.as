@@ -201,6 +201,13 @@
 			}
 		}
 		
+		public function embedSlice(slice:Slice):void {
+			for each(var sliver:Sliver in slice.slivers)
+			{
+				pushRequest(new RequestSliceEmbedding(sliver));
+			}
+		}
+		
 		public function startSlice(slice:Slice):void
 		{
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);

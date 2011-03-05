@@ -67,6 +67,10 @@
 			skinClass: ClassReference("protogeni.display.skins.CheckBoxSkin");
 		}
 		
+		s|List {
+			skinClass: ClassReference("protogeni.display.skins.ListSkin");
+		}
+		
 	</fx:Style>
 	
 	<fx:Script>

@@ -76,8 +76,9 @@ package protogeni.communication
 
     public static var defaultHost : String = "boss.emulab.net";
 
-    public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
-
+    //public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
+	public static var sesUrl : String = "https://www.emulab.net/protogeni/xmlrpc/";
+	
     public static var chUrl : String = "https://boss.emulab.net/protogeni/xmlrpc/";
 
     public static var getCredential : Array = new Array(sa, "GetCredential");

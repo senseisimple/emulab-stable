@@ -60,7 +60,6 @@ package protogeni.communication
 				LogHandler.appendMessage(new LogMessage(plm.Url, "Sites " + String((new Date()).time - startTime.time)));
 
 			Main.geniDispatcher.dispatchGeniManagerChanged(plm, GeniEvent.ACTION_POPULATED);
-			Main.geniHandler.mapHandler.drawMap();
 		}
 		
 		return null;

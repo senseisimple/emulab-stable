@@ -144,6 +144,7 @@
 						break;
 					case Sliver.STATUS_FAILED:
 						this.hrnLabel.styleName = "failedStyle";
+						break;
 					case Sliver.STATUS_CHANGING:
 					case Sliver.STATUS_NOTREADY:
 					case Sliver.STATUS_UNKOWN:
@@ -343,6 +344,9 @@
 		<display:ImageButton id="deleteButton" toolTip="Delete slivers"
 							  click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
 							  icon="{DisplayUtil.deleteIcon}"/>
+		<display:DefaultLine percentHeight="90" />
+		<mx:Button id="embedButton" label="Embed" toolTip="Embed slivers"
+				   click="Main.geniHandler.requestHandler.embedSlice(sliceCanvas.slice)" />
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton id="startButton" toolTip="Start slivers"
 							  click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"

@@ -55,10 +55,13 @@
 			if(hrn == null) return null;
 			var status:String = NA;
 			for each(var sliver:Sliver in slivers) {
+				if(sliver.status == FAILED)
+					return FAILED;
+				
 				if(status == NA) status = sliver.status;
 				else {
 					if(sliver.status != status)
-						return "mixed";
+						return MIXED;
 				}
 			}
 			return status;

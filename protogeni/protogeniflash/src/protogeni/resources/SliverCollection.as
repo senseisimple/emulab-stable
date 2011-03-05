@@ -10,7 +10,7 @@ package protogeni.resources
 		}
 		
 		public function addIfNotExisting(s:Sliver):void
-		{
+		{			
 			for each(var sliver:Sliver in this)
 			{
 				if(sliver.manager == s.manager)

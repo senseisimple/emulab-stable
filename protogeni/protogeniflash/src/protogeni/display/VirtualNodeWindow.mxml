@@ -8,7 +8,9 @@
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
+			import mx.events.FlexEvent;
 			
+			import protogeni.resources.DiskImage;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualLink;
 			import protogeni.resources.VirtualNode;
@@ -17,6 +19,9 @@
 			
 			[Bindable]
 			public var node:VirtualNode = null;
+			
+			[Bindable]
+			private var images:ArrayCollection;
 			
 			public function loadNode(n:VirtualNode):void {
 				node = n;
@@ -27,6 +32,11 @@
 				else imgExclusive.toolTip = "Exclusive";
 				
 				this.diskImageText.text = n.getDiskImageShort();
+				
+				images = new ArrayCollection();
+				for each(var di:DiskImage in node.physicalNode.diskImages)
+					images.addItem(di);
+				
 				this.starupCommandText.text = n.startupCommand;
 				this.tarfilesText.text = n.tarfiles;
 				
@@ -144,6 +154,7 @@
 				}
 				
 			}
+
 		]]>
 	</fx:Script>
 	
@@ -245,8 +256,13 @@
 				<s:Label text="Disk Image" fontWeight="bold"/>
 			</mx:GridItem>
 			<mx:GridItem width="100%">
-				<display:PromptingTextInput id="diskImageText" width="100%"
-											prompt="Replace default with Image ID or full URN" />
+				<s:VGroup>
+					<display:PromptingTextInput id="diskImageText" width="100%"
+												prompt="Replace default with Image ID or full URN" />
+					<s:DropDownList id="diskImageSelect" width="100%"
+									dataProvider="{images}" labelField="description"
+									change="diskImageText.text = diskImageSelect.selectedItem.name" />
+				</s:VGroup>
 			</mx:GridItem>
 		</mx:GridRow>
 		<mx:GridRow width="100%">

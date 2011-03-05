@@ -38,6 +38,7 @@
 			
 			public function addNodeGroup(ng:PhysicalNodeGroup):void {
 				var ngButton:Button = new Button();
+				ngButton.height = 24;
 				ngButton.percentWidth = 100;
 				ngButton.label = ng.collection.length.toString() + " Nodes";
 				ngButton.addEventListener(MouseEvent.CLICK,
@@ -106,7 +107,7 @@
 		<s:VGroup width="100%" height="100%" id="nodeGroupButtonsVbox" gap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
 	</s:Scroller>
 	<s:HGroup>
-		<mx:Button label="All" id="allButton" height="24"
+		<s:Button label="All" id="allButton" height="24"
 				   click="DisplayUtil.viewNodeCollection(nodes);" />
 		<display:ImageButton label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
 	</s:HGroup>
