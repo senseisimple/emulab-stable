@@ -27,6 +27,18 @@
 		public static var statisticsIcon:Class;
 		
 		[Bindable]
+		[Embed(source="../../../images/document_signature.png")]
+		public static var credentialIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/information.png")]
+		public static var infoIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/entity.png")]
+		public static var authorityIcon:Class;
+		
+		[Bindable]
 		[Embed(source="../../../images/help.png")]
 		public static var helpIcon:Class;
 		

@@ -10,13 +10,17 @@
 			import protogeni.display.DisplayUtil;
 			import protogeni.resources.GeniManager;
 			
+			import spark.components.Button;
+			
 			[Bindable]
 			public var manager:GeniManager;
 			private var status:int = -1;
 			
 			public function init():void
 			{
-				this.addElement(DisplayUtil.getGeniManagerButton(manager));
+				var managerButton:Button = DisplayUtil.getGeniManagerButton(manager);
+				managerButton.percentWidth = 100;
+				this.addElement(managerButton);
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, tryUpdate);
 				update();
 			}

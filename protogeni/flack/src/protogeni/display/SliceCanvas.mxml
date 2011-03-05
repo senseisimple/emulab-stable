@@ -9,7 +9,6 @@
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
-			import mx.controls.List;
 			import mx.events.DragEvent;
 			import mx.managers.DragManager;
 			
@@ -18,7 +17,9 @@
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualLink;
-			import protogeni.resources.VirtualNode; 
+			import protogeni.resources.VirtualNode;
+			
+			import spark.components.List; 
 			
 			[Bindable]
 			public var slice:Slice;
@@ -52,6 +53,8 @@
 			
 			public function refreshSlice():void
 			{
+				redrawAllLinks();
+				
 				if(!slice.hasAllAllocatedResources())
 					return;
 				
@@ -72,7 +75,7 @@
 					{
 						for(var j:int = 0; j < unadded.length; j++)
 						{
-							if((unadded[j] as VirtualNode).id == sn.lastId)
+							if((unadded[j] as VirtualNode).clientId == sn.lastId)
 							{
 								unadded.removeItemAt(j);
 								break;
@@ -86,7 +89,7 @@
 				
 				// Add new nodes
 				for each(var unaddedNode:VirtualNode in unadded)
-				this.addVirtualNodeToCanvas(unaddedNode);
+					this.addVirtualNodeToCanvas(unaddedNode);
 				
 				unadded = slice.GetAllLinks();
 				
@@ -97,7 +100,7 @@
 					var vl:VirtualLink = slice.getVirtualLinkWithId(sl.lastId);
 					if(vl == null)
 					{
-						this.removeElement(sl.removeButton);
+						this.removeElement(sl.group);
 						this.removeElement(sl);
 						allLinks.removeItemAt(i);
 						i--;
@@ -106,7 +109,7 @@
 					{
 						for(j = 0; j < unadded.length; j++)
 						{
-							if((unadded[j] as VirtualLink).id == sl.lastId)
+							if((unadded[j] as VirtualLink).clientId == sl.lastId)
 							{
 								unadded.removeItemAt(j);
 								break;
@@ -119,7 +122,7 @@
 				
 				// Add new
 				for each(var unaddedLink:VirtualLink in unadded)
-				this.addVirtualLinkToCanvas(unaddedLink);
+					this.addVirtualLinkToCanvas(unaddedLink);
 				
 				hostWindow.loadNodes();
 			}
@@ -172,10 +175,10 @@
 							SliceCanvas(event.currentTarget).mouseY);
 						
 					} else if(List(event.dragInitiator).selectedItem is VirtualNode) {
-						var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor((List(event.dragInitiator).selectedItem as VirtualNode).manager));
-						nvn.isVirtual = true;
-						nvn.isShared = (List(event.dragInitiator).selectedItem as VirtualNode).isShared;
-						nvn.id = slice.getUniqueVirtualNodeId(nvn);
+						var dragNode:VirtualNode = List(event.dragInitiator).selectedItem as VirtualNode;
+						var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(dragNode.manager));
+						nvn.Exclusive = dragNode.Exclusive;
+						nvn.clientId = slice.getUniqueVirtualNodeId(nvn);
 						this.addVirtualNode(nvn,
 							SliceCanvas(event.currentTarget).mouseX,
 							SliceCanvas(event.currentTarget).mouseY);
@@ -186,8 +189,7 @@
 				{
 					var dragSource:GeniMapMarker = event.dragSource.dataForFormat( 'marker' ) as GeniMapMarker;
 					var vn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(dragSource.nodeGroups.collection[0].collection[0].manager));
-					vn.isVirtual = true;
-					vn.id = slice.getUniqueVirtualNodeId(vn);
+					vn.clientId = slice.getUniqueVirtualNodeId(vn);
 					this.addVirtualNode(vn,
 						SliceCanvas(event.currentTarget).mouseX,
 						SliceCanvas(event.currentTarget).mouseY);
@@ -333,7 +335,9 @@
 				sn.canvas = this;
 				this.addElement(sn);
 				this.validateNow();
-				sn.setLocation(x, y);
+				var addX:int = (x == -1) ? sn.node.flackX : x;
+				var addY:int = (y == -1) ? sn.node.flackY : y;
+				sn.setLocation(addX, addY);
 				sn.adjustWidth();
 				allNodes.addItem(sn);
 				
@@ -400,7 +404,6 @@
 					sl.drawEstablished();
 					this.setElementIndex(sl, 0);
 				}
-				
 			}
 		]]>
 	</fx:Script>

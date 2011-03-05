@@ -5,9 +5,16 @@ package protogeni.display
 	import flash.display.Sprite;
 	import flash.events.MouseEvent;
 	
+	import mx.controls.Alert;
 	import mx.core.UIComponent;
+	import mx.graphics.IFill;
+	import mx.graphics.SolidColor;
 	
 	import protogeni.resources.VirtualLink;
+	
+	import spark.components.Group;
+	import spark.components.HGroup;
+	import spark.primitives.Rect;
 	
 	public class SliceLink extends UIComponent
 	{
@@ -23,11 +30,16 @@ package protogeni.display
 		public static var INVALID_COLOR:uint = 0xff0000;
 		public static var VALID_COLOR:uint = 0x00ff00;
 		
+		public static var color:uint;
+		
 		public var virtualLink:VirtualLink;
 		public var startNode:SliceNode;
 		public var endNode:SliceNode;
 		public var established:Boolean = false;
-		public var removeButton:ImageButton;
+		//public var removeButton:ImageButton;
+		private var buttonGroup:HGroup;
+		public var group:Group;
+		public var groupColor:SolidColor;
 		public var canvas:SliceCanvas;
 		
 		private var rawSprite:Sprite;
@@ -41,6 +53,9 @@ package protogeni.display
 			
 			rawSprite = new Sprite();
 			addChild(rawSprite);
+			
+			color = NORMAL_COLOR;
+			groupColor = new SolidColor(color);
 		}
 		
 		public function isForNodes(first:SliceNode, second:SliceNode):Boolean
@@ -58,10 +73,32 @@ package protogeni.display
 		{
 			setLink(vl);
 			
-			removeButton = new ImageButton();
+			group = new Group();
+			var d:Rect = new Rect();
+			d.percentHeight = 100;
+			d.percentWidth = 100;
+			d.fill = groupColor;
+			group.addElement(d);
+			buttonGroup = new HGroup();
+			buttonGroup.gap = 2;
+			buttonGroup.paddingBottom = 2;
+			buttonGroup.paddingTop = 2;
+			buttonGroup.paddingRight = 2;
+			buttonGroup.paddingLeft = 2;
+			buttonGroup.setStyle("backgroundColor", 0xCCCCCC);
+			group.addElement(buttonGroup);
+			
+			var removeButton:ImageButton = new ImageButton();
 			removeButton.setStyle("icon", ImageUtil.crossIcon);
 			removeButton.addEventListener(MouseEvent.CLICK, removeLink);
-			canvas.addElement(removeButton);
+			buttonGroup.addElement(removeButton);
+			
+			var infoButton:ImageButton = new ImageButton();
+			infoButton.setStyle("icon", ImageUtil.infoIcon);
+			infoButton.addEventListener(MouseEvent.CLICK, viewLink);
+			buttonGroup.addElement(infoButton);
+			
+			canvas.addElement(group);
 			canvas.allLinks.addItem(this);
 
 			// For now just assume there's two ...
@@ -90,7 +127,7 @@ package protogeni.display
 		public function setLink(vl:VirtualLink):void
 		{
 			virtualLink = vl;
-			lastId = vl.id;
+			lastId = vl.clientId;
 		}
 		
 		public function removeLink(event:MouseEvent = null):void
@@ -98,14 +135,19 @@ package protogeni.display
 			virtualLink.remove();
 			startNode.removeLink(this);
 			endNode.removeLink(this);
-			canvas.removeElement(removeButton);
+			canvas.removeElement(group);
 			canvas.removeElement(this);
 			canvas.allLinks.removeItemAt(canvas.allLinks.getItemIndex(this));
 		}
 		
+		public function viewLink(event:MouseEvent = null):void
+		{
+			DisplayUtil.viewVirtualLink(virtualLink);
+		}
+		
 		public function drawEstablished():void
 		{
-			var color:uint = NORMAL_COLOR;
+			color = NORMAL_COLOR;
 			switch(virtualLink.linkType) {
 				case VirtualLink.TYPE_TUNNEL:
 					color = TUNNEL_COLOR;
@@ -117,18 +159,18 @@ package protogeni.display
 					color = ION_COLOR;
 					break;
 			}
-			drawLink(startNode.getMiddleX(), startNode.getMiddleY(), endNode.getMiddleX(), endNode.getMiddleY(), color);
-			removeButton.x = ((startNode.getMiddleX() + endNode.getMiddleX()) / 2) - (removeButton.width/2 + 1);
-			removeButton.y = ((startNode.getMiddleY() + endNode.getMiddleY()) / 2) - (removeButton.height/2);
+			drawLink(startNode.getMiddleX(), startNode.getMiddleY(), endNode.getMiddleX(), endNode.getMiddleY());
+			group.x = ((startNode.getMiddleX() + endNode.getMiddleX()) / 2) - (group.width/2 + 1);
+			group.y = ((startNode.getMiddleY() + endNode.getMiddleY()) / 2) - (group.height/2);
 		}
 		
 		public function drawEstablishing(startX:int, startY:int, endX:int, endY:int, ready:Boolean):void
 		{
-			var color:uint = ready ? VALID_COLOR : INVALID_COLOR;
-			drawLink(startX, startY, endX, endY, color);
+			color = ready ? VALID_COLOR : INVALID_COLOR;
+			drawLink(startX, startY, endX, endY);
 		}
 		
-		public function drawLink(startX:int, startY:int, endX:int, endY:int, color:uint):void
+		public function drawLink(startX:int, startY:int, endX:int, endY:int):void
 		{
 			rawSprite.graphics.clear();
 			rawSprite.graphics.lineStyle(4, color, 1.0, true,
@@ -136,15 +178,7 @@ package protogeni.display
 			rawSprite.graphics.moveTo(startX, startY);
 			rawSprite.graphics.lineTo(endX, endY);
 			
-			if(established)
-			{
-				rawSprite.graphics.moveTo(((startNode.getMiddleX() + endNode.getMiddleX()) / 2), ((startNode.getMiddleY() + endNode.getMiddleY()) / 2));
-				rawSprite.graphics.lineStyle(2, color, 1.0);
-				rawSprite.graphics.beginFill(color, 0.8);
-				rawSprite.graphics.drawCircle(((startNode.getMiddleX() + endNode.getMiddleX()) / 2),
-					((startNode.getMiddleY() + endNode.getMiddleY()) / 2),
-					9);
-			}
+			groupColor.color = color;
 		}
 	}
 }

@@ -393,7 +393,11 @@
 					if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !node.ignoreReturnCode)
 					{
 						Main.Application().setStatus(node.name + " done", true);
-						LogHandler.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));
+						LogHandler.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code),
+													"------------------------\nResponse:\n" +
+														node.op.getResponse() +
+														"\n\n------------------------\nRequest:\n" + node.op.getSent(),
+													true, LogMessage.TYPE_END));
 					} else {
 						Main.Application().setStatus(node.name + " done", false);
 						LogHandler.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponse(), false, LogMessage.TYPE_END));

@@ -8,7 +8,6 @@
 			import mx.collections.Sort;
 			import mx.collections.SortField;
 			
-			import protogeni.resources.NodeType;
 			import protogeni.resources.PhysicalNode;
 			
 			public var nodes:ArrayCollection;
@@ -28,9 +27,9 @@
 
 				var tempNodeTypes:Array = []
 				for each(var node:PhysicalNode in nodes) {
-					for each(var nodeType:NodeType in node.types) {
-						if(tempNodeTypes.indexOf(nodeType.name) == -1)
-							tempNodeTypes.push(nodeType.name);
+					for each(var nodeType:String in node.hardwareTypes) {
+						if(tempNodeTypes.indexOf(nodeType) == -1)
+							tempNodeTypes.push(nodeType);
 					}
 				}
 				
@@ -92,8 +91,8 @@
 				if(typeCheckbox.selected) {
 					viewNodes = new ArrayCollection();
 					for each(var nodeOfType:PhysicalNode in nodes) {
-						for each(var nodeType:NodeType in nodeOfType.types) {
-							if(nodeType.name == types.selectedItem) {
+						for each(var nodeType:String in nodeOfType.hardwareTypes) {
+							if(nodeType == types.selectedItem) {
 								viewNodes.addItem(nodeOfType);
 								break;
 							}
@@ -145,7 +144,7 @@
 	
 	<s:List width="100%" height="100%" id="list"
 			 dataProvider="{viewNodes}"
-			 itemRenderer="NodeItemRenderer"
+			 itemRenderer="protogeni.display.NodeItemRenderer"
 			 dragEnabled="true"
 			 change="if(host != null) host.load(event.target.selectedItem)" />
 </s:VGroup>

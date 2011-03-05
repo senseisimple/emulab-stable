@@ -4,19 +4,36 @@
 		  xmlns:mx="library://ns.adobe.com/flex/mx" width="400" height="300" xmlns:display="protogeni.display.*">
 	<fx:Script>
 		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.controls.Button;
+			
 			import protogeni.Util;
 			import protogeni.resources.PhysicalLink;
+			import protogeni.resources.PhysicalNodeInterface;
 			
 			[Bindable]
 			public var link:PhysicalLink = null;
 			
+			[Bindable]
+			public var linkTypes:ArrayCollection = new ArrayCollection();
+			
 			public function load(l:PhysicalLink):void {
 				link = l;
 				txtBandwidth.text = Util.kbsToString(l.bandwidth);
-				managerGridItem.removeAllChildren();
-				managerGridItem.addChild(DisplayUtil.getGeniManagerButton(link.manager));
-				interface1Button.setStyle("icon",DisplayUtil.assignAvailabilityIcon(l.interface1.owner));
-				interface2Button.setStyle("icon",DisplayUtil.assignAvailabilityIcon(l.interface2.owner));
+				this.managerHgroup.addElement(DisplayUtil.getGeniManagerButton(link.manager));
+				
+				for each(var linkType:String in link.linkTypes) {
+					linkTypes.addItem(linkType);
+				}
+				
+				for each(var i:PhysicalNodeInterface in l.interfaceRefs.collection) {
+					var hgroup:HGroup = new HGroup();
+					hgroup.percentWidth = 100;
+					hgroup.verticalAlign = "middle";
+					hgroup.addElement(DisplayUtil.getPhysicalNodeButton(i.owner));
+					hgroup.addElement(DisplayUtil.getLabel("on " + Util.shortenString(i.id, 40)));
+					this.interfaceVgroup.addElement(hgroup);
+				}
 			}
 			
 			public function viewRspec():void {
@@ -28,80 +45,38 @@
 		]]>
 	</fx:Script>
 	
-	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
-		<mx:GridRow width="100%">
-			<mx:GridItem rowSpan="2">
-				<s:Button label="RSPEC" width="100%" height="100%" click="viewRspec()"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{link.name}" fontSize="17" fontWeight="bold" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem width="100%">
-				<s:HGroup>
-					<s:Label text="Bandwidth" fontWeight="bold"/>
-					<s:Label id="txtBandwidth"/>
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="Latency" fontWeight="bold"/>
-					<s:Label text="{link.latency}"/>
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="Packet Loss" fontWeight="bold"/>
-					<s:Label text="{link.packetLoss}"/>
-				</s:HGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="URN" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{link.urn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
+	<s:HGroup width="100%" verticalAlign="middle">
+		<s:Label text="{link.name}" toolTip="{link.id}" fontSize="17" fontWeight="bold" width="100%" />
+		<display:ImageButton icon="{ImageUtil.pageWhiteCodeIcon}"
+							 click="viewRspec()"
+							 toolTip="View RSPEC" />
+	</s:HGroup>
+	
+	<s:HGroup>
+		<s:Label text="Types" fontWeight="bold"/>
+		<s:List id="listNodes" dataProvider="{linkTypes}" />
+		<s:VGroup>
+			<s:HGroup id="managerHgroup" verticalAlign="middle">
 				<s:Label text="Manager" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%" id="managerGridItem">
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:VGroup horizontalAlign="right" width="100%">
-					<s:Label text="Connects" fontWeight="bold"/>
-				</s:VGroup>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%">
-					<s:Button id="interface1Button" label="{link.interface1.owner.name}" height="24"
-							  click="DisplayUtil.viewPhysicalNode(link.interface1.owner);"/>
-					<s:Label text="on {link.interface1.id}"/>
-				</s:VGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:VGroup horizontalAlign="right" width="100%">
-					<s:Label text="to" fontWeight="bold"/>
-				</s:VGroup>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%">
-					<s:Button id="interface2Button" label="{link.interface2.owner.name}" height="24"
-							  click="DisplayUtil.viewPhysicalNode(link.interface2.owner);"/>
-					<s:Label text="on {link.interface2.id}"/>
-				</s:VGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem>
-				<s:Label text="Types" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<mx:List width="100%" height="100%" id="listNodes" dataProvider="{link.types}" />
-			</mx:GridItem>
-		</mx:GridRow>
-	</mx:Grid>
+			</s:HGroup>
+			<s:HGroup>
+				<s:Label text="Bandwidth" fontWeight="bold"/>
+				<s:Label id="txtBandwidth"/>
+			</s:HGroup>
+			<s:HGroup>
+				<s:Label text="Latency" fontWeight="bold"/>
+				<s:Label text="{link.latency}"/>
+			</s:HGroup>
+			<s:HGroup>
+				<s:Label text="Packet Loss" fontWeight="bold"/>
+				<s:Label text="{link.packetLoss}"/>
+			</s:HGroup>
+		</s:VGroup>
+	</s:HGroup>
+	
+	<s:Label text="Connects" fontWeight="bold"/>
+	<s:Scroller width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" id="interfaceVgroup" />
+	</s:Scroller>
 	
 </s:VGroup>

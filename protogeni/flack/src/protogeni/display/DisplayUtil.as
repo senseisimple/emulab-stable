@@ -23,8 +23,6 @@
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
-	import mx.controls.Button;
-	import mx.controls.ButtonLabelPlacement;
 	import mx.core.DragSource;
 	import mx.managers.DragManager;
 	import mx.managers.PopUpManager;
@@ -44,6 +42,7 @@
 	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
 	
+	import spark.components.Button;
 	import spark.components.Label;
 	
 	public class DisplayUtil
@@ -162,11 +161,11 @@
 			{
 				if(msg.type == LogMessage.TYPE_START) {
 					logButton.setStyle("icon",ImageUtil.rightIcon);
-					logButton.labelPlacement = ButtonLabelPlacement.LEFT;
+					//logButton.labelPlacement = ButtonLabelPlacement.LEFT;
 				}
 				else if(msg.type == LogMessage.TYPE_END) {
 					logButton.setStyle("icon",ImageUtil.rightIcon);
-					logButton.labelPlacement = ButtonLabelPlacement.RIGHT;
+					//logButton.labelPlacement = ButtonLabelPlacement.RIGHT;
 				}
 				else {
 					logButton.setStyle("icon",ImageUtil.availableIcon);
@@ -184,7 +183,6 @@
 		public static function getRequestButton(r:Request):Button {
 			var requestButton:Button = getButton();
 			requestButton.label = r.name;
-			requestButton.data = r;
 			requestButton.toolTip = r.details;
 			requestButton.addEventListener(MouseEvent.CLICK,
 				function openRequest(event:MouseEvent):void {
@@ -198,7 +196,6 @@
 		public static function getSliceButton(s:Slice):Button {
 			var sButton:Button = getButton();
 			sButton.label = Util.getNameFromUrn(s.urn);
-			sButton.data = s;
 			sButton.addEventListener(MouseEvent.CLICK,
 				function openSlice(event:MouseEvent):void {
 					viewSlice(s);
@@ -211,20 +208,19 @@
 		public static function getGeniManagerButton(gm:GeniManager):Button {
 			var cmButton:Button = getButton();
 			cmButton.label = gm.Hrn;
-			cmButton.data = gm;
 			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
 			cmButton.setStyle("chromeColor", colorsDark[gm.colorIdx]);
 			cmButton.setStyle("color", colorsLight[gm.colorIdx]);
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewGeniManager(event.currentTarget.data);
+					DisplayUtil.viewGeniManager(gm);
 				}
 			);
 			cmButton.addEventListener(MouseEvent.MOUSE_MOVE,
 				function startDrag(e:MouseEvent):void {
 					var dragInitiator:Button=Button(e.currentTarget);
 					var ds:DragSource = new DragSource();
-					ds.addData(e.currentTarget.data, 'manager');
+					ds.addData(gm, 'manager');
 					DragManager.doDrag(dragInitiator, ds, e);
 				}
 			);
@@ -250,6 +246,7 @@
 			nodeButton.toolTip = n.name + " on " + n.manager.Hrn;
 			nodeButton.setStyle("chromeColor", colorsDark[n.manager.colorIdx]);
 			nodeButton.setStyle("color", colorsLight[n.manager.colorIdx]);
+			nodeButton.setStyle("icon", assignAvailabilityIcon(n));
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
 					DisplayUtil.viewPhysicalNode(n);
@@ -259,7 +256,32 @@
 				function startDrag(e:MouseEvent):void {
 					var dragInitiator:Button=Button(e.currentTarget);
 					var ds:DragSource = new DragSource();
-					ds.addData(e.currentTarget.data, 'physicalnode');
+					ds.addData(n, 'physicalnode');
+					DragManager.doDrag(dragInitiator, ds, e);
+				}
+			);
+			return nodeButton;
+		}
+		
+		public static function getPhysicalNodeGroupButton(ng:PhysicalNodeGroup):Button {
+			var nodeButton:Button = getButton();
+			if(ng.city.length == 0)
+				nodeButton.label = ng.collection.length.toString() + " Nodes";
+			else
+				nodeButton.label = ng.city + " (" + ng.collection.length + ")";
+			nodeButton.toolTip = ng.GetManager().Hrn;
+			nodeButton.setStyle("chromeColor", colorsDark[ng.GetManager().colorIdx]);
+			nodeButton.setStyle("color", colorsLight[ng.GetManager().colorIdx]);
+			nodeButton.addEventListener(MouseEvent.CLICK,
+				function openNode(event:MouseEvent):void {
+					DisplayUtil.viewNodeGroup(ng);
+				}
+			);
+			nodeButton.addEventListener(MouseEvent.MOUSE_MOVE,
+				function startDrag(e:MouseEvent):void {
+					var dragInitiator:Button=Button(e.currentTarget);
+					var ds:DragSource = new DragSource();
+					ds.addData(ng, 'physicalnodegroup');
 					DragManager.doDrag(dragInitiator, ds, e);
 				}
 			);
@@ -269,8 +291,8 @@
 		// Gets a button for the physical node
 		public static function getVirtualNodeButton(n:VirtualNode):Button {
 			var nodeButton:Button = getButton();
-			nodeButton.label = n.id;
-			nodeButton.toolTip = n.id + " on " + n.manager.Hrn;
+			nodeButton.label = n.clientId;
+			nodeButton.toolTip = n.clientId + " on " + n.manager.Hrn;
 			nodeButton.setStyle("chromeColor", colorsDark[n.manager.colorIdx]);
 			nodeButton.setStyle("color", colorsLight[n.manager.colorIdx]);
 			nodeButton.addEventListener(MouseEvent.CLICK,
@@ -282,7 +304,7 @@
 				function startDrag(e:MouseEvent):void {
 					var dragInitiator:Button=Button(e.currentTarget);
 					var ds:DragSource = new DragSource();
-					ds.addData(e.currentTarget.data, 'virtualnode');
+					ds.addData(n, 'virtualnode');
 					DragManager.doDrag(dragInitiator, ds, e);
 				}
 			);
@@ -305,7 +327,7 @@
 		// Gets a button for the virtual link
 		public static function getVirtualLinkButton(pl:VirtualLink):Button {
 			var linkButton:Button = new Button();
-			linkButton.label = pl.id;
+			linkButton.label = pl.clientId;
 			linkButton.setStyle("icon", ImageUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
@@ -319,7 +341,7 @@
 		public static function viewVirtualLink(pl:VirtualLink):void {
 	    	var plWindow:VirtualLinkWindow = new VirtualLinkWindow();
 			plWindow.showWindow();
-       		plWindow.loadPointLink(pl);
+       		plWindow.loadLink(pl);
 	    }
 		
 		// Opens a physical link window
@@ -373,6 +395,12 @@
 			ngWindow.loadNode(n);
 		}
 		
+		public static function viewSliceNode(sn:SliceNode):void {
+			var ngWindow:VirtualNodeWindow = new VirtualNodeWindow();
+			ngWindow.showWindow();
+			ngWindow.loadNode(sn.node);
+		}
+		
 		// Opens a group of physical nodes in a window
 		public static function viewNodeGroup(ng:PhysicalNodeGroup):void {
 			var ngWindow:PhysicalNodeGroupWindow = new PhysicalNodeGroupWindow();
@@ -395,12 +423,12 @@
 		public static function viewSlice(s:Slice):void {
 			var sWindow:SliceWindow = new SliceWindow();
 			sWindow.showWindow();
-			try {
+			//try {
 				sWindow.loadSlice(s);
-			} catch(e:Error) {
-				LogHandler.appendMessage(new LogMessage("", "View slice fail", e.toString(), true, LogMessage.TYPE_END));
-				Alert.show("Problem loading slice, try refreshing the page");
-			}
+			//} catch(e:Error) {
+			//	LogHandler.appendMessage(new LogMessage("", "View slice fail", e.toString(), true, LogMessage.TYPE_END));
+			//	Alert.show("Problem loading slice, try refreshing the page");
+			//}
 			
 		}
 		
@@ -421,11 +449,6 @@
 			PopUpManager.centerPopUp(aboutWindow);
 		}
 		
-		public static function viewSlicesWindow():void {
-			var slicesWindow:SlicesWindow = new SlicesWindow();
-			slicesWindow.showWindow();
-		}
-		
 		public static function viewUserWindow():void {
 			var userWindow:UserWindow = new UserWindow();
 			userWindow.showWindow();
@@ -436,11 +459,6 @@
 			xmlView.title = title;
 			xmlView.showWindow();
 			xmlView.loadXml(xml);
-		}
-		
-		public static function viewManagersWindow():void {
-			var managersWindow:GeniManagersWindow = new GeniManagersWindow();
-			managersWindow.showWindow();
 		}
 		
 		public static function getButton(img:Class = null, imgOnly:Boolean = false):Button {

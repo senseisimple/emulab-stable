@@ -10,8 +10,6 @@
 			import mx.collections.Sort;
 			import mx.collections.SortField;
 			
-			import protogeni.resources.NodeType;
-			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeGroup;
 			
 			public function loadCollection(group:ArrayCollection):void {

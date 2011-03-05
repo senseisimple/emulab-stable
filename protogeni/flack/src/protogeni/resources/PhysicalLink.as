@@ -19,50 +19,35 @@
 	// Physical link between nodes
 	public class PhysicalLink
 	{
+		public var owner:PhysicalLinkGroup;
+		
+		[Bindable]
+		public var name:String;
+		[Bindable]
+		public var id:String;
+		[Bindable]
+		public var manager:GeniManager;
+		[Bindable]
+		public var linkTypes:Vector.<String> = new Vector.<String>();
+		public var interfaceRefs:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();
+		
+		public var rspec:XML;
+		
+		// TODEPRECIATE
+		[Bindable]
+		public var bandwidth:Number;
+		[Bindable]
+		public var latency:Number;
+		[Bindable]
+		public var packetLoss:Number;
+		
 		public function PhysicalLink(own:PhysicalLinkGroup)
 		{
 			owner = own;
 		}
 		
-		public var owner:PhysicalLinkGroup;
-		
-		[Bindable]
-		public var name:String;
-		
-		[Bindable]
-		public var managerString:String;
-		
-		[Bindable]
-		public var manager:GeniManager;
-		
-		[Bindable]
-		public var urn:String;
-		
-		[Bindable]
-		public var interface1:PhysicalNodeInterface;
-		
-		[Bindable]
-		public var interface2:PhysicalNodeInterface;
-		
-		[Bindable]
-		public var bandwidth:Number;
-		
-		[Bindable]
-		public var latency:Number;
-		
-		[Bindable]
-		public var packetLoss:Number;
-		
-		[Bindable]
-		public var types:Vector.<String> = new Vector.<String>();
-
-		public var rspec:XML;
-		
 		public function GetNodes():Vector.<PhysicalNode> {
-			var ac:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
-			ac.push(interface1.owner);
-			ac.push(interface2.owner);
-			return ac;
+			return interfaceRefs.Nodes();
 		}
 	}
 }

@@ -14,6 +14,9 @@
       <allow-source-path-overlap>false</allow-source-path-overlap>
       <!-- compiler.as3: use the ActionScript 3 class based object model for greater performance and better error reporting. In the class based object model most built-in functions are implemented as fixed methods of classes.-->
       <as3>true</as3>
+      <!-- compiler.compress usage:
+      <compress>boolean</compress>
+      -->
       <!-- compiler.context-root: path to replace {context.root} tokens for service channel endpoints-->
       <!-- compiler.context-root usage:
       <context-root>context-path</context-root>
@@ -53,7 +56,7 @@
       </extensions>
       <!-- compiler.external-library-path: list of SWC files or directories to compile against but to omit from linking-->
       <external-library-path>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\player\10.0\playerglobal.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\player\10.2\playerglobal.swc</path-element>
       </external-library-path>
       <fonts>
          <!-- compiler.fonts.advanced-anti-aliasing: enables advanced anti-aliasing for embedded fonts, which provides greater clarity for small fonts.-->
@@ -126,16 +129,20 @@
       <keep-generated-actionscript>false</keep-generated-actionscript>
       <!-- compiler.library-path: list of SWC files or directories that contain SWC files-->
       <library-path>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\framework.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\textLayout.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\spark.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\sparkskins.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\rpc.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\datavisualization.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\flash-integration.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\osmf.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\libs\utilities.swc</path-element>
-         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\4.1.0\frameworks\locale\{locale}</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\framework.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\textLayout.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\spark.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\sparkskins.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\rpc.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\charts.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\spark_dmv.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\osmf.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\mx\mx.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\advancedgrids.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\authoringsupport.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\core.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\libs\flash-integration.swc</path-element>
+         <path-element>C:\Program Files (x86)\Adobe\Adobe Flash Builder 4\sdks\flex_sdk_4.5.0.20967\frameworks\locale\{locale}</path-element>
          <path-element>D:\Documents\Flash Builder 4\flack\libs</path-element>
       </library-path>
       <!-- compiler.locale: specifies the locale for internationalization-->
@@ -145,6 +152,8 @@
       <!-- compiler.minimum-supported-version usage:
       <minimum-supported-version>string</minimum-supported-version>
       -->
+      <!-- compiler.mobile: specifies the target runtime is a mobile device-->
+      <mobile>false</mobile>
       <mxml>
          <!-- compiler.mxml.compatibility-version: specifies a compatibility version. e.g. -compatibility-version=2.0.1-->
          <!-- compiler.mxml.compatibility-version usage:
@@ -180,9 +189,17 @@
       <omit-trace-statements>true</omit-trace-statements>
       <!-- compiler.optimize: Enable post-link SWF optimization-->
       <optimize>true</optimize>
+      <!-- compiler.preloader: Specifies the default value for the Application's preloader attribute. If not specified, the default preloader value is mx.preloaders.SparkDownloadProgressBar when -compatibility-version >= 4.0 and mx.preloaders.DownloadProgressBar when -compatibility-version < 4.0.-->
+      <!-- compiler.preloader usage:
+      <preloader>string</preloader>
+      -->
       <!-- compiler.report-invalid-styles-as-warnings: enables reporting of invalid styles as warnings-->
       <!-- compiler.report-invalid-styles-as-warnings usage:
       <report-invalid-styles-as-warnings>boolean</report-invalid-styles-as-warnings>
+      -->
+      <!-- compiler.report-missing-required-skin-parts-as-warnings: Use this option to generate a warning instead of an error when a missing required skin part is detected.-->
+      <!-- compiler.report-missing-required-skin-parts-as-warnings usage:
+      <report-missing-required-skin-parts-as-warnings>boolean</report-missing-required-skin-parts-as-warnings>
       -->
       <!-- compiler.services: path to Flex Data Services configuration file-->
       <!-- compiler.services usage:
@@ -322,6 +339,10 @@
       -->
    </frames>
    <framework>halo</framework>
+   <!-- include-inheritance-dependencies-only: only include inheritance dependencies of classes specified with include-classes -->
+   <!-- include-inheritance-dependencies-only usage:
+   <include-inheritance-dependencies-only>boolean</include-inheritance-dependencies-only>
+   -->
    <!-- include-resource-bundles: a list of resource bundles to include in the output SWC-->
    <!-- include-resource-bundles usage:
    <include-resource-bundles>
@@ -352,13 +373,13 @@
       <contributor>name</contributor>
       -->
       <!-- metadata.creator: A creator's name to store in the SWF metadata-->
-      <creator>University of Utah</creator>
+      <creator>unknown</creator>
       <!-- metadata.date: The creation date to store in the SWF metadata-->
       <!-- metadata.date usage:
       <date>text</date>
       -->
       <!-- metadata.description: The default description to store in the SWF metadata-->
-      <description>http://www.protogeni.net</description>
+      <description>http://www.adobe.com/products/flex</description>
       <!-- metadata.language: The language to store in the SWF metadata (i.e. EN, FR)-->
       <language>EN</language>
       <!-- metadata.localized-description: A localized RDF/XMP description to store in the SWF metadata-->
@@ -378,14 +399,16 @@
       </localized-title>
       -->
       <!-- metadata.publisher: A publisher's name to store in the SWF metadata-->
-      <publisher>University of Utah</publisher>
+      <publisher>unknown</publisher>
       <!-- metadata.title: The default title to store in the SWF metadata-->
-      <title>Flack</title>
+      <title>Adobe Flex 4 Application</title>
    </metadata>
    <!-- raw-metadata: XML text to store in the SWF metadata (overrides metadata.* configuration)-->
    <!-- raw-metadata usage:
    <raw-metadata>text</raw-metadata>
    -->
+   <!-- remove-unused-rsls: remove RSLs that are not being used by the application-->
+   <remove-unused-rsls>true</remove-unused-rsls>
    <!-- resource-bundle-list: prints a list of resource bundles to a file for input to the compc compiler to create a resource bundle SWC file. -->
    <!-- resource-bundle-list usage:
    <resource-bundle-list>filename</resource-bundle-list>
@@ -397,6 +420,7 @@
       <url>string</url>
    </runtime-shared-libraries>
    -->
+   <!-- runtime-shared-library-path: specifies a SWC to link against, an RSL URL to load, with an optional policy file URL and optional failover URLs -->
    <!-- runtime-shared-library-path usage:
    <runtime-shared-library-path>
       <path-element>string</path-element>
@@ -404,13 +428,43 @@
       <policy-file-url>string</policy-file-url>
    </runtime-shared-library-path>
    -->
+   <runtime-shared-library-settings>
+      <!-- runtime-shared-library-settings.application-domain: override the application domain an RSL is loaded into. The supported values are 'current', 'default', 'parent', or 'top-level'.-->
+      <!-- runtime-shared-library-settings.application-domain usage:
+      <application-domain>
+         <path-element>string</path-element>
+         <application-domain-target>string</application-domain-target>
+      </application-domain>
+      -->
+      <!-- runtime-shared-library-settings.force-rsls: force an RSL to be loaded, overriding the removal caused by using the remove-unused-rsls option-->
+      <!-- runtime-shared-library-settings.force-rsls usage:
+      <force-rsls>
+         <path-element>string</path-element>
+         <path-element>string</path-element>
+      </force-rsls>
+      -->
+   </runtime-shared-library-settings>
+   <!-- size-report: Output an XML-formatted report detailing the size of all code and data linked into the application.-->
+   <!-- size-report usage:
+   <size-report>filename</size-report>
+   -->
    <!-- static-link-runtime-shared-libraries: statically link the libraries specified by the -runtime-shared-libraries-path option.-->
    <static-link-runtime-shared-libraries>false</static-link-runtime-shared-libraries>
+   <!-- swf-version: specifies the version of the compiled SWF file.-->
+   <swf-version>11</swf-version>
    <!-- target-player: specifies the version of the player the application is targeting. Features requiring a later version will not be compiled into the application. The minimum value supported is "9.0.0".-->
-   <target-player>10.0.0</target-player>
+   <target-player>10.2.0</target-player>
    <!-- tools-locale: specifies the locale used by the compiler when reporting errors and warnings.-->
    <!-- tools-locale usage:
    <tools-locale>string</tools-locale>
+   -->
+   <!-- use-direct-blit: Use hardware acceleration to blit graphics to the screen, where such acceleration is available.-->
+   <!-- use-direct-blit usage:
+   <use-direct-blit>boolean</use-direct-blit>
+   -->
+   <!-- use-gpu: Use GPU compositing features when drawing graphics, where such acceleration is available.-->
+   <!-- use-gpu usage:
+   <use-gpu>boolean</use-gpu>
    -->
    <!-- use-network: toggle whether the SWF is flagged for access to network resources-->
    <use-network>true</use-network>

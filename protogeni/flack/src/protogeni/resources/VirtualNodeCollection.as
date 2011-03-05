@@ -13,7 +13,7 @@ package protogeni.resources
 		{
 			for each(var node:VirtualNode in this)
 			{
-				if(node.id == id)
+				if(node.clientId == id)
 					return node;
 			}
 			return null;
@@ -34,7 +34,7 @@ package protogeni.resources
 		{
 			for each(var node:VirtualNode in this)
 			{
-				if(node.urn == urn)
+				if(node.sliverId == urn)
 					return node;
 			}
 			return null;

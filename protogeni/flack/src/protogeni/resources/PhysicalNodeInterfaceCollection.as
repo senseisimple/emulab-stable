@@ -19,12 +19,15 @@
 	// Collection of interfaces from a physical node
 	public class PhysicalNodeInterfaceCollection
 	{
+		public var collection:Vector.<PhysicalNodeInterface> = new Vector.<PhysicalNodeInterface>();
+		
 		public function PhysicalNodeInterfaceCollection()
 		{
 		}
 		
-		[Bindable]
-		public var collection:ArrayCollection = new ArrayCollection();
+		public function Add(ni:PhysicalNodeInterface):void {
+			collection.push(ni);
+		}
 		
 		public function GetByID(urn:String, exact:Boolean = true):PhysicalNodeInterface {
 			for each(var ni:PhysicalNodeInterface in collection) {
@@ -36,16 +39,21 @@
 			return null;
 		}
 		
-		public function Add(ni:PhysicalNodeInterface):void {
-			collection.addItem(ni);
+		public function Links():Vector.<PhysicalLink> {
+			var ac:Vector.<PhysicalLink> = new Vector.<PhysicalLink>();
+			for each(var ni:PhysicalNodeInterface in collection) {
+				for each(var l:PhysicalLink in ni.physicalLinks) {
+					ac.push(l);
+				}
+			}
+			return ac;
 		}
 		
-		public function Links():ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function Nodes():Vector.<PhysicalNode> {
+			var ac:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 			for each(var ni:PhysicalNodeInterface in collection) {
-				for each(var l:PhysicalLink in ni.links) {
-					ac.addItem(l);
-				}
+				if(ac.indexOf(ni.owner) == -1)
+					ac.push(ni.owner);
 			}
 			return ac;
 		}

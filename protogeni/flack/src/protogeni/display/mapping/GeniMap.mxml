@@ -35,7 +35,7 @@
 			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
-				myMapOptions.zoom = 5;
+				myMapOptions.zoom = 4;
 				myMapOptions.center = new LatLng(38,-97);
 				myMapOptions.mapType = MapType.PHYSICAL_MAP_TYPE;
 				setInitOptions(myMapOptions);
@@ -104,7 +104,7 @@
 			}
 			
 			public function setDefaultZoom():void {
-				setZoom(5);
+				setZoom(4);
 				panTo(new LatLng(38,-97));
 			}
 		]]>

@@ -19,49 +19,47 @@
 	// Link as part of a sliver/slice connecting virtual nodes
 	public class VirtualLink
 	{
-		public static var TYPE_NORMAL:int = 0;
-		public static var TYPE_TUNNEL:int = 1;
-		public static var TYPE_ION:int = 2;
-		public static var TYPE_GPENI:int = 3;
+		public static const TYPE_NORMAL:int = 0;
+		public static const TYPE_TUNNEL:int = 1;
+		public static const TYPE_ION:int = 2;
+		public static const TYPE_GPENI:int = 3;
+		public static function TypeToString(type:int):String {
+			switch(type){
+				case TYPE_NORMAL:
+					return "VLAN";
+				case TYPE_TUNNEL:
+					return "Tunnel";
+				case TYPE_ION:
+					return "ION";
+				case TYPE_GPENI:
+					return "GPENI";
+			}
+			return "Unknown";
+		}
+		
+		[Bindable]
+		public var clientId:String;
+		[Bindable]
+		public var sliverId:String;
+		[Bindable]
+		public var type:String;
+		[Bindable]
+		public var interfaces:ArrayCollection = new ArrayCollection();
+		
+		public var linkType:int = TYPE_NORMAL;
+		public var slivers:Array;
+		public var rspec:XML;
+		
+		// TODEPRECIATE
+		public var firstNode:VirtualNode;
+		public var secondNode:VirtualNode;
+		
+		// Depreciated
+		public var bandwidth:Number;
 		
 		public function VirtualLink(owner:Sliver)
 		{
 			slivers = new Array(owner);
-		}
-		
-		[Bindable]
-		public var id:String;
-		
-		public var type:String;
-		
-		[Bindable]
-		public var interfaces:ArrayCollection = new ArrayCollection();
-		
-		[Bindable]
-		public var bandwidth:Number;
-		
-		public var firstTunnelIp:int = 0;
-		public var secondTunnelIp:int = 0;
-
-		public var linkType:int = TYPE_NORMAL;
-		
-		public var slivers:Array;
-
-		public var rspec:XML;
-		
-		public var firstNode:VirtualNode;
-		public var secondNode:VirtualNode;
-		
-		public static var tunnelNext:int = 1;
-		
-		public var urn:String;
-		
-		public static function getNextTunnel():String
-		{
-			var first : int = ((tunnelNext >> 8) & 0xff);
-			var second : int = (tunnelNext & 0xff);
-			tunnelNext++;
-			return "192.168." + String(first) + "." + String(second);
 		}
 		
 		public function establish(first:VirtualNode, second:VirtualNode):Boolean
@@ -81,42 +79,19 @@
 			}
 			 else
 			 {
-				 if((first.manager.supportsIon && second.manager.supportsIon && Main.useIon) ||
-					 (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)) {
-					 
-					 if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
-						 linkType = TYPE_ION;
-					 else if(first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)
-						 linkType = TYPE_GPENI;
-					 
-					 firstInterface = first.allocateInterface();
-					 secondInterface = second.allocateInterface();
-					 if(firstInterface == null || secondInterface == null)
-						 return false;
-					 first.interfaces.Add(firstInterface);
-					 second.interfaces.Add(secondInterface);
-				 } else {
-					 linkType = TYPE_TUNNEL;
-					 
-					 firstInterface = first.interfaces.GetByID("control");
-					 secondInterface = second.interfaces.GetByID("control");
-					 
-					 // THIS WILL PROBABLY BREAK VERSION 1!!!!
-					 /*
-					 firstInterface = first.allocateInterface();
-					 secondInterface = second.allocateInterface();
-					 if(firstInterface == null || secondInterface == null)
+				 firstInterface = first.allocateInterface();
+				 secondInterface = second.allocateInterface();
+				 if(firstInterface == null || secondInterface == null)
 					 return false;
-					 first.interfaces.Add(firstInterface);
-					 second.interfaces.Add(secondInterface);
-					 */
-					 // END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
-
-					 if(firstInterface.ip.length == 0)
-						 firstInterface.ip = getNextTunnel();
-					 if(secondInterface.ip.length == 0)
-						 secondInterface.ip = getNextTunnel();
-				 }
+				 first.interfaces.Add(firstInterface);
+				 second.interfaces.Add(secondInterface);
+				 
+				 if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
+					 linkType = TYPE_ION;
+				 else if (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)
+					 linkType = TYPE_GPENI;
+				 else
+					 this.setUpTunnels();
 				 
 				 // Make sure nodes are in both
 				 if(!(second.slivers[0] as Sliver).nodes.contains(first))
@@ -139,7 +114,7 @@
 			second.links.addItem(this);
 			firstInterface.virtualLinks.addItem(this);
 			secondInterface.virtualLinks.addItem(this);
-			id = slivers[0].slice.getUniqueVirtualLinkId(this);
+			clientId = slivers[0].slice.getUniqueVirtualLinkId(this);
 			for each(var s:Sliver in slivers)
 				s.links.addItem(this);
 			if(first.manager == second.manager)
@@ -148,9 +123,9 @@
 				secondInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
 			}
 			
-			// Bandwidth
+			// depreciated
 			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
-			if (first.id.slice(0, 2) == "pg" || second.id.slice(0, 2) == "pg")
+			if (first.clientId.slice(0, 2) == "pg" || second.clientId.slice(0, 2) == "pg")
 				bandwidth = 1000000;
 			if(linkType == TYPE_GPENI || linkType == TYPE_ION)
 				bandwidth = 100000;
@@ -158,12 +133,25 @@
 			return true;
 		}
 		
+		public function setUpTunnels():void
+		{
+			this.linkType = VirtualLink.TYPE_TUNNEL;
+			this.type = "gre-tunnel";
+			for each(var i:VirtualInterface in this.interfaces) {
+				if(i.ip.length == 0) {
+					i.ip = VirtualInterface.getNextTunnel();
+					i.mask = "255.255.255.0";
+					i.type = "ipv4";
+				}
+			}
+		}
+		
 		public function remove():void
 		{
 			for each(var vi:VirtualInterface in this.interfaces)
 			{
 				if(vi.id != "control")
-					vi.virtualNode.interfaces.collection.removeItemAt(vi.virtualNode.interfaces.collection.getItemIndex(vi));
+					vi.owner.interfaces.collection.removeItemAt(vi.owner.interfaces.collection.getItemIndex(vi));
 			}
 			interfaces.removeAll();
 			// Remove nodes
@@ -187,11 +175,9 @@
 		
 		public function isConnectedTo(target:GeniManager) : Boolean
 		{
-			//if(this.firstNode.manager == target || secondNode.manager == target)
-			//	return true;
 			for each(var i:VirtualInterface in interfaces)
 			{
-				if(i.virtualNode.manager == target)
+				if(i.owner.manager == target)
 					return true;
 			}
 			return false;
@@ -201,7 +187,7 @@
 		{
 			for each(var i:VirtualInterface in interfaces)
 			{
-				if(i.virtualNode == node)
+				if(i.owner == node)
 					return true;
 			}
 
@@ -212,10 +198,28 @@
 		{
 			for each(var i:VirtualInterface in interfaces)
 			{
-				if(!i.virtualNode.isVirtual && i.virtualNode.physicalNode == node)
+				if(i.owner.IsBound() && i.owner.physicalNode == node)
 					return true;
 			}
 			return false;
+		}
+		
+		public function supportsIon():Boolean {
+			for each(var i:VirtualInterface in interfaces)
+			{
+				if(!i.owner.manager.supportsIon)
+					return false;
+			}
+			return true;
+		}
+		
+		public function supportsGpeni():Boolean {
+			for each(var i:VirtualInterface in interfaces)
+			{
+				if(!i.owner.manager.supportsGpeni)
+					return false;
+			}
+			return true;
 		}
 	}
 }

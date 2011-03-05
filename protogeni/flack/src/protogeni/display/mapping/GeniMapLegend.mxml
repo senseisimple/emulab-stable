@@ -161,7 +161,9 @@
 		</s:Scroller>
 	</s:VGroup>
 	<display:DefaultLine percentWidth="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
-	<s:VGroup width="100%" height="30%" id="userGroup" includeInLayout="false" visible="false">
+	<s:VGroup width="100%" height="30%" minHeight="120"
+			  id="userGroup"
+			  includeInLayout="false" visible="false">
 		<s:CheckBox id="mineOnlyCheckbox"
 					label="Show only mine"
 					click="Main.geniHandler.mapHandler.userResourcesOnly = mineOnlyCheckbox.selected; Main.geniHandler.mapHandler.drawMap()" />

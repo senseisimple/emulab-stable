@@ -37,20 +37,8 @@
 			}	
 			
 			public function addNodeGroup(ng:PhysicalNodeGroup):void {
-				var ngButton:Button = new Button();
-				ngButton.setStyle("chromeColor", DisplayUtil.colorsDark[ng.GetManager().colorIdx]);
-				ngButton.height = 24;
+				var ngButton:Button = DisplayUtil.getPhysicalNodeGroupButton(ng);
 				ngButton.percentWidth = 100;
-				ngButton.label = ng.collection.length.toString() + " Nodes";
-				ngButton.toolTip = ng.GetManager().Hrn;
-				ngButton.addEventListener(MouseEvent.CLICK,
-					function openNodeGroup(evt:Event):void
-					{
-						if(ng.collection.length > 1)
-							DisplayUtil.viewNodeGroup(ng);
-						else
-							DisplayUtil.viewPhysicalNode(ng.collection[0]);
-					});
 				
 				if(ng.original.city.length == 0)
 				{

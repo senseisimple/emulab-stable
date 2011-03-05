@@ -56,8 +56,12 @@ in accordance with the terms of the license agreement accompanying it.
 	
 	<s:states>
 		<s:State name="normal" />
-		<s:State name="collapsed" />
 		<s:State name="disabled" />
+		<s:State name="collapsed" />
+		<s:State name="disabledWithControlBar" />
+		<s:State name="disabledWithPrompt" />
+		<s:State name="normalWithControlBar" />
+		<s:State name="normalWithPrompt" />
 	</s:states>
 	
 	<s:transitions>
