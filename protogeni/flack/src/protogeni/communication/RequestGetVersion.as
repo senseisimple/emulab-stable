@@ -48,6 +48,8 @@ package protogeni.communication
 					cm.inputRspecMinVersion = n;
 			}
 			cm.outputRspecVersion = Number(response.value.output_rspec);
+			if(cm.Hrn == "utahemulab.cm" || cm.Hrn == "ukgeni.cm")
+				cm.outputRspecVersion = 2;
 			cm.Level = response.value.level;
 			r = new RequestDiscoverResources(cm);
 			r.forceNext = true;

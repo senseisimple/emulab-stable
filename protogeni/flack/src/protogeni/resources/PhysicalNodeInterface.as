@@ -63,6 +63,7 @@
 		public var id:String;
 		
 		public var role : int = -1;
+		public var public_ipv4:String = "";
 
 		[Bindable]
 		public var links:ArrayCollection = new ArrayCollection();

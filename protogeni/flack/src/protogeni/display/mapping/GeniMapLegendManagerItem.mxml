@@ -16,9 +16,8 @@
 			
 			public function init():void
 			{
+				this.addElement(DisplayUtil.getGeniManagerButton(manager));
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, tryUpdate);
-				infoButton.setStyle("chromeColor", DisplayUtil.colorsDark[manager.colorIdx]);
-				infoButton.setStyle("color", DisplayUtil.colorsLight[manager.colorIdx]);
 				update();
 			}
 			
@@ -69,8 +68,4 @@
 	<s:CheckBox id="showCheckbox"
 				selected="{manager.Show}"
 				change="setShow()" />
-	<mx:Button id="infoButton"
-			   height="24"
-			   label="{manager.Hrn}"
-			   click="DisplayUtil.viewGeniManager(manager);" />
 </s:HGroup>

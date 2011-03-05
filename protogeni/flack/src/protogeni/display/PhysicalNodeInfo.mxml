@@ -30,13 +30,17 @@
 				virtualNode = null;
 				
 				imgAvailable.source = DisplayUtil.assignAvailabilityIcon(n);
-				imgExclusive.source = DisplayUtil.assignIcon(n.exclusive);
-				if(n.exclusive) imgExclusive.toolTip = "Exclusive";
-				else imgExclusive.toolTip = "Not exclusive";
-				if(n.virtualNodes != null && n.virtualNodes.length > 0) imgAvailable.toolTip = "Allocated";
+				if(n.virtualNodes != null && n.virtualNodes.length > 0)
+					imgAvailable.toolTip = "Allocated, ";
 				else
-					if(n.available) imgAvailable.toolTip = "Available";
-					else imgAvailable.toolTip = "Not available";
+					if(n.available)
+						imgAvailable.toolTip = "Available, ";
+					else
+						imgAvailable.toolTip = "Not available, ";
+				if(n.exclusive)
+					imgAvailable.toolTip += "Exclusive";
+				else
+					imgAvailable.toolTip += "Not exclusive";
 				
 				physicalLinksVbox.removeAllElements();
 				
@@ -77,6 +81,8 @@
 					
 					// Manager
 					var managerHbox:HGroup = new HGroup();
+					managerHbox.verticalAlign = "middle";
+					managerHbox.gap = 4;
 					var managerLabel:Label = new Label();
 					managerLabel.text = "Hosted on";
 					managerHbox.addElement(managerLabel);
@@ -84,34 +90,28 @@
 					hierarchyVbox.addElement(managerHbox);
 					
 					// Parent node info
-					var parentNodeHbox:HGroup = new HGroup();
-					var parentNodeLabel:Label = new Label();
-					parentNodeHbox.addElement(parentNodeLabel);
-					hierarchyVbox.addElement(parentNodeHbox);
 					if(node.subNodeOf != null)
 					{
+						var parentNodeHbox:HGroup = new HGroup();
+						parentNodeHbox.verticalAlign = "middle";
+						parentNodeHbox.gap = 4;
+						var parentNodeLabel:Label = new Label();
+						parentNodeHbox.addElement(parentNodeLabel);
+						hierarchyVbox.addElement(parentNodeHbox);
 						parentNodeLabel.text = "Subnode of";
 						parentNodeHbox.addElement(DisplayUtil.getPhysicalNodeButton(node.subNodeOf));
 					}
-					else
-					{
-						parentNodeLabel.text = "No parent node";
-					}
 					
 					// Child node info
-					var subNodesLabel:Label = new Label();
-					hierarchyVbox.addElement(subNodesLabel);
 					if(node.subNodes.length > 0)
 					{
+						var subNodesLabel:Label = new Label();
+						hierarchyVbox.addElement(subNodesLabel);
 						subNodesLabel.text = "Subnodes:";
 						for each(var subNode:PhysicalNode in node.subNodes)
 						{
 							hierarchyVbox.addElement(DisplayUtil.getPhysicalNodeButton(subNode));
 						}
-					}
-					else
-					{
-						subNodesLabel.text = "No subnodes";
 					}
 				}
 			}
@@ -120,7 +120,6 @@
 				if(sliceLinksVbox != null) {
 					sliceLinksVbox.removeAllElements();
 					if(virtualNode != null) {
-						linkTabs.addChild(sliceLinksVbox);
 						var connectedNodes:ArrayCollection = virtualNode.GetPhysicalNodes();
 						
 						sliceLinksNavigator.label = "Slice (" + connectedNodes.length + " Nodes)"
@@ -147,7 +146,7 @@
 							}
 						}
 					} else if(linkTabs.getChildren().length > 1)
-						linkTabs.removeChild(sliceLinksVbox);
+						sliceLinksNavigator.visible = false;
 				}
 			}
 			
@@ -180,7 +179,6 @@
 							space.width = 16;
 							linkHbox.addElement(space);
 							var endInterfaceButton:mx.controls.Button = DisplayUtil.getPhysicalLinkWithInterfaceButton(endInterface, l);
-							endInterfaceButton.label = endInterface.id;
 							linkHbox.addElement(endInterfaceButton);
 							physicalLinksVbox.addElement(linkHbox);
 						}
@@ -189,109 +187,57 @@
 			}
 			
 			public function viewComponentRspec():void {
-				var rspecView:XmlWindow = new XmlWindow();
-				rspecView.title = "Advertisement RSPEC for " + node.name;
-				rspecView.showWindow();
-				rspecView.loadXml(node.rspec);
+				DisplayUtil.viewXml(node.rspec, "Advertisement RSPEC for " + node.name);
 			}
 			
 			public function viewSliverRspec():void {
 				if(virtualNode == null)
 					Alert.show("No Sliver RSPEC!");
 				else {
-					var rspecView:XmlWindow = new XmlWindow();
-					rspecView.title = "Request RSPEC for " + node.name;
-					rspecView.showWindow();
-					rspecView.loadXml(virtualNode.rspec);
+					DisplayUtil.viewXml(virtualNode.rspec, "Request RSPEC for " + node.name);
 				}
 			}
 		]]>
 	</fx:Script>
 	
-	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
-		<mx:GridRow width="100%">
-			<mx:GridItem width="30">
-				
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.name}" fontSize="17" fontWeight="bold" width="100%" />
-				<display:ImageButton id="locateButton"
-									  icon="{ImageUtil.mapIcon}"
-									 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
-									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="componentButton"
-									  icon="{ImageUtil.pageWhiteCodeIcon}"
-									 click="viewComponentRspec()"
-									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton id="sliverButton"
-									 icon="{ImageUtil.pageCodeIcon}"
-									 click="viewSliverRspec()"
-									 toolTip="View Request RSPEC" visible="false" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				
-			</mx:GridItem>
-			<mx:GridItem width="100%" id="quickInfoHbox">
-				<s:HGroup>
-					<s:Label text="Exclusive" fontWeight="bold"/>
-					<mx:Image id="imgExclusive"/>
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="Availability" fontWeight="bold"/>
-					<mx:Image id="imgAvailable"/>
-				</s:HGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="URN" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.urn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="86">
-			<mx:GridItem>
-				<s:Label text="Types" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<mx:DataGrid width="100%" height="100%" id="gridTypes" dataProvider="{nodeTypes}">
-					<mx:columns>
-						<mx:DataGridColumn headerText="Name" dataField="name"/>
-						<mx:DataGridColumn headerText="Slots" dataField="slots"/>
-						<mx:DataGridColumn headerText="Static" dataField="isStatic"/>
-					</mx:columns>
-				</mx:DataGrid>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Hierarchy" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%" height="100%" id="hierarchyVbox" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem>
-				<s:Label text="Links to" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<mx:TabNavigator id="linkTabs" width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
-					<s:NavigatorContent label="Physical" width="100%" height="100%" id="physicalLinksNavigator">
-						<s:Scroller width="100%" height="100%">
-							<s:VGroup id="physicalLinksVbox" width="100%" height="100%" />
-						</s:Scroller>
-					</s:NavigatorContent>
-					<s:NavigatorContent label="Slice" width="100%" height="100%" id="sliceLinksNavigator">
-						<s:Scroller width="100%" height="100%">
-							<s:VGroup id="sliceLinksVbox" width="100%" height="100%" />
-						</s:Scroller>
-					</s:NavigatorContent>
-				</mx:TabNavigator>
-			</mx:GridItem>
-		</mx:GridRow>
-	</mx:Grid>
+	<s:HGroup width="100%">
+		<mx:Image id="imgAvailable" />
+		<s:Label text="{node.name}" toolTip="{node.urn}" fontSize="17" fontWeight="bold" width="100%" />
+		<display:ImageButton id="locateButton"
+							 icon="{ImageUtil.mapIcon}"
+							 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
+							 toolTip="View Advertisement RSPEC" />
+		<display:ImageButton id="componentButton"
+							 icon="{ImageUtil.pageWhiteCodeIcon}"
+							 click="viewComponentRspec()"
+							 toolTip="View Advertisement RSPEC" />
+		<display:ImageButton id="sliverButton"
+							 icon="{ImageUtil.pageCodeIcon}"
+							 click="viewSliverRspec()"
+							 toolTip="View Request RSPEC" visible="false" />
+	</s:HGroup>
+	<s:HGroup width="100%">
+		<s:Label text="Types" fontWeight="bold" />
+		<s:List id="typeList" dataProvider="{nodeTypes}" labelField="name" />
+		<s:VGroup width="100%">
+			<s:Label text="Hierarchy" fontWeight="bold"/>
+			<s:VGroup width="100%" height="100%" gap="4" id="hierarchyVbox" />
+		</s:VGroup>
+	</s:HGroup>
+	<s:HGroup width="100%" height="100%">
+		<s:Label text="Links to" fontWeight="bold"/>
+		<mx:TabNavigator id="linkTabs" width="100%" height="100%" paddingTop="2" paddingRight="2" paddingLeft="2" paddingBottom="2">
+			<s:NavigatorContent label="Physical" width="100%" height="100%" id="physicalLinksNavigator">
+				<s:Scroller width="100%" height="100%">
+					<s:VGroup id="physicalLinksVbox" width="100%" height="100%" />
+				</s:Scroller>
+			</s:NavigatorContent>
+			<s:NavigatorContent label="Slice" width="100%" height="100%" id="sliceLinksNavigator">
+				<s:Scroller width="100%" height="100%">
+					<s:VGroup id="sliceLinksVbox" width="100%" height="100%" />
+				</s:Scroller>
+			</s:NavigatorContent>
+		</mx:TabNavigator>
+	</s:HGroup>
 	
 </s:VGroup>

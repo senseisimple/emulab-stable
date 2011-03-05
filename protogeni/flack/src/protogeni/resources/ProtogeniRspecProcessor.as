@@ -160,6 +160,7 @@ package protogeni.resources
 					default:
 						n.urn = p.@component_id;
 						n.managerString = p.@component_manager_id;
+						n.exclusive = p.@exclusive == "true";
 				}
 				
 				for each(var ix:XML in p.children()) {
@@ -168,19 +169,34 @@ package protogeni.resources
 						i.id = ix.@component_id;
 						tempString = ix.@role;
 						i.role = PhysicalNodeInterface.RoleIntFromString(tempString);
+						i.public_ipv4 = ix.@public_ipv4;
 						n.interfaces.Add(i);
 						interfaceDictionary[i.id] = i;
 					} else if(ix.localName() == "node_type") {
-						var t:NodeType = new NodeType();
-						t.name = ix.@type_name;
-						t.slots = ix.@type_slots;
-						t.isStatic = ix.@static;
+						var nt:NodeType = new NodeType();
+						nt.name = ix.@type_name;
+						nt.slots = ix.@type_slots;
+						nt.isStatic = ix.@static;
 						// isBgpMux = true?
 						// upstreamAs = value of key->upstream_as in field
-						n.types.push(t);
+						n.types.push(nt);
+					} else if(ix.localName() == "hardware_type") {
+						var ht:NodeType = new NodeType();
+						ht.name = ix.@name;
+						n.types.push(ht);
+					} else if(ix.localName() == "sliver_type") {
+						n.sliverType = ix.@name;
 					} else if(ix.localName() == "available") {
-						var availString:String = ix.toString();
-						n.available = availString == "true";
+						switch(gm.outputRspecVersion)
+						{
+							case 0.1:
+								var availString:String = ix.toString();
+								n.available = availString == "true";
+								break;
+							case 2:
+							default:
+								n.available = ix.@now == "true";
+						}
 					} else if(ix.localName() == "exclusive") {
 						var exString:String = ix.toString();
 						n.exclusive = exString == "true";
@@ -188,6 +204,13 @@ package protogeni.resources
 						var parentName:String = ix.toString();
 						if(parentName.length > 0)
 							subnodeList.addItem({subNode:n, parentName:parentName});
+					} else if(ix.localName() == "relation") {
+						var relationType:String = ix.@type;
+						if(relationType == "subnode_of") {
+							var pararentId:String = ix.@component_id;
+							if(pararentId.length > 0)
+								subnodeList.addItem({subNode:n, parentName:pararentId});
+						}
 					} else if(ix.localName() == "disk_image") {
 						var newDiskImage:DiskImage = new DiskImage();
 						newDiskImage.name = ix.@name;
@@ -235,11 +258,29 @@ package protogeni.resources
 				
 				var nodeName : QName = new QName(gm.Rspec.namespace(), "interface_ref");
 				var temps:XMLList = link.elements(nodeName);
-				var interface1:String = temps[0].@component_interface_id
+				var interface1:String;
+				switch(gm.outputRspecVersion)
+				{
+					case 0.1:
+						interface1 = temps[0].@component_interface_id;
+						break;
+					case 2:
+					default:
+						interface1 = temps[0].@component_id;
+				}
 				//var ni1:NodeInterface = Nodes.GetInterfaceByID(interface1);
 				var ni1:PhysicalNodeInterface = interfaceDictionary[interface1];
 				if(ni1 != null) {
-					var interface2:String = temps[1].@component_interface_id;
+					var interface2:String;
+					switch(gm.outputRspecVersion)
+					{
+						case 0.1:
+							interface2 = temps[1].@component_interface_id;
+							break;
+						case 2:
+						default:
+							interface2 = temps[1].@component_id;
+					}
 					//var ni2:NodeInterface = Nodes.GetInterfaceByID(interface2);
 					var ni2:PhysicalNodeInterface = interfaceDictionary[interface2];
 					if(ni2 != null) {
@@ -250,9 +291,18 @@ package protogeni.resources
 						}
 						var l:PhysicalLink = new PhysicalLink(lg);
 						l.name = link.@component_name;
-						l.managerString = link.@component_manager_uuid;
+						switch(gm.outputRspecVersion)
+						{
+							case 0.1:
+								l.managerString = link.@component_manager_uuid;
+								l.urn = link.@component_uuid;
+								break;
+							case 2:
+							default:
+								l.managerString = link.@component_manager_id;
+								l.urn = link.@component_id;
+						}
 						l.manager = gm;
-						l.urn = link.@component_uuid;
 						l.interface1 = ni1;
 						l.interface2 = ni2;
 						
@@ -263,15 +313,28 @@ package protogeni.resources
 								l.latency = Number(ix);
 							} else if(ix.localName() == "packet_loss") {
 								l.packetLoss = Number(ix);
+							} else if(ix.localName() == "property") {
+								// FIXME: Hack since v1 just had link properties instead of dst & src
+								l.latency = Number(ix.@latency);
+								l.packetLoss = Number(ix.@packet_loss);
+								l.bandwidth = Number(ix.@capacity);
+								//<property source_id="urn:publicid:IDN+emulab.net+interface+cisco8:(null)" dest_id="urn:publicid:IDN+emulab.net+interface+pc219:eth2" capacity="1000000" latency="0" packet_loss="0"/>
+							} else if(ix.localName() == "link_type") {
+								var s:String;
+								switch(gm.outputRspecVersion)
+								{
+									case 0.1:
+										s = ix.@type_name;
+										break;
+									case 2:
+									default:
+										s = ix.@name;
+								}
+								l.types.push(s);
 							}
 						}
 						
 						l.rspec = link.copy();
-						
-						for each(var tx:XML in link.link_type) {
-							var s:String = tx.@type_name;
-							l.types.push(s);
-						}
 						
 						lg.Add(l);
 						ni1.links.addItem(l);

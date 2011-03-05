@@ -20,8 +20,13 @@
 		public static var LEVEL_FULL:int = 1;
 		
 		public var Level:int;
+		
 		[Bindable]
 		public var outputRspecVersion:Number;
+		[Bindable]
+		public var outputRspecMaxVersion:Number;
+		[Bindable]
+		public var outputRspecMinVersion:Number;
 		[Bindable]
 		public var inputRspecMaxVersion:Number;
 		[Bindable]
