@@ -22,8 +22,12 @@
 			private var enterFunction:Function;
 			public function setEnter(f:Function):void { 
 				enterFunction = f;
-				this.textInput.addEventListener(FlexEvent.ENTER, f);
+				this.textInput.addEventListener(FlexEvent.ENTER, enterPressed);
 				removeEnter = true;
+			}
+			
+			public function enterPressed(junk:FlexEvent):void {
+				enterFunction();
 			}
 			
 			private function cleanup():void {

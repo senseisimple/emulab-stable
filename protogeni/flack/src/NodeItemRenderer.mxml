@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				height="24"
+				dataChange="setNode();">
+	<s:layout>
+		<s:HorizontalLayout useVirtualLayout="true" verticalAlign="middle" paddingLeft="2" paddingRight="2" />
+	</s:layout>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+	</s:states>
+	
+	<fx:Script>
+		<![CDATA[
+			import protogeni.display.DisplayUtil;
+			import protogeni.resources.PhysicalNode;
+			
+			private function setNode():void {
+				if (data == null)
+					return;
+
+				var node:PhysicalNode = data as PhysicalNode;
+				nodeImage.source = DisplayUtil.assignAvailabilityIcon(node);
+			}
+		]]>
+	</fx:Script>
+
+	<s:BitmapImage id="nodeImage" />
+	<s:Label id="nodeLabel" text="{data.name}" maxDisplayedLines="1" />
+	
+</s:ItemRenderer>

@@ -35,6 +35,7 @@ package protogeni.communication
 		cm = newCm;
 		op.addField("credentials", new Array(Main.geniHandler.CurrentUser.credential));
 		op.addField("compress", true);
+		op.addField("rspec_version", cm.outputRspecVersion);
 		op.setUrl(newCm.Url);
 		cm.lastRequest = this;
     }

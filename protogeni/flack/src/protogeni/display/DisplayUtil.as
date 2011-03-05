@@ -25,6 +25,8 @@
 	import mx.controls.Alert;
 	import mx.controls.Button;
 	import mx.controls.ButtonLabelPlacement;
+	import mx.core.DragSource;
+	import mx.managers.DragManager;
 	import mx.managers.PopUpManager;
 	
 	import protogeni.Util;
@@ -146,14 +148,6 @@
 	                return ImageUtil.cancelIcon;
             }
         }
-        
-        // Get's the CM icon
-        public static function assignIconForGeniManager(val:GeniManager):Class {
-			if(val.Status == GeniManager.STATUS_VALID)
-				return ImageUtil.availableIcon;
-			else
-				return ImageUtil.crossIcon;
-        }
 		
 		public static function getLogMessageButton(msg:LogMessage):Button {
 			var logButton:Button = getButton();
@@ -215,13 +209,23 @@
 		
 		// Gets a button for the component manager
 		public static function getGeniManagerButton(gm:GeniManager):Button {
-			var cmButton:Button = getButton(DisplayUtil.assignIconForGeniManager(gm));
+			var cmButton:Button = getButton();
 			cmButton.label = gm.Hrn;
 			cmButton.data = gm;
 			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
+			cmButton.setStyle("chromeColor", colorsDark[gm.colorIdx]);
+			cmButton.setStyle("color", colorsLight[gm.colorIdx]);
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewGeniManager(gm);
+					DisplayUtil.viewGeniManager(event.currentTarget.data);
+				}
+			);
+			cmButton.addEventListener(MouseEvent.MOUSE_MOVE,
+				function startDrag(e:MouseEvent):void {
+					var dragInitiator:Button=Button(e.currentTarget);
+					var ds:DragSource = new DragSource();
+					ds.addData(e.currentTarget.data, 'manager');
+					DragManager.doDrag(dragInitiator, ds, e);
 				}
 			);
 			return cmButton;
@@ -244,9 +248,19 @@
 			var nodeButton:Button = getButton(DisplayUtil.assignAvailabilityIcon(n));
 			nodeButton.label = n.name;
 			nodeButton.toolTip = n.name + " on " + n.manager.Hrn;
+			nodeButton.setStyle("chromeColor", colorsDark[n.manager.colorIdx]);
+			nodeButton.setStyle("color", colorsLight[n.manager.colorIdx]);
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
 					DisplayUtil.viewPhysicalNode(n);
+				}
+			);
+			nodeButton.addEventListener(MouseEvent.MOUSE_MOVE,
+				function startDrag(e:MouseEvent):void {
+					var dragInitiator:Button=Button(e.currentTarget);
+					var ds:DragSource = new DragSource();
+					ds.addData(e.currentTarget.data, 'physicalnode');
+					DragManager.doDrag(dragInitiator, ds, e);
 				}
 			);
 			return nodeButton;
@@ -257,9 +271,19 @@
 			var nodeButton:Button = getButton();
 			nodeButton.label = n.id;
 			nodeButton.toolTip = n.id + " on " + n.manager.Hrn;
+			nodeButton.setStyle("chromeColor", colorsDark[n.manager.colorIdx]);
+			nodeButton.setStyle("color", colorsLight[n.manager.colorIdx]);
 			nodeButton.addEventListener(MouseEvent.CLICK,
 				function openNode(event:MouseEvent):void {
 					DisplayUtil.viewVirtualNode(n);
+				}
+			);
+			nodeButton.addEventListener(MouseEvent.MOUSE_MOVE,
+				function startDrag(e:MouseEvent):void {
+					var dragInitiator:Button=Button(e.currentTarget);
+					var ds:DragSource = new DragSource();
+					ds.addData(e.currentTarget.data, 'virtualnode');
+					DragManager.doDrag(dragInitiator, ds, e);
 				}
 			);
 			return nodeButton;
@@ -268,7 +292,8 @@
 		// Gets a button for a physical link
 		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
 			var linkButton:Button = getButton(ImageUtil.linkIcon);
-			linkButton.label = ni.id;
+			linkButton.label = Util.shortenString(ni.id, 50);
+			linkButton.toolTip = ni.id + " on " + nl.name;
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
 					DisplayUtil.viewPhysicalLink(nl);
@@ -404,6 +429,13 @@
 		public static function viewUserWindow():void {
 			var userWindow:UserWindow = new UserWindow();
 			userWindow.showWindow();
+		}
+		
+		public static function viewXml(xml:XML, title:String):void {
+			var xmlView:XmlWindow = new XmlWindow();
+			xmlView.title = title;
+			xmlView.showWindow();
+			xmlView.loadXml(xml);
 		}
 		
 		public static function viewManagersWindow():void {

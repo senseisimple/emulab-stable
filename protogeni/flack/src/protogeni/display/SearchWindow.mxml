@@ -27,7 +27,7 @@
 		<display:ImageButton icon="{ImageUtil.searchIcon}" click="search()" />
 	</s:HGroup>
 	<s:HGroup width="100%">
-		<s:CheckBox label="Match entire string" id="matchCheck"/>
+		<s:CheckBox label="Exact match" id="matchCheck"/>
 	</s:HGroup>
 	<s:Scroller width="100%" height="100%">
 		<s:VGroup width="100%" height="100%" id="resultsBox" />

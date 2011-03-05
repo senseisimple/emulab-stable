@@ -60,6 +60,8 @@
 		
 		public var rspec:XML;
 		
+		public var sliverType:String;
+		
 		// Use for anything, more inmportantly any additions by non-Protogeni managers
 		public var tag:*;
 		
