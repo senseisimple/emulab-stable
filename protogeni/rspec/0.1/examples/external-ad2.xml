@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rspec type="advertisement"
+       xmlns="http://www.protogeni.net/resources/rspec/0.1">
+  <external_ref component_node_uuid="urn:ion+node+ion"
+                component_interface_id="interface"
+                component_manager_uuid="urn:ion+authority+cm" />
+  <node component_uuid="urn:uky+node-a"
+        component_manager_uuid="urn:uky+authority+cm"
+        virtualization_type="emulab-vnode">
+    <node_type type_name="pc" type_slots="1" />
+    <interface component_id="eth0"/>
+  </node>
+  <node component_manager_uuid="urn:uky+authority+cm"
+        component_name="hp1"
+        component_uuid="urn:uky+node+hp1" >
+    <node_type 
+      type_name="switch"
+      type_slots="1"
+    />
+    <available>true</available>
+    <exclusive>true</exclusive>
+    <interface component_id="node-a"/>
+    <interface component_id="ion"/>
+  </node>
+  <link component_name="link-a"
+        component_uuid="urn:uky+link+link-a" >
+    <component_manager
+       name="urn:uky+authority+cm"/>
+    <interface_ref component_node_uuid="urn:uky+node+hp1"
+                   component_interface_id="node-a"/>
+    <interface_ref component_node_uuid="urn:uky+node+node-a"
+                   component_interface_id="eth0"/>
+  </link>
+  <link component_name="link-ion"
+        component_uuid="urn:uky+link+link-ion" >
+    <component_manager
+       name="urn:uky+authority+cm"/>
+    <component_manager
+       name="urn:ion+authority+cm"/>
+    <interface_ref component_node_uuid="urn:uky+node+hp1"
+                   component_interface_id="ion"/>
+    <interface_ref component_node_uuid="urn:ion+node+ion"
+                   component_interface_id="interface"/>
+  </link>
+</rspec>

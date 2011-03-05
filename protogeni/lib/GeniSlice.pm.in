@@ -135,6 +135,7 @@ sub Lookup($$)
     $self->{'CERT'}     = $certificate;
     $self->{'BINDINGS'} = undef;
     $self->{'LOCKED'}   = 0;
+    $self->{'STITCHLOCKED'} = 0;
     
     # Add to cache. 
     $slices{$self->idx()}  = $self;
@@ -165,37 +166,96 @@ sub Create($$$$;$$)
     # Now tack on other stuff we need.
     push(@insert_data, "created=now()");
     push(@insert_data, "expires=DATE_ADD(now(), INTERVAL 6 HOUR)");
-    push(@insert_data, "idx='$idx'");
     push(@insert_data, "sa_uuid='$sa_uuid'");
     push(@insert_data, "exptidx=$exptidx")
 	if (defined($exptidx));
-    push(@insert_data, "locked=now()")
-	if (defined($lock) && $lock);
+
+    # This is no good; should not create slices locked without
+    # making sure this is really the creator. see below
+    if (defined($lock) && $lock) {
+	push(@insert_data, "locked=now()");
+	push(@insert_data, "stitch_locked=now()");
+    }
     
     my $safe_hrn   = DBQuoteSpecial($certificate->hrn());
     my $safe_uuid  = DBQuoteSpecial($certificate->uuid());
-    my $safe_cuuid = DBQuoteSpecial($creator->uuid());
-    my $safe_curn  = DBQuoteSpecial($creator->urn());
     push(@insert_data, "hrn=$safe_hrn");
     push(@insert_data, "uuid=$safe_uuid");
-    push(@insert_data, "creator_uuid=$safe_cuuid");
-    push(@insert_data, "creator_urn=$safe_curn");
+
+    if (defined($creator)) {
+	my $safe_cuuid = DBQuoteSpecial($creator->uuid());
+	my $safe_curn  = DBQuoteSpecial($creator->urn());
+	push(@insert_data, "creator_uuid=$safe_cuuid");
+	push(@insert_data, "creator_urn=$safe_curn");
+    }
+    else {
+	# No creator means this did not come from the actual user.
+	push(@insert_data, "creator_uuid=''");
+	push(@insert_data, "isplaceholder='1'");
+    }
 
     if ($certificate->Store() != 0) {
 	print STDERR "Could not store certificate for new slice.\n";
 	return undef;
     }
 
-    # Insert into DB.
-    return undef
-	if (! DBQueryWarn("insert into geni_slices set " .
-			  join(",", @insert_data)));
+    #
+    # Lock the table and look for an existing entry. If there is one,
+    # and it is the placeholder entry, overwrite it.
+    #
+    DBQueryWarn("lock tables geni_slices write")
+	or return undef;
+    my $query_result =
+	DBQueryWarn("select idx,isplaceholder from geni_slices " .
+		    "where uuid=$safe_uuid or hrn=$safe_hrn");
+    if (!$query_result) {
+	DBQueryWarn("unlock tables");
+	return undef;
+    }
+    if ($query_result->numrows) {
+	if ($query_result->numrows != 1) {
+	    my $urn  = $certificate->urn();
+	    my $uuid = $certificate->uuid();
+	    my $hrn  = $certificate->hrn();
+	    print STDERR "Too many rows for $uuid/$hrn/$urn\n";
+	    DBQueryWarn("unlock tables");
+	    return undef;
+	}
+	my ($curidx,$isplaceholder) = $query_result->fetchrow_array();
+	#
+	# If the existing entry is a placeholder, and we got the creator,
+	# then replace the existing entry to make it a non-placeholder.
+	#
+	if ($isplaceholder && defined($creator)) {
+	    push(@insert_data, "idx='$curidx'");
+	    
+	    if (! DBQueryWarn("replace into geni_slices set " .
+			      "  isplaceholder=0, ".
+			      join(",", @insert_data))) {
+		DBQueryWarn("unlock tables");
+		return undef;
+	    }
+	    $idx = $curidx;
+	}
+	# Slice exists, no inserts needed. Just lookup. 
+	goto lookup;
+    }
+    # Do this after above code since we might need to overwrite entry.
+    push(@insert_data, "idx='$idx'");
 
+    # Insert into DB.
+    if (! DBQueryWarn("insert into geni_slices set " .
+		      join(",", @insert_data))) {
+        DBQueryWarn("unlock tables");
+	return undef;
+    }
+  lookup:
+    DBQueryWarn("unlock tables");
     my $slice = GeniSlice->Lookup($idx);
     return undef
 	if (!defined($slice));
 
-    $slice->{'LOCKED'} = $$
+    $slice->{'LOCKED'} = $slice->{'STITCHLOCKED'} = $$
 	if (defined($lock) && $lock);
     return $slice;
 }
@@ -213,9 +273,11 @@ sub sa_uuid($)		{ return field($_[0], "sa_uuid"); }
 sub exptidx($)		{ return field($_[0], "exptidx"); }
 sub needsfirewall($)	{ return field($_[0], "needsfirewall"); }
 sub registered($)	{ return field($_[0], "registered"); }
+sub isplaceholder($)	{ return field($_[0], "isplaceholder"); }
 sub cert($)		{ return $_[0]->{'CERT'}->cert(); }
 sub GetCertificate($)   { return $_[0]->{'CERT'}; }
 sub LOCKED($)           { return $_[0]->{'LOCKED'}; }
+sub STITCHLOCKED($)     { return $_[0]->{'STITCHLOCKED'}; }
 
 #
 # Stringify for output.
@@ -312,14 +374,20 @@ sub LookupByExperiment($$)
 sub LookupByCreator($$)
 {
     my ($class, $creator) = @_;
-
+    
     my $creator_uuid = $creator->uuid();
     my $query_result =
 	DBQueryWarn("select idx from geni_slices ".
 		    "where creator_uuid='$creator_uuid'");
     return undef unless defined($query_result);
 
-    return map( GeniSlice->Lookup( $_ ), $query_result->fetchcol( 0 ) );
+    my @result = ();
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+	push(@result, $slice)
+	    if (defined($slice));
+    }
+    return @result;
 }
 
 #
@@ -338,20 +406,24 @@ sub Lock($)
     DBQueryWarn("lock tables geni_slices write")
 	or return -1;
 
+    # Slice lock always takes both locks. Holder can drop the stitch lock.
     my $query_result =
-	DBQueryWarn("select locked from geni_slices ".
-		    "where idx='$idx' and locked is null");
+	DBQueryWarn("select locked,stitch_locked from geni_slices ".
+		    "where idx='$idx' and ".
+		    "      locked is null and stitch_locked is null");
     if (!$query_result || !$query_result->numrows) {
 	DBQueryWarn("unlock tables");
 	return 1;
     }
     $query_result =
-	DBQueryWarn("update geni_slices set locked=now() where idx='$idx'");
+	DBQueryWarn("update geni_slices set ".
+		    "locked=now(),stitch_locked=now() where idx='$idx'");
     DBQueryWarn("unlock tables");
 
     return 1
 	if (!$query_result);
     $self->{'LOCKED'} = $$;
+    $self->{'STITCHLOCKED'} = $$;
     return 0;
 }
 sub UnLock($)
@@ -362,10 +434,62 @@ sub UnLock($)
     return 1
 	if (!$self->LOCKED());
 
-    DBQueryWarn("update geni_slices set locked=NULL where idx='$idx'")
+    DBQueryWarn("update geni_slices set ".
+		"locked=NULL,stitch_locked=NULL where idx='$idx'")
 	or return -1;
     
     $self->{'LOCKED'} = 0;
+    $self->{'STITCHLOCKED'} = 0;
+    return 0;
+}
+
+#
+# The stitching lock is used solely for controlling concurrency related
+# to stitching.
+#
+sub StitchLock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    # We already have it locked.
+    return 0
+	if ($self->STITCHLOCKED());
+
+    DBQueryWarn("lock tables geni_slices write")
+	or return -1;
+
+    my $query_result =
+	DBQueryWarn("select stitch_locked from geni_slices ".
+		    "where idx='$idx' and ".
+		    "      stitch_locked is null");
+    if (!$query_result || !$query_result->numrows) {
+	DBQueryWarn("unlock tables");
+	return 1;
+    }
+    $query_result =
+	DBQueryWarn("update geni_slices set ".
+		    " stitch_locked=now() where idx='$idx'");
+    DBQueryWarn("unlock tables");
+
+    return 1
+	if (!$query_result);
+    $self->{'STITCHLOCKED'} = $$;
+    return 0;
+}
+sub StitchUnLock($)
+{
+    my ($self) = @_;
+    my $idx    = $self->idx();
+
+    return 1
+	if (!$self->STITCHLOCKED());
+
+    DBQueryWarn("update geni_slices set ".
+		" stitch_locked=NULL where idx='$idx'")
+	or return -1;
+    
+    $self->{'STITCHLOCKED'} = 0;
     return 0;
 }
 
@@ -779,6 +903,30 @@ sub SetRegisteredFlag($$)
 	if (!$query_result);
 
     $self->{'SLICE'}->{'registered'} = $registered;
+    return 0;
+}
+
+#
+# Convert from placeholder to real slice. Caller will have it locked.
+#
+sub ConvertPlaceholder($$)
+{
+    my ($self, $user) = @_;
+    my $uuid  = $self->uuid();
+
+    my $safe_cuuid = DBQuoteSpecial($user->uuid());
+    my $safe_curn  = DBQuoteSpecial($user->urn());
+
+    my $query_result =
+	DBQueryWarn("update geni_slices set isplaceholder=0, " .
+		    "  creator_uuid=$safe_cuuid, creator_urn=$safe_curn ".
+		    "where uuid='$uuid'");
+    return -1
+	if (!$query_result);
+
+    $self->{'SLICE'}->{'isplaceholder'} = 0;
+    $self->{'SLICE'}->{'creator_urn'}   = $user->urn();
+    $self->{'SLICE'}->{'creator_uuid'}  = $user->uuid();
     return 0;
 }
 

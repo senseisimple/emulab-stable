@@ -221,6 +221,7 @@ AC_SUBST(NOSTACKMIB)
 AC_SUBST(EXP_VIS_SUPPORT)
 AC_SUBST(NOSHAREDFS)
 AC_SUBST(SELFLOADER_DATA)
+AC_SUBST(TBUSEDBI)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -262,6 +263,7 @@ CLIENT_VARDIR="/var/emulab"
 CLIENT_MANDIR="/usr/local/man"
 TBSECURECOOKIES=1
 TBMAINSITE=0
+TBUSEDBI=0
 FANCYBANNER=0
 VIRTNODE_NETWORK=172.16.0.0
 VIRTNODE_NETMASK=255.240.0.0
@@ -406,6 +408,8 @@ if test -n "$FSDIR_SCRATCH"; then
     AC_DEFINE_UNQUOTED(FSDIR_SCRATCH, "$FSDIR_SCRATCH")
 fi
 AC_DEFINE_UNQUOTED(BOSSEVENTPORT, "$BOSSEVENTPORT")
+AC_DEFINE_UNQUOTED(FRISEBEEMCASTADDR, "$FRISEBEEMCASTADDR")
+AC_DEFINE_UNQUOTED(FRISEBEEMCASTPORT, "$FRISEBEEMCASTPORT")
 
 if test $OPSDBSUPPORT -eq 1; then
     AC_DEFINE_UNQUOTED(OPSDBSUPPORT, 1)
@@ -909,8 +913,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/batchexp tbsetup/batch_daemon tbsetup/repos_daemon \
 	tbsetup/wanlinkinfo tbsetup/wanassign \
 	tbsetup/swapexp	tbsetup/endexp tbsetup/elabinelab \
-	tbsetup/frisbeelauncher tbsetup/eventsys.proxy tbsetup/frisbeeimage \
-	tbsetup/subboss_frisbeelauncher tbsetup/subboss_frisbeeimage \
+	tbsetup/eventsys.proxy \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
@@ -925,7 +928,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \
 	tbsetup/assign_wrapper2 \
-	tbsetup/frisbeelauncher tbsetup/node_update \
+	tbsetup/node_update \
 	tbsetup/savelogs tbsetup/setgroups \
 	tbsetup/savelogs.proxy tbsetup/rmgroup tbsetup/mkexpdir \
 	tbsetup/node_control tbsetup/node_attributes \
@@ -1005,6 +1008,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/2.elvind.sh rc.d/3.plab.sh rc.d/2.dhcpd.sh rc.d/3.and.sh \
 	rc.d/3.elvin_gateway.sh rc.d/pelab.sh rc.d/capture.sh \
+	rc.d/3.mfrisbeed.sh rc.d/3.mfrisbeed-subboss.sh \
 	tools/GNUmakefile rc.d/1.mysql-server.sh tools/svn/GNUmakefile \
 	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
         tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \

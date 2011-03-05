@@ -1,5 +1,5 @@
 # PROVIDE: cdroot
-# BEFORE: disks netif
+# BEFORE: disks
 # KEYWORD: FreeBSD
 
 #
@@ -70,8 +70,9 @@ mkunionfs() {
 
 	# better be >= 6.3 
 	# no, I don't know sed or awk
-	major=`uname -r | sed -e 's/\..*$//`
-	minor=`uname -r | sed -e 's/^[0-9]\.//' | sed -e 's/[^0-9]*$//'`
+	major=`uname -r | sed -e 's/\..*$//'`
+	# I DO know sed
+	minor=`uname -r | sed -e 's/^[0-9]\.\([0-9][0-9]*\).*/\1/'`
 
 	if [ $major -lt 6 -o $major -eq 6 -a $minor -lt 3 ]; then
 	        echo -n "FreeBSD version ${major}.${minor} did not have a"
@@ -102,7 +103,7 @@ mkunionfs() {
 	        mkdir ${bufdir}/${mntpt}
 		echo "Generating ${mntpt} via unionfs"
 		# -o copymode=transparent \
-		mount_unionfs -o copymode=transparent \
+		mount_unionfs -o noatime -o copymode=transparent \
 		        ${bufdir}/${mntpt} $mntpt
 		chkerr $? "mount_unionfs ${bufdir}/${mntpt} $mntpt"
 	done

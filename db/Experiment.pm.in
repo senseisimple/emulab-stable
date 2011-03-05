@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005-2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package Experiment;
@@ -3411,6 +3411,28 @@ sub ClearPortRegistration($)
 
     return -1
 	if (! DBQueryWarn("delete from port_registration ".
+			  "where pid='$pid' and eid='$eid'"));
+
+    return 0;
+}
+
+#
+# The reserved_vlantags table is special, and needs to be cleared only
+# at certain times. See tbswap.
+#
+sub ClearReservedVlanTags($)
+{
+    my ($self) = @_;
+
+    # Must be a real reference. 
+    return -1
+	if (! ref($self));
+
+    my $pid = $self->pid();
+    my $eid = $self->eid();
+
+    return -1
+	if (! DBQueryWarn("delete from reserved_vlantags ".
 			  "where pid='$pid' and eid='$eid'"));
 
     return 0;

@@ -1,0 +1,73 @@
+<osid>
+  <attribute name="magic">
+    <value></value>
+  </attribute>
+  <attribute name="features">
+    <value>vlans</value>
+  </attribute>
+  <attribute name="version">
+    <value>1.1</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>60</value>
+  </attribute>
+  <attribute name="description">
+    <value>A Fake OSID for the Fake BBGeni nodes</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="shared">
+    <value>1</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>ALWAYSUP</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>BBGENI-FAKE</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Other</value>
+  </attribute>
+</osid>
+<osid>
+  <attribute name="magic">
+    <value></value>
+  </attribute>
+  <attribute name="features">
+    <value>veths,veth-ne,veth-en,mlinks,vlans</value>
+  </attribute>
+  <attribute name="version">
+    <value>1.X</value>
+  </attribute>
+  <attribute name="reboot_waittime">
+    <value>60</value>
+  </attribute>
+  <attribute name="description">
+    <value>A fake OSID for the fake BBGENIVM nodes</value>
+  </attribute>
+  <attribute name="mustclean">
+    <value>1</value>
+  </attribute>
+  <attribute name="shared">
+    <value>0</value>
+  </attribute>
+  <attribute name="op_mode">
+    <value>ALWAYSUP</value>
+  </attribute>
+  <attribute name="pid">
+    <value>emulab-ops</value>
+  </attribute>
+  <attribute name="osname">
+    <value>BBGENIVM-FAKE</value>
+  </attribute>
+  <attribute name="OS">
+    <value>Other</value>
+  </attribute>
+  <attribute name="nextosid">
+    <value>emulab-ops,BBGENI-FAKE</value>
+  </attribute>
+</osid>

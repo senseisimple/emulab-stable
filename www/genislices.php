@@ -53,12 +53,20 @@ foreach ($showtypes as $type) {
 
     # The form attributes:
     $table = array('#id'       => $type,
-		   '#title'    => $which);
+		   '#title'    => $which,
+		   '#sortable' => 1,
+		   '#headings' => array("idx"          => "ID",
+					"hrn"          => "HRN",
+					"created"      => "Created",
+					"expires"      => "Expires"));
+
     $rows = array();
 
     foreach ($slicelist as $slice) {
 	$slice_idx  = $slice->idx();
 	$slice_hrn  = $slice->hrn();
+	$created    = $slice->created();
+	$expires    = $slice->expires();
 
 	$url = CreateURL("showslice", "showtype", $type,
 			 "slice_idx", $slice_idx);
@@ -70,7 +78,10 @@ foreach ($showtypes as $type) {
 	    $expurl  = CreateURL("showexp", $experiment);
 	    $href    = "$href (<a href='$expurl'>$eid</a>)";
 	}
-	$rows[$slice_idx] = array($slice_idx => $href);
+	$rows[$slice_idx] = array("idx"       => $slice_idx,
+				  "hrn"       => $href,
+				  "created"   => $created,
+				  "expires"   => $expires);
     }
     list ($html, $button) = TableRender($table, $rows);
     echo $html;

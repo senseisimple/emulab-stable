@@ -1,0 +1,135 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2011 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Update an MFS using a specific tarball
+#
+use lib '@srcdir@';
+use English;
+use libinstall;
+use Getopt::Std;
+
+my $MFSDIR = "/tftpboot/frisbee/boot";
+my $UPDATEVERS = "33";
+
+if ($UID != 0) {
+    die("This script must be run as root.\n");
+}
+if (! -d "/mnt") {
+   die("Need directory /mnt.\n");
+}
+if (! -d "/mnt/frisbee" && !mkdir("/mnt/frisbee")) {
+   die("Cannot create directory /mnt/frisbee.\n");
+}
+if (! -e "$MFSDIR/mfsroot") {
+   die("No $MFSDIR/mfsroot; where is your MFS?\n");
+}
+if (!chdir($MFSDIR)) {
+   die("Cannot cd to $MFSDIR.\n");
+}
+
+# make a backup
+print("Backing up mfsroot to mfsroot.bak ...\n");
+if (system("cp -p mfsroot mfsroot.bak")) {
+    die("Could not backup mfsroot.\n");
+}
+
+print("Configuring md device ...\n");
+my $unit = `/sbin/mdconfig -a -t vnode -f mfsroot`;
+if ($?) {
+    die("Could not run mdconfig.\n");
+}
+if ($unit =~ /^md(\d+)$/) {
+    $unit = $1;
+} else {
+    die("Malformed mdconfig output!?\n");
+}
+
+print("Mounting MFS ...\n");
+if (system("mount /dev/md$unit /mnt/frisbee")) {
+    system("mdconfig -d -u $unit");
+    die("Could not mount /dev/md$unit.\n");
+}
+
+# check the current version
+print("Checking version of MFS ...\n");
+my $version = 0;
+if (-e "/mnt/frisbee/etc/emulab/version") {
+    my $vers = `cat /mnt/frisbee/etc/emulab/version`;
+    if ($vers =~ /^(\d+)$/) {
+	$version = $1;
+    }
+}
+if ($version eq $UPDATEVERS) {
+    print "MFS is already up to date (version $UPDATEVERS)\n";
+    if (system("umount /mnt/frisbee") || system("mdconfig -d -u $unit")) {
+	warn("Could not umount/unconfig MFS; do it manually.\n");
+    } else {
+	unlink("mfsroot.bak");
+    }
+    exit(0);
+}
+
+# Rename the backup mfsroot
+my $mfsbackup = "mfsroot.v$version";
+print("Rename old MFS backup ...\n");
+if (system("mv mfsroot.bak $mfsbackup")) {
+    if (system("umount /mnt/frisbee") || system("mdconfig -d -u $unit")) {
+	warn("Could not umount/unconfig MFS; do it manually.\n");
+    }
+    die("Could not rename backup\n");
+}
+
+# Find the latest version of libc installed
+print("Determining MFS libc version ...\n");
+my $libc = `ls /mnt/frisbee/lib/libc.so.* | tail -1`;
+if ($? || ($libc !~ /\.so\.(\d+)$/)) {
+    if (system("umount /mnt/frisbee") || system("mdconfig -d -u $unit")) {
+	warn("Could not umount/unconfig MFS.\n");
+    }
+    die("No libc in MFS!?");
+} else {
+    $libc = $1;
+}
+
+# fetch update tarball
+my $tarball = "frisbee-$UPDATEVERS-libc$libc.tar.gz";
+print("Fetching update tarball $tarball ...\n");
+if (system("fetch -o /var/tmp http://www.emulab.net/downloads/$tarball")) {
+    if (system("umount /mnt/frisbee") || system("mdconfig -d -u $unit")) {
+	warn("Could not umount/unconfig MFS.\n");
+    }
+    die("No libc $libc update for MFS $UPDATEVERS.");
+}
+
+print("Installing tarball $tarball ...\n");
+if (system("tar -C /mnt/frisbee -xvzf /var/tmp/$tarball")) {
+    if (system("umount /mnt/frisbee") || system("mdconfig -d -u $unit")) {
+	warn("Could not umount/unconfig MFS; fix it and ",
+	     "move $mfsbackup to mfsroot.\n");
+    } elsif (system("mv $mfsbackup mfsroot")) {
+	warn("Could not restore old mfsroot; ",
+	     "move $mfsbackup to mfsroot.\n");
+    }
+    die("Could not update to MFS $UPDATEVERS (libc version $libc).\n");
+}
+
+print("Update version ...\n");
+system("echo $UPDATEVERS > /mnt/frisbee/etc/emulab/version");
+
+print("Unmounting MFS ...\n");
+if (system("umount /mnt/frisbee") || system("mdconfig -d -u $unit")) {
+    die("Could not umount/unconfig MFS; fix and run ./prepare\n");
+}
+
+print("Preparing MFS ...\n");
+system("./prepare");
+
+print("MFS successfully updated!\n",
+      "If it doesn't work, move mfsroot.v$version to mfsroot and run ./prepare\n");
+exit(0);

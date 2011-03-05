@@ -1,0 +1,82 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use strict;
+
+#
+# Configure variables
+#
+my $TB			= "@prefix@";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Handle command-line options.
+#
+sub usage() {
+    print STDERR "Usage: $0 <owner-uid> <blob-uuid>\n";
+    exit( 1 );
+}
+
+usage() unless @ARGV == 2;
+my ( $uid, $uuid ) = @ARGV;
+#
+# Must taint check!
+#
+if ($uid =~ /^([-\w #%&*+,.\/:;=?@\[\\\]^{|}]+)$/) {
+    $uid = $1;
+}
+else {
+    print STDERR "Bad character in uid\n";
+    exit( 1 );
+}
+
+if ($uuid =~ /^([-\w]+)$/) {
+    $uuid = $1;
+}
+else {
+    print STDERR "Bad character in uuid\n";
+    exit( 1 );
+}
+
+my $result = DBQueryWarn( "DELETE FROM blobs WHERE uuid='$uuid' AND " .
+			  "owner_uid='$uid';" );
+unless( $result ) {
+    print STDERR "Could not delete record.\n";
+    exit( 1 );
+}
+
+unless( $result->affectedrows == 1 ) {
+    print STDERR "Permission denied.\n";
+    exit( 1 );
+}
+
+# And clean up the blob_files table (which is only a cache), just in case
+# we removed the last reference to a file.
+DBQueryWarn( "DELETE blob_files FROM blob_files LEFT OUTER JOIN blobs ON " .
+	     "blob_files.filename=blobs.filename WHERE " .
+	     "blobs.filename IS NULL;" );
+
+exit( 0 );
