@@ -17,40 +17,41 @@
 	// Sliver from a slice containing all resources from the CM
 	public class Sliver
 	{
-		public static var STATE_READY : String = "ready";
-	    public static var STATE_NOTREADY : String = "notready";
-	    public static var STATE_FAILED : String = "failed";
+		public static const STATE_READY:String = "ready";
+	    public static const STATE_NOTREADY:String = "notready";
+	    public static const STATE_FAILED:String = "failed";
 		
-		public static var STATUS_CHANGING:String = "changing";
-		public static var STATUS_READY:String = "ready";
-		public static var STATUS_NOTREADY:String = "notready";
-		public static var STATUS_FAILED:String = "changing";
-		public static var STATUS_UNKOWN:String = "unknown";
-		public static var STATUS_MIXED:String = "mixed";
+		public static const STATUS_CHANGING:String = "changing";
+		public static const STATUS_READY:String = "ready";
+		public static const STATUS_NOTREADY:String = "notready";
+		public static const STATUS_FAILED:String = "changing";
+		public static const STATUS_UNKOWN:String = "unknown";
+		public static const STATUS_MIXED:String = "mixed";
 		
 		public var created:Boolean = false;
+		public var staged:Boolean = false;
 	    
-		public var credential : Object = null;
+		public var credential:Object = null;
 		public var manager:GeniManager = null;
-		public var rspec : XML = null;
+		public var rspec:XML = null;
 		[Bindable]
-		public var urn : String = null;
+		public var urn:String = null;
 		
 		public var ticket:XML;
 		public var manifest:XML;
 		
-		public var state : String;
-		public var status : String;
+		public var state:String;
+		public var status:String;
 		
 		public var nodes:VirtualNodeCollection = new VirtualNodeCollection();
 		public var links:VirtualLinkCollection = new VirtualLinkCollection();
 		
 		[Bindable]
-		public var slice : Slice;
+		public var slice:Slice;
 		
-		public var validUntil:Date;
+		public var expires:Date;
 		
-		public function Sliver(owner : Slice, newManager:GeniManager = null)
+		public function Sliver(owner:Slice, newManager:GeniManager = null)
 		{
 			slice = owner;
 			manager = newManager;

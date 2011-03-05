@@ -2,15 +2,24 @@ package protogeni.resources
 {
 	public class DiskImage
 	{
-		public function DiskImage()
+		public function DiskImage(newName:String = "",
+								  newOs:String = "",
+								  newVersion:String = "",
+								  newDescription:String = "",
+								  newIsDefault:Boolean = false)
 		{
+			name = newName.replace("+image+emulab-ops:", "+image+emulab-ops//");
+			os = newOs;
+			version = newVersion;
+			description = newDescription;
+			isDefault = newIsDefault;
 		}
 		
-		public var name:String = "";
-		public var os:String = "";
-		public var version:String = "";
-		public var description:String = "";
-		public var isDefault:Boolean = false;
+		public var name:String;
+		public var os:String;
+		public var version:String;
+		public var description:String;
+		public var isDefault:Boolean;
 		
 		public static function getDiskImageShort(long:String, manager:GeniManager):String
 		{

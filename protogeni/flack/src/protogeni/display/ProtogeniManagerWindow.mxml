@@ -22,8 +22,11 @@
 						levelText.text = "Minimal";
 						break;
 				}
-				for each(var num:Number in gm.inputRspecVersions) {
-					inputVersionsHgroup.addElement(DisplayUtil.getLabel(num.toString()));
+				for each(var outputVersion:Number in gm.outputRspecVersions) {
+					outputVersionsHgroup.addElement(DisplayUtil.getLabel(outputVersion.toString(), outputVersion == gm.inputRspecVersion));
+				}
+				for each(var inputVersion:Number in gm.inputRspecVersions) {
+					inputVersionsHgroup.addElement(DisplayUtil.getLabel(inputVersion.toString(), inputVersion == gm.inputRspecVersion));
 				}
 			}
 		]]>
@@ -39,8 +42,6 @@
 	<s:HGroup>
 		<s:Label text="Output:" fontWeight="bold" />
 		<s:HGroup id="outputVersionsHgroup" />
-		<s:Label text=" Default:" fontWeight="bold" />
-		<s:Label text="{gm.outputRspecDefaultVersion}" />
 	</s:HGroup>
 	<s:HGroup>
 		<s:Label text="Input:" fontWeight="bold" />

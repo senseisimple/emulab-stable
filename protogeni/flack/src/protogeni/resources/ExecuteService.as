@@ -5,7 +5,7 @@ package protogeni.resources
 		public var shell:String;
 		public var command:String;
 		
-		public function ExecuteService(newShell:String = "", newCommand:String = "")
+		public function ExecuteService(newCommand:String = "", newShell:String = "sh")
 		{
 			shell = newShell;
 			command = newCommand;

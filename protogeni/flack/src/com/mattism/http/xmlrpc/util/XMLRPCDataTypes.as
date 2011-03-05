@@ -11,16 +11,16 @@ package com.mattism.http.xmlrpc.util
 {
 	public class XMLRPCDataTypes {
 
-		public static var STRING:String   = "string";
-		public static var CDATA:String    = "cdata";
-		public static var i4:String       = "i4";
-		public static var INT:String      = "int";
-		public static var BOOLEAN:String  = "boolean";
-		public static var DOUBLE:String   = "double";
-		public static var DATETIME:String = "dateTime.iso8601";
-		public static var BASE64:String   = "base64";
-		public static var STRUCT:String   = "struct";
-		public static var ARRAY:String    = "array";
+		public static const STRING:String   = "string";
+		public static const CDATA:String    = "cdata";
+		public static const i4:String       = "i4";
+		public static const INT:String      = "int";
+		public static const BOOLEAN:String  = "boolean";
+		public static const DOUBLE:String   = "double";
+		public static const DATETIME:String = "dateTime.iso8601";
+		public static const BASE64:String   = "base64";
+		public static const STRUCT:String   = "struct";
+		public static const ARRAY:String    = "array";
 		
 	}
 }

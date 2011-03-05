@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
-			   xmlns:mx="library://ns.adobe.com/flex/mx" skinClass="protogeni.display.skins.TitleWindowSkin"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:display="protogeni.display.*"
+			   skinClass="protogeni.display.skins.TitleWindowSkin"
 			   title="About"
 			   close="PopUpManager.removePopUp(this)"
-			   xmlns:display="protogeni.display.*">
+			   contentCreationComplete="init()">
 	<s:layout>
-		<s:VerticalLayout horizontalAlign="center" paddingBottom="2"/>
+		<s:VerticalLayout horizontalAlign="center" />
 	</s:layout>
 	
 	<fx:Script>
@@ -14,22 +16,65 @@
 			import mx.managers.PopUpManager;
 			
 			import protogeni.Util;
+			import protogeni.display.ImageUtil;
+			
+			[Bindable]
+			private var memoryString:String;
+			
+			public function init():void
+			{
+				memoryString = (System.totalMemoryNumber/1000000) + " MB";
+			}
 		]]>
 	</fx:Script>
 
-	<s:BitmapImage source="@Embed('../images/protogeni.png')" />
+	<s:Image useHandCursor="true" buttonMode="true"
+			 source="{ImageUtil.logoIcon}"
+			 toolTip="Visit our website"
+			 click="Util.openWebsite('http://www.protogeni.net');" />
 	<s:Label text="Displays resources from ProtoGENI and associated federations." />
 	<s:Button label="Open the manual" click="Util.showManual();" height="24" />
-	<s:Button label="Visit our website" click="Util.openWebsite('http://www.protogeni.net');" height="24" />
-	<display:DefaultLine percentWidth="90" />
-	<s:Label text="Special thanks to" fontWeight="bold" fontStyle="italic"/>
-	<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">
-		<mx:click>navigateToURL(new URLRequest("http://www.fatcow.com/free-icons/index.bml"), "_blank");</mx:click>
-	</mx:LinkButton>
-	<mx:LinkButton label="Mattism (LGPL XML-RPC)" height="24">
-		<mx:click>navigateToURL(new URLRequest("http://sf.net/projects/xmlrpcflash"), "_blank");</mx:click>
-	</mx:LinkButton>
-	<mx:LinkButton label="Icons Land" height="24">
-		<mx:click>navigateToURL(new URLRequest("http://www.icons-land.com/"), "_blank");</mx:click>
-	</mx:LinkButton>
+	<mx:TabNavigator width="100%" height="120" paddingTop="2">
+		<s:NavigatorContent label="Special Thanks" width="100%" height="100%">
+			<s:Scroller width="100%" height="100%">
+				<s:VGroup width="100%" height="100%" horizontalAlign="center" gap="2">
+					<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">
+						<mx:click>navigateToURL(new URLRequest("http://www.fatcow.com/free-icons/index.bml"), "_blank");</mx:click>
+					</mx:LinkButton>
+					<mx:LinkButton label="Mattism (LGPL XML-RPC)" height="24">
+						<mx:click>navigateToURL(new URLRequest("http://sf.net/projects/xmlrpcflash"), "_blank");</mx:click>
+					</mx:LinkButton>
+					<mx:LinkButton label="Icons Land" height="24">
+						<mx:click>navigateToURL(new URLRequest("http://www.icons-land.com/"), "_blank");</mx:click>
+					</mx:LinkButton>
+				</s:VGroup>
+			</s:Scroller>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="System" width="100%" height="100%">
+			<s:Scroller width="100%" height="100%">
+				<s:VGroup width="100%" height="100%">
+					<s:HGroup width="100%">
+						<s:Label text="Flash Version" fontWeight="bold" />
+						<s:Label text="{Capabilities.version}" />
+					</s:HGroup>
+					<s:HGroup width="100%">
+						<s:Label text="Memory Used" fontWeight="bold" />
+						<s:Label text="{memoryString}" />
+					</s:HGroup>
+					<s:HGroup width="100%">
+						<s:Label text="Environment" fontWeight="bold" />
+						<s:Label text="{Capabilities.os} on {Capabilities.cpuArchitecture}" />
+					</s:HGroup>
+					<s:HGroup width="100%">
+						<s:Label text="SSL Available" fontWeight="bold" />
+						<s:Label text="{Capabilities.hasTLS}" />
+					</s:HGroup>
+					<s:HGroup width="100%">
+						<s:Label text="Screen" fontWeight="bold" />
+						<s:Label text="{Capabilities.screenResolutionX}x{Capabilities.screenResolutionY} @ {Capabilities.screenDPI} DPI with touchscreen type {Capabilities.touchscreenType}" />
+					</s:HGroup>
+				</s:VGroup>
+			</s:Scroller>
+		</s:NavigatorContent>
+	</mx:TabNavigator>
 </s:TitleWindow>

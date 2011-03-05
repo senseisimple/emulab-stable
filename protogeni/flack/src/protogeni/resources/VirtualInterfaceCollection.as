@@ -43,12 +43,26 @@
 			collection.addItem(ni);
 		}
 		
-		public function Links():ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function removeAll():void {
+			collection.removeAll();
+		}
+		
+		public function Links():Vector.<VirtualLink> {
+			var ac:Vector.<VirtualLink> = new Vector.<VirtualLink>();
 			for each(var ni:VirtualInterface in collection) {
 				for each(var l:VirtualLink in ni.virtualLinks) {
-					ac.addItem(l);
+					if(ac.indexOf(l) == -1)
+						ac.push(l);
 				}
+			}
+			return ac;
+		}
+		
+		public function Nodes():Vector.<VirtualNode> {
+			var ac:Vector.<VirtualNode> = new Vector.<VirtualNode>();
+			for each(var ni:VirtualInterface in collection) {
+				if(ac.indexOf(ni.owner) == -1)
+					ac.push(ni.owner);
 			}
 			return ac;
 		}

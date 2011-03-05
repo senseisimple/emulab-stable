@@ -116,10 +116,12 @@
 			return value;
 		}
 		
-		public static function getLabel(text:String):Label
+		public static function getLabel(text:String, bold:Boolean = false):Label
 		{
 			var l:Label = new Label();
 			l.text = text;
+			if(bold)
+				l.setStyle("fontWeight", "bold");
 			return l;
 		}
 
@@ -173,9 +175,7 @@
 			}
 			logButton.addEventListener(MouseEvent.CLICK,
 				function openLog():void {
-					var logw:LogMessageWindow = new LogMessageWindow();
-					logw.showWindow();
-					logw.setMessage(msg);
+					DisplayUtil.viewLogMessage(msg);
 				});
 			return logButton;
 		}
@@ -335,6 +335,12 @@
 				}
 			);
 			return linkButton;
+		}
+		
+		public static function viewLogMessage(msg:LogMessage):void {
+			var logw:LogMessageWindow = new LogMessageWindow();
+			logw.showWindow();
+			logw.setMessage(msg);
 		}
 		
 		// Opens a virtual link window

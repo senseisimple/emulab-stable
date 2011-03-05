@@ -38,7 +38,6 @@
 		
 		[Bindable]
 		public var interfaces:VirtualInterfaceCollection;
-		public var links:ArrayCollection = new ArrayCollection();
 		
 		[Bindable]
 		public var slivers:SliverCollection;
@@ -64,7 +63,7 @@
 		// Depreciated
 		public var virtualizationType:String = "emulab-vnode";
 		public var virtualizationSubtype:String = "emulab-openvz";
-		public var uuid:String;
+		//public var uuid:String;
 		[Bindable]
 		public var diskImage:String = "";
 		
@@ -175,11 +174,13 @@
 		
 		public function GetAllNodes():ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
-			for each(var virtualLink:VirtualLink in links) {
-				if(virtualLink.firstNode != this && !ac.contains(virtualLink.firstNode))
-					ac.addItem(virtualLink.firstNode);
-				if(virtualLink.secondNode != this && !ac.contains(virtualLink.secondNode))
-					ac.addItem(virtualLink.secondNode);
+			for each(var sourceInterface:VirtualInterface in this.interfaces.collection) {
+				for each(var virtualLink:VirtualLink in sourceInterface.virtualLinks) {
+					for each(var destInterface:VirtualInterface in virtualLink.interfaces) {
+						if(destInterface.owner != this && !ac.contains(destInterface.owner))
+							ac.addItem(destInterface.owner);
+					}
+				}
 			}
 			return ac;
 		}

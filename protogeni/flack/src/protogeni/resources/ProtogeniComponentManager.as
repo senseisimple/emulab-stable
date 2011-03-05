@@ -16,8 +16,8 @@
 {
 	public class ProtogeniComponentManager extends GeniManager
 	{
-		public static var LEVEL_MINIMAL:int = 0;
-		public static var LEVEL_FULL:int = 1;
+		public static const LEVEL_MINIMAL:int = 0;
+		public static const LEVEL_FULL:int = 1;
 		
 		public var Level:int;
 		
@@ -30,6 +30,10 @@
 		public var outputRspecDefaultVersion:Number;
 		
 		public var inputRspecVersions:Vector.<Number>;
+		public var outputRspecVersions:Vector.<Number>;
+		
+		public var generated:Date;
+		public var expires:Date;
 	    
 		public function ProtogeniComponentManager()
 		{

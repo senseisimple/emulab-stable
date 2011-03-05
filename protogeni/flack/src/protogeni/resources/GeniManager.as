@@ -11,25 +11,25 @@ package protogeni.resources
 
 	public class GeniManager
 	{
-		public static var STATUS_UNKOWN : int = 0;
-		public static var STATUS_INPROGRESS : int = 1;
-		public static var STATUS_VALID : int = 2;
-		public static var STATUS_FAILED : int = 3;
+		public static const STATUS_UNKOWN:int = 0;
+		public static const STATUS_INPROGRESS:int = 1;
+		public static const STATUS_VALID:int = 2;
+		public static const STATUS_FAILED:int = 3;
 		
-		public static var TYPE_PROTOGENI:int = 0;
-		public static var TYPE_PLANETLAB:int = 1;
+		public static const TYPE_PROTOGENI:int = 0;
+		public static const TYPE_PLANETLAB:int = 1;
 		
 		public static var processing:int = 0;
 		public static var maxProcessing:int = 1;
 		
 		[Bindable]
-		public var Url : String = "";
+		public var Url:String = "";
 		
 		[Bindable]
-		public var Hrn : String = "";
+		public var Hrn:String = "";
 		
 		[Bindable]
-		public var Urn : String = "";
+		public var Urn:String = "";
 		
 		public var Authority:String = "";
 		
@@ -37,11 +37,11 @@ package protogeni.resources
 		public var Version:int;
 		
 		[Bindable]
-		public var errorMessage : String = "";
-		public var errorDescription : String = "";
+		public var errorMessage:String = "";
+		public var errorDescription:String = "";
 		
 		[Bindable]
-		public var Status : int = STATUS_UNKOWN;
+		public var Status:int = STATUS_UNKOWN;
 		
 		public var Rspec:XML = null;
 		
@@ -49,7 +49,7 @@ package protogeni.resources
 		public var supportsGpeni:Boolean = false;
 		
 		[Bindable]
-		public var Show : Boolean = true;
+		public var Show:Boolean = true;
 		
 		public var Nodes:PhysicalNodeGroupCollection;
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();

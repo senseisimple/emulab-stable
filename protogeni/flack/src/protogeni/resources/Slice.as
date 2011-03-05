@@ -17,34 +17,37 @@
 	import flash.utils.Dictionary;
 	
 	import mx.collections.ArrayCollection;
+	import mx.controls.Alert;
 	
+	import protogeni.Util;
+	import protogeni.communication.CommunicationUtil;
 	import protogeni.display.ImageUtil;
 	
 	// Slice that a user created in ProtoGENI
 	public class Slice
 	{
 		// Status values
-	    public static var CHANGING : String = "changing";
-		public static var READY : String = "ready";
-	    public static var NOTREADY : String = "notready";
-	    public static var FAILED : String = "failed";
-	    public static var UNKNOWN : String = "unknown";
-	    public static var NA : String = "N/A";
+	    public static const CHANGING:String = "changing";
+		public static const READY:String = "ready";
+	    public static const NOTREADY:String = "notready";
+	    public static const FAILED:String = "failed";
+	    public static const UNKNOWN:String = "unknown";
+	    public static const NA:String = "N/A";
 	    
 	    // State values
-	    public static var STARTED : String = "started";
-		public static var STOPPED : String = "stopped";
-	    public static var MIXED : String = "mixed";
+	    public static const STARTED:String = "started";
+		public static const STOPPED:String = "stopped";
+	    public static const MIXED:String = "mixed";
 	    
-		public var uuid : String = null;
+		public var uuid:String = null;
 		[Bindable]
-		public var hrn : String = null;
+		public var hrn:String = null;
 		[Bindable]
-		public var urn : String = null;
+		public var urn:String = null;
 		[Bindable]
-		public var name : String = null;
-		public var creator : GeniUser = null;
-		public var credential : String = "";
+		public var name:String = null;
+		public var creator:GeniUser = null;
+		public var credential:String = "";
 		public var slivers:SliverCollection = new SliverCollection();
 
 		public var validUntil:Date;
@@ -89,7 +92,19 @@
 			
 			for each(var existing:Sliver in this.slivers)
 			{
-				if(!existing.created)
+				if(!(existing.created || existing.staged))
+					return false;
+			}
+			return true;
+		}
+		
+		public function isStaged():Boolean {
+			if(slivers == null)
+				return false;
+			
+			for each(var existing:Sliver in this.slivers)
+			{
+				if(!existing.staged)
 					return false;
 			}
 			return true;
@@ -206,9 +221,11 @@
 			newSlice.credential = this.credential;
 			newSlice.validUntil = this.validUntil;
 			
+			var sliver:Sliver;
+			
 			// Build up the basic slivers
 			// Build up the slivers with nodes
-			for each(var sliver:Sliver in this.slivers)
+			for each(sliver in this.slivers)
 			{
 				var newSliver:Sliver = new Sliver(newSlice);
 				newSliver.created = sliver.created;
@@ -220,12 +237,13 @@
 				newSliver.manifest = sliver.manifest;
 				newSliver.state = sliver.state;
 				newSliver.status = sliver.status;
-				newSliver.validUntil = sliver.validUntil;
+				newSliver.expires = sliver.expires;
 				
 				newSlice.slivers.addItem(newSliver);
 			}
 			
 			var oldNodeToCloneNode:Dictionary = new Dictionary();
+			var oldLinkToCloneLink:Dictionary = new Dictionary();
 			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
 
 			// Build up the slivers with nodes
@@ -237,7 +255,7 @@
 				var retrace:Array = new Array();
 				for each(var node:VirtualNode in sliver.nodes)
 				{
-					if(node.manager != sliver.manager)
+					if(oldNodeToCloneNode[node] != null)
 						continue;
 					var newNode:VirtualNode = new VirtualNode(newSliver);
 					newNode.clientId = node.clientId;
@@ -247,10 +265,10 @@
 					newNode._exclusive = node.Exclusive;
 					newNode.sliverType = node.sliverType;
 					for each(var executeService:ExecuteService in node.executeServices) {
-						newNode.executeServices.push(new ExecuteService(executeService.shell, executeService.command));
+						newNode.executeServices.push(new ExecuteService(executeService.command, executeService.shell));
 					}
 					for each(var installService:InstallService in node.installServices) {
-						newNode.installServices.push(new InstallService(installService.url, installService.installPath));
+						newNode.installServices.push(new InstallService(installService.url, installService.installPath, installService.fileType));
 					}
 					for each(var loginService:LoginService in node.loginServices) {
 						newNode.loginServices.push(new LoginService(loginService.authentication, loginService.hostname, loginService.port, loginService.username));
@@ -268,13 +286,11 @@
 					// depreciated
 					newNode.virtualizationType = node.virtualizationType;
 					newNode.virtualizationSubtype = node.virtualizationSubtype;
-					newNode.uuid = node.uuid;
 					
 					for each(var nodeSliver:Sliver in node.slivers)
 					{
 						newNode.slivers.addIfNotExisting(newSlice.slivers.getByGm(nodeSliver.manager));
-						if(nodeSliver != sliver)
-							newSlice.slivers.getByUrn(nodeSliver.urn).nodes.addItem(newNode);
+						newSlice.slivers.getByUrn(nodeSliver.urn).nodes.addItem(newNode);
 					}
 					
 					for each(var vi:VirtualInterface in node.interfaces.collection)
@@ -291,7 +307,7 @@
 						// links? add later ...
 					}
 
-					newSliver.nodes.addItem(newNode);
+					//newSliver.nodes.addItem(newNode);
 					
 					oldNodeToCloneNode[node] = newNode;
 				}
@@ -318,35 +334,29 @@
 				
 				for each(var link:VirtualLink in sliver.links)
 				{
-					var newLink:VirtualLink = new VirtualLink(newSliver);
+					if(oldLinkToCloneLink[link] != null)
+						continue;
+					var newLink:VirtualLink = new VirtualLink();
 					newLink.clientId = link.clientId;
+					newLink.sliverId = link.sliverId;
 					newLink.type = link.type;
-					//newLink.bandwidth = link.bandwidth;
-					//newLink.firstTunnelIp = link.firstTunnelIp;
-					//newLink.secondTunnelIp = link.secondTunnelIp;
+					newLink.bandwidth = link.bandwidth;
 					newLink.linkType = link.linkType;
 					newLink.rspec = link.rspec;
-					for each(var linkSliver:Sliver in link.slivers)
-						newLink.slivers.push(newSlice.slivers.getByUrn(linkSliver.urn));
+					for each(var linkSliver:Sliver in link.slivers) {
+						newLink.slivers.push(newSlice.slivers.getByGm(linkSliver.manager));
+						newSlice.slivers.getByGm(linkSliver.manager).links.addItem(newLink);
+					}
 					
-					newLink.firstNode = oldNodeToCloneNode[link.firstNode];
-					newLink.secondNode = oldNodeToCloneNode[link.secondNode];
-					
-					// Make sure it wasn't added by another sliver
-					if((newLink.firstNode.slivers[0] as Sliver).links.getById(newLink.clientId) != null)
-						continue;
-					
+					var slivers:Vector.<Sliver> = new Vector.<Sliver>();
 					for each(var i:VirtualInterface in link.interfaces)
 					{
 						var newInterface:VirtualInterface = oldInterfaceToCloneInterface[i];
 						newLink.interfaces.addItem(newInterface);
 						newInterface.virtualLinks.addItem(newLink);
-						newInterface.owner.links.addItem(newLink);
 					}
 					
-					newLink.firstNode.slivers[0].links.addItem(newLink);
-					if(newLink.secondNode.slivers[0] != newLink.firstNode.slivers[0])
-						newLink.secondNode.slivers[0].links.addItem(newLink);
+					oldLinkToCloneLink[link] = newLink;
 				}
 			}
 
@@ -368,7 +378,7 @@
 				return "All Resources";
 			}
 			
-			var returnString : String;
+			var returnString:String;
 			if(hrn == null)
 				returnString = uuid;
 			else
@@ -469,6 +479,79 @@
 				}
 			}
 			return "interface-" + highest;
+		}
+		
+		public function tryImport(rspec:String):Boolean {
+			var sliceRspec:XML;
+			try
+			{
+				sliceRspec = new XML(rspec);
+			}
+			catch(e:Error)
+			{
+				Alert.show("There is a problem with the XML: " + e.toString());
+				return false;
+			}
+			
+			// Detect managers, create slivers
+			try {
+				var defaultNamespace:Namespace = sliceRspec.namespace();
+				var detectedRspecVersion:Number;
+				var detectedManagers:Vector.<GeniManager> = new Vector.<GeniManager>();
+				switch(defaultNamespace.uri) {
+					case CommunicationUtil.rspec01Namespace:
+						detectedRspecVersion = 0.1;
+						break;
+					case CommunicationUtil.rspec02Namespace:
+						detectedRspecVersion = 0.2;
+						break;
+					case CommunicationUtil.rspec2Namespace:
+						detectedRspecVersion = 2;
+						break;
+				}
+			}
+			catch(e:Error)
+			{
+				Alert.show("Please use a compatible RSPEC");
+				return false;
+			}
+			
+			slivers.removeAll();
+			
+			for each(var nodeXml:XML in sliceRspec.defaultNamespace::node)
+			{
+				var managerUrn:String;
+				if(detectedRspecVersion < 1)
+					managerUrn = nodeXml.@component_manager_uuid;
+				else
+					managerUrn = nodeXml.@component_manager_id;
+				if(managerUrn.length == 0) {
+					Alert.show("All nodes must have a manager id");
+					return false;
+				}
+				var detectedManager:GeniManager = Main.geniHandler.GeniManagers.getByUrn(managerUrn);
+				if(detectedManager == null) {
+					Alert.show("All nodes must have a manager id for a known manager");
+					return false;
+				}
+				
+				if(detectedManager != null && detectedManagers.indexOf(detectedManager) == -1) {
+					var newSliver:Sliver = this.getOrCreateSliverFor(detectedManager);
+					newSliver.rspec = sliceRspec;
+					newSliver.staged = true;
+					//try {
+					newSliver.parseRspec();
+					/*} catch(e:Error) {
+					Alert.show("Error while parsing sliver RSPEC on " + detectedManager.Hrn + ": " + e.toString());
+					return;
+					}*/
+					detectedManagers.push(detectedManager);
+				}
+				
+			}
+			
+			Main.geniDispatcher.dispatchSliceChanged(this);
+			return true;
 		}
 	}
 }

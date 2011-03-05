@@ -18,17 +18,13 @@ package protogeni.display
 	
 	public class SliceLink extends UIComponent
 	{
-		[Bindable]
-		public static var NORMAL_COLOR:uint = 0x000000;
-		[Bindable]
-		public static var TUNNEL_COLOR:uint = 0x00ffff;
-		[Bindable]
-		public static var ION_COLOR:uint = 0xcc33cc;
-		[Bindable]
-		public static var GPENI_COLOR:uint = 0x0000ff;
+		public static const NORMAL_COLOR:uint = 0x000000;
+		public static const TUNNEL_COLOR:uint = 0x00ffff;
+		public static const ION_COLOR:uint = 0xcc33cc;
+		public static const GPENI_COLOR:uint = 0x0000ff;
 		
-		public static var INVALID_COLOR:uint = 0xff0000;
-		public static var VALID_COLOR:uint = 0x00ff00;
+		public static const INVALID_COLOR:uint = 0xff0000;
+		public static const VALID_COLOR:uint = 0x00ff00;
 		
 		public static var color:uint;
 		
@@ -102,10 +98,10 @@ package protogeni.display
 			canvas.allLinks.addItem(this);
 
 			// For now just assume there's two ...
-			startNode = this.canvas.allNodes.getForVirtualNode(virtualLink.firstNode);
+			startNode = this.canvas.allNodes.getForVirtualNode(virtualLink.interfaces[0].owner);
 			startNode.links.addItem(this);
 			
-			endNode = this.canvas.allNodes.getForVirtualNode(virtualLink.secondNode);
+			endNode = this.canvas.allNodes.getForVirtualNode(virtualLink.interfaces[1].owner);
 			endNode.links.addItem(this);
 
 			established = true;
