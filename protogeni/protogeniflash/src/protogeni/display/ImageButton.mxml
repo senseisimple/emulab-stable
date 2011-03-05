@@ -1,34 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<mx:Image xmlns:fx="http://ns.adobe.com/mxml/2009" 
-		  xmlns:s="library://ns.adobe.com/flex/spark" 
-		  xmlns:mx="library://ns.adobe.com/flex/mx"
-		  mouseDownEffect="{mDown}" mouseUpEffect="{mUp}" rollOverEffect="{mIn}" rollOutEffect="{mOut}"
-		  useHandCursor="true" buttonMode="true"
-		  minHeight="16" minWidth="16">
+<mx:Button xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		   xmlns:s="library://ns.adobe.com/flex/spark" 
+		   xmlns:mx="library://ns.adobe.com/flex/mx"
+		   height="24" width="24">
 	<fx:Declarations>
-		<mx:Glow id="mIn" duration="250" 
-				 alphaFrom="0.8" alphaTo="0.3" 
-				 blurXFrom="0.0" blurXTo="15.0" 
-				 blurYFrom="0.0" blurYTo="15.0" 
-				 inner="true"
-				 color="0x0166cb"/>
-		<mx:Glow id="mOut" duration="250" 
-				 alphaFrom="0.3" alphaTo="0.8" 
-				 blurXFrom="15.0" blurXTo="0.0" 
-				 blurYFrom="15.0" blurYTo="0.0" 
-				 inner="true"
-				 color="0x0166cb"/>
-		<mx:Glow id="mDown" duration="100" 
-				 alphaFrom="1.0" alphaTo="0.8"  
-				 blurXFrom="0.0" blurXTo="20.0" 
-				 blurYFrom="0.0" blurYTo="20.0" 
-				 inner="true"
-				 color="0x0166cb"/>
-		<mx:Glow id="mUp" duration="200" 
-				 alphaFrom="0.8" alphaTo="1.0"  
-				 blurXFrom="20.0" blurXTo="0.0" 
-				 blurYFrom="20.0" blurYTo="0.0" 
-				 inner="true"
-				 color="0x0166cb" />
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
-</mx:Image>
+</mx:Button>

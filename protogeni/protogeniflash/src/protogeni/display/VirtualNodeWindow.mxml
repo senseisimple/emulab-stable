@@ -194,11 +194,11 @@
 			<mx:GridItem width="100%">
 				<s:HGroup>
 					<s:Label id="idLabel" text="{node.id}" fontSize="17" fontWeight="bold" width="100%" />
-					<display:ImageButton2 id="physicalButton"
+					<display:ImageButton id="physicalButton"
 										 icon="{DisplayUtil.physicalNodeIcon}"
 										 click="DisplayUtil.viewPhysicalNode(node.physicalNode)"
 										 toolTip="View physical node" visible="false" />
-					<display:ImageButton2 id="rspecButton"
+					<display:ImageButton id="rspecButton"
 										 icon="{DisplayUtil.pageWhiteIcon}"
 										 click="viewRspec()"
 										 toolTip="View the most recent valid RSPEC" />

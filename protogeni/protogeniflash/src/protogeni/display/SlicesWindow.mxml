@@ -84,6 +84,6 @@
 	<display:controlBarContent>
 		<s:Label text="Create new" />
 		<display:KeyboardTextInput id="sliceName" width="100%" creationComplete="readyInput()" />
-		<display:ImageButton2 id="createButton" icon="{DisplayUtil.actionIcon}" click="createSlice();" />
+		<display:ImageButton id="createButton" icon="{DisplayUtil.actionIcon}" click="createSlice();" />
 	</display:controlBarContent>
 </display:DefaultWindow>

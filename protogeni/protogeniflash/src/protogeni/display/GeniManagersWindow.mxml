@@ -194,7 +194,7 @@
 					if(cmGoto == null && gm.mightNeedSecurityException())
 					{
 						cmGoto = new ImageButton();
-						cmGoto.source = DisplayUtil.exclamationIcon;
+						cmGoto.setStyle("icon", DisplayUtil.exclamationIcon);
 						cmGoto.toolTip = "Click to open CM URL, it appears that you might need to add a security exception";
 						cmGoto.addEventListener(MouseEvent.CLICK,
 							function openGm():void {
@@ -281,7 +281,7 @@
 	</fx:Script>
 	<s:HGroup width="100%" verticalAlign="middle" paddingTop="2" paddingRight="2" paddingLeft="2">
 		<s:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true" skinClass="protogeni.display.skins.CheckBoxSkin"/>
-		<display:ImageButton2 id="refreshButton" icon="{DisplayUtil.refreshIcon}" click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
+		<display:ImageButton id="refreshButton" icon="{DisplayUtil.refreshIcon}" click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
 		<mx:Spacer width="100%"/>
 		<s:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 

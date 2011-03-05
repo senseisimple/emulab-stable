@@ -357,25 +357,25 @@
 		<s:HorizontalLayout verticalAlign="middle" gap="4" paddingTop="2" paddingBottom="2" paddingLeft="2" paddingRight="2" />
 	</s:controlBarLayout>
 	<s:controlBarContent>
-		<display:ImageButton2 id="infoButton"
+		<display:ImageButton id="infoButton"
 							 icon="@Embed('../images/protogeni-logo.png')"
 							 click="DisplayUtil.viewAboutWindow()"
 							 toolTip="View more information about ProtoGENI" />
 		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton2 id="refreshButton"
+		<display:ImageButton id="refreshButton"
 							  icon="{DisplayUtil.refreshIcon}"
 							 click="startover()" includeInLayout="true" visible="true"
 							 toolTip="Reload all data" />
-		<display:ImageButton2 id="cmButton"
+		<display:ImageButton id="cmButton"
 							  icon="@Embed('../images/building.png')"
 							 click="DisplayUtil.viewManagersWindow();"
 							 toolTip="GENI managers"/>
-		<display:ImageButton2 id="consoleButton"
+		<display:ImageButton id="consoleButton"
 							  icon="{DisplayUtil.consoleIcon}"
 							 click="LogHandler.viewConsole();" 
 							 toolTip="Console"/>
 		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton2 id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
+		<display:ImageButton id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
 							  icon="{DisplayUtil.graphIcon}"
 							 click="DisplayUtil.viewSlicesWindow();"
 							 toolTip="Work with slices"/>
@@ -398,19 +398,19 @@
 				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
 				   toolTip="Authenticate" label="Authenticate" styleName="unauthenticatedStyle"
 				   id="userButton" height="24" />
-		<display:ImageButton2 id="searchButton"
+		<display:ImageButton id="searchButton"
 							  icon="{DisplayUtil.findIcon}"
 							 click="DisplayUtil.viewSearchWindow()"
 							 toolTip="Search" />
-		<display:ImageButton2 id="resetZoomButton"
+		<display:ImageButton id="resetZoomButton"
 							  icon="@Embed('../images/zoom.png')"
 							 click="map.resetZoom();"
 							 toolTip="Reset zoom" />
-		<display:ImageButton2 id="fullscreenButton"
+		<display:ImageButton id="fullscreenButton"
 							  icon="{arrowOut}"
 							 click="toggleFullScreen()"
 							 toolTip="Toggle fullscreen" />
-		<display:ImageButton2 id="helpButton"
+		<display:ImageButton id="helpButton"
 							  icon="{DisplayUtil.helpIcon}"
 							 click="Util.showManual()"
 							 toolTip="View more information" />

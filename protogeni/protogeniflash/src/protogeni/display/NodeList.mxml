@@ -55,25 +55,61 @@
 				
 				if(host != null)
 					host.load(group[0]);
+				
+				this.filterNodes();
 			}
 			
 			private function assignAvailableIcon(item:Object):Class {
+				/*if(!this.hideUnavailableCheckBox.selected)
+				{
+					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
+					{
+						if(!sn.node.isVirtual && sn.node.physicalNode == node)
+							return DisplayUtil.cancelIcon;
+					}
+				}
+				*/
 				return DisplayUtil.assignAvailabilityIcon(item as PhysicalNode);
 			}
 			
 			private function filterNodes():void {
+				// only show nodes of the selected type
 				if(typeCheckbox.selected) {
 					viewNodes = new ArrayCollection();
-					for each(var node:PhysicalNode in nodes) {
-						for each(var nodeType:NodeType in node.types) {
+					for each(var nodeOfType:PhysicalNode in nodes) {
+						for each(var nodeType:NodeType in nodeOfType.types) {
 							if(nodeType.name == types.selectedItem) {
-								viewNodes.addItem(node);
+								viewNodes.addItem(nodeOfType);
 								break;
 							}
 						}
 					}
-				} else
-					viewNodes = nodes;
+				} else {
+					viewNodes = new ArrayCollection();
+					for each(var nodeToAdd:PhysicalNode in nodes) {
+						viewNodes.addItem(nodeToAdd);
+					}
+				}
+
+				if(this.hideUnavailableCheckBox.selected)
+				{
+					for(var i:int = 0; i < viewNodes.length; i++) {
+						var node:PhysicalNode = viewNodes.getItemAt(i) as PhysicalNode;
+						if(!node.available) {
+							viewNodes.removeItemAt(i);
+							i--;
+						}
+					}
+					/*
+					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
+					{
+						if(!sn.node.isVirtual &&
+							sn.node.manager == gm &&
+							nodes.getItemIndex(sn.node.physicalNode) > -1)
+							viewNodes.removeItemAt(nodes.getItemIndex(sn.node.physicalNode));
+					}
+					*/
+				}
 			}
 		]]>
 	</fx:Script>
@@ -87,6 +123,12 @@
 					dataProvider="{nodeTypes}"
 					requireSelection="true"
 					change="typeCheckbox.selected = true; filterNodes();" />
+	
+	<s:CheckBox id="hideUnavailableCheckBox"
+				label="Hide unavailable"
+				selected="false"
+				valueCommit="filterNodes()"
+				skinClass="protogeni.display.skins.CheckBoxSkin"/>
 	
 	<mx:List width="100%" height="100%" id="list" rowHeight="24"
 			 dataProvider="{viewNodes}"

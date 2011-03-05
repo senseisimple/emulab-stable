@@ -20,9 +20,12 @@
 			import protogeni.Util;
 		]]>
 	</fx:Script>
-	
-	<display:ImageButton source="@Embed('../images/protogeni.png')" click="Util.openWebsite('http://www.protogeni.net')" />
-	<s:Label text="Displays resources from ProtoGENI and associated federations." fontSize="12"/>
+
+	<s:BitmapImage source="@Embed('../images/protogeni.png')" />
+	<s:Label text="Displays resources from ProtoGENI and associated federations." />
+	<mx:LinkButton label="Visit our website" height="24">
+		<mx:click>Util.openWebsite('http://www.protogeni.net');</mx:click>
+	</mx:LinkButton>
 	<display:DefaultLine percentWidth="90" />
 	<s:Label text="Special thanks to" fontWeight="bold" fontStyle="italic"/>
 	<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">

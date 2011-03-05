@@ -269,7 +269,7 @@
 				<mx:Button label="Clear" click="LogHandler.clear();" height="24" />
 				<display:DefaultLine height="24" />
 				<s:Label text="Sort" />
-				<display:ImageButton2 id="sortButton"
+				<display:ImageButton id="sortButton"
 									  icon="{DisplayUtil.upIcon}"
 									  click="toggleSorting()"
 									  toolTip="Switch the ordering" />
@@ -282,15 +282,15 @@
 		<s:VGroup height="100%" width="50%" horizontalAlign="center">
 			<s:Label text="Queued Requests"  fontWeight="bold" fontSize="14"/>
 			<s:HGroup gap="12">
-				<display:ImageButton2 id="stopButton"
+				<display:ImageButton id="stopButton"
 									  icon="{DisplayUtil.stopIcon}"
 									  click="Main.geniHandler.requestHandler.stop();"
 									  toolTip="Force stop the queue" />
-				<display:ImageButton2 id="pauseButton"
+				<display:ImageButton id="pauseButton"
 									  icon="{DisplayUtil.pauseControlIcon}"
 									  click="Main.geniHandler.requestHandler.pause();"
 									  toolTip="Force pause the queue" />
-				<display:ImageButton2 id="startButton"
+				<display:ImageButton id="startButton"
 									  icon="{DisplayUtil.playControlIcon}"
 									  click="Main.geniHandler.requestHandler.start();"
 									  toolTip="Force start the queue" />
@@ -325,7 +325,7 @@
 				<communication:RequestListComponentsPublic />
 			</s:ArrayCollection>
 		</s:DropDownList>
-		<display:ImageButton2 id="runRequestButton" icon="{DisplayUtil.actionIcon}" toolTip="Run the selected request"
+		<display:ImageButton id="runRequestButton" icon="{DisplayUtil.actionIcon}" toolTip="Run the selected request"
 							  click="Main.geniHandler.requestHandler.pushRequest(requestList.selectedItem)" />
 	</display:controlBarContent>
 </display:DefaultWindow>

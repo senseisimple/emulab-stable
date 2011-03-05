@@ -110,19 +110,19 @@
 			</mx:GridItem>
 			<mx:GridItem width="100%">
 				<s:Label text="{gm.Hrn}" fontSize="17" fontWeight="bold" width="100%" />
-				<display:ImageButton2 id="consoleButton"
+				<display:ImageButton id="consoleButton"
 									  icon="{DisplayUtil.consoleIcon}"
 									 click="LogHandler.viewGroup(gm.Url);"
 									 toolTip="View log messages in the console" />
-				<display:ImageButton2 id="rpsecButton"
+				<display:ImageButton id="rpsecButton"
 									  icon="@Embed('../../../images/page_white_code.png')"
 									 click="viewRspec()"
 									 toolTip="View Advertisement RSPEC" />
-				<display:ImageButton2 id="graphInfoButton"
+				<display:ImageButton id="graphInfoButton"
 									  icon="@Embed('../../../images/chart_organisation.png')"
 									 click="openGraphInfo()"
 									 toolTip="View the graph information" />
-				<display:ImageButton2 id="messageButton"
+				<display:ImageButton id="messageButton"
 									 icon="{DisplayUtil.flagRedIcon}"
 									 click="viewMessage()"
 									 toolTip="View Message" />

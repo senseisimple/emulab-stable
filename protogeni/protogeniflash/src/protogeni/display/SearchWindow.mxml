@@ -29,7 +29,7 @@
 
 	<s:HGroup width="100%">
 		<display:KeyboardTextInput id="searchField" width="100%" creationComplete="searchField.setEnter(search)" />
-		<display:ImageButton2 icon="{DisplayUtil.searchIcon}" click="search()" />
+		<display:ImageButton icon="{DisplayUtil.searchIcon}" click="search()" />
 	</s:HGroup>
 	<s:HGroup width="100%">
 		<s:CheckBox label="Match entire string" id="matchCheck"/>

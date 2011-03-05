@@ -111,7 +111,7 @@
 	<s:HGroup>
 		<mx:Button label="All" id="allButton" height="24"
 				   click="DisplayUtil.viewNodeCollection(nodes);" />
-		<display:ImageButton2 label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
+		<display:ImageButton label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
 	</s:HGroup>
 
 </s:VGroup>

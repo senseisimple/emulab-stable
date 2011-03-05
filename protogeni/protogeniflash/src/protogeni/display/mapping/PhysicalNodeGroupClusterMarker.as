@@ -72,7 +72,7 @@ import protogeni.resources.GeniManager;
     else if(label.length == 2)
     	labelMc.x = 7;
     else
-    	labelMc.x = 5;
+    	labelMc.x = 4;
     
     addChild(labelMc);
     cacheAsBitmap = true;
