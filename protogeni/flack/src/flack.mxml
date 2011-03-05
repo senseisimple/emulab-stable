@@ -418,7 +418,7 @@
 		<display:ImageButton id="infoButton"
 							 icon="@Embed('../images/protogeni-logo.png')"
 							 click="DisplayUtil.viewAboutWindow()"
-							 toolTip="View more information about ProtoGENI" />
+							 toolTip="View more information about Flack" />
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton id="refreshButton"
 							  icon="{DisplayUtil.refreshIcon}"

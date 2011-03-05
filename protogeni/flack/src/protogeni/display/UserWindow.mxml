@@ -52,7 +52,7 @@
 			public function save():void
 			{
 				user.sslPem = this.sslPem.text;
-				(Main.Application() as protogeniflash).saveLocalUserData();
+				(Main.Application() as flack).saveLocalUserData();
 			}
 		]]>
 	</fx:Script>

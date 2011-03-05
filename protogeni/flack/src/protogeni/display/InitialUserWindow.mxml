@@ -46,7 +46,7 @@
 			{
 				if(Main.useJavascript) {
 					if(passwordField.textInput.text.length == 0) {
-						Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as protogeniflash);
+						Alert.show("Please enter a password", "", 4, FlexGlobals.topLevelApplication as flack);
 						return;
 					}
 					if(retrieveCertCheckbox.selected && selectedAuthority.workingCertGet) {

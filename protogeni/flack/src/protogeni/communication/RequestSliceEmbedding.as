@@ -14,6 +14,8 @@
 
 package protogeni.communication
 {
+	import mx.utils.Base64Encoder;
+	
 	import protogeni.resources.Sliver;
 
   public class RequestSliceEmbedding extends Request
@@ -23,8 +25,13 @@ package protogeni.communication
       super("SES","Embedding the sliver", CommunicationUtil.map);
       sliver = newSliver;
 	  op.timeout = 500;
+	  
+	  var encoder:Base64Encoder = new Base64Encoder();
+	  encoder.encode(sliver.manager.Rspec.toXMLString());
+	  var encodedRspec:String = encoder.toString();
+	  
 	  op.addField("credential", newSliver.slice.creator.credential);
-	  op.addField("advertisement", sliver.manager.Rspec.toXMLString());
+	  op.addField("advertisement", encodedRspec);
 	  op.addField("request", sliver.getRequestRspec());
 	  op.setUrl(CommunicationUtil.sesUrl);
     }
@@ -39,6 +46,6 @@ package protogeni.communication
 		return null;
     }
 
-    var sliver:Sliver;
+    public var sliver:Sliver;
   }
 }

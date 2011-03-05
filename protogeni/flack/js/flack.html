@@ -1,7 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
    <head>
-      <title>ProtoGENI Flash Client</title>
+      <title>Flack</title>
       <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 
           <!-- Include CSS to eliminate any default margins/padding and set the height of the html element and
@@ -34,12 +34,13 @@
           params.bgcolor = "#d2e1f0";
           params.allowscriptaccess = "always";
           params.allowfullscreen = "true";
+		  params.fullScreenOnSelection = "true";
           var attributes = {};
-          attributes.id = "protogeniflash";
-          attributes.name = "protogeniflash";
+          attributes.id = "flack";
+          attributes.name = "flack";
           attributes.align = "middle";
           swfobject.embedSWF(
-              "protogeniflash.swf?mode=public&debug=1&usejs=1", "flashContent",
+              "flack.swf?mode=public&debug=0&usejs=1", "flashContent",
               "100%", "100%",
               swfVersionStr, xiSwfUrlStr,
               flashvars, params, attributes);
@@ -306,18 +307,20 @@
 
           <noscript>
             <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
-                        width="100%" height="100%" id="protogeniflash">
-                <param name="movie" value="protogeniflash.swf?mode=public&debug=1&usejs=1" />
+                        width="100%" height="100%" id="flack">
+                <param name="movie" value="flack.swf?mode=public&debug=0&usejs=1" />
                 <param name="quality" value="high" />
                 <param name="bgcolor" value="#d2e1f0" />
                 <param name="allowScriptAccess" value="always" />
                 <param name="allowFullScreen" value="true" />
+                <param name="fullScreenOnSelection" value="true" />
                 <!--[if !IE]>-->
-                <object type="application/x-shockwave-flash" data="protogeniflash.swf?mode=public&debug=1&usejs=1" width="100%" height="100%">
+                <object type="application/x-shockwave-flash" data="flack.swf?mode=public&debug=0&usejs=1" width="100%" height="100%">
                     <param name="quality" value="high" />
                     <param name="bgcolor" value="#d2e1f0" />
                     <param name="allowScriptAccess" value="always" />
                     <param name="allowFullScreen" value="true" />
+					<param name="fullScreenOnSelection" value="true" />
                 <!--<![endif]-->
                 <!--[if gte IE 6]>-->
                         <p>

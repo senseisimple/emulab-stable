@@ -33,8 +33,8 @@
   public class Main
   {
 	// Returns the main class
-	public static function Application():protogeniflash {
-		return FlexGlobals.topLevelApplication as protogeniflash;
+	public static function Application():flack {
+		return FlexGlobals.topLevelApplication as flack;
 	}
 	
 	public static function GetLoader():IEventDispatcher {
