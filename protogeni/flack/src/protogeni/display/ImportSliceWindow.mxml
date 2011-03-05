@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   xmlns:display="protogeni.display.*"
+					   title="Paste RSPEC">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import flash.desktop.Clipboard;
+			import flash.desktop.ClipboardFormats;
+			
+			import mx.controls.Alert;
+			
+			import protogeni.communication.CommunicationUtil;
+			import protogeni.resources.GeniManager;
+			import protogeni.resources.Slice;
+			import protogeni.resources.Sliver;
+			
+			public var slice:Slice;
+			
+			public function setSlice(s:Slice):void {
+				slice = s;
+			}
+			
+			public function success():void {
+				if(slice.tryImport(sliceRspecText.text))
+					closeWindow();
+			}
+
+			protected function doPaste(event:MouseEvent):void
+			{
+				if(Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT))
+					sliceRspecText.text = Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT).toString();
+				else
+					Alert.show("No text was found in the clipboard");
+			}
+
+		]]>
+	</fx:Script>
+
+	<s:TextArea id="sliceRspecText" width="100%" height="100%" />
+	
+	<display:controlBarContent>
+		<s:Button id="cancelButton" label="Cancel" icon="{ImageUtil.cancelIcon}" click="closeWindow();" height="24" />
+		<s:Button id="okButton" label="Apply" icon="{ImageUtil.availableIcon}" click="success();" height="24" />
+	</display:controlBarContent>
+</display:DefaultWindow>

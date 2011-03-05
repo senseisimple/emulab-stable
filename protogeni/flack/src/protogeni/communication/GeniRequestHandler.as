@@ -168,6 +168,9 @@
 				// Create
 				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 				for each(sliver in slice.slivers) {
+					sliver.created = false;
+				}
+				for each(sliver in slice.slivers) {
 					if(sliver.manager is AggregateManager)
 						pushRequest(new RequestSliverCreateAm(sliver));
 					else if(sliver.manager is ProtogeniComponentManager)

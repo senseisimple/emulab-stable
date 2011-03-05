@@ -26,20 +26,6 @@
 	// Slice that a user created in ProtoGENI
 	public class Slice
 	{
-		// Status values
-	    public static const CHANGING:String = "changing";
-		public static const READY:String = "ready";
-	    public static const NOTREADY:String = "notready";
-	    public static const FAILED:String = "failed";
-	    public static const UNKNOWN:String = "unknown";
-	    public static const NA:String = "N/A";
-	    
-	    // State values
-	    public static const STARTED:String = "started";
-		public static const STOPPED:String = "stopped";
-	    public static const MIXED:String = "mixed";
-	    
-		public var uuid:String = null;
 		[Bindable]
 		public var hrn:String = null;
 		[Bindable]
@@ -50,7 +36,10 @@
 		public var credential:String = "";
 		public var slivers:SliverCollection = new SliverCollection();
 
-		public var validUntil:Date;
+		public var expires:Date;
+		
+		// depreciated
+		public var uuid:String = null;
 
 		public function Slice()
 		{
@@ -58,15 +47,15 @@
 		
 		public function Status():String {
 			if(hrn == null) return null;
-			var status:String = NA;
+			var status:String = Sliver.STATUS_NA;
 			for each(var sliver:Sliver in slivers) {
-				if(sliver.status == FAILED)
-					return FAILED;
+				if(sliver.status == Sliver.STATUS_FAILED)
+					return Sliver.STATUS_FAILED;
 				
-				if(status == NA) status = sliver.status;
+				if(status == Sliver.STATUS_NA) status = sliver.status;
 				else {
 					if(sliver.status != status)
-						return MIXED;
+						return Sliver.STATUS_MIXED;
 				}
 			}
 			return status;
@@ -219,7 +208,7 @@
 			newSlice.name = this.name;
 			newSlice.creator = this.creator;
 			newSlice.credential = this.credential;
-			newSlice.validUntil = this.validUntil;
+			newSlice.expires = this.expires;
 			
 			var sliver:Sliver;
 			
@@ -365,10 +354,10 @@
 		
 		public function ReadyIcon():Class {
 			switch(Status()) {
-				case READY : return ImageUtil.flagGreenIcon;
-				case NOTREADY : return ImageUtil.flagYellowIcon;
-				case FAILED : return ImageUtil.flagRedIcon;
-				default : return null;
+				case Sliver.STATUS_READY : return ImageUtil.flagGreenIcon;
+				case Sliver.STATUS_NOTREADY : return ImageUtil.flagYellowIcon;
+				case Sliver.STATUS_FAILED : return ImageUtil.flagRedIcon;
+				default : return ImageUtil.flagOrangeIcon;
 			}
 		}
 		

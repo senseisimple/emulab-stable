@@ -17,16 +17,18 @@
 	// Sliver from a slice containing all resources from the CM
 	public class Sliver
 	{
-		public static const STATE_READY:String = "ready";
-	    public static const STATE_NOTREADY:String = "notready";
-	    public static const STATE_FAILED:String = "failed";
+		public static const STATE_STARTED:String = "started";
+		public static const STATE_STOPPED:String = "stopped";
+		public static const STATE_MIXED:String = "mixed";
+		public static const STATE_NA:String = "N/A";
 		
 		public static const STATUS_CHANGING:String = "changing";
 		public static const STATUS_READY:String = "ready";
 		public static const STATUS_NOTREADY:String = "notready";
-		public static const STATUS_FAILED:String = "changing";
+		public static const STATUS_FAILED:String = "failed";
 		public static const STATUS_UNKOWN:String = "unknown";
 		public static const STATUS_MIXED:String = "mixed";
+		public static const STATUS_NA:String = "N/A";
 		
 		public var created:Boolean = false;
 		public var staged:Boolean = false;

@@ -2,29 +2,73 @@
 <s:HGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
-		  verticalAlign="middle" width="100%" gap="2">
+		  verticalAlign="middle" width="100%" gap="2"
+		  creationComplete="init()">
 	<fx:Script>
 		<![CDATA[
 			import protogeni.GeniEvent;
 			import protogeni.display.DisplayUtil;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.Slice;
+			import protogeni.resources.Sliver;
 			
 			import spark.components.CheckBox;
 			import spark.components.RadioButtonGroup;
 			
 			[Bindable]
 			public var slice:Slice;
+			private var status:String = "";
 			
 			[Bindable]
 			public var showCheckbox:CheckBox;
 			
 			[Bindable]
 			public var radioGroup:RadioButtonGroup;
+			
+			public function init():void
+			{
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, tryUpdate);
+			}
+			
+			public function destroy():void {
+				Main.geniDispatcher.removeEventListener(GeniEvent.SLICE_CHANGED, tryUpdate);
+			}
+			
+			public function tryUpdate(e:GeniEvent):void {
+				if(e.changedObject == slice)
+					update();
+			}
+			
+			public function update():void
+			{
+				// Don't do it if not needed
+				if(slice.Status() == status)
+					return;
+				
+				status = slice.Status();
+
+				switch(status) {
+					case Sliver.STATUS_READY:
+						sliceSelect.styleName = "validStyle";
+						break;
+					case Sliver.STATUS_FAILED:
+						sliceSelect.styleName = "failedStyle";
+						break;
+					case Sliver.STATUS_CHANGING:
+					case Sliver.STATUS_NOTREADY:
+					case Sliver.STATUS_MIXED:
+						sliceSelect.styleName = "inprogressStyle";
+						break;
+					default:
+						sliceSelect.styleName = "unknownStyle";
+				}
+				
+				this.toolTip = status;
+			}
 
 		]]>
 	</fx:Script>
-	<s:RadioButton enabled="{showCheckbox.selected}"
+	<s:RadioButton enabled="{showCheckbox.selected}" id="sliceSelect"
 				   group="{radioGroup}"
 				   fontSize="10" />
 	<s:Button id="sliceButton"

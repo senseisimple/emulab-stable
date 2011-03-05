@@ -138,6 +138,7 @@
 					case Sliver.STATUS_FAILED:
 						this.setStyle("borderColor", "red");
 						this.setStyle("backgroundColor", "#FFD9D9");
+						break;
 					case Sliver.STATUS_CHANGING:
 					case Sliver.STATUS_NOTREADY:
 					case Sliver.STATUS_UNKOWN:
