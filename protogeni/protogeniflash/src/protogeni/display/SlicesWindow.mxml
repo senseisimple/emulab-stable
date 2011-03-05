@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	title="Slices" show="refreshView()"
+	width="300" height="220"
+	xmlns:display="protogeni.display.*">
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.controls.Alert;
+			import mx.controls.Button;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
+			import protogeni.resources.Slice; 
+			
+			public function openFirst():void {
+				show();
+				init();
+				
+				focusManager.setFocus(sliceName);
+			}
+			
+			public function init():void
+			{
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, refreshView);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, refreshView);
+			}
+			
+			public function createSlice():void
+			{
+				if(Main.protogeniHandler.CurrentUser.credential == null || Main.protogeniHandler.CurrentUser.credential.length == 0)
+				{
+					Alert.show("User credential needed before trying to create slice.");
+					return;
+				}
+					
+				if(Main.protogeniHandler.CurrentUser.keys == null || Main.protogeniHandler.CurrentUser.keys.length == 0)
+				{
+					Alert.show("User keys needed before trying to create slice.");
+					return;
+				}
+
+				if(sliceName.text.length == 0)
+				{
+					Alert.show("Please input a name for the slice");
+					focusManager.setFocus(sliceName);
+					return;
+				}
+
+				Main.protogeniHandler.rpcHandler.createSlice(sliceName.text);
+			}
+			
+			public function refreshView(junk:* = null):void
+			{
+				this.removeAllChildren();
+				for each(var s:Slice in Main.protogeniHandler.CurrentUser.slices)
+				{
+					var b:Button = DisplayUtil.getSliceButton(s);
+					b.percentWidth = 100;
+					this.addChild(b);
+				}
+			}
+
+		]]>
+	</mx:Script>
+	
+	<mx:ControlBar>
+		<display:PromptingTextInput id="sliceName" width="100%" enter="createSlice();" restrict="a-zA-Z0-9\\-" prompt="New slice name..." />
+		<display:ImageButton id="createButton" source="{DisplayUtil.actionIcon}" click="createSlice();" />
+	</mx:ControlBar>
+	
+</display:DefaultWindow>

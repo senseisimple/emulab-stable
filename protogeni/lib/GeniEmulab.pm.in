@@ -257,15 +257,10 @@ sub CreatePhysNode($$)
     return undef
 	if (!defined($blob));
 
-    my $hrn      = $blob->{'hrn'};
     my $IP       = $blob->{'physctrl'};
     my $hostname = $blob->{'hostname'};
-    if (! (defined($hrn) && defined($hostname))) {
+    if (! defined($hostname)) {
 	print STDERR "Missing stuff in blob from CM for $node_urn\n";
-	goto bad;
-    }
-    if (! ($hrn =~ /^[-\w\.]*$/)) {
-	print STDERR "Invalid hrn '$hrn' in blob from CM for $node_urn\n";
 	goto bad;
     }
     if (! ($hostname =~ /^[-\w\.]*$/)) {
@@ -273,9 +268,35 @@ sub CreatePhysNode($$)
 	    "Invalid hostname '$hostname' in blob from CM for $node_urn\n";
 	goto bad;
     }
-    $node_id = $hrn;
+    if ($authority->IsSFA()) {
+	#
+	# Generate a suitable node_id.
+	#
+	my $site = $blob->{'site'};
+	if (! defined($site)) {
+	    print STDERR "Missing site in blob from CM for $node_urn\n";
+	    goto bad;
+	}
+	if (! ($site =~ /^[-\w\.]*$/)) {
+	    print STDERR "Invalid site '$site' in blob from CM for $node_urn\n";
+	    goto bad;
+	}
+	my @tmp  = split(/\./, $hostname);
+	$node_id = $site . "-" . $tmp[0];
+    }
+    else {
+	my $hrn = $blob->{'hrn'};
+	if (! defined($hrn)) {
+	    print STDERR "Missing hrn in blob from CM for $node_urn\n";
+	    goto bad;
+	}
+	if (! ($hrn =~ /^[-\w\.]*$/)) {
+	    print STDERR "Invalid hrn '$hrn' in blob from CM for $node_urn\n";
+	    goto bad;
+	}
+	$node_id = $hrn;
+    }
     $node_id =~ s/\./\-/g;
-    
     if (length($node_id) > 32) {
 	print STDERR "Nodeid '$node_id' too long for $node_urn\n";
 	goto bad;
@@ -285,12 +306,6 @@ sub CreatePhysNode($$)
     # Find control network.
     #
     if ($authority->IsSFA()) {
-	#
-	# Generate a suitable node_id.
-	#
-	my ($pl) = ($blob->{'hrn'} =~ /^([^.]*)\./);
-	$node_id = "$pl" . "-" . $blob->{'node_id'};
-
 	#
 	# Find the IP from the hostname and generate a stub iface entry.
 	#

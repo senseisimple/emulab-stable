@@ -685,6 +685,7 @@ sub Create($$$$$$)
     GeniXML::SetText("authentication", $login, "ssh-keys");
     GeniXML::SetText("hostname", $login, $phostname);
     GeniXML::SetText("port", $login, $sshdport);
+    GeniXML::SetText("username", $login, $user->uid());
 
     my $sliver = GeniSliver->Create($slice, $user, $resource_uuid, "Node",
 				    $resource_id, $hrn, $nickname, $rspec);

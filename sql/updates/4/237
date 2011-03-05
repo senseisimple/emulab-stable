@@ -1,0 +1,24 @@
+#
+# Add min/max vlan to switch_stacks table, so we can specify
+# per-device limits to override values in the switch_stack_types
+# table. This is needed, for example in Utah, where we have some
+# switches that can do vlans > 1024, but not all of them. 
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("switch_stacks", "min_vlan")) {
+	DBQueryFatal("alter table switch_stacks add ".
+		     "`min_vlan` int(11) default NULL");
+    }
+    if (!DBSlotExists("switch_stacks", "max_vlan")) {
+	DBQueryFatal("alter table switch_stacks add ".
+		     "`max_vlan` int(11) default NULL");
+    }
+    return 0;
+}
+1;

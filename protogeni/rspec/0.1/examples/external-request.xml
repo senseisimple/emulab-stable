@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rspec xmlns="http://www.protogeni.net/resources/rspec/0.1"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd"
+       type="request" >
+  <node virtual_id="left"
+        virtualization_type="emulab-vnode"
+        exclusive="1"
+        component_manager_uuid="urn:uky+authority+cm">
+    <node_type type_name="pc" type_slots="1"/>
+    <interface virtual_id="if0"/>
+  </node>
+  <node virtual_id="right"
+        virtualization_type="emulab-vnode"
+        exclusive="1"
+	component_manager_uuid="urn:utah+authority+cm">
+    <node_type type_name="pc" type_slots="1"/>
+    <interface virtual_id="if0"/>
+  </node>
+  <link virtual_id="center">
+    <component_manager name="urn:uky+authority+cm" />
+    <component_manager name="urn:utah+authority+cm" />
+    <component_manager name="urn:ion+authority+cm" />
+    <interface_ref virtual_node_id="left"
+                   virtual_interface_id="if0" />
+    <interface_ref virtual_node_id="right" 
+                   virtual_interface_id="if0" />
+    <component_hop component_urn="urn:utah+link+link-ion">
+      <interface_ref component_node_uuid="urn:utah+node+cisco3"
+                     component_interface_id="ion"/>
+      <interface_ref component_node_uuid="urn:ion+node+ion"
+                     component_interface_id="interface"/>
+    </component_hop>
+    <component_hop component_urn="urn:uky+link+link-ion">
+      <interface_ref component_node_uuid="urn:uky+node+hp1"
+                     component_interface_id="ion"/>
+      <interface_ref component_node_uuid="urn:ion+node+ion"
+                     component_interface_id="interface"/>
+    </component_hop>
+  </link>
+</rspec>

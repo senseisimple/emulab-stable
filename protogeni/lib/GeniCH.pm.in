@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniCH;
@@ -50,7 +50,35 @@ my $API_VERSION = 1;
 #
 sub GetVersion()
 {
-    return GeniResponse->Create( GENIRESPONSE_SUCCESS, $API_VERSION );
+    my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($me)) {
+	print STDERR "Could not find local authority object\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    my $commithash = VersionInfo("commithash") || "";
+    my @authorities = ();
+    my %peers = ();
+
+    if (GeniAuthority->ListAll(\@authorities) != 0) {
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
+    foreach my $authority (@authorities) {
+	next
+	    if ($authority->type() ne "cm");
+	$peers{$authority->urn()} = $authority->url();
+    }
+    my $blob = {
+	"peers"      => \%peers,
+	"api"        => $API_VERSION,
+	"urn"        => $me->urn(),
+	"hrn"        => $me->hrn(),
+	"url"        => $me->url(),
+	"interface"  => "registry",
+	"code_tag"   => $commithash,
+	# XXX
+	"hostname"   => "www." . $OURDOMAIN,
+    };
+    return GeniResponse->Create(GENIRESPONSE_SUCCESS, $blob);
 }
 
 #

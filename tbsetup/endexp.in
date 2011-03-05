@@ -550,6 +550,12 @@ EmulabFeatures->DeleteAll($experiment) == 0 or
     fatal("Could not delete all features for $experiment");
 
 #
+# Kill any vlan tag reservations.
+#
+$experiment->ClearReservedVlanTags() == 0 or
+    fatal("Could not delete reserved vlan tags for $experiment");
+
+#
 # Cleanup DB state and remove directory. Purge flag is optional and generally
 # used by admins for cleaning up bad DB state caused by script errors.
 #

@@ -30,7 +30,7 @@ RSpecContents =
   # how long the holder may use the resources. For a resource request, it's
   # how long we want the resources. For an advertisement, it might be a hint
   # as to how long it's okay to cache this rspec.
-  attribute valid_until { xsd:dateTime }? &
+  attribute expires { xsd:dateTime }? &
   # One or more nodes/links
   Node* &
   Link*
@@ -47,7 +47,7 @@ NodeContents =
     element relation { RelationContents }* &
 
     # Information about the nodes physical location
-    element location { LocationContents } &
+    element location { LocationContents }? &
 
     # Services set up by the CM provided on this node.
     element services { ServiceContents }? &

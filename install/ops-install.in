@@ -642,6 +642,10 @@ Phase "patches", "Applying patches", sub {
     Phase "perlselfloaderpatch", "Fixing perl self-loader", sub {
 	my $perldir = "/usr/local/lib/perl5/5.10.1";
 	DoneIfDoesntExist("$perldir/SelfLoader.pm");
+	my $ver = `fgrep 'our \$VERSION =' $perldir/SelfLoader.pm 2>/dev/null`;
+	if ($? == 0 && $ver =~ /1\.18/) {
+	    PhaseSkip("Patch already applied");
+	}
 	ExecQuietFatal("$PATCH -d $perldir -i $SELFLOAD_PATCH");
     };
     if ($MAILMANSUPPORT) {

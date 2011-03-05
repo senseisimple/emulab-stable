@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -180,10 +180,13 @@ sub ExpireTickets()
 sub ExpireSlices()
 {
     my $query_result =
-	GeniDB::DBQueryWarn("select idx from geni_slices ".
-			    "where UNIX_TIMESTAMP(now()) > ".
-			    "      UNIX_TIMESTAMP(expires) and ".
-			    "      shutdown is null");
+	GeniDB::DBQueryWarn("select idx from geni_slices where ".
+			    " (UNIX_TIMESTAMP(now()) > ".
+			    "     UNIX_TIMESTAMP(expires) or ".
+			    "  (isplaceholder=1 and ".
+			    "     (UNIX_TIMESTAMP(now()) - ".
+			    "      UNIX_TIMESTAMP(created)) > 3600)) ".
+			    " and shutdown is null");
 
     while (my ($idx) = $query_result->fetchrow_array()) {
 	my $slice = GeniSlice->Lookup($idx);
@@ -211,7 +214,7 @@ sub ExpireSlices()
 	# See if we have any local nodes. No point in using the idle
 	# check if there are no nodes. 
 	#
-	if ($idlecheck) {
+	if ($idlecheck && !$slice->isplaceholder()) {
 	    my @localnodes = ();
 	    $experiment->LocalNodeListNames(\@localnodes);
 	    if (@localnodes) {
@@ -233,7 +236,12 @@ sub ExpireSlices()
 	    print STDERR "$slice ($experiment) is idle; releasing.\n";
 	}
 	else {
-	    print STDERR "$slice ($experiment) has expired; releasing.\n";
+	    if ($slice->isplaceholder()) {
+		print STDERR "Releasing placeholder $slice $experiment.\n";
+	    }
+	    else {
+		print STDERR "Expiring $slice $experiment.\n";
+	    }
 	}
       cleanup:
 	if (GeniCM::CleanupDeadSlice($slice) != 0) {

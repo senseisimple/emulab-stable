@@ -46,6 +46,14 @@ NodeContents &=
     }*
   }*
 
+SliverType &=
+  element disk_image {
+    DiskImageContents &
+    attribute default { text }?
+  }* &
+  attribute default { text }?
+
+
 RelationContents &=
   attribute component_id { text }
 

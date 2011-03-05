@@ -1,0 +1,25 @@
+#
+# Add external_networks table
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBTableExists("external_networks")) {
+	DBQueryFatal("CREATE TABLE `external_networks` ( ".
+		     " `network_id` varchar(32) NOT NULL default '', ".
+		     " `node_id` varchar(32) NOT NULL default '', ".
+		     " `node_type` varchar(30) NOT NULL default '', ".
+		     " `min_vlan` int(11) NOT NULL default '256', ".
+		     " `max_vlan` int(11) NOT NULL default '1000', ".
+		     " PRIMARY KEY  (`network_id`), ".
+		     " UNIQUE KEY `node_id` (`node_id`) ".
+		     ") ENGINE=MyISAM DEFAULT CHARSET=latin1");
+    }
+
+    return 0;
+}
+

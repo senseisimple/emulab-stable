@@ -128,6 +128,7 @@ DROP TABLE IF EXISTS `blobs`;
 CREATE TABLE `blobs` (
   `uuid` varchar(40) NOT NULL,
   `filename` tinytext,
+  `owner_uid` varchar(8) NOT NULL default '',
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -1278,6 +1279,21 @@ CREATE TABLE `exppid_access` (
   PRIMARY KEY  (`exp_eid`,`exp_pid`,`pid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+--
+-- Table structure for table `external_networks`
+--
+
+DROP TABLE IF EXISTS `external_networks`;
+CREATE TABLE `external_networks` (
+  `network_id` varchar(32) NOT NULL default '',
+  `node_id` varchar(32) NOT NULL default '',
+  `node_type` varchar(30) NOT NULL default '',
+  `min_vlan` int(11) NOT NULL default '256',
+  `max_vlan` int(11) NOT NULL default '1000',
+  PRIMARY KEY  (`network_id`),
+  UNIQUE KEY `node_id` (`node_id`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+  
 --
 -- Table structure for table `firewall_rules`
 --
@@ -3269,6 +3285,27 @@ CREATE TABLE `reserved` (
 --
 -- Table structure for table `scheduled_reloads`
 --
+DROP TABLE IF EXISTS `reserved_vlantags`;
+CREATE TABLE `reserved_vlantags` (
+  `pid` varchar(12) NOT NULL default '',
+  `eid` varchar(32) NOT NULL default '',
+  `exptidx` int(11) NOT NULL default '0',
+  `lanid` int(11) NOT NULL default '0',
+  `vname` varchar(128) NOT NULL default '',
+  `tag` smallint(5) NOT NULL default '0',
+  `reserve_time` datetime default NULL,  
+  `locked` datetime default NULL,
+  `state` varchar(32) NOT NULL default '',
+  PRIMARY KEY (`exptidx`,`lanid`,`tag`),
+  UNIQUE KEY `vname` (`pid`,`eid`,`vname`,`tag`),
+  UNIQUE KEY `lanid` (`pid`,`eid`,`lanid`,`tag`),
+  UNIQUE KEY `tag` (`tag`),
+  KEY `id` (`lanid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `scheduled_reloads`
+--
 
 DROP TABLE IF EXISTS `scheduled_reloads`;
 CREATE TABLE `scheduled_reloads` (
@@ -3436,6 +3473,9 @@ CREATE TABLE `switch_stacks` (
   `node_id` varchar(32) NOT NULL default '',
   `stack_id` varchar(32) NOT NULL default '',
   `is_primary` tinyint(1) NOT NULL default '1',
+  `snmp_community` varchar(32) default NULL,
+  `min_vlan` int(11) default NULL,
+  `max_vlan` int(11) default NULL,
   KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

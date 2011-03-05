@@ -55,6 +55,7 @@ script-install:
 	mkdir -p $(TARGET_PATH)/var/emulab/boot
 	mkdir -p $(TARGET_PATH)/var/emulab/db
 	mkdir -p $(TARGET_PATH)/usr/share/udhcpc
+	rm -f $(TARGET_PATH)/usr/local/etc/emulab
 	ln -sf /etc/testbed $(TARGET_PATH)/usr/local/etc/emulab
 	install -m 755 $(TESTBED_BUILD_PATH)/sethostname.dhclient $(TARGET_PATH)/usr/share/udhcpc
 	install -m 755 $(TMCD_PATH)/linux/control_interface $(TARGET_PATH)/etc/testbed

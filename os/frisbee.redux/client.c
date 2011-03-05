@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2010 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2011 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -53,6 +53,7 @@ int		startdelay = 0, startat = 0;
 int		nothreads = 0;
 int		nodecompress = 0;
 int		debug = 0;
+int		quiet = 0;
 int		tracing = 0;
 char		traceprefix[64];
 int		randomize = 1;
@@ -61,8 +62,15 @@ int		keepalive;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
+char		*imageid;
+int		askonly;
+int		busywait = 0;
+char		*proxyfor = NULL;
 static struct timeval stamp;
 static struct in_addr serverip;
+#ifdef MASTER_SERVER
+static int	xfermethods = MS_METHOD_MULTICAST;
+#endif
 
 /* Forward Decls */
 static void	PlayFrisbee(void);
@@ -138,18 +146,30 @@ ClientStats_t	Stats;
 #endif
 
 char *usagestr = 
- "usage: frisbee [-drzbnN] [-s #] <-m ipaddr> <-p #> <output filename>\n"
+ "usage: frisbee [-drzbnqN] [-s #] <-m ipaddr> <-p #> <output filename>\n"
+ "  or\n"
+ "usage: frisbee [-drzbnqN] [-s #] <-S server> <-F fileid> <output filename>\n"
+ "\n"
  " -d              Turn on debugging. Multiple -d options increase output.\n"
  " -r              Randomly delay first request by up to one second.\n"
  " -z              Zero fill unused block ranges (default is to seek past).\n"
  " -b              Use broadcast instead of multicast\n"
  " -n              Do not use extra threads in diskwriter\n"
+ " -q              Quiet mode (no dots)\n"
  " -N              Do not decompress the received data, just write to output.\n"
+ " -S server-IP    Specify the IP address of the server to use.\n"
  " -p portnum      Specify a port number.\n"
  " -m mcastaddr    Specify a multicast address in dotted notation.\n"
  " -i mcastif      Specify a multicast interface in dotted notation.\n"
  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
  "                 NOTE: Must specify a raw disk device for output filename.\n"
+ " -F file-ID      Specify the ID of the file (image) to download.\n"
+ "                 Here -S specifies the 'master' server which will\n"
+ "                 return unicast/multicast info to use for image download.\n"
+ " -Q file-ID      Ask the server (-S) about the indicated file (image).\n"
+ "                 Tells whether the image is accessible by this node/user.\n"
+ " -B seconds      Time to wait between queries if an image is busy (-F).\n"
+ " -X method       Transfer method for -F, one of: ucast, mcast or bcast.\n"
  " -K seconds      Send a multicast keep alive after a period of inactivity.\n"
  "\n"
  "tuning options (if you don't know what they are, don't use em!):\n"
@@ -189,16 +209,20 @@ int
 main(int argc, char **argv)
 {
 	int	ch, mem;
-	char   *filename;
+	char   *filename = NULL;
 	int	dostype = -1;
 	int	slice = 0;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:")) != -1)
+	while ((ch = getopt(argc, argv, "dqhp:m:s:i:tbznT:r:E:D:C:W:S:M:R:I:ONK:B:F:Q:P:X:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
 			break;
 			
+		case 'q':
+			quiet++;
+			break;
+
 		case 'b':
 			broadcast++;
 			break;
@@ -234,12 +258,54 @@ main(int argc, char **argv)
 			break;
 
 		case 'S':
-			if (!inet_aton(optarg, &serverip)) {
-				fprintf(stderr, "Invalid server IP `%s'\n",
+			if (!GetIP(optarg, &serverip)) {
+				fprintf(stderr, "Invalid server name '%s'\n",
 					optarg);
 				exit(1);
 			}
 			break;
+
+#ifdef MASTER_SERVER
+		case 'B':
+			busywait = atoi(optarg);
+			break;
+		case 'F':
+			imageid = optarg;
+			break;
+		case 'Q':
+			imageid = optarg;
+			askonly = 1;
+			break;
+		case 'P':
+			proxyfor = optarg;
+			break;
+		case 'X':
+		{
+			char *ostr, *str, *cp;
+			int nm = 0;
+
+			str = ostr = strdup(optarg);
+			while ((cp = strsep(&str, ",")) != NULL) {
+				if (strcmp(cp, "ucast") == 0)
+					nm |= MS_METHOD_UNICAST;
+				else if (strcmp(cp, "mcast") == 0)
+					nm |= MS_METHOD_MULTICAST;
+				else if (strcmp(cp, "bcast") == 0)
+					nm |= MS_METHOD_BROADCAST;
+				else if (strcmp(cp, "any") == 0)
+					nm = MS_METHOD_ANY;
+			}
+			free(ostr);
+			if (nm == 0) {
+				fprintf(stderr,
+					"-X should specify one or more of: "
+					"'ucast', 'mcast', 'bcast', 'any'\n");
+				exit(1);
+			}
+			xfermethods = nm;
+			break;
+		}
+#endif
 
 		case 't':
 			tracing++;
@@ -322,14 +388,86 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1)
-		usage();
-	filename = argv[0];
+	if (!askonly) {
+		if (argc != 1)
+			usage();
+		filename = argv[0];
+	}
 
-	if (!portnum || ! mcastaddr.s_addr)
+	if (!((imageid != NULL && serverip.s_addr != 0) ||
+	      (mcastaddr.s_addr != 0 && portnum != 0)))
 		usage();
 
 	ClientLogInit();
+#ifdef MASTER_SERVER
+	if (imageid) {
+		GetReply reply;
+		int method = askonly ? MS_METHOD_ANY : xfermethods;
+		int timo = 5; /* XXX */
+		int host = 0;
+
+		if (proxyfor) {
+			struct in_addr in;
+
+			if (!GetIP(proxyfor, &in))
+				fatal("Could not resolve host '%s'\n",
+				      proxyfor);
+			host = ntohl(in.s_addr);
+		}
+		while (1) {
+			if (!ClientNetFindServer(ntohl(serverip.s_addr),
+						 portnum, host, imageid,
+						 method, askonly, timo,
+						 &reply, NULL))
+				fatal("Could not get download info for '%s'",
+				      imageid);
+
+			if (askonly) {
+				PrintGetInfo(imageid, &reply, 1);
+				exit(0);
+			}
+			if (reply.error) {
+				if (busywait == 0 ||
+				    reply.error != MS_ERROR_TRYAGAIN)
+					fatal("%s: server returned error: %s",
+					      imageid,
+					      GetMSError(reply.error));
+				log("%s: image busy, waiting %d seconds...",
+				    imageid, busywait);
+				sleep(busywait);
+				continue;
+			}
+
+			serverip.s_addr = htonl(reply.servaddr);
+			mcastaddr.s_addr = htonl(reply.addr);
+			portnum = reply.port;
+
+			if (serverip.s_addr == mcastaddr.s_addr)
+				log("%s: address: %s:%d",
+				    imageid, inet_ntoa(mcastaddr), portnum);
+			else {
+				char serverstr[sizeof("XXX.XXX.XXX.XXX")+1];
+
+				strncpy(serverstr, inet_ntoa(serverip),
+					sizeof serverstr);
+				log("%s: address: %s:%d, server: %s",
+				    imageid, inet_ntoa(mcastaddr), portnum,
+				    serverstr);
+			}
+			break;
+		}
+	}
+
+	/*
+	 * XXX if proxying for another node, assume that we are only
+	 * interested in starting up the frisbeed and don't care about
+	 * the image ourselves. So, our work is done!
+	 */
+	if (proxyfor) {
+		log("server started on behalf of %s", proxyfor);
+		exit(0);
+	}
+#endif
 	ClientNetInit();
 
 #ifdef DOEVENTS
@@ -457,8 +595,8 @@ main(int argc, char **argv)
 	 * This call fires off the disk writer thread as required.
 	 * The writer thread synchronizes only with us (the decompresser).
 	 */
-	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype, 3,
-		       maxwritebufmem*1024*1024);
+	ImageUnzipInit(filename, slice, debug, zero, nothreads, dostype,
+		       quiet ? 0 : 3, maxwritebufmem*1024*1024);
 
 	if (tracing) {
 		ClientTraceInit(traceprefix);
@@ -1555,7 +1693,8 @@ PlayFrisbee(void)
 				p->msg.join2.chunksize = MAXCHUNKSIZE;
 				p->msg.join2.blocksize = MAXBLOCKSIZE;
 				p->msg.join2.bytecount =
-					p->msg.join.blockcount * MAXBLOCKSIZE;
+					(uint64_t)p->msg.join.blockcount *
+					MAXBLOCKSIZE;
 			}
 			CLEVENT(1, EV_CLIJOINREP,
 				CHUNKSIZE, BLOCKSIZE,
@@ -1627,8 +1766,11 @@ PlayFrisbee(void)
 	p->msg.leave2.stats      = Stats;
 	PacketSend(p, 0);
 
-	log("");
-	ClientStatsDump(myid, &Stats);
+	if (!quiet) {
+		log("");
+		ClientStatsDump(myid, &Stats);
+		log("");
+	}
 #else
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_LEAVE;
@@ -1637,5 +1779,5 @@ PlayFrisbee(void)
 	p->msg.leave.elapsed  = estamp.tv_sec;
 	PacketSend(p, 0);
 #endif
-	log("\nLeft the team after %ld seconds on the field!", estamp.tv_sec);
+	log("Left the team after %ld seconds on the field!", estamp.tv_sec);
 }

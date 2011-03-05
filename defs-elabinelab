@@ -55,6 +55,7 @@ OUTERBOSS_NODENAME=changeme
 TBCOOKIESUFFIX=changeme
 # XXX hack to work around perl bug
 SELFLOADER_DATA=changeme
+TBUSEDBI=1
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.
