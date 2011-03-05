@@ -22,6 +22,7 @@
 		public var latitude:Number;
 		public var longitude:Number;
 		public var country:String;
+		[Bindable]
 		public var city:String = "";
 		
 		public var owner:PhysicalNodeGroupCollection = null;

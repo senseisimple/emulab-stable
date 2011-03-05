@@ -234,7 +234,7 @@
 					&& Main.geniHandler.requestHandler.queue.isEmpty()
 					&& this.sliceCanvas.slice.Status() != Slice.READY
 					&& this.sliceCanvas.slice.Status() != Slice.FAILED)
-					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);
+					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice, true);
 			}
 			
 			public function viewRspecs():void

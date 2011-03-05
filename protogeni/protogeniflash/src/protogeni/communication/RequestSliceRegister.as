@@ -36,6 +36,7 @@ package protogeni.communication
 		{
 			slice.credential = String(response.value);
 			Main.geniHandler.CurrentUser.slices.add(slice);
+			Main.geniDispatcher.dispatchSlicesChanged();
 			DisplayUtil.viewSlice(slice);
 		}
 		else

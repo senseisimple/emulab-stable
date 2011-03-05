@@ -107,8 +107,16 @@
         public static var crossIcon:Class;
         
         [Bindable]
-        [Embed(source="../../../images/drive_network.png")]
+        [Embed(source="../../../images/administrator.png")]
         public static var ownedIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/server.png")]
+		public static var exclusiveIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/server_stanchion.png")]
+		public static var sharedIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/drive_network.png")]
@@ -255,8 +263,12 @@
 				return ownedIcon;
             else
             {
-	            if (val.available)
-	                return availableIcon;
+	            if (val.available) {
+					if(val.exclusive)
+						return exclusiveIcon;
+					else
+						return sharedIcon;
+				}
 	            else
 	                return cancelIcon;
             }

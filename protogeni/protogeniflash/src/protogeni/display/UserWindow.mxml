@@ -15,6 +15,9 @@
 	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			
 			import protogeni.GeniEvent;
 			import protogeni.resources.Slice;
 			import protogeni.resources.User;
@@ -51,7 +54,7 @@
 			
 			public function save():void
 			{
-				user.setPem(this.sslPem.text);
+				user.sslPem = this.sslPem.text;
 				(Main.Application() as protogeniflash).saveLocalUserData();
 			}
 		]]>
@@ -86,6 +89,14 @@
 					</s:Group>
 					<s:Label text="Keys"/>
 					<mx:Image width="16" height="16" id="credentialKeysImage"/>
+				</mx:GridItem>
+			</mx:GridRow>
+			<mx:GridRow width="100%">
+				<mx:GridItem>
+					<s:Label text="Password" fontWeight="bold"/>
+				</mx:GridItem>
+				<mx:GridItem width="100%">
+					<s:Button label="Force delete cache" click="user.encryptedPassword = ''; FlexGlobals.topLevelApplication.saveLocalUserData(); Alert.show('Password removed');" />
 				</mx:GridItem>
 			</mx:GridRow>
 			<mx:GridRow width="100%">

@@ -90,5 +90,8 @@
 	
 	[Bindable]
 	public static var useGpeni:Boolean = false;
+	
+	[Bindable]
+	public static var savePassword:Boolean = false;
   }
 }

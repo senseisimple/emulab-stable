@@ -112,6 +112,7 @@
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
 				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
+				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, fillCombobox);
 				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
 				
 				// Default behavior (public)
@@ -125,7 +126,9 @@
 				try {
 					geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
 				} catch(e:Error) {
-					Alert.show("It looks like Flash is unable to save/load local data.  Would you like to load directions on how to enable local data?", "Enable Local Data?", Alert.YES|Alert.NO, this,
+					Alert.show("It looks like Flash is unable to save/load local data." +
+						"  Would you like to load directions on how to enable local data?",
+						"Enable Local Data?", Alert.YES|Alert.NO, this,
 						function allowData(e:CloseEvent):void {
 							if(e.detail == Alert.YES) {
 								Util.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
@@ -146,8 +149,14 @@
 					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
 					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
 				}
-				
-				Main.geniHandler.requestHandler.startInitiationSequence();
+
+				if(Main.useJavascript && Main.geniHandler.CurrentUser.hasSetupJavascript) {
+					Main.geniHandler.unauthenticatedMode = false;
+					Main.geniHandler.requestHandler.startInitiationSequence(true);
+				} else {
+					var startOptions:StartOptionsWindow = new StartOptionsWindow();
+					startOptions.showWindow();
+				}
 			}
 			
 			//------------------------------------------
@@ -165,7 +174,8 @@
 							break;
 					}
 				} catch (err:SecurityError) {
-					Alert.show("Fullscreen isn't supported on the current system.  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
+					Alert.show("Fullscreen isn't supported on the current system." +
+						"  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
 				}
 			}
 			
@@ -289,8 +299,10 @@
 							break;
 						}
 					}
-
-					Main.geniHandler.CurrentUser.setPem(geniLocalSharedObject.data.sslPem);
+					
+					Main.geniHandler.CurrentUser.sslPem = geniLocalSharedObject.data.sslPem;
+					if(geniLocalSharedObject.data.password != null && geniLocalSharedObject.data.password.length > 0)
+						Main.geniHandler.CurrentUser.setPassword(geniLocalSharedObject.data.password, true);
 				}
 			}
 			
@@ -298,7 +310,8 @@
 			{
 				if(geniLocalSharedObject == null)
 					return;
-				
+
+				geniLocalSharedObject.data.password = Main.geniHandler.CurrentUser.encryptedPassword;
 				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
 				geniLocalSharedObject.data.sslPem = Main.geniHandler.CurrentUser.sslPem;
 				try
@@ -364,7 +377,7 @@
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton id="refreshButton"
 							  icon="{DisplayUtil.refreshIcon}"
-							 click="startover()" includeInLayout="true" visible="true"
+							 click="startover()" includeInLayout="false" visible="false"
 							 toolTip="Reload all data" />
 		<display:ImageButton id="cmButton"
 							  icon="@Embed('../images/building.png')"

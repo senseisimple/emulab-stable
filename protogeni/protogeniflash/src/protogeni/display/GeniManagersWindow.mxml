@@ -281,7 +281,10 @@
 	</fx:Script>
 	<s:HGroup width="100%" verticalAlign="middle" paddingTop="2" paddingRight="2" paddingLeft="2">
 		<s:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true" skinClass="protogeni.display.skins.CheckBoxSkin"/>
-		<display:ImageButton id="refreshButton" icon="{DisplayUtil.refreshIcon}" click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
+		<display:ImageButton id="refreshButton"
+							 includeInLayout="false" visible="false"
+							 icon="{DisplayUtil.refreshIcon}"
+							 click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
 		<mx:Spacer width="100%"/>
 		<s:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 

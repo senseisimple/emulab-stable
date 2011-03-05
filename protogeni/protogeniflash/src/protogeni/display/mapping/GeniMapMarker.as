@@ -13,12 +13,18 @@ package protogeni.display.mapping
 	import flash.events.Event;
 	import flash.geom.Point;
 	
+	import mx.collections.ArrayCollection;
+	import mx.core.UIComponent;
 	import mx.events.FlexEvent;
 	
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PhysicalNodeGroupCollection;
+	import protogeni.resources.Slice;
+	import protogeni.resources.Sliver;
+	import protogeni.resources.VirtualNode;
 	
 	public class GeniMapMarker extends Marker
 	{
@@ -78,23 +84,8 @@ package protogeni.display.mapping
 				} else {
 					groupInfo.city = nodeGroup.city;
 				}
-				
-				addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
-					openInfoWindow(
-						new InfoWindowOptions({
-							customContent:groupInfo,
-							customoffset: new Point(0, 10),
-							width:180,
-							height:130,
-							drawDefaultFrame:true
-						}));
-				});
-				
-				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupMarker(totalNodes.toString(), this, nodeGroup.owner.owner.type),
-					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
-					iconOffset:new Point(-18, -18)
-				}));
+	
+				infoWindow = groupInfo;
 				
 				nodeGroups.Add(nodeGroup);
 				info = groupInfo;
@@ -117,29 +108,108 @@ package protogeni.display.mapping
 						clusterInfo.Load(nodeGroups.collection);
 						//clusterInfo.setZoomButton(bounds);
 					});
-				
-				addEventListener(MapMouseEvent.CLICK, function(e:Event):void {
-					openInfoWindow(
-						new InfoWindowOptions({
-							customContent:clusterInfo,
-							customoffset: new Point(0, 10),
-							width:180,
-							height:170,
-							drawDefaultFrame:true
-						}));
-				});
-				
+				infoWindow = clusterInfo;
+			}
+			
+			setDefault();
+			addEventListener(MapMouseEvent.CLICK, clicked);
+		}
+		
+		public function clicked(e:Event):void {
+			if(showGroups == nodeGroups) {
+				this.openInfoWindow(
+					new InfoWindowOptions({
+						customContent:infoWindow,
+						customoffset: new Point(0, 10),
+						width:infoWindow.width,
+						height:infoWindow.height,
+						drawDefaultFrame:true
+					}));
+			} else {
+				DisplayUtil.viewNodeCollection(new ArrayCollection(showGroups.GetAll()));
+			}
+			
+		}
+
+		public function setDefault():void {
+			var oldLength:int = showGroups.GetAll().length;
+			
+			// Set the show groups as the managers which are visible
+			showGroups = new PhysicalNodeGroupCollection(null);
+			for each(var testGroup:PhysicalNodeGroup in nodeGroups.collection) {
+				var newTestGroup:PhysicalNodeGroup = new PhysicalNodeGroup(testGroup.latitude, testGroup.longitude, testGroup.country, showGroups);
+				newTestGroup.city = testGroup.city;
+				for each(var testNode:PhysicalNode in testGroup.collection) {
+					if(testNode.manager.Show)
+						newTestGroup.Add(testNode);
+				}
+				if(newTestGroup.collection.length > 0)
+					showGroups.Add(newTestGroup);
+			}
+			
+			// Already shown correctly
+			if(showGroups.GetAll().length == oldLength)
+				return;
+			
+			if(showGroups.collection.length == 1) {
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupClusterMarker(totalNodes.toString(), this, type),
+					icon:new PhysicalNodeGroupMarker(this.showGroups.GetAll().length.toString(), this, showGroups.GetType()),
+					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
+					iconOffset:new Point(-18, -18)
+				}));
+			} else if(showGroups.collection.length > 1) {
+				this.setOptions(new MarkerOptions({
+					icon:new PhysicalNodeGroupClusterMarker(this.showGroups.GetAll().length.toString(), this, showGroups.GetType()),
+					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
+					iconOffset:new Point(-20, -20)
+				}));
+			}
+			
+		}
+		
+		// Either sets all nodes the user has or just from one slice
+		public function setUser(slice:Slice = null):void {
+			showGroups = new PhysicalNodeGroupCollection(null);
+			for each(var group:PhysicalNodeGroup in nodeGroups.collection) {
+				var newGroup:PhysicalNodeGroup = new PhysicalNodeGroup(group.latitude, group.longitude, group.country, showGroups);
+				newGroup.city = group.city;
+				for each(var node:PhysicalNode in group.collection) {
+					if(slice == null) {
+						if(node.virtualNodes.length > 0)
+							newGroup.Add(node);
+					} else {
+						for each(var virtualNode:VirtualNode in node.virtualNodes) {
+							if(virtualNode.slivers[0].slice == slice) {
+								newGroup.Add(node);
+								break;
+							}
+						}
+					}
+				}
+				if(newGroup.collection.length > 0)
+					showGroups.Add(newGroup);
+			}
+
+			if(showGroups.collection.length == 1) {
+				this.setOptions(new MarkerOptions({
+					icon:new PhysicalNodeGroupMarker(showGroups.GetAll().length.toString(), this, showGroups.GetType()),
+					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
+					iconOffset:new Point(-18, -18)
+				}));
+			} else if(showGroups.collection.length > 1) {
+				this.setOptions(new MarkerOptions({
+					icon:new PhysicalNodeGroupClusterMarker(showGroups.GetAll().length.toString(), this, showGroups.GetType()),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-20, -20)
 				}));
 			}
 		}
 		
+		public var infoWindow:UIComponent;
 		public var nodeGroups:PhysicalNodeGroupCollection;
 		public var info:DisplayObject;
 		public var added:Boolean = false;
 		public var cluster:Array;
+		public var showGroups:PhysicalNodeGroupCollection = new PhysicalNodeGroupCollection(null);
 	}
 }

@@ -35,6 +35,7 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			Main.geniHandler.clearComponents();
+			
 			var a:Array = (response as String).split(/[\n\r]/);
 			for each(var s:String in a) {
 				if(s.length==0)

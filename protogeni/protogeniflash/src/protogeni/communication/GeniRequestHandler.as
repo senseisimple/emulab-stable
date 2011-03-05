@@ -52,7 +52,7 @@
 				pushRequest(new RequestListComponentsPublic());
 				Main.Application().showAuthenticate();
 				
-			} else if(Main.geniHandler.unauthenticatedMode || Main.geniHandler.forceAuthority == null) {
+			} else if(Main.geniHandler.unauthenticatedMode || Main.geniHandler.CurrentUser.authority == null) {
 				DisplayUtil.viewInitialUserWindow();
 			} else {
 				startAuthenticatedInitiationSequence();
@@ -176,10 +176,12 @@
 			}
 		}
 		
-		public function refreshSlice(slice:Slice):void
+		public function refreshSlice(slice:Slice, skipDone:Boolean = false):void
 		{
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 			for each(var sliver:Sliver in slice.slivers) {
+				if(skipDone && sliver.status == Sliver.STATUS_READY)
+					continue;
 				if(sliver.manager is AggregateManager)
 					pushRequest(new RequestSliverStatusAm(sliver));
 				else if(sliver.manager is ProtogeniComponentManager)

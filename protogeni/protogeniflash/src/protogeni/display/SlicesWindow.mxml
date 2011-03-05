@@ -76,7 +76,7 @@
 		]]>
 	</fx:Script>
 	<s:Scroller width="100%" height="100%">
-		<s:HGroup id="slices" />
+		<s:VGroup width="100%" height="100%" id="slices" />
 	</s:Scroller>
 	<display:controlBarLayout>
 		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingLeft="2" paddingRight="10" paddingTop="2" />

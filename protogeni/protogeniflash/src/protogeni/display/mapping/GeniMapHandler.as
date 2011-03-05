@@ -101,11 +101,6 @@ package protogeni.display.mapping
 			this.drawMap();
 		}
 		
-		public function drawAll():void {
-			drawMap();
-			Main.Application().fillCombobox();
-		}
-		
 		public function drawMap(junk:* = null):void {
 			drawMapNow();
 		}
@@ -252,24 +247,53 @@ package protogeni.display.mapping
 			
 			myState = CLUSTER;
 			myIndex = 0;
-			
-			/*
-			if(userResourcesOnly && selectedSlice != null && selectedSlice.Status() != null) {
-				// Draw virtual links
-				for each(var sliver:Sliver in selectedSlice.slivers)
-				{
-					if(!sliver.manager.Show)
-						continue;
-					for each(var vl:VirtualLink in sliver.links) {
-						addVirtualLink(vl);
-					}	    			
-				}
-			}
-			*/
 		}
 		
 		private var clustersToAdd:ArrayCollection;
 		public function doCluster():void {
+			
+			// Limit to user resources if selected
+			// TODO: Add/Remove virtual links!
+			if(this.userResourcesOnly) {
+				var marker:GeniMapMarker;
+				var slice:Slice = null;
+				var link:GeniMapLink;
+				if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.length>0)
+					slice = selectedSlice;
+				for each(marker in this.nodeGroupMarkers)
+					marker.setUser(slice);
+				for each(marker in this.nodeGroupClusterMarkers)
+					marker.setUser(slice);
+				for each(link in this.linkMarkers) {
+					if(link.polyline.visible) {
+						link.polyline.hide();
+						link.label.visible = false;
+					}
+				}
+				
+				/*
+				// Draw virtual links
+				for each(var sliver:Sliver in selectedSlice.slivers)
+				{
+				if(!sliver.manager.Show)
+				continue;
+				for each(var vl:VirtualLink in sliver.links) {
+				addVirtualLink(vl);
+				}	    			
+				}
+				*/
+			} else {
+				for each(marker in this.nodeGroupMarkers)
+					marker.setDefault();
+				for each(marker in this.nodeGroupClusterMarkers)
+					marker.setDefault();
+				for each(link in this.linkMarkers) {
+					if(!link.polyline.visible) {
+						link.polyline.show()
+						link.label.visible = true;
+					}
+				}
+			}
 			
 			// Cluster node groups close to each other
 			var clusterer:Clusterer = new Clusterer(nodeGroupMarkers, map.getZoom(), 40);
@@ -282,9 +306,9 @@ package protogeni.display.mapping
 				if(!shouldShow)
 					clustersToAdd.addItem(newArray);
 				for each(var newMarker:GeniMapMarker in newArray) {
-					if(shouldShow && !newMarker.visible)
+					if(!newMarker.visible && shouldShow && newMarker.showGroups.collection.length > 0)
 						newMarker.show();
-					else if(!shouldShow && newMarker.visible)
+					else if(newMarker.visible && (newMarker.showGroups.collection.length == 0 || !shouldShow))
 						newMarker.hide();
 				}
 			}
@@ -308,12 +332,12 @@ package protogeni.display.mapping
 					}
 				}
 				if(!found) {
-					//this.map.removeOverlay(oldMarker);
-					//this.nodeGroupClusterMarkers.removeItemAt(i);
 					if(oldMarker.visible)
 						oldMarker.hide();
 				} else {
-					if(!oldMarker.visible)
+					if(oldMarker.visible && oldMarker.showGroups.collection.length == 0)
+						oldMarker.hide();
+					else if(!oldMarker.visible && oldMarker.showGroups.collection.length > 0)
 						oldMarker.show();
 				}
 			}
@@ -335,7 +359,15 @@ package protogeni.display.mapping
 			while(myIndex < clustersToAdd.length) {
 				var cluster:Array = clustersToAdd.getItemAt(myIndex) as Array;
 				var marker:GeniMapMarker = new GeniMapMarker(cluster);
+				if(this.userResourcesOnly) {
+					var slice:Slice = null;
+					if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.length>0)
+						slice = selectedSlice;
+					marker.setUser(slice);
+				}
 				map.addOverlay(marker);
+				if(marker.showGroups.collection.length == 0)
+					marker.hide();
 				nodeGroupClusterMarkers.push(marker);
 				idx++;
 				myIndex++;

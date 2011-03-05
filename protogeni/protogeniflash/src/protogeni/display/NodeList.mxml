@@ -28,12 +28,30 @@
 				host = newHost;
 				nodes = group;
 				viewNodes = nodes;
-				
+
+				var tempNodeTypes:Array = []
 				for each(var node:PhysicalNode in nodes) {
 					for each(var nodeType:NodeType in node.types) {
-						if(nodeTypes.source.indexOf(nodeType.name) == -1)
-							nodeTypes.addItem(nodeType.name);
+						if(tempNodeTypes.indexOf(nodeType.name) == -1)
+							tempNodeTypes.push(nodeType.name);
 					}
+				}
+				
+				
+				this.typeCheckbox.visible =
+					this.types.visible =
+					this.typeCheckbox.includeInLayout =
+					this.types.includeInLayout =
+						tempNodeTypes.length > 0;
+				
+				if(tempNodeTypes.length > 0) {
+					tempNodeTypes.sort();
+					nodeTypes = new ArrayCollection(tempNodeTypes);
+					
+					if(tempNodeTypes.indexOf("pc") != -1)
+						this.types.selectedIndex = tempNodeTypes.indexOf("pc");
+					else
+						this.types.selectedIndex = 0;
 				}
 				
 				var nameSort:Sort = new Sort();

@@ -14,7 +14,11 @@
  
  package protogeni.resources
 {
+	import com.hurlant.crypto.symmetric.AESKey;
+	import com.hurlant.util.Hex;
 	import com.mattism.http.xmlrpc.JSLoader;
+	
+	import flash.utils.ByteArray;
 	
 	// ProtoGENI user information
 	public class User
@@ -37,10 +41,13 @@
 		[Bindable]
 		public var urn:String;
 		
-		[Bindable]
-		public var sslPem:String;
-		
 		public var slices:SliceCollection;
+		
+		public var encryptedPassword:String = "";
+		[Bindable]
+		public var sslPem:String = "";
+		
+		public var hasSetupJavascript:Boolean = false;
 		
 		public function User()
 		{
@@ -48,20 +55,48 @@
 			sslPem = "";
 		}
 		
-		public function setPem(newPem:String, password:String = null):Boolean
-		{
-			sslPem = newPem;
-			if(Main.useJavascript && password != null) {
-				LogHandler.appendMessage(new LogMessage("JS", "JS User Cert", "Setting the user certificate in JavaScript..,"));
-				try {
-					JSLoader.setClientInfo(password, sslPem);
-				} catch ( e:Error) {
-					LogHandler.appendMessage(new LogMessage("JS", "JS User Cert", e.toString(), true, LogMessage.TYPE_END));
+		// Just some simple encryption so it doesn't store in plain text...
+		public function setPassword(password:String, store:Boolean):Boolean {
+			/*
+			var key:ByteArray = Hex.toArray("00010203050607080A0B0C0D0F101112");
+			var pt:ByteArray = Hex.toArray(password);
+			var aes:AESKey = new AESKey(key);
+			aes.encrypt(pt);
+			encryptedPassword = Hex.fromArray(pt);
+			*/
+			if(store)
+				encryptedPassword = password;
+			return tryToSetInJavascript(password);
+		}
+		
+		public function getPassword():String {
+			if(encryptedPassword == "")
+				return "";
+			else
+				return this.encryptedPassword;
+			/*
+			var key:ByteArray = Hex.toArray("00010203050607080A0B0C0D0F101112");
+			var pt:ByteArray = Hex.toArray(encryptedPassword);
+			var aes:AESKey = new AESKey(key);
+			aes.decrypt(pt);
+			return Hex.fromArray(pt);
+			*/
+		}
+		
+		public function tryToSetInJavascript(password:String):Boolean {
+			if(Main.useJavascript) {
+				if(password.length > 0 && sslPem.length > 0) {
+					try {
+						JSLoader.setClientInfo(password, sslPem);
+						hasSetupJavascript = true;
+					} catch ( e:Error) {
+						LogHandler.appendMessage(new LogMessage("JS", "JS User Cert", e.toString(), true, LogMessage.TYPE_END));
+						return false;
+					}
+				} else
 					return false;
-				}
 			}
 			return true;
-				
 		}
 	}
 }
