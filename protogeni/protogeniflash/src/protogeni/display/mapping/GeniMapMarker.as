@@ -28,7 +28,7 @@ package protogeni.display.mapping
 			// Single
 			if(o is PhysicalNodeGroup)
 				ll = new LatLng(o.latitude, o.longitude);
-			// Cluster marker
+				// Cluster marker
 			else if(o is Array)
 				ll = o[0].getLatLng();
 			
@@ -89,17 +89,17 @@ package protogeni.display.mapping
 							drawDefaultFrame:true
 						}));
 				});
-
+				
 				this.setOptions(new MarkerOptions({
 					icon:new PhysicalNodeGroupMarker(totalNodes.toString(), this, nodeGroup.owner.owner.type),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-18, -18)
 				}));
-
+				
 				nodeGroups.Add(nodeGroup);
 				info = groupInfo;
 			}
-			// Cluster marker
+				// Cluster marker
 			else if(o is Array)
 			{
 				cluster = o as Array;
@@ -110,7 +110,7 @@ package protogeni.display.mapping
 						type = -1;
 					this.nodeGroups.Add(m.nodeGroups.collection[0]);
 				}
-
+				
 				var clusterInfo:PhysicalNodeGroupClusterInfo = new PhysicalNodeGroupClusterInfo();
 				clusterInfo.addEventListener(FlexEvent.CREATION_COMPLETE,
 					function loadNodeGroup(evt:FlexEvent):void {
@@ -130,13 +130,13 @@ package protogeni.display.mapping
 				});
 				
 				this.setOptions(new MarkerOptions({
-						icon:new PhysicalNodeGroupClusterMarker(totalNodes.toString(), this, type),
-						//iconAllignment:MarkerOptions.ALIGN_RIGHT,
-						iconOffset:new Point(-20, -20)
-					}));
+					icon:new PhysicalNodeGroupClusterMarker(totalNodes.toString(), this, type),
+					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
+					iconOffset:new Point(-20, -20)
+				}));
 			}
 		}
-
+		
 		public var nodeGroups:PhysicalNodeGroupCollection;
 		public var info:DisplayObject;
 		public var added:Boolean = false;

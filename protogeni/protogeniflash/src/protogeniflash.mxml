@@ -139,7 +139,7 @@
 					LogHandler.viewConsole();
 					DisplayUtil.viewManagersWindow();
 				}
-				
+
 				// Load the certificate bundle
 				if(Main.useJavascript) {
 					loadLocalBundleData();

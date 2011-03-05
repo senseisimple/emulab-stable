@@ -67,8 +67,6 @@
 				enableScrollWheelZoom();
 				enableContinuousZoom();
 				
-				
-				
 				// Create a new pane lying immediately below the marker pane.
 				var manager:IPaneManager = this.getPaneManager();
 				var markerPane:IPane = manager.getPaneById(PaneId.PANE_MARKER);

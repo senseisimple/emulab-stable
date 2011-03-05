@@ -224,7 +224,7 @@ package protogeni.display.mapping
 				var nodeGroup:PhysicalNodeGroup = gm.Nodes.collection.getItemAt(myIndex) as PhysicalNodeGroup;
 				if(nodeGroup.collection.length > 0) {
 					var gmm:GeniMapMarker = new GeniMapMarker(nodeGroup);
-					map.addOverlay(gmm)
+					map.addOverlay(gmm);
 					nodeGroupMarkers.push(gmm);
 					gmm.added = true;
 				}
