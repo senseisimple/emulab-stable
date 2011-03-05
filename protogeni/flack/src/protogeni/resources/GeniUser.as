@@ -21,7 +21,7 @@
 	import flash.utils.ByteArray;
 	
 	// ProtoGENI user information
-	public class User
+	public class GeniUser
 	{
 		[Bindable]
 		public var uid:String;
@@ -49,7 +49,7 @@
 		
 		public var hasSetupJavascript:Boolean = false;
 		
-		public function User()
+		public function GeniUser()
 		{
 			slices = new SliceCollection();
 			sslPem = "";

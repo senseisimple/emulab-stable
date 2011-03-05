@@ -52,6 +52,15 @@ package protogeni.display.mapping
 			nodeGroupClusterMarkers = []
 		}
 		
+		public function redrawFromScratch():void
+		{
+			clearAll();
+			for each(var gm:GeniManager in Main.geniHandler.GeniManagers) {
+				this.changingManagers.push(gm);
+			}
+			this.drawMapNow();
+		}
+		
 		// If nothing given, gives bounds for all resources
 		public static function getBounds(a:Array = null):LatLngBounds
 		{
@@ -96,7 +105,9 @@ package protogeni.display.mapping
 		public function managerChanged(event:GeniEvent):void {
 			if(event.action != GeniEvent.ACTION_POPULATED)
 				return;
-
+			
+			if(Main.debugMode)
+				trace("MAP...New Manager Added: " + event.changedObject.Hrn);
 			this.changingManagers.push(event.changedObject);
 			this.drawMap();
 		}
@@ -129,8 +140,9 @@ package protogeni.display.mapping
 				drawAfter = true;
 				return;
 			}
-			
+
 			drawing = true;
+			myIndex = 0;
 			if(changingManagers.length > 0 )
 				myState = LINK_ADD;
 			else
@@ -139,7 +151,6 @@ package protogeni.display.mapping
 		}
 		
 		public function drawNext(event:Event):void {
-			
 			var startTime:Date = new Date();
 			
 			if(myState == LINK_ADD) {
@@ -203,8 +214,6 @@ package protogeni.display.mapping
 						trace("Links added:" + idx);
 					return;
 				}
-				//if(idx == MAX_WORK)
-				//	return;
 			}
 			
 			myState = NODE_ADD;
@@ -234,8 +243,6 @@ package protogeni.display.mapping
 						trace("Nodes added:" + idx);
 					return;
 				}
-				//if(idx == MAX_WORK)
-				//	return;
 			}
 			
 			changingManagers = changingManagers.slice(1);
@@ -254,10 +261,10 @@ package protogeni.display.mapping
 			
 			// Limit to user resources if selected
 			// TODO: Add/Remove virtual links!
+			var marker:GeniMapMarker;
+			var slice:Slice = null;
+			var link:GeniMapLink;
 			if(this.userResourcesOnly) {
-				var marker:GeniMapMarker;
-				var slice:Slice = null;
-				var link:GeniMapLink;
 				if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.length>0)
 					slice = selectedSlice;
 				for each(marker in this.nodeGroupMarkers)
@@ -288,9 +295,12 @@ package protogeni.display.mapping
 				for each(marker in this.nodeGroupClusterMarkers)
 					marker.setDefault();
 				for each(link in this.linkMarkers) {
-					if(!link.polyline.visible) {
+					if(!link.polyline.visible && link.group.GetManager().Show) {
 						link.polyline.show()
 						link.label.visible = true;
+					} else if(link.polyline.visible && !link.group.GetManager().Show) {
+						link.polyline.hide()
+						link.label.visible = false;
 					}
 				}
 			}
@@ -376,8 +386,6 @@ package protogeni.display.mapping
 						trace("Clusters added:" + idx);
 					return;
 				}
-				//if(idx == MAX_WORK)
-				//	return;
 			}
 			clustersToAdd = null;
 

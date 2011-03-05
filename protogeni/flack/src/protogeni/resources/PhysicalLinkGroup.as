@@ -62,5 +62,10 @@
 			}
 			return la / collection.length;
 		}
+		
+		public function GetManager():GeniManager
+		{
+			return collection.getItemAt(0).manager;
+		}
 	}
 }

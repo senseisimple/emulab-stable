@@ -108,7 +108,7 @@
 			<mx:GridItem width="100%">
 				<s:Label text="{gm.Hrn}" fontSize="17" fontWeight="bold" width="100%" />
 				<display:ImageButton id="consoleButton"
-									  icon="{DisplayUtil.consoleIcon}"
+									  icon="{ImageUtil.consoleIcon}"
 									 click="LogHandler.viewGroup(gm.Url);"
 									 toolTip="View log messages in the console" />
 				<display:ImageButton id="rpsecButton"
@@ -120,7 +120,7 @@
 									 click="openGraphInfo()"
 									 toolTip="View the graph information" />
 				<display:ImageButton id="messageButton"
-									 icon="{DisplayUtil.flagRedIcon}"
+									 icon="{ImageUtil.flagRedIcon}"
 									 click="viewMessage()"
 									 toolTip="View Message" />
 			</mx:GridItem>

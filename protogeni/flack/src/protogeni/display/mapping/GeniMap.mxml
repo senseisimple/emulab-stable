@@ -19,12 +19,16 @@
 			import com.google.maps.MapType;
 			import com.google.maps.MapZoomEvent;
 			import com.google.maps.PaneId;
+			import com.google.maps.controls.NavigationControl;
+			import com.google.maps.controls.PositionControl;
 			import com.google.maps.controls.ZoomControl;
 			import com.google.maps.interfaces.IPane;
 			import com.google.maps.interfaces.IPaneManager;
 			
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
+			
+			import spark.components.Button;
 			
 			public var ready:Boolean;
 			public var linkPane:IPane;
@@ -65,9 +69,11 @@
 			}
 			
 			private function onMapReady(event:Event):void {
-				addControl(new ZoomControl());
+				addControl(new NavigationControl());
 				enableScrollWheelZoom();
 				enableContinuousZoom();
+				
+				
 				
 				// Create a new pane lying immediately below the marker pane.
 				var manager:IPaneManager = this.getPaneManager();

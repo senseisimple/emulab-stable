@@ -3,7 +3,7 @@
 					   xmlns:s="library://ns.adobe.com/flex/spark" 
 					   xmlns:mx="library://ns.adobe.com/flex/mx"
 					   xmlns:display="protogeni.display.*"
-					   title="Start options"
+					   title="I want to..."
 					   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
 					   width="200" height="180" close="closeWindow()" contentCreationComplete="this.closeButton = null">
 	<s:layout>
@@ -17,6 +17,7 @@
 			import mx.core.IFlexDisplayObject;
 			import mx.managers.PopUpManager;
 			
+			import protogeni.Util;
 			import protogeni.display.skins.TitleWindowSkin;
 			
 			public function showWindow():void
@@ -41,6 +42,8 @@
 			}
 			
 			public function doAuthenticate():void {
+				if(Main.useJavascript && Main.geniHandler.CurrentUser.hasSetupJavascript)
+					Main.geniHandler.unauthenticatedMode = false;
 				Main.geniHandler.requestHandler.startInitiationSequence(true);
 				this.closeWindow();
 			}
@@ -49,12 +52,11 @@
 	</fx:Script>
 	
 	<s:Label text="Not a user?" />
-	<s:Button label="Show resources" width="100%" height="33%"
+	<s:Button label="View resources" width="100%" height="33%" toolTip="View resources available in GENI, but allocation of resources is not available"
 			  click="doPublic()" />
-	<s:Button label="Become a user" width="100%" height="33%"
-			  click="Alert.show('Nothing to see here...')" />
+	<s:Button label="Become a user" width="100%" height="33%" toolTip="Follow a few simple steps to be able to allocate resources"
+			  click="Util.openWebsite('https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup')" />
 	<s:Label text="For users" />
-	<s:Button label="Authenticate" width="100%" height="33%"
+	<s:Button label="Log in" width="100%" height="33%" toolTip="Log in to view and be able to allocate resources"
 			  click="doAuthenticate()" />
-	
 </s:TitleWindow>

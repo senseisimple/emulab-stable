@@ -14,6 +14,11 @@
  
  package protogeni.resources
 {	
+	import com.google.maps.LatLng;
+	import com.google.maps.services.ClientGeocoder;
+	import com.google.maps.services.GeocodingEvent;
+	import com.google.maps.services.Placemark;
+	
 	import mx.collections.ArrayCollection;
 	
 	// Group of physical nodes located in one area
@@ -22,6 +27,7 @@
 		public var latitude:Number;
 		public var longitude:Number;
 		public var country:String;
+		
 		[Bindable]
 		public var city:String = "";
 		
@@ -29,12 +35,50 @@
 		public var collection:ArrayCollection = new ArrayCollection;
 		public var links:PhysicalLinkGroup = null;
 		
-		public function PhysicalNodeGroup(lat:Number = -1, lng:Number = -1, cnt:String = "", own:PhysicalNodeGroupCollection = null)
+		[Bindable]
+		public var original:PhysicalNodeGroup = null;
+		
+		public function PhysicalNodeGroup(lat:Number = -1, lng:Number = -1, cnt:String = "", own:PhysicalNodeGroupCollection = null, orig:PhysicalNodeGroup = null)
 		{
 			latitude = lat;
 			longitude = lng;
 			country = cnt;
 			owner = own;
+			original = orig;
+			if(original == null) {
+				Geocode();
+			}
+		}
+		
+		public function Geocode():void {
+			var geocoder:ClientGeocoder = new ClientGeocoder();
+			geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
+				function(event:GeocodingEvent):void {
+					var placemarks:Array = event.response.placemarks;
+					if (placemarks.length > 0) {
+						try {
+							var p:Placemark = event.response.placemarks[0] as Placemark;
+							var fullAddress : String = p.address;
+							var splitAddress : Array = fullAddress.split(',');
+							if(splitAddress.length == 3)
+								city = splitAddress[0];
+							else 
+								if(splitAddress.length == 4)
+									city = splitAddress[1];
+								else
+									city = fullAddress;
+							//nodeGroup.city = groupInfo.city;
+						} catch (err:Error) { }
+					}
+				});
+			
+			geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
+				function(event:GeocodingEvent):void {
+					//Main.log.appendMessage(
+					//	new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
+				});
+
+			geocoder.reverseGeocode(new LatLng(latitude, longitude));
 		}
 		
 		public function Add(n:PhysicalNode):void {
@@ -88,6 +132,11 @@
 				}
 			}
 			return cnt;
+		}
+		
+		public function GetManager():GeniManager
+		{
+			return collection.getItemAt(0).manager;
 		}
 	}
 }

@@ -17,6 +17,9 @@ package protogeni.display.mapping
 
 	public class GeniMapLink
 	{
+		public static const linkColor:Object = 0xFFCFD1;
+		public static const linkBorderColor:Object = 0xFF00FF;
+		
 		public var polyline:Polyline;
 		public var label:TooltipOverlay;
 		public var group:PhysicalLinkGroup;
@@ -25,12 +28,13 @@ package protogeni.display.mapping
 		public function GeniMapLink(linkGroup:PhysicalLinkGroup)
 		{
 			group = linkGroup;
+			
 			// Add line
 			polyline = new Polyline([
 				new LatLng(linkGroup.latitude1, linkGroup.longitude1),
 				new LatLng(linkGroup.latitude2, linkGroup.longitude2)
 			], new PolylineOptions({ strokeStyle: new StrokeStyle({
-				color: DisplayUtil.linkBorderColor,
+				color: linkBorderColor,
 				thickness: 4,
 				alpha:1})
 			}));
@@ -40,8 +44,8 @@ package protogeni.display.mapping
 				new LatLng((linkGroup.latitude1 + linkGroup.latitude2)/2,
 					(linkGroup.longitude1 + linkGroup.longitude2)/2),
 				Util.kbsToString(linkGroup.TotalBandwidth()),
-				DisplayUtil.linkBorderColor,
-				DisplayUtil.linkColor);
+				linkBorderColor,
+				linkColor);
 			label.addEventListener(MouseEvent.CLICK, function(e:Event):void {
 				e.stopImmediatePropagation();
 				DisplayUtil.viewPhysicalLinkGroup(linkGroup)

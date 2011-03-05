@@ -51,7 +51,6 @@
 			if(Main.geniHandler.unauthenticatedMode && !tryAuthenticate) {
 				pushRequest(new RequestListComponentsPublic());
 				Main.Application().showAuthenticate();
-				
 			} else if(Main.geniHandler.unauthenticatedMode || Main.geniHandler.CurrentUser.authority == null) {
 				DisplayUtil.viewInitialUserWindow();
 			} else {
@@ -107,6 +106,7 @@
 			var newSlice:Slice = new Slice();
 			newSlice.hrn = name;
 			newSlice.urn = Util.makeUrn(Main.geniHandler.CurrentUser.authority.Authority, "slice", name);
+			newSlice.name = Util.getNameFromUrn(newSlice.urn);
 			newSlice.creator = Main.geniHandler.CurrentUser;
 			pushRequest(new RequestSliceResolve(newSlice, true));
 		}

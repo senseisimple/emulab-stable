@@ -45,48 +45,7 @@ package protogeni.display.mapping
 			if(o is PhysicalNodeGroup)
 			{
 				cluster = [o];
-				var nodeGroup:PhysicalNodeGroup = o as PhysicalNodeGroup;
-				var groupInfo:PhysicalNodeGroupInfo = new PhysicalNodeGroupInfo();
-				groupInfo.Load(nodeGroup);
-				
-				if(nodeGroup.city.length == 0)
-				{
-					var geocoder:ClientGeocoder = new ClientGeocoder();
-					geocoder.addEventListener(GeocodingEvent.GEOCODING_SUCCESS,
-						function(event:GeocodingEvent):void {
-							var placemarks:Array = event.response.placemarks;
-							if (placemarks.length > 0) {
-								try {
-									var p:Placemark = event.response.placemarks[0] as Placemark;
-									var fullAddress : String = p.address;
-									var splitAddress : Array = fullAddress.split(',');
-									if(splitAddress.length == 3)
-										groupInfo.city = splitAddress[0];
-									else 
-										if(splitAddress.length == 4)
-											groupInfo.city = splitAddress[1];
-										else
-											groupInfo.city = fullAddress;
-									nodeGroup.city = groupInfo.city;
-								} catch (err:Error) { }
-							}
-						});
-					
-					geocoder.addEventListener(GeocodingEvent.GEOCODING_FAILURE,
-						function(event:GeocodingEvent):void {
-							//Main.log.appendMessage(
-							//	new LogMessage("","Geocoding failed (" + event.status + " / " + event.eventPhase + ")","",true));
-						});
-					
-					geocoder.reverseGeocode(new LatLng(nodeGroup.latitude, nodeGroup.longitude));
-				} else {
-					groupInfo.city = nodeGroup.city;
-				}
-	
-				infoWindow = groupInfo;
-				
-				nodeGroups.Add(nodeGroup);
-				info = groupInfo;
+				nodeGroups.Add(o as PhysicalNodeGroup);
 			}
 				// Cluster marker
 			else if(o is Array)
@@ -99,13 +58,7 @@ package protogeni.display.mapping
 					this.nodeGroups.Add(m.nodeGroups.collection[0]);
 				}
 				
-				var clusterInfo:PhysicalNodeGroupClusterInfo = new PhysicalNodeGroupClusterInfo();
-				clusterInfo.addEventListener(FlexEvent.CREATION_COMPLETE,
-					function loadNodeGroup(evt:FlexEvent):void {
-						clusterInfo.Load(nodeGroups.collection);
-						//clusterInfo.setZoomButton(bounds);
-					});
-				infoWindow = clusterInfo;
+				
 			}
 			
 			setDefault();
@@ -134,8 +87,7 @@ package protogeni.display.mapping
 			// Set the show groups as the managers which are visible
 			showGroups = new PhysicalNodeGroupCollection(null);
 			for each(var testGroup:PhysicalNodeGroup in nodeGroups.collection) {
-				var newTestGroup:PhysicalNodeGroup = new PhysicalNodeGroup(testGroup.latitude, testGroup.longitude, testGroup.country, showGroups);
-				newTestGroup.city = testGroup.city;
+				var newTestGroup:PhysicalNodeGroup = new PhysicalNodeGroup(testGroup.latitude, testGroup.longitude, testGroup.country, showGroups, testGroup);
 				for each(var testNode:PhysicalNode in testGroup.collection) {
 					if(testNode.manager.Show)
 						newTestGroup.Add(testNode);
@@ -150,16 +102,34 @@ package protogeni.display.mapping
 			
 			if(showGroups.collection.length == 1) {
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupMarker(this.showGroups.GetAll().length.toString(), this, showGroups.GetType()),
+					icon:new PhysicalNodeGroupMarker(this),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-18, -18)
 				}));
+				
+				var groupInfo:PhysicalNodeGroupInfo = new PhysicalNodeGroupInfo();
+				groupInfo.addEventListener(FlexEvent.CREATION_COMPLETE,
+					function loadNodeGroup(evt:FlexEvent):void {
+						groupInfo.Load(showGroups.collection.getItemAt(0) as PhysicalNodeGroup);
+						//clusterInfo.setZoomButton(bounds);
+					});
+				infoWindow = groupInfo;
+				
 			} else if(showGroups.collection.length > 1) {
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupClusterMarker(this.showGroups.GetAll().length.toString(), this, showGroups.GetType()),
+					icon:new PhysicalNodeGroupMarker(this),
+					//icon:new PhysicalNodeGroupClusterMarker(this.showGroups.GetAll().length.toString(), this, showGroups.GetType()),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-20, -20)
 				}));
+				
+				var clusterInfo:PhysicalNodeGroupClusterInfo = new PhysicalNodeGroupClusterInfo();
+				clusterInfo.addEventListener(FlexEvent.CREATION_COMPLETE,
+					function loadNodeGroup(evt:FlexEvent):void {
+						clusterInfo.Load(showGroups.collection);
+						//clusterInfo.setZoomButton(bounds);
+					});
+				infoWindow = clusterInfo;
 			}
 			
 		}
@@ -168,8 +138,7 @@ package protogeni.display.mapping
 		public function setUser(slice:Slice = null):void {
 			showGroups = new PhysicalNodeGroupCollection(null);
 			for each(var group:PhysicalNodeGroup in nodeGroups.collection) {
-				var newGroup:PhysicalNodeGroup = new PhysicalNodeGroup(group.latitude, group.longitude, group.country, showGroups);
-				newGroup.city = group.city;
+				var newGroup:PhysicalNodeGroup = new PhysicalNodeGroup(group.latitude, group.longitude, group.country, showGroups, group);
 				for each(var node:PhysicalNode in group.collection) {
 					if(slice == null) {
 						if(node.virtualNodes.length > 0)
@@ -189,13 +158,14 @@ package protogeni.display.mapping
 
 			if(showGroups.collection.length == 1) {
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupMarker(showGroups.GetAll().length.toString(), this, showGroups.GetType()),
+					icon:new PhysicalNodeGroupMarker(this),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-18, -18)
 				}));
 			} else if(showGroups.collection.length > 1) {
 				this.setOptions(new MarkerOptions({
-					icon:new PhysicalNodeGroupClusterMarker(showGroups.GetAll().length.toString(), this, showGroups.GetType()),
+					icon:new PhysicalNodeGroupMarker(this),
+					//icon:new PhysicalNodeGroupClusterMarker(showGroups.GetAll().length.toString(), this, showGroups.GetType()),
 					//iconAllignment:MarkerOptions.ALIGN_RIGHT,
 					iconOffset:new Point(-20, -20)
 				}));

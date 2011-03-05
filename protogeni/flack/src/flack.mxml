@@ -3,13 +3,13 @@
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
 			   xmlns:mx="library://ns.adobe.com/flex/mx"
 			   xmlns:mapping="protogeni.display.mapping.*"
-			   minWidth="700" minHeight="400" xmlns:display="protogeni.display.*"
+			   xmlns:display="protogeni.display.*"
+			   minWidth="600" minHeight="400" 
 			   preinitialize="preinit();"
-			   backgroundColor="#D2E1F0"
 			   applicationComplete="init();">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
 	
 	<fx:Style>
 		@namespace s "library://ns.adobe.com/flex/spark";
@@ -18,41 +18,33 @@
 		@namespace mapping "protogeni.display.mapping.*";
 		
 		.authenticatedStyle {
-			themeColor: green;
-			chromeColor: green;
+			chromeColor: #33FF33;
+			color: 006600;
 		}
 		
 		.unauthenticatedStyle {
-			themeColor: red;
-			chromeColor: red;
+			chromeColor: #F08080;
+			color: #990000;
 		}
 		
 		.failedStyle {
-			color: red;
-			textRollOverColor: red;
-			textSelectedColor: red;
-			themeColor: red;
+			chromeColor: #F08080;
+			color: #990000;
 		}
 		
 		.validStyle {
-			color: green;
-			textRollOverColor: green;
-			textSelectedColor: green;
-			themeColor: green;
+			chromeColor: #33FF33;
+			color: #006600;
 		}
 		
 		.inprogressStyle {
-			color: #FF7F00;
-			textRollOverColor: #FF7F00;
-			textSelectedColor: #FF7F00;
-			themeColor: #FF7F00;
+			chromeColor: #FFCC00;
+			color: #CC6600;
 		}
 		
 		.unknownStyle {
+			chromeColor: white;
 			color: grey;
-			textRollOverColor: grey;
-			textSelectedColor: grey;
-			themeColor: grey;
 		}
 		
 		s|TextArea {
@@ -71,6 +63,14 @@
 			skinClass: ClassReference("protogeni.display.skins.ListSkin");
 		}
 		
+		s|RadioButton {
+			skinClass: ClassReference("protogeni.display.skins.RadioButtonSkin");
+		}
+		
+		display|CollapsiblePanel {
+			skin-class: ClassReference('protogeni.display.skins.CollapsiblePanelSkin');
+		}
+		
 	</fx:Style>
 	
 	<fx:Script>
@@ -80,6 +80,7 @@
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
 			import mx.events.ListEvent;
+			import mx.events.ResizeEvent;
 			import mx.rpc.events.ResultEvent;
 			
 			import protogeni.GeniDispatcher;
@@ -90,6 +91,7 @@
 			import protogeni.communication.RequestRootBundle;
 			import protogeni.communication.RequestTest;
 			import protogeni.display.DisplayUtil;
+			import protogeni.display.ImageUtil;
 			import protogeni.display.KeyboardWindow;
 			import protogeni.resources.Slice;
 			import protogeni.resources.SliceAuthority;
@@ -153,11 +155,8 @@
 			}
 			
 			private function init():void {
-				Main.geniDispatcher = new GeniDispatcher();
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICES_CHANGED, fillCombobox);
-				Main.geniDispatcher.addEventListener(GeniEvent.SLICE_CHANGED, fillCombobox);
 				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
 				
 				// Default behavior (public)
@@ -194,14 +193,10 @@
 					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
 					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
 				}
-
-				if(Main.useJavascript && Main.geniHandler.CurrentUser.hasSetupJavascript) {
-					Main.geniHandler.unauthenticatedMode = false;
-					Main.geniHandler.requestHandler.startInitiationSequence(true);
-				} else {
-					var startOptions:StartOptionsWindow = new StartOptionsWindow();
-					startOptions.showWindow();
-				}
+				
+				// Always show the start options
+				var startOptions:StartOptionsWindow = new StartOptionsWindow();
+				startOptions.showWindow();
 			}
 			
 			//------------------------------------------
@@ -229,11 +224,11 @@
 					|| Main.geniHandler.CurrentUser.credential == null
 					|| Main.geniHandler.CurrentUser.credential.length == 0)
 				{
-					this.userButton.setStyle("icon", DisplayUtil.noUserIcon);
+					this.userButton.setStyle("icon", ImageUtil.noUserIcon);
 					this.userButton.toolTip = "Authenticate";
 					this.userButton.label = "Authenticate";
 				} else {
-					this.userButton.setStyle("icon", DisplayUtil.userIcon);
+					this.userButton.setStyle("icon", ImageUtil.userIcon);
 					this.userButton.toolTip = "View user information"
 					this.userButton.label = Main.geniHandler.CurrentUser.uid;
 				}
@@ -262,23 +257,6 @@
 				} else {
 					DisplayUtil.viewUserWindow();
 				}
-			}
-			
-			// ComboBox
-			public function fillCombobox(junk:* = null):void {
-				slicesMenu = Main.geniHandler.CurrentUser.slices.displaySlices();
-			}
-			
-			public function getSliceLabel(s:Slice):String {
-				return s.DisplayString();
-			}
-			
-			public function sliceSelected(evt:ListEvent):void {
-				Main.geniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
-				onlyMyResourcesCheckbox.selected = Main.geniHandler.mapHandler.selectedSlice.hrn != null &&
-					Main.geniHandler.mapHandler.selectedSlice.hrn.length > 0;
-				Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
-				Main.geniHandler.mapHandler.drawMap();
 			}
 			
 			public function startover():void {
@@ -409,55 +387,33 @@
 				else
 					progressLabel.styleName = "validStyle";
 			}
+
 		]]>
 	</fx:Script>
 	<s:controlBarLayout>
 		<s:HorizontalLayout verticalAlign="middle" gap="4" paddingTop="2" paddingBottom="2" paddingLeft="2" paddingRight="2" />
 	</s:controlBarLayout>
 	<s:controlBarContent>
-		<display:ImageButton id="infoButton"
-							 icon="@Embed('../images/protogeni-logo.png')"
-							 click="DisplayUtil.viewAboutWindow()"
-							 toolTip="View more information about Flack" />
-		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton id="refreshButton"
-							  icon="{DisplayUtil.refreshIcon}"
-							 click="startover()" includeInLayout="false" visible="false"
-							 toolTip="Reload all data" />
-		<display:ImageButton id="cmButton"
-							  icon="@Embed('../images/building.png')"
-							 click="DisplayUtil.viewManagersWindow();"
-							 toolTip="GENI managers"/>
 		<display:ImageButton id="consoleButton"
-							  icon="{DisplayUtil.consoleIcon}"
+							 icon="{ImageUtil.consoleIcon}"
 							 click="LogHandler.viewConsole();" 
 							 toolTip="Console"/>
-		<display:DefaultLine percentHeight="90" />
-		<display:ImageButton id="sliceButton" includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}"
-							  icon="{DisplayUtil.graphIcon}"
-							 click="DisplayUtil.viewSlicesWindow();"
-							 toolTip="Work with slices"/>
-		<display:DefaultLine percentHeight="90" includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
-							 visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" height="24"
-					 change="sliceSelected(event)"
-					 includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox"
-					click="Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.geniHandler.mapHandler.drawMap()"
-					includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
-					visible="{!Main.geniHandler.unauthenticatedMode}" />
+		<mx:Button icon="{ImageUtil.noUserIcon}"
+				   click="loadUser()"
+				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
+				   toolTip="Log in to get user-only features" label="Log in" styleName="unauthenticatedStyle"
+				   id="userButton" height="24" />
 		<s:Rect percentWidth="100" />
 		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
 		<s:Rect percentWidth="100" />
-		<mx:Button icon="{DisplayUtil.noUserIcon}"
-				   click="loadUser()"
-				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
-				   toolTip="Authenticate" label="Authenticate" styleName="unauthenticatedStyle"
-				   id="userButton" height="24" />
+		<display:ImageButton id="refreshButton"
+							 icon="{ImageUtil.refreshIcon}"
+							 click="startover()" includeInLayout="false" visible="false"
+							 toolTip="Reload all data" />
 		<display:ImageButton id="searchButton"
-							  icon="{DisplayUtil.findIcon}"
+							  icon="{ImageUtil.findIcon}"
 							 click="DisplayUtil.viewSearchWindow()"
 							 toolTip="Search" />
 		<display:ImageButton id="resetZoomButton"
@@ -469,9 +425,11 @@
 							 click="toggleFullScreen()"
 							 toolTip="Toggle fullscreen" />
 		<display:ImageButton id="helpButton"
-							  icon="{DisplayUtil.helpIcon}"
-							 click="Util.showManual()"
-							 toolTip="View more information" />
+							  icon="{ImageUtil.helpIcon}"
+							 click="DisplayUtil.viewAboutWindow()"
+							 toolTip="View more information about Flack" />
 	</s:controlBarContent>
+	
 	<mapping:GeniMap id="map" />
+	<mapping:GeniMapLegend id="legend" />
 </s:Application>

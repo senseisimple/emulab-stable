@@ -216,15 +216,15 @@
 			<mx:GridItem width="100%">
 				<s:Label text="{node.name}" fontSize="17" fontWeight="bold" width="100%" />
 				<display:ImageButton id="locateButton"
-									  icon="{DisplayUtil.mapIcon}"
+									  icon="{ImageUtil.mapIcon}"
 									 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
 									 toolTip="View Advertisement RSPEC" />
 				<display:ImageButton id="componentButton"
-									  icon="{DisplayUtil.pageWhiteCodeIcon}"
+									  icon="{ImageUtil.pageWhiteCodeIcon}"
 									 click="viewComponentRspec()"
 									 toolTip="View Advertisement RSPEC" />
 				<display:ImageButton id="sliverButton"
-									 icon="{DisplayUtil.pageCodeIcon}"
+									 icon="{ImageUtil.pageCodeIcon}"
 									 click="viewSliverRspec()"
 									 toolTip="View Request RSPEC" visible="false" />
 			</mx:GridItem>

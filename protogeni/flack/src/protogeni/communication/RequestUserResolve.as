@@ -14,6 +14,7 @@
 
 package protogeni.communication
 {
+  import protogeni.Util;
   import protogeni.resources.Slice;
 
   public class RequestUserResolve extends Request
@@ -49,6 +50,7 @@ package protogeni.communication
 				{
 					var userSlice:Slice = new Slice();
 					userSlice.urn = sliceUrn;
+					userSlice.name = Util.getNameFromUrn(sliceUrn);
 					Main.geniHandler.CurrentUser.slices.add(userSlice);
 					newCalls.push(new RequestSliceResolve(userSlice));
 				}

@@ -4,6 +4,7 @@ package protogeni
 	import flash.events.IEventDispatcher;
 	
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.GeniUser;
 	import protogeni.resources.Slice;
 	
 	public class GeniDispatcher extends EventDispatcher
@@ -18,8 +19,8 @@ package protogeni
 			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGER_CHANGED, gm, action));
 		}
 		
-		public function dispatchGeniManagersChanged():void {
-			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGERS_CHANGED));
+		public function dispatchGeniManagersChanged(action:int = 0):void {
+			dispatchEvent(new GeniEvent(GeniEvent.GENIMANAGERS_CHANGED, null, action));
 		}
 		
 		public function dispatchQueueChanged():void {
@@ -27,7 +28,10 @@ package protogeni
 		}
 		
 		public function dispatchUserChanged():void {
-			dispatchEvent(new GeniEvent(GeniEvent.USER_CHANGED));
+			var u:GeniUser = null;
+			if(Main.geniHandler != null)
+				u = Main.geniHandler.CurrentUser;
+			dispatchEvent(new GeniEvent(GeniEvent.USER_CHANGED, u));
 		}
 		
 		public function dispatchSliceChanged(s:Slice):void {

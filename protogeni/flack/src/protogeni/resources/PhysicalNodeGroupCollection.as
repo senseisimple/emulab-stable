@@ -14,6 +14,8 @@
  
  package protogeni.resources
 {
+	import flash.utils.Dictionary;
+	
 	import mx.collections.ArrayCollection;
 	
 	// Collection of all physical node groups
@@ -98,6 +100,33 @@
 				}
 			}
 			return type;
+		}
+		
+		public function GetManagers():Vector.<GeniManager>
+		{
+			var d:Dictionary = new Dictionary();
+			var a:Array = [];
+			var biggestManager:GeniManager;
+			var max:int = 0;
+			for each(var ng:PhysicalNodeGroup in collection) {
+				if(a.indexOf(ng.GetManager()) == -1) {
+					a.push(ng.GetManager());
+					d[ng.GetManager()] = ng.collection.length;
+				} else {
+					d[ng.GetManager()] += ng.collection.length;
+				}
+				if(d[ng.GetManager()] > max) {
+					biggestManager = ng.GetManager();
+					max = d[ng.GetManager()];
+				}
+			}
+			var v:Vector.<GeniManager> = new Vector.<GeniManager>();
+			v.push(biggestManager);
+			for each(var m:GeniManager in a) {
+				if(m != biggestManager)
+					v.push(m);
+			}
+			return v;
 		}
 	}
 }

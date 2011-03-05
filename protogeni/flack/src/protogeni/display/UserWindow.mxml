@@ -17,10 +17,10 @@
 			
 			import protogeni.GeniEvent;
 			import protogeni.resources.Slice;
-			import protogeni.resources.User;
+			import protogeni.resources.GeniUser;
 			
 			[Bindable]
-			private var user:User;
+			private var user:GeniUser;
 			
 			public function onCreationComplete():void
 			{

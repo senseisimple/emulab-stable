@@ -22,9 +22,8 @@ package protogeni.resources
 		public function clear():void
 		{
 			for each(var gm:GeniManager in this)
-			{
 				gm.clear();
-			}
+			Main.geniDispatcher.dispatchGeniManagersChanged();
 		}
 		
 		public function getByUrn(urn:String):GeniManager

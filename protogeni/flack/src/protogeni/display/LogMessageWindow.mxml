@@ -20,15 +20,15 @@
 				if(log.isError)
 				{
 					nameField.setStyle("color","red");
-					this.typeImage.source = DisplayUtil.errorIcon;
+					this.typeImage.source = ImageUtil.errorIcon;
 				} else
 				{
 					if(log.type == LogMessage.TYPE_START)
-						this.typeImage.source = DisplayUtil.rightIcon;
+						this.typeImage.source = ImageUtil.rightIcon;
 					else if(log.type == LogMessage.TYPE_END)
-						this.typeImage.source = DisplayUtil.leftIcon;
+						this.typeImage.source = ImageUtil.leftIcon;
 					else
-						this.typeImage.source = DisplayUtil.availableIcon;
+						this.typeImage.source = ImageUtil.availableIcon;
 				}
 				nameField.text = log.name;
 				groupId.text = log.groupId;

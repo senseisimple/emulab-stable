@@ -28,7 +28,7 @@
 	 import protogeni.resources.SliceAuthority;
 	 import protogeni.resources.SliceCollection;
 	 import protogeni.resources.Sliver;
-	 import protogeni.resources.User;
+	 import protogeni.resources.GeniUser;
 	 import protogeni.resources.VirtualLink;
 	 import protogeni.resources.VirtualNode;
 	
@@ -42,7 +42,7 @@
 		public var mapHandler:protogeni.display.mapping.GeniMapHandler;
 		
 		[Bindable]
-		public var CurrentUser:User;
+		public var CurrentUser:GeniUser;
 		
 		[Bindable]
 		public var unauthenticatedMode:Boolean;
@@ -65,7 +65,7 @@
 			requestHandler = new GeniRequestHandler();
 			mapHandler = new protogeni.display.mapping.GeniMapHandler(Main.Application().map);
 			GeniManagers = new GeniManagerCollection();
-			CurrentUser = new User();
+			CurrentUser = new GeniUser();
 			unauthenticatedMode = true;
 			GeniAuthorities = new ArrayList([
 				new SliceAuthority("utahemulab.sa","urn:publicid:IDN+emulab.net+authority+sa","https://www.emulab.net/protogeni/xmlrpc", true),
@@ -86,7 +86,7 @@
 			CurrentUser.authority = GeniAuthorities.source[0] as SliceAuthority;
 			
 			Main.geniDispatcher.dispatchUserChanged();
-			Main.geniDispatcher.dispatchGeniManagersChanged();
+			//Main.geniDispatcher.dispatchGeniManagersChanged();
 			Main.geniDispatcher.dispatchQueueChanged();
 		}
 		
@@ -98,6 +98,7 @@
 		
 		public function clearComponents() : void
 		{
+			Main.geniDispatcher.dispatchGeniManagersChanged(GeniEvent.ACTION_REMOVING);
 			GeniManagers = new GeniManagerCollection();
 			if(CurrentUser != null)
 				CurrentUser.slices = new SliceCollection();

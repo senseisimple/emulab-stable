@@ -27,6 +27,7 @@
 	import mx.controls.ButtonLabelPlacement;
 	import mx.managers.PopUpManager;
 	
+	import protogeni.Util;
 	import protogeni.communication.Request;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
@@ -45,203 +46,74 @@
 	
 	public class DisplayUtil
 	{
-		public static var successColorString:String = "#0E8219";
-		public static var failColorString:String = "#FE0000";
-		public static var waitColorString:String = "#FF7F00";
-		
-		public static var successColor:uint = 0x0E8219;
-		public static var failColor:uint = 0xFE0000;
-		public static var waitColor:uint = 0xFF7F00;
-		
-		public static var hideColor:Object = 0xCCCCCC;
-		public static var linkColor:Object = 0xFFCFD1;
-		public static var linkBorderColor:Object = 0xFF00FF;
-		public static var tunnelColor:uint = 0xFFAEAE;
-		public static var tunnelBorderColor:Object = 0xFF0000;
-		public static var nodeColor:Object = 0x092B9F;
-		public static var nodeBorderColor:Object = 0xD2E1F0;
-		
-		public static var windowHeight:int = 400;
-		public static var windowWidth:int = 700;
-		public static var minComponentHeight:int = 24;
-		public static var minComponentWidth:int = 24;
-		
-		// Embedded images used around the application
-		[Bindable]
-		[Embed(source="../../../images/chart_bar.png")]
-		public static var statisticsIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/help.png")]
-		public static var helpIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_left.png")]
-		public static var leftIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_right.png")]
-		public static var rightIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_up.png")]
-		public static var upIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_down.png")]
-		public static var downIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/status_online.png")]
-		public static var userIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/status_offline.png")]
-		public static var noUserIcon:Class;
-		
-		[Bindable]
-        [Embed(source="../../../images/tick.png")]
-        public static var availableIcon:Class;
+		public static const windowHeight:int = 400;
+		public static const windowWidth:int = 700;
+		public static const minComponentHeight:int = 24;
+		public static const minComponentWidth:int = 24;
 
-        [Bindable]
-        [Embed(source="../../../images/cross.png")]
-        public static var crossIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/administrator.png")]
-        public static var ownedIcon:Class;
+		public static const colorsLight:Array = new Array(
+			// light
+			0xCCCCCC,	// grey
+			0xF2AEAC,	// red
+			0xD8E4AA,	// green
+			0xB8D2EB,	// blue
+			0xF2D1B0,	// orange
+			0xD4B2D3,	// dark purple
+			0xDDB8A9,	// dark red
+			0xEBBFD9,	// light purple
+			// dark
+			0x010101,	// grey
+			0xED2D2E,	// red
+			0x008C47,	// green
+			0x1859A9,	// blue
+			0xF37D22,	// orange
+			0x662C91,	// dark purple
+			0xA11D20,	// dark red
+			0xB33893);	// light purple
+		public static const colorsMedium:Array = new Array(
+			0x727272,	// grey
+			0xF1595F,	// red
+			0x79C36A,	// green
+			0x599AD3,	// blue
+			0xF9A65A,	// orange
+			0x9E66AB,	// dark purple
+			0xCD7058,	// dark red
+			0xD77FB3,	// light purple
+			0x727272,	// grey
+			0xF1595F,	// red
+			0x79C36A,	// green
+			0x599AD3,	// blue
+			0xF9A65A,	// orange
+			0x9E66AB,	// dark purple
+			0xCD7058,	// dark red
+			0xD77FB3);	// light purple
+		public static const colorsDark:Array = new Array(
+			0x010101,	// grey
+			0xED2D2E,	// red
+			0x008C47,	// green
+			0x1859A9,	// blue
+			0xF37D22,	// orange
+			0x662C91,	// dark purple
+			0xA11D20,	// dark red
+			0xB33893,	// light purple
+			// light
+			0xCCCCCC,	// grey
+			0xF2AEAC,	// red
+			0xD8E4AA,	// green
+			0xB8D2EB,	// blue
+			0xF2D1B0,	// orange
+			0xD4B2D3,	// dark purple
+			0xDDB8A9,	// dark red
+			0xEBBFD9);	// light purple
 		
-		[Bindable]
-		[Embed(source="../../../images/server.png")]
-		public static var exclusiveIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/server_stanchion.png")]
-		public static var sharedIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/drive_network.png")]
-		public static var physicalNodeIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/link.png")]
-        public static var linkIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_green.png")]
-        public static var flagGreenIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_red.png")]
-        public static var flagRedIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_yellow.png")]
-        public static var flagYellowIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/flag_orange.png")]
-        public static var flagOrangeIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/error.png")]
-        public static var errorIcon:Class;
-        
-        [Bindable]
-        [Embed(source="../../../images/exclamation.png")]
-        public static var exclamationIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/lightbulb.png")]
-		public static var onIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/lightbulb_off.png")]
-		public static var offIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/add.png")]
-		public static var addIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/cancel.png")]
-		public static var cancelIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/stop.png")]
-		public static var stopIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_stop_blue.png")]
-		public static var stopControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_pause_blue.png")]
-		public static var pauseControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_play_blue.png")]
-		public static var playControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/control_repeat_blue.png")]
-		public static var repeatControlIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/delete.png")]
-		public static var deleteIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/arrow_refresh.png")]
-		public static var refreshIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/find.png")]
-		public static var findIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/magnifier.png")]
-		public static var searchIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/map.png")]
-		public static var mapIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/graph.png")]
-		public static var graphIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page.png")]
-		public static var pageIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page_code.png")]
-		public static var pageCodeIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page_white.png")]
-		public static var pageWhiteIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/page_white_code.png")]
-		public static var pageWhiteCodeIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/wand.png")]
-		public static var actionIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/ssl_certificates.png")]
-		public static var sslIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/keyboard.png")]
-		public static var keyboardIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/system_monitor.png")]
-		public static var consoleIcon:Class;
+		public static var nextColorIdx:int = 0;
+		public static function getColorIdx():int
+		{
+			var value:int = nextColorIdx++;
+			if(nextColorIdx == colorsMedium.length)
+				nextColorIdx = 0;
+			return value;
+		}
 		
 		public static function getLabel(text:String):Label
 		{
@@ -253,34 +125,34 @@
         // Gets an icon for a boolean value
         public static function assignIcon(val:Boolean):Class {
 			if (val)
-	            return availableIcon;
+	            return ImageUtil.availableIcon;
 	        else
-	            return crossIcon;
+	            return ImageUtil.crossIcon;
         }
         
         // Gets the icon for the given node
         public static function assignAvailabilityIcon(val:PhysicalNode):Class {
 			if(val.virtualNodes != null && val.virtualNodes.length > 0)
-				return ownedIcon;
+				return ImageUtil.ownedIcon;
             else
             {
 	            if (val.available) {
 					if(val.exclusive)
-						return exclusiveIcon;
+						return ImageUtil.exclusiveIcon;
 					else
-						return sharedIcon;
+						return ImageUtil.sharedIcon;
 				}
 	            else
-	                return cancelIcon;
+	                return ImageUtil.cancelIcon;
             }
         }
         
         // Get's the CM icon
         public static function assignIconForGeniManager(val:GeniManager):Class {
 			if(val.Status == GeniManager.STATUS_VALID)
-				return availableIcon;
+				return ImageUtil.availableIcon;
 			else
-				return crossIcon;
+				return ImageUtil.crossIcon;
         }
 		
 		public static function getLogMessageButton(msg:LogMessage):Button {
@@ -289,21 +161,21 @@
 			logButton.toolTip = msg.groupId;
 			if(msg.isError)
 			{
-				logButton.setStyle("icon",DisplayUtil.errorIcon);
+				logButton.setStyle("icon",ImageUtil.errorIcon);
 				logButton.styleName = "failedStyle";
 			}
 			else
 			{
 				if(msg.type == LogMessage.TYPE_START) {
-					logButton.setStyle("icon",DisplayUtil.rightIcon);
+					logButton.setStyle("icon",ImageUtil.rightIcon);
 					logButton.labelPlacement = ButtonLabelPlacement.LEFT;
 				}
 				else if(msg.type == LogMessage.TYPE_END) {
-					logButton.setStyle("icon",DisplayUtil.rightIcon);
+					logButton.setStyle("icon",ImageUtil.rightIcon);
 					logButton.labelPlacement = ButtonLabelPlacement.RIGHT;
 				}
 				else {
-					logButton.setStyle("icon",DisplayUtil.availableIcon);
+					logButton.setStyle("icon",ImageUtil.availableIcon);
 				}
 			}
 			logButton.addEventListener(MouseEvent.CLICK,
@@ -318,6 +190,7 @@
 		public static function getRequestButton(r:Request):Button {
 			var requestButton:Button = getButton();
 			requestButton.label = r.name;
+			requestButton.data = r;
 			requestButton.toolTip = r.details;
 			requestButton.addEventListener(MouseEvent.CLICK,
 				function openRequest(event:MouseEvent):void {
@@ -330,10 +203,8 @@
 		// Gets a button for the slice
 		public static function getSliceButton(s:Slice):Button {
 			var sButton:Button = getButton();
-			if(s.hrn != null && s.hrn.length > 0)
-				sButton.label = s.hrn;
-			else
-				sButton.label = s.urn;
+			sButton.label = Util.getNameFromUrn(s.urn);
+			sButton.data = s;
 			sButton.addEventListener(MouseEvent.CLICK,
 				function openSlice(event:MouseEvent):void {
 					viewSlice(s);
@@ -346,6 +217,7 @@
 		public static function getGeniManagerButton(gm:GeniManager):Button {
 			var cmButton:Button = getButton(DisplayUtil.assignIconForGeniManager(gm));
 			cmButton.label = gm.Hrn;
+			cmButton.data = gm;
 			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openGeniManager(event:MouseEvent):void {
@@ -395,7 +267,7 @@
 		
 		// Gets a button for a physical link
 		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
-			var linkButton:Button = getButton(DisplayUtil.linkIcon);
+			var linkButton:Button = getButton(ImageUtil.linkIcon);
 			linkButton.label = ni.id;
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
@@ -409,7 +281,7 @@
 		public static function getVirtualLinkButton(pl:VirtualLink):Button {
 			var linkButton:Button = new Button();
 			linkButton.label = pl.id;
-			linkButton.setStyle("icon", DisplayUtil.linkIcon);
+			linkButton.setStyle("icon", ImageUtil.linkIcon);
 			linkButton.addEventListener(MouseEvent.CLICK,
 				function openLink(event:MouseEvent):void {
 					DisplayUtil.viewVirtualLink(pl);

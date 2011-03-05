@@ -69,9 +69,9 @@
 			private function toggleSorting():void {
 				sortingUp = !sortingUp;
 				if(sortingUp)
-					this.sortButton.setStyle("icon", DisplayUtil.upIcon);
+					this.sortButton.setStyle("icon", ImageUtil.upIcon);
 				else
-					this.sortButton.setStyle("icon", DisplayUtil.downIcon);
+					this.sortButton.setStyle("icon", ImageUtil.downIcon);
 				this.resetLogView();
 			}
 			
@@ -135,7 +135,7 @@
 			public function addRequest(rqn:RequestQueueNode):void
 			{
 				var reqHbox:HGroup = new HGroup();
-				var removeButton:Button = DisplayUtil.getButton(DisplayUtil.cancelIcon, true);
+				var removeButton:Button = DisplayUtil.getButton(ImageUtil.cancelIcon, true);
 				removeButton.data = rqn;
 				removeButton.toolTip = "Cancel this operation";
 				removeButton.addEventListener(MouseEvent.CLICK,
@@ -238,7 +238,7 @@
 				<display:DefaultLine height="24" />
 				<s:Label text="Sort" />
 				<display:ImageButton id="sortButton"
-									  icon="{DisplayUtil.upIcon}"
+									  icon="{ImageUtil.upIcon}"
 									  click="toggleSorting()"
 									  toolTip="Switch the ordering" />
 			</s:HGroup>
@@ -251,15 +251,15 @@
 			<s:Label text="Queued Requests"  fontWeight="bold" fontSize="14"/>
 			<s:HGroup gap="12">
 				<display:ImageButton id="stopButton"
-									  icon="{DisplayUtil.stopIcon}"
+									  icon="{ImageUtil.stopIcon}"
 									  click="Main.geniHandler.requestHandler.stop();"
 									  toolTip="Force stop the queue" />
 				<display:ImageButton id="pauseButton"
-									  icon="{DisplayUtil.pauseControlIcon}"
+									  icon="{ImageUtil.pauseControlIcon}"
 									  click="Main.geniHandler.requestHandler.pause();"
 									  toolTip="Force pause the queue" />
 				<display:ImageButton id="startButton"
-									  icon="{DisplayUtil.playControlIcon}"
+									  icon="{ImageUtil.playControlIcon}"
 									  click="Main.geniHandler.requestHandler.start();"
 									  toolTip="Force start the queue" />
 				<mx:Button label="Step" click="Main.geniHandler.requestHandler.step()" height="24" />
@@ -278,11 +278,16 @@
 						dataProvider="{groupNames}"
 						selectedIndex="{selectedIndex}"
 						change="refreshView()"
-						width="250" height="24"
+						width="200" height="24"
 						creationComplete="selectedIndex = 0" />
 		<s:Rect width="100%" />
-		<s:Label text="Max Running Ops" />
-		<s:NumericStepper id="maxRunningStepper" value="{Main.geniHandler.requestHandler.maxRunning}" minimum="1" valueCommit="Main.geniHandler.requestHandler.maxRunning = maxRunningStepper.value; Main.geniHandler.requestHandler.tryNext();" />
+		<mx:Button label="Redraw Map" click="Main.geniHandler.mapHandler.redrawFromScratch()" />
+		<display:DefaultLine height="90%" />
+		<s:Label text="Parallel Ops" />
+		<s:NumericStepper id="maxRunningStepper"
+						  value="{Main.geniHandler.requestHandler.maxRunning}"
+						  minimum="1"
+						  valueCommit="Main.geniHandler.requestHandler.maxRunning = maxRunningStepper.value; Main.geniHandler.requestHandler.tryNext();" />
 		<display:DefaultLine height="90%" />
 		<s:DropDownList id="requestList" labelField="name" requireSelection="true" height="24" width="150">
 			<s:ArrayCollection>
@@ -293,7 +298,7 @@
 				<communication:RequestListComponentsPublic />
 			</s:ArrayCollection>
 		</s:DropDownList>
-		<display:ImageButton id="runRequestButton" icon="{DisplayUtil.actionIcon}" toolTip="Run the selected request"
+		<display:ImageButton id="runRequestButton" icon="{ImageUtil.actionIcon}" toolTip="Run the selected request"
 							  click="Main.geniHandler.requestHandler.pushRequest(requestList.selectedItem)" />
 	</display:controlBarContent>
 </display:DefaultWindow>
