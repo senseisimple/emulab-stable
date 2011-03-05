@@ -26,6 +26,47 @@
 			themeColor: red;
 			chromeColor: red;
 		}
+		
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+		}
+		
+		s|TextArea {
+			skinClass: ClassReference("protogeni.display.skins.TextAreaSkin");
+		}
+		
+		s|Scroller {
+			skinClass: ClassReference("protogeni.display.skins.ScrollerSkin");
+		}
+		
+		s|CheckBox {
+			skinClass: ClassReference("protogeni.display.skins.CheckBoxSkin");
+		}
+		
 	</fx:Style>
 	
 	<fx:Script>
@@ -397,7 +438,7 @@
 		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" height="24"
 					 change="sliceSelected(event)"
 					 includeInLayout="{!Main.geniHandler.unauthenticatedMode}" visible="{!Main.geniHandler.unauthenticatedMode}" />
-		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" skinClass="protogeni.display.skins.CheckBoxSkin"
+		<s:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox"
 					click="Main.geniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.geniHandler.mapHandler.drawMap()"
 					includeInLayout="{!Main.geniHandler.unauthenticatedMode}"
 					visible="{!Main.geniHandler.unauthenticatedMode}" />

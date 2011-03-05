@@ -4,9 +4,6 @@
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="Slices" show="refreshView()" creationComplete="openFirst()"
 						width="300" height="220" close="closeWindow()">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
 			import mx.controls.Alert;

@@ -8,9 +8,6 @@
 		  mapevent_mapready="onMapReady(event)"
 		  sensor="false"
 		  key="ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
 	
 	<fx:Script>
 		<![CDATA[
@@ -24,8 +21,11 @@
 			import com.google.maps.interfaces.IPane;
 			import com.google.maps.interfaces.IPaneManager;
 			
+			import mx.controls.Alert;
+			import mx.core.FlexGlobals;
+			
 			public var ready:Boolean;
-			public var linkPane:IPane
+			public var linkPane:IPane;
 			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
@@ -74,6 +74,7 @@
 				linkPane = manager.createPane(2);
 				
 				addEventListener(MapZoomEvent.ZOOM_CHANGED, afterMove);
+				
 				ready = true;
 				Main.geniHandler.mapHandler.drawMap();
 			}

@@ -10,42 +10,6 @@
 	<display:layout>
 		<s:VerticalLayout />
 	</display:layout>
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace display "protogeni.display.*";
-		
-		.validStyle {
-			color: green;
-			textRollOverColor: green;
-			textSelectedColor: green;
-			themeColor: green;
-		}
-		
-		.failedStyle {
-			color: red;
-			textRollOverColor: red;
-			textSelectedColor: red;
-			themeColor: red;
-		}
-		
-		.unknownStyle {
-			color: grey;
-			textRollOverColor: grey;
-			textSelectedColor: grey;
-			themeColor: grey;
-		}
-		
-		.inprogressStyle {
-			color: #FF7F00;
-			textRollOverColor: #FF7F00;
-			textSelectedColor: #FF7F00;
-			themeColor: #FF7F00;
-		}
-	</fx:Style>
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
@@ -242,7 +206,7 @@
 				cmHbox.percentWidth = 100;
 				cmHbox.verticalAlign = "middle";
 				var cmCheckbox:CheckBox = new CheckBox();
-				cmCheckbox.setStyle("skinClass", protogeni.display.skins.CheckBoxSkin);
+				//cmCheckbox.setStyle("skinClass", protogeni.display.skins.CheckBoxSkin);
 				cmCheckbox.selected = gm.Show;
 				//cmCheckbox.label = gm.Hrn;
 				cmHbox.addElement(cmCheckbox);
@@ -280,7 +244,7 @@
 		]]>
 	</fx:Script>
 	<s:HGroup width="100%" verticalAlign="middle" paddingTop="2" paddingRight="2" paddingLeft="2">
-		<s:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true" skinClass="protogeni.display.skins.CheckBoxSkin"/>
+		<s:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true" />
 		<display:ImageButton id="refreshButton"
 							 includeInLayout="false" visible="false"
 							 icon="{DisplayUtil.refreshIcon}"

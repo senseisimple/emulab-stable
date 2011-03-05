@@ -4,9 +4,6 @@
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
 		  height="100%" width="10%" fontSize="12" minHeight="24" minWidth="24"
 		  creationComplete="value = smallLetter; if(label.length==0) label = smallLetter">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
 			public var smallLetter:String = '';

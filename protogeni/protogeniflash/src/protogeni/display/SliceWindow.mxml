@@ -5,45 +5,6 @@
 						title="Slice"
 						creationComplete="onCreationComplete()"
 						close="closeWindow();">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace display "protogeni.display.*";
-		
-		.failedStyle {
-			color: red;
-			textRollOverColor: red;
-			textSelectedColor: red;
-			themeColor: red;
-			borderColor:red;
-		}
-		
-		.validStyle {
-			color: green;
-			textRollOverColor: green;
-			textSelectedColor: green;
-			themeColor: green;
-			borderColor:green;
-		}
-		
-		.unknownStyle {
-			color: grey;
-			textRollOverColor: grey;
-			textSelectedColor: grey;
-			themeColor: grey;
-			borderColor:#B6B6B6;
-		}
-		
-		.inprogressStyle {
-			color: #FF7F00;
-			textRollOverColor: #FF7F00;
-			textSelectedColor: #FF7F00;
-			themeColor: #FF7F00;
-		}
-	</fx:Style>
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
@@ -348,11 +309,11 @@
 							 click="previewRspecs()"
 							 toolTip="Preview the Request RSPEC" />
 		<s:CheckBox id="ionCheckbox" color="{SliceLink.ION_COLOR}"
-					skinClass="protogeni.display.skins.CheckBoxSkin" selected="{Main.useIon}"
+					selected="{Main.useIon}"
 					label="Use ION"
 					valueCommit="Main.useIon = ionCheckbox.selected" />
 		<s:CheckBox id="pgeniCheckbox" color="{SliceLink.GPENI_COLOR}"
-					skinClass="protogeni.display.skins.CheckBoxSkin" selected="{Main.useGpeni}"
+					selected="{Main.useGpeni}"
 					label="Use GPENI"
 					valueCommit="Main.useGpeni = pgeniCheckbox.selected" />
 	</s:HGroup>
@@ -378,8 +339,7 @@
 		<display:ImageButton id="refreshButton" toolTip="Refresh slivers"
 							  click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"
 							  icon="{DisplayUtil.refreshIcon}"/>
-		<s:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" 
-					skinClass="protogeni.display.skins.CheckBoxSkin" />
+		<s:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
 		<display:ImageButton id="deleteButton" toolTip="Delete slivers"
 							  click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
 							  icon="{DisplayUtil.deleteIcon}"/>

@@ -4,9 +4,6 @@
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
 		  width="180" height="170"
 		  horizontalAlign="center" gap="2" xmlns:display="protogeni.display.*">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
 			import com.google.maps.LatLng;

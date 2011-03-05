@@ -4,45 +4,6 @@
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						width="500" height="500"
 						title="Node Information">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace display "protogeni.display.*";
-		
-		.failedStyle {
-			color: red;
-			textRollOverColor: red;
-			textSelectedColor: red;
-			themeColor: red;
-			borderColor:red;
-		}
-		
-		.validStyle {
-			color: green;
-			textRollOverColor: green;
-			textSelectedColor: green;
-			themeColor: green;
-			borderColor:green;
-		}
-		
-		.unknownStyle {
-			color: grey;
-			textRollOverColor: grey;
-			textSelectedColor: grey;
-			themeColor: grey;
-			borderColor:#B6B6B6;
-		}
-		
-		.inprogressStyle {
-			color: #FF7F00;
-			textRollOverColor: #FF7F00;
-			textSelectedColor: #FF7F00;
-			themeColor: #FF7F00;
-		}
-	</fx:Style>
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;

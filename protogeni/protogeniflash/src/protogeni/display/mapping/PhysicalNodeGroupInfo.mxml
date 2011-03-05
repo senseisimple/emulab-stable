@@ -4,9 +4,6 @@
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
 		  width="150" height="130"
 		  horizontalAlign="center" gap="0" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0">
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
 			import protogeni.display.DisplayUtil;

@@ -6,33 +6,6 @@
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
 						contentCreationComplete="onCreationComplete()">
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace display "protogeni.display.*";
-		
-		.failedStyle {
-			color: red;
-			textRollOverColor: red;
-			textSelectedColor: red;
-			themeColor: red;
-		}
-		
-		.validStyle {
-			color: green;
-			textRollOverColor: green;
-			textSelectedColor: green;
-			themeColor: green;
-		}
-		
-		.inprogressStyle {
-			color: #FF7F00;
-			textRollOverColor: #FF7F00;
-			textSelectedColor: #FF7F00;
-			themeColor: #FF7F00;
-		}
-		
-	</fx:Style>
 	<fx:Script>
 		<![CDATA[
 			import com.mattism.http.xmlrpc.JSLoader;
@@ -43,6 +16,7 @@
 			
 			import protogeni.Util;
 			import protogeni.display.skins.CheckBoxSkin;
+			import protogeni.display.skins.TextAreaSkin;
 			import protogeni.resources.SliceAuthority;
 
 			private var certLoader:URLLoader;
@@ -211,24 +185,21 @@
 
 		]]>
 	</fx:Script>
-	<fx:Declarations>
-		
-	</fx:Declarations>
+
 	<s:Label text="Which authority are you registered with?" />
 	<s:DropDownList id="authorities" labelField="Name"  width="100%" height="24" requireSelection="true" 
 					dataProvider="{Main.geniHandler.GeniAuthorities}"
 					selectedItem="@{selectedAuthority}" />
 	<s:VGroup width="100%" height="100%" visible="{Main.useJavascript}" includeInLayout="{Main.useJavascript}">
 		<s:Label text="SSL Certificate Password" />
-		<s:HGroup width="100%">
+		<s:HGroup width="100%" verticalAlign="middle">
 			<display:KeyboardTextInput id="passwordField" width="100%" creationComplete="passwordField.textInput.displayAsPassword = true;" />
-			<s:CheckBox id="cacheCheckbox" label="Cache?" skinClass="protogeni.display.skins.CheckBoxSkin" />
+			<s:CheckBox id="cacheCheckbox" label="Cache?" />
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle">
 			<s:CheckBox id="retrieveCertCheckbox" enabled="{selectedAuthority.workingCertGet}"
 						label="Automatically retrieve SSL Certificate? If not signed in, please sign in to"
-						selected="true"
-						skinClass="protogeni.display.skins.CheckBoxSkin" />
+						selected="true" />
 			<mx:Button label="{selectedAuthority.Authority}"  height="24" click="visitLogin();" />
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle">
@@ -239,7 +210,8 @@
 			<s:Label id="getLabel" text="" />
 		</s:HGroup>
 		<s:Label text="If the automatic SSL Certificate retrieval doesn't work, copy and paste it here" />
-		<s:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}" width="100%" height="100%" />
+		<s:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}"
+					width="100%" height="100%" />
 	</s:VGroup>
 	<display:controlBarLayout>
 		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />

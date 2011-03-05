@@ -5,11 +5,6 @@
 						width="500" height="300"
 						title="Search"
 						close="closeWindow()">
-	
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	
 	<fx:Script>
 		<![CDATA[
 			import mx.core.IVisualElement;

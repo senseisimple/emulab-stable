@@ -9,10 +9,6 @@
 		<s:VerticalLayout horizontalAlign="center" paddingBottom="2"/>
 	</s:layout>
 	
-	<fx:Declarations>
-		<!-- Place non-visual elements (e.g., services, value objects) here -->
-	</fx:Declarations>
-	
 	<fx:Script>
 		<![CDATA[
 			import mx.managers.PopUpManager;

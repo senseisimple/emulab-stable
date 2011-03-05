@@ -8,39 +8,6 @@
 	<display:layout>
 		<s:VerticalLayout paddingBottom="0" paddingLeft="10" paddingRight="10" paddingTop="10"/>
 	</display:layout>
-	<fx:Style>
-		@namespace s "library://ns.adobe.com/flex/spark";
-		@namespace mx "library://ns.adobe.com/flex/mx";
-		@namespace display "protogeni.display.*";
-		
-		.failedStyle {
-			color: red;
-			textRollOverColor: red;
-			textSelectedColor: red;
-			themeColor: red;
-		}
-		
-		.validStyle {
-			color: green;
-			textRollOverColor: green;
-			textSelectedColor: green;
-			themeColor: green;
-		}
-		
-		.unknownStyle {
-			color: grey;
-			textRollOverColor: grey;
-			textSelectedColor: grey;
-			themeColor: grey;
-		}
-		
-		.inprogressStyle {
-			color: #FF7F00;
-			textRollOverColor: #FF7F00;
-			textSelectedColor: #FF7F00;
-			themeColor: #FF7F00;
-		}
-	</fx:Style>
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayList;
@@ -53,6 +20,7 @@
 			import protogeni.communication.Request;
 			import protogeni.communication.RequestQueue;
 			import protogeni.communication.RequestQueueNode;
+			import protogeni.display.skins.ScrollerSkin;
 			import protogeni.resources.GeniManager;
 			
 			import spark.components.HGroup;
@@ -266,7 +234,7 @@
 		<s:VGroup height="100%" width="50%" horizontalAlign="center">
 			<s:Label text="Logs"  fontSize="14" fontWeight="bold"/>
 			<s:HGroup verticalAlign="middle">
-				<mx:Button label="Clear" click="LogHandler.clear();" height="24" />
+				<mx:Button label="Clear" click="LogHandler.clear();" />
 				<display:DefaultLine height="24" />
 				<s:Label text="Sort" />
 				<display:ImageButton id="sortButton"
