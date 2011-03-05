@@ -93,6 +93,7 @@
 					}
 				}
 				FlexGlobals.topLevelApplication.saveLocalUserData();
+				Main.geniHandler.mapHandler.clearAll();
 				Main.geniHandler.unauthenticatedMode = false;
 				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
 				closeWindow();

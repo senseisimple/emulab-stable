@@ -80,13 +80,13 @@ package protogeni.resources
 			{
 				parseNextNode();
 				if(Main.debugMode)
-					LogHandler.appendMessage(new LogMessage(gm.Url, "ParseN " + String((new Date()).time - startTime.time)));
+					trace("ParseN " + String((new Date()).time - startTime.time));
 			}
 			else if (myState == LINK_PARSE)
 			{
 				parseNextLink();
 				if(Main.debugMode)
-					LogHandler.appendMessage(new LogMessage(gm.Url, "ParseL " + String((new Date()).time - startTime.time)));
+					trace("ParseL " + String((new Date()).time - startTime.time));
 			}
 			else if (myState == DONE)
 			{
@@ -117,25 +117,11 @@ package protogeni.resources
 		}
 		
 		private function parseNextNode():void {
-			var idx:int;
-			for(idx = 0; idx < MAX_WORK; idx++) {
-				var fullIdx:int = myIndex + idx;
-				if(fullIdx == nodes.length()) {
-					
-					// Assign subnodes
-					for each(var obj:Object in subnodeList)
-					{
-						var parentNode:PhysicalNode = nodeNameDictionary[obj.parentName];
-						parentNode.subNodes.push(obj.subNode);
-						obj.subNode.subNodeOf = parentNode;
-					}
-					
-					myState = LINK_PARSE;
-					myIndex = 0;
-					return;
-				}
-				
-				var p:XML = nodes[fullIdx];
+			var startTime:Date = new Date();
+			var idx:int = 0;
+			
+			while(myIndex < nodes.length()) {
+				var p:XML = nodes[myIndex];
 				
 				// Get location info
 				var nodeName : QName = new QName(gm.Rspec.namespace(), "location");
@@ -218,22 +204,34 @@ package protogeni.resources
 				nodeNameDictionary[n.urn] = n;
 				nodeNameDictionary[n.name] = n;
 				gm.AllNodes.push(n);
+				idx++;
+				myIndex++;
+				if(((new Date()).time - startTime.time) > 40) {
+					if(Main.debugMode)
+						trace("Nodes processed:" + idx);
+					return;
+				}
 			}
-			myIndex += idx;
+			
+			// Assign subnodes
+			for each(var obj:Object in subnodeList)
+			{
+				var parentNode:PhysicalNode = nodeNameDictionary[obj.parentName];
+				parentNode.subNodes.push(obj.subNode);
+				obj.subNode.subNodeOf = parentNode;
+			}
+			
+			myState = LINK_PARSE;
+			myIndex = 0;
+			return;
 		}
 		
 		private function parseNextLink():void {
-			var idx:int;
-			for(idx = 0; idx < MAX_WORK; idx++) {
-				var fullIdx:int = myIndex + idx;
-				//main.console.appendText("idx:" + idx.toString() + " full:" + fullIdx.toString());
-				if(fullIdx == links.length()) {
-					myState = DONE;
-					//main.console.appendText("...finished links\n");
-					return;
-				}
-				//main.console.appendText("parsing...");
-				var link:XML = links[fullIdx];
+			var startTime:Date = new Date();
+			var idx:int = 0;
+			
+			while(myIndex < links.length()) {
+				var link:XML = links[myIndex];
 				
 				var nodeName : QName = new QName(gm.Rspec.namespace(), "interface_ref");
 				var temps:XMLList = link.elements(nodeName);
@@ -285,8 +283,17 @@ package protogeni.resources
 				}
 				
 				gm.AllLinks.push(l);
+				idx++;
+				myIndex++;
+				if(((new Date()).time - startTime.time) > 40) {
+					if(Main.debugMode)
+						trace("Links processed:" + idx);
+					return;
+				}
 			}
-			myIndex += idx;
+			
+			myState = DONE;
+			return;
 		}
 		
 		public function processSliverRspec(s:Sliver):void

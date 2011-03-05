@@ -233,11 +233,8 @@
 			
 			public function reinit():void
 			{
-				if(Main.geniHandler != null) {
-					Main.geniHandler.requestHandler.pause();
-					Main.geniHandler.requestHandler.clearAll();
-					Main.geniHandler.removeHandlers();
-				}
+				if(Main.geniHandler != null)
+					Main.geniHandler.destroy();
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
 				//loadParams();

@@ -19,7 +19,6 @@
 	 import protogeni.communication.GeniRequestHandler;
 	 import protogeni.display.DisplayUtil;
 	 import protogeni.display.mapping.GeniMapHandler;
-	 import protogeni.display.mapping.GeniMapHandler2;
 	 import protogeni.resources.GeniManager;
 	 import protogeni.resources.GeniManagerCollection;
 	 import protogeni.resources.PhysicalLink;
@@ -39,7 +38,7 @@
 		public var requestHandler:GeniRequestHandler;
 		
 		[Bindable]
-		public var mapHandler:GeniMapHandler;
+		public var mapHandler:protogeni.display.mapping.GeniMapHandler;
 		
 		[Bindable]
 		public var CurrentUser:User;
@@ -63,7 +62,7 @@
 		public function GeniHandler()
 		{
 			requestHandler = new GeniRequestHandler();
-			mapHandler = new GeniMapHandler(Main.Application().map);
+			mapHandler = new protogeni.display.mapping.GeniMapHandler(Main.Application().map);
 			GeniManagers = new GeniManagerCollection();
 			CurrentUser = new User();
 			unauthenticatedMode = true;
@@ -90,6 +89,13 @@
 			Main.geniDispatcher.dispatchQueueChanged();
 			
 			Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
+		}
+		
+		public function destroy():void {
+			mapHandler.destruct();
+			requestHandler.pause();
+			requestHandler.clearAll();
+			removeHandlers();
 		}
 		
 		public function removeHandlers():void {

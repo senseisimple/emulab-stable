@@ -39,6 +39,7 @@ package protogeni.display.mapping
 			// Single marker
 			if(o is PhysicalNodeGroup)
 			{
+				cluster = [o];
 				var nodeGroup:PhysicalNodeGroup = o as PhysicalNodeGroup;
 				totalNodes = nodeGroup.collection.length;
 				var groupInfo:PhysicalNodeGroupInfo = new PhysicalNodeGroupInfo();
@@ -101,9 +102,9 @@ package protogeni.display.mapping
 			// Cluster marker
 			else if(o is Array)
 			{
-				var clusters:Array = o as Array;
-				var type:int = (clusters[0] as GeniMapMarker).nodeGroups.GetType();
-				for each(var m:GeniMapMarker in clusters) {
+				cluster = o as Array;
+				var type:int = (cluster[0] as GeniMapMarker).nodeGroups.GetType();
+				for each(var m:GeniMapMarker in cluster) {
 					totalNodes += m.nodeGroups.GetAll().length;
 					if(type != m.nodeGroups.GetType())
 						type = -1;
@@ -139,5 +140,6 @@ package protogeni.display.mapping
 		public var nodeGroups:PhysicalNodeGroupCollection;
 		public var info:DisplayObject;
 		public var added:Boolean = false;
+		public var cluster:Array;
 	}
 }

@@ -137,6 +137,31 @@ package protogeni
 		return false;
 	}
 	
+	public static function areEqual(a:Array,b:Array):Boolean {
+		if(a.length != b.length) {
+			return false;
+		}
+		var len:int = a.length;
+		for(var i:int = 0; i < len; i++) {
+			if(a[i] !== b[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public static function haveSame(a:Array,b:Array):Boolean {
+		if(a.length != b.length)
+			return false;
+		
+		var len:int = a.length;
+		for(var i:int = 0; i < len; i++) {
+			if(b.indexOf(a[i]) == -1)
+				return false;
+		}
+		return true;
+	}
+	
 	// Shortens the given string to a length, taking out from the middle
 	public static function shortenString(phrase : String, size : int) : String {
 		// Remove any un-needed elements

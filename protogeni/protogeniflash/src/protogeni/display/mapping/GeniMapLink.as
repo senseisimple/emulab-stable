@@ -1,12 +1,15 @@
 package protogeni.display.mapping
 {
 	import com.google.maps.LatLng;
+	import com.google.maps.PaneId;
 	import com.google.maps.overlays.Polyline;
 	import com.google.maps.overlays.PolylineOptions;
 	import com.google.maps.styles.StrokeStyle;
 	
 	import flash.events.Event;
 	import flash.events.MouseEvent;
+	
+	import mx.core.FlexGlobals;
 	
 	import protogeni.Util;
 	import protogeni.display.DisplayUtil;

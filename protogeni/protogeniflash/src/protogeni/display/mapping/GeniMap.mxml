@@ -19,9 +19,13 @@
 			import com.google.maps.MapOptions;
 			import com.google.maps.MapType;
 			import com.google.maps.MapZoomEvent;
+			import com.google.maps.PaneId;
 			import com.google.maps.controls.ZoomControl;
+			import com.google.maps.interfaces.IPane;
+			import com.google.maps.interfaces.IPaneManager;
 			
 			public var ready:Boolean;
+			public var linkPane:IPane
 			
 			private function onMapPreinitialize(event:Event):void {
 				var myMapOptions:MapOptions = new MapOptions();
@@ -62,6 +66,14 @@
 				addControl(new ZoomControl());
 				enableScrollWheelZoom();
 				enableContinuousZoom();
+				
+				
+				
+				// Create a new pane lying immediately below the marker pane.
+				var manager:IPaneManager = this.getPaneManager();
+				var markerPane:IPane = manager.getPaneById(PaneId.PANE_MARKER);
+				var markerIndex:int = manager.getPaneIndex(markerPane);
+				linkPane = manager.createPane(2);
 				
 				addEventListener(MapZoomEvent.ZOOM_CHANGED, afterMove);
 				ready = true;

@@ -2,68 +2,60 @@ package protogeni.display.mapping
 {
 	import com.google.maps.LatLng;
 	import com.google.maps.LatLngBounds;
-	import com.google.maps.PaneId;
-	import com.google.maps.interfaces.IPane;
-	import com.google.maps.overlays.Marker;
-	import com.google.maps.overlays.MarkerOptions;
-	import com.google.maps.overlays.Polyline;
-	import com.google.maps.overlays.PolylineOptions;
-	import com.google.maps.styles.FillStyle;
-	import com.google.maps.styles.StrokeStyle;
 	
 	import flash.events.Event;
-	import flash.events.MouseEvent;
-	import flash.events.TimerEvent;
 	import flash.utils.Timer;
 	
 	import mx.collections.ArrayCollection;
+	import mx.core.FlexGlobals;
 	
+	import protogeni.GeniEvent;
 	import protogeni.Util;
-	import protogeni.display.DisplayUtil;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.Slice;
-	import protogeni.resources.Sliver;
-	import protogeni.resources.VirtualInterface;
-	import protogeni.resources.VirtualLink;
 	import protogeni.resources.VirtualNode;
-	
-	// Handles adding all the ProtoGENI info to the Google Map component
+
 	public class GeniMapHandler
 	{
 		public var map:GeniMap;
 		
-		// Timer used to limit frequency of redraws
-		private var t:Timer;
-		
-		public function GeniMapHandler(attachMap:GeniMap)
-		{
-			map = attachMap;
-			t = new Timer(1000, 1); // Draw at most once a second
-			t.addEventListener(TimerEvent.TIMER, timerHandler);
-		}
-		
-		private var markers:Array;
-		private var attachedMarkers:Vector.<GeniMapMarker>;
-		private var clusterer:Clusterer;
-		private var linkLineOverlays:Vector.<Polyline>;
-		private var linkLabelOverlays:Vector.<TooltipOverlay>;
-		
-		//private var nodeGroupClusters:ArrayCollection;		
+		public var nodeGroupMarkers:Array = [];
+		private var linkMarkers:Vector.<GeniMapLink> = new Vector.<GeniMapLink>();
+		private var nodeGroupClusterMarkers:ArrayCollection = new ArrayCollection();
 		
 		public var userResourcesOnly:Boolean = false;
 		public var selectedSlice:Slice = null;
 		
+		public function GeniMapHandler(newMap:GeniMap)
+		{
+			map = newMap;
+			Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, managerChanged);
+		}
+		
+		public function destruct():void {
+			clearAll();
+			Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, managerChanged);
+		}
+		
+		public function clearAll():void {
+			map.clearOverlays();
+			nodeGroupMarkers = [];
+			linkMarkers = new Vector.<GeniMapLink>();
+			nodeGroupClusterMarkers = new ArrayCollection();
+		}
+		
+		// If nothing given, gives bounds for all resources
 		public static function getBounds(a:Array = null):LatLngBounds
 		{
 			var coords:Array;
 			if(a == null) {
 				coords = new Array();
-				for each(var m:GeniMapMarker in Main.geniHandler.mapHandler.markers)
-				coords.push(m.getLatLng());
+				for each(var m:GeniMapMarker in Main.geniHandler.mapHandler.nodeGroupMarkers)
+					coords.push(m.getLatLng());
 			} else
 				coords = a;
 			
@@ -90,158 +82,19 @@ package protogeni.display.mapping
 			return new LatLngBounds(new LatLng(s,w), new LatLng(n,e));
 		}
 		
-		public function zoomToPhysicalNode(n:PhysicalNode):void
+		public function zoomToPhysicalNode(n:PhysicalNode, zoom:Boolean = false):void
 		{
 			map.panTo(new LatLng(n.GetLatitude(), n.GetLongitude()));
 		}
 		
-		private function addNodeGroupMarker(g:PhysicalNodeGroup):void
-		{
-			// Create the group to be drawn
-			var drawGroup:PhysicalNodeGroup = new PhysicalNodeGroup(g.latitude, g.longitude, g.country, g.owner);
-			if(userResourcesOnly) {
-				for each(var n:PhysicalNode in g.collection) {
-					for each(var vn:VirtualNode in n.virtualNodes)
-					{
-						if(vn.slivers[0].slice == selectedSlice)
-						{
-							drawGroup.Add(n);
-							break;
-						}
-					}
-				}
-			} else {
-				drawGroup = g;
-			}
-			
-			if(drawGroup.collection.length > 0) {
-				markers.push(new GeniMapMarker(g));
-			} else {
-				// Draw an empty marker
-				var nonodes:Marker = new Marker(
-					new LatLng(g.latitude, g.longitude),
-					new MarkerOptions({
-						strokeStyle: new StrokeStyle({color: 0x666666}),
-						fillStyle: new FillStyle({color: 0xCCCCCC, alpha: .8}),
-						radius: 8,
-						hasShadow: false
-					}));
-				
-				map.addOverlay(nonodes);
-			}
-		}
-		
-		public function addPhysicalLink(lg:PhysicalLinkGroup):void {
-			// Create the group to be drawn
-			var drawGroup:PhysicalLinkGroup = lg;
-			for each(var v:PhysicalLink in drawGroup.collection)
-			{
-				if(v.rspec.toXMLString().indexOf("ipv4") > -1)
-				{
-					//Main.log.appendText("Skipped");
-					return;
-				}
-			}
-			
-			if(drawGroup.collection.length > 0 && !userResourcesOnly) {
-				// Add line
-				var polyline:Polyline = new Polyline([
-					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
-					new LatLng(drawGroup.latitude2, drawGroup.longitude2)
-				], new PolylineOptions({ strokeStyle: new StrokeStyle({
-					color: DisplayUtil.linkBorderColor,
-					thickness: 4,
-					alpha:1})
-				}));
-				
-				map.addOverlay(polyline);
-				linkLineOverlays.push(polyline);
-				
-				// Add link marker
-				if(map.getZoom() < 4)
-					return;
-				var ll:LatLng = new LatLng((drawGroup.latitude1 + drawGroup.latitude2)/2, (drawGroup.longitude1 + drawGroup.longitude2)/2);
-				
-				var t:TooltipOverlay = new TooltipOverlay(ll, Util.kbsToString(drawGroup.TotalBandwidth()), DisplayUtil.linkBorderColor, DisplayUtil.linkColor);
-				t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
-					e.stopImmediatePropagation();
-					DisplayUtil.viewPhysicalLinkGroup(drawGroup)
-				});
-				
-				map.addOverlay(t);
-				linkLabelOverlays.push(t);
-			} else {
-				// Add line
-				var blankline:Polyline = new Polyline([
-					new LatLng(drawGroup.latitude1, drawGroup.longitude1),
-					new LatLng(drawGroup.latitude2, drawGroup.longitude2)
-				], new PolylineOptions({ strokeStyle: new StrokeStyle({
-					color: 0x666666,
-					thickness: 3,
-					alpha:.8})
-				}));
-				
-				map.addOverlay(blankline);
-			}
-		}
-		
-		public function addVirtualLink(pl:VirtualLink):void {
-			// Add line
-			var backColor:Object = DisplayUtil.linkColor;
-			var borderColor:Object = DisplayUtil.linkBorderColor;
-			if(pl.type == "tunnel")
-			{
-				backColor = DisplayUtil.tunnelColor;
-				borderColor = DisplayUtil.tunnelBorderColor;
-			}
-			
-			var current:int = 0;
-			var node1:PhysicalNode = (pl.interfaces[pl.interfaces.length - 1] as VirtualInterface).virtualNode.physicalNode;
-			while(current != pl.interfaces.length - 1)
-			{
-				var node2:PhysicalNode = (pl.interfaces[current] as VirtualInterface).virtualNode.physicalNode;
-				
-				if(node1.owner == node2.owner)
-				{
-					node1 = node2;
-					current++;
-					if(current == pl.interfaces.length)
-						current = 0;
-					continue;
-				}
-				
-				var firstll:LatLng = new LatLng(node1.GetLatitude(), node1.GetLongitude());
-				var secondll:LatLng = new LatLng(node2.GetLatitude(), node2.GetLongitude());
-				
-				var polyline:Polyline = new Polyline([
-					firstll,
-					secondll
-				], new PolylineOptions({ strokeStyle: new StrokeStyle({
-					color: borderColor,
-					thickness: 4,
-					alpha:1})
-				}));
-				
-				map.addOverlay(polyline);
-				linkLineOverlays.push(polyline);
-				
-				// Add point link marker
-				var ll:LatLng = new LatLng((firstll.lat() + secondll.lat())/2, (firstll.lng() + secondll.lng())/2);
-				
-				var t:TooltipOverlay = new TooltipOverlay(ll, Util.kbsToString(pl.bandwidth), borderColor, backColor);
-				t.addEventListener(MouseEvent.CLICK, function(e:Event):void {
-					e.stopImmediatePropagation();
-					DisplayUtil.viewVirtualLink(pl)
-				});
-				
-				map.addOverlay(t);
-				linkLabelOverlays.push(t);
-				
-				node1 = node2;
-				current++;
-				if(current == pl.interfaces.length)
-					current = 0;
-			}
+		// Push any managers to be drawn
+		public var changingManagers:Vector.<GeniManager> = new Vector.<GeniManager>();
+		public function managerChanged(event:GeniEvent):void {
+			if(event.action != GeniEvent.ACTION_POPULATED)
+				return;
+
+			this.changingManagers.push(event.changedObject);
+			this.drawMap();
 		}
 		
 		public function drawAll():void {
@@ -249,60 +102,154 @@ package protogeni.display.mapping
 			Main.Application().fillCombobox();
 		}
 		
-		public var drawAfter:Boolean = false;
 		public function drawMap(junk:* = null):void {
-			if(!t.running) {
-				drawMapNow();
-				drawAfter = false;
-				t.start();
-			} else
-				drawAfter = true;
-			//else
-			//	Main.log.appendMessage(new LogMessage("", "Skipping drawing map"));
+			drawMapNow();
 		}
 		
-		public function timerHandler(event:TimerEvent):void {
-			if(drawAfter) {
-				drawMapNow();
-				drawAfter = false;
-			}
-			t.reset();
-		}
+		private static var LINK_ADD : int = 0;
+		private static var NODE_ADD : int = 1;
+		private static var CLUSTER : int = 2;
+		private static var CLUSTER_ADD : int = 3;
+		private static var DONE : int = 4;
 		
+		private static var MAX_WORK : int = 10;// 15;
+		
+		public var myIndex:int;
+		public var myState:int;
+		public var drawing:Boolean = false;
+		public var drawAfter:Boolean = false;
+		
+		// Create cluster nodes and show/hide components
 		public function drawMapNow():void {
 			//Main.log.appendMessage(new LogMessage("", "Drawing map"));
 			
 			if(!map.ready)
 				return;
 			
+			if(drawing) {
+				drawAfter = true;
+				return;
+			}
+			
+			drawing = true;
+			if(changingManagers.length > 0 )
+				myState = LINK_ADD;
+			else
+				myState = CLUSTER;
+			FlexGlobals.topLevelApplication.stage.addEventListener(Event.ENTER_FRAME, drawNext);
+		}
+		
+		public function drawNext(event:Event):void {
+			
 			var startTime:Date = new Date();
 			
-			map.closeInfoWindow();
-			map.clearOverlays();
+			if(myState == LINK_ADD) {
+				drawNextLink();
+				if(Main.debugMode)
+					trace("MapDrawL " + String((new Date()).time - startTime.time));
+			} else if(myState == NODE_ADD) {
+				drawNextNode();
+				if(Main.debugMode)
+					trace("MapDrawN " + String((new Date()).time - startTime.time));
+			} else if(myState == CLUSTER) {
+				doCluster();
+				if(Main.debugMode)
+					trace("MapDrawC " + String((new Date()).time - startTime.time));
+			} else if(myState == CLUSTER_ADD) {
+				drawCluster();
+				if(Main.debugMode)
+					trace("MapDrawCa " + String((new Date()).time - startTime.time));
+			} else if(myState == DONE) {
+				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, drawNext);
+				drawing = false;
+				if(drawAfter) {
+					drawAfter = false;
+					drawMap();
+				}
+			}
+		}
+		
+		public function drawNextLink():void {
+			var idx:int = 0;
+			var gm:GeniManager = changingManagers[0];
 			
-			linkLabelOverlays = new Vector.<TooltipOverlay>();
-			linkLineOverlays = new Vector.<Polyline>();
-			markers = [];
+			var startTime:Date = new Date();
 			
-			// Draw physical components
-			for each(var gm:GeniManager in Main.geniHandler.GeniManagers)
-			{
-				if(!gm.Show)
-					continue;
-				
-				// Links
-				for each(var l:PhysicalLinkGroup in gm.Links.collection) {
-					if(!l.IsSameSite()) {
-						addPhysicalLink(l);
+			while(myIndex < gm.Links.collection.length) {
+				var linkGroup:PhysicalLinkGroup = gm.Links.collection.getItemAt(myIndex) as PhysicalLinkGroup;
+				var add:Boolean = !linkGroup.IsSameSite();
+				if(add) {
+					for each(var v:PhysicalLink in linkGroup.collection)
+					{
+						if(v.rspec.toXMLString().indexOf("ipv4") > -1)
+						{
+							add = false;
+							break;
+						}
 					}
 				}
 				
-				// Nodes
-				for each(var g:PhysicalNodeGroup in gm.Nodes.collection) {
-					addNodeGroupMarker(g);
+				if(add) {
+					var gml:GeniMapLink = new GeniMapLink(linkGroup);
+					linkMarkers.push(gml);
+					map.addOverlay(gml.polyline);
+					map.addOverlay(gml.label);
+					gml.added = true;
 				}
+				
+				idx++
+				myIndex++;
+				if(((new Date()).time - startTime.time) > 60) {
+					if(Main.debugMode)
+						trace("Links added:" + idx);
+					return;
+				}
+				//if(idx == MAX_WORK)
+				//	return;
 			}
 			
+			myState = NODE_ADD;
+			myIndex = 0;
+			return;
+		}
+		
+		public function drawNextNode():void {
+			
+			var startTime:Date = new Date();
+			
+			var idx:int = 0;
+			var gm:GeniManager = changingManagers[0];
+			
+			while(myIndex < gm.Nodes.collection.length) {
+				var nodeGroup:PhysicalNodeGroup = gm.Nodes.collection.getItemAt(myIndex) as PhysicalNodeGroup;
+				if(nodeGroup.collection.length > 0) {
+					var gmm:GeniMapMarker = new GeniMapMarker(nodeGroup);
+					map.addOverlay(gmm)
+					nodeGroupMarkers.push(gmm);
+					gmm.added = true;
+				}
+				idx++
+				myIndex++;
+				if(((new Date()).time - startTime.time) > 60) {
+					if(Main.debugMode)
+						trace("Nodes added:" + idx);
+					return;
+				}
+				//if(idx == MAX_WORK)
+				//	return;
+			}
+			
+			changingManagers = changingManagers.slice(1);
+			if(changingManagers.length>0) {
+				myState = LINK_ADD;
+				myIndex = 0;
+				return;
+			}
+			
+			myState = CLUSTER;
+			myIndex = 0;
+			
+			/*
 			if(userResourcesOnly && selectedSlice != null && selectedSlice.Status() != null) {
 				// Draw virtual links
 				for each(var sliver:Sliver in selectedSlice.slivers)
@@ -314,26 +261,81 @@ package protogeni.display.mapping
 					}	    			
 				}
 			}
+			*/
+		}
+		
+		private var clustersToAdd:ArrayCollection;
+		public function doCluster():void {
 			
 			// Cluster node groups close to each other
-			var marker:GeniMapMarker;
-			clusterer = new Clusterer(markers, map.getZoom(), 35);
-			attachedMarkers = new Vector.<GeniMapMarker>();
+			var clusterer:Clusterer = new Clusterer(nodeGroupMarkers, map.getZoom(), 40);
 			var clusteredMarkers:Array = clusterer.clusters;
+			clustersToAdd = new ArrayCollection();
 			
-			for each (var cluster:Array in clusteredMarkers) {
-				if (cluster.length == 1) {
-					// there is only a single marker in this cluster
-					marker = cluster[0];
-				} else {
-					marker = new GeniMapMarker(cluster);
+			// Show group markers that should be shown now, hide those that shouldn't
+			for each(var newArray:Array in clusteredMarkers) {
+				var shouldShow:Boolean = newArray.length == 1;
+				if(!shouldShow)
+					clustersToAdd.addItem(newArray);
+				for each(var newMarker:GeniMapMarker in newArray) {
+					if(shouldShow && !newMarker.visible)
+						newMarker.show();
+					else if(!shouldShow && newMarker.visible)
+						newMarker.hide();
 				}
-				map.addOverlay(marker);
-				attachedMarkers.push(marker);
 			}
 			
-			if(Main.debugMode)
-				LogHandler.appendMessage(new LogMessage("", "Draw " + String((new Date()).time - startTime.time)));
+			// Remove markers no longer used
+			for(var i:int = 0; i < nodeGroupClusterMarkers.length; i++) {
+				var oldMarker:GeniMapMarker = this.nodeGroupClusterMarkers.getItemAt(i) as GeniMapMarker;
+				var found:Boolean = false;
+				for(var j:int = 0; j < clustersToAdd.length; j++) {
+					var newMarkerArray:Array = clustersToAdd.getItemAt(j) as Array;
+					if(Util.haveSame(newMarkerArray, oldMarker.cluster)) {
+						found = true;
+						clustersToAdd.removeItemAt(j);	// remove markers which will stay from the create array
+						break;
+					}
+				}
+				if(!found) {
+					this.map.removeOverlay(oldMarker);
+					this.nodeGroupClusterMarkers.removeItemAt(i);
+					i--;
+				}
+			}
+			
+			if(clusteredMarkers == null)
+				myState = DONE;
+			else {
+				myIndex = 0;
+				myState = CLUSTER_ADD;
+			}
+		}
+		
+		
+		public function drawCluster():void {
+			var idx:int = 0;
+			
+			var startTime:Date = new Date();
+
+			while(myIndex < clustersToAdd.length) {
+				var cluster:Array = clustersToAdd.getItemAt(myIndex) as Array;
+				var marker:GeniMapMarker = new GeniMapMarker(cluster);
+				map.addOverlay(marker);
+				nodeGroupClusterMarkers.addItem(marker);
+				idx++;
+				myIndex++;
+				if(((new Date()).time - startTime.time) > 60) {
+					if(Main.debugMode)
+						trace("Clusters added:" + idx);
+					return;
+				}
+				//if(idx == MAX_WORK)
+				//	return;
+			}
+			clustersToAdd = null;
+
+			myState = DONE;
 		}
 	}
 }

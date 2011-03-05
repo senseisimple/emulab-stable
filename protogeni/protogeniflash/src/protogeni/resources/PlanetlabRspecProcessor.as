@@ -96,14 +96,10 @@ package protogeni.resources
 		}
 		
 		private function parseNextNode():void {
-			var processedNodes:int = 0;
-			if(myIndex == 90)
-				myIndex = 90;
-			while(processedNodes < MAX_WORK) {
-				if(myIndex == sites.length()) {
-					myState = DONE;
-					return;
-				}
+			var idx:int = 0;
+			var startTime:Date = new Date();
+			
+			while(myIndex < sites.length()) {
 				var s:XML = sites[myIndex];
 				var site:Site = new Site();
 				site.id = s.@id;
@@ -136,12 +132,20 @@ package protogeni.resources
 					node.tag = site;
 					node.available = true;
 					node.exclusive = false;
-					processedNodes++;
+					idx++;
 					gm.AllNodes.push(node);
 					site.nodes.addItem(node);
 				}
 				myIndex++;
+				if(((new Date()).time - startTime.time) > 40) {
+					if(Main.debugMode)
+						trace("Links processed:" + idx);
+					return;
+				}
 			}
+			
+			myState = DONE;
+			return;
 		}
 		
 		public function processSliverRspec(s:Sliver):void
