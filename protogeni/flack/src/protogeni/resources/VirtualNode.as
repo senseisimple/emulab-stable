@@ -19,6 +19,55 @@
 	// Node allocated into a sliver/slice which has a physical node underneath
 	public class VirtualNode
 	{
+		public static const STATUS_CHANGING:String = "changing";
+		public static const STATUS_READY:String = "ready";
+		public static const STATUS_NOTREADY:String = "notready";
+		public static const STATUS_FAILED:String = "failed";
+		public static const STATUS_UNKOWN:String = "unknown";
+		
+		[Bindable]
+		public var physicalNode:PhysicalNode;
+		public var _exclusive:Boolean;
+		[Bindable]
+		public var clientId:String;
+		[Bindable]
+		public var sliverId:String;
+		public var manager:GeniManager;
+		public var superNode:VirtualNode;
+		public var subNodes:Array = new Array();
+		
+		[Bindable]
+		public var interfaces:VirtualInterfaceCollection;
+		public var links:ArrayCollection = new ArrayCollection();
+		
+		[Bindable]
+		public var slivers:SliverCollection;
+		
+		[Bindable]
+		public var error:String;
+		[Bindable]
+		public var state:String = "N/A";
+		[Bindable]
+		public var status:String = "N/A";
+		
+		public var flackX:int = -1;
+		public var flackY:int = -1;
+		
+		public var rspec:XML;
+		
+		public var sliverType:String;
+		
+		public var installServices:Vector.<InstallService> = new Vector.<InstallService>();
+		public var executeServices:Vector.<ExecuteService> = new Vector.<ExecuteService>();
+		public var loginServices:Vector.<LoginService> = new Vector.<LoginService>();
+		
+		// Depreciated
+		public var virtualizationType:String = "emulab-vnode";
+		public var virtualizationSubtype:String = "emulab-openvz";
+		public var uuid:String;
+		[Bindable]
+		public var diskImage:String = "";
+		
 		public function VirtualNode(owner:Sliver)
 		{
 			slivers = new SliverCollection();
@@ -29,102 +78,32 @@
 			}
 				
 			interfaces = new VirtualInterfaceCollection();
+			// depreciated for v2
 			var controlInterface:VirtualInterface = new VirtualInterface(this);
 			controlInterface.id = "control";
-			controlInterface.role = PhysicalNodeInterface.CONTROL;
-			controlInterface.isVirtual = true;
 			interfaces.Add(controlInterface);
 		}
 		
-		[Bindable]
-		public var physicalNode:PhysicalNode;
+		public function get Exclusive():Boolean {
+			return _exclusive;
+		}
 		
-		[Bindable]
-		public var id:String;
-		
-		[Bindable]
-		public var virtualizationType:String = "emulab-vnode";
-		
-		[Bindable]
-		public var virtualizationSubtype:String = "emulab-openvz";
-		
-		// Component
-		public var manager:GeniManager;
-		
-		[Bindable]
-		public var urn:String;
-		public var uuid:String;
-		public var isVirtual:Boolean;
-		public var isShared:Boolean;
-		public var superNode:VirtualNode;
-		public var subNodes:Array = new Array();
-		
-		[Bindable]
-		public var diskImage:String = "";
-		public var tarfiles:String = "";
-		public var startupCommand:String = "";
-		
-		[Bindable]
-		public var interfaces:VirtualInterfaceCollection;
-		public var links:ArrayCollection = new ArrayCollection();
-		
-		public var rspec:XML;
-		
-		[Bindable]
-		public var slivers:SliverCollection;
-		[Bindable]
-		public var hostname:String;
-		public var sshdport:String;
-		
-		[Bindable]
-		public var error:String;
-		[Bindable]
-		public var state:String;
-		[Bindable]
-		public var status:String;
-		
-		public static var STATUS_CHANGING:String = "changing";
-		public static var STATUS_READY:String = "ready";
-		public static var STATUS_NOTREADY:String = "notready";
-		public static var STATUS_FAILED:String = "failed";
-		public static var STATUS_UNKOWN:String = "unknown";
+		public function set Exclusive(value:Boolean):void {
+			_exclusive = value;
+			// TODO: support more
+			if(_exclusive)
+				sliverType = "raw-pc";
+			else
+				sliverType = "emulab-openvz";
+		}
 		
 		public function setToPhysicalNode(node:PhysicalNode):void
 		{
 			physicalNode = node;
-			id = node.name;
+			clientId = node.name;
 			manager = node.manager;
-			urn = node.urn;
-			isVirtual = false;
-			isShared = !node.exclusive;
-			// deal with rest
-		}
-		
-		public function setToVirtualNode(virtualName:String,
-										 virtualManager:GeniManager,
-										 virtualUrn:String,
-										 newIsShared:Boolean):void
-		{
-			id = virtualName;
-			manager = virtualManager;
-			urn = virtualUrn;
-			superNode = null;
-			isVirtual = true;
-			isShared = newIsShared;
-			// deal with rest
-		}
-		
-		public function getDiskImageShort():String
-		{
-			if(diskImage.indexOf("urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//") > -1)
-				return diskImage.replace("urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//", "");
-			else
-				return diskImage;
-		}
-		
-		public function setDiskImageFromOSID(osid:String):void
-		{
-			this.diskImage = "urn:publicid:IDN+" + this.manager.Authority + "+image+emulab-ops//" + osid;
+			sliverId = node.id;
+			Exclusive = node.exclusive;
 		}
 		
 		public function setDiskImage(img:String):void
@@ -134,7 +113,7 @@
 				if(img.length > 3 && img.substr(0, 3) == "urn")
 					this.diskImage = img;
 				else
-					this.setDiskImageFromOSID(img);
+					this.diskImage = DiskImage.getDiskImageLong(img, this.manager);
 			} else
 				this.diskImage = "";
 			
@@ -142,39 +121,41 @@
 		
 		public function allocateInterface():VirtualInterface
 		{
-			if(isVirtual)
+			if(!IsBound())
 			{
 				var newVirtualInterface:VirtualInterface = new VirtualInterface(this);
-				newVirtualInterface.id = this.id + ":if" + this.interfaces.collection.length;
-				newVirtualInterface.role = PhysicalNodeInterface.EXPERIMENTAL;
+				newVirtualInterface.id = this.clientId + ":if" + this.interfaces.collection.length;
+				//newVirtualInterface.role = PhysicalNodeInterface.ROLE_EXPERIMENTAL;
 				newVirtualInterface.bandwidth = 100000;
-				newVirtualInterface.isVirtual = true;
+				//newVirtualInterface.isVirtual = true;
 				return newVirtualInterface;
 			} else {
 				for each (var candidate:PhysicalNodeInterface in physicalNode.interfaces.collection)
 				{
-					if (candidate.role == PhysicalNodeInterface.EXPERIMENTAL)
+					if (candidate.role == PhysicalNodeInterface.ROLE_EXPERIMENTAL)
 					{
 						var success:Boolean = true;
 						for each (var check:VirtualInterface in interfaces)
 						{
-							if(!check.isVirtual && check.physicalNodeInterface == candidate)
+							if(check.IsBound() && check.physicalNodeInterface == candidate)
 								success = false;
 								break;
 						}
 						if(success)
 						{
 							var newPhysicalInterface:VirtualInterface = new VirtualInterface(this);
-							newPhysicalInterface.isVirtual = false;
-							newPhysicalInterface.id = this.id + ":if" + this.interfaces.collection.length;
-							newPhysicalInterface.role = candidate.role;
 							newPhysicalInterface.physicalNodeInterface = candidate;
+							newPhysicalInterface.id = this.clientId + ":if" + this.interfaces.collection.length;
 							return newPhysicalInterface;
 						}
 					}
 				}
 			}
 			return null;
+		}
+		
+		public function IsBound():Boolean {
+			return physicalNode != null;
 		}
 		
 		// Gets all connected physical nodes
@@ -184,8 +165,8 @@
 				for each(var nodeLink:VirtualLink in nodeInterface.virtualLinks) {
 					for each(var nodeLinkInterface:VirtualInterface in nodeLink.interfaces)
 					{
-						if(nodeLinkInterface != nodeInterface && !ac.contains(nodeLinkInterface.virtualNode.physicalNode))
-							 ac.addItem(nodeLinkInterface.virtualNode.physicalNode);
+						if(nodeLinkInterface != nodeInterface && !ac.contains(nodeLinkInterface.owner.physicalNode))
+							 ac.addItem(nodeLinkInterface.owner.physicalNode);
 					}
 				}
 			}
@@ -210,7 +191,7 @@
 			for each(var i:VirtualInterface in interfaces) {
 				for each(var l:VirtualLink in i.virtualLinks) {
 					for each(var nl:VirtualInterface in l.interfaces) {
-						if(nl != i && nl.virtualNode.physicalNode == n && !ac.contains(l)) {
+						if(nl != i && nl.owner.physicalNode == n && !ac.contains(l)) {
 							ac.addItem(l);
 						}
 					}
@@ -225,7 +206,7 @@
 			for each(var i:VirtualInterface in interfaces.collection) {
 				for each(var l:VirtualLink in i.virtualLinks) {
 					for each(var nl:VirtualInterface in l.interfaces) {
-						if(nl != i && nl.virtualNode == n && !ac.contains(l)) {
+						if(nl != i && nl.owner == n && !ac.contains(l)) {
 							ac.addItem(l);
 						}
 					}

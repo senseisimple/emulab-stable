@@ -20,6 +20,9 @@
 			public var node:VirtualNode;
 			public var links:ArrayCollection = new ArrayCollection();
 			
+			[Bindable]
+			private var currentStyle:String;
+			
 			public var startX:int;
 			public var startY:int;
 			public var canvas:SliceCanvas;
@@ -29,28 +32,28 @@
 				this.toolTip = "";
 				if(node.status == VirtualNode.STATUS_READY)
 				{
-					this.styleName = "validStyle";
+					currentStyle = "validStyle";
 					this.toolTip = node.state;
 				} else if(node.status == VirtualNode.STATUS_FAILED)
 				{
-					this.styleName = "failedStyle";
+					currentStyle = "failedStyle";
 					this.toolTip = "Error: " + node.error;
 				} else {
 					if(node.state == null || node.status == null ||
 						(node.state.length == 0 && node.status.length == 0))
 					{
-						toolTip = "Name: " + node.id;
-						if(node.urn != null && node.urn.length > 0)
-							toolTip += "\nURN: " + node.urn;
+						toolTip = "Name: " + node.clientId;
+						if(node.sliverId != null && node.sliverId.length > 0)
+							toolTip += "\nURN: " + node.sliverId;
 						if(node.manager != null)
 							toolTip += "\nManager: " + node.manager.Hrn;
 					}
 					else
 						toolTip = "State: " + node.state + " Status: " + node.status;
 					if(node.status == VirtualNode.STATUS_CHANGING)
-						this.styleName = "inprogressStyle";
+						currentStyle = "inprogressStyle";
 					else
-						this.styleName = "unknownStyle";
+						currentStyle = "unknownStyle";
 				}
 				adjustWidth();
 			}
@@ -58,7 +61,7 @@
 			public function setNode(n:VirtualNode):void
 			{
 				node = n;
-				lastId = n.id;
+				lastId = n.clientId;
 				resetToStatus();
 				adjustWidth();
 			}
@@ -80,7 +83,7 @@
 			public function showInfo(event:MouseEvent):void
 			{
 				event.stopImmediatePropagation();
-				DisplayUtil.viewVirtualNode(node);
+				DisplayUtil.viewSliceNode(this);
 			}
 			
 			public function remove(event:MouseEvent):void
@@ -129,6 +132,8 @@
 				
 				this.x = finalX - (this.width/2);
 				this.y = finalY - (this.height/2);
+				this.node.flackX = this.x;
+				this.node.flackY = this.y;
 			}
 			
 			public function getMiddleX():int
@@ -146,9 +151,9 @@
 	
 	<display:ImageButton id="removeButton" icon="{ImageUtil.crossIcon}"
 						  mouseDown="remove(event)" />
-	<display:ImageButton id="infoButton" icon="@Embed('../../../images/information.png')"
+	<display:ImageButton id="infoButton" icon="{ImageUtil.infoIcon}"
 						  mouseDown="showInfo(event)" />
-	<s:Label id="nameLabel" text="{node.id}" width="100%" />
+	<s:Label id="nameLabel" text="{node.clientId}" width="100%" styleName="{currentStyle}" maxDisplayedLines="1" />
 	<display:ImageButton id="addLink" icon="{ImageUtil.addIcon}"
 						  mouseDown="mouseDownHandler(event)" />
 	

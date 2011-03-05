@@ -22,13 +22,15 @@ package protogeni
 
   public class Util
   {
+	  public static const defaultRspecVersion:Number = 0.2;
+	  
 	  public static function showSetup():void
 	  {
-		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup"), "_blank");
+		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlackManual#Setup"), "_blank");
 	  }
 	  public static function showManual():void
 	  {
-		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/MapClientManual"), "_blank");
+		  navigateToURL(new URLRequest("https://www.protogeni.net/trac/protogeni/wiki/FlackManual"), "_blank");
 	  }
 	  
 	  public static function openWebsite(url:String):void

@@ -240,27 +240,36 @@
 					if(node.manager != sliver.manager)
 						continue;
 					var newNode:VirtualNode = new VirtualNode(newSliver);
-					newNode.id = node.id;
-					newNode.virtualizationType = node.virtualizationType;
-					newNode.virtualizationSubtype = node.virtualizationSubtype;
+					newNode.clientId = node.clientId;
 					newNode.physicalNode = node.physicalNode;
 					newNode.manager = node.manager;
-					newNode.urn = node.urn;
-					newNode.uuid = node.uuid;
-					newNode.isShared = node.isShared;
-					newNode.isVirtual = node.isVirtual;
+					newNode.sliverId = node.sliverId;
+					newNode._exclusive = node.Exclusive;
+					newNode.sliverType = node.sliverType;
+					for each(var executeService:ExecuteService in node.executeServices) {
+						newNode.executeServices.push(new ExecuteService(executeService.shell, executeService.command));
+					}
+					for each(var installService:InstallService in node.installServices) {
+						newNode.installServices.push(new InstallService(installService.url, installService.installPath));
+					}
+					for each(var loginService:LoginService in node.loginServices) {
+						newNode.loginServices.push(new LoginService(loginService.authentication, loginService.hostname, loginService.port, loginService.username));
+					}
 					// supernode? add later ...
 					// subnodes? add later ...
 					retrace.push({clone:newNode, old:node});
-					newNode.diskImage = node.diskImage;
-					newNode.tarfiles = node.tarfiles;
-					newNode.startupCommand = node.startupCommand;
-					newNode.hostname = node.startupCommand;
 					newNode.rspec = node.rspec;
-					newNode.sshdport = node.sshdport;
 					newNode.error = node.error;
 					newNode.state = node.state;
 					newNode.status = node.status;
+					newNode.diskImage = node.diskImage;
+					newNode.flackX = node.flackX;
+					newNode.flackY = node.flackY;
+					// depreciated
+					newNode.virtualizationType = node.virtualizationType;
+					newNode.virtualizationSubtype = node.virtualizationSubtype;
+					newNode.uuid = node.uuid;
+					
 					for each(var nodeSliver:Sliver in node.slivers)
 					{
 						newNode.slivers.addIfNotExisting(newSlice.slivers.getByGm(nodeSliver.manager));
@@ -272,11 +281,11 @@
 					{
 						var newVirtualInterface:VirtualInterface = new VirtualInterface(newNode);
 						newVirtualInterface.id = vi.id;
-						newVirtualInterface.role = vi.role;
-						newVirtualInterface.isVirtual = vi.isVirtual;
 						newVirtualInterface.physicalNodeInterface = vi.physicalNodeInterface;
 						newVirtualInterface.bandwidth = vi.bandwidth;
 						newVirtualInterface.ip = vi.ip;
+						newVirtualInterface.mask = vi.mask;
+						newVirtualInterface.type = vi.type;
 						newNode.interfaces.Add(newVirtualInterface);
 						oldInterfaceToCloneInterface[vi] = newVirtualInterface;
 						// links? add later ...
@@ -293,11 +302,11 @@
 					var cloneNode:VirtualNode = check.clone;
 					var oldNode:VirtualNode = check.old;
 					if(oldNode.superNode != null)
-						cloneNode.superNode = newSliver.nodes.getById(oldNode.id);
+						cloneNode.superNode = newSliver.nodes.getById(oldNode.clientId);
 					if(oldNode.subNodes != null && oldNode.subNodes.length > 0)
 					{
 						for each(var subNode:VirtualNode in oldNode.subNodes)
-						cloneNode.subNodes.push(newSliver.nodes.getById(subNode.id));
+						cloneNode.subNodes.push(newSliver.nodes.getById(subNode.clientId));
 					}
 				}
 			}
@@ -310,11 +319,11 @@
 				for each(var link:VirtualLink in sliver.links)
 				{
 					var newLink:VirtualLink = new VirtualLink(newSliver);
-					newLink.id = link.id;
+					newLink.clientId = link.clientId;
 					newLink.type = link.type;
-					newLink.bandwidth = link.bandwidth;
-					newLink.firstTunnelIp = link.firstTunnelIp;
-					newLink.secondTunnelIp = link.secondTunnelIp;
+					//newLink.bandwidth = link.bandwidth;
+					//newLink.firstTunnelIp = link.firstTunnelIp;
+					//newLink.secondTunnelIp = link.secondTunnelIp;
 					newLink.linkType = link.linkType;
 					newLink.rspec = link.rspec;
 					for each(var linkSliver:Sliver in link.slivers)
@@ -324,7 +333,7 @@
 					newLink.secondNode = oldNodeToCloneNode[link.secondNode];
 					
 					// Make sure it wasn't added by another sliver
-					if((newLink.firstNode.slivers[0] as Sliver).links.getById(newLink.id) != null)
+					if((newLink.firstNode.slivers[0] as Sliver).links.getById(newLink.clientId) != null)
 						continue;
 					
 					for each(var i:VirtualInterface in link.interfaces)
@@ -332,7 +341,7 @@
 						var newInterface:VirtualInterface = oldInterfaceToCloneInterface[i];
 						newLink.interfaces.addItem(newInterface);
 						newInterface.virtualLinks.addItem(newLink);
-						newInterface.virtualNode.links.addItem(newLink);
+						newInterface.owner.links.addItem(newLink);
 					}
 					
 					newLink.firstNode.slivers[0].links.addItem(newLink);
@@ -390,9 +399,9 @@
 				{
 					try
 					{
-						if(l.id.substr(0,5) == "link-")
+						if(l.clientId.substr(0,5) == "link-")
 						{
-							var testHighest:int = parseInt(l.id.substring(5));
+							var testHighest:int = parseInt(l.clientId.substring(5));
 							if(testHighest >= highest)
 								highest = testHighest+1;
 						}
@@ -414,7 +423,7 @@
 				{
 					try
 					{
-						var testHighest:int = parseInt(n.id.substring(n.id.lastIndexOf("-")+1));
+						var testHighest:int = parseInt(n.clientId.substring(n.clientId.lastIndexOf("-")+1));
 						if(testHighest >= highest)
 							highest = testHighest+1;
 					} catch(e:Error)
@@ -427,10 +436,10 @@
 				return "node-" + highest;
 			else
 			{
-				if(n.isShared)
-					return "shared-" + highest;
-				else
+				if(n.Exclusive)
 					return "exclusive-" + highest;
+				else
+					return "shared-" + highest;
 			}
 		}
 		

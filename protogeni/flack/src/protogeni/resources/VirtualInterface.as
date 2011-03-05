@@ -19,25 +19,40 @@
 	// Interface on a virtual node
 	public class VirtualInterface
 	{
-		public function VirtualInterface(own:VirtualNode)
+		public static var tunnelNext:int = 1;
+		public static function getNextTunnel():String
 		{
-			virtualNode = own;
+			var first:int = ((tunnelNext >> 8) & 0xff);
+			var second:int = (tunnelNext & 0xff);
+			tunnelNext++;
+			return "192.168." + String(first) + "." + String(second);
 		}
 		
 		[Bindable]
-		public var virtualNode:VirtualNode;
+		public var owner:VirtualNode;
+		public var physicalNodeInterface:PhysicalNodeInterface;
 		
 		[Bindable]
 		public var id:String;
-		public var role:int;
-		public var isVirtual:Boolean;
-
+		
+		// tunnel stuff
 		public var ip:String = "";
+		public var mask:String = ""; // 255.255.255.0
+		public var type:String = ""; //ipv4
 		
 		[Bindable]
 		public var virtualLinks:ArrayCollection = new ArrayCollection();
 		
-		public var physicalNodeInterface:PhysicalNodeInterface;
+		// depreciated
 		public var bandwidth:int = 100000;
+		
+		public function VirtualInterface(own:VirtualNode)
+		{
+			owner = own;
+		}
+		
+		public function IsBound():Boolean {
+			return physicalNodeInterface != null;
+		}
 	}
 }

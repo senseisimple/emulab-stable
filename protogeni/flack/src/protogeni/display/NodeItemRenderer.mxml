@@ -16,20 +16,33 @@
 	
 	<fx:Script>
 		<![CDATA[
-			import protogeni.display.DisplayUtil;
 			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.VirtualNode;
+			
+			[Bindable]
+			private var nodeName:String;
 			
 			private function setNode():void {
 				if (data == null)
 					return;
 
-				var node:PhysicalNode = data as PhysicalNode;
-				nodeImage.source = DisplayUtil.assignAvailabilityIcon(node);
+				if(data is PhysicalNode) {
+					var phyNode:PhysicalNode = data as PhysicalNode;
+					nodeName = phyNode.name;
+					nodeImage.source = DisplayUtil.assignAvailabilityIcon(phyNode);
+				} else if(data is VirtualNode) {
+					var virtNode:VirtualNode = data as VirtualNode;
+					nodeName = virtNode.clientId;
+					if(virtNode.Exclusive)
+						nodeImage.source = ImageUtil.exclusiveIcon;
+					else
+						nodeImage.source = ImageUtil.sharedIcon;
+				}
 			}
 		]]>
 	</fx:Script>
 
 	<s:BitmapImage id="nodeImage" />
-	<s:Label id="nodeLabel" text="{data.name}" maxDisplayedLines="1" />
+	<s:Label id="nodeLabel" text="{nodeName}" maxDisplayedLines="1" />
 	
 </s:ItemRenderer>

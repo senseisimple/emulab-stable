@@ -19,59 +19,45 @@
 	// Physical node
 	public class PhysicalNode
 	{
+		public var owner:PhysicalNodeGroup;
+		
+		public var rspec:XML;
+		
+		[Bindable]
+		public var name:String;
+		[Bindable]
+		public var id:String;
+		[Bindable]
+		public var manager:GeniManager;
+		[Bindable]
+		public var exclusive:Boolean;
+		[Bindable]
+		public var available:Boolean;
+		[Bindable]
+		public var subNodeOf : PhysicalNode = null;
+		public var subNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
+		[Bindable]
+		public var hardwareTypes:Vector.<String> = new Vector.<String>();
+		[Bindable]
+		public var sliverTypes:Vector.<SliverType> = new Vector.<SliverType>();
+		[Bindable]
+		public var interfaces:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();
+
+		// Sliced
+		public var virtualNodes : ArrayCollection = new ArrayCollection();
+		
+		// Use for anything, more inmportantly any additions by non-Protogeni managers
+		public var tag:*;
+		
 		public function PhysicalNode(own:PhysicalNodeGroup, ownedBy:GeniManager)
 		{
 			owner = own;
 			manager = ownedBy;
 		}
 		
-		public var owner:PhysicalNodeGroup;
-		
-		[Bindable]
-		public var name:String;
-		
-		[Bindable]
-		public var urn:String;
-		
-		[Bindable]
-		public var managerString:String;
-		
-		[Bindable]
-		public var manager:GeniManager;
-		
-		[Bindable]
-		public var available:Boolean;
-		
-		[Bindable]
-		public var exclusive:Boolean;
-		
-		[Bindable]
-		public var subNodeOf : PhysicalNode = null;
-		public var subNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
-		public var virtualNodes : ArrayCollection = new ArrayCollection();
-		
-		public var diskImages:Vector.<DiskImage> = new Vector.<DiskImage>();
-		
-		[Bindable]
-		public var types:Vector.<NodeType> = new Vector.<NodeType>();
-		
-		[Bindable]
-		public var interfaces:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();
-		
-		public var rspec:XML;
-		
-		public var sliverType:String;
-		
-		// Use for anything, more inmportantly any additions by non-Protogeni managers
-		public var tag:*;
-		
-		// Planetlab
-		public var hostname:String;
-		public var bw_limitKbps:int;
-		
 		public function IsSwitch():Boolean {
-			for each(var d:NodeType in types) {
-				if(d.name == "switch")
+			for each(var d:String in hardwareTypes) {
+				if(d == "switch")
 					return true;
 			}
 			return false;
@@ -95,41 +81,44 @@
 			return owner.longitude;
 		}
 		
+		// Gets all links
 		public function GetLinks():ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			for each(var i:PhysicalNodeInterface in interfaces.collection) {
-				for each(var l:PhysicalLink in i.links) {
+				for each(var l:PhysicalLink in i.physicalLinks) {
 					ac.addItem(l);
 				}
 			}
 			return ac;
 		}
 		
-		public function GetNodes():ArrayCollection {
+		// Get links to a certain node
+		public function GetNodeLinks(n:PhysicalNode):ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			for each(var i:PhysicalNodeInterface in interfaces.collection) {
-				for each(var l:PhysicalLink in i.links) {
-					if(l.interface1.owner != this && !ac.contains(l.interface1.owner)) {
-						ac.addItem(l.interface1.owner);
-					}
-					if(l.interface2.owner != this && !ac.contains(l.interface2.owner)) {
-						ac.addItem(l.interface2.owner);
+				for each(var l:PhysicalLink in i.physicalLinks) {
+					if(l.GetNodes().indexOf(n) > -1) {
+						ac.addItem(l);
+						break;
 					}
 				}
 			}
 			return ac;
 		}
 		
-		public function GetNodeLinks(n:PhysicalNode):ArrayCollection {
+		// Gets connected nodes
+		public function GetNodes():ArrayCollection {
 			var ac:ArrayCollection = new ArrayCollection();
 			for each(var i:PhysicalNodeInterface in interfaces.collection) {
-				for each(var l:PhysicalLink in i.links) {
-					if(l.interface1.owner == n || l.interface2.owner == n) {
-						ac.addItem(l);
+				for each(var l:PhysicalLink in i.physicalLinks) {
+					for each(var ln:PhysicalNode in l.GetNodes()) {
+						if(ln != this && !ac.contains(ln))
+							ac.addItem(ln);
 					}
 				}
 			}
 			return ac;
 		}
+		
 	}
 }

@@ -128,7 +128,7 @@
 					}
 				} catch(all:Error) {
 				}
-				
+
 				try{
 					if(FlexGlobals.topLevelApplication.parameters.debug != null)
 					{
@@ -182,10 +182,8 @@
 				
 				loadLocalUserData();
 				
-				if(Main.debugMode) {
+				if(Main.debugMode)
 					LogHandler.viewConsole();
-					DisplayUtil.viewManagersWindow();
-				}
 
 				// Load the certificate bundle
 				if(Main.useJavascript) {
@@ -398,7 +396,7 @@
 							 icon="{ImageUtil.consoleIcon}"
 							 click="LogHandler.viewConsole();" 
 							 toolTip="Console"/>
-		<mx:Button icon="{ImageUtil.noUserIcon}"
+		<s:Button icon="{ImageUtil.noUserIcon}"
 				   click="loadUser()"
 				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
 				   toolTip="Log in to get user-only features" label="Log in" styleName="unauthenticatedStyle"

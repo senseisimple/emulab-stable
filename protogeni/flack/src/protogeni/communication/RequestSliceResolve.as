@@ -45,7 +45,7 @@ package protogeni.communication
 		{
 			if(isCreating)
 			{
-				Alert.show("Slice '" + slice.urn + "' already exists");
+				Alert.show("Slice '" + slice.urn + "' already exists", "Error");
 				Main.Application().setStatus("Slice exists", true);
 			}
 			else

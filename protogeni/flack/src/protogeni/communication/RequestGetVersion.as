@@ -39,17 +39,20 @@ package protogeni.communication
 		try
 		{
 			cm.Version = response.value.api;
-			cm.inputRspecMaxVersion = response.value.input_rspec[0];
-			cm.inputRspecMinVersion = response.value.input_rspec[0];
+			cm.inputRspecVersions = new Vector.<Number>();
 			for each(var n:Number in response.value.input_rspec) {
-				if(cm.inputRspecMaxVersion < n)
-					cm.inputRspecMaxVersion = n;
-				if(cm.inputRspecMinVersion > n)
-					cm.inputRspecMinVersion = n;
+				cm.inputRspecVersions.push(n);
 			}
-			cm.outputRspecVersion = Number(response.value.output_rspec);
-			if(cm.Hrn == "utahemulab.cm" || cm.Hrn == "ukgeni.cm")
-				cm.outputRspecVersion = 2;
+			cm.outputRspecDefaultVersion = Number(response.value.output_rspec);
+			
+			// Set output version
+			//if(cm.Hrn == "utahemulab.cm" || cm.Hrn == "ukgeni.cm")
+			//	cm.outputRspecVersion = 2;
+			//else
+				cm.outputRspecVersion = 0.2;
+			// Set input version
+			cm.inputRspecVersion = Util.defaultRspecVersion; //Math.min(Util.defaultRspecVersion, cm.inputRspecMaxVersion);
+			
 			cm.Level = response.value.level;
 			r = new RequestDiscoverResources(cm);
 			r.forceNext = true;

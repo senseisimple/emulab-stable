@@ -3,7 +3,7 @@
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="PlanetLab Manager Information"
-						height="300">
+						height="300" width="400">
 	<fx:Script>
 		<![CDATA[
 			import protogeni.resources.PlanetlabAggregateManager;
@@ -26,8 +26,8 @@
 	
 	<display:GeniManagerInfo id="geniManagerInfo" />
 
+	<s:Label text="Sites" fontWeight="bold" />
 	<s:Scroller width="100%" height="100%">
-		<s:VGroup width="100%" height="100%" id="sitesBox">
-		</s:VGroup>
+		<s:VGroup width="100%" height="100%" id="sitesBox" />
 	</s:Scroller>
 </display:DefaultWindow>

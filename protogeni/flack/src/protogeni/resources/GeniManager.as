@@ -36,6 +36,7 @@ package protogeni.resources
 		[Bindable]
 		public var Version:int;
 		
+		[Bindable]
 		public var errorMessage : String = "";
 		public var errorDescription : String = "";
 		
@@ -199,7 +200,7 @@ package protogeni.resources
 			for each(currentNode in nodesToAdd) {
 				// Add connections
 				for each(var connectedNode:PhysicalNode in currentNode.GetNodes()) {
-					if(added[connectedNode.urn] != null || !nodesToAdd.contains(connectedNode))
+					if(added[connectedNode.id] != null || !nodesToAdd.contains(connectedNode))
 						continue;
 					edges += "<edge id=\"e" + (randId++) + "\" source=\"" + Util.getDotString(currentNode.name)  + "\" target=\"" + Util.getDotString(connectedNode.name) + "\"/>"
 				}
@@ -208,7 +209,7 @@ package protogeni.resources
 						edges += "<edge id=\"e" + (randId++) + "\" source=\"" + Util.getDotString(currentNode.name)  + "\" target=\"" + Util.getDotString(subNode.name) + "\"/>"
 					}
 				}
-				added[currentNode.urn] = currentNode;
+				added[currentNode.id] = currentNode;
 			}
 			
 			// Build up node groups
@@ -289,7 +290,7 @@ package protogeni.resources
 					dot += " [style=filled, color=limegreen, height=10, width=10];\n";
 				
 				for each(var connectedNode:PhysicalNode in currentNode.GetNodes()) {
-					if(added[connectedNode.urn] == null) {
+					if(added[connectedNode.id] == null) {
 						if(connectedNode.IsSwitch() && currentNode.IsSwitch())
 							links += "\t" + Util.getDotString(currentNode.name) + " -- " + Util.getDotString(connectedNode.name) + " [style=bold, color=deepskyblue3, penwidth=60, len=0.2, weight=6];\n";
 						else if(currentNode.subNodeOf == connectedNode || connectedNode.subNodeOf == currentNode)
@@ -298,7 +299,7 @@ package protogeni.resources
 							links += "\t" + Util.getDotString(currentNode.name) + " -- " + Util.getDotString(connectedNode.name) + " [penwidth=8, len=0.3, weight=.8];\n";
 					}
 				}
-				added[currentNode.urn] = currentNode;
+				added[currentNode.id] = currentNode;
 			}
 			
 			return dot + links + "}";
@@ -327,20 +328,20 @@ package protogeni.resources
 			// FIRST PASS
 			// Process individual nodes
 			for each(var pn:PhysicalNode in AllNodes) {
-				var ref:int = pn.urn.length;
-				for(var i:int = 0; i < pn.urn.length; i++) {
-					ref += pn.urn.charCodeAt(i)*(i+1);
+				var ref:int = pn.id.length;
+				for(var i:int = 0; i < pn.id.length; i++) {
+					ref += pn.id.charCodeAt(i)*(i+1);
 				}
-				nodeReferences[pn.urn] = ref;
+				nodeReferences[pn.id] = ref;
 				if(pn.IsSwitch())
-					switchReferences[pn.urn] = ref + 537;
+					switchReferences[pn.id] = ref + 537;
 			}
 			// Combine switches into nodes
 			for each(var currentNode:PhysicalNode in AllNodes) {
 				// Already added, probably a leaf node
 				if(!nodesToAdd.contains(currentNode))
 					continue;
-				ref = nodeReferences[currentNode.urn];
+				ref = nodeReferences[currentNode.id];
 				
 				if(currentNode.IsSwitch()) {
 					var a:ArrayCollection = new ArrayCollection();
@@ -377,12 +378,12 @@ package protogeni.resources
 						connectedNodes = Util.keepUniqueObjects(nac.GetNodes(), connectedNodes);
 					}
 					// Create the switch/switch-group ref
-					ref = nodeReferences[currentNode.urn];
+					ref = nodeReferences[currentNode.id];
 					for each(nac in connectedNodes) {
-						ref += nodeReferences[nac.urn];
+						ref += nodeReferences[nac.id];
 					}
 					// group empty routers together
-					if(ref == nodeReferences[currentNode.urn] && levels > 0) {
+					if(ref == nodeReferences[currentNode.id] && levels > 0) {
 						ref = 1;
 						for each(nac in nodesToAdd) {
 							if(nac != currentNode && nac.IsSwitch() && nac.GetNodes().length == 0) {
@@ -407,7 +408,7 @@ package protogeni.resources
 					locations.addItem(newLocation);
 					for each(nac in a) {
 						nodesToAdd.removeItemAt(nodesToAdd.getItemIndex(nac));
-						nodeReferences[nac.urn] = ref;
+						nodeReferences[nac.id] = ref;
 					}
 					if(locationReferences[ref] != null)
 						Alert.show("Duplicate reference!!!!", "Problem",4, Main.Application());
@@ -422,15 +423,15 @@ package protogeni.resources
 				ref = 0;
 				for each(var connectedNode:PhysicalNode in currentNode.GetNodes()) {
 					if(connectedNode.IsSwitch())
-						ref += switchReferences[connectedNode.urn];
+						ref += switchReferences[connectedNode.id];
 					else
-						ref += nodeReferences[connectedNode.urn];
+						ref += nodeReferences[connectedNode.id];
 				}
 				if(locationReferences[ref] != null) {
 					var otherLocation:Object = locationReferences[ref];
 					otherLocation.list.addItem(currentNode);
 					otherLocation.name = otherLocation.list.length + " Nodes";
-					locationReferences[nodeReferences[currentNode.urn]] = otherLocation;
+					locationReferences[nodeReferences[currentNode.id]] = otherLocation;
 				} else {
 					newLocation = {
 						list:new ArrayCollection([currentNode]),
@@ -444,7 +445,7 @@ package protogeni.resources
 					if(locationReferences[ref] != null)
 						Alert.show("Duplicate reference!!!!", "Problem",4, Main.Application());
 					locationReferences[ref] = newLocation;
-					locationReferences[nodeReferences[currentNode.urn]] = newLocation;
+					locationReferences[nodeReferences[currentNode.id]] = newLocation;
 				}
 			}
 			
@@ -454,7 +455,7 @@ package protogeni.resources
 				var linkedLocations:ArrayCollection = new ArrayCollection();
 				var linkedLocationsNums:ArrayCollection = new ArrayCollection();
 				for each(connectedNode in location.linked) {
-					var linkedLocation:Object = locationReferences[nodeReferences[connectedNode.urn]];
+					var linkedLocation:Object = locationReferences[nodeReferences[connectedNode.id]];
 					if(!linkedLocations.contains(linkedLocation)) {
 						linkedLocations.addItem(linkedLocation);
 						linkedLocationsNums.addItem(1);

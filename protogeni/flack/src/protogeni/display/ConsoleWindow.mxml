@@ -11,7 +11,6 @@
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayList;
-			import mx.controls.Button;
 			import mx.events.FlexEvent;
 			
 			import protogeni.GeniEvent;
@@ -83,7 +82,7 @@
 					var split:Rect = new Rect();
 					logs.addElement(split);
 				}
-				var b:mx.controls.Button = DisplayUtil.getLogMessageButton(msg);
+				var b:Button = DisplayUtil.getLogMessageButton(msg);
 				var h:HGroup = new HGroup();
 				h.percentWidth = 100;
 				if(msg.type == LogMessage.TYPE_END)
@@ -136,7 +135,7 @@
 			{
 				var reqHbox:HGroup = new HGroup();
 				var removeButton:Button = DisplayUtil.getButton(ImageUtil.cancelIcon, true);
-				removeButton.data = rqn;
+				//removeButton.data = rqn;
 				removeButton.toolTip = "Cancel this operation";
 				removeButton.addEventListener(MouseEvent.CLICK,
 					function remove(e:MouseEvent):void
@@ -234,7 +233,7 @@
 		<s:VGroup height="100%" width="50%" horizontalAlign="center">
 			<s:Label text="Logs"  fontSize="14" fontWeight="bold"/>
 			<s:HGroup verticalAlign="middle">
-				<mx:Button label="Clear" click="LogHandler.clear();" />
+				<s:Button label="Clear" click="LogHandler.clear();" />
 				<display:DefaultLine height="24" />
 				<s:Label text="Sort" />
 				<display:ImageButton id="sortButton"
@@ -262,7 +261,7 @@
 									  icon="{ImageUtil.playControlIcon}"
 									  click="Main.geniHandler.requestHandler.start();"
 									  toolTip="Force start the queue" />
-				<mx:Button label="Step" click="Main.geniHandler.requestHandler.step()" height="24" />
+				<s:Button label="Step" click="Main.geniHandler.requestHandler.step()" height="24" />
 			</s:HGroup>
 			<s:Scroller id="s" height="100%" width="100%">
 				<s:VGroup height="100%" width="100%" id="queue" />
@@ -281,7 +280,7 @@
 						width="200" height="24"
 						creationComplete="selectedIndex = 0" />
 		<s:Rect width="100%" />
-		<mx:Button label="Redraw Map" click="Main.geniHandler.mapHandler.redrawFromScratch()" />
+		<s:Button label="Redraw Map" click="Main.geniHandler.mapHandler.redrawFromScratch()" />
 		<display:DefaultLine height="90%" />
 		<s:Label text="Parallel Ops" />
 		<s:NumericStepper id="maxRunningStepper"

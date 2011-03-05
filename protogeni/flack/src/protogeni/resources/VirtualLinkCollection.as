@@ -13,7 +13,7 @@ package protogeni.resources
 		{
 			for each(var link:VirtualLink in this)
 			{
-				if(link.id == id)
+				if(link.clientId == id)
 					return link;
 			}
 			return null;
@@ -26,7 +26,7 @@ package protogeni.resources
 			{
 				for each(var vli:VirtualInterface in vl.interfaces)
 				{
-					if(vli.virtualNode == vn)
+					if(vli.owner == vn)
 					{
 						vlc.addItem(vl);
 						break;

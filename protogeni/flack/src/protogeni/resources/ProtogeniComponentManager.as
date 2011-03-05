@@ -24,13 +24,12 @@
 		[Bindable]
 		public var outputRspecVersion:Number;
 		[Bindable]
-		public var outputRspecMaxVersion:Number;
+		public var inputRspecVersion:Number;
+		
 		[Bindable]
-		public var outputRspecMinVersion:Number;
-		[Bindable]
-		public var inputRspecMaxVersion:Number;
-		[Bindable]
-		public var inputRspecMinVersion:Number;
+		public var outputRspecDefaultVersion:Number;
+		
+		public var inputRspecVersions:Vector.<Number>;
 	    
 		public function ProtogeniComponentManager()
 		{

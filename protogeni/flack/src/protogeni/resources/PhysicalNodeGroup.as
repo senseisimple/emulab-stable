@@ -24,6 +24,8 @@
 	// Group of physical nodes located in one area
 	public class PhysicalNodeGroup
 	{
+		public var owner:PhysicalNodeGroupCollection = null;
+		
 		public var latitude:Number;
 		public var longitude:Number;
 		public var country:String;
@@ -31,7 +33,6 @@
 		[Bindable]
 		public var city:String = "";
 		
-		public var owner:PhysicalNodeGroupCollection = null;
 		public var collection:ArrayCollection = new ArrayCollection;
 		public var links:PhysicalLinkGroup = null;
 		
@@ -87,7 +88,7 @@
 
 		public function GetByUrn(urn:String):PhysicalNode {
 			for each ( var n:PhysicalNode in collection ) {
-				if(n.urn == urn)
+				if(n.id == urn)
 					return n;
 			}
 			return null;
@@ -104,8 +105,8 @@
 		public function GetByType(type:String):PhysicalNodeGroup {
 			var group:PhysicalNodeGroup = new PhysicalNodeGroup();
 			for each ( var n:PhysicalNode in collection ) {
-				for each ( var nt:NodeType in n.types ) {
-					if(nt.name == type) {
+				for each ( var nt:String in n.hardwareTypes ) {
+					if(nt == type) {
 						group.Add(n);
 						break;
 					}

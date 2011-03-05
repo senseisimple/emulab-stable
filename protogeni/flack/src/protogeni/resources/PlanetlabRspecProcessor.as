@@ -114,19 +114,8 @@ package protogeni.resources
 					node.name = p.@id;
 					for each(var tx:XML in p.children()) {
 						switch(tx.localName()) {
-							case "bw_limit":
-								node.bw_limitKbps = int(tx.toString());
-								switch(tx.@units) {
-									case "kbps":
-									default:
-										break;
-								}
-								break;
-							case "hostname":
-								node.hostname = tx.toString();
-								break;
 							case "urn":
-								node.urn = tx.toString();
+								node.id = tx.toString();
 								break;
 							default:
 						}

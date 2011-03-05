@@ -4,14 +4,21 @@
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						width="500" height="500"
 						title="Node Information">
+	<fx:Declarations>
+		<s:RadioButtonGroup id="boundGroup" change="setBinding()" />
+	</fx:Declarations>
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
+			import mx.collections.ArrayList;
 			import mx.controls.Alert;
 			import mx.events.FlexEvent;
 			
 			import protogeni.resources.DiskImage;
+			import protogeni.resources.ExecuteService;
+			import protogeni.resources.InstallService;
 			import protogeni.resources.Sliver;
+			import protogeni.resources.SliverType;
 			import protogeni.resources.VirtualLink;
 			import protogeni.resources.VirtualNode;
 			
@@ -21,34 +28,20 @@
 			public var node:VirtualNode = null;
 			
 			[Bindable]
-			private var images:ArrayCollection;
+			private var sliverTypes:ArrayList;
+			
+			public var sn:SliceNode;
 			
 			public function loadNode(n:VirtualNode):void {
 				node = n;
-				if(node.physicalNode != null)
-					physicalButton.visible = true;
-				imgExclusive.source = DisplayUtil.assignIcon(!n.isShared);
-				if(n.isShared) imgExclusive.toolTip = "Not exclusive";
-				else imgExclusive.toolTip = "Exclusive";
-				
-				this.diskImageText.text = n.getDiskImageShort();
-				
-				images = new ArrayCollection();
-				for each(var di:DiskImage in node.physicalNode.diskImages)
-					images.addItem(di);
-				
-				this.starupCommandText.text = n.startupCommand;
-				this.tarfilesText.text = n.tarfiles;
 				
 				if(node.rspec != null)
 					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
-				
 				if(node.error != null && node.error.length > 0)
 				{
 					errorButton.includeInLayout = true;
 					errorButton.visible = true;
 				}
-				
 				switch(node.status)
 				{
 					case VirtualNode.STATUS_READY:
@@ -64,8 +57,52 @@
 					default:
 				}
 				
-				loadSlices();
 				loadHierarchy();
+				
+				if(node.physicalNode != null)
+				{
+					this.bindingPhysicalRadiobutton.selected = true;
+					physicalVgroup.addElement(DisplayUtil.getPhysicalNodeButton(node.physicalNode));
+				}
+				else
+				{
+					this.bindingVirtualRadiobutton.selected = true;
+					this.exclusiveCheckbox.selected = node.Exclusive;
+				}
+				
+				if(node.installServices.length > 0) {
+					this.installUrlText.text = node.installServices[0].url;
+					this.installPathText.text = node.installServices[0].installPath;
+				}
+				
+				if(node.executeServices.length > 0) {
+					this.executeShellText.text = node.executeServices[0].shell;
+					this.executeCommandText.text = node.executeServices[0].command;
+				}
+
+				sliverTypes = new ArrayList();
+				if(node.physicalNode != null) {
+					var toSelect:Object = null;
+					for each(var sliverType:SliverType in node.physicalNode.sliverTypes) {
+						for each(var diskImage:DiskImage in sliverType.diskImages) {
+							var newSliverType:Object = new Object();
+							newSliverType.name = sliverType.name;
+							newSliverType.diskLongName = diskImage.name;
+							if(diskImage.name == n.diskImage)
+								toSelect = newSliverType;
+							newSliverType.diskShortName = DiskImage.getDiskImageShort(diskImage.name, node.manager);
+							newSliverType.diskDescription = diskImage.description;
+							newSliverType.diskOs = diskImage.os;
+							newSliverType.diskVersion = diskImage.version;
+							sliverTypes.addItem(newSliverType);
+						}
+					}
+					if(toSelect != null)
+						this.diskImageSelect.selectedItem = toSelect;
+				}
+
+				loadSlices();
+				
 			}
 			
 			public function loadSlices():void {
@@ -92,52 +129,57 @@
 			public function loadHierarchy():void
 			{
 				hierarchyVbox.removeAllElements();
-				
+
 				// Manager
 				var managerHbox:HGroup = new HGroup();
-				var managerLabel:Label = new Label();
-				managerLabel.text = "Hosted on";
-				managerHbox.addElement(managerLabel);
+				managerHbox.verticalAlign = "middle";
+				managerHbox.gap = 4;
+				managerHbox.addElement(DisplayUtil.getLabel("Hosted on"));
 				managerHbox.addElement(DisplayUtil.getGeniManagerButton(node.manager));
 				hierarchyVbox.addElement(managerHbox);
 				
 				// Parent node info
-				var parentNodeHbox:HGroup = new HGroup();
-				var parentNodeLabel:Label = new Label();
-				parentNodeHbox.addElement(parentNodeLabel);
-				hierarchyVbox.addElement(parentNodeHbox);
 				if(node.superNode != null)
 				{
-					parentNodeLabel.text = "Subnode of";
+					var parentNodeHbox:HGroup = new HGroup();
+					parentNodeHbox.verticalAlign = "middle";
+					parentNodeHbox.gap = 4;
+					parentNodeHbox.addElement(DisplayUtil.getLabel("Subnode of"));
 					parentNodeHbox.addElement(DisplayUtil.getVirtualNodeButton(node.superNode));
-				}
-				else
-				{
-					parentNodeLabel.text = "No parent node";
+					hierarchyVbox.addElement(parentNodeHbox);
 				}
 				
 				// Child node info
-				var subNodesLabel:Label = new Label();
-				hierarchyVbox.addElement(subNodesLabel);
 				if(node.subNodes.length > 0)
 				{
-					subNodesLabel.text = "Subnodes:";
+					hierarchyVbox.addElement(DisplayUtil.getLabel("Subnodes:"));
 					for each(var subNode:VirtualNode in node.subNodes)
 					{
 						hierarchyVbox.addElement(DisplayUtil.getVirtualNodeButton(subNode));
 					}
 				}
-				else
-				{
-					subNodesLabel.text = "No subnodes";
-				}
 			}
 			
 			public function success():void
 			{
+				this.node.clientId = this.idLabel.Text;
+				if(this.bindingPhysicalRadiobutton.selected) {
+					// nothing yet
+				} else if(this.bindingVirtualRadiobutton.selected) {
+					node.Exclusive = this.exclusiveCheckbox.selected;
+					node.physicalNode = null;
+				}
+				node.installServices = new Vector.<InstallService>();
+				if(this.installUrlText.text.length > 0) {
+					node.installServices.push(new InstallService(this.installUrlText.text, this.installPathText.text));
+				}
+				node.executeServices = new Vector.<ExecuteService>();
+				if(this.executeCommandText.text.length > 0) {
+					node.executeServices.push(new ExecuteService(this.executeShellText.text, this.executeCommandText.text));
+				}
 				this.node.setDiskImage(diskImageText.text);
-				this.node.tarfiles = this.tarfilesText.text;
-				this.node.startupCommand = this.starupCommandText.text;
+				
+				Main.geniDispatcher.dispatchSliceChanged(node.slivers[0].slice);
 				closeWindow();
 			}
 			
@@ -147,153 +189,88 @@
 				{
 					var rspecWindow:XmlWindow = new XmlWindow;
 					rspecWindow.showWindow();
-					rspecWindow.title = "Last Successful RSPEC from " + node.urn;
+					rspecWindow.title = "Last Successful RSPEC from " + node.sliverId;
 					rspecWindow.loadXml(node.rspec);
 				} else {
 					Alert.show("No previous RSPEC is available");
 				}
-				
+			}
+
+
+			protected function setBinding():void
+			{
+				this.physicalVgroup.enabled = this.bindingPhysicalRadiobutton.selected;
+				this.virtualVgroup.enabled = this.bindingVirtualRadiobutton.selected;
 			}
 
 		]]>
 	</fx:Script>
 	
-	<mx:Grid width="100%" height="100%" verticalGap="2" horizontalGap="2">
-		<mx:GridRow width="100%">
-			<mx:GridItem width="30">
-				
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:HGroup>
-					<s:Label id="idLabel" text="{node.id}" fontSize="17" fontWeight="bold" width="100%" />
-					<display:ImageButton id="physicalButton"
-										 icon="{ImageUtil.physicalNodeIcon}"
-										 click="DisplayUtil.viewPhysicalNode(node.physicalNode)"
-										 toolTip="View physical node" visible="false" />
-					<display:ImageButton id="rspecButton"
-										 icon="{ImageUtil.pageWhiteIcon}"
-										 click="viewRspec()"
-										 toolTip="View the most recent valid RSPEC" />
-				</s:HGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				
-			</mx:GridItem>
-			<mx:GridItem width="100%" id="quickInfoHbox">
-				<s:HGroup>
-					<s:Label text="Exclusive" fontWeight="bold"/>
-					<mx:Image id="imgExclusive"/>
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="Status" fontWeight="bold" />
-					<s:Label id="statusLabel" text="{node.status}" />
-					<display:ImageButton id="errorButton" includeInLayout="false" visible="false" click="Alert.show(node.error,'Error Message')" />
-					<display:DefaultLine percentHeight="90" />
-					<s:Label text="State" fontWeight="bold" />
-					<s:Label id="stateLabel" text="{node.state}" />
-				</s:HGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="URN" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.urn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Sliver" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{(node.slivers.getItemAt(0) as Sliver).urn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Slice" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%" id="sliceButtonContainer">
-				<s:Label text="{(node.slivers.getItemAt(0) as Sliver).slice.hrn}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Virt Type" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.virtualizationType}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Virt Subtype" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.virtualizationSubtype}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Manager" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%" height="100%" id="hierarchyVbox" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Hostname" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:Label text="{node.hostname}" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Disk Image" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup>
-					<display:PromptingTextInput id="diskImageText" width="100%"
-												prompt="Replace default with Image ID or full URN" />
-					<s:DropDownList id="diskImageSelect" width="100%"
-									dataProvider="{images}" labelField="description"
-									change="diskImageText.text = diskImageSelect.selectedItem.name" />
-				</s:VGroup>
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Tar files" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<display:PromptingTextInput id="tarfilesText" width="100%"
-											prompt="file(s) to install after disk image is loaded" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%">
-			<mx:GridItem>
-				<s:Label text="Startup cmd" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<display:PromptingTextInput id="starupCommandText" width="100%"
-											prompt="Command(s) to run after startup" />
-			</mx:GridItem>
-		</mx:GridRow>
-		<mx:GridRow width="100%" height="100%">
-			<mx:GridItem>
-				<s:Label text="Links to" fontWeight="bold"/>
-			</mx:GridItem>
-			<mx:GridItem width="100%">
-				<s:VGroup width="100%" height="100%" id="linksVbox" />
-			</mx:GridItem>
-		</mx:GridRow>
-	</mx:Grid>
+	<s:HGroup width="100%">
+		<display:KeyboardTextInput id="idLabel" Text="{node.clientId}" toolTip="{node.sliverId}" width="100%" />
+		<display:ImageButton id="rspecButton"
+							 icon="{ImageUtil.pageWhiteIcon}"
+							 click="viewRspec()"
+							 toolTip="View the most recent valid RSPEC" />
+	</s:HGroup>
+	
+	<s:HGroup>
+		<s:Label text="Status" fontWeight="bold" />
+		<s:Label id="statusLabel" text="{node.status}" />
+		<display:ImageButton id="errorButton" includeInLayout="false" visible="false" click="Alert.show(node.error,'Error Message')" />
+		<s:Label text="State" fontWeight="bold" />
+		<s:Label id="stateLabel" text="{node.state}" />
+		<s:Label text="Slice" fontWeight="bold"/>
+		<s:Label text="{(node.slivers.getItemAt(0) as Sliver).slice.hrn}" />
+	</s:HGroup>
+
+	<s:VGroup width="100%" id="hierarchyVbox" />
+	
+	<s:Label text="Binding" fontWeight="bold" />
+	<s:HGroup width="100%">
+		<s:VGroup width="50%">
+			<s:RadioButton id="bindingPhysicalRadiobutton" label="Physical" group="{boundGroup}" />
+			<s:VGroup id="physicalVgroup" />
+		</s:VGroup>
+		<s:VGroup width="50%">
+			<s:RadioButton id="bindingVirtualRadiobutton" label="Virtual" group="{boundGroup}" />
+			<s:VGroup id="virtualVgroup">
+				<s:CheckBox id="exclusiveCheckbox" label="Exclusive?" />
+			</s:VGroup>
+		</s:VGroup>
+	</s:HGroup>
+	
+	<s:Label text="Install" fontWeight="bold" />
+	<s:HGroup width="100%">
+		<s:TextInput id="installUrlText" width="100%"
+					 prompt="URL of the archive" />
+		<s:TextInput id="installPathText" width="30%" visible="false" includeInLayout="false"
+					 prompt="Install path" />
+	</s:HGroup>
+	
+	<s:Label text="Execute" fontWeight="bold" />
+	<s:HGroup width="100%">
+		<s:TextInput id="executeShellText" width="20%" visible="false" includeInLayout="false"
+					 prompt="Shell? (sh, bash, etc.)" />
+		<s:TextInput id="executeCommandText" width="100%"
+					 prompt="Command" />
+	</s:HGroup>
+	
+	<s:Label text="Disk Image" fontWeight="bold" />
+	<s:DropDownList id="diskImageSelect" width="100%" prompt="Select image to override default"
+		  dataProvider="{sliverTypes}" labelField="diskDescription"
+		  change="diskImageText.text = diskImageSelect.selectedItem.diskLongName" />
+	<s:TextInput id="diskImageText" width="100%"
+				 text="{node.diskImage}"
+				 prompt="Select image above or manually type OSID" />
+	
+	<s:Label text="Links to" fontWeight="bold"/>
+	<s:Scroller width="100%" height="100%">
+		<s:VGroup width="100%" height="100%" id="linksVbox" />
+	</s:Scroller>
+
 	<display:controlBarContent>
-		<mx:Button id="cancelButton" label="Cancel" icon="{ImageUtil.cancelIcon}" click="closeWindow();" height="24" />
-		<mx:Button id="okButton" label="Apply" icon="{ImageUtil.availableIcon}" click="success();" height="24" />
+		<s:Button id="cancelButton" label="Cancel" icon="{ImageUtil.cancelIcon}" click="closeWindow();" height="24" />
+		<s:Button id="okButton" label="Apply" icon="{ImageUtil.availableIcon}" click="success();" height="24" />
 	</display:controlBarContent>
 </display:DefaultWindow>

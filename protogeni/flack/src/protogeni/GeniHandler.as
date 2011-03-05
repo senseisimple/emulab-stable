@@ -114,7 +114,7 @@
 					results.push(DisplayUtil.getGeniManagerButton(gm));
 				for each(var pn:PhysicalNode in gm.AllNodes)
 				{
-					if(Util.findInAny(searchFrom, new Array(pn.urn, pn.name), matchAll))
+					if(Util.findInAny(searchFrom, new Array(pn.id, pn.name), matchAll))
 						results.push(DisplayUtil.getPhysicalNodeButton(pn));
 				}
 				for each(var pl:PhysicalLink in gm.AllLinks)

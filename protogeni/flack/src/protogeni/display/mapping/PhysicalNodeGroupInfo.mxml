@@ -39,8 +39,7 @@
 				else
 					linksInternal = "0";
 				linksExternal = g.ExternalLinks().toString();
-				moreInfoButton.setStyle("chromeColor", DisplayUtil.colorsDark[g.GetManager().colorIdx]);
-				
+
 				if(group.original.city.length == 0)
 				{
 					var geocoder:ClientGeocoder = new ClientGeocoder();
