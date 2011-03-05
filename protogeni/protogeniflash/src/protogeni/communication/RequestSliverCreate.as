@@ -57,17 +57,6 @@ package protogeni.communication
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);
 
 			return new RequestSliverStatus(sliver);
-		} else if(code == CommunicationUtil.GENIRESPONSE_BUSY) {
-			if(this.numTries == 8) {
-				LogHandler.appendMessage(new LogMessage(this.op.getUrl(), this.name, "Reach limit of retries", true, LogMessage.TYPE_END ));
-				failed();
-			} else {
-				LogHandler.appendMessage(new LogMessage(this.op.getUrl(), this.name, "Preparing to retry", true, LogMessage.TYPE_END ));
-				op.delaySeconds = 10;
-				this.forceNext = true;
-				return this;
-			}
-			
 		}
 		else
 		{

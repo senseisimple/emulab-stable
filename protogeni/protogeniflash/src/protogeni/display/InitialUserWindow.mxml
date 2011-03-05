@@ -183,8 +183,8 @@
 			private function securityErrorHandler(event:SecurityErrorEvent):void {
 				getLabel.text = "Security Error!"
 				getLabel.styleName = "failedStyle";
+				LogHandler.appendMessage(new LogMessage(certUrl, "Security Error", event.toString(), true, LogMessage.TYPE_END));
 				askToLogin();
-				//Main.log.appendMessage(new LogMessage(certUrl, "Security Error", event.toString(), true, LogMessage.TYPE_END));
 			}
 			
 			private function ioErrorHandler(event:IOErrorEvent):void {

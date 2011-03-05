@@ -309,7 +309,7 @@
 					newLink.bandwidth = link.bandwidth;
 					newLink.firstTunnelIp = link.firstTunnelIp;
 					newLink.secondTunnelIp = link.secondTunnelIp;
-					newLink._isTunnel = link._isTunnel;
+					newLink.linkType = link.linkType;
 					newLink.rspec = link.rspec;
 					for each(var linkSliver:Sliver in link.slivers)
 						newLink.slivers.push(newSlice.slivers.getByUrn(linkSliver.urn));

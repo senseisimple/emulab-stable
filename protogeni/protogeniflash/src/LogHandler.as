@@ -26,6 +26,11 @@ package
 			console.openGroup(s);
 		}
 		
+		public static function clear():void {
+			logs = new Vector.<LogMessage>();
+			Main.geniDispatcher.dispatchLogsChanged();
+		}
+		
 		public static var logs:Vector.<LogMessage> = new Vector.<LogMessage>();
 		private static var console:ConsoleWindow = null;
 	}

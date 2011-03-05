@@ -86,6 +86,8 @@
 					var msg:LogMessage = e.changedObject as LogMessage;
 					if(groupComboBox.selectedIndex == 0 || (msg.groupId.indexOf(groups[groupComboBox.selectedIndex]) > -1))
 						addMessage(msg);
+				} else {
+					this.resetLogView();
 				}
 				
 			}
@@ -264,6 +266,8 @@
 		<s:VGroup height="100%" width="50%" horizontalAlign="center">
 			<s:Label text="Logs"  fontSize="14" fontWeight="bold"/>
 			<s:HGroup verticalAlign="middle">
+				<mx:Button label="Clear" click="LogHandler.clear();" height="24" />
+				<display:DefaultLine height="24" />
 				<s:Label text="Sort" />
 				<display:ImageButton2 id="sortButton"
 									  icon="{DisplayUtil.upIcon}"

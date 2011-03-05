@@ -53,6 +53,7 @@ package protogeni.resources
 		public var Links:PhysicalLinkGroupCollection = new PhysicalLinkGroupCollection();
 		
 		public var AllNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
+		
 		public function AllNodesAsArray():Array {
 			var allNodesArray:Array = new Array();
 			for each (var elem:PhysicalNode in AllNodes) {

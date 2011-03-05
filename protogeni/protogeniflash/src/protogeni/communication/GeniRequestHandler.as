@@ -370,16 +370,27 @@
 			var next:*;
 			try
 			{
-				// Output completed
-				if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !node.ignoreReturnCode)
-				{
-					Main.Application().setStatus(node.name + " done", true);
-					LogHandler.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));
+				if(code == CommunicationUtil.GENIRESPONSE_BUSY) {
+					Main.Application().setStatus(node.name + " busy", true);
+					if(node.numTries == 8) {
+						LogHandler.appendMessage(new LogMessage(node.op.getUrl(), node.name + " busy", "Reach limit of retries", true, LogMessage.TYPE_END ));
+					} else {
+						LogHandler.appendMessage(new LogMessage(node.op.getUrl(), node.name + " busy", "Preparing to retry", true, LogMessage.TYPE_END ));
+						node.op.delaySeconds = 10;
+						node.forceNext = true;
+						next = node;
+					}
 				} else {
-					Main.Application().setStatus(node.name + " done", false);
-					LogHandler.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponse(), false, LogMessage.TYPE_END));
+					if(code != CommunicationUtil.GENIRESPONSE_SUCCESS && !node.ignoreReturnCode)
+					{
+						Main.Application().setStatus(node.name + " done", true);
+						LogHandler.appendMessage(new LogMessage(node.op.getUrl(), CommunicationUtil.GeniresponseToString(code), node.op.getResponse(), true, LogMessage.TYPE_END));
+					} else {
+						Main.Application().setStatus(node.name + " done", false);
+						LogHandler.appendMessage(new LogMessage(node.op.getUrl(), node.name, node.op.getResponse(), false, LogMessage.TYPE_END));
+					}
+					next = node.complete(code, response);
 				}
-				next = node.complete(code, response);
 			}
 			catch (e : Error)
 			{

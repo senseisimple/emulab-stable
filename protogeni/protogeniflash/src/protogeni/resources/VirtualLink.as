@@ -19,8 +19,10 @@
 	// Link as part of a sliver/slice connecting virtual nodes
 	public class VirtualLink
 	{
-		// Status values
-		public static var TUNNEL : String = "tunnel";
+		public static var TYPE_NORMAL:int = 0;
+		public static var TYPE_TUNNEL:int = 1;
+		public static var TYPE_ION:int = 2;
+		public static var TYPE_GPENI:int = 3;
 		
 		public function VirtualLink(owner:Sliver)
 		{
@@ -40,7 +42,8 @@
 		
 		public var firstTunnelIp:int = 0;
 		public var secondTunnelIp:int = 0;
-		public var _isTunnel:Boolean = false;
+
+		public var linkType:int = TYPE_NORMAL;
 		
 		public var slivers:Array;
 
@@ -67,6 +70,8 @@
 			var secondInterface:VirtualInterface;
 			if(first.manager == second.manager)
 			{
+				linkType = TYPE_NORMAL;
+				
 				firstInterface = first.allocateInterface();
 				secondInterface = second.allocateInterface();
 				if(firstInterface == null || secondInterface == null)
@@ -78,6 +83,12 @@
 			 {
 				 if((first.manager.supportsIon && second.manager.supportsIon && Main.useIon) ||
 					 (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)) {
+					 
+					 if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
+						 linkType = TYPE_ION;
+					 else if(first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)
+						 linkType = TYPE_GPENI;
+					 
 					 firstInterface = first.allocateInterface();
 					 secondInterface = second.allocateInterface();
 					 if(firstInterface == null || secondInterface == null)
@@ -85,6 +96,8 @@
 					 first.interfaces.Add(firstInterface);
 					 second.interfaces.Add(secondInterface);
 				 } else {
+					 linkType = TYPE_TUNNEL;
+					 
 					 firstInterface = first.interfaces.GetByID("control");
 					 secondInterface = second.interfaces.GetByID("control");
 					 
@@ -98,8 +111,7 @@
 					 second.interfaces.Add(secondInterface);
 					 */
 					 // END OF THE PART WHICH WILL PROBABLY BREAK VERSION 1!!!!
-					 
-					 _isTunnel = true;
+
 					 if(firstInterface.ip.length == 0)
 						 firstInterface.ip = getNextTunnel();
 					 if(secondInterface.ip.length == 0)
@@ -119,13 +131,6 @@
 					 slivers.push(second.slivers[0]);
 			 }
 			
-			// Bandwidth
-			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
-			if (first.id.slice(0, 2) == "pg" || second.id.slice(0, 2) == "pg")
-				bandwidth = 1000000;
-			if(this.isIon() || this.isGpeni())
-				bandwidth = 100000;
-			
 			this.interfaces.addItem(firstInterface);
 			this.interfaces.addItem(secondInterface);
 			firstNode = first;
@@ -142,6 +147,14 @@
 				firstInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
 				secondInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
 			}
+			
+			// Bandwidth
+			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
+			if (first.id.slice(0, 2) == "pg" || second.id.slice(0, 2) == "pg")
+				bandwidth = 1000000;
+			if(linkType == TYPE_GPENI || linkType == TYPE_ION)
+				bandwidth = 100000;
+			
 			return true;
 		}
 		
@@ -172,49 +185,10 @@
 			}
 		}
 		
-		// Needs some major work...
-		public function isTunnel():Boolean
-		{
-			if(_isTunnel)
-				return true;
-			
-			if(interfaces.length > 0)
-			{
-				var basicManager:GeniManager = (interfaces[0] as VirtualInterface).virtualNode.manager;
-				for each(var i:VirtualInterface in interfaces)
-				{
-					if(i.virtualNode.manager != basicManager
-					&& !(i.virtualNode.manager.supportsIon && basicManager.supportsIon)
-					&& !(i.virtualNode.manager.supportsGpeni && basicManager.supportsGpeni))
-						return true;
-				}
-			}
-			
-			return false;
-		}
-		
-		public function isIon():Boolean
-		{
-			return firstNode.manager != secondNode.manager &&
-				firstNode.manager.supportsIon && secondNode.manager.supportsIon && !_isTunnel;
-		}
-		
-		public function isGpeni():Boolean
-		{
-			return firstNode.manager != secondNode.manager &&
-				firstNode.manager.supportsGpeni && secondNode.manager.supportsGpeni && !_isTunnel;
-		}
-		
-		public function hasTunnelTo(target:GeniManager) : Boolean
-		{
-			return isTunnel() && (this.firstNode.manager == target
-				|| secondNode.manager == target);
-		}
-		
 		public function isConnectedTo(target:GeniManager) : Boolean
 		{
-			if(hasTunnelTo(target))
-				return true;
+			//if(this.firstNode.manager == target || secondNode.manager == target)
+			//	return true;
 			for each(var i:VirtualInterface in interfaces)
 			{
 				if(i.virtualNode.manager == target)

@@ -25,7 +25,7 @@ package protogeni.display.mapping
 		
 		public var nodeGroupMarkers:Array = [];
 		private var linkMarkers:Vector.<GeniMapLink> = new Vector.<GeniMapLink>();
-		private var nodeGroupClusterMarkers:ArrayCollection = new ArrayCollection();
+		private var nodeGroupClusterMarkers:Array = [];
 		
 		public var userResourcesOnly:Boolean = false;
 		public var selectedSlice:Slice = null;
@@ -42,10 +42,14 @@ package protogeni.display.mapping
 		}
 		
 		public function clearAll():void {
+			if(drawing) {
+				drawing = false;
+				FlexGlobals.topLevelApplication.stage.removeEventListener(Event.ENTER_FRAME, drawNext);
+			}
 			map.clearOverlays();
 			nodeGroupMarkers = [];
 			linkMarkers = new Vector.<GeniMapLink>();
-			nodeGroupClusterMarkers = new ArrayCollection();
+			nodeGroupClusterMarkers = []
 		}
 		
 		// If nothing given, gives bounds for all resources
@@ -285,12 +289,18 @@ package protogeni.display.mapping
 				}
 			}
 			
-			// Remove markers no longer used
-			for(var i:int = 0; i < nodeGroupClusterMarkers.length; i++) {
-				var oldMarker:GeniMapMarker = this.nodeGroupClusterMarkers.getItemAt(i) as GeniMapMarker;
-				var found:Boolean = false;
-				for(var j:int = 0; j < clustersToAdd.length; j++) {
-					var newMarkerArray:Array = clustersToAdd.getItemAt(j) as Array;
+			var i:int;
+			var j:int;
+			var oldMarker:GeniMapMarker;
+			var found:Boolean;
+			var newMarkerArray:Array;
+			
+			// Hide markers no longer used
+			for(i = 0; i < nodeGroupClusterMarkers.length; i++) {
+				oldMarker = this.nodeGroupClusterMarkers[i] as GeniMapMarker;
+				found = false;
+				for(j = 0; j < clustersToAdd.length; j++) {
+					newMarkerArray = clustersToAdd.getItemAt(j) as Array;
 					if(Util.haveSame(newMarkerArray, oldMarker.cluster)) {
 						found = true;
 						clustersToAdd.removeItemAt(j);	// remove markers which will stay from the create array
@@ -298,9 +308,13 @@ package protogeni.display.mapping
 					}
 				}
 				if(!found) {
-					this.map.removeOverlay(oldMarker);
-					this.nodeGroupClusterMarkers.removeItemAt(i);
-					i--;
+					//this.map.removeOverlay(oldMarker);
+					//this.nodeGroupClusterMarkers.removeItemAt(i);
+					if(oldMarker.visible)
+						oldMarker.hide();
+				} else {
+					if(!oldMarker.visible)
+						oldMarker.show();
 				}
 			}
 			
@@ -322,7 +336,7 @@ package protogeni.display.mapping
 				var cluster:Array = clustersToAdd.getItemAt(myIndex) as Array;
 				var marker:GeniMapMarker = new GeniMapMarker(cluster);
 				map.addOverlay(marker);
-				nodeGroupClusterMarkers.addItem(marker);
+				nodeGroupClusterMarkers.push(marker);
 				idx++;
 				myIndex++;
 				if(((new Date()).time - startTime.time) > 60) {

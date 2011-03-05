@@ -98,7 +98,7 @@ package protogeni.display
 		
 		public function drawEstablished():void
 		{
-			var color:uint = virtualLink.isTunnel() ? TUNNEL_COLOR : INVALID_COLOR;
+			var color:uint = virtualLink.linkType == VirtualLink.TYPE_TUNNEL ? TUNNEL_COLOR : INVALID_COLOR;
 			drawLink(startNode.getMiddleX(), startNode.getMiddleY(), endNode.getMiddleX(), endNode.getMiddleY(), color);
 			removeButton.x = ((startNode.getMiddleX() + endNode.getMiddleX()) / 2) - (removeButton.width/2 + 1);
 			removeButton.y = ((startNode.getMiddleY() + endNode.getMiddleY()) / 2) - (removeButton.height/2);

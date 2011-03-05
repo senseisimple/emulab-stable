@@ -53,6 +53,14 @@
 			return null;
 		}
 		
+		public function GetByType(type:String):PhysicalNodeGroup {
+			var group:PhysicalNodeGroup = new PhysicalNodeGroup();
+			for each(var ng:PhysicalNodeGroup in collection) {
+				group.collection.addAll(ng.GetByType(type).collection);
+			}
+			return group;
+		}
+		
 		public function GetInterfaceByID(id:String):PhysicalNodeInterface {
 			for each(var ng:PhysicalNodeGroup in collection) {
 				for each(var n:PhysicalNode in ng.collection) {

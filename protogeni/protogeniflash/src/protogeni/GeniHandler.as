@@ -14,6 +14,7 @@
  
  package protogeni
 {
+	 import mx.collections.ArrayCollection;
 	 import mx.collections.ArrayList;
 	 
 	 import protogeni.communication.GeniRequestHandler;
@@ -87,19 +88,12 @@
 			Main.geniDispatcher.dispatchUserChanged();
 			Main.geniDispatcher.dispatchGeniManagersChanged();
 			Main.geniDispatcher.dispatchQueueChanged();
-			
-			Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
 		}
 		
 		public function destroy():void {
 			mapHandler.destruct();
 			requestHandler.pause();
 			requestHandler.clearAll();
-			removeHandlers();
-		}
-		
-		public function removeHandlers():void {
-			Main.geniDispatcher.removeEventListener(GeniEvent.GENIMANAGER_CHANGED, mapHandler.drawMap);
 		}
 		
 		public function clearComponents() : void

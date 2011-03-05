@@ -56,6 +56,19 @@
 			return null;
 		}
 		
+		public function GetByType(type:String):PhysicalNodeGroup {
+			var group:PhysicalNodeGroup = new PhysicalNodeGroup();
+			for each ( var n:PhysicalNode in collection ) {
+				for each ( var nt:NodeType in n.types ) {
+					if(nt.name == type) {
+						group.Add(n);
+						break;
+					}
+				}
+			}
+			return group;
+		}
+		
 		public function Available():Number {
 			var cnt:Number = 0;
 			for each ( var n:PhysicalNode in collection ) {
