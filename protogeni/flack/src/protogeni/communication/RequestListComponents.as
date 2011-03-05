@@ -47,36 +47,22 @@ package protogeni.communication
 			{
 				var newGm:GeniManager = null;
 				var ts:String = obj.url.substr(0, obj.url.length-3);
-				/*switch(ts)
-				{
-					case "https://www.emulab.net/protogeni/xmlrpc":
-					//case "https://myboss.myelab.testbed.emulab.net/protogeni/xmlrpc":
-					//case "https://pg-boss.cis.fiu.edu/protogeni/xmlrpc":
-					//case "https://www.uky.emulab.net/protogeni/xmlrpc":
-					//case "https://www.pgeni.gpolab.bbn.com/protogeni/xmlrpc":
-						var newAm:AggregateManager = new AggregateManager();
-						newAm.Url = "https://boss.emulab.net/protogeni/xmlrpc/am";
-						newAm.Hrn = "utahemulab.cm";
-						newAm.Urn = "urn:publicid:IDN+emulab.net+authority+cm";
-						Main.geniHandler.GeniManagers.add(newAm);
-						newGm = newAm;
-						break;
-					default:*/
-						var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
-						newCm.Hrn = obj.hrn;
-						// Quick hack, giving exceptions in forge
-						if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm")
-							continue;
-						newCm.Url = ts;
-						newCm.Urn = obj.urn;
-						newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
-						if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
-							newCm.supportsIon = true;
-						if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
-							newCm.supportsGpeni = true;
-						Main.geniHandler.GeniManagers.add(newCm);
-						newGm = newCm;
-				//}
+				//if(ts != "https://www.emulab.net/protogeni/xmlrpc")
+				//	continue;
+				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
+				newCm.Hrn = obj.hrn;
+				newCm.Url = ts;
+				newCm.Urn = obj.urn;
+				// Quick hack, giving exceptions in forge
+				if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.toLowerCase().indexOf("etri") > 0)
+					continue;
+				newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
+				if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
+					newCm.supportsIon = true;
+				if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")
+					newCm.supportsGpeni = true;
+				Main.geniHandler.GeniManagers.add(newCm);
+				newGm = newCm;
 				if(startDiscoverResources)
 				{
 					newGm.Status = GeniManager.STATUS_INPROGRESS;
@@ -88,15 +74,15 @@ package protogeni.communication
 				Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
 			}
 
+			/*
 			if(!Main.protogeniOnly) {
-				
 				var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 				Main.geniHandler.GeniManagers.add(planetLabAm);
 				planetLabAm.Status = GeniManager.STATUS_INPROGRESS;
 				newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
 				Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
-				
 			}
+			*/
 			
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());

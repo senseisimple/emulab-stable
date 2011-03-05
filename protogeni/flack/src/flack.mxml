@@ -155,6 +155,8 @@
 			}
 			
 			private function init():void {
+				loaderInfo.uncaughtErrorEvents.addEventListener(UncaughtErrorEvent.UNCAUGHT_ERROR, uncaughtErrorHandler);
+				
 				Main.geniHandler = new GeniHandler();
 				Main.geniHandler.mapHandler.map = map;
 				Main.geniDispatcher.addEventListener(GeniEvent.USER_CHANGED, userChanged);
@@ -195,6 +197,24 @@
 				// Always show the start options
 				var startOptions:StartOptionsWindow = new StartOptionsWindow();
 				startOptions.showWindow();
+			}
+			
+			private function uncaughtErrorHandler(event:UncaughtErrorEvent):void
+			{
+				Main.geniHandler.requestHandler.pause();
+				event.preventDefault();
+				event.stopImmediatePropagation();
+				var uncaughtErrorMessage:LogMessage = new LogMessage("",
+															"Uncaught Error",
+															"Error:\n" + event.error.toString() + "\n\nEvent:\n" + event.toString(),
+															true)
+				LogHandler.appendMessage(uncaughtErrorMessage);
+				LogHandler.viewConsole();
+				DisplayUtil.viewLogMessage(uncaughtErrorMessage);
+				
+				Alert.show("An uncaught error was thrown and has possibly corrupted any actions you were doing. The request queue was paused so any pending actions will not be run until you start the queue again.  If you believe the error was not serious, restart the queue and continue.\n\n"
+					+ "Please check the error log message and copy the details into a message and send to mstrum@flux.utah.edu.  Restart the client after you have gathered any RSPECs, error messages, etc that you don't want to lose.",
+					"Uncaught error", Alert.OK, this, null, ImageUtil.errorIcon);
 			}
 			
 			//------------------------------------------

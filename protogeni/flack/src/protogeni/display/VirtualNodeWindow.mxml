@@ -12,11 +12,14 @@
 			import mx.collections.ArrayCollection;
 			import mx.collections.ArrayList;
 			import mx.controls.Alert;
+			import mx.events.CloseEvent;
 			import mx.events.FlexEvent;
 			
 			import protogeni.resources.DiskImage;
 			import protogeni.resources.ExecuteService;
+			import protogeni.resources.GeniManager;
 			import protogeni.resources.InstallService;
+			import protogeni.resources.ProtogeniRspecProcessor;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.SliverType;
 			import protogeni.resources.VirtualLink;
@@ -34,6 +37,11 @@
 			
 			public function loadNode(n:VirtualNode):void {
 				node = n;
+
+				if(n.manager.type == GeniManager.TYPE_PROTOGENI) {
+					previewRspecButton.includeInLayout = true;
+					previewRspecButton.visible = true;
+				}
 				
 				if(node.rspec != null)
 					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
@@ -70,8 +78,10 @@
 					this.exclusiveCheckbox.selected = node.Exclusive;
 				}
 				
+				this.installFileTypeList.selectedIndex = 0;
 				if(node.installServices.length > 0) {
 					this.installUrlText.text = node.installServices[0].url;
+					this.installFileTypeList.textInput.text = node.installServices[0].fileType;
 					this.installPathText.text = node.installServices[0].installPath;
 				}
 				
@@ -162,6 +172,12 @@
 			
 			public function success():void
 			{
+				save();
+				closeWindow();
+			}
+			
+			public function save():void
+			{
 				this.node.clientId = this.idLabel.Text;
 				if(this.bindingPhysicalRadiobutton.selected) {
 					// nothing yet
@@ -171,16 +187,14 @@
 				}
 				node.installServices = new Vector.<InstallService>();
 				if(this.installUrlText.text.length > 0) {
-					node.installServices.push(new InstallService(this.installUrlText.text, this.installPathText.text));
+					node.installServices.push(new InstallService(this.installUrlText.text, this.installPathText.text, this.installFileTypeList.textInput.text));
 				}
 				node.executeServices = new Vector.<ExecuteService>();
 				if(this.executeCommandText.text.length > 0) {
-					node.executeServices.push(new ExecuteService(this.executeShellText.text, this.executeCommandText.text));
+					node.executeServices.push(new ExecuteService(this.executeCommandText.text, this.executeShellText.text));
 				}
 				this.node.setDiskImage(diskImageText.text);
-				
 				Main.geniDispatcher.dispatchSliceChanged(node.slivers[0].slice);
-				closeWindow();
 			}
 			
 			public function viewRspec():void
@@ -196,6 +210,26 @@
 				}
 			}
 
+			public function previewRspec():void
+			{
+				Alert.show("This preview will not show any changes made if changes have been made without applying.  Would you like to apply any changes before previewing?",
+					"Apply?",
+					Alert.YES|Alert.NO|Alert.CANCEL,
+					this,
+					function closeEvent(event:CloseEvent):void {
+						switch(event.detail) {
+							case Alert.CANCEL:
+								return;
+							case Alert.YES:
+								save();
+							default:
+								var previewRspec:XmlWindow = new XmlWindow();
+								previewRspec.title = "Preview Request RSPEC for: " + node.clientId;
+								previewRspec.loadXml((node.manager.rspecProcessor as ProtogeniRspecProcessor).generateNodeRspec(node));
+								previewRspec.showWindow();
+						}
+					});
+			}
 
 			protected function setBinding():void
 			{
@@ -212,6 +246,11 @@
 							 icon="{ImageUtil.pageWhiteIcon}"
 							 click="viewRspec()"
 							 toolTip="View the most recent valid RSPEC" />
+		<display:ImageButton id="previewRspecButton"
+							 visible="false" includeInLayout="false"
+							 icon="{ImageUtil.pageCodeIcon}"
+							 click="previewRspec()"
+							 toolTip="Preview the Request RSPEC" />
 	</s:HGroup>
 	
 	<s:HGroup>
@@ -241,19 +280,28 @@
 	</s:HGroup>
 	
 	<s:Label text="Install" fontWeight="bold" />
-	<s:HGroup width="100%">
-		<s:TextInput id="installUrlText" width="100%"
-					 prompt="URL of the archive" />
-		<s:TextInput id="installPathText" width="30%" visible="false" includeInLayout="false"
+	<s:HGroup width="100%" verticalAlign="middle">
+		<s:TextInput id="installUrlText" width="55%"
+					 prompt="Archive URL" />
+		<s:ComboBox id="installFileTypeList" width="15%" prompt="File type">
+			<s:dataProvider>
+				<s:ArrayList>
+					<fx:String>tar.gz</fx:String>
+				</s:ArrayList>
+			</s:dataProvider>
+		</s:ComboBox>
+		<s:Label text="in" />
+		<s:TextInput id="installPathText" width="30%" text="/"
 					 prompt="Install path" />
 	</s:HGroup>
 	
 	<s:Label text="Execute" fontWeight="bold" />
-	<s:HGroup width="100%">
-		<s:TextInput id="executeShellText" width="20%" visible="false" includeInLayout="false"
-					 prompt="Shell? (sh, bash, etc.)" />
-		<s:TextInput id="executeCommandText" width="100%"
+	<s:HGroup width="100%" verticalAlign="middle">
+		<s:TextInput id="executeCommandText" width="90%"
 					 prompt="Command" />
+		<s:Label text="using" />
+		<s:TextInput id="executeShellText" width="10%" text="sh"
+					 prompt="Shell? (sh, bash, etc.)" />
 	</s:HGroup>
 	
 	<s:Label text="Disk Image" fontWeight="bold" />

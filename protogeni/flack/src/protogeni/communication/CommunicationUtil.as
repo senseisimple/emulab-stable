@@ -21,28 +21,35 @@ package protogeni.communication
   public class CommunicationUtil
   {
 	  // Namespaces
-	  public static var rspec01Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
-	  public static var rspec02Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
-	  public static var rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/2";
+	  public static const rspec01Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
+	  public static const rspec02Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
+	  public static const rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/2";
+	  
+	  // Schemas
+	  public static const rspec01SchemaLocation:String = "http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd";
+	  public static const rspec02SchemaLocation:String = "http://www.protogeni.net/resources/rspec/0.2 http://www.protogeni.net/resources/rspec/0.2/request.xsd";
+	  public static const rspec2SchemaLocation:String = "http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd";
+	  
+	  public static var flackNamespace:Namespace = new Namespace("flack", "http://www.protogeni.net/resources/rspec/ext/flack/1");
 	  
 	  // Error codes
-	  public static var GENIRESPONSE_SUCCESS : int = 0;
-	  public static var GENIRESPONSE_BADARGS : int  = 1;
-	  public static var GENIRESPONSE_ERROR : int = 2;
-	  public static var GENIRESPONSE_FORBIDDEN : int = 3;
-	  public static var GENIRESPONSE_BADVERSION : int = 4;
-	  public static var GENIRESPONSE_SERVERERROR : int = 5;
-	  public static var GENIRESPONSE_TOOBIG : int = 6;
-	  public static var GENIRESPONSE_REFUSED : int = 7;
-	  public static var GENIRESPONSE_TIMEDOUT : int = 8;
-	  public static var GENIRESPONSE_DBERROR : int = 9;
-	  public static var GENIRESPONSE_RPCERROR : int = 10;
-	  public static var GENIRESPONSE_UNAVAILABLE : int = 11;
-	  public static var GENIRESPONSE_SEARCHFAILED : int = 12;
-	  public static var GENIRESPONSE_UNSUPPORTED : int = 13;
-	  public static var GENIRESPONSE_BUSY : int = 14;
-	  public static var GENIRESPONSE_EXPIRED : int = 15;
-	  public static var GENIRESPONSE_INPROGRESS : int = 16;
+	  public static const GENIRESPONSE_SUCCESS : int = 0;
+	  public static const GENIRESPONSE_BADARGS : int  = 1;
+	  public static const GENIRESPONSE_ERROR : int = 2;
+	  public static const GENIRESPONSE_FORBIDDEN : int = 3;
+	  public static const GENIRESPONSE_BADVERSION : int = 4;
+	  public static const GENIRESPONSE_SERVERERROR : int = 5;
+	  public static const GENIRESPONSE_TOOBIG : int = 6;
+	  public static const GENIRESPONSE_REFUSED : int = 7;
+	  public static const GENIRESPONSE_TIMEDOUT : int = 8;
+	  public static const GENIRESPONSE_DBERROR : int = 9;
+	  public static const GENIRESPONSE_RPCERROR : int = 10;
+	  public static const GENIRESPONSE_UNAVAILABLE : int = 11;
+	  public static const GENIRESPONSE_SEARCHFAILED : int = 12;
+	  public static const GENIRESPONSE_UNSUPPORTED : int = 13;
+	  public static const GENIRESPONSE_BUSY : int = 14;
+	  public static const GENIRESPONSE_EXPIRED : int = 15;
+	  public static const GENIRESPONSE_INPROGRESS : int = 16;
 	  
 	  public static function GeniresponseToString(value:int):String
 	  {
@@ -68,18 +75,18 @@ package protogeni.communication
 		  }
 	  }
 	  
-    private static var sa : String = "sa";
-    private static var cm : String = "cm";
-    private static var ses : String = "ses";
-    private static var ch : String = "ch";
-	private static var am : String = "am";
+    private static const sa : String = "sa";
+    private static const cm : String = "cm";
+    private static const ses : String = "ses";
+    private static const ch : String = "ch";
+	private static const am : String = "am";
 
-    public static var defaultHost : String = "boss.emulab.net";
+    public static const defaultHost : String = "boss.emulab.net";
 
     //public static var sesUrl : String = "https://myboss.emulab.geni.emulab.net/protogeni/xmlrpc/";
-	public static var sesUrl : String = "https://www.emulab.net/protogeni/xmlrpc/";
+	public static const sesUrl : String = "https://www.emulab.net/protogeni/xmlrpc/";
 	
-    public static var chUrl : String = "https://boss.emulab.net/protogeni/xmlrpc/";
+    public static const chUrl : String = "https://boss.emulab.net/protogeni/xmlrpc/";
 
     public static var getCredential : Array = new Array(sa, "GetCredential");
     public static var getKeys : Array = new Array(sa, "GetKeys");

@@ -135,12 +135,11 @@
 			{
 				var reqHbox:HGroup = new HGroup();
 				var removeButton:Button = DisplayUtil.getButton(ImageUtil.cancelIcon, true);
-				//removeButton.data = rqn;
 				removeButton.toolTip = "Cancel this operation";
 				removeButton.addEventListener(MouseEvent.CLICK,
 					function remove(e:MouseEvent):void
 					{
-						Main.geniHandler.requestHandler.remove(e.currentTarget.data.item);
+						Main.geniHandler.requestHandler.remove(rqn.item);
 						/*
 						Alert.show("Really remove '" + e.currentTarget.data.item.name + "' from the queue?", "Remove?", Alert.YES|Alert.NO, Main.Application(),
 						function removeRequest(e:CloseEvent):void

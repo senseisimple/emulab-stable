@@ -3,11 +3,12 @@
 					   xmlns:s="library://ns.adobe.com/flex/spark" 
 					   xmlns:mx="library://ns.adobe.com/flex/mx"
 					   xmlns:display="protogeni.display.*"
-					   title="I want to..."
+					   title="Welcome"
 					   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
-					   width="200" height="180" close="closeWindow()" contentCreationComplete="this.closeButton = null">
+					   close="closeWindow()"
+					   contentCreationComplete="this.closeButton = null">
 	<s:layout>
-		<s:VerticalLayout paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5" gap="5" horizontalAlign="center" />
+		<s:VerticalLayout horizontalAlign="center" />
 	</s:layout>
 	
 	<fx:Script>
@@ -18,6 +19,7 @@
 			import mx.managers.PopUpManager;
 			
 			import protogeni.Util;
+			import protogeni.display.ImageUtil;
 			import protogeni.display.skins.TitleWindowSkin;
 			
 			public function showWindow():void
@@ -51,12 +53,21 @@
 		]]>
 	</fx:Script>
 	
-	<s:Label text="Not a user?" />
-	<s:Button label="View resources" width="100%" height="33%" toolTip="View resources available in GENI, but allocation of resources is not available"
-			  click="doPublic()" />
-	<s:Button label="Become a user" width="100%" height="33%" toolTip="Follow a few simple steps to be able to allocate resources"
-			  click="Util.openWebsite('https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup')" />
-	<s:Label text="For users" />
-	<s:Button label="Log in" width="100%" height="33%" toolTip="Log in to view and be able to allocate resources"
-			  click="doAuthenticate()" />
+	<s:BitmapImage source="{ImageUtil.logoIcon}" />
+	<s:VGroup width="50%" paddingTop="10" paddingBottom="10" horizontalAlign="center">
+		<s:Button label="Log in"
+				  width="100%" height="30"
+				  icon="{ImageUtil.authenticationIcon}"
+				  toolTip="Log in to view and be able to allocate resources"
+				  click="doAuthenticate()" />
+		<s:Label text="Not a user?" />
+		<s:Button label="View resources"
+				  width="100%" height="30"
+				  toolTip="View resources available in GENI, but allocation of resources is not available"
+				  click="doPublic()" />
+		<s:Button label="Become a user"
+				  width="100%" height="30"
+				  toolTip="Follow a few simple steps to be able to allocate resources"
+				  click="Util.openWebsite('https://www.protogeni.net/trac/protogeni/wiki/MapClientManual#Setup')" />
+	</s:VGroup>
 </s:TitleWindow>

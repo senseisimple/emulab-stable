@@ -8,9 +8,12 @@
 		<![CDATA[
 			import mx.collections.ArrayList;
 			import mx.controls.Alert;
+			import mx.events.CloseEvent;
 			
 			import protogeni.GeniDispatcher;
 			import protogeni.Util;
+			import protogeni.resources.GeniManager;
+			import protogeni.resources.ProtogeniRspecProcessor;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualInterface;
 			import protogeni.resources.VirtualLink;
@@ -25,6 +28,11 @@
 			
 			public function loadLink(pl:VirtualLink):void {
 				link = pl;
+
+				if((pl.slivers[0] as Sliver).manager.type == GeniManager.TYPE_PROTOGENI) {
+					previewRspecButton.includeInLayout = true;
+					previewRspecButton.visible = true;
+				}
 				
 				types = new ArrayList();
 				types.addItem({type:link.linkType, name:VirtualLink.TypeToString(link.linkType)});
@@ -60,8 +68,34 @@
 				}
 			}
 			
+			public function previewRspec():void
+			{
+				Alert.show("This preview will not show any changes made if changes have been made without applying.  Would you like to apply any changes before previewing?",
+					"Apply?",
+					Alert.YES|Alert.NO|Alert.CANCEL,
+					this,
+					function closeEvent(event:CloseEvent):void {
+						switch(event.detail) {
+							case Alert.CANCEL:
+								return;
+							case Alert.YES:
+								save();
+							default:
+								var previewRspec:XmlWindow = new XmlWindow();
+								previewRspec.title = "Preview Request RSPEC for: " + link.clientId;
+								previewRspec.loadXml(((link.slivers[0] as Sliver).manager.rspecProcessor as ProtogeniRspecProcessor).generateLinkRspec(link));
+								previewRspec.showWindow();
+						}
+					});
+			}
+			
 			public function success():void
 			{
+				save();
+				closeWindow();
+			}
+			
+			public function save():void {
 				this.link.clientId = this.idLabel.Text;
 				if(link.linkType != this.typeList.selectedItem.type) {
 					if(this.typeList.selectedItem.type == VirtualLink.TYPE_TUNNEL)
@@ -70,7 +104,6 @@
 						link.linkType = this.typeList.selectedItem.type;
 				}
 				Main.geniDispatcher.dispatchSliceChanged((link.slivers[0] as Sliver).slice);
-				closeWindow();
 			}
 		]]>
 	</fx:Script>
@@ -81,6 +114,11 @@
 							 icon="{ImageUtil.pageWhiteIcon}"
 							 click="viewRspec()"
 							 toolTip="View the most recent valid RSPEC" />
+		<display:ImageButton id="previewRspecButton"
+							 visible="false" includeInLayout="false"
+							 icon="{ImageUtil.pageCodeIcon}"
+							 click="previewRspec()"
+							 toolTip="Preview the Request RSPEC" />
 	</s:HGroup>
 	
 	<s:HGroup verticalAlign="middle">

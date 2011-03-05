@@ -21,7 +21,10 @@
 {
 	public class ImageUtil
 	{
-		// Embedded images used around the application
+		[Bindable]
+		[Embed(source="../../../images/flack.png")]
+		public static var logoIcon:Class;
+		
 		[Bindable]
 		[Embed(source="../../../images/chart_bar.png")]
 		public static var statisticsIcon:Class;
@@ -33,10 +36,6 @@
 		[Bindable]
 		[Embed(source="../../../images/information.png")]
 		public static var infoIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/entity.png")]
-		public static var authorityIcon:Class;
 		
 		[Bindable]
 		[Embed(source="../../../images/help.png")]
@@ -163,14 +162,6 @@
 		public static var refreshIcon:Class;
 		
 		[Bindable]
-		[Embed(source="../../../images/find.png")]
-		public static var findIcon:Class;
-		
-		[Bindable]
-		[Embed(source="../../../images/magnifier.png")]
-		public static var searchIcon:Class;
-		
-		[Bindable]
 		[Embed(source="../../../images/map.png")]
 		public static var mapIcon:Class;
 		
@@ -210,8 +201,48 @@
 		[Embed(source="../../../images/system_monitor.png")]
 		public static var consoleIcon:Class;
 		
+		// Entities
+		
+		[Bindable]
+		[Embed(source="../../../images/entity.png")]
+		public static var authorityIcon:Class;
+		
 		[Bindable]
 		[Embed(source="../../../images/building.png")]
 		public static var managerIcon:Class;
+		
+		// Operations
+		
+		[Bindable]
+		[Embed(source="../../../images/find.png")]
+		public static var findIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/magnifier.png")]
+		public static var searchIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/disk.png")]
+		public static var saveIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/folder.png")]
+		public static var openIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/paste_plain.png")]
+		public static var pasteIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/page_white_copy.png")]
+		public static var copyIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/key.png")]
+		public static var passwordIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/shield.png")]
+		public static var authenticationIcon:Class;
 	}
 }

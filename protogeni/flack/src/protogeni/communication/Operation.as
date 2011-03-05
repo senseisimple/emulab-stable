@@ -33,8 +33,8 @@ package protogeni.communication
 
   public class Operation
   {
-	  public static var XMLRPC:int = 0;
-	  public static var HTTP:int = 1;
+	  public static const XMLRPC:int = 0;
+	  public static const HTTP:int = 1;
 	  
     public function Operation(qualifiedMethod : Array = null, newNode:Request = null, newType:int = 0) : void
     {

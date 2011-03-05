@@ -26,7 +26,7 @@
 		public static function TypeToString(type:int):String {
 			switch(type){
 				case TYPE_NORMAL:
-					return "VLAN";
+					return "LAN";
 				case TYPE_TUNNEL:
 					return "Tunnel";
 				case TYPE_ION:
@@ -50,42 +50,35 @@
 		public var slivers:Array;
 		public var rspec:XML;
 		
-		// TODEPRECIATE
-		public var firstNode:VirtualNode;
-		public var secondNode:VirtualNode;
-		
 		// Depreciated
 		public var bandwidth:Number;
 		
-		public function VirtualLink(owner:Sliver)
+		public function VirtualLink(owner:Sliver = null)
 		{
-			slivers = new Array(owner);
+			if(owner != null)
+				slivers = new Array(owner);
+			else
+				slivers = new Array();
 		}
 		
 		public function establish(first:VirtualNode, second:VirtualNode):Boolean
 		{
-			var firstInterface:VirtualInterface;
-			var secondInterface:VirtualInterface;
+			var firstInterface:VirtualInterface = first.allocateInterface();
+			var secondInterface:VirtualInterface = second.allocateInterface();
+			if(firstInterface == null || secondInterface == null)
+				return false;
+			clientId = slivers[0].slice.getUniqueVirtualLinkId(this);
+			first.interfaces.Add(firstInterface);
+			second.interfaces.Add(secondInterface);
+			firstInterface.virtualLinks.addItem(this);
+			secondInterface.virtualLinks.addItem(this);
+			this.interfaces.addItem(firstInterface);
+			this.interfaces.addItem(secondInterface);
+			
 			if(first.manager == second.manager)
-			{
 				linkType = TYPE_NORMAL;
-				
-				firstInterface = first.allocateInterface();
-				secondInterface = second.allocateInterface();
-				if(firstInterface == null || secondInterface == null)
-					return false;
-				first.interfaces.Add(firstInterface);
-				second.interfaces.Add(secondInterface);
-			}
 			 else
 			 {
-				 firstInterface = first.allocateInterface();
-				 secondInterface = second.allocateInterface();
-				 if(firstInterface == null || secondInterface == null)
-					 return false;
-				 first.interfaces.Add(firstInterface);
-				 second.interfaces.Add(secondInterface);
-				 
 				 if(first.manager.supportsIon && second.manager.supportsIon && Main.useIon)
 					 linkType = TYPE_ION;
 				 else if (first.manager.supportsGpeni && second.manager.supportsGpeni && Main.useGpeni)
@@ -106,22 +99,8 @@
 					 slivers.push(second.slivers[0]);
 			 }
 			
-			this.interfaces.addItem(firstInterface);
-			this.interfaces.addItem(secondInterface);
-			firstNode = first;
-			secondNode = second;
-			first.links.addItem(this);
-			second.links.addItem(this);
-			firstInterface.virtualLinks.addItem(this);
-			secondInterface.virtualLinks.addItem(this);
-			clientId = slivers[0].slice.getUniqueVirtualLinkId(this);
 			for each(var s:Sliver in slivers)
 				s.links.addItem(this);
-			if(first.manager == second.manager)
-			{
-				firstInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
-				secondInterface.id = slivers[0].slice.getUniqueVirtualInterfaceId();
-			}
 			
 			// depreciated
 			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
@@ -152,21 +131,14 @@
 			{
 				if(vi.id != "control")
 					vi.owner.interfaces.collection.removeItemAt(vi.owner.interfaces.collection.getItemIndex(vi));
+				
+				for(var i:int = 1; i < vi.owner.slivers.length; i++)
+				{
+					if((vi.owner.slivers.getItemAt(i) as Sliver).links.getForNode(vi.owner).length == 0)
+						(vi.owner.slivers.getItemAt(i) as Sliver).nodes.remove(vi.owner);
+				}
 			}
 			interfaces.removeAll();
-			// Remove nodes
-			firstNode.links.removeItemAt(firstNode.links.getItemIndex(this));
-			for(var i:int = 1; i < firstNode.slivers.length; i++)
-			{
-				if((firstNode.slivers.getItemAt(i) as Sliver).links.getForNode(firstNode).length == 0)
-					(firstNode.slivers.getItemAt(i) as Sliver).nodes.remove(firstNode);
-			}
-			secondNode.links.removeItemAt(secondNode.links.getItemIndex(this));
-			for(i = 1; i < secondNode.slivers.length; i++)
-			{
-				if((secondNode.slivers.getItemAt(i) as Sliver).links.getForNode(secondNode).length == 0)
-					(secondNode.slivers.getItemAt(i) as Sliver).nodes.remove(secondNode);
-			}
 			for each(var s:Sliver in slivers)
 			{
 				s.links.removeItemAt(s.links.getItemIndex(this));
@@ -191,7 +163,7 @@
 					return true;
 			}
 
-			return (firstNode == node || secondNode == node);
+			return false;
 		}
 		
 		public function hasPhysicalNode(node:PhysicalNode):Boolean
