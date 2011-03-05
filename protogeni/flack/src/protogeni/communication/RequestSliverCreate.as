@@ -70,14 +70,14 @@ package protogeni.communication
 	private function failed():void {
 		// Remove any pending SliverCreate calls
 		sliver.status = Sliver.STATUS_FAILED;
-		sliver.state = Sliver.STATE_FAILED;
+		sliver.state = Sliver.STATE_NA;
 		
 		// Cancel remaining calls
 		var tryDeleteNode:RequestQueueNode = this.node.next;
 		while(tryDeleteNode != null && tryDeleteNode.item is RequestSliverCreate && (tryDeleteNode.item as RequestSliverCreate).sliver.slice == sliver.slice)
 		{
 			(tryDeleteNode.item as RequestSliverCreate).sliver.status = Sliver.STATUS_FAILED;
-			(tryDeleteNode.item as RequestSliverCreate).sliver.state = Sliver.STATE_FAILED;
+			(tryDeleteNode.item as RequestSliverCreate).sliver.state = Sliver.STATE_NA;
 			Main.geniHandler.requestHandler.remove(tryDeleteNode.item, false);
 			tryDeleteNode = tryDeleteNode.next;
 		}

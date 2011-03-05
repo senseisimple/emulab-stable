@@ -585,7 +585,7 @@ package protogeni.resources
 										{
 											// Get outside node, don't add if not parsed in the other cm yet
 											interfacedNode = s.slice.getVirtualNodeWithId(nid);
-											if(interfacedNode == null)
+											if(interfacedNode == null || !(interfacedNode.slivers[0] as Sliver).created)
 											{
 												virtualLink = null;
 												break;
@@ -612,7 +612,7 @@ package protogeni.resources
 										{
 											// Get outside node, don't add if not parsed in the other cm yet
 											interfacedNodeInterface = s.slice.getVirtualInterfaceWithId(niid);
-											if(interfacedNodeInterface == null)
+											if(interfacedNodeInterface == null || !interfacedNodeInterface.owner.slivers[0].created)
 											{
 												virtualLink = null;
 												break;
@@ -672,6 +672,8 @@ package protogeni.resources
 						}
 					}
 				}
+				
+				return;
 		}
 		
 		public function generateSliverRspec(s:Sliver):XML

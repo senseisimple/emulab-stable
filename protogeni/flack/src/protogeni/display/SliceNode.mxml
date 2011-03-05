@@ -30,31 +30,38 @@
 			public function resetToStatus():void
 			{
 				this.toolTip = "";
-				if(node.status == VirtualNode.STATUS_READY)
-				{
-					currentStyle = "validStyle";
-					this.toolTip = node.state;
-				} else if(node.status == VirtualNode.STATUS_FAILED)
-				{
-					currentStyle = "failedStyle";
-					this.toolTip = "Error: " + node.error;
-				} else {
-					if(node.state == null || node.status == null ||
-						(node.state.length == 0 && node.status.length == 0))
-					{
-						toolTip = "Name: " + node.clientId;
-						if(node.sliverId != null && node.sliverId.length > 0)
-							toolTip += "\nURN: " + node.sliverId;
-						if(node.manager != null)
-							toolTip += "\nManager: " + node.manager.Hrn;
-					}
-					else
-						toolTip = "State: " + node.state + " Status: " + node.status;
-					if(node.status == VirtualNode.STATUS_CHANGING)
+				switch(node.status) {
+					case VirtualNode.STATUS_READY:
+						currentStyle = "validStyle";
+						this.toolTip = node.state;
+						break;
+					case VirtualNode.STATUS_FAILED:
+						currentStyle = "failedStyle";
+						this.toolTip = "Error: " + node.error;
+						break;
+					case VirtualNode.STATUS_CHANGING:
 						currentStyle = "inprogressStyle";
-					else
+						this.toolTip = "Status is changing...";
+						break;
+					case VirtualNode.STATUS_NOTREADY:
+						currentStyle = "inprogressStyle";
+						this.toolTip = "Node is not ready";
+						break;
+					default:
 						currentStyle = "unknownStyle";
+						if(node.state == null || node.status == null ||
+							(node.state.length == 0 && node.status.length == 0))
+						{
+							toolTip = "Name: " + node.clientId;
+							if(node.sliverId != null && node.sliverId.length > 0)
+								toolTip += "\nURN: " + node.sliverId;
+							if(node.manager != null)
+								toolTip += "\nManager: " + node.manager.Hrn;
+						}
+						else
+							toolTip = "State: " + node.state + " Status: " + node.status;
 				}
+
 				adjustWidth();
 			}
 			

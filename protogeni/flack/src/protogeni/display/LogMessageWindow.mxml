@@ -41,8 +41,9 @@
 	<s:HGroup width="100%" verticalAlign="middle">
 		<s:Image id="typeImage" />
 		<s:Label id="nameField" fontSize="17" fontWeight="bold" color="green" width="100%" />
-		<s:Button icon="{ImageUtil.copyIcon}" toolTip="Copy to clipboard"
-				  click="System.setClipboard(message.toString())" />
+		<display:ImageButton icon="{ImageUtil.copyIcon}"
+							 toolTip="Copy to clipboard"
+							 click="System.setClipboard(message.toString())" />
 	</s:HGroup>
 	<s:HGroup>
 		<s:Label text="Group ID" />

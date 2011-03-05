@@ -201,8 +201,8 @@
 					&& this.sliceCanvas.slice.hasAllAllocatedResources()
 					&& !this.sliceCanvas.slice.isStaged()
 					&& Main.geniHandler.requestHandler.queue.isEmpty()
-					&& this.sliceCanvas.slice.Status() != Slice.READY
-					&& this.sliceCanvas.slice.Status() != Slice.FAILED)
+					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_READY
+					&& this.sliceCanvas.slice.Status() != Sliver.STATUS_FAILED)
 					Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice, true);
 			}
 			
@@ -350,7 +350,7 @@
 	</fx:Script>
 	
 	<s:HGroup width="100%" verticalAlign="middle">
-		<s:Label id="hrnLabel" text="{sliceCanvas.slice.hrn}" toolTip="{sliceCanvas.slice.urn}" width="100%" fontSize="17" fontWeight="bold" />
+		<s:Label id="hrnLabel" text="{sliceCanvas.slice.name}" toolTip="{sliceCanvas.slice.urn}" width="100%" fontSize="17" fontWeight="bold" />
 		<display:ImageButton icon="{ImageUtil.pasteIcon}"
 							 toolTip="Paste RSPEC"
 							 click="importRspec()" />
