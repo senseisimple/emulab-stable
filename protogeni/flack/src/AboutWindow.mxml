@@ -19,9 +19,8 @@
 
 	<s:BitmapImage source="@Embed('../images/protogeni.png')" />
 	<s:Label text="Displays resources from ProtoGENI and associated federations." />
-	<mx:LinkButton label="Visit our website" height="24">
-		<mx:click>Util.openWebsite('http://www.protogeni.net');</mx:click>
-	</mx:LinkButton>
+	<s:Button label="Open the manual" click="Util.showManual();" height="24" />
+	<s:Button label="Visit our website" click="Util.openWebsite('http://www.protogeni.net');" height="24" />
 	<display:DefaultLine percentWidth="90" />
 	<s:Label text="Special thanks to" fontWeight="bold" fontStyle="italic"/>
 	<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">

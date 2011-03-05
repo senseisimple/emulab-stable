@@ -37,7 +37,7 @@
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGER_CHANGED, Reset);
 				Main.geniDispatcher.addEventListener(GeniEvent.GENIMANAGERS_CHANGED, refreshList);	
 				okButton.enabled = Main.geniHandler.GeniManagers.length > 0;
-				okButton.setFocus()
+				okButton.setFocus();
 			}
 			
 			public override function closeWindow(event:Event=null):void {
@@ -139,7 +139,7 @@
 					var cmCheckbox:CheckBox = cmHgroup.getElementAt(0) as CheckBox;
 					var cmInfo:Button = cmHgroup.getElementAt(1) as Button;
 					cmInfo.styleName = "unknownStyle";
-					cmInfo.setStyle("icon", DisplayUtil.flagOrangeIcon);
+					cmInfo.setStyle("icon", ImageUtil.flagOrangeIcon);
 				}
 			}
 			
@@ -153,12 +153,12 @@
 				
 				if(gm.Status == GeniManager.STATUS_FAILED) {
 					cmInfo.styleName = "failedStyle";
-					cmInfo.setStyle("icon", DisplayUtil.flagRedIcon);
+					cmInfo.setStyle("icon", ImageUtil.flagRedIcon);
 					cmHbox.toolTip = gm.errorDescription;
 					if(cmGoto == null && gm.mightNeedSecurityException())
 					{
 						cmGoto = new ImageButton();
-						cmGoto.setStyle("icon", DisplayUtil.exclamationIcon);
+						cmGoto.setStyle("icon", ImageUtil.exclamationIcon);
 						cmGoto.toolTip = "Click to open CM URL, it appears that you might need to add a security exception";
 						cmGoto.addEventListener(MouseEvent.CLICK,
 							function openGm():void {
@@ -169,18 +169,18 @@
 				}
 				else if(gm.Status == GeniManager.STATUS_UNKOWN) {
 					cmInfo.styleName = "unknownStyle";
-					cmInfo.setStyle("icon", DisplayUtil.flagOrangeIcon);
+					cmInfo.setStyle("icon", ImageUtil.flagOrangeIcon);
 					cmHbox.toolTip = "Unknown status";
 				}
 				else if(gm.Status == GeniManager.STATUS_INPROGRESS) {
 					cmInfo.styleName = "inprogressStyle";
-					cmInfo.setStyle("icon", DisplayUtil.flagOrangeIcon);
+					cmInfo.setStyle("icon", ImageUtil.flagOrangeIcon);
 					cmHbox.toolTip = "In progress...";
 				}
 				else if(gm.Status == GeniManager.STATUS_VALID)
 				{
 					cmInfo.styleName = "validStyle";
-					cmInfo.setStyle("icon", DisplayUtil.flagGreenIcon);
+					cmInfo.setStyle("icon", ImageUtil.flagGreenIcon);
 					cmHbox.toolTip = "Valid";
 				}
 				updateWidth();
@@ -247,7 +247,7 @@
 		<s:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true" />
 		<display:ImageButton id="refreshButton"
 							 includeInLayout="false" visible="false"
-							 icon="{DisplayUtil.refreshIcon}"
+							 icon="{ImageUtil.refreshIcon}"
 							 click="Main.geniHandler.requestHandler.loadComponentManagers();"/>
 		<mx:Spacer width="100%"/>
 		<s:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
@@ -260,9 +260,9 @@
 		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
 	</display:controlBarLayout>
 	<display:controlBarContent>
-		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" height="24"
+		<mx:Button id="cancelButton" label="Cancel" icon="{ImageUtil.crossIcon}" height="24"
 				   click="closeWindow();" />
-		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" height="24"
+		<mx:Button id="okButton" label="Apply" icon="{ImageUtil.availableIcon}" height="24"
 				   click="success();" enabled="false" />
 	</display:controlBarContent>
 </display:DefaultWindow>

@@ -7,6 +7,7 @@ package protogeni.resources
 	
 	import protogeni.Util;
 	import protogeni.communication.Request;
+	import protogeni.display.DisplayUtil;
 
 	public class GeniManager
 	{
@@ -54,6 +55,8 @@ package protogeni.resources
 		
 		public var AllNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 		
+		public var colorIdx:int;
+		
 		public function AllNodesAsArray():Array {
 			var allNodesArray:Array = new Array();
 			for each (var elem:PhysicalNode in AllNodes) {
@@ -85,6 +88,7 @@ package protogeni.resources
 		public function GeniManager()
 		{
 			Nodes = new PhysicalNodeGroupCollection(this);
+			colorIdx = DisplayUtil.getColorIdx();
 		}
 		
 		public function VisitUrl():String

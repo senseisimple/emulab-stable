@@ -59,7 +59,7 @@ package protogeni.display
 			setLink(vl);
 			
 			removeButton = new ImageButton();
-			removeButton.setStyle("icon", DisplayUtil.crossIcon);
+			removeButton.setStyle("icon", ImageUtil.crossIcon);
 			removeButton.addEventListener(MouseEvent.CLICK, removeLink);
 			canvas.addElement(removeButton);
 			canvas.allLinks.addItem(this);

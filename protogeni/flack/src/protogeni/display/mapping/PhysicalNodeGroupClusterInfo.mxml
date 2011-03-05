@@ -38,9 +38,11 @@
 			
 			public function addNodeGroup(ng:PhysicalNodeGroup):void {
 				var ngButton:Button = new Button();
+				ngButton.setStyle("chromeColor", DisplayUtil.colorsDark[ng.GetManager().colorIdx]);
 				ngButton.height = 24;
 				ngButton.percentWidth = 100;
 				ngButton.label = ng.collection.length.toString() + " Nodes";
+				ngButton.toolTip = ng.GetManager().Hrn;
 				ngButton.addEventListener(MouseEvent.CLICK,
 					function openNodeGroup(evt:Event):void
 					{
@@ -50,7 +52,7 @@
 							DisplayUtil.viewPhysicalNode(ng.collection[0]);
 					});
 				
-				if(ng.city.length == 0)
+				if(ng.original.city.length == 0)
 				{
 					var geocoder:ClientGeocoder = new ClientGeocoder();
 					
@@ -70,7 +72,7 @@
 											city = splitAddress[1];
 										else
 											city = fullAddress;
-									ng.city = city;
+									ng.original.city = city;
 									ngButton.label = city + " (" + ng.collection.length + ")";
 								} catch (err:Error) { }
 							}
@@ -83,7 +85,7 @@
 					
 					geocoder.reverseGeocode(new LatLng(ng.latitude, ng.longitude));
 				} else {
-					ngButton.label = ng.city + " (" + ng.collection.length + ")";
+					ngButton.label = ng.original.city + " (" + ng.collection.length + ")";
 				}
 				nodeGroupButtonsVbox.addElement(ngButton);
 			}

@@ -58,6 +58,11 @@ package protogeni
 		return urn.split("+")[1];
 	}
 	
+	public static function getNameFromUrn(urn:String) : String
+	{
+		return urn.split("+")[3];
+	}
+	
 	// Takes the given bandwidth and creates a human readable string
 	public static function kbsToString(bandwidth:Number):String {
 		var bw:String = "";
@@ -138,9 +143,17 @@ package protogeni
 	}
 	
 	public static function areEqual(a:Array,b:Array):Boolean {
+		// handle null arrays
+		if(a == null && b == null)
+			return true;
+		else if(a == null || b == null)
+			return false;
+		
+		// obviously not equal
 		if(a.length != b.length) {
 			return false;
 		}
+		
 		var len:int = a.length;
 		for(var i:int = 0; i < len; i++) {
 			if(a[i] !== b[i]) {

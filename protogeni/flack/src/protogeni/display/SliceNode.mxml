@@ -144,12 +144,12 @@
 	</fx:Script>
 	
 	
-	<display:ImageButton id="removeButton" icon="{DisplayUtil.crossIcon}"
+	<display:ImageButton id="removeButton" icon="{ImageUtil.crossIcon}"
 						  mouseDown="remove(event)" />
 	<display:ImageButton id="infoButton" icon="@Embed('../../../images/information.png')"
 						  mouseDown="showInfo(event)" />
 	<s:Label id="nameLabel" text="{node.id}" width="100%" />
-	<display:ImageButton id="addLink" icon="{DisplayUtil.addIcon}"
+	<display:ImageButton id="addLink" icon="{ImageUtil.addIcon}"
 						  mouseDown="mouseDownHandler(event)" />
 	
 </s:BorderContainer>

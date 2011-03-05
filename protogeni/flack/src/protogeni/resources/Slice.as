@@ -18,7 +18,7 @@
 	
 	import mx.collections.ArrayCollection;
 	
-	import protogeni.display.DisplayUtil;
+	import protogeni.display.ImageUtil;
 	
 	// Slice that a user created in ProtoGENI
 	public class Slice
@@ -41,7 +41,9 @@
 		public var hrn : String = null;
 		[Bindable]
 		public var urn : String = null;
-		public var creator : User = null;
+		[Bindable]
+		public var name : String = null;
+		public var creator : GeniUser = null;
 		public var credential : String = "";
 		public var slivers:SliverCollection = new SliverCollection();
 
@@ -199,6 +201,7 @@
 			newSlice.uuid = this.uuid;
 			newSlice.hrn = this.hrn;
 			newSlice.urn = this.urn;
+			newSlice.name = this.name;
 			newSlice.creator = this.creator;
 			newSlice.credential = this.credential;
 			newSlice.validUntil = this.validUntil;
@@ -343,9 +346,9 @@
 		
 		public function ReadyIcon():Class {
 			switch(Status()) {
-				case READY : return DisplayUtil.flagGreenIcon;
-				case NOTREADY : return DisplayUtil.flagYellowIcon;
-				case FAILED : return DisplayUtil.flagRedIcon;
+				case READY : return ImageUtil.flagGreenIcon;
+				case NOTREADY : return ImageUtil.flagYellowIcon;
+				case FAILED : return ImageUtil.flagRedIcon;
 				default : return null;
 			}
 		}

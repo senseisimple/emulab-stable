@@ -45,8 +45,6 @@ package protogeni.communication
 				newCm.Urn = s;
 				newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
 				newCm.Hrn = s.split('+')[1];
-				//if(newCm.Hrn != "cron.cct.lsu.edu")
-				//	continue;
 				Main.geniHandler.GeniManagers.add(newCm);
 				newCm.Status = GeniManager.STATUS_INPROGRESS;
 				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);

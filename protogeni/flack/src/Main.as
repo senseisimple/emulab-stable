@@ -74,7 +74,7 @@
 
 	[Bindable]
 	public static var geniHandler:GeniHandler;
-	public static var geniDispatcher:GeniDispatcher;
+	public static var geniDispatcher:GeniDispatcher = new GeniDispatcher();
 
 	private static var visitedSites:Dictionary = new Dictionary();
 	public static var certBundle:String;

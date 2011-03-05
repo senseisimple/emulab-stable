@@ -204,7 +204,7 @@
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle">
 			<mx:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
-					  icon="{DisplayUtil.sslIcon}"
+					  icon="{ImageUtil.sslIcon}"
 					  click="this.tryLoadCert(Util.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
 			<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
 			<s:Label id="getLabel" text="" />
@@ -217,9 +217,9 @@
 		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
 	</display:controlBarLayout>
 	<display:controlBarContent>
-		<mx:Button id="okButton" label="OK" icon="{DisplayUtil.availableIcon}" height="24"
+		<mx:Button id="okButton" label="OK" icon="{ImageUtil.availableIcon}" height="24"
 				  click="trySubmit();" />
-		<mx:Button label="Cancel" icon="{DisplayUtil.crossIcon}" height="24"
+		<mx:Button label="Cancel" icon="{ImageUtil.crossIcon}" height="24"
 				  click="closeWindow()" />
 	</display:controlBarContent>
 </display:DefaultWindow>

@@ -130,10 +130,10 @@
 				
 				if(isCreated)
 				{
-					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteCodeIcon);
+					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteCodeIcon);
 					this.rspecButton.toolTip = "View RSPEC(s) from the created sliver(s)";
 				} else {
-					this.rspecButton.setStyle("icon", DisplayUtil.pageWhiteIcon);
+					this.rspecButton.setStyle("icon", ImageUtil.pageWhiteIcon);
 					this.rspecButton.toolTip = "Sliver(s) not created yet";
 				}
 				
@@ -292,7 +292,7 @@
 			}
 			
 			private function assignAvailableIcon(item:Object):Class {
-				return DisplayUtil.availableIcon;
+				return ImageUtil.availableIcon;
 			}
 		]]>
 	</fx:Script>
@@ -302,11 +302,11 @@
 		<s:Rect width="100%"/>
 		<s:Label id="urnLabel" text="{sliceCanvas.slice.urn}" />
 		<display:ImageButton id="rspecButton"
-							 icon="{DisplayUtil.pageWhiteIcon}"
+							 icon="{ImageUtil.pageWhiteIcon}"
 							 click="viewRspecs()"
 							 toolTip="View the most recent valid RSPEC" />
 		<display:ImageButton id="previewRspecButton"
-							  icon="{DisplayUtil.pageCodeIcon}"
+							  icon="{ImageUtil.pageCodeIcon}"
 							 click="previewRspecs()"
 							 toolTip="Preview the Request RSPEC" />
 		<s:CheckBox id="ionCheckbox" color="{SliceLink.ION_COLOR}"
@@ -335,27 +335,27 @@
 	</display:controlBarLayout>
 	<display:controlBarContent>
 		<mx:Button id="createButton" toolTip="Create slivers" label="Create" height="24"
-				   icon="{DisplayUtil.actionIcon}"
+				   icon="{ImageUtil.actionIcon}"
 				   click="Main.geniHandler.requestHandler.submitSlice(sliceCanvas.slice);"/>
 		<display:ImageButton id="refreshButton" toolTip="Refresh slivers"
 							  click="Main.geniHandler.requestHandler.refreshSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.refreshIcon}"/>
+							  icon="{ImageUtil.refreshIcon}"/>
 		<s:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
 		<display:ImageButton id="deleteButton" toolTip="Delete slivers"
 							  click="Main.geniHandler.requestHandler.deleteSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.deleteIcon}"/>
+							  icon="{ImageUtil.deleteIcon}"/>
 		<display:DefaultLine percentHeight="90" />
 		<mx:Button id="embedButton" label="Embed" toolTip="Embed slivers"
 				   click="Main.geniHandler.requestHandler.embedSlice(sliceCanvas.slice)" />
 		<display:DefaultLine percentHeight="90" />
 		<display:ImageButton id="startButton" toolTip="Start slivers"
 							  click="Main.geniHandler.requestHandler.startSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.playControlIcon}"/>
+							  icon="{ImageUtil.playControlIcon}"/>
 		<display:ImageButton id="stopButton" toolTip="Stop slivers"
 							  click="Main.geniHandler.requestHandler.stopSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.stopControlIcon}"/>
+							  icon="{ImageUtil.stopControlIcon}"/>
 		<display:ImageButton id="restartButton" toolTip="Restart slivers"
 							  click="Main.geniHandler.requestHandler.restartSlice(sliceCanvas.slice);"
-							  icon="{DisplayUtil.repeatControlIcon}"/>
+							  icon="{ImageUtil.repeatControlIcon}"/>
 	</display:controlBarContent>
 </display:DefaultWindow>

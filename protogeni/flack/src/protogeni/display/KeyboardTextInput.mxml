@@ -40,6 +40,6 @@
 	</fx:Script>
 	<s:TextInput id="textInput" height="24" width="100%" />
 	<display:ImageButton
-		icon="{DisplayUtil.keyboardIcon}"
+		icon="{ImageUtil.keyboardIcon}"
 		click="openKeyboard()" />
 </s:HGroup>
