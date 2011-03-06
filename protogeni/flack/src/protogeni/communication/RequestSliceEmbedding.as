@@ -18,7 +18,7 @@ package protogeni.communication
 	
 	import protogeni.resources.Sliver;
 
-  public class RequestSliceEmbedding extends Request
+  public final class RequestSliceEmbedding extends Request
   {
     public function RequestSliceEmbedding(newSliver:Sliver) : void
     {

@@ -2,7 +2,7 @@ package protogeni.resources
 {
 	import protogeni.Util;
 	
-	public class SliverCollection
+	public final class SliverCollection
 	{
 		public var collection:Vector.<Sliver>;
 		public function SliverCollection()
@@ -52,7 +52,7 @@ package protogeni.resources
 		{
 			for each(var sliver:Sliver in this.collection)
 			{
-				if(sliver.urn == urn)
+				if(sliver.urn.full == urn)
 					return sliver;
 			}
 			return null;

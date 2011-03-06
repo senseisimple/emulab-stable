@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -18,15 +18,15 @@ package protogeni.communication
 	
 	import flash.events.ErrorEvent;
 	
-	import protogeni.Util;
+	import protogeni.StringUtil;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
 
-  public class RequestGetVersionAm extends Request
+  public final class RequestGetVersionAm extends Request
   {
     public function RequestGetVersionAm(newAm:AggregateManager) : void
     {
-      super("GetVersion (" + Util.shortenString(newAm.Url, 15) + ")", "Getting the version of the aggregate manager for " + newAm.Hrn, CommunicationUtil.getVersionAm, true, true, true);
+      super("GetVersion (" + StringUtil.shortenString(newAm.Url, 15) + ")", "Getting the version of the aggregate manager for " + newAm.Hrn, CommunicationUtil.getVersionAm, true, true, true);
 	  ignoreReturnCode = true;
 	  am = newAm;
 	  //op.setUrl(am.Url);

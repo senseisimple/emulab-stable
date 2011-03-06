@@ -1,13 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="Console"
 						contentCreationComplete="onCreationComplete()" 
-						close="LogHandler.closeConsole();" xmlns:communication="protogeni.communication.*">
-	<display:layout>
+						close="LogHandler.closeConsole();" xmlns:communication="protogeni.communication.*" xmlns:components="protogeni.display.components.*">
+	<components:layout>
 		<s:VerticalLayout paddingBottom="0" paddingLeft="10" paddingRight="10" paddingTop="10"/>
-	</display:layout>
+	</components:layout>
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayList;
@@ -233,9 +251,9 @@
 			<s:Label text="Logs"  fontSize="14" fontWeight="bold"/>
 			<s:HGroup verticalAlign="middle">
 				<s:Button label="Clear" click="LogHandler.clear();" />
-				<display:DefaultLine height="24" />
+				<components:DefaultLine height="24" />
 				<s:Label text="Sort" />
-				<display:ImageButton id="sortButton"
+				<components:ImageButton id="sortButton"
 									  icon="{ImageUtil.upIcon}"
 									  click="toggleSorting()"
 									  toolTip="Switch the ordering" />
@@ -248,15 +266,15 @@
 		<s:VGroup height="100%" width="50%" horizontalAlign="center">
 			<s:Label text="Queued Requests"  fontWeight="bold" fontSize="14"/>
 			<s:HGroup gap="12">
-				<display:ImageButton id="stopButton"
+				<components:ImageButton id="stopButton"
 									  icon="{ImageUtil.stopIcon}"
 									  click="Main.geniHandler.requestHandler.stop();"
 									  toolTip="Force stop the queue" />
-				<display:ImageButton id="pauseButton"
+				<components:ImageButton id="pauseButton"
 									  icon="{ImageUtil.pauseControlIcon}"
 									  click="Main.geniHandler.requestHandler.pause();"
 									  toolTip="Force pause the queue" />
-				<display:ImageButton id="startButton"
+				<components:ImageButton id="startButton"
 									  icon="{ImageUtil.playControlIcon}"
 									  click="Main.geniHandler.requestHandler.start();"
 									  toolTip="Force start the queue" />
@@ -267,10 +285,10 @@
 			</s:Scroller>
 		</s:VGroup>
 	</mx:HDividedBox>
-	<display:controlBarLayout>
+	<components:controlBarLayout>
 		<s:HorizontalLayout verticalAlign="middle" paddingBottom="2" paddingTop="2" paddingLeft="2" paddingRight="10" />
-	</display:controlBarLayout>
-	<display:controlBarContent>
+	</components:controlBarLayout>
+	<components:controlBarContent>
 		<s:Label text="View" fontWeight="bold" verticalAlign="middle"/>
 		<s:DropDownList id="groupComboBox" requireSelection="true"
 						dataProvider="{groupNames}"
@@ -280,13 +298,13 @@
 						creationComplete="selectedIndex = 0" />
 		<s:Rect width="100%" />
 		<s:Button label="Redraw Map" click="Main.geniHandler.mapHandler.redrawFromScratch()" />
-		<display:DefaultLine height="90%" />
+		<components:DefaultLine height="90%" />
 		<s:Label text="Parallel Ops" />
 		<s:NumericStepper id="maxRunningStepper"
 						  value="{Main.geniHandler.requestHandler.maxRunning}"
 						  minimum="1"
 						  valueCommit="Main.geniHandler.requestHandler.maxRunning = maxRunningStepper.value; Main.geniHandler.requestHandler.tryNext();" />
-		<display:DefaultLine height="90%" />
+		<components:DefaultLine height="90%" />
 		<s:DropDownList id="requestList" labelField="name" requireSelection="true" height="24" width="150">
 			<s:ArrayCollection>
 				<communication:RequestUserResolve />
@@ -296,7 +314,7 @@
 				<communication:RequestListComponentsPublic />
 			</s:ArrayCollection>
 		</s:DropDownList>
-		<display:ImageButton id="runRequestButton" icon="{ImageUtil.actionIcon}" toolTip="Run the selected request"
+		<components:ImageButton id="runRequestButton" icon="{ImageUtil.actionIcon}" toolTip="Run the selected request"
 							  click="Main.geniHandler.requestHandler.pushRequest(requestList.selectedItem)" />
-	</display:controlBarContent>
-</display:DefaultWindow>
+	</components:controlBarContent>
+</components:DefaultWindow>

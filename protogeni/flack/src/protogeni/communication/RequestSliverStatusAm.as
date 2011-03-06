@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,17 +14,18 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	
-  public class RequestSliverStatusAm extends Request
+  public final class RequestSliverStatusAm extends Request
   {
     public function RequestSliverStatusAm(s:Sliver) : void
     {
 		super("SliverStatus", "Getting the sliver status on " + s.manager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.sliverStatusAm, true);
 		ignoreReturnCode = true;
 		sliver = s;
-		op.pushField(sliver.slice.urn);
+		op.pushField(sliver.slice.urn.full);
 		op.pushField([sliver.slice.credential]);
 		op.setExactUrl(sliver.manager.Url);
     }
@@ -34,7 +35,7 @@ package protogeni.communication
 		try
 		{
 			sliver.status = response.geni_status;
-			sliver.urn = response.geni_urn;
+			sliver.urn = new IdnUrn(response.geni_urn);
 			for each(var nodeObject:Object in response.geni_resources)
 			{
 				var vn:VirtualNode = sliver.nodes.getByUrn(nodeObject.geni_urn);

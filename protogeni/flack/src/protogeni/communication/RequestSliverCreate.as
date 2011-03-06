@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -18,20 +18,20 @@ package protogeni.communication
   
   import flash.events.ErrorEvent;
   
+  import protogeni.resources.IdnUrn;
   import protogeni.resources.Slice;
   import protogeni.resources.Sliver;
 
-  public class RequestSliverCreate extends Request
+  public final class RequestSliverCreate extends Request
   {
-	  
-	  public var sliver:Sliver;
-	  
+	public var sliver:Sliver;
+
     public function RequestSliverCreate(s:Sliver) : void
     {
 		super("SliverCreate", "Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
 		sliver = s;
 		s.created = false;
-		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("slice_urn", sliver.slice.urn.full);
 		op.addField("rspec", sliver.getRequestRspec().toXMLString());
 		op.addField("keys", sliver.slice.creator.keys);
 		op.addField("credentials", new Array(sliver.slice.credential));
@@ -44,17 +44,20 @@ package protogeni.communication
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
 			sliver.credential = response.value[0];
+			var cred:XML = new XML(sliver.credential);
+			sliver.urn = new IdnUrn(cred.credential.target_urn);
 			sliver.created = true;
 			sliver.staged = false;
 
 			sliver.rspec = new XML(response.value[1]);
 			sliver.parseRspec();
 			
-			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
+			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);
 			if(old != null)
 			{
-				if(old.slivers.getByUrn(sliver.urn) != null)
-					old.slivers.remove(old.slivers.getByUrn(sliver.urn));
+				var oldSliver:Sliver = old.slivers.getByGm(sliver.manager);
+				if(oldSliver != null)
+					old.slivers.remove(oldSliver);
 				old.slivers.add(sliver);
 			}
 			

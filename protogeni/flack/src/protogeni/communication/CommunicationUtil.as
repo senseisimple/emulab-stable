@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -18,20 +18,8 @@ package protogeni.communication
 	
 	import flash.events.ErrorEvent;
 	
-  public class CommunicationUtil
+  public final class CommunicationUtil
   {
-	  // Namespaces
-	  public static const rspec01Namespace:String = "http://www.protogeni.net/resources/rspec/0.1";
-	  public static const rspec02Namespace:String = "http://www.protogeni.net/resources/rspec/0.2";
-	  public static const rspec2Namespace:String = "http://www.protogeni.net/resources/rspec/2";
-	  
-	  // Schemas
-	  public static const rspec01SchemaLocation:String = "http://www.protogeni.net/resources/rspec/0.1 http://www.protogeni.net/resources/rspec/0.1/request.xsd";
-	  public static const rspec02SchemaLocation:String = "http://www.protogeni.net/resources/rspec/0.2 http://www.protogeni.net/resources/rspec/0.2/request.xsd";
-	  public static const rspec2SchemaLocation:String = "http://www.protogeni.net/resources/rspec/2 http://www.protogeni.net/resources/rspec/2/request.xsd";
-	  
-	  public static var flackNamespace:Namespace = new Namespace("flack", "http://www.protogeni.net/resources/rspec/ext/flack/1");
-	  
 	  // Error codes
 	  public static const GENIRESPONSE_SUCCESS : int = 0;
 	  public static const GENIRESPONSE_BADARGS : int  = 1;

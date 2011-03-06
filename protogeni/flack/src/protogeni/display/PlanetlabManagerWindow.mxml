@@ -1,9 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 						title="PlanetLab Manager Information"
-						height="300" width="400">
+						height="300" width="400" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
 			import protogeni.resources.PlanetlabAggregateManager;
@@ -34,4 +52,4 @@
 	<s:Scroller width="100%" height="100%">
 		<s:VGroup width="100%" height="100%" id="sitesBox" />
 	</s:Scroller>
-</display:DefaultWindow>
+</components:DefaultWindow>

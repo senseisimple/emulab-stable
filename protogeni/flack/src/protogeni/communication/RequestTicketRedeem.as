@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -16,13 +16,13 @@ package protogeni.communication
 {
 	import protogeni.resources.Sliver;
 
-  public class RequestTicketRedeem extends Request
+  public final class RequestTicketRedeem extends Request
   {
     public function RequestTicketRedeem(s:Sliver) : void
     {
 		super("TicketRedeem", "Updating ticket for sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.redeemTicket);
 		sliver = s;
-		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("slice_urn", sliver.slice.urn.full);
 		op.addField("ticket", sliver.ticket.toXMLString());
 		op.addField("keys", sliver.slice.creator.keys);
 		op.addField("credentials", new Array(sliver.slice.credential));

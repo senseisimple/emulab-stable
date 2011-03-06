@@ -16,7 +16,7 @@ in accordance with the terms of the license agreement accompanying it.
 				xmlns:s="library://ns.adobe.com/flex/spark"
 				xmlns:fb="http://ns.adobe.com/flashbuilder/2009"
 				alpha.disabled="0.5"
-				blendMode="normal" xmlns:display="protogeni.display.*">
+				blendMode="normal" xmlns:display="protogeni.display.*" xmlns:components="protogeni.display.components.*">
 	
 	<fx:Metadata>
 		<![CDATA[ 
@@ -128,7 +128,7 @@ in accordance with the terms of the license agreement accompanying it.
 		</s:Rect>
 		
 		<!-- TODO: Custom skin for collapse button should be created with some fancy arrow or cross -->
-		<display:ImageButton id="collapseButton" width="24" height="24" top="4" left="4"
+		<components:ImageButton id="collapseButton" width="24" height="24" top="4" left="4"
 				  toolTip="Collapse"
 				  icon="{ImageUtil.rightIcon}"
 				  icon.collapsed="{ImageUtil.downIcon}"

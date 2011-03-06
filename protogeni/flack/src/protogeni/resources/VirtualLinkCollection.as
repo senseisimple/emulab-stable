@@ -1,6 +1,6 @@
 package protogeni.resources
 {
-	public class VirtualLinkCollection
+	public final class VirtualLinkCollection
 	{
 		public var collection:Vector.<VirtualLink>
 		public function VirtualLinkCollection()

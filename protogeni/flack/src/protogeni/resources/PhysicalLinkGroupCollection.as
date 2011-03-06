@@ -15,7 +15,7 @@
  package protogeni.resources
 {
 	// Collection of all physical link groups
-	public class PhysicalLinkGroupCollection
+	public final class PhysicalLinkGroupCollection
 	{
 		public function PhysicalLinkGroupCollection()
 		{

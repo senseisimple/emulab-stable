@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <s:BorderContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
 				   xmlns:s="library://ns.adobe.com/flex/spark" 
 				   xmlns:mx="library://ns.adobe.com/flex/mx"
@@ -130,7 +148,7 @@
 				for each(var unaddedLink:VirtualLink in unaddedLinks.collection)
 					this.addVirtualLinkToCanvas(unaddedLink);
 				
-				hostWindow.loadNodes();
+				//hostWindow.loadNodes();
 				
 				edited = !slice.isCreated();
 			}
@@ -164,6 +182,7 @@
 				if (event.dragSource.hasFormat("canvas") ||
 					event.dragSource.hasFormat("marker") ||
 					event.dragSource.hasFormat("physicalnode") ||
+					event.dragSource.hasFormat("virtualnode") ||
 					(event.dragInitiator is List &&
 						(List(event.dragInitiator).selectedItem is VirtualNode ||
 							(List(event.dragInitiator).selectedItem is PhysicalNode &&
@@ -185,11 +204,7 @@
 							SliceCanvas(event.currentTarget).mouseY);
 						
 					} else if(List(event.dragInitiator).selectedItem is VirtualNode) {
-						var dragNode:VirtualNode = List(event.dragInitiator).selectedItem as VirtualNode;
-						var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(dragNode.manager));
-						nvn.Exclusive = dragNode.Exclusive;
-						nvn.clientId = slice.getUniqueVirtualNodeId(nvn);
-						this.addVirtualNode(nvn,
+						addBasicVirtualNode(List(event.dragInitiator).selectedItem as VirtualNode,
 							SliceCanvas(event.currentTarget).mouseX,
 							SliceCanvas(event.currentTarget).mouseY);
 					}
@@ -204,6 +219,10 @@
 						SliceCanvas(event.currentTarget).mouseY);
 				} else if(event.dragSource.hasFormat("physicalnode")) {
 					addPhysicalNode(event.dragSource.dataForFormat('physicalnode') as PhysicalNode,
+						SliceCanvas(event.currentTarget).mouseX,
+						SliceCanvas(event.currentTarget).mouseY);
+				} else if(event.dragSource.hasFormat("virtualnode")) {
+					addBasicVirtualNode(event.dragSource.dataForFormat('virtualnode') as VirtualNode,
 						SliceCanvas(event.currentTarget).mouseX,
 						SliceCanvas(event.currentTarget).mouseY);
 				}
@@ -247,7 +266,7 @@
 				
 				this.removeElement(sn);
 				allNodes.removeItemAt(allNodes.getItemIndex(sn));
-				hostWindow.loadNodes();
+				//hostWindow.loadNodes();
 				edited = true;
 			}
 			
@@ -275,6 +294,13 @@
 				sn.setNode(vn);
 				addSliceNode(sn, x, y);
 				return sn;
+			}
+			
+			public function addBasicVirtualNode(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode {
+				var nvn:VirtualNode = new VirtualNode(slice.getOrCreateSliverFor(vn.manager));
+				nvn.Exclusive = vn.Exclusive;
+				nvn.clientId = slice.getUniqueVirtualNodeId(nvn);
+				return this.addVirtualNode(nvn, x, y);
 			}
 			
 			public function addVirtualNode(vn:VirtualNode, x:int = -1, y:int = -1):SliceNode
@@ -357,8 +383,8 @@
 				allNodes.addItem(sn);
 				edited = true;
 				
-				if(sn.node.physicalNode != null && hostWindow.nodes != null && hostWindow.nodes.getItemIndex(sn.node.physicalNode) > -1)
-					hostWindow.nodes.removeItemAt(hostWindow.nodes.getItemIndex(sn.node.physicalNode));
+				//if(sn.node.physicalNode != null && hostWindow.nodes != null && hostWindow.nodes.getItemIndex(sn.node.physicalNode) > -1)
+				//	hostWindow.nodes.removeItemAt(hostWindow.nodes.getItemIndex(sn.node.physicalNode));
 			}
 			
 			public function startLinkingFrom(node:SliceNode):void

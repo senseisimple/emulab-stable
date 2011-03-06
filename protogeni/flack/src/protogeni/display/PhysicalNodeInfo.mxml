@@ -1,7 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
-		  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*">
+		  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
@@ -221,15 +239,15 @@
 	<s:HGroup width="100%" verticalAlign="middle">
 		<s:Image id="imgAvailable" />
 		<s:Label text="{node.name}" toolTip="{node.id}" fontSize="17" fontWeight="bold" width="100%" />
-		<display:ImageButton id="locateButton"
+		<components:ImageButton id="locateButton"
 							 icon="{ImageUtil.mapIcon}"
 							 click="Main.geniHandler.mapHandler.zoomToPhysicalNode(node)"
 							 toolTip="View Advertisement RSPEC" />
-		<display:ImageButton id="componentButton"
+		<components:ImageButton id="componentButton"
 							 icon="{ImageUtil.pageWhiteCodeIcon}"
 							 click="viewComponentRspec()"
 							 toolTip="View Advertisement RSPEC" />
-		<display:ImageButton id="sliverButton"
+		<components:ImageButton id="sliverButton"
 							 icon="{ImageUtil.pageCodeIcon}"
 							 click="viewSliverRspec()"
 							 toolTip="View Request RSPEC" visible="false" />

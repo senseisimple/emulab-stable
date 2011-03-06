@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,7 +14,9 @@
 
 package protogeni.communication
 {
-  public class RequestGetCredential extends Request
+	import protogeni.resources.IdnUrn;
+
+  public final class RequestGetCredential extends Request
   {
     public function RequestGetCredential() : void
     {
@@ -28,7 +30,7 @@ package protogeni.communication
 		{
 			Main.geniHandler.CurrentUser.credential = String(response.value);
 			var cred:XML = new XML(response.value);
-			Main.geniHandler.CurrentUser.urn = cred.credential.owner_urn;
+			Main.geniHandler.CurrentUser.urn = new IdnUrn(cred.credential.owner_urn);
 			Main.geniDispatcher.dispatchUserChanged();
 		}
 		else

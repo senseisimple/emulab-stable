@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -18,15 +18,16 @@ package protogeni.communication
 	
 	import flash.events.ErrorEvent;
 	
+	import protogeni.StringUtil;
 	import protogeni.Util;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.ProtogeniComponentManager;
 
-  public class RequestGetVersion extends Request
+  public final class RequestGetVersion extends Request
   {
     public function RequestGetVersion(newCm:ProtogeniComponentManager) : void
     {
-      super("GetVersion (" + Util.shortenString(newCm.Url, 15) + ")", "Getting the version of the component manager for " + newCm.Hrn, CommunicationUtil.getVersion, true, true, true);
+      super("GetVersion (" + StringUtil.shortenString(newCm.Url, 15) + ")", "Getting the version of the component manager for " + newCm.Hrn, CommunicationUtil.getVersion, true, true, true);
 	  cm = newCm;
 	  op.setUrl(cm.Url);
 	  cm.lastRequest = this;
@@ -42,21 +43,30 @@ package protogeni.communication
 			cm.inputRspecVersions = new Vector.<Number>();
 			cm.outputRspecVersions = new Vector.<Number>();
 			var maxInputRspecVersion:Number = -1;
-			for each(var n:Number in response.value.input_rspec) {
-				cm.inputRspecVersions.push(n);
-				if(n > maxInputRspecVersion)
-					maxInputRspecVersion = n;
+			for each(var inputVersion:Number in response.value.input_rspec) {
+				if(inputVersion) {
+					cm.inputRspecVersions.push(inputVersion);
+					if(inputVersion > maxInputRspecVersion)
+						maxInputRspecVersion = inputVersion;
+				}
+			}
+			for each(var outputVersion:Number in response.value.ad_rspec) {
+				if(outputVersion) {
+					cm.outputRspecVersions.push(outputVersion);
+				}
 			}
 			cm.outputRspecDefaultVersion = Number(response.value.output_rspec);
-			cm.outputRspecVersions.push(cm.outputRspecDefaultVersion);
+			if(cm.outputRspecVersions.indexOf(cm.outputRspecDefaultVersion) == -1)
+				cm.outputRspecVersions.push(cm.outputRspecDefaultVersion);
 			
 			// Set output version
 			if(cm.Hrn == "utahemulab.cm" || cm.Hrn == "ukgeni.cm")
 				cm.outputRspecVersion = 2;
 			else
 				cm.outputRspecVersion = 0.2;
-			if(cm.outputRspecDefaultVersion != cm.outputRspecVersion)
+			if(cm.outputRspecVersions.indexOf(cm.outputRspecVersion) == -1)
 				cm.outputRspecVersions.push(cm.outputRspecVersion);
+			
 			// Set input version
 			cm.inputRspecVersion = Math.min(Util.defaultRspecVersion, maxInputRspecVersion);
 			

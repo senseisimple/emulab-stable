@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -21,16 +21,16 @@ package protogeni.communication
   
   import mx.utils.Base64Decoder;
   
-  import protogeni.Util;
+  import protogeni.StringUtil;
   import protogeni.resources.ProtogeniComponentManager;
   import protogeni.resources.GeniManager;
 
-  public class RequestDiscoverResources extends Request
+  public final class RequestDiscoverResources extends Request
   {
 	  
     public function RequestDiscoverResources(newCm:ProtogeniComponentManager) : void
     {
-		super("DiscoverResources (" + Util.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true, false);
+		super("DiscoverResources (" + StringUtil.shortenString(newCm.Hrn, 15) + ")", "Discovering resources for " + newCm.Hrn, CommunicationUtil.discoverResources, true, true, false);
 		op.timeout = 60;
 		cm = newCm;
 		op.addField("credentials", new Array(Main.geniHandler.CurrentUser.credential));

@@ -14,25 +14,29 @@
  
  package protogeni
 {
+	 import flash.net.SharedObject;
+	 
 	 import mx.collections.ArrayList;
+	 import mx.controls.Alert;
+	 import mx.events.CloseEvent;
 	 
 	 import protogeni.communication.GeniRequestHandler;
 	 import protogeni.display.DisplayUtil;
 	 import protogeni.display.mapping.GeniMapHandler;
 	 import protogeni.resources.GeniManager;
 	 import protogeni.resources.GeniManagerCollection;
+	 import protogeni.resources.GeniUser;
 	 import protogeni.resources.PhysicalLink;
 	 import protogeni.resources.PhysicalNode;
 	 import protogeni.resources.Slice;
 	 import protogeni.resources.SliceAuthority;
 	 import protogeni.resources.SliceCollection;
 	 import protogeni.resources.Sliver;
-	 import protogeni.resources.GeniUser;
 	 import protogeni.resources.VirtualLink;
 	 import protogeni.resources.VirtualNode;
 	
 	// Holds and handles all information regarding ProtoGENI
-	public class GeniHandler
+	public final class GeniHandler
 	{
 		[Bindable]
 		public var requestHandler:GeniRequestHandler;
@@ -109,7 +113,7 @@
 			var results:Array = new Array();
 			for each(var gm:GeniManager in this.GeniManagers)
 			{
-				if(Util.findInAny(searchFrom, new Array(gm.Urn, gm.Hrn, gm.Url), matchAll))
+				if(Util.findInAny(searchFrom, new Array(gm.Urn.full, gm.Hrn, gm.Url), matchAll))
 					results.push(DisplayUtil.getGeniManagerButton(gm));
 				for each(var pn:PhysicalNode in gm.AllNodes)
 				{
@@ -125,7 +129,7 @@
 			
 			for each(var slice:Slice in this.CurrentUser.slices)
 			{
-				if(Util.findInAny(searchFrom, new Array(slice.urn, slice.hrn, slice.uuid), matchAll))
+				if(Util.findInAny(searchFrom, new Array(slice.urn.full, slice.hrn, slice.uuid), matchAll))
 					results.push(DisplayUtil.getSliceButton(slice));
 				for each(var sliver:Sliver in slice.slivers.collection)
 				{

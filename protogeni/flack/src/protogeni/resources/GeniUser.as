@@ -27,8 +27,6 @@
 		public var uid:String;
 		
 		[Bindable]
-		public var uuid:String;
-		[Bindable]
 		public var hrn:String;
 		[Bindable]
 		public var email:String;
@@ -39,7 +37,7 @@
 		public var credential:String;
 		public var keys:Array;
 		[Bindable]
-		public var urn:String;
+		public var urn:IdnUrn;
 		
 		public var slices:SliceCollection;
 		

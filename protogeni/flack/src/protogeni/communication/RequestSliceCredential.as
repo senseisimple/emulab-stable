@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -19,14 +19,14 @@ package protogeni.communication
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
-  public class RequestSliceCredential extends Request
+  public final class RequestSliceCredential extends Request
   {
     public function RequestSliceCredential(s:Slice) : void
     {
 		super("SliceCredential", "Getting the slice credential for " + s.hrn, CommunicationUtil.getCredential, true);
 		slice = s;
 		op.addField("credential", Main.geniHandler.CurrentUser.credential);
-		op.addField("urn", slice.urn);
+		op.addField("urn", slice.urn.full);
 		op.addField("type", "Slice");
 		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
     }

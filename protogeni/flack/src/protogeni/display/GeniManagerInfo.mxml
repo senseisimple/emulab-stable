@@ -1,11 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
 		  xmlns:s="library://ns.adobe.com/flex/spark" 
 		  xmlns:mx="library://ns.adobe.com/flex/mx"
 		  xmlns:display="protogeni.display.*"
-		  width="100%" >
+		  xmlns:components="protogeni.display.components.*"
+		  width="100%">
 	<fx:Script>
 		<![CDATA[
+			import protogeni.display.components.AdvancedTextArea;
+			import protogeni.display.components.DefaultWindow;
+			import protogeni.display.components.XmlWindow;
 			import mx.collections.ArrayCollection;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
@@ -14,6 +36,7 @@
 			
 			import spark.components.NavigatorContent;
 			import spark.components.TextArea;
+			import spark.layouts.VerticalLayout;
 			
 			[Bindable]
 			private var gm:GeniManager = null;
@@ -21,8 +44,8 @@
 			public function load(n:GeniManager):void
 			{
 				gm = n;
-				topHgroupcolor.color = DisplayUtil.colorsDark[gm.colorIdx];
-				hrnLabel.setStyle("color", DisplayUtil.colorsLight[gm.colorIdx]);
+				topHgroupcolor.color = ColorUtil.colorsDark[gm.colorIdx];
+				hrnLabel.setStyle("color", ColorUtil.colorsLight[gm.colorIdx]);
 				switch(gm.Status) {
 					case GeniManager.STATUS_FAILED:
 						this.statusIcon.source = ImageUtil.flagRedIcon;
@@ -63,8 +86,6 @@
 			
 			public function openGraphInfo():void
 			{
-				Alert.show("Not currently supported");
-				/*
 				var cw:DefaultWindow = new DefaultWindow();
 				cw.showWindow();
 				cw.title = "Graph information for " + gm.Hrn;
@@ -72,16 +93,34 @@
 				tabContainer.percentHeight = 100;
 				tabContainer.percentWidth = 100;
 				
+				
 				// Full DOT graph
 				var dotTab:NavigatorContent = new NavigatorContent();
-				dotTab.label = "Full DOT graph";
-				var textd:TextArea = new TextArea();
-				textd.percentHeight = 100;
-				textd.percentWidth = 100;
+				var vertLayout:VerticalLayout = new VerticalLayout();
+				vertLayout.paddingBottom = 5;
+				vertLayout.paddingLeft = 5;
+				vertLayout.paddingRight = 5;
+				dotTab.layout = vertLayout;
+				dotTab.label = "DOT";
+				var textd:AdvancedTextArea = new AdvancedTextArea();
 				textd.text = gm.getDotGraph();
 				dotTab.addElement(textd);
 				tabContainer.addChild(dotTab);
 				
+				// GraphML
+				var graphmlTab:NavigatorContent = new NavigatorContent();
+				var vertLayout2:VerticalLayout = new VerticalLayout();
+				vertLayout2.paddingBottom = 5;
+				vertLayout2.paddingLeft = 5;
+				vertLayout2.paddingRight = 5;
+				graphmlTab.layout = vertLayout2;
+				graphmlTab.label = "GraphML";
+				var textg:AdvancedTextArea = new AdvancedTextArea();
+				textg.text = gm.getGraphML();
+				graphmlTab.addElement(textg);
+				tabContainer.addChild(graphmlTab);
+				
+				/*
 				// Grouped DOT graph
 				var dotGroupedTab:NavigatorContent = new NavigatorContent();
 				dotGroupedTab.label = "Grouped DOT graph";
@@ -101,19 +140,9 @@
 				textgg.text = gm.getGroupedGraphML()
 				groupedgraphmlTab.addElement(textgg);
 				tabContainer.addChild(groupedgraphmlTab);
-				
-				// GraphML
-				var graphmlTab:VBox = new VBox();
-				graphmlTab.label = "GraphML";
-				var textg:TextArea = new TextArea();
-				textg.percentHeight = 100;
-				textg.percentWidth = 100;
-				textg.text = gm.getGraphML();
-				graphmlTab.addChild(textg);
-				tabContainer.addChild(graphmlTab);
+				*/
 				
 				cw.addElement(tabContainer);
-				*/
 			}
 
 		]]>
@@ -125,24 +154,24 @@
 		
 		<s:HGroup width="100%" verticalAlign="middle" paddingLeft="2">
 			<s:Image id="statusIcon" />
-			<s:Label text="{gm.Hrn}" toolTip="{gm.Urn}" fontSize="17" fontWeight="bold" width="100%" id="hrnLabel" />
-			<display:ImageButton id="urlButton"
+			<s:Label text="{gm.Hrn}" toolTip="{gm.Urn.full}" fontSize="17" fontWeight="bold" width="100%" id="hrnLabel" />
+			<components:ImageButton id="urlButton"
 								 icon="@Embed('../../../images/world.png')"
 								 click="navigateToURL(new URLRequest(gm.VisitUrl()), '_blank');"
 								 toolTip="Visit {gm.Url}" />
-			<display:ImageButton id="consoleButton"
+			<components:ImageButton id="consoleButton"
 								 icon="{ImageUtil.consoleIcon}"
 								 click="LogHandler.viewGroup(gm.Url);"
 								 toolTip="View log messages in the console" />
-			<display:ImageButton id="rpsecButton"
+			<components:ImageButton id="rpsecButton"
 								 icon="@Embed('../../../images/page_white_code.png')"
 								 click="viewRspec()"
 								 toolTip="View Advertisement RSPEC" />
-			<display:ImageButton id="graphInfoButton"
+			<components:ImageButton id="graphInfoButton"
 								 icon="@Embed('../../../images/chart_organisation.png')"
 								 click="openGraphInfo()"
 								 toolTip="View the graph information" />
-			<display:ImageButton id="messageButton"
+			<components:ImageButton id="messageButton"
 								 icon="{ImageUtil.flagRedIcon}"
 								 click="viewMessage()"
 								 toolTip="{gm.errorMessage}" />

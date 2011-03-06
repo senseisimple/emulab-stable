@@ -15,7 +15,7 @@
  package protogeni.resources
 {
 	// Collection of interfaces from a node in a sliver/slice
-	public class VirtualInterfaceCollection
+	public final class VirtualInterfaceCollection
 	{
 		[Bindable]
 		public var collection:Vector.<VirtualInterface>;

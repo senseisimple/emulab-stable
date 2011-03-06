@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -18,16 +18,16 @@ package protogeni.communication
   
   import mx.utils.Base64Decoder;
   
-  import protogeni.Util;
+  import protogeni.StringUtil;
   import protogeni.resources.GeniManager;
   import protogeni.resources.ProtogeniComponentManager;
 
-  public class RequestDiscoverResourcesPublic extends Request
+  public final class RequestDiscoverResourcesPublic extends Request
   {
 	  
     public function RequestDiscoverResourcesPublic(newCm:ProtogeniComponentManager) : void
     {
-		super("DiscoverResourcesPublic (" + Util.shortenString(newCm.Url, 15) + ")", "Publicly discovering resources for " + newCm.Url, null, true, true, false);
+		super("DiscoverResourcesPublic (" + StringUtil.shortenString(newCm.Url, 15) + ")", "Publicly discovering resources for " + newCm.Url, null, true, true, false);
 		cm = newCm;
 		op.setExactUrl(newCm.Url);
 		op.type = Operation.HTTP;

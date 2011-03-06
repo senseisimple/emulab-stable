@@ -20,7 +20,7 @@
 	import mx.controls.Alert;
 	import mx.events.CloseEvent;
 	
-	import protogeni.Util;
+	import protogeni.XmlUtil;
 	import protogeni.communication.CommunicationUtil;
 	import protogeni.display.ImageUtil;
 	
@@ -30,9 +30,7 @@
 		[Bindable]
 		public var hrn:String = null;
 		[Bindable]
-		public var urn:String = null;
-		[Bindable]
-		public var name:String = null;
+		public var urn:IdnUrn = null;
 		public var creator:GeniUser = null;
 		public var credential:String = "";
 		public var slivers:SliverCollection = new SliverCollection();
@@ -217,8 +215,7 @@
 			var newSlice:Slice = new Slice();
 			newSlice.uuid = this.uuid;
 			newSlice.hrn = this.hrn;
-			newSlice.urn = this.urn;
-			newSlice.name = this.name;
+			newSlice.urn = new IdnUrn(this.urn.full);
 			newSlice.creator = this.creator;
 			newSlice.credential = this.credential;
 			newSlice.expires = this.expires;
@@ -234,7 +231,7 @@
 				newSliver.credential = sliver.credential;
 				newSliver.manager = sliver.manager;
 				newSliver.rspec = sliver.rspec;
-				newSliver.urn = sliver.urn;
+				newSliver.urn = new IdnUrn(sliver.urn.full);
 				newSliver.ticket = sliver.ticket;
 				newSliver.manifest = sliver.manifest;
 				newSliver.state = sliver.state;
@@ -292,7 +289,7 @@
 					for each(var nodeSliver:Sliver in node.slivers.collection)
 					{
 						newNode.slivers.addIfNotExisting(newSlice.slivers.getByGm(nodeSliver.manager));
-						newSlice.slivers.getByUrn(nodeSliver.urn).nodes.add(newNode);
+						newSlice.slivers.getByUrn(nodeSliver.urn.full).nodes.add(newNode);
 					}
 					
 					for each(var vi:VirtualInterface in node.interfaces.collection)
@@ -428,31 +425,34 @@
 		
 		public function getUniqueVirtualNodeId(n:VirtualNode = null):String
 		{
-			var highest:int = 0;
-			for each(var s:Sliver in slivers.collection)
-			{
-				for each(var n:VirtualNode in s.nodes.collection)
-				{
-					try
-					{
-						var testHighest:int = parseInt(n.clientId.substring(n.clientId.lastIndexOf("-")+1));
-						if(testHighest >= highest)
-							highest = testHighest+1;
-					} catch(e:Error)
-					{
-						
-					}
-				}
-			}
+			var newId:String;
 			if(n == null)
-				return "node-" + highest;
+				newId = "node-";
 			else
 			{
 				if(n.Exclusive)
-					return "exclusive-" + highest;
+					newId = "exclusive-";
 				else
-					return "shared-" + highest;
+					newId = "shared-";
 			}
+			
+			var highest:int = 0;
+			for each(var s:Sliver in slivers.collection)
+			{
+				for each(var testNode:VirtualNode in s.nodes.collection)
+				{
+					try
+					{
+						if(testNode.clientId.indexOf(newId) == 0) {
+							var testHighest:int = parseInt(testNode.clientId.substring(testNode.clientId.lastIndexOf("-")+1));
+							if(testHighest >= highest)
+								highest = testHighest+1;
+						}
+					} catch(e:Error) {}
+				}
+			}
+			
+			return newId + highest;
 		}
 		
 		public function getUniqueVirtualInterfaceId():String
@@ -512,13 +512,13 @@
 				var detectedRspecVersion:Number;
 				var detectedManagers:Vector.<GeniManager> = new Vector.<GeniManager>();
 				switch(defaultNamespace.uri) {
-					case CommunicationUtil.rspec01Namespace:
+					case XmlUtil.rspec01Namespace:
 						detectedRspecVersion = 0.1;
 						break;
-					case CommunicationUtil.rspec02Namespace:
+					case XmlUtil.rspec02Namespace:
 						detectedRspecVersion = 0.2;
 						break;
-					case CommunicationUtil.rspec2Namespace:
+					case XmlUtil.rspec2Namespace:
 						detectedRspecVersion = 2;
 						break;
 				}

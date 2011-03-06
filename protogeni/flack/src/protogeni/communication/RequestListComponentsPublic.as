@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -16,10 +16,11 @@ package protogeni.communication
 {
 	import protogeni.Util;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.IdnUrn;
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 
-  public class RequestListComponentsPublic extends Request
+  public final class RequestListComponentsPublic extends Request
   {
     public function RequestListComponentsPublic() : void
     {
@@ -42,9 +43,8 @@ package protogeni.communication
 					continue;
 				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 				newCm.Url = op.getUrl().substring(0, op.getUrl().lastIndexOf('/')+1) + s;
-				newCm.Urn = s;
-				newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
-				newCm.Hrn = s.split('+')[1];
+				newCm.Urn = new IdnUrn(s);
+				newCm.Hrn = newCm.Urn.authority;
 				Main.geniHandler.GeniManagers.add(newCm);
 				newCm.Status = GeniManager.STATUS_INPROGRESS;
 				Main.geniDispatcher.dispatchGeniManagerChanged(newCm);
@@ -55,7 +55,7 @@ package protogeni.communication
 				
 				var plc:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 				plc.Url = "https://www.emulab.net/protogeni/plc.xml";
-				plc.Urn = Util.makeUrn("plc","authority","am");
+				plc.Urn = IdnUrn.makeFrom("plc","authority","am");
 				Main.geniHandler.GeniManagers.add(plc);
 				plc.Status = GeniManager.STATUS_INPROGRESS;
 				Main.geniDispatcher.dispatchGeniManagerChanged(plc);

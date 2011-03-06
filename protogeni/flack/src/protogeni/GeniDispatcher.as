@@ -7,7 +7,7 @@ package protogeni
 	import protogeni.resources.GeniUser;
 	import protogeni.resources.Slice;
 	
-	public class GeniDispatcher extends EventDispatcher
+	public final class GeniDispatcher extends EventDispatcher
 	{
 		public function GeniDispatcher(target:IEventDispatcher=null)
 		{
