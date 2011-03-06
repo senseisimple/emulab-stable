@@ -17,14 +17,30 @@
 	// Collection of interfaces from a physical node
 	public class PhysicalNodeInterfaceCollection
 	{
-		public var collection:Vector.<PhysicalNodeInterface> = new Vector.<PhysicalNodeInterface>();
-		
+		public var collection:Vector.<PhysicalNodeInterface>;
 		public function PhysicalNodeInterfaceCollection()
 		{
+			collection = new Vector.<PhysicalNodeInterface>();
 		}
 		
-		public function Add(ni:PhysicalNodeInterface):void {
+		public function add(ni:PhysicalNodeInterface):void {
 			collection.push(ni);
+		}
+		
+		public function remove(vi:PhysicalNodeInterface):void
+		{
+			var idx:int = collection.indexOf(vi);
+			if(idx > -1)
+				collection.splice(idx, 1);
+		}
+		
+		public function contains(vi:PhysicalNodeInterface):Boolean
+		{
+			return collection.indexOf(vi) > -1;
+		}
+		
+		public function get length():int{
+			return this.collection.length;
 		}
 		
 		public function GetByID(urn:String, exact:Boolean = true):PhysicalNodeInterface {

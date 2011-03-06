@@ -75,7 +75,6 @@
 	
 	<fx:Script>
 		<![CDATA[
-			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
@@ -107,9 +106,6 @@
 			
 			[Bindable]
 			public var allowAuthenticate:Boolean;
-			
-			[Bindable]
-			public var slicesMenu : ArrayCollection;
 			
 			public var geniLocalSharedObject:SharedObject;
 			

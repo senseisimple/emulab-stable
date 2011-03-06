@@ -136,7 +136,7 @@
 				if(sliceCanvas.slice.slivers.length == 0)
 					isCreated = false;
 				
-				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				for each(var s:Sliver in sliceCanvas.slice.slivers.collection)
 				{
 					if(s.rspec != null && s.staged != true)
 					{
@@ -224,7 +224,7 @@
 					Alert.show("There is no valid RSPEC for the slice yet", "No RSPEC");
 					return;
 				}
-				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				for each(var s:Sliver in sliceCanvas.slice.slivers.collection)
 				{
 					if(s.rspec == null)
 					{
@@ -238,7 +238,7 @@
 				tabs.percentHeight = 100;
 				tabs.percentWidth = 100;
 				viewRspec.addElement(tabs);
-				for each(s in sliceCanvas.slice.slivers)
+				for each(s in sliceCanvas.slice.slivers.collection)
 				{
 					var tab:NavigatorContent = new NavigatorContent();
 					var vertLayout:VerticalLayout = new VerticalLayout();
@@ -281,8 +281,9 @@
 				previewRspec.addElement(tabs);
 				
 				var slivers:Vector.<Sliver> = new Vector.<Sliver>();
-				slivers.push(sliceCanvas.slice.slivers.getCombined());
-				for each(var useSliver:Sliver in sliceCanvas.slice.slivers)
+				if(sliceCanvas.slice.slivers.length > 1)
+					slivers.push(sliceCanvas.slice.slivers.getCombined());
+				for each(var useSliver:Sliver in sliceCanvas.slice.slivers.collection)
 					slivers.push(useSliver);
 				
 				for each(var s:Sliver in slivers)
@@ -301,7 +302,8 @@
 					previewRspecText.percentHeight = 100;
 					previewRspecText.percentWidth = 100;
 					previewRspecText.text = s.getRequestRspec().toString();
-					
+					previewRspecText.editable = false;
+						
 					var copyButton:mx.controls.Button = new mx.controls.Button();
 					copyButton.data = previewRspecText.text;
 					copyButton.label = "Copy to clipboard";

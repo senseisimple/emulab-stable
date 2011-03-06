@@ -53,8 +53,8 @@ package protogeni.communication
 			if(old != null)
 			{
 				if(old.slivers.getByUrn(sliver.urn) != null)
-					old.slivers.removeItemAt(old.slivers.getItemIndex(old.slivers.getByUrn(sliver.urn)));
-				old.slivers.addItem(sliver);
+					old.slivers.remove(old.slivers.getByUrn(sliver.urn));
+				old.slivers.add(sliver);
 			}
 			
 			Main.geniDispatcher.dispatchSliceChanged(sliver.slice);

@@ -14,8 +14,6 @@
  
  package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	
 	// Interface on a virtual node
 	public class VirtualInterface
 	{
@@ -41,7 +39,7 @@
 		public var type:String = ""; //ipv4
 		
 		[Bindable]
-		public var virtualLinks:ArrayCollection = new ArrayCollection();
+		public var virtualLinks:VirtualLinkCollection;
 		
 		// depreciated
 		public var bandwidth:int = 100000;
@@ -49,6 +47,7 @@
 		public function VirtualInterface(own:VirtualNode)
 		{
 			owner = own;
+			virtualLinks = new VirtualLinkCollection();
 		}
 		
 		public function IsBound():Boolean {

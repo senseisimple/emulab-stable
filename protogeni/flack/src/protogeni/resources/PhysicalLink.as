@@ -33,7 +33,7 @@
 		
 		// TODEPRECIATE
 		[Bindable]
-		public var bandwidth:Number;
+		public var capacity:Number;
 		[Bindable]
 		public var latency:Number;
 		[Bindable]

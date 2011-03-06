@@ -49,7 +49,7 @@
 		public function Status():String {
 			if(hrn == null) return null;
 			var status:String = Sliver.STATUS_NA;
-			for each(var sliver:Sliver in slivers) {
+			for each(var sliver:Sliver in slivers.collection) {
 				if(sliver.status == Sliver.STATUS_FAILED)
 					return Sliver.STATUS_FAILED;
 				
@@ -67,7 +67,7 @@
 			if(slivers == null)
 				return false;
 			
-			for each(var existing:Sliver in this.slivers)
+			for each(var existing:Sliver in this.slivers.collection)
 			{
 				if(existing.created)
 					return true;
@@ -80,7 +80,7 @@
 			if(slivers == null)
 				return false;
 			
-			for each(var existing:Sliver in this.slivers)
+			for each(var existing:Sliver in this.slivers.collection)
 			{
 				if(!(existing.created || existing.staged))
 					return false;
@@ -89,10 +89,10 @@
 		}
 		
 		public function isStaged():Boolean {
-			if(slivers == null || slivers.length == 0)
+			if(slivers == null || slivers.collection.length == 0)
 				return false;
 			
-			for each(var existing:Sliver in this.slivers)
+			for each(var existing:Sliver in this.slivers.collection)
 			{
 				if(!existing.staged)
 					return false;
@@ -104,7 +104,7 @@
 			if(slivers == null || slivers.length == 0)
 				return false;
 			
-			for each(var existing:Sliver in this.slivers)
+			for each(var existing:Sliver in this.slivers.collection)
 			{
 				if(!existing.created)
 					return false;
@@ -112,45 +112,45 @@
 			return true;
 		}
 		
-		public function GetAllNodes():ArrayCollection
+		public function GetAllNodes():VirtualNodeCollection
 		{
-			var nodes:ArrayCollection = new ArrayCollection();
-			for each(var s:Sliver in slivers)
+			var nodes:VirtualNodeCollection = new VirtualNodeCollection();
+			for each(var s:Sliver in slivers.collection)
 			{
-				for each(var n:VirtualNode in s.nodes)
+				for each(var n:VirtualNode in s.nodes.collection)
 				{
 					if(n.manager == s.manager)
-						nodes.addItem(n);
+						nodes.add(n);
 				}
 					
 			}
 			return nodes;
 		}
 		
-		public function GetAllLinks():ArrayCollection
+		public function GetAllLinks():VirtualLinkCollection
 		{
-			var links:ArrayCollection = new ArrayCollection();
-			for each(var s:Sliver in slivers)
+			var links:VirtualLinkCollection = new VirtualLinkCollection();
+			for each(var s:Sliver in slivers.collection)
 			{
-				for each(var l:VirtualLink in s.links)
+				for each(var l:VirtualLink in s.links.collection)
 				{
 					if(!links.contains(l))
-						links.addItem(l);
+						links.add(l);
 				}
 				
 			}
 			return links;
 		}
 		
-		public function GetPhysicalNodes():ArrayCollection
+		public function GetPhysicalNodes():Vector.<PhysicalNode>
 		{
-			var nodes:ArrayCollection = new ArrayCollection();
-			for each(var s:Sliver in slivers)
+			var nodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
+			for each(var s:Sliver in slivers.collection)
 			{
-				for each(var n:VirtualNode in s.nodes)
+				for each(var n:VirtualNode in s.nodes.collection)
 				{
-					if(!nodes.contains(n) && n.physicalNode != null)
-						nodes.addItem(n.physicalNode);
+					if(nodes.indexOf(n) == -1 && n.physicalNode != null)
+						nodes.push(n.physicalNode);
 				}
 				
 			}
@@ -159,7 +159,7 @@
 		
 		public function getVirtualNodeWithId(id:String):VirtualNode
 		{
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
 				var vn:VirtualNode = s.nodes.getById(id);
 				if(vn != null)
@@ -170,7 +170,7 @@
 		
 		public function getVirtualInterfaceWithId(id:String):VirtualInterface
 		{
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
 				var vi:VirtualInterface = s.nodes.getByInterfaceId(id);
 				if(vi != null)
@@ -181,7 +181,7 @@
 		
 		public function getVirtualLinkWithId(id:String):VirtualLink
 		{
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
 				var vl:VirtualLink = s.links.getById(id);
 				if(vl != null)
@@ -192,7 +192,7 @@
 		
 		public function hasSliverFor(gm:GeniManager):Boolean
 		{
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
 				if(s.manager == gm)
 					return true;
@@ -202,13 +202,13 @@
 		
 		public function getOrCreateSliverFor(gm:GeniManager):Sliver
 		{
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
 				if(s.manager == gm)
 					return s;
 			}
 			var newSliver:Sliver = new Sliver(this, gm);
-			slivers.addItem(newSliver);
+			slivers.add(newSliver);
 			return newSliver;
 		}
 		
@@ -227,7 +227,7 @@
 			
 			// Build up the basic slivers
 			// Build up the slivers with nodes
-			for each(sliver in this.slivers)
+			for each(sliver in this.slivers.collection)
 			{
 				var newSliver:Sliver = new Sliver(newSlice);
 				newSliver.created = sliver.created;
@@ -241,7 +241,7 @@
 				newSliver.status = sliver.status;
 				newSliver.expires = sliver.expires;
 				
-				newSlice.slivers.addItem(newSliver);
+				newSlice.slivers.add(newSliver);
 			}
 			
 			var oldNodeToCloneNode:Dictionary = new Dictionary();
@@ -249,13 +249,13 @@
 			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
 
 			// Build up the slivers with nodes
-			for each(sliver in this.slivers)
+			for each(sliver in this.slivers.collection)
 			{
 				newSliver = newSlice.slivers.getByGm(sliver.manager);
 				
 				// Build up nodes
 				var retrace:Array = new Array();
-				for each(var node:VirtualNode in sliver.nodes)
+				for each(var node:VirtualNode in sliver.nodes.collection)
 				{
 					if(oldNodeToCloneNode[node] != null)
 						continue;
@@ -289,10 +289,10 @@
 					newNode.virtualizationType = node.virtualizationType;
 					newNode.virtualizationSubtype = node.virtualizationSubtype;
 					
-					for each(var nodeSliver:Sliver in node.slivers)
+					for each(var nodeSliver:Sliver in node.slivers.collection)
 					{
 						newNode.slivers.addIfNotExisting(newSlice.slivers.getByGm(nodeSliver.manager));
-						newSlice.slivers.getByUrn(nodeSliver.urn).nodes.addItem(newNode);
+						newSlice.slivers.getByUrn(nodeSliver.urn).nodes.add(newNode);
 					}
 					
 					for each(var vi:VirtualInterface in node.interfaces.collection)
@@ -304,7 +304,7 @@
 						newVirtualInterface.ip = vi.ip;
 						newVirtualInterface.mask = vi.mask;
 						newVirtualInterface.type = vi.type;
-						newNode.interfaces.Add(newVirtualInterface);
+						newNode.interfaces.add(newVirtualInterface);
 						oldInterfaceToCloneInterface[vi] = newVirtualInterface;
 						// links? add later ...
 					}
@@ -323,18 +323,18 @@
 						cloneNode.superNode = newSliver.nodes.getById(oldNode.clientId);
 					if(oldNode.subNodes != null && oldNode.subNodes.length > 0)
 					{
-						for each(var subNode:VirtualNode in oldNode.subNodes)
-						cloneNode.subNodes.push(newSliver.nodes.getById(subNode.clientId));
+						for each(var subNode:VirtualNode in oldNode.subNodes.collection)
+							cloneNode.subNodes.add(newSliver.nodes.getById(subNode.clientId));
 					}
 				}
 			}
 			
 			// Build up the links
-			for each(sliver in this.slivers)
+			for each(sliver in this.slivers.collection)
 			{
 				newSliver = newSlice.slivers.getByGm(sliver.manager);
 				
-				for each(var link:VirtualLink in sliver.links)
+				for each(var link:VirtualLink in sliver.links.collection)
 				{
 					if(oldLinkToCloneLink[link] != null)
 						continue;
@@ -342,20 +342,20 @@
 					newLink.clientId = link.clientId;
 					newLink.sliverId = link.sliverId;
 					newLink.type = link.type;
-					newLink.bandwidth = link.bandwidth;
+					newLink.capacity = link.capacity;
 					newLink.linkType = link.linkType;
 					newLink.rspec = link.rspec;
-					for each(var linkSliver:Sliver in link.slivers) {
-						newLink.slivers.push(newSlice.slivers.getByGm(linkSliver.manager));
-						newSlice.slivers.getByGm(linkSliver.manager).links.addItem(newLink);
+					for each(var linkSliver:Sliver in link.slivers.collection) {
+						newLink.slivers.add(newSlice.slivers.getByGm(linkSliver.manager));
+						newSlice.slivers.getByGm(linkSliver.manager).links.add(newLink);
 					}
 					
 					var slivers:Vector.<Sliver> = new Vector.<Sliver>();
-					for each(var i:VirtualInterface in link.interfaces)
+					for each(var i:VirtualInterface in link.interfaces.collection)
 					{
 						var newInterface:VirtualInterface = oldInterfaceToCloneInterface[i];
-						newLink.interfaces.addItem(newInterface);
-						newInterface.virtualLinks.addItem(newLink);
+						newLink.interfaces.add(newInterface);
+						newInterface.virtualLinks.add(newLink);
 					}
 					
 					oldLinkToCloneLink[link] = newLink;
@@ -405,9 +405,9 @@
 		public function getUniqueVirtualLinkId(l:VirtualLink = null):String
 		{
 			var highest:int = 0;
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
-				for each(var l:VirtualLink in s.links)
+				for each(var l:VirtualLink in s.links.collection)
 				{
 					try
 					{
@@ -429,9 +429,9 @@
 		public function getUniqueVirtualNodeId(n:VirtualNode = null):String
 		{
 			var highest:int = 0;
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
-				for each(var n:VirtualNode in s.nodes)
+				for each(var n:VirtualNode in s.nodes.collection)
 				{
 					try
 					{
@@ -458,11 +458,11 @@
 		public function getUniqueVirtualInterfaceId():String
 		{
 			var highest:int = 0;
-			for each(var s:Sliver in slivers)
+			for each(var s:Sliver in slivers.collection)
 			{
-				for each(var l:VirtualLink in s.links)
+				for each(var l:VirtualLink in s.links.collection)
 				{
-					for each(var i:VirtualInterface in l.interfaces)
+					for each(var i:VirtualInterface in l.interfaces.collection)
 					{
 						try
 						{
@@ -529,7 +529,7 @@
 				return false;
 			}
 			
-			slivers.removeAll();
+			slivers = new SliverCollection();
 			
 			for each(var nodeXml:XML in sliceRspec.defaultNamespace::node)
 			{

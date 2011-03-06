@@ -98,10 +98,10 @@ package protogeni.display
 			canvas.allLinks.addItem(this);
 
 			// For now just assume there's two ...
-			startNode = this.canvas.allNodes.getForVirtualNode(virtualLink.interfaces[0].owner);
+			startNode = this.canvas.allNodes.getForVirtualNode(virtualLink.interfaces.collection[0].owner);
 			startNode.links.addItem(this);
 			
-			endNode = this.canvas.allNodes.getForVirtualNode(virtualLink.interfaces[1].owner);
+			endNode = this.canvas.allNodes.getForVirtualNode(virtualLink.interfaces.collection[1].owner);
 			endNode.links.addItem(this);
 
 			established = true;
@@ -109,7 +109,7 @@ package protogeni.display
 		
 		public function establish(start:SliceNode, end:SliceNode):Boolean
 		{
-			setLink(new VirtualLink(start.node.slivers[0]));
+			setLink(new VirtualLink(start.node.sliver));
 			if(virtualLink.establish(start.node, end.node))
 			{
 				establishFromExisting(virtualLink);

@@ -70,10 +70,10 @@
 		public function localNodes():VirtualNodeCollection
 		{
 			var on:VirtualNodeCollection = new VirtualNodeCollection();
-			for each(var vn:VirtualNode in this.nodes)
+			for each(var vn:VirtualNode in this.nodes.collection)
 			{
 				if(vn.manager == this.manager)
-					on.addItem(vn);
+					on.add(vn);
 			}
 			return on;
 		}
@@ -81,17 +81,17 @@
 		public function outsideNodes():VirtualNodeCollection
 		{
 			var on:VirtualNodeCollection = new VirtualNodeCollection();
-			for each(var vn:VirtualNode in this.nodes)
+			for each(var vn:VirtualNode in this.nodes.collection)
 			{
 				if(vn.manager != this.manager)
-					on.addItem(vn);
+					on.add(vn);
 			}
 			return on;
 		}
 		
 		public function getVirtualNodeFor(pn:PhysicalNode):VirtualNode
 		{
-			for each(var vn:VirtualNode in this.nodes)
+			for each(var vn:VirtualNode in this.nodes.collection)
 			{
 				if(vn.physicalNode == pn)
 					return vn;
@@ -112,10 +112,10 @@
 		
 		public function removeOutsideReferences():void
 		{
-			for each(var node:VirtualNode in this.nodes)
+			for each(var node:VirtualNode in this.nodes.collection)
 			{
-				if(node.physicalNode.virtualNodes.getItemIndex(node) > -1)
-					node.physicalNode.virtualNodes.removeItemAt(node.physicalNode.virtualNodes.getItemIndex(node));
+				if(node.physicalNode.virtualNodes.contains(node))
+					node.physicalNode.virtualNodes.remove(node);
 			}
 		}
 	}

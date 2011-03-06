@@ -17,7 +17,9 @@
 			import protogeni.resources.Slice;
 			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualLink;
+			import protogeni.resources.VirtualLinkCollection;
 			import protogeni.resources.VirtualNode;
+			import protogeni.resources.VirtualNodeCollection;
 			
 			import spark.components.List; 
 			
@@ -39,16 +41,16 @@
 				slice = newSlice.clone(false);
 				
 				// Nodes
-				for each(var sliver:Sliver in slice.slivers)
+				for each(var sliver:Sliver in slice.slivers.collection)
 				{
-					for each(var n:VirtualNode in sliver.nodes)
+					for each(var n:VirtualNode in sliver.nodes.collection)
 						this.addVirtualNodeToCanvas(n);
 				}
 				
 				// Links
-				for each(var s:Sliver in slice.slivers)
+				for each(var s:Sliver in slice.slivers.collection)
 				{
-					for each(var l:VirtualLink in s.links)
+					for each(var l:VirtualLink in s.links.collection)
 						this.addVirtualLinkToCanvas(l);
 				}
 				
@@ -62,7 +64,7 @@
 				if(!slice.hasAllAllocatedResources() && !slice.isStaged())
 					return;
 				
-				var unadded:ArrayCollection = slice.GetAllNodes();
+				var unaddedNodes:VirtualNodeCollection = slice.GetAllNodes();
 				
 				// Remove/replace old nodes
 				for(var i:int = 0; i < this.allNodes.length; i++)
@@ -77,11 +79,11 @@
 					}
 					else
 					{
-						for(var j:int = 0; j < unadded.length; j++)
+						for(var j:int = 0; j < unaddedNodes.length; j++)
 						{
-							if((unadded[j] as VirtualNode).clientId == sn.lastId)
+							if(unaddedNodes.collection[j].clientId == sn.lastId)
 							{
-								unadded.removeItemAt(j);
+								unaddedNodes.remove(unaddedNodes.collection[j]);
 								break;
 							}
 						}
@@ -92,10 +94,10 @@
 				}
 				
 				// Add new nodes
-				for each(var unaddedNode:VirtualNode in unadded)
+				for each(var unaddedNode:VirtualNode in unaddedNodes.collection)
 					this.addVirtualNodeToCanvas(unaddedNode);
 				
-				unadded = slice.GetAllLinks();
+				var unaddedLinks:VirtualLinkCollection = slice.GetAllLinks();
 				
 				// Remove/replace old links
 				for(i = 0; i < this.allLinks.length; i++)
@@ -111,11 +113,11 @@
 					}
 					else
 					{
-						for(j = 0; j < unadded.length; j++)
+						for(j = 0; j < unaddedLinks.length; j++)
 						{
-							if((unadded[j] as VirtualLink).clientId == sl.lastId)
+							if(unaddedLinks.collection[j].clientId == sl.lastId)
 							{
-								unadded.removeItemAt(j);
+								unaddedLinks.remove(unaddedLinks.collection[j]);
 								break;
 							}
 						}
@@ -125,7 +127,7 @@
 				}
 				
 				// Add new
-				for each(var unaddedLink:VirtualLink in unadded)
+				for each(var unaddedLink:VirtualLink in unaddedLinks.collection)
 					this.addVirtualLinkToCanvas(unaddedLink);
 				
 				hostWindow.loadNodes();
@@ -227,7 +229,7 @@
 			public function removeSliceNode(sn:SliceNode):void
 			{
 				// Remove subnodes
-				for each(var sub:VirtualNode in sn.node.subNodes)
+				for each(var sub:VirtualNode in sn.node.subNodes.collection)
 					removeVirtualNode(sub);
 				
 				// Remove links
@@ -235,12 +237,12 @@
 					sn.links[0].removeLink();
 				
 				// Remove nodes and slivers
-				for each(var s:Sliver in sn.node.slivers)
+				for each(var s:Sliver in sn.node.slivers.collection)
 				{
-					if(s.nodes.getItemIndex(sn.node) > -1)
-						s.nodes.removeItemAt(s.nodes.getItemIndex(sn.node));
-					if(s.nodes.length == 0 && slice.slivers.getItemIndex(s) > -1)
-						slice.slivers.removeItemAt(slice.slivers.getItemIndex(s));
+					if(s.nodes.contains(sn.node))
+						s.nodes.remove(sn.node);
+					if(s.nodes.length == 0 && slice.slivers.contains(s))
+						slice.slivers.remove(s);
 				}
 				
 				this.removeElement(sn);
@@ -282,8 +284,8 @@
 					return allNodes.getForVirtualNode(vn);
 				
 				var sn:SliceNode = addVirtualNodeToCanvas(vn, x, y);
-				if(!(vn.slivers[0] as Sliver).nodes.contains(vn))
-					(vn.slivers[0] as Sliver).nodes.addItem(vn);
+				if(!vn.slivers.collection[0].nodes.contains(vn))
+					vn.slivers.collection[0].nodes.add(vn);
 				
 				// See if we need to connect to a parent node
 				if(vn.superNode != null)
@@ -292,14 +294,14 @@
 						sn.node.superNode = addVirtualNode(vn.superNode, x + 40, y + 40).node;
 					else
 						sn.node.superNode = allNodes.getForVirtualNode(vn.superNode).node;
-					sn.node.superNode.subNodes.push(sn.node);
+					sn.node.superNode.subNodes.add(sn.node);
 				} else if(vn.physicalNode != null && vn.physicalNode.subNodeOf != null)
 				{
 					if(!allNodes.containsPhysicalNode(vn.physicalNode.subNodeOf))
 						sn.node.superNode = addPhysicalNode(vn.physicalNode.subNodeOf, x + 40, y + 40).node;
 					else
 						sn.node.superNode = allNodes.getForPhysicalNode(vn.physicalNode.subNodeOf).node;
-					sn.node.superNode.subNodes.push(sn.node);
+					sn.node.superNode.subNodes.add(sn.node);
 				}
 				
 				return sn;
@@ -325,8 +327,8 @@
 					return allNodes.getForPhysicalNode(pn);
 				
 				var sn:SliceNode = addPhysicalNodeToCanvas(pn, x, y);
-				if(!(sn.node.slivers[0] as Sliver).nodes.contains(sn.node))
-					(sn.node.slivers[0] as Sliver).nodes.addItem(sn.node);
+				if(!sn.node.slivers.collection[0].nodes.contains(sn.node))
+					sn.node.slivers.collection[0].nodes.add(sn.node);
 				
 				// See if we need to connect to a parent node
 				if(pn.subNodeOf != null)
@@ -335,7 +337,7 @@
 						sn.node.superNode = addPhysicalNode(pn.subNodeOf, x + 40, y + 40).node;
 					else
 						sn.node.superNode = allNodes.getForPhysicalNode(pn.subNodeOf).node;
-					sn.node.superNode.subNodes.push(sn.node);
+					sn.node.superNode.subNodes.add(sn.node);
 				}
 				edited = true;
 				return sn;

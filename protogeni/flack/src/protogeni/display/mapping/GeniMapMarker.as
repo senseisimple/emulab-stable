@@ -147,8 +147,8 @@ package protogeni.display.mapping
 						if(node.virtualNodes.length > 0)
 							newGroup.Add(node);
 					} else {
-						for each(var virtualNode:VirtualNode in node.virtualNodes) {
-							if(virtualNode.slivers[0].slice == slice) {
+						for each(var virtualNode:VirtualNode in node.virtualNodes.collection) {
+							if(virtualNode.sliver.slice == slice) {
 								newGroup.Add(node);
 								break;
 							}

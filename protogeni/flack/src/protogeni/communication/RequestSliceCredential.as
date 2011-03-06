@@ -38,7 +38,7 @@ package protogeni.communication
 		{
 			slice.credential = String(response.value);
 			Main.geniDispatcher.dispatchSliceChanged(slice);
-			for each(var s:Sliver in slice.slivers) {
+			for each(var s:Sliver in slice.slivers.collection) {
 				if(s.manager is AggregateManager)
 					newCalls.push(new RequestSliverListResourcesAm(s));
 				else if(s.manager is ProtogeniComponentManager)

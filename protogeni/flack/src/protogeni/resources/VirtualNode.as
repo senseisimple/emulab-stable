@@ -14,8 +14,6 @@
  
  package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	
 	// Node allocated into a sliver/slice which has a physical node underneath
 	public class VirtualNode
 	{
@@ -34,13 +32,19 @@
 		public var sliverId:String;
 		public var manager:GeniManager;
 		public var superNode:VirtualNode;
-		public var subNodes:Array = new Array();
+		public var subNodes:VirtualNodeCollection = new VirtualNodeCollection();
 		
 		[Bindable]
 		public var interfaces:VirtualInterfaceCollection;
 		
 		[Bindable]
 		public var slivers:SliverCollection;
+		public function get sliver():Sliver {
+			if(slivers != null && slivers.length > 0)
+				return slivers.collection[0];
+			else
+				return null;
+		}
 		
 		[Bindable]
 		public var error:String;
@@ -72,7 +76,7 @@
 			slivers = new SliverCollection();
 			if(owner != null)
 			{
-				slivers.addItem(owner);
+				slivers.add(owner);
 				manager = owner.manager;
 			}
 				
@@ -80,7 +84,7 @@
 			// depreciated for v2
 			var controlInterface:VirtualInterface = new VirtualInterface(this);
 			controlInterface.id = "control";
-			interfaces.Add(controlInterface);
+			interfaces.add(controlInterface);
 		}
 		
 		public function get Exclusive():Boolean {
@@ -123,7 +127,7 @@
 			if(!IsBound())
 			{
 				var newVirtualInterface:VirtualInterface = new VirtualInterface(this);
-				newVirtualInterface.id = this.clientId + ":if" + this.interfaces.collection.length;
+				newVirtualInterface.id = this.clientId + ":if" + this.interfaces.length;
 				//newVirtualInterface.role = PhysicalNodeInterface.ROLE_EXPERIMENTAL;
 				newVirtualInterface.bandwidth = 100000;
 				//newVirtualInterface.isVirtual = true;
@@ -134,7 +138,7 @@
 					if (candidate.role == PhysicalNodeInterface.ROLE_EXPERIMENTAL)
 					{
 						var success:Boolean = true;
-						for each (var check:VirtualInterface in interfaces)
+						for each (var check:VirtualInterface in interfaces.collection)
 						{
 							if(check.IsBound() && check.physicalNodeInterface == candidate)
 								success = false;
@@ -158,27 +162,27 @@
 		}
 		
 		// Gets all connected physical nodes
-		public function GetPhysicalNodes():ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function GetPhysicalNodes():Vector.<PhysicalNode> {
+			var ac:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 			for each(var nodeInterface:VirtualInterface in interfaces.collection) {
-				for each(var nodeLink:VirtualLink in nodeInterface.virtualLinks) {
-					for each(var nodeLinkInterface:VirtualInterface in nodeLink.interfaces)
+				for each(var nodeLink:VirtualLink in nodeInterface.virtualLinks.collection) {
+					for each(var nodeLinkInterface:VirtualInterface in nodeLink.interfaces.collection)
 					{
-						if(nodeLinkInterface != nodeInterface && !ac.contains(nodeLinkInterface.owner.physicalNode))
-							 ac.addItem(nodeLinkInterface.owner.physicalNode);
+						if(nodeLinkInterface != nodeInterface && ac.indexOf(nodeLinkInterface.owner.physicalNode) == -1)
+							 ac.push(nodeLinkInterface.owner.physicalNode);
 					}
 				}
 			}
 			return ac;
 		}
 		
-		public function GetAllNodes():ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function GetAllNodes():VirtualNodeCollection {
+			var ac:VirtualNodeCollection = new VirtualNodeCollection();
 			for each(var sourceInterface:VirtualInterface in this.interfaces.collection) {
-				for each(var virtualLink:VirtualLink in sourceInterface.virtualLinks) {
-					for each(var destInterface:VirtualInterface in virtualLink.interfaces) {
+				for each(var virtualLink:VirtualLink in sourceInterface.virtualLinks.collection) {
+					for each(var destInterface:VirtualInterface in virtualLink.interfaces.collection) {
 						if(destInterface.owner != this && !ac.contains(destInterface.owner))
-							ac.addItem(destInterface.owner);
+							ac.add(destInterface.owner);
 					}
 				}
 			}
@@ -186,14 +190,14 @@
 		}
 		
 		// Gets all virtual links connected to this node
-		public function GetLinksForPhysical(n:PhysicalNode):ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function GetLinksForPhysical(n:PhysicalNode):VirtualLinkCollection {
+			var ac:VirtualLinkCollection = new VirtualLinkCollection();
 			
-			for each(var i:VirtualInterface in interfaces) {
-				for each(var l:VirtualLink in i.virtualLinks) {
-					for each(var nl:VirtualInterface in l.interfaces) {
+			for each(var i:VirtualInterface in interfaces.collection) {
+				for each(var l:VirtualLink in i.virtualLinks.collection) {
+					for each(var nl:VirtualInterface in l.interfaces.collection) {
 						if(nl != i && nl.owner.physicalNode == n && !ac.contains(l)) {
-							ac.addItem(l);
+							ac.add(l);
 						}
 					}
 				}
@@ -201,14 +205,14 @@
 			return ac;
 		}
 		
-		public function GetLinks(n:VirtualNode):ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function GetLinks(n:VirtualNode):VirtualLinkCollection {
+			var ac:VirtualLinkCollection = new VirtualLinkCollection();
 
 			for each(var i:VirtualInterface in interfaces.collection) {
-				for each(var l:VirtualLink in i.virtualLinks) {
-					for each(var nl:VirtualInterface in l.interfaces) {
+				for each(var l:VirtualLink in i.virtualLinks.collection) {
+					for each(var nl:VirtualInterface in l.interfaces.collection) {
 						if(nl != i && nl.owner == n && !ac.contains(l)) {
-							ac.addItem(l);
+							ac.add(l);
 						}
 					}
 				}
