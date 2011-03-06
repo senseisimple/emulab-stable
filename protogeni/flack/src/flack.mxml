@@ -1,12 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
 <s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
 			   xmlns:s="library://ns.adobe.com/flex/spark" 
 			   xmlns:mx="library://ns.adobe.com/flex/mx"
-			   xmlns:mapping="protogeni.display.mapping.*"
 			   xmlns:display="protogeni.display.*"
+			   xmlns:components="protogeni.display.components.*"
+			   xmlns:mapping="protogeni.display.mapping.*"
 			   minWidth="600" minHeight="400" 
 			   preinitialize="preinit();"
-			   applicationComplete="init();">
+			   applicationComplete="init();" >
 	<s:layout>
 		<s:BasicLayout/>
 	</s:layout>
@@ -15,6 +34,7 @@
 		@namespace s "library://ns.adobe.com/flex/spark";
 		@namespace mx "library://ns.adobe.com/flex/mx";
 		@namespace display "protogeni.display.*";
+		@namespace components "protogeni.display.components.*";
 		@namespace mapping "protogeni.display.mapping.*";
 		
 		.authenticatedStyle {
@@ -67,7 +87,7 @@
 			skinClass: ClassReference("protogeni.display.skins.RadioButtonSkin");
 		}
 		
-		display|CollapsiblePanel {
+		components|CollapsiblePanel {
 			skin-class: ClassReference('protogeni.display.skins.CollapsiblePanelSkin');
 		}
 		
@@ -85,7 +105,7 @@
 			import protogeni.GeniDispatcher;
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
-			import protogeni.Util;
+			import protogeni.NetUtil;
 			import protogeni.communication.RequestGeniBundle;
 			import protogeni.communication.RequestRootBundle;
 			import protogeni.communication.RequestTest;
@@ -173,7 +193,7 @@
 						"Enable Local Data?", Alert.YES|Alert.NO, this,
 						function allowData(e:CloseEvent):void {
 							if(e.detail == Alert.YES) {
-								Util.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
+								NetUtil.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
 							}
 						});
 				}
@@ -408,7 +428,7 @@
 		<s:HorizontalLayout verticalAlign="middle" gap="4" paddingTop="2" paddingBottom="2" paddingLeft="2" paddingRight="2" />
 	</s:controlBarLayout>
 	<s:controlBarContent>
-		<display:ImageButton id="consoleButton"
+		<components:ImageButton id="consoleButton"
 							 icon="{ImageUtil.consoleIcon}"
 							 click="LogHandler.viewConsole();" 
 							 toolTip="Console"/>
@@ -422,23 +442,23 @@
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
 		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold" maxDisplayedLines="1" />
 		<s:Rect percentWidth="100" />
-		<display:ImageButton id="refreshButton"
+		<components:ImageButton id="refreshButton"
 							 icon="{ImageUtil.refreshIcon}"
 							 click="startover()" includeInLayout="false" visible="false"
 							 toolTip="Reload all data" />
-		<display:ImageButton id="searchButton"
+		<components:ImageButton id="searchButton"
 							  icon="{ImageUtil.findIcon}"
 							 click="DisplayUtil.viewSearchWindow()"
 							 toolTip="Search" />
-		<display:ImageButton id="resetZoomButton"
+		<components:ImageButton id="resetZoomButton"
 							  icon="@Embed('../images/zoom.png')"
 							 click="map.resetZoom();"
 							 toolTip="Reset zoom" />
-		<display:ImageButton id="fullscreenButton"
+		<components:ImageButton id="fullscreenButton"
 							  icon="{arrowOut}"
 							 click="toggleFullScreen()"
 							 toolTip="Toggle fullscreen" />
-		<display:ImageButton id="helpButton"
+		<components:ImageButton id="helpButton"
 							  icon="{ImageUtil.helpIcon}"
 							 click="DisplayUtil.viewAboutWindow()"
 							 toolTip="View more information about Flack" />

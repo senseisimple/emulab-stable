@@ -54,11 +54,7 @@
 		}
 		
 		public function IsSwitch():Boolean {
-			for each(var d:String in hardwareTypes) {
-				if(d == "switch")
-					return true;
-			}
-			return false;
+			return hardwareTypes.indexOf("switch") > 1;
 		}
 		
 		public function ConnectedSwitches():Vector.<PhysicalNode> {

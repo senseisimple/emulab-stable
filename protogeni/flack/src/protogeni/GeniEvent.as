@@ -2,7 +2,7 @@ package protogeni
 {
 	import flash.events.Event;
 	
-	public class GeniEvent extends Event
+	public final class GeniEvent extends Event
 	{
 		public static const ACTION_CHANGED:int = 0;
 		public static const ACTION_REMOVING:int = 1;

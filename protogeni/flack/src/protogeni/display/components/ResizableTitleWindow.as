@@ -1,6 +1,8 @@
-package protogeni.display
+// Found at: http://flexponential.com/2010/01/10/resizable-titlewindow-in-flex-4/
+
+package protogeni.display.components
 {
-	// Found at: http://flexponential.com/2010/01/10/resizable-titlewindow-in-flex-4/
+	
 	import flash.display.DisplayObject;
 	import flash.events.Event;
 	import flash.events.MouseEvent;

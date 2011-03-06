@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -17,13 +17,13 @@ package protogeni.communication
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
-	public class RequestSliverDelete extends Request
+	public final class RequestSliverDelete extends Request
 	{
 		public function RequestSliverDelete(s:Sliver) : void
 		{
 			super("SliverDelete", "Deleting sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.deleteSlice);
 			sliver = s;
-			op.addField("slice_urn", sliver.slice.urn);
+			op.addField("slice_urn", sliver.slice.urn.full);
 			op.addField("credentials", new Array(sliver.slice.credential));
 			op.setUrl(sliver.manager.Url);
 		}
@@ -35,13 +35,13 @@ package protogeni.communication
 				sliver.removeOutsideReferences();
 				if(sliver.slice.slivers.contains(sliver))
 					sliver.slice.slivers.remove(sliver);
-				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
+				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);
 				if(old != null)
 				{
-					var oldSliver:Sliver = old.slivers.getByUrn(sliver.urn);
+					var oldSliver:Sliver = old.slivers.getByUrn(sliver.urn.full);
 					if(oldSliver != null) {
 						oldSliver.removeOutsideReferences();
-						old.slivers.remove(old.slivers.getByUrn(sliver.urn));
+						old.slivers.remove(old.slivers.getByUrn(sliver.urn.full));
 					}
 					Main.geniDispatcher.dispatchSliceChanged(old);
 				}

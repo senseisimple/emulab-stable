@@ -15,6 +15,7 @@ package protogeni.display
 	import spark.components.Group;
 	import spark.components.HGroup;
 	import spark.primitives.Rect;
+	import protogeni.display.components.ImageButton;
 	
 	public class SliceLink extends UIComponent
 	{

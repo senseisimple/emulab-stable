@@ -8,9 +8,8 @@ package protogeni.resources
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniEvent;
+	import protogeni.XmlUtil;
 	import protogeni.Util;
-	import protogeni.communication.CommunicationUtil;
-	
 
 	public class ProtogeniRspecProcessor implements RspecProcessorInterface
 	{
@@ -49,13 +48,13 @@ package protogeni.resources
 			defaultNamespace = gm.Rspec.namespace();
 			
 			switch(defaultNamespace.uri) {
-				case CommunicationUtil.rspec01Namespace:
+				case XmlUtil.rspec01Namespace:
 					detectedOutputRspecVersion = 0.1;
 					break;
-				case CommunicationUtil.rspec02Namespace:
+				case XmlUtil.rspec02Namespace:
 					detectedOutputRspecVersion = 0.2;
 					break;
-				case CommunicationUtil.rspec2Namespace:
+				case XmlUtil.rspec2Namespace:
 					detectedOutputRspecVersion = 2;
 					break;
 				default:
@@ -388,13 +387,13 @@ package protogeni.resources
 		{
 				var defaultNamespace:Namespace = s.rspec.namespace();
 				switch(defaultNamespace.uri) {
-					case CommunicationUtil.rspec01Namespace:
+					case XmlUtil.rspec01Namespace:
 						detectedInputRspecVersion = 0.1;
 						break;
-					case CommunicationUtil.rspec02Namespace:
+					case XmlUtil.rspec02Namespace:
 						detectedInputRspecVersion = 0.2;
 						break;
-					case CommunicationUtil.rspec2Namespace:
+					case XmlUtil.rspec2Namespace:
 						detectedInputRspecVersion = 2;
 						break;
 				}
@@ -703,34 +702,34 @@ package protogeni.resources
 			var defaultNamespace:Namespace;
 			switch(gm.inputRspecVersion) {
 				case 0.1:
-					defaultNamespace = new Namespace(null, CommunicationUtil.rspec01Namespace);
+					defaultNamespace = new Namespace(null, XmlUtil.rspec01Namespace);
 					break;
 				case 0.2:
-					defaultNamespace = new Namespace(null, CommunicationUtil.rspec02Namespace);
+					defaultNamespace = new Namespace(null, XmlUtil.rspec02Namespace);
 					break;
 				case 2:
-					defaultNamespace = new Namespace(null, CommunicationUtil.rspec2Namespace);
+					defaultNamespace = new Namespace(null, XmlUtil.rspec2Namespace);
 					break;
 			}
 			requestRspec.setNamespace(defaultNamespace);
-			var xsiNamespace:Namespace = new Namespace("xsi", "http://www.w3.org/2001/XMLSchema-instance");
+			var xsiNamespace:Namespace = XmlUtil.xsiNamespace;
 			requestRspec.addNamespace(xsiNamespace);
 			var schemaLocations:String;
 			//var tunnelNamespace:Namespace;
 			switch(gm.inputRspecVersion) {
 				case 0.1:
-					schemaLocations = CommunicationUtil.rspec01SchemaLocation;
+					schemaLocations = XmlUtil.rspec01SchemaLocation;
 					break;
 				case 0.2:
-					schemaLocations = CommunicationUtil.rspec02SchemaLocation;
+					schemaLocations = XmlUtil.rspec02SchemaLocation;
 					break;
 				case 2:
-					schemaLocations = CommunicationUtil.rspec2SchemaLocation;
+					schemaLocations = XmlUtil.rspec2SchemaLocation;
 					break;
 			}
 			requestRspec.@xsiNamespace::schemaLocation = schemaLocations;
 			if(gm.inputRspecVersion >= 2) {
-				requestRspec.addNamespace(CommunicationUtil.flackNamespace);
+				requestRspec.addNamespace(XmlUtil.flackNamespace);
 			}
 			// FIXME: Need to add schemaLocation and namespaces if they were there before...
 			// TOHERE
@@ -751,11 +750,11 @@ package protogeni.resources
 			var nodeXml:XML = <node />;
 			if(gm.inputRspecVersion < 1) {
 				nodeXml.@virtual_id = vn.clientId;
-				nodeXml.@component_manager_uuid = vn.manager.Urn;
+				nodeXml.@component_manager_uuid = vn.manager.Urn.full;
 				nodeXml.@virtualization_type = vn.virtualizationType;
 			} else {
 				nodeXml.@client_id = vn.clientId;
-				nodeXml.@component_manager_id = vn.manager.Urn;
+				nodeXml.@component_manager_id = vn.manager.Urn.full;
 			}
 			
 			if (vn.IsBound()) {
@@ -862,7 +861,7 @@ package protogeni.resources
 			
 			if(gm.inputRspecVersion >= 2) {
 				var flackXml:XML = <canvas_location />;
-				flackXml.setNamespace(CommunicationUtil.flackNamespace);
+				flackXml.setNamespace(XmlUtil.flackNamespace);
 				flackXml.@x = vn.flackX;
 				flackXml.@y = vn.flackY;
 				nodeXml.appendChild(flackXml);
@@ -880,10 +879,11 @@ package protogeni.resources
 			else
 				linkXml.@client_id = vl.clientId;
 			
+			var s:Sliver;
 			if(gm.inputRspecVersion >= 2) {
-				for each(var s:Sliver in vl.slivers.collection) {
+				for each(s in vl.slivers.collection) {
 					var cmXml:XML = <component_manager />;
-					cmXml.@name = s.manager.Urn;
+					cmXml.@name = s.manager.Urn.full;
 					linkXml.appendChild(cmXml);
 				}
 			}
@@ -944,9 +944,9 @@ package protogeni.resources
 			if(vl.linkType == VirtualLink.TYPE_ION) {
 				for each(s in vl.slivers.collection) {
 					var componentHopIonXml:XML = <component_hop />;
-					componentHopIonXml.@component_urn = Util.makeUrn(s.manager.Authority, "link", "ion");
+					componentHopIonXml.@component_urn = IdnUrn.makeFrom(s.manager.Urn.authority, "link", "ion").full;
 					interfaceRefXml = <interface_ref />;
-					interfaceRefXml.@component_node_urn = Util.makeUrn(s.manager.Authority, "node", "ion");
+					interfaceRefXml.@component_node_urn = IdnUrn.makeFrom(s.manager.Urn.authority, "node", "ion").full;
 					interfaceRefXml.@component_interface_id = "eth0";
 					componentHopIonXml.appendChild(interfaceRefXml);
 					linkXml.appendChild(componentHopIonXml);
@@ -954,9 +954,9 @@ package protogeni.resources
 			} else if(vl.linkType == VirtualLink.TYPE_GPENI) {
 				for each(s in vl.slivers.collection) {
 					var componentHopGpeniXml:XML = <component_hop />;
-					componentHopGpeniXml.@component_urn = Util.makeUrn(s.manager.Authority, "link", "gpeni");
+					componentHopGpeniXml.@component_urn = IdnUrn.makeFrom(s.manager.Urn.authority, "link", "gpeni").full;
 					interfaceRefXml = <interface_ref />;
-					interfaceRefXml.@component_node_urn = Util.makeUrn(s.manager.Authority, "node", "gpeni");
+					interfaceRefXml.@component_node_urn = IdnUrn.makeFrom(s.manager.Urn.authority, "node", "gpeni").full;
 					interfaceRefXml.@component_interface_id = "eth0";
 					componentHopGpeniXml.appendChild(interfaceRefXml);
 					linkXml.appendChild(componentHopGpeniXml);

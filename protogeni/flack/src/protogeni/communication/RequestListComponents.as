@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -17,10 +17,11 @@ package protogeni.communication
 	import protogeni.Util;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.IdnUrn;
 	import protogeni.resources.PlanetlabAggregateManager;
 	import protogeni.resources.ProtogeniComponentManager;
 
-  public class RequestListComponents extends Request
+  public final class RequestListComponents extends Request
   {
     public function RequestListComponents(shouldDiscoverResources:Boolean = true, shouldStartSlices:Boolean = false) : void
     {
@@ -52,11 +53,10 @@ package protogeni.communication
 				var newCm:ProtogeniComponentManager = new ProtogeniComponentManager();
 				newCm.Hrn = obj.hrn;
 				newCm.Url = ts;
-				newCm.Urn = obj.urn;
+				newCm.Urn = new IdnUrn(obj.urn);
 				// Quick hack, giving exceptions in forge
-				if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.toLowerCase().indexOf("etri") > 0)
+				if(newCm.Hrn == "wigims.cm" || newCm.Hrn == "cron.cct.lsu.edu.cm" || newCm.Urn.full.toLowerCase().indexOf("etri") > 0)
 					continue;
-				newCm.Authority = Util.getAuthorityFromUrn(newCm.Urn);
 				if(newCm.Hrn == "ukgeni.cm" || newCm.Hrn == "utahemulab.cm")
 					newCm.supportsIon = true;
 				if(newCm.Hrn == "wail.cm" || newCm.Hrn == "utahemulab.cm")

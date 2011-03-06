@@ -1,3 +1,17 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.display.mapping
 {
 	import com.google.maps.LatLng;
@@ -19,7 +33,7 @@ package protogeni.display.mapping
 	import protogeni.resources.Slice;
 	import protogeni.resources.VirtualNode;
 
-	public class GeniMapHandler
+	public final class GeniMapHandler
 	{
 		public var map:GeniMap;
 		
@@ -264,7 +278,7 @@ package protogeni.display.mapping
 			var slice:Slice = null;
 			var link:GeniMapLink;
 			if(this.userResourcesOnly) {
-				if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.length>0)
+				if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.full.length>0)
 					slice = selectedSlice;
 				for each(marker in this.nodeGroupMarkers)
 					marker.setUser(slice);
@@ -378,7 +392,7 @@ package protogeni.display.mapping
 				var marker:GeniMapMarker = new GeniMapMarker(cluster);
 				if(this.userResourcesOnly) {
 					var slice:Slice = null;
-					if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.length>0)
+					if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.full.length>0)
 						slice = selectedSlice;
 					marker.setUser(slice);
 				}

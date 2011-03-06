@@ -19,7 +19,7 @@
  
  package protogeni.display
 {
-	public class ImageUtil
+	public final class ImageUtil
 	{
 		[Bindable]
 		[Embed(source="../../../images/flack.png")]

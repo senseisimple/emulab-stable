@@ -37,7 +37,7 @@
 		public var manager:GeniManager = null;
 		public var rspec:XML = null;
 		[Bindable]
-		public var urn:String = null;
+		public var urn:IdnUrn = null;
 		
 		public var ticket:XML;
 		public var manifest:XML;

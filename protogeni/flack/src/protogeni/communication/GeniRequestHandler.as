@@ -21,18 +21,19 @@
 	import mx.controls.Alert;
 	import mx.events.CloseEvent;
 	
-	import protogeni.Util;
+	import protogeni.NetUtil;
 	import protogeni.display.DisplayUtil;
 	import protogeni.display.InitialUserWindow;
 	import protogeni.resources.AggregateManager;
 	import protogeni.resources.GeniManager;
+	import protogeni.resources.IdnUrn;
 	import protogeni.resources.ProtogeniComponentManager;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 	import protogeni.resources.SliverCollection;
     
     // Handles all the XML-RPC calls
-	public class GeniRequestHandler
+	public final class GeniRequestHandler
 	{
 		public function GeniRequestHandler()
 		{
@@ -105,15 +106,14 @@
 		{
 			var newSlice:Slice = new Slice();
 			newSlice.hrn = name;
-			newSlice.urn = Util.makeUrn(Main.geniHandler.CurrentUser.authority.Authority, "slice", name);
-			newSlice.name = Util.getNameFromUrn(newSlice.urn);
+			newSlice.urn = IdnUrn.makeFrom(Main.geniHandler.CurrentUser.authority.Authority, "slice", name);
 			newSlice.creator = Main.geniHandler.CurrentUser;
 			pushRequest(new RequestSliceResolve(newSlice, true));
 		}
 		
 		public function submitSlice(slice:Slice):void
 		{
-			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(slice.urn);
+			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(slice.urn.full);
 			if(old != null && old.hasAllocatedResources())
 			{
 				var newSlivers:SliverCollection = new SliverCollection();
@@ -364,7 +364,7 @@
 						{
 							if(e.detail == Alert.YES)
 							{
-								Util.showSetup();
+								NetUtil.showSetup();
 							}
 						});
 				}

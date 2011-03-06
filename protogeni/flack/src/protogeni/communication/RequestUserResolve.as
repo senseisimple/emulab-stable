@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -15,9 +15,10 @@
 package protogeni.communication
 {
   import protogeni.Util;
+  import protogeni.resources.IdnUrn;
   import protogeni.resources.Slice;
 
-  public class RequestUserResolve extends Request
+  public final class RequestUserResolve extends Request
   {
     public function RequestUserResolve() : void
     {
@@ -29,7 +30,7 @@ package protogeni.communication
 	override public function start():Operation
 	{
 		op.addField("credential", Main.geniHandler.CurrentUser.credential);
-		op.addField("hrn", Main.geniHandler.CurrentUser.urn);
+		op.addField("hrn", Main.geniHandler.CurrentUser.urn.full);
 		return op;
 	}
 	
@@ -40,7 +41,6 @@ package protogeni.communication
 		{
 			Main.geniHandler.CurrentUser.uid = response.value.uid;
 			Main.geniHandler.CurrentUser.hrn = response.value.hrn;
-			Main.geniHandler.CurrentUser.uuid = response.value.uuid;
 			Main.geniHandler.CurrentUser.email = response.value.email;
 			Main.geniHandler.CurrentUser.name = response.value.name;
 			
@@ -49,8 +49,7 @@ package protogeni.communication
 				for each(var sliceUrn:String in slices)
 				{
 					var userSlice:Slice = new Slice();
-					userSlice.urn = sliceUrn;
-					userSlice.name = Util.getNameFromUrn(sliceUrn);
+					userSlice.urn = new IdnUrn(sliceUrn);
 					Main.geniHandler.CurrentUser.slices.add(userSlice);
 					newCalls.push(new RequestSliceResolve(userSlice));
 				}

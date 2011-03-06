@@ -4,7 +4,7 @@ package protogeni.resources
 	
 	import protogeni.GeniHandler;
 	
-	public class GeniManagerCollection extends ArrayCollection
+	public final class GeniManagerCollection extends ArrayCollection
 	{
 		private var owner:GeniHandler;
 		
@@ -30,7 +30,7 @@ package protogeni.resources
 		{
 			for each(var gm:GeniManager in this)
 			{
-				if(gm.Urn == urn)
+				if(gm.Urn.full == urn)
 					return gm;
 			}
 			return null;

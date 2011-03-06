@@ -1,13 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:ResizableTitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:ResizableTitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 							  xmlns:s="library://ns.adobe.com/flex/spark" 
 							  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
 							  height="240" width="450"
 							  title="Onscreen Keyboard"
-							  contentCreationComplete="onCreationComplete()" close="onClose(event)">
-	<display:layout>
+							  contentCreationComplete="onCreationComplete()" close="onClose(event)" xmlns:components="protogeni.display.components.*">
+	<components:layout>
 		<s:VerticalLayout gap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
-	</display:layout>
+	</components:layout>
 	<fx:Script>
 		<![CDATA[
 			import mx.core.FlexGlobals;
@@ -195,4 +213,4 @@
 		<s:Rect width="5%"/>
 	</s:HGroup>
 	
-</display:ResizableTitleWindow>
+</components:ResizableTitleWindow>

@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -19,7 +19,7 @@ package protogeni.communication
   import protogeni.resources.Slice;
   import protogeni.resources.Sliver;
 
-  public class RequestSliverCreateAm extends Request
+  public final class RequestSliverCreateAm extends Request
   {
     public function RequestSliverCreateAm(s:Sliver) : void
     {
@@ -27,7 +27,7 @@ package protogeni.communication
 		ignoreReturnCode = true;
 		sliver = s;
 		s.created = false;
-		op.pushField(sliver.slice.urn);
+		op.pushField(sliver.slice.urn.full);
 		op.pushField([sliver.slice.credential]);
 		op.pushField(sliver.getRequestRspec().toXMLString());
 		// Internal API error: <Fault 102: "person_id 1: AddPersonKey: Invalid key_fields['key'] value: expected string, got struct">
@@ -35,7 +35,7 @@ package protogeni.communication
 		for each(var keyObject:Object in sliver.slice.creator.keys) {
 			userKeys.push(keyObject.key);
 		}
-		op.pushField([{urn:Main.geniHandler.CurrentUser.urn, keys:userKeys}]);
+		op.pushField([{urn:Main.geniHandler.CurrentUser.urn.full, keys:userKeys}]);
 		op.setExactUrl(sliver.manager.Url);
 		op.timeout = 360;
     }
@@ -49,11 +49,11 @@ package protogeni.communication
 			sliver.rspec = new XML(response);
 			sliver.parseRspec();
 			
-			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
+			var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn.full);
 			if(old != null)
 			{
-				if(old.slivers.getByUrn(sliver.urn) != null)
-					old.slivers.remove(old.slivers.getByUrn(sliver.urn));
+				if(old.slivers.getByUrn(sliver.urn.full) != null)
+					old.slivers.remove(old.slivers.getByUrn(sliver.urn.full));
 				old.slivers.add(sliver);
 			}
 			

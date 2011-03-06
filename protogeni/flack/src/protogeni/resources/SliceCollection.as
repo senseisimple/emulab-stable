@@ -5,7 +5,7 @@ package protogeni.resources
 	import mx.collections.SortField;
 	import mx.utils.ObjectUtil;
 	
-	public class SliceCollection extends ArrayCollection
+	public final class SliceCollection extends ArrayCollection
 	{
 		public function SliceCollection(source:Array=null)
 		{
@@ -22,7 +22,7 @@ package protogeni.resources
 		{
 			for each(var existing:Slice in this)
 			{
-				if(existing.urn == urn)
+				if(existing.urn.full == urn)
 					return existing;
 			}
 			return null;
@@ -32,7 +32,7 @@ package protogeni.resources
 		{
 			for each(var existing:Slice in this)
 			{
-				if(existing.urn == s.urn)
+				if(existing.urn.full == s.urn.full)
 				{
 					existing = s;
 					return;

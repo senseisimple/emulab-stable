@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -16,24 +16,25 @@ package protogeni.communication
 {
 	import mx.controls.Alert;
 	
-	import protogeni.Util;
+	import protogeni.StringUtil;
+	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Slice;
 	import protogeni.resources.Sliver;
 
-  public class RequestSliceResolve extends Request
+  public final class RequestSliceResolve extends Request
   {
     public function RequestSliceResolve(s:Slice, willBeCreating:Boolean = false) : void
     {
 		var name:String;
 		if(s.hrn == null)
-			name = Util.shortenString(s.urn, 12);
+			name = StringUtil.shortenString(s.urn.full, 12);
 		else
 			name = s.hrn;
 		super("SliceResolve (" + name + ")", "Resolving slice named " + s.hrn, CommunicationUtil.resolve);
 		slice = s;
 		isCreating = willBeCreating;
 		op.addField("credential", Main.geniHandler.CurrentUser.credential);
-		op.addField("urn", slice.urn);
+		op.addField("urn", slice.urn.full);
 		op.addField("type", "Slice");
 		op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
     }
@@ -45,7 +46,7 @@ package protogeni.communication
 		{
 			if(isCreating)
 			{
-				Alert.show("Slice '" + slice.urn + "' already exists", "Error");
+				Alert.show("Slice '" + slice.urn.full + "' already exists", "Error");
 				Main.Application().setStatus("Slice exists", true);
 			}
 			else
@@ -53,7 +54,7 @@ package protogeni.communication
 				slice.uuid = response.value.uuid;
 				slice.creator = Main.geniHandler.CurrentUser;
 				slice.hrn = response.value.hrn;
-				slice.urn = response.value.urn;
+				slice.urn = new IdnUrn(response.value.urn);
 				for each(var sliverCm:String in response.value.component_managers) {
 					var newSliver:Sliver = new Sliver(slice);
 					newSliver.manager = Main.geniHandler.GeniManagers.getByUrn(sliverCm);
@@ -81,7 +82,7 @@ package protogeni.communication
 		return newRequest;
 	}
 
-    private var slice : Slice;
+    private var slice:Slice;
 	private var isCreating:Boolean;
   }
 }

@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,15 +14,16 @@
 
 package protogeni.communication
 {
+	import protogeni.resources.IdnUrn;
 	import protogeni.resources.Sliver;
 
-  public class RequestSliverGet extends Request
+  public final class RequestSliverGet extends Request
   {
     public function RequestSliverGet(s:Sliver) : void
     {
 		super("SliverGet", "Getting the sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.getSliver, true);
 		sliver = s;
-		op.addField("slice_urn", sliver.slice.urn);
+		op.addField("slice_urn", sliver.slice.urn.full);
 		op.addField("credentials", new Array(sliver.slice.credential));
 		op.setUrl(sliver.manager.Url);
     }
@@ -34,7 +35,7 @@ package protogeni.communication
 		{
 			sliver.credential = String(response.value);
 			var cred:XML = new XML(response.value);
-			sliver.urn = cred.credential.target_urn;
+			sliver.urn = new IdnUrn(cred.credential.target_urn);
 			newCall = new RequestSliverResolve(sliver);
 		}
 		else if(code == CommunicationUtil.GENIRESPONSE_SEARCHFAILED)

@@ -15,7 +15,7 @@
  package protogeni.resources
 {	
 	// Collection of interfaces from a physical node
-	public class PhysicalNodeInterfaceCollection
+	public final class PhysicalNodeInterfaceCollection
 	{
 		public var collection:Vector.<PhysicalNodeInterface>;
 		public function PhysicalNodeInterfaceCollection()

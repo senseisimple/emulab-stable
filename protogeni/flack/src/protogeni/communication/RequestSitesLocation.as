@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -20,7 +20,7 @@ package protogeni.communication
   import protogeni.resources.PlanetlabAggregateManager;
   import protogeni.resources.Site;
 
-  public class RequestSitesLocation extends Request
+  public final class RequestSitesLocation extends Request
   {
 	  
     public function RequestSitesLocation(newPlm:PlanetlabAggregateManager) : void

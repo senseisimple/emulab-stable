@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -16,13 +16,13 @@ package protogeni.communication
 {
 	import protogeni.resources.Slice;
 
-  public class RequestSliceDelete extends Request
+  public final class RequestSliceDelete extends Request
   {
     public function RequestSliceDelete(s:Slice) : void
     {
 		super("SliceDelete", "Deleting slice named " + s.hrn, CommunicationUtil.deleteSlice);
 		slice = s;
-		op.addField("slice_urn", slice.urn);
+		op.addField("slice_urn", slice.urn.full);
 		op.addField("credential", Main.geniHandler.CurrentUser.credential);
 		// What CM???
     }

@@ -16,7 +16,7 @@
 	import mx.events.FlexEvent;
 	import mx.managers.DragManager;
 	
-	import protogeni.display.DisplayUtil;
+	import protogeni.display.ColorUtil;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
@@ -35,23 +35,23 @@
 				var numShownManagers:int = Math.min(managers.length, 5);
 				loc = 3*(numShownManagers-1);
 				for(var i:int = numShownManagers-1; i > -1; i--) {
-					sprite.graphics.lineStyle(2, DisplayUtil.colorsMedium[managers[i].colorIdx], 1);
-					sprite.graphics.beginFill(DisplayUtil.colorsDark[managers[i].colorIdx], 1);
+					sprite.graphics.lineStyle(2, ColorUtil.colorsMedium[managers[i].colorIdx], 1);
+					sprite.graphics.beginFill(ColorUtil.colorsDark[managers[i].colorIdx], 1);
 					sprite.graphics.drawRoundRect(loc, loc, 28, 28, 10, 10);
 					loc -= 3;
 				}
 			} else {
 				loc = Math.min(3*(newMarker.showGroups.collection.length-1), 6);
 				while(loc > -1) {
-					sprite.graphics.lineStyle(2, DisplayUtil.colorsMedium[managers[0].colorIdx], 1);
-					sprite.graphics.beginFill(DisplayUtil.colorsDark[managers[0].colorIdx], 1);
+					sprite.graphics.lineStyle(2, ColorUtil.colorsMedium[managers[0].colorIdx], 1);
+					sprite.graphics.beginFill(ColorUtil.colorsDark[managers[0].colorIdx], 1);
 					sprite.graphics.drawRoundRect(loc, loc, 28, 28, 10, 10);
 					loc -= 3;
 				}
 			}
 			
 			var labelMc:TextField=new TextField();
-			labelMc.textColor = DisplayUtil.colorsLight[managers[0].colorIdx];
+			labelMc.textColor = ColorUtil.colorsLight[managers[0].colorIdx];
 			labelMc.selectable=false;
 			labelMc.border=false;
 			labelMc.embedFonts=false;

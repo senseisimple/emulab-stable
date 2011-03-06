@@ -14,7 +14,7 @@
 
 package protogeni.communication
 {
-  class RequestReleaseTicket extends Request
+	public final class RequestReleaseTicket extends Request
   {
     public function RequestReleaseTicket(newManager : ComponentManager,
 										 newSliceUrn) : void

@@ -1,11 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<display:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
+
+<!--
+
+GENIPUBLIC-COPYRIGHT
+Copyright (c) 2008-2011 University of Utah and the Flux Group.
+All rights reserved.
+
+Permission to use, copy, modify and distribute this software is hereby
+granted provided that (1) source code retains these copyright, permission,
+and disclaimer notices, and (2) redistributions including binaries
+reproduce the notices in supporting documentation.
+
+THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+
+-->
+
+<components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx"
 						xmlns:display="protogeni.display.*"
 						title="Initial User Settings" close="closeWindow()"
 						defaultButton="{okButton}"
-						contentCreationComplete="onCreationComplete()">
+						contentCreationComplete="onCreationComplete()" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
 			import com.mattism.http.xmlrpc.JSLoader;
@@ -14,7 +32,7 @@
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
 			
-			import protogeni.Util;
+			import protogeni.NetUtil;
 			import protogeni.display.skins.CheckBoxSkin;
 			import protogeni.display.skins.TextAreaSkin;
 			import protogeni.resources.SliceAuthority;
@@ -81,9 +99,9 @@
 			
 			public function visitLogin():void
 			{
-				var url:String = Util.tryGetBaseUrl(selectedAuthority.Url) + loginLocation;
+				var url:String = NetUtil.tryGetBaseUrl(selectedAuthority.Url) + loginLocation;
 				Main.checkLoadCrossDomain(url);
-				Util.openWebsite( url );
+				NetUtil.openWebsite( url );
 			}
 			
 			public function checkCloseAfter():void
@@ -203,7 +221,7 @@
 		<s:HGroup verticalAlign="middle">
 			<s:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
 					  icon="{ImageUtil.sslIcon}"
-					  click="this.tryLoadCert(Util.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
+					  click="this.tryLoadCert(NetUtil.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
 			<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
 			<s:Label id="getLabel" text="" />
 		</s:HGroup>
@@ -216,13 +234,13 @@
 			<s:CheckBox id="cacheCheckbox" label="Cache?" />
 		</s:HGroup>
 	</s:VGroup>
-	<display:controlBarLayout>
+	<components:controlBarLayout>
 		<s:HorizontalLayout paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" />
-	</display:controlBarLayout>
-	<display:controlBarContent>
+	</components:controlBarLayout>
+	<components:controlBarContent>
 		<s:Button id="okButton" label="OK" icon="{ImageUtil.authenticationIcon}" height="24"
 				  click="trySubmit();" />
 		<s:Button label="Cancel" icon="{ImageUtil.crossIcon}" height="24"
 				  click="closeWindow()" />
-	</display:controlBarContent>
-</display:DefaultWindow>
+	</components:controlBarContent>
+</components:DefaultWindow>

@@ -1,6 +1,6 @@
 package protogeni.resources
 {
-	public class VirtualNodeCollection
+	public final class VirtualNodeCollection
 	{
 		public var collection:Vector.<VirtualNode>;
 		public function VirtualNodeCollection()

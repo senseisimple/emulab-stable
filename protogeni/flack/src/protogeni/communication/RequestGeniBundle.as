@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -14,11 +14,21 @@
 
 package protogeni.communication
 {
+  import com.mattism.http.xmlrpc.MethodFault;
+  
+  import flash.events.ErrorEvent;
+  
+  import mx.controls.Alert;
+  import mx.core.FlexGlobals;
+  import mx.events.CloseEvent;
+  import mx.managers.PopUpManager;
+  
+  import protogeni.GeniDispatcher;
   import protogeni.Util;
   import protogeni.resources.GeniManager;
   import protogeni.resources.ProtogeniComponentManager;
 
-  public class RequestGeniBundle extends Request
+  public final class RequestGeniBundle extends Request
   {
 	  
     public function RequestGeniBundle() : void

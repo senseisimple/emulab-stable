@@ -1,5 +1,5 @@
 ﻿/* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2008, 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -18,20 +18,20 @@ package protogeni.communication
   
   import mx.utils.Base64Decoder;
   
-  import protogeni.Util;
+  import protogeni.StringUtil;
   import protogeni.resources.Sliver;
 
-  public class RequestSliverListResourcesAm extends Request
+  public final class RequestSliverListResourcesAm extends Request
   {
 	  
     public function RequestSliverListResourcesAm(s:Sliver) : void
     {
-		super("ListResources (" + Util.shortenString(s.manager.Url, 15) + ")", "Listing resources for sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.listResourcesAm, true);
+		super("ListResources (" + StringUtil.shortenString(s.manager.Url, 15) + ")", "Listing resources for sliver on " + s.manager.Hrn + " on slice named " + s.slice.hrn, CommunicationUtil.listResourcesAm, true);
 		ignoreReturnCode = true;
 		op.timeout = 60;
 		sliver = s;
 		op.pushField([sliver.slice.credential]);
-		op.pushField({geni_available:false, geni_compressed:true, geni_slice_urn:sliver.slice.urn});	// geni_available:false = show all, true = show only available
+		op.pushField({geni_available:false, geni_compressed:true, geni_slice_urn:sliver.slice.urn.full});	// geni_available:false = show all, true = show only available
 		op.setExactUrl(sliver.manager.Url);
     }
 	
