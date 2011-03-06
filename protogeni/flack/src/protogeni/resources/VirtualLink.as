@@ -44,21 +44,20 @@
 		[Bindable]
 		public var type:String;
 		[Bindable]
-		public var interfaces:ArrayCollection = new ArrayCollection();
+		public var interfaces:VirtualInterfaceCollection = new VirtualInterfaceCollection();
 		
 		public var linkType:int = TYPE_NORMAL;
-		public var slivers:Array;
+		public var slivers:SliverCollection;
 		public var rspec:XML;
 		
-		// Depreciated
-		public var bandwidth:Number;
+		[Bindable]
+		public var capacity:Number;
 		
 		public function VirtualLink(owner:Sliver = null)
 		{
+			slivers = new SliverCollection();
 			if(owner != null)
-				slivers = new Array(owner);
-			else
-				slivers = new Array();
+				slivers.add(owner);
 		}
 		
 		public function establish(first:VirtualNode, second:VirtualNode):Boolean
@@ -67,13 +66,13 @@
 			var secondInterface:VirtualInterface = second.allocateInterface();
 			if(firstInterface == null || secondInterface == null)
 				return false;
-			clientId = slivers[0].slice.getUniqueVirtualLinkId(this);
-			first.interfaces.Add(firstInterface);
-			second.interfaces.Add(secondInterface);
-			firstInterface.virtualLinks.addItem(this);
-			secondInterface.virtualLinks.addItem(this);
-			this.interfaces.addItem(firstInterface);
-			this.interfaces.addItem(secondInterface);
+			clientId = slivers.collection[0].slice.getUniqueVirtualLinkId(this);
+			first.interfaces.add(firstInterface);
+			second.interfaces.add(secondInterface);
+			firstInterface.virtualLinks.add(this);
+			secondInterface.virtualLinks.add(this);
+			this.interfaces.add(firstInterface);
+			this.interfaces.add(secondInterface);
 			
 			if(first.manager == second.manager)
 				linkType = TYPE_NORMAL;
@@ -87,27 +86,26 @@
 					 this.setUpTunnels();
 				 
 				 // Make sure nodes are in both
-				 if(!(second.slivers[0] as Sliver).nodes.contains(first))
-					 (second.slivers[0] as Sliver).nodes.addItem(first);
-				 if(!(first.slivers[0] as Sliver).nodes.contains(second))
-					 (first.slivers[0] as Sliver).nodes.addItem(second);
+				 if(!second.slivers.collection[0].nodes.contains(first))
+					 second.slivers.collection[0].nodes.add(first);
+				 if(!first.slivers.collection[0].nodes.contains(second))
+					 first.slivers.collection[0].nodes.add(second);
 				 
 				 // Add relative slivers
-				 if(slivers[0].manager != first.slivers[0].manager)
-					 slivers.push(first.slivers[0]);
-				 else if(slivers[0].manager != second.slivers[0].manager)
-					 slivers.push(second.slivers[0]);
+				 if(slivers.collection[0].manager != first.slivers.collection[0].manager)
+					 slivers.add(first.slivers.collection[0]);
+				 else if(slivers.collection[0].manager != second.slivers.collection[0].manager)
+					 slivers.add(second.slivers.collection[0]);
 			 }
 			
-			for each(var s:Sliver in slivers)
-				s.links.addItem(this);
+			for each(var s:Sliver in slivers.collection)
+				s.links.add(this);
 			
-			// depreciated
-			bandwidth = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
+			capacity = Math.floor(Math.min(firstInterface.bandwidth, secondInterface.bandwidth));
 			if (first.clientId.slice(0, 2) == "pg" || second.clientId.slice(0, 2) == "pg")
-				bandwidth = 1000000;
+				capacity = 1000000;
 			if(linkType == TYPE_GPENI || linkType == TYPE_ION)
-				bandwidth = 100000;
+				capacity = 100000;
 			
 			return true;
 		}
@@ -116,7 +114,7 @@
 		{
 			this.linkType = VirtualLink.TYPE_TUNNEL;
 			this.type = "gre-tunnel";
-			for each(var i:VirtualInterface in this.interfaces) {
+			for each(var i:VirtualInterface in this.interfaces.collection) {
 				if(i.ip.length == 0) {
 					i.ip = VirtualInterface.getNextTunnel();
 					i.mask = "255.255.255.0";
@@ -127,27 +125,25 @@
 		
 		public function remove():void
 		{
-			for each(var vi:VirtualInterface in this.interfaces)
+			for each(var vi:VirtualInterface in this.interfaces.collection)
 			{
 				if(vi.id != "control")
-					vi.owner.interfaces.collection.removeItemAt(vi.owner.interfaces.collection.getItemIndex(vi));
+					vi.owner.interfaces.remove(vi);
 				
 				for(var i:int = 1; i < vi.owner.slivers.length; i++)
 				{
-					if((vi.owner.slivers.getItemAt(i) as Sliver).links.getForNode(vi.owner).length == 0)
-						(vi.owner.slivers.getItemAt(i) as Sliver).nodes.remove(vi.owner);
+					if(vi.owner.slivers[i].links.getForNode(vi.owner).length == 0)
+						vi.owner.slivers[i].nodes.remove(vi.owner);
 				}
 			}
-			interfaces.removeAll();
-			for each(var s:Sliver in slivers)
-			{
-				s.links.removeItemAt(s.links.getItemIndex(this));
-			}
+			interfaces = new VirtualInterfaceCollection();
+			for each(var s:Sliver in slivers.collection)
+				s.links.remove(this);
 		}
 		
 		public function isConnectedTo(target:GeniManager) : Boolean
 		{
-			for each(var i:VirtualInterface in interfaces)
+			for each(var i:VirtualInterface in interfaces.collection)
 			{
 				if(i.owner.manager == target)
 					return true;
@@ -157,7 +153,7 @@
 		
 		public function hasVirtualNode(node:VirtualNode):Boolean
 		{
-			for each(var i:VirtualInterface in interfaces)
+			for each(var i:VirtualInterface in interfaces.collection)
 			{
 				if(i.owner == node)
 					return true;
@@ -168,7 +164,7 @@
 		
 		public function hasPhysicalNode(node:PhysicalNode):Boolean
 		{
-			for each(var i:VirtualInterface in interfaces)
+			for each(var i:VirtualInterface in interfaces.collection)
 			{
 				if(i.owner.IsBound() && i.owner.physicalNode == node)
 					return true;
@@ -177,7 +173,7 @@
 		}
 		
 		public function supportsIon():Boolean {
-			for each(var i:VirtualInterface in interfaces)
+			for each(var i:VirtualInterface in interfaces.collection)
 			{
 				if(!i.owner.manager.supportsIon)
 					return false;
@@ -186,7 +182,7 @@
 		}
 		
 		public function supportsGpeni():Boolean {
-			for each(var i:VirtualInterface in interfaces)
+			for each(var i:VirtualInterface in interfaces.collection)
 			{
 				if(!i.owner.manager.supportsGpeni)
 					return false;

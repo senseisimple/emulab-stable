@@ -33,15 +33,15 @@ package protogeni.communication
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{
 				sliver.removeOutsideReferences();
-				if(sliver.slice.slivers.getItemIndex(sliver) > -1)
-					sliver.slice.slivers.removeItemAt(sliver.slice.slivers.getItemIndex(sliver));
+				if(sliver.slice.slivers.contains(sliver))
+					sliver.slice.slivers.remove(sliver);
 				var old:Slice = Main.geniHandler.CurrentUser.slices.getByUrn(sliver.slice.urn);
 				if(old != null)
 				{
 					var oldSliver:Sliver = old.slivers.getByUrn(sliver.urn);
 					if(oldSliver != null) {
 						oldSliver.removeOutsideReferences();
-						old.slivers.removeItemAt(old.slivers.getItemIndex(old.slivers.getByUrn(sliver.urn)));
+						old.slivers.remove(old.slivers.getByUrn(sliver.urn));
 					}
 					Main.geniDispatcher.dispatchSliceChanged(old);
 				}

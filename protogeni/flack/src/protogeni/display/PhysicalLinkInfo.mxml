@@ -19,7 +19,7 @@
 			
 			public function load(l:PhysicalLink):void {
 				link = l;
-				txtBandwidth.text = Util.kbsToString(l.bandwidth);
+				txtBandwidth.text = Util.kbsToString(l.capacity);
 				this.managerHgroup.addElement(DisplayUtil.getGeniManagerButton(link.manager));
 				
 				for each(var linkType:String in link.linkTypes) {

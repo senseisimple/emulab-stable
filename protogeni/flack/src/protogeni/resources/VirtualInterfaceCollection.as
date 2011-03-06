@@ -14,17 +14,40 @@
  
  package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	
 	// Collection of interfaces from a node in a sliver/slice
 	public class VirtualInterfaceCollection
 	{
+		[Bindable]
+		public var collection:Vector.<VirtualInterface>;
 		public function VirtualInterfaceCollection()
 		{
+			collection = new Vector.<VirtualInterface>();
 		}
 		
-		[Bindable]
-		public var collection:ArrayCollection = new ArrayCollection();
+		public function add(ni:VirtualInterface):void {
+			for each(var t:VirtualInterface in this.collection)
+			{
+				if(t.id == ni.id)
+					return;
+			}
+			collection.push(ni);
+		}
+		
+		public function remove(vi:VirtualInterface):void
+		{
+			var idx:int = collection.indexOf(vi);
+			if(idx > -1)
+				collection.splice(idx, 1);
+		}
+		
+		public function contains(vi:VirtualInterface):Boolean
+		{
+			return collection.indexOf(vi) > -1;
+		}
+		
+		public function get length():int{
+			return this.collection.length;
+		}
 		
 		public function GetByID(urn:String):VirtualInterface {
 			for each(var ni:VirtualInterface in collection) {
@@ -34,23 +57,10 @@
 			return null;
 		}
 		
-		public function Add(ni:VirtualInterface):void {
-			for each(var t:VirtualInterface in collection)
-			{
-				if(t.id == ni.id)
-					return;
-			}
-			collection.addItem(ni);
-		}
-		
-		public function removeAll():void {
-			collection.removeAll();
-		}
-		
 		public function Links():Vector.<VirtualLink> {
 			var ac:Vector.<VirtualLink> = new Vector.<VirtualLink>();
 			for each(var ni:VirtualInterface in collection) {
-				for each(var l:VirtualLink in ni.virtualLinks) {
+				for each(var l:VirtualLink in ni.virtualLinks.collection) {
 					if(ac.indexOf(l) == -1)
 						ac.push(l);
 				}

@@ -14,7 +14,6 @@
  
  package protogeni
 {
-	 import mx.collections.ArrayCollection;
 	 import mx.collections.ArrayList;
 	 
 	 import protogeni.communication.GeniRequestHandler;
@@ -128,16 +127,16 @@
 			{
 				if(Util.findInAny(searchFrom, new Array(slice.urn, slice.hrn, slice.uuid), matchAll))
 					results.push(DisplayUtil.getSliceButton(slice));
-				for each(var sliver:Sliver in slice.slivers)
+				for each(var sliver:Sliver in slice.slivers.collection)
 				{
 					//if(sliver.urn == s)
 						//results.push(DisplayUtil.getSliverButton();
-					for each(var vn:VirtualNode in sliver.nodes)
+					for each(var vn:VirtualNode in sliver.nodes.collection)
 					{
 						//if(vn.urn == s || vn.uuid == s)
 							//results.push(DisplayUtil.getVirtualNodeButton());
 					}
-					for each(var vl:VirtualLink in sliver.links)
+					for each(var vl:VirtualLink in sliver.links.collection)
 					{
 						//if(vn.urn == s || vn.uuid == s)
 						//results.push(DisplayUtil.getVirtualNodeButton());

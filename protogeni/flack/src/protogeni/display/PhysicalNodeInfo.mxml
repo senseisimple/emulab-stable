@@ -13,6 +13,7 @@
 			import protogeni.resources.PhysicalNodeInterface;
 			import protogeni.resources.SliverType;
 			import protogeni.resources.VirtualLink;
+			import protogeni.resources.VirtualLinkCollection;
 			import protogeni.resources.VirtualNode;
 			
 			import spark.components.Button;
@@ -56,9 +57,9 @@
 					&& Main.geniHandler.mapHandler.selectedSlice.hrn != null
 					&& Main.geniHandler.mapHandler.selectedSlice.hrn.length>0)
 				{
-					for each(var vn:VirtualNode in node.virtualNodes)
+					for each(var vn:VirtualNode in node.virtualNodes.collection)
 					{
-						if(vn.slivers[0].slice == Main.geniHandler.mapHandler.selectedSlice)
+						if(vn.slivers.collection[0].slice == Main.geniHandler.mapHandler.selectedSlice)
 						{
 							virtualNode = vn;
 							break;
@@ -135,22 +136,22 @@
 				if(sliceLinksVbox != null) {
 					sliceLinksVbox.removeAllElements();
 					if(virtualNode != null) {
-						var connectedNodes:ArrayCollection = virtualNode.GetPhysicalNodes();
+						var connectedNodes:Vector.<PhysicalNode> = virtualNode.GetPhysicalNodes();
 						
 						sliceLinksNavigator.label = "Slice (" + connectedNodes.length + " Nodes)"
 						var connectedLabel:Label = new Label();
 						if(connectedNodes.length > 0)
-							connectedLabel.text = "Connected on " + virtualNode.slivers[0].slice.hrn + " to";
+							connectedLabel.text = "Connected on " + virtualNode.sliver.slice.hrn + " to";
 						else
-							connectedLabel.text = "No linked nodes on " + virtualNode.slivers[0].slice.hrn;
+							connectedLabel.text = "No linked nodes on " + virtualNode.sliver.slice.hrn;
 						sliceLinksVbox.addElement(connectedLabel);
 						
 						for each(var connectedNode:PhysicalNode in connectedNodes)
 						{
 							sliceLinksVbox.addElement(DisplayUtil.getPhysicalNodeButton(connectedNode));
 							
-							var connectedLinks:ArrayCollection = virtualNode.GetLinksForPhysical(connectedNode);
-							for each(var connectedLink:VirtualLink in connectedLinks)
+							var connectedLinks:VirtualLinkCollection = virtualNode.GetLinksForPhysical(connectedNode);
+							for each(var connectedLink:VirtualLink in connectedLinks.collection)
 							{
 								var pointLinkHbox:HGroup = new HGroup();
 								var space:Rect = new Rect();

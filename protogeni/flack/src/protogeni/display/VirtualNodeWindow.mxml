@@ -23,7 +23,9 @@
 			import protogeni.resources.Sliver;
 			import protogeni.resources.SliverType;
 			import protogeni.resources.VirtualLink;
+			import protogeni.resources.VirtualLinkCollection;
 			import protogeni.resources.VirtualNode;
+			import protogeni.resources.VirtualNodeCollection;
 			
 			import spark.primitives.Rect;
 			
@@ -125,14 +127,14 @@
 			
 			public function loadSlices():void {
 				linksVbox.removeAllElements();
-				var connectedNodes:ArrayCollection = node.GetAllNodes();
+				var connectedNodes:VirtualNodeCollection = node.GetAllNodes();
 				
-				for each(var connectedNode:VirtualNode in connectedNodes)
+				for each(var connectedNode:VirtualNode in connectedNodes.collection)
 				{
 					linksVbox.addElement(DisplayUtil.getVirtualNodeButton(connectedNode));
 					
-					var connectedLinks:ArrayCollection = node.GetLinks(connectedNode);
-					for each(var connectedLink:VirtualLink in connectedLinks)
+					var connectedLinks:VirtualLinkCollection = node.GetLinks(connectedNode);
+					for each(var connectedLink:VirtualLink in connectedLinks.collection)
 					{
 						var pointLinkHbox:HGroup = new HGroup();
 						var space:Rect = new Rect();
@@ -171,7 +173,7 @@
 				if(node.subNodes.length > 0)
 				{
 					hierarchyVbox.addElement(DisplayUtil.getLabel("Subnodes:"));
-					for each(var subNode:VirtualNode in node.subNodes)
+					for each(var subNode:VirtualNode in node.subNodes.collection)
 					{
 						hierarchyVbox.addElement(DisplayUtil.getVirtualNodeButton(subNode));
 					}
@@ -202,7 +204,7 @@
 					node.executeServices.push(new ExecuteService(this.executeCommandText.text, this.executeShellText.text));
 				}
 				this.node.setDiskImage(diskImageText.text);
-				Main.geniDispatcher.dispatchSliceChanged(node.slivers[0].slice);
+				Main.geniDispatcher.dispatchSliceChanged(node.sliver.slice);
 			}
 			
 			public function viewRspec():void
@@ -268,7 +270,7 @@
 		<s:Label text="State" fontWeight="bold" />
 		<s:Label id="stateLabel" text="{node.state}" />
 		<s:Label text="Slice" fontWeight="bold"/>
-		<s:Label text="{(node.slivers.getItemAt(0) as Sliver).slice.hrn}" />
+		<s:Label text="{node.sliver.slice.hrn}" />
 	</s:HGroup>
 
 	<s:VGroup width="100%" id="hierarchyVbox" />

@@ -119,24 +119,24 @@
 				var newSlivers:SliverCollection = new SliverCollection();
 				var deleteSlivers:SliverCollection = new SliverCollection();
 				var updateSlivers:SliverCollection = slice.slivers.clone();
-				for each(var s:Sliver in old.slivers)
+				for each(var s:Sliver in old.slivers.collection)
 				{
 					if(slice.slivers.getByGm(s.manager) == null)
-						deleteSlivers.addItem(s);
+						deleteSlivers.add(s);
 				}
-				for each(s in slice.slivers)
+				for each(s in slice.slivers.collection)
 				{
 					if(old.slivers.getByGm(s.manager) == null)
 					{
-						newSlivers.addItem(s);
-						updateSlivers.removeItemAt(updateSlivers.getItemIndex(s));
+						newSlivers.add(s);
+						updateSlivers.remove(s);
 					}
 				}
 				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
 				
 				// Create
 				var addDelay:Boolean = false;
-				for each(var sliver:Sliver in newSlivers) {
+				for each(var sliver:Sliver in newSlivers.collection) {
 					var request:Request;
 					if(sliver.manager is AggregateManager)
 						request = new RequestSliverCreateAm(sliver);
@@ -153,12 +153,12 @@
 				}
 					
 				// Update
-				for each(sliver in updateSlivers) {
+				for each(sliver in updateSlivers.collection) {
 					pushRequest(new RequestSliverUpdate(sliver));
 				}
 				
 				// Delete
-				for each(sliver in deleteSlivers) {
+				for each(sliver in deleteSlivers.collection) {
 					if(sliver.manager is AggregateManager)
 						pushRequest(new RequestSliverDeleteAm(sliver));
 					else if(sliver.manager is ProtogeniComponentManager)
@@ -167,10 +167,10 @@
 			} else {
 				// Create
 				Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-				for each(sliver in slice.slivers) {
+				for each(sliver in slice.slivers.collection) {
 					sliver.created = false;
 				}
-				for each(sliver in slice.slivers) {
+				for each(sliver in slice.slivers.collection) {
 					if(sliver.manager is AggregateManager)
 						pushRequest(new RequestSliverCreateAm(sliver));
 					else if(sliver.manager is ProtogeniComponentManager)
@@ -182,7 +182,7 @@
 		public function refreshSlice(slice:Slice, skipDone:Boolean = false):void
 		{
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers) {
+			for each(var sliver:Sliver in slice.slivers.collection) {
 				if(skipDone && sliver.status == Sliver.STATUS_READY)
 					continue;
 				if(sliver.manager is AggregateManager)
@@ -195,7 +195,7 @@
 		public function deleteSlice(slice:Slice):void
 		{
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers)
+			for each(var sliver:Sliver in slice.slivers.collection)
 			{
 				if(sliver.manager is AggregateManager)
 					pushRequest(new RequestSliverDeleteAm(sliver));
@@ -205,7 +205,7 @@
 		}
 		
 		public function embedSlice(slice:Slice):void {
-			for each(var sliver:Sliver in slice.slivers)
+			for each(var sliver:Sliver in slice.slivers.collection)
 			{
 				pushRequest(new RequestSliceEmbedding(sliver));
 			}
@@ -214,7 +214,7 @@
 		public function startSlice(slice:Slice):void
 		{
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers)
+			for each(var sliver:Sliver in slice.slivers.collection)
 			{
 				pushRequest(new RequestSliverStart(sliver));
 			}
@@ -223,7 +223,7 @@
 		public function stopSlice(slice:Slice):void
 		{
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers)
+			for each(var sliver:Sliver in slice.slivers.collection)
 			{
 				pushRequest(new RequestSliverStop(sliver));
 			}
@@ -232,7 +232,7 @@
 		public function restartSlice(slice:Slice):void
 		{
 			Main.geniHandler.CurrentUser.slices.addOrReplace(slice);
-			for each(var sliver:Sliver in slice.slivers)
+			for each(var sliver:Sliver in slice.slivers.collection)
 			{
 				pushRequest(new RequestSliverRestart(sliver));
 			}

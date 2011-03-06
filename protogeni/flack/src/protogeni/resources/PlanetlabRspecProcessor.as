@@ -151,7 +151,7 @@ package protogeni.resources
 			
 			var requestSites:ArrayCollection = new ArrayCollection();
 			var requestSitesDic:Dictionary = new Dictionary();
-			for each(var vn:VirtualNode in s.nodes) {
+			for each(var vn:VirtualNode in s.nodes.collection) {
 				var newRequestSite:Object = requestSitesDic[vn.physicalNode.tag.id];
 				if(newRequestSite == null) {
 					newRequestSite = new Object();

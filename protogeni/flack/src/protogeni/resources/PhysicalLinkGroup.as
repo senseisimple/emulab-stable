@@ -44,7 +44,7 @@
 		public function TotalBandwidth():Number {
 			var bw:Number = 0;
 			for each(var l:PhysicalLink in collection) {
-				bw += l.bandwidth;
+				bw += l.capacity;
 			}
 			return bw;
 		}
