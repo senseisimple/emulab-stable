@@ -104,7 +104,7 @@
 			for each(var i:PhysicalNodeInterface in interfaces.collection) {
 				for each(var l:PhysicalLink in i.physicalLinks) {
 					for each(var ln:PhysicalNode in l.GetNodes()) {
-						if(ln != this && !ac.indexOf(ln) == -1)
+						if(ln != this && ac.indexOf(ln) == -1)
 							ac.push(ln);
 					}
 				}

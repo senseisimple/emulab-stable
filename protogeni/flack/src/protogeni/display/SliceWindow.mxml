@@ -39,6 +39,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
 			import protogeni.display.components.AdvancedTextArea;
+			import protogeni.display.components.DataButton;
 			import protogeni.display.components.DefaultWindow;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.PhysicalNode;
@@ -376,46 +377,34 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				exclusive.clientId = "Exclusive";
 				exclusive.Exclusive = true;
 				exclusive.manager = manager;
-				var addExclusiveButton:ImageButton = new ImageButton();
-				addExclusiveButton.setStyle("icon", ImageUtil.exclusiveIcon);
+				var addExclusiveButton:DataButton = new DataButton("",
+					"Add an exclusive node",
+					ImageUtil.exclusiveIcon,
+					null,
+					"virtualnode");
+				addExclusiveButton.data = exclusive;
 				addExclusiveButton.setStyle("chromeColor", ColorUtil.colorsDark[manager.colorIdx]);
 				addExclusiveButton.setStyle("color", ColorUtil.colorsLight[manager.colorIdx]);
-				addExclusiveButton.toolTip = "Add an exclusive node";
 				addExclusiveButton.addEventListener(MouseEvent.CLICK,
 					function addExclusiveClicked(e:MouseEvent):void {
-						sliceCanvas.addBasicVirtualNode(exclusive);
+						sliceCanvas.addBasicVirtualNode(e.currentTarget.data);
 					});
-				addExclusiveButton.addEventListener(MouseEvent.MOUSE_MOVE,
-					function startDragExclusive(e:MouseEvent):void {
-						var dragInitiator:Button=Button(e.currentTarget);
-						var ds:DragSource = new DragSource();
-						ds.addData(exclusive, 'virtualnode');
-						DragManager.doDrag(dragInitiator, ds, e);
-					}
-				);
 				managerHgroup.addElement(addExclusiveButton);
 				
 				var shared:VirtualNode = new VirtualNode(null);
 				shared.clientId = "Shared";
 				shared.Exclusive = false;
 				shared.manager = manager;
-				var addSharedButton:ImageButton = new ImageButton();
-				addSharedButton.setStyle("icon", ImageUtil.sharedIcon);
+				var addSharedButton:DataButton = new DataButton("",
+					"Add a shared node",
+					ImageUtil.sharedIcon, null, "virtualnode");
+				addSharedButton.data = shared;
 				addSharedButton.setStyle("chromeColor", ColorUtil.colorsDark[manager.colorIdx]);
 				addSharedButton.setStyle("color", ColorUtil.colorsLight[manager.colorIdx]);
-				addSharedButton.toolTip = "Add a shared node";
 				addSharedButton.addEventListener(MouseEvent.CLICK,
 					function addSharedClicked(e:MouseEvent):void {
 						sliceCanvas.addBasicVirtualNode(shared);
 					});
-				addSharedButton.addEventListener(MouseEvent.MOUSE_MOVE,
-					function startDragExclusive(e:MouseEvent):void {
-						var dragInitiator:Button=Button(e.currentTarget);
-						var ds:DragSource = new DragSource();
-						ds.addData(shared, 'virtualnode');
-						DragManager.doDrag(dragInitiator, ds, e);
-					}
-				);
 				managerHgroup.addElement(addSharedButton);
 				this.sidePane.addElement(managerHgroup);
 			}
