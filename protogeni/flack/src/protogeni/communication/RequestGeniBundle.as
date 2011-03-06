@@ -17,36 +17,34 @@ package protogeni.communication
   import com.mattism.http.xmlrpc.MethodFault;
   
   import flash.events.ErrorEvent;
-  
-  import mx.controls.Alert;
-  import mx.core.FlexGlobals;
-  import mx.events.CloseEvent;
-  import mx.managers.PopUpManager;
-  
-  import protogeni.GeniDispatcher;
-  import protogeni.Util;
-  import protogeni.resources.GeniManager;
-  import protogeni.resources.ProtogeniComponentManager;
 
   public final class RequestGeniBundle extends Request
   {
-	  
-    public function RequestGeniBundle() : void
+    public function RequestGeniBundle():void
     {
-		super("CertBundle", "Getting cert bundle", null, true);
+		super("CertBundle",
+			"Getting cert bundle",
+			null,
+			true);
 		op.setExactUrl(Main.geniHandler.certBundleUrl);
 		op.type = Operation.HTTP;
 		op.timeout = 20;
 	}
 	
-	override public function complete(code : Number, response : Object) : *
+	override public function complete(code:Number, response:Object):*
 	{
 		if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 		{
-			Main.setCertBundle(response as String);
+			FlackCache.instance.geniBundle = response as String;
 		}
 		
 		return null;
+	}
+	
+	override public function fail(event:ErrorEvent, fault:MethodFault):*
+	{
+		if(FlackCache.instance.geniBundle.length == 0)
+			FlackCache.instance.geniBundle = (new FallbackGeniBundle()).toString();
 	}
   }
 }

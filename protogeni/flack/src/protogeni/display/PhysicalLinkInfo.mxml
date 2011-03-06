@@ -22,12 +22,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		  xmlns:mx="library://ns.adobe.com/flex/mx" width="400" height="300" xmlns:display="protogeni.display.*" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
-			import protogeni.display.components.XmlWindow;
 			import mx.collections.ArrayCollection;
-			import mx.controls.Button;
 			
 			import protogeni.StringUtil;
 			import protogeni.Util;
+			import protogeni.display.components.XmlWindow;
 			import protogeni.resources.PhysicalLink;
 			import protogeni.resources.PhysicalNodeInterface;
 			

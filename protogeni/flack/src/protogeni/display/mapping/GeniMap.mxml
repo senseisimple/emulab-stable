@@ -38,15 +38,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import com.google.maps.MapZoomEvent;
 			import com.google.maps.PaneId;
 			import com.google.maps.controls.NavigationControl;
-			import com.google.maps.controls.PositionControl;
-			import com.google.maps.controls.ZoomControl;
 			import com.google.maps.interfaces.IPane;
 			import com.google.maps.interfaces.IPaneManager;
 			
-			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
-			
-			import spark.components.Button;
 			
 			public var ready:Boolean;
 			public var linkPane:IPane;
@@ -67,7 +62,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				// else detect a key from our default list
 				else
 				{
-					var url : String = mx.core.FlexGlobals.topLevelApplication.url;
+					var url:String = mx.core.FlexGlobals.topLevelApplication.url;
 					
 					if(url.indexOf("https://users.emulab.net") > -1)
 						key = "ABQIAAAAJfmFhYY_qvxp3r-UM7Zc6hRvSZn5G9iDjkMHpAGYHc8v1OnErBT5Vzf3wT7WhxaP7ouXIub2R00Wxg";

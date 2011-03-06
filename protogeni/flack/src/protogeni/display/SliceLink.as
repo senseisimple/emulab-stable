@@ -1,3 +1,17 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.display
 {
 	import flash.display.CapsStyle;
@@ -5,17 +19,15 @@ package protogeni.display
 	import flash.display.Sprite;
 	import flash.events.MouseEvent;
 	
-	import mx.controls.Alert;
 	import mx.core.UIComponent;
-	import mx.graphics.IFill;
 	import mx.graphics.SolidColor;
 	
+	import protogeni.display.components.ImageButton;
 	import protogeni.resources.VirtualLink;
 	
 	import spark.components.Group;
 	import spark.components.HGroup;
 	import spark.primitives.Rect;
-	import protogeni.display.components.ImageButton;
 	
 	public class SliceLink extends UIComponent
 	{
@@ -156,18 +168,28 @@ package protogeni.display
 					color = ION_COLOR;
 					break;
 			}
-			drawLink(startNode.getMiddleX(), startNode.getMiddleY(), endNode.getMiddleX(), endNode.getMiddleY());
+			drawLink(startNode.getMiddleX(),
+				startNode.getMiddleY(),
+				endNode.getMiddleX(),
+				endNode.getMiddleY());
 			group.x = ((startNode.getMiddleX() + endNode.getMiddleX()) / 2) - (group.width/2 + 1);
 			group.y = ((startNode.getMiddleY() + endNode.getMiddleY()) / 2) - (group.height/2);
 		}
 		
-		public function drawEstablishing(startX:int, startY:int, endX:int, endY:int, ready:Boolean):void
+		public function drawEstablishing(startX:int,
+										 startY:int,
+										 endX:int,
+										 endY:int,
+										 ready:Boolean):void
 		{
 			color = ready ? VALID_COLOR : INVALID_COLOR;
 			drawLink(startX, startY, endX, endY);
 		}
 		
-		public function drawLink(startX:int, startY:int, endX:int, endY:int):void
+		public function drawLink(startX:int,
+								 startY:int,
+								 endX:int,
+								 endY:int):void
 		{
 			rawSprite.graphics.clear();
 			rawSprite.graphics.lineStyle(4, color, 1.0, true,

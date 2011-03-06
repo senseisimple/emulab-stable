@@ -96,24 +96,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<fx:Script>
 		<![CDATA[
 			import mx.controls.Alert;
-			import mx.core.FlexGlobals;
-			import mx.events.CloseEvent;
-			import mx.events.ListEvent;
-			import mx.events.ResizeEvent;
-			import mx.rpc.events.ResultEvent;
 			
-			import protogeni.GeniDispatcher;
 			import protogeni.GeniEvent;
 			import protogeni.GeniHandler;
-			import protogeni.NetUtil;
 			import protogeni.communication.RequestGeniBundle;
 			import protogeni.communication.RequestRootBundle;
-			import protogeni.communication.RequestTest;
 			import protogeni.display.DisplayUtil;
 			import protogeni.display.ImageUtil;
-			import protogeni.display.KeyboardWindow;
-			import protogeni.resources.Slice;
-			import protogeni.resources.SliceAuthority;
 			
 			//------------------------------------------
 			// Embedded resources
@@ -136,38 +125,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Security.allowInsecureDomain("*");
 				Security.allowDomain("localhost");	
 				
-				// Force a different Google Maps API key if given
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.mapkey != null)
-					{
-						forceMapKey = FlexGlobals.topLevelApplication.parameters.mapkey;
-					}
-				} catch(all:Error) {
-				}
-
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.debug != null)
-					{
-						Main.debugMode = FlexGlobals.topLevelApplication.parameters.debug == "1";
-					}
-				} catch(all:Error) {
-				}
-
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.usejs != null)
-					{
-						Main.useJavascript = FlexGlobals.topLevelApplication.parameters.usejs == "1";
-					}
-				} catch(all:Error) {
-				}
-				
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.pgonly != null)
-					{
-						Main.protogeniOnly = FlexGlobals.topLevelApplication.parameters.pgonly == "1";
-					}
-				} catch(all:Error) {
-				}
+				ParamHandler.preload();
 			}
 			
 			private function init():void {
@@ -182,30 +140,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Main.geniHandler.unauthenticatedMode = true;
 				
 				// Flash options
-				loadParams();
+				ParamHandler.load();
 				
-				// Saved variables
-				try {
-					geniLocalSharedObject = SharedObject.getLocal("geniLocalSharedObject");
-				} catch(e:Error) {
-					Alert.show("It looks like Flash is unable to save/load local data." +
-						"  Would you like to load directions on how to enable local data?",
-						"Enable Local Data?", Alert.YES|Alert.NO, this,
-						function allowData(e:CloseEvent):void {
-							if(e.detail == Alert.YES) {
-								NetUtil.openWebsite("http://kb2.adobe.com/cps/408/kb408202.html");
-							}
-						});
-				}
-				
-				loadLocalUserData();
+				FlackCache.instance.loadSharedObject();
+				FlackCache.instance.applyData();
 				
 				if(Main.debugMode)
 					LogHandler.viewConsole();
-
+				
 				// Load the certificate bundle
 				if(Main.useJavascript) {
-					loadLocalBundleData();
 					Main.geniHandler.requestHandler.pushRequest(new RequestGeniBundle());
 					Main.geniHandler.requestHandler.pushRequest(new RequestRootBundle());
 				}
@@ -221,9 +165,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				event.preventDefault();
 				event.stopImmediatePropagation();
 				var uncaughtErrorMessage:LogMessage = new LogMessage("",
-															"Uncaught Error",
-															"Error:\n" + event.error.toString() + "\n\nEvent:\n" + event.toString(),
-															true)
+					"Uncaught Error",
+					"Error:\n" + event.error.toString() + "\n\nEvent:\n" + event.toString(),
+					true)
 				LogHandler.appendMessage(uncaughtErrorMessage);
 				LogHandler.viewConsole();
 				DisplayUtil.viewLogMessage(uncaughtErrorMessage);
@@ -312,103 +256,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				//Main.geniHandler.requestHandler.startInitiationSequence();
 			}
 			
-			
-			public function loadParams():void
-			{
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.mode != null)
-					{
-						var input:String = FlexGlobals.topLevelApplication.parameters.mode;
-						
-						allowAuthenticate = input != "publiconly";
-						Main.geniHandler.unauthenticatedMode = input != "authenticate";
-					}
-				} catch(all:Error) {
-				}
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.saurl != null)
-					{
-						for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-							if(sa.Url == FlexGlobals.topLevelApplication.parameters.saurl) {
-								Main.geniHandler.forceAuthority = sa;
-								break;
-							}
-						}
-					}
-				} catch(all:Error) {
-				}
-				try{
-					if(FlexGlobals.topLevelApplication.parameters.publicurl != null)
-					{
-						Main.geniHandler.publicUrl = FlexGlobals.topLevelApplication.parameters.publicurl;
-					}
-				} catch(all:Error) {
-				}
-			}
-			
-			public function loadLocalUserData():void
-			{
-				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
-				{
-					for each(var sa:SliceAuthority in Main.geniHandler.GeniAuthorities.source) {
-						if(sa.Url == geniLocalSharedObject.data.authority) {
-							Main.geniHandler.CurrentUser.authority = sa;
-							break;
-						}
-					}
-					
-					Main.geniHandler.CurrentUser.sslPem = geniLocalSharedObject.data.sslPem;
-					if(geniLocalSharedObject.data.password != null && geniLocalSharedObject.data.password.length > 0)
-						Main.geniHandler.CurrentUser.setPassword(geniLocalSharedObject.data.password, true);
-				}
-			}
-			
-			public function saveLocalUserData():void
-			{
-				if(geniLocalSharedObject == null)
-					return;
-
-				geniLocalSharedObject.data.password = Main.geniHandler.CurrentUser.encryptedPassword;
-				geniLocalSharedObject.data.authority = Main.geniHandler.CurrentUser.authority.Url;
-				geniLocalSharedObject.data.sslPem = Main.geniHandler.CurrentUser.sslPem;
-				try
-				{
-					geniLocalSharedObject.flush();
-				}
-				catch (e:Error)
-				{
-					trace("Problem saving shared object");
-				}
-			}
-			
-			public function loadLocalBundleData():void
-			{
-				if (geniLocalSharedObject != null && geniLocalSharedObject.size > 0)
-					Main.setCertBundle(geniLocalSharedObject.data.certBundle);
-				if(Main.certBundle == null || Main.certBundle.length == 0)
-					Main.setCertBundle((new FallbackGeniBundle()).toString() + (new FallbackRootBundle()).toString());
-			}
-			
-			public function saveLocalBundleData():void
-			{
-				if(geniLocalSharedObject == null)
-					return;
-				
-				geniLocalSharedObject.data.certBundle = Main.certBundle;
-				try
-				{
-					geniLocalSharedObject.flush();
-				}
-				catch (e:Error)
-				{
-					trace("Problem saving shared object");
-				}
-			}
-			
 			public function setStatus(s:String, isError:Boolean):void
 			{
 				var isWorking:Boolean = Main.geniHandler.requestHandler.queue.working();
-				waitingIcon.visible = isWorking;
+				spinner.visible = isWorking;
+				if(isWorking)
+					spinner.startSpin();
+				else
+					spinner.stopSpin();
 				progressLabel.text = s;
 				if(isWorking && Main.geniHandler.requestHandler.queue.workingCount() > 1)
 					waitingCountLabel.text = Main.geniHandler.requestHandler.queue.workingCount() + " reqs running";
@@ -421,7 +276,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				else
 					progressLabel.styleName = "validStyle";
 			}
-
+			
 		]]>
 	</fx:Script>
 	<s:controlBarLayout>
@@ -429,39 +284,44 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	</s:controlBarLayout>
 	<s:controlBarContent>
 		<components:ImageButton id="consoleButton"
-							 icon="{ImageUtil.consoleIcon}"
-							 click="LogHandler.viewConsole();" 
-							 toolTip="Console"/>
+								icon="{ImageUtil.consoleIcon}"
+								click="LogHandler.viewConsole();" 
+								toolTip="Console"/>
 		<s:Button icon="{ImageUtil.noUserIcon}"
-				   click="loadUser()"
-				   visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
-				   toolTip="Log in to get user-only features" label="Log in" styleName="unauthenticatedStyle"
-				   id="userButton" height="24" />
+				  click="loadUser()"
+				  visible="{allowAuthenticate}" includeInLayout="{allowAuthenticate}"
+				  toolTip="Log in to get user-only features" label="Log in" styleName="unauthenticatedStyle"
+				  id="userButton" height="24" />
 		<s:Rect percentWidth="100" />
 		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
-		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
+		<components:Spinner id="spinner"
+							width="21"
+							height="21"
+							x="{(width / 2) - (spinner.width / 2)}"
+							y="{(height / 2) - (spinner.height / 2)}"
+							visible="false" />
 		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold" maxDisplayedLines="1" />
 		<s:Rect percentWidth="100" />
 		<components:ImageButton id="refreshButton"
-							 icon="{ImageUtil.refreshIcon}"
-							 click="startover()" includeInLayout="false" visible="false"
-							 toolTip="Reload all data" />
+								icon="{ImageUtil.refreshIcon}"
+								click="startover()" includeInLayout="false" visible="false"
+								toolTip="Reload all data" />
 		<components:ImageButton id="searchButton"
-							  icon="{ImageUtil.findIcon}"
-							 click="DisplayUtil.viewSearchWindow()"
-							 toolTip="Search" />
+								icon="{ImageUtil.findIcon}"
+								click="DisplayUtil.viewSearchWindow()"
+								toolTip="Search" />
 		<components:ImageButton id="resetZoomButton"
-							  icon="@Embed('../images/zoom.png')"
-							 click="map.resetZoom();"
-							 toolTip="Reset zoom" />
+								icon="@Embed('../images/zoom.png')"
+								click="map.resetZoom();"
+								toolTip="Reset zoom" />
 		<components:ImageButton id="fullscreenButton"
-							  icon="{arrowOut}"
-							 click="toggleFullScreen()"
-							 toolTip="Toggle fullscreen" />
+								icon="{arrowOut}"
+								click="toggleFullScreen()"
+								toolTip="Toggle fullscreen" />
 		<components:ImageButton id="helpButton"
-							  icon="{ImageUtil.helpIcon}"
-							 click="DisplayUtil.viewAboutWindow()"
-							 toolTip="View more information about Flack" />
+								icon="{ImageUtil.helpIcon}"
+								click="DisplayUtil.viewAboutWindow()"
+								toolTip="View more information about Flack" />
 	</s:controlBarContent>
 	
 	<mapping:GeniMap id="map" />

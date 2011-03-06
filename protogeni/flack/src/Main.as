@@ -14,21 +14,10 @@
  
  package
 {
-	import com.mattism.http.xmlrpc.JSLoader;
-	
-	import flash.events.IEventDispatcher;
-	import flash.net.URLLoader;
-	import flash.system.Security;
-	import flash.utils.Dictionary;
-	
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniDispatcher;
 	import protogeni.GeniHandler;
-	import protogeni.NetUtil;
-	import protogeni.display.mapping.GeniMap;
-	import protogeni.resources.GeniManager;
-	import protogeni.resources.GeniUser;
 	
   public class Main
   {
@@ -36,48 +25,11 @@
 	public static function Application():flack {
 		return FlexGlobals.topLevelApplication as flack;
 	}
-	
-	public static function GetLoader():IEventDispatcher {
-		if(Main.useJavascript)
-			return new JSLoader();
-		else
-			return new URLLoader();
-	}
-	
-	public static function checkLoadCrossDomain(url:String, protogeniSite:Boolean = true, force:Boolean = false):void
-	{
-		if(Main.useJavascript && !force)
-			return;
-		var baseUrl:String = NetUtil.tryGetBaseUrl(url);
-		if (visitedSites[baseUrl] != true)
-		{
-			visitedSites[baseUrl] = true;
-			var crossdomainUrl:String = baseUrl;
-			if(protogeniSite)
-				crossdomainUrl += "/protogeni/crossdomain.xml";
-			else
-				crossdomainUrl += "/crossdomain.xml";
-			LogHandler.appendMessage(new LogMessage(crossdomainUrl, "Loading CrossDomain", "Attempting to load a crossdomain.xml file so that calls may be made with the server located there.", false, LogMessage.TYPE_OTHER));
-			Security.loadPolicyFile(crossdomainUrl);
-		}
-	}
-	
-	public static function setCertBundle(c:String, append:Boolean = false):void
-	{
-		if(append)
-			certBundle += c;
-		else
-			certBundle = c;
-		if(useJavascript)
-			JSLoader.setServerCertificate(certBundle);
-	}
 
 	[Bindable]
 	public static var geniHandler:GeniHandler;
 	public static var geniDispatcher:GeniDispatcher = new GeniDispatcher();
 
-	private static var visitedSites:Dictionary = new Dictionary();
-	public static var certBundle:String;
 	public static var debugMode:Boolean = false;
 	
 	[Bindable]
@@ -90,8 +42,5 @@
 	
 	[Bindable]
 	public static var useGpeni:Boolean = false;
-	
-	[Bindable]
-	public static var savePassword:Boolean = false;
   }
 }

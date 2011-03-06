@@ -18,21 +18,17 @@ package protogeni.display.mapping
 	import com.google.maps.LatLngBounds;
 	
 	import flash.events.Event;
-	import flash.utils.Timer;
 	
-	import mx.collections.ArrayCollection;
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniEvent;
-	import protogeni.Util;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.Slice;
-	import protogeni.resources.VirtualNode;
-
+	
 	public final class GeniMapHandler
 	{
 		public var map:GeniMap;
@@ -82,7 +78,7 @@ package protogeni.display.mapping
 			if(a == null) {
 				coords = new Vector.<LatLng>();
 				for each(var m:GeniMapMarker in Main.geniHandler.mapHandler.nodeGroupMarkers)
-					coords.push(m.getLatLng());
+				coords.push(m.getLatLng());
 			} else
 				coords = a;
 			
@@ -154,7 +150,7 @@ package protogeni.display.mapping
 				drawAfter = true;
 				return;
 			}
-
+			
 			drawing = true;
 			myIndex = 0;
 			if(changingManagers.length > 0 )
@@ -221,7 +217,7 @@ package protogeni.display.mapping
 				}
 				
 				idx++
-				myIndex++;
+					myIndex++;
 				if(((new Date()).time - startTime.time) > 60) {
 					if(Main.debugMode)
 						trace("Links added:" + idx);
@@ -250,7 +246,7 @@ package protogeni.display.mapping
 					gmm.added = true;
 				}
 				idx++
-				myIndex++;
+					myIndex++;
 				if(((new Date()).time - startTime.time) > 60) {
 					if(Main.debugMode)
 						trace("Nodes added:" + idx);
@@ -278,12 +274,14 @@ package protogeni.display.mapping
 			var slice:Slice = null;
 			var link:GeniMapLink;
 			if(this.userResourcesOnly) {
-				if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.full.length>0)
+				if(this.selectedSlice != null
+						&& this.selectedSlice.urn != null
+						&& this.selectedSlice.urn.full.length>0)
 					slice = selectedSlice;
 				for each(marker in this.nodeGroupMarkers)
-					marker.setUser(slice);
+				marker.setUser(slice);
 				for each(marker in this.nodeGroupClusterMarkers)
-					marker.setUser(slice);
+				marker.setUser(slice);
 				for each(link in this.linkMarkers) {
 					if(link.polyline.visible) {
 						link.polyline.hide();
@@ -304,9 +302,9 @@ package protogeni.display.mapping
 				*/
 			} else {
 				for each(marker in this.nodeGroupMarkers)
-					marker.setDefault();
+				marker.setDefault();
 				for each(marker in this.nodeGroupClusterMarkers)
-					marker.setDefault();
+				marker.setDefault();
 				for each(link in this.linkMarkers) {
 					if(!link.polyline.visible && link.group.GetManager().Show) {
 						link.polyline.show()
@@ -331,7 +329,9 @@ package protogeni.display.mapping
 				for each(var newMarker:GeniMapMarker in newArray) {
 					if(!newMarker.visible && shouldShow && newMarker.showGroups.collection.length > 0)
 						newMarker.show();
-					else if(newMarker.visible && (newMarker.showGroups.collection.length == 0 || !shouldShow))
+					else if(newMarker.visible &&
+							(newMarker.showGroups.collection.length == 0
+								|| !shouldShow))
 						newMarker.hide();
 				}
 			}
@@ -386,13 +386,15 @@ package protogeni.display.mapping
 			var idx:int = 0;
 			
 			var startTime:Date = new Date();
-
+			
 			while(myIndex < clustersToAdd.length) {
 				var cluster:Vector.<GeniMapMarker> = clustersToAdd[myIndex];
 				var marker:GeniMapMarker = new GeniMapMarker(cluster);
 				if(this.userResourcesOnly) {
 					var slice:Slice = null;
-					if(this.selectedSlice != null && this.selectedSlice.urn != null && this.selectedSlice.urn.full.length>0)
+					if(this.selectedSlice != null
+							&& this.selectedSlice.urn != null
+							&& this.selectedSlice.urn.full.length>0)
 						slice = selectedSlice;
 					marker.setUser(slice);
 				}
@@ -409,7 +411,7 @@ package protogeni.display.mapping
 				}
 			}
 			clustersToAdd = null;
-
+			
 			myState = DONE;
 		}
 	}

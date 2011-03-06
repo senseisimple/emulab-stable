@@ -14,8 +14,6 @@
 package com.mattism.http.xmlrpc
 {
 	import flash.events.IEventDispatcher;
-	
-	import com.mattism.http.xmlrpc.MethodFault;
 
 	public interface Connection extends IEventDispatcher {
 	

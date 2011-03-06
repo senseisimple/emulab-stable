@@ -19,8 +19,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 
 <components:ResizableTitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 							  xmlns:s="library://ns.adobe.com/flex/spark" 
-							  xmlns:mx="library://ns.adobe.com/flex/mx" xmlns:display="protogeni.display.*"
-							  width="700" height="400" xmlns:components="protogeni.display.components.*">
+							  xmlns:mx="library://ns.adobe.com/flex/mx"
+							  xmlns:display="protogeni.display.*"
+							  xmlns:components="protogeni.display.components.*"
+							  width="700" height="400">
 
 	<components:layout>
 		<s:VerticalLayout paddingBottom="5" paddingLeft="5" paddingRight="5" paddingTop="5"/>

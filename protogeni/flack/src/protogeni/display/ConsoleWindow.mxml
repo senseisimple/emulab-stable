@@ -32,12 +32,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			import mx.events.FlexEvent;
 			
 			import protogeni.GeniEvent;
-			import protogeni.GeniHandler;
 			import protogeni.communication.CommunicationUtil;
 			import protogeni.communication.Request;
 			import protogeni.communication.RequestQueue;
 			import protogeni.communication.RequestQueueNode;
-			import protogeni.display.skins.ScrollerSkin;
 			import protogeni.resources.GeniManager;
 			
 			import spark.components.HGroup;
@@ -303,7 +301,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<s:NumericStepper id="maxRunningStepper"
 						  value="{Main.geniHandler.requestHandler.maxRunning}"
 						  minimum="1"
-						  valueCommit="Main.geniHandler.requestHandler.maxRunning = maxRunningStepper.value; Main.geniHandler.requestHandler.tryNext();" />
+						  valueCommit="FlackCache.instance.maxParallelRequests = maxRunningStepper.value; FlackCache.instance.save(); Main.geniHandler.requestHandler.maxRunning = maxRunningStepper.value; Main.geniHandler.requestHandler.tryNext();" />
 		<components:DefaultLine height="90%" />
 		<s:DropDownList id="requestList" labelField="name" requireSelection="true" height="24" width="150">
 			<s:ArrayCollection>
@@ -314,7 +312,9 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				<communication:RequestListComponentsPublic />
 			</s:ArrayCollection>
 		</s:DropDownList>
-		<components:ImageButton id="runRequestButton" icon="{ImageUtil.actionIcon}" toolTip="Run the selected request"
-							  click="Main.geniHandler.requestHandler.pushRequest(requestList.selectedItem)" />
+		<components:ImageButton id="runRequestButton"
+								icon="{ImageUtil.actionIcon}"
+								toolTip="Run the selected request"
+								click="Main.geniHandler.requestHandler.pushRequest(requestList.selectedItem)" />
 	</components:controlBarContent>
 </components:DefaultWindow>

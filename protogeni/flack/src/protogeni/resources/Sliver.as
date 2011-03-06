@@ -1,18 +1,18 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2009 University of Utah and the Flux Group.
- * All rights reserved.
- *
- * Permission to use, copy, modify and distribute this software is hereby
- * granted provided that (1) source code retains these copyright, permission,
- * and disclaimer notices, and (2) redistributions including binaries
- * reproduce the notices in supporting documentation.
- *
- * THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
- * CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
- * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- */
- 
- package protogeni.resources
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
+package protogeni.resources
 {
 	// Sliver from a slice containing all resources from the CM
 	public class Sliver
@@ -32,7 +32,7 @@
 		
 		public var created:Boolean = false;
 		public var staged:Boolean = false;
-	    
+		
 		public var credential:Object = null;
 		public var manager:GeniManager = null;
 		public var rspec:XML = null;
@@ -53,18 +53,19 @@
 		
 		public var expires:Date;
 		
-		public function Sliver(owner:Slice, newManager:GeniManager = null)
+		public function Sliver(owner:Slice,
+							   newManager:GeniManager = null)
 		{
-			slice = owner;
-			manager = newManager;
+			this.slice = owner;
+			this.manager = newManager;
 		}
 		
 		public function reset():void
 		{
-			nodes = new VirtualNodeCollection();
-			links = new VirtualLinkCollection();
-			state = "";
-			status = "";
+			this.nodes = new VirtualNodeCollection();
+			this.links = new VirtualLinkCollection();
+			this.state = "";
+			this.status = "";
 		}
 		
 		public function localNodes():VirtualNodeCollection
@@ -102,12 +103,12 @@
 		
 		public function getRequestRspec():XML
 		{
-			return manager.rspecProcessor.generateSliverRspec(this);
+			return this.manager.rspecProcessor.generateSliverRspec(this);
 		}
 		
 		public function parseRspec():void
 		{
-			return manager.rspecProcessor.processSliverRspec(this);
+			return this.manager.rspecProcessor.processSliverRspec(this);
 		}
 		
 		public function removeOutsideReferences():void

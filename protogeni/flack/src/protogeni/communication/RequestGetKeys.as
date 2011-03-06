@@ -16,9 +16,11 @@ package protogeni.communication
 {
 	public final class RequestGetKeys extends Request
 	{
-		public function RequestGetKeys() : void
+		public function RequestGetKeys():void
 		{
-			super("GetKeys", "Getting the ssh credential", CommunicationUtil.getKeys);
+			super("GetKeys",
+				"Getting the ssh credential",
+				CommunicationUtil.getKeys);
 			op.setUrl(Main.geniHandler.CurrentUser.authority.Url);
 		}
 		
@@ -28,7 +30,7 @@ package protogeni.communication
 			return op;
 		}
 		
-		override public function complete(code : Number, response : Object) : *
+		override public function complete(code:Number, response:Object):*
 		{
 			if (code == CommunicationUtil.GENIRESPONSE_SUCCESS)
 			{

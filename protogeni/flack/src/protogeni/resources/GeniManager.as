@@ -1,19 +1,24 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.resources
 {
-	import flash.utils.Dictionary;
-	import flash.utils.IDataInput;
-	import flash.utils.IDataOutput;
-	import flash.utils.IExternalizable;
-	
-	import mx.collections.ArrayCollection;
-	import mx.controls.Alert;
-	
-	import protogeni.XmlUtil;
 	import protogeni.Util;
-	import protogeni.communication.CommunicationUtil;
+	import protogeni.XmlUtil;
 	import protogeni.communication.Request;
 	import protogeni.display.ColorUtil;
-
+	
 	public class GeniManager
 	{
 		public static const STATUS_UNKOWN:int = 0;
@@ -147,7 +152,7 @@ package protogeni.resources
 			graphMl.@xsiNamespace::schemaLocation = "http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd";
 			graphMl.@id = this.Hrn;
 			graphMl.@edgedefault = "undirected";
-
+			
 			for each(var node:PhysicalNode in this.AllNodes) {
 				var nodeXml:XML = <node />;
 				nodeXml.@id = node.id;
@@ -177,7 +182,7 @@ package protogeni.resources
 		
 		public function getDotGraph():String {
 			var dot:String = "graph " + Util.getDotString(Hrn) + " {";
-
+			
 			for each(var node:PhysicalNode in this.AllNodes) {
 				dot += "\n\t" + Util.getDotString(node.name) + " [label=\""+node.name+"\"];";
 			}
@@ -196,93 +201,93 @@ package protogeni.resources
 		/*
 		public function getGroupedGraphML():String
 		{
-			var edges:String = "";
-			var nodes:String = "";
-			
-			createGraphGroups();
-			
-			// Output the nodes and links
-			var addedLocationLinks:Dictionary = new Dictionary();
-			for each(var location:Object in locations) {
-				
-				// output the node
-				nodes += "<node id=\"" + location.ref + "\"";
-				var n:String = Util.getDotString(location.list[0].name);
-				if(location.isSwitch) {
-					if(location.list.length > 1)
-						n = location.list.length+" Switches";
-					nodes += "name=\"" + n + "\" image=\"assets/entrepriseNetwork/switch.swf\"/>";
-				} else {
-					if(location.list.length > 1)
-						nodes += " name=\"" + location.list.length+" Nodes\" image=\"assets/entrepriseNetwork/pccluster.swf\"/>";
-					else
-						nodes += " name=\"" + n + "\" image=\"assets/entrepriseNetwork/pc.swf\"/>";
-				}
-				
-				// output the links
-				for(var i:int = 0; i < location.linkedGroups.length; i++) {
-					var connectedLocation:Object = location.linkedGroups[i];
-					var linkedRef:int = location.ref + connectedLocation.ref;
-					if(addedLocationLinks[linkedRef] == null) {
-						edges += "<edge id=\"e" + location.ref.toString() + connectedLocation.ref.toString() + "\" source=\"" + location.ref + "\" target=\"" +  connectedLocation.ref + "\"/>"
-						addedLocationLinks[linkedRef] = 1;
-					}
-				}
-			}
-			
-			return "<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\""
-			+ " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
-				+ " xsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd\">"
-				+ "<graph id=\"" + this.Hrn + "\" edgedefault=\"undirected\""
-				+ nodes + edges + "</graph></graphml>";
+		var edges:String = "";
+		var nodes:String = "";
+		
+		createGraphGroups();
+		
+		// Output the nodes and links
+		var addedLocationLinks:Dictionary = new Dictionary();
+		for each(var location:Object in locations) {
+		
+		// output the node
+		nodes += "<node id=\"" + location.ref + "\"";
+		var n:String = Util.getDotString(location.list[0].name);
+		if(location.isSwitch) {
+		if(location.list.length > 1)
+		n = location.list.length+" Switches";
+		nodes += "name=\"" + n + "\" image=\"assets/entrepriseNetwork/switch.swf\"/>";
+		} else {
+		if(location.list.length > 1)
+		nodes += " name=\"" + location.list.length+" Nodes\" image=\"assets/entrepriseNetwork/pccluster.swf\"/>";
+		else
+		nodes += " name=\"" + n + "\" image=\"assets/entrepriseNetwork/pc.swf\"/>";
+		}
+		
+		// output the links
+		for(var i:int = 0; i < location.linkedGroups.length; i++) {
+		var connectedLocation:Object = location.linkedGroups[i];
+		var linkedRef:int = location.ref + connectedLocation.ref;
+		if(addedLocationLinks[linkedRef] == null) {
+		edges += "<edge id=\"e" + location.ref.toString() + connectedLocation.ref.toString() + "\" source=\"" + location.ref + "\" target=\"" +  connectedLocation.ref + "\"/>"
+		addedLocationLinks[linkedRef] = 1;
+		}
+		}
+		}
+		
+		return "<graphml xmlns=\"http://graphml.graphdrawing.org/xmlns\""
+		+ " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+		+ " xsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd\">"
+		+ "<graph id=\"" + this.Hrn + "\" edgedefault=\"undirected\""
+		+ nodes + edges + "</graph></graphml>";
 		}
 		
 		
 		
 		public function getDotGroupedGraph(addGraphWrapper:Boolean = true):String {
-			var links:String = "";
-			var dot:String = "";
-			if(addGraphWrapper)
-				dot = "graph " + Util.getDotString(Hrn) + " {\n" +
-					"\toverlap=scale;\n" + 
-					"\tsize=\"10,10\";\n" +
-					"\tfontsize=20;\n" +
-					"\tnode [fontsize=300];\n" +
-					"\tedge [style=bold];\n";
-			
-			createGraphGroups();
-			
-			// Output the nodes and links
-			var addedLocationLinks:Dictionary = new Dictionary();
-			for each(var location:Object in locations) {
-				
-				// output the node
-				dot += "\t" + location.ref;
-				if(location.isSwitch) {
-					dot += " [shape=box3d, style=filled, color=deepskyblue3, height=10, width=20, label=\""+Util.getDotString(location.name)+"\"];\n";
-				} else {
-					dot += " [style=filled, height="+.25*location.list.length+", width="+.375*location.list.length+", color=limegreen, label=\""+Util.getDotString(location.name)+"\"];\n";
-				}
-				
-				// output the links
-				for(var i:int = 0; i < location.linkedGroups.length; i++) {
-					var connectedLocation:Object = location.linkedGroups[i];
-					var linkedRef:int = location.ref + connectedLocation.ref;
-					if(addedLocationLinks[linkedRef] == null) {
-						links += "\t" + location.ref + " -- " + connectedLocation.ref;
-						if(location.isSwitch && connectedLocation.isSwitch)
-							links += " [style=bold, color=deepskyblue3, penwidth=60, len=0.2, weight=6];\n";
-						else
-							links += " [penwidth=8, len=0.3, weight="+0.8*location.linkedGroupsNum[i]+"];\n";
-						addedLocationLinks[linkedRef] = 1;
-					}
-				}
-			}
-			
-			dot += links;
-			if(addGraphWrapper)
-				dot += "}";
-			return dot;
+		var links:String = "";
+		var dot:String = "";
+		if(addGraphWrapper)
+		dot = "graph " + Util.getDotString(Hrn) + " {\n" +
+		"\toverlap=scale;\n" + 
+		"\tsize=\"10,10\";\n" +
+		"\tfontsize=20;\n" +
+		"\tnode [fontsize=300];\n" +
+		"\tedge [style=bold];\n";
+		
+		createGraphGroups();
+		
+		// Output the nodes and links
+		var addedLocationLinks:Dictionary = new Dictionary();
+		for each(var location:Object in locations) {
+		
+		// output the node
+		dot += "\t" + location.ref;
+		if(location.isSwitch) {
+		dot += " [shape=box3d, style=filled, color=deepskyblue3, height=10, width=20, label=\""+Util.getDotString(location.name)+"\"];\n";
+		} else {
+		dot += " [style=filled, height="+.25*location.list.length+", width="+.375*location.list.length+", color=limegreen, label=\""+Util.getDotString(location.name)+"\"];\n";
+		}
+		
+		// output the links
+		for(var i:int = 0; i < location.linkedGroups.length; i++) {
+		var connectedLocation:Object = location.linkedGroups[i];
+		var linkedRef:int = location.ref + connectedLocation.ref;
+		if(addedLocationLinks[linkedRef] == null) {
+		links += "\t" + location.ref + " -- " + connectedLocation.ref;
+		if(location.isSwitch && connectedLocation.isSwitch)
+		links += " [style=bold, color=deepskyblue3, penwidth=60, len=0.2, weight=6];\n";
+		else
+		links += " [penwidth=8, len=0.3, weight="+0.8*location.linkedGroupsNum[i]+"];\n";
+		addedLocationLinks[linkedRef] = 1;
+		}
+		}
+		}
+		
+		dot += links;
+		if(addGraphWrapper)
+		dot += "}";
+		return dot;
 		}
 		*/
 	}

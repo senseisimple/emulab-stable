@@ -1994,3 +1994,81 @@ p3WjhZsKad1wZhhAhZYoc9trEt/M6L7X3spaO5aro04zaky6vKR8WNflKnlT8edL
 hPuuwNtDc90jhRAIbUV7EuZBEQ3CRIBbrVfuvIbYJHMR13RxI4v/uHl4qEgWy9yR
 s1Fx89RFqZliSBAqfWSQr6zf1XtwNjn+/VBUiA==
 -----END CERTIFICATE-----
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            9a:04:b0:a5:85:1f:22:0c
+        Signature Algorithm: sha1WithRSAEncryption
+        Issuer: C=US, ST=Utah, L=Salt Lake City Virtual World, O=Utah Network ElabInElab, OU=Certificate Authority, CN=myboss.geelab.geni.emulab.net/emailAddress=testbed-ops@myops.geelab.geni.emulab.net
+        Validity
+            Not Before: Apr 13 19:44:48 2011 GMT
+            Not After : Oct  3 19:44:48 2016 GMT
+        Subject: C=US, ST=Utah, L=Salt Lake City Virtual World, O=Utah Network ElabInElab, OU=Certificate Authority, CN=myboss.geelab.geni.emulab.net/emailAddress=testbed-ops@myops.geelab.geni.emulab.net
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+            RSA Public Key: (1024 bit)
+                Modulus (1024 bit):
+                    00:c5:5a:ad:3d:4d:2a:39:60:e6:4e:60:33:96:31:
+                    b3:f0:41:ff:22:6f:b9:21:8e:cb:ac:42:f8:d4:97:
+                    1f:65:c2:2d:48:49:01:b0:af:ff:d9:d4:d5:4e:fc:
+                    13:e0:c9:fc:64:36:eb:96:dc:6d:61:e8:ee:03:86:
+                    3d:38:ad:ca:03:04:3f:d3:84:c2:68:26:fd:fc:dd:
+                    08:10:3d:4e:35:27:18:02:d8:9d:58:21:20:91:c8:
+                    21:16:5f:ba:9c:c7:5d:b3:da:ba:4d:a5:ed:e4:d3:
+                    63:b1:89:5a:50:79:9b:56:69:93:87:ea:4c:4e:e3:
+                    58:69:03:58:c0:98:f1:ae:a9
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Subject Key Identifier: 
+                DE:25:C8:7A:D0:25:07:DE:30:0F:3A:FF:39:8F:6F:37:D4:18:84:F6
+            X509v3 Authority Key Identifier: 
+                keyid:DE:25:C8:7A:D0:25:07:DE:30:0F:3A:FF:39:8F:6F:37:D4:18:84:F6
+                DirName:/C=US/ST=Utah/L=Salt Lake City Virtual World/O=Utah Network ElabInElab/OU=Certificate Authority/CN=myboss.geelab.geni.emulab.net/emailAddress=testbed-ops@myops.geelab.geni.emulab.net
+                serial:9A:04:B0:A5:85:1F:22:0C
+
+            X509v3 Basic Constraints: 
+                CA:TRUE
+            X509v3 Subject Alternative Name: 
+                URI:urn:publicid:IDN+geelab.geni.emulab.net+authority+root
+            X509v3 Issuer Alternative Name: 
+                URI:urn:publicid:IDN+geelab.geni.emulab.net+authority+root
+    Signature Algorithm: sha1WithRSAEncryption
+        4c:60:af:b3:85:2b:64:cb:3a:f5:76:88:0a:ad:da:c0:7a:52:
+        7e:fc:9e:ab:88:f3:8d:82:df:d1:fa:2d:69:b4:ab:6d:7a:c0:
+        2e:e3:e0:05:36:93:1f:e7:6d:a7:4c:2d:84:a5:cd:6b:90:d6:
+        f2:1f:63:17:30:40:5c:ba:95:11:67:d0:9d:17:d8:5e:bd:79:
+        5d:4c:e6:33:8a:8e:b1:6b:1d:0c:dd:a8:69:ba:dc:26:c0:b7:
+        53:7d:cd:71:2d:8c:98:43:57:cf:e4:c9:d9:74:74:87:43:24:
+        99:14:e4:40:ca:29:f8:33:95:c3:6b:9f:22:bc:05:de:47:30:
+        61:12
+-----BEGIN CERTIFICATE-----
+MIIFJjCCBI+gAwIBAgIJAJoEsKWFHyIMMA0GCSqGSIb3DQEBBQUAMIHmMQswCQYD
+VQQGEwJVUzENMAsGA1UECBMEVXRhaDElMCMGA1UEBxMcU2FsdCBMYWtlIENpdHkg
+VmlydHVhbCBXb3JsZDEgMB4GA1UEChMXVXRhaCBOZXR3b3JrIEVsYWJJbkVsYWIx
+HjAcBgNVBAsTFUNlcnRpZmljYXRlIEF1dGhvcml0eTEmMCQGA1UEAxMdbXlib3Nz
+LmdlZWxhYi5nZW5pLmVtdWxhYi5uZXQxNzA1BgkqhkiG9w0BCQEWKHRlc3RiZWQt
+b3BzQG15b3BzLmdlZWxhYi5nZW5pLmVtdWxhYi5uZXQwHhcNMTEwNDEzMTk0NDQ4
+WhcNMTYxMDAzMTk0NDQ4WjCB5jELMAkGA1UEBhMCVVMxDTALBgNVBAgTBFV0YWgx
+JTAjBgNVBAcTHFNhbHQgTGFrZSBDaXR5IFZpcnR1YWwgV29ybGQxIDAeBgNVBAoT
+F1V0YWggTmV0d29yayBFbGFiSW5FbGFiMR4wHAYDVQQLExVDZXJ0aWZpY2F0ZSBB
+dXRob3JpdHkxJjAkBgNVBAMTHW15Ym9zcy5nZWVsYWIuZ2VuaS5lbXVsYWIubmV0
+MTcwNQYJKoZIhvcNAQkBFih0ZXN0YmVkLW9wc0BteW9wcy5nZWVsYWIuZ2VuaS5l
+bXVsYWIubmV0MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDFWq09TSo5YOZO
+YDOWMbPwQf8ib7khjsusQvjUlx9lwi1ISQGwr//Z1NVO/BPgyfxkNuuW3G1h6O4D
+hj04rcoDBD/ThMJoJv383QgQPU41JxgC2J1YISCRyCEWX7qcx12z2rpNpe3k02Ox
+iVpQeZtWaZOH6kxO41hpA1jAmPGuqQIDAQABo4IB2DCCAdQwHQYDVR0OBBYEFN4l
+yHrQJQfeMA86/zmPbzfUGIT2MIIBHQYDVR0jBIIBFDCCARCAFN4lyHrQJQfeMA86
+/zmPbzfUGIT2oYHspIHpMIHmMQswCQYDVQQGEwJVUzENMAsGA1UECBMEVXRhaDEl
+MCMGA1UEBxMcU2FsdCBMYWtlIENpdHkgVmlydHVhbCBXb3JsZDEgMB4GA1UEChMX
+VXRhaCBOZXR3b3JrIEVsYWJJbkVsYWIxHjAcBgNVBAsTFUNlcnRpZmljYXRlIEF1
+dGhvcml0eTEmMCQGA1UEAxMdbXlib3NzLmdlZWxhYi5nZW5pLmVtdWxhYi5uZXQx
+NzA1BgkqhkiG9w0BCQEWKHRlc3RiZWQtb3BzQG15b3BzLmdlZWxhYi5nZW5pLmVt
+dWxhYi5uZXSCCQCaBLClhR8iDDAMBgNVHRMEBTADAQH/MEEGA1UdEQQ6MDiGNnVy
+bjpwdWJsaWNpZDpJRE4rZ2VlbGFiLmdlbmkuZW11bGFiLm5ldCthdXRob3JpdHkr
+cm9vdDBBBgNVHRIEOjA4hjZ1cm46cHVibGljaWQ6SUROK2dlZWxhYi5nZW5pLmVt
+dWxhYi5uZXQrYXV0aG9yaXR5K3Jvb3QwDQYJKoZIhvcNAQEFBQADgYEATGCvs4Ur
+ZMs69XaICq3awHpSfvyeq4jzjYLf0fotabSrbXrALuPgBTaTH+dtp0wthKXNa5DW
+8h9jFzBAXLqVEWfQnRfYXr15XUzmM4qOsWsdDN2oabrcJsC3U33NcS2MmENXz+TJ
+2XR0h0MkmRTkQMop+DOVw2ufIrwF3kcwYRI=
+-----END CERTIFICATE-----

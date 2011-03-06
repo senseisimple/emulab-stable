@@ -20,10 +20,12 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 <components:DefaultWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
 						xmlns:s="library://ns.adobe.com/flex/spark" 
 						xmlns:mx="library://ns.adobe.com/flex/mx"
-						xmlns:display="protogeni.display.*" xmlns:components="protogeni.display.components.*">
+						xmlns:display="protogeni.display.*"
+						xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
 			import protogeni.display.ImageUtil;
+			
 			[Bindable]
 			public var xmlString:String;
 			

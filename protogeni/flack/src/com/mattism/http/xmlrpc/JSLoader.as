@@ -9,10 +9,8 @@ package com.mattism.http.xmlrpc
   import flash.events.Event;
   import flash.events.EventDispatcher;
   import flash.events.IOErrorEvent;
-  import flash.events.SecurityErrorEvent;
   import flash.external.ExternalInterface;
   import flash.net.URLRequest;
-  import flash.net.URLRequestHeader;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
   

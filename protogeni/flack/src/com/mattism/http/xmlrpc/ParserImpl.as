@@ -9,9 +9,8 @@
 
 package com.mattism.http.xmlrpc
 {
-	import com.mattism.http.xmlrpc.Parser;
-	import com.mattism.http.xmlrpc.util.XMLRPCUtils;
 	import com.mattism.http.xmlrpc.util.XMLRPCDataTypes;
+	import com.mattism.http.xmlrpc.util.XMLRPCUtils;
 	
 	public class ParserImpl
 	implements Parser {

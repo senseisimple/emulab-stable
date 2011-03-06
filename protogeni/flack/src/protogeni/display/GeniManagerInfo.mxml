@@ -25,17 +25,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		  width="100%">
 	<fx:Script>
 		<![CDATA[
-			import protogeni.display.components.AdvancedTextArea;
-			import protogeni.display.components.DefaultWindow;
-			import protogeni.display.components.XmlWindow;
 			import mx.collections.ArrayCollection;
 			import mx.containers.TabNavigator;
 			import mx.controls.Alert;
 			
+			import protogeni.display.components.AdvancedTextArea;
+			import protogeni.display.components.DefaultWindow;
+			import protogeni.display.components.XmlWindow;
 			import protogeni.resources.GeniManager;
 			
 			import spark.components.NavigatorContent;
-			import spark.components.TextArea;
 			import spark.layouts.VerticalLayout;
 			
 			[Bindable]

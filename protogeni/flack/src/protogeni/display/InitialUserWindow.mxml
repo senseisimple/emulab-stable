@@ -26,15 +26,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						contentCreationComplete="onCreationComplete()" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
-			import com.mattism.http.xmlrpc.JSLoader;
-			
 			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
 			
 			import protogeni.NetUtil;
-			import protogeni.display.skins.CheckBoxSkin;
-			import protogeni.display.skins.TextAreaSkin;
 			import protogeni.resources.SliceAuthority;
 
 			private var certLoader:URLLoader;
@@ -51,13 +47,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				this.authorities.selectedItem = Main.geniHandler.CurrentUser.authority;
 				this.authorities.setFocus();
 				if(Main.useJavascript) {
+					this.passwordField.textInput.text = FlackCache.instance.userPassword;
+					this.sslPem.text = FlackCache.instance.userSslPem;
 					this.retrieveCertCheckbox.selected = sslPem.text.length == 0;
-					this.passwordField.textInput.text = Main.geniHandler.CurrentUser.getPassword();
 				} else {
 					this.height = 130;
 					this.width = 250;
 				}
-					
 			}
 			
 			public function trySubmit():void
@@ -83,14 +79,14 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			{
 				Main.geniHandler.CurrentUser.authority = authorities.selectedItem;
 				if(Main.useJavascript) {
-					Main.geniHandler.CurrentUser.sslPem = sslPem.text;
+					FlackCache.instance.userSslPem = sslPem.text;
+					FlackCache.instance.save();
 					if(!Main.geniHandler.CurrentUser.setPassword(passwordField.textInput.text, cacheCheckbox.selected)) {
 						Alert.show("Incorrect password", "It appears that the password is incorrect");
 						return;
 					}
 				}
 
-				FlexGlobals.topLevelApplication.saveLocalUserData();
 				Main.geniHandler.mapHandler.clearAll();
 				Main.geniHandler.unauthenticatedMode = false;
 				Main.geniHandler.requestHandler.startAuthenticatedInitiationSequence();
@@ -100,7 +96,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function visitLogin():void
 			{
 				var url:String = NetUtil.tryGetBaseUrl(selectedAuthority.Url) + loginLocation;
-				Main.checkLoadCrossDomain(url);
+				NetUtil.checkLoadCrossDomain(url);
 				NetUtil.openWebsite( url );
 			}
 			
@@ -118,7 +114,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			public function tryLoadCert(url:String):void
 			{
 				certUrl = url;
-				Main.checkLoadCrossDomain(url, true, true);
+				NetUtil.checkLoadCrossDomain(url, true, true);
 				
 				var request:URLRequest = new URLRequest(url); 
 				certLoader = new URLLoader(); 
@@ -128,7 +124,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				certLoader.addEventListener(SecurityErrorEvent.SECURITY_ERROR, securityErrorHandler);
 				try
 				{
-					waitingIcon.visible = true;
+					spinner.visible = true;
+					spinner.startSpin();
 					getLabel.styleName = "inprogressStyle";
 					getLabel.text = "Waiting...";
 					LogHandler.appendMessage(new LogMessage(url, "Getting SSL Cert", "Attempting to load user SSL certificate", false, LogMessage.TYPE_START));
@@ -136,9 +133,10 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					asked = false;
 					certLoader.load(request);
 				}
-				catch (e : Error)
+				catch (e:Error)
 				{
-					waitingIcon.visible = false;
+					spinner.visible = false;
+					spinner.stopSpin();
 					LogHandler.appendMessage(new LogMessage(url, "Error", "\n\nException on HTTP Call: "
 						+ e.toString() + "\n\n", true));
 					checkCloseAfter();
@@ -158,7 +156,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 					LogHandler.appendMessage(new LogMessage(certUrl, "Error", event.toString(), true, LogMessage.TYPE_END));
 					askToLogin();
 				}
-				waitingIcon.visible = false;
+				spinner.visible = false;
+				spinner.stopSpin();
 				
 			}
 			
@@ -169,7 +168,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				asked = true;
 				getLabel.text = "Failed! Most likely not logged in.";
 				getLabel.styleName = "failedStyle";
-				waitingIcon.visible = false;
+				spinner.visible = false;
+				spinner.stopSpin();
 				checkCloseAfter();
 				Alert.show("You must be logged in on the authority's website in order to automatically retrieve your SSL Cert.  Visit the login page? After login, come back here and try again.", "Visit login page?", Alert.YES|Alert.NO, Main.Application(), 
 					function handleAction(e:CloseEvent):void {
@@ -222,11 +222,16 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			<s:Button label="Get SSL Certificate" height="24" enabled="{selectedAuthority.workingCertGet}"
 					  icon="{ImageUtil.sslIcon}"
 					  click="this.tryLoadCert(NetUtil.tryGetBaseUrl(selectedAuthority.Url) + certLocation);" />
-			<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false" includeInLayout="{waitingIcon.visible}"/> 
+			<components:Spinner id="spinner"
+					   width="21"
+					   height="21"
+					   x="{(width / 2) - (spinner.width / 2)}"
+					   y="{(height / 2) - (spinner.height / 2)}"
+					   visible="false" includeInLayout="{spinner.visible}" />
 			<s:Label id="getLabel" text="" />
 		</s:HGroup>
 		<s:Label text="If the automatic SSL Certificate retrieval doesn't work, copy and paste it here" />
-		<s:TextArea id="sslPem" text="{Main.geniHandler.CurrentUser.sslPem}" prompt="Copy your SSL Certificate here if automatically getting certificate doesn't work"
+		<s:TextArea id="sslPem" prompt="Copy your SSL Certificate here if automatically getting certificate doesn't work"
 					width="100%" height="100%" />
 		<s:HGroup width="100%" verticalAlign="middle">
 			<s:Image source="{ImageUtil.passwordIcon}" toolTip="SSL Certificate Password" />

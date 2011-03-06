@@ -26,7 +26,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<fx:Script>
 		<![CDATA[
 			import mx.core.IVisualElement;
-			import mx.events.FlexEvent;
 			
 			protected function search():void
 			{
