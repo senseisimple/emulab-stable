@@ -18,6 +18,7 @@
 	
 	import mx.collections.ArrayCollection;
 	import mx.controls.Alert;
+	import mx.events.CloseEvent;
 	
 	import protogeni.Util;
 	import protogeni.communication.CommunicationUtil;
@@ -88,12 +89,24 @@
 		}
 		
 		public function isStaged():Boolean {
-			if(slivers == null)
+			if(slivers == null || slivers.length == 0)
 				return false;
 			
 			for each(var existing:Sliver in this.slivers)
 			{
 				if(!existing.staged)
+					return false;
+			}
+			return true;
+		}
+		
+		public function isCreated():Boolean {
+			if(slivers == null || slivers.length == 0)
+				return false;
+			
+			for each(var existing:Sliver in this.slivers)
+			{
+				if(!existing.created)
 					return false;
 			}
 			return true;
@@ -471,6 +484,17 @@
 		}
 		
 		public function tryImport(rspec:String):Boolean {
+			// Tell user they need to delete
+			if(this.isCreated())
+				Alert.show("The slice has resources allocated to it.  Please delete the slice before trying to import.", "Allocated Resources Exist");
+			else if(this.GetAllNodes().length > 0)
+				Alert.show("The slice already has resources waiting to be allocated.  Please clear the canvas before trying to import", "Resources Exist");
+			else
+				return doImport(rspec);
+			return false;
+		}
+		
+		public function doImport(rspec:String):Boolean {
 			var sliceRspec:XML;
 			try
 			{
@@ -527,13 +551,13 @@
 				if(detectedManager != null && detectedManagers.indexOf(detectedManager) == -1) {
 					var newSliver:Sliver = this.getOrCreateSliverFor(detectedManager);
 					newSliver.rspec = sliceRspec;
-					newSliver.staged = true;
-					//try {
-					newSliver.parseRspec();
-					/*} catch(e:Error) {
-					Alert.show("Error while parsing sliver RSPEC on " + detectedManager.Hrn + ": " + e.toString());
-					return;
-					}*/
+					try {
+						newSliver.parseRspec();
+						newSliver.staged = true;
+					} catch(e:Error) {
+						Alert.show("Error while parsing sliver RSPEC on " + detectedManager.Hrn + ": " + e.toString());
+						return false;
+					}
 					detectedManagers.push(detectedManager);
 				}
 				

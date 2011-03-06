@@ -19,8 +19,6 @@
 	import com.google.maps.services.GeocodingEvent;
 	import com.google.maps.services.Placemark;
 	
-	import mx.collections.ArrayCollection;
-	
 	// Group of physical nodes located in one area
 	public class PhysicalNodeGroup
 	{
@@ -33,7 +31,7 @@
 		[Bindable]
 		public var city:String = "";
 		
-		public var collection:ArrayCollection = new ArrayCollection;
+		public var collection:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 		public var links:PhysicalLinkGroup = null;
 		
 		[Bindable]
@@ -83,7 +81,7 @@
 		}
 		
 		public function Add(n:PhysicalNode):void {
-			collection.addItem(n);
+			collection.push(n);
 		}
 
 		public function GetByUrn(urn:String):PhysicalNode {
@@ -137,7 +135,7 @@
 		
 		public function GetManager():GeniManager
 		{
-			return collection.getItemAt(0).manager;
+			return collection[0].manager;
 		}
 	}
 }

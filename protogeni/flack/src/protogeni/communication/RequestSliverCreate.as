@@ -23,6 +23,9 @@ package protogeni.communication
 
   public class RequestSliverCreate extends Request
   {
+	  
+	  public var sliver:Sliver;
+	  
     public function RequestSliverCreate(s:Sliver) : void
     {
 		super("SliverCreate", "Creating sliver on " + s.manager.Hrn + " for slice named " + s.slice.hrn, CommunicationUtil.createSliver);
@@ -42,6 +45,7 @@ package protogeni.communication
 		{
 			sliver.credential = response.value[0];
 			sliver.created = true;
+			sliver.staged = false;
 
 			sliver.rspec = new XML(response.value[1]);
 			sliver.parseRspec();
@@ -94,7 +98,5 @@ package protogeni.communication
 		
 		return null;
 	}
-
-    public var sliver:Sliver;
   }
 }

@@ -10,6 +10,7 @@
 	
 	<fx:Script>
 		<![CDATA[
+			import protogeni.Util;
 			private var message:LogMessage;
 			
 			public function setMessage(log:LogMessage):void
@@ -41,6 +42,9 @@
 	<s:HGroup width="100%" verticalAlign="middle">
 		<s:Image id="typeImage" />
 		<s:Label id="nameField" fontSize="17" fontWeight="bold" color="green" width="100%" />
+		<display:ImageButton icon="{ImageUtil.emailIcon}"
+							 toolTip="Open an email"
+							 click="System.setClipboard(message.toString()); Util.openMail('mstrum@flux.utah.edu', message.name, 'The message has already been copied into the clipboard, just paste here.\n\n')" />
 		<display:ImageButton icon="{ImageUtil.copyIcon}"
 							 toolTip="Copy to clipboard"
 							 click="System.setClipboard(message.toString())" />

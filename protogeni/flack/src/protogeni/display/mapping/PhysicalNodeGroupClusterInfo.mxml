@@ -16,24 +16,24 @@
 			import mx.core.FlexGlobals;
 			
 			import protogeni.display.DisplayUtil;
+			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeGroup;
 			
-			private var nodes:ArrayCollection;
+			private var nodes:Vector.<PhysicalNode>;
 			
-			public function Load(cluster:ArrayCollection):void 
+			public function Load(cluster:Vector.<PhysicalNodeGroup>):void 
 			{
-				nodes = new ArrayCollection();
-				var nodeCount:int = 0;
+				nodes = new Vector.<PhysicalNode>();
 				var coords:Array = new Array();
 				for each(var ng:PhysicalNodeGroup in cluster)
 				{
 					addNodeGroup(ng);
-					nodeCount += ng.collection.length;
-					nodes.addAll(ng.collection);
+					for each(var node:PhysicalNode in ng.collection)
+						nodes.push(node);
 					coords.push(new LatLng(ng.latitude, ng.longitude));
 				}
 				setZoomButton(GeniMapHandler.getBounds(coords));
-				clusterLabel.text = nodeCount + " Nodes in " + cluster.length + " Groups";
+				clusterLabel.text = nodes.length + " Nodes in " + cluster.length + " Groups";
 			}	
 			
 			public function addNodeGroup(ng:PhysicalNodeGroup):void {
@@ -89,6 +89,14 @@
 					});
 				
 			}
+			
+			public function view():void
+			{
+				var newCollection:ArrayCollection = new ArrayCollection();
+				for each(var node:PhysicalNode in nodes)
+					newCollection.addItem(node);
+				DisplayUtil.viewNodeCollection(newCollection);
+			}
 		]]>
 	</fx:Script>
 	
@@ -98,7 +106,7 @@
 	</s:Scroller>
 	<s:HGroup>
 		<s:Button label="All" id="allButton" height="24"
-				   click="DisplayUtil.viewNodeCollection(nodes);" />
+				   click="view()" />
 		<display:ImageButton label="Zoom" id="zoomButton" icon="@Embed('../../../../images/zoom_in.png')"/>
 	</s:HGroup>
 

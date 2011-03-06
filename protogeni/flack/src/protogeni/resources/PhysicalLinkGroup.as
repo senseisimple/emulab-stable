@@ -13,9 +13,7 @@
  */
  
  package protogeni.resources
-{	
-	import mx.collections.ArrayCollection;
-	
+{
 	// Group of physical links
 	public class PhysicalLinkGroup
 	{
@@ -24,7 +22,7 @@
 		public var latitude2:Number = -1;
 		public var longitude2:Number = -1;
 		public var owner:PhysicalLinkGroupCollection = null;
-		public var collection:ArrayCollection = new ArrayCollection;
+		public var collection:Vector.<PhysicalLink> = new Vector.<PhysicalLink>();
 		
 		public function PhysicalLinkGroup(lat1:Number, lng1:Number, lat2:Number, lng2:Number, own:PhysicalLinkGroupCollection)
 		{
@@ -36,7 +34,7 @@
 		}
 		
 		public function Add(l:PhysicalLink):void {
-			collection.addItem(l);
+			collection.push(l);
 		}
 
 		public function IsSameSite():Boolean {
@@ -65,7 +63,7 @@
 		
 		public function GetManager():GeniManager
 		{
-			return collection.getItemAt(0).manager;
+			return collection[0].manager;
 		}
 	}
 }

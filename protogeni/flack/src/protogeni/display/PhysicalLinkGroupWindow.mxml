@@ -8,6 +8,7 @@
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			
+			import protogeni.resources.PhysicalLink;
 			import protogeni.resources.PhysicalLinkGroup;
 			
 			[Bindable]
@@ -29,7 +30,10 @@
 			}
 			
 			public function loadGroup(group:PhysicalLinkGroup):void {
-				loadCollection(group.collection);
+				links = new ArrayCollection();
+				for each(var link:PhysicalLink in group.collection)
+					links.addItem(link);
+				loadCollection(links);
 			}
 		]]>
 	</fx:Script>

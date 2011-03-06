@@ -74,7 +74,6 @@ package protogeni.communication
 				Main.geniDispatcher.dispatchGeniManagerChanged(newGm);
 			}
 
-			/*
 			if(!Main.protogeniOnly) {
 				var planetLabAm:PlanetlabAggregateManager = new PlanetlabAggregateManager();
 				Main.geniHandler.GeniManagers.add(planetLabAm);
@@ -82,7 +81,6 @@ package protogeni.communication
 				newCalls.push(new RequestGetVersionAm(planetLabAm as AggregateManager));
 				Main.geniDispatcher.dispatchGeniManagerChanged(planetLabAm);
 			}
-			*/
 			
 			if(startSlices)
 				newCalls.push(new RequestUserResolve());

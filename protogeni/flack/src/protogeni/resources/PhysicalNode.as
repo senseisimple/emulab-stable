@@ -14,8 +14,6 @@
  
  package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	
 	// Physical node
 	public class PhysicalNode
 	{
@@ -34,7 +32,7 @@
 		[Bindable]
 		public var available:Boolean;
 		[Bindable]
-		public var subNodeOf : PhysicalNode = null;
+		public var subNodeOf:PhysicalNode = null;
 		public var subNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 		[Bindable]
 		public var hardwareTypes:Vector.<String> = new Vector.<String>();
@@ -44,7 +42,7 @@
 		public var interfaces:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();
 
 		// Sliced
-		public var virtualNodes : ArrayCollection = new ArrayCollection();
+		public var virtualNodes:VirtualNodeCollection = new VirtualNodeCollection();
 		
 		// Use for anything, more inmportantly any additions by non-Protogeni managers
 		public var tag:*;
@@ -63,12 +61,12 @@
 			return false;
 		}
 		
-		public function ConnectedSwitches():ArrayCollection {
-			var connectedNodes:ArrayCollection = GetNodes();
-			var connectedSwitches:ArrayCollection = new ArrayCollection();
+		public function ConnectedSwitches():Vector.<PhysicalNode> {
+			var connectedNodes:Vector.<PhysicalNode> = GetNodes();
+			var connectedSwitches:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 			for each(var connectedNode:PhysicalNode in connectedNodes) {
 				if(connectedNode.IsSwitch())
-					connectedSwitches.addItem(connectedNode);
+					connectedSwitches.push(connectedNode);
 			}
 			return connectedSwitches;
 		}
@@ -82,23 +80,21 @@
 		}
 		
 		// Gets all links
-		public function GetLinks():ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
-			for each(var i:PhysicalNodeInterface in interfaces.collection) {
-				for each(var l:PhysicalLink in i.physicalLinks) {
-					ac.addItem(l);
-				}
-			}
+		public function GetLinks():Vector.<PhysicalLink> {
+			var ac:Vector.<PhysicalLink> = new Vector.<PhysicalLink>();
+			for each(var i:PhysicalNodeInterface in interfaces.collection)
+				for each(var l:PhysicalLink in i.physicalLinks)
+					ac.push(l);
 			return ac;
 		}
 		
 		// Get links to a certain node
-		public function GetNodeLinks(n:PhysicalNode):ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function GetNodeLinks(n:PhysicalNode):Vector.<PhysicalLink> {
+			var ac:Vector.<PhysicalLink> = new Vector.<PhysicalLink>();
 			for each(var i:PhysicalNodeInterface in interfaces.collection) {
 				for each(var l:PhysicalLink in i.physicalLinks) {
-					if(l.GetNodes().indexOf(n) > -1) {
-						ac.addItem(l);
+					if(ac.indexOf(l) == -1 && l.GetNodes().indexOf(n) > -1) {
+						ac.push(l);
 						break;
 					}
 				}
@@ -107,13 +103,13 @@
 		}
 		
 		// Gets connected nodes
-		public function GetNodes():ArrayCollection {
-			var ac:ArrayCollection = new ArrayCollection();
+		public function GetNodes():Vector.<PhysicalNode> {
+			var ac:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 			for each(var i:PhysicalNodeInterface in interfaces.collection) {
 				for each(var l:PhysicalLink in i.physicalLinks) {
 					for each(var ln:PhysicalNode in l.GetNodes()) {
-						if(ln != this && !ac.contains(ln))
-							ac.addItem(ln);
+						if(ln != this && !ac.indexOf(ln) == -1)
+							ac.push(ln);
 					}
 				}
 			}

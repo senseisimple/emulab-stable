@@ -233,7 +233,10 @@
 			cmButton.label = s.id + " (" + s.name + ")";
 			cmButton.addEventListener(MouseEvent.CLICK,
 				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewNodeCollection(s.nodes);
+					var newCollection:ArrayCollection = new ArrayCollection();
+					for each(var node:PhysicalNode in s.nodes)
+						newCollection.addItem(node);
+					DisplayUtil.viewNodeCollection(newCollection);
 				}
 			);
 			return cmButton;

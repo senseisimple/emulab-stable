@@ -136,7 +136,7 @@
 					}
 				} catch(all:Error) {
 				}
-				
+
 				try{
 					if(FlexGlobals.topLevelApplication.parameters.usejs != null)
 					{
@@ -424,7 +424,7 @@
 		<s:Rect percentWidth="100" />
 		<s:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
 		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
-		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
+		<s:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold" maxDisplayedLines="1" />
 		<s:Rect percentWidth="100" />
 		<display:ImageButton id="refreshButton"
 							 icon="{ImageUtil.refreshIcon}"

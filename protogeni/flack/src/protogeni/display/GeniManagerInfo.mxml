@@ -63,6 +63,8 @@
 			
 			public function openGraphInfo():void
 			{
+				Alert.show("Not currently supported");
+				/*
 				var cw:DefaultWindow = new DefaultWindow();
 				cw.showWindow();
 				cw.title = "Graph information for " + gm.Hrn;
@@ -101,7 +103,6 @@
 				tabContainer.addChild(groupedgraphmlTab);
 				
 				// GraphML
-				/*
 				var graphmlTab:VBox = new VBox();
 				graphmlTab.label = "GraphML";
 				var textg:TextArea = new TextArea();
@@ -110,9 +111,9 @@
 				textg.text = gm.getGraphML();
 				graphmlTab.addChild(textg);
 				tabContainer.addChild(graphmlTab);
-				*/
 				
 				cw.addElement(tabContainer);
+				*/
 			}
 
 		]]>

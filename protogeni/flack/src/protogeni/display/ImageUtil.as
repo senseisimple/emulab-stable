@@ -244,5 +244,13 @@
 		[Bindable]
 		[Embed(source="../../../images/shield.png")]
 		public static var authenticationIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/draw_eraser.png")]
+		public static var eraseIcon:Class;
+		
+		[Bindable]
+		[Embed(source="../../../images/email.png")]
+		public static var emailIcon:Class;
 	}
 }
