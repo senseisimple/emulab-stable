@@ -24,7 +24,7 @@
 			public function Load(cluster:Vector.<PhysicalNodeGroup>):void 
 			{
 				nodes = new Vector.<PhysicalNode>();
-				var coords:Array = new Array();
+				var coords:Vector.<LatLng> = new Vector.<LatLng>();
 				for each(var ng:PhysicalNodeGroup in cluster)
 				{
 					addNodeGroup(ng);

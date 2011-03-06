@@ -108,13 +108,13 @@ package protogeni.resources
 			return errorMessage.search("#2048") > -1;
 		}
 		
-		public function getAvailableNodes():ArrayCollection
+		public function getAvailableNodes():Vector.<PhysicalNode>
 		{
-			var availNodes:ArrayCollection = new ArrayCollection();
+			var availNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 			for each(var n:PhysicalNode in AllNodes)
 			{
 				if(n.available)
-					availNodes.addItem(n);
+					availNodes.push(n);
 			}
 			return availNodes;
 		}

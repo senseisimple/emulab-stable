@@ -1,7 +1,7 @@
 package protogeni.display.mapping
 {
 	import com.google.maps.overlays.Marker;
-
+	
 	import flash.geom.Point;
 	import flash.utils.Dictionary;
 
@@ -20,8 +20,8 @@ package protogeni.display.mapping
 		
 		public static const DEFAULT_CLUSTER_RADIUS:int = 25;
 
-		private var _clusters:Array;
-		public function get clusters():Array
+		private var _clusters:Vector.<Vector.<GeniMapMarker>>;
+		public function get clusters():Vector.<Vector.<GeniMapMarker>>
 		{
 			if (_invalidated) {
 				_clusters = calculateClusters();
@@ -30,13 +30,13 @@ package protogeni.display.mapping
 			return _clusters;
 		}
 
-		private var _markers:Array;
-		public function set markers(value:Array):void
+		private var _markers:Vector.<GeniMapMarker>;
+		public function set markers(value:Vector.<GeniMapMarker>):void
 		{
 			if (value != _markers) {
 				_markers = value;
-				_positionedMarkers = [];
-				for each (var marker:Marker in value) {
+				_positionedMarkers = new Vector.<PositionedMarker>();
+				for each (var marker:GeniMapMarker in value) {
 					_positionedMarkers.push(new PositionedMarker(marker));
 				}
 				_invalidated = true;
@@ -62,9 +62,9 @@ package protogeni.display.mapping
 		}
 
 		private var _invalidated:Boolean;
-		private var _positionedMarkers:Array;
+		private var _positionedMarkers:Vector.<PositionedMarker>;
 
-		public function Clusterer(markers:Array, zoom:int, clusterRadius:int = DEFAULT_CLUSTER_RADIUS)
+		public function Clusterer(markers:Vector.<GeniMapMarker>, zoom:int, clusterRadius:int = DEFAULT_CLUSTER_RADIUS)
 		{
 			this.markers = markers;
 			_zoom = zoom;
@@ -72,7 +72,7 @@ package protogeni.display.mapping
 			_invalidated = true;
 		}
 
-		private function calculateClusters():Array
+		private function calculateClusters():Vector.<Vector.<GeniMapMarker>>
 		{
 			var positionedMarkers:Dictionary = new Dictionary();
 			var positionedMarker:PositionedMarker;
@@ -84,8 +84,8 @@ package protogeni.display.mapping
 			// do the calculation once here (backwards).
 			var compareDistance:Number = Math.pow(_clusterRadius * Math.pow(2, 21 - _zoom), 2);
 			
-			var clusters:Array = [];
-			var cluster:Array;
+			var clusters:Vector.<Vector.<GeniMapMarker>> = new Vector.<Vector.<GeniMapMarker>>();
+			var cluster:Vector.<GeniMapMarker>;
 			var p1:Point;
 			var p2:Point;
 			var x:int;
@@ -96,7 +96,8 @@ package protogeni.display.mapping
 					continue;
 				}
 				positionedMarkers[positionedMarker.id] = null;
-				cluster = [positionedMarker.marker];
+				cluster = new Vector.<GeniMapMarker>();
+				cluster.push(positionedMarker.marker);
 				for each (compareMarker in positionedMarkers) {
 					if (compareMarker == null) {
 						continue;
@@ -122,6 +123,8 @@ import com.google.maps.overlays.Marker;
 
 import flash.geom.Point;
 
+import protogeni.display.mapping.GeniMapMarker;
+
 internal class PositionedMarker
 {
 
@@ -132,8 +135,8 @@ internal class PositionedMarker
 	public var position:LatLng;
 	public var point:Point;
 
-	private var _marker:Marker;
-	public function get marker():Marker
+	private var _marker:GeniMapMarker;
+	public function get marker():GeniMapMarker
 	{
 		return _marker;
 	}
@@ -146,7 +149,7 @@ internal class PositionedMarker
 
 	private static var globalId:int = 0;
 
-	public function PositionedMarker(marker:Marker)
+	public function PositionedMarker(marker:GeniMapMarker)
 	{
 		_marker = marker;
 		_id = globalId++;
