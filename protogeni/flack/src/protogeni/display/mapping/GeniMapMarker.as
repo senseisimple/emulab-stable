@@ -28,15 +28,18 @@ package protogeni.display.mapping
 	
 	public class GeniMapMarker extends Marker
 	{
-		public function GeniMapMarker(o:Object)
+		public function GeniMapMarker(o:*)
 		{
+			if(o is Vector.<GeniMapMarker>)
+				this.cluster = o as Vector.<GeniMapMarker>;
+			
 			var ll:LatLng;
 			// Single
 			if(o is PhysicalNodeGroup)
 				ll = new LatLng(o.latitude, o.longitude);
 				// Cluster marker
-			else if(o is Array)
-				ll = o[0].getLatLng();
+			else if(cluster != null)
+				ll = cluster[0].getLatLng();
 			
 			super(ll);
 			nodeGroups = new PhysicalNodeGroupCollection(null);
@@ -44,18 +47,19 @@ package protogeni.display.mapping
 			// Single marker
 			if(o is PhysicalNodeGroup)
 			{
-				cluster = [o];
-				nodeGroups.Add(o as PhysicalNodeGroup);
+				cluster = new Vector.<GeniMapMarker>();
+				cluster.push(this);
+				this.nodeGroups.Add(o);
 			}
-				// Cluster marker
-			else if(o is Array)
+			// Cluster marker
+			else if(cluster != null)
 			{
-				cluster = o as Array;
-				var type:int = (cluster[0] as GeniMapMarker).nodeGroups.GetType();
+				var type:int = cluster[0].nodeGroups.GetType();
 				for each(var m:GeniMapMarker in cluster) {
 					if(type != m.nodeGroups.GetType())
 						type = -1;
-					this.nodeGroups.Add(m.nodeGroups.collection[0]);
+					for each(var nodeGroup:PhysicalNodeGroup in m.nodeGroups.collection)
+						this.nodeGroups.Add(nodeGroup);
 				}
 				
 				
@@ -179,7 +183,7 @@ package protogeni.display.mapping
 		public var nodeGroups:PhysicalNodeGroupCollection;
 		public var info:DisplayObject;
 		public var added:Boolean = false;
-		public var cluster:Array;
+		public var cluster:Vector.<GeniMapMarker>;
 		public var showGroups:PhysicalNodeGroupCollection = new PhysicalNodeGroupCollection(null);
 	}
 }

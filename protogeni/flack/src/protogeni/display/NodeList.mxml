@@ -25,7 +25,7 @@
 				nodes = group;
 				viewNodes = nodes;
 
-				var tempNodeTypes:Array = []
+				var tempNodeTypes:Array = [];
 				for each(var node:PhysicalNode in nodes) {
 					for each(var nodeType:String in node.hardwareTypes) {
 						if(tempNodeTypes.indexOf(nodeType) == -1)

@@ -105,7 +105,7 @@
 		public function GetManagers():Vector.<GeniManager>
 		{
 			var d:Dictionary = new Dictionary();
-			var a:Array = [];
+			var a:Vector.<GeniManager> = new Vector.<GeniManager>();
 			var biggestManager:GeniManager;
 			var max:int = 0;
 			for each(var ng:PhysicalNodeGroup in collection) {

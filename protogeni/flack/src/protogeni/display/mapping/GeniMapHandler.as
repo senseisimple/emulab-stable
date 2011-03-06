@@ -23,9 +23,9 @@ package protogeni.display.mapping
 	{
 		public var map:GeniMap;
 		
-		public var nodeGroupMarkers:Array = [];
+		public var nodeGroupMarkers:Vector.<GeniMapMarker> = new Vector.<GeniMapMarker>();
 		private var linkMarkers:Vector.<GeniMapLink> = new Vector.<GeniMapLink>();
-		private var nodeGroupClusterMarkers:Array = [];
+		private var nodeGroupClusterMarkers:Vector.<GeniMapMarker> = new Vector.<GeniMapMarker>();
 		
 		public var userResourcesOnly:Boolean = false;
 		public var selectedSlice:Slice = null;
@@ -47,9 +47,9 @@ package protogeni.display.mapping
 				FlexGlobals.topLevelApplication.stage.removeEventListener(Event.ENTER_FRAME, drawNext);
 			}
 			map.clearOverlays();
-			nodeGroupMarkers = [];
+			nodeGroupMarkers = new Vector.<GeniMapMarker>();
 			linkMarkers = new Vector.<GeniMapLink>();
-			nodeGroupClusterMarkers = []
+			nodeGroupClusterMarkers = new Vector.<GeniMapMarker>();
 		}
 		
 		public function redrawFromScratch():void
@@ -62,11 +62,11 @@ package protogeni.display.mapping
 		}
 		
 		// If nothing given, gives bounds for all resources
-		public static function getBounds(a:Array = null):LatLngBounds
+		public static function getBounds(a:Vector.<LatLng> = null):LatLngBounds
 		{
-			var coords:Array;
+			var coords:Vector.<LatLng>;
 			if(a == null) {
-				coords = new Array();
+				coords = new Vector.<LatLng>();
 				for each(var m:GeniMapMarker in Main.geniHandler.mapHandler.nodeGroupMarkers)
 					coords.push(m.getLatLng());
 			} else
@@ -255,7 +255,7 @@ package protogeni.display.mapping
 			myIndex = 0;
 		}
 		
-		private var clustersToAdd:ArrayCollection;
+		private var clustersToAdd:Vector.<Vector.<GeniMapMarker>>;
 		public function doCluster():void {
 			
 			// Limit to user resources if selected
@@ -306,14 +306,14 @@ package protogeni.display.mapping
 			
 			// Cluster node groups close to each other
 			var clusterer:Clusterer = new Clusterer(nodeGroupMarkers, map.getZoom(), 40);
-			var clusteredMarkers:Array = clusterer.clusters;
-			clustersToAdd = new ArrayCollection();
+			var clusteredMarkers:Vector.<Vector.<GeniMapMarker>> = clusterer.clusters;
+			clustersToAdd = new Vector.<Vector.<GeniMapMarker>>();
 			
 			// Show group markers that should be shown now, hide those that shouldn't
-			for each(var newArray:Array in clusteredMarkers) {
+			for each(var newArray:Vector.<GeniMapMarker> in clusteredMarkers) {
 				var shouldShow:Boolean = newArray.length == 1;
 				if(!shouldShow)
-					clustersToAdd.addItem(newArray);
+					clustersToAdd.push(newArray);
 				for each(var newMarker:GeniMapMarker in newArray) {
 					if(!newMarker.visible && shouldShow && newMarker.showGroups.collection.length > 0)
 						newMarker.show();
@@ -326,18 +326,26 @@ package protogeni.display.mapping
 			var j:int;
 			var oldMarker:GeniMapMarker;
 			var found:Boolean;
-			var newMarkerArray:Array;
+			var newMarkerArray:Vector.<GeniMapMarker>;
 			
 			// Hide markers no longer used
 			for(i = 0; i < nodeGroupClusterMarkers.length; i++) {
 				oldMarker = this.nodeGroupClusterMarkers[i] as GeniMapMarker;
 				found = false;
 				for(j = 0; j < clustersToAdd.length; j++) {
-					newMarkerArray = clustersToAdd.getItemAt(j) as Array;
-					if(Util.haveSame(newMarkerArray, oldMarker.cluster)) {
+					newMarkerArray = clustersToAdd[j];
+					if(newMarkerArray.length == oldMarker.cluster.length) {
 						found = true;
-						clustersToAdd.removeItemAt(j);	// remove markers which will stay from the create array
-						break;
+						for each(var findMarker:GeniMapMarker in newMarkerArray) {
+							if(oldMarker.cluster.indexOf(findMarker) == -1) {
+								found = false;
+								break;
+							}
+						}
+						if(found) {
+							clustersToAdd.splice(j, 1);	// remove markers which will stay from the create array
+							break;
+						}
 					}
 				}
 				if(!found) {
@@ -366,7 +374,7 @@ package protogeni.display.mapping
 			var startTime:Date = new Date();
 
 			while(myIndex < clustersToAdd.length) {
-				var cluster:Array = clustersToAdd.getItemAt(myIndex) as Array;
+				var cluster:Vector.<GeniMapMarker> = clustersToAdd[myIndex];
 				var marker:GeniMapMarker = new GeniMapMarker(cluster);
 				if(this.userResourcesOnly) {
 					var slice:Slice = null;
