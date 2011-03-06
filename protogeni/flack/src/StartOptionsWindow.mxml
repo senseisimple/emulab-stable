@@ -18,29 +18,26 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 -->
 
 <s:TitleWindow xmlns:fx="http://ns.adobe.com/mxml/2009" 
-					   xmlns:s="library://ns.adobe.com/flex/spark" 
-					   xmlns:mx="library://ns.adobe.com/flex/mx"
-					   xmlns:display="protogeni.display.*"
-					   title="Welcome"
-					   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
-					   close="closeWindow()"
-					   defaultButton="{this.loginButton}"
-					   contentCreationComplete="this.closeButton = null; this.loginButton.setFocus();">
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   xmlns:display="protogeni.display.*"
+			   title="Welcome"
+			   skinClass="protogeni.display.skins.TitleWindowSkinNoCloseButton"
+			   close="closeWindow()"
+			   defaultButton="{this.loginButton}"
+			   contentCreationComplete="this.closeButton = null; this.loginButton.setFocus();">
 	<s:layout>
 		<s:VerticalLayout horizontalAlign="center" />
 	</s:layout>
 	
 	<fx:Script>
 		<![CDATA[
-			import mx.controls.Alert;
 			import mx.core.FlexGlobals;
 			import mx.core.IFlexDisplayObject;
 			import mx.managers.PopUpManager;
 			
-			import protogeni.GeniEvent;
 			import protogeni.NetUtil;
 			import protogeni.display.ImageUtil;
-			import protogeni.display.skins.TitleWindowSkin;
 			
 			public function showWindow():void
 			{
@@ -69,7 +66,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 				Main.geniHandler.requestHandler.startInitiationSequence(true);
 				this.closeWindow();
 			}
-
+			
 		]]>
 	</fx:Script>
 	

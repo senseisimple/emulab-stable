@@ -16,7 +16,11 @@ package protogeni.display.components
 		public var dataType:String;
 		private var allowDragging:Boolean = false;
 		
-		public function DataButton(newLabel:String, newToolTip:String, img:Class = null, newData:* = null, newDataType:String = "")
+		public function DataButton(newLabel:String,
+								   newToolTip:String,
+								   img:Class = null,
+								   newData:* = null,
+								   newDataType:String = "")
 		{
 			super();
 			if(newLabel == null || newLabel.length == 0)
@@ -49,7 +53,7 @@ package protogeni.display.components
 		private function mouseExit(event:MouseEvent):void {
 			allowDragging = false;
 		}
-
+		
 		private function startDragging(event:MouseEvent):void {
 			if(allowDragging) {
 				var ds:DragSource = new DragSource();

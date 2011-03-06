@@ -11,7 +11,6 @@ package com.mattism.http.xmlrpc
 {
 	public interface MethodCall
 	{
-		
 		function setName( name:String ):void;
 		
 		function addParam( arg:Object, type:String ):void;
@@ -19,6 +18,5 @@ package com.mattism.http.xmlrpc
 		function removeParams():void;
 	
 		function getXml():XML;
-	
 	}
 }

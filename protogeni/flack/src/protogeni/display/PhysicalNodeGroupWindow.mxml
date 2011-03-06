@@ -25,8 +25,6 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	<fx:Script>
 		<![CDATA[
 			import mx.collections.ArrayCollection;
-			import mx.collections.Sort;
-			import mx.collections.SortField;
 			
 			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeGroup;

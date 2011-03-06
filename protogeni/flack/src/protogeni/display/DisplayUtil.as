@@ -1,5 +1,5 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2009 University of Utah and the Flux Group.
+ * Copyright (c) 2008-2011 University of Utah and the Flux Group.
  * All rights reserved.
  *
  * Permission to use, copy, modify and distribute this software is hereby
@@ -12,19 +12,9 @@
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
  */
  
- /* Common.as
- 
-    Functions used all around the project
-*/
- 
- package protogeni.display
+package protogeni.display
 {
-	import flash.events.MouseEvent;
-	
 	import mx.collections.ArrayCollection;
-	import mx.controls.Alert;
-	import mx.core.DragSource;
-	import mx.managers.DragManager;
 	import mx.managers.PopUpManager;
 	
 	import protogeni.StringUtil;

@@ -10,16 +10,12 @@
 	import flash.text.TextField;
 	import flash.text.TextFieldAutoSize;
 	
-	import mx.controls.Image;
 	import mx.core.DragSource;
 	import mx.core.UIComponent;
-	import mx.events.FlexEvent;
 	import mx.managers.DragManager;
 	
 	import protogeni.display.ColorUtil;
 	import protogeni.resources.GeniManager;
-	import protogeni.resources.PhysicalNode;
-	import protogeni.resources.PhysicalNodeGroup;
 	
 	public class PhysicalNodeGroupMarker extends UIComponent
 	{

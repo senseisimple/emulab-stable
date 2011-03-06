@@ -21,9 +21,11 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		 xmlns:s="library://ns.adobe.com/flex/spark" 
 		 xmlns:mx="library://ns.adobe.com/flex/mx"
 		 xmlns:mapping="protogeni.display.mapping.*"
+		 xmlns:display="protogeni.display.*"
+		 xmlns:components="protogeni.display.components.*"
 		 top="5" bottom="16" right="5"
 		 title="Resources"
-		 creationComplete="init()" xmlns:display="protogeni.display.*" xmlns:components="protogeni.display.components.*">
+		 creationComplete="init()">
 	<components:layout>
 		<s:VerticalLayout gap="2" paddingBottom="2" paddingLeft="2" paddingRight="2" paddingTop="2" horizontalAlign="center"/>
 	</components:layout>
@@ -34,10 +36,8 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 		<![CDATA[
 			import mx.collections.ArrayCollection;
 			import mx.controls.Alert;
-			import mx.controls.Button;
 			
 			import protogeni.GeniEvent;
-			import protogeni.Util;
 			import protogeni.display.ImageUtil;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.GeniUser;

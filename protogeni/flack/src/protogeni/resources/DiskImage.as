@@ -1,3 +1,17 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.resources
 {
 	public class DiskImage
@@ -21,7 +35,8 @@ package protogeni.resources
 		public var description:String;
 		public var isDefault:Boolean;
 		
-		public static function getDiskImageShort(long:String, manager:GeniManager):String
+		public static function getDiskImageShort(long:String,
+												 manager:GeniManager):String
 		{
 			if(long.indexOf("urn:publicid:IDN+" + manager.Urn.authority + "+image+emulab-ops//") > -1)
 				return long.replace("urn:publicid:IDN+" + manager.Urn.authority + "+image+emulab-ops//", "");
@@ -31,7 +46,8 @@ package protogeni.resources
 				return long;
 		}
 		
-		public static function getDiskImageLong(short:String, manager:GeniManager):String
+		public static function getDiskImageLong(short:String,
+												manager:GeniManager):String
 		{
 			return "urn:publicid:IDN+" + manager.Urn.authority + "+image+emulab-ops//" + short;
 		}

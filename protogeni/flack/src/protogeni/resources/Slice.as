@@ -1,18 +1,18 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2009 University of Utah and the Flux Group.
- * All rights reserved.
- *
- * Permission to use, copy, modify and distribute this software is hereby
- * granted provided that (1) source code retains these copyright, permission,
- * and disclaimer notices, and (2) redistributions including binaries
- * reproduce the notices in supporting documentation.
- *
- * THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
- * CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
- * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- */
- 
- package protogeni.resources
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
+package protogeni.resources
 {
 	import flash.utils.Dictionary;
 	
@@ -34,20 +34,20 @@
 		public var creator:GeniUser = null;
 		public var credential:String = "";
 		public var slivers:SliverCollection = new SliverCollection();
-
+		
 		public var expires:Date;
 		
 		// depreciated
 		public var uuid:String = null;
-
+		
 		public function Slice()
 		{
 		}
 		
 		public function Status():String {
-			if(hrn == null) return null;
+			if(this.hrn == null) return null;
 			var status:String = Sliver.STATUS_NA;
-			for each(var sliver:Sliver in slivers.collection) {
+			for each(var sliver:Sliver in this.slivers.collection) {
 				if(sliver.status == Sliver.STATUS_FAILED)
 					return Sliver.STATUS_FAILED;
 				
@@ -62,7 +62,7 @@
 		
 		public function hasAllocatedResources():Boolean
 		{
-			if(slivers == null)
+			if(this.slivers == null)
 				return false;
 			
 			for each(var existing:Sliver in this.slivers.collection)
@@ -75,7 +75,7 @@
 		
 		public function hasAllAllocatedResources():Boolean
 		{
-			if(slivers == null)
+			if(this.slivers == null)
 				return false;
 			
 			for each(var existing:Sliver in this.slivers.collection)
@@ -87,7 +87,7 @@
 		}
 		
 		public function isStaged():Boolean {
-			if(slivers == null || slivers.collection.length == 0)
+			if(this.slivers == null || this.slivers.collection.length == 0)
 				return false;
 			
 			for each(var existing:Sliver in this.slivers.collection)
@@ -99,7 +99,7 @@
 		}
 		
 		public function isCreated():Boolean {
-			if(slivers == null || slivers.length == 0)
+			if(this.slivers == null || this.slivers.length == 0)
 				return false;
 			
 			for each(var existing:Sliver in this.slivers.collection)
@@ -113,14 +113,14 @@
 		public function GetAllNodes():VirtualNodeCollection
 		{
 			var nodes:VirtualNodeCollection = new VirtualNodeCollection();
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				for each(var n:VirtualNode in s.nodes.collection)
 				{
 					if(n.manager == s.manager)
 						nodes.add(n);
 				}
-					
+				
 			}
 			return nodes;
 		}
@@ -128,7 +128,7 @@
 		public function GetAllLinks():VirtualLinkCollection
 		{
 			var links:VirtualLinkCollection = new VirtualLinkCollection();
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				for each(var l:VirtualLink in s.links.collection)
 				{
@@ -143,7 +143,7 @@
 		public function GetPhysicalNodes():Vector.<PhysicalNode>
 		{
 			var nodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				for each(var n:VirtualNode in s.nodes.collection)
 				{
@@ -157,7 +157,7 @@
 		
 		public function getVirtualNodeWithId(id:String):VirtualNode
 		{
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				var vn:VirtualNode = s.nodes.getById(id);
 				if(vn != null)
@@ -168,7 +168,7 @@
 		
 		public function getVirtualInterfaceWithId(id:String):VirtualInterface
 		{
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				var vi:VirtualInterface = s.nodes.getByInterfaceId(id);
 				if(vi != null)
@@ -179,7 +179,7 @@
 		
 		public function getVirtualLinkWithId(id:String):VirtualLink
 		{
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				var vl:VirtualLink = s.links.getById(id);
 				if(vl != null)
@@ -190,7 +190,7 @@
 		
 		public function hasSliverFor(gm:GeniManager):Boolean
 		{
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				if(s.manager == gm)
 					return true;
@@ -200,13 +200,13 @@
 		
 		public function getOrCreateSliverFor(gm:GeniManager):Sliver
 		{
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				if(s.manager == gm)
 					return s;
 			}
 			var newSliver:Sliver = new Sliver(this, gm);
-			slivers.add(newSliver);
+			this.slivers.add(newSliver);
 			return newSliver;
 		}
 		
@@ -244,7 +244,7 @@
 			var oldNodeToCloneNode:Dictionary = new Dictionary();
 			var oldLinkToCloneLink:Dictionary = new Dictionary();
 			var oldInterfaceToCloneInterface:Dictionary = new Dictionary();
-
+			
 			// Build up the slivers with nodes
 			for each(sliver in this.slivers.collection)
 			{
@@ -264,13 +264,19 @@
 					newNode._exclusive = node.Exclusive;
 					newNode.sliverType = node.sliverType;
 					for each(var executeService:ExecuteService in node.executeServices) {
-						newNode.executeServices.push(new ExecuteService(executeService.command, executeService.shell));
+						newNode.executeServices.push(new ExecuteService(executeService.command,
+																		executeService.shell));
 					}
 					for each(var installService:InstallService in node.installServices) {
-						newNode.installServices.push(new InstallService(installService.url, installService.installPath, installService.fileType));
+						newNode.installServices.push(new InstallService(installService.url,
+																		installService.installPath,
+																		installService.fileType));
 					}
 					for each(var loginService:LoginService in node.loginServices) {
-						newNode.loginServices.push(new LoginService(loginService.authentication, loginService.hostname, loginService.port, loginService.username));
+						newNode.loginServices.push(new LoginService(loginService.authentication,
+																	loginService.hostname,
+																	loginService.port,
+																	loginService.username));
 					}
 					// supernode? add later ...
 					// subnodes? add later ...
@@ -305,7 +311,7 @@
 						oldInterfaceToCloneInterface[vi] = newVirtualInterface;
 						// links? add later ...
 					}
-
+					
 					//newSliver.nodes.addItem(newNode);
 					
 					oldNodeToCloneNode[node] = newNode;
@@ -321,7 +327,7 @@
 					if(oldNode.subNodes != null && oldNode.subNodes.length > 0)
 					{
 						for each(var subNode:VirtualNode in oldNode.subNodes.collection)
-							cloneNode.subNodes.add(newSliver.nodes.getById(subNode.clientId));
+						cloneNode.subNodes.add(newSliver.nodes.getById(subNode.clientId));
 					}
 				}
 			}
@@ -358,12 +364,12 @@
 					oldLinkToCloneLink[link] = newLink;
 				}
 			}
-
+			
 			return newSlice;
 		}
 		
 		public function ReadyIcon():Class {
-			switch(Status()) {
+			switch(this.Status()) {
 				case Sliver.STATUS_READY : return ImageUtil.flagGreenIcon;
 				case Sliver.STATUS_NOTREADY : return ImageUtil.flagYellowIcon;
 				case Sliver.STATUS_FAILED : return ImageUtil.flagRedIcon;
@@ -373,27 +379,29 @@
 		
 		public function DisplayString():String {
 			
-			if(hrn == null && uuid == null) {
+			if(this.hrn == null
+					&& this.uuid == null) {
 				return "All Resources";
 			}
 			
 			var returnString:String;
-			if(hrn == null)
+			if(this.hrn == null)
 				returnString = uuid;
 			else
 				returnString = hrn;
-				
-			return returnString + " (" + Status() + ")";
+			
+			return returnString + " (" + this.Status() + ")";
 		}
 		
 		// Used to push more important slices to the top of lists
 		public function CompareValue():int {
 			
-			if(hrn == null && uuid == null) {
+			if(this.hrn == null
+					&& this.uuid == null) {
 				return -1;
 			}
 			
-			if(Status() == "ready")
+			if(this.Status() == "ready")
 				return 0;
 			else
 				return 1;
@@ -402,7 +410,7 @@
 		public function getUniqueVirtualLinkId(l:VirtualLink = null):String
 		{
 			var highest:int = 0;
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				for each(var l:VirtualLink in s.links.collection)
 				{
@@ -414,10 +422,7 @@
 							if(testHighest >= highest)
 								highest = testHighest+1;
 						}
-					} catch(e:Error)
-					{
-						
-					}
+					} catch(e:Error) { }
 				}
 			}
 			return "link-" + highest;
@@ -437,7 +442,7 @@
 			}
 			
 			var highest:int = 0;
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				for each(var testNode:VirtualNode in s.nodes.collection)
 				{
@@ -458,7 +463,7 @@
 		public function getUniqueVirtualInterfaceId():String
 		{
 			var highest:int = 0;
-			for each(var s:Sliver in slivers.collection)
+			for each(var s:Sliver in this.slivers.collection)
 			{
 				for each(var l:VirtualLink in s.links.collection)
 				{
@@ -472,10 +477,7 @@
 								if(testHighest >= highest)
 									highest = testHighest+1;
 							}
-						} catch(e:Error)
-						{
-							
-						}
+						} catch(e:Error) { }
 					}
 					
 				}
@@ -490,7 +492,7 @@
 			else if(this.GetAllNodes().length > 0)
 				Alert.show("The slice already has resources waiting to be allocated.  Please clear the canvas before trying to import", "Resources Exist");
 			else
-				return doImport(rspec);
+				return this.doImport(rspec);
 			return false;
 		}
 		
@@ -529,7 +531,7 @@
 				return false;
 			}
 			
-			slivers = new SliverCollection();
+			this.slivers = new SliverCollection();
 			
 			for each(var nodeXml:XML in sliceRspec.defaultNamespace::node)
 			{

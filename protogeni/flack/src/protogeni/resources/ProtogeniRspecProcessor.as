@@ -1,3 +1,17 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.resources
 {
 	import flash.events.Event;
@@ -8,17 +22,17 @@ package protogeni.resources
 	import mx.core.FlexGlobals;
 	
 	import protogeni.GeniEvent;
-	import protogeni.XmlUtil;
 	import protogeni.Util;
-
+	import protogeni.XmlUtil;
+	
 	public class ProtogeniRspecProcessor implements RspecProcessorInterface
 	{
+		private var manager:ProtogeniComponentManager;
 		public function ProtogeniRspecProcessor(newGm:ProtogeniComponentManager)
 		{
-			gm = newGm;
+			this.manager = newGm;
 		}
 		
-		private var gm:ProtogeniComponentManager;
 		
 		private static var NODE_PARSE : int = 0;
 		private static var LINK_PARSE : int = 1;
@@ -41,95 +55,99 @@ package protogeni.resources
 		
 		private var detectedOutputRspecVersion:Number;
 		public function processResourceRspec(afterCompletion:Function):void {
-			gm.clearComponents();
+			this.manager.clearComponents();
 			
-			Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC", false);
-
-			defaultNamespace = gm.Rspec.namespace();
+			Main.Application().setStatus("Parsing " + this.manager.Hrn + " RSPEC", false);
+			
+			this.defaultNamespace = this.manager.Rspec.namespace();
 			
 			switch(defaultNamespace.uri) {
 				case XmlUtil.rspec01Namespace:
-					detectedOutputRspecVersion = 0.1;
+					this.detectedOutputRspecVersion = 0.1;
 					break;
 				case XmlUtil.rspec02Namespace:
-					detectedOutputRspecVersion = 0.2;
+					this.detectedOutputRspecVersion = 0.2;
 					break;
 				case XmlUtil.rspec2Namespace:
-					detectedOutputRspecVersion = 2;
+					this.detectedOutputRspecVersion = 2;
 					break;
 				default:
-					var msg:String = "RSPEC with the namespace '" +defaultNamespace.uri+ "' is not supported.";
+					var msg:String = "RSPEC with the namespace '" +this.defaultNamespace.uri+ "' is not supported.";
 					Alert.show(msg);
-					LogHandler.appendMessage(new LogMessage(gm.Url, "Unsupported RSPEC", msg, true, LogMessage.TYPE_END));
+					LogHandler.appendMessage(new LogMessage(this.manager.Url,
+															"Unsupported RSPEC",
+															msg,
+															true,
+															LogMessage.TYPE_END));
 					// FIXME: probably needs to error in a different way...
-					gm.Status = GeniManager.STATUS_FAILED;
+					this.manager.Status = GeniManager.STATUS_FAILED;
 					afterCompletion();
 					return;
 			}
 			
-			if(gm.Rspec.@valid_until.length() == 1)
-				gm.expires = Util.parseProtogeniDate(gm.Rspec.@valid_until);
-			if(gm.Rspec.@expires.length() == 1)
-				gm.expires = Util.parseProtogeniDate(gm.Rspec.@expires);
-			if(gm.Rspec.@generated.length() == 1)
-				gm.generated = Util.parseProtogeniDate(gm.Rspec.@generated);
+			if(this.manager.Rspec.@valid_until.length() == 1)
+				this.manager.expires = Util.parseProtogeniDate(this.manager.Rspec.@valid_until);
+			if(this.manager.Rspec.@expires.length() == 1)
+				this.manager.expires = Util.parseProtogeniDate(this.manager.Rspec.@expires);
+			if(this.manager.Rspec.@generated.length() == 1)
+				this.manager.generated = Util.parseProtogeniDate(this.manager.Rspec.@generated);
 			
-			nodes = gm.Rspec.defaultNamespace::node;
-			links = gm.Rspec.defaultNamespace::link;
+			this.nodes = this.manager.Rspec.defaultNamespace::node;
+			this.links = this.manager.Rspec.defaultNamespace::link;
 			
-			myAfter = afterCompletion;
-			myIndex = 0;
-			myState = NODE_PARSE;
-			interfaceDictionary = new Dictionary();
-			nodeNameDictionary = new Dictionary();
-			subnodeList = new ArrayCollection();
+			this.myAfter = afterCompletion;
+			this.myIndex = 0;
+			this.myState = NODE_PARSE;
+			this.interfaceDictionary = new Dictionary();
+			this.nodeNameDictionary = new Dictionary();
+			this.subnodeList = new ArrayCollection();
 			FlexGlobals.topLevelApplication.stage.addEventListener(Event.ENTER_FRAME, parseNext);
 		}
 		
 		private function parseNext(event:Event) : void
 		{
-			if(!hasslot && GeniManager.processing > GeniManager.maxProcessing)
+			if(!this.hasslot && GeniManager.processing > GeniManager.maxProcessing)
 				return;
-			if(!hasslot) {
-				hasslot = true;
+			if(!this.hasslot) {
+				this.hasslot = true;
 				GeniManager.processing++;
 			}
 			
 			var startTime:Date = new Date();
-			if (myState == NODE_PARSE)	    	
+			if (this.myState == NODE_PARSE)	    	
 			{
-				parseNextNode();
+				this.parseNextNode();
 				if(Main.debugMode)
 					trace("ParseN " + String((new Date()).time - startTime.time));
 			}
-			else if (myState == LINK_PARSE)
+			else if (this.myState == LINK_PARSE)
 			{
-				parseNextLink();
+				this.parseNextLink();
 				if(Main.debugMode)
 					trace("ParseL " + String((new Date()).time - startTime.time));
 			}
-			else if (myState == DONE)
+			else if (this.myState == DONE)
 			{
 				GeniManager.processing--;
-				Main.Application().setStatus("Parsing " + gm.Hrn + " RSPEC Done",false);
-				interfaceDictionary = null;
-				nodeNameDictionary = null;
-				subnodeList = null;
-				gm.totalNodes = gm.AllNodes.length;
-				gm.availableNodes = gm.getAvailableNodes().length;
-				gm.unavailableNodes = gm.AllNodes.length - gm.availableNodes;
-				gm.percentageAvailable = (gm.availableNodes / gm.totalNodes) * 100;
-				gm.Status = GeniManager.STATUS_VALID;
-				Main.geniDispatcher.dispatchGeniManagerChanged(gm, GeniEvent.ACTION_POPULATED);
+				Main.Application().setStatus("Parsing " + manager.Hrn + " RSPEC Done",false);
+				this.interfaceDictionary = null;
+				this.nodeNameDictionary = null;
+				this.subnodeList = null;
+				this.manager.totalNodes = this.manager.AllNodes.length;
+				this.manager.availableNodes = this.manager.getAvailableNodes().length;
+				this.manager.unavailableNodes = this.manager.AllNodes.length - this.manager.availableNodes;
+				this.manager.percentageAvailable = (this.manager.availableNodes / this.manager.totalNodes) * 100;
+				this.manager.Status = GeniManager.STATUS_VALID;
+				Main.geniDispatcher.dispatchGeniManagerChanged(this.manager, GeniEvent.ACTION_POPULATED);
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
-				myAfter();
+				this.myAfter();
 			}
 			else
 			{
 				Main.Application().setStatus("Fail",true);
-				interfaceDictionary = null;
-				nodeNameDictionary = null;
-				subnodeList = null;
+				this.interfaceDictionary = null;
+				this.nodeNameDictionary = null;
+				this.subnodeList = null;
 				Main.Application().stage.removeEventListener(Event.ENTER_FRAME, parseNext);
 				Alert.show("Problem parsing RSPEC");
 				// Throw exception
@@ -140,9 +158,9 @@ package protogeni.resources
 			var startTime:Date = new Date();
 			var idx:int = 0;
 			
-			while(myIndex < nodes.length()) {
+			while(this.myIndex < this.nodes.length()) {
 				try {
-					var nodeXml:XML = nodes[myIndex];
+					var nodeXml:XML = this.nodes[myIndex];
 					
 					// Get location info
 					var lat:Number = -72.134678;
@@ -155,13 +173,13 @@ package protogeni.resources
 					}
 					
 					// Assign to a group based on location
-					var ng:PhysicalNodeGroup = gm.Nodes.GetByLocation(lat,lng);
+					var ng:PhysicalNodeGroup = manager.Nodes.GetByLocation(lat,lng);
 					if(ng == null) {
-						ng = new PhysicalNodeGroup(lat, lng, locationXml.@country, gm.Nodes);
-						gm.Nodes.Add(ng);
+						ng = new PhysicalNodeGroup(lat, lng, locationXml.@country, manager.Nodes);
+						manager.Nodes.Add(ng);
 					}
 					
-					var node:PhysicalNode = new PhysicalNode(ng, gm);
+					var node:PhysicalNode = new PhysicalNode(ng, this.manager);
 					node.name = nodeXml.@component_name;
 					switch(detectedOutputRspecVersion)
 					{
@@ -183,7 +201,7 @@ package protogeni.resources
 								i.role = PhysicalNodeInterface.RoleIntFromString(nodeChildXml.@role);
 								i.publicIPv4 = nodeChildXml.@public_ipv4;
 								node.interfaces.add(i);
-								interfaceDictionary[i.id] = i;
+								this.interfaceDictionary[i.id] = i;
 							} else if(nodeChildXml.localName() == "hardware_type") {
 								node.hardwareTypes.push(nodeChildXml.@name);
 							} else if(nodeChildXml.localName() == "sliver_type") {
@@ -191,10 +209,10 @@ package protogeni.resources
 								for each(var sliverTypeChildXml:XML in nodeChildXml.children()) {
 									if(sliverTypeChildXml.localName() == "disk_image")
 										newSliverType.diskImages.push(new DiskImage(sliverTypeChildXml.@name,
-																					sliverTypeChildXml.@os,
-																					sliverTypeChildXml.@version,
-																					sliverTypeChildXml.@description,
-																					sliverTypeChildXml.@default == "true"));
+											sliverTypeChildXml.@os,
+											sliverTypeChildXml.@version,
+											sliverTypeChildXml.@description,
+											sliverTypeChildXml.@default == "true"));
 								}
 								node.sliverTypes.push(newSliverType);
 							} else if(nodeChildXml.localName() == "available") {
@@ -219,12 +237,12 @@ package protogeni.resources
 								if(node.sliverTypes.length == 0)
 									node.sliverTypes.push(new SliverType("N/A"));
 								node.sliverTypes[0].diskImages.push(new DiskImage(nodeChildXml.@name,
-																				nodeChildXml.@os,
-																				nodeChildXml.@version,
-																				nodeChildXml.@description,
-																				nodeChildXml.@default == "true"));
+									nodeChildXml.@os,
+									nodeChildXml.@version,
+									nodeChildXml.@description,
+									nodeChildXml.@default == "true"));
 							}
-							// Depreciated
+								// Depreciated
 							else if(nodeChildXml.localName() == "exclusive") {
 								var exString:String = nodeChildXml.toString();
 								node.exclusive = exString == "true";
@@ -240,16 +258,16 @@ package protogeni.resources
 					
 					node.rspec = nodeXml;
 					ng.Add(node);
-					nodeNameDictionary[node.id] = node;
-					nodeNameDictionary[node.name] = node;
-					gm.AllNodes.push(node);
+					this.nodeNameDictionary[node.id] = node;
+					this.nodeNameDictionary[node.name] = node;
+					this.manager.AllNodes.push(node);
 				} catch(e:Error) {
 					// skip if some problem
 					if(Main.debugMode)
-						trace("Skipped node which threw error in manager named " + gm.Hrn);
+						trace("Skipped node which threw error in manager named " + manager.Hrn);
 				}
 				idx++;
-				myIndex++;
+				this.myIndex++;
 				if(((new Date()).time - startTime.time) > 40) {
 					if(Main.debugMode)
 						trace("Nodes processed:" + idx);
@@ -258,15 +276,15 @@ package protogeni.resources
 			}
 			
 			// Assign subnodes
-			for each(var obj:Object in subnodeList)
+			for each(var obj:Object in this.subnodeList)
 			{
-				var parentNode:PhysicalNode = nodeNameDictionary[obj.parentName];
+				var parentNode:PhysicalNode = this.nodeNameDictionary[obj.parentName];
 				parentNode.subNodes.push(obj.subNode);
 				obj.subNode.subNodeOf = parentNode;
 			}
 			
-			myState = LINK_PARSE;
-			myIndex = 0;
+			this.myState = LINK_PARSE;
+			this.myIndex = 0;
 			return;
 		}
 		
@@ -274,9 +292,9 @@ package protogeni.resources
 			var startTime:Date = new Date();
 			var idx:int = 0;
 			
-			while(myIndex < links.length()) {
+			while(this.myIndex < this.links.length()) {
 				try {
-					var link:XML = links[myIndex];
+					var link:XML = this.links[myIndex];
 					var l:PhysicalLink = new PhysicalLink(null);
 					
 					// Get interfaces used
@@ -292,18 +310,25 @@ package protogeni.resources
 							default:
 								interfaceId = interfaceRefXml.@component_id;
 						}
-						var referencedInterface:PhysicalNodeInterface = interfaceDictionary[interfaceId];
+						var referencedInterface:PhysicalNodeInterface = this.interfaceDictionary[interfaceId];
 						if(referencedInterface != null)
-							l.interfaceRefs.add(interfaceDictionary[interfaceId]);
+							l.interfaceRefs.add(referencedInterface);
 						else {
 							// error
 						}
 					}
 					
-					var lg:PhysicalLinkGroup = gm.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(), l.interfaceRefs.collection[0].owner.GetLongitude(), l.interfaceRefs.collection[1].owner.GetLatitude(), l.interfaceRefs.collection[1].owner.GetLongitude());
+					var lg:PhysicalLinkGroup = this.manager.Links.Get(l.interfaceRefs.collection[0].owner.GetLatitude(),
+															l.interfaceRefs.collection[0].owner.GetLongitude(),
+															l.interfaceRefs.collection[1].owner.GetLatitude(),
+															l.interfaceRefs.collection[1].owner.GetLongitude());
 					if(lg == null) {
-						lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(), l.interfaceRefs.collection[0].owner.GetLongitude(), l.interfaceRefs.collection[1].owner.GetLatitude(), l.interfaceRefs.collection[1].owner.GetLongitude(), gm.Links);
-						gm.Links.Add(lg);
+						lg = new PhysicalLinkGroup(l.interfaceRefs.collection[0].owner.GetLatitude(),
+													l.interfaceRefs.collection[0].owner.GetLongitude(),
+													l.interfaceRefs.collection[1].owner.GetLatitude(),
+													l.interfaceRefs.collection[1].owner.GetLongitude(),
+													this.manager.Links);
+						this.manager.Links.Add(lg);
 					}
 					l.owner = lg;
 					l.name = link.@component_name;
@@ -317,18 +342,18 @@ package protogeni.resources
 						default:
 							l.id = link.@component_id;
 					}
-					l.manager = gm;
+					l.manager = this.manager;
 					
 					for each(var ix:XML in link.children()) {
 						if(ix.namespace() == defaultNamespace) {
-							 if(ix.localName() == "property") {
+							if(ix.localName() == "property") {
 								// FIXME: Hack since v1 just had link properties instead of dst & src
-								 if(ix.@latency.length() == 1)
-									 l.latency = Number(ix.@latency);
-								 if(ix.@packet_loss.length() == 1)
-									 l.packetLoss = Number(ix.@packet_loss);
-								 if(ix.@capacity.length() == 1)
-									 l.capacity = Number(ix.@capacity);
+								if(ix.@latency.length() == 1)
+									l.latency = Number(ix.@latency);
+								if(ix.@packet_loss.length() == 1)
+									l.packetLoss = Number(ix.@packet_loss);
+								if(ix.@capacity.length() == 1)
+									l.capacity = Number(ix.@capacity);
 								//<property source_id="urn:publicid:IDN+emulab.net+interface+cisco8:(null)" dest_id="urn:publicid:IDN+emulab.net+interface+pc219:eth2" capacity="1000000" latency="0" packet_loss="0"/>
 							} else if(ix.localName() == "link_type") {
 								var s:String;
@@ -344,7 +369,7 @@ package protogeni.resources
 								}
 								l.linkTypes.push(s);
 							}
-							// Depreciated
+								// Depreciated
 							else if(ix.localName() == "bandwidth") {
 								l.capacity = Number(ix);
 							} else if(ix.localName() == "latency") {
@@ -363,14 +388,14 @@ package protogeni.resources
 					}
 					if(lg.IsSameSite())
 						l.interfaceRefs.collection[0].owner.owner.links = lg;
-					gm.AllLinks.push(l);
+					this.manager.AllLinks.push(l);
 				} catch(e:Error) {
 					// skip if some problem
 					if(Main.debugMode)
-						trace("Skipped link which threw error in manager named " + gm.Hrn);
+						trace("Skipped link which threw error in manager named " + manager.Hrn);
 				}
 				idx++;
-				myIndex++;
+				this.myIndex++;
 				if(((new Date()).time - startTime.time) > 40) {
 					if(Main.debugMode)
 						trace("Links processed:" + idx);
@@ -385,322 +410,334 @@ package protogeni.resources
 		private var detectedInputRspecVersion:Number;
 		public function processSliverRspec(s:Sliver):void
 		{
-				var defaultNamespace:Namespace = s.rspec.namespace();
-				switch(defaultNamespace.uri) {
-					case XmlUtil.rspec01Namespace:
-						detectedInputRspecVersion = 0.1;
-						break;
-					case XmlUtil.rspec02Namespace:
-						detectedInputRspecVersion = 0.2;
-						break;
-					case XmlUtil.rspec2Namespace:
-						detectedInputRspecVersion = 2;
-						break;
+			var defaultNamespace:Namespace = s.rspec.namespace();
+			switch(defaultNamespace.uri) {
+				case XmlUtil.rspec01Namespace:
+					this.detectedInputRspecVersion = 0.1;
+					break;
+				case XmlUtil.rspec02Namespace:
+					this.detectedInputRspecVersion = 0.2;
+					break;
+				case XmlUtil.rspec2Namespace:
+					this.detectedInputRspecVersion = 2;
+					break;
+			}
+			
+			if(s.rspec.@valid_until.length() == 1)
+				s.expires = Util.parseProtogeniDate(s.rspec.@valid_until);
+			if(s.rspec.@expires.length() == 1)
+				s.expires = Util.parseProtogeniDate(s.rspec.@expires);
+			
+			s.nodes = new VirtualNodeCollection();
+			s.links = new VirtualLinkCollection();
+			
+			var nodesById:Dictionary = new Dictionary();
+			var interfacesById:Dictionary = new Dictionary();
+			
+			var localName:String;
+			
+			for each(var nodeXml:XML in s.rspec.defaultNamespace::node)
+			{
+				var cmNode:PhysicalNode;
+				var virtualNode:VirtualNode = new VirtualNode(s);
+				if(this.detectedInputRspecVersion < 1)
+				{
+					var managerIdString:String = "";
+					var componentIdString:String = "";
+					if(nodeXml.@component_manager_uuid.length() == 1)
+						managerIdString = nodeXml.@component_manager_uuid;
+					if(nodeXml.@component_manager_urn.length() == 1)
+						managerIdString = nodeXml.@component_manager_urn;
+					// Don't add outside nodes ... do that if found when parsing links ...
+					virtualNode.manager = Main.geniHandler.GeniManagers.getByUrn(managerIdString);
+					if(virtualNode.manager != s.manager)
+						continue;
+					
+					if(nodeXml.@component_uuid.length() == 1)
+						componentIdString = nodeXml.@component_uuid;
+					if(nodeXml.@component_urn.length() == 1)
+						componentIdString = nodeXml.@component_urn;
+					if(componentIdString.length > 0) {
+						cmNode = s.manager.Nodes.GetByUrn(componentIdString);
+						if(cmNode == null)
+							continue;
+						virtualNode.setToPhysicalNode(cmNode);
+					}
+				}
+				else
+				{
+					// Don't add outside nodes ... do that if found when parsing links ...
+					virtualNode.manager = Main.geniHandler.GeniManagers.getByUrn(nodeXml.@component_manager_id);
+					if(virtualNode.manager != s.manager)
+						continue;
+					
+					if(nodeXml.@component_id.length() == 1) {
+						cmNode = s.manager.Nodes.GetByUrn(nodeXml.@component_id);
+						// Don't add outside nodes ... do that if found when parsing links ...
+						if(cmNode == null)
+							continue;
+						virtualNode.setToPhysicalNode(cmNode);
+					}
 				}
 				
-				if(s.rspec.@valid_until.length() == 1)
-					s.expires = Util.parseProtogeniDate(s.rspec.@valid_until);
-				if(s.rspec.@expires.length() == 1)
-					s.expires = Util.parseProtogeniDate(s.rspec.@expires);
-	
-				s.nodes = new VirtualNodeCollection();
-				s.links = new VirtualLinkCollection();
+				if(this.detectedInputRspecVersion < 1) {
+					virtualNode.clientId = nodeXml.@virtual_id;
+					if(virtualNode.manager == null)
+						continue;
+					virtualNode._exclusive = nodeXml.@exclusive == "1";
+					if(nodeXml.@sliver_urn.length() == 1)
+						virtualNode.sliverId = nodeXml.@sliver_urn;
+					if(nodeXml.@sliver_uuid.length() == 1)
+						virtualNode.sliverId = nodeXml.@sliver_uuid;
+					if(nodeXml.@sshdport.length() == 1) {
+						if(virtualNode.loginServices.length == 0)
+							virtualNode.loginServices.push(new LoginService());
+						virtualNode.loginServices[0].port = nodeXml.@sshdport;
+					}
+					if(nodeXml.@hostname.length() == 1) {
+						if(virtualNode.loginServices.length == 0)
+							virtualNode.loginServices.push(new LoginService());
+						virtualNode.loginServices[0].hostname = nodeXml.@hostname;
+					}
+					if(nodeXml.@virtualization_type.length() == 1)
+						virtualNode.virtualizationType = nodeXml.@virtualization_type;
+					if(nodeXml.@virtualization_subtype.length() == 1)
+						virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;
+				} else {
+					virtualNode.clientId = nodeXml.@client_id;
+					if(virtualNode.manager == null)
+						continue;
+					virtualNode._exclusive = nodeXml.@exclusive == "true";
+					virtualNode.sliverId = nodeXml.@sliver_id;
+				}
 				
-				var nodesById:Dictionary = new Dictionary();
-				var interfacesById:Dictionary = new Dictionary();
-				
-				var localName:String;
-				
-				for each(var nodeXml:XML in s.rspec.defaultNamespace::node)
-				{
-					var cmNode:PhysicalNode;
-					var virtualNode:VirtualNode = new VirtualNode(s);
-					if(detectedInputRspecVersion < 1)
-					{
-						var managerIdString:String = "";
-						var componentIdString:String = "";
-						if(nodeXml.@component_manager_uuid.length() == 1)
-							managerIdString = nodeXml.@component_manager_uuid;
-						if(nodeXml.@component_manager_urn.length() == 1)
-							managerIdString = nodeXml.@component_manager_urn;
-						// Don't add outside nodes ... do that if found when parsing links ...
-						virtualNode.manager = Main.geniHandler.GeniManagers.getByUrn(managerIdString);
-						if(virtualNode.manager != s.manager)
-							continue;
-						
-						if(nodeXml.@component_uuid.length() == 1)
-							componentIdString = nodeXml.@component_uuid;
-						if(nodeXml.@component_urn.length() == 1)
-							componentIdString = nodeXml.@component_urn;
-						if(componentIdString.length > 0) {
-							cmNode = s.manager.Nodes.GetByUrn(componentIdString);
-							if(cmNode == null)
-								continue;
-							virtualNode.setToPhysicalNode(cmNode);
+				for each(var nodeChildXml:XML in nodeXml.children()) {
+					localName = nodeChildXml.localName();
+					// default namespace stuff
+					if(nodeChildXml.namespace() == defaultNamespace) {
+						switch(localName) {
+							case "interface":
+								var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
+								if(this.detectedInputRspecVersion < 1) {
+									virtualInterface.id = nodeChildXml.@virtual_id;
+								} else {
+									virtualInterface.id = nodeChildXml.@client_id;
+									for each(var ipXml:XML in nodeChildXml.children()) {
+										if(ipXml.localName() == "ip") {
+											virtualInterface.ip = ipXml.@address;
+											virtualInterface.mask = ipXml.@mask;
+											virtualInterface.type = ipXml.@type;
+										}
+									}
+									if(virtualNode.physicalNode != null)
+										virtualInterface.physicalNodeInterface = virtualNode.physicalNode.interfaces.GetByID(nodeChildXml.@component_id, false);
+								}
+								virtualNode.interfaces.add(virtualInterface);
+								interfacesById[virtualInterface.id] = virtualInterface;
+								break;
+							case "disk_image":
+								virtualNode.diskImage = nodeChildXml.@name;
+								break;
+							case "sliver_type":
+								virtualNode.sliverType = nodeChildXml.@name;
+								for each(var sliverTypeChild:XML in nodeChildXml.children()) {
+								if(sliverTypeChild.localName() == "disk_image")
+									virtualNode.diskImage = sliverTypeChild.@name;
+							}
+								break;
+							case "services":
+								for each(var servicesChild:XML in nodeChildXml.children()) {
+								if(servicesChild.localName() == "login")
+									virtualNode.loginServices.push(new LoginService(servicesChild.@authentication,
+																					servicesChild.@hostname,
+																					servicesChild.@port,
+																					servicesChild.@username));
+								else if(servicesChild.localName() == "install")
+									virtualNode.installServices.push(new InstallService(servicesChild.@url,
+																						servicesChild.@install_path,
+																						servicesChild.@file_type));
+								else if(servicesChild.localName() == "execute")
+									virtualNode.executeServices.push(new ExecuteService(servicesChild.@command,
+																						servicesChild.@shell));
+							}
+								break;
 						}
 					}
+						// Extension stuff
 					else
 					{
-						// Don't add outside nodes ... do that if found when parsing links ...
-						virtualNode.manager = Main.geniHandler.GeniManagers.getByUrn(nodeXml.@component_manager_id);
-						if(virtualNode.manager != s.manager)
-							continue;
-						
-						if(nodeXml.@component_id.length() == 1) {
-							cmNode = s.manager.Nodes.GetByUrn(nodeXml.@component_id);
-							// Don't add outside nodes ... do that if found when parsing links ...
-							if(cmNode == null)
-								continue;
-							virtualNode.setToPhysicalNode(cmNode);
-						}
-					}
-					
-					if(detectedInputRspecVersion < 1) {
-						virtualNode.clientId = nodeXml.@virtual_id;
-						if(virtualNode.manager == null)
-							continue;
-						virtualNode._exclusive = nodeXml.@exclusive == "1";
-						if(nodeXml.@sliver_urn.length() == 1)
-							virtualNode.sliverId = nodeXml.@sliver_urn;
-						if(nodeXml.@sliver_uuid.length() == 1)
-							virtualNode.sliverId = nodeXml.@sliver_uuid;
-						if(nodeXml.@sshdport.length() == 1) {
-							if(virtualNode.loginServices.length == 0)
-								virtualNode.loginServices.push(new LoginService());
-							virtualNode.loginServices[0].port = nodeXml.@sshdport;
-						}
-						if(nodeXml.@hostname.length() == 1) {
-							if(virtualNode.loginServices.length == 0)
-								virtualNode.loginServices.push(new LoginService());
-							virtualNode.loginServices[0].hostname = nodeXml.@hostname;
-						}
-						if(nodeXml.@virtualization_type.length() == 1)
-							virtualNode.virtualizationType = nodeXml.@virtualization_type;
-						if(nodeXml.@virtualization_subtype.length() == 1)
-							virtualNode.virtualizationSubtype = nodeXml.@virtualization_subtype;
-					} else {
-						virtualNode.clientId = nodeXml.@client_id;
-						if(virtualNode.manager == null)
-							continue;
-						virtualNode._exclusive = nodeXml.@exclusive == "true";
-						virtualNode.sliverId = nodeXml.@sliver_id;
-					}
-					
-					for each(var nodeChildXml:XML in nodeXml.children()) {
-						localName = nodeChildXml.localName();
-						// default namespace stuff
-						if(nodeChildXml.namespace() == defaultNamespace) {
-							switch(localName) {
-								case "interface":
-									var virtualInterface:VirtualInterface = new VirtualInterface(virtualNode);
-									if(detectedInputRspecVersion < 1) {
-										virtualInterface.id = nodeChildXml.@virtual_id;
-									} else {
-										virtualInterface.id = nodeChildXml.@client_id;
-										for each(var ipXml:XML in nodeChildXml.children()) {
-											if(ipXml.localName() == "ip") {
-												virtualInterface.ip = ipXml.@address;
-												virtualInterface.mask = ipXml.@mask;
-												virtualInterface.type = ipXml.@type;
-											}
-										}
-										if(virtualNode.physicalNode != null)
-											virtualInterface.physicalNodeInterface = virtualNode.physicalNode.interfaces.GetByID(nodeChildXml.@component_id, false);
-									}
-									virtualNode.interfaces.add(virtualInterface);
-									interfacesById[virtualInterface.id] = virtualInterface;
-									break;
-								case "disk_image":
-									virtualNode.diskImage = nodeChildXml.@name;
-									break;
-								case "sliver_type":
-									virtualNode.sliverType = nodeChildXml.@name;
-									for each(var sliverTypeChild:XML in nodeChildXml.children()) {
-									if(sliverTypeChild.localName() == "disk_image")
-										virtualNode.diskImage = sliverTypeChild.@name;
-									}
-									break;
-								case "services":
-									for each(var servicesChild:XML in nodeChildXml.children()) {
-										if(servicesChild.localName() == "login")
-											virtualNode.loginServices.push(new LoginService(servicesChild.@authentication, servicesChild.@hostname, servicesChild.@port, servicesChild.@username));
-										else if(servicesChild.localName() == "install")
-											virtualNode.installServices.push(new InstallService(servicesChild.@url, servicesChild.@install_path, servicesChild.@file_type));
-										else if(servicesChild.localName() == "execute")
-											virtualNode.executeServices.push(new ExecuteService(servicesChild.@command, servicesChild.@shell));
-									}
-									break;
-							}
-						}
-						// Extension stuff
-						else
+						if(nodeChildXml.localName() == "canvas_location"
+							&& (nodeChildXml.namespace() as Namespace).prefix == "flack")
 						{
-							if(nodeChildXml.localName() == "canvas_location" && (nodeChildXml.namespace() as Namespace).prefix == "flack") {
-								virtualNode.flackX = int(nodeChildXml.@x);
-								virtualNode.flackY = int(nodeChildXml.@y);
-							}
+							virtualNode.flackX = int(nodeChildXml.@x);
+							virtualNode.flackY = int(nodeChildXml.@y);
 						}
 					}
-					
-					virtualNode.rspec = nodeXml;
-					s.nodes.add(virtualNode);
-					nodesById[virtualNode.clientId] = virtualNode;
-					if(virtualNode.physicalNode != null)
-						virtualNode.physicalNode.virtualNodes.add(virtualNode);
 				}
 				
-				for each(var vn:VirtualNode in s.nodes.collection)
+				virtualNode.rspec = nodeXml;
+				s.nodes.add(virtualNode);
+				nodesById[virtualNode.clientId] = virtualNode;
+				if(virtualNode.physicalNode != null)
+					virtualNode.physicalNode.virtualNodes.add(virtualNode);
+			}
+			
+			for each(var vn:VirtualNode in s.nodes.collection)
+			{
+				if(vn.physicalNode != null && vn.physicalNode.subNodeOf != null)
 				{
-					if(vn.physicalNode != null && vn.physicalNode.subNodeOf != null)
-					{
-						vn.superNode = s.nodes.getById(vn.physicalNode.subNodeOf.name);
-						s.nodes.getById(vn.physicalNode.subNodeOf.name).subNodes.add(vn);
-					}
+					vn.superNode = s.nodes.getById(vn.physicalNode.subNodeOf.name);
+					s.nodes.getById(vn.physicalNode.subNodeOf.name).subNodes.add(vn);
+				}
+			}
+			
+			for each(var linkXml:XML in s.rspec.defaultNamespace::link)
+			{
+				var virtualLink:VirtualLink = new VirtualLink();
+				if(this.detectedInputRspecVersion < 1) {
+					virtualLink.clientId = linkXml.@virtual_id;
+					virtualLink.sliverId = linkXml.@sliver_urn;
+					virtualLink.type = linkXml.@link_type;
+				} else {
+					virtualLink.clientId = linkXml.@client_id;
+					virtualLink.sliverId = linkXml.@sliver_id;
+					// vlantag?
 				}
 				
-				for each(var linkXml:XML in s.rspec.defaultNamespace::link)
-				{
-					var virtualLink:VirtualLink = new VirtualLink();
-					if(detectedInputRspecVersion < 1) {
-						virtualLink.clientId = linkXml.@virtual_id;
-						virtualLink.sliverId = linkXml.@sliver_urn;
-						virtualLink.type = linkXml.@link_type;
-					} else {
-						virtualLink.clientId = linkXml.@client_id;
-						virtualLink.sliverId = linkXml.@sliver_id;
-						// vlantag?
-					}
-					
-					for each(var linkChildXml:XML in linkXml.children()) {
-						if(virtualLink == null)
-							break;
-						localName = linkChildXml.localName();
-						// default namespace stuff
-						if(linkChildXml.namespace() == defaultNamespace) {
-							switch(localName) {
-								case "bandwidth":
-									virtualLink.capacity = Number(linkChildXml.toString());
-									break;
-								case "property":
-									/*if(linkChildXml.@latency.length() == 1)
-										virtualLink.latency = Number(linkChildXml.@latency);
-									if(linkChildXml.@packet_loss.length() == 1)
-										virtualLink.packetLoss = Number(linkChildXml.@packet_loss);*/
-									if(linkChildXml.@capacity.length() == 1)
-										virtualLink.capacity = Number(linkChildXml.@capacity);
-									//<property source_id="urn:publicid:IDN+emulab.net+interface+cisco8:(null)" dest_id="urn:publicid:IDN+emulab.net+interface+pc219:eth2" capacity="1000000" latency="0" packet_loss="0"/>
-									break;
-								case "interface_ref":
-									if(detectedInputRspecVersion < 1) {
-										var vid:String = linkChildXml.@virtual_interface_id;
-										var nid:String = linkChildXml.@virtual_node_id;
-										var interfacedNode:VirtualNode = nodesById[nid];
-										// Deal with outside node
-										if(interfacedNode == null)
+				for each(var linkChildXml:XML in linkXml.children()) {
+					if(virtualLink == null)
+						break;
+					localName = linkChildXml.localName();
+					// default namespace stuff
+					if(linkChildXml.namespace() == defaultNamespace) {
+						switch(localName) {
+							case "bandwidth":
+								virtualLink.capacity = Number(linkChildXml.toString());
+								break;
+							case "property":
+								/*if(linkChildXml.@latency.length() == 1)
+								virtualLink.latency = Number(linkChildXml.@latency);
+								if(linkChildXml.@packet_loss.length() == 1)
+								virtualLink.packetLoss = Number(linkChildXml.@packet_loss);*/
+								if(linkChildXml.@capacity.length() == 1)
+									virtualLink.capacity = Number(linkChildXml.@capacity);
+								//<property source_id="urn:publicid:IDN+emulab.net+interface+cisco8:(null)" dest_id="urn:publicid:IDN+emulab.net+interface+pc219:eth2" capacity="1000000" latency="0" packet_loss="0"/>
+								break;
+							case "interface_ref":
+								if(this.detectedInputRspecVersion < 1) {
+									var vid:String = linkChildXml.@virtual_interface_id;
+									var nid:String = linkChildXml.@virtual_node_id;
+									var interfacedNode:VirtualNode = nodesById[nid];
+									// Deal with outside node
+									if(interfacedNode == null)
+									{
+										// Get outside node, don't add if not parsed in the other cm yet
+										interfacedNode = s.slice.getVirtualNodeWithId(nid);
+										if(interfacedNode == null
+											|| !(interfacedNode.sliver.created
+												|| interfacedNode.sliver.staged))
 										{
-											// Get outside node, don't add if not parsed in the other cm yet
-											interfacedNode = s.slice.getVirtualNodeWithId(nid);
-											if(interfacedNode == null || !(interfacedNode.sliver.created || interfacedNode.sliver.staged))
-											{
-												virtualLink = null;
-												break;
-											}
-										}
-										for each(var vi:VirtualInterface in interfacedNode.interfaces.collection)
-										{
-											if(vi.id == vid)
-											{
-												if(linkChildXml.@tunnel_ip.length() == 1)
-													vi.ip = linkChildXml.@tunnel_ip;
-												virtualLink.interfaces.add(vi);
-												vi.virtualLinks.add(virtualLink);
-												if(!virtualLink.slivers.contains(interfacedNode.sliver))
-													virtualLink.slivers.add(interfacedNode.sliver);
-												break;
-											}
-										}
-									} else {
-										var niid:String = linkChildXml.@client_id;
-										var interfacedNodeInterface:VirtualInterface = interfacesById[niid];
-										// Deal with outside node
-										if(interfacedNodeInterface == null)
-										{
-											// Get outside node, don't add if not parsed in the other cm yet
-											interfacedNodeInterface = s.slice.getVirtualInterfaceWithId(niid);
-											if(interfacedNodeInterface == null || !(interfacedNodeInterface.owner.sliver.created || interfacedNodeInterface.owner.sliver.staged))
-											{
-												virtualLink = null;
-												break;
-											}
-										}
-										if(virtualLink != null) {
-											virtualLink.interfaces.add(interfacedNodeInterface);
-											interfacedNodeInterface.virtualLinks.add(virtualLink);
-											if(!virtualLink.slivers.contains(interfacedNodeInterface.owner.sliver))
-												virtualLink.slivers.add(interfacedNodeInterface.owner.sliver);
+											virtualLink = null;
+											break;
 										}
 									}
-									break;
-								case "component_hop":
-									// not a tunnel
-									var testString:String = linkChildXml.toXMLString();
-									if(testString.indexOf("gpeni") != -1)
-										virtualLink.linkType = VirtualLink.TYPE_GPENI;
-									else if(testString.indexOf("ion") != -1)
-										virtualLink.linkType = VirtualLink.TYPE_ION;
-									break;
-							}
-						}
-					}
-					
-					if(virtualLink == null)
-						continue;
-
-					// Make sure this sliver actually uses this link
-					if(!virtualLink.slivers.contains(s))
-						continue;
-					
-					virtualLink.rspec = linkXml;
-					
-					// Make sure nodes and link are in all the slivers
-					for each(var checkSliver:Sliver in virtualLink.slivers.collection) {
-						if(!checkSliver.links.contains(virtualLink))
-							checkSliver.links.add(virtualLink);
-						for each(var checkInterfaceExisting:VirtualInterface in virtualLink.interfaces.collection) {
-							if(!checkSliver.nodes.contains(checkInterfaceExisting.owner))
-								checkSliver.nodes.add(checkInterfaceExisting.owner);
-						}
-					}
-					
-					for each(var checkInterface:VirtualInterface in virtualLink.interfaces.collection) {
-						// Deal with links between managers
-						if(checkInterface.owner.manager != s.manager) {
-							
-							if(virtualLink.linkType == VirtualLink.TYPE_NORMAL)
-								virtualLink.linkType = VirtualLink.TYPE_TUNNEL;
-							
-							if(!checkInterface.owner.slivers.contains(s))
-								checkInterface.owner.slivers.add(s);
-							
-							for each(var checkOtherInterface:VirtualInterface in virtualLink.interfaces.collection) {
-								if(checkOtherInterface != checkInterface
-										&& !checkOtherInterface.owner.slivers.contains(checkInterface.owner.sliver)) {
-									checkOtherInterface.owner.slivers.add(checkInterface.owner.sliver);
+									for each(var vi:VirtualInterface in interfacedNode.interfaces.collection)
+									{
+										if(vi.id == vid)
+										{
+											if(linkChildXml.@tunnel_ip.length() == 1)
+												vi.ip = linkChildXml.@tunnel_ip;
+											virtualLink.interfaces.add(vi);
+											vi.virtualLinks.add(virtualLink);
+											if(!virtualLink.slivers.contains(interfacedNode.sliver))
+												virtualLink.slivers.add(interfacedNode.sliver);
+											break;
+										}
+									}
+								} else {
+									var niid:String = linkChildXml.@client_id;
+									var interfacedNodeInterface:VirtualInterface = interfacesById[niid];
+									// Deal with outside node
+									if(interfacedNodeInterface == null)
+									{
+										// Get outside node, don't add if not parsed in the other cm yet
+										interfacedNodeInterface = s.slice.getVirtualInterfaceWithId(niid);
+										if(interfacedNodeInterface == null
+											|| !(interfacedNodeInterface.owner.sliver.created
+												|| interfacedNodeInterface.owner.sliver.staged))
+										{
+											virtualLink = null;
+											break;
+										}
+									}
+									if(virtualLink != null) {
+										virtualLink.interfaces.add(interfacedNodeInterface);
+										interfacedNodeInterface.virtualLinks.add(virtualLink);
+										if(!virtualLink.slivers.contains(interfacedNodeInterface.owner.sliver))
+											virtualLink.slivers.add(interfacedNodeInterface.owner.sliver);
+									}
 								}
-									
-							}
+								break;
+							case "component_hop":
+								// not a tunnel
+								var testString:String = linkChildXml.toXMLString();
+								if(testString.indexOf("gpeni") != -1)
+									virtualLink.linkType = VirtualLink.TYPE_GPENI;
+								else if(testString.indexOf("ion") != -1)
+									virtualLink.linkType = VirtualLink.TYPE_ION;
+								break;
 						}
 					}
 				}
 				
-				return;
+				if(virtualLink == null)
+					continue;
+				
+				// Make sure this sliver actually uses this link
+				if(!virtualLink.slivers.contains(s))
+					continue;
+				
+				virtualLink.rspec = linkXml;
+				
+				// Make sure nodes and link are in all the slivers
+				for each(var checkSliver:Sliver in virtualLink.slivers.collection) {
+					if(!checkSliver.links.contains(virtualLink))
+						checkSliver.links.add(virtualLink);
+					for each(var checkInterfaceExisting:VirtualInterface in virtualLink.interfaces.collection) {
+						if(!checkSliver.nodes.contains(checkInterfaceExisting.owner))
+							checkSliver.nodes.add(checkInterfaceExisting.owner);
+					}
+				}
+				
+				for each(var checkInterface:VirtualInterface in virtualLink.interfaces.collection) {
+					// Deal with links between managers
+					if(checkInterface.owner.manager != s.manager) {
+						
+						if(virtualLink.linkType == VirtualLink.TYPE_NORMAL)
+							virtualLink.linkType = VirtualLink.TYPE_TUNNEL;
+						
+						if(!checkInterface.owner.slivers.contains(s))
+							checkInterface.owner.slivers.add(s);
+						
+						for each(var checkOtherInterface:VirtualInterface in virtualLink.interfaces.collection) {
+							if(checkOtherInterface != checkInterface
+								&& !checkOtherInterface.owner.slivers.contains(checkInterface.owner.sliver)) {
+								checkOtherInterface.owner.slivers.add(checkInterface.owner.sliver);
+							}
+							
+						}
+					}
+				}
+			}
+			
+			return;
 		}
 		
 		public function generateSliverRspec(s:Sliver):XML
 		{
 			var requestRspec:XML = new XML("<?xml version=\"1.0\" encoding=\"UTF-8\"?><rspec type=\"request\" />");
 			var defaultNamespace:Namespace;
-			switch(gm.inputRspecVersion) {
+			switch(manager.inputRspecVersion) {
 				case 0.1:
 					defaultNamespace = new Namespace(null, XmlUtil.rspec01Namespace);
 					break;
@@ -716,7 +753,7 @@ package protogeni.resources
 			requestRspec.addNamespace(xsiNamespace);
 			var schemaLocations:String;
 			//var tunnelNamespace:Namespace;
-			switch(gm.inputRspecVersion) {
+			switch(manager.inputRspecVersion) {
 				case 0.1:
 					schemaLocations = XmlUtil.rspec01SchemaLocation;
 					break;
@@ -728,12 +765,12 @@ package protogeni.resources
 					break;
 			}
 			requestRspec.@xsiNamespace::schemaLocation = schemaLocations;
-			if(gm.inputRspecVersion >= 2) {
+			if(manager.inputRspecVersion >= 2) {
 				requestRspec.addNamespace(XmlUtil.flackNamespace);
 			}
 			// FIXME: Need to add schemaLocation and namespaces if they were there before...
 			// TOHERE
-
+			
 			for each(var vn:VirtualNode in s.nodes.collection) {
 				requestRspec.appendChild(generateNodeRspec(vn));
 			}
@@ -748,7 +785,7 @@ package protogeni.resources
 		public function generateNodeRspec(vn:VirtualNode):XML
 		{
 			var nodeXml:XML = <node />;
-			if(gm.inputRspecVersion < 1) {
+			if(manager.inputRspecVersion < 1) {
 				nodeXml.@virtual_id = vn.clientId;
 				nodeXml.@component_manager_uuid = vn.manager.Urn.full;
 				nodeXml.@virtualization_type = vn.virtualizationType;
@@ -758,7 +795,7 @@ package protogeni.resources
 			}
 			
 			if (vn.IsBound()) {
-				if(gm.inputRspecVersion < 1) {
+				if(manager.inputRspecVersion < 1) {
 					nodeXml.@component_uuid = vn.physicalNode.id;
 				} else {
 					nodeXml.@component_id = vn.physicalNode.id;
@@ -767,7 +804,7 @@ package protogeni.resources
 			
 			if (!vn.Exclusive)
 			{
-				if(gm.inputRspecVersion < 1) {
+				if(manager.inputRspecVersion < 1) {
 					nodeXml.@virtualization_subtype = vn.virtualizationSubtype;
 					nodeXml.@exclusive = 0;
 				} else {
@@ -775,14 +812,14 @@ package protogeni.resources
 				}
 			}
 			else {
-				if(gm.inputRspecVersion < 1)
+				if(manager.inputRspecVersion < 1)
 					nodeXml.@exclusive = 1;
 				else
 					nodeXml.@exclusive = "true";
 			}
 			
 			// Currently only pcs
-			if(gm.inputRspecVersion < 1) {
+			if(manager.inputRspecVersion < 1) {
 				var nodeType:String = "pc";
 				if (!vn.Exclusive)
 					nodeType = "pcvm";
@@ -802,7 +839,7 @@ package protogeni.resources
 			}
 			
 			// Services
-			if(gm.inputRspecVersion < 1) {
+			if(manager.inputRspecVersion < 1) {
 				if(vn.executeServices.length > 0) {
 					nodeXml.@startup_command = vn.executeServices[0].command;
 				}
@@ -828,21 +865,21 @@ package protogeni.resources
 					nodeXml.appendChild(serviceXml);
 			}
 			
-			if(gm.inputRspecVersion < 2 && vn.diskImage.length > 0) {
+			if(manager.inputRspecVersion < 2 && vn.diskImage.length > 0) {
 				var diskImageXml:XML = <disk_image />;
 				diskImageXml.@name = vn.diskImage;
 				nodeXml.appendChild(diskImageXml);
 			}
 			
-			if (gm.inputRspecVersion < 1 && vn.superNode != null)
+			if (manager.inputRspecVersion < 1 && vn.superNode != null)
 				nodeXml.appendChild(XML("<subnode_of>" + vn.superNode.sliverId + "</subnode_of>"));
 			
 			for each (var current:VirtualInterface in vn.interfaces.collection)
 			{
-				if(gm.inputRspecVersion >= 2 && current.id == "control")
+				if(manager.inputRspecVersion >= 2 && current.id == "control")
 					continue;
 				var interfaceXml:XML = <interface />;
-				if(gm.inputRspecVersion < 1)
+				if(manager.inputRspecVersion < 1)
 					interfaceXml.@virtual_id = current.id;
 				else {
 					interfaceXml.@client_id = current.id;
@@ -859,7 +896,7 @@ package protogeni.resources
 				nodeXml.appendChild(interfaceXml);
 			}
 			
-			if(gm.inputRspecVersion >= 2) {
+			if(manager.inputRspecVersion >= 2) {
 				var flackXml:XML = <canvas_location />;
 				flackXml.setNamespace(XmlUtil.flackNamespace);
 				flackXml.@x = vn.flackX;
@@ -874,13 +911,13 @@ package protogeni.resources
 		{
 			var linkXml:XML =  <link />;
 			
-			if(gm.inputRspecVersion < 1)
+			if(manager.inputRspecVersion < 1)
 				linkXml.@virtual_id = vl.clientId;
 			else
 				linkXml.@client_id = vl.clientId;
 			
 			var s:Sliver;
-			if(gm.inputRspecVersion >= 2) {
+			if(manager.inputRspecVersion >= 2) {
 				for each(s in vl.slivers.collection) {
 					var cmXml:XML = <component_manager />;
 					cmXml.@name = s.manager.Urn.full;
@@ -889,7 +926,7 @@ package protogeni.resources
 			}
 			
 			if (vl.linkType != VirtualLink.TYPE_TUNNEL && vl.capacity) {
-				if(gm.inputRspecVersion < 1)
+				if(manager.inputRspecVersion < 1)
 					linkXml.appendChild(XML("<bandwidth>" + vl.capacity + "</bandwidth>"));
 				else {
 					for(var i:int = 0; i < vl.interfaces.length; i++) {
@@ -911,7 +948,7 @@ package protogeni.resources
 			
 			if (vl.linkType == VirtualLink.TYPE_TUNNEL)
 			{
-				if(gm.inputRspecVersion < 1)
+				if(manager.inputRspecVersion < 1)
 					linkXml.@link_type = "tunnel";
 				else {
 					var link_type:XML = <link_type />;
@@ -922,10 +959,10 @@ package protogeni.resources
 			
 			for each (var currentVi:VirtualInterface in vl.interfaces.collection)
 			{
-				if(gm.inputRspecVersion >= 2 && currentVi.id == "control")
+				if(manager.inputRspecVersion >= 2 && currentVi.id == "control")
 					continue;
 				var interfaceRefXml:XML = <interface_ref />;
-				if(gm.inputRspecVersion < 1) {
+				if(manager.inputRspecVersion < 1) {
 					interfaceRefXml.@virtual_node_id = currentVi.owner.clientId;
 					if (vl.linkType == VirtualLink.TYPE_TUNNEL)
 					{
@@ -954,9 +991,13 @@ package protogeni.resources
 			} else if(vl.linkType == VirtualLink.TYPE_GPENI) {
 				for each(s in vl.slivers.collection) {
 					var componentHopGpeniXml:XML = <component_hop />;
-					componentHopGpeniXml.@component_urn = IdnUrn.makeFrom(s.manager.Urn.authority, "link", "gpeni").full;
+					componentHopGpeniXml.@component_urn = IdnUrn.makeFrom(s.manager.Urn.authority,
+																			"link",
+																			"gpeni").full;
 					interfaceRefXml = <interface_ref />;
-					interfaceRefXml.@component_node_urn = IdnUrn.makeFrom(s.manager.Urn.authority, "node", "gpeni").full;
+					interfaceRefXml.@component_node_urn = IdnUrn.makeFrom(s.manager.Urn.authority,
+																			"node",
+																			"gpeni").full;
 					interfaceRefXml.@component_interface_id = "eth0";
 					componentHopGpeniXml.appendChild(interfaceRefXml);
 					linkXml.appendChild(componentHopGpeniXml);

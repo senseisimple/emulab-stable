@@ -15,7 +15,6 @@
 package protogeni.display.mapping
 {
 	import com.google.maps.LatLng;
-	import com.google.maps.PaneId;
 	import com.google.maps.overlays.Polyline;
 	import com.google.maps.overlays.PolylineOptions;
 	import com.google.maps.styles.StrokeStyle;
@@ -23,12 +22,10 @@ package protogeni.display.mapping
 	import flash.events.Event;
 	import flash.events.MouseEvent;
 	
-	import mx.core.FlexGlobals;
-	
 	import protogeni.Util;
 	import protogeni.display.DisplayUtil;
 	import protogeni.resources.PhysicalLinkGroup;
-
+	
 	public class GeniMapLink
 	{
 		public static const linkColor:Object = 0xFFCFD1;
@@ -52,7 +49,7 @@ package protogeni.display.mapping
 				thickness: 4,
 				alpha:1})
 			}));
-
+			
 			// Add link marker
 			label = new TooltipOverlay(
 				new LatLng((linkGroup.latitude1 + linkGroup.latitude2)/2,

@@ -19,9 +19,6 @@ package protogeni.display.mapping
 	import com.google.maps.MapMouseEvent;
 	import com.google.maps.overlays.Marker;
 	import com.google.maps.overlays.MarkerOptions;
-	import com.google.maps.services.ClientGeocoder;
-	import com.google.maps.services.GeocodingEvent;
-	import com.google.maps.services.Placemark;
 	
 	import flash.display.DisplayObject;
 	import flash.events.Event;
@@ -32,12 +29,10 @@ package protogeni.display.mapping
 	import mx.events.FlexEvent;
 	
 	import protogeni.display.DisplayUtil;
-	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalNode;
 	import protogeni.resources.PhysicalNodeGroup;
 	import protogeni.resources.PhysicalNodeGroupCollection;
 	import protogeni.resources.Slice;
-	import protogeni.resources.Sliver;
 	import protogeni.resources.VirtualNode;
 	
 	public class GeniMapMarker extends Marker
@@ -99,7 +94,6 @@ package protogeni.display.mapping
 					newCollection.addItem(node);
 				DisplayUtil.viewNodeCollection(newCollection);
 			}
-			
 		}
 
 		public function setDefault():void {

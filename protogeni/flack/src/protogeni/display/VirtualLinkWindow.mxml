@@ -24,16 +24,13 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						title="Link Information" xmlns:components="protogeni.display.components.*">
 	<fx:Script>
 		<![CDATA[
-			import protogeni.display.components.XmlWindow;
 			import mx.collections.ArrayList;
 			import mx.controls.Alert;
 			import mx.events.CloseEvent;
 			
-			import protogeni.GeniDispatcher;
-			import protogeni.Util;
+			import protogeni.display.components.XmlWindow;
 			import protogeni.resources.GeniManager;
 			import protogeni.resources.ProtogeniRspecProcessor;
-			import protogeni.resources.Sliver;
 			import protogeni.resources.VirtualInterface;
 			import protogeni.resources.VirtualLink;
 			

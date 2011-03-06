@@ -33,10 +33,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			
 			import mx.controls.Alert;
 			
-			import protogeni.communication.CommunicationUtil;
-			import protogeni.resources.GeniManager;
 			import protogeni.resources.Slice;
-			import protogeni.resources.Sliver;
 			
 			public var slice:Slice;
 			

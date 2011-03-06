@@ -14,7 +14,6 @@
 
 package
 {
-	import protogeni.GeniEvent;
 	import protogeni.display.ConsoleWindow;
 	
 	public class LogHandler

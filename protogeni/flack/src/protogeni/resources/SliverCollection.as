@@ -1,3 +1,17 @@
+/* GENIPUBLIC-COPYRIGHT
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
 package protogeni.resources
 {
 	import protogeni.Util;
@@ -7,23 +21,23 @@ package protogeni.resources
 		public var collection:Vector.<Sliver>;
 		public function SliverCollection()
 		{
-			collection = new Vector.<Sliver>();
+			this.collection = new Vector.<Sliver>();
 		}
 		
 		public function add(s:Sliver):void {
-			collection.push(s);
+			this.collection.push(s);
 		}
 		
 		public function remove(s:Sliver):void
 		{
-			var idx:int = collection.indexOf(s);
+			var idx:int = this.collection.indexOf(s);
 			if(idx > -1)
-				collection.splice(idx, 1);
+				this.collection.splice(idx, 1);
 		}
 		
 		public function contains(s:Sliver):Boolean
 		{
-			return collection.indexOf(s) > -1;
+			return this.collection.indexOf(s) > -1;
 		}
 		
 		public function get length():int{

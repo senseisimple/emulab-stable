@@ -14,8 +14,6 @@
 
 package protogeni.display.mapping
 {
-	import com.google.maps.overlays.Marker;
-	
 	import flash.geom.Point;
 	import flash.utils.Dictionary;
 
@@ -31,7 +29,6 @@ package protogeni.display.mapping
 	 */
 	public class Clusterer 
 	{
-		
 		public static const DEFAULT_CLUSTER_RADIUS:int = 25;
 
 		private var _clusters:Vector.<Vector.<GeniMapMarker>>;
@@ -133,7 +130,6 @@ package protogeni.display.mapping
 }
 
 import com.google.maps.LatLng;
-import com.google.maps.overlays.Marker;
 
 import flash.geom.Point;
 

@@ -2,7 +2,6 @@
 
 package protogeni.display.components
 {
-	
 	import flash.display.DisplayObject;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
@@ -14,8 +13,9 @@ package protogeni.display.components
 	import mx.events.SandboxMouseEvent;
 	import mx.managers.PopUpManager;
 	
-	import spark.components.TitleWindow;
 	import protogeni.display.skins.ResizableTitleWindowSkin;
+	
+	import spark.components.TitleWindow;
 	
 	/**
 	 *  ResizableTitleWindow is a TitleWindow with

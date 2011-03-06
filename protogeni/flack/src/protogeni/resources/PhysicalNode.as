@@ -1,18 +1,18 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2009 University of Utah and the Flux Group.
- * All rights reserved.
- *
- * Permission to use, copy, modify and distribute this software is hereby
- * granted provided that (1) source code retains these copyright, permission,
- * and disclaimer notices, and (2) redistributions including binaries
- * reproduce the notices in supporting documentation.
- *
- * THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
- * CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
- * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- */
- 
- package protogeni.resources
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
+package protogeni.resources
 {
 	// Physical node
 	public class PhysicalNode
@@ -40,25 +40,26 @@
 		public var sliverTypes:Vector.<SliverType> = new Vector.<SliverType>();
 		[Bindable]
 		public var interfaces:PhysicalNodeInterfaceCollection = new PhysicalNodeInterfaceCollection();
-
+		
 		// Sliced
 		public var virtualNodes:VirtualNodeCollection = new VirtualNodeCollection();
 		
 		// Use for anything, more inmportantly any additions by non-Protogeni managers
 		public var tag:*;
 		
-		public function PhysicalNode(own:PhysicalNodeGroup, ownedBy:GeniManager)
+		public function PhysicalNode(own:PhysicalNodeGroup,
+									 ownedBy:GeniManager)
 		{
-			owner = own;
-			manager = ownedBy;
+			this.owner = own;
+			this.manager = ownedBy;
 		}
 		
 		public function IsSwitch():Boolean {
-			return hardwareTypes.indexOf("switch") > 1;
+			return this.hardwareTypes.indexOf("switch") > 1;
 		}
 		
 		public function ConnectedSwitches():Vector.<PhysicalNode> {
-			var connectedNodes:Vector.<PhysicalNode> = GetNodes();
+			var connectedNodes:Vector.<PhysicalNode> = this.GetNodes();
 			var connectedSwitches:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 			for each(var connectedNode:PhysicalNode in connectedNodes) {
 				if(connectedNode.IsSwitch())
@@ -66,28 +67,29 @@
 			}
 			return connectedSwitches;
 		}
-
+		
 		public function GetLatitude():Number {
-			return owner.latitude;
+			return this.owner.latitude;
 		}
-
+		
 		public function GetLongitude():Number {
-			return owner.longitude;
+			return this.owner.longitude;
 		}
 		
 		// Gets all links
 		public function GetLinks():Vector.<PhysicalLink> {
 			var ac:Vector.<PhysicalLink> = new Vector.<PhysicalLink>();
-			for each(var i:PhysicalNodeInterface in interfaces.collection)
+			for each(var i:PhysicalNodeInterface in this.interfaces.collection) {
 				for each(var l:PhysicalLink in i.physicalLinks)
 					ac.push(l);
+			}
 			return ac;
 		}
 		
 		// Get links to a certain node
 		public function GetNodeLinks(n:PhysicalNode):Vector.<PhysicalLink> {
 			var ac:Vector.<PhysicalLink> = new Vector.<PhysicalLink>();
-			for each(var i:PhysicalNodeInterface in interfaces.collection) {
+			for each(var i:PhysicalNodeInterface in this.interfaces.collection) {
 				for each(var l:PhysicalLink in i.physicalLinks) {
 					if(ac.indexOf(l) == -1 && l.GetNodes().indexOf(n) > -1) {
 						ac.push(l);
@@ -101,7 +103,7 @@
 		// Gets connected nodes
 		public function GetNodes():Vector.<PhysicalNode> {
 			var ac:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
-			for each(var i:PhysicalNodeInterface in interfaces.collection) {
+			for each(var i:PhysicalNodeInterface in this.interfaces.collection) {
 				for each(var l:PhysicalLink in i.physicalLinks) {
 					for each(var ln:PhysicalNode in l.GetNodes()) {
 						if(ln != this && ac.indexOf(ln) == -1)

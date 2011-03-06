@@ -1,18 +1,18 @@
 /* GENIPUBLIC-COPYRIGHT
- * Copyright (c) 2009 University of Utah and the Flux Group.
- * All rights reserved.
- *
- * Permission to use, copy, modify and distribute this software is hereby
- * granted provided that (1) source code retains these copyright, permission,
- * and disclaimer notices, and (2) redistributions including binaries
- * reproduce the notices in supporting documentation.
- *
- * THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
- * CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
- * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- */
- 
- package protogeni.resources
+* Copyright (c) 2008-2011 University of Utah and the Flux Group.
+* All rights reserved.
+*
+* Permission to use, copy, modify and distribute this software is hereby
+* granted provided that (1) source code retains these copyright, permission,
+* and disclaimer notices, and (2) redistributions including binaries
+* reproduce the notices in supporting documentation.
+*
+* THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+* CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+* FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+*/
+
+package protogeni.resources
 {
 	// Node allocated into a sliver/slice which has a physical node underneath
 	public class VirtualNode
@@ -73,28 +73,28 @@
 		
 		public function VirtualNode(owner:Sliver)
 		{
-			slivers = new SliverCollection();
+			this.slivers = new SliverCollection();
 			if(owner != null)
 			{
-				slivers.add(owner);
-				manager = owner.manager;
+				this.slivers.add(owner);
+				this.manager = owner.manager;
 			}
-				
-			interfaces = new VirtualInterfaceCollection();
+			
+			this.interfaces = new VirtualInterfaceCollection();
 			// depreciated for v2
 			var controlInterface:VirtualInterface = new VirtualInterface(this);
 			controlInterface.id = "control";
-			interfaces.add(controlInterface);
+			this.interfaces.add(controlInterface);
 		}
 		
 		public function get Exclusive():Boolean {
-			return _exclusive;
+			return this._exclusive;
 		}
 		
 		public function set Exclusive(value:Boolean):void {
-			_exclusive = value;
+			this._exclusive = value;
 			// TODO: support more
-			if(_exclusive)
+			if(this._exclusive)
 				sliverType = "raw-pc";
 			else
 				sliverType = "emulab-openvz";
@@ -102,11 +102,11 @@
 		
 		public function setToPhysicalNode(node:PhysicalNode):void
 		{
-			physicalNode = node;
-			clientId = node.name;
-			manager = node.manager;
-			sliverId = node.id;
-			Exclusive = node.exclusive;
+			this.physicalNode = node;
+			this.clientId = node.name;
+			this.manager = node.manager;
+			this.sliverId = node.id;
+			this.Exclusive = node.exclusive;
 		}
 		
 		public function setDiskImage(img:String):void
@@ -140,9 +140,10 @@
 						var success:Boolean = true;
 						for each (var check:VirtualInterface in interfaces.collection)
 						{
-							if(check.IsBound() && check.physicalNodeInterface == candidate)
+							if(check.IsBound()
+									&& check.physicalNodeInterface == candidate)
 								success = false;
-								break;
+							break;
 						}
 						if(success)
 						{
@@ -164,12 +165,13 @@
 		// Gets all connected physical nodes
 		public function GetPhysicalNodes():Vector.<PhysicalNode> {
 			var ac:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
-			for each(var nodeInterface:VirtualInterface in interfaces.collection) {
+			for each(var nodeInterface:VirtualInterface in this.interfaces.collection) {
 				for each(var nodeLink:VirtualLink in nodeInterface.virtualLinks.collection) {
 					for each(var nodeLinkInterface:VirtualInterface in nodeLink.interfaces.collection)
 					{
-						if(nodeLinkInterface != nodeInterface && ac.indexOf(nodeLinkInterface.owner.physicalNode) == -1)
-							 ac.push(nodeLinkInterface.owner.physicalNode);
+						if(nodeLinkInterface != nodeInterface
+								&& ac.indexOf(nodeLinkInterface.owner.physicalNode) == -1)
+							ac.push(nodeLinkInterface.owner.physicalNode);
 					}
 				}
 			}
@@ -181,7 +183,8 @@
 			for each(var sourceInterface:VirtualInterface in this.interfaces.collection) {
 				for each(var virtualLink:VirtualLink in sourceInterface.virtualLinks.collection) {
 					for each(var destInterface:VirtualInterface in virtualLink.interfaces.collection) {
-						if(destInterface.owner != this && !ac.contains(destInterface.owner))
+						if(destInterface.owner != this
+								&& !ac.contains(destInterface.owner))
 							ac.add(destInterface.owner);
 					}
 				}
@@ -193,10 +196,12 @@
 		public function GetLinksForPhysical(n:PhysicalNode):VirtualLinkCollection {
 			var ac:VirtualLinkCollection = new VirtualLinkCollection();
 			
-			for each(var i:VirtualInterface in interfaces.collection) {
+			for each(var i:VirtualInterface in this.interfaces.collection) {
 				for each(var l:VirtualLink in i.virtualLinks.collection) {
 					for each(var nl:VirtualInterface in l.interfaces.collection) {
-						if(nl != i && nl.owner.physicalNode == n && !ac.contains(l)) {
+						if(nl != i
+								&& nl.owner.physicalNode == n
+								&& !ac.contains(l)) {
 							ac.add(l);
 						}
 					}
@@ -207,11 +212,13 @@
 		
 		public function GetLinks(n:VirtualNode):VirtualLinkCollection {
 			var ac:VirtualLinkCollection = new VirtualLinkCollection();
-
-			for each(var i:VirtualInterface in interfaces.collection) {
+			
+			for each(var i:VirtualInterface in this.interfaces.collection) {
 				for each(var l:VirtualLink in i.virtualLinks.collection) {
 					for each(var nl:VirtualInterface in l.interfaces.collection) {
-						if(nl != i && nl.owner == n && !ac.contains(l)) {
+						if(nl != i
+								&& nl.owner == n
+								&& !ac.contains(l)) {
 							ac.add(l);
 						}
 					}

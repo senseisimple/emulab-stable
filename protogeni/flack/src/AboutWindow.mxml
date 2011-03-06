@@ -45,29 +45,23 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 			}
 		]]>
 	</fx:Script>
-
+	
 	<s:Image useHandCursor="true" buttonMode="true"
 			 source="{ImageUtil.logoIcon}"
 			 toolTip="Visit our website"
 			 click="NetUtil.openWebsite('http://www.protogeni.net');" />
 	<s:Label text="Displays resources from ProtoGENI and associated federations." />
-	<s:Button label="Open the manual" click="NetUtil.showManual();" height="24" />
+	<s:HGroup horizontalAlign="center">
+		<s:Button label="Purge cache"
+				  click="FlackCache.instance.clear();"
+				  height="24" />
+		<s:Button label="Open the manual"
+				  icon="{ImageUtil.helpIcon}"
+				  click="NetUtil.showManual();"
+				  height="24" />
+	</s:HGroup>
+	
 	<mx:TabNavigator width="100%" height="120" paddingTop="2">
-		<s:NavigatorContent label="Special Thanks" width="100%" height="100%">
-			<s:Scroller width="100%" height="100%">
-				<s:VGroup width="100%" height="100%" horizontalAlign="center" gap="2">
-					<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">
-						<mx:click>navigateToURL(new URLRequest("http://www.fatcow.com/free-icons/index.bml"), "_blank");</mx:click>
-					</mx:LinkButton>
-					<mx:LinkButton label="Mattism (LGPL XML-RPC)" height="24">
-						<mx:click>navigateToURL(new URLRequest("http://sf.net/projects/xmlrpcflash"), "_blank");</mx:click>
-					</mx:LinkButton>
-					<mx:LinkButton label="Icons Land" height="24">
-						<mx:click>navigateToURL(new URLRequest("http://www.icons-land.com/"), "_blank");</mx:click>
-					</mx:LinkButton>
-				</s:VGroup>
-			</s:Scroller>
-		</s:NavigatorContent>
 		<s:NavigatorContent label="System" width="100%" height="100%">
 			<s:Scroller width="100%" height="100%">
 				<s:VGroup width="100%" height="100%">
@@ -91,6 +85,21 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 						<s:Label text="Screen" fontWeight="bold" />
 						<s:Label text="{Capabilities.screenResolutionX}x{Capabilities.screenResolutionY} @ {Capabilities.screenDPI} DPI with touchscreen type {Capabilities.touchscreenType}" />
 					</s:HGroup>
+				</s:VGroup>
+			</s:Scroller>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="Special Thanks" width="100%" height="100%">
+			<s:Scroller width="100%" height="100%">
+				<s:VGroup width="100%" height="100%" horizontalAlign="center" gap="2">
+					<mx:LinkButton label="Fatcow (CCA3 Icons)" height="24">
+						<mx:click>navigateToURL(new URLRequest("http://www.fatcow.com/free-icons/index.bml"), "_blank");</mx:click>
+					</mx:LinkButton>
+					<mx:LinkButton label="Mattism (LGPL XML-RPC)" height="24">
+						<mx:click>navigateToURL(new URLRequest("http://sf.net/projects/xmlrpcflash"), "_blank");</mx:click>
+					</mx:LinkButton>
+					<mx:LinkButton label="Icons Land" height="24">
+						<mx:click>navigateToURL(new URLRequest("http://www.icons-land.com/"), "_blank");</mx:click>
+					</mx:LinkButton>
 				</s:VGroup>
 			</s:Scroller>
 		</s:NavigatorContent>

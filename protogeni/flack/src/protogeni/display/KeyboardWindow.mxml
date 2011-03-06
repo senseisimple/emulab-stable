@@ -28,11 +28,7 @@ FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
 	</components:layout>
 	<fx:Script>
 		<![CDATA[
-			import mx.core.FlexGlobals;
 			import mx.events.CloseEvent;
-			import mx.events.FlexEvent;
-			import mx.events.ResizeEvent;
-			import mx.managers.PopUpManager;
 			
 			import spark.components.TextInput;
 			
