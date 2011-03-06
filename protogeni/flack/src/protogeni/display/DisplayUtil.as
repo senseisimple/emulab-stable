@@ -29,6 +29,8 @@
 	
 	import protogeni.StringUtil;
 	import protogeni.communication.Request;
+	import protogeni.display.components.DataButton;
+	import protogeni.display.components.XmlWindow;
 	import protogeni.resources.GeniManager;
 	import protogeni.resources.PhysicalLink;
 	import protogeni.resources.PhysicalLinkGroup;
@@ -44,8 +46,6 @@
 	
 	import spark.components.Button;
 	import spark.components.Label;
-	
-	import protogeni.display.components.XmlWindow;
 	
 	public final class DisplayUtil
 	{
@@ -89,185 +89,134 @@
         }
 		
 		public static function getLogMessageButton(msg:LogMessage):Button {
-			var logButton:Button = getButton();
-			logButton.label = msg.name;
-			logButton.toolTip = msg.groupId;
+			var img:Class;
 			if(msg.isError)
-			{
-				logButton.setStyle("icon",ImageUtil.errorIcon);
-				logButton.styleName = "failedStyle";
-			}
+				img = ImageUtil.errorIcon;
+			else if(msg.type == LogMessage.TYPE_START)
+				img = ImageUtil.rightIcon;
+			else if(msg.type == LogMessage.TYPE_END)
+				img = ImageUtil.rightIcon;
 			else
-			{
-				if(msg.type == LogMessage.TYPE_START) {
-					logButton.setStyle("icon",ImageUtil.rightIcon);
-					//logButton.labelPlacement = ButtonLabelPlacement.LEFT;
-				}
-				else if(msg.type == LogMessage.TYPE_END) {
-					logButton.setStyle("icon",ImageUtil.rightIcon);
-					//logButton.labelPlacement = ButtonLabelPlacement.RIGHT;
-				}
-				else {
-					logButton.setStyle("icon",ImageUtil.availableIcon);
-				}
-			}
-			logButton.addEventListener(MouseEvent.CLICK,
-				function openLog():void {
-					DisplayUtil.viewLogMessage(msg);
-				});
+				img = ImageUtil.availableIcon;
+
+			var logButton:DataButton = new DataButton(msg.name,
+				msg.groupId,
+				img,
+				msg);
+			
+			if(msg.isError)
+				logButton.styleName = "failedStyle";
+			
 			return logButton;
 		}
 		
 		public static function getRequestButton(r:Request):Button {
-			var requestButton:Button = getButton();
-			requestButton.label = r.name;
-			requestButton.toolTip = r.details;
-			requestButton.addEventListener(MouseEvent.CLICK,
-				function openRequest(event:MouseEvent):void {
-					viewRequest(r);
-				}
-			);
-			return requestButton;
+			return new DataButton(r.name, r.details, null, r);
 		}
 		
 		// Gets a button for the slice
 		public static function getSliceButton(s:Slice):Button {
-			var sButton:Button = getButton();
-			sButton.label = s.urn.name;
-			sButton.addEventListener(MouseEvent.CLICK,
-				function openSlice(event:MouseEvent):void {
-					viewSlice(s);
-				}
-			);
-			return sButton;
+			return new DataButton(s.urn.name, s.urn.full, null, s);
 		}
 		
 		// Gets a button for the component manager
 		public static function getGeniManagerButton(gm:GeniManager):Button {
-			var cmButton:Button = getButton();
-			cmButton.label = gm.Hrn;
-			cmButton.toolTip = gm.Hrn + " at " + gm.Url;
+			var cmButton:DataButton = new DataButton(gm.Hrn,
+				"@ " + gm.Url, null, gm);
 			cmButton.setStyle("chromeColor", ColorUtil.colorsDark[gm.colorIdx]);
 			cmButton.setStyle("color", ColorUtil.colorsLight[gm.colorIdx]);
-			cmButton.addEventListener(MouseEvent.CLICK,
-				function openGeniManager(event:MouseEvent):void {
-					DisplayUtil.viewGeniManager(gm);
-				}
-			);
 			return cmButton;
 		}
 		
 		// Gets a button for the component manager
 		public static function getSiteButton(s:Site):Button {
-			var cmButton:Button = getButton();
-			cmButton.label = s.id + " (" + s.name + ")";
-			cmButton.addEventListener(MouseEvent.CLICK,
-				function openGeniManager(event:MouseEvent):void {
-					var newCollection:ArrayCollection = new ArrayCollection();
-					for each(var node:PhysicalNode in s.nodes)
-						newCollection.addItem(node);
-					DisplayUtil.viewNodeCollection(newCollection);
-				}
-			);
-			return cmButton;
+			return new DataButton(s.id + " (" + s.name + ")",
+									s.name,
+									null,
+									s);
 		}
 		
 		// Gets a button for the physical node
 		public static function getPhysicalNodeButton(n:PhysicalNode):Button {
-			var nodeButton:Button = getButton(DisplayUtil.assignAvailabilityIcon(n));
-			nodeButton.label = n.name;
-			nodeButton.toolTip = n.name + " on " + n.manager.Hrn;
+			var nodeButton:DataButton = new DataButton(n.name,
+																"@" + n.manager.Hrn,
+																DisplayUtil.assignAvailabilityIcon(n),
+																n,
+																"physicalnode");
 			nodeButton.setStyle("chromeColor", ColorUtil.colorsDark[n.manager.colorIdx]);
 			nodeButton.setStyle("color", ColorUtil.colorsLight[n.manager.colorIdx]);
-			nodeButton.setStyle("icon", assignAvailabilityIcon(n));
-			nodeButton.addEventListener(MouseEvent.CLICK,
-				function openNode(event:MouseEvent):void {
-					DisplayUtil.viewPhysicalNode(n);
-				}
-			);
-			nodeButton.addEventListener(MouseEvent.MOUSE_MOVE,
-				function startDrag(e:MouseEvent):void {
-					var dragInitiator:Button=Button(e.currentTarget);
-					var ds:DragSource = new DragSource();
-					ds.addData(n, 'physicalnode');
-					DragManager.doDrag(dragInitiator, ds, e);
-				}
-			);
 			return nodeButton;
 		}
 		
 		public static function getPhysicalNodeGroupButton(ng:PhysicalNodeGroup):Button {
-			var nodeButton:Button = getButton();
+			var newLabel:String;
 			if(ng.city.length == 0)
-				nodeButton.label = ng.collection.length.toString() + " Nodes";
+				newLabel = ng.collection.length.toString() + " Nodes";
 			else
-				nodeButton.label = ng.city + " (" + ng.collection.length + ")";
-			nodeButton.toolTip = ng.GetManager().Hrn;
+				newLabel = ng.city + " (" + ng.collection.length + ")";
+			var nodeButton:DataButton = new DataButton(newLabel,
+														ng.GetManager().Hrn,
+														null,
+														ng,
+														"physicalnodegroup");
 			nodeButton.setStyle("chromeColor", ColorUtil.colorsDark[ng.GetManager().colorIdx]);
 			nodeButton.setStyle("color", ColorUtil.colorsLight[ng.GetManager().colorIdx]);
-			nodeButton.addEventListener(MouseEvent.CLICK,
-				function openNode(event:MouseEvent):void {
-					DisplayUtil.viewNodeGroup(ng);
-				}
-			);
-			nodeButton.addEventListener(MouseEvent.MOUSE_MOVE,
-				function startDrag(e:MouseEvent):void {
-					var dragInitiator:Button=Button(e.currentTarget);
-					var ds:DragSource = new DragSource();
-					ds.addData(ng, 'physicalnodegroup');
-					DragManager.doDrag(dragInitiator, ds, e);
-				}
-			);
 			return nodeButton;
 		}
 		
 		// Gets a button for the physical node
 		public static function getVirtualNodeButton(n:VirtualNode):Button {
-			var nodeButton:Button = getButton();
-			nodeButton.label = n.clientId;
-			nodeButton.toolTip = n.clientId + " on " + n.manager.Hrn;
+			var nodeButton:DataButton = new DataButton(n.clientId,
+														"@"+n.manager.Hrn,
+														null,
+														n,
+														"virtualnode");
 			nodeButton.setStyle("chromeColor", ColorUtil.colorsDark[n.manager.colorIdx]);
 			nodeButton.setStyle("color", ColorUtil.colorsLight[n.manager.colorIdx]);
-			nodeButton.addEventListener(MouseEvent.CLICK,
-				function openNode(event:MouseEvent):void {
-					DisplayUtil.viewVirtualNode(n);
-				}
-			);
-			nodeButton.addEventListener(MouseEvent.MOUSE_MOVE,
-				function startDrag(e:MouseEvent):void {
-					var dragInitiator:Button=Button(e.currentTarget);
-					var ds:DragSource = new DragSource();
-					ds.addData(n, 'virtualnode');
-					DragManager.doDrag(dragInitiator, ds, e);
-				}
-			);
 			return nodeButton;
 		}
 		
 		// Gets a button for a physical link
 		public static function getPhysicalLinkWithInterfaceButton(ni:PhysicalNodeInterface, nl:PhysicalLink):Button {
-			var linkButton:Button = getButton(ImageUtil.linkIcon);
-			linkButton.label = StringUtil.shortenString(ni.id, 50);
-			linkButton.toolTip = ni.id + " on " + nl.name;
-			linkButton.addEventListener(MouseEvent.CLICK,
-				function openLink(event:MouseEvent):void {
-					DisplayUtil.viewPhysicalLink(nl);
-				}
-			);
-			return linkButton;
+			return new DataButton(StringUtil.shortenString(ni.id, 50),
+				ni.id + " on " + nl.name,
+				ImageUtil.linkIcon,
+				nl);
 		}
 		
 		// Gets a button for the virtual link
-		public static function getVirtualLinkButton(pl:VirtualLink):Button {
-			var linkButton:Button = new Button();
-			linkButton.label = pl.clientId;
-			linkButton.setStyle("icon", ImageUtil.linkIcon);
-			linkButton.addEventListener(MouseEvent.CLICK,
-				function openLink(event:MouseEvent):void {
-					DisplayUtil.viewVirtualLink(pl);
-				}
-			);
-			return linkButton;
+		public static function getVirtualLinkButton(vl:VirtualLink):Button {
+			return new DataButton(vl.clientId,
+				vl.clientId,
+				ImageUtil.linkIcon,
+				vl);
+		}
+		
+		public static function view(data:*):void {
+			if(data is PhysicalNode)
+				DisplayUtil.viewPhysicalNode(data);
+			else if(data is PhysicalNodeGroup)
+				DisplayUtil.viewNodeGroup(data);
+			else if(data is GeniManager)
+				DisplayUtil.viewGeniManager(data);
+			else if(data is VirtualNode)
+				DisplayUtil.viewVirtualNode(data);
+			else if(data is PhysicalLink)
+				DisplayUtil.viewPhysicalLink(data);
+			else if(data is PhysicalLinkGroup)
+				DisplayUtil.viewPhysicalLinkGroup(data);
+			else if(data is Slice)
+				DisplayUtil.viewSlice(data);
+			else if(data is SliceNode)
+				DisplayUtil.viewSliceNode(data);
+			else if(data is SliceLink)
+				DisplayUtil.viewSliceLink(data);
+			else if(data is Site)
+				DisplayUtil.viewSite(data);
+			else if(data is Request)
+				DisplayUtil.viewRequest(data);
+			else if(data is LogMessage)
+				DisplayUtil.viewLogMessage(data);
 		}
 		
 		public static function viewLogMessage(msg:LogMessage):void {
@@ -335,9 +284,11 @@
 		}
 		
 		public static function viewSliceNode(sn:SliceNode):void {
-			var ngWindow:VirtualNodeWindow = new VirtualNodeWindow();
-			ngWindow.showWindow();
-			ngWindow.loadNode(sn.node);
+			viewVirtualNode(sn.node);
+		}
+		
+		public static function viewSliceLink(sl:SliceLink):void {
+			viewVirtualLink(sl.virtualLink);
 		}
 		
 		// Opens a group of physical nodes in a window
@@ -369,6 +320,13 @@
 			//	Alert.show("Problem loading slice, try refreshing the page");
 			//}
 			
+		}
+		
+		public static function viewSite(s:Site):void {
+			var newCollection:ArrayCollection = new ArrayCollection();
+			for each(var node:PhysicalNode in s.nodes)
+			newCollection.addItem(node);
+			DisplayUtil.viewNodeCollection(newCollection);
 		}
 		
 		public static function viewRequest(r:Request):void {

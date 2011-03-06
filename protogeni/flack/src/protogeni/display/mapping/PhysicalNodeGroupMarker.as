@@ -23,10 +23,18 @@
 	
 	public class PhysicalNodeGroupMarker extends UIComponent
 	{
+		public var marker:GeniMapMarker;
+		public var managers:Vector.<GeniManager>;
+		public var sprite:Sprite;
+		
+		private var allowDragging:Boolean = false;
+		
 		public function PhysicalNodeGroupMarker(newMarker:GeniMapMarker)
 		{
 			marker = newMarker;
 			this.addEventListener(MouseEvent.MOUSE_MOVE, drag);
+			this.addEventListener(MouseEvent.MOUSE_DOWN, mouseDown);
+			this.addEventListener(MouseEvent.ROLL_OUT, mouseExit);
 			managers = newMarker.showGroups.GetManagers();
 			
 			sprite = new Sprite();
@@ -74,18 +82,20 @@
 			useHandCursor = true;
 		}
 		
-		public var marker:GeniMapMarker;
-		public var managers:Vector.<GeniManager>;
-		public var sprite:Sprite;
+		private function mouseDown(event:MouseEvent):void {
+			allowDragging = true;
+		}
+		
+		private function mouseExit(event:MouseEvent):void {
+			allowDragging = false;
+		}
 		
 		public function drag(e:MouseEvent):void
 		{
-			if(e.buttonDown) {
+			if(allowDragging) {
 				var ds:DragSource = new DragSource();
 				ds.addData(marker, 'marker');
-				
 				var d:PhysicalNodeGroupMarker = new PhysicalNodeGroupMarker(marker)
-				
 				DragManager.doDrag(this, ds, e, d);
 			}
 		}
