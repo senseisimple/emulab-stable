@@ -110,6 +110,14 @@
 					if(toSelect != null)
 						this.diskImageSelect.selectedItem = toSelect;
 				}
+				
+				if(node.loginServices.length > 0) {
+					this.loginText.text = node.loginServices[0].authentication + " on ";
+					if(node.loginServices[0].username.length > 0)
+						this.loginText.text += node.loginServices[0].username + "@";
+					this.loginText.text += node.loginServices[0].hostname + ":" + node.loginServices[0].port;
+				} else
+					this.loginText.text = "None established";
 
 				loadSlices();
 				
@@ -279,6 +287,14 @@
 		</s:VGroup>
 	</s:HGroup>
 	
+	<s:Label text="Disk Image" fontWeight="bold" />
+	<s:DropDownList id="diskImageSelect" width="100%" prompt="Select image to override default"
+					dataProvider="{sliverTypes}" labelField="diskDescription"
+					change="diskImageText.text = diskImageSelect.selectedItem.diskLongName" />
+	<s:TextInput id="diskImageText" width="100%"
+				 text="{node.diskImage}"
+				 prompt="Select image above or manually type OSID" />
+
 	<s:Label text="Install" fontWeight="bold" />
 	<s:HGroup width="100%" verticalAlign="middle">
 		<s:TextInput id="installUrlText" width="55%"
@@ -304,13 +320,10 @@
 					 prompt="Shell? (sh, bash, etc.)" />
 	</s:HGroup>
 	
-	<s:Label text="Disk Image" fontWeight="bold" />
-	<s:DropDownList id="diskImageSelect" width="100%" prompt="Select image to override default"
-		  dataProvider="{sliverTypes}" labelField="diskDescription"
-		  change="diskImageText.text = diskImageSelect.selectedItem.diskLongName" />
-	<s:TextInput id="diskImageText" width="100%"
-				 text="{node.diskImage}"
-				 prompt="Select image above or manually type OSID" />
+	<s:HGroup width="100%">
+		<s:Label text="Login" fontWeight="bold" />
+		<s:Label id="loginText" />
+	</s:HGroup>
 	
 	<s:Label text="Links to" fontWeight="bold"/>
 	<s:Scroller width="100%" height="100%">

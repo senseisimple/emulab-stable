@@ -10,6 +10,7 @@
 			import mx.collections.Sort;
 			import mx.collections.SortField;
 			
+			import protogeni.resources.PhysicalNode;
 			import protogeni.resources.PhysicalNodeGroup;
 			
 			public function loadCollection(group:ArrayCollection):void {
@@ -26,7 +27,10 @@
 			public function loadGroup(group:PhysicalNodeGroup):void {
 				if(group.city.length > 0)
 					title = group.city + " Node";
-				loadCollection(group.collection);
+				var newCollection:ArrayCollection = new ArrayCollection();
+				for each(var node:PhysicalNode in group.collection)
+					newCollection.addItem(node);
+				loadCollection(newCollection);
 			}
 		]]>
 	</fx:Script>

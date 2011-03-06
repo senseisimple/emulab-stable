@@ -13,9 +13,7 @@
  */
  
  package protogeni.resources
-{
-	import mx.collections.ArrayCollection;
-	
+{	
 	// Collection of interfaces from a physical node
 	public class PhysicalNodeInterfaceCollection
 	{

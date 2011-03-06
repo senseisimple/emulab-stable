@@ -32,6 +32,8 @@
 			public var allNodes:SliceNodeCollection = new SliceNodeCollection();
 			public var allLinks:SliceLinkCollection = new SliceLinkCollection();
 			
+			private var edited:Boolean = false;
+			
 			public function load(newSlice:Slice):void
 			{
 				slice = newSlice.clone(false);
@@ -49,6 +51,8 @@
 					for each(var l:VirtualLink in s.links)
 						this.addVirtualLinkToCanvas(l);
 				}
+				
+				edited = !slice.isCreated();
 			}
 			
 			public function refreshSlice():void
@@ -125,6 +129,8 @@
 					this.addVirtualLinkToCanvas(unaddedLink);
 				
 				hostWindow.loadNodes();
+				
+				edited = !slice.isCreated();
 			}
 			
 			public function refreshStatus():void
@@ -222,7 +228,7 @@
 			{
 				// Remove subnodes
 				for each(var sub:VirtualNode in sn.node.subNodes)
-				removeVirtualNode(sub);
+					removeVirtualNode(sub);
 				
 				// Remove links
 				while(sn.links.length > 0)
@@ -240,6 +246,7 @@
 				this.removeElement(sn);
 				allNodes.removeItemAt(allNodes.getItemIndex(sn));
 				hostWindow.loadNodes();
+				edited = true;
 			}
 			
 			public function addVirtualLinkToCanvas(vl:VirtualLink):SliceLink
@@ -253,6 +260,7 @@
 				this.addElement(sl);
 				validateNow();
 				redrawAllLinks();
+				edited = true;
 				return sl;
 			}
 			
@@ -329,7 +337,7 @@
 						sn.node.superNode = allNodes.getForPhysicalNode(pn.subNodeOf).node;
 					sn.node.superNode.subNodes.push(sn.node);
 				}
-				
+				edited = true;
 				return sn;
 			}
 			
@@ -345,6 +353,7 @@
 				sn.setLocation(addX, addY);
 				sn.adjustWidth();
 				allNodes.addItem(sn);
+				edited = true;
 				
 				if(sn.node.physicalNode != null && hostWindow.nodes != null && hostWindow.nodes.getItemIndex(sn.node.physicalNode) > -1)
 					hostWindow.nodes.removeItemAt(hostWindow.nodes.getItemIndex(sn.node.physicalNode));
@@ -388,6 +397,7 @@
 				if(startNode != null && currentNode != null) {
 					if(tempLink.establish(startNode, currentNode)) {
 						tempLink.drawEstablished();
+						edited = true;
 					} else
 						removeElement(tempLink);
 				} else if(tempLink != null && contains(tempLink))
@@ -399,6 +409,18 @@
 				currentNode = null;
 				tempLink = null;
 				redrawAllLinks();
+			}
+			
+			public function clear():void {
+				while(this.allNodes.length > 0)
+					this.removeSliceNode(this.allNodes.getItemAt(0) as SliceNode);
+			}
+			
+			public function isEdited():Boolean {
+				if(edited) {
+					return slice.isCreated() || this.allNodes.length > 0;
+				} else
+					return false;
 			}
 			
 			// RAW CHILDREN FUNCTIONS

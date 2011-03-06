@@ -6,14 +6,14 @@ package protogeni.resources
 	{
 		public var id:String;
 		public var name:String;
-		public var nodes:ArrayCollection;
+		public var nodes:Vector.<PhysicalNode>;
 		public var hrn:String;
 		public var latitude:Number;
 		public var longitude:Number;
 		
 		public function Site()
 		{
-			nodes = new ArrayCollection();
+			nodes = new Vector.<PhysicalNode>();
 		}
 	}
 }

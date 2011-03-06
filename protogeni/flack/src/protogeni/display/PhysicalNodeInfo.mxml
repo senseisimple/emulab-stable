@@ -169,7 +169,7 @@
 				if(physicalLinksVbox != null)
 				{
 					physicalLinksVbox.removeAllElements();
-					var nodes:ArrayCollection = node.GetNodes();
+					var nodes:Vector.<PhysicalNode> = node.GetNodes();
 					physicalLinksNavigator.label = "Physical (" + nodes.length + " Nodes)"
 					var connectedLabel:Label = new Label();
 					if(nodes.length > 0)
@@ -181,7 +181,7 @@
 					for each(var n:PhysicalNode in nodes) {
 						physicalLinksVbox.addElement(DisplayUtil.getPhysicalNodeButton(n));
 						
-						var nodeLinks:ArrayCollection = n.GetNodeLinks(node);
+						var nodeLinks:Vector.<PhysicalLink> = n.GetNodeLinks(node);
 						for each(var l:PhysicalLink in nodeLinks) {
 							var endInterface:PhysicalNodeInterface;
 							for each(var testInterface:PhysicalNodeInterface in l.interfaceRefs.collection) {

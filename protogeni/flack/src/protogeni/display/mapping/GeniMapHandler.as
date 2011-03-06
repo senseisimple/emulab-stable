@@ -186,13 +186,12 @@ package protogeni.display.mapping
 			var startTime:Date = new Date();
 			
 			while(myIndex < gm.Links.collection.length) {
-				var linkGroup:PhysicalLinkGroup = gm.Links.collection.getItemAt(myIndex) as PhysicalLinkGroup;
+				var linkGroup:PhysicalLinkGroup = gm.Links.collection[myIndex];
 				var add:Boolean = !linkGroup.IsSameSite();
 				if(add) {
 					for each(var v:PhysicalLink in linkGroup.collection)
 					{
-						if(v.rspec.toXMLString().indexOf("ipv4") > -1)
-						{
+						if(v.linkTypes.indexOf("ipv4") > -1) {
 							add = false;
 							break;
 						}
@@ -229,7 +228,7 @@ package protogeni.display.mapping
 			var gm:GeniManager = changingManagers[0];
 			
 			while(myIndex < gm.Nodes.collection.length) {
-				var nodeGroup:PhysicalNodeGroup = gm.Nodes.collection.getItemAt(myIndex) as PhysicalNodeGroup;
+				var nodeGroup:PhysicalNodeGroup = gm.Nodes.collection[myIndex];
 				if(nodeGroup.collection.length > 0) {
 					var gmm:GeniMapMarker = new GeniMapMarker(nodeGroup);
 					map.addOverlay(gmm);

@@ -136,6 +136,7 @@ package protogeni.resources
 		}
 		
 		//---------------------------------------
+		/*
 		public function getGraphML():String {
 			var added:Dictionary = new Dictionary();
 			var randId:int = 0;
@@ -373,7 +374,7 @@ package protogeni.resources
 					}
 					
 					// Get the list of connected nodes
-					var connectedNodes:ArrayCollection = new ArrayCollection();
+					var connectedNodes:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 					for each(var nac:PhysicalNode in a) {
 						connectedNodes = Util.keepUniqueObjects(nac.GetNodes(), connectedNodes);
 					}
@@ -515,5 +516,6 @@ package protogeni.resources
 				dot += "}";
 			return dot;
 		}
+		*/
 	}
 }

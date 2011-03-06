@@ -28,15 +28,13 @@ package protogeni.communication
   import flash.net.URLRequestMethod;
   import flash.system.Security;
   import flash.utils.Timer;
-  
-  import mx.collections.ArrayCollection;
 
   public class Operation
   {
 	  public static const XMLRPC:int = 0;
 	  public static const HTTP:int = 1;
 	  
-    public function Operation(qualifiedMethod : Array = null, newNode:Request = null, newType:int = 0) : void
+    public function Operation(qualifiedMethod:Array = null, newNode:Request = null, newType:int = 0) : void
     {
       server = null;
 	  node = newNode;
@@ -103,9 +101,9 @@ package protogeni.communication
 	
 	public function pushField(value:Object):void
 	{
-		if(!(param is ArrayCollection))
+		if(!(param is Array))
 			setPositioned();
-		param.addItem(value);
+		param.push(value);
 	}
 
     public function clearFields():void
@@ -115,7 +113,7 @@ package protogeni.communication
 	
 	public function setPositioned():void
 	{
-		param = new ArrayCollection();
+		param = [];
 	}
 	
 	public function setParameterized():void
@@ -157,7 +155,7 @@ package protogeni.communication
 					server.addEventListener(Event.COMPLETE, callSuccess);
 					server.addEventListener(ErrorEvent.ERROR, callFailure);
 					server.addEventListener(SecurityErrorEvent.SECURITY_ERROR, callFailure);
-					if(param is ArrayCollection)
+					if(param is Array)
 					{
 						for each(var o:* in param) {
 							server.addParam(o, null);

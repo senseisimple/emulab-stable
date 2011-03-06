@@ -76,7 +76,10 @@ package protogeni.display.mapping
 						drawDefaultFrame:true
 					}));
 			} else {
-				DisplayUtil.viewNodeCollection(new ArrayCollection(showGroups.GetAll()));
+				var newCollection:ArrayCollection = new ArrayCollection();
+				for each(var node:PhysicalNode in showGroups.GetAll())
+					newCollection.addItem(node);
+				DisplayUtil.viewNodeCollection(newCollection);
 			}
 			
 		}
@@ -110,7 +113,7 @@ package protogeni.display.mapping
 				var groupInfo:PhysicalNodeGroupInfo = new PhysicalNodeGroupInfo();
 				groupInfo.addEventListener(FlexEvent.CREATION_COMPLETE,
 					function loadNodeGroup(evt:FlexEvent):void {
-						groupInfo.Load(showGroups.collection.getItemAt(0) as PhysicalNodeGroup);
+						groupInfo.Load(showGroups.collection[0]);
 						//clusterInfo.setZoomButton(bounds);
 					});
 				infoWindow = groupInfo;

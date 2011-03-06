@@ -14,8 +14,6 @@
  
  package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	
 	// Collection of all physical link groups
 	public class PhysicalLinkGroupCollection
 	{
@@ -23,7 +21,7 @@
 		{
 		}
 		
-		public var collection:ArrayCollection = new ArrayCollection();
+		public var collection:Vector.<PhysicalLinkGroup> = new Vector.<PhysicalLinkGroup>();
 
 		public function Get(lat1:Number, lng1:Number, lat2:Number, lng2:Number):PhysicalLinkGroup {
 			for each(var g:PhysicalLinkGroup in collection) {
@@ -42,7 +40,7 @@
 		}
 		
 		public function Add(g:PhysicalLinkGroup):void {
-			collection.addItem(g);
+			collection.push(g);
 		}
 	}
 }

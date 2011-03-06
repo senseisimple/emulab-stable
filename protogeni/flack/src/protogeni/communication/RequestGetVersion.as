@@ -51,9 +51,9 @@ package protogeni.communication
 			cm.outputRspecVersions.push(cm.outputRspecDefaultVersion);
 			
 			// Set output version
-			//if(cm.Hrn == "utahemulab.cm" || cm.Hrn == "ukgeni.cm")
-			//	cm.outputRspecVersion = 2;
-			//else
+			if(cm.Hrn == "utahemulab.cm" || cm.Hrn == "ukgeni.cm")
+				cm.outputRspecVersion = 2;
+			else
 				cm.outputRspecVersion = 0.2;
 			if(cm.outputRspecDefaultVersion != cm.outputRspecVersion)
 				cm.outputRspecVersions.push(cm.outputRspecVersion);

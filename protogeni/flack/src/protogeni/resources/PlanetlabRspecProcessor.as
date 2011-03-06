@@ -126,7 +126,7 @@ package protogeni.resources
 					node.exclusive = false;
 					idx++;
 					gm.AllNodes.push(node);
-					site.nodes.addItem(node);
+					site.nodes.push(node);
 				}
 				myIndex++;
 				if(((new Date()).time - startTime.time) > 40) {

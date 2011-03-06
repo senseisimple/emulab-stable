@@ -16,13 +16,14 @@ package protogeni
 {
   import flash.external.ExternalInterface;
   import flash.net.URLRequest;
+  import flash.net.URLVariables;
   import flash.net.navigateToURL;
   
   import mx.collections.ArrayCollection;
 
   public class Util
   {
-	  public static const defaultRspecVersion:Number = 0.2;
+	  public static const defaultRspecVersion:Number = 2;
 	  
 	  public static function showSetup():void
 	  {
@@ -36,6 +37,16 @@ package protogeni
 	  public static function openWebsite(url:String):void
 	  {
 		  navigateToURL(new URLRequest(url), "_blank");
+	  }
+	  
+	  public static function openMail(recieverEmail:String, subject:String, body:String):void
+	  {
+		  var mailRequest:URLRequest = new URLRequest("mailto:" + recieverEmail);
+		  var mailVariables:URLVariables = new URLVariables();
+		  mailVariables.subject = subject;
+		  mailVariables.body = body;
+		  mailRequest.data = mailVariables;
+		  navigateToURL(mailRequest, "_blank");
 	  }
 	  
 	  public static function tryGetBaseUrl(url:String):String

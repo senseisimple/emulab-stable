@@ -45,6 +45,7 @@ package protogeni.communication
 		try
 		{
 			sliver.created = true;
+			sliver.staged = false;
 			sliver.rspec = new XML(response);
 			sliver.parseRspec();
 			

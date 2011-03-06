@@ -513,16 +513,20 @@ package protogeni.resources
 									break;
 								case "sliver_type":
 									virtualNode.sliverType = ix.@name;
+									for each(var sliverTypeChild:XML in ix.children()) {
+									if(sliverTypeChild.localName() == "disk_image")
+										virtualNode.diskImage = sliverTypeChild.@name;
+									}
 									break;
 								case "services":
-									for each(var ixx:XML in ix.children()) {
-									if(ixx.localName() == "login")
-										virtualNode.loginServices.push(new LoginService(ixx.@authentication, ixx.@hostname, ixx.@port, ixx.@username));
-									else if(ixx.localName() == "install")
-										virtualNode.installServices.push(new InstallService(ixx.@url, ixx.@install_path, ixx.@file_type));
-									else if(ixx.localName() == "execute")
-										virtualNode.executeServices.push(new ExecuteService(ixx.@command, ixx.@shell));
-								}
+									for each(var servicesChild:XML in ix.children()) {
+										if(servicesChild.localName() == "login")
+											virtualNode.loginServices.push(new LoginService(servicesChild.@authentication, servicesChild.@hostname, servicesChild.@port, servicesChild.@username));
+										else if(servicesChild.localName() == "install")
+											virtualNode.installServices.push(new InstallService(servicesChild.@url, servicesChild.@install_path, servicesChild.@file_type));
+										else if(servicesChild.localName() == "execute")
+											virtualNode.executeServices.push(new ExecuteService(servicesChild.@command, servicesChild.@shell));
+									}
 									break;
 							}
 						}
@@ -585,7 +589,7 @@ package protogeni.resources
 										{
 											// Get outside node, don't add if not parsed in the other cm yet
 											interfacedNode = s.slice.getVirtualNodeWithId(nid);
-											if(interfacedNode == null || !(interfacedNode.slivers[0] as Sliver).created)
+											if(interfacedNode == null || !(interfacedNode.slivers[0].created || interfacedNode.slivers[0].staged))
 											{
 												virtualLink = null;
 												break;
@@ -612,7 +616,7 @@ package protogeni.resources
 										{
 											// Get outside node, don't add if not parsed in the other cm yet
 											interfacedNodeInterface = s.slice.getVirtualInterfaceWithId(niid);
-											if(interfacedNodeInterface == null || !interfacedNodeInterface.owner.slivers[0].created)
+											if(interfacedNodeInterface == null || !(interfacedNodeInterface.owner.slivers[0].created || interfacedNodeInterface.owner.slivers[0].staged))
 											{
 												virtualLink = null;
 												break;

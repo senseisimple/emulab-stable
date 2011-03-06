@@ -16,14 +16,12 @@
 {
 	import flash.utils.Dictionary;
 	
-	import mx.collections.ArrayCollection;
-	
 	// Collection of all physical node groups
 	public class PhysicalNodeGroupCollection
 	{
 		public var owner:GeniManager;
 		
-		public var collection:ArrayCollection = new ArrayCollection();
+		public var collection:Vector.<PhysicalNodeGroup> = new Vector.<PhysicalNodeGroup>();
 		
 		public function PhysicalNodeGroupCollection(own:GeniManager)
 		{
@@ -31,7 +29,7 @@
 		}
 		
 		public function Add(g:PhysicalNodeGroup):void {
-			collection.addItem(g);
+			collection.push(g);
 		}
 		
 		public function GetByLocation(lat:Number, lng:Number):PhysicalNodeGroup {
@@ -63,7 +61,8 @@
 		public function GetByType(type:String):PhysicalNodeGroup {
 			var group:PhysicalNodeGroup = new PhysicalNodeGroup();
 			for each(var ng:PhysicalNodeGroup in collection) {
-				group.collection.addAll(ng.GetByType(type).collection);
+				for each(var node:PhysicalNode in ng.GetByType(type).collection)
+					group.collection.push(node);
 			}
 			return group;
 		}
@@ -79,9 +78,9 @@
 			return null;
 		}
 		
-		public function GetAll():Array
+		public function GetAll():Vector.<PhysicalNode>
 		{
-			var d:Array = [];
+			var d:Vector.<PhysicalNode> = new Vector.<PhysicalNode>();
 			for each(var ng:PhysicalNodeGroup in collection) {
 				for each(var n:PhysicalNode in ng.collection)
 					d.push(n);

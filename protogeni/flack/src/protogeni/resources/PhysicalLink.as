@@ -14,8 +14,6 @@
  
  package protogeni.resources
 {
-	import mx.collections.ArrayCollection;
-	
 	// Physical link between nodes
 	public class PhysicalLink
 	{
