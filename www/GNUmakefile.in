@@ -15,6 +15,7 @@ MAINSITE        = emulab.net
 OURDOMAIN       = @OURDOMAIN@
 CVSSUPPORT      = @CVSSUPPORT@
 CHATSUPPORT     = @CHATSUPPORT@
+PGENISUPPORT    = @PROTOGENI_SUPPORT@
 
 # Filter program
 HTMLINSTALL     = $(INSTALL_SBINDIR)/htmlinstall  
@@ -108,7 +109,11 @@ NLFILES += $(wildcard $(SRCDIR)/netlab/*.png)
 NLFILES += $(wildcard $(SRCDIR)/netlab/*.gif)
 NLFILES += $(wildcard $(SRCDIR)/netlab/*.txt)
 
-PGENIFILES = $(wildcard $(SRCDIR)/protogeni/*.php3)
+PGENIFILES = 
+ifeq ($(PGENISUPPORT),1)
+    PGENIFILES += $(wildcard $(SRCDIR)/protogeni/*.php3)
+    PGENIFILES += $(wildcard $(SRCDIR)/protogeni/*.xml)
+endif
 
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
 WEBDBFILES += $(wildcard $(SRCDIR)/webdb/*.php)
