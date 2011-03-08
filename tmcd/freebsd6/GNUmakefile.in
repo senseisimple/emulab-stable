@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -104,6 +104,7 @@ script-install:	dir-install
 #    (til we switch to 6.x rc.d files)
 #
 frisbee-mfs-install:
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/usr/local/etc
 	(cd ../freebsd5; $(MAKE) all frisbee-mfs-install)
 	rm -f $(SYSETCDIR)/testbed/dhclient
 	rm -f $(DESTDIR)/usr/local/etc/dhclient*

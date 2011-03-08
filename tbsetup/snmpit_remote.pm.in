@@ -189,7 +189,12 @@ sub RemoteDoVlansFromTables($@)
 	    }
 	    my $vlan = $vlans{$vlanid};
 
-	    if ($vlan->SetTag($tag) != 0) {
+	    #
+	    # This is should always succeed since we do whatever the
+	    # outer emulab says to do.
+	    #
+	    if (! ($vlan->HasVlanTagReserved($tag) ||
+		   $vlan->ReserveVlanTag($tag))) {
 		print STDERR "could not set vlan tag for $vlan\n";
 		$errors++;
 	    }
