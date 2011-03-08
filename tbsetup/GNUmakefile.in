@@ -21,7 +21,7 @@ ifeq ($(NSVERIFY),1)
 SUBDIRS		+= nsverify
 endif
 
-BIN_STUFF	= power snmpit tbend tbprerun tbreport \
+BIN_STUFF	= power snmpit snmpit_new tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
 		  node_reboot nscheck node_update savelogs node_control \
 		  portstats checkports eventsys_control os_select tbrestart \
