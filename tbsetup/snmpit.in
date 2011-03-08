@@ -1770,7 +1770,6 @@ sub CreateOneVlan($$$@)
 	    $errors++;
 	}
 	else {
-	    setVlanTag($vlanid, $vlan_number);
 	    VLan->RecordVlanInsertion($experiment, $vlanid,$stack->{STACKID});
 	}
     }
@@ -1842,7 +1841,6 @@ sub doReset($@) {
 	    $errors++;
 	}
 	foreach my $vlan (@existant_vlans) {
-	    setVlanTag($vlan, 0);
 	    clearReservedVlanTag($vlan)
 		if ($opt{C});
 	    VLan->RecordVLanDeletion($vlan);

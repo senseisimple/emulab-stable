@@ -17,7 +17,7 @@ use Exporter;
 		getTestSwitches getControlSwitches getSwitchesInStack
                 getSwitchesInStacks getVlanIfaces
 		getVlanPorts convertPortsFromIfaces convertPortFromIface
-		getExperimentTrunks setVlanTag setVlanStack
+		getExperimentTrunks setVlanStack
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks getStacksForSwitches
@@ -454,26 +454,6 @@ sub getActualStacksForVlans(@) {
         }
     }
     return uniq(@stacks);
-}
-
-#
-# Update database to store vlan tag.
-#
-sub setVlanTag ($$) {
-    my ($vlan_id, $tag) = @_;
-    
-    # Silently exit if they passed us no VLANs
-    if (!$vlan_id || !defined($tag)) {
-	return ();
-    }
-
-    my $vlan = VLan->Lookup($vlan_id);
-    return ()
-	if (!defined($vlan));
-    return ()
-	if ($vlan->SetTag($tag) != 0);
-
-    return 0;
 }
 
 #
