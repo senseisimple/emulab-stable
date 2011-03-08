@@ -348,7 +348,7 @@ sub getExperimentCurrentTrunks($$) {
 }
 
 #
-# Returns an an array of ports (in node:card form) that currently in
+# Returns an an array of ports (in node:card form) that are currently in
 # the given vlan.
 #
 sub getExperimentVlanPorts($) {
@@ -1124,6 +1124,18 @@ sub mapVlansToSwitches(@)
 	my %devices = ();
 	my @ports   = getVlanPorts($vlan_id);
 	my %map     = mapPortsToDevices(@ports);
+
+	foreach my $device (keys %map) {
+	    $devices{$device} = 1;
+	}
+
+	#
+	# Add in the ports that we think are already in the vlan, since
+	# this might be a remove/modify operation. Can probably optimize
+	# this. 
+	#
+	@ports = getExperimentVlanPorts($vlan_id);
+	%map   = mapPortsToDevices(@ports);
 
 	foreach my $device (keys %map) {
 	    $devices{$device} = 1;
