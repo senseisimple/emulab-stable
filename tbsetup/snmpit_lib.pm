@@ -35,6 +35,7 @@ use Exporter;
 	        getExperimentVlanPorts
                 uniq isSwitchPort getPathVlanIfaces
 		reserveVlanTag getReservedVlanTag clearReservedVlanTag
+		mapVlansToSwitches
 );
 
 use English;
@@ -1122,6 +1123,50 @@ sub getTrunkPath($$$$) {
 	    return ();
 	}
     }
+}
+
+#
+# Given a set of vlans, determine *exactly* what devices are needed
+# for the ports and any trunks that need to be crossed. This is done
+# in the stack module, but really want to do this before the stack
+# is created so that we do not add extra devices if not needed.
+#
+sub mapVlansToSwitches(@)
+{
+    my @vlan_ids = @_;
+    my %switches = ();
+    my %trunks   = getTrunks();
+
+    #
+    # This code is lifted from setPortVlan() in snmpit_stack.pm
+    #
+    foreach my $vlan_id (@vlan_ids) {
+	my %devices = ();
+	my @ports   = getVlanPorts($vlan_id);
+	my %map     = mapPortsToDevices(@ports);
+
+	foreach my $device (keys %map) {
+	    $devices{$device} = 1;
+	}
+
+	#
+	# Find out every switch which might have to transit this VLAN through
+	# its trunks.
+	#
+	my @trunks = getTrunksFromSwitches(\%trunks, keys %devices);
+	foreach my $trunk (@trunks) {
+	    my ($src,$dst) = @$trunk;
+	    $devices{$src} = $devices{$dst} = 1;
+	}
+
+	# And update the total set of switches.
+	foreach my $device (keys(%devices)) {
+	    $switches{$device} = 1;
+	}
+    }
+    my @sorted = sort {tbsort($a,$b)} keys %switches;
+    print "mapVlansToSwitches: @sorted\n";
+    return @sorted;
 }
 
 #
