@@ -474,6 +474,10 @@ sub newVlanNumber($$) {
     $limit  = $self->{MAX_VLAN};
 
     while (++$number < $limit) {
+	# Temporary cisco hack to avoid reserved vlans.
+	next
+	    if ($number >= 1000 && $number <= 1024);
+	
 	if (!(grep {$_ == $number} @numbers)) {
 	    #
 	    # Reserve this number in the table. If we can actually

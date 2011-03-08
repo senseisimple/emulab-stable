@@ -14,7 +14,7 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print "Usage: ch_daemon [-d] [-n]\n";
+    print "Usage: ch_daemon [-s] [-d] [-n]\n";
     exit(1);
 }
 my $optlist   = "dns";
@@ -183,7 +183,7 @@ sub ProbeCMs()
 	# Discover resources and cache; for the map client.
 	# Returns a string of xml.
 	#
-	my $resources = $authority->DiscoverResources();
+	my $resources = $authority->DiscoverResources(undef, 0);
 	# Errors will go to the log.
 	next
 	    if (!defined($resources));
