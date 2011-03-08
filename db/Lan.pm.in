@@ -2592,7 +2592,7 @@ sub ReserveVlanTag($$;$$)
 	    DBQueryWarn("select id from vlans where tag='$tag'");
 
 	goto inuse
-	    if (!$force || !$query_result || $query_result->numrows);
+	    if (!$query_result || $query_result->numrows);
 
 	# Just checking ...
 	goto isfree
