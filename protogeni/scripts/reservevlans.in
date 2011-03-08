@@ -205,7 +205,7 @@ my @othertags = ();
 while (my @tags = ReserveLocalTags(@othertags)) {
     my $tag = ReserveRemoteTags($other_manager, \@othertags, @tags);
     if ($tag) {
-	print STDERR "Agreeded on tag $tag. Releasing the rest.\n";
+	print STDERR "Agreed on tag $tag. Releasing the rest.\n";
 	foreach my $t (@tags) {
 	    $vlan->ClearReservedVlanTag($t)
 		if ($t != $tag);
@@ -221,6 +221,8 @@ exit(0);
 sub ReserveRemoteTags($$@)
 {
     my ($authority, $othertags, @tags) = @_;
+    # Lets avoid terminal retry.
+    my $retries = 10;
 
     my $method_args = {};
     $method_args->{'credentials'}   = [$credential->asString()];
@@ -232,7 +234,7 @@ sub ReserveRemoteTags($$@)
     @$othertags = ();
     
     print STDERR "Calling $authority with tags: @tags\n";
-    
+again:    
     my $response =
 	Genixmlrpc::CallMethod($authority->url(),
 			       undef, "ReserveVlanTags", $method_args);
@@ -241,12 +243,23 @@ sub ReserveRemoteTags($$@)
 	fatal("*** Internal error reserving tags at $authority");
     }
     if ($response->code() != GENIRESPONSE_SUCCESS &&
+	$response->code() != GENIRESPONSE_BUSY &&
 	$response->code() != GENIRESPONSE_SEARCHFAILED) {
 	print STDERR "Could not reserve tags at $authority - Error: ";
 	print STDERR "  " . $response->output() . "\n";
 	fatal("");
     }
-    if ($response->code == GENIRESPONSE_SEARCHFAILED) {
+    if ($response->code() == GENIRESPONSE_BUSY) {
+	if ($retries) {
+	    print STDERR
+		"  slice is busy at other CM. Will retry in a moment.\n";
+	    sleep(10);
+	    $retries--;
+	    goto again;
+	}
+	fatal("*** slice was busy for way too long at $authority");
+    }
+    if ($response->code() == GENIRESPONSE_SEARCHFAILED) {
 	print STDERR "*** Target CM did not like any of the tags we sent\n";
 	if (defined($response->value()) && ref($response->value()) eq "ARRAY"){
 	    my @otags = @{ $response->value() };
