@@ -986,7 +986,9 @@ sub getDeviceOptions($) {
     my %options;
 
     my $result = DBQueryFatal("SELECT supports_private, " .
-	"single_domain, t.snmp_community, min_vlan, max_vlan " .
+	"single_domain, s.snmp_community as device_community, ".
+        "min_vlan, max_vlan, " .
+	"t.snmp_community as stack_community ".
 	"FROM switch_stacks AS s left join switch_stack_types AS t " .
 	"    ON s.stack_id = t.stack_id ".
 	"WHERE s.node_id='$switch'");
@@ -996,12 +998,13 @@ sub getDeviceOptions($) {
 	return undef;
     }
 
-    my ($supports_private, $single_domain, $snmp_community, $min_vlan,
-	$max_vlan) = $result->fetchrow();
+    my ($supports_private, $single_domain, $device_community, $min_vlan,
+	$max_vlan, $stack_community) = $result->fetchrow();
 
     $options{'supports_private'} = $supports_private;
     $options{'single_domain'} = $single_domain;
-    $options{'snmp_community'} = $snmp_community || "public";
+    $options{'snmp_community'} =
+ 	$device_community || $stack_community || "public";
     $options{'min_vlan'} = $min_vlan || 2;
     $options{'max_vlan'} = $max_vlan || 1000;
 
