@@ -479,12 +479,24 @@ if ($pid && $eid) {
 if ($MAINSITE && $TB eq "/usr/testbed" && !$opt{Z}) {
     my $group = (defined($experiment) ? $experiment->GetGroup() : undef);
     $EmulabFeatures::verbose = 0;
-    my $newsnmpit =
+    my $robsnmpit =
         (EmulabFeatures->FeatureEnabled("RobSnmpit",
 					$this_user, $group, $experiment));
-    if ($newsnmpit) {
+    if ($robsnmpit) {
 	# Rob, change this path:
 	my $newpath = "$TB/bin/snmpit";
+	print STDERR "Invoking alternate snmpit from $newpath\n";
+	
+        unshift(@SAVEARGV, "-Z");
+	exec $newpath, @SAVEARGV;
+	die("*** $0:\n".
+	    "    Could not exec $newpath: $!");
+    }
+    my $newsnmpit =
+        (EmulabFeatures->FeatureEnabled("NewSnmpit",
+					$this_user, $group, $experiment));
+    if ($newsnmpit) {
+	my $newpath = "$TB/bin/snmpit_new";
 	print STDERR "Invoking alternate snmpit from $newpath\n";
 	
         unshift(@SAVEARGV, "-Z");
