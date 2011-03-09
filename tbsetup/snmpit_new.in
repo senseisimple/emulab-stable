@@ -699,20 +699,29 @@ COMMAND: foreach my $command (@commands) {
         (/remove/) && do {
             # Three levels of possible sources for device names (in order):
             #   passed in on command line
-            #   stack name recorded in database
+            #   vlan from the db
             #   if others fail, default to experimental switches
 	    my ($vlan_name) = @args;
-            my ($vlanobj, $stack);
             if ($supplied_switches) {
                 debug("Remove: using supplied switches\n");
                 @devicenames = @supplied_switches;
-            } elsif (defined($experiment) &&
-                     defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
-                     defined($stack = $vlanobj->GetStack())) {
-                debug("Remove: found stack $stack in database\n");
-                @devicenames = getSwitchesInStack($stack);
-            } else {
-                debug("Remove: using test switches\n");
+            }
+	    else {
+		my $vlanobj;
+		if ($vlan_name =~ /^\d*$/) {
+		    $vlanobj = VLan->Lookup($vlan_name);
+		}
+		else {
+		    $vlanobj = VLan->Lookup($experiment, $vlan_name);
+		}
+		if (defined($vlanobj) && !$vlanobj->IsInternal()) {
+		    @devicenames = mapVlansToSwitches($vlanobj->lanid());
+		    debug("Remove: list from database: " . join(",",@devicenames) .
+			  "\n");
+		}
+            }
+            if (scalar(@devicenames == 0)) {
+                debug("Remove: falling back to test swtiches\n");
                 @devicenames = getTestSwitches();
             }
             last;
