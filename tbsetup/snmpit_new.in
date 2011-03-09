@@ -485,7 +485,8 @@ if ($pid && $eid) {
     if (!defined($experiment)) {
 	die "There is no experiment $eid in project $pid\n";
     }
-    if (defined($this_user) &&
+    # XXX Do not make this check when -f is used; called in user context.
+    if (defined($this_user) && !$opt{f} && 
 	!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	die "You do not have permission to modify experiment $pid/$eid\n";
     }
