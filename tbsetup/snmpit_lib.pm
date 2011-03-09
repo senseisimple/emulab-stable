@@ -986,7 +986,7 @@ sub getDeviceOptions($) {
     my %options;
 
     my $result = DBQueryFatal("SELECT supports_private, " .
-	"single_domain, snmp_community, min_vlan, max_vlan " .
+	"single_domain, t.snmp_community, min_vlan, max_vlan " .
 	"FROM switch_stacks AS s left join switch_stack_types AS t " .
 	"    ON s.stack_id = t.stack_id ".
 	"WHERE s.node_id='$switch'");
