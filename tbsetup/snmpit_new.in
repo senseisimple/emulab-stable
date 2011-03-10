@@ -2770,7 +2770,7 @@ sub doDeleteVlan($@) {
 	    else {
 	       $vlan = VLan->Lookup($experiment, $vlan_name);
 	    }
-	    if (defined($vlan) &&
+	    if (defined($vlan) && !$opt{'f'} &&
 		!$experiment->SameExperiment($vlan->GetExperiment())) {
 		die("$vlan is not in the correct experiment\n");
 	    }
