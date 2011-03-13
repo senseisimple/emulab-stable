@@ -328,7 +328,19 @@ while (1) {
 	while ($now >= $deadline && $node ne "") {
 	    qpop($deadline,$node);
 	    info("POP: $node in ".($deadline-$now).", queue=".qsize()."\n");
-	    handleCtrlEvent($node,$TBTIMEOUT);
+	    #
+	    # If the node is no longer in the nodes array, it was most
+	    # likely a dynamic virtual node which is now gone. Ignore.
+	    # Need to look at reload() to see if we can catch this earlier. 
+	    #
+	    if (exists($nodes{$node})) {
+		handleCtrlEvent($node,$TBTIMEOUT);
+	    }
+	    else {
+		info("POP: $node is no longer in the nodes array. Skipping\n");
+		delete($timeout_tag{$node})
+		    if (exists($timeout_tag{$node}));
+	    }
 	    if (0) { qshow(); }
 	    if (qhead($deadline,$node)) {
 		$deadline=0; $node="";
