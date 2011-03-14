@@ -16,7 +16,6 @@ package power_icebox;
 
 use POSIX;
 use IO::Pty;
-use Net::Telnet; # Saves us from parsing the ssh output by hand
 
 use strict;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin'; # Required when using system() or backticks `` in combination with the perl -T taint checks
@@ -84,6 +83,8 @@ sub _icebox_exec ($$) {
 }
 
 sub new($$;$) {
+
+    require Net::Telnet; # Saves us from parsing the ssh output by hand
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
