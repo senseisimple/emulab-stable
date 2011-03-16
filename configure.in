@@ -914,6 +914,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/eventsys.proxy \
 	tbsetup/snmpit.proxy tbsetup/snmpit_remote.pm \
 	tbsetup/snmpit tbsetup/ns2ir/GNUmakefile \
+	tbsetup/new_snmpit \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
 	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
 	tbsetup/ns2ir/sim.tcl tbsetup/nseswap tbsetup/nseparse/GNUmakefile \
