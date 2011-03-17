@@ -1689,7 +1689,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Find all the virtual interfaces.
 	 */
 	res = mydb_query("select v.unit,v.IP,v.mac,i.mac,v.mask,v.rtabid, "
-			 "       v.type,vll.vname,v.virtlanidx,la.attrvalue, "
+			 "       v.type,vll.vname,v.virtlanidx,vlans.tag, "
 			 "       l.lanid "
 			 "  from vinterfaces as v "
 			 "left join interfaces as i on "
@@ -1699,8 +1699,8 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "left join lans as l on "
 			 "  l.exptidx=vll.exptidx and l.vname=vll.vname and "
 			 "  l.link is null "
-			 "left join lan_attributes as la on "
-			 "  la.lanid=v.vlanid and la.attrkey='vlantag' "
+			 "left join vlans on "
+			 "  vlans.id=l.lanid "
 			 "left join lan_attributes as la2 on "
 			 "  la2.lanid=v.vlanid and la2.attrkey='stack' "
 			 "where v.exptidx='%d' and v.node_id='%s' and "
@@ -4211,9 +4211,18 @@ COMMAND_PROTOTYPE(doloadinfo)
 
 			info("%s LOADINFO compat: starting server for imageid %s",
 			     reqp->nodeid, row[5]);
+			/*
+			 * XXX for vnodes we use the pnode name since the
+			 * master server wants to validate a node_id by
+			 * looking up its control net IP address in the
+			 * interfaces table.  Vnodes have no interfaces
+			 * table entries so that won't work.
+			 */
 			snprintf(_buf, sizeof _buf,
 				 "%s/sbin/frisbeehelper -n %s %s",
-				 TBROOT, reqp->nodeid, row[5]);
+				 TBROOT,
+				 reqp->isvnode ? reqp->pnodeid : reqp->nodeid,
+				 row[5]);
 			if ((cfd = popen(_buf, "r")) == NULL)
 				goto updatemfs;
 			while (fgets(_buf, sizeof _buf, cfd) != NULL) {

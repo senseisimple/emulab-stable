@@ -682,19 +682,17 @@ ClientNetFindServer(in_addr_t sip, in_port_t sport,
 		close(msock);
 		return 0;
 	}
+	close(msock);
 
 	if (strncmp((char *)msg.hdr.version, MS_MSGVERS_1,
 		    sizeof(msg.hdr.version))) {
 		fprintf(stderr, "Got incorrect version from master server\n");
-		close(msock);
 		return 0;
 	}
 	if (ntohl(msg.hdr.type) != MS_MSGTYPE_GETREPLY) {
 		fprintf(stderr, "Got incorrect reply from master server\n");
-		close(msock);
 		return 0;
 	}
-	close(msock);
 
 	/*
 	 * Convert the reply info to host order

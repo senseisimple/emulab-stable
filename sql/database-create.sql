@@ -1290,7 +1290,7 @@ CREATE TABLE `external_networks` (
   `min_vlan` int(11) NOT NULL default '256',
   `max_vlan` int(11) NOT NULL default '1000',
   PRIMARY KEY  (`network_id`),
-  UNIQUE KEY  (`node_id`)
+  UNIQUE KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
   
 --
@@ -3472,6 +3472,7 @@ CREATE TABLE `switch_stacks` (
   `node_id` varchar(32) NOT NULL default '',
   `stack_id` varchar(32) NOT NULL default '',
   `is_primary` tinyint(1) NOT NULL default '1',
+  `snmp_community` varchar(32) default NULL,
   KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

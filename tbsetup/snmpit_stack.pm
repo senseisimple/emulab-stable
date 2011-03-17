@@ -18,6 +18,7 @@ use snmpit_lib;
 
 use libdb;
 use libtestbed;
+use overload ('""' => 'Stringify');
 
 our %devices;
 our $parallelized = 1;
@@ -150,6 +151,18 @@ sub new($$$@) {
        die "$devicename $status\n" if ($status ne "OK");
     }
     return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    my $stack_id = $self->{STACKID};
+
+    return "[Stack ${stack_id}]";
 }
 
 #
@@ -430,7 +443,11 @@ sub newVlanNumber($$) {
 	#
 	if ((grep {$_ == $number} @numbers) ||
 	    !defined(reserveVlanTag($vlan_id, $number))) {
-	    print STDERR "desired vlan tag for $vlan_id already in use!\n";
+	    my $vlan_using_tag = $self->findVlanUsingTag($number);
+	    print STDERR
+		"*** desired vlan tag $number for vlan $vlan_id already in " .
+		"use" . ($vlan_using_tag ? " by vlan $vlan_using_tag" : "") .
+		"\n";
 	    # Indicates no tag assigned. 
 	    return 0;
 	}
@@ -444,7 +461,11 @@ sub newVlanNumber($$) {
     $number = getReservedVlanTag($vlan_id);
     if ($number) {
 	if (grep {$_ == $number} @numbers) {
-	    print STDERR "reserved vlan tag for $vlan_id already in use!\n";
+	    my $vlan_using_tag = $self->findVlanUsingTag($number);
+	    print STDERR
+		"*** reserved vlan tag $number for vlan $vlan_id already in " .
+		"use" . ($vlan_using_tag ? " by vlan $vlan_using_tag" : "") .
+		"\n";
 	    return 0;
 	}
 	return $number;
@@ -453,6 +474,10 @@ sub newVlanNumber($$) {
     $limit  = $self->{MAX_VLAN};
 
     while (++$number < $limit) {
+	# Temporary cisco hack to avoid reserved vlans.
+	next
+	    if ($number >= 1000 && $number <= 1024);
+	
 	if (!(grep {$_ == $number} @numbers)) {
 	    #
 	    # Reserve this number in the table. If we can actually
@@ -604,6 +629,37 @@ sub findVlan($$) {
 	my %dev_map = $device->findVlans($vlan_id);
 	my $vlan_num = $dev_map{$vlan_id};
 	if (defined($vlan_num)) { return $vlan_num; }
+    }
+    return 0;
+}
+
+#
+# Find what vlan a tag is associated with.
+# 
+# usage: findVlanUsingTag($self, $number)
+#        returns the vlan_id if found
+#        0 otherwise;
+#
+sub findVlanUsingTag($$) {
+    my ($self, $number) = @_;
+
+    $self->debug("snmpit_stack::findVlanUsingTag( $number )\n");
+    if ($parallelized) {
+	my %dev_map = $self->findVlans();
+	foreach my $vlan_id (keys(%dev_map)) {
+	    return $vlan_id
+		if ($number == $dev_map{$vlan_id});
+	}
+	return 0;
+    }
+    foreach my $devicename (sort {tbsort($a,$b)} keys %{$self->{DEVICES}}) {
+	my $device = $self->{DEVICES}->{$devicename};
+	my %dev_map = $device->findVlans();
+	foreach my $vlan_id (keys(%dev_map)) {
+	    return $vlan_id
+		if ($number == $dev_map{$vlan_id});
+	}
+	return 0;
     }
     return 0;
 }

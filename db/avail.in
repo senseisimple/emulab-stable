@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2008 University of Utah and the Flux Group.
+# Copyright (c) 2000-2008,2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ my $d = 0; #debug mode
 if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) { 
   die("Usage:\navail [help] [type[=<type>]] [OS[=<OS>]] [ver[=<OS_ver>]]\n".
       "              [[includevirt] or [virtonly[=<phys>]]] [rand]\n".
-      "              [limit=N] [aslist]\n".
+      "              [limit=N] [aslist] [notprereserved]\n".
       "\n".
       "type \t= pc | shark\n"."OS \t= Linux | FreeBSD | NetBSD | ...\n".
       "ver \t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n".#"deltas \t= anetd | ...\n".
@@ -112,6 +112,10 @@ if ($os) {
 if (defined($args{"prereserve"})) {
     $pid = $args{"prereserve"};
     $cond .= " and a.reserved_pid='$pid' ";
+}
+
+if (defined($args{"notprereserved"})) {
+    $cond .= " and a.reserved_pid is null";
 }
 
 my $cmd = "select $cols from $join where $cond order by $order $limit";

@@ -1554,13 +1554,18 @@ sub ReserveVlanTags($)
     my $taglist     = $argref->{'taglist'};
     my $response;
     my $actualtag;
-    my ($myauth,undef,undef) = GeniHRN::Parse($ENV{'MYURN'});
     # List of vlans to delete after getting the tags.
     my @delete      = ();
     my %linkmap     = ();
 
     require Lan;
 
+    my $me = GeniAuthority->Lookup($ENV{'MYURN'});
+    if (!defined($me)) {
+	print STDERR
+	    "Could not find local authority object for $ENV{'MYURN'}\n";
+	return GeniResponse->Create(GENIRESPONSE_ERROR);
+    }
     if (! (defined($credentials) && defined($slice_cert) &&
 	   defined($taglist) &&
 	   defined($linkname) && defined($slice_urn) && defined($rspecstr))) {
@@ -1699,8 +1704,8 @@ sub ReserveVlanTags($)
     foreach my $ref (GeniXML::FindNodes("n:component_hop",
 					$linkref)->get_nodelist()) {
 	my $component_urn = GeniXML::GetNodeId($ref);
-	my ($auth,undef,undef) = GeniHRN::Parse($component_urn);
-	if (defined($auth) and $auth eq $myauth) {
+	my ($domain,undef,undef) = GeniHRN::Parse($component_urn);
+	if (defined($domain) and $domain eq $me->domain()) {
 	    $hopref = $ref;
 	    last;
 	}
@@ -1711,23 +1716,7 @@ sub ReserveVlanTags($)
 	goto done;
     }
     my $hop_urn = GeniXML::GetNodeId($hopref);
-    my (undef,undef,$hop_id) = GeniHRN::Parse($hop_urn);
-
-    #
-    # An artifact of the way we convert physical links
-    # into urns is that we now have to undo that to
-    # figure out what node and interface. At the moment
-    # it looks like "link-ion:eth2-procurve-pgeni-wash:(null)"
-    #
-    my ($link,$iface,undef) = split(":", $hop_id);
-    if (! (defined($link) && defined($iface))) {
-	$response =
-	    GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				 "badly specified component_hop");
-	goto done;
-    }
-    # and strip off the link- stuff.
-    my ($network_id) = ($link =~ /^link-(.*)$/);
+    my (undef,undef,$network_id) = GeniHRN::Parse($hop_urn);
 
     my $network = ExternalNetwork->Lookup($network_id);
     if (!defined($network)) {
@@ -1750,9 +1739,7 @@ sub ReserveVlanTags($)
 	}
 	push(@delete, $vlan);
     }
-    else {
-	print STDERR "$vlan already existed.\n";
-    }
+
     #
     # If there is already a reservation, it better be one of the
     # tags we got.
@@ -1762,7 +1749,13 @@ sub ReserveVlanTags($)
 	print STDERR "$vlan already had tag $tag.\n";
 	if (! (grep {$_ == $tag} @{ $taglist })) {
 	    print STDERR "  but the tag is not in the list we got.\n";
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
+	    #
+	    # Tell the caller about the tag; it is the only choice.
+	    #
+	    my @okaytags = ($tag);
+	    $response = GeniResponse->Create(GENIRESPONSE_SEARCHFAILED,
+					     \@okaytags,
+					     "Could not find a suitable tag");
 	    goto done;
 	}
 	$actualtag = $tag;
@@ -1805,8 +1798,8 @@ sub ReserveVlanTags($)
 	    # Get the last two tokens. Not always the right thing to do. 
 	    my $dom = join('.', splice(@tmp, -2, 2));
 
-	    if ($myauth =~ /$dom$/ && $hisauth =~ /$dom$/) {
-		print STDERR "ElabInElab clause is true: $myauth $hisauth\n";
+	    if ($me->domain() =~ /$dom$/ && $hisauth =~ /$dom$/) {
+		print STDERR "ElabInElab clause is true\n";
 
 		my $tag = pop(@tags);
 		if ($vlan->ReserveVlanTag($tag)) {
