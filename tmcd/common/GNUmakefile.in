@@ -83,6 +83,7 @@ common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/bootsubnodes $(BINDIR)/bootsubnodes
 	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
 	$(INSTALL) -m 755 $(SRCDIR)/startcmddone $(BINDIR)/startcmddone
+	$(INSTALL) -m 755 $(SRCDIR)/getblob $(BINDIR)/getblob
 	(cd config; $(MAKE) DESTDIR=$(DESTDIR) script-install)
 
 subboss-common-script-install:	dir-install
