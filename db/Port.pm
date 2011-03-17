@@ -181,6 +181,9 @@ sub Iface2Triple($;$)
 	return $allports{$striface}->toTripleString();
     } else {
 	my ($nodeid, $iface) = ParseIfaceString($striface);
+	if (!defined($iface)) {
+	    return undef;
+	}
 
 	my $port = Port->LookupByIface($nodeid, $iface);
 	if (defined($port) && $port != 0 && $port != -1) {
@@ -203,6 +206,9 @@ sub Triple2Iface($;$)
 	return $allports{$strtriple}->toIfaceString();
     } else {
 	my ($nodeid, $card, $port) = ParseTripleString($strtriple);
+	if (!defined($card) || !defined($port) || !defined($nodeid)) {
+	    return undef;
+	}
 
 	my $portInst = Port->LookupByTriple($nodeid, $card, $port);
 	if (defined($portInst && $port != 0 && $port != -1)) {
@@ -258,6 +264,9 @@ sub fake_TripleString2IfaceString($;$)
     }
 
     my ($n, $c, $p) = ParseTripleString($t);
+    if (!defined($n) || !defined($c) || !defined($p)) {
+        return undef;
+    }
 
     return "$n:".fake_CardPort2Iface($c, $p);
 }
@@ -271,7 +280,8 @@ sub fake_IfaceString2TripleTokens($;$)
     }
 
     my ($n, $iface) = ParseIfaceString($i);
-    if ($iface =~ /^(.+)\/(.+)$/) {
+    
+    if (defined($iface) && $iface =~ /^(.+)\/(.+)$/) {
 	return ($n, $1, $2);
     }    
 
@@ -281,13 +291,17 @@ sub fake_IfaceString2TripleTokens($;$)
 sub LookupByIface($$;$)
 {
     my ($class, $nodeid, $iface) = @_;
-    my $striface;
+    my $striface="";
 
     if (!defined($iface)) {
 	$striface = $nodeid;
-	($nodeid, $iface) = Port->ParseIfaceString($striface);
+	($nodeid, $iface) = Port->ParseIfaceString($striface);	
     } else {
-	$striface = Tokens2IfaceString($class, $nodeid, $iface);
+	$striface = Tokens2IfaceString($class, $nodeid, $iface);	
+    }
+    
+    if (!defined($striface)) {
+        return undef;
     }
 
     if (exists($allports{$striface})) {
@@ -302,7 +316,7 @@ sub LookupByIface($$;$)
     
     if (!$query_result->numrows) {
 	my ($n, $c, $p) = fake_IfaceString2TripleTokens($class, $striface);
-	if (defined($n)) {
+	if (defined($p)) {
 	    return LookupByTriple($class, $n, $c, $p);
 	} else {
 	    return undef;
@@ -359,6 +373,10 @@ sub LookupByTriple($$;$$)
 	($nodeid, $card, $port) = Port->ParseTripleString($strtriple);
     } else {
 	$strtriple = Tokens2TripleString($class, $nodeid, $card, $port);
+    }
+    
+    if (!defined($strtriple)) {
+        return undef;
     }
 
     if (exists($allports{$strtriple})) {
@@ -477,7 +495,7 @@ sub mask($)    { return field($_[0], 'mask'); }
 sub uuid($)    { return field($_[0], 'uuid'); }
 
 sub wire_end($) { return $_[0]->{'WIRE_END'}; }
-sub is_switch_side($) { return $_[0]->wire_end() == "switch"; }
+sub is_switch_side($) { return $_[0]->wire_end() eq "switch"; }
 
 sub wire_type($)   { return $_[0]->{'WIRES_ROW'}->{'type'}; }
 
@@ -545,7 +563,7 @@ sub pc_port($)
 {
     my $self = shift;
     if (!$self->is_switch_side()) {
-	return $self-port();
+	return $self->port();
     } else {
 	return $self->other_end_port();
     }
@@ -661,21 +679,21 @@ sub getSwitchPort($) {
     }
 }
 
-sub toIfaceStrings($$)
+sub toIfaceStrings($@)
 {
-	my @pts = @{$_[1]};
+	my ($c, @pts) = @_;
 	return join(" ", map($_->toIfaceString(), @pts));
 }
 
-sub toTripleStrings($$)
+sub toTripleStrings($@)
 {
-	my @pts = @{$_[1]};
+	my ($c, @pts) = @_;
 	return join(" ", map($_->toTripleString(), @pts));
 }
 
-sub toStrings($$)
+sub toStrings($@)
 {
-	my @pts = @{$_[1]};
+	my ($c, @pts) = @_;
 	return join(" ", map($_->toString(), @pts)); 
 }
 return 1;

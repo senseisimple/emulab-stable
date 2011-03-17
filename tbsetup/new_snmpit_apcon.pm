@@ -10,14 +10,14 @@
 # snmpit module for Apcon 2000 series layer 1 switch
 #
 
-package snmpit_apcon;
+package new_snmpit_apcon;
 use strict;
 
 $| = 1; # Turn off line buffering on output
 
 use English;
 use SNMP; 
-use snmpit_lib;
+use new_snmpit_lib;
 use libdb;
 
 use libtestbed;
@@ -239,7 +239,7 @@ sub toApconPort($$)
 {
         my ($self, $p) = @_;
         
-        if ($p->node_id() ne $self->{NAME}) [
+        if ($p->node_id() ne $self->{NAME}) {
                 return $p;
         }
         

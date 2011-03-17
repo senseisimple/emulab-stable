@@ -24,7 +24,7 @@ my $SWITCH_NODE_STACK = "Switch-Node";
 use libdb;
 use User;
 use Experiment;
-use snmpit_lib;
+use new_snmpit_lib;
 use snmpit_remote;
 use libtblog;
 use EmulabFeatures;
@@ -239,7 +239,7 @@ my $optdev; # when -i only specify a single device
 # snmpit_lib fills out some hashes for speed of lookup later. Initialize
 # them now
 #
-snmpit_lib::init($debug);
+new_snmpit_lib::init($debug);
 
 if ($opt{i} && @{$opt{i}} == 1) {
     $optdev = $opt{i}->[0];
@@ -587,6 +587,9 @@ if ($opt{y}) {
 	if (defined($c) && defined($p)) {
 	    if (defined($optdev)) {
 		$opt{z} = Port->Triple2Iface(Port->Tokens2TripleString($optdev, $c, $p));
+		if (!defined($opt{z})) {
+		    tbdie "Port $c:$p not found";
+		}
 	    } else {
 		tbdie "The module/port format is only legal if exactly one -i " .
 		    "argument has been given";
@@ -616,7 +619,7 @@ if ($opt{y}) {
 # access to the nodes that the ports are on
 #
 # Convert ports into the correct format
-if (@ports) {
+if (@ports) {	
     @ports = convertPortsFromStrings(@ports, $optdev);
     # @@@@ #@ports = convertPortsFromIfaces(@ports);
     if (scalar(@optports) != scalar(@ports)) {
@@ -631,9 +634,9 @@ if (@ports) {
     #
 
     # @@@@ large change
-    my @pcports = grep {!$_->is_switch_side()}, @ports;
-    my @nodes = map {$_->node_id()}, @pcports;
-    my @switchports = grep {$_->is_switch_side()}, @ports;
+    my @pcports = grep {!$_->is_switch_side()} @ports;
+    my @nodes = map {$_->node_id()} @pcports;
+    my @switchports = grep {$_->is_switch_side()} @ports;
 
     if (@pcports + @switchports != @ports) {
 	tbreport(SEV_ERROR, 'bad_data', 'port', join(" ", @optports));
@@ -981,8 +984,8 @@ COMMAND: foreach my $command (@commands) {
 		last;
 	    };
 	    /generic/ && do {
-		require snmpit_stack;
-		$stack = new snmpit_stack($stack_id,$debug,
+		require new_snmpit_stack;
+		$stack = new new_snmpit_stack($stack_id,$debug,
 					  @{$stacks{$stack_id}});
 		last;
 	    }; # /generic/
@@ -1259,13 +1262,13 @@ $vlan_id,$pideid,           $vname,   $members
 	$FORMAT_NAME = 'vlanlist';
     } else {
     	print << "END";
-VLAN     Number Project/Experiment VName     Members
---------------------------------------------------------------------------------
+VLAN     Number   Project/Experiment VName     Members
+----------------------------------------------------------------------------------
 END
 	format vlanlist2 =
-@<<<<<<< @<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+@<<<<<<< @<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 $vlan_id,$ddep, $pideid,           $vname,   $members
-~~                                           ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+~~                                             ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                              $members
 .
 	$FORMAT_NAME = 'vlanlist2';
@@ -1813,7 +1816,7 @@ sub doVlansFromTables($$@) { #@@@@ OK
 	if (getPathVlanIfaces($vlanid, \%ifaces) != -1) {
 	    my @ifs = keys %ifaces;
 	    @ports = map {Port->LookupByIface($_)} @ifs; #map { ifacemodport{$_} } @ifs;
-	    $errors += CreateOneVlan($snstack, $vlanid, @ports);
+	    $errors += CreateOneVlan($stack, $vlanid, @ports);
 	}
     }
     return $errors;

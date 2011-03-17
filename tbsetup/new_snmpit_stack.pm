@@ -7,14 +7,14 @@
 # All rights reserved.
 #
 
-package snmpit_stack;
+package new_snmpit_stack;
 use strict;
 
 $| = 1; # Turn off line buffering on output
 
 use English;
 use SNMP;
-use snmpit_lib;
+use new_snmpit_lib;
 
 use libdb;
 use libtestbed;
@@ -880,10 +880,12 @@ sub getStats($) { #@@@@ OK
 	my $device = $self->{DEVICES}{$devicename};
 	foreach my $line ($device->getStats()) {
 	    my $port = $$line[0];
-	    if (defined $stats{$port->toString()}) {
-		warn "WARNING: Two ports found for ".$port->toString()."\n";
+	    if (defined($port)) {
+	        if (defined $stats{$port->toString()}) {
+		    warn "WARNING: Two ports found for ".$port->toString()."\n";
+	        }
+	        $stats{$port->toString()} = $line;
 	    }
-	    $stats{$port->toString()} = $line;
 	}
     }
     return map $stats{$_}, sort {tbsort($a,$b)} keys %stats;
@@ -1428,13 +1430,13 @@ sub create($$$$) {
     $self->{MAX_VLAN} = $options->{'max_vlan'} if ($options);
     bless ($self, $class);
     $devices{$name} = $self;
-    $self->spawn() if ($snmpit_stack::parallelized);
+    $self->spawn() if ($new_snmpit_stack::parallelized);
     $self->startChildCall("device_setup",$name);
     # reapCall("device_setup"); done in snmpit_stack::new();
     return $self;
 }
 
-sub debug($$;$) { return &snmpit_stack::debug(@_); }
+sub debug($$;$) { return &new_snmpit_stack::debug(@_); }
 
 sub snap($) {
     my ($self) = @_;
@@ -1477,8 +1479,8 @@ sub snap($) {
 		}; # /hp.*/
 	    (/apcon/)
 		    && do {
-		require snmpit_apcon;
-		$device = new snmpit_apcon($devicename,$self->{DEBUG});
+		require new_snmpit_apcon;
+		$device = new new_snmpit_apcon($devicename,$self->{DEBUG});
 		last;
 	        }; # /apcon.*/
 	    print "Device $devicename is not of a known type\n";
@@ -1606,7 +1608,7 @@ sub startChildCall($$;@) {
 		. $cur_procs{$devname} . "\n";
 	return undef;
     }
-    if (!$snmpit_stack::parallelized) {
+    if (!$new_snmpit_stack::parallelized) {
 	my $this_callid = $cur_callids{$devname} = ++$fake_callid;
 	my @arglist = ($this_callid, $devname, $proc, @args);
 	rpcCallback(snmpit_stack_child::rpc_call_wrapper(@arglist));
@@ -1699,7 +1701,7 @@ sub child_loop($) {
 sub device_setup(@) {
     my ($devname) = @_;
     my $result;
-    if ($owndev = $snmpit_stack::devices{$devname}) {
+    if ($owndev = $new_snmpit_stack::devices{$devname}) {
 	snmpit_jitdev::snap($owndev);
     } else {
 	print "snmpit_stack_child::setup couldn't find $devname\n";
@@ -1728,7 +1730,7 @@ sub rpc_call_wrapper(@) {
     my ($called_id, $devname, $proc, @args) = @_;
     my @result;
     pdebug("Child($devname)::wrapping $proc\n");
-    $owndev = $snmpit_stack::devices{$devname};
+    $owndev = $new_snmpit_stack::devices{$devname};
     if (!defined($owndev)) {
 	@result = ("call_wrapper couldn't find dev object for $devname");
     } elsif (my $special = $special_funcs{$proc}) {
@@ -1736,7 +1738,7 @@ sub rpc_call_wrapper(@) {
     } else {
 	@result = $owndev->{OBJ}->$proc(@args);
     }
-    if ($snmpit_stack::parallelized) {
+    if ($new_snmpit_stack::parallelized) {
 	$rpc->return($called_id, $devname, $proc, @result);
     } else {
 	return($devname, $proc, @result);
