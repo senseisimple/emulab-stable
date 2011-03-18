@@ -36,12 +36,12 @@ use libtestbed;
 # Handle command-line options.
 #
 sub usage() {
-    print STDERR "Usage: $0 <owner-uid> <filename>\n";
+    print STDERR "Usage: $0 <owner-uid> <blob-uuid>\n";
     exit( 1 );
 }
 
 usage() unless @ARGV == 2;
-my ( $uid, $filename ) = @ARGV;
+my ( $uid, $uuid ) = @ARGV;
 #
 # Must taint check!
 #
@@ -53,26 +53,30 @@ else {
     exit( 1 );
 }
 
-if ($filename =~ /^([-\w #%&*+,.\/:;=?@\[\\\]^{|}]+)$/) {
-    $filename = $1;
+if ($uuid =~ /^([-\w]+)$/) {
+    $uuid = $1;
 }
 else {
-    print STDERR "Bad character in filename\n";
+    print STDERR "Bad character in uuid\n";
     exit( 1 );
 }
 
-# We could use MySQL's UUID() function, but if we call it in the INSERT it
-# becomes a pain to retrieve it.  So we do the job ourselves.
-my $uuid = `@UUIDGEN@`;
-chomp $uuid;
-
-my $result = DBQueryWarn( "INSERT INTO blobs SET uuid='$uuid', " .
-			  "filename='$filename', owner_uid='$uid';" );
+my $result = DBQueryWarn( "DELETE FROM blobs WHERE uuid='$uuid' AND " .
+			  "owner_uid='$uid';" );
 unless( $result ) {
-    print STDERR "Could not insert record.\n";
+    print STDERR "Could not delete record.\n";
     exit( 1 );
 }
 
-print "$uuid\n";
+unless( $result->affectedrows == 1 ) {
+    print STDERR "Permission denied.\n";
+    exit( 1 );
+}
+
+# And clean up the blob_files table (which is only a cache), just in case
+# we removed the last reference to a file.
+DBQueryWarn( "DELETE blob_files FROM blob_files LEFT OUTER JOIN blobs ON " .
+	     "blob_files.filename=blobs.filename WHERE " .
+	     "blobs.filename IS NULL;" );
 
 exit( 0 );
