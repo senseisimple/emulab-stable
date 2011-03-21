@@ -3045,17 +3045,20 @@ sub FindVlanByPort($$$)
 {
     my ($class, $experiment, $port) = @_;
     my ($node_id, $card) = split(":", $port);
+    my $clause = "";
 
     my $interface = Interface->Lookup($node_id, $card, 1);
     return undef
 	if (!defined($interface));
     my $iface = $interface->iface();
-    my $exptidx = $experiment->idx();
+    if (defined($experiment)) {
+	my $exptidx = $experiment->idx();
+	$clause = "exptidx='$exptidx' and";
+    }
 
     my $query_result =
 	DBQueryWarn("select id from vlans  ".
-		    "where exptidx='$exptidx' and ".
-		    "      members like '%${node_id}:${iface}%'");
+		    "where $clause members like '%${node_id}:${iface}%'");
 
     return undef
 	if (!$query_result || !$query_result->numrows);
