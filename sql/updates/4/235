@@ -1,0 +1,19 @@
+#
+# Add snmp_community to switch_stacks table, so we can specify a
+# per-device community string to override the community string in the
+# switch_stack_types table.
+#
+use strict;
+use libdb;
+
+sub DoUpdate($$$)
+{
+    my ($dbhandle, $dbname, $version) = @_;
+
+    if (!DBSlotExists("switch_stacks", "snmp_community")) {
+	DBQueryFatal("alter table switch_stacks add ".
+		     "`snmp_community` varchar(32) default NULL");
+    }
+    return 0;
+}
+1;

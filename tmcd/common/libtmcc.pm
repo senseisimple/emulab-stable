@@ -40,6 +40,7 @@ use Exporter;
 # Must come after package declaration!
 use English;
 use Data::Dumper;
+use Fcntl qw(:DEFAULT :seek);
 
 #
 # Turn off line buffering on output
@@ -657,6 +658,174 @@ sub tmccgetconfig()
 	}
     }
     return 0;
+}
+
+# 
+package libtmcc::blob;
+
+my $SERVER = "www.emulab.net"; # FIXME where can this be obtained???
+    # tmcc.c jumps through hoops to get it... do we have to, too?
+my $NICKNAMEFILE = "$BOOTDIR/nickname";
+my $KEYHASHFILE = "$BOOTDIR/tmcc/keyhash";
+
+# Load up the paths. Done like this in case init code is needed.
+BEGIN
+{
+    if (! -e "/etc/emulab/paths.pm") {
+	die("Yikes! Could not require /etc/emulab/paths.pm!\n");
+    }
+    require "/etc/emulab/paths.pm";
+    import emulabpaths;
+}
+
+my $blobid = undef;
+my $canhash;
+my $hash = undef;
+my $key;
+my $existing = undef;
+my $output = undef;
+my $tempfilename = undef;
+my $finalfilename = undef;
+my $project;
+
+sub hash() {
+
+    return $hash if defined( $hash );
+
+    return undef unless defined( $existing );
+
+    my $digest = Digest::SHA1->new;
+    my $hex;
+
+    $digest->addfile( $existing );
+
+    $hash = $digest->hexdigest;
+
+    print "Computed hash $hash\n" if( $debug );
+
+    return $hash;
+}
+
+sub lwp_callback($$$) {
+    my ($chunk, $response, $protocol) = @_;
+
+    print $output $chunk;
+
+    # FIXME would be nice to hash as we go
+}
+
+sub http_common($) {
+    my ($prefix) = @_;
+
+    my $cachedhash = hash();
+
+    my $URL = $prefix . "://" . $SERVER . "/blob/read/" . $key . "/" . $blobid;
+
+    print "Attempting to retrieve $URL\n" if( $debug );
+
+    $URL .= "?hash=" . $cachedhash if( defined( $cachedhash ) );
+
+    my $ua = LWP::UserAgent->new;
+    my $request = HTTP::Request->new( GET => $URL );
+    my $response = $ua->request( $request, \&lwp_callback );
+
+    if( $response->code == 304 ) { # Not modified
+	print "Cached copy is current.\n" if( $debug );
+
+	unlink( $tempfilename ) if( defined( $tempfilename ) );
+
+	exit( 0 );
+    }
+
+    if( $response->is_success ) {
+	print "Retrieved successfully.\n" if( $debug );
+
+	if( defined( $tempfilename ) ) {
+	    rename( $tempfilename, $finalfilename )
+		or die( "$finalfilename: $!" );
+	}
+
+	exit( 0 );
+    }
+
+    print $response->status_line . "\n" if( $debug );
+}
+
+sub http() {
+
+    http_common( "http" );
+}
+
+sub https() {
+
+    http_common( "https" );
+}
+
+sub getblob($$\@$) {
+
+    $blobid = $_[ 0 ];
+    my $outputfilename = $_[ 1 ];
+    my $transport = $_[ 2 ];
+    my $options = $_[ 3 ];
+
+    $debug = 1 if( $options ); # the only option right now
+    require Digest::SHA1;
+    require LWP::UserAgent;
+
+    open NICKNAME, $NICKNAMEFILE or die "$NICKNAMEFILE: $!";
+    <NICKNAME> =~ /.+[.].+[.](.+)/;
+    $project = $1;
+    close NICKNAME;
+    
+    open KEYHASH, $KEYHASHFILE or die "$KEYHASHFILE: $!";
+    <KEYHASH> =~ /HASH='(.+)'/;
+    $key = $1;
+    close KEYHASH;
+    
+    if( $debug ) {
+        $, = " ";
+        print "Blob ID: $blobid\n";
+        print "Key: $key\n";
+        print "Output: " .
+    	( $outputfilename ? $outputfilename : "(standard output)" ) . "\n";
+        print "Project: $project\n";
+        print "Transports: @$transport\n";
+    }
+    
+    if( defined( $outputfilename ) ) {
+        $finalfilename = $outputfilename;
+        $tempfilename = $finalfilename . ".$$";
+    
+        open( OUTPUT, $outputfilename )
+    	and $existing = *OUTPUT{IO};
+        
+        open( TEMP, ">$tempfilename" )
+    	or die( "$tempfilename: $!\n" );
+    
+        $output = *TEMP{IO};
+        $canhash = 1;
+    } else {
+        $output = *STDOUT{IO};
+        $canhash = 0;
+    }
+    
+    foreach( @$transport ) {
+        print "Attempting transport $_...\n" if( $debug );
+    
+        if( /^http$/i ) {
+	    http();
+        } elsif( /^https$/i ) {
+	    https();
+        } else {
+	    print "Unknown transport $_\n";
+        }
+    }
+    
+    print STDERR "$0: failed to retrieve blob $blobid\n";
+    
+    unlink( $tempfilename ) if( defined( $tempfilename ) );
+
+    return undef;
 }
 
 1;

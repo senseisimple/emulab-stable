@@ -564,6 +564,13 @@ sub CompareVlansWithSwitches2($$)
 			"where lanid='$newid'")
 		or return -1;
 	}
+	# From the cache. 
+	delete($lans{"$newid"});
+	delete($lans{"$oldid"});
+    
+	# XXX we should not use this slot anymore.
+	$vlan = VLan->Lookup($oldid);
+	$vlan->SetAttribute("vlantag", $tag);	
     }
     return 0;
 }
@@ -1029,7 +1036,7 @@ sub Initialize($)
 		"Could not create vlan $vname ($id) in $experiment\n";
 	    return -1;
 	}
-	$vlan->SetTag($tag);
+	$vlan->ReserveVlanTag($tag);
 
 	#
 	# Split apart the space-separated list of members
@@ -2501,26 +2508,22 @@ sub GetRole($;$)
     }
     return $role;
 }
-sub SetTag($$)
-{
-    my ($self, $tag) = @_;
-
-    if (!$initialize) {
-	my $vlanid = $self->lanid();
-
-	DBQueryWarn("update vlans set tag='$tag' ".
-		    "where id='$vlanid'");
-    }
-
-    return $self->GetLan()->SetAttribute("vlantag", $tag);
-}
 sub GetTag($$)
 {
     my ($self, $ptag) = @_;
-    my $tag;
+    my $lanid = $self->lanid();
+
+    #
+    # Go to vlans table for this, since that ensures that things are
+    # consistent.
+    #
+    my $query_result =
+	DBQueryWarn("select tag from vlans where id='$lanid'");
 
     return -1
-	if ($self->GetAttribute("vlantag", \$tag) != 0);
+	if (! (defined($query_result) || $query_result->numrows));
+    
+    my ($tag) = $query_result->fetchrow_array();
 
     if (defined($ptag)) {
 	$$ptag = $tag;
@@ -2554,15 +2557,16 @@ sub GetClass($)
 }
 
 # VLan reservation for a specific lan in an experiment.
-sub ReserveVlanTag($$;$)
+sub ReserveVlanTag($$;$$)
 {
-    my ($self, $tag, $checkonly) = @_;
+    my ($self, $tag, $checkonly, $force) = @_;
     my $lanid   = $self->lanid();
     my $vname   = $self->vname();
     my $pid     = $self->pid();
     my $eid     = $self->eid();
     my $exptidx = $self->exptidx();
     $checkonly  = 0 if (!defined($checkonly));
+    $force      = 0 if (!defined($force));
 
     DBQueryWarn("lock tables lan_attributes write, lans write, ".
 		"            reserved_vlantags write, vlans read")
@@ -2581,16 +2585,19 @@ sub ReserveVlanTag($$;$)
     # But because of swapmod and syncvlansfromtables, must also check
     # the vlans table since that is what is currently on the switches.
     #
-    $query_result =
-	DBQueryWarn("select id from vlans where tag='$tag'");
-    
-    goto inuse
-	if (!$query_result || $query_result->numrows);
+    # Skip the vlans check when we want to force consistency.
+    #
+    if (!$force) {
+	$query_result =
+	    DBQueryWarn("select id from vlans where tag='$tag'");
 
-    # Just checking ...
-    goto isfree
-	if ($checkonly);
+	goto inuse
+	    if (!$query_result || $query_result->numrows);
 
+	# Just checking ...
+	goto isfree
+	    if ($checkonly);
+    }
     goto inuse
 	if (!DBQueryWarn("insert into reserved_vlantags set ".
 			 "  lanid='$lanid', tag='$tag', vname='$vname', ".
@@ -2694,6 +2701,34 @@ sub VlanTagAvailable($$)
     return 1;
 }
 
+#
+# Who has a vlan tag reserved.
+#
+sub FindVlanByTag($$)
+{
+    my ($class, $tag) = @_;
+
+    my $query_result =
+	DBQueryWarn("select lanid from reserved_vlantags where tag='$tag'");
+
+    return undef
+	if (!$query_result);
+
+    if ($query_result->numrows) {
+	my ($lanid) = $query_result->fetchrow_array();
+	return VLan->Lookup($lanid);
+    }
+    
+    $query_result =
+	DBQueryWarn("select id from vlans where tag='$tag'");
+    
+    return undef
+	if (!$query_result || !$query_result->numrows);
+    
+    my ($lanid) = $query_result->fetchrow_array();
+    return VLan->Lookup($lanid);
+}
+
 # Find out which stack a VLAN resides on
 sub GetStack($) {
     my ($self) = @_;
@@ -2746,6 +2781,26 @@ sub IsManual($)
 
     return $flag
 	if ($self->GetAttribute("cmdline_created", \$flag) == 0);
+    return 0;
+}
+
+#
+# Mark/Get the "internal" bit on a vlan. These are special vlans
+# not associated with an experiment.
+#
+sub MarkInternal($)
+{
+    my ($self) = @_;
+
+    return $self->GetLan()->SetAttribute("internal", "1");
+}
+sub IsInternal($)
+{
+    my ($self) = @_;
+    my $flag;
+
+    return $flag
+	if ($self->GetAttribute("internal", \$flag) == 0);
     return 0;
 }
 
@@ -2890,19 +2945,22 @@ sub UnInstantiate($;$)
 #
 sub RecordVlanInsertion($$$$)
 {
-    my ($class, $experiment, $lanid, $stack) = @_;
+    my ($class, $experiment, $vlan, $stack) = @_;
 
     my $pid     = $experiment->pid();
     my $eid     = $experiment->eid();
     my $exptidx = $experiment->idx();
-    my $vlan    = VLan->Lookup($lanid);
+    if (!ref($vlan)) {
+	$vlan   = VLan->Lookup($vlan);
+    }
     return -1
 	if (!defined($vlan));
 
+    my $lanid     = $vlan->lanid();
     my $vname     = $vlan->vname();
-    my $tag       = $vlan->GetTag(undef);
+    my $tag       = $vlan->GetReservedVlanTag();
     return -1
-	if ($tag <= 0);
+	if (!defined($tag));
     
     my @portlist;
     $vlan->PortList(\@portlist) == 0

@@ -86,7 +86,8 @@ if ($geniuser) {
 else {
     $user = User::LookupByUUID($slice->creator_uuid());
     if ($user) {
-	$rows[] = array("Creator" => $user->uid());
+	$url = CreateURL("showuser", $user);
+	$rows[] = array("Creator" => "<a href='$url'>". $user->uid() ."</a>");
     }
 }
 
