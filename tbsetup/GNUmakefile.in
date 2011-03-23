@@ -88,7 +88,7 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  power_mail.pm power_whol.pm Template.pm power_rmcp.pm \
 		  power_ilo.pm libvtop.pm libptop.pm libossetup.pm \
 		  power_ipmi.pm libosload_new.pm libosload_switch.pm \
-		  libossetup_switch.pm
+		  libossetup_switch.pm power_icebox.pm
 
 # These scripts installed setuid, with sudo. 
 SETUID_BIN_SCRIPTS   = node_reboot eventsys_control tarfiles_setup savelogs \

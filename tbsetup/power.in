@@ -34,6 +34,7 @@ use power_sgmote;
 use power_mail;
 use power_whol;
 use power_ilo;
+use power_icebox;
 use snmpit_apc;
 use libtestbed;
 use User;
@@ -349,6 +350,19 @@ foreach my $power_id (keys %outlets) {
 	    }
 	}
     }
+    elsif ($type eq "icebox") {
+        my $device = new power_icebox($IP,$verbose);
+	if (!defined $device) {
+	    warn "Unable to contact controller for $nodestr. Skipping...\n";
+	    next;
+	} else {
+	    print "Calling device->power($op,@outlets)\n" if $verbose > 1;
+	    if ($device->power($op,@outlets)) {
+		print "Control of $nodestr failed.\n";
+		$errors++;
+	    }
+	}
+    }
     elsif ($type eq "APC") {
 	my $device = new snmpit_apc($IP,$verbose);
 	if (!defined $device) {
@@ -513,7 +527,28 @@ sub dostatus(@) {
     for my $ctrl (@nwanted) {
 	my %status;
 
-	if ($ctrls{$ctrl} eq "APC") {
+	if ($ctrls{$ctrl} eq 'icebox') {
+  	    my $device = new power_icebox($IPs{$ctrl}, $verbose};
+	    if (!defined $device) {
+		warn "Unable to contact controller $ctrl.\n";
+		$errors++;
+		next;
+	    } else {
+		print "Calling device->status()\n"
+		    if $verbose > 1;
+		if ($device->status(\%status)) {
+		    print "Could not get status for $ctrl.\n";
+		    $errors++;
+		    next;
+		}
+	        for my $outlet (1..24) {
+		    my $ostr = "outlet$outlet";
+		    print "$ctrl Outlet $outlet: ", $status{$ostr}, "\n"
+		        if (defined($status{$ostr}));
+	        }
+	        print "\n";
+	    }
+	} elsif ($ctrls{$ctrl} eq "APC") {
 	    my $device = new snmpit_apc($IPs{$ctrl}, $verbose);
 	    if (!defined $device) {
 		warn "Unable to contact controller $ctrl.\n";

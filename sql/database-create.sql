@@ -128,6 +128,7 @@ DROP TABLE IF EXISTS `blobs`;
 CREATE TABLE `blobs` (
   `uuid` varchar(40) NOT NULL,
   `filename` tinytext,
+  `owner_uid` varchar(8) NOT NULL default '',
   PRIMARY KEY  (`uuid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 

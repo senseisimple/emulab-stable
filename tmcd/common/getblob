@@ -1,0 +1,72 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use strict;
+use libtmcc;
+
+my $blobid = undef;
+my $debug = 0;
+my @transport = ();
+my $outputfilename = undef;
+
+sub Usage($) {
+    my ($code) = @_;
+
+    print "Usage:\n\n";
+    print "    $0 [-d] [-h] [-o file] [-t transport]... [-v] blobid\n\n";
+    print "Options:\n";
+    print "    -d              debug mode (verbose)\n";
+    print "    -h              help\n";
+    print "    -o file         output file name\n";
+    print "    -t transport    specify transports, in decreasing priority\n";
+    print "                        where transport can include:\n";
+    print "            http    HTTP\n";
+    print "            https   HTTP over TLS/SSL\n";
+    print "    -v              show version\n";
+
+    exit( $code );
+}
+
+
+# Perl's Getopt::Std won't handle multiple occurrences of the same
+# option, so we have to do it ourselves.  Bleh.
+while( my $arg = shift ) {
+    if( $arg eq "-d" || $arg eq "--debug" ) {
+	# Turn off all bugs.
+	$debug = 1;
+    } elsif( $arg eq "-h" || $arg eq "--help" ) {
+	Usage( 0 );
+    } elsif( $arg eq "-o" || $arg eq "--output" ) {
+	$outputfilename = shift;
+	if( !defined( $outputfilename ) ) {
+	    print "Option \"-o\" requires an argument.\n";
+	    Usage( 1 );
+	}
+    } elsif( $arg eq "-t" || $arg eq "--transport" ) {
+	my $t = shift;
+	if( !defined( $t ) ) {
+	    print "Option \"-t\" requires an argument.\n";
+	    Usage( 1 );
+	}
+	push( @transport, $t );
+    } elsif( $arg eq "-v" || $arg eq "--version" ) {
+	print "getblob version 6.297864\n"; # who really cares?
+	exit( 0 );
+    } elsif( $arg =~ /^-/ ) {
+	print "Unknown option \"$arg\".\n";
+	Usage( 1 );
+    } else {
+	$blobid = $arg;
+	last;
+    }
+}
+
+Usage( 1 ) unless defined( $blobid );
+
+@transport = ( "https", "http" ) unless @transport;
+
+libtmcc::blob::getblob( $blobid, $outputfilename, @transport, $debug );

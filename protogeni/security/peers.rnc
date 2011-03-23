@@ -1,0 +1,23 @@
+'#
+# GENIPUBLIC-COPYRIGHT
+# Copyright (c) 2010 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+default namespace = "http://www.protogeni.net/resources/peers/1"
+
+include "any-extension.rnc"
+
+Peers = element peers {
+  AnyExtension & 
+  Authority*
+}
+
+Authority = element authority {
+  AnyExtension &
+  attribute name { text } &
+  attribute url { text } &
+  attribute permit { "cm" | "sa" | "ses" | "ch" | "am" | "id" }
+}
+
+start = Peers
