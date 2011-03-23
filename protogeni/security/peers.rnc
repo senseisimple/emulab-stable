@@ -17,7 +17,7 @@ Authority = element authority {
   AnyExtension &
   attribute name { text } &
   attribute url { text } &
-  attribute permit { "cm" | "sa" | "ses" | "ch" | "am" | "id" }
+  attribute permit { "cm" | "sa" | "ses" | "ch" | "am" | "idp" }
 }
 
 start = Peers

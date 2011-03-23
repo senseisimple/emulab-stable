@@ -13,7 +13,7 @@
              permit="sa" />
   <authority name="urn:publicid+emulab.net+authority+sa"
 	     url="https://www.emulab.net/protogeni/xmlrpc/sa"
-             permit="id" />
+             permit="idp" />
   <authority name="urn:publicid+flybynight.com+authority+cm"
 	     url="https://flybynight.com/protogeni/xmlrpc/cm"
              permit="cm" />
