@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Utility routines for Emulab.
@@ -14,7 +14,7 @@ use vars qw(@ISA @EXPORT);
 @ISA = qw(Exporter SelfLoader);
 @EXPORT = qw(TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN
 	     TBDB_CHECKDBSLOT_ERROR TBcheck_dbslot TBFieldErrorString
-	     TBGetUniqueIndex ParRun);
+	     TBGetUniqueIndex ParRun VersionInfo);
 
 use emdb;
 use English;
@@ -459,6 +459,24 @@ sub ParRun($$$@)
     return -1
 	if ($signaled);
     return 0;
+}
+
+#
+# Version Info
+#
+sub VersionInfo($)
+{
+    my ($name) = @_;
+
+    my $query_result = 
+	DBQueryWarn("select value from version_info ".
+		    "where name='$name'");
+
+    return undef
+	if (!$query_result || !$query_result->numrows);
+
+    my ($value) = $query_result->fetchrow_array();
+    return $value;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
