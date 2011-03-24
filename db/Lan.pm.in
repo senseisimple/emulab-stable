@@ -2312,11 +2312,21 @@ sub Refresh($)
 #
 # Stringify for output.
 #
+#
+# Stringify for output.
+#
 sub Stringify($)
 {
     my ($self) = @_;
+    
+    my $pid   = $self->pid();
+    my $eid   = $self->eid();
+    my $vname = $self->vname();
+    my $id    = $self->lanid();
+    my $tag   = $self->GetTag();
+    $tag = (defined($tag) ? ":${tag}" : "");
 
-    return "V" . $self->GetLan()->Stringify();
+    return "[VLan ${id}${tag}: $pid/$eid/$vname]";
 }
 
 #
@@ -2910,6 +2920,23 @@ sub Instantiate($;$)
 }
 
 #
+# Some vlans are not kept sync with the DB; too difficult. Might
+# reexamine this later. For sure, keeping the default vlan and the
+# control vlan in sync would be really hard since these tend to
+# get mucked with on the switch console instead of through snmpit.
+#
+sub KeepInSync($)
+{
+    my ($self) = @_;
+    my $tag    = $self->GetReservedVlanTag();
+
+    return 0
+	if ($self->IsInternal() && $tag <= 10);
+
+    return 1;
+}
+
+#
 # Utility function to remove a vlan from the switch infrastructure.
 #
 sub UnInstantiate($;$)
@@ -2943,19 +2970,19 @@ sub UnInstantiate($;$)
 # Class methods to maintain the backup vlans table, which records what
 # is on the switches. 
 #
-sub RecordVlanInsertion($$$$)
+sub RecordVlanInsertion($$$)
 {
-    my ($class, $experiment, $vlan, $stack) = @_;
+    my ($class, $vlan, $stack) = @_;
 
-    my $pid     = $experiment->pid();
-    my $eid     = $experiment->eid();
-    my $exptidx = $experiment->idx();
     if (!ref($vlan)) {
 	$vlan   = VLan->Lookup($vlan);
     }
     return -1
 	if (!defined($vlan));
 
+    my $pid       = $vlan->pid();
+    my $eid       = $vlan->eid();
+    my $exptidx   = $vlan->exptidx();
     my $lanid     = $vlan->lanid();
     my $vname     = $vlan->vname();
     my $tag       = $vlan->GetReservedVlanTag();
