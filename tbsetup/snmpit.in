@@ -1782,7 +1782,7 @@ sub CreateOneVlan($$$@)
 	    $errors++;
 	}
 	else {
-	    VLan->RecordVlanInsertion($experiment, $vlanid,$stack->{STACKID});
+	    VLan->RecordVlanInsertion($vlanid,$stack->{STACKID});
 	}
     }
     return $errors
@@ -2501,8 +2501,7 @@ sub doMakeVlan($$@) {
 	    VLan->RecordVLanDeletion($source_vlan->id());
 	}
 	if (defined($target_vlan)) {
-	    VLan->RecordVlanInsertion($experiment, $target_vlan->id(),
-                $stack->{STACKID});
+	    VLan->RecordVlanInsertion($target_vlan->id(), $stack->{STACKID});
 	}
     }
     return $errors;

@@ -198,8 +198,7 @@ sub RemoteDoVlansFromTables($@)
 		print STDERR "could not set vlan tag for $vlan\n";
 		$errors++;
 	    }
-	    VLan->RecordVlanInsertion($vlan->GetExperiment(), $vlan->lanid(),
-				      $vlan->GetClass());
+	    VLan->RecordVlanInsertion($vlan->lanid(), $vlan->GetClass());
 	}
     }
     else {
