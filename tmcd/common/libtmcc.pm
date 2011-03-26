@@ -663,7 +663,7 @@ sub tmccgetconfig()
 # 
 package libtmcc::blob;
 
-my $SERVER = "www.emulab.net"; # FIXME where can this be obtained???
+my $SERVERFILE = "$VARDIR/boot/bossip";
     # tmcc.c jumps through hoops to get it... do we have to, too?
 my $NICKNAMEFILE = "$BOOTDIR/nickname";
 my $KEYHASHFILE = "$BOOTDIR/tmcc/keyhash";
@@ -678,48 +678,32 @@ BEGIN
     import emulabpaths;
 }
 
-my $blobid = undef;
-my $canhash;
-my $hash = undef;
-my $key;
-my $existing = undef;
-my $output = undef;
-my $tempfilename = undef;
-my $finalfilename = undef;
-my $project;
+sub hash($) {
+    my ($struct) = @_;
 
-sub hash() {
+    return $struct->{'hash'} if defined( $struct->{'hash'} );
 
-    return $hash if defined( $hash );
-
-    return undef unless defined( $existing );
+    return undef unless defined( $struct->{'existing'} );
 
     my $digest = Digest::SHA1->new;
     my $hex;
 
-    $digest->addfile( $existing );
+    $digest->addfile( $struct->{'existing'} );
 
     $hash = $digest->hexdigest;
 
-    print "Computed hash $hash\n" if( $debug );
+    print "Computed hash $struct->{hash}\n" if( $debug );
 
     return $hash;
 }
 
-sub lwp_callback($$$) {
-    my ($chunk, $response, $protocol) = @_;
+sub http_common($$) {
+    my ($struct,$prefix) = @_;
 
-    print $output $chunk;
+    my $cachedhash = hash($struct);
 
-    # FIXME would be nice to hash as we go
-}
-
-sub http_common($) {
-    my ($prefix) = @_;
-
-    my $cachedhash = hash();
-
-    my $URL = $prefix . "://" . $SERVER . "/blob/read/" . $key . "/" . $blobid;
+    my $URL = $prefix . "://" . $struct->{'server'} . "/blob/read/" . 
+	$struct->{'key'} . "/" . $struct->{'blobid'};
 
     print "Attempting to retrieve $URL\n" if( $debug );
 
@@ -727,46 +711,65 @@ sub http_common($) {
 
     my $ua = LWP::UserAgent->new;
     my $request = HTTP::Request->new( GET => $URL );
-    my $response = $ua->request( $request, \&lwp_callback );
+
+    # setup a callback
+    my $callback = sub {
+	my $cstruct = $struct;
+	my ($chunk, $response, $protocol) = @_;
+
+	print { $cstruct->{'output'} } $chunk;
+
+	# FIXME would be nice to hash as we go
+    };
+
+    my $response = $ua->request( $request, $callback );
 
     if( $response->code == 304 ) { # Not modified
 	print "Cached copy is current.\n" if( $debug );
 
-	unlink( $tempfilename ) if( defined( $tempfilename ) );
+	unlink( $struct->{'tempfilename'} ) if( exists( $struct->{'tempfilename'} ) );
 
-	exit( 0 );
+	close ( $struct->{'output'} );
+	return 1;
     }
 
     if( $response->is_success ) {
 	print "Retrieved successfully.\n" if( $debug );
 
-	if( defined( $tempfilename ) ) {
-	    rename( $tempfilename, $finalfilename )
-		or die( "$finalfilename: $!" );
+	if( exists( $struct->{'tempfilename'} ) ) {
+	    rename( $struct->{'tempfilename'}, $struct->{'finalfilename'} )
+		or die( "$struct->{finalfilename}: $!" );
 	}
 
-	exit( 0 );
+	close ( $struct->{'output'} );
+	return 0;
     }
 
     print $response->status_line . "\n" if( $debug );
+
+    return -1;
 }
 
-sub http() {
-
-    http_common( "http" );
+sub http($) {
+    http_common( $_[0],"http" );
 }
 
-sub https() {
-
-    http_common( "https" );
+sub https($) {
+    http_common( $_[0],"https" );
 }
 
-sub getblob($$\@$) {
+sub getblob($$;\@$) {
+    my ($blobid,$outputfilename,$transport,$options) = @_;
+    if (!defined($transport)) {
+	$transport = [ 'https','http' ];
+    }
 
-    $blobid = $_[ 0 ];
-    my $outputfilename = $_[ 1 ];
-    my $transport = $_[ 2 ];
-    my $options = $_[ 3 ];
+    #
+    # Build a struct so we're reentrant.
+    #
+    my %struct = ( 'blobid' => $blobid,
+		   'outputfilename' => $outputfilename
+	);
 
     $debug = 1 if( $options ); # the only option right now
     require Digest::SHA1;
@@ -774,13 +777,20 @@ sub getblob($$\@$) {
 
     open NICKNAME, $NICKNAMEFILE or die "$NICKNAMEFILE: $!";
     <NICKNAME> =~ /.+[.].+[.](.+)/;
-    $project = $1;
+    my $project = $1;
+    $struct{'project'} = $project;
     close NICKNAME;
     
     open KEYHASH, $KEYHASHFILE or die "$KEYHASHFILE: $!";
     <KEYHASH> =~ /HASH='(.+)'/;
-    $key = $1;
+    my $key = $1;
+    $struct{'key'} = $key;
     close KEYHASH;
+    
+    open BOSSIP, $SERVERFILE or die "$SERVERFILE: $!";
+    <BOSSIP> =~ /^(\d+\.\d+\.\d+\.\d++)$/;
+    $struct{'server'} = $1;
+    close BOSSIP;
     
     if( $debug ) {
         $, = " ";
@@ -791,41 +801,58 @@ sub getblob($$\@$) {
         print "Project: $project\n";
         print "Transports: @$transport\n";
     }
-    
+
+    my $tempfilename;
     if( defined( $outputfilename ) ) {
-        $finalfilename = $outputfilename;
-        $tempfilename = $finalfilename . ".$$";
+        $tempfilename = $outputfilename . ".$$";
+	$struct{'finalfilename'} = $outputfilename;
+	$struct{'tempfilename'} = $tempfilename;
     
         open( OUTPUT, $outputfilename )
-    	and $existing = *OUTPUT{IO};
+	and $struct{'existing'} = *OUTPUT{IO};
         
-        open( TEMP, ">$tempfilename" )
-    	or die( "$tempfilename: $!\n" );
+        if (!open( TEMP, ">$tempfilename" )) {
+	    print STDERR "ERROR(getblob): $tempfilename: $!\n";
+	    return -1;
+	}
     
-        $output = *TEMP{IO};
-        $canhash = 1;
+        $struct{'output'} = *TEMP{IO};
+        $struct{'canhash'} = 1;
     } else {
-        $output = *STDOUT{IO};
-        $canhash = 0;
+        $struct{'output'} = *STDOUT{IO};
+        $struct{'canhash'} = 0;
     }
     
-    foreach( @$transport ) {
-        print "Attempting transport $_...\n" if( $debug );
+    my $retval = 0;
+    foreach my $t ( @$transport ) {
+        print "Attempting transport $t...\n" if( $debug );
     
-        if( /^http$/i ) {
-	    http();
-        } elsif( /^https$/i ) {
-	    https();
+        if( $t =~ /^http$/i ) {
+	    $retval = http(\%struct);
+        } elsif( $t =~ /^https$/i ) {
+	    $retval = https(\%struct);
         } else {
-	    print "Unknown transport $_\n";
+	    $retval = -1;
+	    print STDERR "ERROR(getblob): unknown transport $t\n";
+	    next;
         }
+
+	if ($retval == 1 || $retval == 0) {
+	    # success!
+	    unlink( $tempfilename ) if( defined( $tempfilename ) );
+	    return 0;
+	}
+	else {
+	    print STDERR "ERROR(getblob): transport $t failed!\n";
+	}
     }
     
-    print STDERR "$0: failed to retrieve blob $blobid\n";
+    # nothing worked.
+    print STDERR "ERROR(getblob): failed to retrieve blob $blobid\n";
     
     unlink( $tempfilename ) if( defined( $tempfilename ) );
 
-    return undef;
+    return -1;
 }
 
 1;
