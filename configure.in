@@ -221,6 +221,7 @@ AC_SUBST(NOSTACKMIB)
 AC_SUBST(EXP_VIS_SUPPORT)
 AC_SUBST(NOSHAREDFS)
 AC_SUBST(SELFLOADER_DATA)
+AC_SUBST(TBUSEDBI)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -262,6 +263,7 @@ CLIENT_VARDIR="/var/emulab"
 CLIENT_MANDIR="/usr/local/man"
 TBSECURECOOKIES=1
 TBMAINSITE=0
+TBUSEDBI=0
 FANCYBANNER=0
 VIRTNODE_NETWORK=172.16.0.0
 VIRTNODE_NETMASK=255.240.0.0
@@ -829,6 +831,7 @@ fi
 # overridable for other sites
 if test "$TBMAINSITE" = 1; then
     FANCYBANNER=1
+    TBUSEDBI=1
 fi
 
 #
