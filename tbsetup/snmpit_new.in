@@ -2017,6 +2017,8 @@ sub syncVlansFromTables($$) {
 		    }
 		    VLan->RecordVLanDeletion($vlanid) == 0
 			or goto bad;
+		    VLan->ClearReservedVlanTag($vlanid) == 0
+			or goto bad;
 		}
 	    }
 	}
