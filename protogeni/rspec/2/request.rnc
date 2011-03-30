@@ -42,6 +42,9 @@ ServiceContents &=
   element install { InstallServiceContents }* &
   element execute { ExecuteServiceContents }*
 
+RelationContents &=
+  attribute client_id { text }
+
 InstallServiceContents &=
   AnyExtension &
   attribute url { text } &
@@ -77,8 +80,8 @@ RSpecContents &=
 ComponentHopContents &=
   AnyExtension &
   # Component ID of the link
-  attribute component_id { text } &
-  attribute component_manager_id { text } &
+  attribute component_id { text }? &
+  element component_manager { attribute name { text } }* &
   InterfaceMapping*
 
 # Each interface represents a particular physical interface. If that
