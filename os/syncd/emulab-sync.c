@@ -26,8 +26,11 @@
 #include <netdb.h>
 #include <setjmp.h>
 #include "decls.h"
+
+#ifndef NO_EMULAB
 #include "config.h"
 #include "tmcc.h"
+#endif
 
 #ifndef SYNCSERVER
 #define SYNCSERVER	"/var/emulab/boot/syncserver"
@@ -81,7 +84,9 @@ main(int argc, char **argv)
 	int			nowait  = 0;
 	char			*barrier= DEFAULT_BARRIER;
 	barrier_req_t		barrier_req;
+#ifndef NO_EMULAB
 	extern char		build_info[];
+#endif
 	int			mastercheck = 0;
 	
 	while ((ch = getopt(argc, argv, "hVds:p:ui:n:ae:m")) != -1)
@@ -169,7 +174,11 @@ main(int argc, char **argv)
 			}
 			break;
 		case 'V':
+#ifndef NO_EMULAB
 			fprintf(stderr, "%s\n", build_info);
+#else
+                        fprintf(stderr, "Built in standalone mode\n");
+#endif
 			exit(0);
 			break;
 		case 'h':
@@ -276,6 +285,7 @@ main(int argc, char **argv)
 	 * Lookup the port.
 	 */
 	if (portnum == 0) {
+#ifndef NO_EMULAB
 		char nodename[BUFSIZ];
 		int  rc;
 
@@ -301,6 +311,10 @@ main(int argc, char **argv)
 			/* Delay */
 			sleep(5);
 		}
+#else
+                fprintf(stderr, "No port specified\n");
+                exit(1);
+#endif
 	}
 	
 	/*
