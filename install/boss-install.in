@@ -223,6 +223,11 @@ my %EXPERIMENTS =
 			 "description" => "Nodes in shared mode"},
      "hwcheckup"     => {"pid"	       => "emulab-ops",
 			 "description" => "Nodes being testing after failure"},
+     "external-holding" => {"pid"      => "emulab-ops",
+			 "description" => "Holding experiment for fake nodes"},
+     "vlan-holding"  => {"pid"      => "emulab-ops",
+			 "description" =>
+			     "Holding experiment for internal vlans"},
     );
 
 #

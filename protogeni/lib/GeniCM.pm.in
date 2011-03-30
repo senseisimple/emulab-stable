@@ -1605,45 +1605,82 @@ sub GetTicketAuxAux($$$$$$$$$)
     foreach my $linkname (keys(%external_linkmap)) {
 	my ($linkref, $ifaceref) = @{ $external_linkmap{$linkname} };
 	my $slice_urn = $slice->urn();
+	my $retries   = 10;
 
-	#
-	# Already have a reserved tag? This could happen if the other CM
-	# acted first and talked to this CM before we saw the ticket
-	# request. Or this is an update and we already have tags reserved.
-	#
-	my $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
-	goto tagged
-	    if (defined($tag));
+	while ($retries) {
+	    #
+	    # Already have a reserved tag? This could happen if the other CM
+	    # acted first and talked to this CM before we saw the ticket
+	    # request. Or this is an update and we already have tags reserved.
+	    #
+	    my $tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
+	    last
+		if (defined($tag));
 
-	my ($fh, $filename) = tempfile(UNLINK => 0);
-	if (!defined($fh)) {
-	    print STDERR "Could not create temp file for rspec\n";
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
-	    goto bad;
-	}
-	print $fh GeniXML::Serialize($rspec);
-	close($fh);
-	system("$RESERVEVLANS '$slice_urn' '$linkname' $filename");
-	if ($?) {
-	    unlink($filename);
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-			     "Could not reserve vlan tags for $linkname");
-	    goto bad;
-	}
-	unlink($filename);
+	    my ($fh, $filename) = tempfile(UNLINK => 0);
+	    if (!defined($fh)) {
+		print STDERR "Could not create temp file for rspec\n";
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR);
+		goto bad;
+	    }
+	    print $fh GeniXML::Serialize($rspec);
+	    close($fh);
+	    system("$RESERVEVLANS '$slice_urn' '$linkname' $filename");
+	    if ($CHILD_ERROR) {
+		unlink($filename);
 
-	#
-	# Need to find out what vlan was assigned.
-	#
-	$tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
-	if (!defined($tag)) {
-	    print STDERR "Did not find the reserved tag for $linkname\n";
-	    $response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					     "Error reserving vlan tag");
-	    goto bad;
+		#
+		# Positive exit value indicates the other side returned busy.
+		# This could be for several reasons, not the least of which is
+		# that it is trying to stitch the slice at the same time, and
+		# this side is deadlocked with the other side.
+		#
+		# So, lets try to backoff, dropping the stitching lock for a
+		# while so that other side can proceed. Once we get the lock
+		# back, look to see if we now have a tag (other side was able
+		# to proceed). If so we are done, otherwise try again and repeat
+		# for a while. 
+		#
+		if (($CHILD_ERROR >> 8) == 1) {
+		    print STDERR "reservevlans for $linkname returned busy, ".
+			"will retry in a bit.\n";
+		    $slice->StitchUnLock();
+		    # random backoff. 
+		    sleep(int(rand(20)) + 5);
+		    # We should be able to get the lock at some point.
+		    for (my $r = 20; $r > 0; $r--) {
+			goto again
+			    if ($slice->StitchLock() == 0);
+			sleep(5);
+		    }
+		    print STDERR
+			"Could not get the stitching lock back. Giving up\n";
+		}
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				 "Could not reserve vlan tags for $linkname");
+		goto bad;
+	    }
+	    else {
+		unlink($filename);
+
+		#
+		# Need to find out what vlan was assigned.
+		#
+		$tag = VLan::GetReservedVlanTag($slice_experiment, $linkname);
+		if (defined($tag)) {
+		    GeniXML::SetText("vlantag", $linkref, $tag);
+		    last;
+		}
+		# This should not happen. 
+		print STDERR "Did not find the reserved tag for $linkname\n";
+		$response = GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+						 "Error reserving vlan tag");
+		goto bad;
+	    }
+	    # Try again.
+	  again:
+	    $retries--;
 	}
-      tagged:
-	GeniXML::SetText("vlantag", $linkref, $tag);
     }
     
     print GeniXML::Serialize($rspec);

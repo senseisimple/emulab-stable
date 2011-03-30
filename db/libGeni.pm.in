@@ -200,8 +200,8 @@ sub MapResources($$$$$)
 	# If so, must convert it to something assign can grok.
 	#
 	if ($resource->IsSFA()) {
-	    $advertisement = ConvertAdSFAtoPG($advertisement,
-					      $resource->manager_urn());
+	    $advertisement = ConvertSFAtoPG($advertisement, "ad",
+					    $resource->manager_urn());
 	    return -1
 		if (!defined($advertisement));
 	    $advertisement = GeniXML::Serialize($advertisement, 1);
@@ -573,8 +573,8 @@ sub MapResourcesNew($$$$$)
 	# If so, must convert it to something assign can grok.
 	#
 	if ($resource->IsSFA()) {
-	    $advertisement = ConvertAdSFAtoPG($advertisement,
-					      $resource->manager_urn());
+	    $advertisement = ConvertSFAtoPG($advertisement, "ad",
+					    $resource->manager_urn());
 	    return -1
 		if (!defined($advertisement));
 	    $advertisement = GeniXML::Serialize($advertisement, 1);
@@ -1059,6 +1059,24 @@ sub GetTickets($)
 		#
 		$object = $resource->Manifest();
 
+		#
+		# Convert SFA manifest to rspec format.
+		#
+		if ($object && $resource->IsSFA()) {
+		    my $tmp = ConvertSFAtoPG($object, "manifest",
+					     $resource->manager_urn());
+		    if (!defined($tmp) ||
+			$resource->UpdateManifest($tmp)) {
+			print STDERR "Could not store manifest for $resource\n";
+			$errors++;
+			$object = undef;
+		    }
+		    else {
+			# reload.
+			$object = $tmp;
+		    }
+		}
+		
 		# File the rspec away since that is what we have.
 		if ($resource->UpdateRspec($resource->stashedrspec())) {
 		    print STDERR "Could not store rspec for $resource\n";
@@ -2378,9 +2396,9 @@ sub AddLinkToRspec($$)
     return $rspeclink;
 }
 
-sub ConvertAdSFAtoPG($$)
+sub ConvertSFAtoPG($$$)
 {
-    my ($rspec, $manager_urn) = @_;
+    my ($rspec, $type, $manager_urn) = @_;
 
     # Parse if a string.
     if (! ref($rspec)) {
@@ -2426,14 +2444,17 @@ sub ConvertAdSFAtoPG($$)
 		$rspecnode->setAttribute('component_uuid', $urn);
 		$rspecnode->setAttribute('component_urn', $urn);
 		$rspecnode->setAttribute('component_name', "$id:$name");
-		my $tmp = addChildToRspec($doc, $rspecnode, 'node_type');
-		$tmp->setAttribute("type_name",  "pc");
-		$tmp->setAttribute("type_slots", "1");
 
-		$tmp = addChildToRspec($doc, $rspecnode, 'available');
-		$tmp->appendText("true");
-		$tmp = addChildToRspec($doc, $rspecnode, 'exclusive');
-		$tmp->appendText("true");
+		if ($type eq "ad") {
+		    my $tmp = addChildToRspec($doc, $rspecnode, 'node_type');
+		    $tmp->setAttribute("type_name",  "pc");
+		    $tmp->setAttribute("type_slots", "1");
+
+		    $tmp = addChildToRspec($doc, $rspecnode, 'available');
+		    $tmp->appendText("true");
+		    $tmp = addChildToRspec($doc, $rspecnode, 'exclusive');
+		    $tmp->appendText("true");
+		}
 	    }
 	}
     }

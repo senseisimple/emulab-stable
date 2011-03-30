@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2010 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # node reboot library. Basically the backend to the node_reboot script, but
@@ -371,9 +371,10 @@ sub nodereboot($$)
 	    # batch, and continue on. We do not wait for them to go down or
 	    # reboot.
 	    #
-	    info("*** reboot: Powercyle mode: power cycle ".join(" ",@batch));
+	    info("*** reboot: Powercycle mode: power cycle ".join(" ",@batch));
 	    if (PowerCycle(@batch)) {
-		tberror "Powercyle failed for " . join(" ",@batch);
+		tberror "Powercycle failed for one or more of " .
+		    join(" ",@batch);
 		foreach my $node (@batch) {
 		    $result->{$node} = -1;
 		    $failed++;
@@ -445,7 +446,8 @@ sub nodereboot($$)
     #
     if (@needPowercycle) {
 	if (PowerCycle(@needPowercycle)) {
-	    tberror "Powercyle failed for " . join(" ",@needPowercycle);
+	    tberror "Powercycle failed for one or more of " .
+		join(" ",@needPowercycle);
 	    foreach my $node (@needPowercycle) {
 		$result->{$node} = -1;
 		$failed++;

@@ -1606,23 +1606,15 @@ sub ReserveVlanTags($)
 	#
 	# Already exists locally. 
 	#
-        if ($slice->Lock() != 0) {
+        if ($slice->StitchLock() != 0) {
 	    return GeniResponse->BusyResponse();
-	}
-	#
-	# Confirm that the certificate is the same.
-	#
-	if ($slice->cert() ne $slice_cert) {
-	    $response = GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
-					     "Slice certificate mismatch");
-	    goto done;
 	}
     }
     else {
 	#
 	# Create a placeholder slice. Have to watch for a concurrent
-	# slice creation through the normal path, in which case the user
-	# needs to set if the slice was first created on this path.
+	# slice creation through the normal path, in which case the code
+	# needs to see if the slice was first created on this path.
 	#
 	my ($auth,$type,$id) = GeniHRN::Parse($slice_urn);
 	my $sa_urn = GeniHRN::Generate($auth, "authority", "sa");
@@ -1632,16 +1624,28 @@ sub ReserveVlanTags($)
 	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	    goto done;
 	}
-	$slice = GeniSlice->Create($slice_certificate,
-				   undef, $authority, undef, 1);
+	$slice = GeniSlice->Create($slice_certificate, undef, $authority);
 	if (!defined($slice)) {
 	    $response = GeniResponse->Create(GENIRESPONSE_ERROR);
 	    goto done;
 	}
-	# Slice is returned locked. We will not bother to remove this slice
-	# on failure since it will get aged out automatically, and it avoids
-	# dealing with concurrency issues on this path. 
+	#
+	# Concurrency requires that we try for the lock after we create
+	# it, since in fact it might not be us that created it. 
+	#
+        if ($slice->StitchLock() != 0) {
+	    return GeniResponse->BusyResponse();
+	}
     }
+    #
+    # Confirm that the certificate is the same.
+    #
+    if ($slice->cert() ne $slice_cert) {
+	$response = GeniResponse->Create(GENIRESPONSE_FORBIDDEN, undef,
+					 "Slice certificate mismatch");
+	goto done;
+    }
+    
     my $slice_experiment = GeniCM::GeniExperiment($slice);
     if (!defined($slice_experiment)) {
 	print STDERR "Could not create new Geni slice experiment!\n";
@@ -1859,7 +1863,7 @@ sub ReserveVlanTags($)
 
 	$vlan->Destroy();
     }
-    $slice->UnLock()
+    $slice->StitchUnLock()
 	if (defined($slice));
     return $response;
 }

@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2007, 2009 University of Utah and the Flux Group.
+# Copyright (c) 2000-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -85,7 +85,7 @@ frisbee-mfs-install:	destdircheck
 	@if [ -r $(SRCDIR)/master.passwd ]; then \
 	    $(INSTALL) -m 600 $(SRCDIR)/master.passwd $(SYSETCDIR); \
 	    pwd_mkdb -d $(SYSETCDIR) $(SYSETCDIR)/master.passwd; \
-	    if [ ! -e $(DESTDIR)/bin/csh ]; then \
+	    if [ ! -e $(DESTDIR)/bin/csh -a -e $(DESTDIR)/bin/sh ]; then \
 		ln $(DESTDIR)/bin/sh $(DESTDIR)/bin/csh; \
 	    fi \
 	fi

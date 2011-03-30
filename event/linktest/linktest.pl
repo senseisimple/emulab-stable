@@ -111,6 +111,7 @@ use constant TEST_RT_STATIC => 2;   # prior plus static routing
 use constant TEST_LOSS => 3;   # prior plus loss
 use constant TEST_BW => 4; # prior plus bandwidth
 use constant TEST_UNLINK => 5; # prior plus unconnected interfaces
+use constant TEST_UNLINK_COMPLETE => 6; # prior plus complete unlinktest
 
 # test names
 use constant NAME_RT_STATIC => "Routing";
@@ -118,6 +119,7 @@ use constant NAME_LATENCY => "Latency";
 use constant NAME_LOSS => "Loss";
 use constant NAME_BW => "Bandwidth";
 use constant NAME_UNLINK => "Unlink";
+use constant NAME_UNLINK_COMPLETE => "Unlink Complete";
 
 # error suffix for logs
 use constant SUFFIX_ERROR => ".error";
@@ -651,7 +653,7 @@ if(&dotest(TEST_BW)){
     &report_status(NAME_BW);
 }
 
-if(&dotest(TEST_UNLINK)) {
+if(&dotest(TEST_UNLINK) && ! &dotest(TEST_UNLINK_COMPLETE)) {
     my $stamp = TimeStamp();
     my $msg   = "Testing Unconnected Interfaces ... $stamp";
     &post_event(EVENT_REPORT,$msg);
@@ -665,6 +667,22 @@ if(&dotest(TEST_UNLINK)) {
     &debug("\n$msg\n\n");
     &unlink_test;
     &report_status(NAME_UNLINK);
+}
+
+if(&dotest(TEST_UNLINK_COMPLETE)) {
+    my $stamp = TimeStamp();
+    my $msg   = "Testing Unconnected Interfaces Complete ... $stamp";
+    &post_event(EVENT_REPORT,$msg);
+    &sim_event(EVENT_LOG,$msg);
+    # Ick, this barrier makes sure the above message gets into the log
+    # first, so as not to confuse Mike
+    if ($printsched) {
+	&schedlog("barrier $barriers_hit: pre-unlink test");
+    }
+    &barrier();
+    &debug("\n$msg\n\n");
+    &unlink_test_complete;
+    &report_status(NAME_UNLINK_COMPLETE);
 }
 
 &cleanup;
@@ -707,11 +725,12 @@ sub get_iflist {
     return \@result;
 }
 
-sub gather_stats {
+sub gather_stats
+{
     my @result = ();
     my @iflist = @{ &get_iflist() };
     foreach my $ifline (@iflist) {
-	if ($ifline =~ /^(\w+)\W.*RX packets:([0-9]+) /) {
+	if ($ifline =~ /^(\w+)\W.*HWaddr [0-9a-fA-F:]+\W.*RX packets:([0-9]+) /s) {
 	    if ($1 ne $control_if) {
 		push(@result, $2);
 	    }
@@ -720,7 +739,8 @@ sub gather_stats {
     return \@result;
 }
 
-sub check_stats {
+sub check_stats
+{
     my @first = @{ $_[0] };
     my @second = @{ $_[1] };
     my $result = 0;
@@ -736,16 +756,17 @@ sub check_stats {
     return $result;
 }
 
-sub arpping {
+sub arpping
+{
     my @iflist = @{ &get_iflist() };
     foreach my $ifline (@iflist) {
-	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/s) {
 	    my $ifname = $1;
 	    my $mac = lc(join('', split(':', $2)));
 	    if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
 		my $command
 		    = "sudo /sbin/ifconfig $ifname up; ".
-		      "sudo /sbin/arping -c 1 -w 1 -I $ifname 10.0.0.1; ".
+		      "sudo /sbin/arping -c 1 -w 1 -I $ifname 10.0.0.1 > /dev/null; ".
 		      "sudo /sbin/ifconfig $ifname down";
 #		print($command."\n");
 		system($command);
@@ -754,42 +775,97 @@ sub arpping {
     }
 }
 
-sub modify_interfaces {
+sub modify_interfaces
+{
     my ($speed, $duplex) = @_;
     my @iflist = @{ &get_iflist() };
     foreach my $ifline (@iflist) {
-	if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
-	    my $ifname = $1;
-	    my $mac = lc(join('', split(':', $2)));
-	    if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
-		my $command = "sudo /sbin/ethtool -s $ifname speed $speed ".
-		              "duplex $duplex autoneg off";
+	&modify_single_interface($ifline, $speed, $duplex);
+    }
+}
+
+sub modify_single_interface
+{
+    my ($ifline, $speed, $duplex) = @_;
+    if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+	my $ifname = $1;
+	my $mac = lc(join('', split(':', $2)));
+	if (! exists($interfaces{$mac}) && $ifname ne $control_if) {
+	    my $command = "sudo /sbin/ethtool -s $ifname speed $speed ".
+		"duplex $duplex autoneg off";
 #		print($command."\n");
-		system($command);
-	    }
+	    system($command);
 	}
     }
 }
 
-sub unlink_test {
+sub unlink_test
+{
     my @speeds = ('10', '100', '1000');
     my @duplexes = ('half', 'full');
     &setup_interfaces();
     my $start = &gather_stats();
     &barrier();
     &arpping();
+    &barrier();
     foreach my $speed (@speeds) {
 	foreach my $duplex (@duplexes) {
 	    &modify_interfaces($speed, $duplex);
+	    &barrier();
 	    &arpping();
+	    &barrier();
 	}
     }
-    &barrier();
     my $end = &gather_stats();
     if (! &check_stats($start, $end)) {
 	&error(NAME_UNLINK, undef,
 	       "Some interfaces received packets");
     }
+    &barrier();
+}
+
+sub unlink_test_complete
+{
+    my @speeds = ('10', '100', '1000');
+    my @duplexes = ('half', 'full');
+    &setup_interfaces();
+    my $start = &gather_stats();
+    &barrier();
+    &arpping();
+    &barrier();
+    foreach my $current (keys(%hostmap)) {
+	foreach my $dest_speed (@speeds) {
+	    foreach my $dest_duplex (@duplexes) {
+		&modify_interfaces($dest_speed, $dest_duplex);
+		&barrier();
+		if ($current eq $hostname) {
+		    foreach my $source_speed (@speeds) {
+			foreach my $source_duplex (@duplexes) {
+			    my @iflist = @{ &get_iflist() };
+			    foreach my $ifline (@iflist) {
+				if ($ifline =~ /^(\w+)\W.*HWaddr ([0-9a-fA-F:]+)/) {
+				    &modify_single_interface($ifline,
+							     $source_speed,
+							     $source_duplex);
+				    &arpping();
+				    &modify_single_interface($ifline,
+							     $dest_speed,
+							     $dest_duplex);
+				}
+			    }
+			}
+		    }
+		}
+		&barrier();
+	    }
+	}
+    }
+    my $end = &gather_stats();
+    if (! &check_stats($start, $end)) {
+	&error(NAME_UNLINK_COMPLETE, undef,
+	       "Some interfaces received packets");
+    }
+    &barrier();
 }
 
 

@@ -18,6 +18,7 @@ use snmpit_lib;
 
 use libdb;
 use libtestbed;
+use overload ('""' => 'Stringify');
 
 our %devices;
 our $parallelized = 1;
@@ -150,6 +151,18 @@ sub new($$$@) {
        die "$devicename $status\n" if ($status ne "OK");
     }
     return $self;
+}
+
+#
+# Stringify for output.
+#
+sub Stringify($)
+{
+    my ($self) = @_;
+
+    my $stack_id = $self->{STACKID};
+
+    return "[Stack ${stack_id}]";
 }
 
 #

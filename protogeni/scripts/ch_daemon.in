@@ -107,7 +107,7 @@ if (!defined($certificate)) {
     fatal("Could not get uuid/urn from $EMULAB_PEMFILE\n");
 }
 Genixmlrpc->SetContext(Genixmlrpc->Context($certificate));
-Genixmlrpc->SetTimeout(10);
+Genixmlrpc->SetTimeout(60);
 $ENV{'MYUUID'} = $certificate->uuid();
 $ENV{'MYURN'} = "urn:publicid:IDN+@OURDOMAIN@+authority+ch";
 

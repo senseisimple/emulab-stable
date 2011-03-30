@@ -27,6 +27,7 @@ use snmpit_lib;
 use snmpit_remote;
 use libtblog;
 use EmulabFeatures;
+use Lan;
 
 use English;
 use Getopt::Long;
@@ -41,6 +42,7 @@ sub doPortStatus($@);
 sub doGetStats($);
 sub doVlansFromTables($$@);
 sub syncVlansFromTables($$);
+sub doSyncVlansWithDB($);
 sub doReset($@);
 sub doMakeVlan($$@);
 sub doDeleteVlan($@);
@@ -65,6 +67,7 @@ sub doUnReserveVlanTags($$@);
 #
 my $debug = 0;
 my $quiet = 0;
+my $impotent = 0;
 my $minOpenflowListenerPort = 5000;
 my $maxOpenflowListenerPort = 65535;
 
@@ -182,7 +185,8 @@ GetOptions(\%opt,
     'N=s@','p=s','q','r','s', 'S=s@','t','E=s','T=s','u=s','U','v=s','w',
     'y=s','x=s','z=s','F','L=s','O', 'D', 'R', 'f', 'X', 'Z', 'vlan_tag=i', 
     'of-disable=s', 'of-enable=s', 'of-controller=s', 'of-listener=s',
-    'o=s@{1,1}', 'redirect-err', 'blockmode');
+    'o=s@{1,1}', 'redirect-err', 'blockmode', 'syncvlans', 'impotent',
+    'shadow');
 
 if ($opt{h}) {
     exit &usage;
@@ -194,6 +198,10 @@ if ($opt{h}) {
 #
 if ($opt{'redirect-err'}) {
     open(STDERR, ">&STDOUT");
+}
+
+if ($opt{'impotent'}) {
+    $impotent = 1;
 }
 
 if ($opt{v}) {
@@ -251,10 +259,18 @@ if ($opt{m} || $opt{o}) {
 	    tberror "pid/eid reqired!";
 	    exit(usage());
 	}
+	$pid = VLAN_PID();
+	$eid = VLAN_EID();
+	print "Using internal experiment $pid/$eid for operations\n";
     }
     else {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
     }
+}
+if ($opt{'syncvlans'} || $opt{l}) {
+    $pid = VLAN_PID();
+    $eid = VLAN_EID();
+    print "Using internal experiment $pid/$eid for operations\n";
 }
 if ($opt{t} || $opt{r} || $opt{D} || $opt{R} || $opt{X} ||
     $opt{A} || ($opt{C} && !$opt{o})) {
@@ -370,6 +386,7 @@ if ($opt{U}) { push @commands, ["trunkdisable"]; }
 if ($opt{b}) { push @commands, ["portstatus"]; }
 if ($opt{F}) { push @commands, ["synchleader"]; }
 if ($opt{A}) { push @commands, ["reservetags"]; }
+if ($opt{'syncvlans'}) { push @commands, ["syncvlans"]; }
 
 # This option combines with reset/remove
 if ($opt{C} && !($opt{r} || $opt{o})) { push @commands, ["unreservetags"]; }
@@ -468,7 +485,8 @@ if ($pid && $eid) {
     if (!defined($experiment)) {
 	die "There is no experiment $eid in project $pid\n";
     }
-    if (defined($this_user) &&
+    # XXX Do not make this check when -f is used; called in user context.
+    if (defined($this_user) && !$opt{f} && 
 	!$experiment->AccessCheck($this_user, TB_EXPT_MODIFY)) {
 	die "You do not have permission to modify experiment $pid/$eid\n";
     }
@@ -479,24 +497,12 @@ if ($pid && $eid) {
 if ($MAINSITE && $TB eq "/usr/testbed" && !$opt{Z}) {
     my $group = (defined($experiment) ? $experiment->GetGroup() : undef);
     $EmulabFeatures::verbose = 0;
-    my $robsnmpit =
+    my $newsnmpit =
         (EmulabFeatures->FeatureEnabled("RobSnmpit",
 					$this_user, $group, $experiment));
-    if ($robsnmpit) {
+    if ($newsnmpit) {
 	# Rob, change this path:
 	my $newpath = "$TB/bin/snmpit";
-	print STDERR "Invoking alternate snmpit from $newpath\n";
-	
-        unshift(@SAVEARGV, "-Z");
-	exec $newpath, @SAVEARGV;
-	die("*** $0:\n".
-	    "    Could not exec $newpath: $!");
-    }
-    my $newsnmpit =
-        (EmulabFeatures->FeatureEnabled("NewSnmpit",
-					$this_user, $group, $experiment));
-    if ($newsnmpit) {
-	my $newpath = "$TB/bin/snmpit_new";
 	print STDERR "Invoking alternate snmpit from $newpath\n";
 	
         unshift(@SAVEARGV, "-Z");
@@ -668,7 +674,8 @@ COMMAND: foreach my $command (@commands) {
     my @devicenames;
     my @vlans;
     SWITCH: for ($operation) {
-	(/listvlans/ || /getstats/ || /vlannumber/ || /synchleader/) && do {
+	(/listvlans/ || /getstats/ || /vlannumber/ || /synchleader/ ||
+	 /syncvlans/) && do {
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
@@ -693,20 +700,29 @@ COMMAND: foreach my $command (@commands) {
         (/remove/) && do {
             # Three levels of possible sources for device names (in order):
             #   passed in on command line
-            #   stack name recorded in database
+            #   vlan from the db
             #   if others fail, default to experimental switches
 	    my ($vlan_name) = @args;
-            my ($vlanobj, $stack);
             if ($supplied_switches) {
                 debug("Remove: using supplied switches\n");
                 @devicenames = @supplied_switches;
-            } elsif (defined($experiment) &&
-                     defined($vlanobj = VLan->Lookup($experiment,$vlan_name)) &&
-                     defined($stack = $vlanobj->GetStack())) {
-                debug("Remove: found stack $stack in database\n");
-                @devicenames = getSwitchesInStack($stack);
-            } else {
-                debug("Remove: using test switches\n");
+            }
+	    else {
+		my $vlanobj;
+		if ($vlan_name =~ /^\d*$/) {
+		    $vlanobj = VLan->Lookup($vlan_name);
+		}
+		else {
+		    $vlanobj = VLan->Lookup($experiment, $vlan_name);
+		}
+		if (defined($vlanobj) && !$vlanobj->IsInternal()) {
+		    @devicenames = mapVlansToSwitches($vlanobj->lanid());
+		    debug("Remove: list from database: " . join(",",@devicenames) .
+			  "\n");
+		}
+            }
+            if (scalar(@devicenames == 0)) {
+                debug("Remove: falling back to test swtiches\n");
                 @devicenames = getTestSwitches();
             }
             last;
@@ -733,10 +749,9 @@ COMMAND: foreach my $command (@commands) {
 		    next COMMAND;
 		}
             } else {
-                @devicenames =
-                    getSwitchesInStacks(getPlannedStacksForVlans(@vlans));
+                @devicenames = mapVlansToSwitches(@vlans);
                 debug("Tables: list from database: " . join(",",@devicenames) .
-                    "\n");
+		      "\n");
             }
             if (scalar(@devicenames == 0)) {
                 debug("Tables: falling back to test swtiches\n");
@@ -780,8 +795,7 @@ COMMAND: foreach my $command (@commands) {
 		    next COMMAND;
 		}
             } else {
-                @devicenames =
-                    getSwitchesInStacks(getActualStacksForVlans(@vlans));
+                @devicenames = mapVlansToSwitches(@vlans);
                 debug("Reset: list from database: " . join(",",@devicenames) .
                     "\n");
             }
@@ -800,7 +814,7 @@ COMMAND: foreach my $command (@commands) {
 	    my @newvlans = getExperimentVlans($pid,$eid,@optvlanids);
 	    my @oldvlans;
 	    VLan->StaleVlanList($experiment,\@oldvlans);
-	    my @vlans = uniq(@newvlans, @oldvlans);
+	    @vlans = uniq(@newvlans, @oldvlans);
 
             if ($supplied_switches) {
                 debug("Sync: using supplied switches\n");
@@ -813,8 +827,7 @@ COMMAND: foreach my $command (@commands) {
 		    next COMMAND;
 		}
             } else {
-                @devicenames =
-                    getSwitchesInStacks(getPlannedStacksForVlans(@vlans));
+                @devicenames = mapVlansToSwitches(@vlans);
                 debug("Sync: list from database: " . join(",",@devicenames) .
 		      "\n");
             }
@@ -864,9 +877,8 @@ COMMAND: foreach my $command (@commands) {
             if ($args{vlan}) {
                 @vlans = ($args{vlan});
             }
-            @devicenames = $supplied_switches?
-                           @supplied_switches : getDeviceNames(@ports);
-
+	    @devicenames = $supplied_switches?
+		           @supplied_switches : getDeviceNames(@ports);
             @args = %args;
             last;
         };
@@ -1012,6 +1024,10 @@ COMMAND: foreach my $command (@commands) {
 	    $exitval += doSynchLeader(\@stacks);
 	    last;
 	}; # /listvlans/ && do 
+	/syncvlans/ && do {
+	    $exitval += doSyncVlansWithDB(\@stacks);
+	    last;
+	}; # /listvlans/ && do 
 	/listports/ && do {
 	    $exitval += doListPorts(\@stacks);
 	    last;
@@ -1147,6 +1163,7 @@ sub doListVlans ($) {
 
     my $stacks = shift;
     my %vlans;
+    my %tags;
     my @vlanList;
 
     #
@@ -1163,6 +1180,7 @@ sub doListVlans ($) {
         foreach my $vlan (@vlanList) {
             my ($id,$ddep,$memberref) = @$vlan;
             ${$vlans{$id}}[0] = $ddep;
+	    $tags{$ddep} = $id;
             push @{${$vlans{$id}}[1]}, @$memberref;
         }
     } else {
@@ -1171,6 +1189,7 @@ sub doListVlans ($) {
             foreach my $vlan (@vlanList) {
                 my ($id,$ddep,$memberref) = @$vlan;
                 ${$vlans{$id}}[0] = $ddep;
+		$tags{$ddep} = $id;
                 push @{${$vlans{$id}}[1]}, @$memberref;
             }
         }
@@ -1221,61 +1240,65 @@ VLAN     Number Project/Experiment VName     Members
 --------------------------------------------------------------------------------
 END
 	format vlanlist2 =
-@<<<<<<< @<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+@<<<<<<< @<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 $vlan_id,$ddep, $pideid,           $vname,   $members
-~~                                           ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+~~                                                     ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                              $members
 .
 	$FORMAT_NAME = 'vlanlist2';
-}
+    }
+    my @sorted = ($opt{w} ?
+                  map {$tags{$_}} sort {tbsort($a,$b)} keys %tags :
+                  sort {tbsort($a,$b)} keys %vlans);
 
-    foreach my $vid (sort {tbsort($a,$b)} keys %vlans) {
+    foreach my $vid (@sorted) {
         $vlan_id = $vid;
 	my $memberref;
+        my $vlan;
 	($ddep,$memberref) = @{$vlans{$vid}};
-        
-        my $vlan = VLan->Lookup($vlan_id);
+
+	if ($vlan_id =~ /^\d*$/) {
+	    $vlan = VLan->Lookup($vlan_id);
+	}
+	else {
+	    $vlan = VLan->Lookup($experiment, $vlan_id);
+	}
         if (!defined($vlan)) {
-	    &debug("No such VLAN $vlan_id in lans table\n");
+	    print("No such VLAN $vlan_id in lans table\n");
             # Only print unknown VLANs if -l was given twice, or the 
             # -O option was given
 	    next unless ($opt{l} > 1 || $opt{O});
-	    $vname = $vlan_id;
-	    $experiment = undef;
-        }
-	else {
-	    $vname         = $vlan->vname();
-	    $experiment    = $vlan->GetExperiment();
-	}
 
-	#
-	# Permissions check - people only get to see their own VLANs
-	#
-	if (!defined($experiment)) {
             # If only printing orphaned VLANs, consider only ones that have IDs
             # that look like the ones we assign in the database
-            if ($opt{O} && $vid !~ /^\d+$/) {
+            if ($opt{O} && $vlan_id !~ /^\d+$/) {
                 next;
             }
+
+            # Only admins get to see this. Possibly a silly check.
 	    if (!TBAdmin()) {
 		&debug("Failed TBAdmin check\n");
 		next;
 	    }
-	} else {
+	    $pideid = "";
+            $vname  = $vlan_id;
+        }
+	else {
             # If only printing orphaned VLANs, skip ones for which we know the
             # pid and ied
             if ($opt{O}) {
                 next;
             }
+            my $vlanexp = $vlan->GetExperiment();
             if ($UID &&
-		!$experiment->AccessCheck($this_user, TB_EXPT_READINFO)) {
+		!$vlanexp->AccessCheck($this_user, TB_EXPT_READINFO)) {
                 &debug("$this_user failed access check to $experiment\n");
                 next;
             }
-        }
-
-
-	if (!$vname) { $vname = ""; }
+   	    # Setup $pideid for a more compact display
+            $pideid = $vlan->pid() . "/" . $vlan->eid();
+            $vname  = $vlan->vname();
+	}
 
 	#
 	# Check to see if we were supposed to print out MAC addresses
@@ -1288,15 +1311,6 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 		} @$memberref);
 	} else {
 	    $members = join(" ",@$memberref);
-	}
-
-	#
-	# Setup $pideid for a more compact display
-	#
-	if (defined($experiment)) {
-	    $pideid = $experiment->pid() . "/" . $experiment->eid();
-	} else {
-	    $pideid = "";
 	}
 	write;
     }
@@ -1472,6 +1486,7 @@ sub doRestorePortStatus($@) {
 
     my $stacks = shift;
     my %params = @_; # Yes, this does work
+    my $errors = 0;
 
     my $port = $params{port};
     if (!$port) {
@@ -1479,27 +1494,60 @@ sub doRestorePortStatus($@) {
     }
 
     if (@$stacks > 1) {
-	die "Port restoration accross multiple stacks is not yet supported\n" .
+	die "Port restoration across multiple stacks is not yet supported\n" .
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
 
-    my $errors = 0;
+    #
+    # See where the port is; might be in the default vlan in which case it is
+    # not technically in a vlan.
+    #
+    my $source_vlan = VLan->FindVlanByPort(undef, $port);
+    my $target_vlan;
 
+    #
     # Put the port in the specified VLAN
     # If they didn't give us a VLAN, we assume that means they want it removed
-    # from its vlan
-    my $vlan = $params{vlan};
-    if (!$vlan) { $vlan = "default"; }
-    $errors += $stack->setPortVlan($vlan,$port);
+    # from its vlan and put into the default vlan.
+    #
+    my $vlan_id = $params{vlan};
+    if ($vlan_id) {
+	$target_vlan = VLan->Lookup($vlan_id);
+	if (!defined($target_vlan)) {
+            tbwarn "No such vlan in the DB: $vlan_id\n";
+	    return 1;
+	}
+    }
+    else {
+	$vlan_id = "default";
+    }
+    print "Putting port in VLAN ...\n"
+	if (!$quiet);
+    $errors += $stack->setPortVlan($vlan_id, $port);
     if ($errors) { return $errors; }
+
+    if (defined($source_vlan) && $source_vlan->KeepInSync()) {
+	if ($source_vlan->DelPort($port)) {
+	    print "Could not yank $port from $source_vlan\n";
+	    $errors++;
+	}
+	VLan->RecordVLanModification($source_vlan->id(), undef, $port);
+    }
+    if (defined($target_vlan) && $target_vlan->KeepInSync()) {
+	if ($target_vlan->AddPort($port)) {
+	    print "Could not add $port to $target_vlan\n";
+	    $errors++;
+	}
+	VLan->RecordVlanInsertion($target_vlan->id(), $stack->{STACKID});
+    }
 
     # Enable or disable the port
     # If they didn't tell us either way, we assume they wanted it disabled
     my $enabled = $params{enabled};
     # If they are putting the port into the default VLAN, force it to be
     # disabled, so that a user cannot use this method to break into that VLAN
-    if ($vlan eq "default") { $enabled = "no"; }
+    if ($vlan_id eq "default") { $enabled = "no"; }
     if ($enabled eq "yes") {
         $errors = $stack->portControl("enable",$port);
     } else {
@@ -1594,7 +1642,7 @@ sub doVlansFromTables($$@) {
     my $vlan_number;
 
     if (@$stacks > 1) {
-	die "VLAN creation accross multiple stacks is not yet supported\n" .
+	die "VLAN creation across multiple stacks is not yet supported\n" .
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     
@@ -1782,7 +1830,7 @@ sub CreateOneVlan($$$@)
 	    $errors++;
 	}
 	else {
-	    VLan->RecordVlanInsertion($vlanid,$stack->{STACKID});
+	    VLan->RecordVlanInsertion($vlanid, $stack->{STACKID});
 	}
     }
     return $errors
@@ -1842,6 +1890,8 @@ sub doReset($@) {
     foreach my $port (@trunkedPorts) {
 	$errors += doTrunkDisable($stacks,$port);
     }
+    # In case of error, do not clear the DB state.
+    my %notdeleted = ();
 
     #
     # Just remove the VLAN from every stack on which it exists. We keep a
@@ -1850,13 +1900,25 @@ sub doReset($@) {
     foreach my $stack (@$stacks) {
 	my @existant_vlans = $stack->existantVlans(@vlans);
 	if (!$stack->removeVlan(@existant_vlans)) {
+	    #
+	    # Find out what still exists so that we keep the DB state.
+	    #
+	    foreach my $vlan_id (@existant_vlans) {
+		if ($stack->vlanExists($vlan_id)) {
+		    print "  $vlan_id was not deleted.\n";
+		    $notdeleted{$vlan_id} = 1;
+		}
+	    }
 	    $errors++;
 	}
-	foreach my $vlan (@existant_vlans) {
-	    clearReservedVlanTag($vlan)
-		if ($opt{C});
-	    VLan->RecordVLanDeletion($vlan);
-	}
+    }
+    foreach my $vlan_id (@vlans) {
+	next
+	    if (exists($notdeleted{$vlan_id}));
+	
+	clearReservedVlanTag($vlan_id)
+	    if ($opt{C});
+	VLan->RecordVLanDeletion($vlan_id);
     }
     return $errors;
 }
@@ -1871,14 +1933,13 @@ sub syncVlansFromTables($$) {
     my %expvlans   = ();
     my %curvlans   = ();
     my %stale      = ();
-    my $impotent   = 0;
     my $errors     = 0;
     my $vlan_number;
 
     $debug = 1;
 
     if (@$stacks > 1) {
-	die "VLAN creation accross multiple stacks is not yet supported\n" .
+	die "VLAN creation across multiple stacks is not yet supported\n" .
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
@@ -1955,6 +2016,8 @@ sub syncVlansFromTables($$) {
 			goto bad;
 		    }
 		    VLan->RecordVLanDeletion($vlanid) == 0
+			or goto bad;
+		    VLan->ClearReservedVlanTag($vlanid) == 0
 			or goto bad;
 		}
 	    }
@@ -2343,6 +2406,259 @@ sub doUnReserveVlanTags($$@) {
 }
 
 #
+# Sync the switches and the DB.
+# 
+sub doSyncVlansWithDB($) {
+    my $stacks  = shift;
+    my $errors  = 0;
+    my %portmap = ();
+
+    if (@$stacks > 1) {
+	die "VLAN synchronization across multiple stacks not supported\n" .
+	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
+    }
+    my ($stack) = @$stacks;
+    my $stackid = ($ELABINELAB ? $stack : $stack->{STACKID});
+
+    #
+    # Grab a port mapping of all vlans.
+    #
+    my @vlanList = $stack->listVlans();
+    foreach my $ref (@vlanList) {
+	my ($vlan_id,undef,$memberref) = @$ref;
+	$portmap{$vlan_id} = []
+	    if (!exists($portmap{$vlan_id}));
+
+	foreach my $port (@$memberref) {
+	    # Convert the ports to node:iface for the next call.
+	    push(@{ $portmap{$vlan_id} }, portiface($port))
+		if ((!($port =~ /\./)) && portiface($port));
+	}
+    }
+    #
+    # Now check every vlan.
+    #
+    my %vlans = $stack->findVlans();
+
+    foreach my $vlan_id (keys(%vlans)) {
+	my $tag = $vlans{$vlan_id};
+	my $vlan;
+	    
+	if ($vlan_id =~ /^\d*$/) {
+	    $vlan = VLan->Lookup($vlan_id);
+	}
+	else {
+	    $vlan = VLan->Lookup($experiment, $vlan_id);
+	}
+	if (defined($vlan)) {
+	    #
+	    # Make sure things are consistent.
+	    #
+	    # This looks in the vlans table.
+	    #
+	    my $otag = $vlan->GetTag();
+	    if (defined($otag) && $otag == $tag) {
+		#
+		# Make sure in the reserved vlantags table. 
+		#
+		if (!$vlan->HasVlanTagReserved($tag)) {
+		    #
+		    # Make consistent by entering into reserved tags.
+		    #
+		    print "$vlan is using unreserved vlan tag $otag\n";
+		    if (!$impotent) {
+			print "  attempting to reserve ...\n";
+			if (! $vlan->ReserveVlanTag($tag, 0, 1)) {
+			    die("  could not reserve tag\n");
+			}
+		    }
+		}
+	    }
+	    elsif (defined($otag)) {
+		print "$vlan is using tag $tag but DB says $otag\n";
+		$errors++;
+	    }
+	    else {
+		print "$vlan is using tag $tag but DB says no tag\n";
+		#
+		# Make consistent by entering into reserved tags and vlans.
+		#
+		if (!$impotent) {
+		    print "  attempting to reserve ...\n";
+		    if (!$vlan->HasVlanTagReserved($tag) &&
+			!$vlan->ReserveVlanTag($tag, 0, 1)) {
+			die("  could not reserve tag\n");
+		    }
+		    if (VLan->RecordVlanInsertion($vlan->id(), $stackid)) {
+			die("  could not record insertion for $vlan");
+		    }
+		}
+	    }
+	    next;
+	}
+	elsif ($vlan_id =~ /^\d*$/) {
+	    #
+	    # If the vlan name is an integer, then it is an orphan that
+	    # was mistakenly left behind after an experiment was
+	    # terminated. Or it is for an experiment that existed
+	    # prior to the code that reserves all vlan tags.
+	    #
+	    print "$vlan_id appears to be an orphan but using tag $tag\n";
+	    my @ports = (exists($portmap{$vlan_id}) ?
+			 @{ $portmap{$vlan_id} } : ());
+
+	    #
+	    # Always delete orphans that have no ports in them. 
+	    #
+	    if (!$impotent && !@ports) {
+		print "  removing vlan since it has no ports.\n";
+		if (!$stack->removeVlan($vlan_id)) {
+		    print "  *** error deleting $vlan_id from $stack\n";
+		    $errors++;
+		}
+		elsif (VLan->RecordVLanDeletion($vlan_id)) {
+		    $errors++;
+		}
+		elsif (VLan->ClearReservedVlanTag($vlan_id)) {
+		    $errors++;
+		}
+	    }
+	    next;
+	}
+	#
+	# Check for inconsistent use of the tag.
+	#
+	$vlan = VLan->FindVlanByTag($tag);
+	if ($vlan) {
+	    print "*** $vlan_id is using tag $tag, but DB says its $vlan\n";
+	    $errors++;
+	    next;
+	}
+	my @swports = (exists($portmap{$vlan_id}) ?
+		       @{ $portmap{$vlan_id} } : ());
+	    
+	if ($impotent) {
+	    print "$vlan_id is using unreserved tag $tag";
+
+	    if (@swports) {
+		print ": @swports\n";
+	    }
+	    else {
+		print " but has no node ports\n";
+	    }
+	}
+	else {
+	    print "Creating internal vlan for $vlan_id using tag $tag\n";
+		
+	    #
+	    # Make consistent by creating a vlan object. We do not
+	    # worry about the ports for these vlans. 
+	    #
+	    $vlan = VLan->Create($experiment, $vlan_id);
+	    if (!defined($vlan)) {
+		die("  could not create VLan object for $vlan_id\n");
+	    }
+	    $vlan->MarkManual();
+	    $vlan->MarkInternal();
+
+	    # XXX: Need a better way to figure out whether class is
+	    # Experimental or Control
+	    if ($stackid eq "Control") {
+		$vlan->SetClass("Control");
+	    }
+	    else {
+		$vlan->SetClass("Experimental");
+	    }
+	    
+	    if (!$vlan->HasVlanTagReserved($tag) &&
+		!$vlan->ReserveVlanTag($tag, 0, 1)) {
+		die("  could not reserve tag\n");
+	    }
+	    if (VLan->RecordVlanInsertion($vlan->id(), $stackid)) {
+		die("  could not record insertion for $vlan");
+	    }
+	}
+    }
+    #
+    # Now lets do a port consistency check.
+    #
+    my @allvlans = ();
+    if (VLan->AllVLans(\@allvlans)) {
+	die("Could not get list of all vlans from the DB!\n");
+    }
+    foreach my $vlan (@allvlans) {
+	my $vlan_id = ($vlan->IsInternal() ?
+		       $vlan->vname() : $vlan->id());
+
+	my @swports = (exists($portmap{$vlan_id}) ?
+		       @{ $portmap{$vlan_id} } : ());
+	my @dbports = ();
+	if ($vlan->PortList(\@dbports)) {
+	    die("Could not get list of ports for $vlan!\n");
+	}
+
+	# Sort to make debugging easier.
+	@dbports = sort {tbsort($a,$b)} @dbports;
+	@swports = sort {tbsort($a,$b)} @swports;
+
+	#
+	# Skip vlans that are in the DB but not created on the switches.
+	#
+	next
+	    if (!@swports && !exists($vlans{$vlan_id}));
+
+	# Skip vlans that are on another stack.
+	next if
+	    ($vlan->GetStack() ne $stackid);
+	
+	#
+	# Skip vlans that have matching port lists.
+	#
+	if (scalar(@swports) == scalar(@dbports)) {
+	    my $diff = 0;
+
+	    foreach my $port (@swports) {
+		$diff = 1
+		    if (! grep {$_ eq $port} @dbports);
+	    }
+	    foreach my $port (@dbports) {
+		$diff = 1
+		    if (! grep {$_ eq $port} @swports);
+	    }
+	    next
+		if (!$diff);
+	}
+	if (!$vlan->KeepInSync()) {
+	    print "$vlan portlist is not consistent:\n";
+	    print "  This is okay since its a low numbered vlan. ";
+	    print "Skipping ...\n";
+	    next;
+	}
+	
+	#
+	# If the DB has no ports recorded, but the switch does, then make
+	# the DB consistent with the switch. 
+	#
+	print "$vlan portlist is not consistent:\n";
+	print "  Switch: @swports\n" if (@swports);
+	print "  Database: @dbports\n" if (@dbports);
+	if (!$impotent) {
+	    if (!@dbports) {
+		print "  Making it consistent\n";
+		foreach my $port (@swports) {
+		    if ($vlan->AddPort($port)) {
+			print "Could not add $port to $vlan\n";
+			$errors++;
+		    }
+		}
+		VLan->RecordVlanInsertion($vlan->id(), $stackid);
+	    }
+	}
+    }
+    return $errors;
+}
+
+#
 # Create a vlan with name $vlan_name. It is not an error to try to create a
 # VLAN that already exists, as this can be used to add ports to an existing
 # VLAN. If ports are given, they are put into the VLAN.
@@ -2354,10 +2670,9 @@ sub doMakeVlan($$@) {
     my $errors = 0;
     my $target_vlan;
     my $source_vlan;
-    my $vlan_id = $vlan_name;
 
     if (@$stacks > 1) {
-	die "VLAN creation accross multiple stacks is not yet supported\n" .
+	die "VLAN creation across multiple stacks is not yet supported\n" .
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
@@ -2369,103 +2684,119 @@ sub doMakeVlan($$@) {
     # moment. 
     #
     if (defined($experiment)) {
-	my $stackid = ($ELABINELAB ? $stack : $stack->{STACKID});
-
-	if (defined($stackid) &&
-	    $stackid eq "Control" && $vlan_name eq "Control") {
-	    #
-	    # These ports should be in another vlan object. If not,
-	    # something went wrong, not sure what though.
-	    #
-	    foreach my $port (@ports) {
-		my $vlan = VLan->FindVlanByPort($experiment, $port);
-		if (!defined($vlan)) {
-		    print STDERR "$port is not in a vlan object\n";
-		    # Tell caller. 
-		    exit(2);
-		}
-		if (defined($source_vlan) && !$vlan->SameVlan($source_vlan)) {
-		    die("Ports must be in a single vlan\n");
-		}
-		$source_vlan = $vlan;
+	#
+	# These ports might be in another vlan, or they are free
+	# and not recorded in a vlan (we do not keep internal vlans
+	# uptodate).
+	#
+	foreach my $port (@ports) {
+	    my $vlan = VLan->FindVlanByPort(undef, $port);
+	    
+	    if (defined($source_vlan) && !$vlan->SameVlan($source_vlan)) {
+		die("Ports must be in a single vlan\n");
 	    }
+	    $source_vlan = $vlan;
+	}
+	#
+	# Allow lookup by integer id.
+	#
+	if ($vlan_name =~ /^\d*$/) {
+	    $target_vlan = VLan->Lookup($vlan_name);
 	}
 	else {
-	    #
-	    # Sanity check; should this port exist in another vlan object?
-	    # Perhaps, but cannot think of any situation right now. 
-	    #
-	    foreach my $port (@ports) {
-		if (VLan->FindVlanByPort($experiment, $port)) {
-		    die("$port already in vlan\n");
-		}
-	    }
-	    
 	    $target_vlan = VLan->Lookup($experiment, $vlan_name);
-	    if (!defined($target_vlan)) {
-		#
-		# Create a new vlan object and put the ports into it.
-		#
-		$target_vlan = VLan->Create($experiment, $vlan_name);
-		if (!defined($target_vlan)) {
-		    die("Could not create VLan object for $vlan_name\n");
-		}
-		$target_vlan->MarkManual();
-                # XXX: Need a better way to figure out whether class is
-                # Experimental or Control
-                if ($stackid eq "Control") {
-                    $target_vlan->SetClass("Control");
-                } else {
-                    $target_vlan->SetClass("Experimental");
-                }
+	}
+	if (!defined($target_vlan)) {
+	    if ($vlan_name =~ /^\d*$/) {
+		die("Please do not use an integer name for new vlan\n");
 	    }
-	    $vlan_id = $target_vlan->id();
-	    # This will add the port *only* if not already in the vlan.
-	    foreach my $port (@ports) {
-		$target_vlan->AddPort($port);
+		
+	    #
+	    # Create a new vlan object and put the ports into it.
+	    #
+	    $target_vlan = VLan->Create($experiment, $vlan_name);
+	    if (!defined($target_vlan)) {
+		die("Could not create VLan object for $vlan_name\n");
+	    }
+	    $target_vlan->MarkManual();
+	    # XXX: Need a better way to figure out whether class is
+	    # Experimental or Control
+	    my $stackid = ($ELABINELAB ? $stack : $stack->{STACKID});	    
+	    if ($stackid eq "Control") {
+		$target_vlan->SetClass("Control");
+	    } else {
+		$target_vlan->SetClass("Experimental");
+	    }
+
+	    if ($experiment->pid() eq VLAN_PID() &&
+		$experiment->eid() eq VLAN_EID()) {
+		$target_vlan->MarkInternal();
 	    }
 	}
+	foreach my $port (@ports) {
+	    $target_vlan->AddPort($port);
+	}
+    }
+    else {
+	#
+	# We no longer allow vlans to be created without an experiment.
+	# Use the -f option, which tells snmpit to use internal experiment.
+	#
+	die("Cannot use -m option without experiment or -f option\n");
     }
 
     #
     # Pass to outer boss.
     #
     if ($ELABINELAB) {
-	if ($target_vlan) {
-	    return RemoteDoVlansFromTables($experiment, $target_vlan->id());
+	return RemoteDoVlansFromTables($experiment, $target_vlan->id());
+    }
+
+    #
+    # Check DB to make sure the tag is available.
+    #
+    if (my $number = $opt{'vlan_tag'}) {
+	if ($target_vlan->HasVlanTagReserved($number)) {
+	    # Tag is reserved but might not be on the switches.
 	}
-	else {
-	    return RemoteMakeVlan($stack, $vlan_id, @ports);
+	elsif (! VLan->VlanTagAvailable($number)) {
+	    my $owner_vlan = VLan->FindVlanByTag($number);
+	    if (!defined($owner_vlan)) {
+		print "Could not find owner vlan for tag $number\n";
+		return 1;
+	    }
+	    print "$owner_vlan already has vlan_tag $number\n";
+	    return 1;
+	}
+	elsif (! $target_vlan->ReserveVlanTag($number)) {
+	    print "Not able to reserve vlan_tag $number\n";
+	    return 1;
 	}
     }
 
     #
-    # special temporary case for using a specific vlan number
-    # will go away when tags are allocated from the database.
+    # If this is a "shadow" we do not actually create it; we
+    # are just shadowing (with a tag reservation) a vlan that either
+    # exists on the switch, or should never actually exist on the
+    # switch. The point is to have the data in the DB, but not worry
+    # about what is actually on the switch.
     #
-    if ($next_vlan_tag = $opt{'vlan_tag'}) {
-	my %vlans = $stack->findVlans();
-	my $number = $vlans{$vlan_name};
-	if (defined($number)) {
-	    if ($number != $next_vlan_tag) {
-	bad:	print "VLAN $vlan_name already has vlan_tag $number\n";
-		return 1;
-	    }
-	    goto old_number;
-	} else {
-	    while (my ($id, $tag) = each %vlans) {
-		if ($tag == $next_vlan_tag)
-		    { $vlan_name = $id; $number = $tag; goto bad; }
-	    }
-	    goto new_number;
-	}
-    }
+    return 0
+	if ($opt{'shadow'});
+    
     #
-    # Create it if it doesn't already exist
+    # To maintain backwards compatibility with how snmpit used
+    # to operate, "internal" vlans are named on the switch by the
+    # symbolic name instead of the lanid.
+    #
+    my $vlan_id = ($target_vlan->IsInternal() ?
+		   $target_vlan->vname() : $target_vlan->id());
+
+    #
+    # Create/Update
     #
     if ($stack->vlanExists($vlan_id)) {
-    old_number:
-	print "VLAN $vlan_name already exists\n"
+	print "VLAN $target_vlan already exists\n"
 	    if (!$quiet);
 
 	#
@@ -2482,8 +2813,7 @@ sub doMakeVlan($$@) {
 	    $errors += $perrors;
 	}
     } else {
-    new_number:
-	print "Creating VLAN $vlan_name ...\n"
+	print "Creating VLAN $target_vlan ...\n"
 	    if (!$quiet);
 	my $vlan_number = $stack->createVlan($vlan_id,\@ports,@pvlanArgs);
 	if (!$quiet) {
@@ -2493,14 +2823,21 @@ sub doMakeVlan($$@) {
 	if (!$vlan_number) {
 	    $errors++;
 	}
-	$target_vlan->SetTag($vlan_number)
-	    if (!$errors && defined($target_vlan));
+
     }
     if (!$errors) {
-	if (defined($source_vlan)) {
-	    VLan->RecordVLanDeletion($source_vlan->id());
+	if (defined($source_vlan) && $source_vlan->KeepInSync()) {
+	    # Yank the ports out of the old vlan.
+	    foreach my $port (@ports) {
+		if ($source_vlan->DelPort($port)) {
+		    print "Could not yank $port from $source_vlan\n";
+		    $errors++;
+		}
+	    }
+	    VLan->RecordVLanModification($source_vlan->id(), undef, @ports);
 	}
-	if (defined($target_vlan)) {
+	if (defined($target_vlan) && $target_vlan->KeepInSync()) {
+	    # This updates the port list, so always call it.
 	    VLan->RecordVlanInsertion($target_vlan->id(), $stack->{STACKID});
 	}
     }
@@ -2515,8 +2852,6 @@ sub doDeleteVlan($@) {
     my @vlan_names = @_;
     my %vlans  = ();
     my $errors = 0;
-    my %notdeleted = ();
-    my %vlan_ids = ();
 
     #
     # We require a VLan object for all vlans related to experiments.
@@ -2530,110 +2865,98 @@ sub doDeleteVlan($@) {
 	    else {
 	       $vlan = VLan->Lookup($experiment, $vlan_name);
 	    }
-	    if (defined($vlan) &&
+	    if (defined($vlan) && !$opt{'f'} &&
 		!$experiment->SameExperiment($vlan->GetExperiment())) {
 		die("$vlan is not in the correct experiment\n");
 	    }
-	    if (!defined($vlan)) {
+	    if (!defined($vlan) && !$opt{'f'}) {
 		die("VLan object for $vlan_name does not exist\n");
 	    }
-	    $vlans{$vlan_name} = $vlan;
-	    $vlan_ids{$vlan_name} = $vlan->id();
+	    # Allow deletion by name without vlan object, by force only.
+	    $vlans{$vlan_name} = $vlan || $vlan_name;
 	}
     }
     else {
-	foreach my $vlan_name (@vlan_names) {
-	    $vlan_ids{$vlan_name} = $vlan_name;
-	}
+	#
+	# We no longer allow vlans to be created without an experiment.
+	# Use the -f option, which tells snmpit to use internal experiment.
+	#
+	die("Cannot use -o option without experiment or -f option\n");
     }
 
     #
     # Hand over to outer boss.
-    # If experiment was not specified then list is vlan IDs (tbswap).
     # If experiment was specified, list is vlan names (manual invocation).
     # 
     if ($ELABINELAB) {
-	if (defined($experiment)) {
-	    foreach my $vlan (values(%vlans)) {
-		if (RemoteDeleteVlan($vlan, $opt{C}) == 0) {
-		    if ($vlan->Destroy() != 0) {
-			print STDERR "*** Could not destroy $vlan\n";
-		    }
-		}
-		else {
-		    $errors++;
+	foreach my $vlan (values(%vlans)) {
+	    if (RemoteDeleteVlan($vlan, $opt{C}) == 0) {
+		if ($vlan->Destroy() != 0) {
+		    print STDERR "*** Could not destroy $vlan\n";
 		}
 	    }
-	}
-	else {
-	    my @vidlist = ();
-	    foreach my $vid (values(%vlan_ids)) {
-		push(@vidlist, $vid);
+	    else {
+		$errors++;
 	    }
-	    $errors = RemoteDoReset(undef, 0, $opt{C}, @vidlist);
 	}
 	return $errors;
     }
 
-    my %exists = ();
-    foreach my $stack (@$stacks) {
-	my @existant_vlans;
-	foreach my $vlan_name (@vlan_names) {
-	    if ($stack->vlanExists($vlan_ids{$vlan_name})) {
-		$exists{$vlan_name} = 1;
-		push @existant_vlans, $vlan_name;
-	    }
+    #
+    # We do not do this enough to worry about optimizing it.
+    #
+    foreach my $key (keys(%vlans)) {
+	my $vlan  = $vlans{$key};
+	my $error = 0;
+	my $vlan_name;
+	my $vlan_id;
+
+	#
+	# To maintain backwards compatibility with how snmpit used
+	# to operate, "internal" vlans are named on the switch by the
+	# symbolic name instead of the lanid.
+	#
+	if (ref($vlan)) {
+	    $vlan_name = ($vlan->IsInternal() ?
+			  $vlan->vname() : $vlan->id());
+	    $vlan_id   = $vlan->id();
 	}
-	if (@existant_vlans) {
-	    print "Deleting VLAN(s) " . join(",",@existant_vlans) . " ...\n"
+	else {
+	    $vlan_name = $vlan_id = $vlan;
+	}
+
+	foreach my $stack (@$stacks) {
+	    next
+		if (! $stack->vlanExists($vlan_name));
+		
+	    print "Deleting VLAN $vlan from $stack ...\n"
 		if (!$quiet);
-	    my $ok = $stack->removeVlan(map { $vlan_ids{$_} } @existant_vlans);
+
+	    my $ok = $stack->removeVlan($vlan_name);
 	    if (!$quiet) {
-		print "VLAN deletion ";
+		print "VLAN deletion on $stack ";
 		print $ok? "succeeded":"failed",".\n";
 	    }
 	    if (!$ok) {
-		# Be nice if the stack module told us what was not removed?
-		foreach my $vlan_name (@existant_vlans) {
-		    if ($stack->vlanExists($vlan_name)) {
-			print "  $vlan_name was not deleted.\n";
-			$notdeleted{$vlan_name} = 1;
-		    }
-		}
-		$errors++;
+		print "*** $vlan was not deleted from $stack\n";
+		$error++;
 	    }
 	}
-    }
-    foreach my $vlan_name (@vlan_names) {
-	my $vlan_id = $vlan_ids{$vlan_name};
-
-	# Do not throw an error on this. No point, confuses callers.
-	if (!$exists{$vlan_name}) {
-	    print "VLAN $vlan_name does not exist on any switch\n";
-	}	
+	# Do not delete DB state if we failed to remove it.
+	if ($error) {
+	    $errors++;
+	    next;
+	}
 	
-	#
-	# Skip if this was not deleted
-	#	
-	next
-	    if ($errors && exists($notdeleted{$vlan_name}));
-	
-	# Always delete from the vlans table.
 	VLan->RecordVLanDeletion($vlan_id) == 0
 	    or $errors++;
 
-	if (!exists($vlans{$vlan_name})) {
-	    if ($opt{C}) {
-		VLan::ClearReservedVlanTag($vlan_name) == 0
-		    or $errors++;
-	    }
-	    next;
-	}
-	my $vlan = $vlans{$vlan_name};
+	VLan->ClearReservedVlanTag($vlan_id) == 0
+	    or $errors++ if ($opt{C});
 
-	$vlan->ClearReservedVlanTag()
-	    if ($opt{C});
-
+	next
+	    if (!ref($vlan));
+	
 	if ($vlan->IsManual()) {
 	    $vlan->Destroy() == 0
 		or $errors++;
@@ -2697,7 +3020,7 @@ sub doPortControl($$@) {
     }
 
     if (@$stacks > 1) {
-	die "Port control accross multiple stacks is not yet supported\n" .
+	die "Port control across multiple stacks is not yet supported\n" .
 	    "Stacks are " . join(", ",map {$_->{STACKID}} @$stacks) . "\n";
     }
     my ($stack) = @$stacks;
