@@ -94,6 +94,7 @@ require GeniUtil;
 require GeniCertificate;
 require GeniAuthority;
 require libGeni;
+require GeniSlice;
 use libtestbed;
 use emutil;
 use libEmulab;
@@ -229,7 +230,32 @@ sub ProbeCMs()
 #
 sub ExpireSlices()
 {
-    if( !$impotent ) {
+    my $query_result =
+	GeniDB::DBQueryWarn("select idx from geni_slices ".
+			    "where UNIX_TIMESTAMP(now()) > ".
+			    "      UNIX_TIMESTAMP(expires) and ".
+			    "      shutdown is null");
+    # Catch it next time.
+    return
+	if (!$query_result);
+
+    #
+    # XXX We need to lock the slice ... but that requires changes in
+    # the CH code, which currently does no locking. 
+    #
+    while (my ($idx) = $query_result->fetchrow_array()) {
+	my $slice = GeniSlice->Lookup($idx);
+
+	if (!defined($slice)) {
+	    # Slice is gone, lets not worry.
+	    next;
+	}
+	my $urn = $slice->urn();
+	
+	print STDERR "Slice $urn has expired.\n";
+    }
+	
+    if (!$impotent) {
 	GeniDB::DBQueryWarn("delete from geni_slices ".
 			    "where UNIX_TIMESTAMP(now()) > ".
 			    "      UNIX_TIMESTAMP(expires) and ".
@@ -239,6 +265,31 @@ sub ExpireSlices()
     # We've only updated the database and not cleaned out the stale
     # entries from our cache, but that is about to be flushed anyway
     # (see below).
+}
+
+sub GenerateFederatesList()
+{
+    my @authorities = ();
+    my %federates   = ();
+    
+    if (GeniAuthority->ListAll(\@authorities)) {
+	fatal("Could not get authorities list from the DB");
+    }
+    foreach my $authority (@authorities) {
+	my $urn = $authority->urn();
+	
+    }
+
+    if (open(MAP, "> $ADDIR/list.txt")) {
+	foreach my $urn (keys(%ads)) {
+	    print MAP "$urn\n";
+	}
+	close(MAP);
+    }
+    else {
+	notify("Could not open $ADDIR/list.txt for output\n");
+	next;
+    }
 }
 
 if ($oneshot) {
