@@ -2600,7 +2600,6 @@ fi
 # overridable for other sites
 if test "$TBMAINSITE" = 1; then
     FANCYBANNER=1
-    TBUSEDBI=0
 fi
 
 #
