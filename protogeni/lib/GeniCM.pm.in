@@ -850,7 +850,8 @@ sub GetTicketAuxAux($$$$$$$$$)
 			$exclusive = 0;
 			$virtexperiment->encap_style("vlan");
 		    }
-		    elsif ($virtualization_subtype eq "raw") {
+		    elsif ($virtualization_subtype eq "raw"
+			   || $virtualization_subtype eq "raw-pc") {
 			$pctype = undef;
 			goto raw;
 		    }
