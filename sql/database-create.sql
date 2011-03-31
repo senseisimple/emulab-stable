@@ -3474,6 +3474,8 @@ CREATE TABLE `switch_stacks` (
   `stack_id` varchar(32) NOT NULL default '',
   `is_primary` tinyint(1) NOT NULL default '1',
   `snmp_community` varchar(32) default NULL,
+  `min_vlan` int(11) default NULL,
+  `max_vlan` int(11) default NULL,
   KEY `node_id` (`node_id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
