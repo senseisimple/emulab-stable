@@ -127,7 +127,8 @@ sub Resolve($)
     my (undef,$callertype,$callerid) = GeniHRN::Parse($credential->owner_urn());
     if ($callertype eq "user") {
 	my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-	if (defined($user) && $user->IsLocal() && $user->admin()) {
+	if (!GeniResponse::IsResponse($user) &&
+	    $user->IsLocal() && $user->admin()) {
 	    $admin = 1;
 	}
     }
@@ -360,10 +361,9 @@ sub CreateSliver($)
 	    }
 	    my $user =
 		GeniCM::CreateUserFromCertificate($credential->owner_cert());
-	    if (!defined($user)) {
+	    if (GeniResponse::IsResponse($user)) {	    
 		$slice->UnLock();
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not create user");
+		return $user;
 	    }
 	    if ($slice->ConvertPlaceholder($user) != 0) {
 		$slice->UnLock();
@@ -502,9 +502,8 @@ sub DeleteSliver($)
     # We need the user to sign the new ticket to. 
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
     
     my $response = GeniCM::DeleteSliverAux($credential, $impotent, 1);
     return $response
@@ -1128,10 +1127,9 @@ sub GetTicket($)
 	    }
 	    my $user =
 		GeniCM::CreateUserFromCertificate($credential->owner_cert());
-	    if (!defined($user)) {
+	    if (GeniResponse::IsResponse($user)) {
 		$slice->UnLock();
-		return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					    "Could not create user");
+		return $user;
 	    }
 	    if ($slice->ConvertPlaceholder($user) != 0) {
 		$slice->UnLock();
@@ -1255,9 +1253,9 @@ sub UpdateTicket($)
     # We need the user to sign the new ticket to. 
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     my $credential_objects = [];
     foreach my $credstr (@$credentials) {
         my $cred = CheckCredential($credstr);
@@ -1329,9 +1327,9 @@ sub UpdateSliver($)
     # Any user can update the sliver. The ticket is signed to that user.
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     my $credential_objects = [];
     foreach my $credstr (@$credentials) {
         my $cred = CheckCredential($credstr);
@@ -1426,9 +1424,9 @@ sub BindToSlice($)
     # Find or create the user.
     #
     my $user = GeniCM::CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     if (!$user->IsLocal() && defined($keys)) {
 	$user->Modify(undef, undef, $keys);
     }
