@@ -404,28 +404,26 @@ sub setPortVlan($$@) {
 
 #
 # Allocate a vlan number currently not in use on the stack.
-# Is called from createVlan, here for  clarity and to
-# lower the lines of diff from snmpit_cisco_stack.pm
 #
-# usage: newVlanNumber(self, vlan_identifier)
+# usage: newVlanNumber(self, vlan_identifier, vlan_dbindex)
 #
 # returns a number in $self->{VLAN_MIN} ... $self->{VLAN_MAX}
-# or zero indicating that the id exists, or -1 indicating
-# the number space is full.
+# or zero indicating that the id exists.
 #
-sub newVlanNumber($$) {
+sub newVlanNumber($$$) {
     my $self = shift;
+    my $device_id = shift;
     my $vlan_id = shift;
     my %vlans;
     my $limit;
 
-    $self->debug("stack::newVlanNumber $vlan_id\n");
+    $self->debug("stack::newVlanNumber $device_id/$vlan_id\n");
     if ($self->{ALLVLANSONLEADER}) {
 	%vlans = $self->{LEADER}->findVlans();
     } else {
 	%vlans = $self->findVlans();
     }
-    my $number = $vlans{$vlan_id};
+    my $number = $vlans{$device_id};
     # Vlan exists, so tell caller a new number/vlan is not needed.
     if (defined($number)) { return 0; }
 
@@ -499,13 +497,14 @@ sub newVlanNumber($$) {
 # given, puts them into the newly created VLAN. It is an error to create a
 # VLAN that already exists.
 #
-# usage: createVlan(self, vlan identfier, port list)
+# usage: createVlan(self, vlan identfier, vlan DB index, port list)
 #
 # returns: 1 on success
 # returns: 0 on failure
 #
-sub createVlan($$$;$$$) {
+sub createVlan($$$$;$$$) {
     my $self = shift;
+    my $device_id = shift;
     my $vlan_id = shift;
     my @ports = @{shift()};
     my @otherargs = @_;
@@ -523,7 +522,7 @@ sub createVlan($$$;$$$) {
 	# We need to create the VLAN on all pertinent devices
 	#
 	my ($res, $devicename, $device);
-	$vlan_number = $self->newVlanNumber($vlan_id);
+	$vlan_number = $self->newVlanNumber($device_id, $vlan_id);
 	if ($vlan_number == 0) { last LOCKBLOCK;}
 	print "Creating VLAN $vlan_id as VLAN #$vlan_number on stack " .
                  "$self->{STACKID} ... \n";
@@ -575,11 +574,18 @@ sub createVlan($$$;$$$) {
 # usage: findVlans($self, @vlan_ids)
 #        returns a hash mapping VLAN ids to 802.1Q VLAN numbers
 #
-sub findVlans($@) {
+sub findDeviceVlans($@) {
     my $self = shift;
     my @vlan_ids = @_;
-    my ($count, $device, $devicename) = (scalar(@vlan_ids));
+    my ($device, $devicename);
     my %mapping = ();
+    #
+    # Each value in the mapping is:
+    # {
+    #  'tag'     => vlan tag number,
+    #  'devices' => list of devices the vlan exists on
+    # }
+    #
 
     $self->debug("snmpit_stack::findVlans( @vlan_ids )\n");
     foreach $device (values %{$self->{DEVICES}})
@@ -590,22 +596,43 @@ sub findVlans($@) {
 	my %dev_map = @{$results{$devicename}};
 	my ($id,$num,$oldnum);
 	while (($id,$num) = each %dev_map) {
-		if (defined($mapping{$id})) {
-		    $oldnum = $mapping{$id};
-		    if (defined($num) && ($num != $oldnum))
-			{ warn "Incompatible 802.1Q tag assignments for $id\n" .
-                               "    Saw $num on $device->{NAME}, but had " .
-                               "$oldnum before\n";}
-		} else
-		    { $mapping{$id} = $num; }
+	    if (defined($mapping{$id})) {
+		$oldnum = $mapping{$id}->{'tag'};
+		if (defined($num) && ($num != $oldnum)) {
+		    warn "Incompatible 802.1Q tag assignments for $id\n" .
+			"    Saw $num on $device->{NAME}, but had " .
+			"$oldnum before\n";
+		}
+		push(@{ $mapping{$id}->{'devices'} }, $devicename);
+	    }
+	    else {
+		$mapping{$id} = {
+		    'tag'     => $num,
+		    'devices' => [ $devicename ],
+		};
+	    }
 	}
-#	if (($count > 0) && ($count == scalar (values %mapping))) {
-#		my @k = keys %mapping; my @v = values %mapping;
-#		$self->debug("snmpit_stack::findVlans would bail here"
-#		 . " k = ( @k ) , v = ( @v )\n");
-#	}
     }
     return %mapping;
+}
+
+sub findVlans($@) {
+    my $self = shift;
+    my @vlan_ids = @_;
+    my %mapping = $self->findDeviceVlans(@vlan_ids);
+    my %result  = ();
+
+    #
+    # The caller just wants to know vlan_id to vlan_number.
+    # This is how findVlans() has always operated, and do not
+    # want to change all the calls to it, yet.
+    #
+    foreach my $id (keys(%mapping)) {
+	my $ref = $mapping{$id};
+	my $num = $ref->{'tag'};
+	$result{$id} = $num;
+    }
+    return %result;
 }
 
 #
@@ -1185,7 +1212,7 @@ sub setVlanOnTrunks2($$$$@) {
 # this file, not external functions.
 #
 # Get a list of all switches that have at least one port in the given
-# VLAN - note that is take a VLAN number, not a VLAN ID
+# VLAN - note that this takes a VLAN number, not a VLAN ID
 #
 # Returns a possibly-empty list of switch names
 #
@@ -1197,14 +1224,15 @@ sub setVlanOnTrunks2($$$$@) {
 sub switchesWithPortsInVlan($$) {
     my $self = shift;
     my $vlan_number = shift;
-    my @switches = ();
-    foreach my $devicename (keys %{$self->{DEVICES}}) {
-        my $dev = $self->{DEVICES}{$devicename};
-	if ($dev->vlanNumberExists($vlan_number)) {
-	    push @switches, $devicename;
-        }
+    my %mapping = $self->findDeviceVlans();
+
+    foreach my $id (keys(%mapping)) {
+	my $ref = $mapping{$id};
+	my $num = $ref->{'tag'};
+
+	return @{ $ref->{'devices'} } if ($num == $vlan_number);
     }
-    return @switches;
+    return ();
 }
 
 #

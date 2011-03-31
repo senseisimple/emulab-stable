@@ -2815,6 +2815,50 @@ sub IsInternal($)
 }
 
 #
+# Mark/Get the "alias" bit on a vlan. These are vlans that are
+# an alias of another vlan. This happens cause different switch
+# have internal names for the same vlan tag. For example, vlan
+# tag 1 is default and DEFAULT_VLAN. But only one can have an
+# entry in the reserved_vlantags ans vlans table, since they assume
+# that the tag is a unique key (and this is how it should be). 
+#
+sub SetAlias($$)
+{
+    my ($self, $vlan) = @_;
+
+    return $self->GetLan()->SetAttribute("alias", $vlan->lanid());
+}
+sub IsAlias($)
+{
+    my ($self) = @_;
+    my $lanid;
+
+    return $lanid
+	if ($self->GetAttribute("alias", \$lanid) == 0);
+    return 0;
+}
+sub GetAliases($)
+{
+    my ($self) = @_;
+    my $lanid  = $self->lanid();
+    my @aliases = ();
+
+    my $query_result =
+	DBQueryWarn("select lanid from lan_attributes ".
+		    "where attrkey='alias' and attrvalue='$lanid'");
+    return undef
+	if (!$query_result);
+    
+    while (my ($alias) = $query_result->fetchrow_array()) {
+	my $vlan = VLan->Lookup($alias);
+	# What happens if its gone?
+	push(@aliases, $vlan)
+	    if (defined($vlan));
+    }
+    return @aliases;
+}
+
+#
 # Check to see if we think the VLAN actually exists on any switches at the
 # moment (ie. has a vlans table entry). 
 #

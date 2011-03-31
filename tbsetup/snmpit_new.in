@@ -267,7 +267,7 @@ if ($opt{m} || $opt{o}) {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
     }
 }
-if ($opt{'syncvlans'} || $opt{l}) {
+if ($opt{'syncvlans'} || $opt{l} || $opt{F}) {
     $pid = VLAN_PID();
     $eid = VLAN_EID();
     print "Using internal experiment $pid/$eid for operations\n";
@@ -1228,9 +1228,9 @@ VLAN     Project/Experiment VName     Members
 --------------------------------------------------------------------------------
 END
 	format vlanlist =
-@<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+@<<<<<<< @<<<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 $vlan_id,$pideid,           $vname,   $members
-~~                                    ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+~~                                              ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                       $members
 .
 	$FORMAT_NAME = 'vlanlist';
@@ -1337,10 +1337,24 @@ sub doSynchLeader ($) {
 	my $leader = $stack->{LEADER};
 	my %vlans = $stack->findVlans();
 	while (my ($id,$num) = each %vlans) {
+	    my $vlan;
+	    
+	    if ($id =~ /^\d*$/) {
+		$vlan = VLan->Lookup($id);
+	    }
+	    else {
+		$vlan = VLan->Lookup($experiment, $id);
+	    }
+	    if (!defined($vlan)) {
+		print "Skipping $id/$num cause it is not in the DB\n";
+		$errors++;
+		next;
+	    }
+	    
 	    if (($num >= $leader->{MIN_VLAN}) &&
 		($num <= $leader->{MAX_VLAN}) &&
 		!($leader->vlanNumberExists($num))) {
-			$errors += $leader->createVlan($id, $num);
+		$errors += $leader->createVlan($id, $vlan->lanid(), $num);
 	    }
 	}
     }
@@ -1819,7 +1833,7 @@ sub CreateOneVlan($$$@)
 	}
     }
     else {
-	my $vlan_number = $stack->createVlan($vlanid,\@ports);
+	my $vlan_number = $stack->createVlan($vlanid, $vlanid, \@ports);
 	if (!$vlan_number) {
 	    tberror({type => 'secondary', severity => SEV_SECONDARY,
 		     error => ['create_vlan_failed', $vlanid]},
@@ -2308,7 +2322,7 @@ sub doReserveVlanTags($$@) {
 	# If we can assign a tag, remember we did so that we can
 	# undo whatever we did, if there is an error. 
 	#
-	my $tag = $stack->newVlanNumber($vlanid);
+	my $tag = $stack->newVlanNumber($vlanid, $vlanid);
 	if ($tag) {
 	    push(@assigned, [$vlan,$tag]);
 	}
@@ -2412,6 +2426,7 @@ sub doSyncVlansWithDB($) {
     my $stacks  = shift;
     my $errors  = 0;
     my %portmap = ();
+    my %allports = ();
 
     if (@$stacks > 1) {
 	die "VLAN synchronization across multiple stacks not supported\n" .
@@ -2428,8 +2443,11 @@ sub doSyncVlansWithDB($) {
 	my ($vlan_id,undef,$memberref) = @$ref;
 	$portmap{$vlan_id} = []
 	    if (!exists($portmap{$vlan_id}));
+	$allports{$vlan_id} = []
+	    if (!exists($allports{$vlan_id}));
 
 	foreach my $port (@$memberref) {
+	    push(@{ $allports{$vlan_id} }, $port);
 	    # Convert the ports to node:iface for the next call.
 	    push(@{ $portmap{$vlan_id} }, portiface($port))
 		if ((!($port =~ /\./)) && portiface($port));
@@ -2525,18 +2543,32 @@ sub doSyncVlansWithDB($) {
 	    }
 	    next;
 	}
+	my @swports = (exists($portmap{$vlan_id}) ?
+		       @{ $portmap{$vlan_id} } : ());
+	    
 	#
 	# Check for inconsistent use of the tag.
 	#
 	$vlan = VLan->FindVlanByTag($tag);
 	if ($vlan) {
 	    print "*** $vlan_id is using tag $tag, but DB says its $vlan\n";
-	    $errors++;
+
+	    #
+	    # Create an alias vlan. This should not happen often.
+	    #
+	    if (!$impotent) {
+		print "  creating internal alias vlan.\n";
+
+		my $alias = VLan->Create($experiment, $vlan_id);
+		if (!defined($alias)) {
+		    die("  could not create VLan object for $vlan_id\n");
+		}
+		$alias->MarkManual();
+		$alias->MarkInternal();
+		$alias->SetAlias($vlan);
+	    }
 	    next;
 	}
-	my @swports = (exists($portmap{$vlan_id}) ?
-		       @{ $portmap{$vlan_id} } : ());
-	    
 	if ($impotent) {
 	    print "$vlan_id is using unreserved tag $tag";
 
@@ -2610,6 +2642,10 @@ sub doSyncVlansWithDB($) {
 	# Skip vlans that are on another stack.
 	next if
 	    ($vlan->GetStack() ne $stackid);
+
+	# Skip alias vlans.
+	next if
+	    ($vlan->IsAlias());
 	
 	#
 	# Skip vlans that have matching port lists.
@@ -2789,13 +2825,13 @@ sub doMakeVlan($$@) {
     # to operate, "internal" vlans are named on the switch by the
     # symbolic name instead of the lanid.
     #
-    my $vlan_id = ($target_vlan->IsInternal() ?
-		   $target_vlan->vname() : $target_vlan->id());
+    my $device_id = ($target_vlan->IsInternal() ?
+		     $target_vlan->vname() : $target_vlan->id());
 
     #
     # Create/Update
     #
-    if ($stack->vlanExists($vlan_id)) {
+    if ($stack->vlanExists($device_id)) {
 	print "VLAN $target_vlan already exists\n"
 	    if (!$quiet);
 
@@ -2805,7 +2841,7 @@ sub doMakeVlan($$@) {
 	if (@ports) {
 	    print "Putting ports in VLAN ...\n"
 		if (!$quiet);
-	    my $perrors = $stack->setPortVlan($vlan_id,@ports);
+	    my $perrors = $stack->setPortVlan($device_id, @ports);
 	    if (!$quiet) {
 		print "VLAN change ";
 		print $perrors? "failed":"succeeded",".\n";
@@ -2815,7 +2851,8 @@ sub doMakeVlan($$@) {
     } else {
 	print "Creating VLAN $target_vlan ...\n"
 	    if (!$quiet);
-	my $vlan_number = $stack->createVlan($vlan_id,\@ports,@pvlanArgs);
+	my $vlan_number = $stack->createVlan($device_id, $target_vlan->lanid(),
+					     \@ports,@pvlanArgs);
 	if (!$quiet) {
 	    print "VLAN creation ";
 	    print $vlan_number? "succeeded":"failed",".\n";
@@ -2871,6 +2908,9 @@ sub doDeleteVlan($@) {
 	    }
 	    if (!defined($vlan) && !$opt{'f'}) {
 		die("VLan object for $vlan_name does not exist\n");
+	    }
+	    if (defined($vlan) && $vlan->GetAliases()) {
+		die("$vlan has aliases; cannot delete before aliases\n");
 	    }
 	    # Allow deletion by name without vlan object, by force only.
 	    $vlans{$vlan_name} = $vlan || $vlan_name;
@@ -2951,8 +2991,8 @@ sub doDeleteVlan($@) {
 	VLan->RecordVLanDeletion($vlan_id) == 0
 	    or $errors++;
 
-	VLan->ClearReservedVlanTag($vlan_id) == 0
-	    or $errors++ if ($opt{C});
+	VLan->ClearReservedVlanTag($vlan_id) == 0 or $errors++
+	    if ($opt{C} || (ref($vlan) && $vlan->IsInternal()));
 
 	next
 	    if (!ref($vlan));

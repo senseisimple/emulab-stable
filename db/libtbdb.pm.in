@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005, 2006, 2010 University of Utah and the Flux Group.
+# Copyright (c) 2005-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,7 +21,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use English;
 use File::Basename;
-require Mysql;
+require DBI;
 use vars qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES @EXPORT_OK);
 
 # Configure variables
@@ -54,6 +54,38 @@ my $tbdbuser;
 my $tbdbhost   = "localhost";
 my $tbdbpasswd = "none";
 
+#############################################################################
+# Trivial wrapper for the DBI statement class to avoid a zillion silly
+# changes to the rest of the code. These were defined in the Mysql
+# wrapper we used to use. Pretty simple stuff, no big deal.
+#
+package libtbdb_wrapper::DBI::st;
+use vars '@ISA';
+@ISA = ('DBI::st');
+
+sub dataseek($$)	{ return $_[0]->func($_[1], 'dataseek'); };
+sub numrows($)		{ return $_[0]->rows(); };
+sub num_rows($)		{ return $_[0]->rows(); };
+sub affectedrows($)	{ return $_[0]->rows(); };
+sub insertid($)		{ return $_[0]->{'mysql_insertid'}; };
+sub fetchrow($)
+{
+    my ($self) = @_;
+    my @row    = $self->fetchrow_array();
+    return (@row ? (wantarray ? @row : $row[0]) : ());
+}
+sub fetchhash($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_hashref();
+    return ($ref ? %$ref : ());
+}
+
+#############################################################################
+# Back to the main package.
+#
+package libtbdb;
+
 #
 # Database handle passed by reference as 5th argument ($_[4])
 #
@@ -81,7 +113,9 @@ sub TBDBConnect($;$$$$)
 	if (defined($dbhost));
 
     while ($maxtries) {
-	$DB = Mysql->connect($tbdbhost, $tbdbname, $tbdbuser, $tbdbpasswd);
+	$DB = DBI->connect("DBI:mysql:database=$tbdbname;host=$tbdbhost",
+			   $tbdbuser, $tbdbpasswd,
+			   {'PrintError' => 0});
 	if (defined($DB)) {
 	    last;
 	}
@@ -93,8 +127,6 @@ sub TBDBConnect($;$$$$)
 	# Ensure consistent error value. 
 	return -1;
     }
-    $DB->{'dbh'}->{'PrintError'} = 0;
-    $Mysql::QUIET = 1;
     if (@_ == 5)  {
 	$_[4]->{'tbdbname'} = $tbdbname;
 	$_[4]->{'tbdbuser'} = $tbdbuser;
@@ -114,20 +146,6 @@ sub TBDBDisconnect(;$)
     }    
 }
     
-sub TBdbfork(;$)
-{
-    select(undef, undef, undef, 0.3);
-    if (defined($_[0])) {
-	undef($_[0]->{'DB'});
-        TBDBReConnect($_[0]->{'tbdbname'}, $_[0]->{'tbdbuser'}, 
-		      $_[0]->{'tbdbpasswd'}, $_[0]->{'tbdbhost'}, 
-		      $_[0]->{'DB'});
-    } else {
-	undef($DB);
-	TBDBReConnect($tbdbname, $tbdbuser, $tbdbpasswd);
-    }
-}
-
 #
 # Record last DB error string.
 #
@@ -164,15 +182,30 @@ sub DBQuery($;$)
     }
 
     while ($maxtries) {
-	$result = $dbhandle->query($query);
-	if (! defined($result)) {
+	my $sth = $dbhandle->prepare($query);
+	if (!$sth) {
+	    my $err = $dbhandle->err;
+
+	    $DBErrorString =
+		"  Query: $query\n".
+		"  Error: " . $dbhandle->errstr() . " ($err)";
+	    last;
+	}
+	my $query_result = $sth->execute();
+	if (defined($query_result)) {
+	    $sth->{'CompatMode'} = 1;
+	    # See above; we add a couple of extra routines.
+	    bless($sth, "libtbdb_wrapper::DBI::st");
+	    $result = $sth;
+	}
+	else {
 	    my $err = $dbhandle->err;
 
 	    $DBErrorString =
 		"  Query: $query\n".
 		"  Error: " . $dbhandle->errstr . " ($err)";
 	}
-	if (defined($result) ||
+	if (defined($query_result) ||
 	    ($dbhandle->err != 2006) && ($dbhandle->err != 1053) && 
             ($dbhandle->err != 2013) &&
 	    ($dbhandle->err != 1046)) {
@@ -311,7 +344,6 @@ sub DBBinaryQuery {
 	   "  Error: " . $dbh->errstr() . " ( " . $dbh->err() . ")";
        return undef;
    }
-   $sth->{'PrintError'} = !$Mysql::QUIET;
    
    my $query_result = $sth->execute(@data);
    if (!$query_result) {
@@ -321,6 +353,8 @@ sub DBBinaryQuery {
        return undef;
    }
    $sth->{'CompatMode'} = 1;
+   # See above; we add a couple of extra routines.
+   bless($sth, "libtbdb_wrapper::DBI::st");
    $sth;
 }
 

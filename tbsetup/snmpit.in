@@ -1771,7 +1771,7 @@ sub CreateOneVlan($$$@)
 	}
     }
     else {
-	my $vlan_number = $stack->createVlan($vlanid,\@ports);
+	my $vlan_number = $stack->createVlan($vlanid, $vlanid, \@ports);
 	if (!$vlan_number) {
 	    tberror({type => 'secondary', severity => SEV_SECONDARY,
 		     error => ['create_vlan_failed', $vlanid]},
@@ -2245,7 +2245,7 @@ sub doReserveVlanTags($$@) {
 	# If we can assign a tag, remember we did so that we can
 	# undo whatever we did, if there is an error. 
 	#
-	my $tag = $stack->newVlanNumber($vlanid);
+	my $tag = $stack->newVlanNumber($vlanid, $vlanid);
 	if ($tag) {
 	    push(@assigned, [$vlan,$tag]);
 	}
@@ -2485,7 +2485,8 @@ sub doMakeVlan($$@) {
     new_number:
 	print "Creating VLAN $vlan_name ...\n"
 	    if (!$quiet);
-	my $vlan_number = $stack->createVlan($vlan_id,\@ports,@pvlanArgs);
+	my $vlan_number = $stack->createVlan($vlan_id,$vlan_id,
+					     \@ports,@pvlanArgs);
 	if (!$quiet) {
 	    print "VLAN creation ";
 	    print $vlan_number? "succeeded":"failed",".\n";

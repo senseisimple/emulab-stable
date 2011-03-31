@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # GENIPUBLIC-COPYRIGHT
-# Copyright (c) 2008-2010 University of Utah and the Flux Group.
+# Copyright (c) 2008-2011 University of Utah and the Flux Group.
 # All rights reserved.
 #
 package GeniUser;
@@ -18,7 +18,7 @@ use GeniRegistry;
 use GeniAuthority;
 use GeniCertificate;
 use GeniHRN;
-use emutil qw(TBGetUniqueIndex);
+use emutil;
 use English;
 use overload ('""' => 'Stringify');
 use vars qw();
@@ -70,15 +70,18 @@ sub Lookup($$;$)
 
     if( GeniHRN::IsValid( $token ) ) {
 	$token = GeniHRN::Normalise( $token );
+	my $safe_token = DBQuoteSpecial($token);
 	my ($authority, $type, $id) = GeniHRN::Parse( $token );
 
 	return undef if $type ne "user";
 
 	if( GeniHRN::Authoritative( $token, "@OURDOMAIN@" ) ) {
+	    my $safe_hrn = DBQuoteSpecial("${PGENIDOMAIN}.$id");
+	    
 	    # A local name, so look only for local users...
 	    $query_result =
 		DBQueryWarn("select idx from geni_users ".
-			    "where hrn='${PGENIDOMAIN}.$id' " .
+			    "where hrn=$safe_hrn " .
 			    "and status='active'");
 
 	    return undef
@@ -101,7 +104,7 @@ sub Lookup($$;$)
 	    $query_result = DBQueryWarn(
 		"SELECT geni_users.idx FROM geni_users, geni_certificates " .
 		"WHERE geni_users.uuid = geni_certificates.uuid AND " .
-		"geni_certificates.urn = '$token';" );
+		"geni_certificates.urn = $safe_token;" );
 	    return undef unless $query_result and $query_result->numrows;
 	}
 	($idx) = $query_result->fetchrow_array();	
@@ -268,6 +271,18 @@ sub CheckConflict($$)
 }
 
 #
+# Check to see if a uid is valid (and okay for a password file).
+#
+sub ValidUserID($$)
+{
+    my ($class, $uid) = @_;
+
+    return TBcheck_dbslot($uid, "users", "uid",
+			  TBDB_CHECKDBSLOT_WARN()|
+			  TBDB_CHECKDBSLOT_ERROR());
+}
+
+#
 # Class function to create new Geni user in the DB and return object. 
 #
 sub Create($$$$;$)
@@ -304,12 +319,31 @@ sub Create($$$$;$)
     push(@insert_data, "sa_uuid='$sa_uuid'");
 
     #
-    # uid comes from last component of the hrn.
+    # uid comes from urn, but only if its valid for Emulab.
     #
-    my ($uid) = ($certificate->hrn() =~ /^.*\.(\w*)$/);
-    if (!defined($uid)) {
-	print STDERR "HRN is not dotted: " . $certificate->hrn() . "\n";
+    my (undef,$type,$uid) = GeniHRN::Parse($certificate->urn());
+    if (!defined($uid) || $type ne "user") {
+	print STDERR "URN is not well formed: " . $certificate->urn() . "\n";
 	return undef;
+    }
+    if (! GeniUser->ValidUserID($uid)) {
+	print STDERR
+	    "UID is not valid for Emulab: " . $certificate->urn() . "\n";
+	#
+	# Create something reasonable and consistent.
+	# It gets returned in the manifest.
+	#
+	my $hash = $certificate->sha1();
+	return undef
+	    if (!defined($hash));
+	$hash = substr($hash, 0, 7);
+	if (!$hash || GeniUser->ValidUserID("u${hash}")) {
+	    print STDERR "Cannot form a uid from certificate\n".
+		$certificate->cert() . "\n";
+	    return undef;
+	}
+	$uid = lc("u${hash}");
+	print STDERR "Using $uid instead\n";
     }
 
     #
@@ -441,6 +475,11 @@ sub Delete($)
 
     my $idx  = $self->idx();
     my $uuid = $self->uuid();
+
+    my $emulab_user = User::NonLocal->Lookup($uuid);
+    if (defined($emulab_user)) {
+	$emulab_user->Delete();
+    }
 
     DBQueryWarn("delete from geni_bindings where user_uuid='$uuid'")
 	or return -1;

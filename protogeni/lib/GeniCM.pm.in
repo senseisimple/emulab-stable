@@ -382,15 +382,9 @@ sub GetTicketAux($$$$$$$)
     # Create user from the certificate.
     #
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	if ($isupdate) {
-	    print STDERR "Could not locate $user_urn for UpdateTicket\n";
-	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-					"No user found for UpdateTicket");
-	}
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
-
+    return $user
+	if (GeniResponse::IsResponse($user));
+    
     #
     # Create slice from the certificate.
     #
@@ -1933,9 +1927,9 @@ sub SliverWorkAux($$$$$$$)
     # Create the user.
     #
     my $owner = CreateUserFromCertificate($owner_cert);
-    if (!defined($owner)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $owner
+	if (GeniResponse::IsResponse($owner));
+
     if (defined($keys)) {
 	$response = CheckKeys($keys);
 	return $response
@@ -3423,9 +3417,8 @@ sub GetSliverAux($)
 				     "Insufficient privilege" );
 
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
 
     my $slice = GeniSlice->Lookup($credential->target_urn());
     if (!defined($slice)) {
@@ -3502,9 +3495,8 @@ sub BindToSlice($)
     # Find or create the user.
     #
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
     if (defined($keys)) {
 	my $response = CheckKeys($keys);
 	return $response
@@ -3846,9 +3838,9 @@ sub SliverTicket($)
     }
 
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR);
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
+
     my $aggregate = GeniAggregate->Lookup($credential->target_urn());
     if (!defined($aggregate)) {
 	return GeniResponse->Create(GENIRESPONSE_SEARCHFAILED, undef,
@@ -4036,10 +4028,8 @@ sub ListTickets($)
 	if (GeniResponse::IsResponse($credential));
 
     my $user = CreateUserFromCertificate($credential->owner_cert());
-    if (!defined($user)) {
-	return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
-				    "No such user found");
-    }
+    return $user
+	if (GeniResponse::IsResponse($user));
 
     #
     # A plain credential issued to a user lets that user get a list
@@ -4149,21 +4139,30 @@ sub CreateUserFromCertificate($)
 	$certificate->Store();
 	$user = GeniUser->Lookup($certificate->urn());
 	if (!defined($user)) {
-	    print STDERR "Could not reload user for $certificate\n";
-	    return undef;
+	    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+			    "Problem loading your certificate");
 	}
 	return $user;
     }
 
+    #
+    # Check urn. Must be a "user" urn. The uid is checked in Create().
+    #
+    my (undef,$type,$uid) = GeniHRN::Parse($certificate->urn());
+    if (!defined($uid) || $type ne "user") {
+	return GeniResponse->Create(GENIRESPONSE_BADARGS, undef,
+				    "Malformed user URN");
+    }
     my $authority = CreateAuthorityFromRegistry($certificate);
-    return undef    
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not create authority object")
 	if (!defined($authority));
 
     $user = GeniUser->Create($certificate, $authority);
-    if (!defined($user)) {
-	print STDERR "Could not create user from $certificate\n";
-	return undef;
-    }
+    return GeniResponse->Create(GENIRESPONSE_ERROR, undef,
+				"Could not create user from your certificate")
+	if (!defined($user));
+
     return $user;
 }
 
