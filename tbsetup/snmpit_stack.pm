@@ -586,7 +586,6 @@ sub findDeviceVlans($@) {
     #  'devices' => list of devices the vlan exists on
     # }
     #
-
     $self->debug("snmpit_stack::findVlans( @vlan_ids )\n");
     foreach $device (values %{$self->{DEVICES}})
 	{ $device->findVlans_start(@vlan_ids); }
@@ -596,7 +595,10 @@ sub findDeviceVlans($@) {
 	my %dev_map = @{$results{$devicename}};
 	my ($id,$num,$oldnum);
 	while (($id,$num) = each %dev_map) {
-	    if (defined($mapping{$id})) {
+	    next
+		if (!defined($num));
+	    
+	    if (exists($mapping{$id})) {
 		$oldnum = $mapping{$id}->{'tag'};
 		if (defined($num) && ($num != $oldnum)) {
 		    warn "Incompatible 802.1Q tag assignments for $id\n" .
