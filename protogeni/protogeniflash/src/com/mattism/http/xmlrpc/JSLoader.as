@@ -5,7 +5,7 @@ package com.mattism.http.xmlrpc
   import com.hurlant.crypto.hash.MD5;
   import com.hurlant.crypto.symmetric.CBCMode;
   import com.hurlant.crypto.symmetric.TripleDESKey;
-  
+
   import flash.events.Event;
   import flash.events.EventDispatcher;
   import flash.events.IOErrorEvent;
@@ -15,7 +15,7 @@ package com.mattism.http.xmlrpc
   import flash.net.URLRequestHeader;
   import flash.utils.ByteArray;
   import flash.utils.Dictionary;
-  
+
   import mx.utils.Base64Decoder;
   import mx.utils.Base64Encoder;
 
@@ -29,13 +29,14 @@ package com.mattism.http.xmlrpc
     public static function setClientInfo(password : String,
                                          pem : String) : void
     {
-      var lines : Array = pem.split(/[\n\r]/);
+      var lines : Array = pem.split("\n");
       var key : String = "";
       var cert : String = "";
       var inKey : Boolean = false;
       var inCert : Boolean = false;
       for each (var line : String in lines)
       {
+//        LogHandler.appendMessage(new LogMessage("debug", "clientinfo", line));
         if (line == "-----BEGIN RSA PRIVATE KEY-----" && key == "")
         {
           inKey = true;
@@ -73,7 +74,7 @@ package com.mattism.http.xmlrpc
       }
       else
       {
-		  throw new Error("Invalid Key: " + key);
+                  throw new Error("Invalid Key: " + key);
       }
     }
 
@@ -81,9 +82,10 @@ package com.mattism.http.xmlrpc
     {
       var result : ByteArray = null;
       var patterns : Array = null;
-      var lines : Array = key.split(/[\n\r]/);
+      var lines : Array = key.split("\n");
       for each (var line : String in lines)
       {
+//        LogHandler.appendMessage(new LogMessage("debug", "iv", line));
         patterns = line.match(/^DEK-Info: ([\-a-zA-Z0-9]+),([A-Za-z0-9]+)$/);
         if (patterns != null)
         {
@@ -154,9 +156,10 @@ package com.mattism.http.xmlrpc
     private static function parseKey(key : String) : ByteArray
     {
       var decoder : Base64Decoder = new Base64Decoder();
-      var lines : Array = key.split(/[\n\r]/);
+      var lines : Array = key.split("\n");
       for each (var line : String in lines)
       {
+//        LogHandler.appendMessage(new LogMessage("debug", "key", line));
         if (! line.match("----") && ! line.match(": ") && line != "")
         {
           decoder.decode(line);
@@ -196,8 +199,8 @@ package com.mattism.http.xmlrpc
     public function load(request : URLRequest) : void
     {
       var sendData : String = "";
-	  if(request.data != null)
-	  	sendData = request.data.toXMLString();
+          if(request.data != null)
+                sendData = request.data.toXMLString();
       var splitExp : RegExp = /^(https?:\/\/[^\/]+)(\/.*)$/;
       var result : Array = splitExp.exec(request.url);
       var host : String = result[1];
@@ -210,7 +213,7 @@ package com.mattism.http.xmlrpc
       loadInstance(id, host, path, sendData);
     }
 
-	public function close() : void
+        public function close() : void
     {
       cleanupInstance(id);
       id = NO_ID;
@@ -231,8 +234,8 @@ package com.mattism.http.xmlrpc
                                      message));
     }
 
-	public var data : String;
-	public var bytesLoaded : uint;
+        public var data : String;
+        public var bytesLoaded : uint;
 
     private var id : int;
 

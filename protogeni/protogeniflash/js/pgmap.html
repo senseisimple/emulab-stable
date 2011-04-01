@@ -39,7 +39,7 @@
           attributes.name = "protogeniflash";
           attributes.align = "middle";
           swfobject.embedSWF(
-              "protogeniflash.swf?mode=public&debug=1&usejs=1", "flashContent",
+              "protogeniflash.swf?mode=public&debug=0&usejs=1", "flashContent",
               "100%", "100%",
               swfVersionStr, xiSwfUrlStr,
               flashvars, params, attributes);
@@ -155,10 +155,13 @@
   {
     try {
       serverCerts = [];
-      var list = newCert.split("-----END CERTIFICATE-----");
-      for (var i = 0; i < list.length - 1; ++i)
+      if (newCert != null)
       {
-        serverCerts.push(list[i] + "-----END CERTIFICATE-----\n");
+        var list = newCert.split("-----END CERTIFICATE-----");
+        for (var i = 0; i < list.length - 1; ++i)
+        {
+          serverCerts.push(list[i] + "-----END CERTIFICATE-----\n");
+        }
       }
     } catch(ex) {
        forge.log.error(cat, ex);
@@ -307,13 +310,13 @@
           <noscript>
             <object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000"
                         width="100%" height="100%" id="protogeniflash">
-                <param name="movie" value="protogeniflash.swf?mode=public&debug=1&usejs=1" />
+                <param name="movie" value="protogeniflash.swf?mode=public&debug=0&usejs=1" />
                 <param name="quality" value="high" />
                 <param name="bgcolor" value="#d2e1f0" />
                 <param name="allowScriptAccess" value="always" />
                 <param name="allowFullScreen" value="true" />
                 <!--[if !IE]>-->
-                <object type="application/x-shockwave-flash" data="protogeniflash.swf?mode=public&debug=1&usejs=1" width="100%" height="100%">
+                <object type="application/x-shockwave-flash" data="protogeniflash.swf?mode=public&debug=0&usejs=1" width="100%" height="100%">
                     <param name="quality" value="high" />
                     <param name="bgcolor" value="#d2e1f0" />
                     <param name="allowScriptAccess" value="always" />
