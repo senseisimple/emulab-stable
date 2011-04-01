@@ -4383,11 +4383,16 @@ sub ReserveSharedBandwidth($;$$)
 	$query_result  = $previous_result;
 	$previous_result = $tmp;
     }
+    # Need to do this when we want to seek around inside the results.
+    $previous_result = $previous_result->WrapForSeek();
+    $query_result = $query_result->WrapForSeek();
 
     #
     # This is how much we need to release.
     #
     if ($isupdate && defined($previous_result)) {
+	$previous_result = $previous_result->WrapForSeek();
+	
 	while (my ($node_id,$unit,$iface,$bw) =
 	       $previous_result->fetchrow_array()) {
 

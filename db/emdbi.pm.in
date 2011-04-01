@@ -65,7 +65,21 @@ sub Wrap($$$)
 sub pid($)	{ return $_[0]->{'PID'}; };
 sub dbh($)	{ return $_[0]->{'DBH'}; };
 sub dbname($)	{ return $_[0]->{'DBNAME'}; };
-sub query($$)   { return $_[0]->dbh->query($_[1]); };
+
+#
+# Need to wrap the return value. See below.
+#
+sub query($$)
+{
+    my ($self, $query) = @_;
+    my $result = $self->dbh->query($query);
+    return undef
+	if (!defined($result));
+
+    # See below.
+    bless($result, "emdbi_wrapper::Mysql::Statement");
+    return $result;
+}
 
 sub DESTROY
 {
@@ -79,6 +93,16 @@ sub DESTROY
 }
 
 #############################################################################
+# Trivial wrapper for the Mysql statement so that we can add a method.
+#
+package emdbi_wrapper::Mysql::Statement;
+use vars '@ISA';
+@ISA = ('Mysql::Statement');
+
+# Natively supported, so nothing to worry about.
+sub WrapForSeek($)	{ return $_[0]; }
+
+#############################################################################
 #
 # We are making the transition to DBI so we can stop using the ancient
 # and unmaintained Mysql module.
@@ -86,6 +110,7 @@ sub DESTROY
 package emdbi_wrapper::DBI;
 use vars '@ISA';
 @ISA = ('DBI::db');
+use Data::Dumper;
 
 sub Wrap($$$)
 {
@@ -151,11 +176,141 @@ package emdbi_wrapper::DBI::st;
 use vars '@ISA';
 @ISA = ('DBI::st');
 
-sub dataseek($$)	{ return $_[0]->func($_[1], 'dataseek'); };
 sub numrows($)		{ return $_[0]->rows(); };
 sub num_rows($)		{ return $_[0]->rows(); };
 sub affectedrows($)	{ return $_[0]->rows(); };
 sub insertid($)		{ return $_[0]->{'mysql_insertid'}; };
+sub fetchrow($)
+{
+    my ($self) = @_;
+    my @row    = $self->fetchrow_array();
+    return (@row ? (wantarray ? @row : $row[0]) : ());
+}
+sub fetchhash($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_hashref();
+    return ($ref ? %$ref : ());
+}
+
+# Not supported so generate an error.
+sub dataseek($$)
+{
+    DBWarn("Attempt to 'seek' not supported. Better fix it!");
+}
+
+# This is how we do it. See below.
+sub WrapForSeek($)	{ return emdbi_wrapper::DBI::WrapForSeek->Wrap($_[0]); }
+
+#############################################################################
+# Another wrapper. DBI does not implement "seek" or "rewind". The only way
+# to do this is suck all the data out and save it. We do not want to do this
+# for every query though, so anyplace we want to seek around, wrap things
+# up with this, and then use it like a normal query result. 
+#
+package emdbi_wrapper::DBI::WrapForSeek;
+
+use Data::Dumper;
+
+sub Wrap($$)
+{
+    my ($class, $sth) = @_;
+    my @data  = ();
+    my @names = ();
+
+    #
+    # This tells us the original select column ordering.
+    #
+    my $names = $sth->{'NAME'};
+    my $numFields = $sth->{'NUM_OF_FIELDS'};
+    for (my $i = 0;  $i < $numFields;  $i++) {
+	push(@names, $$names[$i]);
+    }
+
+    #
+    # Grab all the rows. 90 percent of queries request rows as
+    # arrays, so lets do that. We can construct a hash using the
+    # column names we grabbed above.
+    #
+    while (my $rowref = $sth->fetchrow_arrayref()) {
+	#
+	# This looks weird and pointless, but there is some funky
+	# memory stuff going in underneath; if we do not make a copy
+	# explicitly, each successive row overwrites the previous row.
+	# Not very perl like.
+	#
+	my @row = @$rowref;
+	
+	push(@data, \@row);
+    }
+
+    my $self = {};
+    $self->{'STH'}       = $sth;
+    $self->{'ROWS'}      = $sth->rows();
+    $self->{'COLNAMES'}  = \@names;
+    $self->{'COLCOUNT'}  = scalar(@names);
+    $self->{'DATA'}      = \@data;
+    $self->{'IDX'}       = 0;
+
+    bless($self, $class);
+    return $self;
+}
+sub sth($)		{ return $_[0]->{'STH'}; };
+sub rows($)		{ return $_[0]->{'ROWS'}; };
+sub idx($)		{ return $_[0]->{'IDX'}; };
+sub incridx($)		{ return $_[0]->{'IDX'}++; };
+sub data($)		{ return $_[0]->{'DATA'}; };
+sub colnames($)		{ return $_[0]->{'COLNAMES'}; };
+sub colcount($)		{ return $_[0]->{'COLCOUNT'}; };
+sub numrows($)		{ return $_[0]->{'ROWS'}; };
+sub num_rows($)		{ return $_[0]->{'ROWS'}; };
+sub affectedrows($)	{ return $_[0]->{'ROWS'}; };
+sub insertid($)		{ return $_[0]->sth()->{'mysql_insertid'}; };
+sub dataseek($$)	{ $_[0]->{'IDX'} = $_[1]; };
+
+sub fetchrow_arrayref($)
+{
+    my ($self) = @_;
+    my $data   = $self->data();
+    my $idx    = $self->idx();
+
+    return undef
+	if ($idx >= $self->rows());
+
+    $self->incridx();
+    return $data->[$idx];
+}
+
+sub fetchrow_array($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_arrayref();
+
+    return ()
+	if (!defined($ref));
+
+    return @{ $ref };
+}
+
+sub fetchrow_hashref($)
+{
+    my ($self) = @_;
+    my $ref    = $self->fetchrow_arrayref();
+
+    return undef
+	if (!defined($ref));
+
+    #
+    # Construct a hash using the column names
+    #
+    my %hash  = ();
+    my $count = $self->colcount();
+    for (my $i = 0; $i < $count; $i++) {
+	$hash{$self->colnames()->[$i]} = $ref->[$i];
+    }
+    return \%hash;
+}
+
 sub fetchrow($)
 {
     my ($self) = @_;
