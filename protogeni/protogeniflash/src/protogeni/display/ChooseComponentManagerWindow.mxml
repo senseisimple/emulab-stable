@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="vertical"
+	title="Component Managers"
+	width="270" height="360"
+	defaultButton="{okButton}"
+	resize="cmVbox.height = this.height - 108"
+	creationComplete="okButton.setFocus()"
+	horizontalScrollPolicy="off" verticalScrollPolicy="off"
+	xmlns:display="protogeni.display.*">
+	
+	<mx:Style>
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+		}
+		
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+	</mx:Style>
+	
+	<mx:Script>
+		<![CDATA[
+			import flash.net.navigateToURL;
+			
+			import mx.collections.ArrayCollection;
+			import mx.containers.HBox;
+			import mx.controls.Alert;
+			import mx.controls.CheckBox;
+			import mx.controls.TextArea;
+			import mx.events.CloseEvent;
+			import mx.managers.PopUpManager;
+			
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
+			import protogeni.Util;
+			import protogeni.resources.ComponentManager;
+
+			public function success():void {
+				okButton.enabled = false;
+				Main.protogeniHandler.mapHandler.drawMap();
+			}
+			
+			public function openFirst():void {
+				show();
+       			init();
+			}
+			
+			public function init():void
+			{
+				okButton.enabled = Main.protogeniHandler.ComponentManagers.length > 0;
+				refreshList();
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, Reset);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGERS_CHANGED, refreshList);	
+			}
+			
+			public function refreshList(junk:* = null):void {
+				var existingCms:ArrayCollection = new ArrayCollection();
+				
+				// Remove non-valid CMs
+				for(var i:int = 0; i < cmVbox.getChildren().length; i++)
+				{
+					var found:Boolean = false;
+					var checkboxCm:CheckBox = (cmVbox.getChildAt(i) as HBox).getChildAt(0) as CheckBox;
+					for each(var testCm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+					{
+						if(checkboxCm.label == testCm.Hrn)
+						{
+							found = true;
+							if(testCm.Rspec == null && checkboxCm.selected)
+							{
+								okButton.enabled = true;
+								testCm.Show = true;
+							}
+							if(!existingCms.contains(testCm))
+								existingCms.addItem(testCm);
+							break;
+						}
+					}
+					if(!found)
+					{
+						cmVbox.removeChildAt(i);
+						i--;
+					}
+				}
+				
+				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers )
+				{
+					if(!existingCms.contains(cm))
+						addCm(cm);
+				}
+			}
+			
+			public function updateWidth():void
+			{
+				this.validateNow();
+				var max:int = this.width;
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					if((cmHbox.minWidth+50) > max)
+						max = (cmHbox.minWidth+50);
+				}
+				this.width = max;
+				this.validateNow();
+			}
+			
+			public function Reset(e:ProtogeniEvent):void
+			{
+				var cm:ComponentManager = e.changedObject as ComponentManager;
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					if(cm.Hrn == cmCheckbox.label)
+					{
+						updateCmHbox(cmHbox, cm);
+						break;
+					}
+				}
+			}
+			
+			public function ResetAll(junk:* = null):void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers )
+					{
+						if(cm.Hrn == cmCheckbox.label)
+						{
+							updateCmHbox(cmHbox, cm);
+							break;
+						}
+					}
+				}
+			}
+			
+			public function BlankAll():void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
+					cmCheckbox.styleName = "unknownStyle";
+					cmInfo.source = DisplayUtil.flagOrangeIcon;
+				}
+			}
+			
+			public function updateCmHbox(cmHbox:HBox, cm:ComponentManager):void
+			{
+				var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+				var cmInfo:ImageButton = cmHbox.getChildAt(1) as ImageButton;
+				var cmGoto:ImageButton;
+				if(cmHbox.numChildren == 3)
+					cmGoto = cmHbox.getChildAt(2) as ImageButton;
+				
+				if(cm.Status == ComponentManager.FAILED) {
+					cmCheckbox.styleName = "failedStyle";
+					cmInfo.source = DisplayUtil.flagRedIcon;
+					cmHbox.toolTip = cm.errorDescription;
+					if(cmGoto == null && cm.mightNeedSecurityException())
+					{
+						cmGoto = new ImageButton();
+						cmGoto.source = DisplayUtil.exclamationIcon;
+						cmGoto.toolTip = "Click to open CM URL, it appears that you might need to add a security exception";
+						cmGoto.addEventListener(MouseEvent.CLICK,
+							function openCm():void {
+								navigateToURL(new URLRequest(cm.VisitUrl()), "_blank");
+							});
+						cmHbox.addChild(cmGoto);
+					}
+				}
+				else if(cm.Status == ComponentManager.UNKOWN) {
+					cmCheckbox.styleName = "unknownStyle";
+					cmInfo.source = DisplayUtil.flagOrangeIcon;
+					cmHbox.toolTip = "Unknown status";
+				}
+				else if(cm.Status == ComponentManager.INPROGRESS) {
+					cmCheckbox.styleName = "inprogressStyle";
+					cmInfo.source = DisplayUtil.flagOrangeIcon;
+					cmHbox.toolTip = "In progress...";
+				}
+				else if(cm.Status == ComponentManager.VALID)
+				{
+					cmCheckbox.styleName = "validStyle";
+					cmInfo.source = DisplayUtil.flagGreenIcon;
+					cmHbox.toolTip = "Valid";
+				}
+				updateWidth();
+			}
+			
+			public function selectAll():void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					var cmCheckbox:CheckBox = cmHbox.getChildAt(0) as CheckBox;
+					cmCheckbox.selected = true;
+					//cmCheckbox.dispatchEvent(new MouseEvent(MouseEvent.CLICK, false, false));
+				}
+				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+					cm.Show = true;
+				okButton.enabled = cmVbox.getChildren().length > 0;
+			}
+			
+			public function addCm(cm:ComponentManager):void
+			{
+				var cmHbox:HBox = new HBox();
+				cmHbox.percentWidth = 100;
+				var cmCheckbox:CheckBox = new CheckBox();
+				cmCheckbox.selected = cm.Show;
+				cmCheckbox.label = cm.Hrn;
+				cmHbox.addChild(cmCheckbox);
+				
+				var cmInfo:ImageButton = new ImageButton();
+				cmHbox.addChild(cmInfo);
+				
+				updateCmHbox(cmHbox, cm);
+				cmCheckbox.addEventListener(MouseEvent.CLICK,
+					function allowApply():void {
+						okButton.enabled = true;
+						cm.Show = cmCheckbox.selected;
+						if(!cmCheckbox.selected)
+							selectAllCheckBox.selected = false;
+					});
+				
+				cmInfo.addEventListener(MouseEvent.CLICK,
+					function openCm():void {
+						DisplayUtil.viewComponentManager(cm);
+					});
+				cmVbox.addChild(cmHbox);
+				updateWidth();
+			}
+			
+			public function selectAllChange():void
+			{
+				for each(var cmHbox:HBox in cmVbox.getChildren() )
+				{
+					(cmHbox.getChildAt(0) as CheckBox).selected = selectAllCheckBox.selected;
+				}
+			}
+		]]>
+	</mx:Script>
+			
+	<mx:HBox width="100%" horizontalAlign="right">
+	<mx:CheckBox id="selectAllCheckBox" click="selectAllChange()" selected="true"/>
+	<display:ImageButton id="refreshButton" source="{DisplayUtil.refreshIcon}" click="Main.protogeniHandler.rpcHandler.loadComponentManagers();"/>
+	<mx:Spacer width="100%"/>
+	<mx:Label id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+	<mx:SWFLoader id="waitingIcon" source="@Embed('../../../images/waiting.swf')" visible="false"/> 
+	</mx:HBox>
+	<mx:VBox width="100%" height="200" id="cmVbox" borderStyle="solid" verticalGap="2" paddingLeft="2" paddingBottom="2" paddingRight="2" paddingTop="2" horizontalScrollPolicy="off">
+	</mx:VBox>
+	<mx:ControlBar>
+		<mx:Spacer width="100%"/>
+		<mx:Button id="cancelButton" label="Cancel" icon="{DisplayUtil.crossIcon}" click="close();"/>
+		<mx:Button id="okButton" label="Apply" icon="{DisplayUtil.availableIcon}" click="success();" enabled="false"/>
+	</mx:ControlBar>
+</display:DefaultWindow>

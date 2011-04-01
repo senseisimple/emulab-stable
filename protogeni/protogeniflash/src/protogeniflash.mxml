@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:maps="com.google.maps.*"
+	xmlns:protogeniflash="protogeniflash.*"
+	layout="vertical" paddingRight="0" paddingLeft="0" paddingTop="0" paddingBottom="0" horizontalAlign="left"
+	backgroundColor="#D2E1F0"
+    preinitialize="preinit();"
+	creationComplete="init();" xmlns:display="protogeni.display.*">
+	
+	<mx:Script>
+    <![CDATA[
+		import com.google.maps.LatLng;
+		import com.google.maps.MapOptions;
+		import com.google.maps.MapType;
+		
+		import mx.collections.ArrayCollection;
+		import mx.controls.Alert;
+		import mx.controls.Image;
+		import mx.controls.Label;
+		import mx.core.mx_internal;
+		import mx.events.CloseEvent;
+		import mx.events.CollectionEvent;
+		import mx.events.ListEvent;
+		import mx.events.ResizeEvent;
+		import mx.managers.PopUpManager;
+		
+		import protogeni.ProtogeniEvent;
+		import protogeni.ProtogeniHandler;
+		import protogeni.Util;
+		import protogeni.display.ChooseComponentManagerWindow;
+		import protogeni.display.ConsoleWindow;
+		import protogeni.display.DisplayUtil;
+		import protogeni.display.SearchWindow;
+		import protogeni.display.SlicesWindow;
+		import protogeni.display.UserWindow;
+		import protogeni.resources.Slice;
+	    
+	    //------------------------------------------
+	    // Embedded resources
+	    [Embed(source="../images/arrow_out.png")] 
+        private var arrowOut:Class;
+        
+        [Embed(source="../images/arrow_in.png")] 
+        private var arrowIn:Class;
+        
+        public var console:ConsoleWindow;
+		public var cms:ChooseComponentManagerWindow;
+        public var about:AboutWindow = new AboutWindow();
+		public var slices:SlicesWindow;
+		public var user:UserWindow;
+		public var search:SearchWindow;
+		
+		[Bindable]
+		public var slicesMenu : ArrayCollection;
+	    
+	    private function preinit():void {
+	    	Security.allowDomain("*");
+	    	Security.allowInsecureDomain("*");
+	    }
+	    
+	    // Start out by asking the user for the CM URL
+	    private function init():void {
+			Main.protogeniHandler = new ProtogeniHandler();
+			Main.protogeniHandler.mapHandler.map = map;
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
+			
+			console = new ConsoleWindow();
+			PopUpManager.addPopUp(console, this, false);
+			PopUpManager.centerPopUp(console);
+			PopUpManager.removePopUp(console);
+			Main.log = console;
+			
+			cms = new ChooseComponentManagerWindow();
+			cms.openFirst();
+			
+			search = new SearchWindow();
+			search.show();
+			search.close();
+			
+			slices = new SlicesWindow();
+			slices.openFirst();
+			slices.close();
+			
+			user = new UserWindow();
+			user.show();
+			user.load(Main.protogeniHandler.CurrentUser);
+			user.close();
+			
+			Security.allowDomain("localhost");	
+	    }
+		
+		private function reinit():void
+		{
+			Main.protogeniHandler = new ProtogeniHandler();
+			Main.protogeniHandler.mapHandler.map = map;
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICES_CHANGED, fillCombobox);
+			Main.protogeniHandler.addEventListener(ProtogeniEvent.USER_CHANGED, userChanged);
+			
+			cms.init();
+			user.load(Main.protogeniHandler.CurrentUser);
+			slices.init();
+		}
+        
+        public function showAbout():void {
+	    	PopUpManager.addPopUp(about, this, false);
+       		PopUpManager.centerPopUp(about);
+	    }
+            
+	    //------------------------------------------
+	    // GUI
+	    private function toggleFullScreen():void {
+	      try {
+	        switch (systemManager.stage.displayState) {
+	          case StageDisplayState.FULL_SCREEN:
+	            systemManager.stage.displayState = StageDisplayState.NORMAL;
+	            fullscreenButton.source = new arrowOut();
+	            break;
+	          default:
+	            systemManager.stage.displayState = StageDisplayState.FULL_SCREEN;
+	            fullscreenButton.source = new arrowIn();
+	            break;
+	        }
+	      } catch (err:SecurityError) {
+	      	Alert.show("Fullscreen isn't supported on the current system.  Either you are running an older version of Fash or allowFullScreen is not set in the HTML object/embed tags.");
+	      }
+	    }
+		
+		public function userChanged(pe:ProtogeniEvent):void {
+			if(Main.protogeniHandler.CurrentUser == null
+				|| Main.protogeniHandler.CurrentUser.credential == null
+				|| Main.protogeniHandler.CurrentUser.credential.length == 0)
+			{
+				this.userButton.source = DisplayUtil.noUserIcon;
+			} else {
+				this.userButton.source = DisplayUtil.userIcon;
+			}
+		}
+	    
+	    // ComboBox
+	    public function fillCombobox(junk:* = null):void {
+	    	slicesMenu = Main.protogeniHandler.CurrentUser.slices.displaySlices();
+	    }
+	    
+	    public function getSliceLabel(s:Slice):String {
+	    	return s.DisplayString();
+	    }
+	    
+	    public function sliceSelected(evt:ListEvent):void {
+			Main.protogeniHandler.mapHandler.selectedSlice = evt.currentTarget.selectedItem;
+	    	onlyMyResourcesCheckbox.selected = Main.protogeniHandler.mapHandler.selectedSlice.hrn != null &&
+				Main.protogeniHandler.mapHandler.selectedSlice.hrn.length > 0;
+			Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected;
+	    	Main.protogeniHandler.mapHandler.drawMap();
+	    }
+		
+		public function startover():void
+		{
+			Main.protogeniHandler.rpcHandler.pause();
+			Main.protogeniHandler.rpcHandler.clearAll();
+			reinit();
+			Main.protogeniHandler.rpcHandler.startInitiationSequence();
+		}
+    ]]>
+</mx:Script>
+
+	<mx:ApplicationControlBar dock="true">
+		<display:ImageButton id="infoButton"
+							 source="@Embed('../images/protogeni-logo.png')"
+							 click="showAbout()"
+							 toolTip="View more information about ProtoGENI" />
+		<mx:VRule height="14"/>
+		<display:ImageButton id="refreshButton"
+			source="{DisplayUtil.refreshIcon}"
+			click="startover()" includeInLayout="false" visible="false"
+			toolTip="Reload all data" />
+		<display:ImageButton id="cmButton"
+			source="@Embed('../images/building.png')"
+			click="cms.show()"
+			toolTip="Manage component managers"/>
+		<display:ImageButton id="consoleButton"
+			source="@Embed('../images/application_xp_terminal.png')"
+			click="Main.log.open()" 
+			toolTip="View the console"/>
+		<mx:VRule height="14" includeInLayout="true" visible="true" />
+		<display:ImageButton id="sliceButton" includeInLayout="true" visible="true"
+						   source="{DisplayUtil.graphIcon}"
+						   click="slices.show()"
+						   toolTip="Work with slices"/>
+		<mx:VRule height="14"/>
+		<mx:ComboBox id="slicesCombobox" dataProvider="{slicesMenu}" labelFunction="getSliceLabel" change="sliceSelected(event)"></mx:ComboBox>
+		<mx:CheckBox label="Show Mine Only" id="onlyMyResourcesCheckbox" click="Main.protogeniHandler.mapHandler.userResourcesOnly = onlyMyResourcesCheckbox.selected; Main.protogeniHandler.mapHandler.drawMap()"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label text="Initialized" id="progressLabel"  fontStyle="normal" fontWeight="bold"/>
+		<mx:SWFLoader id="waitingIcon" source="@Embed('../images/waiting.swf')" visible="false"/> 
+		<mx:Label text="" id="waitingCountLabel"  fontStyle="normal" fontWeight="bold"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label  text="{Main.protogeniHandler.CurrentUser.uid}"/>
+		<display:ImageButton id="userButton"
+							 source="{DisplayUtil.noUserIcon}"
+							 click="user.show()"
+							 toolTip="View user information" />
+		<display:ImageButton id="searchButton"
+							 source="{DisplayUtil.searchIcon}"
+							 click="search.show()"
+							 toolTip="Search" />
+		<display:ImageButton id="resetZoomButton"
+			source="@Embed('../images/zoom.png')"
+			click="map.resetZoom();"
+			toolTip="Reset zoom" />
+		<display:ImageButton id="fullscreenButton"
+			source="@Embed('../images/arrow_out.png')"
+			click="toggleFullScreen()"
+			toolTip="Toggle fullscreen" />
+		<display:ImageButton id="helpButton"
+							 source="{DisplayUtil.helpIcon}"
+							 click="Util.showManual()"
+							 toolTip="View more information" />
+	</mx:ApplicationControlBar>
+
+	<display:ProtogeniMap id="map" />
+	
+</mx:Application>

@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="utf-8"?>
+<display:DefaultWindow
+	xmlns:mx="http://www.adobe.com/2006/mxml"
+	xmlns:protogeniflash="protogeniflash.*" initialize="init()" close="sliceStatusRefresher.stop()"
+	title="Slice" xmlns:display="protogeni.display.*" xmlns:resources="protogeni.resources.*" xmlns:s="library://ns.adobe.com/flex/spark">
+	
+	<mx:Style>
+		.failedStyle {
+			color: red;
+			textRollOverColor: red;
+			textSelectedColor: red;
+			themeColor: red;
+			borderColor:red;
+		}
+		
+		.validStyle {
+			color: green;
+			textRollOverColor: green;
+			textSelectedColor: green;
+			themeColor: green;
+			borderColor:green;
+		}
+		
+		.unknownStyle {
+			color: grey;
+			textRollOverColor: grey;
+			textSelectedColor: grey;
+			themeColor: grey;
+			borderColor:#B6B6B6;
+		}
+		
+		.inprogressStyle {
+			color: #FF7F00;
+			textRollOverColor: #FF7F00;
+			textSelectedColor: #FF7F00;
+			themeColor: #FF7F00;
+		}
+	</mx:Style>
+	
+	<mx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.collections.Sort;
+			import mx.collections.SortField;
+			import mx.containers.TabNavigator;
+			import mx.controls.Alert;
+			import mx.controls.TextArea;
+			import mx.controls.scrollClasses.ScrollThumb;
+			import mx.core.DragSource;
+			import mx.core.UIComponent;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			
+			import protogeni.ProtogeniEvent;
+			import protogeni.ProtogeniHandler;
+			import protogeni.resources.ComponentManager;
+			import protogeni.resources.PhysicalNode;
+			import protogeni.resources.Slice;
+			import protogeni.resources.Sliver;
+			import protogeni.resources.VirtualNode;
+			
+			[Bindable]
+			private var cms:Array;
+			private var cmsSrc:Array;
+			
+			[Bindable]
+			public var nodes:ArrayCollection;
+			
+			[Bindable]
+			public var nodesPredefined:ArrayCollection;
+			
+			private var cm:ComponentManager;
+			
+			public var sliceStatusRefresher:Timer = new Timer(10000);
+			
+			public function init():void
+			{
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.COMPONENTMANAGER_CHANGED, cmChanged);
+				Main.protogeniHandler.addEventListener(ProtogeniEvent.SLICE_CHANGED, sliceChanged);
+			}
+			
+			public function sliceChanged(e:ProtogeniEvent):void
+			{
+				if(e.changedObject == sliceCanvas.slice)
+				{
+					refreshSlice();
+				}
+			}
+			
+			public function cmChanged(e:ProtogeniEvent):void
+			{
+				if(e.changedObject == cm)
+					loadNodes();
+			}
+			
+			public function loadNodes():void {
+				if(cms == null)
+					return;
+				cm = cmsSrc[selectCm.selectedIndex];
+				if(this.hideUnavailableCheckBox.selected)
+				{
+					nodes = cm.getAvailableNodes();
+					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
+					{
+						if(!sn.node.isVirtual &&
+							sn.node.manager == cm &&
+							nodes.getItemIndex(sn.node.physicalNode) > -1)
+							nodes.removeItemAt(nodes.getItemIndex(sn.node.physicalNode));
+					}
+				}
+				else
+					nodes = cm.AllNodes;
+				
+				var nameSort:Sort = new Sort();
+				var dataSortField:SortField = new SortField();
+				dataSortField.name = "name";
+				nameSort.fields = [dataSortField];
+				
+				nodes.sort = nameSort;
+				nodes.refresh();
+				
+				//
+				nodesPredefined = new ArrayCollection();
+				
+				var exclusive:VirtualNode = new VirtualNode(null);
+				exclusive.id = "Exclusive";
+				exclusive.isShared = false;
+				exclusive.isVirtual = true;
+				exclusive.manager = cm;
+				
+				var shared:VirtualNode = new VirtualNode(null);
+				shared.id = "Shared";
+				shared.isShared = true;
+				shared.isVirtual = true;
+				shared.manager = cm;
+				
+				nodesPredefined.addItem(exclusive);
+				nodesPredefined.addItem(shared);
+			}
+			
+			public function refreshInterface():void
+			{
+				var isCreated:Boolean;
+				
+				if(sliceCanvas.slice.slivers.length == 0)
+					isCreated = false;
+
+				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				{
+					if(s.rspec != null)
+					{
+						isCreated = true;
+						break;
+					}
+				}
+				
+				if(isCreated)
+				{
+					this.rspecButton.source = DisplayUtil.pageWhiteCodeIcon;
+					this.rspecButton.toolTip = "View RSPEC(s) from the created sliver(s)";
+				} else {
+					this.rspecButton.source = DisplayUtil.pageWhiteIcon;
+					this.rspecButton.toolTip = "Sliver(s) not created yet";
+				}
+				
+				switch(this.sliceCanvas.slice.Status())
+				{
+					case Sliver.STATUS_READY:
+						this.hrnLabel.styleName = "validStyle";
+						break;
+					case Sliver.STATUS_FAILED:
+						this.hrnLabel.styleName = "failedStyle";
+					case Sliver.STATUS_CHANGING:
+					case Sliver.STATUS_NOTREADY:
+					case Sliver.STATUS_UNKOWN:
+					case Sliver.STATUS_MIXED:
+						this.hrnLabel.styleName = "inprogressStyle";
+						break;
+					default:
+						this.hrnLabel.styleName = "unknownStyle";
+				}
+				
+				this.sliceCanvas.refreshStatus();
+			}
+			
+			public function refreshSlice():void
+			{
+				sliceCanvas.refreshSlice();
+				refreshInterface();
+			}
+			
+			public function loadSlice(s:Slice):void
+			{
+				sliceCanvas.load(s);
+				
+				cms = new Array();
+				cmsSrc = new Array();
+				for each(var cm:ComponentManager in Main.protogeniHandler.ComponentManagers)
+				{
+					if(cm.Status == ComponentManager.VALID)
+					{
+						cmsSrc.push(cm);
+						cms.push(cm.Hrn);
+					}
+				}
+					
+				selectCm.selectedIndex = 0;
+				loadNodes();
+				
+				refreshInterface();
+				
+				sliceStatusRefresher.addEventListener(TimerEvent.TIMER, autorefresh);
+				sliceStatusRefresher.start();
+			}
+			
+			private function autorefresh(e:TimerEvent):void
+			{
+				if(this.autoRefreshCheckbox.selected
+					&& this.sliceCanvas.slice != null
+					&& this.sliceCanvas.slice.hasAllAllocatedResources()
+					&& Main.protogeniHandler.rpcHandler.queue.isEmpty()
+					&& this.sliceCanvas.slice.Status() != Slice.READY
+					&& this.sliceCanvas.slice.Status() != Slice.FAILED)
+					Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);
+			}
+			
+			private function assignAvailableIconPhysical(item:Object):Class {
+				var node:PhysicalNode = item as PhysicalNode;
+				if(!this.hideUnavailableCheckBox.selected)
+				{
+					for each(var sn:SliceNode in this.sliceCanvas.allNodes)
+					{
+						if(!sn.node.isVirtual && sn.node.physicalNode == node)
+							return DisplayUtil.cancelIcon;
+					}
+				}
+				return DisplayUtil.assignAvailabilityIcon(item as PhysicalNode);
+			}
+			
+			private function assignAvailableIcon(item:Object):Class {
+				return DisplayUtil.availableIcon;
+			}
+			
+			public function viewRspecs():void
+			{
+				if(sliceCanvas.slice.slivers.length == 0)
+				{
+					Alert.show("There is no valid RSPEC for the slice yet", "No RSPEC");
+					return;
+				}
+				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				{
+					if(s.rspec == null)
+					{
+						Alert.show("There is no valid RSPEC for the slice yet", "No RSPEC");
+						return;
+					}
+				}
+				var viewRspec:DefaultWindow = new DefaultWindow();
+				viewRspec.title = "Last Valid Request RSPEC(s) for: " + sliceCanvas.slice.hrn;
+				var tabs:TabNavigator = new TabNavigator();
+				tabs.percentHeight = 100;
+				tabs.percentWidth = 100;
+				viewRspec.addChild(tabs);
+				for each(s in sliceCanvas.slice.slivers)
+				{
+					var tab:VBox = new VBox();
+					tab.percentHeight = 100;
+					tab.percentWidth = 100;
+					tab.label = s.componentManager.Hrn;
+					var reviewRspecText:TextArea = new TextArea();
+					reviewRspecText.percentHeight = 100;
+					reviewRspecText.percentWidth = 100;
+					if(s.rspec != null)
+						reviewRspecText.text = s.rspec.toString();
+					else
+						reviewRspecText.text = "No valid RSPEC yet";
+					tab.addChild(reviewRspecText);
+					tabs.addChild(tab);
+				}
+				viewRspec.show();
+			}
+			
+			public function previewRspecs():void
+			{
+				var previewRspec:DefaultWindow = new DefaultWindow();
+				previewRspec.title = "Preview Request RSPEC(s) for: " + sliceCanvas.slice.hrn;
+				var tabs:TabNavigator = new TabNavigator();
+				tabs.percentHeight = 100;
+				tabs.percentWidth = 100;
+				previewRspec.addChild(tabs);
+				for each(var s:Sliver in sliceCanvas.slice.slivers)
+				{
+					var tab:VBox = new VBox();
+					tab.percentHeight = 100;
+					tab.percentWidth = 100;
+					tab.label = s.componentManager.Hrn;
+					var previewRspecText:TextArea = new TextArea();
+					previewRspecText.percentHeight = 100;
+					previewRspecText.percentWidth = 100;
+					previewRspecText.text = s.getRequestRspec().toString();
+					tab.addChild(previewRspecText);
+					tabs.addChild(tab);
+				}
+				previewRspec.show();
+			}
+		]]>
+	</mx:Script>
+	<mx:HBox width="100%">
+		<mx:Label id="hrnLabel" text="{sliceCanvas.slice.hrn}" fontSize="17" fontWeight="bold" selectable="true"/>
+		<mx:Spacer width="100%"/>
+		<mx:Label id="urnLabel" text="{sliceCanvas.slice.urn}" selectable="true"/>
+		<display:ImageButton id="rspecButton"
+							 source="{DisplayUtil.pageWhiteIcon}"
+							 click="viewRspecs()"
+							 toolTip="View the most recent valid RSPEC" />
+		<display:ImageButton id="previewRspecButton"
+							 source="{DisplayUtil.pageCodeIcon}"
+							 click="previewRspecs()"
+							 toolTip="Preview the Request RSPEC" />
+	</mx:HBox>
+	<mx:HDividedBox width="100%" height="100%">
+		<mx:VBox height="100%" verticalGap="2">
+			<mx:ComboBox id="selectCm" width="100%" dataProvider="{cms}" change="loadNodes()"></mx:ComboBox>
+			<mx:CheckBox label="Hide unavailable" selected="true" id="hideUnavailableCheckBox" click="loadNodes()"/>
+			<mx:List width="100%" height="100%" id="listNodes"
+					 dataProvider="{nodes}"
+					 labelField="name" dragEnabled="true"
+					 iconFunction="assignAvailableIconPhysical">
+			</mx:List>
+			<mx:List width="100%" height="46" id="listNodesPredefined"
+					 dataProvider="{nodesPredefined}"
+					 labelField="id" dragEnabled="true"
+					 iconFunction="assignAvailableIcon">
+			</mx:List>
+		</mx:VBox>
+			<display:SliceCanvas id="sliceCanvas" hostWindow="{this}">
+			</display:SliceCanvas>
+	</mx:HDividedBox>
+	<mx:ControlBar>
+		<mx:Button id="createButton" toolTip="Create slivers" label="Create" icon="{DisplayUtil.actionIcon}" click="Main.protogeniHandler.rpcHandler.submitSlice(sliceCanvas.slice);"/>
+		<display:ImageButton id="refreshButton" toolTip="Refresh slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.refreshSlice(sliceCanvas.slice);" source="{DisplayUtil.refreshIcon}"/>
+		<mx:CheckBox id="autoRefreshCheckbox" label="Autorefresh" toolTip="Autorefresh the status of the slice/slivers?" selected="true" />
+		<display:ImageButton id="deleteButton" toolTip="Delete slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.deleteSlice(sliceCanvas.slice);" source="{DisplayUtil.deleteIcon}"/>
+		<mx:VRule height="16"/>
+		<display:ImageButton id="startButton" toolTip="Start slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.startSlice(sliceCanvas.slice);" source="{DisplayUtil.playIcon}"/>
+		<display:ImageButton id="stopButton" toolTip="Stop slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.stopSlice(sliceCanvas.slice);" source="{DisplayUtil.stopIcon}"/>
+		<display:ImageButton id="restartButton" toolTip="Restart slivers" width="16" height="16" click="Main.protogeniHandler.rpcHandler.restartSlice(sliceCanvas.slice);" source="{DisplayUtil.repeatIcon}"/>
+	</mx:ControlBar>
+	
+</display:DefaultWindow>
